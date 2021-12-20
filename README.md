@@ -1,29 +1,23 @@
-# README #
+# RE-WILD
 
-This README would normally document whatever steps are necessary to get your application up and running.
+Rewild is a game about time travel and natural history. Built with WASM and WebGPU
 
-### What is this repository for? ###
+### How do I get set up?
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+Clone the project and install the dependencies
 
-### How do I get set up? ###
+```
+npm intall
+```
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+Build the project
 
-### Contribution guidelines ###
+```
+npm run build
+```
 
-* Writing tests
-* Code review
-* Other guidelines
+Run the prroject
 
-### Who do I talk to? ###
-
-* Repo owner or admin
-* Other community or team contact
+```
+npm run start
+```
