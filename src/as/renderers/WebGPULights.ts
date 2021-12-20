@@ -1,9 +1,9 @@
-import { Camera } from "../../cameras/Camera";
-import { AmbientLight } from "../../lights/AmbientLight";
-import { DirectionalLight } from "../../lights/DirectionalLight";
-import { Light } from "../../lights/Light";
-import { Color } from "../../math/Color";
-import { Vector3 } from "../../math/Vector3";
+import { Camera } from "../cameras/Camera";
+import { AmbientLight } from "../lights/AmbientLight";
+import { DirectionalLight } from "../lights/DirectionalLight";
+import { Light } from "../lights/Light";
+import { Color } from "../math/Color";
+import { Vector3 } from "../math/Vector3";
 
 const color: Color = new Color();
 const vector1: Vector3 = new Vector3();

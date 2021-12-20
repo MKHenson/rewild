@@ -2,7 +2,7 @@ import { RenderLoop } from "../core/RenderLoop";
 import { Runtime } from "../objects/routing/core/Runtime";
 import { print } from "../Imports";
 import { Vector4 } from "../math/Vector4";
-import { WebGPURenderer } from "../renderers/webGPU/WebGPURenderer";
+import { WebGPURenderer } from "../renderers/WebGPURenderer";
 
 let runtime: Runtime | null = null;
 const renderer = new WebGPURenderer();

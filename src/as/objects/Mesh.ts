@@ -6,7 +6,6 @@ import { Matrix4 } from "../math/Matrix4";
 import { Object } from "../core/Object";
 import { Triangle } from "../math/Triangle";
 import { Side } from "../../common/GLEnums";
-import { MeshBasicMaterial } from "../materials/MeshBasicMaterial";
 import { AttributeTypes, BufferGeometry } from "../core/BufferGeometry";
 import { MeshPipeline } from "../pipelines/MeshPipeline";
 import { Raycaster } from "../core/Raycaster";

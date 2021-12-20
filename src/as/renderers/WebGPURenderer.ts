@@ -1,16 +1,16 @@
-import { Camera } from "../../cameras/Camera";
-import { Object } from "../../core/Object";
+import { Camera } from "../cameras/Camera";
+import { Object } from "../core/Object";
 import { WebGPURenderQueue } from "./WebGPURenderQueue";
-import { print } from "../../Imports";
-import { Matrix4 } from "../../math/Matrix4";
-import { Vector4 } from "../../math/Vector4";
-import { Mesh } from "../../objects/Mesh";
-import { Scene } from "../../scenes/Scene";
+import { print } from "../Imports";
+import { Matrix4 } from "../math/Matrix4";
+import { Vector4 } from "../math/Vector4";
+import { Mesh } from "../objects/Mesh";
+import { Scene } from "../scenes/Scene";
 import { WebGPUGeometries } from "./WebGPUGeometries";
-import { AttributeTypes } from "../../core/BufferGeometry";
-import { PipelineResourceType } from "../../../common/PipelineResourceType";
+import { AttributeTypes } from "../core/BufferGeometry";
+import { PipelineResourceType } from "../../common/PipelineResourceType";
 import { WebGPULights } from "./WebGPULights";
-import { Light } from "../../lights/Light";
+import { Light } from "../lights/Light";
 
 const renderQueue = new WebGPURenderQueue();
 

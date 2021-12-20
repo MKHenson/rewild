@@ -49,7 +49,7 @@ export class Sprite extends Object {
 
       const interleavedBuffer = new InterleavedBuffer(float32Array, 5);
 
-      _geometry.setIndexes([0, 1, 2, 0, 2, 3], null);
+      _geometry.setIndexes([0, 1, 2, 0, 2, 3]);
       _geometry.setAttribute(AttributeTypes.POSITION, new InterleavedBufferAttribute(interleavedBuffer, 3, 0, false));
       _geometry.setAttribute(AttributeTypes.UV, new InterleavedBufferAttribute(interleavedBuffer, 2, 3, false));
     }

@@ -1,6 +1,6 @@
-import { render } from "../../Imports";
-import { GPUCommands } from "../../../common/Commands";
-import { PipelineResourceType } from "../../../common/PipelineResourceType";
+import { render } from "../Imports";
+import { GPUCommands } from "../../common/Commands";
+import { PipelineResourceType } from "../../common/PipelineResourceType";
 import { WebGPULights } from "./WebGPULights";
 
 export class WebGPURenderQueue {

@@ -23,13 +23,7 @@ export class Container extends Node {
     }
   }
 
-  onUpdate(delta: f32, total: u32, fps: u32): void {
-    // const meshes = this.meshes;
-    // for (let i: i32 = 0, l: i32 = meshes.length; i < l; i++) {
-    //   meshes[i].rotation.x += delta * 1;
-    //   meshes[i].rotation.y += delta * 1;
-    // }
-  }
+  onUpdate(delta: f32, total: u32, fps: u32): void {}
 
   mount(): void {
     const meshes = this.meshes;

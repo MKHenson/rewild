@@ -1,10 +1,10 @@
-import { GPUBufferUsageFlags } from "../../../common/GPUEnums";
-import { Float32BufferAttribute } from "../../core/BufferAttribute";
-import { AttributeTypes, BufferGeometry } from "../../core/BufferGeometry";
-import { Event } from "../../core/Event";
-import { Listener } from "../../core/EventDispatcher";
-import { InstancedBufferGeometry } from "../../core/InstancedBufferGeometry";
-import { createBufferFromF32, createIndexBuffer } from "../../Imports";
+import { GPUBufferUsageFlags } from "../../common/GPUEnums";
+import { Float32BufferAttribute } from "../core/BufferAttribute";
+import { AttributeTypes, BufferGeometry } from "../core/BufferGeometry";
+import { Event } from "../core/Event";
+import { Listener } from "../core/EventDispatcher";
+import { InstancedBufferGeometry } from "../core/InstancedBufferGeometry";
+import { createBufferFromF32, createIndexBuffer } from "../Imports";
 
 export class AttributeMap {
   attributeBuffers: Map<symbol, i32>;
