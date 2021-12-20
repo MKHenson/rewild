@@ -1,0 +1,46 @@
+{
+  "name": "re-wild",
+  "version": "0.0.1",
+  "description": "Game about exploring earth's history",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx mocha 'tests/**/*.ts'",
+    "clean": "rimraf ./dist -RF",
+    "asbuild:untouched": "asc src/as/index.ts  --sourceMap --target debug -d ./build/types.d.ts --exportTable --importMemory --exportRuntime --debug",
+    "asbuild:optimized": "asc src/as/index.ts --target release -d ./build/types.d.ts --exportTable --importMemory --exportRuntime",
+    "build:webpack": "webpack --mode development",
+    "build": "npm run clean && npm run asbuild:untouched && npm run build:webpack",
+    "start": "npm run build && npm run server",
+    "server": "live-server --port=9001 --watch=dist,build --open=dist/ ./"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@bitbucket.org/MathewKHenson/rewild-web.git"
+  },
+  "author": "Mathew Henson",
+  "license": "ISC",
+  "homepage": "https://bitbucket.org/MathewKHenson/rewild-web#readme",
+  "dependencies": {
+    "@assemblyscript/loader": "^0.19.1",
+    "@types/node": "^16.11.6",
+    "source-map-support": "^0.5.19"
+  },
+  "devDependencies": {
+    "@types/mocha": "8.2.2",
+    "@webgpu/types": "0.1.6",
+    "assemblyscript": "0.19.16",
+    "copy-webpack-plugin": "^9.0.1",
+    "file-loader": "^6.2.0",
+    "html-webpack-plugin": "5.3.1",
+    "live-server": "^1.2.1",
+    "mocha": "9.0.0",
+    "prettier": "~2.3.1",
+    "raw-loader": "^4.0.2",
+    "rimraf": "3.0.2",
+    "ts-loader": "9.2.3",
+    "ts-node": "10.0.0",
+    "typescript": "4.3.2",
+    "webpack": "5.38.1",
+    "webpack-cli": "4.7.0"
+  }
+}

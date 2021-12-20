@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitReturns": true,
+    "noEmitOnError": true,
+    "noFallthroughCasesInSwitch": true,
+    "strictPropertyInitialization": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": false,
+    "declaration": false,
+    "sourceMap": true,
+    "inlineSources": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "jsx": "react",
+    "forceConsistentCasingInFileNames": true,
+    "preserveConstEnums": true,
+    "pretty": true,
+    "skipLibCheck": false,
+    "lib": ["dom"],
+    "moduleResolution": "node",
+    "target": "es6",
+    "module": "esnext",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "inlineSourceMap": false,
+    "baseUrl": "../../",
+    "types": ["node", "@webgpu/types"],
+    "paths": {
+      // prioritize types at the project level (avoids types in npm linked modules)
+      "*": ["./types/*", "node_modules/@types/*", "*"]
+    }
+  }
+}
