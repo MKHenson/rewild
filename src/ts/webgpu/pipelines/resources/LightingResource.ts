@@ -1,8 +1,9 @@
 import { GameManager } from "../../gameManager";
 import { UNIFORM_TYPES_MAP } from "./memoryUtils";
-import { PipelineResource } from "./PipelineResource";
+import { PipelineResourceTemplate } from "./PipelineResourceTemplate";
+import { PipelineResourceInstance } from "./PipelineResourceInstance";
 
-export class LightingResource extends PipelineResource {
+export class LightingResource extends PipelineResourceTemplate {
   static lightingConfig: GPUBuffer;
   static directionLightsBuffer: GPUBuffer;
   static sceneLightingBuffer: GPUBuffer;
@@ -11,10 +12,10 @@ export class LightingResource extends PipelineResource {
   static rebuildDirectionLights = true;
 
   constructor(group: number, binding: number = 0) {
-    super(group, binding, true);
+    super(group, binding);
   }
 
-  initialize(manager: GameManager, pipeline: GPURenderPipeline): GPUBindGroup {
+  initialize(manager: GameManager, pipeline: GPURenderPipeline): number {
     if (!LightingResource.lightingConfig) {
       const LIGHTING_CONFIG_SIZE = UNIFORM_TYPES_MAP["u32"];
       const SCENE_LIGHTING_BUFFER = UNIFORM_TYPES_MAP["vec4<f32>"];
@@ -53,7 +54,7 @@ export class LightingResource extends PipelineResource {
       LightingResource.sceneLightingBuffer.unmap();
     }
 
-    if (LightingResource.rebuildDirectionLights) {
+    if (LightingResource.rebuildDirectionLights && LightingResource.numDirLights > 0) {
       LightingResource.rebuildDirectionLights = false;
 
       if (LightingResource.directionLightsBuffer) LightingResource.directionLightsBuffer.destroy();
@@ -65,6 +66,10 @@ export class LightingResource extends PipelineResource {
       });
     }
 
+    return 1;
+  }
+
+  createInstance(manager: GameManager, pipeline: GPURenderPipeline): PipelineResourceInstance {
     const bindGroup = manager.device.createBindGroup({
       label: "lighting",
       layout: pipeline.getBindGroupLayout(this.group),
@@ -78,26 +83,21 @@ export class LightingResource extends PipelineResource {
         {
           binding: 1,
           resource: {
-            buffer: LightingResource.directionLightsBuffer,
-          },
-        },
-        {
-          binding: 2,
-          resource: {
             buffer: LightingResource.sceneLightingBuffer,
           },
         },
-      ],
+      ].concat(
+        LightingResource.numDirLights
+          ? {
+              binding: 2,
+              resource: {
+                buffer: LightingResource.directionLightsBuffer,
+              },
+            }
+          : []
+      ),
     });
 
-    return bindGroup;
-  }
-
-  clone(): PipelineResource {
-    return new LightingResource(this.group, this.binding);
-  }
-
-  dispose() {
-    super.dispose();
+    return new PipelineResourceInstance(this.group, bindGroup);
   }
 }

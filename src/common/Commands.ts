@@ -26,7 +26,6 @@ export enum Commands {
 
 export enum GPUCommands {
   SET_PIPELINE,
-  SET_PROJECTION,
   SET_TRANSFORM,
   SETUP_LIGHTING,
   SET_INDEX_BUFFER,

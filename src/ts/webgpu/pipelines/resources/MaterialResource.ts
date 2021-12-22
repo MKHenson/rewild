@@ -1,14 +1,17 @@
 import { GameManager } from "../../gameManager";
-import { PipelineResource } from "./PipelineResource";
+import { PipelineResourceTemplate } from "./PipelineResourceTemplate";
+import { PipelineResourceInstance } from "./PipelineResourceInstance";
 
-export class MaterialResource extends PipelineResource {
-  buffer: GPUBuffer;
-
+export class MaterialResource extends PipelineResourceTemplate {
   constructor(group: number, binding: number = 0) {
-    super(group, binding, true);
+    super(group, binding);
   }
 
-  initialize(manager: GameManager, pipeline: GPURenderPipeline): GPUBindGroup {
+  initialize(manager: GameManager, pipeline: GPURenderPipeline): number {
+    return 1;
+  }
+
+  createInstance(manager: GameManager, pipeline: GPURenderPipeline): PipelineResourceInstance {
     // prettier-ignore
     const initialValues = new Float32Array([
       1, 1, 1, 0,         // Diffuse
@@ -19,7 +22,7 @@ export class MaterialResource extends PipelineResource {
     ]);
     const SIZE = Float32Array.BYTES_PER_ELEMENT * initialValues.length;
 
-    this.buffer = manager.device.createBuffer({
+    const buffer = manager.device.createBuffer({
       label: "materialData",
       size: SIZE,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -27,11 +30,11 @@ export class MaterialResource extends PipelineResource {
     });
 
     // Set defaults
-    new Float32Array(this.buffer.getMappedRange()).set(initialValues);
-    this.buffer.unmap();
+    new Float32Array(buffer.getMappedRange()).set(initialValues);
+    buffer.unmap();
 
     const resource: GPUBindingResource = {
-      buffer: this.buffer,
+      buffer: buffer,
       offset: 0,
       size: SIZE,
     };
@@ -47,15 +50,6 @@ export class MaterialResource extends PipelineResource {
       ],
     });
 
-    return bindGroup;
-  }
-
-  clone(): PipelineResource {
-    return new MaterialResource(this.group, this.binding);
-  }
-
-  dispose() {
-    super.dispose();
-    this.buffer?.destroy();
+    return new PipelineResourceInstance(this.group, bindGroup, buffer);
   }
 }

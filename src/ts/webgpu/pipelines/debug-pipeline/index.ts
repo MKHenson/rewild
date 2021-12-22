@@ -6,6 +6,7 @@ import { Pipeline } from "../Pipeline";
 import { LightingResource } from "../resources/LightingResource";
 import { MaterialResource } from "../resources/MaterialResource";
 import { TextureResource } from "../resources/TextureResource";
+import { TransformResource } from "../resources/TransformResource";
 import { mathConstants, mathFunctions } from "../shader-lib/math-functions";
 import { shader, shaderBuilder } from "../shader-lib/utils";
 
@@ -63,6 +64,7 @@ struct LightingConfigUniform {
   numDirectionalLights: u32;
 };
 
+${e => e.defines.NUM_DIR_LIGHTS ? `
 struct DirectionLightUniform {
   direction : vec4<f32>;
   color : vec4<f32>;
@@ -71,6 +73,8 @@ struct DirectionLightUniform {
 struct DirectionLightsUniform {
   directionalLights: array<DirectionLightUniform>;
 };
+` : ''}
+
 
 // INTERNAL STRUCTS
 struct IncidentLight {
@@ -111,8 +115,12 @@ ${e => e.defines.diffuse && `
 [[group(${e.groupIndex(PipelineResourceType.Diffuse)}), binding(1)]] var myTexture: texture_2d<f32>;
 `}
 [[group(${e => e.groupIndex(PipelineResourceType.Lighting)}), binding(0)]] var<uniform> lightingConfigUniform: LightingConfigUniform;
-[[group(${e => e.groupIndex(PipelineResourceType.Lighting)}), binding(1)]] var<storage, read> directionLightsUniform: DirectionLightsUniform;
-[[group(${e => e.groupIndex(PipelineResourceType.Lighting)}), binding(2)]] var<uniform> sceneLightingUniform: SceneLightingUniform;
+[[group(${e => e.groupIndex(PipelineResourceType.Lighting)}), binding(1)]] var<uniform> sceneLightingUniform: SceneLightingUniform;
+
+${e => e.defines.NUM_DIR_LIGHTS ? `
+[[group(${e.groupIndex(PipelineResourceType.Lighting)}), binding(2)]] var<storage, read> directionLightsUniform: DirectionLightsUniform;
+` : ''}
+
 
 ${mathConstants}
 ${mathFunctions}
@@ -306,6 +314,7 @@ fn main(
   // ========
   var numDirectionalLights = lightingConfigUniform.numDirectionalLights;
 
+  ${e => e.defines.NUM_DIR_LIGHTS ? `
   for (var i : u32 = 0u; i < numDirectionalLights; i = i + 1u) {
     var directionalLight: DirectionalLight;
     directionalLight.direction = directionLightsUniform.directionalLights[i].direction.xyz;
@@ -313,7 +322,7 @@ fn main(
 
     getDirectionalLightInfo( directionalLight, geometry, &directLight );
     RE_Direct_Physical( directLight, geometry, material, &reflectedLight );
-  }
+  }` : ''}
 
   // #if defined( RE_IndirectDiffuse )
   var iblIrradiance = vec3<f32>( 0.0 );
@@ -358,6 +367,7 @@ interface DebugDefines {
   diffuse?: Texture;
   metalnessMap?: Texture;
   roughnessMap?: Texture;
+  NUM_DIR_LIGHTS: number;
 }
 
 export class DebugPipeline extends Pipeline<DebugDefines> {
@@ -365,8 +375,8 @@ export class DebugPipeline extends Pipeline<DebugDefines> {
     super(name, vertexShader, fragmentShader, defines);
   }
 
-  initialize(gameManager: GameManager): void {
-    super.initialize(gameManager);
+  build(gameManager: GameManager): void {
+    super.build(gameManager);
 
     const vertSource = shaderBuilder(this.vertexSource, this);
     const fragSource = shaderBuilder(this.fragmentSource, this);
@@ -425,16 +435,19 @@ export class DebugPipeline extends Pipeline<DebugDefines> {
       },
     });
 
+    const transformResource = new TransformResource(this.groupIndex(PipelineResourceType.Transform), 0);
+    this.resourceTemplates.set(PipelineResourceType.Transform, transformResource);
+
     const materialResource = new MaterialResource(this.groupIndex(PipelineResourceType.Material), 0);
-    this.addResource(PipelineResourceType.Material, materialResource);
+    this.resourceTemplates.set(PipelineResourceType.Material, materialResource);
 
     const lightingResource = new LightingResource(this.groupIndex(PipelineResourceType.Lighting), 0);
-    this.addResource(PipelineResourceType.Lighting, lightingResource);
+    this.resourceTemplates.set(PipelineResourceType.Lighting, lightingResource);
 
     if (this.defines.diffuse) {
       const group = this.groupIndex(PipelineResourceType.Diffuse);
       const resource = new TextureResource(this.defines.diffuse, group, 0);
-      this.addResource(PipelineResourceType.Diffuse, resource);
+      this.resourceTemplates.set(PipelineResourceType.Diffuse, resource);
     }
   }
 }

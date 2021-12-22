@@ -2,10 +2,8 @@ import { PipelineResourceType } from "../../common/PipelineResourceType";
 import { GPUCommands } from "../../common/Commands";
 import { GameManager } from "./gameManager";
 import { Pipeline } from "./pipelines/Pipeline";
-import { PipelineResource } from "./pipelines/resources/PipelineResource";
-import { TransformResource } from "./pipelines/resources/TransformResource";
-import { ProjectionResource } from "./pipelines/resources/ProjectionResource";
 import { LightingResource } from "./pipelines/resources/LightingResource";
+import { PipelineResourceInstance } from "./pipelines/resources/PipelineResourceInstance";
 
 const ARRAYBUFFERVIEW_DATASTART_OFFSET = 4;
 
@@ -25,7 +23,7 @@ export class RenderQueueManager {
     };
     getPtrIndex;
 
-    let pipeline: Pipeline<any>, buffer: GPUBuffer, resources: PipelineResource[], resourceIndex: number;
+    let pipeline: Pipeline<any>, buffer: GPUBuffer, instances: PipelineResourceInstance[], resourceIndex: number;
 
     let pass = manager.currentPass!;
 
@@ -33,15 +31,6 @@ export class RenderQueueManager {
       const command = commandBuffer[i];
 
       switch (command) {
-        case GPUCommands.SET_PROJECTION:
-          buffer = ProjectionResource.buffer;
-          if (buffer) {
-            const persMatrixPtr = getPtrIndex(commandBuffer[i + 1]);
-            device.queue.writeBuffer(buffer, 0, wasmMemoryBlock, persMatrixPtr, 64);
-          }
-          i += 1;
-          break;
-
         case GPUCommands.SETUP_LIGHTING:
           const numDirectionLights = commandBuffer[i + 1];
 
@@ -49,7 +38,9 @@ export class RenderQueueManager {
             LightingResource.numDirLights = numDirectionLights;
             LightingResource.rebuildDirectionLights = true;
             this.manager.pipelines.forEach((p) => {
-              if (p.resources.has(PipelineResourceType.Lighting)) p.rebuild = true;
+              if (p.resourceTemplates.has(PipelineResourceType.Lighting)) {
+                p.defines = { ...p.defines, NUM_DIR_LIGHTS: numDirectionLights };
+              }
             });
           }
 
@@ -75,7 +66,7 @@ export class RenderQueueManager {
           break;
 
         case GPUCommands.SET_TRANSFORM:
-          resources = pipeline!.resources.get(PipelineResourceType.Transform)!;
+          instances = pipeline!.resourceInstances.get(PipelineResourceType.Transform)!;
           resourceIndex = commandBuffer[i + 1];
           const projMatrixPtr = getPtrIndex(commandBuffer[i + 2]);
           const mvMatrixPtr = getPtrIndex(commandBuffer[i + 3]);
@@ -97,7 +88,7 @@ export class RenderQueueManager {
           normalAs4x4[9] = mat3x3[7];
           normalAs4x4[10] = mat3x3[8];
 
-          const transformBuffer = (resources[resourceIndex] as TransformResource).buffer;
+          const transformBuffer = instances[resourceIndex].buffer!;
           device.queue.writeBuffer(transformBuffer, 0, wasmMemoryBlock, projMatrixPtr, 64);
           device.queue.writeBuffer(transformBuffer, 64, wasmMemoryBlock, mvMatrixPtr, 64);
           device.queue.writeBuffer(transformBuffer, 128, normalAs4x4);
@@ -127,8 +118,8 @@ export class RenderQueueManager {
           pipeline = manager.pipelines[commandBuffer[i + 1]];
 
           if (pipeline.rebuild) {
-            pipeline.initialize(manager);
             pipeline.build(manager);
+            pipeline.initialize(manager);
           }
 
           pass.setPipeline(pipeline.renderPipeline!);
@@ -136,9 +127,9 @@ export class RenderQueueManager {
           break;
 
         case GPUCommands.SET_BIND_GROUP:
-          resources = pipeline!.resources.get(commandBuffer[i + 1])!;
-          const resource = resources?.[commandBuffer[i + 2]];
-          if (resource) pass.setBindGroup(resource.group, resource.bindGroup);
+          instances = pipeline!.resourceInstances.get(commandBuffer[i + 1])!;
+          const instance = instances?.[commandBuffer[i + 2]];
+          if (instance) pass.setBindGroup(instance.group, instance.bindGroup);
 
           i += 2;
           break;

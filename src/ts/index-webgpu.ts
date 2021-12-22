@@ -44,9 +44,9 @@ async function init() {
 
   try {
     await gameManager.init(obj.exports);
-  } catch (err) {
+  } catch (err: unknown) {
     message.style.display = "initial";
-    message.innerHTML = `Your browser does not yet support WebGPU`;
+    message.innerHTML = (err as Error).message;
   }
 
   (document.querySelector("#apply") as HTMLButtonElement).addEventListener("click", () => {

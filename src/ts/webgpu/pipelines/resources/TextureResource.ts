@@ -1,16 +1,21 @@
 import { GameManager } from "../../gameManager";
 import { Texture } from "../../GPUTexture";
-import { PipelineResource } from "./PipelineResource";
+import { PipelineResourceTemplate } from "./PipelineResourceTemplate";
+import { PipelineResourceInstance } from "./PipelineResourceInstance";
 
-export class TextureResource extends PipelineResource {
+export class TextureResource extends PipelineResourceTemplate {
   texture: Texture;
 
-  constructor(texture: Texture, group: number, binding: number, transient = false) {
-    super(group, binding, transient);
+  constructor(texture: Texture, group: number, binding: number) {
+    super(group, binding);
     this.texture = texture;
   }
 
-  initialize(manager: GameManager, pipeline: GPURenderPipeline): GPUBindGroup {
+  initialize(manager: GameManager, pipeline: GPURenderPipeline): number {
+    return 1;
+  }
+
+  createInstance(manager: GameManager, pipeline: GPURenderPipeline): PipelineResourceInstance {
     const bindGroup = manager.device.createBindGroup({
       label: "diffuse",
       layout: pipeline.getBindGroupLayout(this.group),
@@ -26,10 +31,6 @@ export class TextureResource extends PipelineResource {
       ],
     });
 
-    return bindGroup;
-  }
-
-  clone(): PipelineResource {
-    return new TextureResource(this.texture, this.group, this.binding);
+    return new PipelineResourceInstance(this.group, bindGroup);
   }
 }
