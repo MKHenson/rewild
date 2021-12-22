@@ -1,22 +1,30 @@
 import { Pipeline } from "../Pipeline";
 
-export type Defines<T> = { [K in keyof T]: T[K] };
-export type ShaderFunction<T extends any> =
+export type Defines<T> = {
+  [K in keyof T]: T[K];
+} & {
+  NUM_DIR_LIGHTS: number;
+};
+
+export type ShaderFunction<T extends Defines<T>> =
   | ((pipeline: Pipeline<T>) => number | string | boolean | undefined | null)
   | string;
-export interface SourceFragments<T> {
+export interface SourceFragments<T extends Defines<T>> {
   strings: TemplateStringsArray;
   expressions: (ShaderFunction<T> | string)[];
 }
 
-export function shader<T extends any>(strings: TemplateStringsArray, ...expr: ShaderFunction<T>[]): SourceFragments<T> {
+export function shader<T extends Defines<T>>(
+  strings: TemplateStringsArray,
+  ...expr: ShaderFunction<T>[]
+): SourceFragments<T> {
   return {
     strings,
     expressions: expr,
   };
 }
 
-export function shaderBuilder<T>(sourceFragments: SourceFragments<T>, pipeline: Pipeline<T>) {
+export function shaderBuilder<T extends Defines<T>>(sourceFragments: SourceFragments<T>, pipeline: Pipeline<T>) {
   let str = "";
   sourceFragments.strings.forEach((string, i) => {
     if (typeof sourceFragments.expressions[i] === "string" || typeof sourceFragments.expressions[i] === "number")

@@ -1,5 +1,6 @@
 import { GameManager } from "../gameManager";
-import { PipelineResource } from "./resources/PipelineResource";
+import { PipelineResourceTemplate } from "./resources/PipelineResourceTemplate";
+import { PipelineResourceInstance } from "./resources/PipelineResourceInstance";
 import { PipelineResourceType } from "../../../common/PipelineResourceType";
 import "./shader-lib/utils";
 import { Defines, SourceFragments } from "./shader-lib/utils";
@@ -10,7 +11,8 @@ export abstract class Pipeline<T extends Defines<T>> {
   fragmentSource: SourceFragments<T>;
   vertexSource: SourceFragments<T>;
   private _defines: Defines<T>;
-  resources: Map<PipelineResourceType, PipelineResource[]>;
+  resourceTemplates: Map<PipelineResourceType, PipelineResourceTemplate>;
+  resourceInstances: Map<PipelineResourceType, PipelineResourceInstance[]>;
   rebuild: boolean;
 
   groupMapping: Map<PipelineResourceType, number>;
@@ -21,7 +23,8 @@ export abstract class Pipeline<T extends Defines<T>> {
     this.renderPipeline = null;
     this.vertexSource = vertexSource;
     this.fragmentSource = fragmentSource;
-    this.resources = new Map();
+    this.resourceTemplates = new Map();
+    this.resourceInstances = new Map();
     this.defines = defines;
     this.rebuild = true;
 
@@ -48,35 +51,53 @@ export abstract class Pipeline<T extends Defines<T>> {
     }
   }
 
-  initialize(gameManager: GameManager): void {
+  build(gameManager: GameManager): void {
     this.rebuild = false;
 
-    const allResources = this.resources;
-    const keys = Array.from(this.resources.keys());
+    const resourceInstanceMap = this.resourceInstances;
+    const keys = Array.from(this.resourceTemplates.keys());
 
+    // Destroy previous instances
     keys.forEach((key) => {
-      const resources = allResources.get(key)!;
-      let clones: PipelineResource[] | null = null;
-
-      resources.forEach((r) => {
-        r.dispose();
-
-        if (!clones && r.transient) clones = [];
-        if (r.transient) clones!.push(r.clone());
-
-        return r.transient;
+      const resourceInstances = resourceInstanceMap.get(key)!;
+      resourceInstances.forEach((i) => {
+        i.dispose();
       });
-
-      if (clones) allResources.set(key, clones);
-      else allResources.delete(key);
     });
+
+    // Reset
+    this.resourceTemplates = new Map();
+    this.groupMapping = new Map();
+    this.groups = 0;
   }
 
-  build(gameManager: GameManager): void {
-    this.resources.forEach((resources) => {
-      resources.forEach((resource) => {
-        resource.bindGroup = resource.initialize(gameManager, this.renderPipeline!);
-      });
+  initialize(gameManager: GameManager): void {
+    const prevKeys = Array.from(this.resourceInstances.keys());
+    const curKeys = Array.from(this.resourceTemplates.keys());
+
+    // Remove any unused instances
+    prevKeys.forEach((key) => {
+      if (!curKeys.includes(key)) this.resourceInstances.delete(key);
+    });
+
+    this.resourceTemplates.forEach((resourceTemplate, key) => {
+      let numInstancesToCreate = resourceTemplate.initialize(gameManager, this.renderPipeline!);
+      let instances: PipelineResourceInstance[];
+
+      // If we previously had instances, then save the number of them
+      // as we have to re-create the same amount as before. Otherwise just create 1;
+      if (this.resourceInstances.has(key)) {
+        instances = this.resourceInstances.get(key)!;
+        numInstancesToCreate = instances.length;
+        instances.splice(0, instances.length);
+      } else {
+        instances = [];
+        this.resourceInstances.set(key, instances);
+      }
+
+      for (let i = 0; i < numInstancesToCreate; i++) {
+        instances.push(resourceTemplate.createInstance(gameManager, this.renderPipeline!));
+      }
     });
   }
 
@@ -127,15 +148,14 @@ export abstract class Pipeline<T extends Defines<T>> {
   //   return index;
   // }
 
-  addResource(type: PipelineResourceType, resource: PipelineResource) {
-    let index = 0;
+  addResourceInstance(manager: GameManager, type: PipelineResourceType) {
+    if (this.resourceTemplates.has(type)) {
+      const resourceTemplate = this.resourceTemplates.get(type)!;
+      const newInstance = resourceTemplate.createInstance(manager, this.renderPipeline!);
 
-    if (this.resources.has(type)) {
-      const resourceArr = this.resources.get(type)!;
-      resourceArr.push(resource);
-      index = resourceArr.length - 1;
-    } else this.resources.set(type, [resource]);
-
-    return index;
+      const instanceArray = this.resourceInstances.get(type)!;
+      instanceArray.push(newInstance);
+      return instanceArray.length - 1;
+    } else throw new Error("Pipeline does not use resource type");
   }
 }

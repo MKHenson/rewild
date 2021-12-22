@@ -8,7 +8,6 @@ import { RenderQueueManager } from "./RenderQueueManager";
 import { WasmInterface } from "../index-webgpu";
 import { Texture } from "./GPUTexture";
 import { PipelineResourceType } from "../../common/PipelineResourceType";
-import { TransformResource } from "./pipelines/resources/TransformResource";
 import { MeshPipeline } from "build/types";
 
 // let vertexBuffer: GPUBuffer, indexBuffer: GPUBuffer;
@@ -96,7 +95,10 @@ export class GameManager {
     );
 
     // PIPELINES
-    this.pipelines = [new DebugPipeline("textured", { diffuse: this.textures[1] }), new DebugPipeline("simple", {})];
+    this.pipelines = [
+      new DebugPipeline("textured", { diffuse: this.textures[1], NUM_DIR_LIGHTS: 0 }),
+      new DebugPipeline("simple", { NUM_DIR_LIGHTS: 0 }),
+    ];
 
     const sampleCount = 4;
     this.renderTarget = device.createTexture({
@@ -142,6 +144,11 @@ export class GameManager {
     const wasm = this.wasm;
     const runime = wasm.Runtime.wrap(wasm.AsSceneManager.getRuntime());
 
+    this.pipelines.forEach((p) => {
+      p.build(this);
+      p.initialize(this);
+    });
+
     const containerPtr = wasm.__pin(wasm.createLevel1());
     const container = wasm.Level1.wrap(containerPtr);
     container.addAsset(this.createMesh(1, "sphere", false));
@@ -167,11 +174,8 @@ export class GameManager {
 
     meshPipelineInstances.push(meshPipelineIns);
 
-    const group = debugPipeline.groupIndex(PipelineResourceType.Transform);
-    const resource = new TransformResource(group, 0);
-
     // Assign a transform buffer to the intance
-    meshPipelineIns.transformResourceIndex = debugPipeline.addResource(PipelineResourceType.Transform, resource);
+    meshPipelineIns.transformResourceIndex = debugPipeline.addResourceInstance(this, PipelineResourceType.Transform);
 
     if (useTexture) {
       meshPipelineIns.diffuseResourceIndex = 0;
