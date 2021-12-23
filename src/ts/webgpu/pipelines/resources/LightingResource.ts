@@ -2,6 +2,9 @@ import { GameManager } from "../../gameManager";
 import { UNIFORM_TYPES_MAP } from "./memoryUtils";
 import { PipelineResourceTemplate } from "./PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
+import { PipelineResourceType } from "../../../../common/PipelineResourceType";
+import { Defines } from "../shader-lib/utils";
+import { Pipeline } from "../Pipeline";
 
 export class LightingResource extends PipelineResourceTemplate {
   static lightingConfig: GPUBuffer;
@@ -15,7 +18,7 @@ export class LightingResource extends PipelineResourceTemplate {
     super(group, binding);
   }
 
-  initialize(manager: GameManager, pipeline: GPURenderPipeline): number {
+  initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
     if (!LightingResource.lightingConfig) {
       const LIGHTING_CONFIG_SIZE = UNIFORM_TYPES_MAP["u32"];
       const SCENE_LIGHTING_BUFFER = UNIFORM_TYPES_MAP["vec4<f32>"];
@@ -67,6 +70,34 @@ export class LightingResource extends PipelineResourceTemplate {
     }
 
     return 1;
+  }
+
+  getResourceHeader<T extends Defines<T>>(pipeline: Pipeline<T>) {
+    // prettier-ignore
+    return `struct SceneLightingUniform {
+      ambientLightColor: vec4<f32>;
+    };
+
+    struct LightingConfigUniform {
+      numDirectionalLights: u32;
+    };
+
+    ${pipeline.defines.NUM_DIR_LIGHTS ? `
+    struct DirectionLightUniform {
+      direction : vec4<f32>;
+      color : vec4<f32>;
+    };
+
+    struct DirectionLightsUniform {
+      directionalLights: array<DirectionLightUniform>;
+    };
+
+    [[group(${pipeline.groupIndex(PipelineResourceType.Lighting)}), binding(2)]] var<storage, read> directionLightsUniform: DirectionLightsUniform;
+    ` : ''}
+
+    [[group(${pipeline.groupIndex(PipelineResourceType.Lighting)}), binding(0)]] var<uniform> lightingConfigUniform: LightingConfigUniform;
+    [[group(${pipeline.groupIndex(PipelineResourceType.Lighting)}), binding(1)]] var<uniform> sceneLightingUniform: SceneLightingUniform;
+    `;
   }
 
   createInstance(manager: GameManager, pipeline: GPURenderPipeline): PipelineResourceInstance {

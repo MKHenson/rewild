@@ -1,8 +1,10 @@
+import { Texture } from "../../GPUTexture";
 import { Pipeline } from "../Pipeline";
 
 export type Defines<T> = {
   [K in keyof T]: T[K];
 } & {
+  diffuse?: Texture;
   NUM_DIR_LIGHTS: number;
 };
 

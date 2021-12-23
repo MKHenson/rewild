@@ -2,14 +2,29 @@ import { GameManager } from "../../gameManager";
 import { UNIFORM_TYPES_MAP } from "./memoryUtils";
 import { PipelineResourceTemplate } from "./PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
+import { Pipeline } from "../Pipeline";
+import { Defines } from "../shader-lib/utils";
+import { PipelineResourceType } from "../../../../common/PipelineResourceType";
 
 export class TransformResource extends PipelineResourceTemplate {
   constructor(group: number, binding: number = 0) {
     super(group, binding);
   }
 
-  initialize(manager: GameManager, pipeline: GPURenderPipeline): number {
+  initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
     return 0;
+  }
+
+  getResourceHeader<T extends Defines<T>>(pipeline: Pipeline<T>) {
+    // prettier-ignore
+    return `
+    struct TransformUniform {
+      projMatrix: mat4x4<f32>;
+      modelViewMatrix: mat4x4<f32>;
+      normalMatrix: mat3x3<f32>;
+    };
+    [[group(${pipeline.groupIndex(PipelineResourceType.Transform)}), binding(0)]] var<uniform> uniforms: TransformUniform;
+    `;
   }
 
   createInstance(manager: GameManager, pipeline: GPURenderPipeline): PipelineResourceInstance {

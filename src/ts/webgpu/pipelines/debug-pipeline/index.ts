@@ -12,12 +12,7 @@ import { shader, shaderBuilder } from "../shader-lib/utils";
 
 // prettier-ignore
 const vertexShader = shader<DebugDefines>`
-struct Uniforms {
-  projMatrix: mat4x4<f32>;
-  modelViewMatrix: mat4x4<f32>;
-  normalMatrix: mat3x3<f32>;
-};
-[[group(${e => e.groupIndex(PipelineResourceType.Transform)}), binding(0)]] var<uniform> uniforms: Uniforms;
+${e => e.resourceTemplates.get(PipelineResourceType.Transform)!.getResourceHeader(e)}
 
 struct Output {
     [[builtin(position)]] Position : vec4<f32>;
@@ -47,34 +42,9 @@ fn main([[location(0)]] pos: vec4<f32>, [[location(1)]] norm: vec3<f32>, [[locat
 // prettier-ignore
 const fragmentShader = shader<DebugDefines>`
 
-
-struct MaterialData {
-  diffuse: vec4<f32>;
-  emissive: vec4<f32>;
-  opacity: f32;
-  metalness: f32;
-  roughness: f32;
-};
-
-struct SceneLightingUniform {
-  ambientLightColor: vec4<f32>;
-};
-
-struct LightingConfigUniform {
-  numDirectionalLights: u32;
-};
-
-${e => e.defines.NUM_DIR_LIGHTS ? `
-struct DirectionLightUniform {
-  direction : vec4<f32>;
-  color : vec4<f32>;
-};
-
-struct DirectionLightsUniform {
-  directionalLights: array<DirectionLightUniform>;
-};
-` : ''}
-
+${e => e.resourceTemplates.get(PipelineResourceType.Lighting)!.getResourceHeader(e)}
+${e => e.resourceTemplates.get(PipelineResourceType.Material)!.getResourceHeader(e)}
+${e => e.defines.diffuse ? e.resourceTemplates.get(PipelineResourceType.Diffuse)!.getResourceHeader(e) : ''}
 
 // INTERNAL STRUCTS
 struct IncidentLight {
@@ -107,20 +77,6 @@ struct DirectionalLight {
   direction: vec3<f32>;
   color: vec3<f32>;
 };
-
-
-[[group(${e => e.groupIndex(PipelineResourceType.Material)}), binding(0)]] var<uniform> materialData: MaterialData;
-${e => e.defines.diffuse && `
-[[group(${e.groupIndex(PipelineResourceType.Diffuse)}), binding(0)]] var mySampler: sampler;
-[[group(${e.groupIndex(PipelineResourceType.Diffuse)}), binding(1)]] var myTexture: texture_2d<f32>;
-`}
-[[group(${e => e.groupIndex(PipelineResourceType.Lighting)}), binding(0)]] var<uniform> lightingConfigUniform: LightingConfigUniform;
-[[group(${e => e.groupIndex(PipelineResourceType.Lighting)}), binding(1)]] var<uniform> sceneLightingUniform: SceneLightingUniform;
-
-${e => e.defines.NUM_DIR_LIGHTS ? `
-[[group(${e.groupIndex(PipelineResourceType.Lighting)}), binding(2)]] var<storage, read> directionLightsUniform: DirectionLightsUniform;
-` : ''}
-
 
 ${mathConstants}
 ${mathFunctions}
@@ -378,6 +334,23 @@ export class DebugPipeline extends Pipeline<DebugDefines> {
   build(gameManager: GameManager): void {
     super.build(gameManager);
 
+    // Add the resources we're interested in
+    const transformResource = new TransformResource(this.groupIndex(PipelineResourceType.Transform), 0);
+    this.resourceTemplates.set(PipelineResourceType.Transform, transformResource);
+
+    const materialResource = new MaterialResource(this.groupIndex(PipelineResourceType.Material), 0);
+    this.resourceTemplates.set(PipelineResourceType.Material, materialResource);
+
+    const lightingResource = new LightingResource(this.groupIndex(PipelineResourceType.Lighting), 0);
+    this.resourceTemplates.set(PipelineResourceType.Lighting, lightingResource);
+
+    if (this.defines.diffuse) {
+      const group = this.groupIndex(PipelineResourceType.Diffuse);
+      const resource = new TextureResource(this.defines.diffuse, group, 0);
+      this.resourceTemplates.set(PipelineResourceType.Diffuse, resource);
+    }
+
+    // Build the shaders - should go after adding the resources as we might use those in the shader source
     const vertSource = shaderBuilder(this.vertexSource, this);
     const fragSource = shaderBuilder(this.fragmentSource, this);
 
@@ -434,20 +407,5 @@ export class DebugPipeline extends Pipeline<DebugDefines> {
         targets: [{ format: gameManager.format }],
       },
     });
-
-    const transformResource = new TransformResource(this.groupIndex(PipelineResourceType.Transform), 0);
-    this.resourceTemplates.set(PipelineResourceType.Transform, transformResource);
-
-    const materialResource = new MaterialResource(this.groupIndex(PipelineResourceType.Material), 0);
-    this.resourceTemplates.set(PipelineResourceType.Material, materialResource);
-
-    const lightingResource = new LightingResource(this.groupIndex(PipelineResourceType.Lighting), 0);
-    this.resourceTemplates.set(PipelineResourceType.Lighting, lightingResource);
-
-    if (this.defines.diffuse) {
-      const group = this.groupIndex(PipelineResourceType.Diffuse);
-      const resource = new TextureResource(this.defines.diffuse, group, 0);
-      this.resourceTemplates.set(PipelineResourceType.Diffuse, resource);
-    }
   }
 }

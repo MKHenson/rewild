@@ -1,14 +1,32 @@
 import { GameManager } from "../../gameManager";
 import { PipelineResourceTemplate } from "./PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
+import { Defines } from "../shader-lib/utils";
+import { Pipeline } from "../Pipeline";
+import { PipelineResourceType } from "../../../../common/PipelineResourceType";
 
 export class MaterialResource extends PipelineResourceTemplate {
   constructor(group: number, binding: number = 0) {
     super(group, binding);
   }
 
-  initialize(manager: GameManager, pipeline: GPURenderPipeline): number {
+  initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
     return 1;
+  }
+
+  getResourceHeader<T extends Defines<T>>(pipeline: Pipeline<T>) {
+    // prettier-ignore
+    return `
+    struct MaterialData {
+      diffuse: vec4<f32>;
+      emissive: vec4<f32>;
+      opacity: f32;
+      metalness: f32;
+      roughness: f32;
+    };
+
+    [[group(${pipeline.groupIndex(PipelineResourceType.Material)}), binding(0)]] var<uniform> materialData: MaterialData;
+    `;
   }
 
   createInstance(manager: GameManager, pipeline: GPURenderPipeline): PipelineResourceInstance {

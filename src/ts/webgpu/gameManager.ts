@@ -125,14 +125,19 @@ export class GameManager {
     window.addEventListener("resize", this.onResizeHandler);
     window.requestAnimationFrame(this.onFrameHandler);
     window.addEventListener("click", (e) => {
-      // const pipelines = this.pipelines as DebugPipeline[];
-      // pipelines.forEach((p) => {
-      //   if (p.defines.diffuse) p.defines = {};
-      //   else p.defines = { diffuse: this.textures[1] };
-      // });
-      // meshPipelineInstances.forEach((pi) => {
-      //   pi.diffuseResourceIndex = pi.diffuseResourceIndex === -1 ? 0 : -1;
-      // });
+      const pipelines = this.pipelines as DebugPipeline[];
+      pipelines.forEach((p) => {
+        if (p.defines.diffuse) {
+          delete p.defines.diffuse;
+          p.defines = p.defines;
+        } else {
+          p.defines.diffuse = this.textures[1];
+          p.defines = p.defines;
+        }
+      });
+      meshPipelineInstances.forEach((pi) => {
+        pi.diffuseResourceIndex = pi.diffuseResourceIndex === -1 ? 0 : -1;
+      });
     });
   }
 
@@ -152,8 +157,8 @@ export class GameManager {
     const containerPtr = wasm.__pin(wasm.createLevel1());
     const container = wasm.Level1.wrap(containerPtr);
     container.addAsset(this.createMesh(1, "sphere", false));
-    container.addAsset(this.createMesh(1, "box", false));
-    container.addAsset(this.createMesh(1, "box", false));
+    container.addAsset(this.createMesh(1, "box", true));
+    container.addAsset(this.createMesh(1, "box", true));
     wasm.__unpin(containerPtr);
 
     runime.addContainer(containerPtr);

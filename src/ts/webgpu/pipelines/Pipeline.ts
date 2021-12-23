@@ -81,7 +81,7 @@ export abstract class Pipeline<T extends Defines<T>> {
     });
 
     this.resourceTemplates.forEach((resourceTemplate, key) => {
-      let numInstancesToCreate = resourceTemplate.initialize(gameManager, this.renderPipeline!);
+      let numInstancesToCreate = resourceTemplate.initialize(gameManager, this);
       let instances: PipelineResourceInstance[];
 
       // If we previously had instances, then save the number of them
