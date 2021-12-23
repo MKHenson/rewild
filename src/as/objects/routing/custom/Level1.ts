@@ -3,12 +3,20 @@ import { AmbientLight } from "../../../lights/AmbientLight";
 import { DirectionalLight } from "../../../lights/DirectionalLight";
 import { Color } from "../../../math/Color";
 import { Container } from "../core/Container";
+import { inputManager, ASInputManager } from "../../../exports/ASInputManager";
+import { Listener } from "../../../core/EventDispatcher";
+import { Event } from "../../../core/Event";
 
-export class Level1 extends Container {
+export class Level1 extends Container implements Listener {
   orbitController!: OrbitController;
 
   constructor() {
     super();
+  }
+
+  onEvent(event: Event): void {
+    const mouseEvent = event.attachment as ASInputManager.MouseEvent;
+    mouseEvent;
   }
 
   onUpdate(delta: f32, total: u32, fps: u32): void {
@@ -47,6 +55,8 @@ export class Level1 extends Container {
     this.runtime!.camera.lookAt(0, 0, 0);
 
     this.orbitController = new OrbitController(this.runtime!.camera);
+
+    inputManager.addEventListener("mouseup", this);
   }
 }
 

@@ -20,7 +20,7 @@ export class WebGPULights {
   directionLightsBuffer!: Float32Array;
 
   constructor() {
-    this.numDirectionLights = 0;
+    this.numDirectionLights = -1;
     this.lightingConfigBuffer = new Uint32Array(1);
     this.sceneLightsBuffer = new Float32Array(4);
   }
@@ -45,7 +45,10 @@ export class WebGPULights {
       }
     }
 
-    this.numDirectionLights = numDirLights;
+    if (this.numDirectionLights != numDirLights) {
+      this.numDirectionLights = numDirLights;
+      this.directionLightsBuffer = new Float32Array(SIZE_DIR_LIGHT_BUFFER * numDirLights);
+    }
 
     // Set the info buffer of num of direction lights
     this.lightingConfigBuffer[0] = numDirLights;
@@ -55,8 +58,7 @@ export class WebGPULights {
     this.sceneLightsBuffer[1] = color.g;
     this.sceneLightsBuffer[2] = color.b;
 
-    this.directionLightsBuffer = new Float32Array(SIZE_DIR_LIGHT_BUFFER * numDirLights);
-
+    let dirLightI = 0;
     for (let i: i32 = 0, l = lights.length; i < l; i++) {
       if (lights[i] instanceof DirectionalLight) {
         directionLight = lights[i] as DirectionalLight;
@@ -66,14 +68,19 @@ export class WebGPULights {
         vector1.sub(vector2);
         vector1.transformDirection(viewMatrix);
 
-        this.directionLightsBuffer[i * SIZE_DIR_LIGHT_BUFFER] = vector1.x;
-        this.directionLightsBuffer[i * SIZE_DIR_LIGHT_BUFFER + 1] = vector1.y;
-        this.directionLightsBuffer[i * SIZE_DIR_LIGHT_BUFFER + 2] = vector1.z;
-        this.directionLightsBuffer[i * SIZE_DIR_LIGHT_BUFFER + 3] = 0; // Padding
-        this.directionLightsBuffer[i * SIZE_DIR_LIGHT_BUFFER + 4] = directionLight.color.r * directionLight.intensity;
-        this.directionLightsBuffer[i * SIZE_DIR_LIGHT_BUFFER + 5] = directionLight.color.g * directionLight.intensity;
-        this.directionLightsBuffer[i * SIZE_DIR_LIGHT_BUFFER + 6] = directionLight.color.b * directionLight.intensity;
-        this.directionLightsBuffer[i * SIZE_DIR_LIGHT_BUFFER + 7] = 0; // Padding
+        this.directionLightsBuffer[dirLightI * SIZE_DIR_LIGHT_BUFFER] = vector1.x;
+        this.directionLightsBuffer[dirLightI * SIZE_DIR_LIGHT_BUFFER + 1] = vector1.y;
+        this.directionLightsBuffer[dirLightI * SIZE_DIR_LIGHT_BUFFER + 2] = vector1.z;
+        this.directionLightsBuffer[dirLightI * SIZE_DIR_LIGHT_BUFFER + 3] = 0; // Padding
+        this.directionLightsBuffer[dirLightI * SIZE_DIR_LIGHT_BUFFER + 4] =
+          directionLight.color.r * directionLight.intensity;
+        this.directionLightsBuffer[dirLightI * SIZE_DIR_LIGHT_BUFFER + 5] =
+          directionLight.color.g * directionLight.intensity;
+        this.directionLightsBuffer[dirLightI * SIZE_DIR_LIGHT_BUFFER + 6] =
+          directionLight.color.b * directionLight.intensity;
+        this.directionLightsBuffer[dirLightI * SIZE_DIR_LIGHT_BUFFER + 7] = 0; // Padding
+
+        dirLightI++;
       }
     }
   }
