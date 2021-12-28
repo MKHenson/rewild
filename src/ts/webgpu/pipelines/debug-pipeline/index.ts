@@ -12,7 +12,7 @@ import { shader, shaderBuilder } from "../shader-lib/utils";
 
 // prettier-ignore
 const vertexShader = shader<DebugDefines>`
-${e => e.resourceTemplates.get(PipelineResourceType.Transform)!.getResourceHeader(e)}
+${e => e.resourceTemplates.get(PipelineResourceType.Transform)!.template.vertexBlock }
 
 struct Output {
     [[builtin(position)]] Position : vec4<f32>;
@@ -42,9 +42,9 @@ fn main([[location(0)]] pos: vec4<f32>, [[location(1)]] norm: vec3<f32>, [[locat
 // prettier-ignore
 const fragmentShader = shader<DebugDefines>`
 
-${e => e.resourceTemplates.get(PipelineResourceType.Lighting)!.getResourceHeader(e)}
-${e => e.resourceTemplates.get(PipelineResourceType.Material)!.getResourceHeader(e)}
-${e => e.defines.diffuse ? e.resourceTemplates.get(PipelineResourceType.Diffuse)!.getResourceHeader(e) : ''}
+${e => e.resourceTemplates.get(PipelineResourceType.Lighting)!.template.fragmentBlock}
+${e => e.resourceTemplates.get(PipelineResourceType.Material)!.template.fragmentBlock}
+${e => e.defines.diffuse ? e.resourceTemplates.get(PipelineResourceType.Diffuse)!.template.fragmentBlock : ''}
 
 // INTERNAL STRUCTS
 struct IncidentLight {

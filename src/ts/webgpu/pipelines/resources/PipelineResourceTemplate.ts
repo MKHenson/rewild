@@ -3,19 +3,20 @@ import { Pipeline } from "../Pipeline";
 import { Defines } from "../shader-lib/utils";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
 
-export abstract class PipelineResourceTemplate {
+export type Template = {
   group: number;
+  bindings: GPUBindingResource[];
+  fragmentBlock: string | null;
+  vertexBlock: string | null;
+};
 
-  constructor() {
-    this.group = -1;
-  }
+export abstract class PipelineResourceTemplate {
+  template: Template;
 
-  getResourceHeader<T extends Defines<T>>(pipeline: Pipeline<T>) {
-    return "";
-  }
+  constructor() {}
 
   /** Creates the resource. Must return a group index*/
-  abstract build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number;
+  abstract build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template;
 
   /** Initialize the resource and return the number of initial instances to create */
   abstract initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number;

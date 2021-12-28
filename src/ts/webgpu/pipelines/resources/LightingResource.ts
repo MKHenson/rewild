@@ -1,6 +1,6 @@
 import { GameManager } from "../../gameManager";
 import { UNIFORM_TYPES_MAP } from "./memoryUtils";
-import { PipelineResourceTemplate } from "./PipelineResourceTemplate";
+import { PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
 import { GroupType } from "../../../../common/GroupType";
 import { Defines } from "../shader-lib/utils";
@@ -22,12 +22,45 @@ export class LightingResource extends PipelineResourceTemplate {
     super();
   }
 
-  build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
-    this.directionLightBinding = pipeline.bindingIndex(GroupType.Lighting);
-    this.lightingConfigBinding = pipeline.bindingIndex(GroupType.Lighting);
-    this.sceneLightingBinding = pipeline.bindingIndex(GroupType.Lighting);
+  build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
+    this.lightingConfigBinding = curBindIndex;
+    this.sceneLightingBinding = curBindIndex + 1;
+    this.directionLightBinding = pipeline.defines.NUM_DIR_LIGHTS ? curBindIndex + 2 : -1;
+    const group = pipeline.groupIndex(GroupType.Lighting);
 
-    return pipeline.groupIndex(GroupType.Lighting);
+    // prettier-ignore
+    return {
+      group,
+      bindings: [ { buffer: LightingResource.lightingConfig, }, { buffer: LightingResource.sceneLightingBuffer },
+      ].concat(LightingResource.numDirLights ? { buffer: LightingResource.directionLightsBuffer } : []),
+
+      fragmentBlock: `struct SceneLightingUniform {
+        ambientLightColor: vec4<f32>;
+      };
+
+      struct LightingConfigUniform {
+        numDirectionalLights: u32;
+      };
+
+      [[group(${group}), binding(${this.lightingConfigBinding})]] var<uniform> lightingConfigUniform: LightingConfigUniform;
+      [[group(${group}), binding(${this.sceneLightingBinding})]] var<uniform> sceneLightingUniform: SceneLightingUniform;
+
+
+      ${pipeline.defines.NUM_DIR_LIGHTS ? `
+      struct DirectionLightUniform {
+        direction : vec4<f32>;
+        color : vec4<f32>;
+      };
+
+      struct DirectionLightsUniform {
+        directionalLights: array<DirectionLightUniform>;
+      };
+
+      [[group(${group}), binding(${this.directionLightBinding})]] var<storage, read> directionLightsUniform: DirectionLightsUniform;
+      ` : ''}
+      `,
+      vertexBlock: null,
+    };
   }
 
   initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
@@ -84,38 +117,10 @@ export class LightingResource extends PipelineResourceTemplate {
     return 1;
   }
 
-  getResourceHeader<T extends Defines<T>>(pipeline: Pipeline<T>) {
-    // prettier-ignore
-    return `struct SceneLightingUniform {
-      ambientLightColor: vec4<f32>;
-    };
-
-    struct LightingConfigUniform {
-      numDirectionalLights: u32;
-    };
-
-    ${pipeline.defines.NUM_DIR_LIGHTS ? `
-    struct DirectionLightUniform {
-      direction : vec4<f32>;
-      color : vec4<f32>;
-    };
-
-    struct DirectionLightsUniform {
-      directionalLights: array<DirectionLightUniform>;
-    };
-
-    [[group(${this.group}), binding(${this.directionLightBinding})]] var<storage, read> directionLightsUniform: DirectionLightsUniform;
-    ` : ''}
-
-    [[group(${this.group}), binding(${this.lightingConfigBinding})]] var<uniform> lightingConfigUniform: LightingConfigUniform;
-    [[group(${this.group}), binding(${this.sceneLightingBinding})]] var<uniform> sceneLightingUniform: SceneLightingUniform;
-    `;
-  }
-
   createInstance(manager: GameManager, pipeline: GPURenderPipeline): PipelineResourceInstance {
     const bindGroup = manager.device.createBindGroup({
       label: "lighting",
-      layout: pipeline.getBindGroupLayout(this.group),
+      layout: pipeline.getBindGroupLayout(this.template.group),
       entries: [
         {
           binding: this.lightingConfigBinding,
@@ -141,6 +146,6 @@ export class LightingResource extends PipelineResourceTemplate {
       ),
     });
 
-    return new PipelineResourceInstance(this.group, bindGroup);
+    return new PipelineResourceInstance(this.template.group, bindGroup);
   }
 }

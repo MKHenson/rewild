@@ -104,9 +104,18 @@ export abstract class Pipeline<T extends Defines<T>> {
 
     this.onAddResources();
 
+    let curBinding = 0;
+    let prevGroup = -1;
     this.resourceTemplates.forEach((resourceTemplate, key) => {
-      const group = resourceTemplate.build(gameManager, this);
-      resourceTemplate.group = group;
+      const template = resourceTemplate.build(gameManager, this, curBinding);
+
+      if (prevGroup !== -1) {
+        if (prevGroup === template.group) curBinding += template.bindings.length;
+        else curBinding = 0;
+      }
+
+      prevGroup = template.group;
+      resourceTemplate.template = template;
     });
   }
 
