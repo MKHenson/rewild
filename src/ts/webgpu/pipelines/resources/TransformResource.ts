@@ -4,11 +4,18 @@ import { PipelineResourceTemplate } from "./PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
 import { Pipeline } from "../Pipeline";
 import { Defines } from "../shader-lib/utils";
-import { PipelineResourceType } from "../../../../common/PipelineResourceType";
+import { GroupType } from "../../../../common/GroupType";
 
 export class TransformResource extends PipelineResourceTemplate {
-  constructor(group: number, binding: number = 0) {
-    super(group, binding);
+  binding: number;
+
+  constructor() {
+    super();
+  }
+
+  build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
+    this.binding = pipeline.bindingIndex(GroupType.Transform);
+    return pipeline.groupIndex(GroupType.Transform);
   }
 
   initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
@@ -23,7 +30,7 @@ export class TransformResource extends PipelineResourceTemplate {
       modelViewMatrix: mat4x4<f32>;
       normalMatrix: mat3x3<f32>;
     };
-    [[group(${pipeline.groupIndex(PipelineResourceType.Transform)}), binding(0)]] var<uniform> uniforms: TransformUniform;
+    [[group(${this.group}), binding(${this.binding})]] var<uniform> uniforms: TransformUniform;
     `;
   }
 

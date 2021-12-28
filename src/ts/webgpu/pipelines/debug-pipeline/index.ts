@@ -331,24 +331,24 @@ export class DebugPipeline extends Pipeline<DebugDefines> {
     super(name, vertexShader, fragmentShader, defines);
   }
 
-  build(gameManager: GameManager): void {
-    super.build(gameManager);
-
-    // Add the resources we're interested in
-    const transformResource = new TransformResource(this.groupIndex(PipelineResourceType.Transform), 0);
+  onAddResources(): void {
+    const transformResource = new TransformResource();
     this.resourceTemplates.set(PipelineResourceType.Transform, transformResource);
 
-    const materialResource = new MaterialResource(this.groupIndex(PipelineResourceType.Material), 0);
+    const materialResource = new MaterialResource();
     this.resourceTemplates.set(PipelineResourceType.Material, materialResource);
 
-    const lightingResource = new LightingResource(this.groupIndex(PipelineResourceType.Lighting), 0);
+    const lightingResource = new LightingResource();
     this.resourceTemplates.set(PipelineResourceType.Lighting, lightingResource);
 
     if (this.defines.diffuse) {
-      const group = this.groupIndex(PipelineResourceType.Diffuse);
-      const resource = new TextureResource(this.defines.diffuse, group, 0);
+      const resource = new TextureResource(this.defines.diffuse);
       this.resourceTemplates.set(PipelineResourceType.Diffuse, resource);
     }
+  }
+
+  build(gameManager: GameManager): void {
+    super.build(gameManager);
 
     // Build the shaders - should go after adding the resources as we might use those in the shader source
     const vertSource = shaderBuilder(this.vertexSource, this);

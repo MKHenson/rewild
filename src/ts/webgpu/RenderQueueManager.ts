@@ -6,6 +6,7 @@ import { LightingResource } from "./pipelines/resources/LightingResource";
 import { PipelineResourceInstance } from "./pipelines/resources/PipelineResourceInstance";
 
 const ARRAYBUFFERVIEW_DATASTART_OFFSET = 4;
+const normalAs4x4 = new Float32Array(12);
 
 export class RenderQueueManager {
   manager: GameManager;
@@ -73,7 +74,6 @@ export class RenderQueueManager {
           const normMatrixPtr = getPtrIndex(commandBuffer[i + 4]);
 
           const mat3x3 = new Float32Array(wasmMemoryBlock, normMatrixPtr, 9);
-          const normalAs4x4 = new Float32Array(12);
 
           // TODO: Make this neater
           normalAs4x4[0] = mat3x3[0];
@@ -115,12 +115,19 @@ export class RenderQueueManager {
           break;
 
         case GPUCommands.SET_PIPELINE:
-          pipeline = manager.pipelines[commandBuffer[i + 1]];
+          const newPipeline = manager.pipelines[commandBuffer[i + 1]];
 
-          if (pipeline.rebuild) {
-            pipeline.build(manager);
-            pipeline.initialize(manager);
+          if (newPipeline.rebuild) {
+            newPipeline.build(manager);
+            newPipeline.initialize(manager);
           }
+
+          if (newPipeline === pipeline!) {
+            i += 1;
+            break;
+          }
+
+          pipeline = newPipeline;
 
           pass.setPipeline(pipeline.renderPipeline!);
           i += 1;

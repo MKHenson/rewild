@@ -3,11 +3,18 @@ import { PipelineResourceTemplate } from "./PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
 import { Defines } from "../shader-lib/utils";
 import { Pipeline } from "../Pipeline";
-import { PipelineResourceType } from "../../../../common/PipelineResourceType";
+import { GroupType } from "../../../../common/GroupType";
 
 export class MaterialResource extends PipelineResourceTemplate {
-  constructor(group: number, binding: number = 0) {
-    super(group, binding);
+  binding: number;
+
+  constructor() {
+    super();
+  }
+
+  build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
+    this.binding = pipeline.bindingIndex(GroupType.Material);
+    return pipeline.groupIndex(GroupType.Material);
   }
 
   initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
@@ -25,7 +32,7 @@ export class MaterialResource extends PipelineResourceTemplate {
       roughness: f32;
     };
 
-    [[group(${pipeline.groupIndex(PipelineResourceType.Material)}), binding(0)]] var<uniform> materialData: MaterialData;
+    [[group(${this.group}), binding(${this.binding})]] var<uniform> materialData: MaterialData;
     `;
   }
 

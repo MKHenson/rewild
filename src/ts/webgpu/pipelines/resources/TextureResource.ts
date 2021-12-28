@@ -4,14 +4,23 @@ import { PipelineResourceTemplate } from "./PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
 import { Pipeline } from "../Pipeline";
 import { Defines } from "../shader-lib/utils";
-import { PipelineResourceType } from "../../../../common/PipelineResourceType";
+import { GroupType } from "../../../../common/GroupType";
 
 export class TextureResource extends PipelineResourceTemplate {
   texture: Texture;
+  textureBind: number;
+  samplerBind: number;
 
-  constructor(texture: Texture, group: number, binding: number) {
-    super(group, binding);
+  constructor(texture: Texture) {
+    super();
     this.texture = texture;
+  }
+
+  build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
+    this.samplerBind = pipeline.bindingIndex(GroupType.Diffuse);
+    this.textureBind = pipeline.bindingIndex(GroupType.Diffuse);
+
+    return pipeline.groupIndex(GroupType.Diffuse);
   }
 
   initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
@@ -22,8 +31,8 @@ export class TextureResource extends PipelineResourceTemplate {
     // prettier-ignore
     return `
     ${pipeline.defines.diffuse && `
-    [[group(${pipeline.groupIndex(PipelineResourceType.Diffuse)}), binding(0)]] var mySampler: sampler;
-    [[group(${pipeline.groupIndex(PipelineResourceType.Diffuse)}), binding(1)]] var myTexture: texture_2d<f32>;
+    [[group(${this.group}), binding(${this.samplerBind})]] var mySampler: sampler;
+    [[group(${this.group}), binding(${this.textureBind})]] var myTexture: texture_2d<f32>;
     `}`;
   }
 
@@ -33,11 +42,11 @@ export class TextureResource extends PipelineResourceTemplate {
       layout: pipeline.getBindGroupLayout(this.group),
       entries: [
         {
-          binding: this.binding,
+          binding: this.samplerBind,
           resource: manager.samplers[0],
         },
         {
-          binding: this.binding + 1,
+          binding: this.textureBind,
           resource: this.texture!.gpuTexture.createView(),
         },
       ],

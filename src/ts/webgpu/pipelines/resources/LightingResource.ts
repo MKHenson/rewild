@@ -2,7 +2,7 @@ import { GameManager } from "../../gameManager";
 import { UNIFORM_TYPES_MAP } from "./memoryUtils";
 import { PipelineResourceTemplate } from "./PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
-import { PipelineResourceType } from "../../../../common/PipelineResourceType";
+import { GroupType } from "../../../../common/GroupType";
 import { Defines } from "../shader-lib/utils";
 import { Pipeline } from "../Pipeline";
 
@@ -14,8 +14,20 @@ export class LightingResource extends PipelineResourceTemplate {
   static numDirLights: number = 0;
   static rebuildDirectionLights = true;
 
-  constructor(group: number, binding: number = 0) {
-    super(group, binding);
+  directionLightBinding: number;
+  lightingConfigBinding: number;
+  sceneLightingBinding: number;
+
+  constructor() {
+    super();
+  }
+
+  build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
+    this.directionLightBinding = pipeline.bindingIndex(GroupType.Lighting);
+    this.lightingConfigBinding = pipeline.bindingIndex(GroupType.Lighting);
+    this.sceneLightingBinding = pipeline.bindingIndex(GroupType.Lighting);
+
+    return pipeline.groupIndex(GroupType.Lighting);
   }
 
   initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
@@ -92,11 +104,11 @@ export class LightingResource extends PipelineResourceTemplate {
       directionalLights: array<DirectionLightUniform>;
     };
 
-    [[group(${pipeline.groupIndex(PipelineResourceType.Lighting)}), binding(2)]] var<storage, read> directionLightsUniform: DirectionLightsUniform;
+    [[group(${this.group}), binding(${this.directionLightBinding})]] var<storage, read> directionLightsUniform: DirectionLightsUniform;
     ` : ''}
 
-    [[group(${pipeline.groupIndex(PipelineResourceType.Lighting)}), binding(0)]] var<uniform> lightingConfigUniform: LightingConfigUniform;
-    [[group(${pipeline.groupIndex(PipelineResourceType.Lighting)}), binding(1)]] var<uniform> sceneLightingUniform: SceneLightingUniform;
+    [[group(${this.group}), binding(${this.lightingConfigBinding})]] var<uniform> lightingConfigUniform: LightingConfigUniform;
+    [[group(${this.group}), binding(${this.sceneLightingBinding})]] var<uniform> sceneLightingUniform: SceneLightingUniform;
     `;
   }
 
@@ -106,13 +118,13 @@ export class LightingResource extends PipelineResourceTemplate {
       layout: pipeline.getBindGroupLayout(this.group),
       entries: [
         {
-          binding: 0,
+          binding: this.lightingConfigBinding,
           resource: {
             buffer: LightingResource.lightingConfig,
           },
         },
         {
-          binding: 1,
+          binding: this.sceneLightingBinding,
           resource: {
             buffer: LightingResource.sceneLightingBuffer,
           },
@@ -120,7 +132,7 @@ export class LightingResource extends PipelineResourceTemplate {
       ].concat(
         LightingResource.numDirLights
           ? {
-              binding: 2,
+              binding: this.directionLightBinding,
               resource: {
                 buffer: LightingResource.directionLightsBuffer,
               },

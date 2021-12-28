@@ -2,8 +2,25 @@ import { GameManager } from "../gameManager";
 import { PipelineResourceTemplate } from "./resources/PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./resources/PipelineResourceInstance";
 import { PipelineResourceType } from "../../../common/PipelineResourceType";
+import { GroupType } from "../../../common/GroupType";
 import "./shader-lib/utils";
 import { Defines, SourceFragments } from "./shader-lib/utils";
+
+export class GroupMapping {
+  index: number;
+  bindingCount: number;
+
+  constructor(index: number) {
+    this.index = index;
+    this.bindingCount = 0;
+  }
+
+  getBinding(): number {
+    const toRet = this.bindingCount;
+    this.bindingCount++;
+    return toRet;
+  }
+}
 
 export abstract class Pipeline<T extends Defines<T>> {
   name: string;
@@ -15,7 +32,7 @@ export abstract class Pipeline<T extends Defines<T>> {
   resourceInstances: Map<PipelineResourceType, PipelineResourceInstance[]>;
   rebuild: boolean;
 
-  groupMapping: Map<PipelineResourceType, number>;
+  groupMapping: Map<GroupType, GroupMapping>;
   private groups: number;
 
   constructor(name: string, vertexSource: SourceFragments<T>, fragmentSource: SourceFragments<T>, defines: Defines<T>) {
@@ -41,15 +58,30 @@ export abstract class Pipeline<T extends Defines<T>> {
     return this._defines;
   }
 
-  groupIndex(type: PipelineResourceType): number {
-    if (this.groupMapping.has(type)) return this.groupMapping.get(type)!;
+  groupIndex(type: GroupType): number {
+    if (this.groupMapping.has(type)) return this.groupMapping.get(type)!.index;
     else {
-      const group = this.groups;
-      this.groupMapping.set(type, group);
+      const groupMapping = new GroupMapping(this.groups);
+      this.groupMapping.set(type, groupMapping);
       this.groups++;
-      return group;
+      return groupMapping.index;
     }
   }
+
+  bindingIndex(type: GroupType): number {
+    if (this.groupMapping.has(type)) {
+      const groupMapping = this.groupMapping.get(type)!;
+      return groupMapping.getBinding();
+    } else {
+      const groupMapping = new GroupMapping(this.groups);
+      this.groupMapping.set(type, groupMapping);
+      this.groups++;
+      return groupMapping.getBinding();
+    }
+  }
+
+  /** Use this function to add resource templates */
+  abstract onAddResources(): void;
 
   build(gameManager: GameManager): void {
     this.rebuild = false;
@@ -59,8 +91,8 @@ export abstract class Pipeline<T extends Defines<T>> {
 
     // Destroy previous instances
     keys.forEach((key) => {
-      const resourceInstances = resourceInstanceMap.get(key)!;
-      resourceInstances.forEach((i) => {
+      const resourceInstances = resourceInstanceMap.get(key);
+      resourceInstances?.forEach((i) => {
         i.dispose();
       });
     });
@@ -69,6 +101,13 @@ export abstract class Pipeline<T extends Defines<T>> {
     this.resourceTemplates = new Map();
     this.groupMapping = new Map();
     this.groups = 0;
+
+    this.onAddResources();
+
+    this.resourceTemplates.forEach((resourceTemplate, key) => {
+      const group = resourceTemplate.build(gameManager, this);
+      resourceTemplate.group = group;
+    });
   }
 
   initialize(gameManager: GameManager): void {
@@ -100,53 +139,6 @@ export abstract class Pipeline<T extends Defines<T>> {
       }
     });
   }
-
-  // createBufferResource(type: PipelineResourceType, bufferSize: number, device: GPUDevice, label?: string) {
-  //   const buffer = device.createBuffer({
-  //     label,
-  //     size: bufferSize,
-  //     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  //   });
-
-  //   const resource: GPUBindingResource = {
-  //     buffer,
-  //     offset: 0,
-  //     size: bufferSize,
-  //   };
-
-  //   const group = this.requestGroupIndex(type);
-
-  //   const bindGroup = device.createBindGroup({
-  //     label: label,
-  //     layout: this.renderPipeline!.getBindGroupLayout(group),
-  //     entries: [
-  //       {
-  //         binding: 0,
-  //         resource,
-  //       },
-  //     ],
-  //   });
-
-  //   return this.createResource(type, [resource], bindGroup, group);
-  // }
-
-  // addResource(
-  //   type: PipelineResourceType,
-  //   resources: GPUBindingResource[],
-  //   bindGroup: GPUBindGroup,
-  //   group = this.requestGroupIndex(type)
-  // ) {
-  //   const resource = new PipelineResource(resources, bindGroup, group);
-  //   let index = 0;
-
-  //   if (this.resources.has(type)) {
-  //     const resourceArr = this.resources.get(type)!;
-  //     resourceArr.push(resource);
-  //     index = resourceArr.length - 1;
-  //   } else this.resources.set(type, [resource]);
-
-  //   return index;
-  // }
 
   addResourceInstance(manager: GameManager, type: PipelineResourceType) {
     if (this.resourceTemplates.has(type)) {
