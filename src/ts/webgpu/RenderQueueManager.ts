@@ -1,4 +1,4 @@
-import { PipelineResourceType } from "../../common/PipelineResourceType";
+import { GroupType } from "../../common/GroupType";
 import { GPUCommands } from "../../common/Commands";
 import { GameManager } from "./gameManager";
 import { Pipeline } from "./pipelines/Pipeline";
@@ -39,7 +39,7 @@ export class RenderQueueManager {
             LightingResource.numDirLights = numDirectionLights;
             LightingResource.rebuildDirectionLights = true;
             this.manager.pipelines.forEach((p) => {
-              if (p.resourceTemplates.has(PipelineResourceType.Lighting)) {
+              if (p.findTemplateByType(GroupType.Lighting)) {
                 p.defines = { ...p.defines, NUM_DIR_LIGHTS: numDirectionLights };
               }
             });
@@ -67,7 +67,7 @@ export class RenderQueueManager {
           break;
 
         case GPUCommands.SET_TRANSFORM:
-          instances = pipeline!.resourceInstances.get(PipelineResourceType.Transform)!;
+          instances = pipeline!.resourceInstances.get(GroupType.Transform)!;
           resourceIndex = commandBuffer[i + 1];
           const projMatrixPtr = getPtrIndex(commandBuffer[i + 2]);
           const mvMatrixPtr = getPtrIndex(commandBuffer[i + 3]);

@@ -1,4 +1,3 @@
-// import { PipelineResourceType } from "src/common/PipelineResourceType";
 import { GPUBufferUsageFlags } from "../common/GPUEnums";
 import { ExportType } from "./index-webgpu";
 import { GameManager } from "./webgpu/gameManager";
@@ -25,10 +24,6 @@ export function createBindingsGPU(importObject: Import, gameManager: GameManager
     print(stringIndex: number) {
       if (wasmExports) console.log(wasmExports.exports.__getString(stringIndex));
     },
-    // createUniformBuffer(pipeline: number, type: PipelineResourceType, size: number, labelPtr?: number) {
-    //   const label = labelPtr ? wasmExports.exports.__getString(labelPtr) : undefined;
-    //   return gameManager.pipelines[pipeline].createBufferResource(type, size, gameManager.device, label);
-    // },
     createBufferFromF32(data: number, usage: GPUBufferUsageFlags) {
       const buffer = wasmExports.exports.__getFloat32Array(data);
       return gameManager.createBufferF32(buffer, usage);

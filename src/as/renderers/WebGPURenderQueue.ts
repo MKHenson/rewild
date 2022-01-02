@@ -1,6 +1,6 @@
 import { render } from "../Imports";
 import { GPUCommands } from "../../common/Commands";
-import { PipelineResourceType } from "../../common/PipelineResourceType";
+import { GroupType } from "../../common/GroupType";
 import { WebGPULights } from "./WebGPULights";
 
 export class WebGPURenderQueue {
@@ -45,7 +45,7 @@ export class WebGPURenderQueue {
     return this;
   }
 
-  setBindGroupResource(type: PipelineResourceType, resourceIndex: u32 = 0): WebGPURenderQueue {
+  setBindGroupResource(type: GroupType, resourceIndex: u32 = 0): WebGPURenderQueue {
     const q = this.q;
     q.push(GPUCommands.SET_BIND_GROUP);
     q.push(type);

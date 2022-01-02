@@ -1,4 +1,4 @@
-import { PipelineResourceType } from "../../../../common/PipelineResourceType";
+import { GroupType } from "../../../../common/GroupType";
 import { GameManager } from "../../gameManager";
 import { Texture } from "../../GPUTexture";
 import { defaultPipelineDescriptor } from "../defaultPipelineDescriptor";
@@ -12,7 +12,7 @@ import { shader, shaderBuilder } from "../shader-lib/utils";
 
 // prettier-ignore
 const vertexShader = shader<DebugDefines>`
-${e => e.resourceTemplates.get(PipelineResourceType.Transform)!.template.vertexBlock }
+${e => e.findTemplateByType(GroupType.Transform)!.template.vertexBlock }
 
 struct Output {
     [[builtin(position)]] Position : vec4<f32>;
@@ -42,9 +42,9 @@ fn main([[location(0)]] pos: vec4<f32>, [[location(1)]] norm: vec3<f32>, [[locat
 // prettier-ignore
 const fragmentShader = shader<DebugDefines>`
 
-${e => e.resourceTemplates.get(PipelineResourceType.Lighting)!.template.fragmentBlock}
-${e => e.resourceTemplates.get(PipelineResourceType.Material)!.template.fragmentBlock}
-${e => e.defines.diffuse ? e.resourceTemplates.get(PipelineResourceType.Diffuse)!.template.fragmentBlock : ''}
+${e => e.findTemplateByType(GroupType.Lighting)!.template.fragmentBlock}
+${e => e.findTemplateByType(GroupType.Material)!.template.fragmentBlock}
+${e => e.defines.diffuse ? e.findTemplateByType(GroupType.Diffuse)!.template.fragmentBlock : ''}
 
 // INTERNAL STRUCTS
 struct IncidentLight {
@@ -333,17 +333,17 @@ export class DebugPipeline extends Pipeline<DebugDefines> {
 
   onAddResources(): void {
     const transformResource = new TransformResource();
-    this.resourceTemplates.set(PipelineResourceType.Transform, transformResource);
+    this.addTemplate(transformResource);
 
     const materialResource = new MaterialResource();
-    this.resourceTemplates.set(PipelineResourceType.Material, materialResource);
+    this.addTemplate(materialResource);
 
     const lightingResource = new LightingResource();
-    this.resourceTemplates.set(PipelineResourceType.Lighting, lightingResource);
+    this.addTemplate(lightingResource);
 
     if (this.defines.diffuse) {
       const resource = new TextureResource(this.defines.diffuse);
-      this.resourceTemplates.set(PipelineResourceType.Diffuse, resource);
+      this.addTemplate(resource);
     }
   }
 
@@ -356,6 +356,7 @@ export class DebugPipeline extends Pipeline<DebugDefines> {
 
     this.renderPipeline = gameManager.device.createRenderPipeline({
       ...defaultPipelineDescriptor,
+      label: "Debug Pipeline",
       vertex: {
         module: gameManager.device.createShaderModule({
           code: vertSource,

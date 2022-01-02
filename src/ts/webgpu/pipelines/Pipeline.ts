@@ -1,7 +1,6 @@
 import { GameManager } from "../gameManager";
 import { PipelineResourceTemplate } from "./resources/PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./resources/PipelineResourceInstance";
-import { PipelineResourceType } from "../../../common/PipelineResourceType";
 import { GroupType } from "../../../common/GroupType";
 import "./shader-lib/utils";
 import { Defines, SourceFragments } from "./shader-lib/utils";
@@ -28,8 +27,8 @@ export abstract class Pipeline<T extends Defines<T>> {
   fragmentSource: SourceFragments<T>;
   vertexSource: SourceFragments<T>;
   private _defines: Defines<T>;
-  resourceTemplates: Map<PipelineResourceType, PipelineResourceTemplate>;
-  resourceInstances: Map<PipelineResourceType, PipelineResourceInstance[]>;
+  private resourceTemplates: PipelineResourceTemplate[];
+  resourceInstances: Map<GroupType, PipelineResourceInstance[]>;
   rebuild: boolean;
 
   groupMapping: Map<GroupType, GroupMapping>;
@@ -40,7 +39,7 @@ export abstract class Pipeline<T extends Defines<T>> {
     this.renderPipeline = null;
     this.vertexSource = vertexSource;
     this.fragmentSource = fragmentSource;
-    this.resourceTemplates = new Map();
+    this.resourceTemplates = [];
     this.resourceInstances = new Map();
     this.defines = defines;
     this.rebuild = true;
@@ -83,6 +82,15 @@ export abstract class Pipeline<T extends Defines<T>> {
   /** Use this function to add resource templates */
   abstract onAddResources(): void;
 
+  findTemplateByType(type: GroupType) {
+    return this.resourceTemplates.find((r) => r.groupType === type) || null;
+  }
+
+  addTemplate(template: PipelineResourceTemplate) {
+    this.resourceTemplates.push(template);
+    return this;
+  }
+
   build(gameManager: GameManager): void {
     this.rebuild = false;
 
@@ -98,15 +106,15 @@ export abstract class Pipeline<T extends Defines<T>> {
     });
 
     // Reset
-    this.resourceTemplates = new Map();
-    this.groupMapping = new Map();
+    this.resourceTemplates.splice(0, this.resourceTemplates.length);
+    this.groupMapping.clear();
     this.groups = 0;
 
     this.onAddResources();
 
     let curBinding = 0;
     let prevGroup = -1;
-    this.resourceTemplates.forEach((resourceTemplate, key) => {
+    this.resourceTemplates.forEach((resourceTemplate) => {
       const template = resourceTemplate.build(gameManager, this, curBinding);
 
       if (prevGroup !== -1) {
@@ -121,26 +129,26 @@ export abstract class Pipeline<T extends Defines<T>> {
 
   initialize(gameManager: GameManager): void {
     const prevKeys = Array.from(this.resourceInstances.keys());
-    const curKeys = Array.from(this.resourceTemplates.keys());
+    const curKeys = this.resourceTemplates.map((r) => r.groupType);
 
     // Remove any unused instances
     prevKeys.forEach((key) => {
       if (!curKeys.includes(key)) this.resourceInstances.delete(key);
     });
 
-    this.resourceTemplates.forEach((resourceTemplate, key) => {
+    this.resourceTemplates.forEach((resourceTemplate) => {
       let numInstancesToCreate = resourceTemplate.initialize(gameManager, this);
       let instances: PipelineResourceInstance[];
 
       // If we previously had instances, then save the number of them
       // as we have to re-create the same amount as before. Otherwise just create 1;
-      if (this.resourceInstances.has(key)) {
-        instances = this.resourceInstances.get(key)!;
+      if (this.resourceInstances.has(resourceTemplate.groupType)) {
+        instances = this.resourceInstances.get(resourceTemplate.groupType)!;
         numInstancesToCreate = instances.length;
         instances.splice(0, instances.length);
       } else {
         instances = [];
-        this.resourceInstances.set(key, instances);
+        this.resourceInstances.set(resourceTemplate.groupType, instances);
       }
 
       for (let i = 0; i < numInstancesToCreate; i++) {
@@ -149,10 +157,11 @@ export abstract class Pipeline<T extends Defines<T>> {
     });
   }
 
-  addResourceInstance(manager: GameManager, type: PipelineResourceType) {
-    if (this.resourceTemplates.has(type)) {
-      const resourceTemplate = this.resourceTemplates.get(type)!;
-      const newInstance = resourceTemplate.createInstance(manager, this.renderPipeline!);
+  addResourceInstance(manager: GameManager, type: GroupType) {
+    const template = this.findTemplateByType(type);
+
+    if (template) {
+      const newInstance = template.createInstance(manager, this.renderPipeline!);
 
       const instanceArray = this.resourceInstances.get(type)!;
       instanceArray.push(newInstance);

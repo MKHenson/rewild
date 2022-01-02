@@ -8,7 +8,7 @@ import { Mesh } from "../objects/Mesh";
 import { Scene } from "../scenes/Scene";
 import { WebGPUGeometries } from "./WebGPUGeometries";
 import { AttributeTypes } from "../core/BufferGeometry";
-import { PipelineResourceType } from "../../common/PipelineResourceType";
+import { GroupType } from "../../common/GroupType";
 import { WebGPULights } from "./WebGPULights";
 import { Light } from "../lights/Light";
 
@@ -95,12 +95,12 @@ export class WebGPURenderer {
       mesh.normalMatrix.elements
     );
 
-    renderQueue.setBindGroupResource(PipelineResourceType.Transform, transformIndex);
-    renderQueue.setBindGroupResource(PipelineResourceType.Material);
-    renderQueue.setBindGroupResource(PipelineResourceType.Lighting);
+    renderQueue.setBindGroupResource(GroupType.Transform, transformIndex);
+    renderQueue.setBindGroupResource(GroupType.Material);
+    renderQueue.setBindGroupResource(GroupType.Lighting);
 
     if (mesh.pipelines[0].diffuseResourceIndex != -1)
-      renderQueue.setBindGroupResource(PipelineResourceType.Diffuse, mesh.pipelines[0].diffuseResourceIndex);
+      renderQueue.setBindGroupResource(GroupType.Diffuse, mesh.pipelines[0].diffuseResourceIndex);
     // ========================
 
     if (mesh.geometry) {

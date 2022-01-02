@@ -7,7 +7,7 @@ import { createBuffer, createIndexBuffer } from "./utils";
 import { RenderQueueManager } from "./RenderQueueManager";
 import { WasmInterface } from "../index-webgpu";
 import { Texture } from "./GPUTexture";
-import { PipelineResourceType } from "../../common/PipelineResourceType";
+import { GroupType } from "../../common/GroupType";
 import { MeshPipeline } from "build/types";
 
 // let vertexBuffer: GPUBuffer, indexBuffer: GPUBuffer;
@@ -180,16 +180,10 @@ export class GameManager {
     meshPipelineInstances.push(meshPipelineIns);
 
     // Assign a transform buffer to the intance
-    meshPipelineIns.transformGroupId = debugPipeline.resourceTemplates.get(
-      PipelineResourceType.Transform
-    )!.template.group;
-    meshPipelineIns.materialGroupId = debugPipeline.resourceTemplates.get(
-      PipelineResourceType.Material
-    )!.template.group;
-    meshPipelineIns.lightingGroupId = debugPipeline.resourceTemplates.get(
-      PipelineResourceType.Lighting
-    )!.template.group;
-    meshPipelineIns.transformResourceIndex = debugPipeline.addResourceInstance(this, PipelineResourceType.Transform);
+    meshPipelineIns.transformGroupId = debugPipeline.findTemplateByType(GroupType.Transform)!.template.group;
+    meshPipelineIns.materialGroupId = debugPipeline.findTemplateByType(GroupType.Material)!.template.group;
+    meshPipelineIns.lightingGroupId = debugPipeline.findTemplateByType(GroupType.Lighting)!.template.group;
+    meshPipelineIns.transformResourceIndex = debugPipeline.addResourceInstance(this, GroupType.Transform);
 
     if (useTexture) {
       meshPipelineIns.diffuseResourceIndex = 0;
