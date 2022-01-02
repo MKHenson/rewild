@@ -9,12 +9,12 @@ export class MaterialResource extends PipelineResourceTemplate {
   binding: number;
 
   constructor() {
-    super();
+    super(GroupType.Material);
   }
 
   build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
     this.binding = curBindIndex;
-    const group = pipeline.groupIndex(GroupType.Material);
+    const group = pipeline.groupIndex(this.groupType);
 
     // prettier-ignore
     const initialValues = new Float32Array([

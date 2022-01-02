@@ -1,5 +1,6 @@
 import { GameManager } from "../../gameManager";
 import { Pipeline } from "../Pipeline";
+import { GroupType } from "../../../../common/GroupType";
 import { Defines } from "../shader-lib/utils";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
 
@@ -12,8 +13,11 @@ export type Template = {
 
 export abstract class PipelineResourceTemplate {
   template: Template;
+  groupType: GroupType;
 
-  constructor() {}
+  constructor(groupType: GroupType) {
+    this.groupType = groupType;
+  }
 
   /** Creates the resource. Must return a group index*/
   abstract build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template;

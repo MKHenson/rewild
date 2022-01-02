@@ -19,14 +19,14 @@ export class LightingResource extends PipelineResourceTemplate {
   sceneLightingBinding: number;
 
   constructor() {
-    super();
+    super(GroupType.Lighting);
   }
 
   build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
     this.lightingConfigBinding = curBindIndex;
     this.sceneLightingBinding = curBindIndex + 1;
     this.directionLightBinding = pipeline.defines.NUM_DIR_LIGHTS ? curBindIndex + 2 : -1;
-    const group = pipeline.groupIndex(GroupType.Lighting);
+    const group = pipeline.groupIndex(this.groupType);
 
     // prettier-ignore
     return {

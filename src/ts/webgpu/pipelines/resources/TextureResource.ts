@@ -12,14 +12,14 @@ export class TextureResource extends PipelineResourceTemplate {
   samplerBind: number;
 
   constructor(texture: Texture) {
-    super();
+    super(GroupType.Diffuse);
     this.texture = texture;
   }
 
   build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
     this.samplerBind = curBindIndex;
     this.textureBind = curBindIndex + 1;
-    const group = pipeline.groupIndex(GroupType.Diffuse);
+    const group = pipeline.groupIndex(this.groupType);
 
     // prettier-ignore
     return {

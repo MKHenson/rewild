@@ -10,12 +10,12 @@ export class TransformResource extends PipelineResourceTemplate {
   binding: number;
 
   constructor() {
-    super();
+    super(GroupType.Transform);
   }
 
   build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
     this.binding = curBindIndex;
-    const group = pipeline.groupIndex(GroupType.Transform);
+    const group = pipeline.groupIndex(this.groupType);
 
     const SIZEOF_MATRICES = UNIFORM_TYPES_MAP["mat4x4<f32>"] * 2 + UNIFORM_TYPES_MAP["mat3x3<f32>"];
 
