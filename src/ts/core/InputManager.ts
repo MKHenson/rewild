@@ -1,4 +1,4 @@
-import { WasmInterface } from "../index-webgpu";
+import { WasmInterface } from "../index";
 
 export enum MouseEventType {
   MouseDown,

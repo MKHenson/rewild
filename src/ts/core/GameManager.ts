@@ -3,14 +3,13 @@ import { GPUBufferUsageFlags } from "../../common/GPUEnums";
 import { PipelineType } from "../../common/PipelineType";
 import { DebugPipeline } from "./pipelines/debug-pipeline";
 import { Pipeline } from "./pipelines/Pipeline";
-import { createBuffer, createIndexBuffer } from "./utils";
+import { createBuffer, createIndexBuffer } from "./Utils";
 import { RenderQueueManager } from "./RenderQueueManager";
-import { WasmInterface } from "../index-webgpu";
-import { Texture } from "./GPUTexture";
+import { WasmInterface } from "..";
+import { Texture } from "./Texture";
 import { GroupType } from "../../common/GroupType";
 import { MeshPipeline } from "build/types";
 
-// let vertexBuffer: GPUBuffer, indexBuffer: GPUBuffer;
 const meshPipelineInstances: MeshPipeline[] = [];
 
 export class GameManager {
@@ -28,7 +27,7 @@ export class GameManager {
 
   onResizeHandler: () => void;
   onFrameHandler: () => void;
-  disposed: bool;
+  disposed: boolean;
   renderQueueManager: RenderQueueManager;
 
   renderTargetView: GPUTextureView;

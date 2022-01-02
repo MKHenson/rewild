@@ -1,9 +1,9 @@
-import { GameManager } from "../gameManager";
+import { GameManager } from "../GameManager";
 import { PipelineResourceTemplate } from "./resources/PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./resources/PipelineResourceInstance";
 import { GroupType } from "../../../common/GroupType";
-import "./shader-lib/utils";
-import { Defines, SourceFragments } from "./shader-lib/utils";
+import "./shader-lib/Utils";
+import { Defines, SourceFragments } from "./shader-lib/Utils";
 
 export class GroupMapping {
   index: number;

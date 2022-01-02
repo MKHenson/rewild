@@ -1,9 +1,9 @@
-import { GameManager } from "../../gameManager";
-import { UNIFORM_TYPES_MAP } from "./memoryUtils";
+import { GameManager } from "../../GameManager";
+import { UNIFORM_TYPES_MAP } from "./MemoryUtils";
 import { PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
 import { GroupType } from "../../../../common/GroupType";
-import { Defines } from "../shader-lib/utils";
+import { Defines } from "../shader-lib/Utils";
 import { Pipeline } from "../Pipeline";
 
 export class LightingResource extends PipelineResourceTemplate {

@@ -1,7 +1,7 @@
-import { GameManager } from "../../gameManager";
+import { GameManager } from "../../GameManager";
 import { PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
-import { Defines } from "../shader-lib/utils";
+import { Defines } from "../shader-lib/Utils";
 import { Pipeline } from "../Pipeline";
 import { GroupType } from "../../../../common/GroupType";
 

@@ -1,4 +1,4 @@
-import { Texture } from "../../GPUTexture";
+import { Texture } from "../../Texture";
 import { Pipeline } from "../Pipeline";
 
 export type Defines<T> = {

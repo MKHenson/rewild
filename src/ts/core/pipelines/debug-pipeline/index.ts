@@ -1,14 +1,14 @@
 import { GroupType } from "../../../../common/GroupType";
-import { GameManager } from "../../gameManager";
-import { Texture } from "../../GPUTexture";
-import { defaultPipelineDescriptor } from "../defaultPipelineDescriptor";
+import { GameManager } from "../../GameManager";
+import { Texture } from "../../Texture";
+import { defaultPipelineDescriptor } from "../DefaultPipelineDescriptor";
 import { Pipeline } from "../Pipeline";
 import { LightingResource } from "../resources/LightingResource";
 import { MaterialResource } from "../resources/MaterialResource";
 import { TextureResource } from "../resources/TextureResource";
 import { TransformResource } from "../resources/TransformResource";
-import { mathConstants, mathFunctions } from "../shader-lib/math-functions";
-import { shader, shaderBuilder } from "../shader-lib/utils";
+import { mathConstants, mathFunctions } from "../shader-lib/MathFunctions";
+import { shader, shaderBuilder } from "../shader-lib/Utils";
 
 // prettier-ignore
 const vertexShader = shader<DebugDefines>`

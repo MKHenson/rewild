@@ -1,9 +1,9 @@
-import { GameManager } from "../../gameManager";
-import { Texture } from "../../GPUTexture";
+import { GameManager } from "../../GameManager";
+import { Texture } from "../../Texture";
 import { PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./PipelineResourceInstance";
 import { Pipeline } from "../Pipeline";
-import { Defines } from "../shader-lib/utils";
+import { Defines } from "../shader-lib/Utils";
 import { GroupType } from "../../../../common/GroupType";
 
 export class TextureResource extends PipelineResourceTemplate {

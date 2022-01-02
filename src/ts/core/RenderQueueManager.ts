@@ -1,6 +1,6 @@
 import { GroupType } from "../../common/GroupType";
 import { GPUCommands } from "../../common/Commands";
-import { GameManager } from "./gameManager";
+import { GameManager } from "./GameManager";
 import { Pipeline } from "./pipelines/Pipeline";
 import { LightingResource } from "./pipelines/resources/LightingResource";
 import { PipelineResourceInstance } from "./pipelines/resources/PipelineResourceInstance";
