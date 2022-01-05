@@ -42,9 +42,9 @@ fn main([[location(0)]] pos: vec4<f32>, [[location(1)]] norm: vec3<f32>, [[locat
 // prettier-ignore
 const fragmentShader = shader<DebugDefines>`
 
-${e => e.findTemplateByType(GroupType.Lighting)!.template.fragmentBlock}
-${e => e.findTemplateByType(GroupType.Material)!.template.fragmentBlock}
-${e => e.defines.diffuse ? e.findTemplateByType(GroupType.Diffuse)!.template.fragmentBlock : ''}
+${e => e.findTemplateByType(GroupType.Material, 'lighting')!.template.fragmentBlock}
+${e => e.findTemplateByType(GroupType.Material, 'material')!.template.fragmentBlock}
+${e => e.defines.diffuse ? e.findTemplateByType(GroupType.Material, 'texture')!.template.fragmentBlock : ''}
 
 // INTERNAL STRUCTS
 struct IncidentLight {

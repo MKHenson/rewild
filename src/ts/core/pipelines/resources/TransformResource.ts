@@ -1,7 +1,6 @@
 import { GameManager } from "../../GameManager";
 import { UNIFORM_TYPES_MAP } from "./MemoryUtils";
-import { PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
-import { PipelineResourceInstance } from "./PipelineResourceInstance";
+import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { Pipeline } from "../Pipeline";
 import { Defines } from "../shader-lib/Utils";
 import { GroupType } from "../../../../common/GroupType";
@@ -10,7 +9,7 @@ export class TransformResource extends PipelineResourceTemplate {
   binding: number;
 
   constructor() {
-    super(GroupType.Transform);
+    super(GroupType.Transform, "transform");
   }
 
   build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
@@ -49,7 +48,7 @@ export class TransformResource extends PipelineResourceTemplate {
     return 0;
   }
 
-  createInstance(manager: GameManager, pipeline: GPURenderPipeline): PipelineResourceInstance {
+  getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
     const SIZEOF_MATRICES = UNIFORM_TYPES_MAP["mat4x4<f32>"] * 2 + UNIFORM_TYPES_MAP["mat3x3<f32>"];
 
     const buffer = manager.device.createBuffer({
@@ -58,10 +57,8 @@ export class TransformResource extends PipelineResourceTemplate {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    const bindGroup = manager.device.createBindGroup({
-      label: "transform",
-      layout: pipeline.getBindGroupLayout(this.template.group),
-      entries: [
+    return {
+      binds: [
         {
           binding: this.binding,
           resource: {
@@ -71,8 +68,7 @@ export class TransformResource extends PipelineResourceTemplate {
           },
         },
       ],
-    });
-
-    return new PipelineResourceInstance(this.template.group, bindGroup, buffer);
+      buffer,
+    };
   }
 }

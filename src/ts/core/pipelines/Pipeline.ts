@@ -1,5 +1,5 @@
 import { GameManager } from "../GameManager";
-import { PipelineResourceTemplate } from "./resources/PipelineResourceTemplate";
+import { BindingData, PipelineResourceTemplate } from "./resources/PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./resources/PipelineResourceInstance";
 import { GroupType } from "../../../common/GroupType";
 import "./shader-lib/Utils";
@@ -28,7 +28,7 @@ export abstract class Pipeline<T extends Defines<T>> {
   vertexSource: SourceFragments<T>;
   private _defines: Defines<T>;
   private resourceTemplates: PipelineResourceTemplate[];
-  resourceInstances: Map<GroupType, PipelineResourceInstance[]>;
+  groupInstances: Map<GroupType, PipelineResourceInstance[]>;
   rebuild: boolean;
 
   groupMapping: Map<GroupType, GroupMapping>;
@@ -40,7 +40,7 @@ export abstract class Pipeline<T extends Defines<T>> {
     this.vertexSource = vertexSource;
     this.fragmentSource = fragmentSource;
     this.resourceTemplates = [];
-    this.resourceInstances = new Map();
+    this.groupInstances = new Map();
     this.defines = defines;
     this.rebuild = true;
 
@@ -82,8 +82,9 @@ export abstract class Pipeline<T extends Defines<T>> {
   /** Use this function to add resource templates */
   abstract onAddResources(): void;
 
-  findTemplateByType(type: GroupType) {
-    return this.resourceTemplates.find((r) => r.groupType === type) || null;
+  findTemplateByType(type: GroupType, subType?: string) {
+    if (subType) return this.resourceTemplates.find((r) => r.groupType === type && r.groupSubType === subType) || null;
+    else return this.resourceTemplates.find((r) => r.groupType === type) || null;
   }
 
   addTemplate(template: PipelineResourceTemplate) {
@@ -94,66 +95,120 @@ export abstract class Pipeline<T extends Defines<T>> {
   build(gameManager: GameManager): void {
     this.rebuild = false;
 
-    const resourceInstanceMap = this.resourceInstances;
-    const keys = Array.from(this.resourceTemplates.keys());
+    const groupInstanceMap = this.groupInstances;
+    const templates = this.resourceTemplates;
 
     // Destroy previous instances
-    keys.forEach((key) => {
-      const resourceInstances = resourceInstanceMap.get(key);
+    templates.forEach((template) => {
+      const resourceInstances = groupInstanceMap.get(template.groupType);
       resourceInstances?.forEach((i) => {
         i.dispose();
       });
     });
 
     // Reset
-    this.resourceTemplates.splice(0, this.resourceTemplates.length);
+    templates.splice(0, templates.length);
     this.groupMapping.clear();
     this.groups = 0;
 
     this.onAddResources();
 
     let curBinding = 0;
-    let prevGroup = -1;
-    this.resourceTemplates.forEach((resourceTemplate) => {
+    const binds: Map<number, number> = new Map();
+
+    templates.forEach((resourceTemplate) => {
+      const groupIndex = this.groupIndex(resourceTemplate.groupType);
+      if (!binds.has(groupIndex)) binds.set(groupIndex, 0);
+
+      curBinding = binds.get(groupIndex)!;
+
       const template = resourceTemplate.build(gameManager, this, curBinding);
 
-      if (prevGroup !== -1) {
-        if (prevGroup === template.group) curBinding += template.bindings.length;
-        else curBinding = 0;
-      }
+      curBinding += template.bindings.length;
+      binds.set(groupIndex, curBinding);
 
-      prevGroup = template.group;
       resourceTemplate.template = template;
     });
   }
 
   initialize(gameManager: GameManager): void {
-    const prevKeys = Array.from(this.resourceInstances.keys());
-    const curKeys = this.resourceTemplates.map((r) => r.groupType);
+    const templates = this.resourceTemplates;
+    const groupInstances = this.groupInstances;
+    const prevGroupKeys = Array.from(this.groupInstances.keys());
+    const uniqueNewGroupKeys = templates
+      .map((r) => r.groupType)
+      .filter((value, index, self) => self.indexOf(value) === index);
+    const groupCache: Map<GroupType, { numInstances: number; bindData: Map<number, BindingData[]> }> = new Map();
 
     // Remove any unused instances
-    prevKeys.forEach((key) => {
-      if (!curKeys.includes(key)) this.resourceInstances.delete(key);
+    prevGroupKeys.forEach((key) => {
+      if (!uniqueNewGroupKeys.includes(key)) groupInstances.delete(key);
     });
 
-    this.resourceTemplates.forEach((resourceTemplate) => {
-      let numInstancesToCreate = resourceTemplate.initialize(gameManager, this);
+    // Initialize temp cache maps
+    for (const newKey of uniqueNewGroupKeys) {
+      let numInstancesToCreate = 0;
       let instances: PipelineResourceInstance[];
 
       // If we previously had instances, then save the number of them
       // as we have to re-create the same amount as before. Otherwise just create 1;
-      if (this.resourceInstances.has(resourceTemplate.groupType)) {
-        instances = this.resourceInstances.get(resourceTemplate.groupType)!;
+      if (groupInstances.has(newKey)) {
+        instances = groupInstances.get(newKey)!;
         numInstancesToCreate = instances.length;
         instances.splice(0, instances.length);
       } else {
+        numInstancesToCreate = 1;
         instances = [];
-        this.resourceInstances.set(resourceTemplate.groupType, instances);
+        groupInstances.set(newKey, instances);
       }
 
-      for (let i = 0; i < numInstancesToCreate; i++) {
-        instances.push(resourceTemplate.createInstance(gameManager, this.renderPipeline!));
+      groupCache.set(newKey, { bindData: new Map(), numInstances: numInstancesToCreate });
+    }
+
+    // Initialize each template
+    templates.forEach((resourceTemplate) => {
+      resourceTemplate.initialize(gameManager, this);
+
+      const { bindData, numInstances } = groupCache.get(resourceTemplate.groupType)!;
+
+      for (let i = 0; i < numInstances; i++)
+        if (bindData.has(i)) {
+          bindData.get(i)!.push(resourceTemplate.getBindingData(gameManager, this.renderPipeline!));
+        } else {
+          bindData.set(i, [resourceTemplate.getBindingData(gameManager, this.renderPipeline!)]);
+        }
+    });
+
+    // Create the instances & bind groups
+    groupCache.forEach((cache, groupType) => {
+      const instances: PipelineResourceInstance[] = new Array(cache.numInstances);
+      const groupIndex = this.groupIndex(groupType);
+
+      for (let i = 0; i < cache.numInstances; i++) {
+        let buffers: GPUBuffer[] | null = null;
+
+        // Join all the entries from each template
+        // Also join all the collect each of the buffers we want to cache for the render queue
+        const entries: GPUBindGroupEntry[] = cache.bindData.get(i)!.reduce((accumulator, cur) => {
+          if (cur.buffer) {
+            if (!buffers) buffers = [cur.buffer];
+            else buffers.push(cur.buffer);
+          }
+
+          accumulator.push(...cur.binds);
+          return accumulator;
+        }, [] as GPUBindGroupEntry[]);
+
+        const bindGroup = gameManager.device.createBindGroup({
+          label: GroupType[groupType],
+          layout: this.renderPipeline!.getBindGroupLayout(groupIndex),
+          entries,
+        });
+
+        instances[i] = new PipelineResourceInstance(groupIndex, bindGroup, buffers);
       }
+
+      groupInstances.set(groupType, instances);
     });
   }
 
@@ -161,10 +216,23 @@ export abstract class Pipeline<T extends Defines<T>> {
     const template = this.findTemplateByType(type);
 
     if (template) {
-      const newInstance = template.createInstance(manager, this.renderPipeline!);
+      const bindingData = template.getBindingData(manager, this.renderPipeline!);
+      const groupIndex = this.groupIndex(type);
 
-      const instanceArray = this.resourceInstances.get(type)!;
-      instanceArray.push(newInstance);
+      const bindGroup = manager.device.createBindGroup({
+        label: GroupType[type],
+        layout: this.renderPipeline!.getBindGroupLayout(groupIndex),
+        entries: bindingData.binds,
+      });
+
+      const instances = new PipelineResourceInstance(
+        groupIndex,
+        bindGroup,
+        bindingData.buffer ? [bindingData.buffer] : null
+      );
+
+      const instanceArray = this.groupInstances.get(type)!;
+      instanceArray.push(instances);
       return instanceArray.length - 1;
     } else throw new Error("Pipeline does not use resource type");
   }

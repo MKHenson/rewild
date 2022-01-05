@@ -1,7 +1,6 @@
 import { GameManager } from "../../GameManager";
 import { UNIFORM_TYPES_MAP } from "./MemoryUtils";
-import { PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
-import { PipelineResourceInstance } from "./PipelineResourceInstance";
+import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { GroupType } from "../../../../common/GroupType";
 import { Defines } from "../shader-lib/Utils";
 import { Pipeline } from "../Pipeline";
@@ -19,7 +18,7 @@ export class LightingResource extends PipelineResourceTemplate {
   sceneLightingBinding: number;
 
   constructor() {
-    super(GroupType.Lighting);
+    super(GroupType.Material, "lighting");
   }
 
   build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
@@ -117,11 +116,9 @@ export class LightingResource extends PipelineResourceTemplate {
     return 1;
   }
 
-  createInstance(manager: GameManager, pipeline: GPURenderPipeline): PipelineResourceInstance {
-    const bindGroup = manager.device.createBindGroup({
-      label: "lighting",
-      layout: pipeline.getBindGroupLayout(this.template.group),
-      entries: [
+  getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
+    return {
+      binds: [
         {
           binding: this.lightingConfigBinding,
           resource: {
@@ -144,8 +141,7 @@ export class LightingResource extends PipelineResourceTemplate {
             }
           : []
       ),
-    });
-
-    return new PipelineResourceInstance(this.template.group, bindGroup);
+      buffer: null,
+    };
   }
 }

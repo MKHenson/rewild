@@ -181,7 +181,6 @@ export class GameManager {
     // Assign a transform buffer to the intance
     meshPipelineIns.transformGroupId = debugPipeline.findTemplateByType(GroupType.Transform)!.template.group;
     meshPipelineIns.materialGroupId = debugPipeline.findTemplateByType(GroupType.Material)!.template.group;
-    meshPipelineIns.lightingGroupId = debugPipeline.findTemplateByType(GroupType.Lighting)!.template.group;
     meshPipelineIns.transformResourceIndex = debugPipeline.addResourceInstance(this, GroupType.Transform);
 
     if (useTexture) {

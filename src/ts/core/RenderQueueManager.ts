@@ -39,7 +39,7 @@ export class RenderQueueManager {
             LightingResource.numDirLights = numDirectionLights;
             LightingResource.rebuildDirectionLights = true;
             this.manager.pipelines.forEach((p) => {
-              if (p.findTemplateByType(GroupType.Lighting)) {
+              if (p.findTemplateByType(GroupType.Material)) {
                 p.defines = { ...p.defines, NUM_DIR_LIGHTS: numDirectionLights };
               }
             });
@@ -67,7 +67,7 @@ export class RenderQueueManager {
           break;
 
         case GPUCommands.SET_TRANSFORM:
-          instances = pipeline!.resourceInstances.get(GroupType.Transform)!;
+          instances = pipeline!.groupInstances.get(GroupType.Transform)!;
           resourceIndex = commandBuffer[i + 1];
           const projMatrixPtr = getPtrIndex(commandBuffer[i + 2]);
           const mvMatrixPtr = getPtrIndex(commandBuffer[i + 3]);
@@ -88,7 +88,7 @@ export class RenderQueueManager {
           normalAs4x4[9] = mat3x3[7];
           normalAs4x4[10] = mat3x3[8];
 
-          const transformBuffer = instances[resourceIndex].buffer!;
+          const transformBuffer = instances[resourceIndex].buffers![0];
           device.queue.writeBuffer(transformBuffer, 0, wasmMemoryBlock, projMatrixPtr, 64);
           device.queue.writeBuffer(transformBuffer, 64, wasmMemoryBlock, mvMatrixPtr, 64);
           device.queue.writeBuffer(transformBuffer, 128, normalAs4x4);
@@ -134,7 +134,7 @@ export class RenderQueueManager {
           break;
 
         case GPUCommands.SET_BIND_GROUP:
-          instances = pipeline!.resourceInstances.get(commandBuffer[i + 1])!;
+          instances = pipeline!.groupInstances.get(commandBuffer[i + 1])!;
           const instance = instances?.[commandBuffer[i + 2]];
           if (instance) pass.setBindGroup(instance.group, instance.bindGroup);
 

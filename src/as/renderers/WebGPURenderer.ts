@@ -97,10 +97,7 @@ export class WebGPURenderer {
 
     renderQueue.setBindGroupResource(GroupType.Transform, transformIndex);
     renderQueue.setBindGroupResource(GroupType.Material);
-    renderQueue.setBindGroupResource(GroupType.Lighting);
 
-    if (mesh.pipelines[0].diffuseResourceIndex != -1)
-      renderQueue.setBindGroupResource(GroupType.Diffuse, mesh.pipelines[0].diffuseResourceIndex);
     // ========================
 
     if (mesh.geometry) {

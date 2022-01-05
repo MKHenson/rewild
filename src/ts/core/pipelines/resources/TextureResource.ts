@@ -1,7 +1,6 @@
 import { GameManager } from "../../GameManager";
 import { Texture } from "../../Texture";
-import { PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
-import { PipelineResourceInstance } from "./PipelineResourceInstance";
+import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { Pipeline } from "../Pipeline";
 import { Defines } from "../shader-lib/Utils";
 import { GroupType } from "../../../../common/GroupType";
@@ -12,7 +11,7 @@ export class TextureResource extends PipelineResourceTemplate {
   samplerBind: number;
 
   constructor(texture: Texture) {
-    super(GroupType.Diffuse);
+    super(GroupType.Material, "texture");
     this.texture = texture;
   }
 
@@ -38,11 +37,9 @@ export class TextureResource extends PipelineResourceTemplate {
     return 1;
   }
 
-  createInstance(manager: GameManager, pipeline: GPURenderPipeline): PipelineResourceInstance {
-    const bindGroup = manager.device.createBindGroup({
-      label: "diffuse",
-      layout: pipeline.getBindGroupLayout(this.template.group),
-      entries: [
+  getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
+    return {
+      binds: [
         {
           binding: this.samplerBind,
           resource: manager.samplers[0],
@@ -52,8 +49,7 @@ export class TextureResource extends PipelineResourceTemplate {
           resource: this.texture!.gpuTexture.createView(),
         },
       ],
-    });
-
-    return new PipelineResourceInstance(this.template.group, bindGroup);
+      buffer: null,
+    };
   }
 }

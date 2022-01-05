@@ -1,6 +1,5 @@
 import { GameManager } from "../../GameManager";
-import { PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
-import { PipelineResourceInstance } from "./PipelineResourceInstance";
+import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { Defines } from "../shader-lib/Utils";
 import { Pipeline } from "../Pipeline";
 import { GroupType } from "../../../../common/GroupType";
@@ -9,7 +8,7 @@ export class MaterialResource extends PipelineResourceTemplate {
   binding: number;
 
   constructor() {
-    super(GroupType.Material);
+    super(GroupType.Material, "material");
   }
 
   build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
@@ -66,7 +65,7 @@ export class MaterialResource extends PipelineResourceTemplate {
     return 1;
   }
 
-  createInstance(manager: GameManager, pipeline: GPURenderPipeline): PipelineResourceInstance {
+  getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
     // prettier-ignore
     const initialValues = new Float32Array([
       1, 1, 1, 0,         // Diffuse
@@ -94,17 +93,14 @@ export class MaterialResource extends PipelineResourceTemplate {
       size: SIZE,
     };
 
-    const bindGroup = manager.device.createBindGroup({
-      label: "materialData",
-      layout: pipeline.getBindGroupLayout(this.template.group),
-      entries: [
+    return {
+      binds: [
         {
           binding: this.binding,
           resource,
         },
       ],
-    });
-
-    return new PipelineResourceInstance(this.template.group, bindGroup, buffer);
+      buffer,
+    };
   }
 }
