@@ -1,4 +1,4 @@
-import { GroupType } from "../../../../common/GroupType";
+import { ResourceType } from "../../../../common/ResourceType";
 import { GameManager } from "../../GameManager";
 import { Texture } from "../../Texture";
 import { defaultPipelineDescriptor } from "../DefaultPipelineDescriptor";
@@ -12,7 +12,7 @@ import { shader, shaderBuilder } from "../shader-lib/Utils";
 
 // prettier-ignore
 const vertexShader = shader<DebugDefines>`
-${e => e.findTemplateByType(GroupType.Transform)!.template.vertexBlock }
+${e => e.getTemplateByType(ResourceType.Transform)!.template.vertexBlock }
 
 struct Output {
     [[builtin(position)]] Position : vec4<f32>;
@@ -42,9 +42,9 @@ fn main([[location(0)]] pos: vec4<f32>, [[location(1)]] norm: vec3<f32>, [[locat
 // prettier-ignore
 const fragmentShader = shader<DebugDefines>`
 
-${e => e.findTemplateByType(GroupType.Material, 'lighting')!.template.fragmentBlock}
-${e => e.findTemplateByType(GroupType.Material, 'material')!.template.fragmentBlock}
-${e => e.defines.diffuse ? e.findTemplateByType(GroupType.Material, 'texture')!.template.fragmentBlock : ''}
+${e => e.getTemplateByType(ResourceType.Lighting)!.template.fragmentBlock}
+${e => e.getTemplateByType(ResourceType.Material)!.template.fragmentBlock}
+${e => e.defines.diffuse ? e.getTemplateByType(ResourceType.Texture)!.template.fragmentBlock : ''}
 
 // INTERNAL STRUCTS
 struct IncidentLight {

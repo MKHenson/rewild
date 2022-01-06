@@ -1,4 +1,5 @@
 import { GroupType } from "../../common/GroupType";
+import { ResourceType } from "../../common/ResourceType";
 import { GPUCommands } from "../../common/Commands";
 import { GameManager } from "./GameManager";
 import { Pipeline } from "./pipelines/Pipeline";
@@ -39,7 +40,7 @@ export class RenderQueueManager {
             LightingResource.numDirLights = numDirectionLights;
             LightingResource.rebuildDirectionLights = true;
             this.manager.pipelines.forEach((p) => {
-              if (p.findTemplateByType(GroupType.Material)) {
+              if (p.getTemplateByType(ResourceType.Material)) {
                 p.defines = { ...p.defines, NUM_DIR_LIGHTS: numDirectionLights };
               }
             });

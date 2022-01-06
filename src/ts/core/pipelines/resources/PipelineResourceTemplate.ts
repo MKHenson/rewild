@@ -1,6 +1,7 @@
 import { GameManager } from "../../GameManager";
 import { Pipeline } from "../Pipeline";
 import { GroupType } from "../../../../common/GroupType";
+import { ResourceType } from "../../../../common/ResourceType";
 import { Defines } from "../shader-lib/Utils";
 
 export type Template = {
@@ -18,11 +19,11 @@ export type BindingData = {
 export abstract class PipelineResourceTemplate {
   template: Template;
   groupType: GroupType;
-  groupSubType: string;
+  resourceType: ResourceType;
 
-  constructor(groupType: GroupType, groupSubType: string) {
+  constructor(groupType: GroupType, groupSubType: ResourceType) {
     this.groupType = groupType;
-    this.groupSubType = groupSubType;
+    this.resourceType = groupSubType;
   }
 
   /** Creates the resource. Must return a group index*/

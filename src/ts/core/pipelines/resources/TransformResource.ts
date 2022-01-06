@@ -4,12 +4,13 @@ import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResou
 import { Pipeline } from "../Pipeline";
 import { Defines } from "../shader-lib/Utils";
 import { GroupType } from "../../../../common/GroupType";
+import { ResourceType } from "../../../../common/ResourceType";
 
 export class TransformResource extends PipelineResourceTemplate {
   binding: number;
 
   constructor() {
-    super(GroupType.Transform, "transform");
+    super(GroupType.Transform, ResourceType.Transform);
   }
 
   build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {

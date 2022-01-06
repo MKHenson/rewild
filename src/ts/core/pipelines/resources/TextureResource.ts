@@ -4,6 +4,7 @@ import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResou
 import { Pipeline } from "../Pipeline";
 import { Defines } from "../shader-lib/Utils";
 import { GroupType } from "../../../../common/GroupType";
+import { ResourceType } from "../../../../common/ResourceType";
 
 export class TextureResource extends PipelineResourceTemplate {
   texture: Texture;
@@ -11,7 +12,7 @@ export class TextureResource extends PipelineResourceTemplate {
   samplerBind: number;
 
   constructor(texture: Texture) {
-    super(GroupType.Material, "texture");
+    super(GroupType.Material, ResourceType.Texture);
     this.texture = texture;
   }
 

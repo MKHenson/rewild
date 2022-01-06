@@ -2,6 +2,7 @@ import { GameManager } from "../GameManager";
 import { BindingData, PipelineResourceTemplate } from "./resources/PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./resources/PipelineResourceInstance";
 import { GroupType } from "../../../common/GroupType";
+import { ResourceType } from "../../../common/ResourceType";
 import "./shader-lib/Utils";
 import { Defines, SourceFragments } from "./shader-lib/Utils";
 
@@ -82,9 +83,12 @@ export abstract class Pipeline<T extends Defines<T>> {
   /** Use this function to add resource templates */
   abstract onAddResources(): void;
 
-  findTemplateByType(type: GroupType, subType?: string) {
-    if (subType) return this.resourceTemplates.find((r) => r.groupType === type && r.groupSubType === subType) || null;
-    else return this.resourceTemplates.find((r) => r.groupType === type) || null;
+  getTemplateByType(type: ResourceType) {
+    return this.resourceTemplates.find((t) => t.resourceType === type);
+  }
+
+  getTemplateByGroup(type: GroupType) {
+    return this.resourceTemplates.find((t) => t.groupType === type);
   }
 
   addTemplate(template: PipelineResourceTemplate) {
@@ -213,7 +217,7 @@ export abstract class Pipeline<T extends Defines<T>> {
   }
 
   addResourceInstance(manager: GameManager, type: GroupType) {
-    const template = this.findTemplateByType(type);
+    const template = this.getTemplateByGroup(type);
 
     if (template) {
       const bindingData = template.getBindingData(manager, this.renderPipeline!);

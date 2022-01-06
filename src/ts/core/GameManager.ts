@@ -8,6 +8,7 @@ import { RenderQueueManager } from "./RenderQueueManager";
 import { WasmInterface } from "..";
 import { Texture } from "./Texture";
 import { GroupType } from "../../common/GroupType";
+import { ResourceType } from "../../common/ResourceType";
 import { MeshPipeline } from "build/types";
 
 const meshPipelineInstances: MeshPipeline[] = [];
@@ -134,9 +135,6 @@ export class GameManager {
           p.defines = p.defines;
         }
       });
-      meshPipelineInstances.forEach((pi) => {
-        pi.diffuseResourceIndex = pi.diffuseResourceIndex === -1 ? 0 : -1;
-      });
     });
   }
 
@@ -179,13 +177,8 @@ export class GameManager {
     meshPipelineInstances.push(meshPipelineIns);
 
     // Assign a transform buffer to the intance
-    meshPipelineIns.transformGroupId = debugPipeline.findTemplateByType(GroupType.Transform)!.template.group;
-    meshPipelineIns.materialGroupId = debugPipeline.findTemplateByType(GroupType.Material)!.template.group;
+    meshPipelineIns.transformGroupId = debugPipeline.getTemplateByType(ResourceType.Transform)!.template.group;
     meshPipelineIns.transformResourceIndex = debugPipeline.addResourceInstance(this, GroupType.Transform);
-
-    if (useTexture) {
-      meshPipelineIns.diffuseResourceIndex = 0;
-    }
 
     const geometryPtr =
       type === "box" ? this.wasm.GeometryFactory.createBox(size) : this.wasm.GeometryFactory.createSphere(size);

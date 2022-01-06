@@ -2,6 +2,7 @@ import { GameManager } from "../../GameManager";
 import { UNIFORM_TYPES_MAP } from "./MemoryUtils";
 import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { GroupType } from "../../../../common/GroupType";
+import { ResourceType } from "../../../../common/ResourceType";
 import { Defines } from "../shader-lib/Utils";
 import { Pipeline } from "../Pipeline";
 
@@ -18,7 +19,7 @@ export class LightingResource extends PipelineResourceTemplate {
   sceneLightingBinding: number;
 
   constructor() {
-    super(GroupType.Material, "lighting");
+    super(GroupType.Material, ResourceType.Lighting);
   }
 
   build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {

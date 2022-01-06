@@ -3,12 +3,13 @@ import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResou
 import { Defines } from "../shader-lib/Utils";
 import { Pipeline } from "../Pipeline";
 import { GroupType } from "../../../../common/GroupType";
+import { ResourceType } from "../../../../common/ResourceType";
 
 export class MaterialResource extends PipelineResourceTemplate {
   binding: number;
 
   constructor() {
-    super(GroupType.Material, "material");
+    super(GroupType.Material, ResourceType.Material);
   }
 
   build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
