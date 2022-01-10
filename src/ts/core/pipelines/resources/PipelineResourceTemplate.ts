@@ -20,10 +20,12 @@ export abstract class PipelineResourceTemplate {
   template: Template;
   groupType: GroupType;
   resourceType: ResourceType;
+  id?: string;
 
-  constructor(groupType: GroupType, groupSubType: ResourceType) {
+  constructor(groupType: GroupType, groupSubType: ResourceType, id?: string) {
     this.groupType = groupType;
     this.resourceType = groupSubType;
+    this.id = id;
   }
 
   /** Creates the resource. Must return a group index*/

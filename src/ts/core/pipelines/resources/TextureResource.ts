@@ -11,8 +11,8 @@ export class TextureResource extends PipelineResourceTemplate {
   textureBind: number;
   samplerBind: number;
 
-  constructor(texture: Texture) {
-    super(GroupType.Material, ResourceType.Texture);
+  constructor(texture: Texture, id: string) {
+    super(GroupType.Material, ResourceType.Texture, id);
     this.texture = texture;
   }
 
@@ -26,9 +26,9 @@ export class TextureResource extends PipelineResourceTemplate {
       group,
       bindings: [manager.samplers[0], this.texture!.gpuTexture.createView()],
       fragmentBlock: `
-      ${pipeline.defines.diffuse && `
-      [[group(${group}), binding(${this.samplerBind})]] var mySampler: sampler;
-      [[group(${group}), binding(${this.textureBind})]] var myTexture: texture_2d<f32>;`
+      ${pipeline.defines.diffuseMap && `
+      [[group(${group}), binding(${this.samplerBind})]] var ${this.id}Sampler: sampler;
+      [[group(${group}), binding(${this.textureBind})]] var ${this.id}Texture: texture_2d<f32>;`
       }`,
       vertexBlock: null,
     };

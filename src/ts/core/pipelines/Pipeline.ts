@@ -83,8 +83,9 @@ export abstract class Pipeline<T extends Defines<T>> {
   /** Use this function to add resource templates */
   abstract onAddResources(): void;
 
-  getTemplateByType(type: ResourceType) {
-    return this.resourceTemplates.find((t) => t.resourceType === type);
+  getTemplateByType(type: ResourceType, id?: string) {
+    if (id) return this.resourceTemplates.find((t) => t.resourceType === type && id === t.id);
+    else return this.resourceTemplates.find((t) => t.resourceType === type);
   }
 
   getTemplateByGroup(type: GroupType) {

@@ -96,7 +96,7 @@ export class GameManager {
 
     // PIPELINES
     this.pipelines = [
-      new DebugPipeline("textured", { diffuse: this.textures[1], NUM_DIR_LIGHTS: 0 }),
+      new DebugPipeline("textured", { diffuseMap: this.textures[1], NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("simple", { NUM_DIR_LIGHTS: 0 }),
     ];
 
@@ -127,11 +127,11 @@ export class GameManager {
     window.addEventListener("click", (e) => {
       const pipelines = this.pipelines as DebugPipeline[];
       pipelines.forEach((p) => {
-        if (p.defines.diffuse) {
-          delete p.defines.diffuse;
+        if (p.defines.diffuseMap) {
+          delete p.defines.diffuseMap;
           p.defines = p.defines;
         } else {
-          p.defines.diffuse = this.textures[1];
+          p.defines.diffuseMap = this.textures[1];
           p.defines = p.defines;
         }
       });

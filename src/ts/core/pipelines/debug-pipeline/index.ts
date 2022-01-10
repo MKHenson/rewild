@@ -44,7 +44,8 @@ const fragmentShader = shader<DebugDefines>`
 
 ${e => e.getTemplateByType(ResourceType.Lighting)!.template.fragmentBlock}
 ${e => e.getTemplateByType(ResourceType.Material)!.template.fragmentBlock}
-${e => e.defines.diffuse ? e.getTemplateByType(ResourceType.Texture)!.template.fragmentBlock : ''}
+${e => e.defines.diffuseMap ? e.getTemplateByType(ResourceType.Texture, 'diffuse')!.template.fragmentBlock : ''}
+${e => e.defines.normalMap ? e.getTemplateByType(ResourceType.Texture, 'normal')!.template.fragmentBlock : ''}
 
 // INTERNAL STRUCTS
 struct IncidentLight {
@@ -199,8 +200,8 @@ fn main(
   var diffuseColor = vec4<f32>( materialData.diffuse.xyz, materialData.opacity );
   var reflectedLight: ReflectedLight = ReflectedLight( vec3<f32>( 0.0 ), vec3<f32>( 0.0 ), vec3<f32>( 0.0 ), vec3<f32>( 0.0 ) );
 
-  ${e => e.defines.diffuse &&
-  `var texelColor = textureSample(myTexture, mySampler, vFragUV);
+  ${e => e.defines.diffuseMap &&
+  `var texelColor = textureSample(diffuseTexture, diffuseSampler, vFragUV);
   diffuseColor = diffuseColor * texelColor;`}
 
   // TODO: Alpha test - discard early
@@ -316,7 +317,8 @@ fn main(
 `;
 
 interface DebugDefines {
-  diffuse?: Texture;
+  diffuseMap?: Texture;
+  normalMap?: Texture;
   metalnessMap?: Texture;
   roughnessMap?: Texture;
   NUM_DIR_LIGHTS: number;
@@ -337,8 +339,13 @@ export class DebugPipeline extends Pipeline<DebugDefines> {
     const lightingResource = new LightingResource();
     this.addTemplate(lightingResource);
 
-    if (this.defines.diffuse) {
-      const resource = new TextureResource(this.defines.diffuse);
+    if (this.defines.diffuseMap) {
+      const resource = new TextureResource(this.defines.diffuseMap, "diffuse");
+      this.addTemplate(resource);
+    }
+
+    if (this.defines.normalMap) {
+      const resource = new TextureResource(this.defines.normalMap, "normal");
       this.addTemplate(resource);
     }
   }
