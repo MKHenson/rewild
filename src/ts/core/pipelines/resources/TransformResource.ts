@@ -45,10 +45,6 @@ export class TransformResource extends PipelineResourceTemplate {
     };
   }
 
-  initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
-    return 0;
-  }
-
   getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
     const SIZEOF_MATRICES = UNIFORM_TYPES_MAP["mat4x4<f32>"] * 2 + UNIFORM_TYPES_MAP["mat3x3<f32>"];
 

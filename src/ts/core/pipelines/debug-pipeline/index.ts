@@ -196,8 +196,6 @@ fn main(
   var geometryNormal = normal;
 
   var totalEmissiveRadiance: vec3<f32> = materialData.emissive.xyz;
-  // vec3<f32> outgoingLight = totalEmissiveRadiance;
-
   var diffuseColor = vec4<f32>( materialData.diffuse.xyz, materialData.opacity );
   var reflectedLight: ReflectedLight = ReflectedLight( vec3<f32>( 0.0 ), vec3<f32>( 0.0 ), vec3<f32>( 0.0 ), vec3<f32>( 0.0 ) );
 
@@ -219,7 +217,7 @@ fn main(
   var roughnessFactor: f32 = materialData.roughness;
   // TODO:
   ${e => e.defines.roughnessMap &&
-    `vec4 texelRoughness = = textureSample(roughnessMap, mySampler, vFragUV);
+    `vec4 texelRoughness = textureSample(roughnessMap, mySampler, vFragUV);
     roughnessFactor *= texelRoughness.b;`
   }
 
@@ -230,8 +228,6 @@ fn main(
   geometry.viewDir =  select(normalize( vViewPosition ), vec3<f32>( 0.0, 0.0, 1.0 ), isOrthographic ); // Same as ternary operator (select( false, true, condition ))
 
   var directLight: IncidentLight;
-
-
   var material: PhysicalMaterial;
 
   material.diffuseColor = diffuseColor.rgb * ( 1.0 - metalnessFactor );

@@ -28,9 +28,5 @@ export abstract class PipelineResourceTemplate {
 
   /** Creates the resource. Must return a group index*/
   abstract build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template;
-
-  /** Initialize the resource and return the number of initial instances to create */
-  abstract initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number;
-
   abstract getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData;
 }

@@ -34,10 +34,6 @@ export class TextureResource extends PipelineResourceTemplate {
     };
   }
 
-  initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
-    return 1;
-  }
-
   getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
     return {
       binds: [

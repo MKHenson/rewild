@@ -62,10 +62,6 @@ export class MaterialResource extends PipelineResourceTemplate {
     };
   }
 
-  initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
-    return 1;
-  }
-
   getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
     // prettier-ignore
     const initialValues = new Float32Array([

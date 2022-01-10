@@ -171,8 +171,6 @@ export abstract class Pipeline<T extends Defines<T>> {
 
     // Initialize each template
     templates.forEach((resourceTemplate) => {
-      resourceTemplate.initialize(gameManager, this);
-
       const { bindData, numInstances } = groupCache.get(resourceTemplate.groupType)!;
 
       for (let i = 0; i < numInstances; i++)

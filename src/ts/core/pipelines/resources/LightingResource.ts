@@ -28,42 +28,6 @@ export class LightingResource extends PipelineResourceTemplate {
     this.directionLightBinding = pipeline.defines.NUM_DIR_LIGHTS ? curBindIndex + 2 : -1;
     const group = pipeline.groupIndex(this.groupType);
 
-    // prettier-ignore
-    return {
-      group,
-      bindings: [ { buffer: LightingResource.lightingConfig, }, { buffer: LightingResource.sceneLightingBuffer },
-      ].concat(LightingResource.numDirLights ? { buffer: LightingResource.directionLightsBuffer } : []),
-
-      fragmentBlock: `struct SceneLightingUniform {
-        ambientLightColor: vec4<f32>;
-      };
-
-      struct LightingConfigUniform {
-        numDirectionalLights: u32;
-      };
-
-      [[group(${group}), binding(${this.lightingConfigBinding})]] var<uniform> lightingConfigUniform: LightingConfigUniform;
-      [[group(${group}), binding(${this.sceneLightingBinding})]] var<uniform> sceneLightingUniform: SceneLightingUniform;
-
-
-      ${pipeline.defines.NUM_DIR_LIGHTS ? `
-      struct DirectionLightUniform {
-        direction : vec4<f32>;
-        color : vec4<f32>;
-      };
-
-      struct DirectionLightsUniform {
-        directionalLights: array<DirectionLightUniform>;
-      };
-
-      [[group(${group}), binding(${this.directionLightBinding})]] var<storage, read> directionLightsUniform: DirectionLightsUniform;
-      ` : ''}
-      `,
-      vertexBlock: null,
-    };
-  }
-
-  initialize<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>): number {
     if (!LightingResource.lightingConfig) {
       const LIGHTING_CONFIG_SIZE = UNIFORM_TYPES_MAP["u32"];
       const SCENE_LIGHTING_BUFFER = UNIFORM_TYPES_MAP["vec4<f32>"];
@@ -114,7 +78,39 @@ export class LightingResource extends PipelineResourceTemplate {
       });
     }
 
-    return 1;
+    // prettier-ignore
+    return {
+      group,
+      bindings: [ { buffer: LightingResource.lightingConfig, }, { buffer: LightingResource.sceneLightingBuffer },
+      ].concat(LightingResource.numDirLights ? { buffer: LightingResource.directionLightsBuffer } : []),
+
+      fragmentBlock: `struct SceneLightingUniform {
+        ambientLightColor: vec4<f32>;
+      };
+
+      struct LightingConfigUniform {
+        numDirectionalLights: u32;
+      };
+
+      [[group(${group}), binding(${this.lightingConfigBinding})]] var<uniform> lightingConfigUniform: LightingConfigUniform;
+      [[group(${group}), binding(${this.sceneLightingBinding})]] var<uniform> sceneLightingUniform: SceneLightingUniform;
+
+
+      ${pipeline.defines.NUM_DIR_LIGHTS ? `
+      struct DirectionLightUniform {
+        direction : vec4<f32>;
+        color : vec4<f32>;
+      };
+
+      struct DirectionLightsUniform {
+        directionalLights: array<DirectionLightUniform>;
+      };
+
+      [[group(${group}), binding(${this.directionLightBinding})]] var<storage, read> directionLightsUniform: DirectionLightsUniform;
+      ` : ''}
+      `,
+      vertexBlock: null,
+    };
   }
 
   getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
