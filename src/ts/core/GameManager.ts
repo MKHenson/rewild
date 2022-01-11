@@ -82,8 +82,8 @@ export class GameManager {
 
     // TEXTURES
     const texturePaths = [
-      { name: "grid", path: "./media/uv-grid.jpg" },
-      { name: "crate", path: "./media/crate-wooden.jpg" },
+      { name: "grid", path: "./dist/media/uv-grid.jpg" },
+      { name: "crate", path: "./dist/media/crate-wooden.jpg" },
     ];
 
     this.textures = await Promise.all(

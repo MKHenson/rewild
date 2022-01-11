@@ -19,10 +19,6 @@ module.exports = {
         { from: "build/untouched.wasm.map", to: "" },
       ],
     }),
-    new HtmlWebpackPlugin({
-      title: "Rewild",
-      template: "./src/ts/index.html",
-    }),
   ],
   resolve: {
     // Add `.ts` and `.tsx` as a resolvable extension.

@@ -721,8 +721,8 @@ class GameManager {
             ];
             // TEXTURES
             const texturePaths = [
-                { name: "grid", path: "./media/uv-grid.jpg" },
-                { name: "crate", path: "./media/crate-wooden.jpg" },
+                { name: "grid", path: "./dist/media/uv-grid.jpg" },
+                { name: "crate", path: "./dist/media/crate-wooden.jpg" },
             ];
             this.textures = yield Promise.all(texturePaths.map((tp, index) => {
                 const texture = new _Texture__WEBPACK_IMPORTED_MODULE_5__.Texture(tp.name, tp.path);
