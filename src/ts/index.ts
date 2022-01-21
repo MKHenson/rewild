@@ -2,6 +2,7 @@ import wasmFile from "../../build/untouched.wasm";
 import type * as MyModule from "../../build/types";
 import { createBindingsGPU, bindExports } from "./AppBindings";
 import loader, { ASUtil, ResultObject } from "@assemblyscript/loader";
+import "./ui/index";
 
 import { GameManager } from "./core/GameManager";
 
@@ -48,10 +49,6 @@ async function init() {
     message.style.display = "initial";
     message.innerHTML = (err as Error).message;
   }
-
-  (document.querySelector("#apply") as HTMLButtonElement).addEventListener("click", () => {
-    (document.querySelector("#input") as HTMLInputElement).value;
-  });
 }
 
 init();

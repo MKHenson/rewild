@@ -98,7 +98,7 @@ export class WebGPURenderer {
     renderQueue.setBindGroupResource(GroupType.Transform, transformIndex);
     renderQueue.setBindGroupResource(GroupType.Material);
 
-    // ========================
+    // ===========================
 
     if (mesh.geometry) {
       const attributeMap = this.geometries.get(mesh.geometry);
