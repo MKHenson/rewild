@@ -12,6 +12,7 @@
     "inlineSources": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "jsx": "react",
     "forceConsistentCasingInFileNames": true,
     "preserveConstEnums": true,

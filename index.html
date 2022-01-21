@@ -3,51 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <style>
-      html,
-      body {
-        margin: 0;
-        width: 100%;
-        height: 100%;
-        box-sizing: border-box;
-      }
-      * {
-        font-family: Arial, Helvetica, sans-serif;
-      }
-      #message {
-        padding: 1rem;
-        background: red;
-        color: white;
-        width: 300px;
-        display: none;
-        position: absolute;
-        top: 1rem;
-        left: calc(50% - 150px);
-        text-align: center;
-      }
-      .application {
-        display: flex;
-      }
-      .application > div {
-        flex: 1;
-        padding: 1rem;
-      }
-      .application > div:nth-child(2) {
-        flex: 2;
-      }
-    </style>
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;500&display=swap" rel="stylesheet" />
     <script defer src="./dist/index_bundle.js"></script>
   </head>
   <body>
     <div id="message"></div>
     <div class="application">
-      <div>
-        <h2>Rewild Demo Project</h2>
-        <div>Hold onto your butts :|</div>
-      </div>
-      <div>
-        <canvas id="canvas" width="1280" height="960"></canvas>
-      </div>
+      <x-pane3d>
+        <canvas width="1280" height="960" id="canvas"></canvas>
+      </x-pane3d>
+      <x-modal open title="Welcome To Rewild!">
+        This is the main menu.
+        <x-button id="modal-btn">Start Game</x-button>
+      </x-modal>
     </div>
+
+    <script type="text/javascript">
+      const modal = document.querySelector("x-modal");
+
+      modal.addEventListener("cancel", function () {
+        modal.open = false;
+      });
+      modal.addEventListener("ok", function () {
+        modal.open = false;
+      });
+    </script>
   </body>
 </html>

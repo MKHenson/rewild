@@ -1,0 +1,59 @@
+:root {
+  --primary-400: #2861a3;
+  --primary-500: #1f4f86;
+  --primary-600: #194372;
+
+  --secondary-400: rgb(45, 143, 146);
+  --secondary-500: rgb(17, 84, 87);
+  --secondary-600: rgb(8, 63, 65);
+
+  --background: #fff;
+  --surface: #fff;
+
+  --error-400: #972222;
+  --error-500: #811a1a;
+  --error-600: #641111;
+
+  --on-primary-400: #fff;
+  --on-primary-500: #fff;
+  --on-primary-600: #fff;
+
+  --on-secondary-400: #fff;
+  --on-secondary-500: #fff;
+  --on-secondary-600: #fff;
+
+  --on-background: #333;
+  --on-surface: #333;
+
+  --on-error-400: #fff;
+  --on-error-500: #fff;
+  --on-error-600: #fff;
+
+  --font-family: Roboto, sans-serif;
+
+  font-weight: 300;
+  font-family: Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+#message {
+  padding: 1rem;
+  background: red;
+  color: white;
+  width: 300px;
+  display: none;
+  position: absolute;
+  top: 1rem;
+  left: calc(50% - 150px);
+  text-align: center;
+}
+
+.application {
+  margin: 2rem auto;
+}
