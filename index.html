@@ -6,7 +6,10 @@
     <link rel="stylesheet" href="./style.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;500&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;1,100;1,300&display=swap"
+      rel="stylesheet"
+    />
     <script defer src="./dist/index_bundle.js"></script>
   </head>
   <body>
@@ -15,25 +18,7 @@
       <x-pane3d>
         <canvas width="1280" height="960" id="canvas"></canvas>
       </x-pane3d>
-      <x-modal open title="Welcome To Rewild!" hideConfirmButtons>
-        This is the main menu.
-        <x-button id="modal-btn">Start Game</x-button>
-      </x-modal>
     </div>
-
-    <script type="text/javascript">
-      const modal = document.querySelector("x-modal");
-
-      document.querySelector("#modal-btn").addEventListener("click", function () {
-        modal.open = false;
-      });
-
-      modal.addEventListener("cancel", function () {
-        modal.open = false;
-      });
-      modal.addEventListener("ok", function () {
-        modal.open = false;
-      });
-    </script>
+    <div id="lit"></div>
   </body>
 </html>

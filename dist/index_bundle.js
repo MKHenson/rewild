@@ -2590,6 +2590,184 @@ if (DEV_MODE && globalThis.litElementVersions.length > 1) {
 
 /***/ }),
 
+/***/ "./node_modules/lit-html/development/directive.js":
+/*!********************************************************!*\
+  !*** ./node_modules/lit-html/development/directive.js ***!
+  \********************************************************/
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "PartType": () => (/* binding */ PartType),
+/* harmony export */   "directive": () => (/* binding */ directive),
+/* harmony export */   "Directive": () => (/* binding */ Directive)
+/* harmony export */ });
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+const PartType = {
+    ATTRIBUTE: 1,
+    CHILD: 2,
+    PROPERTY: 3,
+    BOOLEAN_ATTRIBUTE: 4,
+    EVENT: 5,
+    ELEMENT: 6,
+};
+/**
+ * Creates a user-facing directive function from a Directive class. This
+ * function has the same parameters as the directive's render() method.
+ */
+const directive = (c) => (...values) => ({
+    // This property needs to remain unminified.
+    ['_$litDirective$']: c,
+    values,
+});
+/**
+ * Base class for creating custom directives. Users should extend this class,
+ * implement `render` and/or `update`, and then pass their subclass to
+ * `directive`.
+ */
+class Directive {
+    constructor(_partInfo) { }
+    // See comment in Disconnectable interface for why this is a getter
+    get _$isConnected() {
+        return this._$parent._$isConnected;
+    }
+    /** @internal */
+    _$initialize(part, parent, attributeIndex) {
+        this.__part = part;
+        this._$parent = parent;
+        this.__attributeIndex = attributeIndex;
+    }
+    /** @internal */
+    _$resolve(part, props) {
+        return this.update(part, props);
+    }
+    update(_part, props) {
+        return this.render(...props);
+    }
+}
+//# sourceMappingURL=directive.js.map
+
+/***/ }),
+
+/***/ "./node_modules/lit-html/development/directives/style-map.js":
+/*!*******************************************************************!*\
+  !*** ./node_modules/lit-html/development/directives/style-map.js ***!
+  \*******************************************************************/
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "styleMap": () => (/* binding */ styleMap)
+/* harmony export */ });
+/* harmony import */ var _lit_html_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../lit-html.js */ "./node_modules/lit-html/development/lit-html.js");
+/* harmony import */ var _directive_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../directive.js */ "./node_modules/lit-html/development/directive.js");
+/**
+ * @license
+ * Copyright 2018 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+
+class StyleMapDirective extends _directive_js__WEBPACK_IMPORTED_MODULE_1__.Directive {
+    constructor(partInfo) {
+        var _a;
+        super(partInfo);
+        if (partInfo.type !== _directive_js__WEBPACK_IMPORTED_MODULE_1__.PartType.ATTRIBUTE ||
+            partInfo.name !== 'style' ||
+            ((_a = partInfo.strings) === null || _a === void 0 ? void 0 : _a.length) > 2) {
+            throw new Error('The `styleMap` directive must be used in the `style` attribute ' +
+                'and must be the only part in the attribute.');
+        }
+    }
+    render(styleInfo) {
+        return Object.keys(styleInfo).reduce((style, prop) => {
+            const value = styleInfo[prop];
+            if (value == null) {
+                return style;
+            }
+            // Convert property names from camel-case to dash-case, i.e.:
+            //  `backgroundColor` -> `background-color`
+            // Vendor-prefixed names need an extra `-` appended to front:
+            //  `webkitAppearance` -> `-webkit-appearance`
+            // Exception is any property name containing a dash, including
+            // custom properties; we assume these are already dash-cased i.e.:
+            //  `--my-button-color` --> `--my-button-color`
+            prop = prop
+                .replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g, '-$&')
+                .toLowerCase();
+            return style + `${prop}:${value};`;
+        }, '');
+    }
+    update(part, [styleInfo]) {
+        const { style } = part.element;
+        if (this._previousStyleProperties === undefined) {
+            this._previousStyleProperties = new Set();
+            for (const name in styleInfo) {
+                this._previousStyleProperties.add(name);
+            }
+            return this.render(styleInfo);
+        }
+        // Remove old properties that no longer exist in styleInfo
+        // We use forEach() instead of for-of so that re don't require down-level
+        // iteration.
+        this._previousStyleProperties.forEach((name) => {
+            // If the name isn't in styleInfo or it's null/undefined
+            if (styleInfo[name] == null) {
+                this._previousStyleProperties.delete(name);
+                if (name.includes('-')) {
+                    style.removeProperty(name);
+                }
+                else {
+                    // Note reset using empty string (vs null) as IE11 does not always
+                    // reset via null (https://developer.mozilla.org/en-US/docs/Web/API/ElementCSSInlineStyle/style#setting_styles)
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    style[name] = '';
+                }
+            }
+        });
+        // Add or update properties
+        for (const name in styleInfo) {
+            const value = styleInfo[name];
+            if (value != null) {
+                this._previousStyleProperties.add(name);
+                if (name.includes('-')) {
+                    style.setProperty(name, value);
+                }
+                else {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    style[name] = value;
+                }
+            }
+        }
+        return _lit_html_js__WEBPACK_IMPORTED_MODULE_0__.noChange;
+    }
+}
+/**
+ * A directive that applies CSS properties to an element.
+ *
+ * `styleMap` can only be used in the `style` attribute and must be the only
+ * expression in the attribute. It takes the property names in the `styleInfo`
+ * object and adds the property values as CSS properties. Property names with
+ * dashes (`-`) are assumed to be valid CSS property names and set on the
+ * element's style object using `setProperty()`. Names without dashes are
+ * assumed to be camelCased JavaScript property names and set on the element's
+ * style object using property assignment, allowing the style object to
+ * translate JavaScript-style names to CSS property names.
+ *
+ * For example `styleMap({backgroundColor: 'red', 'border-top': '5px', '--size':
+ * '0'})` sets the `background-color`, `border-top` and `--size` properties.
+ *
+ * @param styleInfo
+ */
+const styleMap = (0,_directive_js__WEBPACK_IMPORTED_MODULE_1__.directive)(StyleMapDirective);
+//# sourceMappingURL=style-map.js.map
+
+/***/ }),
+
 /***/ "./node_modules/lit-html/development/lit-html.js":
 /*!*******************************************************!*\
   !*** ./node_modules/lit-html/development/lit-html.js ***!
@@ -3919,6 +4097,23 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _lit_reactive_element_decorators_query_assigned_nodes_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! @lit/reactive-element/decorators/query-assigned-nodes.js */ "./node_modules/@lit/reactive-element/development/decorators/query-assigned-nodes.js");
 
 //# sourceMappingURL=decorators.js.map
+
+
+/***/ }),
+
+/***/ "./node_modules/lit/directives/style-map.js":
+/*!**************************************************!*\
+  !*** ./node_modules/lit/directives/style-map.js ***!
+  \**************************************************/
+/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "styleMap": () => (/* reexport safe */ lit_html_directives_style_map_js__WEBPACK_IMPORTED_MODULE_0__.styleMap)
+/* harmony export */ });
+/* harmony import */ var lit_html_directives_style_map_js__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! lit-html/directives/style-map.js */ "./node_modules/lit-html/development/directives/style-map.js");
+
+//# sourceMappingURL=style-map.js.map
 
 
 /***/ }),
@@ -5856,6 +6051,36 @@ function shaderBuilder(sourceFragments, pipeline) {
 
 /***/ }),
 
+/***/ "./src/ts/ui/application/Application.ts":
+/*!**********************************************!*\
+  !*** ./src/ts/ui/application/Application.ts ***!
+  \**********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var lit__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! lit */ "./node_modules/lit/index.js");
+
+const Application = () => lit__WEBPACK_IMPORTED_MODULE_0__.html `
+  <x-modal open id="main-menu" hideConfirmButtons>
+    <x-typography variant="h4" align="center">Rewild!</x-typography>
+    <x-typography variant="body2"
+      >Welcome to rewild. A game about exploration, natural history and saving the planet</x-typography
+    >
+    <x-button id="start-game" variant="contained" color="primary">Start Game</x-button>
+  </x-modal>
+`;
+document.addEventListener("readystatechange", (e) => {
+    if (document.readyState === "interactive" || document.readyState === "complete") {
+        (0,lit__WEBPACK_IMPORTED_MODULE_0__.render)(Application(), document.querySelector("#lit"));
+        const mainMenu = document.querySelector("#main-menu");
+        mainMenu.addEventListener("close", (e) => (mainMenu.open = false));
+        document.querySelector("#start-game").addEventListener("click", (e) => (mainMenu.open = false));
+    }
+});
+
+
+/***/ }),
+
 /***/ "./src/ts/ui/common/Button.ts":
 /*!************************************!*\
   !*** ./src/ts/ui/common/Button.ts ***!
@@ -6037,16 +6262,21 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
 
 let Modal = class Modal extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
     constructor() {
-        super(...arguments);
+        super();
         // Declare reactive properties
         this.open = false;
         this.hideConfirmButtons = false;
+    }
+    onClick(e) {
+        if (e.target.classList.contains("wrapper")) {
+            this.dispatchEvent(new CustomEvent("close"));
+        }
     }
     // Render the UI as a function of component state
     render() {
         const wrapperClass = this.open ? "wrapper visible" : "wrapper";
         return lit__WEBPACK_IMPORTED_MODULE_0__.html `
-      <div class="${wrapperClass}">
+      <div class="${wrapperClass}" @click="${this.onClick}">
         <div class="modal">
           <span class="title">${this.title}</span>
           <div class="content">
@@ -6092,7 +6322,6 @@ Modal.styles = lit__WEBPACK_IMPORTED_MODULE_0__.css `
       transition: visibility 0s linear 0s, opacity 0.25s 0s, transform 0.25s;
     }
     .modal {
-      font-size: 14px;
       padding: 1rem;
       background-color: var(--surface);
       position: absolute;
@@ -6124,7 +6353,8 @@ __decorate([
     __metadata("design:type", Boolean)
 ], Modal.prototype, "hideConfirmButtons", void 0);
 Modal = __decorate([
-    (0,lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__.customElement)("x-modal")
+    (0,lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__.customElement)("x-modal"),
+    __metadata("design:paramtypes", [])
 ], Modal);
 
 
@@ -6182,6 +6412,109 @@ Pane3D = __decorate([
 
 /***/ }),
 
+/***/ "./src/ts/ui/common/Typography.ts":
+/*!****************************************!*\
+  !*** ./src/ts/ui/common/Typography.ts ***!
+  \****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Typography": () => (/* binding */ Typography)
+/* harmony export */ });
+/* harmony import */ var lit__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! lit */ "./node_modules/lit/index.js");
+/* harmony import */ var lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! lit/decorators.js */ "./node_modules/lit/decorators.js");
+/* harmony import */ var lit_directives_style_map_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! lit/directives/style-map.js */ "./node_modules/lit/directives/style-map.js");
+var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (undefined && undefined.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+
+
+
+let Typography = class Typography extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
+    constructor() {
+        super();
+        this.variant = "body1";
+        this.align = "inherit";
+    }
+    render() {
+        return lit__WEBPACK_IMPORTED_MODULE_0__.html `<div class="typography ${this.variant}" style=${(0,lit_directives_style_map_js__WEBPACK_IMPORTED_MODULE_2__.styleMap)({ textAlign: this.align })}>
+      <slot></slot>
+    </div>`;
+    }
+};
+Typography.styles = lit__WEBPACK_IMPORTED_MODULE_0__.css `
+    div {
+      margin: 0;
+      font-family: var(--font-family);
+      margin-bottom: 0.35em;
+    }
+
+    .h1 {
+      font-weight: 300;
+      font-size: 6rem;
+      line-height: 1.167;
+      letter-spacing: -0.01562em;
+    }
+
+    .h2 {
+      font-weight: 300;
+      font-size: 3.75rem;
+      line-height: 1.2;
+      letter-spacing: -0.00833em;
+    }
+
+    .h3 {
+      font-weight: 400;
+      font-size: 3rem;
+      line-height: 1.167;
+      letter-spacing: 0em;
+    }
+
+    .h4 {
+      font-weight: 400;
+      font-size: 2.125rem;
+      line-height: 1.235;
+      letter-spacing: 0.00735em;
+    }
+
+    .body1 {
+      font-weight: 400;
+      font-size: 1rem;
+      line-height: 1.5;
+      letter-spacing: 0.00938em;
+    }
+
+    .body2 {
+      font-weight: 400;
+      font-size: 0.875rem;
+      line-height: 1.43;
+      letter-spacing: 0.01071em;
+    }
+  `;
+__decorate([
+    (0,lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__.property)({ type: String }),
+    __metadata("design:type", String)
+], Typography.prototype, "variant", void 0);
+__decorate([
+    (0,lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__.property)({ type: String }),
+    __metadata("design:type", String)
+], Typography.prototype, "align", void 0);
+Typography = __decorate([
+    (0,lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__.customElement)("x-typography"),
+    __metadata("design:paramtypes", [])
+], Typography);
+
+
+
+/***/ }),
+
 /***/ "./src/ts/ui/index.ts":
 /*!****************************!*\
   !*** ./src/ts/ui/index.ts ***!
@@ -6192,6 +6525,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _common_Button__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./common/Button */ "./src/ts/ui/common/Button.ts");
 /* harmony import */ var _common_Modal__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./common/Modal */ "./src/ts/ui/common/Modal.ts");
 /* harmony import */ var _common_Pane3D__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./common/Pane3D */ "./src/ts/ui/common/Pane3D.ts");
+/* harmony import */ var _common_Typography__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./common/Typography */ "./src/ts/ui/common/Typography.ts");
+/* harmony import */ var _application_Application__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./application/Application */ "./src/ts/ui/application/Application.ts");
+
+
 
 
 

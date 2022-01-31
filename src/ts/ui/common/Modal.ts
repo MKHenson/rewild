@@ -24,7 +24,6 @@ export class Modal extends LitElement {
       transition: visibility 0s linear 0s, opacity 0.25s 0s, transform 0.25s;
     }
     .modal {
-      font-size: 14px;
       padding: 1rem;
       background-color: var(--surface);
       position: absolute;
@@ -55,11 +54,21 @@ export class Modal extends LitElement {
   @property({ type: Boolean })
   hideConfirmButtons?: boolean = false;
 
+  constructor() {
+    super();
+  }
+
+  onClick(e: MouseEvent) {
+    if ((e.target as HTMLElement).classList.contains("wrapper")) {
+      this.dispatchEvent(new CustomEvent("close"));
+    }
+  }
+
   // Render the UI as a function of component state
   render() {
     const wrapperClass = this.open ? "wrapper visible" : "wrapper";
     return html`
-      <div class="${wrapperClass}">
+      <div class="${wrapperClass}" @click="${this.onClick}">
         <div class="modal">
           <span class="title">${this.title}</span>
           <div class="content">
