@@ -6040,6 +6040,7 @@ let Modal = class Modal extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
         super(...arguments);
         // Declare reactive properties
         this.open = false;
+        this.hideConfirmButtons = false;
     }
     // Render the UI as a function of component state
     render() {
@@ -6051,10 +6052,12 @@ let Modal = class Modal extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
           <div class="content">
             <slot></slot>
           </div>
-          <div class="button-container">
-            <x-button variant="outlined" @click="${this.onCancel}" class="cancel">Cancel</x-button>
-            <x-button @click="${this.onOk}" class="ok">Okay</x-button>
-          </div>
+          ${this.hideConfirmButtons
+            ? ""
+            : lit__WEBPACK_IMPORTED_MODULE_0__.html `<div class="button-container">
+                <x-button variant="outlined" @click="${this.onCancel}" class="cancel">Cancel</x-button>
+                <x-button @click="${this.onOk}" class="ok">Okay</x-button>
+              </div>`}
         </div>
       </div>
     `;
@@ -6119,6 +6122,10 @@ __decorate([
     (0,lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__.property)({ type: Boolean }),
     __metadata("design:type", Boolean)
 ], Modal.prototype, "open", void 0);
+__decorate([
+    (0,lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__.property)({ type: Boolean }),
+    __metadata("design:type", Boolean)
+], Modal.prototype, "hideConfirmButtons", void 0);
 Modal = __decorate([
     (0,lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__.customElement)("x-modal")
 ], Modal);

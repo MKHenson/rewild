@@ -55,10 +55,12 @@ export class Modal extends LitElement {
   @property({ type: Boolean })
   open?: boolean = false;
 
+  @property({ type: Boolean })
+  hideConfirmButtons?: boolean = false;
+
   // Render the UI as a function of component state
   render() {
     const wrapperClass = this.open ? "wrapper visible" : "wrapper";
-
     return html`
       <div class="${wrapperClass}">
         <div class="modal">
@@ -66,10 +68,12 @@ export class Modal extends LitElement {
           <div class="content">
             <slot></slot>
           </div>
-          <div class="button-container">
-            <x-button variant="outlined" @click="${this.onCancel}" class="cancel">Cancel</x-button>
-            <x-button @click="${this.onOk}" class="ok">Okay</x-button>
-          </div>
+          ${this.hideConfirmButtons
+            ? ""
+            : html`<div class="button-container">
+                <x-button variant="outlined" @click="${this.onCancel}" class="cancel">Cancel</x-button>
+                <x-button @click="${this.onOk}" class="ok">Okay</x-button>
+              </div>`}
         </div>
       </div>
     `;
