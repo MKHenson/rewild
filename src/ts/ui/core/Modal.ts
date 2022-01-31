@@ -4,8 +4,6 @@ import { customElement, property } from "lit/decorators.js";
 @customElement("x-modal")
 export class Modal extends LitElement {
   static styles = css`
-    :host {
-    }
     .wrapper {
       position: fixed;
       left: 0;
@@ -26,7 +24,6 @@ export class Modal extends LitElement {
       transition: visibility 0s linear 0s, opacity 0.25s 0s, transform 0.25s;
     }
     .modal {
-      font-family: Helvetica;
       font-size: 14px;
       padding: 1rem;
       background-color: var(--surface);
@@ -69,7 +66,7 @@ export class Modal extends LitElement {
             <slot></slot>
           </div>
           ${this.hideConfirmButtons
-            ? ""
+            ? null
             : html`<div class="button-container">
                 <x-button variant="outlined" @click="${this.onCancel}" class="cancel">Cancel</x-button>
                 <x-button @click="${this.onOk}" class="ok">Okay</x-button>

@@ -6053,7 +6053,7 @@ let Modal = class Modal extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
             <slot></slot>
           </div>
           ${this.hideConfirmButtons
-            ? ""
+            ? null
             : lit__WEBPACK_IMPORTED_MODULE_0__.html `<div class="button-container">
                 <x-button variant="outlined" @click="${this.onCancel}" class="cancel">Cancel</x-button>
                 <x-button @click="${this.onOk}" class="ok">Okay</x-button>
@@ -6072,8 +6072,6 @@ let Modal = class Modal extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
     }
 };
 Modal.styles = lit__WEBPACK_IMPORTED_MODULE_0__.css `
-    :host {
-    }
     .wrapper {
       position: fixed;
       left: 0;
@@ -6094,7 +6092,6 @@ Modal.styles = lit__WEBPACK_IMPORTED_MODULE_0__.css `
       transition: visibility 0s linear 0s, opacity 0.25s 0s, transform 0.25s;
     }
     .modal {
-      font-family: Helvetica;
       font-size: 14px;
       padding: 1rem;
       background-color: var(--surface);
