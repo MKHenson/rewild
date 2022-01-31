@@ -9,9 +9,11 @@ import { Event } from "../../../core/Event";
 
 export class Level1 extends Container implements Listener {
   orbitController!: OrbitController;
+  totalTime: f32;
 
   constructor() {
     super();
+    this.totalTime = 0;
   }
 
   onEvent(event: Event): void {
@@ -21,9 +23,12 @@ export class Level1 extends Container implements Listener {
 
   onUpdate(delta: f32, total: u32, fps: u32): void {
     const meshes = this.meshes;
+    this.totalTime += delta;
+
     for (let i: i32 = 0, l: i32 = meshes.length; i < l; i++) {
       meshes[i].rotation.x += delta * 1;
       meshes[i].rotation.y += delta * 1;
+      meshes[i].position.y = Mathf.sin(this.totalTime + meshes[i].position.x);
     }
 
     if (this.orbitController) this.orbitController.update();
@@ -41,6 +46,11 @@ export class Level1 extends Container implements Listener {
     direction2.position.set(10, -10, 0);
     direction2.target.position.set(0, 0, 0);
     this.runtime!.scene.add(direction2);
+
+    const direction3 = new DirectionalLight(new Color(1, 1, 0), 2.1416);
+    direction3.position.set(-10, -10, 0);
+    direction3.target.position.set(0, 0, 0);
+    this.runtime!.scene.add(direction3);
 
     const ambient = new AmbientLight(new Color(1, 1, 1), 0.1);
     this.runtime!.scene.add(ambient);
