@@ -1,3 +1,3 @@
-import "./core/Button";
-import "./core/Modal";
-import "./core/Pane3D";
+import "./common/Button";
+import "./common/Modal";
+import "./common/Pane3D";

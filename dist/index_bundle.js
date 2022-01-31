@@ -5856,10 +5856,10 @@ function shaderBuilder(sourceFragments, pipeline) {
 
 /***/ }),
 
-/***/ "./src/ts/ui/core/Button.ts":
-/*!**********************************!*\
-  !*** ./src/ts/ui/core/Button.ts ***!
-  \**********************************/
+/***/ "./src/ts/ui/common/Button.ts":
+/*!************************************!*\
+  !*** ./src/ts/ui/common/Button.ts ***!
+  \************************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -6012,10 +6012,10 @@ Button = __decorate([
 
 /***/ }),
 
-/***/ "./src/ts/ui/core/Modal.ts":
-/*!*********************************!*\
-  !*** ./src/ts/ui/core/Modal.ts ***!
-  \*********************************/
+/***/ "./src/ts/ui/common/Modal.ts":
+/*!***********************************!*\
+  !*** ./src/ts/ui/common/Modal.ts ***!
+  \***********************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -6131,10 +6131,10 @@ Modal = __decorate([
 
 /***/ }),
 
-/***/ "./src/ts/ui/core/Pane3D.ts":
-/*!**********************************!*\
-  !*** ./src/ts/ui/core/Pane3D.ts ***!
-  \**********************************/
+/***/ "./src/ts/ui/common/Pane3D.ts":
+/*!************************************!*\
+  !*** ./src/ts/ui/common/Pane3D.ts ***!
+  \************************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
@@ -6189,9 +6189,9 @@ Pane3D = __decorate([
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _core_Button__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./core/Button */ "./src/ts/ui/core/Button.ts");
-/* harmony import */ var _core_Modal__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./core/Modal */ "./src/ts/ui/core/Modal.ts");
-/* harmony import */ var _core_Pane3D__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./core/Pane3D */ "./src/ts/ui/core/Pane3D.ts");
+/* harmony import */ var _common_Button__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./common/Button */ "./src/ts/ui/common/Button.ts");
+/* harmony import */ var _common_Modal__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./common/Modal */ "./src/ts/ui/common/Modal.ts");
+/* harmony import */ var _common_Pane3D__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./common/Pane3D */ "./src/ts/ui/common/Pane3D.ts");
 
 
 
