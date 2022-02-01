@@ -10,8 +10,10 @@ import { Texture } from "./Texture";
 import { GroupType } from "../../common/GroupType";
 import { ResourceType } from "../../common/ResourceType";
 import { MeshPipeline } from "build/types";
+import { Pane3D } from "../ui/common/Pane3D";
 
 const meshPipelineInstances: MeshPipeline[] = [];
+const sampleCount = 4;
 
 export class GameManager {
   canvas: HTMLCanvasElement;
@@ -37,16 +39,17 @@ export class GameManager {
 
   currentPass: GPURenderPassEncoder | null;
   currentCommandEncoder: GPUCommandEncoder;
+  private presentationSize: [number, number];
 
-  constructor(canvasId: string) {
-    this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
+  constructor(paneSelector: string) {
+    const pane3D = document.querySelector(paneSelector) as Pane3D;
+    this.canvas = pane3D.canvas;
     this.buffers = [];
     this.textures = [];
     this.samplers = [];
     this.disposed = false;
     this.currentPass = null;
     this.renderQueueManager = new RenderQueueManager(this);
-    this.onResizeHandler = this.onWindowResize.bind(this);
     this.onFrameHandler = this.onFrame.bind(this);
   }
 
@@ -100,21 +103,8 @@ export class GameManager {
       new DebugPipeline("simple", { NUM_DIR_LIGHTS: 0 }),
     ];
 
-    const sampleCount = 4;
-    this.renderTarget = device.createTexture({
-      size: this.canvasSize(),
-      sampleCount,
-      format: format,
-      usage: GPUTextureUsage.RENDER_ATTACHMENT,
-    });
-
-    this.renderTargetView = this.renderTarget.createView();
-    this.depthTexture = device.createTexture({
-      size: this.canvasSize(),
-      format: "depth24plus",
-      sampleCount: sampleCount,
-      usage: GPUTextureUsage.RENDER_ATTACHMENT,
-    });
+    const size = this.canvasSize();
+    this.onResize(size, false);
 
     // Initialize the wasm module
     wasm.AsSceneManager.init(this.canvas.width, this.canvas.height);
@@ -192,20 +182,61 @@ export class GameManager {
     this.inputManager?.dispose();
   }
 
-  // TODO:
-  private onWindowResize() {
-    this.wasm.AsSceneManager.resize(this.canvas.width, this.canvas.height);
+  private onResize(newSize: [number, number], updateWasm = true) {
+    if (this.renderTarget) {
+      // Destroy the previous render target
+      this.renderTarget.destroy();
+      this.depthTexture.destroy();
+    }
+
+    this.presentationSize = newSize;
+
+    // Reconfigure the canvas size.
+    this.context.configure({
+      device: this.device,
+      format: this.format,
+      size: this.presentationSize,
+    });
+
+    this.renderTarget = this.device.createTexture({
+      size: this.presentationSize,
+      sampleCount,
+      format: this.format,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+    this.depthTexture = this.device.createTexture({
+      size: this.presentationSize,
+      format: "depth24plus",
+      sampleCount: sampleCount,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+    this.renderTargetView = this.renderTarget.createView();
+
+    if (updateWasm) this.wasm.AsSceneManager.resize(this.canvas.width, this.canvas.height);
   }
 
   private onFrame() {
-    if (this.disposed) return;
-    this.wasm.AsSceneManager.update(performance.now());
     window.requestAnimationFrame(this.onFrameHandler);
+    if (this.disposed) return;
+
+    // Check if we need to resize
+    const [w, h] = this.presentationSize;
+    const newSize = this.canvasSize();
+    if (newSize[0] !== w || newSize[1] !== h) {
+      this.onResize(newSize);
+    }
+
+    this.wasm.AsSceneManager.update(performance.now());
   }
 
   canvasSize() {
     const devicePixelRatio = window.devicePixelRatio || 1;
-    const size = [this.canvas.clientWidth * devicePixelRatio, this.canvas.clientHeight * devicePixelRatio];
+    const size: [number, number] = [
+      this.canvas.clientWidth * devicePixelRatio,
+      this.canvas.clientHeight * devicePixelRatio,
+    ];
     return size;
   }
 

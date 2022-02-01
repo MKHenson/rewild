@@ -4353,16 +4353,17 @@ var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argume
 
 
 const meshPipelineInstances = [];
+const sampleCount = 4;
 class GameManager {
-    constructor(canvasId) {
-        this.canvas = document.getElementById(canvasId);
+    constructor(paneSelector) {
+        const pane3D = document.querySelector(paneSelector);
+        this.canvas = pane3D.canvas;
         this.buffers = [];
         this.textures = [];
         this.samplers = [];
         this.disposed = false;
         this.currentPass = null;
         this.renderQueueManager = new _RenderQueueManager__WEBPACK_IMPORTED_MODULE_4__.RenderQueueManager(this);
-        this.onResizeHandler = this.onWindowResize.bind(this);
         this.onFrameHandler = this.onFrame.bind(this);
     }
     init(wasm) {
@@ -4406,20 +4407,8 @@ class GameManager {
                 new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("textured", { diffuseMap: this.textures[1], NUM_DIR_LIGHTS: 0 }),
                 new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("simple", { NUM_DIR_LIGHTS: 0 }),
             ];
-            const sampleCount = 4;
-            this.renderTarget = device.createTexture({
-                size: this.canvasSize(),
-                sampleCount,
-                format: format,
-                usage: GPUTextureUsage.RENDER_ATTACHMENT,
-            });
-            this.renderTargetView = this.renderTarget.createView();
-            this.depthTexture = device.createTexture({
-                size: this.canvasSize(),
-                format: "depth24plus",
-                sampleCount: sampleCount,
-                usage: GPUTextureUsage.RENDER_ATTACHMENT,
-            });
+            const size = this.canvasSize();
+            this.onResize(size, false);
             // Initialize the wasm module
             wasm.AsSceneManager.init(this.canvas.width, this.canvas.height);
             this.initRuntime();
@@ -4480,19 +4469,53 @@ class GameManager {
         window.removeEventListener("resize", this.onResizeHandler);
         (_a = this.inputManager) === null || _a === void 0 ? void 0 : _a.dispose();
     }
-    // TODO:
-    onWindowResize() {
-        this.wasm.AsSceneManager.resize(this.canvas.width, this.canvas.height);
+    onResize(newSize, updateWasm = true) {
+        if (this.renderTarget) {
+            // Destroy the previous render target
+            this.renderTarget.destroy();
+            this.depthTexture.destroy();
+        }
+        this.presentationSize = newSize;
+        // Reconfigure the canvas size.
+        this.context.configure({
+            device: this.device,
+            format: this.format,
+            size: this.presentationSize,
+        });
+        this.renderTarget = this.device.createTexture({
+            size: this.presentationSize,
+            sampleCount,
+            format: this.format,
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+        this.depthTexture = this.device.createTexture({
+            size: this.presentationSize,
+            format: "depth24plus",
+            sampleCount: sampleCount,
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+        this.renderTargetView = this.renderTarget.createView();
+        if (updateWasm)
+            this.wasm.AsSceneManager.resize(this.canvas.width, this.canvas.height);
     }
     onFrame() {
+        window.requestAnimationFrame(this.onFrameHandler);
         if (this.disposed)
             return;
+        // Check if we need to resize
+        const [w, h] = this.presentationSize;
+        const newSize = this.canvasSize();
+        if (newSize[0] !== w || newSize[1] !== h) {
+            this.onResize(newSize);
+        }
         this.wasm.AsSceneManager.update(performance.now());
-        window.requestAnimationFrame(this.onFrameHandler);
     }
     canvasSize() {
         const devicePixelRatio = window.devicePixelRatio || 1;
-        const size = [this.canvas.clientWidth * devicePixelRatio, this.canvas.clientHeight * devicePixelRatio];
+        const size = [
+            this.canvas.clientWidth * devicePixelRatio,
+            this.canvas.clientHeight * devicePixelRatio,
+        ];
         return size;
     }
     hasWebGPU() {
@@ -5118,14 +5141,14 @@ const vertexShader = _shader_lib_Utils__WEBPACK_IMPORTED_MODULE_8__.shader `
 ${e => e.getTemplateByType(_common_ResourceType__WEBPACK_IMPORTED_MODULE_0__.ResourceType.Transform).template.vertexBlock}
 
 struct Output {
-    [[builtin(position)]] Position : vec4<f32>;
-    [[location(0)]] vFragUV : vec2<f32>;
-    [[location(1)]] vNormal : vec3<f32>;
-    [[location(2)]] vViewPosition : vec3<f32>;
+    @builtin(position) Position : vec4<f32>;
+    @location(0) vFragUV : vec2<f32>;
+    @location(1) vNormal : vec3<f32>;
+    @location(2) vViewPosition : vec3<f32>;
 };
 
-[[stage(vertex)]]
-fn main([[location(0)]] pos: vec4<f32>, [[location(1)]] norm: vec3<f32>, [[location(2)]] uv: vec2<f32>) -> Output {
+@stage(vertex)
+fn main(@location(0) pos: vec4<f32>, @location(1) norm: vec3<f32>, @location(2) uv: vec2<f32>) -> Output {
     var output: Output;
     var mvPosition = vec4<f32>( pos.xyz, 1.0 );
 
@@ -5288,12 +5311,12 @@ fn changeDiffuseToRed( colorPtr: ptr<function, vec4<f32>> ) {
   (*colorPtr).b = 0.0;
 }
 
-[[stage(fragment)]]
+@stage(fragment)
 fn main(
-  [[location(0)]] vFragUV: vec2<f32>,
-  [[location(1)]] vNormal : vec3<f32>,
-  [[location(2)]] vViewPosition : vec3<f32>
-) -> [[location(0)]] vec4<f32> {
+  @location(0) vFragUV: vec2<f32>,
+  @location(1) vNormal : vec3<f32>,
+  @location(2) vViewPosition : vec3<f32>
+) -> @location(0) vec4<f32> {
 
   var normal = normalize( vNormal );
   var geometryNormal = normal;
@@ -5576,8 +5599,11 @@ class LightingResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODUL
         numDirectionalLights: u32;
       };
 
-      [[group(${group}), binding(${this.lightingConfigBinding})]] var<uniform> lightingConfigUniform: LightingConfigUniform;
-      [[group(${group}), binding(${this.sceneLightingBinding})]] var<uniform> sceneLightingUniform: SceneLightingUniform;
+      @group(${group}) @binding(${this.lightingConfigBinding})
+      var<uniform> lightingConfigUniform: LightingConfigUniform;
+
+      @group(${group}) @binding(${this.sceneLightingBinding})
+      var<uniform> sceneLightingUniform: SceneLightingUniform;
 
 
       ${pipeline.defines.NUM_DIR_LIGHTS ? `
@@ -5590,7 +5616,8 @@ class LightingResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODUL
         directionalLights: array<DirectionLightUniform>;
       };
 
-      [[group(${group}), binding(${this.directionLightBinding})]] var<storage, read> directionLightsUniform: DirectionLightsUniform;
+      @group(${group}) @binding(${this.directionLightBinding})
+      var<storage, read> directionLightsUniform: DirectionLightsUniform;
       ` : ''}
       `,
             vertexBlock: null,
@@ -5688,7 +5715,8 @@ class MaterialResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODUL
         roughness: f32;
       };
 
-      [[group(${group}), binding(${curBindIndex})]] var<uniform> materialData: MaterialData;
+      @group(${group}) @binding(${curBindIndex})
+      var<uniform> materialData: MaterialData;
       `,
             vertexBlock: null,
         };
@@ -5835,8 +5863,10 @@ class TextureResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODULE
             bindings: [manager.samplers[0], this.texture.gpuTexture.createView()],
             fragmentBlock: `
       ${pipeline.defines.diffuseMap && `
-      [[group(${group}), binding(${this.samplerBind})]] var ${this.id}Sampler: sampler;
-      [[group(${group}), binding(${this.textureBind})]] var ${this.id}Texture: texture_2d<f32>;`}`,
+      @group(${group}) @binding(${this.samplerBind})
+      var ${this.id}Sampler: sampler;
+      @group(${group}) @binding(${this.textureBind})
+      var ${this.id}Texture: texture_2d<f32>;`}`,
             vertexBlock: null,
         };
     }
@@ -5906,7 +5936,8 @@ class TransformResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODU
         modelViewMatrix: mat4x4<f32>;
         normalMatrix: mat3x3<f32>;
       };
-      [[group(${group}), binding(${curBindIndex})]] var<uniform> uniforms: TransformUniform;
+      @group(${group}) @binding(${curBindIndex})
+      var<uniform> uniforms: TransformUniform;
       `,
         };
     }
@@ -6387,20 +6418,41 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
 let Pane3D = class Pane3D extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
     constructor() {
         super();
+        this.onResizeDelegate = this.onResize.bind(this);
+    }
+    connectedCallback() {
+        super.connectedCallback();
+        window.addEventListener("resize", this.onResizeDelegate);
+    }
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        window.removeEventListener("resize", this.onResizeDelegate);
+    }
+    onResize() {
+        var _a;
+        const canvas = (_a = this.shadowRoot) === null || _a === void 0 ? void 0 : _a.querySelector("canvas");
+        if (canvas) {
+            canvas.width = this.clientWidth;
+            canvas.height = this.clientHeight;
+        }
+    }
+    get canvas() {
+        return this.shadowRoot.querySelector("canvas");
     }
     render() {
-        return lit__WEBPACK_IMPORTED_MODULE_0__.html `
-      <div>
-        <slot></slot>
-      </div>
-    `;
+        return lit__WEBPACK_IMPORTED_MODULE_0__.html `<canvas></canvas>`;
+    }
+    updated(changedProps) {
+        this.onResize();
+        return super.updated(changedProps);
     }
 };
-Pane3D.stlyes = lit__WEBPACK_IMPORTED_MODULE_0__.css `
-    :host,
-    canvas {
+Pane3D.styles = lit__WEBPACK_IMPORTED_MODULE_0__.css `
+    :host {
       width: 100%;
       height: 100%;
+      overflow: hidden;
+      display: block;
     }
   `;
 Pane3D = __decorate([
@@ -6673,8 +6725,7 @@ const importObject = {
         },
     },
 };
-const gameManager = new _core_GameManager__WEBPACK_IMPORTED_MODULE_4__.GameManager("canvas");
-(0,_AppBindings__WEBPACK_IMPORTED_MODULE_1__.createBindingsGPU)(importObject, gameManager);
+let gameManager;
 function init() {
     return __awaiter(this, void 0, void 0, function* () {
         // Load the wasm file
@@ -6691,7 +6742,13 @@ function init() {
         }
     });
 }
-init();
+document.addEventListener("readystatechange", (e) => {
+    if (document.readyState === "complete") {
+        gameManager = new _core_GameManager__WEBPACK_IMPORTED_MODULE_4__.GameManager("x-pane3d");
+        (0,_AppBindings__WEBPACK_IMPORTED_MODULE_1__.createBindingsGPU)(importObject, gameManager);
+        init();
+    }
+});
 
 })();
 

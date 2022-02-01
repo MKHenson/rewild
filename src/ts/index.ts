@@ -32,8 +32,7 @@ const importObject: WebAssembly.Imports = {
   },
 };
 
-const gameManager = new GameManager("canvas");
-createBindingsGPU(importObject, gameManager);
+let gameManager: GameManager;
 
 async function init() {
   // Load the wasm file
@@ -51,4 +50,10 @@ async function init() {
   }
 }
 
-init();
+document.addEventListener("readystatechange", (e) => {
+  if (document.readyState === "complete") {
+    gameManager = new GameManager("x-pane3d");
+    createBindingsGPU(importObject, gameManager);
+    init();
+  }
+});

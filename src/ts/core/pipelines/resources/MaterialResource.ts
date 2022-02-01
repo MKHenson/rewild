@@ -56,7 +56,8 @@ export class MaterialResource extends PipelineResourceTemplate {
         roughness: f32;
       };
 
-      [[group(${group}), binding(${curBindIndex})]] var<uniform> materialData: MaterialData;
+      @group(${group}) @binding(${curBindIndex})
+      var<uniform> materialData: MaterialData;
       `,
       vertexBlock: null,
     };
