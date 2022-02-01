@@ -13,7 +13,7 @@ const Application = () => html`
 
 document.addEventListener("readystatechange", (e) => {
   if (document.readyState === "interactive" || document.readyState === "complete") {
-    render(Application(), document.querySelector("#lit") as HTMLDivElement);
+    render(Application(), document.querySelector("#application") as HTMLDivElement);
 
     const mainMenu = document.querySelector("#main-menu") as Modal;
 

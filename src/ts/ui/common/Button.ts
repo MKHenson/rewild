@@ -112,18 +112,17 @@ export class Button extends LitElement {
     this.addEventListener("click", this.onClick.bind(this));
   }
 
+  render() {
+    return html`<button ?disabled=${this.disabled} class="${this.color} ${this.variant}">
+      <slot></slot>
+    </button>`;
+  }
+
   private onClick(e: MouseEvent) {
     if (this.disabled) {
       e.stopPropagation();
       e.stopImmediatePropagation();
     }
-  }
-
-  // Render the UI as a function of component state
-  render() {
-    return html`<button ?disabled=${this.disabled} class="${this.color} ${this.variant}">
-      <slot></slot>
-    </button>`;
   }
 }
 

@@ -6102,7 +6102,7 @@ const Application = () => lit__WEBPACK_IMPORTED_MODULE_0__.html `
 `;
 document.addEventListener("readystatechange", (e) => {
     if (document.readyState === "interactive" || document.readyState === "complete") {
-        (0,lit__WEBPACK_IMPORTED_MODULE_0__.render)(Application(), document.querySelector("#lit"));
+        (0,lit__WEBPACK_IMPORTED_MODULE_0__.render)(Application(), document.querySelector("#application"));
         const mainMenu = document.querySelector("#main-menu");
         mainMenu.addEventListener("close", (e) => (mainMenu.open = false));
         document.querySelector("#start-game").addEventListener("click", (e) => (mainMenu.open = false));
@@ -6144,17 +6144,16 @@ let Button = class Button extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
         this.variant = "contained";
         this.addEventListener("click", this.onClick.bind(this));
     }
+    render() {
+        return lit__WEBPACK_IMPORTED_MODULE_0__.html `<button ?disabled=${this.disabled} class="${this.color} ${this.variant}">
+      <slot></slot>
+    </button>`;
+    }
     onClick(e) {
         if (this.disabled) {
             e.stopPropagation();
             e.stopImmediatePropagation();
         }
-    }
-    // Render the UI as a function of component state
-    render() {
-        return lit__WEBPACK_IMPORTED_MODULE_0__.html `<button ?disabled=${this.disabled} class="${this.color} ${this.variant}">
-      <slot></slot>
-    </button>`;
     }
 };
 Button.styles = lit__WEBPACK_IMPORTED_MODULE_0__.css `
@@ -6420,6 +6419,9 @@ let Pane3D = class Pane3D extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
         super();
         this.onResizeDelegate = this.onResize.bind(this);
     }
+    get canvas() {
+        return this.shadowRoot.querySelector("canvas");
+    }
     connectedCallback() {
         super.connectedCallback();
         window.addEventListener("resize", this.onResizeDelegate);
@@ -6428,6 +6430,13 @@ let Pane3D = class Pane3D extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
         super.disconnectedCallback();
         window.removeEventListener("resize", this.onResizeDelegate);
     }
+    render() {
+        return lit__WEBPACK_IMPORTED_MODULE_0__.html `<canvas></canvas>`;
+    }
+    updated(changedProps) {
+        this.onResize();
+        return super.updated(changedProps);
+    }
     onResize() {
         var _a;
         const canvas = (_a = this.shadowRoot) === null || _a === void 0 ? void 0 : _a.querySelector("canvas");
@@ -6435,16 +6444,6 @@ let Pane3D = class Pane3D extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
             canvas.width = this.clientWidth;
             canvas.height = this.clientHeight;
         }
-    }
-    get canvas() {
-        return this.shadowRoot.querySelector("canvas");
-    }
-    render() {
-        return lit__WEBPACK_IMPORTED_MODULE_0__.html `<canvas></canvas>`;
-    }
-    updated(changedProps) {
-        this.onResize();
-        return super.updated(changedProps);
     }
 };
 Pane3D.styles = lit__WEBPACK_IMPORTED_MODULE_0__.css `
