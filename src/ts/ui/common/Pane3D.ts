@@ -19,6 +19,10 @@ export class Pane3D extends LitElement {
     this.onResizeDelegate = this.onResize.bind(this);
   }
 
+  get canvas() {
+    return this.shadowRoot!.querySelector("canvas")!;
+  }
+
   connectedCallback(): void {
     super.connectedCallback();
     window.addEventListener("resize", this.onResizeDelegate);
@@ -29,18 +33,6 @@ export class Pane3D extends LitElement {
     window.removeEventListener("resize", this.onResizeDelegate);
   }
 
-  private onResize() {
-    const canvas = this.shadowRoot?.querySelector("canvas");
-    if (canvas) {
-      canvas.width = this.clientWidth;
-      canvas.height = this.clientHeight;
-    }
-  }
-
-  get canvas() {
-    return this.shadowRoot!.querySelector("canvas")!;
-  }
-
   render() {
     return html`<canvas></canvas>`;
   }
@@ -48,6 +40,14 @@ export class Pane3D extends LitElement {
   updated(changedProps: PropertyValues) {
     this.onResize();
     return super.updated(changedProps);
+  }
+
+  private onResize() {
+    const canvas = this.shadowRoot?.querySelector("canvas");
+    if (canvas) {
+      canvas.width = this.clientWidth;
+      canvas.height = this.clientHeight;
+    }
   }
 }
 

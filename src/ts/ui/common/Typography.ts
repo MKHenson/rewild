@@ -73,3 +73,9 @@ export class Typography extends LitElement {
     </div>`;
   }
 }
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "x-typography": Typography;
+  }
+}
