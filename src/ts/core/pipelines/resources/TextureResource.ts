@@ -27,8 +27,10 @@ export class TextureResource extends PipelineResourceTemplate {
       bindings: [manager.samplers[0], this.texture!.gpuTexture.createView()],
       fragmentBlock: `
       ${pipeline.defines.diffuseMap && `
-      [[group(${group}), binding(${this.samplerBind})]] var ${this.id}Sampler: sampler;
-      [[group(${group}), binding(${this.textureBind})]] var ${this.id}Texture: texture_2d<f32>;`
+      @group(${group}) @binding(${this.samplerBind})
+      var ${this.id}Sampler: sampler;
+      @group(${group}) @binding(${this.textureBind})
+      var ${this.id}Texture: texture_2d<f32>;`
       }`,
       vertexBlock: null,
     };

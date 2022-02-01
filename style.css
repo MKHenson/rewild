@@ -34,6 +34,13 @@
   font-weight: 300;
   font-family: Roboto, sans-serif;
 }
+html,
+body,
+.application {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
 
 body {
   margin: 0;
@@ -52,8 +59,4 @@ body {
   top: 1rem;
   left: calc(50% - 150px);
   text-align: center;
-}
-
-.application {
-  margin: 2rem auto;
 }

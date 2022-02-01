@@ -92,8 +92,11 @@ export class LightingResource extends PipelineResourceTemplate {
         numDirectionalLights: u32;
       };
 
-      [[group(${group}), binding(${this.lightingConfigBinding})]] var<uniform> lightingConfigUniform: LightingConfigUniform;
-      [[group(${group}), binding(${this.sceneLightingBinding})]] var<uniform> sceneLightingUniform: SceneLightingUniform;
+      @group(${group}) @binding(${this.lightingConfigBinding})
+      var<uniform> lightingConfigUniform: LightingConfigUniform;
+
+      @group(${group}) @binding(${this.sceneLightingBinding})
+      var<uniform> sceneLightingUniform: SceneLightingUniform;
 
 
       ${pipeline.defines.NUM_DIR_LIGHTS ? `
@@ -106,7 +109,8 @@ export class LightingResource extends PipelineResourceTemplate {
         directionalLights: array<DirectionLightUniform>;
       };
 
-      [[group(${group}), binding(${this.directionLightBinding})]] var<storage, read> directionLightsUniform: DirectionLightsUniform;
+      @group(${group}) @binding(${this.directionLightBinding})
+      var<storage, read> directionLightsUniform: DirectionLightsUniform;
       ` : ''}
       `,
       vertexBlock: null,

@@ -40,7 +40,8 @@ export class TransformResource extends PipelineResourceTemplate {
         modelViewMatrix: mat4x4<f32>;
         normalMatrix: mat3x3<f32>;
       };
-      [[group(${group}), binding(${curBindIndex})]] var<uniform> uniforms: TransformUniform;
+      @group(${group}) @binding(${curBindIndex})
+      var<uniform> uniforms: TransformUniform;
       `,
     };
   }
