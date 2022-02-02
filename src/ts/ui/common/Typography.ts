@@ -7,6 +7,22 @@ export type TypographyAlign = "center" | "inherit" | "justify" | "left" | "right
 
 @customElement("x-typography")
 export class Typography extends LitElement {
+  @property({ type: String })
+  variant: TypographyVariant = "body1";
+
+  @property({ type: String })
+  align: TypographyAlign = "inherit";
+
+  constructor() {
+    super();
+  }
+
+  render() {
+    return html`<div class="typography ${this.variant}" style=${styleMap({ textAlign: this.align })}>
+      <slot></slot>
+    </div>`;
+  }
+
   static styles = css`
     div {
       margin: 0;
@@ -56,22 +72,6 @@ export class Typography extends LitElement {
       letter-spacing: 0.01071em;
     }
   `;
-
-  @property({ type: String })
-  variant: TypographyVariant = "body1";
-
-  @property({ type: String })
-  align: TypographyAlign = "inherit";
-
-  constructor() {
-    super();
-  }
-
-  render() {
-    return html`<div class="typography ${this.variant}" style=${styleMap({ textAlign: this.align })}>
-      <slot></slot>
-    </div>`;
-  }
 }
 
 declare global {

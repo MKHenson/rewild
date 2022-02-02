@@ -5,12 +5,12 @@ import { DebugPipeline } from "./pipelines/debug-pipeline";
 import { Pipeline } from "./pipelines/Pipeline";
 import { createBuffer, createIndexBuffer } from "./Utils";
 import { RenderQueueManager } from "./RenderQueueManager";
-import { WasmInterface } from "..";
 import { Texture } from "./Texture";
 import { GroupType } from "../../common/GroupType";
 import { ResourceType } from "../../common/ResourceType";
 import { MeshPipeline } from "build/types";
 import { Pane3D } from "../ui/common/Pane3D";
+import { WasmInterface } from "../ui/application/Application";
 
 const meshPipelineInstances: MeshPipeline[] = [];
 const sampleCount = 4;
@@ -41,8 +41,7 @@ export class GameManager {
   currentCommandEncoder: GPUCommandEncoder;
   private presentationSize: [number, number];
 
-  constructor(paneSelector: string) {
-    const pane3D = document.querySelector(paneSelector) as Pane3D;
+  constructor(pane3D: Pane3D) {
     this.canvas = pane3D.canvas;
     this.buffers = [];
     this.textures = [];

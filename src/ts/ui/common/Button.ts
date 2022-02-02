@@ -1,4 +1,4 @@
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, PropertyValues } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 export type ButtonVariant = "contained" | "outlined";
@@ -6,6 +6,41 @@ export type ButtonColor = "primary" | "secondary" | "error";
 
 @customElement("x-button")
 export class Button extends LitElement {
+  @property({ type: Boolean })
+  disabled?: boolean = false;
+
+  @property()
+  color?: ButtonColor = "primary";
+
+  @property()
+  variant?: ButtonVariant = "contained";
+
+  @property({ type: Boolean })
+  fullWidth?: boolean = false;
+
+  constructor() {
+    super();
+    this.addEventListener("click", this.onClick.bind(this));
+  }
+
+  protected willUpdate(changedProperties: PropertyValues): void {
+    super.willUpdate(changedProperties);
+    this.style.display = this.fullWidth ? "block" : "inline-block";
+  }
+
+  render() {
+    return html`<button ?disabled=${this.disabled} class="${this.color} ${this.variant}">
+      <slot></slot>
+    </button>`;
+  }
+
+  private onClick(e: MouseEvent) {
+    if (this.disabled) {
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    }
+  }
+
   static styles = css`
     button {
       padding: 0.5rem 1rem;
@@ -17,6 +52,7 @@ export class Button extends LitElement {
       font-weight: 400;
       cursor: pointer;
       user-select: none;
+      width: 100%;
       transition: box-shadow 0.25s, background-color 0.25s;
     }
 
@@ -96,34 +132,6 @@ export class Button extends LitElement {
       border: 1px solid var(--errory-400);
     }
   `;
-
-  // Declare reactive properties
-  @property({ type: Boolean })
-  disabled?: boolean = false;
-
-  @property()
-  color?: ButtonColor = "primary";
-
-  @property()
-  variant?: ButtonVariant = "contained";
-
-  constructor() {
-    super();
-    this.addEventListener("click", this.onClick.bind(this));
-  }
-
-  render() {
-    return html`<button ?disabled=${this.disabled} class="${this.color} ${this.variant}">
-      <slot></slot>
-    </button>`;
-  }
-
-  private onClick(e: MouseEvent) {
-    if (this.disabled) {
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-    }
-  }
 }
 
 declare global {

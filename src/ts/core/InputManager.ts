@@ -1,4 +1,4 @@
-import { WasmInterface } from "../index";
+import { WasmInterface } from "../../ts/ui/application/Application";
 
 export enum MouseEventType {
   MouseDown,

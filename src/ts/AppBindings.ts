@@ -1,6 +1,6 @@
 import { GPUBufferUsageFlags } from "../common/GPUEnums";
-import { ExportType } from "./index";
 import { GameManager } from "./core/GameManager";
+import { ExportType } from "./ui/application/Application";
 
 type Import = WebAssembly.Imports;
 export const vaos: WebGLVertexArrayObject[] = [];

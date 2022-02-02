@@ -4355,8 +4355,7 @@ var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _argume
 const meshPipelineInstances = [];
 const sampleCount = 4;
 class GameManager {
-    constructor(paneSelector) {
-        const pane3D = document.querySelector(paneSelector);
+    constructor(pane3D) {
         this.canvas = pane3D.canvas;
         this.buffers = [];
         this.textures = [];
@@ -6089,25 +6088,140 @@ function shaderBuilder(sourceFragments, pipeline) {
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Application": () => (/* binding */ Application)
+/* harmony export */ });
 /* harmony import */ var lit__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! lit */ "./node_modules/lit/index.js");
+/* harmony import */ var lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! lit/decorators.js */ "./node_modules/lit/decorators.js");
+/* harmony import */ var _build_untouched_wasm__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../../build/untouched.wasm */ "./build/untouched.wasm");
+/* harmony import */ var _AppBindings__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../AppBindings */ "./src/ts/AppBindings.ts");
+/* harmony import */ var _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @assemblyscript/loader */ "./node_modules/@assemblyscript/loader/index.js");
+/* harmony import */ var _core_GameManager__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../core/GameManager */ "./src/ts/core/GameManager.ts");
+var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (undefined && undefined.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __classPrivateFieldGet = (undefined && undefined.__classPrivateFieldGet) || function (receiver, state, kind, f) {
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
+    return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
+};
+var __classPrivateFieldSet = (undefined && undefined.__classPrivateFieldSet) || function (receiver, state, value, kind, f) {
+    if (kind === "m") throw new TypeError("Private method is not writable");
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
+    return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
+};
+var _Application_instances, _Application_mainMenu, _Application_onStart;
 
-const Application = () => lit__WEBPACK_IMPORTED_MODULE_0__.html `
-  <x-modal open id="main-menu" hideConfirmButtons>
-    <x-typography variant="h4" align="center">Rewild!</x-typography>
-    <x-typography variant="body2"
-      >Welcome to rewild. A game about exploration, natural history and saving the planet</x-typography
-    >
-    <x-button id="start-game" variant="contained" color="primary">Start Game</x-button>
-  </x-modal>
-`;
-document.addEventListener("readystatechange", (e) => {
-    if (document.readyState === "interactive" || document.readyState === "complete") {
-        (0,lit__WEBPACK_IMPORTED_MODULE_0__.render)(Application(), document.querySelector("#application"));
-        const mainMenu = document.querySelector("#main-menu");
-        mainMenu.addEventListener("close", (e) => (mainMenu.open = false));
-        document.querySelector("#start-game").addEventListener("click", (e) => (mainMenu.open = false));
+
+
+
+
+
+// Creating WASM with Linear memory
+const memory = new WebAssembly.Memory({ initial: 100 });
+const importObject = {
+    env: {
+        memory: memory,
+        seed: Date.now,
+        abort: (...args) => {
+            console.log("abort");
+            console.log(importObject.env.getString(args[0]));
+        },
+        getString: (string_index) => {
+            const buffer = importObject.env.memory.buffer;
+            const U32 = new Uint32Array(buffer);
+            const id_addr = string_index / 4 - 2;
+            const id = U32[id_addr];
+            if (id !== 0x01)
+                throw Error(`not a string index=${string_index} id=${id}`);
+            const len = U32[id_addr + 1];
+            const str = new TextDecoder("utf-16").decode(buffer.slice(string_index, string_index + len));
+            return str;
+        },
+    },
+};
+let Application = class Application extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
+    constructor() {
+        super();
+        _Application_instances.add(this);
+        _Application_mainMenu.set(this, void 0);
     }
-});
+    render() {
+        return lit__WEBPACK_IMPORTED_MODULE_0__.html `<x-modal open @close=${__classPrivateFieldGet(this, _Application_instances, "m", _Application_onStart)} id="main-menu" hideConfirmButtons>
+        <x-typography variant="h4" align="center">Rewild!</x-typography>
+        <x-typography variant="body2"
+          >Welcome to rewild. A game about exploration, natural history and saving the planet</x-typography
+        >
+        <div class="buttons">
+          <x-button id="options" fullWidth variant="outlined" disabled>Options</x-button>
+          <x-button id="start-game" @click=${__classPrivateFieldGet(this, _Application_instances, "m", _Application_onStart)} fullWidth variant="contained" color="primary"
+            >Start Game</x-button
+          >
+        </div>
+      </x-modal>
+      <x-pane3d />`;
+    }
+    firstUpdated(changedProps) {
+        const _super = Object.create(null, {
+            firstUpdated: { get: () => super.firstUpdated }
+        });
+        return __awaiter(this, void 0, void 0, function* () {
+            _super.firstUpdated.call(this, changedProps);
+            __classPrivateFieldSet(this, _Application_mainMenu, this.shadowRoot.querySelector("#main-menu"), "f");
+            const panel3D = this.shadowRoot.querySelector("x-pane3d");
+            // Wait for panel to be fully mounted
+            yield panel3D.updateComplete;
+            this.gameManager = new _core_GameManager__WEBPACK_IMPORTED_MODULE_5__.GameManager(panel3D);
+            (0,_AppBindings__WEBPACK_IMPORTED_MODULE_3__.createBindingsGPU)(importObject, this.gameManager);
+            this.init();
+        });
+    }
+    init() {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Load the wasm file
+            const obj = yield _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_4__.default.instantiateStreaming(fetch(_build_untouched_wasm__WEBPACK_IMPORTED_MODULE_2__.default), importObject);
+            const message = document.querySelector("#message");
+            // Bind the newly created export file
+            (0,_AppBindings__WEBPACK_IMPORTED_MODULE_3__.bindExports)(obj);
+            try {
+                yield this.gameManager.init(obj.exports);
+            }
+            catch (err) {
+                message.style.display = "initial";
+                message.innerHTML = err.message;
+            }
+        });
+    }
+};
+_Application_mainMenu = new WeakMap(), _Application_instances = new WeakSet(), _Application_onStart = function _Application_onStart() {
+    __classPrivateFieldGet(this, _Application_mainMenu, "f").open = false;
+};
+Application.styles = lit__WEBPACK_IMPORTED_MODULE_0__.css `
+    x-button {
+      margin: 1rem 0 0 0;
+    }
+  `;
+Application = __decorate([
+    (0,lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__.customElement)("x-application"),
+    __metadata("design:paramtypes", [])
+], Application);
+
 
 
 /***/ }),
@@ -6138,11 +6252,15 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
 let Button = class Button extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
     constructor() {
         super();
-        // Declare reactive properties
         this.disabled = false;
         this.color = "primary";
         this.variant = "contained";
+        this.fullWidth = false;
         this.addEventListener("click", this.onClick.bind(this));
+    }
+    willUpdate(changedProperties) {
+        super.willUpdate(changedProperties);
+        this.style.display = this.fullWidth ? "block" : "inline-block";
     }
     render() {
         return lit__WEBPACK_IMPORTED_MODULE_0__.html `<button ?disabled=${this.disabled} class="${this.color} ${this.variant}">
@@ -6167,6 +6285,7 @@ Button.styles = lit__WEBPACK_IMPORTED_MODULE_0__.css `
       font-weight: 400;
       cursor: pointer;
       user-select: none;
+      width: 100%;
       transition: box-shadow 0.25s, background-color 0.25s;
     }
 
@@ -6258,6 +6377,10 @@ __decorate([
     (0,lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__.property)(),
     __metadata("design:type", String)
 ], Button.prototype, "variant", void 0);
+__decorate([
+    (0,lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__.property)({ type: Boolean }),
+    __metadata("design:type", Boolean)
+], Button.prototype, "fullWidth", void 0);
 Button = __decorate([
     (0,lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__.customElement)("x-button"),
     __metadata("design:paramtypes", [])
@@ -6293,7 +6416,6 @@ var __metadata = (undefined && undefined.__metadata) || function (k, v) {
 let Modal = class Modal extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
     constructor() {
         super();
-        // Declare reactive properties
         this.open = false;
         this.hideConfirmButtons = false;
     }
@@ -6358,8 +6480,9 @@ Modal.styles = lit__WEBPACK_IMPORTED_MODULE_0__.css `
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      border-radius: 2px;
+      border-radius: 5px;
       min-width: 300px;
+      box-shadow: 2px 2px 2px 4px rgba(0, 0, 0, 0.1);
     }
     .title {
       font-size: 18px;
@@ -6433,9 +6556,9 @@ let Pane3D = class Pane3D extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
     render() {
         return lit__WEBPACK_IMPORTED_MODULE_0__.html `<canvas></canvas>`;
     }
-    updated(changedProps) {
+    firstUpdated(changedProps) {
         this.onResize();
-        return super.updated(changedProps);
+        return super.firstUpdated(changedProps);
     }
     onResize() {
         var _a;
@@ -6682,70 +6805,15 @@ var __webpack_exports__ = {};
   !*** ./src/ts/index.ts ***!
   \*************************/
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _build_untouched_wasm__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../build/untouched.wasm */ "./build/untouched.wasm");
-/* harmony import */ var _AppBindings__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./AppBindings */ "./src/ts/AppBindings.ts");
-/* harmony import */ var _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @assemblyscript/loader */ "./node_modules/@assemblyscript/loader/index.js");
-/* harmony import */ var _ui_index__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./ui/index */ "./src/ts/ui/index.ts");
-/* harmony import */ var _core_GameManager__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./core/GameManager */ "./src/ts/core/GameManager.ts");
-var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
+/* harmony import */ var _ui_index__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./ui/index */ "./src/ts/ui/index.ts");
+/* harmony import */ var _ui_application_Application__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ui/application/Application */ "./src/ts/ui/application/Application.ts");
+/* harmony import */ var lit__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! lit */ "./node_modules/lit/index.js");
 
 
 
-
-
-// Creating WASM with Linear memory
-const memory = new WebAssembly.Memory({ initial: 100 });
-const importObject = {
-    env: {
-        memory: memory,
-        seed: Date.now,
-        abort: (...args) => {
-            console.log("abort");
-            console.log(importObject.env.getString(args[0]));
-        },
-        getString: (string_index) => {
-            const buffer = importObject.env.memory.buffer;
-            const U32 = new Uint32Array(buffer);
-            const id_addr = string_index / 4 - 2;
-            const id = U32[id_addr];
-            if (id !== 0x01)
-                throw Error(`not a string index=${string_index} id=${id}`);
-            const len = U32[id_addr + 1];
-            const str = new TextDecoder("utf-16").decode(buffer.slice(string_index, string_index + len));
-            return str;
-        },
-    },
-};
-let gameManager;
-function init() {
-    return __awaiter(this, void 0, void 0, function* () {
-        // Load the wasm file
-        const obj = yield _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_2__.default.instantiateStreaming(fetch(_build_untouched_wasm__WEBPACK_IMPORTED_MODULE_0__.default), importObject);
-        const message = document.querySelector("#message");
-        // Bind the newly created export file
-        (0,_AppBindings__WEBPACK_IMPORTED_MODULE_1__.bindExports)(obj);
-        try {
-            yield gameManager.init(obj.exports);
-        }
-        catch (err) {
-            message.style.display = "initial";
-            message.innerHTML = err.message;
-        }
-    });
-}
 document.addEventListener("readystatechange", (e) => {
-    if (document.readyState === "complete") {
-        gameManager = new _core_GameManager__WEBPACK_IMPORTED_MODULE_4__.GameManager("x-pane3d");
-        (0,_AppBindings__WEBPACK_IMPORTED_MODULE_1__.createBindingsGPU)(importObject, gameManager);
-        init();
+    if (document.readyState === "interactive" || document.readyState === "complete") {
+        (0,lit__WEBPACK_IMPORTED_MODULE_2__.render)(new _ui_application_Application__WEBPACK_IMPORTED_MODULE_1__.Application(), document.querySelector("#application"));
     }
 });
 

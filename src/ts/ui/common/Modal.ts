@@ -3,51 +3,6 @@ import { customElement, property } from "lit/decorators.js";
 
 @customElement("x-modal")
 export class Modal extends LitElement {
-  static styles = css`
-    .wrapper {
-      position: fixed;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      opacity: 0;
-      visibility: hidden;
-      transform: scale(1.1);
-      transition: visibility 0s linear 0.25s, opacity 0.25s 0s, transform 0.25s;
-      z-index: 1;
-    }
-    .visible {
-      opacity: 1;
-      visibility: visible;
-      transform: scale(1);
-      transition: visibility 0s linear 0s, opacity 0.25s 0s, transform 0.25s;
-    }
-    .modal {
-      padding: 1rem;
-      background-color: var(--surface);
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      border-radius: 2px;
-      min-width: 300px;
-    }
-    .title {
-      font-size: 18px;
-    }
-    .button-container {
-      text-align: right;
-    }
-    .button-container > x-button {
-      margin: 0 0 0 4px;
-    }
-    .content {
-      padding: 0.5rem 0;
-    }
-  `;
-
-  // Declare reactive properties
   @property({ type: Boolean })
   open?: boolean = false;
 
@@ -94,6 +49,51 @@ export class Modal extends LitElement {
     this.dispatchEvent(new CustomEvent("ok"));
     this.removeAttribute("open");
   }
+
+  static styles = css`
+    .wrapper {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      visibility: hidden;
+      transform: scale(1.1);
+      transition: visibility 0s linear 0.25s, opacity 0.25s 0s, transform 0.25s;
+      z-index: 1;
+    }
+    .visible {
+      opacity: 1;
+      visibility: visible;
+      transform: scale(1);
+      transition: visibility 0s linear 0s, opacity 0.25s 0s, transform 0.25s;
+    }
+    .modal {
+      padding: 1rem;
+      background-color: var(--surface);
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border-radius: 5px;
+      min-width: 300px;
+      box-shadow: 2px 2px 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .title {
+      font-size: 18px;
+    }
+    .button-container {
+      text-align: right;
+    }
+    .button-container > x-button {
+      margin: 0 0 0 4px;
+    }
+    .content {
+      padding: 0.5rem 0;
+    }
+  `;
 }
 
 declare global {

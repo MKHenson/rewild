@@ -3,15 +3,6 @@ import { customElement } from "lit/decorators.js";
 
 @customElement("x-pane3d")
 export class Pane3D extends LitElement {
-  static styles = css`
-    :host {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      display: block;
-    }
-  `;
-
   private onResizeDelegate: () => void;
 
   constructor() {
@@ -37,9 +28,9 @@ export class Pane3D extends LitElement {
     return html`<canvas></canvas>`;
   }
 
-  updated(changedProps: PropertyValues) {
+  firstUpdated(changedProps: PropertyValues) {
     this.onResize();
-    return super.updated(changedProps);
+    return super.firstUpdated(changedProps);
   }
 
   private onResize() {
@@ -49,6 +40,15 @@ export class Pane3D extends LitElement {
       canvas.height = this.clientHeight;
     }
   }
+
+  static styles = css`
+    :host {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      display: block;
+    }
+  `;
 }
 
 declare global {
