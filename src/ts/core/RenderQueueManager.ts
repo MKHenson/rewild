@@ -5,23 +5,27 @@ import { GameManager } from "./GameManager";
 import { Pipeline } from "./pipelines/Pipeline";
 import { LightingResource } from "./pipelines/resources/LightingResource";
 import { PipelineResourceInstance } from "./pipelines/resources/PipelineResourceInstance";
+import { WasmManager } from "./WasmManager";
 
 const ARRAYBUFFERVIEW_DATASTART_OFFSET = 4;
 const normalAs4x4 = new Float32Array(12);
 
 export class RenderQueueManager {
   manager: GameManager;
+  wasmManager: WasmManager;
 
-  constructor(manager: GameManager) {
+  constructor(manager: GameManager, wasmManager: WasmManager) {
     this.manager = manager;
+    this.wasmManager = wasmManager;
   }
 
-  run(commandBuffer: Array<number>, arrayBuffer: Uint32Array, wasmMemoryBlock: ArrayBuffer) {
+  run(commandBuffer: Array<number>) {
     const manager = this.manager;
     const device = manager.device;
+    const { wasmArrayBuffer, wasmMemoryBlock } = this.wasmManager;
 
     const getPtrIndex = function (ptr: number) {
-      return arrayBuffer[(ptr + ARRAYBUFFERVIEW_DATASTART_OFFSET) >>> 2];
+      return wasmArrayBuffer[(ptr + ARRAYBUFFERVIEW_DATASTART_OFFSET) >>> 2];
     };
     getPtrIndex;
 

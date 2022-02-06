@@ -1,20 +1,14 @@
 import { GPUBufferUsageFlags } from "../common/GPUEnums";
 import { GameManager } from "./core/GameManager";
-import { ExportType } from "./ui/application/Application";
+import { ExportType } from "./core/WasmManager";
 
 type Import = WebAssembly.Imports;
 export const vaos: WebGLVertexArrayObject[] = [];
 export const buffers: WebGLBuffer[] = [];
 let wasmExports: ExportType;
-let wasmArrayBuffer: Uint32Array, wasmDataView: DataView, wasmMemoryBlock: ArrayBuffer;
 
 export function bindExports(exports: ExportType) {
   wasmExports = exports;
-
-  wasmMemoryBlock = wasmExports.exports.memory!.buffer;
-  wasmArrayBuffer = new Uint32Array(wasmMemoryBlock);
-  wasmDataView = new DataView(exports.exports.memory.buffer);
-  wasmDataView;
 }
 
 export function createBindingsGPU(importObject: Import, gameManager: GameManager) {
@@ -34,7 +28,7 @@ export function createBindingsGPU(importObject: Import, gameManager: GameManager
     },
     render(commandsIndex: number) {
       const commandBuffer = wasmExports.exports.__getArray(commandsIndex) as Array<number>;
-      gameManager.renderQueueManager.run(commandBuffer, wasmArrayBuffer, wasmMemoryBlock);
+      gameManager.renderQueueManager.run(commandBuffer);
     },
   };
 

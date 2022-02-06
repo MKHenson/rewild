@@ -10,7 +10,7 @@ import { GroupType } from "../../common/GroupType";
 import { ResourceType } from "../../common/ResourceType";
 import { MeshPipeline } from "build/types";
 import { Pane3D } from "../ui/common/Pane3D";
-import { WasmInterface } from "../ui/application/Application";
+import { WasmManager } from "./WasmManager";
 
 const meshPipelineInstances: MeshPipeline[] = [];
 const sampleCount = 4;
@@ -21,7 +21,7 @@ export class GameManager {
   context: GPUCanvasContext;
   format: GPUTextureFormat;
   inputManager: InputManager;
-  wasm: WasmInterface;
+  wasmManager: WasmManager;
 
   buffers: GPUBuffer[];
   pipelines: Pipeline<any>[];
@@ -48,17 +48,18 @@ export class GameManager {
     this.samplers = [];
     this.disposed = false;
     this.currentPass = null;
-    this.renderQueueManager = new RenderQueueManager(this);
     this.onFrameHandler = this.onFrame.bind(this);
   }
 
-  async init(wasm: WasmInterface) {
-    this.wasm = wasm;
+  async init(wasmManager: WasmManager) {
+    this.wasmManager = wasmManager;
+    this.renderQueueManager = new RenderQueueManager(this, wasmManager);
+    const wasmExports = wasmManager.exports;
 
     const hasGPU = this.hasWebGPU();
     if (!hasGPU) throw new Error("Your current browser does not support WebGPU!");
 
-    this.inputManager = new InputManager(this.canvas, wasm);
+    this.inputManager = new InputManager(this.canvas, wasmManager);
 
     const adapter = await navigator.gpu?.requestAdapter();
     const device = (await adapter?.requestDevice()) as GPUDevice;
@@ -91,7 +92,7 @@ export class GameManager {
     this.textures = await Promise.all(
       texturePaths.map((tp, index) => {
         const texture = new Texture(tp.name, tp.path);
-        wasm.TextureFactory.createTexture(wasm.__newString(tp.name), index);
+        wasmExports.TextureFactory.createTexture(wasmExports.__newString(tp.name), index);
         return texture.load(device);
       })
     );
@@ -106,7 +107,7 @@ export class GameManager {
     this.onResize(size, false);
 
     // Initialize the wasm module
-    wasm.AsSceneManager.init(this.canvas.width, this.canvas.height);
+    wasmExports.AsSceneManager.init(this.canvas.width, this.canvas.height);
 
     this.initRuntime();
 
@@ -132,7 +133,7 @@ export class GameManager {
   }
 
   initRuntime() {
-    const wasm = this.wasm;
+    const wasm = this.wasmManager.exports;
     const runime = wasm.Runtime.wrap(wasm.AsSceneManager.getRuntime());
 
     this.pipelines.forEach((p) => {
@@ -154,14 +155,15 @@ export class GameManager {
     // Get the pipeline
     const debugPipeline = this.getPipeline(useTexture ? "textured" : "simple")!;
     const pipelineIndex = this.pipelines.indexOf(debugPipeline);
+    const wasmExports = this.wasmManager.exports;
 
     // Create an instance in WASM
-    const pipelineInsPtr = this.wasm.PipelineFactory.createPipeline(
-      this.wasm.__newString(debugPipeline.name),
+    const pipelineInsPtr = wasmExports.PipelineFactory.createPipeline(
+      wasmExports.__newString(debugPipeline.name),
       pipelineIndex,
       PipelineType.Mesh
     );
-    const meshPipelineIns = this.wasm.MeshPipeline.wrap(pipelineInsPtr);
+    const meshPipelineIns = wasmExports.MeshPipeline.wrap(pipelineInsPtr);
 
     meshPipelineInstances.push(meshPipelineIns);
 
@@ -170,8 +172,8 @@ export class GameManager {
     meshPipelineIns.transformResourceIndex = debugPipeline.addResourceInstance(this, GroupType.Transform);
 
     const geometryPtr =
-      type === "box" ? this.wasm.GeometryFactory.createBox(size) : this.wasm.GeometryFactory.createSphere(size);
-    const meshPtr = this.wasm.createMesh(geometryPtr, pipelineInsPtr);
+      type === "box" ? wasmExports.GeometryFactory.createBox(size) : wasmExports.GeometryFactory.createSphere(size);
+    const meshPtr = wasmExports.createMesh(geometryPtr, pipelineInsPtr);
     return meshPtr;
   }
 
@@ -213,7 +215,7 @@ export class GameManager {
 
     this.renderTargetView = this.renderTarget.createView();
 
-    if (updateWasm) this.wasm.AsSceneManager.resize(this.canvas.width, this.canvas.height);
+    if (updateWasm) this.wasmManager.exports.AsSceneManager.resize(this.canvas.width, this.canvas.height);
   }
 
   private onFrame() {
@@ -227,7 +229,7 @@ export class GameManager {
       this.onResize(newSize);
     }
 
-    this.wasm.AsSceneManager.update(performance.now());
+    this.wasmManager.exports.AsSceneManager.update(performance.now());
   }
 
   canvasSize() {

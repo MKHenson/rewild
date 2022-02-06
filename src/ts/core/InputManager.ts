@@ -1,4 +1,4 @@
-import { WasmInterface } from "../../ts/ui/application/Application";
+import { WasmManager } from "./WasmManager";
 
 export enum MouseEventType {
   MouseDown,
@@ -9,7 +9,7 @@ export enum MouseEventType {
 
 export class InputManager {
   canvas: HTMLCanvasElement;
-  wasm: WasmInterface;
+  wasmManager: WasmManager;
 
   private onDownHandler: (e: MouseEvent) => void;
   private onUpHandler: (e: MouseEvent) => void;
@@ -17,8 +17,8 @@ export class InputManager {
   private onWheelHandler: (e: WheelEvent) => void;
   private canvasBounds: DOMRect;
 
-  constructor(canvas: HTMLCanvasElement, wasm: WasmInterface) {
-    this.wasm = wasm;
+  constructor(canvas: HTMLCanvasElement, wasm: WasmManager) {
+    this.wasmManager = wasm;
     this.canvas = canvas;
     this.canvasBounds = canvas.getBoundingClientRect();
 
@@ -57,8 +57,9 @@ export class InputManager {
   }
 
   private createMouseEvent(e: MouseEvent, bounds: DOMRect, delta: number = 0) {
-    const mouseEventPtr = this.wasm.__pin(
-      this.wasm.ASInputManager.createMouseEvent(
+    const wasmExports = this.wasmManager.exports;
+    const mouseEventPtr = wasmExports.__pin(
+      wasmExports.ASInputManager.createMouseEvent(
         e.clientX,
         e.clientY,
         e.pageX,
@@ -75,12 +76,13 @@ export class InputManager {
         delta
       )
     );
-    this.wasm.ASInputManager.MouseEvent.wrap(mouseEventPtr);
+    wasmExports.ASInputManager.MouseEvent.wrap(mouseEventPtr);
     return mouseEventPtr;
   }
 
   private sendMouseEvent(type: MouseEventType, event: MouseEvent, bounds: DOMRect, delta: number): void {
-    const manager = this.wasm.ASInputManager.InputManager.wrap(this.wasm.ASInputManager.getInputManager());
+    const wasmExports = this.wasmManager.exports;
+    const manager = wasmExports.ASInputManager.InputManager.wrap(wasmExports.ASInputManager.getInputManager());
     const wasmEvent = this.createMouseEvent(event, bounds, delta);
 
     if (type === MouseEventType.MouseUp) manager.onMouseUp(wasmEvent);
@@ -88,7 +90,7 @@ export class InputManager {
     else if (type === MouseEventType.MouseDown) manager.onMouseDown(wasmEvent);
     else if (type === MouseEventType.MouseWheel) manager.onWheel(wasmEvent);
 
-    this.wasm.__unpin(wasmEvent);
+    wasmExports.__unpin(wasmEvent);
   }
 
   dispose() {

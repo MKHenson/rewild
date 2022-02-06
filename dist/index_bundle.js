@@ -4282,13 +4282,8 @@ __webpack_require__.r(__webpack_exports__);
 const vaos = [];
 const buffers = [];
 let wasmExports;
-let wasmArrayBuffer, wasmDataView, wasmMemoryBlock;
 function bindExports(exports) {
     wasmExports = exports;
-    wasmMemoryBlock = wasmExports.exports.memory.buffer;
-    wasmArrayBuffer = new Uint32Array(wasmMemoryBlock);
-    wasmDataView = new DataView(exports.exports.memory.buffer);
-    wasmDataView;
 }
 function createBindingsGPU(importObject, gameManager) {
     if (!importObject.env.memory)
@@ -4308,7 +4303,7 @@ function createBindingsGPU(importObject, gameManager) {
         },
         render(commandsIndex) {
             const commandBuffer = wasmExports.exports.__getArray(commandsIndex);
-            gameManager.renderQueueManager.run(commandBuffer, wasmArrayBuffer, wasmMemoryBlock);
+            gameManager.renderQueueManager.run(commandBuffer);
         },
     };
     importObject.Imports = binding;
@@ -4362,17 +4357,18 @@ class GameManager {
         this.samplers = [];
         this.disposed = false;
         this.currentPass = null;
-        this.renderQueueManager = new _RenderQueueManager__WEBPACK_IMPORTED_MODULE_4__.RenderQueueManager(this);
         this.onFrameHandler = this.onFrame.bind(this);
     }
-    init(wasm) {
+    init(wasmManager) {
         var _a;
         return __awaiter(this, void 0, void 0, function* () {
-            this.wasm = wasm;
+            this.wasmManager = wasmManager;
+            this.renderQueueManager = new _RenderQueueManager__WEBPACK_IMPORTED_MODULE_4__.RenderQueueManager(this, wasmManager);
+            const wasmExports = wasmManager.exports;
             const hasGPU = this.hasWebGPU();
             if (!hasGPU)
                 throw new Error("Your current browser does not support WebGPU!");
-            this.inputManager = new _InputManager__WEBPACK_IMPORTED_MODULE_0__.InputManager(this.canvas, wasm);
+            this.inputManager = new _InputManager__WEBPACK_IMPORTED_MODULE_0__.InputManager(this.canvas, wasmManager);
             const adapter = yield ((_a = navigator.gpu) === null || _a === void 0 ? void 0 : _a.requestAdapter());
             const device = (yield (adapter === null || adapter === void 0 ? void 0 : adapter.requestDevice()));
             const context = this.canvas.getContext("webgpu");
@@ -4398,7 +4394,7 @@ class GameManager {
             ];
             this.textures = yield Promise.all(texturePaths.map((tp, index) => {
                 const texture = new _Texture__WEBPACK_IMPORTED_MODULE_5__.Texture(tp.name, tp.path);
-                wasm.TextureFactory.createTexture(wasm.__newString(tp.name), index);
+                wasmExports.TextureFactory.createTexture(wasmExports.__newString(tp.name), index);
                 return texture.load(device);
             }));
             // PIPELINES
@@ -4409,7 +4405,7 @@ class GameManager {
             const size = this.canvasSize();
             this.onResize(size, false);
             // Initialize the wasm module
-            wasm.AsSceneManager.init(this.canvas.width, this.canvas.height);
+            wasmExports.AsSceneManager.init(this.canvas.width, this.canvas.height);
             this.initRuntime();
             // Setup events
             window.addEventListener("resize", this.onResizeHandler);
@@ -4433,7 +4429,7 @@ class GameManager {
         return this.textures.find((t) => t.name === name) || null;
     }
     initRuntime() {
-        const wasm = this.wasm;
+        const wasm = this.wasmManager.exports;
         const runime = wasm.Runtime.wrap(wasm.AsSceneManager.getRuntime());
         this.pipelines.forEach((p) => {
             p.build(this);
@@ -4451,15 +4447,16 @@ class GameManager {
         // Get the pipeline
         const debugPipeline = this.getPipeline(useTexture ? "textured" : "simple");
         const pipelineIndex = this.pipelines.indexOf(debugPipeline);
+        const wasmExports = this.wasmManager.exports;
         // Create an instance in WASM
-        const pipelineInsPtr = this.wasm.PipelineFactory.createPipeline(this.wasm.__newString(debugPipeline.name), pipelineIndex, _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__.PipelineType.Mesh);
-        const meshPipelineIns = this.wasm.MeshPipeline.wrap(pipelineInsPtr);
+        const pipelineInsPtr = wasmExports.PipelineFactory.createPipeline(wasmExports.__newString(debugPipeline.name), pipelineIndex, _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__.PipelineType.Mesh);
+        const meshPipelineIns = wasmExports.MeshPipeline.wrap(pipelineInsPtr);
         meshPipelineInstances.push(meshPipelineIns);
         // Assign a transform buffer to the intance
         meshPipelineIns.transformGroupId = debugPipeline.getTemplateByType(_common_ResourceType__WEBPACK_IMPORTED_MODULE_7__.ResourceType.Transform).template.group;
         meshPipelineIns.transformResourceIndex = debugPipeline.addResourceInstance(this, _common_GroupType__WEBPACK_IMPORTED_MODULE_6__.GroupType.Transform);
-        const geometryPtr = type === "box" ? this.wasm.GeometryFactory.createBox(size) : this.wasm.GeometryFactory.createSphere(size);
-        const meshPtr = this.wasm.createMesh(geometryPtr, pipelineInsPtr);
+        const geometryPtr = type === "box" ? wasmExports.GeometryFactory.createBox(size) : wasmExports.GeometryFactory.createSphere(size);
+        const meshPtr = wasmExports.createMesh(geometryPtr, pipelineInsPtr);
         return meshPtr;
     }
     dispose() {
@@ -4495,7 +4492,7 @@ class GameManager {
         });
         this.renderTargetView = this.renderTarget.createView();
         if (updateWasm)
-            this.wasm.AsSceneManager.resize(this.canvas.width, this.canvas.height);
+            this.wasmManager.exports.AsSceneManager.resize(this.canvas.width, this.canvas.height);
     }
     onFrame() {
         window.requestAnimationFrame(this.onFrameHandler);
@@ -4507,7 +4504,7 @@ class GameManager {
         if (newSize[0] !== w || newSize[1] !== h) {
             this.onResize(newSize);
         }
-        this.wasm.AsSceneManager.update(performance.now());
+        this.wasmManager.exports.AsSceneManager.update(performance.now());
     }
     canvasSize() {
         const devicePixelRatio = window.devicePixelRatio || 1;
@@ -4590,7 +4587,7 @@ var MouseEventType;
 })(MouseEventType || (MouseEventType = {}));
 class InputManager {
     constructor(canvas, wasm) {
-        this.wasm = wasm;
+        this.wasmManager = wasm;
         this.canvas = canvas;
         this.canvasBounds = canvas.getBoundingClientRect();
         this.onDownHandler = this.onDown.bind(this);
@@ -4620,12 +4617,14 @@ class InputManager {
         this.sendMouseEvent(MouseEventType.MouseWheel, e, this.canvasBounds, e.deltaY);
     }
     createMouseEvent(e, bounds, delta = 0) {
-        const mouseEventPtr = this.wasm.__pin(this.wasm.ASInputManager.createMouseEvent(e.clientX, e.clientY, e.pageX, e.pageY, e.ctrlKey, e.shiftKey, e.altKey, e.button, e.buttons, bounds.x, bounds.y, bounds.width, bounds.height, delta));
-        this.wasm.ASInputManager.MouseEvent.wrap(mouseEventPtr);
+        const wasmExports = this.wasmManager.exports;
+        const mouseEventPtr = wasmExports.__pin(wasmExports.ASInputManager.createMouseEvent(e.clientX, e.clientY, e.pageX, e.pageY, e.ctrlKey, e.shiftKey, e.altKey, e.button, e.buttons, bounds.x, bounds.y, bounds.width, bounds.height, delta));
+        wasmExports.ASInputManager.MouseEvent.wrap(mouseEventPtr);
         return mouseEventPtr;
     }
     sendMouseEvent(type, event, bounds, delta) {
-        const manager = this.wasm.ASInputManager.InputManager.wrap(this.wasm.ASInputManager.getInputManager());
+        const wasmExports = this.wasmManager.exports;
+        const manager = wasmExports.ASInputManager.InputManager.wrap(wasmExports.ASInputManager.getInputManager());
         const wasmEvent = this.createMouseEvent(event, bounds, delta);
         if (type === MouseEventType.MouseUp)
             manager.onMouseUp(wasmEvent);
@@ -4635,7 +4634,7 @@ class InputManager {
             manager.onMouseDown(wasmEvent);
         else if (type === MouseEventType.MouseWheel)
             manager.onWheel(wasmEvent);
-        this.wasm.__unpin(wasmEvent);
+        wasmExports.__unpin(wasmEvent);
     }
     dispose() {
         this.canvas.removeEventListener("mousedown", this.onDownHandler);
@@ -4669,14 +4668,16 @@ __webpack_require__.r(__webpack_exports__);
 const ARRAYBUFFERVIEW_DATASTART_OFFSET = 4;
 const normalAs4x4 = new Float32Array(12);
 class RenderQueueManager {
-    constructor(manager) {
+    constructor(manager, wasmManager) {
         this.manager = manager;
+        this.wasmManager = wasmManager;
     }
-    run(commandBuffer, arrayBuffer, wasmMemoryBlock) {
+    run(commandBuffer) {
         const manager = this.manager;
         const device = manager.device;
+        const { wasmArrayBuffer, wasmMemoryBlock } = this.wasmManager;
         const getPtrIndex = function (ptr) {
-            return arrayBuffer[(ptr + ARRAYBUFFERVIEW_DATASTART_OFFSET) >>> 2];
+            return wasmArrayBuffer[(ptr + ARRAYBUFFERVIEW_DATASTART_OFFSET) >>> 2];
         };
         getPtrIndex;
         let pipeline, buffer, instances, resourceIndex;
@@ -4868,6 +4869,73 @@ function createIndexBuffer(device, data, usageFlag = GPUBufferUsage.INDEX | GPUB
     new Uint32Array(buffer.getMappedRange()).set(data);
     buffer.unmap();
     return buffer;
+}
+
+
+/***/ }),
+
+/***/ "./src/ts/core/WasmManager.ts":
+/*!************************************!*\
+  !*** ./src/ts/core/WasmManager.ts ***!
+  \************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "WasmManager": () => (/* binding */ WasmManager)
+/* harmony export */ });
+/* harmony import */ var _build_untouched_wasm__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../build/untouched.wasm */ "./build/untouched.wasm");
+/* harmony import */ var _AppBindings__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../AppBindings */ "./src/ts/AppBindings.ts");
+/* harmony import */ var _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @assemblyscript/loader */ "./node_modules/@assemblyscript/loader/index.js");
+var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+
+
+
+class WasmManager {
+    constructor() { }
+    load(gameManager) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Creating WASM with Linear memory
+            this.memory = new WebAssembly.Memory({ initial: 100 });
+            this.importObject = {
+                env: {
+                    memory: this.memory,
+                    seed: Date.now,
+                    abort: (...args) => {
+                        console.log("abort");
+                        console.log(this.importObject.env.getString(args[0]));
+                    },
+                    getString: (string_index) => {
+                        const buffer = this.importObject.env.memory.buffer;
+                        const U32 = new Uint32Array(buffer);
+                        const id_addr = string_index / 4 - 2;
+                        const id = U32[id_addr];
+                        if (id !== 0x01)
+                            throw Error(`not a string index=${string_index} id=${id}`);
+                        const len = U32[id_addr + 1];
+                        const str = new TextDecoder("utf-16").decode(buffer.slice(string_index, string_index + len));
+                        return str;
+                    },
+                },
+            };
+            (0,_AppBindings__WEBPACK_IMPORTED_MODULE_1__.createBindingsGPU)(this.importObject, gameManager);
+            const obj = yield _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_2__.default.instantiateStreaming(fetch(_build_untouched_wasm__WEBPACK_IMPORTED_MODULE_0__.default), this.importObject);
+            this.exports = obj.exports;
+            // Bind the newly created export file
+            (0,_AppBindings__WEBPACK_IMPORTED_MODULE_1__.bindExports)(obj);
+            this.wasmMemoryBlock = obj.exports.memory.buffer;
+            this.wasmArrayBuffer = new Uint32Array(this.wasmMemoryBlock);
+            this.wasmDataView = new DataView(this.exports.memory.buffer);
+        });
+    }
 }
 
 
@@ -6093,10 +6161,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var lit__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! lit */ "./node_modules/lit/index.js");
 /* harmony import */ var lit_decorators_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! lit/decorators.js */ "./node_modules/lit/decorators.js");
-/* harmony import */ var _build_untouched_wasm__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../../build/untouched.wasm */ "./build/untouched.wasm");
-/* harmony import */ var _AppBindings__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../AppBindings */ "./src/ts/AppBindings.ts");
-/* harmony import */ var _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! @assemblyscript/loader */ "./node_modules/@assemblyscript/loader/index.js");
-/* harmony import */ var _core_GameManager__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../core/GameManager */ "./src/ts/core/GameManager.ts");
+/* harmony import */ var _core_GameManager__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../core/GameManager */ "./src/ts/core/GameManager.ts");
+/* harmony import */ var _core_WasmManager__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../core/WasmManager */ "./src/ts/core/WasmManager.ts");
 var __decorate = (undefined && undefined.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -6120,50 +6186,23 @@ var __classPrivateFieldGet = (undefined && undefined.__classPrivateFieldGet) || 
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var __classPrivateFieldSet = (undefined && undefined.__classPrivateFieldSet) || function (receiver, state, value, kind, f) {
-    if (kind === "m") throw new TypeError("Private method is not writable");
-    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
-    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
-    return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
-};
-var _Application_instances, _Application_mainMenu, _Application_onStart;
+var _Application_instances, _Application_onStart;
 
 
+// import wasmFile from "../../../../build/untouched.wasm";
+// import type * as MyModule from "../../../../build/types";
+// import { createBindingsGPU, bindExports } from "../../AppBindings";
+// import loader, { ASUtil, ResultObject } from "@assemblyscript/loader";
 
 
-
-
-// Creating WASM with Linear memory
-const memory = new WebAssembly.Memory({ initial: 100 });
-const importObject = {
-    env: {
-        memory: memory,
-        seed: Date.now,
-        abort: (...args) => {
-            console.log("abort");
-            console.log(importObject.env.getString(args[0]));
-        },
-        getString: (string_index) => {
-            const buffer = importObject.env.memory.buffer;
-            const U32 = new Uint32Array(buffer);
-            const id_addr = string_index / 4 - 2;
-            const id = U32[id_addr];
-            if (id !== 0x01)
-                throw Error(`not a string index=${string_index} id=${id}`);
-            const len = U32[id_addr + 1];
-            const str = new TextDecoder("utf-16").decode(buffer.slice(string_index, string_index + len));
-            return str;
-        },
-    },
-};
 let Application = class Application extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
     constructor() {
         super();
         _Application_instances.add(this);
-        _Application_mainMenu.set(this, void 0);
+        this.wasmManager = new _core_WasmManager__WEBPACK_IMPORTED_MODULE_3__.WasmManager();
     }
     render() {
-        return lit__WEBPACK_IMPORTED_MODULE_0__.html `<x-modal open @close=${__classPrivateFieldGet(this, _Application_instances, "m", _Application_onStart)} id="main-menu" hideConfirmButtons>
+        return lit__WEBPACK_IMPORTED_MODULE_0__.html `<x-modal open id="main-menu" hideConfirmButtons>
         <x-typography variant="h4" align="center">Rewild!</x-typography>
         <x-typography variant="body2"
           >Welcome to rewild. A game about exploration, natural history and saving the planet</x-typography
@@ -6177,30 +6216,28 @@ let Application = class Application extends lit__WEBPACK_IMPORTED_MODULE_0__.Lit
       </x-modal>
       <x-pane3d />`;
     }
+    connectedCallback() {
+        super.connectedCallback();
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape")
+                this.mainMenu.open = !this.mainMenu.open;
+        });
+    }
     firstUpdated(changedProps) {
         const _super = Object.create(null, {
             firstUpdated: { get: () => super.firstUpdated }
         });
         return __awaiter(this, void 0, void 0, function* () {
             _super.firstUpdated.call(this, changedProps);
-            __classPrivateFieldSet(this, _Application_mainMenu, this.shadowRoot.querySelector("#main-menu"), "f");
+            this.mainMenu = this.shadowRoot.querySelector("#main-menu");
             const panel3D = this.shadowRoot.querySelector("x-pane3d");
             // Wait for panel to be fully mounted
             yield panel3D.updateComplete;
-            this.gameManager = new _core_GameManager__WEBPACK_IMPORTED_MODULE_5__.GameManager(panel3D);
-            (0,_AppBindings__WEBPACK_IMPORTED_MODULE_3__.createBindingsGPU)(importObject, this.gameManager);
-            this.init();
-        });
-    }
-    init() {
-        return __awaiter(this, void 0, void 0, function* () {
-            // Load the wasm file
-            const obj = yield _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_4__.default.instantiateStreaming(fetch(_build_untouched_wasm__WEBPACK_IMPORTED_MODULE_2__.default), importObject);
+            this.gameManager = new _core_GameManager__WEBPACK_IMPORTED_MODULE_2__.GameManager(panel3D);
+            yield this.wasmManager.load(this.gameManager);
             const message = document.querySelector("#message");
-            // Bind the newly created export file
-            (0,_AppBindings__WEBPACK_IMPORTED_MODULE_3__.bindExports)(obj);
             try {
-                yield this.gameManager.init(obj.exports);
+                yield this.gameManager.init(this.wasmManager);
             }
             catch (err) {
                 message.style.display = "initial";
@@ -6209,8 +6246,8 @@ let Application = class Application extends lit__WEBPACK_IMPORTED_MODULE_0__.Lit
         });
     }
 };
-_Application_mainMenu = new WeakMap(), _Application_instances = new WeakSet(), _Application_onStart = function _Application_onStart() {
-    __classPrivateFieldGet(this, _Application_mainMenu, "f").open = false;
+_Application_instances = new WeakSet(), _Application_onStart = function _Application_onStart() {
+    this.mainMenu.open = false;
 };
 Application.styles = lit__WEBPACK_IMPORTED_MODULE_0__.css `
     x-button {
