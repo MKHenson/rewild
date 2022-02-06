@@ -19,7 +19,7 @@ export class MaterialResource extends PipelineResourceTemplate {
     // prettier-ignore
     const initialValues = new Float32Array([
       1, 1, 1, 0,         // Diffuse
-      0.1, 0.1, 0.1, 0,   // Emissive
+      0.0, 0.0, 0.0, 0,   // Emissive
       1,                  // Alpha
       0,                  // Metalness
       0.5                 // Roughness
@@ -67,7 +67,7 @@ export class MaterialResource extends PipelineResourceTemplate {
     // prettier-ignore
     const initialValues = new Float32Array([
       1, 1, 1, 0,         // Diffuse
-      0.1, 0.1, 0.1, 0,   // Emissive
+      0.0, 0.0, 0.0, 0,   // Emissive
       1,                  // Alpha
       0,                  // Metalness
       0.5                 // Roughness

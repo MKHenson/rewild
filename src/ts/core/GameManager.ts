@@ -87,6 +87,7 @@ export class GameManager {
     const texturePaths = [
       { name: "grid", path: "./dist/media/uv-grid.jpg" },
       { name: "crate", path: "./dist/media/crate-wooden.jpg" },
+      { name: "earth", path: "./dist/media/earth-day-2k.jpg" },
     ];
 
     this.textures = await Promise.all(
@@ -101,6 +102,7 @@ export class GameManager {
     this.pipelines = [
       new DebugPipeline("textured", { diffuseMap: this.textures[1], NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("simple", { NUM_DIR_LIGHTS: 0 }),
+      new DebugPipeline("earth", { diffuseMap: this.textures[2], NUM_DIR_LIGHTS: 0 }),
     ];
 
     const size = this.canvasSize();
@@ -114,18 +116,18 @@ export class GameManager {
     // Setup events
     window.addEventListener("resize", this.onResizeHandler);
     window.requestAnimationFrame(this.onFrameHandler);
-    window.addEventListener("click", (e) => {
-      const pipelines = this.pipelines as DebugPipeline[];
-      pipelines.forEach((p) => {
-        if (p.defines.diffuseMap) {
-          delete p.defines.diffuseMap;
-          p.defines = p.defines;
-        } else {
-          p.defines.diffuseMap = this.textures[1];
-          p.defines = p.defines;
-        }
-      });
-    });
+    // window.addEventListener("click", (e) => {
+    //   const pipelines = this.pipelines as DebugPipeline[];
+    //   pipelines.forEach((p) => {
+    //     if (p.defines.diffuseMap) {
+    //       delete p.defines.diffuseMap;
+    //       p.defines = p.defines;
+    //     } else {
+    //       p.defines.diffuseMap = this.textures[1];
+    //       p.defines = p.defines;
+    //     }
+    //   });
+    // });
   }
 
   getTexture(name: string) {
@@ -141,19 +143,24 @@ export class GameManager {
       p.initialize(this);
     });
 
-    const containerPtr = wasm.__pin(wasm.createLevel1());
-    const container = wasm.Level1.wrap(containerPtr);
-    container.addAsset(this.createMesh(1, "sphere", false));
-    container.addAsset(this.createMesh(1, "box", true));
-    container.addAsset(this.createMesh(1, "box", true));
-    wasm.__unpin(containerPtr);
+    const containerLvl1Ptr = wasm.__pin(wasm.createLevel1());
+    const containerLvl1 = wasm.Level1.wrap(containerLvl1Ptr);
+    containerLvl1.addAsset(this.createMesh(1, "sphere", "simple"));
+    containerLvl1.addAsset(this.createMesh(1, "box", "textured"));
+    containerLvl1.addAsset(this.createMesh(1, "box", "textured"));
+    wasm.__unpin(containerLvl1Ptr);
 
-    runime.addContainer(containerPtr);
+    const containerMainMenuPtr = wasm.__pin(wasm.createMainMenu());
+    const containerMainMenu = wasm.MainMenu.wrap(containerMainMenuPtr);
+    containerMainMenu.addAsset(this.createMesh(1, "sphere", "earth"));
+    wasm.__unpin(containerMainMenuPtr);
+
+    runime.addContainer(containerMainMenuPtr);
   }
 
-  createMesh(size: number, type: "box" | "sphere", useTexture = true) {
+  createMesh(size: number, type: "box" | "sphere", pipelineName: string) {
     // Get the pipeline
-    const debugPipeline = this.getPipeline(useTexture ? "textured" : "simple")!;
+    const debugPipeline = this.getPipeline(pipelineName)!;
     const pipelineIndex = this.pipelines.indexOf(debugPipeline);
     const wasmExports = this.wasmManager.exports;
 

@@ -1,10 +1,6 @@
 import { LitElement, css, html, PropertyValues } from "lit";
 import { customElement } from "lit/decorators.js";
 import { Modal } from "../common/Modal";
-// import wasmFile from "../../../../build/untouched.wasm";
-// import type * as MyModule from "../../../../build/types";
-// import { createBindingsGPU, bindExports } from "../../AppBindings";
-// import loader, { ASUtil, ResultObject } from "@assemblyscript/loader";
 import { GameManager } from "../../core/GameManager";
 import { Pane3D } from "../common/Pane3D";
 import { WasmManager } from "../../core/WasmManager";

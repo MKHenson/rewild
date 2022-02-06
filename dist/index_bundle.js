@@ -4391,6 +4391,7 @@ class GameManager {
             const texturePaths = [
                 { name: "grid", path: "./dist/media/uv-grid.jpg" },
                 { name: "crate", path: "./dist/media/crate-wooden.jpg" },
+                { name: "earth", path: "./dist/media/earth-day-2k.jpg" },
             ];
             this.textures = yield Promise.all(texturePaths.map((tp, index) => {
                 const texture = new _Texture__WEBPACK_IMPORTED_MODULE_5__.Texture(tp.name, tp.path);
@@ -4401,6 +4402,7 @@ class GameManager {
             this.pipelines = [
                 new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("textured", { diffuseMap: this.textures[1], NUM_DIR_LIGHTS: 0 }),
                 new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("simple", { NUM_DIR_LIGHTS: 0 }),
+                new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("earth", { diffuseMap: this.textures[2], NUM_DIR_LIGHTS: 0 }),
             ];
             const size = this.canvasSize();
             this.onResize(size, false);
@@ -4410,19 +4412,6 @@ class GameManager {
             // Setup events
             window.addEventListener("resize", this.onResizeHandler);
             window.requestAnimationFrame(this.onFrameHandler);
-            window.addEventListener("click", (e) => {
-                const pipelines = this.pipelines;
-                pipelines.forEach((p) => {
-                    if (p.defines.diffuseMap) {
-                        delete p.defines.diffuseMap;
-                        p.defines = p.defines;
-                    }
-                    else {
-                        p.defines.diffuseMap = this.textures[1];
-                        p.defines = p.defines;
-                    }
-                });
-            });
         });
     }
     getTexture(name) {
@@ -4435,17 +4424,21 @@ class GameManager {
             p.build(this);
             p.initialize(this);
         });
-        const containerPtr = wasm.__pin(wasm.createLevel1());
-        const container = wasm.Level1.wrap(containerPtr);
-        container.addAsset(this.createMesh(1, "sphere", false));
-        container.addAsset(this.createMesh(1, "box", true));
-        container.addAsset(this.createMesh(1, "box", true));
-        wasm.__unpin(containerPtr);
-        runime.addContainer(containerPtr);
+        const containerLvl1Ptr = wasm.__pin(wasm.createLevel1());
+        const containerLvl1 = wasm.Level1.wrap(containerLvl1Ptr);
+        containerLvl1.addAsset(this.createMesh(1, "sphere", "simple"));
+        containerLvl1.addAsset(this.createMesh(1, "box", "textured"));
+        containerLvl1.addAsset(this.createMesh(1, "box", "textured"));
+        wasm.__unpin(containerLvl1Ptr);
+        const containerMainMenuPtr = wasm.__pin(wasm.createMainMenu());
+        const containerMainMenu = wasm.MainMenu.wrap(containerMainMenuPtr);
+        containerMainMenu.addAsset(this.createMesh(1, "sphere", "earth"));
+        wasm.__unpin(containerMainMenuPtr);
+        runime.addContainer(containerMainMenuPtr);
     }
-    createMesh(size, type, useTexture = true) {
+    createMesh(size, type, pipelineName) {
         // Get the pipeline
-        const debugPipeline = this.getPipeline(useTexture ? "textured" : "simple");
+        const debugPipeline = this.getPipeline(pipelineName);
         const pipelineIndex = this.pipelines.indexOf(debugPipeline);
         const wasmExports = this.wasmManager.exports;
         // Create an instance in WASM
@@ -5635,7 +5628,7 @@ class LightingResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODUL
             // Defaults for scene lights buffer
             // prettier-ignore
             const sceneLightingBufferDefaults = new Float32Array([
-                0.4, 0.4, 0.4, 0, // Ambient Light Color
+                0.0, 0.0, 0.0, 0, // Ambient Light Color
             ]);
             // Set defaults
             new Float32Array(LightingResource.lightingConfig.getMappedRange()).set(lightInofoDefaults);
@@ -5749,7 +5742,7 @@ class MaterialResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODUL
         // prettier-ignore
         const initialValues = new Float32Array([
             1, 1, 1, 0,
-            0.1, 0.1, 0.1, 0,
+            0.0, 0.0, 0.0, 0,
             1,
             0,
             0.5 // Roughness
@@ -5792,7 +5785,7 @@ class MaterialResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODUL
         // prettier-ignore
         const initialValues = new Float32Array([
             1, 1, 1, 0,
-            0.1, 0.1, 0.1, 0,
+            0.0, 0.0, 0.0, 0,
             1,
             0,
             0.5 // Roughness
@@ -6189,10 +6182,6 @@ var __classPrivateFieldGet = (undefined && undefined.__classPrivateFieldGet) || 
 var _Application_instances, _Application_onStart;
 
 
-// import wasmFile from "../../../../build/untouched.wasm";
-// import type * as MyModule from "../../../../build/types";
-// import { createBindingsGPU, bindExports } from "../../AppBindings";
-// import loader, { ASUtil, ResultObject } from "@assemblyscript/loader";
 
 
 let Application = class Application extends lit__WEBPACK_IMPORTED_MODULE_0__.LitElement {
