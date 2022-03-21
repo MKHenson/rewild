@@ -2,7 +2,7 @@ const path = require("path");
 const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
-  entry: ["./src/ts/index.ts"],
+  entry: ["./src/ts/index.tsx"],
   mode: "development",
   devtool: "source-map",
   output: {
@@ -21,14 +21,27 @@ module.exports = {
   ],
   resolve: {
     // Add `.ts` and `.tsx` as a resolvable extension.
-    extensions: [".ts", ".tsx", ".js", "glsl", "vs", "fs"],
+    extensions: [".tsx", ".ts", ".js", "glsl", "vs", "fs"],
   },
   module: {
     rules: [
       // all files with a `.ts` or `.tsx` extension will be handled by `ts-loader`
       {
         test: /\.tsx?$/,
-        loader: "ts-loader",
+        exclude: /node_modules/,
+        use: {
+          loader: "babel-loader",
+          options: {
+            babelrc: false,
+            configFile: false,
+            presets: ["@babel/preset-env", "solid", "@babel/preset-typescript"],
+            plugins: [
+              "@babel/plugin-syntax-dynamic-import",
+              "@babel/plugin-proposal-class-properties",
+              "@babel/plugin-proposal-object-rest-spread",
+            ],
+          },
+        },
       },
       {
         test: /\.(png|jpe?g|gif)$/i,
