@@ -268,16 +268,16 @@ export class GameManager {
         {
           view: this.renderTargetView,
           resolveTarget: this.context.getCurrentTexture().createView(),
-          loadValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 }, //background color
+          clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 }, //background color
           storeOp: "store",
+          loadOp: "clear",
         },
       ],
       depthStencilAttachment: {
         view: this.depthTexture.createView(),
-        depthLoadValue: 1,
+        depthLoadOp: "clear",
         depthStoreOp: "store",
-        stencilLoadValue: 0,
-        stencilStoreOp: "store",
+        depthClearValue: 1,
       },
     });
 
@@ -286,7 +286,7 @@ export class GameManager {
   }
 
   endPass() {
-    this.currentPass!.endPass();
+    this.currentPass!.end();
     this.device.queue.submit([this.currentCommandEncoder.finish()]);
   }
 
