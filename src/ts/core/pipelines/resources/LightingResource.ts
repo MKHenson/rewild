@@ -55,7 +55,7 @@ export class LightingResource extends PipelineResourceTemplate {
       // Defaults for scene lights buffer
       // prettier-ignore
       const sceneLightingBufferDefaults = new  Float32Array([
-        0.4, 0.4, 0.4, 0, // Ambient Light Color
+        0.0, 0.0, 0.0, 0, // Ambient Light Color
       ]);
 
       // Set defaults

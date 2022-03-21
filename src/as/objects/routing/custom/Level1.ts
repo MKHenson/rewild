@@ -68,6 +68,10 @@ export class Level1 extends Container implements Listener {
 
     inputManager.addEventListener("mouseup", this);
   }
+
+  unMount(): void {
+    super.unMount();
+  }
 }
 
 export function createLevel1(): Level1 {

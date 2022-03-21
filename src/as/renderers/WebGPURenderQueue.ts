@@ -1,4 +1,4 @@
-import { render } from "../Imports";
+import { print, render } from "../Imports";
 import { GPUCommands } from "../../common/Commands";
 import { GroupType } from "../../common/GroupType";
 import { WebGPULights } from "./WebGPULights";
@@ -36,6 +36,7 @@ export class WebGPURenderQueue {
   }
 
   setupLighting(lighting: WebGPULights): WebGPURenderQueue {
+    print(`ambient length: ${lighting.sceneLightsBuffer.length}`);
     const q = this.q;
     q.push(GPUCommands.SETUP_LIGHTING);
     q.push(lighting.numDirectionLights);

@@ -5,12 +5,12 @@ import { DebugPipeline } from "./pipelines/debug-pipeline";
 import { Pipeline } from "./pipelines/Pipeline";
 import { createBuffer, createIndexBuffer } from "./Utils";
 import { RenderQueueManager } from "./RenderQueueManager";
-import { WasmInterface } from "..";
 import { Texture } from "./Texture";
 import { GroupType } from "../../common/GroupType";
 import { ResourceType } from "../../common/ResourceType";
 import { MeshPipeline } from "build/types";
 import { Pane3D } from "../ui/common/Pane3D";
+import { WasmManager } from "./WasmManager";
 
 const meshPipelineInstances: MeshPipeline[] = [];
 const sampleCount = 4;
@@ -21,7 +21,7 @@ export class GameManager {
   context: GPUCanvasContext;
   format: GPUTextureFormat;
   inputManager: InputManager;
-  wasm: WasmInterface;
+  wasmManager: WasmManager;
 
   buffers: GPUBuffer[];
   pipelines: Pipeline<any>[];
@@ -41,25 +41,25 @@ export class GameManager {
   currentCommandEncoder: GPUCommandEncoder;
   private presentationSize: [number, number];
 
-  constructor(paneSelector: string) {
-    const pane3D = document.querySelector(paneSelector) as Pane3D;
+  constructor(pane3D: Pane3D) {
     this.canvas = pane3D.canvas;
     this.buffers = [];
     this.textures = [];
     this.samplers = [];
     this.disposed = false;
     this.currentPass = null;
-    this.renderQueueManager = new RenderQueueManager(this);
     this.onFrameHandler = this.onFrame.bind(this);
   }
 
-  async init(wasm: WasmInterface) {
-    this.wasm = wasm;
+  async init(wasmManager: WasmManager) {
+    this.wasmManager = wasmManager;
+    this.renderQueueManager = new RenderQueueManager(this, wasmManager);
+    const wasmExports = wasmManager.exports;
 
     const hasGPU = this.hasWebGPU();
     if (!hasGPU) throw new Error("Your current browser does not support WebGPU!");
 
-    this.inputManager = new InputManager(this.canvas, wasm);
+    this.inputManager = new InputManager(this.canvas, wasmManager);
 
     const adapter = await navigator.gpu?.requestAdapter();
     const device = (await adapter?.requestDevice()) as GPUDevice;
@@ -87,12 +87,13 @@ export class GameManager {
     const texturePaths = [
       { name: "grid", path: "./dist/media/uv-grid.jpg" },
       { name: "crate", path: "./dist/media/crate-wooden.jpg" },
+      { name: "earth", path: "./dist/media/earth-day-2k.jpg" },
     ];
 
     this.textures = await Promise.all(
       texturePaths.map((tp, index) => {
         const texture = new Texture(tp.name, tp.path);
-        wasm.TextureFactory.createTexture(wasm.__newString(tp.name), index);
+        wasmExports.TextureFactory.createTexture(wasmExports.__newString(tp.name), index);
         return texture.load(device);
       })
     );
@@ -101,31 +102,32 @@ export class GameManager {
     this.pipelines = [
       new DebugPipeline("textured", { diffuseMap: this.textures[1], NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("simple", { NUM_DIR_LIGHTS: 0 }),
+      new DebugPipeline("earth", { diffuseMap: this.textures[2], NUM_DIR_LIGHTS: 0 }),
     ];
 
     const size = this.canvasSize();
     this.onResize(size, false);
 
     // Initialize the wasm module
-    wasm.AsSceneManager.init(this.canvas.width, this.canvas.height);
+    wasmExports.AsSceneManager.init(this.canvas.width, this.canvas.height);
 
     this.initRuntime();
 
     // Setup events
     window.addEventListener("resize", this.onResizeHandler);
     window.requestAnimationFrame(this.onFrameHandler);
-    window.addEventListener("click", (e) => {
-      const pipelines = this.pipelines as DebugPipeline[];
-      pipelines.forEach((p) => {
-        if (p.defines.diffuseMap) {
-          delete p.defines.diffuseMap;
-          p.defines = p.defines;
-        } else {
-          p.defines.diffuseMap = this.textures[1];
-          p.defines = p.defines;
-        }
-      });
-    });
+    // window.addEventListener("click", (e) => {
+    //   const pipelines = this.pipelines as DebugPipeline[];
+    //   pipelines.forEach((p) => {
+    //     if (p.defines.diffuseMap) {
+    //       delete p.defines.diffuseMap;
+    //       p.defines = p.defines;
+    //     } else {
+    //       p.defines.diffuseMap = this.textures[1];
+    //       p.defines = p.defines;
+    //     }
+    //   });
+    // });
   }
 
   getTexture(name: string) {
@@ -133,7 +135,7 @@ export class GameManager {
   }
 
   initRuntime() {
-    const wasm = this.wasm;
+    const wasm = this.wasmManager.exports;
     const runime = wasm.Runtime.wrap(wasm.AsSceneManager.getRuntime());
 
     this.pipelines.forEach((p) => {
@@ -141,28 +143,34 @@ export class GameManager {
       p.initialize(this);
     });
 
-    const containerPtr = wasm.__pin(wasm.createLevel1());
-    const container = wasm.Level1.wrap(containerPtr);
-    container.addAsset(this.createMesh(1, "sphere", false));
-    container.addAsset(this.createMesh(1, "box", true));
-    container.addAsset(this.createMesh(1, "box", true));
-    wasm.__unpin(containerPtr);
+    const containerLvl1Ptr = wasm.__pin(wasm.createLevel1());
+    const containerLvl1 = wasm.Level1.wrap(containerLvl1Ptr);
+    containerLvl1.addAsset(this.createMesh(1, "sphere", "simple"));
+    containerLvl1.addAsset(this.createMesh(1, "box", "textured"));
+    containerLvl1.addAsset(this.createMesh(1, "box", "textured"));
+    wasm.__unpin(containerLvl1Ptr);
 
-    runime.addContainer(containerPtr);
+    const containerMainMenuPtr = wasm.__pin(wasm.createMainMenu());
+    const containerMainMenu = wasm.MainMenu.wrap(containerMainMenuPtr);
+    containerMainMenu.addAsset(this.createMesh(1, "sphere", "earth"));
+    wasm.__unpin(containerMainMenuPtr);
+
+    runime.addContainer(containerMainMenuPtr);
   }
 
-  createMesh(size: number, type: "box" | "sphere", useTexture = true) {
+  createMesh(size: number, type: "box" | "sphere", pipelineName: string) {
     // Get the pipeline
-    const debugPipeline = this.getPipeline(useTexture ? "textured" : "simple")!;
+    const debugPipeline = this.getPipeline(pipelineName)!;
     const pipelineIndex = this.pipelines.indexOf(debugPipeline);
+    const wasmExports = this.wasmManager.exports;
 
     // Create an instance in WASM
-    const pipelineInsPtr = this.wasm.PipelineFactory.createPipeline(
-      this.wasm.__newString(debugPipeline.name),
+    const pipelineInsPtr = wasmExports.PipelineFactory.createPipeline(
+      wasmExports.__newString(debugPipeline.name),
       pipelineIndex,
       PipelineType.Mesh
     );
-    const meshPipelineIns = this.wasm.MeshPipeline.wrap(pipelineInsPtr);
+    const meshPipelineIns = wasmExports.MeshPipeline.wrap(pipelineInsPtr);
 
     meshPipelineInstances.push(meshPipelineIns);
 
@@ -171,8 +179,8 @@ export class GameManager {
     meshPipelineIns.transformResourceIndex = debugPipeline.addResourceInstance(this, GroupType.Transform);
 
     const geometryPtr =
-      type === "box" ? this.wasm.GeometryFactory.createBox(size) : this.wasm.GeometryFactory.createSphere(size);
-    const meshPtr = this.wasm.createMesh(geometryPtr, pipelineInsPtr);
+      type === "box" ? wasmExports.GeometryFactory.createBox(size) : wasmExports.GeometryFactory.createSphere(size);
+    const meshPtr = wasmExports.createMesh(geometryPtr, pipelineInsPtr);
     return meshPtr;
   }
 
@@ -214,7 +222,7 @@ export class GameManager {
 
     this.renderTargetView = this.renderTarget.createView();
 
-    if (updateWasm) this.wasm.AsSceneManager.resize(this.canvas.width, this.canvas.height);
+    if (updateWasm) this.wasmManager.exports.AsSceneManager.resize(this.canvas.width, this.canvas.height);
   }
 
   private onFrame() {
@@ -228,7 +236,7 @@ export class GameManager {
       this.onResize(newSize);
     }
 
-    this.wasm.AsSceneManager.update(performance.now());
+    this.wasmManager.exports.AsSceneManager.update(performance.now());
   }
 
   canvasSize() {
