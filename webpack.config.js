@@ -34,12 +34,7 @@ module.exports = {
           options: {
             babelrc: false,
             configFile: false,
-            presets: ["@babel/preset-env", "solid", "@babel/preset-typescript"],
-            plugins: [
-              "@babel/plugin-syntax-dynamic-import",
-              "@babel/plugin-proposal-class-properties",
-              "@babel/plugin-proposal-object-rest-spread",
-            ],
+            presets: [["@babel/preset-env", { targets: ">0.95%" }], "solid", "@babel/preset-typescript"],
           },
         },
       },
