@@ -5,7 +5,7 @@ interface Props {
   onCanvasReady: (canvas: HTMLCanvasElement) => void;
 }
 
-export const SolidPane3D: Component<Props> = (props) => {
+export const Pane3D: Component<Props> = (props) => {
   let parent!: HTMLDivElement;
 
   const onResizeDelegate = () => {

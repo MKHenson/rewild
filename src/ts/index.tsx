@@ -1,4 +1,4 @@
-import { SolidApplication } from "./ui/application/SolidApplication";
+import { Application } from "./ui/application/Application";
 import { ThemeProvider } from "solid-styled-components";
 import { theme } from "./ui/theme";
 import { render } from "solid-js/web";
@@ -8,7 +8,7 @@ document.addEventListener("readystatechange", (e) => {
     render(
       () => (
         <ThemeProvider theme={theme}>
-          <SolidApplication />
+          <Application />
         </ThemeProvider>
       ),
       document.querySelector("#application") as HTMLDivElement

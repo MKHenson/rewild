@@ -1,7 +1,7 @@
 import { styled } from "solid-styled-components";
 import { Portal } from "solid-js/web";
 import { Component } from "solid-js";
-import { SolidButton } from "./SolidButton";
+import { Button } from "./Button";
 
 interface Props {
   title: string;
@@ -12,7 +12,7 @@ interface Props {
   onOk?: () => void;
 }
 
-export const SolidModal: Component<Props> = (props) => {
+export const Modal: Component<Props> = (props) => {
   const handleClick = (e: MouseEvent) => {
     if ((e.target as HTMLElement).classList.contains("wrapper")) {
       props.onClose && props.onClose();
@@ -37,12 +37,12 @@ export const SolidModal: Component<Props> = (props) => {
           <div class="content">{props.children}</div>
           {props.hideConfirmButtons ? null : (
             <div class="button-container">
-              <SolidButton onClick={handleCancel} class="cancel" variant="outlined">
+              <Button onClick={handleCancel} class="cancel" variant="outlined">
                 Cancel
-              </SolidButton>
-              <SolidButton onClick={handleOk} class="ok">
+              </Button>
+              <Button onClick={handleOk} class="ok">
                 Okay
-              </SolidButton>
+              </Button>
             </div>
           )}
         </StyledModal>

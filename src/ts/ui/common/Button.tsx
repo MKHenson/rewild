@@ -13,7 +13,7 @@ interface Props {
   class?: string;
 }
 
-export const SolidButton: Component<Props> = (props) => {
+export const Button: Component<Props> = (props) => {
   return (
     <StyledButton
       fullWidth={props.fullWidth || false}
