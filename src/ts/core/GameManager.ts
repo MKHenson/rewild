@@ -9,7 +9,6 @@ import { Texture } from "./Texture";
 import { GroupType } from "../../common/GroupType";
 import { ResourceType } from "../../common/ResourceType";
 import { MeshPipeline } from "build/types";
-import { Pane3D } from "../ui/common/Pane3D";
 import { WasmManager } from "./WasmManager";
 
 const meshPipelineInstances: MeshPipeline[] = [];
@@ -41,8 +40,8 @@ export class GameManager {
   currentCommandEncoder: GPUCommandEncoder;
   private presentationSize: [number, number];
 
-  constructor(pane3D: Pane3D) {
-    this.canvas = pane3D.canvas;
+  constructor(canvas: HTMLCanvasElement) {
+    this.canvas = canvas;
     this.buffers = [];
     this.textures = [];
     this.samplers = [];
