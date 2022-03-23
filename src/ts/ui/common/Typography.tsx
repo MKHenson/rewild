@@ -9,7 +9,7 @@ interface Props {
   align?: TypographyAlign;
 }
 
-export const SolidTypography: Component<Props> = (props) => {
+export const Typography: Component<Props> = (props) => {
   return (
     <StyledTypography className={`typography ${props.variant}`} style={{ textAlign: props.align }}>
       {props.children}

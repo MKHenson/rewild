@@ -2072,24 +2072,24 @@ function shaderBuilder(sourceFragments, pipeline) {
 
 /***/ }),
 
-/***/ "./src/ts/ui/application/SolidApplication.tsx":
-/*!****************************************************!*\
-  !*** ./src/ts/ui/application/SolidApplication.tsx ***!
-  \****************************************************/
+/***/ "./src/ts/ui/application/Application.tsx":
+/*!***********************************************!*\
+  !*** ./src/ts/ui/application/Application.tsx ***!
+  \***********************************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "SolidApplication": () => (/* binding */ SolidApplication)
+/* harmony export */   "Application": () => (/* binding */ Application)
 /* harmony export */ });
 /* harmony import */ var solid_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
 /* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
 /* harmony import */ var _core_GameManager__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/GameManager */ "./src/ts/core/GameManager.ts");
 /* harmony import */ var _core_WasmManager__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../core/WasmManager */ "./src/ts/core/WasmManager.ts");
-/* harmony import */ var _common_SolidButton__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../common/SolidButton */ "./src/ts/ui/common/SolidButton.tsx");
-/* harmony import */ var _common_SolidModal__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../common/SolidModal */ "./src/ts/ui/common/SolidModal.tsx");
-/* harmony import */ var _common_SolidPane3D__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../common/SolidPane3D */ "./src/ts/ui/common/SolidPane3D.tsx");
-/* harmony import */ var _common_SolidTypography__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../common/SolidTypography */ "./src/ts/ui/common/SolidTypography.tsx");
+/* harmony import */ var _common_Button__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../common/Button */ "./src/ts/ui/common/Button.tsx");
+/* harmony import */ var _common_Modal__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../common/Modal */ "./src/ts/ui/common/Modal.tsx");
+/* harmony import */ var _common_Pane3D__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../common/Pane3D */ "./src/ts/ui/common/Pane3D.tsx");
+/* harmony import */ var _common_Typography__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../common/Typography */ "./src/ts/ui/common/Typography.tsx");
 
 
 
@@ -2099,7 +2099,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-const SolidApplication = _ref => {
+const Application = _ref => {
   let {} = _ref;
   const [modalOpen, setModalOpen] = (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createSignal)(true);
   let gameManager;
@@ -2129,7 +2129,7 @@ const SolidApplication = _ref => {
 
   return (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(StyledApplication, {
     get children() {
-      return [(0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_SolidModal__WEBPACK_IMPORTED_MODULE_3__.SolidModal, {
+      return [(0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_Modal__WEBPACK_IMPORTED_MODULE_3__.Modal, {
         hideConfirmButtons: true,
 
         get open() {
@@ -2140,21 +2140,21 @@ const SolidApplication = _ref => {
         onClose: () => setModalOpen(false),
 
         get children() {
-          return [(0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_SolidTypography__WEBPACK_IMPORTED_MODULE_5__.SolidTypography, {
+          return [(0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_5__.Typography, {
             variant: "h4",
             align: "center",
             children: "Rewild!"
-          }), (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_SolidTypography__WEBPACK_IMPORTED_MODULE_5__.SolidTypography, {
+          }), (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_5__.Typography, {
             variant: "body2",
             children: "Welcome to rewild. A game about exploration, natural history and saving the planet"
           }), (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(StyledButtons, {
             get children() {
-              return [(0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_SolidButton__WEBPACK_IMPORTED_MODULE_2__.SolidButton, {
+              return [(0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_Button__WEBPACK_IMPORTED_MODULE_2__.Button, {
                 fullWidth: true,
                 variant: "outlined",
                 disabled: true,
                 children: "Options"
-              }), (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_SolidButton__WEBPACK_IMPORTED_MODULE_2__.SolidButton, {
+              }), (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_Button__WEBPACK_IMPORTED_MODULE_2__.Button, {
                 onClick: onStart,
                 fullWidth: true,
                 variant: "contained",
@@ -2166,7 +2166,7 @@ const SolidApplication = _ref => {
           })];
         }
 
-      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_SolidPane3D__WEBPACK_IMPORTED_MODULE_4__.SolidPane3D, {
+      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_Pane3D__WEBPACK_IMPORTED_MODULE_4__.Pane3D, {
         onCanvasReady: onCanvasReady
       })];
     }
@@ -2182,68 +2182,26 @@ const StyledButtons = solid_styled_components__WEBPACK_IMPORTED_MODULE_7__.style
   button {
     margin: 1rem 0 0 0;
   }
-`; // import { Component, createSignal, For, onMount } from "solid-js";
-// import { styled } from "solid-styled-components";
-// import { GameManager } from "src/ts/core/GameManager";
-// import { WasmManager } from "src/ts/core/WasmManager";
-// interface Props {}
-// const items = ["knife", "sword", "axe"];
-// export const SolidApplication: Component<Props> = ({}) => {
-//   let gameManager: GameManager;
-//   const wasmManager: WasmManager = new WasmManager();
-//   const mainMenu: Modal;
-//   const [count, setCount] = createSignal<number>(0);
-//   onMount(async () => {
-//     document.addEventListener("keydown", (e) => {
-//       if (e.key === "Escape") mainMenu.open = !mainMenu.open;
-//     });
-//     mainMenu = shadowRoot!.querySelector("#main-menu") as Modal;
-//     const panel3D = shadowRoot!.querySelector("x-pane3d") as Pane3D;
-//     // Wait for panel to be fully mounted
-//     await panel3D.updateComplete;
-//     gameManager = new GameManager(panel3D);
-//     await wasmManager.load(gameManager);
-//     const message = document.querySelector("#message") as HTMLElement;
-//     try {
-//       await gameManager.init(wasmManager);
-//     } catch (err: unknown) {
-//       message.style.display = "initial";
-//       message.innerHTML = (err as Error).message;
-//     }
-//   })
-//   const onStart = () => {
-//     mainMenu.open = false;
-//   }
-//   return (
-//     <StyledApplication>
-//       <div>The Count is: {count()}</div>
-//       <button onClick={() => setCount(count() + 1)}>Increment</button>
-//       <For each={items}>{(item) => <div>{item}</div>}</For>
-//     </StyledApplication>
-//   );
-// };
-// const StyledApplication = styled.div`
-//   color: ${(e) => e.theme!.colors.primary};
-// `;
+`;
 
 /***/ }),
 
-/***/ "./src/ts/ui/common/SolidButton.tsx":
-/*!******************************************!*\
-  !*** ./src/ts/ui/common/SolidButton.tsx ***!
-  \******************************************/
+/***/ "./src/ts/ui/common/Button.tsx":
+/*!*************************************!*\
+  !*** ./src/ts/ui/common/Button.tsx ***!
+  \*************************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "SolidButton": () => (/* binding */ SolidButton)
+/* harmony export */   "Button": () => (/* binding */ Button)
 /* harmony export */ });
 /* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/dist/dev.js");
 /* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
 
 
 
-const SolidButton = props => {
+const Button = props => {
   return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.createComponent)(StyledButton, {
     get fullWidth() {
       return props.fullWidth || false;
@@ -2360,20 +2318,20 @@ const StyledButton = solid_styled_components__WEBPACK_IMPORTED_MODULE_1__.styled
 
 /***/ }),
 
-/***/ "./src/ts/ui/common/SolidModal.tsx":
-/*!*****************************************!*\
-  !*** ./src/ts/ui/common/SolidModal.tsx ***!
-  \*****************************************/
+/***/ "./src/ts/ui/common/Modal.tsx":
+/*!************************************!*\
+  !*** ./src/ts/ui/common/Modal.tsx ***!
+  \************************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "SolidModal": () => (/* binding */ SolidModal)
+/* harmony export */   "Modal": () => (/* binding */ Modal)
 /* harmony export */ });
 /* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
 /* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/dist/dev.js");
 /* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
-/* harmony import */ var _SolidButton__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./SolidButton */ "./src/ts/ui/common/SolidButton.tsx");
+/* harmony import */ var _Button__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Button */ "./src/ts/ui/common/Button.tsx");
 
 
 
@@ -2386,7 +2344,7 @@ const _tmpl$ = /*#__PURE__*/(0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.templat
 
 
 
-const SolidModal = props => {
+const Modal = props => {
   const handleClick = e => {
     if (e.target.classList.contains("wrapper")) {
       props.onClose && props.onClose();
@@ -2433,14 +2391,14 @@ const SolidModal = props => {
               })(), (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.memo)(() => (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.memo)(() => !!props.hideConfirmButtons, true)() ? null : (() => {
                 const _el$3 = _tmpl$3.cloneNode(true);
 
-                (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.insert)(_el$3, (0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createComponent)(_SolidButton__WEBPACK_IMPORTED_MODULE_1__.SolidButton, {
+                (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.insert)(_el$3, (0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createComponent)(_Button__WEBPACK_IMPORTED_MODULE_1__.Button, {
                   onClick: handleCancel,
                   "class": "cancel",
                   variant: "outlined",
                   children: "Cancel"
                 }), null);
 
-                (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.insert)(_el$3, (0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createComponent)(_SolidButton__WEBPACK_IMPORTED_MODULE_1__.SolidButton, {
+                (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.insert)(_el$3, (0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createComponent)(_Button__WEBPACK_IMPORTED_MODULE_1__.Button, {
                   onClick: handleOk,
                   "class": "ok",
                   children: "Okay"
@@ -2503,15 +2461,15 @@ const StyledModal = solid_styled_components__WEBPACK_IMPORTED_MODULE_3__.styled.
 
 /***/ }),
 
-/***/ "./src/ts/ui/common/SolidPane3D.tsx":
-/*!******************************************!*\
-  !*** ./src/ts/ui/common/SolidPane3D.tsx ***!
-  \******************************************/
+/***/ "./src/ts/ui/common/Pane3D.tsx":
+/*!*************************************!*\
+  !*** ./src/ts/ui/common/Pane3D.tsx ***!
+  \*************************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "SolidPane3D": () => (/* binding */ SolidPane3D)
+/* harmony export */   "Pane3D": () => (/* binding */ Pane3D)
 /* harmony export */ });
 /* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
 /* harmony import */ var solid_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
@@ -2523,7 +2481,7 @@ const _tmpl$ = /*#__PURE__*/(0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.templat
 
 
 
-const SolidPane3D = props => {
+const Pane3D = props => {
   let parent;
 
   const onResizeDelegate = () => {
@@ -2564,21 +2522,21 @@ const StyledCanvas = solid_styled_components__WEBPACK_IMPORTED_MODULE_2__.styled
 
 /***/ }),
 
-/***/ "./src/ts/ui/common/SolidTypography.tsx":
-/*!**********************************************!*\
-  !*** ./src/ts/ui/common/SolidTypography.tsx ***!
-  \**********************************************/
+/***/ "./src/ts/ui/common/Typography.tsx":
+/*!*****************************************!*\
+  !*** ./src/ts/ui/common/Typography.tsx ***!
+  \*****************************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "SolidTypography": () => (/* binding */ SolidTypography)
+/* harmony export */   "Typography": () => (/* binding */ Typography)
 /* harmony export */ });
 /* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/dist/dev.js");
 /* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
 
 
-const SolidTypography = props => {
+const Typography = props => {
   return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.createComponent)(StyledTypography, {
     get className() {
       return `typography ${props.variant}`;
@@ -5651,7 +5609,7 @@ var __webpack_exports__ = {};
   \**************************/
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/dist/dev.js");
-/* harmony import */ var _ui_application_SolidApplication__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./ui/application/SolidApplication */ "./src/ts/ui/application/SolidApplication.tsx");
+/* harmony import */ var _ui_application_Application__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./ui/application/Application */ "./src/ts/ui/application/Application.tsx");
 /* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
 /* harmony import */ var _ui_theme__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ui/theme */ "./src/ts/ui/theme.tsx");
 /* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
@@ -5666,7 +5624,7 @@ document.addEventListener("readystatechange", e => {
       theme: _ui_theme__WEBPACK_IMPORTED_MODULE_1__.theme,
 
       get children() {
-        return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_ui_application_SolidApplication__WEBPACK_IMPORTED_MODULE_0__.SolidApplication, {});
+        return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_ui_application_Application__WEBPACK_IMPORTED_MODULE_0__.Application, {});
       }
 
     }), document.querySelector("#application"));
