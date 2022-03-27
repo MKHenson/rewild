@@ -1,17 +1,26 @@
 import { Runtime } from ".";
+import { Link } from "./Link";
+import { Portal } from "./Portal";
 
 export class Node {
+  protected portals: Portal[];
   protected children: Node[];
   protected parent: Node | null;
+
   runtime: Runtime | null;
   initialized: boolean;
   mounted: boolean;
+  active: boolean;
+  name: string;
 
-  constructor() {
+  constructor(name: string) {
+    this.name = name;
     this.children = [];
+    this.portals = [];
     this.initialized = false;
     this.parent = null;
     this.mounted = false;
+    this.active = false;
   }
 
   addChild(node: Node): Node {
@@ -36,16 +45,31 @@ export class Node {
 
   init(): void {
     this.initialized = true;
-    this.onReady();
+  }
+
+  getPortal(name: string): Portal | null {
+    const portals = this.portals;
+    for (let i: i32 = 0, l = portals.length; i < l; i++) if (portals[i].name == name) return portals[i];
+
+    return null;
   }
 
   mount(): void {
     this.mounted = true;
   }
+
   unMount(): void {
     this.mounted = false;
   }
 
-  onReady(): void {}
   onUpdate(delta: f32, total: u32, fps: u32): void {}
+
+  enter(portalEntered: Portal): void {
+    this.active = true;
+  }
+
+  exit(exitPortal: Portal, turnOff: boolean): void {
+    if (turnOff) this.active = false;
+    this.runtime!.sendSignal(exitPortal);
+  }
 }

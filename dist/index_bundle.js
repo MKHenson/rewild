@@ -230,7 +230,8 @@ class GameManager {
     context.configure({
       device: device,
       format: format,
-      size: this.canvasSize()
+      size: this.canvasSize(),
+      compositingAlphaMode: "premultiplied"
     });
     this.device = device;
     this.context = context;
@@ -314,7 +315,8 @@ class GameManager {
 
     wasm.__unpin(containerMainMenuPtr);
 
-    runime.addContainer(containerMainMenuPtr);
+    runime.addContainer(containerLvl1Ptr, false);
+    runime.addContainer(containerMainMenuPtr, true);
   }
 
   createMesh(size, type, pipelineName) {
@@ -356,7 +358,8 @@ class GameManager {
     this.context.configure({
       device: this.device,
       format: this.format,
-      size: this.presentationSize
+      size: this.presentationSize,
+      compositingAlphaMode: "premultiplied"
     });
     this.renderTarget = this.device.createTexture({
       size: this.presentationSize,
@@ -466,6 +469,7 @@ class GameManager {
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "InputManager": () => (/* binding */ InputManager),
+/* harmony export */   "KeyEventType": () => (/* binding */ KeyEventType),
 /* harmony export */   "MouseEventType": () => (/* binding */ MouseEventType)
 /* harmony export */ });
 let MouseEventType;
@@ -477,6 +481,13 @@ let MouseEventType;
   MouseEventType[MouseEventType["MouseWheel"] = 3] = "MouseWheel";
 })(MouseEventType || (MouseEventType = {}));
 
+let KeyEventType;
+
+(function (KeyEventType) {
+  KeyEventType[KeyEventType["KeyDown"] = 0] = "KeyDown";
+  KeyEventType[KeyEventType["KeyUp"] = 1] = "KeyUp";
+})(KeyEventType || (KeyEventType = {}));
+
 class InputManager {
   constructor(canvas, wasm) {
     this.wasmManager = wasm;
@@ -484,12 +495,16 @@ class InputManager {
     this.canvasBounds = canvas.getBoundingClientRect();
     this.onDownHandler = this.onDown.bind(this);
     this.onUpHandler = this.onUp.bind(this);
+    this.onKeyDownHandler = this.onKeyDown.bind(this);
+    this.onKeyUpHandler = this.onKeyUp.bind(this);
     this.onMoveHandler = this.onMove.bind(this);
     this.onWheelHandler = this.onWheel.bind(this);
     this.canvas.addEventListener("mousedown", this.onDownHandler);
     window.addEventListener("wheel", this.onWheelHandler);
     window.addEventListener("mouseup", this.onUpHandler);
     window.addEventListener("mousemove", this.onMoveHandler);
+    document.addEventListener("keydown", this.onKeyDownHandler);
+    document.addEventListener("keyup", this.onKeyUpHandler);
     this.reset();
   }
 
@@ -510,6 +525,15 @@ class InputManager {
     this.sendMouseEvent(MouseEventType.MouseDown, e, this.canvasBounds, 0);
   }
 
+  onKeyDown(e) {
+    this.sendKeyEvent(KeyEventType.KeyDown, e);
+  }
+
+  onKeyUp(e) {
+    e.preventDefault();
+    this.sendKeyEvent(KeyEventType.KeyUp, e);
+  }
+
   onWheel(e) {
     this.sendMouseEvent(MouseEventType.MouseWheel, e, this.canvasBounds, e.deltaY);
   }
@@ -520,7 +544,6 @@ class InputManager {
 
     const mouseEventPtr = wasmExports.__pin(wasmExports.ASInputManager.createMouseEvent(e.clientX, e.clientY, e.pageX, e.pageY, e.ctrlKey, e.shiftKey, e.altKey, e.button, e.buttons, bounds.x, bounds.y, bounds.width, bounds.height, delta));
 
-    wasmExports.ASInputManager.MouseEvent.wrap(mouseEventPtr);
     return mouseEventPtr;
   }
 
@@ -533,11 +556,24 @@ class InputManager {
     wasmExports.__unpin(wasmEvent);
   }
 
+  sendKeyEvent(type, event) {
+    const wasmExports = this.wasmManager.exports;
+    const manager = wasmExports.ASInputManager.InputManager.wrap(wasmExports.ASInputManager.getInputManager());
+
+    const wasmEvent = wasmExports.__pin(wasmExports.ASInputManager.createKeyboardEvent(wasmExports.__newString(event.code)));
+
+    if (type === KeyEventType.KeyUp) manager.onKeyUp(wasmEvent);else if (type === KeyEventType.KeyDown) manager.onKeyDown(wasmEvent);
+
+    wasmExports.__unpin(wasmEvent);
+  }
+
   dispose() {
     this.canvas.removeEventListener("mousedown", this.onDownHandler);
-    window.removeEventListener("wheel", this.onWheelHandler);
     window.removeEventListener("mouseup", this.onUpHandler);
+    window.removeEventListener("wheel", this.onWheelHandler);
     window.removeEventListener("mousemove", this.onMoveHandler);
+    document.removeEventListener("keydown", this.onKeyDownHandler);
+    document.removeEventListener("keyup", this.onKeyUpHandler);
   }
 
 }
@@ -824,8 +860,8 @@ class WasmManager {
         memory: this.memory,
         seed: Date.now,
         abort: function () {
-          console.log("abort");
-          console.log(_this.importObject.env.getString(arguments.length <= 0 ? undefined : arguments[0]));
+          console.error(_this.importObject.env.getString(arguments.length <= 0 ? undefined : arguments[0]));
+          console.error(_this.importObject.env.getString(arguments.length <= 1 ? undefined : arguments[1]));
         },
         getString: string_index => {
           const buffer = this.importObject.env.memory.buffer;

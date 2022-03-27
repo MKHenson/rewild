@@ -1,12 +1,13 @@
 import { EventAttachable } from "../core/EventAttachable";
 import { Event } from "../core/Event";
 import { EventDispatcher } from "../core/EventDispatcher";
-import { print } from "../Imports";
 
 const moveEventDown: Event = new Event("mousedown");
 const moveEventUp: Event = new Event("mouseup");
 const moveEventMove: Event = new Event("mousemove");
 const moveEventWheel: Event = new Event("wheel");
+const keyDownEvent: Event = new Event("keydown");
+const keyUpEvent: Event = new Event("keyup");
 
 export namespace ASInputManager {
   export class InputManager extends EventDispatcher {
@@ -26,13 +27,24 @@ export namespace ASInputManager {
       moveEventUp.target = this;
       moveEventUp.attachment = event;
       this.dispatchEvent(moveEventUp);
-      print(`Mouse Click [${event.clientX}, ${event.clientY}]`);
     }
 
     onMouseMove(event: ASInputManager.MouseEvent): void {
       moveEventMove.target = this;
       moveEventMove.attachment = event;
       this.dispatchEvent(moveEventMove);
+    }
+
+    onKeyDown(event: ASInputManager.KeyboardEvent): void {
+      keyDownEvent.target = this;
+      keyDownEvent.attachment = event;
+      this.dispatchEvent(keyDownEvent);
+    }
+
+    onKeyUp(event: ASInputManager.KeyboardEvent): void {
+      keyUpEvent.target = this;
+      keyUpEvent.attachment = event;
+      this.dispatchEvent(keyUpEvent);
     }
   }
 
@@ -57,6 +69,12 @@ export namespace ASInputManager {
       public targetHeight: i32,
       public delta: i16
     ) {
+      super();
+    }
+  }
+
+  export class KeyboardEvent extends EventAttachable {
+    constructor(public code: string) {
       super();
     }
   }
@@ -93,6 +111,10 @@ export namespace ASInputManager {
       targetHeight,
       delta
     );
+  }
+
+  export function createKeyboardEvent(code: string): KeyboardEvent {
+    return new KeyboardEvent(code);
   }
 }
 

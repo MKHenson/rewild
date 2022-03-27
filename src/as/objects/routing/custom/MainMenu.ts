@@ -1,23 +1,34 @@
 import { DirectionalLight } from "../../../lights/DirectionalLight";
 import { Color } from "../../../math/Color";
 import { Container } from "../core/Container";
-import { ASInputManager } from "../../../exports/ASInputManager";
+import { inputManager, ASInputManager } from "../../../exports/ASInputManager";
 import { Listener } from "../../../core/EventDispatcher";
 import { Event } from "../../../core/Event";
 import { degToRad } from "../../../math/MathUtils";
+import { Link } from "../core/Link";
+import { print } from "../../../Imports";
 
 export class MainMenu extends Container implements Listener {
   constructor() {
-    super();
+    super("MainMenu");
+  }
+
+  init(): void {
+    super.init();
+    const link = new Link();
+    const level1 = this.runtime!.getNode("Level1");
+
+    if (!level1) print(`dont have level`);
+    link.connect(this.getPortal("Exit")!, level1!.getPortal("Enter")!);
   }
 
   onEvent(event: Event): void {
-    const mouseEvent = event.attachment as ASInputManager.MouseEvent;
-    mouseEvent;
+    const keyEvent = event.attachment as ASInputManager.KeyboardEvent;
+    if (keyEvent.code == "Enter") this.exit(this.getPortal("Exit")!, true);
   }
 
   onUpdate(delta: f32, total: u32, fps: u32): void {
-    this.meshes[0].rotation.y += delta * 0.1;
+    this.objects[0].rotation.y += delta * 0.1;
   }
 
   mount(): void {
@@ -27,17 +38,21 @@ export class MainMenu extends Container implements Listener {
     direction.position.set(10, 10, 0);
     direction.target.position.set(0, 0, 0);
     this.runtime!.scene.add(direction);
+    this.addAsset(direction);
 
     this.runtime!.camera.position.set(0, 5, 10);
     this.runtime!.camera.lookAt(0, 0, 0);
 
-    this.meshes[0].position.set(0, -40, -50);
-    this.meshes[0].scale.set(30, 30, 30);
-    this.meshes[0].rotation.x = degToRad(180);
+    this.objects[0].position.set(0, -40, -50);
+    this.objects[0].scale.set(30, 30, 30);
+    this.objects[0].rotation.x = degToRad(180);
+
+    inputManager.addEventListener("keyup", this);
   }
 
   unMount(): void {
     super.unMount();
+    inputManager.removeEventListener("keyup", this);
   }
 }
 
