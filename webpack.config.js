@@ -1,5 +1,6 @@
 const path = require("path");
 const CopyPlugin = require("copy-webpack-plugin");
+const ForkTsCheckerWebpackPlugin = require("fork-ts-checker-webpack-plugin");
 
 module.exports = {
   entry: ["./src/ts/index.tsx"],
@@ -12,6 +13,7 @@ module.exports = {
     filename: "index_bundle.js",
   },
   plugins: [
+    new ForkTsCheckerWebpackPlugin({ typescript: { configFile: "src/ts/tsconfig.json" } }),
     new CopyPlugin({
       patterns: [
         { from: "src/media", to: "media" },
