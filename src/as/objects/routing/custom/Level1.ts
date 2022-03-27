@@ -3,7 +3,8 @@ import { AmbientLight } from "../../../lights/AmbientLight";
 import { DirectionalLight } from "../../../lights/DirectionalLight";
 import { Color } from "../../../math/Color";
 import { Container } from "../core/Container";
-import { inputManager, ASInputManager } from "../../../exports/ASInputManager";
+import { inputManager } from "../../../exports/io/InputManager";
+import { MouseEvent } from "../../../exports/io/MouseEvent";
 import { Listener } from "../../../core/EventDispatcher";
 import { Event } from "../../../core/Event";
 import { Mesh } from "../../Mesh";
@@ -18,7 +19,7 @@ export class Level1 extends Container implements Listener {
   }
 
   onEvent(event: Event): void {
-    const mouseEvent = event.attachment as ASInputManager.MouseEvent;
+    const mouseEvent = event.attachment as MouseEvent;
     mouseEvent;
   }
 

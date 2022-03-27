@@ -1,4 +1,4 @@
-export * from "./exports/ASInputManager";
+export * from "./exports/io";
 export * from "./exports/AsSceneManager";
 export * from "./exports/TextureFactory";
 export * from "./exports/GeometryFactory";

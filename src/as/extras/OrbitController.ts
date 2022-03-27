@@ -3,7 +3,8 @@ import { OrthographicCamera } from "../cameras/OrthographicCamera";
 import { PerspectiveCamera } from "../cameras/PerspectiveCamera";
 import { Event } from "../core/Event";
 import { Listener } from "../core/EventDispatcher";
-import { inputManager, ASInputManager } from "../exports/ASInputManager";
+import { inputManager } from "../exports/io/InputManager";
+import { MouseEvent } from "../exports/io/MouseEvent";
 import { print } from "../Imports";
 import { Matrix4 } from "../math/Matrix4";
 import { Quaternion } from "../math/Quaternion";
@@ -170,14 +171,14 @@ export class OrbitController implements Listener {
   }
 
   onEvent(event: Event): void {
-    const mouseEvent = event.attachment as ASInputManager.MouseEvent;
+    const mouseEvent = event.attachment as MouseEvent;
     if (event.type === "mousedown") this.onMouseDown(mouseEvent);
     else if (event.type === "mouseup") this.onMouseUp(mouseEvent);
     else if (event.type === "mousemove") this.onMouseMove(mouseEvent);
     else if (event.type === "wheel") this.onMouseWheel(mouseEvent);
   }
 
-  private onMouseDown(event: ASInputManager.MouseEvent): void {
+  private onMouseDown(event: MouseEvent): void {
     if (this.enabled === false) return;
 
     if (event.button === 0) {
@@ -202,7 +203,7 @@ export class OrbitController implements Listener {
     }
   }
 
-  private onMouseMove(event: ASInputManager.MouseEvent): void {
+  private onMouseMove(event: MouseEvent): void {
     if (this.enabled === false) return;
     //     // event.preventDefault();
     if (this.state === STATE.ROTATE) {
@@ -237,7 +238,7 @@ export class OrbitController implements Listener {
     }
   }
 
-  private onMouseUp(event: ASInputManager.MouseEvent): void {
+  private onMouseUp(event: MouseEvent): void {
     if (this.enabled === false) return;
     inputManager.removeEventListener("mousemove", this);
     inputManager.removeEventListener("mouseup", this);
@@ -246,7 +247,7 @@ export class OrbitController implements Listener {
     this.state = STATE.NONE;
   }
 
-  private onMouseWheel(event: ASInputManager.MouseEvent): void {
+  private onMouseWheel(event: MouseEvent): void {
     if (
       this.enabled === false ||
       this.enableZoom === false ||

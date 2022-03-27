@@ -253,7 +253,7 @@ class GameManager {
     }];
     this.textures = await Promise.all(texturePaths.map((tp, index) => {
       const texture = new _Texture__WEBPACK_IMPORTED_MODULE_5__.Texture(tp.name, tp.path);
-      wasmExports.TextureFactory.createTexture(wasmExports.__newString(tp.name), index);
+      wasmExports.createTexture(wasmExports.__newString(tp.name), index);
       return texture.load(device);
     })); // PIPELINES
 
@@ -269,7 +269,7 @@ class GameManager {
     const size = this.canvasSize();
     this.onResize(size, false); // Initialize the wasm module
 
-    wasmExports.AsSceneManager.init(this.canvas.width, this.canvas.height);
+    wasmExports.init(this.canvas.width, this.canvas.height);
     this.initRuntime(); // Setup events
 
     window.addEventListener("resize", this.onResizeHandler);
@@ -293,7 +293,7 @@ class GameManager {
 
   initRuntime() {
     const wasm = this.wasmManager.exports;
-    const runime = wasm.Runtime.wrap(wasm.AsSceneManager.getRuntime());
+    const runime = wasm.Runtime.wrap(wasm.getRuntime());
     this.pipelines.forEach(p => {
       p.build(this);
       p.initialize(this);
@@ -325,13 +325,13 @@ class GameManager {
     const pipelineIndex = this.pipelines.indexOf(debugPipeline);
     const wasmExports = this.wasmManager.exports; // Create an instance in WASM
 
-    const pipelineInsPtr = wasmExports.PipelineFactory.createPipeline(wasmExports.__newString(debugPipeline.name), pipelineIndex, _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__.PipelineType.Mesh);
+    const pipelineInsPtr = wasmExports.createPipeline(wasmExports.__newString(debugPipeline.name), pipelineIndex, _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__.PipelineType.Mesh);
     const meshPipelineIns = wasmExports.MeshPipeline.wrap(pipelineInsPtr);
     meshPipelineInstances.push(meshPipelineIns); // Assign a transform buffer to the intance
 
     meshPipelineIns.transformGroupId = debugPipeline.getTemplateByType(_common_ResourceType__WEBPACK_IMPORTED_MODULE_7__.ResourceType.Transform).template.group;
     meshPipelineIns.transformResourceIndex = debugPipeline.addResourceInstance(this, _common_GroupType__WEBPACK_IMPORTED_MODULE_6__.GroupType.Transform);
-    const geometryPtr = type === "box" ? wasmExports.GeometryFactory.createBox(size) : wasmExports.GeometryFactory.createSphere(size);
+    const geometryPtr = type === "box" ? wasmExports.createBox(size) : wasmExports.createSphere(size);
     const meshPtr = wasmExports.createMesh(geometryPtr, pipelineInsPtr);
     return meshPtr;
   }
@@ -374,7 +374,7 @@ class GameManager {
       usage: GPUTextureUsage.RENDER_ATTACHMENT
     });
     this.renderTargetView = this.renderTarget.createView();
-    if (updateWasm) this.wasmManager.exports.AsSceneManager.resize(this.canvas.width, this.canvas.height);
+    if (updateWasm) this.wasmManager.exports.resize(this.canvas.width, this.canvas.height);
   }
 
   onFrame() {
@@ -388,7 +388,7 @@ class GameManager {
       this.onResize(newSize);
     }
 
-    this.wasmManager.exports.AsSceneManager.update(performance.now());
+    this.wasmManager.exports.update(performance.now());
   }
 
   canvasSize() {
@@ -542,14 +542,14 @@ class InputManager {
     let delta = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
     const wasmExports = this.wasmManager.exports;
 
-    const mouseEventPtr = wasmExports.__pin(wasmExports.ASInputManager.createMouseEvent(e.clientX, e.clientY, e.pageX, e.pageY, e.ctrlKey, e.shiftKey, e.altKey, e.button, e.buttons, bounds.x, bounds.y, bounds.width, bounds.height, delta));
+    const mouseEventPtr = wasmExports.__pin(wasmExports.createMouseEvent(e.clientX, e.clientY, e.pageX, e.pageY, e.ctrlKey, e.shiftKey, e.altKey, e.button, e.buttons, bounds.x, bounds.y, bounds.width, bounds.height, delta));
 
     return mouseEventPtr;
   }
 
   sendMouseEvent(type, event, bounds, delta) {
     const wasmExports = this.wasmManager.exports;
-    const manager = wasmExports.ASInputManager.InputManager.wrap(wasmExports.ASInputManager.getInputManager());
+    const manager = wasmExports.InputManager.wrap(wasmExports.getInputManager());
     const wasmEvent = this.createMouseEvent(event, bounds, delta);
     if (type === MouseEventType.MouseUp) manager.onMouseUp(wasmEvent);else if (type === MouseEventType.MouseMove) manager.onMouseMove(wasmEvent);else if (type === MouseEventType.MouseDown) manager.onMouseDown(wasmEvent);else if (type === MouseEventType.MouseWheel) manager.onWheel(wasmEvent);
 
@@ -558,9 +558,9 @@ class InputManager {
 
   sendKeyEvent(type, event) {
     const wasmExports = this.wasmManager.exports;
-    const manager = wasmExports.ASInputManager.InputManager.wrap(wasmExports.ASInputManager.getInputManager());
+    const manager = wasmExports.InputManager.wrap(wasmExports.getInputManager());
 
-    const wasmEvent = wasmExports.__pin(wasmExports.ASInputManager.createKeyboardEvent(wasmExports.__newString(event.code)));
+    const wasmEvent = wasmExports.__pin(wasmExports.createKeyboardEvent(wasmExports.__newString(event.code)));
 
     if (type === KeyEventType.KeyUp) manager.onKeyUp(wasmEvent);else if (type === KeyEventType.KeyDown) manager.onKeyDown(wasmEvent);
 

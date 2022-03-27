@@ -93,7 +93,7 @@ export class GameManager {
     this.textures = await Promise.all(
       texturePaths.map((tp, index) => {
         const texture = new Texture(tp.name, tp.path);
-        wasmExports.TextureFactory.createTexture(wasmExports.__newString(tp.name), index);
+        wasmExports.createTexture(wasmExports.__newString(tp.name), index);
         return texture.load(device);
       })
     );
@@ -109,7 +109,7 @@ export class GameManager {
     this.onResize(size, false);
 
     // Initialize the wasm module
-    wasmExports.AsSceneManager.init(this.canvas.width, this.canvas.height);
+    wasmExports.init(this.canvas.width, this.canvas.height);
 
     this.initRuntime();
 
@@ -136,7 +136,7 @@ export class GameManager {
 
   initRuntime() {
     const wasm = this.wasmManager.exports;
-    const runime = wasm.Runtime.wrap(wasm.AsSceneManager.getRuntime());
+    const runime = wasm.Runtime.wrap(wasm.getRuntime());
 
     this.pipelines.forEach((p) => {
       p.build(this);
@@ -166,7 +166,7 @@ export class GameManager {
     const wasmExports = this.wasmManager.exports;
 
     // Create an instance in WASM
-    const pipelineInsPtr = wasmExports.PipelineFactory.createPipeline(
+    const pipelineInsPtr = wasmExports.createPipeline(
       wasmExports.__newString(debugPipeline.name),
       pipelineIndex,
       PipelineType.Mesh
@@ -179,8 +179,7 @@ export class GameManager {
     meshPipelineIns.transformGroupId = debugPipeline.getTemplateByType(ResourceType.Transform)!.template.group;
     meshPipelineIns.transformResourceIndex = debugPipeline.addResourceInstance(this, GroupType.Transform);
 
-    const geometryPtr =
-      type === "box" ? wasmExports.GeometryFactory.createBox(size) : wasmExports.GeometryFactory.createSphere(size);
+    const geometryPtr = type === "box" ? wasmExports.createBox(size) : wasmExports.createSphere(size);
     const meshPtr = wasmExports.createMesh(geometryPtr, pipelineInsPtr);
     return meshPtr;
   }
@@ -224,7 +223,7 @@ export class GameManager {
 
     this.renderTargetView = this.renderTarget.createView();
 
-    if (updateWasm) this.wasmManager.exports.AsSceneManager.resize(this.canvas.width, this.canvas.height);
+    if (updateWasm) this.wasmManager.exports.resize(this.canvas.width, this.canvas.height);
   }
 
   private onFrame() {
@@ -238,7 +237,7 @@ export class GameManager {
       this.onResize(newSize);
     }
 
-    this.wasmManager.exports.AsSceneManager.update(performance.now());
+    this.wasmManager.exports.update(performance.now());
   }
 
   canvasSize() {

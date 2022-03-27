@@ -1,7 +1,8 @@
 import { DirectionalLight } from "../../../lights/DirectionalLight";
 import { Color } from "../../../math/Color";
 import { Container } from "../core/Container";
-import { inputManager, ASInputManager } from "../../../exports/ASInputManager";
+import { inputManager } from "../../../exports/io/InputManager";
+import { KeyboardEvent } from "../../../exports/io/KeyboardEvent";
 import { Listener } from "../../../core/EventDispatcher";
 import { Event } from "../../../core/Event";
 import { degToRad } from "../../../math/MathUtils";
@@ -23,7 +24,7 @@ export class MainMenu extends Container implements Listener {
   }
 
   onEvent(event: Event): void {
-    const keyEvent = event.attachment as ASInputManager.KeyboardEvent;
+    const keyEvent = event.attachment as KeyboardEvent;
     if (keyEvent.code == "Enter") this.exit(this.getPortal("Exit")!, true);
   }
 

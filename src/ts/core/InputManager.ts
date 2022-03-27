@@ -79,7 +79,7 @@ export class InputManager {
   private createMouseEvent(e: MouseEvent, bounds: DOMRect, delta: number = 0) {
     const wasmExports = this.wasmManager.exports;
     const mouseEventPtr = wasmExports.__pin(
-      wasmExports.ASInputManager.createMouseEvent(
+      wasmExports.createMouseEvent(
         e.clientX,
         e.clientY,
         e.pageX,
@@ -102,7 +102,7 @@ export class InputManager {
 
   private sendMouseEvent(type: MouseEventType, event: MouseEvent, bounds: DOMRect, delta: number): void {
     const wasmExports = this.wasmManager.exports;
-    const manager = wasmExports.ASInputManager.InputManager.wrap(wasmExports.ASInputManager.getInputManager());
+    const manager = wasmExports.InputManager.wrap(wasmExports.getInputManager());
     const wasmEvent = this.createMouseEvent(event, bounds, delta);
 
     if (type === MouseEventType.MouseUp) manager.onMouseUp(wasmEvent);
@@ -115,10 +115,8 @@ export class InputManager {
 
   private sendKeyEvent(type: KeyEventType, event: KeyboardEvent): void {
     const wasmExports = this.wasmManager.exports;
-    const manager = wasmExports.ASInputManager.InputManager.wrap(wasmExports.ASInputManager.getInputManager());
-    const wasmEvent = wasmExports.__pin(
-      wasmExports.ASInputManager.createKeyboardEvent(wasmExports.__newString(event.code))
-    );
+    const manager = wasmExports.InputManager.wrap(wasmExports.getInputManager());
+    const wasmEvent = wasmExports.__pin(wasmExports.createKeyboardEvent(wasmExports.__newString(event.code)));
 
     if (type === KeyEventType.KeyUp) manager.onKeyUp(wasmEvent);
     else if (type === KeyEventType.KeyDown) manager.onKeyDown(wasmEvent);
