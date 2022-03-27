@@ -26,8 +26,8 @@ export class WasmManager {
         memory: this.memory,
         seed: Date.now,
         abort: (...args: any[]) => {
-          console.log("abort");
-          console.log((this.importObject.env as any).getString(args[0]));
+          console.error((this.importObject.env as any).getString(args[0]));
+          console.error((this.importObject.env as any).getString(args[1]));
         },
         getString: (string_index: number) => {
           const buffer = (this.importObject.env as any).memory.buffer;

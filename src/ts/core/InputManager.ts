@@ -7,12 +7,19 @@ export enum MouseEventType {
   MouseWheel,
 }
 
+export enum KeyEventType {
+  KeyDown,
+  KeyUp,
+}
+
 export class InputManager {
   canvas: HTMLCanvasElement;
   wasmManager: WasmManager;
 
   private onDownHandler: (e: MouseEvent) => void;
   private onUpHandler: (e: MouseEvent) => void;
+  private onKeyDownHandler: (e: KeyboardEvent) => void;
+  private onKeyUpHandler: (e: KeyboardEvent) => void;
   private onMoveHandler: (e: MouseEvent) => void;
   private onWheelHandler: (e: WheelEvent) => void;
   private canvasBounds: DOMRect;
@@ -24,6 +31,8 @@ export class InputManager {
 
     this.onDownHandler = this.onDown.bind(this);
     this.onUpHandler = this.onUp.bind(this);
+    this.onKeyDownHandler = this.onKeyDown.bind(this);
+    this.onKeyUpHandler = this.onKeyUp.bind(this);
     this.onMoveHandler = this.onMove.bind(this);
     this.onWheelHandler = this.onWheel.bind(this);
 
@@ -31,6 +40,8 @@ export class InputManager {
     window.addEventListener("wheel", this.onWheelHandler);
     window.addEventListener("mouseup", this.onUpHandler);
     window.addEventListener("mousemove", this.onMoveHandler);
+    document.addEventListener("keydown", this.onKeyDownHandler);
+    document.addEventListener("keyup", this.onKeyUpHandler);
 
     this.reset();
   }
@@ -50,6 +61,15 @@ export class InputManager {
   private onDown(e: MouseEvent) {
     e.preventDefault();
     this.sendMouseEvent(MouseEventType.MouseDown, e, this.canvasBounds, 0);
+  }
+
+  private onKeyDown(e: KeyboardEvent) {
+    this.sendKeyEvent(KeyEventType.KeyDown, e);
+  }
+
+  private onKeyUp(e: KeyboardEvent) {
+    e.preventDefault();
+    this.sendKeyEvent(KeyEventType.KeyUp, e);
   }
 
   private onWheel(e: WheelEvent) {
@@ -76,7 +96,7 @@ export class InputManager {
         delta
       )
     );
-    wasmExports.ASInputManager.MouseEvent.wrap(mouseEventPtr);
+
     return mouseEventPtr;
   }
 
@@ -93,10 +113,25 @@ export class InputManager {
     wasmExports.__unpin(wasmEvent);
   }
 
+  private sendKeyEvent(type: KeyEventType, event: KeyboardEvent): void {
+    const wasmExports = this.wasmManager.exports;
+    const manager = wasmExports.ASInputManager.InputManager.wrap(wasmExports.ASInputManager.getInputManager());
+    const wasmEvent = wasmExports.__pin(
+      wasmExports.ASInputManager.createKeyboardEvent(wasmExports.__newString(event.code))
+    );
+
+    if (type === KeyEventType.KeyUp) manager.onKeyUp(wasmEvent);
+    else if (type === KeyEventType.KeyDown) manager.onKeyDown(wasmEvent);
+
+    wasmExports.__unpin(wasmEvent);
+  }
+
   dispose() {
     this.canvas.removeEventListener("mousedown", this.onDownHandler);
-    window.removeEventListener("wheel", this.onWheelHandler);
     window.removeEventListener("mouseup", this.onUpHandler);
+    window.removeEventListener("wheel", this.onWheelHandler);
     window.removeEventListener("mousemove", this.onMoveHandler);
+    document.removeEventListener("keydown", this.onKeyDownHandler);
+    document.removeEventListener("keyup", this.onKeyUpHandler);
   }
 }

@@ -36,7 +36,6 @@ export class WebGPURenderQueue {
   }
 
   setupLighting(lighting: WebGPULights): WebGPURenderQueue {
-    print(`ambient length: ${lighting.sceneLightsBuffer.length}`);
     const q = this.q;
     q.push(GPUCommands.SETUP_LIGHTING);
     q.push(lighting.numDirectionLights);

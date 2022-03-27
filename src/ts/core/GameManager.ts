@@ -69,6 +69,7 @@ export class GameManager {
       device: device,
       format: format,
       size: this.canvasSize(),
+      compositingAlphaMode: "premultiplied",
     });
 
     this.device = device;
@@ -154,7 +155,8 @@ export class GameManager {
     containerMainMenu.addAsset(this.createMesh(1, "sphere", "earth"));
     wasm.__unpin(containerMainMenuPtr);
 
-    runime.addContainer(containerMainMenuPtr);
+    runime.addContainer(containerLvl1Ptr, false);
+    runime.addContainer(containerMainMenuPtr, true);
   }
 
   createMesh(size: number, type: "box" | "sphere", pipelineName: string) {
@@ -203,6 +205,7 @@ export class GameManager {
       device: this.device,
       format: this.format,
       size: this.presentationSize,
+      compositingAlphaMode: "premultiplied",
     });
 
     this.renderTarget = this.device.createTexture({

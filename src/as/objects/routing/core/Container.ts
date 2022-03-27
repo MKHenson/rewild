@@ -2,57 +2,58 @@ import { Object } from "../../../core/Object";
 import { Node } from "./Node";
 import { Mesh } from "../../Mesh";
 import { print } from "../../../Imports";
+import { Portal } from "./Portal";
 
 let totalTime: f32 = 0;
 export class Container extends Node {
-  protected meshes: Mesh[];
+  protected objects: Object[];
   protected loaded: boolean;
 
-  constructor() {
-    super();
-    this.meshes = [];
+  constructor(name: string) {
+    super(name);
+    this.objects = [];
     this.loaded = false;
+    this.portals.push(new Portal("Enter", this));
+    this.portals.push(new Portal("Exit", this));
   }
 
   addAsset(object: Object): void {
-    if (object instanceof Mesh) {
-      const mesh = object as Mesh;
-
-      print(`Adding mesh to container...`);
-      this.meshes.push(mesh);
-    }
+    this.objects.push(object);
   }
 
   onUpdate(delta: f32, total: u32, fps: u32): void {}
 
   mount(): void {
-    const meshes = this.meshes;
-    for (let i: i32 = 0, l: i32 = meshes.length; i < l; i++) {
-      this.runtime!.scene.add(meshes[i]);
+    const objects = this.objects;
+    for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
+      this.runtime!.scene.add(objects[i]);
     }
     super.mount();
   }
 
   unMount(): void {
-    const meshes = this.meshes;
-    for (let i: i32 = 0, l: i32 = meshes.length; i < l; i++) {
-      this.runtime!.scene.remove(meshes[i]);
+    const objects = this.objects;
+    for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
+      this.runtime!.scene.remove(objects[i]);
     }
     super.unMount();
   }
 
   init(): void {
     // Load any assets
-    const meshes = this.meshes;
-    for (let i: i32 = 0, l: i32 = meshes.length; i < l; i++) {
-      const geometry = meshes[i].geometry;
-      if (geometry) this.runtime!.renderer.geometries.set(geometry);
+    const objects = this.objects;
+    for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
+      const obj = objects[i];
+      if (obj instanceof Mesh) {
+        const geometry = (obj as Mesh).geometry;
+        if (geometry) this.runtime!.renderer.geometries.set(geometry);
+      }
     }
 
     super.init();
   }
 }
 
-export function createContainer(): Container {
-  return new Container();
+export function createContainer(name: string): Container {
+  return new Container(name);
 }
