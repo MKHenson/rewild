@@ -10,11 +10,12 @@ import { GroupType } from "../../common/GroupType";
 import { ResourceType } from "../../common/ResourceType";
 import { MeshPipeline } from "build/types";
 import { WasmManager } from "./WasmManager";
+import { IBindable } from "./IBindable";
 
 const meshPipelineInstances: MeshPipeline[] = [];
 const sampleCount = 4;
 
-export class GameManager {
+export class GameManager implements IBindable {
   canvas: HTMLCanvasElement;
   device: GPUDevice;
   context: GPUCanvasContext;
@@ -48,6 +49,17 @@ export class GameManager {
     this.disposed = false;
     this.currentPass = null;
     this.onFrameHandler = this.onFrame.bind(this);
+  }
+
+  createBinding() {
+    return {
+      createBufferFromF32: this.createBufferF32.bind(this),
+      createIndexBuffer: this.createIndexBuffer.bind(this),
+      render: (commandsIndex: number) => {
+        const commandBuffer = this.wasmManager.exports.__getArray(commandsIndex) as Array<number>;
+        this.renderQueueManager.run(commandBuffer);
+      },
+    };
   }
 
   async init(wasmManager: WasmManager) {
@@ -291,20 +303,16 @@ export class GameManager {
     this.device.queue.submit([this.currentCommandEncoder.finish()]);
   }
 
-  createBufferF32(
-    data: Float32Array,
-    usageFlag: GPUBufferUsageFlags = GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-  ) {
-    const buffer = createBuffer(this.device, data, usageFlag);
+  createBufferF32(data: number, usageFlag: GPUBufferUsageFlags = GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST) {
+    const f32Array = this.wasmManager.exports.__getFloat32Array(data);
+    const buffer = createBuffer(this.device, f32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;
   }
 
-  createIndexBuffer(
-    data: Uint32Array,
-    usageFlag: GPUBufferUsageFlags = GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
-  ) {
-    const buffer = createIndexBuffer(this.device, data, usageFlag);
+  createIndexBuffer(data: number, usageFlag: GPUBufferUsageFlags = GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST) {
+    const u32Array = this.wasmManager.exports.__getUint32Array(data);
+    const buffer = createIndexBuffer(this.device, u32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;
   }

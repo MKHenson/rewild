@@ -1,8 +1,7 @@
 import type * as MyModule from "../../../build/types";
 import wasmFile from "../../../build/untouched.wasm";
-import { createBindingsGPU, bindExports } from "../AppBindings";
 import loader, { ASUtil, ResultObject } from "@assemblyscript/loader";
-import { GameManager } from "./GameManager";
+import { IBindable } from "./IBindable";
 
 export type IWasmExports = ASUtil & typeof MyModule;
 export type ExportType = ResultObject & { exports: IWasmExports };
@@ -18,7 +17,7 @@ export class WasmManager {
 
   constructor() {}
 
-  async load(gameManager: GameManager) {
+  async load(bindables: IBindable[]) {
     // Creating WASM with Linear memory
     this.memory = new WebAssembly.Memory({ initial: 100 });
     this.importObject = {
@@ -42,13 +41,20 @@ export class WasmManager {
       },
     };
 
-    createBindingsGPU(this.importObject, gameManager);
+    if (!this.importObject.env.memory) throw new Error("You need to set memory in your importObject");
+
+    const bindings: any = {
+      print: (stringIndex: number) => {
+        if (this.exports) console.log(this.exports.__getString(stringIndex));
+      },
+    };
+
+    for (const bindable of bindables) Object.assign(bindings, bindable.createBinding());
+
+    this.importObject.Imports = bindings;
 
     const obj = await loader.instantiateStreaming<typeof MyModule>(fetch(wasmFile), this.importObject);
     this.exports = obj.exports;
-
-    // Bind the newly created export file
-    bindExports(obj);
     this.wasmMemoryBlock = obj.exports.memory!.buffer;
     this.wasmArrayBuffer = new Uint32Array(this.wasmMemoryBlock);
     this.wasmDataView = new DataView(this.exports.memory.buffer);
