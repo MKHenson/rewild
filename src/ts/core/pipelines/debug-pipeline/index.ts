@@ -15,10 +15,10 @@ const vertexShader = shader<DebugDefines>`
 ${e => e.getTemplateByType(ResourceType.Transform)!.template.vertexBlock }
 
 struct Output {
-    @builtin(position) Position : vec4<f32>;
-    @location(0) vFragUV : vec2<f32>;
-    @location(1) vNormal : vec3<f32>;
-    @location(2) vViewPosition : vec3<f32>;
+    @builtin(position) Position : vec4<f32>,
+    @location(0) vFragUV : vec2<f32>,
+    @location(1) vNormal : vec3<f32>,
+    @location(2) vViewPosition : vec3<f32>
 };
 
 @stage(vertex)
@@ -49,34 +49,34 @@ ${e => e.defines.normalMap ? e.getTemplateByType(ResourceType.Texture, 'normal')
 
 // INTERNAL STRUCTS
 struct IncidentLight {
-  color: vec3<f32>;
-  direction: vec3<f32>;
-  visible: bool;
+  color: vec3<f32>,
+  direction: vec3<f32>,
+  visible: bool
 };
 
 struct ReflectedLight {
-  directDiffuse: vec3<f32>;
-  directSpecular: vec3<f32>;
-  indirectDiffuse: vec3<f32>;
-  indirectSpecular: vec3<f32>;
+  directDiffuse: vec3<f32>,
+  directSpecular: vec3<f32>,
+  indirectDiffuse: vec3<f32>,
+  indirectSpecular: vec3<f32>
 };
 
 struct PhysicalMaterial {
-  diffuseColor: vec3<f32>;
-  specularColor: vec3<f32>;
-  roughness: f32;
-  specularF90: f32;
+  diffuseColor: vec3<f32>,
+  specularColor: vec3<f32>,
+  roughness: f32,
+  specularF90: f32
 };
 
 struct GeometricContext {
-  position: vec3<f32>;
-  normal: vec3<f32>;
-  viewDir: vec3<f32>;
+  position: vec3<f32>,
+  normal: vec3<f32>,
+  viewDir: vec3<f32>
 };
 
 struct DirectionalLight {
-  direction: vec3<f32>;
-  color: vec3<f32>;
+  direction: vec3<f32>,
+  color: vec3<f32>
 };
 
 ${mathConstants}

@@ -85,11 +85,11 @@ export class LightingResource extends PipelineResourceTemplate {
       ].concat(LightingResource.numDirLights ? { buffer: LightingResource.directionLightsBuffer } : []),
 
       fragmentBlock: `struct SceneLightingUniform {
-        ambientLightColor: vec4<f32>;
+        ambientLightColor: vec4<f32>
       };
 
       struct LightingConfigUniform {
-        numDirectionalLights: u32;
+        numDirectionalLights: u32
       };
 
       @group(${group}) @binding(${this.lightingConfigBinding})
@@ -101,12 +101,12 @@ export class LightingResource extends PipelineResourceTemplate {
 
       ${pipeline.defines.NUM_DIR_LIGHTS ? `
       struct DirectionLightUniform {
-        direction : vec4<f32>;
-        color : vec4<f32>;
+        direction : vec4<f32>,
+        color : vec4<f32>
       };
 
       struct DirectionLightsUniform {
-        directionalLights: array<DirectionLightUniform>;
+        directionalLights: array<DirectionLightUniform>
       };
 
       @group(${group}) @binding(${this.directionLightBinding})

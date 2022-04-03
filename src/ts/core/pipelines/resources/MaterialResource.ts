@@ -49,11 +49,11 @@ export class MaterialResource extends PipelineResourceTemplate {
       // prettier-ignore
       fragmentBlock: `
       struct MaterialData {
-        diffuse: vec4<f32>;
-        emissive: vec4<f32>;
-        opacity: f32;
-        metalness: f32;
-        roughness: f32;
+        diffuse: vec4<f32>,
+        emissive: vec4<f32>,
+        opacity: f32,
+        metalness: f32,
+        roughness: f32
       };
 
       @group(${group}) @binding(${curBindIndex})
