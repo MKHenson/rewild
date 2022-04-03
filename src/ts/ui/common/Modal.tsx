@@ -1,10 +1,10 @@
 import { styled } from "solid-styled-components";
 import { Portal } from "solid-js/web";
-import { Component } from "solid-js";
+import { Component, Show } from "solid-js";
 import { Button } from "./Button";
 
 interface Props {
-  title: string;
+  title?: string;
   open: boolean;
   hideConfirmButtons?: boolean;
   onClose?: () => void;
@@ -33,7 +33,9 @@ export const Modal: Component<Props> = (props) => {
     <Portal>
       <StyledWrapper class="wrapper" onClick={handleClick} visible={props.open}>
         <StyledModal class="modal">
-          <span class="title">{props.title}</span>
+          <Show when={props.title}>
+            <span class="title">{props.title}</span>
+          </Show>
           <div class="content">{props.children}</div>
           {props.hideConfirmButtons ? null : (
             <div class="button-container">

@@ -125,52 +125,136 @@ let ResourceType;
 
 /***/ }),
 
-/***/ "./src/ts/AppBindings.ts":
-/*!*******************************!*\
-  !*** ./src/ts/AppBindings.ts ***!
-  \*******************************/
+/***/ "./src/common/UIEventType.ts":
+/*!***********************************!*\
+  !*** ./src/common/UIEventType.ts ***!
+  \***********************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "bindExports": () => (/* binding */ bindExports),
-/* harmony export */   "buffers": () => (/* binding */ buffers),
-/* harmony export */   "createBindingsGPU": () => (/* binding */ createBindingsGPU),
-/* harmony export */   "vaos": () => (/* binding */ vaos)
+/* harmony export */   "UIEventType": () => (/* binding */ UIEventType)
 /* harmony export */ });
-const vaos = [];
-const buffers = [];
-let wasmExports;
-function bindExports(exports) {
-  wasmExports = exports;
-}
-function createBindingsGPU(importObject, gameManager) {
-  if (!importObject.env.memory) throw new Error("You need to set memory in your importObject");
-  const binding = {
-    print(stringIndex) {
-      if (wasmExports) console.log(wasmExports.exports.__getString(stringIndex));
-    },
+let UIEventType;
 
-    createBufferFromF32(data, usage) {
-      const buffer = wasmExports.exports.__getFloat32Array(data);
+(function (UIEventType) {
+  UIEventType[UIEventType["StartGame"] = 0] = "StartGame";
+  UIEventType[UIEventType["QuitGame"] = 1] = "QuitGame";
+  UIEventType[UIEventType["OpenInGameMenu"] = 2] = "OpenInGameMenu";
+})(UIEventType || (UIEventType = {}));
 
-      return gameManager.createBufferF32(buffer, usage);
-    },
+/***/ }),
 
-    createIndexBuffer(data, usage) {
-      const buffer = wasmExports.exports.__getUint32Array(data);
+/***/ "./src/ts/core/EventDispatcher.ts":
+/*!****************************************!*\
+  !*** ./src/ts/core/EventDispatcher.ts ***!
+  \****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
-      return gameManager.createIndexBuffer(buffer, usage);
-    },
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "DispatchableEvent": () => (/* binding */ DispatchableEvent),
+/* harmony export */   "default": () => (/* binding */ EventDispatcher)
+/* harmony export */ });
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
-    render(commandsIndex) {
-      const commandBuffer = wasmExports.exports.__getArray(commandsIndex);
+/**
+ * Vehicle for dispatching DispatchableEvent objects.
+ *
+ * @author Jeremy Daley
+ * @version 0.0.1
+ * @export
+ * @class EventDispatcher
+ * @implements {EventTarget}
+ */
+class EventDispatcher {
+  constructor() {
+    _defineProperty(this, "listeners", {});
 
-      gameManager.renderQueueManager.run(commandBuffer);
+    _defineProperty(this, "target", null);
+  }
+  /**
+   * Add a listener for an event type.
+   *
+   * @param {string} type Type of event.
+   * @param {*} callback Callback for dispatched event.
+   * @memberof EventDispatcher
+   */
+
+
+  addEventListener(type, callback) {
+    if (!(type in this.listeners)) {
+      this.listeners[type] = [];
     }
 
-  };
-  importObject.Imports = binding;
+    this.listeners[type].push(callback);
+  }
+  /**
+   * Removes a listener that's been added.
+   *
+   * @param {string} type Type of event.
+   * @param {any} callback Callback for dispatched event.
+   * @returns
+   * @memberof EventDispatcher
+   */
+
+
+  removeEventListener(type, callback) {
+    if (!(type in this.listeners)) {
+      return;
+    }
+
+    var stack = this.listeners[type];
+
+    for (let i = 0, l = stack.length; i < l; i++) {
+      if (stack[i] === callback) {
+        stack.splice(i, 1);
+        return;
+      }
+    }
+  }
+  /**
+   * Dispatches an event to any listeners.
+   *
+   * @param {DispatchableEvent} event An event object to dispatch.
+   * @returns
+   * @memberof EventDispatcher
+   */
+
+
+  dispatchEvent(event) {
+    if (!(event.type in this.listeners)) {
+      return true;
+    }
+
+    let stack = this.listeners[event.type];
+
+    for (let i = 0, l = stack.length; i < l; i++) {
+      stack[i].call(this, event);
+    }
+
+    return false;
+  }
+
+}
+/**
+ * Generic event for dispatching through an EventDispatcher.
+ *
+ * @export
+ * @class DispatchableEvent
+ */
+
+class DispatchableEvent {
+  /**
+   * Instantiates a new DispatchableEvent object
+   *
+   * @param {string} type Type of event.
+   * @memberof DispatchableEvent
+   */
+  constructor(type) {
+    this.type = type;
+  }
+
 }
 
 /***/ }),
@@ -212,6 +296,18 @@ class GameManager {
     this.disposed = false;
     this.currentPass = null;
     this.onFrameHandler = this.onFrame.bind(this);
+  }
+
+  createBinding() {
+    return {
+      createBufferFromF32: this.createBufferF32.bind(this),
+      createIndexBuffer: this.createIndexBuffer.bind(this),
+      render: commandsIndex => {
+        const commandBuffer = this.wasmManager.exports.__getArray(commandsIndex);
+
+        this.renderQueueManager.run(commandBuffer);
+      }
+    };
   }
 
   async init(wasmManager) {
@@ -444,14 +540,20 @@ class GameManager {
 
   createBufferF32(data) {
     let usageFlag = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST;
-    const buffer = (0,_Utils__WEBPACK_IMPORTED_MODULE_3__.createBuffer)(this.device, data, usageFlag);
+
+    const f32Array = this.wasmManager.exports.__getFloat32Array(data);
+
+    const buffer = (0,_Utils__WEBPACK_IMPORTED_MODULE_3__.createBuffer)(this.device, f32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;
   }
 
   createIndexBuffer(data) {
     let usageFlag = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST;
-    const buffer = (0,_Utils__WEBPACK_IMPORTED_MODULE_3__.createIndexBuffer)(this.device, data, usageFlag);
+
+    const u32Array = this.wasmManager.exports.__getUint32Array(data);
+
+    const buffer = (0,_Utils__WEBPACK_IMPORTED_MODULE_3__.createIndexBuffer)(this.device, u32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;
   }
@@ -791,6 +893,48 @@ class Texture {
 
 /***/ }),
 
+/***/ "./src/ts/core/UIEventManager.ts":
+/*!***************************************!*\
+  !*** ./src/ts/core/UIEventManager.ts ***!
+  \***************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "UIEventManager": () => (/* binding */ UIEventManager)
+/* harmony export */ });
+/* harmony import */ var _EventDispatcher__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./EventDispatcher */ "./src/ts/core/EventDispatcher.ts");
+/* harmony import */ var _events_UIEvent__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./events/UIEvent */ "./src/ts/core/events/UIEvent.ts");
+
+
+const uiEvent = new _events_UIEvent__WEBPACK_IMPORTED_MODULE_1__.UIEvent();
+class UIEventManager extends _EventDispatcher__WEBPACK_IMPORTED_MODULE_0__["default"] {
+  constructor(wasm) {
+    super();
+    this.wasmManager = wasm;
+  }
+
+  createBinding() {
+    return {
+      onSignalReceived: this.onSignalReceived.bind(this)
+    };
+  }
+
+  onSignalReceived(type, event) {
+    uiEvent.uiEventType = type;
+    this.dispatchEvent(uiEvent);
+  }
+
+  triggerUIEvent(type) {
+    const wasmExports = this.wasmManager.exports;
+    const manager = wasmExports.UISignalManager.wrap(wasmExports.getSignalManager());
+    manager.onSignalEvent(type);
+  }
+
+}
+
+/***/ }),
+
 /***/ "./src/ts/core/Utils.ts":
 /*!******************************!*\
   !*** ./src/ts/core/Utils.ts ***!
@@ -840,15 +984,13 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "WasmManager": () => (/* binding */ WasmManager)
 /* harmony export */ });
 /* harmony import */ var _build_untouched_wasm__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../build/untouched.wasm */ "./build/untouched.wasm");
-/* harmony import */ var _AppBindings__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../AppBindings */ "./src/ts/AppBindings.ts");
-/* harmony import */ var _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @assemblyscript/loader */ "./node_modules/@assemblyscript/loader/index.js");
-
+/* harmony import */ var _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @assemblyscript/loader */ "./node_modules/@assemblyscript/loader/index.js");
 
 
 class WasmManager {
   constructor() {}
 
-  async load(gameManager) {
+  async load(bindables) {
     var _this = this;
 
     // Creating WASM with Linear memory
@@ -875,14 +1017,42 @@ class WasmManager {
         }
       }
     };
-    (0,_AppBindings__WEBPACK_IMPORTED_MODULE_1__.createBindingsGPU)(this.importObject, gameManager);
-    const obj = await _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_2__["default"].instantiateStreaming(fetch(_build_untouched_wasm__WEBPACK_IMPORTED_MODULE_0__["default"]), this.importObject);
-    this.exports = obj.exports; // Bind the newly created export file
+    if (!this.importObject.env.memory) throw new Error("You need to set memory in your importObject");
+    const bindings = {
+      print: stringIndex => {
+        if (this.exports) console.log(this.exports.__getString(stringIndex));
+      }
+    };
 
-    (0,_AppBindings__WEBPACK_IMPORTED_MODULE_1__.bindExports)(obj);
+    for (const bindable of bindables) Object.assign(bindings, bindable.createBinding());
+
+    this.importObject.Imports = bindings;
+    const obj = await _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_1__["default"].instantiateStreaming(fetch(_build_untouched_wasm__WEBPACK_IMPORTED_MODULE_0__["default"]), this.importObject);
+    this.exports = obj.exports;
     this.wasmMemoryBlock = obj.exports.memory.buffer;
     this.wasmArrayBuffer = new Uint32Array(this.wasmMemoryBlock);
     this.wasmDataView = new DataView(this.exports.memory.buffer);
+  }
+
+}
+
+/***/ }),
+
+/***/ "./src/ts/core/events/UIEvent.ts":
+/*!***************************************!*\
+  !*** ./src/ts/core/events/UIEvent.ts ***!
+  \***************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "UIEvent": () => (/* binding */ UIEvent)
+/* harmony export */ });
+/* harmony import */ var _EventDispatcher__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../EventDispatcher */ "./src/ts/core/EventDispatcher.ts");
+
+class UIEvent extends _EventDispatcher__WEBPACK_IMPORTED_MODULE_0__.DispatchableEvent {
+  constructor() {
+    super("uievent");
   }
 
 }
@@ -1164,10 +1334,10 @@ const vertexShader = _shader_lib_Utils__WEBPACK_IMPORTED_MODULE_8__.shader`
 ${e => e.getTemplateByType(_common_ResourceType__WEBPACK_IMPORTED_MODULE_0__.ResourceType.Transform).template.vertexBlock}
 
 struct Output {
-    @builtin(position) Position : vec4<f32>;
-    @location(0) vFragUV : vec2<f32>;
-    @location(1) vNormal : vec3<f32>;
-    @location(2) vViewPosition : vec3<f32>;
+    @builtin(position) Position : vec4<f32>,
+    @location(0) vFragUV : vec2<f32>,
+    @location(1) vNormal : vec3<f32>,
+    @location(2) vViewPosition : vec3<f32>
 };
 
 @stage(vertex)
@@ -1197,34 +1367,34 @@ ${e => e.defines.normalMap ? e.getTemplateByType(_common_ResourceType__WEBPACK_I
 
 // INTERNAL STRUCTS
 struct IncidentLight {
-  color: vec3<f32>;
-  direction: vec3<f32>;
-  visible: bool;
+  color: vec3<f32>,
+  direction: vec3<f32>,
+  visible: bool
 };
 
 struct ReflectedLight {
-  directDiffuse: vec3<f32>;
-  directSpecular: vec3<f32>;
-  indirectDiffuse: vec3<f32>;
-  indirectSpecular: vec3<f32>;
+  directDiffuse: vec3<f32>,
+  directSpecular: vec3<f32>,
+  indirectDiffuse: vec3<f32>,
+  indirectSpecular: vec3<f32>
 };
 
 struct PhysicalMaterial {
-  diffuseColor: vec3<f32>;
-  specularColor: vec3<f32>;
-  roughness: f32;
-  specularF90: f32;
+  diffuseColor: vec3<f32>,
+  specularColor: vec3<f32>,
+  roughness: f32,
+  specularF90: f32
 };
 
 struct GeometricContext {
-  position: vec3<f32>;
-  normal: vec3<f32>;
-  viewDir: vec3<f32>;
+  position: vec3<f32>,
+  normal: vec3<f32>,
+  viewDir: vec3<f32>
 };
 
 struct DirectionalLight {
-  direction: vec3<f32>;
-  color: vec3<f32>;
+  direction: vec3<f32>,
+  color: vec3<f32>
 };
 
 ${_shader_lib_MathFunctions__WEBPACK_IMPORTED_MODULE_7__.mathConstants}
@@ -1621,11 +1791,11 @@ class LightingResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODUL
         buffer: LightingResource.directionLightsBuffer
       } : []),
       fragmentBlock: `struct SceneLightingUniform {
-        ambientLightColor: vec4<f32>;
+        ambientLightColor: vec4<f32>
       };
 
       struct LightingConfigUniform {
-        numDirectionalLights: u32;
+        numDirectionalLights: u32
       };
 
       @group(${group}) @binding(${this.lightingConfigBinding})
@@ -1637,12 +1807,12 @@ class LightingResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODUL
 
       ${pipeline.defines.NUM_DIR_LIGHTS ? `
       struct DirectionLightUniform {
-        direction : vec4<f32>;
-        color : vec4<f32>;
+        direction : vec4<f32>,
+        color : vec4<f32>
       };
 
       struct DirectionLightsUniform {
-        directionalLights: array<DirectionLightUniform>;
+        directionalLights: array<DirectionLightUniform>
       };
 
       @group(${group}) @binding(${this.directionLightBinding})
@@ -1735,11 +1905,11 @@ class MaterialResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODUL
       // prettier-ignore
       fragmentBlock: `
       struct MaterialData {
-        diffuse: vec4<f32>;
-        emissive: vec4<f32>;
-        opacity: f32;
-        metalness: f32;
-        roughness: f32;
+        diffuse: vec4<f32>,
+        emissive: vec4<f32>,
+        opacity: f32,
+        metalness: f32,
+        roughness: f32
       };
 
       @group(${group}) @binding(${curBindIndex})
@@ -1957,9 +2127,9 @@ class TransformResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODU
       // prettier-ignore
       vertexBlock: `
       struct TransformUniform {
-        projMatrix: mat4x4<f32>;
-        modelViewMatrix: mat4x4<f32>;
-        normalMatrix: mat3x3<f32>;
+        projMatrix: mat4x4<f32>,
+        modelViewMatrix: mat4x4<f32>,
+        normalMatrix: mat3x3<f32>
       };
       @group(${group}) @binding(${curBindIndex})
       var<uniform> uniforms: TransformUniform;
@@ -2118,14 +2288,18 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "Application": () => (/* binding */ Application)
 /* harmony export */ });
-/* harmony import */ var solid_js__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
-/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
-/* harmony import */ var _core_GameManager__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/GameManager */ "./src/ts/core/GameManager.ts");
-/* harmony import */ var _core_WasmManager__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../core/WasmManager */ "./src/ts/core/WasmManager.ts");
-/* harmony import */ var _common_Button__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../common/Button */ "./src/ts/ui/common/Button.tsx");
-/* harmony import */ var _common_Modal__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../common/Modal */ "./src/ts/ui/common/Modal.tsx");
-/* harmony import */ var _common_Pane3D__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../common/Pane3D */ "./src/ts/ui/common/Pane3D.tsx");
-/* harmony import */ var _common_Typography__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../common/Typography */ "./src/ts/ui/common/Typography.tsx");
+/* harmony import */ var solid_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
+/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
+/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
+/* harmony import */ var _core_UIEventManager__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/UIEventManager */ "./src/ts/core/UIEventManager.ts");
+/* harmony import */ var _core_GameManager__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../core/GameManager */ "./src/ts/core/GameManager.ts");
+/* harmony import */ var _core_WasmManager__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../core/WasmManager */ "./src/ts/core/WasmManager.ts");
+/* harmony import */ var _common_Pane3D__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../common/Pane3D */ "./src/ts/ui/common/Pane3D.tsx");
+/* harmony import */ var _InGameMenu__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./InGameMenu */ "./src/ts/ui/application/InGameMenu.tsx");
+/* harmony import */ var _MainMenu__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./MainMenu */ "./src/ts/ui/application/MainMenu.tsx");
+/* harmony import */ var _common_UIEventType__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../../common/UIEventType */ "./src/common/UIEventType.ts");
+
+
 
 
 
@@ -2137,22 +2311,26 @@ __webpack_require__.r(__webpack_exports__);
 
 const Application = _ref => {
   let {} = _ref;
-  const [modalOpen, setModalOpen] = (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createSignal)(true);
+  const [modalOpen, setModalOpen] = (0,solid_js__WEBPACK_IMPORTED_MODULE_7__.createSignal)(true);
+  const [activeMenu, setActiveMenu] = (0,solid_js__WEBPACK_IMPORTED_MODULE_7__.createSignal)("main");
   let gameManager;
-  const wasmManager = new _core_WasmManager__WEBPACK_IMPORTED_MODULE_1__.WasmManager();
-  (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.onMount)(async () => {
-    document.addEventListener("keydown", e => {
-      if (e.key === "Escape") setModalOpen(!modalOpen());
-    });
-  });
+  let eventManager;
+  const wasmManager = new _core_WasmManager__WEBPACK_IMPORTED_MODULE_2__.WasmManager();
+
+  const onWasmUiEvent = event => {
+    if (event.uiEventType === _common_UIEventType__WEBPACK_IMPORTED_MODULE_6__.UIEventType.OpenInGameMenu) setModalOpen(!modalOpen());
+  };
 
   const onCanvasReady = async canvas => {
-    gameManager = new _core_GameManager__WEBPACK_IMPORTED_MODULE_0__.GameManager(canvas);
-    await wasmManager.load(gameManager);
+    gameManager = new _core_GameManager__WEBPACK_IMPORTED_MODULE_1__.GameManager(canvas);
+    eventManager = new _core_UIEventManager__WEBPACK_IMPORTED_MODULE_0__.UIEventManager(wasmManager);
+    const bindables = [gameManager, eventManager];
+    await wasmManager.load(bindables);
     const message = document.querySelector("#message");
 
     try {
       await gameManager.init(wasmManager);
+      eventManager.addEventListener("uievent", onWasmUiEvent);
     } catch (err) {
       message.style.display = "initial";
       message.innerHTML = err.message;
@@ -2161,60 +2339,172 @@ const Application = _ref => {
 
   const onStart = () => {
     setModalOpen(false);
+    setActiveMenu("ingame");
+    eventManager.triggerUIEvent(_common_UIEventType__WEBPACK_IMPORTED_MODULE_6__.UIEventType.StartGame);
   };
 
-  return (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(StyledApplication, {
+  const onQuit = () => {
+    setActiveMenu("main");
+    eventManager.triggerUIEvent(_common_UIEventType__WEBPACK_IMPORTED_MODULE_6__.UIEventType.QuitGame);
+  };
+
+  const options = {
+    main: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_7__.createComponent)(_MainMenu__WEBPACK_IMPORTED_MODULE_5__.MainMenu, {
+      get open() {
+        return modalOpen();
+      },
+
+      onStart: onStart
+    }),
+    ingame: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_7__.createComponent)(_InGameMenu__WEBPACK_IMPORTED_MODULE_4__.InGameMenu, {
+      get open() {
+        return modalOpen();
+      },
+
+      onResumeClick: onStart,
+      onQuitClick: onQuit
+    })
+  };
+  return (0,solid_js__WEBPACK_IMPORTED_MODULE_7__.createComponent)(StyledApplication, {
     get children() {
-      return [(0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_Modal__WEBPACK_IMPORTED_MODULE_3__.Modal, {
-        hideConfirmButtons: true,
-
-        get open() {
-          return modalOpen();
-        },
-
-        title: "Hello World",
-        onClose: () => setModalOpen(false),
-
-        get children() {
-          return [(0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_5__.Typography, {
-            variant: "h4",
-            align: "center",
-            children: "Rewild!"
-          }), (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_5__.Typography, {
-            variant: "body2",
-            children: "Welcome to rewild. A game about exploration, natural history and saving the planet"
-          }), (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(StyledButtons, {
-            get children() {
-              return [(0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_Button__WEBPACK_IMPORTED_MODULE_2__.Button, {
-                fullWidth: true,
-                variant: "outlined",
-                disabled: true,
-                children: "Options"
-              }), (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_Button__WEBPACK_IMPORTED_MODULE_2__.Button, {
-                onClick: onStart,
-                fullWidth: true,
-                variant: "contained",
-                color: "primary",
-                children: "Start Game"
-              })];
-            }
-
-          })];
+      return [(0,solid_js__WEBPACK_IMPORTED_MODULE_7__.createComponent)(solid_js_web__WEBPACK_IMPORTED_MODULE_8__.Dynamic, {
+        get component() {
+          return options[activeMenu()];
         }
 
-      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_6__.createComponent)(_common_Pane3D__WEBPACK_IMPORTED_MODULE_4__.Pane3D, {
+      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_7__.createComponent)(_common_Pane3D__WEBPACK_IMPORTED_MODULE_3__.Pane3D, {
         onCanvasReady: onCanvasReady
       })];
     }
 
   });
 };
-const StyledApplication = solid_styled_components__WEBPACK_IMPORTED_MODULE_7__.styled.div`
+const StyledApplication = solid_styled_components__WEBPACK_IMPORTED_MODULE_9__.styled.div`
   width: 100%;
   height: 100%;
   margin: 0;
 `;
-const StyledButtons = solid_styled_components__WEBPACK_IMPORTED_MODULE_7__.styled.div`
+
+/***/ }),
+
+/***/ "./src/ts/ui/application/InGameMenu.tsx":
+/*!**********************************************!*\
+  !*** ./src/ts/ui/application/InGameMenu.tsx ***!
+  \**********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "InGameMenu": () => (/* binding */ InGameMenu)
+/* harmony export */ });
+/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/dist/dev.js");
+/* harmony import */ var _common_Modal__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../common/Modal */ "./src/ts/ui/common/Modal.tsx");
+/* harmony import */ var _common_Button__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../common/Button */ "./src/ts/ui/common/Button.tsx");
+/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
+
+
+
+
+const InGameMenu = props => {
+  return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createComponent)(_common_Modal__WEBPACK_IMPORTED_MODULE_0__.Modal, {
+    hideConfirmButtons: true,
+
+    get open() {
+      return props.open;
+    },
+
+    get children() {
+      return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createComponent)(StyledButtons, {
+        get children() {
+          return [(0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createComponent)(_common_Button__WEBPACK_IMPORTED_MODULE_1__.Button, {
+            get onClick() {
+              return props.onResumeClick;
+            },
+
+            fullWidth: true,
+            children: "Resume"
+          }), (0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createComponent)(_common_Button__WEBPACK_IMPORTED_MODULE_1__.Button, {
+            get onClick() {
+              return props.onQuitClick;
+            },
+
+            fullWidth: true,
+            children: "Quit"
+          })];
+        }
+
+      });
+    }
+
+  });
+};
+const StyledButtons = solid_styled_components__WEBPACK_IMPORTED_MODULE_3__.styled.div`
+  button {
+    margin: 1rem 0 0 0;
+  }
+`;
+
+/***/ }),
+
+/***/ "./src/ts/ui/application/MainMenu.tsx":
+/*!********************************************!*\
+  !*** ./src/ts/ui/application/MainMenu.tsx ***!
+  \********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "MainMenu": () => (/* binding */ MainMenu)
+/* harmony export */ });
+/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/dist/dev.js");
+/* harmony import */ var _common_Modal__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../common/Modal */ "./src/ts/ui/common/Modal.tsx");
+/* harmony import */ var _common_Button__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../common/Button */ "./src/ts/ui/common/Button.tsx");
+/* harmony import */ var _common_Typography__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../common/Typography */ "./src/ts/ui/common/Typography.tsx");
+/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
+
+
+
+
+
+const MainMenu = props => {
+  const onOptionsClick = () => {};
+
+  return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Modal__WEBPACK_IMPORTED_MODULE_0__.Modal, {
+    hideConfirmButtons: true,
+
+    get open() {
+      return props.open;
+    },
+
+    title: "Rewild",
+
+    get children() {
+      return [(0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_2__.Typography, {
+        variant: "body2",
+        children: "Welcome to rewild. A game about exploration, natural history and saving the planet"
+      }), (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(StyledButtons, {
+        get children() {
+          return [(0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Button__WEBPACK_IMPORTED_MODULE_1__.Button, {
+            get onClick() {
+              return props.onStart;
+            },
+
+            fullWidth: true,
+            children: "New Game"
+          }), (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Button__WEBPACK_IMPORTED_MODULE_1__.Button, {
+            onClick: onOptionsClick,
+            fullWidth: true,
+            disabled: true,
+            children: "Options"
+          })];
+        }
+
+      })];
+    }
+
+  });
+};
+const StyledButtons = solid_styled_components__WEBPACK_IMPORTED_MODULE_4__.styled.div`
   button {
     margin: 1rem 0 0 0;
   }
@@ -2365,7 +2655,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "Modal": () => (/* binding */ Modal)
 /* harmony export */ });
 /* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
-/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/dist/dev.js");
+/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
 /* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
 /* harmony import */ var _Button__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Button */ "./src/ts/ui/common/Button.tsx");
 
@@ -2376,6 +2666,7 @@ __webpack_require__.r(__webpack_exports__);
 const _tmpl$ = /*#__PURE__*/(0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.template)(`<span class="title"></span>`, 2),
       _tmpl$2 = /*#__PURE__*/(0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.template)(`<div class="content"></div>`, 2),
       _tmpl$3 = /*#__PURE__*/(0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.template)(`<div class="button-container"></div>`, 2);
+
 
 
 
@@ -2412,13 +2703,20 @@ const Modal = props => {
             "class": "modal",
 
             get children() {
-              return [(() => {
-                const _el$ = _tmpl$.cloneNode(true);
+              return [(0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createComponent)(solid_js_web__WEBPACK_IMPORTED_MODULE_2__.Show, {
+                get when() {
+                  return props.title;
+                },
 
-                (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.insert)(_el$, () => props.title);
+                get children() {
+                  const _el$ = _tmpl$.cloneNode(true);
 
-                return _el$;
-              })(), (() => {
+                  (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.insert)(_el$, () => props.title);
+
+                  return _el$;
+                }
+
+              }), (() => {
                 const _el$2 = _tmpl$2.cloneNode(true);
 
                 (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.insert)(_el$2, () => props.children);

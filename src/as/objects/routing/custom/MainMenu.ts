@@ -1,15 +1,18 @@
 import { DirectionalLight } from "../../../lights/DirectionalLight";
 import { Color } from "../../../math/Color";
 import { Container } from "../core/Container";
-import { inputManager } from "../../../exports/io/InputManager";
-import { KeyboardEvent } from "../../../exports/io/KeyboardEvent";
+import { uiSignaller } from "../../../exports/ui/uiSignalManager";
 import { Listener } from "../../../core/EventDispatcher";
 import { Event } from "../../../core/Event";
+import { UIEvent } from "../../../exports/ui/UIEvent";
 import { degToRad } from "../../../math/MathUtils";
 import { Link } from "../core/Link";
 import { print } from "../../../Imports";
+import { UIEventType } from "../../../../common/UIEventType";
 
 export class MainMenu extends Container implements Listener {
+  private sun!: DirectionalLight;
+
   constructor() {
     super("MainMenu");
   }
@@ -21,11 +24,16 @@ export class MainMenu extends Container implements Listener {
 
     if (!level1) print(`dont have level`);
     link.connect(this.getPortal("Exit")!, level1!.getPortal("Enter")!);
+
+    this.sun = new DirectionalLight(new Color(1, 1, 1), 6);
+    this.sun.position.set(10, 10, 0);
+    this.sun.target.position.set(0, 0, 0);
+    this.addAsset(this.sun);
   }
 
   onEvent(event: Event): void {
-    const keyEvent = event.attachment as KeyboardEvent;
-    if (keyEvent.code == "Enter") this.exit(this.getPortal("Exit")!, true);
+    const uiEvent = event.attachment as UIEvent;
+    if (uiEvent.eventType == UIEventType.StartGame) this.exit(this.getPortal("Exit")!, true);
   }
 
   onUpdate(delta: f32, total: u32, fps: u32): void {
@@ -35,12 +43,6 @@ export class MainMenu extends Container implements Listener {
   mount(): void {
     super.mount();
 
-    const direction = new DirectionalLight(new Color(1, 1, 1), 6);
-    direction.position.set(10, 10, 0);
-    direction.target.position.set(0, 0, 0);
-    this.runtime!.scene.add(direction);
-    this.addAsset(direction);
-
     this.runtime!.camera.position.set(0, 5, 10);
     this.runtime!.camera.lookAt(0, 0, 0);
 
@@ -48,12 +50,12 @@ export class MainMenu extends Container implements Listener {
     this.objects[0].scale.set(30, 30, 30);
     this.objects[0].rotation.x = degToRad(180);
 
-    inputManager.addEventListener("keyup", this);
+    uiSignaller.addEventListener("uievent", this);
   }
 
   unMount(): void {
     super.unMount();
-    inputManager.removeEventListener("keyup", this);
+    uiSignaller.removeEventListener("uievent", this);
   }
 }
 

@@ -1,4 +1,5 @@
 export * from "./exports/io";
+export * from "./exports/ui";
 export * from "./exports/AsSceneManager";
 export * from "./exports/TextureFactory";
 export * from "./exports/GeometryFactory";
