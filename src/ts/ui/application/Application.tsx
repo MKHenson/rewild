@@ -1,4 +1,4 @@
-import { Component, createSignal } from "solid-js";
+import { Component, createSignal, Show } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { styled } from "solid-styled-components";
 import { IBindable } from "src/ts/core/IBindable";
@@ -11,14 +11,16 @@ import { MainMenu } from "./MainMenu";
 import { UIEvent } from "../../core/events/UIEvent";
 import { EventType } from "../../core/events/eventTypes";
 import { UIEventType } from "../../../common/UIEventType";
+import { InGameUI } from "./InGameUI";
 
 interface Props {}
 
-type activeMenu = "main" | "ingame";
+type activeMenu = "main" | "ingameMenu";
 
 export const Application: Component<Props> = ({}) => {
   const [modalOpen, setModalOpen] = createSignal(true);
   const [activeMenu, setActiveMenu] = createSignal<activeMenu>("main");
+  const [gameIsRunning, setGameIsRunning] = createSignal(false);
 
   let gameManager: GameManager;
   let eventManager: UIEventManager;
@@ -47,22 +49,27 @@ export const Application: Component<Props> = ({}) => {
 
   const onStart = () => {
     setModalOpen(false);
-    setActiveMenu("ingame");
+    setGameIsRunning(true);
+    setActiveMenu("ingameMenu");
     eventManager.triggerUIEvent(UIEventType.StartGame);
   };
 
   const onQuit = () => {
     setActiveMenu("main");
+    setGameIsRunning(false);
     eventManager.triggerUIEvent(UIEventType.QuitGame);
   };
 
   const options: { [key in activeMenu]: Component } = {
     main: () => <MainMenu open={modalOpen()} onStart={onStart} />,
-    ingame: () => <InGameMenu open={modalOpen()} onResumeClick={onStart} onQuitClick={onQuit} />,
+    ingameMenu: () => <InGameMenu open={modalOpen()} onResumeClick={onStart} onQuitClick={onQuit} />,
   };
 
   return (
     <StyledApplication>
+      <Show when={gameIsRunning()}>
+        <InGameUI />
+      </Show>
       <Dynamic component={options[activeMenu()]} />
       <Pane3D onCanvasReady={onCanvasReady} />
     </StyledApplication>
