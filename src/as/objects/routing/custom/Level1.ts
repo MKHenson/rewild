@@ -84,6 +84,7 @@ export class Level1 extends Container implements Listener {
 
     if (u32(this.totalTime) > playerHungerThreshold && this.playerDied == false) {
       this.playerDied = true;
+      this.orbitController.enabled = false;
       uiSignaller.signalClientEvent(UIEventType.PlayerDied);
     }
 
@@ -95,7 +96,7 @@ export class Level1 extends Container implements Listener {
       }
     }
 
-    if (this.orbitController && !this.playerDied) this.orbitController.update();
+    if (this.orbitController) this.orbitController.update();
   }
 
   mount(): void {
@@ -113,7 +114,7 @@ export class Level1 extends Container implements Listener {
     this.runtime!.camera.position.set(0, 0, 10);
     this.runtime!.camera.lookAt(0, 0, 0);
 
-    // this.orbitController = new OrbitController(this.runtime!.camera);
+    this.orbitController.enabled = true;
 
     inputManager.addEventListener("keyup", this);
     uiSignaller.addEventListener("uievent", this);
@@ -121,6 +122,7 @@ export class Level1 extends Container implements Listener {
 
   unMount(): void {
     super.unMount();
+    this.orbitController.enabled = false;
     inputManager.removeEventListener("keyup", this);
     uiSignaller.removeEventListener("uievent", this);
   }
