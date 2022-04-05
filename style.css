@@ -48,15 +48,3 @@ body {
   height: 100%;
   box-sizing: border-box;
 }
-
-#message {
-  padding: 1rem;
-  background: red;
-  color: white;
-  width: 300px;
-  display: none;
-  position: absolute;
-  top: 1rem;
-  left: calc(50% - 150px);
-  text-align: center;
-}

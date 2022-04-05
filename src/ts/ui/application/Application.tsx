@@ -13,14 +13,17 @@ import { EventType } from "../../core/events/eventTypes";
 import { UIEventType } from "../../../common/UIEventType";
 import { InGameUI } from "./InGameUI";
 import { GameOverMenu } from "./GameOverMenu";
+import { ErrorType, StartError } from "./StartError";
 
 interface Props {}
 
-type activeMenu = "main" | "ingameMenu" | "gameOverMenu";
+type ActiveMenu = "main" | "ingameMenu" | "gameOverMenu" | "error";
 
 export const Application: Component<Props> = ({}) => {
   const [modalOpen, setModalOpen] = createSignal(true);
-  const [activeMenu, setActiveMenu] = createSignal<activeMenu>("main");
+  const [errorMessage, setErrorMessage] = createSignal("");
+  const [errorType, setErrorType] = createSignal<ErrorType>("OTHER");
+  const [activeMenu, setActiveMenu] = createSignal<ActiveMenu>("main");
   const [gameIsRunning, setGameIsRunning] = createSignal(false);
 
   let gameManager: GameManager;
@@ -37,15 +40,24 @@ export const Application: Component<Props> = ({}) => {
     eventManager = new UIEventManager(wasmManager);
 
     const bindables: IBindable[] = [gameManager, eventManager];
-    await wasmManager.load(bindables);
 
-    const message = document.querySelector("#message") as HTMLElement;
     try {
+      await wasmManager.load(bindables);
+
+      if (!gameManager.hasWebGPU()) {
+        setErrorMessage("Your browser does not support WebGPU");
+        setErrorType("WGPU");
+        setActiveMenu("error");
+        return;
+      }
+
       await gameManager.init(wasmManager);
       eventManager.addEventListener("uievent" as EventType, onWasmUiEvent);
     } catch (err: unknown) {
-      message.style.display = "initial";
-      message.innerHTML = (err as Error).message;
+      setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");
+      setErrorType("OTHER");
+      setActiveMenu("error");
+      console.log(err);
     }
   };
 
@@ -69,10 +81,11 @@ export const Application: Component<Props> = ({}) => {
     eventManager.triggerUIEvent(UIEventType.QuitGame);
   };
 
-  const options: { [key in activeMenu]: Component } = {
+  const options: { [key in ActiveMenu]: Component } = {
     main: () => <MainMenu open={modalOpen()} onStart={onStart} />,
     ingameMenu: () => <InGameMenu open={modalOpen()} onResumeClick={onResume} onQuitClick={onQuit} />,
     gameOverMenu: () => <GameOverMenu onQuitClick={onQuit} open />,
+    error: () => <StartError open errorMsg={errorMessage()} errorType={errorType()} />,
   };
 
   return (

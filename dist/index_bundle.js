@@ -2290,9 +2290,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "Application": () => (/* binding */ Application)
 /* harmony export */ });
-/* harmony import */ var solid_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
-/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
-/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
+/* harmony import */ var solid_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
+/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
+/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
 /* harmony import */ var _core_UIEventManager__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/UIEventManager */ "./src/ts/core/UIEventManager.ts");
 /* harmony import */ var _core_GameManager__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../core/GameManager */ "./src/ts/core/GameManager.ts");
 /* harmony import */ var _core_WasmManager__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../core/WasmManager */ "./src/ts/core/WasmManager.ts");
@@ -2302,6 +2302,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _common_UIEventType__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../../common/UIEventType */ "./src/common/UIEventType.ts");
 /* harmony import */ var _InGameUI__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./InGameUI */ "./src/ts/ui/application/InGameUI.tsx");
 /* harmony import */ var _GameOverMenu__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./GameOverMenu */ "./src/ts/ui/application/GameOverMenu.tsx");
+/* harmony import */ var _StartError__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./StartError */ "./src/ts/ui/application/StartError.tsx");
+
 
 
 
@@ -2317,9 +2319,11 @@ __webpack_require__.r(__webpack_exports__);
 
 const Application = _ref => {
   let {} = _ref;
-  const [modalOpen, setModalOpen] = (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createSignal)(true);
-  const [activeMenu, setActiveMenu] = (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createSignal)("main");
-  const [gameIsRunning, setGameIsRunning] = (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createSignal)(false);
+  const [modalOpen, setModalOpen] = (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createSignal)(true);
+  const [errorMessage, setErrorMessage] = (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createSignal)("");
+  const [errorType, setErrorType] = (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createSignal)("OTHER");
+  const [activeMenu, setActiveMenu] = (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createSignal)("main");
+  const [gameIsRunning, setGameIsRunning] = (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createSignal)(false);
   let gameManager;
   let eventManager;
   const wasmManager = new _core_WasmManager__WEBPACK_IMPORTED_MODULE_2__.WasmManager();
@@ -2332,15 +2336,24 @@ const Application = _ref => {
     gameManager = new _core_GameManager__WEBPACK_IMPORTED_MODULE_1__.GameManager(canvas);
     eventManager = new _core_UIEventManager__WEBPACK_IMPORTED_MODULE_0__.UIEventManager(wasmManager);
     const bindables = [gameManager, eventManager];
-    await wasmManager.load(bindables);
-    const message = document.querySelector("#message");
 
     try {
+      await wasmManager.load(bindables);
+
+      if (!gameManager.hasWebGPU()) {
+        setErrorMessage("Your browser does not support WebGPU");
+        setErrorType("WGPU");
+        setActiveMenu("error");
+        return;
+      }
+
       await gameManager.init(wasmManager);
       eventManager.addEventListener("uievent", onWasmUiEvent);
     } catch (err) {
-      message.style.display = "initial";
-      message.innerHTML = err.message;
+      setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");
+      setErrorType("OTHER");
+      setActiveMenu("error");
+      console.log(err);
     }
   };
 
@@ -2365,14 +2378,14 @@ const Application = _ref => {
   };
 
   const options = {
-    main: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(_MainMenu__WEBPACK_IMPORTED_MODULE_5__.MainMenu, {
+    main: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(_MainMenu__WEBPACK_IMPORTED_MODULE_5__.MainMenu, {
       get open() {
         return modalOpen();
       },
 
       onStart: onStart
     }),
-    ingameMenu: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(_InGameMenu__WEBPACK_IMPORTED_MODULE_4__.InGameMenu, {
+    ingameMenu: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(_InGameMenu__WEBPACK_IMPORTED_MODULE_4__.InGameMenu, {
       get open() {
         return modalOpen();
       },
@@ -2380,35 +2393,47 @@ const Application = _ref => {
       onResumeClick: onResume,
       onQuitClick: onQuit
     }),
-    gameOverMenu: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(_GameOverMenu__WEBPACK_IMPORTED_MODULE_8__.GameOverMenu, {
+    gameOverMenu: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(_GameOverMenu__WEBPACK_IMPORTED_MODULE_8__.GameOverMenu, {
       onQuitClick: onQuit,
       open: true
+    }),
+    error: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(_StartError__WEBPACK_IMPORTED_MODULE_9__.StartError, {
+      open: true,
+
+      get errorMsg() {
+        return errorMessage();
+      },
+
+      get errorType() {
+        return errorType();
+      }
+
     })
   };
-  return (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(StyledApplication, {
+  return (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(StyledApplication, {
     get children() {
-      return [(0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(solid_js__WEBPACK_IMPORTED_MODULE_9__.Show, {
+      return [(0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(solid_js__WEBPACK_IMPORTED_MODULE_10__.Show, {
         get when() {
           return gameIsRunning();
         },
 
         get children() {
-          return (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(_InGameUI__WEBPACK_IMPORTED_MODULE_7__.InGameUI, {});
+          return (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(_InGameUI__WEBPACK_IMPORTED_MODULE_7__.InGameUI, {});
         }
 
-      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(solid_js_web__WEBPACK_IMPORTED_MODULE_10__.Dynamic, {
+      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(solid_js_web__WEBPACK_IMPORTED_MODULE_11__.Dynamic, {
         get component() {
           return options[activeMenu()];
         }
 
-      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(_common_Pane3D__WEBPACK_IMPORTED_MODULE_3__.Pane3D, {
+      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(_common_Pane3D__WEBPACK_IMPORTED_MODULE_3__.Pane3D, {
         onCanvasReady: onCanvasReady
       })];
     }
 
   });
 };
-const StyledApplication = solid_styled_components__WEBPACK_IMPORTED_MODULE_11__.styled.div`
+const StyledApplication = solid_styled_components__WEBPACK_IMPORTED_MODULE_12__.styled.div`
   width: 100%;
   height: 100%;
   margin: 0;
@@ -2647,6 +2672,102 @@ const MainMenu = props => {
         }
 
       })];
+    }
+
+  });
+};
+const StyledButtons = solid_styled_components__WEBPACK_IMPORTED_MODULE_4__.styled.div`
+  button {
+    margin: 1rem 0 0 0;
+  }
+`;
+
+/***/ }),
+
+/***/ "./src/ts/ui/application/StartError.tsx":
+/*!**********************************************!*\
+  !*** ./src/ts/ui/application/StartError.tsx ***!
+  \**********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "StartError": () => (/* binding */ StartError)
+/* harmony export */ });
+/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
+/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
+/* harmony import */ var _common_Modal__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../common/Modal */ "./src/ts/ui/common/Modal.tsx");
+/* harmony import */ var _common_Typography__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../common/Typography */ "./src/ts/ui/common/Typography.tsx");
+/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
+
+
+
+
+const _tmpl$ = /*#__PURE__*/(0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.template)(`<a href="https://www.google.com/intl/en_ie/chrome/canary/">Chrome Canary</a>`, 2),
+      _tmpl$2 = /*#__PURE__*/(0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.template)(`<pre>chrome://flags/#enable-unsafe-webgpu</pre>`, 2),
+      _tmpl$3 = /*#__PURE__*/(0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.template)(`<a href="https://www.mozilla.org/en-US/firefox/channel/desktop/">Firefox Nightly</a>`, 2),
+      _tmpl$4 = /*#__PURE__*/(0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.template)(`<pre>dom.webgpu.enabled and gfx.webrender.all</pre>`, 2);
+
+
+
+
+
+const StartError = props => {
+  return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Modal__WEBPACK_IMPORTED_MODULE_1__.Modal, {
+    hideConfirmButtons: true,
+
+    get open() {
+      return props.open;
+    },
+
+    get title() {
+      return props.errorType === "WGPU" ? "WebGPU Not Supported" : "An Error Occurred";
+    },
+
+    get children() {
+      return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(StyledButtons, {
+        get children() {
+          return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(solid_js_web__WEBPACK_IMPORTED_MODULE_3__.Show, {
+            get when() {
+              return props.errorType === "WGPU";
+            },
+
+            get fallback() {
+              return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_2__.Typography, {
+                variant: "body2",
+
+                get children() {
+                  return props.errorMsg;
+                }
+
+              });
+            },
+
+            get children() {
+              return [(0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_2__.Typography, {
+                variant: "body1",
+
+                get children() {
+                  return ["WebGPU is available for now in ", _tmpl$.cloneNode(true), " ", "on desktop behind an experimental flag. You can enable with the following flag:", _tmpl$2.cloneNode(true)];
+                }
+
+              }), (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_2__.Typography, {
+                variant: "body1",
+
+                get children() {
+                  return ["Work is also in progress in", " ", _tmpl$3.cloneNode(true), ", enabled by the prefs below: ", _tmpl$4.cloneNode(true)];
+                }
+
+              }), (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_2__.Typography, {
+                variant: "body1",
+                children: "The API is constantly changing and currently unsafe."
+              })];
+            }
+
+          });
+        }
+
+      });
     }
 
   });
