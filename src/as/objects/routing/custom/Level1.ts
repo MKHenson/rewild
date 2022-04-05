@@ -12,11 +12,14 @@ import { Mesh } from "../../Mesh";
 import { UIEventType } from "../../../../common/UIEventType";
 import { UIEvent } from "../../../exports/ui/UIEvent";
 import { Link } from "../core/Link";
-import { print } from "../../../Imports";
+
+const playerHungerThreshold: u32 = 5;
 
 export class Level1 extends Container implements Listener {
   orbitController!: OrbitController;
   totalTime: f32;
+  playerDied: bool;
+  isPaused: bool;
 
   private direction1!: DirectionalLight;
   private direction2!: DirectionalLight;
@@ -26,6 +29,8 @@ export class Level1 extends Container implements Listener {
   constructor() {
     super("Level1");
     this.totalTime = 0;
+    this.playerDied = false;
+    this.isPaused = false;
   }
 
   init(): void {
@@ -58,16 +63,29 @@ export class Level1 extends Container implements Listener {
   onEvent(event: Event): void {
     if (event.attachment instanceof KeyboardEvent) {
       const keyEvent = event.attachment as KeyboardEvent;
-      if (keyEvent.code == "Escape") uiSignaller.signalClientEvent(UIEventType.OpenInGameMenu);
+      if (!this.playerDied) {
+        if (keyEvent.code == "Escape") {
+          this.isPaused = !this.isPaused;
+          uiSignaller.signalClientEvent(UIEventType.OpenInGameMenu);
+        }
+      }
     } else {
       const uiEvent = event.attachment as UIEvent;
       if (uiEvent.eventType == UIEventType.QuitGame) this.exit(this.getPortal("Exit")!, true);
+      else if (uiEvent.eventType == UIEventType.Resume) this.isPaused = false;
     }
   }
 
   onUpdate(delta: f32, total: u32, fps: u32): void {
+    if (this.isPaused) return;
+
     const objects = this.objects;
     this.totalTime += delta;
+
+    if (u32(this.totalTime) > playerHungerThreshold && this.playerDied == false) {
+      this.playerDied = true;
+      uiSignaller.signalClientEvent(UIEventType.PlayerDied);
+    }
 
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
       if (objects[i] instanceof Mesh) {
@@ -77,11 +95,14 @@ export class Level1 extends Container implements Listener {
       }
     }
 
-    if (this.orbitController) this.orbitController.update();
+    if (this.orbitController && !this.playerDied) this.orbitController.update();
   }
 
   mount(): void {
     super.mount();
+    this.totalTime = 0;
+    this.playerDied = false;
+    this.isPaused = false;
 
     this.objects[0].position.set(0, 0, 0);
     this.objects[1].position.set(3, 0, 0);

@@ -12,10 +12,11 @@ import { UIEvent } from "../../core/events/UIEvent";
 import { EventType } from "../../core/events/eventTypes";
 import { UIEventType } from "../../../common/UIEventType";
 import { InGameUI } from "./InGameUI";
+import { GameOverMenu } from "./GameOverMenu";
 
 interface Props {}
 
-type activeMenu = "main" | "ingameMenu";
+type activeMenu = "main" | "ingameMenu" | "gameOverMenu";
 
 export const Application: Component<Props> = ({}) => {
   const [modalOpen, setModalOpen] = createSignal(true);
@@ -28,6 +29,7 @@ export const Application: Component<Props> = ({}) => {
 
   const onWasmUiEvent = (event: UIEvent) => {
     if (event.uiEventType === UIEventType.OpenInGameMenu) setModalOpen(!modalOpen());
+    else if (event.uiEventType === UIEventType.PlayerDied) setActiveMenu("gameOverMenu");
   };
 
   const onCanvasReady = async (canvas: HTMLCanvasElement) => {
@@ -54,7 +56,14 @@ export const Application: Component<Props> = ({}) => {
     eventManager.triggerUIEvent(UIEventType.StartGame);
   };
 
+  const onResume = () => {
+    setModalOpen(false);
+    setGameIsRunning(true);
+    eventManager.triggerUIEvent(UIEventType.Resume);
+  };
+
   const onQuit = () => {
+    setModalOpen(true);
     setActiveMenu("main");
     setGameIsRunning(false);
     eventManager.triggerUIEvent(UIEventType.QuitGame);
@@ -62,7 +71,8 @@ export const Application: Component<Props> = ({}) => {
 
   const options: { [key in activeMenu]: Component } = {
     main: () => <MainMenu open={modalOpen()} onStart={onStart} />,
-    ingameMenu: () => <InGameMenu open={modalOpen()} onResumeClick={onStart} onQuitClick={onQuit} />,
+    ingameMenu: () => <InGameMenu open={modalOpen()} onResumeClick={onResume} onQuitClick={onQuit} />,
+    gameOverMenu: () => <GameOverMenu onQuitClick={onQuit} open />,
   };
 
   return (

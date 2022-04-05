@@ -141,6 +141,8 @@ let UIEventType;
   UIEventType[UIEventType["StartGame"] = 0] = "StartGame";
   UIEventType[UIEventType["QuitGame"] = 1] = "QuitGame";
   UIEventType[UIEventType["OpenInGameMenu"] = 2] = "OpenInGameMenu";
+  UIEventType[UIEventType["PlayerDied"] = 3] = "PlayerDied";
+  UIEventType[UIEventType["Resume"] = 4] = "Resume";
 })(UIEventType || (UIEventType = {}));
 
 /***/ }),
@@ -2288,9 +2290,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "Application": () => (/* binding */ Application)
 /* harmony export */ });
-/* harmony import */ var solid_js__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
-/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
-/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
+/* harmony import */ var solid_js__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
+/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
+/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
 /* harmony import */ var _core_UIEventManager__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/UIEventManager */ "./src/ts/core/UIEventManager.ts");
 /* harmony import */ var _core_GameManager__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../core/GameManager */ "./src/ts/core/GameManager.ts");
 /* harmony import */ var _core_WasmManager__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../core/WasmManager */ "./src/ts/core/WasmManager.ts");
@@ -2299,6 +2301,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _MainMenu__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./MainMenu */ "./src/ts/ui/application/MainMenu.tsx");
 /* harmony import */ var _common_UIEventType__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../../common/UIEventType */ "./src/common/UIEventType.ts");
 /* harmony import */ var _InGameUI__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./InGameUI */ "./src/ts/ui/application/InGameUI.tsx");
+/* harmony import */ var _GameOverMenu__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./GameOverMenu */ "./src/ts/ui/application/GameOverMenu.tsx");
+
 
 
 
@@ -2313,15 +2317,15 @@ __webpack_require__.r(__webpack_exports__);
 
 const Application = _ref => {
   let {} = _ref;
-  const [modalOpen, setModalOpen] = (0,solid_js__WEBPACK_IMPORTED_MODULE_8__.createSignal)(true);
-  const [activeMenu, setActiveMenu] = (0,solid_js__WEBPACK_IMPORTED_MODULE_8__.createSignal)("main");
-  const [gameIsRunning, setGameIsRunning] = (0,solid_js__WEBPACK_IMPORTED_MODULE_8__.createSignal)(false);
+  const [modalOpen, setModalOpen] = (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createSignal)(true);
+  const [activeMenu, setActiveMenu] = (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createSignal)("main");
+  const [gameIsRunning, setGameIsRunning] = (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createSignal)(false);
   let gameManager;
   let eventManager;
   const wasmManager = new _core_WasmManager__WEBPACK_IMPORTED_MODULE_2__.WasmManager();
 
   const onWasmUiEvent = event => {
-    if (event.uiEventType === _common_UIEventType__WEBPACK_IMPORTED_MODULE_6__.UIEventType.OpenInGameMenu) setModalOpen(!modalOpen());
+    if (event.uiEventType === _common_UIEventType__WEBPACK_IMPORTED_MODULE_6__.UIEventType.OpenInGameMenu) setModalOpen(!modalOpen());else if (event.uiEventType === _common_UIEventType__WEBPACK_IMPORTED_MODULE_6__.UIEventType.PlayerDied) setActiveMenu("gameOverMenu");
   };
 
   const onCanvasReady = async canvas => {
@@ -2347,56 +2351,124 @@ const Application = _ref => {
     eventManager.triggerUIEvent(_common_UIEventType__WEBPACK_IMPORTED_MODULE_6__.UIEventType.StartGame);
   };
 
+  const onResume = () => {
+    setModalOpen(false);
+    setGameIsRunning(true);
+    eventManager.triggerUIEvent(_common_UIEventType__WEBPACK_IMPORTED_MODULE_6__.UIEventType.Resume);
+  };
+
   const onQuit = () => {
+    setModalOpen(true);
     setActiveMenu("main");
     setGameIsRunning(false);
     eventManager.triggerUIEvent(_common_UIEventType__WEBPACK_IMPORTED_MODULE_6__.UIEventType.QuitGame);
   };
 
   const options = {
-    main: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_8__.createComponent)(_MainMenu__WEBPACK_IMPORTED_MODULE_5__.MainMenu, {
+    main: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(_MainMenu__WEBPACK_IMPORTED_MODULE_5__.MainMenu, {
       get open() {
         return modalOpen();
       },
 
       onStart: onStart
     }),
-    ingameMenu: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_8__.createComponent)(_InGameMenu__WEBPACK_IMPORTED_MODULE_4__.InGameMenu, {
+    ingameMenu: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(_InGameMenu__WEBPACK_IMPORTED_MODULE_4__.InGameMenu, {
       get open() {
         return modalOpen();
       },
 
-      onResumeClick: onStart,
+      onResumeClick: onResume,
       onQuitClick: onQuit
+    }),
+    gameOverMenu: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(_GameOverMenu__WEBPACK_IMPORTED_MODULE_8__.GameOverMenu, {
+      onQuitClick: onQuit,
+      open: true
     })
   };
-  return (0,solid_js__WEBPACK_IMPORTED_MODULE_8__.createComponent)(StyledApplication, {
+  return (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(StyledApplication, {
     get children() {
-      return [(0,solid_js__WEBPACK_IMPORTED_MODULE_8__.createComponent)(solid_js__WEBPACK_IMPORTED_MODULE_8__.Show, {
+      return [(0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(solid_js__WEBPACK_IMPORTED_MODULE_9__.Show, {
         get when() {
           return gameIsRunning();
         },
 
         get children() {
-          return (0,solid_js__WEBPACK_IMPORTED_MODULE_8__.createComponent)(_InGameUI__WEBPACK_IMPORTED_MODULE_7__.InGameUI, {});
+          return (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(_InGameUI__WEBPACK_IMPORTED_MODULE_7__.InGameUI, {});
         }
 
-      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_8__.createComponent)(solid_js_web__WEBPACK_IMPORTED_MODULE_9__.Dynamic, {
+      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(solid_js_web__WEBPACK_IMPORTED_MODULE_10__.Dynamic, {
         get component() {
           return options[activeMenu()];
         }
 
-      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_8__.createComponent)(_common_Pane3D__WEBPACK_IMPORTED_MODULE_3__.Pane3D, {
+      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_9__.createComponent)(_common_Pane3D__WEBPACK_IMPORTED_MODULE_3__.Pane3D, {
         onCanvasReady: onCanvasReady
       })];
     }
 
   });
 };
-const StyledApplication = solid_styled_components__WEBPACK_IMPORTED_MODULE_10__.styled.div`
+const StyledApplication = solid_styled_components__WEBPACK_IMPORTED_MODULE_11__.styled.div`
   width: 100%;
   height: 100%;
   margin: 0;
+`;
+
+/***/ }),
+
+/***/ "./src/ts/ui/application/GameOverMenu.tsx":
+/*!************************************************!*\
+  !*** ./src/ts/ui/application/GameOverMenu.tsx ***!
+  \************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "GameOverMenu": () => (/* binding */ GameOverMenu)
+/* harmony export */ });
+/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/dist/dev.js");
+/* harmony import */ var _common_Modal__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../common/Modal */ "./src/ts/ui/common/Modal.tsx");
+/* harmony import */ var _common_Button__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../common/Button */ "./src/ts/ui/common/Button.tsx");
+/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
+/* harmony import */ var _common_Typography__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../common/Typography */ "./src/ts/ui/common/Typography.tsx");
+
+
+
+
+
+const GameOverMenu = props => {
+  return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Modal__WEBPACK_IMPORTED_MODULE_0__.Modal, {
+    hideConfirmButtons: true,
+
+    get open() {
+      return props.open;
+    },
+
+    get children() {
+      return [(0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_2__.Typography, {
+        variant: "h2",
+        children: "GAME OVER"
+      }), (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(StyledButtons, {
+        get children() {
+          return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Button__WEBPACK_IMPORTED_MODULE_1__.Button, {
+            get onClick() {
+              return props.onQuitClick;
+            },
+
+            fullWidth: true,
+            children: "Quit"
+          });
+        }
+
+      })];
+    }
+
+  });
+};
+const StyledButtons = solid_styled_components__WEBPACK_IMPORTED_MODULE_4__.styled.div`
+  button {
+    margin: 1rem 0 0 0;
+  }
 `;
 
 /***/ }),
@@ -2482,8 +2554,8 @@ const InGameUI = () => {
       return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_1__.createComponent)(StyledFooter, {
         get children() {
           return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_1__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_0__.Typography, {
-            variant: "h4",
-            children: "In Game"
+            variant: "h2",
+            children: "The Game Will End in 5 Seconds"
           });
         }
 
@@ -2496,18 +2568,27 @@ const StyledContainer = solid_styled_components__WEBPACK_IMPORTED_MODULE_2__.sty
   width: 100%;
   height: 100%;
   position: absolute;
+  pointer-events: none;
 `;
 const StyledFooter = solid_styled_components__WEBPACK_IMPORTED_MODULE_2__.styled.div`
+  pointer-events: initial;
   width: 90%;
   height: 5%;
+  min-height: 50px;
   position: absolute;
   bottom: 30px;
   background: rgb(84 92 135);
   margin: 0 0 0 5%;
   border-radius: 10px;
-  padding: 1rem;
   box-sizing: border-box;
   color: white;
+  justify-content: center;
+  align-items: center;
+  display: flex;
+
+  > div {
+    flex: 0 1 auto;
+  }
 `;
 
 /***/ }),
