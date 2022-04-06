@@ -12,7 +12,6 @@ export class Texture {
   async load(device: GPUDevice) {
     let gpuTexture: GPUTexture;
     const img = document.createElement("img");
-    img.crossOrigin = "use-credentials";
     img.src = this.src;
     await img.decode();
     this.imageData = await createImageBitmap(img);

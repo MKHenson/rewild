@@ -874,7 +874,6 @@ class Texture {
   async load(device) {
     let gpuTexture;
     const img = document.createElement("img");
-    img.crossOrigin = "use-credentials";
     img.src = this.src;
     await img.decode();
     this.imageData = await createImageBitmap(img);
