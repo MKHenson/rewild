@@ -1,8 +1,9 @@
 const path = require("path");
+const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 const ForkTsCheckerWebpackPlugin = require("fork-ts-checker-webpack-plugin");
 
-module.exports = {
+module.exports = (options) => ({
   entry: ["./src/ts/index.tsx"],
   mode: "development",
   devtool: "source-map",
@@ -13,6 +14,11 @@ module.exports = {
     filename: "index_bundle.js",
   },
   plugins: [
+    new webpack.DefinePlugin({
+      "process.env.MEDIA_URL": JSON.stringify(
+        options.env === "local" ? "./dist/media/" : "https://storage.googleapis.com/rewild-6809/"
+      ),
+    }),
     new ForkTsCheckerWebpackPlugin({ typescript: { configFile: "src/ts/tsconfig.json" } }),
     new CopyPlugin({
       patterns: [
@@ -76,4 +82,4 @@ module.exports = {
       },
     ],
   },
-};
+});

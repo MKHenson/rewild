@@ -289,6 +289,7 @@ __webpack_require__.r(__webpack_exports__);
 
 const meshPipelineInstances = [];
 const sampleCount = 4;
+const MEDIA_URL = "https://storage.googleapis.com/rewild-6809/";
 class GameManager {
   constructor(canvas) {
     this.canvas = canvas;
@@ -341,14 +342,19 @@ class GameManager {
 
     const texturePaths = [{
       name: "grid",
-      src: "https://storage.googleapis.com/rewild-6809/uv-grid.jpg"
+      src: MEDIA_URL + "uv-grid.jpg"
     }, {
       name: "crate",
-      src: "https://storage.googleapis.com/rewild-6809/crate-wooden.jpg"
+      src: MEDIA_URL + "crate-wooden.jpg"
     }, {
       name: "earth",
-      src: "https://storage.googleapis.com/rewild-6809/earth-day-2k.jpg"
-    }];
+      src: MEDIA_URL + "earth-day-2k.jpg"
+    }]; // const texturePaths = [
+    //   { name: "grid", src: "https://storage.googleapis.com/rewild-6809/uv-grid.jpg" },
+    //   { name: "crate", src: "https://storage.googleapis.com/rewild-6809/crate-wooden.jpg" },
+    //   { name: "earth", src: "https://storage.googleapis.com/rewild-6809/earth-day-2k.jpg" },
+    // ];
+
     this.textures = await Promise.all(texturePaths.map((tp, index) => {
       const texture = new _Texture__WEBPACK_IMPORTED_MODULE_5__.Texture(tp.name, tp.src);
       wasmExports.createTexture(wasmExports.__newString(tp.name), index);

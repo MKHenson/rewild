@@ -14,6 +14,7 @@ import { IBindable } from "./IBindable";
 
 const meshPipelineInstances: MeshPipeline[] = [];
 const sampleCount = 4;
+const MEDIA_URL = process.env.MEDIA_URL;
 
 export class GameManager implements IBindable {
   canvas: HTMLCanvasElement;
@@ -97,10 +98,16 @@ export class GameManager implements IBindable {
 
     // TEXTURES
     const texturePaths = [
-      { name: "grid", src: "https://storage.googleapis.com/rewild-6809/uv-grid.jpg" },
-      { name: "crate", src: "https://storage.googleapis.com/rewild-6809/crate-wooden.jpg" },
-      { name: "earth", src: "https://storage.googleapis.com/rewild-6809/earth-day-2k.jpg" },
+      { name: "grid", src: MEDIA_URL + "uv-grid.jpg" },
+      { name: "crate", src: MEDIA_URL + "crate-wooden.jpg" },
+      { name: "earth", src: MEDIA_URL + "earth-day-2k.jpg" },
     ];
+
+    // const texturePaths = [
+    //   { name: "grid", src: "https://storage.googleapis.com/rewild-6809/uv-grid.jpg" },
+    //   { name: "crate", src: "https://storage.googleapis.com/rewild-6809/crate-wooden.jpg" },
+    //   { name: "earth", src: "https://storage.googleapis.com/rewild-6809/earth-day-2k.jpg" },
+    // ];
 
     this.textures = await Promise.all(
       texturePaths.map((tp, index) => {

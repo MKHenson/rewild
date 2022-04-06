@@ -10,7 +10,7 @@
     "asbuild:optimized": "asc src/as/index.ts --target release -d ./build/types.d.ts --exportTable --importMemory --exportRuntime",
     "build:webpack": "webpack --mode development",
     "build": "npm run clean && npm run asbuild:untouched && npm run build:webpack",
-    "watch": "webpack --mode development --watch",
+    "watch": "webpack --mode development --watch --env env=local2",
     "start": "npm run build && npm-run-all --parallel server watch",
     "server": "live-server --port=9001 --watch=dist,build --open=/ ./"
   },
