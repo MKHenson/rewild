@@ -12,9 +12,11 @@
     "build": "npm run clean && npm run asbuild:untouched && npm run build:webpack",
     "watch": "webpack --mode development --watch --env env=local",
     "start": "npm run build && npm-run-all --parallel server watch",
-    "server": "live-server --port=9001 --watch=dist,build --open=/ ./",
-    "prepush": "npm run build"
+    "server": "live-server --port=9001 --watch=dist,build --open=/ ./"
   },
+  "pre-push": [
+    "build"
+  ],
   "repository": {
     "type": "git",
     "url": "git+ssh://git@bitbucket.org/MathewKHenson/rewild-web.git"
@@ -24,18 +26,18 @@
   "homepage": "https://bitbucket.org/MathewKHenson/rewild-web#readme",
   "dependencies": {
     "@assemblyscript/loader": "^0.19.1",
-    "@types/node": "^16.11.6",
-    "source-map-support": "^0.5.19",
-    "solid-js": "1.3.13",
-    "solid-styled-components": "0.27.6",
     "@babel/core": "^7.14.6",
     "@babel/plugin-proposal-class-properties": "^7.14.5",
     "@babel/plugin-proposal-object-rest-spread": "^7.14.7",
     "@babel/preset-env": "^7.14.7",
     "@babel/preset-typescript": "^7.14.5",
-    "fork-ts-checker-webpack-plugin": "7.2.1",
+    "@types/node": "^16.11.6",
     "babel-loader": "^8.1.0",
-    "babel-preset-solid": "1.3.13"
+    "babel-preset-solid": "1.3.13",
+    "fork-ts-checker-webpack-plugin": "7.2.1",
+    "solid-js": "1.3.13",
+    "solid-styled-components": "0.27.6",
+    "source-map-support": "^0.5.19"
   },
   "devDependencies": {
     "@types/mocha": "8.2.2",
@@ -46,6 +48,7 @@
     "live-server": "^1.2.1",
     "mocha": "9.0.0",
     "npm-run-all": "4.1.5",
+    "pre-push": "^0.1.2",
     "prettier": "2.3.2",
     "raw-loader": "^4.0.2",
     "rimraf": "3.0.2",
