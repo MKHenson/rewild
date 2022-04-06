@@ -12,7 +12,8 @@
     "build": "npm run clean && npm run asbuild:untouched && npm run build:webpack",
     "watch": "webpack --mode development --watch --env env=local",
     "start": "npm run build && npm-run-all --parallel server watch",
-    "server": "live-server --port=9001 --watch=dist,build --open=/ ./"
+    "server": "live-server --port=9001 --watch=dist,build --open=/ ./",
+    "prepush": "npm run build"
   },
   "repository": {
     "type": "git",
