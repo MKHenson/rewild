@@ -341,16 +341,16 @@ class GameManager {
 
     const texturePaths = [{
       name: "grid",
-      path: "./dist/media/uv-grid.jpg"
+      src: "https://storage.googleapis.com/rewild-6809/uv-grid.jpg"
     }, {
       name: "crate",
-      path: "./dist/media/crate-wooden.jpg"
+      src: "https://storage.googleapis.com/rewild-6809/crate-wooden.jpg"
     }, {
       name: "earth",
-      path: "./dist/media/earth-day-2k.jpg"
+      src: "https://storage.googleapis.com/rewild-6809/earth-day-2k.jpg"
     }];
     this.textures = await Promise.all(texturePaths.map((tp, index) => {
-      const texture = new _Texture__WEBPACK_IMPORTED_MODULE_5__.Texture(tp.name, tp.path);
+      const texture = new _Texture__WEBPACK_IMPORTED_MODULE_5__.Texture(tp.name, tp.src);
       wasmExports.createTexture(wasmExports.__newString(tp.name), index);
       return texture.load(device);
     })); // PIPELINES
@@ -866,15 +866,16 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "Texture": () => (/* binding */ Texture)
 /* harmony export */ });
 class Texture {
-  constructor(name, path) {
+  constructor(name, src) {
     this.name = name;
-    this.path = path;
+    this.src = src;
   }
 
   async load(device) {
     let gpuTexture;
     const img = document.createElement("img");
-    img.src = this.path;
+    img.crossOrigin = "use-credentials";
+    img.src = this.src;
     await img.decode();
     this.imageData = await createImageBitmap(img);
     gpuTexture = device.createTexture({

@@ -1,18 +1,19 @@
 export class Texture {
   name: string;
-  path: string;
+  src: string;
   gpuTexture: GPUTexture;
   imageData: ImageBitmap;
 
-  constructor(name: string, path: string) {
+  constructor(name: string, src: string) {
     this.name = name;
-    this.path = path;
+    this.src = src;
   }
 
   async load(device: GPUDevice) {
     let gpuTexture: GPUTexture;
     const img = document.createElement("img");
-    img.src = this.path;
+    img.crossOrigin = "use-credentials";
+    img.src = this.src;
     await img.decode();
     this.imageData = await createImageBitmap(img);
 

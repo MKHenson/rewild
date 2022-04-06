@@ -97,14 +97,14 @@ export class GameManager implements IBindable {
 
     // TEXTURES
     const texturePaths = [
-      { name: "grid", path: "./dist/media/uv-grid.jpg" },
-      { name: "crate", path: "./dist/media/crate-wooden.jpg" },
-      { name: "earth", path: "./dist/media/earth-day-2k.jpg" },
+      { name: "grid", src: "https://storage.googleapis.com/rewild-6809/uv-grid.jpg" },
+      { name: "crate", src: "https://storage.googleapis.com/rewild-6809/crate-wooden.jpg" },
+      { name: "earth", src: "https://storage.googleapis.com/rewild-6809/earth-day-2k.jpg" },
     ];
 
     this.textures = await Promise.all(
       texturePaths.map((tp, index) => {
-        const texture = new Texture(tp.name, tp.path);
+        const texture = new Texture(tp.name, tp.src);
         wasmExports.createTexture(wasmExports.__newString(tp.name), index);
         return texture.load(device);
       })
