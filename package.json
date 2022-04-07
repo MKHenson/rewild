@@ -12,8 +12,7 @@
     "build": "npm run clean && npm run asbuild:untouched && npm run build:webpack",
     "watch": "webpack --mode development --watch --env env=local",
     "start": "npm run build && npm-run-all --parallel server watch",
-    "server": "live-server --port=9001 --watch=dist,build --open=/ ./",
-    "prepare": "husky install"
+    "server": "live-server --port=9001 --watch=dist,build --open=/ ./"
   },
   "repository": {
     "type": "git",
@@ -43,7 +42,6 @@
     "assemblyscript": "0.19.16",
     "copy-webpack-plugin": "^9.0.1",
     "file-loader": "^6.2.0",
-    "husky": "^7.0.4",
     "live-server": "^1.2.1",
     "mocha": "9.0.0",
     "npm-run-all": "4.1.5",
