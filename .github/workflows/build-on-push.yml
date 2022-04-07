@@ -10,4 +10,9 @@ jobs:
           node-version: "16"
       - run: npm install
       - run: npm run build
-      - uses: actions/pages-deploy
+      
+      - name: Deploy 🚀
+        uses: JamesIves/github-pages-deploy-action@v4.3.0
+        with:
+          branch: gh-pages # The branch the action should deploy to.
+          folder: dist # The folder the action should deploy.

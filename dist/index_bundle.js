@@ -289,7 +289,7 @@ __webpack_require__.r(__webpack_exports__);
 
 const meshPipelineInstances = [];
 const sampleCount = 4;
-const MEDIA_URL = "./dist/media/";
+const MEDIA_URL = "https://storage.googleapis.com/rewild-6809/";
 class GameManager {
   constructor(canvas) {
     this.canvas = canvas;
