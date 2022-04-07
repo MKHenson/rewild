@@ -22,6 +22,7 @@ module.exports = (options) => ({
     new ForkTsCheckerWebpackPlugin({ typescript: { configFile: "src/ts/tsconfig.json" } }),
     new CopyPlugin({
       patterns: [
+        { from: "style.css", to: "style.css" },
         { from: "index.html", to: "index.html" },
         { from: "src/media", to: "media" },
         { from: "build/untouched.wasm.map", to: "" },
