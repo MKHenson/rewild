@@ -10,8 +10,9 @@
     "asbuild:optimized": "asc src/as/index.ts --target release -d ./build/types.d.ts --exportTable --importMemory --exportRuntime",
     "build:webpack": "webpack --mode development",
     "build": "npm run clean && npm run asbuild:untouched && npm run build:webpack",
-    "watch": "webpack --mode development --watch --env env=local",
-    "start": "npm run build && npm-run-all --parallel server watch",
+    "watch-webpack": "webpack --mode development --watch --env env=local",
+    "watch-as": "nodemon -e js,ts,tsx --watch src/as -x \"npm run asbuild:untouched\"",
+    "start": "npm run build && npm-run-all --parallel server watch-webpack watch-as",
     "server": "live-server --port=9001 --watch=dist,build --open=/ ./"
   },
   "repository": {
@@ -50,6 +51,7 @@
     "rimraf": "3.0.2",
     "ts-loader": "9.2.3",
     "ts-node": "10.0.0",
+    "nodemon": "2.0.15",
     "typescript": "4.3.2",
     "webpack": "5.70.0",
     "webpack-cli": "4.7.0"
