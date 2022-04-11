@@ -278,7 +278,6 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _RenderQueueManager__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./RenderQueueManager */ "./src/ts/core/RenderQueueManager.ts");
 /* harmony import */ var _Texture__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./Texture */ "./src/ts/core/Texture.ts");
 /* harmony import */ var _common_GroupType__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../common/GroupType */ "./src/common/GroupType.ts");
-/* harmony import */ var _common_ResourceType__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../../common/ResourceType */ "./src/common/ResourceType.ts");
 
 
 
@@ -286,8 +285,6 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
-
-const meshPipelineInstances = [];
 const sampleCount = 4;
 const MEDIA_URL = "https://storage.googleapis.com/rewild-6809/";
 class GameManager {
@@ -349,6 +346,9 @@ class GameManager {
     }, {
       name: "earth",
       src: MEDIA_URL + "earth-day-2k.jpg"
+    }, {
+      name: "ground-coastal-1",
+      src: MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png"
     }]; // const texturePaths = [
     //   { name: "grid", src: "https://storage.googleapis.com/rewild-6809/uv-grid.jpg" },
     //   { name: "crate", src: "https://storage.googleapis.com/rewild-6809/crate-wooden.jpg" },
@@ -361,7 +361,10 @@ class GameManager {
       return texture.load(device);
     })); // PIPELINES
 
-    this.pipelines = [new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("textured", {
+    this.pipelines = [new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("coastal-floor", {
+      diffuseMap: this.textures[3],
+      NUM_DIR_LIGHTS: 0
+    }), new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("textured", {
       diffuseMap: this.textures[1],
       NUM_DIR_LIGHTS: 0
     }), new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("simple", {
@@ -406,16 +409,19 @@ class GameManager {
     const containerLvl1Ptr = wasm.__pin(wasm.createLevel1());
 
     const containerLvl1 = wasm.Level1.wrap(containerLvl1Ptr);
-    containerLvl1.addAsset(this.createMesh(1, "sphere", "simple"));
-    containerLvl1.addAsset(this.createMesh(1, "box", "textured"));
-    containerLvl1.addAsset(this.createMesh(1, "box", "textured"));
+    const geometrySphere = wasm.createSphere(1);
+    const geometryBox = wasm.createBox(1);
+    containerLvl1.addAsset(this.createMesh(geometrySphere, "simple"));
+    containerLvl1.addAsset(this.createMesh(geometryBox, "textured"));
+    containerLvl1.addAsset(this.createMesh(geometryBox, "textured"));
+    containerLvl1.addAsset(this.createMesh(geometryBox, "coastal-floor"));
 
     wasm.__unpin(containerLvl1Ptr);
 
     const containerMainMenuPtr = wasm.__pin(wasm.createMainMenu());
 
     const containerMainMenu = wasm.MainMenu.wrap(containerMainMenuPtr);
-    containerMainMenu.addAsset(this.createMesh(1, "sphere", "earth"));
+    containerMainMenu.addAsset(this.createMesh(geometrySphere, "earth"));
 
     wasm.__unpin(containerMainMenuPtr);
 
@@ -423,19 +429,16 @@ class GameManager {
     runime.addContainer(containerMainMenuPtr, true);
   }
 
-  createMesh(size, type, pipelineName) {
+  createMesh(geometryPtr, pipelineName) {
     // Get the pipeline
-    const debugPipeline = this.getPipeline(pipelineName);
-    const pipelineIndex = this.pipelines.indexOf(debugPipeline);
-    const wasmExports = this.wasmManager.exports; // Create an instance in WASM
+    const wasmExports = this.wasmManager.exports;
+    const pipeline = this.getPipeline(pipelineName);
+    const pipelineIndex = this.pipelines.indexOf(pipeline); // Create an instance in WASM
 
-    const pipelineInsPtr = wasmExports.createPipeline(wasmExports.__newString(debugPipeline.name), pipelineIndex, _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__.PipelineType.Mesh);
-    const meshPipelineIns = wasmExports.MeshPipeline.wrap(pipelineInsPtr);
-    meshPipelineInstances.push(meshPipelineIns); // Assign a transform buffer to the intance
+    const pipelineInsPtr = wasmExports.createPipelineInstance(wasmExports.__newString(pipeline.name), pipelineIndex, _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__.PipelineType.Mesh);
+    const meshPipelineIns = wasmExports.MeshPipelineInstance.wrap(pipelineInsPtr); // Assign a transform buffer to the intance
 
-    meshPipelineIns.transformGroupId = debugPipeline.getTemplateByType(_common_ResourceType__WEBPACK_IMPORTED_MODULE_7__.ResourceType.Transform).template.group;
-    meshPipelineIns.transformResourceIndex = debugPipeline.addResourceInstance(this, _common_GroupType__WEBPACK_IMPORTED_MODULE_6__.GroupType.Transform);
-    const geometryPtr = type === "box" ? wasmExports.createBox(size) : wasmExports.createSphere(size);
+    meshPipelineIns.transformResourceIndex = pipeline.addResourceInstance(this, _common_GroupType__WEBPACK_IMPORTED_MODULE_6__.GroupType.Transform);
     const meshPtr = wasmExports.createMesh(geometryPtr, pipelineInsPtr);
     return meshPtr;
   }
@@ -2587,7 +2590,7 @@ const InGameUI = () => {
         get children() {
           return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_1__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_0__.Typography, {
             variant: "h2",
-            children: "The Game Will End in 5 Seconds"
+            children: "The Game Will End in 15 Seconds"
           });
         }
 
