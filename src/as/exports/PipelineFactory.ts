@@ -1,16 +1,16 @@
 import { print } from "../Imports";
-import { Pipeline } from "../pipelines/Pipeline";
-import { MeshPipeline } from "../pipelines/MeshPipeline";
+import { PipelineInstance } from "../pipelines/PipelineInstance";
+import { MeshPipelineInstance } from "../pipelines/MeshPipelineInstance";
 import { PipelineType } from "../../common/PipelineType";
 
-const pipelines: Pipeline[] = [];
+const pipelines: PipelineInstance[] = [];
 
-export function createPipeline(name: string, index: i32, type: PipelineType): Pipeline {
-  print(`Added pipeline ${name}...`);
-  if (type == PipelineType.Mesh) pipelines.push(new MeshPipeline(name, index));
+export function createPipelineInstance(name: string, index: i32, type: PipelineType): PipelineInstance {
+  print(`Added pipeline instance ${name}...`);
+  if (type == PipelineType.Mesh) pipelines.push(new MeshPipelineInstance(name, index));
   else throw new Error(`Pipeline type not recognised`);
 
   return pipelines[pipelines.length - 1];
 }
 
-export { Pipeline, MeshPipeline };
+export { PipelineInstance, MeshPipelineInstance };

@@ -12,8 +12,9 @@ import { Mesh } from "../../Mesh";
 import { UIEventType } from "../../../../common/UIEventType";
 import { UIEvent } from "../../../exports/ui/UIEvent";
 import { Link } from "../core/Link";
+import { Object } from "../../../core/Object";
 
-const playerHungerThreshold: u32 = 5;
+const playerHungerThreshold: u32 = 15;
 
 export class Level1 extends Container implements Listener {
   orbitController!: OrbitController;
@@ -25,6 +26,7 @@ export class Level1 extends Container implements Listener {
   private direction2!: DirectionalLight;
   private direction3!: DirectionalLight;
   private ambient!: AmbientLight;
+  private floor!: Object;
 
   constructor() {
     super("Level1");
@@ -89,7 +91,7 @@ export class Level1 extends Container implements Listener {
     }
 
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      if (objects[i] instanceof Mesh) {
+      if (objects[i] != this.floor && objects[i] instanceof Mesh) {
         objects[i].rotation.x += delta * 1;
         objects[i].rotation.y += delta * 1;
         objects[i].position.y = Mathf.sin(this.totalTime + objects[i].position.x);
@@ -109,6 +111,10 @@ export class Level1 extends Container implements Listener {
     this.objects[1].position.set(3, 0, 0);
     this.objects[2].position.set(-3, 0, 0);
     this.objects[2].rotation.y += 0.8;
+
+    this.floor = this.objects[3];
+    this.floor.scale.set(200, 0.1, 200);
+    this.floor.position.set(0, -3, 0);
 
     // Possitive z comes out of screen
     this.runtime!.camera.position.set(0, 0, 10);

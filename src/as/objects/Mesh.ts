@@ -7,11 +7,11 @@ import { Object } from "../core/Object";
 import { Triangle } from "../math/Triangle";
 import { Side } from "../../common/GLEnums";
 import { AttributeTypes, BufferGeometry } from "../core/BufferGeometry";
-import { MeshPipeline } from "../pipelines/MeshPipeline";
+import { MeshPipelineInstance } from "../pipelines/MeshPipelineInstance";
 import { Raycaster } from "../core/Raycaster";
 import { BufferAttribute, Float32BufferAttribute } from "../core/BufferAttribute";
 import { SkinnedMesh } from "./SkinnedMesh";
-import { Pipeline } from "..";
+import { PipelineInstance } from "../pipelines/PipelineInstance";
 
 export class Face {
   public a: i32;
@@ -56,12 +56,12 @@ const _intersectionPoint = new Vector3();
 const _intersectionPointWorld = new Vector3();
 
 export class Mesh extends Object {
-  pipelines: MeshPipeline[];
+  pipelines: MeshPipelineInstance[];
   geometry: BufferGeometry;
   morphTargetInfluences: f32[] | null;
   morphTargetDictionary: Map<string, i32> | null;
 
-  constructor(geometry: BufferGeometry = new BufferGeometry(), pipelines: MeshPipeline[] = []) {
+  constructor(geometry: BufferGeometry = new BufferGeometry(), pipelines: MeshPipelineInstance[] = []) {
     super();
 
     this.type = "Mesh";
@@ -95,7 +95,7 @@ export class Mesh extends Object {
 
     this.pipelines = new Array(source.pipelines.length);
     for (let i: i32 = 0; i < source.pipelines.length; i++)
-      this.pipelines[i] = source.pipelines[i].clone() as MeshPipeline;
+      this.pipelines[i] = source.pipelines[i].clone() as MeshPipelineInstance;
 
     this.geometry = source.geometry;
 
@@ -306,7 +306,7 @@ export class Mesh extends Object {
 
 function checkIntersection(
   object: Object,
-  pipeline: Pipeline,
+  pipeline: PipelineInstance,
   raycaster: Raycaster,
   ray: Ray,
   pA: Vector3,
@@ -345,7 +345,7 @@ function checkIntersection(
 
 function checkBufferGeometryIntersection(
   object: Mesh,
-  pipeline: Pipeline,
+  pipeline: PipelineInstance,
   raycaster: Raycaster,
   ray: Ray,
   position: BufferAttribute<f32, Float32Array>,

@@ -16,7 +16,7 @@ module.exports = (options) => ({
   plugins: [
     new webpack.DefinePlugin({
       "process.env.MEDIA_URL": JSON.stringify(
-        options.env === "local" ? "./dist/media/" : "https://storage.googleapis.com/rewild-6809/"
+        options.env === "local" ? "./media/" : "https://storage.googleapis.com/rewild-6809/"
       ),
     }),
     new ForkTsCheckerWebpackPlugin({ typescript: { configFile: "src/ts/tsconfig.json" } }),

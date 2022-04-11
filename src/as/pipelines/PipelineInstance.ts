@@ -1,7 +1,7 @@
 import { Side } from "../../common/GPUEnums";
 let object3DId: i32 = 1;
 
-export class Pipeline {
+export class PipelineInstance {
   name: string;
   index: i32;
   side: Side;
@@ -13,11 +13,11 @@ export class Pipeline {
     this.side = Side.FrontSide;
   }
 
-  clone(): Pipeline {
-    return new Pipeline(this.name, this.index);
+  clone(): PipelineInstance {
+    return new PipelineInstance(this.name, this.index);
   }
 
-  copy(source: Pipeline): Pipeline {
+  copy(source: PipelineInstance): PipelineInstance {
     this.name = source.name;
     this.index = source.index;
     return this;

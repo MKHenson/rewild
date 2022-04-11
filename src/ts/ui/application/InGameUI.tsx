@@ -6,7 +6,7 @@ export const InGameUI: Component = () => {
   return (
     <StyledContainer>
       <StyledFooter>
-        <Typography variant="h2">The Game Will End in 5 Seconds</Typography>
+        <Typography variant="h2">The Game Will End in 15 Seconds</Typography>
       </StyledFooter>
     </StyledContainer>
   );

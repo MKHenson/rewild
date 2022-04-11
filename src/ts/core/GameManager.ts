@@ -7,12 +7,9 @@ import { createBuffer, createIndexBuffer } from "./Utils";
 import { RenderQueueManager } from "./RenderQueueManager";
 import { Texture } from "./Texture";
 import { GroupType } from "../../common/GroupType";
-import { ResourceType } from "../../common/ResourceType";
-import { MeshPipeline } from "build/types";
 import { WasmManager } from "./WasmManager";
 import { IBindable } from "./IBindable";
 
-const meshPipelineInstances: MeshPipeline[] = [];
 const sampleCount = 4;
 const MEDIA_URL = process.env.MEDIA_URL;
 
@@ -101,6 +98,7 @@ export class GameManager implements IBindable {
       { name: "grid", src: MEDIA_URL + "uv-grid.jpg" },
       { name: "crate", src: MEDIA_URL + "crate-wooden.jpg" },
       { name: "earth", src: MEDIA_URL + "earth-day-2k.jpg" },
+      { name: "ground-coastal-1", src: MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png" },
     ];
 
     // const texturePaths = [
@@ -119,6 +117,7 @@ export class GameManager implements IBindable {
 
     // PIPELINES
     this.pipelines = [
+      new DebugPipeline("coastal-floor", { diffuseMap: this.textures[3], NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("textured", { diffuseMap: this.textures[1], NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("simple", { NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("earth", { diffuseMap: this.textures[2], NUM_DIR_LIGHTS: 0 }),
@@ -164,41 +163,42 @@ export class GameManager implements IBindable {
 
     const containerLvl1Ptr = wasm.__pin(wasm.createLevel1());
     const containerLvl1 = wasm.Level1.wrap(containerLvl1Ptr);
-    containerLvl1.addAsset(this.createMesh(1, "sphere", "simple"));
-    containerLvl1.addAsset(this.createMesh(1, "box", "textured"));
-    containerLvl1.addAsset(this.createMesh(1, "box", "textured"));
+
+    const geometrySphere = wasm.createSphere(1);
+    const geometryBox = wasm.createBox(1);
+
+    containerLvl1.addAsset(this.createMesh(geometrySphere, "simple"));
+    containerLvl1.addAsset(this.createMesh(geometryBox, "textured"));
+    containerLvl1.addAsset(this.createMesh(geometryBox, "textured"));
+    containerLvl1.addAsset(this.createMesh(geometryBox, "coastal-floor"));
     wasm.__unpin(containerLvl1Ptr);
 
     const containerMainMenuPtr = wasm.__pin(wasm.createMainMenu());
     const containerMainMenu = wasm.MainMenu.wrap(containerMainMenuPtr);
-    containerMainMenu.addAsset(this.createMesh(1, "sphere", "earth"));
+    containerMainMenu.addAsset(this.createMesh(geometrySphere, "earth"));
     wasm.__unpin(containerMainMenuPtr);
 
     runime.addContainer(containerLvl1Ptr, false);
     runime.addContainer(containerMainMenuPtr, true);
   }
 
-  createMesh(size: number, type: "box" | "sphere", pipelineName: string) {
+  createMesh(geometryPtr: number, pipelineName: string) {
     // Get the pipeline
-    const debugPipeline = this.getPipeline(pipelineName)!;
-    const pipelineIndex = this.pipelines.indexOf(debugPipeline);
     const wasmExports = this.wasmManager.exports;
+    const pipeline = this.getPipeline(pipelineName)!;
+    const pipelineIndex = this.pipelines.indexOf(pipeline);
 
     // Create an instance in WASM
-    const pipelineInsPtr = wasmExports.createPipeline(
-      wasmExports.__newString(debugPipeline.name),
+    const pipelineInsPtr = wasmExports.createPipelineInstance(
+      wasmExports.__newString(pipeline.name),
       pipelineIndex,
       PipelineType.Mesh
     );
-    const meshPipelineIns = wasmExports.MeshPipeline.wrap(pipelineInsPtr);
-
-    meshPipelineInstances.push(meshPipelineIns);
+    const meshPipelineIns = wasmExports.MeshPipelineInstance.wrap(pipelineInsPtr);
 
     // Assign a transform buffer to the intance
-    meshPipelineIns.transformGroupId = debugPipeline.getTemplateByType(ResourceType.Transform)!.template.group;
-    meshPipelineIns.transformResourceIndex = debugPipeline.addResourceInstance(this, GroupType.Transform);
+    meshPipelineIns.transformResourceIndex = pipeline.addResourceInstance(this, GroupType.Transform);
 
-    const geometryPtr = type === "box" ? wasmExports.createBox(size) : wasmExports.createSphere(size);
     const meshPtr = wasmExports.createMesh(geometryPtr, pipelineInsPtr);
     return meshPtr;
   }
