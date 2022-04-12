@@ -334,7 +334,12 @@ class GameManager {
     this.format = format;
     this.samplers = [device.createSampler({
       minFilter: "linear",
-      magFilter: "linear"
+      magFilter: "linear",
+      mipmapFilter: "linear",
+      maxAnisotropy: 4,
+      addressModeU: "repeat",
+      addressModeV: "repeat",
+      addressModeW: "repeat"
     })]; // TEXTURES
 
     const texturePaths = [{
@@ -349,6 +354,9 @@ class GameManager {
     }, {
       name: "ground-coastal-1",
       src: MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png"
+    }, {
+      name: "block-concrete-4",
+      src: MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png"
     }]; // const texturePaths = [
     //   { name: "grid", src: "https://storage.googleapis.com/rewild-6809/uv-grid.jpg" },
     //   { name: "crate", src: "https://storage.googleapis.com/rewild-6809/crate-wooden.jpg" },
@@ -363,14 +371,19 @@ class GameManager {
 
     this.pipelines = [new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("coastal-floor", {
       diffuseMap: this.textures[3],
-      NUM_DIR_LIGHTS: 0
-    }), new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("textured", {
+      NUM_DIR_LIGHTS: 0,
+      uvScaleX: "30.0",
+      uvScaleY: "30.0"
+    }), new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("crate", {
       diffuseMap: this.textures[1],
       NUM_DIR_LIGHTS: 0
     }), new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("simple", {
       NUM_DIR_LIGHTS: 0
     }), new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("earth", {
       diffuseMap: this.textures[2],
+      NUM_DIR_LIGHTS: 0
+    }), new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("concrete", {
+      diffuseMap: this.textures[4],
       NUM_DIR_LIGHTS: 0
     })];
     const size = this.canvasSize();
@@ -411,10 +424,13 @@ class GameManager {
     const containerLvl1 = wasm.Level1.wrap(containerLvl1Ptr);
     const geometrySphere = wasm.createSphere(1);
     const geometryBox = wasm.createBox(1);
-    containerLvl1.addAsset(this.createMesh(geometrySphere, "simple"));
-    containerLvl1.addAsset(this.createMesh(geometryBox, "textured"));
-    containerLvl1.addAsset(this.createMesh(geometryBox, "textured"));
-    containerLvl1.addAsset(this.createMesh(geometryBox, "coastal-floor"));
+    containerLvl1.addAsset(this.createMesh(geometrySphere, "simple", "ball"));
+
+    for (let i = 0; i < 20; i++) containerLvl1.addAsset(this.createMesh(geometryBox, "concrete", `building-${i}`));
+
+    for (let i = 0; i < 20; i++) containerLvl1.addAsset(this.createMesh(geometryBox, "crate", `crate-${i}`));
+
+    containerLvl1.addAsset(this.createMesh(geometryBox, "coastal-floor", "floor"));
 
     wasm.__unpin(containerLvl1Ptr);
 
@@ -429,7 +445,7 @@ class GameManager {
     runime.addContainer(containerMainMenuPtr, true);
   }
 
-  createMesh(geometryPtr, pipelineName) {
+  createMesh(geometryPtr, pipelineName, name) {
     // Get the pipeline
     const wasmExports = this.wasmManager.exports;
     const pipeline = this.getPipeline(pipelineName);
@@ -439,7 +455,7 @@ class GameManager {
     const meshPipelineIns = wasmExports.MeshPipelineInstance.wrap(pipelineInsPtr); // Assign a transform buffer to the intance
 
     meshPipelineIns.transformResourceIndex = pipeline.addResourceInstance(this, _common_GroupType__WEBPACK_IMPORTED_MODULE_6__.GroupType.Transform);
-    const meshPtr = wasmExports.createMesh(geometryPtr, pipelineInsPtr);
+    const meshPtr = wasmExports.createMesh(geometryPtr, pipelineInsPtr, name ? wasmExports.__newString(name) : undefined);
     return meshPtr;
   }
 
@@ -1361,7 +1377,7 @@ fn main(@location(0) pos: vec4<f32>, @location(1) norm: vec3<f32>, @location(2) 
 
     output.vViewPosition = - mvPosition.xyz;
     output.Position = uniforms.projMatrix * mvPosition;
-    output.vFragUV = uv;
+    output.vFragUV = uv * vec2<f32>(${e => e.defines.uvScaleX || '1.0'}, ${e => e.defines.uvScaleY || '1.0'});
 
     var transformedNormal = uniforms.normalMatrix * norm.xyz;
     output.vNormal = normalize( transformedNormal );
