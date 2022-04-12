@@ -90,6 +90,11 @@ export class GameManager implements IBindable {
       device.createSampler({
         minFilter: "linear",
         magFilter: "linear",
+        mipmapFilter: "linear",
+        maxAnisotropy: 4,
+        addressModeU: "repeat",
+        addressModeV: "repeat",
+        addressModeW: "repeat",
       }),
     ];
 
@@ -99,6 +104,10 @@ export class GameManager implements IBindable {
       { name: "crate", src: MEDIA_URL + "crate-wooden.jpg" },
       { name: "earth", src: MEDIA_URL + "earth-day-2k.jpg" },
       { name: "ground-coastal-1", src: MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png" },
+      {
+        name: "block-concrete-4",
+        src: MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png",
+      },
     ];
 
     // const texturePaths = [
@@ -117,10 +126,16 @@ export class GameManager implements IBindable {
 
     // PIPELINES
     this.pipelines = [
-      new DebugPipeline("coastal-floor", { diffuseMap: this.textures[3], NUM_DIR_LIGHTS: 0 }),
-      new DebugPipeline("textured", { diffuseMap: this.textures[1], NUM_DIR_LIGHTS: 0 }),
+      new DebugPipeline("coastal-floor", {
+        diffuseMap: this.textures[3],
+        NUM_DIR_LIGHTS: 0,
+        uvScaleX: "30.0",
+        uvScaleY: "30.0",
+      }),
+      new DebugPipeline("crate", { diffuseMap: this.textures[1], NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("simple", { NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("earth", { diffuseMap: this.textures[2], NUM_DIR_LIGHTS: 0 }),
+      new DebugPipeline("concrete", { diffuseMap: this.textures[4], NUM_DIR_LIGHTS: 0 }),
     ];
 
     const size = this.canvasSize();
@@ -167,10 +182,12 @@ export class GameManager implements IBindable {
     const geometrySphere = wasm.createSphere(1);
     const geometryBox = wasm.createBox(1);
 
-    containerLvl1.addAsset(this.createMesh(geometrySphere, "simple"));
-    containerLvl1.addAsset(this.createMesh(geometryBox, "textured"));
-    containerLvl1.addAsset(this.createMesh(geometryBox, "textured"));
-    containerLvl1.addAsset(this.createMesh(geometryBox, "coastal-floor"));
+    containerLvl1.addAsset(this.createMesh(geometrySphere, "simple", "ball"));
+
+    for (let i = 0; i < 20; i++) containerLvl1.addAsset(this.createMesh(geometryBox, "concrete", `building-${i}`));
+    for (let i = 0; i < 20; i++) containerLvl1.addAsset(this.createMesh(geometryBox, "crate", `crate-${i}`));
+
+    containerLvl1.addAsset(this.createMesh(geometryBox, "coastal-floor", "floor"));
     wasm.__unpin(containerLvl1Ptr);
 
     const containerMainMenuPtr = wasm.__pin(wasm.createMainMenu());
@@ -182,7 +199,7 @@ export class GameManager implements IBindable {
     runime.addContainer(containerMainMenuPtr, true);
   }
 
-  createMesh(geometryPtr: number, pipelineName: string) {
+  createMesh(geometryPtr: number, pipelineName: string, name?: string) {
     // Get the pipeline
     const wasmExports = this.wasmManager.exports;
     const pipeline = this.getPipeline(pipelineName)!;
@@ -199,7 +216,11 @@ export class GameManager implements IBindable {
     // Assign a transform buffer to the intance
     meshPipelineIns.transformResourceIndex = pipeline.addResourceInstance(this, GroupType.Transform);
 
-    const meshPtr = wasmExports.createMesh(geometryPtr, pipelineInsPtr);
+    const meshPtr = wasmExports.createMesh(
+      geometryPtr,
+      pipelineInsPtr,
+      name ? wasmExports.__newString(name) : undefined
+    );
     return meshPtr;
   }
 

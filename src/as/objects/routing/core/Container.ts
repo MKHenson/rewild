@@ -1,10 +1,8 @@
 import { Object } from "../../../core/Object";
 import { Node } from "./Node";
 import { Mesh } from "../../Mesh";
-import { print } from "../../../Imports";
 import { Portal } from "./Portal";
 
-let totalTime: f32 = 0;
 export class Container extends Node {
   protected objects: Object[];
   protected loaded: boolean;
@@ -15,6 +13,13 @@ export class Container extends Node {
     this.loaded = false;
     this.portals.push(new Portal("Enter", this));
     this.portals.push(new Portal("Exit", this));
+  }
+
+  findObjectByName(name: string): Object | null {
+    const objects = this.objects;
+    for (let i: i32 = 0, l = objects.length; i < l; i++) if (objects[i].name == name) return objects[i];
+
+    return null;
   }
 
   addAsset(object: Object): void {

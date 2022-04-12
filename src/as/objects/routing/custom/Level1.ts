@@ -28,6 +28,8 @@ export class Level1 extends Container implements Listener {
   private ambient!: AmbientLight;
   private floor!: Object;
 
+  private ball!: Object;
+
   constructor() {
     super("Level1");
     this.totalTime = 0;
@@ -56,7 +58,7 @@ export class Level1 extends Container implements Listener {
     this.direction3.target.position.set(0, 0, 0);
     this.addAsset(this.direction3);
 
-    this.ambient = new AmbientLight(new Color(1, 1, 1), 0.1);
+    this.ambient = new AmbientLight(new Color(1, 1, 1), 0.4);
     this.addAsset(this.ambient);
 
     this.orbitController = new OrbitController(this.runtime!.camera);
@@ -91,14 +93,19 @@ export class Level1 extends Container implements Listener {
     }
 
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      if (objects[i] != this.floor && objects[i] instanceof Mesh) {
+      if (objects[i] == this.ball) {
         objects[i].rotation.x += delta * 1;
         objects[i].rotation.y += delta * 1;
-        objects[i].position.y = Mathf.sin(this.totalTime + objects[i].position.x);
+        objects[i].position.y = Mathf.sin(this.totalTime + objects[i].position.x) + 2;
+        break;
       }
     }
 
     if (this.orbitController) this.orbitController.update();
+  }
+
+  getRandomArbitrary(min: f32, max: f32): f32 {
+    return Mathf.random() * (max - min) + min;
   }
 
   mount(): void {
@@ -107,17 +114,28 @@ export class Level1 extends Container implements Listener {
     this.playerDied = false;
     this.isPaused = false;
 
-    this.objects[0].position.set(0, 0, 0);
-    this.objects[1].position.set(3, 0, 0);
-    this.objects[2].position.set(-3, 0, 0);
-    this.objects[2].rotation.y += 0.8;
+    this.floor = this.findObjectByName("floor")!;
+    this.ball = this.findObjectByName("ball")!;
 
-    this.floor = this.objects[3];
+    const objects = this.objects;
+    for (let i: i32 = 0, l = objects.length; i < l; i++) {
+      const obj = objects[i];
+      if (obj.name.includes("crate")) {
+        obj.position.set(this.getRandomArbitrary(-100, 100), 0.5, this.getRandomArbitrary(-100, 100));
+        obj.rotation.y = Mathf.random() * Mathf.PI;
+      } else if (obj.name.includes("building")) {
+        const height = this.getRandomArbitrary(5, 10);
+        obj.position.set(this.getRandomArbitrary(-100, 100), height / 2, this.getRandomArbitrary(-100, 100));
+        obj.scale.set(5, height, 5);
+      }
+    }
+
+    this.ball.position.set(3, 3, 0);
     this.floor.scale.set(200, 0.1, 200);
-    this.floor.position.set(0, -3, 0);
+    this.floor.position.set(0, -0.1, 0);
 
     // Possitive z comes out of screen
-    this.runtime!.camera.position.set(0, 0, 10);
+    this.runtime!.camera.position.set(0, 1, 10);
     this.runtime!.camera.lookAt(0, 0, 0);
 
     this.orbitController.enabled = true;

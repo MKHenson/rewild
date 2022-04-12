@@ -30,7 +30,7 @@ fn main(@location(0) pos: vec4<f32>, @location(1) norm: vec3<f32>, @location(2) 
 
     output.vViewPosition = - mvPosition.xyz;
     output.Position = uniforms.projMatrix * mvPosition;
-    output.vFragUV = uv;
+    output.vFragUV = uv * vec2<f32>(${ e => e.defines.uvScaleX || '1.0'}, ${ e => e.defines.uvScaleY || '1.0'});
 
     var transformedNormal = uniforms.normalMatrix * norm.xyz;
     output.vNormal = normalize( transformedNormal );
@@ -317,6 +317,8 @@ fn main(
 `;
 
 interface DebugDefines {
+  uvScaleX?: string;
+  uvScaleY?: string;
   diffuseMap?: Texture;
   normalMap?: Texture;
   metalnessMap?: Texture;
