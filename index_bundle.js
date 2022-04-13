@@ -671,7 +671,7 @@ class InputManager {
     let delta = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
     const wasmExports = this.wasmManager.exports;
 
-    const mouseEventPtr = wasmExports.__pin(wasmExports.createMouseEvent(e.clientX, e.clientY, e.pageX, e.pageY, e.ctrlKey, e.shiftKey, e.altKey, e.button, e.buttons, bounds.x, bounds.y, bounds.width, bounds.height, delta));
+    const mouseEventPtr = wasmExports.__pin(wasmExports.createMouseEvent(e.clientX, e.clientY, e.pageX, e.pageY, e.ctrlKey, e.shiftKey, e.altKey, e.button, e.buttons, bounds.x, bounds.y, bounds.width, bounds.height, delta, e.movementX || 0, e.movementY || 0));
 
     return mouseEventPtr;
   }
