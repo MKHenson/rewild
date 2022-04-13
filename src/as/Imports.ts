@@ -8,3 +8,5 @@ export declare function createIndexBuffer(data: Uint32Array, usage: GPUBufferUsa
 export declare function render(commandsIndex: Array<i32>): void;
 export declare function print(message: string): u32;
 export declare function onSignalReceived(type: UIEventType, event: Event): void;
+export declare function lock(): void;
+export declare function unlock(): void;
