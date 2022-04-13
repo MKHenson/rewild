@@ -298,10 +298,20 @@ class GameManager {
     this.onFrameHandler = this.onFrame.bind(this);
   }
 
+  lock() {
+    this.canvas.requestPointerLock();
+  }
+
+  unlock() {
+    document.exitPointerLock();
+  }
+
   createBinding() {
     return {
       createBufferFromF32: this.createBufferF32.bind(this),
       createIndexBuffer: this.createIndexBuffer.bind(this),
+      lock: this.lock.bind(this),
+      unlock: this.unlock.bind(this),
       render: commandsIndex => {
         const commandBuffer = this.wasmManager.exports.__getArray(commandsIndex);
 
@@ -628,13 +638,30 @@ class InputManager {
     this.onKeyUpHandler = this.onKeyUp.bind(this);
     this.onMoveHandler = this.onMove.bind(this);
     this.onWheelHandler = this.onWheel.bind(this);
+    this.onPointerlockChangeHandler = this.onPointerlockChange.bind(this);
+    this.onPointerlockErrorHandler = this.onPointerlockError.bind(this);
     this.canvas.addEventListener("mousedown", this.onDownHandler);
     window.addEventListener("wheel", this.onWheelHandler);
     window.addEventListener("mouseup", this.onUpHandler);
     window.addEventListener("mousemove", this.onMoveHandler);
     document.addEventListener("keydown", this.onKeyDownHandler);
     document.addEventListener("keyup", this.onKeyUpHandler);
+    document.addEventListener("pointerlockchange", this.onPointerlockChangeHandler);
+    document.addEventListener("pointerlockerror", this.onPointerlockErrorHandler);
     this.reset();
+  }
+
+  onPointerlockChange() {
+    if (document.pointerLockElement === this.canvas) {} else {
+      // Signal escape was pushed
+      this.sendKeyEvent(KeyEventType.KeyUp, {
+        code: "Escape"
+      });
+    }
+  }
+
+  onPointerlockError() {
+    console.error("Unable to use Pointer Lock API");
   }
 
   reset() {
@@ -703,6 +730,8 @@ class InputManager {
     window.removeEventListener("mousemove", this.onMoveHandler);
     document.removeEventListener("keydown", this.onKeyDownHandler);
     document.removeEventListener("keyup", this.onKeyUpHandler);
+    document.removeEventListener("pointerlockchange", this.onPointerlockChangeHandler);
+    document.removeEventListener("pointerlockerror", this.onPointerlockErrorHandler);
   }
 
 }
