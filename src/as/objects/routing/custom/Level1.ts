@@ -1,4 +1,5 @@
 import { OrbitController } from "../../../extras/OrbitController";
+import { PointerLockController } from "../../../extras/PointerLockController";
 import { AmbientLight } from "../../../lights/AmbientLight";
 import { DirectionalLight } from "../../../lights/DirectionalLight";
 import { Color } from "../../../math/Color";
@@ -8,7 +9,6 @@ import { KeyboardEvent } from "../../../exports/io/KeyboardEvent";
 import { Listener } from "../../../core/EventDispatcher";
 import { uiSignaller } from "../../../exports/ui/uiSignalManager";
 import { Event } from "../../../core/Event";
-import { Mesh } from "../../Mesh";
 import { UIEventType } from "../../../../common/UIEventType";
 import { UIEvent } from "../../../exports/ui/UIEvent";
 import { Link } from "../core/Link";
@@ -18,6 +18,7 @@ const playerHungerThreshold: u32 = 15;
 
 export class Level1 extends Container implements Listener {
   orbitController!: OrbitController;
+  pointerController!: PointerLockController;
   totalTime: f32;
   playerDied: bool;
   isPaused: bool;
@@ -61,7 +62,8 @@ export class Level1 extends Container implements Listener {
     this.ambient = new AmbientLight(new Color(1, 1, 1), 0.4);
     this.addAsset(this.ambient);
 
-    this.orbitController = new OrbitController(this.runtime!.camera);
+    // this.orbitController = new OrbitController(this.runtime!.camera);
+    this.pointerController = new PointerLockController(this.runtime!.camera);
   }
 
   onEvent(event: Event): void {
@@ -88,7 +90,8 @@ export class Level1 extends Container implements Listener {
 
     if (u32(this.totalTime) > playerHungerThreshold && this.playerDied == false) {
       this.playerDied = true;
-      this.orbitController.enabled = false;
+      // this.orbitController.enabled = false;
+      this.pointerController.enabled = false;
       uiSignaller.signalClientEvent(UIEventType.PlayerDied);
     }
 
@@ -101,7 +104,8 @@ export class Level1 extends Container implements Listener {
       }
     }
 
-    if (this.orbitController) this.orbitController.update();
+    // if (this.orbitController) this.orbitController.update();
+    if (this.pointerController) this.pointerController.update(delta);
   }
 
   getRandomArbitrary(min: f32, max: f32): f32 {
@@ -138,7 +142,8 @@ export class Level1 extends Container implements Listener {
     this.runtime!.camera.position.set(0, 1, 10);
     this.runtime!.camera.lookAt(0, 0, 0);
 
-    this.orbitController.enabled = true;
+    // this.orbitController.enabled = true;
+    this.pointerController.enabled = true;
 
     inputManager.addEventListener("keyup", this);
     uiSignaller.addEventListener("uievent", this);
@@ -146,7 +151,8 @@ export class Level1 extends Container implements Listener {
 
   unMount(): void {
     super.unMount();
-    this.orbitController.enabled = false;
+    // this.orbitController.enabled = false;
+    this.pointerController.enabled = false;
     inputManager.removeEventListener("keyup", this);
     uiSignaller.removeEventListener("uievent", this);
   }

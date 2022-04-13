@@ -93,7 +93,9 @@ export class InputManager {
         bounds.y,
         bounds.width,
         bounds.height,
-        delta
+        delta,
+        e.movementX || 0,
+        e.movementY || 0
       )
     );
 

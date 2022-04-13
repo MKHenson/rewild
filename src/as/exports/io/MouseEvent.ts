@@ -15,7 +15,9 @@ export class MouseEvent extends EventAttachable {
     public targetY: i32,
     public targetWidth: i32,
     public targetHeight: i32,
-    public delta: i16
+    public delta: i16,
+    public movementX: i16,
+    public movementY: i16
   ) {
     super();
   }
@@ -35,7 +37,9 @@ export function createMouseEvent(
   targetY: i32,
   targetWidth: i32,
   targetHeight: i32,
-  delta: i16
+  delta: i16,
+  movementX: i16,
+  movementY: i16
 ): MouseEvent {
   return new MouseEvent(
     clientX,
@@ -51,6 +55,8 @@ export function createMouseEvent(
     targetY,
     targetWidth,
     targetHeight,
-    delta
+    delta,
+    movementX,
+    movementY
   );
 }
