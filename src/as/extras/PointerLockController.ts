@@ -72,8 +72,6 @@ export class PointerLockController implements Listener {
 
   onMouseMove(event: MouseEvent): void {
     if (!this.enabled) return;
-    // TODO: Enable?
-    // if (this.isLocked === false) return;
 
     const movementX = f32(event.movementX);
     const movementY = f32(event.movementY);
@@ -85,43 +83,16 @@ export class PointerLockController implements Listener {
 
     _euler.x = Mathf.max(_PI_2 - this.maxPolarAngle, Mathf.min(_PI_2 - this.minPolarAngle, _euler.x));
 
-    // TODO: NOT SURE IF FALSE IS RIGHT HERE
     this.camera.quaternion.setFromEuler(_euler, false);
-
-    // this.dispatchEvent(_changeEvent);
   }
 
-  //   onPointerlockChange() {
-  //     if (this.domElement.ownerDocument.pointerLockElement === scope.domElement) {
-  //       this.dispatchEvent(_lockEvent);
-
-  //       this.isLocked = true;
-  //     } else {
-  //       this.dispatchEvent(_unlockEvent);
-
-  //       this.isLocked = false;
-  //     }
-  //   }
-
-  //   onPointerlockError() {
-  //     console.error("THREE.PointerLockControls: Unable to use Pointer Lock API");
-  //   }
-
   connect(): void {
-    // this.domElement.ownerDocument.addEventListener("mousemove", onMouseMove);
-    // this.domElement.ownerDocument.addEventListener("pointerlockchange", onPointerlockChange);
-    // this.domElement.ownerDocument.addEventListener("pointerlockerror", onPointerlockError);
-
     inputManager.addEventListener("mousemove", this);
     inputManager.addEventListener("keydown", this);
     inputManager.addEventListener("keyup", this);
   }
 
   disconnect(): void {
-    // this.domElement.ownerDocument.removeEventListener("mousemove", onMouseMove);
-    // this.domElement.ownerDocument.removeEventListener("pointerlockchange", onPointerlockChange);
-    // this.domElement.ownerDocument.removeEventListener("pointerlockerror", onPointerlockError);
-
     inputManager.removeEventListener("mousemove", this);
     inputManager.removeEventListener("keydown", this);
     inputManager.removeEventListener("keyup", this);
@@ -132,8 +103,6 @@ export class PointerLockController implements Listener {
   }
 
   getObject(): Camera {
-    // retaining this method for backward compatibility
-
     return this.camera;
   }
 
@@ -144,7 +113,6 @@ export class PointerLockController implements Listener {
   moveForward(distance: f32): void {
     // move forward parallel to the xz-plane
     // assumes camera.up is y-up
-
     _vector.setFromMatrixColumn(this.camera.matrix, 0);
 
     _vector.crossVectors(this.camera.up, _vector);
@@ -157,12 +125,4 @@ export class PointerLockController implements Listener {
 
     this.camera.position.addScaledVector(_vector, distance);
   }
-
-  //   lock() {
-  //     this.domElement.requestPointerLock();
-  //   }
-
-  //   unlock() {
-  //     this.domElement.ownerDocument.exitPointerLock();
-  //   }
 }
