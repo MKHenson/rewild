@@ -22,6 +22,8 @@ export class InputManager {
   private onKeyUpHandler: (e: KeyboardEvent) => void;
   private onMoveHandler: (e: MouseEvent) => void;
   private onWheelHandler: (e: WheelEvent) => void;
+  private onPointerlockChangeHandler: () => void;
+  private onPointerlockErrorHandler: () => void;
   private canvasBounds: DOMRect;
 
   constructor(canvas: HTMLCanvasElement, wasm: WasmManager) {
@@ -35,6 +37,8 @@ export class InputManager {
     this.onKeyUpHandler = this.onKeyUp.bind(this);
     this.onMoveHandler = this.onMove.bind(this);
     this.onWheelHandler = this.onWheel.bind(this);
+    this.onPointerlockChangeHandler = this.onPointerlockChange.bind(this);
+    this.onPointerlockErrorHandler = this.onPointerlockError.bind(this);
 
     this.canvas.addEventListener("mousedown", this.onDownHandler);
     window.addEventListener("wheel", this.onWheelHandler);
@@ -42,8 +46,22 @@ export class InputManager {
     window.addEventListener("mousemove", this.onMoveHandler);
     document.addEventListener("keydown", this.onKeyDownHandler);
     document.addEventListener("keyup", this.onKeyUpHandler);
+    document.addEventListener("pointerlockchange", this.onPointerlockChangeHandler);
+    document.addEventListener("pointerlockerror", this.onPointerlockErrorHandler);
 
     this.reset();
+  }
+
+  private onPointerlockChange() {
+    if (document.pointerLockElement === this.canvas) {
+    } else {
+      // Signal escape was pushed
+      this.sendKeyEvent(KeyEventType.KeyUp, { code: "Escape" });
+    }
+  }
+
+  private onPointerlockError() {
+    console.error("Unable to use Pointer Lock API");
   }
 
   reset() {
@@ -115,10 +133,10 @@ export class InputManager {
     wasmExports.__unpin(wasmEvent);
   }
 
-  private sendKeyEvent(type: KeyEventType, event: KeyboardEvent): void {
+  private sendKeyEvent(type: KeyEventType, event: Partial<KeyboardEvent>): void {
     const wasmExports = this.wasmManager.exports;
     const manager = wasmExports.InputManager.wrap(wasmExports.getInputManager());
-    const wasmEvent = wasmExports.__pin(wasmExports.createKeyboardEvent(wasmExports.__newString(event.code)));
+    const wasmEvent = wasmExports.__pin(wasmExports.createKeyboardEvent(wasmExports.__newString(event.code!)));
 
     if (type === KeyEventType.KeyUp) manager.onKeyUp(wasmEvent);
     else if (type === KeyEventType.KeyDown) manager.onKeyDown(wasmEvent);
@@ -133,5 +151,7 @@ export class InputManager {
     window.removeEventListener("mousemove", this.onMoveHandler);
     document.removeEventListener("keydown", this.onKeyDownHandler);
     document.removeEventListener("keyup", this.onKeyUpHandler);
+    document.removeEventListener("pointerlockchange", this.onPointerlockChangeHandler);
+    document.removeEventListener("pointerlockerror", this.onPointerlockErrorHandler);
   }
 }

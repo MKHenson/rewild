@@ -49,10 +49,20 @@ export class GameManager implements IBindable {
     this.onFrameHandler = this.onFrame.bind(this);
   }
 
+  lock() {
+    this.canvas.requestPointerLock();
+  }
+
+  unlock() {
+    document.exitPointerLock();
+  }
+
   createBinding() {
     return {
       createBufferFromF32: this.createBufferF32.bind(this),
       createIndexBuffer: this.createIndexBuffer.bind(this),
+      lock: this.lock.bind(this),
+      unlock: this.unlock.bind(this),
       render: (commandsIndex: number) => {
         const commandBuffer = this.wasmManager.exports.__getArray(commandsIndex) as Array<number>;
         this.renderQueueManager.run(commandBuffer);

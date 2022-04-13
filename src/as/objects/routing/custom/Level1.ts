@@ -13,6 +13,7 @@ import { UIEventType } from "../../../../common/UIEventType";
 import { UIEvent } from "../../../exports/ui/UIEvent";
 import { Link } from "../core/Link";
 import { Object } from "../../../core/Object";
+import { lock, unlock } from "../../../Imports";
 
 const playerHungerThreshold: u32 = 15;
 
@@ -20,8 +21,8 @@ export class Level1 extends Container implements Listener {
   orbitController!: OrbitController;
   pointerController!: PointerLockController;
   totalTime: f32;
-  playerDied: bool;
-  isPaused: bool;
+  playerDied: boolean;
+  isPaused: boolean;
 
   private direction1!: DirectionalLight;
   private direction2!: DirectionalLight;
@@ -72,14 +73,21 @@ export class Level1 extends Container implements Listener {
       if (!this.playerDied) {
         if (keyEvent.code == "Escape") {
           this.isPaused = !this.isPaused;
+          if (this.isPaused) unlock();
+          else lock();
           uiSignaller.signalClientEvent(UIEventType.OpenInGameMenu);
         }
       }
     } else {
       const uiEvent = event.attachment as UIEvent;
       if (uiEvent.eventType == UIEventType.QuitGame) this.exit(this.getPortal("Exit")!, true);
-      else if (uiEvent.eventType == UIEventType.Resume) this.isPaused = false;
+      else if (uiEvent.eventType == UIEventType.Resume) {
+        this.isPaused = false;
+        lock();
+      }
     }
+
+    this.pointerController.enabled = !this.isPaused && !this.playerDied;
   }
 
   onUpdate(delta: f32, total: u32, fps: u32): void {
@@ -92,6 +100,7 @@ export class Level1 extends Container implements Listener {
       this.playerDied = true;
       // this.orbitController.enabled = false;
       this.pointerController.enabled = false;
+      unlock();
       uiSignaller.signalClientEvent(UIEventType.PlayerDied);
     }
 
@@ -147,6 +156,7 @@ export class Level1 extends Container implements Listener {
 
     inputManager.addEventListener("keyup", this);
     uiSignaller.addEventListener("uievent", this);
+    lock();
   }
 
   unMount(): void {
