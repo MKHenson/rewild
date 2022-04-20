@@ -120,12 +120,6 @@ export class GameManager implements IBindable {
       },
     ];
 
-    // const texturePaths = [
-    //   { name: "grid", src: "https://storage.googleapis.com/rewild-6809/uv-grid.jpg" },
-    //   { name: "crate", src: "https://storage.googleapis.com/rewild-6809/crate-wooden.jpg" },
-    //   { name: "earth", src: "https://storage.googleapis.com/rewild-6809/earth-day-2k.jpg" },
-    // ];
-
     this.textures = await Promise.all(
       texturePaths.map((tp, index) => {
         const texture = new Texture(tp.name, tp.src);
@@ -171,10 +165,6 @@ export class GameManager implements IBindable {
     //     }
     //   });
     // });
-  }
-
-  getTexture(name: string) {
-    return this.textures.find((t) => t.name === name) || null;
   }
 
   initRuntime() {
@@ -241,8 +231,8 @@ export class GameManager implements IBindable {
   }
 
   private onResize(newSize: [number, number], updateWasm = true) {
+    // Destroy the previous render target
     if (this.renderTarget) {
-      // Destroy the previous render target
       this.renderTarget.destroy();
       this.depthTexture.destroy();
     }
