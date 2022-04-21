@@ -1,4 +1,4 @@
-import { Texture } from "../../Texture";
+import { Texture } from "../../textures/Texture";
 import { Pipeline } from "../Pipeline";
 
 export type Defines<T> = {
@@ -6,7 +6,7 @@ export type Defines<T> = {
 } & {
   diffuseMap?: Texture;
   normalMap?: Texture;
-  NUM_DIR_LIGHTS: number;
+  NUM_DIR_LIGHTS?: number;
 };
 
 export type ShaderFunction<T extends Defines<T>> =
