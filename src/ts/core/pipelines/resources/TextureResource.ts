@@ -1,5 +1,5 @@
 import { GameManager } from "../../GameManager";
-import { Texture } from "../../Texture";
+import { Texture } from "../../textures/Texture";
 import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { Pipeline } from "../Pipeline";
 import { Defines } from "../shader-lib/Utils";
@@ -24,7 +24,7 @@ export class TextureResource extends PipelineResourceTemplate {
     // prettier-ignore
     return {
       group,
-      bindings: [manager.samplers[0], this.texture!.gpuTexture.createView()],
+      bindings: [this.texture!.sampler.gpuSampler, this.texture!.gpuTexture.createView()],
       fragmentBlock: `
       ${pipeline.defines.diffuseMap && `
       @group(${group}) @binding(${this.samplerBind})
@@ -41,7 +41,7 @@ export class TextureResource extends PipelineResourceTemplate {
       binds: [
         {
           binding: this.samplerBind,
-          resource: manager.samplers[0],
+          resource: this.texture!.sampler.gpuSampler,
         },
         {
           binding: this.textureBind,

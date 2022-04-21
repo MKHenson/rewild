@@ -1,14 +1,15 @@
 import { InputManager } from "./InputManager";
 import { GPUBufferUsageFlags } from "../../common/GPUEnums";
 import { PipelineType } from "../../common/PipelineType";
-import { DebugPipeline } from "./pipelines/debug-pipeline";
+import { DebugPipeline } from "./pipelines/DebugPipeline";
 import { Pipeline } from "./pipelines/Pipeline";
 import { createBuffer, createIndexBuffer } from "./Utils";
 import { RenderQueueManager } from "./RenderQueueManager";
-import { Texture } from "./Texture";
+import { Texture } from "./textures/Texture";
 import { GroupType } from "../../common/GroupType";
 import { WasmManager } from "./WasmManager";
 import { IBindable } from "./IBindable";
+import { BitmapTexture } from "./textures/BitmapTexture";
 
 const sampleCount = 4;
 const MEDIA_URL = process.env.MEDIA_URL;
@@ -23,7 +24,6 @@ export class GameManager implements IBindable {
 
   buffers: GPUBuffer[];
   pipelines: Pipeline<any>[];
-  samplers: GPUSampler[];
   textures: Texture[];
 
   onResizeHandler: () => void;
@@ -43,7 +43,6 @@ export class GameManager implements IBindable {
     this.canvas = canvas;
     this.buffers = [];
     this.textures = [];
-    this.samplers = [];
     this.disposed = false;
     this.currentPass = null;
     this.onFrameHandler = this.onFrame.bind(this);
@@ -96,18 +95,6 @@ export class GameManager implements IBindable {
     this.context = context;
     this.format = format;
 
-    this.samplers = [
-      device.createSampler({
-        minFilter: "linear",
-        magFilter: "linear",
-        mipmapFilter: "linear",
-        maxAnisotropy: 4,
-        addressModeU: "repeat",
-        addressModeV: "repeat",
-        addressModeW: "repeat",
-      }),
-    ];
-
     // TEXTURES
     const texturePaths = [
       { name: "grid", src: MEDIA_URL + "uv-grid.jpg" },
@@ -122,7 +109,7 @@ export class GameManager implements IBindable {
 
     this.textures = await Promise.all(
       texturePaths.map((tp, index) => {
-        const texture = new Texture(tp.name, tp.src);
+        const texture = new BitmapTexture(tp.name, tp.src, device);
         wasmExports.createTexture(wasmExports.__newString(tp.name), index);
         return texture.load(device);
       })
