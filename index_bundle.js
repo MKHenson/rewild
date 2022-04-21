@@ -273,11 +273,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var _InputManager__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./InputManager */ "./src/ts/core/InputManager.ts");
 /* harmony import */ var _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../common/PipelineType */ "./src/common/PipelineType.ts");
-/* harmony import */ var _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pipelines/debug-pipeline */ "./src/ts/core/pipelines/debug-pipeline/index.ts");
+/* harmony import */ var _pipelines_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pipelines/DebugPipeline */ "./src/ts/core/pipelines/DebugPipeline.ts");
 /* harmony import */ var _Utils__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./Utils */ "./src/ts/core/Utils.ts");
 /* harmony import */ var _RenderQueueManager__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./RenderQueueManager */ "./src/ts/core/RenderQueueManager.ts");
-/* harmony import */ var _Texture__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./Texture */ "./src/ts/core/Texture.ts");
-/* harmony import */ var _common_GroupType__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../../common/GroupType */ "./src/common/GroupType.ts");
+/* harmony import */ var _common_GroupType__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../common/GroupType */ "./src/common/GroupType.ts");
+/* harmony import */ var _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./textures/BitmapTexture */ "./src/ts/core/textures/BitmapTexture.ts");
 
 
 
@@ -292,7 +292,6 @@ class GameManager {
     this.canvas = canvas;
     this.buffers = [];
     this.textures = [];
-    this.samplers = [];
     this.disposed = false;
     this.currentPass = null;
     this.onFrameHandler = this.onFrame.bind(this);
@@ -341,16 +340,7 @@ class GameManager {
     });
     this.device = device;
     this.context = context;
-    this.format = format;
-    this.samplers = [device.createSampler({
-      minFilter: "linear",
-      magFilter: "linear",
-      mipmapFilter: "linear",
-      maxAnisotropy: 4,
-      addressModeU: "repeat",
-      addressModeV: "repeat",
-      addressModeW: "repeat"
-    })]; // TEXTURES
+    this.format = format; // TEXTURES
 
     const texturePaths = [{
       name: "grid",
@@ -367,32 +357,27 @@ class GameManager {
     }, {
       name: "block-concrete-4",
       src: MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png"
-    }]; // const texturePaths = [
-    //   { name: "grid", src: "https://storage.googleapis.com/rewild-6809/uv-grid.jpg" },
-    //   { name: "crate", src: "https://storage.googleapis.com/rewild-6809/crate-wooden.jpg" },
-    //   { name: "earth", src: "https://storage.googleapis.com/rewild-6809/earth-day-2k.jpg" },
-    // ];
-
+    }];
     this.textures = await Promise.all(texturePaths.map((tp, index) => {
-      const texture = new _Texture__WEBPACK_IMPORTED_MODULE_5__.Texture(tp.name, tp.src);
+      const texture = new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__.BitmapTexture(tp.name, tp.src, device);
       wasmExports.createTexture(wasmExports.__newString(tp.name), index);
       return texture.load(device);
     })); // PIPELINES
 
-    this.pipelines = [new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("coastal-floor", {
+    this.pipelines = [new _pipelines_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("coastal-floor", {
       diffuseMap: this.textures[3],
       NUM_DIR_LIGHTS: 0,
       uvScaleX: "30.0",
       uvScaleY: "30.0"
-    }), new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("crate", {
+    }), new _pipelines_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("crate", {
       diffuseMap: this.textures[1],
       NUM_DIR_LIGHTS: 0
-    }), new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("simple", {
+    }), new _pipelines_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("simple", {
       NUM_DIR_LIGHTS: 0
-    }), new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("earth", {
+    }), new _pipelines_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("earth", {
       diffuseMap: this.textures[2],
       NUM_DIR_LIGHTS: 0
-    }), new _pipelines_debug_pipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("concrete", {
+    }), new _pipelines_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("concrete", {
       diffuseMap: this.textures[4],
       NUM_DIR_LIGHTS: 0
     })];
@@ -415,10 +400,6 @@ class GameManager {
     //     }
     //   });
     // });
-  }
-
-  getTexture(name) {
-    return this.textures.find(t => t.name === name) || null;
   }
 
   initRuntime() {
@@ -464,7 +445,7 @@ class GameManager {
     const pipelineInsPtr = wasmExports.createPipelineInstance(wasmExports.__newString(pipeline.name), pipelineIndex, _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__.PipelineType.Mesh);
     const meshPipelineIns = wasmExports.MeshPipelineInstance.wrap(pipelineInsPtr); // Assign a transform buffer to the intance
 
-    meshPipelineIns.transformResourceIndex = pipeline.addResourceInstance(this, _common_GroupType__WEBPACK_IMPORTED_MODULE_6__.GroupType.Transform);
+    meshPipelineIns.transformResourceIndex = pipeline.addResourceInstance(this, _common_GroupType__WEBPACK_IMPORTED_MODULE_5__.GroupType.Transform);
     const meshPtr = wasmExports.createMesh(geometryPtr, pipelineInsPtr, name ? wasmExports.__newString(name) : undefined);
     return meshPtr;
   }
@@ -480,8 +461,8 @@ class GameManager {
   onResize(newSize) {
     let updateWasm = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
 
+    // Destroy the previous render target
     if (this.renderTarget) {
-      // Destroy the previous render target
       this.renderTarget.destroy();
       this.depthTexture.destroy();
     }
@@ -909,47 +890,6 @@ class RenderQueueManager {
 
 /***/ }),
 
-/***/ "./src/ts/core/Texture.ts":
-/*!********************************!*\
-  !*** ./src/ts/core/Texture.ts ***!
-  \********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "Texture": () => (/* binding */ Texture)
-/* harmony export */ });
-class Texture {
-  constructor(name, src) {
-    this.name = name;
-    this.src = src;
-  }
-
-  async load(device) {
-    let gpuTexture;
-    const img = document.createElement("img");
-    img.crossOrigin = "Anonymous";
-    img.src = this.src;
-    await img.decode();
-    this.imageData = await createImageBitmap(img);
-    gpuTexture = device.createTexture({
-      size: [this.imageData.width, this.imageData.height, 1],
-      format: "rgba8unorm",
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
-    });
-    device.queue.copyExternalImageToTexture({
-      source: this.imageData
-    }, {
-      texture: gpuTexture
-    }, [this.imageData.width, this.imageData.height]);
-    this.gpuTexture = gpuTexture;
-    return this;
-  }
-
-}
-
-/***/ }),
-
 /***/ "./src/ts/core/UIEventManager.ts":
 /*!***************************************!*\
   !*** ./src/ts/core/UIEventManager.ts ***!
@@ -1116,267 +1056,25 @@ class UIEvent extends _EventDispatcher__WEBPACK_IMPORTED_MODULE_0__.Dispatchable
 
 /***/ }),
 
-/***/ "./src/ts/core/pipelines/DefaultPipelineDescriptor.ts":
-/*!************************************************************!*\
-  !*** ./src/ts/core/pipelines/DefaultPipelineDescriptor.ts ***!
-  \************************************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "defaultPipelineDescriptor": () => (/* binding */ defaultPipelineDescriptor)
-/* harmony export */ });
-const defaultPipelineDescriptor = {
-  primitive: {
-    topology: "triangle-list",
-    cullMode: "back",
-    frontFace: "ccw"
-  },
-  depthStencil: {
-    format: "depth24plus",
-    depthWriteEnabled: true,
-    depthCompare: "less"
-  },
-  multisample: {
-    count: 4
-  }
-};
-
-/***/ }),
-
-/***/ "./src/ts/core/pipelines/Pipeline.ts":
-/*!*******************************************!*\
-  !*** ./src/ts/core/pipelines/Pipeline.ts ***!
-  \*******************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "GroupMapping": () => (/* binding */ GroupMapping),
-/* harmony export */   "Pipeline": () => (/* binding */ Pipeline)
-/* harmony export */ });
-/* harmony import */ var _resources_PipelineResourceInstance__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./resources/PipelineResourceInstance */ "./src/ts/core/pipelines/resources/PipelineResourceInstance.ts");
-/* harmony import */ var _common_GroupType__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../common/GroupType */ "./src/common/GroupType.ts");
-/* harmony import */ var _shader_lib_Utils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./shader-lib/Utils */ "./src/ts/core/pipelines/shader-lib/Utils.ts");
-
-
-
-class GroupMapping {
-  constructor(index) {
-    this.index = index;
-    this.bindingCount = 0;
-  }
-
-  getBinding() {
-    const toRet = this.bindingCount;
-    this.bindingCount++;
-    return toRet;
-  }
-
-}
-class Pipeline {
-  constructor(name, vertexSource, fragmentSource, defines) {
-    this.name = name;
-    this.renderPipeline = null;
-    this.vertexSource = vertexSource;
-    this.fragmentSource = fragmentSource;
-    this.resourceTemplates = [];
-    this.groupInstances = new Map();
-    this.defines = defines;
-    this.rebuild = true;
-    this.groupMapping = new Map();
-    this.groups = 0;
-  }
-
-  set defines(defines) {
-    this._defines = defines;
-    this.rebuild = true;
-  }
-
-  get defines() {
-    return this._defines;
-  }
-
-  groupIndex(type) {
-    if (this.groupMapping.has(type)) return this.groupMapping.get(type).index;else {
-      const groupMapping = new GroupMapping(this.groups);
-      this.groupMapping.set(type, groupMapping);
-      this.groups++;
-      return groupMapping.index;
-    }
-  }
-
-  bindingIndex(type) {
-    if (this.groupMapping.has(type)) {
-      const groupMapping = this.groupMapping.get(type);
-      return groupMapping.getBinding();
-    } else {
-      const groupMapping = new GroupMapping(this.groups);
-      this.groupMapping.set(type, groupMapping);
-      this.groups++;
-      return groupMapping.getBinding();
-    }
-  }
-  /** Use this function to add resource templates */
-
-
-  getTemplateByType(type, id) {
-    if (id) return this.resourceTemplates.find(t => t.resourceType === type && id === t.id);else return this.resourceTemplates.find(t => t.resourceType === type);
-  }
-
-  getTemplateByGroup(type) {
-    return this.resourceTemplates.find(t => t.groupType === type);
-  }
-
-  addTemplate(template) {
-    this.resourceTemplates.push(template);
-    return this;
-  }
-
-  build(gameManager) {
-    this.rebuild = false;
-    const groupInstanceMap = this.groupInstances;
-    const templates = this.resourceTemplates; // Destroy previous instances
-
-    templates.forEach(template => {
-      const resourceInstances = groupInstanceMap.get(template.groupType);
-      resourceInstances === null || resourceInstances === void 0 ? void 0 : resourceInstances.forEach(i => {
-        i.dispose();
-      });
-    }); // Reset
-
-    templates.splice(0, templates.length);
-    this.groupMapping.clear();
-    this.groups = 0;
-    this.onAddResources();
-    let curBinding = 0;
-    const binds = new Map();
-    templates.forEach(resourceTemplate => {
-      const groupIndex = this.groupIndex(resourceTemplate.groupType);
-      if (!binds.has(groupIndex)) binds.set(groupIndex, 0);
-      curBinding = binds.get(groupIndex);
-      const template = resourceTemplate.build(gameManager, this, curBinding);
-      curBinding += template.bindings.length;
-      binds.set(groupIndex, curBinding);
-      resourceTemplate.template = template;
-    });
-  }
-
-  initialize(gameManager) {
-    const templates = this.resourceTemplates;
-    const groupInstances = this.groupInstances;
-    const prevGroupKeys = Array.from(this.groupInstances.keys());
-    const uniqueNewGroupKeys = templates.map(r => r.groupType).filter((value, index, self) => self.indexOf(value) === index);
-    const groupCache = new Map(); // Remove any unused instances
-
-    prevGroupKeys.forEach(key => {
-      if (!uniqueNewGroupKeys.includes(key)) groupInstances.delete(key);
-    }); // Initialize temp cache maps
-
-    for (const newKey of uniqueNewGroupKeys) {
-      let numInstancesToCreate = 0;
-      let instances; // If we previously had instances, then save the number of them
-      // as we have to re-create the same amount as before. Otherwise just create 1;
-
-      if (groupInstances.has(newKey)) {
-        instances = groupInstances.get(newKey);
-        numInstancesToCreate = instances.length;
-        instances.splice(0, instances.length);
-      } else {
-        numInstancesToCreate = 1;
-        instances = [];
-        groupInstances.set(newKey, instances);
-      }
-
-      groupCache.set(newKey, {
-        bindData: new Map(),
-        numInstances: numInstancesToCreate
-      });
-    } // Initialize each template
-
-
-    templates.forEach(resourceTemplate => {
-      const {
-        bindData,
-        numInstances
-      } = groupCache.get(resourceTemplate.groupType);
-
-      for (let i = 0; i < numInstances; i++) if (bindData.has(i)) {
-        bindData.get(i).push(resourceTemplate.getBindingData(gameManager, this.renderPipeline));
-      } else {
-        bindData.set(i, [resourceTemplate.getBindingData(gameManager, this.renderPipeline)]);
-      }
-    }); // Create the instances & bind groups
-
-    groupCache.forEach((cache, groupType) => {
-      const instances = new Array(cache.numInstances);
-      const groupIndex = this.groupIndex(groupType);
-
-      for (let i = 0; i < cache.numInstances; i++) {
-        let buffers = null; // Join all the entries from each template
-        // Also join all the collect each of the buffers we want to cache for the render queue
-
-        const entries = cache.bindData.get(i).reduce((accumulator, cur) => {
-          if (cur.buffer) {
-            if (!buffers) buffers = [cur.buffer];else buffers.push(cur.buffer);
-          }
-
-          accumulator.push(...cur.binds);
-          return accumulator;
-        }, []);
-        const bindGroup = gameManager.device.createBindGroup({
-          label: _common_GroupType__WEBPACK_IMPORTED_MODULE_1__.GroupType[groupType],
-          layout: this.renderPipeline.getBindGroupLayout(groupIndex),
-          entries
-        });
-        instances[i] = new _resources_PipelineResourceInstance__WEBPACK_IMPORTED_MODULE_0__.PipelineResourceInstance(groupIndex, bindGroup, buffers);
-      }
-
-      groupInstances.set(groupType, instances);
-    });
-  }
-
-  addResourceInstance(manager, type) {
-    const template = this.getTemplateByGroup(type);
-
-    if (template) {
-      const bindingData = template.getBindingData(manager, this.renderPipeline);
-      const groupIndex = this.groupIndex(type);
-      const bindGroup = manager.device.createBindGroup({
-        label: _common_GroupType__WEBPACK_IMPORTED_MODULE_1__.GroupType[type],
-        layout: this.renderPipeline.getBindGroupLayout(groupIndex),
-        entries: bindingData.binds
-      });
-      const instances = new _resources_PipelineResourceInstance__WEBPACK_IMPORTED_MODULE_0__.PipelineResourceInstance(groupIndex, bindGroup, bindingData.buffer ? [bindingData.buffer] : null);
-      const instanceArray = this.groupInstances.get(type);
-      instanceArray.push(instances);
-      return instanceArray.length - 1;
-    } else throw new Error("Pipeline does not use resource type");
-  }
-
-}
-
-/***/ }),
-
-/***/ "./src/ts/core/pipelines/debug-pipeline/index.ts":
-/*!*******************************************************!*\
-  !*** ./src/ts/core/pipelines/debug-pipeline/index.ts ***!
-  \*******************************************************/
+/***/ "./src/ts/core/pipelines/DebugPipeline.ts":
+/*!************************************************!*\
+  !*** ./src/ts/core/pipelines/DebugPipeline.ts ***!
+  \************************************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "DebugPipeline": () => (/* binding */ DebugPipeline)
 /* harmony export */ });
-/* harmony import */ var _common_ResourceType__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../../common/ResourceType */ "./src/common/ResourceType.ts");
-/* harmony import */ var _DefaultPipelineDescriptor__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../DefaultPipelineDescriptor */ "./src/ts/core/pipelines/DefaultPipelineDescriptor.ts");
-/* harmony import */ var _Pipeline__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../Pipeline */ "./src/ts/core/pipelines/Pipeline.ts");
-/* harmony import */ var _resources_LightingResource__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../resources/LightingResource */ "./src/ts/core/pipelines/resources/LightingResource.ts");
-/* harmony import */ var _resources_MaterialResource__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../resources/MaterialResource */ "./src/ts/core/pipelines/resources/MaterialResource.ts");
-/* harmony import */ var _resources_TextureResource__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../resources/TextureResource */ "./src/ts/core/pipelines/resources/TextureResource.ts");
-/* harmony import */ var _resources_TransformResource__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ../resources/TransformResource */ "./src/ts/core/pipelines/resources/TransformResource.ts");
-/* harmony import */ var _shader_lib_MathFunctions__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../shader-lib/MathFunctions */ "./src/ts/core/pipelines/shader-lib/MathFunctions.ts");
-/* harmony import */ var _shader_lib_Utils__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../shader-lib/Utils */ "./src/ts/core/pipelines/shader-lib/Utils.ts");
+/* harmony import */ var _common_ResourceType__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../common/ResourceType */ "./src/common/ResourceType.ts");
+/* harmony import */ var _shader_lib_DefaultPipelineDescriptor__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./shader-lib/DefaultPipelineDescriptor */ "./src/ts/core/pipelines/shader-lib/DefaultPipelineDescriptor.ts");
+/* harmony import */ var _Pipeline__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./Pipeline */ "./src/ts/core/pipelines/Pipeline.ts");
+/* harmony import */ var _resources_LightingResource__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./resources/LightingResource */ "./src/ts/core/pipelines/resources/LightingResource.ts");
+/* harmony import */ var _resources_MaterialResource__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./resources/MaterialResource */ "./src/ts/core/pipelines/resources/MaterialResource.ts");
+/* harmony import */ var _resources_TextureResource__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./resources/TextureResource */ "./src/ts/core/pipelines/resources/TextureResource.ts");
+/* harmony import */ var _resources_TransformResource__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./resources/TransformResource */ "./src/ts/core/pipelines/resources/TransformResource.ts");
+/* harmony import */ var _shader_lib_MathFunctions__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./shader-lib/MathFunctions */ "./src/ts/core/pipelines/shader-lib/MathFunctions.ts");
+/* harmony import */ var _shader_lib_Utils__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./shader-lib/Utils */ "./src/ts/core/pipelines/shader-lib/Utils.ts");
 
 
 
@@ -1714,7 +1412,7 @@ class DebugPipeline extends _Pipeline__WEBPACK_IMPORTED_MODULE_2__.Pipeline {
 
     const vertSource = (0,_shader_lib_Utils__WEBPACK_IMPORTED_MODULE_8__.shaderBuilder)(this.vertexSource, this);
     const fragSource = (0,_shader_lib_Utils__WEBPACK_IMPORTED_MODULE_8__.shaderBuilder)(this.fragmentSource, this);
-    this.renderPipeline = gameManager.device.createRenderPipeline({ ..._DefaultPipelineDescriptor__WEBPACK_IMPORTED_MODULE_1__.defaultPipelineDescriptor,
+    this.renderPipeline = gameManager.device.createRenderPipeline({ ..._shader_lib_DefaultPipelineDescriptor__WEBPACK_IMPORTED_MODULE_1__.defaultPipelineDescriptor,
       label: "Debug Pipeline",
       vertex: {
         module: gameManager.device.createShaderModule({
@@ -1760,6 +1458,220 @@ class DebugPipeline extends _Pipeline__WEBPACK_IMPORTED_MODULE_2__.Pipeline {
         }]
       }
     });
+  }
+
+}
+
+/***/ }),
+
+/***/ "./src/ts/core/pipelines/Pipeline.ts":
+/*!*******************************************!*\
+  !*** ./src/ts/core/pipelines/Pipeline.ts ***!
+  \*******************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "GroupMapping": () => (/* binding */ GroupMapping),
+/* harmony export */   "Pipeline": () => (/* binding */ Pipeline)
+/* harmony export */ });
+/* harmony import */ var _resources_PipelineResourceInstance__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./resources/PipelineResourceInstance */ "./src/ts/core/pipelines/resources/PipelineResourceInstance.ts");
+/* harmony import */ var _common_GroupType__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../common/GroupType */ "./src/common/GroupType.ts");
+/* harmony import */ var _shader_lib_Utils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./shader-lib/Utils */ "./src/ts/core/pipelines/shader-lib/Utils.ts");
+
+
+
+class GroupMapping {
+  constructor(index) {
+    this.index = index;
+    this.bindingCount = 0;
+  }
+
+  getBinding() {
+    const toRet = this.bindingCount;
+    this.bindingCount++;
+    return toRet;
+  }
+
+}
+class Pipeline {
+  constructor(name, vertexSource, fragmentSource, defines) {
+    this.name = name;
+    this.renderPipeline = null;
+    this.vertexSource = vertexSource;
+    this.fragmentSource = fragmentSource;
+    this.resourceTemplates = [];
+    this.groupInstances = new Map();
+    this.defines = defines;
+    this.rebuild = true;
+    this.groupMapping = new Map();
+    this.groups = 0;
+  }
+
+  set defines(defines) {
+    this._defines = defines;
+    this.rebuild = true;
+  }
+
+  get defines() {
+    return this._defines;
+  }
+
+  groupIndex(type) {
+    if (this.groupMapping.has(type)) return this.groupMapping.get(type).index;else {
+      const groupMapping = new GroupMapping(this.groups);
+      this.groupMapping.set(type, groupMapping);
+      this.groups++;
+      return groupMapping.index;
+    }
+  }
+
+  bindingIndex(type) {
+    if (this.groupMapping.has(type)) {
+      const groupMapping = this.groupMapping.get(type);
+      return groupMapping.getBinding();
+    } else {
+      const groupMapping = new GroupMapping(this.groups);
+      this.groupMapping.set(type, groupMapping);
+      this.groups++;
+      return groupMapping.getBinding();
+    }
+  }
+  /** Use this function to add resource templates */
+
+
+  getTemplateByType(type, id) {
+    if (id) return this.resourceTemplates.find(t => t.resourceType === type && id === t.id);else return this.resourceTemplates.find(t => t.resourceType === type);
+  }
+
+  getTemplateByGroup(type) {
+    return this.resourceTemplates.find(t => t.groupType === type);
+  }
+
+  addTemplate(template) {
+    this.resourceTemplates.push(template);
+    return this;
+  }
+
+  build(gameManager) {
+    this.rebuild = false;
+    const groupInstanceMap = this.groupInstances;
+    const templates = this.resourceTemplates; // Destroy previous instances
+
+    templates.forEach(template => {
+      const resourceInstances = groupInstanceMap.get(template.groupType);
+      resourceInstances === null || resourceInstances === void 0 ? void 0 : resourceInstances.forEach(i => {
+        i.dispose();
+      });
+    }); // Reset
+
+    templates.splice(0, templates.length);
+    this.groupMapping.clear();
+    this.groups = 0;
+    this.onAddResources();
+    let curBinding = 0;
+    const binds = new Map();
+    templates.forEach(resourceTemplate => {
+      const groupIndex = this.groupIndex(resourceTemplate.groupType);
+      if (!binds.has(groupIndex)) binds.set(groupIndex, 0);
+      curBinding = binds.get(groupIndex);
+      const template = resourceTemplate.build(gameManager, this, curBinding);
+      curBinding += template.bindings.length;
+      binds.set(groupIndex, curBinding);
+      resourceTemplate.template = template;
+    });
+  }
+
+  initialize(gameManager) {
+    const templates = this.resourceTemplates;
+    const groupInstances = this.groupInstances;
+    const prevGroupKeys = Array.from(this.groupInstances.keys());
+    const uniqueNewGroupKeys = templates.map(r => r.groupType).filter((value, index, self) => self.indexOf(value) === index);
+    const groupCache = new Map(); // Remove any unused instances
+
+    prevGroupKeys.forEach(key => {
+      if (!uniqueNewGroupKeys.includes(key)) groupInstances.delete(key);
+    }); // Initialize temp cache maps
+
+    for (const newKey of uniqueNewGroupKeys) {
+      let numInstancesToCreate = 0;
+      let instances; // If we previously had instances, then save the number of them
+      // as we have to re-create the same amount as before. Otherwise just create 1;
+
+      if (groupInstances.has(newKey)) {
+        instances = groupInstances.get(newKey);
+        numInstancesToCreate = instances.length;
+        instances.splice(0, instances.length);
+      } else {
+        numInstancesToCreate = 1;
+        instances = [];
+        groupInstances.set(newKey, instances);
+      }
+
+      groupCache.set(newKey, {
+        bindData: new Map(),
+        numInstances: numInstancesToCreate
+      });
+    } // Initialize each template
+
+
+    templates.forEach(resourceTemplate => {
+      const {
+        bindData,
+        numInstances
+      } = groupCache.get(resourceTemplate.groupType);
+
+      for (let i = 0; i < numInstances; i++) if (bindData.has(i)) {
+        bindData.get(i).push(resourceTemplate.getBindingData(gameManager, this.renderPipeline));
+      } else {
+        bindData.set(i, [resourceTemplate.getBindingData(gameManager, this.renderPipeline)]);
+      }
+    }); // Create the instances & bind groups
+
+    groupCache.forEach((cache, groupType) => {
+      const instances = new Array(cache.numInstances);
+      const groupIndex = this.groupIndex(groupType);
+
+      for (let i = 0; i < cache.numInstances; i++) {
+        let buffers = null; // Join all the entries from each template
+        // Also join all the collect each of the buffers we want to cache for the render queue
+
+        const entries = cache.bindData.get(i).reduce((accumulator, cur) => {
+          if (cur.buffer) {
+            if (!buffers) buffers = [cur.buffer];else buffers.push(cur.buffer);
+          }
+
+          accumulator.push(...cur.binds);
+          return accumulator;
+        }, []);
+        const bindGroup = gameManager.device.createBindGroup({
+          label: _common_GroupType__WEBPACK_IMPORTED_MODULE_1__.GroupType[groupType],
+          layout: this.renderPipeline.getBindGroupLayout(groupIndex),
+          entries
+        });
+        instances[i] = new _resources_PipelineResourceInstance__WEBPACK_IMPORTED_MODULE_0__.PipelineResourceInstance(groupIndex, bindGroup, buffers);
+      }
+
+      groupInstances.set(groupType, instances);
+    });
+  }
+
+  addResourceInstance(manager, type) {
+    const template = this.getTemplateByGroup(type);
+
+    if (template) {
+      const bindingData = template.getBindingData(manager, this.renderPipeline);
+      const groupIndex = this.groupIndex(type);
+      const bindGroup = manager.device.createBindGroup({
+        label: _common_GroupType__WEBPACK_IMPORTED_MODULE_1__.GroupType[type],
+        layout: this.renderPipeline.getBindGroupLayout(groupIndex),
+        entries: bindingData.binds
+      });
+      const instances = new _resources_PipelineResourceInstance__WEBPACK_IMPORTED_MODULE_0__.PipelineResourceInstance(groupIndex, bindGroup, bindingData.buffer ? [bindingData.buffer] : null);
+      const instanceArray = this.groupInstances.get(type);
+      instanceArray.push(instances);
+      return instanceArray.length - 1;
+    } else throw new Error("Pipeline does not use resource type");
   }
 
 }
@@ -2115,7 +2027,7 @@ class TextureResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODULE
 
     return {
       group,
-      bindings: [manager.samplers[0], this.texture.gpuTexture.createView()],
+      bindings: [this.texture.sampler.gpuSampler, this.texture.gpuTexture.createView()],
       fragmentBlock: `
       ${pipeline.defines.diffuseMap && `
       @group(${group}) @binding(${this.samplerBind})
@@ -2130,7 +2042,7 @@ class TextureResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODULE
     return {
       binds: [{
         binding: this.samplerBind,
-        resource: manager.samplers[0]
+        resource: this.texture.sampler.gpuSampler
       }, {
         binding: this.textureBind,
         resource: this.texture.gpuTexture.createView()
@@ -2215,6 +2127,34 @@ class TransformResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODU
   }
 
 }
+
+/***/ }),
+
+/***/ "./src/ts/core/pipelines/shader-lib/DefaultPipelineDescriptor.ts":
+/*!***********************************************************************!*\
+  !*** ./src/ts/core/pipelines/shader-lib/DefaultPipelineDescriptor.ts ***!
+  \***********************************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "defaultPipelineDescriptor": () => (/* binding */ defaultPipelineDescriptor)
+/* harmony export */ });
+const defaultPipelineDescriptor = {
+  primitive: {
+    topology: "triangle-list",
+    cullMode: "back",
+    frontFace: "ccw"
+  },
+  depthStencil: {
+    format: "depth24plus",
+    depthWriteEnabled: true,
+    depthCompare: "less"
+  },
+  multisample: {
+    count: 4
+  }
+};
 
 /***/ }),
 
@@ -2331,6 +2271,168 @@ function shaderBuilder(sourceFragments, pipeline) {
     }
   });
   return str;
+}
+
+/***/ }),
+
+/***/ "./src/ts/core/textures/BitmapTexture.ts":
+/*!***********************************************!*\
+  !*** ./src/ts/core/textures/BitmapTexture.ts ***!
+  \***********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "BitmapTexture": () => (/* binding */ BitmapTexture)
+/* harmony export */ });
+/* harmony import */ var _ImageLoader__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./ImageLoader */ "./src/ts/core/textures/ImageLoader.ts");
+/* harmony import */ var _Texture__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Texture */ "./src/ts/core/textures/Texture.ts");
+
+
+class BitmapTexture extends _Texture__WEBPACK_IMPORTED_MODULE_1__.Texture {
+  constructor(name, src, device, sampler) {
+    super(name, device, sampler);
+    this.src = src;
+  }
+
+  async load(device) {
+    let gpuTexture;
+    const loader = await new _ImageLoader__WEBPACK_IMPORTED_MODULE_0__.ImageLoader().loadImages([this.src]);
+    gpuTexture = device.createTexture({
+      size: {
+        width: loader.maxWidth,
+        height: loader.maxHeight,
+        depthOrArrayLayers: 1
+      },
+      format: "rgba8unorm",
+      dimension: "2d",
+      mipLevelCount: 1,
+      // TODO: why doesnt this work? this.getNumMipmaps(loader.maxWidth, loader.maxHeight),
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
+    });
+    device.queue.copyExternalImageToTexture({
+      source: loader.images[0]
+    }, {
+      texture: gpuTexture
+    }, [loader.maxWidth, loader.maxHeight]);
+    this.gpuTexture = gpuTexture;
+    return this;
+  }
+
+}
+
+/***/ }),
+
+/***/ "./src/ts/core/textures/ImageLoader.ts":
+/*!*********************************************!*\
+  !*** ./src/ts/core/textures/ImageLoader.ts ***!
+  \*********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "ImageLoader": () => (/* binding */ ImageLoader)
+/* harmony export */ });
+class ImageLoader {
+  constructor() {}
+
+  async loadImages(paths) {
+    const promises = paths.map(src => {
+      return new Promise(function (resolve, reject) {
+        const img = document.createElement("img");
+        img.crossOrigin = "Anonymous";
+        img.src = src;
+        img.decode().then(result => {
+          return createImageBitmap(img);
+        }).then(data => {
+          resolve(data);
+        }).catch(err => reject(err));
+      });
+    });
+    const images = await Promise.all(promises);
+    const {
+      maxHeight,
+      maxWidth
+    } = images.reduce((prev, cur) => {
+      prev.maxHeight = Math.max(cur.height, prev.maxHeight);
+      prev.maxWidth = Math.max(cur.width, prev.maxWidth);
+      return prev;
+    }, {
+      maxHeight: 0,
+      maxWidth: 0
+    });
+    this.maxHeight = maxHeight;
+    this.maxWidth = maxWidth;
+    this.images = images;
+    return this;
+  }
+
+}
+
+/***/ }),
+
+/***/ "./src/ts/core/textures/Sampler.ts":
+/*!*****************************************!*\
+  !*** ./src/ts/core/textures/Sampler.ts ***!
+  \*****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Sampler": () => (/* binding */ Sampler)
+/* harmony export */ });
+const TABLE = new Map();
+class Sampler {
+  constructor(device) {
+    let option = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+    option = {
+      magFilter: option.magFilter || "linear",
+      minFilter: option.minFilter || "linear",
+      mipmapFilter: option.mipmapFilter || "linear",
+      addressModeU: option.addressModeU || "repeat",
+      addressModeV: option.addressModeV || "repeat",
+      addressModeW: option.addressModeW || "repeat"
+    };
+    this.id = JSON.stringify(option);
+    if (TABLE.has(this.id)) return TABLE.get(this.id);else this.gpuSampler = device.createSampler(option);
+    TABLE.set(this.id, this);
+  }
+
+}
+
+/***/ }),
+
+/***/ "./src/ts/core/textures/Texture.ts":
+/*!*****************************************!*\
+  !*** ./src/ts/core/textures/Texture.ts ***!
+  \*****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Texture": () => (/* binding */ Texture)
+/* harmony export */ });
+/* harmony import */ var _Sampler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Sampler */ "./src/ts/core/textures/Sampler.ts");
+
+let defaultSampler;
+class Texture {
+  constructor(name, device, sampler) {
+    this.name = name;
+    this.generateMipmaps = true;
+    if (!defaultSampler) defaultSampler = new _Sampler__WEBPACK_IMPORTED_MODULE_0__.Sampler(device);
+    this.sampler = sampler || defaultSampler;
+  }
+
+  getNumMipmaps(w, h) {
+    if (this.generateMipmaps) {
+      const mipMaps = Math.round(Math.log2(Math.max(w, h)));
+      if (mipMaps > 10) return 11;
+      return mipMaps + 1;
+    }
+
+    return 1;
+  }
+
 }
 
 /***/ }),
