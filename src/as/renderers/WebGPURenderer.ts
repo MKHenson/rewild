@@ -92,6 +92,7 @@ export class WebGPURenderer {
       transformIndex,
       camera.projectionMatrix.elements,
       mesh.modelViewMatrix.elements,
+      mesh.matrixWorld.elements,
       mesh.normalMatrix.elements
     );
 

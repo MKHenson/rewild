@@ -29,7 +29,7 @@ export class Level1 extends Container implements Listener {
   private direction3!: DirectionalLight;
   private ambient!: AmbientLight;
   private floor!: Object;
-
+  private sbybox!: Object;
   private ball!: Object;
 
   constructor() {
@@ -129,6 +129,7 @@ export class Level1 extends Container implements Listener {
 
     this.floor = this.findObjectByName("floor")!;
     this.ball = this.findObjectByName("ball")!;
+    this.sbybox = this.findObjectByName("skybox")!;
 
     const objects = this.objects;
     for (let i: i32 = 0, l = objects.length; i < l; i++) {
@@ -146,6 +147,9 @@ export class Level1 extends Container implements Listener {
     this.ball.position.set(3, 3, 0);
     this.floor.scale.set(200, 0.1, 200);
     this.floor.position.set(0, -0.1, 0);
+
+    this.sbybox.scale.set(2, 2, 2);
+    this.sbybox.position.set(0, 0, 0);
 
     // Possitive z comes out of screen
     this.runtime!.camera.position.set(0, 1, 10);

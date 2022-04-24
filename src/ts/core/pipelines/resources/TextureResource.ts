@@ -5,6 +5,7 @@ import { Pipeline } from "../Pipeline";
 import { Defines } from "../shader-lib/Utils";
 import { GroupType } from "../../../../common/GroupType";
 import { ResourceType } from "../../../../common/ResourceType";
+import { BitmapCubeTexture } from "../../textures/BitmapCubeTexture";
 
 export class TextureResource extends PipelineResourceTemplate {
   texture: Texture;
@@ -21,6 +22,8 @@ export class TextureResource extends PipelineResourceTemplate {
     this.textureBind = curBindIndex + 1;
     const group = pipeline.groupIndex(this.groupType);
 
+    const isCube = this.texture instanceof BitmapCubeTexture;
+
     // prettier-ignore
     return {
       group,
@@ -30,13 +33,16 @@ export class TextureResource extends PipelineResourceTemplate {
       @group(${group}) @binding(${this.samplerBind})
       var ${this.id}Sampler: sampler;
       @group(${group}) @binding(${this.textureBind})
-      var ${this.id}Texture: texture_2d<f32>;`
+      var ${this.id}Texture: texture_${ isCube ? '3d' : '2d'}<f32>;`
       }`,
       vertexBlock: null,
     };
   }
 
   getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
+    const isCube = this.texture instanceof BitmapCubeTexture;
+    const cubeTexture = this.texture as BitmapCubeTexture;
+
     return {
       binds: [
         {
@@ -45,7 +51,14 @@ export class TextureResource extends PipelineResourceTemplate {
         },
         {
           binding: this.textureBind,
-          resource: this.texture!.gpuTexture.createView(),
+          resource: this.texture!.gpuTexture.createView({
+            dimension: isCube ? "cube" : "2d",
+            aspect: "all",
+            label: isCube ? "Cube View Form" : "2D View Format",
+            arrayLayerCount: isCube ? cubeTexture.src.length : undefined,
+            baseArrayLayer: isCube ? 0 : undefined,
+            baseMipLevel: 0,
+          }),
         },
       ],
       buffer: null,

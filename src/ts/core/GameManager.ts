@@ -10,6 +10,8 @@ import { GroupType } from "../../common/GroupType";
 import { WasmManager } from "./WasmManager";
 import { IBindable } from "./IBindable";
 import { BitmapTexture } from "./textures/BitmapTexture";
+import { BitmapCubeTexture } from "./textures/BitmapCubeTexture";
+import { SkyboxPipeline } from "./pipelines/SkyboxPipeline";
 
 const sampleCount = 4;
 const MEDIA_URL = process.env.MEDIA_URL;
@@ -96,21 +98,37 @@ export class GameManager implements IBindable {
     this.format = format;
 
     // TEXTURES
-    const texturePaths = [
-      { name: "grid", src: MEDIA_URL + "uv-grid.jpg" },
-      { name: "crate", src: MEDIA_URL + "crate-wooden.jpg" },
-      { name: "earth", src: MEDIA_URL + "earth-day-2k.jpg" },
-      { name: "ground-coastal-1", src: MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png" },
-      {
-        name: "block-concrete-4",
-        src: MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png",
-      },
+    const textures: Texture[] = [
+      new BitmapTexture("grid", MEDIA_URL + "uv-grid.jpg", device),
+      new BitmapTexture("crate", MEDIA_URL + "crate-wooden.jpg", device),
+      new BitmapTexture("earth", MEDIA_URL + "earth-day-2k.jpg", device),
+      new BitmapTexture(
+        "ground-coastal-1",
+        MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png",
+        device
+      ),
+      new BitmapTexture(
+        "block-concrete-4",
+        MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png",
+        device
+      ),
+      new BitmapCubeTexture(
+        "desert-sky",
+        [
+          MEDIA_URL + "skyboxes/desert/px.jpg",
+          MEDIA_URL + "skyboxes/desert/nx.jpg",
+          MEDIA_URL + "skyboxes/desert/py.jpg",
+          MEDIA_URL + "skyboxes/desert/ny.jpg",
+          MEDIA_URL + "skyboxes/desert/pz.jpg",
+          MEDIA_URL + "skyboxes/desert/nz.jpg",
+        ],
+        device
+      ),
     ];
 
     this.textures = await Promise.all(
-      texturePaths.map((tp, index) => {
-        const texture = new BitmapTexture(tp.name, tp.src, device);
-        wasmExports.createTexture(wasmExports.__newString(tp.name), index);
+      textures.map((texture, index) => {
+        wasmExports.createTexture(wasmExports.__newString(texture.name), index);
         return texture.load(device);
       })
     );
@@ -127,6 +145,7 @@ export class GameManager implements IBindable {
       new DebugPipeline("simple", { NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("earth", { diffuseMap: this.textures[2], NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("concrete", { diffuseMap: this.textures[4], NUM_DIR_LIGHTS: 0 }),
+      new SkyboxPipeline("skybox", { diffuseMap: this.textures[5] }),
     ];
 
     const size = this.canvasSize();
@@ -169,6 +188,7 @@ export class GameManager implements IBindable {
     const geometrySphere = wasm.createSphere(1);
     const geometryBox = wasm.createBox(1);
 
+    containerLvl1.addAsset(this.createMesh(geometryBox, "skybox", "skybox"));
     containerLvl1.addAsset(this.createMesh(geometrySphere, "simple", "ball"));
 
     for (let i = 0; i < 20; i++) containerLvl1.addAsset(this.createMesh(geometryBox, "concrete", `building-${i}`));
