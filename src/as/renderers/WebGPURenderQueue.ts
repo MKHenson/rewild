@@ -24,6 +24,7 @@ export class WebGPURenderQueue {
     transformIndex: i32,
     projectionMatrix: Float32Array,
     modelViewMatrix: Float32Array,
+    modelMatrix: Float32Array,
     normalMatrix: Float32Array
   ): WebGPURenderQueue {
     const q = this.q;
@@ -31,6 +32,7 @@ export class WebGPURenderQueue {
     q.push(transformIndex);
     q.push(changetype<i32>(projectionMatrix));
     q.push(changetype<i32>(modelViewMatrix));
+    q.push(changetype<i32>(modelMatrix));
     q.push(changetype<i32>(normalMatrix));
     return this;
   }

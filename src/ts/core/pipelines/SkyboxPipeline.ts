@@ -3,7 +3,7 @@ import { GameManager } from "../GameManager";
 import { Texture } from "../textures/Texture";
 import { Pipeline } from "./Pipeline";
 import { TextureResource } from "./resources/TextureResource";
-import { TransformResource } from "./resources/TransformResource";
+import { TransformResource, TransformType } from "./resources/TransformResource";
 import { shader, shaderBuilder } from "./shader-lib/Utils";
 
 // prettier-ignore
@@ -13,22 +13,26 @@ ${e => e.getTemplateByType(ResourceType.Transform)!.template.vertexBlock }
 struct Output {
     @builtin(position) Position : vec4<f32>,
     @location(0) vFragUV : vec2<f32>,
-    @location(1) vViewPosition : vec3<f32>
+    @location(1) vViewPosition : vec3<f32>,
+    @location(2) vWorldDirection : vec3<f32>
 };
+
+fn transformDirection( dir: vec3<f32>, matrix: mat4x4<f32> ) -> vec3<f32> {
+  return normalize( ( matrix * vec4<f32>( dir, 0.0 ) ).xyz );
+}
 
 @stage(vertex)
 fn main(@location(0) pos: vec4<f32>, @location(1) uv: vec2<f32>) -> Output {
     var output: Output;
     var mvPosition = vec4<f32>( pos.xyz, 1.0 );
 
+    output.vWorldDirection = transformDirection( pos.xyz, uniforms.modelMatrix );
+
     mvPosition = uniforms.modelViewMatrix * mvPosition;
 
     output.vViewPosition = - mvPosition.xyz;
     output.Position = uniforms.projMatrix * mvPosition;
     output.vFragUV = uv;
-
-    var transformedNormal = uniforms.normalMatrix * norm.xyz;
-    output.vNormal = normalize( transformedNormal );
 
     return output;
 }
@@ -42,14 +46,17 @@ ${e => e.defines.diffuseMap ? e.getTemplateByType(ResourceType.Texture, 'diffuse
 @stage(fragment)
 fn main(
   @location(0) vFragUV: vec2<f32>,
-  @location(1) vViewPosition : vec3<f32>
+  @location(1) vViewPosition : vec3<f32>,
+  @location(2) vWorldDirection : vec3<f32>
 ) -> @location(0) vec4<f32> {
 
   var diffuseColor = vec4<f32>( 1.0, 1.0, 1.0, 1.0 );
+  var vReflect = vWorldDirection;
 
   ${e => e.defines.diffuseMap &&
-  `var texelColor = textureSample(diffuseTexture, diffuseSampler, vFragUV);
+  `var texelColor = textureSample(diffuseTexture, diffuseSampler, vec3<f32>( vReflect.x, vReflect.yz ));
   diffuseColor = diffuseColor * texelColor;`}
+
   return vec4<f32>( diffuseColor.xyz, 1.0);
 }
 `;
@@ -64,7 +71,9 @@ export class SkyboxPipeline extends Pipeline<Defines> {
   }
 
   onAddResources(): void {
-    const transformResource = new TransformResource();
+    const transformResource = new TransformResource(
+      TransformType.Projection | TransformType.ModelView | TransformType.Model
+    );
     this.addTemplate(transformResource);
 
     if (this.defines.diffuseMap) {
@@ -115,7 +124,7 @@ export class SkyboxPipeline extends Pipeline<Defines> {
             arrayStride: Float32Array.BYTES_PER_ELEMENT * 2,
             attributes: [
               {
-                shaderLocation: 2,
+                shaderLocation: 1,
                 format: "float32x2",
                 offset: 0,
               },

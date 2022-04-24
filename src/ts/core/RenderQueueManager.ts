@@ -6,6 +6,7 @@ import { Pipeline } from "./pipelines/Pipeline";
 import { LightingResource } from "./pipelines/resources/LightingResource";
 import { PipelineResourceInstance } from "./pipelines/resources/PipelineResourceInstance";
 import { WasmManager } from "./WasmManager";
+import { TransformResource } from "./pipelines/resources/TransformResource";
 
 const ARRAYBUFFERVIEW_DATASTART_OFFSET = 4;
 const normalAs4x4 = new Float32Array(12);
@@ -72,11 +73,13 @@ export class RenderQueueManager {
           break;
 
         case GPUCommands.SET_TRANSFORM:
+          const template = pipeline!.getTemplateByGroup(GroupType.Transform)! as TransformResource;
           instances = pipeline!.groupInstances.get(GroupType.Transform)!;
           resourceIndex = commandBuffer[i + 1];
           const projMatrixPtr = getPtrIndex(commandBuffer[i + 2]);
           const mvMatrixPtr = getPtrIndex(commandBuffer[i + 3]);
-          const normMatrixPtr = getPtrIndex(commandBuffer[i + 4]);
+          const mMatrixPtr = getPtrIndex(commandBuffer[i + 4]);
+          const normMatrixPtr = getPtrIndex(commandBuffer[i + 5]);
 
           const mat3x3 = new Float32Array(wasmMemoryBlock, normMatrixPtr, 9);
 
@@ -94,10 +97,16 @@ export class RenderQueueManager {
           normalAs4x4[10] = mat3x3[8];
 
           const transformBuffer = instances[resourceIndex].buffers![0];
-          device.queue.writeBuffer(transformBuffer, 0, wasmMemoryBlock, projMatrixPtr, 64);
-          device.queue.writeBuffer(transformBuffer, 64, wasmMemoryBlock, mvMatrixPtr, 64);
-          device.queue.writeBuffer(transformBuffer, 128, normalAs4x4);
-          i += 4;
+
+          if (template.projectionOffset !== -1)
+            device.queue.writeBuffer(transformBuffer, template.projectionOffset, wasmMemoryBlock, projMatrixPtr, 64);
+          if (template.modelViewOffset !== -1)
+            device.queue.writeBuffer(transformBuffer, template.modelViewOffset, wasmMemoryBlock, mvMatrixPtr, 64);
+          if (template.modelOffset !== -1)
+            device.queue.writeBuffer(transformBuffer, template.modelOffset, wasmMemoryBlock, mMatrixPtr, 64);
+          if (template.normalOffset !== -1)
+            device.queue.writeBuffer(transformBuffer, template.normalOffset, normalAs4x4);
+          i += 5;
           break;
 
         case GPUCommands.SET_INDEX_BUFFER:

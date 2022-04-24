@@ -6,7 +6,7 @@ import { Pipeline } from "./Pipeline";
 import { LightingResource } from "./resources/LightingResource";
 import { MaterialResource } from "./resources/MaterialResource";
 import { TextureResource } from "./resources/TextureResource";
-import { TransformResource } from "./resources/TransformResource";
+import { TransformResource, TransformType } from "./resources/TransformResource";
 import { mathConstants, mathFunctions } from "./shader-lib/MathFunctions";
 import { shader, shaderBuilder } from "./shader-lib/Utils";
 
@@ -332,7 +332,9 @@ export class DebugPipeline extends Pipeline<DebugDefines> {
   }
 
   onAddResources(): void {
-    const transformResource = new TransformResource();
+    const transformResource = new TransformResource(
+      TransformType.Projection | TransformType.ModelView | TransformType.Normal
+    );
     this.addTemplate(transformResource);
 
     const materialResource = new MaterialResource();
