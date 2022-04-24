@@ -1,7 +1,7 @@
 import { InputManager } from "./InputManager";
 import { GPUBufferUsageFlags } from "../../common/GPUEnums";
 import { PipelineType } from "../../common/PipelineType";
-import { DebugPipeline } from "./pipelines/DebugPipeline";
+import { DebugPipeline } from "./pipelines/debug-pipeline/DebugPipeline";
 import { Pipeline } from "./pipelines/Pipeline";
 import { createBuffer, createIndexBuffer } from "./Utils";
 import { RenderQueueManager } from "./RenderQueueManager";
@@ -11,7 +11,7 @@ import { WasmManager } from "./WasmManager";
 import { IBindable } from "./IBindable";
 import { BitmapTexture } from "./textures/BitmapTexture";
 import { BitmapCubeTexture } from "./textures/BitmapCubeTexture";
-import { SkyboxPipeline } from "./pipelines/SkyboxPipeline";
+import { SkyboxPipeline } from "./pipelines/skybox-pipeline/SkyboxPipeline";
 
 const sampleCount = 4;
 const MEDIA_URL = process.env.MEDIA_URL;
