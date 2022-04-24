@@ -278,6 +278,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _RenderQueueManager__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./RenderQueueManager */ "./src/ts/core/RenderQueueManager.ts");
 /* harmony import */ var _common_GroupType__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../common/GroupType */ "./src/common/GroupType.ts");
 /* harmony import */ var _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./textures/BitmapTexture */ "./src/ts/core/textures/BitmapTexture.ts");
+/* harmony import */ var _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./textures/BitmapCubeTexture */ "./src/ts/core/textures/BitmapCubeTexture.ts");
+/* harmony import */ var _pipelines_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./pipelines/SkyboxPipeline */ "./src/ts/core/pipelines/SkyboxPipeline.ts");
+
+
 
 
 
@@ -342,25 +346,9 @@ class GameManager {
     this.context = context;
     this.format = format; // TEXTURES
 
-    const texturePaths = [{
-      name: "grid",
-      src: MEDIA_URL + "uv-grid.jpg"
-    }, {
-      name: "crate",
-      src: MEDIA_URL + "crate-wooden.jpg"
-    }, {
-      name: "earth",
-      src: MEDIA_URL + "earth-day-2k.jpg"
-    }, {
-      name: "ground-coastal-1",
-      src: MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png"
-    }, {
-      name: "block-concrete-4",
-      src: MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png"
-    }];
-    this.textures = await Promise.all(texturePaths.map((tp, index) => {
-      const texture = new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__.BitmapTexture(tp.name, tp.src, device);
-      wasmExports.createTexture(wasmExports.__newString(tp.name), index);
+    const textures = [new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__.BitmapTexture("grid", MEDIA_URL + "uv-grid.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__.BitmapTexture("crate", MEDIA_URL + "crate-wooden.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__.BitmapTexture("earth", MEDIA_URL + "earth-day-2k.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__.BitmapTexture("ground-coastal-1", MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__.BitmapTexture("block-concrete-4", MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png", device), new _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapCubeTexture("desert-sky", [MEDIA_URL + "skyboxes/desert/px.jpg", MEDIA_URL + "skyboxes/desert/nx.jpg", MEDIA_URL + "skyboxes/desert/py.jpg", MEDIA_URL + "skyboxes/desert/ny.jpg", MEDIA_URL + "skyboxes/desert/pz.jpg", MEDIA_URL + "skyboxes/desert/nz.jpg"], device)];
+    this.textures = await Promise.all(textures.map((texture, index) => {
+      wasmExports.createTexture(wasmExports.__newString(texture.name), index);
       return texture.load(device);
     })); // PIPELINES
 
@@ -380,6 +368,8 @@ class GameManager {
     }), new _pipelines_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("concrete", {
       diffuseMap: this.textures[4],
       NUM_DIR_LIGHTS: 0
+    }), new _pipelines_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_8__.SkyboxPipeline("skybox", {
+      diffuseMap: this.textures[5]
     })];
     const size = this.canvasSize();
     this.onResize(size, false); // Initialize the wasm module
@@ -415,6 +405,7 @@ class GameManager {
     const containerLvl1 = wasm.Level1.wrap(containerLvl1Ptr);
     const geometrySphere = wasm.createSphere(1);
     const geometryBox = wasm.createBox(1);
+    containerLvl1.addAsset(this.createMesh(geometryBox, "skybox", "skybox"));
     containerLvl1.addAsset(this.createMesh(geometrySphere, "simple", "ball"));
 
     for (let i = 0; i < 20; i++) containerLvl1.addAsset(this.createMesh(geometryBox, "concrete", `building-${i}`));
@@ -807,11 +798,13 @@ class RenderQueueManager {
           break;
 
         case _common_Commands__WEBPACK_IMPORTED_MODULE_2__.GPUCommands.SET_TRANSFORM:
+          const template = pipeline.getTemplateByGroup(_common_GroupType__WEBPACK_IMPORTED_MODULE_0__.GroupType.Transform);
           instances = pipeline.groupInstances.get(_common_GroupType__WEBPACK_IMPORTED_MODULE_0__.GroupType.Transform);
           resourceIndex = commandBuffer[i + 1];
           const projMatrixPtr = getPtrIndex(commandBuffer[i + 2]);
           const mvMatrixPtr = getPtrIndex(commandBuffer[i + 3]);
-          const normMatrixPtr = getPtrIndex(commandBuffer[i + 4]);
+          const mMatrixPtr = getPtrIndex(commandBuffer[i + 4]);
+          const normMatrixPtr = getPtrIndex(commandBuffer[i + 5]);
           const mat3x3 = new Float32Array(wasmMemoryBlock, normMatrixPtr, 9); // TODO: Make this neater
 
           normalAs4x4[0] = mat3x3[0];
@@ -824,10 +817,11 @@ class RenderQueueManager {
           normalAs4x4[9] = mat3x3[7];
           normalAs4x4[10] = mat3x3[8];
           const transformBuffer = instances[resourceIndex].buffers[0];
-          device.queue.writeBuffer(transformBuffer, 0, wasmMemoryBlock, projMatrixPtr, 64);
-          device.queue.writeBuffer(transformBuffer, 64, wasmMemoryBlock, mvMatrixPtr, 64);
-          device.queue.writeBuffer(transformBuffer, 128, normalAs4x4);
-          i += 4;
+          if (template.projectionOffset !== -1) device.queue.writeBuffer(transformBuffer, template.projectionOffset, wasmMemoryBlock, projMatrixPtr, 64);
+          if (template.modelViewOffset !== -1) device.queue.writeBuffer(transformBuffer, template.modelViewOffset, wasmMemoryBlock, mvMatrixPtr, 64);
+          if (template.modelOffset !== -1) device.queue.writeBuffer(transformBuffer, template.modelOffset, wasmMemoryBlock, mMatrixPtr, 64);
+          if (template.normalOffset !== -1) device.queue.writeBuffer(transformBuffer, template.normalOffset, normalAs4x4);
+          i += 5;
           break;
 
         case _common_Commands__WEBPACK_IMPORTED_MODULE_2__.GPUCommands.SET_INDEX_BUFFER:
@@ -1389,7 +1383,7 @@ class DebugPipeline extends _Pipeline__WEBPACK_IMPORTED_MODULE_2__.Pipeline {
   }
 
   onAddResources() {
-    const transformResource = new _resources_TransformResource__WEBPACK_IMPORTED_MODULE_6__.TransformResource();
+    const transformResource = new _resources_TransformResource__WEBPACK_IMPORTED_MODULE_6__.TransformResource(_resources_TransformResource__WEBPACK_IMPORTED_MODULE_6__.TransformType.Projection | _resources_TransformResource__WEBPACK_IMPORTED_MODULE_6__.TransformType.ModelView | _resources_TransformResource__WEBPACK_IMPORTED_MODULE_6__.TransformType.Normal);
     this.addTemplate(transformResource);
     const materialResource = new _resources_MaterialResource__WEBPACK_IMPORTED_MODULE_4__.MaterialResource();
     this.addTemplate(materialResource);
@@ -1672,6 +1666,150 @@ class Pipeline {
       instanceArray.push(instances);
       return instanceArray.length - 1;
     } else throw new Error("Pipeline does not use resource type");
+  }
+
+}
+
+/***/ }),
+
+/***/ "./src/ts/core/pipelines/SkyboxPipeline.ts":
+/*!*************************************************!*\
+  !*** ./src/ts/core/pipelines/SkyboxPipeline.ts ***!
+  \*************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "SkyboxPipeline": () => (/* binding */ SkyboxPipeline)
+/* harmony export */ });
+/* harmony import */ var _common_ResourceType__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../common/ResourceType */ "./src/common/ResourceType.ts");
+/* harmony import */ var _Pipeline__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Pipeline */ "./src/ts/core/pipelines/Pipeline.ts");
+/* harmony import */ var _resources_TextureResource__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./resources/TextureResource */ "./src/ts/core/pipelines/resources/TextureResource.ts");
+/* harmony import */ var _resources_TransformResource__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./resources/TransformResource */ "./src/ts/core/pipelines/resources/TransformResource.ts");
+/* harmony import */ var _shader_lib_Utils__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./shader-lib/Utils */ "./src/ts/core/pipelines/shader-lib/Utils.ts");
+
+
+
+
+ // prettier-ignore
+
+const vertexShader = _shader_lib_Utils__WEBPACK_IMPORTED_MODULE_4__.shader`
+${e => e.getTemplateByType(_common_ResourceType__WEBPACK_IMPORTED_MODULE_0__.ResourceType.Transform).template.vertexBlock}
+
+struct Output {
+    @builtin(position) Position : vec4<f32>,
+    @location(0) vFragUV : vec2<f32>,
+    @location(1) vViewPosition : vec3<f32>,
+    @location(2) vWorldDirection : vec3<f32>
+};
+
+fn transformDirection( dir: vec3<f32>, matrix: mat4x4<f32> ) -> vec3<f32> {
+  return normalize( ( matrix * vec4<f32>( dir, 0.0 ) ).xyz );
+}
+
+@stage(vertex)
+fn main(@location(0) pos: vec4<f32>, @location(1) uv: vec2<f32>) -> Output {
+    var output: Output;
+    var mvPosition = vec4<f32>( pos.xyz, 1.0 );
+
+    output.vWorldDirection = transformDirection( pos.xyz, uniforms.modelMatrix );
+
+    mvPosition = uniforms.modelViewMatrix * mvPosition;
+
+    output.vViewPosition = - mvPosition.xyz;
+    output.Position = uniforms.projMatrix * mvPosition;
+    output.vFragUV = uv;
+
+    return output;
+}
+`; // prettier-ignore
+
+const fragmentShader = _shader_lib_Utils__WEBPACK_IMPORTED_MODULE_4__.shader`
+
+${e => e.defines.diffuseMap ? e.getTemplateByType(_common_ResourceType__WEBPACK_IMPORTED_MODULE_0__.ResourceType.Texture, 'diffuse').template.fragmentBlock : ''}
+
+@stage(fragment)
+fn main(
+  @location(0) vFragUV: vec2<f32>,
+  @location(1) vViewPosition : vec3<f32>,
+  @location(2) vWorldDirection : vec3<f32>
+) -> @location(0) vec4<f32> {
+
+  var diffuseColor = vec4<f32>( 1.0, 1.0, 1.0, 1.0 );
+  var vReflect = vWorldDirection;
+
+  ${e => e.defines.diffuseMap && `var texelColor = textureSample(diffuseTexture, diffuseSampler, vec3<f32>( vReflect.x, vReflect.yz ));
+  diffuseColor = diffuseColor * texelColor;`}
+
+  return vec4<f32>( diffuseColor.xyz, 1.0);
+}
+`;
+class SkyboxPipeline extends _Pipeline__WEBPACK_IMPORTED_MODULE_1__.Pipeline {
+  constructor(name, defines) {
+    super(name, vertexShader, fragmentShader, defines);
+  }
+
+  onAddResources() {
+    const transformResource = new _resources_TransformResource__WEBPACK_IMPORTED_MODULE_3__.TransformResource(_resources_TransformResource__WEBPACK_IMPORTED_MODULE_3__.TransformType.Projection | _resources_TransformResource__WEBPACK_IMPORTED_MODULE_3__.TransformType.ModelView | _resources_TransformResource__WEBPACK_IMPORTED_MODULE_3__.TransformType.Model);
+    this.addTemplate(transformResource);
+
+    if (this.defines.diffuseMap) {
+      const resource = new _resources_TextureResource__WEBPACK_IMPORTED_MODULE_2__.TextureResource(this.defines.diffuseMap, "diffuse");
+      this.addTemplate(resource);
+    }
+  }
+
+  build(gameManager) {
+    super.build(gameManager); // Build the shaders - should go after adding the resources as we might use those in the shader source
+
+    const vertSource = (0,_shader_lib_Utils__WEBPACK_IMPORTED_MODULE_4__.shaderBuilder)(this.vertexSource, this);
+    const fragSource = (0,_shader_lib_Utils__WEBPACK_IMPORTED_MODULE_4__.shaderBuilder)(this.fragmentSource, this);
+    this.renderPipeline = gameManager.device.createRenderPipeline({
+      primitive: {
+        topology: "triangle-list",
+        cullMode: "back",
+        frontFace: "cw"
+      },
+      depthStencil: {
+        format: "depth24plus",
+        depthWriteEnabled: false,
+        depthCompare: "less"
+      },
+      multisample: {
+        count: 4
+      },
+      label: "Skybox Pipeline",
+      vertex: {
+        module: gameManager.device.createShaderModule({
+          code: vertSource
+        }),
+        entryPoint: "main",
+        buffers: [{
+          arrayStride: Float32Array.BYTES_PER_ELEMENT * 3,
+          attributes: [{
+            shaderLocation: 0,
+            format: "float32x3",
+            offset: 0
+          }]
+        }, {
+          arrayStride: Float32Array.BYTES_PER_ELEMENT * 2,
+          attributes: [{
+            shaderLocation: 1,
+            format: "float32x2",
+            offset: 0
+          }]
+        }]
+      },
+      fragment: {
+        module: gameManager.device.createShaderModule({
+          code: fragSource
+        }),
+        entryPoint: "main",
+        targets: [{
+          format: gameManager.format
+        }]
+      }
+    });
   }
 
 }
@@ -2011,6 +2149,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _PipelineResourceTemplate__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./PipelineResourceTemplate */ "./src/ts/core/pipelines/resources/PipelineResourceTemplate.ts");
 /* harmony import */ var _common_GroupType__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../../common/GroupType */ "./src/common/GroupType.ts");
 /* harmony import */ var _common_ResourceType__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../../common/ResourceType */ "./src/common/ResourceType.ts");
+/* harmony import */ var _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../../textures/BitmapCubeTexture */ "./src/ts/core/textures/BitmapCubeTexture.ts");
+
 
 
 
@@ -2023,7 +2163,8 @@ class TextureResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODULE
   build(manager, pipeline, curBindIndex) {
     this.samplerBind = curBindIndex;
     this.textureBind = curBindIndex + 1;
-    const group = pipeline.groupIndex(this.groupType); // prettier-ignore
+    const group = pipeline.groupIndex(this.groupType);
+    const isCube = this.texture instanceof _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_3__.BitmapCubeTexture; // prettier-ignore
 
     return {
       group,
@@ -2033,19 +2174,28 @@ class TextureResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODULE
       @group(${group}) @binding(${this.samplerBind})
       var ${this.id}Sampler: sampler;
       @group(${group}) @binding(${this.textureBind})
-      var ${this.id}Texture: texture_2d<f32>;`}`,
+      var ${this.id}Texture: texture_${isCube ? '3d' : '2d'}<f32>;`}`,
       vertexBlock: null
     };
   }
 
   getBindingData(manager, pipeline) {
+    const isCube = this.texture instanceof _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_3__.BitmapCubeTexture;
+    const cubeTexture = this.texture;
     return {
       binds: [{
         binding: this.samplerBind,
         resource: this.texture.sampler.gpuSampler
       }, {
         binding: this.textureBind,
-        resource: this.texture.gpuTexture.createView()
+        resource: this.texture.gpuTexture.createView({
+          dimension: isCube ? "cube" : "2d",
+          aspect: "all",
+          label: isCube ? "Cube View Form" : "2D View Format",
+          arrayLayerCount: isCube ? cubeTexture.src.length : undefined,
+          baseArrayLayer: isCube ? 0 : undefined,
+          baseMipLevel: 0
+        })
       }],
       buffer: null
     };
@@ -2063,7 +2213,8 @@ class TextureResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODULE
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "TransformResource": () => (/* binding */ TransformResource)
+/* harmony export */   "TransformResource": () => (/* binding */ TransformResource),
+/* harmony export */   "TransformType": () => (/* binding */ TransformType)
 /* harmony export */ });
 /* harmony import */ var _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./MemoryUtils */ "./src/ts/core/pipelines/resources/MemoryUtils.ts");
 /* harmony import */ var _PipelineResourceTemplate__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./PipelineResourceTemplate */ "./src/ts/core/pipelines/resources/PipelineResourceTemplate.ts");
@@ -2073,15 +2224,68 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+let TransformType;
+
+(function (TransformType) {
+  TransformType[TransformType["Projection"] = 1] = "Projection";
+  TransformType[TransformType["ModelView"] = 2] = "ModelView";
+  TransformType[TransformType["Model"] = 4] = "Model";
+  TransformType[TransformType["Normal"] = 8] = "Normal";
+})(TransformType || (TransformType = {}));
+
 class TransformResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODULE_1__.PipelineResourceTemplate {
-  constructor() {
+  constructor(transformType) {
     super(_common_GroupType__WEBPACK_IMPORTED_MODULE_2__.GroupType.Transform, _common_ResourceType__WEBPACK_IMPORTED_MODULE_3__.ResourceType.Transform);
+    this.transformType = transformType;
+    this.projectionOffset = -1;
+    this.modelViewOffset = -1;
+    this.modelOffset = -1;
+    this.normalOffset = -1;
+  }
+
+  getBufferSize() {
+    const requiresProjection = this.transformType & TransformType.Projection;
+    const requiresModelView = this.transformType & TransformType.ModelView;
+    const requiresModel = this.transformType & TransformType.Model;
+    const requiresNormal = this.transformType & TransformType.Normal; // prettier-ignore
+
+    return (requiresProjection ? _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__.UNIFORM_TYPES_MAP["mat4x4<f32>"] : 0) + (requiresModelView ? _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__.UNIFORM_TYPES_MAP["mat4x4<f32>"] : 0) + (requiresModel ? _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__.UNIFORM_TYPES_MAP["mat4x4<f32>"] : 0) + (requiresNormal ? _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__.UNIFORM_TYPES_MAP["mat3x3<f32>"] : 0);
   }
 
   build(manager, pipeline, curBindIndex) {
     this.binding = curBindIndex;
     const group = pipeline.groupIndex(this.groupType);
-    const SIZEOF_MATRICES = _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__.UNIFORM_TYPES_MAP["mat4x4<f32>"] * 2 + _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__.UNIFORM_TYPES_MAP["mat3x3<f32>"];
+    const requiresProjection = this.transformType & TransformType.Projection;
+    const requiresModelView = this.transformType & TransformType.ModelView;
+    const requiresModel = this.transformType & TransformType.Model;
+    const requiresNormal = this.transformType & TransformType.Normal;
+    this.projectionOffset = -1;
+    this.modelViewOffset = -1;
+    this.modelOffset = -1;
+    this.normalOffset = -1;
+    let curOffset = 0;
+
+    if (requiresProjection) {
+      this.projectionOffset = curOffset;
+      curOffset += _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__.UNIFORM_TYPES_MAP["mat4x4<f32>"];
+    }
+
+    if (requiresModelView) {
+      this.modelViewOffset = curOffset;
+      curOffset += _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__.UNIFORM_TYPES_MAP["mat4x4<f32>"];
+    }
+
+    if (requiresModel) {
+      this.modelOffset = curOffset;
+      curOffset += _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__.UNIFORM_TYPES_MAP["mat4x4<f32>"];
+    }
+
+    if (requiresNormal) {
+      this.normalOffset = curOffset;
+      curOffset += _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__.UNIFORM_TYPES_MAP["mat3x3<f32>"];
+    }
+
+    const SIZEOF_MATRICES = this.getBufferSize();
     const buffer = manager.device.createBuffer({
       label: "transform",
       size: SIZEOF_MATRICES,
@@ -2096,9 +2300,10 @@ class TransformResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODU
       // prettier-ignore
       vertexBlock: `
       struct TransformUniform {
-        projMatrix: mat4x4<f32>,
-        modelViewMatrix: mat4x4<f32>,
-        normalMatrix: mat3x3<f32>
+        ${requiresProjection ? 'projMatrix: mat4x4<f32>,' : ''}
+        ${requiresModelView ? 'modelViewMatrix: mat4x4<f32>,' : ''}
+        ${requiresModel ? 'modelMatrix: mat4x4<f32>,' : ''}
+        ${requiresNormal ? 'normalMatrix: mat3x3<f32>' : ''}
       };
       @group(${group}) @binding(${curBindIndex})
       var<uniform> uniforms: TransformUniform;
@@ -2107,7 +2312,7 @@ class TransformResource extends _PipelineResourceTemplate__WEBPACK_IMPORTED_MODU
   }
 
   getBindingData(manager, pipeline) {
-    const SIZEOF_MATRICES = _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__.UNIFORM_TYPES_MAP["mat4x4<f32>"] * 2 + _MemoryUtils__WEBPACK_IMPORTED_MODULE_0__.UNIFORM_TYPES_MAP["mat3x3<f32>"];
+    const SIZEOF_MATRICES = this.getBufferSize();
     const buffer = manager.device.createBuffer({
       label: "transform",
       size: SIZEOF_MATRICES,
@@ -2271,6 +2476,64 @@ function shaderBuilder(sourceFragments, pipeline) {
     }
   });
   return str;
+}
+
+/***/ }),
+
+/***/ "./src/ts/core/textures/BitmapCubeTexture.ts":
+/*!***************************************************!*\
+  !*** ./src/ts/core/textures/BitmapCubeTexture.ts ***!
+  \***************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "BitmapCubeTexture": () => (/* binding */ BitmapCubeTexture)
+/* harmony export */ });
+/* harmony import */ var _ImageLoader__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./ImageLoader */ "./src/ts/core/textures/ImageLoader.ts");
+/* harmony import */ var _Texture__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Texture */ "./src/ts/core/textures/Texture.ts");
+
+
+class BitmapCubeTexture extends _Texture__WEBPACK_IMPORTED_MODULE_1__.Texture {
+  constructor(name, src, device, sampler) {
+    super(name, device, sampler);
+    this.src = src;
+  }
+
+  async load(device) {
+    let gpuTexture;
+    const loader = await new _ImageLoader__WEBPACK_IMPORTED_MODULE_0__.ImageLoader().loadImages(this.src);
+    gpuTexture = device.createTexture({
+      size: {
+        width: loader.maxWidth,
+        height: loader.maxHeight,
+        depthOrArrayLayers: this.src.length
+      },
+      format: "rgba8unorm",
+      dimension: "2d",
+      mipLevelCount: 1,
+      // TODO: why doesnt this work? this.getNumMipmaps(loader.maxWidth, loader.maxHeight),
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
+    });
+
+    for (let i = 0; i < this.src.length; i++) device.queue.copyExternalImageToTexture({
+      source: loader.images[i]
+    }, {
+      texture: gpuTexture,
+      origin: {
+        x: 0,
+        y: 0,
+        z: i
+      }
+    }, {
+      width: loader.maxWidth,
+      height: loader.maxHeight
+    });
+
+    this.gpuTexture = gpuTexture;
+    return this;
+  }
+
 }
 
 /***/ }),
