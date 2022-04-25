@@ -1,7 +1,8 @@
-import { AttributeTypes, BufferGeometry } from "../core/BufferGeometry";
+import { BufferGeometry } from "../core/BufferGeometry";
 import { Float32BufferAttribute } from "../core/BufferAttribute";
 import { Vector3 } from "../math/Vector3";
 import { f32Array } from "../utils";
+import { AttributeType } from "../../common/AttributeType";
 
 export class BoxGeometryParameters {
   public width: f32;
@@ -186,9 +187,9 @@ export class BoxGeometry extends BufferGeometry {
     // build geometry
 
     this.setIndexes(builder.indices);
-    this.setAttribute(AttributeTypes.POSITION, new Float32BufferAttribute(f32Array(builder.vertices), 3));
-    this.setAttribute(AttributeTypes.NORMAL, new Float32BufferAttribute(f32Array(builder.normals), 3));
-    this.setAttribute(AttributeTypes.UV, new Float32BufferAttribute(f32Array(builder.uvs), 2));
+    this.setAttribute(AttributeType.POSITION, new Float32BufferAttribute(f32Array(builder.vertices), 3));
+    this.setAttribute(AttributeType.NORMAL, new Float32BufferAttribute(f32Array(builder.normals), 3));
+    this.setAttribute(AttributeType.UV, new Float32BufferAttribute(f32Array(builder.uvs), 2));
   }
 
   // static fromJSON( data ) {

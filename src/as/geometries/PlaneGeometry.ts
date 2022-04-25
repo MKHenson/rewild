@@ -1,6 +1,7 @@
-import { AttributeTypes, BufferGeometry } from "../core/BufferGeometry";
+import { BufferGeometry } from "../core/BufferGeometry";
 import { Float32BufferAttribute } from "../core/BufferAttribute";
 import { f32Array } from "../utils";
+import { AttributeType } from "../../common/AttributeType";
 
 export class PlaneGeometryParameters {
   public width: f32;
@@ -77,9 +78,9 @@ export class PlaneGeometry extends BufferGeometry {
     }
 
     this.setIndexes(indices);
-    this.setAttribute(AttributeTypes.POSITION, new Float32BufferAttribute(f32Array(vertices), 3));
-    this.setAttribute(AttributeTypes.NORMAL, new Float32BufferAttribute(f32Array(normals), 3));
-    this.setAttribute(AttributeTypes.UV, new Float32BufferAttribute(f32Array(uvs), 2));
+    this.setAttribute(AttributeType.POSITION, new Float32BufferAttribute(f32Array(vertices), 3));
+    this.setAttribute(AttributeType.NORMAL, new Float32BufferAttribute(f32Array(normals), 3));
+    this.setAttribute(AttributeType.UV, new Float32BufferAttribute(f32Array(uvs), 2));
   }
 
   // TODO:

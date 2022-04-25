@@ -148,7 +148,7 @@ export class Level1 extends Container implements Listener {
     this.floor.scale.set(200, 0.1, 200);
     this.floor.position.set(0, -0.1, 0);
 
-    this.sbybox.scale.set(2, 2, 2);
+    this.sbybox.scale.set(200, 200, 200);
     this.sbybox.position.set(0, 0, 0);
 
     // Possitive z comes out of screen
