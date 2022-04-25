@@ -50,6 +50,10 @@ export class MainMenu extends Container implements Listener {
     this.objects[0].scale.set(30, 30, 30);
     this.objects[0].rotation.x = degToRad(180);
 
+    const sbybox = this.findObjectByName("skybox")!;
+    sbybox.scale.set(200, 200, 200);
+    sbybox.position.set(0, 0, 0);
+
     uiSignaller.addEventListener("uievent", this);
   }
 

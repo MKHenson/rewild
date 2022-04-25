@@ -4,7 +4,6 @@ import type { SkyboxDefines } from "./SkyboxPipeline";
 
 // prettier-ignore
 export const fragmentShader = shader<SkyboxDefines>`
-
 ${e => e.defines.diffuseMap ? e.getTemplateByType(ResourceType.Texture, 'diffuse')!.template.fragmentBlock : ''}
 
 @stage(fragment)

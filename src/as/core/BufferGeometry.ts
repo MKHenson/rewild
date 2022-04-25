@@ -21,6 +21,7 @@ import { GLBufferAttribute } from "./GLBufferAttribute";
 import { Event } from "./Event";
 import { toTypedArray } from "../utils";
 import { BridgeManager } from "../core/BridgeManager";
+import { AttributeType } from "../../common/AttributeType";
 
 let _id = 0;
 
@@ -30,13 +31,6 @@ const _offset = new Vector3();
 const _box = new Box3();
 const _boxMorphTargets = new Box3();
 const _vector = new Vector3();
-
-export class AttributeTypes {
-  static POSITION: symbol = Symbol();
-  static NORMAL: symbol = Symbol();
-  static UV: symbol = Symbol();
-  static TANGENT: symbol = Symbol();
-}
 
 export class BufferGeometryDrawRange {
   start: i32;
@@ -68,9 +62,9 @@ export class BufferGeometry extends EventDispatcher {
   type: string;
 
   indexes: Uint32BufferAttribute | null;
-  attributes: Map<symbol, BaseAttribute>;
+  attributes: Map<AttributeType, BaseAttribute>;
 
-  morphAttributes: Map<symbol, BaseAttribute[]>;
+  morphAttributes: Map<AttributeType, BaseAttribute[]>;
   morphTargetsRelative: boolean;
 
   groups: BufferGeometryGroup[];
@@ -126,35 +120,35 @@ export class BufferGeometry extends EventDispatcher {
   }
   // ==================
 
-  getAttribute<K extends BaseAttribute>(name: symbol): K | null {
+  getAttribute<K extends BaseAttribute>(name: AttributeType): K | null {
     if (this.hasAttribute(name)) return this.attributes.get(name) as K;
     else return null;
   }
 
-  getMorphAttribute<K extends BaseAttribute>(name: symbol): K[] | null {
+  getMorphAttribute<K extends BaseAttribute>(name: AttributeType): K[] | null {
     if (this.hasMoprhAttribute(name)) {
       const toRet = this.morphAttributes.get(name);
       return changetype<K[]>(toRet);
     } else return null;
   }
 
-  setAttribute(name: symbol, attribute: BaseAttribute): BufferGeometry {
+  setAttribute(name: AttributeType, attribute: BaseAttribute): BufferGeometry {
     this.attributes.set(name, attribute);
 
     return this;
   }
 
-  deleteAttribute(name: symbol): BufferGeometry {
+  deleteAttribute(name: AttributeType): BufferGeometry {
     this.attributes.delete(name);
 
     return this;
   }
 
-  hasAttribute(name: symbol): bool {
+  hasAttribute(name: AttributeType): bool {
     return this.attributes.has(name);
   }
 
-  hasMoprhAttribute(name: symbol): bool {
+  hasMoprhAttribute(name: AttributeType): bool {
     return this.morphAttributes.has(name);
   }
 
@@ -172,7 +166,7 @@ export class BufferGeometry extends EventDispatcher {
   }
 
   applyMatrix4(matrix: Matrix4): BufferGeometry {
-    const position = this.getAttribute<Float32BufferAttribute>(AttributeTypes.POSITION);
+    const position = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION);
 
     if (position) {
       BufferAttribute.applyMatrix4(matrix, position);
@@ -180,7 +174,7 @@ export class BufferGeometry extends EventDispatcher {
       position.needsUpdate = true;
     }
 
-    const normal = this.getAttribute<Float32BufferAttribute>(AttributeTypes.NORMAL);
+    const normal = this.getAttribute<Float32BufferAttribute>(AttributeType.NORMAL);
 
     if (normal !== null) {
       const normalMatrix = new Matrix3().getNormalMatrix(matrix);
@@ -188,7 +182,7 @@ export class BufferGeometry extends EventDispatcher {
       normal.needsUpdate = true;
     }
 
-    const tangent = this.getAttribute<Float32BufferAttribute>(AttributeTypes.TANGENT);
+    const tangent = this.getAttribute<Float32BufferAttribute>(AttributeType.TANGENT);
 
     if (tangent !== null) {
       BufferAttribute.transformDirection(matrix, tangent);
@@ -295,7 +289,7 @@ export class BufferGeometry extends EventDispatcher {
     }
 
     this.setAttribute(
-      AttributeTypes.POSITION,
+      AttributeType.POSITION,
       new Float32BufferAttribute(toTypedArray<f32, Float32Array>(position, Float32Array.BYTES_PER_ELEMENT), 3)
     );
 
@@ -307,8 +301,8 @@ export class BufferGeometry extends EventDispatcher {
       this.boundingBox = new Box3();
     }
 
-    const position = this.getAttribute<Float32BufferAttribute>(AttributeTypes.POSITION);
-    const morphAttributesPosition = this.getMorphAttribute<Float32BufferAttribute>(AttributeTypes.POSITION);
+    const position = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION);
+    const morphAttributesPosition = this.getMorphAttribute<Float32BufferAttribute>(AttributeType.POSITION);
 
     if (position && position instanceof GLBufferAttribute) {
       BridgeManager.getBridge().print(
@@ -358,8 +352,8 @@ export class BufferGeometry extends EventDispatcher {
       this.boundingSphere = new Sphere();
     }
 
-    const position = this.getAttribute<Float32BufferAttribute>(AttributeTypes.POSITION);
-    const morphAttributesPosition = this.getMorphAttribute<Float32BufferAttribute>(AttributeTypes.POSITION);
+    const position = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION);
+    const morphAttributesPosition = this.getMorphAttribute<Float32BufferAttribute>(AttributeType.POSITION);
 
     if (position && position instanceof GLBufferAttribute) {
       BridgeManager.getBridge().print(
@@ -452,26 +446,26 @@ export class BufferGeometry extends EventDispatcher {
 
     if (
       index === null ||
-      !attributes.has(AttributeTypes.POSITION) ||
-      !attributes.has(AttributeTypes.NORMAL) ||
-      !attributes.has(AttributeTypes.UV)
+      !attributes.has(AttributeType.POSITION) ||
+      !attributes.has(AttributeType.NORMAL) ||
+      !attributes.has(AttributeType.UV)
     )
       throw new ASError(
         "BufferGeometry: .computeTangents() failed. Missing required attributes (index, position, normal or uv)"
       );
 
     const indices = index.array;
-    const positions = this.getAttribute<Float32BufferAttribute>(AttributeTypes.POSITION)!.array;
-    const normals = this.getAttribute<Float32BufferAttribute>(AttributeTypes.NORMAL)!.array;
-    const uvs = this.getAttribute<Float32BufferAttribute>(AttributeTypes.UV)!.array;
+    const positions = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION)!.array;
+    const normals = this.getAttribute<Float32BufferAttribute>(AttributeType.NORMAL)!.array;
+    const uvs = this.getAttribute<Float32BufferAttribute>(AttributeType.UV)!.array;
 
     const nVertices = positions.length / 3;
 
-    if (!attributes.has(AttributeTypes.TANGENT)) {
-      this.setAttribute(AttributeTypes.TANGENT, new Float32BufferAttribute(new Float32Array(4 * nVertices), 4));
+    if (!attributes.has(AttributeType.TANGENT)) {
+      this.setAttribute(AttributeType.TANGENT, new Float32BufferAttribute(new Float32Array(4 * nVertices), 4));
     }
 
-    const tangents = this.getAttribute<Float32BufferAttribute>(AttributeTypes.TANGENT)!.array;
+    const tangents = this.getAttribute<Float32BufferAttribute>(AttributeType.TANGENT)!.array;
 
     const tan1: Vector3[] = [],
       tan2: Vector3[] = [];
@@ -584,14 +578,14 @@ export class BufferGeometry extends EventDispatcher {
 
   computeVertexNormals(): void {
     const index = this.indexes;
-    const positionAttribute = this.getAttribute<Float32BufferAttribute>(AttributeTypes.POSITION);
+    const positionAttribute = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION);
 
     if (positionAttribute !== null) {
-      let normalAttribute = this.getAttribute<Float32BufferAttribute>(AttributeTypes.NORMAL);
+      let normalAttribute = this.getAttribute<Float32BufferAttribute>(AttributeType.NORMAL);
 
       if (normalAttribute === null) {
         normalAttribute = new BufferAttribute(new Float32Array(positionAttribute.count * 3), 3);
-        this.setAttribute(AttributeTypes.NORMAL, normalAttribute);
+        this.setAttribute(AttributeType.NORMAL, normalAttribute);
       } else {
         // reset existing normals to zero
 
@@ -689,7 +683,7 @@ export class BufferGeometry extends EventDispatcher {
   }
 
   normalizeNormals(): void {
-    const normals = this.getAttribute<Float32BufferAttribute>(AttributeTypes.NORMAL);
+    const normals = this.getAttribute<Float32BufferAttribute>(AttributeType.NORMAL);
     if (!normals) throw new Error("No normal attribute defined");
 
     for (let i = 0, il = normals.count; i < il; i++) {

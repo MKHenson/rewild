@@ -1,7 +1,8 @@
 import { Float32BufferAttribute, Uint16BufferAttribute } from "../core/BufferAttribute";
-import { AttributeTypes, BufferGeometry } from "../core/BufferGeometry";
+import { BufferGeometry } from "../core/BufferGeometry";
 import { Vector2 } from "../math/Vector2";
 import { Vector3 } from "../math/Vector3";
+import { AttributeType } from "../../common/AttributeType";
 
 export class CapsuleGeometryParameters {
   public radiusTop: f32;
@@ -267,8 +268,8 @@ export class CapsuleGeometry extends BufferGeometry {
 
     // build geometry
     this.setIndexAttrbute(builder.indices);
-    this.setAttribute(AttributeTypes.POSITION, builder.vertices);
-    this.setAttribute(AttributeTypes.NORMAL, builder.normals);
-    this.setAttribute(AttributeTypes.UV, builder.uvs);
+    this.setAttribute(AttributeType.POSITION, builder.vertices);
+    this.setAttribute(AttributeType.NORMAL, builder.normals);
+    this.setAttribute(AttributeType.UV, builder.uvs);
   }
 }

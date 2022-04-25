@@ -4,7 +4,8 @@ import { PipelineResourceInstance } from "./resources/PipelineResourceInstance";
 import { GroupType } from "../../../common/GroupType";
 import { ResourceType } from "../../../common/ResourceType";
 import "./shader-lib/Utils";
-import { Defines, SourceFragments } from "./shader-lib/Utils";
+import { Defines, shaderBuilder, SourceFragments } from "./shader-lib/Utils";
+import { VertexBufferLayout } from "./VertexBufferLayout";
 
 export class GroupMapping {
   index: number;
@@ -35,6 +36,14 @@ export abstract class Pipeline<T extends Defines<T>> {
   groupMapping: Map<GroupType, GroupMapping>;
   private groups: number;
 
+  topology: GPUPrimitiveTopology;
+  cullMode: GPUCullMode;
+  frontFace: GPUFrontFace;
+  depthFormat: GPUTextureFormat;
+  depthWriteEnabled: boolean;
+  depthCompare: GPUCompareFunction;
+  vertexLayouts: VertexBufferLayout[];
+
   constructor(name: string, vertexSource: SourceFragments<T>, fragmentSource: SourceFragments<T>, defines: Defines<T>) {
     this.name = name;
     this.renderPipeline = null;
@@ -47,6 +56,13 @@ export abstract class Pipeline<T extends Defines<T>> {
 
     this.groupMapping = new Map();
     this.groups = 0;
+
+    this.topology = "triangle-list";
+    this.cullMode = "back";
+    this.frontFace = "ccw";
+    this.depthFormat = "depth24plus";
+    this.depthWriteEnabled = true;
+    this.depthCompare = "less";
   }
 
   set defines(defines: T) {
@@ -133,6 +149,48 @@ export abstract class Pipeline<T extends Defines<T>> {
       binds.set(groupIndex, curBinding);
 
       resourceTemplate.template = template;
+    });
+
+    // Build the shaders - should go after adding the resources as we might use those in the shader source
+    const vertSource = shaderBuilder(this.vertexSource, this);
+    const fragSource = shaderBuilder(this.fragmentSource, this);
+
+    this.renderPipeline = gameManager.device.createRenderPipeline({
+      primitive: {
+        topology: this.topology,
+        cullMode: this.cullMode,
+        frontFace: this.frontFace,
+      },
+      depthStencil: {
+        format: this.depthFormat,
+        depthWriteEnabled: this.depthWriteEnabled,
+        depthCompare: this.depthCompare,
+      },
+      multisample: {
+        count: 4,
+      },
+      label: this.name,
+      vertex: {
+        module: gameManager.device.createShaderModule({
+          code: vertSource,
+        }),
+        entryPoint: "main",
+        buffers: this.vertexLayouts.map(
+          (layout) =>
+            ({
+              arrayStride: layout.arrayStride,
+              stepMode: layout.stepMode,
+              attributes: layout.attributes,
+            } as GPUVertexBufferLayout)
+        ),
+      },
+      fragment: {
+        module: gameManager.device.createShaderModule({
+          code: fragSource,
+        }),
+        entryPoint: "main",
+        targets: [{ format: gameManager.format }],
+      },
     });
   }
 

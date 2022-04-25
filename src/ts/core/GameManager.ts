@@ -124,6 +124,18 @@ export class GameManager implements IBindable {
         ],
         device
       ),
+      new BitmapCubeTexture(
+        "starry-sky",
+        [
+          MEDIA_URL + "skyboxes/stars/left.png",
+          MEDIA_URL + "skyboxes/stars/right.png",
+          MEDIA_URL + "skyboxes/stars/top.png",
+          MEDIA_URL + "skyboxes/stars/bottom.png",
+          MEDIA_URL + "skyboxes/stars/front.png",
+          MEDIA_URL + "skyboxes/stars/back.png",
+        ],
+        device
+      ),
     ];
 
     this.textures = await Promise.all(
@@ -146,6 +158,7 @@ export class GameManager implements IBindable {
       new DebugPipeline("earth", { diffuseMap: this.textures[2], NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("concrete", { diffuseMap: this.textures[4], NUM_DIR_LIGHTS: 0 }),
       new SkyboxPipeline("skybox", { diffuseMap: this.textures[5] }),
+      new SkyboxPipeline("stars", { diffuseMap: this.textures[6] }),
     ];
 
     const size = this.canvasSize();
@@ -197,13 +210,20 @@ export class GameManager implements IBindable {
     containerLvl1.addAsset(this.createMesh(geometryBox, "coastal-floor", "floor"));
     wasm.__unpin(containerLvl1Ptr);
 
+    const containerTestPtr = wasm.__pin(wasm.createTestLevel());
+    const containerTestLevel = wasm.TestLevel.wrap(containerTestPtr);
+    containerTestLevel.addAsset(this.createMesh(geometryBox, "skybox", "skybox"));
+    wasm.__unpin(containerTestPtr);
+
     const containerMainMenuPtr = wasm.__pin(wasm.createMainMenu());
     const containerMainMenu = wasm.MainMenu.wrap(containerMainMenuPtr);
     containerMainMenu.addAsset(this.createMesh(geometrySphere, "earth"));
+    containerMainMenu.addAsset(this.createMesh(geometryBox, "stars", "skybox"));
     wasm.__unpin(containerMainMenuPtr);
 
     runime.addContainer(containerLvl1Ptr, false);
     runime.addContainer(containerMainMenuPtr, true);
+    runime.addContainer(containerTestPtr, false);
   }
 
   createMesh(geometryPtr: number, pipelineName: string, name?: string) {
@@ -219,6 +239,10 @@ export class GameManager implements IBindable {
       PipelineType.Mesh
     );
     const meshPipelineIns = wasmExports.MeshPipelineInstance.wrap(pipelineInsPtr);
+
+    pipeline.vertexLayouts.map((buffer) =>
+      buffer.attributes.map((attr) => meshPipelineIns.addAttribute(attr.attributeType, attr.shaderLocation))
+    );
 
     // Assign a transform buffer to the intance
     meshPipelineIns.transformResourceIndex = pipeline.addResourceInstance(this, GroupType.Transform);

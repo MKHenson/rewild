@@ -33,7 +33,7 @@ export class TextureResource extends PipelineResourceTemplate {
       @group(${group}) @binding(${this.samplerBind})
       var ${this.id}Sampler: sampler;
       @group(${group}) @binding(${this.textureBind})
-      var ${this.id}Texture: texture_${ isCube ? '3d' : '2d'}<f32>;`
+      var ${this.id}Texture: ${ isCube ? 'texture_cube' : 'texture_2d'}<f32>;`
       }`,
       vertexBlock: null,
     };

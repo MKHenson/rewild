@@ -6,12 +6,13 @@ import { Matrix4 } from "../math/Matrix4";
 import { Object } from "../core/Object";
 import { Triangle } from "../math/Triangle";
 import { Side } from "../../common/GLEnums";
-import { AttributeTypes, BufferGeometry } from "../core/BufferGeometry";
+import { BufferGeometry } from "../core/BufferGeometry";
 import { MeshPipelineInstance } from "../pipelines/MeshPipelineInstance";
 import { Raycaster } from "../core/Raycaster";
 import { BufferAttribute, Float32BufferAttribute } from "../core/BufferAttribute";
 import { SkinnedMesh } from "./SkinnedMesh";
 import { PipelineInstance } from "../pipelines/PipelineInstance";
+import { AttributeType } from "../../common/AttributeType";
 
 export class Face {
   public a: i32;
@@ -154,11 +155,11 @@ export class Mesh extends Object {
 
     const indexes = geometry.indexes;
 
-    const position = geometry.getAttribute<Float32BufferAttribute>(AttributeTypes.POSITION)!;
-    const morphPosition = geometry.getMorphAttribute<Float32BufferAttribute>(AttributeTypes.POSITION);
+    const position = geometry.getAttribute<Float32BufferAttribute>(AttributeType.POSITION)!;
+    const morphPosition = geometry.getMorphAttribute<Float32BufferAttribute>(AttributeType.POSITION);
     const morphTargetsRelative = geometry.morphTargetsRelative;
-    const uv = geometry.getAttribute<Float32BufferAttribute>(AttributeTypes.UV);
-    const uv2 = geometry.getAttribute<Float32BufferAttribute>(AttributeTypes.UV);
+    const uv = geometry.getAttribute<Float32BufferAttribute>(AttributeType.UV);
+    const uv2 = geometry.getAttribute<Float32BufferAttribute>(AttributeType.UV);
     const groups = geometry.groups;
     const drawRange = geometry.drawRange;
 

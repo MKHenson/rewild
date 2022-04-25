@@ -3,7 +3,7 @@ import { Vector3 } from "../math/Vector3";
 import { Matrix4 } from "../math/Matrix4";
 import { Triangle } from "../math/Triangle";
 import { Object } from "../core/Object";
-import { AttributeTypes, BufferGeometry } from "../core/BufferGeometry";
+import { BufferGeometry } from "../core/BufferGeometry";
 import { InterleavedBuffer } from "../core/InterleavedBuffer";
 import { InterleavedBufferAttribute } from "../core/InterleavedBufferAttribute";
 import { SpriteMaterial } from "../materials/SpriteMaterial";
@@ -12,6 +12,7 @@ import { Raycaster } from "../core/Raycaster";
 import { Intersection } from "./Mesh";
 import { PerspectiveCamera } from "../cameras/PerspectiveCamera";
 import { ASError } from "../core/Error";
+import { AttributeType } from "../../common/AttributeType";
 
 let _geometry: BufferGeometry;
 
@@ -50,8 +51,8 @@ export class Sprite extends Object {
       const interleavedBuffer = new InterleavedBuffer(float32Array, 5);
 
       _geometry.setIndexes([0, 1, 2, 0, 2, 3]);
-      _geometry.setAttribute(AttributeTypes.POSITION, new InterleavedBufferAttribute(interleavedBuffer, 3, 0, false));
-      _geometry.setAttribute(AttributeTypes.UV, new InterleavedBufferAttribute(interleavedBuffer, 2, 3, false));
+      _geometry.setAttribute(AttributeType.POSITION, new InterleavedBufferAttribute(interleavedBuffer, 3, 0, false));
+      _geometry.setAttribute(AttributeType.UV, new InterleavedBufferAttribute(interleavedBuffer, 2, 3, false));
     }
 
     this.geometry = _geometry;

@@ -7,10 +7,10 @@ import { Vector4 } from "../math/Vector4";
 import { Mesh } from "../objects/Mesh";
 import { Scene } from "../scenes/Scene";
 import { WebGPUGeometries } from "./WebGPUGeometries";
-import { AttributeTypes } from "../core/BufferGeometry";
 import { GroupType } from "../../common/GroupType";
 import { WebGPULights } from "./WebGPULights";
 import { Light } from "../lights/Light";
+import { AttributeType } from "../../common/AttributeType";
 
 const renderQueue = new WebGPURenderQueue();
 
@@ -81,12 +81,13 @@ export class WebGPURenderer {
   renderMesh(mesh: Mesh, camera: Camera): void {
     mesh.modelViewMatrix.multiplyMatrices(camera.matrixWorldInverse, mesh.matrixWorld);
     mesh.normalMatrix.getNormalMatrix(mesh.modelViewMatrix);
+    const pipelineInstance = mesh.pipelines[0];
 
     // TODO:
     // ========================
-    renderQueue.setPipeline(mesh.pipelines[0].index);
+    renderQueue.setPipeline(pipelineInstance.index);
 
-    const transformIndex = mesh.pipelines[0].transformResourceIndex;
+    const transformIndex = pipelineInstance.transformResourceIndex;
 
     renderQueue.setTransform(
       transformIndex,
@@ -104,14 +105,32 @@ export class WebGPURenderer {
     if (mesh.geometry) {
       const attributeMap = this.geometries.get(mesh.geometry);
       if (attributeMap) {
-        if (attributeMap.attributeBuffers.has(AttributeTypes.POSITION))
-          renderQueue.setBuffer(0, attributeMap.attributeBuffers.get(AttributeTypes.POSITION));
+        if (
+          attributeMap.attributeBuffers.has(AttributeType.POSITION) &&
+          pipelineInstance.attributes.has(AttributeType.POSITION)
+        ) {
+          renderQueue.setBuffer(
+            pipelineInstance.attributes.get(AttributeType.POSITION),
+            attributeMap.attributeBuffers.get(AttributeType.POSITION)
+          );
+        }
 
-        if (attributeMap.attributeBuffers.has(AttributeTypes.NORMAL))
-          renderQueue.setBuffer(1, attributeMap.attributeBuffers.get(AttributeTypes.NORMAL));
+        if (
+          attributeMap.attributeBuffers.has(AttributeType.NORMAL) &&
+          pipelineInstance.attributes.has(AttributeType.NORMAL)
+        ) {
+          renderQueue.setBuffer(
+            pipelineInstance.attributes.get(AttributeType.NORMAL),
+            attributeMap.attributeBuffers.get(AttributeType.NORMAL)
+          );
+        }
 
-        if (attributeMap.attributeBuffers.has(AttributeTypes.UV))
-          renderQueue.setBuffer(2, attributeMap.attributeBuffers.get(AttributeTypes.UV));
+        if (attributeMap.attributeBuffers.has(AttributeType.UV) && pipelineInstance.attributes.has(AttributeType.UV)) {
+          renderQueue.setBuffer(
+            pipelineInstance.attributes.get(AttributeType.UV),
+            attributeMap.attributeBuffers.get(AttributeType.UV)
+          );
+        }
 
         if (attributeMap.indexBuffer != -1) {
           renderQueue.setIndexBuffer(attributeMap.indexBuffer);

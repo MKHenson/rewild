@@ -1,17 +1,18 @@
 import { GPUBufferUsageFlags } from "../../common/GPUEnums";
 import { Float32BufferAttribute } from "../core/BufferAttribute";
-import { AttributeTypes, BufferGeometry } from "../core/BufferGeometry";
+import { BufferGeometry } from "../core/BufferGeometry";
 import { Event } from "../core/Event";
 import { Listener } from "../core/EventDispatcher";
 import { InstancedBufferGeometry } from "../core/InstancedBufferGeometry";
 import { createBufferFromF32, createIndexBuffer } from "../Imports";
+import { AttributeType } from "../../common/AttributeType";
 
 export class AttributeMap {
-  attributeBuffers: Map<symbol, i32>;
+  attributeBuffers: Map<AttributeType, i32>;
   indexBuffer: i32;
 
   constructor() {
-    this.attributeBuffers = new Map<symbol, i32>();
+    this.attributeBuffers = new Map<AttributeType, i32>();
     this.indexBuffer = -1;
   }
 }
@@ -52,28 +53,28 @@ export class WebGPUGeometries implements Listener {
 
       geometries.set(geometry.id, attributeMap);
 
-      const posBuffer = geometry.getAttribute<Float32BufferAttribute>(AttributeTypes.POSITION);
-      const normBuffer = geometry.getAttribute<Float32BufferAttribute>(AttributeTypes.NORMAL);
-      const uvBuffer = geometry.getAttribute<Float32BufferAttribute>(AttributeTypes.UV);
+      const posBuffer = geometry.getAttribute<Float32BufferAttribute>(AttributeType.POSITION);
+      const normBuffer = geometry.getAttribute<Float32BufferAttribute>(AttributeType.NORMAL);
+      const uvBuffer = geometry.getAttribute<Float32BufferAttribute>(AttributeType.UV);
       const indexBuffer = geometry.getIndexes();
 
       if (posBuffer) {
         attributeMap.attributeBuffers.set(
-          AttributeTypes.POSITION,
+          AttributeType.POSITION,
           createBufferFromF32(posBuffer.array, GPUBufferUsageFlags.COPY_DST | GPUBufferUsageFlags.VERTEX)
         );
       }
 
       if (normBuffer) {
         attributeMap.attributeBuffers.set(
-          AttributeTypes.NORMAL,
+          AttributeType.NORMAL,
           createBufferFromF32(normBuffer.array, GPUBufferUsageFlags.COPY_DST | GPUBufferUsageFlags.VERTEX)
         );
       }
 
       if (uvBuffer) {
         attributeMap.attributeBuffers.set(
-          AttributeTypes.UV,
+          AttributeType.UV,
           createBufferFromF32(uvBuffer.array, GPUBufferUsageFlags.COPY_DST | GPUBufferUsageFlags.VERTEX)
         );
       }
