@@ -28,7 +28,6 @@ export class RenderQueueManager {
     const getPtrIndex = function (ptr: number) {
       return wasmArrayBuffer[(ptr + ARRAYBUFFERVIEW_DATASTART_OFFSET) >>> 2];
     };
-    getPtrIndex;
 
     let pipeline: Pipeline<any>, buffer: GPUBuffer, instances: PipelineResourceInstance[], resourceIndex: number;
 

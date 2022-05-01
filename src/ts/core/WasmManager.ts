@@ -12,7 +12,6 @@ export class WasmManager {
   exports: IWasmExports;
 
   wasmArrayBuffer: Uint32Array;
-  wasmDataView: DataView;
   wasmMemoryBlock: ArrayBuffer;
 
   constructor() {}
@@ -55,8 +54,8 @@ export class WasmManager {
 
     const obj = await loader.instantiateStreaming<typeof MyModule>(fetch(wasmFile), this.importObject);
     this.exports = obj.exports;
+
     this.wasmMemoryBlock = obj.exports.memory!.buffer;
     this.wasmArrayBuffer = new Uint32Array(this.wasmMemoryBlock);
-    this.wasmDataView = new DataView(this.exports.memory.buffer);
   }
 }
