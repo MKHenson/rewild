@@ -783,7 +783,6 @@ class RenderQueueManager {
       return wasmArrayBuffer[ptr + ARRAYBUFFERVIEW_DATASTART_OFFSET >>> 2];
     };
 
-    getPtrIndex;
     let pipeline, buffer, instances, resourceIndex;
     let pass = manager.currentPass;
 
@@ -1055,7 +1054,6 @@ class WasmManager {
     this.exports = obj.exports;
     this.wasmMemoryBlock = obj.exports.memory.buffer;
     this.wasmArrayBuffer = new Uint32Array(this.wasmMemoryBlock);
-    this.wasmDataView = new DataView(this.exports.memory.buffer);
   }
 
 }
