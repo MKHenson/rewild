@@ -1,4 +1,4 @@
-import { WasmManager } from "./WasmManager";
+import { wasm } from "./WasmManager";
 
 export enum MouseEventType {
   MouseDown,
@@ -14,7 +14,6 @@ export enum KeyEventType {
 
 export class InputManager {
   canvas: HTMLCanvasElement;
-  wasmManager: WasmManager;
 
   private onDownHandler: (e: MouseEvent) => void;
   private onUpHandler: (e: MouseEvent) => void;
@@ -26,8 +25,7 @@ export class InputManager {
   private onPointerlockErrorHandler: () => void;
   private canvasBounds: DOMRect;
 
-  constructor(canvas: HTMLCanvasElement, wasm: WasmManager) {
-    this.wasmManager = wasm;
+  constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.canvasBounds = canvas.getBoundingClientRect();
 
@@ -95,9 +93,8 @@ export class InputManager {
   }
 
   private createMouseEvent(e: MouseEvent, bounds: DOMRect, delta: number = 0) {
-    const wasmExports = this.wasmManager.exports;
-    const mouseEventPtr = wasmExports.__pin(
-      wasmExports.createMouseEvent(
+    const mouseEventPtr = wasm.__pin(
+      wasm.createMouseEvent(
         e.clientX,
         e.clientY,
         e.pageX,
@@ -121,8 +118,7 @@ export class InputManager {
   }
 
   private sendMouseEvent(type: MouseEventType, event: MouseEvent, bounds: DOMRect, delta: number): void {
-    const wasmExports = this.wasmManager.exports;
-    const manager = wasmExports.InputManager.wrap(wasmExports.getInputManager());
+    const manager = wasm.InputManager.wrap(wasm.getInputManager());
     const wasmEvent = this.createMouseEvent(event, bounds, delta);
 
     if (type === MouseEventType.MouseUp) manager.onMouseUp(wasmEvent);
@@ -130,18 +126,17 @@ export class InputManager {
     else if (type === MouseEventType.MouseDown) manager.onMouseDown(wasmEvent);
     else if (type === MouseEventType.MouseWheel) manager.onWheel(wasmEvent);
 
-    wasmExports.__unpin(wasmEvent);
+    wasm.__unpin(wasmEvent);
   }
 
   private sendKeyEvent(type: KeyEventType, event: Partial<KeyboardEvent>): void {
-    const wasmExports = this.wasmManager.exports;
-    const manager = wasmExports.InputManager.wrap(wasmExports.getInputManager());
-    const wasmEvent = wasmExports.__pin(wasmExports.createKeyboardEvent(wasmExports.__newString(event.code!)));
+    const manager = wasm.InputManager.wrap(wasm.getInputManager());
+    const wasmEvent = wasm.__pin(wasm.createKeyboardEvent(wasm.__newString(event.code!)));
 
     if (type === KeyEventType.KeyUp) manager.onKeyUp(wasmEvent);
     else if (type === KeyEventType.KeyDown) manager.onKeyDown(wasmEvent);
 
-    wasmExports.__unpin(wasmEvent);
+    wasm.__unpin(wasmEvent);
   }
 
   dispose() {

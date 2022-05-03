@@ -2,16 +2,13 @@ import { UIEventType } from "../../common/UIEventType";
 import EventDispatcher from "./EventDispatcher";
 import { UIEvent } from "./events/UIEvent";
 import { IBindable } from "./IBindable";
-import { WasmManager } from "./WasmManager";
+import { wasm } from "./WasmManager";
 
 const uiEvent: UIEvent = new UIEvent();
 
 export class UIEventManager extends EventDispatcher implements IBindable {
-  wasmManager: WasmManager;
-
-  constructor(wasm: WasmManager) {
+  constructor() {
     super();
-    this.wasmManager = wasm;
   }
 
   createBinding(): any {
@@ -26,8 +23,7 @@ export class UIEventManager extends EventDispatcher implements IBindable {
   }
 
   triggerUIEvent(type: UIEventType) {
-    const wasmExports = this.wasmManager.exports;
-    const manager = wasmExports.UISignalManager.wrap(wasmExports.getSignalManager());
+    const manager = wasm.UISignalManager.wrap(wasm.getSignalManager());
     manager.onSignalEvent(type);
   }
 }

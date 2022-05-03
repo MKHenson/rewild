@@ -7,7 +7,7 @@ import { createBuffer, createIndexBuffer } from "./Utils";
 import { RenderQueueManager } from "./RenderQueueManager";
 import { Texture } from "./textures/Texture";
 import { GroupType } from "../../common/GroupType";
-import { WasmManager } from "./WasmManager";
+import { wasm } from "./WasmManager";
 import { IBindable } from "./IBindable";
 import { BitmapTexture } from "./textures/BitmapTexture";
 import { BitmapCubeTexture } from "./textures/BitmapCubeTexture";
@@ -22,7 +22,6 @@ export class GameManager implements IBindable {
   context: GPUCanvasContext;
   format: GPUTextureFormat;
   inputManager: InputManager;
-  wasmManager: WasmManager;
 
   buffers: GPUBuffer[];
   pipelines: Pipeline<any>[];
@@ -65,21 +64,19 @@ export class GameManager implements IBindable {
       lock: this.lock.bind(this),
       unlock: this.unlock.bind(this),
       render: (commandsIndex: number) => {
-        const commandBuffer = this.wasmManager.exports.__getArray(commandsIndex) as Array<number>;
+        const commandBuffer = wasm.__getArray(commandsIndex) as Array<number>;
         this.renderQueueManager.run(commandBuffer);
       },
     };
   }
 
-  async init(wasmManager: WasmManager) {
-    this.wasmManager = wasmManager;
-    this.renderQueueManager = new RenderQueueManager(this, wasmManager);
-    const wasmExports = wasmManager.exports;
+  async init() {
+    this.renderQueueManager = new RenderQueueManager(this);
 
     const hasGPU = this.hasWebGPU();
     if (!hasGPU) throw new Error("Your current browser does not support WebGPU!");
 
-    this.inputManager = new InputManager(this.canvas, wasmManager);
+    this.inputManager = new InputManager(this.canvas);
 
     const adapter = await navigator.gpu?.requestAdapter();
     const device = (await adapter?.requestDevice()) as GPUDevice;
@@ -140,7 +137,7 @@ export class GameManager implements IBindable {
 
     this.textures = await Promise.all(
       textures.map((texture, index) => {
-        wasmExports.createTexture(wasmExports.__newString(texture.name), index);
+        wasm.createTexture(wasm.__newString(texture.name), index);
         return texture.load(device);
       })
     );
@@ -165,7 +162,7 @@ export class GameManager implements IBindable {
     this.onResize(size, false);
 
     // Initialize the wasm module
-    wasmExports.init(this.canvas.width, this.canvas.height);
+    wasm.init(this.canvas.width, this.canvas.height);
 
     this.initRuntime();
 
@@ -187,7 +184,6 @@ export class GameManager implements IBindable {
   }
 
   initRuntime() {
-    const wasm = this.wasmManager.exports;
     const runime = wasm.Runtime.wrap(wasm.getRuntime());
 
     this.pipelines.forEach((p) => {
@@ -228,17 +224,17 @@ export class GameManager implements IBindable {
 
   createMesh(geometryPtr: number, pipelineName: string, name?: string) {
     // Get the pipeline
-    const wasmExports = this.wasmManager.exports;
+
     const pipeline = this.getPipeline(pipelineName)!;
     const pipelineIndex = this.pipelines.indexOf(pipeline);
 
     // Create an instance in WASM
-    const pipelineInsPtr = wasmExports.createPipelineInstance(
-      wasmExports.__newString(pipeline.name),
+    const pipelineInsPtr = wasm.createPipelineInstance(
+      wasm.__newString(pipeline.name),
       pipelineIndex,
       PipelineType.Mesh
     );
-    const meshPipelineIns = wasmExports.MeshPipelineInstance.wrap(pipelineInsPtr);
+    const meshPipelineIns = wasm.MeshPipelineInstance.wrap(pipelineInsPtr);
 
     pipeline.vertexLayouts.map((buffer) =>
       buffer.attributes.map((attr) => meshPipelineIns.addAttribute(attr.attributeType, attr.shaderLocation))
@@ -247,11 +243,7 @@ export class GameManager implements IBindable {
     // Assign a transform buffer to the intance
     meshPipelineIns.transformResourceIndex = pipeline.addResourceInstance(this, GroupType.Transform);
 
-    const meshPtr = wasmExports.createMesh(
-      geometryPtr,
-      pipelineInsPtr,
-      name ? wasmExports.__newString(name) : undefined
-    );
+    const meshPtr = wasm.createMesh(geometryPtr, pipelineInsPtr, name ? wasm.__newString(name) : undefined);
     return meshPtr;
   }
 
@@ -294,7 +286,7 @@ export class GameManager implements IBindable {
 
     this.renderTargetView = this.renderTarget.createView();
 
-    if (updateWasm) this.wasmManager.exports.resize(this.canvas.width, this.canvas.height);
+    if (updateWasm) wasm.resize(this.canvas.width, this.canvas.height);
   }
 
   private onFrame() {
@@ -308,7 +300,7 @@ export class GameManager implements IBindable {
       this.onResize(newSize);
     }
 
-    this.wasmManager.exports.update(performance.now());
+    wasm.update(performance.now());
   }
 
   canvasSize() {
@@ -363,14 +355,14 @@ export class GameManager implements IBindable {
   }
 
   createBufferF32(data: number, usageFlag: GPUBufferUsageFlags = GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST) {
-    const f32Array = this.wasmManager.exports.__getFloat32Array(data);
+    const f32Array = wasm.__getFloat32Array(data);
     const buffer = createBuffer(this.device, f32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;
   }
 
   createIndexBuffer(data: number, usageFlag: GPUBufferUsageFlags = GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST) {
-    const u32Array = this.wasmManager.exports.__getUint32Array(data);
+    const u32Array = wasm.__getUint32Array(data);
     const buffer = createIndexBuffer(this.device, u32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;
