@@ -37,7 +37,7 @@ export const Application: Component<Props> = ({}) => {
 
   const onCanvasReady = async (canvas: HTMLCanvasElement) => {
     gameManager = new GameManager(canvas);
-    eventManager = new UIEventManager(wasmManager);
+    eventManager = new UIEventManager();
 
     const bindables: IBindable[] = [gameManager, eventManager];
 
@@ -51,7 +51,7 @@ export const Application: Component<Props> = ({}) => {
         return;
       }
 
-      await gameManager.init(wasmManager);
+      await gameManager.init();
       eventManager.addEventListener("uievent" as EventType, onWasmUiEvent);
     } catch (err: unknown) {
       setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");

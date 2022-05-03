@@ -6,6 +6,9 @@ import { IBindable } from "./IBindable";
 export type IWasmExports = ASUtil & typeof MyModule;
 export type ExportType = ResultObject & { exports: IWasmExports };
 
+export let wasmManager: WasmManager;
+export let wasm: IWasmExports;
+
 export class WasmManager {
   memory: WebAssembly.Memory;
   importObject: WebAssembly.Imports;
@@ -14,7 +17,9 @@ export class WasmManager {
   wasmArrayBuffer: Uint32Array;
   wasmMemoryBlock: ArrayBuffer;
 
-  constructor() {}
+  constructor() {
+    wasmManager = this;
+  }
 
   async load(bindables: IBindable[]) {
     // Creating WASM with Linear memory
@@ -54,6 +59,7 @@ export class WasmManager {
 
     const obj = await loader.instantiateStreaming<typeof MyModule>(fetch(wasmFile), this.importObject);
     this.exports = obj.exports;
+    wasm = obj.exports;
 
     this.wasmMemoryBlock = obj.exports.memory!.buffer;
     this.wasmArrayBuffer = new Uint32Array(this.wasmMemoryBlock);
