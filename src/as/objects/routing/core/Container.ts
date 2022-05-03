@@ -1,10 +1,10 @@
-import { Object } from "../../../core/Object";
+import { TransformNode } from "../../../core/TransformNode";
 import { Node } from "./Node";
 import { Mesh } from "../../Mesh";
 import { Portal } from "./Portal";
 
 export class Container extends Node {
-  protected objects: Object[];
+  protected objects: TransformNode[];
   protected loaded: boolean;
 
   constructor(name: string) {
@@ -15,14 +15,14 @@ export class Container extends Node {
     this.portals.push(new Portal("Exit", this));
   }
 
-  findObjectByName(name: string): Object | null {
+  findObjectByName(name: string): TransformNode | null {
     const objects = this.objects;
     for (let i: i32 = 0, l = objects.length; i < l; i++) if (objects[i].name == name) return objects[i];
 
     return null;
   }
 
-  addAsset(object: Object): void {
+  addAsset(object: TransformNode): void {
     this.objects.push(object);
   }
 

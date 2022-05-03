@@ -1,10 +1,10 @@
-import { Object } from "../core/Object";
+import { TransformNode } from "../core/TransformNode";
 import { Material } from "../materials/Material";
 import { Color } from "../math/Color";
 import { Texture } from "../textures/Texture";
 import { Fog } from "./Fog";
 
-export class Scene extends Object {
+export class Scene extends TransformNode {
   isScene: boolean = true;
   autoUpdate: boolean;
   overrideMaterial: Material | null;

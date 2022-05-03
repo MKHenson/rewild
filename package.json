@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "npx mocha 'tests/**/*.ts'",
-    "clean": "rimraf ./dist -RF",
+    "clean": "rimraf ./dist/untouched.wasm && rimraf ./dist/untouched.wasm.map && rimraf ./dist/untouched.wat",
     "asbuild:untouched": "asc src/as/index.ts  --sourceMap --target debug -d ./build/types.d.ts --exportTable --importMemory --exportRuntime --debug",
     "asbuild:optimized": "asc src/as/index.ts --target release -d ./build/types.d.ts --exportTable --importMemory --exportRuntime",
     "build:webpack": "webpack --mode development",

@@ -1,6 +1,6 @@
 import { Light } from "./Light";
 import { Color } from "../math/Color";
-import { Object } from "../core/Object";
+import { TransformNode } from "../core/TransformNode";
 
 export class HemisphereLight extends Light {
   groundColor: Color;
@@ -10,7 +10,7 @@ export class HemisphereLight extends Light {
 
     this.type = "HemisphereLight";
 
-    this.position.copy(Object.DefaultUp);
+    this.position.copy(TransformNode.DefaultUp);
     this.updateMatrix();
 
     this.groundColor = new Color(groundColor.r, groundColor.g, groundColor.b);

@@ -2,7 +2,7 @@ import { Vector2 } from "../math/Vector2";
 import { Vector3 } from "../math/Vector3";
 import { Matrix4 } from "../math/Matrix4";
 import { Triangle } from "../math/Triangle";
-import { Object } from "../core/Object";
+import { TransformNode } from "../core/TransformNode";
 import { BufferGeometry } from "../core/BufferGeometry";
 import { InterleavedBuffer } from "../core/InterleavedBuffer";
 import { InterleavedBufferAttribute } from "../core/InterleavedBufferAttribute";
@@ -33,7 +33,7 @@ const _uvA = new Vector2();
 const _uvB = new Vector2();
 const _uvC = new Vector2();
 
-export class Sprite extends Object {
+export class Sprite extends TransformNode {
   geometry: BufferGeometry;
   material: SpriteMaterial;
   center: Vector2;

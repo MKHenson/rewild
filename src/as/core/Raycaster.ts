@@ -6,7 +6,7 @@ import { Vector2 } from "../math/Vector2";
 import { Vector3 } from "../math/Vector3";
 import { Intersection, Mesh } from "../objects/Mesh";
 import { Layers } from "./Layers";
-import { Object } from "./Object";
+import { TransformNode } from "./TransformNode";
 
 // export class RayCasterParams {
 //   public Mesh: Mesh | null;
@@ -61,7 +61,7 @@ export class Raycaster {
     }
   }
 
-  intersectObject(object: Object, recursive: boolean = false, intersects: Intersection[] = []): Intersection[] {
+  intersectObject(object: TransformNode, recursive: boolean = false, intersects: Intersection[] = []): Intersection[] {
     intersectObject(object, this, intersects, recursive);
 
     intersects.sort(ascSort);
@@ -69,7 +69,11 @@ export class Raycaster {
     return intersects;
   }
 
-  intersectObjects(objects: Object[], recursive: boolean = false, intersects: Intersection[] = []): Intersection[] {
+  intersectObjects(
+    objects: TransformNode[],
+    recursive: boolean = false,
+    intersects: Intersection[] = []
+  ): Intersection[] {
     for (let i = 0, l = objects.length; i < l; i++) {
       intersectObject(objects[i], this, intersects, recursive);
     }
@@ -84,7 +88,12 @@ function ascSort(a: Intersection, b: Intersection): i32 {
   return i32(a.distance) - i32(b.distance);
 }
 
-function intersectObject(object: Object, raycaster: Raycaster, intersects: Intersection[], recursive: boolean): void {
+function intersectObject(
+  object: TransformNode,
+  raycaster: Raycaster,
+  intersects: Intersection[],
+  recursive: boolean
+): void {
   if (object.layers.test(raycaster.layers)) {
     object.raycast(raycaster, intersects);
   }

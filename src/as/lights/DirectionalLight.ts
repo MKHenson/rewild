@@ -1,10 +1,10 @@
 import { Light } from "./Light";
 import { DirectionalLightShadow } from "./DirectionalLightShadow";
-import { Object } from "../core/Object";
+import { TransformNode } from "../core/TransformNode";
 import { Color } from "../math/Color";
 
 export class DirectionalLight extends Light {
-  target: Object;
+  target: TransformNode;
   shadow: DirectionalLightShadow;
 
   constructor(color: Color, intensity: f32) {
@@ -12,9 +12,9 @@ export class DirectionalLight extends Light {
 
     this.type = "DirectionalLight";
 
-    this.position.copy(Object.DefaultUp);
+    this.position.copy(TransformNode.DefaultUp);
 
-    this.target = new Object();
+    this.target = new TransformNode();
     this.shadow = new DirectionalLightShadow();
 
     this.updateMatrix();
@@ -24,7 +24,7 @@ export class DirectionalLight extends Light {
     this.shadow.dispose();
   }
 
-  copy(source: Object, recursive?: boolean): Object {
+  copy(source: TransformNode, recursive?: boolean): TransformNode {
     super.copy(source, recursive);
 
     const sourceLight = source as DirectionalLight;

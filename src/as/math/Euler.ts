@@ -2,7 +2,7 @@ import { Quaternion } from "./Quaternion";
 import { Vector3 } from "./Vector3";
 import { Matrix4 } from "./Matrix4";
 import { clamp } from "./MathUtils";
-import { Object } from "../core/Object";
+import { TransformNode } from "../core/TransformNode";
 
 const _matrix = new Matrix4();
 const _quaternion = new Quaternion();
@@ -22,7 +22,7 @@ export class Euler {
   _y: f32;
   _z: f32;
   _order: EulerRotationOrder;
-  _onChangeCallback: Object | null;
+  _onChangeCallback: TransformNode | null;
 
   static DefaultOrder: EulerRotationOrder = 0; // TODO: This is supposed to be EulerRotationOrder.XYZ but it keeps failing >:/
   static RotationOrders: EulerRotationOrder[] = [
@@ -264,7 +264,7 @@ export class Euler {
     if (this._onChangeCallback) this._onChangeCallback!.onEulerChanged(this);
   }
 
-  _onChange(callback: Object): Euler {
+  _onChange(callback: TransformNode): Euler {
     this._onChangeCallback = callback;
 
     return this;
