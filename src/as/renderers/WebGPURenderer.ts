@@ -1,5 +1,5 @@
 import { Camera } from "../cameras/Camera";
-import { Object } from "../core/Object";
+import { TransformNode } from "../core/TransformNode";
 import { WebGPURenderQueue } from "./WebGPURenderQueue";
 import { print } from "../Imports";
 import { Matrix4 } from "../math/Matrix4";
@@ -141,7 +141,7 @@ export class WebGPURenderer {
     }
   }
 
-  projectObject(object: Object, camera: Camera): void {
+  projectObject(object: TransformNode, camera: Camera): void {
     if (object.visible === false) return;
 
     if (object instanceof Mesh) {

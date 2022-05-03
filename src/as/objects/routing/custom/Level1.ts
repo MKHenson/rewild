@@ -12,7 +12,7 @@ import { Event } from "../../../core/Event";
 import { UIEventType } from "../../../../common/UIEventType";
 import { UIEvent } from "../../../exports/ui/UIEvent";
 import { Link } from "../core/Link";
-import { Object } from "../../../core/Object";
+import { TransformNode } from "../../../core/TransformNode";
 import { lock, unlock } from "../../../Imports";
 
 const playerHungerThreshold: u32 = 15;
@@ -28,9 +28,9 @@ export class Level1 extends Container implements Listener {
   private direction2!: DirectionalLight;
   private direction3!: DirectionalLight;
   private ambient!: AmbientLight;
-  private floor!: Object;
-  private sbybox!: Object;
-  private ball!: Object;
+  private floor!: TransformNode;
+  private sbybox!: TransformNode;
+  private ball!: TransformNode;
 
   constructor() {
     super("Level1");

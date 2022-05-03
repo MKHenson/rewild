@@ -1,5 +1,5 @@
 import { BufferAttribute } from "../core/BufferAttribute";
-import { Object } from "../core/Object";
+import { TransformNode } from "../core/TransformNode";
 import { Mesh } from "../objects/Mesh";
 import { Matrix4 } from "./Matrix4";
 import { Plane } from "./Plane";
@@ -104,7 +104,7 @@ export class Box3 {
     return this;
   }
 
-  setFromObject(object: Object): Box3 {
+  setFromObject(object: TransformNode): Box3 {
     this.makeEmpty();
 
     return this.expandByObject(object);
@@ -163,7 +163,7 @@ export class Box3 {
     return this;
   }
 
-  expandByObject(object: Object): Box3 {
+  expandByObject(object: TransformNode): Box3 {
     // Computes the world-axis-aligned bounding box of an object (including its children),
     // accounting for both the object's, and children's, world transforms
 

@@ -2,7 +2,7 @@ import { Euler, EulerRotationOrder } from "./Euler";
 import * as MathUtils from "./MathUtils";
 import { Matrix4 } from "./Matrix4";
 import { Vector3 } from "./Vector3";
-import { Object } from "../core/Object";
+import { TransformNode } from "../core/TransformNode";
 
 export class Quaternion {
   _x: f32;
@@ -11,7 +11,7 @@ export class Quaternion {
   _w: f32;
 
   isQuaternion: boolean = true;
-  _onChangeCallback: Object | null;
+  _onChangeCallback: TransformNode | null;
 
   constructor(x: f32 = 0, y: f32 = 0, z: f32 = 0, w: f32 = 1) {
     this._x = x;
@@ -571,7 +571,7 @@ export class Quaternion {
     if (this._onChangeCallback) this._onChangeCallback!.onQuatChanged(this);
   }
 
-  _onChange(callback: Object): Quaternion {
+  _onChange(callback: TransformNode): Quaternion {
     this._onChangeCallback = callback;
 
     return this;

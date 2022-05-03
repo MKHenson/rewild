@@ -1,10 +1,10 @@
 import { Light } from "./Light";
 import { SpotLightShadow } from "./SpotLightShadow";
-import { Object } from "../core/Object";
+import { TransformNode } from "../core/TransformNode";
 import { Color } from "../math/Color";
 
 export class SpotLight extends Light {
-  target: Object;
+  target: TransformNode;
   distance: f32;
   angle: f32;
   penumbra: f32;
@@ -23,10 +23,10 @@ export class SpotLight extends Light {
 
     this.type = "SpotLight";
 
-    this.position.copy(Object.DefaultUp);
+    this.position.copy(TransformNode.DefaultUp);
     this.updateMatrix();
 
-    this.target = new Object();
+    this.target = new TransformNode();
 
     this.distance = distance;
     this.angle = angle;

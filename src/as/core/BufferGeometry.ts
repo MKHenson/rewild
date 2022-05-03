@@ -11,7 +11,7 @@ import {
   Uint32BufferAttribute,
 } from "./BufferAttribute";
 import { Sphere } from "../math/Sphere";
-import { Object } from "./Object";
+import { TransformNode } from "./TransformNode";
 import { Matrix4 } from "../math/Matrix4";
 import { Matrix3 } from "../math/Matrix3";
 import * as MathUtils from "../math/MathUtils";
@@ -26,7 +26,7 @@ import { AttributeType } from "../../common/AttributeType";
 let _id = 0;
 
 const _m1 = new Matrix4();
-const _obj = new Object();
+const _obj = new TransformNode();
 const _offset = new Vector3();
 const _box = new Box3();
 const _boxMorphTargets = new Box3();

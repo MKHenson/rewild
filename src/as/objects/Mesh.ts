@@ -3,7 +3,7 @@ import { Vector2 } from "../math/Vector2";
 import { Sphere } from "../math/Sphere";
 import { Ray } from "../math/Ray";
 import { Matrix4 } from "../math/Matrix4";
-import { Object } from "../core/Object";
+import { TransformNode } from "../core/TransformNode";
 import { Triangle } from "../math/Triangle";
 import { Side } from "../../common/GLEnums";
 import { BufferGeometry } from "../core/BufferGeometry";
@@ -25,7 +25,7 @@ export class Face {
 export class Intersection {
   public distance: f32;
   public point: Vector3;
-  public object: Object;
+  public object: TransformNode;
   public faceIndex: i32;
   public face: Face | null;
   public uv: Vector2 | null;
@@ -56,7 +56,7 @@ const _uvC = new Vector2();
 const _intersectionPoint = new Vector3();
 const _intersectionPointWorld = new Vector3();
 
-export class Mesh extends Object {
+export class Mesh extends TransformNode {
   pipelines: MeshPipelineInstance[];
   geometry: BufferGeometry;
   morphTargetInfluences: f32[] | null;
@@ -306,7 +306,7 @@ export class Mesh extends Object {
 }
 
 function checkIntersection(
-  object: Object,
+  object: TransformNode,
   pipeline: PipelineInstance,
   raycaster: Raycaster,
   ray: Ray,

@@ -7,11 +7,11 @@ import { uiSignaller } from "../../../exports/ui/uiSignalManager";
 import { Event } from "../../../core/Event";
 import { UIEvent } from "../../../exports/ui/UIEvent";
 import { Link } from "../core/Link";
-import { Object } from "../../../core/Object";
+import { TransformNode } from "../../../core/TransformNode";
 
 export class TestLevel extends Container implements Listener {
   orbitController!: OrbitController;
-  private sbybox!: Object;
+  private sbybox!: TransformNode;
 
   constructor() {
     super("TestLevel");

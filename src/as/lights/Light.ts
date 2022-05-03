@@ -1,7 +1,7 @@
-import { Object } from "../core/Object";
+import { TransformNode } from "../core/TransformNode";
 import { Color } from "../math/Color";
 
-export class Light extends Object {
+export class Light extends TransformNode {
   isLight: boolean = true;
   color: Color;
   intensity: f32;
@@ -19,7 +19,7 @@ export class Light extends Object {
     // Empty here in base class; some subclasses override.
   }
 
-  copy(source: Object, recursive: boolean = true): Object {
+  copy(source: TransformNode, recursive: boolean = true): TransformNode {
     const lightSource = source as Light;
     super.copy(lightSource);
 

@@ -27,19 +27,19 @@ const _xAxis = new Vector3(1, 0, 0);
 const _yAxis = new Vector3(0, 1, 0);
 const _zAxis = new Vector3(0, 0, 1);
 
-type TraverseCallback = (object: Object) => void;
+type TraverseCallback = (object: TransformNode) => void;
 const _addedEvent: Event = new Event("added");
 const _removedEvent: Event = new Event("removed");
 
-export class Object extends EventDispatcher {
+export class TransformNode extends EventDispatcher {
   static DefaultUp: Vector3 = new Vector3(0, 1, 0);
   static DefaultMatrixAutoUpdate: boolean = true;
 
   uuid: string = MathUtils.generateUUID();
   name: string;
   type: string;
-  parent: Object | null;
-  children: Object[];
+  parent: TransformNode | null;
+  children: TransformNode[];
   matrix: Matrix4;
   matrixWorld: Matrix4;
   up: Vector3;
@@ -81,12 +81,12 @@ export class Object extends EventDispatcher {
     this.parent = null;
     this.children = [];
 
-    this.up = Object.DefaultUp.clone();
+    this.up = TransformNode.DefaultUp.clone();
 
     this.matrix = new Matrix4();
     this.matrixWorld = new Matrix4();
 
-    this.matrixAutoUpdate = Object.DefaultMatrixAutoUpdate;
+    this.matrixAutoUpdate = TransformNode.DefaultMatrixAutoUpdate;
     this.matrixWorldNeedsUpdate = false;
 
     this.layers = new Layers();
@@ -124,7 +124,7 @@ export class Object extends EventDispatcher {
     this.matrix.decompose(this.position, this.quaternion, this.scale);
   }
 
-  applyQuaternion(q: Quaternion): Object {
+  applyQuaternion(q: Quaternion): TransformNode {
     this.quaternion.premultiply(q);
 
     return this;
@@ -152,7 +152,7 @@ export class Object extends EventDispatcher {
     this.quaternion.copy(q);
   }
 
-  rotateOnAxis(axis: Vector3, angle: f32): Object {
+  rotateOnAxis(axis: Vector3, angle: f32): TransformNode {
     // rotate object on axis in object space
     // axis is assumed to be normalized
 
@@ -163,7 +163,7 @@ export class Object extends EventDispatcher {
     return this;
   }
 
-  rotateOnWorldAxis(axis: Vector3, angle: f32): Object {
+  rotateOnWorldAxis(axis: Vector3, angle: f32): TransformNode {
     // rotate object on axis in world space
     // axis is assumed to be normalized
     // method assumes no rotated parent
@@ -175,19 +175,19 @@ export class Object extends EventDispatcher {
     return this;
   }
 
-  rotateX(angle: f32): Object {
+  rotateX(angle: f32): TransformNode {
     return this.rotateOnAxis(_xAxis, angle);
   }
 
-  rotateY(angle: f32): Object {
+  rotateY(angle: f32): TransformNode {
     return this.rotateOnAxis(_yAxis, angle);
   }
 
-  rotateZ(angle: f32): Object {
+  rotateZ(angle: f32): TransformNode {
     return this.rotateOnAxis(_zAxis, angle);
   }
 
-  translateOnAxis(axis: Vector3, distance: f32): Object {
+  translateOnAxis(axis: Vector3, distance: f32): TransformNode {
     // translate object by distance along axis in object space
     // axis is assumed to be normalized
 
@@ -198,15 +198,15 @@ export class Object extends EventDispatcher {
     return this;
   }
 
-  translateX(distance: f32): Object {
+  translateX(distance: f32): TransformNode {
     return this.translateOnAxis(_xAxis, distance);
   }
 
-  translateY(distance: f32): Object {
+  translateY(distance: f32): TransformNode {
     return this.translateOnAxis(_yAxis, distance);
   }
 
-  translateZ(distance: f32): Object {
+  translateZ(distance: f32): TransformNode {
     return this.translateOnAxis(_zAxis, distance);
   }
 
@@ -244,7 +244,7 @@ export class Object extends EventDispatcher {
     }
   }
 
-  add(object: Object): Object {
+  add(object: TransformNode): TransformNode {
     if (object === this) throw new Error("Object can't be added as a child of itself.");
 
     if (object.parent !== null) {
@@ -260,7 +260,7 @@ export class Object extends EventDispatcher {
     return this;
   }
 
-  remove(object: Object): Object {
+  remove(object: TransformNode): TransformNode {
     const index = this.children.indexOf(object);
 
     if (index !== -1) {
@@ -274,7 +274,7 @@ export class Object extends EventDispatcher {
     return this;
   }
 
-  removeFromParent(): Object {
+  removeFromParent(): TransformNode {
     const parent = this.parent;
 
     if (parent !== null) parent.remove(this);
@@ -282,7 +282,7 @@ export class Object extends EventDispatcher {
     return this;
   }
 
-  clear(): Object {
+  clear(): TransformNode {
     const children = this.children;
     for (let i = 0; i < children.length; i++) {
       const object = children[i];
@@ -295,7 +295,7 @@ export class Object extends EventDispatcher {
     return this;
   }
 
-  attach(object: Object): Object {
+  attach(object: TransformNode): TransformNode {
     // adds object as a child of this, while maintaining the object's world transform
 
     this.updateWorldMatrix(true, false);
@@ -462,11 +462,11 @@ export class Object extends EventDispatcher {
     }
   }
 
-  clone(recursive: boolean = false): Object {
-    return new Object().copy(this, recursive);
+  clone(recursive: boolean = false): TransformNode {
+    return new TransformNode().copy(this, recursive);
   }
 
-  copy(source: Object, recursive: boolean = true): Object {
+  copy(source: TransformNode, recursive: boolean = true): TransformNode {
     this.name = source.name;
 
     this.up.copy(source.up);

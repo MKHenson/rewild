@@ -1,8 +1,8 @@
 import { Matrix4 } from "../math/Matrix4";
-import { Object } from "../core/Object";
+import { TransformNode } from "../core/TransformNode";
 import { Vector3 } from "../math/Vector3";
 
-export class Camera extends Object {
+export class Camera extends TransformNode {
   readonly matrixWorldInverse: Matrix4 = new Matrix4();
   readonly projectionMatrix: Matrix4 = new Matrix4();
   readonly projectionMatrixInverse: Matrix4 = new Matrix4();
@@ -42,7 +42,7 @@ export class Camera extends Object {
     this.matrixWorldInverse.copy(this.matrixWorld).invert();
   }
 
-  clone(recursive: boolean = false): Object {
+  clone(recursive: boolean = false): TransformNode {
     return new Camera().copy(this);
   }
 }
