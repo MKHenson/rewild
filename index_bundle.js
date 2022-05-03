@@ -298,9 +298,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _Utils__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./Utils */ "./src/ts/core/Utils.ts");
 /* harmony import */ var _RenderQueueManager__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./RenderQueueManager */ "./src/ts/core/RenderQueueManager.ts");
 /* harmony import */ var _common_GroupType__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../common/GroupType */ "./src/common/GroupType.ts");
-/* harmony import */ var _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./textures/BitmapTexture */ "./src/ts/core/textures/BitmapTexture.ts");
-/* harmony import */ var _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./textures/BitmapCubeTexture */ "./src/ts/core/textures/BitmapCubeTexture.ts");
-/* harmony import */ var _pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./pipelines/skybox-pipeline/SkyboxPipeline */ "./src/ts/core/pipelines/skybox-pipeline/SkyboxPipeline.ts");
+/* harmony import */ var _WasmManager__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./WasmManager */ "./src/ts/core/WasmManager.ts");
+/* harmony import */ var _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./textures/BitmapTexture */ "./src/ts/core/textures/BitmapTexture.ts");
+/* harmony import */ var _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./textures/BitmapCubeTexture */ "./src/ts/core/textures/BitmapCubeTexture.ts");
+/* harmony import */ var _pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./pipelines/skybox-pipeline/SkyboxPipeline */ "./src/ts/core/pipelines/skybox-pipeline/SkyboxPipeline.ts");
+
 
 
 
@@ -337,22 +339,20 @@ class GameManager {
       lock: this.lock.bind(this),
       unlock: this.unlock.bind(this),
       render: commandsIndex => {
-        const commandBuffer = this.wasmManager.exports.__getArray(commandsIndex);
+        const commandBuffer = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__getArray(commandsIndex);
 
         this.renderQueueManager.run(commandBuffer);
       }
     };
   }
 
-  async init(wasmManager) {
+  async init() {
     var _navigator$gpu;
 
-    this.wasmManager = wasmManager;
-    this.renderQueueManager = new _RenderQueueManager__WEBPACK_IMPORTED_MODULE_4__.RenderQueueManager(this, wasmManager);
-    const wasmExports = wasmManager.exports;
+    this.renderQueueManager = new _RenderQueueManager__WEBPACK_IMPORTED_MODULE_4__.RenderQueueManager(this);
     const hasGPU = this.hasWebGPU();
     if (!hasGPU) throw new Error("Your current browser does not support WebGPU!");
-    this.inputManager = new _InputManager__WEBPACK_IMPORTED_MODULE_0__.InputManager(this.canvas, wasmManager);
+    this.inputManager = new _InputManager__WEBPACK_IMPORTED_MODULE_0__.InputManager(this.canvas);
     const adapter = await ((_navigator$gpu = navigator.gpu) === null || _navigator$gpu === void 0 ? void 0 : _navigator$gpu.requestAdapter());
     const device = await (adapter === null || adapter === void 0 ? void 0 : adapter.requestDevice());
     const context = this.canvas.getContext("webgpu");
@@ -367,9 +367,9 @@ class GameManager {
     this.context = context;
     this.format = format; // TEXTURES
 
-    const textures = [new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__.BitmapTexture("grid", MEDIA_URL + "uv-grid.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__.BitmapTexture("crate", MEDIA_URL + "crate-wooden.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__.BitmapTexture("earth", MEDIA_URL + "earth-day-2k.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__.BitmapTexture("ground-coastal-1", MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_6__.BitmapTexture("block-concrete-4", MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png", device), new _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapCubeTexture("desert-sky", [MEDIA_URL + "skyboxes/desert/px.jpg", MEDIA_URL + "skyboxes/desert/nx.jpg", MEDIA_URL + "skyboxes/desert/py.jpg", MEDIA_URL + "skyboxes/desert/ny.jpg", MEDIA_URL + "skyboxes/desert/pz.jpg", MEDIA_URL + "skyboxes/desert/nz.jpg"], device), new _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapCubeTexture("starry-sky", [MEDIA_URL + "skyboxes/stars/left.png", MEDIA_URL + "skyboxes/stars/right.png", MEDIA_URL + "skyboxes/stars/top.png", MEDIA_URL + "skyboxes/stars/bottom.png", MEDIA_URL + "skyboxes/stars/front.png", MEDIA_URL + "skyboxes/stars/back.png"], device)];
+    const textures = [new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("grid", MEDIA_URL + "uv-grid.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("crate", MEDIA_URL + "crate-wooden.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("earth", MEDIA_URL + "earth-day-2k.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("ground-coastal-1", MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("block-concrete-4", MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png", device), new _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_8__.BitmapCubeTexture("desert-sky", [MEDIA_URL + "skyboxes/desert/px.jpg", MEDIA_URL + "skyboxes/desert/nx.jpg", MEDIA_URL + "skyboxes/desert/py.jpg", MEDIA_URL + "skyboxes/desert/ny.jpg", MEDIA_URL + "skyboxes/desert/pz.jpg", MEDIA_URL + "skyboxes/desert/nz.jpg"], device), new _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_8__.BitmapCubeTexture("starry-sky", [MEDIA_URL + "skyboxes/stars/left.png", MEDIA_URL + "skyboxes/stars/right.png", MEDIA_URL + "skyboxes/stars/top.png", MEDIA_URL + "skyboxes/stars/bottom.png", MEDIA_URL + "skyboxes/stars/front.png", MEDIA_URL + "skyboxes/stars/back.png"], device)];
     this.textures = await Promise.all(textures.map((texture, index) => {
-      wasmExports.createTexture(wasmExports.__newString(texture.name), index);
+      _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createTexture(_WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__newString(texture.name), index);
       return texture.load(device);
     })); // PIPELINES
 
@@ -389,15 +389,15 @@ class GameManager {
     }), new _pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("concrete", {
       diffuseMap: this.textures[4],
       NUM_DIR_LIGHTS: 0
-    }), new _pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_8__.SkyboxPipeline("skybox", {
+    }), new _pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_9__.SkyboxPipeline("skybox", {
       diffuseMap: this.textures[5]
-    }), new _pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_8__.SkyboxPipeline("stars", {
+    }), new _pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_9__.SkyboxPipeline("stars", {
       diffuseMap: this.textures[6]
     })];
     const size = this.canvasSize();
     this.onResize(size, false); // Initialize the wasm module
 
-    wasmExports.init(this.canvas.width, this.canvas.height);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.init(this.canvas.width, this.canvas.height);
     this.initRuntime(); // Setup events
 
     window.addEventListener("resize", this.onResizeHandler);
@@ -416,18 +416,17 @@ class GameManager {
   }
 
   initRuntime() {
-    const wasm = this.wasmManager.exports;
-    const runime = wasm.Runtime.wrap(wasm.getRuntime());
+    const runime = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.Runtime.wrap(_WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.getRuntime());
     this.pipelines.forEach(p => {
       p.build(this);
       p.initialize(this);
     });
 
-    const containerLvl1Ptr = wasm.__pin(wasm.createLevel1());
+    const containerLvl1Ptr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__pin(_WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createLevel1());
 
-    const containerLvl1 = wasm.Level1.wrap(containerLvl1Ptr);
-    const geometrySphere = wasm.createSphere(1);
-    const geometryBox = wasm.createBox(1);
+    const containerLvl1 = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.Level1.wrap(containerLvl1Ptr);
+    const geometrySphere = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createSphere(1);
+    const geometryBox = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createBox(1);
     containerLvl1.addAsset(this.createMesh(geometryBox, "skybox", "skybox"));
     containerLvl1.addAsset(this.createMesh(geometrySphere, "simple", "ball"));
 
@@ -437,22 +436,22 @@ class GameManager {
 
     containerLvl1.addAsset(this.createMesh(geometryBox, "coastal-floor", "floor"));
 
-    wasm.__unpin(containerLvl1Ptr);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__unpin(containerLvl1Ptr);
 
-    const containerTestPtr = wasm.__pin(wasm.createTestLevel());
+    const containerTestPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__pin(_WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createTestLevel());
 
-    const containerTestLevel = wasm.TestLevel.wrap(containerTestPtr);
+    const containerTestLevel = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.TestLevel.wrap(containerTestPtr);
     containerTestLevel.addAsset(this.createMesh(geometryBox, "skybox", "skybox"));
 
-    wasm.__unpin(containerTestPtr);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__unpin(containerTestPtr);
 
-    const containerMainMenuPtr = wasm.__pin(wasm.createMainMenu());
+    const containerMainMenuPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__pin(_WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createMainMenu());
 
-    const containerMainMenu = wasm.MainMenu.wrap(containerMainMenuPtr);
+    const containerMainMenu = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.MainMenu.wrap(containerMainMenuPtr);
     containerMainMenu.addAsset(this.createMesh(geometrySphere, "earth"));
     containerMainMenu.addAsset(this.createMesh(geometryBox, "stars", "skybox"));
 
-    wasm.__unpin(containerMainMenuPtr);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__unpin(containerMainMenuPtr);
 
     runime.addContainer(containerLvl1Ptr, false);
     runime.addContainer(containerMainMenuPtr, true);
@@ -461,16 +460,15 @@ class GameManager {
 
   createMesh(geometryPtr, pipelineName, name) {
     // Get the pipeline
-    const wasmExports = this.wasmManager.exports;
     const pipeline = this.getPipeline(pipelineName);
     const pipelineIndex = this.pipelines.indexOf(pipeline); // Create an instance in WASM
 
-    const pipelineInsPtr = wasmExports.createPipelineInstance(wasmExports.__newString(pipeline.name), pipelineIndex, _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__.PipelineType.Mesh);
-    const meshPipelineIns = wasmExports.MeshPipelineInstance.wrap(pipelineInsPtr);
+    const pipelineInsPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createPipelineInstance(_WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__newString(pipeline.name), pipelineIndex, _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__.PipelineType.Mesh);
+    const meshPipelineIns = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.MeshPipelineInstance.wrap(pipelineInsPtr);
     pipeline.vertexLayouts.map(buffer => buffer.attributes.map(attr => meshPipelineIns.addAttribute(attr.attributeType, attr.shaderLocation))); // Assign a transform buffer to the intance
 
     meshPipelineIns.transformResourceIndex = pipeline.addResourceInstance(this, _common_GroupType__WEBPACK_IMPORTED_MODULE_5__.GroupType.Transform);
-    const meshPtr = wasmExports.createMesh(geometryPtr, pipelineInsPtr, name ? wasmExports.__newString(name) : undefined);
+    const meshPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createMesh(geometryPtr, pipelineInsPtr, name ? _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__newString(name) : undefined);
     return meshPtr;
   }
 
@@ -512,7 +510,7 @@ class GameManager {
       usage: GPUTextureUsage.RENDER_ATTACHMENT
     });
     this.renderTargetView = this.renderTarget.createView();
-    if (updateWasm) this.wasmManager.exports.resize(this.canvas.width, this.canvas.height);
+    if (updateWasm) _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.resize(this.canvas.width, this.canvas.height);
   }
 
   onFrame() {
@@ -526,7 +524,7 @@ class GameManager {
       this.onResize(newSize);
     }
 
-    this.wasmManager.exports.update(performance.now());
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.update(performance.now());
   }
 
   canvasSize() {
@@ -583,7 +581,7 @@ class GameManager {
   createBufferF32(data) {
     let usageFlag = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST;
 
-    const f32Array = this.wasmManager.exports.__getFloat32Array(data);
+    const f32Array = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__getFloat32Array(data);
 
     const buffer = (0,_Utils__WEBPACK_IMPORTED_MODULE_3__.createBuffer)(this.device, f32Array, usageFlag);
     this.buffers.push(buffer);
@@ -593,7 +591,7 @@ class GameManager {
   createIndexBuffer(data) {
     let usageFlag = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST;
 
-    const u32Array = this.wasmManager.exports.__getUint32Array(data);
+    const u32Array = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__getUint32Array(data);
 
     const buffer = (0,_Utils__WEBPACK_IMPORTED_MODULE_3__.createIndexBuffer)(this.device, u32Array, usageFlag);
     this.buffers.push(buffer);
@@ -616,6 +614,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "KeyEventType": () => (/* binding */ KeyEventType),
 /* harmony export */   "MouseEventType": () => (/* binding */ MouseEventType)
 /* harmony export */ });
+/* harmony import */ var _WasmManager__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./WasmManager */ "./src/ts/core/WasmManager.ts");
+
 let MouseEventType;
 
 (function (MouseEventType) {
@@ -633,8 +633,7 @@ let KeyEventType;
 })(KeyEventType || (KeyEventType = {}));
 
 class InputManager {
-  constructor(canvas, wasm) {
-    this.wasmManager = wasm;
+  constructor(canvas) {
     this.canvas = canvas;
     this.canvasBounds = canvas.getBoundingClientRect();
     this.onDownHandler = this.onDown.bind(this);
@@ -701,31 +700,28 @@ class InputManager {
 
   createMouseEvent(e, bounds) {
     let delta = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
-    const wasmExports = this.wasmManager.exports;
 
-    const mouseEventPtr = wasmExports.__pin(wasmExports.createMouseEvent(e.clientX, e.clientY, e.pageX, e.pageY, e.ctrlKey, e.shiftKey, e.altKey, e.button, e.buttons, bounds.x, bounds.y, bounds.width, bounds.height, delta, e.movementX || 0, e.movementY || 0));
+    const mouseEventPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.__pin(_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.createMouseEvent(e.clientX, e.clientY, e.pageX, e.pageY, e.ctrlKey, e.shiftKey, e.altKey, e.button, e.buttons, bounds.x, bounds.y, bounds.width, bounds.height, delta, e.movementX || 0, e.movementY || 0));
 
     return mouseEventPtr;
   }
 
   sendMouseEvent(type, event, bounds, delta) {
-    const wasmExports = this.wasmManager.exports;
-    const manager = wasmExports.InputManager.wrap(wasmExports.getInputManager());
+    const manager = _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.InputManager.wrap(_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.getInputManager());
     const wasmEvent = this.createMouseEvent(event, bounds, delta);
     if (type === MouseEventType.MouseUp) manager.onMouseUp(wasmEvent);else if (type === MouseEventType.MouseMove) manager.onMouseMove(wasmEvent);else if (type === MouseEventType.MouseDown) manager.onMouseDown(wasmEvent);else if (type === MouseEventType.MouseWheel) manager.onWheel(wasmEvent);
 
-    wasmExports.__unpin(wasmEvent);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.__unpin(wasmEvent);
   }
 
   sendKeyEvent(type, event) {
-    const wasmExports = this.wasmManager.exports;
-    const manager = wasmExports.InputManager.wrap(wasmExports.getInputManager());
+    const manager = _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.InputManager.wrap(_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.getInputManager());
 
-    const wasmEvent = wasmExports.__pin(wasmExports.createKeyboardEvent(wasmExports.__newString(event.code)));
+    const wasmEvent = _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.__pin(_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.createKeyboardEvent(_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.__newString(event.code)));
 
     if (type === KeyEventType.KeyUp) manager.onKeyUp(wasmEvent);else if (type === KeyEventType.KeyDown) manager.onKeyDown(wasmEvent);
 
-    wasmExports.__unpin(wasmEvent);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.__unpin(wasmEvent);
   }
 
   dispose() {
@@ -757,6 +753,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _common_ResourceType__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../common/ResourceType */ "./src/common/ResourceType.ts");
 /* harmony import */ var _common_Commands__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../common/Commands */ "./src/common/Commands.ts");
 /* harmony import */ var _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./pipelines/resources/LightingResource */ "./src/ts/core/pipelines/resources/LightingResource.ts");
+/* harmony import */ var _WasmManager__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./WasmManager */ "./src/ts/core/WasmManager.ts");
+
 
 
 
@@ -764,9 +762,8 @@ __webpack_require__.r(__webpack_exports__);
 const ARRAYBUFFERVIEW_DATASTART_OFFSET = 4;
 const normalAs4x4 = new Float32Array(12);
 class RenderQueueManager {
-  constructor(manager, wasmManager) {
+  constructor(manager) {
     this.manager = manager;
-    this.wasmManager = wasmManager;
   }
 
   run(commandBuffer) {
@@ -777,7 +774,7 @@ class RenderQueueManager {
     const {
       wasmArrayBuffer,
       wasmMemoryBlock
-    } = this.wasmManager;
+    } = _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasmManager;
 
     const getPtrIndex = function (ptr) {
       return wasmArrayBuffer[ptr + ARRAYBUFFERVIEW_DATASTART_OFFSET >>> 2];
@@ -928,13 +925,14 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var _EventDispatcher__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./EventDispatcher */ "./src/ts/core/EventDispatcher.ts");
 /* harmony import */ var _events_UIEvent__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./events/UIEvent */ "./src/ts/core/events/UIEvent.ts");
+/* harmony import */ var _WasmManager__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./WasmManager */ "./src/ts/core/WasmManager.ts");
+
 
 
 const uiEvent = new _events_UIEvent__WEBPACK_IMPORTED_MODULE_1__.UIEvent();
 class UIEventManager extends _EventDispatcher__WEBPACK_IMPORTED_MODULE_0__["default"] {
-  constructor(wasm) {
+  constructor() {
     super();
-    this.wasmManager = wasm;
   }
 
   createBinding() {
@@ -949,8 +947,7 @@ class UIEventManager extends _EventDispatcher__WEBPACK_IMPORTED_MODULE_0__["defa
   }
 
   triggerUIEvent(type) {
-    const wasmExports = this.wasmManager.exports;
-    const manager = wasmExports.UISignalManager.wrap(wasmExports.getSignalManager());
+    const manager = _WasmManager__WEBPACK_IMPORTED_MODULE_2__.wasm.UISignalManager.wrap(_WasmManager__WEBPACK_IMPORTED_MODULE_2__.wasm.getSignalManager());
     manager.onSignalEvent(type);
   }
 
@@ -1004,14 +1001,20 @@ function createIndexBuffer(device, data) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "WasmManager": () => (/* binding */ WasmManager)
+/* harmony export */   "WasmManager": () => (/* binding */ WasmManager),
+/* harmony export */   "wasm": () => (/* binding */ wasm),
+/* harmony export */   "wasmManager": () => (/* binding */ wasmManager)
 /* harmony export */ });
 /* harmony import */ var _build_untouched_wasm__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../build/untouched.wasm */ "./build/untouched.wasm");
 /* harmony import */ var _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @assemblyscript/loader */ "./node_modules/@assemblyscript/loader/index.js");
 
 
+let wasmManager;
+let wasm;
 class WasmManager {
-  constructor() {}
+  constructor() {
+    wasmManager = this;
+  }
 
   async load(bindables) {
     var _this = this;
@@ -1052,6 +1055,7 @@ class WasmManager {
     this.importObject.Imports = bindings;
     const obj = await _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_1__["default"].instantiateStreaming(fetch(_build_untouched_wasm__WEBPACK_IMPORTED_MODULE_0__["default"]), this.importObject);
     this.exports = obj.exports;
+    wasm = obj.exports;
     this.wasmMemoryBlock = obj.exports.memory.buffer;
     this.wasmArrayBuffer = new Uint32Array(this.wasmMemoryBlock);
   }
@@ -2822,7 +2826,7 @@ const Application = _ref => {
 
   const onCanvasReady = async canvas => {
     gameManager = new _core_GameManager__WEBPACK_IMPORTED_MODULE_1__.GameManager(canvas);
-    eventManager = new _core_UIEventManager__WEBPACK_IMPORTED_MODULE_0__.UIEventManager(wasmManager);
+    eventManager = new _core_UIEventManager__WEBPACK_IMPORTED_MODULE_0__.UIEventManager();
     const bindables = [gameManager, eventManager];
 
     try {
@@ -2835,7 +2839,7 @@ const Application = _ref => {
         return;
       }
 
-      await gameManager.init(wasmManager);
+      await gameManager.init();
       eventManager.addEventListener("uievent", onWasmUiEvent);
     } catch (err) {
       setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");
