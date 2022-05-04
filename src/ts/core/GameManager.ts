@@ -12,6 +12,7 @@ import { IBindable } from "./IBindable";
 import { BitmapTexture } from "./textures/BitmapTexture";
 import { BitmapCubeTexture } from "./textures/BitmapCubeTexture";
 import { SkyboxPipeline } from "./pipelines/skybox-pipeline/SkyboxPipeline";
+import { Object3D } from "../renderer/Object3D";
 
 const sampleCount = 4;
 const MEDIA_URL = process.env.MEDIA_URL;
@@ -39,6 +40,8 @@ export class GameManager implements IBindable {
   currentPass: GPURenderPassEncoder | null;
   currentCommandEncoder: GPUCommandEncoder;
   private presentationSize: [number, number];
+
+  private character: Object3D;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -203,6 +206,10 @@ export class GameManager implements IBindable {
     for (let i = 0; i < 20; i++) containerLvl1.addAsset(this.createMesh(geometryBox, "concrete", `building-${i}`));
     for (let i = 0; i < 20; i++) containerLvl1.addAsset(this.createMesh(geometryBox, "crate", `crate-${i}`));
 
+    this.character = new Object3D();
+    this.character.transform.add(this.createMesh(geometrySphere, "simple", "character"));
+    containerLvl1.addAsset(this.character.transform.valueOf());
+
     containerLvl1.addAsset(this.createMesh(geometryBox, "coastal-floor", "floor"));
     wasm.__unpin(containerLvl1Ptr);
 
@@ -300,6 +307,7 @@ export class GameManager implements IBindable {
       this.onResize(newSize);
     }
 
+    this.character.transform.translateZ(0.01);
     wasm.update(performance.now());
   }
 
