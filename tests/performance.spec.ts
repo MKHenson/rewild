@@ -1,9 +1,10 @@
-import { SimpleMatrix4 } from "../src/ts/renderer/SimpleMatrix4";
+import expect = require("expect.js");
+import { SimpleMatrix4 } from "./math/SimpleMatrix4";
 import { wasm } from "./wasm-module";
 
 const numTests = 20000;
 
-describe("Check the performance difference between matrix multiplications", () => {
+describe("Performance Tests", () => {
   it("is faster in wasm when multiplying a matrix4", () => {
     const testMatrixMultiplication = (numMatrices: number = 100): void => {
       const source = new SimpleMatrix4();
@@ -21,13 +22,14 @@ describe("Check the performance difference between matrix multiplications", () =
       }
     };
 
-    console.time("As Test #1");
-    const value = wasm.testMatrixMultiplication(numTests);
-    console.timeEnd("As Test #1");
-    console.log(`The value is ${value}`);
+    const t1 = performance.now();
+    wasm.PerformanceTests.matrixMultiplication(numTests);
+    const asDeltaMS = performance.now() - t1;
 
-    console.time("TS Test #2");
+    const t2 = performance.now();
     testMatrixMultiplication(numTests);
-    console.timeEnd("TS Test #2");
+    const tsDeltaMS = performance.now() - t2;
+
+    expect(asDeltaMS).to.be.lessThan(tsDeltaMS);
   });
 });

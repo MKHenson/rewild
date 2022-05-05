@@ -29,8 +29,7 @@
     "baseUrl": "../../",
     "types": ["node", "@webgpu/types"],
     "paths": {
-      // prioritize types at the project level (avoids types in npm linked modules)
-      "*": ["/build/types.d.ts", "./types/*", "node_modules/@types/*", "*"]
+      "*": ["/build/types.d.ts", "node_modules/@types/*", "*"]
     }
   }
 }
