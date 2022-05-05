@@ -6,8 +6,8 @@
   "scripts": {
     "test": "npx mocha 'tests/**/*.ts'",
     "clean": "rimraf ./dist/untouched.wasm && rimraf ./dist/untouched.wasm.map && rimraf ./dist/untouched.wat",
-    "asbuild:untouched": "asc src/as/index.ts  --sourceMap --target debug -d ./build/types.d.ts --exportTable --importMemory --exportRuntime --debug",
-    "asbuild:optimized": "asc src/as/index.ts --target release -d ./build/types.d.ts --exportTable --importMemory --exportRuntime",
+    "asbuild:untouched": "asc src/as/index.ts  --sourceMap --target debug -d ./build/types.d.ts --exportTable --importMemory --exportRuntime --debug --enable simd",
+    "asbuild:optimized": "asc src/as/index.ts --target release -d ./build/types.d.ts --exportTable --importMemory --exportRuntime --enable simd",
     "build:webpack": "webpack --mode development",
     "build": "npm run clean && npm run asbuild:untouched && npm run build:webpack",
     "watch-webpack": "webpack --mode development --watch --env env=local",
