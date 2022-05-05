@@ -348,39 +348,58 @@ export class Matrix4 {
     const be = b.elements;
     const te = this.elements;
 
-    const a11 = ae[0],
-      a12 = ae[4],
-      a13 = ae[8],
-      a14 = ae[12];
-    const a21 = ae[1],
-      a22 = ae[5],
-      a23 = ae[9],
-      a24 = ae[13];
-    const a31 = ae[2],
-      a32 = ae[6],
-      a33 = ae[10],
-      a34 = ae[14];
-    const a41 = ae[3],
-      a42 = ae[7],
-      a43 = ae[11],
-      a44 = ae[15];
+    const a11 = unchecked(ae[0]),
+      a12 = unchecked(ae[4]),
+      a13 = unchecked(ae[8]),
+      a14 = unchecked(ae[12]);
+    const a21 = unchecked(ae[1]),
+      a22 = unchecked(ae[5]),
+      a23 = unchecked(ae[9]),
+      a24 = unchecked(ae[13]);
+    const a31 = unchecked(ae[2]),
+      a32 = unchecked(ae[6]),
+      a33 = unchecked(ae[10]),
+      a34 = unchecked(ae[14]);
+    const a41 = unchecked(ae[3]),
+      a42 = unchecked(ae[7]),
+      a43 = unchecked(ae[11]),
+      a44 = unchecked(ae[15]);
 
-    const b11 = be[0],
-      b12 = be[4],
-      b13 = be[8],
-      b14 = be[12];
-    const b21 = be[1],
-      b22 = be[5],
-      b23 = be[9],
-      b24 = be[13];
-    const b31 = be[2],
-      b32 = be[6],
-      b33 = be[10],
-      b34 = be[14];
-    const b41 = be[3],
-      b42 = be[7],
-      b43 = be[11],
-      b44 = be[15];
+    const b11 = unchecked(be[0]),
+      b12 = unchecked(be[4]),
+      b13 = unchecked(be[8]),
+      b14 = unchecked(be[12]);
+    const b21 = unchecked(be[1]),
+      b22 = unchecked(be[5]),
+      b23 = unchecked(be[9]),
+      b24 = unchecked(be[13]);
+    const b31 = unchecked(be[2]),
+      b32 = unchecked(be[6]),
+      b33 = unchecked(be[10]),
+      b34 = unchecked(be[14]);
+    const b41 = unchecked(be[3]),
+      b42 = unchecked(be[7]),
+      b43 = unchecked(be[11]),
+      b44 = unchecked(be[15]);
+
+    // const vecA1 = v128.load(a.elements.dataStart, 0);
+    // const vecB1 = v128.load(b.elements.dataStart, 0);
+    // const vecA2 = v128.load(a.elements.dataStart, 16);
+    // const vecB2 = v128.load(b.elements.dataStart, 16);
+    // const vecA3 = v128.load(a.elements.dataStart, 32);
+    // const vecB3 = v128.load(b.elements.dataStart, 32);
+    // const vecA4 = v128.load(a.elements.dataStart, 48);
+    // const vecB4 = v128.load(b.elements.dataStart, 48);
+
+    // const vecC1: v128 = f32x4.mul(vecA1, vecB1);
+    // const vecC2: v128 = f32x4.mul(vecA2, vecB2);
+    // const vecC3: v128 = f32x4.mul(vecA3, vecB3);
+    // const vecC4: v128 = f32x4.mul(vecA4, vecB4);
+
+    // v128.store(te.dataStart, vecC1);
+    // v128.store(te.dataStart, vecC2, 16);
+    // v128.store(te.dataStart, vecC3, 32);
+    // v128.store(te.dataStart, vecC4, 48);
 
     te[0] = a11 * b11 + a12 * b21 + a13 * b31 + a14 * b41;
     te[4] = a11 * b12 + a12 * b22 + a13 * b32 + a14 * b42;

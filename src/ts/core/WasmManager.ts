@@ -23,7 +23,7 @@ export class WasmManager {
 
   async load(bindables: IBindable[]) {
     // Creating WASM with Linear memory
-    this.memory = new WebAssembly.Memory({ initial: 100 });
+    this.memory = new WebAssembly.Memory({ initial: 10000 });
     this.importObject = {
       env: {
         memory: this.memory,

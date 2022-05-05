@@ -21,7 +21,11 @@ function testMatrixMultiplication(numMatrices: i32 = 100): f32 {
   }
 
   for (let i = 0; i < matrices.length; i++) {
-    matrices[i].multiplyMatrices(matrices[i], source);
+    unchecked(matrices[i]).multiplyMatrices(unchecked(matrices[i]), source);
+  }
+
+  for (let i = 0; i < matrices.length; i++) {
+    unchecked(matrices[i]).multiplyMatrices(unchecked(matrices[i]), source);
   }
 
   return 0;
