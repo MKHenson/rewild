@@ -4,7 +4,7 @@
   "description": "Game about exploring earth's history",
   "main": "index.js",
   "scripts": {
-    "test": "npx mocha 'tests/**/*.ts'",
+    "test": "node --experimental-wasm-simd node_modules/mocha/bin/_mocha 'tests/**/*.ts' --experimental-wasm-simd",
     "clean": "rimraf ./dist/untouched.wasm && rimraf ./dist/untouched.wasm.map && rimraf ./dist/untouched.wat",
     "asbuild:untouched": "asc src/as/index.ts  --sourceMap --target debug -d ./build/types.d.ts --exportTable --importMemory --exportRuntime --debug --enable simd",
     "asbuild:optimized": "asc src/as/index.ts --target release -d ./build/types.d.ts --exportTable --importMemory --exportRuntime --enable simd",
