@@ -1,6 +1,9 @@
 import * as fs from "fs";
 import * as loader from "@assemblyscript/loader";
 import type * as MyModule from "../build/test-types";
+import { WASI } from "wasi";
+
+const wasi = new WASI();
 
 const memory = new WebAssembly.Memory({ initial: 100 });
 const importObject = {
@@ -14,6 +17,7 @@ const importObject = {
     // lock: () => {},
     // unlock: () => {},
   },
+  wasi_snapshot_preview1: wasi.wasiImport,
   env: {
     memory: memory,
     seed: Date.now,
@@ -25,5 +29,6 @@ const importObject = {
 const wasmBin = fs.readFileSync(__dirname + "/../build/optimized.wasm");
 
 const wasmModule = loader.instantiateSync<typeof MyModule>(wasmBin, importObject);
+// wasi.start(wasmModule);
 
 export const wasm = wasmModule.exports;

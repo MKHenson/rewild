@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "asbuild:test": "asc src/as/tests.ts --target release -d ./build/test-types.d.ts  --exportTable --importMemory --exportRuntime --enable simd",
-    "run-mocha": "node --experimental-wasm-simd node_modules/mocha/bin/_mocha 'tests/**/*.spec.ts' --reporter spec",
+    "run-mocha": "node --experimental-wasi-unstable-preview1 --experimental-wasm-simd node_modules/mocha/bin/_mocha 'tests/**/*.spec.ts' --reporter spec",
     "test": "npm run asbuild:test && npm run run-mocha",
     "clean": "rimraf ./dist/untouched.wasm && rimraf ./dist/untouched.wasm.map && rimraf ./dist/untouched.wat",
     "asbuild:untouched": "asc src/as/index.ts  --sourceMap --target debug -d ./build/types.d.ts --exportTable --importMemory --exportRuntime --debug --enable simd",
