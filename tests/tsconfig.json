@@ -8,7 +8,8 @@
     "isolatedModules": false,
     "strict": false,
     "noImplicitAny": false,
-    "typeRoots": ["./node_modules/@types"]
+    "typeRoots": ["./node_modules/@types"],
+    "types": ["mocha", "node"]
   },
   "exclude": ["./node_modules"]
 }
