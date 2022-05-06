@@ -44,9 +44,6 @@ export const Application: Component<Props> = ({}) => {
     try {
       await wasmManager.load(bindables);
 
-      const test = wasmManager.exports.testMatrixMultiplication(5000);
-      console.log(test);
-
       if (!gameManager.hasWebGPU()) {
         setErrorMessage("Your browser does not support WebGPU");
         setErrorType("WGPU");
