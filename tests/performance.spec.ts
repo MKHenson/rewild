@@ -1,5 +1,5 @@
 import expect = require("expect.js");
-import { SimpleMatrix4 } from "./math/SimpleMatrix4";
+import { SimpleMatrix4 } from "./utils/math/SimpleMatrix4";
 import { wasm } from "./wasm-module";
 
 const numTests = 20000;

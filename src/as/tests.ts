@@ -20,3 +20,9 @@ export namespace PerformanceTests {
     return 0;
   }
 }
+
+function newMatrix4(): Matrix4 {
+  return new Matrix4();
+}
+
+export { newMatrix4, Matrix4 };
