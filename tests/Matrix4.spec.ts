@@ -1,10 +1,10 @@
 import { wasm } from "./wasm-module";
 import expect from "expect.js";
 
-function matrixEquals4(a: Float32Array, b: Float32Array, tolerance?: number) {
+function matrixEquals4(a: any, b: any, tolerance?: number) {
   tolerance = tolerance || 0.0001;
-  const aElements = a;
-  const bEelements = b;
+  const aElements = wasm.getLiveF32Array(wasm.matrix_elements(a));
+  const bEelements = wasm.getLiveF32Array(wasm.matrix_elements(b));
   if (aElements.length != bEelements.length) {
     return false;
   }
@@ -163,9 +163,7 @@ describe("Matrix4", () => {
     wasm.matrix_set(c, 2, 6, 12, 4, 10, 18, 28, 8, 18, 30, 44, 12, 26, 42, 60, 16);
 
     wasm.matrix_scale(a, b);
-    expect(
-      matrixEquals4(wasm.getLiveF32Array(wasm.matrix_elements(a)), wasm.getLiveF32Array(wasm.matrix_elements(c)))
-    ).to.be.equal(true);
+    expect(matrixEquals4(a, c)).to.be.equal(true);
   });
 
   it("scales correctly with SIMD", () => {
@@ -176,8 +174,73 @@ describe("Matrix4", () => {
     wasm.matrix_set(c, 2, 6, 12, 4, 10, 18, 28, 8, 18, 30, 44, 12, 26, 42, 60, 16);
 
     wasm.matrix_scaleSIMD(a, b);
-    expect(
-      matrixEquals4(wasm.getLiveF32Array(wasm.matrix_elements(a)), wasm.getLiveF32Array(wasm.matrix_elements(c)))
-    ).to.be.equal(true);
+    expect(matrixEquals4(a, c)).to.be.equal(true);
+  });
+
+  it("transposes correctly", () => {
+    let a = wasm.newMatrix4();
+    let b = wasm.matrix_transpose(wasm.matrix_clone(a));
+    expect(matrixEquals4(a, b)).to.be.equal(true);
+
+    b = wasm.matrix_set(wasm.newMatrix4(), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+    const c = wasm.matrix_transpose(wasm.matrix_clone(b));
+    expect(matrixEquals4(b, c)).to.be.equal(false);
+
+    wasm.matrix_transpose(c);
+    expect(matrixEquals4(b, c)).to.be.equal(true);
+  });
+
+  it("transposes correctly with SIMD", () => {
+    let a = wasm.newMatrix4();
+    let b = wasm.matrix_transposeSIMD(wasm.matrix_clone(a));
+    expect(matrixEquals4(a, b)).to.be.equal(true);
+
+    b = wasm.matrix_set(wasm.newMatrix4(), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+    const c = wasm.matrix_transposeSIMD(wasm.matrix_clone(b));
+    expect(matrixEquals4(b, c)).to.be.equal(false);
+
+    wasm.matrix_transposeSIMD(c);
+    expect(matrixEquals4(b, c)).to.be.equal(true);
+  });
+
+  it("does invert a matrix", () => {
+    const zero = wasm.matrix_set(wasm.newMatrix4(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    const identity = wasm.newMatrix4();
+    const a = wasm.newMatrix4();
+    const b = wasm.matrix_set(wasm.newMatrix4(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+    wasm.matrix_invert(wasm.matrix_copy(a, b));
+    expect(matrixEquals4(a, zero)).to.be.equal(true);
+
+    const testMatrices = [
+      wasm.matrix_makeRotationX(wasm.newMatrix4(), 0.3),
+      wasm.matrix_makeRotationX(wasm.newMatrix4(), -0.3),
+      wasm.matrix_makeRotationY(wasm.newMatrix4(), 0.3),
+      wasm.matrix_makeRotationY(wasm.newMatrix4(), -0.3),
+      wasm.matrix_makeRotationZ(wasm.newMatrix4(), 0.3),
+      wasm.matrix_makeRotationZ(wasm.newMatrix4(), -0.3),
+      wasm.matrix_makeScale(wasm.newMatrix4(), 1, 2, 3),
+      wasm.matrix_makeScale(wasm.newMatrix4(), 1 / 8, 1 / 2, 1 / 3),
+      wasm.matrix_makePerspective(wasm.newMatrix4(), -1, 1, 1, -1, 1, 1000),
+      wasm.matrix_makePerspective(wasm.newMatrix4(), -16, 16, 9, -9, 0.1, 10000),
+      wasm.matrix_makeTranslation(wasm.newMatrix4(), 1, 2, 3),
+    ];
+
+    for (let i = 0, il = testMatrices.length; i < il; i++) {
+      let m = testMatrices[i];
+      var mInverse = wasm.matrix_invert(wasm.matrix_copy(wasm.newMatrix4(), m));
+      var mSelfInverse = wasm.matrix_clone(m);
+      wasm.matrix_invert(wasm.matrix_copy(mSelfInverse, mSelfInverse));
+
+      // self-inverse should the same as inverse
+      expect(matrixEquals4(mSelfInverse, mInverse)).to.be.equal(true);
+
+      // the determinant of the inverse should be the reciprocal
+      expect(Math.abs(wasm.matrix_determinant(m) * wasm.matrix_determinant(mInverse) - 1) < 0.0001).to.be.equal(true);
+      const mProduct = wasm.matrix_multiplyMatrices(wasm.newMatrix4(), m, mInverse);
+      // the determinant of the identity matrix is 1
+      expect(Math.abs(wasm.matrix_determinant(mProduct) - 1) < 0.0001).to.be.equal(true);
+      expect(matrixEquals4(mProduct, identity)).to.be.equal(true);
+    }
   });
 });
