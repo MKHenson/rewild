@@ -177,102 +177,94 @@ export class Matrix4 {
         be = b * e,
         bf = b * f;
 
-      te[0] = c * e;
-      te[4] = -c * f;
-      te[8] = d;
+      unchecked((te[0] = c * e));
+      unchecked((te[4] = -c * f));
+      unchecked((te[8] = d));
 
-      te[1] = af + be * d;
-      te[5] = ae - bf * d;
-      te[9] = -b * c;
+      unchecked((te[1] = af + be * d));
+      unchecked((te[5] = ae - bf * d));
+      unchecked((te[9] = -b * c));
 
-      te[2] = bf - ae * d;
-      te[6] = be + af * d;
-      te[10] = a * c;
+      unchecked((te[2] = bf - ae * d));
+      unchecked((te[6] = be + af * d));
+      unchecked((te[10] = a * c));
     } else if (euler.order === EulerRotationOrder.YXZ) {
       const ce = c * e,
         cf = c * f,
         de = d * e,
         df = d * f;
 
-      te[0] = ce + df * b;
-      te[4] = de * b - cf;
-      te[8] = a * d;
+      unchecked((te[0] = ce + df * b));
+      unchecked((te[4] = de * b - cf));
+      unchecked((te[8] = a * d));
 
-      te[1] = a * f;
-      te[5] = a * e;
-      te[9] = -b;
+      unchecked((te[1] = a * f));
+      unchecked((te[5] = a * e));
+      unchecked((te[9] = -b));
 
-      te[2] = cf * b - de;
-      te[6] = df + ce * b;
-      te[10] = a * c;
+      unchecked((te[2] = cf * b - de));
+      unchecked((te[6] = df + ce * b));
+      unchecked((te[10] = a * c));
     } else if (euler.order === EulerRotationOrder.ZXY) {
       const ce = c * e,
         cf = c * f,
         de = d * e,
         df = d * f;
 
-      te[0] = ce - df * b;
-      te[4] = -a * f;
-      te[8] = de + cf * b;
-
-      te[1] = cf + de * b;
-      te[5] = a * e;
-      te[9] = df - ce * b;
-
-      te[2] = -a * d;
-      te[6] = b;
-      te[10] = a * c;
+      unchecked((te[0] = ce - df * b));
+      unchecked((te[4] = -a * f));
+      unchecked((te[8] = de + cf * b));
+      unchecked((te[1] = cf + de * b));
+      unchecked((te[5] = a * e));
+      unchecked((te[9] = df - ce * b));
+      unchecked((te[2] = -a * d));
+      unchecked((te[6] = b));
+      unchecked((te[10] = a * c));
     } else if (euler.order === EulerRotationOrder.ZYX) {
       const ae = a * e,
         af = a * f,
         be = b * e,
         bf = b * f;
 
-      te[0] = c * e;
-      te[4] = be * d - af;
-      te[8] = ae * d + bf;
-
-      te[1] = c * f;
-      te[5] = bf * d + ae;
-      te[9] = af * d - be;
-
-      te[2] = -d;
-      te[6] = b * c;
-      te[10] = a * c;
+      unchecked((te[0] = c * e));
+      unchecked((te[4] = be * d - af));
+      unchecked((te[8] = ae * d + bf));
+      unchecked((te[1] = c * f));
+      unchecked((te[5] = bf * d + ae));
+      unchecked((te[9] = af * d - be));
+      unchecked((te[2] = -d));
+      unchecked((te[6] = b * c));
+      unchecked((te[10] = a * c));
     } else if (euler.order === EulerRotationOrder.YZX) {
       const ac = a * c,
         ad = a * d,
         bc = b * c,
         bd = b * d;
 
-      te[0] = c * e;
-      te[4] = bd - ac * f;
-      te[8] = bc * f + ad;
-
-      te[1] = f;
-      te[5] = a * e;
-      te[9] = -b * e;
-
-      te[2] = -d * e;
-      te[6] = ad * f + bc;
-      te[10] = ac - bd * f;
+      unchecked((te[0] = c * e));
+      unchecked((te[4] = bd - ac * f));
+      unchecked((te[8] = bc * f + ad));
+      unchecked((te[1] = f));
+      unchecked((te[5] = a * e));
+      unchecked((te[9] = -b * e));
+      unchecked((te[2] = -d * e));
+      unchecked((te[6] = ad * f + bc));
+      unchecked((te[10] = ac - bd * f));
     } else if (euler.order === EulerRotationOrder.XZY) {
       const ac = a * c,
         ad = a * d,
         bc = b * c,
         bd = b * d;
 
-      te[0] = c * e;
-      te[4] = -f;
-      te[8] = d * e;
-
-      te[1] = ac * f + bd;
-      te[5] = a * e;
-      te[9] = ad * f - bc;
-
-      te[2] = bc * f - ad;
-      te[6] = b * e;
-      te[10] = bd * f + ac;
+      unchecked((te[0] = c * e));
+      unchecked((te[4] = -f));
+      unchecked((te[8] = d * e));
+      unchecked((te[1] = ac * f + bd));
+      unchecked((te[5] = a * e));
+      unchecked((te[9] = ad * f - bc));
+      unchecked((te[2] = bc * f - ad));
+      unchecked((te[6] = b * e));
+      unchecked((te[10] = bd * f + ac));
     }
 
     // bottom row
@@ -519,22 +511,22 @@ export class Matrix4 {
   determinant(): f32 {
     const te = this.elements;
 
-    const n11 = te[0],
-      n12 = te[4],
-      n13 = te[8],
-      n14 = te[12];
-    const n21 = te[1],
-      n22 = te[5],
-      n23 = te[9],
-      n24 = te[13];
-    const n31 = te[2],
-      n32 = te[6],
-      n33 = te[10],
-      n34 = te[14];
-    const n41 = te[3],
-      n42 = te[7],
-      n43 = te[11],
-      n44 = te[15];
+    const n11 = unchecked(te[0]),
+      n12 = unchecked(te[4]),
+      n13 = unchecked(te[8]),
+      n14 = unchecked(te[12]);
+    const n21 = unchecked(te[1]),
+      n22 = unchecked(te[5]),
+      n23 = unchecked(te[9]),
+      n24 = unchecked(te[13]);
+    const n31 = unchecked(te[2]),
+      n32 = unchecked(te[6]),
+      n33 = unchecked(te[10]),
+      n34 = unchecked(te[14]);
+    const n41 = unchecked(te[3]),
+      n42 = unchecked(te[7]),
+      n43 = unchecked(te[11]),
+      n44 = unchecked(te[15]);
 
     //TODO: make this more efficient
     //( based on http://www.euclideanspace.com/maths/algebra/matrix/functions/inverse/fourD/index.htm )
@@ -554,25 +546,60 @@ export class Matrix4 {
     const te = this.elements;
     let tmp: f32;
 
-    tmp = te[1];
-    te[1] = te[4];
-    te[4] = tmp;
-    tmp = te[2];
-    te[2] = te[8];
-    te[8] = tmp;
-    tmp = te[6];
-    te[6] = te[9];
-    te[9] = tmp;
+    unchecked((tmp = te[1]));
+    unchecked((te[1] = te[4]));
+    unchecked((te[4] = tmp));
+    unchecked((tmp = te[2]));
+    unchecked((te[2] = te[8]));
+    unchecked((te[8] = tmp));
+    unchecked((tmp = te[6]));
+    unchecked((te[6] = te[9]));
+    unchecked((te[9] = tmp));
+    unchecked((tmp = te[3]));
+    unchecked((te[3] = te[12]));
+    unchecked((te[12] = tmp));
+    unchecked((tmp = te[7]));
+    unchecked((te[7] = te[13]));
+    unchecked((te[13] = tmp));
+    unchecked((tmp = te[11]));
+    unchecked((te[11] = te[14]));
+    unchecked((te[14] = tmp));
 
-    tmp = te[3];
-    te[3] = te[12];
-    te[12] = tmp;
-    tmp = te[7];
-    te[7] = te[13];
-    te[13] = tmp;
-    tmp = te[11];
-    te[11] = te[14];
-    te[14] = tmp;
+    return this;
+  }
+
+  transposeSIMD(): Matrix4 {
+    const te = this.elements;
+    let a0: v128,
+      a1: v128,
+      a2: v128,
+      a3: v128,
+      tmp01: v128,
+      tmp23: v128,
+      out0: v128,
+      out1: v128,
+      out2: v128,
+      out3: v128;
+    const a = te.dataStart;
+
+    a0 = v128.load(a, 0);
+    a1 = v128.load(a, 16);
+    a2 = v128.load(a, 32);
+    a3 = v128.load(a, 48);
+
+    tmp01 = v128.shuffle<f32>(a0, a1, 0, 1, 4, 5);
+    tmp23 = v128.shuffle<f32>(a2, a3, 0, 1, 4, 5);
+    out0 = v128.shuffle<f32>(tmp01, tmp23, 0, 2, 4, 6);
+    out1 = v128.shuffle<f32>(tmp01, tmp23, 1, 3, 5, 7);
+    v128.store(a, out0, 0);
+    v128.store(a, out1, 16);
+
+    tmp01 = v128.shuffle<f32>(a0, a1, 2, 3, 6, 7);
+    tmp23 = v128.shuffle<f32>(a2, a3, 2, 3, 6, 7);
+    out2 = v128.shuffle<f32>(tmp01, tmp23, 0, 2, 4, 6);
+    out3 = v128.shuffle<f32>(tmp01, tmp23, 1, 3, 5, 7);
+    v128.store(a, out2, 32);
+    v128.store(a, out3, 48);
 
     return this;
   }

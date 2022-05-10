@@ -65,6 +65,7 @@ function testMat4Performance(numMatrices: i32): void {
     m.multiplyMatrices(m, source);
     m.multiplyScalar(5);
     m.scale(scaleVec);
+    m.transpose();
   }
 }
 
@@ -77,6 +78,7 @@ function testMat4SIMDPerformance(numMatrices: i32): void {
     m.multiplyMatricesSIMD(m, source);
     m.multiplyScalarSIMD(5);
     m.scaleSIMD(scaleVec);
+    m.transposeSIMD();
   }
 }
 
@@ -87,20 +89,48 @@ function newVector3(x: f32 = 0, y: f32 = 0, z: f32 = 0): Vector3 { return new Ve
 // prettier-ignore
 function matrix_elements(matrix: Matrix4): usize { return changetype<usize>( matrix.elements); }
 // prettier-ignore
-function matrix_multiply(matrixA: Matrix4, matrixB: Matrix4): void { matrixA.multiply(matrixB); }
+function matrix_multiply(matrixA: Matrix4, matrixB: Matrix4): Matrix4 { return matrixA.multiply(matrixB); }
 // prettier-ignore
-function matrix_multiplySIMD(matrixA: Matrix4, matrixB: Matrix4): void { matrixA.multiplySIMD(matrixB); }
+function matrix_multiplySIMD(matrixA: Matrix4, matrixB: Matrix4): Matrix4 { return matrixA.multiplySIMD(matrixB); }
 // prettier-ignore
-function matrix_multiplyScalar(matrixA: Matrix4, v: f32): void { matrixA.multiplyScalar(v); }
+function matrix_multiplyScalar(matrixA: Matrix4, v: f32): Matrix4 { return matrixA.multiplyScalar(v); }
 // prettier-ignore
-function matrix_scale(matrixA: Matrix4, v: Vector3): void { matrixA.scale(v); }
+function matrix_scale(matrixA: Matrix4, v: Vector3): Matrix4 { return matrixA.scale(v); }
 // prettier-ignore
-function matrix_scaleSIMD(matrixA: Matrix4, v: Vector3): void { matrixA.scaleSIMD(v); }
+function matrix_makeRotationX(matrixA: Matrix4, v: f32): Matrix4 { return matrixA.makeRotationX(v); }
 // prettier-ignore
-function matrix_multiplyScalarSIMD(matrixA: Matrix4, v: f32): void { matrixA.multiplyScalarSIMD(v); }
+function matrix_makeRotationY(matrixA: Matrix4, v: f32): Matrix4 { return matrixA.makeRotationY(v); }
 // prettier-ignore
-function matrix_set(matrixA: Matrix4,  n11: f32, n12: f32, n13: f32, n14: f32, n21: f32, n22: f32, n23: f32, n24: f32, n31: f32, n32: f32, n33: f32, n34: f32, n41: f32, n42: f32, n43: f32, n44: f32): void {
-  matrixA.set( n11, n12, n13, n14, n21, n22, n23, n24, n31, n32, n33, n34, n41, n42, n43, n44 );
+function matrix_makeRotationZ(matrixA: Matrix4, v: f32): Matrix4 { return matrixA.makeRotationZ(v); }
+// prettier-ignore
+function matrix_makePerspective(matrixA: Matrix4, l: f32, r: f32, t: f32, b: f32, n: f32, f: f32): Matrix4 { return matrixA.makePerspective(l, r, t, b, n, f); }
+// prettier-ignore
+function matrix_makeTranslation(matrixA: Matrix4, x: f32, y: f32, z: f32): Matrix4 { return matrixA.makeTranslation(x, y, z); }
+// prettier-ignore
+function matrix_makeScale(matrixA: Matrix4, x: f32, y: f32, z: f32): Matrix4 { return matrixA.makeScale(x, y, z); }
+// prettier-ignore
+function matrix_determinant(matrixA: Matrix4): f32 { return matrixA.determinant(); }
+// prettier-ignore
+function matrix_multiplyMatrices(matrixA: Matrix4, a: Matrix4, b: Matrix4): Matrix4 { return matrixA.multiplyMatrices(a, b); }
+
+// prettier-ignore
+function matrix_scaleSIMD(matrixA: Matrix4, v: Vector3): Matrix4 { return matrixA.scaleSIMD(v); }
+// prettier-ignore
+function matrix_clone(matrixA: Matrix4): Matrix4 { return matrixA.clone(); }
+// prettier-ignore
+function matrix_copy(matrixA: Matrix4, matrixB: Matrix4): Matrix4 {return  matrixA.copy(matrixB); }
+// prettier-ignore
+function matrix_transpose(matrixA: Matrix4): Matrix4 {return  matrixA.transpose(); }
+// prettier-ignore
+function matrix_transposeSIMD(matrixA: Matrix4): Matrix4 {return  matrixA.transposeSIMD(); }
+// prettier-ignore
+function matrix_invert(matrixA: Matrix4): Matrix4 {return  matrixA.invert(); }
+
+// prettier-ignore
+function matrix_multiplyScalarSIMD(matrixA: Matrix4, v: f32): Matrix4 { return matrixA.multiplyScalarSIMD(v); }
+// prettier-ignore
+function matrix_set(matrixA: Matrix4,  n11: f32, n12: f32, n13: f32, n14: f32, n21: f32, n22: f32, n23: f32, n24: f32, n31: f32, n32: f32, n33: f32, n34: f32, n41: f32, n42: f32, n43: f32, n44: f32): Matrix4 {
+  return matrixA.set( n11, n12, n13, n14, n21, n22, n23, n24, n31, n32, n33, n34, n41, n42, n43, n44 );
 }
 
 export {
@@ -120,4 +150,17 @@ export {
   matrix_set,
   matrix_scale,
   matrix_scaleSIMD,
+  matrix_clone,
+  matrix_transpose,
+  matrix_transposeSIMD,
+  matrix_copy,
+  matrix_invert,
+  matrix_makeRotationX,
+  matrix_makeRotationY,
+  matrix_makeRotationZ,
+  matrix_makePerspective,
+  matrix_makeTranslation,
+  matrix_makeScale,
+  matrix_determinant,
+  matrix_multiplyMatrices,
 };
