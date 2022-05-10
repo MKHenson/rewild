@@ -1,22 +1,12 @@
 import * as fs from "fs";
-import * as loader from "@assemblyscript/loader";
-import type * as MyModule from "../build/test-types";
+import { __AdaptedExports, instantiate } from "../build/test";
 import { WASI } from "wasi";
 
 const wasi = new WASI();
 
 const memory = new WebAssembly.Memory({ initial: 100 });
 const importObject = {
-  Imports: {
-    // createBufferFromF32: (data: any, usage: any) => {},
-    // createBuffer: (data: any, usage: any) => {},
-    // createIndexBuffer: (data: any, usage: any) => {},
-    // render: (commandsIndex: any) => {},
-    // print: (message: string) => {},
-    // onSignalReceived: (type: any, event: any) => {},
-    // lock: () => {},
-    // unlock: () => {},
-  },
+  Imports: {},
   wasi_snapshot_preview1: wasi.wasiImport,
   env: {
     memory: memory,
@@ -26,9 +16,30 @@ const importObject = {
 };
 
 /* imports go here */
-const wasmBin = fs.readFileSync(__dirname + "/../build/optimized.wasm");
+const wasmBin = fs.readFileSync(__dirname + "/../build/test.wasm");
+let wasm: typeof __AdaptedExports & {
+  getLiveF32Array: (pointer: Number) => Float32Array;
+};
 
-const wasmModule = loader.instantiateSync<typeof MyModule>(wasmBin, importObject);
-// wasi.start(wasmModule);
+export async function init() {
+  const moduleFile: WebAssembly.Module = await WebAssembly.compile(wasmBin);
+  wasm = (await instantiate(moduleFile, importObject)) as any;
+  wasm.getLiveF32Array = (pointer) => {
+    return __liftTypedArray(Float32Array, pointer.valueOf() >>> 0);
+  };
+}
 
-export const wasm = wasmModule.exports;
+function __liftTypedArray<T extends Float32Array | Int32Array | Int16Array>(
+  constructor: Float32ArrayConstructor,
+  pointer: number
+): T {
+  if (!pointer) return null;
+  const memoryU32 = new Uint32Array(memory.buffer);
+  return new constructor(
+    memory.buffer,
+    memoryU32[(pointer + 4) >>> 2],
+    memoryU32[(pointer + 8) >>> 2] / constructor.BYTES_PER_ELEMENT
+  ) as T;
+}
+
+export { wasm };

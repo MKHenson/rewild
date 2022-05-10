@@ -3,6 +3,7 @@ import { Matrix3 } from "./Matrix3";
 import { Quaternion } from "./Quaternion";
 import { Vector3 } from "./Vector3";
 import { f32Array } from "../utils";
+
 export class Matrix4 {
   isMatrix4: boolean = true;
   elements: Float32Array;
@@ -339,8 +340,81 @@ export class Matrix4 {
     return this.multiplyMatrices(this, m);
   }
 
+  multiplySIMD(m: Matrix4): Matrix4 {
+    return this.multiplyMatricesSIMD(this, m);
+  }
+
   premultiply(m: Matrix4): Matrix4 {
     return this.multiplyMatrices(m, this);
+  }
+
+  swizzleTest(): Float32Array {
+    const t = f32Array([1, 1, 1, 1]);
+    v128.store(
+      t.dataStart,
+      // i * 4 (+1,2,3)
+      // 1, 4, 2, 4
+      v128.swizzle(f32x4(1, 2, 3, 4), v128(0, 1, 2, 3, 12, 13, 14, 15, 4, 5, 6, 7, 12, 13, 14, 15))
+    );
+    return t;
+  }
+
+  multiplyMatricesSIMD(a: Matrix4, b: Matrix4): Matrix4 {
+    const ae = a.elements;
+    const be = b.elements;
+    const te = this.elements;
+
+    const a0 = v128.load(ae.dataStart, 0); // 0 * 4
+    const a1 = v128.load(ae.dataStart, 16); // 4 * 4
+    const a2 = v128.load(ae.dataStart, 32); // 8 * 4
+    const a3 = v128.load(ae.dataStart, 48); // 8 * 4
+
+    const swiz0000 = v128(0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3);
+    const swiz1111 = v128(4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7);
+    const swiz2222 = v128(8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11);
+    const swiz3333 = v128(12, 13, 14, 15, 12, 13, 14, 15, 12, 13, 14, 15, 12, 13, 14, 15);
+
+    const b0 = v128.load(be.dataStart, 0);
+    const out0 = f32x4.add(
+      f32x4.mul(v128.swizzle(b0, swiz0000), a0),
+      f32x4.add(
+        f32x4.mul(v128.swizzle(b0, swiz1111), a1),
+        f32x4.add(f32x4.mul(v128.swizzle(b0, swiz2222), a2), f32x4.mul(v128.swizzle(b0, swiz3333), a3))
+      )
+    );
+    v128.store(te.dataStart, out0, 0);
+
+    const b1 = v128.load(be.dataStart, 16);
+    const out1 = f32x4.add(
+      f32x4.mul(v128.swizzle(b1, swiz0000), a0),
+      f32x4.add(
+        f32x4.mul(v128.swizzle(b1, swiz1111), a1),
+        f32x4.add(f32x4.mul(v128.swizzle(b1, swiz2222), a2), f32x4.mul(v128.swizzle(b1, swiz3333), a3))
+      )
+    );
+    v128.store(te.dataStart, out1, 16);
+
+    const b2 = v128.load(be.dataStart, 32);
+    const out2 = f32x4.add(
+      f32x4.mul(v128.swizzle(b2, swiz0000), a0),
+      f32x4.add(
+        f32x4.mul(v128.swizzle(b2, swiz1111), a1),
+        f32x4.add(f32x4.mul(v128.swizzle(b2, swiz2222), a2), f32x4.mul(v128.swizzle(b2, swiz3333), a3))
+      )
+    );
+    v128.store(te.dataStart, out2, 32);
+
+    const b3 = v128.load(be.dataStart, 48);
+    const out3 = f32x4.add(
+      f32x4.mul(v128.swizzle(b3, swiz0000), a0),
+      f32x4.add(
+        f32x4.mul(v128.swizzle(b3, swiz1111), a1),
+        f32x4.add(f32x4.mul(v128.swizzle(b3, swiz2222), a2), f32x4.mul(v128.swizzle(b3, swiz3333), a3))
+      )
+    );
+    v128.store(te.dataStart, out3, 48);
+
+    return this;
   }
 
   multiplyMatrices(a: Matrix4, b: Matrix4): Matrix4 {
@@ -382,44 +456,25 @@ export class Matrix4 {
       b43 = unchecked(be[11]),
       b44 = unchecked(be[15]);
 
-    // const vecA1 = v128.load(a.elements.dataStart, 0);
-    // const vecB1 = v128.load(b.elements.dataStart, 0);
-    // const vecA2 = v128.load(a.elements.dataStart, 16);
-    // const vecB2 = v128.load(b.elements.dataStart, 16);
-    // const vecA3 = v128.load(a.elements.dataStart, 32);
-    // const vecB3 = v128.load(b.elements.dataStart, 32);
-    // const vecA4 = v128.load(a.elements.dataStart, 48);
-    // const vecB4 = v128.load(b.elements.dataStart, 48);
+    unchecked((te[0] = a11 * b11 + a12 * b21 + a13 * b31 + a14 * b41));
+    unchecked((te[4] = a11 * b12 + a12 * b22 + a13 * b32 + a14 * b42));
+    unchecked((te[8] = a11 * b13 + a12 * b23 + a13 * b33 + a14 * b43));
+    unchecked((te[12] = a11 * b14 + a12 * b24 + a13 * b34 + a14 * b44));
 
-    // const vecC1: v128 = f32x4.mul(vecA1, vecB1);
-    // const vecC2: v128 = f32x4.mul(vecA2, vecB2);
-    // const vecC3: v128 = f32x4.mul(vecA3, vecB3);
-    // const vecC4: v128 = f32x4.mul(vecA4, vecB4);
+    unchecked((te[1] = a21 * b11 + a22 * b21 + a23 * b31 + a24 * b41));
+    unchecked((te[5] = a21 * b12 + a22 * b22 + a23 * b32 + a24 * b42));
+    unchecked((te[9] = a21 * b13 + a22 * b23 + a23 * b33 + a24 * b43));
+    unchecked((te[13] = a21 * b14 + a22 * b24 + a23 * b34 + a24 * b44));
 
-    // v128.store(te.dataStart, vecC1);
-    // v128.store(te.dataStart, vecC2, 16);
-    // v128.store(te.dataStart, vecC3, 32);
-    // v128.store(te.dataStart, vecC4, 48);
+    unchecked((te[2] = a31 * b11 + a32 * b21 + a33 * b31 + a34 * b41));
+    unchecked((te[6] = a31 * b12 + a32 * b22 + a33 * b32 + a34 * b42));
+    unchecked((te[10] = a31 * b13 + a32 * b23 + a33 * b33 + a34 * b43));
+    unchecked((te[14] = a31 * b14 + a32 * b24 + a33 * b34 + a34 * b44));
 
-    te[0] = a11 * b11 + a12 * b21 + a13 * b31 + a14 * b41;
-    te[4] = a11 * b12 + a12 * b22 + a13 * b32 + a14 * b42;
-    te[8] = a11 * b13 + a12 * b23 + a13 * b33 + a14 * b43;
-    te[12] = a11 * b14 + a12 * b24 + a13 * b34 + a14 * b44;
-
-    te[1] = a21 * b11 + a22 * b21 + a23 * b31 + a24 * b41;
-    te[5] = a21 * b12 + a22 * b22 + a23 * b32 + a24 * b42;
-    te[9] = a21 * b13 + a22 * b23 + a23 * b33 + a24 * b43;
-    te[13] = a21 * b14 + a22 * b24 + a23 * b34 + a24 * b44;
-
-    te[2] = a31 * b11 + a32 * b21 + a33 * b31 + a34 * b41;
-    te[6] = a31 * b12 + a32 * b22 + a33 * b32 + a34 * b42;
-    te[10] = a31 * b13 + a32 * b23 + a33 * b33 + a34 * b43;
-    te[14] = a31 * b14 + a32 * b24 + a33 * b34 + a34 * b44;
-
-    te[3] = a41 * b11 + a42 * b21 + a43 * b31 + a44 * b41;
-    te[7] = a41 * b12 + a42 * b22 + a43 * b32 + a44 * b42;
-    te[11] = a41 * b13 + a42 * b23 + a43 * b33 + a44 * b43;
-    te[15] = a41 * b14 + a42 * b24 + a43 * b34 + a44 * b44;
+    unchecked((te[3] = a41 * b11 + a42 * b21 + a43 * b31 + a44 * b41));
+    unchecked((te[7] = a41 * b12 + a42 * b22 + a43 * b32 + a44 * b42));
+    unchecked((te[11] = a41 * b13 + a42 * b23 + a43 * b33 + a44 * b43));
+    unchecked((te[15] = a41 * b14 + a42 * b24 + a43 * b34 + a44 * b44));
 
     return this;
   }
@@ -427,23 +482,37 @@ export class Matrix4 {
   multiplyScalar(s: f32): Matrix4 {
     const te = this.elements;
 
-    te[0] *= s;
-    te[4] *= s;
-    te[8] *= s;
-    te[12] *= s;
-    te[1] *= s;
-    te[5] *= s;
-    te[9] *= s;
-    te[13] *= s;
-    te[2] *= s;
-    te[6] *= s;
-    te[10] *= s;
-    te[14] *= s;
-    te[3] *= s;
-    te[7] *= s;
-    te[11] *= s;
-    te[15] *= s;
+    unchecked((te[0] *= s));
+    unchecked((te[4] *= s));
+    unchecked((te[8] *= s));
+    unchecked((te[12] *= s));
+    unchecked((te[1] *= s));
+    unchecked((te[5] *= s));
+    unchecked((te[9] *= s));
+    unchecked((te[13] *= s));
+    unchecked((te[2] *= s));
+    unchecked((te[6] *= s));
+    unchecked((te[10] *= s));
+    unchecked((te[14] *= s));
+    unchecked((te[3] *= s));
+    unchecked((te[7] *= s));
+    unchecked((te[11] *= s));
+    unchecked((te[15] *= s));
 
+    return this;
+  }
+
+  multiplyScalarSIMD(s: f32): Matrix4 {
+    const te = this.elements;
+    const scalar = f32x4.splat(s);
+    const a0 = f32x4.mul(v128.load(te.dataStart, 0), scalar);
+    const a1 = f32x4.mul(v128.load(te.dataStart, 16), scalar);
+    const a2 = f32x4.mul(v128.load(te.dataStart, 32), scalar);
+    const a3 = f32x4.mul(v128.load(te.dataStart, 48), scalar);
+    v128.store(te.dataStart, a0, 0);
+    v128.store(te.dataStart, a1, 16);
+    v128.store(te.dataStart, a2, 32);
+    v128.store(te.dataStart, a3, 48);
     return this;
   }
 
@@ -511,9 +580,9 @@ export class Matrix4 {
   setPosition(x: f32, y: f32, z: f32): Matrix4 {
     const te = this.elements;
 
-    te[12] = x;
-    te[13] = y;
-    te[14] = z;
+    unchecked((te[12] = x));
+    unchecked((te[13] = y));
+    unchecked((te[14] = z));
 
     return this;
   }
@@ -521,22 +590,22 @@ export class Matrix4 {
   invert(): Matrix4 {
     // based on http://www.euclideanspace.com/maths/algebra/matrix/functions/inverse/fourD/index.htm
     const te = this.elements,
-      n11: f32 = te[0],
-      n21: f32 = te[1],
-      n31: f32 = te[2],
-      n41: f32 = te[3],
-      n12: f32 = te[4],
-      n22: f32 = te[5],
-      n32: f32 = te[6],
-      n42: f32 = te[7],
-      n13: f32 = te[8],
-      n23: f32 = te[9],
-      n33: f32 = te[10],
-      n43: f32 = te[11],
-      n14: f32 = te[12],
-      n24: f32 = te[13],
-      n34: f32 = te[14],
-      n44: f32 = te[15],
+      n11: f32 = unchecked(te[0]),
+      n21: f32 = unchecked(te[1]),
+      n31: f32 = unchecked(te[2]),
+      n41: f32 = unchecked(te[3]),
+      n12: f32 = unchecked(te[4]),
+      n22: f32 = unchecked(te[5]),
+      n32: f32 = unchecked(te[6]),
+      n42: f32 = unchecked(te[7]),
+      n13: f32 = unchecked(te[8]),
+      n23: f32 = unchecked(te[9]),
+      n33: f32 = unchecked(te[10]),
+      n43: f32 = unchecked(te[11]),
+      n14: f32 = unchecked(te[12]),
+      n24: f32 = unchecked(te[13]),
+      n34: f32 = unchecked(te[14]),
+      n44: f32 = unchecked(te[15]),
       t11: f32 =
         n23 * n34 * n42 - n24 * n33 * n42 + n24 * n32 * n43 - n22 * n34 * n43 - n23 * n32 * n44 + n22 * n33 * n44,
       t12: f32 =
@@ -552,49 +621,70 @@ export class Matrix4 {
 
     const detInv: f32 = 1 / det;
 
-    te[0] = t11 * detInv;
-    te[1] =
-      (n24 * n33 * n41 - n23 * n34 * n41 - n24 * n31 * n43 + n21 * n34 * n43 + n23 * n31 * n44 - n21 * n33 * n44) *
-      detInv;
-    te[2] =
-      (n22 * n34 * n41 - n24 * n32 * n41 + n24 * n31 * n42 - n21 * n34 * n42 - n22 * n31 * n44 + n21 * n32 * n44) *
-      detInv;
-    te[3] =
-      (n23 * n32 * n41 - n22 * n33 * n41 - n23 * n31 * n42 + n21 * n33 * n42 + n22 * n31 * n43 - n21 * n32 * n43) *
-      detInv;
-
-    te[4] = t12 * detInv;
-    te[5] =
-      (n13 * n34 * n41 - n14 * n33 * n41 + n14 * n31 * n43 - n11 * n34 * n43 - n13 * n31 * n44 + n11 * n33 * n44) *
-      detInv;
-    te[6] =
-      (n14 * n32 * n41 - n12 * n34 * n41 - n14 * n31 * n42 + n11 * n34 * n42 + n12 * n31 * n44 - n11 * n32 * n44) *
-      detInv;
-    te[7] =
-      (n12 * n33 * n41 - n13 * n32 * n41 + n13 * n31 * n42 - n11 * n33 * n42 - n12 * n31 * n43 + n11 * n32 * n43) *
-      detInv;
-
-    te[8] = t13 * detInv;
-    te[9] =
-      (n14 * n23 * n41 - n13 * n24 * n41 - n14 * n21 * n43 + n11 * n24 * n43 + n13 * n21 * n44 - n11 * n23 * n44) *
-      detInv;
-    te[10] =
-      (n12 * n24 * n41 - n14 * n22 * n41 + n14 * n21 * n42 - n11 * n24 * n42 - n12 * n21 * n44 + n11 * n22 * n44) *
-      detInv;
-    te[11] =
-      (n13 * n22 * n41 - n12 * n23 * n41 - n13 * n21 * n42 + n11 * n23 * n42 + n12 * n21 * n43 - n11 * n22 * n43) *
-      detInv;
-
-    te[12] = t14 * detInv;
-    te[13] =
-      (n13 * n24 * n31 - n14 * n23 * n31 + n14 * n21 * n33 - n11 * n24 * n33 - n13 * n21 * n34 + n11 * n23 * n34) *
-      detInv;
-    te[14] =
-      (n14 * n22 * n31 - n12 * n24 * n31 - n14 * n21 * n32 + n11 * n24 * n32 + n12 * n21 * n34 - n11 * n22 * n34) *
-      detInv;
-    te[15] =
-      (n12 * n23 * n31 - n13 * n22 * n31 + n13 * n21 * n32 - n11 * n23 * n32 - n12 * n21 * n33 + n11 * n22 * n33) *
-      detInv;
+    unchecked((te[0] = t11 * detInv));
+    unchecked(
+      (te[1] =
+        (n24 * n33 * n41 - n23 * n34 * n41 - n24 * n31 * n43 + n21 * n34 * n43 + n23 * n31 * n44 - n21 * n33 * n44) *
+        detInv)
+    );
+    unchecked(
+      (te[2] =
+        (n22 * n34 * n41 - n24 * n32 * n41 + n24 * n31 * n42 - n21 * n34 * n42 - n22 * n31 * n44 + n21 * n32 * n44) *
+        detInv)
+    );
+    unchecked(
+      (te[3] =
+        (n23 * n32 * n41 - n22 * n33 * n41 - n23 * n31 * n42 + n21 * n33 * n42 + n22 * n31 * n43 - n21 * n32 * n43) *
+        detInv)
+    );
+    unchecked((te[4] = t12 * detInv));
+    unchecked(
+      (te[5] =
+        (n13 * n34 * n41 - n14 * n33 * n41 + n14 * n31 * n43 - n11 * n34 * n43 - n13 * n31 * n44 + n11 * n33 * n44) *
+        detInv)
+    );
+    unchecked(
+      (te[6] =
+        (n14 * n32 * n41 - n12 * n34 * n41 - n14 * n31 * n42 + n11 * n34 * n42 + n12 * n31 * n44 - n11 * n32 * n44) *
+        detInv)
+    );
+    unchecked(
+      (te[7] =
+        (n12 * n33 * n41 - n13 * n32 * n41 + n13 * n31 * n42 - n11 * n33 * n42 - n12 * n31 * n43 + n11 * n32 * n43) *
+        detInv)
+    );
+    unchecked((te[8] = t13 * detInv));
+    unchecked(
+      (te[9] =
+        (n14 * n23 * n41 - n13 * n24 * n41 - n14 * n21 * n43 + n11 * n24 * n43 + n13 * n21 * n44 - n11 * n23 * n44) *
+        detInv)
+    );
+    unchecked(
+      (te[10] =
+        (n12 * n24 * n41 - n14 * n22 * n41 + n14 * n21 * n42 - n11 * n24 * n42 - n12 * n21 * n44 + n11 * n22 * n44) *
+        detInv)
+    );
+    unchecked(
+      (te[11] =
+        (n13 * n22 * n41 - n12 * n23 * n41 - n13 * n21 * n42 + n11 * n23 * n42 + n12 * n21 * n43 - n11 * n22 * n43) *
+        detInv)
+    );
+    unchecked((te[12] = t14 * detInv));
+    unchecked(
+      (te[13] =
+        (n13 * n24 * n31 - n14 * n23 * n31 + n14 * n21 * n33 - n11 * n24 * n33 - n13 * n21 * n34 + n11 * n23 * n34) *
+        detInv)
+    );
+    unchecked(
+      (te[14] =
+        (n14 * n22 * n31 - n12 * n24 * n31 - n14 * n21 * n32 + n11 * n24 * n32 + n12 * n21 * n34 - n11 * n22 * n34) *
+        detInv)
+    );
+    unchecked(
+      (te[15] =
+        (n12 * n23 * n31 - n13 * n22 * n31 + n13 * n21 * n32 - n11 * n23 * n32 - n12 * n21 * n33 + n11 * n22 * n33) *
+        detInv)
+    );
 
     return this;
   }
@@ -605,19 +695,36 @@ export class Matrix4 {
       y: f32 = v.y,
       z: f32 = v.z;
 
-    te[0] *= x;
-    te[4] *= y;
-    te[8] *= z;
-    te[1] *= x;
-    te[5] *= y;
-    te[9] *= z;
-    te[2] *= x;
-    te[6] *= y;
-    te[10] *= z;
-    te[3] *= x;
-    te[7] *= y;
-    te[11] *= z;
+    unchecked((te[0] *= x));
+    unchecked((te[4] *= y));
+    unchecked((te[8] *= z));
+    unchecked((te[1] *= x));
+    unchecked((te[5] *= y));
+    unchecked((te[9] *= z));
+    unchecked((te[2] *= x));
+    unchecked((te[6] *= y));
+    unchecked((te[10] *= z));
+    unchecked((te[3] *= x));
+    unchecked((te[7] *= y));
+    unchecked((te[11] *= z));
 
+    return this;
+  }
+
+  scaleSIMD(v: Vector3): Matrix4 {
+    const swizXXXX = v128(0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3);
+    const swizYYYY = v128(4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7);
+    const swizZZZZ = v128(8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11);
+
+    const te = this.elements;
+    const vec = f32x4(v.x, v.y, v.z, 0);
+    const a0 = f32x4.mul(v128.load(te.dataStart, 0), v128.swizzle(vec, swizXXXX));
+    const a1 = f32x4.mul(v128.load(te.dataStart, 16), v128.swizzle(vec, swizYYYY));
+    const a2 = f32x4.mul(v128.load(te.dataStart, 32), v128.swizzle(vec, swizZZZZ));
+
+    v128.store(te.dataStart, a0, 0);
+    v128.store(te.dataStart, a1, 16);
+    v128.store(te.dataStart, a2, 32);
     return this;
   }
 
