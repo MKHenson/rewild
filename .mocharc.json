@@ -1,4 +1,4 @@
 {
-  "require": "./tests/register.js",
+  "require": "./register.js",
   "reporter": "dot"
 }
