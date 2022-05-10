@@ -4,8 +4,8 @@
   "description": "Game about exploring earth's history",
   "main": "index.js",
   "scripts": {
-    "asbuild:test": "asc src/as/tests.ts --target release -d ./build/test-types.d.ts  --exportTable --importMemory --exportRuntime --enable simd",
-    "run-mocha": "node --experimental-wasi-unstable-preview1 --experimental-wasm-simd node_modules/mocha/bin/_mocha 'tests/**/*.spec.ts' --reporter spec",
+    "asbuild:test": "asc src/as/tests.ts --target test",
+    "run-mocha": "node --experimental-wasi-unstable-preview1 --experimental-wasm-simd node_modules/mocha/bin/_mocha './tests/init.spec.ts' 'tests/**/*.spec.ts' --reporter spec",
     "test": "npm run asbuild:test && npm run run-mocha",
     "clean": "rimraf ./dist/untouched.wasm && rimraf ./dist/untouched.wasm.map && rimraf ./dist/untouched.wat",
     "asbuild:untouched": "asc src/as/index.ts  --sourceMap --target debug -d ./build/types.d.ts --exportTable --importMemory --exportRuntime --debug --enable simd",
@@ -25,7 +25,6 @@
   "license": "ISC",
   "homepage": "https://bitbucket.org/MathewKHenson/rewild-web#readme",
   "dependencies": {
-    "@assemblyscript/loader": "^0.19.1",
     "@babel/core": "^7.14.6",
     "@babel/plugin-proposal-class-properties": "^7.14.5",
     "@babel/plugin-proposal-object-rest-spread": "^7.14.7",
@@ -44,7 +43,7 @@
     "@types/mocha": "8.2.2",
     "@types/expect.js": "0.3.29",
     "@webgpu/types": "0.1.13",
-    "assemblyscript": "0.19.16",
+    "assemblyscript": "0.20.6",
     "copy-webpack-plugin": "^9.0.1",
     "file-loader": "^6.2.0",
     "live-server": "^1.2.1",
@@ -55,7 +54,7 @@
     "raw-loader": "^4.0.2",
     "rimraf": "3.0.2",
     "ts-loader": "9.2.3",
-    "ts-node": "10.0.0",
+    "ts-node": "10.7.0",
     "typescript": "4.3.2",
     "webpack": "5.70.0",
     "webpack-cli": "4.7.0"
