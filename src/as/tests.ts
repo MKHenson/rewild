@@ -1,86 +1,7 @@
 import { Matrix4 } from "./math/Matrix4";
 import { Vector3 } from "./math/Vector3";
 
-const _matrices: Matrix4[] = new Array();
-
-// // asc --runtime incremental
-// @unmanaged  // means it will not managed by GC
-// class Foo {
-//   constructor(public n: i32) {}
-// }
-// const foo = new Foo(1);
-// heap.free(changetype<usize>(foo));  // dealloc
-
-function allocatePerfTest(numMatrices: i32): void {
-  for (let i = 0; i < numMatrices; i++) {
-    _matrices.push(new Matrix4());
-  }
-
-  // const matrices: Matrix4[] = [];
-  // for (let i = 0; i < numMatrices; i++) {
-  //   matrices.push(new Matrix4());
-  // }
-
-  // for (let i = 0; i < matrices.length; i++) {
-  //   _matrices[i].dispose();
-  // }
-}
-
-function deallocatePerfTest(): void {
-  // const numMatrices = _matrices.length;
-  // for (let i = 0; i < numMatrices; i++) {
-  //   heap.free(changetype<usize>(unchecked(_matrices[i])));
-  // }
-  _matrices.splice(0, _matrices.length);
-}
-
-function testASMultiplicationPerformance(numMatrices: i32): void {
-  const source = new Matrix4();
-  const matrices = _matrices;
-  let m: Matrix4;
-  for (let i = 0; i < numMatrices; i++) {
-    m = unchecked(matrices[i]);
-    m.multiplyMatrices(m, source);
-  }
-}
-
-function testASMultiplicationPerformanceWithSIMD(numMatrices: i32): void {
-  const source = new Matrix4();
-  const matrices = _matrices;
-  let m: Matrix4;
-  for (let i = 0; i < numMatrices; i++) {
-    m = unchecked(matrices[i]);
-    m.multiplyMatricesSIMD(m, source);
-  }
-}
-
-const scaleVec: Vector3 = new Vector3(1.5, 3.4, 5.5);
-
-function testMat4Performance(numMatrices: i32): void {
-  const source = new Matrix4();
-  const matrices = _matrices;
-  let m: Matrix4;
-  for (let i = 0; i < numMatrices; i++) {
-    m = unchecked(matrices[i]);
-    m.multiplyMatrices(m, source);
-    m.multiplyScalar(5);
-    m.scale(scaleVec);
-    m.transpose();
-  }
-}
-
-function testMat4SIMDPerformance(numMatrices: i32): void {
-  const source = new Matrix4();
-  const matrices = _matrices;
-  let m: Matrix4;
-  for (let i = 0; i < numMatrices; i++) {
-    m = unchecked(matrices[i]);
-    m.multiplyMatricesSIMD(m, source);
-    m.multiplyScalarSIMD(5);
-    m.scaleSIMD(scaleVec);
-    m.transposeSIMD();
-  }
-}
+export * from "./tests/performance";
 
 // prettier-ignore
 function newMatrix4(): Matrix4 { return new Matrix4(); }
@@ -125,7 +46,8 @@ function matrix_transpose(matrixA: Matrix4): Matrix4 {return  matrixA.transpose(
 function matrix_transposeSIMD(matrixA: Matrix4): Matrix4 {return  matrixA.transposeSIMD(); }
 // prettier-ignore
 function matrix_invert(matrixA: Matrix4): Matrix4 {return  matrixA.invert(); }
-
+// prettier-ignore
+function matrix_invertSIMD(matrixA: Matrix4): Matrix4 { return matrixA.invertSIMD(); }
 // prettier-ignore
 function matrix_multiplyScalarSIMD(matrixA: Matrix4, v: f32): Matrix4 { return matrixA.multiplyScalarSIMD(v); }
 // prettier-ignore
@@ -134,12 +56,6 @@ function matrix_set(matrixA: Matrix4,  n11: f32, n12: f32, n13: f32, n14: f32, n
 }
 
 export {
-  allocatePerfTest,
-  deallocatePerfTest,
-  testASMultiplicationPerformance,
-  testASMultiplicationPerformanceWithSIMD,
-  testMat4SIMDPerformance,
-  testMat4Performance,
   newMatrix4,
   newVector3,
   matrix_elements,
@@ -163,4 +79,5 @@ export {
   matrix_makeScale,
   matrix_determinant,
   matrix_multiplyMatrices,
+  matrix_invertSIMD,
 };

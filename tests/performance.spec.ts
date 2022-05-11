@@ -2,11 +2,11 @@ import expect from "expect.js";
 import { SimpleMatrix4 } from "./utils/math/SimpleMatrix4";
 import { wasm } from "./wasm-module";
 
-const numTests = 50000;
+const numTests = 20000;
 
 const matrices: SimpleMatrix4[] = new Array();
 for (let i = 0; i < numTests; i++) {
-  matrices.push(new SimpleMatrix4());
+  matrices.push(new SimpleMatrix4().set(1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0));
 }
 
 const testJSMultiplicationPerformance = (numMatrices: number = 100): void => {
@@ -25,10 +25,10 @@ describe("Performance Tests", () => {
 
     // Warm up
     for (let i = 0; i < 3; i++) {
-      wasm.testASMultiplicationPerformance(numTests);
-      wasm.testASMultiplicationPerformanceWithSIMD(numTests);
-      wasm.testMat4Performance(numTests);
-      wasm.testMat4SIMDPerformance(numTests);
+      wasm.testPerformanceMat4Multiply(numTests);
+      wasm.testPerformanceMat4MultiplyScalar(numTests);
+      wasm.testPerformanceMat4Inverse(numTests);
+      wasm.testPerformanceMat4Scale(numTests);
       testJSMultiplicationPerformance(numTests);
     }
   });
@@ -39,7 +39,7 @@ describe("Performance Tests", () => {
 
   it("is faster in wasm to use SIMD versus regular JS", () => {
     const t1 = performance.now();
-    wasm.testASMultiplicationPerformanceWithSIMD(numTests);
+    wasm.testPerformanceMat4Multiply(numTests, true);
     const simdDeltaMS = performance.now() - t1;
 
     const t2 = performance.now();
@@ -50,9 +50,9 @@ describe("Performance Tests", () => {
     expect(simdDeltaMS).to.be.lessThan(jsDeltaMS);
   });
 
-  it("is faster in wasm when multiplying a matrix4", () => {
+  it("is faster in AS when multiplying a matrix4 compared to JS", () => {
     const t1 = performance.now();
-    wasm.testASMultiplicationPerformance(numTests);
+    wasm.testPerformanceMat4Multiply(numTests);
     const asDeltaMS = performance.now() - t1;
 
     const t2 = performance.now();
@@ -63,16 +63,55 @@ describe("Performance Tests", () => {
     expect(asDeltaMS).to.be.lessThan(jsDeltaMS);
   });
 
-  it("is faster in wasm when using SIMD versus not using it", () => {
+  it("multiplies mat4 faster in SIMD versus non-SIMD", () => {
     const t1 = performance.now();
-    wasm.testMat4SIMDPerformance(numTests);
+    wasm.testPerformanceMat4Multiply(numTests, true);
     const simdDelta = performance.now() - t1;
 
     const t2 = performance.now();
-    wasm.testMat4Performance(numTests);
+    wasm.testPerformanceMat4Multiply(numTests);
     const nonSimdPerformance = performance.now() - t2;
 
-    console.log(`AS Matrix SIMD Time: ${simdDelta}, AS Matrix Non-SIMD Time: ${nonSimdPerformance}`);
+    console.log(`Matrix Multiply: SIMD Time: ${simdDelta}, Non-SIMD Time: ${nonSimdPerformance}`);
+    expect(simdDelta).to.be.lessThan(nonSimdPerformance);
+  });
+
+  it("scales mat4 faster in SIMD versus non-SIMD", () => {
+    const t1 = performance.now();
+    wasm.testPerformanceMat4Scale(numTests, true);
+    const simdDelta = performance.now() - t1;
+
+    const t2 = performance.now();
+    wasm.testPerformanceMat4Scale(numTests);
+    const nonSimdPerformance = performance.now() - t2;
+
+    console.log(`Matrix Scale: SIMD Time: ${simdDelta}, Non-SIMD Time: ${nonSimdPerformance}`);
+    expect(simdDelta).to.be.lessThan(nonSimdPerformance);
+  });
+
+  it("inverts mat4 faster in SIMD versus non-SIMD", () => {
+    const t1 = performance.now();
+    wasm.testPerformanceMat4Inverse(numTests, true);
+    const simdDelta = performance.now() - t1;
+
+    const t2 = performance.now();
+    wasm.testPerformanceMat4Inverse(numTests);
+    const nonSimdPerformance = performance.now() - t2;
+
+    console.log(`Matrix Inverse: SIMD Time: ${simdDelta}, Non-SIMD Time: ${nonSimdPerformance}`);
+    expect(simdDelta).to.be.lessThan(nonSimdPerformance);
+  });
+
+  it("multiplies a scalar mat4 faster in SIMD versus non-SIMD", () => {
+    const t1 = performance.now();
+    wasm.testPerformanceMat4MultiplyScalar(numTests, true);
+    const simdDelta = performance.now() - t1;
+
+    const t2 = performance.now();
+    wasm.testPerformanceMat4MultiplyScalar(numTests);
+    const nonSimdPerformance = performance.now() - t2;
+
+    console.log(`Matrix Multiply Scalar: SIMD Time: ${simdDelta}, Non-SIMD Time: ${nonSimdPerformance}`);
     expect(simdDelta).to.be.lessThan(nonSimdPerformance);
   });
 });

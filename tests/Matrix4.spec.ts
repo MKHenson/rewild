@@ -230,7 +230,7 @@ describe("Matrix4", () => {
       let m = testMatrices[i];
       var mInverse = wasm.matrix_invert(wasm.matrix_copy(wasm.newMatrix4(), m));
       var mSelfInverse = wasm.matrix_clone(m);
-      wasm.matrix_invert(wasm.matrix_copy(mSelfInverse, mSelfInverse));
+      wasm.matrix_invert(mSelfInverse);
 
       // self-inverse should the same as inverse
       expect(matrixEquals4(mSelfInverse, mInverse)).to.be.equal(true);
@@ -240,6 +240,51 @@ describe("Matrix4", () => {
       const mProduct = wasm.matrix_multiplyMatrices(wasm.newMatrix4(), m, mInverse);
       // the determinant of the identity matrix is 1
       expect(Math.abs(wasm.matrix_determinant(mProduct) - 1) < 0.0001).to.be.equal(true);
+      expect(matrixEquals4(mProduct, identity)).to.be.equal(true);
+    }
+  });
+
+  it("does invert a matrix with SIMD", () => {
+    const zero = wasm.matrix_set(wasm.newMatrix4(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    const identity = wasm.newMatrix4();
+    const a = wasm.newMatrix4();
+    const b = wasm.matrix_set(wasm.newMatrix4(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+    wasm.matrix_invertSIMD(wasm.matrix_copy(a, b));
+    expect(matrixEquals4(a, zero)).to.be.equal(true);
+
+    const testMatrices = [
+      wasm.matrix_makeRotationX(wasm.newMatrix4(), 0.3),
+      wasm.matrix_makeRotationX(wasm.newMatrix4(), -0.3),
+      wasm.matrix_makeRotationY(wasm.newMatrix4(), 0.3),
+      wasm.matrix_makeRotationY(wasm.newMatrix4(), -0.3),
+      wasm.matrix_makeRotationZ(wasm.newMatrix4(), 0.3),
+      wasm.matrix_makeRotationZ(wasm.newMatrix4(), -0.3),
+      wasm.matrix_makeScale(wasm.newMatrix4(), 1, 2, 3),
+      wasm.matrix_makeScale(wasm.newMatrix4(), 1 / 8, 1 / 2, 1 / 3),
+      wasm.matrix_makePerspective(wasm.newMatrix4(), -1, 1, 1, -1, 1, 1000),
+      wasm.matrix_makePerspective(wasm.newMatrix4(), -16, 16, 9, -9, 0.1, 10000),
+      wasm.matrix_makeTranslation(wasm.newMatrix4(), 1, 2, 3),
+    ];
+
+    for (let i = 0, il = testMatrices.length; i < il; i++) {
+      let m = testMatrices[i];
+      var mInverse = wasm.matrix_invertSIMD(wasm.matrix_copy(wasm.newMatrix4(), m));
+      var mSelfInverse = wasm.matrix_clone(m);
+      wasm.matrix_invertSIMD(wasm.matrix_copy(mSelfInverse, mSelfInverse));
+
+      // self-inverse should the same as inverse
+      expect(matrixEquals4(mSelfInverse, mInverse)).to.be.equal(true);
+
+      // the determinant of the inverse should be the reciprocal
+      let recip = Math.abs(wasm.matrix_determinant(m) * wasm.matrix_determinant(mInverse) - 1);
+      expect(recip < 0.0001).to.be.equal(true);
+
+      const mProduct = wasm.matrix_multiplyMatrices(wasm.newMatrix4(), m, mInverse);
+
+      // the determinant of the identity matrix is 1
+      recip = Math.abs(wasm.matrix_determinant(mProduct) - 1);
+      expect(recip < 0.0001).to.be.equal(true);
       expect(matrixEquals4(mProduct, identity)).to.be.equal(true);
     }
   });
