@@ -95,7 +95,7 @@ export class OrthographicCamera extends Camera {
 
     this.projectionMatrix.makeOrthographic(left, right, top, bottom, this.near, this.far);
 
-    this.projectionMatrixInverse.copy(this.projectionMatrix).invert();
+    this.projectionMatrixInverse.copy(this.projectionMatrix).invertSIMD();
   }
 
   // toJSON( meta ) {

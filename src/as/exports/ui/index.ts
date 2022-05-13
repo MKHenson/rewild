@@ -1,1 +1,1 @@
-export * from "./uiSignalManager";
+export { dispatchSignalClientEvent, dispatchOnSignalEvent } from "./uiSignalManager";

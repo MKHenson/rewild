@@ -7,7 +7,6 @@ import { Event } from "../../../core/Event";
 import { UIEvent } from "../../../exports/ui/UIEvent";
 import { degToRad } from "../../../math/MathUtils";
 import { Link } from "../core/Link";
-import { print } from "../../../Imports";
 import { UIEventType } from "../../../../common/UIEventType";
 
 export class MainMenu extends Container implements Listener {
@@ -22,7 +21,7 @@ export class MainMenu extends Container implements Listener {
     const link = new Link();
     const level1 = this.runtime!.getNode("Level1");
 
-    if (!level1) print(`dont have level`);
+    if (!level1) console.log(`dont have level`);
     link.connect(this.getPortal("Exit")!, level1!.getPortal("Enter")!);
 
     this.sun = new DirectionalLight(new Color(1, 1, 1), 6);
@@ -63,6 +62,6 @@ export class MainMenu extends Container implements Listener {
   }
 }
 
-export function createMainMenu(): MainMenu {
+export function createMainMenu(): Container {
   return new MainMenu();
 }

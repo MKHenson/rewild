@@ -1,7 +1,6 @@
 import { Camera } from "../cameras/Camera";
 import { TransformNode } from "../core/TransformNode";
 import { WebGPURenderQueue } from "./WebGPURenderQueue";
-import { print } from "../Imports";
 import { Matrix4 } from "../math/Matrix4";
 import { Vector4 } from "../math/Vector4";
 import { Mesh } from "../objects/Mesh";
@@ -44,7 +43,7 @@ export class WebGPURenderer {
   }
 
   init(view: Vector4): void {
-    print(`Initializing WGPU renderer`);
+    console.log(`Initializing WGPU renderer`);
     this.view = view;
   }
 
@@ -58,7 +57,7 @@ export class WebGPURenderer {
     scene.onBeforeRender();
 
     const _projScreenMatrix = this._projScreenMatrix;
-    _projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    _projScreenMatrix.multiplyMatricesSIMD(camera.projectionMatrix, camera.matrixWorldInverse);
 
     this.currentRenderList.reset();
     this.projectObject(scene, camera);
@@ -79,7 +78,7 @@ export class WebGPURenderer {
   }
 
   renderMesh(mesh: Mesh, camera: Camera): void {
-    mesh.modelViewMatrix.multiplyMatrices(camera.matrixWorldInverse, mesh.matrixWorld);
+    mesh.modelViewMatrix.multiplyMatricesSIMD(camera.matrixWorldInverse, mesh.matrixWorld);
     mesh.normalMatrix.getNormalMatrix(mesh.modelViewMatrix);
     const pipelineInstance = mesh.pipelines[0];
 

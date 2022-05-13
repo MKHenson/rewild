@@ -176,7 +176,7 @@ export class PerspectiveCamera extends Camera {
 
     this.projectionMatrix.makePerspective(left, left + width, top, top - height, near, this.far);
 
-    this.projectionMatrixInverse.copy(this.projectionMatrix).invert();
+    this.projectionMatrixInverse.copy(this.projectionMatrix).invertSIMD();
   }
 
   // TODO

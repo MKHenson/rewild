@@ -33,13 +33,13 @@ export class Camera extends TransformNode {
   updateMatrixWorld(force: boolean = false): void {
     super.updateMatrixWorld(force);
 
-    this.matrixWorldInverse.copy(this.matrixWorld).invert();
+    this.matrixWorldInverse.copy(this.matrixWorld).invertSIMD();
   }
 
   updateWorldMatrix(updateParents: boolean, updateChildren: boolean): void {
     super.updateWorldMatrix(updateParents, updateChildren);
 
-    this.matrixWorldInverse.copy(this.matrixWorld).invert();
+    this.matrixWorldInverse.copy(this.matrixWorld).invertSIMD();
   }
 
   clone(recursive: boolean = false): TransformNode {

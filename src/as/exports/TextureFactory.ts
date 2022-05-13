@@ -1,5 +1,3 @@
-import { print } from "../Imports";
-
 export const textures: Texture[] = [];
 
 export class Texture {
@@ -12,7 +10,7 @@ export class Texture {
 }
 
 export function createTexture(name: string, index: i32): Texture {
-  print(`Added texture ${name}...`);
+  console.log(`Added texture ${name}...`);
   textures.push(new Texture(name, index));
   return textures[textures.length - 1];
 }

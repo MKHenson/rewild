@@ -20,6 +20,13 @@ export class UISignalManager extends EventDispatcher {
   }
 }
 
+export function dispatchOnSignalEvent(eventType: UIEventType): void {
+  uiSignaller.onSignalEvent(eventType);
+}
+export function dispatchSignalClientEvent(eventType: UIEventType): void {
+  uiSignaller.signalClientEvent(eventType);
+}
+
 export function getSignalManager(): UISignalManager {
   return uiSignaller;
 }

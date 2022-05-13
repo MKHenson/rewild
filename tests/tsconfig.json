@@ -13,5 +13,8 @@
     "typeRoots": ["./node_modules/@types"],
     "types": ["mocha", "node"]
   },
+  "ts-node": {
+    "files": true
+  },
   "exclude": ["./node_modules"]
 }

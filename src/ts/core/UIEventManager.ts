@@ -23,7 +23,6 @@ export class UIEventManager extends EventDispatcher implements IBindable {
   }
 
   triggerUIEvent(type: UIEventType) {
-    const manager = wasm.UISignalManager.wrap(wasm.getSignalManager());
-    manager.onSignalEvent(type);
+    wasm.dispatchOnSignalEvent(type);
   }
 }

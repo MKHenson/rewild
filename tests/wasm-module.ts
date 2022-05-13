@@ -27,6 +27,8 @@ export async function init() {
   wasm.getLiveF32Array = (pointer) => {
     return __liftTypedArray(Float32Array, pointer.valueOf() >>> 0);
   };
+
+  return wasm;
 }
 
 function __liftTypedArray<T extends Float32Array | Int32Array | Int16Array>(
