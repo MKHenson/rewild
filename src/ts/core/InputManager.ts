@@ -93,50 +93,39 @@ export class InputManager {
   }
 
   private createMouseEvent(e: MouseEvent, bounds: DOMRect, delta: number = 0) {
-    const mouseEventPtr = wasm.__pin(
-      wasm.createMouseEvent(
-        e.clientX,
-        e.clientY,
-        e.pageX,
-        e.pageY,
-        e.ctrlKey,
-        e.shiftKey,
-        e.altKey,
-        e.button,
-        e.buttons,
-        bounds.x,
-        bounds.y,
-        bounds.width,
-        bounds.height,
-        delta,
-        e.movementX || 0,
-        e.movementY || 0
-      )
+    return wasm.createMouseEvent(
+      e.clientX,
+      e.clientY,
+      e.pageX,
+      e.pageY,
+      e.ctrlKey,
+      e.shiftKey,
+      e.altKey,
+      e.button,
+      e.buttons,
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+      delta,
+      e.movementX || 0,
+      e.movementY || 0
     );
-
-    return mouseEventPtr;
   }
 
   private sendMouseEvent(type: MouseEventType, event: MouseEvent, bounds: DOMRect, delta: number): void {
-    const manager = wasm.InputManager.wrap(wasm.getInputManager());
     const wasmEvent = this.createMouseEvent(event, bounds, delta);
 
-    if (type === MouseEventType.MouseUp) manager.onMouseUp(wasmEvent);
-    else if (type === MouseEventType.MouseMove) manager.onMouseMove(wasmEvent);
-    else if (type === MouseEventType.MouseDown) manager.onMouseDown(wasmEvent);
-    else if (type === MouseEventType.MouseWheel) manager.onWheel(wasmEvent);
-
-    wasm.__unpin(wasmEvent);
+    if (type === MouseEventType.MouseUp) wasm.dispatchOnMouseDown(wasmEvent);
+    else if (type === MouseEventType.MouseMove) wasm.dispatchOnMouseMove(wasmEvent);
+    else if (type === MouseEventType.MouseDown) wasm.dispatchOnMouseDown(wasmEvent);
+    else if (type === MouseEventType.MouseWheel) wasm.dispatchOnWheel(wasmEvent);
   }
 
   private sendKeyEvent(type: KeyEventType, event: Partial<KeyboardEvent>): void {
-    const manager = wasm.InputManager.wrap(wasm.getInputManager());
-    const wasmEvent = wasm.__pin(wasm.createKeyboardEvent(wasm.__newString(event.code!)));
-
-    if (type === KeyEventType.KeyUp) manager.onKeyUp(wasmEvent);
-    else if (type === KeyEventType.KeyDown) manager.onKeyDown(wasmEvent);
-
-    wasm.__unpin(wasmEvent);
+    const wasmEvent = wasm.createKeyboardEvent(event.code!);
+    if (type === KeyEventType.KeyUp) wasm.dispatchOnKeyUp(wasmEvent);
+    else if (type === KeyEventType.KeyDown) wasm.dispatchOnKeyDown(wasmEvent);
   }
 
   dispose() {

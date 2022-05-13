@@ -1,7 +1,8 @@
 import { Camera } from "../cameras/Camera";
 import { Event } from "../core/Event";
 import { Listener } from "../core/EventDispatcher";
-import { KeyboardEvent, MouseEvent } from "../exports/io";
+import { MouseEvent } from "../exports/io/MouseEvent";
+import { KeyboardEvent } from "../exports/io/KeyboardEvent";
 import { inputManager } from "../exports/io/InputManager";
 import { Euler, EulerRotationOrder } from "../math/Euler";
 import { Vector3 } from "../math/Vector3";

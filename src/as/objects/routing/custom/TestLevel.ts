@@ -59,6 +59,6 @@ export class TestLevel extends Container implements Listener {
   }
 }
 
-export function createTestLevel(): TestLevel {
+export function createTestLevel(): Container {
   return new TestLevel();
 }

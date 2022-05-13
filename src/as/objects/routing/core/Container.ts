@@ -18,7 +18,6 @@ export class Container extends Node {
   findObjectByName(name: string): TransformNode | null {
     const objects = this.objects;
     for (let i: i32 = 0, l = objects.length; i < l; i++) if (objects[i].name == name) return objects[i];
-
     return null;
   }
 
@@ -61,4 +60,8 @@ export class Container extends Node {
 
 export function createContainer(name: string): Container {
   return new Container(name);
+}
+
+export function addAsset(container: Container, object: TransformNode): void {
+  container.addAsset(object);
 }

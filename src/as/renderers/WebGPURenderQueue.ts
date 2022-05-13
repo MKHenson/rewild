@@ -1,4 +1,4 @@
-import { print, render } from "../Imports";
+import { render } from "../Imports";
 import { GPUCommands } from "../../common/Commands";
 import { GroupType } from "../../common/GroupType";
 import { WebGPULights } from "./WebGPULights";
@@ -16,7 +16,10 @@ export class WebGPURenderQueue {
   }
 
   push(): WebGPURenderQueue {
-    render(this.q);
+    let len = this.q.length;
+    let result = new Int32Array(len);
+    memory.copy(result.dataStart, this.q.dataStart, len * Int32Array.BYTES_PER_ELEMENT);
+    render(changetype<usize>(result));
     return this;
   }
 

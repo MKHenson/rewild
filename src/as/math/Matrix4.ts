@@ -337,18 +337,7 @@ export class Matrix4 {
   }
 
   premultiply(m: Matrix4): Matrix4 {
-    return this.multiplyMatrices(m, this);
-  }
-
-  swizzleTest(): Float32Array {
-    const t = f32Array([1, 1, 1, 1]);
-    v128.store(
-      t.dataStart,
-      // i * 4 (+1,2,3)
-      // 1, 4, 2, 4
-      v128.swizzle(f32x4(1, 2, 3, 4), v128(0, 1, 2, 3, 12, 13, 14, 15, 4, 5, 6, 7, 12, 13, 14, 15))
-    );
-    return t;
+    return this.multiplyMatricesSIMD(m, this);
   }
 
   multiplyMatricesSIMD(a: Matrix4, b: Matrix4): Matrix4 {

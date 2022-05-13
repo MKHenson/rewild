@@ -1,3 +1,10 @@
-export { getInputManager, InputManager } from "./InputManager";
-export * from "./MouseEvent";
-export * from "./KeyboardEvent";
+export {
+  dispatchOnKeyDown,
+  dispatchOnKeyUp,
+  dispatchOnMouseDown,
+  dispatchOnMouseMove,
+  dispatchOnMouseUp,
+  dispatchOnWheel,
+} from "./InputManager";
+export { createMouseEvent } from "./MouseEvent";
+export { createKeyboardEvent } from "./KeyboardEvent";

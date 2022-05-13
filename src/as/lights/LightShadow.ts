@@ -78,7 +78,7 @@ export class LightShadow {
     shadowCamera.lookAt(_lookTarget.x, _lookTarget.y, _lookTarget.z);
     shadowCamera.updateMatrixWorld();
 
-    _projScreenMatrix.multiplyMatrices(shadowCamera.projectionMatrix, shadowCamera.matrixWorldInverse);
+    _projScreenMatrix.multiplyMatricesSIMD(shadowCamera.projectionMatrix, shadowCamera.matrixWorldInverse);
     this._frustum.setFromProjectionMatrix(_projScreenMatrix);
 
     // prettier-ignore
@@ -89,8 +89,8 @@ export class LightShadow {
         0.0, 0.0, 0.0, 1.0
     );
 
-    shadowMatrix.multiply(shadowCamera.projectionMatrix);
-    shadowMatrix.multiply(shadowCamera.matrixWorldInverse);
+    shadowMatrix.multiplySIMD(shadowCamera.projectionMatrix);
+    shadowMatrix.multiplySIMD(shadowCamera.matrixWorldInverse);
   }
 
   getViewport(viewportIndex: u32): Vector4 {

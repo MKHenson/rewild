@@ -18,7 +18,7 @@ export class RenderQueueManager {
     this.manager = manager;
   }
 
-  run(commandBuffer: Array<number>) {
+  run(commandBuffer: Int32Array) {
     const manager = this.manager;
     const device = manager.device;
     const { wasmArrayBuffer, wasmMemoryBlock } = wasmManager;

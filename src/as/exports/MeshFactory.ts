@@ -1,9 +1,15 @@
 import { MeshPipelineInstance } from "../pipelines/MeshPipelineInstance";
 import { BufferGeometry } from "../core/BufferGeometry";
 import { Mesh } from "../objects/Mesh";
+import { TransformNode } from "./ObjectFactory";
+import { PipelineInstance } from "./PipelineFactory";
 
-export function createMesh(geometry: BufferGeometry, pipeline: MeshPipelineInstance, name: string | null = null): Mesh {
-  const newMesh = new Mesh(geometry, [pipeline]);
+export function createMesh(
+  geometry: BufferGeometry,
+  pipeline: PipelineInstance,
+  name: string | null = null
+): TransformNode {
+  const newMesh = new Mesh(geometry, [pipeline as MeshPipelineInstance]);
   if (name) newMesh.name = name;
   return newMesh;
 }

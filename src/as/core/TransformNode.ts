@@ -215,7 +215,7 @@ export class TransformNode extends EventDispatcher {
   }
 
   worldToLocal(vector: Vector3): Vector3 {
-    return vector.applyMatrix4(_m1.copy(this.matrixWorld).invert());
+    return vector.applyMatrix4(_m1.copy(this.matrixWorld).invertSIMD());
   }
 
   lookAt(x: f32, y: f32, z: f32): void {
@@ -300,13 +300,13 @@ export class TransformNode extends EventDispatcher {
 
     this.updateWorldMatrix(true, false);
 
-    _m1.copy(this.matrixWorld).invert();
+    _m1.copy(this.matrixWorld).invertSIMD();
 
     const objectParent = object.parent;
     if (objectParent != null) {
       objectParent.updateWorldMatrix(true, false);
 
-      _m1.multiply(objectParent.matrixWorld);
+      _m1.multiplySIMD(objectParent.matrixWorld);
     }
 
     object.applyMatrix4(_m1);
@@ -419,7 +419,7 @@ export class TransformNode extends EventDispatcher {
       if (this.parent === null) {
         this.matrixWorld.copy(this.matrix);
       } else {
-        this.matrixWorld.multiplyMatrices(this.parent!.matrixWorld, this.matrix);
+        this.matrixWorld.multiplyMatricesSIMD(this.parent!.matrixWorld, this.matrix);
       }
 
       this.matrixWorldNeedsUpdate = false;
@@ -448,7 +448,7 @@ export class TransformNode extends EventDispatcher {
     if (this.parent === null) {
       this.matrixWorld.copy(this.matrix);
     } else {
-      this.matrixWorld.multiplyMatrices(this.parent!.matrixWorld, this.matrix);
+      this.matrixWorld.multiplyMatricesSIMD(this.parent!.matrixWorld, this.matrix);
     }
 
     // update children

@@ -5,7 +5,6 @@ import { Event } from "../core/Event";
 import { Listener } from "../core/EventDispatcher";
 import { inputManager } from "../exports/io/InputManager";
 import { MouseEvent } from "../exports/io/MouseEvent";
-import { print } from "../Imports";
 import { Matrix4 } from "../math/Matrix4";
 import { Quaternion } from "../math/Quaternion";
 import { Spherical } from "../math/Spherical";
@@ -190,7 +189,6 @@ export class OrbitController implements Listener {
       this.dollyStart.set(f32(event.clientX), f32(event.clientY));
       this.state = STATE.DOLLY;
     } else if (event.button === 1) {
-      print(`Panning`);
       if (this.enablePan === false) return;
       this.panStart.set(f32(event.clientX), f32(event.clientY));
       this.state = STATE.PAN;
@@ -263,8 +261,6 @@ export class OrbitController implements Listener {
     } else if (event.delta > 0) {
       this.dollyIn(this.getZoomScale());
     }
-
-    print(`Zooming? with delta ${event.delta}`);
 
     this.update();
 

@@ -61,27 +61,36 @@ export class WebGPUGeometries implements Listener {
       if (posBuffer) {
         attributeMap.attributeBuffers.set(
           AttributeType.POSITION,
-          createBufferFromF32(posBuffer.array, GPUBufferUsageFlags.COPY_DST | GPUBufferUsageFlags.VERTEX)
+          createBufferFromF32(
+            changetype<usize>(posBuffer.array),
+            GPUBufferUsageFlags.COPY_DST | GPUBufferUsageFlags.VERTEX
+          )
         );
       }
 
       if (normBuffer) {
         attributeMap.attributeBuffers.set(
           AttributeType.NORMAL,
-          createBufferFromF32(normBuffer.array, GPUBufferUsageFlags.COPY_DST | GPUBufferUsageFlags.VERTEX)
+          createBufferFromF32(
+            changetype<usize>(normBuffer.array),
+            GPUBufferUsageFlags.COPY_DST | GPUBufferUsageFlags.VERTEX
+          )
         );
       }
 
       if (uvBuffer) {
         attributeMap.attributeBuffers.set(
           AttributeType.UV,
-          createBufferFromF32(uvBuffer.array, GPUBufferUsageFlags.COPY_DST | GPUBufferUsageFlags.VERTEX)
+          createBufferFromF32(
+            changetype<usize>(uvBuffer.array),
+            GPUBufferUsageFlags.COPY_DST | GPUBufferUsageFlags.VERTEX
+          )
         );
       }
 
       if (indexBuffer) {
         attributeMap.indexBuffer = createIndexBuffer(
-          indexBuffer.array,
+          changetype<usize>(indexBuffer.array),
           GPUBufferUsageFlags.COPY_DST | GPUBufferUsageFlags.INDEX
         );
       }

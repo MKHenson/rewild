@@ -1,18 +1,20 @@
-import type * as MyModule from "../../../build/types";
-import wasmFile from "../../../build/untouched.wasm";
-import loader, { ASUtil, ResultObject } from "@assemblyscript/loader";
+import { instantiate, __AdaptedExports } from "../../../build/release";
+import wasmFile from "../../../build/release.wasm";
 import { IBindable } from "./IBindable";
 
-export type IWasmExports = ASUtil & typeof MyModule;
-export type ExportType = ResultObject & { exports: IWasmExports };
+export type Wasm = typeof __AdaptedExports & {
+  getFloat32Array: (pointer: Number) => Float32Array;
+  getUint32Array: (pointer: Number) => Uint32Array;
+  getInt32Array: (pointer: Number) => Int32Array;
+};
 
 export let wasmManager: WasmManager;
-export let wasm: IWasmExports;
+export let wasm: Wasm;
 
 export class WasmManager {
   memory: WebAssembly.Memory;
-  importObject: WebAssembly.Imports;
-  exports: IWasmExports;
+
+  exports: Wasm;
 
   wasmArrayBuffer: Uint32Array;
   wasmMemoryBlock: ArrayBuffer;
@@ -21,47 +23,41 @@ export class WasmManager {
     wasmManager = this;
   }
 
+  private __liftTypedArray<T extends Float32Array | Int32Array | Int16Array | Uint32Array>(
+    constructor: Float32ArrayConstructor | Uint32ArrayConstructor | Int32ArrayConstructor,
+    pointer: number
+  ): T {
+    const memoryU32 = new Uint32Array(this.memory.buffer);
+    return new constructor(
+      this.memory.buffer,
+      memoryU32[(pointer + 4) >>> 2],
+      memoryU32[(pointer + 8) >>> 2] / constructor.BYTES_PER_ELEMENT
+    ) as T;
+  }
+
   async load(bindables: IBindable[]) {
     // Creating WASM with Linear memory
     this.memory = new WebAssembly.Memory({ initial: 10000 });
-    this.importObject = {
-      env: {
-        memory: this.memory,
-        seed: Date.now,
-        abort: (...args: any[]) => {
-          console.error((this.importObject.env as any).getString(args[0]));
-          console.error((this.importObject.env as any).getString(args[1]));
-        },
-        getString: (string_index: number) => {
-          const buffer = (this.importObject.env as any).memory.buffer;
-          const U32 = new Uint32Array(buffer);
-          const id_addr = string_index / 4 - 2;
-          const id = U32[id_addr];
-          if (id !== 0x01) throw Error(`not a string index=${string_index} id=${id}`);
-          const len = U32[id_addr + 1];
-          const str = new TextDecoder("utf-16").decode(buffer.slice(string_index, string_index + len));
-          return str;
-        },
-      },
-    };
 
-    if (!this.importObject.env.memory) throw new Error("You need to set memory in your importObject");
-
-    const bindings: any = {
-      print: (stringIndex: number) => {
-        if (this.exports) console.log(this.exports.__getString(stringIndex));
-      },
-    };
+    const bindings: any = {};
 
     for (const bindable of bindables) Object.assign(bindings, bindable.createBinding());
 
-    this.importObject.Imports = bindings;
+    const obj = (await instantiate(await WebAssembly.compileStreaming(fetch(wasmFile)), {
+      Imports: bindings,
+      env: {
+        memory: this.memory,
+      },
+    })) as Wasm;
 
-    const obj = await loader.instantiateStreaming<typeof MyModule>(fetch(wasmFile), this.importObject);
-    this.exports = obj.exports;
-    wasm = obj.exports;
+    obj.getFloat32Array = (pointer) => this.__liftTypedArray(Float32Array, pointer.valueOf() >>> 0);
+    obj.getUint32Array = (pointer) => this.__liftTypedArray(Uint32Array, pointer.valueOf() >>> 0);
+    obj.getInt32Array = (pointer) => this.__liftTypedArray(Int32Array, pointer.valueOf() >>> 0);
 
-    this.wasmMemoryBlock = obj.exports.memory!.buffer;
+    this.exports = obj;
+    wasm = obj;
+
+    this.wasmMemoryBlock = this.memory!.buffer;
     this.wasmArrayBuffer = new Uint32Array(this.wasmMemoryBlock);
   }
 }

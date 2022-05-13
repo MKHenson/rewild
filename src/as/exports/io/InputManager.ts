@@ -48,6 +48,25 @@ export class InputManager extends EventDispatcher {
   }
 }
 
+export function dispatchOnWheel(mouseEvent: MouseEvent): void {
+  inputManager.onWheel(mouseEvent);
+}
+export function dispatchOnMouseDown(mouseEvent: MouseEvent): void {
+  inputManager.onMouseDown(mouseEvent);
+}
+export function dispatchOnMouseUp(mouseEvent: MouseEvent): void {
+  inputManager.onMouseUp(mouseEvent);
+}
+export function dispatchOnMouseMove(mouseEvent: MouseEvent): void {
+  inputManager.onMouseMove(mouseEvent);
+}
+export function dispatchOnKeyDown(keyEvent: KeyboardEvent): void {
+  inputManager.onKeyDown(keyEvent);
+}
+export function dispatchOnKeyUp(keyEvent: KeyboardEvent): void {
+  inputManager.onKeyUp(keyEvent);
+}
+
 export function getInputManager(): InputManager {
   return inputManager;
 }

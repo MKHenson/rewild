@@ -142,7 +142,7 @@ export class Mesh extends TransformNode {
 
     //
 
-    _inverseMatrix.copy(matrixWorld).invert();
+    _inverseMatrix.copy(matrixWorld).invertSIMD();
     _ray.copy(raycaster.ray).applyMatrix4(_inverseMatrix);
 
     // Check boundingBox before continuing

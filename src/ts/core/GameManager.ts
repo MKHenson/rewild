@@ -41,7 +41,7 @@ export class GameManager implements IBindable {
   currentCommandEncoder: GPUCommandEncoder;
   private presentationSize: [number, number];
 
-  private character: Object3D;
+  character: Object3D;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -67,7 +67,7 @@ export class GameManager implements IBindable {
       lock: this.lock.bind(this),
       unlock: this.unlock.bind(this),
       render: (commandsIndex: number) => {
-        const commandBuffer = wasm.__getArray(commandsIndex) as Array<number>;
+        const commandBuffer = wasm.getInt32Array(commandsIndex);
         this.renderQueueManager.run(commandBuffer);
       },
     };
@@ -140,7 +140,7 @@ export class GameManager implements IBindable {
 
     this.textures = await Promise.all(
       textures.map((texture, index) => {
-        wasm.createTexture(wasm.__newString(texture.name), index);
+        wasm.createTexture(texture.name, index);
         return texture.load(device);
       })
     );
@@ -187,70 +187,59 @@ export class GameManager implements IBindable {
   }
 
   initRuntime() {
-    const runime = wasm.Runtime.wrap(wasm.getRuntime());
-
     this.pipelines.forEach((p) => {
       p.build(this);
       p.initialize(this);
     });
 
-    const containerLvl1Ptr = wasm.__pin(wasm.createLevel1());
-    const containerLvl1 = wasm.Level1.wrap(containerLvl1Ptr);
-
+    const containerLvl1Ptr = wasm.createLevel1();
     const geometrySphere = wasm.createSphere(1);
     const geometryBox = wasm.createBox(1);
 
-    containerLvl1.addAsset(this.createMesh(geometryBox, "skybox", "skybox"));
-    containerLvl1.addAsset(this.createMesh(geometrySphere, "simple", "ball"));
+    wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "skybox", "skybox"));
+    wasm.addAsset(containerLvl1Ptr, this.createMesh(geometrySphere, "simple", "ball"));
 
-    for (let i = 0; i < 20; i++) containerLvl1.addAsset(this.createMesh(geometryBox, "concrete", `building-${i}`));
-    for (let i = 0; i < 20; i++) containerLvl1.addAsset(this.createMesh(geometryBox, "crate", `crate-${i}`));
+    for (let i = 0; i < 20; i++)
+      wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "concrete", `building-${i}`));
+    for (let i = 0; i < 20; i++) wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "crate", `crate-${i}`));
 
     this.character = new Object3D();
-    this.character.transform.add(this.createMesh(geometrySphere, "simple", "character"));
-    containerLvl1.addAsset(this.character.transform.valueOf());
+    // this.character.transform.add(this.createMesh(geometrySphere, "simple", "character"));
+    // wasm.addAsset( containerLvl1Ptr, this.character.transform.valueOf());
+    wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "coastal-floor", "floor"));
 
-    containerLvl1.addAsset(this.createMesh(geometryBox, "coastal-floor", "floor"));
-    wasm.__unpin(containerLvl1Ptr);
+    const containerTestPtr = wasm.createTestLevel();
+    wasm.addAsset(containerTestPtr, this.createMesh(geometryBox, "skybox", "skybox"));
 
-    const containerTestPtr = wasm.__pin(wasm.createTestLevel());
-    const containerTestLevel = wasm.TestLevel.wrap(containerTestPtr);
-    containerTestLevel.addAsset(this.createMesh(geometryBox, "skybox", "skybox"));
-    wasm.__unpin(containerTestPtr);
+    const containerMainMenuPtr = wasm.createMainMenu();
 
-    const containerMainMenuPtr = wasm.__pin(wasm.createMainMenu());
-    const containerMainMenu = wasm.MainMenu.wrap(containerMainMenuPtr);
-    containerMainMenu.addAsset(this.createMesh(geometrySphere, "earth"));
-    containerMainMenu.addAsset(this.createMesh(geometryBox, "stars", "skybox"));
-    wasm.__unpin(containerMainMenuPtr);
+    wasm.addAsset(containerMainMenuPtr, this.createMesh(geometrySphere, "earth"));
+    wasm.addAsset(containerMainMenuPtr, this.createMesh(geometryBox, "stars", "skybox"));
 
-    runime.addContainer(containerLvl1Ptr, false);
-    runime.addContainer(containerMainMenuPtr, true);
-    runime.addContainer(containerTestPtr, false);
+    wasm.addContainer(containerLvl1Ptr, false);
+    wasm.addContainer(containerMainMenuPtr, true);
+    wasm.addContainer(containerTestPtr, false);
   }
 
-  createMesh(geometryPtr: number, pipelineName: string, name?: string) {
+  createMesh(geometryPtr: Number, pipelineName: string, name?: string) {
     // Get the pipeline
 
     const pipeline = this.getPipeline(pipelineName)!;
     const pipelineIndex = this.pipelines.indexOf(pipeline);
 
     // Create an instance in WASM
-    const pipelineInsPtr = wasm.createPipelineInstance(
-      wasm.__newString(pipeline.name),
-      pipelineIndex,
-      PipelineType.Mesh
-    );
-    const meshPipelineIns = wasm.MeshPipelineInstance.wrap(pipelineInsPtr);
+    const pipelineInsPtr = wasm.createPipelineInstance(pipeline.name, pipelineIndex, PipelineType.Mesh);
 
     pipeline.vertexLayouts.map((buffer) =>
-      buffer.attributes.map((attr) => meshPipelineIns.addAttribute(attr.attributeType, attr.shaderLocation))
+      buffer.attributes.map((attr) =>
+        wasm.addPipelineAttribute(pipelineInsPtr, attr.attributeType, attr.shaderLocation)
+      )
     );
 
     // Assign a transform buffer to the intance
-    meshPipelineIns.transformResourceIndex = pipeline.addResourceInstance(this, GroupType.Transform);
+    wasm.setMeshPipelineTransformIndex(pipelineInsPtr, pipeline.addResourceInstance(this, GroupType.Transform));
 
-    const meshPtr = wasm.createMesh(geometryPtr, pipelineInsPtr, name ? wasm.__newString(name) : undefined);
+    const meshPtr = wasm.createMesh(geometryPtr as any, pipelineInsPtr, name);
     return meshPtr;
   }
 
@@ -307,7 +296,7 @@ export class GameManager implements IBindable {
       this.onResize(newSize);
     }
 
-    this.character.transform.translateZ(0.01);
+    // this.character.transform.translateZ(0.01);
     wasm.update(performance.now());
   }
 
@@ -363,14 +352,14 @@ export class GameManager implements IBindable {
   }
 
   createBufferF32(data: number, usageFlag: GPUBufferUsageFlags = GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST) {
-    const f32Array = wasm.__getFloat32Array(data);
+    const f32Array = wasm.getFloat32Array(data);
     const buffer = createBuffer(this.device, f32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;
   }
 
   createIndexBuffer(data: number, usageFlag: GPUBufferUsageFlags = GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST) {
-    const u32Array = wasm.__getUint32Array(data);
+    const u32Array = wasm.getUint32Array(data);
     const buffer = createIndexBuffer(this.device, u32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;

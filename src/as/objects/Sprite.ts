@@ -69,7 +69,7 @@ export class Sprite extends TransformNode {
     _worldScale.setFromMatrixScale(this.matrixWorld);
 
     _viewWorldMatrix.copy(raycaster.camera!.matrixWorld);
-    this.modelViewMatrix.multiplyMatrices(raycaster.camera!.matrixWorldInverse, this.matrixWorld);
+    this.modelViewMatrix.multiplyMatricesSIMD(raycaster.camera!.matrixWorldInverse, this.matrixWorld);
 
     _mvPosition.setFromMatrixPosition(this.modelViewMatrix);
 

@@ -154,7 +154,6 @@ export class Level1 extends Container implements Listener {
     // Possitive z comes out of screen
     this.runtime!.camera.position.set(0, 1, 10);
     this.runtime!.camera.lookAt(0, 0, 0);
-
     // this.orbitController.enabled = true;
     this.pointerController.enabled = true;
 
@@ -172,6 +171,6 @@ export class Level1 extends Container implements Listener {
   }
 }
 
-export function createLevel1(): Level1 {
+export function createLevel1(): Container {
   return new Level1();
 }

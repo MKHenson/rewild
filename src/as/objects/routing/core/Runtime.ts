@@ -8,7 +8,6 @@ import { Container } from "./Container";
 import { Node } from "./Node";
 import { Link } from "./Link";
 import { Portal } from "./Portal";
-import { print } from "../../../Imports";
 
 export class Runtime implements Listener {
   renderer: WebGPURenderer;
@@ -91,14 +90,14 @@ export class Runtime implements Listener {
         activeNodes.splice(activeNodes.indexOf(sourcePortal.node), 1);
         this.inactiveNodes.push(sourcePortal.node);
 
-        print(`Deactivating ${sourcePortal.node.name}`);
+        console.log(`Deactivating ${sourcePortal.node.name}`);
       }
     }
 
     for (let i: i32 = 0, l = links.length; i < l; i++) {
       links[i].destinationPortal!.node.enter(links[i].destinationPortal!);
 
-      print(
+      console.log(
         `Entering ${links[i].destinationPortal!.name} of ${links[i].destinationPortal!.node.name} which is active ${
           links[i].destinationPortal!.node.active
         }`
@@ -107,7 +106,7 @@ export class Runtime implements Listener {
       if (activeNodes.indexOf(links[i].destinationPortal!.node) == -1) {
         activeNodes.push(links[i].destinationPortal!.node);
 
-        print(`Activating ${links[i].destinationPortal!.node.name}`);
+        console.log(`Activating ${links[i].destinationPortal!.node.name}`);
       }
     }
   }
