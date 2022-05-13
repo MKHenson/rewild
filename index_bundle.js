@@ -12,6 +12,301 @@ return /******/ (() => { // webpackBootstrap
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
 
+/***/ "./build/release.js":
+/*!**************************!*\
+  !*** ./build/release.js ***!
+  \**************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "instantiate": () => (/* binding */ instantiate)
+/* harmony export */ });
+async function instantiate(module, imports = {}) {
+  const __module0 = imports.Imports;
+  const adaptedImports = {
+    env: Object.assign(Object.create(globalThis), imports.env || {}, {
+      abort(message, fileName, lineNumber, columnNumber) {
+        // ~lib/builtins/abort(~lib/string/String | null?, ~lib/string/String | null?, u32?, u32?) => void
+        message = __liftString(message >>> 0);
+        fileName = __liftString(fileName >>> 0);
+        lineNumber = lineNumber >>> 0;
+        columnNumber = columnNumber >>> 0;
+        (() => {
+          // @external.js
+          throw Error(`${message} in ${fileName}:${lineNumber}:${columnNumber}`);
+        })();
+      },
+      seed() {
+        // ~lib/builtins/seed() => f64
+        return (() => {
+          // @external.js
+          return Date.now() * Math.random();
+        })();
+      },
+      "console.log"(text) {
+        // ~lib/bindings/dom/console.log(~lib/string/String) => void
+        text = __liftString(text >>> 0);
+        console.log(text);
+      },
+    }),
+    Imports: Object.assign(Object.create(__module0), {
+      render(commandsIndex) {
+        // src/as/Imports/render(usize) => void
+        commandsIndex = commandsIndex >>> 0;
+        __module0.render(commandsIndex);
+      },
+      onSignalReceived(type, event) {
+        // src/as/Imports/onSignalReceived(i32, src/as/core/Event/Event) => void
+        event = __liftInternref(event >>> 0);
+        __module0.onSignalReceived(type, event);
+      },
+      createBufferFromF32(data, usage) {
+        // src/as/Imports/createBufferFromF32(usize, i32) => i32
+        data = data >>> 0;
+        return __module0.createBufferFromF32(data, usage);
+      },
+      createIndexBuffer(data, usage) {
+        // src/as/Imports/createIndexBuffer(usize, i32) => i32
+        data = data >>> 0;
+        return __module0.createIndexBuffer(data, usage);
+      },
+    }),
+  };
+  const { exports } = await WebAssembly.instantiate(module, adaptedImports);
+  const memory = exports.memory || imports.env.memory;
+  const adaptedExports = Object.setPrototypeOf({
+    Float32ArrayID: {
+      // src/as/index/Float32ArrayID: u32
+      valueOf() { return this.value; },
+      get value() {
+        return exports.Float32ArrayID.value >>> 0;
+      }
+    },
+    foo() {
+      // src/as/index/foo() => ~lib/array/Array<i32>
+      return __liftArray(pointer => new Int32Array(memory.buffer)[pointer >>> 2], 2, exports.foo() >>> 0);
+    },
+    getRuntime() {
+      // src/as/exports/AsSceneManager/getRuntime() => src/as/objects/routing/core/Runtime/Runtime
+      return __liftInternref(exports.getRuntime() >>> 0);
+    },
+    addContainer(container, activate) {
+      // src/as/exports/AsSceneManager/addContainer(src/as/objects/routing/core/Container/Container, bool) => void
+      container = __lowerInternref(container) || __notnull();
+      activate = activate ? 1 : 0;
+      exports.addContainer(container, activate);
+    },
+    createTexture(name, index) {
+      // src/as/exports/TextureFactory/createTexture(~lib/string/String, i32) => src/as/exports/TextureFactory/Texture
+      name = __lowerString(name) || __notnull();
+      return __liftInternref(exports.createTexture(name, index) >>> 0);
+    },
+    createBox(width, height, depth, widthSegments, heightSegments, depthSegments) {
+      // src/as/exports/GeometryFactory/createBox(f32?, f32?, f32?, u16?, u16?, u16?) => src/as/core/BufferGeometry/BufferGeometry
+      exports.__setArgumentsLength(arguments.length);
+      return __liftInternref(exports.createBox(width, height, depth, widthSegments, heightSegments, depthSegments) >>> 0);
+    },
+    createPlane(width, height, widthSegments, heightSegments) {
+      // src/as/exports/GeometryFactory/createPlane(f32?, f32?, u16?, u16?) => src/as/core/BufferGeometry/BufferGeometry
+      exports.__setArgumentsLength(arguments.length);
+      return __liftInternref(exports.createPlane(width, height, widthSegments, heightSegments) >>> 0);
+    },
+    createSphere(radius, widthSegments, heightSegments) {
+      // src/as/exports/GeometryFactory/createSphere(f32?, u16?, u16?) => src/as/core/BufferGeometry/BufferGeometry
+      exports.__setArgumentsLength(arguments.length);
+      return __liftInternref(exports.createSphere(radius, widthSegments, heightSegments) >>> 0);
+    },
+    addVertGeometry(verts) {
+      // src/as/exports/GeometryFactory/addVertGeometry(~lib/typedarray/Float32Array) => i32
+      verts = __lowerTypedArray(Float32Array, 20, 2, verts) || __notnull();
+      return exports.addVertGeometry(verts);
+    },
+    createPipelineInstance(name, index, type) {
+      // src/as/exports/PipelineFactory/createPipelineInstance(~lib/string/String, i32, i32) => src/as/pipelines/PipelineInstance/PipelineInstance
+      name = __lowerString(name) || __notnull();
+      return __liftInternref(exports.createPipelineInstance(name, index, type) >>> 0);
+    },
+    addPipelineAttribute(pipeline, type, location) {
+      // src/as/exports/PipelineFactory/addPipelineAttribute(src/as/pipelines/PipelineInstance/PipelineInstance, i32, u16) => void
+      pipeline = __lowerInternref(pipeline) || __notnull();
+      exports.addPipelineAttribute(pipeline, type, location);
+    },
+    setMeshPipelineTransformIndex(pipeline, transformResourceIndex) {
+      // src/as/exports/PipelineFactory/setMeshPipelineTransformIndex(src/as/pipelines/PipelineInstance/PipelineInstance, i32) => void
+      pipeline = __lowerInternref(pipeline) || __notnull();
+      exports.setMeshPipelineTransformIndex(pipeline, transformResourceIndex);
+    },
+    createMesh(geometry, pipeline, name) {
+      // src/as/exports/MeshFactory/createMesh(src/as/core/BufferGeometry/BufferGeometry, src/as/pipelines/PipelineInstance/PipelineInstance, ~lib/string/String | null?) => src/as/core/TransformNode/TransformNode
+      geometry = __retain(__lowerInternref(geometry) || __notnull());
+      pipeline = __retain(__lowerInternref(pipeline) || __notnull());
+      name = __lowerString(name);
+      try {
+        exports.__setArgumentsLength(arguments.length);
+        return __liftInternref(exports.createMesh(geometry, pipeline, name) >>> 0);
+      } finally {
+        __release(geometry);
+        __release(pipeline);
+      }
+    },
+    createContainer(name) {
+      // src/as/objects/routing/core/Container/createContainer(~lib/string/String) => src/as/objects/routing/core/Container/Container
+      name = __lowerString(name) || __notnull();
+      return __liftInternref(exports.createContainer(name) >>> 0);
+    },
+    addAsset(container, object) {
+      // src/as/objects/routing/core/Container/addAsset(src/as/objects/routing/core/Container/Container, src/as/core/TransformNode/TransformNode) => void
+      container = __retain(__lowerInternref(container) || __notnull());
+      object = __lowerInternref(object) || __notnull();
+      try {
+        exports.addAsset(container, object);
+      } finally {
+        __release(container);
+      }
+    },
+    createLevel1() {
+      // src/as/objects/routing/custom/Level1/createLevel1() => src/as/objects/routing/core/Container/Container
+      return __liftInternref(exports.createLevel1() >>> 0);
+    },
+    createMainMenu() {
+      // src/as/objects/routing/custom/MainMenu/createMainMenu() => src/as/objects/routing/core/Container/Container
+      return __liftInternref(exports.createMainMenu() >>> 0);
+    },
+    createTestLevel() {
+      // src/as/objects/routing/custom/TestLevel/createTestLevel() => src/as/objects/routing/core/Container/Container
+      return __liftInternref(exports.createTestLevel() >>> 0);
+    },
+    createTransformNode() {
+      // src/as/exports/ObjectFactory/createTransformNode() => src/as/core/TransformNode/TransformNode
+      return __liftInternref(exports.createTransformNode() >>> 0);
+    },
+    dispatchOnKeyDown(keyEvent) {
+      // src/as/exports/io/InputManager/dispatchOnKeyDown(src/as/exports/io/KeyboardEvent/KeyboardEvent) => void
+      keyEvent = __lowerInternref(keyEvent) || __notnull();
+      exports.dispatchOnKeyDown(keyEvent);
+    },
+    dispatchOnKeyUp(keyEvent) {
+      // src/as/exports/io/InputManager/dispatchOnKeyUp(src/as/exports/io/KeyboardEvent/KeyboardEvent) => void
+      keyEvent = __lowerInternref(keyEvent) || __notnull();
+      exports.dispatchOnKeyUp(keyEvent);
+    },
+    dispatchOnMouseDown(mouseEvent) {
+      // src/as/exports/io/InputManager/dispatchOnMouseDown(src/as/exports/io/MouseEvent/MouseEvent) => void
+      mouseEvent = __lowerInternref(mouseEvent) || __notnull();
+      exports.dispatchOnMouseDown(mouseEvent);
+    },
+    dispatchOnMouseMove(mouseEvent) {
+      // src/as/exports/io/InputManager/dispatchOnMouseMove(src/as/exports/io/MouseEvent/MouseEvent) => void
+      mouseEvent = __lowerInternref(mouseEvent) || __notnull();
+      exports.dispatchOnMouseMove(mouseEvent);
+    },
+    dispatchOnMouseUp(mouseEvent) {
+      // src/as/exports/io/InputManager/dispatchOnMouseUp(src/as/exports/io/MouseEvent/MouseEvent) => void
+      mouseEvent = __lowerInternref(mouseEvent) || __notnull();
+      exports.dispatchOnMouseUp(mouseEvent);
+    },
+    dispatchOnWheel(mouseEvent) {
+      // src/as/exports/io/InputManager/dispatchOnWheel(src/as/exports/io/MouseEvent/MouseEvent) => void
+      mouseEvent = __lowerInternref(mouseEvent) || __notnull();
+      exports.dispatchOnWheel(mouseEvent);
+    },
+    createMouseEvent(clientX, clientY, pageX, pageY, ctrlKey, shiftKey, altKey, button, buttons, targetX, targetY, targetWidth, targetHeight, delta, movementX, movementY) {
+      // src/as/exports/io/MouseEvent/createMouseEvent(i32, i32, i32, i32, bool, bool, bool, i32, i32, i32, i32, i32, i32, i16, i16, i16) => src/as/exports/io/MouseEvent/MouseEvent
+      ctrlKey = ctrlKey ? 1 : 0;
+      shiftKey = shiftKey ? 1 : 0;
+      altKey = altKey ? 1 : 0;
+      return __liftInternref(exports.createMouseEvent(clientX, clientY, pageX, pageY, ctrlKey, shiftKey, altKey, button, buttons, targetX, targetY, targetWidth, targetHeight, delta, movementX, movementY) >>> 0);
+    },
+    createKeyboardEvent(code) {
+      // src/as/exports/io/KeyboardEvent/createKeyboardEvent(~lib/string/String) => src/as/exports/io/KeyboardEvent/KeyboardEvent
+      code = __lowerString(code) || __notnull();
+      return __liftInternref(exports.createKeyboardEvent(code) >>> 0);
+    },
+  }, exports);
+  function __liftString(pointer) {
+    if (!pointer) return null;
+    const
+      end = pointer + new Uint32Array(memory.buffer)[pointer - 4 >>> 2] >>> 1,
+      memoryU16 = new Uint16Array(memory.buffer);
+    let
+      start = pointer >>> 1,
+      string = "";
+    while (end - start > 1024) string += String.fromCharCode(...memoryU16.subarray(start, start += 1024));
+    return string + String.fromCharCode(...memoryU16.subarray(start, end));
+  }
+  function __lowerString(value) {
+    if (value == null) return 0;
+    const
+      length = value.length,
+      pointer = exports.__new(length << 1, 1) >>> 0,
+      memoryU16 = new Uint16Array(memory.buffer);
+    for (let i = 0; i < length; ++i) memoryU16[(pointer >>> 1) + i] = value.charCodeAt(i);
+    return pointer;
+  }
+  function __liftArray(liftElement, align, pointer) {
+    if (!pointer) return null;
+    const
+      memoryU32 = new Uint32Array(memory.buffer),
+      dataStart = memoryU32[pointer + 4 >>> 2],
+      length = memoryU32[pointer + 12 >>> 2],
+      values = new Array(length);
+    for (let i = 0; i < length; ++i) values[i] = liftElement(dataStart + (i << align >>> 0));
+    return values;
+  }
+  function __lowerTypedArray(constructor, id, align, values) {
+    if (values == null) return 0;
+    const
+      length = values.length,
+      buffer = exports.__pin(exports.__new(length << align, 0)) >>> 0,
+      header = exports.__new(12, id) >>> 0,
+      memoryU32 = new Uint32Array(memory.buffer);
+    memoryU32[header + 0 >>> 2] = buffer;
+    memoryU32[header + 4 >>> 2] = buffer;
+    memoryU32[header + 8 >>> 2] = length << align;
+    new constructor(memory.buffer, buffer, length).set(values);
+    exports.__unpin(buffer);
+    return header;
+  }
+  const registry = new FinalizationRegistry(__release);
+  class Internref extends Number {}
+  function __liftInternref(pointer) {
+    if (!pointer) return null;
+    const sentinel = new Internref(__retain(pointer));
+    registry.register(sentinel, pointer);
+    return sentinel;
+  }
+  function __lowerInternref(value) {
+    if (value == null) return 0;
+    if (value instanceof Internref) return value.valueOf();
+    throw TypeError("internref expected");
+  }
+  const refcounts = new Map();
+  function __retain(pointer) {
+    if (pointer) {
+      const refcount = refcounts.get(pointer);
+      if (refcount) refcounts.set(pointer, refcount + 1);
+      else refcounts.set(exports.__pin(pointer), 1);
+    }
+    return pointer;
+  }
+  function __release(pointer) {
+    if (pointer) {
+      const refcount = refcounts.get(pointer);
+      if (refcount === 1) exports.__unpin(pointer), refcounts.delete(pointer);
+      else if (refcount) refcounts.set(pointer, refcount - 1);
+      else throw Error(`invalid refcount '${refcount}' for reference '${pointer}'`);
+    }
+  }
+  function __notnull() {
+    throw TypeError("value must not be null");
+  }
+  return adaptedExports;
+}
+
+
+/***/ }),
+
 /***/ "./src/common/AttributeType.ts":
 /*!*************************************!*\
   !*** ./src/common/AttributeType.ts ***!
@@ -302,6 +597,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./textures/BitmapTexture */ "./src/ts/core/textures/BitmapTexture.ts");
 /* harmony import */ var _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./textures/BitmapCubeTexture */ "./src/ts/core/textures/BitmapCubeTexture.ts");
 /* harmony import */ var _pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./pipelines/skybox-pipeline/SkyboxPipeline */ "./src/ts/core/pipelines/skybox-pipeline/SkyboxPipeline.ts");
+/* harmony import */ var _renderer_Object3D__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../renderer/Object3D */ "./src/ts/renderer/Object3D.ts");
+
 
 
 
@@ -339,8 +636,7 @@ class GameManager {
       lock: this.lock.bind(this),
       unlock: this.unlock.bind(this),
       render: commandsIndex => {
-        const commandBuffer = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__getArray(commandsIndex);
-
+        const commandBuffer = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.getInt32Array(commandsIndex);
         this.renderQueueManager.run(commandBuffer);
       }
     };
@@ -369,7 +665,7 @@ class GameManager {
 
     const textures = [new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("grid", MEDIA_URL + "uv-grid.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("crate", MEDIA_URL + "crate-wooden.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("earth", MEDIA_URL + "earth-day-2k.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("ground-coastal-1", MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("block-concrete-4", MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png", device), new _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_8__.BitmapCubeTexture("desert-sky", [MEDIA_URL + "skyboxes/desert/px.jpg", MEDIA_URL + "skyboxes/desert/nx.jpg", MEDIA_URL + "skyboxes/desert/py.jpg", MEDIA_URL + "skyboxes/desert/ny.jpg", MEDIA_URL + "skyboxes/desert/pz.jpg", MEDIA_URL + "skyboxes/desert/nz.jpg"], device), new _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_8__.BitmapCubeTexture("starry-sky", [MEDIA_URL + "skyboxes/stars/left.png", MEDIA_URL + "skyboxes/stars/right.png", MEDIA_URL + "skyboxes/stars/top.png", MEDIA_URL + "skyboxes/stars/bottom.png", MEDIA_URL + "skyboxes/stars/front.png", MEDIA_URL + "skyboxes/stars/back.png"], device)];
     this.textures = await Promise.all(textures.map((texture, index) => {
-      _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createTexture(_WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__newString(texture.name), index);
+      _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createTexture(texture.name, index);
       return texture.load(device);
     })); // PIPELINES
 
@@ -416,46 +712,32 @@ class GameManager {
   }
 
   initRuntime() {
-    const runime = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.Runtime.wrap(_WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.getRuntime());
     this.pipelines.forEach(p => {
       p.build(this);
       p.initialize(this);
     });
-
-    const containerLvl1Ptr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__pin(_WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createLevel1());
-
-    const containerLvl1 = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.Level1.wrap(containerLvl1Ptr);
+    const containerLvl1Ptr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createLevel1();
     const geometrySphere = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createSphere(1);
     const geometryBox = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createBox(1);
-    containerLvl1.addAsset(this.createMesh(geometryBox, "skybox", "skybox"));
-    containerLvl1.addAsset(this.createMesh(geometrySphere, "simple", "ball"));
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "skybox", "skybox"));
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerLvl1Ptr, this.createMesh(geometrySphere, "simple", "ball"));
 
-    for (let i = 0; i < 20; i++) containerLvl1.addAsset(this.createMesh(geometryBox, "concrete", `building-${i}`));
+    for (let i = 0; i < 20; i++) _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "concrete", `building-${i}`));
 
-    for (let i = 0; i < 20; i++) containerLvl1.addAsset(this.createMesh(geometryBox, "crate", `crate-${i}`));
+    for (let i = 0; i < 20; i++) _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "crate", `crate-${i}`));
 
-    containerLvl1.addAsset(this.createMesh(geometryBox, "coastal-floor", "floor"));
+    this.character = new _renderer_Object3D__WEBPACK_IMPORTED_MODULE_10__.Object3D(); // this.character.transform.add(this.createMesh(geometrySphere, "simple", "character"));
+    // wasm.addAsset( containerLvl1Ptr, this.character.transform.valueOf());
 
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__unpin(containerLvl1Ptr);
-
-    const containerTestPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__pin(_WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createTestLevel());
-
-    const containerTestLevel = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.TestLevel.wrap(containerTestPtr);
-    containerTestLevel.addAsset(this.createMesh(geometryBox, "skybox", "skybox"));
-
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__unpin(containerTestPtr);
-
-    const containerMainMenuPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__pin(_WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createMainMenu());
-
-    const containerMainMenu = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.MainMenu.wrap(containerMainMenuPtr);
-    containerMainMenu.addAsset(this.createMesh(geometrySphere, "earth"));
-    containerMainMenu.addAsset(this.createMesh(geometryBox, "stars", "skybox"));
-
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__unpin(containerMainMenuPtr);
-
-    runime.addContainer(containerLvl1Ptr, false);
-    runime.addContainer(containerMainMenuPtr, true);
-    runime.addContainer(containerTestPtr, false);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "coastal-floor", "floor"));
+    const containerTestPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createTestLevel();
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerTestPtr, this.createMesh(geometryBox, "skybox", "skybox"));
+    const containerMainMenuPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createMainMenu();
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerMainMenuPtr, this.createMesh(geometrySphere, "earth"));
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerMainMenuPtr, this.createMesh(geometryBox, "stars", "skybox"));
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addContainer(containerLvl1Ptr, false);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addContainer(containerMainMenuPtr, true);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addContainer(containerTestPtr, false);
   }
 
   createMesh(geometryPtr, pipelineName, name) {
@@ -463,12 +745,11 @@ class GameManager {
     const pipeline = this.getPipeline(pipelineName);
     const pipelineIndex = this.pipelines.indexOf(pipeline); // Create an instance in WASM
 
-    const pipelineInsPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createPipelineInstance(_WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__newString(pipeline.name), pipelineIndex, _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__.PipelineType.Mesh);
-    const meshPipelineIns = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.MeshPipelineInstance.wrap(pipelineInsPtr);
-    pipeline.vertexLayouts.map(buffer => buffer.attributes.map(attr => meshPipelineIns.addAttribute(attr.attributeType, attr.shaderLocation))); // Assign a transform buffer to the intance
+    const pipelineInsPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createPipelineInstance(pipeline.name, pipelineIndex, _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__.PipelineType.Mesh);
+    pipeline.vertexLayouts.map(buffer => buffer.attributes.map(attr => _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addPipelineAttribute(pipelineInsPtr, attr.attributeType, attr.shaderLocation))); // Assign a transform buffer to the intance
 
-    meshPipelineIns.transformResourceIndex = pipeline.addResourceInstance(this, _common_GroupType__WEBPACK_IMPORTED_MODULE_5__.GroupType.Transform);
-    const meshPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createMesh(geometryPtr, pipelineInsPtr, name ? _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__newString(name) : undefined);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.setMeshPipelineTransformIndex(pipelineInsPtr, pipeline.addResourceInstance(this, _common_GroupType__WEBPACK_IMPORTED_MODULE_5__.GroupType.Transform));
+    const meshPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createMesh(geometryPtr, pipelineInsPtr, name);
     return meshPtr;
   }
 
@@ -522,7 +803,8 @@ class GameManager {
 
     if (newSize[0] !== w || newSize[1] !== h) {
       this.onResize(newSize);
-    }
+    } // this.character.transform.translateZ(0.01);
+
 
     _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.update(performance.now());
   }
@@ -580,9 +862,7 @@ class GameManager {
 
   createBufferF32(data) {
     let usageFlag = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST;
-
-    const f32Array = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__getFloat32Array(data);
-
+    const f32Array = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.getFloat32Array(data);
     const buffer = (0,_Utils__WEBPACK_IMPORTED_MODULE_3__.createBuffer)(this.device, f32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;
@@ -590,9 +870,7 @@ class GameManager {
 
   createIndexBuffer(data) {
     let usageFlag = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST;
-
-    const u32Array = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.__getUint32Array(data);
-
+    const u32Array = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.getUint32Array(data);
     const buffer = (0,_Utils__WEBPACK_IMPORTED_MODULE_3__.createIndexBuffer)(this.device, u32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;
@@ -700,28 +978,17 @@ class InputManager {
 
   createMouseEvent(e, bounds) {
     let delta = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
-
-    const mouseEventPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.__pin(_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.createMouseEvent(e.clientX, e.clientY, e.pageX, e.pageY, e.ctrlKey, e.shiftKey, e.altKey, e.button, e.buttons, bounds.x, bounds.y, bounds.width, bounds.height, delta, e.movementX || 0, e.movementY || 0));
-
-    return mouseEventPtr;
+    return _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.createMouseEvent(e.clientX, e.clientY, e.pageX, e.pageY, e.ctrlKey, e.shiftKey, e.altKey, e.button, e.buttons, bounds.x, bounds.y, bounds.width, bounds.height, delta, e.movementX || 0, e.movementY || 0);
   }
 
   sendMouseEvent(type, event, bounds, delta) {
-    const manager = _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.InputManager.wrap(_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.getInputManager());
     const wasmEvent = this.createMouseEvent(event, bounds, delta);
-    if (type === MouseEventType.MouseUp) manager.onMouseUp(wasmEvent);else if (type === MouseEventType.MouseMove) manager.onMouseMove(wasmEvent);else if (type === MouseEventType.MouseDown) manager.onMouseDown(wasmEvent);else if (type === MouseEventType.MouseWheel) manager.onWheel(wasmEvent);
-
-    _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.__unpin(wasmEvent);
+    if (type === MouseEventType.MouseUp) _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.dispatchOnMouseDown(wasmEvent);else if (type === MouseEventType.MouseMove) _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.dispatchOnMouseMove(wasmEvent);else if (type === MouseEventType.MouseDown) _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.dispatchOnMouseDown(wasmEvent);else if (type === MouseEventType.MouseWheel) _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.dispatchOnWheel(wasmEvent);
   }
 
   sendKeyEvent(type, event) {
-    const manager = _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.InputManager.wrap(_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.getInputManager());
-
-    const wasmEvent = _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.__pin(_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.createKeyboardEvent(_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.__newString(event.code)));
-
-    if (type === KeyEventType.KeyUp) manager.onKeyUp(wasmEvent);else if (type === KeyEventType.KeyDown) manager.onKeyDown(wasmEvent);
-
-    _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.__unpin(wasmEvent);
+    const wasmEvent = _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.createKeyboardEvent(event.code);
+    if (type === KeyEventType.KeyUp) _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.dispatchOnKeyUp(wasmEvent);else if (type === KeyEventType.KeyDown) _WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.dispatchOnKeyDown(wasmEvent);
   }
 
   dispose() {
@@ -947,8 +1214,7 @@ class UIEventManager extends _EventDispatcher__WEBPACK_IMPORTED_MODULE_0__["defa
   }
 
   triggerUIEvent(type) {
-    const manager = _WasmManager__WEBPACK_IMPORTED_MODULE_2__.wasm.UISignalManager.wrap(_WasmManager__WEBPACK_IMPORTED_MODULE_2__.wasm.getSignalManager());
-    manager.onSignalEvent(type);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_2__.wasm.dispatchOnSignalEvent(type);
   }
 
 }
@@ -1005,8 +1271,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "wasm": () => (/* binding */ wasm),
 /* harmony export */   "wasmManager": () => (/* binding */ wasmManager)
 /* harmony export */ });
-/* harmony import */ var _build_untouched_wasm__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../build/untouched.wasm */ "./build/untouched.wasm");
-/* harmony import */ var _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! @assemblyscript/loader */ "./node_modules/@assemblyscript/loader/index.js");
+/* harmony import */ var _build_release__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../../build/release */ "./build/release.js");
+/* harmony import */ var _build_release_wasm__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../build/release.wasm */ "./build/release.wasm");
 
 
 let wasmManager;
@@ -1016,47 +1282,36 @@ class WasmManager {
     wasmManager = this;
   }
 
-  async load(bindables) {
-    var _this = this;
+  __liftTypedArray(constructor, pointer) {
+    const memoryU32 = new Uint32Array(this.memory.buffer);
+    return new constructor(this.memory.buffer, memoryU32[pointer + 4 >>> 2], memoryU32[pointer + 8 >>> 2] / constructor.BYTES_PER_ELEMENT);
+  }
 
+  async load(bindables) {
     // Creating WASM with Linear memory
     this.memory = new WebAssembly.Memory({
-      initial: 100
+      initial: 10000
     });
-    this.importObject = {
-      env: {
-        memory: this.memory,
-        seed: Date.now,
-        abort: function () {
-          console.error(_this.importObject.env.getString(arguments.length <= 0 ? undefined : arguments[0]));
-          console.error(_this.importObject.env.getString(arguments.length <= 1 ? undefined : arguments[1]));
-        },
-        getString: string_index => {
-          const buffer = this.importObject.env.memory.buffer;
-          const U32 = new Uint32Array(buffer);
-          const id_addr = string_index / 4 - 2;
-          const id = U32[id_addr];
-          if (id !== 0x01) throw Error(`not a string index=${string_index} id=${id}`);
-          const len = U32[id_addr + 1];
-          const str = new TextDecoder("utf-16").decode(buffer.slice(string_index, string_index + len));
-          return str;
-        }
-      }
-    };
-    if (!this.importObject.env.memory) throw new Error("You need to set memory in your importObject");
-    const bindings = {
-      print: stringIndex => {
-        if (this.exports) console.log(this.exports.__getString(stringIndex));
-      }
-    };
+    const bindings = {};
 
     for (const bindable of bindables) Object.assign(bindings, bindable.createBinding());
 
-    this.importObject.Imports = bindings;
-    const obj = await _assemblyscript_loader__WEBPACK_IMPORTED_MODULE_1__["default"].instantiateStreaming(fetch(_build_untouched_wasm__WEBPACK_IMPORTED_MODULE_0__["default"]), this.importObject);
-    this.exports = obj.exports;
-    wasm = obj.exports;
-    this.wasmMemoryBlock = obj.exports.memory.buffer;
+    const obj = await (0,_build_release__WEBPACK_IMPORTED_MODULE_0__.instantiate)(await WebAssembly.compileStreaming(fetch(_build_release_wasm__WEBPACK_IMPORTED_MODULE_1__["default"])), {
+      Imports: bindings,
+      env: {
+        memory: this.memory
+      }
+    });
+
+    obj.getFloat32Array = pointer => this.__liftTypedArray(Float32Array, pointer.valueOf() >>> 0);
+
+    obj.getUint32Array = pointer => this.__liftTypedArray(Uint32Array, pointer.valueOf() >>> 0);
+
+    obj.getInt32Array = pointer => this.__liftTypedArray(Int32Array, pointer.valueOf() >>> 0);
+
+    this.exports = obj;
+    wasm = obj;
+    this.wasmMemoryBlock = this.memory.buffer;
     this.wasmArrayBuffer = new Uint32Array(this.wasmMemoryBlock);
   }
 
@@ -2772,6 +3027,27 @@ class Texture {
 
 /***/ }),
 
+/***/ "./src/ts/renderer/Object3D.ts":
+/*!*************************************!*\
+  !*** ./src/ts/renderer/Object3D.ts ***!
+  \*************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Object3D": () => (/* binding */ Object3D)
+/* harmony export */ });
+// import type { TransformNode } from "build/types";
+// import { wasm } from "../core/WasmManager";
+class Object3D {
+  // transform: TransformNode;
+  constructor() {// this.transform = wasm.TransformNode.wrap(wasm.createTransformNode());
+  }
+
+}
+
+/***/ }),
+
 /***/ "./src/ts/ui/application/Application.tsx":
 /*!***********************************************!*\
   !*** ./src/ts/ui/application/Application.tsx ***!
@@ -3716,474 +3992,17 @@ const theme = {
 
 /***/ }),
 
-/***/ "./build/untouched.wasm":
-/*!******************************!*\
-  !*** ./build/untouched.wasm ***!
-  \******************************/
+/***/ "./build/release.wasm":
+/*!****************************!*\
+  !*** ./build/release.wasm ***!
+  \****************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__)
 /* harmony export */ });
-/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (__webpack_require__.p + "untouched.wasm");
-
-/***/ }),
-
-/***/ "./node_modules/@assemblyscript/loader/index.js":
-/*!******************************************************!*\
-  !*** ./node_modules/@assemblyscript/loader/index.js ***!
-  \******************************************************/
-/***/ ((__unused_webpack___webpack_module__, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "default": () => (__WEBPACK_DEFAULT_EXPORT__),
-/* harmony export */   "demangle": () => (/* binding */ demangle),
-/* harmony export */   "instantiate": () => (/* binding */ instantiate),
-/* harmony export */   "instantiateStreaming": () => (/* binding */ instantiateStreaming),
-/* harmony export */   "instantiateSync": () => (/* binding */ instantiateSync)
-/* harmony export */ });
-// Runtime header offsets
-const ID_OFFSET = -8;
-const SIZE_OFFSET = -4;
-
-// Runtime ids
-const ARRAYBUFFER_ID = 0;
-const STRING_ID = 1;
-// const ARRAYBUFFERVIEW_ID = 2;
-
-// Runtime type information
-const ARRAYBUFFERVIEW = 1 << 0;
-const ARRAY = 1 << 1;
-const STATICARRAY = 1 << 2;
-// const SET = 1 << 3;
-// const MAP = 1 << 4;
-const VAL_ALIGN_OFFSET = 6;
-// const VAL_ALIGN = 1 << VAL_ALIGN_OFFSET;
-const VAL_SIGNED = 1 << 11;
-const VAL_FLOAT = 1 << 12;
-// const VAL_NULLABLE = 1 << 13;
-const VAL_MANAGED = 1 << 14;
-// const KEY_ALIGN_OFFSET = 15;
-// const KEY_ALIGN = 1 << KEY_ALIGN_OFFSET;
-// const KEY_SIGNED = 1 << 20;
-// const KEY_FLOAT = 1 << 21;
-// const KEY_NULLABLE = 1 << 22;
-// const KEY_MANAGED = 1 << 23;
-
-// Array(BufferView) layout
-const ARRAYBUFFERVIEW_BUFFER_OFFSET = 0;
-const ARRAYBUFFERVIEW_DATASTART_OFFSET = 4;
-const ARRAYBUFFERVIEW_DATALENGTH_OFFSET = 8;
-const ARRAYBUFFERVIEW_SIZE = 12;
-const ARRAY_LENGTH_OFFSET = 12;
-const ARRAY_SIZE = 16;
-
-const BIGINT = typeof BigUint64Array !== "undefined";
-const THIS = Symbol();
-
-const STRING_DECODE_THRESHOLD = 32;
-const decoder = new TextDecoder("utf-16le");
-
-/** Gets a string from an U32 and an U16 view on a memory. */
-function getStringImpl(buffer, ptr) {
-  const len = new Uint32Array(buffer)[ptr + SIZE_OFFSET >>> 2] >>> 1;
-  const arr = new Uint16Array(buffer, ptr, len);
-  if (len <= STRING_DECODE_THRESHOLD) {
-    return String.fromCharCode.apply(String, arr);
-  }
-  return decoder.decode(arr);
-}
-
-/** Prepares the base module prior to instantiation. */
-function preInstantiate(imports) {
-  const extendedExports = {};
-
-  function getString(memory, ptr) {
-    if (!memory) return "<yet unknown>";
-    return getStringImpl(memory.buffer, ptr);
-  }
-
-  // add common imports used by stdlib for convenience
-  const env = (imports.env = imports.env || {});
-  env.abort = env.abort || function abort(msg, file, line, colm) {
-    const memory = extendedExports.memory || env.memory; // prefer exported, otherwise try imported
-    throw Error(`abort: ${getString(memory, msg)} at ${getString(memory, file)}:${line}:${colm}`);
-  };
-  env.trace = env.trace || function trace(msg, n, ...args) {
-    const memory = extendedExports.memory || env.memory;
-    console.log(`trace: ${getString(memory, msg)}${n ? " " : ""}${args.slice(0, n).join(", ")}`);
-  };
-  env.seed = env.seed || Date.now;
-  imports.Math = imports.Math || Math;
-  imports.Date = imports.Date || Date;
-
-  return extendedExports;
-}
-
-const E_NOEXPORTRUNTIME = "Operation requires compiling with --exportRuntime";
-const F_NOEXPORTRUNTIME = function() { throw Error(E_NOEXPORTRUNTIME); };
-
-/** Prepares the final module once instantiation is complete. */
-function postInstantiate(extendedExports, instance) {
-  const exports = instance.exports;
-  const memory = exports.memory;
-  const table = exports.table;
-  const __new = exports.__new || F_NOEXPORTRUNTIME;
-  const __pin = exports.__pin || F_NOEXPORTRUNTIME;
-  const __unpin = exports.__unpin || F_NOEXPORTRUNTIME;
-  const __collect = exports.__collect || F_NOEXPORTRUNTIME;
-  const __rtti_base = exports.__rtti_base;
-  const getRttiCount = __rtti_base
-    ? function (arr) { return arr[__rtti_base >>> 2]; }
-    : F_NOEXPORTRUNTIME;
-
-  extendedExports.__new = __new;
-  extendedExports.__pin = __pin;
-  extendedExports.__unpin = __unpin;
-  extendedExports.__collect = __collect;
-
-  /** Gets the runtime type info for the given id. */
-  function getInfo(id) {
-    const U32 = new Uint32Array(memory.buffer);
-    const count = getRttiCount(U32);
-    if ((id >>>= 0) >= count) throw Error(`invalid id: ${id}`);
-    return U32[(__rtti_base + 4 >>> 2) + id * 2];
-  }
-
-  /** Gets and validate runtime type info for the given id for array like objects */
-  function getArrayInfo(id) {
-    const info = getInfo(id);
-    if (!(info & (ARRAYBUFFERVIEW | ARRAY | STATICARRAY))) throw Error(`not an array: ${id}, flags=${info}`);
-    return info;
-  }
-
-  /** Gets the runtime base id for the given id. */
-  function getBase(id) {
-    const U32 = new Uint32Array(memory.buffer);
-    const count = getRttiCount(U32);
-    if ((id >>>= 0) >= count) throw Error(`invalid id: ${id}`);
-    return U32[(__rtti_base + 4 >>> 2) + id * 2 + 1];
-  }
-
-  /** Gets the runtime alignment of a collection's values. */
-  function getValueAlign(info) {
-    return 31 - Math.clz32((info >>> VAL_ALIGN_OFFSET) & 31); // -1 if none
-  }
-
-  /** Gets the runtime alignment of a collection's keys. */
-  // function getKeyAlign(info) {
-  //   return 31 - Math.clz32((info >>> KEY_ALIGN_OFFSET) & 31); // -1 if none
-  // }
-
-  /** Allocates a new string in the module's memory and returns its pointer. */
-  function __newString(str) {
-    if (str == null) return 0;
-    const length = str.length;
-    const ptr = __new(length << 1, STRING_ID);
-    const U16 = new Uint16Array(memory.buffer);
-    for (var i = 0, p = ptr >>> 1; i < length; ++i) U16[p + i] = str.charCodeAt(i);
-    return ptr;
-  }
-
-  extendedExports.__newString = __newString;
-
-  /** Reads a string from the module's memory by its pointer. */
-  function __getString(ptr) {
-    if (!ptr) return null;
-    const buffer = memory.buffer;
-    const id = new Uint32Array(buffer)[ptr + ID_OFFSET >>> 2];
-    if (id !== STRING_ID) throw Error(`not a string: ${ptr}`);
-    return getStringImpl(buffer, ptr);
-  }
-
-  extendedExports.__getString = __getString;
-
-  /** Gets the view matching the specified alignment, signedness and floatness. */
-  function getView(alignLog2, signed, float) {
-    const buffer = memory.buffer;
-    if (float) {
-      switch (alignLog2) {
-        case 2: return new Float32Array(buffer);
-        case 3: return new Float64Array(buffer);
-      }
-    } else {
-      switch (alignLog2) {
-        case 0: return new (signed ? Int8Array : Uint8Array)(buffer);
-        case 1: return new (signed ? Int16Array : Uint16Array)(buffer);
-        case 2: return new (signed ? Int32Array : Uint32Array)(buffer);
-        case 3: return new (signed ? BigInt64Array : BigUint64Array)(buffer);
-      }
-    }
-    throw Error(`unsupported align: ${alignLog2}`);
-  }
-
-  /** Allocates a new array in the module's memory and returns its pointer. */
-  function __newArray(id, values) {
-    const info = getArrayInfo(id);
-    const align = getValueAlign(info);
-    const length = values.length;
-    const buf = __new(length << align, info & STATICARRAY ? id : ARRAYBUFFER_ID);
-    let result;
-    if (info & STATICARRAY) {
-      result = buf;
-    } else {
-      __pin(buf);
-      const arr = __new(info & ARRAY ? ARRAY_SIZE : ARRAYBUFFERVIEW_SIZE, id);
-      __unpin(buf);
-      const U32 = new Uint32Array(memory.buffer);
-      U32[arr + ARRAYBUFFERVIEW_BUFFER_OFFSET >>> 2] = buf;
-      U32[arr + ARRAYBUFFERVIEW_DATASTART_OFFSET >>> 2] = buf;
-      U32[arr + ARRAYBUFFERVIEW_DATALENGTH_OFFSET >>> 2] = length << align;
-      if (info & ARRAY) U32[arr + ARRAY_LENGTH_OFFSET >>> 2] = length;
-      result = arr;
-    }
-    const view = getView(align, info & VAL_SIGNED, info & VAL_FLOAT);
-    if (info & VAL_MANAGED) {
-      for (let i = 0; i < length; ++i) {
-        const value = values[i];
-        view[(buf >>> align) + i] = value;
-      }
-    } else {
-      view.set(values, buf >>> align);
-    }
-    return result;
-  }
-
-  extendedExports.__newArray = __newArray;
-
-  /** Gets a live view on an array's values in the module's memory. Infers the array type from RTTI. */
-  function __getArrayView(arr) {
-    const U32 = new Uint32Array(memory.buffer);
-    const id = U32[arr + ID_OFFSET >>> 2];
-    const info = getArrayInfo(id);
-    const align = getValueAlign(info);
-    let buf = info & STATICARRAY
-      ? arr
-      : U32[arr + ARRAYBUFFERVIEW_DATASTART_OFFSET >>> 2];
-    const length = info & ARRAY
-      ? U32[arr + ARRAY_LENGTH_OFFSET >>> 2]
-      : U32[buf + SIZE_OFFSET >>> 2] >>> align;
-    return getView(align, info & VAL_SIGNED, info & VAL_FLOAT).subarray(buf >>>= align, buf + length);
-  }
-
-  extendedExports.__getArrayView = __getArrayView;
-
-  /** Copies an array's values from the module's memory. Infers the array type from RTTI. */
-  function __getArray(arr) {
-    const input = __getArrayView(arr);
-    const len = input.length;
-    const out = new Array(len);
-    for (let i = 0; i < len; i++) out[i] = input[i];
-    return out;
-  }
-
-  extendedExports.__getArray = __getArray;
-
-  /** Copies an ArrayBuffer's value from the module's memory. */
-  function __getArrayBuffer(ptr) {
-    const buffer = memory.buffer;
-    const length = new Uint32Array(buffer)[ptr + SIZE_OFFSET >>> 2];
-    return buffer.slice(ptr, ptr + length);
-  }
-
-  extendedExports.__getArrayBuffer = __getArrayBuffer;
-
-  /** Copies a typed array's values from the module's memory. */
-  function getTypedArray(Type, alignLog2, ptr) {
-    return new Type(getTypedArrayView(Type, alignLog2, ptr));
-  }
-
-  /** Gets a live view on a typed array's values in the module's memory. */
-  function getTypedArrayView(Type, alignLog2, ptr) {
-    const buffer = memory.buffer;
-    const U32 = new Uint32Array(buffer);
-    const bufPtr = U32[ptr + ARRAYBUFFERVIEW_DATASTART_OFFSET >>> 2];
-    return new Type(buffer, bufPtr, U32[bufPtr + SIZE_OFFSET >>> 2] >>> alignLog2);
-  }
-
-  /** Attach a set of get TypedArray and View functions to the exports. */
-  function attachTypedArrayFunctions(ctor, name, align) {
-    extendedExports[`__get${name}`] = getTypedArray.bind(null, ctor, align);
-    extendedExports[`__get${name}View`] = getTypedArrayView.bind(null, ctor, align);
-  }
-
-  [
-    Int8Array,
-    Uint8Array,
-    Uint8ClampedArray,
-    Int16Array,
-    Uint16Array,
-    Int32Array,
-    Uint32Array,
-    Float32Array,
-    Float64Array
-  ].forEach(ctor => {
-    attachTypedArrayFunctions(ctor, ctor.name, 31 - Math.clz32(ctor.BYTES_PER_ELEMENT));
-  });
-
-  if (BIGINT) {
-    [BigUint64Array, BigInt64Array].forEach(ctor => {
-      attachTypedArrayFunctions(ctor, ctor.name.slice(3), 3);
-    });
-  }
-
-  /** Tests whether an object is an instance of the class represented by the specified base id. */
-  function __instanceof(ptr, baseId) {
-    const U32 = new Uint32Array(memory.buffer);
-    let id = U32[ptr + ID_OFFSET >>> 2];
-    if (id <= getRttiCount(U32)) {
-      do {
-        if (id == baseId) return true;
-        id = getBase(id);
-      } while (id);
-    }
-    return false;
-  }
-
-  extendedExports.__instanceof = __instanceof;
-
-  // Pull basic exports to extendedExports so code in preInstantiate can use them
-  extendedExports.memory = extendedExports.memory || memory;
-  extendedExports.table  = extendedExports.table  || table;
-
-  // Demangle exports and provide the usual utility on the prototype
-  return demangle(exports, extendedExports);
-}
-
-function isResponse(src) {
-  return typeof Response !== "undefined" && src instanceof Response;
-}
-
-function isModule(src) {
-  return src instanceof WebAssembly.Module;
-}
-
-/** Asynchronously instantiates an AssemblyScript module from anything that can be instantiated. */
-async function instantiate(source, imports = {}) {
-  if (isResponse(source = await source)) return instantiateStreaming(source, imports);
-  const module = isModule(source) ? source : await WebAssembly.compile(source);
-  const extended = preInstantiate(imports);
-  const instance = await WebAssembly.instantiate(module, imports);
-  const exports = postInstantiate(extended, instance);
-  return { module, instance, exports };
-}
-
-/** Synchronously instantiates an AssemblyScript module from a WebAssembly.Module or binary buffer. */
-function instantiateSync(source, imports = {}) {
-  const module = isModule(source) ? source : new WebAssembly.Module(source);
-  const extended = preInstantiate(imports);
-  const instance = new WebAssembly.Instance(module, imports);
-  const exports = postInstantiate(extended, instance);
-  return { module, instance, exports };
-}
-
-/** Asynchronously instantiates an AssemblyScript module from a response, i.e. as obtained by `fetch`. */
-async function instantiateStreaming(source, imports = {}) {
-  if (!WebAssembly.instantiateStreaming) {
-    return instantiate(
-      isResponse(source = await source)
-        ? source.arrayBuffer()
-        : source,
-      imports
-    );
-  }
-  const extended = preInstantiate(imports);
-  const result = await WebAssembly.instantiateStreaming(source, imports);
-  const exports = postInstantiate(extended, result.instance);
-  return { ...result, exports };
-}
-
-/** Demangles an AssemblyScript module's exports to a friendly object structure. */
-function demangle(exports, extendedExports = {}) {
-  const setArgumentsLength = exports["__argumentsLength"]
-    ? length => { exports["__argumentsLength"].value = length; }
-    : exports["__setArgumentsLength"] || exports["__setargc"] || (() => { /* nop */ });
-  for (let internalName in exports) {
-    if (!Object.prototype.hasOwnProperty.call(exports, internalName)) continue;
-    const elem = exports[internalName];
-    let parts = internalName.split(".");
-    let curr = extendedExports;
-    while (parts.length > 1) {
-      let part = parts.shift();
-      if (!Object.prototype.hasOwnProperty.call(curr, part)) curr[part] = {};
-      curr = curr[part];
-    }
-    let name = parts[0];
-    let hash = name.indexOf("#");
-    if (hash >= 0) {
-      const className = name.substring(0, hash);
-      const classElem = curr[className];
-      if (typeof classElem === "undefined" || !classElem.prototype) {
-        const ctor = function(...args) {
-          return ctor.wrap(ctor.prototype.constructor(0, ...args));
-        };
-        ctor.prototype = {
-          valueOf() { return this[THIS]; }
-        };
-        ctor.wrap = function(thisValue) {
-          return Object.create(ctor.prototype, { [THIS]: { value: thisValue, writable: false } });
-        };
-        if (classElem) Object.getOwnPropertyNames(classElem).forEach(name =>
-          Object.defineProperty(ctor, name, Object.getOwnPropertyDescriptor(classElem, name))
-        );
-        curr[className] = ctor;
-      }
-      name = name.substring(hash + 1);
-      curr = curr[className].prototype;
-      if (/^(get|set):/.test(name)) {
-        if (!Object.prototype.hasOwnProperty.call(curr, name = name.substring(4))) {
-          let getter = exports[internalName.replace("set:", "get:")];
-          let setter = exports[internalName.replace("get:", "set:")];
-          Object.defineProperty(curr, name, {
-            get() { return getter(this[THIS]); },
-            set(value) { setter(this[THIS], value); },
-            enumerable: true
-          });
-        }
-      } else {
-        if (name === 'constructor') {
-          (curr[name] = (...args) => {
-            setArgumentsLength(args.length);
-            return elem(...args);
-          }).original = elem;
-        } else { // instance method
-          (curr[name] = function(...args) { // !
-            setArgumentsLength(args.length);
-            return elem(this[THIS], ...args);
-          }).original = elem;
-        }
-      }
-    } else {
-      if (/^(get|set):/.test(name)) {
-        if (!Object.prototype.hasOwnProperty.call(curr, name = name.substring(4))) {
-          Object.defineProperty(curr, name, {
-            get: exports[internalName.replace("set:", "get:")],
-            set: exports[internalName.replace("get:", "set:")],
-            enumerable: true
-          });
-        }
-      } else if (typeof elem === "function" && elem !== setArgumentsLength) {
-        (curr[name] = (...args) => {
-          setArgumentsLength(args.length);
-          return elem(...args);
-        }).original = elem;
-      } else {
-        curr[name] = elem;
-      }
-    }
-  }
-  return extendedExports;
-}
-
-/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ({
-  instantiate,
-  instantiateSync,
-  instantiateStreaming,
-  demangle
-});
-
+/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (__webpack_require__.p + "release.wasm");
 
 /***/ }),
 
@@ -4197,12 +4016,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "css": () => (/* binding */ u),
 /* harmony export */   "extractCss": () => (/* binding */ r),
-/* harmony export */   "glob": () => (/* binding */ g),
-/* harmony export */   "keyframes": () => (/* binding */ b),
-/* harmony export */   "setup": () => (/* binding */ h),
-/* harmony export */   "styled": () => (/* binding */ m)
+/* harmony export */   "glob": () => (/* binding */ b),
+/* harmony export */   "keyframes": () => (/* binding */ h),
+/* harmony export */   "setup": () => (/* binding */ m),
+/* harmony export */   "styled": () => (/* binding */ j)
 /* harmony export */ });
-let e={data:""},t=t=>"object"==typeof window?((t?t.querySelector("#_goober"):window._goober)||Object.assign((t||document.head).appendChild(document.createElement("style")),{innerHTML:" ",id:"_goober"})).firstChild:t||e,r=e=>{let r=t(e),l=r.data;return r.data="",l},l=/(?:([\u0080-\uFFFF\w-%@]+) *:? *([^{;]+?);|([^;}{]*?) *{)|(}\s*)/g,a=/\/\*[^]*?\*\/|\s\s+|\n/g,n=(e,t)=>{let r="",l="",a="";for(let o in e){let s=e[o];"@"==o[0]?"i"==o[1]?r=o+" "+s+";":l+="f"==o[1]?n(s,o):o+"{"+n(s,"k"==o[1]?"":t)+"}":"object"==typeof s?l+=n(s,t?t.replace(/([^,])+/g,e=>o.replace(/(^:.*)|([^,])+/g,t=>/&/.test(t)?t.replace(/&/g,e):e?e+" "+t:t)):o):null!=s&&(o=/^--/.test(o)?o:o.replace(/[A-Z]/g,"-$&").toLowerCase(),a+=n.p?n.p(o,s):o+":"+s+";")}return r+(t&&a?t+"{"+a+"}":a)+l},o={},s=e=>{if("object"==typeof e){let t="";for(let r in e)t+=r+s(e[r]);return t}return e},c=(e,t,r,c,i)=>{let u=s(e),p=o[u]||(o[u]=(e=>{let t=0,r=11;for(;t<e.length;)r=101*r+e.charCodeAt(t++)>>>0;return"go"+r})(u));if(!o[p]){let t=u!==e?e:(e=>{let t,r=[{}];for(;t=l.exec(e.replace(a,""));)t[4]?r.shift():t[3]?r.unshift(r[0][t[3]]=r[0][t[3]]||{}):r[0][t[1]]=t[2];return r[0]})(e);o[p]=n(i?{["@keyframes "+p]:t}:t,r?"":"."+p)}return((e,t,r)=>{-1==t.data.indexOf(e)&&(t.data=r?e+t.data:t.data+e)})(o[p],t,c),p},i=(e,t,r)=>e.reduce((e,l,a)=>{let o=t[a];if(o&&o.call){let e=o(r),t=e&&e.props&&e.props.className||/^go/.test(e)&&e;o=t?"."+t:e&&"object"==typeof e?e.props?"":n(e,""):!1===e?"":e}return e+l+(null==o?"":o)},"");function u(e){let r=this||{},l=e.call?e(r.p):e;return c(l.unshift?l.raw?i(l,[].slice.call(arguments,1),r.p):l.reduce((e,t)=>Object.assign(e,t&&t.call?t(r.p):t),{}):l,t(r.target),r.g,r.o,r.k)}let p,d,f,g=u.bind({g:1}),b=u.bind({k:1});function h(e,t,r,l){n.p=t,p=e,d=r,f=l}function m(e,t){let r=this||{};return function(){let l=arguments;function a(n,o){let s=Object.assign({},n),c=s.className||a.className;r.p=Object.assign({theme:d&&d()},s),r.o=/ *go\d+/.test(c),s.className=u.apply(r,l)+(c?" "+c:""),t&&(s.ref=o);let i=e;return e[0]&&(i=s.as||e,delete s.as),f&&i[0]&&f(s),p(i,s)}return t?t(a):a}}
+let e={data:""},t=t=>"object"==typeof window?((t?t.querySelector("#_goober"):window._goober)||Object.assign((t||document.head).appendChild(document.createElement("style")),{innerHTML:" ",id:"_goober"})).firstChild:t||e,r=e=>{let r=t(e),l=r.data;return r.data="",l},l=/(?:([\u0080-\uFFFF\w-%@]+) *:? *([^{;]+?);|([^;}{]*?) *{)|(}\s*)/g,a=/\/\*[^]*?\*\/|  +/g,n=/\n+/g,o=(e,t)=>{let r="",l="",a="";for(let n in e){let c=e[n];"@"==n[0]?"i"==n[1]?r=n+" "+c+";":l+="f"==n[1]?o(c,n):n+"{"+o(c,"k"==n[1]?"":t)+"}":"object"==typeof c?l+=o(c,t?t.replace(/([^,])+/g,e=>n.replace(/(^:.*)|([^,])+/g,t=>/&/.test(t)?t.replace(/&/g,e):e?e+" "+t:t)):n):null!=c&&(n=/^--/.test(n)?n:n.replace(/[A-Z]/g,"-$&").toLowerCase(),a+=o.p?o.p(n,c):n+":"+c+";")}return r+(t&&a?t+"{"+a+"}":a)+l},c={},s=e=>{if("object"==typeof e){let t="";for(let r in e)t+=r+s(e[r]);return t}return e},i=(e,t,r,i,p)=>{let u=s(e),d=c[u]||(c[u]=(e=>{let t=0,r=11;for(;t<e.length;)r=101*r+e.charCodeAt(t++)>>>0;return"go"+r})(u));if(!c[d]){let t=u!==e?e:(e=>{let t,r,o=[{}];for(;t=l.exec(e.replace(a,""));)t[4]?o.shift():t[3]?(r=t[3].replace(n," ").trim(),o.unshift(o[0][r]=o[0][r]||{})):o[0][t[1]]=t[2].replace(n," ").trim();return o[0]})(e);c[d]=o(p?{["@keyframes "+d]:t}:t,r?"":"."+d)}return((e,t,r)=>{-1==t.data.indexOf(e)&&(t.data=r?e+t.data:t.data+e)})(c[d],t,i),d},p=(e,t,r)=>e.reduce((e,l,a)=>{let n=t[a];if(n&&n.call){let e=n(r),t=e&&e.props&&e.props.className||/^go/.test(e)&&e;n=t?"."+t:e&&"object"==typeof e?e.props?"":o(e,""):!1===e?"":e}return e+l+(null==n?"":n)},"");function u(e){let r=this||{},l=e.call?e(r.p):e;return i(l.unshift?l.raw?p(l,[].slice.call(arguments,1),r.p):l.reduce((e,t)=>Object.assign(e,t&&t.call?t(r.p):t),{}):l,t(r.target),r.g,r.o,r.k)}let d,f,g,b=u.bind({g:1}),h=u.bind({k:1});function m(e,t,r,l){o.p=t,d=e,f=r,g=l}function j(e,t){let r=this||{};return function(){let l=arguments;function a(n,o){let c=Object.assign({},n),s=c.className||a.className;r.p=Object.assign({theme:f&&f()},c),r.o=/ *go\d+/.test(s),c.className=u.apply(r,l)+(s?" "+s:""),t&&(c.ref=o);let i=e;return e[0]&&(i=c.as||e,delete c.as),g&&i[0]&&g(c),d(i,c)}return t?t(a):a}}
 
 
 /***/ }),
