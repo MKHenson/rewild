@@ -1,32 +1,23 @@
 import { InputManager } from "./InputManager";
 import { GPUBufferUsageFlags } from "../../common/GPUEnums";
-import { DebugPipeline } from "./pipelines/debug-pipeline/DebugPipeline";
-import { Pipeline } from "./pipelines/Pipeline";
 import { createBuffer, createIndexBuffer } from "./Utils";
 import { RenderQueueManager } from "./RenderQueueManager";
-import { Texture } from "./textures/Texture";
-import { GroupType } from "../../common/GroupType";
 import { wasm } from "./WasmManager";
 import { IBindable } from "./IBindable";
-import { BitmapTexture } from "./textures/BitmapTexture";
-import { BitmapCubeTexture } from "./textures/BitmapCubeTexture";
-import { SkyboxPipeline } from "./pipelines/skybox-pipeline/SkyboxPipeline";
 import { Object3D } from "../renderer/Object3D";
 import { Clock } from "./Clock";
+import { pipelineManager } from "../renderer/PipelineManager";
+import { textureManager } from "../renderer/TextureManager";
+import { Mesh } from "../renderer/Mesh";
 
 const sampleCount = 4;
-const MEDIA_URL = process.env.MEDIA_URL;
-
 export class GameManager implements IBindable {
   canvas: HTMLCanvasElement;
   device: GPUDevice;
   context: GPUCanvasContext;
   format: GPUTextureFormat;
   inputManager: InputManager;
-
   buffers: GPUBuffer[];
-  pipelines: Pipeline<any>[];
-  textures: Texture[];
   clock: Clock;
 
   onResizeHandler: () => void;
@@ -48,7 +39,6 @@ export class GameManager implements IBindable {
   constructor(canvas: HTMLCanvasElement, onUpdate: () => void) {
     this.canvas = canvas;
     this.buffers = [];
-    this.textures = [];
     this.disposed = false;
     this.currentPass = null;
     this.onFrameHandler = this.onFrame.bind(this);
@@ -101,68 +91,7 @@ export class GameManager implements IBindable {
     this.context = context;
     this.format = format;
 
-    // TEXTURES
-    const textures: Texture[] = [
-      new BitmapTexture("grid", MEDIA_URL + "uv-grid.jpg", device),
-      new BitmapTexture("crate", MEDIA_URL + "crate-wooden.jpg", device),
-      new BitmapTexture("earth", MEDIA_URL + "earth-day-2k.jpg", device),
-      new BitmapTexture(
-        "ground-coastal-1",
-        MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png",
-        device
-      ),
-      new BitmapTexture(
-        "block-concrete-4",
-        MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png",
-        device
-      ),
-      new BitmapCubeTexture(
-        "desert-sky",
-        [
-          MEDIA_URL + "skyboxes/desert/px.jpg",
-          MEDIA_URL + "skyboxes/desert/nx.jpg",
-          MEDIA_URL + "skyboxes/desert/py.jpg",
-          MEDIA_URL + "skyboxes/desert/ny.jpg",
-          MEDIA_URL + "skyboxes/desert/pz.jpg",
-          MEDIA_URL + "skyboxes/desert/nz.jpg",
-        ],
-        device
-      ),
-      new BitmapCubeTexture(
-        "starry-sky",
-        [
-          MEDIA_URL + "skyboxes/stars/left.png",
-          MEDIA_URL + "skyboxes/stars/right.png",
-          MEDIA_URL + "skyboxes/stars/top.png",
-          MEDIA_URL + "skyboxes/stars/bottom.png",
-          MEDIA_URL + "skyboxes/stars/front.png",
-          MEDIA_URL + "skyboxes/stars/back.png",
-        ],
-        device
-      ),
-    ];
-
-    this.textures = await Promise.all(
-      textures.map((texture) => {
-        return texture.load(device);
-      })
-    );
-
-    // PIPELINES
-    this.pipelines = [
-      new DebugPipeline("coastal-floor", {
-        diffuseMap: this.textures[3],
-        NUM_DIR_LIGHTS: 0,
-        uvScaleX: "30.0",
-        uvScaleY: "30.0",
-      }),
-      new DebugPipeline("crate", { diffuseMap: this.textures[1], NUM_DIR_LIGHTS: 0 }),
-      new DebugPipeline("simple", { NUM_DIR_LIGHTS: 0 }),
-      new DebugPipeline("earth", { diffuseMap: this.textures[2], NUM_DIR_LIGHTS: 0 }),
-      new DebugPipeline("concrete", { diffuseMap: this.textures[4], NUM_DIR_LIGHTS: 0 }),
-      new SkyboxPipeline("skybox", { diffuseMap: this.textures[5] }),
-      new SkyboxPipeline("stars", { diffuseMap: this.textures[6] }),
-    ];
+    await textureManager.init(device);
 
     const size = this.canvasSize();
     this.onResize(size, false);
@@ -176,49 +105,33 @@ export class GameManager implements IBindable {
     window.addEventListener("resize", this.onResizeHandler);
     window.requestAnimationFrame(this.onFrameHandler);
     this.clock.start();
-    // window.addEventListener("click", (e) => {
-    //   const pipelines = this.pipelines as DebugPipeline[];
-    //   pipelines.forEach((p) => {
-    //     if (p.defines.diffuseMap) {
-    //       delete p.defines.diffuseMap;
-    //       p.defines = p.defines;
-    //     } else {
-    //       p.defines.diffuseMap = this.textures[1];
-    //       p.defines = p.defines;
-    //     }
-    //   });
-    // });
   }
 
   initRuntime() {
-    this.pipelines.forEach((p) => {
-      p.build(this);
-      p.initialize(this);
-    });
+    pipelineManager.init(this);
 
     const containerLvl1Ptr = wasm.createLevel1();
     const geometrySphere = wasm.createSphere(1);
     const geometryBox = wasm.createBox(1);
 
-    wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "skybox", "skybox"));
-    wasm.addAsset(containerLvl1Ptr, this.createMesh(geometrySphere, "simple", "ball"));
+    wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "skybox", "skybox").transform as any);
+    wasm.addAsset(containerLvl1Ptr, this.createMesh(geometrySphere, "simple", "ball").transform as any);
 
     for (let i = 0; i < 20; i++)
-      wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "concrete", `building-${i}`));
-    for (let i = 0; i < 20; i++) wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "crate", `crate-${i}`));
+      wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "concrete", `building-${i}`).transform as any);
+    for (let i = 0; i < 20; i++)
+      wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "crate", `crate-${i}`).transform as any);
 
     this.character = new Object3D();
-    // this.character.transform.add(this.createMesh(geometrySphere, "simple", "character"));
-    // wasm.addAsset( containerLvl1Ptr, this.character.transform.valueOf());
-    wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "coastal-floor", "floor"));
+    wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "coastal-floor", "floor").transform as any);
 
     const containerTestPtr = wasm.createTestLevel();
-    wasm.addAsset(containerTestPtr, this.createMesh(geometryBox, "skybox", "skybox"));
+    wasm.addAsset(containerTestPtr, this.createMesh(geometryBox, "skybox", "skybox").transform as any);
 
     const containerMainMenuPtr = wasm.createMainMenu();
 
-    wasm.addAsset(containerMainMenuPtr, this.createMesh(geometrySphere, "earth"));
-    wasm.addAsset(containerMainMenuPtr, this.createMesh(geometryBox, "stars", "skybox"));
+    wasm.addAsset(containerMainMenuPtr, this.createMesh(geometrySphere, "earth").transform as any);
+    wasm.addAsset(containerMainMenuPtr, this.createMesh(geometryBox, "stars", "skybox").transform as any);
 
     wasm.addContainer(containerLvl1Ptr, false);
     wasm.addContainer(containerMainMenuPtr, true);
@@ -226,25 +139,8 @@ export class GameManager implements IBindable {
   }
 
   createMesh(geometryPtr: Number, pipelineName: string, name?: string) {
-    // Get the pipeline
-
-    const pipeline = this.getPipeline(pipelineName)!;
-    const pipelineIndex = this.pipelines.indexOf(pipeline);
-
-    // Create an instance in WASM
-    const pipelineInsPtr = wasm.createMeshPipelineInstance(pipeline.name, pipelineIndex);
-
-    pipeline.vertexLayouts.map((buffer) =>
-      buffer.attributes.map((attr) =>
-        wasm.addPipelineAttribute(pipelineInsPtr, attr.attributeType, attr.shaderLocation)
-      )
-    );
-
-    // Assign a transform buffer to the intance
-    wasm.setMeshPipelineTransformIndex(pipelineInsPtr, pipeline.addResourceInstance(this, GroupType.Transform));
-
-    const meshPtr = wasm.createMesh(geometryPtr as any, pipelineInsPtr, name);
-    return meshPtr;
+    const pipeline = pipelineManager.getPipeline(pipelineName)!;
+    return new Mesh(geometryPtr, pipeline, this, name);
   }
 
   dispose() {
@@ -322,10 +218,6 @@ export class GameManager implements IBindable {
     } else {
       return true;
     }
-  }
-
-  getPipeline(name: string) {
-    return this.pipelines.find((p) => p.name === name);
   }
 
   startPass() {

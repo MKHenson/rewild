@@ -17,7 +17,8 @@ export class Container extends Node {
 
   findObjectByName(name: string): TransformNode | null {
     const objects = this.objects;
-    for (let i: i32 = 0, l = objects.length; i < l; i++) if (objects[i].name == name) return objects[i];
+    for (let i: i32 = 0, l = objects.length; i < l; i++)
+      if (unchecked(objects[i]).name == name) return unchecked(objects[i]);
     return null;
   }
 
@@ -30,7 +31,7 @@ export class Container extends Node {
   mount(): void {
     const objects = this.objects;
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      addChild(this.runtime!.scene, objects[i]);
+      addChild(this.runtime!.scene, unchecked(objects[i]));
     }
     super.mount();
   }
@@ -38,7 +39,7 @@ export class Container extends Node {
   unMount(): void {
     const objects = this.objects;
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      removeChild(this.runtime!.scene, objects[i]);
+      removeChild(this.runtime!.scene, unchecked(objects[i]));
     }
     super.unMount();
   }
@@ -47,7 +48,7 @@ export class Container extends Node {
     // Load any assets
     const objects = this.objects;
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      const obj = objects[i];
+      const obj = unchecked(objects[i]);
       if (obj instanceof MeshNode) {
         const geometry = (obj as MeshNode).geometry;
         if (geometry) this.runtime!.renderer.geometries.set(geometry);
