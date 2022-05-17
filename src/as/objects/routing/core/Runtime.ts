@@ -8,6 +8,7 @@ import { Container } from "./Container";
 import { Node } from "./Node";
 import { Link } from "./Link";
 import { Portal } from "./Portal";
+import { addChild } from "../../../core/TransformNode";
 
 export class Runtime implements Listener {
   renderer: WebGPURenderer;
@@ -30,7 +31,7 @@ export class Runtime implements Listener {
     this.camera = new PerspectiveCamera(45, f32(width) / f32(height), 0.1, 1000);
     this.camera.position.set(0, 0, 10);
     this.camera.lookAt(0, 0, 0);
-    this.scene.add(this.camera);
+    addChild(this.scene, this.camera);
 
     inputManager.addEventListener("mousemove", this);
   }

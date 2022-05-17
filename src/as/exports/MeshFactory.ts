@@ -1,7 +1,7 @@
 import { MeshPipelineInstance } from "../pipelines/MeshPipelineInstance";
 import { BufferGeometry } from "../core/BufferGeometry";
 import { Mesh } from "../objects/Mesh";
-import { TransformNode } from "./ObjectFactory";
+import { TransformNode } from "../core/TransformNode";
 import { PipelineInstance } from "./PipelineFactory";
 
 export function createMesh(

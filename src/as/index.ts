@@ -6,7 +6,7 @@ export { createBox, createPlane, createSphere, addVertGeometry } from "./exports
 export { createPipelineInstance, addPipelineAttribute, setMeshPipelineTransformIndex } from "./exports/PipelineFactory";
 export { createMesh } from "./exports/MeshFactory";
 export { createContainer, addAsset, createLevel1, createMainMenu, createTestLevel } from "./objects/routing";
-export { createTransformNode } from "./exports/ObjectFactory";
+export { addChild, createTransformNode, removeChild, getVisibility, setVisibility } from "./core/TransformNode";
 
 export const Float32ArrayID = idof<Float32Array>();
 
