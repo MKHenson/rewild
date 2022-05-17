@@ -14,4 +14,12 @@ export class Object3D {
   get visibility() {
     return wasm.getVisibility(this.transform as any);
   }
+
+  add(child: Object3D) {
+    wasm.addChild(this.transform as any, child.transform as any);
+  }
+
+  remove(child: Object3D) {
+    wasm.removeChild(this.transform as any, child.transform as any);
+  }
 }

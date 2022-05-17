@@ -6,6 +6,7 @@ import { Button } from "./Button";
 interface Props {
   title?: string;
   open: boolean;
+  withBackground?: boolean;
   hideConfirmButtons?: boolean;
   onClose?: () => void;
   onCancel?: () => void;
@@ -31,7 +32,12 @@ export const Modal: Component<Props> = (props) => {
 
   return (
     <Portal>
-      <StyledWrapper class="wrapper" onClick={handleClick} visible={props.open}>
+      <StyledWrapper
+        class="wrapper"
+        onClick={handleClick}
+        visible={props.open}
+        withBackground={props.withBackground || false}
+      >
         <StyledModal class="modal">
           <Show when={props.title}>
             <span class="title">{props.title}</span>
@@ -53,13 +59,13 @@ export const Modal: Component<Props> = (props) => {
   );
 };
 
-const StyledWrapper = styled.div<{ visible: boolean }>`
+const StyledWrapper = styled.div<{ visible: boolean; withBackground: boolean }>`
   position: fixed;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: ${(e) => (e.withBackground ? `rgba(0, 0, 0, 0.5);` : "")};
   opacity: 0;
   visibility: hidden;
   transform: scale(1.1);

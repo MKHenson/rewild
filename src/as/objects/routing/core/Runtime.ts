@@ -51,7 +51,7 @@ export class Runtime implements Listener {
     if (activevate) this.activeNodes.push(container);
   }
 
-  OnLoop(delta: f32, total: u32, fps: u32): void {
+  OnLoop(delta: f32, total: u32): void {
     const activeNodes = this.activeNodes;
     const inactiveNodes = this.inactiveNodes;
 
@@ -75,7 +75,7 @@ export class Runtime implements Listener {
     }
 
     for (let i: i32 = 0, l: i32 = activeNodes.length; i < l; i++) {
-      activeNodes[i].onUpdate(delta, total, fps);
+      activeNodes[i].onUpdate(delta, total);
     }
 
     this.renderer.render(this.scene, this.camera);

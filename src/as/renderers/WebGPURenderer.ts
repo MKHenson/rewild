@@ -4,7 +4,6 @@ import { WebGPURenderQueue } from "./WebGPURenderQueue";
 import { Matrix4 } from "../math/Matrix4";
 import { Vector4 } from "../math/Vector4";
 import { MeshNode } from "../objects/MeshNode";
-import { Scene } from "../scenes/Scene";
 import { WebGPUGeometries } from "./WebGPUGeometries";
 import { GroupType } from "../../common/GroupType";
 import { WebGPULights } from "./WebGPULights";
@@ -47,7 +46,7 @@ export class WebGPURenderer {
     this.view = view;
   }
 
-  render(scene: Scene, camera: Camera): void {
+  render(scene: TransformNode, camera: Camera): void {
     // update scene graph
     scene.updateMatrixWorld();
 
