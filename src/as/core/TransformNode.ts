@@ -10,7 +10,7 @@ import * as MathUtils from "../math/MathUtils";
 import { Camera } from "../cameras/Camera";
 import { Light } from "../lights/Light";
 import { Raycaster } from "./Raycaster";
-import { Intersection } from "../objects/Mesh";
+import { Intersection } from "../objects/MeshNode";
 
 let object3DId: i32 = 1;
 

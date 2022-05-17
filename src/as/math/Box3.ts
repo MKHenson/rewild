@@ -1,6 +1,6 @@
 import { BufferAttribute } from "../core/BufferAttribute";
 import { TransformNode } from "../core/TransformNode";
-import { MeshNode } from "../objects/Mesh";
+import { MeshNode } from "../objects/MeshNode";
 import { Matrix4 } from "./Matrix4";
 import { Plane } from "./Plane";
 import { Sphere } from "./Sphere";
