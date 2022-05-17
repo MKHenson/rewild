@@ -12,6 +12,7 @@ import { BitmapTexture } from "./textures/BitmapTexture";
 import { BitmapCubeTexture } from "./textures/BitmapCubeTexture";
 import { SkyboxPipeline } from "./pipelines/skybox-pipeline/SkyboxPipeline";
 import { Object3D } from "../renderer/Object3D";
+import { Clock } from "./Clock";
 
 const sampleCount = 4;
 const MEDIA_URL = process.env.MEDIA_URL;
@@ -26,6 +27,7 @@ export class GameManager implements IBindable {
   buffers: GPUBuffer[];
   pipelines: Pipeline<any>[];
   textures: Texture[];
+  clock: Clock;
 
   onResizeHandler: () => void;
   onFrameHandler: () => void;
@@ -41,14 +43,17 @@ export class GameManager implements IBindable {
   private presentationSize: [number, number];
 
   character: Object3D;
+  onUpdate: () => void;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, onUpdate: () => void) {
     this.canvas = canvas;
     this.buffers = [];
     this.textures = [];
     this.disposed = false;
     this.currentPass = null;
     this.onFrameHandler = this.onFrame.bind(this);
+    this.clock = new Clock();
+    this.onUpdate = onUpdate;
   }
 
   lock() {
@@ -170,6 +175,7 @@ export class GameManager implements IBindable {
     // Setup events
     window.addEventListener("resize", this.onResizeHandler);
     window.requestAnimationFrame(this.onFrameHandler);
+    this.clock.start();
     // window.addEventListener("click", (e) => {
     //   const pipelines = this.pipelines as DebugPipeline[];
     //   pipelines.forEach((p) => {
@@ -284,7 +290,10 @@ export class GameManager implements IBindable {
   }
 
   private onFrame() {
+    const clock = this.clock;
     window.requestAnimationFrame(this.onFrameHandler);
+    this.onUpdate();
+
     if (this.disposed) return;
 
     // Check if we need to resize
@@ -295,7 +304,7 @@ export class GameManager implements IBindable {
     }
 
     // this.character.transform.translateZ(0.01);
-    wasm.update(performance.now());
+    wasm.update(clock.elapsedTime, clock.getDelta());
   }
 
   canvasSize() {

@@ -1,4 +1,3 @@
-import { RenderLoop } from "../../core/RenderLoop";
 import { Runtime } from "./core/Runtime";
 import { Vector4 } from "../../math/Vector4";
 import { WebGPURenderer } from "../../renderers/WebGPURenderer";
@@ -21,12 +20,8 @@ export function resize(w: u16, h: u16): void {
   runtime!.onResize(w, h);
 }
 
-const renderLoop = new RenderLoop((delta: f32, total: u32, fps: u32) => {
-  runtime!.OnLoop(delta, total, fps);
-});
-
-export function update(now: u32): void {
-  renderLoop.onFrame(now);
+export function update(total: u32, delta: f32): void {
+  runtime!.OnLoop(delta, total);
 }
 
 export function addContainer(container: Container, activate: boolean): void {

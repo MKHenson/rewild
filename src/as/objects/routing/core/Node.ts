@@ -62,7 +62,7 @@ export class Node {
     this.mounted = false;
   }
 
-  onUpdate(delta: f32, total: u32, fps: u32): void {}
+  onUpdate(delta: f32, total: u32): void {}
 
   enter(portalEntered: Portal): void {
     this.active = true;

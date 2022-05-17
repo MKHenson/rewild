@@ -90,7 +90,7 @@ export class Level1 extends Container implements Listener {
     this.pointerController.enabled = !this.isPaused && !this.playerDied;
   }
 
-  onUpdate(delta: f32, total: u32, fps: u32): void {
+  onUpdate(delta: f32, total: u32): void {
     if (this.isPaused) return;
 
     const objects = this.objects;

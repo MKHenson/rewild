@@ -14,17 +14,20 @@ import { UIEventType } from "../../../common/UIEventType";
 import { InGameUI } from "./InGameUI";
 import { GameOverMenu } from "./GameOverMenu";
 import { ErrorType, StartError } from "./StartError";
+import { update } from "./FPSCounter";
 
 interface Props {}
-
 type ActiveMenu = "main" | "ingameMenu" | "gameOverMenu" | "error";
 
 export const Application: Component<Props> = ({}) => {
   const [modalOpen, setModalOpen] = createSignal(true);
   const [errorMessage, setErrorMessage] = createSignal("");
+
   const [errorType, setErrorType] = createSignal<ErrorType>("OTHER");
   const [activeMenu, setActiveMenu] = createSignal<ActiveMenu>("main");
   const [gameIsRunning, setGameIsRunning] = createSignal(false);
+
+  let fpsDiv!: HTMLDivElement;
 
   let gameManager: GameManager;
   let eventManager: UIEventManager;
@@ -35,8 +38,12 @@ export const Application: Component<Props> = ({}) => {
     else if (event.uiEventType === UIEventType.PlayerDied) setActiveMenu("gameOverMenu");
   };
 
+  const onFrameUpdate = () => {
+    update(fpsDiv);
+  };
+
   const onCanvasReady = async (canvas: HTMLCanvasElement) => {
-    gameManager = new GameManager(canvas);
+    gameManager = new GameManager(canvas, onFrameUpdate);
     eventManager = new UIEventManager();
 
     const bindables: IBindable[] = [gameManager, eventManager];
@@ -95,9 +102,23 @@ export const Application: Component<Props> = ({}) => {
       </Show>
       <Dynamic component={options[activeMenu()]} />
       <Pane3D onCanvasReady={onCanvasReady} />
+      <StyledFPS ref={fpsDiv}>0</StyledFPS>
     </StyledApplication>
   );
 };
+
+const StyledFPS = styled.div`
+  width: 100px;
+  color: white;
+  font-size: 14px;
+  height: 25px;
+  padding: 5px;
+  text-align: center;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: #255fa1;
+`;
 
 const StyledApplication = styled.div`
   width: 100%;

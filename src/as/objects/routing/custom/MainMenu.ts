@@ -35,7 +35,7 @@ export class MainMenu extends Container implements Listener {
     if (uiEvent.eventType == UIEventType.StartGame) this.exit(this.getPortal("Exit")!, true);
   }
 
-  onUpdate(delta: f32, total: u32, fps: u32): void {
+  onUpdate(delta: f32, total: u32): void {
     this.objects[0].rotation.y += delta * 0.1;
   }
 

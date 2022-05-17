@@ -11,7 +11,7 @@ type Props = {
 
 export const InGameMenu: Component<Props> = (props) => {
   return (
-    <Modal hideConfirmButtons open={props.open}>
+    <Modal hideConfirmButtons open={props.open} withBackground>
       <StyledButtons>
         <Button onClick={props.onResumeClick} fullWidth>
           Resume

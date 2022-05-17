@@ -33,7 +33,7 @@ export class TestLevel extends Container implements Listener {
     }
   }
 
-  onUpdate(delta: f32, total: u32, fps: u32): void {
+  onUpdate(delta: f32, total: u32): void {
     if (this.orbitController) this.orbitController.update();
   }
 

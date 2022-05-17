@@ -25,7 +25,7 @@ export class Container extends Node {
     this.objects.push(object);
   }
 
-  onUpdate(delta: f32, total: u32, fps: u32): void {}
+  onUpdate(delta: f32, total: u32): void {}
 
   mount(): void {
     const objects = this.objects;

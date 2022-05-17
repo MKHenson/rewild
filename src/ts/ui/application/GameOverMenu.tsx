@@ -11,7 +11,7 @@ type Props = {
 
 export const GameOverMenu: Component<Props> = (props) => {
   return (
-    <Modal hideConfirmButtons open={props.open}>
+    <Modal hideConfirmButtons open={props.open} withBackground>
       <Typography variant="h2">GAME OVER</Typography>
       <StyledButtons>
         <Button onClick={props.onQuitClick} fullWidth>
