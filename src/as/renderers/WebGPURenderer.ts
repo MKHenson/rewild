@@ -3,7 +3,7 @@ import { TransformNode } from "../core/TransformNode";
 import { WebGPURenderQueue } from "./WebGPURenderQueue";
 import { Matrix4 } from "../math/Matrix4";
 import { Vector4 } from "../math/Vector4";
-import { Mesh } from "../objects/Mesh";
+import { MeshNode } from "../objects/Mesh";
 import { Scene } from "../scenes/Scene";
 import { WebGPUGeometries } from "./WebGPUGeometries";
 import { GroupType } from "../../common/GroupType";
@@ -14,7 +14,7 @@ import { AttributeType } from "../../common/AttributeType";
 const renderQueue = new WebGPURenderQueue();
 
 export class RenderList {
-  solids: Mesh[];
+  solids: MeshNode[];
   lights: Light[];
 
   constructor() {
@@ -77,7 +77,7 @@ export class WebGPURenderer {
     renderQueue.push();
   }
 
-  renderMesh(mesh: Mesh, camera: Camera): void {
+  renderMesh(mesh: MeshNode, camera: Camera): void {
     mesh.modelViewMatrix.multiplyMatricesSIMD(camera.matrixWorldInverse, mesh.matrixWorld);
     mesh.normalMatrix.getNormalMatrix(mesh.modelViewMatrix);
     const pipelineInstance = mesh.pipelines[0];
@@ -143,8 +143,8 @@ export class WebGPURenderer {
   projectObject(object: TransformNode, camera: Camera): void {
     if (object.visible === false) return;
 
-    if (object instanceof Mesh) {
-      this.currentRenderList.solids.push(object as Mesh);
+    if (object instanceof MeshNode) {
+      this.currentRenderList.solids.push(object as MeshNode);
     } else if (object instanceof Light) {
       this.currentRenderList.lights.push(object as Light);
     }

@@ -4,7 +4,7 @@ import { PerspectiveCamera } from "../cameras/PerspectiveCamera";
 import { Ray } from "../math/Ray";
 import { Vector2 } from "../math/Vector2";
 import { Vector3 } from "../math/Vector3";
-import { Intersection, Mesh } from "../objects/Mesh";
+import { Intersection, MeshNode } from "../objects/Mesh";
 import { Layers } from "./Layers";
 import { TransformNode } from "./TransformNode";
 

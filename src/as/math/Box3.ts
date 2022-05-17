@@ -1,6 +1,6 @@
 import { BufferAttribute } from "../core/BufferAttribute";
 import { TransformNode } from "../core/TransformNode";
-import { Mesh } from "../objects/Mesh";
+import { MeshNode } from "../objects/Mesh";
 import { Matrix4 } from "./Matrix4";
 import { Plane } from "./Plane";
 import { Sphere } from "./Sphere";
@@ -169,7 +169,7 @@ export class Box3 {
 
     object.updateWorldMatrix(false, false);
 
-    const geometry = (object as Mesh).geometry;
+    const geometry = (object as MeshNode).geometry;
 
     if (geometry !== undefined) {
       if (geometry.boundingBox === null) {

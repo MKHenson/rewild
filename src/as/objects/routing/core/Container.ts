@@ -1,6 +1,6 @@
 import { addChild, removeChild, TransformNode } from "../../../core/TransformNode";
 import { Node } from "./Node";
-import { Mesh } from "../../Mesh";
+import { MeshNode } from "../../Mesh";
 import { Portal } from "./Portal";
 
 export class Container extends Node {
@@ -48,8 +48,8 @@ export class Container extends Node {
     const objects = this.objects;
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
       const obj = objects[i];
-      if (obj instanceof Mesh) {
-        const geometry = (obj as Mesh).geometry;
+      if (obj instanceof MeshNode) {
+        const geometry = (obj as MeshNode).geometry;
         if (geometry) this.runtime!.renderer.geometries.set(geometry);
       }
     }
