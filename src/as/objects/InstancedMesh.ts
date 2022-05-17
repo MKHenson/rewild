@@ -1,5 +1,5 @@
 import { InstancedBufferAttribute } from "../core/InstancedBufferAttribute";
-import { Intersection, Mesh } from "./Mesh";
+import { Intersection, MeshNode } from "./Mesh";
 import { Matrix4 } from "../math/Matrix4";
 import { Raycaster } from "../core/Raycaster";
 import { Material } from "../materials/Material";
@@ -11,11 +11,11 @@ const _instanceLocalMatrix = new Matrix4();
 const _instanceWorldMatrix = new Matrix4();
 
 const _instanceIntersects: Intersection[] = [];
-const _mesh = new Mesh();
+const _mesh = new MeshNode();
 
 const disposeEvent: Event = new Event("dispose");
 
-export class InstancedMesh extends Mesh {
+export class InstancedMesh extends MeshNode {
   count: i32;
   instanceColor: InstancedBufferAttribute<f32, Float32Array> | null;
   instanceMatrix: InstancedBufferAttribute<f32, Float32Array>;

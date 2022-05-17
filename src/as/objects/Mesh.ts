@@ -56,7 +56,7 @@ const _uvC = new Vector2();
 const _intersectionPoint = new Vector3();
 const _intersectionPointWorld = new Vector3();
 
-export class Mesh extends TransformNode {
+export class MeshNode extends TransformNode {
   pipelines: MeshPipelineInstance[];
   geometry: BufferGeometry;
   morphTargetInfluences: f32[] | null;
@@ -75,7 +75,7 @@ export class Mesh extends TransformNode {
     this.updateMorphTargets();
   }
 
-  copy(source: Mesh, recursive: boolean = true): Mesh {
+  copy(source: MeshNode, recursive: boolean = true): MeshNode {
     super.copy(source, recursive);
 
     const sourceMorphTargetInfluences = source.morphTargetInfluences;
@@ -345,7 +345,7 @@ function checkIntersection(
 }
 
 function checkBufferGeometryIntersection(
-  object: Mesh,
+  object: MeshNode,
   pipeline: PipelineInstance,
   raycaster: Raycaster,
   ray: Ray,
@@ -451,7 +451,7 @@ export function createMesh(
   pipeline: PipelineInstance,
   name: string | null = null
 ): TransformNode {
-  const newMesh = new Mesh(geometry, [pipeline as MeshPipelineInstance]);
+  const newMesh = new MeshNode(geometry, [pipeline as MeshPipelineInstance]);
   if (name) newMesh.name = name;
   return newMesh;
 }
