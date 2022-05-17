@@ -1,6 +1,6 @@
 import { Listener } from "../../../core/EventDispatcher";
 import { WebGPURenderer } from "../../../renderers/WebGPURenderer";
-import { inputManager } from "../../../exports/io/InputManager";
+import { inputManager } from "../../../extras/io/InputManager";
 import { Event } from "../../../core/Event";
 import { Scene } from "../../../scenes/Scene";
 import { PerspectiveCamera } from "../../../cameras/PerspectiveCamera";

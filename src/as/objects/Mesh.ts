@@ -91,12 +91,12 @@ export class Mesh extends TransformNode {
       const morphTargetDictionary = this.morphTargetDictionary;
 
       for (let i: i32 = 0; i < keys.length; i++)
-        morphTargetDictionary!.set(keys[i], sourceMorphTargetDictionary.get(keys[i]));
+        morphTargetDictionary!.set(unchecked(keys[i]), sourceMorphTargetDictionary.get(unchecked(keys[i])));
     }
 
     this.pipelines = new Array(source.pipelines.length);
     for (let i: i32 = 0; i < source.pipelines.length; i++)
-      this.pipelines[i] = source.pipelines[i].clone() as MeshPipelineInstance;
+      unchecked((this.pipelines[i] = source.pipelines[i].clone() as MeshPipelineInstance));
 
     this.geometry = source.geometry;
 
@@ -110,14 +110,14 @@ export class Mesh extends TransformNode {
     const keys = morphAttributes.keys();
 
     if (keys.length > 0) {
-      const morphAttribute = morphAttributes.get(keys[0]);
+      const morphAttribute = morphAttributes.get(unchecked(keys[0]));
 
       if (morphAttribute !== null) {
         this.morphTargetInfluences = [];
         this.morphTargetDictionary = new Map();
 
         for (let m: i32 = 0, ml = morphAttribute.length; m < ml; m++) {
-          const name = morphAttribute[m].name || m.toString();
+          const name = unchecked(morphAttribute[m]).name || m.toString();
 
           this.morphTargetInfluences!.push(0);
           this.morphTargetDictionary!.set(name, m);
@@ -170,8 +170,8 @@ export class Mesh extends TransformNode {
 
       if (pipelines.length > 1) {
         for (let i = 0, il = groups.length; i < il; i++) {
-          const group = groups[i];
-          const groupPipeline = pipelines[group.materialIndex];
+          const group = unchecked(groups[i]);
+          const groupPipeline = unchecked(pipelines[group.materialIndex]);
 
           const start = Math.max(group.start, drawRange.start);
           const end = Math.min(group.start + group.count, drawRange.start + drawRange.count);
@@ -214,7 +214,7 @@ export class Mesh extends TransformNode {
 
           intersection = checkBufferGeometryIntersection(
             this,
-            pipelines[0],
+            unchecked(pipelines[0]),
             raycaster,
             _ray,
             position,
@@ -238,8 +238,8 @@ export class Mesh extends TransformNode {
 
       if (pipelines.length > 1) {
         for (let i: i32 = 0, il = groups.length; i < il; i++) {
-          const group = groups[i];
-          const groupPipeline = pipelines[group.materialIndex];
+          const group = unchecked(groups[i]);
+          const groupPipeline = unchecked(pipelines[group.materialIndex]);
 
           const start = Math.max(group.start, drawRange.start);
           const end = Math.min(group.start + group.count, drawRange.start + drawRange.count);
@@ -282,7 +282,7 @@ export class Mesh extends TransformNode {
 
           intersection = checkBufferGeometryIntersection(
             this,
-            pipelines[0],
+            unchecked(pipelines[0]),
             raycaster,
             _ray,
             position,
@@ -370,8 +370,8 @@ function checkBufferGeometryIntersection(
     _morphC.set(0, 0, 0);
 
     for (let i = 0, il = morphPosition.length; i < il; i++) {
-      const influence = morphInfluences[i];
-      const morphAttribute = morphPosition[i];
+      const influence = unchecked(morphInfluences[i]);
+      const morphAttribute = unchecked(morphPosition[i]);
 
       if (influence === 0) continue;
 
@@ -444,4 +444,14 @@ function checkBufferGeometryIntersection(
   }
 
   return intersection;
+}
+
+export function createMesh(
+  geometry: BufferGeometry,
+  pipeline: PipelineInstance,
+  name: string | null = null
+): TransformNode {
+  const newMesh = new Mesh(geometry, [pipeline as MeshPipelineInstance]);
+  if (name) newMesh.name = name;
+  return newMesh;
 }

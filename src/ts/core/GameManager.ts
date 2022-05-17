@@ -1,6 +1,5 @@
 import { InputManager } from "./InputManager";
 import { GPUBufferUsageFlags } from "../../common/GPUEnums";
-import { PipelineType } from "../../common/PipelineType";
 import { DebugPipeline } from "./pipelines/debug-pipeline/DebugPipeline";
 import { Pipeline } from "./pipelines/Pipeline";
 import { createBuffer, createIndexBuffer } from "./Utils";
@@ -139,8 +138,7 @@ export class GameManager implements IBindable {
     ];
 
     this.textures = await Promise.all(
-      textures.map((texture, index) => {
-        wasm.createTexture(texture.name, index);
+      textures.map((texture) => {
         return texture.load(device);
       })
     );
@@ -228,7 +226,7 @@ export class GameManager implements IBindable {
     const pipelineIndex = this.pipelines.indexOf(pipeline);
 
     // Create an instance in WASM
-    const pipelineInsPtr = wasm.createPipelineInstance(pipeline.name, pipelineIndex, PipelineType.Mesh);
+    const pipelineInsPtr = wasm.createMeshPipelineInstance(pipeline.name, pipelineIndex);
 
     pipeline.vertexLayouts.map((buffer) =>
       buffer.attributes.map((attr) =>

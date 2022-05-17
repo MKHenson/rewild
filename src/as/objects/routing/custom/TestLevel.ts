@@ -1,11 +1,11 @@
 import { OrbitController } from "../../../extras/OrbitController";
 import { Container } from "../core/Container";
-import { inputManager } from "../../../exports/io/InputManager";
-import { KeyboardEvent } from "../../../exports/io/KeyboardEvent";
+import { inputManager } from "../../../extras/io/InputManager";
+import { KeyboardEvent } from "../../../extras/io/KeyboardEvent";
 import { Listener } from "../../../core/EventDispatcher";
-import { uiSignaller } from "../../../exports/ui/uiSignalManager";
+import { uiSignaller } from "../../../extras/ui/uiSignalManager";
 import { Event } from "../../../core/Event";
-import { UIEvent } from "../../../exports/ui/UIEvent";
+import { UIEvent } from "../../../extras/ui/UIEvent";
 import { Link } from "../core/Link";
 import { TransformNode } from "../../../core/TransformNode";
 
