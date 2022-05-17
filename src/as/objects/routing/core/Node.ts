@@ -1,5 +1,4 @@
 import { Runtime } from ".";
-import { Link } from "./Link";
 import { Portal } from "./Portal";
 
 export class Node {

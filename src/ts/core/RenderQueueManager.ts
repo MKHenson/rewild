@@ -7,6 +7,7 @@ import { LightingResource } from "./pipelines/resources/LightingResource";
 import { PipelineResourceInstance } from "./pipelines/resources/PipelineResourceInstance";
 import { wasmManager } from "./WasmManager";
 import { TransformResource } from "./pipelines/resources/TransformResource";
+import { pipelineManager } from "../renderer/PipelineManager";
 
 const ARRAYBUFFERVIEW_DATASTART_OFFSET = 4;
 const normalAs4x4 = new Float32Array(12);
@@ -22,6 +23,7 @@ export class RenderQueueManager {
     const manager = this.manager;
     const device = manager.device;
     const { wasmArrayBuffer, wasmMemoryBlock } = wasmManager;
+    const pipelines = pipelineManager.pipelines;
 
     const getPtrIndex = function (ptr: number) {
       return wasmArrayBuffer[(ptr + ARRAYBUFFERVIEW_DATASTART_OFFSET) >>> 2];
@@ -41,7 +43,7 @@ export class RenderQueueManager {
           if (LightingResource.numDirLights !== numDirectionLights) {
             LightingResource.numDirLights = numDirectionLights;
             LightingResource.rebuildDirectionLights = true;
-            this.manager.pipelines.forEach((p) => {
+            pipelines.forEach((p) => {
               if (p.getTemplateByType(ResourceType.Material)) {
                 p.defines = { ...p.defines, NUM_DIR_LIGHTS: numDirectionLights };
               }
@@ -126,7 +128,7 @@ export class RenderQueueManager {
           break;
 
         case GPUCommands.SET_PIPELINE:
-          const newPipeline = manager.pipelines[commandBuffer[i + 1]];
+          const newPipeline = pipelines[commandBuffer[i + 1]];
 
           if (newPipeline.rebuild) {
             newPipeline.build(manager);

@@ -6,7 +6,6 @@ import { Scene } from "../../../scenes/Scene";
 import { PerspectiveCamera } from "../../../cameras/PerspectiveCamera";
 import { Container } from "./Container";
 import { Node } from "./Node";
-import { Link } from "./Link";
 import { Portal } from "./Portal";
 import { addChild } from "../../../core/TransformNode";
 
@@ -18,13 +17,11 @@ export class Runtime implements Listener {
   private nodes: Node[];
   private activeNodes: Node[];
   private inactiveNodes: Node[];
-  private links: Link[];
 
   constructor(width: f32, height: f32, renderer: WebGPURenderer) {
     this.nodes = [];
     this.activeNodes = [];
     this.inactiveNodes = [];
-    this.links = [];
 
     this.renderer = renderer;
     this.scene = new Scene();
@@ -39,7 +36,7 @@ export class Runtime implements Listener {
   getNode(name: string): Node | null {
     const nodes = this.nodes;
     for (let i: i32 = 0, l = nodes.length; i < l; i++) {
-      if (nodes[i].name == name) return nodes[i];
+      if (unchecked(nodes[i]).name == name) return unchecked(nodes[i]);
     }
 
     return null;
@@ -59,7 +56,7 @@ export class Runtime implements Listener {
     const numInactiveNodes = inactiveNodes.length;
     if (numInactiveNodes) {
       for (let i: i32 = 0; i < numInactiveNodes; i++) {
-        const node = inactiveNodes[i];
+        const node = unchecked(inactiveNodes[i]);
         node.unMount();
       }
 
@@ -68,14 +65,14 @@ export class Runtime implements Listener {
 
     // Initialize and mount nodes
     for (let i: i32 = 0, l: i32 = activeNodes.length; i < l; i++) {
-      const node = activeNodes[i];
+      const node = unchecked(activeNodes[i]);
 
       if (!node.initialized) node.init();
       if (!node.mounted) node.mount();
     }
 
     for (let i: i32 = 0, l: i32 = activeNodes.length; i < l; i++) {
-      activeNodes[i].onUpdate(delta, total);
+      unchecked(activeNodes[i]).onUpdate(delta, total);
     }
 
     this.renderer.render(this.scene, this.camera);
@@ -96,18 +93,18 @@ export class Runtime implements Listener {
     }
 
     for (let i: i32 = 0, l = links.length; i < l; i++) {
-      links[i].destinationPortal!.node.enter(links[i].destinationPortal!);
+      unchecked(links[i]).destinationPortal!.node.enter(unchecked(links[i]).destinationPortal!);
 
       console.log(
-        `Entering ${links[i].destinationPortal!.name} of ${links[i].destinationPortal!.node.name} which is active ${
-          links[i].destinationPortal!.node.active
-        }`
+        `Entering ${unchecked(links[i]).destinationPortal!.name} of ${
+          unchecked(links[i]).destinationPortal!.node.name
+        } which is active ${links[i].destinationPortal!.node.active}`
       );
 
-      if (activeNodes.indexOf(links[i].destinationPortal!.node) == -1) {
-        activeNodes.push(links[i].destinationPortal!.node);
+      if (activeNodes.indexOf(unchecked(links[i]).destinationPortal!.node) == -1) {
+        activeNodes.push(unchecked(links[i]).destinationPortal!.node);
 
-        console.log(`Activating ${links[i].destinationPortal!.node.name}`);
+        console.log(`Activating ${unchecked(links[i]).destinationPortal!.node.name}`);
       }
     }
   }
