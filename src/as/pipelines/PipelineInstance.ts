@@ -30,3 +30,7 @@ export class PipelineInstance {
     return this;
   }
 }
+
+export function addPipelineAttribute(pipeline: PipelineInstance, type: AttributeType, location: u16): void {
+  pipeline.addAttribute(type, location);
+}

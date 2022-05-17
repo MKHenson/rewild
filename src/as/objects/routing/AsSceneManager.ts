@@ -1,8 +1,8 @@
-import { RenderLoop } from "../core/RenderLoop";
-import { Runtime } from "../objects/routing/core/Runtime";
-import { Vector4 } from "../math/Vector4";
-import { WebGPURenderer } from "../renderers/WebGPURenderer";
-import { Container } from "../objects/routing";
+import { RenderLoop } from "../../core/RenderLoop";
+import { Runtime } from "./core/Runtime";
+import { Vector4 } from "../../math/Vector4";
+import { WebGPURenderer } from "../../renderers/WebGPURenderer";
+import { Container } from ".";
 
 let runtime: Runtime | null = null;
 const renderer = new WebGPURenderer();

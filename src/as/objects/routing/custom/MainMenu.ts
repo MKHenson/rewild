@@ -1,10 +1,10 @@
 import { DirectionalLight } from "../../../lights/DirectionalLight";
 import { Color } from "../../../math/Color";
 import { Container } from "../core/Container";
-import { uiSignaller } from "../../../exports/ui/uiSignalManager";
+import { uiSignaller } from "../../../extras/ui/uiSignalManager";
 import { Listener } from "../../../core/EventDispatcher";
 import { Event } from "../../../core/Event";
-import { UIEvent } from "../../../exports/ui/UIEvent";
+import { UIEvent } from "../../../extras/ui/UIEvent";
 import { degToRad } from "../../../math/MathUtils";
 import { Link } from "../core/Link";
 import { UIEventType } from "../../../../common/UIEventType";

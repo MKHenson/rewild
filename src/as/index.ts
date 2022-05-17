@@ -1,10 +1,10 @@
-export * from "./exports/io";
-export * from "./exports/ui";
-export { getRuntime, init, resize, update, addContainer } from "./exports/AsSceneManager";
-export { createTexture } from "./exports/TextureFactory";
-export { createBox, createPlane, createSphere, addVertGeometry } from "./exports/GeometryFactory";
-export { createPipelineInstance, addPipelineAttribute, setMeshPipelineTransformIndex } from "./exports/PipelineFactory";
-export { createMesh } from "./exports/MeshFactory";
+export * from "./extras/io";
+export * from "./extras/ui";
+export { getRuntime, init, resize, update, addContainer } from "./objects/routing/AsSceneManager";
+export * from "./geometries";
+export { createMeshPipelineInstance, setMeshPipelineTransformIndex } from "./pipelines/MeshPipelineInstance";
+export { addPipelineAttribute } from "./pipelines/PipelineInstance";
+export { createMesh } from "./objects/Mesh";
 export { createContainer, addAsset, createLevel1, createMainMenu, createTestLevel } from "./objects/routing";
 export { addChild, createTransformNode, removeChild, getVisibility, setVisibility } from "./core/TransformNode";
 

@@ -140,3 +140,8 @@ export class SphereGeometry extends BufferGeometry {
 
   // }
 }
+
+export function createSphere(radius: f32 = 1, widthSegments: u16 = 32, heightSegments: u16 = 16): BufferGeometry {
+  const geometry = new SphereGeometry(radius, widthSegments, heightSegments);
+  return geometry;
+}

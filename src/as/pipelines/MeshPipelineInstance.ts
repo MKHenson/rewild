@@ -18,3 +18,12 @@ export class MeshPipelineInstance extends PipelineInstance {
     return this;
   }
 }
+
+export function createMeshPipelineInstance(name: string, index: i32): PipelineInstance {
+  return new MeshPipelineInstance(name, index);
+}
+
+export function setMeshPipelineTransformIndex(pipeline: PipelineInstance, transformResourceIndex: i32): void {
+  const meshPipeline = pipeline as MeshPipelineInstance;
+  meshPipeline.transformResourceIndex = transformResourceIndex;
+}

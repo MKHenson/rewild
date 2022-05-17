@@ -90,3 +90,13 @@ export class PlaneGeometry extends BufferGeometry {
 
   // }
 }
+
+export function createPlane(
+  width: f32 = 1,
+  height: f32 = 1,
+  widthSegments: u16 = 1,
+  heightSegments: u16 = 1
+): BufferGeometry {
+  const geometry = new PlaneGeometry(width, height, widthSegments, heightSegments);
+  return geometry;
+}

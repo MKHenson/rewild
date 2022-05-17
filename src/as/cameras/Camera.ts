@@ -27,7 +27,7 @@ export class Camera extends TransformNode {
 
     const e = this.matrixWorld.elements;
 
-    return target.set(-e[8], -e[9], -e[10]).normalize();
+    return target.set(unchecked(-e[8]), unchecked(-e[9]), unchecked(-e[10])).normalize();
   }
 
   updateMatrixWorld(force: boolean = false): void {

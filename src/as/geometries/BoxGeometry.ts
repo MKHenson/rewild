@@ -196,3 +196,15 @@ export class BoxGeometry extends BufferGeometry {
   // 	return new BoxGeometry( data.width, data.height, data.depth, data.widthSegments, data.heightSegments, data.depthSegments );
   // }
 }
+
+export function createBox(
+  width: f32 = 1,
+  height: f32 = 1,
+  depth: f32 = 1,
+  widthSegments: u16 = 1,
+  heightSegments: u16 = 1,
+  depthSegments: u16 = 1
+): BufferGeometry {
+  const geometry = new BoxGeometry(width, height, depth, widthSegments, heightSegments, depthSegments);
+  return geometry;
+}
