@@ -3,7 +3,7 @@ import { TransformNode } from "../core/TransformNode";
 import { WebGPURenderQueue } from "./WebGPURenderQueue";
 import { Matrix4 } from "../math/Matrix4";
 import { Vector4 } from "../math/Vector4";
-import { MeshNode } from "../objects/Mesh";
+import { MeshNode } from "../objects/MeshNode";
 import { Scene } from "../scenes/Scene";
 import { WebGPUGeometries } from "./WebGPUGeometries";
 import { GroupType } from "../../common/GroupType";

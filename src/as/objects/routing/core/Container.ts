@@ -1,6 +1,6 @@
 import { addChild, removeChild, TransformNode } from "../../../core/TransformNode";
 import { Node } from "./Node";
-import { MeshNode } from "../../Mesh";
+import { MeshNode } from "../../MeshNode";
 import { Portal } from "./Portal";
 
 export class Container extends Node {

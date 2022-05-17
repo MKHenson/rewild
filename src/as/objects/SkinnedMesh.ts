@@ -2,7 +2,7 @@ import { BufferGeometry } from "../core/BufferGeometry";
 import { Material } from "../materials/Material";
 import { MeshBasicMaterial } from "../materials/MeshBasicMaterial";
 import { Vector3 } from "../math/Vector3";
-import { MeshNode } from "./Mesh";
+import { MeshNode } from "./MeshNode";
 
 export class SkinnedMesh extends MeshNode {
   constructor(geometry: BufferGeometry = new BufferGeometry(), materials: Material[] = [new MeshBasicMaterial()]) {

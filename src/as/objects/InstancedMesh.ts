@@ -1,5 +1,5 @@
 import { InstancedBufferAttribute } from "../core/InstancedBufferAttribute";
-import { Intersection, MeshNode } from "./Mesh";
+import { Intersection, MeshNode } from "./MeshNode";
 import { Matrix4 } from "../math/Matrix4";
 import { Raycaster } from "../core/Raycaster";
 import { Material } from "../materials/Material";
