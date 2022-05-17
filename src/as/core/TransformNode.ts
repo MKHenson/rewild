@@ -244,40 +244,9 @@ export class TransformNode extends EventDispatcher {
     }
   }
 
-  add(object: TransformNode): TransformNode {
-    if (object === this) throw new Error("Object can't be added as a child of itself.");
-
-    if (object.parent !== null) {
-      object.parent!.remove(object);
-    }
-
-    object.parent = this;
-    this.children.push(object);
-
-    _addedEvent.target = this;
-    object.dispatchEvent(_addedEvent);
-
-    return this;
-  }
-
-  remove(object: TransformNode): TransformNode {
-    const index = this.children.indexOf(object);
-
-    if (index !== -1) {
-      object.parent = null;
-      this.children.splice(index, 1);
-
-      _removedEvent.target = this;
-      object.dispatchEvent(_removedEvent);
-    }
-
-    return this;
-  }
-
   removeFromParent(): TransformNode {
     const parent = this.parent;
-
-    if (parent !== null) parent.remove(this);
+    if (parent !== null) removeChild(parent, this);
 
     return this;
   }
@@ -311,7 +280,7 @@ export class TransformNode extends EventDispatcher {
 
     object.applyMatrix4(_m1);
 
-    this.add(object);
+    addChild(this, object);
 
     object.updateWorldMatrix(false, true);
 
@@ -497,10 +466,52 @@ export class TransformNode extends EventDispatcher {
     if (recursive === true) {
       for (let i = 0; i < source.children.length; i++) {
         const child = source.children[i];
-        this.add(child.clone());
+        addChild(this, child.clone());
       }
     }
 
     return this;
   }
+}
+
+export function createTransformNode(): TransformNode {
+  return new TransformNode();
+}
+
+export function addChild(parent: TransformNode, child: TransformNode): TransformNode {
+  if (child === parent) throw new Error("Transform can't be added as a child of itself.");
+
+  if (child.parent !== null) {
+    removeChild(child.parent!, child);
+  }
+
+  child.parent = parent;
+  parent.children.push(child);
+
+  _addedEvent.target = parent;
+  child.dispatchEvent(_addedEvent);
+
+  return parent;
+}
+
+export function getVisibility(node: TransformNode): boolean {
+  return node.visible;
+}
+
+export function setVisibility(node: TransformNode, value: boolean): void {
+  node.visible = value;
+}
+
+export function removeChild(parent: TransformNode, child: TransformNode): TransformNode {
+  const index = parent.children.indexOf(child);
+
+  if (index !== -1) {
+    child.parent = null;
+    parent.children.splice(index, 1);
+
+    _removedEvent.target = parent;
+    child.dispatchEvent(_removedEvent);
+  }
+
+  return parent;
 }

@@ -1,4 +1,4 @@
-import { TransformNode } from "../../../core/TransformNode";
+import { addChild, removeChild, TransformNode } from "../../../core/TransformNode";
 import { Node } from "./Node";
 import { Mesh } from "../../Mesh";
 import { Portal } from "./Portal";
@@ -30,7 +30,7 @@ export class Container extends Node {
   mount(): void {
     const objects = this.objects;
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      this.runtime!.scene.add(objects[i]);
+      addChild(this.runtime!.scene, objects[i]);
     }
     super.mount();
   }
@@ -38,7 +38,7 @@ export class Container extends Node {
   unMount(): void {
     const objects = this.objects;
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      this.runtime!.scene.remove(objects[i]);
+      removeChild(this.runtime!.scene, objects[i]);
     }
     super.unMount();
   }
