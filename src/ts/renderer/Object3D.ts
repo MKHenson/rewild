@@ -2,9 +2,11 @@ import { wasm } from "../core/WasmManager";
 
 export class Object3D {
   transform: Number;
+  name: string;
 
   constructor(createTransform = true) {
     this.transform = createTransform ? wasm.createTransformNode() : 0;
+    this.name = "";
   }
 
   set visibility(val: boolean) {
