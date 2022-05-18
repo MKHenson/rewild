@@ -61,12 +61,13 @@ export class MeshNode extends TransformNode {
   geometry: BufferGeometry;
   morphTargetInfluences: f32[] | null;
   morphTargetDictionary: Map<string, i32> | null;
+  renderIndex: u32;
 
   constructor(geometry: BufferGeometry = new BufferGeometry(), pipelines: MeshPipelineInstance[] = []) {
     super();
 
     this.type = "Mesh";
-
+    this.renderIndex = -1;
     this.geometry = geometry;
     this.pipelines = pipelines;
     this.morphTargetInfluences = null;
@@ -444,6 +445,10 @@ function checkBufferGeometryIntersection(
   }
 
   return intersection;
+}
+
+export function setMeshRenderIndex(mesh: MeshNode, value: u32): void {
+  mesh.renderIndex = value;
 }
 
 export function createMesh(

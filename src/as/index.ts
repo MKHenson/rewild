@@ -4,7 +4,7 @@ export { getRuntime, init, resize, update, addContainer } from "./objects/routin
 export * from "./geometries";
 export { createMeshPipelineInstance, setMeshPipelineTransformIndex } from "./pipelines/MeshPipelineInstance";
 export { addPipelineAttribute } from "./pipelines/PipelineInstance";
-export { createMesh } from "./objects/MeshNode";
+export { createMesh, setMeshRenderIndex } from "./objects/MeshNode";
 export { createContainer, addAsset, createLevel1, createMainMenu, createTestLevel } from "./objects/routing";
 export { addChild, createTransformNode, removeChild, getVisibility, setVisibility } from "./core/TransformNode";
 
