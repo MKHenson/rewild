@@ -1,32 +1,32 @@
-import { Matrix4 } from "../math/Matrix4";
-import { Vector2 } from "../math/Vector2";
-import { Vector3 } from "../math/Vector3";
-import { Vector4 } from "../math/Vector4";
+import { EngineMatrix4 } from "../math/Matrix4";
+import { EngineVector2 } from "../math/Vector2";
+import { EngineVector3 } from "../math/Vector3";
+import { EngineVector4 } from "../math/Vector4";
 import { Frustum } from "../math/Frustum";
 import { Camera } from "../cameras/Camera";
 import { Light } from "./Light";
 import { DirectionalLight } from "./DirectionalLight";
 import { SpotLight } from "./SpotLight";
 
-const _projScreenMatrix = new Matrix4();
-const _lightPositionWorld = new Vector3();
-const _lookTarget = new Vector3();
+const _projScreenMatrix = new EngineMatrix4();
+const _lightPositionWorld = new EngineVector3();
+const _lookTarget = new EngineVector3();
 
 export class LightShadow {
   camera: Camera;
   bias: f32;
   normalBias: f32;
   radius: f32;
-  mapSize: Vector2;
+  mapSize: EngineVector2;
   // map: Texture | null;
   //   mapPass: null;
-  matrix: Matrix4;
+  matrix: EngineMatrix4;
   autoUpdate: boolean;
   needsUpdate: boolean;
   _frustum: Frustum;
-  _frameExtents: Vector2;
+  _frameExtents: EngineVector2;
   _viewportCount: i32;
-  _viewports: Vector4[];
+  _viewports: EngineVector4[];
 
   constructor(camera: Camera) {
     this.camera = camera;
@@ -35,21 +35,21 @@ export class LightShadow {
     this.normalBias = 0;
     this.radius = 1;
 
-    this.mapSize = new Vector2(512, 512);
+    this.mapSize = new EngineVector2(512, 512);
 
     // this.map = null;
     // this.mapPass = null;
-    this.matrix = new Matrix4();
+    this.matrix = new EngineMatrix4();
 
     this.autoUpdate = true;
     this.needsUpdate = false;
 
     this._frustum = new Frustum();
-    this._frameExtents = new Vector2(1, 1);
+    this._frameExtents = new EngineVector2(1, 1);
 
     this._viewportCount = 1;
 
-    this._viewports = [new Vector4(0, 0, 1, 1)];
+    this._viewports = [new EngineVector4(0, 0, 1, 1)];
   }
 
   getViewportCount(): i32 {
@@ -93,11 +93,11 @@ export class LightShadow {
     shadowMatrix.multiplySIMD(shadowCamera.matrixWorldInverse);
   }
 
-  getViewport(viewportIndex: u32): Vector4 {
+  getViewport(viewportIndex: u32): EngineVector4 {
     return this._viewports[viewportIndex];
   }
 
-  getFrameExtents(): Vector2 {
+  getFrameExtents(): EngineVector2 {
     return this._frameExtents;
   }
 

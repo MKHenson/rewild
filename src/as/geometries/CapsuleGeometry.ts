@@ -1,7 +1,7 @@
 import { Float32BufferAttribute, Uint16BufferAttribute } from "../core/BufferAttribute";
 import { BufferGeometry } from "../core/BufferGeometry";
-import { Vector2 } from "../math/Vector2";
-import { Vector3 } from "../math/Vector3";
+import { EngineVector2 } from "../math/Vector2";
+import { EngineVector3 } from "../math/Vector3";
 import { AttributeType } from "../../common/AttributeType";
 
 export class CapsuleGeometryParameters {
@@ -43,14 +43,14 @@ class CapsuleGeometryBuilder {
     const uvs = this.uvs;
 
     let x: u16, y: u16;
-    const normal = new Vector3();
-    const vertex = new Vector3();
+    const normal = new EngineVector3();
+    const vertex = new EngineVector3();
 
     const cosAlpha = Mathf.cos(alpha);
     const sinAlpha = Mathf.sin(alpha);
 
-    const cone_length: f32 = new Vector2(params.radiusTop * sinAlpha, halfHeight + params.radiusTop * cosAlpha)
-      .sub(new Vector2(params.radiusBottom * sinAlpha, -halfHeight + params.radiusBottom * cosAlpha))
+    const cone_length: f32 = new EngineVector2(params.radiusTop * sinAlpha, halfHeight + params.radiusTop * cosAlpha)
+      .sub(new EngineVector2(params.radiusBottom * sinAlpha, -halfHeight + params.radiusBottom * cosAlpha))
       .length();
 
     // Total length for v texture coord

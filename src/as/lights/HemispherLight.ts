@@ -1,5 +1,5 @@
 import { Light } from "./Light";
-import { Color } from "../math/Color";
+import { Color } from "../../common/math/Color";
 import { TransformNode } from "../core/TransformNode";
 
 export class HemisphereLight extends Light {

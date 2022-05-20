@@ -1,4 +1,4 @@
-import { Color } from "../math/Color";
+import { Color } from "../../common/math/Color";
 
 export class FogExp2 {
   isFogExp2: boolean = true;

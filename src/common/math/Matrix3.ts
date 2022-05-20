@@ -1,12 +1,13 @@
 import { Matrix4 } from "./Matrix4";
 import { Vector3 } from "./Vector3";
-import { f32Array } from "../utils";
+
 export class Matrix3 {
   isMatrix3: boolean = true;
   elements: Float32Array;
 
   constructor() {
-    this.elements = f32Array([1, 0, 0, 0, 1, 0, 0, 0, 1]);
+    this.elements = new Float32Array(9);
+    this.set(1, 0, 0, 0, 1, 0, 0, 0, 1);
   }
 
   set(n11: f32, n12: f32, n13: f32, n21: f32, n22: f32, n23: f32, n31: f32, n32: f32, n33: f32): Matrix3 {

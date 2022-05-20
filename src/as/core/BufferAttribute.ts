@@ -1,14 +1,14 @@
-import { Vector4 } from "../math/Vector4";
-import { Vector3 } from "../math/Vector3";
-import { Vector2 } from "../math/Vector2";
-import { Color } from "../math/Color";
+import { EngineVector4 } from "../math/Vector4";
+import { EngineVector3 } from "../math/Vector3";
+import { EngineVector2 } from "../math/Vector2";
+import { Color } from "../../common/math/Color";
 import { UsageType } from "../../common/GLEnums";
-import { Matrix3 } from "../math/Matrix3";
-import { Matrix4 } from "../math/Matrix4";
+import { Matrix3 } from "../../common/math/Matrix3";
+import { EngineMatrix4 } from "../math/Matrix4";
 
 export class CloneToken {}
-const _vector = new Vector3();
-const _vector2 = new Vector2();
+const _vector = new EngineVector3();
+const _vector2 = new EngineVector2();
 export class UpdateRange {
   offset: u32;
   count: i32;
@@ -183,7 +183,7 @@ export class BufferAttribute<K, T extends TypedArray<K>> extends BaseAttribute {
   }
 
   static copyVector2sArray(
-    vectors: Vector2[],
+    vectors: EngineVector2[],
     buffer: BufferAttribute<f32, Float32Array>
   ): BufferAttribute<f32, Float32Array> {
     const array = buffer.array;
@@ -199,7 +199,7 @@ export class BufferAttribute<K, T extends TypedArray<K>> extends BaseAttribute {
   }
 
   static copyVector3sArray(
-    vectors: Vector3[],
+    vectors: EngineVector3[],
     buffer: BufferAttribute<f32, Float32Array>
   ): BufferAttribute<f32, Float32Array> {
     const array = buffer.array;
@@ -216,7 +216,7 @@ export class BufferAttribute<K, T extends TypedArray<K>> extends BaseAttribute {
   }
 
   static copyVector4sArray(
-    vectors: Vector4[],
+    vectors: EngineVector4[],
     buffer: BufferAttribute<f32, Float32Array>
   ): BufferAttribute<f32, Float32Array> {
     const array = buffer.array;
@@ -253,7 +253,10 @@ export class BufferAttribute<K, T extends TypedArray<K>> extends BaseAttribute {
     return buffer;
   }
 
-  static applyMatrix4(m: Matrix4, buffer: BufferAttribute<f32, Float32Array>): BufferAttribute<f32, Float32Array> {
+  static applyMatrix4(
+    m: EngineMatrix4,
+    buffer: BufferAttribute<f32, Float32Array>
+  ): BufferAttribute<f32, Float32Array> {
     for (let i: u32 = 0, l = buffer.count; i < l; i++) {
       _vector.x = buffer.getX(i);
       _vector.y = buffer.getY(i);
@@ -282,7 +285,7 @@ export class BufferAttribute<K, T extends TypedArray<K>> extends BaseAttribute {
   }
 
   static transformDirection(
-    m: Matrix4,
+    m: EngineMatrix4,
     buffer: BufferAttribute<f32, Float32Array>
   ): BufferAttribute<f32, Float32Array> {
     for (let i: u32 = 0, l = buffer.count; i < l; i++) {

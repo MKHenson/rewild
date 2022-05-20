@@ -11,10 +11,10 @@ import {
   ShadowSide,
   Precision,
 } from "../../common/GLEnums";
-import * as MathUtils from "../math/MathUtils";
-import { Plane } from "../math/Plane";
+import * as MathUtils from "../../common/math/MathUtils";
+import { Plane } from "../../common/math/Plane";
 import { Event } from "../core/Event";
-import { Vector2 } from "../math/Vector2";
+import { EngineVector2 } from "../math/Vector2";
 
 let materialId: u32 = 0;
 
@@ -56,7 +56,7 @@ export class Material extends EventDispatcher {
   colorWrite: boolean;
   precision: Precision; // TODO: This should be null
   polygonOffset: boolean;
-  polygonOffsetVector: Vector2;
+  polygonOffsetVector: EngineVector2;
   dithering: boolean;
   alphaTest: f32;
   alphaToCoverage: boolean;
@@ -120,7 +120,7 @@ export class Material extends EventDispatcher {
     this.precision = Precision.Default; // override the renderer's default precision for this material
 
     this.polygonOffset = false;
-    this.polygonOffsetVector = new Vector2();
+    this.polygonOffsetVector = new EngineVector2();
 
     this.dithering = false;
 

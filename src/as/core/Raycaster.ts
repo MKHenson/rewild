@@ -1,9 +1,9 @@
 import { Camera } from "../cameras/Camera";
 import { OrthographicCamera } from "../cameras/OrthographicCamera";
 import { PerspectiveCamera } from "../cameras/PerspectiveCamera";
-import { Ray } from "../math/Ray";
-import { Vector2 } from "../math/Vector2";
-import { Vector3 } from "../math/Vector3";
+import { Ray } from "../../common/math/Ray";
+import { EngineVector2 } from "../math/Vector2";
+import { EngineVector3 } from "../math/Vector3";
 import { Intersection } from "../objects/MeshNode";
 import { Layers } from "./Layers";
 import { TransformNode } from "./TransformNode";
@@ -24,7 +24,12 @@ export class Raycaster {
   layers: Layers;
   // params: RayCasterParams;
 
-  constructor(origin: Vector3 = new Vector3(), direction: Vector3 = new Vector3(), near: f32 = 0, far: f32 = Infinity) {
+  constructor(
+    origin: EngineVector3 = new EngineVector3(),
+    direction: EngineVector3 = new EngineVector3(),
+    near: f32 = 0,
+    far: f32 = Infinity
+  ) {
     this.ray = new Ray(origin, direction);
     // direction is assumed to be normalized (for accurate distance calculations)
 
@@ -42,20 +47,25 @@ export class Raycaster {
     // };
   }
 
-  set(origin: Vector3, direction: Vector3): void {
+  set(origin: EngineVector3, direction: EngineVector3): void {
     // direction is assumed to be normalized (for accurate distance calculations)
     this.ray.set(origin, direction);
   }
 
-  setFromCamera(coords: Vector2, camera: Camera): void {
+  setFromCamera(coords: EngineVector2, camera: Camera): void {
     if (camera && camera instanceof PerspectiveCamera) {
       const pCam = camera as PerspectiveCamera;
       this.ray.origin.setFromMatrixPosition(pCam.matrixWorld);
-      this.ray.direction.set(coords.x, coords.y, 0.5).unproject(camera).sub(this.ray.origin).normalize();
+      (this.ray.direction.set(coords.x, coords.y, 0.5) as EngineVector3)
+        .unproject(camera)
+        .sub(this.ray.origin)
+        .normalize();
       this.camera = camera;
     } else if (camera && camera instanceof OrthographicCamera) {
       const oCam = camera as OrthographicCamera;
-      this.ray.origin.set(coords.x, coords.y, (oCam.near + oCam.far) / (oCam.near - oCam.far)).unproject(oCam); // set origin in plane of camera
+      (
+        this.ray.origin.set(coords.x, coords.y, (oCam.near + oCam.far) / (oCam.near - oCam.far)) as EngineVector3
+      ).unproject(oCam); // set origin in plane of camera
       this.ray.direction.set(0, 0, -1).transformDirection(oCam.matrixWorld);
       this.camera = oCam;
     }

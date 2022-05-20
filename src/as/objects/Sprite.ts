@@ -1,7 +1,7 @@
-import { Vector2 } from "../math/Vector2";
-import { Vector3 } from "../math/Vector3";
-import { Matrix4 } from "../math/Matrix4";
-import { Triangle } from "../math/Triangle";
+import { EngineVector2 } from "../math/Vector2";
+import { EngineVector3 } from "../math/Vector3";
+import { EngineMatrix4 } from "../math/Matrix4";
+import { Triangle } from "../../common/math/Triangle";
 import { TransformNode } from "../core/TransformNode";
 import { BufferGeometry } from "../core/BufferGeometry";
 import { InterleavedBuffer } from "../core/InterleavedBuffer";
@@ -16,27 +16,27 @@ import { AttributeType } from "../../common/AttributeType";
 
 let _geometry: BufferGeometry;
 
-const _tempVec2 = new Vector2();
-const _intersectPoint = new Vector3();
-const _worldScale = new Vector3();
-const _mvPosition = new Vector3();
+const _tempVec2 = new EngineVector2();
+const _intersectPoint = new EngineVector3();
+const _worldScale = new EngineVector3();
+const _mvPosition = new EngineVector3();
 
-const _alignedPosition = new Vector2();
-const _rotatedPosition = new Vector2();
-const _viewWorldMatrix = new Matrix4();
+const _alignedPosition = new EngineVector2();
+const _rotatedPosition = new EngineVector2();
+const _viewWorldMatrix = new EngineMatrix4();
 
-const _vA = new Vector3();
-const _vB = new Vector3();
-const _vC = new Vector3();
+const _vA = new EngineVector3();
+const _vB = new EngineVector3();
+const _vC = new EngineVector3();
 
-const _uvA = new Vector2();
-const _uvB = new Vector2();
-const _uvC = new Vector2();
+const _uvA = new EngineVector2();
+const _uvB = new EngineVector2();
+const _uvC = new EngineVector2();
 
 export class Sprite extends TransformNode {
   geometry: BufferGeometry;
   material: SpriteMaterial;
-  center: Vector2;
+  center: EngineVector2;
 
   constructor(material: SpriteMaterial) {
     super();
@@ -58,7 +58,7 @@ export class Sprite extends TransformNode {
     this.geometry = _geometry;
     this.material = material !== undefined ? material : new SpriteMaterial();
 
-    this.center = new Vector2(0.5, 0.5);
+    this.center = new EngineVector2(0.5, 0.5);
   }
 
   raycast(raycaster: Raycaster, intersects: Intersection[]): void {
@@ -117,7 +117,7 @@ export class Sprite extends TransformNode {
     intersects.push({
       distance: distance,
       point: _intersectPoint.clone(),
-      uv: Triangle.getUV(_intersectPoint, _vA, _vB, _vC, _uvA, _uvB, _uvC, new Vector2()),
+      uv: Triangle.getUV(_intersectPoint, _vA, _vB, _vC, _uvA, _uvB, _uvC, new EngineVector2()),
       face: null,
       object: this,
       faceIndex: -1,
@@ -138,10 +138,10 @@ export class Sprite extends TransformNode {
 }
 
 function transformVertex(
-  vertexPosition: Vector3,
-  mvPosition: Vector3,
-  center: Vector2,
-  scale: Vector3,
+  vertexPosition: EngineVector3,
+  mvPosition: EngineVector3,
+  center: EngineVector2,
+  scale: EngineVector3,
   sin: f32,
   cos: f32
 ): void {

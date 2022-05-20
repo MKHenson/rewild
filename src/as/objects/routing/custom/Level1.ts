@@ -2,7 +2,7 @@ import { OrbitController } from "../../../extras/OrbitController";
 import { PointerLockController } from "../../../extras/PointerLockController";
 import { AmbientLight } from "../../../lights/AmbientLight";
 import { DirectionalLight } from "../../../lights/DirectionalLight";
-import { Color } from "../../../math/Color";
+import { Color } from "../../../../common/math/Color";
 import { Container } from "../core/Container";
 import { inputManager } from "../../../extras/io/InputManager";
 import { KeyboardEvent } from "../../../extras/io/KeyboardEvent";

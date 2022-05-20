@@ -5,11 +5,11 @@ import { Event } from "../core/Event";
 import { Listener } from "../core/EventDispatcher";
 import { inputManager } from "./io/InputManager";
 import { MouseEvent } from "./io/MouseEvent";
-import { Matrix4 } from "../math/Matrix4";
-import { Quaternion } from "../math/Quaternion";
-import { Spherical } from "../math/Spherical";
-import { Vector2 } from "../math/Vector2";
-import { Vector3 } from "../math/Vector3";
+import { EngineMatrix4 } from "../math/Matrix4";
+import { Quaternion } from "../../common/math/Quaternion";
+import { Spherical } from "../../common/math/Spherical";
+import { EngineVector2 } from "../math/Vector2";
+import { EngineVector3 } from "../math/Vector3";
 
 enum STATE {
   NONE = -1,
@@ -26,7 +26,7 @@ const EPS: f32 = 0.000001;
 export class OrbitController implements Listener {
   object: Camera;
   enabled: boolean;
-  target: Vector3;
+  target: EngineVector3;
   enableZoom: boolean;
   zoomSpeed: f32;
   minDistance: f32;
@@ -50,33 +50,33 @@ export class OrbitController implements Listener {
   private scale: f32;
   private zoomChanged: boolean;
   private state: STATE;
-  private panOffset: Vector3;
+  private panOffset: EngineVector3;
 
-  private target0: Vector3;
-  private position0: Vector3;
+  private target0: EngineVector3;
+  private position0: EngineVector3;
   private zoom0: f32;
 
-  private rotateStart: Vector2;
-  private rotateEnd: Vector2;
-  private rotateDelta: Vector2;
+  private rotateStart: EngineVector2;
+  private rotateEnd: EngineVector2;
+  private rotateDelta: EngineVector2;
 
-  private panStart: Vector2;
-  private panEnd: Vector2;
-  private panDelta: Vector2;
+  private panStart: EngineVector2;
+  private panEnd: EngineVector2;
+  private panDelta: EngineVector2;
 
-  private dollyStart: Vector2;
-  private dollyEnd: Vector2;
-  private dollyDelta: Vector2;
+  private dollyStart: EngineVector2;
+  private dollyEnd: EngineVector2;
+  private dollyDelta: EngineVector2;
 
-  private updateLastPosition: Vector3;
-  private updateOffset: Vector3;
+  private updateLastPosition: EngineVector3;
+  private updateOffset: EngineVector3;
   private updateQuat: Quaternion;
   private updateLastQuaternion: Quaternion;
   private updateQuatInverse: Quaternion;
 
-  private panLeftV: Vector3;
-  private panUpV: Vector3;
-  private panInternalOffset: Vector3;
+  private panLeftV: EngineVector3;
+  private panUpV: EngineVector3;
+  private panInternalOffset: EngineVector3;
 
   constructor(object: Camera) {
     this.object = object;
@@ -85,7 +85,7 @@ export class OrbitController implements Listener {
     this.enabled = true;
 
     // "target" sets the location of focus, where the object orbits around
-    this.target = new Vector3();
+    this.target = new EngineVector3();
 
     // How far you can dolly in and out ( PerspectiveCamera only )
     this.minDistance = 0;
@@ -120,7 +120,7 @@ export class OrbitController implements Listener {
     this.sphericalDelta = new Spherical();
 
     this.scale = 1;
-    this.panOffset = new Vector3();
+    this.panOffset = new EngineVector3();
     this.zoomChanged = false;
 
     // Set to true to enable damping (inertia)
@@ -140,28 +140,28 @@ export class OrbitController implements Listener {
     this.enablePan = true;
 
     // for update speedup
-    this.updateOffset = new Vector3();
+    this.updateOffset = new EngineVector3();
     // so camera.up is the orbit axis
-    this.updateQuat = new Quaternion().setFromUnitVectors(object.up, new Vector3(0, 1, 0));
-    this.updateQuatInverse = this.updateQuat.clone().invert();
-    this.updateLastPosition = new Vector3();
+    this.updateQuat = new Quaternion().setFromUnitVectors(object.up, new EngineVector3(0, 1, 0)) as Quaternion;
+    this.updateQuatInverse = this.updateQuat.clone().invert() as Quaternion;
+    this.updateLastPosition = new EngineVector3();
     this.updateLastQuaternion = new Quaternion();
 
-    this.rotateStart = new Vector2();
-    this.rotateEnd = new Vector2();
-    this.rotateDelta = new Vector2();
+    this.rotateStart = new EngineVector2();
+    this.rotateEnd = new EngineVector2();
+    this.rotateDelta = new EngineVector2();
 
-    this.panStart = new Vector2();
-    this.panEnd = new Vector2();
-    this.panDelta = new Vector2();
+    this.panStart = new EngineVector2();
+    this.panEnd = new EngineVector2();
+    this.panDelta = new EngineVector2();
 
-    this.dollyStart = new Vector2();
-    this.dollyEnd = new Vector2();
-    this.dollyDelta = new Vector2();
+    this.dollyStart = new EngineVector2();
+    this.dollyEnd = new EngineVector2();
+    this.dollyDelta = new EngineVector2();
 
-    this.panLeftV = new Vector3();
-    this.panUpV = new Vector3();
-    this.panInternalOffset = new Vector3();
+    this.panLeftV = new EngineVector3();
+    this.panUpV = new EngineVector3();
+    this.panInternalOffset = new EngineVector3();
 
     this.state = STATE.NONE;
 
@@ -365,13 +365,13 @@ export class OrbitController implements Listener {
     return false;
   }
 
-  panLeft(distance: f32, objectMatrix: Matrix4): void {
+  panLeft(distance: f32, objectMatrix: EngineMatrix4): void {
     this.panLeftV.setFromMatrixColumn(objectMatrix, 0); // get X column of objectMatrix
     this.panLeftV.multiplyScalar(-distance);
     this.panOffset.add(this.panLeftV);
   }
 
-  panUp(distance: f32, objectMatrix: Matrix4): void {
+  panUp(distance: f32, objectMatrix: EngineMatrix4): void {
     this.panUpV.setFromMatrixColumn(objectMatrix, 1); // get Y column of objectMatrix
     this.panUpV.multiplyScalar(distance);
     this.panOffset.add(this.panUpV);

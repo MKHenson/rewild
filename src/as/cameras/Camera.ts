@@ -1,11 +1,11 @@
-import { Matrix4 } from "../math/Matrix4";
+import { EngineMatrix4 } from "../math/Matrix4";
 import { TransformNode } from "../core/TransformNode";
-import { Vector3 } from "../math/Vector3";
+import { EngineVector3 } from "../math/Vector3";
 
 export class Camera extends TransformNode {
-  readonly matrixWorldInverse: Matrix4 = new Matrix4();
-  readonly projectionMatrix: Matrix4 = new Matrix4();
-  readonly projectionMatrixInverse: Matrix4 = new Matrix4();
+  readonly matrixWorldInverse: EngineMatrix4 = new EngineMatrix4();
+  readonly projectionMatrix: EngineMatrix4 = new EngineMatrix4();
+  readonly projectionMatrixInverse: EngineMatrix4 = new EngineMatrix4();
 
   constructor() {
     super();
@@ -22,7 +22,7 @@ export class Camera extends TransformNode {
     return this;
   }
 
-  getWorldDirection(target: Vector3): Vector3 {
+  getWorldDirection(target: EngineVector3): EngineVector3 {
     this.updateWorldMatrix(true, false);
 
     const e = this.matrixWorld.elements;

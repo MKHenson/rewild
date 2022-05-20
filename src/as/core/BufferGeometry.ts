@@ -1,6 +1,6 @@
-import { Vector3 } from "../math/Vector3";
-import { Vector2 } from "../math/Vector2";
-import { Box3 } from "../math/Box3";
+import { EngineVector3 } from "../math/Vector3";
+import { EngineVector2 } from "../math/Vector2";
+import { Box3 } from "../../common/math/Box3";
 import { EventDispatcher } from "./EventDispatcher";
 import {
   BaseAttribute,
@@ -10,12 +10,12 @@ import {
   Uint16BufferAttribute,
   Uint32BufferAttribute,
 } from "./BufferAttribute";
-import { Sphere } from "../math/Sphere";
+import { Sphere } from "../../common/math/Sphere";
 import { TransformNode } from "./TransformNode";
-import { Matrix4 } from "../math/Matrix4";
-import { Matrix3 } from "../math/Matrix3";
-import * as MathUtils from "../math/MathUtils";
-import { Quaternion } from "../math/Quaternion";
+import { EngineMatrix4 } from "../math/Matrix4";
+import { Matrix3 } from "../../common/math/Matrix3";
+import * as MathUtils from "../../common/math/MathUtils";
+import { Quaternion } from "../../common/math/Quaternion";
 import { ASError } from "./Error";
 import { GLBufferAttribute } from "./GLBufferAttribute";
 import { Event } from "./Event";
@@ -25,12 +25,12 @@ import { AttributeType } from "../../common/AttributeType";
 
 let _id = 0;
 
-const _m1 = new Matrix4();
+const _m1 = new EngineMatrix4();
 const _obj = new TransformNode();
-const _offset = new Vector3();
+const _offset = new EngineVector3();
 const _box = new Box3();
 const _boxMorphTargets = new Box3();
-const _vector = new Vector3();
+const _vector = new EngineVector3();
 
 export class BufferGeometryDrawRange {
   start: i32;
@@ -165,7 +165,7 @@ export class BufferGeometry extends EventDispatcher {
     this.drawRange.count = count;
   }
 
-  applyMatrix4(matrix: Matrix4): BufferGeometry {
+  applyMatrix4(matrix: EngineMatrix4): BufferGeometry {
     const position = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION);
 
     if (position) {
@@ -258,7 +258,7 @@ export class BufferGeometry extends EventDispatcher {
     return this;
   }
 
-  lookAt(vector: Vector3): BufferGeometry {
+  lookAt(vector: EngineVector3): BufferGeometry {
     _obj.lookAt(vector.x, vector.y, vector.z);
 
     _obj.updateMatrix();
@@ -278,7 +278,7 @@ export class BufferGeometry extends EventDispatcher {
     return this;
   }
 
-  setFromPoints(points: Vector3[]): BufferGeometry {
+  setFromPoints(points: EngineVector3[]): BufferGeometry {
     const position: f32[] = [];
 
     for (let i = 0, l = points.length; i < l; i++) {
@@ -309,7 +309,10 @@ export class BufferGeometry extends EventDispatcher {
         'BufferGeometry.computeBoundingBox(): GLBufferAttribute requires a manual bounding box. Alternatively set "mesh.frustumCulled" to "false".'
       );
 
-      this.boundingBox!.set(new Vector3(-Infinity, -Infinity, -Infinity), new Vector3(+Infinity, +Infinity, +Infinity));
+      this.boundingBox!.set(
+        new EngineVector3(-Infinity, -Infinity, -Infinity),
+        new EngineVector3(+Infinity, +Infinity, +Infinity)
+      );
 
       return;
     }
@@ -359,7 +362,7 @@ export class BufferGeometry extends EventDispatcher {
       BridgeManager.getBridge().print(
         'BufferGeometry.computeBoundingSphere(): GLBufferAttribute requires a manual bounding sphere. Alternatively set "mesh.frustumCulled" to "false".'
       );
-      this.boundingSphere!.set(new Vector3(), Infinity);
+      this.boundingSphere!.set(new EngineVector3(), Infinity);
       return;
     }
 
@@ -467,22 +470,22 @@ export class BufferGeometry extends EventDispatcher {
 
     const tangents = this.getAttribute<Float32BufferAttribute>(AttributeType.TANGENT)!.array;
 
-    const tan1: Vector3[] = [],
-      tan2: Vector3[] = [];
+    const tan1: EngineVector3[] = [],
+      tan2: EngineVector3[] = [];
 
     for (let i = 0; i < nVertices; i++) {
-      tan1[i] = new Vector3();
-      tan2[i] = new Vector3();
+      tan1[i] = new EngineVector3();
+      tan2[i] = new EngineVector3();
     }
 
-    const vA = new Vector3(),
-      vB = new Vector3(),
-      vC = new Vector3(),
-      uvA = new Vector2(),
-      uvB = new Vector2(),
-      uvC = new Vector2(),
-      sdir = new Vector3(),
-      tdir = new Vector3();
+    const vA = new EngineVector3(),
+      vB = new EngineVector3(),
+      vC = new EngineVector3(),
+      uvA = new EngineVector2(),
+      uvB = new EngineVector2(),
+      uvC = new EngineVector2(),
+      sdir = new EngineVector3(),
+      tdir = new EngineVector3();
 
     function handleTriangle(a: f32, b: f32, c: f32) {
       vA.fromF32Array(positions, a * 3);
@@ -534,10 +537,10 @@ export class BufferGeometry extends EventDispatcher {
       }
     }
 
-    const tmp = new Vector3(),
-      tmp2 = new Vector3();
-    const n = new Vector3(),
-      n2 = new Vector3();
+    const tmp = new EngineVector3(),
+      tmp2 = new EngineVector3();
+    const n = new EngineVector3(),
+      n2 = new EngineVector3();
 
     function handleVertex(v: u32) {
       n.fromF32Array(normals, v * 3);
@@ -594,14 +597,14 @@ export class BufferGeometry extends EventDispatcher {
         }
       }
 
-      const pA = new Vector3(),
-        pB = new Vector3(),
-        pC = new Vector3();
-      const nA = new Vector3(),
-        nB = new Vector3(),
-        nC = new Vector3();
-      const cb = new Vector3(),
-        ab = new Vector3();
+      const pA = new EngineVector3(),
+        pB = new EngineVector3(),
+        pC = new EngineVector3();
+      const nA = new EngineVector3(),
+        nB = new EngineVector3(),
+        nC = new EngineVector3();
+      const cb = new EngineVector3(),
+        ab = new EngineVector3();
 
       // indexed elements
 

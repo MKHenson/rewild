@@ -1,10 +1,10 @@
-import { Vector3 } from "../math/Vector3";
-import { Vector2 } from "../math/Vector2";
-import { Sphere } from "../math/Sphere";
-import { Ray } from "../math/Ray";
-import { Matrix4 } from "../math/Matrix4";
+import { EngineVector3 } from "../math/Vector3";
+import { EngineVector2 } from "../math/Vector2";
+import { Sphere } from "../../common/math/Sphere";
+import { Ray } from "../../common/math/Ray";
+import { EngineMatrix4 } from "../math/Matrix4";
 import { TransformNode } from "../core/TransformNode";
-import { Triangle } from "../math/Triangle";
+import { Triangle } from "../../common/math/Triangle";
 import { Side } from "../../common/GLEnums";
 import { BufferGeometry } from "../core/BufferGeometry";
 import { MeshPipelineInstance } from "../pipelines/MeshPipelineInstance";
@@ -13,48 +13,49 @@ import { BufferAttribute, Float32BufferAttribute } from "../core/BufferAttribute
 import { SkinnedMesh } from "./SkinnedMesh";
 import { PipelineInstance } from "../pipelines/PipelineInstance";
 import { AttributeType } from "../../common/AttributeType";
+import { Vector3 } from "../../common/math/Vector3";
 
 export class Face {
   public a: i32;
   public b: i32;
   public c: i32;
-  public normal: Vector3;
+  public normal: EngineVector3;
   public materialIndex: i32;
 }
 
 export class Intersection {
   public distance: f32;
-  public point: Vector3;
+  public point: EngineVector3;
   public object: TransformNode;
   public faceIndex: i32;
   public face: Face | null;
-  public uv: Vector2 | null;
-  public uv2: Vector2 | null;
+  public uv: EngineVector2 | null;
+  public uv2: EngineVector2 | null;
   public instanceId: i32;
 }
 
-const _inverseMatrix = new Matrix4();
+const _inverseMatrix = new EngineMatrix4();
 const _ray = new Ray();
 const _sphere = new Sphere();
 
-const _vA = new Vector3();
-const _vB = new Vector3();
-const _vC = new Vector3();
+const _vA = new EngineVector3();
+const _vB = new EngineVector3();
+const _vC = new EngineVector3();
 
-const _tempA = new Vector3();
-const _tempB = new Vector3();
-const _tempC = new Vector3();
+const _tempA = new EngineVector3();
+const _tempB = new EngineVector3();
+const _tempC = new EngineVector3();
 
-const _morphA = new Vector3();
-const _morphB = new Vector3();
-const _morphC = new Vector3();
+const _morphA = new EngineVector3();
+const _morphB = new EngineVector3();
+const _morphC = new EngineVector3();
 
-const _uvA = new Vector2();
-const _uvB = new Vector2();
-const _uvC = new Vector2();
+const _uvA = new EngineVector2();
+const _uvB = new EngineVector2();
+const _uvC = new EngineVector2();
 
-const _intersectionPoint = new Vector3();
-const _intersectionPointWorld = new Vector3();
+const _intersectionPoint = new EngineVector3();
+const _intersectionPointWorld = new EngineVector3();
 
 export class MeshNode extends TransformNode {
   pipelines: MeshPipelineInstance[];
@@ -311,10 +312,10 @@ function checkIntersection(
   pipeline: PipelineInstance,
   raycaster: Raycaster,
   ray: Ray,
-  pA: Vector3,
-  pB: Vector3,
-  pC: Vector3,
-  point: Vector3
+  pA: EngineVector3,
+  pB: EngineVector3,
+  pC: EngineVector3,
+  point: EngineVector3
 ): Intersection | null {
   let intersect: Vector3 | null = null;
 
@@ -420,7 +421,16 @@ function checkBufferGeometryIntersection(
       _uvB.fromBufferAttribute(uv, b);
       _uvC.fromBufferAttribute(uv, c);
 
-      intersection.uv = Triangle.getUV(_intersectionPoint, _vA, _vB, _vC, _uvA, _uvB, _uvC, new Vector2());
+      intersection.uv = Triangle.getUV(
+        _intersectionPoint,
+        _vA,
+        _vB,
+        _vC,
+        _uvA,
+        _uvB,
+        _uvC,
+        new EngineVector2()
+      ) as EngineVector2;
     }
 
     if (uv2) {
@@ -428,14 +438,23 @@ function checkBufferGeometryIntersection(
       _uvB.fromBufferAttribute(uv2, b);
       _uvC.fromBufferAttribute(uv2, c);
 
-      intersection.uv2 = Triangle.getUV(_intersectionPoint, _vA, _vB, _vC, _uvA, _uvB, _uvC, new Vector2());
+      intersection.uv2 = Triangle.getUV(
+        _intersectionPoint,
+        _vA,
+        _vB,
+        _vC,
+        _uvA,
+        _uvB,
+        _uvC,
+        new EngineVector2()
+      ) as EngineVector2;
     }
 
     const face: Face = {
       a: a,
       b: b,
       c: c,
-      normal: new Vector3(),
+      normal: new EngineVector3(),
       materialIndex: 0,
     };
 

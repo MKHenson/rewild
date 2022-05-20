@@ -1,5 +1,5 @@
 import { TransformNode } from "../core/TransformNode";
-import { Color } from "../math/Color";
+import { Color } from "../../common/math/Color";
 
 export class Light extends TransformNode {
   isLight: boolean = true;

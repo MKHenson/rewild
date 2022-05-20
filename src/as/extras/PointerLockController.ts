@@ -4,11 +4,12 @@ import { Listener } from "../core/EventDispatcher";
 import { MouseEvent } from "./io/MouseEvent";
 import { KeyboardEvent } from "./io/KeyboardEvent";
 import { inputManager } from "./io/InputManager";
-import { Euler, EulerRotationOrder } from "../math/Euler";
-import { Vector3 } from "../math/Vector3";
+import { Euler } from "../../common/math/Euler";
+import { EulerRotationOrder } from "../../common/math/Euler";
+import { EngineVector3 } from "../math/Vector3";
 
 const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);
-const _vector = new Vector3();
+const _vector = new EngineVector3();
 
 // const _changeEvent = { type: "change" };
 // const _lockEvent = { type: "lock" };
@@ -16,7 +17,7 @@ const _vector = new Vector3();
 
 const _PI_2: f32 = Mathf.PI / 2;
 
-const direction = new Vector3(0, 0, -1);
+const direction = new EngineVector3(0, 0, -1);
 
 export class PointerLockController implements Listener {
   minPolarAngle: f32;
@@ -107,8 +108,8 @@ export class PointerLockController implements Listener {
     return this.camera;
   }
 
-  getDirection(v: Vector3): Vector3 {
-    return v.copy(direction).applyQuaternion(this.camera.quaternion);
+  getDirection(v: EngineVector3): EngineVector3 {
+    return v.copy(direction).applyQuaternion(this.camera.quaternion) as EngineVector3;
   }
 
   moveForward(distance: f32): void {

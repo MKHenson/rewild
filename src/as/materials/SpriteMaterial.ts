@@ -1,5 +1,5 @@
 import { Material } from "./Material";
-import { Color } from "../math/Color";
+import { Color } from "../../common/math/Color";
 import { Texture } from "../textures/Texture";
 
 /**

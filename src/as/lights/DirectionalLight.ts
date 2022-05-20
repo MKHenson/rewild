@@ -1,7 +1,7 @@
 import { Light } from "./Light";
 import { DirectionalLightShadow } from "./DirectionalLightShadow";
 import { TransformNode } from "../core/TransformNode";
-import { Color } from "../math/Color";
+import { Color } from "../../common/math/Color";
 
 export class DirectionalLight extends Light {
   target: TransformNode;

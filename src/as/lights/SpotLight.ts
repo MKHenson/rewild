@@ -1,7 +1,7 @@
 import { Light } from "./Light";
 import { SpotLightShadow } from "./SpotLightShadow";
 import { TransformNode } from "../core/TransformNode";
-import { Color } from "../math/Color";
+import { Color } from "../../common/math/Color";
 
 export class SpotLight extends Light {
   target: TransformNode;

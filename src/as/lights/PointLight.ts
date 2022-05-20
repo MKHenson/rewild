@@ -1,4 +1,4 @@
-import { Color } from "../math/Color";
+import { Color } from "../../common/math/Color";
 import { Light } from "./Light";
 import { PointLightShadow } from "./PointLightShadow";
 

@@ -2,7 +2,10 @@ import { Euler, EulerRotationOrder } from "./Euler";
 import * as MathUtils from "./MathUtils";
 import { Matrix4 } from "./Matrix4";
 import { Vector3 } from "./Vector3";
-import { TransformNode } from "../core/TransformNode";
+
+export interface IQuatChangeListener {
+  onQuatChanged(quat: Quaternion): void;
+}
 
 export class Quaternion {
   _x: f32;
@@ -11,7 +14,7 @@ export class Quaternion {
   _w: f32;
 
   isQuaternion: boolean = true;
-  _onChangeCallback: TransformNode | null;
+  _onChangeCallback: IQuatChangeListener | null;
 
   constructor(x: f32 = 0, y: f32 = 0, z: f32 = 0, w: f32 = 1) {
     this._x = x;
@@ -571,7 +574,7 @@ export class Quaternion {
     if (this._onChangeCallback) this._onChangeCallback!.onQuatChanged(this);
   }
 
-  _onChange(callback: TransformNode): Quaternion {
+  _onChange(callback: IQuatChangeListener): Quaternion {
     this._onChangeCallback = callback;
 
     return this;
