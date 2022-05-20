@@ -1,8 +1,6 @@
-import { BufferGeometry } from "../core/BufferGeometry";
-import { Float32BufferAttribute } from "../core/BufferAttribute";
-import { EngineVector3 } from "../math/Vector3";
-import { f32Array } from "../utils";
-import { AttributeType } from "../../common/AttributeType";
+import { Geometry } from "./Geometry";
+import { Vector3 } from "../../../common/math/Vector3";
+import { AttributeType } from "../../../common/AttributeType";
 
 export class BoxGeometryParameters {
   public width: f32;
@@ -56,7 +54,7 @@ class BoxGeometryBuilder {
     let vertexCounter: u16 = 0;
     let groupCount: u16 = 0;
 
-    const vector = new EngineVector3();
+    const vector = new Vector3();
 
     // generate vertices, normals and uvs
 
@@ -144,7 +142,7 @@ class BoxGeometryBuilder {
   }
 }
 
-export class BoxGeometry extends BufferGeometry {
+export class BoxGeometry extends Geometry {
   parameters: BoxGeometryParameters;
 
   constructor(
@@ -156,8 +154,6 @@ export class BoxGeometry extends BufferGeometry {
     depthSegments: u16 = 1
   ) {
     super();
-
-    this.type = "BoxGeometry";
 
     this.parameters = {
       width: width,
@@ -187,24 +183,12 @@ export class BoxGeometry extends BufferGeometry {
     // build geometry
 
     this.setIndexes(builder.indices);
-    this.setAttribute(AttributeType.POSITION, new Float32BufferAttribute(f32Array(builder.vertices), 3));
-    this.setAttribute(AttributeType.NORMAL, new Float32BufferAttribute(f32Array(builder.normals), 3));
-    this.setAttribute(AttributeType.UV, new Float32BufferAttribute(f32Array(builder.uvs), 2));
+    this.setAttribute(AttributeType.POSITION, new Float32Array(builder.vertices), 3);
+    this.setAttribute(AttributeType.NORMAL, new Float32Array(builder.normals), 3);
+    this.setAttribute(AttributeType.UV, new Float32Array(builder.uvs), 2);
   }
 
   // static fromJSON( data ) {
   // 	return new BoxGeometry( data.width, data.height, data.depth, data.widthSegments, data.heightSegments, data.depthSegments );
   // }
-}
-
-export function createBox(
-  width: f32 = 1,
-  height: f32 = 1,
-  depth: f32 = 1,
-  widthSegments: u16 = 1,
-  heightSegments: u16 = 1,
-  depthSegments: u16 = 1
-): BufferGeometry {
-  const geometry = new BoxGeometry(width, height, depth, widthSegments, heightSegments, depthSegments);
-  return geometry;
 }

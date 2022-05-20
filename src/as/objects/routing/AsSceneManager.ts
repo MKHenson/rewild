@@ -1,5 +1,5 @@
 import { Runtime } from "./core/Runtime";
-import { Vector4 } from "../../math/Vector4";
+import { EngineVector4 } from "../../math/Vector4";
 import { WebGPURenderer } from "../../renderers/WebGPURenderer";
 import { Container } from ".";
 
@@ -12,7 +12,7 @@ export function getRuntime(): Runtime {
 
 export function init(w: u16, h: u16): void {
   console.log("Starting Engine");
-  renderer.init(new Vector4(0, 0, f32(w), f32(h)));
+  renderer.init(new EngineVector4(0, 0, f32(w), f32(h)));
   runtime = new Runtime(f32(w), f32(h), renderer);
 }
 

@@ -1,38 +1,39 @@
-import { Euler } from "../math/Euler";
-import { Matrix4 } from "../math/Matrix4";
-import { Matrix3 } from "../math/Matrix3";
-import { Quaternion } from "../math/Quaternion";
-import { Vector3 } from "../math/Vector3";
+import { Euler, IEulerChangeListener } from "../../common/math/Euler";
+import { EngineMatrix4 } from "../math/Matrix4";
+import { Matrix3 } from "../../common/math/Matrix3";
+import { Quaternion } from "../../common/math/Quaternion";
+import { EngineVector3 } from "../math/Vector3";
 import { Event } from "./Event";
 import { EventDispatcher } from "./EventDispatcher";
 import { Layers } from "./Layers";
-import * as MathUtils from "../math/MathUtils";
+import * as MathUtils from "../../common/math/MathUtils";
 import { Camera } from "../cameras/Camera";
 import { Light } from "../lights/Light";
 import { Raycaster } from "./Raycaster";
 import { Intersection } from "../objects/MeshNode";
+import { IQuatChangeListener } from "../../common/math/Quaternion";
 
 let object3DId: i32 = 1;
 
-const _v1 = new Vector3();
+const _v1 = new EngineVector3();
 const _q1 = new Quaternion();
-const _m1 = new Matrix4();
-const _target = new Vector3();
+const _m1 = new EngineMatrix4();
+const _target = new EngineVector3();
 
-const _position = new Vector3();
-const _scale = new Vector3();
+const _position = new EngineVector3();
+const _scale = new EngineVector3();
 const _quaternion = new Quaternion();
 
-const _xAxis = new Vector3(1, 0, 0);
-const _yAxis = new Vector3(0, 1, 0);
-const _zAxis = new Vector3(0, 0, 1);
+const _xAxis = new EngineVector3(1, 0, 0);
+const _yAxis = new EngineVector3(0, 1, 0);
+const _zAxis = new EngineVector3(0, 0, 1);
 
 type TraverseCallback = (object: TransformNode) => void;
 const _addedEvent: Event = new Event("added");
 const _removedEvent: Event = new Event("removed");
 
-export class TransformNode extends EventDispatcher {
-  static DefaultUp: Vector3 = new Vector3(0, 1, 0);
+export class TransformNode extends EventDispatcher implements IQuatChangeListener, IEulerChangeListener {
+  static DefaultUp: EngineVector3 = new EngineVector3(0, 1, 0);
   static DefaultMatrixAutoUpdate: boolean = true;
 
   uuid: string = MathUtils.generateUUID();
@@ -40,9 +41,9 @@ export class TransformNode extends EventDispatcher {
   type: string;
   parent: TransformNode | null;
   children: TransformNode[];
-  matrix: Matrix4;
-  matrixWorld: Matrix4;
-  up: Vector3;
+  matrix: EngineMatrix4;
+  matrixWorld: EngineMatrix4;
+  up: EngineVector3;
   castShadow: boolean;
   receiveShadow: boolean;
   frustumCulled: boolean;
@@ -57,20 +58,20 @@ export class TransformNode extends EventDispatcher {
 
   id: i32 = object3DId++;
 
-  readonly position: Vector3;
+  readonly position: EngineVector3;
   readonly rotation: Euler;
   readonly quaternion: Quaternion;
-  readonly scale: Vector3;
-  readonly modelViewMatrix: Matrix4;
+  readonly scale: EngineVector3;
+  readonly modelViewMatrix: EngineMatrix4;
   readonly normalMatrix: Matrix3;
 
   constructor() {
     super();
-    this.position = new Vector3();
+    this.position = new EngineVector3();
     this.rotation = new Euler();
     this.quaternion = new Quaternion();
-    this.scale = new Vector3(1, 1, 1);
-    this.modelViewMatrix = new Matrix4();
+    this.scale = new EngineVector3(1, 1, 1);
+    this.modelViewMatrix = new EngineMatrix4();
     this.normalMatrix = new Matrix3();
 
     this.uuid = MathUtils.generateUUID();
@@ -83,8 +84,8 @@ export class TransformNode extends EventDispatcher {
 
     this.up = TransformNode.DefaultUp.clone();
 
-    this.matrix = new Matrix4();
-    this.matrixWorld = new Matrix4();
+    this.matrix = new EngineMatrix4();
+    this.matrixWorld = new EngineMatrix4();
 
     this.matrixAutoUpdate = TransformNode.DefaultMatrixAutoUpdate;
     this.matrixWorldNeedsUpdate = false;
@@ -116,7 +117,7 @@ export class TransformNode extends EventDispatcher {
   onBeforeRender(): void {}
   onAfterRender(): void {}
 
-  applyMatrix4(matrix: Matrix4): void {
+  applyMatrix4(matrix: EngineMatrix4): void {
     if (this.matrixAutoUpdate) this.updateMatrix();
 
     this.matrix.premultiply(matrix);
@@ -130,7 +131,7 @@ export class TransformNode extends EventDispatcher {
     return this;
   }
 
-  setRotationFromAxisAngle(axis: Vector3, angle: f32): void {
+  setRotationFromAxisAngle(axis: EngineVector3, angle: f32): void {
     // assumes axis is normalized
 
     this.quaternion.setFromAxisAngle(axis, angle);
@@ -140,7 +141,7 @@ export class TransformNode extends EventDispatcher {
     this.quaternion.setFromEuler(euler, true);
   }
 
-  setRotationFromMatrix(m: Matrix4): void {
+  setRotationFromMatrix(m: EngineMatrix4): void {
     // assumes the upper 3x3 of m is a pure rotation matrix (i.e, unscaled)
 
     this.quaternion.setFromRotationMatrix(m);
@@ -152,7 +153,7 @@ export class TransformNode extends EventDispatcher {
     this.quaternion.copy(q);
   }
 
-  rotateOnAxis(axis: Vector3, angle: f32): TransformNode {
+  rotateOnAxis(axis: EngineVector3, angle: f32): TransformNode {
     // rotate object on axis in object space
     // axis is assumed to be normalized
 
@@ -163,7 +164,7 @@ export class TransformNode extends EventDispatcher {
     return this;
   }
 
-  rotateOnWorldAxis(axis: Vector3, angle: f32): TransformNode {
+  rotateOnWorldAxis(axis: EngineVector3, angle: f32): TransformNode {
     // rotate object on axis in world space
     // axis is assumed to be normalized
     // method assumes no rotated parent
@@ -187,7 +188,7 @@ export class TransformNode extends EventDispatcher {
     return this.rotateOnAxis(_zAxis, angle);
   }
 
-  translateOnAxis(axis: Vector3, distance: f32): TransformNode {
+  translateOnAxis(axis: EngineVector3, distance: f32): TransformNode {
     // translate object by distance along axis in object space
     // axis is assumed to be normalized
 
@@ -210,12 +211,12 @@ export class TransformNode extends EventDispatcher {
     return this.translateOnAxis(_zAxis, distance);
   }
 
-  localToWorld(vector: Vector3): Vector3 {
-    return vector.applyMatrix4(this.matrixWorld);
+  localToWorld(vector: EngineVector3): EngineVector3 {
+    return vector.applyMatrix4(this.matrixWorld) as EngineVector3;
   }
 
-  worldToLocal(vector: Vector3): Vector3 {
-    return vector.applyMatrix4(_m1.copy(this.matrixWorld).invertSIMD());
+  worldToLocal(vector: EngineVector3): EngineVector3 {
+    return vector.applyMatrix4(_m1.copy(this.matrixWorld).invertSIMD()) as EngineVector3;
   }
 
   lookAt(x: f32, y: f32, z: f32): void {
@@ -311,10 +312,10 @@ export class TransformNode extends EventDispatcher {
   //   return undefined;
   // }
 
-  getWorldPosition(target: Vector3): Vector3 {
+  getWorldPosition(target: EngineVector3): EngineVector3 {
     this.updateWorldMatrix(true, false);
 
-    return target.setFromMatrixPosition(this.matrixWorld);
+    return target.setFromMatrixPosition(this.matrixWorld) as EngineVector3;
   }
 
   getWorldQuaternion(target: Quaternion): Quaternion {
@@ -325,7 +326,7 @@ export class TransformNode extends EventDispatcher {
     return target;
   }
 
-  getWorldScale(target: Vector3): Vector3 {
+  getWorldScale(target: EngineVector3): EngineVector3 {
     this.updateWorldMatrix(true, false);
 
     this.matrixWorld.decompose(_position, _quaternion, target);
@@ -333,12 +334,12 @@ export class TransformNode extends EventDispatcher {
     return target;
   }
 
-  getWorldDirection(target: Vector3): Vector3 {
+  getWorldDirection(target: EngineVector3): EngineVector3 {
     this.updateWorldMatrix(true, false);
 
     const e = this.matrixWorld.elements;
 
-    return target.set(e[8], e[9], e[10]).normalize();
+    return target.set(e[8], e[9], e[10]).normalize() as EngineVector3;
   }
 
   raycast(raycaster: Raycaster, intersects: Intersection[]): void {}

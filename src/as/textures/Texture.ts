@@ -1,8 +1,8 @@
 import { EventDispatcher } from "../core/EventDispatcher";
 import { Mapping, Wrapping, TextureFilter, PixelFormat, TextureDataType, TextureEncoding } from "../../common/GLEnums";
-import * as MathUtils from "../math/MathUtils";
-import { Vector2 } from "../math/Vector2";
-import { Matrix3 } from "../math/Matrix3";
+import * as MathUtils from "../../common//math/MathUtils";
+import { EngineVector2 } from "../math/Vector2";
+import { Matrix3 } from "../../common/math/Matrix3";
 // import { ImageUtils } from "../extras/ImageUtils";
 import { Event } from "../core/Event";
 
@@ -29,9 +29,9 @@ export class Texture extends EventDispatcher {
   format: PixelFormat;
   internalFormat: PixelFormat; // TODO: THis should be null
   type: TextureDataType;
-  offset: Vector2;
-  repeat: Vector2;
-  center: Vector2;
+  offset: EngineVector2;
+  repeat: EngineVector2;
+  center: EngineVector2;
   rotation: f32;
   matrixAutoUpdate: boolean;
   matrix: Matrix3;
@@ -83,9 +83,9 @@ export class Texture extends EventDispatcher {
     this.internalFormat = PixelFormat.RGBAFormat;
     this.type = type;
 
-    this.offset = new Vector2(0, 0);
-    this.repeat = new Vector2(1, 1);
-    this.center = new Vector2(0, 0);
+    this.offset = new EngineVector2(0, 0);
+    this.repeat = new EngineVector2(1, 1);
+    this.center = new EngineVector2(0, 0);
     this.rotation = 0;
 
     this.matrixAutoUpdate = true;
@@ -253,7 +253,7 @@ export class Texture extends EventDispatcher {
     this.dispatchEvent(this.disposeEvent);
   }
 
-  transformUv(uv: Vector2): Vector2 {
+  transformUv(uv: EngineVector2): EngineVector2 {
     if (this.mapping != Mapping.UVMapping) return uv;
 
     uv.applyMatrix3(this.matrix);

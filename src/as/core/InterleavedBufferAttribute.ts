@@ -1,12 +1,12 @@
 import { UsageType } from "../../common/GLEnums";
-import { Matrix3 } from "../math/Matrix3";
-import { Matrix4 } from "../math/Matrix4";
-import { Vector3 } from "../math/Vector3";
+import { Matrix3 } from "../../common/math/Matrix3";
+import { EngineMatrix4 } from "../math/Matrix4";
+import { EngineVector3 } from "../math/Vector3";
 import { BaseAttribute, CloneToken, Float32BufferAttribute, UpdateRange } from "./BufferAttribute";
 // import { BufferAttribute } from "./BufferAttribute";
 import { InterleavedBuffer } from "./InterleavedBuffer";
 
-const _vector = new Vector3();
+const _vector = new EngineVector3();
 
 export class InterleavedBufferAttribute extends BaseAttribute {
   data: InterleavedBuffer;
@@ -76,7 +76,7 @@ export class InterleavedBufferAttribute extends BaseAttribute {
     return null;
   }
 
-  applyMatrix4(m: Matrix4): InterleavedBufferAttribute {
+  applyMatrix4(m: EngineMatrix4): InterleavedBufferAttribute {
     for (let i = 0, l = this.data.count; i < l; i++) {
       _vector.x = this.getX(i);
       _vector.y = this.getY(i);
@@ -104,7 +104,7 @@ export class InterleavedBufferAttribute extends BaseAttribute {
     return this;
   }
 
-  transformDirection(m: Matrix4): InterleavedBufferAttribute {
+  transformDirection(m: EngineMatrix4): InterleavedBufferAttribute {
     for (let i = 0, l = this.count; i < l; i++) {
       _vector.x = this.getX(i);
       _vector.y = this.getY(i);

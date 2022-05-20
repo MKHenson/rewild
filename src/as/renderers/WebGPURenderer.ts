@@ -1,8 +1,8 @@
 import { Camera } from "../cameras/Camera";
 import { TransformNode } from "../core/TransformNode";
 import { WebGPURenderQueue } from "./WebGPURenderQueue";
-import { Matrix4 } from "../math/Matrix4";
-import { Vector4 } from "../math/Vector4";
+import { EngineMatrix4 } from "../math/Matrix4";
+import { EngineVector4 } from "../math/Vector4";
 import { MeshNode } from "../objects/MeshNode";
 import { WebGPUGeometries } from "./WebGPUGeometries";
 import { GroupType } from "../../common/GroupType";
@@ -28,20 +28,20 @@ export class RenderList {
 }
 
 export class WebGPURenderer {
-  view!: Vector4;
+  view!: EngineVector4;
   geometries: WebGPUGeometries;
   lights: WebGPULights;
-  private _projScreenMatrix: Matrix4;
+  private _projScreenMatrix: EngineMatrix4;
   private currentRenderList: RenderList;
 
   constructor() {
-    this._projScreenMatrix = new Matrix4();
+    this._projScreenMatrix = new EngineMatrix4();
     this.currentRenderList = new RenderList();
     this.geometries = new WebGPUGeometries();
     this.lights = new WebGPULights();
   }
 
-  init(view: Vector4): void {
+  init(view: EngineVector4): void {
     console.log(`Initializing WGPU renderer`);
     this.view = view;
   }

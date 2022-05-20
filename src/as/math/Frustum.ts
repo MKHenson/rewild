@@ -1,13 +1,13 @@
-import { Vector3 } from "./Vector3";
-import { Sphere } from "./Sphere";
-import { Plane } from "./Plane";
-import { Matrix4 } from "./Matrix4";
-import { Box3 } from "./Box3";
+import { EngineVector3 } from "./Vector3";
+import { Sphere } from "../../common/math/Sphere";
+import { Plane } from "../../common/math//Plane";
+import { EngineMatrix4 } from "./Matrix4";
+import { Box3 } from "../../common/math/Box3";
 import { MeshNode } from "../objects/MeshNode";
 import { Sprite } from "../objects/Sprite";
 
 const _sphere = new Sphere();
-const _vector = new Vector3();
+const _vector = new EngineVector3();
 
 export class Frustum {
   planes: Plane[];
@@ -46,7 +46,7 @@ export class Frustum {
     return this;
   }
 
-  setFromProjectionMatrix(m: Matrix4): Frustum {
+  setFromProjectionMatrix(m: EngineMatrix4): Frustum {
     const planes = this.planes;
     const me = m.elements;
     const me0 = me[0],
@@ -130,7 +130,7 @@ export class Frustum {
     return true;
   }
 
-  containsPoint(point: Vector3): boolean {
+  containsPoint(point: EngineVector3): boolean {
     const planes = this.planes;
 
     for (let i = 0; i < 6; i++) {

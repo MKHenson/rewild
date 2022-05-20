@@ -1,14 +1,14 @@
 import { InstancedBufferAttribute } from "../core/InstancedBufferAttribute";
 import { Intersection, MeshNode } from "./MeshNode";
-import { Matrix4 } from "../math/Matrix4";
+import { EngineMatrix4 } from "../math/Matrix4";
 import { Raycaster } from "../core/Raycaster";
 import { Material } from "../materials/Material";
 import { BufferGeometry } from "../core/BufferGeometry";
 import { Color } from "../math/Color";
 import { Event } from "../core/Event";
 
-const _instanceLocalMatrix = new Matrix4();
-const _instanceWorldMatrix = new Matrix4();
+const _instanceLocalMatrix = new EngineMatrix4();
+const _instanceWorldMatrix = new EngineMatrix4();
 
 const _instanceIntersects: Intersection[] = [];
 const _mesh = new MeshNode();
@@ -48,7 +48,7 @@ export class InstancedMesh extends MeshNode {
     color.fromF32Array(this.instanceColor!.array, index * 3);
   }
 
-  getMatrixAt(index: i32, matrix: Matrix4): void {
+  getMatrixAt(index: i32, matrix: EngineMatrix4): void {
     matrix.fromArray(this.instanceMatrix.array, index * 16);
   }
 
@@ -93,7 +93,7 @@ export class InstancedMesh extends MeshNode {
     color.toF32Array(this.instanceColor.array, index * 3);
   }
 
-  setMatrixAt(index: i32, matrix: Matrix4): void {
+  setMatrixAt(index: i32, matrix: EngineMatrix4): void {
     matrix.toArray(this.instanceMatrix.array, index * 16);
   }
 

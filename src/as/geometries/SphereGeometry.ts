@@ -1,6 +1,6 @@
 import { BufferGeometry } from "../core/BufferGeometry";
 import { Float32BufferAttribute } from "../core/BufferAttribute";
-import { Vector3 } from "../math/Vector3";
+import { EngineVector3 } from "../math/Vector3";
 import { f32Array } from "../utils";
 import { AttributeType } from "../../common/AttributeType";
 export class SphereGeometryParameters {
@@ -46,8 +46,8 @@ export class SphereGeometry extends BufferGeometry {
     let index: u32 = 0;
     const grid: u32[][] = [];
 
-    const vertex = new Vector3();
-    const normal = new Vector3();
+    const vertex = new EngineVector3();
+    const normal = new EngineVector3();
 
     // buffers
 

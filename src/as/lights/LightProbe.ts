@@ -1,4 +1,4 @@
-import { Color } from "../math/Color";
+import { Color } from "../../common/math/Color";
 import { SphericalHarmonics3 } from "../math/SphericalHarmonics3";
 import { Light } from "./Light";
 

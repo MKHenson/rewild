@@ -1,23 +1,23 @@
 import { LightShadow } from "./LightShadow";
 import { PerspectiveCamera } from "../cameras/PerspectiveCamera";
-import { Matrix4 } from "../math/Matrix4";
-import { Vector2 } from "../math/Vector2";
-import { Vector3 } from "../math/Vector3";
-import { Vector4 } from "../math/Vector4";
+import { EngineMatrix4 } from "../math/Matrix4";
+import { EngineVector2 } from "../math/Vector2";
+import { EngineVector3 } from "../math/Vector3";
+import { EngineVector4 } from "../math/Vector4";
 import { PointLight } from "./PointLight";
 
-const _projScreenMatrix = new Matrix4();
-const _lightPositionWorld = new Vector3();
-const _lookTarget = new Vector3();
+const _projScreenMatrix = new EngineMatrix4();
+const _lightPositionWorld = new EngineVector3();
+const _lookTarget = new EngineVector3();
 
 export class PointLightShadow extends LightShadow {
-  _cubeDirections: Vector3[];
-  _cubeUps: Vector3[];
+  _cubeDirections: EngineVector3[];
+  _cubeUps: EngineVector3[];
 
   constructor() {
     super(new PerspectiveCamera(90, 1, 0.5, 500));
 
-    this._frameExtents = new Vector2(4, 2);
+    this._frameExtents = new EngineVector2(4, 2);
 
     this._viewportCount = 6;
 
@@ -36,35 +36,35 @@ export class PointLightShadow extends LightShadow {
       // z - Negative z direction
 
       // positive X
-      new Vector4(2, 1, 1, 1),
+      new EngineVector4(2, 1, 1, 1),
       // negative X
-      new Vector4(0, 1, 1, 1),
+      new EngineVector4(0, 1, 1, 1),
       // positive Z
-      new Vector4(3, 1, 1, 1),
+      new EngineVector4(3, 1, 1, 1),
       // negative Z
-      new Vector4(1, 1, 1, 1),
+      new EngineVector4(1, 1, 1, 1),
       // positive Y
-      new Vector4(3, 0, 1, 1),
+      new EngineVector4(3, 0, 1, 1),
       // negative Y
-      new Vector4(1, 0, 1, 1),
+      new EngineVector4(1, 0, 1, 1),
     ];
 
     this._cubeDirections = [
-      new Vector3(1, 0, 0),
-      new Vector3(-1, 0, 0),
-      new Vector3(0, 0, 1),
-      new Vector3(0, 0, -1),
-      new Vector3(0, 1, 0),
-      new Vector3(0, -1, 0),
+      new EngineVector3(1, 0, 0),
+      new EngineVector3(-1, 0, 0),
+      new EngineVector3(0, 0, 1),
+      new EngineVector3(0, 0, -1),
+      new EngineVector3(0, 1, 0),
+      new EngineVector3(0, -1, 0),
     ];
 
     this._cubeUps = [
-      new Vector3(0, 1, 0),
-      new Vector3(0, 1, 0),
-      new Vector3(0, 1, 0),
-      new Vector3(0, 1, 0),
-      new Vector3(0, 0, 1),
-      new Vector3(0, 0, -1),
+      new EngineVector3(0, 1, 0),
+      new EngineVector3(0, 1, 0),
+      new EngineVector3(0, 1, 0),
+      new EngineVector3(0, 1, 0),
+      new EngineVector3(0, 0, 1),
+      new EngineVector3(0, 0, -1),
     ];
   }
 

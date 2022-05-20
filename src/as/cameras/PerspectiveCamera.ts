@@ -1,5 +1,5 @@
 import { Camera } from "./Camera";
-import * as MathUtils from "../math/MathUtils";
+import * as MathUtils from "../../common/math/MathUtils";
 import { ViewProperties } from "./ViewProperties";
 
 export class PerspectiveCamera extends Camera {
