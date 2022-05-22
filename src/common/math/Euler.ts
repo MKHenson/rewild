@@ -2,21 +2,13 @@ import { Quaternion } from "./Quaternion";
 import { Vector3 } from "./Vector3";
 import { Matrix4 } from "./Matrix4";
 import { clamp } from "./MathUtils";
+import { EulerRotationOrder } from "./EulerOrder";
 
 const _matrix = new Matrix4();
 const _quaternion = new Quaternion();
 
 export interface IEulerChangeListener {
   onEulerChanged(euer: Euler): void;
-}
-
-export enum EulerRotationOrder {
-  XYZ = 0,
-  YZX,
-  ZXY,
-  XZY,
-  YXZ,
-  ZYX,
 }
 
 export class Euler {

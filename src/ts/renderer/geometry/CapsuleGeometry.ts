@@ -1,8 +1,7 @@
-import { Float32BufferAttribute, Uint16BufferAttribute } from "../core/BufferAttribute";
-import { BufferGeometry } from "../core/BufferGeometry";
-import { EngineVector2 } from "../math/Vector2";
-import { EngineVector3 } from "../math/Vector3";
-import { AttributeType } from "../../common/AttributeType";
+import { Geometry, Attribute } from "./Geometry";
+import { Vector2 } from "../../../common/math/Vector2";
+import { Vector3 } from "../../../common/math/Vector3";
+import { AttributeType } from "../../../common/AttributeType";
 
 export class CapsuleGeometryParameters {
   public radiusTop: f32;
@@ -17,10 +16,10 @@ export class CapsuleGeometryParameters {
 }
 
 class CapsuleGeometryBuilder {
-  indices: Uint16BufferAttribute;
-  vertices: Float32BufferAttribute;
-  normals: Float32BufferAttribute;
-  uvs: Float32BufferAttribute;
+  indices: number[];
+  vertices: Attribute<Float32Array>;
+  normals: Attribute<Float32Array>;
+  uvs: Attribute<Float32Array>;
 
   index: u16 = 0;
   indexOffset: u16 = 0;
@@ -28,10 +27,10 @@ class CapsuleGeometryBuilder {
 
   constructor(indexCount: u16, vertexCount: u16) {
     // buffers
-    this.indices = new Uint16BufferAttribute(new Uint16Array(indexCount), 1);
-    this.vertices = new Float32BufferAttribute(new Float32Array(vertexCount * 3), 3);
-    this.normals = new Float32BufferAttribute(new Float32Array(vertexCount * 3), 3);
-    this.uvs = new Float32BufferAttribute(new Float32Array(vertexCount * 2), 2);
+    this.indices = new Array(indexCount);
+    this.vertices = new Attribute(new Float32Array(vertexCount * 3), 3);
+    this.normals = new Attribute(new Float32Array(vertexCount * 3), 3);
+    this.uvs = new Attribute(new Float32Array(vertexCount * 2), 2);
   }
 
   generateTorso(params: CapsuleGeometryParameters, alpha: f32): void {
@@ -43,14 +42,14 @@ class CapsuleGeometryBuilder {
     const uvs = this.uvs;
 
     let x: u16, y: u16;
-    const normal = new EngineVector3();
-    const vertex = new EngineVector3();
+    const normal = new Vector3();
+    const vertex = new Vector3();
 
     const cosAlpha = Mathf.cos(alpha);
     const sinAlpha = Mathf.sin(alpha);
 
-    const cone_length: f32 = new EngineVector2(params.radiusTop * sinAlpha, halfHeight + params.radiusTop * cosAlpha)
-      .sub(new EngineVector2(params.radiusBottom * sinAlpha, -halfHeight + params.radiusBottom * cosAlpha))
+    const cone_length: f32 = new Vector2(params.radiusTop * sinAlpha, halfHeight + params.radiusTop * cosAlpha)
+      .sub(new Vector2(params.radiusBottom * sinAlpha, -halfHeight + params.radiusBottom * cosAlpha))
       .length();
 
     // Total length for v texture coord
@@ -62,9 +61,9 @@ class CapsuleGeometryBuilder {
     for (y = 0; y <= params.capsTopSegments; y++) {
       const indexRow: u16[] = [];
 
-      const a: f32 = Mathf.PI / 2 - alpha * (f32(y) / f32(params.capsTopSegments));
+      const a: f32 = Mathf.PI / 2 - alpha * (y / params.capsTopSegments);
 
-      v += (params.radiusTop * alpha) / f32(params.capsTopSegments);
+      v += (params.radiusTop * alpha) / params.capsTopSegments;
 
       const cosA = Mathf.cos(a);
       const sinA = Mathf.sin(a);
@@ -73,9 +72,9 @@ class CapsuleGeometryBuilder {
       const radius = cosA * params.radiusTop;
 
       for (x = 0; x <= params.radialSegments; x++) {
-        const u = f32(x) / f32(params.radialSegments);
+        const u = x / params.radialSegments;
 
-        const theta = f32(u) * params.thetaLength + params.thetaStart;
+        const theta = u * params.thetaLength + params.thetaStart;
 
         const sinTheta = Mathf.sin(theta);
         const cosTheta = Mathf.cos(theta);
@@ -91,7 +90,7 @@ class CapsuleGeometryBuilder {
         normals.setXYZ(this.index, normal.x, normal.y, normal.z);
 
         // uv
-        uvs.setXY(this.index, f32(u), 1 - f32(v) / f32(vl));
+        uvs.setXY(this.index, u, 1 - v / vl);
 
         // save index of vertex in respective row
         indexRow.push(this.index);
@@ -109,14 +108,14 @@ class CapsuleGeometryBuilder {
     for (y = 1; y <= params.heightSegments; y++) {
       const indexRow: u16[] = [];
 
-      v += cone_length / f32(params.heightSegments);
+      v += cone_length / params.heightSegments;
 
       // calculate the radius of the current row
       const radius =
         sinAlpha * ((y * (params.radiusBottom - params.radiusTop)) / params.heightSegments + params.radiusTop);
 
       for (x = 0; x <= params.radialSegments; x++) {
-        const u: f32 = f32(x) / f32(params.radialSegments);
+        const u: f32 = x / params.radialSegments;
 
         const theta: f32 = u * params.thetaLength + params.thetaStart;
 
@@ -125,7 +124,7 @@ class CapsuleGeometryBuilder {
 
         // vertex
         vertex.x = radius * sinTheta;
-        vertex.y = halfHeight + cosAlpha * params.radiusTop - (f32(y) * cone_height) / f32(params.heightSegments);
+        vertex.y = halfHeight + cosAlpha * params.radiusTop - (y * cone_height) / params.heightSegments;
         vertex.z = radius * cosTheta;
         vertices.setXYZ(this.index, vertex.x, vertex.y, vertex.z);
 
@@ -150,9 +149,9 @@ class CapsuleGeometryBuilder {
     for (y = 1; y <= params.capsBottomSegments; y++) {
       const indexRow: u16[] = [];
 
-      const a: f32 = Mathf.PI / 2 - alpha - (Mathf.PI - alpha) * (f32(y) / f32(params.capsBottomSegments));
+      const a: f32 = Mathf.PI / 2 - alpha - (Mathf.PI - alpha) * (y / params.capsBottomSegments);
 
-      v += (params.radiusBottom * alpha) / f32(params.capsBottomSegments);
+      v += (params.radiusBottom * alpha) / params.capsBottomSegments;
 
       const cosA: f32 = Mathf.cos(a);
       const sinA: f32 = Mathf.sin(a);
@@ -161,9 +160,9 @@ class CapsuleGeometryBuilder {
       const radius = cosA * params.radiusBottom;
 
       for (x = 0; x <= params.radialSegments; x++) {
-        const u: f32 = f32(x) / f32(params.radialSegments);
+        const u: f32 = x / params.radialSegments;
 
-        const theta: f32 = f32(u) * params.thetaLength + params.thetaStart;
+        const theta: f32 = u * params.thetaLength + params.thetaStart;
 
         const sinTheta: f32 = Mathf.sin(theta);
         const cosTheta: f32 = Mathf.cos(theta);
@@ -203,26 +202,26 @@ class CapsuleGeometryBuilder {
         const i4 = indexArray[y][x + 1];
 
         // face one
-        indices.setX(this.indexOffset, i1);
+        indices[this.indexOffset] = i1;
         this.indexOffset++;
-        indices.setX(this.indexOffset, i2);
+        indices[this.indexOffset] = i2;
         this.indexOffset++;
-        indices.setX(this.indexOffset, i4);
+        indices[this.indexOffset] = i4;
         this.indexOffset++;
 
         // face two
-        indices.setX(this.indexOffset, i2);
+        indices[this.indexOffset] = i2;
         this.indexOffset++;
-        indices.setX(this.indexOffset, i3);
+        indices[this.indexOffset] = i3;
         this.indexOffset++;
-        indices.setX(this.indexOffset, i4);
+        indices[this.indexOffset] = i4;
         this.indexOffset++;
       }
     }
   }
 }
 
-export class CapsuleGeometry extends BufferGeometry {
+export class CapsuleGeometry extends Geometry {
   parameters: CapsuleGeometryParameters;
 
   constructor(
@@ -237,7 +236,6 @@ export class CapsuleGeometry extends BufferGeometry {
     thetaLength: f32 = Mathf.PI * 2
   ) {
     super();
-    this.type = "CapsuleBufferGeometry";
 
     this.parameters = {
       radiusTop: radiusTop,
@@ -267,7 +265,7 @@ export class CapsuleGeometry extends BufferGeometry {
     builder.generateTorso(this.parameters, alpha);
 
     // build geometry
-    this.setIndexAttrbute(builder.indices);
+    this.setIndexes(builder.indices);
     this.setAttribute(AttributeType.POSITION, builder.vertices);
     this.setAttribute(AttributeType.NORMAL, builder.normals);
     this.setAttribute(AttributeType.UV, builder.uvs);

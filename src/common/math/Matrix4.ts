@@ -1,7 +1,8 @@
-import { Euler, EulerRotationOrder } from "./Euler";
+import { Vector3 } from "./Vector3";
+import { EulerRotationOrder } from "./EulerOrder";
+import { Euler } from "./Euler";
 import { Matrix3 } from "./Matrix3";
 import { Quaternion } from "./Quaternion";
-import { Vector3 } from "./Vector3";
 
 export class Matrix4 {
   isMatrix4: boolean = true;

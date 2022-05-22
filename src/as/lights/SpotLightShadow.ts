@@ -1,5 +1,5 @@
 import { LightShadow } from "./LightShadow";
-import * as MathUtils from "../math/MathUtils";
+import * as MathUtils from "../../common/math/MathUtils";
 import { PerspectiveCamera } from "../cameras/PerspectiveCamera";
 import { SpotLight } from "./SpotLight";
 

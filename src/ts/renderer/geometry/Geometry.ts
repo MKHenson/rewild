@@ -1,3 +1,4 @@
+import { wasm } from "../../core/WasmManager";
 import { AttributeType } from "../../../common/AttributeType";
 
 export class BufferGeometryGroup {
@@ -12,7 +13,9 @@ export class BufferGeometryGroup {
   }
 }
 
-export class Attribute<T extends ArrayBuffer> {
+export type BufferArray = ArrayBuffer & { [index: number]: number };
+
+export class Attribute<T extends BufferArray> {
   itemSize: number;
   version: number;
   normalized: boolean;
@@ -23,12 +26,82 @@ export class Attribute<T extends ArrayBuffer> {
     this.normalized = normalized;
     this.buffer = buffer;
   }
+
+  getX(index: u32): number {
+    return this.buffer[index * this.itemSize];
+  }
+
+  setX(index: u32, x: number) {
+    this.buffer[index * this.itemSize] = x;
+
+    return this;
+  }
+
+  getY(index: u32) {
+    return this.buffer[index * this.itemSize + 1];
+  }
+
+  setY(index: u32, y: number) {
+    this.buffer[index * this.itemSize + 1] = y;
+
+    return this;
+  }
+
+  getZ(index: u32) {
+    return this.buffer[index * this.itemSize + 2];
+  }
+
+  setZ(index: u32, z: number) {
+    this.buffer[index * this.itemSize + 2] = z;
+
+    return this;
+  }
+
+  getW(index: u32) {
+    return this.buffer[index * this.itemSize + 3];
+  }
+
+  setW(index: u32, w: number) {
+    this.buffer[index * this.itemSize + 3] = w;
+
+    return this;
+  }
+
+  setXY(index: u32, x: number, y: number) {
+    index *= this.itemSize;
+
+    this.buffer[index + 0] = x;
+    this.buffer[index + 1] = y;
+
+    return this;
+  }
+
+  setXYZ(index: u32, x: number, y: number, z: number) {
+    index *= this.itemSize;
+
+    this.buffer[index + 0] = x;
+    this.buffer[index + 1] = y;
+    this.buffer[index + 2] = z;
+
+    return this;
+  }
+
+  setXYZW(index: u32, x: number, y: number, z: number, w: number) {
+    index *= this.itemSize;
+
+    this.buffer[index + 0] = x;
+    this.buffer[index + 1] = y;
+    this.buffer[index + 2] = z;
+    this.buffer[index + 3] = w;
+
+    return this;
+  }
 }
 
 export class Geometry {
   name: string;
   bufferGeometry: Number;
-  attributes: Map<AttributeType, Attribute<ArrayBuffer>>;
+  attributes: Map<AttributeType, Attribute<BufferArray>>;
   indices: Uint32Array | Uint16Array;
   groups: BufferGeometryGroup[];
 
@@ -36,14 +109,31 @@ export class Geometry {
     this.name = "";
     this.attributes = new Map();
     this.groups = [];
+    this.bufferGeometry = wasm.creatBufferGeometry();
   }
 
-  setAttribute(type: AttributeType, buffer: ArrayBuffer, itemSize: number) {
-    this.attributes.set(type, new Attribute(buffer, itemSize));
+  setAttribute(
+    type: AttributeType,
+    buffer: BufferArray | Attribute<BufferArray>,
+    itemSize?: number,
+    normalized = false
+  ) {
+    let attribute: Attribute<BufferArray>;
+
+    if (buffer instanceof Attribute) attribute = buffer;
+    else attribute = new Attribute(buffer, itemSize!, normalized);
+
+    this.attributes.set(type, attribute);
+    if (buffer instanceof Float32Array) {
+      const wasmAttribute = wasm.createBufferAttributeF32(buffer, attribute.itemSize, attribute.normalized);
+      wasm.setBufferAttribute(this.bufferGeometry as any, type, wasmAttribute);
+    }
   }
 
   setIndexes(buffer: number[]) {
-    this.indices = arrayMax(buffer) > 65535 ? new Uint32Array(buffer) : new Uint16Array(buffer);
+    this.indices = new Uint32Array(buffer);
+    const wasmAttribute = wasm.createBufferAttributeu32(this.indices, 1, false);
+    wasm.setIndexAttribute(this.bufferGeometry as any, wasmAttribute);
   }
 
   addGroup(start: i32, count: i32, materialIndex: i32 = 0): void {
@@ -53,16 +143,4 @@ export class Geometry {
   clearGroups(): void {
     this.groups = [];
   }
-}
-
-function arrayMax(array: number[]) {
-  if (array.length === 0) return -Infinity;
-
-  let max = array[0];
-
-  for (let i = 1, l = array.length; i < l; ++i) {
-    if (array[i] > max) max = array[i];
-  }
-
-  return max;
 }

@@ -5,7 +5,7 @@ import { MouseEvent } from "./io/MouseEvent";
 import { KeyboardEvent } from "./io/KeyboardEvent";
 import { inputManager } from "./io/InputManager";
 import { Euler } from "../../common/math/Euler";
-import { EulerRotationOrder } from "../../common/math/Euler";
+import { EulerRotationOrder } from "../../common/math/EulerOrder";
 import { EngineVector3 } from "../math/Vector3";
 
 const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);

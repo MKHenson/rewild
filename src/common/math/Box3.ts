@@ -9,12 +9,9 @@ export class Box3 {
   min: Vector3;
   max: Vector3;
 
-  constructor(
-    min: Vector3 = new Vector3(+Infinity, +Infinity, +Infinity),
-    max: Vector3 = new Vector3(-Infinity, -Infinity, -Infinity)
-  ) {
-    this.min = min;
-    this.max = max;
+  constructor(min: Vector3 | null = null, max: Vector3 | null = null) {
+    this.min = min ? min : new Vector3(+Infinity, +Infinity, +Infinity);
+    this.max = max ? max : new Vector3(-Infinity, -Infinity, -Infinity);
   }
 
   set(min: Vector3, max: Vector3): Box3 {

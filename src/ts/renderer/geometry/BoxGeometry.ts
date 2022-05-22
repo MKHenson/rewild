@@ -65,36 +65,30 @@ class BoxGeometryBuilder {
         const x: f32 = ix * segmentWidth - widthHalf;
 
         // set values to correct vector component
-
         vector.setByIndex(u, x * udir);
         vector.setByIndex(v, y * vdir);
         vector.setByIndex(w, depthHalf);
 
         // now apply vector to vertex buffer
-
         vertices.push(vector.x);
         vertices.push(vector.y);
         vertices.push(vector.z);
 
         // set values to correct vector component
-
         vector.setByIndex(u, 0);
         vector.setByIndex(v, 0);
         vector.setByIndex(w, depth > 0 ? 1 : -1);
 
         // now apply vector to normal buffer
-
         normals.push(vector.x);
         normals.push(vector.y);
         normals.push(vector.z);
 
         // uvs
-
         uvs.push(ix / gridX);
         uvs.push(1 - iy / gridY);
 
         // counters
-
         vertexCounter += 1;
       }
     }
@@ -129,15 +123,12 @@ class BoxGeometryBuilder {
     }
 
     // add a group to the geometry. this will ensure multi material support
-
     box.addGroup(this.groupStart, groupCount, materialIndex);
 
     // calculate new start value for groups
-
     this.groupStart += groupCount;
 
     // update total number of vertices
-
     this.numberOfVertices += vertexCounter;
   }
 }
