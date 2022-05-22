@@ -1,6 +1,6 @@
+import { Matrix4 } from "./Matrix4";
 import { Vector3 } from "./Vector3";
 import * as MathUtils from "./MathUtils";
-import { Matrix4 } from "./Matrix4";
 
 const _startP = new Vector3();
 const _startEnd = new Vector3();

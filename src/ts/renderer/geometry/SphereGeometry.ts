@@ -1,8 +1,7 @@
-import { BufferGeometry } from "../core/BufferGeometry";
-import { Float32BufferAttribute } from "../core/BufferAttribute";
-import { EngineVector3 } from "../math/Vector3";
-import { f32Array } from "../utils";
-import { AttributeType } from "../../common/AttributeType";
+import { Geometry } from "./Geometry";
+import { Vector3 } from "../../../common/math/Vector3";
+import { AttributeType } from "../../../common/AttributeType";
+
 export class SphereGeometryParameters {
   public radius: f32;
   public widthSegments: u32;
@@ -13,7 +12,7 @@ export class SphereGeometryParameters {
   public thetaLength: f32;
 }
 
-export class SphereGeometry extends BufferGeometry {
+export class SphereGeometry extends Geometry {
   parameters: SphereGeometryParameters;
 
   constructor(
@@ -26,8 +25,6 @@ export class SphereGeometry extends BufferGeometry {
     thetaLength: f32 = Mathf.PI
   ) {
     super();
-    this.type = "SphereGeometry";
-
     this.parameters = {
       radius: radius,
       widthSegments: widthSegments,
@@ -46,38 +43,34 @@ export class SphereGeometry extends BufferGeometry {
     let index: u32 = 0;
     const grid: u32[][] = [];
 
-    const vertex = new EngineVector3();
-    const normal = new EngineVector3();
+    const vertex = new Vector3();
+    const normal = new Vector3();
 
     // buffers
-
     const indices: u32[] = [];
     const vertices: f32[] = [];
     const normals: f32[] = [];
     const uvs: f32[] = [];
 
     // generate vertices, normals and uvs
-
     for (let iy: u32 = 0; iy <= heightSegments; iy++) {
       const verticesRow: u32[] = [];
 
-      const v: f32 = f32(iy) / f32(heightSegments);
+      const v: f32 = iy / heightSegments;
 
       // special case for the poles
-
       let uOffset: f32 = 0;
 
       if (iy == 0 && thetaStart == 0) {
-        uOffset = 0.5 / f32(widthSegments);
+        uOffset = 0.5 / widthSegments;
       } else if (iy == heightSegments && thetaEnd == Mathf.PI) {
-        uOffset = -0.5 / f32(widthSegments);
+        uOffset = -0.5 / widthSegments;
       }
 
       for (let ix: u32 = 0; ix <= widthSegments; ix++) {
-        const u: f32 = f32(ix) / f32(widthSegments);
+        const u: f32 = ix / widthSegments;
 
         // vertex
-
         vertex.x = -radius * Mathf.cos(phiStart + u * phiLength) * Mathf.sin(thetaStart + v * thetaLength);
         vertex.y = radius * Mathf.cos(thetaStart + v * thetaLength);
         vertex.z = radius * Mathf.sin(phiStart + u * phiLength) * Mathf.sin(thetaStart + v * thetaLength);
@@ -87,14 +80,12 @@ export class SphereGeometry extends BufferGeometry {
         vertices.push(vertex.z);
 
         // normal
-
         normal.copy(vertex).normalize();
         normals.push(normal.x);
         normals.push(normal.y);
         normals.push(normal.z);
 
         // uv
-
         uvs.push(u + uOffset);
         uvs.push(1 - v);
 
@@ -105,7 +96,6 @@ export class SphereGeometry extends BufferGeometry {
     }
 
     // indices
-
     for (let iy: u32 = 0; iy < heightSegments; iy++) {
       for (let ix: u32 = 0; ix < widthSegments; ix++) {
         const a: u32 = grid[iy][ix + 1];
@@ -127,21 +117,9 @@ export class SphereGeometry extends BufferGeometry {
     }
 
     // build geometry
-
     this.setIndexes(indices);
-    this.setAttribute(AttributeType.POSITION, new Float32BufferAttribute(f32Array(vertices), 3));
-    this.setAttribute(AttributeType.NORMAL, new Float32BufferAttribute(f32Array(normals), 3));
-    this.setAttribute(AttributeType.UV, new Float32BufferAttribute(f32Array(uvs), 2));
+    this.setAttribute(AttributeType.POSITION, new Float32Array(vertices), 3);
+    this.setAttribute(AttributeType.NORMAL, new Float32Array(normals), 3);
+    this.setAttribute(AttributeType.UV, new Float32Array(uvs), 2);
   }
-
-  // static fromJSON( data ) {
-
-  // 	return new BoxGeometry( data.width, data.height, data.depth, data.widthSegments, data.heightSegments, data.depthSegments );
-
-  // }
-}
-
-export function createSphere(radius: f32 = 1, widthSegments: u16 = 32, heightSegments: u16 = 16): BufferGeometry {
-  const geometry = new SphereGeometry(radius, widthSegments, heightSegments);
-  return geometry;
 }

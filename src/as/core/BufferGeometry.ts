@@ -1,13 +1,12 @@
 import { EngineVector3 } from "../math/Vector3";
 import { EngineVector2 } from "../math/Vector2";
-import { Box3 } from "../../common/math/Box3";
+import { EngineBox3 } from "../math/Box3";
 import { EventDispatcher } from "./EventDispatcher";
 import {
   BaseAttribute,
   BufferAttribute,
   CloneToken,
   Float32BufferAttribute,
-  Uint16BufferAttribute,
   Uint32BufferAttribute,
 } from "./BufferAttribute";
 import { Sphere } from "../../common/math/Sphere";
@@ -22,14 +21,15 @@ import { Event } from "./Event";
 import { toTypedArray } from "../utils";
 import { BridgeManager } from "../core/BridgeManager";
 import { AttributeType } from "../../common/AttributeType";
+import { Vector3 } from "../../common/math/Vector3";
 
 let _id = 0;
 
 const _m1 = new EngineMatrix4();
 const _obj = new TransformNode();
 const _offset = new EngineVector3();
-const _box = new Box3();
-const _boxMorphTargets = new Box3();
+const _box = new EngineBox3();
+const _boxMorphTargets = new EngineBox3();
 const _vector = new EngineVector3();
 
 export class BufferGeometryDrawRange {
@@ -69,7 +69,7 @@ export class BufferGeometry extends EventDispatcher {
 
   groups: BufferGeometryGroup[];
 
-  boundingBox: Box3 | null;
+  boundingBox: EngineBox3 | null;
   boundingSphere: Sphere | null;
 
   drawRange: BufferGeometryDrawRange;
@@ -114,7 +114,7 @@ export class BufferGeometry extends EventDispatcher {
     return this;
   }
 
-  setIndexAttrbute(index: Uint32BufferAttribute): BufferGeometry {
+  setIndexAttribute(index: Uint32BufferAttribute): BufferGeometry {
     this.indexes = index;
     return this;
   }
@@ -278,7 +278,7 @@ export class BufferGeometry extends EventDispatcher {
     return this;
   }
 
-  setFromPoints(points: EngineVector3[]): BufferGeometry {
+  setFromPoints(points: Vector3[]): BufferGeometry {
     const position: f32[] = [];
 
     for (let i = 0, l = points.length; i < l; i++) {
@@ -298,7 +298,7 @@ export class BufferGeometry extends EventDispatcher {
 
   computeBoundingBox(): void {
     if (this.boundingBox === null) {
-      this.boundingBox = new Box3();
+      this.boundingBox = new EngineBox3();
     }
 
     const position = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION);
@@ -955,4 +955,28 @@ export class BufferGeometry extends EventDispatcher {
     disposeEvent.target = this;
     this.dispatchEvent(disposeEvent);
   }
+}
+
+export function creatBufferGeometry(): BufferGeometry {
+  return new BufferGeometry();
+}
+
+export function createBufferAttributeF32(array: Float32Array, itemSize: u32, normalized: boolean): BaseAttribute {
+  return new Float32BufferAttribute(array, itemSize, normalized);
+}
+
+export function createBufferAttributeu32(array: Uint32Array, itemSize: u32, normalized: boolean): BaseAttribute {
+  return new Uint32BufferAttribute(array, itemSize, normalized);
+}
+
+export function setBufferAttribute(
+  geometry: BufferGeometry,
+  type: AttributeType,
+  attributeBuffer: BaseAttribute
+): void {
+  geometry.setAttribute(type, attributeBuffer);
+}
+
+export function setIndexAttribute(geometry: BufferGeometry, attributeBuffer: BaseAttribute): void {
+  geometry.setIndexAttribute(attributeBuffer as Uint32BufferAttribute);
 }

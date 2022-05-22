@@ -1,4 +1,4 @@
-import * as MathUtils from "../math/MathUtils";
+import * as MathUtils from "../../common/math/MathUtils";
 import { UsageType } from "../../common/GLEnums";
 import { BaseAttribute, UpdateRange, UploadCallback } from "./BufferAttribute";
 import { InterleavedBufferAttribute } from "./InterleavedBufferAttribute";

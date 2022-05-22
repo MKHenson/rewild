@@ -10,6 +10,9 @@ import { pipelineManager } from "../renderer/PipelineManager";
 import { textureManager } from "../renderer/TextureManager";
 import { Mesh } from "../renderer/Mesh";
 import { meshManager } from "../renderer/MeshManager";
+import { BoxGeometry } from "../renderer/geometry/BoxGeometry";
+import { SphereGeometry } from "../renderer/geometry/SphereGeometry";
+import { PlaneGeometry } from "../renderer/geometry/PlaneGeometry";
 
 const sampleCount = 4;
 export class GameManager implements IBindable {
@@ -112,47 +115,51 @@ export class GameManager implements IBindable {
     pipelineManager.init(this);
 
     const containerLvl1Ptr = wasm.createLevel1();
-    const geometrySphere = wasm.createSphere(1);
-    const geometryBox = wasm.createBox(1);
+    const geometrySphere = new SphereGeometry(1, 64, 32);
+    const geometryBox = new BoxGeometry();
+    const geometryPlane = new PlaneGeometry();
 
     wasm.addAsset(
       containerLvl1Ptr,
-      meshManager.addMesh(this.createMesh(geometryBox, "skybox", "skybox")).transform as any
+      meshManager.addMesh(this.createMesh(geometryBox.bufferGeometry, "skybox", "skybox")).transform as any
     );
     wasm.addAsset(
       containerLvl1Ptr,
-      meshManager.addMesh(this.createMesh(geometrySphere, "simple", "ball")).transform as any
+      meshManager.addMesh(this.createMesh(geometrySphere.bufferGeometry, "simple", "ball")).transform as any
     );
 
     for (let i = 0; i < 20; i++)
       wasm.addAsset(
         containerLvl1Ptr,
-        meshManager.addMesh(this.createMesh(geometryBox, "concrete", `building-${i}`)).transform as any
+        meshManager.addMesh(this.createMesh(geometryBox.bufferGeometry, "concrete", `building-${i}`)).transform as any
       );
     for (let i = 0; i < 20; i++)
       wasm.addAsset(
         containerLvl1Ptr,
-        meshManager.addMesh(this.createMesh(geometryBox, "crate", `crate-${i}`)).transform as any
+        meshManager.addMesh(this.createMesh(geometryBox.bufferGeometry, "crate", `crate-${i}`)).transform as any
       );
 
     this.character = new Object3D();
     wasm.addAsset(
       containerLvl1Ptr,
-      meshManager.addMesh(this.createMesh(geometryBox, "coastal-floor", "floor")).transform as any
+      meshManager.addMesh(this.createMesh(geometryPlane.bufferGeometry, "coastal-floor", "floor")).transform as any
     );
 
     const containerTestPtr = wasm.createTestLevel();
     wasm.addAsset(
       containerTestPtr,
-      meshManager.addMesh(this.createMesh(geometryBox, "skybox", "skybox")).transform as any
+      meshManager.addMesh(this.createMesh(geometryBox.bufferGeometry, "skybox", "skybox")).transform as any
     );
 
     const containerMainMenuPtr = wasm.createMainMenu();
 
-    wasm.addAsset(containerMainMenuPtr, meshManager.addMesh(this.createMesh(geometrySphere, "earth")).transform as any);
     wasm.addAsset(
       containerMainMenuPtr,
-      meshManager.addMesh(this.createMesh(geometryBox, "stars", "skybox")).transform as any
+      meshManager.addMesh(this.createMesh(geometrySphere.bufferGeometry, "earth")).transform as any
+    );
+    wasm.addAsset(
+      containerMainMenuPtr,
+      meshManager.addMesh(this.createMesh(geometryBox.bufferGeometry, "stars", "skybox")).transform as any
     );
 
     wasm.addContainer(containerLvl1Ptr, false);

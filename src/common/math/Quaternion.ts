@@ -1,7 +1,8 @@
-import { Euler, EulerRotationOrder } from "./Euler";
 import * as MathUtils from "./MathUtils";
 import { Matrix4 } from "./Matrix4";
 import { Vector3 } from "./Vector3";
+import { Euler } from "./Euler";
+import { EulerRotationOrder } from "./EulerOrder";
 
 export interface IQuatChangeListener {
   onQuatChanged(quat: Quaternion): void;

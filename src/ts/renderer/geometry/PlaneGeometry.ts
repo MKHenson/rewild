@@ -1,7 +1,5 @@
-import { BufferGeometry } from "../core/BufferGeometry";
-import { Float32BufferAttribute } from "../core/BufferAttribute";
-import { f32Array } from "../utils";
-import { AttributeType } from "../../common/AttributeType";
+import { Geometry } from "./Geometry";
+import { AttributeType } from "../../../common/AttributeType";
 
 export class PlaneGeometryParameters {
   public width: f32;
@@ -10,12 +8,11 @@ export class PlaneGeometryParameters {
   public heightSegments: u32;
 }
 
-export class PlaneGeometry extends BufferGeometry {
+export class PlaneGeometry extends Geometry {
   parameters: PlaneGeometryParameters;
 
   constructor(width: f32 = 1, height: f32 = 1, widthSegments: u16 = 1, heightSegments: u16 = 1) {
     super();
-    this.type = "PlaneGeometry";
     this.parameters = {
       width: width,
       height: height,
@@ -32,8 +29,8 @@ export class PlaneGeometry extends BufferGeometry {
     const gridX1: u32 = gridX + 1;
     const gridY1: u32 = gridY + 1;
 
-    const segment_width = width / f32(gridX);
-    const segment_height = height / f32(gridY);
+    const segment_width = width / gridX;
+    const segment_height = height / gridY;
 
     //
 
@@ -43,10 +40,10 @@ export class PlaneGeometry extends BufferGeometry {
     const uvs: f32[] = [];
 
     for (let iy: u32 = 0; iy < gridY1; iy++) {
-      const y: f32 = f32(iy) * segment_height - height_half;
+      const y: f32 = iy * segment_height - height_half;
 
       for (let ix: u32 = 0; ix < gridX1; ix++) {
-        const x: f32 = f32(ix) * segment_width - width_half;
+        const x: f32 = ix * segment_width - width_half;
 
         vertices.push(x);
         vertices.push(-y);
@@ -56,8 +53,8 @@ export class PlaneGeometry extends BufferGeometry {
         normals.push(0);
         normals.push(1);
 
-        uvs.push(f32(ix) / f32(gridX));
-        uvs.push(1 - f32(iy) / f32(gridY));
+        uvs.push(ix / gridX);
+        uvs.push(1 - iy / gridY);
       }
     }
 
@@ -78,9 +75,9 @@ export class PlaneGeometry extends BufferGeometry {
     }
 
     this.setIndexes(indices);
-    this.setAttribute(AttributeType.POSITION, new Float32BufferAttribute(f32Array(vertices), 3));
-    this.setAttribute(AttributeType.NORMAL, new Float32BufferAttribute(f32Array(normals), 3));
-    this.setAttribute(AttributeType.UV, new Float32BufferAttribute(f32Array(uvs), 2));
+    this.setAttribute(AttributeType.POSITION, new Float32Array(vertices), 3);
+    this.setAttribute(AttributeType.NORMAL, new Float32Array(normals), 3);
+    this.setAttribute(AttributeType.UV, new Float32Array(uvs), 2);
   }
 
   // TODO:
@@ -89,14 +86,4 @@ export class PlaneGeometry extends BufferGeometry {
   // 	return new PlaneGeometry( data.width, data.height, data.widthSegments, data.heightSegments );
 
   // }
-}
-
-export function createPlane(
-  width: f32 = 1,
-  height: f32 = 1,
-  widthSegments: u16 = 1,
-  heightSegments: u16 = 1
-): BufferGeometry {
-  const geometry = new PlaneGeometry(width, height, widthSegments, heightSegments);
-  return geometry;
 }

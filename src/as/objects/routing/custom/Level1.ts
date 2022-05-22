@@ -14,6 +14,7 @@ import { UIEvent } from "../../../extras/ui/UIEvent";
 import { Link } from "../core/Link";
 import { TransformNode } from "../../../core/TransformNode";
 import { lock, unlock } from "../../../Imports";
+import { degToRad } from "../../../../common/math/MathUtils";
 
 const playerHungerThreshold: u32 = 15;
 
@@ -145,8 +146,9 @@ export class Level1 extends Container implements Listener {
     }
 
     this.ball.position.set(3, 3, 0);
-    this.floor.scale.set(200, 0.1, 200);
+    this.floor.scale.set(200, 200, 200);
     this.floor.position.set(0, -0.1, 0);
+    this.floor.rotation.x -= degToRad(90);
 
     this.sbybox.scale.set(200, 200, 200);
     this.sbybox.position.set(0, 0, 0);
