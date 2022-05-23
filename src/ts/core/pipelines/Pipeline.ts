@@ -156,6 +156,7 @@ export abstract class Pipeline<T extends Defines<T>> {
     const fragSource = shaderBuilder(this.fragmentSource, this);
 
     this.renderPipeline = gameManager.device.createRenderPipeline({
+      layout: "auto",
       primitive: {
         topology: this.topology,
         cullMode: this.cullMode,

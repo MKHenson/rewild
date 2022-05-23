@@ -40,6 +40,8 @@ export class GameManager implements IBindable {
   character: Object3D;
   onUpdate: () => void;
 
+  canvasSizeCache: [number, number];
+
   constructor(canvas: HTMLCanvasElement, onUpdate: () => void) {
     this.canvas = canvas;
     this.buffers = [];
@@ -48,6 +50,7 @@ export class GameManager implements IBindable {
     this.onFrameHandler = this.onFrame.bind(this);
     this.clock = new Clock();
     this.onUpdate = onUpdate;
+    window.addEventListener("resize", (e) => (this.canvasSizeCache = this.canvasSize()));
   }
 
   lock() {
@@ -72,6 +75,7 @@ export class GameManager implements IBindable {
   }
 
   async init() {
+    this.canvasSizeCache = this.canvasSize();
     this.renderQueueManager = new RenderQueueManager(this);
 
     const hasGPU = this.hasWebGPU();
@@ -82,7 +86,7 @@ export class GameManager implements IBindable {
     const adapter = await navigator.gpu?.requestAdapter();
     const device = (await adapter?.requestDevice()) as GPUDevice;
     const context = this.canvas.getContext("webgpu") as unknown as GPUCanvasContext;
-    const format = context.getPreferredFormat(adapter!);
+    const format = navigator.gpu.getPreferredCanvasFormat();
 
     context.configure({
       device: device,
@@ -223,7 +227,7 @@ export class GameManager implements IBindable {
 
     // Check if we need to resize
     const [w, h] = this.presentationSize;
-    const newSize = this.canvasSize();
+    const newSize = this.canvasSizeCache;
     if (newSize[0] !== w || newSize[1] !== h) {
       this.onResize(newSize);
     }
