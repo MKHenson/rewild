@@ -5,7 +5,7 @@ const _matrices: EngineMatrix4[] = new Array();
 
 function allocatePerfTest(numMatrices: i32): void {
   for (let i = 0; i < numMatrices; i++) {
-    _matrices.push(new EngineMatrix4().set(1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0));
+    _matrices.push(new EngineMatrix4().set(1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0) as EngineMatrix4);
   }
 }
 

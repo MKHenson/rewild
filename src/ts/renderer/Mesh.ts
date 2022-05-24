@@ -7,32 +7,35 @@ import { pipelineManager } from "./PipelineManager";
 
 export class Mesh extends Object3D {
   transform: Number;
+  geometry: Number;
   pipeline: Pipeline<any>;
   renderIndex: number;
 
-  constructor(geometryPtr: Number, pipeline: Pipeline<any>, manager: GameManager, name?: string) {
-    super(false);
+  constructor(geometryPtr: Number, pipeline: Pipeline<any>, name?: string) {
+    super();
 
     this.name = name || "";
     this.renderIndex = -1;
-
-    const pipelineIndex = pipelineManager.pipelines.indexOf(pipeline);
+    this.geometry = geometryPtr;
     this.pipeline = pipeline;
+  }
 
-    // Create an instance in WASM
-    const pipelineInsPtr = wasm.createMeshPipelineInstance(pipeline.name, pipelineIndex);
+  initialize(manager: GameManager) {
+    const pipelineIndex = pipelineManager.pipelines.indexOf(this.pipeline);
+    const pipelineInsPtr = wasm.createMeshPipelineInstance(this.pipeline.name, pipelineIndex);
 
-    pipeline.vertexLayouts.map((buffer) =>
+    this.transform = wasm.createMesh(this.geometry as any, pipelineInsPtr, this.name);
+
+    this.pipeline.vertexLayouts.map((buffer) =>
       buffer.attributes.map((attr) =>
         wasm.addPipelineAttribute(pipelineInsPtr, attr.attributeType, attr.shaderLocation)
       )
     );
 
     // Assign a transform buffer to the intance
-    wasm.setMeshPipelineTransformIndex(pipelineInsPtr, pipeline.addResourceInstance(manager, GroupType.Transform));
+    wasm.setMeshPipelineTransformIndex(pipelineInsPtr, this.pipeline.addResourceInstance(manager, GroupType.Transform));
 
-    const meshPtr = wasm.createMesh(geometryPtr as any, pipelineInsPtr, name);
-    this.transform = meshPtr;
+    super.initialize(manager, false);
   }
 
   setRenderIndex(index: number) {

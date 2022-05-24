@@ -6,14 +6,11 @@ import { EngineVector3 } from "../math/Vector3";
 import { Event } from "./Event";
 import { EventDispatcher } from "./EventDispatcher";
 import { Layers } from "./Layers";
-import * as MathUtils from "../../common/math/MathUtils";
 import { Camera } from "../cameras/Camera";
 import { Light } from "../lights/Light";
 import { Raycaster } from "./Raycaster";
 import { Intersection } from "../objects/MeshNode";
 import { IQuatChangeListener } from "../../common/math/Quaternion";
-
-let object3DId: i32 = 1;
 
 const _v1 = new EngineVector3();
 const _q1 = new Quaternion();
@@ -36,7 +33,6 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
   static DefaultUp: EngineVector3 = new EngineVector3(0, 1, 0);
   static DefaultMatrixAutoUpdate: boolean = true;
 
-  uuid: string = MathUtils.generateUUID();
   name: string;
   type: string;
   parent: TransformNode | null;
@@ -44,19 +40,19 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
   matrix: EngineMatrix4;
   matrixWorld: EngineMatrix4;
   up: EngineVector3;
-  castShadow: boolean;
-  receiveShadow: boolean;
-  frustumCulled: boolean;
-  renderOrder: i32;
+  // castShadow: boolean;
+  // receiveShadow: boolean;
+  // frustumCulled: boolean;
+  // renderOrder: i32;
   // animations = [];
   // TODO:
   // userData: any;
-  matrixAutoUpdate: boolean;
-  visible: boolean;
+  // matrixAutoUpdate: boolean;
+  // visible: boolean;
   matrixWorldNeedsUpdate: boolean;
   layers: Layers;
 
-  id: i32 = object3DId++;
+  // id: i32;
 
   readonly position: EngineVector3;
   readonly rotation: Euler;
@@ -65,16 +61,20 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
   readonly modelViewMatrix: EngineMatrix4;
   readonly normalMatrix: Matrix3;
 
+  readonly dataProperties: Int32Array;
+
   constructor() {
     super();
+
+    this.dataProperties = new Int32Array(7);
+
+    this.id = 0;
     this.position = new EngineVector3();
     this.rotation = new Euler();
     this.quaternion = new Quaternion();
     this.scale = new EngineVector3(1, 1, 1);
     this.modelViewMatrix = new EngineMatrix4();
     this.normalMatrix = new Matrix3();
-
-    this.uuid = MathUtils.generateUUID();
 
     this.name = "";
     this.type = "Object3D";
@@ -104,6 +104,55 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
     // this.transform = new Transform();
     this.rotation._onChange(this);
     this.quaternion._onChange(this);
+  }
+
+  get visible(): boolean {
+    return this.dataProperties[0] === 0 ? false : true;
+  }
+  set visible(val: boolean) {
+    this.dataProperties[0] = val ? 1 : 0;
+  }
+
+  get renderOrder(): i32 {
+    return this.dataProperties[1];
+  }
+  set renderOrder(val: i32) {
+    this.dataProperties[1];
+  }
+
+  get frustumCulled(): boolean {
+    return this.dataProperties[2] === 0 ? false : true;
+  }
+  set frustumCulled(val: boolean) {
+    this.dataProperties[2] = val ? 1 : 0;
+  }
+
+  get matrixAutoUpdate(): boolean {
+    return this.dataProperties[3] === 0 ? false : true;
+  }
+  set matrixAutoUpdate(val: boolean) {
+    this.dataProperties[3] = val ? 1 : 0;
+  }
+
+  get castShadow(): boolean {
+    return this.dataProperties[4] === 0 ? false : true;
+  }
+  set castShadow(val: boolean) {
+    this.dataProperties[4] = val ? 1 : 0;
+  }
+
+  get receiveShadow(): boolean {
+    return this.dataProperties[5] === 0 ? false : true;
+  }
+  set receiveShadow(val: boolean) {
+    this.dataProperties[5] = val ? 1 : 0;
+  }
+
+  get id(): i32 {
+    return this.dataProperties[6];
+  }
+  set id(val: i32) {
+    this.dataProperties[6] = val;
   }
 
   onEulerChanged(euler: Euler): void {
@@ -501,6 +550,19 @@ export function getVisibility(node: TransformNode): boolean {
 
 export function setVisibility(node: TransformNode, value: boolean): void {
   node.visible = value;
+}
+
+export function getId(node: TransformNode): i32 {
+  return node.id;
+}
+
+export function setId(node: TransformNode, value: i32): TransformNode {
+  node.id = value;
+  return node;
+}
+
+export function getDataProperties(node: TransformNode): usize {
+  return changetype<usize>(node.dataProperties);
 }
 
 export function removeChild(parent: TransformNode, child: TransformNode): TransformNode {
