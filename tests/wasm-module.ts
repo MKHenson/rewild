@@ -19,6 +19,7 @@ const importObject = {
 const wasmBin = fs.readFileSync(__dirname + "/../build/test.wasm");
 let wasm: typeof __AdaptedExports & {
   getLiveF32Array: (pointer: Number) => Float32Array;
+  getLiveI32Array: (pointer: Number) => Int32Array;
 };
 
 export async function init() {
@@ -27,12 +28,15 @@ export async function init() {
   wasm.getLiveF32Array = (pointer) => {
     return __liftTypedArray(Float32Array, pointer.valueOf() >>> 0);
   };
+  wasm.getLiveI32Array = (pointer) => {
+    return __liftTypedArray(Int32Array, pointer.valueOf() >>> 0);
+  };
 
   return wasm;
 }
 
 function __liftTypedArray<T extends Float32Array | Int32Array | Int16Array>(
-  constructor: Float32ArrayConstructor,
+  constructor: Float32ArrayConstructor | Int32ArrayConstructor,
   pointer: number
 ): T {
   if (!pointer) return null;

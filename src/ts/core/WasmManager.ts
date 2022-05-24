@@ -13,6 +13,7 @@ export let wasm: Wasm;
 
 export class WasmManager {
   memory: WebAssembly.Memory;
+  memoryU32: Uint32Array;
 
   exports: Wasm;
 
@@ -27,7 +28,7 @@ export class WasmManager {
     constructor: Float32ArrayConstructor | Uint32ArrayConstructor | Int32ArrayConstructor,
     pointer: number
   ): T {
-    const memoryU32 = new Uint32Array(this.memory.buffer);
+    const memoryU32 = this.memoryU32;
     return new constructor(
       this.memory.buffer,
       memoryU32[(pointer + 4) >>> 2],
@@ -38,6 +39,7 @@ export class WasmManager {
   async load(bindables: IBindable[]) {
     // Creating WASM with Linear memory
     this.memory = new WebAssembly.Memory({ initial: 10000 });
+    this.memoryU32 = new Uint32Array(this.memory.buffer);
 
     const bindings: any = {};
 

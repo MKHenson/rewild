@@ -1,12 +1,24 @@
+import { GameManager } from "../core/GameManager";
 import { wasm } from "../core/WasmManager";
+import { generateUUID } from "../../common/math/MathUtils";
+
+let objectId = 1;
 
 export class Object3D {
   transform: Number;
   name: string;
+  id: number;
+  uuid: string = generateUUID();
 
-  constructor(createTransform = true) {
-    this.transform = createTransform ? wasm.createTransformNode() : 0;
+  constructor() {
+    this.transform = 0;
     this.name = "";
+    this.id = objectId++;
+  }
+
+  initialize(manager: GameManager, createTransform = true) {
+    if (createTransform) this.transform = wasm.createTransformNode();
+    wasm.setId(this.transform as any, this.id);
   }
 
   set visibility(val: boolean) {

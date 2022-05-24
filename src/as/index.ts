@@ -5,7 +5,15 @@ export { createMeshPipelineInstance, setMeshPipelineTransformIndex } from "./pip
 export { addPipelineAttribute } from "./pipelines/PipelineInstance";
 export { createMesh, setMeshRenderIndex } from "./objects/MeshNode";
 export { createContainer, addAsset, createLevel1, createMainMenu, createTestLevel } from "./objects/routing";
-export { addChild, createTransformNode, removeChild, getVisibility, setVisibility } from "./core/TransformNode";
+export {
+  addChild,
+  createTransformNode,
+  removeChild,
+  getVisibility,
+  setVisibility,
+  getId,
+  setId,
+} from "./core/TransformNode";
 export {
   creatBufferGeometry,
   createBufferAttributeF32,
