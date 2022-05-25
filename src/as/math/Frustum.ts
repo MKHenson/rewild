@@ -3,7 +3,7 @@ import { Sphere } from "../../common/math/Sphere";
 import { Plane } from "../../common/math//Plane";
 import { EngineMatrix4 } from "./Matrix4";
 import { Box3 } from "../../common/math/Box3";
-import { MeshNode } from "../objects/MeshNode";
+import { MeshComponent } from "../components/MeshComponent";
 import { Sprite } from "../objects/Sprite";
 
 const _sphere = new Sphere();
@@ -76,7 +76,7 @@ export class Frustum {
     return this;
   }
 
-  intersectsObject(object: MeshNode): boolean {
+  intersectsObject(object: MeshComponent): boolean {
     const geometry = object.geometry;
 
     if (geometry.boundingSphere === null) geometry.computeBoundingSphere();

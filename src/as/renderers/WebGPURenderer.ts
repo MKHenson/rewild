@@ -3,7 +3,7 @@ import { TransformNode } from "../core/TransformNode";
 import { WebGPURenderQueue } from "./WebGPURenderQueue";
 import { EngineMatrix4 } from "../math/Matrix4";
 import { EngineVector4 } from "../math/Vector4";
-import { MeshNode } from "../objects/MeshNode";
+import { MeshComponent } from "../components/MeshComponent";
 import { WebGPUGeometries } from "./WebGPUGeometries";
 import { GroupType } from "../../common/GroupType";
 import { WebGPULights } from "./WebGPULights";
@@ -13,7 +13,7 @@ import { AttributeType } from "../../common/AttributeType";
 const renderQueue = new WebGPURenderQueue();
 
 export class RenderList {
-  solids: MeshNode[];
+  solids: MeshComponent[];
   lights: Light[];
 
   constructor() {
@@ -69,17 +69,21 @@ export class WebGPURenderer {
     renderQueue.setupLighting(this.lights);
 
     for (let i: i32 = 0, l: i32 = this.currentRenderList.solids.length; i < l; i++) {
-      this.renderMesh(this.currentRenderList.solids[i], camera);
+      const node = unchecked(this.currentRenderList.solids[i]);
+      this.renderMesh(node, camera);
     }
 
     renderQueue.endPass();
     renderQueue.push();
   }
 
-  renderMesh(mesh: MeshNode, camera: Camera): void {
-    mesh.modelViewMatrix.multiplyMatricesSIMD(camera.matrixWorldInverse, mesh.matrixWorld);
-    mesh.normalMatrix.getNormalMatrix(mesh.modelViewMatrix);
-    const pipelineInstance = mesh.pipelines[0];
+  renderMesh(mesh: MeshComponent, camera: Camera): void {
+    const transform = mesh.transform;
+    if (!transform) return;
+
+    transform.modelViewMatrix.multiplyMatricesSIMD(camera.matrixWorldInverse, transform.matrixWorld);
+    transform.normalMatrix.getNormalMatrix(transform.modelViewMatrix);
+    const pipelineInstance = unchecked(mesh.pipelines[0]);
 
     // TODO:
     // ========================
@@ -90,9 +94,9 @@ export class WebGPURenderer {
     renderQueue.setTransform(
       transformIndex,
       camera.projectionMatrix.elements,
-      mesh.modelViewMatrix.elements,
-      mesh.matrixWorld.elements,
-      mesh.normalMatrix.elements
+      transform.modelViewMatrix.elements,
+      transform.matrixWorld.elements,
+      transform.normalMatrix.elements
     );
 
     renderQueue.setBindGroupResource(GroupType.Transform, transformIndex);
@@ -142,12 +146,18 @@ export class WebGPURenderer {
   projectObject(object: TransformNode, camera: Camera): void {
     if (object.visible === false) return;
 
-    if (object instanceof MeshNode) {
-      this.currentRenderList.solids.push(object as MeshNode);
-    } else if (object instanceof Light) {
+    const components = object.components;
+    for (let i: i32 = 0, l = components.length; i < l; i++) {
+      const component = unchecked(components[i]);
+      if (component instanceof MeshComponent) {
+        this.currentRenderList.solids.push(component as MeshComponent);
+      }
+    }
+
+    if (object instanceof Light) {
       this.currentRenderList.lights.push(object as Light);
     }
 
-    for (let i = 0, l = object.children.length; i < l; i++) this.projectObject(object.children[i], camera);
+    for (let i = 0, l = object.children.length; i < l; i++) this.projectObject(unchecked(object.children[i]), camera);
   }
 }
