@@ -10,10 +10,11 @@ import { BufferGeometry } from "../core/BufferGeometry";
 import { MeshPipelineInstance } from "../pipelines/MeshPipelineInstance";
 import { Raycaster } from "../core/Raycaster";
 import { BufferAttribute, Float32BufferAttribute } from "../core/BufferAttribute";
-import { SkinnedMesh } from "./SkinnedMesh";
+import { SkinnedMesh } from "../objects/SkinnedMesh";
 import { PipelineInstance } from "../pipelines/PipelineInstance";
 import { AttributeType } from "../../common/AttributeType";
 import { Vector3 } from "../../common/math/Vector3";
+import { Component } from "../core/Component";
 
 export class Face {
   public a: i32;
@@ -57,17 +58,18 @@ const _uvC = new EngineVector2();
 const _intersectionPoint = new EngineVector3();
 const _intersectionPointWorld = new EngineVector3();
 
-export class MeshNode extends TransformNode {
+export class MeshComponent extends Component {
   pipelines: MeshPipelineInstance[];
   geometry: BufferGeometry;
   morphTargetInfluences: f32[] | null;
   morphTargetDictionary: Map<string, i32> | null;
   renderIndex: u32;
+  name: string;
 
   constructor(geometry: BufferGeometry = new BufferGeometry(), pipelines: MeshPipelineInstance[] = []) {
     super();
 
-    this.type = "Mesh";
+    this.name = "";
     this.renderIndex = -1;
     this.geometry = geometry;
     this.pipelines = pipelines;
@@ -77,8 +79,8 @@ export class MeshNode extends TransformNode {
     this.updateMorphTargets();
   }
 
-  copy(source: MeshNode, recursive: boolean = true): MeshNode {
-    super.copy(source, recursive);
+  copy(source: MeshComponent): MeshComponent {
+    super.copy(source);
 
     const sourceMorphTargetInfluences = source.morphTargetInfluences;
     if (sourceMorphTargetInfluences != null) {
@@ -131,7 +133,7 @@ export class MeshNode extends TransformNode {
   raycast(raycaster: Raycaster, intersects: Intersection[]): void {
     const geometry = this.geometry;
     const pipelines = this.pipelines;
-    const matrixWorld = this.matrixWorld;
+    const matrixWorld = this.transform.matrixWorld;
 
     // Checking boundingSphere distance to ray
 
@@ -347,7 +349,7 @@ function checkIntersection(
 }
 
 function checkBufferGeometryIntersection(
-  object: MeshNode,
+  object: MeshComponent,
   pipeline: PipelineInstance,
   raycaster: Raycaster,
   ray: Ray,
@@ -405,7 +407,7 @@ function checkBufferGeometryIntersection(
   }
 
   const intersection: Intersection | null = checkIntersection(
-    object,
+    object.transform,
     pipeline,
     raycaster,
     ray,
@@ -466,16 +468,17 @@ function checkBufferGeometryIntersection(
   return intersection;
 }
 
-export function setMeshRenderIndex(mesh: MeshNode, value: u32): void {
-  mesh.renderIndex = value;
-}
-
-export function createMesh(
+export function createMeshComponent(
   geometry: BufferGeometry,
   pipeline: PipelineInstance,
   name: string | null = null
-): TransformNode {
-  const newMesh = new MeshNode(geometry, [pipeline as MeshPipelineInstance]);
+): Component {
+  const newMesh = new MeshComponent(geometry, [pipeline as MeshPipelineInstance]);
   if (name) newMesh.name = name;
   return newMesh;
+}
+
+export function setMeshRenderIndex(component: MeshComponent, index: i32): Component {
+  component.renderIndex = index;
+  return component;
 }

@@ -173,8 +173,7 @@ export class GameManager implements IBindable {
 
   createMesh(geometryPtr: Number, pipelineName: string, name?: string) {
     const pipeline = pipelineManager.getPipeline(pipelineName)!;
-    const mesh = new Mesh(geometryPtr, pipeline, name);
-    mesh.initialize(this);
+    const mesh = new Mesh(geometryPtr, pipeline, this, name);
     return mesh;
   }
 

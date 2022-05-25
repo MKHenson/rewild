@@ -9,7 +9,7 @@ import { InterleavedBufferAttribute } from "../core/InterleavedBufferAttribute";
 import { SpriteMaterial } from "../materials/SpriteMaterial";
 import { f32Array } from "../utils";
 import { Raycaster } from "../core/Raycaster";
-import { Intersection } from "./MeshNode";
+import { Intersection } from "../components/MeshComponent";
 import { PerspectiveCamera } from "../cameras/PerspectiveCamera";
 import { ASError } from "../core/Error";
 import { AttributeType } from "../../common/AttributeType";

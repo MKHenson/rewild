@@ -9,8 +9,9 @@ import { Layers } from "./Layers";
 import { Camera } from "../cameras/Camera";
 import { Light } from "../lights/Light";
 import { Raycaster } from "./Raycaster";
-import { Intersection } from "../objects/MeshNode";
+import { Intersection } from "../components/MeshComponent";
 import { IQuatChangeListener } from "../../common/math/Quaternion";
+import { Component } from "./Component";
 
 const _v1 = new EngineVector3();
 const _q1 = new Quaternion();
@@ -40,19 +41,8 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
   matrix: EngineMatrix4;
   matrixWorld: EngineMatrix4;
   up: EngineVector3;
-  // castShadow: boolean;
-  // receiveShadow: boolean;
-  // frustumCulled: boolean;
-  // renderOrder: i32;
-  // animations = [];
-  // TODO:
-  // userData: any;
-  // matrixAutoUpdate: boolean;
-  // visible: boolean;
   matrixWorldNeedsUpdate: boolean;
   layers: Layers;
-
-  // id: i32;
 
   readonly position: EngineVector3;
   readonly rotation: Euler;
@@ -62,12 +52,14 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
   readonly normalMatrix: Matrix3;
 
   readonly dataProperties: Int32Array;
+  readonly components: Component[];
 
   constructor() {
     super();
 
     this.dataProperties = new Int32Array(7);
 
+    this.components = [];
     this.id = 0;
     this.position = new EngineVector3();
     this.rotation = new Euler();
@@ -101,7 +93,6 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
 
     // this.animations = [];
 
-    // this.transform = new Transform();
     this.rotation._onChange(this);
     this.quaternion._onChange(this);
   }
@@ -391,7 +382,13 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
     return target.set(e[8], e[9], e[10]).normalize() as EngineVector3;
   }
 
-  raycast(raycaster: Raycaster, intersects: Intersection[]): void {}
+  raycast(raycaster: Raycaster, intersects: Intersection[]): void {
+    const components = this.components;
+    for (let i: i32 = 0, l = components.length; i < l; i++) {
+      const component = unchecked(components[i]);
+      component.raycast(raycaster, intersects);
+    }
+  }
 
   traverse(callback: TraverseCallback): void {
     callback(this);
@@ -524,8 +521,10 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
   }
 }
 
-export function createTransformNode(): TransformNode {
-  return new TransformNode();
+export function createTransformNode(name: string | null): TransformNode {
+  const toReturn = new TransformNode();
+  if (name) toReturn.name = name;
+  return toReturn;
 }
 
 export function addChild(parent: TransformNode, child: TransformNode): TransformNode {
@@ -563,6 +562,16 @@ export function setId(node: TransformNode, value: i32): TransformNode {
 
 export function getDataProperties(node: TransformNode): usize {
   return changetype<usize>(node.dataProperties);
+}
+
+export function addComponent(node: TransformNode, component: Component): TransformNode {
+  if (component.transform) {
+    component.transform!.components.splice(component.transform!.components.indexOf(component), 1);
+  }
+
+  node.components.push(component);
+  component.transform = node;
+  return node;
 }
 
 export function removeChild(parent: TransformNode, child: TransformNode): TransformNode {
