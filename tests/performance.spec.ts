@@ -9,16 +9,6 @@ for (let i = 0; i < numTests; i++) {
   matrices.push(new SimpleMatrix4().set(1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0));
 }
 
-const testJSMultiplicationPerformance = (numMatrices: number = 100): void => {
-  const source = new SimpleMatrix4();
-  let m: SimpleMatrix4;
-
-  for (let i = 0; i < numMatrices; i++) {
-    m = matrices[i];
-    m.multiplyMatrices(m, source);
-  }
-};
-
 describe("Performance Tests", () => {
   before(() => {
     wasm.allocatePerfTest(numTests);
@@ -114,4 +104,27 @@ describe("Performance Tests", () => {
     console.log(`Matrix Multiply Scalar: SIMD Time: ${simdDelta}, Non-SIMD Time: ${nonSimdPerformance}`);
     expect(simdDelta).to.be.lessThan(nonSimdPerformance);
   });
+
+  it("is faster to batch calls to AS compared to individual calls", () => {
+    const t1 = performance.now();
+    for (let i = 0, l = numTests; i < l; i++) wasm.testPerformanceSingleMultiplyScalar();
+    const nonBatched = performance.now() - t1;
+
+    const t2 = performance.now();
+    wasm.testPerformanceMat4MultiplyScalar(numTests);
+    const batched = performance.now() - t2;
+
+    console.log(`Batched Versus Non-Batched: Non-Batched ${nonBatched}, Batched: ${batched}`);
+    expect(batched).to.be.lessThan(nonBatched);
+  });
 });
+
+const testJSMultiplicationPerformance = (l: number = 100): void => {
+  const source = new SimpleMatrix4();
+  let m: SimpleMatrix4;
+
+  for (let i = 0; i < l; i++) {
+    m = matrices[i];
+    m.multiplyMatrices(m, source);
+  }
+};

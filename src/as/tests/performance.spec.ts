@@ -78,6 +78,13 @@ function testPerformanceMat4MultiplyScalar(numMatrices: i32, useSimd: boolean = 
   }
 }
 
+function testPerformanceSingleMultiplyScalar(): void {
+  const matrices = _matrices;
+  let m: EngineMatrix4;
+  m = unchecked(matrices[0]);
+  m.multiplyScalarSIMD(5);
+}
+
 const scaleVec: EngineVector3 = new EngineVector3(1.5, 3.4, 5.5);
 
 export {
@@ -87,4 +94,5 @@ export {
   testPerformanceMat4Inverse,
   testPerformanceMat4Scale,
   testPerformanceMat4MultiplyScalar,
+  testPerformanceSingleMultiplyScalar,
 };
