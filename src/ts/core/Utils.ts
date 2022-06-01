@@ -36,7 +36,7 @@ export function createBuffer(
   return buffer;
 }
 
-export function createIndexBuffer(
+export function createIndexBufferU32(
   device: GPUDevice,
   data: Uint32Array,
   usageFlag: GPUBufferUsageFlags = GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
