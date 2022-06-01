@@ -40,16 +40,6 @@ export class WebGPURenderQueue {
     return this;
   }
 
-  setupLighting(lighting: WebGPULights): WebGPURenderQueue {
-    const q = this.q;
-    q.push(GPUCommands.SETUP_LIGHTING);
-    q.push(lighting.numDirectionLights);
-    q.push(changetype<i32>(lighting.lightingConfigBuffer));
-    q.push(changetype<i32>(lighting.sceneLightsBuffer));
-    q.push(changetype<i32>(lighting.directionLightsBuffer));
-    return this;
-  }
-
   setBindGroupResource(type: GroupType, resourceIndex: u32 = 0): WebGPURenderQueue {
     const q = this.q;
     q.push(GPUCommands.SET_BIND_GROUP);

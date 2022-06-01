@@ -1,22 +1,20 @@
 import { Mesh } from "./Mesh";
 
 class MeshManager {
-  meshes: Mesh[];
+  meshes: Map<number, Mesh>;
 
   constructor() {
-    this.meshes = [];
-  }
-
-  getPipeline(name: string) {
-    return this.meshes.find((m) => m.name === name);
+    this.meshes = new Map();
   }
 
   addMesh(mesh: Mesh) {
     const meshes = this.meshes;
-    const index = meshes.indexOf(mesh);
-    if (index === -1) {
-      mesh.setRenderIndex(meshes.length);
-      meshes.push(mesh);
+
+    // @ts-expect-error
+    const meshPtr = mesh.meshComponent | 0;
+
+    if (!meshes.has(meshPtr)) {
+      meshes.set(meshPtr, mesh);
     }
 
     return mesh;
@@ -24,10 +22,12 @@ class MeshManager {
 
   removeMesh(mesh: Mesh) {
     const meshes = this.meshes;
-    const index = meshes.indexOf(mesh);
-    if (index !== -1) {
-      mesh.setRenderIndex(-1);
-      meshes.splice(index, 1);
+
+    // @ts-expect-error
+    const meshPtr = mesh.meshComponent | 0;
+
+    if (meshes.has(meshPtr)) {
+      meshes.delete(meshPtr);
     }
 
     return mesh;

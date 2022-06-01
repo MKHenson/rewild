@@ -1,9 +1,7 @@
 import { GroupType } from "../../common/GroupType";
-import { ResourceType } from "../../common/ResourceType";
 import { GPUCommands } from "../../common/Commands";
 import { GameManager } from "./GameManager";
 import { Pipeline } from "./pipelines/Pipeline";
-import { LightingResource } from "./pipelines/resources/LightingResource";
 import { PipelineResourceInstance } from "./pipelines/resources/PipelineResourceInstance";
 import { wasmManager } from "./WasmManager";
 import { TransformResource } from "./pipelines/resources/TransformResource";
@@ -37,40 +35,6 @@ export class RenderQueueManager {
       const command = commandBuffer[i];
 
       switch (command) {
-        case GPUCommands.SETUP_LIGHTING:
-          const numDirectionLights = commandBuffer[i + 1];
-
-          if (LightingResource.numDirLights !== numDirectionLights) {
-            LightingResource.numDirLights = numDirectionLights;
-            LightingResource.rebuildDirectionLights = true;
-            pipelines.forEach((p) => {
-              if (p.getTemplateByType(ResourceType.Material)) {
-                p.defines = { ...p.defines, NUM_DIR_LIGHTS: numDirectionLights };
-              }
-            });
-          }
-
-          buffer = LightingResource.lightingConfig;
-          if (buffer) {
-            const info = getPtrIndex(commandBuffer[i + 2]);
-            device.queue.writeBuffer(buffer, 0, wasmMemoryBlock, info, 4);
-          }
-
-          buffer = LightingResource.sceneLightingBuffer;
-          if (buffer) {
-            const ambientLights = getPtrIndex(commandBuffer[i + 3]);
-            device.queue.writeBuffer(buffer, 0, wasmMemoryBlock, ambientLights, 4 * 4);
-          }
-
-          buffer = LightingResource.directionLightsBuffer;
-          if (buffer) {
-            const dirLights = getPtrIndex(commandBuffer[i + 4]);
-            device.queue.writeBuffer(buffer, 0, wasmMemoryBlock, dirLights, numDirectionLights * 4 * 4 * 2);
-          }
-
-          i += 4;
-          break;
-
         case GPUCommands.SET_TRANSFORM:
           const template = pipeline!.getTemplateByGroup(GroupType.Transform)! as TransformResource;
           instances = pipeline!.groupInstances.get(GroupType.Transform)!;

@@ -9,11 +9,13 @@ import { GroupType } from "../../common/GroupType";
 import { WebGPULights } from "./WebGPULights";
 import { Light } from "../lights/Light";
 import { AttributeType } from "../../common/AttributeType";
+import { renderComponents } from "../Imports";
+import { Component } from "../core/Component";
 
 const renderQueue = new WebGPURenderQueue();
 
 export class RenderList {
-  solids: MeshComponent[];
+  solids: Component[];
   lights: Light[];
 
   constructor() {
@@ -66,12 +68,20 @@ export class WebGPURenderer {
     renderQueue.begin();
     renderQueue.startPass();
 
-    renderQueue.setupLighting(this.lights);
-
+    let mesh: MeshComponent;
+    let transform: TransformNode | null;
     for (let i: i32 = 0, l: i32 = this.currentRenderList.solids.length; i < l; i++) {
-      const node = unchecked(this.currentRenderList.solids[i]);
-      this.renderMesh(node, camera);
+      mesh = unchecked(this.currentRenderList.solids[i]) as MeshComponent;
+      // this.renderMesh(node, camera);
+
+      transform = mesh.transform;
+      if (!transform) return;
+
+      transform.modelViewMatrix.multiplyMatricesSIMD(camera.matrixWorldInverse, transform.matrixWorld);
+      transform.normalMatrix.getNormalMatrix(transform.modelViewMatrix);
     }
+
+    renderComponents(camera, this.currentRenderList.solids);
 
     renderQueue.endPass();
     renderQueue.push();

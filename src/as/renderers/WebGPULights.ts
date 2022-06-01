@@ -4,6 +4,7 @@ import { DirectionalLight } from "../lights/DirectionalLight";
 import { Light } from "../lights/Light";
 import { Color } from "../../common/math/Color";
 import { EngineVector3 } from "../math/Vector3";
+import { setupLights } from "../Imports";
 
 const color: Color = new Color();
 const vector1: EngineVector3 = new EngineVector3();
@@ -83,5 +84,12 @@ export class WebGPULights {
         dirLightI++;
       }
     }
+
+    setupLights(
+      this.numDirectionLights,
+      changetype<usize>(this.lightingConfigBuffer),
+      changetype<usize>(this.sceneLightsBuffer),
+      changetype<usize>(this.directionLightsBuffer)
+    );
   }
 }
