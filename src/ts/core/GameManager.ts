@@ -2,7 +2,7 @@ import { InputManager } from "./InputManager";
 import { GPUBufferUsageFlags } from "../../common/GPUEnums";
 import { GroupType } from "../../common/GroupType";
 import { AttributeType } from "../../common/AttributeType";
-import { createBufferFromF32, createIndexBuffer } from "./Utils";
+import { createBufferFromF32, createIndexBufferU32 } from "./Utils";
 import { RenderQueueManager } from "./RenderQueueManager";
 import { wasm } from "./WasmManager";
 import { IBindable } from "./IBindable";
@@ -301,7 +301,7 @@ export class GameManager implements IBindable {
 
   createIndexBuffer(data: number, usageFlag: GPUBufferUsageFlags = GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST) {
     const u32Array = wasm.getUint32Array(data);
-    const buffer = createIndexBuffer(this.device, u32Array, usageFlag);
+    const buffer = createIndexBufferU32(this.device, u32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;
   }

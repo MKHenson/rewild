@@ -1,6 +1,6 @@
 import { wasm } from "../../core/WasmManager";
 import { AttributeType } from "../../../common/AttributeType";
-import { createBuffer } from "../../core/Utils";
+import { createBufferFromF32, createIndexBufferU32 } from "../../core/Utils";
 import { GameManager } from "../../core/GameManager";
 
 export class BufferGeometryGroup {
@@ -106,7 +106,7 @@ export class Geometry {
   name: string;
   bufferGeometry: Number;
   attributes: Map<AttributeType, Attribute<BufferArray>>;
-  indices: Uint32Array | Uint16Array;
+  indices: Uint32Array;
   groups: BufferGeometryGroup[];
   requiresBuild: boolean;
 
@@ -124,11 +124,22 @@ export class Geometry {
   build(manager: GameManager) {
     this.requiresBuild = false;
     this.attributes.forEach((value, key) => {
-      const buffer = createBuffer(manager.device, value.buffer, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST);
-      value.gpuBuffer = buffer;
+      if (
+        key === AttributeType.NORMAL ||
+        key === AttributeType.POSITION ||
+        key === AttributeType.UV ||
+        key === AttributeType.TANGENT
+      ) {
+        const buffer = createBufferFromF32(
+          manager.device,
+          value.buffer as Float32Array,
+          GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+        );
+        value.gpuBuffer = buffer;
+      } else throw new Error(`Attribute ${AttributeType[key]} not recognised`);
     });
 
-    this.indexBuffer = createBuffer(manager.device, this.indices, GPUBufferUsage.COPY_DST | GPUBufferUsage.INDEX);
+    this.indexBuffer = createIndexBufferU32(manager.device, this.indices);
     return this;
   }
 
