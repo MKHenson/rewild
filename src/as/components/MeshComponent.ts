@@ -63,14 +63,12 @@ export class MeshComponent extends Component {
   geometry: BufferGeometry;
   morphTargetInfluences: f32[] | null;
   morphTargetDictionary: Map<string, i32> | null;
-  renderIndex: u32;
   name: string;
 
   constructor(geometry: BufferGeometry = new BufferGeometry(), pipelines: MeshPipelineInstance[] = []) {
     super();
 
     this.name = "";
-    this.renderIndex = -1;
     this.geometry = geometry;
     this.pipelines = pipelines;
     this.morphTargetInfluences = null;
@@ -133,7 +131,7 @@ export class MeshComponent extends Component {
   raycast(raycaster: Raycaster, intersects: Intersection[]): void {
     const geometry = this.geometry;
     const pipelines = this.pipelines;
-    const matrixWorld = this.transform.matrixWorld;
+    const matrixWorld = this.transform!.matrixWorld;
 
     // Checking boundingSphere distance to ray
 
@@ -407,7 +405,7 @@ function checkBufferGeometryIntersection(
   }
 
   const intersection: Intersection | null = checkIntersection(
-    object.transform,
+    object.transform!,
     pipeline,
     raycaster,
     ray,
@@ -476,9 +474,4 @@ export function createMeshComponent(
   const newMesh = new MeshComponent(geometry, [pipeline as MeshPipelineInstance]);
   if (name) newMesh.name = name;
   return newMesh;
-}
-
-export function setMeshRenderIndex(component: MeshComponent, index: i32): Component {
-  component.renderIndex = index;
-  return component;
 }

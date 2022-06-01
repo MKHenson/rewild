@@ -27,7 +27,7 @@ export class Camera extends TransformNode {
 
     const e = this.matrixWorld.elements;
 
-    return target.set(unchecked(-e[8]), unchecked(-e[9]), unchecked(-e[10])).normalize();
+    return target.set(unchecked(-e[8]), unchecked(-e[9]), unchecked(-e[10])).normalize() as EngineVector3;
   }
 
   updateMatrixWorld(force: boolean = false): void {
@@ -45,4 +45,14 @@ export class Camera extends TransformNode {
   clone(recursive: boolean = false): TransformNode {
     return new Camera().copy(this);
   }
+}
+
+export function getCameraWorldInverseMatrix(camera: Camera): usize {
+  return changetype<usize>(camera.matrixWorldInverse.elements);
+}
+export function getCameraProjectionMatrix(camera: Camera): usize {
+  return changetype<usize>(camera.projectionMatrix.elements);
+}
+export function getCameraProjectionInverseMatrix(camera: Camera): usize {
+  return changetype<usize>(camera.projectionMatrixInverse.elements);
 }

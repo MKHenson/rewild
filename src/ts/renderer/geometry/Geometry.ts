@@ -1,5 +1,7 @@
 import { wasm } from "../../core/WasmManager";
 import { AttributeType } from "../../../common/AttributeType";
+import { createBuffer } from "../../core/Utils";
+import { GameManager } from "../../core/GameManager";
 
 export class BufferGeometryGroup {
   start: i32;
@@ -20,11 +22,13 @@ export class Attribute<T extends BufferArray> {
   version: number;
   normalized: boolean;
   buffer: T;
+  gpuBuffer: GPUBuffer | null;
 
   constructor(buffer: T, itemSize: number, normalized = false) {
     this.itemSize = itemSize;
     this.normalized = normalized;
     this.buffer = buffer;
+    this.gpuBuffer = null;
   }
 
   getX(index: u32): number {
@@ -104,12 +108,28 @@ export class Geometry {
   attributes: Map<AttributeType, Attribute<BufferArray>>;
   indices: Uint32Array | Uint16Array;
   groups: BufferGeometryGroup[];
+  requiresBuild: boolean;
+
+  indexBuffer: GPUBuffer | null;
 
   constructor() {
     this.name = "";
     this.attributes = new Map();
     this.groups = [];
     this.bufferGeometry = wasm.creatBufferGeometry();
+    this.requiresBuild = true;
+    this.indexBuffer = null;
+  }
+
+  build(manager: GameManager) {
+    this.requiresBuild = false;
+    this.attributes.forEach((value, key) => {
+      const buffer = createBuffer(manager.device, value.buffer, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST);
+      value.gpuBuffer = buffer;
+    });
+
+    this.indexBuffer = createBuffer(manager.device, this.indices, GPUBufferUsage.COPY_DST | GPUBufferUsage.INDEX);
+    return this;
   }
 
   setAttribute(

@@ -3,8 +3,14 @@ export * from "./extras/ui";
 export { getRuntime, init, resize, update, addContainer } from "./objects/routing/AsSceneManager";
 export { createMeshPipelineInstance, setMeshPipelineTransformIndex } from "./pipelines/MeshPipelineInstance";
 export { addPipelineAttribute } from "./pipelines/PipelineInstance";
-export { createMeshComponent, setMeshRenderIndex } from "./components/MeshComponent";
+export { createMeshComponent } from "./components/MeshComponent";
 export { createContainer, addAsset, createLevel1, createMainMenu, createTestLevel } from "./objects/routing";
+export {
+  getCameraProjectionInverseMatrix,
+  getCameraProjectionMatrix,
+  getCameraWorldInverseMatrix,
+} from "./cameras/Camera";
+
 export {
   addChild,
   createTransformNode,
@@ -15,6 +21,9 @@ export {
   getDataProperties,
   getId,
   setId,
+  getTransformModelViewMatrix,
+  getTransformNormalMatrix,
+  getTransformWorldMatrix,
 } from "./core/TransformNode";
 export {
   creatBufferGeometry,

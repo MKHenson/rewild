@@ -587,3 +587,13 @@ export function removeChild(parent: TransformNode, child: TransformNode): Transf
 
   return parent;
 }
+
+export function getTransformModelViewMatrix(node: TransformNode): usize {
+  return changetype<usize>(node.modelViewMatrix.elements);
+}
+export function getTransformWorldMatrix(node: TransformNode): usize {
+  return changetype<usize>(node.matrixWorld.elements);
+}
+export function getTransformNormalMatrix(node: TransformNode): usize {
+  return changetype<usize>(node.normalMatrix.elements);
+}
