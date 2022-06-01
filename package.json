@@ -4,9 +4,9 @@
   "description": "Game about exploring earth's history",
   "main": "index.js",
   "scripts": {
-    "asbuild:test": "asc src/as/tests.ts --target test",
-    "run-mocha": "node --experimental-wasi-unstable-preview1 --experimental-wasm-simd node_modules/mocha/bin/_mocha './tests/init.spec.ts' 'tests/**/*.spec.ts' --reporter spec",
-    "test": "npm run asbuild:test && npm run run-mocha",
+    "build-test": "asc src/as/tests.ts --target test",
+    "mocha": "node --experimental-wasi-unstable-preview1 --experimental-wasm-simd node_modules/mocha/bin/_mocha './tests/init.spec.ts' 'tests/**/*.spec.ts' --reporter spec",
+    "test": "npm run build-test && npm run mocha",
     "benchmark": "cross-env TS_NODE_PROJECT=\"./tests/tsconfig.json\" node --experimental-wasi-unstable-preview1 --experimental-wasm-simd --require ts-node/register ./tests/benchmarks.ts",
     "clean": "rimraf ./dist/untouched.wasm && rimraf ./dist/untouched.wasm.map && rimraf ./dist/untouched.wat",
     "asbuild:release": "asc src/as/index.ts --target release",
