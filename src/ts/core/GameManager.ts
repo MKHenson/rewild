@@ -21,8 +21,11 @@ import { Pipeline } from "./pipelines/Pipeline";
 import { TransformResource } from "./pipelines/resources/TransformResource";
 import { PipelineResourceInstance } from "./pipelines/resources/PipelineResourceInstance";
 import { Geometry } from "../renderer/geometry/Geometry";
+import { Player } from "../gameplay/Player";
 
 const sampleCount = 4;
+export type UpdateCallback = () => void;
+
 export class GameManager implements IBindable {
   canvas: HTMLCanvasElement;
   device: GPUDevice;
@@ -31,6 +34,7 @@ export class GameManager implements IBindable {
   inputManager: InputManager;
   buffers: GPUBuffer[];
   clock: Clock;
+  player: Player;
 
   onResizeHandler: () => void;
   onFrameHandler: () => void;
@@ -46,18 +50,18 @@ export class GameManager implements IBindable {
   private presentationSize: [number, number];
 
   character: Object3D;
-  onUpdate: () => void;
+  updateCallbacks: UpdateCallback[];
 
   canvasSizeCache: [number, number];
 
-  constructor(canvas: HTMLCanvasElement, onUpdate: () => void) {
+  constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.buffers = [];
     this.disposed = false;
     this.currentPass = null;
     this.onFrameHandler = this.onFrame.bind(this);
     this.clock = new Clock();
-    this.onUpdate = onUpdate;
+    this.updateCallbacks = [];
     window.addEventListener("resize", (e) => (this.canvasSizeCache = this.canvasSize()));
   }
 
@@ -174,6 +178,10 @@ export class GameManager implements IBindable {
       meshManager.addMesh(this.createMesh(geometryBox, "stars", "skybox")).transform as any
     );
 
+    this.player = new Player();
+
+    wasm.addAsset(containerLvl1Ptr, this.player.transformPtr as any);
+
     wasm.addContainer(containerLvl1Ptr, false);
     wasm.addContainer(containerMainMenuPtr, true);
     wasm.addContainer(containerTestPtr, false);
@@ -230,7 +238,8 @@ export class GameManager implements IBindable {
   private onFrame() {
     const clock = this.clock;
     window.requestAnimationFrame(this.onFrameHandler);
-    this.onUpdate();
+    const callbacks = this.updateCallbacks;
+    for (const callback of callbacks) callback();
 
     if (this.disposed) return;
 

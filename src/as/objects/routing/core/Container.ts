@@ -2,6 +2,7 @@ import { addChild, removeChild, TransformNode } from "../../../core/TransformNod
 import { Node } from "./Node";
 import { MeshComponent } from "../../../components/MeshComponent";
 import { Portal } from "./Portal";
+import { Component } from "../../../core/Component";
 
 export class Container extends Node {
   protected objects: TransformNode[];
@@ -26,7 +27,18 @@ export class Container extends Node {
     this.objects.push(object);
   }
 
-  onUpdate(delta: f32, total: u32): void {}
+  onUpdate(delta: f32, total: u32): void {
+    const children = this.objects;
+    let components: Component[];
+
+    for (let c: i32 = 0, cl = children.length; c < cl; c++) {
+      components = children[c].components;
+      for (let i: i32 = 0, l = components.length; i < l; i++) {
+        const component = unchecked(components[i]);
+        component.onUpdate(delta, total);
+      }
+    }
+  }
 
   mount(): void {
     const objects = this.objects;

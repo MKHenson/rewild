@@ -5,6 +5,7 @@ import { EngineVector3 } from "./math/Vector3";
 
 export * from "./tests/performance.spec";
 export * from "./tests/TransformNode.spec";
+export * from "./tests/PlayerComponent.spec";
 
 // prettier-ignore
 function newMatrix4(): EngineMatrix4 { return new EngineMatrix4(); }
