@@ -1,12 +1,33 @@
-import { Component } from "solid-js";
+import { Component, createSignal } from "solid-js";
 import { styled } from "solid-styled-components";
-import { Typography } from "../common/Typography";
+import { GameManager } from "../../core/GameManager";
+import { CircularProgress } from "../common/CircularProgress";
 
-export const InGameUI: Component = () => {
+type Props = {
+  gameManager: GameManager;
+};
+
+export const InGameUI: Component<Props> = (props) => {
+  const [playerHealth, setPlayerHealth] = createSignal(100);
+  const [playerHunger, setPlayerHunger] = createSignal(100);
+
+  const onFrameUpdate = () => {
+    if (props.gameManager.player.health !== playerHealth()) {
+      setPlayerHealth(props.gameManager.player.health);
+    }
+
+    if (props.gameManager.player.hunger !== playerHunger()) {
+      setPlayerHunger(props.gameManager.player.hunger);
+    }
+  };
+
+  props.gameManager.updateCallbacks.push(onFrameUpdate);
+
   return (
     <StyledContainer>
       <StyledFooter>
-        <Typography variant="h2">The Game Will End in 15 Seconds</Typography>
+        <CircularProgress size={120} value={playerHealth()} strokeSize={20} />
+        <CircularProgress size={80} value={playerHunger()} strokeSize={14} />
       </StyledFooter>
     </StyledContainer>
   );
@@ -26,7 +47,6 @@ const StyledFooter = styled.div`
   min-height: 50px;
   position: absolute;
   bottom: 30px;
-  background: rgb(84 92 135);
   margin: 0 0 0 5%;
   border-radius: 10px;
   box-sizing: border-box;

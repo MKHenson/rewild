@@ -9,7 +9,7 @@ import { Layers } from "./Layers";
 import { Camera } from "../cameras/Camera";
 import { Light } from "../lights/Light";
 import { Raycaster } from "./Raycaster";
-import { Intersection } from "../components/MeshComponent";
+import { Intersection, MeshComponent } from "../components/MeshComponent";
 import { IQuatChangeListener } from "../../common/math/Quaternion";
 import { Component } from "./Component";
 
@@ -98,52 +98,52 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
   }
 
   get visible(): boolean {
-    return this.dataProperties[0] === 0 ? false : true;
+    return unchecked(this.dataProperties[0]) === 0 ? false : true;
   }
   set visible(val: boolean) {
-    this.dataProperties[0] = val ? 1 : 0;
+    unchecked((this.dataProperties[0] = val ? 1 : 0));
   }
 
   get renderOrder(): i32 {
-    return this.dataProperties[1];
+    return unchecked(this.dataProperties[1]);
   }
   set renderOrder(val: i32) {
-    this.dataProperties[1];
+    unchecked(this.dataProperties[1]);
   }
 
   get frustumCulled(): boolean {
-    return this.dataProperties[2] === 0 ? false : true;
+    return unchecked(this.dataProperties[2] === 0 ? false : true);
   }
   set frustumCulled(val: boolean) {
-    this.dataProperties[2] = val ? 1 : 0;
+    unchecked((this.dataProperties[2] = val ? 1 : 0));
   }
 
   get matrixAutoUpdate(): boolean {
-    return this.dataProperties[3] === 0 ? false : true;
+    return unchecked(this.dataProperties[3] === 0 ? false : true);
   }
   set matrixAutoUpdate(val: boolean) {
-    this.dataProperties[3] = val ? 1 : 0;
+    unchecked((this.dataProperties[3] = val ? 1 : 0));
   }
 
   get castShadow(): boolean {
-    return this.dataProperties[4] === 0 ? false : true;
+    return unchecked(this.dataProperties[4] === 0 ? false : true);
   }
   set castShadow(val: boolean) {
-    this.dataProperties[4] = val ? 1 : 0;
+    unchecked((this.dataProperties[4] = val ? 1 : 0));
   }
 
   get receiveShadow(): boolean {
-    return this.dataProperties[5] === 0 ? false : true;
+    return unchecked(this.dataProperties[5] === 0 ? false : true);
   }
   set receiveShadow(val: boolean) {
-    this.dataProperties[5] = val ? 1 : 0;
+    unchecked((this.dataProperties[5] = val ? 1 : 0));
   }
 
   get id(): i32 {
-    return this.dataProperties[6];
+    return unchecked(this.dataProperties[6]);
   }
   set id(val: i32) {
-    this.dataProperties[6] = val;
+    unchecked((this.dataProperties[6] = val));
   }
 
   onEulerChanged(euler: Euler): void {
@@ -386,7 +386,7 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
     const components = this.components;
     for (let i: i32 = 0, l = components.length; i < l; i++) {
       const component = unchecked(components[i]);
-      component.raycast(raycaster, intersects);
+      if (component instanceof MeshComponent) component.raycast(raycaster, intersects);
     }
   }
 

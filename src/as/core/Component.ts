@@ -1,13 +1,14 @@
-import { Intersection } from "../components/MeshComponent";
-import { Raycaster } from "./Raycaster";
+import { EventDispatcher } from "./EventDispatcher";
 import { addComponent, TransformNode } from "./TransformNode";
 
-export class Component {
+export class Component extends EventDispatcher {
   transform: TransformNode | null;
 
-  constructor() {}
+  constructor() {
+    super();
+  }
 
-  raycast(raycaster: Raycaster, intersects: Intersection[]): void {}
+  onUpdate(delta: f32, total: u32): void {}
 
   copy(source: Component): Component {
     if (source.transform) addComponent(source.transform, this);

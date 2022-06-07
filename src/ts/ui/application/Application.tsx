@@ -43,7 +43,9 @@ export const Application: Component<Props> = ({}) => {
   };
 
   const onCanvasReady = async (canvas: HTMLCanvasElement) => {
-    gameManager = new GameManager(canvas, onFrameUpdate);
+    gameManager = new GameManager(canvas);
+    gameManager.updateCallbacks.push(onFrameUpdate);
+
     eventManager = new UIEventManager();
 
     const bindables: IBindable[] = [gameManager, eventManager];
@@ -98,7 +100,7 @@ export const Application: Component<Props> = ({}) => {
   return (
     <StyledApplication>
       <Show when={gameIsRunning()}>
-        <InGameUI />
+        <InGameUI gameManager={gameManager!} />
       </Show>
       <Dynamic component={options[activeMenu()]} />
       <Pane3D onCanvasReady={onCanvasReady} />

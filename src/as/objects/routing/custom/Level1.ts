@@ -15,16 +15,15 @@ import { Link } from "../core/Link";
 import { TransformNode } from "../../../core/TransformNode";
 import { lock, unlock } from "../../../Imports";
 import { degToRad } from "../../../../common/math/MathUtils";
-
-const playerHungerThreshold: u32 = 15;
+import { PlayerComponent } from "../../../components/PlayerComponent";
 
 export class Level1 extends Container implements Listener {
   orbitController!: OrbitController;
   pointerController!: PointerLockController;
   totalTime: f32;
-  playerDied: boolean;
   isPaused: boolean;
 
+  private player!: PlayerComponent;
   private direction1!: DirectionalLight;
   private direction2!: DirectionalLight;
   private direction3!: DirectionalLight;
@@ -36,7 +35,6 @@ export class Level1 extends Container implements Listener {
   constructor() {
     super("Level1");
     this.totalTime = 0;
-    this.playerDied = false;
     this.isPaused = false;
   }
 
@@ -71,7 +69,7 @@ export class Level1 extends Container implements Listener {
   onEvent(event: Event): void {
     if (event.attachment instanceof KeyboardEvent) {
       const keyEvent = event.attachment as KeyboardEvent;
-      if (!this.playerDied) {
+      if (!this.player.isDead) {
         if (keyEvent.code == "Escape") {
           this.isPaused = !this.isPaused;
           if (this.isPaused) unlock();
@@ -88,21 +86,19 @@ export class Level1 extends Container implements Listener {
       }
     }
 
-    this.pointerController.enabled = !this.isPaused && !this.playerDied;
+    this.pointerController.enabled = !this.isPaused && !this.player.isDead;
   }
 
   onUpdate(delta: f32, total: u32): void {
     if (this.isPaused) return;
+    super.onUpdate(delta, total);
 
     const objects = this.objects;
     this.totalTime += delta;
 
-    if (u32(this.totalTime) > playerHungerThreshold && this.playerDied == false) {
-      this.playerDied = true;
+    if (this.player.isDead) {
       // this.orbitController.enabled = false;
       this.pointerController.enabled = false;
-      unlock();
-      uiSignaller.signalClientEvent(UIEventType.PlayerDied);
     }
 
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
@@ -125,8 +121,10 @@ export class Level1 extends Container implements Listener {
   mount(): void {
     super.mount();
     this.totalTime = 0;
-    this.playerDied = false;
     this.isPaused = false;
+
+    this.player = this.findObjectByName("player")!.components[0] as PlayerComponent;
+    this.player.onRestart();
 
     this.floor = this.findObjectByName("floor")!;
     this.ball = this.findObjectByName("ball")!;
@@ -148,7 +146,7 @@ export class Level1 extends Container implements Listener {
     this.ball.position.set(3, 3, 0);
     this.floor.scale.set(200, 200, 200);
     this.floor.position.set(0, -0.1, 0);
-    this.floor.rotation.x -= degToRad(90);
+    this.floor.rotation.x = -degToRad(90);
 
     this.sbybox.scale.set(200, 200, 200);
     this.sbybox.position.set(0, 0, 0);
