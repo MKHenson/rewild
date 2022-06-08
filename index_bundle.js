@@ -37,6 +37,11 @@ async function instantiate(module, imports = {}) {
           throw Error(`${message} in ${fileName}:${lineNumber}:${columnNumber}`);
         })();
       },
+      "console.log"(text) {
+        // ~lib/bindings/dom/console.log(~lib/string/String) => void
+        text = __liftString(text >>> 0);
+        console.log(text);
+      },
       seed() {
         // ~lib/builtins/seed() => f64
         return (() => {
@@ -44,32 +49,26 @@ async function instantiate(module, imports = {}) {
           return Date.now() * Math.random();
         })();
       },
-      "console.log"(text) {
-        // ~lib/bindings/dom/console.log(~lib/string/String) => void
-        text = __liftString(text >>> 0);
-        console.log(text);
-      },
     }),
     Imports: Object.assign(Object.create(__module0), {
-      render(commandsIndex) {
-        // src/as/Imports/render(usize) => void
-        commandsIndex = commandsIndex >>> 0;
-        __module0.render(commandsIndex);
+      setupLights(numLights, config, scene, direction) {
+        // src/as/Imports/setupLights(u32, usize, usize, usize) => void
+        numLights = numLights >>> 0;
+        config = config >>> 0;
+        scene = scene >>> 0;
+        direction = direction >>> 0;
+        __module0.setupLights(numLights, config, scene, direction);
+      },
+      renderComponents(camera, meshComponents) {
+        // src/as/Imports/renderComponents(src/as/cameras/Camera/Camera, ~lib/array/Array<src/as/core/Component/Component>) => void
+        camera = __liftInternref(camera >>> 0);
+        meshComponents = __liftArray(pointer => __liftInternref(new Uint32Array(memory.buffer)[pointer >>> 2]), 2, meshComponents >>> 0);
+        __module0.renderComponents(camera, meshComponents);
       },
       onSignalReceived(type, event) {
         // src/as/Imports/onSignalReceived(i32, src/as/core/Event/Event) => void
         event = __liftInternref(event >>> 0);
         __module0.onSignalReceived(type, event);
-      },
-      createBufferFromF32(data, usage) {
-        // src/as/Imports/createBufferFromF32(usize, i32) => i32
-        data = data >>> 0;
-        return __module0.createBufferFromF32(data, usage);
-      },
-      createIndexBuffer(data, usage) {
-        // src/as/Imports/createIndexBuffer(usize, i32) => i32
-        data = data >>> 0;
-        return __module0.createIndexBuffer(data, usage);
       },
     }),
   };
@@ -88,67 +87,51 @@ async function instantiate(module, imports = {}) {
       return __liftArray(pointer => new Int32Array(memory.buffer)[pointer >>> 2], 2, exports.foo() >>> 0);
     },
     getRuntime() {
-      // src/as/exports/AsSceneManager/getRuntime() => src/as/objects/routing/core/Runtime/Runtime
+      // src/as/objects/routing/AsSceneManager/getRuntime() => src/as/objects/routing/core/Runtime/Runtime
       return __liftInternref(exports.getRuntime() >>> 0);
     },
     addContainer(container, activate) {
-      // src/as/exports/AsSceneManager/addContainer(src/as/objects/routing/core/Container/Container, bool) => void
+      // src/as/objects/routing/AsSceneManager/addContainer(src/as/objects/routing/core/Container/Container, bool) => void
       container = __lowerInternref(container) || __notnull();
       activate = activate ? 1 : 0;
       exports.addContainer(container, activate);
     },
-    createTexture(name, index) {
-      // src/as/exports/TextureFactory/createTexture(~lib/string/String, i32) => src/as/exports/TextureFactory/Texture
+    createMeshPipelineInstance(name, index) {
+      // src/as/pipelines/MeshPipelineInstance/createMeshPipelineInstance(~lib/string/String, i32) => src/as/pipelines/PipelineInstance/PipelineInstance
       name = __lowerString(name) || __notnull();
-      return __liftInternref(exports.createTexture(name, index) >>> 0);
-    },
-    createBox(width, height, depth, widthSegments, heightSegments, depthSegments) {
-      // src/as/exports/GeometryFactory/createBox(f32?, f32?, f32?, u16?, u16?, u16?) => src/as/core/BufferGeometry/BufferGeometry
-      exports.__setArgumentsLength(arguments.length);
-      return __liftInternref(exports.createBox(width, height, depth, widthSegments, heightSegments, depthSegments) >>> 0);
-    },
-    createPlane(width, height, widthSegments, heightSegments) {
-      // src/as/exports/GeometryFactory/createPlane(f32?, f32?, u16?, u16?) => src/as/core/BufferGeometry/BufferGeometry
-      exports.__setArgumentsLength(arguments.length);
-      return __liftInternref(exports.createPlane(width, height, widthSegments, heightSegments) >>> 0);
-    },
-    createSphere(radius, widthSegments, heightSegments) {
-      // src/as/exports/GeometryFactory/createSphere(f32?, u16?, u16?) => src/as/core/BufferGeometry/BufferGeometry
-      exports.__setArgumentsLength(arguments.length);
-      return __liftInternref(exports.createSphere(radius, widthSegments, heightSegments) >>> 0);
-    },
-    addVertGeometry(verts) {
-      // src/as/exports/GeometryFactory/addVertGeometry(~lib/typedarray/Float32Array) => i32
-      verts = __lowerTypedArray(Float32Array, 20, 2, verts) || __notnull();
-      return exports.addVertGeometry(verts);
-    },
-    createPipelineInstance(name, index, type) {
-      // src/as/exports/PipelineFactory/createPipelineInstance(~lib/string/String, i32, i32) => src/as/pipelines/PipelineInstance/PipelineInstance
-      name = __lowerString(name) || __notnull();
-      return __liftInternref(exports.createPipelineInstance(name, index, type) >>> 0);
-    },
-    addPipelineAttribute(pipeline, type, location) {
-      // src/as/exports/PipelineFactory/addPipelineAttribute(src/as/pipelines/PipelineInstance/PipelineInstance, i32, u16) => void
-      pipeline = __lowerInternref(pipeline) || __notnull();
-      exports.addPipelineAttribute(pipeline, type, location);
+      return __liftInternref(exports.createMeshPipelineInstance(name, index) >>> 0);
     },
     setMeshPipelineTransformIndex(pipeline, transformResourceIndex) {
-      // src/as/exports/PipelineFactory/setMeshPipelineTransformIndex(src/as/pipelines/PipelineInstance/PipelineInstance, i32) => void
+      // src/as/pipelines/MeshPipelineInstance/setMeshPipelineTransformIndex(src/as/pipelines/PipelineInstance/PipelineInstance, i32) => void
       pipeline = __lowerInternref(pipeline) || __notnull();
       exports.setMeshPipelineTransformIndex(pipeline, transformResourceIndex);
     },
-    createMesh(geometry, pipeline, name) {
-      // src/as/exports/MeshFactory/createMesh(src/as/core/BufferGeometry/BufferGeometry, src/as/pipelines/PipelineInstance/PipelineInstance, ~lib/string/String | null?) => src/as/core/TransformNode/TransformNode
+    addPipelineAttribute(pipeline, type, location) {
+      // src/as/pipelines/PipelineInstance/addPipelineAttribute(src/as/pipelines/PipelineInstance/PipelineInstance, i32, u16) => void
+      pipeline = __lowerInternref(pipeline) || __notnull();
+      exports.addPipelineAttribute(pipeline, type, location);
+    },
+    createMeshComponent(geometry, pipeline, name) {
+      // src/as/components/MeshComponent/createMeshComponent(src/as/core/BufferGeometry/BufferGeometry, src/as/pipelines/PipelineInstance/PipelineInstance, ~lib/string/String | null?) => src/as/core/Component/Component
       geometry = __retain(__lowerInternref(geometry) || __notnull());
       pipeline = __retain(__lowerInternref(pipeline) || __notnull());
       name = __lowerString(name);
       try {
         exports.__setArgumentsLength(arguments.length);
-        return __liftInternref(exports.createMesh(geometry, pipeline, name) >>> 0);
+        return __liftInternref(exports.createMeshComponent(geometry, pipeline, name) >>> 0);
       } finally {
         __release(geometry);
         __release(pipeline);
       }
+    },
+    createPlayerComponent() {
+      // src/as/components/PlayerComponent/createPlayerComponent() => src/as/components/PlayerComponent/PlayerComponent
+      return __liftInternref(exports.createPlayerComponent() >>> 0);
+    },
+    getPlayerComponentProperties(player) {
+      // src/as/components/PlayerComponent/getPlayerComponentProperties(src/as/components/PlayerComponent/PlayerComponent) => usize
+      player = __lowerInternref(player) || __notnull();
+      return exports.getPlayerComponentProperties(player) >>> 0;
     },
     createContainer(name) {
       // src/as/objects/routing/core/Container/createContainer(~lib/string/String) => src/as/objects/routing/core/Container/Container
@@ -177,49 +160,172 @@ async function instantiate(module, imports = {}) {
       // src/as/objects/routing/custom/TestLevel/createTestLevel() => src/as/objects/routing/core/Container/Container
       return __liftInternref(exports.createTestLevel() >>> 0);
     },
-    createTransformNode() {
-      // src/as/exports/ObjectFactory/createTransformNode() => src/as/core/TransformNode/TransformNode
-      return __liftInternref(exports.createTransformNode() >>> 0);
+    getCameraProjectionInverseMatrix(camera) {
+      // src/as/cameras/Camera/getCameraProjectionInverseMatrix(src/as/cameras/Camera/Camera) => usize
+      camera = __lowerInternref(camera) || __notnull();
+      return exports.getCameraProjectionInverseMatrix(camera) >>> 0;
+    },
+    getCameraProjectionMatrix(camera) {
+      // src/as/cameras/Camera/getCameraProjectionMatrix(src/as/cameras/Camera/Camera) => usize
+      camera = __lowerInternref(camera) || __notnull();
+      return exports.getCameraProjectionMatrix(camera) >>> 0;
+    },
+    getCameraWorldInverseMatrix(camera) {
+      // src/as/cameras/Camera/getCameraWorldInverseMatrix(src/as/cameras/Camera/Camera) => usize
+      camera = __lowerInternref(camera) || __notnull();
+      return exports.getCameraWorldInverseMatrix(camera) >>> 0;
+    },
+    addChild(parent, child) {
+      // src/as/core/TransformNode/addChild(src/as/core/TransformNode/TransformNode, src/as/core/TransformNode/TransformNode) => src/as/core/TransformNode/TransformNode
+      parent = __retain(__lowerInternref(parent) || __notnull());
+      child = __lowerInternref(child) || __notnull();
+      try {
+        return __liftInternref(exports.addChild(parent, child) >>> 0);
+      } finally {
+        __release(parent);
+      }
+    },
+    createTransformNode(name) {
+      // src/as/core/TransformNode/createTransformNode(~lib/string/String | null) => src/as/core/TransformNode/TransformNode
+      name = __lowerString(name);
+      return __liftInternref(exports.createTransformNode(name) >>> 0);
+    },
+    removeChild(parent, child) {
+      // src/as/core/TransformNode/removeChild(src/as/core/TransformNode/TransformNode, src/as/core/TransformNode/TransformNode) => src/as/core/TransformNode/TransformNode
+      parent = __retain(__lowerInternref(parent) || __notnull());
+      child = __lowerInternref(child) || __notnull();
+      try {
+        return __liftInternref(exports.removeChild(parent, child) >>> 0);
+      } finally {
+        __release(parent);
+      }
+    },
+    getVisibility(node) {
+      // src/as/core/TransformNode/getVisibility(src/as/core/TransformNode/TransformNode) => bool
+      node = __lowerInternref(node) || __notnull();
+      return exports.getVisibility(node) != 0;
+    },
+    setVisibility(node, value) {
+      // src/as/core/TransformNode/setVisibility(src/as/core/TransformNode/TransformNode, bool) => void
+      node = __lowerInternref(node) || __notnull();
+      value = value ? 1 : 0;
+      exports.setVisibility(node, value);
+    },
+    addComponent(node, component) {
+      // src/as/core/TransformNode/addComponent(src/as/core/TransformNode/TransformNode, src/as/core/Component/Component) => src/as/core/TransformNode/TransformNode
+      node = __retain(__lowerInternref(node) || __notnull());
+      component = __lowerInternref(component) || __notnull();
+      try {
+        return __liftInternref(exports.addComponent(node, component) >>> 0);
+      } finally {
+        __release(node);
+      }
+    },
+    getDataProperties(node) {
+      // src/as/core/TransformNode/getDataProperties(src/as/core/TransformNode/TransformNode) => usize
+      node = __lowerInternref(node) || __notnull();
+      return exports.getDataProperties(node) >>> 0;
+    },
+    getId(node) {
+      // src/as/core/TransformNode/getId(src/as/core/TransformNode/TransformNode) => i32
+      node = __lowerInternref(node) || __notnull();
+      return exports.getId(node);
+    },
+    setId(node, value) {
+      // src/as/core/TransformNode/setId(src/as/core/TransformNode/TransformNode, i32) => src/as/core/TransformNode/TransformNode
+      node = __lowerInternref(node) || __notnull();
+      return __liftInternref(exports.setId(node, value) >>> 0);
+    },
+    getTransformModelViewMatrix(node) {
+      // src/as/core/TransformNode/getTransformModelViewMatrix(src/as/core/TransformNode/TransformNode) => usize
+      node = __lowerInternref(node) || __notnull();
+      return exports.getTransformModelViewMatrix(node) >>> 0;
+    },
+    getTransformNormalMatrix(node) {
+      // src/as/core/TransformNode/getTransformNormalMatrix(src/as/core/TransformNode/TransformNode) => usize
+      node = __lowerInternref(node) || __notnull();
+      return exports.getTransformNormalMatrix(node) >>> 0;
+    },
+    getTransformWorldMatrix(node) {
+      // src/as/core/TransformNode/getTransformWorldMatrix(src/as/core/TransformNode/TransformNode) => usize
+      node = __lowerInternref(node) || __notnull();
+      return exports.getTransformWorldMatrix(node) >>> 0;
+    },
+    creatBufferGeometry() {
+      // src/as/core/BufferGeometry/creatBufferGeometry() => src/as/core/BufferGeometry/BufferGeometry
+      return __liftInternref(exports.creatBufferGeometry() >>> 0);
+    },
+    createBufferAttributeF32(array, itemSize, normalized) {
+      // src/as/core/BufferGeometry/createBufferAttributeF32(~lib/typedarray/Float32Array, u32, bool) => src/as/core/BufferAttribute/BaseAttribute
+      array = __lowerTypedArray(Float32Array, 16, 2, array) || __notnull();
+      normalized = normalized ? 1 : 0;
+      return __liftInternref(exports.createBufferAttributeF32(array, itemSize, normalized) >>> 0);
+    },
+    setBufferAttribute(geometry, type, attributeBuffer) {
+      // src/as/core/BufferGeometry/setBufferAttribute(src/as/core/BufferGeometry/BufferGeometry, i32, src/as/core/BufferAttribute/BaseAttribute) => void
+      geometry = __retain(__lowerInternref(geometry) || __notnull());
+      attributeBuffer = __lowerInternref(attributeBuffer) || __notnull();
+      try {
+        exports.setBufferAttribute(geometry, type, attributeBuffer);
+      } finally {
+        __release(geometry);
+      }
+    },
+    createBufferAttributeu32(array, itemSize, normalized) {
+      // src/as/core/BufferGeometry/createBufferAttributeu32(~lib/typedarray/Uint32Array, u32, bool) => src/as/core/BufferAttribute/BaseAttribute
+      array = __lowerTypedArray(Uint32Array, 54, 2, array) || __notnull();
+      normalized = normalized ? 1 : 0;
+      return __liftInternref(exports.createBufferAttributeu32(array, itemSize, normalized) >>> 0);
+    },
+    setIndexAttribute(geometry, attributeBuffer) {
+      // src/as/core/BufferGeometry/setIndexAttribute(src/as/core/BufferGeometry/BufferGeometry, src/as/core/BufferAttribute/BaseAttribute) => void
+      geometry = __retain(__lowerInternref(geometry) || __notnull());
+      attributeBuffer = __lowerInternref(attributeBuffer) || __notnull();
+      try {
+        exports.setIndexAttribute(geometry, attributeBuffer);
+      } finally {
+        __release(geometry);
+      }
     },
     dispatchOnKeyDown(keyEvent) {
-      // src/as/exports/io/InputManager/dispatchOnKeyDown(src/as/exports/io/KeyboardEvent/KeyboardEvent) => void
+      // src/as/extras/io/InputManager/dispatchOnKeyDown(src/as/extras/io/KeyboardEvent/KeyboardEvent) => void
       keyEvent = __lowerInternref(keyEvent) || __notnull();
       exports.dispatchOnKeyDown(keyEvent);
     },
     dispatchOnKeyUp(keyEvent) {
-      // src/as/exports/io/InputManager/dispatchOnKeyUp(src/as/exports/io/KeyboardEvent/KeyboardEvent) => void
+      // src/as/extras/io/InputManager/dispatchOnKeyUp(src/as/extras/io/KeyboardEvent/KeyboardEvent) => void
       keyEvent = __lowerInternref(keyEvent) || __notnull();
       exports.dispatchOnKeyUp(keyEvent);
     },
     dispatchOnMouseDown(mouseEvent) {
-      // src/as/exports/io/InputManager/dispatchOnMouseDown(src/as/exports/io/MouseEvent/MouseEvent) => void
+      // src/as/extras/io/InputManager/dispatchOnMouseDown(src/as/extras/io/MouseEvent/MouseEvent) => void
       mouseEvent = __lowerInternref(mouseEvent) || __notnull();
       exports.dispatchOnMouseDown(mouseEvent);
     },
     dispatchOnMouseMove(mouseEvent) {
-      // src/as/exports/io/InputManager/dispatchOnMouseMove(src/as/exports/io/MouseEvent/MouseEvent) => void
+      // src/as/extras/io/InputManager/dispatchOnMouseMove(src/as/extras/io/MouseEvent/MouseEvent) => void
       mouseEvent = __lowerInternref(mouseEvent) || __notnull();
       exports.dispatchOnMouseMove(mouseEvent);
     },
     dispatchOnMouseUp(mouseEvent) {
-      // src/as/exports/io/InputManager/dispatchOnMouseUp(src/as/exports/io/MouseEvent/MouseEvent) => void
+      // src/as/extras/io/InputManager/dispatchOnMouseUp(src/as/extras/io/MouseEvent/MouseEvent) => void
       mouseEvent = __lowerInternref(mouseEvent) || __notnull();
       exports.dispatchOnMouseUp(mouseEvent);
     },
     dispatchOnWheel(mouseEvent) {
-      // src/as/exports/io/InputManager/dispatchOnWheel(src/as/exports/io/MouseEvent/MouseEvent) => void
+      // src/as/extras/io/InputManager/dispatchOnWheel(src/as/extras/io/MouseEvent/MouseEvent) => void
       mouseEvent = __lowerInternref(mouseEvent) || __notnull();
       exports.dispatchOnWheel(mouseEvent);
     },
     createMouseEvent(clientX, clientY, pageX, pageY, ctrlKey, shiftKey, altKey, button, buttons, targetX, targetY, targetWidth, targetHeight, delta, movementX, movementY) {
-      // src/as/exports/io/MouseEvent/createMouseEvent(i32, i32, i32, i32, bool, bool, bool, i32, i32, i32, i32, i32, i32, i16, i16, i16) => src/as/exports/io/MouseEvent/MouseEvent
+      // src/as/extras/io/MouseEvent/createMouseEvent(i32, i32, i32, i32, bool, bool, bool, i32, i32, i32, i32, i32, i32, i16, i16, i16) => src/as/extras/io/MouseEvent/MouseEvent
       ctrlKey = ctrlKey ? 1 : 0;
       shiftKey = shiftKey ? 1 : 0;
       altKey = altKey ? 1 : 0;
       return __liftInternref(exports.createMouseEvent(clientX, clientY, pageX, pageY, ctrlKey, shiftKey, altKey, button, buttons, targetX, targetY, targetWidth, targetHeight, delta, movementX, movementY) >>> 0);
     },
     createKeyboardEvent(code) {
-      // src/as/exports/io/KeyboardEvent/createKeyboardEvent(~lib/string/String) => src/as/exports/io/KeyboardEvent/KeyboardEvent
+      // src/as/extras/io/KeyboardEvent/createKeyboardEvent(~lib/string/String) => src/as/extras/io/KeyboardEvent/KeyboardEvent
       code = __lowerString(code) || __notnull();
       return __liftInternref(exports.createKeyboardEvent(code) >>> 0);
     },
@@ -328,61 +434,6 @@ let AttributeType;
 
 /***/ }),
 
-/***/ "./src/common/Commands.ts":
-/*!********************************!*\
-  !*** ./src/common/Commands.ts ***!
-  \********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "Commands": () => (/* binding */ Commands),
-/* harmony export */   "GPUCommands": () => (/* binding */ GPUCommands)
-/* harmony export */ });
-let Commands;
-
-(function (Commands) {
-  Commands[Commands["CLEAR"] = 0] = "CLEAR";
-  Commands[Commands["RENDER_VAO"] = 1] = "RENDER_VAO";
-  Commands[Commands["ACTIVATE_SHADER"] = 2] = "ACTIVATE_SHADER";
-  Commands[Commands["UMATRIX4FV"] = 3] = "UMATRIX4FV";
-  Commands[Commands["UTEXTURE2D"] = 4] = "UTEXTURE2D";
-  Commands[Commands["GL_DEPTH_MASK"] = 5] = "GL_DEPTH_MASK";
-  Commands[Commands["GL_DEPTH_FUNC"] = 6] = "GL_DEPTH_FUNC";
-  Commands[Commands["GL_CLEAR_DEPTH"] = 7] = "GL_CLEAR_DEPTH";
-  Commands[Commands["GL_ENABLE"] = 8] = "GL_ENABLE";
-  Commands[Commands["GL_DISABLE"] = 9] = "GL_DISABLE";
-  Commands[Commands["GL_STENCIL_MASK"] = 10] = "GL_STENCIL_MASK";
-  Commands[Commands["GL_STENCIL_FUNC"] = 11] = "GL_STENCIL_FUNC";
-  Commands[Commands["GL_STENCIL_OP"] = 12] = "GL_STENCIL_OP";
-  Commands[Commands["GL_CLEAR_STENCIL"] = 13] = "GL_CLEAR_STENCIL";
-  Commands[Commands["GL_POLYGON_OFFSET"] = 14] = "GL_POLYGON_OFFSET";
-  Commands[Commands["GL_CULLFACE"] = 15] = "GL_CULLFACE";
-  Commands[Commands["GL_COLOR_MASK"] = 16] = "GL_COLOR_MASK";
-  Commands[Commands["GL_CLEAR_COLOR"] = 17] = "GL_CLEAR_COLOR";
-  Commands[Commands["GL_FRONT_FACE"] = 18] = "GL_FRONT_FACE";
-  Commands[Commands["GL_BLEND_EQUATION"] = 19] = "GL_BLEND_EQUATION";
-  Commands[Commands["GL_BLEND_FUNC"] = 20] = "GL_BLEND_FUNC";
-  Commands[Commands["GL_BLEND_EQUATION_SEPARATE"] = 21] = "GL_BLEND_EQUATION_SEPARATE";
-  Commands[Commands["GL_BLEND_FUNC_SEPARATE"] = 22] = "GL_BLEND_FUNC_SEPARATE";
-})(Commands || (Commands = {}));
-
-let GPUCommands;
-
-(function (GPUCommands) {
-  GPUCommands[GPUCommands["SET_PIPELINE"] = 0] = "SET_PIPELINE";
-  GPUCommands[GPUCommands["SET_TRANSFORM"] = 1] = "SET_TRANSFORM";
-  GPUCommands[GPUCommands["SETUP_LIGHTING"] = 2] = "SETUP_LIGHTING";
-  GPUCommands[GPUCommands["SET_INDEX_BUFFER"] = 3] = "SET_INDEX_BUFFER";
-  GPUCommands[GPUCommands["SET_BUFFER"] = 4] = "SET_BUFFER";
-  GPUCommands[GPUCommands["START_PASS"] = 5] = "START_PASS";
-  GPUCommands[GPUCommands["SET_BIND_GROUP"] = 6] = "SET_BIND_GROUP";
-  GPUCommands[GPUCommands["END_PASS"] = 7] = "END_PASS";
-  GPUCommands[GPUCommands["DRAW_INDEXED"] = 8] = "DRAW_INDEXED";
-})(GPUCommands || (GPUCommands = {}));
-
-/***/ }),
-
 /***/ "./src/common/GroupType.ts":
 /*!*********************************!*\
   !*** ./src/common/GroupType.ts ***!
@@ -399,24 +450,6 @@ let GroupType;
   GroupType[GroupType["Transform"] = 0] = "Transform";
   GroupType[GroupType["Material"] = 1] = "Material";
 })(GroupType || (GroupType = {}));
-
-/***/ }),
-
-/***/ "./src/common/PipelineType.ts":
-/*!************************************!*\
-  !*** ./src/common/PipelineType.ts ***!
-  \************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "PipelineType": () => (/* binding */ PipelineType)
-/* harmony export */ });
-let PipelineType;
-
-(function (PipelineType) {
-  PipelineType[PipelineType["Mesh"] = 0] = "Mesh";
-})(PipelineType || (PipelineType = {}));
 
 /***/ }),
 
@@ -460,6 +493,1307 @@ let UIEventType;
   UIEventType[UIEventType["PlayerDied"] = 3] = "PlayerDied";
   UIEventType[UIEventType["Resume"] = 4] = "Resume";
 })(UIEventType || (UIEventType = {}));
+
+/***/ }),
+
+/***/ "./src/common/math/EulerOrder.ts":
+/*!***************************************!*\
+  !*** ./src/common/math/EulerOrder.ts ***!
+  \***************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "EulerRotationOrder": () => (/* binding */ EulerRotationOrder)
+/* harmony export */ });
+let EulerRotationOrder;
+
+(function (EulerRotationOrder) {
+  EulerRotationOrder[EulerRotationOrder["XYZ"] = 0] = "XYZ";
+  EulerRotationOrder[EulerRotationOrder["YZX"] = 1] = "YZX";
+  EulerRotationOrder[EulerRotationOrder["ZXY"] = 2] = "ZXY";
+  EulerRotationOrder[EulerRotationOrder["XZY"] = 3] = "XZY";
+  EulerRotationOrder[EulerRotationOrder["YXZ"] = 4] = "YXZ";
+  EulerRotationOrder[EulerRotationOrder["ZYX"] = 5] = "ZYX";
+})(EulerRotationOrder || (EulerRotationOrder = {}));
+
+/***/ }),
+
+/***/ "./src/common/math/MathUtils.ts":
+/*!**************************************!*\
+  !*** ./src/common/math/MathUtils.ts ***!
+  \**************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "DEG2RAD": () => (/* binding */ DEG2RAD),
+/* harmony export */   "RAD2DEG": () => (/* binding */ RAD2DEG),
+/* harmony export */   "ceilPowerOfTwo": () => (/* binding */ ceilPowerOfTwo),
+/* harmony export */   "clamp": () => (/* binding */ clamp),
+/* harmony export */   "damp": () => (/* binding */ damp),
+/* harmony export */   "degToRad": () => (/* binding */ degToRad),
+/* harmony export */   "euclideanModulo": () => (/* binding */ euclideanModulo),
+/* harmony export */   "floorPowerOfTwo": () => (/* binding */ floorPowerOfTwo),
+/* harmony export */   "generateUUID": () => (/* binding */ generateUUID),
+/* harmony export */   "inverseLerp": () => (/* binding */ inverseLerp),
+/* harmony export */   "isPowerOfTwo": () => (/* binding */ isPowerOfTwo),
+/* harmony export */   "lerp": () => (/* binding */ lerp),
+/* harmony export */   "mapLinear": () => (/* binding */ mapLinear),
+/* harmony export */   "pingpong": () => (/* binding */ pingpong),
+/* harmony export */   "radToDeg": () => (/* binding */ radToDeg),
+/* harmony export */   "randFloat": () => (/* binding */ randFloat),
+/* harmony export */   "randFloatSpread": () => (/* binding */ randFloatSpread),
+/* harmony export */   "randInt": () => (/* binding */ randInt),
+/* harmony export */   "seededRandom": () => (/* binding */ seededRandom),
+/* harmony export */   "setQuaternionFromProperEuler": () => (/* binding */ setQuaternionFromProperEuler),
+/* harmony export */   "smootherstep": () => (/* binding */ smootherstep),
+/* harmony export */   "smoothstep": () => (/* binding */ smoothstep)
+/* harmony export */ });
+const _lut = [];
+
+for (let i = 0; i < 256; i++) {
+  _lut[i] = (i < 16 ? "0" : "") + i.toString(16);
+}
+
+let _seed = 1234567;
+const DEG2RAD = Mathf.PI / 180;
+const RAD2DEG = 180 / Mathf.PI; // http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript/21963136#21963136
+
+function generateUUID() {
+  const d0 = u32(Mathf.random() * 0xffffffff) | 0;
+  const d1 = u32(Mathf.random() * 0xffffffff) | 0;
+  const d2 = u32(Mathf.random() * 0xffffffff) | 0;
+  const d3 = u32(Mathf.random() * 0xffffffff) | 0;
+  const uuid = _lut[d0 & 0xff] + _lut[d0 >> 8 & 0xff] + _lut[d0 >> 16 & 0xff] + _lut[d0 >> 24 & 0xff] + "-" + _lut[d1 & 0xff] + _lut[d1 >> 8 & 0xff] + "-" + _lut[d1 >> 16 & 0x0f | 0x40] + _lut[d1 >> 24 & 0xff] + "-" + _lut[d2 & 0x3f | 0x80] + _lut[d2 >> 8 & 0xff] + "-" + _lut[d2 >> 16 & 0xff] + _lut[d2 >> 24 & 0xff] + _lut[d3 & 0xff] + _lut[d3 >> 8 & 0xff] + _lut[d3 >> 16 & 0xff] + _lut[d3 >> 24 & 0xff]; // .toUpperCase() here flattens concatenated strings to save heap memory space.
+
+  return uuid.toUpperCase();
+}
+function clamp(value, min, max) {
+  return Mathf.max(min, Mathf.min(max, value));
+} // compute euclidian modulo of m % n
+// https://en.wikipedia.org/wiki/Modulo_operation
+
+function euclideanModulo(n, m) {
+  return (n % m + m) % m;
+} // Linear mapping from range <a1, a2> to range <b1, b2>
+
+function mapLinear(x, a1, a2, b1, b2) {
+  return b1 + (x - a1) * (b2 - b1) / (a2 - a1);
+} // https://www.gamedev.net/tutorials/programming/general-and-gameplay-programming/inverse-lerp-a-super-useful-yet-often-overlooked-function-r5230/
+
+function inverseLerp(x, y, value) {
+  if (x !== y) {
+    return (value - x) / (y - x);
+  } else {
+    return 0;
+  }
+} // https://en.wikipedia.org/wiki/Linear_interpolation
+
+function lerp(x, y, t) {
+  return (1 - t) * x + t * y;
+} // http://www.rorydriscoll.com/2016/03/07/frame-rate-independent-damping-using-lerp/
+
+function damp(x, y, lambda, dt) {
+  return lerp(x, y, 1 - Mathf.exp(-lambda * dt));
+} // https://www.desmos.com/calculator/vcsjnyz7x4
+
+function pingpong(x) {
+  let length = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
+  return length - Mathf.abs(euclideanModulo(x, length * 2) - length);
+} // http://en.wikipedia.org/wiki/Smoothstep
+
+function smoothstep(x, min, max) {
+  if (x <= min) return 0;
+  if (x >= max) return 1;
+  x = (x - min) / (max - min);
+  return x * x * (3 - 2 * x);
+}
+function smootherstep(x, min, max) {
+  if (x <= min) return 0;
+  if (x >= max) return 1;
+  x = (x - min) / (max - min);
+  return x * x * x * (x * (x * 6 - 15) + 10);
+} // Random integer from <low, high> interval
+
+function randInt(low, high) {
+  return low + Mathf.floor(Mathf.random() * (high - low + 1));
+} // Random float from <low, high> interval
+
+function randFloat(low, high) {
+  return low + Mathf.random() * (high - low);
+} // Random float from <-range/2, range/2> interval
+
+function randFloatSpread(range) {
+  return range * (0.5 - Mathf.random());
+} // Deterministic pseudo-random float in the interval [ 0, 1 ]
+
+function seededRandom(s) {
+  if (s !== undefined) _seed = s % 2147483647; // Park-Miller algorithm
+
+  _seed = _seed * 16807 % 2147483647;
+  return (_seed - 1) / 2147483646;
+}
+function degToRad(degrees) {
+  return degrees * DEG2RAD;
+}
+function radToDeg(radians) {
+  return radians * RAD2DEG;
+}
+function isPowerOfTwo(value) {
+  return (value & value - 1) === 0 && value !== 0;
+}
+function ceilPowerOfTwo(value) {
+  return Mathf.pow(2, Mathf.ceil(Mathf.log(value) / Mathf.LN2));
+}
+function floorPowerOfTwo(value) {
+  return Mathf.pow(2, Mathf.floor(Mathf.log(value) / Mathf.LN2));
+}
+function setQuaternionFromProperEuler(q, a, b, c, order) {
+  // Intrinsic Proper Euler Angles - see https://en.wikipedia.org/wiki/Euler_angles
+  // rotations are applied to the axes in the order specified by 'order'
+  // rotation by angle 'a' is applied first, then by angle 'b', then by angle 'c'
+  // angles are in radians
+  const cos = Mathf.cos;
+  const sin = Mathf.sin;
+  const c2 = cos(b / 2);
+  const s2 = sin(b / 2);
+  const c13 = cos((a + c) / 2);
+  const s13 = sin((a + c) / 2);
+  const c1_3 = cos((a - c) / 2);
+  const s1_3 = sin((a - c) / 2);
+  const c3_1 = cos((c - a) / 2);
+  const s3_1 = sin((c - a) / 2);
+
+  switch (order) {
+    case "XYX":
+      q.set(c2 * s13, s2 * c1_3, s2 * s1_3, c2 * c13);
+      break;
+
+    case "YZY":
+      q.set(s2 * s1_3, c2 * s13, s2 * c1_3, c2 * c13);
+      break;
+
+    case "ZXZ":
+      q.set(s2 * c1_3, s2 * s1_3, c2 * s13, c2 * c13);
+      break;
+
+    case "XZX":
+      q.set(c2 * s13, s2 * s3_1, s2 * c3_1, c2 * c13);
+      break;
+
+    case "YXY":
+      q.set(s2 * c3_1, c2 * s13, s2 * s3_1, c2 * c13);
+      break;
+
+    case "ZYZ":
+      q.set(s2 * s3_1, s2 * c3_1, c2 * s13, c2 * c13);
+      break;
+
+    default:
+      console.warn("THREE.MathUtils: .setQuaternionFromProperEuler() encountered an unknown order: " + order);
+  }
+}
+
+/***/ }),
+
+/***/ "./src/common/math/Quaternion.ts":
+/*!***************************************!*\
+  !*** ./src/common/math/Quaternion.ts ***!
+  \***************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Quaternion": () => (/* binding */ Quaternion)
+/* harmony export */ });
+/* harmony import */ var _MathUtils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./MathUtils */ "./src/common/math/MathUtils.ts");
+/* harmony import */ var _EulerOrder__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./EulerOrder */ "./src/common/math/EulerOrder.ts");
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
+
+
+class Quaternion {
+  constructor() {
+    let x = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+    let y = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+    let z = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
+    let w = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
+
+    _defineProperty(this, "isQuaternion", true);
+
+    this._x = x;
+    this._y = y;
+    this._z = z;
+    this._w = w;
+    this._onChangeCallback = null;
+  }
+
+  static slerp(qa, qb, qm, t) {
+    return qm.slerpQuaternions(qa, qb, t);
+  }
+
+  static slerpFlat(dst, dstOffset, src0, srcOffset0, src1, srcOffset1, t) {
+    // fuzz-free, array-based Quaternion SLERP operation
+    let x0 = src0[srcOffset0 + 0],
+        y0 = src0[srcOffset0 + 1],
+        z0 = src0[srcOffset0 + 2],
+        w0 = src0[srcOffset0 + 3];
+    const x1 = src1[srcOffset1 + 0],
+          y1 = src1[srcOffset1 + 1],
+          z1 = src1[srcOffset1 + 2],
+          w1 = src1[srcOffset1 + 3];
+
+    if (t === 0) {
+      dst[dstOffset + 0] = x0;
+      dst[dstOffset + 1] = y0;
+      dst[dstOffset + 2] = z0;
+      dst[dstOffset + 3] = w0;
+      return;
+    }
+
+    if (t === 1) {
+      dst[dstOffset + 0] = x1;
+      dst[dstOffset + 1] = y1;
+      dst[dstOffset + 2] = z1;
+      dst[dstOffset + 3] = w1;
+      return;
+    }
+
+    if (w0 !== w1 || x0 !== x1 || y0 !== y1 || z0 !== z1) {
+      let s = 1 - t;
+      const cos = x0 * x1 + y0 * y1 + z0 * z1 + w0 * w1,
+            dir = cos >= 0 ? 1 : -1,
+            sqrSin = 1 - cos * cos; // Skip the Slerp for tiny steps to avoid numeric problems:
+
+      if (sqrSin > f32.EPSILON) {
+        const sin = Mathf.sqrt(sqrSin),
+              len = Mathf.atan2(sin, cos * dir);
+        s = Mathf.sin(s * len) / sin;
+        t = Mathf.sin(t * len) / sin;
+      }
+
+      const tDir = t * dir;
+      x0 = x0 * s + x1 * tDir;
+      y0 = y0 * s + y1 * tDir;
+      z0 = z0 * s + z1 * tDir;
+      w0 = w0 * s + w1 * tDir; // Normalize in case we just did a lerp:
+
+      if (s === 1 - t) {
+        const f = 1 / Mathf.sqrt(x0 * x0 + y0 * y0 + z0 * z0 + w0 * w0);
+        x0 *= f;
+        y0 *= f;
+        z0 *= f;
+        w0 *= f;
+      }
+    }
+
+    dst[dstOffset] = x0;
+    dst[dstOffset + 1] = y0;
+    dst[dstOffset + 2] = z0;
+    dst[dstOffset + 3] = w0;
+  }
+
+  static multiplyQuaternionsFlat(dst, dstOffset, src0, srcOffset0, src1, srcOffset1) {
+    const x0 = src0[srcOffset0];
+    const y0 = src0[srcOffset0 + 1];
+    const z0 = src0[srcOffset0 + 2];
+    const w0 = src0[srcOffset0 + 3];
+    const x1 = src1[srcOffset1];
+    const y1 = src1[srcOffset1 + 1];
+    const z1 = src1[srcOffset1 + 2];
+    const w1 = src1[srcOffset1 + 3];
+    dst[dstOffset] = x0 * w1 + w0 * x1 + y0 * z1 - z0 * y1;
+    dst[dstOffset + 1] = y0 * w1 + w0 * y1 + z0 * x1 - x0 * z1;
+    dst[dstOffset + 2] = z0 * w1 + w0 * z1 + x0 * y1 - y0 * x1;
+    dst[dstOffset + 3] = w0 * w1 - x0 * x1 - y0 * y1 - z0 * z1;
+    return dst;
+  }
+
+  get x() {
+    return this._x;
+  }
+
+  set x(value) {
+    this._x = value;
+    this.onChangeCallback();
+  }
+
+  get y() {
+    return this._y;
+  }
+
+  set y(value) {
+    this._y = value;
+    this.onChangeCallback();
+  }
+
+  get z() {
+    return this._z;
+  }
+
+  set z(value) {
+    this._z = value;
+    this.onChangeCallback();
+  }
+
+  get w() {
+    return this._w;
+  }
+
+  set w(value) {
+    this._w = value;
+    this.onChangeCallback();
+  }
+
+  set(x, y, z, w) {
+    this._x = x;
+    this._y = y;
+    this._z = z;
+    this._w = w;
+    this.onChangeCallback();
+    return this;
+  }
+
+  clone() {
+    return new Quaternion(this._x, this._y, this._z, this._w);
+  }
+
+  copy(quaternion) {
+    this._x = quaternion.x;
+    this._y = quaternion.y;
+    this._z = quaternion.z;
+    this._w = quaternion.w;
+    this.onChangeCallback();
+    return this;
+  }
+
+  setFromEuler(euler, update) {
+    const x = euler._x,
+          y = euler._y,
+          z = euler._z,
+          order = euler._order; // http://www.mathworks.com/matlabcentral/fileexchange/
+    // 	20696-function-to-convert-between-dcm-euler-angles-quaternions-and-euler-vectors/
+    //	content/SpinCalc.m
+
+    const cos = Mathf.cos;
+    const sin = Mathf.sin;
+    const c1 = cos(x / 2);
+    const c2 = cos(y / 2);
+    const c3 = cos(z / 2);
+    const s1 = sin(x / 2);
+    const s2 = sin(y / 2);
+    const s3 = sin(z / 2);
+
+    switch (order) {
+      case _EulerOrder__WEBPACK_IMPORTED_MODULE_1__.EulerRotationOrder.XYZ:
+        this._x = s1 * c2 * c3 + c1 * s2 * s3;
+        this._y = c1 * s2 * c3 - s1 * c2 * s3;
+        this._z = c1 * c2 * s3 + s1 * s2 * c3;
+        this._w = c1 * c2 * c3 - s1 * s2 * s3;
+        break;
+
+      case _EulerOrder__WEBPACK_IMPORTED_MODULE_1__.EulerRotationOrder.YXZ:
+        this._x = s1 * c2 * c3 + c1 * s2 * s3;
+        this._y = c1 * s2 * c3 - s1 * c2 * s3;
+        this._z = c1 * c2 * s3 - s1 * s2 * c3;
+        this._w = c1 * c2 * c3 + s1 * s2 * s3;
+        break;
+
+      case _EulerOrder__WEBPACK_IMPORTED_MODULE_1__.EulerRotationOrder.ZXY:
+        this._x = s1 * c2 * c3 - c1 * s2 * s3;
+        this._y = c1 * s2 * c3 + s1 * c2 * s3;
+        this._z = c1 * c2 * s3 + s1 * s2 * c3;
+        this._w = c1 * c2 * c3 - s1 * s2 * s3;
+        break;
+
+      case _EulerOrder__WEBPACK_IMPORTED_MODULE_1__.EulerRotationOrder.ZYX:
+        this._x = s1 * c2 * c3 - c1 * s2 * s3;
+        this._y = c1 * s2 * c3 + s1 * c2 * s3;
+        this._z = c1 * c2 * s3 - s1 * s2 * c3;
+        this._w = c1 * c2 * c3 + s1 * s2 * s3;
+        break;
+
+      case _EulerOrder__WEBPACK_IMPORTED_MODULE_1__.EulerRotationOrder.YZX:
+        this._x = s1 * c2 * c3 + c1 * s2 * s3;
+        this._y = c1 * s2 * c3 + s1 * c2 * s3;
+        this._z = c1 * c2 * s3 - s1 * s2 * c3;
+        this._w = c1 * c2 * c3 - s1 * s2 * s3;
+        break;
+
+      case _EulerOrder__WEBPACK_IMPORTED_MODULE_1__.EulerRotationOrder.XZY:
+        this._x = s1 * c2 * c3 - c1 * s2 * s3;
+        this._y = c1 * s2 * c3 - s1 * c2 * s3;
+        this._z = c1 * c2 * s3 + s1 * s2 * c3;
+        this._w = c1 * c2 * c3 + s1 * s2 * s3;
+        break;
+
+      default:
+        throw new Error("Quaternion: .setFromEuler() encountered an unknown order");
+    }
+
+    if (update !== false) this.onChangeCallback();
+    return this;
+  }
+
+  setFromAxisAngle(axis, angle) {
+    // http://www.euclideanspace.com/maths/geometry/rotations/conversions/angleToQuaternion/index.htm
+    // assumes axis is normalized
+    const halfAngle = angle / 2,
+          s = Mathf.sin(halfAngle);
+    this._x = axis.x * s;
+    this._y = axis.y * s;
+    this._z = axis.z * s;
+    this._w = Mathf.cos(halfAngle);
+    this.onChangeCallback();
+    return this;
+  }
+
+  setFromRotationMatrix(m) {
+    // http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/index.htm
+    // assumes the upper 3x3 of m is a pure rotation matrix (i.e, unscaled)
+    const te = m.elements,
+          m11 = te[0],
+          m12 = te[4],
+          m13 = te[8],
+          m21 = te[1],
+          m22 = te[5],
+          m23 = te[9],
+          m31 = te[2],
+          m32 = te[6],
+          m33 = te[10],
+          trace = m11 + m22 + m33;
+
+    if (trace > 0) {
+      const s = 0.5 / Mathf.sqrt(trace + 1.0);
+      this._w = 0.25 / s;
+      this._x = (m32 - m23) * s;
+      this._y = (m13 - m31) * s;
+      this._z = (m21 - m12) * s;
+    } else if (m11 > m22 && m11 > m33) {
+      const s = 2.0 * Mathf.sqrt(1.0 + m11 - m22 - m33);
+      this._w = (m32 - m23) / s;
+      this._x = 0.25 * s;
+      this._y = (m12 + m21) / s;
+      this._z = (m13 + m31) / s;
+    } else if (m22 > m33) {
+      const s = 2.0 * Mathf.sqrt(1.0 + m22 - m11 - m33);
+      this._w = (m13 - m31) / s;
+      this._x = (m12 + m21) / s;
+      this._y = 0.25 * s;
+      this._z = (m23 + m32) / s;
+    } else {
+      const s = 2.0 * Mathf.sqrt(1.0 + m33 - m11 - m22);
+      this._w = (m21 - m12) / s;
+      this._x = (m13 + m31) / s;
+      this._y = (m23 + m32) / s;
+      this._z = 0.25 * s;
+    }
+
+    this.onChangeCallback();
+    return this;
+  }
+
+  setFromUnitVectors(vFrom, vTo) {
+    // assumes direction vectors vFrom and vTo are normalized
+    let r = vFrom.dot(vTo) + 1;
+
+    if (r < f32.EPSILON) {
+      // vFrom and vTo point in opposite directions
+      r = 0;
+
+      if (Mathf.abs(vFrom.x) > Mathf.abs(vFrom.z)) {
+        this._x = -vFrom.y;
+        this._y = vFrom.x;
+        this._z = 0;
+        this._w = r;
+      } else {
+        this._x = 0;
+        this._y = -vFrom.z;
+        this._z = vFrom.y;
+        this._w = r;
+      }
+    } else {
+      // crossVectors( vFrom, vTo ); // inlined to avoid cyclic dependency on Vector3
+      this._x = vFrom.y * vTo.z - vFrom.z * vTo.y;
+      this._y = vFrom.z * vTo.x - vFrom.x * vTo.z;
+      this._z = vFrom.x * vTo.y - vFrom.y * vTo.x;
+      this._w = r;
+    }
+
+    return this.normalize();
+  }
+
+  angleTo(q) {
+    return 2 * Mathf.acos(Mathf.abs(_MathUtils__WEBPACK_IMPORTED_MODULE_0__.clamp(this.dot(q), -1, 1)));
+  }
+
+  rotateTowards(q, step) {
+    const angle = this.angleTo(q);
+    if (angle === 0) return this;
+    const t = Mathf.min(1, step / angle);
+    this.slerp(q, t);
+    return this;
+  }
+
+  identity() {
+    return this.set(0, 0, 0, 1);
+  }
+
+  invert() {
+    // quaternion is assumed to have unit length
+    return this.conjugate();
+  }
+
+  conjugate() {
+    this._x *= -1;
+    this._y *= -1;
+    this._z *= -1;
+    this.onChangeCallback();
+    return this;
+  }
+
+  dot(v) {
+    return this._x * v._x + this._y * v._y + this._z * v._z + this._w * v._w;
+  }
+
+  lengthSq() {
+    return this._x * this._x + this._y * this._y + this._z * this._z + this._w * this._w;
+  }
+
+  length() {
+    return Mathf.sqrt(this._x * this._x + this._y * this._y + this._z * this._z + this._w * this._w);
+  }
+
+  normalize() {
+    let l = this.length();
+
+    if (l === 0) {
+      this._x = 0;
+      this._y = 0;
+      this._z = 0;
+      this._w = 1;
+    } else {
+      l = 1 / l;
+      this._x = this._x * l;
+      this._y = this._y * l;
+      this._z = this._z * l;
+      this._w = this._w * l;
+    }
+
+    this.onChangeCallback();
+    return this;
+  }
+
+  multiply(q) {
+    return this.multiplyQuaternions(this, q);
+  }
+
+  premultiply(q) {
+    return this.multiplyQuaternions(q, this);
+  }
+
+  multiplyQuaternions(a, b) {
+    // from http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/code/index.htm
+    const qax = a._x,
+          qay = a._y,
+          qaz = a._z,
+          qaw = a._w;
+    const qbx = b._x,
+          qby = b._y,
+          qbz = b._z,
+          qbw = b._w;
+    this._x = qax * qbw + qaw * qbx + qay * qbz - qaz * qby;
+    this._y = qay * qbw + qaw * qby + qaz * qbx - qax * qbz;
+    this._z = qaz * qbw + qaw * qbz + qax * qby - qay * qbx;
+    this._w = qaw * qbw - qax * qbx - qay * qby - qaz * qbz;
+    this.onChangeCallback();
+    return this;
+  }
+
+  slerp(qb, t) {
+    if (t === 0) return this;
+    if (t === 1) return this.copy(qb);
+    const x = this._x,
+          y = this._y,
+          z = this._z,
+          w = this._w; // http://www.euclideanspace.com/maths/algebra/realNormedAlgebra/quaternions/slerp/
+
+    let cosHalfTheta = w * qb._w + x * qb._x + y * qb._y + z * qb._z;
+
+    if (cosHalfTheta < 0) {
+      this._w = -qb._w;
+      this._x = -qb._x;
+      this._y = -qb._y;
+      this._z = -qb._z;
+      cosHalfTheta = -cosHalfTheta;
+    } else {
+      this.copy(qb);
+    }
+
+    if (cosHalfTheta >= 1.0) {
+      this._w = w;
+      this._x = x;
+      this._y = y;
+      this._z = z;
+      return this;
+    }
+
+    const sqrSinHalfTheta = 1.0 - cosHalfTheta * cosHalfTheta;
+
+    if (sqrSinHalfTheta <= f32.EPSILON) {
+      const s = 1 - t;
+      this._w = s * w + t * this._w;
+      this._x = s * x + t * this._x;
+      this._y = s * y + t * this._y;
+      this._z = s * z + t * this._z;
+      this.normalize();
+      this.onChangeCallback();
+      return this;
+    }
+
+    const sinHalfTheta = Mathf.sqrt(sqrSinHalfTheta);
+    const halfTheta = Mathf.atan2(sinHalfTheta, cosHalfTheta);
+    const ratioA = Mathf.sin((1 - t) * halfTheta) / sinHalfTheta,
+          ratioB = Mathf.sin(t * halfTheta) / sinHalfTheta;
+    this._w = w * ratioA + this._w * ratioB;
+    this._x = x * ratioA + this._x * ratioB;
+    this._y = y * ratioA + this._y * ratioB;
+    this._z = z * ratioA + this._z * ratioB;
+    this.onChangeCallback();
+    return this;
+  }
+
+  slerpQuaternions(qa, qb, t) {
+    this.copy(qa).slerp(qb, t);
+  }
+
+  equals(quaternion) {
+    return quaternion._x === this._x && quaternion._y === this._y && quaternion._z === this._z && quaternion._w === this._w;
+  }
+
+  fromArray(array) {
+    let offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+    this._x = array[offset];
+    this._y = array[offset + 1];
+    this._z = array[offset + 2];
+    this._w = array[offset + 3];
+    this.onChangeCallback();
+    return this;
+  }
+
+  toArray() {
+    let array = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+    let offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+    array[offset] = this._x;
+    array[offset + 1] = this._y;
+    array[offset + 2] = this._z;
+    array[offset + 3] = this._w;
+    return array;
+  } // TODO:
+  //   fromBufferAttribute(attribute, index) {
+  //     this._x = attribute.getX(index);
+  //     this._y = attribute.getY(index);
+  //     this._z = attribute.getZ(index);
+  //     this._w = attribute.getW(index);
+  //     return this;
+  //   }
+
+
+  onChangeCallback() {
+    if (this._onChangeCallback) this._onChangeCallback.onQuatChanged(this);
+  }
+
+  _onChange(callback) {
+    this._onChangeCallback = callback;
+    return this;
+  }
+
+}
+
+/***/ }),
+
+/***/ "./src/common/math/Vector3.ts":
+/*!************************************!*\
+  !*** ./src/common/math/Vector3.ts ***!
+  \************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Vector3": () => (/* binding */ Vector3)
+/* harmony export */ });
+/* harmony import */ var _MathUtils__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./MathUtils */ "./src/common/math/MathUtils.ts");
+/* harmony import */ var _Quaternion__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./Quaternion */ "./src/common/math/Quaternion.ts");
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
+
+
+class Vector3 {
+  constructor() {
+    let x = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+    let y = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+    let z = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
+
+    _defineProperty(this, "isVector3", true);
+
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+
+  set(x, y, z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    return this;
+  }
+
+  setByIndex(index, value) {
+    if (index === 0) this.x = value;else if (index === 1) this.y = value;else this.z = value;
+    return this;
+  }
+
+  setScalar(scalar) {
+    this.x = scalar;
+    this.y = scalar;
+    this.z = scalar;
+    return this;
+  }
+
+  setX(x) {
+    this.x = x;
+    return this;
+  }
+
+  setY(y) {
+    this.y = y;
+    return this;
+  }
+
+  setZ(z) {
+    this.z = z;
+    return this;
+  }
+
+  setComponent(index, value) {
+    switch (index) {
+      case 0:
+        this.x = value;
+        break;
+
+      case 1:
+        this.y = value;
+        break;
+
+      case 2:
+        this.z = value;
+        break;
+
+      default:
+        throw new Error(`index is out of range: ${index}`);
+    }
+
+    return this;
+  }
+
+  getComponent(index) {
+    switch (index) {
+      case 0:
+        return this.x;
+
+      case 1:
+        return this.y;
+
+      case 2:
+        return this.z;
+
+      default:
+        throw new Error(`index is out of range: ${index}`);
+    }
+  }
+
+  clone() {
+    return new Vector3(this.x, this.y, this.z);
+  }
+
+  copy(v) {
+    this.x = v.x;
+    this.y = v.y;
+    this.z = v.z;
+    return this;
+  }
+
+  add(v) {
+    this.x += v.x;
+    this.y += v.y;
+    this.z += v.z;
+    return this;
+  }
+
+  addScalar(s) {
+    this.x += s;
+    this.y += s;
+    this.z += s;
+    return this;
+  }
+
+  addVectors(a, b) {
+    this.x = a.x + b.x;
+    this.y = a.y + b.y;
+    this.z = a.z + b.z;
+    return this;
+  }
+
+  addScaledVector(v, s) {
+    this.x += v.x * s;
+    this.y += v.y * s;
+    this.z += v.z * s;
+    return this;
+  }
+
+  sub(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    this.z -= v.z;
+    return this;
+  }
+
+  subScalar(s) {
+    this.x -= s;
+    this.y -= s;
+    this.z -= s;
+    return this;
+  }
+
+  subVectors(a, b) {
+    this.x = a.x - b.x;
+    this.y = a.y - b.y;
+    this.z = a.z - b.z;
+    return this;
+  }
+
+  multiply(v) {
+    this.x *= v.x;
+    this.y *= v.y;
+    this.z *= v.z;
+    return this;
+  }
+
+  multiplyScalar(scalar) {
+    this.x *= scalar;
+    this.y *= scalar;
+    this.z *= scalar;
+    return this;
+  }
+
+  multiplyVectors(a, b) {
+    this.x = a.x * b.x;
+    this.y = a.y * b.y;
+    this.z = a.z * b.z;
+    return this;
+  }
+
+  applyEuler(euler) {
+    return this.applyQuaternion(_quaternion.setFromEuler(euler, false));
+  }
+
+  applyAxisAngle(axis, angle) {
+    return this.applyQuaternion(_quaternion.setFromAxisAngle(axis, angle));
+  }
+
+  applyMatrix3(m) {
+    const x = this.x,
+          y = this.y,
+          z = this.z;
+    const e = m.elements;
+    this.x = e[0] * x + e[3] * y + e[6] * z;
+    this.y = e[1] * x + e[4] * y + e[7] * z;
+    this.z = e[2] * x + e[5] * y + e[8] * z;
+    return this;
+  }
+
+  applyNormalMatrix(m) {
+    return this.applyMatrix3(m).normalize();
+  }
+
+  applyMatrix4(m) {
+    const x = this.x,
+          y = this.y,
+          z = this.z;
+    const e = m.elements;
+    const w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15]);
+    this.x = (e[0] * x + e[4] * y + e[8] * z + e[12]) * w;
+    this.y = (e[1] * x + e[5] * y + e[9] * z + e[13]) * w;
+    this.z = (e[2] * x + e[6] * y + e[10] * z + e[14]) * w;
+    return this;
+  }
+
+  applyQuaternion(q) {
+    const x = this.x,
+          y = this.y,
+          z = this.z;
+    const qx = q.x,
+          qy = q.y,
+          qz = q.z,
+          qw = q.w; // calculate quat * vector
+
+    const ix = qw * x + qy * z - qz * y;
+    const iy = qw * y + qz * x - qx * z;
+    const iz = qw * z + qx * y - qy * x;
+    const iw = -qx * x - qy * y - qz * z; // calculate result * inverse quat
+
+    this.x = ix * qw + iw * -qx + iy * -qz - iz * -qy;
+    this.y = iy * qw + iw * -qy + iz * -qx - ix * -qz;
+    this.z = iz * qw + iw * -qz + ix * -qy - iy * -qx;
+    return this;
+  }
+
+  transformDirection(m) {
+    // input: THREE.Matrix4 affine matrix
+    // vector interpreted as a direction
+    const x = this.x,
+          y = this.y,
+          z = this.z;
+    const e = m.elements;
+    this.x = e[0] * x + e[4] * y + e[8] * z;
+    this.y = e[1] * x + e[5] * y + e[9] * z;
+    this.z = e[2] * x + e[6] * y + e[10] * z;
+    return this.normalize();
+  }
+
+  divide(v) {
+    this.x /= v.x;
+    this.y /= v.y;
+    this.z /= v.z;
+    return this;
+  }
+
+  divideScalar(scalar) {
+    return this.multiplyScalar(1 / scalar);
+  }
+
+  min(v) {
+    this.x = Mathf.min(this.x, v.x);
+    this.y = Mathf.min(this.y, v.y);
+    this.z = Mathf.min(this.z, v.z);
+    return this;
+  }
+
+  max(v) {
+    this.x = Mathf.max(this.x, v.x);
+    this.y = Mathf.max(this.y, v.y);
+    this.z = Mathf.max(this.z, v.z);
+    return this;
+  }
+
+  clamp(min, max) {
+    // assumes min < max, componentwise
+    this.x = Mathf.max(min.x, Mathf.min(max.x, this.x));
+    this.y = Mathf.max(min.y, Mathf.min(max.y, this.y));
+    this.z = Mathf.max(min.z, Mathf.min(max.z, this.z));
+    return this;
+  }
+
+  clampScalar(minVal, maxVal) {
+    this.x = Mathf.max(minVal, Mathf.min(maxVal, this.x));
+    this.y = Mathf.max(minVal, Mathf.min(maxVal, this.y));
+    this.z = Mathf.max(minVal, Mathf.min(maxVal, this.z));
+    return this;
+  }
+
+  clampLength(min, max) {
+    const length = this.length();
+    return this.divideScalar(length || 1).multiplyScalar(Mathf.max(min, Mathf.min(max, length)));
+  }
+
+  floor() {
+    this.x = Mathf.floor(this.x);
+    this.y = Mathf.floor(this.y);
+    this.z = Mathf.floor(this.z);
+    return this;
+  }
+
+  ceil() {
+    this.x = Mathf.ceil(this.x);
+    this.y = Mathf.ceil(this.y);
+    this.z = Mathf.ceil(this.z);
+    return this;
+  }
+
+  round() {
+    this.x = Mathf.round(this.x);
+    this.y = Mathf.round(this.y);
+    this.z = Mathf.round(this.z);
+    return this;
+  }
+
+  roundToZero() {
+    this.x = this.x < 0 ? Mathf.ceil(this.x) : Mathf.floor(this.x);
+    this.y = this.y < 0 ? Mathf.ceil(this.y) : Mathf.floor(this.y);
+    this.z = this.z < 0 ? Mathf.ceil(this.z) : Mathf.floor(this.z);
+    return this;
+  }
+
+  negate() {
+    this.x = -this.x;
+    this.y = -this.y;
+    this.z = -this.z;
+    return this;
+  }
+
+  dot(v) {
+    return this.x * v.x + this.y * v.y + this.z * v.z;
+  } // TODO lengthSquared?
+
+
+  lengthSq() {
+    return this.x * this.x + this.y * this.y + this.z * this.z;
+  }
+
+  length() {
+    return Mathf.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+  }
+
+  manhattanLength() {
+    return Mathf.abs(this.x) + Mathf.abs(this.y) + Mathf.abs(this.z);
+  }
+
+  normalize() {
+    return this.divideScalar(this.length() || 1);
+  }
+
+  setLength(length) {
+    return this.normalize().multiplyScalar(length);
+  }
+
+  lerp(v, alpha) {
+    this.x += (v.x - this.x) * alpha;
+    this.y += (v.y - this.y) * alpha;
+    this.z += (v.z - this.z) * alpha;
+    return this;
+  }
+
+  lerpVectors(v1, v2, alpha) {
+    this.x = v1.x + (v2.x - v1.x) * alpha;
+    this.y = v1.y + (v2.y - v1.y) * alpha;
+    this.z = v1.z + (v2.z - v1.z) * alpha;
+    return this;
+  }
+
+  cross(v) {
+    return this.crossVectors(this, v);
+  }
+
+  crossVectors(a, b) {
+    const ax = a.x,
+          ay = a.y,
+          az = a.z;
+    const bx = b.x,
+          by = b.y,
+          bz = b.z;
+    this.x = ay * bz - az * by;
+    this.y = az * bx - ax * bz;
+    this.z = ax * by - ay * bx;
+    return this;
+  }
+
+  projectOnVector(v) {
+    const denominator = v.lengthSq();
+    if (denominator === 0) return this.set(0, 0, 0);
+    const scalar = v.dot(this) / denominator;
+    return this.copy(v).multiplyScalar(scalar);
+  }
+
+  projectOnPlane(planeNormal) {
+    _vector.copy(this).projectOnVector(planeNormal);
+
+    return this.sub(_vector);
+  }
+
+  reflect(normal) {
+    // reflect incident vector off plane orthogonal to normal
+    // normal is assumed to have unit length
+    return this.sub(_vector.copy(normal).multiplyScalar(2 * this.dot(normal)));
+  }
+
+  angleTo(v) {
+    const denominator = Mathf.sqrt(this.lengthSq() * v.lengthSq());
+    if (denominator === 0) return Mathf.PI / 2;
+    const theta = this.dot(v) / denominator; // clamp, to handle numerical problems
+
+    return Mathf.acos(_MathUtils__WEBPACK_IMPORTED_MODULE_0__.clamp(theta, -1, 1));
+  }
+
+  distanceTo(v) {
+    return Mathf.sqrt(this.distanceToSquared(v));
+  }
+
+  distanceToSquared(v) {
+    const dx = this.x - v.x,
+          dy = this.y - v.y,
+          dz = this.z - v.z;
+    return dx * dx + dy * dy + dz * dz;
+  }
+
+  manhattanDistanceTo(v) {
+    return Mathf.abs(this.x - v.x) + Mathf.abs(this.y - v.y) + Mathf.abs(this.z - v.z);
+  }
+
+  setFromSpherical(s) {
+    return this.setFromSphericalCoords(s.radius, s.phi, s.theta);
+  }
+
+  setFromSphericalCoords(radius, phi, theta) {
+    const sinPhiRadius = Mathf.sin(phi) * radius;
+    this.x = sinPhiRadius * Mathf.sin(theta);
+    this.y = Mathf.cos(phi) * radius;
+    this.z = sinPhiRadius * Mathf.cos(theta);
+    return this;
+  }
+
+  setFromCylindrical(c) {
+    return this.setFromCylindricalCoords(c.radius, c.theta, c.y);
+  }
+
+  setFromCylindricalCoords(radius, theta, y) {
+    this.x = radius * Mathf.sin(theta);
+    this.y = y;
+    this.z = radius * Mathf.cos(theta);
+    return this;
+  }
+
+  setFromMatrixPosition(m) {
+    const e = m.elements;
+    this.x = e[12];
+    this.y = e[13];
+    this.z = e[14];
+    return this;
+  }
+
+  setFromMatrixScale(m) {
+    const sx = this.setFromMatrixColumn(m, 0).length();
+    const sy = this.setFromMatrixColumn(m, 1).length();
+    const sz = this.setFromMatrixColumn(m, 2).length();
+    this.x = sx;
+    this.y = sy;
+    this.z = sz;
+    return this;
+  }
+
+  setFromMatrixColumn(m, index) {
+    return this.fromF32Array(m.elements, index * 4);
+  }
+
+  setFromMatrix3Column(m, index) {
+    return this.fromF32Array(m.elements, index * 3);
+  }
+
+  equals(v) {
+    return v.x === this.x && v.y === this.y && v.z === this.z;
+  }
+
+  fromArray(array) {
+    let offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+    this.x = array[offset];
+    this.y = array[offset + 1];
+    this.z = array[offset + 2];
+    return this;
+  }
+
+  fromF32Array(array) {
+    let offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+    this.x = array[offset];
+    this.y = array[offset + 1];
+    this.z = array[offset + 2];
+    return this;
+  }
+
+  toArray() {
+    let array = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+    let offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+    array[offset] = this.x;
+    array[offset + 1] = this.y;
+    array[offset + 2] = this.z;
+    return array;
+  }
+
+  random() {
+    this.x = Mathf.random();
+    this.y = Mathf.random();
+    this.z = Mathf.random();
+    return this;
+  }
+
+}
+
+const _vector = new Vector3();
+
+const _quaternion = new _Quaternion__WEBPACK_IMPORTED_MODULE_1__.Quaternion();
+
+/***/ }),
+
+/***/ "./src/ts/core/Clock.ts":
+/*!******************************!*\
+  !*** ./src/ts/core/Clock.ts ***!
+  \******************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Clock": () => (/* binding */ Clock)
+/* harmony export */ });
+class Clock {
+  constructor() {
+    let autoStart = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;
+    this.autoStart = autoStart;
+    this.startTime = 0;
+    this.oldTime = 0;
+    this.elapsedTime = 0;
+    this.running = false;
+  }
+
+  start() {
+    this.startTime = now();
+    this.oldTime = this.startTime;
+    this.elapsedTime = 0;
+    this.running = true;
+  }
+
+  stop() {
+    this.getElapsedTime();
+    this.running = false;
+    this.autoStart = false;
+  }
+
+  getElapsedTime() {
+    this.getDelta();
+    return this.elapsedTime;
+  }
+
+  getDelta() {
+    let diff = 0;
+
+    if (this.autoStart && !this.running) {
+      this.start();
+      return 0;
+    }
+
+    if (this.running) {
+      const newTime = now();
+      diff = (newTime - this.oldTime) / 1000;
+      this.oldTime = newTime;
+      this.elapsedTime += diff;
+    }
+
+    return diff;
+  }
+
+}
+
+function now() {
+  return performance.now();
+}
 
 /***/ }),
 
@@ -588,16 +1922,28 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "GameManager": () => (/* binding */ GameManager)
 /* harmony export */ });
 /* harmony import */ var _InputManager__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./InputManager */ "./src/ts/core/InputManager.ts");
-/* harmony import */ var _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../common/PipelineType */ "./src/common/PipelineType.ts");
-/* harmony import */ var _pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pipelines/debug-pipeline/DebugPipeline */ "./src/ts/core/pipelines/debug-pipeline/DebugPipeline.ts");
+/* harmony import */ var _common_GroupType__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../common/GroupType */ "./src/common/GroupType.ts");
+/* harmony import */ var _common_AttributeType__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../common/AttributeType */ "./src/common/AttributeType.ts");
 /* harmony import */ var _Utils__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./Utils */ "./src/ts/core/Utils.ts");
-/* harmony import */ var _RenderQueueManager__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./RenderQueueManager */ "./src/ts/core/RenderQueueManager.ts");
-/* harmony import */ var _common_GroupType__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../../common/GroupType */ "./src/common/GroupType.ts");
-/* harmony import */ var _WasmManager__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./WasmManager */ "./src/ts/core/WasmManager.ts");
-/* harmony import */ var _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./textures/BitmapTexture */ "./src/ts/core/textures/BitmapTexture.ts");
-/* harmony import */ var _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./textures/BitmapCubeTexture */ "./src/ts/core/textures/BitmapCubeTexture.ts");
-/* harmony import */ var _pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./pipelines/skybox-pipeline/SkyboxPipeline */ "./src/ts/core/pipelines/skybox-pipeline/SkyboxPipeline.ts");
-/* harmony import */ var _renderer_Object3D__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../renderer/Object3D */ "./src/ts/renderer/Object3D.ts");
+/* harmony import */ var _WasmManager__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./WasmManager */ "./src/ts/core/WasmManager.ts");
+/* harmony import */ var _renderer_Object3D__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ../renderer/Object3D */ "./src/ts/renderer/Object3D.ts");
+/* harmony import */ var _Clock__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./Clock */ "./src/ts/core/Clock.ts");
+/* harmony import */ var _renderer_PipelineManager__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ../renderer/PipelineManager */ "./src/ts/renderer/PipelineManager.ts");
+/* harmony import */ var _renderer_TextureManager__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ../renderer/TextureManager */ "./src/ts/renderer/TextureManager.ts");
+/* harmony import */ var _renderer_Mesh__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ../renderer/Mesh */ "./src/ts/renderer/Mesh.ts");
+/* harmony import */ var _common_ResourceType__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ../../common/ResourceType */ "./src/common/ResourceType.ts");
+/* harmony import */ var _renderer_MeshManager__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ../renderer/MeshManager */ "./src/ts/renderer/MeshManager.ts");
+/* harmony import */ var _renderer_geometry_BoxGeometry__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ../renderer/geometry/BoxGeometry */ "./src/ts/renderer/geometry/BoxGeometry.ts");
+/* harmony import */ var _renderer_geometry_SphereGeometry__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! ../renderer/geometry/SphereGeometry */ "./src/ts/renderer/geometry/SphereGeometry.ts");
+/* harmony import */ var _renderer_geometry_PlaneGeometry__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! ../renderer/geometry/PlaneGeometry */ "./src/ts/renderer/geometry/PlaneGeometry.ts");
+/* harmony import */ var _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ./pipelines/resources/LightingResource */ "./src/ts/core/pipelines/resources/LightingResource.ts");
+/* harmony import */ var _gameplay_Player__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ../gameplay/Player */ "./src/ts/gameplay/Player.ts");
+
+
+
+
+
+
 
 
 
@@ -610,15 +1956,16 @@ __webpack_require__.r(__webpack_exports__);
 
 
 const sampleCount = 4;
-const MEDIA_URL = "https://storage.googleapis.com/rewild-6809/";
 class GameManager {
   constructor(canvas) {
     this.canvas = canvas;
     this.buffers = [];
-    this.textures = [];
     this.disposed = false;
     this.currentPass = null;
     this.onFrameHandler = this.onFrame.bind(this);
+    this.clock = new _Clock__WEBPACK_IMPORTED_MODULE_6__.Clock();
+    this.updateCallbacks = [];
+    window.addEventListener("resize", e => this.canvasSizeCache = this.canvasSize());
   }
 
   lock() {
@@ -631,28 +1978,24 @@ class GameManager {
 
   createBinding() {
     return {
-      createBufferFromF32: this.createBufferF32.bind(this),
-      createIndexBuffer: this.createIndexBuffer.bind(this),
+      setupLights: this.setupLights.bind(this),
+      renderComponents: this.renderComponents.bind(this),
       lock: this.lock.bind(this),
-      unlock: this.unlock.bind(this),
-      render: commandsIndex => {
-        const commandBuffer = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.getInt32Array(commandsIndex);
-        this.renderQueueManager.run(commandBuffer);
-      }
+      unlock: this.unlock.bind(this)
     };
   }
 
   async init() {
     var _navigator$gpu;
 
-    this.renderQueueManager = new _RenderQueueManager__WEBPACK_IMPORTED_MODULE_4__.RenderQueueManager(this);
+    this.canvasSizeCache = this.canvasSize();
     const hasGPU = this.hasWebGPU();
     if (!hasGPU) throw new Error("Your current browser does not support WebGPU!");
     this.inputManager = new _InputManager__WEBPACK_IMPORTED_MODULE_0__.InputManager(this.canvas);
     const adapter = await ((_navigator$gpu = navigator.gpu) === null || _navigator$gpu === void 0 ? void 0 : _navigator$gpu.requestAdapter());
     const device = await (adapter === null || adapter === void 0 ? void 0 : adapter.requestDevice());
     const context = this.canvas.getContext("webgpu");
-    const format = context.getPreferredFormat(adapter);
+    const format = navigator.gpu.getPreferredCanvasFormat();
     context.configure({
       device: device,
       format: format,
@@ -661,96 +2004,50 @@ class GameManager {
     });
     this.device = device;
     this.context = context;
-    this.format = format; // TEXTURES
-
-    const textures = [new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("grid", MEDIA_URL + "uv-grid.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("crate", MEDIA_URL + "crate-wooden.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("earth", MEDIA_URL + "earth-day-2k.jpg", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("ground-coastal-1", MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png", device), new _textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_7__.BitmapTexture("block-concrete-4", MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png", device), new _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_8__.BitmapCubeTexture("desert-sky", [MEDIA_URL + "skyboxes/desert/px.jpg", MEDIA_URL + "skyboxes/desert/nx.jpg", MEDIA_URL + "skyboxes/desert/py.jpg", MEDIA_URL + "skyboxes/desert/ny.jpg", MEDIA_URL + "skyboxes/desert/pz.jpg", MEDIA_URL + "skyboxes/desert/nz.jpg"], device), new _textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_8__.BitmapCubeTexture("starry-sky", [MEDIA_URL + "skyboxes/stars/left.png", MEDIA_URL + "skyboxes/stars/right.png", MEDIA_URL + "skyboxes/stars/top.png", MEDIA_URL + "skyboxes/stars/bottom.png", MEDIA_URL + "skyboxes/stars/front.png", MEDIA_URL + "skyboxes/stars/back.png"], device)];
-    this.textures = await Promise.all(textures.map((texture, index) => {
-      _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createTexture(texture.name, index);
-      return texture.load(device);
-    })); // PIPELINES
-
-    this.pipelines = [new _pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("coastal-floor", {
-      diffuseMap: this.textures[3],
-      NUM_DIR_LIGHTS: 0,
-      uvScaleX: "30.0",
-      uvScaleY: "30.0"
-    }), new _pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("crate", {
-      diffuseMap: this.textures[1],
-      NUM_DIR_LIGHTS: 0
-    }), new _pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("simple", {
-      NUM_DIR_LIGHTS: 0
-    }), new _pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("earth", {
-      diffuseMap: this.textures[2],
-      NUM_DIR_LIGHTS: 0
-    }), new _pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_2__.DebugPipeline("concrete", {
-      diffuseMap: this.textures[4],
-      NUM_DIR_LIGHTS: 0
-    }), new _pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_9__.SkyboxPipeline("skybox", {
-      diffuseMap: this.textures[5]
-    }), new _pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_9__.SkyboxPipeline("stars", {
-      diffuseMap: this.textures[6]
-    })];
+    this.format = format;
+    await _renderer_TextureManager__WEBPACK_IMPORTED_MODULE_8__.textureManager.init(device);
     const size = this.canvasSize();
     this.onResize(size, false); // Initialize the wasm module
 
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.init(this.canvas.width, this.canvas.height);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.init(this.canvas.width, this.canvas.height);
     this.initRuntime(); // Setup events
 
     window.addEventListener("resize", this.onResizeHandler);
-    window.requestAnimationFrame(this.onFrameHandler); // window.addEventListener("click", (e) => {
-    //   const pipelines = this.pipelines as DebugPipeline[];
-    //   pipelines.forEach((p) => {
-    //     if (p.defines.diffuseMap) {
-    //       delete p.defines.diffuseMap;
-    //       p.defines = p.defines;
-    //     } else {
-    //       p.defines.diffuseMap = this.textures[1];
-    //       p.defines = p.defines;
-    //     }
-    //   });
-    // });
+    window.requestAnimationFrame(this.onFrameHandler);
+    this.clock.start();
   }
 
   initRuntime() {
-    this.pipelines.forEach(p => {
-      p.build(this);
-      p.initialize(this);
-    });
-    const containerLvl1Ptr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createLevel1();
-    const geometrySphere = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createSphere(1);
-    const geometryBox = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createBox(1);
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "skybox", "skybox"));
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerLvl1Ptr, this.createMesh(geometrySphere, "simple", "ball"));
+    _renderer_PipelineManager__WEBPACK_IMPORTED_MODULE_7__.pipelineManager.init(this);
+    const containerLvl1Ptr = _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.createLevel1();
+    const geometrySphere = new _renderer_geometry_SphereGeometry__WEBPACK_IMPORTED_MODULE_13__.SphereGeometry(1, 64, 32).build(this);
+    const geometryBox = new _renderer_geometry_BoxGeometry__WEBPACK_IMPORTED_MODULE_12__.BoxGeometry().build(this);
+    const geometryPlane = new _renderer_geometry_PlaneGeometry__WEBPACK_IMPORTED_MODULE_14__.PlaneGeometry().build(this);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.addAsset(containerLvl1Ptr, _renderer_MeshManager__WEBPACK_IMPORTED_MODULE_11__.meshManager.addMesh(this.createMesh(geometryBox, "skybox", "skybox")).transform);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.addAsset(containerLvl1Ptr, _renderer_MeshManager__WEBPACK_IMPORTED_MODULE_11__.meshManager.addMesh(this.createMesh(geometrySphere, "simple", "ball")).transform);
 
-    for (let i = 0; i < 20; i++) _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "concrete", `building-${i}`));
+    for (let i = 0; i < 20; i++) _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.addAsset(containerLvl1Ptr, _renderer_MeshManager__WEBPACK_IMPORTED_MODULE_11__.meshManager.addMesh(this.createMesh(geometryBox, "concrete", `building-${i}`)).transform);
 
-    for (let i = 0; i < 20; i++) _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "crate", `crate-${i}`));
+    for (let i = 0; i < 20; i++) _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.addAsset(containerLvl1Ptr, _renderer_MeshManager__WEBPACK_IMPORTED_MODULE_11__.meshManager.addMesh(this.createMesh(geometryBox, "crate", `crate-${i}`)).transform);
 
-    this.character = new _renderer_Object3D__WEBPACK_IMPORTED_MODULE_10__.Object3D(); // this.character.transform.add(this.createMesh(geometrySphere, "simple", "character"));
-    // wasm.addAsset( containerLvl1Ptr, this.character.transform.valueOf());
-
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerLvl1Ptr, this.createMesh(geometryBox, "coastal-floor", "floor"));
-    const containerTestPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createTestLevel();
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerTestPtr, this.createMesh(geometryBox, "skybox", "skybox"));
-    const containerMainMenuPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createMainMenu();
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerMainMenuPtr, this.createMesh(geometrySphere, "earth"));
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addAsset(containerMainMenuPtr, this.createMesh(geometryBox, "stars", "skybox"));
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addContainer(containerLvl1Ptr, false);
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addContainer(containerMainMenuPtr, true);
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addContainer(containerTestPtr, false);
+    this.character = new _renderer_Object3D__WEBPACK_IMPORTED_MODULE_5__.Object3D();
+    _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.addAsset(containerLvl1Ptr, _renderer_MeshManager__WEBPACK_IMPORTED_MODULE_11__.meshManager.addMesh(this.createMesh(geometryPlane, "coastal-floor", "floor")).transform);
+    const containerTestPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.createTestLevel();
+    _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.addAsset(containerTestPtr, _renderer_MeshManager__WEBPACK_IMPORTED_MODULE_11__.meshManager.addMesh(this.createMesh(geometryBox, "skybox", "skybox")).transform);
+    const containerMainMenuPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.createMainMenu();
+    _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.addAsset(containerMainMenuPtr, _renderer_MeshManager__WEBPACK_IMPORTED_MODULE_11__.meshManager.addMesh(this.createMesh(geometrySphere, "earth")).transform);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.addAsset(containerMainMenuPtr, _renderer_MeshManager__WEBPACK_IMPORTED_MODULE_11__.meshManager.addMesh(this.createMesh(geometryBox, "stars", "skybox")).transform);
+    this.player = new _gameplay_Player__WEBPACK_IMPORTED_MODULE_16__.Player();
+    _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.addAsset(containerLvl1Ptr, this.player.transformPtr);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.addContainer(containerLvl1Ptr, false);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.addContainer(containerMainMenuPtr, true);
+    _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.addContainer(containerTestPtr, false);
   }
 
-  createMesh(geometryPtr, pipelineName, name) {
-    // Get the pipeline
-    const pipeline = this.getPipeline(pipelineName);
-    const pipelineIndex = this.pipelines.indexOf(pipeline); // Create an instance in WASM
-
-    const pipelineInsPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createPipelineInstance(pipeline.name, pipelineIndex, _common_PipelineType__WEBPACK_IMPORTED_MODULE_1__.PipelineType.Mesh);
-    pipeline.vertexLayouts.map(buffer => buffer.attributes.map(attr => _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.addPipelineAttribute(pipelineInsPtr, attr.attributeType, attr.shaderLocation))); // Assign a transform buffer to the intance
-
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.setMeshPipelineTransformIndex(pipelineInsPtr, pipeline.addResourceInstance(this, _common_GroupType__WEBPACK_IMPORTED_MODULE_5__.GroupType.Transform));
-    const meshPtr = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.createMesh(geometryPtr, pipelineInsPtr, name);
-    return meshPtr;
+  createMesh(geometry, pipelineName, name) {
+    const pipeline = _renderer_PipelineManager__WEBPACK_IMPORTED_MODULE_7__.pipelineManager.getPipeline(pipelineName);
+    const mesh = new _renderer_Mesh__WEBPACK_IMPORTED_MODULE_9__.Mesh(geometry, pipeline, this, name);
+    return mesh;
   }
 
   dispose() {
@@ -791,22 +2088,27 @@ class GameManager {
       usage: GPUTextureUsage.RENDER_ATTACHMENT
     });
     this.renderTargetView = this.renderTarget.createView();
-    if (updateWasm) _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.resize(this.canvas.width, this.canvas.height);
+    if (updateWasm) _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.resize(this.canvas.width, this.canvas.height);
   }
 
   onFrame() {
+    const clock = this.clock;
     window.requestAnimationFrame(this.onFrameHandler);
+    const callbacks = this.updateCallbacks;
+
+    for (const callback of callbacks) callback();
+
     if (this.disposed) return; // Check if we need to resize
 
     const [w, h] = this.presentationSize;
-    const newSize = this.canvasSize();
+    const newSize = this.canvasSizeCache;
 
     if (newSize[0] !== w || newSize[1] !== h) {
       this.onResize(newSize);
     } // this.character.transform.translateZ(0.01);
 
 
-    _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.update(performance.now());
+    _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.update(clock.elapsedTime, clock.getDelta());
   }
 
   canvasSize() {
@@ -821,10 +2123,6 @@ class GameManager {
     } else {
       return true;
     }
-  }
-
-  getPipeline(name) {
-    return this.pipelines.find(p => p.name === name);
   }
 
   startPass() {
@@ -862,18 +2160,130 @@ class GameManager {
 
   createBufferF32(data) {
     let usageFlag = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST;
-    const f32Array = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.getFloat32Array(data);
-    const buffer = (0,_Utils__WEBPACK_IMPORTED_MODULE_3__.createBuffer)(this.device, f32Array, usageFlag);
+    const f32Array = _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.getFloat32Array(data);
+    const buffer = (0,_Utils__WEBPACK_IMPORTED_MODULE_3__.createBufferFromF32)(this.device, f32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;
   }
 
   createIndexBuffer(data) {
     let usageFlag = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST;
-    const u32Array = _WasmManager__WEBPACK_IMPORTED_MODULE_6__.wasm.getUint32Array(data);
-    const buffer = (0,_Utils__WEBPACK_IMPORTED_MODULE_3__.createIndexBuffer)(this.device, u32Array, usageFlag);
+    const u32Array = _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.getUint32Array(data);
+    const buffer = (0,_Utils__WEBPACK_IMPORTED_MODULE_3__.createIndexBufferU32)(this.device, u32Array, usageFlag);
     this.buffers.push(buffer);
     return this.buffers.length - 1;
+  }
+
+  renderComponents(camera, meshes) {
+    this.startPass();
+    let mesh;
+    let pipeline;
+    let pass = this.currentPass;
+    let instances;
+    let instance;
+    const device = this.device;
+    const projectionMatrix = _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.getFloat32Array(_WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.getCameraProjectionMatrix(camera));
+
+    for (let i = 0, l = meshes.length; i < l; i++) {
+      const meshPtr = meshes[i] | 0;
+      mesh = _renderer_MeshManager__WEBPACK_IMPORTED_MODULE_11__.meshManager.meshes.get(meshPtr);
+
+      if (mesh) {
+        var _instances, _instances2;
+
+        // Set pipeline
+        const newPipeline = mesh.pipeline;
+
+        if (newPipeline.rebuild) {
+          newPipeline.build(this);
+          newPipeline.initialize(this);
+        }
+
+        pipeline = newPipeline;
+        pass.setPipeline(pipeline.renderPipeline); // Set transform
+
+        const template = pipeline.getTemplateByGroup(_common_GroupType__WEBPACK_IMPORTED_MODULE_1__.GroupType.Transform);
+        instances = pipeline.groupInstances.get(_common_GroupType__WEBPACK_IMPORTED_MODULE_1__.GroupType.Transform);
+        const transformBuffer = instances[mesh.transformIndex].buffers[0];
+        if (template.projectionOffset !== -1) device.queue.writeBuffer(transformBuffer, template.projectionOffset, projectionMatrix);
+        if (template.modelViewOffset !== -1) device.queue.writeBuffer(transformBuffer, template.modelViewOffset, mesh.modelViewMatrix);
+        if (template.modelOffset !== -1) device.queue.writeBuffer(transformBuffer, template.modelOffset, mesh.worldMatrix);
+        if (template.normalOffset !== -1) device.queue.writeBuffer(transformBuffer, template.normalOffset, mesh.normalMatrix); // Set transform bind group
+
+        instances = pipeline.groupInstances.get(_common_GroupType__WEBPACK_IMPORTED_MODULE_1__.GroupType.Transform);
+        instance = (_instances = instances) === null || _instances === void 0 ? void 0 : _instances[mesh.transformIndex];
+        if (instance) pass.setBindGroup(instance.group, instance.bindGroup); // Set material bind group
+
+        instances = pipeline.groupInstances.get(_common_GroupType__WEBPACK_IMPORTED_MODULE_1__.GroupType.Material);
+        instance = (_instances2 = instances) === null || _instances2 === void 0 ? void 0 : _instances2[0];
+        if (instance) pass.setBindGroup(instance.group, instance.bindGroup); // Set attribute buffers
+
+        if (mesh.geometry && mesh.pipeline) {
+          const attributeMap = mesh.geometry.attributes;
+          const slotMap = mesh.slotMap;
+
+          if (attributeMap) {
+            if (attributeMap.has(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.POSITION) && slotMap.has(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.POSITION)) {
+              pass.setVertexBuffer(slotMap.get(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.POSITION), attributeMap.get(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.POSITION).gpuBuffer);
+            }
+
+            if (attributeMap.has(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.NORMAL) && slotMap.has(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.NORMAL)) {
+              pass.setVertexBuffer(slotMap.get(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.NORMAL), attributeMap.get(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.NORMAL).gpuBuffer);
+            }
+
+            if (attributeMap.has(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.UV) && slotMap.has(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.UV)) {
+              pass.setVertexBuffer(slotMap.get(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.UV), attributeMap.get(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.UV).gpuBuffer);
+            }
+
+            if (mesh.geometry.indexBuffer) {
+              pass.setIndexBuffer(mesh.geometry.indexBuffer, "uint32");
+              pass.drawIndexed(mesh.geometry.indices.length);
+            } else {}
+          }
+        }
+      }
+    }
+
+    this.endPass();
+  }
+
+  setupLights(numDirectionLights, configArrayPtr, sceneArrayPtr, directionArrayPtr) {
+    const pipelines = _renderer_PipelineManager__WEBPACK_IMPORTED_MODULE_7__.pipelineManager.pipelines;
+    let buffer;
+    const device = this.device;
+
+    if (_pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_15__.LightingResource.numDirLights !== numDirectionLights) {
+      _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_15__.LightingResource.numDirLights = numDirectionLights;
+      _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_15__.LightingResource.rebuildDirectionLights = true;
+      pipelines.forEach(p => {
+        if (p.getTemplateByType(_common_ResourceType__WEBPACK_IMPORTED_MODULE_10__.ResourceType.Material)) {
+          p.defines = { ...p.defines,
+            NUM_DIR_LIGHTS: numDirectionLights
+          };
+        }
+      });
+    }
+
+    buffer = _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_15__.LightingResource.lightingConfig;
+
+    if (buffer) {
+      const info = _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.getUint32Array(configArrayPtr);
+      device.queue.writeBuffer(buffer, 0, info);
+    }
+
+    buffer = _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_15__.LightingResource.sceneLightingBuffer;
+
+    if (buffer) {
+      const ambientLights = _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.getFloat32Array(sceneArrayPtr);
+      device.queue.writeBuffer(buffer, 0, ambientLights);
+    }
+
+    buffer = _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_15__.LightingResource.directionLightsBuffer;
+
+    if (buffer) {
+      const dirLights = _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasm.getFloat32Array(directionArrayPtr);
+      device.queue.writeBuffer(buffer, 0, dirLights);
+    }
   }
 
 }
@@ -1006,180 +2416,6 @@ class InputManager {
 
 /***/ }),
 
-/***/ "./src/ts/core/RenderQueueManager.ts":
-/*!*******************************************!*\
-  !*** ./src/ts/core/RenderQueueManager.ts ***!
-  \*******************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
-
-__webpack_require__.r(__webpack_exports__);
-/* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   "RenderQueueManager": () => (/* binding */ RenderQueueManager)
-/* harmony export */ });
-/* harmony import */ var _common_GroupType__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../common/GroupType */ "./src/common/GroupType.ts");
-/* harmony import */ var _common_ResourceType__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../common/ResourceType */ "./src/common/ResourceType.ts");
-/* harmony import */ var _common_Commands__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../common/Commands */ "./src/common/Commands.ts");
-/* harmony import */ var _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./pipelines/resources/LightingResource */ "./src/ts/core/pipelines/resources/LightingResource.ts");
-/* harmony import */ var _WasmManager__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./WasmManager */ "./src/ts/core/WasmManager.ts");
-
-
-
-
-
-const ARRAYBUFFERVIEW_DATASTART_OFFSET = 4;
-const normalAs4x4 = new Float32Array(12);
-class RenderQueueManager {
-  constructor(manager) {
-    this.manager = manager;
-  }
-
-  run(commandBuffer) {
-    var _instances;
-
-    const manager = this.manager;
-    const device = manager.device;
-    const {
-      wasmArrayBuffer,
-      wasmMemoryBlock
-    } = _WasmManager__WEBPACK_IMPORTED_MODULE_4__.wasmManager;
-
-    const getPtrIndex = function (ptr) {
-      return wasmArrayBuffer[ptr + ARRAYBUFFERVIEW_DATASTART_OFFSET >>> 2];
-    };
-
-    let pipeline, buffer, instances, resourceIndex;
-    let pass = manager.currentPass;
-
-    for (let i = 0, l = commandBuffer.length; i < l; i++) {
-      const command = commandBuffer[i];
-
-      switch (command) {
-        case _common_Commands__WEBPACK_IMPORTED_MODULE_2__.GPUCommands.SETUP_LIGHTING:
-          const numDirectionLights = commandBuffer[i + 1];
-
-          if (_pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_3__.LightingResource.numDirLights !== numDirectionLights) {
-            _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_3__.LightingResource.numDirLights = numDirectionLights;
-            _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_3__.LightingResource.rebuildDirectionLights = true;
-            this.manager.pipelines.forEach(p => {
-              if (p.getTemplateByType(_common_ResourceType__WEBPACK_IMPORTED_MODULE_1__.ResourceType.Material)) {
-                p.defines = { ...p.defines,
-                  NUM_DIR_LIGHTS: numDirectionLights
-                };
-              }
-            });
-          }
-
-          buffer = _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_3__.LightingResource.lightingConfig;
-
-          if (buffer) {
-            const info = getPtrIndex(commandBuffer[i + 2]);
-            device.queue.writeBuffer(buffer, 0, wasmMemoryBlock, info, 4);
-          }
-
-          buffer = _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_3__.LightingResource.sceneLightingBuffer;
-
-          if (buffer) {
-            const ambientLights = getPtrIndex(commandBuffer[i + 3]);
-            device.queue.writeBuffer(buffer, 0, wasmMemoryBlock, ambientLights, 4 * 4);
-          }
-
-          buffer = _pipelines_resources_LightingResource__WEBPACK_IMPORTED_MODULE_3__.LightingResource.directionLightsBuffer;
-
-          if (buffer) {
-            const dirLights = getPtrIndex(commandBuffer[i + 4]);
-            device.queue.writeBuffer(buffer, 0, wasmMemoryBlock, dirLights, numDirectionLights * 4 * 4 * 2);
-          }
-
-          i += 4;
-          break;
-
-        case _common_Commands__WEBPACK_IMPORTED_MODULE_2__.GPUCommands.SET_TRANSFORM:
-          const template = pipeline.getTemplateByGroup(_common_GroupType__WEBPACK_IMPORTED_MODULE_0__.GroupType.Transform);
-          instances = pipeline.groupInstances.get(_common_GroupType__WEBPACK_IMPORTED_MODULE_0__.GroupType.Transform);
-          resourceIndex = commandBuffer[i + 1];
-          const projMatrixPtr = getPtrIndex(commandBuffer[i + 2]);
-          const mvMatrixPtr = getPtrIndex(commandBuffer[i + 3]);
-          const mMatrixPtr = getPtrIndex(commandBuffer[i + 4]);
-          const normMatrixPtr = getPtrIndex(commandBuffer[i + 5]);
-          const mat3x3 = new Float32Array(wasmMemoryBlock, normMatrixPtr, 9); // TODO: Make this neater
-
-          normalAs4x4[0] = mat3x3[0];
-          normalAs4x4[1] = mat3x3[1];
-          normalAs4x4[2] = mat3x3[2];
-          normalAs4x4[4] = mat3x3[3];
-          normalAs4x4[5] = mat3x3[4];
-          normalAs4x4[6] = mat3x3[5];
-          normalAs4x4[8] = mat3x3[6];
-          normalAs4x4[9] = mat3x3[7];
-          normalAs4x4[10] = mat3x3[8];
-          const transformBuffer = instances[resourceIndex].buffers[0];
-          if (template.projectionOffset !== -1) device.queue.writeBuffer(transformBuffer, template.projectionOffset, wasmMemoryBlock, projMatrixPtr, 64);
-          if (template.modelViewOffset !== -1) device.queue.writeBuffer(transformBuffer, template.modelViewOffset, wasmMemoryBlock, mvMatrixPtr, 64);
-          if (template.modelOffset !== -1) device.queue.writeBuffer(transformBuffer, template.modelOffset, wasmMemoryBlock, mMatrixPtr, 64);
-          if (template.normalOffset !== -1) device.queue.writeBuffer(transformBuffer, template.normalOffset, normalAs4x4);
-          i += 5;
-          break;
-
-        case _common_Commands__WEBPACK_IMPORTED_MODULE_2__.GPUCommands.SET_INDEX_BUFFER:
-          buffer = manager.buffers[commandBuffer[i + 1]];
-          pass.setIndexBuffer(buffer, "uint32");
-          i += 1;
-          break;
-
-        case _common_Commands__WEBPACK_IMPORTED_MODULE_2__.GPUCommands.SET_BUFFER:
-          const slot = commandBuffer[i + 1];
-          buffer = manager.buffers[commandBuffer[i + 2]];
-          pass.setVertexBuffer(slot, buffer);
-          i += 2;
-          break;
-
-        case _common_Commands__WEBPACK_IMPORTED_MODULE_2__.GPUCommands.DRAW_INDEXED:
-          const indexCount = commandBuffer[i + 1];
-          pass.drawIndexed(indexCount);
-          i += 1;
-          break;
-
-        case _common_Commands__WEBPACK_IMPORTED_MODULE_2__.GPUCommands.SET_PIPELINE:
-          const newPipeline = manager.pipelines[commandBuffer[i + 1]];
-
-          if (newPipeline.rebuild) {
-            newPipeline.build(manager);
-            newPipeline.initialize(manager);
-          }
-
-          if (newPipeline === pipeline) {
-            i += 1;
-            break;
-          }
-
-          pipeline = newPipeline;
-          pass.setPipeline(pipeline.renderPipeline);
-          i += 1;
-          break;
-
-        case _common_Commands__WEBPACK_IMPORTED_MODULE_2__.GPUCommands.SET_BIND_GROUP:
-          instances = pipeline.groupInstances.get(commandBuffer[i + 1]);
-          const instance = (_instances = instances) === null || _instances === void 0 ? void 0 : _instances[commandBuffer[i + 2]];
-          if (instance) pass.setBindGroup(instance.group, instance.bindGroup);
-          i += 2;
-          break;
-
-        case _common_Commands__WEBPACK_IMPORTED_MODULE_2__.GPUCommands.START_PASS:
-          manager.startPass();
-          pass = manager.currentPass;
-          break;
-
-        case _common_Commands__WEBPACK_IMPORTED_MODULE_2__.GPUCommands.END_PASS:
-          manager.endPass();
-          break;
-      }
-    }
-  }
-
-}
-
-/***/ }),
-
 /***/ "./src/ts/core/UIEventManager.ts":
 /*!***************************************!*\
   !*** ./src/ts/core/UIEventManager.ts ***!
@@ -1230,9 +2466,10 @@ class UIEventManager extends _EventDispatcher__WEBPACK_IMPORTED_MODULE_0__["defa
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "createBuffer": () => (/* binding */ createBuffer),
-/* harmony export */   "createIndexBuffer": () => (/* binding */ createIndexBuffer)
+/* harmony export */   "createBufferFromF32": () => (/* binding */ createBufferFromF32),
+/* harmony export */   "createIndexBufferU32": () => (/* binding */ createIndexBufferU32)
 /* harmony export */ });
-function createBuffer(device, data) {
+function createBufferFromF32(device, data) {
   let usageFlag = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST;
   const buffer = device.createBuffer({
     size: data.byteLength,
@@ -1244,7 +2481,20 @@ function createBuffer(device, data) {
   buffer.unmap();
   return buffer;
 }
-function createIndexBuffer(device, data) {
+function createBuffer(device, data) {
+  let usageFlag = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST;
+  const buffer = device.createBuffer({
+    size: data.byteLength,
+    usage: usageFlag,
+    // mappedAtCreation is true so we can interact with it via the CPU
+    mappedAtCreation: true
+  });
+  var dst = buffer.getMappedRange();
+  new Uint8Array(dst).set(new Uint8Array(data));
+  buffer.unmap();
+  return buffer;
+}
+function createIndexBufferU32(device, data) {
   let usageFlag = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST;
   const buffer = device.createBuffer({
     size: data.byteLength,
@@ -1283,7 +2533,7 @@ class WasmManager {
   }
 
   __liftTypedArray(constructor, pointer) {
-    const memoryU32 = new Uint32Array(this.memory.buffer);
+    const memoryU32 = this.memoryU32;
     return new constructor(this.memory.buffer, memoryU32[pointer + 4 >>> 2], memoryU32[pointer + 8 >>> 2] / constructor.BYTES_PER_ELEMENT);
   }
 
@@ -1292,6 +2542,7 @@ class WasmManager {
     this.memory = new WebAssembly.Memory({
       initial: 10000
     });
+    this.memoryU32 = new Uint32Array(this.memory.buffer);
     const bindings = {};
 
     for (const bindable of bindables) Object.assign(bindings, bindable.createBinding());
@@ -1467,6 +2718,7 @@ class Pipeline {
     const vertSource = (0,_shader_lib_Utils__WEBPACK_IMPORTED_MODULE_2__.shaderBuilder)(this.vertexSource, this);
     const fragSource = (0,_shader_lib_Utils__WEBPACK_IMPORTED_MODULE_2__.shaderBuilder)(this.fragmentSource, this);
     this.renderPipeline = gameManager.device.createRenderPipeline({
+      layout: "auto",
       primitive: {
         topology: this.topology,
         cullMode: this.cullMode,
@@ -3027,6 +4279,129 @@ class Texture {
 
 /***/ }),
 
+/***/ "./src/ts/gameplay/Player.ts":
+/*!***********************************!*\
+  !*** ./src/ts/gameplay/Player.ts ***!
+  \***********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Player": () => (/* binding */ Player)
+/* harmony export */ });
+/* harmony import */ var _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../core/WasmManager */ "./src/ts/core/WasmManager.ts");
+
+class Player {
+  constructor() {
+    this.transformPtr = _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.createTransformNode("player");
+    this.playerPtr = _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.createPlayerComponent();
+    this.propertiesView = _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.getInt32Array(_core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.getPlayerComponentProperties(this.playerPtr));
+    _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.addComponent(this.transformPtr, this.playerPtr);
+  }
+
+  get health() {
+    return this.propertiesView[0];
+  }
+
+  get hunger() {
+    return this.propertiesView[2];
+  }
+
+}
+
+/***/ }),
+
+/***/ "./src/ts/renderer/Mesh.ts":
+/*!*********************************!*\
+  !*** ./src/ts/renderer/Mesh.ts ***!
+  \*********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Mesh": () => (/* binding */ Mesh)
+/* harmony export */ });
+/* harmony import */ var _common_GroupType__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../common/GroupType */ "./src/common/GroupType.ts");
+/* harmony import */ var _core_WasmManager__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../core/WasmManager */ "./src/ts/core/WasmManager.ts");
+/* harmony import */ var _Object3D__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./Object3D */ "./src/ts/renderer/Object3D.ts");
+/* harmony import */ var _PipelineManager__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./PipelineManager */ "./src/ts/renderer/PipelineManager.ts");
+
+
+
+
+class Mesh extends _Object3D__WEBPACK_IMPORTED_MODULE_2__.Object3D {
+  constructor(geometry, pipeline, manager, name) {
+    super(name);
+    this.renderIndex = -1;
+    this.geometry = geometry;
+    this.pipeline = pipeline;
+    this.meshComponent = -1;
+    this.slotMap = new Map();
+    const pipelineIndex = _PipelineManager__WEBPACK_IMPORTED_MODULE_3__.pipelineManager.pipelines.indexOf(this.pipeline);
+    const pipelineInsPtr = _core_WasmManager__WEBPACK_IMPORTED_MODULE_1__.wasm.createMeshPipelineInstance(this.pipeline.name, pipelineIndex);
+    this.meshComponent = _core_WasmManager__WEBPACK_IMPORTED_MODULE_1__.wasm.createMeshComponent(this.geometry.bufferGeometry, pipelineInsPtr, this.name);
+    this.pipeline.vertexLayouts.map(buffer => buffer.attributes.map(attr => {
+      _core_WasmManager__WEBPACK_IMPORTED_MODULE_1__.wasm.addPipelineAttribute(pipelineInsPtr, attr.attributeType, attr.shaderLocation);
+      this.slotMap.set(attr.attributeType, attr.shaderLocation);
+    })); // Assign a transform buffer to the intance
+
+    this.transformIndex = this.pipeline.addResourceInstance(manager, _common_GroupType__WEBPACK_IMPORTED_MODULE_0__.GroupType.Transform);
+    _core_WasmManager__WEBPACK_IMPORTED_MODULE_1__.wasm.setMeshPipelineTransformIndex(pipelineInsPtr, this.transformIndex);
+    _core_WasmManager__WEBPACK_IMPORTED_MODULE_1__.wasm.addComponent(this.transform, this.meshComponent);
+    this.modelViewMatrix = _core_WasmManager__WEBPACK_IMPORTED_MODULE_1__.wasm.getFloat32Array(_core_WasmManager__WEBPACK_IMPORTED_MODULE_1__.wasm.getTransformModelViewMatrix(this.transform));
+    this.normalMatrix = _core_WasmManager__WEBPACK_IMPORTED_MODULE_1__.wasm.getFloat32Array(_core_WasmManager__WEBPACK_IMPORTED_MODULE_1__.wasm.getTransformNormalMatrix(this.transform));
+    this.worldMatrix = _core_WasmManager__WEBPACK_IMPORTED_MODULE_1__.wasm.getFloat32Array(_core_WasmManager__WEBPACK_IMPORTED_MODULE_1__.wasm.getTransformWorldMatrix(this.transform));
+  }
+
+}
+
+/***/ }),
+
+/***/ "./src/ts/renderer/MeshManager.ts":
+/*!****************************************!*\
+  !*** ./src/ts/renderer/MeshManager.ts ***!
+  \****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "meshManager": () => (/* binding */ meshManager)
+/* harmony export */ });
+class MeshManager {
+  constructor() {
+    this.meshes = new Map();
+  }
+
+  addMesh(mesh) {
+    const meshes = this.meshes; // @ts-expect-error
+
+    const meshPtr = mesh.meshComponent | 0;
+
+    if (!meshes.has(meshPtr)) {
+      meshes.set(meshPtr, mesh);
+    }
+
+    return mesh;
+  }
+
+  removeMesh(mesh) {
+    const meshes = this.meshes; // @ts-expect-error
+
+    const meshPtr = mesh.meshComponent | 0;
+
+    if (meshes.has(meshPtr)) {
+      meshes.delete(meshPtr);
+    }
+
+    return mesh;
+  }
+
+}
+
+const meshManager = new MeshManager();
+
+/***/ }),
+
 /***/ "./src/ts/renderer/Object3D.ts":
 /*!*************************************!*\
   !*** ./src/ts/renderer/Object3D.ts ***!
@@ -3037,11 +4412,649 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "Object3D": () => (/* binding */ Object3D)
 /* harmony export */ });
-// import type { TransformNode } from "build/types";
-// import { wasm } from "../core/WasmManager";
+/* harmony import */ var _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../core/WasmManager */ "./src/ts/core/WasmManager.ts");
+/* harmony import */ var _common_math_MathUtils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../common/math/MathUtils */ "./src/common/math/MathUtils.ts");
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
+
+
+let objectId = 1;
 class Object3D {
-  // transform: TransformNode;
-  constructor() {// this.transform = wasm.TransformNode.wrap(wasm.createTransformNode());
+  constructor(name) {
+    _defineProperty(this, "uuid", (0,_common_math_MathUtils__WEBPACK_IMPORTED_MODULE_1__.generateUUID)());
+
+    this.transform = 0;
+    this.name = name || "";
+    this.id = objectId++;
+    this.transform = _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.createTransformNode(this.name);
+    _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.setId(this.transform, this.id);
+  }
+
+  set visibility(val) {
+    _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.setVisibility(this.transform, val);
+  }
+
+  get visibility() {
+    return _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.getVisibility(this.transform);
+  }
+
+  add(child) {
+    _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.addChild(this.transform, child.transform);
+  }
+
+  remove(child) {
+    _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.removeChild(this.transform, child.transform);
+  }
+
+}
+
+/***/ }),
+
+/***/ "./src/ts/renderer/PipelineManager.ts":
+/*!********************************************!*\
+  !*** ./src/ts/renderer/PipelineManager.ts ***!
+  \********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "pipelineManager": () => (/* binding */ pipelineManager)
+/* harmony export */ });
+/* harmony import */ var _core_pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../core/pipelines/debug-pipeline/DebugPipeline */ "./src/ts/core/pipelines/debug-pipeline/DebugPipeline.ts");
+/* harmony import */ var _core_pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../core/pipelines/skybox-pipeline/SkyboxPipeline */ "./src/ts/core/pipelines/skybox-pipeline/SkyboxPipeline.ts");
+/* harmony import */ var _TextureManager__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./TextureManager */ "./src/ts/renderer/TextureManager.ts");
+
+
+
+
+class PipelineManager {
+  getPipeline(name) {
+    return this.pipelines.find(p => p.name === name);
+  }
+
+  init(gameManager) {
+    this.pipelines = [new _core_pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_0__.DebugPipeline("coastal-floor", {
+      diffuseMap: _TextureManager__WEBPACK_IMPORTED_MODULE_2__.textureManager.find("ground-coastal-1"),
+      NUM_DIR_LIGHTS: 0,
+      uvScaleX: "30.0",
+      uvScaleY: "30.0"
+    }), new _core_pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_0__.DebugPipeline("crate", {
+      diffuseMap: _TextureManager__WEBPACK_IMPORTED_MODULE_2__.textureManager.find("crate"),
+      NUM_DIR_LIGHTS: 0
+    }), new _core_pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_0__.DebugPipeline("simple", {
+      NUM_DIR_LIGHTS: 0
+    }), new _core_pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_0__.DebugPipeline("earth", {
+      diffuseMap: _TextureManager__WEBPACK_IMPORTED_MODULE_2__.textureManager.find("earth"),
+      NUM_DIR_LIGHTS: 0
+    }), new _core_pipelines_debug_pipeline_DebugPipeline__WEBPACK_IMPORTED_MODULE_0__.DebugPipeline("concrete", {
+      diffuseMap: _TextureManager__WEBPACK_IMPORTED_MODULE_2__.textureManager.find("block-concrete-4"),
+      NUM_DIR_LIGHTS: 0
+    }), new _core_pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_1__.SkyboxPipeline("skybox", {
+      diffuseMap: _TextureManager__WEBPACK_IMPORTED_MODULE_2__.textureManager.find("desert-sky")
+    }), new _core_pipelines_skybox_pipeline_SkyboxPipeline__WEBPACK_IMPORTED_MODULE_1__.SkyboxPipeline("stars", {
+      diffuseMap: _TextureManager__WEBPACK_IMPORTED_MODULE_2__.textureManager.find("starry-sky")
+    })];
+    this.pipelines.forEach(p => {
+      p.build(gameManager);
+      p.initialize(gameManager);
+    });
+  }
+
+}
+
+const pipelineManager = new PipelineManager();
+
+/***/ }),
+
+/***/ "./src/ts/renderer/TextureManager.ts":
+/*!*******************************************!*\
+  !*** ./src/ts/renderer/TextureManager.ts ***!
+  \*******************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "textureManager": () => (/* binding */ textureManager)
+/* harmony export */ });
+/* harmony import */ var _core_textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../core/textures/BitmapCubeTexture */ "./src/ts/core/textures/BitmapCubeTexture.ts");
+/* harmony import */ var _core_textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../core/textures/BitmapTexture */ "./src/ts/core/textures/BitmapTexture.ts");
+
+
+const MEDIA_URL = "https://storage.googleapis.com/rewild-6809/";
+
+class TextureManager {
+  async init(device) {
+    // TEXTURES
+    const textures = [new _core_textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_1__.BitmapTexture("grid", MEDIA_URL + "uv-grid.jpg", device), new _core_textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_1__.BitmapTexture("crate", MEDIA_URL + "crate-wooden.jpg", device), new _core_textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_1__.BitmapTexture("earth", MEDIA_URL + "earth-day-2k.jpg", device), new _core_textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_1__.BitmapTexture("ground-coastal-1", MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png", device), new _core_textures_BitmapTexture__WEBPACK_IMPORTED_MODULE_1__.BitmapTexture("block-concrete-4", MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png", device), new _core_textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_0__.BitmapCubeTexture("desert-sky", [MEDIA_URL + "skyboxes/desert/px.jpg", MEDIA_URL + "skyboxes/desert/nx.jpg", MEDIA_URL + "skyboxes/desert/py.jpg", MEDIA_URL + "skyboxes/desert/ny.jpg", MEDIA_URL + "skyboxes/desert/pz.jpg", MEDIA_URL + "skyboxes/desert/nz.jpg"], device), new _core_textures_BitmapCubeTexture__WEBPACK_IMPORTED_MODULE_0__.BitmapCubeTexture("starry-sky", [MEDIA_URL + "skyboxes/stars/left.png", MEDIA_URL + "skyboxes/stars/right.png", MEDIA_URL + "skyboxes/stars/top.png", MEDIA_URL + "skyboxes/stars/bottom.png", MEDIA_URL + "skyboxes/stars/front.png", MEDIA_URL + "skyboxes/stars/back.png"], device)];
+    this.textures = await Promise.all(textures.map(texture => {
+      return texture.load(device);
+    }));
+  }
+
+  find(name) {
+    return this.textures.find(texture => texture.name === name);
+  }
+
+}
+
+const textureManager = new TextureManager();
+
+/***/ }),
+
+/***/ "./src/ts/renderer/geometry/BoxGeometry.ts":
+/*!*************************************************!*\
+  !*** ./src/ts/renderer/geometry/BoxGeometry.ts ***!
+  \*************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "BoxGeometry": () => (/* binding */ BoxGeometry),
+/* harmony export */   "BoxGeometryParameters": () => (/* binding */ BoxGeometryParameters)
+/* harmony export */ });
+/* harmony import */ var _Geometry__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Geometry */ "./src/ts/renderer/geometry/Geometry.ts");
+/* harmony import */ var _common_math_Vector3__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../common/math/Vector3 */ "./src/common/math/Vector3.ts");
+/* harmony import */ var _common_AttributeType__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../common/AttributeType */ "./src/common/AttributeType.ts");
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
+
+
+
+class BoxGeometryParameters {}
+
+class BoxGeometryBuilder {
+  constructor(widthSegments, heightSegments, depthSegments) {
+    _defineProperty(this, "indices", []);
+
+    _defineProperty(this, "vertices", []);
+
+    _defineProperty(this, "normals", []);
+
+    _defineProperty(this, "uvs", []);
+
+    _defineProperty(this, "numberOfVertices", 0);
+
+    _defineProperty(this, "groupStart", 0);
+
+    this.widthSegments = widthSegments;
+    this.heightSegments = heightSegments;
+    this.depthSegments = depthSegments;
+  }
+
+  buildPlane(u, v, w, udir, vdir, width, height, depth, gridX, gridY, materialIndex, box) {
+    const vertices = this.vertices;
+    const indices = this.indices;
+    const normals = this.normals;
+    const uvs = this.uvs;
+    const numberOfVertices = this.numberOfVertices;
+    const segmentWidth = width / gridX;
+    const segmentHeight = height / gridY;
+    const widthHalf = width / 2;
+    const heightHalf = height / 2;
+    const depthHalf = depth / 2;
+    const gridX1 = gridX + 1;
+    const gridY1 = gridY + 1;
+    let vertexCounter = 0;
+    let groupCount = 0;
+    const vector = new _common_math_Vector3__WEBPACK_IMPORTED_MODULE_1__.Vector3(); // generate vertices, normals and uvs
+
+    for (let iy = 0; iy < gridY1; iy++) {
+      const y = iy * segmentHeight - heightHalf;
+
+      for (let ix = 0; ix < gridX1; ix++) {
+        const x = ix * segmentWidth - widthHalf; // set values to correct vector component
+
+        vector.setByIndex(u, x * udir);
+        vector.setByIndex(v, y * vdir);
+        vector.setByIndex(w, depthHalf); // now apply vector to vertex buffer
+
+        vertices.push(vector.x);
+        vertices.push(vector.y);
+        vertices.push(vector.z); // set values to correct vector component
+
+        vector.setByIndex(u, 0);
+        vector.setByIndex(v, 0);
+        vector.setByIndex(w, depth > 0 ? 1 : -1); // now apply vector to normal buffer
+
+        normals.push(vector.x);
+        normals.push(vector.y);
+        normals.push(vector.z); // uvs
+
+        uvs.push(ix / gridX);
+        uvs.push(1 - iy / gridY); // counters
+
+        vertexCounter += 1;
+      }
+    } // indices
+    // 1. you need three indices to draw a single face
+    // 2. a single segment consists of two faces
+    // 3. so we need to generate six (2*3) indices per segment
+
+
+    for (let iy = 0; iy < gridY; iy++) {
+      for (let ix = 0; ix < gridX; ix++) {
+        const a = numberOfVertices + ix + gridX1 * iy;
+        const b = numberOfVertices + ix + gridX1 * (iy + 1);
+        const c = numberOfVertices + (ix + 1) + gridX1 * (iy + 1);
+        const d = numberOfVertices + (ix + 1) + gridX1 * iy; // faces
+
+        indices.push(a);
+        indices.push(b);
+        indices.push(d);
+        indices.push(b);
+        indices.push(c);
+        indices.push(d); // increase counter
+
+        groupCount += 6;
+      }
+    } // add a group to the geometry. this will ensure multi material support
+
+
+    box.addGroup(this.groupStart, groupCount, materialIndex); // calculate new start value for groups
+
+    this.groupStart += groupCount; // update total number of vertices
+
+    this.numberOfVertices += vertexCounter;
+  }
+
+}
+
+class BoxGeometry extends _Geometry__WEBPACK_IMPORTED_MODULE_0__.Geometry {
+  constructor() {
+    let width = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
+    let height = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
+    let depth = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
+    let widthSegments = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
+    let heightSegments = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 1;
+    let depthSegments = arguments.length > 5 && arguments[5] !== undefined ? arguments[5] : 1;
+    super();
+    this.parameters = {
+      width: width,
+      height: height,
+      depth: depth,
+      widthSegments: widthSegments,
+      heightSegments: heightSegments,
+      depthSegments: depthSegments
+    }; // segments
+
+    const builder = new BoxGeometryBuilder(Math.floor(widthSegments), Math.floor(heightSegments), Math.floor(depthSegments)); // build each side of the box geometry
+
+    builder.buildPlane(2, 1, 0, -1, -1, depth, height, width, depthSegments, heightSegments, 0, this); // px
+
+    builder.buildPlane(2, 1, 0, 1, -1, depth, height, -width, depthSegments, heightSegments, 1, this); // nx
+
+    builder.buildPlane(0, 2, 1, 1, 1, width, depth, height, widthSegments, depthSegments, 2, this); // py
+
+    builder.buildPlane(0, 2, 1, 1, -1, width, depth, -height, widthSegments, depthSegments, 3, this); // ny
+
+    builder.buildPlane(0, 1, 2, 1, -1, width, height, depth, widthSegments, heightSegments, 4, this); // pz
+
+    builder.buildPlane(0, 1, 2, -1, -1, width, height, -depth, widthSegments, heightSegments, 5, this); // nz
+    // build geometry
+
+    this.setIndexes(builder.indices);
+    this.setAttribute(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.POSITION, new Float32Array(builder.vertices), 3);
+    this.setAttribute(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.NORMAL, new Float32Array(builder.normals), 3);
+    this.setAttribute(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.UV, new Float32Array(builder.uvs), 2);
+  } // static fromJSON( data ) {
+  // 	return new BoxGeometry( data.width, data.height, data.depth, data.widthSegments, data.heightSegments, data.depthSegments );
+  // }
+
+
+}
+
+/***/ }),
+
+/***/ "./src/ts/renderer/geometry/Geometry.ts":
+/*!**********************************************!*\
+  !*** ./src/ts/renderer/geometry/Geometry.ts ***!
+  \**********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "Attribute": () => (/* binding */ Attribute),
+/* harmony export */   "BufferGeometryGroup": () => (/* binding */ BufferGeometryGroup),
+/* harmony export */   "Geometry": () => (/* binding */ Geometry)
+/* harmony export */ });
+/* harmony import */ var _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/WasmManager */ "./src/ts/core/WasmManager.ts");
+/* harmony import */ var _common_AttributeType__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../common/AttributeType */ "./src/common/AttributeType.ts");
+/* harmony import */ var _core_Utils__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../core/Utils */ "./src/ts/core/Utils.ts");
+
+
+
+class BufferGeometryGroup {
+  constructor(start, count) {
+    let materialIndex = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
+    this.start = start;
+    this.count = count;
+    this.materialIndex = materialIndex;
+  }
+
+}
+class Attribute {
+  constructor(buffer, itemSize) {
+    let normalized = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : false;
+    this.itemSize = itemSize;
+    this.normalized = normalized;
+    this.buffer = buffer;
+    this.gpuBuffer = null;
+  }
+
+  getX(index) {
+    return this.buffer[index * this.itemSize];
+  }
+
+  setX(index, x) {
+    this.buffer[index * this.itemSize] = x;
+    return this;
+  }
+
+  getY(index) {
+    return this.buffer[index * this.itemSize + 1];
+  }
+
+  setY(index, y) {
+    this.buffer[index * this.itemSize + 1] = y;
+    return this;
+  }
+
+  getZ(index) {
+    return this.buffer[index * this.itemSize + 2];
+  }
+
+  setZ(index, z) {
+    this.buffer[index * this.itemSize + 2] = z;
+    return this;
+  }
+
+  getW(index) {
+    return this.buffer[index * this.itemSize + 3];
+  }
+
+  setW(index, w) {
+    this.buffer[index * this.itemSize + 3] = w;
+    return this;
+  }
+
+  setXY(index, x, y) {
+    index *= this.itemSize;
+    this.buffer[index + 0] = x;
+    this.buffer[index + 1] = y;
+    return this;
+  }
+
+  setXYZ(index, x, y, z) {
+    index *= this.itemSize;
+    this.buffer[index + 0] = x;
+    this.buffer[index + 1] = y;
+    this.buffer[index + 2] = z;
+    return this;
+  }
+
+  setXYZW(index, x, y, z, w) {
+    index *= this.itemSize;
+    this.buffer[index + 0] = x;
+    this.buffer[index + 1] = y;
+    this.buffer[index + 2] = z;
+    this.buffer[index + 3] = w;
+    return this;
+  }
+
+}
+class Geometry {
+  constructor() {
+    this.name = "";
+    this.attributes = new Map();
+    this.groups = [];
+    this.bufferGeometry = _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.creatBufferGeometry();
+    this.requiresBuild = true;
+    this.indexBuffer = null;
+  }
+
+  build(manager) {
+    this.requiresBuild = false;
+    this.attributes.forEach((value, key) => {
+      if (key === _common_AttributeType__WEBPACK_IMPORTED_MODULE_1__.AttributeType.NORMAL || key === _common_AttributeType__WEBPACK_IMPORTED_MODULE_1__.AttributeType.POSITION || key === _common_AttributeType__WEBPACK_IMPORTED_MODULE_1__.AttributeType.UV || key === _common_AttributeType__WEBPACK_IMPORTED_MODULE_1__.AttributeType.TANGENT) {
+        const buffer = (0,_core_Utils__WEBPACK_IMPORTED_MODULE_2__.createBufferFromF32)(manager.device, value.buffer, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST);
+        value.gpuBuffer = buffer;
+      } else throw new Error(`Attribute ${_common_AttributeType__WEBPACK_IMPORTED_MODULE_1__.AttributeType[key]} not recognised`);
+    });
+    this.indexBuffer = (0,_core_Utils__WEBPACK_IMPORTED_MODULE_2__.createIndexBufferU32)(manager.device, this.indices);
+    return this;
+  }
+
+  setAttribute(type, buffer, itemSize) {
+    let normalized = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
+    let attribute;
+    if (buffer instanceof Attribute) attribute = buffer;else attribute = new Attribute(buffer, itemSize, normalized);
+    this.attributes.set(type, attribute);
+
+    if (buffer instanceof Float32Array) {
+      const wasmAttribute = _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.createBufferAttributeF32(buffer, attribute.itemSize, attribute.normalized);
+      _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.setBufferAttribute(this.bufferGeometry, type, wasmAttribute);
+    }
+  }
+
+  setIndexes(buffer) {
+    this.indices = new Uint32Array(buffer);
+    const wasmAttribute = _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.createBufferAttributeu32(this.indices, 1, false);
+    _core_WasmManager__WEBPACK_IMPORTED_MODULE_0__.wasm.setIndexAttribute(this.bufferGeometry, wasmAttribute);
+  }
+
+  addGroup(start, count) {
+    let materialIndex = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
+    this.groups.push(new BufferGeometryGroup(start, count, materialIndex));
+  }
+
+  clearGroups() {
+    this.groups = [];
+  }
+
+}
+
+/***/ }),
+
+/***/ "./src/ts/renderer/geometry/PlaneGeometry.ts":
+/*!***************************************************!*\
+  !*** ./src/ts/renderer/geometry/PlaneGeometry.ts ***!
+  \***************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "PlaneGeometry": () => (/* binding */ PlaneGeometry),
+/* harmony export */   "PlaneGeometryParameters": () => (/* binding */ PlaneGeometryParameters)
+/* harmony export */ });
+/* harmony import */ var _Geometry__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Geometry */ "./src/ts/renderer/geometry/Geometry.ts");
+/* harmony import */ var _common_AttributeType__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../common/AttributeType */ "./src/common/AttributeType.ts");
+
+
+class PlaneGeometryParameters {}
+class PlaneGeometry extends _Geometry__WEBPACK_IMPORTED_MODULE_0__.Geometry {
+  constructor() {
+    let width = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
+    let height = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
+    let widthSegments = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
+    let heightSegments = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
+    super();
+    this.parameters = {
+      width: width,
+      height: height,
+      widthSegments: widthSegments,
+      heightSegments: heightSegments
+    };
+    const width_half = width / 2;
+    const height_half = height / 2;
+    const gridX = u32(Math.floor(widthSegments));
+    const gridY = u32(Math.floor(heightSegments));
+    const gridX1 = gridX + 1;
+    const gridY1 = gridY + 1;
+    const segment_width = width / gridX;
+    const segment_height = height / gridY; //
+
+    const indices = [];
+    const vertices = [];
+    const normals = [];
+    const uvs = [];
+
+    for (let iy = 0; iy < gridY1; iy++) {
+      const y = iy * segment_height - height_half;
+
+      for (let ix = 0; ix < gridX1; ix++) {
+        const x = ix * segment_width - width_half;
+        vertices.push(x);
+        vertices.push(-y);
+        vertices.push(0);
+        normals.push(0);
+        normals.push(0);
+        normals.push(1);
+        uvs.push(ix / gridX);
+        uvs.push(1 - iy / gridY);
+      }
+    }
+
+    for (let iy = 0; iy < gridY; iy++) {
+      for (let ix = 0; ix < gridX; ix++) {
+        const a = ix + gridX1 * iy;
+        const b = ix + gridX1 * (iy + 1);
+        const c = ix + 1 + gridX1 * (iy + 1);
+        const d = ix + 1 + gridX1 * iy;
+        indices.push(a);
+        indices.push(b);
+        indices.push(d);
+        indices.push(b);
+        indices.push(c);
+        indices.push(d);
+      }
+    }
+
+    this.setIndexes(indices);
+    this.setAttribute(_common_AttributeType__WEBPACK_IMPORTED_MODULE_1__.AttributeType.POSITION, new Float32Array(vertices), 3);
+    this.setAttribute(_common_AttributeType__WEBPACK_IMPORTED_MODULE_1__.AttributeType.NORMAL, new Float32Array(normals), 3);
+    this.setAttribute(_common_AttributeType__WEBPACK_IMPORTED_MODULE_1__.AttributeType.UV, new Float32Array(uvs), 2);
+  } // TODO:
+  // static fromJSON( data ) {
+  // 	return new PlaneGeometry( data.width, data.height, data.widthSegments, data.heightSegments );
+  // }
+
+
+}
+
+/***/ }),
+
+/***/ "./src/ts/renderer/geometry/SphereGeometry.ts":
+/*!****************************************************!*\
+  !*** ./src/ts/renderer/geometry/SphereGeometry.ts ***!
+  \****************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "SphereGeometry": () => (/* binding */ SphereGeometry),
+/* harmony export */   "SphereGeometryParameters": () => (/* binding */ SphereGeometryParameters)
+/* harmony export */ });
+/* harmony import */ var _Geometry__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Geometry */ "./src/ts/renderer/geometry/Geometry.ts");
+/* harmony import */ var _common_math_Vector3__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../common/math/Vector3 */ "./src/common/math/Vector3.ts");
+/* harmony import */ var _common_AttributeType__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../../common/AttributeType */ "./src/common/AttributeType.ts");
+
+
+
+class SphereGeometryParameters {}
+class SphereGeometry extends _Geometry__WEBPACK_IMPORTED_MODULE_0__.Geometry {
+  constructor() {
+    let radius = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
+    let widthSegments = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 32;
+    let heightSegments = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 16;
+    let phiStart = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 0;
+    let phiLength = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : Mathf.PI * 2;
+    let thetaStart = arguments.length > 5 && arguments[5] !== undefined ? arguments[5] : 0;
+    let thetaLength = arguments.length > 6 && arguments[6] !== undefined ? arguments[6] : Mathf.PI;
+    super();
+    this.parameters = {
+      radius: radius,
+      widthSegments: widthSegments,
+      heightSegments: heightSegments,
+      phiStart: phiStart,
+      phiLength: phiLength,
+      thetaStart: thetaStart,
+      thetaLength: thetaLength
+    };
+    widthSegments = Math.max(3, Math.floor(widthSegments));
+    heightSegments = Math.max(2, Math.floor(heightSegments));
+    const thetaEnd = Mathf.min(thetaStart + thetaLength, Mathf.PI);
+    let index = 0;
+    const grid = [];
+    const vertex = new _common_math_Vector3__WEBPACK_IMPORTED_MODULE_1__.Vector3();
+    const normal = new _common_math_Vector3__WEBPACK_IMPORTED_MODULE_1__.Vector3(); // buffers
+
+    const indices = [];
+    const vertices = [];
+    const normals = [];
+    const uvs = []; // generate vertices, normals and uvs
+
+    for (let iy = 0; iy <= heightSegments; iy++) {
+      const verticesRow = [];
+      const v = iy / heightSegments; // special case for the poles
+
+      let uOffset = 0;
+
+      if (iy == 0 && thetaStart == 0) {
+        uOffset = 0.5 / widthSegments;
+      } else if (iy == heightSegments && thetaEnd == Mathf.PI) {
+        uOffset = -0.5 / widthSegments;
+      }
+
+      for (let ix = 0; ix <= widthSegments; ix++) {
+        const u = ix / widthSegments; // vertex
+
+        vertex.x = -radius * Mathf.cos(phiStart + u * phiLength) * Mathf.sin(thetaStart + v * thetaLength);
+        vertex.y = radius * Mathf.cos(thetaStart + v * thetaLength);
+        vertex.z = radius * Mathf.sin(phiStart + u * phiLength) * Mathf.sin(thetaStart + v * thetaLength);
+        vertices.push(vertex.x);
+        vertices.push(vertex.y);
+        vertices.push(vertex.z); // normal
+
+        normal.copy(vertex).normalize();
+        normals.push(normal.x);
+        normals.push(normal.y);
+        normals.push(normal.z); // uv
+
+        uvs.push(u + uOffset);
+        uvs.push(1 - v);
+        verticesRow.push(index++);
+      }
+
+      grid.push(verticesRow);
+    } // indices
+
+
+    for (let iy = 0; iy < heightSegments; iy++) {
+      for (let ix = 0; ix < widthSegments; ix++) {
+        const a = grid[iy][ix + 1];
+        const b = grid[iy][ix];
+        const c = grid[iy + 1][ix];
+        const d = grid[iy + 1][ix + 1];
+
+        if (iy !== 0 || thetaStart > 0) {
+          indices.push(a);
+          indices.push(b);
+          indices.push(d);
+        }
+
+        if (iy !== heightSegments - 1 || thetaEnd < Mathf.PI) {
+          indices.push(b);
+          indices.push(c);
+          indices.push(d);
+        }
+      }
+    } // build geometry
+
+
+    this.setIndexes(indices);
+    this.setAttribute(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.POSITION, new Float32Array(vertices), 3);
+    this.setAttribute(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.NORMAL, new Float32Array(normals), 3);
+    this.setAttribute(_common_AttributeType__WEBPACK_IMPORTED_MODULE_2__.AttributeType.UV, new Float32Array(uvs), 2);
   }
 
 }
@@ -3058,9 +5071,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "Application": () => (/* binding */ Application)
 /* harmony export */ });
-/* harmony import */ var solid_js__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
-/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
-/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
+/* harmony import */ var solid_js__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
+/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
+/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
 /* harmony import */ var _core_UIEventManager__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../../core/UIEventManager */ "./src/ts/core/UIEventManager.ts");
 /* harmony import */ var _core_GameManager__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../core/GameManager */ "./src/ts/core/GameManager.ts");
 /* harmony import */ var _core_WasmManager__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../../core/WasmManager */ "./src/ts/core/WasmManager.ts");
@@ -3071,6 +5084,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _InGameUI__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./InGameUI */ "./src/ts/ui/application/InGameUI.tsx");
 /* harmony import */ var _GameOverMenu__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./GameOverMenu */ "./src/ts/ui/application/GameOverMenu.tsx");
 /* harmony import */ var _StartError__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./StartError */ "./src/ts/ui/application/StartError.tsx");
+/* harmony import */ var _FPSCounter__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./FPSCounter */ "./src/ts/ui/application/FPSCounter.tsx");
+
 
 
 
@@ -3087,11 +5102,12 @@ __webpack_require__.r(__webpack_exports__);
 
 const Application = _ref => {
   let {} = _ref;
-  const [modalOpen, setModalOpen] = (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createSignal)(true);
-  const [errorMessage, setErrorMessage] = (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createSignal)("");
-  const [errorType, setErrorType] = (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createSignal)("OTHER");
-  const [activeMenu, setActiveMenu] = (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createSignal)("main");
-  const [gameIsRunning, setGameIsRunning] = (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createSignal)(false);
+  const [modalOpen, setModalOpen] = (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createSignal)(true);
+  const [errorMessage, setErrorMessage] = (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createSignal)("");
+  const [errorType, setErrorType] = (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createSignal)("OTHER");
+  const [activeMenu, setActiveMenu] = (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createSignal)("main");
+  const [gameIsRunning, setGameIsRunning] = (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createSignal)(false);
+  let fpsDiv;
   let gameManager;
   let eventManager;
   const wasmManager = new _core_WasmManager__WEBPACK_IMPORTED_MODULE_2__.WasmManager();
@@ -3100,8 +5116,13 @@ const Application = _ref => {
     if (event.uiEventType === _common_UIEventType__WEBPACK_IMPORTED_MODULE_6__.UIEventType.OpenInGameMenu) setModalOpen(!modalOpen());else if (event.uiEventType === _common_UIEventType__WEBPACK_IMPORTED_MODULE_6__.UIEventType.PlayerDied) setActiveMenu("gameOverMenu");
   };
 
+  const onFrameUpdate = () => {
+    (0,_FPSCounter__WEBPACK_IMPORTED_MODULE_10__.update)(fpsDiv);
+  };
+
   const onCanvasReady = async canvas => {
     gameManager = new _core_GameManager__WEBPACK_IMPORTED_MODULE_1__.GameManager(canvas);
+    gameManager.updateCallbacks.push(onFrameUpdate);
     eventManager = new _core_UIEventManager__WEBPACK_IMPORTED_MODULE_0__.UIEventManager();
     const bindables = [gameManager, eventManager];
 
@@ -3146,14 +5167,14 @@ const Application = _ref => {
   };
 
   const options = {
-    main: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(_MainMenu__WEBPACK_IMPORTED_MODULE_5__.MainMenu, {
+    main: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createComponent)(_MainMenu__WEBPACK_IMPORTED_MODULE_5__.MainMenu, {
       get open() {
         return modalOpen();
       },
 
       onStart: onStart
     }),
-    ingameMenu: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(_InGameMenu__WEBPACK_IMPORTED_MODULE_4__.InGameMenu, {
+    ingameMenu: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createComponent)(_InGameMenu__WEBPACK_IMPORTED_MODULE_4__.InGameMenu, {
       get open() {
         return modalOpen();
       },
@@ -3161,11 +5182,11 @@ const Application = _ref => {
       onResumeClick: onResume,
       onQuitClick: onQuit
     }),
-    gameOverMenu: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(_GameOverMenu__WEBPACK_IMPORTED_MODULE_8__.GameOverMenu, {
+    gameOverMenu: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createComponent)(_GameOverMenu__WEBPACK_IMPORTED_MODULE_8__.GameOverMenu, {
       onQuitClick: onQuit,
       open: true
     }),
-    error: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(_StartError__WEBPACK_IMPORTED_MODULE_9__.StartError, {
+    error: () => (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createComponent)(_StartError__WEBPACK_IMPORTED_MODULE_9__.StartError, {
       open: true,
 
       get errorMsg() {
@@ -3178,34 +5199,94 @@ const Application = _ref => {
 
     })
   };
-  return (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(StyledApplication, {
+  return (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createComponent)(StyledApplication, {
     get children() {
-      return [(0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(solid_js__WEBPACK_IMPORTED_MODULE_10__.Show, {
+      return [(0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createComponent)(solid_js__WEBPACK_IMPORTED_MODULE_11__.Show, {
         get when() {
           return gameIsRunning();
         },
 
         get children() {
-          return (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(_InGameUI__WEBPACK_IMPORTED_MODULE_7__.InGameUI, {});
+          return (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createComponent)(_InGameUI__WEBPACK_IMPORTED_MODULE_7__.InGameUI, {
+            gameManager: gameManager
+          });
         }
 
-      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(solid_js_web__WEBPACK_IMPORTED_MODULE_11__.Dynamic, {
+      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createComponent)(solid_js_web__WEBPACK_IMPORTED_MODULE_12__.Dynamic, {
         get component() {
           return options[activeMenu()];
         }
 
-      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_10__.createComponent)(_common_Pane3D__WEBPACK_IMPORTED_MODULE_3__.Pane3D, {
+      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createComponent)(_common_Pane3D__WEBPACK_IMPORTED_MODULE_3__.Pane3D, {
         onCanvasReady: onCanvasReady
+      }), (0,solid_js__WEBPACK_IMPORTED_MODULE_11__.createComponent)(StyledFPS, {
+        ref(r$) {
+          const _ref$ = fpsDiv;
+          typeof _ref$ === "function" ? _ref$(r$) : fpsDiv = r$;
+        },
+
+        children: "0"
       })];
     }
 
   });
 };
-const StyledApplication = solid_styled_components__WEBPACK_IMPORTED_MODULE_12__.styled.div`
+const StyledFPS = solid_styled_components__WEBPACK_IMPORTED_MODULE_13__.styled.div`
+  width: 100px;
+  color: white;
+  font-size: 14px;
+  height: 25px;
+  padding: 5px;
+  text-align: center;
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: #255fa1;
+`;
+const StyledApplication = solid_styled_components__WEBPACK_IMPORTED_MODULE_13__.styled.div`
   width: 100%;
   height: 100%;
   margin: 0;
 `;
+
+/***/ }),
+
+/***/ "./src/ts/ui/application/FPSCounter.tsx":
+/*!**********************************************!*\
+  !*** ./src/ts/ui/application/FPSCounter.tsx ***!
+  \**********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "update": () => (/* binding */ update)
+/* harmony export */ });
+let beginTime = performance.now();
+let prevTime = beginTime;
+let frameCount = 0;
+let min = Infinity;
+let max = 0;
+const round = Math.round;
+
+const end = elm => {
+  frameCount++;
+  let time = performance.now();
+
+  if (time >= prevTime + 1000) {
+    const value = frameCount * 1000 / (time - prevTime);
+    min = Math.min(min, value);
+    max = Math.max(max, value);
+    elm.textContent = round(value) + " " + name + " (" + round(min) + "-" + round(max) + ")";
+    prevTime = time;
+    frameCount = 0;
+  }
+
+  return time;
+};
+
+const update = elm => {
+  beginTime = end(elm);
+};
 
 /***/ }),
 
@@ -3236,6 +5317,8 @@ const GameOverMenu = props => {
     get open() {
       return props.open;
     },
+
+    withBackground: true,
 
     get children() {
       return [(0,solid_js_web__WEBPACK_IMPORTED_MODULE_3__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_2__.Typography, {
@@ -3292,6 +5375,8 @@ const InGameMenu = props => {
       return props.open;
     },
 
+    withBackground: true,
+
     get children() {
       return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createComponent)(StyledButtons, {
         get children() {
@@ -3335,21 +5420,49 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   "InGameUI": () => (/* binding */ InGameUI)
 /* harmony export */ });
-/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/dist/dev.js");
+/* harmony import */ var solid_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! solid-js */ "./node_modules/solid-js/dist/dev.js");
 /* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
-/* harmony import */ var _common_Typography__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../common/Typography */ "./src/ts/ui/common/Typography.tsx");
+/* harmony import */ var _common_CircularProgress__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../common/CircularProgress */ "./src/ts/ui/common/CircularProgress.tsx");
 
 
 
-const InGameUI = () => {
-  return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_1__.createComponent)(StyledContainer, {
+
+const InGameUI = props => {
+  const [playerHealth, setPlayerHealth] = (0,solid_js__WEBPACK_IMPORTED_MODULE_1__.createSignal)(100);
+  const [playerHunger, setPlayerHunger] = (0,solid_js__WEBPACK_IMPORTED_MODULE_1__.createSignal)(100);
+
+  const onFrameUpdate = () => {
+    if (props.gameManager.player.health !== playerHealth()) {
+      setPlayerHealth(props.gameManager.player.health);
+    }
+
+    if (props.gameManager.player.hunger !== playerHunger()) {
+      setPlayerHunger(props.gameManager.player.hunger);
+    }
+  };
+
+  props.gameManager.updateCallbacks.push(onFrameUpdate);
+  return (0,solid_js__WEBPACK_IMPORTED_MODULE_1__.createComponent)(StyledContainer, {
     get children() {
-      return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_1__.createComponent)(StyledFooter, {
+      return (0,solid_js__WEBPACK_IMPORTED_MODULE_1__.createComponent)(StyledFooter, {
         get children() {
-          return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_1__.createComponent)(_common_Typography__WEBPACK_IMPORTED_MODULE_0__.Typography, {
-            variant: "h2",
-            children: "The Game Will End in 15 Seconds"
-          });
+          return [(0,solid_js__WEBPACK_IMPORTED_MODULE_1__.createComponent)(_common_CircularProgress__WEBPACK_IMPORTED_MODULE_0__.CircularProgress, {
+            size: 120,
+
+            get value() {
+              return playerHealth();
+            },
+
+            strokeSize: 20
+          }), (0,solid_js__WEBPACK_IMPORTED_MODULE_1__.createComponent)(_common_CircularProgress__WEBPACK_IMPORTED_MODULE_0__.CircularProgress, {
+            size: 80,
+
+            get value() {
+              return playerHunger();
+            },
+
+            strokeSize: 14
+          })];
         }
 
       });
@@ -3370,7 +5483,6 @@ const StyledFooter = solid_styled_components__WEBPACK_IMPORTED_MODULE_2__.styled
   min-height: 50px;
   position: absolute;
   bottom: 30px;
-  background: rgb(84 92 135);
   margin: 0 0 0 5%;
   border-radius: 10px;
   box-sizing: border-box;
@@ -3680,6 +5792,188 @@ const StyledButton = solid_styled_components__WEBPACK_IMPORTED_MODULE_1__.styled
 
 /***/ }),
 
+/***/ "./src/ts/ui/common/CircularProgress.tsx":
+/*!***********************************************!*\
+  !*** ./src/ts/ui/common/CircularProgress.tsx ***!
+  \***********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   "CircularProgress": () => (/* binding */ CircularProgress)
+/* harmony export */ });
+/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/web/dist/dev.js");
+/* harmony import */ var solid_js_web__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! solid-js/web */ "./node_modules/solid-js/dist/dev.js");
+/* harmony import */ var solid_styled_components__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! solid-styled-components */ "./node_modules/solid-styled-components/src/index.js");
+/* harmony import */ var _common_math_MathUtils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../../../common/math/MathUtils */ "./src/common/math/MathUtils.ts");
+
+
+
+
+
+const _tmpl$ = /*#__PURE__*/(0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.template)(`<svg id="svg" version="1.1" xmlns="http://www.w3.org/2000/svg"><linearGradient x1="1" x2="0.5" y1="1" y2="0.5"><stop class="stop1" offset="0%"></stop><stop class="stop2" offset="100%"></stop></linearGradient><circle fill="transparent" stroke-dashoffset="0"></circle><circle id="bar" fill="transparent" stroke="url(#$gradient)"></circle></svg>`, 12);
+
+
+
+const CircularProgress = props => {
+  //https://codepen.io/JMChristensen/pen/AGbeEy
+  let circleBar;
+  const radius = props.size / 2 - props.strokeSize / 2;
+  const c = Math.PI * (radius * 2);
+
+  const val = () => {
+    let val = props.value;
+
+    if (val < 0) {
+      val = 0;
+    }
+
+    if (val > 100) {
+      val = 100;
+    }
+
+    const pct = (100 - val) / 100 * c + c;
+    if (circleBar) circleBar.style.strokeDashoffset = `${pct}px`;
+    return val;
+  };
+
+  const pct = (100 - val()) / 100 * c + c;
+  const gradientId = (0,_common_math_MathUtils__WEBPACK_IMPORTED_MODULE_1__.generateUUID)();
+  return (0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createComponent)(StyledDiv, {
+    gradientId: gradientId,
+
+    get val() {
+      return val();
+    },
+
+    get size() {
+      return props.size;
+    },
+
+    get strokeSize() {
+      return props.strokeSize;
+    },
+
+    get children() {
+      return [(() => {
+        const _el$ = _tmpl$.cloneNode(true),
+              _el$2 = _el$.firstChild,
+              _el$3 = _el$2.firstChild,
+              _el$4 = _el$3.nextSibling,
+              _el$5 = _el$2.nextSibling,
+              _el$6 = _el$5.nextSibling;
+
+        (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$2, "id", gradientId);
+
+        (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$5, "r", radius);
+
+        const _ref$ = circleBar;
+        typeof _ref$ === "function" ? _ref$(_el$6) : circleBar = _el$6;
+
+        (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$6, "r", radius);
+
+        (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$6, "stroke-dashoffset", pct);
+
+        (0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createRenderEffect)(_p$ => {
+          const _v$ = props.size,
+                _v$2 = props.size,
+                _v$3 = `0 0 ${props.size} ${props.size}`,
+                _v$4 = val() < 50 ? "#ff0000" : "#eeff50",
+                _v$5 = val() < 50 ? "#eeff50" : "#9198e5",
+                _v$6 = props.size / 2,
+                _v$7 = props.size / 2,
+                _v$8 = (c * 2).toFixed(2),
+                _v$9 = props.size / 2,
+                _v$10 = props.size / 2,
+                _v$11 = (c * 2).toFixed(2);
+
+          _v$ !== _p$._v$ && (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$, "width", _p$._v$ = _v$);
+          _v$2 !== _p$._v$2 && (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$, "height", _p$._v$2 = _v$2);
+          _v$3 !== _p$._v$3 && (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$, "viewBox", _p$._v$3 = _v$3);
+          _v$4 !== _p$._v$4 && (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$3, "stop-color", _p$._v$4 = _v$4);
+          _v$5 !== _p$._v$5 && (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$4, "stop-color", _p$._v$5 = _v$5);
+          _v$6 !== _p$._v$6 && (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$5, "cx", _p$._v$6 = _v$6);
+          _v$7 !== _p$._v$7 && (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$5, "cy", _p$._v$7 = _v$7);
+          _v$8 !== _p$._v$8 && (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$5, "stroke-dasharray", _p$._v$8 = _v$8);
+          _v$9 !== _p$._v$9 && (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$6, "cx", _p$._v$9 = _v$9);
+          _v$10 !== _p$._v$10 && (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$6, "cy", _p$._v$10 = _v$10);
+          _v$11 !== _p$._v$11 && (0,solid_js_web__WEBPACK_IMPORTED_MODULE_0__.setAttribute)(_el$6, "stroke-dasharray", _p$._v$11 = _v$11);
+          return _p$;
+        }, {
+          _v$: undefined,
+          _v$2: undefined,
+          _v$3: undefined,
+          _v$4: undefined,
+          _v$5: undefined,
+          _v$6: undefined,
+          _v$7: undefined,
+          _v$8: undefined,
+          _v$9: undefined,
+          _v$10: undefined,
+          _v$11: undefined
+        });
+
+        return _el$;
+      })(), (0,solid_js_web__WEBPACK_IMPORTED_MODULE_2__.createComponent)(StyledLabel, {
+        get size() {
+          return props.size;
+        },
+
+        get strokeSize() {
+          return props.strokeSize;
+        },
+
+        get children() {
+          return val();
+        }
+
+      })];
+    }
+
+  });
+};
+const StyledLabel = solid_styled_components__WEBPACK_IMPORTED_MODULE_3__.styled.div`
+  position: absolute;
+  display: block;
+  height: ${e => e.size - e.strokeSize * 2}px;
+  width: ${e => e.size - e.strokeSize * 2}px;
+  left: 50%;
+  top: 50%;
+  box-shadow: inset 0 0 1em black;
+  margin-top: -${e => e.size / 2 - e.strokeSize}px;
+  margin-left: -${e => e.size / 2 - e.strokeSize}px;
+  border-radius: 100%;
+  line-height: ${e => e.size - e.strokeSize * 2}px;
+  font-size: 1.5em;
+  text-shadow: 0 0 0.5em black;
+  text-align: center;
+`;
+const StyledDiv = solid_styled_components__WEBPACK_IMPORTED_MODULE_3__.styled.div`
+  display: inline-block;
+  height: ${e => e.size}px;
+  width: ${e => e.size}px;
+  box-shadow: 0 0 1em black;
+  border-radius: 100%;
+  position: relative;
+
+  stop {
+    transition: stop-color 5s;
+  }
+
+  circle {
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.3s linear, stroke 2s linear;
+    stroke: #666;
+    stroke-width: ${e => e.strokeSize}px;
+  }
+
+  #bar {
+    stroke: url(#${e => e.gradientId});
+  }
+`;
+
+/***/ }),
+
 /***/ "./src/ts/ui/common/Modal.tsx":
 /*!************************************!*\
   !*** ./src/ts/ui/common/Modal.tsx ***!
@@ -3732,6 +6026,10 @@ const Modal = props => {
 
         get visible() {
           return props.open;
+        },
+
+        get withBackground() {
+          return props.withBackground || false;
         },
 
         get children() {
@@ -3792,7 +6090,7 @@ const StyledWrapper = solid_styled_components__WEBPACK_IMPORTED_MODULE_3__.style
   top: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: ${e => e.withBackground ? `rgba(0, 0, 0, 0.5);` : ""};
   opacity: 0;
   visibility: hidden;
   transform: scale(1.1);
