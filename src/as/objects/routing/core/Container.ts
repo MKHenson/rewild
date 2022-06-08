@@ -1,6 +1,6 @@
 import { addChild, removeChild, TransformNode } from "../../../core/TransformNode";
 import { Node } from "./Node";
-import { MeshComponent } from "../../../components/MeshComponent";
+// import { MeshComponent } from "../../../components/MeshComponent";
 import { Portal } from "./Portal";
 import { Component } from "../../../core/Component";
 
@@ -56,24 +56,24 @@ export class Container extends Node {
     super.unMount();
   }
 
-  init(): void {
-    // Load any assets
-    const objects = this.objects;
-    for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      const obj = unchecked(objects[i]);
+  // init(): void {
+  //   // Load any assets
+  //   const objects = this.objects;
+  //   for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
+  //     const obj = unchecked(objects[i]);
 
-      const components = obj.components;
-      for (let ci: i32 = 0, cl = components.length; ci < cl; ci++) {
-        const component = unchecked(components[ci]);
-        if (component instanceof MeshComponent) {
-          const geometry = (component as MeshComponent).geometry;
-          if (geometry) this.runtime!.renderer.geometries.set(geometry);
-        }
-      }
-    }
+  // const components = obj.components;
+  // for (let ci: i32 = 0, cl = components.length; ci < cl; ci++) {
+  //   const component = unchecked(components[ci]);
+  // if (component instanceof MeshComponent) {
+  //   const geometry = (component as MeshComponent).geometry;
+  //   if (geometry) this.runtime!.renderer.geometries.set(geometry);
+  // }
+  // }
+  //   }
 
-    super.init();
-  }
+  //   super.init();
+  // }
 }
 
 export function createContainer(name: string): Container {
