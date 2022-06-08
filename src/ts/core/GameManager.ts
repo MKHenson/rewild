@@ -3,7 +3,6 @@ import { GPUBufferUsageFlags } from "../../common/GPUEnums";
 import { GroupType } from "../../common/GroupType";
 import { AttributeType } from "../../common/AttributeType";
 import { createBufferFromF32, createIndexBufferU32 } from "./Utils";
-import { RenderQueueManager } from "./RenderQueueManager";
 import { wasm } from "./WasmManager";
 import { IBindable } from "./IBindable";
 import { Object3D } from "../renderer/Object3D";
@@ -39,7 +38,6 @@ export class GameManager implements IBindable {
   onResizeHandler: () => void;
   onFrameHandler: () => void;
   disposed: boolean;
-  renderQueueManager: RenderQueueManager;
 
   renderTargetView: GPUTextureView;
   renderTarget: GPUTexture;
@@ -75,24 +73,15 @@ export class GameManager implements IBindable {
 
   createBinding() {
     return {
-      createBufferFromF32: this.createBufferF32.bind(this),
-      createIndexBuffer: this.createIndexBuffer.bind(this),
       setupLights: this.setupLights.bind(this),
       renderComponents: this.renderComponents.bind(this),
       lock: this.lock.bind(this),
       unlock: this.unlock.bind(this),
-      render: (commandsIndex: number) => {
-        const commandBuffer = wasm.getInt32Array(commandsIndex);
-        commandBuffer;
-        //this.renderQueueManager.run(commandBuffer);
-      },
     };
   }
 
   async init() {
     this.canvasSizeCache = this.canvasSize();
-    this.renderQueueManager = new RenderQueueManager(this);
-
     const hasGPU = this.hasWebGPU();
     if (!hasGPU) throw new Error("Your current browser does not support WebGPU!");
 
