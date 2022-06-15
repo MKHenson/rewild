@@ -35,6 +35,22 @@ export class Matrix3 {
     return this;
   }
 
+  setZero() {
+    var e = this.elements;
+    e[0] = 0;
+    e[1] = 0;
+    e[2] = 0;
+    e[3] = 0;
+    e[4] = 0;
+    e[5] = 0;
+    e[6] = 0;
+    e[7] = 0;
+    e[8] = 0;
+    e[9] = 0;
+    e[10] = 0;
+    e[11] = 0;
+  }
+
   copy(m: Matrix3): Matrix3 {
     const te = this.elements;
     const me = m.elements;

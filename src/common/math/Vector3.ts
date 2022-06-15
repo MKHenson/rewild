@@ -1,3 +1,8 @@
+/**
+ * @author MathewKHenson
+ * @author schteppe
+ */
+
 import { Cylindrical } from "./Cylindrical";
 import { Euler } from "./Euler";
 import * as MathUtils from "./MathUtils";
@@ -7,6 +12,11 @@ import { Quaternion } from "./Quaternion";
 import { Spherical } from "./Spherical";
 
 export class Vector3 {
+  static ZERO: Vector3 = new Vector3(0, 0, 0);
+  static UNITX: Vector3 = new Vector3(1, 0, 0);
+  static UNITY: Vector3 = new Vector3(0, 1, 0);
+  static UNITZ: Vector3 = new Vector3(0, 0, 1);
+
   isVector3: boolean = true;
   x: f32;
   y: f32;
@@ -167,6 +177,7 @@ export class Vector3 {
     return this;
   }
 
+  @inline
   multiplyScalar(scalar: f32): Vector3 {
     this.x *= scalar;
     this.y *= scalar;
@@ -189,6 +200,16 @@ export class Vector3 {
 
   applyAxisAngle(axis: Vector3, angle: f32): Vector3 {
     return this.applyQuaternion(_quaternion.setFromAxisAngle(axis, angle));
+  }
+
+  /**
+   * Get the cross product matrix a_cross from a vector, such that a x b = a_cross * b = c
+   * @method crossmat
+   * @see http://www8.cs.umu.se/kurser/TDBD24/VT06/lectures/Lecture6.pdf
+   */
+  @inline
+  crossmat(): Matrix3 {
+    return new Matrix3().set(0, -this.z, this.y, this.z, 0, -this.x, -this.y, this.x, 0);
   }
 
   applyMatrix3(m: Matrix3): Vector3 {
@@ -272,6 +293,7 @@ export class Vector3 {
     return this;
   }
 
+  @inline
   divideScalar(scalar: f32): Vector3 {
     return this.multiplyScalar(1 / scalar);
   }
@@ -356,28 +378,102 @@ export class Vector3 {
     return this;
   }
 
+  /**
+   * Compute two artificial tangents to the vector
+   * @method tangents
+   * @param {Vec3} t1 Vector object to save the first tangent in
+   * @param {Vec3} t2 Vector object to save the second tangent in
+   */
+
+  tangents(t1: Vector3, t2: Vector3) {
+    var norm = this.length();
+
+    if (norm > 0.0) {
+      var n = Vec3_tangents_n;
+      var inorm = 1 / norm;
+      n.set(this.x * inorm, this.y * inorm, this.z * inorm);
+      var randVec = Vec3_tangents_randVec;
+      if (Math.abs(n.x) < 0.9) {
+        randVec.set(1, 0, 0);
+        // n.cross(randVec, t1);
+        t1.crossVectors(n, randVec);
+      } else {
+        randVec.set(0, 1, 0);
+        // n.cross(randVec, t1);
+        t1.crossVectors(n, randVec);
+      }
+      // n.cross(t1, t2);
+      t2.crossVectors(n, t1);
+    } else {
+      // The normal length is zero, make something up
+      t1.set(1, 0, 0);
+      t2.set(0, 1, 0);
+    }
+  }
+
+  @inline
   dot(v: Vector3): f32 {
     return this.x * v.x + this.y * v.y + this.z * v.z;
   }
 
-  // TODO lengthSquared?
+  /**
+   * Get the squared length of the vector
+   */
+  norm2() {
+    return this.dot(this);
+  }
 
+  @inline
+  isZero(): boolean {
+    return this.x == 0 && this.y == 0 && this.z == 0;
+  }
+
+  // TODO lengthSquared?
+  @inline
   lengthSq(): f32 {
     return this.x * this.x + this.y * this.y + this.z * this.z;
   }
 
+  @inline
   length(): f32 {
     return Mathf.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
   }
 
+  @inline
   manhattanLength(): f32 {
     return Mathf.abs(this.x) + Mathf.abs(this.y) + Mathf.abs(this.z);
   }
 
+  @inline
   normalize(): Vector3 {
     return this.divideScalar(this.length() || 1);
   }
 
+  /**
+   * Get the version of this vector that is of length 1.
+   * @method unit
+   * @param {Vec3} target Optional target to save in
+   */
+  unit(target: Vector3 | null): Vector3 {
+    target = target || new Vector3();
+    var x = this.x,
+      y = this.y,
+      z = this.z;
+    var ninv = Mathf.sqrt(x * x + y * y + z * z);
+    if (ninv > 0.0) {
+      ninv = 1.0 / ninv;
+      target.x = x * ninv;
+      target.y = y * ninv;
+      target.z = z * ninv;
+    } else {
+      target.x = 1;
+      target.y = 0;
+      target.z = 0;
+    }
+    return target;
+  }
+
+  @inline
   setLength(length: f32): Vector3 {
     return this.normalize().multiplyScalar(length);
   }
@@ -398,6 +494,7 @@ export class Vector3 {
     return this;
   }
 
+  @inline
   cross(v: Vector3): Vector3 {
     return this.crossVectors(this, v);
   }
@@ -415,6 +512,11 @@ export class Vector3 {
     this.z = ax * by - ay * bx;
 
     return this;
+  }
+
+  @inline
+  setZero() {
+    this.x = this.y = this.z = 0;
   }
 
   projectOnVector(v: Vector3): Vector3 {
@@ -452,6 +554,7 @@ export class Vector3 {
     return Mathf.acos(MathUtils.clamp(theta, -1, 1));
   }
 
+  @inline
   distanceTo(v: Vector3): f32 {
     return Mathf.sqrt(this.distanceToSquared(v));
   }
@@ -468,6 +571,7 @@ export class Vector3 {
     return Mathf.abs(this.x - v.x) + Mathf.abs(this.y - v.y) + Mathf.abs(this.z - v.z);
   }
 
+  @inline
   setFromSpherical(s: Spherical): Vector3 {
     return this.setFromSphericalCoords(s.radius, s.phi, s.theta);
   }
@@ -516,16 +620,36 @@ export class Vector3 {
     return this;
   }
 
+  @inline
   setFromMatrixColumn(m: Matrix4, index: u32): Vector3 {
     return this.fromF32Array(m.elements, index * 4);
   }
 
+  @inline
   setFromMatrix3Column(m: Matrix3, index: u32): Vector3 {
     return this.fromF32Array(m.elements, index * 3);
   }
 
   equals(v: Vector3): boolean {
     return v.x === this.x && v.y === this.y && v.z === this.z;
+  }
+
+  almostEquals(v: Vector3, precision: f32 = 1e-6): boolean {
+    if (
+      Mathf.abs(this.x - v.x) > precision ||
+      Mathf.abs(this.y - v.y) > precision ||
+      Mathf.abs(this.z - v.z) > precision
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  almostZero(precision = 1e-6): boolean {
+    if (Mathf.abs(this.x) > precision || Mathf.abs(this.y) > precision || Mathf.abs(this.z) > precision) {
+      return false;
+    }
+    return true;
   }
 
   fromArray(array: f32[], offset: u32 = 0): Vector3 {
@@ -552,6 +676,14 @@ export class Vector3 {
     return array;
   }
 
+  /**
+   * Check if the vector is anti-parallel to another vector.
+   */
+  isAntiparallelTo(v: Vector3, precision: f32): boolean {
+    antip_neg.copy(v).negate();
+    return antip_neg.almostEquals(v, precision);
+  }
+
   random(): Vector3 {
     this.x = Mathf.random();
     this.y = Mathf.random();
@@ -563,3 +695,6 @@ export class Vector3 {
 
 const _vector = new Vector3();
 const _quaternion = new Quaternion();
+const Vec3_tangents_n = new Vector3();
+const Vec3_tangents_randVec = new Vector3();
+const antip_neg = new Vector3();
