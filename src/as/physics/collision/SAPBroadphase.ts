@@ -1,7 +1,7 @@
-var Shape = require('../shapes/Shape');
-var Broadphase = require('../collision/Broadphase');
-
-module.exports = SAPBroadphase;
+import { Body } from "../objects/Body";
+import { World } from "../world/World";
+import { AABB } from "./AABB";
+import { Broadphase } from "./Broadphase";
 
 /**
  * Sweep and prune broadphase along one axis.
@@ -11,60 +11,64 @@ module.exports = SAPBroadphase;
  * @param {World} [world]
  * @extends Broadphase
  */
-function SAPBroadphase(world){
-    Broadphase.apply(this);
+export class SAPBroadphase extends Broadphase { 
+    axisList: Body[];
+    axisIndex: i32;
 
-    /**
-     * List of bodies currently in the broadphase.
-     * @property axisList
-     * @type {Array}
-     */
-    this.axisList = [];
+    constructor(world: World){
+        super();
 
-    /**
-     * The world to search in.
-     * @property world
-     * @type {World}
-     */
-    this.world = null;
+        /**
+         * List of bodies currently in the broadphase.
+         * @property axisList
+         * @type {Array}
+         */
+        this.axisList = [];
 
-    /**
-     * Axis to sort the bodies along. Set to 0 for x axis, and 1 for y axis. For best performance, choose an axis that the bodies are spread out more on.
-     * @property axisIndex
-     * @type {Number}
-     */
-    this.axisIndex = 0;
+        /**
+         * The world to search in.
+         * @property world
+         * @type {World}
+         */
+        this.world = null;
 
-    var axisList = this.axisList;
+        /**
+         * Axis to sort the bodies along. Set to 0 for x axis, and 1 for y axis. For best performance, choose an axis that the bodies are spread out more on.
+         * @property axisIndex
+         * @type {Number}
+         */
+        this.axisIndex = 0;
 
-    this._addBodyHandler = function(e){
-        axisList.push(e.body);
-    };
+        const axisList = this.axisList;
 
-    this._removeBodyHandler = function(e){
-        var idx = axisList.indexOf(e.body);
-        if(idx !== -1){
-            axisList.splice(idx,1);
+        this._addBodyHandler(e){
+            axisList.push(e.body);
+        };
+
+        this._removeBodyHandler(e){
+            const idx = axisList.indexOf(e.body);
+            if(idx !== -1){
+                axisList.splice(idx,1);
+            }
+        };
+
+        if(world){
+            this.setWorld(world);
         }
-    };
-
-    if(world){
-        this.setWorld(world);
     }
-}
-SAPBroadphase.prototype = new Broadphase();
 
+    
 /**
  * Change the world
  * @method setWorld
  * @param  {World} world
  */
-SAPBroadphase.prototype.setWorld = function(world){
+setWorld(world: World): void{
     // Clear the old axis array
     this.axisList.length = 0;
 
     // Add all bodies from the new world
-    for(var i=0; i<world.bodies.length; i++){
+    for(const i=0; i<world.bodies.length; i++){
         this.axisList.push(world.bodies[i]);
     }
 
@@ -86,10 +90,10 @@ SAPBroadphase.prototype.setWorld = function(world){
  * @param  {Array} a
  * @return {Array}
  */
-SAPBroadphase.insertionSortX = function(a) {
-    for(var i=1,l=a.length;i<l;i++) {
-        var v = a[i];
-        for(var j=i - 1;j>=0;j--) {
+static insertionSortX(a) {
+    for(const i=1,l=a.length;i<l;i++) {
+        const v = a[i];
+        for(const j=i - 1;j>=0;j--) {
             if(a[j].aabb.lowerBound.x <= v.aabb.lowerBound.x){
                 break;
             }
@@ -106,10 +110,10 @@ SAPBroadphase.insertionSortX = function(a) {
  * @param  {Array} a
  * @return {Array}
  */
-SAPBroadphase.insertionSortY = function(a) {
-    for(var i=1,l=a.length;i<l;i++) {
-        var v = a[i];
-        for(var j=i - 1;j>=0;j--) {
+ static insertionSortY(a) {
+    for(const i=1,l=a.length;i<l;i++) {
+        const v = a[i];
+        for(const j=i - 1;j>=0;j--) {
             if(a[j].aabb.lowerBound.y <= v.aabb.lowerBound.y){
                 break;
             }
@@ -126,10 +130,10 @@ SAPBroadphase.insertionSortY = function(a) {
  * @param  {Array} a
  * @return {Array}
  */
-SAPBroadphase.insertionSortZ = function(a) {
-    for(var i=1,l=a.length;i<l;i++) {
-        var v = a[i];
-        for(var j=i - 1;j>=0;j--) {
+ static insertionSortZ(a) {
+    for(const i=1,l=a.length;i<l;i++) {
+        const v = a[i];
+        for(const j=i - 1;j>=0;j--) {
             if(a[j].aabb.lowerBound.z <= v.aabb.lowerBound.z){
                 break;
             }
@@ -147,11 +151,11 @@ SAPBroadphase.insertionSortZ = function(a) {
  * @param  {Array} p1
  * @param  {Array} p2
  */
-SAPBroadphase.prototype.collisionPairs = function(world,p1,p2){
-    var bodies = this.axisList,
+collisionPairs(world: World, p1,p2): void{
+    const bodies = this.axisList,
         N = bodies.length,
-        axisIndex = this.axisIndex,
-        i, j;
+        axisIndex = this.axisIndex;
+        let i: i32, j: i32;
 
     if(this.dirty){
         this.sortList();
@@ -160,10 +164,10 @@ SAPBroadphase.prototype.collisionPairs = function(world,p1,p2){
 
     // Look through the list
     for(i=0; i !== N; i++){
-        var bi = bodies[i];
+        const bi = bodies[i];
 
         for(j=i+1; j < N; j++){
-            var bj = bodies[j];
+            const bj = bodies[j];
 
             if(!this.needBroadphaseCollision(bi,bj)){
                 continue;
@@ -178,14 +182,14 @@ SAPBroadphase.prototype.collisionPairs = function(world,p1,p2){
     }
 };
 
-SAPBroadphase.prototype.sortList = function(){
-    var axisList = this.axisList;
-    var axisIndex = this.axisIndex;
-    var N = axisList.length;
+sortList(): void {
+    const axisList = this.axisList;
+    const axisIndex = this.axisIndex;
+    const N = axisList.length;
 
     // Update AABBs
-    for(var i = 0; i!==N; i++){
-        var bi = axisList[i];
+    for(let i = 0; i!==N; i++){
+        const bi = axisList[i];
         if(bi.aabbNeedsUpdate){
             bi.computeAABB();
         }
@@ -210,9 +214,9 @@ SAPBroadphase.prototype.sortList = function(){
  * @param  {Number} axisIndex
  * @return {Boolean}
  */
-SAPBroadphase.checkBounds = function(bi, bj, axisIndex){
-    var biPos;
-    var bjPos;
+ static checkBounds(bi: Body, bj: Body, axisIndex: i32): boolean{
+    let biPos!: f32;
+    let bjPos!: f32;
 
     if(axisIndex === 0){
         biPos = bi.position.x;
@@ -225,7 +229,7 @@ SAPBroadphase.checkBounds = function(bi, bj, axisIndex){
         bjPos = bj.position.z;
     }
 
-    var ri = bi.boundingRadius,
+    const ri = bi.boundingRadius,
         rj = bj.boundingRadius,
         boundA1 = biPos - ri,
         boundA2 = biPos + ri,
@@ -240,8 +244,8 @@ SAPBroadphase.checkBounds = function(bi, bj, axisIndex){
  * axis to use. Will automatically set property .axisIndex.
  * @method autoDetectAxis
  */
-SAPBroadphase.prototype.autoDetectAxis = function(){
-    var sumX=0,
+autoDetectAxis(): void {
+    let sumX=0,
         sumX2=0,
         sumY=0,
         sumY2=0,
@@ -251,23 +255,23 @@ SAPBroadphase.prototype.autoDetectAxis = function(){
         N = bodies.length,
         invN=1/N;
 
-    for(var i=0; i!==N; i++){
-        var b = bodies[i];
+    for(let i: i32=0; i!==N; i++){
+        const b = bodies[i];
 
-        var centerX = b.position.x;
+        const centerX = b.position.x;
         sumX += centerX;
         sumX2 += centerX*centerX;
 
-        var centerY = b.position.y;
+        const centerY = b.position.y;
         sumY += centerY;
         sumY2 += centerY*centerY;
 
-        var centerZ = b.position.z;
+        const centerZ = b.position.z;
         sumZ += centerZ;
         sumZ2 += centerZ*centerZ;
     }
 
-    var varianceX = sumX2 - sumX*sumX*invN,
+    const varianceX = sumX2 - sumX*sumX*invN,
         varianceY = sumY2 - sumY*sumY*invN,
         varianceZ = sumZ2 - sumZ*sumZ*invN;
 
@@ -292,7 +296,7 @@ SAPBroadphase.prototype.autoDetectAxis = function(){
  * @param {array} result An array to store resulting bodies in.
  * @return {array}
  */
-SAPBroadphase.prototype.aabbQuery = function(world, aabb, result){
+aabbQuery(world: World, aabb: AABB, result: Body[]): Body[]{
     result = result || [];
 
     if(this.dirty){
@@ -300,15 +304,15 @@ SAPBroadphase.prototype.aabbQuery = function(world, aabb, result){
         this.dirty = false;
     }
 
-    var axisIndex = this.axisIndex, axis = 'x';
+    const axisIndex = this.axisIndex, axis = 'x';
     if(axisIndex === 1){ axis = 'y'; }
     if(axisIndex === 2){ axis = 'z'; }
 
-    var axisList = this.axisList;
-    var lower = aabb.lowerBound[axis];
-    var upper = aabb.upperBound[axis];
-    for(var i = 0; i < axisList.length; i++){
-        var b = axisList[i];
+    const axisList = this.axisList;
+    const lower = aabb.lowerBound[axis];
+    const upper = aabb.upperBound[axis];
+    for(const i = 0; i < axisList.length; i++){
+        const b = axisList[i];
 
         if(b.aabbNeedsUpdate){
             b.computeAABB();
@@ -321,3 +325,4 @@ SAPBroadphase.prototype.aabbQuery = function(world, aabb, result){
 
     return result;
 };
+}

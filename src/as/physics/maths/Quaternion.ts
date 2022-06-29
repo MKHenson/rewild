@@ -193,9 +193,7 @@ export class Quaternion {
    * @param {Quaternion} target
    * @return {Quaternion}
    */
-  conjugate(target: Quaternion): Quaternion {
-    target = target || new Quaternion();
-
+  conjugate(target: Quaternion = new Quaternion()): Quaternion {
     target.x = -this.x;
     target.y = -this.y;
     target.z = -this.z;

@@ -1,8 +1,3 @@
-/**
- * @author schteppe
- * @author MathewKHenson
- */
-
 import { Vec3 } from "../maths/Vec3";
 import { Shape, ShapeType } from "./Shape";
 

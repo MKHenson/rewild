@@ -1,8 +1,3 @@
-/**
- * @author schteppe
- * @author MathewKHenson
- */
-
 import { Vec3 } from "../maths/Vec3";
 import { PhysicsMaterialOptions } from "../materials/PhysicsMaterial";
 import { Body } from "../objects/Body";
@@ -44,7 +39,7 @@ export abstract class Shape {
   // The local bounding sphere radius of this shape.
   boundingSphereRadius: f32;
 
-  constructor(type: ShapeType, options: ShapeOptions | null) {
+  constructor(type: ShapeType, options: ShapeOptions | null = null) {
     this.id = Shape.idCounter++;
     this.type = type;
     this.boundingSphereRadius = 0;

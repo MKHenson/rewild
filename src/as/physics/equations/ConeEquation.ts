@@ -1,8 +1,6 @@
-module.exports = ConeEquation;
-
-var Vec3 = require('../math/Vec3');
-var Mat3 = require('../math/Mat3');
-var Equation = require('./Equation');
+import { Vec3 } from "../maths/Vec3";
+import { Body } from "../objects/Body";
+import { Equation } from "./Equation";
 
 /**
  * Cone equation. Works to keep the given body world vectors aligned, or tilted within a given angle from each other.
@@ -17,11 +15,16 @@ var Equation = require('./Equation');
  * @param {number} [options.maxForce=1e6]
  * @extends Equation
  */
-function ConeEquation(bodyA, bodyB, options){
-    options = options || {};
-    var maxForce = typeof(options.maxForce) !== 'undefined' ? options.maxForce : 1e6;
+export class ConeEquation extends Equation {
+  axisA: Vec3;
+  axisB: Vec3;
+  angle: f32;
 
-    Equation.call(this,bodyA,bodyB,-maxForce, maxForce);
+  constructor(bodyA: Body, bodyB: Body, options) {
+    options = options || {};
+    var maxForce = typeof options.maxForce !== "undefined" ? options.maxForce : 1e6;
+
+    super(bodyA, bodyB, -maxForce, maxForce);
 
     this.axisA = options.axisA ? options.axisA.clone() : new Vec3(1, 0, 0);
     this.axisB = options.axisB ? options.axisB.clone() : new Vec3(0, 1, 0);
@@ -30,27 +33,18 @@ function ConeEquation(bodyA, bodyB, options){
      * The cone angle to keep
      * @property {number} angle
      */
-    this.angle = typeof(options.angle) !== 'undefined' ? options.angle : 0;
-}
+    this.angle = typeof options.angle !== "undefined" ? options.angle : 0;
+  }
 
-ConeEquation.prototype = new Equation();
-ConeEquation.prototype.constructor = ConeEquation;
-
-var tmpVec1 = new Vec3();
-var tmpVec2 = new Vec3();
-
-ConeEquation.prototype.computeB = function(h){
-    var a = this.a,
-        b = this.b,
-
-        ni = this.axisA,
-        nj = this.axisB,
-
-        nixnj = tmpVec1,
-        njxni = tmpVec2,
-
-        GA = this.jacobianElementA,
-        GB = this.jacobianElementB;
+  computeB(h: f32) {
+    const a = this.a,
+      b = this.b,
+      ni = this.axisA,
+      nj = this.axisB,
+      nixnj = tmpVec1,
+      njxni = tmpVec2,
+      GA = this.jacobianElementA,
+      GB = this.jacobianElementB;
 
     // Caluclate cross products
     ni.cross(nj, nixnj);
@@ -66,12 +60,15 @@ ConeEquation.prototype.computeB = function(h){
     GA.rotational.copy(njxni);
     GB.rotational.copy(nixnj);
 
-    var g = Math.cos(this.angle) - ni.dot(nj),
-        GW = this.computeGW(),
-        GiMf = this.computeGiMf();
+    const g = Math.cos(this.angle) - ni.dot(nj),
+      GW = this.computeGW(),
+      GiMf = this.computeGiMf();
 
-    var B = - g * a - GW * b - h * GiMf;
+    const B = -g * a - GW * b - h * GiMf;
 
     return B;
-};
+  }
+}
 
+const tmpVec1 = new Vec3();
+const tmpVec2 = new Vec3();

@@ -6,6 +6,7 @@ import { PhysicsMaterial } from "../materials/PhysicsMaterial";
 import { Mat3 } from "../maths/Mat3";
 import { Quaternion } from "../maths/Quaternion";
 import { Vec3 } from "../maths/Vec3";
+import { Box } from "../shapes/Box";
 import { Shape, ShapeOptions } from "../shapes/Shape";
 
 /**
@@ -251,6 +252,9 @@ export class Body extends EventDispatcher {
 
   wlambda: Vec3;
 
+  preStep: null;
+  postStep: null;
+
   constructor(options) {
     super();
     options = options || {};
@@ -470,7 +474,7 @@ export class Body extends EventDispatcher {
    * @param {Quaternion} [_orientation]
    * @return {Body} The body object, for chainability.
    */
-  addShape(shape: Shape, _offset: Vec3, _orientation: Quaternion): Body {
+  addShape(shape: Shape, _offset: Vec3 | null = null, _orientation: Quaternion | null = null): Body {
     var offset = new Vec3();
     var orientation = new Quaternion();
 
@@ -560,7 +564,7 @@ export class Body extends EventDispatcher {
    * Update .inertiaWorld and .invInertiaWorld
    * @method updateInertiaWorld
    */
-  updateInertiaWorld(force: boolean): void {
+  updateInertiaWorld(force: boolean = false): void {
     var I = this.invInertia;
     if (I.x === I.y && I.y === I.z && !force) {
       // If inertia M = s*I, where I is identity and s a scalar, then

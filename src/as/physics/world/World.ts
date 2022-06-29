@@ -2,12 +2,18 @@ import { Event } from "../../core/Event";
 import { EventDispatcher } from "../../core/EventDispatcher";
 import { AABB } from "../collision/AABB";
 import { ArrayCollisionMatrix } from "../collision/ArrayCollisionMatrix";
+import { Broadphase } from "../collision/Broadphase";
+import { NaiveBroadphase } from "../collision/NaiveBroadphase";
 import { Ray } from "../collision/Ray";
+import { ContactMaterial } from "../materials/ContactMaterial";
 import { PhysicsMaterial } from "../materials/PhysicsMaterial";
 import { Quaternion } from "../maths/Quaternion";
 import { Vec3 } from "../maths/Vec3";
 import { Body } from "../objects/Body";
+import { GSSolver } from "../solver/GSSolver";
 import { Solver } from "../solver/Solver";
+import { TupleDictionary } from "../utils/TupleDictionary";
+import { Narrowphase } from "./Narrowphase";
 
   /**
        * Dispatched after a body has been added to the world.
@@ -106,7 +112,7 @@ export class World extends EventDispatcher {
        * @property broadphase
        * @type {Broadphase}
        */
-      broadphase: f32;
+      broadphase: Broadphase;
 
       /**
        * @property bodies
@@ -131,7 +137,7 @@ export class World extends EventDispatcher {
        * @property narrowphase
        * @type {Narrowphase}
        */
-      narrowphase: f32;
+      narrowphase: Narrowphase;
 
       /**
        * @property {ArrayCollisionMatrix} collisionMatrix
@@ -346,7 +352,7 @@ export class World extends EventDispatcher {
          */
         this.contactMaterialTable = new TupleDictionary();
 
-        this.defaultMaterial = new Material("default");
+        this.defaultMaterial = new PhysicsMaterial("default");
 
         /**
          * This contact material is used if no suitable contactmaterial is found for a contact.
@@ -418,7 +424,7 @@ export class World extends EventDispatcher {
  * @param {Material} m2
  * @return {ContactMaterial} The contact material if it was found.
  */
-getContactMaterial(m1,m2){
+getContactMaterial(m1: PhysicsMaterial,m2: PhysicsMaterial): ContactMaterial {
     return this.contactMaterialTable.get(m1.id,m2.id); //this.contactmaterials[this.mats2cmat[i+j*this.materials.length]];
 }
 
@@ -446,7 +452,7 @@ collisionMatrixTick(){
     this.shapeOverlapKeeper.tick();
 }
 
-add(body) { return this.addBody(body); }
+add(body: Body): void { return this.addBody(body); }
 
 /**
  * Add a rigid body to the simulation.
@@ -456,7 +462,7 @@ add(body) { return this.addBody(body); }
  * @todo Adding an array of bodies should be possible. This would save some loops too
  * @deprecated Use .addBody instead
  */
-addBody(body){
+addBody(body: Body): void {
     if(this.bodies.indexOf(body) !== -1){
         return;
     }
@@ -481,7 +487,7 @@ addBody(body){
  * @method addConstraint
  * @param {Constraint} c
  */
-addConstraint(c){
+addConstraint(c: Constraint): void{
     this.constraints.push(c);
 };
 
