@@ -1,3 +1,4 @@
+import { Body } from "../objects/Body";
 import { World } from "../world/World";
 import { AABB } from "./AABB";
 import { Broadphase } from "./Broadphase";
@@ -21,7 +22,7 @@ export class NaiveBroadphase extends Broadphase {
    * @param {Array} pairs1
    * @param {Array} pairs2
    */
-  collisionPairs(world: World, pairs1, pairs2) {
+  collisionPairs(world: World, pairs1: Body[], pairs2: Body[]) {
     let bodies = world.bodies,
       n = bodies.length,
       i,

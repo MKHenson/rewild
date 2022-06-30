@@ -1,6 +1,7 @@
 import { Vec3 } from "../maths/Vec3";
 import { PhysicsMaterialOptions } from "../materials/PhysicsMaterial";
 import { Body } from "../objects/Body";
+import { Quaternion } from "../maths/Quaternion";
 
 export enum ShapeType {
   SPHERE = 1,
@@ -55,6 +56,8 @@ export abstract class Shape {
    * @method updateBoundingSphereRadius
    */
   abstract updateBoundingSphereRadius(): void;
+
+  abstract calculateWorldAABB(pos: Vec3, quat: Quaternion, min: Vec3, max: Vec3): void;
 
   /**
    * Get the volume of this shape

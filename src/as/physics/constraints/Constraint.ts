@@ -21,8 +21,6 @@ export abstract class Constraint {
 
   /**
    * Equations to be solved in this constraint
-   * @property equations
-   * @type {Array}
    */
   equations: Equation[];
   bodyA: Body;
@@ -31,8 +29,6 @@ export abstract class Constraint {
 
   /**
    * Set to true if you want the bodies to collide when they are connected.
-   * @property collideConnected
-   * @type {boolean}
    */
   collideConnected: boolean;
 
@@ -64,8 +60,8 @@ export abstract class Constraint {
    * @method enable
    */
   enable(): void {
-    var eqs = this.equations;
-    for (var i = 0; i < eqs.length; i++) {
+    const eqs = this.equations;
+    for (let i: i32 = 0; i < eqs.length; i++) {
       eqs[i].enabled = true;
     }
   }
@@ -75,8 +71,8 @@ export abstract class Constraint {
    * @method disable
    */
   disable(): void {
-    var eqs = this.equations;
-    for (var i = 0; i < eqs.length; i++) {
+    const eqs = this.equations;
+    for (let i: i32 = 0; i < eqs.length; i++) {
       eqs[i].enabled = false;
     }
   }

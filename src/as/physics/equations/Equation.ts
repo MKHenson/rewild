@@ -1,4 +1,5 @@
 import { JacobianElement } from "../maths/JacobianElement";
+import { Vec3 } from "../maths/Vec3";
 import { Body } from "../objects/Body";
 
 /**

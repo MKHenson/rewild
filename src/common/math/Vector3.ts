@@ -177,7 +177,6 @@ export class Vector3 {
     return this;
   }
 
-  @inline
   multiplyScalar(scalar: f32): Vector3 {
     this.x *= scalar;
     this.y *= scalar;
@@ -207,7 +206,6 @@ export class Vector3 {
    * @method crossmat
    * @see http://www8.cs.umu.se/kurser/TDBD24/VT06/lectures/Lecture6.pdf
    */
-  @inline
   crossmat(): Matrix3 {
     return new Matrix3().set(0, -this.z, this.y, this.z, 0, -this.x, -this.y, this.x, 0);
   }
@@ -293,7 +291,6 @@ export class Vector3 {
     return this;
   }
 
-  @inline
   divideScalar(scalar: f32): Vector3 {
     return this.multiplyScalar(1 / scalar);
   }
@@ -411,7 +408,6 @@ export class Vector3 {
     }
   }
 
-  @inline
   dot(v: Vector3): f32 {
     return this.x * v.x + this.y * v.y + this.z * v.z;
   }
@@ -423,28 +419,23 @@ export class Vector3 {
     return this.dot(this);
   }
 
-  @inline
   isZero(): boolean {
     return this.x == 0 && this.y == 0 && this.z == 0;
   }
 
   // TODO lengthSquared?
-  @inline
   lengthSq(): f32 {
     return this.x * this.x + this.y * this.y + this.z * this.z;
   }
 
-  @inline
   length(): f32 {
     return Mathf.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
   }
 
-  @inline
   manhattanLength(): f32 {
     return Mathf.abs(this.x) + Mathf.abs(this.y) + Mathf.abs(this.z);
   }
 
-  @inline
   normalize(): Vector3 {
     return this.divideScalar(this.length() || 1);
   }
@@ -473,7 +464,6 @@ export class Vector3 {
     return target;
   }
 
-  @inline
   setLength(length: f32): Vector3 {
     return this.normalize().multiplyScalar(length);
   }
@@ -494,7 +484,6 @@ export class Vector3 {
     return this;
   }
 
-  @inline
   cross(v: Vector3): Vector3 {
     return this.crossVectors(this, v);
   }
@@ -514,7 +503,6 @@ export class Vector3 {
     return this;
   }
 
-  @inline
   setZero() {
     this.x = this.y = this.z = 0;
   }
@@ -554,7 +542,6 @@ export class Vector3 {
     return Mathf.acos(MathUtils.clamp(theta, -1, 1));
   }
 
-  @inline
   distanceTo(v: Vector3): f32 {
     return Mathf.sqrt(this.distanceToSquared(v));
   }
@@ -571,7 +558,6 @@ export class Vector3 {
     return Mathf.abs(this.x - v.x) + Mathf.abs(this.y - v.y) + Mathf.abs(this.z - v.z);
   }
 
-  @inline
   setFromSpherical(s: Spherical): Vector3 {
     return this.setFromSphericalCoords(s.radius, s.phi, s.theta);
   }
@@ -620,12 +606,10 @@ export class Vector3 {
     return this;
   }
 
-  @inline
   setFromMatrixColumn(m: Matrix4, index: u32): Vector3 {
     return this.fromF32Array(m.elements, index * 4);
   }
 
-  @inline
   setFromMatrix3Column(m: Matrix3, index: u32): Vector3 {
     return this.fromF32Array(m.elements, index * 3);
   }

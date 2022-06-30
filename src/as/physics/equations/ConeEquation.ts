@@ -2,38 +2,32 @@ import { Vec3 } from "../maths/Vec3";
 import { Body } from "../objects/Body";
 import { Equation } from "./Equation";
 
+export class ConeEquationOptions {
+  constructor(
+    public axisA = new Vec3(1, 0, 0),
+    public axisB = new Vec3(0, 1, 0),
+    public maxForce: f32 = 1e6,
+    public angle: f32 = 0
+  ) {}
+}
+
 /**
  * Cone equation. Works to keep the given body world vectors aligned, or tilted within a given angle from each other.
- * @class ConeEquation
- * @constructor
- * @author schteppe
- * @param {Body} bodyA
- * @param {Body} bodyB
- * @param {Vec3} [options.axisA] Local axis in A
- * @param {Vec3} [options.axisB] Local axis in B
- * @param {Vec3} [options.angle] The "cone angle" to keep
- * @param {number} [options.maxForce=1e6]
- * @extends Equation
  */
 export class ConeEquation extends Equation {
   axisA: Vec3;
   axisB: Vec3;
+  /**
+   * The cone angle to keep
+   */
   angle: f32;
 
-  constructor(bodyA: Body, bodyB: Body, options) {
-    options = options || {};
-    var maxForce = typeof options.maxForce !== "undefined" ? options.maxForce : 1e6;
+  constructor(bodyA: Body, bodyB: Body, options = new ConeEquationOptions()) {
+    super(bodyA, bodyB, -options.maxForce, options.maxForce);
 
-    super(bodyA, bodyB, -maxForce, maxForce);
-
-    this.axisA = options.axisA ? options.axisA.clone() : new Vec3(1, 0, 0);
-    this.axisB = options.axisB ? options.axisB.clone() : new Vec3(0, 1, 0);
-
-    /**
-     * The cone angle to keep
-     * @property {number} angle
-     */
-    this.angle = typeof options.angle !== "undefined" ? options.angle : 0;
+    this.axisA = options.axisA;
+    this.axisB = options.axisB;
+    this.angle = options.angle;
   }
 
   computeB(h: f32) {

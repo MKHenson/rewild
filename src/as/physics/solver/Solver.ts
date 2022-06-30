@@ -1,4 +1,5 @@
 import { Equation } from "../equations/Equation";
+import { World } from "../world/World";
 
 export class Solver {
   equations: Equation[];
@@ -17,7 +18,7 @@ export class Solver {
    * @param  {Number} dt
    * @param  {World} world
    */
-  solve(dt: f32, world): i32 {
+  solve(dt: f32, world: World): i32 | undefined {
     // Should return the number of iterations done!
     return 0;
   }

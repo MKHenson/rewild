@@ -1,4 +1,5 @@
 import { Vec3 } from "../maths/Vec3";
+import { Body } from "../objects/Body";
 import { ShapeType } from "../shapes/Shape";
 import { World } from "../world/World";
 import { AABB } from "./AABB";
@@ -54,7 +55,7 @@ export class GridBroadphase extends Broadphase {
    * @param {Array} pairs2
    */
 
-  collisionPairs(world: World, pairs1, pairs2): void {
+  collisionPairs(world: World, pairs1: Body[], pairs2: Body[]): void {
     const N = world.numObjects(),
       bodies = world.bodies;
 

@@ -12,27 +12,18 @@ import { Equation } from "./Equation";
  * @extends Equation
  */
 export class ContactEquation extends Equation {
-  /**
-   * @property restitution
-   * @type {Number}
-   */
   restitution: f32;
 
   /**
    * World-oriented vector that goes from the center of bi to the contact point.
-   * @property {Vec3} ri
    */
   ri: Vec3;
-
   /**
    * World-oriented vector that starts in body j position and goes to the contact point.
-   * @property {Vec3} rj
    */
   rj: Vec3;
-
   /**
    * Contact normal, pointing out of body i.
-   * @property {Vec3} ni
    */
   ni: Vec3;
 

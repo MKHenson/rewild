@@ -2,6 +2,10 @@ import { Vec3 } from "../maths/Vec3";
 import { Body } from "../objects/Body";
 import { Equation } from "./Equation";
 
+export class RotationalEquationOptions {
+  constructor(public axisA = new Vec3(1, 0, 0), public axisB = new Vec3(0, 1, 0), public maxForce: f32 = 1e6) {}
+}
+
 /**
  * Rotational constraint. Works to keep the local vectors orthogonal to each other in world space.
  * @class RotationalEquation
@@ -19,14 +23,10 @@ export class RotationalEquation extends Equation {
   axisB: Vec3;
   maxAngle: f32;
 
-  constructor(bodyA: Body, bodyB: Body, options) {
-    options = options || {};
-    const maxForce = typeof options.maxForce !== "undefined" ? options.maxForce : 1e6;
-
-    super(bodyA, bodyB, -maxForce, maxForce);
-
-    this.axisA = options.axisA ? options.axisA.clone() : new Vec3(1, 0, 0);
-    this.axisB = options.axisB ? options.axisB.clone() : new Vec3(0, 1, 0);
+  constructor(bodyA: Body, bodyB: Body, options = new RotationalEquationOptions()) {
+    super(bodyA, bodyB, -options.maxForce, options.maxForce);
+    this.axisA = options.axisA;
+    this.axisB = options.axisB;
 
     this.maxAngle = Mathf.PI / 2;
   }

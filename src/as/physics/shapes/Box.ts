@@ -3,6 +3,10 @@ import { Vec3 } from "../maths/Vec3";
 import { ConvexPolyhedron } from "./ConvexPolyhedron";
 import { Shape, ShapeType } from "./Shape";
 
+export interface ICornerHandler {
+  onCornerCallback(x: f32, y: f32, z: f32): void;
+}
+
 /**
  * A 3d box shape.
  * @class Box
@@ -123,7 +127,7 @@ export class Box extends Shape {
     this.boundingSphereRadius = this.halfExtents.norm();
   }
 
-  forEachWorldCorner(pos: Vec3, quat: Quaternion, callback): void {
+  forEachWorldCorner(pos: Vec3, quat: Quaternion, callbackHandler: ICornerHandler): void {
     const e = this.halfExtents;
     const corners = [
       [e.x, e.y, e.z],
@@ -139,7 +143,7 @@ export class Box extends Shape {
       worldCornerTempPos.set(corners[i][0], corners[i][1], corners[i][2]);
       quat.vmult(worldCornerTempPos, worldCornerTempPos);
       pos.vadd(worldCornerTempPos, worldCornerTempPos);
-      callback(worldCornerTempPos.x, worldCornerTempPos.y, worldCornerTempPos.z);
+      callbackHandler.onCornerCallback(worldCornerTempPos.x, worldCornerTempPos.y, worldCornerTempPos.z);
     }
   }
 

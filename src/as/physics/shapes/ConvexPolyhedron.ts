@@ -99,7 +99,7 @@ export class ConvexPolyhedron extends Shape {
     for (let i: i32 = 0; i !== faces.length; i++) {
       const face = faces[i];
       const numVertices = face.length;
-      for (const j = 0; j !== numVertices; j++) {
+      for (let j: i32 = 0; j !== numVertices; j++) {
         const k = (j + 1) % numVertices;
         vertices[face[j]].vsub(vertices[face[k]], edge);
         edge.normalize();
@@ -128,7 +128,7 @@ export class ConvexPolyhedron extends Shape {
     // Generate normals
     for (let i: i32 = 0; i < this.faces.length; i++) {
       // Check so all vertices exists for this face
-      for (const j = 0; j < this.faces[i].length; j++) {
+      for (let j: i32 = 0; j < this.faces[i].length; j++) {
         if (!this.vertices[this.faces[i][j]]) {
           throw new Error("Vertex " + this.faces[i][j] + " not found!");
         }
@@ -147,7 +147,7 @@ export class ConvexPolyhedron extends Shape {
             n.toString() +
             ") looks like it points into the shape? The vertices follow. Make sure they are ordered CCW around the normal, using the right hand rule."
         );
-        for (const j = 0; j < this.faces[i].length; j++) {
+        for (let j: i32 = 0; j < this.faces[i].length; j++) {
           console.warn(
             ".vertices[" + this.faces[i][j] + "] = Vec3(" + this.vertices[this.faces[i][j]].toString() + ")"
           );
@@ -477,8 +477,8 @@ export class ConvexPolyhedron extends Shape {
     const pVtxIn = worldVertsB1;
     const pVtxOut = worldVertsB2;
     // Find the face with normal closest to the separating axis
-    const closestFaceA = -1;
-    const dmin = Number.MAX_VALUE;
+    let closestFaceA = -1;
+    let dmin = Number.MAX_VALUE;
     for (const face = 0; face < hullA.faces.length; face++) {
       faceANormalWS.copy(hullA.faceNormals[face]);
       quatA.vmult(faceANormalWS, faceANormalWS);

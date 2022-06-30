@@ -1,3 +1,4 @@
+import { World } from "../world/World";
 import { Solver } from "./Solver";
 
 /**
@@ -38,15 +39,15 @@ export class GSSolver extends Solver {
     this.tolerance = 1e-7;
   }
 
-  solve(dt: f32, world) {
-    const iter = 0,
+  solve(dt: f32, world: World): i32 | undefined {
+    let iter = 0,
       maxIter = this.iterations,
       tolSquared = this.tolerance * this.tolerance,
       equations = this.equations,
       Neq = equations.length,
       bodies = world.bodies,
       Nbodies = bodies.length,
-      h = dt,
+      h: f32 = dt,
       q,
       B,
       invC,
@@ -69,7 +70,7 @@ export class GSSolver extends Solver {
     invCs.length = Neq;
     Bs.length = Neq;
     lambda.length = Neq;
-    for (const i = 0; i !== Neq; i++) {
+    for (let i: i32 = 0; i !== Neq; i++) {
       const c = equations[i];
       lambda[i] = 0.0;
       Bs[i] = c.computeB(h);

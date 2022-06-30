@@ -32,24 +32,8 @@ export abstract class Broadphase {
   dirty: boolean;
 
   constructor() {
-    /**
-     * The world to search for collisions in.
-     * @property world
-     * @type {World}
-     */
     this.world = null;
-
-    /**
-     * If set to true, the broadphase uses bounding boxes for intersection test, else it uses bounding spheres.
-     * @property useBoundingBoxes
-     * @type {Boolean}
-     */
     this.useBoundingBoxes = false;
-
-    /**
-     * Set to true if the objects in the world moved.
-     * @property {Boolean} dirty
-     */
     this.dirty = true;
   }
 
@@ -60,7 +44,7 @@ export abstract class Broadphase {
    * @param {Array} p1 Empty array to be filled with body objects
    * @param {Array} p2 Empty array to be filled with body objects
    */
-  abstract collisionPairs(world: World, p1, p2): void;
+  abstract collisionPairs(world: World, p1: Body[], p2: Body[]): void;
 
   /**
    * Check if a body pair needs to be intersection tested at all.
@@ -98,7 +82,7 @@ export abstract class Broadphase {
    * @param {array} pairs1
    * @param {array} pairs2
    */
-  intersectionTest(bodyA: Body, bodyB: Body, pairs1, pairs2): void {
+  intersectionTest(bodyA: Body, bodyB: Body, pairs1: Body[], pairs2: Body[]): void {
     if (this.useBoundingBoxes) {
       this.doBoundingBoxBroadphase(bodyA, bodyB, pairs1, pairs2);
     } else {
@@ -115,7 +99,7 @@ export abstract class Broadphase {
    * @param {Array} pairs2 bodyB is appended to this array if intersection
    */
 
-  doBoundingSphereBroadphase(bodyA: Body, bodyB: Body, pairs1, pairs2): void {
+  doBoundingSphereBroadphase(bodyA: Body, bodyB: Body, pairs1: Body[], pairs2: Body[]): void {
     const r = Broadphase_collisionPairs_r;
     bodyB.position.vsub(bodyA.position, r);
     const boundingRadiusSum2 = Math.pow(bodyA.boundingRadius + bodyB.boundingRadius, 2);
@@ -134,7 +118,7 @@ export abstract class Broadphase {
    * @param {Array} pairs1
    * @param {Array} pairs2
    */
-  doBoundingBoxBroadphase(bodyA: Body, bodyB: Body, pairs1, pairs2): void {
+  doBoundingBoxBroadphase(bodyA: Body, bodyB: Body, pairs1: Body[], pairs2: Body[]): void {
     if (bodyA.aabbNeedsUpdate) {
       bodyA.computeAABB();
     }
@@ -156,13 +140,13 @@ export abstract class Broadphase {
    * @param {Array} pairs2
    */
 
-  makePairsUnique(pairs1, pairs2): void {
+  makePairsUnique(pairs1: Body[], pairs2: Body[]): void {
     const t = Broadphase_makePairsUnique_temp,
       p1 = Broadphase_makePairsUnique_p1,
       p2 = Broadphase_makePairsUnique_p2,
       N = pairs1.length;
 
-    for (const i = 0; i !== N; i++) {
+    for (let i: i32 = 0; i !== N; i++) {
       p1[i] = pairs1[i];
       p2[i] = pairs2[i];
     }
@@ -202,7 +186,7 @@ export abstract class Broadphase {
    * @return {boolean}
    */
 
-  static boundingSphereCheck(bodyA: Body, bodyB: Body): f32 {
+  static boundingSphereCheck(bodyA: Body, bodyB: Body): boolean {
     const dist = bsc_dist;
     bodyA.position.vsub(bodyB.position, dist);
     return Mathf.pow(bodyA.shape.boundingSphereRadius + bodyB.shape.boundingSphereRadius, 2) > dist.norm2();
@@ -224,6 +208,6 @@ const Broadphase_collisionPairs_r = new Vec3(), // Temp objects
   Broadphase_collisionPairs_quat = new Quaternion(),
   Broadphase_collisionPairs_relpos = new Vec3();
 const bsc_dist = new Vec3();
-const Broadphase_makePairsUnique_temp = { keys: [] },
-  Broadphase_makePairsUnique_p1 = [],
-  Broadphase_makePairsUnique_p2 = [];
+const Broadphase_makePairsUnique_temp: { keys: string[] } = { keys: [] },
+  Broadphase_makePairsUnique_p1: Body[] = [],
+  Broadphase_makePairsUnique_p2: Body[] = [];

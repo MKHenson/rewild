@@ -1,4 +1,16 @@
+import { Equation } from "../equations/Equation";
+import { Body } from "../objects/Body";
+import { World } from "../world/World";
 import { Solver } from "./Solver";
+
+export class SplitSolverNode {
+  constructor(
+    public body: Body | null = null,
+    public children: SplitSolverNode[] = [],
+    public eqs: Equation[] = [],
+    public visited = false
+  ) {}
+}
 
 /**
  * Splits the equations into islands and solves them independently. Can improve performance.
@@ -10,11 +22,11 @@ import { Solver } from "./Solver";
 export class SplitSolver extends Solver {
   iterations: f32;
   tolerance: f32;
-  subsolver: f32;
-  nodes: f32[];
-  nodePool: f32[];
+  subsolver: Solver;
+  nodes: SplitSolverNode[];
+  nodePool: SplitSolverNode[];
 
-  constructor(subsolver) {
+  constructor(subsolver: Solver) {
     super();
     this.iterations = 10;
     this.tolerance = 1e-7;
@@ -28,8 +40,8 @@ export class SplitSolver extends Solver {
     }
   }
 
-  createNode() {
-    return { body: null, children: [], eqs: [], visited: false };
+  createNode(): SplitSolverNode {
+    return new SplitSolverNode();
   }
 
   /**
@@ -38,7 +50,7 @@ export class SplitSolver extends Solver {
    * @param  {Number} dt
    * @param  {World} world
    */
-  solve(dt: f32, world) {
+  solve(dt: f32, world: World): i32 | undefined {
     const nodes = SplitSolver_solve_nodes,
       nodePool = this.nodePool,
       bodies = world.bodies,
@@ -52,19 +64,19 @@ export class SplitSolver extends Solver {
       nodePool.push(this.createNode());
     }
     nodes.length = Nbodies;
-    for (const i = 0; i < Nbodies; i++) {
+    for (let i: i32 = 0; i < Nbodies; i++) {
       nodes[i] = nodePool[i];
     }
 
     // Reset node values
-    for (const i = 0; i !== Nbodies; i++) {
+    for (let i: i32 = 0; i !== Nbodies; i++) {
       const node = nodes[i];
       node.body = bodies[i];
       node.children.length = 0;
       node.eqs.length = 0;
       node.visited = false;
     }
-    for (const k = 0; k !== Neq; k++) {
+    for (let k: i32 = 0; k !== Neq; k++) {
       const eq = equations[k],
         i = bodies.indexOf(eq.bi),
         j = bodies.indexOf(eq.bj),
@@ -76,8 +88,8 @@ export class SplitSolver extends Solver {
       nj.eqs.push(eq);
     }
 
-    const child,
-      n = 0,
+    let child,
+      n: i32 = 0,
       eqs = SplitSolver_solve_eqs;
 
     subsolver.tolerance = this.tolerance;
@@ -107,10 +119,10 @@ export class SplitSolver extends Solver {
 }
 
 // Returns the number of subsystems
-const SplitSolver_solve_nodes = []; // All allocated node objects
+const SplitSolver_solve_nodes: SplitSolverNode[] = []; // All allocated node objects
 const SplitSolver_solve_nodePool = []; // All allocated node objects
-const SplitSolver_solve_eqs = []; // Temp array
-const SplitSolver_solve_bds = []; // Temp array
+const SplitSolver_solve_eqs: Equation[] = []; // Temp array
+const SplitSolver_solve_bds: SplitSolverNode[] = []; // Temp array
 const SplitSolver_solve_dummyWorld = { bodies: [] }; // Temp object
 
 const STATIC = Body.STATIC;
@@ -126,6 +138,7 @@ function getUnvisitedNode(nodes) {
 }
 
 const queue = [];
+
 function bfs(root, visitFunc, bds, eqs) {
   queue.push(root);
   root.visited = true;
@@ -153,6 +166,6 @@ function visitFunc(node, bds, eqs) {
   }
 }
 
-function sortById(a, b) {
+function sortById(a: Equation, b: Equation): i32 {
   return b.id - a.id;
 }

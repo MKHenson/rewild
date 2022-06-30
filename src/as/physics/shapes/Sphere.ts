@@ -1,3 +1,4 @@
+import { Quaternion } from "../maths/Quaternion";
 import { Vec3 } from "../maths/Vec3";
 import { Shape, ShapeType } from "./Shape";
 
@@ -33,7 +34,7 @@ export class Sphere extends Shape {
     this.boundingSphereRadius = this.radius;
   }
 
-  calculateWorldAABB(pos: Vec3, quat: null, min: Vec3, max: Vec3): void {
+  calculateWorldAABB(pos: Vec3, quat: Quaternion, min: Vec3, max: Vec3): void {
     var r = this.radius;
 
     min.x = pos.x - r;

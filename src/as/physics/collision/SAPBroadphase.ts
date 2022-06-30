@@ -12,31 +12,22 @@ import { Broadphase } from "./Broadphase";
  * @extends Broadphase
  */
 export class SAPBroadphase extends Broadphase { 
+    /**
+     * List of bodies currently in the broadphase.
+     */
     axisList: Body[];
+
+      /**
+         * The world to search in.
+         */
     axisIndex: i32;
 
     constructor(world: World){
         super();
 
-        /**
-         * List of bodies currently in the broadphase.
-         * @property axisList
-         * @type {Array}
-         */
+     
         this.axisList = [];
-
-        /**
-         * The world to search in.
-         * @property world
-         * @type {World}
-         */
         this.world = null;
-
-        /**
-         * Axis to sort the bodies along. Set to 0 for x axis, and 1 for y axis. For best performance, choose an axis that the bodies are spread out more on.
-         * @property axisIndex
-         * @type {Number}
-         */
         this.axisIndex = 0;
 
         const axisList = this.axisList;
@@ -91,9 +82,9 @@ setWorld(world: World): void{
  * @return {Array}
  */
 static insertionSortX(a) {
-    for(const i=1,l=a.length;i<l;i++) {
+    for(let i=1,l=a.length;i<l;i++) {
         const v = a[i];
-        for(const j=i - 1;j>=0;j--) {
+        for(let j=i - 1;j>=0;j--) {
             if(a[j].aabb.lowerBound.x <= v.aabb.lowerBound.x){
                 break;
             }
@@ -151,7 +142,7 @@ static insertionSortX(a) {
  * @param  {Array} p1
  * @param  {Array} p2
  */
-collisionPairs(world: World, p1,p2): void{
+collisionPairs(world: World, p1: Body[],p2: Body[]): void{
     const bodies = this.axisList,
         N = bodies.length,
         axisIndex = this.axisIndex;
@@ -304,14 +295,14 @@ aabbQuery(world: World, aabb: AABB, result: Body[]): Body[]{
         this.dirty = false;
     }
 
-    const axisIndex = this.axisIndex, axis = 'x';
+    let axisIndex = this.axisIndex, axis = 'x';
     if(axisIndex === 1){ axis = 'y'; }
     if(axisIndex === 2){ axis = 'z'; }
 
     const axisList = this.axisList;
     const lower = aabb.lowerBound[axis];
     const upper = aabb.upperBound[axis];
-    for(const i = 0; i < axisList.length; i++){
+    for(let i: i32 = 0; i < axisList.length; i++){
         const b = axisList[i];
 
         if(b.aabbNeedsUpdate){

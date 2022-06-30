@@ -47,6 +47,29 @@ export enum SleepState {
   SLEEPING = 2,
 }
 
+export class BodyOptions {
+  constructor(
+    public collisionFilterGroup: f32 = 1,
+    public collisionFilterMask: i32 = -1,
+    public position: Vec3 | null = null,
+    public velocity: Vec3 | null = null,
+    public mass: f32 = 0,
+    public material: PhysicsMaterial | null = null,
+    public linearDamping: f32 = 0.01,
+    public type: BodyType = BodyType.STATIC,
+    public allowSleep: boolean = true,
+    public sleepSpeedLimit: f32 = 0.1,
+    public sleepTimeLimit: f32 = 1,
+    public quaternion: Quaternion | null = null,
+    public angularVelocity: Vec3 | null = null,
+    public fixedRotation = false,
+    public angularDamping: f32 = 0.01,
+    public linearFactor: Vec3 | null = null,
+    public angularFactor: Vec3 | null = null,
+    public shape: Shape | null = null
+  ) {}
+}
+
 /**
  * Base class for all body types.
  * @class Body
@@ -255,7 +278,7 @@ export class Body extends EventDispatcher {
   preStep: null;
   postStep: null;
 
-  constructor(options) {
+  constructor(options: BodyOptions = new BodyOptions()) {
     super();
     options = options || {};
 
