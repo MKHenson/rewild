@@ -278,6 +278,9 @@ export class Body extends EventDispatcher {
   preStep: null;
   postStep: null;
 
+  // TODO: Not sure where this gets set?
+  shape: Shape;
+
   constructor(options: BodyOptions = new BodyOptions()) {
     super();
     options = options || {};

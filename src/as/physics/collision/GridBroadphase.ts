@@ -1,6 +1,7 @@
 import { Vec3 } from "../maths/Vec3";
 import { Body } from "../objects/Body";
 import { ShapeType } from "../shapes/Shape";
+import { Sphere } from "../shapes/Sphere";
 import { World } from "../world/World";
 import { AABB } from "./AABB";
 import { Broadphase } from "./Broadphase";
@@ -23,7 +24,7 @@ export class GridBroadphase extends Broadphase {
   nz: i32;
   aabbMin: Vec3;
   aabbMax: Vec3;
-  bins: i32[][];
+  bins: Body[][];
   binLengths: i32[]; //Rather than continually resizing arrays (thrashing the memory), just record length and allow them to grow
 
   constructor(aabbMin: Vec3, aabbMax: Vec3, nx: i32, ny: i32, nz: i32) {
@@ -102,10 +103,10 @@ export class GridBroadphase extends Broadphase {
     }
 
     const ceil = Mathf.ceil;
-    const min = Mathf.min;
-    const max = Mathf.max;
+    // const min = Mathf.min;
+    // const max = Mathf.max;
 
-    function addBoxToBins(x0: i32, y0: i32, z0: i32, x1: i32, y1: i32, z1: i32, bi: i32) {
+    function addBoxToBins(x0: i32, y0: i32, z0: i32, x1: i32, y1: i32, z1: i32, bi: Body) {
       let xoff0 = ((x0 - xmin) * xmult) | 0,
         yoff0 = ((y0 - ymin) * ymult) | 0,
         zoff0 = ((z0 - zmin) * zmult) | 0,
@@ -173,7 +174,7 @@ export class GridBroadphase extends Broadphase {
           const x = bi.position.x,
             y = bi.position.y,
             z = bi.position.z;
-          const r = si.radius;
+          const r = (si as Sphere).radius;
 
           addBoxToBins(x - r, y - r, z - r, x + r, y + r, z + r, bi);
           break;
@@ -256,6 +257,10 @@ export class GridBroadphase extends Broadphase {
     //	}
 
     this.makePairsUnique(pairs1, pairs2);
+  }
+
+  aabbQuery(world: World, aabb: AABB, result: Body[]): Body[] {
+    throw new Error("Method not implemented.");
   }
 }
 
