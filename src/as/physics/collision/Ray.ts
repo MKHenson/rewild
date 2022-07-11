@@ -2,7 +2,12 @@ import { Quaternion } from "../maths/Quaternion";
 import { Transform } from "../maths/Transform";
 import { Vec3 } from "../maths/Vec3";
 import { Body } from "../objects/Body";
+import { Box } from "../shapes/Box";
+import { ConvexPolyhedron } from "../shapes/ConvexPolyhedron";
+import { Plane } from "../shapes/Plane";
 import { Shape, ShapeType } from "../shapes/Shape";
+import { Sphere } from "../shapes/Sphere";
+import { World } from "../world/World";
 import { AABB } from "./AABB";
 import { RaycastResult } from "./RaycastResult";
 
@@ -10,6 +15,23 @@ export enum RayMode {
   CLOSEST = 1,
   ANY = 2,
   ALL = 4,
+}
+
+export interface IIntersectionReceiver {
+  onIntersection(result: RaycastResult): void;
+}
+
+export class IntersectionOptions {
+  constructor(
+    public mode: RayMode = RayMode.ANY,
+    public result: RaycastResult = new RaycastResult(),
+    public skipBackfaces: boolean = true,
+    public collisionFilterMask: i32 = -1,
+    public collisionFilterGroup: i32 = -1,
+    public from: Vec3 | null = null,
+    public to: Vec3 | null = null,
+    public callback: IIntersectionReceiver | null = null
+  ) {}
 }
 
 /**
@@ -84,7 +106,7 @@ export class Ray {
    * Current, user-provided result callback. Will be used if mode is Ray.ALL.
    * @property {Function} callback
    */
-  callback: (result: RaycastResult) => void;
+  callback: IIntersectionReceiver | null;
 
   constructor(from: Vec3 | null = null, to: Vec3 | null = null) {
     this.from = from ? from.clone() : new Vec3();
@@ -98,7 +120,7 @@ export class Ray {
     this.mode = RayMode.ANY;
     this.result = new RaycastResult();
     this.hasHit = false;
-    this.callback = (result) => {};
+    this.callback = null;
   }
 
   /**
@@ -108,19 +130,14 @@ export class Ray {
    * @param  {object} options
    * @return {Boolean} True if the ray hit anything, otherwise false.
    */
-  intersectWorld(world, options) {
-    this.mode = options.mode || RayMode.ANY;
-    this.result = options.result || new RaycastResult();
-    this.skipBackfaces = !!options.skipBackfaces;
-    this.collisionFilterMask = typeof options.collisionFilterMask !== "undefined" ? options.collisionFilterMask : -1;
-    this.collisionFilterGroup = typeof options.collisionFilterGroup !== "undefined" ? options.collisionFilterGroup : -1;
+  intersectWorld(world: World, options: IntersectionOptions = new IntersectionOptions()): boolean {
     if (options.from) {
       this.from.copy(options.from);
     }
     if (options.to) {
       this.to.copy(options.to);
     }
-    this.callback = options.callback || function () {};
+    this.callback = options.callback;
     this.hasHit = false;
 
     this.result.reset();
@@ -137,7 +154,7 @@ export class Ray {
   /*
    * As per "Barycentric Technique" as named here http://www.blackpawn.com/texts/pointinpoly/default.html But without the division
    */
-  static pointInTriangle(p: Vec3, a: Vec3, b: Vec3, c: Vec3) {
+  static pointInTriangle(p: Vec3, a: Vec3, b: Vec3, c: Vec3): boolean {
     c.vsub(a, v0);
     b.vsub(a, v1);
     p.vsub(a, v2);
@@ -165,7 +182,7 @@ export class Ray {
    * @param {RaycastResult} [result] Deprecated - set the result property of the Ray instead.
    */
 
-  intersectBody(body: Body, result: RaycastResult | null = null) {
+  intersectBody(body: Body, result: RaycastResult | null = null): void {
     if (result) {
       this.result = result;
       this._updateDirection();
@@ -210,7 +227,7 @@ export class Ray {
    * @param {Array} bodies An array of Body objects.
    * @param {RaycastResult} [result] Deprecated
    */
-  intersectBodies(bodies: Body[], result: RaycastResult | null = null) {
+  intersectBodies(bodies: Body[], result: RaycastResult | null = null): void {
     if (result) {
       this.result = result;
       this._updateDirection();
@@ -226,7 +243,7 @@ export class Ray {
    * @private
    * @method _updateDirection
    */
-  private _updateDirection() {
+  private _updateDirection(): void {
     this.to.vsub(this.from, this._direction);
     this._direction.normalize();
   }
@@ -239,7 +256,7 @@ export class Ray {
    * @param {Vec3} position
    * @param {Body} body
    */
-  private intersectShape(shape: Shape, quat: Quaternion, position: Vec3, body: Body) {
+  private intersectShape(shape: Shape, quat: Quaternion, position: Vec3, body: Body): void {
     const from = this.from;
 
     // Checking boundingSphere
@@ -250,7 +267,7 @@ export class Ray {
 
     const shapeType = shape.type;
 
-    if (shape.type == ShapeType.BOX) this.intersectBox(shape, quat, position, body, shape);
+    if (shape.type == ShapeType.BOX) this.intersectBox(shape as Box, quat, position, body, shape);
   }
 
   /**
@@ -261,7 +278,7 @@ export class Ray {
    * @param  {Vec3} position
    * @param  {Body} body
    */
-  intersectBox(shape: Shape, quat: Quaternion, position: Vec3, body: Body, reportedShape: Shape) {
+  intersectBox(shape: Box, quat: Quaternion, position: Vec3, body: Body, reportedShape: Shape) {
     return this.intersectConvex(shape.convexPolyhedronRepresentation, quat, position, body, reportedShape);
   }
 
@@ -273,7 +290,7 @@ export class Ray {
    * @param  {Vec3} position
    * @param  {Body} body
    */
-  intersectPlane(shape: Shape, quat: Quaternion, position: Vec3, body: Body, reportedShape: Shape): void {
+  intersectPlane(shape: Plane, quat: Quaternion, position: Vec3, body: Body, reportedShape: Shape): void {
     const from = this.from;
     const to = this.to;
     const direction = this._direction;
@@ -406,7 +423,7 @@ export class Ray {
    * @param  {Vec3} position
    * @param  {Body} body
    */
-  intersectSphere(shape: Shape, quat: Quaternion, position: Vec3, body: Body, reportedShape: Shape): void {
+  intersectSphere(shape: Sphere, quat: Quaternion, position: Vec3, body: Body, reportedShape: Shape): void {
     const from = this.from,
       to = this.to,
       r = shape.radius;
@@ -474,11 +491,11 @@ export class Ray {
    * @param {array} [options.faceList]
    */
   intersectConvexintersectConvex(
-    shape: Shape,
+    shape: ConvexPolyhedron,
     quat: Quaternion,
     position: Vec3,
     body: Body,
-    reportedShape: Body,
+    reportedShape: Shape,
     options
   ): void {
     const minDistNormal = intersectConvex_minDistNormal;

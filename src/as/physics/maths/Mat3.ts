@@ -287,9 +287,7 @@ export class Mat3 {
    * @param {Mat3} target Optional. Target matrix to save in.
    * @return {Mat3} The solution x
    */
-  reverse(target: Mat3): Mat3 {
-    target = target || new Mat3();
-
+  reverse(target: Mat3 = new Mat3()): Mat3 {
     // Construct equations
     const nr: i32 = 3; // num rows
     const nc: i32 = 6; // num cols
@@ -432,9 +430,7 @@ export class Mat3 {
    * @param  {Mat3} target Where to store the result.
    * @return {Mat3} The target Mat3, or a new Mat3 if target was omitted.
    */
-  transpose(target: Mat3): Mat3 {
-    target = target || new Mat3();
-
+  transpose(target: Mat3 = new Mat3()): Mat3 {
     const Mt = target.elements,
       M = this.elements;
 

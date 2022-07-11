@@ -93,5 +93,6 @@ class OverlapKeeper {
 }
 
 function unpackAndPush(array: i32[], key: i32) {
-  array.push((key & 0xffff0000) >> 16, key & 0x0000ffff);
+  array.push((key & 0xffff0000) >> 16);
+  array.push(key & 0x0000ffff);
 }

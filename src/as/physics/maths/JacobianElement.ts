@@ -15,7 +15,7 @@ export class JacobianElement {
   /**
    * Multiply with other JacobianElement
    */
-  multiplyElement(element: JacobianElement) {
+  multiplyElement(element: JacobianElement): f32 {
     return element.spatial.dot(this.spatial) + element.rotational.dot(this.rotational);
   }
 

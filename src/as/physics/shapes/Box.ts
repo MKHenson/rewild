@@ -42,7 +42,7 @@ export class Box extends Shape {
    * Updates the local convex polyhedron representation used for some collisions.
    * @method updateConvexPolyhedronRepresentation
    */
-  updateConvexPolyhedronRepresentation() {
+  updateConvexPolyhedronRepresentation(): void {
     const sx = this.halfExtents.x;
     const sy = this.halfExtents.y;
     const sz = this.halfExtents.z;

@@ -22,7 +22,7 @@ export class FrictionEquation extends Equation {
   }
 
   computeB(h: f32): f32 {
-    var a = this.a,
+    const a = this.a,
       b = this.b,
       bi = this.bi,
       bj = this.bj,
@@ -38,21 +38,21 @@ export class FrictionEquation extends Equation {
 
     // G = [-t -rixt t rjxt]
     // And remember, this is a pure velocity constraint, g is always zero!
-    var GA = this.jacobianElementA,
+    const GA = this.jacobianElementA,
       GB = this.jacobianElementB;
     t.negate(GA.spatial);
     rixt.negate(GA.rotational);
     GB.spatial.copy(t);
     GB.rotational.copy(rjxt);
 
-    var GW = this.computeGW();
-    var GiMf = this.computeGiMf();
+    const GW = this.computeGW();
+    const GiMf = this.computeGiMf();
 
-    var B = -GW * b - h * GiMf;
+    const B = -GW * b - h * GiMf;
 
     return B;
   }
 }
 
-var FrictionEquation_computeB_temp1 = new Vec3();
-var FrictionEquation_computeB_temp2 = new Vec3();
+const FrictionEquation_computeB_temp1 = new Vec3();
+const FrictionEquation_computeB_temp2 = new Vec3();

@@ -105,7 +105,7 @@ export class SplitSolver extends Solver {
 
       eqs = eqs.sort(sortById);
 
-      for (const i = 0; i !== Neqs; i++) {
+      for (let i: i32 = 0; i !== Neqs; i++) {
         subsolver.addEquation(eqs[i]);
       }
 
@@ -126,6 +126,7 @@ const SplitSolver_solve_bds: SplitSolverNode[] = []; // Temp array
 const SplitSolver_solve_dummyWorld = { bodies: [] }; // Temp object
 
 const STATIC = Body.STATIC;
+
 function getUnvisitedNode(nodes) {
   const Nnodes = nodes.length;
   for (let i: i32 = 0; i !== Nnodes; i++) {
@@ -158,7 +159,7 @@ function bfs(root, visitFunc, bds, eqs) {
 function visitFunc(node, bds, eqs) {
   bds.push(node.body);
   const Neqs = node.eqs.length;
-  for (const i = 0; i !== Neqs; i++) {
+  for (let i: i32 = 0; i !== Neqs; i++) {
     const eq = node.eqs[i];
     if (eqs.indexOf(eq) === -1) {
       eqs.push(eq);

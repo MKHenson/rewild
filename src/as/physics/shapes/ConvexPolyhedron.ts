@@ -34,7 +34,7 @@ export class ConvexPolyhedron extends Shape {
   faces: i32[][];
   uniqueAxes: Vec3[] | null = null;
 
-  constructor(points: Vec3[], faces: i32[][], uniqueAxes: Vec3[] | null = null) {
+  constructor(points: Vec3[] = [], faces: i32[][] = [], uniqueAxes: Vec3[] | null = null) {
     super(ShapeType.CONVEXPOLYHEDRON);
 
     /**
@@ -42,7 +42,7 @@ export class ConvexPolyhedron extends Shape {
      * @property vertices
      * @type {Array}
      */
-    this.vertices = points || [];
+    this.vertices = points;
 
     this.worldVertices = []; // World transformed version of .vertices
     this.worldVerticesNeedsUpdate = true;
@@ -52,7 +52,7 @@ export class ConvexPolyhedron extends Shape {
      * @property faces
      * @type {Array}
      */
-    this.faces = faces || [];
+    this.faces = faces;
 
     /**
      * Array of Vec3
@@ -479,7 +479,7 @@ export class ConvexPolyhedron extends Shape {
     // Find the face with normal closest to the separating axis
     let closestFaceA = -1;
     let dmin = Number.MAX_VALUE;
-    for (const face = 0; face < hullA.faces.length; face++) {
+    for (let face: i32 = 0; face < hullA.faces.length; face++) {
       faceANormalWS.copy(hullA.faceNormals[face]);
       quatA.vmult(faceANormalWS, faceANormalWS);
       //posA.vadd(faceANormalWS,faceANormalWS);
@@ -600,7 +600,7 @@ export class ConvexPolyhedron extends Shape {
    * @param {Vec3} planeNormal
    * @param {Number} planeConstant The constant in the mathematical plane equation
    */
-  clipFaceAgainstPlane(inVertices: Vec3[], outVertices: Vec3[], planeNormal: Vec3, planeConstant: f32): void {
+  clipFaceAgainstPlane(inVertices: Vec3[], outVertices: Vec3[], planeNormal: Vec3, planeConstant: f32): Vec3[] {
     let n_dot_first: f32, n_dot_last: f32;
     const numVerts = inVertices.length;
 
@@ -932,8 +932,8 @@ const fsa_faceANormalWS3 = new Vec3(),
   fsa_worldEdge1 = new Vec3(),
   fsa_Cross = new Vec3();
 const cah_WorldNormal = new Vec3();
-const maxminA: Vec3[] = [],
-  maxminB: Vec3[] = [];
+const maxminA: f32[] = [],
+  maxminB: f32[] = [];
 const cli_aabbmin = new Vec3(),
   cli_aabbmax = new Vec3();
 const cfah_faceANormalWS = new Vec3(),

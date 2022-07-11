@@ -208,6 +208,6 @@ const Broadphase_collisionPairs_r = new Vec3(), // Temp objects
   Broadphase_collisionPairs_quat = new Quaternion(),
   Broadphase_collisionPairs_relpos = new Vec3();
 const bsc_dist = new Vec3();
-const Broadphase_makePairsUnique_temp: { keys: string[] } = { keys: [] },
+const Broadphase_makePairsUnique_temp: { [index: string]: i32; keys: string[] } = { keys: [] },
   Broadphase_makePairsUnique_p1: Body[] = [],
   Broadphase_makePairsUnique_p2: Body[] = [];

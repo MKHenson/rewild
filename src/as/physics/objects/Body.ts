@@ -311,7 +311,7 @@ export class Body extends EventDispatcher {
     }
     this.initVelocity = new Vec3();
     this.force = new Vec3();
-    var mass = typeof options.mass === "number" ? options.mass : 0;
+    const mass = typeof options.mass === "number" ? options.mass : 0;
     this.mass = mass;
     this.invMass = mass > 0 ? 1.0 / mass : 0;
     this.material = options.material || null;
@@ -380,7 +380,7 @@ export class Body extends EventDispatcher {
    * @method wakeUp
    */
   wakeUp(): void {
-    var s = this.sleepState;
+    const s = this.sleepState;
     this.sleepState = 0;
     this._wakeUpAfterNarrowphase = false;
     if (s === SleepState.SLEEPING) {
@@ -406,9 +406,9 @@ export class Body extends EventDispatcher {
    */
   sleepTick(time: f32): void {
     if (this.allowSleep) {
-      var sleepState = this.sleepState;
-      var speedSquared = this.velocity.norm2() + this.angularVelocity.norm2();
-      var speedLimitSquared = Math.pow(this.sleepSpeedLimit, 2);
+      const sleepState = this.sleepState;
+      const speedSquared = this.velocity.norm2() + this.angularVelocity.norm2();
+      const speedLimitSquared = Math.pow(this.sleepSpeedLimit, 2);
       if (sleepState === SleepState.AWAKE && speedSquared < speedLimitSquared) {
         this.sleepState = SleepState.SLEEPY; // Sleepy
         this.timeLastSleepy = time;
@@ -445,8 +445,7 @@ export class Body extends EventDispatcher {
    * @param  {Vec3} result
    * @return {Vec3}
    */
-  pointToLocalFrame(worldPoint: Vec3, result: Vec3): Vec3 {
-    var result = result || new Vec3();
+  pointToLocalFrame(worldPoint: Vec3, result: Vec3 = new Vec3()): Vec3 {
     worldPoint.vsub(this.position, result);
     this.quaternion.conjugate().vmult(result, result);
     return result;
@@ -459,8 +458,7 @@ export class Body extends EventDispatcher {
    * @param  {Vec3} result
    * @return {Vec3}
    */
-  vectorToLocalFrame(worldVector: Vec3, result: Vec3): Vec3 {
-    var result = result || new Vec3();
+  vectorToLocalFrame(worldVector: Vec3, result: Vec3 = new Vec3()): Vec3 {
     this.quaternion.conjugate().vmult(worldVector, result);
     return result;
   }
@@ -472,8 +470,7 @@ export class Body extends EventDispatcher {
    * @param  {Vec3} result
    * @return {Vec3}
    */
-  pointToWorldFrame(localPoint: Vec3, result: Vec3): Vec3 {
-    var result = result || new Vec3();
+  pointToWorldFrame(localPoint: Vec3, result: Vec3 = new Vec3()): Vec3 {
     this.quaternion.vmult(localPoint, result);
     result.vadd(this.position, result);
     return result;
@@ -486,8 +483,7 @@ export class Body extends EventDispatcher {
    * @param  {Vec3} result
    * @return {Vec3}
    */
-  vectorToWorldFrame(localVector: Vec3, result: Vec3): Vec3 {
-    var result = result || new Vec3();
+  vectorToWorldFrame(localVector: Vec3, result: Vec3 = new Vec3()): Vec3 {
     this.quaternion.vmult(localVector, result);
     return result;
   }
@@ -501,8 +497,8 @@ export class Body extends EventDispatcher {
    * @return {Body} The body object, for chainability.
    */
   addShape(shape: Shape, _offset: Vec3 | null = null, _orientation: Quaternion | null = null): Body {
-    var offset = new Vec3();
-    var orientation = new Quaternion();
+    const offset = new Vec3();
+    const orientation = new Quaternion();
 
     if (_offset) {
       offset.copy(_offset);
@@ -529,15 +525,15 @@ export class Body extends EventDispatcher {
    * @method updateBoundingRadius
    */
   updateBoundingRadius(): void {
-    var shapes = this.shapes,
+    const shapes = this.shapes,
       shapeOffsets = this.shapeOffsets,
-      N = shapes.length,
-      radius = 0;
+      N = shapes.length;
+    let radius: f32 = 0;
 
-    for (var i = 0; i !== N; i++) {
-      var shape = shapes[i];
+    for (let i: i32 = 0; i !== N; i++) {
+      const shape = shapes[i];
       shape.updateBoundingSphereRadius();
-      var offset = shapeOffsets[i].norm(),
+      const offset = shapeOffsets[i].norm(),
         r = shape.boundingSphereRadius;
       if (offset + r > radius) {
         radius = offset + r;
@@ -553,7 +549,7 @@ export class Body extends EventDispatcher {
    * @todo rename to updateAABB()
    */
   computeAABB(): void {
-    var shapes = this.shapes,
+    const shapes = this.shapes,
       shapeOffsets = this.shapeOffsets,
       shapeOrientations = this.shapeOrientations,
       N = shapes.length,
@@ -563,8 +559,8 @@ export class Body extends EventDispatcher {
       aabb = this.aabb,
       shapeAABB = computeAABB_shapeAABB;
 
-    for (var i = 0; i !== N; i++) {
-      var shape = shapes[i];
+    for (let i: i32 = 0; i !== N; i++) {
+      const shape = shapes[i];
 
       // Get shape world position
       bodyQuat.vmult(shapeOffsets[i], offset);
@@ -591,7 +587,7 @@ export class Body extends EventDispatcher {
    * @method updateInertiaWorld
    */
   updateInertiaWorld(force: boolean = false): void {
-    var I = this.invInertia;
+    const I = this.invInertia;
     if (I.x === I.y && I.y === I.z && !force) {
       // If inertia M = s*I, where I is identity and s a scalar, then
       //    R*M*R' = R*(s*I)*R' = s*R*I*R' = s*R*R' = s*I = M
@@ -599,7 +595,7 @@ export class Body extends EventDispatcher {
       // In other words, we don't have to transform the inertia if all
       // inertia diagonal entries are equal.
     } else {
-      var m1 = uiw_m1,
+      const m1 = uiw_m1,
         m2 = uiw_m2,
         m3 = uiw_m3;
       m1.setRotationFromQuaternion(this.quaternion);
@@ -622,7 +618,7 @@ export class Body extends EventDispatcher {
     }
 
     // Compute produced rotational force
-    var rotForce = Body_applyForce_rotForce;
+    const rotForce = Body_applyForce_rotForce;
     relativePoint.cross(force, rotForce);
 
     // Add linear force
@@ -643,8 +639,8 @@ export class Body extends EventDispatcher {
       return;
     }
 
-    var worldForce = Body_applyLocalForce_worldForce;
-    var relativePointWorld = Body_applyLocalForce_relativePointWorld;
+    const worldForce = Body_applyLocalForce_worldForce;
+    const relativePointWorld = Body_applyLocalForce_relativePointWorld;
 
     // Transform the force vector to world space
     this.vectorToWorldFrame(localForce, worldForce);
@@ -665,10 +661,10 @@ export class Body extends EventDispatcher {
     }
 
     // Compute point position relative to the body center
-    var r = relativePoint;
+    const r = relativePoint;
 
     // Compute produced central impulse velocity
-    var velo = Body_applyImpulse_velo;
+    const velo = Body_applyImpulse_velo;
     velo.copy(impulse);
     velo.mult(this.invMass, velo);
 
@@ -676,7 +672,7 @@ export class Body extends EventDispatcher {
     this.velocity.vadd(velo, this.velocity);
 
     // Compute produced rotational impulse velocity
-    var rotVelo = Body_applyImpulse_rotVelo;
+    const rotVelo = Body_applyImpulse_rotVelo;
     r.cross(impulse, rotVelo);
 
     /*
@@ -701,8 +697,8 @@ export class Body extends EventDispatcher {
       return;
     }
 
-    var worldImpulse = Body_applyLocalImpulse_worldImpulse;
-    var relativePointWorld = Body_applyLocalImpulse_relativePoint;
+    const worldImpulse = Body_applyLocalImpulse_worldImpulse;
+    const relativePointWorld = Body_applyLocalImpulse_relativePoint;
 
     // Transform the force vector to world space
     this.vectorToWorldFrame(localImpulse, worldImpulse);
@@ -716,11 +712,11 @@ export class Body extends EventDispatcher {
    * @method updateMassProperties
    */
   updateMassProperties(): void {
-    var halfExtents = Body_updateMassProperties_halfExtents;
+    const halfExtents = Body_updateMassProperties_halfExtents;
 
     this.invMass = this.mass > 0 ? 1.0 / this.mass : 0;
-    var I = this.inertia;
-    var fixed = this.fixedRotation;
+    const I = this.inertia;
+    const fixed = this.fixedRotation;
 
     // Approximate with AABB box
     this.computeAABB();
@@ -748,7 +744,7 @@ export class Body extends EventDispatcher {
    * @return {Vec3} The result vector.
    */
   getVelocityAtWorldPoint(worldPoint: Vec3, result: Vec3): Vec3 {
-    var r = new Vec3();
+    const r = new Vec3();
     worldPoint.vsub(this.position, r);
     this.angularVelocity.cross(r, result);
     this.velocity.vadd(result, result);
@@ -774,7 +770,7 @@ export class Body extends EventDispatcher {
       return;
     }
 
-    var velo = this.velocity,
+    const velo = this.velocity,
       angularVelo = this.angularVelocity,
       pos = this.position,
       force = this.force,
@@ -784,16 +780,16 @@ export class Body extends EventDispatcher {
       invInertia = this.invInertiaWorld,
       linearFactor = this.linearFactor;
 
-    var iMdt = invMass * dt;
+    const iMdt = invMass * dt;
     velo.x += force.x * iMdt * linearFactor.x;
     velo.y += force.y * iMdt * linearFactor.y;
     velo.z += force.z * iMdt * linearFactor.z;
 
-    var e = invInertia.elements;
-    var angularFactor = this.angularFactor;
-    var tx = torque.x * angularFactor.x;
-    var ty = torque.y * angularFactor.y;
-    var tz = torque.z * angularFactor.z;
+    const e = invInertia.elements;
+    const angularFactor = this.angularFactor;
+    const tx = torque.x * angularFactor.x;
+    const ty = torque.y * angularFactor.y;
+    const tz = torque.z * angularFactor.z;
     angularVelo.x += dt * (e[0] * tx + e[1] * ty + e[2] * tz);
     angularVelo.y += dt * (e[3] * tx + e[4] * ty + e[5] * tz);
     angularVelo.z += dt * (e[6] * tx + e[7] * ty + e[8] * tz);

@@ -1,5 +1,6 @@
 import { Vec3 } from "../maths/Vec3";
 import { Body } from "../objects/Body";
+import { Plane } from "../shapes/Plane";
 import { ShapeType } from "../shapes/Shape";
 import { Sphere } from "../shapes/Sphere";
 import { World } from "../world/World";
@@ -106,62 +107,6 @@ export class GridBroadphase extends Broadphase {
     // const min = Mathf.min;
     // const max = Mathf.max;
 
-    function addBoxToBins(x0: i32, y0: i32, z0: i32, x1: i32, y1: i32, z1: i32, bi: Body) {
-      let xoff0 = ((x0 - xmin) * xmult) | 0,
-        yoff0 = ((y0 - ymin) * ymult) | 0,
-        zoff0 = ((z0 - zmin) * zmult) | 0,
-        xoff1 = ceil((x1 - xmin) * xmult),
-        yoff1 = ceil((y1 - ymin) * ymult),
-        zoff1 = ceil((z1 - zmin) * zmult);
-
-      if (xoff0 < 0) {
-        xoff0 = 0;
-      } else if (xoff0 >= nx) {
-        xoff0 = nx - 1;
-      }
-      if (yoff0 < 0) {
-        yoff0 = 0;
-      } else if (yoff0 >= ny) {
-        yoff0 = ny - 1;
-      }
-      if (zoff0 < 0) {
-        zoff0 = 0;
-      } else if (zoff0 >= nz) {
-        zoff0 = nz - 1;
-      }
-      if (xoff1 < 0) {
-        xoff1 = 0;
-      } else if (xoff1 >= nx) {
-        xoff1 = nx - 1;
-      }
-      if (yoff1 < 0) {
-        yoff1 = 0;
-      } else if (yoff1 >= ny) {
-        yoff1 = ny - 1;
-      }
-      if (zoff1 < 0) {
-        zoff1 = 0;
-      } else if (zoff1 >= nz) {
-        zoff1 = nz - 1;
-      }
-
-      xoff0 *= xstep;
-      yoff0 *= ystep;
-      zoff0 *= zstep;
-      xoff1 *= xstep;
-      yoff1 *= ystep;
-      zoff1 *= zstep;
-
-      for (let xoff: i32 = xoff0; xoff <= xoff1; xoff += xstep) {
-        for (let yoff: i32 = yoff0; yoff <= yoff1; yoff += ystep) {
-          for (let zoff: i32 = zoff0; zoff <= zoff1; zoff += zstep) {
-            const idx = xoff + yoff + zoff;
-            bins[idx][binLengths[idx]++] = bi;
-          }
-        }
-      }
-    }
-
     // Put all bodies into the bins
     for (let i: i32 = 0; i !== N; i++) {
       const bi = bodies[i];
@@ -176,14 +121,37 @@ export class GridBroadphase extends Broadphase {
             z = bi.position.z;
           const r = (si as Sphere).radius;
 
-          addBoxToBins(x - r, y - r, z - r, x + r, y + r, z + r, bi);
+          addBoxToBins(
+            x - r,
+            y - r,
+            z - r,
+            x + r,
+            y + r,
+            z + r,
+            bi,
+            xmin,
+            ymin,
+            zmin,
+            xmult,
+            ymult,
+            zmult,
+            nx,
+            ny,
+            nz,
+            xstep,
+            ystep,
+            zstep,
+            binLengths,
+            bins
+          );
           break;
 
         case PLANE:
-          if (si.worldNormalNeedsUpdate) {
-            si.computeWorldNormal(bi.quaternion);
+          const plane = si as Plane;
+          if (plane.worldNormalNeedsUpdate) {
+            plane.computeWorldNormal(bi.quaternion);
           }
-          const planeNormal = si.worldNormal;
+          const planeNormal = plane.worldNormal;
 
           //Relative position from origin of plane object to the first bin
           //Incremented as we iterate through the bins
@@ -218,7 +186,21 @@ export class GridBroadphase extends Broadphase {
             bi.aabb.upperBound.x,
             bi.aabb.upperBound.y,
             bi.aabb.upperBound.z,
-            bi
+            bi,
+            xmin,
+            ymin,
+            zmin,
+            xmult,
+            ymult,
+            zmult,
+            nx,
+            ny,
+            nz,
+            xstep,
+            ystep,
+            zstep,
+            binLengths,
+            bins
           );
           break;
       }
@@ -261,6 +243,84 @@ export class GridBroadphase extends Broadphase {
 
   aabbQuery(world: World, aabb: AABB, result: Body[]): Body[] {
     throw new Error("Method not implemented.");
+  }
+}
+
+function addBoxToBins(
+  x0: i32,
+  y0: i32,
+  z0: i32,
+  x1: i32,
+  y1: i32,
+  z1: i32,
+  bi: Body,
+  xmin: i32,
+  ymin: i32,
+  zmin: i32,
+  xmult: i32,
+  ymult: i32,
+  zmult: i32,
+  nx: i32,
+  ny: i32,
+  nz: i32,
+  xstep: i32,
+  ystep: i32,
+  zstep: i32,
+  binLengths: i32[],
+  bins: Body[][]
+) {
+  let xoff0 = ((x0 - xmin) * xmult) | 0,
+    yoff0 = ((y0 - ymin) * ymult) | 0,
+    zoff0 = ((z0 - zmin) * zmult) | 0,
+    xoff1 = ceil((x1 - xmin) * xmult),
+    yoff1 = ceil((y1 - ymin) * ymult),
+    zoff1 = ceil((z1 - zmin) * zmult);
+
+  if (xoff0 < 0) {
+    xoff0 = 0;
+  } else if (xoff0 >= nx) {
+    xoff0 = nx - 1;
+  }
+  if (yoff0 < 0) {
+    yoff0 = 0;
+  } else if (yoff0 >= ny) {
+    yoff0 = ny - 1;
+  }
+  if (zoff0 < 0) {
+    zoff0 = 0;
+  } else if (zoff0 >= nz) {
+    zoff0 = nz - 1;
+  }
+  if (xoff1 < 0) {
+    xoff1 = 0;
+  } else if (xoff1 >= nx) {
+    xoff1 = nx - 1;
+  }
+  if (yoff1 < 0) {
+    yoff1 = 0;
+  } else if (yoff1 >= ny) {
+    yoff1 = ny - 1;
+  }
+  if (zoff1 < 0) {
+    zoff1 = 0;
+  } else if (zoff1 >= nz) {
+    zoff1 = nz - 1;
+  }
+
+  xoff0 *= xstep;
+  yoff0 *= ystep;
+  zoff0 *= zstep;
+  xoff1 *= xstep;
+  yoff1 *= ystep;
+  zoff1 *= zstep;
+
+  for (let xoff: i32 = xoff0; xoff <= xoff1; xoff += xstep) {
+    for (let yoff: i32 = yoff0; yoff <= yoff1; yoff += ystep) {
+      for (let zoff: i32 = zoff0; zoff <= zoff1; zoff += zstep) {
+        const idx = xoff + yoff + zoff;
+        bins[idx][binLengths[idx]++] = bi;
+      }
+    }
   }
 }
 

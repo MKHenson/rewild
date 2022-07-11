@@ -73,7 +73,7 @@ setWorld(world: World): void{
 
     this.world = world;
     this.dirty = true;
-};
+}
 
 /**
  * @static
@@ -84,7 +84,7 @@ setWorld(world: World): void{
 static insertionSortX(a) {
     for(let i=1,l=a.length;i<l;i++) {
         const v = a[i];
-        for(let j=i - 1;j>=0;j--) {
+        for(let j: i32=i - 1;j>=0;j--) {
             if(a[j].aabb.lowerBound.x <= v.aabb.lowerBound.x){
                 break;
             }
@@ -93,7 +93,7 @@ static insertionSortX(a) {
         a[j+1] = v;
     }
     return a;
-};
+}
 
 /**
  * @static
@@ -102,9 +102,9 @@ static insertionSortX(a) {
  * @return {Array}
  */
  static insertionSortY(a) {
-    for(const i=1,l=a.length;i<l;i++) {
+    for(let i: i32=1,l=a.length;i<l;i++) {
         const v = a[i];
-        for(const j=i - 1;j>=0;j--) {
+        for(let j: i32=i - 1;j>=0;j--) {
             if(a[j].aabb.lowerBound.y <= v.aabb.lowerBound.y){
                 break;
             }
@@ -113,7 +113,7 @@ static insertionSortX(a) {
         a[j+1] = v;
     }
     return a;
-};
+}
 
 /**
  * @static
@@ -122,9 +122,9 @@ static insertionSortX(a) {
  * @return {Array}
  */
  static insertionSortZ(a) {
-    for(const i=1,l=a.length;i<l;i++) {
+    for(let i: i32=1,l=a.length;i<l;i++) {
         const v = a[i];
-        for(const j=i - 1;j>=0;j--) {
+        for(let j: i32=i - 1;j>=0;j--) {
             if(a[j].aabb.lowerBound.z <= v.aabb.lowerBound.z){
                 break;
             }
@@ -133,7 +133,7 @@ static insertionSortX(a) {
         a[j+1] = v;
     }
     return a;
-};
+}
 
 /**
  * Collect all collision pairs
@@ -171,7 +171,7 @@ collisionPairs(world: World, p1: Body[],p2: Body[]): void{
             this.intersectionTest(bi,bj,p1,p2);
         }
     }
-};
+}
 
 sortList(): void {
     const axisList = this.axisList;
@@ -194,7 +194,7 @@ sortList(): void {
     } else if(axisIndex === 2){
         SAPBroadphase.insertionSortZ(axisList);
     }
-};
+}
 
 /**
  * Check if the bounds of two bodies overlap, along the given SAP axis.
@@ -228,7 +228,7 @@ sortList(): void {
         boundB2 = bjPos + rj;
 
     return boundB1 < boundA2;
-};
+}
 
 /**
  * Computes the variance of the body positions and estimates the best
@@ -277,7 +277,7 @@ autoDetectAxis(): void {
     } else{
         this.axisIndex = 2;
     }
-};
+}
 
 /**
  * Returns all the bodies within an AABB.
@@ -315,5 +315,5 @@ aabbQuery(world: World, aabb: AABB, result: Body[]): Body[]{
     }
 
     return result;
-};
+}
 }
