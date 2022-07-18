@@ -4,6 +4,7 @@ import { Vec3 } from "../maths/Vec3";
 import { Body } from "../objects/Body";
 import { Box } from "../shapes/Box";
 import { ConvexPolyhedron } from "../shapes/ConvexPolyhedron";
+import { Heightfield } from "../shapes/Heightfield";
 import { Plane } from "../shapes/Plane";
 import { Shape, ShapeType } from "../shapes/Shape";
 import { Sphere } from "../shapes/Sphere";
@@ -15,6 +16,14 @@ export enum RayMode {
   CLOSEST = 1,
   ANY = 2,
   ALL = 4,
+}
+
+export class IntersectConvexOptions {
+  faceList: i32[];
+
+  constructor() {
+    this.faceList = [0];
+  }
 }
 
 export interface IIntersectionReceiver {
@@ -357,7 +366,7 @@ export class Ray {
    * @param  {Vec3} position
    * @param  {Body} body
    */
-  intersectHeightfield(shape: Shape, quat: Quaternion, position: Vec3, body: Body, reportedShape: Shape): void {
+  intersectHeightfield(shape: Heightfield, quat: Quaternion, position: Vec3, body: Body, reportedShape: Shape): void {
     const data = shape.data,
       w = shape.elementSize;
 
@@ -490,13 +499,13 @@ export class Ray {
    * @param {object} [options]
    * @param {array} [options.faceList]
    */
-  intersectConvexintersectConvex(
+  intersectConvex(
     shape: ConvexPolyhedron,
     quat: Quaternion,
     position: Vec3,
     body: Body,
     reportedShape: Shape,
-    options
+    options: null | IntersectConvexOptions
   ): void {
     const minDistNormal = intersectConvex_minDistNormal;
     const normal = intersectConvex_normal;
@@ -608,7 +617,7 @@ export class Ray {
     position: Vec3,
     body: Body,
     reportedShape: Shape,
-    options
+    options: IntersectConvexOptions | null
   ): void {
     const normal = intersectTrimesh_normal;
     const triangles = intersectTrimesh_triangles;
@@ -744,7 +753,7 @@ export class Ray {
         this.hasHit = true;
         result.set(from, to, normal, hitPointWorld, shape, body, distance);
         result.hasHit = true;
-        this.callback(result);
+        if (this.callback) this.callback.onIntersection(result);
         break;
 
       case RayMode.CLOSEST:
@@ -785,9 +794,7 @@ const c = new Vec3();
 const d = new Vec3();
 
 const tmpRaycastResult = new RaycastResult();
-const intersectConvexOptions = {
-  faceList: [0],
-};
+const intersectConvexOptions = new IntersectConvexOptions();
 const worldPillarOffset = new Vec3();
 const intersectHeightfield_localRay = new Ray();
 const intersectHeightfield_index: i32[] = [];

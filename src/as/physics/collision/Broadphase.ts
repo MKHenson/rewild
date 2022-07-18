@@ -158,16 +158,16 @@ export abstract class Broadphase {
       const id1 = p1[i].id,
         id2 = p2[i].id;
       const key = id1 < id2 ? id1 + "," + id2 : id2 + "," + id1;
-      t[key] = i;
+      t.map.set(key, i);
       t.keys.push(key);
     }
 
     for (let i: i32 = 0; i !== t.keys.length; i++) {
       const key = t.keys.pop(),
-        pairIndex = t[key];
+        pairIndex = t.map.get(key);
       pairs1.push(p1[pairIndex]);
       pairs2.push(p2[pairIndex]);
-      delete t[key];
+      t.map.delete(key);
     }
   }
 
@@ -208,6 +208,6 @@ const Broadphase_collisionPairs_r = new Vec3(), // Temp objects
   Broadphase_collisionPairs_quat = new Quaternion(),
   Broadphase_collisionPairs_relpos = new Vec3();
 const bsc_dist = new Vec3();
-const Broadphase_makePairsUnique_temp: { [index: string]: i32; keys: string[] } = { keys: [] },
+const Broadphase_makePairsUnique_temp: { map: Map<string, i32>; keys: string[] } = { map: new Map(), keys: [] },
   Broadphase_makePairsUnique_p1: Body[] = [],
   Broadphase_makePairsUnique_p2: Body[] = [];

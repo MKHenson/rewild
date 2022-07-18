@@ -4,12 +4,22 @@ import { World } from "../world/World";
 export class Solver {
   equations: Equation[];
 
+  /**
+   * When tolerance is reached, the system is assumed to be converged.
+   * @property tolerance
+   * @type {Number}
+   */
+  tolerance: f32;
+  iterations: i32;
+
   constructor() {
     /**
      * All equations to be solved
      * @property {Array} equations
      */
     this.equations = [];
+    this.tolerance = 1e-7;
+    this.iterations = 10;
   }
 
   /**

@@ -1,5 +1,5 @@
 import { Equation } from "../equations/Equation";
-import { Body } from "../objects/Body";
+import { Body, BodyType } from "../objects/Body";
 import { World } from "../world/World";
 import { Solver } from "./Solver";
 
@@ -20,8 +20,6 @@ export class SplitSolverNode {
  * @param {Solver} subsolver
  */
 export class SplitSolver extends Solver {
-  iterations: f32;
-  tolerance: f32;
   subsolver: Solver;
   nodes: SplitSolverNode[];
   nodePool: SplitSolverNode[];
@@ -29,7 +27,6 @@ export class SplitSolver extends Solver {
   constructor(subsolver: Solver) {
     super();
     this.iterations = 10;
-    this.tolerance = 1e-7;
     this.subsolver = subsolver;
     this.nodes = [];
     this.nodePool = [];
@@ -125,7 +122,7 @@ const SplitSolver_solve_eqs: Equation[] = []; // Temp array
 const SplitSolver_solve_bds: SplitSolverNode[] = []; // Temp array
 const SplitSolver_solve_dummyWorld = { bodies: [] }; // Temp object
 
-const STATIC = Body.STATIC;
+const STATIC = BodyType.STATIC;
 
 function getUnvisitedNode(nodes) {
   const Nnodes = nodes.length;

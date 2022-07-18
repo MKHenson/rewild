@@ -213,7 +213,7 @@ createFrictionFromAverage(numContacts){
  * @param {array} result Array to store generated contacts
  * @param {array} oldcontacts Optional. Array of reusable contact objects
  */
-getContacts(p1, p2, world, result, oldcontacts, frictionResult, frictionPool){
+getContacts(p1: Body[], p2: Body[], world, result, oldcontacts, frictionResult, frictionPool){
     // Save old contact objects
     this.contactPointPool = oldcontacts;
     this.frictionEquationPool = frictionPool;

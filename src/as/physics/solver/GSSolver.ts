@@ -11,32 +11,8 @@ import { Solver } from "./Solver";
  * @extends Solver
  */
 export class GSSolver extends Solver {
-  /**
-   * The number of solver iterations determines quality of the constraints in the world. The more iterations, the more correct simulation. More iterations need more computations though. If you have a large gravity force in your world, you will need more iterations.
-   * @property iterations
-   * @type {Number}
-   * @todo write more about solver and iterations in the wiki
-   */
-  iterations: i32;
-
-  /**
-   * When tolerance is reached, the system is assumed to be converged.
-   * @property tolerance
-   * @type {Number}
-   */
-  tolerance: f32;
-
   constructor() {
     super();
-
-    this.iterations = 10;
-
-    /**
-     * When tolerance is reached, the system is assumed to be converged.
-     * @property tolerance
-     * @type {Number}
-     */
-    this.tolerance = 1e-7;
   }
 
   solve(dt: f32, world: World): i32 | undefined {
@@ -79,7 +55,7 @@ export class GSSolver extends Solver {
 
     if (Neq !== 0) {
       // Reset vlambda
-      for (const i = 0; i !== Nbodies; i++) {
+      for (let i: i32 = 0; i !== Nbodies; i++) {
         const b = bodies[i],
           vlambda = b.vlambda,
           wlambda = b.wlambda;
@@ -92,7 +68,7 @@ export class GSSolver extends Solver {
         // Accumulate the total error for each iteration.
         deltalambdaTot = 0.0;
 
-        for (const j = 0; j !== Neq; j++) {
+        for (let j: i32 = 0; j !== Neq; j++) {
           const c = equations[j];
 
           // Compute iteration
@@ -122,7 +98,7 @@ export class GSSolver extends Solver {
       }
 
       // Add result to velocity
-      for (const i = 0; i !== Nbodies; i++) {
+      for (let i: i32 = 0; i !== Nbodies; i++) {
         const b = bodies[i],
           v = b.velocity,
           w = b.angularVelocity;

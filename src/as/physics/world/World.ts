@@ -4,15 +4,17 @@ import { AABB } from "../collision/AABB";
 import { ArrayCollisionMatrix } from "../collision/ArrayCollisionMatrix";
 import { Broadphase } from "../collision/Broadphase";
 import { NaiveBroadphase } from "../collision/NaiveBroadphase";
-import { Ray } from "../collision/Ray";
+import { IntersectionOptions, Ray, RayMode } from "../collision/Ray";
 import { RaycastResult } from "../collision/RaycastResult";
 import { Constraint } from "../constraints/Constraint";
+import { ContactEquation } from "../equations/ContactEquation";
 import { Equation } from "../equations/Equation";
+import { FrictionEquation } from "../equations/FrictionEquation";
 import { ContactMaterial } from "../materials/ContactMaterial";
 import { PhysicsMaterial } from "../materials/PhysicsMaterial";
 import { Quaternion } from "../maths/Quaternion";
 import { Vec3 } from "../maths/Vec3";
-import { Body } from "../objects/Body";
+import { Body, BodyType, SleepState } from "../objects/Body";
 import { GSSolver } from "../solver/GSSolver";
 import { Solver } from "../solver/Solver";
 import { TupleDictionary } from "../utils/TupleDictionary";
@@ -65,8 +67,8 @@ export class World extends EventDispatcher {
        * @property contacts
        * @type {Array}
        */
-      contacts: f32[];
-      frictionEquations: Equation[];
+      contacts: ContactEquation[];
+      frictionEquations: FrictionEquation[];
 
       /**
        * How often to normalize quaternions. Set to 0 for every step, 1 for every second etc.. A larger value increases performance. If bodies tend to explode, set to a smaller value (zero to be sure nothing can go wrong).
@@ -172,7 +174,7 @@ export class World extends EventDispatcher {
        * @type {Array}
        */
       subsystems: f32[];
-      idToBodyMap: f32;
+      idToBodyMap: Map<i32, Body>;
 
     constructor(options){
         super();
@@ -229,7 +231,7 @@ export class World extends EventDispatcher {
             body : null
         };
 
-        this.idToBodyMap = {};
+        this.idToBodyMap = new Map();
         this.broadphase.setWorld(this);
     }
 
@@ -295,7 +297,7 @@ addBody(body: Body): void {
     }
 	this.collisionMatrix.setNumObjects(this.bodies.length);
     this.addBodyEvent.body = body;
-    this.idToBodyMap[body.id] = body;
+    this.idToBodyMap.set( body.id, body );
     this.dispatchEvent(this.addBodyEvent);
 };
 
@@ -313,7 +315,7 @@ addConstraint(c: Constraint): void{
  * @method removeConstraint
  * @param {Constraint} c
  */
-removeConstraint(c){
+removeConstraint(c: Constraint): void{
     const idx = this.constraints.indexOf(c);
     if(idx!==-1){
         this.constraints.splice(idx,1);
@@ -328,7 +330,7 @@ removeConstraint(c){
  * @param {RaycastResult} result
  * @deprecated Use .raycastAll, .raycastClosest or .raycastAny instead.
  */
-rayTest(from: Vec3, to: Vec3, result: RaycastResult){
+rayTest(from: Vec3, to: Vec3, result: RaycastResult): void{
     if(result instanceof RaycastResult){
         // Do raycastclosest
         this.raycastClosest(from, to, {
@@ -355,8 +357,8 @@ rayTest(from: Vec3, to: Vec3, result: RaycastResult){
  * @param  {Function} callback
  * @return {boolean} True if any body was hit.
  */
-raycastAll(from: Vec3, to: Vec3, options, callback){
-    options.mode = Ray.ALL;
+raycastAll(from: Vec3, to: Vec3, options: IntersectionOptions, callback){
+    options.mode = RayMode.ALL;
     options.from = from;
     options.to = to;
     options.callback = callback;
@@ -376,8 +378,8 @@ raycastAll(from: Vec3, to: Vec3, options, callback){
  * @param  {RaycastResult} result
  * @return {boolean} True if any body was hit.
  */
-raycastAny(from: Vec3, to: Vec3, options, result){
-    options.mode = Ray.ANY;
+raycastAny(from: Vec3, to: Vec3, options: IntersectionOptions, result){
+    options.mode = RayMode.ANY;
     options.from = from;
     options.to = to;
     options.result = result;
@@ -397,8 +399,8 @@ raycastAny(from: Vec3, to: Vec3, options, result){
  * @param  {RaycastResult} result
  * @return {boolean} True if any body was hit.
  */
-raycastClosest(from: Vec3, to: Vec3, options, result){
-    options.mode = Ray.CLOSEST;
+raycastClosest(from: Vec3, to: Vec3, options: IntersectionOptions, result){
+    options.mode = RayMode.CLOSEST;
     options.from = from;
     options.to = to;
     options.result = result;
@@ -420,21 +422,22 @@ remove(body: Body) : void {
         bodies.splice(idx, 1); // Todo: should use a garbage free method
 
         // Recompute index
-        for(const i=0; i!==bodies.length; i++){
+        for(let i:i32=0; i!==bodies.length; i++){
             bodies[i].index = i;
         }
 
         this.collisionMatrix.setNumObjects(n);
         this.removeBodyEvent.body = body;
-        delete this.idToBodyMap[body.id];
+        this.idToBodyMap.delete(body.id);
         this.dispatchEvent(this.removeBodyEvent);
     }
 };
 
 removeBody(body: Body): void{  this.remove(body)}
 
-getBodyById(id: i32){
-    return this.idToBodyMap[id];
+getBodyById(id: i32): Body | null {
+    if ( this.idToBodyMap.has(id) ) this.idToBodyMap.has(id)
+    return null;
 };
 
 // TODO Make a faster map
@@ -475,7 +478,7 @@ addContactMaterial(cmat: ContactMaterial): void {
     this.contactMaterialTable.set(cmat.materials[0].id,cmat.materials[1].id,cmat);
 };
 
-internalStep(dt){
+internalStep(dt: f32): void {
     this.dt = dt;
 
     let world = this,
@@ -489,8 +492,8 @@ internalStep(dt){
         gravity = this.gravity,
         doProfiling = this.doProfiling,
         profile = this.profile,
-        DYNAMIC = Body.DYNAMIC,
-        profilingStart,
+        DYNAMIC = BodyType.DYNAMIC,
+        profilingStart: f64,
         constraints = this.constraints,
         frictionEquationPool = World_step_frictionEquationPool,
         gnorm = gravity.norm(),
@@ -527,7 +530,7 @@ internalStep(dt){
     if(doProfiling){ profile.broadphase = performance.now() - profilingStart; }
 
     // Remove constrained pairs with collideConnected == false
-    const Nconstraints = constraints.length;
+    let Nconstraints = constraints.length;
     for(i=0; i!==Nconstraints; i++){
         const c = constraints[i];
         if(!c.collideConnected){
@@ -668,10 +671,10 @@ internalStep(dt){
 		// }
 
         if( bi.allowSleep &&
-            bi.type === Body.DYNAMIC &&
-            bi.sleepState  === Body.SLEEPING &&
-            bj.sleepState  === Body.AWAKE &&
-            bj.type !== Body.STATIC
+            bi.type === BodyType.DYNAMIC &&
+            bi.sleepState  === SleepState.SLEEPING &&
+            bj.sleepState  === SleepState.AWAKE &&
+            bj.type !== BodyType.STATIC
         ){
             const speedSquaredB = bj.velocity.norm2() + bj.angularVelocity.norm2();
             const speedLimitSquaredB = Math.pow(bj.sleepSpeedLimit,2);
@@ -681,10 +684,10 @@ internalStep(dt){
         }
 
         if( bj.allowSleep &&
-            bj.type === Body.DYNAMIC &&
-            bj.sleepState  === Body.SLEEPING &&
-            bi.sleepState  === Body.AWAKE &&
-            bi.type !== Body.STATIC
+            bj.type === BodyType.DYNAMIC &&
+            bj.sleepState  === SleepState.SLEEPING &&
+            bi.sleepState  === SleepState.AWAKE &&
+            bi.type !== BodyType.STATIC
         ){
             const speedSquaredA = bi.velocity.norm2() + bi.angularVelocity.norm2();
             const speedLimitSquaredA = Math.pow(bi.sleepSpeedLimit,2);
@@ -728,7 +731,7 @@ internalStep(dt){
     }
 
     // Add user-added constraints
-    const Nconstraints = constraints.length;
+    Nconstraints = constraints.length;
     for(i=0; i!==Nconstraints; i++){
         const c = constraints[i];
         c.update();
@@ -835,7 +838,7 @@ internalStep(dt){
  *
  * @see http://bulletphysics.org/mediawiki-1.5.8/index.php/Stepping_The_World
  */
- step(dt, timeSinceLastCalled, maxSubSteps){
+ step(dt: f32, timeSinceLastCalled: f32, maxSubSteps: i32){
     maxSubSteps = maxSubSteps || 10;
     timeSinceLastCalled = timeSinceLastCalled || 0;
 
@@ -849,7 +852,7 @@ internalStep(dt){
     } else {
 
         this.accumulator += timeSinceLastCalled;
-        const substeps = 0;
+        let substeps: i32 = 0;
         while (this.accumulator >= dt && substeps < maxSubSteps) {
             // Do fixed steps to catch up
             this.internalStep(dt);
@@ -876,7 +879,7 @@ internalStep(dt){
  clearForces(){
     const bodies = this.bodies;
     const N = bodies.length;
-    for(const i=0; i !== N; i++){
+    for(let i:i32=0; i !== N; i++){
         const b = bodies[i],
             force = b.force,
             tau = b.torque;
@@ -896,6 +899,7 @@ const tmpRay = new Ray();
 
 // performance.now()
 if(typeof performance === 'undefined'){
+ 
     performance = {};
 }
 if(!performance.now){
@@ -910,7 +914,6 @@ if(!performance.now){
 
 const step_tmp1 = new Vec3();
 
-
 const
     /**
      * Dispatched after the world has stepped forward in time.
@@ -923,10 +926,10 @@ const
      */
     World_step_preStepEvent = new Event( "preStep" ),
     World_step_collideEvent = {type:Body.COLLIDE_EVENT_NAME, body:null, contact:null },
-    World_step_oldContacts = [], // Pools for unused objects
-    World_step_frictionEquationPool = [],
-    World_step_p1 = [], // Reusable arrays for collision pairs
-    World_step_p2 = [],
+    World_step_oldContacts: ContactEquation[] = [], // Pools for unused objects
+    World_step_frictionEquationPool: FrictionEquation[] = [],
+    World_step_p1: Body[] = [], // Reusable arrays for collision pairs
+    World_step_p2: Body[] = [],
     World_step_gvec = new Vec3(), // Temporary vectors and quats
     World_step_vi = new Vec3(),
     World_step_vj = new Vec3(),
