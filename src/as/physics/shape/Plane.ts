@@ -12,13 +12,13 @@ import { ShapeConfig } from "./ShapeConfig";
 export class Plane extends Shape {
   normal: Vec3;
 
-  constructor(config: ShapeConfig, normal: Vec3) {
+  constructor(config: ShapeConfig, normal: Vec3 = new Vec3(0, 1, 0)) {
     super(config);
 
     this.type = SHAPE_PLANE;
 
     // radius of the shape.
-    this.normal = new Vec3(0, 1, 0);
+    this.normal = normal;
   }
 
   volume(): f32 {

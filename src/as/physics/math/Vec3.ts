@@ -20,8 +20,8 @@ export class Vec3 {
     return this;
   }
 
-  add(a: Vec3, b: Vec3): Vec3 {
-    if (b !== undefined) return this.addVectors(a, b);
+  add(a: Vec3, b: Vec3 | null = null): Vec3 {
+    if (b != null) return this.addVectors(a, b);
 
     this.x += a.x;
     this.y += a.y;
@@ -43,8 +43,8 @@ export class Vec3 {
     return this;
   }
 
-  sub(a: Vec3, b: Vec3): Vec3 {
-    if (b !== undefined) return this.subVectors(a, b);
+  sub(a: Vec3, b: Vec3 | null = null): Vec3 {
+    if (b != null) return this.subVectors(a, b);
 
     this.x -= a.x;
     this.y -= a.y;
@@ -148,7 +148,7 @@ export class Vec3 {
 
     }*/
 
-  cross(a: Vec3, b: Vec3 | null): Vec3 {
+  cross(a: Vec3, b: Vec3 | null = null): Vec3 {
     if (b != null) return this.crossVectors(a, b);
 
     var x = this.x,
@@ -245,7 +245,7 @@ export class Vec3 {
 
     }*/
 
-  applyMatrix3(m: Mat33, transpose: boolean): Vec3 {
+  applyMatrix3(m: Mat33, transpose: boolean = false): Vec3 {
     //if( transpose ) m = m.clone().transpose();
     var x = this.x,
       y = this.y,

@@ -24,7 +24,7 @@ export class Mat33 {
     return this;
   }
 
-  add(a: Mat33, b: Mat33 | null): Mat33 {
+  add(a: Mat33, b: Mat33 | null = null): Mat33 {
     if (b != null) return this.addMatrixs(a, b);
 
     var e = this.elements,
@@ -151,7 +151,7 @@ export class Mat33 {
     return this;
   }
 
-  multiplyMatrices(m1: Mat33, m2: Mat33, transpose: boolean): Mat33 {
+  multiplyMatrices(m1: Mat33, m2: Mat33, transpose: boolean = false): Mat33 {
     if (transpose) m2 = m2.clone().transpose();
 
     var te = this.elements;

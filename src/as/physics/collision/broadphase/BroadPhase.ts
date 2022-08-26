@@ -21,7 +21,7 @@ export abstract class BroadPhase {
   }
 
   // Create a new proxy.
-  abstract createProxy(shape: Shape): void;
+  abstract createProxy(shape: Shape): Proxy;
 
   // Add the proxy into the broad-phase.
   abstract addProxy(proxy: Proxy): void;
@@ -31,8 +31,8 @@ export abstract class BroadPhase {
 
   // Returns whether the pair is available or not.
   isAvailablePair(s1: Shape, s2: Shape): boolean {
-    const b1 = s1.parent;
-    const b2 = s2.parent;
+    const b1 = s1.parent!;
+    const b2 = s2.parent!;
     if (
       b1 == b2 || // same parents
       (!b1.isDynamic && !b2.isDynamic) || // static or kinematic object

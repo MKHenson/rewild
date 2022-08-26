@@ -1,6 +1,7 @@
 import { ManifoldPoint } from "./ManifoldPoint";
 import { Vec3 } from "../../math/Vec3";
 import { Shape } from "../../shape/Shape";
+import { RigidBody } from "../../core/RigidBody";
 
 /**
  * A contact manifold between two shapes.
@@ -9,9 +10,9 @@ import { Shape } from "../../shape/Shape";
  */
 
 export class ContactManifold {
-  body1: null;
+  body1: null | RigidBody;
   // The second rigid body.
-  body2: null;
+  body2: null | RigidBody;
   // The number of manifold points.
   numPoints: i32;
   // The manifold points.
@@ -36,8 +37,8 @@ export class ContactManifold {
     const p = this.points[this.numPoints++];
 
     p.position.copy(pos);
-    p.localPoint1.sub(pos, this.body1!.position).applyMatrix3(this.body1.rotation);
-    p.localPoint2.sub(pos, this.body2!.position).applyMatrix3(this.body2.rotation);
+    p.localPoint1.sub(pos, this.body1!.position).applyMatrix3(this.body1!.rotation);
+    p.localPoint2.sub(pos, this.body2!.position).applyMatrix3(this.body2!.rotation);
 
     p.normal.copy(norm);
     if (flip) p.normal.negate();

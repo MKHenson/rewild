@@ -7,6 +7,7 @@ import { MassInfo } from "./MassInfo";
 import { ShapeConfig } from "./ShapeConfig";
 import { Proxy } from "../collision/broadphase/Proxy";
 import { ContactLink } from "../constraint/contact/ContactLink";
+import { RigidBody } from "../core/RigidBody";
 
 let count = 0;
 function ShapeIdCount() {
@@ -22,8 +23,8 @@ function ShapeIdCount() {
 export abstract class Shape {
   type: i32;
   id: i32;
-  prev: null;
-  next: null;
+  prev: null | Shape;
+  next: null | Shape;
   proxy: Proxy | null;
   parent: RigidBody | null;
   contactLink: ContactLink | null;

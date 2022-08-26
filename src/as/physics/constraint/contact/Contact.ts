@@ -5,6 +5,8 @@ import { ContactConstraint } from "./ContactConstraint";
 import { _Math } from "../../math/Math";
 import { ManifoldPoint } from "./ManifoldPoint";
 import { Shape } from "../../shape/Shape";
+import { CollisionDetector } from "../../collision/narrowphase/CollisionDetector";
+import { RigidBody } from "../../core/RigidBody";
 /**
  * A contact is a pair of shapes whose axis-aligned bounding boxes are overlapping.
  * @author saharan
@@ -16,19 +18,19 @@ export class Contact {
   // The second shape.
   shape2: null | Shape;
   // The first rigid body.
-  body1: null | Body;
+  body1: null | RigidBody;
   // The second rigid body.
-  body2: null | Body;
+  body2: null | RigidBody;
   // The previous contact in the world.
-  prev: null;
+  prev: Contact | null;
   // The next contact in the world.
-  next: null;
+  next: Contact | null;
   // Internal
   persisting: boolean;
   // Whether both the rigid bodies are sleeping or not.
   sleeping: boolean;
   // The collision detector between two shapes.
-  detector = null;
+  detector: CollisionDetector | null;
   // The contact constraint of the contact.
   constraint: ContactConstraint | null;
   // Whether the shapes are touching or not.
@@ -105,7 +107,7 @@ export class Contact {
       b.impulse = p.normalImpulse;
     }
     this.manifold.numPoints = 0;
-    this.detector!.detectCollision(this.shape1, this.shape2, this.manifold);
+    this.detector!.detectCollision(this.shape1!, this.shape2!, this.manifold!);
     const num = this.manifold.numPoints;
     if (num == 0) {
       this.touching = false;
@@ -181,8 +183,8 @@ export class Contact {
     this.body1 = shape1.parent;
     this.body2 = shape2.parent;
 
-    this.manifold.body1 = this.body1;
-    this.manifold.body2 = this.body2;
+    this.manifold!.body1 = this.body1;
+    this.manifold!.body2 = this.body2;
     this.constraint!.body1 = this.body1;
     this.constraint!.body2 = this.body2;
     this.constraint!.attach();
