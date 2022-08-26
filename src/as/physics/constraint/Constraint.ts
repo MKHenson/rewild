@@ -1,3 +1,5 @@
+import { RigidBody } from "../core/RigidBody";
+import { World } from "../core/World";
 import { Vec3 } from "../math/Vec3";
 
 /**
@@ -9,13 +11,13 @@ import { Vec3 } from "../math/Vec3";
 
 export abstract class Constraint {
   // parent world of the constraint.
-  parent: null;
+  parent: null | World;
 
   // first body of the constraint.
-  body1: null;
+  body1: RigidBody | null;
 
   // second body of the constraint.
-  body2: null;
+  body2: RigidBody | null;
 
   // Internal
   addedToIsland: boolean;

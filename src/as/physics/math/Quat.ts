@@ -53,7 +53,7 @@ export class Quat {
 
     }*/
 
-  multiply(q: Quat, p: Quat | null): Quat {
+  multiply(q: Quat, p: Quat | null = null): Quat {
     if (p != null) return this.multiplyQuaternions(q, p);
     return this.multiplyQuaternions(this, q);
   }

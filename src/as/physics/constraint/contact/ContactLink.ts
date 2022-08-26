@@ -1,3 +1,4 @@
+import { RigidBody } from "../../core/RigidBody";
 import { Shape } from "../../shape/Shape";
 import { Contact } from "./Contact";
 
@@ -9,7 +10,7 @@ export class ContactLink {
   prev: null;
   next: null;
   shape: Shape | null;
-  body: null;
+  body: RigidBody | null;
   contact: null | Contact;
 
   constructor(contact: Contact) {

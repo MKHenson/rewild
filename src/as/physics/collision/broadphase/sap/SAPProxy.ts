@@ -1,5 +1,6 @@
 import { Shape } from "../../../shape/Shape";
 import { Proxy } from "../Proxy";
+import { SAPBroadPhase } from "./SAPBroadPhase";
 import { SAPElement } from "./SAPElement";
 
 /**
@@ -16,9 +17,9 @@ export class SAPProxy extends Proxy {
   // The minimum elements on each axis.
   min: SAPElement[];
 
-  sap: SAPElement;
+  sap: SAPBroadPhase;
 
-  constructor(sap: SAPElement, shape: Shape) {
+  constructor(sap: SAPBroadPhase, shape: Shape) {
     super(shape);
     this.belongsTo = 0;
     this.max = [];
@@ -50,7 +51,7 @@ export class SAPProxy extends Proxy {
 
   // Returns whether the proxy is dynamic or not.
   isDynamic() {
-    const body = this.shape.parent;
+    const body = this.shape.parent!;
     return body.isDynamic && !body.sleeping;
   }
 

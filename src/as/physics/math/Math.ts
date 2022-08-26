@@ -15,16 +15,16 @@ export class _Math {
   // min    : Math.min,
   // random : Math.random,
 
-  degtorad: f32 = 0.0174532925199432957;
-  radtodeg: f32 = 57.295779513082320876;
-  PI: f32 = 3.141592653589793;
-  TwoPI: f32 = 6.283185307179586;
-  PI90: f32 = 1.570796326794896;
-  PI270: f32 = 4.712388980384689;
+  static degtorad: f32 = 0.0174532925199432957;
+  static radtodeg: f32 = 57.295779513082320876;
+  static PI: f32 = 3.141592653589793;
+  static TwoPI: f32 = 6.283185307179586;
+  static PI90: f32 = 1.570796326794896;
+  static PI270: f32 = 4.712388980384689;
 
-  INF: f32 = Infinity;
-  EPZ: f32 = 0.00001;
-  EPZ2: f32 = 0.000001;
+  static INF: f32 = Infinity;
+  static EPZ: f32 = 0.00001;
+  static EPZ2: f32 = 0.000001;
 
   static lerp(x: f32, y: f32, t: f32): f32 {
     return (1 - t) * x + t * y;
