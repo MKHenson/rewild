@@ -26,19 +26,19 @@ export class _Math {
   EPZ: f32 = 0.00001;
   EPZ2: f32 = 0.000001;
 
-  lerp(x: f32, y: f32, t: f32): f32 {
+  static lerp(x: f32, y: f32, t: f32): f32 {
     return (1 - t) * x + t * y;
   }
 
-  randInt(low: f32, high: f32): i32 {
+  static randInt(low: f32, high: f32): i32 {
     return i32(low + Mathf.floor(Mathf.random() * (high - low + 1)));
   }
 
-  rand(low: f32, high: f32): f32 {
+  static rand(low: f32, high: f32): f32 {
     return low + Mathf.random() * (high - low);
   }
 
-  generateUUID() {
+  static generateUUID() {
     // http://www.broofa.com/Tools/Math.uuid.htm
 
     var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".split("");
@@ -64,21 +64,21 @@ export class _Math {
     };
   }
 
-  int(x: f32): i32 {
+  static int(x: f32): i32 {
     return i32(x);
   }
 
-  fix(x: f32, n: f32): f32 {
+  static fix(x: f32, n: f32): f32 {
     return x.toFixed(n || 3, 10);
   }
 
-  clamp(value: f32, min: f32, max: f32): f32 {
+  static clamp(value: f32, min: f32, max: f32): f32 {
     return Mathf.max(min, Mathf.min(max, value));
   }
 
   //clamp( x, a, b ) { return ( x < a ) ? a : ( ( x > b ) ? b : x ); },
 
-  distance(p1: f32[], p2: f32[]): f32 {
+  static distance(p1: f32[], p2: f32[]): f32 {
     var xd = p2[0] - p1[0];
     var yd = p2[1] - p1[1];
     var zd = p2[2] - p1[2];
@@ -103,20 +103,20 @@ export class _Math {
 
     },*/
 
-  acosClamp(cos: f32): f32 {
+  static acosClamp(cos: f32): f32 {
     if (cos > 1) return 0;
     else if (cos < -1) return Mathf.PI;
     else return Mathf.acos(cos);
   }
 
-  distanceVector(v1: Vec3, v2: Vec3): f32 {
+  static distanceVector(v1: Vec3, v2: Vec3): f32 {
     var xd = v1.x - v2.x;
     var yd = v1.y - v2.y;
     var zd = v1.z - v2.z;
     return xd * xd + yd * yd + zd * zd;
   }
 
-  dotVectors(a: Vec3, b: Vec3): f32 {
+  static dotVectors(a: Vec3, b: Vec3): f32 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
   }
 }

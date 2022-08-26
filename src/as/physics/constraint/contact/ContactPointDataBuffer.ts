@@ -1,7 +1,43 @@
-import { Vec3 } from '../../math/Vec3';
+import { Vec3 } from "../../math/Vec3";
 
-function ContactPointDataBuffer (){
+export class ContactPointDataBuffer {
+  nor: Vec3;
+  tan: Vec3;
+  bin: Vec3;
 
+  norU1: Vec3;
+  tanU1: Vec3;
+  binU1: Vec3;
+
+  norU2: Vec3;
+  tanU2: Vec3;
+  binU2: Vec3;
+
+  norT1: Vec3;
+  tanT1: Vec3;
+  binT1: Vec3;
+
+  norT2: Vec3;
+  tanT2: Vec3;
+  binT2: Vec3;
+
+  norTU1: Vec3;
+  tanTU1: Vec3;
+  binTU1: Vec3;
+  norTU2: Vec3;
+  tanTU2: Vec3;
+  binTU2: Vec3;
+  norImp: f32;
+  tanImp: f32;
+  binImp: f32;
+  norDen: f32;
+  tanDen: f32;
+  binDen: f32;
+  norTar: f32;
+  next: ContactPointDataBuffer | null;
+  last: boolean;
+
+  constructor() {
     this.nor = new Vec3();
     this.tan = new Vec3();
     this.bin = new Vec3();
@@ -42,7 +78,5 @@ function ContactPointDataBuffer (){
 
     this.next = null;
     this.last = false;
-
+  }
 }
-
-export { ContactPointDataBuffer };

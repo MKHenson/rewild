@@ -6,6 +6,7 @@ import { AABB } from "../math/AABB";
 import { MassInfo } from "./MassInfo";
 import { ShapeConfig } from "./ShapeConfig";
 import { Proxy } from "../collision/broadphase/Proxy";
+import { ContactLink } from "../constraint/contact/ContactLink";
 
 let count = 0;
 function ShapeIdCount() {
@@ -24,8 +25,8 @@ export abstract class Shape {
   prev: null;
   next: null;
   proxy: Proxy | null;
-  parent: null;
-  contactLink: null;
+  parent: RigidBody | null;
+  contactLink: ContactLink | null;
   numContacts: i32;
   position: Vec3;
   rotation: Mat33;
