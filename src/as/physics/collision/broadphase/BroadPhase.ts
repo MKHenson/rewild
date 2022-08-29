@@ -1,4 +1,5 @@
 import { BR_NULL } from "../../constants";
+import { JointLink } from "../../constraint/joint/JointLink";
 import { Shape } from "../../shape/Shape";
 import { Pair } from "./Pair";
 import { Proxy } from "./Proxy";
@@ -41,7 +42,7 @@ export abstract class BroadPhase {
     ) {
       return false;
     }
-    let js;
+    let js: JointLink | null;
     if (b1.numJoints < b2.numJoints) js = b1.jointLink;
     else js = b2.jointLink;
     while (js !== null) {
