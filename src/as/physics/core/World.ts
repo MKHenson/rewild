@@ -760,7 +760,7 @@ export class World extends EventDispatcher {
   //   else return this.initBody(type, o);
   // }
 
-  initBody(type: "cylinder" | "sphere" | "box" | "plane", o): RigidBody {
+  initBody(type: ("cylinder" | "sphere" | "box" | "plane")[], o): RigidBody {
     const invScale = this.invScale;
 
     // body dynamic or static
