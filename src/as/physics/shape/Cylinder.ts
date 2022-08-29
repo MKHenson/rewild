@@ -30,17 +30,17 @@ export class Cylinder extends Shape {
   }
 
   calculateMassInfo(out: MassInfo): void {
-    var rsq = this.radius * this.radius;
-    var mass = Mathf.PI * rsq * this.height * this.density;
-    var inertiaXZ = (0.25 * rsq + 0.0833 * this.height * this.height) * mass;
-    var inertiaY = 0.5 * rsq;
+    let rsq = this.radius * this.radius;
+    let mass = Mathf.PI * rsq * this.height * this.density;
+    let inertiaXZ = (0.25 * rsq + 0.0833 * this.height * this.height) * mass;
+    let inertiaY = 0.5 * rsq;
     out.mass = mass;
     out.inertia.set(inertiaXZ, 0, 0, 0, inertiaY, 0, 0, 0, inertiaXZ);
   }
 
   updateProxy(): void {
-    var te = this.rotation.elements;
-    var len, wx, hy, dz, xx, yy, zz, w, h, d, p;
+    let te = this.rotation.elements;
+    let len, wx, hy, dz, xx, yy, zz, w, h, d, p;
 
     xx = te[1] * te[1];
     yy = te[4] * te[4];

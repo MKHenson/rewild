@@ -72,8 +72,8 @@ export class Mat33 {
     return this;
   }
 
-  sub(a: Mat33, b: Mat33): Mat33 {
-    if (b !== undefined) return this.subMatrixs(a, b);
+  sub(a: Mat33, b: Mat33 | null = null): Mat33 {
+    if (b != null) return this.subMatrixs(a, b);
 
     var e = this.elements,
       te = a.elements;
@@ -452,9 +452,6 @@ export class Mat33 {
   }
 
   toArray(array: f32[], offset = 0): f32[] {
-    if (array === undefined) array = [];
-    if (offset === undefined) offset = 0;
-
     var te = this.elements;
 
     array[offset] = te[0];

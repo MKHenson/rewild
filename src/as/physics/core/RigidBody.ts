@@ -8,6 +8,7 @@ import { Shape } from "../shape/Shape";
 import { ContactLink } from "../constraint/contact/ContactLink";
 import { JointLink } from "../constraint/joint/JointLink";
 import { World } from "./World";
+import { PhysicsObject } from "./PhysicsObject";
 
 /**
  * The class of rigid body.
@@ -17,7 +18,7 @@ import { World } from "./World";
  * @author lo-th
  */
 
-export class RigidBody {
+export class RigidBody extends PhysicsObject {
   position: Vec3;
   orientation: Quat;
 
@@ -27,8 +28,6 @@ export class RigidBody {
   // possible link to three Mesh;
   mesh = null;
 
-  id: i32;
-  name: string;
   // The maximum number of shapes that can be added to a one rigid.
   //MAX_SHAPES = 64;//64;
 
@@ -118,6 +117,7 @@ export class RigidBody {
   sleeping: boolean;
 
   constructor(Position: Vec3, Rotation: Quat) {
+    super();
     this.position = Position || new Vec3();
     this.orientation = Rotation || new Quat();
 

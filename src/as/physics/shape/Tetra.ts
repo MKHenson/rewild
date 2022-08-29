@@ -25,12 +25,12 @@ export class Tetra extends Shape {
     // I guess you could calculate box mass and split it
     // in half for the tetra...
     this.aabb.setFromPoints(this.verts);
-    var p = this.aabb.elements;
-    var x = p[3] - p[0];
-    var y = p[4] - p[1];
-    var z = p[5] - p[2];
-    var mass = x * y * z * this.density;
-    var divid = 1 / 12;
+    let p = this.aabb.elements;
+    let x = p[3] - p[0];
+    let y = p[4] - p[1];
+    let z = p[5] - p[2];
+    let mass = x * y * z * this.density;
+    let divid = 1 / 12;
     out.mass = mass;
     out.inertia.set(
       mass * (2 * y * 2 * y + 2 * z * 2 * z) * divid,
