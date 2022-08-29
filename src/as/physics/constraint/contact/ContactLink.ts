@@ -7,8 +7,8 @@ import { Contact } from "./Contact";
  * @author saharan
  */
 export class ContactLink {
-  prev: null;
-  next: null;
+  prev: null | ContactLink;
+  next: null | ContactLink;
   shape: Shape | null;
   body: RigidBody | null;
   contact: null | Contact;

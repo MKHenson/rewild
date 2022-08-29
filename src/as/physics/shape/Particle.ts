@@ -23,12 +23,12 @@ export class Particle extends Shape {
   }
 
   calculateMassInfo(out: MassInfo): void {
-    var inertia = 0;
+    let inertia = 0;
     out.inertia.set(inertia, 0, 0, 0, inertia, 0, 0, 0, inertia);
   }
 
   updateProxy(): void {
-    var p = 0; //AABB_PROX;
+    let p = 0; //AABB_PROX;
 
     this.aabb.set(
       this.position.x - p,

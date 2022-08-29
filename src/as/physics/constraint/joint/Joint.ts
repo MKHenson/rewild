@@ -18,10 +18,6 @@ export class Joint extends Constraint {
   scale: f32;
   invScale: f32;
 
-  // joint name
-  name: string;
-  id: u32;
-
   // The type of the joint.
   type = JOINT_NULL;
   //  The previous joint in the world.

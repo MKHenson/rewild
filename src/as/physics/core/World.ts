@@ -1,5 +1,5 @@
 import { SHAPE_BOX, SHAPE_SPHERE, SHAPE_CYLINDER, SHAPE_PLANE, BODY_DYNAMIC, BODY_STATIC } from "../constants";
-import { InfoDisplay, printError } from "./Utils";
+import { InfoDisplay } from "./Utils";
 import { BruteForceBroadPhase } from "../collision/broadphase/BruteForceBroadPhase";
 import { SAPBroadPhase } from "../collision/broadphase/sap/SAPBroadPhase";
 import { DBVTBroadPhase } from "../collision/broadphase/dbvt/DBVTBroadPhase";
@@ -10,7 +10,7 @@ import { SphereBoxCollisionDetector } from "../collision/narrowphase/SphereBoxCo
 import { SphereCylinderCollisionDetector } from "../collision/narrowphase/SphereCylinderCollisionDetector";
 import { SphereSphereCollisionDetector } from "../collision/narrowphase/SphereSphereCollisionDetector";
 import { SpherePlaneCollisionDetector } from "../collision/narrowphase/SpherePlaneCollisionDetector_X";
-import { BoxPlaneCollisionDetector } from "../collision/narrowphase/BoxPlaneCollisionDetector_X";
+import { BoxPlaneCollisionDetector } from "../collision/narrowphase/BoxPlaneCollisionDetector";
 import { _Math } from "../math/Math";
 import { Quat } from "../math/Quat";
 import { Vec3 } from "../math/Vec3";
@@ -34,6 +34,22 @@ import { Shape } from "../shape/Shape";
 import { Joint } from "../constraint/joint/Joint";
 import { CollisionDetector } from "../collision/narrowphase/CollisionDetector";
 import { ContactLink } from "../constraint/contact/ContactLink";
+import { EventDispatcher } from "../../core/EventDispatcher";
+import { Event } from "../../core/Event";
+import { PhysicsObject } from "./PhysicsObject";
+
+const postLoop = new Event("post-loop");
+export class WorldOptions {
+  constructor(
+    public worldscale: f32 = 1,
+    public timestep: f32 = 0.01666,
+    public iterations: i32 = 8,
+    public random: boolean = true,
+    public gravity = new Vec3(0, -9.8, 0),
+    public broadphase: i32 = 2,
+    public info: boolean = false
+  ) {}
+}
 
 /**
  * The class of physical computing world.
@@ -43,20 +59,20 @@ import { ContactLink } from "../constraint/contact/ContactLink";
  * @author lo-th
  */
 
-export class World {
+export class World extends EventDispatcher {
   scale: f32;
   invScale: f32;
   timeStep: f32; // 1/60;
   timerate: f32;
   timer: null;
-  preLoop: null; //function(){};
-  postLoop: null; //function(){};
+  // preLoop: null; //function(){};
+  //postLoop: null; //function(){};
   numIterations: i32;
   broadPhase: BroadPhase;
   Btypes: string[];
   broadPhaseType: string;
-  performance: f64;
-  isStat: Vec3;
+  performance: InfoDisplay | null;
+  isStat: boolean;
   enableRandomizer: boolean;
   rigidBodies: RigidBody | null;
   numRigidBodies: i32;
@@ -76,8 +92,8 @@ export class World {
   islandStack: (RigidBody | null)[];
   islandConstraints: (Constraint | null)[];
 
-  constructor(o) {
-    if (!(o instanceof Object)) o = {};
+  constructor(o: WorldOptions = new WorldOptions()) {
+    super();
 
     // this world scale defaut is 0.1 to 10 meters max for dynamique body
     this.scale = o.worldscale || 1;
@@ -88,8 +104,8 @@ export class World {
     this.timerate = this.timeStep * 1000;
     this.timer = null;
 
-    this.preLoop = null; //function(){};
-    this.postLoop = null; //function(){};
+    // this.preLoop = null; //function(){};
+    // this.postLoop = null; //function(){};
 
     // The number of iterations for constraint solvers.
     this.numIterations = o.iterations || 8;
@@ -113,7 +129,7 @@ export class World {
 
     // This is the detailed information of the performance.
     this.performance = null;
-    this.isStat = o.info === undefined ? false : o.info;
+    this.isStat = o.info;
     if (this.isStat) this.performance = new InfoDisplay(this);
 
     /**
@@ -122,7 +138,7 @@ export class World {
      * @property enableRandomizer
      * @type {Boolean}
      */
-    this.enableRandomizer = o.random !== undefined ? o.random : true;
+    this.enableRandomizer = o.random;
 
     // The rigid body list
     this.rigidBodies = null;
@@ -143,8 +159,7 @@ export class World {
     this.numIslands = 0;
 
     // The gravity in the world.
-    this.gravity = new Vec3(0, -9.8, 0);
-    if (o.gravity !== undefined) this.gravity.fromArray(o.gravity);
+    this.gravity = o.gravity;
 
     const numShapeTypes = 5; //4;//3;
     this.detectors = [];
@@ -210,15 +225,15 @@ export class World {
     this.gravity.fromArray(ar);
   }
 
-  getInfo(): void {
-    return this.isStat ? this.performance.show() : "";
+  getInfo(): string {
+    return this.isStat ? this.performance!.show() : "";
   }
 
   // Reset the world and remove all rigid bodies, shapes, joints and any object from the world.
   clear(): void {
     this.stop();
-    this.preLoop = null;
-    this.postLoop = null;
+    // this.preLoop = null;
+    // this.postLoop = null;
 
     this.randX = 65535;
 
@@ -240,13 +255,13 @@ export class World {
    */
   addRigidBody(rigidBody: RigidBody): void {
     if (rigidBody.parent) {
-      printError("World", "It is not possible to be added to more than one world one of the rigid body");
+      throw new Error("It is not possible to be added to more than one world one of the rigid body");
     }
 
     rigidBody.setParent(this);
     //rigidBody.awake();
 
-    for (const shape = rigidBody.shapes; shape !== null; shape = shape.next) {
+    for (let shape = rigidBody.shapes; shape !== null; shape = shape.next) {
       this.addShape(shape);
     }
     if (this.rigidBodies !== null) (this.rigidBodies.prev = rigidBody).next = this.rigidBodies;
@@ -283,7 +298,7 @@ export class World {
     this.numRigidBodies--;
   }
 
-  getByName(name: string): RigidBody | null {
+  getByName(name: string): PhysicsObject | null {
     let body = this.rigidBodies;
     while (body !== null) {
       if (body.name === name) return body;
@@ -307,7 +322,7 @@ export class World {
    */
   addShape(shape: Shape): void {
     if (!shape.parent || !shape.parent.parent) {
-      printError("World", "It is not possible to be added alone to shape world");
+      throw new Error("It is not possible to be added alone to shape world");
     }
 
     shape.proxy = this.broadPhase.createProxy(shape);
@@ -333,7 +348,7 @@ export class World {
    */
   addJoint(joint: Joint): void {
     if (joint.parent) {
-      printError("World", "It is not possible to be added to more than one world one of the joint");
+      throw new Error("It is not possible to be added to more than one world one of the joint");
     }
     if (this.joints != null) (this.joints.prev = joint).next = this.joints;
     this.joints = joint;
@@ -392,15 +407,15 @@ export class World {
     this.numContacts--;
   }
 
-  getContact(b1: RigidBody, b2: RigidBody): void {
-    b1 = b1.constructor === RigidBody ? b1.name : b1;
-    b2 = b2.constructor === RigidBody ? b2.name : b2;
+  getContact(b1: string, b2: string): Contact | null {
+    // b1 = b1.constructor === RigidBody ? b1.name : b1;
+    // b2 = b2.constructor === RigidBody ? b2.name : b2;
 
     let n1: string, n2: string;
-    const contact = this.contacts;
+    let contact = this.contacts;
     while (contact !== null) {
-      n1 = contact.body1.name;
-      n2 = contact.body2.name;
+      n1 = contact.body1!.name;
+      n2 = contact.body2!.name;
       if ((n1 === b1 && n2 === b2) || (n2 === b1 && n1 === b2)) {
         if (contact.touching) return contact;
         else return null;
@@ -420,7 +435,9 @@ export class World {
         else return false;
       } else contact = contact.next;
     }
-    //return false;
+
+    // Unsure if this is correct
+    return false;
   }
 
   callSleep(body: RigidBody): boolean {
@@ -436,7 +453,7 @@ export class World {
   step(): void {
     const stat = this.isStat;
 
-    if (stat) this.performance.setTime(0);
+    if (stat) this.performance!.setTime(0);
 
     let body = this.rigidBodies;
 
@@ -452,7 +469,7 @@ export class World {
     //   UPDATE BROADPHASE CONTACT
     //------------------------------------------------------
 
-    if (stat) this.performance.setTime(1);
+    if (stat) this.performance!.setTime(1);
 
     this.broadPhase.detectPairs();
 
@@ -492,7 +509,7 @@ export class World {
       }
     } // while(i-- >0);
 
-    if (stat) this.performance.calcBroadPhase();
+    if (stat) this.performance!.calcBroadPhase();
 
     //------------------------------------------------------
     //   UPDATE NARROWPHASE CONTACT
@@ -511,24 +528,24 @@ export class World {
 	                aabb1.minY>aabb2.maxY || aabb1.maxY<aabb2.minY ||
 	                aabb1.minZ>aabb2.maxZ || aabb1.maxZ<aabb2.minZ
                 ){*/
-          const next = contact.next;
-          this.removeContact(contact);
+          const next: Contact | null = contact.next;
+          if (next) this.removeContact(contact);
           contact = next;
           continue;
         }
       }
-      const b1 = contact.body1;
-      const b2 = contact.body2;
+      const b1 = contact.body1!;
+      const b2 = contact.body2!;
 
       if ((b1.isDynamic && !b1.sleeping) || (b2.isDynamic && !b2.sleeping)) contact.updateManifold();
 
       this.numContactPoints += contact.manifold.numPoints;
       contact.persisting = false;
-      contact.constraint.addedToIsland = false;
+      contact.constraint!.addedToIsland = false;
       contact = contact.next;
     }
 
-    if (stat) this.performance.calcNarrowPhase();
+    if (stat) this.performance!.calcNarrowPhase();
 
     //------------------------------------------------------
     //   SOLVE ISLANDS
@@ -547,7 +564,7 @@ export class World {
     this.islandConstraints = [];
     this.islandStack = [];
 
-    if (stat) this.performance.setTime(1);
+    if (stat) this.performance!.setTime(1);
 
     this.numIslands = 0;
 
@@ -576,9 +593,9 @@ export class World {
         continue;
       }
 
-      let islandNumRigidBodies = 0;
-      let islandNumConstraints = 0;
-      let stackCount = 1;
+      let islandNumRigidBodies: i32 = 0;
+      let islandNumConstraints: i32 = 0;
+      let stackCount: i32 = 1;
       // add rigid body to stack
       this.islandStack[0] = base;
       base.addedToIsland = true;
@@ -594,7 +611,7 @@ export class World {
         if (body.isStatic) continue;
 
         // search connections
-        for (const cs = body.contactLink; cs !== null; cs = cs.next) {
+        for (let cs = body.contactLink; cs !== null; cs = cs.next) {
           const contact = cs.contact!;
           constraint = contact.constraint!;
           if (constraint.addedToIsland || !contact.touching) continue; // ignore
@@ -632,10 +649,10 @@ export class World {
       /*const gx=this.gravity.x*this.timeStep;
             const gy=this.gravity.y*this.timeStep;
             const gz=this.gravity.z*this.timeStep;*/
-      let j = islandNumRigidBodies;
+      let j: i32 = islandNumRigidBodies;
       while (j--) {
         //or(const j=0, l=islandNumRigidBodies; j<l; j++){
-        body = this.islandRigidBodies[j];
+        body = this.islandRigidBodies[j]!;
         if (body.isDynamic) {
           body.linearVelocity.addEqual(gVel);
           /*body.linearVelocity.x+=gx;
@@ -665,7 +682,7 @@ export class World {
         //for(j=0, l=islandNumConstraints; j<l; j++){
         this.islandConstraints[j]!.preSolve(this.timeStep, invTimeStep); // pre-solve
       }
-      const k = this.numIterations;
+      let k: i32 = this.numIterations;
       while (k--) {
         //for(const k=0, l=this.numIterations; k<l; k++){
         j = islandNumConstraints;
@@ -687,7 +704,7 @@ export class World {
       j = islandNumRigidBodies;
       while (j--) {
         //for(j=0, l=islandNumRigidBodies;j<l;j++){
-        body = this.islandRigidBodies[j];
+        body = this.islandRigidBodies[j]!;
         if (this.callSleep(body)) {
           body.sleepTime += this.timeStep;
           if (body.sleepTime < sleepTime) sleepTime = body.sleepTime;
@@ -721,27 +738,27 @@ export class World {
     //   END SIMULATION
     //------------------------------------------------------
 
-    if (stat) this.performance.calcEnd();
+    if (stat) this.performance!.calcEnd();
 
-    if (this.postLoop !== null) this.postLoop();
+    this.dispatchEvent(postLoop);
   }
 
   // remove someting to world
 
-  remove(obj): void {}
+  // remove(obj): void {}
 
   // add someting to world
 
-  add(o): void {
-    o = o || {};
+  // add(o): void {
+  //   o = o || {};
 
-    const type = o.type || "box";
-    if (type.constructor === String) type = [type];
-    const isJoint = type[0].substring(0, 5) === "joint" ? true : false;
+  //   const type = o.type || "box";
+  //   if (type.constructor === String) type = [type];
+  //   const isJoint = type[0].substring(0, 5) === "joint" ? true : false;
 
-    if (isJoint) return this.initJoint(type[0], o);
-    else return this.initBody(type, o);
-  }
+  //   if (isJoint) return this.initJoint(type[0], o);
+  //   else return this.initBody(type, o);
+  // }
 
   initBody(type: "cylinder" | "sphere" | "box" | "plane", o): RigidBody {
     const invScale = this.invScale;
@@ -753,7 +770,7 @@ export class World {
     // POSITION
 
     // body position
-    const p = o.pos || [0, 0, 0];
+    let p = o.pos || [0, 0, 0];
     p = p.map(function (x) {
       return x * invScale;
     });
@@ -938,20 +955,20 @@ export class World {
     let b2: RigidBody | null = null;
 
     if (o.body1 === undefined || o.body2 === undefined)
-      return printError("World", "Can't add joint if attach rigidbodys not define !");
+      throw new Error("Can't add joint if attach rigidbodys not define !");
 
     if (o.body1.constructor === String) {
-      b1 = this.getByName(o.body1);
+      b1 = this.getByName(o.body1) as RigidBody;
     } else if (o.body1.constructor === Number) {
-      b1 = this.getByName(o.body1);
+      b1 = this.getByName(o.body1) as RigidBody;
     } else if (o.body1.constructor === RigidBody) {
       b1 = o.body1;
     }
 
     if (o.body2.constructor === String) {
-      b2 = this.getByName(o.body2);
+      b2 = this.getByName(o.body2) as RigidBody;
     } else if (o.body2.constructor === Number) {
-      b2 = this.getByName(o.body2);
+      b2 = this.getByName(o.body2) as RigidBody;
     } else if (o.body2.constructor === RigidBody) {
       b2 = o.body2;
     }

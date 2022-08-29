@@ -209,29 +209,29 @@ export class Contact {
     this.b2Link.shape = shape1;
     this.b2Link.body = this.body1;
 
-    if (this.body1.contactLink != null) (this.b1Link.next = this.body1.contactLink).prev = this.b1Link;
+    if (this.body1!.contactLink != null) (this.b1Link.next = this.body1!.contactLink).prev = this.b1Link;
     else this.b1Link.next = null;
-    this.body1.contactLink = this.b1Link;
-    this.body1.numContacts++;
+    this.body1!.contactLink = this.b1Link;
+    this.body1!.numContacts++;
 
-    if (this.body2.contactLink != null) (this.b2Link.next = this.body2.contactLink).prev = this.b2Link;
+    if (this.body2!.contactLink != null) (this.b2Link.next = this.body2!.contactLink).prev = this.b2Link;
     else this.b2Link.next = null;
-    this.body2.contactLink = this.b2Link;
-    this.body2.numContacts++;
+    this.body2!.contactLink = this.b2Link;
+    this.body2!.numContacts++;
 
     this.prev = null;
     this.next = null;
 
     this.persisting = true;
-    this.sleeping = this.body1.sleeping && this.body2.sleeping;
+    this.sleeping = this.body1!.sleeping && this.body2!.sleeping;
     this.manifold.numPoints = 0;
   }
   /**
    * Detach the contact from the shapes.
    */
   detach() {
-    const prev = this.s1Link.prev;
-    const next = this.s1Link.next;
+    let prev = this.s1Link.prev;
+    let next = this.s1Link.next;
     if (prev !== null) prev.next = next;
     if (next !== null) next.prev = prev;
     if (this.shape1!.contactLink == this.s1Link) this.shape1!.contactLink = next;
@@ -256,23 +256,23 @@ export class Contact {
     next = this.b1Link.next;
     if (prev !== null) prev.next = next;
     if (next !== null) next.prev = prev;
-    if (this.body1.contactLink == this.b1Link) this.body1.contactLink = next;
+    if (this.body1!.contactLink == this.b1Link) this.body1!.contactLink = next;
     this.b1Link.prev = null;
     this.b1Link.next = null;
     this.b1Link.shape = null;
     this.b1Link.body = null;
-    this.body1.numContacts--;
+    this.body1!.numContacts--;
 
     prev = this.b2Link.prev;
     next = this.b2Link.next;
     if (prev !== null) prev.next = next;
     if (next !== null) next.prev = prev;
-    if (this.body2.contactLink == this.b2Link) this.body2.contactLink = next;
+    if (this.body2!.contactLink == this.b2Link) this.body2!.contactLink = next;
     this.b2Link.prev = null;
     this.b2Link.next = null;
     this.b2Link.shape = null;
     this.b2Link.body = null;
-    this.body2.numContacts--;
+    this.body2!.numContacts--;
 
     this.manifold.body1 = null;
     this.manifold.body2 = null;

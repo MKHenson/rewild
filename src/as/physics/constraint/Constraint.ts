@@ -1,6 +1,6 @@
+import { PhysicsObject } from "../core/PhysicsObject";
 import { RigidBody } from "../core/RigidBody";
 import { World } from "../core/World";
-import { Vec3 } from "../math/Vec3";
 
 /**
  * The base class of all type of the constraints.
@@ -9,7 +9,7 @@ import { Vec3 } from "../math/Vec3";
  * @author lo-th
  */
 
-export abstract class Constraint {
+export abstract class Constraint extends PhysicsObject {
   // parent world of the constraint.
   parent: null | World;
 
@@ -23,6 +23,7 @@ export abstract class Constraint {
   addedToIsland: boolean;
 
   constructor() {
+    super();
     this.parent = null;
     this.body1 = null;
     this.body2 = null;

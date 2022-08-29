@@ -27,16 +27,16 @@ export class Plane extends Shape {
 
   calculateMassInfo(out: MassInfo): void {
     out.mass = this.density; //0.0001;
-    var inertia = 1;
+    let inertia = 1;
     out.inertia.set(inertia, 0, 0, 0, inertia, 0, 0, 0, inertia);
   }
 
   updateProxy(): void {
-    var p = AABB_PROX;
+    let p = AABB_PROX;
 
-    var min = -Infinity;
-    var max = Infinity;
-    var n = this.normal;
+    let min = -Infinity;
+    let max = Infinity;
+    let n = this.normal;
     // The plane AABB is infinite, except if the normal is pointing along any axis
     this.aabb.set(
       n.x === -1 ? this.position.x - p : min,
