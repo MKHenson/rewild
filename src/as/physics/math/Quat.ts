@@ -25,10 +25,10 @@ export class Quat {
   }
 
   addTime(v: Vec3, t: f32): Quat {
-    var ax = v.x,
+    let ax = v.x,
       ay = v.y,
       az = v.z;
-    var qw = this.w,
+    let qw = this.w,
       qx = this.x,
       qy = this.y,
       qz = this.z;
@@ -43,7 +43,7 @@ export class Quat {
 
   /*mul( q1, q2 ){
 
-        var ax = q1.x, ay = q1.y, az = q1.z, as = q1.w,
+        let ax = q1.x, ay = q1.y, az = q1.z, as = q1.w,
         bx = q2.x, by = q2.y, bz = q2.z, bs = q2.w;
         this.x = ax * bs + as * bx + ay * bz - az * by;
         this.y = ay * bs + as * by + az * bx - ax * bz;
@@ -59,11 +59,11 @@ export class Quat {
   }
 
   multiplyQuaternions(a: Quat, b: Quat): Quat {
-    var qax = a.x,
+    let qax = a.x,
       qay = a.y,
       qaz = a.z,
       qaw = a.w;
-    var qbx = b.x,
+    let qbx = b.x,
       qby = b.y,
       qbz = b.z,
       qbw = b.w;
@@ -76,8 +76,8 @@ export class Quat {
   }
 
   setFromUnitVectors(v1: Vec3, v2: Vec3): Quat {
-    var vx = new Vec3();
-    var r = v1.dot(v2) + 1;
+    let vx = new Vec3();
+    let r = v1.dot(v2) + 1;
 
     if (r < f32.EPSILON) {
       r = 0;
@@ -96,13 +96,13 @@ export class Quat {
   }
 
   arc(v1: Vec3, v2: Vec3): Quat {
-    var x1 = v1.x;
-    var y1 = v1.y;
-    var z1 = v1.z;
-    var x2 = v2.x;
-    var y2 = v2.y;
-    var z2 = v2.z;
-    var d = x1 * x2 + y1 * y2 + z1 * z2;
+    let x1 = v1.x;
+    let y1 = v1.y;
+    let z1 = v1.z;
+    let x2 = v2.x;
+    let y2 = v2.y;
+    let z2 = v2.z;
+    let d = x1 * x2 + y1 * y2 + z1 * z2;
     if (d == -1) {
       x2 = y1 * x1 - z1 * z1;
       y2 = -z1 * y1 - x1 * x1;
@@ -114,9 +114,9 @@ export class Quat {
       this.z = z2 * d;
       return this;
     }
-    var cx = y1 * z2 - z1 * y2;
-    var cy = z1 * x2 - x1 * z2;
-    var cz = x1 * y2 - y1 * x2;
+    let cx = y1 * z2 - z1 * y2;
+    let cy = z1 * x2 - x1 * z2;
+    let cz = x1 * y2 - y1 * x2;
     this.w = Mathf.sqrt((1 + d) * 0.5);
     d = 0.5 / this.w;
     this.x = cx * d;
@@ -126,7 +126,7 @@ export class Quat {
   }
 
   normalize(): Quat {
-    var l = this.length();
+    let l = this.length();
     if (l === 0) {
       this.set(0, 0, 0, 1);
     } else {
@@ -202,12 +202,12 @@ export class Quat {
   //   }
 
   setFromEuler(x: f32, y: f32, z: f32): Quat {
-    var c1 = Math.cos(x * 0.5);
-    var c2 = Math.cos(y * 0.5);
-    var c3 = Math.cos(z * 0.5);
-    var s1 = Math.sin(x * 0.5);
-    var s2 = Math.sin(y * 0.5);
-    var s3 = Math.sin(z * 0.5);
+    let c1 = Math.cos(x * 0.5);
+    let c2 = Math.cos(y * 0.5);
+    let c3 = Math.cos(z * 0.5);
+    let s1 = Math.sin(x * 0.5);
+    let s2 = Math.sin(y * 0.5);
+    let s3 = Math.sin(z * 0.5);
 
     // XYZ
     this.x = s1 * c2 * c3 + c1 * s2 * s3;
@@ -221,7 +221,7 @@ export class Quat {
   setFromAxis(axis: Vec3, rad: f32): Quat {
     axis.normalize();
     rad = rad * 0.5;
-    var s = Mathf.sin(rad);
+    let s = Mathf.sin(rad);
     this.x = s * axis.x;
     this.y = s * axis.y;
     this.z = s * axis.z;
@@ -230,8 +230,8 @@ export class Quat {
   }
 
   setFromMat33(m: Float32Array): Quat {
-    var trace = m[0] + m[4] + m[8];
-    var s;
+    let trace = m[0] + m[4] + m[8];
+    let s: f32;
 
     if (trace > 0) {
       s = Mathf.sqrt(trace + 1.0);
@@ -243,13 +243,13 @@ export class Quat {
     }
     // Doesnt seem to ever get in here...
     // else {
-    //   var out = [];
-    //   var i = 0;
+    //   let out = [];
+    //   let i = 0;
     //   if (m[4] > m[0]) i = 1;
     //   if (m[8] > m[i * 3 + i]) i = 2;
 
-    //   var j = (i + 1) % 3;
-    //   var k = (i + 2) % 3;
+    //   let j = (i + 1) % 3;
+    //   let k = (i + 2) % 3;
 
     //   s = Mathf.sqrt(m[i * 3 + i] - m[j * 3 + j] - m[k * 3 + k] + 1.0);
     //   out[i] = 0.5 * fRoot;

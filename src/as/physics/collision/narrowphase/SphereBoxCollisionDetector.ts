@@ -51,11 +51,11 @@ export class SphereBoxCollisionDetector extends CollisionDetector {
     let sx = D[0] * dx + D[1] * dy + D[2] * dz;
     let sy = D[3] * dx + D[4] * dy + D[5] * dz;
     let sz = D[6] * dx + D[7] * dy + D[8] * dz;
-    let cx;
-    let cy;
-    let cz;
-    let len;
-    let invLen;
+    let cx: f32;
+    let cy: f32;
+    let cz: f32;
+    let len: f32;
+    let invLen: f32;
     let overlap = 0;
     if (sx > hw) {
       sx = hw;

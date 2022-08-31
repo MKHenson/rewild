@@ -10,9 +10,9 @@ import { RigidBody } from "../../core/RigidBody";
  */
 
 export class ContactManifold {
-  body1: null | RigidBody;
+  body1: RigidBody | null;
   // The second rigid body.
-  body2: null | RigidBody;
+  body2: RigidBody | null;
   // The number of manifold points.
   numPoints: i32;
   // The manifold points.
@@ -26,14 +26,14 @@ export class ContactManifold {
   }
 
   //Reset the manifold.
-  reset(shape1: Shape, shape2: Shape) {
+  reset(shape1: Shape, shape2: Shape): void {
     this.body1 = shape1.parent;
     this.body2 = shape2.parent;
     this.numPoints = 0;
   }
 
   //  Add a point into this manifold.
-  addPointVec(pos: Vec3, norm: Vec3, penetration: f32, flip: boolean) {
+  addPointVec(pos: Vec3, norm: Vec3, penetration: f32, flip: boolean): void {
     const p = this.points[this.numPoints++];
 
     p.position.copy(pos);
@@ -49,7 +49,7 @@ export class ContactManifold {
   }
 
   //  Add a point into this manifold.
-  addPoint(x: f32, y: f32, z: f32, nx: f32, ny: f32, nz: f32, penetration: f32, flip: boolean) {
+  addPoint(x: f32, y: f32, z: f32, nx: f32, ny: f32, nz: f32, penetration: f32, flip: boolean): void {
     const p = this.points[this.numPoints++];
 
     p.position.set(x, y, z);

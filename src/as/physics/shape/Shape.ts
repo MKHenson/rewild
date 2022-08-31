@@ -10,7 +10,7 @@ import { ContactLink } from "../constraint/contact/ContactLink";
 import { RigidBody } from "../core/RigidBody";
 
 let count = 0;
-function ShapeIdCount() {
+function ShapeIdCount(): i32 {
   return count++;
 }
 
@@ -23,8 +23,8 @@ function ShapeIdCount() {
 export abstract class Shape {
   type: i32;
   id: i32;
-  prev: null | Shape;
-  next: null | Shape;
+  prev: Shape | null;
+  next: Shape | null;
   proxy: Proxy | null;
   parent: RigidBody | null;
   contactLink: ContactLink | null;

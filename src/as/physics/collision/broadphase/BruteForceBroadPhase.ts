@@ -29,11 +29,11 @@ export class BruteForceBroadPhase extends BroadPhase {
     /*if(this.numProxies==this.maxProxies){
             //this.maxProxies<<=1;
             this.maxProxies*=2;
-            var newProxies=[];
+            let newProxies=[];
             newProxies.length = this.maxProxies;
-            var i = this.numProxies;
+            let i = this.numProxies;
             while(i--){
-            //for(var i=0, l=this.numProxies;i<l;i++){
+            //for(let i=0, l=this.numProxies;i<l;i++){
                 newProxies[i]=this.proxies[i];
             }
             this.proxies=newProxies;
@@ -44,15 +44,15 @@ export class BruteForceBroadPhase extends BroadPhase {
   }
 
   removeProxy(proxy: Proxy): void {
-    var n = this.proxies.indexOf(proxy);
+    let n = this.proxies.indexOf(proxy);
     if (n > -1) {
       this.proxies.splice(n, 1);
       //this.numProxies--;
     }
 
-    /*var i = this.numProxies;
+    /*let i = this.numProxies;
         while(i--){
-        //for(var i=0, l=this.numProxies;i<l;i++){
+        //for(let i=0, l=this.numProxies;i<l;i++){
             if(this.proxies[i] == proxy){
                 this.proxies[i] = this.proxies[--this.numProxies];
                 this.proxies[this.numProxies] = null;
@@ -62,21 +62,21 @@ export class BruteForceBroadPhase extends BroadPhase {
   }
 
   collectPairs(): void {
-    var i = 0,
-      j,
-      p1,
-      p2;
+    let i: i32 = 0,
+      j: i32,
+      p1: Proxy,
+      p2: Proxy;
 
-    var px = this.proxies;
-    var l = px.length; //this.numProxies;
-    //var ar1 = [];
-    //var ar2 = [];
+    let px = this.proxies;
+    let l = px.length; //this.numProxies;
+    //let ar1 = [];
+    //let ar2 = [];
 
     //for( i = px.length ; i-- ; ar1[ i ] = px[ i ] ){};
     //for( i = px.length ; i-- ; ar2[ i ] = px[ i ] ){};
 
-    //var ar1 = JSON.parse(JSON.stringify(this.proxies))
-    //var ar2 = JSON.parse(JSON.stringify(this.proxies))
+    //let ar1 = JSON.parse(JSON.stringify(this.proxies))
+    //let ar2 = JSON.parse(JSON.stringify(this.proxies))
 
     this.numPairChecks = (l * (l - 1)) >> 1;
     //this.numPairChecks=this.numProxies*(this.numProxies-1)*0.5;

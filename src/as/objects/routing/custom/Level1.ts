@@ -16,6 +16,7 @@ import { TransformNode } from "../../../core/TransformNode";
 import { lock, unlock } from "../../../Imports";
 import { degToRad } from "../../../../common/math/MathUtils";
 import { PlayerComponent } from "../../../components/PlayerComponent";
+import { World } from "../../../physics/core/World";
 
 export class Level1 extends Container implements Listener {
   orbitController!: OrbitController;
@@ -32,10 +33,13 @@ export class Level1 extends Container implements Listener {
   private sbybox!: TransformNode;
   private ball!: TransformNode;
 
+  private world: World | null;
+
   constructor() {
     super("Level1");
     this.totalTime = 0;
     this.isPaused = false;
+    this.world = null;
   }
 
   init(): void {
@@ -64,6 +68,7 @@ export class Level1 extends Container implements Listener {
 
     // this.orbitController = new OrbitController(this.runtime!.camera);
     this.pointerController = new PointerLockController(this.runtime!.camera);
+    this.world = new World();
   }
 
   onEvent(event: Event): void {

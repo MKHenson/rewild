@@ -15,5 +15,5 @@ export class BasicProxy extends Proxy {
     this.id = ProxyIdCount();
   }
 
-  update() {}
+  update(): void {}
 }

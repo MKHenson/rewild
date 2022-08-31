@@ -276,8 +276,8 @@ export class Rotational3Constraint {
     this.maxMotorForce3 = this.limitMotor3.maxMotorForce;
     this.enableMotor3 = this.maxMotorForce3 > 0;
 
-    var ti1 = this.i1.elements;
-    var ti2 = this.i2.elements;
+    let ti1 = this.i1.elements;
+    let ti2 = this.i2.elements;
     this.i1e00 = ti1[0];
     this.i1e01 = ti1[1];
     this.i1e02 = ti1[2];
@@ -298,16 +298,16 @@ export class Rotational3Constraint {
     this.i2e21 = ti2[7];
     this.i2e22 = ti2[8];
 
-    var frequency1 = this.limitMotor1.frequency;
-    var frequency2 = this.limitMotor2.frequency;
-    var frequency3 = this.limitMotor3.frequency;
-    var enableSpring1 = frequency1 > 0;
-    var enableSpring2 = frequency2 > 0;
-    var enableSpring3 = frequency3 > 0;
-    var enableLimit1 = this.lowerLimit1 <= this.upperLimit1;
-    var enableLimit2 = this.lowerLimit2 <= this.upperLimit2;
-    var enableLimit3 = this.lowerLimit3 <= this.upperLimit3;
-    var angle1 = this.limitMotor1.angle;
+    let frequency1 = this.limitMotor1.frequency;
+    let frequency2 = this.limitMotor2.frequency;
+    let frequency3 = this.limitMotor3.frequency;
+    let enableSpring1 = frequency1 > 0;
+    let enableSpring2 = frequency2 > 0;
+    let enableSpring3 = frequency3 > 0;
+    let enableLimit1 = this.lowerLimit1 <= this.upperLimit1;
+    let enableLimit2 = this.lowerLimit2 <= this.upperLimit2;
+    let enableLimit3 = this.lowerLimit3 <= this.upperLimit3;
+    let angle1 = this.limitMotor1.angle;
     if (enableLimit1) {
       if (this.lowerLimit1 == this.upperLimit1) {
         if (this.limitState1 != 0) {
@@ -342,7 +342,7 @@ export class Rotational3Constraint {
       this.limitImpulse1 = 0;
     }
 
-    var angle2 = this.limitMotor2.angle;
+    let angle2 = this.limitMotor2.angle;
     if (enableLimit2) {
       if (this.lowerLimit2 == this.upperLimit2) {
         if (this.limitState2 != 0) {
@@ -377,7 +377,7 @@ export class Rotational3Constraint {
       this.limitImpulse2 = 0;
     }
 
-    var angle3 = this.limitMotor3.angle;
+    let angle3 = this.limitMotor3.angle;
     if (enableLimit3) {
       if (this.lowerLimit3 == this.upperLimit3) {
         if (this.limitState3 != 0) {
@@ -481,9 +481,9 @@ export class Rotational3Constraint {
     this.dv22 = 1 / this.kv22;
 
     if (enableSpring1 && this.limitState1 != 2) {
-      var omega = 6.2831853 * frequency1;
-      var k = omega * omega * timeStep;
-      var dmp = invTimeStep / (k + 2 * this.limitMotor1.dampingRatio * omega);
+      let omega = 6.2831853 * frequency1;
+      let k = omega * omega * timeStep;
+      let dmp = invTimeStep / (k + 2 * this.limitMotor1.dampingRatio * omega);
       this.cfm1 = this.kv00 * dmp;
       this.limitVelocity1 *= k * dmp;
     } else {
@@ -517,7 +517,7 @@ export class Rotational3Constraint {
     this.k11 += this.cfm2;
     this.k22 += this.cfm3;
 
-    var inv =
+    let inv =
       1 /
       (this.k00 * (this.k11 * this.k22 - this.k21 * this.k12) +
         this.k10 * (this.k21 * this.k02 - this.k01 * this.k22) +
@@ -538,9 +538,9 @@ export class Rotational3Constraint {
     this.motorImpulse2 *= 0.95;
     this.limitImpulse3 *= 0.95;
     this.motorImpulse3 *= 0.95;
-    var totalImpulse1 = this.limitImpulse1 + this.motorImpulse1;
-    var totalImpulse2 = this.limitImpulse2 + this.motorImpulse2;
-    var totalImpulse3 = this.limitImpulse3 + this.motorImpulse3;
+    let totalImpulse1 = this.limitImpulse1 + this.motorImpulse1;
+    let totalImpulse2 = this.limitImpulse2 + this.motorImpulse2;
+    let totalImpulse3 = this.limitImpulse3 + this.motorImpulse3;
     this.a1.x += totalImpulse1 * this.a1x1 + totalImpulse2 * this.a1x2 + totalImpulse3 * this.a1x3;
     this.a1.y += totalImpulse1 * this.a1y1 + totalImpulse2 * this.a1y2 + totalImpulse3 * this.a1y3;
     this.a1.z += totalImpulse1 * this.a1z1 + totalImpulse2 * this.a1z2 + totalImpulse3 * this.a1z3;
@@ -550,18 +550,18 @@ export class Rotational3Constraint {
   }
 
   solve_(): void {
-    var rvx = this.a2.x - this.a1.x;
-    var rvy = this.a2.y - this.a1.y;
-    var rvz = this.a2.z - this.a1.z;
+    let rvx = this.a2.x - this.a1.x;
+    let rvy = this.a2.y - this.a1.y;
+    let rvz = this.a2.z - this.a1.z;
 
     this.limitVelocity3 = 30;
-    var rvn1 = rvx * this.ax1 + rvy * this.ay1 + rvz * this.az1 - this.limitVelocity1;
-    var rvn2 = rvx * this.ax2 + rvy * this.ay2 + rvz * this.az2 - this.limitVelocity2;
-    var rvn3 = rvx * this.ax3 + rvy * this.ay3 + rvz * this.az3 - this.limitVelocity3;
+    let rvn1 = rvx * this.ax1 + rvy * this.ay1 + rvz * this.az1 - this.limitVelocity1;
+    let rvn2 = rvx * this.ax2 + rvy * this.ay2 + rvz * this.az2 - this.limitVelocity2;
+    let rvn3 = rvx * this.ax3 + rvy * this.ay3 + rvz * this.az3 - this.limitVelocity3;
 
-    var dLimitImpulse1 = rvn1 * this.d00 + rvn2 * this.d01 + rvn3 * this.d02;
-    var dLimitImpulse2 = rvn1 * this.d10 + rvn2 * this.d11 + rvn3 * this.d12;
-    var dLimitImpulse3 = rvn1 * this.d20 + rvn2 * this.d21 + rvn3 * this.d22;
+    let dLimitImpulse1 = rvn1 * this.d00 + rvn2 * this.d01 + rvn3 * this.d02;
+    let dLimitImpulse2 = rvn1 * this.d10 + rvn2 * this.d11 + rvn3 * this.d12;
+    let dLimitImpulse3 = rvn1 * this.d20 + rvn2 * this.d21 + rvn3 * this.d22;
 
     this.limitImpulse1 += dLimitImpulse1;
     this.limitImpulse2 += dLimitImpulse2;
@@ -576,21 +576,21 @@ export class Rotational3Constraint {
   }
 
   solve(): void {
-    var rvx = this.a2.x - this.a1.x;
-    var rvy = this.a2.y - this.a1.y;
-    var rvz = this.a2.z - this.a1.z;
+    let rvx = this.a2.x - this.a1.x;
+    let rvy = this.a2.y - this.a1.y;
+    let rvz = this.a2.z - this.a1.z;
 
-    var rvn1 = rvx * this.ax1 + rvy * this.ay1 + rvz * this.az1;
-    var rvn2 = rvx * this.ax2 + rvy * this.ay2 + rvz * this.az2;
-    var rvn3 = rvx * this.ax3 + rvy * this.ay3 + rvz * this.az3;
+    let rvn1 = rvx * this.ax1 + rvy * this.ay1 + rvz * this.az1;
+    let rvn2 = rvx * this.ax2 + rvy * this.ay2 + rvz * this.az2;
+    let rvn3 = rvx * this.ax3 + rvy * this.ay3 + rvz * this.az3;
 
-    var oldMotorImpulse1 = this.motorImpulse1;
-    var oldMotorImpulse2 = this.motorImpulse2;
-    var oldMotorImpulse3 = this.motorImpulse3;
+    let oldMotorImpulse1 = this.motorImpulse1;
+    let oldMotorImpulse2 = this.motorImpulse2;
+    let oldMotorImpulse3 = this.motorImpulse3;
 
-    var dMotorImpulse1 = 0;
-    var dMotorImpulse2 = 0;
-    var dMotorImpulse3 = 0;
+    let dMotorImpulse1 = 0;
+    let dMotorImpulse2 = 0;
+    let dMotorImpulse3 = 0;
 
     if (this.enableMotor1) {
       dMotorImpulse1 = (rvn1 - this.motorSpeed1) * this.dv00;
@@ -636,20 +636,20 @@ export class Rotational3Constraint {
     rvn2 -= this.limitVelocity2 + this.limitImpulse2 * this.cfm2;
     rvn3 -= this.limitVelocity3 + this.limitImpulse3 * this.cfm3;
 
-    var oldLimitImpulse1 = this.limitImpulse1;
-    var oldLimitImpulse2 = this.limitImpulse2;
-    var oldLimitImpulse3 = this.limitImpulse3;
+    let oldLimitImpulse1 = this.limitImpulse1;
+    let oldLimitImpulse2 = this.limitImpulse2;
+    let oldLimitImpulse3 = this.limitImpulse3;
 
-    var dLimitImpulse1 = rvn1 * this.d00 + rvn2 * this.d01 + rvn3 * this.d02;
-    var dLimitImpulse2 = rvn1 * this.d10 + rvn2 * this.d11 + rvn3 * this.d12;
-    var dLimitImpulse3 = rvn1 * this.d20 + rvn2 * this.d21 + rvn3 * this.d22;
+    let dLimitImpulse1 = rvn1 * this.d00 + rvn2 * this.d01 + rvn3 * this.d02;
+    let dLimitImpulse2 = rvn1 * this.d10 + rvn2 * this.d11 + rvn3 * this.d12;
+    let dLimitImpulse3 = rvn1 * this.d20 + rvn2 * this.d21 + rvn3 * this.d22;
 
     this.limitImpulse1 += dLimitImpulse1;
     this.limitImpulse2 += dLimitImpulse2;
     this.limitImpulse3 += dLimitImpulse3;
 
     // clamp
-    var clampState = 0;
+    let clampState = 0;
     if (this.limitState1 == 2 || this.limitImpulse1 * this.limitState1 < 0) {
       dLimitImpulse1 = -oldLimitImpulse1;
       rvn2 += dLimitImpulse1 * this.k10;
@@ -671,7 +671,7 @@ export class Rotational3Constraint {
 
     // update un-clamped impulse
     // TODO: isolate division
-    var det;
+    let det: f32;
     switch (clampState) {
       case 1: // update 2 3
         det = 1 / (this.k11 * this.k22 - this.k12 * this.k21);
@@ -703,9 +703,9 @@ export class Rotational3Constraint {
     this.limitImpulse2 = dLimitImpulse2 + oldLimitImpulse2;
     this.limitImpulse3 = dLimitImpulse3 + oldLimitImpulse3;
 
-    var dImpulse1 = dMotorImpulse1 + dLimitImpulse1;
-    var dImpulse2 = dMotorImpulse2 + dLimitImpulse2;
-    var dImpulse3 = dMotorImpulse3 + dLimitImpulse3;
+    let dImpulse1 = dMotorImpulse1 + dLimitImpulse1;
+    let dImpulse2 = dMotorImpulse2 + dLimitImpulse2;
+    let dImpulse3 = dMotorImpulse3 + dLimitImpulse3;
 
     // apply impulse
     this.a1.x += dImpulse1 * this.a1x1 + dImpulse2 * this.a1x2 + dImpulse3 * this.a1x3;

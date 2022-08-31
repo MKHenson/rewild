@@ -9,7 +9,7 @@ export class CylinderCylinderCollisionDetector extends CollisionDetector {
     super();
   }
 
-  getSep(c1: Cylinder, c2: Cylinder, sep: Vec3, pos: Vec3, dep: Vec3) {
+  getSep(c1: Cylinder, c2: Cylinder, sep: Vec3, pos: Vec3, dep: Vec3): boolean {
     let t1x: f32 = 0;
     let t1y: f32 = 0;
     let t1z: f32 = 0;
@@ -283,7 +283,7 @@ export class CylinderCylinderCollisionDetector extends CollisionDetector {
     //return false;
   }
 
-  supportPoint(c: Cylinder, dx: f32, dy: f32, dz: f32, out: Vec3) {
+  supportPoint(c: Cylinder, dx: f32, dy: f32, dz: f32, out: Vec3): void {
     let rot = c.rotation.elements;
     let ldx = rot[0] * dx + rot[3] * dy + rot[6] * dz;
     let ldy = rot[1] * dx + rot[4] * dy + rot[7] * dz;
@@ -293,9 +293,9 @@ export class CylinderCylinderCollisionDetector extends CollisionDetector {
     let len = radx * radx + radz * radz;
     let rad = c.radius;
     let hh = c.halfHeight;
-    let ox;
-    let oy;
-    let oz;
+    let ox: f32;
+    let oy: f32;
+    let oz: f32;
     if (len == 0) {
       if (ldy < 0) {
         ox = rad;

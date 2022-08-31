@@ -14,7 +14,7 @@ export class SphereSphereCollisionDetector extends CollisionDetector {
     super();
   }
 
-  detectCollision(shape1: Sphere, shape2: Sphere, manifold: ContactManifold) {
+  detectCollision(shape1: Sphere, shape2: Sphere, manifold: ContactManifold): void {
     const s1 = shape1;
     const s2 = shape2;
     const p1 = s1.position;

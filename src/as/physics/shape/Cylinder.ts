@@ -40,7 +40,17 @@ export class Cylinder extends Shape {
 
   updateProxy(): void {
     let te = this.rotation.elements;
-    let len, wx, hy, dz, xx, yy, zz, w, h, d, p;
+    let len: f32 = 0,
+      wx: f32 = 0,
+      hy: f32 = 0,
+      dz: f32 = 0,
+      xx: f32 = 0,
+      yy: f32 = 0,
+      zz: f32 = 0,
+      w: f32 = 0,
+      h: f32 = 0,
+      d: f32 = 0,
+      p: f32 = 0;
 
     xx = te[1] * te[1];
     yy = te[4] * te[4];

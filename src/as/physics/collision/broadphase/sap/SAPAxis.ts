@@ -158,7 +158,7 @@ export class SAPAxis {
     }
   }
 
-  calculateTestCount() {
+  calculateTestCount(): f32 {
     let num: i32 = 1;
     let sum: i32 = 0;
     for (let i: i32 = 1, l: i32 = this.numElements; i < l; i++) {

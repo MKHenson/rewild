@@ -64,7 +64,7 @@ export class TranslationalConstraint {
   upperLimit: f32;
   limitVelocity: f32;
   limitState: f32; // -1: at lower, 0: locked, 1: at upper, 2: free
-  enableMotor = false;
+  enableMotor: boolean;
   motorSpeed: f32;
   maxMotorForce: f32;
   maxMotorImpulse: f32;
@@ -175,8 +175,8 @@ export class TranslationalConstraint {
     this.m1 = this.b1!.inverseMass;
     this.m2 = this.b2!.inverseMass;
 
-    var ti1 = this.i1.elements;
-    var ti2 = this.i2.elements;
+    let ti1 = this.i1.elements;
+    let ti2 = this.i2.elements;
     this.i1e00 = ti1[0];
     this.i1e01 = ti1[1];
     this.i1e02 = ti1[2];
@@ -197,13 +197,13 @@ export class TranslationalConstraint {
     this.i2e21 = ti2[7];
     this.i2e22 = ti2[8];
 
-    var dx = this.p2.x - this.p1.x;
-    var dy = this.p2.y - this.p1.y;
-    var dz = this.p2.z - this.p1.z;
-    var d = dx * this.ax + dy * this.ay + dz * this.az;
-    var frequency = this.limitMotor.frequency;
-    var enableSpring = frequency > 0;
-    var enableLimit = this.lowerLimit <= this.upperLimit;
+    let dx = this.p2.x - this.p1.x;
+    let dy = this.p2.y - this.p1.y;
+    let dz = this.p2.z - this.p1.z;
+    let d = dx * this.ax + dy * this.ay + dz * this.az;
+    let frequency = this.limitMotor.frequency;
+    let enableSpring = frequency > 0;
+    let enableLimit = this.lowerLimit <= this.upperLimit;
     if ((enableSpring && d > 20) || d < -20) {
       enableSpring = false;
     }
@@ -252,11 +252,11 @@ export class TranslationalConstraint {
       this.maxMotorImpulse = 0;
     }
 
-    var rdx = d * this.ax;
-    var rdy = d * this.ay;
-    var rdz = d * this.az;
-    var w1 = this.m1 / (this.m1 + this.m2);
-    var w2 = 1 - w1;
+    let rdx = d * this.ax;
+    let rdy = d * this.ay;
+    let rdz = d * this.az;
+    let w1 = this.m1 / (this.m1 + this.m2);
+    let w2 = 1 - w1;
     this.r1x = this.r1.x + rdx * w1;
     this.r1y = this.r1.y + rdy * w1;
     this.r1z = this.r1.z + rdz * w1;
@@ -292,9 +292,9 @@ export class TranslationalConstraint {
     this.invMotorDenom = 1 / this.motorDenom;
 
     if (enableSpring && this.limitState != 2) {
-      var omega = 6.2831853 * frequency;
-      var k = omega * omega * timeStep;
-      var dmp = invTimeStep / (k + 2 * this.limitMotor.dampingRatio * omega);
+      let omega = 6.2831853 * frequency;
+      let k = omega * omega * timeStep;
+      let dmp = invTimeStep / (k + 2 * this.limitMotor.dampingRatio * omega);
       this.cfm = this.motorDenom * dmp;
       this.limitVelocity *= k * dmp;
     } else {
@@ -304,7 +304,7 @@ export class TranslationalConstraint {
 
     this.invDenom = 1 / (this.motorDenom + this.cfm);
 
-    var totalImpulse = this.limitImpulse + this.motorImpulse;
+    let totalImpulse = this.limitImpulse + this.motorImpulse;
     this.l1.x += totalImpulse * this.l1x;
     this.l1.y += totalImpulse * this.l1y;
     this.l1.z += totalImpulse * this.l1z;
@@ -319,7 +319,7 @@ export class TranslationalConstraint {
     this.a2.z -= totalImpulse * this.a2z;
   }
   solve(): void {
-    var rvn =
+    let rvn =
       this.ax * (this.l2.x - this.l1.x) +
       this.ay * (this.l2.y - this.l1.y) +
       this.az * (this.l2.z - this.l1.z) +
@@ -331,10 +331,10 @@ export class TranslationalConstraint {
       this.t1z * this.a1.z;
 
     // motor part
-    var newMotorImpulse;
+    let newMotorImpulse: f32;
     if (this.enableMotor) {
       newMotorImpulse = (rvn - this.motorSpeed) * this.invMotorDenom;
-      var oldMotorImpulse = this.motorImpulse;
+      let oldMotorImpulse = this.motorImpulse;
       this.motorImpulse += newMotorImpulse;
       if (this.motorImpulse > this.maxMotorImpulse) this.motorImpulse = this.maxMotorImpulse;
       else if (this.motorImpulse < -this.maxMotorImpulse) this.motorImpulse = -this.maxMotorImpulse;
@@ -343,16 +343,16 @@ export class TranslationalConstraint {
     } else newMotorImpulse = 0;
 
     // limit part
-    var newLimitImpulse;
+    let newLimitImpulse: f32;
     if (this.limitState != 2) {
       newLimitImpulse = (rvn - this.limitVelocity - this.limitImpulse * this.cfm) * this.invDenom;
-      var oldLimitImpulse = this.limitImpulse;
+      let oldLimitImpulse = this.limitImpulse;
       this.limitImpulse += newLimitImpulse;
       if (this.limitImpulse * this.limitState < 0) this.limitImpulse = 0;
       newLimitImpulse = this.limitImpulse - oldLimitImpulse;
     } else newLimitImpulse = 0;
 
-    var totalImpulse = newLimitImpulse + newMotorImpulse;
+    let totalImpulse = newLimitImpulse + newMotorImpulse;
     this.l1.x += totalImpulse * this.l1x;
     this.l1.y += totalImpulse * this.l1y;
     this.l1.z += totalImpulse * this.l1z;

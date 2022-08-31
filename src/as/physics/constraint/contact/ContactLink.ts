@@ -7,11 +7,11 @@ import { Contact } from "./Contact";
  * @author saharan
  */
 export class ContactLink {
-  prev: null | ContactLink;
-  next: null | ContactLink;
+  prev: ContactLink | null;
+  next: ContactLink | null;
   shape: Shape | null;
   body: RigidBody | null;
-  contact: null | Contact;
+  contact: Contact | null;
 
   constructor(contact: Contact) {
     // The previous contact link.

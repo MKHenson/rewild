@@ -12,6 +12,6 @@ export class MassInfo {
     public mass: f32 = 0,
 
     // The moment inertia of the shape.
-    public inertia = new Mat33()
+    public inertia: Mat33 = new Mat33()
   ) {}
 }

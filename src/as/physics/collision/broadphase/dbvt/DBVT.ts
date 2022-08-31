@@ -332,7 +332,7 @@ export class DBVT {
     return node;
   }
 
-  fix(node: DBVTNode) {
+  fix(node: DBVTNode): void {
     const c1 = node.child1!;
     const c2 = node.child2!;
     node.aabb.combine(c1.aabb, c2.aabb);
