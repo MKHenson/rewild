@@ -44,6 +44,6 @@ export class Sphere extends Shape {
       this.position.z + this.radius + p
     );
 
-    if (this.proxy != null) this.proxy.update();
+    if (this.proxy != null) this.proxy!.update();
   }
 }

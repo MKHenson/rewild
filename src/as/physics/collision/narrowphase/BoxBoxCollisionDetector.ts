@@ -294,7 +294,7 @@ export class BoxBoxCollisionDetector extends CollisionDetector {
     // try axis 7
     len = a7x * a7x + a7y * a7y + a7z * a7z;
     if (len > 1e-5) {
-      len = 1 / Math.sqrt(len);
+      len = 1 / Mathf.sqrt(len);
       a7x *= len;
       a7y *= len;
       a7z *= len;
@@ -321,7 +321,7 @@ export class BoxBoxCollisionDetector extends CollisionDetector {
     // try axis 8
     len = a8x * a8x + a8y * a8y + a8z * a8z;
     if (len > 1e-5) {
-      len = 1 / Math.sqrt(len);
+      len = 1 / Mathf.sqrt(len);
       a8x *= len;
       a8y *= len;
       a8z *= len;
@@ -348,7 +348,7 @@ export class BoxBoxCollisionDetector extends CollisionDetector {
     // try axis 9
     len = a9x * a9x + a9y * a9y + a9z * a9z;
     if (len > 1e-5) {
-      len = 1 / Math.sqrt(len);
+      len = 1 / Mathf.sqrt(len);
       a9x *= len;
       a9y *= len;
       a9z *= len;
@@ -375,7 +375,7 @@ export class BoxBoxCollisionDetector extends CollisionDetector {
     // try axis 10
     len = aax * aax + aay * aay + aaz * aaz;
     if (len > 1e-5) {
-      len = 1 / Math.sqrt(len);
+      len = 1 / Mathf.sqrt(len);
       aax *= len;
       aay *= len;
       aaz *= len;
@@ -402,7 +402,7 @@ export class BoxBoxCollisionDetector extends CollisionDetector {
     // try axis 11
     len = abx * abx + aby * aby + abz * abz;
     if (len > 1e-5) {
-      len = 1 / Math.sqrt(len);
+      len = 1 / Mathf.sqrt(len);
       abx *= len;
       aby *= len;
       abz *= len;
@@ -429,7 +429,7 @@ export class BoxBoxCollisionDetector extends CollisionDetector {
     // try axis 12
     len = acx * acx + acy * acy + acz * acz;
     if (len > 1e-5) {
-      len = 1 / Math.sqrt(len);
+      len = 1 / Mathf.sqrt(len);
       acx *= len;
       acy *= len;
       acz *= len;
@@ -456,7 +456,7 @@ export class BoxBoxCollisionDetector extends CollisionDetector {
     // try axis 13
     len = adx * adx + ady * ady + adz * adz;
     if (len > 1e-5) {
-      len = 1 / Math.sqrt(len);
+      len = 1 / Mathf.sqrt(len);
       adx *= len;
       ady *= len;
       adz *= len;
@@ -483,7 +483,7 @@ export class BoxBoxCollisionDetector extends CollisionDetector {
     // try axis 14
     len = aex * aex + aey * aey + aez * aez;
     if (len > 1e-5) {
-      len = 1 / Math.sqrt(len);
+      len = 1 / Mathf.sqrt(len);
       aex *= len;
       aey *= len;
       aez *= len;
@@ -510,7 +510,7 @@ export class BoxBoxCollisionDetector extends CollisionDetector {
     // try axis 15
     len = afx * afx + afy * afy + afz * afz;
     if (len > 1e-5) {
-      len = 1 / Math.sqrt(len);
+      len = 1 / Mathf.sqrt(len);
       afx *= len;
       afy *= len;
       afz *= len;
@@ -1145,9 +1145,9 @@ export class BoxBoxCollisionDetector extends CollisionDetector {
     let q4y: f32 = 0;
     let q4z: f32 = 0;
     // search support face and vertex
-    let minDot = 1;
-    let dot = 0;
-    let minDotIndex = 0;
+    let minDot: f32 = 1;
+    let dot: f32 = 0;
+    let minDotIndex: i32 = 0;
     if (swap) {
       dot = a1x * nx + a1y * ny + a1z * nz;
       if (dot < minDot) {

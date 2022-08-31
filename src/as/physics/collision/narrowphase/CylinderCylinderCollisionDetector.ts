@@ -203,7 +203,7 @@ export class CylinderCylinderCollisionDetector extends CollisionDetector {
             b3 = (v1y * v2z - v1z * v2y) * nx + (v1z * v2x - v1x * v2z) * ny + (v1x * v2y - v1y * v2x) * nz;
             sum = b1 + b2 + b3;
           }
-          let inv = 1 / sum;
+          let inv: f32 = 1 / sum;
           p1x = (v01x * b0 + v11x * b1 + v21x * b2 + v31x * b3) * inv;
           p1y = (v01y * b0 + v11y * b1 + v21y * b2 + v31y * b3) * inv;
           p1z = (v01z * b0 + v11z * b1 + v21z * b2 + v31z * b3) * inv;

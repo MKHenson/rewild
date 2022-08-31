@@ -111,7 +111,7 @@ export class DBVT {
     }
     // update whole tree
     do {
-      newParent = this.balance(newParent)!;
+      newParent = this.balance(newParent);
       this.fix(newParent);
       newParent = newParent.parent!;
     } while (newParent != null);

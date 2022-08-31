@@ -91,6 +91,6 @@ export class Cylinder extends Shape {
       this.position.z + d + p
     );
 
-    if (this.proxy != null) this.proxy.update();
+    if (this.proxy != null) this.proxy!.update();
   }
 }
