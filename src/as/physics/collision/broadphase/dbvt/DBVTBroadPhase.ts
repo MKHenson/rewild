@@ -69,7 +69,7 @@ export class DBVTBroadPhase extends BroadPhase {
 
   collide(node1: DBVTNode, node2: DBVTNode): void {
     let stackCount: i32 = 2;
-    let s1: Shape, s2: Shape, n1, n2, l1, l2;
+    let s1: Shape, s2: Shape, n1: DBVTNode, n2: DBVTNode, l1: boolean, l2: boolean;
     this.stack[0] = node1;
     this.stack[1] = node2;
 

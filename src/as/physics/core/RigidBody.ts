@@ -9,6 +9,7 @@ import { ContactLink } from "../constraint/contact/ContactLink";
 import { JointLink } from "../constraint/joint/JointLink";
 import { World } from "./World";
 import { PhysicsObject } from "./PhysicsObject";
+import { TransformNode } from "../../core/TransformNode";
 
 /**
  * The class of rigid body.
@@ -26,7 +27,7 @@ export class RigidBody extends PhysicsObject {
   invScale: f32;
 
   // possible link to three Mesh;
-  mesh = null;
+  mesh: TransformNode | null;
 
   // The maximum number of shapes that can be added to a one rigid.
   //MAX_SHAPES = 64;//64;
@@ -44,13 +45,13 @@ export class RigidBody extends PhysicsObject {
 
   newPosition: Vec3;
   controlPos: boolean;
-  newOrientation = new Quat();
-  newRotation = new Vec3();
+  newOrientation: Quat;
+  newRotation: Vec3;
   currentRotation: Vec3;
   controlRot: boolean;
   controlRotInTime: boolean;
 
-  quaternion = new Quat();
+  quaternion: Quat;
   pos: Vec3;
 
   // Is the translational velocity.
@@ -68,7 +69,7 @@ export class RigidBody extends PhysicsObject {
   numContacts: i32;
 
   // An array of shapes that are included in the rigid body.
-  shapes: null | Shape;
+  shapes: Shape | null;
   // The number of shapes that are included in the rigid body.
   numShapes: i32;
 
@@ -519,7 +520,7 @@ export class RigidBody extends PhysicsObject {
   // AUTO UPDATE THREE MESH
   //---------------------------------------------
 
-  connectMesh(mesh): void {
+  connectMesh(mesh: TransformNode): void {
     this.mesh = mesh;
     this.updateMesh();
   }
@@ -530,7 +531,10 @@ export class RigidBody extends PhysicsObject {
 
     if (this.mesh === null) return;
 
-    this.mesh.position.copy(this.getPosition());
-    this.mesh.quaternion.copy(this.getQuaternion());
+    // this.mesh.position.copy(this.getPosition());
+    // this.mesh.quaternion.copy(this.getQuaternion());
+
+    this.mesh.position.set(this.pos.x, this.pos.y, this.pos.z);
+    this.mesh.quaternion.set(this.quaternion.x, this.quaternion.y, this.quaternion.z, this.quaternion.z);
   }
 }

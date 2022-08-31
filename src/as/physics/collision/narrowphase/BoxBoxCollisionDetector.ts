@@ -22,7 +22,7 @@ export class BoxBoxCollisionDetector extends CollisionDetector {
     this.INF = 1 / 0;
   }
 
-  detectCollision(shape1: Box, shape2: Box, manifold: ContactManifold) {
+  detectCollision(shape1: Box, shape2: Box, manifold: ContactManifold): void {
     // What you are doing
     // · I to prepare a separate axis of the fifteen
     //-Six in each of three normal vectors of the xyz direction of the box both
@@ -1381,15 +1381,15 @@ export class BoxBoxCollisionDetector extends CollisionDetector {
       }
     }
     // clip vertices
-    let numClipVertices;
-    let numAddedClipVertices;
-    let index;
-    let x1;
-    let y1;
-    let z1;
-    let x2;
-    let y2;
-    let z2;
+    let numClipVertices: i32;
+    let numAddedClipVertices: i32;
+    let index: i32;
+    let x1: f32;
+    let y1: f32;
+    let z1: f32;
+    let x2: f32;
+    let y2: f32;
+    let z2: f32;
     this.clipVertices1[0] = q1x;
     this.clipVertices1[1] = q1y;
     this.clipVertices1[2] = q1z;

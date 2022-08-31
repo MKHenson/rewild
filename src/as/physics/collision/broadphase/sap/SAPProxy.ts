@@ -50,12 +50,12 @@ export class SAPProxy extends Proxy {
   }
 
   // Returns whether the proxy is dynamic or not.
-  isDynamic() {
+  isDynamic(): boolean {
     const body = this.shape.parent!;
     return body.isDynamic && !body.sleeping;
   }
 
-  update() {
+  update(): void {
     const te = this.aabb.elements;
     this.min[0].value = te[0];
     this.min[1].value = te[1];

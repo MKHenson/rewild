@@ -19,7 +19,7 @@ import { JointConfig } from "./JointConfig";
  */
 
 export class WheelJoint extends Joint {
-  type = JOINT_WHEEL;
+  type: i32;
 
   localAxis1: Vec3;
   localAxis2: Vec3;

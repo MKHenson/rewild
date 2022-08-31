@@ -53,11 +53,11 @@ export class InfoDisplay {
     this.MaxUpdateTime = 0;
   }
 
-  setTime(n: f32) {
+  setTime(n: f32): void {
     this.times[n || 0] = performance.now();
   }
 
-  resetMax() {
+  resetMax(): void {
     this.MaxBroadPhaseTime = 0;
     this.MaxNarrowPhaseTime = 0;
     this.MaxSolvingTime = 0;
@@ -65,17 +65,17 @@ export class InfoDisplay {
     this.MaxUpdateTime = 0;
   }
 
-  calcBroadPhase() {
+  calcBroadPhase(): void {
     this.setTime(2);
     this.broadPhaseTime = this.times[2] - this.times[1];
   }
 
-  calcNarrowPhase() {
+  calcNarrowPhase(): void {
     this.setTime(3);
     this.narrowPhaseTime = this.times[3] - this.times[2];
   }
 
-  calcEnd() {
+  calcEnd(): void {
     this.setTime(2);
     this.solvingTime = this.times[2] - this.times[1];
     this.totalTime = this.times[2] - this.times[0];
@@ -97,7 +97,7 @@ export class InfoDisplay {
     if (this.tt > 500) this.tt = 0;
   }
 
-  upfps() {
+  upfps(): void {
     this.f[1] = Date.now();
     if (this.f[1] - 1000 > this.f[0]) {
       this.f[0] = this.f[1];
@@ -107,8 +107,8 @@ export class InfoDisplay {
     this.f[2]++;
   }
 
-  show() {
-    var info = [
+  show(): string {
+    const info = [
       "Oimo.js " + this.version + "<br>",
       this.broadPhase + "<br><br>",
       "FPS: " + this.fps + " fps<br><br>",
@@ -135,7 +135,7 @@ export class InfoDisplay {
     return info;
   }
 
-  toArray() {
+  toArray(): Float32Array {
     this.infos[0] = this.parent.broadPhase.types;
     this.infos[1] = this.parent.numRigidBodies;
     this.infos[2] = this.parent.numContacts;

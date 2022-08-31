@@ -37,4 +37,4 @@ export const JOINT_SLIDER: i32 = 5;
 export const JOINT_PRISMATIC: i32 = 6;
 
 // AABB aproximation
-export const AABB_PROX: i32 = 0.005;
+export const AABB_PROX: f32 = 0.005;

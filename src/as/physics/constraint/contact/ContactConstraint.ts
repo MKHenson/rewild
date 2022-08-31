@@ -17,14 +17,14 @@ export class ContactConstraint extends Constraint {
   restitution: f32;
   // The coefficient of friction of the constraint.
   friction: f32;
-  p1: null | Vec3;
-  p2: null | Vec3;
-  lv1: null | Vec3;
-  lv2: null | Vec3;
-  av1: null | Vec3;
-  av2: null | Vec3;
-  i1: null | Mat33;
-  i2: null | Mat33;
+  p1: Vec3 | null;
+  p2: Vec3 | null;
+  lv1: Vec3 | null;
+  lv2: Vec3 | null;
+  av1: Vec3 | null;
+  av2: Vec3 | null;
+  i1: Mat33 | null;
+  i2: Mat33 | null;
   tmp: Vec3;
   tmpC1: Vec3;
   tmpC2: Vec3;
@@ -84,7 +84,7 @@ export class ContactConstraint extends Constraint {
   }
 
   // Attach the constraint to the bodies.
-  attach() {
+  attach(): void {
     const body1 = this.body1!;
     const body2 = this.body2!;
     this.p1 = body1.position;
@@ -118,7 +118,7 @@ export class ContactConstraint extends Constraint {
     this.num = this.manifold.numPoints;
 
     let c: ContactPointDataBuffer | null = this.cs;
-    let p, rvn, len, norImp, norTar, sepV, i1: Mat33, i2: Mat33;
+    let p: ManifoldPoint, rvn: f32, len: f32, norImp: f32, norTar: f32, sepV: f32, i1: Mat33, i2: Mat33;
 
     for (let i: i32 = 0; i < this.num; i++) {
       p = this.ps[i];

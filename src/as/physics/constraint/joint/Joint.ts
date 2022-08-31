@@ -19,7 +19,7 @@ export class Joint extends Constraint {
   invScale: f32;
 
   // The type of the joint.
-  type = JOINT_NULL;
+  type: i32;
   //  The previous joint in the world.
   prev: Joint | null;
   // The next joint in the world.
@@ -179,7 +179,7 @@ export class Joint extends Constraint {
 
   // Three js add
 
-  getPosition(): [Vec3, Vec3] {
+  getPosition(): Vec3[] {
     const p1 = new Vec3().scale(this.anchorPoint1, this.scale);
     const p2 = new Vec3().scale(this.anchorPoint2, this.scale);
     return [p1, p2];

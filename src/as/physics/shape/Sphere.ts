@@ -21,7 +21,7 @@ export class Sphere extends Shape {
     this.radius = radius;
   }
 
-  volume() {
+  volume(): f32 {
     return Mathf.PI * this.radius * 1.333333;
   }
 

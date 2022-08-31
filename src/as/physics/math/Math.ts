@@ -38,39 +38,39 @@ export class _Math {
     return low + Mathf.random() * (high - low);
   }
 
-  static generateUUID() {
-    // http://www.broofa.com/Tools/Math.uuid.htm
+  // static generateUUID(): string {
+  //   // http://www.broofa.com/Tools/Math.uuid.htm
 
-    var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".split("");
-    var uuid = new Array(36);
-    var rnd = 0,
-      r;
+  //   let chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz".split("");
+  //   let uuid = new Array(36);
+  //   let rnd: f32 = 0,
+  //     r: f32;
 
-    return function generateUUID() {
-      for (var i = 0; i < 36; i++) {
-        if (i === 8 || i === 13 || i === 18 || i === 23) {
-          uuid[i] = "-";
-        } else if (i === 14) {
-          uuid[i] = "4";
-        } else {
-          if (rnd <= 0x02) rnd = (0x2000000 + Math.random() * 0x1000000) | 0;
-          r = rnd & 0xf;
-          rnd = rnd >> 4;
-          uuid[i] = chars[i === 19 ? (r & 0x3) | 0x8 : r];
-        }
-      }
+  //   return function generateUUID() {
+  //     for (let i = 0; i < 36; i++) {
+  //       if (i === 8 || i === 13 || i === 18 || i === 23) {
+  //         uuid[i] = "-";
+  //       } else if (i === 14) {
+  //         uuid[i] = "4";
+  //       } else {
+  //         if (rnd <= 0x02) rnd = (0x2000000 + Math.random() * 0x1000000) | 0;
+  //         r = rnd & 0xf;
+  //         rnd = rnd >> 4;
+  //         uuid[i] = chars[i === 19 ? (r & 0x3) | 0x8 : r];
+  //       }
+  //     }
 
-      return uuid.join("");
-    };
-  }
+  //     return uuid.join("");
+  //   };
+  // }
 
   static int(x: f32): i32 {
     return i32(x);
   }
 
-  static fix(x: f32, n: f32): f32 {
-    return x.toFixed(n || 3, 10);
-  }
+  // static fix(x: f32, n: f32): f32 {
+  //   return x.toFixed(n || 3, 10);
+  // }
 
   static clamp(value: f32, min: f32, max: f32): f32 {
     return Mathf.max(min, Mathf.min(max, value));
@@ -79,9 +79,9 @@ export class _Math {
   //clamp( x, a, b ) { return ( x < a ) ? a : ( ( x > b ) ? b : x ); },
 
   static distance(p1: f32[], p2: f32[]): f32 {
-    var xd = p2[0] - p1[0];
-    var yd = p2[1] - p1[1];
-    var zd = p2[2] - p1[2];
+    let xd = p2[0] - p1[0];
+    let yd = p2[1] - p1[1];
+    let zd = p2[2] - p1[2];
     return Mathf.sqrt(xd * xd + yd * yd + zd * zd);
   }
 
@@ -110,9 +110,9 @@ export class _Math {
   }
 
   static distanceVector(v1: Vec3, v2: Vec3): f32 {
-    var xd = v1.x - v2.x;
-    var yd = v1.y - v2.y;
-    var zd = v1.z - v2.z;
+    let xd = v1.x - v2.x;
+    let yd = v1.y - v2.y;
+    let zd = v1.z - v2.z;
     return xd * xd + yd * yd + zd * zd;
   }
 

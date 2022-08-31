@@ -16,5 +16,5 @@ export class DBVTProxy extends Proxy {
     this.leaf = new DBVTNode();
     this.leaf.proxy = this;
   }
-  update() {}
+  update(): void {}
 }

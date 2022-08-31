@@ -2,7 +2,7 @@ import { AABB } from "../../math/AABB";
 import { Shape } from "../../shape/Shape";
 
 let count: i32 = 0;
-export function ProxyIdCount() {
+export function ProxyIdCount(): i32 {
   return count++;
 }
 

@@ -14,7 +14,7 @@ export class DBVTNode {
   //  The parent node of this tree.
   parent: DBVTNode | null;
   // The proxy of this node. This has no value if this node is not leaf.
-  proxy: null | Proxy;
+  proxy: Proxy | null;
   // The maximum distance from leaf nodes.
   height: i32;
   // The AABB of this node.

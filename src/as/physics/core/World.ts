@@ -41,11 +41,11 @@ import { PhysicsObject } from "./PhysicsObject";
 const postLoop = new Event("post-loop");
 export class WorldOptions {
   constructor(
-    public worldscale: f32 = 1,
+    public worldscale: f32 = 100,
     public timestep: f32 = 0.01666,
     public iterations: i32 = 8,
     public random: boolean = true,
-    public gravity = new Vec3(0, -9.8, 0),
+    public gravity: Vec3 = new Vec3(0, -9.8, 0),
     public broadphase: i32 = 2,
     public info: boolean = false
   ) {}
@@ -64,11 +64,14 @@ export class World extends EventDispatcher {
   invScale: f32;
   timeStep: f32; // 1/60;
   timerate: f32;
-  timer: null;
+
+  paused: boolean;
+
+  // timer: null;
   // preLoop: null; //function(){};
   //postLoop: null; //function(){};
   numIterations: i32;
-  broadPhase: BroadPhase;
+  broadPhase!: BroadPhase;
   Btypes: string[];
   broadPhaseType: string;
   performance: InfoDisplay | null;
@@ -83,17 +86,19 @@ export class World extends EventDispatcher {
   joints: Joint | null;
   numJoints: i32;
   numIslands: i32;
-  gravity = new Vec3(0, -9.8, 0);
+  gravity: Vec3;
   detectors: CollisionDetector[][];
   randX: i32;
   randA: i32;
   randB: i32;
   islandRigidBodies: (RigidBody | null)[];
   islandStack: (RigidBody | null)[];
-  islandConstraints: (Constraint | null)[];
+  islandConstraints: Array<Constraint | null>[];
 
   constructor(o: WorldOptions = new WorldOptions()) {
     super();
+
+    this.paused = true;
 
     // this world scale defaut is 0.1 to 10 meters max for dynamique body
     this.scale = o.worldscale || 1;
@@ -102,7 +107,7 @@ export class World extends EventDispatcher {
     // The time between each step
     this.timeStep = o.timestep || 0.01666; // 1/60;
     this.timerate = this.timeStep * 1000;
-    this.timer = null;
+    // this.timer = null;
 
     // this.preLoop = null; //function(){};
     // this.postLoop = null; //function(){};
@@ -130,7 +135,6 @@ export class World extends EventDispatcher {
     // This is the detailed information of the performance.
     this.performance = null;
     this.isStat = o.info;
-    if (this.isStat) this.performance = new InfoDisplay(this);
 
     /**
      * Whether the constraints randomizer is enabled or not.
@@ -202,23 +206,30 @@ export class World extends EventDispatcher {
     this.islandRigidBodies = [];
     this.islandStack = [];
     this.islandConstraints = [];
+
+    if (this.isStat) this.performance = new InfoDisplay(this);
   }
 
   play(): void {
-    if (this.timer !== null) return;
+    // if (this.timer !== null) return;
 
-    const _this = this;
-    this.timer = setInterval(function () {
-      _this.step();
-    }, this.timerate);
-    //this.timer = setInterval( this.loop.bind(this) , this.timerate );
+    // const _this = this;
+    // this.timer = setInterval(function () {
+    //   _this.step();
+    // }, this.timerate);
+    // //this.timer = setInterval( this.loop.bind(this) , this.timerate );
+
+    this.paused = false;
+    if (!this.paused) return;
   }
 
   stop(): void {
-    if (this.timer === null) return;
+    // if (this.timer === null) return;
 
-    clearInterval(this.timer);
-    this.timer = null;
+    // clearInterval(this.timer);
+    // this.timer = null;
+
+    this.paused = true;
   }
 
   setGravity(ar: f32[]): void {
@@ -760,23 +771,23 @@ export class World extends EventDispatcher {
   //   else return this.initBody(type, o);
   // }
 
-  initBody(type: ("cylinder" | "sphere" | "box" | "plane")[], o): RigidBody {
+  initBody(type: string[], o: BodyOptions): RigidBody {
     const invScale = this.invScale;
 
     // body dynamic or static
-    const move = o.move || false;
-    const kinematic = o.kinematic || false;
+    const move = o.move;
+    const kinematic = o.kinematic;
 
     // POSITION
 
     // body position
-    let p = o.pos || [0, 0, 0];
+    let p = o.pos;
     p = p.map(function (x) {
       return x * invScale;
     });
 
     // shape position
-    let p2 = o.posShape || [0, 0, 0];
+    let p2 = o.posShape;
     p2 = p2.map(function (x) {
       return x * invScale;
     });
@@ -784,13 +795,13 @@ export class World extends EventDispatcher {
     // ROTATION
 
     // body rotation in degree
-    let r = o.rot || [0, 0, 0];
+    let r = o.rot;
     r = r.map(function (x) {
       return x * _Math.degtorad;
     });
 
     // shape rotation in degree
-    let r2 = o.rotShape || [0, 0, 0];
+    let r2 = o.rotShape;
     r2 = r.map(function (x) {
       return x * _Math.degtorad;
     });
@@ -822,7 +833,7 @@ export class World extends EventDispatcher {
     // The bits of the collision groups with which the shape collides.
     if (o.collidesWith !== undefined) sc.collidesWith = o.collidesWith;
 
-    if (o.config !== undefined) {
+    if (o.config != null) {
       if (o.config[0] !== undefined) sc.density = o.config[0];
       if (o.config[1] !== undefined) sc.friction = o.config[1];
       if (o.config[2] !== undefined) sc.restitution = o.config[2];
@@ -893,7 +904,7 @@ export class World extends EventDispatcher {
       body.setupMass(BODY_STATIC);
     }
 
-    if (o.name !== undefined) body.name = o.name;
+    if (o.name != null) body.name = o.name;
     //else if( move ) body.name = this.numRigidBodies;
 
     // finaly add to physics world
@@ -908,14 +919,14 @@ export class World extends EventDispatcher {
     return body;
   }
 
-  initJoint(type: string, o): Joint {
+  initJoint(type: string, o: JointOptions): Joint {
     //const type = type;
     const invScale = this.invScale;
 
-    const axe1 = o.axe1 || [1, 0, 0];
-    const axe2 = o.axe2 || [1, 0, 0];
-    let pos1 = o.pos1 || [0, 0, 0];
-    let pos2 = o.pos2 || [0, 0, 0];
+    const axe1 = o.axe1;
+    const axe2 = o.axe2;
+    let pos1 = o.pos1;
+    let pos2 = o.pos2;
 
     pos1 = pos1.map(function (x) {
       return x * invScale;
@@ -937,43 +948,40 @@ export class World extends EventDispatcher {
       max = max * _Math.degtorad;
     }
 
-    const limit = o.limit || null;
-    const spring = o.spring || null;
-    const motor = o.motor || null;
+    const limit = o.limit;
+    const spring = o.spring;
+    const motor = o.motor;
 
     // joint setting
     const jc = new JointConfig();
     jc.scale = this.scale;
     jc.invScale = this.invScale;
-    jc.allowCollision = o.collision || false;
+    jc.allowCollision = o.collision;
     jc.localAxis1.set(axe1[0], axe1[1], axe1[2]);
     jc.localAxis2.set(axe2[0], axe2[1], axe2[2]);
     jc.localAnchorPoint1.set(pos1[0], pos1[1], pos1[2]);
     jc.localAnchorPoint2.set(pos2[0], pos2[1], pos2[2]);
 
-    let b1: RigidBody | null = null;
-    let b2: RigidBody | null = null;
+    let b1: RigidBody = o.body1;
+    let b2: RigidBody = o.body2;
 
-    if (o.body1 === undefined || o.body2 === undefined)
-      throw new Error("Can't add joint if attach rigidbodys not define !");
+    // if (o.body1.constructor === String) {
+    //   b1 = this.getByName(o.body1) as RigidBody;
+    // } else if (o.body1.constructor === Number) {
+    //   b1 = this.getByName(o.body1) as RigidBody;
+    // } else if (o.body1.constructor === RigidBody) {
+    //   b1 = o.body1;
+    // }
 
-    if (o.body1.constructor === String) {
-      b1 = this.getByName(o.body1) as RigidBody;
-    } else if (o.body1.constructor === Number) {
-      b1 = this.getByName(o.body1) as RigidBody;
-    } else if (o.body1.constructor === RigidBody) {
-      b1 = o.body1;
-    }
+    // if (o.body2.constructor === String) {
+    //   b2 = this.getByName(o.body2) as RigidBody;
+    // } else if (o.body2.constructor === Number) {
+    //   b2 = this.getByName(o.body2) as RigidBody;
+    // } else if (o.body2.constructor === RigidBody) {
+    //   b2 = o.body2;
+    // }
 
-    if (o.body2.constructor === String) {
-      b2 = this.getByName(o.body2) as RigidBody;
-    } else if (o.body2.constructor === Number) {
-      b2 = this.getByName(o.body2) as RigidBody;
-    } else if (o.body2.constructor === RigidBody) {
-      b2 = o.body2;
-    }
-
-    if (b1 === null || b2 === null) throw new Error("Can't add joint attach rigidbodys not find !");
+    // if (b1 === null || b2 === null) throw new Error("Can't add joint attach rigidbodys not find !");
 
     jc.body1 = b1;
     jc.body2 = b2;
@@ -1008,10 +1016,51 @@ export class World extends EventDispatcher {
         break;
     }
 
-    joint.name = o.name || "";
+    joint.name = o.name;
     // finaly add to physics world
     this.addJoint(joint);
 
     return joint;
   }
+}
+
+export class JointOptions {
+  constructor(
+    public body1: RigidBody,
+    public body2: RigidBody,
+    public axe1: f32[] = [1, 0, 0],
+    public axe2: f32[] = [1, 0, 0],
+    public pos1: f32[] = [0, 0, 0],
+    public pos2: f32[] = [0, 0, 0],
+    public limit: f32[] | null = null,
+    public spring: f32[] | null = null,
+    public motor: f32[] | null = null,
+    public min: f32 = 0,
+    public max: f32 = 0,
+    public name: string = "",
+    public collision: boolean = false
+  ) {}
+}
+
+export class BodyOptions {
+  constructor(
+    public density: f32 = 1,
+    public friction: f32 = 0.2,
+    public restitution: f32 = 0.2,
+    public belongsTo: f32 = 1,
+    public collidesWith: f32 = 0xffffffff,
+    public config: f32[] | null = null,
+    public size: f32[] = [1, 1, 1],
+    public rot: f32[] = [0, 0, 0],
+    public rotShape: f32[] = [0, 0, 0],
+    public pos: f32[] = [0, 0, 0],
+    public posShape: f32[] = [0, 0, 0],
+    public move: boolean = false,
+    public neverSleep: boolean = false,
+    public sleep: boolean = false,
+    public kinematic: boolean = false,
+    public massPos: boolean = false,
+    public massRot: boolean = false,
+    public name: string | null = null
+  ) {}
 }

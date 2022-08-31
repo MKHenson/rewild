@@ -1,12 +1,12 @@
-import './polyfills.js';
+import "./polyfills.js";
 
-export * from './constants.js';
-export * from './core/Utils.js';
+export * from "./constants.js";
+export * from "./core/Utils.js";
 
-export { _Math as Math } from './math/Math.js';
-export { Vec3 } from './math/Vec3.js';
-export { Quat } from './math/Quat.js';
-export { Mat33 } from './math/Mat33.js';
+export { _Math as Math } from "./math/Math.js";
+export { Vec3 } from "./math/Vec3.js";
+export { Quat } from "./math/Quat.js";
+export { Mat33 } from "./math/Mat33.js";
 
 /*
 // broadphase
@@ -62,32 +62,28 @@ export { Translational3Constraint } from './constraint/joint/base/Translational3
 export { TranslationalConstraint } from './constraint/joint/base/TranslationalConstraint.js';
 */
 
-
-export { Shape } from './shape/Shape.js';
-export { Box } from './shape/Box.js';
-export { Sphere } from './shape/Sphere.js';
-export { Cylinder } from './shape/Cylinder.js';
-export { Plane } from './shape/Plane';
-export { Particle } from './shape/Particle';
-export { ShapeConfig } from './shape/ShapeConfig.js';
+// export { Shape } from './shape/Shape.js';
+// export { Box } from './shape/Box.js';
+// export { Sphere } from './shape/Sphere.js';
+// export { Cylinder } from './shape/Cylinder.js';
+// export { Plane } from './shape/Plane';
+// export { Particle } from './shape/Particle';
+// export { ShapeConfig } from './shape/ShapeConfig.js';
 
 //export { TetraShape } from './collision/shape/TetraShape.js';
 //export { Joint } from './constraint/joint/Joint.js';
 //export { JointLink } from './constraint/joint/JointLink.js';
-export { LimitMotor } from './constraint/joint/LimitMotor.js';
-export { HingeJoint } from './constraint/joint/HingeJoint.js';
-export { BallAndSocketJoint } from './constraint/joint/BallAndSocketJoint.js';
-export { DistanceJoint } from './constraint/joint/DistanceJoint.js';
-export { PrismaticJoint } from './constraint/joint/PrismaticJoint.js';
-export { SliderJoint } from './constraint/joint/SliderJoint.js';
-export { WheelJoint } from './constraint/joint/WheelJoint.js';
-export { JointConfig } from './constraint/joint/JointConfig.js';
+// export { LimitMotor } from './constraint/joint/LimitMotor.js';
+// export { HingeJoint } from './constraint/joint/HingeJoint.js';
+// export { BallAndSocketJoint } from './constraint/joint/BallAndSocketJoint.js';
+// export { DistanceJoint } from './constraint/joint/DistanceJoint.js';
+// export { PrismaticJoint } from './constraint/joint/PrismaticJoint.js';
+// export { SliderJoint } from './constraint/joint/SliderJoint.js';
+// export { WheelJoint } from './constraint/joint/WheelJoint.js';
+// export { JointConfig } from './constraint/joint/JointConfig.js';
 
-
-
-
-export { RigidBody } from './core/RigidBody.js';
-export { World } from './core/World.js';
+// export { RigidBody } from './core/RigidBody.js';
+// export { World } from './core/World.js';
 
 // test version
 

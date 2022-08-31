@@ -55,7 +55,9 @@ export class AngularConstraint {
   }
 
   preSolve(timeStep: f32, invTimeStep: f32): void {
-    var inv, len, v;
+    let inv: f32 = 0,
+      len: f32 = 0,
+      v: Float32Array;
 
     this.ii1 = this.i1.clone();
     this.ii2 = this.i2.clone();
@@ -82,7 +84,9 @@ export class AngularConstraint {
 
     inv = this.relativeOrientation.w * 2;
 
-    this.vel.copy(this.relativeOrientation).multiplyScalar(inv);
+    this.vel
+      .set(this.relativeOrientation.x, this.relativeOrientation.y, this.relativeOrientation.z)
+      .multiplyScalar(inv);
 
     len = this.vel.length();
 
@@ -101,7 +105,7 @@ export class AngularConstraint {
   }
 
   solve(): void {
-    var r = this.a2.clone().sub(this.a1).sub(this.vel);
+    let r = this.a2.clone().sub(this.a1).sub(this.vel);
 
     this.rn0.copy(r).applyMatrix3(this.dd!, true);
     this.rn1.copy(this.rn0).applyMatrix3(this.ii1!, true);

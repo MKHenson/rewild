@@ -11,7 +11,7 @@ import { World } from "../core/World";
 
 export abstract class Constraint extends PhysicsObject {
   // parent world of the constraint.
-  parent: null | World;
+  parent: World | null;
 
   // first body of the constraint.
   body1: RigidBody | null;

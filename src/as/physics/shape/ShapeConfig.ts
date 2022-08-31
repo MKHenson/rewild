@@ -11,9 +11,9 @@ import { Mat33 } from "../math/Mat33";
 export class ShapeConfig {
   constructor(
     // position of the shape in parent's coordinate system.
-    public relativePosition = new Vec3(),
+    public relativePosition: Vec3 = new Vec3(),
     // rotation matrix of the shape in parent's coordinate system.
-    public relativeRotation = new Mat33(),
+    public relativeRotation: Mat33 = new Mat33(),
     // coefficient of friction of the shape.
     public friction: f32 = 0.2, // 0.4
     // coefficient of restitution of the shape.

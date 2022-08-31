@@ -15,7 +15,7 @@ export class BoxCylinderCollisionDetector extends CollisionDetector {
     this.flip = flip;
   }
 
-  getSep(c1: Box, c2: Cylinder, sep: Vec3, pos: Vec3, dep: Vec3) {
+  getSep(c1: Box, c2: Cylinder, sep: Vec3, pos: Vec3, dep: Vec3): boolean {
     let t1x: f32 = 0;
     let t1y: f32 = 0;
     let t1z: f32 = 0;
@@ -289,7 +289,7 @@ export class BoxCylinderCollisionDetector extends CollisionDetector {
     //return false;
   }
 
-  supportPointB(c: Box, dx: f32, dy: f32, dz: f32, out: Vec3) {
+  supportPointB(c: Box, dx: f32, dy: f32, dz: f32, out: Vec3): void {
     let rot = c.rotation.elements;
     let ldx = rot[0] * dx + rot[3] * dy + rot[6] * dz;
     let ldy = rot[1] * dx + rot[4] * dy + rot[7] * dz;
@@ -297,9 +297,9 @@ export class BoxCylinderCollisionDetector extends CollisionDetector {
     let w = c.halfWidth;
     let h = c.halfHeight;
     let d = c.halfDepth;
-    let ox;
-    let oy;
-    let oz;
+    let ox: f32;
+    let oy: f32;
+    let oz: f32;
     if (ldx < 0) ox = -w;
     else ox = w;
     if (ldy < 0) oy = -h;
@@ -312,7 +312,7 @@ export class BoxCylinderCollisionDetector extends CollisionDetector {
     out.set(ldx, ldy, ldz);
   }
 
-  supportPointC(c: Cylinder, dx: f32, dy: f32, dz: f32, out: Vec3) {
+  supportPointC(c: Cylinder, dx: f32, dy: f32, dz: f32, out: Vec3): void {
     let rot = c.rotation.elements;
     let ldx = rot[0] * dx + rot[3] * dy + rot[6] * dz;
     let ldy = rot[1] * dx + rot[4] * dy + rot[7] * dz;
@@ -353,7 +353,7 @@ export class BoxCylinderCollisionDetector extends CollisionDetector {
     out.set(ldx, ldy, ldz);
   }
 
-  detectCollision(shape1: Shape, shape2: Shape, manifold: ContactManifold) {
+  detectCollision(shape1: Shape, shape2: Shape, manifold: ContactManifold): void {
     let b: Box;
     let c: Cylinder;
     if (this.flip) {

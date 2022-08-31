@@ -17,7 +17,7 @@ import { JointConfig } from "./JointConfig";
  */
 
 export class PrismaticJoint extends Joint {
-  type = JOINT_PRISMATIC;
+  type: i32;
 
   // The axis in the first body's coordinate system.
   localAxis1: Vec3;

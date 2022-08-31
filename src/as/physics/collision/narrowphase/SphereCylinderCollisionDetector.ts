@@ -13,7 +13,7 @@ export class SphereCylinderCollisionDetector extends CollisionDetector {
     this.flip = flip;
   }
 
-  detectCollision(shape1: Shape, shape2: Shape, manifold: ContactManifold) {
+  detectCollision(shape1: Shape, shape2: Shape, manifold: ContactManifold): void {
     let s: Sphere;
     let c: Cylinder;
 
@@ -68,7 +68,7 @@ export class SphereCylinderCollisionDetector extends CollisionDetector {
     dy = cy - psy;
     dz = cz - psz;
     len = dx * dx + dy * dy + dz * dz;
-    let invLen;
+    let invLen: f32;
     if (len > 0 && len < rads * rads) {
       len = Math.sqrt(len);
       invLen = 1 / len;

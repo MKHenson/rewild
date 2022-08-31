@@ -14,13 +14,13 @@ import { RigidBody } from "../../core/RigidBody";
 
 export class Contact {
   // The first shape.
-  shape1: null | Shape;
+  shape1: Shape | null;
   // The second shape.
-  shape2: null | Shape;
+  shape2: Shape | null;
   // The first rigid body.
-  body1: null | RigidBody;
+  body1: RigidBody | null;
   // The second rigid body.
-  body2: null | RigidBody;
+  body2: RigidBody | null;
   // The previous contact in the world.
   prev: Contact | null;
   // The next contact in the world.
@@ -229,7 +229,7 @@ export class Contact {
   /**
    * Detach the contact from the shapes.
    */
-  detach() {
+  detach(): void {
     let prev = this.s1Link.prev;
     let next = this.s1Link.next;
     if (prev !== null) prev.next = next;
