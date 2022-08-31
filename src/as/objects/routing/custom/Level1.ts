@@ -98,6 +98,8 @@ export class Level1 extends Container implements Listener {
     if (this.isPaused) return;
     super.onUpdate(delta, total);
 
+    this.world!.step();
+
     const objects = this.objects;
     this.totalTime += delta;
 
@@ -164,11 +166,13 @@ export class Level1 extends Container implements Listener {
 
     inputManager.addEventListener("keyup", this);
     uiSignaller.addEventListener("uievent", this);
+    this.world!.play();
     lock();
   }
 
   unMount(): void {
     super.unMount();
+    this.world!.stop();
     // this.orbitController.enabled = false;
     this.pointerController.enabled = false;
     inputManager.removeEventListener("keyup", this);

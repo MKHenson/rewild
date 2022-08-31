@@ -100,7 +100,7 @@ export class SAPAxis {
       const left = stack[--count];
       const diff = right - left;
       let tmp: SAPElement, tmp2: SAPElement;
-      let pivot: f32, i: i32, j: i32;
+      let pivot: f32, i: f32, j: f32;
 
       if (diff > 16) {
         // quick sort

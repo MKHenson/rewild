@@ -34,8 +34,8 @@ export class Plane extends Shape {
   updateProxy(): void {
     let p = AABB_PROX;
 
-    let min = -Infinity;
-    let max = Infinity;
+    let min = -f32.MAX_VALUE;
+    let max = f32.MAX_VALUE;
     let n = this.normal;
     // The plane AABB is infinite, except if the normal is pointing along any axis
     this.aabb.set(
@@ -47,6 +47,6 @@ export class Plane extends Shape {
       n.z === 1 ? this.position.z + p : max
     );
 
-    if (this.proxy != null) this.proxy.update();
+    if (this.proxy != null) this.proxy!.update();
   }
 }

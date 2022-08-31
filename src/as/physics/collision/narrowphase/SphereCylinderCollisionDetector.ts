@@ -51,10 +51,10 @@ export class SphereCylinderCollisionDetector extends CollisionDetector {
     let d2x = psx - cx;
     let d2y = psy - cy;
     let d2z = psz - cz;
-    let len = d2x * d2x + d2y * d2y + d2z * d2z;
+    let len: f32 = d2x * d2x + d2y * d2y + d2z * d2z;
     if (len > rad2 * rad2) return;
     if (len > radc * radc) {
-      len = radc / Math.sqrt(len);
+      len = radc / Mathf.sqrt(len);
       d2x *= len;
       d2y *= len;
       d2z *= len;
@@ -70,7 +70,7 @@ export class SphereCylinderCollisionDetector extends CollisionDetector {
     len = dx * dx + dy * dy + dz * dz;
     let invLen: f32;
     if (len > 0 && len < rads * rads) {
-      len = Math.sqrt(len);
+      len = Mathf.sqrt(len);
       invLen = 1 / len;
       dx *= invLen;
       dy *= invLen;

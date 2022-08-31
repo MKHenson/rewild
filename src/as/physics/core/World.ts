@@ -91,9 +91,9 @@ export class World extends EventDispatcher {
   randX: i32;
   randA: i32;
   randB: i32;
-  islandRigidBodies: (RigidBody | null)[];
-  islandStack: (RigidBody | null)[];
-  islandConstraints: Array<Constraint | null>[];
+  islandRigidBodies: Array<RigidBody | null>;
+  islandStack: Array<RigidBody | null>;
+  islandConstraints: Array<Constraint | null>;
 
   constructor(o: WorldOptions = new WorldOptions()) {
     super();

@@ -192,7 +192,7 @@ export class BoxCylinderCollisionDetector extends CollisionDetector {
         nx = t1y * t2z - t1z * t2y;
         ny = t1z * t2x - t1x * t2z;
         nz = t1x * t2y - t1y * t2x;
-        len = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+        len = 1 / Mathf.sqrt(nx * nx + ny * ny + nz * nz);
         nx *= len;
         ny *= len;
         nz *= len;
@@ -209,7 +209,7 @@ export class BoxCylinderCollisionDetector extends CollisionDetector {
             b3 = (v1y * v2z - v1z * v2y) * nx + (v1z * v2x - v1x * v2z) * ny + (v1x * v2y - v1y * v2x) * nz;
             sum = b1 + b2 + b3;
           }
-          let inv = 1 / sum;
+          let inv: f32 = 1 / sum;
           p1x = (v01x * b0 + v11x * b1 + v21x * b2 + v31x * b3) * inv;
           p1y = (v01y * b0 + v11y * b1 + v21y * b2 + v31y * b3) * inv;
           p1z = (v01z * b0 + v11z * b1 + v21z * b2 + v31z * b3) * inv;
@@ -336,7 +336,7 @@ export class BoxCylinderCollisionDetector extends CollisionDetector {
         oz = 0;
       }
     } else {
-      len = c.radius / Math.sqrt(len);
+      len = c.radius / Mathf.sqrt(len);
       if (ldy < 0) {
         ox = radx * len;
         oy = -hh;
@@ -770,7 +770,7 @@ export class BoxCylinderCollisionDetector extends CollisionDetector {
       dx = len * ncx - tx;
       dy = len * ncy - ty;
       dz = len * ncz - tz;
-      len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      len = Mathf.sqrt(dx * dx + dy * dy + dz * dz);
       if (len == 0) return;
       len = r / len;
       dx *= len;

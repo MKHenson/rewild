@@ -36,7 +36,7 @@ export class ContactConstraint extends Constraint {
   tmpav2: Vec3;
   m1: f32;
   m2: f32;
-  num: f32;
+  num: i32;
   ps: ManifoldPoint[];
   cs: ContactPointDataBuffer;
 
@@ -254,7 +254,7 @@ export class ContactConstraint extends Constraint {
       tanImp: f32,
       binImp: f32,
       max: f32,
-      len: i32;
+      len: f32;
 
     let c: ContactPointDataBuffer | null = this.cs;
 

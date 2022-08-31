@@ -22,13 +22,13 @@ export class SphereSphereCollisionDetector extends CollisionDetector {
     let dx = p2.x - p1.x;
     let dy = p2.y - p1.y;
     let dz = p2.z - p1.z;
-    let len = dx * dx + dy * dy + dz * dz;
+    let len: f32 = dx * dx + dy * dy + dz * dz;
     const r1 = s1.radius;
     const r2 = s2.radius;
     const rad = r1 + r2;
     if (len > 0 && len < rad * rad) {
       len = Mathf.sqrt(len);
-      const invLen = 1 / len;
+      const invLen: f32 = 1 / len;
       dx *= invLen;
       dy *= invLen;
       dz *= invLen;
