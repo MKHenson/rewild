@@ -94,24 +94,24 @@ export class SAPAxis {
     count = 2;
     const stack = this.stack;
     stack[0] = 0;
-    stack[1] = this.numElements - 1;
+    stack[1] = f32(this.numElements - 1);
     while (count > 0) {
-      const right = stack[--count];
-      const left = stack[--count];
-      const diff = right - left;
+      const right = i32(stack[--count]);
+      const left = i32(stack[--count]);
+      const diff = f32(right - left);
       let tmp: SAPElement, tmp2: SAPElement;
-      let pivot: f32, i: f32, j: f32;
+      let pivot: f32, i: i32, j: i32;
 
       if (diff > 16) {
         // quick sort
         //const mid=left+(diff>>1);
-        const mid = left + Mathf.floor(diff * 0.5);
+        const mid = left + i32(Mathf.floor(diff * 0.5));
         tmp = elements[mid]!;
         elements[mid] = elements[right];
         elements[right] = tmp;
         pivot = tmp.value;
-        i = left - 1;
-        j = right;
+        i = i32(left - 1);
+        j = i32(right);
         while (true) {
           let ei: SAPElement;
           let ej: SAPElement;
@@ -129,15 +129,15 @@ export class SAPAxis {
         elements[right] = elements[i];
         elements[i] = tmp;
         if (i - left > right - i) {
-          stack[count++] = left;
-          stack[count++] = i - 1;
-          stack[count++] = i + 1;
-          stack[count++] = right;
+          stack[count++] = f32(left);
+          stack[count++] = f32(i - 1);
+          stack[count++] = f32(i + 1);
+          stack[count++] = f32(right);
         } else {
-          stack[count++] = i + 1;
-          stack[count++] = right;
-          stack[count++] = left;
-          stack[count++] = i - 1;
+          stack[count++] = f32(i + 1);
+          stack[count++] = f32(right);
+          stack[count++] = f32(left);
+          stack[count++] = f32(i - 1);
         }
       } else {
         for (i = left + 1; i <= right; i++) {
@@ -158,7 +158,7 @@ export class SAPAxis {
     }
   }
 
-  calculateTestCount(): f32 {
+  calculateTestCount(): i32 {
     let num: i32 = 1;
     let sum: i32 = 0;
     for (let i: i32 = 1, l: i32 = this.numElements; i < l; i++) {

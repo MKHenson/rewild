@@ -79,8 +79,8 @@ export class ContactConstraint extends Constraint {
     this.ps = manifold.points;
     this.cs = new ContactPointDataBuffer();
     this.cs.next = new ContactPointDataBuffer();
-    this.cs.next.next = new ContactPointDataBuffer();
-    this.cs.next.next.next = new ContactPointDataBuffer();
+    this.cs.next!.next = new ContactPointDataBuffer();
+    this.cs.next!.next!.next = new ContactPointDataBuffer();
   }
 
   // Attach the constraint to the bodies.

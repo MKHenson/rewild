@@ -38,12 +38,12 @@ export class Contact {
   // shapes is very close and touching
   close: boolean;
 
-  dist: u32;
+  dist: f64;
 
-  b1Link: ContactLink;
-  b2Link: ContactLink;
-  s1Link: ContactLink;
-  s2Link: ContactLink;
+  b1Link!: ContactLink;
+  b2Link!: ContactLink;
+  s1Link!: ContactLink;
+  s2Link!: ContactLink;
 
   // The contact manifold of the contact.
   manifold: ContactManifold;
@@ -67,16 +67,16 @@ export class Contact {
 
     this.dist = Infinity;
 
-    this.b1Link = new ContactLink(this);
-    this.b2Link = new ContactLink(this);
-    this.s1Link = new ContactLink(this);
-    this.s2Link = new ContactLink(this);
-
     this.manifold = new ContactManifold();
     this.buffer = [new ImpulseDataBuffer(), new ImpulseDataBuffer(), new ImpulseDataBuffer(), new ImpulseDataBuffer()];
 
     this.points = this.manifold.points;
     this.constraint = new ContactConstraint(this.manifold);
+
+    this.b1Link = new ContactLink(this);
+    this.b2Link = new ContactLink(this);
+    this.s1Link = new ContactLink(this);
+    this.s2Link = new ContactLink(this);
   }
 
   mixRestitution(restitution1: f32, restitution2: f32): f32 {
@@ -107,7 +107,7 @@ export class Contact {
       b.impulse = p.normalImpulse;
     }
     this.manifold.numPoints = 0;
-    this.detector!.detectCollision(this.shape1!, this.shape2!, this.manifold!);
+    this.detector!.detectCollision(this.shape1!, this.shape2!, this.manifold);
     const num = this.manifold.numPoints;
     if (num == 0) {
       this.touching = false;
@@ -131,7 +131,7 @@ export class Contact {
       const lp2y = p.localPoint2.y;
       const lp2z = p.localPoint2.z;
       let index = -1;
-      let minDistance = 0.0004;
+      let minDistance: f32 = 0.0004;
       let j = numBuffers;
       let b: ImpulseDataBuffer;
 
@@ -183,8 +183,8 @@ export class Contact {
     this.body1 = shape1.parent;
     this.body2 = shape2.parent;
 
-    this.manifold!.body1 = this.body1;
-    this.manifold!.body2 = this.body2;
+    this.manifold.body1 = this.body1;
+    this.manifold.body2 = this.body2;
     this.constraint!.body1 = this.body1;
     this.constraint!.body2 = this.body2;
     this.constraint!.attach();
@@ -194,12 +194,12 @@ export class Contact {
     this.s2Link.shape = shape1;
     this.s2Link.body = this.body1;
 
-    if (shape1.contactLink != null) (this.s1Link.next = shape1.contactLink).prev = this.s1Link;
+    if (shape1.contactLink != null) (this.s1Link.next = shape1.contactLink)!.prev = this.s1Link;
     else this.s1Link.next = null;
     shape1.contactLink = this.s1Link;
     shape1.numContacts++;
 
-    if (shape2.contactLink != null) (this.s2Link.next = shape2.contactLink).prev = this.s2Link;
+    if (shape2.contactLink != null) (this.s2Link.next = shape2.contactLink)!.prev = this.s2Link;
     else this.s2Link.next = null;
     shape2.contactLink = this.s2Link;
     shape2.numContacts++;
@@ -209,12 +209,12 @@ export class Contact {
     this.b2Link.shape = shape1;
     this.b2Link.body = this.body1;
 
-    if (this.body1!.contactLink != null) (this.b1Link.next = this.body1!.contactLink).prev = this.b1Link;
+    if (this.body1!.contactLink != null) (this.b1Link.next = this.body1!.contactLink)!.prev = this.b1Link;
     else this.b1Link.next = null;
     this.body1!.contactLink = this.b1Link;
     this.body1!.numContacts++;
 
-    if (this.body2!.contactLink != null) (this.b2Link.next = this.body2!.contactLink).prev = this.b2Link;
+    if (this.body2!.contactLink != null) (this.b2Link.next = this.body2!.contactLink)!.prev = this.b2Link;
     else this.b2Link.next = null;
     this.body2!.contactLink = this.b2Link;
     this.body2!.numContacts++;

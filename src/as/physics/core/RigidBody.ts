@@ -323,7 +323,7 @@ export class RigidBody extends PhysicsObject {
       js.body!.sleeping = false;
       js = js.next;
     }
-    for (let shape = this.shapes; shape != null; shape = shape.next) {
+    for (let shape = this.shapes; shape != null; shape = shape!.next) {
       shape.updateProxy();
     }
   }
@@ -341,7 +341,7 @@ export class RigidBody extends PhysicsObject {
 
     this.sleepTime = 0;
     this.sleeping = true;
-    for (let shape = this.shapes; shape != null; shape = shape.next) {
+    for (let shape = this.shapes; shape != null; shape = shape!.next) {
       shape.updateProxy();
     }
   }
@@ -437,7 +437,7 @@ export class RigidBody extends PhysicsObject {
     this.rotation.setQuat(this.orientation);
     this.rotateInertia(this.rotation, this.inverseLocalInertia, this.inverseInertia);
 
-    for (let shape = this.shapes; shape != null; shape = shape.next) {
+    for (let shape = this.shapes; shape != null; shape = shape!.next) {
       shape.position.copy(shape.relativePosition).applyMatrix3(this.rotation, true).add(this.position);
       // add by QuaziKb
       shape.rotation.multiplyMatrices(this.rotation, shape.relativeRotation);
@@ -529,12 +529,12 @@ export class RigidBody extends PhysicsObject {
     this.pos.scale(this.position, this.scale);
     this.quaternion.copy(this.orientation);
 
-    if (this.mesh === null) return;
+    if (this.mesh == null) return;
 
     // this.mesh.position.copy(this.getPosition());
     // this.mesh.quaternion.copy(this.getQuaternion());
 
-    this.mesh.position.set(this.pos.x, this.pos.y, this.pos.z);
-    this.mesh.quaternion.set(this.quaternion.x, this.quaternion.y, this.quaternion.z, this.quaternion.z);
+    this.mesh!.position.set(this.pos.x, this.pos.y, this.pos.z);
+    this.mesh!.quaternion.set(this.quaternion.x, this.quaternion.y, this.quaternion.z, this.quaternion.z);
   }
 }

@@ -34,7 +34,7 @@ export class DBVT {
       return;
     }
     const lb = leaf.aabb;
-    let sibling = this.root;
+    let sibling = this.root!;
     let oldArea: f32;
     let newArea: f32;
     while (sibling.proxy == null) {
@@ -83,8 +83,9 @@ export class DBVT {
         }
       }
     }
+
     let oldParent = sibling.parent;
-    let newParent: DBVTNode;
+    let newParent: DBVTNode | null = null;
     if (this.numFreeNodes > 0) {
       newParent = this.freeNodes[--this.numFreeNodes];
     } else {
@@ -141,16 +142,16 @@ export class DBVT {
     }
     let grandParent: DBVTNode | null = parent.parent!;
     sibling!.parent = grandParent;
-    if (grandParent.child1 == parent) {
-      grandParent.child1 = sibling;
+    if (grandParent!.child1 == parent) {
+      grandParent!.child1 = sibling;
     } else {
-      grandParent.child2 = sibling;
+      grandParent!.child2 = sibling;
     }
     if (this.numFreeNodes < 16384) {
       this.freeNodes[this.numFreeNodes++] = parent;
     }
     do {
-      grandParent = this.balance(grandParent);
+      grandParent = this.balance(grandParent!);
       this.fix(grandParent);
       grandParent = grandParent.parent;
     } while (grandParent != null);

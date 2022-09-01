@@ -391,15 +391,15 @@ export class World extends EventDispatcher {
 
   addContact(s1: Shape, s2: Shape): void {
     let newContact: Contact;
-    if (this.unusedContacts !== null) {
-      newContact = this.unusedContacts;
-      this.unusedContacts = this.unusedContacts.next;
+    if (this.unusedContacts != null) {
+      newContact = this.unusedContacts!;
+      this.unusedContacts = this.unusedContacts!.next;
     } else {
       newContact = new Contact();
     }
     newContact.attach(s1, s2);
     newContact.detector = this.detectors[s1.type][s2.type];
-    if (this.contacts) (this.contacts.prev = newContact).next = this.contacts;
+    if (this.contacts) (this.contacts!.prev = newContact)!.next = this.contacts;
     this.contacts = newContact;
     this.numContacts++;
   }
@@ -508,8 +508,8 @@ export class World extends EventDispatcher {
       let exists = false;
       while (link) {
         let contact: Contact | null = link.contact!;
-        if (contact.shape1 == s1 && contact.shape2 == s2) {
-          contact.persisting = true;
+        if (contact!.shape1 == s1 && contact!.shape2 == s2) {
+          contact!.persisting = true;
           exists = true; // contact already exists
           break;
         }
@@ -529,7 +529,7 @@ export class World extends EventDispatcher {
     // update & narrow phase
     this.numContactPoints = 0;
     let contact: Contact | null = this.contacts!;
-    while (contact !== null) {
+    while (contact != null) {
       if (!contact.persisting) {
         if (contact.shape1!.aabb.intersectTest(contact.shape2!.aabb)) {
           /*const aabb1=contact.shape1.aabb;
@@ -545,15 +545,15 @@ export class World extends EventDispatcher {
           continue;
         }
       }
-      const b1 = contact.body1!;
-      const b2 = contact.body2!;
+      const b1 = contact!.body1!;
+      const b2 = contact!.body2!;
 
-      if ((b1.isDynamic && !b1.sleeping) || (b2.isDynamic && !b2.sleeping)) contact.updateManifold();
+      if ((b1.isDynamic && !b1.sleeping) || (b2.isDynamic && !b2.sleeping)) contact!.updateManifold();
 
-      this.numContactPoints += contact.manifold.numPoints;
-      contact.persisting = false;
-      contact.constraint!.addedToIsland = false;
-      contact = contact.next;
+      this.numContactPoints += contact!.manifold.numPoints;
+      contact!.persisting = false;
+      contact!.constraint!.addedToIsland = false;
+      contact = contact!.next;
     }
 
     if (stat) this.performance!.calcNarrowPhase();
@@ -562,11 +562,11 @@ export class World extends EventDispatcher {
     //   SOLVE ISLANDS
     //------------------------------------------------------
 
-    const invTimeStep = 1 / this.timeStep;
+    const invTimeStep: f32 = 1 / this.timeStep;
     let joint: Joint | null;
     let constraint: Constraint;
 
-    for (joint = this.joints; joint !== null; joint = joint.next) {
+    for (joint = this.joints; joint !== null; joint = joint!.next) {
       joint.addedToIsland = false;
     }
 
@@ -581,7 +581,7 @@ export class World extends EventDispatcher {
 
     // build and solve simulation islands
 
-    for (let base = this.rigidBodies; base !== null; base = base.next) {
+    for (let base = this.rigidBodies; base !== null; base = base!.next) {
       if (base.addedToIsland || base.isStatic || base.sleeping) continue; // ignore
 
       if (base.isLonely()) {
@@ -622,7 +622,7 @@ export class World extends EventDispatcher {
         if (body.isStatic) continue;
 
         // search connections
-        for (let cs = body.contactLink; cs !== null; cs = cs.next) {
+        for (let cs = body.contactLink; cs !== null; cs = cs!.next) {
           const contact = cs.contact!;
           constraint = contact.constraint!;
           if (constraint.addedToIsland || !contact.touching) continue; // ignore
@@ -638,7 +638,7 @@ export class World extends EventDispatcher {
           this.islandStack[stackCount++] = next;
           next.addedToIsland = true;
         }
-        for (let js = body.jointLink; js !== null; js = js.next) {
+        for (let js = body.jointLink; js !== null; js = js!.next) {
           constraint = js.joint;
 
           if (constraint.addedToIsland) continue; // ignore
@@ -678,7 +678,7 @@ export class World extends EventDispatcher {
         j = islandNumConstraints;
         while (j--) {
           if (j !== 0) {
-            const swap = (((this.randX = (this.randX * this.randA + this.randB) & 0x7fffffff) / 2147483648.0) * j) | 0;
+            const swap = i32(((this.randX = (this.randX * this.randA + this.randB) & 0x7fffffff) / 2147483648.0) * j);
             constraint = this.islandConstraints[j]!;
             this.islandConstraints[j] = this.islandConstraints[swap];
             this.islandConstraints[swap] = constraint;
@@ -711,7 +711,7 @@ export class World extends EventDispatcher {
 
       // sleeping check
 
-      let sleepTime = 10;
+      let sleepTime: f32 = 10;
       j = islandNumRigidBodies;
       while (j--) {
         //for(j=0, l=islandNumRigidBodies;j<l;j++){
