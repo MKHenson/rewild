@@ -186,9 +186,9 @@ export class RigidBody extends PhysicsObject {
 
   setParent(world: World): void {
     this.parent = world;
-    this.scale = this.parent.scale;
-    this.invScale = this.parent.invScale;
-    this.id = this.parent.numRigidBodies;
+    this.scale = this.parent!.scale;
+    this.invScale = this.parent!.invScale;
+    this.id = this.parent!.numRigidBodies;
     if (!this.name) this.name = this.id.toString();
 
     this.updateMesh();
@@ -204,10 +204,10 @@ export class RigidBody extends PhysicsObject {
       throw new Error("It is not possible that you add a shape which already has an associated body.");
     }
 
-    if (this.shapes != null) (this.shapes.prev = shape).next = this.shapes;
+    if (this.shapes != null) (this.shapes!.prev = shape)!.next = this.shapes;
     this.shapes = shape;
     shape.parent = this;
-    if (this.parent) this.parent.addShape(shape);
+    if (this.parent) this.parent!.addShape(shape);
     this.numShapes++;
   }
   /**
@@ -252,7 +252,7 @@ export class RigidBody extends PhysicsObject {
    * @param adjustPosition
    * @return void
    */
-  setupMass(type: i32, AdjustPosition = true): void {
+  setupMass(type: i32, AdjustPosition: boolean = true): void {
     const adjustPosition = AdjustPosition;
 
     this.type = type || BODY_STATIC;
@@ -265,7 +265,7 @@ export class RigidBody extends PhysicsObject {
     const tmpM = new Mat33();
     const tmpV = new Vec3();
 
-    for (let shape = this.shapes; shape !== null; shape = shape.next) {
+    for (let shape = this.shapes; shape !== null; shape = shape!.next) {
       shape.calculateMassInfo(this.massInfo);
       const shapeMass = this.massInfo.mass;
       tmpV.addScaledVector(shape.relativePosition, shapeMass);
@@ -282,7 +282,7 @@ export class RigidBody extends PhysicsObject {
 
     if (adjustPosition) {
       this.position.add(tmpV);
-      for (let shape = this.shapes; shape !== null; shape = shape.next) {
+      for (let shape = this.shapes; shape !== null; shape = shape!.next) {
         shape.relativePosition.subEqual(tmpV);
       }
 

@@ -272,10 +272,10 @@ export class World extends EventDispatcher {
     rigidBody.setParent(this);
     //rigidBody.awake();
 
-    for (let shape = rigidBody.shapes; shape !== null; shape = shape.next) {
+    for (let shape = rigidBody.shapes; shape !== null; shape = shape!.next) {
       this.addShape(shape);
     }
-    if (this.rigidBodies !== null) (this.rigidBodies.prev = rigidBody).next = this.rigidBodies;
+    if (this.rigidBodies != null) (this.rigidBodies!.prev = rigidBody)!.next = this.rigidBodies;
     this.rigidBodies = rigidBody;
     this.numRigidBodies++;
   }
@@ -332,13 +332,13 @@ export class World extends EventDispatcher {
    * @param  shape  Shape you want to add
    */
   addShape(shape: Shape): void {
-    if (!shape.parent || !shape.parent.parent) {
+    if (!shape.parent || !shape.parent!.parent) {
       throw new Error("It is not possible to be added alone to shape world");
     }
 
     shape.proxy = this.broadPhase.createProxy(shape);
     shape.updateProxy();
-    this.broadPhase.addProxy(shape.proxy);
+    this.broadPhase.addProxy(shape.proxy!);
   }
 
   /**
@@ -809,7 +809,7 @@ export class World extends EventDispatcher {
     // SIZE
 
     // shape size
-    let s = o.size === undefined ? [1, 1, 1] : o.size;
+    let s: f32[] = o.size;
     if (s.length === 1) {
       s[1] = s[0];
     }
@@ -868,7 +868,8 @@ export class World extends EventDispatcher {
       if (p2[n] !== undefined) sc.relativePosition.set(p2[n], p2[n + 1], p2[n + 2]);
       if (r2[n] !== undefined) sc.relativeRotation.setQuat(new Quat().setFromEuler(r2[n], r2[n + 1], r2[n + 2]));
 
-      switch (type[i]) {
+      const curType: string = type[i];
+      switch (curType) {
         case "sphere":
           shape = new Sphere(sc, s[n]);
           break;
@@ -904,7 +905,7 @@ export class World extends EventDispatcher {
       body.setupMass(BODY_STATIC);
     }
 
-    if (o.name != null) body.name = o.name;
+    if (o.name != null) body.name = o.name!;
     //else if( move ) body.name = this.numRigidBodies;
 
     // finaly add to physics world

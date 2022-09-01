@@ -24,7 +24,7 @@ export class SAPAxis {
     if (this.numElements + 2 >= this.bufferSize) {
       //this.bufferSize<<=1;
       this.bufferSize *= 2;
-      const newElements = [];
+      const newElements: Array<SAPElement | null> = [];
       let i: i32 = this.numElements;
       while (i--) {
         //for(let i: i32=0, l=this.numElements; i<l; i++){

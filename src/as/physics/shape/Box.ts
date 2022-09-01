@@ -35,8 +35,8 @@ export class Box extends Shape {
   }
 
   calculateMassInfo(out: MassInfo): void {
-    const mass = this.width * this.height * this.depth * this.density;
-    const divid = 1 / 12;
+    const mass: f32 = this.width * this.height * this.depth * this.density;
+    const divid: f32 = 1 / 12;
     out.mass = mass;
     out.inertia.set(
       mass * (this.height * this.height + this.depth * this.depth) * divid,
