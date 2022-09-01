@@ -27,7 +27,7 @@ export class Plane extends Shape {
 
   calculateMassInfo(out: MassInfo): void {
     out.mass = this.density; //0.0001;
-    let inertia = 1;
+    let inertia: f32 = 1;
     out.inertia.set(inertia, 0, 0, 0, inertia, 0, 0, 0, inertia);
   }
 

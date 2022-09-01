@@ -16,7 +16,7 @@ import { TransformNode } from "../../../core/TransformNode";
 import { lock, unlock } from "../../../Imports";
 import { degToRad } from "../../../../common/math/MathUtils";
 import { PlayerComponent } from "../../../components/PlayerComponent";
-import { World } from "../../../physics/core/World";
+import { BodyOptions, World } from "../../../physics/core/World";
 
 export class Level1 extends Container implements Listener {
   orbitController!: OrbitController;
@@ -140,6 +140,7 @@ export class Level1 extends Container implements Listener {
     const objects = this.objects;
     for (let i: i32 = 0, l = objects.length; i < l; i++) {
       const obj = objects[i];
+
       if (obj.name.includes("crate")) {
         obj.position.set(this.getRandomArbitrary(-100, 100), 0.5, this.getRandomArbitrary(-100, 100));
         obj.rotation.y = Mathf.random() * Mathf.PI;
@@ -147,6 +148,12 @@ export class Level1 extends Container implements Listener {
         const height = this.getRandomArbitrary(5, 10);
         obj.position.set(this.getRandomArbitrary(-100, 100), height / 2, this.getRandomArbitrary(-100, 100));
         obj.scale.set(5, height, 5);
+
+        const options = new BodyOptions();
+        options.pos = [obj.position.x, obj.position.y, obj.position.z];
+        options.size = [5, height, 5];
+
+        this.world!.initBody(["box"], options);
       }
     }
 
@@ -154,6 +161,11 @@ export class Level1 extends Container implements Listener {
     this.floor.scale.set(200, 200, 200);
     this.floor.position.set(0, -0.1, 0);
     this.floor.rotation.x = -degToRad(90);
+
+    const floorOptions = new BodyOptions();
+    floorOptions.pos = [0, 0, 0];
+    floorOptions.size = [200, 0.1, 200];
+    this.world!.initBody(["box"], floorOptions);
 
     this.sbybox.scale.set(200, 200, 200);
     this.sbybox.position.set(0, 0, 0);
@@ -173,6 +185,7 @@ export class Level1 extends Container implements Listener {
   unMount(): void {
     super.unMount();
     this.world!.stop();
+    this.world!.clear();
     // this.orbitController.enabled = false;
     this.pointerController.enabled = false;
     inputManager.removeEventListener("keyup", this);
