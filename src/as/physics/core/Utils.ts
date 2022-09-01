@@ -7,22 +7,22 @@ import { World } from "./World";
 export class InfoDisplay {
   parent: World;
   infos: Float32Array;
-  f: f32[];
-  times: f32[];
+  f: i64[];
+  times: f64[];
   broadPhase: string;
   version: string;
-  fps: f32;
+  fps: i64;
   tt: f32;
-  broadPhaseTime: f32;
-  narrowPhaseTime: f32;
-  solvingTime: f32;
-  totalTime: f32;
-  updateTime: f32;
-  MaxBroadPhaseTime: f32;
-  MaxNarrowPhaseTime: f32;
-  MaxSolvingTime: f32;
-  MaxTotalTime: f32;
-  MaxUpdateTime: f32;
+  broadPhaseTime: f64;
+  narrowPhaseTime: f64;
+  solvingTime: f64;
+  totalTime: f64;
+  updateTime: f64;
+  MaxBroadPhaseTime: f64;
+  MaxNarrowPhaseTime: f64;
+  MaxSolvingTime: f64;
+  MaxTotalTime: f64;
+  MaxUpdateTime: f64;
 
   constructor(world: World) {
     this.parent = world;
@@ -53,8 +53,8 @@ export class InfoDisplay {
     this.MaxUpdateTime = 0;
   }
 
-  setTime(n: f32): void {
-    this.times[n || 0] = performance.now();
+  setTime(n: f64): void {
+    this.times[i32(n) || 0] = performance.now();
   }
 
   resetMax(): void {

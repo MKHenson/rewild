@@ -443,7 +443,7 @@ export class Mat33 {
     return this;
   }
 
-  fromArray32(array: Float32Array, offset = 0): Mat33 {
+  fromArray32(array: Float32Array, offset: i32 = 0): Mat33 {
     for (var i = 0; i < 9; i++) {
       this.elements[i] = array[i + offset];
     }
