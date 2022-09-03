@@ -42,7 +42,7 @@ const postLoop = new Event("post-loop");
 export class WorldOptions {
   constructor(
     public worldscale: f32 = 100,
-    public timestep: f32 = 0.01666,
+    public timestep: f32 = 0.01666, // 1/60
     public iterations: i32 = 8,
     public random: boolean = true,
     public gravity: Vec3 = new Vec3(0, -9.8, 0),
@@ -101,11 +101,11 @@ export class World extends EventDispatcher {
     this.paused = true;
 
     // this world scale defaut is 0.1 to 10 meters max for dynamique body
-    this.scale = o.worldscale || 1;
+    this.scale = o.worldscale;
     this.invScale = 1 / this.scale;
 
     // The time between each step
-    this.timeStep = o.timestep || 0.01666; // 1/60;
+    this.timeStep = o.timestep;
     this.timerate = this.timeStep * 1000;
     // this.timer = null;
 
@@ -211,13 +211,13 @@ export class World extends EventDispatcher {
   }
 
   play(): void {
-    // if (this.timer !== null) return;
+    // if (this.timer != null) return;
 
     // const _this = this;
     // this.timer = setInterval(function () {
     //   _this.step();
     // }, this.timerate);
-    // //this.timer = setInterval( this.loop.bind(this) , this.timerate );
+    // //                this.timer = setInterval( this.loop.bind(this) , this.timerate );
 
     this.paused = false;
     if (!this.paused) return;
@@ -248,14 +248,14 @@ export class World extends EventDispatcher {
 
     this.randX = 65535;
 
-    while (this.joints !== null) {
-      this.removeJoint(this.joints);
+    while (this.joints != null) {
+      this.removeJoint(this.joints!);
     }
-    while (this.contacts !== null) {
-      this.removeContact(this.contacts);
+    while (this.contacts != null) {
+      this.removeContact(this.contacts!);
     }
-    while (this.rigidBodies !== null) {
-      this.removeRigidBody(this.rigidBodies);
+    while (this.rigidBodies != null) {
+      this.removeRigidBody(this.rigidBodies!);
     }
   }
 
@@ -272,7 +272,7 @@ export class World extends EventDispatcher {
     rigidBody.setParent(this);
     //rigidBody.awake();
 
-    for (let shape = rigidBody.shapes; shape !== null; shape = shape!.next) {
+    for (let shape = rigidBody.shapes; shape != null; shape = shape!.next) {
       this.addShape(shape);
     }
     if (this.rigidBodies != null) (this.rigidBodies!.prev = rigidBody)!.next = this.rigidBodies;
@@ -287,7 +287,7 @@ export class World extends EventDispatcher {
    */
   removeRigidBody(rigidBody: RigidBody): void {
     const remove = rigidBody;
-    if (remove.parent !== this) return;
+    if (remove.parent != this) return;
     remove.awake();
     let js = remove.jointLink;
     while (js != null) {
@@ -295,13 +295,13 @@ export class World extends EventDispatcher {
       js = js.next;
       this.removeJoint(joint);
     }
-    for (let shape = rigidBody.shapes; shape !== null; shape = shape.next) {
+    for (let shape = rigidBody.shapes; shape != null; shape = shape!.next) {
       this.removeShape(shape);
     }
     const prev = remove.prev;
     const next = remove.next;
-    if (prev !== null) prev.next = next;
-    if (next !== null) next.prev = prev;
+    if (prev != null) prev.next = next;
+    if (next != null) next.prev = prev;
     if (this.rigidBodies == remove) this.rigidBodies = next;
     remove.prev = null;
     remove.next = null;
@@ -311,13 +311,13 @@ export class World extends EventDispatcher {
 
   getByName(name: string): PhysicsObject | null {
     let body = this.rigidBodies;
-    while (body !== null) {
+    while (body != null) {
       if (body.name === name) return body;
       body = body.next;
     }
 
     let joint = this.joints;
-    while (joint !== null) {
+    while (joint != null) {
       if (joint.name === name) return joint;
       joint = joint.next;
     }
@@ -378,8 +378,8 @@ export class World extends EventDispatcher {
     const remove = joint;
     const prev = remove.prev;
     const next = remove.next;
-    if (prev !== null) prev.next = next;
-    if (next !== null) next.prev = prev;
+    if (prev != null) prev.next = next;
+    if (next != null) next.prev = prev;
     if (this.joints == remove) this.joints = next;
     remove.prev = null;
     remove.next = null;
@@ -424,7 +424,7 @@ export class World extends EventDispatcher {
 
     let n1: string, n2: string;
     let contact = this.contacts;
-    while (contact !== null) {
+    while (contact != null) {
       n1 = contact.body1!.name;
       n2 = contact.body2!.name;
       if ((n1 === b1 && n2 === b2) || (n2 === b1 && n1 === b2)) {
@@ -438,7 +438,7 @@ export class World extends EventDispatcher {
   checkContact(name1: string, name2: string): boolean {
     let n1: string, n2: string;
     let contact = this.contacts;
-    while (contact !== null) {
+    while (contact != null) {
       n1 = contact.body1!.name || " ";
       n2 = contact.body2!.name || " ";
       if ((n1 == name1 && n2 == name2) || (n2 == name1 && n1 == name2)) {
@@ -468,7 +468,7 @@ export class World extends EventDispatcher {
 
     let body = this.rigidBodies;
 
-    while (body !== null) {
+    while (body != null) {
       body.addedToIsland = false;
 
       if (body.sleeping) body.testWakeUp();
@@ -528,7 +528,7 @@ export class World extends EventDispatcher {
 
     // update & narrow phase
     this.numContactPoints = 0;
-    let contact: Contact | null = this.contacts!;
+    let contact: Contact | null = this.contacts;
     while (contact != null) {
       if (!contact.persisting) {
         if (contact.shape1!.aabb.intersectTest(contact.shape2!.aabb)) {
@@ -566,7 +566,7 @@ export class World extends EventDispatcher {
     let joint: Joint | null;
     let constraint: Constraint;
 
-    for (joint = this.joints; joint !== null; joint = joint!.next) {
+    for (joint = this.joints; joint != null; joint = joint!.next) {
       joint.addedToIsland = false;
     }
 
@@ -581,7 +581,7 @@ export class World extends EventDispatcher {
 
     // build and solve simulation islands
 
-    for (let base = this.rigidBodies; base !== null; base = base!.next) {
+    for (let base = this.rigidBodies; base != null; base = base!.next) {
       if (base.addedToIsland || base.isStatic || base.sleeping) continue; // ignore
 
       if (base.isLonely()) {
@@ -622,7 +622,7 @@ export class World extends EventDispatcher {
         if (body.isStatic) continue;
 
         // search connections
-        for (let cs = body.contactLink; cs !== null; cs = cs!.next) {
+        for (let cs = body.contactLink; cs != null; cs = cs!.next) {
           const contact = cs.contact!;
           constraint = contact.constraint!;
           if (constraint.addedToIsland || !contact.touching) continue; // ignore
@@ -638,7 +638,7 @@ export class World extends EventDispatcher {
           this.islandStack[stackCount++] = next;
           next.addedToIsland = true;
         }
-        for (let js = body.jointLink; js !== null; js = js!.next) {
+        for (let js = body.jointLink; js != null; js = js!.next) {
           constraint = js.joint;
 
           if (constraint.addedToIsland) continue; // ignore
@@ -677,7 +677,7 @@ export class World extends EventDispatcher {
         //for(const j=1, l=islandNumConstraints; j<l; j++){
         j = islandNumConstraints;
         while (j--) {
-          if (j !== 0) {
+          if (j != 0) {
             const swap = i32(((this.randX = (this.randX * this.randA + this.randB) & 0x7fffffff) / 2147483648.0) * j);
             constraint = this.islandConstraints[j]!;
             this.islandConstraints[j] = this.islandConstraints[swap];
@@ -771,7 +771,7 @@ export class World extends EventDispatcher {
   //   else return this.initBody(type, o);
   // }
 
-  initBody(type: string[], o: BodyOptions): RigidBody {
+  initBody(type: string, o: BodyOptions, sc: ShapeConfig = new ShapeConfig()): RigidBody {
     const invScale = this.invScale;
 
     // body dynamic or static
@@ -781,65 +781,71 @@ export class World extends EventDispatcher {
     // POSITION
 
     // body position
-    let p = o.pos;
-    p = p.map(function (x) {
-      return x * invScale;
-    });
+    const position = o.pos.multiplyScalar(invScale);
+    // let pos = o.pos;
+    // pos = pos.map(function (x: f32): f32 {
+    //   return x * invScale;
+    // });
 
     // shape position
-    let p2 = o.posShape;
-    p2 = p2.map(function (x) {
-      return x * invScale;
-    });
+    const posShape = o.posShape.multiplyScalar(invScale);
+    // let posShape = o.posShape;
+    // posShape = posShape.map(function (x: f32): f32 {
+    //   return x * invScale;
+    // });
 
     // ROTATION
 
     // body rotation in degree
-    let r = o.rot;
-    r = r.map(function (x) {
-      return x * _Math.degtorad;
-    });
+    const rot = o.rot.multiplyScalar(_Math.degtorad);
+    const rotation = new Quat().setFromEuler(rot.x, rot.y, rot.z);
+    // let rot = o.rot;
+    // rot = rot.map(function (x: f32): f32 {
+    //   return x * _Math.degtorad;
+    // });
 
     // shape rotation in degree
-    let r2 = o.rotShape;
-    r2 = r.map(function (x) {
-      return x * _Math.degtorad;
-    });
+    const rotShape = o.rotShape.multiplyScalar(_Math.degtorad);
+    // let rotShape = o.rotShape;
+    // rotShape = rot.map(function (x: f32): f32 {
+    //   return x * _Math.degtorad;
+    // });
 
     // SIZE
 
     // shape size
-    let s: f32[] = o.size;
-    if (s.length === 1) {
-      s[1] = s[0];
-    }
-    if (s.length === 2) {
-      s[2] = s[0];
-    }
-    s = s.map(function (x) {
-      return x * invScale;
-    });
+    const size = o.size.multiplyScalar(invScale);
+    // let size: f32[] = o.size;
+    // if (size.length === 1) {
+    //   size[1] = size[0];
+    // }
+    // if (size.length === 2) {
+    //   size[2] = size[0];
+    // }
+    // size = size.map(function (x) {
+    //   return x * invScale;
+    // });
 
-    // body physics settings
-    const sc = new ShapeConfig();
-    // The density of the shape.
-    if (o.density !== undefined) sc.density = o.density;
-    // The coefficient of friction of the shape.
-    if (o.friction !== undefined) sc.friction = o.friction;
-    // The coefficient of restitution of the shape.
-    if (o.restitution !== undefined) sc.restitution = o.restitution;
-    // The bits of the collision groups to which the shape belongs.
-    if (o.belongsTo !== undefined) sc.belongsTo = o.belongsTo;
-    // The bits of the collision groups with which the shape collides.
-    if (o.collidesWith !== undefined) sc.collidesWith = o.collidesWith;
+    // // body physics settings
+    // const sc = new ShapeConfig();
+    // // The density of the shape.
+    // if (o.density != undefined) sc.density = o.density;
+    // // The coefficient of friction of the shape.
+    // if (o.friction != undefined) sc.friction = o.friction;
+    // // The coefficient of restitution of the shape.
+    // if (o.restitution != undefined) sc.restitution = o.restitution;
+    // // The bits of the collision groups to which the shape belongs.
+    // if (o.belongsTo != undefined) sc.belongsTo = o.belongsTo;
+    // // The bits of the collision groups with which the shape collides.
+    // if (o.collidesWith != undefined) sc.collidesWith = o.collidesWith;
 
-    if (o.config != null) {
-      if (o.config[0] !== undefined) sc.density = o.config[0];
-      if (o.config[1] !== undefined) sc.friction = o.config[1];
-      if (o.config[2] !== undefined) sc.restitution = o.config[2];
-      if (o.config[3] !== undefined) sc.belongsTo = o.config[3];
-      if (o.config[4] !== undefined) sc.collidesWith = o.config[4];
-    }
+    // if (o.config != null) {
+    //   if (o.config[0] != undefined) sc.density = o.config[0];
+    //   if (o.config[1] != undefined) sc.friction = o.config[1];
+    //   if (o.config[2] != undefined) sc.restitution = o.config[2];
+    //   if (o.config[3] != undefined) sc.belongsTo = o.config[3];
+    //   if (o.config[4] != undefined) sc.collidesWith = o.config[4];
+    // }
 
     /* if(o.massPos){
             o.massPos = o.massPos.map(function(x) { return x * invScale; });
@@ -851,8 +857,8 @@ export class World extends EventDispatcher {
             sc.relativeRotation = new Mat33().setQuat( q );//_Math.EulerToMatrix( o.massRot[0], o.massRot[1], o.massRot[2] );
         }*/
 
-    const position = new Vec3(p[0], p[1], p[2]);
-    const rotation = new Quat().setFromEuler(r[0], r[1], r[2]);
+    // const position = new Vec3(pos[0], pos[1], pos[2]);
+    // const rotation = new Quat().setFromEuler(rot[0], rot[1], rot[2]);
 
     // rigidbody
     const body = new RigidBody(position, rotation);
@@ -860,32 +866,32 @@ export class World extends EventDispatcher {
 
     // SHAPES
 
-    let shape: Shape, n: i32;
+    let shape!: Shape, n: i32;
 
-    for (let i: i32 = 0; i < type.length; i++) {
-      n = i * 3;
+    // for (let i: i32 = 0; i < type.length; i++) {
+    //   n = i * 3;
 
-      if (p2[n] !== undefined) sc.relativePosition.set(p2[n], p2[n + 1], p2[n + 2]);
-      if (r2[n] !== undefined) sc.relativeRotation.setQuat(new Quat().setFromEuler(r2[n], r2[n + 1], r2[n + 2]));
+    //   if (posShape[n] != undefined) sc.relativePosition.set(posShape[n], posShape[n + 1], posShape[n + 2]);
+    //   if (rotShape[n] != undefined)
+    //     sc.relativeRotation.setQuat(new Quat().setFromEuler(rotShape[n], rotShape[n + 1], rotShape[n + 2]));
 
-      const curType: string = type[i];
-      switch (curType) {
-        case "sphere":
-          shape = new Sphere(sc, s[n]);
-          break;
-        case "cylinder":
-          shape = new Cylinder(sc, s[n], s[n + 1]);
-          break;
-        case "box":
-          shape = new Box(sc, s[n], s[n + 1], s[n + 2]);
-          break;
-        case "plane":
-          shape = new Plane(sc);
-          break;
-      }
+    //   const curType: string = type[i];
+    //   if (curType == "sphere") shape = new Sphere(sc, size[n]);
+    //   else if (curType == "cylinder") shape = new Cylinder(sc, size[n], size[n + 1]);
+    //   else if (curType == "box") shape = new Box(sc, size[n], size[n + 1], size[n + 2]);
+    //   else if (curType == "plane") shape = new Plane(sc);
 
-      body.addShape(shape!);
-    }
+    //   body.addShape(shape);
+    // }
+
+    sc.relativePosition.set(posShape.x, posShape.y, posShape.z);
+    sc.relativeRotation.setQuat(new Quat().setFromEuler(rotShape.x, rotShape.y, rotShape.z));
+    if (type == "sphere") shape = new Sphere(sc, size.x);
+    else if (type == "cylinder") shape = new Cylinder(sc, size.x, size.y);
+    else if (type == "box") shape = new Box(sc, size.x, size.y, size.z);
+    else if (type == "plane") shape = new Plane(sc);
+
+    body.addShape(shape);
 
     // body can sleep or not
     if (o.neverSleep || kinematic) body.allowSleep = false;
@@ -991,14 +997,14 @@ export class World extends EventDispatcher {
     switch (type) {
       case "jointDistance":
         joint = new DistanceJoint(jc, min, max);
-        if (spring !== null) (joint as DistanceJoint).limitMotor.setSpring(spring[0], spring[1]);
-        if (motor !== null) (joint as DistanceJoint).limitMotor.setMotor(motor[0], motor[1]);
+        if (spring != null) (joint as DistanceJoint).limitMotor.setSpring(spring[0], spring[1]);
+        if (motor != null) (joint as DistanceJoint).limitMotor.setMotor(motor[0], motor[1]);
         break;
       case "jointHinge":
       case "joint":
         joint = new HingeJoint(jc, min, max);
-        if (spring !== null) (joint as HingeJoint).limitMotor.setSpring(spring[0], spring[1]); // soften the joint ex: 100, 0.2
-        if (motor !== null) (joint as HingeJoint).limitMotor.setMotor(motor[0], motor[1]);
+        if (spring != null) (joint as HingeJoint).limitMotor.setSpring(spring[0], spring[1]); // soften the joint ex: 100, 0.2
+        if (motor != null) (joint as HingeJoint).limitMotor.setMotor(motor[0], motor[1]);
         break;
       case "jointPrisme":
         joint = new PrismaticJoint(jc, min, max);
@@ -1011,9 +1017,9 @@ export class World extends EventDispatcher {
         break;
       case "jointWheel":
         joint = new WheelJoint(jc);
-        if (limit !== null) (joint as WheelJoint).rotationalLimitMotor1.setLimit(limit[0], limit[1]);
-        if (spring !== null) (joint as WheelJoint).rotationalLimitMotor1.setSpring(spring[0], spring[1]);
-        if (motor !== null) (joint as WheelJoint).rotationalLimitMotor1.setMotor(motor[0], motor[1]);
+        if (limit != null) (joint as WheelJoint).rotationalLimitMotor1.setLimit(limit[0], limit[1]);
+        if (spring != null) (joint as WheelJoint).rotationalLimitMotor1.setSpring(spring[0], spring[1]);
+        if (motor != null) (joint as WheelJoint).rotationalLimitMotor1.setMotor(motor[0], motor[1]);
         break;
     }
 
@@ -1045,17 +1051,17 @@ export class JointOptions {
 
 export class BodyOptions {
   constructor(
-    public density: f32 = 1,
-    public friction: f32 = 0.2,
-    public restitution: f32 = 0.2,
-    public belongsTo: f32 = 1,
-    public collidesWith: f32 = 0xffffffff,
-    public config: f32[] | null = null,
-    public size: f32[] = [1, 1, 1],
-    public rot: f32[] = [0, 0, 0],
-    public rotShape: f32[] = [0, 0, 0],
-    public pos: f32[] = [0, 0, 0],
-    public posShape: f32[] = [0, 0, 0],
+    // public density: f32 = 1,
+    // public friction: f32 = 0.2,
+    // public restitution: f32 = 0.2,
+    // public belongsTo: f32 = 1,
+    // public collidesWith: f32 = 0xffffffff,
+    // public config: f32[] | null = null,
+    public size: Vec3 = new Vec3(1, 1, 1),
+    public rot: Vec3 = new Vec3(0, 0, 0),
+    public rotShape: Vec3 = new Vec3(0, 0, 0),
+    public pos: Vec3 = new Vec3(0, 0, 0),
+    public posShape: Vec3 = new Vec3(0, 0, 0),
     public move: boolean = false,
     public neverSleep: boolean = false,
     public sleep: boolean = false,

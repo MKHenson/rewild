@@ -15,7 +15,7 @@ export class InterleavedBuffer extends BaseAttribute {
     super();
     this.array = array;
     this.stride = stride;
-    this.count = array !== undefined ? array.length / stride : 0;
+    this.count = array != undefined ? array.length / stride : 0;
 
     this.usage = UsageType.STATIC_DRAW;
     this.updateRange = { offset: 0, count: -1 };

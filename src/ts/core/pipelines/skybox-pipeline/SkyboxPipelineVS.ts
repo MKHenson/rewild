@@ -17,7 +17,7 @@ fn transformDirection( dir: vec3<f32>, matrix: mat4x4<f32> ) -> vec3<f32> {
   return normalize( ( matrix * vec4<f32>( dir, 0.0 ) ).xyz );
 }
 
-@stage(vertex)
+@vertex
 fn main(@location(0) pos: vec4<f32>, @location(1) uv: vec2<f32>) -> Output {
     var output: Output;
     var mvPosition = vec4<f32>( pos.xyz, 1.0 );

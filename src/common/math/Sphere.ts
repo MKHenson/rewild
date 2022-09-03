@@ -27,7 +27,7 @@ export class Sphere {
   setFromPoints(points: Vector3[], optionalCenter: Vector3): Sphere {
     const center = this.center;
 
-    if (optionalCenter !== undefined) {
+    if (optionalCenter != undefined) {
       center.copy(optionalCenter);
     } else {
       _box.setFromPoints(points).getCenter(center);

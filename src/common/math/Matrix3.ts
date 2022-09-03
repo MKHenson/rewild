@@ -296,7 +296,7 @@ export class Matrix3 {
     const me = matrix.elements;
 
     for (let i: u8 = 0; i < 12; i++) {
-      if (te[i] !== me[i]) return false;
+      if (te[i] != me[i]) return false;
     }
 
     return true;

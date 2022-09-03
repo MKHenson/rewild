@@ -176,7 +176,7 @@ export class BufferGeometry extends EventDispatcher {
 
     const normal = this.getAttribute<Float32BufferAttribute>(AttributeType.NORMAL);
 
-    if (normal !== null) {
+    if (normal != null) {
       const normalMatrix = new Matrix3().getNormalMatrix(matrix);
       BufferAttribute.applyNormalMatrix(normalMatrix, normal);
       normal.needsUpdate = true;
@@ -184,16 +184,16 @@ export class BufferGeometry extends EventDispatcher {
 
     const tangent = this.getAttribute<Float32BufferAttribute>(AttributeType.TANGENT);
 
-    if (tangent !== null) {
+    if (tangent != null) {
       BufferAttribute.transformDirection(matrix, tangent);
       tangent.needsUpdate = true;
     }
 
-    if (this.boundingBox !== null) {
+    if (this.boundingBox != null) {
       this.computeBoundingBox();
     }
 
-    if (this.boundingSphere !== null) {
+    if (this.boundingSphere != null) {
       this.computeBoundingSphere();
     }
 
@@ -317,7 +317,7 @@ export class BufferGeometry extends EventDispatcher {
       return;
     }
 
-    if (position !== null) {
+    if (position != null) {
       this.boundingBox!.setFromBufferAttribute(position);
 
       // process morph attributes if present
@@ -583,7 +583,7 @@ export class BufferGeometry extends EventDispatcher {
     const index = this.indexes;
     const positionAttribute = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION);
 
-    if (positionAttribute !== null) {
+    if (positionAttribute != null) {
       let normalAttribute = this.getAttribute<Float32BufferAttribute>(AttributeType.NORMAL);
 
       if (normalAttribute === null) {
@@ -765,14 +765,14 @@ export class BufferGeometry extends EventDispatcher {
 
   //   data.uuid = this.uuid;
   //   data.type = this.type;
-  //   if (this.name !== "") data.name = this.name;
+  //   if (this.name != "") data.name = this.name;
   //   if (Object.keys(this.userData).length > 0) data.userData = this.userData;
 
-  //   if (this.parameters !== undefined) {
+  //   if (this.parameters != undefined) {
   //     const parameters = this.parameters;
 
   //     for (const key in parameters) {
-  //       if (parameters[key] !== undefined) data[key] = parameters[key];
+  //       if (parameters[key] != undefined) data[key] = parameters[key];
   //     }
 
   //     return data;
@@ -784,7 +784,7 @@ export class BufferGeometry extends EventDispatcher {
 
   //   const index = this.index;
 
-  //   if (index !== null) {
+  //   if (index != null) {
   //     data.data.index = {
   //       type: index.array.constructor.name,
   //       array: Array.prototype.slice.call(index.array),
@@ -833,7 +833,7 @@ export class BufferGeometry extends EventDispatcher {
 
   //   const boundingSphere = this.boundingSphere;
 
-  //   if (boundingSphere !== null) {
+  //   if (boundingSphere != null) {
   //     data.data.boundingSphere = {
   //       center: boundingSphere.center.toArray(),
   //       radius: boundingSphere.radius,
@@ -847,7 +847,7 @@ export class BufferGeometry extends EventDispatcher {
     /*
 		 // Handle primitives
 		 const parameters = this.parameters;
-		 if ( parameters !== undefined ) {
+		 if ( parameters != undefined ) {
 		 const values = [];
 		 for ( const key in parameters ) {
 		 values.push( parameters[ key ] );
@@ -927,7 +927,7 @@ export class BufferGeometry extends EventDispatcher {
 
     const boundingBox = source.boundingBox;
 
-    if (boundingBox !== null) {
+    if (boundingBox != null) {
       this.boundingBox = boundingBox.clone();
     }
 
@@ -935,7 +935,7 @@ export class BufferGeometry extends EventDispatcher {
 
     const boundingSphere = source.boundingSphere;
 
-    if (boundingSphere !== null) {
+    if (boundingSphere != null) {
       this.boundingSphere = boundingSphere.clone();
     }
 

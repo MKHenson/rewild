@@ -232,8 +232,8 @@ export class Contact {
   detach(): void {
     let prev = this.s1Link.prev;
     let next = this.s1Link.next;
-    if (prev !== null) prev.next = next;
-    if (next !== null) next.prev = prev;
+    if (prev != null) prev.next = next;
+    if (next != null) next.prev = prev;
     if (this.shape1!.contactLink == this.s1Link) this.shape1!.contactLink = next;
     this.s1Link.prev = null;
     this.s1Link.next = null;
@@ -243,8 +243,8 @@ export class Contact {
 
     prev = this.s2Link.prev;
     next = this.s2Link.next;
-    if (prev !== null) prev.next = next;
-    if (next !== null) next.prev = prev;
+    if (prev != null) prev.next = next;
+    if (next != null) next.prev = prev;
     if (this.shape2!.contactLink == this.s2Link) this.shape2!.contactLink = next;
     this.s2Link.prev = null;
     this.s2Link.next = null;
@@ -254,8 +254,8 @@ export class Contact {
 
     prev = this.b1Link.prev;
     next = this.b1Link.next;
-    if (prev !== null) prev.next = next;
-    if (next !== null) next.prev = prev;
+    if (prev != null) prev.next = next;
+    if (next != null) next.prev = prev;
     if (this.body1!.contactLink == this.b1Link) this.body1!.contactLink = next;
     this.b1Link.prev = null;
     this.b1Link.next = null;
@@ -265,8 +265,8 @@ export class Contact {
 
     prev = this.b2Link.prev;
     next = this.b2Link.next;
-    if (prev !== null) prev.next = next;
-    if (next !== null) next.prev = prev;
+    if (prev != null) prev.next = next;
+    if (next != null) next.prev = prev;
     if (this.body2!.contactLink == this.b2Link) this.body2!.contactLink = next;
     this.b2Link.prev = null;
     this.b2Link.next = null;

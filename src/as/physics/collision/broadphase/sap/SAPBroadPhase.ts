@@ -152,7 +152,7 @@ export class SAPBroadPhase extends BroadPhase {
         const min2 = e1.min2!.value;
         const max2 = e1.max2!.value;
 
-        for (let e2: SAPElement | null = activeD!; e2 != null; e2 = e2!.pair) {
+        for (let e2: SAPElement | null = activeD; e2 != null; e2 = e2!.pair) {
           // test for dynamic
           const s2 = e2.proxy.shape;
 
@@ -168,7 +168,7 @@ export class SAPBroadPhase extends BroadPhase {
           this.addPair(s1, s2);
         }
         if (dyn) {
-          for (let e2: SAPElement | null = activeS!; e2 != null; e2 = e2!.pair) {
+          for (let e2: SAPElement | null = activeS; e2 != null; e2 = e2!.pair) {
             // test for static
             s2 = e2.proxy.shape;
 

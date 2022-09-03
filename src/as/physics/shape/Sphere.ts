@@ -26,6 +26,8 @@ export class Sphere extends Shape {
   }
 
   calculateMassInfo(out: MassInfo): void {
+    console.log(`sphere ${this.radius} ${this.volume()} * ${this.radius} * ${this.radius} * ${this.density}`);
+
     let mass = this.volume() * this.radius * this.radius * this.density; //1.333 * _Math.PI * this.radius * this.radius * this.radius * this.density;
     out.mass = mass;
     let inertia = mass * this.radius * this.radius * 0.4;

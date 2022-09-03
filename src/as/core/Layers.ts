@@ -30,6 +30,6 @@ export class Layers {
   }
 
   test(layers: Layers): boolean {
-    return (this.mask & layers.mask) !== 0;
+    return (this.mask & layers.mask) != 0;
   }
 }

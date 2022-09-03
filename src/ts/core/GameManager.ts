@@ -96,7 +96,7 @@ export class GameManager implements IBindable {
       device: device,
       format: format,
       size: this.canvasSize(),
-      compositingAlphaMode: "premultiplied",
+      alphaMode: "premultiplied",
     });
 
     this.device = device;
@@ -202,7 +202,7 @@ export class GameManager implements IBindable {
       device: this.device,
       format: this.format,
       size: this.presentationSize,
-      compositingAlphaMode: "premultiplied",
+      alphaMode: "premultiplied",
     });
 
     this.renderTarget = this.device.createTexture({
@@ -235,7 +235,7 @@ export class GameManager implements IBindable {
     // Check if we need to resize
     const [w, h] = this.presentationSize;
     const newSize = this.canvasSizeCache;
-    if (newSize[0] !== w || newSize[1] !== h) {
+    if (newSize[0] != w || newSize[1] != h) {
       this.onResize(newSize);
     }
 
@@ -336,13 +336,13 @@ export class GameManager implements IBindable {
         instances = pipeline.groupInstances.get(GroupType.Transform)!;
         const transformBuffer = instances[mesh.transformIndex].buffers![0];
 
-        if (template.projectionOffset !== -1)
+        if (template.projectionOffset != -1)
           device.queue.writeBuffer(transformBuffer, template.projectionOffset, projectionMatrix);
-        if (template.modelViewOffset !== -1)
+        if (template.modelViewOffset != -1)
           device.queue.writeBuffer(transformBuffer, template.modelViewOffset, mesh.modelViewMatrix);
-        if (template.modelOffset !== -1)
+        if (template.modelOffset != -1)
           device.queue.writeBuffer(transformBuffer, template.modelOffset, mesh.worldMatrix);
-        if (template.normalOffset !== -1)
+        if (template.normalOffset != -1)
           device.queue.writeBuffer(transformBuffer, template.normalOffset, mesh.normalMatrix);
 
         // Set transform bind group
@@ -402,7 +402,7 @@ export class GameManager implements IBindable {
     let buffer: GPUBuffer;
     const device = this.device;
 
-    if (LightingResource.numDirLights !== numDirectionLights) {
+    if (LightingResource.numDirLights != numDirectionLights) {
       LightingResource.numDirLights = numDirectionLights;
       LightingResource.rebuildDirectionLights = true;
       pipelines.forEach((p) => {

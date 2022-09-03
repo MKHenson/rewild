@@ -66,7 +66,7 @@ export class Quaternion {
       return;
     }
 
-    if (w0 !== w1 || x0 !== x1 || y0 !== y1 || z0 !== z1) {
+    if (w0 != w1 || x0 != x1 || y0 != y1 || z0 != z1) {
       let s = 1 - t;
       const cos = x0 * x1 + y0 * y1 + z0 * z1 + w0 * w1,
         dir = cos >= 0 ? 1 : -1,
@@ -261,7 +261,7 @@ export class Quaternion {
         throw new Error("Quaternion: .setFromEuler() encountered an unknown order");
     }
 
-    if (update !== false) this.onChangeCallback();
+    if (update != false) this.onChangeCallback();
 
     return this;
   }

@@ -863,7 +863,7 @@ export class Matrix4 {
     const me = matrix.elements;
 
     for (let i: u8 = 0; i < 16; i++) {
-      if (te[i] !== me[i]) return false;
+      if (te[i] != me[i]) return false;
     }
 
     return true;

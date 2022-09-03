@@ -103,12 +103,12 @@ export class SphereGeometry extends Geometry {
         const c: u32 = grid[iy + 1][ix];
         const d: u32 = grid[iy + 1][ix + 1];
 
-        if (iy !== 0 || thetaStart > 0) {
+        if (iy != 0 || thetaStart > 0) {
           indices.push(a);
           indices.push(b);
           indices.push(d);
         }
-        if (iy !== heightSegments - 1 || thetaEnd < Mathf.PI) {
+        if (iy != heightSegments - 1 || thetaEnd < Mathf.PI) {
           indices.push(b);
           indices.push(c);
           indices.push(d);

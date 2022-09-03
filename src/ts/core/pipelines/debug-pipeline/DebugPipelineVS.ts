@@ -13,7 +13,7 @@ struct Output {
     @location(2) vViewPosition : vec3<f32>
 };
 
-@stage(vertex)
+@vertex
 fn main(@location(0) pos: vec4<f32>, @location(1) norm: vec3<f32>, @location(2) uv: vec2<f32>) -> Output {
     var output: Output;
     var mvPosition = vec4<f32>( pos.xyz, 1.0 );

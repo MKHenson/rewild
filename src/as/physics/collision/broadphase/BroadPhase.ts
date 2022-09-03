@@ -45,7 +45,7 @@ export abstract class BroadPhase {
     let js: JointLink | null;
     if (b1.numJoints < b2.numJoints) js = b1.jointLink;
     else js = b2.jointLink;
-    while (js !== null) {
+    while (js != null) {
       const joint = js.joint;
       if (
         !joint.allowCollision &&

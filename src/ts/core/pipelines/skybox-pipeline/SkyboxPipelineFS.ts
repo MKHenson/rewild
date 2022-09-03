@@ -6,7 +6,7 @@ import type { SkyboxDefines } from "./SkyboxPipeline";
 export const fragmentShader = shader<SkyboxDefines>`
 ${e => e.defines.diffuseMap ? e.getTemplateByType(ResourceType.Texture, 'diffuse')!.template.fragmentBlock : ''}
 
-@stage(fragment)
+@fragment
 fn main(
   @location(0) vFragUV: vec2<f32>,
   @location(1) vViewPosition : vec3<f32>,

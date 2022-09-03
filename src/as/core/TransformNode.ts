@@ -287,7 +287,7 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
 
   removeFromParent(): TransformNode {
     const parent = this.parent;
-    if (parent !== null) removeChild(parent, this);
+    if (parent != null) removeChild(parent, this);
 
     return this;
   }
@@ -344,7 +344,7 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
   //     const child = this.children[i];
   //     const object = child.getObjectByProperty(name, value);
 
-  //     if (object !== undefined) {
+  //     if (object != undefined) {
   //       return object;
   //     }
   //   }
@@ -415,7 +415,7 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
   traverseAncestors(callback: TraverseCallback): void {
     const parent = this.parent;
 
-    if (parent !== null) {
+    if (parent != null) {
       callback(parent);
 
       parent.traverseAncestors(callback);
@@ -455,7 +455,7 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
   updateWorldMatrix(updateParents: boolean, updateChildren: boolean): void {
     const parent = this.parent;
 
-    if (updateParents === true && parent !== null) {
+    if (updateParents === true && parent != null) {
       parent.updateWorldMatrix(true, false);
     }
 
@@ -530,7 +530,7 @@ export function createTransformNode(name: string | null): TransformNode {
 export function addChild(parent: TransformNode, child: TransformNode): TransformNode {
   if (child === parent) throw new Error("Transform can't be added as a child of itself.");
 
-  if (child.parent !== null) {
+  if (child.parent != null) {
     removeChild(child.parent!, child);
   }
 
@@ -577,7 +577,7 @@ export function addComponent(node: TransformNode, component: Component): Transfo
 export function removeChild(parent: TransformNode, child: TransformNode): TransformNode {
   const index = parent.children.indexOf(child);
 
-  if (index !== -1) {
+  if (index != -1) {
     child.parent = null;
     parent.children.splice(index, 1);
 

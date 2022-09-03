@@ -357,7 +357,7 @@ export class Color {
   //   // color keywords
   //   const hex: u32 = Colors[style.toLowerCase()];
 
-  //   if (hex !== undefined) {
+  //   if (hex != undefined) {
   //     // red
   //     this.setHex(hex);
   //   } else {

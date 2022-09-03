@@ -56,7 +56,7 @@ export class Sprite extends TransformNode {
     }
 
     this.geometry = _geometry;
-    this.material = material !== undefined ? material : new SpriteMaterial();
+    this.material = material != undefined ? material : new SpriteMaterial();
 
     this.center = new EngineVector2(0.5, 0.5);
   }
@@ -81,7 +81,7 @@ export class Sprite extends TransformNode {
     let sin: f32 = 0,
       cos: f32 = 0;
 
-    if (rotation !== 0) {
+    if (rotation != 0) {
       cos = Mathf.cos(rotation);
       sin = Mathf.sin(rotation);
     }
@@ -129,7 +129,7 @@ export class Sprite extends TransformNode {
   copy(source: Sprite): Sprite {
     super.copy(source);
 
-    if (source.center !== undefined) this.center.copy(source.center);
+    if (source.center != undefined) this.center.copy(source.center);
 
     this.material = source.material;
 
@@ -152,7 +152,7 @@ function transformVertex(
     .multiply(_tempVec2.set(scale.x, scale.y));
 
   // to check if rotation is not zero
-  if (sin !== undefined) {
+  if (sin != undefined) {
     _rotatedPosition.x = cos * _alignedPosition.x - sin * _alignedPosition.y;
     _rotatedPosition.y = sin * _alignedPosition.x + cos * _alignedPosition.y;
   } else {

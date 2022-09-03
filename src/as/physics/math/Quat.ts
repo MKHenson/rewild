@@ -202,12 +202,12 @@ export class Quat {
   //   }
 
   setFromEuler(x: f32, y: f32, z: f32): Quat {
-    let c1 = Math.cos(x * 0.5);
-    let c2 = Math.cos(y * 0.5);
-    let c3 = Math.cos(z * 0.5);
-    let s1 = Math.sin(x * 0.5);
-    let s2 = Math.sin(y * 0.5);
-    let s3 = Math.sin(z * 0.5);
+    let c1 = Mathf.cos(x * 0.5);
+    let c2 = Mathf.cos(y * 0.5);
+    let c3 = Mathf.cos(z * 0.5);
+    let s1 = Mathf.sin(x * 0.5);
+    let s2 = Mathf.sin(y * 0.5);
+    let s3 = Mathf.sin(z * 0.5);
 
     // XYZ
     this.x = s1 * c2 * c3 + c1 * s2 * s3;

@@ -114,7 +114,7 @@ export class MeshComponent extends Component {
     if (keys.length > 0) {
       const morphAttribute = morphAttributes.get(unchecked(keys[0]));
 
-      if (morphAttribute !== null) {
+      if (morphAttribute != null) {
         this.morphTargetInfluences = [];
         this.morphTargetDictionary = new Map();
 
@@ -149,7 +149,7 @@ export class MeshComponent extends Component {
 
     // Check boundingBox before continuing
 
-    if (geometry.boundingBox !== null) {
+    if (geometry.boundingBox != null) {
       if (_ray.intersectsBox(geometry.boundingBox!) === false) return;
     }
 
@@ -165,7 +165,7 @@ export class MeshComponent extends Component {
     const groups = geometry.groups;
     const drawRange = geometry.drawRange;
 
-    if (indexes !== null) {
+    if (indexes != null) {
       const index = indexes;
 
       // indexed buffer geometry
@@ -235,7 +235,7 @@ export class MeshComponent extends Component {
           }
         }
       }
-    } else if (position !== null) {
+    } else if (position != null) {
       // non-indexed buffer geometry
 
       if (pipelines.length > 1) {
@@ -322,7 +322,7 @@ function checkIntersection(
   if (pipeline.side === Side.BackSide) {
     intersect = ray.intersectTriangle(pC, pB, pA, true, point);
   } else {
-    intersect = ray.intersectTriangle(pA, pB, pC, pipeline.side !== Side.DoubleSide, point);
+    intersect = ray.intersectTriangle(pA, pB, pC, pipeline.side != Side.DoubleSide, point);
   }
 
   if (intersect === null) return null;

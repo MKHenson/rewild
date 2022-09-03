@@ -241,21 +241,21 @@ export class Material extends EventDispatcher {
   // 	data.uuid = this.uuid;
   // 	data.type = this.type;
 
-  // 	if ( this.name !== '' ) data.name = this.name;
+  // 	if ( this.name != '' ) data.name = this.name;
 
   // 	if ( this.color && this.color.isColor ) data.color = this.color.getHex();
 
-  // 	if ( this.roughness !== undefined ) data.roughness = this.roughness;
-  // 	if ( this.metalness !== undefined ) data.metalness = this.metalness;
+  // 	if ( this.roughness != undefined ) data.roughness = this.roughness;
+  // 	if ( this.metalness != undefined ) data.metalness = this.metalness;
 
   // 	if ( this.sheen && this.sheen.isColor ) data.sheen = this.sheen.getHex();
   // 	if ( this.emissive && this.emissive.isColor ) data.emissive = this.emissive.getHex();
-  // 	if ( this.emissiveIntensity && this.emissiveIntensity !== 1 ) data.emissiveIntensity = this.emissiveIntensity;
+  // 	if ( this.emissiveIntensity && this.emissiveIntensity != 1 ) data.emissiveIntensity = this.emissiveIntensity;
 
   // 	if ( this.specular && this.specular.isColor ) data.specular = this.specular.getHex();
-  // 	if ( this.shininess !== undefined ) data.shininess = this.shininess;
-  // 	if ( this.clearcoat !== undefined ) data.clearcoat = this.clearcoat;
-  // 	if ( this.clearcoatRoughness !== undefined ) data.clearcoatRoughness = this.clearcoatRoughness;
+  // 	if ( this.shininess != undefined ) data.shininess = this.shininess;
+  // 	if ( this.clearcoat != undefined ) data.clearcoat = this.clearcoat;
+  // 	if ( this.clearcoatRoughness != undefined ) data.clearcoatRoughness = this.clearcoatRoughness;
 
   // 	if ( this.clearcoatMap && this.clearcoatMap.isTexture ) {
 
@@ -327,13 +327,13 @@ export class Material extends EventDispatcher {
 
   // 		data.envMap = this.envMap.toJSON( meta ).uuid;
 
-  // 		if ( this.combine !== undefined ) data.combine = this.combine;
+  // 		if ( this.combine != undefined ) data.combine = this.combine;
 
   // 	}
 
-  // 	if ( this.envMapIntensity !== undefined ) data.envMapIntensity = this.envMapIntensity;
-  // 	if ( this.reflectivity !== undefined ) data.reflectivity = this.reflectivity;
-  // 	if ( this.refractionRatio !== undefined ) data.refractionRatio = this.refractionRatio;
+  // 	if ( this.envMapIntensity != undefined ) data.envMapIntensity = this.envMapIntensity;
+  // 	if ( this.reflectivity != undefined ) data.reflectivity = this.reflectivity;
+  // 	if ( this.refractionRatio != undefined ) data.refractionRatio = this.refractionRatio;
 
   // 	if ( this.gradientMap && this.gradientMap.isTexture ) {
 
@@ -341,19 +341,19 @@ export class Material extends EventDispatcher {
 
   // 	}
 
-  // 	if ( this.transmission !== undefined ) data.transmission = this.transmission;
+  // 	if ( this.transmission != undefined ) data.transmission = this.transmission;
   // 	if ( this.transmissionMap && this.transmissionMap.isTexture ) data.transmissionMap = this.transmissionMap.toJSON( meta ).uuid;
-  // 	if ( this.thickness !== undefined ) data.thickness = this.thickness;
+  // 	if ( this.thickness != undefined ) data.thickness = this.thickness;
   // 	if ( this.thicknessMap && this.thicknessMap.isTexture ) data.thicknessMap = this.thicknessMap.toJSON( meta ).uuid;
-  // 	if ( this.attenuationDistance !== undefined ) data.attenuationDistance = this.attenuationDistance;
-  // 	if ( this.attenuationColor !== undefined ) data.attenuationColor = this.attenuationColor.getHex();
+  // 	if ( this.attenuationDistance != undefined ) data.attenuationDistance = this.attenuationDistance;
+  // 	if ( this.attenuationColor != undefined ) data.attenuationColor = this.attenuationColor.getHex();
 
-  // 	if ( this.size !== undefined ) data.size = this.size;
-  // 	if ( this.shadowSide !== null ) data.shadowSide = this.shadowSide;
-  // 	if ( this.sizeAttenuation !== undefined ) data.sizeAttenuation = this.sizeAttenuation;
+  // 	if ( this.size != undefined ) data.size = this.size;
+  // 	if ( this.shadowSide != null ) data.shadowSide = this.shadowSide;
+  // 	if ( this.sizeAttenuation != undefined ) data.sizeAttenuation = this.sizeAttenuation;
 
-  // 	if ( this.blending !== NormalBlending ) data.blending = this.blending;
-  // 	if ( this.side !== FrontSide ) data.side = this.side;
+  // 	if ( this.blending != NormalBlending ) data.blending = this.blending;
+  // 	if ( this.side != FrontSide ) data.side = this.side;
   // 	if ( this.vertexColors ) data.vertexColors = true;
 
   // 	if ( this.opacity < 1 ) data.opacity = this.opacity;
@@ -374,16 +374,16 @@ export class Material extends EventDispatcher {
   // 	data.stencilZPass = this.stencilZPass;
 
   // 	// rotation (SpriteMaterial)
-  // 	if ( this.rotation && this.rotation !== 0 ) data.rotation = this.rotation;
+  // 	if ( this.rotation && this.rotation != 0 ) data.rotation = this.rotation;
 
   // 	if ( this.polygonOffset === true ) data.polygonOffset = true;
-  // 	if ( this.polygonOffsetFactor !== 0 ) data.polygonOffsetFactor = this.polygonOffsetFactor;
-  // 	if ( this.polygonOffsetUnits !== 0 ) data.polygonOffsetUnits = this.polygonOffsetUnits;
+  // 	if ( this.polygonOffsetFactor != 0 ) data.polygonOffsetFactor = this.polygonOffsetFactor;
+  // 	if ( this.polygonOffsetUnits != 0 ) data.polygonOffsetUnits = this.polygonOffsetUnits;
 
-  // 	if ( this.linewidth && this.linewidth !== 1 ) data.linewidth = this.linewidth;
-  // 	if ( this.dashSize !== undefined ) data.dashSize = this.dashSize;
-  // 	if ( this.gapSize !== undefined ) data.gapSize = this.gapSize;
-  // 	if ( this.scale !== undefined ) data.scale = this.scale;
+  // 	if ( this.linewidth && this.linewidth != 1 ) data.linewidth = this.linewidth;
+  // 	if ( this.dashSize != undefined ) data.dashSize = this.dashSize;
+  // 	if ( this.gapSize != undefined ) data.gapSize = this.gapSize;
+  // 	if ( this.scale != undefined ) data.scale = this.scale;
 
   // 	if ( this.dithering === true ) data.dithering = true;
 
@@ -393,8 +393,8 @@ export class Material extends EventDispatcher {
 
   // 	if ( this.wireframe === true ) data.wireframe = this.wireframe;
   // 	if ( this.wireframeLinewidth > 1 ) data.wireframeLinewidth = this.wireframeLinewidth;
-  // 	if ( this.wireframeLinecap !== 'round' ) data.wireframeLinecap = this.wireframeLinecap;
-  // 	if ( this.wireframeLinejoin !== 'round' ) data.wireframeLinejoin = this.wireframeLinejoin;
+  // 	if ( this.wireframeLinecap != 'round' ) data.wireframeLinecap = this.wireframeLinecap;
+  // 	if ( this.wireframeLinejoin != 'round' ) data.wireframeLinejoin = this.wireframeLinejoin;
 
   // 	if ( this.morphTargets === true ) data.morphTargets = true;
   // 	if ( this.morphNormals === true ) data.morphNormals = true;
@@ -405,7 +405,7 @@ export class Material extends EventDispatcher {
 
   // 	if ( this.toneMapped === false ) data.toneMapped = false;
 
-  // 	if ( JSON.stringify( this.userData ) !== '{}' ) data.userData = this.userData;
+  // 	if ( JSON.stringify( this.userData ) != '{}' ) data.userData = this.userData;
 
   // 	// TODO: Copied from Object3D.toJSON
 
@@ -478,11 +478,11 @@ export class Material extends EventDispatcher {
     const srcPlanes = source.clippingPlanes;
     let dstPlanes: Plane[] | null = null;
 
-    if (srcPlanes !== null) {
+    if (srcPlanes != null) {
       const n = srcPlanes.length;
       dstPlanes = new Array(n);
 
-      for (let i = 0; i !== n; ++i) {
+      for (let i = 0; i != n; ++i) {
         dstPlanes[i] = srcPlanes[i].clone();
       }
     }
