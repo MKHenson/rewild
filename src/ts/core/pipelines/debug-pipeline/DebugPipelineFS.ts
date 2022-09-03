@@ -150,7 +150,7 @@ fn changeDiffuseToRed( colorPtr: ptr<function, vec4<f32>> ) {
   (*colorPtr).b = 0.0;
 }
 
-@stage(fragment)
+@fragment
 fn main(
   @location(0) vFragUV: vec2<f32>,
   @location(1) vNormal : vec3<f32>,

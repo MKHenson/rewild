@@ -96,7 +96,7 @@ export class Texture extends EventDispatcher {
     this.flipY = true;
     this.unpackAlignment = 4; // valid values: 1, 2, 4, 8 (see http://www.khronos.org/opengles/sdk/docs/man/xhtml/glPixelStorei.xml)
 
-    // Values of encoding !== THREE.LinearEncoding only supported on map, envMap and emissiveMap.
+    // Values of encoding != THREE.LinearEncoding only supported on map, envMap and emissiveMap.
     //
     // Also changing the encoding after already used by a Material will not automatically make the Material
     // update. You need to explicitly call Material.needsUpdate to trigger it to recompile.
@@ -164,7 +164,7 @@ export class Texture extends EventDispatcher {
   //   toJSON(meta) {
   //     const isRootObject = meta === undefined || typeof meta === "string";
 
-  //     if (!isRootObject && meta.textures[this.uuid] !== undefined) {
+  //     if (!isRootObject && meta.textures[this.uuid] != undefined) {
   //       return meta.textures[this.uuid];
   //     }
 
@@ -201,7 +201,7 @@ export class Texture extends EventDispatcher {
   //       unpackAlignment: this.unpackAlignment,
   //     };
 
-  //     if (this.image !== undefined) {
+  //     if (this.image != undefined) {
   //       // TODO: Move to THREE.Image
 
   //       const image = this.image;
@@ -315,11 +315,11 @@ export class Texture extends EventDispatcher {
 // TODO
 // function serializeImage(image) {
 //   if (
-//     (typeof HTMLImageElement !== "undefined" &&
+//     (typeof HTMLImageElement != "undefined" &&
 //       image instanceof HTMLImageElement) ||
-//     (typeof HTMLCanvasElement !== "undefined" &&
+//     (typeof HTMLCanvasElement != "undefined" &&
 //       image instanceof HTMLCanvasElement) ||
-//     (typeof ImageBitmap !== "undefined" && image instanceof ImageBitmap)
+//     (typeof ImageBitmap != "undefined" && image instanceof ImageBitmap)
 //   ) {
 //     // default images
 

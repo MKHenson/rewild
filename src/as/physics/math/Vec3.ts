@@ -292,7 +292,7 @@ export class Vec3 {
   }
 
   testZero(): boolean {
-    if (this.x !== 0 || this.y !== 0 || this.z !== 0) return true;
+    if (this.x != 0 || this.y != 0 || this.z != 0) return true;
     else return false;
   }
 

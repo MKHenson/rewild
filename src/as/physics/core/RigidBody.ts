@@ -127,7 +127,7 @@ export class RigidBody extends PhysicsObject {
 
     this.mesh = null;
 
-    this.id = NaN;
+    this.id = i32.MAX_VALUE;
     this.name = "";
 
     this.prev = null;
@@ -265,9 +265,10 @@ export class RigidBody extends PhysicsObject {
     const tmpM = new Mat33();
     const tmpV = new Vec3();
 
-    for (let shape = this.shapes; shape !== null; shape = shape!.next) {
+    for (let shape = this.shapes; shape != null; shape = shape!.next) {
       shape.calculateMassInfo(this.massInfo);
       const shapeMass = this.massInfo.mass;
+
       tmpV.addScaledVector(shape.relativePosition, shapeMass);
       this.mass += shapeMass;
       this.rotateInertia(shape.relativeRotation, this.massInfo.inertia, tmpM);
@@ -282,7 +283,8 @@ export class RigidBody extends PhysicsObject {
 
     if (adjustPosition) {
       this.position.add(tmpV);
-      for (let shape = this.shapes; shape !== null; shape = shape!.next) {
+
+      for (let shape = this.shapes; shape != null; shape = shape!.next) {
         shape.relativePosition.subEqual(tmpV);
       }
 
@@ -404,6 +406,7 @@ export class RigidBody extends PhysicsObject {
           this.linearVelocity.subVectors(this.newPosition, this.position).multiplyScalar(1 / timeStep);
           this.controlPos = false;
         }
+
         if (this.controlRot) {
           this.angularVelocity.copy(this.getAxis());
           this.orientation.copy(this.newOrientation);
@@ -535,6 +538,6 @@ export class RigidBody extends PhysicsObject {
     // this.mesh.quaternion.copy(this.getQuaternion());
 
     this.mesh!.position.set(this.pos.x, this.pos.y, this.pos.z);
-    this.mesh!.quaternion.set(this.quaternion.x, this.quaternion.y, this.quaternion.z, this.quaternion.z);
+    this.mesh!.quaternion.set(this.quaternion.x, this.quaternion.y, this.quaternion.z, this.quaternion.w);
   }
 }

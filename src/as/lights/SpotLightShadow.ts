@@ -19,7 +19,7 @@ export class SpotLightShadow extends LightShadow {
     const aspect = this.mapSize.width / this.mapSize.height;
     const far = light.distance || camera.far;
 
-    if (fov !== camera.fov || aspect !== camera.aspect || far !== camera.far) {
+    if (fov != camera.fov || aspect != camera.aspect || far != camera.far) {
       camera.fov = fov;
       camera.aspect = aspect;
       camera.far = far;

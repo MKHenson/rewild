@@ -284,11 +284,11 @@ export class Ray {
     if (tmin > tymax || tymin > tmax) return null;
 
     // These lines also handle the case where tmin or tmax is NaN
-    // (result of 0 * Infinity). x !== x returns true if x is NaN
+    // (result of 0 * Infinity). x != x returns true if x is NaN
 
-    if (tymin > tmin || tmin !== tmin) tmin = tymin;
+    if (tymin > tmin || tmin != tmin) tmin = tymin;
 
-    if (tymax < tmax || tmax !== tmax) tmax = tymax;
+    if (tymax < tmax || tmax != tmax) tmax = tymax;
 
     if (invdirz >= 0) {
       tzmin = (box.min.z - origin.z) * invdirz;
@@ -300,9 +300,9 @@ export class Ray {
 
     if (tmin > tzmax || tzmin > tmax) return null;
 
-    if (tzmin > tmin || tmin !== tmin) tmin = tzmin;
+    if (tzmin > tmin || tmin != tmin) tmin = tzmin;
 
-    if (tzmax < tmax || tmax !== tmax) tmax = tzmax;
+    if (tzmax < tmax || tmax != tmax) tmax = tzmax;
 
     //return point closest to the ray (positive side)
 
@@ -312,7 +312,7 @@ export class Ray {
   }
 
   intersectsBox(box: Box3): boolean {
-    return this.intersectBox(box, _vector) !== null;
+    return this.intersectBox(box, _vector) != null;
   }
 
   intersectTriangle(a: Vector3, b: Vector3, c: Vector3, backfaceCulling: boolean, target: Vector3): Vector3 | null {

@@ -27,7 +27,7 @@ export class RayCollisionDetector extends CollisionDetector {
     for (let i = 0; i < shape2.faces.length; i++) {
       intersect = this.triangleIntersect(vec3_1, vec3_1.angleTo(vec3_2), shape2.faces[i], false);
 
-      if (intersect !== null) manifold.addPoint(new Vec3(intersect.x, intersect.y, intersect.z));
+      if (intersect != null) manifold.addPoint(new Vec3(intersect.x, intersect.y, intersect.z));
     }
   }
 

@@ -49,7 +49,7 @@ export class Tetra extends Shape {
     this.aabb.setFromPoints(this.verts);
     this.aabb.expandByScalar(AABB_PROX);
 
-    if (this.proxy !== null) this.proxy.update();
+    if (this.proxy != null) this.proxy.update();
   }
 
   mtri(a: i32, b: i32, c: i32): Tri {

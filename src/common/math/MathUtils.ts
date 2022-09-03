@@ -60,7 +60,7 @@ export function mapLinear(x: f32, a1: f32, a2: f32, b1: f32, b2: f32): f32 {
 
 // https://www.gamedev.net/tutorials/programming/general-and-gameplay-programming/inverse-lerp-a-super-useful-yet-often-overlooked-function-r5230/
 export function inverseLerp(x: f32, y: f32, value: f32): f32 {
-  if (x !== y) {
+  if (x != y) {
     return (value - x) / (y - x);
   } else {
     return 0;
@@ -118,7 +118,7 @@ export function randFloatSpread(range: f32): f32 {
 
 // Deterministic pseudo-random float in the interval [ 0, 1 ]
 export function seededRandom(s: f32): f32 {
-  if (s !== undefined) _seed = s % 2147483647;
+  if (s != undefined) _seed = s % 2147483647;
 
   // Park-Miller algorithm
 
@@ -136,7 +136,7 @@ export function radToDeg(radians: f32): f32 {
 }
 
 export function isPowerOfTwo(value: f32): boolean {
-  return (value & (value - 1)) === 0 && value !== 0;
+  return (value & (value - 1)) === 0 && value != 0;
 }
 
 export function ceilPowerOfTwo(value: f32): f32 {

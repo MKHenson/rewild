@@ -27,9 +27,9 @@
 //     anisotropy: f32,
 //     format: PixelFormat
 //   ) {
-//     format = format !== undefined ? format : DepthFormat;
+//     format = format != undefined ? format : DepthFormat;
 
-//     if (format !== DepthFormat && format !== DepthStencilFormat) {
+//     if (format != DepthFormat && format != DepthStencilFormat) {
 //       throw new Error(
 //         "DepthTexture format must be either THREE.DepthFormat or THREE.DepthStencilFormat"
 //       );
@@ -53,8 +53,8 @@
 
 //     this.image = { width: width, height: height };
 
-//     this.magFilter = magFilter !== undefined ? magFilter : NearestFilter;
-//     this.minFilter = minFilter !== undefined ? minFilter : NearestFilter;
+//     this.magFilter = magFilter != undefined ? magFilter : NearestFilter;
+//     this.minFilter = minFilter != undefined ? minFilter : NearestFilter;
 
 //     this.flipY = false;
 //     this.generateMipmaps = false;

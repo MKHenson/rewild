@@ -65,7 +65,7 @@ export class OrthographicCamera extends Camera {
   }
 
   clearViewOffset(): void {
-    if (this.view !== null) {
+    if (this.view != null) {
       this.view.enabled = false;
     }
 
@@ -83,7 +83,7 @@ export class OrthographicCamera extends Camera {
     let top = cy + dy;
     let bottom = cy - dy;
 
-    if (this.view !== null && this.view!.enabled) {
+    if (this.view != null && this.view!.enabled) {
       const scaleW = (this.right - this.left) / this.view!.fullWidth / this.zoom;
       const scaleH = (this.top - this.bottom) / this.view!.fullHeight / this.zoom;
 
@@ -110,7 +110,7 @@ export class OrthographicCamera extends Camera {
   // 	data.object.near = this.near;
   // 	data.object.far = this.far;
 
-  // 	if ( this.view !== null ) data.object.view = Object.assign( {}, this.view );
+  // 	if ( this.view != null ) data.object.view = Object.assign( {}, this.view );
 
   // 	return data;
 

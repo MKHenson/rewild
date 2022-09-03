@@ -16,7 +16,12 @@ import { TransformNode } from "../../../core/TransformNode";
 import { lock, unlock } from "../../../Imports";
 import { degToRad } from "../../../../common/math/MathUtils";
 import { PlayerComponent } from "../../../components/PlayerComponent";
-import { BodyOptions, World } from "../../../physics/core/World";
+import { BodyOptions, World, WorldOptions } from "../../../physics/core/World";
+import { RigidBody } from "../../../physics/core/RigidBody";
+import { ShapeConfig } from "../../../physics/shape/ShapeConfig";
+import { Vec3 } from "../../../physics/math/Vec3";
+
+const vec: Vec3 = new Vec3();
 
 export class Level1 extends Container implements Listener {
   orbitController!: OrbitController;
@@ -32,7 +37,8 @@ export class Level1 extends Container implements Listener {
   private floor!: TransformNode;
   private sbybox!: TransformNode;
   private ball!: TransformNode;
-
+  private sphereBody: RigidBody | null;
+  private playerBody: RigidBody | null;
   private world: World | null;
 
   constructor() {
@@ -40,6 +46,8 @@ export class Level1 extends Container implements Listener {
     this.totalTime = 0;
     this.isPaused = false;
     this.world = null;
+    this.sphereBody = null;
+    this.playerBody = null;
   }
 
   init(): void {
@@ -68,7 +76,10 @@ export class Level1 extends Container implements Listener {
 
     // this.orbitController = new OrbitController(this.runtime!.camera);
     this.pointerController = new PointerLockController(this.runtime!.camera);
-    this.world = new World();
+
+    const physicsWorldOptions = new WorldOptions();
+    physicsWorldOptions.gravity.set(0, -1.0, 0);
+    this.world = new World(physicsWorldOptions);
   }
 
   onEvent(event: Event): void {
@@ -103,19 +114,29 @@ export class Level1 extends Container implements Listener {
     const objects = this.objects;
     this.totalTime += delta;
 
+    this.playerBody!.setPosition(
+      vec.set(
+        this.pointerController.camera.position.x,
+        this.pointerController.camera.position.y,
+        this.pointerController.camera.position.z
+      )
+    );
+
+    console.log(`update ${vec.x}, ${vec.y}, ${vec.z}`);
+
     if (this.player.isDead) {
       // this.orbitController.enabled = false;
       this.pointerController.enabled = false;
     }
 
-    for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      if (objects[i] == this.ball) {
-        objects[i].rotation.x += delta * 1;
-        objects[i].rotation.y += delta * 1;
-        objects[i].position.y = Mathf.sin(this.totalTime + objects[i].position.x) + 2;
-        break;
-      }
-    }
+    // for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
+    // if (objects[i] == this.ball) {
+    //   objects[i].rotation.x += delta * 1;
+    //   objects[i].rotation.y += delta * 1;
+    //   objects[i].position.y = Mathf.sin(this.totalTime + objects[i].position.x) + 2;
+    //   break;
+    // }
+    // }
 
     // if (this.orbitController) this.orbitController.update();
     if (this.pointerController) this.pointerController.update(delta);
@@ -150,22 +171,51 @@ export class Level1 extends Container implements Listener {
         obj.scale.set(5, height, 5);
 
         const options = new BodyOptions();
-        options.pos = [obj.position.x, obj.position.y, obj.position.z];
-        options.size = [5, height, 5];
+        options.pos.set(obj.position.x, obj.position.y, obj.position.z);
+        options.size.set(5, height, 5);
 
-        this.world!.initBody(["box"], options);
+        this.world!.initBody("box", options);
       }
     }
 
-    this.ball.position.set(3, 3, 0);
+    if (this.sphereBody != null) {
+      this.world!.removeRigidBody(this.sphereBody!);
+      this.world!.removeRigidBody(this.playerBody!);
+    }
+    const playerOptions = new BodyOptions();
+    playerOptions.pos.set(
+      this.player.transform!.position.x,
+      this.player.transform!.position.y,
+      this.player.transform!.position.z
+    );
+    playerOptions.size.set(1, 1, 1);
+    playerOptions.move = true;
+    playerOptions.kinematic = true;
+    this.playerBody = this.world!.initBody("sphere", playerOptions);
+
+    const sphereOptions = new BodyOptions();
+    sphereOptions.size.set(1, 1, 1);
+    sphereOptions.move = true;
+    sphereOptions.pos.set(0, 100, 0);
+    const sphereConfifg = new ShapeConfig();
+    sphereConfifg.friction = 0.7;
+
+    this.sphereBody = this.world!.initBody("sphere", sphereOptions, sphereConfifg);
+    this.sphereBody!.connectMesh(this.ball);
+
+    this.ball.position.set(0, 0, 0);
     this.floor.scale.set(200, 200, 200);
     this.floor.position.set(0, -0.1, 0);
     this.floor.rotation.x = -degToRad(90);
 
     const floorOptions = new BodyOptions();
-    floorOptions.pos = [0, 0, 0];
-    floorOptions.size = [200, 0.1, 200];
-    this.world!.initBody(["box"], floorOptions);
+    floorOptions.pos.set(0, 0, 0);
+    floorOptions.size.set(200, 0.1, 200);
+    const floorConfifg = new ShapeConfig();
+    floorConfifg.friction = 0.7;
+    floorConfifg.density = 1;
+    floorConfifg.restitution = 0.2;
+    this.world!.initBody("box", floorOptions, floorConfifg);
 
     this.sbybox.scale.set(200, 200, 200);
     this.sbybox.position.set(0, 0, 0);

@@ -200,7 +200,7 @@ export class Euler {
 
     this._order = order;
 
-    if (update !== false) this.onChangeCallback();
+    if (update != false) this.onChangeCallback();
 
     return this;
   }
@@ -231,7 +231,7 @@ export class Euler {
     this._x = array[0];
     this._y = array[1];
     this._z = array[2];
-    if (array[3] !== undefined) this._order = array[3];
+    if (array[3] != undefined) this._order = array[3];
 
     this.onChangeCallback();
 

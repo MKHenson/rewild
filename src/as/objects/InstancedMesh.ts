@@ -36,7 +36,7 @@ export class InstancedMesh extends MeshComponent {
 
     this.instanceMatrix!.copy(source.instanceMatrix, source.instanceMatrix!.array.slice(0));
 
-    if (source.instanceColor !== null)
+    if (source.instanceColor != null)
       this.instanceColor = source.instanceColor.clone(null) as InstancedBufferAttribute<f32, Float32Array>;
 
     this.count = source.count;

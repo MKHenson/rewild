@@ -146,7 +146,7 @@ export class PerspectiveCamera extends Camera {
   }
 
   clearViewOffset(): void {
-    if (this.view !== null) {
+    if (this.view != null) {
       this.view.enabled = false;
     }
 
@@ -172,7 +172,7 @@ export class PerspectiveCamera extends Camera {
     }
 
     const skew = this.filmOffset;
-    if (skew !== 0) left += (near * skew) / this.getFilmWidth();
+    if (skew != 0) left += (near * skew) / this.getFilmWidth();
 
     this.projectionMatrix.makePerspective(left, left + width, top, top - height, near, this.far);
 
@@ -193,7 +193,7 @@ export class PerspectiveCamera extends Camera {
 
   // 	data.object.aspect = this.aspect;
 
-  // 	if ( this.view !== null ) data.object.view = Object.assign( {}, this.view );
+  // 	if ( this.view != null ) data.object.view = Object.assign( {}, this.view );
 
   // 	data.object.filmGauge = this.filmGauge;
   // 	data.object.filmOffset = this.filmOffset;

@@ -59,7 +59,7 @@ export class EventDispatcher extends EventTargetable {
       const listenerArray = listeners.get(type);
       const index = listenerArray.indexOf(listener);
 
-      if (index !== -1) {
+      if (index != -1) {
         listenerArray.splice(index, 1);
       }
     }

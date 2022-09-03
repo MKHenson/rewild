@@ -12,11 +12,11 @@ export const InGameUI: Component<Props> = (props) => {
   const [playerHunger, setPlayerHunger] = createSignal(100);
 
   const onFrameUpdate = () => {
-    if (props.gameManager.player.health !== playerHealth()) {
+    if (props.gameManager.player.health != playerHealth()) {
       setPlayerHealth(props.gameManager.player.health);
     }
 
-    if (props.gameManager.player.hunger !== playerHunger()) {
+    if (props.gameManager.player.hunger != playerHunger()) {
       setPlayerHunger(props.gameManager.player.hunger);
     }
   };

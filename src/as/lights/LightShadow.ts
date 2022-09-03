@@ -130,10 +130,10 @@ export class LightShadow {
 
   // 	const object = {};
 
-  // 	if ( this.bias !== 0 ) object.bias = this.bias;
-  // 	if ( this.normalBias !== 0 ) object.normalBias = this.normalBias;
-  // 	if ( this.radius !== 1 ) object.radius = this.radius;
-  // 	if ( this.mapSize.x !== 512 || this.mapSize.y !== 512 ) object.mapSize = this.mapSize.toArray();
+  // 	if ( this.bias != 0 ) object.bias = this.bias;
+  // 	if ( this.normalBias != 0 ) object.normalBias = this.normalBias;
+  // 	if ( this.radius != 1 ) object.radius = this.radius;
+  // 	if ( this.mapSize.x != 512 || this.mapSize.y != 512 ) object.mapSize = this.mapSize.toArray();
 
   // 	object.camera = this.camera.toJSON( false ).object;
   // 	delete object.camera.matrix;

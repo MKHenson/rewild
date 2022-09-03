@@ -194,7 +194,7 @@ export class OrbitController implements Listener {
       this.state = STATE.PAN;
     }
 
-    if (this.state !== STATE.NONE) {
+    if (this.state != STATE.NONE) {
       inputManager.addEventListener("mousemove", this);
       inputManager.addEventListener("mouseup", this);
       //   this.dispatchEvent(START_EVENT);
@@ -246,11 +246,7 @@ export class OrbitController implements Listener {
   }
 
   private onMouseWheel(event: MouseEvent): void {
-    if (
-      this.enabled === false ||
-      this.enableZoom === false ||
-      (this.state !== STATE.NONE && this.state !== STATE.ROTATE)
-    )
+    if (this.enabled === false || this.enableZoom === false || (this.state != STATE.NONE && this.state != STATE.ROTATE))
       return;
 
     // event.preventDefault();

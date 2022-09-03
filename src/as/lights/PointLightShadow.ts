@@ -74,7 +74,7 @@ export class PointLightShadow extends LightShadow {
 
     const far = light.distance || camera.far;
 
-    if (far !== camera.far) {
+    if (far != camera.far) {
       camera.far = far;
       camera.updateProjectionMatrix();
     }
