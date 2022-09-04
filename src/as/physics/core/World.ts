@@ -41,7 +41,7 @@ import { PhysicsObject } from "./PhysicsObject";
 const postLoop = new Event("post-loop");
 export class WorldOptions {
   constructor(
-    public worldscale: f32 = 100,
+    public worldscale: f32 = 1,
     public timestep: f32 = 0.01666, // 1/60
     public iterations: i32 = 8,
     public random: boolean = true,
@@ -113,10 +113,10 @@ export class World extends EventDispatcher {
     // this.postLoop = null; //function(){};
 
     // The number of iterations for constraint solvers.
-    this.numIterations = o.iterations || 8;
+    this.numIterations = o.iterations;
 
     // It is a wide-area collision judgment that is used in order to reduce as much as possible a detailed collision judgment.
-    switch (o.broadphase || 2) {
+    switch (o.broadphase) {
       case 1:
         this.broadPhase = new BruteForceBroadPhase();
         break;
@@ -130,7 +130,7 @@ export class World extends EventDispatcher {
     }
 
     this.Btypes = ["None", "BruteForce", "Sweep & Prune", "Bounding Volume Tree"];
-    this.broadPhaseType = this.Btypes[o.broadphase || 2];
+    this.broadPhaseType = this.Btypes[o.broadphase];
 
     // This is the detailed information of the performance.
     this.performance = null;
@@ -224,7 +224,7 @@ export class World extends EventDispatcher {
   }
 
   stop(): void {
-    // if (this.timer === null) return;
+    // if (this.timer == null) return;
 
     // clearInterval(this.timer);
     // this.timer = null;
@@ -275,7 +275,10 @@ export class World extends EventDispatcher {
     for (let shape = rigidBody.shapes; shape != null; shape = shape!.next) {
       this.addShape(shape);
     }
-    if (this.rigidBodies != null) (this.rigidBodies!.prev = rigidBody)!.next = this.rigidBodies;
+    if (this.rigidBodies != null) {
+      this.rigidBodies!.prev = rigidBody;
+      rigidBody.next = this.rigidBodies;
+    }
     this.rigidBodies = rigidBody;
     this.numRigidBodies++;
   }
@@ -312,13 +315,13 @@ export class World extends EventDispatcher {
   getByName(name: string): PhysicsObject | null {
     let body = this.rigidBodies;
     while (body != null) {
-      if (body.name === name) return body;
+      if (body.name == name) return body;
       body = body.next;
     }
 
     let joint = this.joints;
     while (joint != null) {
-      if (joint.name === name) return joint;
+      if (joint.name == name) return joint;
       joint = joint.next;
     }
 
@@ -399,7 +402,10 @@ export class World extends EventDispatcher {
     }
     newContact.attach(s1, s2);
     newContact.detector = this.detectors[s1.type][s2.type];
-    if (this.contacts) (this.contacts!.prev = newContact)!.next = this.contacts;
+    if (this.contacts) {
+      this.contacts!.prev = newContact;
+      newContact.next = this.contacts;
+    }
     this.contacts = newContact;
     this.numContacts++;
   }
@@ -419,15 +425,15 @@ export class World extends EventDispatcher {
   }
 
   getContact(b1: string, b2: string): Contact | null {
-    // b1 = b1.constructor === RigidBody ? b1.name : b1;
-    // b2 = b2.constructor === RigidBody ? b2.name : b2;
+    // b1 = b1.constructor == RigidBody ? b1.name : b1;
+    // b2 = b2.constructor == RigidBody ? b2.name : b2;
 
     let n1: string, n2: string;
     let contact = this.contacts;
     while (contact != null) {
       n1 = contact.body1!.name;
       n2 = contact.body2!.name;
-      if ((n1 === b1 && n2 === b2) || (n2 === b1 && n1 === b2)) {
+      if ((n1 == b1 && n2 == b2) || (n2 == b1 && n1 == b2)) {
         if (contact.touching) return contact;
         else return null;
       } else contact = contact.next;
@@ -764,8 +770,8 @@ export class World extends EventDispatcher {
   //   o = o || {};
 
   //   const type = o.type || "box";
-  //   if (type.constructor === String) type = [type];
-  //   const isJoint = type[0].substring(0, 5) === "joint" ? true : false;
+  //   if (type.constructor == String) type = [type];
+  //   const isJoint = type[0].substring(0, 5) == "joint" ? true : false;
 
   //   if (isJoint) return this.initJoint(type[0], o);
   //   else return this.initBody(type, o);
@@ -816,10 +822,10 @@ export class World extends EventDispatcher {
     // shape size
     const size = o.size.multiplyScalar(invScale);
     // let size: f32[] = o.size;
-    // if (size.length === 1) {
+    // if (size.length == 1) {
     //   size[1] = size[0];
     // }
-    // if (size.length === 2) {
+    // if (size.length == 2) {
     //   size[2] = size[0];
     // }
     // size = size.map(function (x) {
@@ -943,7 +949,7 @@ export class World extends EventDispatcher {
     });
 
     let min: f32, max: f32;
-    if (type === "jointDistance") {
+    if (type == "jointDistance") {
       min = o.min || 0;
       max = o.max || 10;
       min = min * invScale;
@@ -972,23 +978,23 @@ export class World extends EventDispatcher {
     let b1: RigidBody = o.body1;
     let b2: RigidBody = o.body2;
 
-    // if (o.body1.constructor === String) {
+    // if (o.body1.constructor == String) {
     //   b1 = this.getByName(o.body1) as RigidBody;
-    // } else if (o.body1.constructor === Number) {
+    // } else if (o.body1.constructor == Number) {
     //   b1 = this.getByName(o.body1) as RigidBody;
-    // } else if (o.body1.constructor === RigidBody) {
+    // } else if (o.body1.constructor == RigidBody) {
     //   b1 = o.body1;
     // }
 
-    // if (o.body2.constructor === String) {
+    // if (o.body2.constructor == String) {
     //   b2 = this.getByName(o.body2) as RigidBody;
-    // } else if (o.body2.constructor === Number) {
+    // } else if (o.body2.constructor == Number) {
     //   b2 = this.getByName(o.body2) as RigidBody;
-    // } else if (o.body2.constructor === RigidBody) {
+    // } else if (o.body2.constructor == RigidBody) {
     //   b2 = o.body2;
     // }
 
-    // if (b1 === null || b2 === null) throw new Error("Can't add joint attach rigidbodys not find !");
+    // if (b1 == null || b2 == null) throw new Error("Can't add joint attach rigidbodys not find !");
 
     jc.body1 = b1;
     jc.body2 = b2;

@@ -194,13 +194,21 @@ export class Contact {
     this.s2Link.shape = shape1;
     this.s2Link.body = this.body1;
 
-    if (shape1.contactLink != null) (this.s1Link.next = shape1.contactLink)!.prev = this.s1Link;
-    else this.s1Link.next = null;
+    if (shape1.contactLink != null) {
+      this.s1Link.next = shape1.contactLink;
+      shape1.contactLink!.prev = this.s1Link;
+    } else {
+      this.s1Link.next = null;
+    }
     shape1.contactLink = this.s1Link;
     shape1.numContacts++;
 
-    if (shape2.contactLink != null) (this.s2Link.next = shape2.contactLink)!.prev = this.s2Link;
-    else this.s2Link.next = null;
+    if (shape2.contactLink != null) {
+      this.s2Link.next = shape2.contactLink;
+      shape2.contactLink!.prev = this.s2Link;
+    } else {
+      this.s2Link.next = null;
+    }
     shape2.contactLink = this.s2Link;
     shape2.numContacts++;
 
@@ -209,13 +217,22 @@ export class Contact {
     this.b2Link.shape = shape1;
     this.b2Link.body = this.body1;
 
-    if (this.body1!.contactLink != null) (this.b1Link.next = this.body1!.contactLink)!.prev = this.b1Link;
-    else this.b1Link.next = null;
+    if (this.body1!.contactLink != null) {
+      this.b1Link.next = this.body1!.contactLink;
+      this.body1!.contactLink!.prev = this.b1Link;
+    } else {
+      this.b1Link.next = null;
+    }
     this.body1!.contactLink = this.b1Link;
     this.body1!.numContacts++;
 
-    if (this.body2!.contactLink != null) (this.b2Link.next = this.body2!.contactLink)!.prev = this.b2Link;
-    else this.b2Link.next = null;
+    if (this.body2!.contactLink != null) {
+      this.b2Link.next = this.body2!.contactLink;
+      this.body2!.contactLink!.prev = this.b2Link;
+    } else {
+      this.b2Link.next = null;
+    }
+
     this.body2!.contactLink = this.b2Link;
     this.body2!.numContacts++;
 

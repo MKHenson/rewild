@@ -78,7 +78,7 @@ export class Level1 extends Container implements Listener {
     this.pointerController = new PointerLockController(this.runtime!.camera);
 
     const physicsWorldOptions = new WorldOptions();
-    physicsWorldOptions.gravity.set(0, -1.0, 0);
+    physicsWorldOptions.gravity.set(0, -9.8, 0);
     this.world = new World(physicsWorldOptions);
   }
 
@@ -122,8 +122,6 @@ export class Level1 extends Container implements Listener {
       )
     );
 
-    console.log(`update ${vec.x}, ${vec.y}, ${vec.z}`);
-
     if (this.player.isDead) {
       // this.orbitController.enabled = false;
       this.pointerController.enabled = false;
@@ -158,6 +156,12 @@ export class Level1 extends Container implements Listener {
     this.ball = this.findObjectByName("ball")!;
     this.sbybox = this.findObjectByName("skybox")!;
 
+    // Possitive z comes out of screen
+    this.runtime!.camera.position.set(0, 1, 50);
+    this.runtime!.camera.lookAt(0, 0, 0);
+    // this.orbitController.enabled = true;
+    this.pointerController.enabled = true;
+
     const objects = this.objects;
     for (let i: i32 = 0, l = objects.length; i < l; i++) {
       const obj = objects[i];
@@ -173,7 +177,6 @@ export class Level1 extends Container implements Listener {
         const options = new BodyOptions();
         options.pos.set(obj.position.x, obj.position.y, obj.position.z);
         options.size.set(5, height, 5);
-
         this.world!.initBody("box", options);
       }
     }
@@ -184,9 +187,9 @@ export class Level1 extends Container implements Listener {
     }
     const playerOptions = new BodyOptions();
     playerOptions.pos.set(
-      this.player.transform!.position.x,
-      this.player.transform!.position.y,
-      this.player.transform!.position.z
+      this.runtime!.camera.position.x,
+      this.runtime!.camera.position.y,
+      this.runtime!.camera.position.z
     );
     playerOptions.size.set(1, 1, 1);
     playerOptions.move = true;
@@ -196,9 +199,11 @@ export class Level1 extends Container implements Listener {
     const sphereOptions = new BodyOptions();
     sphereOptions.size.set(1, 1, 1);
     sphereOptions.move = true;
-    sphereOptions.pos.set(0, 100, 0);
+    sphereOptions.pos.set(0, 10, 0);
     const sphereConfifg = new ShapeConfig();
-    sphereConfifg.friction = 0.7;
+    sphereConfifg.friction = 0.2;
+    sphereConfifg.density = 20.0;
+    sphereConfifg.restitution = 0.9;
 
     this.sphereBody = this.world!.initBody("sphere", sphereOptions, sphereConfifg);
     this.sphereBody!.connectMesh(this.ball);
@@ -209,22 +214,19 @@ export class Level1 extends Container implements Listener {
     this.floor.rotation.x = -degToRad(90);
 
     const floorOptions = new BodyOptions();
+    // floorOptions.pos.set(0, -40, 0);
+    //floorOptions.size.set(200, 80, 200);
     floorOptions.pos.set(0, 0, 0);
-    floorOptions.size.set(200, 0.1, 200);
+    floorOptions.rot.set(-90, 0, 0);
+
     const floorConfifg = new ShapeConfig();
-    floorConfifg.friction = 0.7;
-    floorConfifg.density = 1;
+    floorConfifg.friction = 0.2;
+    floorConfifg.density = 100;
     floorConfifg.restitution = 0.2;
-    this.world!.initBody("box", floorOptions, floorConfifg);
+    this.world!.initBody("plane", floorOptions, floorConfifg);
 
     this.sbybox.scale.set(200, 200, 200);
     this.sbybox.position.set(0, 0, 0);
-
-    // Possitive z comes out of screen
-    this.runtime!.camera.position.set(0, 1, 10);
-    this.runtime!.camera.lookAt(0, 0, 0);
-    // this.orbitController.enabled = true;
-    this.pointerController.enabled = true;
 
     inputManager.addEventListener("keyup", this);
     uiSignaller.addEventListener("uievent", this);

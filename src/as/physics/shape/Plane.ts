@@ -39,12 +39,12 @@ export class Plane extends Shape {
     let n = this.normal;
     // The plane AABB is infinite, except if the normal is pointing along any axis
     this.aabb.set(
-      n.x === -1 ? this.position.x - p : min,
-      n.x === 1 ? this.position.x + p : max,
-      n.y === -1 ? this.position.y - p : min,
-      n.y === 1 ? this.position.y + p : max,
-      n.z === -1 ? this.position.z - p : min,
-      n.z === 1 ? this.position.z + p : max
+      n.x == -1 ? this.position.x - p : min,
+      n.x == 1 ? this.position.x + p : max,
+      n.y == -1 ? this.position.y - p : min,
+      n.y == 1 ? this.position.y + p : max,
+      n.z == -1 ? this.position.z - p : min,
+      n.z == 1 ? this.position.z + p : max
     );
 
     if (this.proxy != null) this.proxy!.update();
