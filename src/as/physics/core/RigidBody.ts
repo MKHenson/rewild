@@ -204,7 +204,10 @@ export class RigidBody extends PhysicsObject {
       throw new Error("It is not possible that you add a shape which already has an associated body.");
     }
 
-    if (this.shapes != null) (this.shapes!.prev = shape)!.next = this.shapes;
+    if (this.shapes != null) {
+      this.shapes!.prev = shape;
+      shape.next = this.shapes;
+    }
     this.shapes = shape;
     shape.parent = this;
     if (this.parent) this.parent!.addShape(shape);
