@@ -1,8 +1,6 @@
 import { InputManager } from "./InputManager";
-import { GPUBufferUsageFlags } from "../../common/GPUEnums";
 import { GroupType } from "../../common/GroupType";
 import { AttributeType } from "../../common/AttributeType";
-import { createBufferFromF32, createIndexBufferU32 } from "./Utils";
 import { wasm } from "./WasmManager";
 import { IBindable } from "./IBindable";
 import { Object3D } from "../renderer/Object3D";
@@ -288,20 +286,6 @@ export class GameManager implements IBindable {
   endPass() {
     this.currentPass!.end();
     this.device.queue.submit([this.currentCommandEncoder.finish()]);
-  }
-
-  createBufferF32(data: number, usageFlag: GPUBufferUsageFlags = GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST) {
-    const f32Array = wasm.getFloat32Array(data);
-    const buffer = createBufferFromF32(this.device, f32Array, usageFlag);
-    this.buffers.push(buffer);
-    return this.buffers.length - 1;
-  }
-
-  createIndexBuffer(data: number, usageFlag: GPUBufferUsageFlags = GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST) {
-    const u32Array = wasm.getUint32Array(data);
-    const buffer = createIndexBufferU32(this.device, u32Array, usageFlag);
-    this.buffers.push(buffer);
-    return this.buffers.length - 1;
   }
 
   renderComponents(camera: Number, meshes: number[]) {
