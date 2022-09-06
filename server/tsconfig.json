@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "removeComments": false,
+    "noEmit": true,
+    "noEmitOnError": true,
+    "declaration": false,
+    "sourceMap": false,
+    "preserveConstEnums": true,
+    "noImplicitAny": true,
+    "target": "es2018",
+    "lib": ["es2018"],
+    "experimentalDecorators": true,
+    "allowUnreachableCode": false,
+    "emitDecoratorMetadata": true,
+    "allowUnusedLabels": false,
+    "noUnusedParameters": false,
+    "noUnusedLocals": true,
+    "strictNullChecks": true,
+    "allowSyntheticDefaultImports": true,
+    "jsx": "react",
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules/**", "src/index.ts"]
+}
