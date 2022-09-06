@@ -19,3 +19,4 @@ declare const Mathf: typeof Math;
 
 declare function unchecked(val: any): any;
 declare function u32(val: number): number;
+declare function f32(val: number): number;

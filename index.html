@@ -13,11 +13,15 @@
     <script type="text/javascript">
       window.Mathf = Math;
       window.f32 = { EPSILON: Number.EPSILON };
+      window.i32 = { MAX_VALUE: Number.MAX_VALUE };
       window.unchecked = function (t) {
         return t;
       };
       window.u32 = function (t) {
         return t | 0;
+      };
+      window.f32 = function (t) {
+        return t;
       };
     </script>
     <script defer src="./index_bundle.js"></script>
