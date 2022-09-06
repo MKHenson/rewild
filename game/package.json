@@ -8,14 +8,14 @@
     "mocha": "node --experimental-wasi-unstable-preview1 --experimental-wasm-simd node_modules/mocha/bin/_mocha './tests/init.spec.ts' 'tests/**/*.spec.ts' --reporter spec",
     "test": "npm run build-test && npm run mocha",
     "benchmark": "cross-env TS_NODE_PROJECT=\"./tests/tsconfig.json\" node --experimental-wasi-unstable-preview1 --experimental-wasm-simd --require ts-node/register ./tests/benchmarks.ts",
-    "clean": "rimraf ./dist/untouched.wasm && rimraf ./dist/untouched.wasm.map && rimraf ./dist/untouched.wat",
+    "clean": "rimraf ../dist/untouched.wasm && rimraf ../dist/untouched.wasm.map && rimraf ../dist/untouched.wat",
     "asbuild": "asc src/as/index.ts --target release",
     "build:webpack": "webpack --mode development",
     "build": "npm run clean && npm run asbuild && npm run build:webpack",
     "watch-webpack": "webpack --mode development --watch --env env=local",
     "watch-as": "nodemon -e js,ts,tsx --watch src/as -x \"npm run asbuild\"",
     "start": "npm run build && npm-run-all --parallel server watch-webpack watch-as",
-    "server": "live-server --port=9001 --watch=dist,build --open=/ ./dist"
+    "server": "live-server --port=9001 --watch=dist,build --open=/ ../dist"
   },
   "repository": {
     "type": "git",
