@@ -1,0 +1,42 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug",
+      "type": "node",
+      "protocol": "auto",
+      "request": "launch",
+      "stopOnEntry": false,
+      "args": ["${workspaceRoot}/src/main.ts"],
+      "outputCapture": "std",
+      "cwd": "${workspaceRoot}",
+      "preLaunchTask": null,
+      "runtimeExecutable": null,
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "internalConsole",
+      "sourceMaps": true,
+      "outFiles": []
+    },
+    {
+      "name": "Watch",
+      "type": "node",
+      "protocol": "auto",
+      "request": "launch",
+      "stopOnEntry": false,
+      "program": "${workspaceRoot}/node_modules/nodemon/bin/nodemon.js",
+      "args": ["${workspaceRoot}/src/main.ts"],
+      "outputCapture": "std",
+      "cwd": "${workspaceRoot}",
+      "preLaunchTask": null,
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "internalConsole",
+      "sourceMaps": true,
+      "outFiles": []
+    }
+  ]
+}
