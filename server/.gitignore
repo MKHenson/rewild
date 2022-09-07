@@ -5,6 +5,7 @@
 
 # Node artifact files
 node_modules/
+keys/
 
 # Log files
 *.log
