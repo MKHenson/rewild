@@ -1,0 +1,44 @@
+type Query {
+  file(id: String!): File
+
+  """Gets a paginated list of files"""
+  files(index: Int = 0, limit: Int = 10, search: String, sortOrder: SortOrder = asc, sortType: FileSortType = created): PaginatedFilesResponse!
+}
+
+"""Object representing a File"""
+type File {
+  id: String!
+  name: String!
+  publicURL: String!
+  mimeType: String!
+  created: Long!
+  updated: Long!
+  size: Long!
+}
+
+"""64-bit integral numbers"""
+scalar Long
+
+"""A page of wrapper of files"""
+type PaginatedFilesResponse {
+  data: [File!]!
+  count: Int!
+  limit: Int!
+  index: Int!
+}
+
+enum SortOrder {
+  asc
+  desc
+}
+
+"""The type of sorting performed when fetching files"""
+enum FileSortType {
+  created
+  memory
+  name
+}
+
+type Mutation {
+  removeFile(id: String!): Boolean!
+}
