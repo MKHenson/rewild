@@ -5,7 +5,14 @@ export { createMeshPipelineInstance, setMeshPipelineTransformIndex } from "./pip
 export { addPipelineAttribute } from "./pipelines/PipelineInstance";
 export { createMeshComponent } from "./components/MeshComponent";
 export { createPlayerComponent, getPlayerComponentProperties } from "./components/PlayerComponent";
-export { createContainer, addAsset, createLevel1, createMainMenu, createTestLevel } from "./objects/routing";
+export {
+  createContainer,
+  addAsset,
+  createLevel1,
+  createMainMenu,
+  createEditor,
+  createTestLevel,
+} from "./objects/routing";
 export {
   getCameraProjectionInverseMatrix,
   getCameraProjectionMatrix,

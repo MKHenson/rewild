@@ -158,6 +158,7 @@ export class GameManager implements IBindable {
     );
 
     const containerMainMenuPtr = wasm.createMainMenu();
+    const containerEditorPtr = wasm.createEditor();
 
     wasm.addAsset(containerMainMenuPtr, meshManager.addMesh(this.createMesh(geometrySphere, "earth")).transform as any);
     wasm.addAsset(
@@ -171,6 +172,7 @@ export class GameManager implements IBindable {
 
     wasm.addContainer(containerLvl1Ptr, false);
     wasm.addContainer(containerMainMenuPtr, true);
+    wasm.addContainer(containerEditorPtr, false);
     wasm.addContainer(containerTestPtr, false);
   }
 

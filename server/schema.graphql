@@ -1,8 +1,14 @@
 type Query {
+  system: System!
   file(id: String!): File
 
   """Gets a paginated list of files"""
   files(index: Int = 0, limit: Int = 10, search: String, sortOrder: SortOrder = asc, sortType: FileSortType = created): PaginatedFilesResponse!
+}
+
+"""Object representing the server system"""
+type System {
+  status: String!
 }
 
 """Object representing a File"""

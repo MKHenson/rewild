@@ -5,7 +5,8 @@ import { KeyboardEvent } from "../../../extras/io/KeyboardEvent";
 import { Listener } from "../../../core/EventDispatcher";
 import { uiSignaller } from "../../../extras/ui/uiSignalManager";
 import { Event } from "../../../core/Event";
-import { UIEvent } from "../../../extras/ui/UIEvent";
+import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
+import { UIEventType } from "../../../../common/EventTypes";
 import { Link } from "../core/Link";
 import { TransformNode } from "../../../core/TransformNode";
 
@@ -29,7 +30,7 @@ export class TestLevel extends Container implements Listener {
     if (event.attachment instanceof KeyboardEvent) {
       const keyEvent = event.attachment as KeyboardEvent;
     } else {
-      const uiEvent = event.attachment as UIEvent;
+      const uiEvent = event.attachment as ApplicationEvent;
     }
   }
 
@@ -49,13 +50,13 @@ export class TestLevel extends Container implements Listener {
     this.runtime!.camera.lookAt(0, 0, 0);
 
     inputManager.addEventListener("keyup", this);
-    uiSignaller.addEventListener("uievent", this);
+    uiSignaller.addEventListener(UIEventType, this);
   }
 
   unMount(): void {
     super.unMount();
     inputManager.removeEventListener("keyup", this);
-    uiSignaller.removeEventListener("uievent", this);
+    uiSignaller.removeEventListener(UIEventType, this);
   }
 }
 

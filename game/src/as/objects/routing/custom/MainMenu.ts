@@ -4,25 +4,34 @@ import { Container } from "../core/Container";
 import { uiSignaller } from "../../../extras/ui/uiSignalManager";
 import { Listener } from "../../../core/EventDispatcher";
 import { Event } from "../../../core/Event";
-import { UIEvent } from "../../../extras/ui/UIEvent";
+import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
 import { degToRad } from "../../../../common/math/MathUtils";
 import { Link } from "../core/Link";
-import { UIEventType } from "../../../../common/UIEventType";
+import { ApplicationEventType, UIEventType } from "../../../../common/EventTypes";
+import { Portal } from "../core/Portal";
 
 export class MainMenu extends Container implements Listener {
   private sun!: DirectionalLight;
 
   constructor() {
-    super("MainMenu");
+    super("MainMenu", false);
+    this.portals.push(new Portal("Enter", this));
+    this.portals.push(new Portal("Exit - Start Game", this));
+    this.portals.push(new Portal("Exit - Start Editor", this));
   }
 
   init(): void {
     super.init();
-    const link = new Link();
+    const link1 = new Link();
+    const link2 = new Link();
     const level1 = this.runtime!.getNode("Level1");
+    const editor = this.runtime!.getNode("Editor");
 
-    if (!level1) console.log(`dont have level`);
-    link.connect(this.getPortal("Exit")!, level1!.getPortal("Enter")!);
+    if (!level1) throw new Error(`dont have level`);
+    if (!editor) throw new Error(`dont have editor`);
+
+    link1.connect(this.getPortal("Exit - Start Game")!, level1.getPortal("Enter")!);
+    link2.connect(this.getPortal("Exit - Start Editor")!, editor.getPortal("Enter")!);
 
     this.sun = new DirectionalLight(new Color(1, 1, 1), 6);
     this.sun.position.set(10, 10, 0);
@@ -31,8 +40,10 @@ export class MainMenu extends Container implements Listener {
   }
 
   onEvent(event: Event): void {
-    const uiEvent = event.attachment as UIEvent;
-    if (uiEvent.eventType == UIEventType.StartGame) this.exit(this.getPortal("Exit")!, true);
+    const uiEvent = event.attachment as ApplicationEvent;
+    if (uiEvent.eventType == ApplicationEventType.StartGame) this.exit(this.getPortal("Exit - Start Game")!, true);
+    else if (uiEvent.eventType == ApplicationEventType.StartEditor)
+      this.exit(this.getPortal("Exit - Start Editor")!, true);
   }
 
   onUpdate(delta: f32, total: u32): void {
@@ -53,12 +64,12 @@ export class MainMenu extends Container implements Listener {
     sbybox.scale.set(200, 200, 200);
     sbybox.position.set(0, 0, 0);
 
-    uiSignaller.addEventListener("uievent", this);
+    uiSignaller.addEventListener(UIEventType, this);
   }
 
   unMount(): void {
     super.unMount();
-    uiSignaller.removeEventListener("uievent", this);
+    uiSignaller.removeEventListener(UIEventType, this);
   }
 }
 

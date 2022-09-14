@@ -37,6 +37,30 @@ async function start() {
 
   const schema = await generateSchema();
 
+  // CORS
+  app.use((req, res, next) => {
+    if (req.headers.origin) {
+      res.setHeader(
+        "Access-Control-Allow-Origin",
+        req.headers.origin as string
+      );
+      res.setHeader(
+        "Access-Control-Allow-Methods",
+        "GET,PUT,POST,DELETE,OPTIONS"
+      );
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization, Content-Length, X-Requested-With, X-Mime-Type, X-File-Name, Cache-Control"
+      );
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    }
+
+    if (req.method === "OPTIONS") {
+      res.status(200);
+      res.end();
+    } else next();
+  });
+
   // bind express with graphql
   app.use(
     "/graphql",
@@ -70,7 +94,7 @@ async function start() {
     }
   });
 
-  app.listen(port, () => {});
+  app.listen(port, "127.0.0.1", () => {});
   console.log("\x1b[36m%s\x1b[0m", "Server Ready!"); //cyan
 }
 

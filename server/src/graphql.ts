@@ -2,11 +2,12 @@ import "./scalars/enums";
 import { printSchema } from "graphql";
 import { writeFileSync } from "fs";
 import { buildSchema } from "type-graphql";
+import { SystemResolver } from "./resolvers/system-resolver";
 import { FileResolver } from "./resolvers/file-resolver";
 
 export async function generateSchema() {
   const schema = await buildSchema({
-    resolvers: [FileResolver],
+    resolvers: [SystemResolver, FileResolver],
   });
 
   return schema;

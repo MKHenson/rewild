@@ -1,16 +1,5 @@
 import { wasm } from "./WasmManager";
-
-export enum MouseEventType {
-  MouseDown,
-  MouseUp,
-  MouseMove,
-  MouseWheel,
-}
-
-export enum KeyEventType {
-  KeyDown,
-  KeyUp,
-}
+import { MouseEventType, KeyEventType } from "../../common/EventTypes";
 
 export class InputManager {
   canvas: HTMLCanvasElement;

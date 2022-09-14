@@ -1,6 +1,6 @@
 import { Component } from "../core/Component";
 import { uiSignaller } from "../extras/ui/uiSignalManager";
-import { UIEventType } from "../../common/UIEventType";
+import { ApplicationEventType } from "../../common/EventTypes";
 import { unlock } from "../Imports";
 
 export class PlayerComponent extends Component {
@@ -53,7 +53,7 @@ export class PlayerComponent extends Component {
   onPlayerDied(): void {
     unlock();
     this.isDead = true;
-    uiSignaller.signalClientEvent(UIEventType.PlayerDied);
+    uiSignaller.signalClientEvent(ApplicationEventType.PlayerDied);
   }
 
   get health(): i32 {

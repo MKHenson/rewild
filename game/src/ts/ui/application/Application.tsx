@@ -8,16 +8,16 @@ import { WasmManager } from "../../core/WasmManager";
 import { Pane3D } from "../common/Pane3D";
 import { InGameMenu } from "./InGameMenu";
 import { MainMenu } from "./MainMenu";
-import { UIEvent } from "../../core/events/UIEvent";
-import { EventType } from "../../core/events/eventTypes";
-import { UIEventType } from "../../../common/UIEventType";
+import { ApplicationEvent } from "../../core/events/ApplicationEvent";
+import { ApplicationEventType, UIEventType } from "../../../common/EventTypes";
 import { InGameUI } from "./InGameUI";
+import { Editor } from "./editor/Editor";
 import { GameOverMenu } from "./GameOverMenu";
 import { ErrorType, StartError } from "./StartError";
 import { update } from "./FPSCounter";
 
 interface Props {}
-type ActiveMenu = "main" | "ingameMenu" | "gameOverMenu" | "error";
+type ActiveMenu = "main" | "ingameMenu" | "gameOverMenu" | "error" | "editor";
 
 export const Application: Component<Props> = ({}) => {
   const [modalOpen, setModalOpen] = createSignal(true);
@@ -27,19 +27,19 @@ export const Application: Component<Props> = ({}) => {
   const [activeMenu, setActiveMenu] = createSignal<ActiveMenu>("main");
   const [gameIsRunning, setGameIsRunning] = createSignal(false);
 
-  let fpsDiv!: HTMLDivElement;
+  let fpsDiv: HTMLDivElement | null = null;
 
   let gameManager: GameManager;
   let eventManager: UIEventManager;
   const wasmManager: WasmManager = new WasmManager();
 
-  const onWasmUiEvent = (event: UIEvent) => {
-    if (event.uiEventType === UIEventType.OpenInGameMenu) setModalOpen(!modalOpen());
-    else if (event.uiEventType === UIEventType.PlayerDied) setActiveMenu("gameOverMenu");
+  const onWasmUiEvent = (event: ApplicationEvent) => {
+    if (event.eventType === ApplicationEventType.OpenInGameMenu) setModalOpen(!modalOpen());
+    else if (event.eventType === ApplicationEventType.PlayerDied) setActiveMenu("gameOverMenu");
   };
 
   const onFrameUpdate = () => {
-    update(fpsDiv);
+    if (fpsDiv) update(fpsDiv);
   };
 
   const onCanvasReady = async (canvas: HTMLCanvasElement) => {
@@ -61,7 +61,7 @@ export const Application: Component<Props> = ({}) => {
       }
 
       await gameManager.init();
-      eventManager.addEventListener("uievent" as EventType, onWasmUiEvent);
+      eventManager.addEventListener(UIEventType, onWasmUiEvent);
     } catch (err: unknown) {
       setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");
       setErrorType("OTHER");
@@ -74,27 +74,35 @@ export const Application: Component<Props> = ({}) => {
     setModalOpen(false);
     setGameIsRunning(true);
     setActiveMenu("ingameMenu");
-    eventManager.triggerUIEvent(UIEventType.StartGame);
+    eventManager.triggerUIEvent(ApplicationEventType.StartGame);
+  };
+
+  const onEditor = () => {
+    setModalOpen(false);
+    setGameIsRunning(false);
+    setActiveMenu("editor");
+    eventManager.triggerUIEvent(ApplicationEventType.StartEditor);
   };
 
   const onResume = () => {
     setModalOpen(false);
     setGameIsRunning(true);
-    eventManager.triggerUIEvent(UIEventType.Resume);
+    eventManager.triggerUIEvent(ApplicationEventType.Resume);
   };
 
   const onQuit = () => {
     setModalOpen(true);
     setActiveMenu("main");
     setGameIsRunning(false);
-    eventManager.triggerUIEvent(UIEventType.QuitGame);
+    eventManager.triggerUIEvent(ApplicationEventType.Quit);
   };
 
   const options: { [key in ActiveMenu]: Component } = {
-    main: () => <MainMenu open={modalOpen()} onStart={onStart} />,
+    main: () => <MainMenu open={modalOpen()} onStart={onStart} onEditor={onEditor} />,
     ingameMenu: () => <InGameMenu open={modalOpen()} onResumeClick={onResume} onQuitClick={onQuit} />,
     gameOverMenu: () => <GameOverMenu onQuitClick={onQuit} open />,
     error: () => <StartError open errorMsg={errorMessage()} errorType={errorType()} />,
+    editor: () => <Editor onQuit={onQuit} gameManager={gameManager} eventManager={eventManager} />,
   };
 
   return (
@@ -104,7 +112,9 @@ export const Application: Component<Props> = ({}) => {
       </Show>
       <Dynamic component={options[activeMenu()]} />
       <Pane3D onCanvasReady={onCanvasReady} />
-      <StyledFPS ref={fpsDiv}>0</StyledFPS>
+      <Show when={gameIsRunning()}>
+        <StyledFPS ref={(elm) => (fpsDiv = elm)}>0</StyledFPS>
+      </Show>
     </StyledApplication>
   );
 };
