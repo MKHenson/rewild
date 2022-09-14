@@ -8,12 +8,15 @@ export class Container extends Node {
   protected objects: TransformNode[];
   protected loaded: boolean;
 
-  constructor(name: string) {
+  constructor(name: string, addDefaultPortals: boolean = true) {
     super(name);
     this.objects = [];
     this.loaded = false;
-    this.portals.push(new Portal("Enter", this));
-    this.portals.push(new Portal("Exit", this));
+
+    if (addDefaultPortals) {
+      this.portals.push(new Portal("Enter", this));
+      this.portals.push(new Portal("Exit", this));
+    }
   }
 
   findObjectByName(name: string): TransformNode | null {

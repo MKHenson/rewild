@@ -1,10 +1,10 @@
-import { UIEventType } from "../../common/UIEventType";
+import { ApplicationEventType } from "../../common/EventTypes";
 import EventDispatcher from "./EventDispatcher";
-import { UIEvent } from "./events/UIEvent";
+import { ApplicationEvent } from "./events/ApplicationEvent";
 import { IBindable } from "./IBindable";
 import { wasm } from "./WasmManager";
 
-const uiEvent: UIEvent = new UIEvent();
+const uiEvent: ApplicationEvent = new ApplicationEvent();
 
 export class UIEventManager extends EventDispatcher implements IBindable {
   constructor() {
@@ -17,12 +17,12 @@ export class UIEventManager extends EventDispatcher implements IBindable {
     };
   }
 
-  onSignalReceived(type: UIEventType, event: number) {
-    uiEvent.uiEventType = type;
+  onSignalReceived(type: ApplicationEventType, event: number) {
+    uiEvent.eventType = type;
     this.dispatchEvent(uiEvent);
   }
 
-  triggerUIEvent(type: UIEventType) {
+  triggerUIEvent(type: ApplicationEventType) {
     wasm.dispatchOnSignalEvent(type);
   }
 }

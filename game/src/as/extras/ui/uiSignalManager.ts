@@ -1,29 +1,29 @@
 import { Event } from "../../core/Event";
-import { UIEvent } from "./UIEvent";
-import { UIEventType } from "../../../common/UIEventType";
+import { ApplicationEvent } from "./ApplicationEvent";
+import { ApplicationEventType, UIEventType } from "../../../common/EventTypes";
 import { EventDispatcher } from "../../core/EventDispatcher";
 import { onSignalReceived } from "../../Imports";
 
-const uiEvent: Event = new Event("uievent");
+const uiEvent: Event = new Event(UIEventType);
 
 export class UISignalManager extends EventDispatcher {
-  onSignalEvent(eventType: UIEventType): void {
+  onSignalEvent(eventType: ApplicationEventType): void {
     uiEvent.target = this;
-    uiEvent.attachment = new UIEvent(eventType);
+    uiEvent.attachment = new ApplicationEvent(eventType);
     this.dispatchEvent(uiEvent);
   }
 
-  signalClientEvent(eventType: UIEventType): void {
+  signalClientEvent(eventType: ApplicationEventType): void {
     uiEvent.target = this;
-    uiEvent.attachment = new UIEvent(eventType);
+    uiEvent.attachment = new ApplicationEvent(eventType);
     onSignalReceived(eventType, uiEvent);
   }
 }
 
-export function dispatchOnSignalEvent(eventType: UIEventType): void {
+export function dispatchOnSignalEvent(eventType: ApplicationEventType): void {
   uiSignaller.onSignalEvent(eventType);
 }
-export function dispatchSignalClientEvent(eventType: UIEventType): void {
+export function dispatchSignalClientEvent(eventType: ApplicationEventType): void {
   uiSignaller.signalClientEvent(eventType);
 }
 

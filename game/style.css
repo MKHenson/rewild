@@ -24,6 +24,7 @@
 
   --on-background: #333;
   --on-surface: #333;
+  --on-surface-border: #ccc;
 
   --on-error-400: #fff;
   --on-error-500: #fff;

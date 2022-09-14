@@ -36,6 +36,9 @@ const StyledButton = styled.button<{ fullWidth: boolean }>`
   font-weight: 400;
   cursor: pointer;
   user-select: none;
+  > * {
+    vertical-align: middle;
+  }
   ${(e) => (e.fullWidth ? "width: 100%;" : "")}
   transition: box-shadow 0.25s, background-color 0.25s;
   display: ${(e) => (e.fullWidth ? "block" : "inline-block")};

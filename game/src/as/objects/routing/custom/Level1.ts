@@ -9,12 +9,12 @@ import { KeyboardEvent } from "../../../extras/io/KeyboardEvent";
 import { Listener } from "../../../core/EventDispatcher";
 import { uiSignaller } from "../../../extras/ui/uiSignalManager";
 import { Event } from "../../../core/Event";
-import { UIEventType } from "../../../../common/UIEventType";
-import { UIEvent } from "../../../extras/ui/UIEvent";
+import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
 import { Link } from "../core/Link";
 import { TransformNode } from "../../../core/TransformNode";
 import { lock, unlock } from "../../../Imports";
 import { degToRad } from "../../../../common/math/MathUtils";
+import { ApplicationEventType, UIEventType } from "../../../../common/EventTypes";
 import { PlayerComponent } from "../../../components/PlayerComponent";
 import { BodyOptions, World, WorldOptions } from "../../../physics/core/World";
 import { RigidBody } from "../../../physics/core/RigidBody";
@@ -90,13 +90,13 @@ export class Level1 extends Container implements Listener {
           this.isPaused = !this.isPaused;
           if (this.isPaused) unlock();
           else lock();
-          uiSignaller.signalClientEvent(UIEventType.OpenInGameMenu);
+          uiSignaller.signalClientEvent(ApplicationEventType.OpenInGameMenu);
         }
       }
     } else {
-      const uiEvent = event.attachment as UIEvent;
-      if (uiEvent.eventType == UIEventType.QuitGame) this.exit(this.getPortal("Exit")!, true);
-      else if (uiEvent.eventType == UIEventType.Resume) {
+      const uiEvent = event.attachment as ApplicationEvent;
+      if (uiEvent.eventType == ApplicationEventType.Quit) this.exit(this.getPortal("Exit")!, true);
+      else if (uiEvent.eventType == ApplicationEventType.Resume) {
         this.isPaused = false;
         lock();
       }
@@ -229,7 +229,7 @@ export class Level1 extends Container implements Listener {
     this.sbybox.position.set(0, 0, 0);
 
     inputManager.addEventListener("keyup", this);
-    uiSignaller.addEventListener("uievent", this);
+    uiSignaller.addEventListener(UIEventType, this);
     this.world!.play();
     lock();
   }
@@ -241,7 +241,7 @@ export class Level1 extends Container implements Listener {
     // this.orbitController.enabled = false;
     this.pointerController.enabled = false;
     inputManager.removeEventListener("keyup", this);
-    uiSignaller.removeEventListener("uievent", this);
+    uiSignaller.removeEventListener(UIEventType, this);
   }
 }
 

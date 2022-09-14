@@ -8,9 +8,7 @@ const EPSILON: f32 = 0.000001;
 `;
 
 export const mathFunctions = /* wgsl */ `
-fn saturate( a: f32 ) -> f32 {
-    return clamp( a, 0.0, 1.0 );
-}
+
 
 fn whiteComplement( a: f32 ) -> f32 {
     return ( 1.0 - saturate( a ) );
