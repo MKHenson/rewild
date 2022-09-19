@@ -4,10 +4,11 @@ import { writeFileSync } from "fs";
 import { buildSchema } from "type-graphql";
 import { SystemResolver } from "./resolvers/system-resolver";
 import { FileResolver } from "./resolvers/file-resolver";
+import { ProjectResolver } from "./resolvers/project-resolver";
 
 export async function generateSchema() {
   const schema = await buildSchema({
-    resolvers: [SystemResolver, FileResolver],
+    resolvers: [SystemResolver, ProjectResolver, FileResolver],
   });
 
   return schema;

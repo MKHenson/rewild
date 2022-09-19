@@ -4,6 +4,10 @@ type Query {
 
   """Gets a paginated list of files"""
   files(index: Int = 0, limit: Int = 10, search: String, sortOrder: SortOrder = asc, sortType: FileSortType = created): PaginatedFilesResponse!
+  project(id: String!): Project
+
+  """Gets a paginated list of files"""
+  projects(index: Int = 0, limit: Int = 10): PaginatedProjectResponse!
 }
 
 """Object representing the server system"""
@@ -45,6 +49,34 @@ enum FileSortType {
   name
 }
 
+"""Object representing a Project"""
+type Project {
+  id: String!
+  name: String!
+  created: Long!
+  lastUpdated: Long!
+}
+
+"""A page of wrapper of files"""
+type PaginatedProjectResponse {
+  data: [Project!]!
+  count: Int!
+  limit: Int!
+  index: Int!
+}
+
 type Mutation {
   removeFile(id: String!): Boolean!
+  removeProject(id: String!): Boolean!
+  addProject(project: AddProjectInput!): Project
+  patchProject(project: UpdateProjectInput!): Project
+}
+
+input AddProjectInput {
+  name: String!
+}
+
+input UpdateProjectInput {
+  id: String!
+  name: String!
 }

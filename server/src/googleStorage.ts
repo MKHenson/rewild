@@ -1,8 +1,5 @@
 import { Storage } from "@google-cloud/storage";
-import { readFileSync } from "fs";
-
-const result = readFileSync(__dirname + "/../keys/config.json", "utf8");
-const config = JSON.parse(result.toString());
+import { config } from "./config";
 
 const projectId = config.projectId;
 const keyFilename = config.keyFilename;
