@@ -1,24 +1,20 @@
 # RE-WILD
 
-Rewild is a game about time travel and natural history. Built with WASM and WebGPU
+### How do I get set up? 🦕
 
-Checkout the 🦕[Demo](https://mkhenson.github.io/rewild/)🦖
-
-### How do I get set up?
-
-Clone the project and install the dependencies
+Clone the project and install the dependencies in both the game and server folders
 
 ```
 npm intall
 ```
 
-Build the project
+### Building the game/server 🦖
 
 ```
 npm run build
 ```
 
-Run the project
+### Run the game or server
 
 ```
 npm run start
