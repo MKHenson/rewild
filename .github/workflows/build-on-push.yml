@@ -7,11 +7,12 @@ jobs:
   build-page:
     runs-on: ubuntu-latest
     steps:
+      - name: Build
+        working-directory: ./game
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
           node-version: "16"
-      - working-directory: ./game
       - run: npm install
       - run: npm run build
 
