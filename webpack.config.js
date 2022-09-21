@@ -10,16 +10,18 @@ module.exports = (options) => ({
   output: {
     library: "main",
     libraryTarget: "umd",
-    path: path.resolve(__dirname, "../dist"),
+    path: path.resolve(__dirname, "public"),
     filename: "index_bundle.js",
   },
   plugins: [
     new webpack.DefinePlugin({
       "process.env.MEDIA_URL": JSON.stringify(
-        options.env === "local" ? "./media/" : "https://storage.googleapis.com/rewild-6809/"
+        "https://storage.googleapis.com/rewild-6809/"
       ),
     }),
-    new ForkTsCheckerWebpackPlugin({ typescript: { configFile: "src/ts/tsconfig.json" } }),
+    new ForkTsCheckerWebpackPlugin({
+      typescript: { configFile: "src/ts/tsconfig.json" },
+    }),
     new CopyPlugin({
       patterns: [
         { from: "style.css", to: "style.css" },
@@ -44,7 +46,11 @@ module.exports = (options) => ({
           options: {
             babelrc: false,
             configFile: false,
-            presets: [["@babel/preset-env", { targets: ">0.95%" }], "solid", "@babel/preset-typescript"],
+            presets: [
+              ["@babel/preset-env", { targets: ">0.95%" }],
+              "solid",
+              "@babel/preset-typescript",
+            ],
           },
         },
       },
