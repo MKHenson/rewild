@@ -1,5 +1,6 @@
 import { Application } from "./ui/application/Application";
 import { ThemeProvider } from "solid-styled-components";
+import { AuthProvider } from "./ui/providers/AuthProvider";
 import { theme } from "./ui/theme";
 import { render } from "solid-js/web";
 
@@ -8,7 +9,9 @@ document.addEventListener("readystatechange", (e) => {
     render(
       () => (
         <ThemeProvider theme={theme}>
-          <Application />
+          <AuthProvider>
+            <Application />
+          </AuthProvider>
         </ThemeProvider>
       ),
       document.querySelector("#application") as HTMLDivElement

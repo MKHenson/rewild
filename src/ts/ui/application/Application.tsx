@@ -15,6 +15,7 @@ import { Editor } from "./editor/Editor";
 import { GameOverMenu } from "./GameOverMenu";
 import { ErrorType, StartError } from "./StartError";
 import { update } from "./FPSCounter";
+import { useCounter } from "../providers/AuthProvider";
 
 interface Props {}
 type ActiveMenu = "main" | "ingameMenu" | "gameOverMenu" | "error" | "editor";
@@ -22,6 +23,8 @@ type ActiveMenu = "main" | "ingameMenu" | "gameOverMenu" | "error" | "editor";
 export const Application: Component<Props> = ({}) => {
   const [modalOpen, setModalOpen] = createSignal(true);
   const [errorMessage, setErrorMessage] = createSignal("");
+  const c = useCounter();
+  c;
 
   const [errorType, setErrorType] = createSignal<ErrorType>("OTHER");
   const [activeMenu, setActiveMenu] = createSignal<ActiveMenu>("main");
