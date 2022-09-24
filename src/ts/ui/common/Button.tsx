@@ -58,42 +58,42 @@ const StyledButton = styled.button<{ fullWidth: boolean }>`
   }
 
   &.contained.primary {
-    background: var(--primary-400);
-    color: var(--on-primary-400);
+    background: ${(e) => e.theme?.colors.primary400};
+    color: ${(e) => e.theme?.colors.onPrimary400};
   }
   &.contained.primary:hover {
-    background: var(--primary-500);
-    color: var(--on-primary-500);
+    background: ${(e) => e.theme?.colors.primary500};
+    color: ${(e) => e.theme?.colors.onPrimary500};
   }
   &.contained.primary:active {
-    background: var(--primary-600);
-    color: var(--on-primary-600);
+    background: ${(e) => e.theme?.colors.primary600};
+    color: ${(e) => e.theme?.colors.onPrimary600};
   }
 
   &.contained.secondary {
-    background: var(--secondary-400);
-    color: var(--on-secondary-400);
+    background: ${(e) => e.theme?.colors.secondary400};
+    color: ${(e) => e.theme?.colors.onSecondary400};
   }
   &.contained.secondary:hover {
-    background: var(--secondary-500);
-    color: var(--on-secondary-500);
+    background: ${(e) => e.theme?.colors.secondary500};
+    color: ${(e) => e.theme?.colors.onSecondary500};
   }
   &.contained.secondary:active {
-    background: var(--secondary-600);
-    color: var(--on-secondary-600);
+    background: ${(e) => e.theme?.colors.secondary600};
+    color: ${(e) => e.theme?.colors.onSecondary600};
   }
 
   &.contained.error {
-    background: var(--error-400);
-    color: var(--on-errory-400);
+    background: ${(e) => e.theme?.colors.error400};
+    color: ${(e) => e.theme?.colors.onError400};
   }
   &.contained.error:hover {
-    background: var(--error-500);
-    color: var(--on-error-500);
+    background: ${(e) => e.theme?.colors.error500};
+    color: ${(e) => e.theme?.colors.onError500};
   }
   &.contained.error:active {
-    background: var(--error-600);
-    color: var(--on-error-600);
+    background: ${(e) => e.theme?.colors.error600};
+    color: ${(e) => e.theme?.colors.onError600};
   }
 
   &.outlined {
@@ -107,15 +107,15 @@ const StyledButton = styled.button<{ fullWidth: boolean }>`
   }
 
   &.outlined.primary {
-    color: var(--primary-400);
-    border: 1px solid var(--primary-400);
+    color: ${(e) => e.theme?.colors.primary400};
+    border: 1px solid ${(e) => e.theme?.colors.primary400};
   }
   &.outlined.secondary {
-    color: var(--secondary-400);
-    border: 1px solid var(--secondary-400);
+    color: ${(e) => e.theme?.colors.secondary400};
+    border: 1px solid ${(e) => e.theme?.colors.secondary400};
   }
   &.outlined.error {
-    color: var(--errory-400);
-    border: 1px solid var(--errory-400);
+    color: ${(e) => e.theme?.colors.error400};
+    border: 1px solid ${(e) => e.theme?.colors.error400};
   }
 `;
