@@ -1,12 +1,10 @@
-import { Component, onMount, Show } from "solid-js";
+import { Component, Show } from "solid-js";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Typography } from "../common/Typography";
 import { MaterialIcon } from "../common/MaterialIcon";
 import { styled } from "solid-styled-components";
-import { useCounter } from "../providers/AuthProvider";
-import { authUI } from "../../../firebase";
-import { EmailAuthProvider, GoogleAuthProvider } from "firebase/auth";
+import { useAuth } from "../providers/AuthProvider";
 
 type Props = {
   open: boolean;
@@ -17,17 +15,7 @@ type Props = {
 export const MainMenu: Component<Props> = (props) => {
   const onOptionsClick = () => {};
 
-  const { loading, loggedIn } = useCounter()!;
-
-  onMount(async () => {
-    authUI.start("#sign-in", {
-      signInOptions: [
-        { provider: EmailAuthProvider.PROVIDER_ID, signInMethod: EmailAuthProvider.EMAIL_LINK_SIGN_IN_METHOD },
-        GoogleAuthProvider.PROVIDER_ID,
-      ],
-      // Other config options...
-    });
-  });
+  const { loading, loggedIn } = useAuth()!;
 
   return (
     <Modal hideConfirmButtons open={props.open} title="Rewild">
@@ -45,7 +33,6 @@ export const MainMenu: Component<Props> = (props) => {
         <Button disabled={!loggedIn()} onClick={props.onEditor} fullWidth>
           <MaterialIcon icon="build_circle" /> Editor
         </Button>
-        <div id="sign-in" />
       </StyledButtons>
     </Modal>
   );

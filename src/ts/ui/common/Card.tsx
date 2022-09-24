@@ -12,7 +12,7 @@ export const Card: Component<Props> = (props) => {
 
 const StyledCard = styled.div`
   padding: 1rem;
-  background-color: var(--surface);
+  background-color: ${(e) => e.theme?.colors.surface};
   box-sizing: border-box;
   border-radius: 5px;
 `;

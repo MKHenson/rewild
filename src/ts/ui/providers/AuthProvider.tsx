@@ -1,25 +1,25 @@
 import { createSignal, createContext, useContext, Component, Accessor } from "solid-js";
-import { onAuthStateChanged, signOut, signInWithEmailAndPassword } from "firebase/auth";
+import { onAuthStateChanged, User, signOut, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../../firebase";
 
 const AuthContext = createContext<AuthContext>();
 
 interface AuthContext {
-  loggedIn: Accessor<boolean>;
+  loggedIn: Accessor<User | null>;
   loading: Accessor<boolean>;
   signOut: () => void;
   signIn: (email: string, password: string) => void;
 }
 
 export const AuthProvider: Component = (props) => {
-  const [loggedIn, setLoggedIn] = createSignal(false);
+  const [loggedIn, setLoggedIn] = createSignal<User | null>(null);
   const [loading, setLoading] = createSignal(true);
 
   onAuthStateChanged(auth, (user) => {
     if (user) {
-      setLoggedIn(true);
+      setLoggedIn(user);
     } else {
-      setLoggedIn(false);
+      setLoggedIn(null);
     }
     setLoading(false);
   });
@@ -40,6 +40,6 @@ export const AuthProvider: Component = (props) => {
   return <AuthContext.Provider value={counter}>{props.children}</AuthContext.Provider>;
 };
 
-export function useCounter() {
-  return useContext(AuthContext);
+export function useAuth() {
+  return useContext(AuthContext)!;
 }
