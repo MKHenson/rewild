@@ -1,7 +1,7 @@
 import { styled } from "solid-styled-components";
 import { Component } from "solid-js";
 
-export type ButtonVariant = "contained" | "outlined";
+export type ButtonVariant = "contained" | "outlined" | "text";
 export type ButtonColor = "primary" | "secondary" | "error";
 
 interface Props {
@@ -96,7 +96,8 @@ const StyledButton = styled.button<{ fullWidth: boolean }>`
     color: ${(e) => e.theme?.colors.onError600};
   }
 
-  &.outlined {
+  &.outlined,
+  &.text {
     background: transparent;
   }
   &.outlined:hover {
@@ -104,6 +105,10 @@ const StyledButton = styled.button<{ fullWidth: boolean }>`
   }
   &.outlined:active {
     background: rgba(0, 0, 0, 0.1);
+  }
+
+  &.text:hover {
+    font-weight: 500;
   }
 
   &.outlined.primary {
@@ -117,5 +122,15 @@ const StyledButton = styled.button<{ fullWidth: boolean }>`
   &.outlined.error {
     color: ${(e) => e.theme?.colors.error400};
     border: 1px solid ${(e) => e.theme?.colors.error400};
+  }
+
+  &.text.primary:hover {
+    color: ${(e) => e.theme?.colors.primary400};
+  }
+  &.text.secondary:hover {
+    color: ${(e) => e.theme?.colors.secondary400};
+  }
+  &.text.error:hover {
+    color: ${(e) => e.theme?.colors.error400};
   }
 `;

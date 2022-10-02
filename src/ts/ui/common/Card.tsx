@@ -4,10 +4,16 @@ import { Component } from "solid-js";
 export type ButtonVariant = "contained" | "outlined";
 export type ButtonColor = "primary" | "secondary" | "error";
 
-interface Props {}
+interface Props {
+  onClick?: (e: MouseEvent) => void;
+}
 
 export const Card: Component<Props> = (props) => {
-  return <StyledCard>{props.children}</StyledCard>;
+  return (
+    <StyledCard className="card" onClick={props.onClick}>
+      {props.children}
+    </StyledCard>
+  );
 };
 
 const StyledCard = styled.div`

@@ -27,6 +27,7 @@ declare module "solid-styled-components" {
 
       onBackground: string;
       onSurface: string;
+      onSurfaceLight: string;
       onSurfaceBorder: string;
 
       onError400: string;
@@ -35,6 +36,8 @@ declare module "solid-styled-components" {
 
       background: string;
       surface: string;
+      shadowShort1: string;
+      shadowShort2: string;
     };
   }
 }
