@@ -15,9 +15,7 @@ module.exports = (options) => ({
   },
   plugins: [
     new webpack.DefinePlugin({
-      "process.env.MEDIA_URL": JSON.stringify(
-        "https://storage.googleapis.com/rewild-6809/"
-      ),
+      "process.env.MEDIA_URL": JSON.stringify("https://storage.googleapis.com/rewild-6809/"),
     }),
     new ForkTsCheckerWebpackPlugin({
       typescript: { configFile: "src/ts/tsconfig.json" },
@@ -26,7 +24,7 @@ module.exports = (options) => ({
       patterns: [
         { from: "style.css", to: "style.css" },
         { from: "index.html", to: "index.html" },
-        { from: "src/media", to: "media" },
+        // { from: "src/media", to: "media" },
         { from: "build/release.wasm.map", to: "" },
       ],
     }),
@@ -46,11 +44,7 @@ module.exports = (options) => ({
           options: {
             babelrc: false,
             configFile: false,
-            presets: [
-              ["@babel/preset-env", { targets: ">0.95%" }],
-              "solid",
-              "@babel/preset-typescript",
-            ],
+            presets: [["@babel/preset-env", { targets: ">0.95%" }], "solid", "@babel/preset-typescript"],
           },
         },
       },

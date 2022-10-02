@@ -29,7 +29,8 @@
     "baseUrl": "../../",
     "types": ["node", "@webgpu/types"],
     "paths": {
-      "*": ["/build/types.d.ts", "node_modules/@types/*", "*"]
+      "*": ["/build/types.d.ts", "node_modules/@types/*", "*"],
+      "models": ["./types/models.d.ts"]
     }
   }
 }

@@ -1,4 +1,4 @@
-import { Component } from "solid-js";
+import { Component, createSignal } from "solid-js";
 import { styled } from "solid-styled-components";
 import { Button } from "../../common/Button";
 import { Card } from "../../common/Card";
@@ -7,35 +7,49 @@ import { Divider } from "../../common/Divider";
 import { MaterialIcon } from "../../common/MaterialIcon";
 import { GameManager } from "../../../core/GameManager";
 import { UIEventManager } from "../../../core/UIEventManager";
-
+import { ProjectSelector } from "./ProjectSelector";
+import { Dynamic } from "solid-js/web";
 interface Props {
   gameManager: GameManager;
   eventManager: UIEventManager;
   onQuit: () => void;
 }
 
+type ActiveMenu = "menu" | "editor";
+
 export const Editor: Component<Props> = (props) => {
+  const [activeMenu, setActiveMenu] = createSignal<ActiveMenu>("menu");
+
   const onHomeClick = () => {
     props.onQuit();
   };
 
+  const options: { [key in ActiveMenu]: Component } = {
+    menu: () => <ProjectSelector onBack={onHomeClick} open onOpen={(uid) => setActiveMenu("editor")} />,
+    editor: () => (
+      <>
+        <StyledTools>
+          <Card>
+            <Button fullWidth onClick={onHomeClick}>
+              <MaterialIcon icon="home" size="s" /> Home
+            </Button>
+            <Divider />
+            <Typography variant="h3">Tools</Typography>
+          </Card>
+        </StyledTools>
+        <StyledBody></StyledBody>
+        <StyledProperties>
+          <Card>
+            <Typography variant="h3">Properties</Typography>
+          </Card>
+        </StyledProperties>
+      </>
+    ),
+  };
+
   return (
     <StyledContainer>
-      <StyledTools>
-        <Card>
-          <Button fullWidth onClick={onHomeClick}>
-            <MaterialIcon icon="home" size="s" /> Home
-          </Button>
-          <Divider />
-          <Typography variant="h3">Tools</Typography>
-        </Card>
-      </StyledTools>
-      <StyledBody></StyledBody>
-      <StyledProperties>
-        <Card>
-          <Typography variant="h3">Properties</Typography>
-        </Card>
-      </StyledProperties>
+      <Dynamic component={options[activeMenu()]}></Dynamic>
     </StyledContainer>
   );
 };

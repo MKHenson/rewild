@@ -30,7 +30,7 @@ export const MainMenu: Component<Props> = (props) => {
         <Button onClick={onOptionsClick} fullWidth disabled>
           Options
         </Button>
-        <Button disabled={!loggedIn()} onClick={props.onEditor} fullWidth>
+        <Button disabled={!loggedIn() || loggedIn()?.email !== "mat@webinate.net"} onClick={props.onEditor} fullWidth>
           <MaterialIcon icon="build_circle" /> Editor
         </Button>
       </StyledButtons>
