@@ -51,6 +51,12 @@ html {
   color: var(--on-surface);
 }
 
+::placeholder {
+  color: var(--on-surface-border);
+  font-family: var(--font-family);
+  font-weight: 300;
+}
+
 body {
   margin: 0;
   width: 100%;
