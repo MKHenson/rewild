@@ -1,7 +1,7 @@
 import { styled } from "solid-styled-components";
 import { Component } from "solid-js";
 
-export type TypographyVariant = "h1" | "h2" | "h3" | "h4" | "body1" | "body2";
+export type TypographyVariant = "h1" | "h2" | "h3" | "h4" | "body1" | "body2" | "label";
 export type TypographyAlign = "center" | "inherit" | "justify" | "left" | "right";
 
 interface Props {
@@ -21,6 +21,13 @@ const StyledTypography = styled.div`
   margin: 0;
   font-family: var(--font-family);
   margin-bottom: 0.35em;
+
+  &.label {
+    font-weight: 500;
+    font-size: 0.9rem;
+    line-height: 1.367;
+    letter-spacing: 0.01562em;
+  }
 
   &.h1 {
     font-weight: 300;
@@ -51,7 +58,7 @@ const StyledTypography = styled.div`
   }
 
   &.body1 {
-    font-weight: 400;
+    font-weight: 300;
     font-size: 1rem;
     line-height: 1.5;
     letter-spacing: 0.00938em;
