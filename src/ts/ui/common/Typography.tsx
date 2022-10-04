@@ -1,17 +1,17 @@
 import { styled } from "solid-styled-components";
-import { Component } from "solid-js";
+import { Component, JSX } from "solid-js";
 
-export type TypographyVariant = "h1" | "h2" | "h3" | "h4" | "body1" | "body2" | "label";
+export type TypographyVariant = "h1" | "h2" | "h3" | "h4" | "body1" | "body2" | "label" | "light";
 export type TypographyAlign = "center" | "inherit" | "justify" | "left" | "right";
 
 interface Props {
   variant: TypographyVariant;
-  align?: TypographyAlign;
+  style?: JSX.CSSProperties;
 }
 
 export const Typography: Component<Props> = (props) => {
   return (
-    <StyledTypography className={`typography ${props.variant}`} style={{ textAlign: props.align }}>
+    <StyledTypography className={`typography ${props.variant}`} style={props.style}>
       {props.children}
     </StyledTypography>
   );
@@ -27,6 +27,13 @@ const StyledTypography = styled.div`
     font-size: 0.9rem;
     line-height: 1.367;
     letter-spacing: 0.01562em;
+  }
+
+  &.light {
+    font-weight: 300;
+    font-size: 0.875rem;
+    line-height: 1.43;
+    letter-spacing: 0.01071em;
   }
 
   &.h1 {

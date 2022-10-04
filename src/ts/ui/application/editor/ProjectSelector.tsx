@@ -5,10 +5,10 @@ import { Typography } from "../../common/Typography";
 import { StyledMaterialIcon } from "../../common/MaterialIcon";
 import { Popup } from "../../common/Popup";
 import { Card } from "../../common/Card";
-import { Input } from "../../common/Input";
 import { getProjects, addProject, removeProjects } from "./ProjectSelectorUtils";
 import { IProject } from "models";
-import { Field } from "../../common/Field";
+import { Loading } from "../../common/Loading";
+import { NewProjectForm } from "./NewProjectForm";
 
 interface Props {
   open: boolean;
@@ -67,7 +67,7 @@ export const ProjectSelector: Component<Props> = (props) => {
 
   const projectList = (
     <div className="projects-list">
-      <Card onClick={onNewProject}>
+      <Card button raised onClick={onNewProject}>
         <Typography variant="h4">
           <div>
             <StyledMaterialIcon icon="add_circle" />
@@ -77,38 +77,17 @@ export const ProjectSelector: Component<Props> = (props) => {
       </Card>
 
       <Show when={projectsResource.loading || projectsResource.error}>
-        {projectsResource.error ? projectsResource.error.toString() : "Loading..."}
+        {projectsResource.error ? projectsResource.error.toString() : <Loading />}
       </Show>
       <Show when={!projectsResource.loading}>
         <For each={projectsResource()}>
           {(item) => (
-            <Card onClick={(e) => setSelectedProject(item)}>
+            <Card button raised onClick={(e) => setSelectedProject(item)} pushed={selectedProject()?.id === item.id}>
               <Typography variant="h4">{item.name}</Typography>
             </Card>
           )}
         </For>
       </Show>
-    </div>
-  );
-
-  const newProjectForm = (
-    <div>
-      <Field label="Name" required>
-        <Input
-          autoFocus
-          placeholder="Enter project name"
-          value={newProject()?.name}
-          onChange={(name) => setNewProject({ ...newProject(), name })}
-        />
-      </Field>
-      <Field label="Description">
-        <Input
-          placeholder="Enter a description"
-          value={newProject()?.description}
-          onChange={(description) => setNewProject({ ...newProject(), description })}
-        />
-      </Field>
-      <Show when={!!mutationError()}>{mutationError()}</Show>
     </div>
   );
 
@@ -129,7 +108,8 @@ export const ProjectSelector: Component<Props> = (props) => {
 
         <StyledProjects>
           <Show when={!!newProject()} fallback={projectList}>
-            {newProjectForm}
+            <NewProjectForm project={newProject()} onChange={(project) => setNewProject(project)} />
+            <Show when={!!mutationError()}>{mutationError()}</Show>
           </Show>
         </StyledProjects>
 
@@ -142,7 +122,7 @@ export const ProjectSelector: Component<Props> = (props) => {
 
         <StyledProjectActions>
           <Show when={!!selectedProject()}>
-            <Button variant="text" fullWidth onClick={onDelete}>
+            <Button color="error" variant="text" fullWidth onClick={onDelete}>
               Delete
             </Button>
           </Show>
@@ -188,19 +168,14 @@ const StyledProjects = styled.div`
   }
 
   .card {
-    cursor: pointer;
     width: 160px;
     height: 160px;
-    box-shadow: ${(e) => e.theme?.colors.shadowShort1};
     text-align: center;
     display: inline-flex;
     justify-content: center;
     align-items: center;
     transition: box-shadow 0.25s;
     margin: 2px;
-  }
-  .card:hover {
-    box-shadow: ${(e) => e.theme?.colors.shadowShort2};
   }
 `;
 const StyledProjectActions = styled.div`
