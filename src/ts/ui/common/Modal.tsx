@@ -1,10 +1,11 @@
 import { styled } from "solid-styled-components";
-import { Component, Show } from "solid-js";
+import { Component, JSX, Show } from "solid-js";
 import { Button } from "./Button";
 import { Popup } from "./Popup";
+import { Typography } from "./Typography";
 
 interface Props {
-  title?: string;
+  title?: JSX.Element | string;
   open: boolean;
   withBackground?: boolean;
   hideConfirmButtons?: boolean;
@@ -28,7 +29,7 @@ export const Modal: Component<Props> = (props) => {
     <Popup open={props.open} onClose={props.onClose} withBackground={props.withBackground}>
       <StyledContent>
         <Show when={props.title}>
-          <span class="title">{props.title}</span>
+          {typeof props.title === "string" ? <Typography variant="h2">{props.title}</Typography> : props.title}
         </Show>
         <div class="content">{props.children}</div>
         {props.hideConfirmButtons ? null : (
@@ -47,9 +48,6 @@ export const Modal: Component<Props> = (props) => {
 };
 
 const StyledContent = styled.div`
-  .title {
-    font-size: 18px;
-  }
   .button-container {
     text-align: right;
   }

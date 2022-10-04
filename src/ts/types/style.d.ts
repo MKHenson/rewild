@@ -17,6 +17,10 @@ declare module "solid-styled-components" {
       error500: string;
       error600: string;
 
+      subtle400: string;
+      subtle500: string;
+      subtle600: string;
+
       onPrimary400: string;
       onPrimary500: string;
       onPrimary600: string;
@@ -27,6 +31,7 @@ declare module "solid-styled-components" {
 
       onBackground: string;
       onSurface: string;
+      onSubtle: string;
       onSurfaceLight: string;
       onSurfaceBorder: string;
 

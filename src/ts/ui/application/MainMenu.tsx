@@ -5,6 +5,7 @@ import { Typography } from "../common/Typography";
 import { MaterialIcon } from "../common/MaterialIcon";
 import { styled } from "solid-styled-components";
 import { useAuth } from "../providers/AuthProvider";
+import { Loading } from "../common/Loading";
 
 type Props = {
   open: boolean;
@@ -18,22 +19,44 @@ export const MainMenu: Component<Props> = (props) => {
   const { loading, loggedIn } = useAuth()!;
 
   return (
-    <Modal hideConfirmButtons open={props.open} title="Rewild">
-      <Show when={loading()}>Loading...</Show>
-      <Typography variant="body2">
-        Welcome to rewild. A game about exploration, natural history and saving the planet
-      </Typography>
-      <StyledButtons>
-        <Button onClick={props.onStart} fullWidth>
-          New Game
-        </Button>
-        <Button onClick={onOptionsClick} fullWidth disabled>
-          Options
-        </Button>
-        <Button disabled={!loggedIn() || loggedIn()?.email !== "mat@webinate.net"} onClick={props.onEditor} fullWidth>
-          <MaterialIcon icon="build_circle" /> Editor
-        </Button>
-      </StyledButtons>
+    <Modal
+      hideConfirmButtons
+      open={props.open}
+      title={
+        <Typography variant="h2" style={{ "text-align": "center", margin: "0" }}>
+          Rewild
+        </Typography>
+      }
+    >
+      <StyledTagLine>
+        <Typography variant="light">
+          Welcome to rewild. A game about exploration, natural history and saving the planet
+        </Typography>
+      </StyledTagLine>
+      <Show
+        when={loading()}
+        fallback={
+          <StyledButtons>
+            <Button onClick={props.onStart} fullWidth>
+              New Game
+            </Button>
+            <Button onClick={onOptionsClick} fullWidth disabled>
+              Options
+            </Button>
+            <Button
+              disabled={!loggedIn() || loggedIn()?.email !== "mat@webinate.net"}
+              onClick={props.onEditor}
+              fullWidth
+            >
+              <MaterialIcon size="s" icon="build_circle" /> Editor
+            </Button>
+          </StyledButtons>
+        }
+      >
+        <div style={{ "text-align": "center" }}>
+          <Loading />
+        </div>
+      </Show>
     </Modal>
   );
 };
@@ -41,5 +64,13 @@ export const MainMenu: Component<Props> = (props) => {
 const StyledButtons = styled.div`
   button {
     margin: 1rem 0 0 0;
+  }
+`;
+
+const StyledTagLine = styled.div`
+  .light {
+    margin: 0 auto 2rem auto;
+    width: 70%;
+    text-align: center;
   }
 `;
