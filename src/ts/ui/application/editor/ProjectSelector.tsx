@@ -66,7 +66,7 @@ export const ProjectSelector: Component<Props> = (props) => {
   };
 
   const projectList = (
-    <div className="projects-list">
+    <div class="projects-list">
       <Card button raised onClick={onNewProject}>
         <Typography variant="h4">
           <div>

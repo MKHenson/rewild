@@ -1,5 +1,5 @@
 import { styled } from "solid-styled-components";
-import { Component } from "solid-js";
+import { ParentComponent } from "solid-js";
 
 export type ButtonVariant = "contained" | "outlined" | "text";
 export type ButtonColor = "primary" | "secondary" | "error";
@@ -13,13 +13,13 @@ interface Props {
   class?: string;
 }
 
-export const Button: Component<Props> = (props) => {
+export const Button: ParentComponent<Props> = (props) => {
   return (
     <StyledButton
       fullWidth={props.fullWidth || false}
       disabled={props.disabled}
       onClick={props.onClick}
-      className={`${props.class} ${props.variant || "contained"} ${props.color || "primary"}`}
+      class={`${props.class} ${props.variant || "contained"} ${props.color || "primary"}`}
     >
       {props.children}
     </StyledButton>

@@ -1,6 +1,6 @@
 import { styled } from "solid-styled-components";
 import { Portal } from "solid-js/web";
-import { Component } from "solid-js";
+import { ParentComponent } from "solid-js";
 
 interface Props {
   open: boolean;
@@ -8,7 +8,7 @@ interface Props {
   onClose?: () => void;
 }
 
-export const Popup: Component<Props> = (props) => {
+export const Popup: ParentComponent<Props> = (props) => {
   const handleClick = (e: MouseEvent) => {
     if ((e.target as HTMLElement).classList.contains("wrapper")) {
       props.onClose && props.onClose();
@@ -18,7 +18,7 @@ export const Popup: Component<Props> = (props) => {
   return (
     <Portal>
       <StyledWrapper
-        className="wrapper popup"
+        class="wrapper popup"
         onClick={handleClick}
         visible={props.open}
         withBackground={props.withBackground || false}

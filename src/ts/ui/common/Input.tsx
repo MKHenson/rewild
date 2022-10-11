@@ -33,7 +33,7 @@ export const Input: Component<Props> = (props) => {
   };
 
   return (
-    <StyledInput className="input" fullWidth={props.fullWidth || true}>
+    <StyledInput class="input" fullWidth={props.fullWidth || true}>
       <input
         ref={inputRef}
         autofocus={props.autoFocus}

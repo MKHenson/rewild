@@ -1,5 +1,5 @@
 import { styled } from "solid-styled-components";
-import { Component, JSX } from "solid-js";
+import { ParentComponent, JSX } from "solid-js";
 
 export type ButtonVariant = "contained" | "outlined";
 export type ButtonColor = "primary" | "secondary" | "error";
@@ -10,7 +10,7 @@ interface Props {
   style?: JSX.CSSProperties;
 }
 
-export const MaterialIcon: Component<Props> = (props) => {
+export const MaterialIcon: ParentComponent<Props> = (props) => {
   const size =
     props.size === "s"
       ? "md-18"
@@ -23,13 +23,13 @@ export const MaterialIcon: Component<Props> = (props) => {
       : "md-24";
 
   return (
-    <StyledIcon style={props.style} className={`icon material-icons-sharp ${size}`}>
+    <StyledIcon style={props.style} class={`icon material-icons-sharp ${size}`}>
       {props.icon}
     </StyledIcon>
   );
 };
 
-export const StyledMaterialIcon: Component<Props> = (props) => {
+export const StyledMaterialIcon: ParentComponent<Props> = (props) => {
   return (
     <MaterialIcon style={{ color: "var(--on-surface-light)" }} {...props}>
       {props.children}

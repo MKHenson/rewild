@@ -7,7 +7,7 @@ interface Props {
 
 export const Loading: Component<Props> = (props) => {
   return (
-    <StyledLoading size={props.size || 60} className="loading">
+    <StyledLoading size={props.size || 60} class="loading">
       <div></div>
       <div></div>
     </StyledLoading>

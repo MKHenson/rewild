@@ -1,4 +1,4 @@
-import { createSignal, createContext, useContext, Component, Accessor } from "solid-js";
+import { createSignal, createContext, useContext, Component, Accessor, ParentProps } from "solid-js";
 import { onAuthStateChanged, User, signOut, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../../firebase";
 
@@ -11,7 +11,7 @@ interface AuthContext {
   signIn: (email: string, password: string) => void;
 }
 
-export const AuthProvider: Component = (props) => {
+export const AuthProvider: Component<ParentProps> = (props) => {
   const [loggedIn, setLoggedIn] = createSignal<User | null>(null);
   const [loading, setLoading] = createSignal(true);
 
