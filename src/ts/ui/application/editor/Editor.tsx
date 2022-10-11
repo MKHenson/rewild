@@ -1,55 +1,45 @@
-import { Component, createSignal } from "solid-js";
+import { Component, createResource, Show } from "solid-js";
+import { useParams } from "@solidjs/router";
 import { styled } from "solid-styled-components";
 import { Button } from "../../common/Button";
 import { Card } from "../../common/Card";
 import { Typography } from "../../common/Typography";
 import { Divider } from "../../common/Divider";
 import { MaterialIcon } from "../../common/MaterialIcon";
-import { GameManager } from "../../../core/GameManager";
-import { UIEventManager } from "../../../core/UIEventManager";
-import { ProjectSelector } from "./ProjectSelector";
-import { Dynamic } from "solid-js/web";
+import { Loading } from "../../common/Loading";
+import { getProject } from "./ProjectSelectorUtils";
+
 interface Props {
-  gameManager: GameManager;
-  eventManager: UIEventManager;
-  onQuit: () => void;
+  onHome: () => void;
 }
 
-type ActiveMenu = "menu" | "editor";
-
 export const Editor: Component<Props> = (props) => {
-  const [activeMenu, setActiveMenu] = createSignal<ActiveMenu>("menu");
-
-  const onHomeClick = () => {
-    props.onQuit();
-  };
-
-  const options: { [key in ActiveMenu]: Component } = {
-    menu: () => <ProjectSelector onBack={onHomeClick} open onOpen={(uid) => setActiveMenu("editor")} />,
-    editor: () => (
-      <>
-        <StyledTools>
-          <Card>
-            <Button fullWidth onClick={onHomeClick}>
-              <MaterialIcon icon="home" size="s" /> Home
-            </Button>
-            <Divider />
-            <Typography variant="h3">Tools</Typography>
-          </Card>
-        </StyledTools>
-        <StyledBody></StyledBody>
-        <StyledProperties>
-          <Card>
-            <Typography variant="h3">Properties</Typography>
-          </Card>
-        </StyledProperties>
-      </>
-    ),
-  };
+  const { project: projectId } = useParams<{ project: string }>();
+  const [project] = createResource(projectId, getProject);
 
   return (
     <StyledContainer>
-      <Dynamic component={options[activeMenu()]}></Dynamic>
+      <StyledTools>
+        <Card>
+          <Button fullWidth onClick={props.onHome}>
+            <MaterialIcon icon="home" size="s" /> Home
+          </Button>
+          <Divider />
+          <Typography variant="h3">Tools</Typography>
+        </Card>
+      </StyledTools>
+      <StyledBody></StyledBody>
+      <StyledProperties>
+        <Card>
+          <Typography variant="h3">Properties</Typography>
+          <Show when={!project.loading} fallback={<Loading />}>
+            <>
+              <Typography variant="h2">{project()?.name}</Typography>
+              <Typography variant="light">{project()?.description}</Typography>
+            </>
+          </Show>
+        </Card>
+      </StyledProperties>
     </StyledContainer>
   );
 };
@@ -57,11 +47,6 @@ export const Editor: Component<Props> = (props) => {
 const StyledContainer = styled.div`
   height: 100%;
   width: 100%;
-  top: 0;
-  left: 0;
-  position: absolute;
-  display: flex;
-  box-sizing: border-box;
 `;
 
 const StyledTools = styled.div`

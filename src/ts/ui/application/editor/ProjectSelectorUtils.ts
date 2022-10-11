@@ -1,4 +1,4 @@
-import { getDocs, addDoc, deleteDoc, doc } from "firebase/firestore";
+import { getDocs, addDoc, deleteDoc, getDoc, doc } from "firebase/firestore";
 import { dbs } from "../../../../firebase";
 import { IProject } from "models";
 
@@ -6,6 +6,12 @@ export async function getProjects() {
   const querySnapshot = await getDocs(dbs.projects);
   const toRet = querySnapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
   return toRet;
+}
+
+export async function getProject(id: string) {
+  const docRef = await doc(dbs.projects, id);
+  const projectDoc = await getDoc(docRef);
+  return projectDoc.data();
 }
 
 export async function addProject(token: Partial<IProject>) {

@@ -8,7 +8,7 @@ import { WasmManager } from "../../core/WasmManager";
 import { Pane3D } from "../common/Pane3D";
 import { MainMenu } from "./MainMenu";
 import { ApplicationEventType } from "../../../common/EventTypes";
-import { Editor } from "./editor/Editor";
+import { EditorSplash } from "./editor/EditorSplash";
 import { ErrorType, StartError } from "./StartError";
 import { Auth } from "./Auth";
 import { InGame } from "./InGame";
@@ -16,6 +16,7 @@ import { InGame } from "./InGame";
 interface Props {}
 
 export const Application: Component<Props> = ({}) => {
+  const [ready, setReady] = createSignal(false);
   const [errorMessage, setErrorMessage] = createSignal("");
   const [errorType, setErrorType] = createSignal<ErrorType>("OTHER");
   const navigate = useNavigate();
@@ -40,6 +41,7 @@ export const Application: Component<Props> = ({}) => {
       }
 
       await gameManager.init();
+      setReady(true);
     } catch (err: unknown) {
       setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");
       setErrorType("OTHER");
@@ -54,7 +56,6 @@ export const Application: Component<Props> = ({}) => {
 
   const onEditor = () => {
     navigate("/editor");
-    eventManager.triggerUIEvent(ApplicationEventType.StartEditor);
   };
 
   const onQuit = () => {
@@ -65,6 +66,7 @@ export const Application: Component<Props> = ({}) => {
   return (
     <StyledApplication>
       <Pane3D onCanvasReady={onCanvasReady} />
+
       <Routes>
         <Route
           path="/"
@@ -77,14 +79,18 @@ export const Application: Component<Props> = ({}) => {
             </Show>
           }
         />
-        <Route
-          path="/game"
-          element={<InGame gameManager={gameManager!} eventManager={eventManager!} onQuit={onQuit} />}
-        />
-        <Route
-          path="/editor"
-          element={<Editor onQuit={onQuit} gameManager={gameManager!} eventManager={eventManager!} />}
-        />
+        <Show when={ready()}>
+          <>
+            <Route
+              path="/game"
+              element={<InGame gameManager={gameManager!} eventManager={eventManager!} onQuit={onQuit} />}
+            />
+            <Route
+              path="/editor/*"
+              element={<EditorSplash onQuit={onQuit} gameManager={gameManager!} eventManager={eventManager!} />}
+            />
+          </>
+        </Show>
       </Routes>
       <Auth />
     </StyledApplication>
