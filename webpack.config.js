@@ -13,6 +13,9 @@ module.exports = (options) => ({
     path: path.resolve(__dirname, "public"),
     filename: "index_bundle.js",
   },
+  devServer: {
+    historyApiFallback: true,
+  },
   plugins: [
     new webpack.DefinePlugin({
       "process.env.MEDIA_URL": JSON.stringify("https://storage.googleapis.com/rewild-6809/"),
