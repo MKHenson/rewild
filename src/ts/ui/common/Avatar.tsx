@@ -9,7 +9,7 @@ interface Props {
 
 export const Avatar: Component<Props> = (props) => {
   return (
-    <StyledAvatar onClick={props.onClick} className="avatar">
+    <StyledAvatar onClick={props.onClick} class="avatar">
       <Show
         when={props.src}
         fallback={

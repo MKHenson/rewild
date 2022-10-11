@@ -1,5 +1,5 @@
 import { styled } from "solid-styled-components";
-import { Component, JSX, Show } from "solid-js";
+import { ParentComponent, JSX, Show } from "solid-js";
 import { Button } from "./Button";
 import { Popup } from "./Popup";
 import { Typography } from "./Typography";
@@ -14,7 +14,7 @@ interface Props {
   onOk?: () => void;
 }
 
-export const Modal: Component<Props> = (props) => {
+export const Modal: ParentComponent<Props> = (props) => {
   const handleCancel = (e: MouseEvent) => {
     props.onCancel && props.onCancel();
     props.onClose && props.onClose();

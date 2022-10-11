@@ -1,5 +1,5 @@
 import { styled } from "solid-styled-components";
-import { Component, JSX } from "solid-js";
+import { ParentComponent, JSX } from "solid-js";
 
 export type TypographyVariant = "h1" | "h2" | "h3" | "h4" | "body1" | "body2" | "label" | "light";
 export type TypographyAlign = "center" | "inherit" | "justify" | "left" | "right";
@@ -9,9 +9,9 @@ interface Props {
   style?: JSX.CSSProperties;
 }
 
-export const Typography: Component<Props> = (props) => {
+export const Typography: ParentComponent<Props> = (props) => {
   return (
-    <StyledTypography className={`typography ${props.variant}`} style={props.style}>
+    <StyledTypography class={`typography ${props.variant}`} style={props.style}>
       {props.children}
     </StyledTypography>
   );

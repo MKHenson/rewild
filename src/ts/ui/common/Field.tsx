@@ -1,5 +1,5 @@
 import { styled } from "solid-styled-components";
-import { Component, Show } from "solid-js";
+import { ParentComponent, Show } from "solid-js";
 import { Typography } from "./Typography";
 
 interface Props {
@@ -7,13 +7,13 @@ interface Props {
   required?: boolean;
 }
 
-export const Field: Component<Props> = (props) => {
+export const Field: ParentComponent<Props> = (props) => {
   return (
-    <StyledField className="field">
+    <StyledField class="field">
       <Typography variant="label">
         {props.label}
         <Show when={props.required}>
-          <span className="required">*</span>
+          <span class="required">*</span>
         </Show>
       </Typography>
       {props.children}

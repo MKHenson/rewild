@@ -1,5 +1,5 @@
 import { styled } from "solid-styled-components";
-import { Component } from "solid-js";
+import { ParentComponent } from "solid-js";
 
 export type ButtonVariant = "contained" | "outlined";
 export type ButtonColor = "primary" | "secondary" | "error";
@@ -11,10 +11,10 @@ interface Props {
   onClick?: (e: MouseEvent) => void;
 }
 
-export const Card: Component<Props> = (props) => {
+export const Card: ParentComponent<Props> = (props) => {
   return (
     <StyledCard
-      className="card"
+      class="card"
       classList={{
         pushed: props.pushed || false,
         button: props.button || false,
