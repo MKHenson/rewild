@@ -9,13 +9,13 @@ document.addEventListener("readystatechange", (e) => {
   if (document.readyState === "interactive" || document.readyState === "complete") {
     render(
       () => (
-        <ThemeProvider theme={theme}>
-          <Router>
+        <Router>
+          <ThemeProvider theme={theme}>
             <AuthProvider>
               <Application />
             </AuthProvider>
-          </Router>
-        </ThemeProvider>
+          </ThemeProvider>
+        </Router>
       ),
       document.querySelector("#application") as HTMLDivElement
     );
