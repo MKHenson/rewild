@@ -9,12 +9,25 @@ interface Props {
   index: number;
   editorElm?: JSX.Element;
   editor?: string;
-  onEditorMoved: (type: string, row: number, col: number) => void;
+  onEditorMoved: (type: string, rowStart: number, colStart: number, rowEnd: number, colEnd: number) => void;
 }
+
+type Data = {
+  editor: string;
+  sizeX: number;
+  sizeY: number;
+};
 
 export const GridCell: Component<Props> = (props) => {
   const onDragStart = (e: DragEvent) => {
-    e.dataTransfer?.setData("text", props.editor!);
+    e.dataTransfer?.setData(
+      "text",
+      JSON.stringify({
+        editor: props.editor!,
+        sizeX: props.colEnd - props.colStart,
+        sizeY: props.rowEnd - props.rowStart,
+      } as Data)
+    );
     e.dataTransfer?.setDragImage((e.currentTarget as HTMLDivElement).parentElement!, 0, 0);
   };
 
@@ -31,7 +44,18 @@ export const GridCell: Component<Props> = (props) => {
   const onDrop = (e: DragEvent) => {
     (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "");
     const data = e.dataTransfer?.getData("text");
-    props.onEditorMoved(data!, props.rowStart, props.colStart);
+    if (!data) return;
+    const json = JSON.parse(data) as Data;
+    const rowEnd = props.rowStart + json.sizeY;
+    const colEnd = props.colStart + json.sizeX;
+
+    props.onEditorMoved(
+      json.editor,
+      props.rowStart,
+      props.colStart,
+      rowEnd < props.rowEnd ? props.rowEnd : rowEnd,
+      colEnd < props.colEnd ? props.colEnd : colEnd
+    );
   };
 
   const onDragEndEvent = (e: DragEvent) => {
@@ -47,12 +71,42 @@ export const GridCell: Component<Props> = (props) => {
       style={{ "grid-area": `${props.rowStart} / ${props.colStart} / ${props.rowEnd} / ${props.colEnd}` }}
     >
       <Show when={props.editorElm}>
-        <>
+        <div class="content">
+          {props.editorElm}
           <div class="dragger" draggable={true} onDragStart={onDragStart} />
-          <div class="sizer sizerX" />
-          <div class="sizer sizerY" />
-          <div class="content">{props.editorElm}</div>
-        </>
+          <div
+            class="sizer sizerRight_shrink"
+            onClick={(e) =>
+              props.onEditorMoved(props.editor!, props.rowStart, props.colStart, props.rowEnd, props.colEnd - 1)
+            }
+          >
+            -
+          </div>
+          <div
+            class="sizer sizerRight_expand"
+            onClick={(e) =>
+              props.onEditorMoved(props.editor!, props.rowStart, props.colStart, props.rowEnd, props.colEnd + 1)
+            }
+          >
+            +
+          </div>
+          <div
+            class="sizer sizerHeight_shrink"
+            onClick={(e) =>
+              props.onEditorMoved(props.editor!, props.rowStart, props.colStart, props.rowEnd - 1, props.colEnd)
+            }
+          >
+            -
+          </div>
+          <div
+            class="sizer sizerHeight_expand"
+            onClick={(e) =>
+              props.onEditorMoved(props.editor!, props.rowStart, props.colStart, props.rowEnd + 1, props.colEnd)
+            }
+          >
+            +
+          </div>
+        </div>
       </Show>
     </StyledContainer>
   );
@@ -61,7 +115,7 @@ export const GridCell: Component<Props> = (props) => {
 const StyledContainer = styled.div`
   height: 100%;
   width: 100%;
-  position: relative;
+  background: transparent;
 
   .content {
     height: 100%;
@@ -69,29 +123,57 @@ const StyledContainer = styled.div`
     overflow: auto;
     padding: 5px;
     box-sizing: border-box;
+    position: relative;
   }
 
   &[drop-active="true"] {
-    box-shadow: inset 0px 0px 0px 2px #00c;
+    background: #1e5ebf7f;
   }
 
   .sizer {
+    transition: 0.3s width, 0.3s height, 0.3s opacity;
     position: absolute;
-    width: 10px;
-    height: 10px;
+    width: 0px;
+    height: 0px;
     background: transparent;
+    cursor: pointer;
+    overflow: hidden;
+    color: #fff;
+    font-size: 12px;
+    text-align: center;
+    line-height: 12px;
+    border-radius: 50%;
+    opacity: 0;
   }
-  .sizerX {
+
+  .sizerRight_shrink {
     right: -0;
-    top: calc(50% - 5px);
+    top: calc(50% - 8px);
   }
-  .sizerY {
-    right: calc(50% - 5px);
+  .sizerRight_expand {
+    right: -0;
+    top: calc(50% + 8px);
+  }
+
+  .sizerHeight_shrink {
+    right: calc(50% + 8px);
     bottom: -0;
   }
-  &:hover .sizer {
+  .sizerHeight_expand {
+    right: calc(50% - 8px);
+    bottom: -0;
+  }
+
+  .content:hover .sizer {
     background: transparent;
     background: #3b5db4;
+    width: 12px;
+    height: 12px;
+    opacity: 1;
+  }
+
+  .content:hover .sizer:hover {
+    background: #213464;
   }
 
   .dragger {
@@ -101,10 +183,15 @@ const StyledContainer = styled.div`
     width: 100%;
     height: 5px;
     background: transparent;
+    cursor: move;
   }
 
-  &:hover .dragger {
+  .content:hover .dragger {
     background: #3b5db4;
+  }
+
+  .content:hover .dragger:hover {
+    background: #213464;
   }
 
   .card {
