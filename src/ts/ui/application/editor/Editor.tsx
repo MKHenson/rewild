@@ -48,25 +48,34 @@ interface IWorkspace {
   type: string;
   colStart: number;
   rowStart: number;
-  numCols: number;
-  numRows: number;
+  colEnd: number;
+  rowEnd: number;
 }
 
 interface ICell {
   index: number;
-  col: number;
-  row: number;
+  colStart: number;
+  rowStart: number;
+  colEnd: number;
+  rowEnd: number;
   editor?: string;
 }
 
-function createCells(workspace: IWorkspace[]): ICell[] {
+function createCells(workspaces: IWorkspace[]): ICell[] {
   const toRet: ICell[] = [];
   for (let y = 0; y < numRows; y++)
     for (let x = 0; x < numColumns; x++) {
       const index = y * numColumns + x;
 
-      const editor = workspace.find((editor) => editor.colStart === x + 1 && editor.rowStart === y + 1);
-      toRet.push({ row: y, col: x, index, editor: editor?.type });
+      const workspace = workspaces.find((editor) => editor.colStart === x + 1 && editor.rowStart === y + 1);
+      toRet.push({
+        rowStart: y + 1,
+        colStart: x + 1,
+        rowEnd: workspace ? (workspace.rowEnd <= y + 2 ? y + 2 : workspace.rowEnd) : y + 2,
+        colEnd: workspace ? (workspace.colEnd <= x + 2 ? x + 2 : workspace.colEnd) : x + 2,
+        index,
+        editor: workspace?.type,
+      });
     }
 
   return toRet;
@@ -79,16 +88,16 @@ export const Editor: Component<Props> = (props) => {
     {
       type: "properties",
       colStart: 1,
-      rowStart: 2,
-      numCols: 1,
-      numRows: 1,
+      rowStart: 3,
+      colEnd: 2,
+      rowEnd: 4,
     },
     {
       type: "tools",
-      colStart: 2,
-      rowStart: 2,
-      numCols: 1,
-      numRows: 1,
+      colStart: 3,
+      rowStart: 3,
+      colEnd: 2,
+      rowEnd: 4,
     },
   ]);
   const [cells, setCells] = createSignal<ICell[]>(createCells(workspace()));
@@ -108,22 +117,22 @@ export const Editor: Component<Props> = (props) => {
         {(cell, i) => (
           <GridCell
             index={cell.index}
-            rowStart={cell.row + 1}
-            rowEnd={cell.row + 2}
-            colStart={cell.col + 1}
-            colEnd={cell.col + 2}
+            rowStart={cell.rowStart}
+            rowEnd={cell.rowEnd}
+            colStart={cell.colStart}
+            colEnd={cell.colEnd}
             editor={cell.editor}
             editorElm={cell.editor ? mapped[cell.editor] : undefined}
-            onEditorMoved={(editor, row, col) =>
+            onEditorMoved={(editor, rowStart, colStart, rowEnd, colEnd) =>
               setWorkspace(
                 workspace().map((e) =>
                   e.type === editor
                     ? {
                         type: editor,
-                        colStart: col,
-                        rowStart: row,
-                        numCols: 1,
-                        numRows: 1,
+                        colStart,
+                        rowStart,
+                        colEnd,
+                        rowEnd,
                       }
                     : e
                 )
@@ -131,7 +140,7 @@ export const Editor: Component<Props> = (props) => {
             }
           />
         )}
-      </For>{" "}
+      </For>
     </StyledContainer>
   );
 };
