@@ -8,7 +8,7 @@ import { WasmManager } from "../../core/WasmManager";
 import { Pane3D } from "../common/Pane3D";
 import { MainMenu } from "./MainMenu";
 import { ApplicationEventType } from "../../../common/EventTypes";
-import { EditorSplash } from "./editor/EditorSplash";
+import { ProjectEditorPage } from "./project-editor/ProjectEditorPage";
 import { ErrorType, StartError } from "./StartError";
 import { Auth } from "./Auth";
 import { InGame } from "./InGame";
@@ -87,7 +87,7 @@ export const Application: Component<Props> = ({}) => {
             />
             <Route
               path="/editor/*"
-              element={<EditorSplash onQuit={onQuit} gameManager={gameManager!} eventManager={eventManager!} />}
+              element={<ProjectEditorPage onQuit={onQuit} gameManager={gameManager!} eventManager={eventManager!} />}
             />
           </>
         </Show>

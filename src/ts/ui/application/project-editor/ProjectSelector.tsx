@@ -5,7 +5,7 @@ import { Typography } from "../../common/Typography";
 import { StyledMaterialIcon } from "../../common/MaterialIcon";
 import { Popup } from "../../common/Popup";
 import { Card } from "../../common/Card";
-import { getProjects, addProject, removeProjects } from "./ProjectSelectorUtils";
+import { getProjects, addProject, removeProjects } from "./hooks/ProjectEditorAPI";
 import { IProject } from "models";
 import { Loading } from "../../common/Loading";
 import { NewProjectForm } from "./NewProjectForm";

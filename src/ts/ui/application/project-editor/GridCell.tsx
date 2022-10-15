@@ -6,7 +6,6 @@ interface Props {
   rowEnd: number;
   colStart: number;
   colEnd: number;
-  index: number;
   editorElm?: JSX.Element;
   editor?: string;
   onEditorMoved: (type: string, rowStart: number, colStart: number, rowEnd: number, colEnd: number) => void;
