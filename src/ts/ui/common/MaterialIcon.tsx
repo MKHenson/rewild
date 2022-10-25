@@ -8,6 +8,7 @@ interface Props {
   icon: IconType;
   size?: "s" | "m" | "l" | "xl";
   style?: JSX.CSSProperties;
+  onClick?: (e: MouseEvent) => void;
 }
 
 export const MaterialIcon: ParentComponent<Props> = (props) => {
@@ -23,7 +24,7 @@ export const MaterialIcon: ParentComponent<Props> = (props) => {
       : "md-24";
 
   return (
-    <StyledIcon style={props.style} class={`icon material-icons-sharp ${size}`}>
+    <StyledIcon onClick={props.onClick} style={props.style} class={`icon material-icons-sharp ${size}`}>
       {props.icon}
     </StyledIcon>
   );
