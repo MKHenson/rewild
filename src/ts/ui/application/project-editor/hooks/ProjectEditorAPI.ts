@@ -19,6 +19,7 @@ export async function addProject(token: Partial<IProject>) {
   if (!token) return;
 
   token.workspace = defaultWorkspace();
+  token.containers = [];
 
   const docRef = await addDoc(dbs.projects, token);
   return docRef.id;

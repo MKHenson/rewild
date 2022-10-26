@@ -1,11 +1,18 @@
 declare module "models" {
-  export type EditorType = "properties" | "ribbon";
+  export type EditorType = "properties" | "ribbon" | "scene-graph";
 
   export interface IProject {
     id?: string;
     name: string;
     description: string;
     workspace: IWorkspace;
+    containers: IContainer[];
+  }
+
+  export interface IContainer {
+    id?: string;
+    name: string;
+    activeOnStartup: boolean;
   }
 
   export interface IWorkspace {

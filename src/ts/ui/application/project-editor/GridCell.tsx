@@ -120,7 +120,7 @@ const StyledContainer = styled.div`
     height: 100%;
     width: 100%;
     overflow: auto;
-    padding: 5px;
+    padding: 0 5px 5px 5px;
     box-sizing: border-box;
     position: relative;
   }
@@ -143,6 +143,11 @@ const StyledContainer = styled.div`
     line-height: 12px;
     border-radius: 50%;
     opacity: 0;
+    transform: scale(1);
+  }
+
+  .sizer:active {
+    transform: scale(0.8);
   }
 
   .sizerRight_shrink {

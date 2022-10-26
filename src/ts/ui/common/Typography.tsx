@@ -7,11 +7,12 @@ export type TypographyAlign = "center" | "inherit" | "justify" | "left" | "right
 interface Props {
   variant: TypographyVariant;
   style?: JSX.CSSProperties;
+  onClick?: (e: MouseEvent) => void;
 }
 
 export const Typography: ParentComponent<Props> = (props) => {
   return (
-    <StyledTypography class={`typography ${props.variant}`} style={props.style}>
+    <StyledTypography class={`typography ${props.variant}`} onClick={props.onClick} style={props.style}>
       {props.children}
     </StyledTypography>
   );

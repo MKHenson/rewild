@@ -6,6 +6,7 @@ export type ButtonColor = "primary" | "secondary" | "error";
 
 interface Props {
   icon: IconType;
+  class?: string;
   size?: "s" | "m" | "l" | "xl";
   style?: JSX.CSSProperties;
   onClick?: (e: MouseEvent) => void;
@@ -24,7 +25,11 @@ export const MaterialIcon: ParentComponent<Props> = (props) => {
       : "md-24";
 
   return (
-    <StyledIcon onClick={props.onClick} style={props.style} class={`icon material-icons-sharp ${size}`}>
+    <StyledIcon
+      onClick={props.onClick}
+      style={props.style}
+      class={`icon material-icons-sharp ${size} ${props.class || ""}`}
+    >
       {props.icon}
     </StyledIcon>
   );
