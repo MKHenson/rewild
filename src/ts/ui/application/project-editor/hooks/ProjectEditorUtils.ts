@@ -15,7 +15,14 @@ export const defaultWorkspace = (): IWorkspace => {
         colStart: 5,
         colEnd: 6,
         rowStart: 2,
-        rowEnd: 4,
+        rowEnd: 3,
+      },
+      {
+        editor: "scene-graph",
+        colStart: 5,
+        colEnd: 6,
+        rowStart: 3,
+        rowEnd: 6,
       },
     ],
   };

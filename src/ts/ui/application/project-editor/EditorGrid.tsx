@@ -8,6 +8,7 @@ import { Properties } from "./editors/Properties";
 import { EditorType, IWorkspaceCell, IProject } from "models";
 import { Loading } from "../../common/Loading";
 import { updateProject } from "./hooks/ProjectEditorAPI";
+import { SceneGraph } from "./editors/SceneGraph";
 
 interface Props {
   onHome: () => void;
@@ -64,6 +65,8 @@ export const EditorGrid: Component<Props> = (props) => {
 
   const mapped = (type: EditorType) => {
     if (type === "properties") return <Properties project={projectResource} />;
+    if (type === "scene-graph")
+      return <SceneGraph project={project()} onChange={(token) => updateProjectState(token)} />;
     if (type === "ribbon")
       return (
         <RibbonButtons mutating={mutating()} projectDirty={projectDirty()} onHome={props.onHome} onSave={onSave} />

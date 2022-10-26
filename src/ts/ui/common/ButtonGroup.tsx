@@ -12,6 +12,13 @@ export const ButtonGroup: ParentComponent<Props> = (props) => {
 const StyledButtonGroup = styled.div`
   display: inline-flex;
 
+  button {
+    transform: scale(1);
+  }
+  button:active {
+    transform: scale(0.8);
+  }
+
   > button:not(:last-of-type) {
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
