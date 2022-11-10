@@ -1,13 +1,13 @@
-import { Component, createEffect, createSignal, Show } from "solid-js";
+import { Component, createEffect, createSignal, onMount, onCleanup, Show } from "solid-js";
 import { styled } from "solid-styled-components";
-import { IContainer, IProject } from "models";
+import { IResource, IProject, IContainer } from "models";
 import { Card } from "../../../common/Card";
 import { Typography } from "../../../common/Typography";
 import { Loading } from "../../../common/Loading";
 import { ITreeNode, Tree } from "../../../common/Tree";
 import { Button } from "../../../common/Button";
 import { ButtonGroup } from "../../../common/ButtonGroup";
-import { MaterialIcon } from "../../../common/MaterialIcon";
+import { StyledMaterialIcon } from "../../../common/MaterialIcon";
 
 interface Props {
   project?: IProject;
@@ -15,15 +15,80 @@ interface Props {
 }
 
 export const SceneGraph: Component<Props> = (props) => {
-  const [selectedNodes, setSelectedNodes] = createSignal<ITreeNode<IContainer>[]>([]);
-  const [nodes, setNodes] = createSignal<ITreeNode<IContainer>[]>([]);
+  const [selectedNodes, setSelectedNodes] = createSignal<ITreeNode<IResource>[]>([]);
+  const [nodes, setNodes] = createSignal<ITreeNode<IResource>[]>([]);
+  let activeNode: HTMLDivElement | null = null;
 
   createEffect(() => {
     if (props.project)
-      setNodes(
-        props.project.containers.map((container) => ({ name: container.name, resource: container } as ITreeNode))
-      );
+      setNodes([
+        {
+          name: "Containers",
+          canSelect: false,
+          icon: <StyledMaterialIcon icon="group_work" size="s" />,
+          children: props.project.containers.map(
+            (container) =>
+              ({
+                name: container.name,
+                icon: <StyledMaterialIcon icon="label" size="xs" />,
+                canSelect: true,
+                resource: container,
+                canRename: true,
+              } as ITreeNode)
+          ),
+        },
+      ]);
   });
+
+  onMount(() => {
+    document.addEventListener("keydown", onKeyUp);
+  });
+
+  onCleanup(() => {
+    document.removeEventListener("keydown", onKeyUp);
+    handleNodeDeactivate();
+  });
+
+  const handleNodeDeactivate = () => {
+    if (!activeNode) return;
+
+    activeNode.removeEventListener("blur", handleNodeDeactivate);
+    activeNode.contentEditable = "false";
+    activeNode.classList.remove("editting");
+    const selected = selectedNodes();
+    const newName = (activeNode.textContent || "").trim() || (selected[0].resource as IContainer).name;
+
+    props.onChange({
+      ...props.project!,
+      containers: props.project!.containers.map((c) =>
+        c === selected[0].resource ? { ...(selected[0].resource as IContainer), name: newName } : c
+      ),
+    });
+  };
+
+  const activateNodeEdit = (node: HTMLDivElement) => {
+    node.contentEditable = "true";
+    node.classList.add("editting");
+    node.focus();
+    activeNode = node;
+
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    node.addEventListener("blur", handleNodeDeactivate);
+  };
+
+  const onKeyUp = (e: KeyboardEvent) => {
+    const node = document.querySelector(".selected-treenode .treenode-text") as HTMLDivElement;
+    if (e.key === "F2" && selectedNodes().length === 1 && selectedNodes()[0].canRename && node) {
+      activateNodeEdit(node);
+    } else if (activeNode && e.key === "Enter") {
+      handleNodeDeactivate();
+    }
+  };
 
   const onContainerAdd = () => {
     const newContainer = {
@@ -63,10 +128,10 @@ export const SceneGraph: Component<Props> = (props) => {
         <div class="graph-actions">
           <ButtonGroup>
             <Button variant="text" onClick={onContainerAdd}>
-              <MaterialIcon icon="add_circle" size="s" />
+              <StyledMaterialIcon icon="add_circle" size="s" />
             </Button>
             <Button variant="text" onClick={onContainerRemove}>
-              <MaterialIcon icon="delete" size="s" />
+              <StyledMaterialIcon icon="delete" size="s" />
             </Button>
           </ButtonGroup>
         </div>
@@ -89,5 +154,11 @@ const StyleSceneGraph = styled.div`
   .nodes {
     max-height: 100%;
     overflow: hidden;
+  }
+
+  .selected-treenode .treenode-text.editting {
+    border: 1px dashed grey;
+    outline: none;
+    padding: 2px 4px;
   }
 `;

@@ -9,6 +9,10 @@ declare module "models" {
     containers: IContainer[];
   }
 
+  export interface IResource {
+    id?: string;
+  }
+
   export interface IContainer {
     id?: string;
     name: string;

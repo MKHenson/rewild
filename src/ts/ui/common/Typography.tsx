@@ -4,7 +4,7 @@ import { ParentComponent, JSX } from "solid-js";
 export type TypographyVariant = "h1" | "h2" | "h3" | "h4" | "body1" | "body2" | "label" | "light";
 export type TypographyAlign = "center" | "inherit" | "justify" | "left" | "right";
 
-interface Props {
+interface Props extends JSX.HTMLAttributes<HTMLDivElement> {
   variant: TypographyVariant;
   style?: JSX.CSSProperties;
   onClick?: (e: MouseEvent) => void;
@@ -12,7 +12,12 @@ interface Props {
 
 export const Typography: ParentComponent<Props> = (props) => {
   return (
-    <StyledTypography class={`typography ${props.variant}`} onClick={props.onClick} style={props.style}>
+    <StyledTypography
+      {...props}
+      class={`typography ${props.variant} ${props.class || ""}`}
+      onClick={props.onClick}
+      style={props.style}
+    >
       {props.children}
     </StyledTypography>
   );
