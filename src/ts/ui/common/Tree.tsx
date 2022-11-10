@@ -1,12 +1,15 @@
 import { styled } from "solid-styled-components";
-import { createSignal, For, ParentComponent, Show } from "solid-js";
+import { createSignal, For, JSX, ParentComponent, Show } from "solid-js";
 import { Typography } from "./Typography";
 import { MaterialIcon } from "./MaterialIcon";
 
 export type ITreeNode<Resource extends any = any> = {
   name: string;
+  icon?: JSX.Element;
+  canSelect?: boolean;
+  canRename?: boolean;
   children: ITreeNode<Resource>[];
-  resource: Resource;
+  resource?: Resource;
 };
 
 interface TreeProps {
@@ -41,6 +44,8 @@ export const TreeNode: ParentComponent<NodeProps> = (props) => {
   };
 
   const handleNodeClick = (e: MouseEvent) => {
+    if (!props.node.canSelect) return;
+
     const isSelected = props.selectedNodes.includes(props.node);
     if (e.shiftKey) {
       if (isSelected) props.onSelectionChanged(props.selectedNodes.filter((node) => node !== props.node));
@@ -50,14 +55,18 @@ export const TreeNode: ParentComponent<NodeProps> = (props) => {
 
   return (
     <StyledTreenode class="treenode">
-      <StyledTreenodeContent class={props.selectedNodes.includes(props.node) ? "selected" : ""}>
+      <StyledTreenodeContent class={props.selectedNodes.includes(props.node) ? "selected-treenode" : ""}>
         <Show when={props.node.children && props.node.children.length}>
-          <Show when={expanded()} fallback={<MaterialIcon onClick={handleExpandedClick} icon="add" size="s" />}>
-            <MaterialIcon onClick={handleExpandedClick} icon="remove" size="s" />
+          <Show
+            when={expanded()}
+            fallback={<MaterialIcon class="expand-icon" onClick={handleExpandedClick} icon="arrow_drop_up" size="s" />}
+          >
+            <MaterialIcon class="expand-icon" onClick={handleExpandedClick} icon="arrow_drop_down" size="s" />
           </Show>
         </Show>
         <Typography variant="body2" onClick={handleNodeClick}>
-          {props.node.name}
+          {props.node.icon && <span class="node-icon">{props.node.icon}</span>}
+          <span class="treenode-text">{props.node.name}</span>
         </Typography>
       </StyledTreenodeContent>
       <Show when={expanded()}>
@@ -90,14 +99,19 @@ const StyledTreenodeContent = styled.div`
   cursor: pointer;
   user-select: none;
 
-  &.selected {
+  .node-icon {
+    vertical-align: middle;
+    margin: 0 4px 0 0;
+  }
+
+  &.selected-treenode {
     .body2 {
       color: ${(e) => e.theme?.colors.primary400};
       font-weight: 500;
     }
   }
 
-  .icon {
+  .expand-icon {
     vertical-align: middle;
     margin: 0 4px 0 0;
   }
