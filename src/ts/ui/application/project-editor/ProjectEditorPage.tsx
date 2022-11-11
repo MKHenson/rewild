@@ -1,7 +1,7 @@
 import { Component, onMount } from "solid-js";
 import { styled } from "solid-styled-components";
 import { Routes, Route, useNavigate } from "@solidjs/router";
-import { EditorGrid } from "./EditorGrid";
+import { Editor } from "./Editor";
 import { GameManager } from "../../../core/GameManager";
 import { UIEventManager } from "../../../core/UIEventManager";
 import { ApplicationEventType } from "../../../../common/EventTypes";
@@ -30,7 +30,7 @@ export const ProjectEditorPage: Component<Props> = (props) => {
           path="/"
           element={<ProjectSelector onBack={onHomeClick} open onOpen={(uid) => navigate(`/editor/${uid}`)} />}
         />
-        <Route path="/:project" element={<EditorGrid onHome={onHomeClick} />} />
+        <Route path="/:project" element={<Editor onHome={onHomeClick} />} />
       </Routes>
     </StyledContainer>
   );

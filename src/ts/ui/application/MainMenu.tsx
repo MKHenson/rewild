@@ -4,7 +4,7 @@ import { Button } from "../common/Button";
 import { Typography } from "../common/Typography";
 import { MaterialIcon } from "../common/MaterialIcon";
 import { styled } from "solid-styled-components";
-import { useAuth } from "../providers/AuthProvider";
+import { useAuth } from "../AuthProvider";
 import { Loading } from "../common/Loading";
 
 type Props = {

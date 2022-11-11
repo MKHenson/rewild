@@ -1,6 +1,6 @@
 import { createSignal, createContext, useContext, Component, Accessor, ParentProps } from "solid-js";
 import { onAuthStateChanged, User, signOut, signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../../firebase";
+import { auth } from "../../firebase";
 
 const AuthContext = createContext<AuthContext>();
 

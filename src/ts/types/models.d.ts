@@ -10,11 +10,11 @@ declare module "models" {
   }
 
   export interface IResource {
-    id?: string;
+    id: string;
+    type: "container";
   }
 
-  export interface IContainer {
-    id?: string;
+  export interface IContainer extends IResource {
     name: string;
     activeOnStartup: boolean;
   }

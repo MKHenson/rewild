@@ -1,6 +1,7 @@
-import { IWorkspace } from "models";
+import { IWorkspace, IProject } from "models";
+import { createUUID } from "../../../utils";
 
-export const defaultWorkspace = (): IWorkspace => {
+export const createDefaultWorkspace = (): IWorkspace => {
   return {
     cells: [
       {
@@ -27,3 +28,15 @@ export const defaultWorkspace = (): IWorkspace => {
     ],
   };
 };
+
+export function createProject() {
+  const project = {
+    id: createUUID(),
+    name: "New Project",
+    containers: [],
+    description: "",
+    workspace: createDefaultWorkspace(),
+  } as IProject;
+
+  return project;
+}

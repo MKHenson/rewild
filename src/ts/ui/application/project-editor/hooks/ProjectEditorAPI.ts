@@ -1,7 +1,6 @@
 import { IProject } from "models";
 import { getDocs, addDoc, deleteDoc, updateDoc, getDoc, doc } from "firebase/firestore";
 import { dbs } from "../../../../../firebase";
-import { defaultWorkspace } from "./ProjectEditorUtils";
 
 export async function getProjects() {
   const querySnapshot = await getDocs(dbs.projects);
@@ -17,10 +16,6 @@ export async function getProject(id: string) {
 
 export async function addProject(token: Partial<IProject>) {
   if (!token) return;
-
-  token.workspace = defaultWorkspace();
-  token.containers = [];
-
   const docRef = await addDoc(dbs.projects, token);
   return docRef.id;
 }

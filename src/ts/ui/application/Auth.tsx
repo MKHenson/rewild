@@ -4,7 +4,7 @@ import { authUI } from "../../../firebase";
 import { EmailAuthProvider, GoogleAuthProvider } from "firebase/auth";
 import { Avatar } from "../common/Avatar";
 import { Popup } from "../common/Popup";
-import { useAuth } from "../providers/AuthProvider";
+import { useAuth } from "../AuthProvider";
 
 type Props = {};
 

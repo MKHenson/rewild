@@ -1,11 +1,12 @@
 import { styled } from "solid-styled-components";
-import { createSignal, For, JSX, ParentComponent, Show } from "solid-js";
+import { createSignal, For, ParentComponent, Show } from "solid-js";
 import { Typography } from "./Typography";
-import { MaterialIcon } from "./MaterialIcon";
+import { IconType, MaterialIcon, StyledMaterialIcon } from "./MaterialIcon";
 
 export type ITreeNode<Resource extends any = any> = {
   name: string;
-  icon?: JSX.Element;
+  icon?: IconType;
+  iconSize?: "s" | "xs";
   canSelect?: boolean;
   canRename?: boolean;
   children: ITreeNode<Resource>[];
@@ -65,7 +66,11 @@ export const TreeNode: ParentComponent<NodeProps> = (props) => {
           </Show>
         </Show>
         <Typography variant="body2" onClick={handleNodeClick}>
-          {props.node.icon && <span class="node-icon">{props.node.icon}</span>}
+          {props.node.icon && (
+            <span class="node-icon">
+              <StyledMaterialIcon icon={props.node.icon} size={props.node.iconSize || "s"} />
+            </span>
+          )}
           <span class="treenode-text">{props.node.name}</span>
         </Typography>
       </StyledTreenodeContent>
