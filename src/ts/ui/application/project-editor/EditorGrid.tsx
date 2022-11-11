@@ -1,15 +1,13 @@
-import { Component, createEffect, createResource, createSignal, For, Show } from "solid-js";
-import { useParams } from "@solidjs/router";
+import { Component, createEffect, createSignal, For, Show } from "solid-js";
+import { produce } from "solid-js/store";
 import { styled } from "solid-styled-components";
-import { getProject } from "./hooks/ProjectEditorAPI";
 import { GridCell } from "./GridCell";
 import { RibbonButtons } from "./editors/RibbonButtons";
 import { Properties } from "./editors/Properties";
-import { EditorType, IWorkspaceCell, IProject } from "models";
+import { EditorType, IWorkspaceCell } from "models";
 import { Loading } from "../../common/Loading";
-import { updateProject } from "./hooks/ProjectEditorAPI";
 import { SceneGraph } from "./editors/SceneGraph";
-
+import { useEditor } from "./EditorProvider";
 interface Props {
   onHome: () => void;
 }
@@ -21,7 +19,7 @@ function createCells(workspaceCells: IWorkspaceCell[]): IWorkspaceCell[] {
   const toRet: IWorkspaceCell[] = [];
   for (let y = 0; y < numRows; y++)
     for (let x = 0; x < numColumns; x++) {
-      const workspace = workspaceCells.find((editor) => editor.colStart === x + 1 && editor.rowStart === y + 1);
+      const workspace = workspaceCells.find((cell) => cell.colStart === x + 1 && cell.rowStart === y + 1);
       toRet.push({
         rowStart: y + 1,
         colStart: x + 1,
@@ -35,77 +33,52 @@ function createCells(workspaceCells: IWorkspaceCell[]): IWorkspaceCell[] {
 }
 
 export const EditorGrid: Component<Props> = (props) => {
-  const { project: projectId } = useParams<{ project: string }>();
-  const [projectResource] = createResource(projectId, getProject);
   const [cells, setCells] = createSignal<IWorkspaceCell[]>([]);
-  const [project, setProject] = createSignal<IProject>();
-  const [projectDirty, setProjectDirty] = createSignal(false);
-  const [mutating, setMutating] = createSignal(false);
-
-  const updateProjectState = (token: IProject) => {
-    const updatedProject = token;
-    setProject(updatedProject);
-    setCells(createCells(updatedProject.workspace.cells));
-    setProjectDirty(true);
-  };
+  const { project, setProjectStore, setProjectDirty } = useEditor();
 
   createEffect(() => {
-    if (projectResource()) {
-      updateProjectState(projectResource()!);
-      setProjectDirty(false);
-    }
+    if (project.workspace) setCells(createCells(project.workspace.cells));
   });
 
-  const onSave = async () => {
-    setMutating(true);
-    await updateProject(project()!);
-    setProjectDirty(false);
-    setMutating(false);
-  };
-
-  const mapped = (type: EditorType) => {
-    if (type === "properties") return <Properties project={projectResource} />;
-    if (type === "scene-graph")
-      return <SceneGraph project={project()} onChange={(token) => updateProjectState(token)} />;
-    if (type === "ribbon")
-      return (
-        <RibbonButtons mutating={mutating()} projectDirty={projectDirty()} onHome={props.onHome} onSave={onSave} />
-      );
+  const mapped = (type?: EditorType) => {
+    if (!type) return null;
+    if (type === "properties") return <Properties />;
+    if (type === "scene-graph") return <SceneGraph />;
+    if (type === "ribbon") return <RibbonButtons onHome={props.onHome} />;
     return null;
   };
 
   return (
     <StyledContainer>
-      <Show when={project()} fallback={<Loading />}>
+      <Show when={project} fallback={<Loading />}>
         <For each={cells()}>
-          {(cell, i) => (
-            <GridCell
-              rowStart={cell.rowStart}
-              rowEnd={cell.rowEnd}
-              colStart={cell.colStart}
-              colEnd={cell.colEnd}
-              editor={cell.editor}
-              editorElm={cell.editor ? mapped(cell.editor) : undefined}
-              onEditorMoved={(editor, rowStart, colStart, rowEnd, colEnd) =>
-                updateProjectState({
-                  ...project()!,
-                  workspace: {
-                    cells: project()!.workspace.cells.map((e) =>
-                      e.editor === editor
-                        ? ({
-                            editor,
-                            colStart,
-                            rowStart,
-                            colEnd,
-                            rowEnd,
-                          } as IWorkspaceCell)
-                        : e
-                    ),
-                  },
-                })
-              }
-            />
-          )}
+          {(cell, i) => {
+            const editor = mapped(cell.editor);
+            return (
+              <GridCell
+                rowStart={cell.rowStart}
+                rowEnd={cell.rowEnd}
+                colStart={cell.colStart}
+                colEnd={cell.colEnd}
+                editor={cell.editor}
+                hasElement={!!editor}
+                editorElm={editor}
+                onEditorMoved={(editor, rowStart, colStart, rowEnd, colEnd) => {
+                  setProjectDirty(true);
+                  setProjectStore(
+                    produce((state) => {
+                      const cell = state.workspace!.cells.find((c) => c.editor === editor)!;
+                      cell.editor = editor;
+                      cell.colStart = colStart;
+                      cell.rowStart = rowStart;
+                      cell.rowEnd = rowEnd;
+                      cell.colEnd = colEnd;
+                    })
+                  );
+                }}
+              />
+            );
+          }}
         </For>
       </Show>
     </StyledContainer>

@@ -9,6 +9,7 @@ import { getProjects, addProject, removeProjects } from "./hooks/ProjectEditorAP
 import { IProject } from "models";
 import { Loading } from "../../common/Loading";
 import { NewProjectForm } from "./NewProjectForm";
+import { createProject } from "./factories/projectFactory";
 
 interface Props {
   open: boolean;
@@ -61,7 +62,7 @@ export const ProjectSelector: Component<Props> = (props) => {
   };
 
   const onNewProject = () => {
-    setNewProject({ name: "New Project" });
+    setNewProject(createProject());
     setSelectedProject(undefined);
   };
 

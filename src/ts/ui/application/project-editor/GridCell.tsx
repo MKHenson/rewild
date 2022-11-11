@@ -1,3 +1,4 @@
+import { EditorType } from "models";
 import { JSX, Component, Show } from "solid-js";
 import { styled } from "solid-styled-components";
 
@@ -6,9 +7,10 @@ interface Props {
   rowEnd: number;
   colStart: number;
   colEnd: number;
+  hasElement?: boolean;
   editorElm?: JSX.Element;
-  editor?: string;
-  onEditorMoved: (type: string, rowStart: number, colStart: number, rowEnd: number, colEnd: number) => void;
+  editor?: EditorType;
+  onEditorMoved: (type: EditorType, rowStart: number, colStart: number, rowEnd: number, colEnd: number) => void;
 }
 
 type Data = {
@@ -49,7 +51,7 @@ export const GridCell: Component<Props> = (props) => {
     const colEnd = props.colStart + json.sizeX;
 
     props.onEditorMoved(
-      json.editor,
+      json.editor as EditorType,
       props.rowStart,
       props.colStart,
       rowEnd < props.rowEnd ? props.rowEnd : rowEnd,
@@ -69,7 +71,7 @@ export const GridCell: Component<Props> = (props) => {
       onDrop={onDrop}
       style={{ "grid-area": `${props.rowStart} / ${props.colStart} / ${props.rowEnd} / ${props.colEnd}` }}
     >
-      <Show when={props.editorElm}>
+      <Show when={props.hasElement}>
         <div class="content">
           {props.editorElm}
           <div class="dragger" draggable={true} onDragStart={onDragStart} />
