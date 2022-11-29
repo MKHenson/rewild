@@ -11,7 +11,7 @@ interface Props {
 }
 
 export const RibbonButtons: Component<Props> = (props) => {
-  const { save, projectDirty, loading } = useEditor();
+  const { save, publish, dirty, loading } = useEditor();
   return (
     <StyledContainer>
       <Card>
@@ -19,8 +19,11 @@ export const RibbonButtons: Component<Props> = (props) => {
           <Button variant="text" onClick={props.onHome} disabled={loading()}>
             <StyledMaterialIcon icon="home" size="s" />
           </Button>
-          <Button variant="text" disabled={!projectDirty() || loading()} onClick={save}>
+          <Button variant="text" disabled={!dirty() || loading()} onClick={save}>
             <StyledMaterialIcon icon="save" size="s" />
+          </Button>
+          <Button variant="text" disabled={loading()} onClick={publish}>
+            <StyledMaterialIcon icon="file_upload" size="s" />
           </Button>
         </ButtonGroup>
       </Card>

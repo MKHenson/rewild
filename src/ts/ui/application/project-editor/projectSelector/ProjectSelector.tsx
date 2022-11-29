@@ -1,15 +1,15 @@
-import { Component, createResource, createSignal, For, Show } from "solid-js";
+import { Component, createSignal, For, onMount, Show } from "solid-js";
 import { styled } from "solid-styled-components";
-import { Button } from "../../common/Button";
-import { Typography } from "../../common/Typography";
-import { StyledMaterialIcon } from "../../common/MaterialIcon";
-import { Popup } from "../../common/Popup";
-import { Card } from "../../common/Card";
-import { getProjects, addProject, removeProjects } from "./hooks/ProjectEditorAPI";
 import { IProject } from "models";
-import { Loading } from "../../common/Loading";
-import { NewProjectForm } from "./NewProjectForm";
-import { createProject } from "./factories/projectFactory";
+import { Button } from "../../../common/Button";
+import { Typography } from "../../../common/Typography";
+import { StyledMaterialIcon } from "../../../common/MaterialIcon";
+import { Popup } from "../../../common/Popup";
+import { Card } from "../../../common/Card";
+import { Loading } from "../../../common/Loading";
+import { useProjects } from "./useProjects";
+import { NewProjectForm } from "../NewProjectForm";
+import { createProject } from "./ProjectSelectorUtils";
 
 interface Props {
   open: boolean;
@@ -18,37 +18,21 @@ interface Props {
 }
 
 export const ProjectSelector: Component<Props> = (props) => {
-  const [newProject, setNewProject] = createSignal<Partial<IProject | null>>(null);
-  const [mutating, setMutating] = createSignal(false);
-  const [mutationError, setMutationError] = createSignal("");
+  const [newProject, setNewProject] = createSignal<Partial<IProject> | null>(null);
   const [selectedProject, setSelectedProject] = createSignal<IProject>();
-  const [projectsResource, { refetch }] = createResource(getProjects);
+  const { loading, error, addProject, projects, getProjects, removeProjects } = useProjects();
+
+  onMount(async () => {
+    await getProjects();
+  });
 
   const onCreate = async () => {
-    setMutating(true);
-    setMutationError("");
-    try {
-      await addProject(newProject()!);
-      setNewProject(null);
-      setMutating(false);
-      refetch();
-    } catch (err: any) {
-      setMutationError(err.toString());
-      setMutating(false);
-    }
+    await addProject(newProject()!);
+    setNewProject(null);
   };
 
   const onDelete = async () => {
-    setMutating(true);
-    setMutationError("");
-    try {
-      await removeProjects(selectedProject()!.id!);
-      setMutating(false);
-      refetch();
-    } catch (err: any) {
-      setMutationError(err.toString());
-      setMutating(false);
-    }
+    await removeProjects(selectedProject()!.id!);
   };
 
   const onBack = () => {
@@ -77,11 +61,9 @@ export const ProjectSelector: Component<Props> = (props) => {
         </Typography>
       </Card>
 
-      <Show when={projectsResource.loading || projectsResource.error}>
-        {projectsResource.error ? projectsResource.error.toString() : <Loading />}
-      </Show>
-      <Show when={!projectsResource.loading}>
-        <For each={projectsResource()}>
+      <Show when={loading() || error()}>{error() ? error() : <Loading />}</Show>
+      <Show when={!loading()}>
+        <For each={projects()}>
           {(item) => (
             <Card button raised onClick={(e) => setSelectedProject(item)} pushed={selectedProject()?.id === item.id}>
               <Typography variant="h4">{item.name}</Typography>
@@ -110,7 +92,7 @@ export const ProjectSelector: Component<Props> = (props) => {
         <StyledProjects>
           <Show when={!!newProject()} fallback={projectList}>
             <NewProjectForm project={newProject()} onChange={(project) => setNewProject(project)} />
-            <Show when={!!mutationError()}>{mutationError()}</Show>
+            <Show when={!!error()}>{error()}</Show>
           </Show>
         </StyledProjects>
 
@@ -135,7 +117,7 @@ export const ProjectSelector: Component<Props> = (props) => {
           </Show>
 
           <Show when={!!newProject()}>
-            <Button onClick={onCreate} fullWidth disabled={mutating() || !isProjectValid()}>
+            <Button onClick={onCreate} fullWidth disabled={loading() || !isProjectValid()}>
               Create Project
             </Button>
           </Show>

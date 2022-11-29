@@ -4,7 +4,8 @@ import { getAuth } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { auth as UIAuth } from "firebaseui";
 import { collection, QueryDocumentSnapshot, DocumentData, SnapshotOptions } from "firebase/firestore";
-import { IProject } from "models";
+import { IProject, ILevel } from "models";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -31,9 +32,11 @@ export const analytics = getAnalytics(app);
 export const auth = getAuth(app);
 export const authUI = new UIAuth.AuthUI(auth);
 export const db = getFirestore(app);
+export const functions = getFunctions(app);
 
 if (location.hostname === "127.0.0.1") {
   connectFirestoreEmulator(db, "localhost", 8080);
+  connectFunctionsEmulator(functions, "localhost", 5002);
 }
 
 const converter = <T>() => ({
@@ -43,4 +46,5 @@ const converter = <T>() => ({
 
 export const dbs = {
   projects: collection(db, "projects").withConverter<IProject>(converter<IProject>()),
+  levels: collection(db, "levels").withConverter<ILevel>(converter<ILevel>()),
 };
