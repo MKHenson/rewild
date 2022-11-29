@@ -5,6 +5,13 @@ export const createDefaultWorkspace = (): IWorkspace => {
   return {
     cells: [
       {
+        editor: "project-settings",
+        colStart: 1,
+        colEnd: 2,
+        rowStart: 2,
+        rowEnd: 5,
+      },
+      {
         editor: "ribbon",
         colStart: 3,
         colEnd: 4,
@@ -36,7 +43,7 @@ export function createProject() {
     containers: [],
     description: "",
     workspace: createDefaultWorkspace(),
-  } as IProject;
+  } as Partial<IProject>;
 
   return project;
 }

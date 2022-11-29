@@ -10,7 +10,7 @@ import { ButtonGroup } from "../../../common/ButtonGroup";
 import { StyledMaterialIcon } from "../../../common/MaterialIcon";
 import { useEditor } from "../EditorProvider";
 import { produce } from "solid-js/store";
-import { createContainer } from "../factories/containerFactory";
+import { createUUID } from "src/ts/ui/utils";
 
 interface Props {}
 
@@ -33,6 +33,17 @@ function buildTree(project: IProject) {
       ),
     } as ITreeNode,
   ];
+}
+
+export function createContainer() {
+  const newContainer = {
+    id: createUUID(),
+    name: `New Container`,
+    activeOnStartup: true,
+    type: "container",
+  } as IContainer;
+
+  return newContainer;
 }
 
 export const SceneGraph: Component<Props> = (props) => {

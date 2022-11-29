@@ -1,11 +1,21 @@
 declare module "models" {
-  export type EditorType = "properties" | "ribbon" | "scene-graph";
+  export type EditorType = "properties" | "ribbon" | "scene-graph" | "project-settings";
+  import type { Timestamp } from "firebase/firestore";
 
   export interface IProject {
     id?: string;
     name: string;
     description: string;
     workspace: IWorkspace;
+    containers: IContainer[];
+    created: Timestamp;
+    lastModified: Timestamp;
+  }
+
+  export interface ILevel {
+    id?: string;
+    project: string;
+    created: Timestamp;
     containers: IContainer[];
   }
 

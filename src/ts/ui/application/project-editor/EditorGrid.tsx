@@ -8,6 +8,7 @@ import { EditorType, IWorkspaceCell } from "models";
 import { Loading } from "../../common/Loading";
 import { SceneGraph } from "./editors/SceneGraph";
 import { useEditor } from "./EditorProvider";
+import { ProjectSettings } from "./editors/ProjectSettings";
 interface Props {
   onHome: () => void;
 }
@@ -34,7 +35,7 @@ function createCells(workspaceCells: IWorkspaceCell[]): IWorkspaceCell[] {
 
 export const EditorGrid: Component<Props> = (props) => {
   const [cells, setCells] = createSignal<IWorkspaceCell[]>([]);
-  const { project, setProjectStore, setProjectDirty } = useEditor();
+  const { project, setProjectStore, setDirty } = useEditor();
 
   createEffect(() => {
     if (project.workspace) setCells(createCells(project.workspace.cells));
@@ -44,6 +45,7 @@ export const EditorGrid: Component<Props> = (props) => {
     if (!type) return null;
     if (type === "properties") return <Properties />;
     if (type === "scene-graph") return <SceneGraph />;
+    if (type === "project-settings") return <ProjectSettings />;
     if (type === "ribbon") return <RibbonButtons onHome={props.onHome} />;
     return null;
   };
@@ -64,7 +66,7 @@ export const EditorGrid: Component<Props> = (props) => {
                 hasElement={!!editor}
                 editorElm={editor}
                 onEditorMoved={(editor, rowStart, colStart, rowEnd, colEnd) => {
-                  setProjectDirty(true);
+                  setDirty(true);
                   setProjectStore(
                     produce((state) => {
                       const cell = state.workspace!.cells.find((c) => c.editor === editor)!;

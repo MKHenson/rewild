@@ -1,7 +1,5 @@
 import {
   createSignal,
-  createResource,
-  Resource,
   createContext,
   useContext,
   Component,
@@ -10,21 +8,23 @@ import {
   createEffect,
   Setter,
 } from "solid-js";
-import { createStore, SetStoreFunction } from "solid-js/store";
-import { IProject, IResource } from "models";
-import { getProject, updateProject } from "./hooks/ProjectEditorAPI";
+import { SetStoreFunction } from "solid-js/store";
+import { ILevel, IProject, IResource } from "models";
+import { useProject } from "./hooks/useProject";
 
 const EditorContext = createContext<EditorContext>();
 
 interface EditorContext {
+  projectId: string;
   selectedResource: Accessor<IResource | null>;
   setResource: (resource: IResource | null) => void;
   save: () => void;
-  projectResource: Resource<IProject>;
+  publish: () => void;
   project: Partial<IProject>;
+  levels: Accessor<ILevel[]>;
   loading: () => boolean;
-  projectDirty: Accessor<boolean>;
-  setProjectDirty: Setter<boolean>;
+  dirty: Accessor<boolean>;
+  setDirty: Setter<boolean>;
   setProjectStore: SetStoreFunction<Partial<IProject>>;
 }
 
@@ -33,48 +33,38 @@ interface Props extends ParentProps {
 }
 
 export const EditorProvider: Component<Props> = (props) => {
+  const { updateProject, setDirty, dirty, getProject, setProjectStore, levels, publish, project, loading } = useProject(
+    props.projectId
+  );
   const [selectedResource, setSelectedResource] = createSignal<IResource | null>(null);
-  const [projectResource] = createResource(props.projectId, getProject);
-  const [project, setProjectStore] = createStore<Partial<IProject>>({});
-  const [projectDirty, setProjectDirty] = createSignal(false);
-  const [mutating, setMutating] = createSignal(false);
 
   createEffect(() => {
-    const newProj = projectResource();
-    if (newProj) {
-      setProjectStore(newProj);
-      setProjectDirty(false);
-    }
+    getProject();
   });
 
   const setResource = (resource: IResource | null) => {
     setSelectedResource(resource);
   };
 
-  const loading = () => {
-    return projectResource.loading || mutating();
+  const save = () => {
+    updateProject();
   };
 
-  const save = async () => {
-    setMutating(true);
-    await updateProject(project as IProject);
-    setProjectDirty(false);
-    setMutating(false);
-  };
-
-  const counter: EditorContext = {
-    projectResource,
+  const context: EditorContext = {
+    projectId: props.projectId,
     loading,
     save,
+    publish,
     selectedResource,
     setResource,
     setProjectStore,
-    projectDirty,
-    setProjectDirty,
+    dirty,
+    setDirty,
+    levels,
     project,
   };
 
-  return <EditorContext.Provider value={counter}>{props.children}</EditorContext.Provider>;
+  return <EditorContext.Provider value={context}>{props.children}</EditorContext.Provider>;
 };
 
 export function useEditor() {

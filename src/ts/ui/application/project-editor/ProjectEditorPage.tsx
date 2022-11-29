@@ -5,7 +5,7 @@ import { Editor } from "./Editor";
 import { GameManager } from "../../../core/GameManager";
 import { UIEventManager } from "../../../core/UIEventManager";
 import { ApplicationEventType } from "../../../../common/EventTypes";
-import { ProjectSelector } from "./ProjectSelector";
+import { ProjectSelector } from "./projectSelector/ProjectSelector";
 
 interface Props {
   gameManager: GameManager;
