@@ -35,7 +35,7 @@ function createCells(workspaceCells: IWorkspaceCell[]): IWorkspaceCell[] {
 
 export const EditorGrid: Component<Props> = (props) => {
   const [cells, setCells] = createSignal<IWorkspaceCell[]>([]);
-  const { project, setProjectStore, setDirty } = useEditor();
+  const { project, setProject } = useEditor();
 
   createEffect(() => {
     if (project.workspace) setCells(createCells(project.workspace.cells));
@@ -66,8 +66,7 @@ export const EditorGrid: Component<Props> = (props) => {
                 hasElement={!!editor}
                 editorElm={editor}
                 onEditorMoved={(editor, rowStart, colStart, rowEnd, colEnd) => {
-                  setDirty(true);
-                  setProjectStore(
+                  setProject(
                     produce((state) => {
                       const cell = state.workspace!.cells.find((c) => c.editor === editor)!;
                       cell.editor = editor;

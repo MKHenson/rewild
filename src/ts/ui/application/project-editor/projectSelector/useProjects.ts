@@ -56,7 +56,18 @@ export function useProjects() {
     try {
       token.created = Timestamp.now();
       token.lastModified = Timestamp.now();
-      await addDoc(dbs.projects, token);
+      const resp = await addDoc(dbs.projects, token);
+
+      const newLevel: ILevel = {
+        containers: [],
+        created: Timestamp.now(),
+        lastModified: Timestamp.now(),
+        project: resp.id,
+      };
+      const levelResp = await addDoc(dbs.levels, newLevel);
+
+      await updateDoc(resp, { level: levelResp.id });
+
       await getProjects();
     } catch (err: any) {
       setError(err.toString());
@@ -94,19 +105,6 @@ export function useProjects() {
     return functionResult.data;
   };
 
-  const publishLevel = async (project: IProject) => {
-    const { id, ...token } = project;
-    if (!id) throw new Error(`Project ID is required`);
-
-    const level: ILevel = {
-      project: id,
-      containers: token.containers.slice(),
-      created: Timestamp.now(),
-    };
-    const docRef = await addDoc(dbs.levels, level);
-    return docRef.id;
-  };
-
   const getLevels = async (projectId: string, page?: QueryDocumentSnapshot<ILevel>) => {
     const resp = await query<ILevel>(
       dbs.levels,
@@ -126,7 +124,6 @@ export function useProjects() {
     loading,
     projects,
     getLevels,
-    publishLevel,
     functionsTest,
     updateProject,
     removeProjects,
