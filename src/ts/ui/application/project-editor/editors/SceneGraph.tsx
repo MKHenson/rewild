@@ -10,7 +10,7 @@ import { ButtonGroup } from "../../../common/ButtonGroup";
 import { StyledMaterialIcon } from "../../../common/MaterialIcon";
 import { useEditor } from "../EditorProvider";
 import { produce } from "solid-js/store";
-import { createUUID } from "src/ts/ui/utils";
+import { createUUID } from "../../../utils";
 
 interface Props {}
 
