@@ -1,13 +1,4 @@
-import {
-  createSignal,
-  createContext,
-  useContext,
-  Component,
-  Accessor,
-  ParentProps,
-  createEffect,
-  Setter,
-} from "solid-js";
+import { createSignal, createContext, useContext, Component, Accessor, ParentProps, createEffect } from "solid-js";
 import { SetStoreFunction } from "solid-js/store";
 import { ILevel, IProject, IResource } from "models";
 import { useProject } from "./hooks/useProject";
@@ -21,11 +12,10 @@ interface EditorContext {
   save: () => void;
   publish: () => void;
   project: Partial<IProject>;
-  levels: Accessor<ILevel[]>;
+  level: Accessor<ILevel | null>;
   loading: () => boolean;
   dirty: Accessor<boolean>;
-  setDirty: Setter<boolean>;
-  setProjectStore: SetStoreFunction<Partial<IProject>>;
+  setProject: SetStoreFunction<Partial<IProject>>;
 }
 
 interface Props extends ParentProps {
@@ -33,7 +23,7 @@ interface Props extends ParentProps {
 }
 
 export const EditorProvider: Component<Props> = (props) => {
-  const { updateProject, setDirty, dirty, getProject, setProjectStore, levels, publish, project, loading } = useProject(
+  const { updateProject, dirty, getProject, setProject, level, publish, project, loading } = useProject(
     props.projectId
   );
   const [selectedResource, setSelectedResource] = createSignal<IResource | null>(null);
@@ -57,10 +47,9 @@ export const EditorProvider: Component<Props> = (props) => {
     publish,
     selectedResource,
     setResource,
-    setProjectStore,
+    setProject,
     dirty,
-    setDirty,
-    levels,
+    level,
     project,
   };
 

@@ -4,8 +4,10 @@ declare module "models" {
 
   export interface IProject {
     id?: string;
+    level: string;
     name: string;
     description: string;
+    activeOnStartup: boolean;
     workspace: IWorkspace;
     containers: IContainer[];
     created: Timestamp;
@@ -16,6 +18,7 @@ declare module "models" {
     id?: string;
     project: string;
     created: Timestamp;
+    lastModified: Timestamp;
     containers: IContainer[];
   }
 

@@ -49,7 +49,7 @@ export function createContainer() {
 export const SceneGraph: Component<Props> = (props) => {
   const [selectedNodes, setSelectedNodes] = createSignal<ITreeNode<IResource>[]>([]);
   const [nodes, setNodes] = createSignal<ITreeNode<IResource>[]>([]);
-  const { setResource, setProjectStore, project } = useEditor();
+  const { setResource, setProject, project } = useEditor();
 
   let activeNode: HTMLDivElement | null = null;
 
@@ -86,7 +86,7 @@ export const SceneGraph: Component<Props> = (props) => {
 
     activeNode = null;
 
-    setProjectStore(
+    setProject(
       produce((state) => {
         const resource = state.containers!.find((c) => c.id === selectedResource!.id);
         if (!resource) return;
@@ -121,13 +121,11 @@ export const SceneGraph: Component<Props> = (props) => {
 
   const onContainerAdd = () => {
     const newContainer = createContainer();
-    setProjectStore("containers", (c) => [...c!, newContainer]);
+    setProject("containers", (c) => [...c!, newContainer]);
   };
 
   const onContainerRemove = () => {
-    setProjectStore("containers", (c) =>
-      c!.filter((c) => !selectedNodes().find((selected) => selected.resource === c))
-    );
+    setProject("containers", (c) => c!.filter((c) => !selectedNodes().find((selected) => selected.resource === c)));
     setSelectedNodes([]);
   };
 

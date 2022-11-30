@@ -1,28 +1,14 @@
 import { ILevel, IProject } from "models";
-import {
-  getDocs,
-  addDoc,
-  updateDoc,
-  getDoc,
-  doc,
-  where,
-  Timestamp,
-  query,
-  orderBy,
-  limit,
-  startAfter,
-  QueryDocumentSnapshot,
-  QueryConstraint,
-} from "firebase/firestore";
+import { getDocs, updateDoc, getDoc, doc, where, Timestamp, query } from "firebase/firestore";
 import { dbs } from "../../../../../firebase";
 import { createSignal } from "solid-js";
-import { createStore } from "solid-js/store";
+import { createStore, SetStoreFunction } from "solid-js/store";
 
 export function useProject(projectId: string) {
   const [loading, setLoading] = createSignal(false);
   const [project, setProjectStore] = createStore<Partial<IProject>>({});
   const [error, setError] = createSignal("");
-  const [levels, setLevels] = createSignal<ILevel[]>([]);
+  const [level, setLevel] = createSignal<ILevel | null>(null);
   const [dirty, setDirty] = createSignal(false);
 
   const getProject = async () => {
@@ -41,6 +27,11 @@ export function useProject(projectId: string) {
     setLoading(false);
     setDirty(false);
   };
+
+  const setProject = ((...args: any[]) => {
+    setDirty(true);
+    (setProjectStore as any)(...args);
+  }) as SetStoreFunction<IProject>;
 
   const updateProject = async () => {
     const { id, ...token } = project;
@@ -62,43 +53,27 @@ export function useProject(projectId: string) {
     await updateProject();
     setLoading(true);
 
-    const { id, ...token } = project;
-    if (!id) throw new Error(`Project ID is required`);
-
-    const level: ILevel = {
-      project: id,
-      containers: token.containers!.slice(),
-      created: Timestamp.now(),
-    };
-    await addDoc(dbs.levels, level);
-    await getLevels(id);
+    const levelRef = doc(dbs.levels, project.level);
+    await updateDoc(levelRef, { lastModified: Timestamp.now(), containers: project.containers?.slice(0) });
+    await getLevels(project.id!);
     setLoading(false);
     setDirty(false);
   };
 
-  const getLevels = async (projectId: string, page?: QueryDocumentSnapshot<ILevel>) => {
-    const resp = await query<ILevel>(
-      dbs.levels,
-      ...([
-        where("project", "==", projectId),
-        orderBy("created", "desc"),
-        limit(30),
-        page ? startAfter(page) : undefined,
-      ].filter((q) => !!q) as QueryConstraint[])
-    );
+  const getLevels = async (projectId: string) => {
+    const resp = await query<ILevel>(dbs.levels, where("project", "==", projectId));
     const toRet = await getDocs(resp);
     const levels = toRet.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
-    setLevels(levels);
+    setLevel(levels.at(0)!);
   };
 
   return {
     dirty,
     error,
-    setDirty,
     project,
-    setProjectStore,
+    setProject,
     loading,
-    levels,
+    level,
     getLevels,
     publish,
     updateProject,

@@ -10,13 +10,12 @@ import { produce } from "solid-js/store";
 interface Props {}
 
 export const Properties: Component<Props> = (props) => {
-  const { selectedResource, setDirty, setProjectStore, loading } = useEditor();
+  const { selectedResource, setProject, loading } = useEditor();
 
   const onNameEdited = (val: string) => {
     const resource = selectedResource() as IContainer;
-    setDirty(true);
 
-    setProjectStore(
+    setProject(
       produce((state) => {
         if (selectedResource()?.type === "container") {
           const container = state.containers?.find((c) => c.id === resource.id)!;
