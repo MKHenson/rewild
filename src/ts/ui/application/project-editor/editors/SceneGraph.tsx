@@ -36,12 +36,13 @@ function buildTree(project: IProject) {
 }
 
 export function createContainer() {
-  const newContainer = {
+  const newContainer: IContainer = {
     id: createUUID(),
     name: `New Container`,
+    baseContainer: "",
     activeOnStartup: true,
     type: "container",
-  } as IContainer;
+  };
 
   return newContainer;
 }

@@ -29,6 +29,7 @@ declare module "models" {
 
   export interface IContainer extends IResource {
     name: string;
+    baseContainer: string;
     activeOnStartup: boolean;
   }
 

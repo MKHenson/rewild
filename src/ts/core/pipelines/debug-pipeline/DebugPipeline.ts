@@ -41,22 +41,22 @@ export class DebugPipeline extends Pipeline<DebugDefines> {
     const transformResource = new TransformResource(
       TransformType.Projection | TransformType.ModelView | TransformType.Normal
     );
-    this.addTemplate(transformResource);
+    this.addResourceTemplate(transformResource);
 
     const materialResource = new MaterialResource();
-    this.addTemplate(materialResource);
+    this.addResourceTemplate(materialResource);
 
     const lightingResource = new LightingResource();
-    this.addTemplate(lightingResource);
+    this.addResourceTemplate(lightingResource);
 
     if (this.defines.diffuseMap) {
       const resource = new TextureResource(this.defines.diffuseMap, "diffuse");
-      this.addTemplate(resource);
+      this.addResourceTemplate(resource);
     }
 
     if (this.defines.normalMap) {
       const resource = new TextureResource(this.defines.normalMap, "normal");
-      this.addTemplate(resource);
+      this.addResourceTemplate(resource);
     }
   }
 }

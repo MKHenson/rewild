@@ -33,11 +33,11 @@ export class SkyboxPipeline extends Pipeline<SkyboxDefines> {
     const transformResource = new TransformResource(
       TransformType.Projection | TransformType.ModelView | TransformType.Model
     );
-    this.addTemplate(transformResource);
+    this.addResourceTemplate(transformResource);
 
     if (this.defines.diffuseMap) {
       const resource = new TextureResource(this.defines.diffuseMap, "diffuse");
-      this.addTemplate(resource);
+      this.addResourceTemplate(resource);
     }
   }
 }

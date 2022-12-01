@@ -24,7 +24,8 @@ export class MaterialResource extends PipelineResourceTemplate {
       0,                  // Metalness
       0.5                 // Roughness
     ]);
-    const SIZE = Float32Array.BYTES_PER_ELEMENT * initialValues.length;
+
+    const SIZE = Mathf.max(Float32Array.BYTES_PER_ELEMENT * initialValues.length, 48); // 48 is the min a size can be in WGPU
 
     const buffer = manager.device.createBuffer({
       label: "materialData",
@@ -72,7 +73,7 @@ export class MaterialResource extends PipelineResourceTemplate {
       0,                  // Metalness
       0.5                 // Roughness
     ]);
-    const SIZE = Float32Array.BYTES_PER_ELEMENT * initialValues.length;
+    const SIZE = Mathf.max(Float32Array.BYTES_PER_ELEMENT * initialValues.length, 48); // 48 is the min a size can be in WGPU
 
     const buffer = manager.device.createBuffer({
       label: "materialData",
