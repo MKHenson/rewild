@@ -9,17 +9,24 @@ import { produce } from "solid-js/store";
 
 interface Props {}
 
+interface StringEditFunction<T, K extends keyof T> {
+  (value: T[K], key: K): void;
+}
+
+function setProperty<T, K extends keyof T>(obj: T, key: K, value: T[K]) {
+  obj[key] = value;
+}
+
 export const Properties: Component<Props> = (props) => {
   const { selectedResource, setProject, loading } = useEditor();
 
-  const onNameEdited = (val: string) => {
+  const onContainerEdited: StringEditFunction<IContainer, keyof IContainer> = (val, type) => {
     const resource = selectedResource() as IContainer;
-
     setProject(
       produce((state) => {
         if (selectedResource()?.type === "container") {
-          const container = state.containers?.find((c) => c.id === resource.id)!;
-          container.name = val;
+          const container: IContainer = state.containers?.find((c) => c.id === resource.id)!;
+          setProperty(container, type, val);
         }
       })
     );
@@ -36,7 +43,19 @@ export const Properties: Component<Props> = (props) => {
             label="Name"
             value={(selectedResource() as IContainer).name}
             type="string"
-            onChange={onNameEdited}
+            onChange={(val) => onContainerEdited(val, "name")}
+          />
+          <PropertyValue
+            label="Base Container"
+            value={(selectedResource() as IContainer).baseContainer}
+            type="string"
+            onChange={(val) => onContainerEdited(val, "baseContainer")}
+          />
+          <PropertyValue<boolean>
+            label="Active On Startup"
+            value={(selectedResource() as IContainer).activeOnStartup}
+            type="boolean"
+            onChange={(val) => onContainerEdited(val, "activeOnStartup")}
           />
         </StyledPropGrid>
       </Show>

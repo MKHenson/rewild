@@ -108,7 +108,7 @@ export abstract class Pipeline<T extends Defines<T>> {
     return this.resourceTemplates.find((t) => t.groupType === type);
   }
 
-  addTemplate(template: PipelineResourceTemplate) {
+  addResourceTemplate(template: PipelineResourceTemplate) {
     this.resourceTemplates.push(template);
     return this;
   }
