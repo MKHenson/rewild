@@ -2,13 +2,13 @@ import { Component, onMount } from "solid-js";
 import { styled } from "solid-styled-components";
 import { Routes, Route, useNavigate } from "@solidjs/router";
 import { Editor } from "./Editor";
-import { GameManager } from "../../../core/GameManager";
+import { Renderer } from "../../../renderer/Renderer";
 import { UIEventManager } from "../../../core/UIEventManager";
 import { ApplicationEventType } from "../../../../common/EventTypes";
 import { ProjectSelector } from "./projectSelector/ProjectSelector";
 
 interface Props {
-  gameManager: GameManager;
+  renderer: Renderer;
   eventManager: UIEventManager;
   onQuit: () => void;
 }

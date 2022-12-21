@@ -1,6 +1,6 @@
 import { ILevel, IProject } from "models";
-import { getDocs, updateDoc, getDoc, doc, where, Timestamp, query } from "firebase/firestore";
-import { dbs } from "../../../../../firebase";
+import { Timestamp } from "firebase/firestore";
+import { getLevel as getLevelApi, patchLevel, patchProject, getProject as getProjectApi } from "../../../../../api";
 import { createSignal } from "solid-js";
 import { createStore, SetStoreFunction } from "solid-js/store";
 
@@ -15,11 +15,10 @@ export function useProject(projectId: string) {
     setLoading(true);
 
     try {
-      const docRef = await doc(dbs.projects, projectId);
-      const projectDoc = await getDoc(docRef);
-      setProjectStore({ ...projectDoc.data()!, id: projectId });
+      const resp = await getProjectApi(projectId);
+      setProjectStore({ ...resp, id: projectId });
 
-      await getLevel(projectDoc.id);
+      await getLevel(resp.id);
     } catch (err: any) {
       setError(err.toString());
     }
@@ -39,8 +38,7 @@ export function useProject(projectId: string) {
     setLoading(true);
 
     try {
-      const docRef = await doc(dbs.projects, id);
-      await updateDoc(docRef, token);
+      await patchProject(id!, token);
     } catch (err: any) {
       setError(err.toString());
     }
@@ -53,18 +51,21 @@ export function useProject(projectId: string) {
     await updateProject();
     setLoading(true);
 
-    const levelRef = doc(dbs.levels, project.level);
-    await updateDoc(levelRef, { lastModified: Timestamp.now(), containers: project.containers?.slice(0) });
+    await patchLevel(project.level!, {
+      lastModified: Timestamp.now(),
+      containers: project.containers?.slice(0),
+      activeOnStartup: project.activeOnStartup,
+      startEvent: project.startEvent,
+    });
+
     await getLevel(project.id!);
     setLoading(false);
     setDirty(false);
   };
 
   const getLevel = async (projectId: string) => {
-    const resp = await query<ILevel>(dbs.levels, where("project", "==", projectId));
-    const toRet = await getDocs(resp);
-    const levels = toRet.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
-    setLevel(levels.at(0)!);
+    const level = await getLevelApi(projectId);
+    setLevel(level);
   };
 
   return {

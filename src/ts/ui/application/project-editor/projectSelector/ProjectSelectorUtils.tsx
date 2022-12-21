@@ -43,6 +43,7 @@ export function createProject() {
     containers: [],
     description: "",
     activeOnStartup: true,
+    startEvent: "",
     workspace: createDefaultWorkspace(),
   } as Partial<IProject>;
 

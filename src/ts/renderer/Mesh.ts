@@ -1,6 +1,6 @@
 import { AttributeType } from "../../common/AttributeType";
 import { GroupType } from "../../common/GroupType";
-import { GameManager } from "../core/GameManager";
+import { Renderer } from "./Renderer";
 import { Pipeline } from "../core/pipelines/Pipeline";
 import { wasm } from "../core/WasmManager";
 import { Geometry } from "./geometry/Geometry";
@@ -19,7 +19,7 @@ export class Mesh extends Object3D {
   readonly worldMatrix: Float32Array;
   readonly slotMap: Map<AttributeType, number>;
 
-  constructor(geometry: Geometry, pipeline: Pipeline<any>, manager: GameManager, name?: string) {
+  constructor(geometry: Geometry, pipeline: Pipeline<any>, renderer: Renderer, name?: string) {
     super(name);
 
     this.renderIndex = -1;
@@ -41,7 +41,7 @@ export class Mesh extends Object3D {
     );
 
     // Assign a transform buffer to the intance
-    this.transformIndex = this.pipeline.addResourceInstance(manager, GroupType.Transform);
+    this.transformIndex = this.pipeline.addResourceInstance(renderer, GroupType.Transform);
     wasm.setMeshPipelineTransformIndex(pipelineInsPtr, this.transformIndex);
     wasm.addComponent(this.transform as any, this.meshComponent as any);
 

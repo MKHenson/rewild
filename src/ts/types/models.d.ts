@@ -8,6 +8,7 @@ declare module "models" {
     name: string;
     description: string;
     activeOnStartup: boolean;
+    startEvent: string;
     workspace: IWorkspace;
     containers: IContainer[];
     created: Timestamp;
@@ -17,6 +18,8 @@ declare module "models" {
   export interface ILevel {
     id?: string;
     project: string;
+    activeOnStartup: boolean;
+    startEvent: string;
     created: Timestamp;
     lastModified: Timestamp;
     containers: IContainer[];

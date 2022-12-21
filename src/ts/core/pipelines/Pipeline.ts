@@ -1,4 +1,4 @@
-import { GameManager } from "../GameManager";
+import { Renderer } from "../../renderer/Renderer";
 import { BindingData, PipelineResourceTemplate } from "./resources/PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./resources/PipelineResourceInstance";
 import { GroupType } from "../../../common/GroupType";
@@ -113,7 +113,7 @@ export abstract class Pipeline<T extends Defines<T>> {
     return this;
   }
 
-  build(gameManager: GameManager): void {
+  build(renderer: Renderer): void {
     this.rebuild = false;
 
     const groupInstanceMap = this.groupInstances;
@@ -143,7 +143,7 @@ export abstract class Pipeline<T extends Defines<T>> {
 
       curBinding = binds.get(groupIndex)!;
 
-      const template = resourceTemplate.build(gameManager, this, curBinding);
+      const template = resourceTemplate.build(renderer, this, curBinding);
 
       curBinding += template.bindings.length;
       binds.set(groupIndex, curBinding);
@@ -155,7 +155,7 @@ export abstract class Pipeline<T extends Defines<T>> {
     const vertSource = shaderBuilder(this.vertexSource, this);
     const fragSource = shaderBuilder(this.fragmentSource, this);
 
-    this.renderPipeline = gameManager.device.createRenderPipeline({
+    this.renderPipeline = renderer.device.createRenderPipeline({
       layout: "auto",
       primitive: {
         topology: this.topology,
@@ -172,7 +172,7 @@ export abstract class Pipeline<T extends Defines<T>> {
       },
       label: this.name,
       vertex: {
-        module: gameManager.device.createShaderModule({
+        module: renderer.device.createShaderModule({
           code: vertSource,
         }),
         entryPoint: "main",
@@ -186,16 +186,16 @@ export abstract class Pipeline<T extends Defines<T>> {
         ),
       },
       fragment: {
-        module: gameManager.device.createShaderModule({
+        module: renderer.device.createShaderModule({
           code: fragSource,
         }),
         entryPoint: "main",
-        targets: [{ format: gameManager.format }],
+        targets: [{ format: renderer.format }],
       },
     });
   }
 
-  initialize(gameManager: GameManager): void {
+  initialize(renderer: Renderer): void {
     const templates = this.resourceTemplates;
     const groupInstances = this.groupInstances;
     const prevGroupKeys = Array.from(this.groupInstances.keys());
@@ -235,9 +235,9 @@ export abstract class Pipeline<T extends Defines<T>> {
 
       for (let i = 0; i < numInstances; i++)
         if (bindData.has(i)) {
-          bindData.get(i)!.push(resourceTemplate.getBindingData(gameManager, this.renderPipeline!));
+          bindData.get(i)!.push(resourceTemplate.getBindingData(renderer, this.renderPipeline!));
         } else {
-          bindData.set(i, [resourceTemplate.getBindingData(gameManager, this.renderPipeline!)]);
+          bindData.set(i, [resourceTemplate.getBindingData(renderer, this.renderPipeline!)]);
         }
     });
 
@@ -261,7 +261,7 @@ export abstract class Pipeline<T extends Defines<T>> {
           return accumulator;
         }, [] as GPUBindGroupEntry[]);
 
-        const bindGroup = gameManager.device.createBindGroup({
+        const bindGroup = renderer.device.createBindGroup({
           label: GroupType[groupType],
           layout: this.renderPipeline!.getBindGroupLayout(groupIndex),
           entries,
@@ -274,14 +274,14 @@ export abstract class Pipeline<T extends Defines<T>> {
     });
   }
 
-  addResourceInstance(manager: GameManager, type: GroupType) {
+  addResourceInstance(renderer: Renderer, type: GroupType) {
     const template = this.getTemplateByGroup(type);
 
     if (template) {
-      const bindingData = template.getBindingData(manager, this.renderPipeline!);
+      const bindingData = template.getBindingData(renderer, this.renderPipeline!);
       const groupIndex = this.groupIndex(type);
 
-      const bindGroup = manager.device.createBindGroup({
+      const bindGroup = renderer.device.createBindGroup({
         label: GroupType[type],
         layout: this.renderPipeline!.getBindGroupLayout(groupIndex),
         entries: bindingData.binds,

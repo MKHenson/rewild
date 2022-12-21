@@ -1,4 +1,4 @@
-import { GameManager } from "../../GameManager";
+import { Renderer } from "../../../renderer/Renderer";
 import { Texture } from "../../textures/Texture";
 import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { Pipeline } from "../Pipeline";
@@ -17,7 +17,7 @@ export class TextureResource extends PipelineResourceTemplate {
     this.texture = texture;
   }
 
-  build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
+  build<T extends Defines<T>>(renderer: Renderer, pipeline: Pipeline<T>, curBindIndex: number): Template {
     this.samplerBind = curBindIndex;
     this.textureBind = curBindIndex + 1;
     const group = pipeline.groupIndex(this.groupType);
@@ -39,7 +39,7 @@ export class TextureResource extends PipelineResourceTemplate {
     };
   }
 
-  getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
+  getBindingData(renderer: Renderer, pipeline: GPURenderPipeline): BindingData {
     const isCube = this.texture instanceof BitmapCubeTexture;
     const cubeTexture = this.texture as BitmapCubeTexture;
 

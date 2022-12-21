@@ -1,4 +1,4 @@
-import { GameManager } from "../../GameManager";
+import { Renderer } from "../../../renderer/Renderer";
 import { Pipeline } from "../Pipeline";
 import { GroupType } from "../../../../common/GroupType";
 import { ResourceType } from "../../../../common/ResourceType";
@@ -29,6 +29,6 @@ export abstract class PipelineResourceTemplate {
   }
 
   /** Creates the resource. Must return a group index*/
-  abstract build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template;
-  abstract getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData;
+  abstract build<T extends Defines<T>>(renderer: Renderer, pipeline: Pipeline<T>, curBindIndex: number): Template;
+  abstract getBindingData(renderer: Renderer, pipeline: GPURenderPipeline): BindingData;
 }

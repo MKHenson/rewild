@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "moduleResolution": "node",
+    "paths": {
+      "models": ["../ts/types/models.d.ts"]
+    }
+  }
+}

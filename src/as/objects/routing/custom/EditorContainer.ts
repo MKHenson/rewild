@@ -11,8 +11,8 @@ import { Link } from "../core/Link";
 export class EditorContainer extends Container implements Listener {
   private sun!: DirectionalLight;
 
-  constructor() {
-    super("Editor");
+  constructor(name: string) {
+    super(name);
   }
 
   init(): void {
@@ -47,8 +47,4 @@ export class EditorContainer extends Container implements Listener {
     super.unMount();
     uiSignaller.removeEventListener(UIEventType, this);
   }
-}
-
-export function createEditor(): Container {
-  return new EditorContainer();
 }

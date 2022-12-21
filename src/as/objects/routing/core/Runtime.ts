@@ -45,7 +45,29 @@ export class Runtime implements Listener {
   addContainer(container: Container, activevate: boolean): void {
     container.runtime = this;
     this.nodes.push(container);
-    if (activevate) this.activeNodes.push(container);
+    if (activevate) {
+      container.active = true;
+      this.activeNodes.push(container);
+      console.log(`Activating ${container.name}`);
+    }
+  }
+
+  removeContainer(container: Container): void {
+    const nodeIndex = this.nodes.indexOf(container);
+    const activeNodeIndex = this.activeNodes.indexOf(container);
+    const inactiveNodeIndex = this.inactiveNodes.indexOf(container);
+
+    if (nodeIndex == -1) throw new Error("Container does not exist");
+
+    container.runtime = null;
+    this.nodes.splice(this.nodes.indexOf(container), 1);
+
+    if (activeNodeIndex != -1) this.activeNodes.splice(activeNodeIndex, 1);
+    if (inactiveNodeIndex != -1) this.inactiveNodes.splice(inactiveNodeIndex, 1);
+    if (container.active) {
+      container.unMount();
+      console.log(`Deactivating ${container.name}`);
+    }
   }
 
   OnLoop(delta: f32, total: u32): void {

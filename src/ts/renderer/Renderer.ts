@@ -1,29 +1,25 @@
-import { InputManager } from "./InputManager";
+import { InputManager } from "../core/InputManager";
 import { GroupType } from "../../common/GroupType";
 import { AttributeType } from "../../common/AttributeType";
-import { wasm } from "./WasmManager";
-import { IBindable } from "./IBindable";
-import { Object3D } from "../renderer/Object3D";
-import { Clock } from "./Clock";
-import { pipelineManager } from "../renderer/PipelineManager";
-import { textureManager } from "../renderer/TextureManager";
-import { Mesh } from "../renderer/Mesh";
+import { wasm } from "../core/WasmManager";
+import { IBindable } from "../core/IBindable";
+import { Clock } from "../core/Clock";
+import { pipelineManager } from "./PipelineManager";
+import { textureManager } from "./TextureManager";
+import { Mesh } from "./Mesh";
 import { ResourceType } from "../../common/ResourceType";
-import { meshManager } from "../renderer/MeshManager";
-import { BoxGeometry } from "../renderer/geometry/BoxGeometry";
-import { SphereGeometry } from "../renderer/geometry/SphereGeometry";
-import { PlaneGeometry } from "../renderer/geometry/PlaneGeometry";
-import { LightingResource } from "./pipelines/resources/LightingResource";
-import { Pipeline } from "./pipelines/Pipeline";
-import { TransformResource } from "./pipelines/resources/TransformResource";
-import { PipelineResourceInstance } from "./pipelines/resources/PipelineResourceInstance";
-import { Geometry } from "../renderer/geometry/Geometry";
+import { meshManager } from "./MeshManager";
+import { LightingResource } from "../core/pipelines/resources/LightingResource";
+import { Pipeline } from "../core/pipelines/Pipeline";
+import { TransformResource } from "../core/pipelines/resources/TransformResource";
+import { PipelineResourceInstance } from "../core/pipelines/resources/PipelineResourceInstance";
+import { Geometry } from "./geometry/Geometry";
 import { Player } from "../gameplay/Player";
 
 const sampleCount = 4;
 export type UpdateCallback = () => void;
 
-export class GameManager implements IBindable {
+export class Renderer implements IBindable {
   canvas: HTMLCanvasElement;
   device: GPUDevice;
   context: GPUCanvasContext;
@@ -45,7 +41,6 @@ export class GameManager implements IBindable {
   currentCommandEncoder: GPUCommandEncoder;
   private presentationSize: [number, number];
 
-  character: Object3D;
   updateCallbacks: UpdateCallback[];
 
   canvasSizeCache: [number, number];
@@ -109,71 +104,13 @@ export class GameManager implements IBindable {
     // Initialize the wasm module
     wasm.init(this.canvas.width, this.canvas.height);
 
-    this.initRuntime();
+    pipelineManager.init(this);
+    this.player = new Player();
 
     // Setup events
     window.addEventListener("resize", this.onResizeHandler);
     window.requestAnimationFrame(this.onFrameHandler);
     this.clock.start();
-  }
-
-  initRuntime() {
-    pipelineManager.init(this);
-
-    const containerLvl1Ptr = wasm.createLevel1();
-    const geometrySphere = new SphereGeometry(1, 64, 32).build(this);
-    const geometryBox = new BoxGeometry().build(this);
-    const geometryPlane = new PlaneGeometry().build(this);
-
-    wasm.addAsset(
-      containerLvl1Ptr,
-      meshManager.addMesh(this.createMesh(geometryBox, "skybox", "skybox")).transform as any
-    );
-    wasm.addAsset(
-      containerLvl1Ptr,
-      meshManager.addMesh(this.createMesh(geometrySphere, "simple", "ball")).transform as any
-    );
-
-    for (let i = 0; i < 20; i++)
-      wasm.addAsset(
-        containerLvl1Ptr,
-        meshManager.addMesh(this.createMesh(geometryBox, "concrete", `building-${i}`)).transform as any
-      );
-    for (let i = 0; i < 20; i++)
-      wasm.addAsset(
-        containerLvl1Ptr,
-        meshManager.addMesh(this.createMesh(geometryBox, "crate", `crate-${i}`)).transform as any
-      );
-
-    this.character = new Object3D();
-    wasm.addAsset(
-      containerLvl1Ptr,
-      meshManager.addMesh(this.createMesh(geometryPlane, "coastal-floor", "floor")).transform as any
-    );
-
-    const containerTestPtr = wasm.createTestLevel();
-    wasm.addAsset(
-      containerTestPtr,
-      meshManager.addMesh(this.createMesh(geometryBox, "skybox", "skybox")).transform as any
-    );
-
-    const containerMainMenuPtr = wasm.createMainMenu();
-    const containerEditorPtr = wasm.createEditor();
-
-    wasm.addAsset(containerMainMenuPtr, meshManager.addMesh(this.createMesh(geometrySphere, "earth")).transform as any);
-    wasm.addAsset(
-      containerMainMenuPtr,
-      meshManager.addMesh(this.createMesh(geometryBox, "stars", "skybox")).transform as any
-    );
-
-    this.player = new Player();
-
-    wasm.addAsset(containerLvl1Ptr, this.player.transformPtr as any);
-
-    wasm.addContainer(containerLvl1Ptr, false);
-    wasm.addContainer(containerMainMenuPtr, true);
-    wasm.addContainer(containerEditorPtr, false);
-    wasm.addContainer(containerTestPtr, false);
   }
 
   createMesh(geometry: Geometry, pipelineName: string, name?: string) {
@@ -239,7 +176,6 @@ export class GameManager implements IBindable {
       this.onResize(newSize);
     }
 
-    // this.character.transform.translateZ(0.01);
     wasm.update(clock.elapsedTime, clock.getDelta());
   }
 

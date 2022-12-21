@@ -2,7 +2,7 @@ import { Component, createSignal, onCleanup, onMount } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import { styled } from "solid-styled-components";
 import { UIEventManager } from "../../core/UIEventManager";
-import { GameManager } from "../../core/GameManager";
+import { Renderer } from "../../renderer/Renderer";
 import { InGameMenu } from "./InGameMenu";
 import { ApplicationEvent } from "../../core/events/ApplicationEvent";
 import { ApplicationEventType, UIEventType } from "../../../common/EventTypes";
@@ -11,7 +11,7 @@ import { GameOverMenu } from "./GameOverMenu";
 import { update } from "./FPSCounter";
 
 interface Props {
-  gameManager: GameManager;
+  renderer: Renderer;
   eventManager: UIEventManager;
   onQuit: () => void;
 }
@@ -33,12 +33,12 @@ export const InGame: Component<Props> = (props) => {
   };
 
   onMount(() => {
-    props.gameManager.updateCallbacks.push(onFrameUpdate);
+    props.renderer.updateCallbacks.push(onFrameUpdate);
     props.eventManager.addEventListener(UIEventType, onWasmUiEvent);
   });
 
   onCleanup(() => {
-    props.gameManager.updateCallbacks.splice(props.gameManager.updateCallbacks.indexOf(onFrameUpdate), 1);
+    props.renderer.updateCallbacks.splice(props.renderer.updateCallbacks.indexOf(onFrameUpdate), 1);
     props.eventManager.removeEventListener(UIEventType, onWasmUiEvent);
   });
 
@@ -58,7 +58,7 @@ export const InGame: Component<Props> = (props) => {
 
   return (
     <StyledApplication>
-      <InGameUI gameManager={props.gameManager} />
+      <InGameUI renderer={props.renderer} />
       <Dynamic component={options[activeMenu()]} />
       <StyledFPS ref={(elm) => (fpsDiv = elm)}>0</StyledFPS>
     </StyledApplication>

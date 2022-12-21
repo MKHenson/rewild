@@ -1,4 +1,4 @@
-import { GameManager } from "../../GameManager";
+import { Renderer } from "../../../renderer/Renderer";
 import { UNIFORM_TYPES_MAP } from "./MemoryUtils";
 import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { Pipeline } from "../Pipeline";
@@ -44,7 +44,7 @@ export class TransformResource extends PipelineResourceTemplate {
       (requiresNormal ? UNIFORM_TYPES_MAP["mat3x3<f32>"] : 0);
   }
 
-  build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
+  build<T extends Defines<T>>(renderer: Renderer, pipeline: Pipeline<T>, curBindIndex: number): Template {
     this.binding = curBindIndex;
     const group = pipeline.groupIndex(this.groupType);
 
@@ -78,7 +78,7 @@ export class TransformResource extends PipelineResourceTemplate {
 
     const SIZEOF_MATRICES = this.getBufferSize();
 
-    const buffer = manager.device.createBuffer({
+    const buffer = renderer.device.createBuffer({
       label: "transform",
       size: SIZEOF_MATRICES,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -106,10 +106,10 @@ export class TransformResource extends PipelineResourceTemplate {
     };
   }
 
-  getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
+  getBindingData(renderer: Renderer, pipeline: GPURenderPipeline): BindingData {
     const SIZEOF_MATRICES = this.getBufferSize();
 
-    const buffer = manager.device.createBuffer({
+    const buffer = renderer.device.createBuffer({
       label: "transform",
       size: SIZEOF_MATRICES,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,

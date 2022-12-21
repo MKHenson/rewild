@@ -1,10 +1,10 @@
 import { Component, createSignal } from "solid-js";
 import { styled } from "solid-styled-components";
-import { GameManager } from "../../core/GameManager";
+import { Renderer } from "../../renderer/Renderer";
 import { CircularProgress } from "../common/CircularProgress";
 
 type Props = {
-  gameManager: GameManager;
+  renderer: Renderer;
 };
 
 export const InGameUI: Component<Props> = (props) => {
@@ -12,16 +12,16 @@ export const InGameUI: Component<Props> = (props) => {
   const [playerHunger, setPlayerHunger] = createSignal(100);
 
   const onFrameUpdate = () => {
-    if (props.gameManager.player.health != playerHealth()) {
-      setPlayerHealth(props.gameManager.player.health);
+    if (props.renderer.player.health != playerHealth()) {
+      setPlayerHealth(props.renderer.player.health);
     }
 
-    if (props.gameManager.player.hunger != playerHunger()) {
-      setPlayerHunger(props.gameManager.player.hunger);
+    if (props.renderer.player.hunger != playerHunger()) {
+      setPlayerHunger(props.renderer.player.hunger);
     }
   };
 
-  props.gameManager.updateCallbacks.push(onFrameUpdate);
+  props.renderer.updateCallbacks.push(onFrameUpdate);
 
   return (
     <StyledContainer>
