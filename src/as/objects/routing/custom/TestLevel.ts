@@ -14,8 +14,8 @@ export class TestLevel extends Container implements Listener {
   orbitController!: OrbitController;
   private sbybox!: TransformNode;
 
-  constructor() {
-    super("TestLevel");
+  constructor(name: string) {
+    super(name);
   }
 
   init(): void {
@@ -58,8 +58,4 @@ export class TestLevel extends Container implements Listener {
     inputManager.removeEventListener("keyup", this);
     uiSignaller.removeEventListener(UIEventType, this);
   }
-}
-
-export function createTestLevel(): Container {
-  return new TestLevel();
 }

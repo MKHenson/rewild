@@ -27,3 +27,7 @@ export function update(total: u32, delta: f32): void {
 export function addContainer(container: Container, activate: boolean): void {
   runtime!.addContainer(container, activate);
 }
+
+export function removeContainer(container: Container): void {
+  runtime!.removeContainer(container);
+}

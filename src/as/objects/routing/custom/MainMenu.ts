@@ -13,8 +13,8 @@ import { Portal } from "../core/Portal";
 export class MainMenu extends Container implements Listener {
   private sun!: DirectionalLight;
 
-  constructor() {
-    super("MainMenu", false);
+  constructor(name: string) {
+    super(name, false);
     this.portals.push(new Portal("Enter", this));
     this.portals.push(new Portal("Exit - Start Game", this));
     this.portals.push(new Portal("Exit - Start Editor", this));
@@ -71,8 +71,4 @@ export class MainMenu extends Container implements Listener {
     super.unMount();
     uiSignaller.removeEventListener(UIEventType, this);
   }
-}
-
-export function createMainMenu(): Container {
-  return new MainMenu();
 }

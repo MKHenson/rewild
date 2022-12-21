@@ -4,6 +4,7 @@ import { Card } from "../../../common/Card";
 import { Typography } from "../../../common/Typography";
 import { Switch } from "../../../common/Switch";
 import { Date } from "../../../common/Date";
+import { Input } from "../../../common/Input";
 import { useEditor } from "../EditorProvider";
 
 interface Props {}
@@ -34,6 +35,8 @@ export const ProjectSettings: Component<Props> = (props) => {
             }}
             checked={project.activeOnStartup}
           />
+          <Typography variant="label">Start Event</Typography>
+          <Input fullWidth value={project.startEvent} onChange={(e) => setProject("startEvent", e)} />
         </StyledContainer>
       </Show>
     </Card>

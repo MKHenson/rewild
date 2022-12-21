@@ -1,7 +1,7 @@
 import { wasm } from "../../core/WasmManager";
 import { AttributeType } from "../../../common/AttributeType";
 import { createBufferFromF32, createIndexBufferU32 } from "../../core/Utils";
-import { GameManager } from "../../core/GameManager";
+import { Renderer } from "../Renderer";
 
 export class BufferGeometryGroup {
   start: i32;
@@ -121,7 +121,7 @@ export class Geometry {
     this.indexBuffer = null;
   }
 
-  build(manager: GameManager) {
+  build(renderer: Renderer) {
     this.requiresBuild = false;
     this.attributes.forEach((value, key) => {
       if (
@@ -131,7 +131,7 @@ export class Geometry {
         key === AttributeType.TANGENT
       ) {
         const buffer = createBufferFromF32(
-          manager.device,
+          renderer.device,
           value.buffer as Float32Array,
           GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
         );
@@ -139,7 +139,7 @@ export class Geometry {
       } else throw new Error(`Attribute ${AttributeType[key]} not recognised`);
     });
 
-    this.indexBuffer = createIndexBufferU32(manager.device, this.indices);
+    this.indexBuffer = createIndexBufferU32(renderer.device, this.indices);
     return this;
   }
 

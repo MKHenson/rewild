@@ -1,18 +1,11 @@
 export * from "./extras/io";
 export * from "./extras/ui";
-export { getRuntime, init, resize, update, addContainer } from "./objects/routing/AsSceneManager";
+export { getRuntime, init, resize, update, addContainer, removeContainer } from "./objects/routing/AsSceneManager";
 export { createMeshPipelineInstance, setMeshPipelineTransformIndex } from "./pipelines/MeshPipelineInstance";
 export { addPipelineAttribute } from "./pipelines/PipelineInstance";
 export { createMeshComponent } from "./components/MeshComponent";
 export { createPlayerComponent, getPlayerComponentProperties } from "./components/PlayerComponent";
-export {
-  createContainer,
-  addAsset,
-  createLevel1,
-  createMainMenu,
-  createEditor,
-  createTestLevel,
-} from "./objects/routing";
+export { createContainer, addAsset } from "./objects/routing";
 export {
   getCameraProjectionInverseMatrix,
   getCameraProjectionMatrix,

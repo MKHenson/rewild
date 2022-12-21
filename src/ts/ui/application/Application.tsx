@@ -3,7 +3,8 @@ import { styled } from "solid-styled-components";
 import { Routes, Route, useNavigate } from "@solidjs/router";
 import { IBindable } from "src/ts/core/IBindable";
 import { UIEventManager } from "../../core/UIEventManager";
-import { GameManager } from "../../core/GameManager";
+import { Renderer } from "../../renderer/Renderer";
+import { GameLoader } from "../../core/GameLoader";
 import { WasmManager } from "../../core/WasmManager";
 import { Pane3D } from "../common/Pane3D";
 import { MainMenu } from "./MainMenu";
@@ -21,26 +22,30 @@ export const Application: Component<Props> = ({}) => {
   const [errorType, setErrorType] = createSignal<ErrorType>("OTHER");
   const navigate = useNavigate();
 
-  let gameManager: GameManager;
+  let renderer: Renderer;
+  let gameLoader: GameLoader;
   let eventManager: UIEventManager;
   const wasmManager: WasmManager = new WasmManager();
 
   const onCanvasReady = async (canvas: HTMLCanvasElement) => {
-    gameManager = new GameManager(canvas);
+    renderer = new Renderer(canvas);
+    gameLoader = new GameLoader(renderer);
     eventManager = new UIEventManager();
 
-    const bindables: IBindable[] = [gameManager, eventManager];
+    const bindables: IBindable[] = [renderer, eventManager];
 
     try {
       await wasmManager.load(bindables);
 
-      if (!gameManager.hasWebGPU()) {
+      if (!renderer.hasWebGPU()) {
         setErrorMessage("Your browser does not support WebGPU");
         setErrorType("WGPU");
         return;
       }
 
-      await gameManager.init();
+      await renderer.init();
+      await gameLoader.loadInitialContainers();
+
       setReady(true);
     } catch (err: unknown) {
       setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");
@@ -49,8 +54,9 @@ export const Application: Component<Props> = ({}) => {
     }
   };
 
-  const onStart = () => {
+  const onStart = async () => {
     navigate("/game");
+    await gameLoader.loadInitialLevels();
     eventManager.triggerUIEvent(ApplicationEventType.StartGame);
   };
 
@@ -60,6 +66,7 @@ export const Application: Component<Props> = ({}) => {
 
   const onQuit = () => {
     navigate("/");
+    gameLoader.unloadInitialLevels();
     eventManager.triggerUIEvent(ApplicationEventType.Quit);
   };
 
@@ -83,11 +90,11 @@ export const Application: Component<Props> = ({}) => {
           <>
             <Route
               path="/game"
-              element={<InGame gameManager={gameManager!} eventManager={eventManager!} onQuit={onQuit} />}
+              element={<InGame renderer={renderer!} eventManager={eventManager!} onQuit={onQuit} />}
             />
             <Route
               path="/editor/*"
-              element={<ProjectEditorPage onQuit={onQuit} gameManager={gameManager!} eventManager={eventManager!} />}
+              element={<ProjectEditorPage onQuit={onQuit} renderer={renderer!} eventManager={eventManager!} />}
             />
           </>
         </Show>

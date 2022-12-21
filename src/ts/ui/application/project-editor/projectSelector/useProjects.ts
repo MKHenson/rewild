@@ -1,22 +1,17 @@
 import { ILevel, IProject } from "models";
 import {
-  getDocs,
-  addDoc,
-  deleteDoc,
-  updateDoc,
-  getDoc,
-  doc,
-  where,
-  Timestamp,
-  query,
-  orderBy,
-  limit,
-  startAfter,
-  QueryDocumentSnapshot,
-  QueryConstraint,
-} from "firebase/firestore";
+  getLevels,
+  addLevel,
+  addProject as addProjectApi,
+  getProject,
+  deleteLevel,
+  deleteProject,
+  getProjects as getProjectsApi,
+  patchProject,
+} from "../../../../../api";
+import { Timestamp, QueryDocumentSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { dbs, functions } from "../../../../../firebase";
+import { functions } from "../../../../../firebase";
 import { createSignal } from "solid-js";
 
 const helloworld = httpsCallable(functions, "helloworld");
@@ -26,26 +21,11 @@ export function useProjects() {
   const [projects, setProjects] = createSignal<IProject[]>([]);
   const [error, setError] = createSignal("");
 
-  const getProjects = async (page?: QueryDocumentSnapshot<ILevel>) => {
+  const getProjects = async (page?: QueryDocumentSnapshot<IProject>) => {
     setLoading(true);
-
-    const resp = await query<IProject>(
-      dbs.projects,
-      ...([orderBy("created", "desc"), limit(30), page ? startAfter(page) : undefined].filter(
-        (q) => !!q
-      ) as QueryConstraint[])
-    );
-    const toRet = await getDocs(resp);
-    const projects = toRet.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
-
+    const projects = await getProjectsApi(false, page);
     setProjects(projects);
     setLoading(false);
-  };
-
-  const getProject = async (id: string) => {
-    const docRef = await doc(dbs.projects, id);
-    const projectDoc = await getDoc(docRef);
-    return { ...projectDoc.data()!, id: projectDoc.id };
   };
 
   const addProject = async (token: Partial<IProject>) => {
@@ -56,17 +36,18 @@ export function useProjects() {
     try {
       token.created = Timestamp.now();
       token.lastModified = Timestamp.now();
-      const resp = await addDoc(dbs.projects, token);
+      const resp = await addProjectApi(token);
 
       const newLevel: ILevel = {
         containers: [],
+        startEvent: token.startEvent || "",
         created: Timestamp.now(),
         lastModified: Timestamp.now(),
         project: resp.id,
+        activeOnStartup: token.activeOnStartup || true,
       };
-      const levelResp = await addDoc(dbs.levels, newLevel);
-
-      await updateDoc(resp, { level: levelResp.id });
+      const levelResp = await addLevel(newLevel);
+      patchProject(resp, { level: levelResp.id });
 
       await getProjects();
     } catch (err: any) {
@@ -81,8 +62,9 @@ export function useProjects() {
     setError("");
 
     try {
-      const docRef = await doc(dbs.projects, id);
-      await deleteDoc(docRef);
+      const project = await getProject(id);
+      await deleteProject(id);
+      await deleteLevel(project.level);
       await getProjects();
     } catch (err: any) {
       setError(err.toString());
@@ -94,29 +76,13 @@ export function useProjects() {
   const updateProject = async (project: IProject) => {
     const { id, ...token } = project;
     token.lastModified = Timestamp.now();
-
-    const docRef = await doc(dbs.projects, id);
-    await updateDoc(docRef, token);
+    await patchProject(id!, token);
   };
 
   // This is just a reference for the future
   const functionsTest = async () => {
     const functionResult = await helloworld({ foo: "bar" });
     return functionResult.data;
-  };
-
-  const getLevels = async (projectId: string, page?: QueryDocumentSnapshot<ILevel>) => {
-    const resp = await query<ILevel>(
-      dbs.levels,
-      ...([
-        where("project", "==", projectId),
-        orderBy("created", "desc"),
-        limit(30),
-        page ? startAfter(page) : undefined,
-      ].filter((q) => !!q) as QueryConstraint[])
-    );
-    const toRet = await getDocs(resp);
-    return toRet.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
   };
 
   return {

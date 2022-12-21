@@ -1,4 +1,4 @@
-import { GameManager } from "../../GameManager";
+import { Renderer } from "../../../renderer/Renderer";
 import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { Defines } from "../shader-lib/Utils";
 import { Pipeline } from "../Pipeline";
@@ -12,7 +12,7 @@ export class MaterialResource extends PipelineResourceTemplate {
     super(GroupType.Material, ResourceType.Material);
   }
 
-  build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
+  build<T extends Defines<T>>(renderer: Renderer, pipeline: Pipeline<T>, curBindIndex: number): Template {
     this.binding = curBindIndex;
     const group = pipeline.groupIndex(this.groupType);
 
@@ -27,7 +27,7 @@ export class MaterialResource extends PipelineResourceTemplate {
 
     const SIZE = Mathf.max(Float32Array.BYTES_PER_ELEMENT * initialValues.length, 48); // 48 is the min a size can be in WGPU
 
-    const buffer = manager.device.createBuffer({
+    const buffer = renderer.device.createBuffer({
       label: "materialData",
       size: SIZE,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -64,7 +64,7 @@ export class MaterialResource extends PipelineResourceTemplate {
     };
   }
 
-  getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
+  getBindingData(renderer: Renderer, pipeline: GPURenderPipeline): BindingData {
     // prettier-ignore
     const initialValues = new Float32Array([
       1, 1, 1, 0,         // Diffuse
@@ -75,7 +75,7 @@ export class MaterialResource extends PipelineResourceTemplate {
     ]);
     const SIZE = Mathf.max(Float32Array.BYTES_PER_ELEMENT * initialValues.length, 48); // 48 is the min a size can be in WGPU
 
-    const buffer = manager.device.createBuffer({
+    const buffer = renderer.device.createBuffer({
       label: "materialData",
       size: SIZE,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,

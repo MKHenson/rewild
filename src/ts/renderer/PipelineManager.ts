@@ -1,4 +1,4 @@
-import { GameManager } from "../core/GameManager";
+import { Renderer } from "./Renderer";
 import { DebugPipeline } from "../core/pipelines/debug-pipeline/DebugPipeline";
 import { Pipeline } from "../core/pipelines/Pipeline";
 import { SkyboxPipeline } from "../core/pipelines/skybox-pipeline/SkyboxPipeline";
@@ -11,7 +11,7 @@ class PipelineManager {
     return this.pipelines.find((p) => p.name === name);
   }
 
-  init(gameManager: GameManager) {
+  init(renderer: Renderer) {
     this.pipelines = [
       new DebugPipeline("coastal-floor", {
         diffuseMap: textureManager.find("ground-coastal-1"),
@@ -28,8 +28,8 @@ class PipelineManager {
     ];
 
     this.pipelines.forEach((p) => {
-      p.build(gameManager);
-      p.initialize(gameManager);
+      p.build(renderer);
+      p.initialize(renderer);
     });
   }
 }

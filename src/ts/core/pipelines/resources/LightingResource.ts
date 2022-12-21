@@ -1,4 +1,4 @@
-import { GameManager } from "../../GameManager";
+import { Renderer } from "../../../renderer/Renderer";
 import { UNIFORM_TYPES_MAP } from "./MemoryUtils";
 import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { GroupType } from "../../../../common/GroupType";
@@ -22,7 +22,7 @@ export class LightingResource extends PipelineResourceTemplate {
     super(GroupType.Material, ResourceType.Lighting);
   }
 
-  build<T extends Defines<T>>(manager: GameManager, pipeline: Pipeline<T>, curBindIndex: number): Template {
+  build<T extends Defines<T>>(renderer: Renderer, pipeline: Pipeline<T>, curBindIndex: number): Template {
     this.lightingConfigBinding = curBindIndex;
     this.sceneLightingBinding = curBindIndex + 1;
     this.directionLightBinding = pipeline.defines.NUM_DIR_LIGHTS ? curBindIndex + 2 : -1;
@@ -32,14 +32,14 @@ export class LightingResource extends PipelineResourceTemplate {
       const LIGHTING_CONFIG_SIZE = UNIFORM_TYPES_MAP["u32"];
       const SCENE_LIGHTING_BUFFER = UNIFORM_TYPES_MAP["vec4<f32>"];
 
-      LightingResource.lightingConfig = manager.device.createBuffer({
+      LightingResource.lightingConfig = renderer.device.createBuffer({
         label: "lightingConfigUniform",
         size: LIGHTING_CONFIG_SIZE,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         mappedAtCreation: true,
       });
 
-      LightingResource.sceneLightingBuffer = manager.device.createBuffer({
+      LightingResource.sceneLightingBuffer = renderer.device.createBuffer({
         label: "sceneLightingBuffer",
         size: SCENE_LIGHTING_BUFFER,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -71,7 +71,7 @@ export class LightingResource extends PipelineResourceTemplate {
 
       if (LightingResource.directionLightsBuffer) LightingResource.directionLightsBuffer.destroy();
 
-      LightingResource.directionLightsBuffer = manager.device.createBuffer({
+      LightingResource.directionLightsBuffer = renderer.device.createBuffer({
         label: "dirLightsBuffer",
         size: UNIFORM_TYPES_MAP["vec4<f32>"] * 2 * LightingResource.numDirLights,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
@@ -117,7 +117,7 @@ export class LightingResource extends PipelineResourceTemplate {
     };
   }
 
-  getBindingData(manager: GameManager, pipeline: GPURenderPipeline): BindingData {
+  getBindingData(renderer: Renderer, pipeline: GPURenderPipeline): BindingData {
     return {
       binds: [
         {

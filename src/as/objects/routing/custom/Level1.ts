@@ -41,8 +41,8 @@ export class Level1 extends Container implements Listener {
   private playerBody: RigidBody | null;
   private world: World | null;
 
-  constructor() {
-    super("Level1");
+  constructor(name: string) {
+    super(name);
     this.totalTime = 0;
     this.isPaused = false;
     this.world = null;
@@ -243,8 +243,4 @@ export class Level1 extends Container implements Listener {
     inputManager.removeEventListener("keyup", this);
     uiSignaller.removeEventListener(UIEventType, this);
   }
-}
-
-export function createLevel1(): Container {
-  return new Level1();
 }
