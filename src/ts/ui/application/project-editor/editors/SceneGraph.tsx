@@ -126,7 +126,9 @@ export const SceneGraph: Component<Props> = (props) => {
   };
 
   const onContainerRemove = () => {
-    setProject("containers", (c) => c!.filter((c) => !selectedNodes().find((selected) => selected.resource === c)));
+    setProject("containers", (c) =>
+      c!.filter((c) => !selectedNodes().find((selected) => selected.resource?.id === c.id))
+    );
     setSelectedNodes([]);
   };
 
