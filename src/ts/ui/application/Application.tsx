@@ -46,6 +46,9 @@ export const Application: Component<Props> = ({}) => {
       await renderer.init();
       await gameLoader.loadInitialContainers();
 
+      // Call the first frame so the containers can initialize
+      renderer.onFrame();
+
       setReady(true);
     } catch (err: unknown) {
       setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");

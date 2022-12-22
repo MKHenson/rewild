@@ -161,7 +161,7 @@ export class Renderer implements IBindable {
     if (updateWasm) wasm.resize(this.canvas.width, this.canvas.height);
   }
 
-  private onFrame() {
+  onFrame() {
     const clock = this.clock;
     window.requestAnimationFrame(this.onFrameHandler);
     const callbacks = this.updateCallbacks;
