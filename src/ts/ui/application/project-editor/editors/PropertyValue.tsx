@@ -19,6 +19,9 @@ export function PropertyValue<T extends any>(props: Props<T>) {
         <StyledStringValue
           readOnly={props.readonly}
           value={(props.value as string) || ""}
+          onBlur={(e) => {
+            props.onChange?.(e.currentTarget.value as T);
+          }}
           onKeyDown={(e) => {
             if (!props.onChange) return;
             if (e.key === "Enter") props.onChange(e.currentTarget.value as T);

@@ -1,62 +1,53 @@
 import { Component, createEffect, createSignal, onMount, onCleanup, Show } from "solid-js";
 import { styled } from "solid-styled-components";
+import { produce } from "solid-js/store";
 import { IResource, IProject, IContainer } from "models";
 import { Card } from "../../../common/Card";
 import { Typography } from "../../../common/Typography";
 import { Loading } from "../../../common/Loading";
-import { ITreeNode, Tree } from "../../../common/Tree";
+import { ITreeNode, Tree, traverseTree } from "../../../common/Tree";
 import { Button } from "../../../common/Button";
 import { ButtonGroup } from "../../../common/ButtonGroup";
 import { StyledMaterialIcon } from "../../../common/MaterialIcon";
 import { useEditor } from "../EditorProvider";
-import { produce } from "solid-js/store";
-import { createUUID } from "../../../utils";
+import { SceneGraphFactory } from "./SceneGraphFactory";
 
 interface Props {}
 
-function buildTree(project: IProject) {
-  return [
-    {
-      name: "Containers",
-      canSelect: false,
-      icon: "group_work",
-      children: project.containers.map(
-        (container) =>
-          ({
-            name: container.name,
-            icon: "label",
-            iconSize: "xs",
-            canSelect: true,
-            resource: container,
-            canRename: true,
-          } as ITreeNode)
-      ),
-    } as ITreeNode,
-  ];
-}
+const factory = new SceneGraphFactory();
 
-export function createContainer() {
-  const newContainer: IContainer = {
-    id: createUUID(),
-    name: `New Container`,
-    baseContainer: "",
-    activeOnStartup: true,
-    type: "container",
-  };
-
-  return newContainer;
-}
+// Keep track of prev nodes so we can match it if nodes
+// added and tree is rebuilt
+let selectedNodesCache: ITreeNode<IResource>[] = [];
 
 export const SceneGraph: Component<Props> = (props) => {
   const [selectedNodes, setSelectedNodes] = createSignal<ITreeNode<IResource>[]>([]);
   const [nodes, setNodes] = createSignal<ITreeNode<IResource>[]>([]);
-  const { setResource, setProject, project } = useEditor();
+  const { selectedResource, setResource, setProject, project } = useEditor();
 
   let activeNode: HTMLDivElement | null = null;
 
   createEffect(() => {
-    if (project) setNodes(buildTree(project as IProject));
+    if (project) {
+      const newNodes = factory.buildTree(project as IProject);
+      const prevNodesCache = selectedNodesCache;
+      let prevNode: ITreeNode | undefined = undefined;
+      const newSelection: ITreeNode[] = [];
+      traverseTree(newNodes, (node) => {
+        prevNode = prevNodesCache.find((prevNode) => prevNode.id === node.id);
+        if (prevNode) {
+          newSelection.push(node);
+        }
+      });
+      setNodes(newNodes);
+      setSelectedNodes(newSelection);
+    }
   });
+
+  const setSelection = (val: ITreeNode<IResource>[]) => {
+    selectedNodesCache = val;
+    setSelectedNodes(val);
+  };
 
   onMount(() => {
     document.addEventListener("keydown", onKeyUp);
@@ -120,20 +111,22 @@ export const SceneGraph: Component<Props> = (props) => {
     }
   };
 
-  const onContainerAdd = () => {
-    const newContainer = createContainer();
-    setProject("containers", (c) => [...c!, newContainer]);
+  const onAdd = () => {
+    const newResource = factory.createChildNode(selectedNodes()[0]);
+    if (newResource?.type === "container") setProject("containers", (c) => [...c!, newResource as IContainer]);
   };
 
-  const onContainerRemove = () => {
-    setProject("containers", (c) =>
-      c!.filter((c) => !selectedNodes().find((selected) => selected.resource?.id === c.id))
-    );
-    setSelectedNodes([]);
+  const onDelete = () => {
+    if (selectedResource()?.type === "container") {
+      setProject("containers", (c) =>
+        c!.filter((c) => !selectedNodes().find((selected) => selected.resource?.id === c.id))
+      );
+    }
+    setSelection([]);
   };
 
   const onSelectionChanged = (val: ITreeNode[]) => {
-    setSelectedNodes(val);
+    setSelection(val);
 
     if (val.length === 1 && val[0].resource) setResource(val[0].resource!);
     else setResource(null);
@@ -152,10 +145,18 @@ export const SceneGraph: Component<Props> = (props) => {
         </div>
         <div class="graph-actions">
           <ButtonGroup>
-            <Button variant="text" onClick={onContainerAdd}>
+            <Button
+              disabled={selectedNodes().length > 0 && !factory.canCreateNode(selectedNodes()[0])}
+              variant="text"
+              onClick={onAdd}
+            >
               <StyledMaterialIcon icon="add_circle" size="s" />
             </Button>
-            <Button variant="text" onClick={onContainerRemove}>
+            <Button
+              disabled={selectedNodes().length > 0 && !factory.canDeleteNode(selectedNodes()[0])}
+              variant="text"
+              onClick={onDelete}
+            >
               <StyledMaterialIcon icon="delete" size="s" />
             </Button>
           </ButtonGroup>

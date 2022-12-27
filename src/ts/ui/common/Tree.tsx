@@ -11,6 +11,7 @@ export type ITreeNode<Resource extends any = any> = {
   canRename?: boolean;
   children: ITreeNode<Resource>[];
   resource?: Resource;
+  id?: Resource | string;
 };
 
 interface TreeProps {
@@ -23,6 +24,18 @@ interface NodeProps {
   node: ITreeNode;
   selectedNodes: ITreeNode[];
   onSelectionChanged: (nodes: ITreeNode[]) => void;
+}
+
+export function traverseTree(rootNodes: ITreeNode[], onNode: (node: ITreeNode) => void) {
+  function traverseNode(node: ITreeNode) {
+    onNode(node);
+
+    if (node.children) {
+      for (const child of node.children) traverseNode(child);
+    }
+  }
+
+  for (const root of rootNodes) traverseNode(root);
 }
 
 export const Tree: ParentComponent<TreeProps> = (props) => {
