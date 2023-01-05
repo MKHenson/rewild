@@ -9,6 +9,7 @@ import { Loading } from "../../common/Loading";
 import { SceneGraph } from "./editors/SceneGraph";
 import { useEditor } from "./EditorProvider";
 import { ProjectSettings } from "./editors/ProjectSettings";
+import { Actors } from "./editors/Actors";
 interface Props {
   onHome: () => void;
 }
@@ -47,6 +48,7 @@ export const EditorGrid: Component<Props> = (props) => {
     if (type === "scene-graph") return <SceneGraph />;
     if (type === "project-settings") return <ProjectSettings />;
     if (type === "ribbon") return <RibbonButtons onHome={props.onHome} />;
+    if (type === "actors") return <Actors />;
     return null;
   };
 
