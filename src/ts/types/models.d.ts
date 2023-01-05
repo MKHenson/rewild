@@ -1,5 +1,5 @@
 declare module "models" {
-  export type EditorType = "properties" | "ribbon" | "scene-graph" | "project-settings";
+  export type EditorType = "properties" | "ribbon" | "scene-graph" | "project-settings" | "actors";
   import type { Timestamp } from "firebase/firestore";
 
   export interface IProject {
