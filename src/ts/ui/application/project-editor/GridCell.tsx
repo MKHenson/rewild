@@ -1,6 +1,7 @@
 import { EditorType } from "models";
 import { JSX, Component, Show } from "solid-js";
 import { styled } from "solid-styled-components";
+import { IDragData, getDragData, getDraggedData, setDragData } from "./hooks/useGlobalDragDrop";
 
 interface Props {
   rowStart: number;
@@ -13,28 +14,30 @@ interface Props {
   onEditorMoved: (type: EditorType, rowStart: number, colStart: number, rowEnd: number, colEnd: number) => void;
 }
 
-type Data = {
-  editor: string;
+interface DragData extends IDragData {
+  editor: EditorType;
   sizeX: number;
   sizeY: number;
-};
+}
 
 export const GridCell: Component<Props> = (props) => {
   const onDragStart = (e: DragEvent) => {
-    e.dataTransfer?.setData(
-      "text",
-      JSON.stringify({
-        editor: props.editor!,
-        sizeX: props.colEnd - props.colStart,
-        sizeY: props.rowEnd - props.rowStart,
-      } as Data)
-    );
+    const dragData: DragData = {
+      editor: props.editor!,
+      sizeX: props.colEnd - props.colStart,
+      sizeY: props.rowEnd - props.rowStart,
+      type: "gridcell",
+    } as DragData;
+    setDragData(e, dragData);
     e.dataTransfer?.setDragImage((e.currentTarget as HTMLDivElement).parentElement!, 0, 0);
   };
 
   const onDragOverEvent = (e: DragEvent) => {
-    (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "true");
-    e.preventDefault();
+    const data = getDraggedData();
+    if (data?.type === "gridcell") {
+      (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "true");
+      e.preventDefault();
+    }
   };
 
   const onDragLeaveEvent = (e: DragEvent) => {
@@ -43,15 +46,15 @@ export const GridCell: Component<Props> = (props) => {
   };
 
   const onDrop = (e: DragEvent) => {
+    const data = getDragData(e) as DragData;
+    if (!data || data.type !== "gridcell") return;
+
     (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "");
-    const data = e.dataTransfer?.getData("text");
-    if (!data) return;
-    const json = JSON.parse(data) as Data;
-    const rowEnd = props.rowStart + json.sizeY;
-    const colEnd = props.colStart + json.sizeX;
+    const rowEnd = props.rowStart + data.sizeY;
+    const colEnd = props.colStart + data.sizeX;
 
     props.onEditorMoved(
-      json.editor as EditorType,
+      data.editor,
       props.rowStart,
       props.colStart,
       rowEnd < props.rowEnd ? props.rowEnd : rowEnd,

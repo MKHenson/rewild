@@ -27,7 +27,7 @@ declare module "models" {
 
   export interface IResource {
     id: string;
-    type: "container";
+    type: "container" | "actor";
   }
 
   export interface IContainer extends IResource {
