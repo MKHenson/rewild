@@ -2,6 +2,12 @@ import { styled } from "solid-styled-components";
 import { createSignal, For, ParentComponent, Show } from "solid-js";
 import { Typography } from "./Typography";
 import { IconType, MaterialIcon, StyledMaterialIcon } from "./MaterialIcon";
+import {
+  getDragData,
+  getDraggedData,
+  setDragData,
+  IDragData,
+} from "../application/project-editor/hooks/useGlobalDragDrop";
 
 export type ITreeNode<Resource extends any = any> = {
   name: string;
@@ -12,6 +18,8 @@ export type ITreeNode<Resource extends any = any> = {
   children: ITreeNode<Resource>[];
   resource?: Resource;
   id?: Resource | string;
+  onDragOver?: (data: NodeDragData, node: ITreeNode<Resource>) => boolean;
+  onDrop?: (data: NodeDragData, node: ITreeNode<Resource>) => void;
 };
 
 interface TreeProps {
@@ -24,6 +32,10 @@ interface NodeProps {
   node: ITreeNode;
   selectedNodes: ITreeNode[];
   onSelectionChanged: (nodes: ITreeNode[]) => void;
+}
+
+interface NodeDragData extends IDragData {
+  type: "treenode";
 }
 
 export function traverseTree(rootNodes: ITreeNode[], onNode: (node: ITreeNode) => void) {
@@ -67,6 +79,34 @@ export const TreeNode: ParentComponent<NodeProps> = (props) => {
     } else props.onSelectionChanged([props.node]);
   };
 
+  const handleDragStart = (e: DragEvent) => {
+    const data: NodeDragData = { type: "treenode" };
+    setDragData(e, data);
+  };
+
+  const handleDragEnd = (e: DragEvent) => {
+    e.dataTransfer?.clearData();
+  };
+
+  const handleDragOver = (e: DragEvent) => {
+    const data = getDraggedData<NodeDragData>();
+    if (data && props.node.onDragOver?.(data, props.node)) {
+      (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "true");
+      e.preventDefault();
+    }
+  };
+
+  const handleDragLeave = (e: DragEvent) => {
+    (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "");
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    const data = getDragData(e) as NodeDragData;
+    if (!data) return;
+    props.node.onDrop?.(data, props.node);
+    (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "");
+  };
+
   return (
     <StyledTreenode class="treenode">
       <StyledTreenodeContent class={props.selectedNodes.includes(props.node) ? "selected-treenode" : ""}>
@@ -78,7 +118,16 @@ export const TreeNode: ParentComponent<NodeProps> = (props) => {
             <MaterialIcon class="expand-icon" onClick={handleExpandedClick} icon="arrow_drop_down" size="s" />
           </Show>
         </Show>
-        <Typography variant="body2" onClick={handleNodeClick}>
+        <Typography
+          draggable
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          variant="body2"
+          onClick={handleNodeClick}
+        >
           {props.node.icon && (
             <span class="node-icon">
               <StyledMaterialIcon icon={props.node.icon} size={props.node.iconSize || "s"} />
@@ -116,6 +165,15 @@ const StyledTreenodeContent = styled.div`
   margin: 0 0 0 0.5rem;
   cursor: pointer;
   user-select: none;
+
+  *[drop-active="true"] {
+    background: ${(e) => e.theme?.colors.primary400};
+    color: ${(e) => e.theme?.colors.onPrimary400};
+
+    .icon {
+      color: ${(e) => e.theme?.colors.onPrimary400} !important;
+    }
+  }
 
   .node-icon {
     vertical-align: middle;

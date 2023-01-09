@@ -1,6 +1,7 @@
 import { IContainer, IProject, IResource } from "models";
 import { ITreeNode } from "../../../../ui/common/Tree";
 import { createUUID } from "../../../utils";
+import { NodeDroppedDelegate } from "./SceneGraph";
 
 export class SceneGraphFactory {
   private createContainer() {
@@ -15,7 +16,7 @@ export class SceneGraphFactory {
     return newContainer;
   }
 
-  buildTree(project: IProject) {
+  buildTree(project: IProject, onNodeDropped: NodeDroppedDelegate) {
     return [
       {
         name: "Containers",
@@ -32,6 +33,10 @@ export class SceneGraphFactory {
               resource: container,
               canRename: true,
               id: container,
+              onDragOver(data, node) {
+                return true;
+              },
+              onDrop: onNodeDropped,
             } as ITreeNode)
         ),
       } as ITreeNode,

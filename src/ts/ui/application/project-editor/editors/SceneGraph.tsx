@@ -11,10 +11,13 @@ import { ButtonGroup } from "../../../common/ButtonGroup";
 import { StyledMaterialIcon } from "../../../common/MaterialIcon";
 import { useEditor } from "../EditorProvider";
 import { SceneGraphFactory } from "./SceneGraphFactory";
+import { IDragData } from "../hooks/useGlobalDragDrop";
 
 interface Props {}
 
 const factory = new SceneGraphFactory();
+
+export type NodeDroppedDelegate = (data: IDragData, node: ITreeNode) => void;
 
 // Keep track of prev nodes so we can match it if nodes
 // added and tree is rebuilt
@@ -29,7 +32,7 @@ export const SceneGraph: Component<Props> = (props) => {
 
   createEffect(() => {
     if (project) {
-      const newNodes = factory.buildTree(project as IProject);
+      const newNodes = factory.buildTree(project as IProject, onNodeDropped);
       const prevNodesCache = selectedNodesCache;
       let prevNode: ITreeNode | undefined = undefined;
       const newSelection: ITreeNode[] = [];
@@ -109,6 +112,11 @@ export const SceneGraph: Component<Props> = (props) => {
     } else if (activeNode && e.key === "Enter") {
       handleNodeDeactivate();
     }
+  };
+
+  const onNodeDropped: NodeDroppedDelegate = (data, node) => {
+    // const newResource = factory.createChildNode(node);
+    // if (newResource?.type === "actor") setProject("containers", (c) => c );
   };
 
   const onAdd = () => {
