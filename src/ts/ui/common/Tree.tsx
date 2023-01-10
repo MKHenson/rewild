@@ -20,6 +20,7 @@ export type ITreeNode<Resource extends any = any> = {
   id?: Resource | string;
   onDragOver?: (data: NodeDragData, node: ITreeNode<Resource>) => boolean;
   onDrop?: (data: NodeDragData, node: ITreeNode<Resource>) => void;
+  onDragStart?: (node: ITreeNode<Resource>) => NodeDragData;
 };
 
 interface TreeProps {
@@ -34,8 +35,9 @@ interface NodeProps {
   onSelectionChanged: (nodes: ITreeNode[]) => void;
 }
 
-interface NodeDragData extends IDragData {
+export interface NodeDragData extends IDragData {
   type: "treenode";
+  data: any;
 }
 
 export function traverseTree(rootNodes: ITreeNode[], onNode: (node: ITreeNode) => void) {
@@ -80,8 +82,10 @@ export const TreeNode: ParentComponent<NodeProps> = (props) => {
   };
 
   const handleDragStart = (e: DragEvent) => {
-    const data: NodeDragData = { type: "treenode" };
-    setDragData(e, data);
+    if (props.node.onDragStart) {
+      const data: NodeDragData = props.node.onDragStart(props.node);
+      setDragData(e, data);
+    }
   };
 
   const handleDragEnd = (e: DragEvent) => {

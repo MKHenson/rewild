@@ -1,17 +1,17 @@
 import { Component, createEffect, createSignal, onMount, onCleanup, Show } from "solid-js";
 import { styled } from "solid-styled-components";
 import { produce } from "solid-js/store";
-import { IResource, IProject, IContainer } from "models";
-import { Card } from "../../../common/Card";
-import { Typography } from "../../../common/Typography";
-import { Loading } from "../../../common/Loading";
-import { ITreeNode, Tree, traverseTree } from "../../../common/Tree";
-import { Button } from "../../../common/Button";
-import { ButtonGroup } from "../../../common/ButtonGroup";
-import { StyledMaterialIcon } from "../../../common/MaterialIcon";
-import { useEditor } from "../EditorProvider";
+import { IResource, IProject, IContainer, IActor } from "models";
+import { Card } from "../../../../common/Card";
+import { Typography } from "../../../../common/Typography";
+import { Loading } from "../../../../common/Loading";
+import { ITreeNode, Tree, traverseTree, NodeDragData } from "../../../../common/Tree";
+import { Button } from "../../../../common/Button";
+import { ButtonGroup } from "../../../../common/ButtonGroup";
+import { StyledMaterialIcon } from "../../../../common/MaterialIcon";
+import { useEditor } from "../../EditorProvider";
 import { SceneGraphFactory } from "./SceneGraphFactory";
-import { IDragData } from "../hooks/useGlobalDragDrop";
+import { IDragData } from "../../hooks/useGlobalDragDrop";
 
 interface Props {}
 
@@ -115,8 +115,17 @@ export const SceneGraph: Component<Props> = (props) => {
   };
 
   const onNodeDropped: NodeDroppedDelegate = (data, node) => {
-    // const newResource = factory.createChildNode(node);
-    // if (newResource?.type === "actor") setProject("containers", (c) => c );
+    const castNode = node as ITreeNode<IResource>;
+
+    if (castNode.resource?.type === "container")
+      setProject("containers", (c) =>
+        c?.map((container) => {
+          if (castNode.resource?.id === container.id) {
+            return { ...container, actors: container.actors.concat((data as NodeDragData).data as IActor) };
+          }
+          return container;
+        })
+      );
   };
 
   const onAdd = () => {

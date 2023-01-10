@@ -1,12 +1,14 @@
 import { Component, createEffect, createSignal, Show } from "solid-js";
 import { styled } from "solid-styled-components";
 import { IResource } from "models";
-import { Card } from "../../../common/Card";
-import { Typography } from "../../../common/Typography";
-import { Loading } from "../../../common/Loading";
-import { ITreeNode, Tree } from "../../../common/Tree";
-import { useEditor } from "../EditorProvider";
+import { Card } from "../../../../common/Card";
+import { Typography } from "../../../../common/Typography";
+import { Loading } from "../../../../common/Loading";
+import { ITreeNode, Tree } from "../../../../common/Tree";
+import { useEditor } from "../../EditorProvider";
+import { ActorFactory } from "./ActorFactory";
 
+const actorFactory = new ActorFactory();
 interface Props {}
 
 export const Actors: Component<Props> = (props) => {
@@ -16,21 +18,7 @@ export const Actors: Component<Props> = (props) => {
 
   createEffect(() => {
     if (project) {
-      const newNodes: ITreeNode<IResource>[] = [
-        {
-          name: "Actors",
-          icon: "man",
-          children: [
-            {
-              name: "Earth",
-              icon: "label_important",
-              canSelect: true,
-              iconSize: "xs",
-              children: [],
-            },
-          ],
-        },
-      ];
+      const newNodes = actorFactory.buildTree();
       setNodes(newNodes);
     }
   });
