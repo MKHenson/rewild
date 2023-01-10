@@ -30,10 +30,22 @@ declare module "models" {
     type: "container" | "actor";
   }
 
+  export type BaseType = "static";
+
+  export interface IActor extends IResource {
+    name: string;
+    baseType: BaseType;
+    pipeline: string;
+    geometry: "box" | "sphere";
+    type: "actor";
+  }
+
   export interface IContainer extends IResource {
     name: string;
     baseContainer: string;
     activeOnStartup: boolean;
+    type: "container";
+    actors: IActor[];
   }
 
   export interface IWorkspace {

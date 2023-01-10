@@ -6,10 +6,10 @@ import { RibbonButtons } from "./editors/RibbonButtons";
 import { Properties } from "./editors/Properties";
 import { EditorType, IWorkspaceCell } from "models";
 import { Loading } from "../../common/Loading";
-import { SceneGraph } from "./editors/SceneGraph";
+import { SceneGraph } from "./editors/scene-graph/SceneGraph";
 import { useEditor } from "./EditorProvider";
 import { ProjectSettings } from "./editors/ProjectSettings";
-import { Actors } from "./editors/Actors";
+import { Actors } from "./editors/actors/Actors";
 interface Props {
   onHome: () => void;
 }
