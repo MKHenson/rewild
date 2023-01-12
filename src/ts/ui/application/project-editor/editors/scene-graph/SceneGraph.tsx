@@ -134,7 +134,10 @@ export const SceneGraph: Component<Props> = (props) => {
   };
 
   const onDelete = () => {
-    if (selectedResource()?.type === "container") {
+    const selected = selectedResource();
+    if (!selected) return;
+
+    if (selected.type === "container") {
       setProject("containers", (c) =>
         c!.filter((c) => !selectedNodes().find((selected) => selected.resource?.id === c.id))
       );
