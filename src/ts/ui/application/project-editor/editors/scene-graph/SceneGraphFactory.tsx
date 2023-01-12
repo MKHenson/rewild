@@ -1,5 +1,4 @@
-import { IContainer, IProject, IResource } from "models";
-import { ITreeNode } from "../../../../../ui/common/Tree";
+import { IContainer, IProject, IResource, ITreeNode } from "models";
 import { createUUID } from "../../../../utils";
 import { NodeDroppedDelegate } from "./SceneGraph";
 

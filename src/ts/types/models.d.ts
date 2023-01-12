@@ -1,6 +1,25 @@
 declare module "models" {
   export type EditorType = "properties" | "ribbon" | "scene-graph" | "project-settings" | "actors";
   import type { Timestamp } from "firebase/firestore";
+  import type { IconType } from "src/ts/ui/common/MaterialIcon";
+
+  export interface IDragData {
+    type: "gridcell" | "treenode";
+  }
+
+  export type ITreeNode<Resource extends any = any> = {
+    name: string;
+    icon?: IconType;
+    iconSize?: "s" | "xs";
+    canSelect?: boolean;
+    canRename?: boolean;
+    children: ITreeNode<Resource>[];
+    resource?: Resource;
+    id?: Resource | string;
+    onDragOver?: (data: IDragData, node: ITreeNode<Resource>) => boolean;
+    onDrop?: (data: IDragData, node: ITreeNode<Resource>) => void;
+    onDragStart?: (node: ITreeNode<Resource>) => IDragData;
+  };
 
   export interface IProject {
     id?: string;
@@ -11,6 +30,9 @@ declare module "models" {
     startEvent: string;
     workspace: IWorkspace;
     containers: IContainer[];
+    sceneGraph: {
+      containers: ITreeNode<IResource>[];
+    };
     created: Timestamp;
     lastModified: Timestamp;
   }

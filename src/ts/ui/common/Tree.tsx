@@ -1,27 +1,9 @@
+import { IDragData, ITreeNode } from "models";
 import { styled } from "solid-styled-components";
 import { createSignal, For, ParentComponent, Show } from "solid-js";
 import { Typography } from "./Typography";
-import { IconType, MaterialIcon, StyledMaterialIcon } from "./MaterialIcon";
-import {
-  getDragData,
-  getDraggedData,
-  setDragData,
-  IDragData,
-} from "../application/project-editor/hooks/useGlobalDragDrop";
-
-export type ITreeNode<Resource extends any = any> = {
-  name: string;
-  icon?: IconType;
-  iconSize?: "s" | "xs";
-  canSelect?: boolean;
-  canRename?: boolean;
-  children: ITreeNode<Resource>[];
-  resource?: Resource;
-  id?: Resource | string;
-  onDragOver?: (data: NodeDragData, node: ITreeNode<Resource>) => boolean;
-  onDrop?: (data: NodeDragData, node: ITreeNode<Resource>) => void;
-  onDragStart?: (node: ITreeNode<Resource>) => NodeDragData;
-};
+import { MaterialIcon, StyledMaterialIcon } from "./MaterialIcon";
+import { getDragData, getDraggedData, setDragData } from "../application/project-editor/hooks/useGlobalDragDrop";
 
 interface TreeProps {
   rootNodes: ITreeNode[];
@@ -83,7 +65,7 @@ export const TreeNode: ParentComponent<NodeProps> = (props) => {
 
   const handleDragStart = (e: DragEvent) => {
     if (props.node.onDragStart) {
-      const data: NodeDragData = props.node.onDragStart(props.node);
+      const data = props.node.onDragStart(props.node) as NodeDragData;
       setDragData(e, data);
     }
   };

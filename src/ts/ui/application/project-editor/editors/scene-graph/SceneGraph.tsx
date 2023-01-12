@@ -1,17 +1,16 @@
 import { Component, createEffect, createSignal, onMount, onCleanup, Show } from "solid-js";
 import { styled } from "solid-styled-components";
 import { produce } from "solid-js/store";
-import { IResource, IProject, IContainer, IActor } from "models";
+import { IResource, IProject, IContainer, IActor, IDragData, ITreeNode } from "models";
 import { Card } from "../../../../common/Card";
 import { Typography } from "../../../../common/Typography";
 import { Loading } from "../../../../common/Loading";
-import { ITreeNode, Tree, traverseTree, NodeDragData } from "../../../../common/Tree";
+import { Tree, traverseTree, NodeDragData } from "../../../../common/Tree";
 import { Button } from "../../../../common/Button";
 import { ButtonGroup } from "../../../../common/ButtonGroup";
 import { StyledMaterialIcon } from "../../../../common/MaterialIcon";
 import { useEditor } from "../../EditorProvider";
 import { SceneGraphFactory } from "./SceneGraphFactory";
-import { IDragData } from "../../hooks/useGlobalDragDrop";
 
 interface Props {}
 
