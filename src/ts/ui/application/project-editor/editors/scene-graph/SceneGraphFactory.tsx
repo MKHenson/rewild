@@ -34,7 +34,13 @@ export class SceneGraphFactory {
               resource: container,
               canRename: true,
               id: container,
-              children: [],
+              children: container.actors.map((actor) => ({
+                name: actor.name,
+                id: actor.id,
+                canSelect: true,
+                resource: actor,
+                children: [],
+              })),
               onDragOver(data, node) {
                 return true;
               },
