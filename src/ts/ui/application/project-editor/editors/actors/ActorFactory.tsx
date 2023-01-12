@@ -1,5 +1,5 @@
-import { IActor } from "models";
-import { ITreeNode, NodeDragData } from "../../../../common/Tree";
+import { IActor, ITreeNode } from "models";
+import { NodeDragData } from "../../../../common/Tree";
 import { createUUID } from "../../../../utils";
 
 const actors: IActor[] = [

@@ -1,7 +1,7 @@
-import { EditorType } from "models";
+import { EditorType, IDragData } from "models";
 import { JSX, Component, Show } from "solid-js";
 import { styled } from "solid-styled-components";
-import { IDragData, getDragData, getDraggedData, setDragData } from "./hooks/useGlobalDragDrop";
+import { getDragData, getDraggedData, setDragData } from "./hooks/useGlobalDragDrop";
 
 interface Props {
   rowStart: number;

@@ -1,8 +1,5 @@
+import { IDragData } from "models";
 import { createSignal } from "solid-js";
-
-export interface IDragData {
-  type: "gridcell" | "treenode";
-}
 
 const signal = createSignal<IDragData | null>(null);
 

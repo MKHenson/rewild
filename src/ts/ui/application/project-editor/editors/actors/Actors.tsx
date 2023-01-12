@@ -1,10 +1,10 @@
 import { Component, createEffect, createSignal, Show } from "solid-js";
 import { styled } from "solid-styled-components";
-import { IResource } from "models";
+import { IResource, ITreeNode } from "models";
 import { Card } from "../../../../common/Card";
 import { Typography } from "../../../../common/Typography";
 import { Loading } from "../../../../common/Loading";
-import { ITreeNode, Tree } from "../../../../common/Tree";
+import { Tree } from "../../../../common/Tree";
 import { useEditor } from "../../EditorProvider";
 import { ActorFactory } from "./ActorFactory";
 
