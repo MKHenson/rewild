@@ -48,6 +48,9 @@ export function createProject() {
     id: createUUID(),
     name: "New Project",
     containers: [],
+    sceneGraph: {
+      containers: [],
+    },
     description: "",
     activeOnStartup: true,
     startEvent: "",

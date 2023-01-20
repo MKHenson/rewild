@@ -7,6 +7,14 @@ declare module "models" {
     type: "gridcell" | "treenode";
   }
 
+  export type PropType = "string" | "boolean";
+  export type PropValue = string | boolean | number;
+  export type IProperty = {
+    name: string;
+    type: PropType;
+    value: PropValue;
+  };
+
   export type ITreeNode<Resource extends any = any> = {
     name: string;
     icon?: IconType;
@@ -31,7 +39,7 @@ declare module "models" {
     workspace: IWorkspace;
     containers: IContainer[];
     sceneGraph: {
-      containers: ITreeNode<IResource>[];
+      containers: ITreeNode<IEditorResource>[];
     };
     created: Timestamp;
     lastModified: Timestamp;
@@ -50,6 +58,10 @@ declare module "models" {
   export interface IResource {
     id: string;
     type: "container" | "actor";
+  }
+
+  export interface IEditorResource extends IResource {
+    properties: IProperty[];
   }
 
   export type BaseType = "static";

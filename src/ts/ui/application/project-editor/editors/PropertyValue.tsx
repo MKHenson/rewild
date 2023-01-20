@@ -1,8 +1,7 @@
 import { styled } from "solid-styled-components";
 import { Typography } from "../../../common/Typography";
 import { Switch } from "../../../common/Switch";
-
-type PropType = "string" | "boolean";
+import { PropType } from "models";
 
 interface Props<T> {
   label: string;

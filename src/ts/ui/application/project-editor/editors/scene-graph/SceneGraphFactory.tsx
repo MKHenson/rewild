@@ -1,19 +1,24 @@
-import { IContainer, IProject, IResource, ITreeNode } from "models";
+import { IEditorResource, IProject, ITreeNode } from "models";
 import { createUUID } from "../../../../utils";
 import { NodeDroppedDelegate } from "./SceneGraph";
 
 export class SceneGraphFactory {
   private createContainer() {
-    const newContainer: IContainer = {
+    const newContainerNode: ITreeNode<IEditorResource> = {
       id: createUUID(),
       name: `New Container`,
-      baseContainer: "",
-      activeOnStartup: true,
-      type: "container",
-      actors: [],
+      resource: {
+        id: createUUID(),
+        properties: [
+          { name: "baseContainer", value: "", type: "string" },
+          { name: "activeOnStartup", value: true, type: "boolean" },
+        ],
+        type: "container",
+      },
+      children: [],
     };
 
-    return newContainer;
+    return newContainerNode;
   }
 
   buildTree(project: IProject, onNodeDropped: NodeDroppedDelegate) {
@@ -50,7 +55,7 @@ export class SceneGraphFactory {
     ];
   }
 
-  createChildNode(selectedNode: ITreeNode): IResource | null {
+  createChildNode(selectedNode: ITreeNode) {
     if (selectedNode.name === "Containers") return this.createContainer();
     return null;
   }

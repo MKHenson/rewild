@@ -128,15 +128,17 @@ export const SceneGraph: Component<Props> = (props) => {
   };
 
   const onAdd = () => {
-    const newResource = factory.createChildNode(selectedNodes()[0]);
-    if (newResource?.type === "container") setProject("containers", (c) => [...c!, newResource as IContainer]);
+    const selectedNode = selectedNodes()[0];
+    const childNode = factory.createChildNode(selectedNode);
+    if (!childNode) return;
+    if (selectedNode?.id === "CONTAINERS") setProject("sceneGraph", "containers", (c) => [...c, childNode]);
   };
 
   const onDelete = () => {
     const selected = selectedResource();
     if (!selected) return;
 
-    if (selected.type === "container") {
+    if (selected.id === "CONTAINERS") {
       setProject("containers", (c) =>
         c!.filter((c) => !selectedNodes().find((selected) => selected.resource?.id === c.id))
       );
