@@ -1,14 +1,14 @@
 import { createSignal, createContext, useContext, Component, Accessor, ParentProps, createEffect } from "solid-js";
 import { SetStoreFunction } from "solid-js/store";
-import { ILevel, IProject, IResource } from "models";
+import { ILevel, IProject, IResource, ITreeNode } from "models";
 import { useProject } from "./hooks/useProject";
 
 const EditorContext = createContext<EditorContext>();
 
 interface EditorContext {
   projectId: string;
-  selectedResource: Accessor<IResource | null>;
-  setResource: (resource: IResource | null) => void;
+  selectedResource: Accessor<ITreeNode<IResource> | null>;
+  setResource: (resource: ITreeNode<IResource> | null) => void;
   save: () => void;
   publish: () => void;
   project: Partial<IProject>;
@@ -26,13 +26,13 @@ export const EditorProvider: Component<Props> = (props) => {
   const { updateProject, dirty, getProject, setProject, level, publish, project, loading } = useProject(
     props.projectId
   );
-  const [selectedResource, setSelectedResource] = createSignal<IResource | null>(null);
+  const [selectedResource, setSelectedResource] = createSignal<ITreeNode<IResource> | null>(null);
 
   createEffect(() => {
     getProject();
   });
 
-  const setResource = (resource: IResource | null) => {
+  const setResource = (resource: ITreeNode<IResource> | null) => {
     setSelectedResource(resource);
   };
 
