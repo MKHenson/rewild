@@ -53,7 +53,6 @@ export class Renderer implements IBindable {
     this.onFrameHandler = this.onFrame.bind(this);
     this.clock = new Clock();
     this.updateCallbacks = [];
-    window.addEventListener("resize", (e) => (this.canvasSizeCache = this.canvasSize()));
   }
 
   lock() {
@@ -88,7 +87,6 @@ export class Renderer implements IBindable {
     context.configure({
       device: device,
       format: format,
-      size: this.canvasSize(),
       alphaMode: "premultiplied",
     });
 
@@ -138,7 +136,6 @@ export class Renderer implements IBindable {
     this.context.configure({
       device: this.device,
       format: this.format,
-      size: this.presentationSize,
       alphaMode: "premultiplied",
     });
 
@@ -171,7 +168,7 @@ export class Renderer implements IBindable {
 
     // Check if we need to resize
     const [w, h] = this.presentationSize;
-    const newSize = this.canvasSizeCache;
+    const newSize = this.canvasSize();
     if (newSize[0] != w || newSize[1] != h) {
       this.onResize(newSize);
     }
@@ -180,7 +177,7 @@ export class Renderer implements IBindable {
   }
 
   canvasSize() {
-    const devicePixelRatio = window.devicePixelRatio || 1;
+    const devicePixelRatio = 1; // TODO: Why does this not work? ---> window.devicePixelRatio || 1;
     const size: [number, number] = [
       this.canvas.clientWidth * devicePixelRatio,
       this.canvas.clientHeight * devicePixelRatio,
