@@ -1,33 +1,23 @@
 import { styled } from "solid-styled-components";
-import { IContainer } from "models";
-import { Component, Show } from "solid-js";
+import { IEditorResource, PropValue, IProperty } from "models";
+import { Component, For, Show } from "solid-js";
 import { Card } from "../../../common/Card";
 import { Typography } from "../../../common/Typography";
 import { useEditor } from "../EditorProvider";
 import { PropertyValue } from "./PropertyValue";
-import { produce } from "solid-js/store";
 
 interface Props {}
-
-interface StringEditFunction<T, K extends keyof T> {
-  (value: T[K], key: K): void;
-}
-
-function setProperty<T, K extends keyof T>(obj: T, key: K, value: T[K]) {
-  obj[key] = value;
-}
 
 export const Properties: Component<Props> = (props) => {
   const { selectedResource, setProject, loading } = useEditor();
 
-  const onContainerEdited: StringEditFunction<IContainer, keyof IContainer> = (val, type) => {
-    const resource = selectedResource() as IContainer;
-    setProject(
-      produce((state) => {
-        if (selectedResource()?.type === "container") {
-          const container: IContainer = state.containers?.find((c) => c.id === resource.id)!;
-          setProperty(container, type, val);
-        }
+  const onPropEdited = (val: PropValue, prop: IProperty) => {
+    const node = selectedResource();
+
+    setProject("sceneGraph", "containers", (containers) =>
+      containers.map((container) => {
+        if (container === node) return container;
+        else return { ...container };
       })
     );
   };
@@ -39,24 +29,16 @@ export const Properties: Component<Props> = (props) => {
       <Show when={selectedResource()}>
         <StyledPropGrid>
           <PropertyValue label="ID" value={selectedResource()?.id} type="string" readonly />
-          <PropertyValue
-            label="Name"
-            value={(selectedResource() as IContainer).name}
-            type="string"
-            onChange={(val) => onContainerEdited(val, "name")}
-          />
-          <PropertyValue
-            label="Base Container"
-            value={(selectedResource() as IContainer).baseContainer}
-            type="string"
-            onChange={(val) => onContainerEdited(val, "baseContainer")}
-          />
-          <PropertyValue<boolean>
-            label="Active On Startup"
-            value={(selectedResource() as IContainer).activeOnStartup}
-            type="boolean"
-            onChange={(val) => onContainerEdited(val, "activeOnStartup")}
-          />
+          <For each={(selectedResource()?.resource as IEditorResource).properties}>
+            {(prop) => (
+              <PropertyValue
+                label={prop.name}
+                value={prop.value}
+                type={prop.type}
+                onChange={(val) => onPropEdited(val, prop)}
+              />
+            )}
+          </For>
         </StyledPropGrid>
       </Show>
     </Card>

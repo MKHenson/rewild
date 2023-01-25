@@ -1,7 +1,7 @@
 import { Component, createEffect, createSignal, onMount, onCleanup, Show } from "solid-js";
 import { styled } from "solid-styled-components";
 import { produce } from "solid-js/store";
-import { IResource, IProject, IContainer, IActor, IDragData, ITreeNode } from "models";
+import { IProject, IContainer, IActor, IDragData, ITreeNode } from "models";
 import { Card } from "../../../../common/Card";
 import { Typography } from "../../../../common/Typography";
 import { Loading } from "../../../../common/Loading";
@@ -20,11 +20,11 @@ export type NodeDroppedDelegate = (data: IDragData, node: ITreeNode) => void;
 
 // Keep track of prev nodes so we can match it if nodes
 // added and tree is rebuilt
-let selectedNodesCache: ITreeNode<IResource>[] = [];
+let selectedNodesCache: ITreeNode[] = [];
 
 export const SceneGraph: Component<Props> = (props) => {
-  const [selectedNodes, setSelectedNodes] = createSignal<ITreeNode<IResource>[]>([]);
-  const [nodes, setNodes] = createSignal<ITreeNode<IResource>[]>([]);
+  const [selectedNodes, setSelectedNodes] = createSignal<ITreeNode[]>([]);
+  const [nodes, setNodes] = createSignal<ITreeNode[]>([]);
   const { selectedResource, setResource, setProject, project } = useEditor();
 
   let activeNode: HTMLDivElement | null = null;
@@ -46,7 +46,7 @@ export const SceneGraph: Component<Props> = (props) => {
     }
   });
 
-  const setSelection = (val: ITreeNode<IResource>[]) => {
+  const setSelection = (val: ITreeNode[]) => {
     selectedNodesCache = val;
     setSelectedNodes(val);
   };
@@ -114,7 +114,7 @@ export const SceneGraph: Component<Props> = (props) => {
   };
 
   const onNodeDropped: NodeDroppedDelegate = (data, node) => {
-    const castNode = node as ITreeNode<IResource>;
+    const castNode = node as ITreeNode;
 
     if (castNode.resource?.type === "container")
       setProject("containers", (c) =>
@@ -131,6 +131,7 @@ export const SceneGraph: Component<Props> = (props) => {
     const selectedNode = selectedNodes()[0];
     const childNode = factory.createChildNode(selectedNode);
     if (!childNode) return;
+
     if (selectedNode?.id === "CONTAINERS") setProject("sceneGraph", "containers", (c) => [...c, childNode]);
   };
 
@@ -149,7 +150,7 @@ export const SceneGraph: Component<Props> = (props) => {
   const onSelectionChanged = (val: ITreeNode[]) => {
     setSelection(val);
 
-    if (val.length === 1 && val[0].resource) setResource(val[0].resource!);
+    if (val.length === 1 && val[0].resource) setResource(val[0]);
     else setResource(null);
   };
 
