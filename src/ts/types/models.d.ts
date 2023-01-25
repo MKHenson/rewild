@@ -15,18 +15,18 @@ declare module "models" {
     value: PropValue;
   };
 
-  export type ITreeNode<Resource extends any = any> = {
+  export type ITreeNode = {
     name: string;
     icon?: IconType;
     iconSize?: "s" | "xs";
     canSelect?: boolean;
     canRename?: boolean;
-    children: ITreeNode<Resource>[];
-    resource?: Resource;
-    id?: Resource | string;
-    onDragOver?: (data: IDragData, node: ITreeNode<Resource>) => boolean;
-    onDrop?: (data: IDragData, node: ITreeNode<Resource>) => void;
-    onDragStart?: (node: ITreeNode<Resource>) => IDragData;
+    children: ITreeNode[];
+    resource?: IResource;
+    id?: IResource | string;
+    onDragOver?: (data: IDragData, node: ITreeNode) => boolean;
+    onDrop?: (data: IDragData, node: ITreeNode) => void;
+    onDragStart?: (node: ITreeNode) => IDragData;
   };
 
   export interface IProject {
@@ -39,7 +39,7 @@ declare module "models" {
     workspace: IWorkspace;
     containers: IContainer[];
     sceneGraph: {
-      containers: ITreeNode<IEditorResource>[];
+      containers: ITreeNode[];
     };
     created: Timestamp;
     lastModified: Timestamp;

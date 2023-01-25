@@ -1,6 +1,6 @@
 import { Component, createEffect, createSignal, Show } from "solid-js";
 import { styled } from "solid-styled-components";
-import { IResource, ITreeNode } from "models";
+import { ITreeNode } from "models";
 import { Card } from "../../../../common/Card";
 import { Typography } from "../../../../common/Typography";
 import { Loading } from "../../../../common/Loading";
@@ -12,8 +12,8 @@ const actorFactory = new ActorFactory();
 interface Props {}
 
 export const Actors: Component<Props> = (props) => {
-  const [selectedNodes, setSelectedNodes] = createSignal<ITreeNode<IResource>[]>([]);
-  const [nodes, setNodes] = createSignal<ITreeNode<IResource>[]>([]);
+  const [selectedNodes, setSelectedNodes] = createSignal<ITreeNode[]>([]);
+  const [nodes, setNodes] = createSignal<ITreeNode[]>([]);
   const { project } = useEditor();
 
   createEffect(() => {
@@ -23,7 +23,7 @@ export const Actors: Component<Props> = (props) => {
     }
   });
 
-  const setSelection = (val: ITreeNode<IResource>[]) => {
+  const setSelection = (val: ITreeNode[]) => {
     setSelectedNodes(val);
   };
 

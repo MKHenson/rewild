@@ -4,7 +4,7 @@ import { NodeDroppedDelegate } from "./SceneGraph";
 
 export class SceneGraphFactory {
   private createContainer() {
-    const newContainerNode: ITreeNode<IEditorResource> = {
+    const newContainerNode: ITreeNode = {
       id: createUUID(),
       name: `New Container`,
       resource: {
@@ -14,7 +14,7 @@ export class SceneGraphFactory {
           { name: "activeOnStartup", value: true, type: "boolean" },
         ],
         type: "container",
-      },
+      } as IEditorResource,
       children: [],
     };
 
