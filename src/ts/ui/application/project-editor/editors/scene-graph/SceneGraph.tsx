@@ -30,7 +30,7 @@ export const SceneGraph: Component<Props> = (props) => {
   let activeNode: HTMLDivElement | null = null;
 
   createEffect(() => {
-    if (project) {
+    if (project.sceneGraph?.containers) {
       const newNodes = factory.buildTree(project as IProject, onNodeDropped);
       const prevNodesCache = selectedNodesCache;
       let prevNode: ITreeNode | undefined = undefined;
