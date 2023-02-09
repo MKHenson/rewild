@@ -1,6 +1,4 @@
-import { DefaultTheme } from "solid-styled-components";
-
-export const theme: DefaultTheme = {
+export const theme = {
   colors: {
     primary400: "var(--primary-400)",
     primary500: "var(--primary-500)",

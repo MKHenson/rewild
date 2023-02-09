@@ -38,18 +38,10 @@ module.exports = (options) => ({
   },
   module: {
     rules: [
-      // all files with a `.ts` or `.tsx` extension will be handled by `ts-loader`
       {
         test: /\.tsx?$/,
+        use: "ts-loader",
         exclude: /node_modules/,
-        use: {
-          loader: "babel-loader",
-          options: {
-            babelrc: false,
-            configFile: false,
-            presets: [["@babel/preset-env", { targets: ">0.95%" }], "solid", "@babel/preset-typescript"],
-          },
-        },
       },
       {
         test: /\.(png|jpe?g|gif)$/i,
