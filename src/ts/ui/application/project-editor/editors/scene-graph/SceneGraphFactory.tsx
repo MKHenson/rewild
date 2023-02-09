@@ -7,6 +7,10 @@ export class SceneGraphFactory {
     const newContainerNode: ITreeNode = {
       id: createUUID(),
       name: `New Container`,
+      icon: "label",
+      iconSize: "xs",
+      canSelect: true,
+      canRename: true,
       resource: {
         id: createUUID(),
         properties: [
@@ -28,23 +32,12 @@ export class SceneGraphFactory {
         canSelect: true,
         icon: "group_work",
         id: "CONTAINERS",
-        children: project.containers.map(
+        children: project.sceneGraph.containers.map(
           (container) =>
             ({
+              ...container,
               name: container.name,
-              icon: "label",
-              iconSize: "xs",
-              canSelect: true,
-              resource: container,
-              canRename: true,
-              id: container,
-              children: container.actors.map((actor) => ({
-                name: actor.name,
-                id: actor.id,
-                canSelect: true,
-                resource: actor,
-                children: [],
-              })),
+              children: [],
               onDragOver(data, node) {
                 return true;
               },
