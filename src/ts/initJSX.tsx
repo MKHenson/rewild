@@ -13,7 +13,7 @@ function jsx(
   // Check if this is a web component
   if (typeof tag === "function" && (tag as JSX.ComponentStatic).tagName) {
     const element = document.createElement((tag as JSX.ComponentStatic).tagName!) as JSX.Element;
-    element.props = attributes!;
+    element.props = { ...element.props, ...attributes };
     appendChildren(element, children);
     return element;
   }
@@ -62,4 +62,9 @@ function appendChildren(element: HTMLElement, children: Node[]) {
 }
 
 (window as any).jsx = jsx;
-(window as any).css = (val: string) => val;
+(window as any).css = (val: TemplateStringsArray, ...rest: (TemplateStringsArray | string)[]) => {
+  let str = "";
+  val.forEach((string, i) => (str += string + (rest[i] || "")));
+  str = str.replace(/\r?\n|\r/g, "");
+  return str;
+};
