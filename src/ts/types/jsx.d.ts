@@ -1,5 +1,3 @@
-// import * as csstype from "csstype";
-
 declare namespace JSX {
   // The return type of our JSX Factory
   type Element = HTMLElement & { props: any };
@@ -33,7 +31,7 @@ declare namespace JSX {
   }
 }
 
-declare function css(val: TemplateStringsArray): string;
+declare function css(val: TemplateStringsArray, ...rest: (TemplateStringsArray | string | number)[]): string;
 
 // ===============================
 
@@ -58,9 +56,9 @@ declare namespace JSX {
     // empty, libs can define requirements downstream
     props: any;
   }
-  // interface ElementChildrenAttribute {
-  //   children: {};
-  // }
+  interface ElementChildrenAttribute {
+    children: {};
+  }
   interface EventHandler<T, E extends Event> {
     (
       e: E & {
@@ -140,94 +138,6 @@ declare namespace JSX {
     innerHTML?: string;
     innerText?: string | number;
     textContent?: string | number;
-    onCopy?: EventHandlerUnion<T, ClipboardEvent>;
-    onCut?: EventHandlerUnion<T, ClipboardEvent>;
-    onPaste?: EventHandlerUnion<T, ClipboardEvent>;
-    onCompositionEnd?: EventHandlerUnion<T, CompositionEvent>;
-    onCompositionStart?: EventHandlerUnion<T, CompositionEvent>;
-    onCompositionUpdate?: EventHandlerUnion<T, CompositionEvent>;
-    onFocus?: EventHandlerUnion<T, FocusEvent>;
-    onFocusOut?: EventHandlerUnion<T, FocusEvent>;
-    onFocusIn?: EventHandlerUnion<T, FocusEvent>;
-    onBlur?: EventHandlerUnion<T, FocusEvent>;
-    onChange?: EventHandlerUnion<T, Event>;
-    onInvalid?: EventHandlerUnion<T, Event>;
-    onInput?: EventHandlerUnion<T, InputEvent>;
-    onBeforeInput?: EventHandlerUnion<T, InputEvent>;
-    onReset?: EventHandlerUnion<T, Event>;
-    onSubmit?: EventHandlerUnion<
-      T,
-      Event & {
-        submitter: HTMLElement;
-      }
-    >;
-    onLoad?: EventHandlerUnion<T, Event>;
-    onError?: EventHandlerUnion<T, Event>;
-    onKeyDown?: EventHandlerUnion<T, KeyboardEvent>;
-    onKeyPress?: EventHandlerUnion<T, KeyboardEvent>;
-    onKeyUp?: EventHandlerUnion<T, KeyboardEvent>;
-    onGotPointerCapture?: EventHandlerUnion<T, PointerEvent>;
-    onLostPointerCapture?: EventHandlerUnion<T, PointerEvent>;
-    onPointerCancel?: EventHandlerUnion<T, PointerEvent>;
-    onPointerDown?: EventHandlerUnion<T, PointerEvent>;
-    onPointerEnter?: EventHandlerUnion<T, PointerEvent>;
-    onPointerLeave?: EventHandlerUnion<T, PointerEvent>;
-    onPointerMove?: EventHandlerUnion<T, PointerEvent>;
-    onPointerOver?: EventHandlerUnion<T, PointerEvent>;
-    onPointerOut?: EventHandlerUnion<T, PointerEvent>;
-    onPointerUp?: EventHandlerUnion<T, PointerEvent>;
-    onAbort?: EventHandlerUnion<T, Event>;
-    onCanPlay?: EventHandlerUnion<T, Event>;
-    onCanPlayThrough?: EventHandlerUnion<T, Event>;
-    onDurationChange?: EventHandlerUnion<T, Event>;
-    onEmptied?: EventHandlerUnion<T, Event>;
-    onEncrypted?: EventHandlerUnion<T, Event>;
-    onEnded?: EventHandlerUnion<T, Event>;
-    onLoadedData?: EventHandlerUnion<T, Event>;
-    onLoadedMetadata?: EventHandlerUnion<T, Event>;
-    onLoadStart?: EventHandlerUnion<T, Event>;
-    onPause?: EventHandlerUnion<T, Event>;
-    onPlay?: EventHandlerUnion<T, Event>;
-    onPlaying?: EventHandlerUnion<T, Event>;
-    onProgress?: EventHandlerUnion<T, Event>;
-    onRateChange?: EventHandlerUnion<T, Event>;
-    onSeeked?: EventHandlerUnion<T, Event>;
-    onSeeking?: EventHandlerUnion<T, Event>;
-    onStalled?: EventHandlerUnion<T, Event>;
-    onSuspend?: EventHandlerUnion<T, Event>;
-    onTimeUpdate?: EventHandlerUnion<T, Event>;
-    onVolumeChange?: EventHandlerUnion<T, Event>;
-    onWaiting?: EventHandlerUnion<T, Event>;
-    onClick?: EventHandlerUnion<T, MouseEvent>;
-    onAuxClick?: EventHandlerUnion<T, MouseEvent>;
-    onContextMenu?: EventHandlerUnion<T, MouseEvent>;
-    onDblClick?: EventHandlerUnion<T, MouseEvent>;
-    onDrag?: EventHandlerUnion<T, DragEvent>;
-    onDragEnd?: EventHandlerUnion<T, DragEvent>;
-    onDragEnter?: EventHandlerUnion<T, DragEvent>;
-    onDragExit?: EventHandlerUnion<T, DragEvent>;
-    onDragLeave?: EventHandlerUnion<T, DragEvent>;
-    onDragOver?: EventHandlerUnion<T, DragEvent>;
-    onDragStart?: EventHandlerUnion<T, DragEvent>;
-    onDrop?: EventHandlerUnion<T, DragEvent>;
-    onMouseDown?: EventHandlerUnion<T, MouseEvent>;
-    onMouseEnter?: EventHandlerUnion<T, MouseEvent>;
-    onMouseLeave?: EventHandlerUnion<T, MouseEvent>;
-    onMouseMove?: EventHandlerUnion<T, MouseEvent>;
-    onMouseOut?: EventHandlerUnion<T, MouseEvent>;
-    onMouseOver?: EventHandlerUnion<T, MouseEvent>;
-    onMouseUp?: EventHandlerUnion<T, MouseEvent>;
-    onSelect?: EventHandlerUnion<T, UIEvent>;
-    onTouchCancel?: EventHandlerUnion<T, TouchEvent>;
-    onTouchEnd?: EventHandlerUnion<T, TouchEvent>;
-    onTouchMove?: EventHandlerUnion<T, TouchEvent>;
-    onTouchStart?: EventHandlerUnion<T, TouchEvent>;
-    onScroll?: EventHandlerUnion<T, UIEvent>;
-    onWheel?: EventHandlerUnion<T, WheelEvent>;
-    onAnimationStart?: EventHandlerUnion<T, AnimationEvent>;
-    onAnimationEnd?: EventHandlerUnion<T, AnimationEvent>;
-    onAnimationIteration?: EventHandlerUnion<T, AnimationEvent>;
-    onTransitionEnd?: EventHandlerUnion<T, TransitionEvent>;
 
     // lower case events
     oncopy?: EventHandlerUnion<T, ClipboardEvent>;
@@ -322,7 +232,7 @@ declare namespace JSX {
 
   interface CSSProperties {
     // Override
-    [key: `-${string}`]: string | number | undefined;
+    [key: string]: string | number | undefined;
   }
 
   type HTMLAutocapitalize = "off" | "none" | "on" | "sentences" | "words" | "characters";
@@ -657,7 +567,7 @@ declare namespace JSX {
     id?: string;
     lang?: string;
     spellcheck?: boolean;
-    style?: CSSProperties | string;
+    style?: string;
     tabindex?: number | string;
     title?: string;
     translate?: "yes" | "no";
