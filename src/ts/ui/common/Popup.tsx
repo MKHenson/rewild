@@ -21,6 +21,8 @@ export class Popup extends Component<Props> {
         }
       };
 
+      this.toggleAttribute("open", this.props.open);
+
       this.shadow!.append(
         <div
           class={`wrapper popup ${this.props.open ? "visible" : ""} ${
@@ -38,6 +40,13 @@ export class Popup extends Component<Props> {
 
   css() {
     return css`
+      :host {
+        display: none;
+      }
+      :host([open]) {
+        display: initial;
+      }
+
       :host,
       :host > div {
         position: fixed;

@@ -17,39 +17,44 @@ export interface ComponentOptions<T> {
   shadow?: ShadowRootInit;
 }
 
+export type ChildType = Node | Element | string | undefined;
+
 export abstract class Component<T = any> extends HTMLElement {
   shadow: ShadowRoot | null;
   render: RenderFn;
   private trackedStores: UnsubscribeStoreFn[];
 
   // specify the property on the element instance type
-  _props: T & { children?: any };
+  _props: T & { children?: ChildType | ChildType[] };
 
   constructor(options?: ComponentOptions<T>) {
     super();
     this.trackedStores = [];
     const useShadow = options?.useShadow === undefined ? true : options?.useShadow;
     this.shadow = useShadow ? this.attachShadow(options?.shadow || { mode: "open" }) : null;
+    const parent = useShadow ? this.shadow! : this;
+
     const fn = this.init();
     const css = this.css();
-    if (css) {
-      this.shadow?.append(<style>{css}</style>);
-    }
 
     this._props = options?.props as any;
 
     this.render = () => {
-      let numInitialElements = css ? 1 : 0;
-      if (this.shadow) while (this.shadow.children.length !== numInitialElements) this.shadow?.lastChild?.remove();
+      while (parent.children.length !== 0) parent.lastChild?.remove();
+
+      if (css) {
+        parent.append(<style>{css}</style>);
+      }
+
       fn();
     };
   }
 
-  get props(): T & { children?: any } {
+  get props(): T & { children?: ChildType | ChildType[] } {
     return this._props;
   }
 
-  set props(val: T & { children?: any }) {
+  set props(val: T & { children?: ChildType | ChildType[] }) {
     this._props = val || ({} as any);
     this.render();
   }
