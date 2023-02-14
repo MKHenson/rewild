@@ -38,12 +38,16 @@ export class Popup extends Component<Props> {
 
   css() {
     return css`
+      :host,
       :host > div {
         position: fixed;
         left: 0;
         top: 0;
         width: 100%;
         height: 100%;
+      }
+
+      :host > div {
         pointer-events: none;
         background: none;
         opacity: 0;

@@ -17,11 +17,12 @@ interface Props {
 export class Button extends Component<Props> {
   init() {
     return () => {
+      this.toggleAttribute("fullwidth", this.props.fullWidth);
       this.shadow!.append(
         <button
           disabled={this.props.disabled}
           onclick={this.props.onClick}
-          class={`${this.props.class} ${this.props.variant || "contained"} ${this.props.color || "primary"} ${
+          class={`${this.props.class || ""} ${this.props.variant || "contained"} ${this.props.color || "primary"} ${
             this.props.fullWidth ? "fullwidth" : ""
           }`}
         >
@@ -33,6 +34,13 @@ export class Button extends Component<Props> {
 
   css() {
     return css`
+      :host {
+        display: inline-block;
+      }
+      :host([fullwidth]) {
+        display: block;
+      }
+
       button {
         padding: 0.5rem 1rem;
         border-radius: 5px;

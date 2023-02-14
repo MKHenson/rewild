@@ -33,28 +33,26 @@ export class Modal extends Component<Props> {
 
       this.shadow!.append(
         <Popup open={this.props.open} onClose={this.props.onClose} withBackground={this.props.withBackground}>
-          <div>
-            {typeof this.props.title === "string" ? (
-              <Typography variant="h2">{this.props.title}</Typography>
-            ) : (
-              this.props.title || ""
-            )}
-            <div class="content">
-              <slot></slot>
-            </div>
-            {this.props.hideConfirmButtons ? (
-              ""
-            ) : (
-              <div class="button-container">
-                <Button onClick={handleCancel} class="cancel" variant="outlined">
-                  Cancel
-                </Button>
-                <Button onClick={handleOk} class="ok">
-                  Okay
-                </Button>
-              </div>
-            )}
+          {typeof this.props.title === "string" ? (
+            <Typography variant="h2">{this.props.title}</Typography>
+          ) : (
+            this.props.title || ""
+          )}
+          <div class="content">
+            <slot></slot>
           </div>
+          {this.props.hideConfirmButtons ? (
+            ""
+          ) : (
+            <div class="button-container">
+              <Button onClick={handleCancel} class="cancel" variant="outlined">
+                Cancel
+              </Button>
+              <Button onClick={handleOk} class="ok">
+                Okay
+              </Button>
+            </div>
+          )}
         </Popup>
       );
     };

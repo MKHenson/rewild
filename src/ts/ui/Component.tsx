@@ -29,7 +29,7 @@ export abstract class Component<T = any> extends HTMLElement {
     super();
     this.trackedStores = [];
     const useShadow = options?.useShadow === undefined ? true : options?.useShadow;
-    this.shadow = useShadow ? this.attachShadow(options?.shadow || { mode: "closed" }) : null;
+    this.shadow = useShadow ? this.attachShadow(options?.shadow || { mode: "open" }) : null;
     const fn = this.init();
     const css = this.css();
     if (css) {

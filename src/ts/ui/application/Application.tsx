@@ -7,120 +7,126 @@
 // // import { GameLoader } from "../../core/GameLoader";
 // // import { WasmManager } from "../../core/WasmManager";
 // // import { Pane3D } from "../common/Pane3D";
-// // import { MainMenu } from "./MainMenu";
+import { MainMenu } from "./MainMenu";
 // // import { ApplicationEventType } from "../../../common/EventTypes";
 // // import { ProjectEditorPage } from "./project-editor/ProjectEditorPage";
-// import { ErrorType, StartError } from "./StartError";
+import { ErrorType, StartError } from "./StartError";
 // // import { Auth } from "./Auth";
 // // import { InGame } from "./InGame";
 
-// import { Route } from "../common/Route";
-// import { RouterSwitch } from "../common/RouterSwitch";
-// import { Component } from "../Component";
+import { Route } from "../common/Route";
+import { navigate } from "../common/Router";
+import { RouterSwitch } from "../common/RouterSwitch";
+import { Component, register } from "../Component";
 
-// interface Props {}
+interface Props {}
 
-// export class Application extends Component<Props> {
-//   init() {
-//     return () => {
-//       // let renderer: Renderer;
-//       const [errorType] = this.useState<ErrorType>("OTHER"); // setErrorType
-//       const [errorMessage] = this.useState(""); // , setErrorMessage
-//       // const [ready] = this.useState(false); // , setReady
+@register("x-application")
+export class Application extends Component<Props> {
+  init() {
+    return () => {
+      // let renderer: Renderer;
+      const [errorType] = this.useState<ErrorType>("OTHER"); // setErrorType
+      const [errorMessage] = this.useState(""); // , setErrorMessage
+      // const [ready] = this.useState(false); // , setReady
 
-//       this.shadow!.append(
-//         <div>
-//           {/* <Pane3D onCanvasReady={onCanvasReady} /> */}
+      const onStart = async () => {
+        navigate("/game");
+        //   await gameLoader.loadInitialLevels();
+        //   eventManager.triggerUIEvent(ApplicationEventType.StartGame);
+      };
 
-//           <RouterSwitch>
-//             <Route
-//               path="/"
-//               onRender={(params) =>
-//                 errorMessage() === "" ? (
-//                   <StartError open errorMsg={errorMessage()} errorType={errorType()} />
-//                 ) : (
-//                   <MainMenu open onStart={onStart} onEditor={onEditor} />
-//                 )
-//               }
-//             />
-//             {/* { ready() ?
-//                     <div>
-//                             <Route
-//                             path="/game"
-//                             element={<InGame renderer={renderer!} eventManager={eventManager!} onQuit={onQuit} />}
-//                             />
-//                             <Route
-//                             path="/editor/*"
-//                             element={<ProjectEditorPage onQuit={onQuit} renderer={renderer!} eventManager={eventManager!} />}
-//                             />
-//                             </div>
-//                      : ''
-//                     } */}
-//           </RouterSwitch>
-//           {/* <Auth /> */}
-//         </div>
-//       );
-//     };
-//   }
+      const onEditor = () => {
+        //   navigate("/editor");
+      };
 
-//   //   const [errorType, setErrorType] = createSignal<ErrorType>("OTHER");
-//   //   const navigate = useNavigate();
+      this.shadow!.append(
+        <div>
+          {/* <Pane3D onCanvasReady={onCanvasReady} /> */}
+          <RouterSwitch>
+            <Route
+              path="/"
+              onRender={(params) =>
+                errorMessage() !== "" ? (
+                  <StartError open errorMsg={errorMessage()} errorType={errorType()} />
+                ) : (
+                  <MainMenu open onStart={onStart} onEditor={onEditor} />
+                )
+              }
+            />
+            <Route path="/game" onRender={(params) => <a href="/">Home</a>} />
+            {/* { ready() ?
+                    <div>
+                            <Route
+                            path="/game"
+                            element={<InGame renderer={renderer!} eventManager={eventManager!} onQuit={onQuit} />}
+                            />
+                            <Route
+                            path="/editor/*"
+                            element={<ProjectEditorPage onQuit={onQuit} renderer={renderer!} eventManager={eventManager!} />}
+                            />
+                            </div>
+                     : ''
+                    } */}
+          </RouterSwitch>
+          {/* <Auth /> */}
+        </div>
+      );
+    };
+  }
 
-//   //   let gameLoader: GameLoader;
-//   //   let eventManager: UIEventManager;
-//   //   const wasmManager: WasmManager = new WasmManager();
+  //   //   const [errorType, setErrorType] = createSignal<ErrorType>("OTHER");
+  //   //   const navigate = useNavigate();
 
-//   //   const onCanvasReady = async (canvas: HTMLCanvasElement) => {
-//   //     renderer = new Renderer(canvas);
-//   //     gameLoader = new GameLoader(renderer);
-//   //     eventManager = new UIEventManager();
+  //   //   let gameLoader: GameLoader;
+  //   //   let eventManager: UIEventManager;
+  //   //   const wasmManager: WasmManager = new WasmManager();
 
-//   //     const bindables: IBindable[] = [renderer, eventManager];
+  //   //   const onCanvasReady = async (canvas: HTMLCanvasElement) => {
+  //   //     renderer = new Renderer(canvas);
+  //   //     gameLoader = new GameLoader(renderer);
+  //   //     eventManager = new UIEventManager();
 
-//   //     try {
-//   //       await wasmManager.load(bindables);
+  //   //     const bindables: IBindable[] = [renderer, eventManager];
 
-//   //       if (!renderer.hasWebGPU()) {
-//   //         setErrorMessage("Your browser does not support WebGPU");
-//   //         setErrorType("WGPU");
-//   //         return;
-//   //       }
+  //   //     try {
+  //   //       await wasmManager.load(bindables);
 
-//   //       await renderer.init();
-//   //       await gameLoader.loadInitialContainers();
+  //   //       if (!renderer.hasWebGPU()) {
+  //   //         setErrorMessage("Your browser does not support WebGPU");
+  //   //         setErrorType("WGPU");
+  //   //         return;
+  //   //       }
 
-//   //       // Call the first frame so the containers can initialize
-//   //       renderer.onFrame();
+  //   //       await renderer.init();
+  //   //       await gameLoader.loadInitialContainers();
 
-//   //       setReady(true);
-//   //     } catch (err: unknown) {
-//   //       setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");
-//   //       setErrorType("OTHER");
-//   //       console.log(err);
-//   //     }
-//   //   };
+  //   //       // Call the first frame so the containers can initialize
+  //   //       renderer.onFrame();
 
-//   //   const onStart = async () => {
-//   //     navigate("/game");
-//   //     await gameLoader.loadInitialLevels();
-//   //     eventManager.triggerUIEvent(ApplicationEventType.StartGame);
-//   //   };
+  //   //       setReady(true);
+  //   //     } catch (err: unknown) {
+  //   //       setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");
+  //   //       setErrorType("OTHER");
+  //   //       console.log(err);
+  //   //     }
+  //   //   };
 
-//   //   const onEditor = () => {
-//   //     navigate("/editor");
-//   //   };
+  //   //   const onQuit = () => {
+  //   //     navigate("/");
+  //   //     gameLoader.unloadInitialLevels();
+  //   //     eventManager.triggerUIEvent(ApplicationEventType.Quit);
+  //   //   };
 
-//   //   const onQuit = () => {
-//   //     navigate("/");
-//   //     gameLoader.unloadInitialLevels();
-//   //     eventManager.triggerUIEvent(ApplicationEventType.Quit);
-//   //   };
-
-//   css() {
-//     return css`
-//       width: 100%;
-//       height: 100%;
-//       margin: 0;
-//     `;
-//   }
-// }
+  css() {
+    return css`
+      :host,
+      :host > div {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        display: block;
+      }
+    `;
+  }
+}

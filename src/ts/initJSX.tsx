@@ -48,7 +48,7 @@ function jsx(
 function appendChildren(element: HTMLElement, children: Node[]) {
   // append children
   for (let child of children) {
-    if (typeof child === "string") {
+    if (typeof child === "string" && child) {
       element.innerText += child;
       continue;
     }

@@ -12,6 +12,19 @@ interface Props {
   type?: "hash" | "history";
 }
 
+function createUrl(isHash: boolean, href: string) {
+  if (isHash && href.startsWith("#")) {
+    href = href.substr(1);
+  }
+  return new URL(href, document.location.origin);
+}
+
+export function navigate(path: string, isHash = false) {
+  const url = createUrl(isHash, path);
+  window.history.pushState({ path: path }, path, url.origin + url.pathname);
+  window.dispatchEvent(new CustomEvent("history-pushed"));
+}
+
 /**
  * SPA Router - replacement for Framework Routers (history and hash).
  */
@@ -61,7 +74,7 @@ export class Router extends Component<Props> {
   }
 
   private tryNav(href: string) {
-    const url = this.createUrl(href);
+    const url = createUrl(this.isHashRouter, href);
     if (url.protocol.startsWith("http")) {
       const routePath = this.findRoute(url.pathname);
       if (routePath) {
@@ -76,18 +89,11 @@ export class Router extends Component<Props> {
     return false;
   }
 
-  private createUrl(href: string) {
-    if (this.isHashRouter && href.startsWith("#")) {
-      href = href.substr(1);
-    }
-    return new URL(href, document.location.origin);
-  }
-
   /**
    * Prevents a click and instead pushes a router change
    */
   private onNavClick(e: MouseEvent) {
-    const element = e.target as HTMLElement;
+    const element = e.composedPath().at(0) as HTMLElement;
     const href = (element.closest("[href]") as HTMLAnchorElement)?.href;
     if (href && this.tryNav(href)) {
       e.preventDefault();
