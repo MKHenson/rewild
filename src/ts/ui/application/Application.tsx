@@ -18,28 +18,29 @@ import { Route } from "../common/Route";
 import { navigate } from "../common/Router";
 import { RouterSwitch } from "../common/RouterSwitch";
 import { Component, register } from "../Component";
+import { Auth } from "./Auth";
 
 interface Props {}
 
 @register("x-application")
 export class Application extends Component<Props> {
   init() {
+    // let renderer: Renderer;
+    const [errorType] = this.useState<ErrorType>("OTHER"); // setErrorType
+    const [errorMessage] = this.useState(""); // , setErrorMessage
+    // const [ready] = this.useState(false); // , setReady
+
+    const onStart = async () => {
+      navigate("/game");
+      //   await gameLoader.loadInitialLevels();
+      //   eventManager.triggerUIEvent(ApplicationEventType.StartGame);
+    };
+
+    const onEditor = () => {
+      navigate("/editor");
+    };
+
     return () => {
-      // let renderer: Renderer;
-      const [errorType] = this.useState<ErrorType>("OTHER"); // setErrorType
-      const [errorMessage] = this.useState(""); // , setErrorMessage
-      // const [ready] = this.useState(false); // , setReady
-
-      const onStart = async () => {
-        navigate("/game");
-        //   await gameLoader.loadInitialLevels();
-        //   eventManager.triggerUIEvent(ApplicationEventType.StartGame);
-      };
-
-      const onEditor = () => {
-        //   navigate("/editor");
-      };
-
       this.shadow!.append(
         <div>
           {/* <Pane3D onCanvasReady={onCanvasReady} /> */}
@@ -69,7 +70,7 @@ export class Application extends Component<Props> {
                      : ''
                     } */}
           </RouterSwitch>
-          {/* <Auth /> */}
+          <Auth />
         </div>
       );
     };

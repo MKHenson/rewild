@@ -31,14 +31,21 @@ export function navigate(path: string, isHash = false) {
 @register("x-router")
 export class Router extends Component<Props> {
   constructor() {
-    super({ props: { type: "history" }, shadow: { mode: "open" } });
+    super({ props: { type: "history" }, useShadow: false });
   }
 
   init() {
     return () => {
-      this.listen();
-      this.shadow!.append(<slot></slot>);
+      if (this.props.children) {
+        if (Array.isArray(this.props.children)) this.append(...(this.props.children as Node[]));
+        else this.append(this.props.children as Node);
+      }
     };
+  }
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.listen();
   }
 
   /**

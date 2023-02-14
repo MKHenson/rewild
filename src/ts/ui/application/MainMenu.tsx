@@ -16,9 +16,9 @@ type Props = {
 export class MainMenu extends Component<Props> {
   init() {
     const authState = this.observeStore(authStore);
+    const onOptionsClick = () => {};
 
     return () => {
-      const onOptionsClick = () => {};
       const props = this.props;
 
       this.shadow!.append(
