@@ -5,8 +5,11 @@ interface Props {}
 
 @register("x-router-switch")
 export class RouterSwitch extends Component<Props> {
+  triggerPopStateDelegate: (e: Event) => void;
+
   constructor() {
     super({ shadow: { mode: "open" } });
+    this.triggerPopStateDelegate = this.triggerPopState.bind(this);
   }
 
   init() {
@@ -63,12 +66,17 @@ export class RouterSwitch extends Component<Props> {
   }
 
   connectedCallback(): void {
-    window.addEventListener("history-pushed", this.triggerPopState.bind(this));
+    super.connectedCallback();
+    window.addEventListener("history-pushed", this.triggerPopStateDelegate);
     this.renderRoute();
   }
 
   disconnectedCallback(): void {
-    window.removeEventListener("history-pushed", this.triggerPopState.bind(this));
+    const routes = this.shadow!.querySelector("slot")!.assignedElements() as Route[];
+    for (const route of routes) if (route.parentNode) route.clear();
+
+    super.disconnectedCallback();
+    window.removeEventListener("history-pushed", this.triggerPopStateDelegate);
   }
 
   triggerPopState(e: Event): void {

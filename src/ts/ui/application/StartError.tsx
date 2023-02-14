@@ -1,6 +1,6 @@
 import { Modal } from "../common/Modal";
 import { Typography } from "../common/Typography";
-import { Component } from "../Component";
+import { Component, register } from "../Component";
 
 export type ErrorType = "WGPU" | "OTHER";
 
@@ -10,6 +10,7 @@ type Props = {
   errorType: ErrorType;
 };
 
+@register("x-start-error")
 export class StartError extends Component<Props> {
   init() {
     return () => {

@@ -3,12 +3,15 @@ import { Component } from "./Component";
 export type UnsubscribeStoreFn = () => void;
 
 export class Store<T extends object> {
-  data: T;
-  listeners: { path?: string; component: Component }[];
+  readonly data: T;
+  protected defaultProxy: T;
+  private listeners: { path?: string; component: Component }[];
 
   constructor(val: T) {
     this.data = val;
     this.listeners = [];
+    const [proxy] = this.proxy();
+    this.defaultProxy = proxy;
   }
 
   createHandler(parentKey?: string): ProxyHandler<T> {
@@ -31,6 +34,8 @@ export class Store<T extends object> {
 
         const val = Reflect.set(target, p, newValue, receiver);
         listeners.forEach((l) => {
+          if (!l.component.parentNode) return;
+
           if (l.path) {
             if (!(parentKey ? `${parentKey}.${p.toString()}` : p.toString()).startsWith(l.path)) return; // path doesnt match
           }
@@ -42,9 +47,10 @@ export class Store<T extends object> {
     };
   }
 
-  proxy(component: Component, path?: string): [T, UnsubscribeStoreFn] {
+  proxy(component?: Component, path?: string): [T, UnsubscribeStoreFn] {
     const listeners = this.listeners;
-    listeners.push({ component, path });
+
+    if (component) listeners.push({ component, path });
 
     return [
       new Proxy<T>(this.data, this.createHandler()),

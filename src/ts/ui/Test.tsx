@@ -1,6 +1,4 @@
-import { Button } from "./common/Button";
 import { register, Component } from "./Component";
-import { authStore } from "./stores/Auth";
 
 interface Props {
   name: string;
@@ -12,7 +10,6 @@ export class HelloWorld extends Component<Props> {
   init() {
     const [count, setCount] = this.useState(0);
     const [over, setOver] = this.useState(false);
-    const user = this.observeStore(authStore);
 
     return () => {
       this.shadow!.append(
@@ -32,12 +29,6 @@ export class HelloWorld extends Component<Props> {
           <h2>
             Hello {this.props.name}! You clicked {count().toString()} many times.
           </h2>
-          <Button onClick={(e) => (user.loggedIn = !user.loggedIn)}>
-            {user.user.name} is {user.loggedIn ? "LOGGED IN" : "LOGGED OUT"}
-          </Button>
-          <div>
-            {user.user.name} has {user.user.pies.length.toString()} Pies!
-          </div>
         </div>
       );
     };
