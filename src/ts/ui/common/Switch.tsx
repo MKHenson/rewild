@@ -13,7 +13,7 @@ interface Props {
 export class Switch extends Component<Props> {
   init() {
     return () => {
-      this.shadow!.append(
+      return (
         <div
           class="switch"
           classList={{

@@ -8,13 +8,13 @@ export class RouterSwitch extends Component<Props> {
   triggerPopStateDelegate: (e: Event) => void;
 
   constructor() {
-    super({ shadow: { mode: "open" } });
+    super({ useShadow: false });
     this.triggerPopStateDelegate = this.triggerPopState.bind(this);
   }
 
   init() {
     return () => {
-      this.shadow?.append(<slot></slot>);
+      return this.props.children;
     };
   }
 
@@ -44,7 +44,7 @@ export class RouterSwitch extends Component<Props> {
 
   renderRoute() {
     const path = window.location.pathname;
-    const routes = this.shadow!.querySelector("slot")!.assignedElements() as Route[];
+    const routes = Array.from(this.children).filter((child) => child instanceof Route) as Route[];
     const locationParts = path.split("/");
 
     for (const route of routes) {
@@ -61,6 +61,7 @@ export class RouterSwitch extends Component<Props> {
         }, {} as { [id: string]: string });
 
         route.append(route.props.onRender(params));
+        return;
       }
     }
   }
@@ -72,7 +73,7 @@ export class RouterSwitch extends Component<Props> {
   }
 
   disconnectedCallback(): void {
-    const routes = this.shadow!.querySelector("slot")!.assignedElements() as Route[];
+    const routes = Array.from(this.children).filter((child) => child instanceof Route) as Route[];
     for (const route of routes) if (route.parentNode) route.clear();
 
     super.disconnectedCallback();

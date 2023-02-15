@@ -44,7 +44,7 @@ export class Tree extends Component<TreeProps> {
     return () => {
       const props = this.props;
 
-      this.shadow!.append(
+      return (
         <div class="tree">
           {props.rootNodes.map((node) => (
             <TreeNode selectedNodes={props.selectedNodes} onSelectionChanged={props.onSelectionChanged} node={node} />
@@ -89,7 +89,7 @@ export class TreeNode extends Component<NodeProps> {
         } else props.onSelectionChanged([props.node]);
       };
 
-      this.shadow!.append(
+      return (
         <div class="treenode">
           <div class={"tree-content" + props.selectedNodes.includes(props.node) ? "selected-treenode" : ""}>
             {props.node.children && props.node.children.length ? (

@@ -18,7 +18,7 @@ export class Button extends Component<Props> {
   init() {
     return () => {
       this.toggleAttribute("fullwidth", this.props.fullWidth);
-      this.shadow!.append(
+      return (
         <button
           disabled={this.props.disabled}
           onclick={this.props.onClick}

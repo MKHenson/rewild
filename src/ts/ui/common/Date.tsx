@@ -10,7 +10,7 @@ interface Props {
 export class Date extends Component<Props> {
   init() {
     return () => {
-      this.shadow!.append(
+      return (
         <div>
           {this.props.date
             ? format(

@@ -13,17 +13,15 @@ interface Props {
 @register("x-typography")
 export class Typography extends Component<Props> {
   init() {
-    return () => {
-      this.shadow!.append(
-        <div
-          class={`typography ${this.props.variant} ${this.props.class || ""}`}
-          onclick={this.props.onClick}
-          style={this.props.style}
-        >
-          <slot></slot>
-        </div>
-      );
-    };
+    return () => (
+      <div
+        class={`typography ${this.props.variant} ${this.props.class || ""}`}
+        onclick={this.props.onClick}
+        style={this.props.style}
+      >
+        <slot></slot>
+      </div>
+    );
   }
 
   css() {

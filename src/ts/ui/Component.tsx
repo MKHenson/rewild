@@ -1,6 +1,7 @@
 import { Store, UnsubscribeStoreFn } from "./Store";
 
 type RenderFn = () => void;
+type InitFn = () => null | ChildType | ChildType[];
 
 export function register<T extends CustomElementConstructor | JSX.ComponentStatic>(tagName: string) {
   return <U extends T>(constructor: U) => {
@@ -35,18 +36,47 @@ export abstract class Component<T = any> extends HTMLElement {
     const parent = useShadow ? this.shadow! : this;
 
     const fn = this.init();
-    const css = this.css();
 
     this._props = options?.props as any;
 
     this.render = () => {
-      while (parent.children.length !== 0) parent.lastChild?.remove();
+      const css = this.css();
+
+      let children = fn();
+      let existingChildren = parent.children;
+      const styleOffset = css ? 1 : 0;
+      const lenOfExistingChildren = existingChildren.length - styleOffset;
 
       if (css) {
-        parent.append(<style>{css}</style>);
+        if (parent.firstChild) {
+          const prevStyle = parent.firstChild;
+          parent.insertBefore(<style>{css}</style>, prevStyle);
+          prevStyle.remove();
+        } else parent.append(<style>{css}</style>);
       }
 
-      fn();
+      if (children) {
+        // Convert to array
+        if (!Array.isArray(children)) children = [children];
+
+        for (let i = 0, l = children.length; i < l; i++) {
+          // If the new node is exactly the same - skip it as we dont want to re-render
+          if (i < lenOfExistingChildren && children[i] === existingChildren[i + styleOffset]) {
+            continue;
+          }
+          // New node is not the same, and at the same position of an existing element. So replace existing elm with new one.
+          else if (i < lenOfExistingChildren) {
+            const childToReplace = parent.children[i + styleOffset];
+            parent.insertBefore(children[i] as Node, childToReplace);
+            childToReplace.remove();
+          } else parent.append(children[i] as Node);
+        }
+      } else {
+        // If nothing returned, then clear existing elements
+        while (parent.children.length !== (css ? 1 : 0)) {
+          parent.lastChild!.remove();
+        }
+      }
     };
   }
 
@@ -57,6 +87,16 @@ export abstract class Component<T = any> extends HTMLElement {
   set props(val: T & { children?: ChildType | ChildType[] }) {
     this._props = val || ({} as any);
     this.render();
+  }
+
+  addChildren(parent: Element, children?: ChildType | ChildType[]) {
+    if (children) {
+      if (Array.isArray(children)) {
+        for (const child of children) if (child) parent.append(child);
+      } else {
+        parent.append(children as Node);
+      }
+    }
   }
 
   /**
@@ -89,7 +129,7 @@ export abstract class Component<T = any> extends HTMLElement {
     return [getValue, setValue];
   }
 
-  abstract init(): RenderFn;
+  abstract init(): InitFn;
 
   // connect component
   connectedCallback() {

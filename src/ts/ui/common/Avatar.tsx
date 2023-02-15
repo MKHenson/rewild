@@ -11,11 +11,8 @@ interface Props {
 export class Avatar extends Component<Props> {
   init() {
     return () => {
-      this.shadow!.append(
-        <div onclick={this.props.onClick} class="avatar">
-          {this.props.src ? <img src={this.props.src} /> : <MaterialIcon icon="person" />}
-        </div>
-      );
+      this.onclick = this.props.onClick || null;
+      return <div class="avatar">{this.props.src ? <img src={this.props.src} /> : <MaterialIcon icon="person" />}</div>;
     };
   }
 

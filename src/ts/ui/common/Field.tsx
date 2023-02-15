@@ -11,7 +11,7 @@ interface Props {
 export class Field extends Component<Props> {
   init() {
     return () => {
-      this.shadow!.append(
+      return (
         <div class="field">
           <Typography variant="label">
             {this.props.label}

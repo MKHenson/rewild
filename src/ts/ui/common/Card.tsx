@@ -15,7 +15,7 @@ interface Props {
 export class Card extends Component<Props> {
   init() {
     return () => {
-      this.shadow!.append(
+      return (
         <div
           class={`card ${this.props.pushed ? "pushed" : ""} ${this.props.button ? "button" : ""} ${
             this.props.raised ? "raised" : ""

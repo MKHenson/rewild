@@ -8,7 +8,7 @@ interface Props {
 export class ButtonGroup extends Component<Props> {
   init() {
     return () => {
-      this.shadow!.append(
+      return (
         <div class={`${this.props.class} button-group`}>
           <slot></slot>
         </div>

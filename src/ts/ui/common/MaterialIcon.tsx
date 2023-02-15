@@ -32,7 +32,7 @@ export class MaterialIcon extends Component<Props> {
           ? "md-48"
           : "md-24";
 
-      this.shadow!.append(
+      return (
         <span
           onclick={this.props.onClick}
           style={this.props.style}
