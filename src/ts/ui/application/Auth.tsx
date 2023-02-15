@@ -25,12 +25,9 @@ function initAuth(elm: Element) {
 export class Auth extends Component<Props> {
   signInSection: HTMLDivElement | null = null;
 
-  constructor() {
-    super({ useShadow: false });
-  }
-
   connectedCallback(): void {
-    const elm = this.querySelector("#sign-in");
+    super.connectedCallback();
+    const elm = this.shadow!.querySelector("#sign-in");
     if (elm) initAuth(elm);
   }
 
@@ -50,15 +47,23 @@ export class Auth extends Component<Props> {
         }
 
         setMenuOpen(true);
-        const elm = this.querySelector("#sign-in");
-        if (elm) initAuth(elm);
+        const elm = this.shadow!.querySelector("#sign-in");
+        if (elm) {
+          setTimeout(() => (elm.className = "fadein"), 30);
+          initAuth(elm);
+        }
       }
     };
 
     return () => {
       this.signInSection = (<div id="sign-in" />) as Node as HTMLDivElement;
 
-      this.append(
+      return [
+        <link
+          type="text/css"
+          rel="stylesheet"
+          href="https://www.gstatic.com/firebasejs/ui/6.0.1/firebase-ui-auth.css"
+        />,
         <div>
           <Avatar src={auth.user?.photoURL || undefined} onClick={onClick} />
           <Popup
@@ -70,14 +75,14 @@ export class Auth extends Component<Props> {
           >
             {this.signInSection}
           </Popup>
-        </div>
-      );
+        </div>,
+      ];
     };
   }
 
   css() {
     return css`
-      x-auth {
+      :host {
         position: absolute;
         top: 0;
         right: 0;
@@ -87,7 +92,14 @@ export class Auth extends Component<Props> {
       x-avatar {
         cursor: pointer;
       }
+
       #sign-in {
+        transition: opacity 1s;
+        opacity: 0;
+      }
+
+      #sign-in.fadein {
+        opacity: 1;
       }
     `;
   }

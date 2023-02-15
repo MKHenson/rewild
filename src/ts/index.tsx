@@ -6,14 +6,14 @@
 // import { render } from "solid-js/web";
 import "./initJSX";
 import { Application } from "./ui/application/Application";
-import { Router } from "./ui/common/Router";
+import { RouterProvider } from "./ui/common/RouterProvider";
 
 document.addEventListener("readystatechange", (e) => {
   if (document.readyState === "interactive" || document.readyState === "complete") {
     document.querySelector("#application")!.append(
-      <Router>
+      <RouterProvider>
         <Application />
-      </Router>
+      </RouterProvider>
     );
   }
 });

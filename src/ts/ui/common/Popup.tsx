@@ -23,7 +23,7 @@ export class Popup extends Component<Props> {
 
       this.toggleAttribute("open", this.props.open);
 
-      this.shadow!.append(
+      return (
         <div
           class={`wrapper popup ${this.props.open ? "visible" : ""} ${
             this.props.withBackground ? "withBackground" : ""

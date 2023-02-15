@@ -14,7 +14,7 @@ type Props = {
 export class StartError extends Component<Props> {
   init() {
     return () => {
-      this.shadow!.append(
+      return (
         <Modal
           hideConfirmButtons
           open={this.props.open}

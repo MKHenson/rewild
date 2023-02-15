@@ -13,7 +13,7 @@ function jsx(
   // Check if this is a web component
   if (typeof tag === "function" && (tag as JSX.ComponentStatic).tagName) {
     const element = document.createElement((tag as JSX.ComponentStatic).tagName!) as JSX.Element;
-    element.props = { ...element.props, ...attributes, children };
+    (element as any)._props = { ...element.props, ...attributes, children };
     appendChildren(element, children);
     return element;
   }

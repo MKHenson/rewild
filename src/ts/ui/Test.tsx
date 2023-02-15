@@ -11,27 +11,25 @@ export class HelloWorld extends Component<Props> {
     const [count, setCount] = this.useState(0);
     const [over, setOver] = this.useState(false);
 
-    return () => {
-      this.shadow!.append(
-        <div
-          onmouseover={(e) => {
-            setOver(true);
-          }}
-          onmouseout={(e) => {
-            setOver(false);
-          }}
-          onclick={(e) => {
-            setCount(count() + 1);
-            this.props.onClick?.();
-          }}
-          class={`tits ${over() ? "highlight" : ""}`}
-        >
-          <h2>
-            Hello {this.props.name}! You clicked {count().toString()} many times.
-          </h2>
-        </div>
-      );
-    };
+    return () => (
+      <div
+        onmouseover={(e) => {
+          setOver(true);
+        }}
+        onmouseout={(e) => {
+          setOver(false);
+        }}
+        onclick={(e) => {
+          setCount(count() + 1);
+          this.props.onClick?.();
+        }}
+        class={`tits ${over() ? "highlight" : ""}`}
+      >
+        <h2>
+          Hello {this.props.name}! You clicked {count().toString()} many times.
+        </h2>
+      </div>
+    );
   }
 
   css() {

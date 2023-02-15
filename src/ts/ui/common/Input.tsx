@@ -25,7 +25,7 @@ export class Input extends Component<Props> {
         if (this.props.onClick) this.props.onClick(e);
       };
 
-      this.shadow!.append(
+      return (
         <div class={`input ${this.props.fullWidth ? "fullwidth" : ""}`}>
           <input
             autofocus={this.props.autoFocus}

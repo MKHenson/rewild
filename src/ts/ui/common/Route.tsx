@@ -9,17 +9,16 @@ interface Props {
 @register("x-route")
 export class Route extends Component<Props> {
   constructor() {
-    super({ props: { exact: false }, shadow: { mode: "open" } });
+    super({ props: { exact: false }, useShadow: false });
   }
 
   init() {
     return () => {
-      this.shadow?.append(<slot></slot>);
+      return this.props.children;
     };
   }
 
   clear() {
-    const elements = this.shadow!.querySelector("slot")!.assignedElements();
-    for (const elm of elements) elm.remove();
+    while (this.lastChild) this.lastChild.remove();
   }
 }

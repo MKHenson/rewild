@@ -21,9 +21,10 @@ export class MainMenu extends Component<Props> {
     return () => {
       const props = this.props;
 
-      this.shadow!.append(
+      return (
         <Modal
           hideConfirmButtons
+          withBackground={false}
           open={props.open}
           title={
             <Typography

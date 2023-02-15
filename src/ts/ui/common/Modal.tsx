@@ -31,7 +31,7 @@ export class Modal extends Component<Props> {
         this.props.onClose && this.props.onClose();
       };
 
-      this.shadow!.append(
+      return (
         <Popup open={this.props.open} onClose={this.props.onClose} withBackground={this.props.withBackground}>
           {typeof this.props.title === "string" ? (
             <Typography variant="h2">{this.props.title}</Typography>

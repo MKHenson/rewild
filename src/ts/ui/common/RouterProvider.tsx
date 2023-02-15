@@ -28,23 +28,20 @@ export function navigate(path: string, isHash = false) {
 /**
  * SPA Router - replacement for Framework Routers (history and hash).
  */
-@register("x-router")
-export class Router extends Component<Props> {
+@register("x-router-provider")
+export class RouterProvider extends Component<Props> {
   constructor() {
     super({ props: { type: "history" }, useShadow: false });
   }
 
   init() {
     return () => {
-      if (this.props.children) {
-        if (Array.isArray(this.props.children)) this.append(...(this.props.children as Node[]));
-        else this.append(this.props.children as Node);
-      }
+      return null;
     };
   }
 
   connectedCallback(): void {
-    super.connectedCallback();
+    // We do not call the super connectedCallback as we dont want this to clear and re-draw anything
     this.listen();
   }
 
