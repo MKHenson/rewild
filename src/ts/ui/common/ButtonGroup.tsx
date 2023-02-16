@@ -7,16 +7,14 @@ interface Props {
 @register("x-button-group")
 export class ButtonGroup extends Component<Props> {
   init() {
-    return () => {
-      return (
-        <div class={`${this.props.class} button-group`}>
-          <slot></slot>
-        </div>
-      );
-    };
+    return () => (
+      <div class={`${this.props.class} button-group`}>
+        <slot></slot>
+      </div>
+    );
   }
 
-  css() {
+  getStyle() {
     return css`
       div {
         display: inline-flex;

@@ -12,20 +12,18 @@ interface Props {
 @register("x-switch")
 export class Switch extends Component<Props> {
   init() {
-    return () => {
-      return (
-        <div
-          class="switch"
-          classList={{
-            checked: this.props.checked || false,
-          }}
-          onclick={this.props.onClick}
-        />
-      );
-    };
+    return () => (
+      <div
+        class="switch"
+        classList={{
+          checked: this.props.checked || false,
+        }}
+        onclick={this.props.onClick}
+      />
+    );
   }
 
-  css() {
+  getStyle() {
     return css`
       div {
         box-sizing: border-box;

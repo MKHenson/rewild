@@ -10,20 +10,18 @@ interface Props {
 @register("x-field")
 export class Field extends Component<Props> {
   init() {
-    return () => {
-      return (
-        <div class="field">
-          <Typography variant="label">
-            {this.props.label}
-            {this.props.required ? <span class="required">*</span> : ""}
-          </Typography>
-          <slot></slot>
-        </div>
-      );
-    };
+    return () => (
+      <div class="field">
+        <Typography variant="label">
+          {this.props.label}
+          {this.props.required ? <span class="required">*</span> : ""}
+        </Typography>
+        <slot></slot>
+      </div>
+    );
   }
 
-  css() {
+  getStyle() {
     return css`
       width: 100%;
       margin: 0 0 1rem 0;

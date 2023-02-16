@@ -36,11 +36,10 @@ export abstract class Component<T = any> extends HTMLElement {
     const parent = useShadow ? this.shadow! : this;
 
     const fn = this.init();
-
     this._props = options?.props as any;
 
     this.render = () => {
-      const css = this.css();
+      const css = this.getStyle();
 
       let children = fn();
       let existingChildren = parent.children;
@@ -111,7 +110,7 @@ export abstract class Component<T = any> extends HTMLElement {
     return val;
   }
 
-  css(): string | null {
+  getStyle(): string | null {
     return null;
   }
 

@@ -16,27 +16,25 @@ interface Props {
 @register("x-input")
 export class Input extends Component<Props> {
   init() {
-    return () => {
-      const onClick = (e: MouseEvent) => {
-        const elm = e.currentTarget as HTMLInputElement;
-        elm.focus();
-        elm.setSelectionRange(0, elm.value?.length || null);
+    const onClick = (e: MouseEvent) => {
+      const elm = e.currentTarget as HTMLInputElement;
+      elm.focus();
+      elm.setSelectionRange(0, elm.value?.length || null);
 
-        if (this.props.onClick) this.props.onClick(e);
-      };
-
-      return (
-        <div class={`input ${this.props.fullWidth ? "fullwidth" : ""}`}>
-          <input
-            autofocus={this.props.autoFocus}
-            value={this.props.value || ""}
-            onclick={onClick}
-            placeholder={this.props.placeholder || ""}
-            onchange={this.props.onChange ? (e) => this.props.onChange!(e.currentTarget.value) : undefined}
-          />
-        </div>
-      );
+      if (this.props.onClick) this.props.onClick(e);
     };
+
+    return () => (
+      <div class={`input ${this.props.fullWidth ? "fullwidth" : ""}`}>
+        <input
+          autofocus={this.props.autoFocus}
+          value={this.props.value || ""}
+          onclick={onClick}
+          placeholder={this.props.placeholder || ""}
+          onchange={this.props.onChange ? (e) => this.props.onChange!(e.currentTarget.value) : undefined}
+        />
+      </div>
+    );
   }
 
   connectedCallback() {
@@ -47,7 +45,7 @@ export class Input extends Component<Props> {
     }
   }
 
-  css() {
+  getStyle() {
     return css`
       :host > div {
         width: 200px;

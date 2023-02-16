@@ -54,7 +54,7 @@ export class Tree extends Component<TreeProps> {
     };
   }
 
-  css() {
+  getStyle() {
     return css`
       div {
         width: 100%;
@@ -70,24 +70,25 @@ export class Tree extends Component<TreeProps> {
 @register("x-treenode")
 export class TreeNode extends Component<NodeProps> {
   init() {
+    const [expanded, setExpanded] = this.useState(true);
+
+    const handleExpandedClick = () => {
+      setExpanded(!expanded());
+    };
+
+    const handleNodeClick = (e: MouseEvent) => {
+      const props = this.props;
+      if (!props.node.canSelect) return;
+
+      const isSelected = props.selectedNodes.includes(props.node);
+      if (e.shiftKey) {
+        if (isSelected) props.onSelectionChanged(props.selectedNodes.filter((node) => node !== props.node));
+        else props.onSelectionChanged(props.selectedNodes.concat(props.node));
+      } else props.onSelectionChanged([props.node]);
+    };
+
     return () => {
       const props = this.props;
-
-      const [expanded, setExpanded] = this.useState(true);
-
-      const handleExpandedClick = () => {
-        setExpanded(!expanded());
-      };
-
-      const handleNodeClick = (e: MouseEvent) => {
-        if (!props.node.canSelect) return;
-
-        const isSelected = props.selectedNodes.includes(props.node);
-        if (e.shiftKey) {
-          if (isSelected) props.onSelectionChanged(props.selectedNodes.filter((node) => node !== props.node));
-          else props.onSelectionChanged(props.selectedNodes.concat(props.node));
-        } else props.onSelectionChanged([props.node]);
-      };
 
       return (
         <div class="treenode">
@@ -128,7 +129,7 @@ export class TreeNode extends Component<NodeProps> {
     };
   }
 
-  css() {
+  getStyle() {
     return css`
       .tree-content {
         margin: 0 0 0 0.5rem;

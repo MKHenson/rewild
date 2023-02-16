@@ -45,7 +45,7 @@ export class StartError extends Component<Props> {
     };
   }
 
-  css() {
+  getStyle() {
     return css`
       button {
         margin: 1rem 0 0 0;

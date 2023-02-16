@@ -80,7 +80,7 @@ export class Auth extends Component<Props> {
     };
   }
 
-  css() {
+  getStyle() {
     return css`
       :host {
         position: absolute;

@@ -38,7 +38,7 @@ export class Popup extends Component<Props> {
     };
   }
 
-  css() {
+  getStyle() {
     return css`
       :host {
         display: none;

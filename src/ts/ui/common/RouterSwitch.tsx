@@ -18,7 +18,7 @@ export class RouterSwitch extends Component<Props> {
     };
   }
 
-  isMatch(exact: boolean, locationParts: string[], routeParts: string[]) {
+  private isMatch(exact: boolean, locationParts: string[], routeParts: string[]) {
     if (exact) {
       if (locationParts.length !== routeParts.length) {
         return false;
@@ -42,14 +42,14 @@ export class RouterSwitch extends Component<Props> {
     }
   }
 
-  renderRoute() {
+  private renderRoute() {
     const path = window.location.pathname;
     const routes = Array.from(this.children).filter((child) => child instanceof Route) as Route[];
     const locationParts = path.split("/");
 
-    for (const route of routes) {
-      if (route.parentNode) route.clear();
+    for (const route of routes) if (route.parentNode) route.clear();
 
+    for (const route of routes) {
       const routeParts = route._props.path.split("/");
       const isMatch = this.isMatch(route._props.exact!, locationParts, routeParts);
 
@@ -80,7 +80,7 @@ export class RouterSwitch extends Component<Props> {
     window.removeEventListener("history-pushed", this.triggerPopStateDelegate);
   }
 
-  triggerPopState(e: Event): void {
+  private triggerPopState(e: Event): void {
     this.renderRoute();
   }
 }

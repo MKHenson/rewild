@@ -13,9 +13,7 @@ export class Route extends Component<Props> {
   }
 
   init() {
-    return () => {
-      return this.props.children;
-    };
+    return () => this.props.children;
   }
 
   clear() {

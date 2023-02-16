@@ -18,6 +18,8 @@ export class MainMenu extends Component<Props> {
     const authState = this.observeStore(authStore);
     const onOptionsClick = () => {};
 
+    const [count, setCount] = this.useState(0);
+
     return () => {
       const props = this.props;
 
@@ -39,8 +41,9 @@ export class MainMenu extends Component<Props> {
           }
         >
           <div class="tag-line">
-            <Typography variant="light">
+            <Typography variant="light" onClick={(e) => setCount(count() + 1)}>
               Welcome to rewild. A game about exploration, natural history and saving the planet
+              <span>Count {count().toString()}</span>
             </Typography>
           </div>
           {authState.loading ? (
@@ -53,7 +56,7 @@ export class MainMenu extends Component<Props> {
             </div>
           ) : (
             <div class="styled-buttons">
-              <Button onClick={props.onStart} fullWidth>
+              <Button disabled onClick={props.onStart} fullWidth>
                 New Game
               </Button>
               <Button onClick={onOptionsClick} fullWidth disabled>
@@ -73,7 +76,7 @@ export class MainMenu extends Component<Props> {
     };
   }
 
-  css() {
+  getStyle() {
     return css`
       .styled-buttons x-button {
         margin: 1rem 0 0 0;
