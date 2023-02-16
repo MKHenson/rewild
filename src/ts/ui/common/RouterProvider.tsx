@@ -26,7 +26,7 @@ export function navigate(path: string, isHash = false) {
 }
 
 /**
- * SPA Router - replacement for Framework Routers (history and hash).
+ * A simple SPA Router
  */
 @register("x-router-provider")
 export class RouterProvider extends Component<Props> {
@@ -47,7 +47,6 @@ export class RouterProvider extends Component<Props> {
 
   /**
    * Start listening for route changes.
-   * @returns {VanillaRouter} reference to itself.
    */
   listen() {
     if (this.isHashRouter) {

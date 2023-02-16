@@ -24,7 +24,7 @@ export class Typography extends Component<Props> {
     );
   }
 
-  css() {
+  getStyle() {
     return css`
       :host > div {
         margin: 0;

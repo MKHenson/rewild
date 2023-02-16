@@ -11,13 +11,11 @@ export class Pane3D extends Component<Props> {
   init() {
     this.onResizeDelegate = this.onResize.bind(this);
 
-    return () => {
-      return (
-        <div>
-          <canvas></canvas>
-        </div>
-      );
-    };
+    return () => (
+      <div>
+        <canvas></canvas>
+      </div>
+    );
   }
 
   private onResize(e?: UIEvent) {

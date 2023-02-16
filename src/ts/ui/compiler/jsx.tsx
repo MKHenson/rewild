@@ -1,18 +1,28 @@
 function jsx<T extends JSX.Tag = JSX.Tag>(
   tag: T,
   attributes: { [key: string]: any } | null,
-  ...children: Node[]
+  ...children: JSX.ChildElement[]
 ): JSX.Element;
-function jsx(tag: JSX.Component, attributes: Parameters<typeof tag> | null, ...children: Node[]): Node;
-function jsx(tag: JSX.ComponentStatic, attributes: Parameters<typeof tag> | null, ...children: Node[]): Node;
+function jsx(
+  tag: JSX.Component,
+  attributes: Parameters<typeof tag> | null,
+  ...children: JSX.ChildElement[]
+): Node;
+function jsx(
+  tag: JSX.ComponentStatic,
+  attributes: Parameters<typeof tag> | null,
+  ...children: JSX.ChildElement[]
+): Node;
 function jsx(
   tag: JSX.Tag | JSX.Component | JSX.ComponentStatic,
   attributes: { [key: string]: any } | null,
-  ...children: Node[]
+  ...children: JSX.ChildElement[]
 ) {
   // Check if this is a web component
   if (typeof tag === "function" && (tag as JSX.ComponentStatic).tagName) {
-    const element = document.createElement((tag as JSX.ComponentStatic).tagName!) as JSX.Element;
+    const element = document.createElement(
+      (tag as JSX.ComponentStatic).tagName!
+    ) as JSX.Element;
     (element as any)._props = { ...element.props, ...attributes, children };
     appendChildren(element, children);
     return element;
@@ -45,24 +55,36 @@ function jsx(
   return element;
 }
 
-function appendChildren(element: HTMLElement, children: Node[]) {
+function appendChildren(element: HTMLElement, children: JSX.ChildElement[]) {
   // append children
   for (let child of children) {
-    if (typeof child === "string" && child) {
+    if (child === undefined || child === null || child === "") continue;
+
+    if (
+      typeof child === "string" ||
+      typeof child === "number" ||
+      typeof child === "boolean"
+    ) {
       element.innerText += child;
       continue;
     }
+
     if (Array.isArray(child)) {
-      element.append(...child);
+      appendChildren(element, child);
       continue;
     }
 
-    if (child) element.appendChild(child);
+    if (child) {
+      element.appendChild(child);
+    }
   }
 }
 
 (window as any).jsx = jsx;
-(window as any).css = (val: TemplateStringsArray, ...rest: (TemplateStringsArray | string)[]) => {
+(window as any).css = (
+  val: TemplateStringsArray,
+  ...rest: (TemplateStringsArray | string)[]
+) => {
   let str = "";
   val.forEach((string, i) => (str += string + (rest[i] || "")));
   str = str.replace(/\r?\n|\r/g, "");

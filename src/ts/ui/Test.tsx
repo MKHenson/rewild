@@ -32,7 +32,7 @@ export class HelloWorld extends Component<Props> {
     );
   }
 
-  css() {
+  getStyle() {
     return css`
       :host {
         user-select: none;

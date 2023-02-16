@@ -32,7 +32,7 @@ export class Button extends Component<Props> {
     };
   }
 
-  css() {
+  getStyle() {
     return css`
       :host {
         display: inline-block;

@@ -114,7 +114,50 @@ export class Application extends Component<Props> {
     };
   }
 
-  css() {
+  //   //   const [errorType, setErrorType] = createSignal<ErrorType>("OTHER");
+  //   //   const navigate = useNavigate();
+
+  //   //   let gameLoader: GameLoader;
+  //   //   let eventManager: UIEventManager;
+  //   //   const wasmManager: WasmManager = new WasmManager();
+
+  //   //   const onCanvasReady = async (canvas: HTMLCanvasElement) => {
+  //   //     renderer = new Renderer(canvas);
+  //   //     gameLoader = new GameLoader(renderer);
+  //   //     eventManager = new UIEventManager();
+
+  //   //     const bindables: IBindable[] = [renderer, eventManager];
+
+  //   //     try {
+  //   //       await wasmManager.load(bindables);
+
+  //   //       if (!renderer.hasWebGPU()) {
+  //   //         setErrorMessage("Your browser does not support WebGPU");
+  //   //         setErrorType("WGPU");
+  //   //         return;
+  //   //       }
+
+  //   //       await renderer.init();
+  //   //       await gameLoader.loadInitialContainers();
+
+  //   //       // Call the first frame so the containers can initialize
+  //   //       renderer.onFrame();
+
+  //   //       setReady(true);
+  //   //     } catch (err: unknown) {
+  //   //       setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");
+  //   //       setErrorType("OTHER");
+  //   //       console.log(err);
+  //   //     }
+  //   //   };
+
+  //   //   const onQuit = () => {
+  //   //     navigate("/");
+  //   //     gameLoader.unloadInitialLevels();
+  //   //     eventManager.triggerUIEvent(ApplicationEventType.Quit);
+  //   //   };
+
+  getStyle() {
     return css`
       :host {
         width: 100%;

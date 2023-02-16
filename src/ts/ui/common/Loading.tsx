@@ -12,14 +12,12 @@ export class Loading extends Component<Props> {
   }
 
   init() {
-    return () => {
-      return (
-        <div class="loading">
-          <div></div>
-          <div></div>
-        </div>
-      );
-    };
+    return () => (
+      <div class="loading">
+        <div></div>
+        <div></div>
+      </div>
+    );
   }
 
   css() {

@@ -14,21 +14,19 @@ interface Props {
 @register("x-card")
 export class Card extends Component<Props> {
   init() {
-    return () => {
-      return (
-        <div
-          class={`card ${this.props.pushed ? "pushed" : ""} ${this.props.button ? "button" : ""} ${
-            this.props.raised ? "raised" : ""
-          }`}
-          onclick={this.props.onClick}
-        >
-          <slot></slot>
-        </div>
-      );
-    };
+    return () => (
+      <div
+        class={`card ${this.props.pushed ? "pushed" : ""} ${this.props.button ? "button" : ""} ${
+          this.props.raised ? "raised" : ""
+        }`}
+        onclick={this.props.onClick}
+      >
+        <slot></slot>
+      </div>
+    );
   }
 
-  css() {
+  getStyle() {
     return css`
       div {
         padding: 1rem;

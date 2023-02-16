@@ -44,7 +44,7 @@ export class MaterialIcon extends Component<Props> {
     };
   }
 
-  css() {
+  getStyle() {
     return css`
       span {
         color: inherit;
