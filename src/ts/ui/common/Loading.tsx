@@ -20,7 +20,7 @@ export class Loading extends Component<Props> {
     );
   }
 
-  css() {
+  getStyle() {
     const size = this.props.size!;
 
     return css`

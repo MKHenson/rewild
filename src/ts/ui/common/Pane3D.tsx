@@ -38,7 +38,7 @@ export class Pane3D extends Component<Props> {
     window.removeEventListener("resize", this.onResizeDelegate);
   }
 
-  css() {
+  getStyle() {
     return css`
       :host,
       :host > div {

@@ -15,6 +15,10 @@ interface Props {
 
 @register("x-button")
 export class Button extends Component<Props> {
+  constructor() {
+    super({ useShadow: false });
+  }
+
   init() {
     return () => {
       this.toggleAttribute("fullwidth", this.props.fullWidth);
@@ -26,7 +30,7 @@ export class Button extends Component<Props> {
             this.props.fullWidth ? "fullwidth" : ""
           }`}
         >
-          <slot></slot>
+          {this.props.children}
         </button>
       );
     };
@@ -34,14 +38,14 @@ export class Button extends Component<Props> {
 
   getStyle() {
     return css`
-      :host {
+      x-button {
         display: inline-block;
       }
-      :host([fullwidth]) {
+      x-button[fullwidth] {
         display: block;
       }
 
-      button {
+      x-button button {
         padding: 0.5rem 1rem;
         border-radius: 5px;
         border: none;
@@ -54,94 +58,94 @@ export class Button extends Component<Props> {
         cursor: pointer;
         transition: box-shadow 0.25s, background-color 0.25s;
       }
-      button.fullwidth {
+      x-button button.fullwidth {
         width: 100%;
         display: block;
       }
 
-      button > * {
+      x-button button > * {
         vertical-align: middle;
       }
 
-      button[disabled],
-      button[disabled]:hover {
+      x-button button[disabled],
+      x-button button[disabled]:hover {
         opacity: 0.65;
         pointer-events: none;
       }
-      button.contained {
+      x-button button.contained {
         box-shadow: 2px 2px 2px rgb(0 0 0 / 30%);
       }
-      button.contained:hover {
+      x-button button.contained:hover {
         box-shadow: 2px 2px 4px rgb(0 0 0 / 40%);
       }
-      button.contained.primary {
+      x-button button.contained.primary {
         background: ${theme?.colors.primary400};
         color: ${theme?.colors.onPrimary400};
       }
-      button.contained.primary:hover {
+      x-button button.contained.primary:hover {
         background: ${theme?.colors.primary500};
         color: ${theme?.colors.onPrimary500};
       }
-      button.contained.primary:active {
+      x-button button.contained.primary:active {
         background: ${theme?.colors.primary600};
         color: ${theme?.colors.onPrimary600};
       }
-      button.contained.secondary {
+      x-button button.contained.secondary {
         background: ${theme?.colors.secondary400};
         color: ${theme?.colors.onSecondary400};
       }
-      button.contained.secondary:hover {
+      x-button button.contained.secondary:hover {
         background: ${theme?.colors.secondary500};
         color: ${theme?.colors.onSecondary500};
       }
-      button.contained.secondary:active {
+      x-button button.contained.secondary:active {
         background: ${theme?.colors.secondary600};
         color: ${theme?.colors.onSecondary600};
       }
-      button.contained.error {
+      x-button button.contained.error {
         background: ${theme?.colors.error400};
         color: ${theme?.colors.onError400};
       }
-      button.contained.error:hover {
+      x-button button.contained.error:hover {
         background: ${theme?.colors.error500};
         color: ${theme?.colors.onError500};
       }
-      button.contained.error:active {
+      x-button button.contained.error:active {
         background: ${theme?.colors.error600};
         color: ${theme?.colors.onError600};
       }
-      button.outlined,
-      button.text {
+      x-button button.outlined,
+      x-button button.text {
         background: transparent;
       }
-      button.outlined:hover {
+      x-button button.outlined:hover {
         background: rgba(0, 0, 0, 0.05);
       }
-      button.outlined:active {
+      x-button button.outlined:active {
         background: rgba(0, 0, 0, 0.1);
       }
-      button.text:hover {
+      x-button button.text:hover {
         font-weight: 500;
       }
-      button.outlined.primary {
+      x-button button.outlined.primary {
         color: ${theme?.colors.primary400};
         border: 1px solid ${theme?.colors.primary400};
       }
-      button.outlined.secondary {
+      x-button button.outlined.secondary {
         color: ${theme?.colors.secondary400};
         border: 1px solid ${theme?.colors.secondary400};
       }
-      button.outlined.error {
+      x-button button.outlined.error {
         color: ${theme?.colors.error400};
         border: 1px solid ${theme?.colors.error400};
       }
-      button.text.primary:hover {
+      x-button button.text.primary:hover {
         color: ${theme?.colors.primary400};
       }
-      button.text.secondary:hover {
+      x-button button.text.secondary:hover {
         color: ${theme?.colors.secondary400};
       }
-      button.text.error:hover {
+      x-button button.text.error:hover {
         color: ${theme?.colors.error400};
       }
     `;

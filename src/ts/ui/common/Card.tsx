@@ -13,6 +13,10 @@ interface Props {
 
 @register("x-card")
 export class Card extends Component<Props> {
+  constructor() {
+    super({ useShadow: false });
+  }
+
   init() {
     return () => (
       <div
@@ -21,30 +25,30 @@ export class Card extends Component<Props> {
         }`}
         onclick={this.props.onClick}
       >
-        <slot></slot>
+        {this.props.children}
       </div>
     );
   }
 
   getStyle() {
     return css`
-      div {
+      .card {
         padding: 1rem;
         background-color: ${theme?.colors.surface};
         box-sizing: border-box;
         border-radius: 5px;
       }
 
-      div.button {
+      .card.button {
         cursor: pointer;
       }
-      div.raised {
+      .card.raised {
         box-shadow: ${theme?.colors.shadowShort1};
       }
-      div.raised:hover {
+      .card.raised:hover {
         box-shadow: ${theme?.colors.shadowShort2};
       }
-      div.pushed.raised {
+      .card.pushed.raised {
         box-shadow: ${theme?.colors.shadowShort1}, inset 0 0 0px 2px ${theme?.colors.primary400};
       }
     `;

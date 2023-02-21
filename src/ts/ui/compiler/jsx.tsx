@@ -3,11 +3,7 @@ function jsx<T extends JSX.Tag = JSX.Tag>(
   attributes: { [key: string]: any } | null,
   ...children: JSX.ChildElement[]
 ): JSX.Element;
-function jsx(
-  tag: JSX.Component,
-  attributes: Parameters<typeof tag> | null,
-  ...children: JSX.ChildElement[]
-): Node;
+function jsx(tag: JSX.Component, attributes: Parameters<typeof tag> | null, ...children: JSX.ChildElement[]): Node;
 function jsx(
   tag: JSX.ComponentStatic,
   attributes: Parameters<typeof tag> | null,
@@ -20,10 +16,8 @@ function jsx(
 ) {
   // Check if this is a web component
   if (typeof tag === "function" && (tag as JSX.ComponentStatic).tagName) {
-    const element = document.createElement(
-      (tag as JSX.ComponentStatic).tagName!
-    ) as JSX.Element;
-    (element as any)._props = { ...element.props, ...attributes, children };
+    const element = document.createElement((tag as JSX.ComponentStatic).tagName!) as JSX.Component;
+    element._props = { ...element._props, ...attributes, children };
     appendChildren(element, children);
     return element;
   }
@@ -60,11 +54,9 @@ function appendChildren(element: HTMLElement, children: JSX.ChildElement[]) {
   for (let child of children) {
     if (child === undefined || child === null || child === "") continue;
 
-    if (
-      typeof child === "string" ||
-      typeof child === "number" ||
-      typeof child === "boolean"
-    ) {
+    if (typeof child === "string" || typeof child === "number" || typeof child === "boolean") {
+      if (typeof child === "boolean" && !child) continue;
+
       element.innerText += child;
       continue;
     }
@@ -81,10 +73,7 @@ function appendChildren(element: HTMLElement, children: JSX.ChildElement[]) {
 }
 
 (window as any).jsx = jsx;
-(window as any).css = (
-  val: TemplateStringsArray,
-  ...rest: (TemplateStringsArray | string)[]
-) => {
+(window as any).css = (val: TemplateStringsArray, ...rest: (TemplateStringsArray | string)[]) => {
   let str = "";
   val.forEach((string, i) => (str += string + (rest[i] || "")));
   str = str.replace(/\r?\n|\r/g, "");

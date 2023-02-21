@@ -23,8 +23,12 @@ export class Field extends Component<Props> {
 
   getStyle() {
     return css`
-      width: 100%;
-      margin: 0 0 1rem 0;
+      :host {
+        width: 100%;
+        display: block;
+        margin: 0 0 1rem 0;
+      }
+
       .required {
         color: ${theme!.colors.error400};
         font-weight: 400;

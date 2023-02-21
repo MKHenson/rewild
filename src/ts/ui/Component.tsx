@@ -24,6 +24,7 @@ export abstract class Component<T = any> extends HTMLElement {
   shadow: ShadowRoot | null;
   render: RenderFn;
   private trackedStores: UnsubscribeStoreFn[];
+  domStyle: HTMLElement;
 
   // specify the property on the element instance type
   _props: T & { children?: ChildType | ChildType[] };
