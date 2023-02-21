@@ -9,7 +9,7 @@ import { WasmManager } from "../../core/WasmManager";
 import { Pane3D } from "../common/Pane3D";
 import { MainMenu } from "./MainMenu";
 import { ApplicationEventType } from "../../../common/EventTypes";
-// // import { ProjectEditorPage } from "./project-editor/ProjectEditorPage";
+import { ProjectEditorPage } from "./project-editor/ProjectEditorPage";
 import { ErrorType, StartError } from "./StartError";
 // // import { Auth } from "./Auth";
 // // import { InGame } from "./InGame";
@@ -102,9 +102,7 @@ export class Application extends Component<Props> {
             <Route
               path="/editor"
               onRender={(params) => (
-                <a style="color: black;" onclick={onQuit}>
-                  Home
-                </a>
+                <ProjectEditorPage onQuit={onQuit} renderer={renderer!} eventManager={eventManager!} />
               )}
             />
           ) : undefined}

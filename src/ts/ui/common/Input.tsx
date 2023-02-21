@@ -38,6 +38,7 @@ export class Input extends Component<Props> {
   }
 
   connectedCallback() {
+    super.connectedCallback();
     if (this.props.autoFocus) {
       const elm = this.shadow!.querySelector("input")!;
       elm.focus();

@@ -34,9 +34,7 @@ declare namespace JSX {
     ) => void;
     1: any;
   }
-  type EventHandlerUnion<T, E extends Event> =
-    | EventHandler<T, E>
-    | BoundEventHandler<T, E>;
+  type EventHandlerUnion<T, E extends Event> = EventHandler<T, E> | BoundEventHandler<T, E>;
   interface IntrinsicAttributes {
     ref?: unknown | ((e: unknown) => void);
   }
@@ -60,9 +58,7 @@ declare namespace JSX {
     [Key in keyof Directives as `use:${Key}`]?: Directives[Key];
   };
   type DirectiveFunctionAttributes<T> = {
-    [K in keyof DirectiveFunctions as string extends K
-      ? never
-      : `use:${K}`]?: DirectiveFunctions[K] extends (
+    [K in keyof DirectiveFunctions as string extends K ? never : `use:${K}`]?: DirectiveFunctions[K] extends (
       el: infer E, // will be unknown if not provided
       ...rest: infer R // use rest so that we can check whether it's provided or not
     ) => void
@@ -82,16 +78,10 @@ declare namespace JSX {
     [Key in keyof ExplicitAttributes as `attr:${Key}`]?: ExplicitAttributes[Key];
   };
   type OnAttributes<T> = {
-    [Key in keyof CustomEvents as `on:${Key}`]?: EventHandler<
-      T,
-      CustomEvents[Key]
-    >;
+    [Key in keyof CustomEvents as `on:${Key}`]?: EventHandler<T, CustomEvents[Key]>;
   };
   type OnCaptureAttributes<T> = {
-    [Key in keyof CustomCaptureEvents as `oncapture:${Key}`]?: EventHandler<
-      T,
-      CustomCaptureEvents[Key]
-    >;
+    [Key in keyof CustomCaptureEvents as `oncapture:${Key}`]?: EventHandler<T, CustomCaptureEvents[Key]>;
   };
   interface DOMAttributes<T>
     extends CustomAttributes<T>,
@@ -101,7 +91,7 @@ declare namespace JSX {
       AttrAttributes,
       OnAttributes<T>,
       OnCaptureAttributes<T> {
-    children?: (ChildElement | string)[] | ChildElement | string;
+    children?: any; // (ChildElement | string)[] | ChildElement | string;
     innerHTML?: string;
     innerText?: string | number;
     textContent?: string | number;
@@ -202,18 +192,9 @@ declare namespace JSX {
     [key: string]: string | number | undefined;
   }
 
-  type HTMLAutocapitalize =
-    | "off"
-    | "none"
-    | "on"
-    | "sentences"
-    | "words"
-    | "characters";
+  type HTMLAutocapitalize = "off" | "none" | "on" | "sentences" | "words" | "characters";
   type HTMLDir = "ltr" | "rtl" | "auto";
-  type HTMLFormEncType =
-    | "application/x-www-form-urlencoded"
-    | "multipart/form-data"
-    | "text/plain";
+  type HTMLFormEncType = "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain";
   type HTMLFormMethod = "post" | "get" | "dialog";
   type HTMLCrossorigin = "anonymous" | "use-credentials" | "";
   type HTMLReferrerPolicy =
@@ -293,15 +274,7 @@ declare namespace JSX {
      */
     "aria-controls"?: string;
     /** Indicates the element that represents the current item within a container or set of related elements. */
-    "aria-current"?:
-      | boolean
-      | "false"
-      | "true"
-      | "page"
-      | "step"
-      | "location"
-      | "date"
-      | "time";
+    "aria-current"?: boolean | "false" | "true" | "page" | "step" | "location" | "date" | "time";
     /**
      * Identifies the element (or elements) that describes the object.
      * @see aria-labelledby
@@ -340,15 +313,7 @@ declare namespace JSX {
      */
     "aria-grabbed"?: boolean | "false" | "true";
     /** Indicates the availability and type of interactive popup element, such as menu or dialog, that can be triggered by an element. */
-    "aria-haspopup"?:
-      | boolean
-      | "false"
-      | "true"
-      | "menu"
-      | "listbox"
-      | "tree"
-      | "grid"
-      | "dialog";
+    "aria-haspopup"?: boolean | "false" | "true" | "menu" | "listbox" | "tree" | "grid" | "dialog";
     /**
      * Indicates whether the element is exposed to an accessibility API.
      * @see aria-disabled.
@@ -581,15 +546,7 @@ declare namespace JSX {
     itemref?: string;
     part?: string;
     exportparts?: string;
-    inputmode?:
-      | "none"
-      | "text"
-      | "tel"
-      | "url"
-      | "email"
-      | "numeric"
-      | "decimal"
-      | "search";
+    inputmode?: "none" | "text" | "tel" | "url" | "email" | "numeric" | "decimal" | "search";
     contentEditable?: boolean | "inherit";
     contextMenu?: string;
     tabIndex?: number | string;
@@ -600,15 +557,7 @@ declare namespace JSX {
     itemId?: string;
     itemRef?: string;
     exportParts?: string;
-    inputMode?:
-      | "none"
-      | "text"
-      | "tel"
-      | "url"
-      | "email"
-      | "numeric"
-      | "decimal"
-      | "search";
+    inputMode?: "none" | "text" | "tel" | "url" | "email" | "numeric" | "decimal" | "search";
   }
   interface AnchorHTMLAttributes<T> extends HTMLAttributes<T> {
     download?: any;
@@ -918,8 +867,7 @@ declare namespace JSX {
     size?: number | string;
     value?: string | string[] | number;
   }
-  interface HTMLSlotElementAttributes<T = HTMLSlotElement>
-    extends HTMLAttributes<T> {
+  interface HTMLSlotElementAttributes<T = HTMLSlotElement> extends HTMLAttributes<T> {
     name?: string;
   }
   interface SourceHTMLAttributes<T> extends HTMLAttributes<T> {
@@ -1120,11 +1068,7 @@ declare namespace JSX {
     "color-interpolation"?: "auto" | "sRGB" | "linearRGB" | "inherit";
     "color-interpolation-filters"?: "auto" | "sRGB" | "linearRGB" | "inherit";
     "color-profile"?: string;
-    "color-rendering"?:
-      | "auto"
-      | "optimizeSpeed"
-      | "optimizeQuality"
-      | "inherit";
+    "color-rendering"?: "auto" | "optimizeSpeed" | "optimizeQuality" | "inherit";
     cursor?: string;
     direction?: "ltr" | "rtl" | "inherit";
     display?: string;
@@ -1155,11 +1099,7 @@ declare namespace JSX {
     "font-weight"?: number | string;
     "glyph-orientation-horizontal"?: string;
     "glyph-orientation-vertical"?: string;
-    "image-rendering"?:
-      | "auto"
-      | "optimizeQuality"
-      | "optimizeSpeed"
-      | "inherit";
+    "image-rendering"?: "auto" | "optimizeQuality" | "optimizeSpeed" | "inherit";
     kerning?: string;
     "letter-spacing"?: number | string;
     "lighting-color"?: string;
@@ -1182,53 +1122,24 @@ declare namespace JSX {
       | "all"
       | "none"
       | "inherit";
-    "shape-rendering"?:
-      | "auto"
-      | "optimizeSpeed"
-      | "crispEdges"
-      | "geometricPrecision"
-      | "inherit";
+    "shape-rendering"?: "auto" | "optimizeSpeed" | "crispEdges" | "geometricPrecision" | "inherit";
     "stop-color"?: string;
     "stop-opacity"?: number | string | "inherit";
     stroke?: string;
     "stroke-dasharray"?: string;
     "stroke-dashoffset"?: number | string;
     "stroke-linecap"?: "butt" | "round" | "square" | "inherit";
-    "stroke-linejoin"?:
-      | "arcs"
-      | "bevel"
-      | "miter"
-      | "miter-clip"
-      | "round"
-      | "inherit";
+    "stroke-linejoin"?: "arcs" | "bevel" | "miter" | "miter-clip" | "round" | "inherit";
     "stroke-miterlimit"?: number | string | "inherit";
     "stroke-opacity"?: number | string | "inherit";
     "stroke-width"?: number | string;
     "text-anchor"?: "start" | "middle" | "end" | "inherit";
-    "text-decoration"?:
-      | "none"
-      | "underline"
-      | "overline"
-      | "line-through"
-      | "blink"
-      | "inherit";
-    "text-rendering"?:
-      | "auto"
-      | "optimizeSpeed"
-      | "optimizeLegibility"
-      | "geometricPrecision"
-      | "inherit";
+    "text-decoration"?: "none" | "underline" | "overline" | "line-through" | "blink" | "inherit";
+    "text-rendering"?: "auto" | "optimizeSpeed" | "optimizeLegibility" | "geometricPrecision" | "inherit";
     "unicode-bidi"?: string;
     visibility?: "visible" | "hidden" | "collapse" | "inherit";
     "word-spacing"?: number | string;
-    "writing-mode"?:
-      | "lr-tb"
-      | "rl-tb"
-      | "tb-rl"
-      | "lr"
-      | "rl"
-      | "tb"
-      | "inherit";
+    "writing-mode"?: "lr-tb" | "rl-tb" | "tb-rl" | "lr" | "rl" | "tb" | "inherit";
   }
   interface AnimationElementSVGAttributes<T>
     extends CoreSVGAttributes<T>,
@@ -1358,10 +1269,7 @@ declare namespace JSX {
       AnimationTimingSVGAttributes,
       AnimationValueSVGAttributes,
       AnimationAdditionSVGAttributes,
-      Pick<
-        PresentationSVGAttributes,
-        "color-interpolation" | "color-rendering"
-      > {}
+      Pick<PresentationSVGAttributes, "color-interpolation" | "color-rendering"> {}
   interface AnimateMotionSVGAttributes<T>
     extends AnimationElementSVGAttributes<T>,
       AnimationTimingSVGAttributes,
@@ -1405,9 +1313,7 @@ declare namespace JSX {
       ExternalResourceSVGAttributes,
       StylableSVGAttributes,
       TransformableSVGAttributes {}
-  interface DescSVGAttributes<T>
-    extends CoreSVGAttributes<T>,
-      StylableSVGAttributes {}
+  interface DescSVGAttributes<T> extends CoreSVGAttributes<T>, StylableSVGAttributes {}
   interface EllipseSVGAttributes<T>
     extends GraphicsElementSVGAttributes<T>,
       ShapeElementSVGAttributes<T>,
@@ -1478,18 +1384,14 @@ declare namespace JSX {
     xChannelSelector?: "R" | "G" | "B" | "A";
     yChannelSelector?: "R" | "G" | "B" | "A";
   }
-  interface FeDistantLightSVGAttributes<T>
-    extends LightSourceElementSVGAttributes<T> {
+  interface FeDistantLightSVGAttributes<T> extends LightSourceElementSVGAttributes<T> {
     azimuth?: number | string;
     elevation?: number | string;
   }
   interface FeFloodSVGAttributes<T>
     extends FilterPrimitiveElementSVGAttributes<T>,
       StylableSVGAttributes,
-      Pick<
-        PresentationSVGAttributes,
-        "color" | "flood-color" | "flood-opacity"
-      > {}
+      Pick<PresentationSVGAttributes, "color" | "flood-color" | "flood-opacity"> {}
   interface FeFuncSVGAttributes<T> extends CoreSVGAttributes<T> {
     type?: "identity" | "table" | "discrete" | "linear" | "gamma";
     tableValues?: string;
@@ -1512,12 +1414,8 @@ declare namespace JSX {
     preserveAspectRatio?: SVGPreserveAspectRatio;
     href?: string;
   }
-  interface FeMergeSVGAttributes<T>
-    extends FilterPrimitiveElementSVGAttributes<T>,
-      StylableSVGAttributes {}
-  interface FeMergeNodeSVGAttributes<T>
-    extends CoreSVGAttributes<T>,
-      SingleInputFilterSVGAttributes {}
+  interface FeMergeSVGAttributes<T> extends FilterPrimitiveElementSVGAttributes<T>, StylableSVGAttributes {}
+  interface FeMergeNodeSVGAttributes<T> extends CoreSVGAttributes<T>, SingleInputFilterSVGAttributes {}
   interface FeMorphologySVGAttributes<T>
     extends FilterPrimitiveElementSVGAttributes<T>,
       SingleInputFilterSVGAttributes,
@@ -1532,8 +1430,7 @@ declare namespace JSX {
     dx?: number | string;
     dy?: number | string;
   }
-  interface FePointLightSVGAttributes<T>
-    extends LightSourceElementSVGAttributes<T> {
+  interface FePointLightSVGAttributes<T> extends LightSourceElementSVGAttributes<T> {
     x?: number | string;
     y?: number | string;
     z?: number | string;
@@ -1548,8 +1445,7 @@ declare namespace JSX {
     specularExponent?: string;
     kernelUnitLength?: number | string;
   }
-  interface FeSpotLightSVGAttributes<T>
-    extends LightSourceElementSVGAttributes<T> {
+  interface FeSpotLightSVGAttributes<T> extends LightSourceElementSVGAttributes<T> {
     x?: number | string;
     y?: number | string;
     z?: number | string;
@@ -1563,19 +1459,14 @@ declare namespace JSX {
     extends FilterPrimitiveElementSVGAttributes<T>,
       SingleInputFilterSVGAttributes,
       StylableSVGAttributes {}
-  interface FeTurbulanceSVGAttributes<T>
-    extends FilterPrimitiveElementSVGAttributes<T>,
-      StylableSVGAttributes {
+  interface FeTurbulanceSVGAttributes<T> extends FilterPrimitiveElementSVGAttributes<T>, StylableSVGAttributes {
     baseFrequency?: number | string;
     numOctaves?: number | string;
     seed?: number | string;
     stitchTiles?: "stitch" | "noStitch";
     type?: "fractalNoise" | "turbulence";
   }
-  interface FilterSVGAttributes<T>
-    extends CoreSVGAttributes<T>,
-      ExternalResourceSVGAttributes,
-      StylableSVGAttributes {
+  interface FilterSVGAttributes<T> extends CoreSVGAttributes<T>, ExternalResourceSVGAttributes, StylableSVGAttributes {
     filterUnits?: SVGUnits;
     primitiveUnits?: SVGUnits;
     x?: number | string;
@@ -1624,17 +1515,13 @@ declare namespace JSX {
       ExternalResourceSVGAttributes,
       StylableSVGAttributes,
       TransformableSVGAttributes,
-      Pick<
-        PresentationSVGAttributes,
-        "marker-start" | "marker-mid" | "marker-end"
-      > {
+      Pick<PresentationSVGAttributes, "marker-start" | "marker-mid" | "marker-end"> {
     x1?: number | string;
     y1?: number | string;
     x2?: number | string;
     y2?: number | string;
   }
-  interface LinearGradientSVGAttributes<T>
-    extends GradientElementSVGAttributes<T> {
+  interface LinearGradientSVGAttributes<T> extends GradientElementSVGAttributes<T> {
     x1?: number | string;
     x2?: number | string;
     y1?: number | string;
@@ -1673,10 +1560,7 @@ declare namespace JSX {
       ExternalResourceSVGAttributes,
       StylableSVGAttributes,
       TransformableSVGAttributes,
-      Pick<
-        PresentationSVGAttributes,
-        "marker-start" | "marker-mid" | "marker-end"
-      > {
+      Pick<PresentationSVGAttributes, "marker-start" | "marker-mid" | "marker-end"> {
     d?: string;
     pathLength?: number | string;
   }
@@ -1702,10 +1586,7 @@ declare namespace JSX {
       ExternalResourceSVGAttributes,
       StylableSVGAttributes,
       TransformableSVGAttributes,
-      Pick<
-        PresentationSVGAttributes,
-        "marker-start" | "marker-mid" | "marker-end"
-      > {
+      Pick<PresentationSVGAttributes, "marker-start" | "marker-mid" | "marker-end"> {
     points?: string;
   }
   interface PolylineSVGAttributes<T>
@@ -1715,14 +1596,10 @@ declare namespace JSX {
       ExternalResourceSVGAttributes,
       StylableSVGAttributes,
       TransformableSVGAttributes,
-      Pick<
-        PresentationSVGAttributes,
-        "marker-start" | "marker-mid" | "marker-end"
-      > {
+      Pick<PresentationSVGAttributes, "marker-start" | "marker-mid" | "marker-end"> {
     points?: string;
   }
-  interface RadialGradientSVGAttributes<T>
-    extends GradientElementSVGAttributes<T> {
+  interface RadialGradientSVGAttributes<T> extends GradientElementSVGAttributes<T> {
     cx?: number | string;
     cy?: number | string;
     r?: number | string;
@@ -1802,10 +1679,7 @@ declare namespace JSX {
       ConditionalProcessingSVGAttributes,
       ExternalResourceSVGAttributes,
       StylableSVGAttributes,
-      Pick<
-        PresentationSVGAttributes,
-        "alignment-baseline" | "baseline-shift" | "display" | "visibility"
-      > {
+      Pick<PresentationSVGAttributes, "alignment-baseline" | "baseline-shift" | "display" | "visibility"> {
     startOffset?: number | string;
     method?: "align" | "stretch";
     spacing?: "auto" | "exact";
@@ -1816,10 +1690,7 @@ declare namespace JSX {
       ConditionalProcessingSVGAttributes,
       ExternalResourceSVGAttributes,
       StylableSVGAttributes,
-      Pick<
-        PresentationSVGAttributes,
-        "alignment-baseline" | "baseline-shift" | "display" | "visibility"
-      > {
+      Pick<PresentationSVGAttributes, "alignment-baseline" | "baseline-shift" | "display" | "visibility"> {
     x?: number | string;
     y?: number | string;
     dx?: number | string;
