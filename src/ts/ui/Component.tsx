@@ -19,11 +19,12 @@ export interface ComponentOptions<T> {
 }
 
 export type ChildType = Node | Element | string | undefined;
-
+type Effect = { cb: () => void; deps: any[] };
 export abstract class Component<T = any> extends HTMLElement {
   shadow: ShadowRoot | null;
   render: RenderFn;
   private trackedStores: UnsubscribeStoreFn[];
+  private effects: Effect[];
   domStyle: HTMLElement;
 
   // specify the property on the element instance type
@@ -31,6 +32,7 @@ export abstract class Component<T = any> extends HTMLElement {
 
   constructor(options?: ComponentOptions<T>) {
     super();
+    this.effects = [];
     this.trackedStores = [];
     const useShadow = options?.useShadow === undefined ? true : options?.useShadow;
     this.shadow = useShadow ? this.attachShadow(options?.shadow || { mode: "open" }) : null;
@@ -40,9 +42,37 @@ export abstract class Component<T = any> extends HTMLElement {
     this._props = options?.props as any;
 
     this.render = () => {
+      let prevEffects = this.effects.slice(0);
+      if (this.effects.length) {
+        this.effects = [];
+      }
+
       const css = this.getStyle();
 
+      // Generates new DOM
       let children = fn();
+
+      if (this.effects.length) {
+        let curDeps: any[], prevDeps: any[];
+        let curEffect: Effect, prevEffect: Effect;
+        for (let i = 0, l = this.effects.length; i < l; i++) {
+          curEffect = this.effects[i];
+          prevEffect = prevEffects[i];
+
+          if (!prevEffect) continue;
+
+          curDeps = curEffect.deps;
+          prevDeps = prevEffect.deps;
+
+          for (let ii = 0, il = curDeps.length; ii < il; ii++) {
+            if (curDeps[ii] !== prevDeps[ii]) {
+              curEffect.cb();
+              break;
+            }
+          }
+        }
+      }
+
       let existingChildren = parent.children;
       const styleOffset = css ? 1 : 0;
       const lenOfExistingChildren = existingChildren.length - styleOffset;
@@ -115,18 +145,22 @@ export abstract class Component<T = any> extends HTMLElement {
     return null;
   }
 
-  useState<T>(defaultValue: T): [() => T, (val: T) => void] {
+  useState<T>(defaultValue: T): [() => T, (val: T, render?: boolean) => void] {
     let value = defaultValue;
 
     const getValue = (): T => {
       return value;
     };
-    const setValue = (newValue: T) => {
+    const setValue = (newValue: T, render = true) => {
       if (newValue === value) return;
       value = newValue;
-      this.render();
+      if (render) this.render();
     };
     return [getValue, setValue];
+  }
+
+  useEffect(cb: () => void, deps: any[]) {
+    this.effects.push({ cb, deps });
   }
 
   abstract init(): InitFn;
