@@ -72,7 +72,7 @@ export class ProjectSelector extends Component<Props> {
             <div class="projects">
               {isNewProject ? (
                 [
-                  <NewProjectForm project={newProject()} onChange={(project) => setNewProject(project)} />,
+                  <NewProjectForm project={newProject()} onChange={(project) => setNewProject(project, false)} />,
                   !!projectStoreProxy.error && projectStoreProxy.error,
                 ]
               ) : (

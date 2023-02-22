@@ -14,6 +14,10 @@ export class Store<T extends object> {
     this.defaultProxy = proxy;
   }
 
+  setTarget(data: Partial<T>) {
+    for (let i in data) this.defaultProxy[i] = data[i]!;
+  }
+
   createHandler(parentKey?: string): ProxyHandler<T> {
     const listeners = this.listeners;
     return {
@@ -33,6 +37,7 @@ export class Store<T extends object> {
         if (target[p] === newValue) return true;
 
         const val = Reflect.set(target, p, newValue, receiver);
+
         listeners.forEach((l) => {
           if (!l.component.parentNode) return;
 
@@ -42,6 +47,7 @@ export class Store<T extends object> {
 
           l.component.render();
         });
+
         return val;
       },
     };

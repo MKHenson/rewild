@@ -1,4 +1,4 @@
-// import { Editor } from "./Editor";
+import { Editor } from "./Editor";
 import { Renderer } from "../../../renderer/Renderer";
 import { UIEventManager } from "../../../core/UIEventManager";
 import { ApplicationEventType } from "../../../../common/EventTypes";
@@ -24,17 +24,19 @@ export class ProjectEditorPage extends Component<Props> {
     return () => (
       <RouterSwitch>
         <Route
+          exact
           path="/editor"
           onRender={(params) => (
             <ProjectSelector onBack={onHomeClick} open onOpen={(uid) => navigate(`/editor/${uid}`)} />
           )}
         />
-        <Route path="/editor/:project" onRender={(params) => <div>EDITOR</div>} />
+        <Route
+          path="/editor/:project"
+          onRender={(params) => <Editor onHome={onHomeClick} projectId={params.project} />}
+        />
       </RouterSwitch>
     );
   }
-
-  // <Editor onHome={onHomeClick} />
 
   connectedCallback() {
     super.connectedCallback();
