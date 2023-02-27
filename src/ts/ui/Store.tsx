@@ -1,11 +1,10 @@
-import { Component } from "./Component";
-
 export type UnsubscribeStoreFn = () => void;
+export type CallBack = () => void;
 
 export class Store<T extends object> {
   readonly data: T;
   protected defaultProxy: T;
-  private listeners: { path?: string; component: Component }[];
+  private listeners: { path?: string; component: CallBack }[];
 
   constructor(val: T) {
     this.data = val;
@@ -39,13 +38,11 @@ export class Store<T extends object> {
         const val = Reflect.set(target, p, newValue, receiver);
 
         listeners.forEach((l) => {
-          if (!l.component.parentNode) return;
-
           if (l.path) {
             if (!(parentKey ? `${parentKey}.${p.toString()}` : p.toString()).startsWith(l.path)) return; // path doesnt match
           }
 
-          l.component.render();
+          l.component();
         });
 
         return val;
@@ -53,7 +50,7 @@ export class Store<T extends object> {
     };
   }
 
-  proxy(component?: Component, path?: string): [T, UnsubscribeStoreFn] {
+  proxy(component?: CallBack, path?: string): [T, UnsubscribeStoreFn] {
     const listeners = this.listeners;
 
     if (component) listeners.push({ component, path });

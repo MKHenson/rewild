@@ -11,6 +11,8 @@ interface Props {
 @register("x-new-project-form")
 export class NewProjectForm extends Component<Props> {
   init() {
+    let project = { ...this.props.project };
+
     return () => (
       <div>
         <Field label="Name" required>
@@ -18,16 +20,22 @@ export class NewProjectForm extends Component<Props> {
             autoFocus
             fullWidth
             placeholder="Enter project name"
-            value={this.props.project?.name}
-            onChange={(name) => this.props.onChange({ ...this.props.project, name })}
+            value={project.name}
+            onChange={(value) => {
+              project.name = value;
+              this.props.onChange(project);
+            }}
           />
         </Field>
         <Field label="Description">
           <Input
             fullWidth
             placeholder="Enter a description"
-            value={this.props.project?.description}
-            onChange={(description) => this.props.onChange({ ...this.props.project, description })}
+            value={project.description}
+            onChange={(value) => {
+              project.description = value;
+              this.props.onChange(project);
+            }}
           />
         </Field>
       </div>

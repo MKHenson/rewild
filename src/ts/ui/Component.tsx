@@ -1,7 +1,7 @@
 import { Store, UnsubscribeStoreFn } from "./Store";
 
 type RenderFn = () => void;
-type InitFn = () => null | ChildType | ChildType[];
+type InitFn = () => null | JSX.ChildElement | JSX.ChildElement[];
 
 export function register<T extends CustomElementConstructor | JSX.ComponentStatic>(tagName: string) {
   return <U extends T>(constructor: U) => {
@@ -18,17 +18,15 @@ export interface ComponentOptions<T> {
   shadow?: ShadowRootInit;
 }
 
-export type ChildType = Node | Element | string | undefined;
 type Effect = { cb: () => void; deps: any[] };
-export abstract class Component<T = any> extends HTMLElement {
+export abstract class Component<T = any> extends HTMLElement implements JSX.Component {
   shadow: ShadowRoot | null;
   render: RenderFn;
   private trackedStores: UnsubscribeStoreFn[];
   private effects: Effect[];
-  domStyle: HTMLElement;
 
   // specify the property on the element instance type
-  _props: T & { children?: ChildType | ChildType[] };
+  _props: T & { children?: JSX.ChildElement | JSX.ChildElement[] };
 
   constructor(options?: ComponentOptions<T>) {
     super();
@@ -36,11 +34,11 @@ export abstract class Component<T = any> extends HTMLElement {
     this.trackedStores = [];
     const useShadow = options?.useShadow === undefined ? true : options?.useShadow;
     this.shadow = useShadow ? this.attachShadow(options?.shadow || { mode: "open" }) : null;
-    const parent = useShadow ? this.shadow! : this;
-
-    const fn = this.init();
     this._props = options?.props as any;
+  }
 
+  _createRenderer() {
+    const parent = this.shadow ? this.shadow : this;
     this.render = () => {
       let prevEffects = this.effects.slice(0);
       if (this.effects.length) {
@@ -108,25 +106,17 @@ export abstract class Component<T = any> extends HTMLElement {
         }
       }
     };
+
+    const fn = this.init();
   }
 
-  get props(): T & { children?: ChildType | ChildType[] } {
+  get props(): T & { children?: JSX.ChildElement | JSX.ChildElement[] } {
     return this._props;
   }
 
-  set props(val: T & { children?: ChildType | ChildType[] }) {
+  set props(val: T & { children?: JSX.ChildElement | JSX.ChildElement[] }) {
     this._props = val || ({} as any);
     this.render();
-  }
-
-  addChildren(parent: Element, children?: ChildType | ChildType[]) {
-    if (children) {
-      if (Array.isArray(children)) {
-        for (const child of children) if (child) parent.append(child);
-      } else {
-        parent.append(children as Node);
-      }
-    }
   }
 
   /**
@@ -136,7 +126,7 @@ export abstract class Component<T = any> extends HTMLElement {
    * @returns
    */
   observeStore<K extends object>(store: Store<K>, path?: string) {
-    const [val, unsubscribe] = store.proxy(this, path);
+    const [val, unsubscribe] = store.proxy(this.render, path);
     this.trackedStores.push(unsubscribe);
     return val;
   }
