@@ -1,9 +1,9 @@
 export type UnsubscribeStoreFn = () => void;
-export type Callback = () => void;
+export type Callback = (prop: string, prevValue: any, value: any, path: string) => void;
 
 export class Signaller<T extends object> {
   readonly target: T;
-  private listeners: { path?: string; cb: Callback }[];
+  private listeners: Callback[];
 
   constructor(target: T) {
     this.target = target;
@@ -14,13 +14,13 @@ export class Signaller<T extends object> {
   proxy(cb?: Callback, path?: string): [T, UnsubscribeStoreFn] {
     const listeners = this.listeners;
 
-    if (cb) listeners.push({ cb, path });
+    if (cb) listeners.push(cb);
 
     return [
       new Proxy<T>(this.target, this.setHandlers()),
       (() =>
         this.listeners.splice(
-          listeners.findIndex((val) => val.cb === cb),
+          listeners.findIndex((val) => val === cb),
           1
         )) as UnsubscribeStoreFn,
     ];
@@ -33,9 +33,7 @@ export class Signaller<T extends object> {
         if (typeof target[key] === "object" && target[key] !== null) {
           const newProxy = new Proxy(
             target[key],
-            this.setHandlers(
-              parentKey ? `${parentKey}.${key.toString()}` : key.toString()
-            )
+            this.setHandlers(parentKey ? `${parentKey}.${key.toString()}` : key.toString())
           );
           return newProxy;
         } else {
@@ -46,22 +44,13 @@ export class Signaller<T extends object> {
         // Do nothing if its the same value
         if (target[p] === newValue) return true;
 
-        const val = Reflect.set(target, p, newValue, receiver);
-        listeners.forEach((l) => {
-          // Check if a path is specified. If it is, we compare it to the prop path to see if we should
-          // dispatch a render
-          if (l.path) {
-            if (
-              !(
-                parentKey ? `${parentKey}.${p.toString()}` : p.toString()
-              ).startsWith(l.path)
-            )
-              return;
-          }
+        const prevValue = target[p];
+        const validReturn = Reflect.set(target, p, newValue, receiver);
 
-          l.cb();
+        listeners.forEach((l) => {
+          l(p as string, prevValue, newValue, parentKey ? `${parentKey}.${p.toString()}` : p.toString());
         });
-        return val;
+        return validReturn;
       },
     };
   }

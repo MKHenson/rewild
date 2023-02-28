@@ -9,6 +9,10 @@ interface Props {
 
 @register("x-editor")
 export class Editor extends Component<Props> {
+  constructor() {
+    super({ useShadow: false });
+  }
+
   init() {
     return () => <EditorGrid onHome={this.props.onHome} />;
   }
@@ -16,5 +20,15 @@ export class Editor extends Component<Props> {
   connectedCallback(): void {
     projectStore.getProject(this.props.projectId);
     super.connectedCallback();
+  }
+
+  getStyle() {
+    return css`
+      x-editor {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+    `;
   }
 }
