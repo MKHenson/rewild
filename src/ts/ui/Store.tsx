@@ -11,7 +11,11 @@ export class Store<T extends object> {
     this.defaultProxy = proxy;
   }
 
-  createProxy(cb?: Callback, path?: string) {
-    return this.signaller.proxy(cb, path);
+  setTarget(data: Partial<T>) {
+    for (let i in data) this.defaultProxy[i] = data[i]!;
+  }
+
+  createProxy(cb?: Callback) {
+    return this.signaller.proxy(cb);
   }
 }

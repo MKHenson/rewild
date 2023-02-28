@@ -1,4 +1,4 @@
-import { UnsubscribeStoreFn } from "./Signaller";
+import { Callback, UnsubscribeStoreFn } from "./Signaller";
 import { Store } from "./Store";
 
 type RenderFn = () => void;
@@ -19,19 +19,16 @@ export interface ComponentOptions<T> {
   shadow?: ShadowRootInit;
 }
 
-type Effect = { cb: () => void; deps: any[] };
 export abstract class Component<T = any> extends HTMLElement implements JSX.Component {
   shadow: ShadowRoot | null;
   render: RenderFn;
   private trackedStores: UnsubscribeStoreFn[];
-  private effects: Effect[];
 
   // specify the property on the element instance type
   _props: T & { children?: JSX.ChildElement | JSX.ChildElement[] };
 
   constructor(options?: ComponentOptions<T>) {
     super();
-    this.effects = [];
     this.trackedStores = [];
     const useShadow = options?.useShadow === undefined ? true : options?.useShadow;
     this.shadow = useShadow ? this.attachShadow(options?.shadow || { mode: "open" }) : null;
@@ -41,36 +38,10 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
   _createRenderer() {
     const parent = this.shadow ? this.shadow : this;
     this.render = () => {
-      let prevEffects = this.effects.slice(0);
-      if (this.effects.length) {
-        this.effects = [];
-      }
-
       const css = this.getStyle();
 
       // Generates new DOM
       let children = fn();
-
-      if (this.effects.length) {
-        let curDeps: any[], prevDeps: any[];
-        let curEffect: Effect, prevEffect: Effect;
-        for (let i = 0, l = this.effects.length; i < l; i++) {
-          curEffect = this.effects[i];
-          prevEffect = prevEffects[i];
-
-          if (!prevEffect) continue;
-
-          curDeps = curEffect.deps;
-          prevDeps = prevEffect.deps;
-
-          for (let ii = 0, il = curDeps.length; ii < il; ii++) {
-            if (curDeps[ii] !== prevDeps[ii]) {
-              curEffect.cb();
-              break;
-            }
-          }
-        }
-      }
 
       let existingChildren = parent.children;
       const styleOffset = css ? 1 : 0;
@@ -126,8 +97,8 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
    * @param path [Optional] Path can be specified using dot notation to only render if the propety name matches. For example "foo.bar" will trigger a render for any change to fields of bar or beyond (foo.bar.baz = 1 or even foo.bar.baz.gar = 1)
    * @returns
    */
-  observeStore<K extends object>(store: Store<K>, path?: string) {
-    const [val, unsubscribe] = store.createProxy(this.render, path);
+  observeStore<K extends object>(store: Store<K>, cb?: Callback) {
+    const [val, unsubscribe] = store.createProxy(cb || this.render);
     this.trackedStores.push(unsubscribe);
     return val;
   }
@@ -148,10 +119,6 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
       if (render) this.render();
     };
     return [getValue, setValue];
-  }
-
-  useEffect(cb: () => void, deps: any[]) {
-    this.effects.push({ cb, deps });
   }
 
   abstract init(): InitFn;

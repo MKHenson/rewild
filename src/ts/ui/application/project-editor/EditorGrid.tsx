@@ -36,7 +36,11 @@ function createCells(workspaceCells: IWorkspaceCell[]): IWorkspaceCell[] {
 export class EditorGrid extends Component<Props> {
   init() {
     const [cells, setCells] = this.useState<IWorkspaceCell[]>([]);
-    const projectStoreProxy = this.observeStore(projectStore);
+    const projectStoreProxy = this.observeStore(projectStore, (prop, prevVal, val, path) => {
+      if (prop === "project" || prop === "workspace") {
+        setCells(createCells(projectStoreProxy.project!.workspace.cells), false);
+      } else this.render();
+    });
 
     const mapped = (type?: EditorType) => {
       if (!type) return null;
@@ -48,11 +52,11 @@ export class EditorGrid extends Component<Props> {
     };
 
     return () => {
-      this.useEffect(() => {
-        if (projectStoreProxy.project?.workspace) {
-          setCells(createCells(projectStoreProxy.project.workspace.cells), false);
-        }
-      }, [projectStoreProxy.project?.workspace]);
+      // this.useEffect(() => {
+      //   if (projectStoreProxy.project?.workspace) {
+      //     setCells(createCells(projectStoreProxy.project.workspace.cells), false);
+      //   }
+      // }, [projectStoreProxy.project?.workspace]);
 
       return (
         <div>
