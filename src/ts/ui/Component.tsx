@@ -1,4 +1,5 @@
-import { Store, UnsubscribeStoreFn } from "./Store";
+import { UnsubscribeStoreFn } from "./Signaller";
+import { Store } from "./Store";
 
 type RenderFn = () => void;
 type InitFn = () => null | JSX.ChildElement | JSX.ChildElement[];
@@ -126,7 +127,7 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
    * @returns
    */
   observeStore<K extends object>(store: Store<K>, path?: string) {
-    const [val, unsubscribe] = store.proxy(this.render, path);
+    const [val, unsubscribe] = store.createProxy(this.render, path);
     this.trackedStores.push(unsubscribe);
     return val;
   }
