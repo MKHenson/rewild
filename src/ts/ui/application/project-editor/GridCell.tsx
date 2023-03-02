@@ -69,16 +69,14 @@ export class GridCell extends Component<Props> {
 
     return () => {
       const props = this.props;
+      this.style.gridArea = `${props.rowStart} / ${props.colStart} / ${props.rowEnd} / ${props.colEnd};`;
+      this.ondragover = onDragOverEvent;
+      this.ondragleave = onDragLeaveEvent;
+      this.ondragend = onDragEndEvent;
+      this.ondrop = onDrop;
+
       return (
-        <div
-          ondragover={onDragOverEvent}
-          ondragleave={onDragLeaveEvent}
-          ondragend={onDragEndEvent}
-          ondrop={onDrop}
-          style={css`
-            grid-area: ${props.rowStart} / ${props.colStart} / ${props.rowEnd} / ${props.colEnd};
-          `}
-        >
+        <div>
           {props.hasElement && (
             <div class="content">
               {props.editorElm}
@@ -124,6 +122,10 @@ export class GridCell extends Component<Props> {
 
   getStyle(): string | null {
     return css`
+      :host {
+        grid-area: ${this.props.rowStart} / ${this.props.colStart} / ${this.props.rowEnd} / ${this.props.colEnd};
+      }
+
       :host,
       :host > div {
         height: 100%;

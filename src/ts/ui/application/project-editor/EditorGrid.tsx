@@ -58,43 +58,37 @@ export class EditorGrid extends Component<Props> {
       //   }
       // }, [projectStoreProxy.project?.workspace]);
 
-      return (
-        <div>
-          {projectStoreProxy.project! ? (
-            cells().map((cell, i) => {
-              const editor = mapped(cell.editor);
-              return (
-                <GridCell
-                  rowStart={cell.rowStart}
-                  rowEnd={cell.rowEnd}
-                  colStart={cell.colStart}
-                  colEnd={cell.colEnd}
-                  editor={cell.editor}
-                  hasElement={!!editor}
-                  editorElm={editor || undefined}
-                  onEditorMoved={(editor, rowStart, colStart, rowEnd, colEnd) => {
-                    projectStoreProxy.project!.workspace.cells = projectStoreProxy.project!.workspace.cells.map(
-                      (cell) => {
-                        if (cell.editor === editor)
-                          return {
-                            ...cell,
-                            editor,
-                            colStart,
-                            rowStart,
-                            rowEnd,
-                            colEnd,
-                          };
-                        return cell;
-                      }
-                    );
-                  }}
-                />
-              );
-            })
-          ) : (
-            <Loading />
-          )}
-        </div>
+      return projectStoreProxy.project! ? (
+        cells().map((cell, i) => {
+          const editor = mapped(cell.editor);
+          return (
+            <GridCell
+              rowStart={cell.rowStart}
+              rowEnd={cell.rowEnd}
+              colStart={cell.colStart}
+              colEnd={cell.colEnd}
+              editor={cell.editor}
+              hasElement={!!editor}
+              editorElm={editor || undefined}
+              onEditorMoved={(editor, rowStart, colStart, rowEnd, colEnd) => {
+                projectStoreProxy.project!.workspace.cells = projectStoreProxy.project!.workspace.cells.map((cell) => {
+                  if (cell.editor === editor)
+                    return {
+                      ...cell,
+                      editor,
+                      colStart,
+                      rowStart,
+                      rowEnd,
+                      colEnd,
+                    };
+                  return cell;
+                });
+              }}
+            />
+          );
+        })
+      ) : (
+        <Loading />
       );
     };
   }

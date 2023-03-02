@@ -21,7 +21,7 @@ function jsx(
 
   // Check if a functional component
   if (typeof tag === "function") {
-    return (tag as JSX.FC<any>)(attributes ?? {});
+    return (tag as JSX.FC<any>)({ ...attributes, children: children });
   }
   const element = document.createElement(tag as JSX.Tag);
 
@@ -75,4 +75,10 @@ function appendChildren(element: HTMLElement, children: JSX.ChildElement[]) {
   val.forEach((string, i) => (str += string + (rest[i] || "")));
   str = str.replace(/\r?\n|\r/g, "");
   return str;
+};
+
+(window as any).cssStylesheet = (val: string) => {
+  const stylesheet = new CSSStyleSheet();
+  stylesheet.replaceSync(val);
+  return stylesheet;
 };

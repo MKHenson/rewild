@@ -38,22 +38,11 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
   _createRenderer() {
     const parent = this.shadow ? this.shadow : this;
     this.render = () => {
-      const css = this.getStyle();
-
       // Generates new DOM
       let children = fn();
 
-      let existingChildren = parent.children;
-      const styleOffset = css ? 1 : 0;
-      const lenOfExistingChildren = existingChildren.length - styleOffset;
-
-      if (css) {
-        if (parent.firstChild) {
-          const prevStyle = parent.firstChild;
-          parent.insertBefore(<style>{css}</style>, prevStyle);
-          prevStyle.remove();
-        } else parent.append(<style>{css}</style>);
-      }
+      let existingChildren = parent.childNodes;
+      const lenOfExistingChildren = existingChildren.length;
 
       if (children) {
         // Convert to array
@@ -61,19 +50,19 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
 
         for (let i = 0, l = children.length; i < l; i++) {
           // If the new node is exactly the same - skip it as we dont want to re-render
-          if (i < lenOfExistingChildren && children[i] === existingChildren[i + styleOffset]) {
+          if (i < lenOfExistingChildren && children[i] === existingChildren[i]) {
             continue;
           }
           // New node is not the same, and at the same position of an existing element. So replace existing elm with new one.
           else if (i < lenOfExistingChildren) {
-            const childToReplace = parent.children[i + styleOffset];
+            const childToReplace = parent.childNodes[i];
             parent.insertBefore(children[i] as Node, childToReplace);
             childToReplace.remove();
           } else parent.append(children[i] as Node);
         }
       } else {
         // If nothing returned, then clear existing elements
-        while (parent.children.length !== (css ? 1 : 0)) {
+        while (parent.childNodes.length !== 0) {
           parent.lastChild!.remove();
         }
       }
@@ -103,7 +92,7 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
     return val;
   }
 
-  getStyle(): string | null {
+  getStyle(): string | CSSStyleSheet | null {
     return null;
   }
 
@@ -123,8 +112,26 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
 
   abstract init(): InitFn;
 
+  generateCss() {
+    const css = this.getStyle();
+    if (!css) return;
+
+    const cssIsStylesheetObj = !(typeof css === "string");
+    let stylesheed: CSSStyleSheet;
+
+    if (!cssIsStylesheetObj) {
+      stylesheed = new CSSStyleSheet();
+      stylesheed.replaceSync(css);
+    } else stylesheed = css;
+
+    if (this.shadow) this.shadow.adoptedStyleSheets = [stylesheed];
+    else if (!document.adoptedStyleSheets.includes(stylesheed))
+      document.adoptedStyleSheets = document.adoptedStyleSheets.concat(stylesheed);
+  }
+
   // connect component
   connectedCallback() {
+    this.generateCss();
     this.render();
   }
 

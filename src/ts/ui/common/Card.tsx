@@ -13,10 +13,6 @@ interface Props {
 
 @register("x-card")
 export class Card extends Component<Props> {
-  constructor() {
-    super({ useShadow: false });
-  }
-
   init() {
     return () => (
       <div
@@ -31,26 +27,31 @@ export class Card extends Component<Props> {
   }
 
   getStyle() {
-    return css`
-      .card {
-        padding: 1rem;
-        background-color: ${theme?.colors.surface};
-        box-sizing: border-box;
-        border-radius: 5px;
-      }
-
-      .card.button {
-        cursor: pointer;
-      }
-      .card.raised {
-        box-shadow: ${theme?.colors.shadowShort1};
-      }
-      .card.raised:hover {
-        box-shadow: ${theme?.colors.shadowShort2};
-      }
-      .card.pushed.raised {
-        box-shadow: ${theme?.colors.shadowShort1}, inset 0 0 0px 2px ${theme?.colors.primary400};
-      }
-    `;
+    return StyledCard;
   }
 }
+
+const StyledCard = cssStylesheet(css`
+  :host {
+    display: block;
+    padding: 1rem;
+    background-color: ${theme?.colors.surface};
+    box-sizing: border-box;
+    border-radius: 5px;
+  }
+  .card {
+  }
+
+  .card.button {
+    cursor: pointer;
+  }
+  .card.raised {
+    box-shadow: ${theme?.colors.shadowShort1};
+  }
+  .card.raised:hover {
+    box-shadow: ${theme?.colors.shadowShort2};
+  }
+  .card.pushed.raised {
+    box-shadow: ${theme?.colors.shadowShort1}, inset 0 0 0px 2px ${theme?.colors.primary400};
+  }
+`);

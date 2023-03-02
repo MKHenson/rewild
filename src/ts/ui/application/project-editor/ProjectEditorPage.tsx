@@ -51,7 +51,7 @@ export class ProjectEditorPage extends Component<Props> {
         top: 0;
         left: 0;
         position: absolute;
-        display: flex;
+        display: block;
         box-sizing: border-box;
       }
     `;

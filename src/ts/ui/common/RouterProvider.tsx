@@ -45,6 +45,16 @@ export class RouterProvider extends Component<Props> {
     this.listen();
   }
 
+  getStyle() {
+    return css`
+      x-router-provider {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+    `;
+  }
+
   /**
    * Start listening for route changes.
    */
