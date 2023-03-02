@@ -18,30 +18,29 @@ export class RibbonButtons extends Component<Props> {
     const { loading, dirty } = projectStoreProxy;
 
     return () => (
-      <div>
-        <Card>
-          <ButtonGroup>
-            <Button variant="text" onClick={this.props.onHome} disabled={loading}>
-              <StyledMaterialIcon icon="home" size="s" />
-            </Button>
-            <Button variant="text" disabled={!dirty || loading} onClick={projectStore.updateProject}>
-              <StyledMaterialIcon icon="save" size="s" />
-            </Button>
-            <Button variant="text" disabled={loading} onClick={projectStore.publish}>
-              <StyledMaterialIcon icon="file_upload" size="s" />
-            </Button>
-          </ButtonGroup>
-        </Card>
-      </div>
+      <Card>
+        <ButtonGroup>
+          <Button variant="text" onClick={this.props.onHome} disabled={loading}>
+            <StyledMaterialIcon icon="home" size="s" />
+          </Button>
+          <Button variant="text" disabled={!dirty || loading} onClick={projectStore.updateProject}>
+            <StyledMaterialIcon icon="save" size="s" />
+          </Button>
+          <Button variant="text" disabled={loading} onClick={projectStore.publish}>
+            <StyledMaterialIcon icon="file_upload" size="s" />
+          </Button>
+        </ButtonGroup>
+      </Card>
     );
   }
 
   getStyle(): string | null {
     return css`
-      .card {
+      x-card {
         padding: 3px;
       }
-      button {
+
+      x-button {
         color: ${theme?.colors.onSubtle};
         padding: 0.5rem;
       }

@@ -34,3 +34,4 @@ declare namespace JSX {
 
 // Declare global css helper function for nice styling :)
 declare function css(val: TemplateStringsArray, ...rest: (TemplateStringsArray | string | number)[]): string;
+declare function cssStylesheet(val: string): CSSStyleSheet;
