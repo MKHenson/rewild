@@ -39,14 +39,16 @@ export class Pane3D extends Component<Props> {
   }
 
   getStyle() {
-    return css`
-      :host,
-      :host > div {
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        display: block;
-      }
-    `;
+    return StyledPane3D;
   }
 }
+
+const StyledPane3D = cssStylesheet(css`
+  :host,
+  :host > div {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: block;
+  }
+`);

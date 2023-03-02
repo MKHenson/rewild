@@ -47,32 +47,34 @@ export class Input extends Component<Props> {
   }
 
   getStyle() {
-    return css`
-      :host > div {
-        width: 200px;
-      }
-
-      :host > div.fullwidth {
-        width: 100%;
-      }
-
-      input {
-        width: 100%;
-        height: 100%;
-        padding: 0.6rem;
-        outline: none;
-        box-sizing: border-box;
-        font-family: var(--font-family);
-        transition: all 0.25s;
-        border: 1px solid transparent;
-        border-bottom: 1px solid ${theme.colors.onSurfaceBorder};
-        background: ${theme.colors.surface};
-        color: ${theme.colors.onSurface};
-      }
-      input:focus {
-        border: 1px solid ${theme.colors.primary400};
-        color: ${theme.colors.primary500};
-      }
-    `;
+    return StyledInput;
   }
 }
+
+const StyledInput = cssStylesheet(css`
+  :host > div {
+    width: 200px;
+  }
+
+  :host > div.fullwidth {
+    width: 100%;
+  }
+
+  input {
+    width: 100%;
+    height: 100%;
+    padding: 0.6rem;
+    outline: none;
+    box-sizing: border-box;
+    font-family: var(--font-family);
+    transition: all 0.25s;
+    border: 1px solid transparent;
+    border-bottom: 1px solid ${theme.colors.onSurfaceBorder};
+    background: ${theme.colors.surface};
+    color: ${theme.colors.onSurface};
+  }
+  input:focus {
+    border: 1px solid ${theme.colors.primary400};
+    color: ${theme.colors.primary500};
+  }
+`);
