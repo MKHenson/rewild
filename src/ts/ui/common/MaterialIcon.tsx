@@ -45,45 +45,47 @@ export class MaterialIcon extends Component<Props> {
   }
 
   getStyle() {
-    return css`
-      :host {
-        display: inline-block;
-      }
-
-      span {
-        color: inherit;
-        font-family: "Material Icons Sharp";
-        font-weight: normal;
-        font-style: normal;
-        font-size: 24px;
-        line-height: 1;
-        letter-spacing: normal;
-        text-transform: none;
-        display: block;
-        white-space: nowrap;
-        word-wrap: normal;
-        direction: ltr;
-        -webkit-font-feature-settings: "liga";
-        -webkit-font-smoothing: antialiased;
-      }
-      span.md-12 {
-        font-size: 12px;
-      }
-      span.md-18 {
-        font-size: 18px;
-      }
-      span.md-24 {
-        font-size: 24px;
-      }
-      span.md-36 {
-        font-size: 36px;
-      }
-      span.md-48 {
-        font-size: 48px;
-      }
-    `;
+    return StyledMaterialIconStylesheet;
   }
 }
+
+const StyledMaterialIconStylesheet = cssStylesheet(css`
+  :host {
+    display: inline-block;
+  }
+
+  span {
+    color: inherit;
+    font-family: "Material Icons Sharp";
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: "liga";
+    -webkit-font-smoothing: antialiased;
+  }
+  span.md-12 {
+    font-size: 12px;
+  }
+  span.md-18 {
+    font-size: 18px;
+  }
+  span.md-24 {
+    font-size: 24px;
+  }
+  span.md-36 {
+    font-size: 36px;
+  }
+  span.md-48 {
+    font-size: 48px;
+  }
+`);
 
 @register("x-styled-material-icon")
 export class StyledMaterialIcon extends MaterialIcon {

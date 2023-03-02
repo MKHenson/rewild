@@ -55,17 +55,19 @@ export class Tree extends Component<TreeProps> {
   }
 
   getStyle() {
-    return css`
-      div {
-        width: 100%;
-        height: 100%;
-        box-sizing: border-box;
-        overflow: auto;
-        padding: 1rem 0;
-      }
-    `;
+    return StyledTree;
   }
 }
+
+const StyledTree = cssStylesheet(css`
+  div {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: auto;
+    padding: 1rem 0;
+  }
+`);
 
 @register("x-treenode")
 export class TreeNode extends Component<NodeProps> {
@@ -130,33 +132,35 @@ export class TreeNode extends Component<NodeProps> {
   }
 
   getStyle() {
-    return css`
-      .tree-content {
-        margin: 0 0 0 0.5rem;
-        cursor: pointer;
-        user-select: none;
-      }
-      .tree-content .node-icon {
-        vertical-align: middle;
-        margin: 0 4px 0 0;
-      }
-      .tree-content.selected-treenode {
-        .body2 {
-          color: ${theme?.colors.primary400};
-          font-weight: 500;
-        }
-      }
-      .tree-content .expand-icon {
-        vertical-align: middle;
-        margin: 0 4px 0 0;
-      }
-      .tree-content .body2 {
-        display: inline-block;
-      }
-
-      .node-children {
-        margin: 0 0 0 0.5rem;
-      }
-    `;
+    return StyledTreeNode;
   }
 }
+
+const StyledTreeNode = cssStylesheet(css`
+  .tree-content {
+    margin: 0 0 0 0.5rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .tree-content .node-icon {
+    vertical-align: middle;
+    margin: 0 4px 0 0;
+  }
+  .tree-content.selected-treenode {
+    .body2 {
+      color: ${theme?.colors.primary400};
+      font-weight: 500;
+    }
+  }
+  .tree-content .expand-icon {
+    vertical-align: middle;
+    margin: 0 4px 0 0;
+  }
+  .tree-content .body2 {
+    display: inline-block;
+  }
+
+  .node-children {
+    margin: 0 0 0 0.5rem;
+  }
+`);

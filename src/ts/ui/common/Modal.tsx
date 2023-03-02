@@ -57,16 +57,18 @@ export class Modal extends Component<Props> {
   }
 
   getStyle() {
-    return css`
-      .button-container {
-        text-align: right;
-      }
-      .button-container > x-button {
-        margin: 0 0 0 4px;
-      }
-      .content {
-        padding: 0.5rem 0;
-      }
-    `;
+    return StyledModal;
   }
 }
+
+const StyledModal = cssStylesheet(css`
+  .button-container {
+    text-align: right;
+  }
+  .button-container > x-button {
+    margin: 0 0 0 4px;
+  }
+  .content {
+    padding: 0.5rem 0;
+  }
+`);
