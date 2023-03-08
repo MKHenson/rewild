@@ -52,6 +52,7 @@ export class MaterialIcon extends Component<Props> {
 const StyledMaterialIconStylesheet = cssStylesheet(css`
   :host {
     display: inline-block;
+    vertical-align: middle;
   }
 
   span {

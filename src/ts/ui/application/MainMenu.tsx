@@ -57,17 +57,18 @@ export class MainMenu extends Component<Props> {
           ) : (
             <div class="styled-buttons">
               <Button disabled onClick={props.onStart} fullWidth>
-                New Game
+                <span>New Game</span>
               </Button>
               <Button onClick={onOptionsClick} fullWidth disabled>
-                Options
+                <span>Options</span>
               </Button>
               <Button
                 disabled={!authState.loggedIn || authState.user?.email !== "mat@webinate.net"}
                 onClick={props.onEditor}
                 fullWidth
               >
-                <MaterialIcon size="s" icon="build_circle" /> Editor
+                <MaterialIcon size="s" icon="build_circle" />
+                <span>Editor</span>
               </Button>
             </div>
           )}
@@ -80,6 +81,14 @@ export class MainMenu extends Component<Props> {
     return css`
       .styled-buttons x-button {
         margin: 1rem 0 0 0;
+      }
+
+      x-material-icon {
+        margin: 0 4px 0 0;
+      }
+
+      x-button span {
+        vertical-align: middle;
       }
 
       .tag-line .light {

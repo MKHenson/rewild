@@ -7,11 +7,16 @@ interface Props {
 @register("x-button-group")
 export class ButtonGroup extends Component<Props> {
   init() {
-    return () => (
-      <div class={`${this.props.class} button-group`}>
+    const elm = (
+      <div>
         <slot></slot>
       </div>
     );
+
+    return () => {
+      this.className = `${this.props.class} button-group`;
+      return elm;
+    };
   }
 
   getStyle() {

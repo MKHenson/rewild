@@ -11,16 +11,23 @@ interface Props {
 
 @register("x-switch")
 export class Switch extends Component<Props> {
+  public checked: boolean;
+
   init() {
-    return () => (
+    this.checked = this.props.checked || false;
+
+    const elm = (
       <div
-        class="switch"
-        classList={{
-          checked: this.props.checked || false,
+        class={`${this.checked ? "checked" : ""}`}
+        onclick={(e) => {
+          this.checked = !this.checked;
+          elm.classList.toggle("checked", this.checked);
+          this.props.onClick?.(e);
         }}
-        onclick={this.props.onClick}
       />
     );
+
+    return () => elm;
   }
 
   getStyle() {
