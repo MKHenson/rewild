@@ -54,6 +54,10 @@ export class Tree extends Component<TreeProps> {
     };
   }
 
+  connectedCallback(): void {
+    super.connectedCallback();
+  }
+
   getStyle() {
     return StyledTree;
   }

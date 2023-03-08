@@ -120,94 +120,92 @@ export class GridCell extends Component<Props> {
     };
   }
 
-  getStyle(): string | null {
-    return css`
-      :host {
-        grid-area: ${this.props.rowStart} / ${this.props.colStart} / ${this.props.rowEnd} / ${this.props.colEnd};
-      }
-
-      :host,
-      :host > div {
-        height: 100%;
-        width: 100%;
-        background: transparent;
-      }
-
-      .content {
-        height: 100%;
-        width: 100%;
-        overflow: auto;
-        padding: 0 5px 5px 5px;
-        box-sizing: border-box;
-        position: relative;
-      }
-      &[drop-active="true"] {
-        background: #1e5ebf7f;
-      }
-      .sizer {
-        transition: 0.3s width, 0.3s height, 0.3s opacity;
-        position: absolute;
-        width: 0px;
-        height: 0px;
-        background: transparent;
-        cursor: pointer;
-        overflow: hidden;
-        color: #fff;
-        font-size: 12px;
-        text-align: center;
-        line-height: 12px;
-        border-radius: 50%;
-        opacity: 0;
-        transform: scale(1);
-      }
-      .sizer:active {
-        transform: scale(0.8);
-      }
-      .sizerRight_shrink {
-        right: -0;
-        top: calc(50% - 8px);
-      }
-      .sizerRight_expand {
-        right: -0;
-        top: calc(50% + 8px);
-      }
-      .sizerHeight_shrink {
-        right: calc(50% + 8px);
-        bottom: -0;
-      }
-      .sizerHeight_expand {
-        right: calc(50% - 8px);
-        bottom: -0;
-      }
-      .content:hover .sizer {
-        background: transparent;
-        background: #3b5db4;
-        width: 12px;
-        height: 12px;
-        opacity: 1;
-      }
-      .content:hover .sizer:hover {
-        background: #213464;
-      }
-      .dragger {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 5px;
-        background: transparent;
-        cursor: move;
-      }
-      .content:hover .dragger {
-        background: #3b5db4;
-      }
-      .content:hover .dragger:hover {
-        background: #213464;
-      }
-      .card {
-        width: 100%;
-        height: 100%;
-      }
-    `;
+  getStyle() {
+    return StyledGridCell;
   }
 }
+
+const StyledGridCell = cssStylesheet(css`
+  :host,
+  :host > div {
+    height: 100%;
+    width: 100%;
+    background: transparent;
+  }
+
+  .content {
+    height: 100%;
+    width: 100%;
+    overflow: auto;
+    padding: 0 5px 5px 5px;
+    box-sizing: border-box;
+    position: relative;
+  }
+  :host([drop-active="true"]) {
+    background: #1e5ebf7f;
+  }
+  .sizer {
+    transition: 0.3s width, 0.3s height, 0.3s opacity;
+    position: absolute;
+    width: 0px;
+    height: 0px;
+    background: transparent;
+    cursor: pointer;
+    overflow: hidden;
+    color: #fff;
+    font-size: 12px;
+    text-align: center;
+    line-height: 12px;
+    border-radius: 50%;
+    opacity: 0;
+    transform: scale(1);
+  }
+  .sizer:active {
+    transform: scale(0.8);
+  }
+  .sizerRight_shrink {
+    right: -0;
+    top: calc(50% - 8px);
+  }
+  .sizerRight_expand {
+    right: -0;
+    top: calc(50% + 8px);
+  }
+  .sizerHeight_shrink {
+    right: calc(50% + 8px);
+    bottom: -0;
+  }
+  .sizerHeight_expand {
+    right: calc(50% - 8px);
+    bottom: -0;
+  }
+  .content:hover .sizer {
+    background: transparent;
+    background: #3b5db4;
+    width: 12px;
+    height: 12px;
+    opacity: 1;
+  }
+  .content:hover .sizer:hover {
+    background: #213464;
+  }
+  .dragger {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 5px;
+    background: transparent;
+    cursor: move;
+  }
+  .content:hover .dragger {
+    background: #3b5db4;
+  }
+  .content:hover .dragger:hover {
+    background: #213464;
+  }
+  .card {
+    width: 100%;
+    height: 100%;
+  }
+`);

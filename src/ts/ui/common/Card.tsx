@@ -8,22 +8,21 @@ interface Props {
   pushed?: boolean;
   raised?: boolean;
   button?: boolean;
+  stretched?: boolean;
   onClick?: (e: MouseEvent) => void;
 }
 
 @register("x-card")
 export class Card extends Component<Props> {
   init() {
-    return () => (
-      <div
-        class={`card ${this.props.pushed ? "pushed" : ""} ${this.props.button ? "button" : ""} ${
-          this.props.raised ? "raised" : ""
-        }`}
-        onclick={this.props.onClick}
-      >
-        {this.props.children}
-      </div>
-    );
+    return () => {
+      this.toggleAttribute("button", this.props.button);
+      this.classList.toggle("pushed", this.props.pushed || false);
+      this.classList.toggle("raised", this.props.raised || false);
+      this.toggleAttribute("stretched", this.props.stretched || false);
+      if (this.props.onClick) this.onclick = this.props.onClick;
+      return <slot></slot>;
+    };
   }
 
   getStyle() {
@@ -39,19 +38,22 @@ const StyledCard = cssStylesheet(css`
     box-sizing: border-box;
     border-radius: 5px;
   }
-  .card {
+
+  :host([stretched]) {
+    width: 100%;
+    height: 100%;
   }
 
-  .card.button {
+  :host([button]) {
     cursor: pointer;
   }
-  .card.raised {
+  :host(.raised) {
     box-shadow: ${theme?.colors.shadowShort1};
   }
-  .card.raised:hover {
+  :host(.raised):hover {
     box-shadow: ${theme?.colors.shadowShort2};
   }
-  .card.pushed.raised {
+  :host(.pushed.raised) {
     box-shadow: ${theme?.colors.shadowShort1}, inset 0 0 0px 2px ${theme?.colors.primary400};
   }
 `);

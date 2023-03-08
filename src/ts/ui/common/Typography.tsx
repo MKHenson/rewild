@@ -74,8 +74,8 @@ const StyledTypography = cssStylesheet(css`
   }
   .body1 {
     font-weight: 300;
-    font-size: 1rem;
-    line-height: 1.5;
+    font-size: 14px;
+    line-height: 1.2;
     letter-spacing: 0.00938em;
   }
   .body2 {

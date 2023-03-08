@@ -1,4 +1,4 @@
-import { ILevel, IProject } from "models";
+import { ILevel, IProject, IResource } from "models";
 import { Store } from "../Store";
 import { getLevel as getLevelApi, patchLevel, patchProject, getProject as getProjectApi } from "../../../api";
 import { Timestamp } from "firebase/firestore";
@@ -9,6 +9,7 @@ export interface IProjectStore {
   error?: string;
   level: ILevel | null;
   project: IProject | null;
+  selectedResource: IResource | null;
 }
 
 export class ProjectStore extends Store<IProjectStore> {
@@ -19,6 +20,7 @@ export class ProjectStore extends Store<IProjectStore> {
       level: null,
       project: null,
       error: undefined,
+      selectedResource: null,
     });
   }
 

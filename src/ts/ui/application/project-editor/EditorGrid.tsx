@@ -3,11 +3,12 @@ import { RibbonButtons } from "./editors/RibbonButtons";
 // import { Properties } from "./editors/Properties";
 import { EditorType, IWorkspaceCell } from "models";
 import { Loading } from "../../common/Loading";
-// import { SceneGraph } from "./editors/SceneGraph";
+import { SceneGraph } from "./editors/SceneGraph";
 // import { useEditor } from "./EditorProvider";
-// import { ProjectSettings } from "./editors/ProjectSettings";
+import { ProjectSettings } from "./editors/ProjectSettings";
 import { Component, register } from "../../Component";
 import { projectStore } from "../../stores/Project";
+import { InfoBox } from "../../common/InfoBox";
 interface Props {
   onHome: () => void;
 }
@@ -37,21 +38,28 @@ export class EditorGrid extends Component<Props> {
   init() {
     const [cells, setCells] = this.useState<IWorkspaceCell[]>([]);
     const projectStoreProxy = this.observeStore(projectStore, (prop, prevVal, val, path) => {
-      if (prop === "project" || prop === "workspace") {
-        setCells(createCells(projectStoreProxy.project!.workspace.cells), false);
-      } else this.render();
+      if (prop === "project" || prop === "cells" || prop === "error") {
+        setCells(createCells(projectStoreProxy.project!.workspace.cells));
+      }
     });
 
     const mapped = (type?: EditorType) => {
       if (!type) return null;
       //   if (type === "properties") return <Properties />;
-      //   if (type === "scene-graph") return <SceneGraph />;
-      //   if (type === "project-settings") return <ProjectSettings />;
+      if (type === "scene-graph") return <SceneGraph />;
+      if (type === "project-settings") return <ProjectSettings />;
       if (type === "ribbon") return <RibbonButtons onHome={this.props.onHome} />;
       return null;
     };
 
     return () => {
+      if (projectStoreProxy.error)
+        return (
+          <InfoBox title="Error" variant="error">
+            {projectStoreProxy.error}
+          </InfoBox>
+        );
+
       // this.useEffect(() => {
       //   if (projectStoreProxy.project?.workspace) {
       //     setCells(createCells(projectStoreProxy.project.workspace.cells), false);
@@ -71,6 +79,7 @@ export class EditorGrid extends Component<Props> {
               hasElement={!!editor}
               editorElm={editor || undefined}
               onEditorMoved={(editor, rowStart, colStart, rowEnd, colEnd) => {
+                projectStoreProxy.dirty = true;
                 projectStoreProxy.project!.workspace.cells = projectStoreProxy.project!.workspace.cells.map((cell) => {
                   if (cell.editor === editor)
                     return {
@@ -94,14 +103,16 @@ export class EditorGrid extends Component<Props> {
   }
 
   getStyle() {
-    return css`
-      :host {
-        height: 100%;
-        width: 100%;
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
-        grid-template-rows: 50px 1fr 1fr 1fr 1fr;
-      }
-    `;
+    return StyledEditorGrid;
   }
 }
+
+const StyledEditorGrid = cssStylesheet(css`
+  :host {
+    height: 100%;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+    grid-template-rows: 50px 1fr 1fr 1fr 1fr;
+  }
+`);

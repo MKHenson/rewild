@@ -164,7 +164,7 @@ export class ProjectSelector extends Component<Props> {
         grid-gap: 10px 0;
       }
 
-      .projects .card {
+      .projects x-card {
         width: 160px;
         height: 160px;
         text-align: center;

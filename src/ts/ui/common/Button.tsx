@@ -16,19 +16,17 @@ interface Props {
 @register("x-button")
 export class Button extends Component<Props> {
   init() {
+    if (this.props.onClick) this.onclick = this.props.onClick;
+    const elm = <slot></slot>;
+
     return () => {
-      this.toggleAttribute("fullwidth", this.props.fullWidth);
-      return (
-        <button
-          disabled={this.props.disabled}
-          onclick={this.props.onClick}
-          class={`${this.props.class || ""} ${this.props.variant || "contained"} ${this.props.color || "primary"} ${
-            this.props.fullWidth ? "fullwidth" : ""
-          }`}
-        >
-          {this.props.children}
-        </button>
-      );
+      this.toggleAttribute("fullwidth", this.props.fullWidth || false);
+      this.toggleAttribute("disabled", this.props.disabled || false);
+      this.className = `${this.props.class || ""} ${this.props.variant || "contained"} ${
+        this.props.color || "primary"
+      }`;
+
+      return elm;
     };
   }
 
@@ -40,12 +38,6 @@ export class Button extends Component<Props> {
 const StyledButtons = cssStylesheet(css`
   :host {
     display: inline-block;
-  }
-  :host([fullwidth]) {
-    display: block;
-  }
-
-  :host button {
     padding: 0.5rem 1rem;
     border-radius: 5px;
     border: none;
@@ -53,99 +45,100 @@ const StyledButtons = cssStylesheet(css`
     font-weight: 500;
     font-family: var(--font-family);
     font-weight: 400;
+    font-size: 14px;
     display: inline-block;
+    text-align: center;
     user-select: none;
     cursor: pointer;
     transition: box-shadow 0.25s, background-color 0.25s;
   }
-  :host button.fullwidth {
-    width: 100%;
+  :host([fullwidth]) {
     display: block;
   }
 
-  :host button > * {
+  :host > * {
     vertical-align: middle;
   }
 
-  :host button[disabled],
-  :host button[disabled]:hover {
+  :host([disabled]),
+  :host([disabled]):hover {
     opacity: 0.65;
     pointer-events: none;
   }
-  :host button.contained {
+  :host(.contained) {
     box-shadow: 2px 2px 2px rgb(0 0 0 / 30%);
   }
-  :host button.contained:hover {
+  :host(.contained):hover {
     box-shadow: 2px 2px 4px rgb(0 0 0 / 40%);
   }
-  :host button.contained.primary {
+  :host(.contained.primary) {
     background: ${theme?.colors.primary400};
     color: ${theme?.colors.onPrimary400};
   }
-  :host button.contained.primary:hover {
+  :host(.contained.primary:hover) {
     background: ${theme?.colors.primary500};
     color: ${theme?.colors.onPrimary500};
   }
-  :host button.contained.primary:active {
+  :host(.contained.primary:active) {
     background: ${theme?.colors.primary600};
     color: ${theme?.colors.onPrimary600};
   }
-  :host button.contained.secondary {
+  :host(.contained.secondary) {
     background: ${theme?.colors.secondary400};
     color: ${theme?.colors.onSecondary400};
   }
-  :host button.contained.secondary:hover {
+  :host(.contained.secondary:hover) {
     background: ${theme?.colors.secondary500};
     color: ${theme?.colors.onSecondary500};
   }
-  :host button.contained.secondary:active {
+  :host(.contained.secondary:active) {
     background: ${theme?.colors.secondary600};
     color: ${theme?.colors.onSecondary600};
   }
-  :host button.contained.error {
+  :host(.contained.error) {
     background: ${theme?.colors.error400};
     color: ${theme?.colors.onError400};
   }
-  :host button.contained.error:hover {
+  :host(.contained.error:hover) {
     background: ${theme?.colors.error500};
     color: ${theme?.colors.onError500};
   }
-  :host button.contained.error:active {
+  :host(.contained.error:active) {
     background: ${theme?.colors.error600};
     color: ${theme?.colors.onError600};
   }
-  :host button.outlined,
-  :host button.text {
+  :host(.outlined),
+  :host(.text) {
     background: transparent;
   }
-  :host button.outlined:hover {
+  :host(.outlined:hover) {
     background: rgba(0, 0, 0, 0.05);
   }
-  :host button.outlined:active {
+  :host(.outlined:active) {
     background: rgba(0, 0, 0, 0.1);
   }
-  :host button.text:hover {
+  :host(.text:hover) {
     font-weight: 500;
   }
-  :host button.outlined.primary {
+  :host(.outlined.primary) {
     color: ${theme?.colors.primary400};
     border: 1px solid ${theme?.colors.primary400};
   }
-  :host button.outlined.secondary {
+  :host(.outlined.secondary) {
     color: ${theme?.colors.secondary400};
     border: 1px solid ${theme?.colors.secondary400};
   }
-  :host button.outlined.error {
+  :host(.outlined.error) {
     color: ${theme?.colors.error400};
     border: 1px solid ${theme?.colors.error400};
   }
-  :host button.text.primary:hover {
+  :host(.text.primary:hover) {
     color: ${theme?.colors.primary400};
   }
-  :host button.text.secondary:hover {
+  :host(.text.secondary:hover) {
     color: ${theme?.colors.secondary400};
   }
-  :host button.text.error:hover {
+  :host(.text.error:hover) {
     color: ${theme?.colors.error400};
   }
 `);
