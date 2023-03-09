@@ -32,7 +32,7 @@ export class SceneGraphFactory {
               canSelect: true,
               resource: container,
               canRename: true,
-              id: container,
+              id: container.id,
               children: [],
             } as ITreeNode)
         ),

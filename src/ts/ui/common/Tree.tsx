@@ -11,7 +11,7 @@ export type ITreeNode<Resource extends any = any> = {
   canRename?: boolean;
   children: ITreeNode<Resource>[];
   resource?: Resource;
-  id?: Resource | string;
+  id?: string;
 };
 
 interface TreeProps {
@@ -54,6 +54,20 @@ export class Tree extends Component<TreeProps> {
     };
   }
 
+  getSelectedNode(): TreeNode | null {
+    const nodes = Array.from(this.shadow!.querySelectorAll("x-treenode")) as TreeNode[];
+    let selectedNode: TreeNode | null;
+    for (const node of nodes) {
+      if (node.selected) return node;
+      else {
+        selectedNode = node.getSelectedNode();
+        if (selectedNode) return selectedNode;
+      }
+    }
+
+    return null;
+  }
+
   connectedCallback(): void {
     super.connectedCallback();
   }
@@ -75,7 +89,10 @@ const StyledTree = cssStylesheet(css`
 
 @register("x-treenode")
 export class TreeNode extends Component<NodeProps> {
+  selected: boolean = false;
+
   init() {
+    this.selected = this.props.selectedNodes.includes(this.props.node);
     const [expanded, setExpanded] = this.useState(true);
 
     const handleExpandedClick = () => {
@@ -95,19 +112,18 @@ export class TreeNode extends Component<NodeProps> {
 
     return () => {
       const props = this.props;
+      this.selected = props.selectedNodes.includes(props.node);
 
       return (
         <div class="treenode">
-          <div class={"tree-content" + props.selectedNodes.includes(props.node) ? "selected-treenode" : ""}>
+          <div class={"tree-content" + (this.selected ? " selected-treenode" : "")}>
             {props.node.children && props.node.children.length ? (
               expanded() ? (
                 <MaterialIcon class="expand-icon" onClick={handleExpandedClick} icon="arrow_drop_down" size="s" />
               ) : (
                 <MaterialIcon class="expand-icon" onClick={handleExpandedClick} icon="arrow_drop_up" size="s" />
               )
-            ) : (
-              ""
-            )}
+            ) : null}
             <Typography variant="body2" onClick={handleNodeClick}>
               {props.node.icon && (
                 <span class="node-icon">
@@ -127,12 +143,24 @@ export class TreeNode extends Component<NodeProps> {
                 />
               ))}
             </div>
-          ) : (
-            ""
-          )}
+          ) : null}
         </div>
       );
     };
+  }
+
+  getSelectedNode(): TreeNode | null {
+    const nodes = Array.from(this.shadow!.querySelectorAll("x-treenode")) as TreeNode[];
+    let selectedNode: TreeNode | null;
+    for (const node of nodes) {
+      if (node.selected) return node;
+      else {
+        selectedNode = node.getSelectedNode();
+        if (selectedNode) return selectedNode;
+      }
+    }
+
+    return null;
   }
 
   getStyle() {
@@ -150,18 +178,20 @@ const StyledTreeNode = cssStylesheet(css`
     vertical-align: middle;
     margin: 0 4px 0 0;
   }
-  .tree-content.selected-treenode {
-    .body2 {
-      color: ${theme?.colors.primary400};
-      font-weight: 500;
-    }
+  .tree-content.selected-treenode x-typography {
+    color: ${theme?.colors.primary400};
+    font-weight: 500;
   }
   .tree-content .expand-icon {
     vertical-align: middle;
     margin: 0 4px 0 0;
   }
-  .tree-content .body2 {
+  .tree-content x-typography {
     display: inline-block;
+  }
+
+  .treenode-text {
+    vertical-align: middle;
   }
 
   .node-children {

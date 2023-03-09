@@ -67,13 +67,14 @@ export class GridCell extends Component<Props> {
       e.preventDefault();
     };
 
+    this.ondragover = onDragOverEvent;
+    this.ondragleave = onDragLeaveEvent;
+    this.ondragend = onDragEndEvent;
+    this.ondrop = onDrop;
+
     return () => {
       const props = this.props;
       this.style.gridArea = `${props.rowStart} / ${props.colStart} / ${props.rowEnd} / ${props.colEnd};`;
-      this.ondragover = onDragOverEvent;
-      this.ondragleave = onDragLeaveEvent;
-      this.ondragend = onDragEndEvent;
-      this.ondrop = onDrop;
 
       return (
         <div>
