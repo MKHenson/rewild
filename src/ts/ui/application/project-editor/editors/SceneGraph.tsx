@@ -44,11 +44,10 @@ export class SceneGraph extends Component<Props> {
     });
 
     const project = projectStoreProxy.project!;
-    const selectedResource = projectStoreProxy.selectedResource;
 
-    let activeNode: HTMLDivElement | null = null;
+    let activeNode: HTMLElement | null = null;
 
-    const activateNodeEdit = (node: HTMLDivElement) => {
+    const activateNodeEdit = (node: HTMLElement) => {
       node.contentEditable = "true";
       node.classList.add("editting");
       node.focus();
@@ -64,7 +63,7 @@ export class SceneGraph extends Component<Props> {
     };
 
     this.keyUpDelegate = (e: KeyboardEvent) => {
-      const node = document.querySelector(".selected-treenode .treenode-text") as HTMLDivElement;
+      const node = tree.getSelectedNode();
       if (e.key === "F2" && selectedNodes().length === 1 && selectedNodes()[0].canRename && node) {
         activateNodeEdit(node);
       } else if (activeNode && e.key === "Enter") {
@@ -109,7 +108,7 @@ export class SceneGraph extends Component<Props> {
     };
 
     const onDelete = () => {
-      if (selectedResource!.type === "container") {
+      if (projectStoreProxy.selectedResource!.type === "container") {
         project!.containers = project!.containers.filter(
           (c) => !selectedNodes().find((selected) => selected.resource?.id === c.id)
         );
@@ -124,36 +123,42 @@ export class SceneGraph extends Component<Props> {
       else projectStoreProxy.selectedResource = null;
     };
 
-    return () => (
-      <Card stretched>
-        <div class="content">
-          <div class="header">
-            <Typography variant="h3">Scene</Typography>
+    let tree: Tree;
+
+    return () => {
+      tree = (
+        <Tree onSelectionChanged={onSelectionChanged} selectedNodes={selectedNodes()} rootNodes={nodes()} />
+      ) as Tree;
+
+      return (
+        <Card stretched>
+          <div class="content">
+            <div class="header">
+              <Typography variant="h3">Scene</Typography>
+            </div>
+            <div class="nodes">{tree}</div>
+            <div class="graph-actions">
+              <ButtonGroup>
+                <Button
+                  disabled={selectedNodes().length == 0 || !factory.canCreateNode(selectedNodes()[0])}
+                  variant="text"
+                  onClick={onAdd}
+                >
+                  <StyledMaterialIcon icon="add_circle" size="s" />
+                </Button>
+                <Button
+                  disabled={selectedNodes().length == 0 || !factory.canDeleteNode(selectedNodes()[0])}
+                  variant="text"
+                  onClick={onDelete}
+                >
+                  <StyledMaterialIcon icon="delete" size="s" />
+                </Button>
+              </ButtonGroup>
+            </div>
           </div>
-          <div class="nodes">
-            <Tree onSelectionChanged={onSelectionChanged} selectedNodes={selectedNodes()} rootNodes={nodes()} />
-          </div>
-          <div class="graph-actions">
-            <ButtonGroup>
-              <Button
-                disabled={selectedNodes().length == 0 || !factory.canCreateNode(selectedNodes()[0])}
-                variant="text"
-                onClick={onAdd}
-              >
-                <StyledMaterialIcon icon="add_circle" size="s" />
-              </Button>
-              <Button
-                disabled={selectedNodes().length == 0 || !factory.canDeleteNode(selectedNodes()[0])}
-                variant="text"
-                onClick={onDelete}
-              >
-                <StyledMaterialIcon icon="delete" size="s" />
-              </Button>
-            </ButtonGroup>
-          </div>
-        </div>
-      </Card>
-    );
+        </Card>
+      );
+    };
   }
 
   getStyle() {
