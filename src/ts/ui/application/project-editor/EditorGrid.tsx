@@ -87,8 +87,8 @@ export class EditorGrid extends Component<Props> {
                       editor,
                       colStart,
                       rowStart,
-                      rowEnd,
-                      colEnd,
+                      rowEnd: rowEnd > 6 ? 6 : rowEnd,
+                      colEnd: colEnd > 6 ? 6 : colEnd,
                     };
                   return cell;
                 });

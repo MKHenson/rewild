@@ -42,6 +42,7 @@ const StyledCard = cssStylesheet(css`
   :host([stretched]) {
     width: 100%;
     height: 100%;
+    overflow: auto;
   }
 
   :host([button]) {

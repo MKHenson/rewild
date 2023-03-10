@@ -19,7 +19,7 @@ export class ProjectSettings extends Component<Props> {
     return () => {
       const { project, level } = projectStoreProxy;
       return (
-        <Card>
+        <Card stretched>
           <Typography variant="h3">Project Settings</Typography>
           {project ? (
             <div>
