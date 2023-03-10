@@ -74,7 +74,7 @@ export class GridCell extends Component<Props> {
 
     return () => {
       const props = this.props;
-      this.style.gridArea = `${props.rowStart} / ${props.colStart} / ${props.rowEnd} / ${props.colEnd};`;
+      this.style.gridArea = `${props.rowStart} / ${props.colStart} / ${props.rowEnd} / ${props.colEnd}`;
 
       return (
         <div>
@@ -132,6 +132,10 @@ const StyledGridCell = cssStylesheet(css`
     height: 100%;
     width: 100%;
     background: transparent;
+  }
+
+  :host {
+    min-height: 0;
   }
 
   .content {
