@@ -5,6 +5,10 @@ declare namespace JSX {
   /** The child types we allow  */
   export type ChildElement = JSX.Element | number | boolean | undefined | null | string;
 
+  export interface PropsWithChildren {
+    children?: JSX.ChildElement | JSX.ChildElement[];
+  }
+
   // IntrinsicElements describes to TS what all the standard elements are supported.
   // For example things like <div> or <span>
   interface IntrinsicElements extends BaseIntrinsicElements {}
@@ -34,4 +38,4 @@ declare namespace JSX {
 
 // Declare global css helper function for nice styling :)
 declare function css(val: TemplateStringsArray, ...rest: (TemplateStringsArray | string | number)[]): string;
-declare function cssStylesheet(val: string): CSSStyleSheet;
+declare function cssStylesheet(val: string, addToDom?: boolean): CSSStyleSheet;

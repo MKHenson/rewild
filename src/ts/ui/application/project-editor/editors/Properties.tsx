@@ -19,7 +19,7 @@ function setProperty<T, K extends keyof T>(obj: T, key: K, value: T[K]) {
 @register("x-properties")
 export class Properties extends Component<Props> {
   init() {
-    const projectStoreProxy = this.observeStore(projectStore, (prop, prevValue, value, path) => {
+    const projectStoreProxy = this.observeStore(projectStore, (prop, prevValue, value) => {
       this.render();
     });
 
