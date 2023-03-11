@@ -25,7 +25,7 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
   private trackedStores: UnsubscribeStoreFn[];
 
   // specify the property on the element instance type
-  _props: T & { children?: JSX.ChildElement | JSX.ChildElement[] };
+  _props: T & JSX.PropsWithChildren;
 
   constructor(options?: ComponentOptions<T>) {
     super();
@@ -38,6 +38,7 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
   _createRenderer() {
     const parent = this.shadow ? this.shadow : this;
     this.render = () => {
+      console.log(this.constructor.name + ".render()");
       // Generates new DOM
       let children = fn();
 
@@ -71,11 +72,11 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
     const fn = this.init();
   }
 
-  get props(): T & { children?: JSX.ChildElement | JSX.ChildElement[] } {
+  get props(): T & JSX.PropsWithChildren {
     return this._props;
   }
 
-  set props(val: T & { children?: JSX.ChildElement | JSX.ChildElement[] }) {
+  set props(val: T & JSX.PropsWithChildren) {
     this._props = val || ({} as any);
     this.render();
   }
@@ -86,7 +87,7 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
    * @param path [Optional] Path can be specified using dot notation to only render if the propety name matches. For example "foo.bar" will trigger a render for any change to fields of bar or beyond (foo.bar.baz = 1 or even foo.bar.baz.gar = 1)
    * @returns
    */
-  observeStore<K extends object>(store: Store<K>, cb?: Callback) {
+  observeStore<K extends object>(store: Store<K>, cb?: Callback<K>) {
     const [val, unsubscribe] = store.createProxy(cb || this.render);
     this.trackedStores.push(unsubscribe);
     return val;

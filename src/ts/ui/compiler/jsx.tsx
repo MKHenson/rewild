@@ -77,8 +77,10 @@ function appendChildren(element: HTMLElement, children: JSX.ChildElement[]) {
   return str;
 };
 
-(window as any).cssStylesheet = (val: string) => {
+(window as any).cssStylesheet = (val: string, addToDom?: boolean) => {
   const stylesheet = new CSSStyleSheet();
   stylesheet.replaceSync(val);
+
+  if (addToDom) document.adoptedStyleSheets.push(stylesheet);
   return stylesheet;
 };

@@ -36,11 +36,14 @@ function createCells(workspaceCells: IWorkspaceCell[]): IWorkspaceCell[] {
 export class EditorGrid extends Component<Props> {
   init() {
     const [cells, setCells] = this.useState<IWorkspaceCell[]>([]);
-    const projectStoreProxy = this.observeStore(projectStore, (prop, prevVal, val, path) => {
-      if (prop === "project" || prop === "cells" || prop === "error") {
+
+    const projectStoreProxy = this.observeStore(projectStore, (prop, prevVal, val) => {
+      if (prop === "project" || prop === "project.workspace.cells" || prop === "error") {
         setCells(createCells(projectStoreProxy.project!.workspace.cells));
       }
     });
+
+    projectStoreProxy.project?.workspace.cells;
 
     const mapped = (type?: EditorType) => {
       if (!type) return null;

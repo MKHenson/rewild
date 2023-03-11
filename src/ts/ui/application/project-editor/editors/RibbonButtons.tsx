@@ -13,7 +13,9 @@ interface Props {
 @register("x-ribbon-buttons")
 export class RibbonButtons extends Component<Props> {
   init() {
-    const projectStoreProxy = this.observeStore(projectStore);
+    const projectStoreProxy = this.observeStore(projectStore, (prop) => {
+      if (prop === "dirty" || prop === "loading") this.render();
+    });
 
     return () => {
       const { loading, dirty } = projectStoreProxy;

@@ -1,5 +1,17 @@
+type DotPrefix<T extends string> = T extends "" ? "" : `.${T}`;
+
+type DotNestedKeys<T> = T extends Date | Function | Array<any>
+  ? ""
+  : (
+      T extends object
+        ? { [K in Exclude<keyof T, symbol>]: `${K}${DotPrefix<DotNestedKeys<T[K]>>}` }[Exclude<keyof T, symbol>]
+        : ""
+    ) extends infer D
+  ? Extract<D, string>
+  : never;
+
 export type UnsubscribeStoreFn = () => void;
-export type Callback = (prop: string, prevValue: any, value: any, path: string) => void;
+export type Callback<T> = (prop: DotNestedKeys<T>, prevValue: any, value: any) => void;
 
 // "Marks" proxies, but does not prevent them
 // from being garbage-collected
@@ -7,7 +19,7 @@ const proxies = new WeakSet<typeof Proxy>();
 
 export class Signaller<T extends object> {
   readonly target: T;
-  private listeners: Callback[];
+  private listeners: Callback<T>[];
 
   constructor(target: T) {
     this.target = target;
@@ -15,7 +27,7 @@ export class Signaller<T extends object> {
   }
 
   /** Creates a proxy of the store's target*/
-  proxy(cb?: Callback, path?: string): [T, UnsubscribeStoreFn] {
+  proxy(cb?: Callback<T>, path?: string): [T, UnsubscribeStoreFn] {
     const listeners = this.listeners;
 
     if (cb) listeners.push(cb);
@@ -61,7 +73,7 @@ export class Signaller<T extends object> {
         const validReturn = Reflect.set(target, p, newValue, receiver);
 
         listeners.forEach((l) => {
-          l(p as string, prevValue, newValue, parentKey ? `${parentKey}.${p.toString()}` : p.toString());
+          l((parentKey ? `${parentKey}.${p.toString()}` : p.toString()) as DotNestedKeys<T>, prevValue, newValue);
         });
         return validReturn;
       },
