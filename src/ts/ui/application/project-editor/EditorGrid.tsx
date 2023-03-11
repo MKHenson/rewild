@@ -1,14 +1,13 @@
 import { GridCell } from "./GridCell";
 import { RibbonButtons } from "./editors/RibbonButtons";
-// import { Properties } from "./editors/Properties";
 import { EditorType, IWorkspaceCell } from "models";
 import { Loading } from "../../common/Loading";
 import { SceneGraph } from "./editors/SceneGraph";
-// import { useEditor } from "./EditorProvider";
 import { ProjectSettings } from "./editors/ProjectSettings";
 import { Component, register } from "../../Component";
 import { projectStore } from "../../stores/Project";
 import { InfoBox } from "../../common/InfoBox";
+import { Properties } from "./editors/Properties";
 interface Props {
   onHome: () => void;
 }
@@ -45,11 +44,89 @@ export class EditorGrid extends Component<Props> {
 
     const mapped = (type?: EditorType) => {
       if (!type) return null;
-      //   if (type === "properties") return <Properties />;
+      if (type === "properties") return <Properties />;
       if (type === "scene-graph") return <SceneGraph />;
       if (type === "project-settings") return <ProjectSettings />;
       if (type === "ribbon") return <RibbonButtons onHome={this.props.onHome} />;
       return null;
+    };
+
+    const onCellsUpdated = (type: EditorType, rowStart: number, colStart: number, rowEnd: number, colEnd: number) => {
+      projectStoreProxy.dirty = true;
+      const cells = projectStoreProxy.project!.workspace.cells;
+      let dir: "up" | "down" | "left" | "right" = "down";
+
+      const newCells = cells.map((cell) => {
+        if (cell.editor === type) {
+          if (rowEnd > cell.rowEnd) dir = "down";
+          else if (rowEnd < cell.rowEnd) dir = "up";
+          else if (colEnd < cell.colEnd) dir = "left";
+          else if (colEnd > cell.colEnd) dir = "right";
+
+          return {
+            ...cell,
+            editor: type,
+            colStart,
+            rowStart,
+            rowEnd,
+            colEnd,
+          };
+        }
+        return cell;
+      });
+
+      newCells.forEach((cell) => {
+        for (const otherCell of newCells) {
+          if (otherCell === cell) continue;
+
+          if (
+            (dir === "down" || dir === "up") &&
+            otherCell.colStart === cell.colStart && // Same column
+            otherCell.rowStart === cell.rowEnd - (dir === "down" ? 1 : -1) // At a horizontal join
+          ) {
+            // If the 'cell' is above the otherCell
+            if (cell.rowStart < otherCell.rowStart) {
+              if (dir === "down") {
+                // If this is the last row
+                if (otherCell.rowStart + 1 >= 6) {
+                  otherCell.rowStart = 5;
+                  cell.rowEnd -= 1;
+                } else {
+                  otherCell.rowStart += 1;
+                }
+              } else {
+                otherCell.rowStart -= 1;
+              }
+            }
+          } else if (
+            (dir === "left" || dir === "right") &&
+            otherCell.rowStart === cell.rowStart && // Same row
+            otherCell.colStart === cell.colEnd - (dir === "right" ? 1 : -1) // At a horizontal join
+          ) {
+            // If the 'cell' is above the otherCell
+            if (cell.colStart < otherCell.colStart) {
+              if (dir === "right") {
+                // If this is the last row
+                if (otherCell.colStart + 1 >= 6) {
+                  otherCell.colStart = 5;
+                  cell.colEnd -= 1;
+                } else {
+                  otherCell.colStart += 1;
+                }
+              } else {
+                otherCell.colStart -= 1;
+              }
+            }
+          }
+        }
+
+        cell.colStart = cell.colStart > 6 ? 6 : cell.colStart;
+        cell.rowStart = cell.rowStart > 6 ? 6 : cell.rowStart;
+        cell.colEnd = cell.colEnd > 6 ? 6 : cell.colEnd;
+        cell.rowEnd = cell.rowEnd > 6 ? 6 : cell.rowEnd;
+      });
+
+      projectStoreProxy.project!.workspace.cells = newCells;
     };
 
     return () => {
@@ -59,12 +136,6 @@ export class EditorGrid extends Component<Props> {
             {projectStoreProxy.error}
           </InfoBox>
         );
-
-      // this.useEffect(() => {
-      //   if (projectStoreProxy.project?.workspace) {
-      //     setCells(createCells(projectStoreProxy.project.workspace.cells), false);
-      //   }
-      // }, [projectStoreProxy.project?.workspace]);
 
       return projectStoreProxy.project! ? (
         cells().map((cell, i) => {
@@ -78,21 +149,7 @@ export class EditorGrid extends Component<Props> {
               editor={cell.editor}
               hasElement={!!editor}
               editorElm={editor || undefined}
-              onEditorMoved={(editor, rowStart, colStart, rowEnd, colEnd) => {
-                projectStoreProxy.dirty = true;
-                projectStoreProxy.project!.workspace.cells = projectStoreProxy.project!.workspace.cells.map((cell) => {
-                  if (cell.editor === editor)
-                    return {
-                      ...cell,
-                      editor,
-                      colStart,
-                      rowStart,
-                      rowEnd: rowEnd > 6 ? 6 : rowEnd,
-                      colEnd: colEnd > 6 ? 6 : colEnd,
-                    };
-                  return cell;
-                });
-              }}
+              onEditorMoved={onCellsUpdated}
             />
           );
         })

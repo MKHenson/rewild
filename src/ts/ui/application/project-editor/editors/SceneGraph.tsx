@@ -105,6 +105,8 @@ export class SceneGraph extends Component<Props> {
       const newResource = factory.createChildNode(selectedNodes()[0]);
       if (newResource?.type === "container")
         project!.containers = project!.containers!.concat(newResource as IContainer);
+
+      projectStoreProxy.dirty = true;
     };
 
     const onDelete = () => {
@@ -112,6 +114,8 @@ export class SceneGraph extends Component<Props> {
         project!.containers = project!.containers.filter(
           (c) => !selectedNodes().find((selected) => selected.resource?.id === c.id)
         );
+
+        projectStoreProxy.dirty = true;
       }
       setSelection([]);
     };
