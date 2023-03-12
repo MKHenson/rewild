@@ -1,7 +1,8 @@
-import { ILevel, IProject, IResource } from "models";
+import { ILevel, IProject, IEditorResource } from "models";
 import { Store } from "../Store";
 import { getLevel as getLevelApi, patchLevel, patchProject, getProject as getProjectApi } from "../../../api";
 import { Timestamp } from "firebase/firestore";
+import { sceneGraphStore } from "./SceneGraphStore";
 
 export interface IProjectStore {
   loading: boolean;
@@ -9,7 +10,7 @@ export interface IProjectStore {
   error?: string;
   level: ILevel | null;
   project: IProject | null;
-  selectedResource: IResource | null;
+  selectedResource: IEditorResource | null;
 }
 
 export class ProjectStore extends Store<IProjectStore> {
@@ -40,12 +41,20 @@ export class ProjectStore extends Store<IProjectStore> {
       loading: false,
       dirty: false,
     });
+
+    sceneGraphStore.buildTree(this.target.project!);
   }
 
   async updateProject() {
     const project = this.defaultProxy.project!;
     const { id, ...token } = project;
+    const containers = sceneGraphStore.defaultProxy.nodes.find((n) => n.name === "Containers")!.children;
+
     token.lastModified = Timestamp.now();
+    token.sceneGraph = {
+      containers: containers || [],
+    };
+
     this.defaultProxy.loading = true;
 
     try {

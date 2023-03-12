@@ -13,17 +13,15 @@ type DotNestedKeys<T> = T extends Date | Function | Array<any>
 export type UnsubscribeStoreFn = () => void;
 export type Callback<T> = (prop: DotNestedKeys<T>, prevValue: any, value: any) => void;
 
-// "Marks" proxies, but does not prevent them
-// from being garbage-collected
-const proxies = new WeakSet<typeof Proxy>();
-
 export class Signaller<T extends object> {
   readonly target: T;
   private listeners: Callback<T>[];
+  private proxies: Map<string, typeof Proxy>;
 
   constructor(target: T) {
     this.target = target;
     this.listeners = [];
+    this.proxies = new Map();
   }
 
   /** Creates a proxy of the store's target*/
@@ -46,17 +44,16 @@ export class Signaller<T extends object> {
     const listeners = this.listeners;
     return {
       get: (target: any, key) => {
+        const path = parentKey ? `${parentKey}.${key.toString()}` : key.toString();
+
         if (typeof target[key] === "object" && target[key] !== null) {
-          if (proxies.has(target[key])) {
-            return target[key];
+          if (this.proxies.has(path)) {
+            return this.proxies.get(path);
           }
 
-          const newProxy = new Proxy(
-            target[key],
-            this.setHandlers(parentKey ? `${parentKey}.${key.toString()}` : key.toString())
-          );
+          const newProxy = new Proxy(target[key], this.setHandlers(path));
 
-          proxies.add(newProxy);
+          this.proxies.set(path, newProxy);
 
           return newProxy;
         } else {
@@ -64,12 +61,24 @@ export class Signaller<T extends object> {
         }
       },
       set: (target: any, p, newValue, receiver) => {
+        const path = parentKey ? `${parentKey}.${p.toString()}` : p.toString();
+
         // Do nothing if its the same value
         if (target[p] === newValue) return true;
         const prevValue = receiver[p];
-        if (proxies.has(prevValue)) {
-          proxies.delete(prevValue);
+
+        if (this.proxies.has(path)) {
+          this.proxies.delete(path);
+
+          // Delete any other nested proxies of this path
+          const keys = this.proxies.keys();
+          for (const key of keys) {
+            if (key.startsWith(path + ".")) {
+              this.proxies.delete(key);
+            }
+          }
         }
+
         const validReturn = Reflect.set(target, p, newValue, receiver);
 
         listeners.forEach((l) => {

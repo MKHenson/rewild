@@ -1,18 +1,8 @@
 import { Typography } from "./Typography";
-import { IconType, MaterialIcon, StyledMaterialIcon } from "./MaterialIcon";
+import { MaterialIcon, StyledMaterialIcon } from "./MaterialIcon";
 import { Component, register } from "../Component";
 import { theme } from "../theme";
-
-export type ITreeNode<Resource extends any = any> = {
-  name: string;
-  icon?: IconType;
-  iconSize?: "s" | "xs";
-  canSelect?: boolean;
-  canRename?: boolean;
-  children: ITreeNode<Resource>[];
-  resource?: Resource;
-  id?: string;
-};
+import { ITreeNode } from "models";
 
 interface TreeProps {
   rootNodes: ITreeNode[];
@@ -26,16 +16,22 @@ interface NodeProps {
   onSelectionChanged: (nodes: ITreeNode[]) => void;
 }
 
-export function traverseTree(rootNodes: ITreeNode[], onNode: (node: ITreeNode) => void) {
-  function traverseNode(node: ITreeNode) {
-    onNode(node);
+export function traverseTree(rootNodes: ITreeNode[], onNode: (node: ITreeNode, parent: ITreeNode | null) => boolean) {
+  function traverseNode(node: ITreeNode, parent: ITreeNode | null): boolean {
+    const complete = onNode(node, parent);
+
+    if (complete) return true;
 
     if (node.children) {
-      for (const child of node.children) traverseNode(child);
+      for (const child of node.children) {
+        if (traverseNode(child, node)) return true;
+      }
     }
+
+    return false;
   }
 
-  for (const root of rootNodes) traverseNode(root);
+  for (const root of rootNodes) if (traverseNode(root, null)) return;
 }
 
 @register("x-tree")
@@ -161,10 +157,10 @@ export class TreeNode extends Component<NodeProps> {
                   <StyledMaterialIcon icon={props.node.icon} size={props.node.iconSize || "s"} />
                 </span>
               )}
-              <span class="treenode-text">{props.node.name}</span>
+              <span class="treenode-text">{props.node.resource?.name || props.node.name}</span>
             </Typography>
           </div>
-          {expanded() ? (
+          {expanded() && props.node.children ? (
             <div class="node-children">
               {props.node.children.map((node) => (
                 <TreeNode

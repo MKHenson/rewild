@@ -16,18 +16,21 @@ declare module "models" {
   };
 
   export type ITreeNode = {
-    name: string;
+    name?: string;
     icon?: IconType;
     iconSize?: "s" | "xs";
     canSelect?: boolean;
     canRename?: boolean;
-    children: ITreeNode[];
-    resource?: IResource;
-    id?: IResource | string;
+    children?: ITreeNode[] | null;
+    resource?: IEditorResource;
     onDragOver?: (data: IDragData, node: ITreeNode) => boolean;
     onDrop?: (data: IDragData, node: ITreeNode) => void;
     onDragStart?: (node: ITreeNode) => IDragData;
   };
+
+  export interface ITemplateTreeNode extends ITreeNode {
+    template: () => ITreeNode;
+  }
 
   export interface IProject {
     id?: string;
