@@ -91,6 +91,37 @@ const StyledTree = cssStylesheet(css`
 export class TreeNode extends Component<NodeProps> {
   selected: boolean = false;
 
+  editName(): Promise<string> {
+    return new Promise<string>((resolve) => {
+      const node = this.shadow!.querySelector(".treenode-text") as HTMLElement;
+      node.contentEditable = "true";
+      node.classList.add("editting");
+      node.focus();
+
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const sel = window.getSelection()!;
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      const onDeactivate = (event: Event) => {
+        if ((event as KeyboardEvent).key !== undefined && (event as KeyboardEvent).key !== "Enter") {
+          return;
+        }
+
+        node.contentEditable = "false";
+        node.classList.remove("editting");
+        const newName = (node.textContent || "").trim();
+        node.removeEventListener("blur", onDeactivate);
+        node.removeEventListener("keydown", onDeactivate);
+        resolve(newName);
+      };
+
+      node.addEventListener("blur", onDeactivate);
+      node.addEventListener("keydown", onDeactivate);
+    });
+  }
+
   init() {
     this.selected = this.props.selectedNodes.includes(this.props.node);
     const [expanded, setExpanded] = this.useState(true);

@@ -21,7 +21,6 @@ let selectedNodesCache: ITreeNode<IResource>[] = [];
 @register("x-scene-graph")
 export class SceneGraph extends Component<Props> {
   keyUpDelegate: (e: KeyboardEvent) => void;
-  nodeDeactivatedDelegate: () => void;
 
   init() {
     const [selectedNodes, setSelectedNodes] = this.useState<ITreeNode<IResource>[]>([]);
@@ -45,60 +44,17 @@ export class SceneGraph extends Component<Props> {
 
     const project = projectStoreProxy.project!;
 
-    let activeNode: HTMLElement | null = null;
-
-    const activateNodeEdit = (node: HTMLElement) => {
-      node.contentEditable = "true";
-      node.classList.add("editting");
-      node.focus();
-      activeNode = node;
-
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      const sel = window.getSelection()!;
-      sel.removeAllRanges();
-      sel.addRange(range);
-
-      node.addEventListener("blur", this.nodeDeactivatedDelegate);
-    };
-
-    this.keyUpDelegate = (e: KeyboardEvent) => {
+    this.keyUpDelegate = async (e: KeyboardEvent) => {
       const node = tree.getSelectedNode();
       if (e.key === "F2" && selectedNodes().length === 1 && selectedNodes()[0].canRename && node) {
-        activateNodeEdit(node);
-      } else if (activeNode && e.key === "Enter") {
-        this.nodeDeactivatedDelegate();
+        const newName = await node.editName();
+        projectStoreProxy.selectedResource!.name = newName;
       }
     };
 
     const setSelection = (val: ITreeNode<IResource>[]) => {
       selectedNodesCache = val;
       setSelectedNodes(val);
-    };
-
-    this.nodeDeactivatedDelegate = () => {
-      if (!activeNode) return;
-
-      activeNode.removeEventListener("blur", this.nodeDeactivatedDelegate);
-      activeNode.contentEditable = "false";
-      activeNode.classList.remove("editting");
-      const selected = selectedNodes();
-      const selectedResource = selected[0].resource;
-
-      const oldName = (selectedResource as IContainer).name;
-      const newName = (activeNode.textContent || "").trim() || oldName;
-
-      if (newName === oldName) {
-        activeNode.innerText = oldName;
-        activeNode = null;
-        return;
-      }
-
-      activeNode = null;
-
-      const resource = project!.containers!.find((c) => c.id === selectedResource!.id);
-      if (!resource) return;
-      resource.name = newName;
     };
 
     const onAdd = () => {
@@ -177,7 +133,6 @@ export class SceneGraph extends Component<Props> {
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener("keydown", this.keyUpDelegate);
-    this.nodeDeactivatedDelegate();
   }
 }
 
