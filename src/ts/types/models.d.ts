@@ -57,6 +57,7 @@ declare module "models" {
 
   export interface IResource {
     id: string;
+    name: string;
     type: "container" | "actor";
   }
 
@@ -67,7 +68,6 @@ declare module "models" {
   export type BaseType = "static";
 
   export interface IActor extends IResource {
-    name: string;
     baseType: BaseType;
     pipeline: string;
     geometry: "box" | "sphere";
@@ -75,7 +75,6 @@ declare module "models" {
   }
 
   export interface IContainer extends IResource {
-    name: string;
     baseContainer: string;
     activeOnStartup: boolean;
     type: "container";

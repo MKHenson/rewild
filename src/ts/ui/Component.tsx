@@ -38,7 +38,6 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
   _createRenderer() {
     const parent = this.shadow ? this.shadow : this;
     this.render = () => {
-      console.log(this.constructor.name + ".render()");
       // Generates new DOM
       let children = fn();
 
