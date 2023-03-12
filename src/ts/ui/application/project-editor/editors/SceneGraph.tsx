@@ -1,48 +1,26 @@
-import { IResource, IProject, IContainer } from "models";
+import { ITreeNode, ITemplateTreeNode } from "models";
 import { Card } from "../../../common/Card";
 import { Typography } from "../../../common/Typography";
 import { Component, register } from "../../../Component";
-import { ITreeNode, Tree, traverseTree } from "../../../common/Tree";
+import { Tree } from "../../../common/Tree";
 import { Button } from "../../../common/Button";
 import { ButtonGroup } from "../../../common/ButtonGroup";
 import { StyledMaterialIcon } from "../../../common/MaterialIcon";
-import { SceneGraphFactory } from "./SceneGraphFactory";
 import { theme } from "../../../theme";
+import { sceneGraphStore } from "../../../stores/SceneGraphStore";
 import { projectStore } from "../../../stores/Project";
 
 interface Props {}
-
-const factory = new SceneGraphFactory();
-
-// Keep track of prev nodes so we can match it if nodes
-// added and tree is rebuilt
-let selectedNodesCache: ITreeNode<IResource>[] = [];
 
 @register("x-scene-graph")
 export class SceneGraph extends Component<Props> {
   keyUpDelegate: (e: KeyboardEvent) => void;
 
   init() {
-    const [selectedNodes, setSelectedNodes] = this.useState<ITreeNode<IResource>[]>([]);
-    const [nodes, setNodes] = this.useState<ITreeNode<IResource>[]>([]);
+    const [selectedNodes, setSelectedNodes] = this.useState<ITreeNode[]>([]);
 
-    const projectStoreProxy = this.observeStore(projectStore, (prop, prevVal, value) => {
-      const newNodes = factory.buildTree(project as IProject);
-      const prevNodesCache = selectedNodesCache;
-      let prevNode: ITreeNode | undefined = undefined;
-      const newSelection: ITreeNode[] = [];
-      traverseTree(newNodes, (node) => {
-        prevNode = prevNodesCache.find((prevNode) => prevNode.id === node.id);
-        if (prevNode) {
-          newSelection.push(node);
-        }
-      });
-      setNodes(newNodes, false);
-      setSelectedNodes(newSelection, false);
-      this.render();
-    });
-
-    const project = projectStoreProxy.project!;
+    const sceneGraphStoreProxy = this.observeStore(sceneGraphStore);
+    const projectStoreProxy = this.observeStore(projectStore);
 
     this.keyUpDelegate = async (e: KeyboardEvent) => {
       const node = tree.getSelectedNode();
@@ -52,27 +30,17 @@ export class SceneGraph extends Component<Props> {
       }
     };
 
-    const setSelection = (val: ITreeNode<IResource>[]) => {
-      selectedNodesCache = val;
+    const setSelection = (val: ITreeNode[]) => {
       setSelectedNodes(val);
     };
 
     const onAdd = () => {
-      const newResource = factory.createChildNode(selectedNodes()[0]);
-      if (newResource?.type === "container")
-        project!.containers = project!.containers!.concat(newResource as IContainer);
-
-      projectStoreProxy.dirty = true;
+      sceneGraphStore.createChildNode(selectedNodes()[0] as ITemplateTreeNode);
+      this.render();
     };
 
     const onDelete = () => {
-      if (projectStoreProxy.selectedResource!.type === "container") {
-        project!.containers = project!.containers.filter(
-          (c) => !selectedNodes().find((selected) => selected.resource?.id === c.id)
-        );
-
-        projectStoreProxy.dirty = true;
-      }
+      sceneGraphStore.removeNode(selectedNodes()[0]);
       setSelection([]);
     };
 
@@ -87,7 +55,11 @@ export class SceneGraph extends Component<Props> {
 
     return () => {
       tree = (
-        <Tree onSelectionChanged={onSelectionChanged} selectedNodes={selectedNodes()} rootNodes={nodes()} />
+        <Tree
+          onSelectionChanged={onSelectionChanged}
+          selectedNodes={selectedNodes()}
+          rootNodes={sceneGraphStoreProxy.nodes}
+        />
       ) as Tree;
 
       return (
@@ -100,14 +72,14 @@ export class SceneGraph extends Component<Props> {
             <div class="graph-actions">
               <ButtonGroup>
                 <Button
-                  disabled={selectedNodes().length == 0 || !factory.canCreateNode(selectedNodes()[0])}
+                  disabled={selectedNodes().length == 0 || !(selectedNodes()[0] as ITemplateTreeNode).template}
                   variant="text"
                   onClick={onAdd}
                 >
                   <StyledMaterialIcon icon="add_circle" size="s" />
                 </Button>
                 <Button
-                  disabled={selectedNodes().length == 0 || !factory.canDeleteNode(selectedNodes()[0])}
+                  disabled={selectedNodes().length == 0 || !selectedNodes()[0].resource}
                   variant="text"
                   onClick={onDelete}
                 >

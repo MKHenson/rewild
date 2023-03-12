@@ -1,4 +1,3 @@
-import { IContainer } from "models";
 import { Card } from "../../../common/Card";
 import { Typography } from "../../../common/Typography";
 import { PropertyValue } from "./PropertyValue";
@@ -8,31 +7,10 @@ import { theme } from "../../../theme";
 
 interface Props {}
 
-interface StringEditFunction<T, K extends keyof T> {
-  (value: T[K], key: K): void;
-}
-
-function setProperty<T, K extends keyof T>(obj: T, key: K, value: T[K]) {
-  obj[key] = value;
-}
-
 @register("x-properties")
 export class Properties extends Component<Props> {
   init() {
-    const projectStoreProxy = this.observeStore(projectStore, (prop, prevValue, value) => {
-      this.render();
-    });
-
-    const onContainerEdited: StringEditFunction<IContainer, keyof IContainer> = (val, type) => {
-      const selectedResource = projectStoreProxy.selectedResource;
-
-      if (selectedResource?.type === "container") {
-        const container: IContainer = projectStoreProxy.project?.containers.find((c) => c.id === selectedResource.id)!;
-        setProperty(container, type, val);
-      }
-
-      projectStoreProxy.dirty = true;
-    };
+    const projectStoreProxy = this.observeStore(projectStore);
 
     return () => {
       const selectedResource = projectStoreProxy.selectedResource;
@@ -42,24 +20,26 @@ export class Properties extends Component<Props> {
           <Typography variant="h3">Properties</Typography>
           {selectedResource && (
             <div class="properties">
+              {selectedResource.properties.map((prop) => (
+                <PropertyValue
+                  label={prop.name}
+                  value={prop.value}
+                  type={prop.type}
+                  onChange={(val) => {
+                    prop.value = val;
+                    projectStoreProxy.dirty = true;
+                  }}
+                />
+              ))}
               <PropertyValue label="ID" value={selectedResource?.id} type="string" readonly />
               <PropertyValue
                 label="Name"
-                value={(selectedResource as IContainer).name}
+                value={selectedResource.name}
                 type="string"
-                onChange={(val) => onContainerEdited(val, "name")}
-              />
-              <PropertyValue
-                label="Base Container"
-                value={(selectedResource as IContainer).baseContainer}
-                type="string"
-                onChange={(val) => onContainerEdited(val, "baseContainer")}
-              />
-              <PropertyValue<boolean>
-                label="Active On Startup"
-                value={(selectedResource as IContainer).activeOnStartup}
-                type="boolean"
-                onChange={(val) => onContainerEdited(val, "activeOnStartup")}
+                onChange={(val) => {
+                  selectedResource.name = val;
+                  projectStoreProxy.dirty = true;
+                }}
               />
             </div>
           )}

@@ -43,8 +43,6 @@ export class EditorGrid extends Component<Props> {
       }
     });
 
-    projectStoreProxy.project?.workspace.cells;
-
     const mapped = (type?: EditorType) => {
       if (!type) return null;
       if (type === "properties") return <Properties />;
