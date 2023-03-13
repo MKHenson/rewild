@@ -2,7 +2,7 @@ import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Typography } from "../common/Typography";
 import { MaterialIcon } from "../common/MaterialIcon";
-import { authStore } from "../stores/Auth";
+import { authStore } from "../stores/AuthStore";
 import { Loading } from "../common/Loading";
 import { Component, register } from "../Component";
 

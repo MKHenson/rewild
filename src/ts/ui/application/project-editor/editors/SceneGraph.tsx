@@ -8,7 +8,7 @@ import { ButtonGroup } from "../../../common/ButtonGroup";
 import { StyledMaterialIcon } from "../../../common/MaterialIcon";
 import { theme } from "../../../theme";
 import { sceneGraphStore } from "../../../stores/SceneGraphStore";
-import { projectStore } from "../../../stores/Project";
+import { projectStore } from "../../../stores/ProjectStore";
 
 interface Props {}
 

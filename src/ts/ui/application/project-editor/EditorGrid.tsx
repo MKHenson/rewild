@@ -5,7 +5,7 @@ import { Loading } from "../../common/Loading";
 import { SceneGraph } from "./editors/SceneGraph";
 import { ProjectSettings } from "./editors/ProjectSettings";
 import { Component, register } from "../../Component";
-import { projectStore } from "../../stores/Project";
+import { projectStore } from "../../stores/ProjectStore";
 import { InfoBox } from "../../common/InfoBox";
 import { Properties } from "./editors/Properties";
 import { ActorsTree } from "./editors/ActorsTree";

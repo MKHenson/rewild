@@ -2,7 +2,7 @@ import { Card } from "../../../common/Card";
 import { Typography } from "../../../common/Typography";
 import { PropertyValue } from "./PropertyValue";
 import { Component, register } from "../../../Component";
-import { projectStore } from "../../../stores/Project";
+import { projectStore } from "../../../stores/ProjectStore";
 import { theme } from "../../../theme";
 
 interface Props {}
