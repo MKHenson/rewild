@@ -4,7 +4,7 @@ import { ButtonGroup } from "../../../common/ButtonGroup";
 import { StyledMaterialIcon } from "../../../common/MaterialIcon";
 import { Component, register } from "../../../Component";
 import { theme } from "../../../../ui/theme";
-import { projectStore } from "../../../stores/Project";
+import { projectStore } from "../../../stores/ProjectStore";
 
 interface Props {
   onHome: () => void;

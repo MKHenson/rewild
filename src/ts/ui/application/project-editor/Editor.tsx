@@ -1,5 +1,5 @@
 import { Component, register } from "../../Component";
-import { projectStore } from "../../stores/Project";
+import { projectStore } from "../../stores/ProjectStore";
 import { EditorGrid } from "./EditorGrid";
 
 interface Props {

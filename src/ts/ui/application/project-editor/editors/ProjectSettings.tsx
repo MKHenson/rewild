@@ -5,7 +5,7 @@ import { Date } from "../../../common/Date";
 import { Input } from "../../../common/Input";
 import { Button } from "../../../common/Button";
 import { Component, register } from "../../../Component";
-import { projectStore } from "../../../stores/Project";
+import { projectStore } from "../../../stores/ProjectStore";
 import { IProject } from "models";
 
 interface Props {}
