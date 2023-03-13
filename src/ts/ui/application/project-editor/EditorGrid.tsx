@@ -8,6 +8,7 @@ import { Component, register } from "../../Component";
 import { projectStore } from "../../stores/ProjectStore";
 import { InfoBox } from "../../common/InfoBox";
 import { Properties } from "./editors/Properties";
+import { ActorsTree } from "./editors/ActorsTree";
 interface Props {
   onHome: () => void;
 }
@@ -49,6 +50,7 @@ export class EditorGrid extends Component<Props> {
       if (type === "scene-graph") return <SceneGraph />;
       if (type === "project-settings") return <ProjectSettings />;
       if (type === "ribbon") return <RibbonButtons onHome={this.props.onHome} />;
+      if (type === "actors") return <ActorsTree />;
       return null;
     };
 

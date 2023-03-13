@@ -1,5 +1,6 @@
 import { EditorType } from "models";
 import { Component, register } from "../../Component";
+import { startDragDrop, IGridCellAction, compelteDragDrop, curDragAction } from "../../utils/dragDrop";
 
 interface Props {
   rowStart: number;
@@ -12,10 +13,8 @@ interface Props {
   onEditorMoved: (type: EditorType, rowStart: number, colStart: number, rowEnd: number, colEnd: number) => void;
 }
 
-type Data = {
-  editor: string;
-  sizeX: number;
-  sizeY: number;
+const onDragEndEvent = (e: DragEvent) => {
+  e.preventDefault();
 };
 
 @register("x-grid-cell")
@@ -24,47 +23,12 @@ export class GridCell extends Component<Props> {
     const onDragStart = (e: DragEvent) => {
       const props = this.props;
 
-      e.dataTransfer?.setData(
-        "text",
-        JSON.stringify({
-          editor: props.editor!,
-          sizeX: props.colEnd - props.colStart,
-          sizeY: props.rowEnd - props.rowStart,
-        } as Data)
-      );
-      e.dataTransfer?.setDragImage((e.currentTarget as HTMLDivElement).parentElement!, 0, 0);
-    };
-
-    const onDragOverEvent = (e: DragEvent) => {
-      (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "true");
-      e.preventDefault();
-    };
-
-    const onDragLeaveEvent = (e: DragEvent) => {
-      (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "");
-      e.preventDefault();
-    };
-
-    const onDrop = (e: DragEvent) => {
-      const props = this.props;
-      (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "");
-      const data = e.dataTransfer?.getData("text");
-      if (!data) return;
-      const json = JSON.parse(data) as Data;
-      const rowEnd = props.rowStart + json.sizeY;
-      const colEnd = props.colStart + json.sizeX;
-
-      props.onEditorMoved(
-        json.editor as EditorType,
-        props.rowStart,
-        props.colStart,
-        rowEnd < props.rowEnd ? props.rowEnd : rowEnd,
-        colEnd < props.colEnd ? props.colEnd : colEnd
-      );
-    };
-
-    const onDragEndEvent = (e: DragEvent) => {
-      e.preventDefault();
+      startDragDrop<IGridCellAction>(e, {
+        type: "cell-move",
+        editor: props.editor!,
+        sizeX: props.colEnd - props.colStart,
+        sizeY: props.rowEnd - props.rowStart,
+      });
     };
 
     this.ondragover = onDragOverEvent;
@@ -125,6 +89,37 @@ export class GridCell extends Component<Props> {
     return StyledGridCell;
   }
 }
+
+/** Allow drop */
+const onDragOverEvent = (e: DragEvent) => {
+  if (curDragAction?.type !== "cell-move") return;
+
+  (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "true");
+  e.preventDefault();
+};
+
+const onDragLeaveEvent = (e: DragEvent) => {
+  (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "");
+  e.preventDefault();
+};
+
+const onDrop = (e: DragEvent) => {
+  const props = (e.currentTarget as GridCell).props;
+  (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "");
+  const json = compelteDragDrop<IGridCellAction>(e);
+  if (!json) return;
+
+  const rowEnd = props.rowStart + json.sizeY;
+  const colEnd = props.colStart + json.sizeX;
+
+  props.onEditorMoved(
+    json.editor as EditorType,
+    props.rowStart,
+    props.colStart,
+    rowEnd < props.rowEnd ? props.rowEnd : rowEnd,
+    colEnd < props.colEnd ? props.colEnd : colEnd
+  );
+};
 
 const StyledGridCell = cssStylesheet(css`
   :host,

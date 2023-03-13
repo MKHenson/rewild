@@ -1,4 +1,4 @@
-import { ILevel, IProject, IEditorResource } from "models";
+import { ILevel, IProject, IEditorResource, ITreeNode, IContainer } from "models";
 import { Store } from "../Store";
 import { getLevel as getLevelApi, patchLevel, patchProject, getProject as getProjectApi } from "../../../api";
 import { Timestamp } from "firebase/firestore";
@@ -11,6 +11,11 @@ export interface IProjectStore {
   level: ILevel | null;
   project: IProject | null;
   selectedResource: IEditorResource | null;
+}
+
+function extractProp(node: ITreeNode, propName: string) {
+  const property = node.resource?.properties.find((property) => property.name === propName);
+  return property?.value;
 }
 
 export class ProjectStore extends Store<IProjectStore> {
@@ -77,7 +82,14 @@ export class ProjectStore extends Store<IProjectStore> {
 
     await patchLevel(project.level!, {
       lastModified: Timestamp.now(),
-      containers: project.containers?.slice(0),
+      containers: project.sceneGraph.containers.map(
+        (c) =>
+          ({
+            ...c.resource?.target,
+            activeOnStartup: extractProp(c, "Active On Startup") as boolean,
+            baseContainer: extractProp(c, "Base Container") as string,
+          } as IContainer)
+      ),
       activeOnStartup: project.activeOnStartup,
       startEvent: project.startEvent,
     });

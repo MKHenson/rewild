@@ -10,7 +10,9 @@ interface Props {}
 @register("x-properties")
 export class Properties extends Component<Props> {
   init() {
-    const projectStoreProxy = this.observeStore(projectStore);
+    const projectStoreProxy = this.observeStore(projectStore, (prop) => {
+      if (prop === "selectedResource" || prop === "selectedResource.target.name") this.render();
+    });
 
     return () => {
       const selectedResource = projectStoreProxy.selectedResource;
@@ -31,13 +33,13 @@ export class Properties extends Component<Props> {
                   }}
                 />
               ))}
-              <PropertyValue label="ID" value={selectedResource?.id} type="string" readonly />
+              <PropertyValue label="ID" value={selectedResource?.target.id} type="string" readonly />
               <PropertyValue
                 label="Name"
-                value={selectedResource.name}
+                value={selectedResource.target.name}
                 type="string"
                 onChange={(val) => {
-                  selectedResource.name = val;
+                  selectedResource.target.name = val;
                   projectStoreProxy.dirty = true;
                 }}
               />

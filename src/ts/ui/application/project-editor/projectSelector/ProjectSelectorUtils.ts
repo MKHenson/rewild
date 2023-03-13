@@ -9,7 +9,14 @@ export const createDefaultWorkspace = (): IWorkspace => {
         colStart: 1,
         colEnd: 2,
         rowStart: 2,
-        rowEnd: 5,
+        rowEnd: 4,
+      },
+      {
+        editor: "actors",
+        colStart: 1,
+        colEnd: 2,
+        rowStart: 4,
+        rowEnd: 6,
       },
       {
         editor: "ribbon",
