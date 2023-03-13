@@ -26,7 +26,7 @@ export class SceneGraph extends Component<Props> {
       const node = tree.getSelectedNode();
       if (e.key === "F2" && selectedNodes().length === 1 && selectedNodes()[0].canRename && node) {
         const newName = await node.editName();
-        projectStoreProxy.selectedResource!.name = newName;
+        projectStoreProxy.selectedResource!.target.name = newName;
       }
     };
 
@@ -123,10 +123,5 @@ const StyleSceneGraph = cssStylesheet(css`
   .nodes {
     max-height: 100%;
     overflow: hidden;
-  }
-  .selected-treenode .treenode-text.editting {
-    border: 1px dashed grey;
-    outline: none;
-    padding: 2px 4px;
   }
 `);

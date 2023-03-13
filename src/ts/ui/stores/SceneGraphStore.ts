@@ -27,9 +27,7 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
           icon: "label",
           iconSize: "xs",
           resource: {
-            type: "container",
-            id: createUUID(),
-            name: "New Container",
+            target: { type: "container", id: createUUID(), name: "New Container" },
             properties: [
               {
                 name: "Base Container",

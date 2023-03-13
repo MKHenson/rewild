@@ -40,7 +40,6 @@ declare module "models" {
     activeOnStartup: boolean;
     startEvent: string;
     workspace: IWorkspace;
-    containers: IContainer[];
     sceneGraph: {
       containers: ITreeNode[];
     };
@@ -64,8 +63,9 @@ declare module "models" {
     type: "container" | "actor";
   }
 
-  export interface IEditorResource extends IResource {
+  export interface IEditorResource {
     properties: IProperty[];
+    target: IResource;
   }
 
   export type BaseType = "static";
