@@ -3,7 +3,7 @@ import { EmailAuthProvider, GoogleAuthProvider } from "firebase/auth";
 import { Avatar } from "../common/Avatar";
 import { Popup } from "../common/Popup";
 import { Component, register } from "../Component";
-import { authStore } from "../stores/Auth";
+import { authStore } from "../stores/AuthStore";
 
 type Props = {};
 
