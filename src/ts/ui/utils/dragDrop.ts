@@ -1,18 +1,4 @@
-import { ITreeNode } from "models";
-
-export interface IDragDropAction {
-  type: "cell-move" | "treenode";
-}
-
-export interface IGridCellAction extends IDragDropAction {
-  editor: string;
-  sizeX: number;
-  sizeY: number;
-}
-
-export interface ITreeNodeAction extends IDragDropAction {
-  node: ITreeNode;
-}
+import { IDragDropAction } from "models";
 
 export let curDragAction: IDragDropAction | null = null;
 

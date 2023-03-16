@@ -1,4 +1,4 @@
-import { ITemplateTreeNode, IProject, ITreeNode } from "models";
+import { ITemplateTreeNode, IProject, ITreeNode, ITreeNodeAction } from "models";
 import { traverseTree } from "../common/Tree";
 import { Store } from "../Store";
 import { createUUID } from "../utils";
@@ -26,6 +26,13 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
           canSelect: true,
           icon: "label",
           iconSize: "xs",
+          onDragOver(data, node) {
+            if (data?.type === "treenode" && (data as ITreeNodeAction).node) return true;
+            return false;
+          },
+          onDrop(data, node) {
+            return true;
+          },
           resource: {
             target: { type: "container", id: createUUID(), name: "New Container" },
             properties: [

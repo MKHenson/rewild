@@ -3,11 +3,11 @@ import { Signaller, Callback } from "./Signaller";
 /** Stores are used to created Proxied objects which can be observed, mutated and trigger renders on Components*/
 export class Store<T extends object> {
   protected _defaultProxy: T;
-  protected signaller: Signaller<T>;
+  protected _signaller: Signaller<T>;
 
   constructor(target: T) {
-    this.signaller = new Signaller<T>(target);
-    const [proxy] = this.signaller.proxy();
+    this._signaller = new Signaller<T>(target);
+    const [proxy] = this._signaller.proxy();
     this._defaultProxy = proxy;
   }
 
@@ -16,14 +16,18 @@ export class Store<T extends object> {
   }
 
   createProxy(cb?: Callback<T>) {
-    return this.signaller.proxy(cb);
+    return this._signaller.proxy(cb);
   }
 
   get target(): T {
-    return this.signaller.target;
+    return this._signaller.target;
   }
 
   get defaultProxy(): T {
     return this._defaultProxy;
+  }
+
+  get signaller(): Signaller<T> {
+    return this._signaller;
   }
 }

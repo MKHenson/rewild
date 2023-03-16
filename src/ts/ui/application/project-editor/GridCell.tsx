@@ -1,6 +1,6 @@
-import { EditorType } from "models";
+import { EditorType, IGridCellAction } from "models";
 import { Component, register } from "../../Component";
-import { startDragDrop, IGridCellAction, compelteDragDrop, curDragAction } from "../../utils/dragDrop";
+import { startDragDrop, compelteDragDrop, curDragAction } from "../../utils/dragDrop";
 
 interface Props {
   rowStart: number;
@@ -10,7 +10,14 @@ interface Props {
   hasElement?: boolean;
   editorElm?: JSX.Element;
   editor?: EditorType;
-  onEditorMoved: (type: EditorType, rowStart: number, colStart: number, rowEnd: number, colEnd: number) => void;
+  onEditorMoved: (
+    type: EditorType,
+    rowStart: number,
+    colStart: number,
+    rowEnd: number,
+    colEnd: number,
+    interaction: "drop" | "button"
+  ) => void;
 }
 
 const onDragEndEvent = (e: DragEvent) => {
@@ -49,7 +56,14 @@ export class GridCell extends Component<Props> {
               <div
                 class="sizer sizerRight_shrink"
                 onclick={(e) =>
-                  props.onEditorMoved(props.editor!, props.rowStart, props.colStart, props.rowEnd, props.colEnd - 1)
+                  props.onEditorMoved(
+                    props.editor!,
+                    props.rowStart,
+                    props.colStart,
+                    props.rowEnd,
+                    props.colEnd - 1,
+                    "button"
+                  )
                 }
               >
                 -
@@ -57,7 +71,14 @@ export class GridCell extends Component<Props> {
               <div
                 class="sizer sizerRight_expand"
                 onclick={(e) =>
-                  props.onEditorMoved(props.editor!, props.rowStart, props.colStart, props.rowEnd, props.colEnd + 1)
+                  props.onEditorMoved(
+                    props.editor!,
+                    props.rowStart,
+                    props.colStart,
+                    props.rowEnd,
+                    props.colEnd + 1,
+                    "button"
+                  )
                 }
               >
                 +
@@ -65,7 +86,14 @@ export class GridCell extends Component<Props> {
               <div
                 class="sizer sizerHeight_shrink"
                 onclick={(e) =>
-                  props.onEditorMoved(props.editor!, props.rowStart, props.colStart, props.rowEnd - 1, props.colEnd)
+                  props.onEditorMoved(
+                    props.editor!,
+                    props.rowStart,
+                    props.colStart,
+                    props.rowEnd - 1,
+                    props.colEnd,
+                    "button"
+                  )
                 }
               >
                 -
@@ -73,7 +101,14 @@ export class GridCell extends Component<Props> {
               <div
                 class="sizer sizerHeight_expand"
                 onclick={(e) =>
-                  props.onEditorMoved(props.editor!, props.rowStart, props.colStart, props.rowEnd + 1, props.colEnd)
+                  props.onEditorMoved(
+                    props.editor!,
+                    props.rowStart,
+                    props.colStart,
+                    props.rowEnd + 1,
+                    props.colEnd,
+                    "button"
+                  )
                 }
               >
                 +
@@ -92,7 +127,7 @@ export class GridCell extends Component<Props> {
 
 /** Allow drop */
 const onDragOverEvent = (e: DragEvent) => {
-  if (curDragAction?.type !== "cell-move") return;
+  if (!curDragAction || curDragAction.type !== "cell-move") return;
 
   (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "true");
   e.preventDefault();
@@ -117,7 +152,8 @@ const onDrop = (e: DragEvent) => {
     props.rowStart,
     props.colStart,
     rowEnd < props.rowEnd ? props.rowEnd : rowEnd,
-    colEnd < props.colEnd ? props.colEnd : colEnd
+    colEnd < props.colEnd ? props.colEnd : colEnd,
+    "drop"
   );
 };
 

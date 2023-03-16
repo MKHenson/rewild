@@ -5,6 +5,8 @@
     "target": "es2020",
     "allowJs": true,
     "esModuleInterop": true,
+    "jsx": "react",
+    "jsxFactory": "jsx",
     "experimentalDecorators": true,
     "strictPropertyInitialization": false,
     "isolatedModules": false,
