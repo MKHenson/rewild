@@ -16,7 +16,8 @@ export type Callback<T> = (prop: DotNestedKeys<T>, prevValue: any, value: any) =
 export class Signaller<T extends object> {
   readonly target: T;
   private listeners: Callback<T>[];
-  private proxies: Map<string, typeof Proxy>;
+  private proxies: Map<string, { proxy: typeof Proxy; origVal: any }>;
+  public __debuggerGetDelegate?: (target: any, key: string | symbol) => void;
 
   constructor(target: T) {
     this.target = target;
@@ -25,7 +26,7 @@ export class Signaller<T extends object> {
   }
 
   /** Creates a proxy of the store's target*/
-  proxy(cb?: Callback<T>, path?: string): [T, UnsubscribeStoreFn] {
+  proxy(cb?: Callback<T>): [T, UnsubscribeStoreFn] {
     const listeners = this.listeners;
 
     if (cb) listeners.push(cb);
@@ -40,20 +41,28 @@ export class Signaller<T extends object> {
     ];
   }
 
+  getListeners() {
+    return this.listeners;
+  }
+
   private setHandlers(parentKey?: string): ProxyHandler<T> {
     const listeners = this.listeners;
+    const proxies = this.proxies;
+
     return {
       get: (target: any, key) => {
-        const path = parentKey ? `${parentKey}.${key.toString()}` : key.toString();
-
+        if (key === "__isProxy") return true;
         if (typeof target[key] === "object" && target[key] !== null) {
-          if (this.proxies.has(path)) {
-            return this.proxies.get(path);
+          const path = parentKey ? `${parentKey}.${key.toString()}` : key.toString();
+          this.__debuggerGetDelegate?.(target, key);
+
+          if (proxies.has(path)) {
+            return proxies.get(path)!.proxy;
           }
 
           const newProxy = new Proxy(target[key], this.setHandlers(path));
 
-          this.proxies.set(path, newProxy);
+          proxies.set(path, { proxy: newProxy, origVal: target[key] });
 
           return newProxy;
         } else {
@@ -61,23 +70,23 @@ export class Signaller<T extends object> {
         }
       },
       set: (target: any, p, newValue, receiver) => {
-        const path = parentKey ? `${parentKey}.${p.toString()}` : p.toString();
+        // const path = parentKey ? `${parentKey}.${p.toString()}` : p.toString();
 
         // Do nothing if its the same value
         if (target[p] === newValue) return true;
-        const prevValue = receiver[p];
+        const prevValue = Reflect.get(target, p, receiver);
+        // const proxies = this.proxies;
 
-        if (this.proxies.has(path)) {
-          this.proxies.delete(path);
+        // if (proxies.has(path))
+        //   proxies.delete(path);
 
-          // Delete any other nested proxies of this path
-          const keys = this.proxies.keys();
-          for (const key of keys) {
-            if (key.startsWith(path + ".")) {
-              this.proxies.delete(key);
-            }
-          }
-        }
+        // // Delete any other nested proxies of this path
+        // const keys = proxies.keys();
+        // for (const key of keys) {
+        //   if (key.startsWith(path + ".") && proxies.get(key) !== newValue) {
+        //     proxies.delete(key);
+        //   }
+        // }
 
         const validReturn = Reflect.set(target, p, newValue, receiver);
 

@@ -1,4 +1,4 @@
-import { IActor, IProperty, ITemplateTreeNode, ITreeNode } from "models";
+import { IActor, IProperty, ITemplateTreeNode, ITreeNode, ITreeNodeAction } from "models";
 import { Store } from "../Store";
 import { createUUID } from "../utils";
 
@@ -11,6 +11,9 @@ const baseActorTemplate: ITreeNode = {
   canSelect: true,
   icon: "label_important",
   iconSize: "xs",
+  onDragStart(node) {
+    return { type: "treenode", node: { ...(node as ITemplateTreeNode).template } } as ITreeNodeAction;
+  },
 };
 
 const baseActorProperties: IProperty[] = [

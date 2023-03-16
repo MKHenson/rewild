@@ -2,8 +2,8 @@ import { Typography } from "./Typography";
 import { MaterialIcon, StyledMaterialIcon } from "./MaterialIcon";
 import { Component, register } from "../Component";
 import { theme } from "../theme";
-import { ITreeNode } from "models";
-import { compelteDragDrop, curDragAction, ITreeNodeAction, startDragDrop } from "../utils/dragDrop";
+import { IDragDropAction, ITreeNode, ITreeNodeAction } from "models";
+import { compelteDragDrop, curDragAction, startDragDrop } from "../utils/dragDrop";
 
 interface NodeProps {
   node: ITreeNode;
@@ -53,10 +53,8 @@ export class TreeNode extends Component<NodeProps> {
     const onDragStart = (e: DragEvent) => {
       const props = this.props;
 
-      startDragDrop<ITreeNodeAction>(e, {
-        type: "treenode",
-        node: props.node,
-      });
+      const action = props.node.onDragStart!(props.node);
+      startDragDrop<IDragDropAction>(e, action);
     };
 
     const handleExpandedClick = () => {
@@ -81,7 +79,17 @@ export class TreeNode extends Component<NodeProps> {
       const json = compelteDragDrop<ITreeNodeAction>(e);
       if (!json) return;
 
+      if (!this.props.node.onDrop!(json, this.props.node)) return;
       this.props.node.children = this.props.node.children ? this.props.node.children.concat(json.node) : [json.node];
+    };
+
+    /** Allow drop */
+    const onDragOverEvent = (e: DragEvent) => {
+      if (!this.props.node.onDragOver!(curDragAction, this.props.node)) return;
+
+      (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "true");
+      e.preventDefault();
+      e.stopPropagation();
     };
 
     return () => {
@@ -101,12 +109,12 @@ export class TreeNode extends Component<NodeProps> {
             <div
               class="treenode-drop-area"
               draggable
-              ondragstart={onDragStart}
+              ondragstart={props.node.onDragStart ? onDragStart : undefined}
               onclick={handleNodeClick}
-              ondragover={onDragOverEvent}
+              ondragover={props.node.onDragOver ? onDragOverEvent : undefined}
               ondragleave={onDragLeaveEvent}
               ondragend={onDragEndEvent}
-              ondrop={onDrop}
+              ondrop={props.node.onDrop ? onDrop : undefined}
             >
               <Typography variant="body2">
                 {props.node.icon && (
@@ -152,15 +160,6 @@ export class TreeNode extends Component<NodeProps> {
     return StyledTreeNode;
   }
 }
-
-/** Allow drop */
-const onDragOverEvent = (e: DragEvent) => {
-  if (curDragAction?.type !== "treenode") return;
-
-  (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "true");
-  e.preventDefault();
-  e.stopPropagation();
-};
 
 const onDragLeaveEvent = (e: DragEvent) => {
   (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "");

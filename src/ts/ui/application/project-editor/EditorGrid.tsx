@@ -54,17 +54,26 @@ export class EditorGrid extends Component<Props> {
       return null;
     };
 
-    const onCellsUpdated = (type: EditorType, rowStart: number, colStart: number, rowEnd: number, colEnd: number) => {
+    const onCellsUpdated = (
+      type: EditorType,
+      rowStart: number,
+      colStart: number,
+      rowEnd: number,
+      colEnd: number,
+      interaction: "drop" | "button"
+    ) => {
       projectStoreProxy.dirty = true;
       const cells = projectStoreProxy.project!.workspace.cells;
-      let dir: "up" | "down" | "left" | "right" = "down";
+      let dir: "up" | "down" | "left" | "right" | "none" = "none";
 
       const newCells = cells.map((cell) => {
         if (cell.editor === type) {
-          if (rowEnd > cell.rowEnd) dir = "down";
-          else if (rowEnd < cell.rowEnd) dir = "up";
-          else if (colEnd < cell.colEnd) dir = "left";
-          else if (colEnd > cell.colEnd) dir = "right";
+          if (interaction === "button") {
+            if (rowEnd > cell.rowEnd) dir = "down";
+            else if (rowEnd < cell.rowEnd) dir = "up";
+            else if (colEnd < cell.colEnd) dir = "left";
+            else if (colEnd > cell.colEnd) dir = "right";
+          }
 
           return {
             ...cell,

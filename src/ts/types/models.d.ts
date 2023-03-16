@@ -3,8 +3,18 @@ declare module "models" {
   import type { Timestamp } from "firebase/firestore";
   import type { IconType } from "src/ts/ui/common/MaterialIcon";
 
-  export interface IDragData {
-    type: "gridcell" | "treenode";
+  export interface IDragDropAction {
+    type: "cell-move" | "treenode";
+  }
+
+  export interface IGridCellAction extends IDragDropAction {
+    editor: string;
+    sizeX: number;
+    sizeY: number;
+  }
+
+  export interface ITreeNodeAction extends IDragDropAction {
+    node: ITreeNode;
   }
 
   export type PropType = "string" | "boolean";
@@ -23,9 +33,9 @@ declare module "models" {
     canRename?: boolean;
     children?: ITreeNode[] | null;
     resource?: IEditorResource;
-    onDragOver?: (data: IDragData, node: ITreeNode) => boolean;
-    onDrop?: (data: IDragData, node: ITreeNode) => void;
-    onDragStart?: (node: ITreeNode) => IDragData;
+    onDragOver?: (data: IDragDropAction | null, node: ITreeNode) => boolean;
+    onDrop?: (data: IDragDropAction, node: ITreeNode) => boolean;
+    onDragStart?: (node: ITreeNode) => IDragDropAction;
   };
 
   export interface ITemplateTreeNode extends ITreeNode {
