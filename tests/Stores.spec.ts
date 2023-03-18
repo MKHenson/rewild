@@ -28,22 +28,27 @@ describe("Stores", () => {
     store.defaultProxy.person.name.first = "Mary";
   });
 
-  it("does not create a proxy loop with arrays", () => {
+  it("does not duplicate proxies in arrays", () => {
     const store = new Store({
-      people: [
-        { name: "george", age: 0 },
-        { name: "mary", age: 0 },
-      ],
+      world: {
+        people: [
+          { name: "george", age: 0 },
+          { name: "mary", age: 0 },
+        ],
+      },
     });
     let numCalls = 0;
+
+    for (let i = 0; i < 20; i++) {
+      const newPeople = store.defaultProxy.world.people.map((person) => person);
+      store.defaultProxy.world.people = newPeople;
+    }
+
     store.signaller.__debuggerGetDelegate = (target, prop) => {
-      if (prop === "people") numCalls++;
+      numCalls++;
     };
 
-    store.defaultProxy.people = store.defaultProxy.people.map((p) => ({ ...p, age: p.age + 1 }));
-    store.defaultProxy.people = store.defaultProxy.people.map((p) => ({ ...p, age: p.age + 1 }));
-    store.defaultProxy.people[1].age;
-
-    expect(numCalls).to.equal(3);
+    store.defaultProxy.world.people[0].age;
+    expect(numCalls).to.equal(4);
   });
 });
