@@ -16,7 +16,7 @@ export type Callback<T> = (prop: DotNestedKeys<T>, prevValue: any, value: any) =
 export class Signaller<T extends object> {
   readonly target: T;
   private listeners: Callback<T>[];
-  private proxies: Map<string, { proxy: typeof Proxy; origVal: any }>;
+  private proxies: Map<string, typeof Proxy>;
   public __debuggerGetDelegate?: (target: any, key: string | symbol) => void;
 
   constructor(target: T) {
@@ -57,12 +57,12 @@ export class Signaller<T extends object> {
           this.__debuggerGetDelegate?.(target, key);
 
           if (proxies.has(path)) {
-            return proxies.get(path)!.proxy;
+            return proxies.get(path);
           }
 
-          const newProxy = new Proxy(target[key], this.setHandlers(path));
+          const newProxy = target[key].__isProxy ? target[key] : new Proxy(target[key], this.setHandlers(path));
 
-          proxies.set(path, { proxy: newProxy, origVal: target[key] });
+          proxies.set(path, newProxy);
 
           return newProxy;
         } else {
@@ -70,23 +70,22 @@ export class Signaller<T extends object> {
         }
       },
       set: (target: any, p, newValue, receiver) => {
-        // const path = parentKey ? `${parentKey}.${p.toString()}` : p.toString();
+        const path = parentKey ? `${parentKey}.${p.toString()}` : p.toString();
 
         // Do nothing if its the same value
         if (target[p] === newValue) return true;
         const prevValue = Reflect.get(target, p, receiver);
-        // const proxies = this.proxies;
+        const proxies = this.proxies;
 
-        // if (proxies.has(path))
-        //   proxies.delete(path);
+        if (proxies.has(path)) proxies.delete(path);
 
-        // // Delete any other nested proxies of this path
-        // const keys = proxies.keys();
-        // for (const key of keys) {
-        //   if (key.startsWith(path + ".") && proxies.get(key) !== newValue) {
-        //     proxies.delete(key);
-        //   }
-        // }
+        // Delete any other nested proxies of this path
+        const keys = proxies.keys();
+        for (const key of keys) {
+          if (key.startsWith(path + ".") && proxies.get(key) !== newValue) {
+            proxies.delete(key);
+          }
+        }
 
         const validReturn = Reflect.set(target, p, newValue, receiver);
 
