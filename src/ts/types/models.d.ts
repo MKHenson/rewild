@@ -3,6 +3,8 @@ declare module "models" {
   import type { Timestamp } from "firebase/firestore";
   import type { IconType } from "src/ts/ui/common/MaterialIcon";
 
+  export type FactoryKey = "actor" | "container";
+
   export interface IDragDropAction {
     type: "cell-move" | "treenode";
   }
@@ -39,6 +41,7 @@ declare module "models" {
   };
 
   export interface ITemplateTreeNode extends ITreeNode {
+    factoryKey: FactoryKey;
     template: () => ITreeNode;
   }
 
