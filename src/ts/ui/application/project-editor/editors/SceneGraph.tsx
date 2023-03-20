@@ -51,6 +51,10 @@ export class SceneGraph extends Component<Props> {
       else projectStoreProxy.selectedResource = null;
     };
 
+    const onDrop = (val: ITreeNode) => {
+      projectStoreProxy.dirty = true;
+    };
+
     let tree: Tree;
 
     return () => {
@@ -58,6 +62,7 @@ export class SceneGraph extends Component<Props> {
         <Tree
           onSelectionChanged={onSelectionChanged}
           selectedNodes={selectedNodes()}
+          onDrop={onDrop}
           rootNodes={sceneGraphStoreProxy.nodes}
         />
       ) as Tree;

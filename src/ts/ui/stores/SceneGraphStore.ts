@@ -1,7 +1,7 @@
-import { ITemplateTreeNode, IProject, ITreeNode, ITreeNodeAction } from "models";
+import { ITemplateTreeNode, IProject, ITreeNode } from "models";
 import { traverseTree } from "../common/Tree";
 import { Store } from "../Store";
-import { createUUID } from "../utils";
+import { containerFactory } from "../utils/TemplateFactories";
 
 export interface ISceneGraphStore {
   nodes: ITreeNode[];
@@ -18,38 +18,12 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
     this.defaultProxy.nodes = [
       {
         name: "Containers",
+        factoryKey: "container",
         canSelect: true,
         icon: "group_work",
         id: "CONTAINERS",
-        template: () => ({
-          canRename: true,
-          canSelect: true,
-          icon: "label",
-          iconSize: "xs",
-          onDragOver(data, node) {
-            if (data?.type === "treenode" && (data as ITreeNodeAction).node) return true;
-            return false;
-          },
-          onDrop(data, node) {
-            return true;
-          },
-          resource: {
-            target: { type: "container", id: createUUID(), name: "New Container" },
-            properties: [
-              {
-                name: "Base Container",
-                type: "string",
-                value: "",
-              },
-              {
-                name: "Active On Startup",
-                type: "boolean",
-                value: true,
-              },
-            ],
-          },
-        }),
-        children: project.sceneGraph?.containers || [],
+        template: containerFactory,
+        children: project.sceneGraph?.containers.map((node) => ({ ...containerFactory(), ...node })) || [],
       } as ITemplateTreeNode,
     ];
   }

@@ -3,6 +3,7 @@ import { Store } from "../Store";
 import { getLevel as getLevelApi, patchLevel, patchProject, getProject as getProjectApi } from "../../../api";
 import { Timestamp } from "firebase/firestore";
 import { sceneGraphStore } from "./SceneGraphStore";
+import { JSONReviver } from "../utils/JSONReviver";
 
 export interface IProjectStore {
   loading: boolean;
@@ -52,18 +53,22 @@ export class ProjectStore extends Store<IProjectStore> {
 
   async updateProject() {
     const project = this.defaultProxy.project!;
+    project.lastModified = Timestamp.now();
+
     const { id, ...token } = project;
     const containers = sceneGraphStore.defaultProxy.nodes.find((n) => n.name === "Containers")!.children;
 
-    token.lastModified = Timestamp.now();
     token.sceneGraph = {
       containers: containers || [],
     };
 
     this.defaultProxy.loading = true;
 
+    // Deep copy - removes functions etc...
+    const serialized = JSON.stringify(token);
+
     try {
-      await patchProject(id!, token);
+      await patchProject(id!, JSON.parse(serialized, JSONReviver));
     } catch (err: any) {
       this.defaultProxy.error = err.toString();
     }

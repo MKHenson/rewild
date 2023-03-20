@@ -9,6 +9,7 @@ interface NodeProps {
   node: ITreeNode;
   selectedNodes?: ITreeNode[];
   onSelectionChanged?: (nodes: ITreeNode[]) => void;
+  onDrop?: (node: ITreeNode) => void;
 }
 
 @register("x-treenode")
@@ -81,6 +82,7 @@ export class TreeNode extends Component<NodeProps> {
 
       if (!this.props.node.onDrop!(json, this.props.node)) return;
       this.props.node.children = this.props.node.children ? this.props.node.children.concat(json.node) : [json.node];
+      this.props.onDrop?.(this.props.node);
     };
 
     /** Allow drop */
@@ -133,6 +135,7 @@ export class TreeNode extends Component<NodeProps> {
                   selectedNodes={props.selectedNodes}
                   onSelectionChanged={props.onSelectionChanged}
                   node={node}
+                  onDrop={this.props.onDrop}
                 />
               ))}
             </div>

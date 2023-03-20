@@ -1,46 +1,16 @@
-import { IActor, IProperty, ITemplateTreeNode, ITreeNode, ITreeNodeAction } from "models";
+import { ITemplateTreeNode, ITreeNode, ITreeNodeAction } from "models";
 import { Store } from "../Store";
-import { createUUID } from "../utils";
+import { actorFactory } from "../utils/TemplateFactories";
 
 export interface IActorStoreStore {
   nodes: ITreeNode[];
 }
 
-const baseActorTemplate: ITreeNode = {
-  canRename: true,
-  canSelect: true,
-  icon: "label_important",
-  iconSize: "xs",
-  onDragStart(node) {
-    return { type: "treenode", node: { ...(node as ITemplateTreeNode).template } } as ITreeNodeAction;
-  },
-};
-
-const baseActorProperties: IProperty[] = [
-  {
-    name: "Size",
-    type: "string",
-    value: "1",
-  },
-];
-
-const actorTemplates: { name: string; template: () => ITreeNode }[] = [
+const actorTemplates: ITemplateTreeNode[] = [
   {
     name: "Earth",
-    template: () => ({
-      ...baseActorTemplate,
-      resource: {
-        properties: [...baseActorProperties],
-        target: {
-          name: "Earth",
-          type: "actor",
-          id: createUUID(),
-          baseType: "static",
-          geometry: "sphere",
-          pipeline: "earth",
-        } as IActor,
-      },
-    }),
+    factoryKey: "actor",
+    template: actorFactory,
   },
 ];
 
@@ -51,15 +21,15 @@ export class ActorStore extends Store<IActorStoreStore> {
         {
           name: "Actors",
           icon: "man",
-          children: actorTemplates.map(
-            (actor) =>
-              ({
-                icon: "label_important",
-                iconSize: "xs",
-                name: actor.name,
-                template: actor.template,
-              } as ITemplateTreeNode)
-          ),
+          children: actorTemplates.map((actor) => ({
+            icon: "label_important",
+            iconSize: "xs",
+            name: actor.name,
+            template: actor.template,
+            onDragStart(node) {
+              return { type: "treenode", node: { ...(node as ITemplateTreeNode).template() } } as ITreeNodeAction;
+            },
+          })),
         },
       ],
     });

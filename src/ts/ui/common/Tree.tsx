@@ -6,6 +6,7 @@ interface TreeProps {
   rootNodes: ITreeNode[];
   selectedNodes?: ITreeNode[];
   onSelectionChanged?: (nodes: ITreeNode[]) => void;
+  onDrop?: (node: ITreeNode) => void;
 }
 
 export function traverseTree(rootNodes: ITreeNode[], onNode: (node: ITreeNode, parent: ITreeNode | null) => boolean) {
@@ -35,7 +36,12 @@ export class Tree extends Component<TreeProps> {
       return (
         <div class="tree">
           {props.rootNodes.map((node) => (
-            <TreeNode selectedNodes={props.selectedNodes} onSelectionChanged={props.onSelectionChanged} node={node} />
+            <TreeNode
+              selectedNodes={props.selectedNodes}
+              onSelectionChanged={props.onSelectionChanged}
+              node={node}
+              onDrop={this.props.onDrop}
+            />
           ))}
         </div>
       );
