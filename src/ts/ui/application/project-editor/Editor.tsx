@@ -14,12 +14,11 @@ export class Editor extends Component<Props> {
   }
 
   init() {
-    return () => <EditorGrid onHome={this.props.onHome} />;
-  }
+    this.onMount = () => {
+      projectStore.getProject(this.props.projectId);
+    };
 
-  connectedCallback(): void {
-    projectStore.getProject(this.props.projectId);
-    super.connectedCallback();
+    return () => <EditorGrid onHome={this.props.onHome} />;
   }
 
   getStyle() {

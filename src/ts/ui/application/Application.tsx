@@ -1,6 +1,3 @@
-// // import { Component, createSignal, Show } from "solid-js";
-// // import { styled } from "solid-styled-components";
-// // import { Routes, Route, useNavigate } from "@solidjs/router";
 import { IBindable } from "src/ts/core/IBindable";
 import { UIEventManager } from "../../core/UIEventManager";
 import { Renderer } from "../../renderer/Renderer";
@@ -11,8 +8,7 @@ import { MainMenu } from "./MainMenu";
 import { ApplicationEventType } from "../../../common/EventTypes";
 import { ProjectEditorPage } from "./project-editor/ProjectEditorPage";
 import { ErrorType, StartError } from "./StartError";
-// // import { Auth } from "./Auth";
-// // import { InGame } from "./InGame";
+import { InGame } from "./InGame";
 
 import { Route } from "../common/Route";
 import { navigate } from "../common/RouterProvider";
@@ -98,6 +94,13 @@ export class Application extends Component<Props> {
               )
             }
           />
+          {ready() ? (
+            <Route
+              path="/game"
+              onRender={() => <InGame renderer={renderer!} eventManager={eventManager!} onQuit={onQuit} />}
+            />
+          ) : undefined}
+
           {ready() ? (
             <Route
               path="/editor"

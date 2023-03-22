@@ -11,6 +11,18 @@ export class Pane3D extends Component<Props> {
   init() {
     this.onResizeDelegate = this.onResize.bind(this);
 
+    this.onMount = () => {
+      window.addEventListener("resize", this.onResizeDelegate);
+      this.onResizeDelegate();
+
+      const canvas = this.shadow!.querySelector("canvas")!;
+      if (canvas) this.props.onCanvasReady(canvas);
+    };
+
+    this.onCleanup = () => {
+      window.removeEventListener("resize", this.onResizeDelegate);
+    };
+
     return () => (
       <div>
         <canvas></canvas>
@@ -22,20 +34,6 @@ export class Pane3D extends Component<Props> {
     const canvas = this.shadow!.querySelector("canvas")!;
     canvas.width = this.clientWidth;
     canvas.height = this.clientHeight;
-  }
-
-  connectedCallback(): void {
-    super.connectedCallback();
-    window.addEventListener("resize", this.onResizeDelegate);
-    this.onResizeDelegate();
-
-    const canvas = this.shadow!.querySelector("canvas")!;
-    if (canvas) this.props.onCanvasReady(canvas);
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    window.removeEventListener("resize", this.onResizeDelegate);
   }
 
   getStyle() {

@@ -18,11 +18,6 @@ interface Props {
 
 @register("x-project-selector")
 export class ProjectSelector extends Component<Props> {
-  async connectedCallback() {
-    super.connectedCallback();
-    projectsStore.getProjects();
-  }
-
   init() {
     const projectStoreProxy = this.observeStore(projectsStore);
 
@@ -48,6 +43,10 @@ export class ProjectSelector extends Component<Props> {
     const onNewProject = () => {
       setNewProject(createProject());
       setSelectedProject(null);
+    };
+
+    this.onMount = () => {
+      projectsStore.getProjects();
     };
 
     const [newProject, setNewProject] = this.useState<Partial<IProject> | null>(null);

@@ -24,6 +24,14 @@ export class Input extends Component<Props> {
       if (this.props.onClick) this.props.onClick(e);
     };
 
+    this.onMount = () => {
+      if (this.props.autoFocus) {
+        const elm = this.shadow!.querySelector("input")!;
+        elm.focus();
+        elm.setSelectionRange(0, this.props.value?.length || null);
+      }
+    };
+
     return () => (
       <div class={`input ${this.props.fullWidth ? "fullwidth" : ""}`}>
         <input
@@ -35,15 +43,6 @@ export class Input extends Component<Props> {
         />
       </div>
     );
-  }
-
-  connectedCallback() {
-    super.connectedCallback();
-    if (this.props.autoFocus) {
-      const elm = this.shadow!.querySelector("input")!;
-      elm.focus();
-      elm.setSelectionRange(0, this.props.value?.length || null);
-    }
   }
 
   getStyle() {

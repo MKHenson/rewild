@@ -55,6 +55,14 @@ export class SceneGraph extends Component<Props> {
       projectStoreProxy.dirty = true;
     };
 
+    this.onMount = () => {
+      document.addEventListener("keydown", this.keyUpDelegate);
+    };
+
+    this.onCleanup = () => {
+      document.removeEventListener("keydown", this.keyUpDelegate);
+    };
+
     let tree: Tree;
 
     return () => {
@@ -100,16 +108,6 @@ export class SceneGraph extends Component<Props> {
 
   getStyle() {
     return StyleSceneGraph;
-  }
-
-  connectedCallback() {
-    super.connectedCallback();
-    document.addEventListener("keydown", this.keyUpDelegate);
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    document.removeEventListener("keydown", this.keyUpDelegate);
   }
 }
 

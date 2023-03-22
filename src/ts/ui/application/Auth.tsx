@@ -25,16 +25,15 @@ function initAuth(elm: Element) {
 export class Auth extends Component<Props> {
   signInSection: HTMLDivElement | null = null;
 
-  connectedCallback(): void {
-    super.connectedCallback();
-    const elm = this.shadow!.querySelector("#sign-in");
-    if (elm) initAuth(elm);
-  }
-
   init() {
     const auth = this.observeStore(authStore);
     const [menuOpen, setMenuOpen] = this.useState(false);
     const [hasLoggedOutOnce, setHasLoggedOutOnce] = this.useState(false);
+
+    this.onMount = () => {
+      const elm = this.shadow!.querySelector("#sign-in");
+      if (elm) initAuth(elm);
+    };
 
     const onClick = () => {
       if (auth.loggedIn) {

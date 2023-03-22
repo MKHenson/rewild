@@ -21,6 +21,10 @@ export class ProjectEditorPage extends Component<Props> {
       this.props.onQuit();
     };
 
+    this.onMount = () => {
+      this.props.eventManager.triggerUIEvent(ApplicationEventType.StartEditor);
+    };
+
     return () => (
       <RouterSwitch>
         <Route
@@ -36,11 +40,6 @@ export class ProjectEditorPage extends Component<Props> {
         />
       </RouterSwitch>
     );
-  }
-
-  connectedCallback() {
-    super.connectedCallback();
-    this.props.eventManager.triggerUIEvent(ApplicationEventType.StartEditor);
   }
 
   getStyle() {
