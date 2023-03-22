@@ -23,6 +23,8 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
   shadow: ShadowRoot | null;
   render: RenderFn;
   private trackedStores: UnsubscribeStoreFn[];
+  onMount?: () => void;
+  onCleanup?: () => void;
 
   // specify the property on the element instance type
   _props: T & JSX.PropsWithChildren;
@@ -133,9 +135,11 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
   connectedCallback() {
     this.generateCss();
     this.render();
+    this.onMount?.();
   }
 
   disconnectedCallback() {
+    this.onCleanup?.();
     for (const soreUnsubscribeFn of this.trackedStores) soreUnsubscribeFn();
   }
 }

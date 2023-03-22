@@ -3,7 +3,7 @@ import { Store } from "../Store";
 import { getLevel as getLevelApi, patchLevel, patchProject, getProject as getProjectApi } from "../../../api";
 import { Timestamp } from "firebase/firestore";
 import { sceneGraphStore } from "./SceneGraphStore";
-import { JSONReviver } from "../utils/JSONReviver";
+import { createExporterObj } from "../utils/exportHelper";
 
 export interface IProjectStore {
   loading: boolean;
@@ -64,11 +64,8 @@ export class ProjectStore extends Store<IProjectStore> {
 
     this.defaultProxy.loading = true;
 
-    // Deep copy - removes functions etc...
-    const serialized = JSON.stringify(token);
-
     try {
-      await patchProject(id!, JSON.parse(serialized, JSONReviver));
+      await patchProject(id!, createExporterObj(token));
     } catch (err: any) {
       this.defaultProxy.error = err.toString();
     }
