@@ -16,13 +16,13 @@ export type Callback<T> = (prop: DotNestedKeys<T>, prevValue: any, value: any) =
 export class Signaller<T extends object> {
   readonly target: T;
   private listeners: Callback<T>[];
-  private proxies: Map<string, typeof Proxy>;
+  private _proxies: Map<string, typeof Proxy>;
   public __debuggerGetDelegate?: (target: any, key: string | symbol) => void;
 
   constructor(target: T) {
     this.target = target;
     this.listeners = [];
-    this.proxies = new Map();
+    this._proxies = new Map();
   }
 
   /** Creates a proxy of the store's target*/
@@ -41,17 +41,54 @@ export class Signaller<T extends object> {
     ];
   }
 
-  getListeners() {
+  _getListeners() {
     return this.listeners;
+  }
+
+  _getProxies() {
+    return this._proxies;
+  }
+
+  private stripProxyChildren(obj: any, key: string | symbol) {
+    const targetValue = obj[key];
+
+    if (targetValue !== null && targetValue.__isProxy) {
+      obj[key] = targetValue.__source;
+    }
+
+    const keys = Object.keys(targetValue);
+    for (const childKey of keys) {
+      if (typeof targetValue[childKey] === "object" && targetValue[childKey] !== null)
+        this.stripProxyChildren(targetValue, childKey);
+    }
+  }
+
+  private stripProxies(obj: any) {
+    let toReturn = obj;
+    if (obj.__isProxy) {
+      toReturn = obj.__source;
+    }
+
+    const keys = Object.keys(toReturn);
+
+    for (const key of keys) {
+      if (typeof toReturn[key] === "object" && toReturn[key] !== null) {
+        this.stripProxyChildren(toReturn, key);
+      }
+    }
+
+    return toReturn;
   }
 
   private setHandlers(parentKey?: string): ProxyHandler<T> {
     const listeners = this.listeners;
-    const proxies = this.proxies;
+    const proxies = this._proxies;
 
     return {
       get: (target: any, key) => {
         if (key === "__isProxy") return true;
+        if (key === "__source") return target;
+
         if (typeof target[key] === "object" && target[key] !== null) {
           const path = parentKey ? `${parentKey}.${key.toString()}` : key.toString();
           this.__debuggerGetDelegate?.(target, key);
@@ -75,7 +112,7 @@ export class Signaller<T extends object> {
         // Do nothing if its the same value
         if (target[p] === newValue) return true;
         const prevValue = Reflect.get(target, p, receiver);
-        const proxies = this.proxies;
+        const proxies = this._proxies;
 
         if (proxies.has(path)) proxies.delete(path);
 
@@ -87,10 +124,12 @@ export class Signaller<T extends object> {
           }
         }
 
-        const validReturn = Reflect.set(target, p, newValue, receiver);
+        const originalRef = this.stripProxies(newValue);
+
+        const validReturn = Reflect.set(target, p, originalRef, receiver);
 
         listeners.forEach((l) => {
-          l((parentKey ? `${parentKey}.${p.toString()}` : p.toString()) as DotNestedKeys<T>, prevValue, newValue);
+          l((parentKey ? `${parentKey}.${p.toString()}` : p.toString()) as DotNestedKeys<T>, prevValue, originalRef);
         });
         return validReturn;
       },
