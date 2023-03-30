@@ -9,19 +9,22 @@ interface Props {
   raised?: boolean;
   button?: boolean;
   stretched?: boolean;
+  disabled?: boolean;
   onClick?: (e: MouseEvent) => void;
 }
 
 @register("x-card")
 export class Card extends Component<Props> {
   init() {
+    const elm = <slot></slot>;
     return () => {
       this.toggleAttribute("button", this.props.button);
+      this.toggleAttribute("disabled", this.props.disabled || false);
       this.classList.toggle("pushed", this.props.pushed || false);
       this.classList.toggle("raised", this.props.raised || false);
       this.toggleAttribute("stretched", this.props.stretched || false);
-      if (this.props.onClick) this.onclick = this.props.onClick;
-      return <slot></slot>;
+      if (!this.props.disabled && this.props.onClick) this.onclick = this.props.onClick;
+      return elm;
     };
   }
 
@@ -48,6 +51,12 @@ const StyledCard = cssStylesheet(css`
   :host([button]) {
     cursor: pointer;
   }
+
+  :host([disabled]) {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
   :host(.raised) {
     box-shadow: ${theme?.colors.shadowShort1};
   }
