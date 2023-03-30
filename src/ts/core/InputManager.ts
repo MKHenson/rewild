@@ -1,8 +1,9 @@
 import { wasm } from "./WasmManager";
 import { MouseEventType, KeyEventType } from "../../common/EventTypes";
+import { Pane3D } from "../ui/common/Pane3D";
 
 export class InputManager {
-  canvas: HTMLCanvasElement;
+  pane3D: Pane3D;
 
   private onDownHandler: (e: MouseEvent) => void;
   private onUpHandler: (e: MouseEvent) => void;
@@ -14,9 +15,9 @@ export class InputManager {
   private onPointerlockErrorHandler: () => void;
   private canvasBounds: DOMRect;
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
-    this.canvasBounds = canvas.getBoundingClientRect();
+  constructor(pane3D: Pane3D) {
+    this.pane3D = pane3D;
+    this.canvasBounds = pane3D.canvas()!.getBoundingClientRect();
 
     this.onDownHandler = this.onDown.bind(this);
     this.onUpHandler = this.onUp.bind(this);
@@ -27,7 +28,7 @@ export class InputManager {
     this.onPointerlockChangeHandler = this.onPointerlockChange.bind(this);
     this.onPointerlockErrorHandler = this.onPointerlockError.bind(this);
 
-    this.canvas.addEventListener("mousedown", this.onDownHandler);
+    this.pane3D.addEventListener("mousedown", this.onDownHandler);
     window.addEventListener("wheel", this.onWheelHandler);
     window.addEventListener("mouseup", this.onUpHandler);
     window.addEventListener("mousemove", this.onMoveHandler);
@@ -40,7 +41,7 @@ export class InputManager {
   }
 
   private onPointerlockChange() {
-    if (document.pointerLockElement === this.canvas) {
+    if (this.pane3D.shadow!.pointerLockElement === this.pane3D.canvas()) {
     } else {
       // Signal escape was pushed
       this.sendKeyEvent(KeyEventType.KeyUp, { code: "Escape" });
@@ -52,7 +53,7 @@ export class InputManager {
   }
 
   reset() {
-    this.canvasBounds = this.canvas.getBoundingClientRect();
+    this.canvasBounds = this.pane3D.canvas()!.getBoundingClientRect();
   }
 
   private onUp(e: MouseEvent) {
@@ -118,7 +119,7 @@ export class InputManager {
   }
 
   dispose() {
-    this.canvas.removeEventListener("mousedown", this.onDownHandler);
+    this.pane3D.removeEventListener("mousedown", this.onDownHandler);
     window.removeEventListener("mouseup", this.onUpHandler);
     window.removeEventListener("wheel", this.onWheelHandler);
     window.removeEventListener("mousemove", this.onMoveHandler);

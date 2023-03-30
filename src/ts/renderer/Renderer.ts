@@ -15,12 +15,13 @@ import { TransformResource } from "../core/pipelines/resources/TransformResource
 import { PipelineResourceInstance } from "../core/pipelines/resources/PipelineResourceInstance";
 import { Geometry } from "./geometry/Geometry";
 import { Player } from "../gameplay/Player";
+import { Pane3D } from "../ui/common/Pane3D";
 
 const sampleCount = 4;
 export type UpdateCallback = () => void;
 
 export class Renderer implements IBindable {
-  canvas: HTMLCanvasElement;
+  pane3D: Pane3D;
   device: GPUDevice;
   context: GPUCanvasContext;
   format: GPUTextureFormat;
@@ -45,8 +46,8 @@ export class Renderer implements IBindable {
 
   canvasSizeCache: [number, number];
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
+  constructor(canvas: Pane3D) {
+    this.pane3D = canvas;
     this.buffers = [];
     this.disposed = false;
     this.currentPass = null;
@@ -56,7 +57,7 @@ export class Renderer implements IBindable {
   }
 
   lock() {
-    this.canvas.requestPointerLock();
+    this.pane3D.canvas()!.requestPointerLock();
   }
 
   unlock() {
@@ -77,11 +78,12 @@ export class Renderer implements IBindable {
     const hasGPU = this.hasWebGPU();
     if (!hasGPU) throw new Error("Your current browser does not support WebGPU!");
 
-    this.inputManager = new InputManager(this.canvas);
+    const canvas = this.pane3D.canvas()!;
+    this.inputManager = new InputManager(this.pane3D);
 
     const adapter = await navigator.gpu?.requestAdapter();
     const device = (await adapter?.requestDevice()) as GPUDevice;
-    const context = this.canvas.getContext("webgpu") as unknown as GPUCanvasContext;
+    const context = canvas.getContext("webgpu") as unknown as GPUCanvasContext;
     const format = navigator.gpu.getPreferredCanvasFormat();
 
     context.configure({
@@ -100,7 +102,7 @@ export class Renderer implements IBindable {
     this.onResize(size, false);
 
     // Initialize the wasm module
-    wasm.init(this.canvas.width, this.canvas.height);
+    wasm.init(canvas.width, canvas.height);
 
     pipelineManager.init(this);
     this.player = new Player();
@@ -154,8 +156,9 @@ export class Renderer implements IBindable {
     });
 
     this.renderTargetView = this.renderTarget.createView();
+    const canvas = this.pane3D.canvas()!;
 
-    if (updateWasm) wasm.resize(this.canvas.width, this.canvas.height);
+    if (updateWasm) wasm.resize(canvas.width, canvas.height);
   }
 
   onFrame() {
@@ -177,11 +180,9 @@ export class Renderer implements IBindable {
   }
 
   canvasSize() {
+    const canvas = this.pane3D.canvas()!;
     const devicePixelRatio = 1; // TODO: Why does this not work? ---> window.devicePixelRatio || 1;
-    const size: [number, number] = [
-      this.canvas.clientWidth * devicePixelRatio,
-      this.canvas.clientHeight * devicePixelRatio,
-    ];
+    const size: [number, number] = [canvas.clientWidth * devicePixelRatio, canvas.clientHeight * devicePixelRatio];
     return size;
   }
 
