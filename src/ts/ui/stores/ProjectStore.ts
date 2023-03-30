@@ -81,20 +81,26 @@ export class ProjectStore extends Store<IProjectStore> {
     this.defaultProxy.loading = true;
 
     const project = this.defaultProxy.project!;
+    const containers = sceneGraphStore.defaultProxy.nodes.find((n) => n.name === "Containers")!.children;
 
-    await patchLevel(project.level!, {
-      lastModified: Timestamp.now(),
-      containers: project.sceneGraph.containers.map(
-        (c) =>
-          ({
-            ...c.resource?.target,
-            activeOnStartup: extractProp(c, "Active On Startup") as boolean,
-            baseContainer: extractProp(c, "Base Container") as string,
-          } as IContainer)
-      ),
-      activeOnStartup: project.activeOnStartup,
-      startEvent: project.startEvent,
-    });
+    try {
+      await patchLevel(project.level!, {
+        lastModified: Timestamp.now(),
+        containers:
+          containers?.map(
+            (c) =>
+              ({
+                ...c.resource?.target,
+                activeOnStartup: extractProp(c, "Active On Startup") as boolean,
+                baseContainer: extractProp(c, "Base Container") as string,
+              } as IContainer)
+          ) || [],
+        activeOnStartup: project.activeOnStartup,
+        startEvent: project.startEvent,
+      });
+    } catch (err: any) {
+      this.defaultProxy.error = err.toString();
+    }
 
     await this.getLevel(project.id!);
 
