@@ -50,7 +50,16 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
         // Convert to array
         if (!Array.isArray(children)) children = [children];
 
-        for (let i = 0, l = children.length; i < l; i++) {
+        const curLengthChildren = children.length;
+
+        // Remove children after the length index
+        if (lenOfExistingChildren > curLengthChildren && curLengthChildren > 0) {
+          for (let i = lenOfExistingChildren - 1; i > curLengthChildren; i--) {
+            existingChildren[i].remove();
+          }
+        }
+
+        for (let i = 0, l = curLengthChildren; i < l; i++) {
           // If the new node is exactly the same - skip it as we dont want to re-render
           if (i < lenOfExistingChildren && children[i] === existingChildren[i]) {
             continue;
