@@ -184,4 +184,11 @@ const StyledEditorGrid = cssStylesheet(css`
     grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
     grid-template-rows: 50px 1fr 1fr 1fr 1fr;
   }
+
+  x-info-box {
+    position: absolute;
+    width: 400px;
+    left: calc(50% - 150px);
+    top: calc(50% - 100px);
+  }
 `);

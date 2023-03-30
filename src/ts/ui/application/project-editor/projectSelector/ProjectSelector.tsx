@@ -56,6 +56,7 @@ export class ProjectSelector extends Component<Props> {
       const isProjectSelected = !!selectedProject();
       const isNewProject = !!newProject();
       const props = this.props;
+      const loading = projectStoreProxy.loading;
 
       return (
         <Popup open={props.open}>
@@ -76,7 +77,7 @@ export class ProjectSelector extends Component<Props> {
                 ]
               ) : (
                 <div class="projects-list">
-                  <Card button raised onClick={onNewProject}>
+                  <Card button raised disabled={loading} onClick={onNewProject}>
                     <Typography variant="h4">
                       <div>
                         <StyledMaterialIcon icon="add_circle" />
@@ -84,14 +85,14 @@ export class ProjectSelector extends Component<Props> {
                       Add New Project
                     </Typography>
                   </Card>
-                  {projectStoreProxy.loading || projectStoreProxy.error ? (
+                  {loading || projectStoreProxy.error ? (
                     projectStoreProxy.error ? (
                       projectStoreProxy.error
                     ) : (
                       <Loading />
                     )
                   ) : undefined}
-                  {!projectStoreProxy.loading
+                  {!loading
                     ? projectStoreProxy.projects.map((item) => (
                         <Card
                           button
@@ -128,7 +129,7 @@ export class ProjectSelector extends Component<Props> {
               )}
 
               {isNewProject && (
-                <Button onClick={onCreate} fullWidth disabled={projectStoreProxy.loading || !isProjectValid()}>
+                <Button onClick={onCreate} fullWidth disabled={loading || !isProjectValid()}>
                   Create Project
                 </Button>
               )}
