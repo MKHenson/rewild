@@ -29,13 +29,7 @@ export class MainMenu extends Component<Props> {
           withBackground={false}
           open={props.open}
           title={
-            <Typography
-              variant="h2"
-              style={css`
-                text-align: center;
-                margin: 0;
-              `}
-            >
+            <Typography variant="h2" style={`text-align: center; margin: 0;`}>
               Rewild
             </Typography>
           }
@@ -47,11 +41,7 @@ export class MainMenu extends Component<Props> {
             </Typography>
           </div>
           {authState.loading ? (
-            <div
-              style={css`
-                text-align: center;
-              `}
-            >
+            <div style={`text-align: center;`}>
               <Loading />
             </div>
           ) : (
