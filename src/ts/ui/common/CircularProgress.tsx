@@ -85,6 +85,9 @@ export class CircularProgress extends Component<Props> {
       outerDivSection.style.height = `${size}px`;
       outerDivSection.style.width = `${size}px`;
 
+      this.style.height = `${size}px`;
+      this.style.width = `${size}px`;
+
       circleBar.style.strokeWidth = strokeSize + "px";
       circleBar.style.stroke = `url(#${gradientId})`;
       circleBar.style.strokeDashoffset = `${pct}px`;
@@ -110,6 +113,16 @@ export class CircularProgress extends Component<Props> {
 // styled.div<{ gradientId: string; strokeSize: number; size: number; val: number }>
 
 const StyledCircle = cssStylesheet(css`
+  :host {
+    display: inline-block;
+  }
+
+  svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
   .label-section {
     position: absolute;
     display: block;
