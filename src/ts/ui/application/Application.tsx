@@ -46,7 +46,7 @@ export class Application extends Component<Props> {
       eventManager.triggerUIEvent(ApplicationEventType.Quit);
     };
 
-    const onCanvasReady = async (canvas: HTMLCanvasElement) => {
+    const onCanvasReady = async (canvas: Pane3D) => {
       if (renderer) return;
 
       renderer = new Renderer(canvas);
@@ -78,7 +78,7 @@ export class Application extends Component<Props> {
       }
     };
 
-    const canvas = <Pane3D onCanvasReady={onCanvasReady} />;
+    const canvas = (<Pane3D onCanvasReady={onCanvasReady} />) as Pane3D;
 
     return () => {
       return [

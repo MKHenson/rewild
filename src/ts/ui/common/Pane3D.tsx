@@ -1,7 +1,7 @@
 import { Component, register } from "../Component";
 
 interface Props {
-  onCanvasReady: (canvas: HTMLCanvasElement) => void;
+  onCanvasReady: (canvas: Pane3D) => void;
 }
 
 @register("x-pane-3d")
@@ -15,8 +15,8 @@ export class Pane3D extends Component<Props> {
       window.addEventListener("resize", this.onResizeDelegate);
       this.onResizeDelegate();
 
-      const canvas = this.shadow!.querySelector("canvas")!;
-      if (canvas) this.props.onCanvasReady(canvas);
+      const canvas = this.canvas();
+      if (canvas) this.props.onCanvasReady(this);
     };
 
     this.onCleanup = () => {
@@ -34,6 +34,11 @@ export class Pane3D extends Component<Props> {
     const canvas = this.shadow!.querySelector("canvas")!;
     canvas.width = this.clientWidth;
     canvas.height = this.clientHeight;
+  }
+
+  canvas() {
+    const canvas = this.shadow!.querySelector("canvas");
+    return canvas;
   }
 
   getStyle() {
