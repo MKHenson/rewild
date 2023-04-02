@@ -23,7 +23,11 @@ function jsx(
   if (typeof tag === "function") {
     return (tag as JSX.FC<any>)({ ...attributes, children: children });
   }
-  const element = document.createElement(tag as JSX.Tag);
+
+  const isSVGElm = svgTags.includes(tag.toString());
+  const element = isSVGElm
+    ? document.createElementNS("http://www.w3.org/2000/svg", tag.toString())
+    : document.createElement(tag as JSX.Tag);
 
   // Assign attributes:
   let map = attributes ?? {};
@@ -33,7 +37,7 @@ function jsx(
     prop = prop.toString();
     const value = map[prop] as any;
     const anyReference = element as any;
-    if (typeof anyReference[prop] === "undefined") {
+    if (typeof anyReference[prop] === "undefined" || isSVGElm) {
       // As a fallback, attempt to set an attribute:
       element.setAttribute(prop, value);
     } else {
@@ -46,13 +50,15 @@ function jsx(
   return element;
 }
 
-function appendChildren(element: HTMLElement, children: JSX.ChildElement[]) {
+function appendChildren(element: HTMLElement | SVGElement, children: JSX.ChildElement[]) {
   // append children
   for (let child of children) {
     if (child === undefined || child === null || child === "") continue;
 
     if (typeof child === "string" || typeof child === "number" || typeof child === "boolean") {
       if (typeof child === "boolean" && !child) continue;
+
+      if (element instanceof SVGElement) continue;
 
       element.innerText += child;
       continue;
@@ -84,3 +90,86 @@ function appendChildren(element: HTMLElement, children: JSX.ChildElement[]) {
   if (addToDom) document.adoptedStyleSheets.push(stylesheet);
   return stylesheet;
 };
+
+const svgTags = [
+  "a",
+  "altGlyph",
+  "altGlyphDef",
+  "altGlyphItem",
+  "animate",
+  "animateMotion",
+  "animateTransform",
+  "circle",
+  "clipPath",
+  "cursor",
+  "defs",
+  "desc",
+  "discard",
+  "ellipse",
+  "feBlend",
+  "feColorMatrix",
+  "feComponentTransfer",
+  "feComposite",
+  "feConvolveMatrix",
+  "feDiffuseLighting",
+  "feDisplacementMap",
+  "feDistantLight",
+  "feDropShadow",
+  "feFlood",
+  "feFuncA",
+  "feFuncB",
+  "feFuncG",
+  "feFuncR",
+  "feGaussianBlur",
+  "feImage",
+  "feMerge",
+  "feMergeNode",
+  "feMorphology",
+  "feOffset",
+  "fePointLight",
+  "feSpecularLighting",
+  "feSpotLight",
+  "feTile",
+  "feTurbulence",
+  "filter",
+  "font-face-format",
+  "font-face-name",
+  "font-face-src",
+  "font-face-uri",
+  "font-face",
+  "font",
+  "foreignObject",
+  "g",
+  "glyph",
+  "glyphRef",
+  "hkern",
+  "image",
+  "line",
+  "linearGradient",
+  "marker",
+  "mask",
+  "metadata",
+  "missing-glyph",
+  "mpath",
+  "path",
+  "pattern",
+  "polygon",
+  "polyline",
+  "radialGradient",
+  "rect",
+  "script",
+  "set",
+  "stop",
+  "style",
+  "svg",
+  "switch",
+  "symbol",
+  "text",
+  "textPath",
+  "title",
+  "tref",
+  "tspan",
+  "use",
+  "view",
+  "vkern",
+];
