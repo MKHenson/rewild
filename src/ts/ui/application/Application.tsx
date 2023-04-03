@@ -9,7 +9,6 @@ import { ApplicationEventType } from "../../../common/EventTypes";
 import { ProjectEditorPage } from "./project-editor/ProjectEditorPage";
 import { ErrorType, StartError } from "./StartError";
 import { InGame } from "./InGame";
-
 import { Route } from "../common/Route";
 import { navigate } from "../common/RouterProvider";
 import { RouterSwitch } from "../common/RouterSwitch";
@@ -115,49 +114,6 @@ export class Application extends Component<Props> {
     };
   }
 
-  //   //   const [errorType, setErrorType] = createSignal<ErrorType>("OTHER");
-  //   //   const navigate = useNavigate();
-
-  //   //   let gameLoader: GameLoader;
-  //   //   let eventManager: UIEventManager;
-  //   //   const wasmManager: WasmManager = new WasmManager();
-
-  //   //   const onCanvasReady = async (canvas: HTMLCanvasElement) => {
-  //   //     renderer = new Renderer(canvas);
-  //   //     gameLoader = new GameLoader(renderer);
-  //   //     eventManager = new UIEventManager();
-
-  //   //     const bindables: IBindable[] = [renderer, eventManager];
-
-  //   //     try {
-  //   //       await wasmManager.load(bindables);
-
-  //   //       if (!renderer.hasWebGPU()) {
-  //   //         setErrorMessage("Your browser does not support WebGPU");
-  //   //         setErrorType("WGPU");
-  //   //         return;
-  //   //       }
-
-  //   //       await renderer.init();
-  //   //       await gameLoader.loadInitialContainers();
-
-  //   //       // Call the first frame so the containers can initialize
-  //   //       renderer.onFrame();
-
-  //   //       setReady(true);
-  //   //     } catch (err: unknown) {
-  //   //       setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");
-  //   //       setErrorType("OTHER");
-  //   //       console.log(err);
-  //   //     }
-  //   //   };
-
-  //   //   const onQuit = () => {
-  //   //     navigate("/");
-  //   //     gameLoader.unloadInitialLevels();
-  //   //     eventManager.triggerUIEvent(ApplicationEventType.Quit);
-  //   //   };
-
   getStyle() {
     return css`
       :host {
@@ -169,12 +125,3 @@ export class Application extends Component<Props> {
     `;
   }
 }
-
-/*{ <Route
-path="/game"
-element={<InGame renderer={renderer!} eventManager={eventManager!} onQuit={onQuit} />}
-/>
-<Route
-path="/editor/*"
-element={<ProjectEditorPage onQuit={onQuit} renderer={renderer!} eventManager={eventManager!} />}
-/> } */

@@ -100,6 +100,10 @@ export class Runtime implements Listener {
     this.renderer.render(this.scene, this.camera);
   }
 
+  /**
+   * Fires the signal from a source portal to a destination. Which in turn may start a new node
+   * @param sourcePortal
+   */
   sendSignal(sourcePortal: Portal): void {
     const activeNodes = this.activeNodes;
     const links = sourcePortal.links;
