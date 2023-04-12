@@ -1,0 +1,22 @@
+{
+  "name": "@rewild/common",
+  "version": "1.0.0",
+  "description": "A common set of files & standards",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "clean": "rimraf build",
+    "build-all": "npm run clean && tsc",
+    "build": "npm run build-all"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Webinate/rewild.git"
+  },
+  "author": "Mathew Henson",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Webinate/rewild/issues"
+  },
+  "homepage": "https://github.com/Webinate/rewild#readme"
+}

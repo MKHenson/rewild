@@ -3,7 +3,7 @@
     "target": "ESNext",
     "moduleResolution": "node",
     "paths": {
-      "models": ["../ts/types/models.d.ts"]
+      "models": ["../types/models.d.ts"]
     }
   }
 }

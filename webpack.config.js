@@ -4,7 +4,7 @@ const CopyPlugin = require("copy-webpack-plugin");
 const ForkTsCheckerWebpackPlugin = require("fork-ts-checker-webpack-plugin");
 
 module.exports = (options) => ({
-  entry: ["./src/ts/index.tsx"],
+  entry: ["./src/index.tsx"],
   mode: "development",
   devtool: "source-map",
   output: {
@@ -21,14 +21,14 @@ module.exports = (options) => ({
       "process.env.MEDIA_URL": JSON.stringify("https://storage.googleapis.com/rewild-6809/"),
     }),
     new ForkTsCheckerWebpackPlugin({
-      typescript: { configFile: "src/ts/tsconfig.json" },
+      typescript: { configFile: "src/tsconfig.json" },
     }),
     new CopyPlugin({
       patterns: [
         { from: "style.css", to: "style.css" },
         { from: "index.html", to: "index.html" },
         // { from: "src/media", to: "media" },
-        { from: "build/release.wasm.map", to: "" },
+        { from: "packages/@rewild-assembly/build/release.wasm.map", to: "" },
       ],
     }),
   ],
