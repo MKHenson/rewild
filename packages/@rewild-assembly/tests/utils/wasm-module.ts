@@ -1,5 +1,5 @@
 import * as fs from "fs";
-import { __AdaptedExports, instantiate } from "@rewild/assembly/build/test";
+import { __AdaptedExports, instantiate } from "../../build/test";
 
 const memory = new WebAssembly.Memory({ initial: 100 });
 const importObject = {
