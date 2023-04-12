@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "baseUrl": "../",
+    "module": "commonjs",
+    "target": "es2020",
+    "allowJs": true,
+    "esModuleInterop": true,
+    "jsx": "react",
+    "jsxFactory": "jsx",
+    "experimentalDecorators": true,
+    "strictPropertyInitialization": false,
+    "isolatedModules": false,
+    "strict": false,
+    "noImplicitAny": false,
+    "types": ["node", "jest"]
+  },
+  "ts-node": {
+    "files": true
+  },
+  "exclude": ["./node_modules"]
+}

@@ -8,7 +8,7 @@
     "strict": true,
     "target": "es2017",
     "paths": {
-      "models": ["../src/ts/types/models.d.ts"]
+      "models": ["../src/types/models.d.ts"]
     }
   },
   "compileOnSave": true,

@@ -4,17 +4,13 @@
   "description": "Game about exploring earth's history",
   "main": "index.js",
   "scripts": {
-    "build-test": "asc src/as/tests.ts --target test",
-    "mocha": "node --experimental-wasi-unstable-preview1 --experimental-wasm-simd node_modules/mocha/bin/_mocha './tests/init.spec.ts' 'tests/**/*.spec.ts' --reporter spec",
-    "test": "npm run build-test && npm run mocha",
+    "test": "npm run test --workspaces",
     "benchmark": "cross-env TS_NODE_PROJECT=\"./tests/tsconfig.json\" node --experimental-wasi-unstable-preview1 --experimental-wasm-simd --require ts-node/register ./tests/benchmarks.ts",
-    "clean": "rimraf public/untouched.wasm && rimraf public/untouched.wasm.map && rimraf public/untouched.wat",
-    "asbuild": "asc src/as/index.ts --target release",
+    "clean": "rimraf public",
     "build:webpack": "webpack --mode development",
-    "build": "npm run clean && npm run asbuild && npm run build:webpack",
+    "build": "npm run clean && npm run build --workspaces && npm run build:webpack",
     "watch-webpack": "webpack --mode development --watch --env env=local",
-    "watch-as": "nodemon -e js,ts,tsx --watch src/as -x \"npm run asbuild\"",
-    "start": "npm run build && npm-run-all --parallel server watch-webpack watch-as",
+    "start": "npm run build && npm-run-all --parallel server watch-webpack",
     "server": "live-server --port=9001 --entry-file=/index.html --watch=public,build --open=/ ./public"
   },
   "repository": {
@@ -25,7 +21,7 @@
   "license": "ISC",
   "homepage": "https://bitbucket.org/MathewKHenson/rewild-web#readme",
   "dependencies": {
-    "@types/node": "^16.11.6",
+    "@types/node": "18.15.11",
     "date-fns": "2.29.3",
     "firebase": "^9.10.0",
     "firebaseui": "^6.0.1",
@@ -33,15 +29,18 @@
     "source-map-support": "^0.5.19"
   },
   "devDependencies": {
-    "@types/expect.js": "0.3.29",
-    "@types/mocha": "8.2.2",
+    "@babel/core": "^7.21.4",
+    "@babel/preset-env": "^7.21.4",
+    "@babel/preset-typescript": "^7.21.4",
+    "@types/jest": "^29.5.0",
     "@webgpu/types": "0.1.21",
-    "assemblyscript": "0.20.6",
+    "babel-jest": "^29.5.0",
     "copy-webpack-plugin": "^9.0.1",
     "cross-env": "7.0.3",
-    "expect.js": "^0.3.1",
     "file-loader": "^6.2.0",
     "graphql-tag": "2.12.6",
+    "jest": "^29.5.0",
+    "jest-environment-jsdom": "^29.5.0",
     "live-server": "1.2.2",
     "mocha": "10.0.0",
     "nodemon": "2.0.19",
@@ -54,5 +53,10 @@
     "typescript": "4.9.4",
     "webpack": "5.70.0",
     "webpack-cli": "4.7.0"
-  }
+  },
+  "workspaces": [
+    "packages\\@rewild-ui",
+    "packages\\@rewild-assembly",
+    "packages\\@rewild-common"
+  ]
 }
