@@ -9,7 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: cd ./packages/@rewild-assembly && npm ci && cd ../../
+      - run: cd ./packages/@rewild-assembly && npm ci && npm run build && cd ../../
+      - run: cd ./packages/@rewild-assembly/build && ls && cd ../../
       - run: npm ci && npm run build
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
