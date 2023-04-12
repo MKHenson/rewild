@@ -10,6 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: npm ci
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - run: cd ./packages/@rewild-common && npm ci && npm run build && cd ../../
       - run: cd ./packages/@rewild-ui && npm ci && npm run build && cd ../../
       - run: cd ./packages/@rewild-assembly && npm ci && npm run build && cd ../../
