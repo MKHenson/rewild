@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "A common set of files & standards",
   "main": "index.js",
-  "devDependencies": {},
+  "devDependencies": {
+    "rimraf": "5.0.0"
+  },
   "scripts": {
     "clean": "rimraf build",
     "build-all": "npm run clean && tsc",
