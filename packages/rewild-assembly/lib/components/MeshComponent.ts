@@ -1,6 +1,6 @@
 import { EngineVector3 } from "../math/Vector3";
 import { EngineVector2 } from "../math/Vector2";
-import { Sphere, Ray, Triangle, Side, AttributeType, Vector3 } from "rewild-Common";
+import { Sphere, Ray, Triangle, Side, AttributeType, Vector3 } from "rewild-common";
 import { EngineMatrix4 } from "../math/Matrix4";
 import { TransformNode } from "../core/TransformNode";
 import { BufferGeometry } from "../core/BufferGeometry";
