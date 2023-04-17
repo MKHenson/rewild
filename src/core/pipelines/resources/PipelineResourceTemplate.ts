@@ -1,6 +1,6 @@
 import { Renderer } from "../../../renderer/Renderer";
 import { Pipeline } from "../Pipeline";
-import { GroupType, ResourceType } from "@rewild/common";
+import { GroupType, ResourceType } from "rewild-common";
 import { Defines } from "../shader-lib/Utils";
 
 export type Template = {

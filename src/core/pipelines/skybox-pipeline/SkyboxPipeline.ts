@@ -6,7 +6,7 @@ import { VertexAttribute } from "../VertexAttribute";
 import { VertexBufferLayout } from "../VertexBufferLayout";
 import { fragmentShader } from "./SkyboxPipelineFS";
 import { vertexShader } from "./SkyboxPipelineVS";
-import { AttributeType } from "@rewild/common";
+import { AttributeType } from "rewild-common";
 
 export interface SkyboxDefines {
   diffuseMap?: Texture;

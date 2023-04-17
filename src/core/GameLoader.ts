@@ -1,7 +1,7 @@
 import { wasm } from "./WasmManager";
 import { pipelineManager } from "../renderer/PipelineManager";
 import { Mesh } from "../renderer/Mesh";
-import { ContainerTypes } from "@rewild/common";
+import { ContainerTypes } from "rewild-common";
 import { meshManager } from "../renderer/MeshManager";
 import { BoxGeometry } from "../renderer/geometry/BoxGeometry";
 import { SphereGeometry } from "../renderer/geometry/SphereGeometry";

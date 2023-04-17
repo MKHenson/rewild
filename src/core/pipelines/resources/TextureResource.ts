@@ -3,7 +3,7 @@ import { Texture } from "../../textures/Texture";
 import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { Pipeline } from "../Pipeline";
 import { Defines } from "../shader-lib/Utils";
-import { GroupType, ResourceType } from "@rewild/common";
+import { GroupType, ResourceType } from "rewild-common";
 import { BitmapCubeTexture } from "../../textures/BitmapCubeTexture";
 
 export class TextureResource extends PipelineResourceTemplate {

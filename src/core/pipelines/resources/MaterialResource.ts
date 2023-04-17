@@ -2,7 +2,7 @@ import { Renderer } from "../../../renderer/Renderer";
 import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { Defines } from "../shader-lib/Utils";
 import { Pipeline } from "../Pipeline";
-import { GroupType, ResourceType } from "@rewild/common";
+import { GroupType, ResourceType } from "rewild-common";
 
 export class MaterialResource extends PipelineResourceTemplate {
   binding: number;

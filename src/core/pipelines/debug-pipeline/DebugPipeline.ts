@@ -8,7 +8,7 @@ import { vertexShader } from "./DebugPipelineVS";
 import { fragmentShader } from "./DebugPipelineFS";
 import { VertexBufferLayout } from "../VertexBufferLayout";
 import { VertexAttribute } from "../VertexAttribute";
-import { AttributeType } from "@rewild/common";
+import { AttributeType } from "rewild-common";
 
 export interface DebugDefines {
   uvScaleX?: string;

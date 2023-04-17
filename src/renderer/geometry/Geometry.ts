@@ -1,5 +1,5 @@
 import { wasm } from "../../core/WasmManager";
-import { AttributeType } from "@rewild/common";
+import { AttributeType } from "rewild-common";
 import { createBufferFromF32, createIndexBufferU32 } from "../../core/Utils";
 import { Renderer } from "../Renderer";
 

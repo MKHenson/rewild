@@ -28,7 +28,7 @@ module.exports = (options) => ({
         { from: "style.css", to: "style.css" },
         { from: "index.html", to: "index.html" },
         // { from: "src/media", to: "media" },
-        { from: "packages/@rewild-assembly/build/release.wasm.map", to: "" },
+        { from: "packages/rewild-assembly/build/release.wasm.map", to: "" },
       ],
     }),
   ],

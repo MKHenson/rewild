@@ -2,11 +2,11 @@ import { UIEventManager } from "../../core/UIEventManager";
 import { Renderer } from "../../renderer/Renderer";
 import { InGameMenu } from "./InGameMenu";
 import { ApplicationEvent } from "../../core/events/ApplicationEvent";
-import { ApplicationEventType, UIEventType } from "@rewild/common";
+import { ApplicationEventType, UIEventType } from "rewild-common";
 import { InGameUI } from "./InGameUI";
 import { GameOverMenu } from "./GameOverMenu";
 import { update } from "./FPSCounter";
-import { Component, register } from "@rewild/ui/lib/Component";
+import { Component, register } from "rewild-ui/lib/Component";
 
 interface Props {
   renderer: Renderer;

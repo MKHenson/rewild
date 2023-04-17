@@ -29,7 +29,7 @@
     "esModuleInterop": true,
     "inlineSourceMap": false,
     "baseUrl": "../",
-    "types": ["node", "@webgpu/types", "@rewild/ui/types/jsx", "@rewild/ui/types/jsx-base"],
+    "types": ["node", "@webgpu/types", "rewild-ui/types/jsx", "rewild-ui/types/jsx-base"],
     "paths": {
       "*": ["/build/types.d.ts", "node_modules/@types/*", "*"],
       "models": ["./types/models.d.ts"]

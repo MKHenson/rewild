@@ -1,7 +1,7 @@
 import { Renderer } from "../../renderer/Renderer";
 import { BindingData, PipelineResourceTemplate } from "./resources/PipelineResourceTemplate";
 import { PipelineResourceInstance } from "./resources/PipelineResourceInstance";
-import { GroupType, ResourceType } from "@rewild/common";
+import { GroupType, ResourceType } from "rewild-common";
 import "./shader-lib/Utils";
 import { Defines, shaderBuilder, SourceFragments } from "./shader-lib/Utils";
 import { VertexBufferLayout } from "./VertexBufferLayout";

@@ -3,7 +3,7 @@ import { UNIFORM_TYPES_MAP } from "./MemoryUtils";
 import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
 import { Pipeline } from "../Pipeline";
 import { Defines } from "../shader-lib/Utils";
-import { ResourceType, GroupType } from "@rewild/common";
+import { ResourceType, GroupType } from "rewild-common";
 
 export enum TransformType {
   Projection = 1,

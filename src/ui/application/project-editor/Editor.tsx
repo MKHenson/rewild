@@ -1,4 +1,4 @@
-import { Component, register } from "@rewild/ui/lib/Component";
+import { Component, register } from "rewild-ui/lib/Component";
 import { projectStore } from "../../stores/ProjectStore";
 import { EditorGrid } from "./EditorGrid";
 

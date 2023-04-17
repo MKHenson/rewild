@@ -1,13 +1,13 @@
 import { IProject } from "models";
-import { Button } from "@rewild/ui/lib/common/Button";
-import { Typography } from "@rewild/ui/lib/common/Typography";
-import { StyledMaterialIcon } from "@rewild/ui/lib/common/MaterialIcon";
-import { Popup } from "@rewild/ui/lib/common/Popup";
-import { Card } from "@rewild/ui/lib/common/Card";
-import { Loading } from "@rewild/ui/lib/common/Loading";
+import { Button } from "rewild-ui/lib/common/Button";
+import { Typography } from "rewild-ui/lib/common/Typography";
+import { StyledMaterialIcon } from "rewild-ui/lib/common/MaterialIcon";
+import { Popup } from "rewild-ui/lib/common/Popup";
+import { Card } from "rewild-ui/lib/common/Card";
+import { Loading } from "rewild-ui/lib/common/Loading";
 import { NewProjectForm } from "../NewProjectForm";
 import { createProject } from "./ProjectSelectorUtils";
-import { Component, register } from "@rewild/ui/lib/Component";
+import { Component, register } from "rewild-ui/lib/Component";
 import { projectsStore } from "../../../stores/ProjectsStore";
 
 interface Props {

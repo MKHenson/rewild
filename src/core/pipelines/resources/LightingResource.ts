@@ -1,7 +1,7 @@
 import { Renderer } from "../../../renderer/Renderer";
 import { UNIFORM_TYPES_MAP } from "./MemoryUtils";
 import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
-import { GroupType, ResourceType } from "@rewild/common";
+import { GroupType, ResourceType } from "rewild-common";
 import { Defines } from "../shader-lib/Utils";
 import { Pipeline } from "../Pipeline";
 

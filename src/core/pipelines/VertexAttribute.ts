@@ -1,4 +1,4 @@
-import { AttributeType } from "@rewild/common";
+import { AttributeType } from "rewild-common";
 
 export class VertexAttribute {
   constructor(

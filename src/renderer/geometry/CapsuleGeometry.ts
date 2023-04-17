@@ -1,5 +1,5 @@
 import { Geometry, Attribute } from "./Geometry";
-import { Vector2, Vector3, AttributeType } from "@rewild/common";
+import { Vector2, Vector3, AttributeType } from "rewild-common";
 
 export class CapsuleGeometryParameters {
   public radiusTop: f32;

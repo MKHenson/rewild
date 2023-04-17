@@ -1,5 +1,5 @@
 import { Geometry } from "./Geometry";
-import { Vector3, AttributeType } from "@rewild/common";
+import { Vector3, AttributeType } from "rewild-common";
 
 export class SphereGeometryParameters {
   public radius: f32;

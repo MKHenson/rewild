@@ -1,4 +1,4 @@
-import { ApplicationEventType } from "@rewild/common";
+import { ApplicationEventType } from "rewild-common";
 import EventDispatcher from "./EventDispatcher";
 import { ApplicationEvent } from "./events/ApplicationEvent";
 import { IBindable } from "./IBindable";
