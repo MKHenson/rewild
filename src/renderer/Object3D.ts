@@ -1,5 +1,5 @@
 import { wasm } from "../core/WasmManager";
-import { generateUUID } from "@rewild/common";
+import { generateUUID } from "rewild-common";
 
 let objectId = 1;
 

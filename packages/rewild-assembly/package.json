@@ -1,0 +1,31 @@
+{
+  "name": "rewild-assembly",
+  "version": "0.0.1",
+  "description": "The assembly engine running the scene graph updates",
+  "main": "./build/release.js",
+  "types": "./build/release.d.ts",
+  "devDependencies": {
+    "assemblyscript": "0.20.6",
+    "rimraf": "5.0.0"
+  },
+  "scripts": {
+    "build-test": "asc lib/tests.ts --target test",
+    "jest": "node ../../node_modules/jest/bin/jest",
+    "test": "npm run build-test && npm run jest",
+    "benchmark": "cross-env TS_NODE_PROJECT=\"./tests/tsconfig.json\" node --require ts-node/register ./tests/utils/benchmarks.ts",
+    "clean": "rimraf build",
+    "asbuild": "asc lib/index.ts --target release",
+    "build": "npm run clean && npm run build-test && npm run asbuild",
+    "watch-as": "nodemon -e js,ts,tsx --watch lib/ -x \"npm run asbuild\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Webinate/rewild.git"
+  },
+  "author": "Mathew Henson",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Webinate/rewild/issues"
+  },
+  "homepage": "https://github.com/Webinate/rewild#readme"
+}

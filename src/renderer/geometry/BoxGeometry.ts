@@ -1,5 +1,5 @@
 import { Geometry } from "./Geometry";
-import { AttributeType, Vector3 } from "@rewild/common";
+import { AttributeType, Vector3 } from "rewild-common";
 
 export class BoxGeometryParameters {
   public width: f32;

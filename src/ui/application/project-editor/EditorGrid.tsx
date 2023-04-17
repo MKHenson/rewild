@@ -1,12 +1,12 @@
 import { GridCell } from "./GridCell";
 import { RibbonButtons } from "./editors/RibbonButtons";
 import { EditorType, IWorkspaceCell } from "models";
-import { Loading } from "@rewild/ui/lib/common/Loading";
+import { Loading } from "rewild-ui/lib/common/Loading";
 import { SceneGraph } from "./editors/SceneGraph";
 import { ProjectSettings } from "./editors/ProjectSettings";
-import { Component, register } from "@rewild/ui/lib/Component";
+import { Component, register } from "rewild-ui/lib/Component";
 import { projectStore } from "../../stores/ProjectStore";
-import { InfoBox } from "@rewild/ui/lib/common/InfoBox";
+import { InfoBox } from "rewild-ui/lib/common/InfoBox";
 import { Properties } from "./editors/Properties";
 import { ActorsTree } from "./editors/ActorsTree";
 interface Props {

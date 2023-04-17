@@ -1,12 +1,12 @@
 import { ITreeNode, ITemplateTreeNode } from "models";
-import { Card } from "@rewild/ui/lib/common/Card";
-import { Typography } from "@rewild/ui/lib/common/Typography";
-import { Component, register } from "@rewild/ui/lib/Component";
-import { Tree } from "@rewild/ui/lib/common/Tree";
-import { Button } from "@rewild/ui/lib/common/Button";
-import { ButtonGroup } from "@rewild/ui/lib/common/ButtonGroup";
-import { StyledMaterialIcon } from "@rewild/ui/lib/common/MaterialIcon";
-import { theme } from "@rewild/ui/lib/theme";
+import { Card } from "rewild-ui/lib/common/Card";
+import { Typography } from "rewild-ui/lib/common/Typography";
+import { Component, register } from "rewild-ui/lib/Component";
+import { Tree } from "rewild-ui/lib/common/Tree";
+import { Button } from "rewild-ui/lib/common/Button";
+import { ButtonGroup } from "rewild-ui/lib/common/ButtonGroup";
+import { StyledMaterialIcon } from "rewild-ui/lib/common/MaterialIcon";
+import { theme } from "rewild-ui/lib/theme";
 import { sceneGraphStore } from "../../../stores/SceneGraphStore";
 import { projectStore } from "../../../stores/ProjectStore";
 

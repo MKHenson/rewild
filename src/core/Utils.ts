@@ -1,4 +1,4 @@
-import { GPUBufferUsageFlags } from "@rewild/common";
+import { GPUBufferUsageFlags } from "rewild-common";
 import { BufferArray } from "../renderer/geometry/Geometry";
 
 export function createBufferFromF32(

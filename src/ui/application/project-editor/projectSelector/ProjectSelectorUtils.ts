@@ -1,5 +1,5 @@
 import { IWorkspace, IProject } from "models";
-import { createUUID } from "@rewild/ui/lib/utils/createUUID";
+import { createUUID } from "rewild-ui/lib/utils/createUUID";
 
 export const createDefaultWorkspace = (): IWorkspace => {
   return {

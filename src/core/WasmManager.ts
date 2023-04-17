@@ -1,5 +1,5 @@
-import { instantiate, __AdaptedExports } from "@rewild/assembly";
-import wasmFile from "@rewild/assembly/build/release.wasm";
+import { instantiate, __AdaptedExports } from "rewild-assembly";
+import wasmFile from "rewild-assembly/build/release.wasm";
 import { IBindable } from "./IBindable";
 
 export type Wasm = typeof __AdaptedExports & {

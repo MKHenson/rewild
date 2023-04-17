@@ -1,4 +1,4 @@
-import { GroupType, AttributeType } from "@rewild/common";
+import { GroupType, AttributeType } from "rewild-common";
 import { Renderer } from "./Renderer";
 import { Pipeline } from "../core/pipelines/Pipeline";
 import { wasm } from "../core/WasmManager";

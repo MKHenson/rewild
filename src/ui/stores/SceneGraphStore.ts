@@ -1,6 +1,6 @@
 import { ITemplateTreeNode, IProject, ITreeNode } from "models";
-import { traverseTree } from "@rewild/ui/lib/common/Tree";
-import { Store } from "@rewild/ui/lib/Store";
+import { traverseTree } from "rewild-ui/lib/common/Tree";
+import { Store } from "rewild-ui/lib/Store";
 import { containerFactory } from "../utils/TemplateFactories";
 
 export interface ISceneGraphStore {

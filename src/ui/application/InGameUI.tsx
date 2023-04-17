@@ -1,6 +1,6 @@
 import { Renderer } from "../../renderer/Renderer";
-import { CircularProgress } from "@rewild/ui/lib/common/CircularProgress";
-import { Component, register } from "@rewild/ui/lib/Component";
+import { CircularProgress } from "rewild-ui/lib/common/CircularProgress";
+import { Component, register } from "rewild-ui/lib/Component";
 
 type Props = {
   renderer: Renderer;

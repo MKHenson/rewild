@@ -1,5 +1,5 @@
 import { ITemplateTreeNode, ITreeNode, ITreeNodeAction } from "models";
-import { Store } from "@rewild/ui/lib/Store";
+import { Store } from "rewild-ui/lib/Store";
 import { actorFactory } from "../utils/TemplateFactories";
 
 export interface IActorStoreStore {

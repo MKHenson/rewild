@@ -5,7 +5,7 @@ import { Clock } from "../core/Clock";
 import { pipelineManager } from "./PipelineManager";
 import { textureManager } from "./TextureManager";
 import { Mesh } from "./Mesh";
-import { ResourceType, GroupType, AttributeType } from "@rewild/common";
+import { ResourceType, GroupType, AttributeType } from "rewild-common";
 import { meshManager } from "./MeshManager";
 import { LightingResource } from "../core/pipelines/resources/LightingResource";
 import { Pipeline } from "../core/pipelines/Pipeline";
@@ -13,7 +13,7 @@ import { TransformResource } from "../core/pipelines/resources/TransformResource
 import { PipelineResourceInstance } from "../core/pipelines/resources/PipelineResourceInstance";
 import { Geometry } from "./geometry/Geometry";
 import { Player } from "../gameplay/Player";
-import { Pane3D } from "@rewild/ui/lib/common/Pane3D";
+import { Pane3D } from "rewild-ui/lib/common/Pane3D";
 
 const sampleCount = 4;
 export type UpdateCallback = () => void;

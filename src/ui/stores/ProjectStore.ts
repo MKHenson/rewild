@@ -1,5 +1,5 @@
 import { ILevel, IProject, IEditorResource, ITreeNode, IContainer } from "models";
-import { Store } from "@rewild/ui/lib/Store";
+import { Store } from "rewild-ui/lib/Store";
 import { getLevel as getLevelApi, patchLevel, patchProject, getProject as getProjectApi } from "../../api";
 import { Timestamp } from "firebase/firestore";
 import { sceneGraphStore } from "./SceneGraphStore";

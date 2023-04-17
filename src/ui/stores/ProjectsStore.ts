@@ -1,5 +1,5 @@
 import { ILevel, IProject } from "models";
-import { Store } from "@rewild/ui/lib/Store";
+import { Store } from "rewild-ui/lib/Store";
 import {
   addLevel,
   addProject as addProjectApi,

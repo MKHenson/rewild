@@ -1,5 +1,5 @@
 import { shader } from "../shader-lib/Utils";
-import { ResourceType } from "@rewild/common";
+import { ResourceType } from "rewild-common";
 import type { DebugDefines } from "./DebugPipeline";
 import { mathConstants, mathFunctions } from "../shader-lib/MathFunctions";
 
