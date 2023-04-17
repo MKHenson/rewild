@@ -6,7 +6,8 @@
   "types": "./build/release.d.ts",
   "devDependencies": {
     "assemblyscript": "0.20.6",
-    "rimraf": "5.0.0"
+    "rimraf": "5.0.0",
+    "@rewild/common": "1.0.0"
   },
   "scripts": {
     "build-test": "asc lib/tests.ts --target test",
