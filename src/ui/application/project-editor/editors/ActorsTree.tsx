@@ -1,7 +1,4 @@
-import { Card } from "rewild-ui/lib/common/Card";
-import { Typography } from "rewild-ui/lib/common/Typography";
-import { Component, register } from "rewild-ui/lib/Component";
-import { Tree } from "rewild-ui/lib/common/Tree";
+import { Tree, Component, register, Typography, Card } from "rewild-ui";
 import { actorStore } from "../../../stores/ActorStore";
 
 interface Props {}

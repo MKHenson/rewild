@@ -1,6 +1,4 @@
-import { Modal } from "rewild-ui/lib/common/Modal";
-import { Typography } from "rewild-ui/lib/common/Typography";
-import { Component, register } from "rewild-ui/lib/Component";
+import { Typography, Modal, Component, register } from "rewild-ui";
 
 export type ErrorType = "WGPU" | "OTHER";
 

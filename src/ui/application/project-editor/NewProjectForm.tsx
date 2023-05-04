@@ -1,7 +1,5 @@
-import { Input } from "rewild-ui/lib/common/Input";
+import { Component, register, Input, Field } from "rewild-ui";
 import { IProject } from "models";
-import { Field } from "rewild-ui/lib/common/Field";
-import { Component, register } from "rewild-ui/lib/Component";
 
 interface Props {
   project: Partial<IProject | null>;

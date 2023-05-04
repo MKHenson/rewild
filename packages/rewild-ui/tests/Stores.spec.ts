@@ -1,4 +1,4 @@
-import { Store } from "rewild-ui";
+import { Store } from "../lib/Store";
 
 interface IReference {}
 interface IPerson extends IReference {
@@ -34,7 +34,10 @@ describe("Stores", () => {
   });
 
   it("strips out proxies when setting properties on a store target", () => {
-    const store = new Store<IPeopleStore>({ person1: { name: { first: "John" } }, referencePointer: { type: "none" } });
+    const store = new Store<IPeopleStore>({
+      person1: { name: { first: "John" } },
+      referencePointer: { type: "none" },
+    });
 
     const person1Proxied = store.defaultProxy.person1;
     store.defaultProxy.referencePointer;
@@ -51,10 +54,14 @@ describe("Stores", () => {
 
     // target is not a proxy
     expect((store.signaller.target.person1 as any).__isProxy).toBe(undefined);
-    expect((store.signaller.target.referencePointer as any).__isProxy).toBe(undefined);
+    expect((store.signaller.target.referencePointer as any).__isProxy).toBe(
+      undefined
+    );
 
     // references still work on the original target - i.e. the proxy was stripped out
-    expect(store.signaller.target.referencePointer).toBe(store.signaller.target.person1);
+    expect(store.signaller.target.referencePointer).toBe(
+      store.signaller.target.person1
+    );
     expect(store.signaller.target.referencePointer).not.toEqual(person1Proxied);
 
     // Now update the reference on the proxy, which should affect the original as its the same

@@ -6,7 +6,7 @@ import { ApplicationEventType, UIEventType } from "rewild-common";
 import { InGameUI } from "./InGameUI";
 import { GameOverMenu } from "./GameOverMenu";
 import { update } from "./FPSCounter";
-import { Component, register } from "rewild-ui/lib/Component";
+import { Component, register } from "rewild-ui";
 
 interface Props {
   renderer: Renderer;

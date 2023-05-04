@@ -1,9 +1,6 @@
 import { Component, register } from "../Component";
 import { theme } from "../theme";
 
-export type ButtonVariant = "contained" | "outlined";
-export type ButtonColor = "primary" | "secondary" | "error";
-
 interface Props {
   pushed?: boolean;
   raised?: boolean;
@@ -23,7 +20,8 @@ export class Card extends Component<Props> {
       this.classList.toggle("pushed", this.props.pushed || false);
       this.classList.toggle("raised", this.props.raised || false);
       this.toggleAttribute("stretched", this.props.stretched || false);
-      if (!this.props.disabled && this.props.onClick) this.onclick = this.props.onClick;
+      if (!this.props.disabled && this.props.onClick)
+        this.onclick = this.props.onClick;
       return elm;
     };
   }
@@ -64,6 +62,7 @@ const StyledCard = cssStylesheet(css`
     box-shadow: ${theme?.colors.shadowShort2};
   }
   :host(.pushed.raised) {
-    box-shadow: ${theme?.colors.shadowShort1}, inset 0 0 0px 2px ${theme?.colors.primary400};
+    box-shadow: ${theme?.colors.shadowShort1},
+      inset 0 0 0px 2px ${theme?.colors.primary400};
   }
 `);

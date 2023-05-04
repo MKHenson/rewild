@@ -1,9 +1,6 @@
-import { Card } from "rewild-ui/lib/common/Card";
-import { Typography } from "rewild-ui/lib/common/Typography";
+import { theme, Component, register, Typography, Card } from "rewild-ui";
 import { PropertyValue } from "./PropertyValue";
-import { Component, register } from "rewild-ui/lib/Component";
 import { projectStore } from "../../../stores/ProjectStore";
-import { theme } from "rewild-ui/lib/theme";
 
 interface Props {}
 

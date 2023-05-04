@@ -22,9 +22,9 @@ export class Button extends Component<Props> {
     return () => {
       this.toggleAttribute("fullwidth", this.props.fullWidth || false);
       this.toggleAttribute("disabled", this.props.disabled || false);
-      this.className = `${this.props.class || ""} ${this.props.variant || "contained"} ${
-        this.props.color || "primary"
-      }`;
+      this.className = `${this.props.class || ""} ${
+        this.props.variant || "contained"
+      } ${this.props.color || "primary"}`;
 
       return elm;
     };

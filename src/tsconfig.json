@@ -13,8 +13,6 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
-    // "jsx": "preserve",
-    // "jsxImportSource": "solid-js",
     "jsx": "react",
     "jsxFactory": "jsx",
     "forceConsistentCasingInFileNames": true,

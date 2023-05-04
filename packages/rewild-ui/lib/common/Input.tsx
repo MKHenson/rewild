@@ -1,9 +1,6 @@
 import { Component, register } from "../Component";
 import { theme } from "../theme";
 
-export type ButtonVariant = "contained" | "outlined";
-export type ButtonColor = "primary" | "secondary" | "error";
-
 interface Props {
   value?: string;
   placeholder?: string;
@@ -39,7 +36,11 @@ export class Input extends Component<Props> {
           value={this.props.value || ""}
           onclick={onClick}
           placeholder={this.props.placeholder || ""}
-          onchange={this.props.onChange ? (e) => this.props.onChange!(e.currentTarget.value) : undefined}
+          onchange={
+            this.props.onChange
+              ? (e) => this.props.onChange!(e.currentTarget.value)
+              : undefined
+          }
         />
       </div>
     );

@@ -1,10 +1,5 @@
-import { Modal } from "rewild-ui/lib/common/Modal";
-import { Button } from "rewild-ui/lib/common/Button";
-import { Typography } from "rewild-ui/lib/common/Typography";
-import { MaterialIcon } from "rewild-ui/lib/common/MaterialIcon";
 import { authStore } from "../stores/AuthStore";
-import { Loading } from "rewild-ui/lib/common/Loading";
-import { Component, register } from "rewild-ui/lib/Component";
+import { Modal, Button, Typography, MaterialIcon, Loading, Component, register } from "rewild-ui";
 
 type Props = {
   open: boolean;

@@ -1,9 +1,4 @@
-import { Card } from "rewild-ui/lib/common/Card";
-import { Button } from "rewild-ui/lib/common/Button";
-import { ButtonGroup } from "rewild-ui/lib/common/ButtonGroup";
-import { StyledMaterialIcon } from "rewild-ui/lib/common/MaterialIcon";
-import { Component, register } from "rewild-ui/lib/Component";
-import { theme } from "rewild-ui/lib/theme";
+import { theme, Component, register, StyledMaterialIcon, ButtonGroup, Card, Button } from "rewild-ui";
 import { projectStore } from "../../../stores/ProjectStore";
 
 interface Props {

@@ -3,16 +3,12 @@ import { UIEventManager } from "../../core/UIEventManager";
 import { Renderer } from "../../renderer/Renderer";
 import { GameLoader } from "../../core/GameLoader";
 import { WasmManager } from "../../core/WasmManager";
-import { Pane3D } from "rewild-ui/lib/common/Pane3D";
+import { Pane3D, Route, navigate, RouterSwitch, Component, register } from "rewild-ui";
 import { MainMenu } from "./MainMenu";
 import { ApplicationEventType } from "rewild-common";
 import { ProjectEditorPage } from "./project-editor/ProjectEditorPage";
 import { ErrorType, StartError } from "./StartError";
 import { InGame } from "./InGame";
-import { Route } from "rewild-ui/lib/common/Route";
-import { navigate } from "rewild-ui/lib/common/RouterProvider";
-import { RouterSwitch } from "rewild-ui/lib/common/RouterSwitch";
-import { Component, register } from "rewild-ui/lib/Component";
 import { Auth } from "./Auth";
 
 interface Props {}
@@ -64,7 +60,7 @@ export class Application extends Component<Props> {
         }
 
         await renderer.init();
-        await gameLoader.loadInitialContainers();
+        await gameLoader.loadSystemContainers();
 
         // Call the first frame so the containers can initialize
         renderer.onFrame();

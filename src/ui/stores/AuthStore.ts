@@ -1,6 +1,6 @@
 import { onAuthStateChanged, signOut, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../firebase";
-import { Store } from "rewild-ui/lib/Store";
+import { Store } from "rewild-ui";
 
 interface IAuth {
   loading: boolean;

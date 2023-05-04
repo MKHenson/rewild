@@ -1,8 +1,5 @@
 import { Component, ComponentOptions, register } from "../Component";
 
-export type ButtonVariant = "contained" | "outlined";
-export type ButtonColor = "primary" | "secondary" | "error";
-
 interface Props {
   icon: IconType;
   class?: string;
