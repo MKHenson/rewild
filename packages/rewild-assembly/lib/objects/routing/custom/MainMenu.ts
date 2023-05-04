@@ -1,5 +1,10 @@
 import { DirectionalLight } from "../../../lights/DirectionalLight";
-import { Color, degToRad, ApplicationEventType, UIEventType } from "rewild-common";
+import {
+  Color,
+  degToRad,
+  ApplicationEventType,
+  UIEventType,
+} from "rewild-common";
 import { Container } from "../core/Container";
 import { uiSignaller } from "../../../extras/ui/uiSignalManager";
 import { Listener } from "../../../core/EventDispatcher";
@@ -28,8 +33,14 @@ export class MainMenu extends Container implements Listener {
     if (!level1) throw new Error(`dont have level`);
     if (!editor) throw new Error(`dont have editor`);
 
-    link1.connect(this.getPortal("Exit - Start Game")!, level1.getPortal("Enter")!);
-    link2.connect(this.getPortal("Exit - Start Editor")!, editor.getPortal("Enter")!);
+    link1.connect(
+      this.getPortal("Exit - Start Game")!,
+      level1.getPortal("Enter")!
+    );
+    link2.connect(
+      this.getPortal("Exit - Start Editor")!,
+      editor.getPortal("Enter")!
+    );
 
     this.sun = new DirectionalLight(new Color(1, 1, 1), 6);
     this.sun.position.set(10, 10, 0);
@@ -39,7 +50,8 @@ export class MainMenu extends Container implements Listener {
 
   onEvent(event: Event): void {
     const uiEvent = event.attachment as ApplicationEvent;
-    if (uiEvent.eventType == ApplicationEventType.StartGame) this.exit(this.getPortal("Exit - Start Game")!, true);
+    if (uiEvent.eventType == ApplicationEventType.StartGame)
+      this.exit(this.getPortal("Exit - Start Game")!, true);
     else if (uiEvent.eventType == ApplicationEventType.StartEditor)
       this.exit(this.getPortal("Exit - Start Editor")!, true);
   }

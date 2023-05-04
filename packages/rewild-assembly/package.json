@@ -6,7 +6,10 @@
   "types": "./build/release.d.ts",
   "devDependencies": {
     "assemblyscript": "0.20.6",
-    "rimraf": "5.0.0"
+    "rimraf": "5.0.0",
+    "jest": "^29.5.0",
+    "@types/jest": "^29.5.0",
+    "@types/node": "18.15.11"
   },
   "scripts": {
     "build-test": "asc lib/tests.ts --target test",
@@ -15,7 +18,7 @@
     "benchmark": "cross-env TS_NODE_PROJECT=\"./tests/tsconfig.json\" node --require ts-node/register ./tests/utils/benchmarks.ts",
     "clean": "rimraf build",
     "asbuild": "asc lib/index.ts --target release",
-    "build": "npm run clean && npm run build-test && npm run asbuild",
+    "build": "npm run build-test && npm run asbuild",
     "watch-as": "nodemon -e js,ts,tsx --watch lib/ -x \"npm run asbuild\""
   },
   "repository": {

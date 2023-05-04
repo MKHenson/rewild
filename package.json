@@ -3,15 +3,16 @@
   "version": "0.0.2",
   "description": "Game about exploring earth's history",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "test": "npm run test --workspaces",
     "benchmark": "cross-env TS_NODE_PROJECT=\"./tests/tsconfig.json\" node --experimental-wasi-unstable-preview1 --experimental-wasm-simd --require ts-node/register ./tests/benchmarks.ts",
     "clean": "rimraf public",
-    "build:webpack": "webpack --mode development",
-    "build": "npm run clean && npm run build --workspaces && npm run build:webpack",
-    "watch-webpack": "webpack --mode development --watch --env env=local",
-    "start": "npm run build && npm-run-all --parallel server watch-webpack",
-    "server": "live-server --port=9001 --entry-file=/index.html --watch=public,build --open=/ ./public"
+    "build": "npm run clean && npm run build --workspaces && node ./esbuild.js",
+    "watch": "node ./esbuild.js --watch",
+    "watchAS": "npm run watch-as --workspace=rewild-assembly",
+    "start": "npm-run-all --parallel server watch watchAS",
+    "server": "live-server --port=9001 --entry-file=/public/index.html --open=/ ./public"
   },
   "repository": {
     "type": "git",
@@ -23,6 +24,7 @@
   "dependencies": {
     "@types/node": "18.15.11",
     "date-fns": "2.29.3",
+    "esbuild": "0.17.18",
     "firebase": "^9.10.0",
     "firebaseui": "^6.0.1",
     "fork-ts-checker-webpack-plugin": "7.2.13",
@@ -35,8 +37,8 @@
     "@types/jest": "^29.5.0",
     "@webgpu/types": "0.1.21",
     "babel-jest": "^29.5.0",
-    "copy-webpack-plugin": "^9.0.1",
     "cross-env": "7.0.3",
+    "esbuild-plugin-copy": "^2.1.1",
     "file-loader": "^6.2.0",
     "graphql-tag": "2.12.6",
     "jest": "^29.5.0",
@@ -50,9 +52,7 @@
     "rimraf": "3.0.2",
     "ts-loader": "9.2.3",
     "ts-node": "10.7.0",
-    "typescript": "4.9.4",
-    "webpack": "5.70.0",
-    "webpack-cli": "4.7.0"
+    "typescript": "4.9.4"
   },
   "workspaces": [
     "packages\\rewild-ui",

@@ -1,6 +1,6 @@
 import { wasm } from "./WasmManager";
 import { MouseEventType, KeyEventType } from "rewild-common";
-import { Pane3D } from "rewild-ui/lib/common/Pane3D";
+import { Pane3D } from "rewild-ui";
 
 export class InputManager {
   pane3D: Pane3D;

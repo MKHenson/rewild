@@ -1,18 +1,13 @@
-import { Renderer } from "./Renderer";
-import { DebugPipeline } from "../core/pipelines/debug-pipeline/DebugPipeline";
-import { Pipeline } from "../core/pipelines/Pipeline";
-import { SkyboxPipeline } from "../core/pipelines/skybox-pipeline/SkyboxPipeline";
-import { textureManager } from "./TextureManager";
+import { Renderer } from "../Renderer";
+import { DebugPipeline } from "../../core/pipelines/debug-pipeline/DebugPipeline";
+import { Pipeline } from "../../core/pipelines/Pipeline";
+import { SkyboxPipeline } from "../../core/pipelines/skybox-pipeline/SkyboxPipeline";
+import { textureManager } from "../TextureManager";
+import { AssetManager } from "./AssetManager";
 
-class PipelineManager {
-  pipelines: Pipeline<any>[];
-
-  getPipeline(name: string) {
-    return this.pipelines.find((p) => p.name === name);
-  }
-
-  init(renderer: Renderer) {
-    this.pipelines = [
+class PipelineManager extends AssetManager<Pipeline<any>> {
+  initialize(renderer: Renderer): void {
+    this.assets.push(
       new DebugPipeline("coastal-floor", {
         diffuseMap: textureManager.find("ground-coastal-1"),
         NUM_DIR_LIGHTS: 0,
@@ -24,10 +19,10 @@ class PipelineManager {
       new DebugPipeline("earth", { diffuseMap: textureManager.find("earth"), NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("concrete", { diffuseMap: textureManager.find("block-concrete-4"), NUM_DIR_LIGHTS: 0 }),
       new SkyboxPipeline("skybox", { diffuseMap: textureManager.find("desert-sky") }),
-      new SkyboxPipeline("stars", { diffuseMap: textureManager.find("starry-sky") }),
-    ];
+      new SkyboxPipeline("stars", { diffuseMap: textureManager.find("starry-sky") })
+    );
 
-    this.pipelines.forEach((p) => {
+    this.assets.forEach((p) => {
       p.build(renderer);
       p.initialize(renderer);
     });

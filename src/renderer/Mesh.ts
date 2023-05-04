@@ -4,7 +4,7 @@ import { Pipeline } from "../core/pipelines/Pipeline";
 import { wasm } from "../core/WasmManager";
 import { Geometry } from "./geometry/Geometry";
 import { Object3D } from "./Object3D";
-import { pipelineManager } from "./PipelineManager";
+import { pipelineManager } from "./AssetManagers/PipelineManager";
 
 export class Mesh extends Object3D {
   meshComponent: Number;
@@ -27,7 +27,7 @@ export class Mesh extends Object3D {
     this.meshComponent = -1;
     this.slotMap = new Map();
 
-    const pipelineIndex = pipelineManager.pipelines.indexOf(this.pipeline);
+    const pipelineIndex = pipelineManager.assets.indexOf(this.pipeline);
     const pipelineInsPtr = wasm.createMeshPipelineInstance(this.pipeline.name, pipelineIndex);
 
     this.meshComponent = wasm.createMeshComponent(this.geometry.bufferGeometry as any, pipelineInsPtr, this.name);
@@ -41,7 +41,6 @@ export class Mesh extends Object3D {
 
     // Assign a transform buffer to the intance
     this.transformIndex = this.pipeline.addResourceInstance(renderer, GroupType.Transform);
-    wasm.setMeshPipelineTransformIndex(pipelineInsPtr, this.transformIndex);
     wasm.addComponent(this.transform as any, this.meshComponent as any);
 
     this.modelViewMatrix = wasm.getFloat32Array(wasm.getTransformModelViewMatrix(this.transform as any));
