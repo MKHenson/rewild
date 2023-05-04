@@ -12,7 +12,7 @@ export class PlaneGeometry extends Geometry {
   parameters: PlaneGeometryParameters;
 
   constructor(width: f32 = 1, height: f32 = 1, widthSegments: u16 = 1, heightSegments: u16 = 1) {
-    super();
+    super("plane");
     this.parameters = {
       width: width,
       height: height,

@@ -143,7 +143,7 @@ export class BoxGeometry extends Geometry {
     heightSegments: u16 = 1,
     depthSegments: u16 = 1
   ) {
-    super();
+    super("box");
 
     this.parameters = {
       width: width,
