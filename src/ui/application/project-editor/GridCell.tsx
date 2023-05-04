@@ -1,6 +1,5 @@
 import { EditorType, IGridCellAction } from "models";
-import { Component, register } from "rewild-ui/lib/Component";
-import { startDragDrop, compelteDragDrop, curDragAction } from "rewild-ui/lib/utils/dragDrop";
+import { startDragDrop, compelteDragDrop, curDragAction, Component, register } from "rewild-ui";
 
 interface Props {
   rowStart: number;

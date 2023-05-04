@@ -1,10 +1,4 @@
-import { Card } from "rewild-ui/lib/common/Card";
-import { Typography } from "rewild-ui/lib/common/Typography";
-import { Switch } from "rewild-ui/lib/common/Switch";
-import { Date } from "rewild-ui/lib/common/Date";
-import { Input } from "rewild-ui/lib/common/Input";
-import { Button } from "rewild-ui/lib/common/Button";
-import { Component, register } from "rewild-ui/lib/Component";
+import { Card, Typography, Switch, Date, Input, Button, Component, register } from "rewild-ui";
 import { projectStore } from "../../../stores/ProjectStore";
 import { IProject } from "models";
 

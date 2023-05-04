@@ -1,5 +1,5 @@
 import { IActor, IProperty, ITreeNode, ITreeNodeAction } from "models";
-import { createUUID } from "rewild-ui/lib/utils/createUUID";
+import { createUUID } from "rewild-ui";
 
 const baseActorTemplate: ITreeNode = {
   canRename: true,

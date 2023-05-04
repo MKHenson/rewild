@@ -1,7 +1,4 @@
-import { Typography } from "rewild-ui/lib/common/Typography";
-import { Switch } from "rewild-ui/lib/common/Switch";
-import { Component, register } from "rewild-ui/lib/Component";
-import { theme } from "rewild-ui/lib/theme";
+import { theme, Component, register, Switch, Typography } from "rewild-ui";
 
 type PropType = "string" | "boolean";
 

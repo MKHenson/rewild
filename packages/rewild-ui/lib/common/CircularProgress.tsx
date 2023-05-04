@@ -1,9 +1,6 @@
 import { createUUID } from "../utils/createUUID";
 import { Component, register } from "../Component";
 
-export type ButtonVariant = "contained" | "outlined";
-export type ButtonColor = "primary" | "secondary" | "error";
-
 interface Props {
   size: number;
   strokeSize: number;
@@ -45,8 +42,16 @@ export class CircularProgress extends Component<Props> {
           xmlns="http://www.w3.org/2000/svg"
         >
           <linearGradient id={gradientId} x1="1" x2="0.5" y1="1" y2="0.5">
-            <stop class="stop1" stop-color={val() < 50 ? "#ff0000" : "#eeff50"} offset="0%" />
-            <stop class="stop2" stop-color={val() < 50 ? "#eeff50" : "#9198e5"} offset="100%" />
+            <stop
+              class="stop1"
+              stop-color={val() < 50 ? "#ff0000" : "#eeff50"}
+              offset="0%"
+            />
+            <stop
+              class="stop2"
+              stop-color={val() < 50 ? "#eeff50" : "#9198e5"}
+              offset="100%"
+            />
           </linearGradient>
           <circle
             id="first-circle"

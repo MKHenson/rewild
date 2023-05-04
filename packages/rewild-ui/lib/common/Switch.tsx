@@ -1,9 +1,6 @@
 import { Component, register } from "../Component";
 import { theme } from "../theme";
 
-export type ButtonVariant = "contained" | "outlined";
-export type ButtonColor = "primary" | "secondary" | "error";
-
 interface Props {
   checked?: boolean;
   onClick?: (e: MouseEvent) => void;

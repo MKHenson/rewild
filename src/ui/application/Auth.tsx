@@ -1,8 +1,6 @@
 import { authUI } from "../../firebase";
 import { EmailAuthProvider, GoogleAuthProvider } from "firebase/auth";
-import { Avatar } from "rewild-ui/lib/common/Avatar";
-import { Popup } from "rewild-ui/lib/common/Popup";
-import { Component, register } from "rewild-ui/lib/Component";
+import { Avatar, Popup, Component, register } from "rewild-ui";
 import { authStore } from "../stores/AuthStore";
 
 type Props = {};

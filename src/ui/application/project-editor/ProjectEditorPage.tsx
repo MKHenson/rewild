@@ -3,10 +3,7 @@ import { Renderer } from "../../../renderer/Renderer";
 import { UIEventManager } from "../../../core/UIEventManager";
 import { ApplicationEventType } from "rewild-common";
 import { ProjectSelector } from "./projectSelector/ProjectSelector";
-import { Component, register } from "rewild-ui/lib/Component";
-import { Route } from "rewild-ui/lib/common/Route";
-import { RouterSwitch } from "rewild-ui/lib/common/RouterSwitch";
-import { navigate } from "rewild-ui/lib/common/RouterProvider";
+import { navigate, RouterSwitch, Route, Component, register } from "rewild-ui";
 
 interface Props {
   renderer: Renderer;
