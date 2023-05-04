@@ -1,5 +1,4 @@
-import { instantiate, __AdaptedExports } from "rewild-assembly";
-import wasmFile from "rewild-assembly/build/release.wasm";
+import { instantiate, __AdaptedExports } from "rewild-assembly/build/release";
 import { IBindable } from "./IBindable";
 
 export type Wasm = typeof __AdaptedExports & {
@@ -45,7 +44,7 @@ export class WasmManager {
 
     for (const bindable of bindables) Object.assign(bindings, bindable.createBinding());
 
-    const obj = (await instantiate(await WebAssembly.compileStreaming(fetch(wasmFile)), {
+    const obj = (await instantiate(await WebAssembly.compileStreaming(fetch("./release.wasm")), {
       Imports: bindings,
       env: {
         memory: this.memory,

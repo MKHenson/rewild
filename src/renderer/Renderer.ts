@@ -2,7 +2,8 @@ import { InputManager } from "../core/InputManager";
 import { wasm } from "../core/WasmManager";
 import { IBindable } from "../core/IBindable";
 import { Clock } from "../core/Clock";
-import { pipelineManager } from "./PipelineManager";
+import { pipelineManager } from "./AssetManagers/PipelineManager";
+import { geometryManager } from "./AssetManagers/GeometryManager";
 import { textureManager } from "./TextureManager";
 import { Mesh } from "./Mesh";
 import { ResourceType, GroupType, AttributeType } from "rewild-common";
@@ -13,7 +14,7 @@ import { TransformResource } from "../core/pipelines/resources/TransformResource
 import { PipelineResourceInstance } from "../core/pipelines/resources/PipelineResourceInstance";
 import { Geometry } from "./geometry/Geometry";
 import { Player } from "../gameplay/Player";
-import { Pane3D } from "rewild-ui/lib/common/Pane3D";
+import { Pane3D } from "rewild-ui";
 
 const sampleCount = 4;
 export type UpdateCallback = () => void;
@@ -102,7 +103,8 @@ export class Renderer implements IBindable {
     // Initialize the wasm module
     wasm.init(canvas.width, canvas.height);
 
-    pipelineManager.init(this);
+    pipelineManager.initialize(this);
+    geometryManager.initialize(this);
     this.player = new Player();
 
     // Setup events
@@ -112,7 +114,7 @@ export class Renderer implements IBindable {
   }
 
   createMesh(geometry: Geometry, pipelineName: string, name?: string) {
-    const pipeline = pipelineManager.getPipeline(pipelineName)!;
+    const pipeline = pipelineManager.getAsset(pipelineName)!;
     const mesh = new Mesh(geometry, pipeline, this, name);
     return mesh;
   }
@@ -316,7 +318,7 @@ export class Renderer implements IBindable {
     sceneArrayPtr: number,
     directionArrayPtr: number
   ): void {
-    const pipelines = pipelineManager.pipelines;
+    const pipelines = pipelineManager.assets;
     let buffer: GPUBuffer;
     const device = this.device;
 
