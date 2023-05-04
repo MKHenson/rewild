@@ -1,7 +1,7 @@
 declare module "models" {
   export type EditorType = "properties" | "ribbon" | "scene-graph" | "project-settings" | "actors";
   import type { Timestamp } from "firebase/firestore";
-  import type { IconType } from "rewild-ui/lib/common/MaterialIcon";
+  import type { IconType } from "rewild-ui";
 
   export type FactoryKey = "actor" | "container";
 

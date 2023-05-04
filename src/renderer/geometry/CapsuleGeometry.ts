@@ -233,7 +233,7 @@ export class CapsuleGeometry extends Geometry {
     thetaStart: f32 = 0,
     thetaLength: f32 = Mathf.PI * 2
   ) {
-    super();
+    super("capsule");
 
     this.parameters = {
       radiusTop: radiusTop,

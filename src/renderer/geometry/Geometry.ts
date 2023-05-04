@@ -112,8 +112,8 @@ export class Geometry {
 
   indexBuffer: GPUBuffer | null;
 
-  constructor() {
-    this.name = "";
+  constructor(name: string = "") {
+    this.name = name;
     this.attributes = new Map();
     this.groups = [];
     this.bufferGeometry = wasm.creatBufferGeometry();
