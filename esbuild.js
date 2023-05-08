@@ -57,6 +57,7 @@ async function watch() {
   let ctx = await esbuild.context({
     entryPoints: ["./src/index.tsx"],
     bundle: true,
+    sourcemap: true,
     external: [],
     tsconfig: "./src/tsconfig.json",
     outfile: `./public/index_bundle.js`,

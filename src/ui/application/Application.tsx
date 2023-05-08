@@ -3,7 +3,7 @@ import { UIEventManager } from "../../core/UIEventManager";
 import { Renderer } from "../../renderer/Renderer";
 import { GameLoader } from "../../core/GameLoader";
 import { WasmManager } from "../../core/WasmManager";
-import { Pane3D, Route, navigate, RouterSwitch, Component, register } from "rewild-ui";
+import { Pane3D, Route, navigate, RouterSwitch, Component, register, InfoBox } from "rewild-ui";
 import { MainMenu } from "./MainMenu";
 import { ApplicationEventType } from "rewild-common";
 import { ProjectEditorPage } from "./project-editor/ProjectEditorPage";
@@ -76,6 +76,13 @@ export class Application extends Component<Props> {
     const canvas = (<Pane3D onCanvasReady={onCanvasReady} />) as Pane3D;
 
     return () => {
+      if (errorMessage())
+        return (
+          <InfoBox title="Error" variant="error">
+            {errorMessage()}
+          </InfoBox>
+        );
+
       return [
         canvas,
         <RouterSwitch>
