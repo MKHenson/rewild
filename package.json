@@ -12,7 +12,7 @@
     "watch": "node ./esbuild.js --watch",
     "watchAS": "npm run watch-as --workspace=rewild-assembly",
     "start": "npm-run-all --parallel server watch watchAS",
-    "server": "live-server --port=9001 --entry-file=/public/index.html --open=/ ./public"
+    "server": "live-server --port=9001 --entry-file=index.html --open=/ ./public"
   },
   "repository": {
     "type": "git",

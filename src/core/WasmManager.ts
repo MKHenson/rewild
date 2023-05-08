@@ -44,7 +44,7 @@ export class WasmManager {
 
     for (const bindable of bindables) Object.assign(bindings, bindable.createBinding());
 
-    const obj = (await instantiate(await WebAssembly.compileStreaming(fetch("./release.wasm")), {
+    const obj = (await instantiate(await WebAssembly.compileStreaming(fetch("/release.wasm")), {
       Imports: bindings,
       env: {
         memory: this.memory,
