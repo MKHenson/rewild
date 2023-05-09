@@ -3,7 +3,11 @@ import { MaterialIcon, StyledMaterialIcon } from "./MaterialIcon";
 import { Component, register } from "../Component";
 import { theme } from "../theme";
 import { IDragDropAction, ITreeNode, ITreeNodeAction } from "models";
-import { compelteDragDrop, curDragAction, startDragDrop } from "../utils/dragDrop";
+import {
+  compelteDragDrop,
+  curDragAction,
+  startDragDrop,
+} from "../utils/dragDrop";
 
 interface NodeProps {
   node: ITreeNode;
@@ -30,7 +34,10 @@ export class TreeNode extends Component<NodeProps> {
       sel.addRange(range);
 
       const onDeactivate = (event: Event) => {
-        if ((event as KeyboardEvent).key !== undefined && (event as KeyboardEvent).key !== "Enter") {
+        if (
+          (event as KeyboardEvent).key !== undefined &&
+          (event as KeyboardEvent).key !== "Enter"
+        ) {
           return;
         }
 
@@ -48,7 +55,8 @@ export class TreeNode extends Component<NodeProps> {
   }
 
   init() {
-    this.selected = this.props.selectedNodes?.includes(this.props.node) || false;
+    this.selected =
+      this.props.selectedNodes?.includes(this.props.node) || false;
     const [expanded, setExpanded] = this.useState(true);
 
     const onDragStart = (e: DragEvent) => {
@@ -69,7 +77,10 @@ export class TreeNode extends Component<NodeProps> {
 
       const isSelected = props.selectedNodes.includes(props.node) || false;
       if (e.shiftKey) {
-        if (isSelected) props.onSelectionChanged(props.selectedNodes.filter((node) => node !== props.node));
+        if (isSelected)
+          props.onSelectionChanged(
+            props.selectedNodes.filter((node) => node !== props.node)
+          );
         else props.onSelectionChanged(props.selectedNodes.concat(props.node));
       } else props.onSelectionChanged([props.node]);
     };
@@ -81,7 +92,9 @@ export class TreeNode extends Component<NodeProps> {
       if (!json) return;
 
       if (!this.props.node.onDrop!(json, this.props.node)) return;
-      this.props.node.children = this.props.node.children ? this.props.node.children.concat(json.node) : [json.node];
+      this.props.node.children = this.props.node.children
+        ? this.props.node.children.concat(json.node)
+        : [json.node];
       this.props.onDrop?.(this.props.node);
     };
 
@@ -100,12 +113,24 @@ export class TreeNode extends Component<NodeProps> {
 
       return (
         <div class="treenode">
-          <div class={"tree-content" + (this.selected ? " selected-treenode" : "")}>
+          <div
+            class={"tree-content" + (this.selected ? " selected-treenode" : "")}
+          >
             {props.node.children && props.node.children.length ? (
               expanded() ? (
-                <MaterialIcon class="expand-icon" onClick={handleExpandedClick} icon="arrow_drop_down" size="s" />
+                <MaterialIcon
+                  class="expand-icon"
+                  onClick={handleExpandedClick}
+                  icon="arrow_drop_down"
+                  size="s"
+                />
               ) : (
-                <MaterialIcon class="expand-icon" onClick={handleExpandedClick} icon="arrow_drop_up" size="s" />
+                <MaterialIcon
+                  class="expand-icon"
+                  onClick={handleExpandedClick}
+                  icon="arrow_drop_up"
+                  size="s"
+                />
               )
             ) : null}
             <div
@@ -121,10 +146,15 @@ export class TreeNode extends Component<NodeProps> {
               <Typography variant="body2">
                 {props.node.icon && (
                   <span class="node-icon">
-                    <StyledMaterialIcon icon={props.node.icon} size={props.node.iconSize || "s"} />
+                    <StyledMaterialIcon
+                      icon={props.node.icon}
+                      size={props.node.iconSize || "s"}
+                    />
                   </span>
                 )}
-                <span class="treenode-text">{props.node.resource?.target.name || props.node.name}</span>
+                <span class="treenode-text">
+                  {props.node.resource?.name || props.node.name}
+                </span>
               </Typography>
             </div>
           </div>
@@ -146,7 +176,9 @@ export class TreeNode extends Component<NodeProps> {
   }
 
   getSelectedNode(): TreeNode | null {
-    const nodes = Array.from(this.shadow!.querySelectorAll("x-treenode")) as TreeNode[];
+    const nodes = Array.from(
+      this.shadow!.querySelectorAll("x-treenode")
+    ) as TreeNode[];
     let selectedNode: TreeNode | null;
     for (const node of nodes) {
       if (node.selected) return node;

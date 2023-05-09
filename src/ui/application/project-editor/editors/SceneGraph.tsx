@@ -19,7 +19,7 @@ export class SceneGraph extends Component<Props> {
       const node = tree.getSelectedNode();
       if (e.key === "F2" && selectedNodes().length === 1 && selectedNodes()[0].canRename && node) {
         const newName = await node.editName();
-        projectStoreProxy.selectedResource!.target.name = newName;
+        projectStoreProxy.selectedResource!.name = newName;
       }
     };
 

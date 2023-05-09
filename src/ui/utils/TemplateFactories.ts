@@ -20,15 +20,13 @@ export const actorFactory: () => ITreeNode = () => ({
   icon: "label_important",
   resource: {
     properties: [...baseActorProperties],
-    target: {
-      name: "Earth",
-      type: "actor",
-      id: createUUID(),
-      baseType: "static",
-      geometry: "sphere",
-      pipeline: "earth",
-    } as IActor,
-  },
+    name: "Earth",
+    type: "actor",
+    id: createUUID(),
+    baseType: "static",
+    geometry: "sphere",
+    pipeline: "earth",
+  } as IActor,
 });
 
 export const containerFactory: () => ITreeNode = () => ({
@@ -42,7 +40,9 @@ export const containerFactory: () => ITreeNode = () => ({
     return true;
   },
   resource: {
-    target: { type: "container", id: createUUID(), name: "New Container" },
+    type: "container",
+    id: createUUID(),
+    name: "New Container",
     properties: [
       {
         name: "Base Container",

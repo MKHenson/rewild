@@ -34,7 +34,7 @@ declare module "models" {
     canSelect?: boolean;
     canRename?: boolean;
     children?: ITreeNode[] | null;
-    resource?: IEditorResource;
+    resource?: IResource;
     onDragOver?: (data: IDragDropAction | null, node: ITreeNode) => boolean;
     onDrop?: (data: IDragDropAction, node: ITreeNode) => boolean;
     onDragStart?: (node: ITreeNode) => IDragDropAction;
@@ -74,11 +74,7 @@ declare module "models" {
     id: string;
     name: string;
     type: "container" | "actor";
-  }
-
-  export interface IEditorResource {
     properties: IProperty[];
-    target: IResource;
   }
 
   export type BaseType = "static";

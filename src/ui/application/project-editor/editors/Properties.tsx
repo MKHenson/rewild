@@ -8,7 +8,7 @@ interface Props {}
 export class Properties extends Component<Props> {
   init() {
     const projectStoreProxy = this.observeStore(projectStore, (prop) => {
-      if (prop === "selectedResource" || prop === "selectedResource.target.name") this.render();
+      if (prop === "selectedResource" || prop === "selectedResource.name") this.render();
     });
 
     return () => {
@@ -30,13 +30,13 @@ export class Properties extends Component<Props> {
                   }}
                 />
               ))}
-              <PropertyValue label="ID" value={selectedResource?.target.id} type="string" readonly />
+              <PropertyValue label="ID" value={selectedResource?.id} type="string" readonly />
               <PropertyValue
                 label="Name"
-                value={selectedResource.target.name}
+                value={selectedResource.name}
                 type="string"
                 onChange={(val) => {
-                  selectedResource.target.name = val;
+                  selectedResource.name = val;
                   projectStoreProxy.dirty = true;
                 }}
               />
