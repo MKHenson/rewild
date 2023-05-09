@@ -8,10 +8,12 @@
     "test": "npm run test --workspaces",
     "benchmark": "cross-env TS_NODE_PROJECT=\"./tests/tsconfig.json\" node --experimental-wasi-unstable-preview1 --experimental-wasm-simd --require ts-node/register ./tests/benchmarks.ts",
     "clean": "rimraf public",
-    "build": "npm run clean && npm run build --workspaces && node ./esbuild.js",
+    "build": "npm run clean && npm run ts-check && npm run build --workspaces && node ./esbuild.js",
+    "ts-check": "npx tsc --noEmit --project src/tsconfig.json",
+    "ts-check-watch": "npx tsc --noEmit --watch --project src/tsconfig.json",
     "watch": "node ./esbuild.js --watch",
     "watchAS": "npm run watch-as --workspace=rewild-assembly",
-    "start": "npm-run-all --parallel server watch watchAS",
+    "start": "npm-run-all --parallel server watch watchAS ts-check-watch",
     "server": "live-server --port=9001 --entry-file=index.html --open=/ ./public"
   },
   "repository": {
