@@ -56,10 +56,25 @@ export class GameLoader {
     const projects = await getProjects(true);
     const startupLevels = await Promise.all(projects.map((project) => getLevel(project.id)));
 
+    const box = geometryManager.getAsset("box");
+    const sphere = geometryManager.getAsset("sphere");
+
     for (const level of startupLevels) {
       for (const container of level.containers) {
         const containerPtr = wasm.createContainer(container.name, ContainerTypes.Default);
         this.loadedContainerPtrs.push(containerPtr);
+
+        for (const actor of container.actors) {
+          if (actor.geometry && actor.pipeline) {
+            const geometry = actor.properties.find((prop) => prop.name === "Geometry")?.value;
+            const size = actor.properties.find((prop) => prop.name === "Size")?.value;
+            const speed = actor.properties.find((prop) => prop.name === "Speed")?.value;
+            const newMesh = this.createMesh(geometry === "sphere" ? sphere : box, actor.pipeline);
+            const planetComponent = wasm.createPlanetComponent(size as number, speed as number);
+            wasm.addComponent(newMesh.transform as any, planetComponent as any);
+            wasm.addAsset(containerPtr, newMesh.transform as any);
+          }
+        }
 
         wasm.addContainer(containerPtr, container.activeOnStartup);
       }

@@ -11,10 +11,9 @@ export {
 export { createMeshPipelineInstance } from "./pipelines/MeshPipelineInstance";
 export { addPipelineAttribute } from "./pipelines/PipelineInstance";
 export { createMeshComponent } from "./components/MeshComponent";
-export {
-  createPlayerComponent,
-  getPlayerComponentProperties,
-} from "./components/PlayerComponent";
+
+export * from "./components/index";
+
 export { createContainer, addAsset } from "./objects/routing";
 export {
   getCameraProjectionInverseMatrix,

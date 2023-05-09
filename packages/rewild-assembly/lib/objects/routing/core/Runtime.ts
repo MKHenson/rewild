@@ -25,7 +25,12 @@ export class Runtime implements Listener {
 
     this.renderer = renderer;
     this.scene = new Scene();
-    this.camera = new PerspectiveCamera(45, f32(width) / f32(height), 0.1, 1000);
+    this.camera = new PerspectiveCamera(
+      45,
+      f32(width) / f32(height),
+      0.1,
+      1000
+    );
     this.camera.position.set(0, 0, 10);
     this.camera.lookAt(0, 0, 0);
     addChild(this.scene, this.camera);
@@ -59,15 +64,17 @@ export class Runtime implements Listener {
 
     if (nodeIndex == -1) throw new Error("Container does not exist");
 
-    container.runtime = null;
     this.nodes.splice(this.nodes.indexOf(container), 1);
 
     if (activeNodeIndex != -1) this.activeNodes.splice(activeNodeIndex, 1);
-    if (inactiveNodeIndex != -1) this.inactiveNodes.splice(inactiveNodeIndex, 1);
+    if (inactiveNodeIndex != -1)
+      this.inactiveNodes.splice(inactiveNodeIndex, 1);
     if (container.active) {
       container.unMount();
       console.log(`Deactivating ${container.name}`);
     }
+
+    container.runtime = null;
   }
 
   OnLoop(delta: f32, total: u32): void {
@@ -119,7 +126,9 @@ export class Runtime implements Listener {
     }
 
     for (let i: i32 = 0, l = links.length; i < l; i++) {
-      unchecked(links[i]).destinationPortal!.node.enter(unchecked(links[i]).destinationPortal!);
+      unchecked(links[i]).destinationPortal!.node.enter(
+        unchecked(links[i]).destinationPortal!
+      );
 
       console.log(
         `Entering ${unchecked(links[i]).destinationPortal!.name} of ${
@@ -127,10 +136,14 @@ export class Runtime implements Listener {
         } which is active ${links[i].destinationPortal!.node.active}`
       );
 
-      if (activeNodes.indexOf(unchecked(links[i]).destinationPortal!.node) == -1) {
+      if (
+        activeNodes.indexOf(unchecked(links[i]).destinationPortal!.node) == -1
+      ) {
         activeNodes.push(unchecked(links[i]).destinationPortal!.node);
 
-        console.log(`Activating ${unchecked(links[i]).destinationPortal!.node.name}`);
+        console.log(
+          `Activating ${unchecked(links[i]).destinationPortal!.node.name}`
+        );
       }
     }
   }

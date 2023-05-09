@@ -13,6 +13,16 @@ const baseActorProperties: IProperty[] = [
     type: "string",
     value: "1",
   },
+  {
+    name: "Speed",
+    type: "string",
+    value: "1",
+  },
+  {
+    name: "Geometry",
+    type: "string",
+    value: "sphere",
+  },
 ];
 
 export const actorFactory: () => ITreeNode = () => ({

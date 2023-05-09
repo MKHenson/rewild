@@ -1,6 +1,9 @@
-import { addChild, removeChild, TransformNode } from "../../../core/TransformNode";
+import {
+  addChild,
+  removeChild,
+  TransformNode,
+} from "../../../core/TransformNode";
 import { Node } from "./Node";
-// import { MeshComponent } from "../../../components/MeshComponent";
 import { Portal } from "./Portal";
 import { Component } from "../../../core/Component";
 
@@ -31,11 +34,11 @@ export class Container extends Node {
   }
 
   onUpdate(delta: f32, total: u32): void {
-    const children = this.objects;
+    const objects = this.objects;
     let components: Component[];
 
-    for (let c: i32 = 0, cl = children.length; c < cl; c++) {
-      components = children[c].components;
+    for (let c: i32 = 0, cl = objects.length; c < cl; c++) {
+      components = objects[c].components;
       for (let i: i32 = 0, l = components.length; i < l; i++) {
         const component = unchecked(components[i]);
         component.onUpdate(delta, total);
@@ -45,38 +48,38 @@ export class Container extends Node {
 
   mount(): void {
     const objects = this.objects;
+    let components: Component[];
+
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
+      components = objects[i].components;
       addChild(this.runtime!.scene, unchecked(objects[i]));
+
+      for (let c: i32 = 0, cl = components.length; c < cl; c++) {
+        const component = unchecked(components[c]);
+        component.mount();
+      }
     }
+
     super.mount();
   }
 
   unMount(): void {
     const objects = this.objects;
+    let components: Component[];
+
+    console.log(this.name + " is unmounting and runtime ");
+
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
+      components = objects[i].components;
       removeChild(this.runtime!.scene, unchecked(objects[i]));
+
+      for (let c: i32 = 0, cl = components.length; c < cl; c++) {
+        const component = unchecked(components[c]);
+        component.mount();
+      }
     }
     super.unMount();
   }
-
-  // init(): void {
-  //   // Load any assets
-  //   const objects = this.objects;
-  //   for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-  //     const obj = unchecked(objects[i]);
-
-  // const components = obj.components;
-  // for (let ci: i32 = 0, cl = components.length; ci < cl; ci++) {
-  //   const component = unchecked(components[ci]);
-  // if (component instanceof MeshComponent) {
-  //   const geometry = (component as MeshComponent).geometry;
-  //   if (geometry) this.runtime!.renderer.geometries.set(geometry);
-  // }
-  // }
-  //   }
-
-  //   super.init();
-  // }
 }
 
 export function createContainer(name: string): Container {
