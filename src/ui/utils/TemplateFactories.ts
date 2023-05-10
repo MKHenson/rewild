@@ -20,8 +20,12 @@ const baseActorProperties: IProperty[] = [
   },
   {
     name: "Geometry",
-    type: "string",
+    type: "enum",
     value: "sphere",
+    options: [
+      { value: "sphere", label: "Sphere" },
+      { value: " box", label: "Box" },
+    ],
   },
 ];
 

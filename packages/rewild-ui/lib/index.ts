@@ -26,3 +26,4 @@ export * from "./common/Switch";
 export * from "./common/Tree";
 export * from "./common/TreeNode";
 export * from "./common/Typography";
+export * from "./common/Select";

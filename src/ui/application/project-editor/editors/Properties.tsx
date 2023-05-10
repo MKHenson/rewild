@@ -8,7 +8,12 @@ interface Props {}
 export class Properties extends Component<Props> {
   init() {
     const projectStoreProxy = this.observeStore(projectStore, (prop) => {
-      if (prop === "selectedResource" || prop === "selectedResource.name") this.render();
+      if (
+        prop === "selectedResource" ||
+        prop === "selectedResource.name" ||
+        prop.includes("selectedResource.properties")
+      )
+        this.render();
     });
 
     return () => {
@@ -24,6 +29,7 @@ export class Properties extends Component<Props> {
                   label={prop.name}
                   value={prop.value}
                   type={prop.type}
+                  options={prop.options}
                   onChange={(val) => {
                     prop.value = val;
                     projectStoreProxy.dirty = true;

@@ -19,12 +19,17 @@ declare module "models" {
     node: ITreeNode;
   }
 
-  export type PropType = "string" | "boolean";
+  export type PropType = "string" | "boolean" | "enum";
   export type PropValue = string | boolean | number;
+  export type IOption = {
+    value: string;
+    label: string;
+  };
   export type IProperty = {
     name: string;
     type: PropType;
     value: PropValue;
+    options?: IOption[];
   };
 
   export type ITreeNode = {

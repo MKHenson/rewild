@@ -1,11 +1,13 @@
-import { theme, Component, register, Switch, Typography } from "rewild-ui";
+import { IOption } from "models";
+import { theme, Component, register, Switch, Typography, Select } from "rewild-ui";
 
-type PropType = "string" | "boolean";
+type PropType = "string" | "boolean" | "enum";
 
 interface Props<T> {
   label: string;
   type: PropType;
   value?: T;
+  options?: IOption[];
   readonly?: boolean;
   onChange?: (newValue: T) => void;
 }
@@ -36,6 +38,18 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
             onClick={(e) => {
               if (!this.props.onChange) return;
               this.props.onChange(!this.props.value as boolean as T);
+            }}
+          />
+        );
+
+      if (type === "enum")
+        return (
+          <Select
+            options={this.props.options || []}
+            value={this.props.value as string}
+            onChange={(e) => {
+              if (!this.props.onChange) return;
+              this.props.onChange(e as T);
             }}
           />
         );
