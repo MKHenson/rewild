@@ -2,7 +2,12 @@ import { OrbitController } from "../../../extras/OrbitController";
 import { PointerLockController } from "../../../extras/PointerLockController";
 import { AmbientLight } from "../../../lights/AmbientLight";
 import { DirectionalLight } from "../../../lights/DirectionalLight";
-import { Color, degToRad, ApplicationEventType, UIEventType } from "rewild-common";
+import {
+  Color,
+  degToRad,
+  ApplicationEventType,
+  UIEventType,
+} from "rewild-common";
 import { Container } from "../core/Container";
 import { inputManager } from "../../../extras/io/InputManager";
 import { KeyboardEvent } from "../../../extras/io/KeyboardEvent";
@@ -32,7 +37,7 @@ export class Level1 extends Container implements Listener {
   private direction2!: DirectionalLight;
   private direction3!: DirectionalLight;
   private ambient!: AmbientLight;
-  private floor!: TransformNode;
+  // private floor!: TransformNode;
   private sbybox!: TransformNode;
   private ball!: TransformNode;
   private sphereBody: RigidBody | null;
@@ -93,7 +98,8 @@ export class Level1 extends Container implements Listener {
       }
     } else {
       const uiEvent = event.attachment as ApplicationEvent;
-      if (uiEvent.eventType == ApplicationEventType.Quit) this.exit(this.getPortal("Exit")!, true);
+      if (uiEvent.eventType == ApplicationEventType.Quit)
+        this.exit(this.getPortal("Exit")!, true);
       else if (uiEvent.eventType == ApplicationEventType.Resume) {
         this.isPaused = false;
         lock();
@@ -147,10 +153,11 @@ export class Level1 extends Container implements Listener {
     this.totalTime = 0;
     this.isPaused = false;
 
-    this.player = this.findObjectByName("player")!.components[0] as PlayerComponent;
+    this.player = this.findObjectByName("player")!
+      .components[0] as PlayerComponent;
     this.player.onRestart();
 
-    this.floor = this.findObjectByName("floor")!;
+    // this.floor = this.findObjectByName("floor")!;
     this.ball = this.findObjectByName("ball")!;
     this.sbybox = this.findObjectByName("skybox")!;
 
@@ -165,11 +172,19 @@ export class Level1 extends Container implements Listener {
       const obj = objects[i];
 
       if (obj.name.includes("crate")) {
-        obj.position.set(this.getRandomArbitrary(-100, 100), 0.5, this.getRandomArbitrary(-100, 100));
+        obj.position.set(
+          this.getRandomArbitrary(-100, 100),
+          0.5,
+          this.getRandomArbitrary(-100, 100)
+        );
         obj.rotation.y = Mathf.random() * Mathf.PI;
       } else if (obj.name.includes("building")) {
         const height = this.getRandomArbitrary(5, 10);
-        obj.position.set(this.getRandomArbitrary(-100, 100), height / 2, this.getRandomArbitrary(-100, 100));
+        obj.position.set(
+          this.getRandomArbitrary(-100, 100),
+          height / 2,
+          this.getRandomArbitrary(-100, 100)
+        );
         obj.scale.set(5, height, 5);
 
         const options = new BodyOptions();
@@ -203,13 +218,17 @@ export class Level1 extends Container implements Listener {
     sphereConfifg.density = 20.0;
     sphereConfifg.restitution = 0.9;
 
-    this.sphereBody = this.world!.initBody("sphere", sphereOptions, sphereConfifg);
+    this.sphereBody = this.world!.initBody(
+      "sphere",
+      sphereOptions,
+      sphereConfifg
+    );
     this.sphereBody!.connectMesh(this.ball);
 
     this.ball.position.set(0, 0, 0);
-    this.floor.scale.set(200, 200, 200);
-    this.floor.position.set(0, -0.1, 0);
-    this.floor.rotation.x = -degToRad(90);
+    // this.floor.scale.set(200, 200, 200);
+    // this.floor.position.set(0, -0.1, 0);
+    // this.floor.rotation.x = -degToRad(90);
 
     const floorOptions = new BodyOptions();
     // floorOptions.pos.set(0, -40, 0);

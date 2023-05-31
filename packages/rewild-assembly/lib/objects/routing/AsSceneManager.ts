@@ -14,6 +14,7 @@ export function init(w: u16, h: u16): void {
   console.log("Starting Engine");
   renderer.init(new EngineVector4(0, 0, f32(w), f32(h)));
   runtime = new Runtime(f32(w), f32(h), renderer);
+  runtime!.init();
 }
 
 export function resize(w: u16, h: u16): void {

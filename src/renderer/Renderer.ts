@@ -4,6 +4,7 @@ import { IBindable } from "../core/IBindable";
 import { Clock } from "../core/Clock";
 import { pipelineManager } from "./AssetManagers/PipelineManager";
 import { geometryManager } from "./AssetManagers/GeometryManager";
+import { terrainManager } from "./AssetManagers/TerrainManager";
 import { textureManager } from "./TextureManager";
 import { Mesh } from "./Mesh";
 import { ResourceType, GroupType, AttributeType } from "rewild-common";
@@ -12,7 +13,6 @@ import { LightingResource } from "../core/pipelines/resources/LightingResource";
 import { Pipeline } from "../core/pipelines/Pipeline";
 import { TransformResource } from "../core/pipelines/resources/TransformResource";
 import { PipelineResourceInstance } from "../core/pipelines/resources/PipelineResourceInstance";
-import { Geometry } from "./geometry/Geometry";
 import { Player } from "../gameplay/Player";
 import { Pane3D } from "rewild-ui";
 
@@ -100,23 +100,19 @@ export class Renderer implements IBindable {
     const size = this.canvasSize();
     this.onResize(size, false);
 
+    pipelineManager.initialize(this);
+    geometryManager.initialize(this);
+    terrainManager.initialize(this);
+
     // Initialize the wasm module
     wasm.init(canvas.width, canvas.height);
 
-    pipelineManager.initialize(this);
-    geometryManager.initialize(this);
     this.player = new Player();
 
     // Setup events
     window.addEventListener("resize", this.onResizeHandler);
     window.requestAnimationFrame(this.onFrameHandler);
     this.clock.start();
-  }
-
-  createMesh(geometry: Geometry, pipelineName: string, name?: string) {
-    const pipeline = pipelineManager.getAsset(pipelineName)!;
-    const mesh = new Mesh(geometry, pipeline, this, name);
-    return mesh;
   }
 
   dispose() {
@@ -224,10 +220,22 @@ export class Renderer implements IBindable {
     this.device.queue.submit([this.currentCommandEncoder.finish()]);
   }
 
-  renderComponents(camera: Number, meshes: number[]) {
+  renderComponents(camera: number, meshComponents: number[]) {
     this.startPass();
 
-    let mesh: Mesh | undefined;
+    let meshes: Mesh[] = [];
+    for (let i = 0, l = meshComponents.length; i < l; i++) {
+      const meshPtr = meshComponents[i] | 0;
+      const mesh = meshManager.meshes.get(meshPtr);
+      if (mesh) meshes.push(mesh);
+    }
+
+    this.renderMeshes(camera, meshes);
+    this.endPass();
+  }
+
+  renderMeshes(camera: number, meshes: Mesh[]) {
+    let mesh: Mesh;
     let pipeline: Pipeline<any>;
     let pass = this.currentPass!;
     let instances: PipelineResourceInstance[];
@@ -236,8 +244,7 @@ export class Renderer implements IBindable {
     const projectionMatrix = wasm.getFloat32Array(wasm.getCameraProjectionMatrix(camera as any));
 
     for (let i = 0, l = meshes.length; i < l; i++) {
-      const meshPtr = meshes[i] | 0;
-      mesh = meshManager.meshes.get(meshPtr);
+      mesh = meshes[i];
 
       if (mesh) {
         // Set pipeline
@@ -279,13 +286,14 @@ export class Renderer implements IBindable {
         if (mesh.geometry && mesh.pipeline) {
           const attributeMap = mesh.geometry.attributes;
           const slotMap = mesh.slotMap;
+          let numVertices = 0;
 
           if (attributeMap) {
             if (attributeMap.has(AttributeType.POSITION) && slotMap.has(AttributeType.POSITION)) {
-              pass.setVertexBuffer(
-                slotMap.get(AttributeType.POSITION)!,
-                attributeMap.get(AttributeType.POSITION)!.gpuBuffer!
-              );
+              const positionAttribute = attributeMap.get(AttributeType.POSITION)!;
+              numVertices = (positionAttribute.buffer as Float32Array).length / positionAttribute.itemSize;
+
+              pass.setVertexBuffer(slotMap.get(AttributeType.POSITION)!, positionAttribute.gpuBuffer!);
             }
 
             if (attributeMap.has(AttributeType.NORMAL) && slotMap.has(AttributeType.NORMAL)) {
@@ -302,14 +310,17 @@ export class Renderer implements IBindable {
             if (mesh.geometry.indexBuffer) {
               pass.setIndexBuffer(mesh.geometry.indexBuffer, "uint32");
               pass.drawIndexed(mesh.geometry.indices.length);
-            } else {
+            } else if (numVertices) {
+              pass.draw(numVertices, 1, 0, 0);
             }
           }
         }
       }
     }
+  }
 
-    this.endPass();
+  setupPipeline(pipeline: Pipeline<any>): Pipeline<any> {
+    return pipeline;
   }
 
   setupLights(

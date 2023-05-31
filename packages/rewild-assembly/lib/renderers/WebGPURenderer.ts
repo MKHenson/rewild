@@ -50,7 +50,10 @@ export class WebGPURenderer {
     scene.onBeforeRender();
 
     const _projScreenMatrix = this._projScreenMatrix;
-    _projScreenMatrix.multiplyMatricesSIMD(camera.projectionMatrix, camera.matrixWorldInverse);
+    _projScreenMatrix.multiplyMatricesSIMD(
+      camera.projectionMatrix,
+      camera.matrixWorldInverse
+    );
 
     this.currentRenderList.reset();
     this.projectObject(scene, camera);
@@ -59,13 +62,20 @@ export class WebGPURenderer {
 
     let mesh: MeshComponent;
     let transform: TransformNode | null;
-    for (let i: i32 = 0, l: i32 = this.currentRenderList.solids.length; i < l; i++) {
+    for (
+      let i: i32 = 0, l: i32 = this.currentRenderList.solids.length;
+      i < l;
+      i++
+    ) {
       mesh = unchecked(this.currentRenderList.solids[i]) as MeshComponent;
 
       transform = mesh.transform;
       if (!transform) return;
 
-      transform.modelViewMatrix.multiplyMatricesSIMD(camera.matrixWorldInverse, transform.matrixWorld);
+      transform.modelViewMatrix.multiplyMatricesSIMD(
+        camera.matrixWorldInverse,
+        transform.matrixWorld
+      );
       transform.normalMatrix.getNormalMatrix(transform.modelViewMatrix);
     }
 
@@ -87,6 +97,7 @@ export class WebGPURenderer {
       this.currentRenderList.lights.push(object as Light);
     }
 
-    for (let i = 0, l = object.children.length; i < l; i++) this.projectObject(unchecked(object.children[i]), camera);
+    for (let i = 0, l = object.children.length; i < l; i++)
+      this.projectObject(unchecked(object.children[i]), camera);
   }
 }
