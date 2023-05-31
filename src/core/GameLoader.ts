@@ -8,6 +8,7 @@ import { Renderer } from "../renderer/Renderer";
 import { getLevel } from "../api/levels";
 import { getProjects } from "../api/projects";
 import { geometryManager } from "../renderer/AssetManagers/GeometryManager";
+import { terrainManager } from "src/renderer/AssetManagers/TerrainManager";
 
 /** Loads game files and assets and sends the created objects to wasm */
 export class GameLoader {
@@ -23,8 +24,8 @@ export class GameLoader {
     const containerLvl1Ptr = wasm.createContainer(ContainerTypes.Level1, ContainerTypes.Level1);
     const box = geometryManager.getAsset("box");
     const sphere = geometryManager.getAsset("sphere");
-    const plane = geometryManager.getAsset("plane");
 
+    wasm.addAsset(containerLvl1Ptr, terrainManager.terrainPtr);
     wasm.addAsset(containerLvl1Ptr, this.createMesh(box, "skybox", "skybox").transform as any);
     wasm.addAsset(containerLvl1Ptr, this.createMesh(sphere, "simple", "ball").transform as any);
 
@@ -32,8 +33,6 @@ export class GameLoader {
       wasm.addAsset(containerLvl1Ptr, this.createMesh(box, "concrete", `building-${i}`).transform as any);
     for (let i = 0; i < 20; i++)
       wasm.addAsset(containerLvl1Ptr, this.createMesh(box, "crate", `crate-${i}`).transform as any);
-
-    wasm.addAsset(containerLvl1Ptr, this.createMesh(plane, "coastal-floor", "floor").transform as any);
 
     const containerTestPtr = wasm.createContainer(ContainerTypes.TestLevel, ContainerTypes.TestLevel);
     wasm.addAsset(containerTestPtr, this.createMesh(box, "skybox", "skybox").transform as any);

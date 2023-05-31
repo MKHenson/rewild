@@ -33,10 +33,13 @@ export class Runtime implements Listener {
     );
     this.camera.position.set(0, 0, 10);
     this.camera.lookAt(0, 0, 0);
+
     addChild(this.scene, this.camera);
 
     inputManager.addEventListener("mousemove", this);
   }
+
+  init(): void {}
 
   getNode(name: string): Node | null {
     const nodes = this.nodes;

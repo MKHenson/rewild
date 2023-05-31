@@ -79,11 +79,4 @@ export class PlaneGeometry extends Geometry {
     this.setAttribute(AttributeType.NORMAL, new Float32Array(normals), 3);
     this.setAttribute(AttributeType.UV, new Float32Array(uvs), 2);
   }
-
-  // TODO:
-  // static fromJSON( data ) {
-
-  // 	return new PlaneGeometry( data.width, data.height, data.widthSegments, data.heightSegments );
-
-  // }
 }

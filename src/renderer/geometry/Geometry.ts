@@ -139,7 +139,7 @@ export class Geometry {
       } else throw new Error(`Attribute ${AttributeType[key]} not recognised`);
     });
 
-    this.indexBuffer = createIndexBufferU32(renderer.device, this.indices);
+    if (this.indices) this.indexBuffer = createIndexBufferU32(renderer.device, this.indices);
     return this;
   }
 
