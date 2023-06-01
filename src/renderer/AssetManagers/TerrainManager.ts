@@ -1,4 +1,4 @@
-import { AttributeType, CHUNK_SIZE } from "rewild-common";
+import { AttributeType, CHUNK_SIZE, Noise } from "rewild-common";
 import { Renderer } from "../Renderer";
 import { Geometry } from "../geometry/Geometry";
 import { TerrainPipeline } from "../../core/pipelines/terrain-pipeline/TerrainPipeline";
@@ -24,6 +24,28 @@ export class TerrainManager {
 
   createTerrainChunk() {
     const geometry = new Geometry();
+
+    const map = Noise.generateNoiseMap(CHUNK_SIZE, CHUNK_SIZE);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = CHUNK_SIZE;
+    canvas.height = CHUNK_SIZE;
+    const ctx = canvas.getContext("2d")!;
+    const imgData = ctx.createImageData(CHUNK_SIZE, CHUNK_SIZE);
+
+    for (let y: i32 = 0; y < CHUNK_SIZE; y++) {
+      for (let x: i32 = 0; x < CHUNK_SIZE; x++) {
+        const value = map[x][y];
+        const i = (y * CHUNK_SIZE + x) * 4;
+        imgData.data[i] = value * 255;
+        imgData.data[i + 1] = value * 255;
+        imgData.data[i + 2] = value * 255;
+        imgData.data[i + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    document.body.appendChild(canvas);
 
     const vecData: Array<f32[]> = new Array(CHUNK_SIZE * CHUNK_SIZE);
     for (let z: i32 = 0; z < CHUNK_SIZE; z++) {
