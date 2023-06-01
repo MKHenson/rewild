@@ -1,1 +1,1 @@
-export const CHUNK_SIZE: i32 = 32;
+export const CHUNK_SIZE: i32 = 512;
