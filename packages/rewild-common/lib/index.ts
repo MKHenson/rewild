@@ -7,7 +7,6 @@ export * from "./GLEnums";
 export * from "./GPUEnums";
 export * from "./GroupType";
 export * from "./IBridge";
-export * from "./Noise";
 export * from "./PipelineType";
 export * from "./ResourceType";
 export * from "./ShaderConstants";
