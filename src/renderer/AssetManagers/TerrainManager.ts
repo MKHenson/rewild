@@ -1,4 +1,4 @@
-import { AttributeType, CHUNK_SIZE, Noise } from "rewild-common";
+import { AttributeType, CHUNK_SIZE, Simplex } from "rewild-common";
 import { Renderer } from "../Renderer";
 import { Geometry } from "../geometry/Geometry";
 import { TerrainPipeline } from "../../core/pipelines/terrain-pipeline/TerrainPipeline";
@@ -12,8 +12,11 @@ export class TerrainManager {
   terrainPipeline: TerrainPipeline;
   renderer: Renderer;
   terrainPtr: any;
+  noise: Simplex;
 
-  constructor() {}
+  constructor() {
+    this.noise = new Simplex(1);
+  }
 
   initialize(renderer: Renderer): void {
     this.renderer = renderer;
@@ -25,26 +28,9 @@ export class TerrainManager {
   createTerrainChunk() {
     const geometry = new Geometry();
 
-    const map = Noise.generateNoiseMap(CHUNK_SIZE, CHUNK_SIZE);
+    const map = Simplex.generateNoiseMap(CHUNK_SIZE, CHUNK_SIZE, 1.1, this.noise);
+    const canvas = this.noise.createNoiseMap(map);
 
-    const canvas = document.createElement("canvas");
-    canvas.width = CHUNK_SIZE;
-    canvas.height = CHUNK_SIZE;
-    const ctx = canvas.getContext("2d")!;
-    const imgData = ctx.createImageData(CHUNK_SIZE, CHUNK_SIZE);
-
-    for (let y: i32 = 0; y < CHUNK_SIZE; y++) {
-      for (let x: i32 = 0; x < CHUNK_SIZE; x++) {
-        const value = map[x][y];
-        const i = (y * CHUNK_SIZE + x) * 4;
-        imgData.data[i] = value * 255;
-        imgData.data[i + 1] = value * 255;
-        imgData.data[i + 2] = value * 255;
-        imgData.data[i + 3] = 255;
-      }
-    }
-
-    ctx.putImageData(imgData, 0, 0);
     document.body.appendChild(canvas);
 
     const vecData: Array<f32[]> = new Array(CHUNK_SIZE * CHUNK_SIZE);
