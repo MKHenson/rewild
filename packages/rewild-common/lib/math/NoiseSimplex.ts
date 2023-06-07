@@ -1,6 +1,6 @@
-import { create2DArray } from "../Utils";
+import type { INoise } from "./Noise";
 
-export class Simplex {
+export class NoiseSimplex implements INoise {
   // Grad table for Simplex noise
   static grad3: f32[][] = [
     [1, 1, 0],
@@ -55,8 +55,8 @@ export class Simplex {
   }
 
   // Simplex noise function
-  noise2D(xin: f32, yin: f32): f32 {
-    const grad3 = Simplex.grad3;
+  get2D(xin: f32, yin: f32): f32 {
+    const grad3 = NoiseSimplex.grad3;
     const perm = this.perm;
 
     const F2: f32 = 0.5 * (Mathf.sqrt(3.0) - 1.0);
@@ -119,65 +119,10 @@ export class Simplex {
       n2 = t2 * t2 * this.dot(grad3[gi2], x2, y2);
     }
 
-    return 70.0 * (n0 + n1 + n2);
+    return (70.0 * (n0 + n1 + n2) + 1) / 2;
   }
 
   private dot(g: f32[], x: f32, y: f32) {
     return g[0] * x + g[1] * y;
-  }
-
-  // Initialize the canvas and render the noise
-  createNoiseMap(map: f32[][]) {
-    const canvas = document.createElement("canvas") as HTMLCanvasElement;
-    const width = map.length;
-    const height = map[0].length;
-
-    canvas.width = width;
-    canvas.height = height;
-
-    let noise: i32[] = new Array(width * height);
-
-    for (let y: f32 = 0; y < height; y++) {
-      for (let x: f32 = 0; x < width; x++) {
-        let value = map[x][y];
-        value = Mathf.floor((value + 1) * 128); // Convert noise value to grayscale
-        noise[y * width + x] = value;
-      }
-    }
-
-    const ctx = canvas.getContext("2d")!;
-    const imageData = ctx.createImageData(width, height);
-
-    for (let i = 0; i < noise.length; i++) {
-      const value = noise[i];
-      imageData.data[i * 4] = value; // Red component
-      imageData.data[i * 4 + 1] = value; // Green component
-      imageData.data[i * 4 + 2] = value; // Blue component
-      imageData.data[i * 4 + 3] = 255; // Alpha component
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    return canvas;
-  }
-
-  public static generateNoiseMap(
-    mapWidth: u16,
-    mapHeight: u16,
-    scale: f32 = 0.01,
-    noise: Simplex = new Simplex(Mathf.floor(Math.random() * 100000))
-  ): f32[][] {
-    const noiseMap: f32[][] = create2DArray(mapWidth, mapHeight);
-
-    for (let y: i32 = 0; y < mapHeight; y++) {
-      for (let x: i32 = 0; x < mapHeight; x++) {
-        const sampleX = f32(x) / f32(mapWidth) / scale;
-        const sampleY = f32(y) / f32(mapHeight) / scale;
-
-        const value = noise.noise2D(sampleX, sampleY);
-        noiseMap[x][y] = value;
-      }
-    }
-
-    return noiseMap;
   }
 }
