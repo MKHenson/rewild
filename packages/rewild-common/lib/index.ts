@@ -12,3 +12,4 @@ export * from "./ResourceType";
 export * from "./ShaderConstants";
 export * from "./math";
 export * from "./TerrainConstants";
+export * from "./Utils";
