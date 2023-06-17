@@ -1,15 +1,18 @@
-import { BitmapCubeTexture } from "../core/textures/BitmapCubeTexture";
-import { BitmapTexture } from "../core/textures/BitmapTexture";
-import { Texture } from "../core/textures/Texture";
+import { BitmapCubeTexture } from "../../core/textures/BitmapCubeTexture";
+import { BitmapTexture } from "../../core/textures/BitmapTexture";
+import { Texture } from "../../core/textures/Texture";
+import { Renderer } from "../Renderer";
+import { AssetManager } from "./AssetManager";
 
 const MEDIA_URL = process.env.MEDIA_URL;
 
-class TextureManager {
+class TextureManager extends AssetManager<Texture> {
   textures: Texture[];
 
-  async init(device: GPUDevice) {
-    // TEXTURES
-    const textures: Texture[] = [
+  async initialize(renderer: Renderer) {
+    const { device } = renderer;
+
+    this.assets.push(
       new BitmapTexture("grid", MEDIA_URL + "uv-grid.jpg", device),
       new BitmapTexture("crate", MEDIA_URL + "crate-wooden.jpg", device),
       new BitmapTexture("earth", MEDIA_URL + "earth-day-2k.jpg", device),
@@ -46,18 +49,19 @@ class TextureManager {
           MEDIA_URL + "skyboxes/stars/back.png",
         ],
         device
-      ),
-    ];
+      )
+    );
 
-    this.textures = await Promise.all(
-      textures.map((texture) => {
+    this.assets = await Promise.all(
+      this.assets.map((texture) => {
         return texture.load(device);
       })
     );
   }
 
-  find(name: string) {
-    return this.textures.find((texture) => texture.name === name);
+  addTexture(texture: Texture) {
+    this.assets.push(texture);
+    return texture;
   }
 }
 

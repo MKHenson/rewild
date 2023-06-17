@@ -1,4 +1,4 @@
-import { AttributeType, CHUNK_SIZE, NoiseSimplex, create2DArray, INoise, NoisePerlin } from "rewild-common";
+import { AttributeType, CHUNK_SIZE } from "rewild-common";
 import { Renderer } from "../Renderer";
 import { Geometry } from "../geometry/Geometry";
 import { TerrainPipeline } from "../../core/pipelines/terrain-pipeline/TerrainPipeline";
@@ -6,95 +6,76 @@ import { Mesh } from "../Mesh";
 import { meshManager } from "../MeshManager";
 import { pipelineManager } from "./PipelineManager";
 import { wasm } from "src/core/WasmManager";
+import { NoiseMap } from "../terrain/NoiseMap";
+import { textureManager } from "./TextureManager";
+import { CanvasTexture } from "src/core/textures/CanvasTexture";
 
 export class TerrainManager {
   geometry: Geometry;
   terrainPipeline: TerrainPipeline;
   renderer: Renderer;
   terrainPtr: any;
-  noise1: INoise;
-  noise2: INoise;
+  noiseMap: NoiseMap;
 
   constructor() {
-    this.noise1 = new NoiseSimplex(100);
-    this.noise2 = new NoisePerlin(100);
+    this.noiseMap = new NoiseMap(CHUNK_SIZE, 0.6, 4, 0.5, 2, [1.4, 0], 100);
   }
 
-  initialize(renderer: Renderer): void {
+  async initialize(renderer: Renderer): Promise<void> {
     this.renderer = renderer;
     this.terrainPipeline = pipelineManager.getAsset("terrain");
     this.terrainPtr = wasm.createTerrain("Terrain");
+
+    const canvas = this.noiseMap.generate().createCanvas();
+    document.body.appendChild(canvas);
+
+    const texture = textureManager.addTexture(new CanvasTexture("terrain1", canvas, this.renderer.device));
+    await texture.load(this.renderer.device);
+
     this.createTerrainChunk();
-  }
-
-  // Initialize the canvas and render the noise
-  createNoiseMap(map: f32[][]) {
-    const canvas = document.createElement("canvas") as HTMLCanvasElement;
-    const width = map.length;
-    const height = map[0].length;
-
-    canvas.width = width;
-    canvas.height = height;
-
-    let noise: i32[] = new Array(width * height);
-
-    for (let y: f32 = 0; y < height; y++) {
-      for (let x: f32 = 0; x < width; x++) {
-        let value = map[x][y];
-        value = Mathf.floor(value * 255); // Convert noise value to grayscale
-        noise[y * width + x] = value;
-      }
-    }
-
-    const ctx = canvas.getContext("2d")!;
-    const imageData = ctx.createImageData(width, height);
-
-    for (let i = 0; i < noise.length; i++) {
-      const value = noise[i];
-      imageData.data[i * 4] = value; // Red component
-      imageData.data[i * 4 + 1] = value; // Green component
-      imageData.data[i * 4 + 2] = value; // Blue component
-      imageData.data[i * 4 + 3] = 255; // Alpha component
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    return canvas;
-  }
-
-  public generateNoiseMap(mapWidth: u16, mapHeight: u16, scale: f32 = 0.01, noise: INoise): f32[][] {
-    const noiseMap: f32[][] = create2DArray(mapWidth, mapHeight);
-
-    for (let y: i32 = 0; y < mapHeight; y++) {
-      for (let x: i32 = 0; x < mapHeight; x++) {
-        const sampleX = f32(x) / f32(mapWidth) / scale;
-        const sampleY = f32(y) / f32(mapHeight) / scale;
-
-        const value = noise.get2D(sampleX, sampleY);
-        noiseMap[x][y] = value;
-      }
-    }
-
-    return noiseMap;
   }
 
   createTerrainChunk() {
     const geometry = new Geometry();
+    const texture = textureManager.getAsset("terrain1");
 
-    const canvas1 = this.createNoiseMap(this.generateNoiseMap(CHUNK_SIZE, CHUNK_SIZE, 0.05, this.noise1));
-    document.body.appendChild(canvas1);
+    this.terrainPipeline.defines = {
+      diffuseMap: texture,
+    };
 
-    const canvas2 = this.createNoiseMap(this.generateNoiseMap(CHUNK_SIZE, CHUNK_SIZE, 0.05, this.noise2));
-    document.body.appendChild(canvas2);
-
-    const vecData: Array<f32[]> = new Array(CHUNK_SIZE * CHUNK_SIZE);
+    let vecData: Array<f32[]> = new Array(CHUNK_SIZE * CHUNK_SIZE);
     for (let z: i32 = 0; z < CHUNK_SIZE; z++) {
       for (let x: i32 = 0; x < CHUNK_SIZE; x++) {
         vecData[CHUNK_SIZE * z + x] = [x, 0, z];
       }
     }
 
-    const data = new Float32Array(vecData.flat());
+    // Create a simple triagle
+    const vecDataFlat = [
+      [0, 0, 50],
+      [50, 0, 0],
+      [0, 0, 0],
+
+      [50, 0, 0],
+      [0, 0, 50],
+      [50, 0, 50],
+    ];
+
+    const uvDataFlat = [
+      [0, 0],
+      [1, 1],
+      [0, 1],
+
+      [1, 1],
+      [0, 0],
+      [1, 0],
+    ];
+
+    const data = new Float32Array(vecDataFlat.flat());
     geometry.setAttribute(AttributeType.POSITION, data, 3);
+
+    const uvData = new Float32Array(uvDataFlat.flat());
+    geometry.setAttribute(AttributeType.UV, uvData, 2);
 
     // const geometry = new PlaneGeometry(100, 100);
     geometry.build(this.renderer);

@@ -5,7 +5,7 @@ import { Clock } from "../core/Clock";
 import { pipelineManager } from "./AssetManagers/PipelineManager";
 import { geometryManager } from "./AssetManagers/GeometryManager";
 import { terrainManager } from "./AssetManagers/TerrainManager";
-import { textureManager } from "./TextureManager";
+import { textureManager } from "./AssetManagers/TextureManager";
 import { Mesh } from "./Mesh";
 import { ResourceType, GroupType, AttributeType } from "rewild-common";
 import { meshManager } from "./MeshManager";
@@ -95,14 +95,13 @@ export class Renderer implements IBindable {
     this.context = context;
     this.format = format;
 
-    await textureManager.init(device);
-
     const size = this.canvasSize();
     this.onResize(size, false);
 
-    pipelineManager.initialize(this);
-    geometryManager.initialize(this);
-    terrainManager.initialize(this);
+    await textureManager.initialize(this);
+    await pipelineManager.initialize(this);
+    await geometryManager.initialize(this);
+    await terrainManager.initialize(this);
 
     // Initialize the wasm module
     wasm.init(canvas.width, canvas.height);

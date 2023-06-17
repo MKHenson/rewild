@@ -39,7 +39,7 @@ export class NoiseSimplex implements INoise {
     };
   }
 
-  private seedPermutationTable(seed: i32) {
+  private seedPermutationTable(seed: i32): void {
     const random = this.createRandom(seed);
     const p = this.p;
     const perm = this.perm;
@@ -122,7 +122,7 @@ export class NoiseSimplex implements INoise {
     return (70.0 * (n0 + n1 + n2) + 1) / 2;
   }
 
-  private dot(g: f32[], x: f32, y: f32) {
+  private dot(g: f32[], x: f32, y: f32): f32 {
     return g[0] * x + g[1] * y;
   }
 }

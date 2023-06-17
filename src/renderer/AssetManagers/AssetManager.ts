@@ -13,5 +13,5 @@ export abstract class AssetManager<T extends { name: string }> {
     return toRet;
   }
 
-  abstract initialize(renderer: Renderer): void;
+  abstract initialize(renderer: Renderer): Promise<void>;
 }
