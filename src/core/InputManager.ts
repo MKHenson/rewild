@@ -4,6 +4,7 @@ import { Pane3D } from "rewild-ui";
 
 export class InputManager {
   pane3D: Pane3D;
+  preventSignalEscOnLock = false;
 
   private onDownHandler: (e: MouseEvent) => void;
   private onUpHandler: (e: MouseEvent) => void;
@@ -43,6 +44,7 @@ export class InputManager {
   private onPointerlockChange() {
     if (this.pane3D.shadow!.pointerLockElement === this.pane3D.canvas()) {
     } else {
+      if (this.preventSignalEscOnLock) return;
       // Signal escape was pushed
       this.sendKeyEvent(KeyEventType.KeyUp, { code: "Escape" });
     }

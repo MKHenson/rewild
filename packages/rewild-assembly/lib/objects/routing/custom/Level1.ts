@@ -27,22 +27,24 @@ import { Vec3 } from "../../../physics/math/Vec3";
 const vec: Vec3 = new Vec3();
 
 export class Level1 extends Container implements Listener {
-  orbitController!: OrbitController;
-  pointerController!: PointerLockController;
-  totalTime: f32;
-  isPaused: boolean;
-
+  private orbitController!: OrbitController;
+  private pointerController!: PointerLockController;
+  private totalTime: f32;
+  private isPaused: boolean;
+  private useOrbitController: boolean;
   private player!: PlayerComponent;
   private direction1!: DirectionalLight;
   private direction2!: DirectionalLight;
   private direction3!: DirectionalLight;
   private ambient!: AmbientLight;
   // private floor!: TransformNode;
-  private sbybox!: TransformNode;
+  private skybox!: TransformNode;
   private ball!: TransformNode;
   private sphereBody: RigidBody | null;
   private playerBody: RigidBody | null;
   private world: World | null;
+
+  private gravity: f32 = -9.8;
 
   constructor(name: string) {
     super(name);
@@ -77,23 +79,31 @@ export class Level1 extends Container implements Listener {
     this.ambient = new AmbientLight(new Color(1, 1, 1), 0.4);
     this.addAsset(this.ambient);
 
-    // this.orbitController = new OrbitController(this.runtime!.camera);
+    this.useOrbitController = false;
+    this.orbitController = new OrbitController(this.runtime!.camera);
     this.pointerController = new PointerLockController(this.runtime!.camera);
 
     const physicsWorldOptions = new WorldOptions();
-    physicsWorldOptions.gravity.set(0, -9.8, 0);
+    physicsWorldOptions.gravity.set(0, this.gravity, 0);
     this.world = new World(physicsWorldOptions);
   }
 
   onEvent(event: Event): void {
     if (event.attachment instanceof KeyboardEvent) {
       const keyEvent = event.attachment as KeyboardEvent;
+
       if (!this.player.isDead) {
         if (keyEvent.code == "Escape") {
           this.isPaused = !this.isPaused;
+
           if (this.isPaused) unlock();
-          else lock();
+          else if (!this.useOrbitController) lock();
+
           uiSignaller.signalClientEvent(ApplicationEventType.OpenInGameMenu);
+        } else if (keyEvent.code == "KeyC") {
+          this.useOrbitController = !this.useOrbitController;
+          if (!this.useOrbitController) lock();
+          else unlock();
         }
       }
     } else {
@@ -102,11 +112,16 @@ export class Level1 extends Container implements Listener {
         this.exit(this.getPortal("Exit")!, true);
       else if (uiEvent.eventType == ApplicationEventType.Resume) {
         this.isPaused = false;
-        lock();
+        if (!this.useOrbitController) lock();
       }
     }
 
-    this.pointerController.enabled = !this.isPaused && !this.player.isDead;
+    this.pointerController.enabled = this.useOrbitController
+      ? false
+      : !this.isPaused && !this.player.isDead;
+    this.orbitController.enabled = this.useOrbitController
+      ? !this.isPaused && !this.player.isDead
+      : false;
   }
 
   onUpdate(delta: f32, total: u32): void {
@@ -114,34 +129,29 @@ export class Level1 extends Container implements Listener {
     super.onUpdate(delta, total);
 
     this.world!.step();
-
-    const objects = this.objects;
     this.totalTime += delta;
 
-    this.playerBody!.setPosition(
-      vec.set(
-        this.pointerController.camera.position.x,
-        this.pointerController.camera.position.y,
-        this.pointerController.camera.position.z
-      )
-    );
+    const camera = this.runtime!.camera;
+    const camPos = camera.position;
+    this.skybox.position.set(camPos.x, camPos.y, camPos.z);
+
+    if (!this.useOrbitController) {
+      let yValue = camPos.y + this.gravity * delta;
+      if (yValue < 0) yValue = 0;
+      camPos.set(camPos.x, yValue, camPos.z);
+
+      this.playerBody!.setPosition(vec.set(camPos.x, camPos.y, camPos.z));
+    }
 
     if (this.player.isDead) {
-      // this.orbitController.enabled = false;
+      this.orbitController.enabled = false;
       this.pointerController.enabled = false;
     }
 
-    // for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-    // if (objects[i] == this.ball) {
-    //   objects[i].rotation.x += delta * 1;
-    //   objects[i].rotation.y += delta * 1;
-    //   objects[i].position.y = Mathf.sin(this.totalTime + objects[i].position.x) + 2;
-    //   break;
-    // }
-    // }
-
-    // if (this.orbitController) this.orbitController.update();
-    if (this.pointerController) this.pointerController.update(delta);
+    if (this.orbitController && this.useOrbitController)
+      this.orbitController.update();
+    if (this.pointerController && !this.useOrbitController)
+      this.pointerController.update(delta);
   }
 
   getRandomArbitrary(min: f32, max: f32): f32 {
@@ -159,12 +169,12 @@ export class Level1 extends Container implements Listener {
 
     // this.floor = this.findObjectByName("floor")!;
     this.ball = this.findObjectByName("ball")!;
-    this.sbybox = this.findObjectByName("skybox")!;
+    this.skybox = this.findObjectByName("skybox")!;
 
     // Possitive z comes out of screen
     this.runtime!.camera.position.set(0, 1, 50);
     this.runtime!.camera.lookAt(0, 0, 0);
-    // this.orbitController.enabled = true;
+    this.orbitController.enabled = true;
     this.pointerController.enabled = true;
 
     const objects = this.objects;
@@ -198,12 +208,14 @@ export class Level1 extends Container implements Listener {
       this.world!.removeRigidBody(this.sphereBody!);
       this.world!.removeRigidBody(this.playerBody!);
     }
+
     const playerOptions = new BodyOptions();
     playerOptions.pos.set(
       this.runtime!.camera.position.x,
       this.runtime!.camera.position.y,
       this.runtime!.camera.position.z
     );
+
     playerOptions.size.set(1, 1, 1);
     playerOptions.move = true;
     playerOptions.kinematic = true;
@@ -242,20 +254,21 @@ export class Level1 extends Container implements Listener {
     floorConfifg.restitution = 0.2;
     this.world!.initBody("plane", floorOptions, floorConfifg);
 
-    this.sbybox.scale.set(200, 200, 200);
-    this.sbybox.position.set(0, 0, 0);
+    this.skybox.scale.set(5000, 5000, 5000);
+    this.skybox.position.set(0, 0, 0);
 
     inputManager.addEventListener("keyup", this);
     uiSignaller.addEventListener(UIEventType, this);
     this.world!.play();
-    lock();
+
+    if (!this.useOrbitController) lock();
   }
 
   unMount(): void {
     super.unMount();
     this.world!.stop();
     this.world!.clear();
-    // this.orbitController.enabled = false;
+    this.orbitController.enabled = false;
     this.pointerController.enabled = false;
     inputManager.removeEventListener("keyup", this);
     uiSignaller.removeEventListener(UIEventType, this);

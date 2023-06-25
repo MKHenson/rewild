@@ -2,13 +2,13 @@ import { AttributeType, CHUNK_SIZE } from "rewild-common";
 import { Renderer } from "../Renderer";
 import { Geometry } from "../geometry/Geometry";
 import { TerrainPipeline } from "../../core/pipelines/terrain-pipeline/TerrainPipeline";
-import { Mesh } from "../Mesh";
 import { meshManager } from "../MeshManager";
 import { pipelineManager } from "./PipelineManager";
 import { wasm } from "src/core/WasmManager";
 import { NoiseMap } from "../terrain/NoiseMap";
 import { textureManager } from "./TextureManager";
 import { CanvasTexture } from "src/core/textures/CanvasTexture";
+import { MeshGenerator } from "../terrain/MeshGenerator";
 
 export class TerrainManager {
   geometry: Geometry;
@@ -27,8 +27,6 @@ export class TerrainManager {
     this.terrainPtr = wasm.createTerrain("Terrain");
 
     const canvas = this.noiseMap.generate().createCanvas();
-    document.body.appendChild(canvas);
-
     const texture = textureManager.addTexture(new CanvasTexture("terrain1", canvas, this.renderer.device));
     await texture.load(this.renderer.device);
 
@@ -80,7 +78,11 @@ export class TerrainManager {
     // const geometry = new PlaneGeometry(100, 100);
     geometry.build(this.renderer);
 
-    const mesh = new Mesh(geometry, this.terrainPipeline, this.renderer, `TerrainChunk`);
+    // new Mesh(geometry, this.terrainPipeline, this.renderer, `TerrainChunk`);
+    // wasm.addChild(this.terrainPtr, mesh.transform as any);
+
+    const meshData = MeshGenerator.generateTerrainMesh(this.noiseMap.noiseMap);
+    const mesh = meshData.createMesh(this.renderer);
     wasm.addChild(this.terrainPtr, mesh.transform as any);
 
     return meshManager.addMesh(mesh);

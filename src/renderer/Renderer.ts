@@ -60,7 +60,9 @@ export class Renderer implements IBindable {
   }
 
   unlock() {
+    this.inputManager.preventSignalEscOnLock = true;
     document.exitPointerLock();
+    setTimeout(() => (this.inputManager.preventSignalEscOnLock = false), 500);
   }
 
   createBinding() {

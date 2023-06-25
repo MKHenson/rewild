@@ -29,7 +29,7 @@ export class Runtime implements Listener {
       45,
       f32(width) / f32(height),
       0.1,
-      1000
+      10000
     );
     this.camera.position.set(0, 0, 10);
     this.camera.lookAt(0, 0, 0);

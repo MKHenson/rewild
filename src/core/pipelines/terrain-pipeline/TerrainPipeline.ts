@@ -15,7 +15,7 @@ export interface TerrainDefines {
 export class TerrainPipeline extends Pipeline<TerrainDefines> {
   constructor(name: string, defines: TerrainDefines) {
     super(name, vertexShader, fragmentShader, defines);
-
+    this.frontFace = "ccw";
     this.vertexLayouts = [
       new VertexBufferLayout(Float32Array.BYTES_PER_ELEMENT * 3, [
         new VertexAttribute(AttributeType.POSITION, 0, "float32x3", 0),

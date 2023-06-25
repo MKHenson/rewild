@@ -1,4 +1,17 @@
-import type { INoise } from "./Noise";
+import { INoise } from "./Noise";
+
+class Random {
+  private value: i32;
+
+  constructor(seed: i32) {
+    this.value = seed % 2147483647;
+  }
+
+  next(): i32 {
+    this.value = (this.value * 16807) % 2147483647;
+    return (this.value - 1) / 2147483646;
+  }
+}
 
 export class NoiseSimplex implements INoise {
   // Grad table for Simplex noise
@@ -31,12 +44,8 @@ export class NoiseSimplex implements INoise {
   }
 
   // Seeded random number generator
-  private createRandom(seed: i32) {
-    let value = seed % 2147483647;
-    return function random() {
-      value = (value * 16807) % 2147483647;
-      return (value - 1) / 2147483646;
-    };
+  private createRandom(seed: i32): Random {
+    return new Random(seed);
   }
 
   private seedPermutationTable(seed: i32): void {
@@ -45,7 +54,7 @@ export class NoiseSimplex implements INoise {
     const perm = this.perm;
 
     for (let i = 0; i < 256; i++) {
-      const j = Mathf.floor(random() * (i + 1));
+      const j = Mathf.floor(random.next() * (i + 1));
 
       [p[i], p[j]] = [p[j], p[i]];
     }
@@ -102,7 +111,7 @@ export class NoiseSimplex implements INoise {
     }
 
     let t1: f32 = 0.5 - x1 * x1 - y1 * y1;
-    let n1;
+    let n1: f32;
     if (t1 < 0) {
       n1 = 0.0;
     } else {
