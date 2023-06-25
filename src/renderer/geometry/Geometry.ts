@@ -2,6 +2,9 @@ import { wasm } from "../../core/WasmManager";
 import { AttributeType } from "rewild-common";
 import { createBufferFromF32, createIndexBufferU32 } from "../../core/Utils";
 import { Renderer } from "../Renderer";
+import { ClientVector3 } from "../../math/ClientVector3";
+
+const _vector = new ClientVector3();
 
 export class BufferGeometryGroup {
   start: i32;
@@ -15,10 +18,11 @@ export class BufferGeometryGroup {
   }
 }
 
-export type BufferArray = ArrayBuffer & { [index: number]: number };
+export type BufferArray = ArrayBuffer & { [index: number]: number; length: number };
 
 export class Attribute<T extends BufferArray> {
   itemSize: number;
+  count: number;
   version: number;
   normalized: boolean;
   buffer: T;
@@ -26,6 +30,7 @@ export class Attribute<T extends BufferArray> {
 
   constructor(buffer: T, itemSize: number, normalized = false) {
     this.itemSize = itemSize;
+    this.count = buffer.length / itemSize;
     this.normalized = normalized;
     this.buffer = buffer;
     this.gpuBuffer = null;
@@ -102,6 +107,15 @@ export class Attribute<T extends BufferArray> {
   }
 }
 
+const pA = new ClientVector3(),
+  pB = new ClientVector3(),
+  pC = new ClientVector3();
+const nA = new ClientVector3(),
+  nB = new ClientVector3(),
+  nC = new ClientVector3();
+const cb = new ClientVector3(),
+  ab = new ClientVector3();
+
 export class Geometry {
   name: string;
   bufferGeometry: Number;
@@ -148,7 +162,7 @@ export class Geometry {
     buffer: BufferArray | Attribute<BufferArray>,
     itemSize?: number,
     normalized = false
-  ) {
+  ): void {
     let attribute: Attribute<BufferArray>;
 
     if (buffer instanceof Attribute) attribute = buffer;
@@ -158,6 +172,85 @@ export class Geometry {
     if (buffer instanceof Float32Array) {
       const wasmAttribute = wasm.createBufferAttributeF32(buffer, attribute.itemSize, attribute.normalized);
       wasm.setBufferAttribute(this.bufferGeometry as any, type, wasmAttribute);
+    }
+  }
+
+  normalizeNormals(): void {
+    const normalAttribute = this.attributes.get(AttributeType.NORMAL) as Attribute<Float32Array>;
+    if (!normalAttribute) throw new Error("No normal attribute defined");
+
+    for (let i = 0, il = normalAttribute.count; i < il; i++) {
+      _vector.fromBufferAttribute(normalAttribute, i);
+      _vector.normalize();
+      normalAttribute.setXYZ(i, _vector.x, _vector.y, _vector.z);
+    }
+  }
+
+  computeVertexNormals(): void {
+    const index = this.indices;
+    const positionAttribute = this.attributes.get(AttributeType.POSITION) as Attribute<Float32Array>;
+
+    if (positionAttribute) {
+      let normalAttribute = this.attributes.get(AttributeType.NORMAL) as Attribute<Float32Array>;
+
+      if (!normalAttribute) {
+        normalAttribute = new Attribute(new Float32Array(positionAttribute.count * 3), 3);
+        this.setAttribute(AttributeType.NORMAL, normalAttribute);
+      } else {
+        // reset existing normals to zero
+        for (let i = 0, il = normalAttribute.count; i < il; i++) {
+          normalAttribute.setXYZ(i, 0, 0, 0);
+        }
+      }
+
+      // indexed elements
+
+      if (index) {
+        for (let i = 0, il = index.length; i < il; i += 3) {
+          const vA = index.at(i + 0)!;
+          const vB = index.at(i + 1)!;
+          const vC = index.at(i + 2)!;
+
+          pA.fromBufferAttribute(positionAttribute, vA);
+          pB.fromBufferAttribute(positionAttribute, vB);
+          pC.fromBufferAttribute(positionAttribute, vC);
+
+          cb.subVectors(pC, pB);
+          ab.subVectors(pA, pB);
+          cb.cross(ab);
+
+          nA.fromBufferAttribute(normalAttribute, vA);
+          nB.fromBufferAttribute(normalAttribute, vB);
+          nC.fromBufferAttribute(normalAttribute, vC);
+
+          nA.add(cb);
+          nB.add(cb);
+          nC.add(cb);
+
+          normalAttribute.setXYZ(vA, nA.x, nA.y, nA.z);
+          normalAttribute.setXYZ(vB, nB.x, nB.y, nB.z);
+          normalAttribute.setXYZ(vC, nC.x, nC.y, nC.z);
+        }
+      } else {
+        // non-indexed elements (unconnected triangle soup)
+
+        for (let i = 0, il = positionAttribute.count; i < il; i += 3) {
+          pA.fromBufferAttribute(positionAttribute, i + 0);
+          pB.fromBufferAttribute(positionAttribute, i + 1);
+          pC.fromBufferAttribute(positionAttribute, i + 2);
+
+          cb.subVectors(pC, pB);
+          ab.subVectors(pA, pB);
+          cb.cross(ab);
+
+          normalAttribute.setXYZ(i + 0, cb.x, cb.y, cb.z);
+          normalAttribute.setXYZ(i + 1, cb.x, cb.y, cb.z);
+          normalAttribute.setXYZ(i + 2, cb.x, cb.y, cb.z);
+        }
+      }
+
+      this.normalizeNormals();
+      normalAttribute.version++;
     }
   }
 

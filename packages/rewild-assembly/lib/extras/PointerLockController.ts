@@ -47,7 +47,8 @@ export class PointerLockController implements Listener {
   }
 
   onEvent(event: Event): void {
-    if (event.type === "mousemove") this.onMouseMove(event.attachment as MouseEvent);
+    if (event.type === "mousemove")
+      this.onMouseMove(event.attachment as MouseEvent);
     else if (event.type === "keydown") {
       const keyboardEvent = event.attachment as KeyboardEvent;
       if (keyboardEvent.code == "KeyW") this.movingForward = true;
@@ -82,7 +83,10 @@ export class PointerLockController implements Listener {
     _euler.y -= movementX * 0.002;
     _euler.x -= movementY * 0.002;
 
-    _euler.x = Mathf.max(_PI_2 - this.maxPolarAngle, Mathf.min(_PI_2 - this.minPolarAngle, _euler.x));
+    _euler.x = Mathf.max(
+      _PI_2 - this.maxPolarAngle,
+      Mathf.min(_PI_2 - this.minPolarAngle, _euler.x)
+    );
 
     this.camera.quaternion.setFromEuler(_euler, false);
   }
@@ -108,7 +112,9 @@ export class PointerLockController implements Listener {
   }
 
   getDirection(v: EngineVector3): EngineVector3 {
-    return v.copy(direction).applyQuaternion(this.camera.quaternion) as EngineVector3;
+    return v
+      .copy(direction)
+      .applyQuaternion(this.camera.quaternion) as EngineVector3;
   }
 
   moveForward(distance: f32): void {
