@@ -1,11 +1,11 @@
-import { SimpleMatrix4 } from "./utils/math/SimpleMatrix4";
+import { Matrix4 } from "rewild-common";
 import { init, wasm } from "./utils/wasm-module";
 
 const numTests = 20000;
 
-const matrices: SimpleMatrix4[] = new Array();
+const matrices: Matrix4[] = new Array();
 for (let i = 0; i < numTests; i++) {
-  matrices.push(new SimpleMatrix4().set(1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0));
+  matrices.push(new Matrix4().set(1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0));
 }
 
 describe("Performance Tests", () => {
@@ -113,8 +113,8 @@ describe("Performance Tests", () => {
 });
 
 const testJSMultiplicationPerformance = (l: number = 100): void => {
-  const source = new SimpleMatrix4();
-  let m: SimpleMatrix4;
+  const source = new Matrix4();
+  let m: Matrix4;
 
   for (let i = 0; i < l; i++) {
     m = matrices[i];

@@ -75,7 +75,7 @@ describe("Matrix4", () => {
     expect(elements[14]).toBe(12378);
     expect(elements[15]).toBe(18710);
   });
-
+ 
   it("multiplies a scalar", () => {
     const b = wasm.newMatrix4();
     wasm.matrix4_set(b, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
