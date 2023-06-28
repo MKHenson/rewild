@@ -38,6 +38,10 @@ const ConvexPolyhedron_vToPointInside = new Vec3();
 const computeLocalAABB_worldVert = new Vec3();
 const tempWorldVertex = new Vec3();
 
+export class Point {
+  constructor(public point: Vec3, public normal: Vec3, public depth: f32) {}
+}
+
 export class ConvexPolyhedron extends Shape {
   vertices: Vec3[];
   worldVertices: Vec3[];
@@ -253,7 +257,7 @@ export class ConvexPolyhedron extends Shape {
     separatingNormal: Vec3,
     minDist: f32,
     maxDist: f32,
-    result: any[]
+    result: Point[]
   ): void {
     const WorldNormal = cah_WorldNormal;
     const hullA = this;
@@ -313,7 +317,9 @@ export class ConvexPolyhedron extends Shape {
     quatA: Quaternion,
     posB: Vec3,
     quatB: Quaternion,
-    target: Vec3
+    target: Vec3,
+    faceListA: i32[] | null = null,
+    faceListB: i32[] | null = null
   ): boolean {
     const faceANormalWS3 = fsa_faceANormalWS3,
       Worldnormal1 = fsa_Worldnormal1,
@@ -553,7 +559,7 @@ export class ConvexPolyhedron extends Shape {
     worldVertsB1: Vec3[],
     minDist: f32,
     maxDist: f32,
-    result: Vec3[]
+    result: Point[]
   ) {
     const faceANormalWS = cfah_faceANormalWS,
       edge0 = cfah_edge0,
@@ -676,11 +682,7 @@ export class ConvexPolyhedron extends Shape {
                   "contact normal=",separatingNormal.toString(),
                   "plane",planeNormalWS.toString(),
                   "planeConstant",planeEqWS);*/
-          const p = {
-            point: point,
-            normal: planeNormalWS,
-            depth: depth,
-          };
+          const p = new Point(point, planeNormalWS, depth);
           result.push(p);
         }
       }

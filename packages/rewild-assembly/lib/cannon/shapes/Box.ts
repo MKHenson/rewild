@@ -18,8 +18,18 @@ const worldCornersTemp = [
 ];
 
 export class Box extends Shape {
+  /**
+   * @property halfExtents
+   * @type {Vec3}
+   */
   halfExtents: Vec3;
-  convexPolyhedronRepresentation: ConvexPolyhedron | null;
+
+  /**
+   * Used by the contact generator to make contacts with other convex polyhedra for example
+   * @property convexPolyhedronRepresentation
+   * @type {ConvexPolyhedron}
+   */
+  convexPolyhedronRepresentation: ConvexPolyhedron;
 
   /**
    * A 3d box shape.
@@ -32,18 +42,7 @@ export class Box extends Shape {
   constructor(halfExtents: Vec3) {
     super(Shape.types.BOX);
 
-    /**
-     * @property halfExtents
-     * @type {Vec3}
-     */
     this.halfExtents = halfExtents;
-
-    /**
-     * Used by the contact generator to make contacts with other convex polyhedra for example
-     * @property convexPolyhedronRepresentation
-     * @type {ConvexPolyhedron}
-     */
-    this.convexPolyhedronRepresentation = null;
 
     this.updateConvexPolyhedronRepresentation();
     this.updateBoundingSphereRadius();

@@ -1,6 +1,6 @@
-export abstract class Pool {
+export abstract class Pool<T> {
   static idCounter: i32 = 0;
-  objects: Array<any>;
+  objects: Array<T>;
   type: any;
 
   /**
@@ -27,11 +27,16 @@ export abstract class Pool {
    * @method release
    * @param {Object} obj
    */
-  release(): Pool {
-    var Nargs = arguments.length;
-    for (var i = 0; i !== Nargs; i++) {
-      this.objects.push(arguments[i]);
+  release(toRelease: T[]): Pool<T> {
+    var Nargs = toRelease.length;
+    for (var i = 0; i != Nargs; i++) {
+      this.objects.push(toRelease[i]);
     }
+    return this;
+  }
+
+  releaseOne(toRelease: T): Pool<T> {
+    this.objects.push(toRelease);
     return this;
   }
 
@@ -40,7 +45,7 @@ export abstract class Pool {
    * @method get
    * @return {mixed}
    */
-  get(): void {
+  get(): T {
     if (this.objects.length === 0) {
       return this.constructObject();
     } else {
@@ -53,14 +58,14 @@ export abstract class Pool {
    * @method constructObject
    * @return {mixed}
    */
-  abstract constructObject(): void;
+  abstract constructObject(): T;
 
   /**
    * @method resize
    * @param {number} size
    * @return {Pool} Self, for chaining
    */
-  resize(size: i32): Pool {
+  resize(size: i32): Pool<T> {
     var objects = this.objects;
 
     while (objects.length > size) {

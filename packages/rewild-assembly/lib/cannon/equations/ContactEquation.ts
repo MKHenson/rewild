@@ -1,5 +1,6 @@
 import { Vec3 } from "../math/Vec3";
 import { Body } from "../objects/Body";
+import { Shape } from "../shapes/Shape";
 import { Equation } from "./Equation";
 
 const ContactEquation_computeB_temp1 = new Vec3(); // Temp vectors
@@ -16,6 +17,8 @@ export class ContactEquation extends Equation {
   ri: Vec3;
   rj: Vec3;
   restitution: f32;
+  si: Shape | null;
+  sj: Shape | null;
 
   /**
    * Contact/non-penetration constraint equation
@@ -52,6 +55,9 @@ export class ContactEquation extends Equation {
      * @property {Vec3} ni
      */
     this.ni = new Vec3();
+
+    this.si = null;
+    this.sj = null;
   }
 
   computeB(h: f32): f32 {

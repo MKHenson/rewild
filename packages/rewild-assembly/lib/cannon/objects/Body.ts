@@ -1,3 +1,5 @@
+import { Event } from "../../core/Event";
+import { EventDispatcher } from "../../core/EventDispatcher";
 import { AABB } from "../collision/AABB";
 import { Material } from "../material/Material";
 import { Mat3 } from "../math/Mat3";
@@ -31,11 +33,12 @@ const Body_applyImpulse_rotVelo = new Vec3();
 const Body_applyLocalForce_worldForce = new Vec3();
 const Body_applyLocalForce_relativePointWorld = new Vec3();
 
-export class Body extends EventTarget {
+export class Body extends EventDispatcher {
   id: i32;
+  index: i32;
   world: World | null;
-  preStep: Function | null;
-  postStep: Function | null;
+  preStep: ((body: Body) => void) | null;
+  postStep: ((body: Body) => void) | null;
   vlambda: Vec3;
   collisionFilterGroup: i32;
   collisionFilterMask: i32;
@@ -147,12 +150,18 @@ export class Body extends EventTarget {
     /**
      * @property {Number} collisionFilterGroup
      */
-    this.collisionFilterGroup = typeof options.collisionFilterGroup === "number" ? options.collisionFilterGroup : 1;
+    this.collisionFilterGroup =
+      typeof options.collisionFilterGroup === "number"
+        ? options.collisionFilterGroup
+        : 1;
 
     /**
      * @property {Number} collisionFilterMask
      */
-    this.collisionFilterMask = typeof options.collisionFilterMask === "number" ? options.collisionFilterMask : -1;
+    this.collisionFilterMask =
+      typeof options.collisionFilterMask === "number"
+        ? options.collisionFilterMask
+        : -1;
 
     /**
      * Whether to produce contact forces when in contact with other bodies. Note that contacts will be generated, but they will be disabled.
@@ -241,7 +250,8 @@ export class Body extends EventTarget {
      * @property linearDamping
      * @type {Number}
      */
-    this.linearDamping = typeof options.linearDamping === "number" ? options.linearDamping : 0.01;
+    this.linearDamping =
+      typeof options.linearDamping === "number" ? options.linearDamping : 0.01;
 
     /**
      * One of: Body.DYNAMIC, Body.STATIC and Body.KINEMATIC.
@@ -259,7 +269,8 @@ export class Body extends EventTarget {
      * @type {Boolean}
      * @default true
      */
-    this.allowSleep = typeof options.allowSleep !== "undefined" ? options.allowSleep : true;
+    this.allowSleep =
+      typeof options.allowSleep !== "undefined" ? options.allowSleep : true;
 
     /**
      * Current sleep state.
@@ -274,7 +285,10 @@ export class Body extends EventTarget {
      * @type {Number}
      * @default 0.1
      */
-    this.sleepSpeedLimit = typeof options.sleepSpeedLimit !== "undefined" ? options.sleepSpeedLimit : 0.1;
+    this.sleepSpeedLimit =
+      typeof options.sleepSpeedLimit !== "undefined"
+        ? options.sleepSpeedLimit
+        : 0.1;
 
     /**
      * If the body has been sleepy for this sleepTimeLimit seconds, it is considered sleeping.
@@ -282,7 +296,10 @@ export class Body extends EventTarget {
      * @type {Number}
      * @default 1
      */
-    this.sleepTimeLimit = typeof options.sleepTimeLimit !== "undefined" ? options.sleepTimeLimit : 1;
+    this.sleepTimeLimit =
+      typeof options.sleepTimeLimit !== "undefined"
+        ? options.sleepTimeLimit
+        : 1;
 
     this.timeLastSleepy = 0;
 
@@ -395,12 +412,18 @@ export class Body extends EventTarget {
      * @property {Boolean} fixedRotation
      * @default false
      */
-    this.fixedRotation = typeof options.fixedRotation !== "undefined" ? options.fixedRotation : false;
+    this.fixedRotation =
+      typeof options.fixedRotation !== "undefined"
+        ? options.fixedRotation
+        : false;
 
     /**
      * @property {Number} angularDamping
      */
-    this.angularDamping = typeof options.angularDamping !== "undefined" ? options.angularDamping : 0.01;
+    this.angularDamping =
+      typeof options.angularDamping !== "undefined"
+        ? options.angularDamping
+        : 0.01;
 
     /**
      * Use this property to limit the motion along any world axis. (1,1,1) will allow motion along all axes while (0,0,0) allows none.
@@ -440,6 +463,8 @@ export class Body extends EventTarget {
      * @type {Number}
      */
     this.boundingRadius = 0;
+
+    this.index = -1;
 
     this.wlambda = new Vec3();
 
@@ -510,9 +535,7 @@ export class Body extends EventTarget {
    * Dispatched after a sleeping body has woken up.
    * @event wakeup
    */
-  static wakeupEvent = {
-    type: "wakeup",
-  };
+  static wakeupEvent = new Event("wakeup");
 
   /**
    * Wake the body up.
@@ -542,17 +565,13 @@ export class Body extends EventTarget {
    * Dispatched after a body has gone in to the sleepy state.
    * @event sleepy
    */
-  static sleepyEvent = {
-    type: "sleepy",
-  };
+  static sleepyEvent = new Event("sleepy");
 
   /**
    * Dispatched after a body has fallen asleep.
    * @event sleep
    */
-  static sleepEvent = {
-    type: "sleep",
-  };
+  static sleepEvent = new Event("sleep");
 
   /**
    * Called every timestep to update internal sleep timer and change sleep state if needed.
@@ -568,9 +587,15 @@ export class Body extends EventTarget {
         this.sleepState = Body.SLEEPY; // Sleepy
         this.timeLastSleepy = time;
         this.dispatchEvent(Body.sleepyEvent);
-      } else if (sleepState === Body.SLEEPY && speedSquared > speedLimitSquared) {
+      } else if (
+        sleepState === Body.SLEEPY &&
+        speedSquared > speedLimitSquared
+      ) {
         this.wakeUp(); // Wake up
-      } else if (sleepState === Body.SLEEPY && time - this.timeLastSleepy > this.sleepTimeLimit) {
+      } else if (
+        sleepState === Body.SLEEPY &&
+        time - this.timeLastSleepy > this.sleepTimeLimit
+      ) {
         this.sleep(); // Sleeping
         this.dispatchEvent(Body.sleepEvent);
       }
@@ -651,7 +676,11 @@ export class Body extends EventTarget {
    * @param {Quaternion} [_orientation]
    * @return {Body} The body object, for chainability.
    */
-  addShape(shape: Shape, _offset: Vec3 | null = null, _orientation: Quaternion | null = null): Body {
+  addShape(
+    shape: Shape,
+    _offset: Vec3 | null = null,
+    _orientation: Quaternion | null = null
+  ): Body {
     const offset = new Vec3();
     const orientation = new Quaternion();
 
@@ -725,7 +754,12 @@ export class Body extends EventTarget {
       shapeOrientations[i].mult(bodyQuat, orientation);
 
       // Get shape AABB
-      shape.calculateWorldAABB(offset, orientation, shapeAABB.lowerBound, shapeAABB.upperBound);
+      shape.calculateWorldAABB(
+        offset,
+        orientation,
+        shapeAABB.lowerBound,
+        shapeAABB.upperBound
+      );
 
       if (i === 0) {
         aabb.copy(shapeAABB);
@@ -917,7 +951,10 @@ export class Body extends EventTarget {
     this.previousPosition.copy(this.position);
     this.previousQuaternion.copy(this.quaternion);
 
-    if (!(this.type === Body.DYNAMIC || this.type === Body.KINEMATIC) || this.sleepState === Body.SLEEPING) {
+    if (
+      !(this.type === Body.DYNAMIC || this.type === Body.KINEMATIC) ||
+      this.sleepState === Body.SLEEPING
+    ) {
       // Only for dynamic
       return;
     }
