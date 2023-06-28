@@ -1,11 +1,12 @@
 /* global performance */
-
+import { Event } from "../../core/Event";
+import { EventDispatcher } from "../../core/EventDispatcher";
 import { AABB } from "../collision/AABB";
 import { ArrayCollisionMatrix } from "../collision/ArrayCollisionMatrix";
 import { Broadphase } from "../collision/Broadphase";
 import { NaiveBroadphase } from "../collision/NaiveBroadphase";
 import { OverlapKeeper } from "../collision/OverlapKeeper";
-import { Ray } from "../collision/Ray";
+import { Callback, IntersectionOptions, Ray } from "../collision/Ray";
 import { RaycastResult } from "../collision/RaycastResult";
 import { Constraint } from "../constraints/Constraint";
 import { ContactEquation } from "../equations/ContactEquation";
@@ -42,21 +43,6 @@ export class Profile {
   ) {}
 }
 
-/**
- * Dispatched after the world has stepped forward in time.
- * @event postStep
- */
-const World_step_postStepEvent = { type: "postStep" }; // Reusable event objects to save memory
-/**
- * Dispatched before the world steps forward in time.
- * @event preStep
- */
-const World_step_preStepEvent = { type: "preStep" };
-const World_step_collideEvent = {
-  type: Body.COLLIDE_EVENT_NAME,
-  body: null,
-  contact: null,
-};
 const World_step_oldContacts: ContactEquation[] = []; // Pools for unused objects
 const World_step_frictionEquationPool: FrictionEquation[] = [];
 const World_step_p1: Body[] = []; // Reusable arrays for collision pairs
@@ -79,8 +65,10 @@ const tmpAABB1 = new AABB();
 const tmpArray1 = [];
 const tmpRay = new Ray();
 const step_tmp1 = new Vec3();
+const rayTestOptions = new IntersectionOptions();
+rayTestOptions.skipBackfaces = true;
 
-export class World extends EventTarget {
+export class World extends EventDispatcher {
   dt: f32;
   allowSleep: boolean;
   contacts: ContactEquation[];
@@ -336,7 +324,7 @@ export class World extends EventTarget {
       body: null,
     };
 
-    this.idToBodyMap = {};
+    this.idToBodyMap = new Map();
 
     this.broadphase.setWorld(this);
   }
@@ -400,7 +388,7 @@ export class World extends EventTarget {
     }
     this.collisionMatrix.setNumObjects(this.bodies.length);
     this.addBodyEvent.body = body;
-    this.idToBodyMap[body.id] = body;
+    this.idToBodyMap.set(body.id, body);
     this.dispatchEvent(this.addBodyEvent);
   }
 
@@ -440,24 +428,10 @@ export class World extends EventTarget {
   rayTest(from: Vec3, to: Vec3, result: RaycastResult): void {
     if (result instanceof RaycastResult) {
       // Do raycastclosest
-      this.raycastClosest(
-        from,
-        to,
-        {
-          skipBackfaces: true,
-        },
-        result
-      );
+      this.raycastClosest(from, to, rayTestOptions, result);
     } else {
       // Do raycastAll
-      this.raycastAll(
-        from,
-        to,
-        {
-          skipBackfaces: true,
-        },
-        result
-      );
+      this.raycastAll(from, to, rayTestOptions, result);
     }
   }
 
@@ -474,7 +448,12 @@ export class World extends EventTarget {
    * @param  {Function} callback
    * @return {boolean} True if any body was hit.
    */
-  raycastAll(from: Vec3, to: Vec3, options, callback) {
+  raycastAll(
+    from: Vec3,
+    to: Vec3,
+    options: IntersectionOptions,
+    callback: Callback | null = null
+  ): boolean {
     options.mode = Ray.ALL;
     options.from = from;
     options.to = to;
@@ -495,7 +474,12 @@ export class World extends EventTarget {
    * @param  {RaycastResult} result
    * @return {boolean} True if any body was hit.
    */
-  raycastAny(from: Vec3, to: Vec3, options, result) {
+  raycastAny(
+    from: Vec3,
+    to: Vec3,
+    options: IntersectionOptions,
+    result: RaycastResult
+  ) {
     options.mode = Ray.ANY;
     options.from = from;
     options.to = to;
@@ -516,7 +500,12 @@ export class World extends EventTarget {
    * @param  {RaycastResult} result
    * @return {boolean} True if any body was hit.
    */
-  raycastClosest(from: Vec3, to: Vec3, options, result) {
+  raycastClosest(
+    from: Vec3,
+    to: Vec3,
+    options: IntersectionOptions,
+    result: RaycastResult
+  ) {
     options.mode = Ray.CLOSEST;
     options.from = from;
     options.to = to;
@@ -545,7 +534,7 @@ export class World extends EventTarget {
 
       this.collisionMatrix.setNumObjects(n);
       this.removeBodyEvent.body = body;
-      delete this.idToBodyMap[body.id];
+      this.idToBodyMap.delete(body.id);
       this.dispatchEvent(this.removeBodyEvent);
     }
   }
@@ -560,7 +549,7 @@ export class World extends EventTarget {
   }
 
   getBodyById(id: i32): Body {
-    return this.idToBodyMap[id];
+    return this.idToBodyMap.get(id);
   }
 
   // TODO Make a faster map
@@ -905,7 +894,7 @@ export class World extends EventTarget {
       }
 
       this.bodyOverlapKeeper.set(bi.id, bj.id);
-      this.shapeOverlapKeeper.set(si.id, sj.id);
+      this.shapeOverlapKeeper.set(si!.id, sj!.id);
     }
 
     this.emitContactEvents();
@@ -947,7 +936,7 @@ export class World extends EventTarget {
 
     // Apply damping, see http://code.google.com/p/bullet/issues/detail?id=74 for details
     const pow = Mathf.pow;
-    for (i = 0; i !== N; i++) {
+    for (i = 0; i != N; i++) {
       const bi = bodies[i];
       if (bi.type & DYNAMIC) {
         // Only for dynamic bodies
@@ -968,7 +957,7 @@ export class World extends EventTarget {
     for (i = 0; i !== N; i++) {
       const bi = bodies[i];
       if (bi.preStep) {
-        bi.preStep.call(bi);
+        bi.preStep(bi);
       }
     }
 
@@ -1004,7 +993,7 @@ export class World extends EventTarget {
       const bi = bodies[i];
       const postStep = bi.postStep;
       if (postStep) {
-        postStep.call(bi);
+        postStep(bi);
       }
     }
 
@@ -1016,104 +1005,78 @@ export class World extends EventTarget {
     }
   }
 
-  emitContactEvents = (function () {
-    const additions = [];
-    const removals = [];
-    const beginContactEvent = {
-      type: "beginContact",
-      bodyA: null,
-      bodyB: null,
-    };
-    const endContactEvent = {
-      type: "endContact",
-      bodyA: null,
-      bodyB: null,
-    };
-    const beginShapeContactEvent = {
-      type: "beginShapeContact",
-      bodyA: null,
-      bodyB: null,
-      shapeA: null,
-      shapeB: null,
-    };
-    const endShapeContactEvent = {
-      type: "endShapeContact",
-      bodyA: null,
-      bodyB: null,
-      shapeA: null,
-      shapeB: null,
-    };
-    return function () {
-      const hasBeginContact = this.hasAnyEventListener("beginContact");
-      const hasEndContact = this.hasAnyEventListener("endContact");
+  emitContactEvents(): void {
+    additions.length = 0;
+    removals.length = 0;
 
-      if (hasBeginContact || hasEndContact) {
-        this.bodyOverlapKeeper.getDiff(additions, removals);
+    const hasBeginContact = this.hasAnyEventListener("beginContact");
+    const hasEndContact = this.hasAnyEventListener("endContact");
+
+    if (hasBeginContact || hasEndContact) {
+      this.bodyOverlapKeeper.getDiff(additions, removals);
+    }
+
+    if (hasBeginContact) {
+      for (let i: i32 = 0, l = additions.length; i < l; i += 2) {
+        beginContactEvent.bodyA = this.getBodyById(additions[i]);
+        beginContactEvent.bodyB = this.getBodyById(additions[i + 1]);
+        this.dispatchEvent(beginContactEvent);
       }
+      beginContactEvent.bodyA = beginContactEvent.bodyB = null;
+    }
 
-      if (hasBeginContact) {
-        for (let i: i32 = 0, l = additions.length; i < l; i += 2) {
-          beginContactEvent.bodyA = this.getBodyById(additions[i]);
-          beginContactEvent.bodyB = this.getBodyById(additions[i + 1]);
-          this.dispatchEvent(beginContactEvent);
-        }
-        beginContactEvent.bodyA = beginContactEvent.bodyB = null;
+    if (hasEndContact) {
+      for (let i: i32 = 0, l = removals.length; i < l; i += 2) {
+        endContactEvent.bodyA = this.getBodyById(removals[i]);
+        endContactEvent.bodyB = this.getBodyById(removals[i + 1]);
+        this.dispatchEvent(endContactEvent);
       }
+      endContactEvent.bodyA = endContactEvent.bodyB = null;
+    }
 
-      if (hasEndContact) {
-        for (let i: i32 = 0, l = removals.length; i < l; i += 2) {
-          endContactEvent.bodyA = this.getBodyById(removals[i]);
-          endContactEvent.bodyB = this.getBodyById(removals[i + 1]);
-          this.dispatchEvent(endContactEvent);
-        }
-        endContactEvent.bodyA = endContactEvent.bodyB = null;
+    additions.length = removals.length = 0;
+
+    const hasBeginShapeContact = this.hasAnyEventListener("beginShapeContact");
+    const hasEndShapeContact = this.hasAnyEventListener("endShapeContact");
+
+    if (hasBeginShapeContact || hasEndShapeContact) {
+      this.shapeOverlapKeeper.getDiff(additions, removals);
+    }
+
+    if (hasBeginShapeContact) {
+      for (let i: i32 = 0, l = additions.length; i < l; i += 2) {
+        const shapeA = this.getShapeById(additions[i]);
+        const shapeB = this.getShapeById(additions[i + 1]);
+        beginShapeContactEvent.shapeA = shapeA;
+        beginShapeContactEvent.shapeB = shapeB;
+        beginShapeContactEvent.bodyA = shapeA ? shapeA.body : null;
+        beginShapeContactEvent.bodyB = shapeB ? shapeB.body : null;
+        this.dispatchEvent(beginShapeContactEvent);
       }
+      beginShapeContactEvent.bodyA =
+        beginShapeContactEvent.bodyB =
+        beginShapeContactEvent.shapeA =
+        beginShapeContactEvent.shapeB =
+          null;
+    }
 
-      additions.length = removals.length = 0;
-
-      const hasBeginShapeContact =
-        this.hasAnyEventListener("beginShapeContact");
-      const hasEndShapeContact = this.hasAnyEventListener("endShapeContact");
-
-      if (hasBeginShapeContact || hasEndShapeContact) {
-        this.shapeOverlapKeeper.getDiff(additions, removals);
+    if (hasEndShapeContact) {
+      for (let i: i32 = 0, l = removals.length; i < l; i += 2) {
+        const shapeA = this.getShapeById(removals[i]);
+        const shapeB = this.getShapeById(removals[i + 1]);
+        endShapeContactEvent.shapeA = shapeA;
+        endShapeContactEvent.shapeB = shapeB;
+        endShapeContactEvent.bodyA = shapeA ? shapeA.body : null;
+        endShapeContactEvent.bodyB = shapeB ? shapeB.body : null;
+        this.dispatchEvent(endShapeContactEvent);
       }
-
-      if (hasBeginShapeContact) {
-        for (let i: i32 = 0, l = additions.length; i < l; i += 2) {
-          const shapeA = this.getShapeById(additions[i]);
-          const shapeB = this.getShapeById(additions[i + 1]);
-          beginShapeContactEvent.shapeA = shapeA;
-          beginShapeContactEvent.shapeB = shapeB;
-          beginShapeContactEvent.bodyA = shapeA.body;
-          beginShapeContactEvent.bodyB = shapeB.body;
-          this.dispatchEvent(beginShapeContactEvent);
-        }
-        beginShapeContactEvent.bodyA =
-          beginShapeContactEvent.bodyB =
-          beginShapeContactEvent.shapeA =
-          beginShapeContactEvent.shapeB =
-            null;
-      }
-
-      if (hasEndShapeContact) {
-        for (let i: i32 = 0, l = removals.length; i < l; i += 2) {
-          const shapeA = this.getShapeById(removals[i]);
-          const shapeB = this.getShapeById(removals[i + 1]);
-          endShapeContactEvent.shapeA = shapeA;
-          endShapeContactEvent.shapeB = shapeB;
-          endShapeContactEvent.bodyA = shapeA.body;
-          endShapeContactEvent.bodyB = shapeB.body;
-          this.dispatchEvent(endShapeContactEvent);
-        }
-        endShapeContactEvent.bodyA =
-          endShapeContactEvent.bodyB =
-          endShapeContactEvent.shapeA =
-          endShapeContactEvent.shapeB =
-            null;
-      }
-    };
-  })();
+      endShapeContactEvent.bodyA =
+        endShapeContactEvent.bodyB =
+        endShapeContactEvent.shapeA =
+        endShapeContactEvent.shapeB =
+          null;
+    }
+  }
 
   /**
    * Sets all body forces in the world to zero.
@@ -1132,3 +1095,49 @@ export class World extends EventTarget {
     }
   }
 }
+
+export class ContactEvent extends Event {
+  bodyA: Body | null;
+  bodyB: Body | null;
+  shapeA: Shape | null;
+  shapeB: Shape | null;
+
+  constructor(type: string) {
+    super(type);
+    this.bodyA = null;
+    this.bodyB = null;
+    this.shapeA = null;
+    this.shapeB = null;
+  }
+}
+
+export class CollideEvent extends Event {
+  body: Body | null;
+  contact: ContactEquation | null;
+
+  constructor(type: string) {
+    super(type);
+    this.body = null;
+    this.contact = null;
+  }
+}
+
+/**
+ * Dispatched after the world has stepped forward in time.
+ * @event postStep
+ */
+const World_step_postStepEvent = new Event("postStep"); // Reusable event objects to save memory
+/**
+ * Dispatched before the world steps forward in time.
+ * @event preStep
+ */
+const World_step_preStepEvent = new Event("preStep");
+
+const World_step_collideEvent = new CollideEvent(Body.COLLIDE_EVENT_NAME);
+
+const additions: i32[] = [];
+const removals: i32[] = [];
+const beginContactEvent = new ContactEvent("beginContact");
+const endContactEvent = new ContactEvent("endContact");
+const beginShapeContactEvent = new ContactEvent("beginShapeContact");
+const endShapeContactEvent = new ContactEvent("endShapeContact");

@@ -48,6 +48,15 @@ export class EventDispatcher extends EventTargetable {
   }
 
   /**
+   * Checks if any listener is added to an event type.
+   * @param type The type of event to listen to.
+   */
+  hasAnyEventListener(type: string): bool {
+    const listeners = this._listeners;
+    return listeners.has(type) && listeners.get(type).length > 0;
+  }
+
+  /**
    * Removes a listener from an event type.
    * @param type The type of the listener that gets removed.
    * @param listener The listener function that gets removed.

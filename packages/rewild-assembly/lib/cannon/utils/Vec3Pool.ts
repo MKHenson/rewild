@@ -1,7 +1,7 @@
 import { Vec3 } from "../math/Vec3";
 import { Pool } from "./Pool";
 
-export class Vec3Pool extends Pool {
+export class Vec3Pool extends Pool<Vec3> {
   type: typeof Vec3;
   /**
    * @class Vec3Pool

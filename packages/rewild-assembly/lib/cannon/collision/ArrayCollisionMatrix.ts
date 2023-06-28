@@ -1,3 +1,5 @@
+import { Body } from "../objects/Body";
+
 export class ArrayCollisionMatrix {
   matrix: i32[];
 
@@ -18,15 +20,12 @@ export class ArrayCollisionMatrix {
   /**
    * Get an element
    * @method get
-   * @param  {Number} i
-   * @param  {Number} j
-   * @return {Number}
    */
-  get(i: f32, j: f32): f32 {
-    i = i.index;
-    j = j.index;
+  get(bi: Body, bj: Body): f32 {
+    let i = bi.index;
+    let j = bj.index;
     if (j > i) {
-      var temp = j;
+      const temp = j;
       j = i;
       i = temp;
     }
@@ -36,15 +35,13 @@ export class ArrayCollisionMatrix {
   /**
    * Set an element
    * @method set
-   * @param {Number} i
-   * @param {Number} j
    * @param {Number} value
    */
-  set(i: f32, j: f32, value: i32): void {
-    i = i.index;
-    j = j.index;
+  set(bi: Body, bj: Body, value: boolean): void {
+    let i = bi.index;
+    let j = bj.index;
     if (j > i) {
-      var temp = j;
+      const temp = j;
       j = i;
       i = temp;
     }
