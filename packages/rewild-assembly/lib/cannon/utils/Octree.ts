@@ -17,13 +17,16 @@ export class OctreeNode {
   aabb: AABB;
   data: any[];
   children: OctreeNode[];
+  maxDepth: i32 = 8;
 
-  constructor(root: OctreeNode | null = null, aabb: AABB | null = null) {
+  constructor(root: OctreeNode | null = null, aabb: AABB | null = null, maxDepth: i32 = 8) {
     /**
      * The root node
      * @property {OctreeNode} root
      */
     this.root = root;
+
+    this.maxDepth = maxDepth;
 
     /**
      * Boundary of this node
@@ -44,7 +47,7 @@ export class OctreeNode {
     this.children = [];
   }
 
-  reset(aabb: AABB, options) {
+  reset() {
     this.children.length = this.data.length = 0;
   }
 
@@ -55,7 +58,7 @@ export class OctreeNode {
    * @param  {object} elementData
    * @return {boolean} True if successful, otherwise false
    */
-  insert(aabb: AABB, elementData, level): boolean {
+  insert(aabb: AABB, elementData: i32, level: i32 = 0): boolean {
     const nodeData = this.data;
     level = level || 0;
 
@@ -68,7 +71,7 @@ export class OctreeNode {
 
     if (level < (this.maxDepth || this.root.maxDepth)) {
       // Subdivide if there are no children yet
-      const subdivided = false;
+      let subdivided = false;
       if (!children.length) {
         this.subdivide();
         subdivided = true;
@@ -97,7 +100,7 @@ export class OctreeNode {
    * Create 8 equally sized children nodes and put them in the .children array.
    * @method subdivide
    */
-  subdivide() {
+  subdivide(): void {
     const aabb = this.aabb;
     const l = aabb.lowerBound;
     const u = aabb.upperBound;
@@ -144,7 +147,7 @@ export class OctreeNode {
    * @param  {array} result
    * @return {array} The "result" object
    */
-  aabbQuery(aabb: AABB, result) {
+  aabbQuery(aabb: AABB, result): void {
     const nodeData = this.data;
 
     // abort if the range does not intersect this node
@@ -183,7 +186,7 @@ export class OctreeNode {
    * @param  {array} result
    * @return {array} The "result" object
    */
-  rayQuery(ray: Ray, treeTransform: Transform, result) {
+  rayQuery(ray: Ray, treeTransform: Transform, result: i32[]): i32[] {
     // Use aabb query for now.
     // @todo implement real ray query which needs less lookups
     ray.getAABB(tmpAABB);
@@ -219,8 +222,8 @@ export class OctreeNode {
  */
 export class Octree extends OctreeNode {
   maxDepth: i32;
-  constructor(aabb: AABB, maxDepth: i32 = 8) {
-    super(null, aabb);
+  constructor(aabb: AABB | null = null, maxDepth: i32 = 8) {
+    super(null, aabb, maxDepth);
 
     /**
      * Maximum subdivision depth

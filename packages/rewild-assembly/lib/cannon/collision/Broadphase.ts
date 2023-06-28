@@ -9,7 +9,7 @@ const Broadphase_collisionPairs_r = new Vec3(), // Temp objects
   Broadphase_collisionPairs_normal = new Vec3(),
   Broadphase_collisionPairs_quat = new Quaternion(),
   Broadphase_collisionPairs_relpos = new Vec3();
-const Broadphase_makePairsUnique_temp = { keys: [] },
+const Broadphase_makePairsUnique_temp: { keys: string[] } = { keys: [] },
   Broadphase_makePairsUnique_p1: Body[] = [],
   Broadphase_makePairsUnique_p2: Body[] = [];
 
@@ -73,8 +73,7 @@ export abstract class Broadphase {
 
     // Check types
     if (
-      ((bodyA.type & Body.STATIC) !== 0 ||
-        bodyA.sleepState === Body.SLEEPING) &&
+      ((bodyA.type & Body.STATIC) !== 0 || bodyA.sleepState === Body.SLEEPING) &&
       ((bodyB.type & Body.STATIC) !== 0 || bodyB.sleepState === Body.SLEEPING)
     ) {
       // Both bodies are static or sleeping. Skip.
@@ -109,18 +108,10 @@ export abstract class Broadphase {
    * @param {Array} pairs2 bodyB is appended to this array if intersection
    */
 
-  doBoundingSphereBroadphase(
-    bodyA: Body,
-    bodyB: Body,
-    pairs1: Body[],
-    pairs2: Body[]
-  ): void {
+  doBoundingSphereBroadphase(bodyA: Body, bodyB: Body, pairs1: Body[], pairs2: Body[]): void {
     const r = Broadphase_collisionPairs_r;
     bodyB.position.vsub(bodyA.position, r);
-    const boundingRadiusSum2 = Mathf.pow(
-      bodyA.boundingRadius + bodyB.boundingRadius,
-      2
-    );
+    const boundingRadiusSum2 = Mathf.pow(bodyA.boundingRadius + bodyB.boundingRadius, 2);
     const norm2 = r.norm2();
     if (norm2 < boundingRadiusSum2) {
       pairs1.push(bodyA);
@@ -136,12 +127,7 @@ export abstract class Broadphase {
    * @param {Array} pairs1
    * @param {Array} pairs2
    */
-  doBoundingBoxBroadphase(
-    bodyA: Body,
-    bodyB: Body,
-    pairs1: Body[],
-    pairs2: Body[]
-  ): void {
+  doBoundingBoxBroadphase(bodyA: Body, bodyB: Body, pairs1: Body[], pairs2: Body[]): void {
     if (bodyA.aabbNeedsUpdate) {
       bodyA.computeAABB();
     }
@@ -211,12 +197,7 @@ export abstract class Broadphase {
   static boundingSphereCheck(bodyA: Body, bodyB: Body): boolean {
     const dist = bsc_dist;
     bodyA.position.vsub(bodyB.position, dist);
-    return (
-      Mathf.pow(
-        bodyA.shape.boundingSphereRadius + bodyB.shape.boundingSphereRadius,
-        2
-      ) > dist.norm2()
-    );
+    return Mathf.pow(bodyA.shape.boundingSphereRadius + bodyB.shape.boundingSphereRadius, 2) > dist.norm2();
   }
 
   /**
