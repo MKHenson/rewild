@@ -2,6 +2,7 @@ import { AABB } from "../collision/AABB";
 import { Quaternion } from "../math/Quaternion";
 import { Transform } from "../math/Transform";
 import { Vec3 } from "../math/Vec3";
+import { Octree } from "../utils/Octree";
 import { Shape } from "./Shape";
 
 
@@ -25,7 +26,7 @@ export class Trimesh extends Shape {
     indices: Int16Array;
     normals: Float32Array;
     aabb: AABB;
-    edges: Int16Array;
+    edges: Int16Array | null;
     scale: Vec3;
     tree: Octree;
 
@@ -126,7 +127,7 @@ updateTree(): void {
     const b = new Vec3();
     const c = new Vec3();
     const points = [a, b, c];
-    for (const i = 0; i < this.indices.length / 3; i++) {
+    for (let i: i32 = 0; i < this.indices.length / 3; i++) {
         //this.getTriangleVertices(i, a, b, c);
 
         // Get unscaled triangle verts

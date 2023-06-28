@@ -1,16 +1,13 @@
 export class ObjectCollisionMatrix {
+  matrix: Map<string, boolean>;
+
   /**
    * Records what objects are colliding with each other
    * @class ObjectCollisionMatrix
    * @constructor
    */
   constructor() {
-    /**
-     * The matrix storage
-     * @property matrix
-     * @type {Object}
-     */
-    this.matrix = {};
+    this.matrix = new Map();
   }
 
   /**
@@ -19,7 +16,7 @@ export class ObjectCollisionMatrix {
    * @param  {Number} j
    * @return {Number}
    */
-  get(i: i32, j: i32): void {
+  get(i: i32, j: i32): bool {
     i = i.id;
     j = j.id;
     if (j > i) {
@@ -27,7 +24,7 @@ export class ObjectCollisionMatrix {
       j = i;
       i = temp;
     }
-    return i + "-" + j in this.matrix;
+    return this.matrix.has(i.toString() + "-" + j.toString()); // i + "-" + j in this.matrix;
   }
 
   /**
@@ -36,7 +33,7 @@ export class ObjectCollisionMatrix {
    * @param  {Number} j
    * @param {Number} value
    */
-  set(i, j, value: f32): void {
+  set(i: i32, j: i32, value: f32): void {
     i = i.id;
     j = j.id;
     if (j > i) {
@@ -45,9 +42,9 @@ export class ObjectCollisionMatrix {
       i = temp;
     }
     if (value) {
-      this.matrix[i + "-" + j] = true;
+      this.matrix.set(i.toString() + "-" + j.toString(), true);
     } else {
-      delete this.matrix[i + "-" + j];
+      this.matrix.delete(i.toString() + "-" + j.toString());
     }
   }
 
@@ -56,7 +53,7 @@ export class ObjectCollisionMatrix {
    * @method reset
    */
   reset(): void {
-    this.matrix = {};
+    this.matrix.clear();
   }
 
   /**
