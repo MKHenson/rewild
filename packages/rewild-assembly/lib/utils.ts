@@ -6,7 +6,10 @@ export function fillArray<T>(array1: T[], array2: T[]): T[] {
   return array1;
 }
 
-export function toTypedArray<T, TyArr extends ArrayBufferView>(arr: Array<T>, byteSize: i32): TyArr {
+export function toTypedArray<T, TyArr extends ArrayBufferView>(
+  arr: Array<T>,
+  byteSize: i32
+): TyArr {
   let len = arr.length;
   let result = instantiate<TyArr>(len);
   memory.copy(result.dataStart, arr.dataStart, len * byteSize);
@@ -14,9 +17,24 @@ export function toTypedArray<T, TyArr extends ArrayBufferView>(arr: Array<T>, by
 }
 
 export function f32Array(arr: Array<f32>): Float32Array {
-  let len = arr.length;
-  let result = new Float32Array(len);
-  memory.copy(result.dataStart, arr.dataStart, len * Float32Array.BYTES_PER_ELEMENT);
+  const len = arr.length;
+  const result = new Float32Array(len);
+  memory.copy(
+    result.dataStart,
+    arr.dataStart,
+    len * Float32Array.BYTES_PER_ELEMENT
+  );
+  return result;
+}
+
+export function i16Array(arr: Array<i16>): Int16Array {
+  const len = arr.length;
+  const result = new Int16Array(len);
+  memory.copy(
+    result.dataStart,
+    arr.dataStart,
+    len * Int16Array.BYTES_PER_ELEMENT
+  );
   return result;
 }
 

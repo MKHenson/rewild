@@ -1,34 +1,45 @@
 import { Equation } from "../equations/Equation";
+import { Body } from "../objects/Body";
+import { GSSolver } from "./GSSolver";
 import { Solver } from "./Solver";
 
 // Returns the number of subsystems
-const SplitSolver_solve_nodes = []; // All allocated node objects
-const SplitSolver_solve_nodePool = []; // All allocated node objects
+const SplitSolver_solve_nodes: SolverNode[] = []; // All allocated node objects
+// const SplitSolver_solve_nodePool = []; // All allocated node objects
 const SplitSolver_solve_eqs: Equation[] = []; // Temp array
-const SplitSolver_solve_bds = []; // Temp array
-const SplitSolver_solve_dummyWorld = { bodies: [] }; // Temp object
+// const SplitSolver_solve_bds = []; // Temp array
+const SplitSolver_solve_dummyWorld: Body[] = []; // { bodies: [] }; // Temp object
 
 const STATIC = Body.STATIC;
-function getUnvisitedNode(nodes) {
+
+function getUnvisitedNode(nodes: SolverNode[]) {
   const Nnodes = nodes.length;
   for (let i: i32 = 0; i !== Nnodes; i++) {
     const node = nodes[i];
-    if (!node.visited && !(node.body.type & STATIC)) {
+    if (!node.visited && !(node.body!.type & STATIC)) {
       return node;
     }
   }
-  return false;
+  return null;
 }
 
-const queue = [];
-function bfs(root, visitFunc, bds, eqs) {
+const queue: SolverNode[] = [];
+
+type VisitFunc = (node: SolverNode, bds: Body[], eqs: Equation[]) => void;
+
+function bfs(
+  root: SolverNode,
+  visitFunc: VisitFunc,
+  bds: Body[],
+  eqs: Equation[]
+) {
   queue.push(root);
   root.visited = true;
   visitFunc(root, bds, eqs);
   while (queue.length) {
     const node = queue.pop();
     // Loop over unvisited child nodes
-    const child;
+    let child: SolverNode | null;
     while ((child = getUnvisitedNode(node.children))) {
       child.visited = true;
       visitFunc(child, bds, eqs);
@@ -37,25 +48,34 @@ function bfs(root, visitFunc, bds, eqs) {
   }
 }
 
-function visitFunc(node, bds, eqs) {
-  bds.push(node.body);
+function visitFunc(node: SolverNode, bds: Body[], eqs: Equation[]): void {
+  bds.push(node.body!);
   const Neqs = node.eqs.length;
-  for (let i: i32 = 0; i !== Neqs; i++) {
+  for (let i: i32 = 0; i != Neqs; i++) {
     const eq = node.eqs[i];
-    if (eqs.indexOf(eq) === -1) {
+    if (eqs.indexOf(eq) == -1) {
       eqs.push(eq);
     }
   }
 }
 
-function sortById(a, b) {
+function sortById(a: Equation, b: Equation): i32 {
   return b.id - a.id;
 }
 
+export class SolverNode {
+  constructor(
+    public body: Body | null = null,
+    public children: SolverNode[] = [],
+    public eqs: Equation[] = [],
+    public visited: boolean = false
+  ) {}
+}
+
 export class SplitSolver extends Solver {
-  subsolver: Solver;
+  subsolver: GSSolver;
   nodes: any[];
-  nodePool: any[];
+  nodePool: SolverNode[];
   iterations: i32;
   tolerance: f32;
 
@@ -66,7 +86,7 @@ export class SplitSolver extends Solver {
    * @extends Solver
    * @param {Solver} subsolver
    */
-  constructor(subsolver: Solver) {
+  constructor(subsolver: GSSolver) {
     super();
     this.iterations = 10;
     this.tolerance = 1e-7;
@@ -81,7 +101,7 @@ export class SplitSolver extends Solver {
   }
 
   createNode() {
-    return { body: null, children: [], eqs: [], visited: false };
+    return new SolverNode();
   }
 
   /**
@@ -90,10 +110,10 @@ export class SplitSolver extends Solver {
    * @param  {Number} dt
    * @param  {World} world
    */
-  solve(dt: f32, world: World): i32 {
+  solve(dt: f32, worldBodies: Body[]): i32 {
     const nodes = SplitSolver_solve_nodes,
       nodePool = this.nodePool,
-      bodies = world.bodies,
+      bodies = worldBodies, // world.bodies,
       equations = this.equations,
       Neq = equations.length,
       Nbodies = bodies.length,
@@ -128,7 +148,7 @@ export class SplitSolver extends Solver {
       nj.eqs.push(eq);
     }
 
-    let child,
+    let child: SolverNode | null,
       n: i32 = 0,
       eqs = SplitSolver_solve_eqs;
 
@@ -136,16 +156,17 @@ export class SplitSolver extends Solver {
     subsolver.iterations = this.iterations;
 
     const dummyWorld = SplitSolver_solve_dummyWorld;
+
     while ((child = getUnvisitedNode(nodes))) {
       eqs.length = 0;
-      dummyWorld.bodies.length = 0;
-      bfs(child, visitFunc, dummyWorld.bodies, eqs);
+      dummyWorld.length = 0;
+      bfs(child, visitFunc, dummyWorld, eqs);
 
       const Neqs = eqs.length;
 
       eqs = eqs.sort(sortById);
 
-      for (let i: i32 = 0; i !== Neqs; i++) {
+      for (let i: i32 = 0; i != Neqs; i++) {
         subsolver.addEquation(eqs[i]);
       }
 

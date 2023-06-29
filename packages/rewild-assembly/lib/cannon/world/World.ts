@@ -925,7 +925,7 @@ export class World extends EventDispatcher {
     }
 
     // Solve the constrained system
-    solver.solve(dt, this);
+    solver.solve(dt, this.bodies);
 
     if (doProfiling) {
       profile.solve = performance.now() - profilingStart;

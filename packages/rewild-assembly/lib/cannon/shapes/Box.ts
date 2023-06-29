@@ -40,7 +40,7 @@ export class Box extends Shape {
    * @extends Shape
    */
   constructor(halfExtents: Vec3) {
-    super(Shape.types.BOX);
+    super(Shape.BOX);
 
     this.halfExtents = halfExtents;
 

@@ -11,7 +11,7 @@ export class Particle extends Shape {
    * @extends Shape
    */
   constructor() {
-    super(Shape.types.PARTICLE);
+    super(Shape.PARTICLE);
   }
 
   /**

@@ -17,8 +17,8 @@ const fsa_faceANormalWS3 = new Vec3(),
 const maxminA: f32[] = [],
   maxminB: f32[] = [];
 
-const cli_aabbmin = new AABB(),
-  cli_aabbmax = new AABB();
+const cli_aabbmin = new Vec3(),
+  cli_aabbmax = new Vec3();
 const cfah_faceANormalWS = new Vec3(),
   cfah_edge0 = new Vec3(),
   cfah_WorldEdge0 = new Vec3(),
@@ -77,7 +77,7 @@ export class ConvexPolyhedron extends Shape {
     faces: i32[][] = [],
     uniqueAxes: Vec3[] | null = null
   ) {
-    super(Shape.types.CONVEXPOLYHEDRON);
+    super(Shape.CONVEXPOLYHEDRON);
 
     /**
      * Array of Vec3
@@ -118,7 +118,7 @@ export class ConvexPolyhedron extends Shape {
      * If given, these locally defined, normalized axes are the only ones being checked when doing separating axis check.
      * @property {Array} uniqueAxes
      */
-    this.uniqueAxes = uniqueAxes ? uniqueAxes.slice() : null;
+    this.uniqueAxes = uniqueAxes ? uniqueAxes.slice(0) : null;
 
     this.computeEdges();
     this.updateBoundingSphereRadius();
@@ -594,16 +594,17 @@ export class ConvexPolyhedron extends Shape {
     //console.log("closest A: ",closestFaceA);
     // Get the face and construct connected faces
     const polyA = hullA.faces[closestFaceA];
-    polyA.connectedFaces = [];
+    // polyA.connectedFaces = [];
+    const connectedFaces: i32[] = [];
     for (let i: i32 = 0; i < hullA.faces.length; i++) {
       for (let j = 0; j < hullA.faces[i].length; j++) {
         if (
           polyA.indexOf(hullA.faces[i][j]) !== -1 /* Sharing a vertex*/ &&
           i !==
             closestFaceA /* Not the one we are looking for connections from */ &&
-          polyA.connectedFaces.indexOf(i) === -1 /* Not already added */
+          connectedFaces.indexOf(i) === -1 /* Not already added */
         ) {
-          polyA.connectedFaces.push(i);
+          connectedFaces.push(i);
         }
       }
     }
@@ -629,14 +630,14 @@ export class ConvexPolyhedron extends Shape {
       const planeEqWS1 = -worldA1.dot(planeNormalWS1);
       let planeEqWS: f32;
       if (true) {
-        const otherFace = polyA.connectedFaces[e0];
+        const otherFace = connectedFaces[e0];
         localPlaneNormal.copy(this.faceNormals[otherFace]);
         const localPlaneEq = this.getPlaneConstantOfFace(otherFace);
 
         planeNormalWS.copy(localPlaneNormal);
         quatA.vmult(planeNormalWS, planeNormalWS);
         //posA.vadd(planeNormalWS,planeNormalWS);
-        const planeEqWS = localPlaneEq - planeNormalWS.dot(posA);
+        planeEqWS = localPlaneEq - planeNormalWS.dot(posA);
       } else {
         planeNormalWS.copy(planeNormalWS1);
         planeEqWS = planeEqWS1;

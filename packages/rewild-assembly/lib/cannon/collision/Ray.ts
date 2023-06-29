@@ -258,11 +258,11 @@ export class Ray {
       return;
     }
 
-    if (shape.type == Shape.types.SPHERE)
+    if (shape.type == Shape.SPHERE)
       this.intersectSphere(shape as Sphere, quat, position, body, shape);
-    else if (shape.type == Shape.types.BOX)
+    else if (shape.type == Shape.BOX)
       this.intersectBox(shape as Box, quat, position, body, shape);
-    else if (shape.type == Shape.types.CONVEXPOLYHEDRON)
+    else if (shape.type == Shape.CONVEXPOLYHEDRON)
       this.intersectConvex(
         shape as ConvexPolyhedron,
         quat,
@@ -270,7 +270,7 @@ export class Ray {
         body,
         shape
       );
-    else if (shape.type == Shape.types.HEIGHTFIELD)
+    else if (shape.type == Shape.HEIGHTFIELD)
       this.intersectHeightfield(
         shape as Heightfield,
         quat,
@@ -278,9 +278,9 @@ export class Ray {
         body,
         shape
       );
-    else if (shape.type == Shape.types.PLANE)
+    else if (shape.type == Shape.PLANE)
       this.intersectPlane(shape as Plane, quat, position, body, shape);
-    else if (shape.type == Shape.types.TRIMESH)
+    else if (shape.type == Shape.TRIMESH)
       this.intersectTrimesh(shape as Trimesh, quat, position, body, shape);
 
     // const intersectMethod = this[shape.type];

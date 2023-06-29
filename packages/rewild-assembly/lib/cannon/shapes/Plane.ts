@@ -15,7 +15,7 @@ export class Plane extends Shape {
    * @author schteppe
    */
   constructor() {
-    super(Shape.types.PLANE);
+    super(Shape.PLANE);
 
     // World oriented normal
     this.worldNormal = new Vec3();

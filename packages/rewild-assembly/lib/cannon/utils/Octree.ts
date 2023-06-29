@@ -19,7 +19,11 @@ export class OctreeNode {
   children: OctreeNode[];
   maxDepth: i32 = 8;
 
-  constructor(root: OctreeNode | null = null, aabb: AABB | null = null, maxDepth: i32 = 8) {
+  constructor(
+    root: OctreeNode | null = null,
+    aabb: AABB | null = null,
+    maxDepth: i32 = 8
+  ) {
     /**
      * The root node
      * @property {OctreeNode} root
@@ -69,7 +73,7 @@ export class OctreeNode {
 
     const children = this.children;
 
-    if (level < (this.maxDepth || this.root.maxDepth)) {
+    if (level < (this.maxDepth || this.root!.maxDepth)) {
       // Subdivide if there are no children yet
       let subdivided = false;
       if (!children.length) {
@@ -147,7 +151,7 @@ export class OctreeNode {
    * @param  {array} result
    * @return {array} The "result" object
    */
-  aabbQuery(aabb: AABB, result): void {
+  aabbQuery(aabb: AABB, result: i32[]): i32[] {
     const nodeData = this.data;
 
     // abort if the range does not intersect this node
@@ -166,13 +170,20 @@ export class OctreeNode {
     //     children[i].aabbQuery(aabb, result);
     // }
 
-    const queue = [this];
+    const queue: OctreeNode[] = [this];
     while (queue.length) {
       const node = queue.pop();
       if (node.aabb.overlaps(aabb)) {
-        Array.prototype.push.apply(result, node.data);
+        // Array.prototype.push.apply(result, node.data);
+        for (let i: i32 = 0; i < node.data.length; i++) {
+          result.push(node.data[i]);
+        }
       }
-      Array.prototype.push.apply(queue, node.children);
+      // Array.prototype.push.apply(queue, node.children);
+
+      for (let i: i32 = 0; i < node.children.length; i++) {
+        queue.push(node.children[i]);
+      }
     }
 
     return result;
@@ -200,15 +211,19 @@ export class OctreeNode {
    * @method removeEmptyNodes
    */
   removeEmptyNodes() {
-    const queue = [this];
+    const queue: OctreeNode[] = [this];
     while (queue.length) {
       const node = queue.pop();
-      for (const i = node.children.length - 1; i >= 0; i--) {
+      for (let i: i32 = node.children.length - 1; i >= 0; i--) {
         if (!node.children[i].data.length) {
           node.children.splice(i, 1);
         }
       }
-      Array.prototype.push.apply(queue, node.children);
+
+      // Array.prototype.push.apply(queue, node.children);
+      for (let i: i32 = 0; i < node.children.length; i++) {
+        queue.push(node.children[i]);
+      }
     }
   }
 }

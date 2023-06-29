@@ -129,7 +129,7 @@ export class Equation {
    * @method computeB
    * @return {Number}
    */
-  computeB(a: f32, b: f32, h: f32): f32 {
+  computeB(a: f32, b: f32 = 0, h: f32 = 0): f32 {
     const GW = this.computeGW(),
       Gq = this.computeGq(),
       GiMf = this.computeGiMf();
