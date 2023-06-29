@@ -115,15 +115,13 @@ export abstract class Shape {
    * @property types
    * @type {Object}
    */
-  static types = {
-    SPHERE: 1,
-    PLANE: 2,
-    BOX: 4,
-    COMPOUND: 8,
-    CONVEXPOLYHEDRON: 16,
-    HEIGHTFIELD: 32,
-    PARTICLE: 64,
-    CYLINDER: 128,
-    TRIMESH: 256,
-  };
+  static SPHERE: i16 = 1;
+  static PLANE: i16 = 2;
+  static BOX: i16 = 4;
+  static COMPOUND: i16 = 8;
+  static CONVEXPOLYHEDRON: i16 = 16;
+  static HEIGHTFIELD: i16 = 32;
+  static PARTICLE: i16 = 64;
+  static CYLINDER: i16 = 128;
+  static TRIMESH: i16 = 256;
 }

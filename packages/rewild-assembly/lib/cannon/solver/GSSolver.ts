@@ -1,8 +1,9 @@
+import { Body } from "../objects/Body";
 import { Solver } from "./Solver";
 
-const GSSolver_solve_lambda = []; // Just temporary number holders that we want to reuse each solve.
-const GSSolver_solve_invCs = [];
-const GSSolver_solve_Bs = [];
+const GSSolver_solve_lambda: f32[] = []; // Just temporary number holders that we want to reuse each solve.
+const GSSolver_solve_invCs: f32[] = [];
+const GSSolver_solve_Bs: f32[] = [];
 
 export class GSSolver extends Solver {
   iterations: i32;
@@ -36,13 +37,13 @@ export class GSSolver extends Solver {
     this.tolerance = 1e-7;
   }
 
-  solve(dt: f32, world: World): i32 {
+  solve(dt: f32, worldBodies: Body[]): i32 {
     let iter: i32 = 0,
       maxIter = this.iterations,
       tolSquared = this.tolerance * this.tolerance,
       equations = this.equations,
       Neq = equations.length,
-      bodies = world.bodies,
+      bodies = worldBodies, // world.bodies,
       Nbodies = bodies.length,
       h = dt,
       q,
@@ -67,6 +68,7 @@ export class GSSolver extends Solver {
     invCs.length = Neq;
     Bs.length = Neq;
     lambda.length = Neq;
+
     for (let i: i32 = 0; i !== Neq; i++) {
       const c = equations[i];
       lambda[i] = 0.0;

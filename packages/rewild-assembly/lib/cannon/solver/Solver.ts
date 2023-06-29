@@ -1,4 +1,5 @@
 import { Equation } from "../equations/Equation";
+import { Body } from "../objects/Body";
 
 export class Solver {
   equations: Equation[];
@@ -23,7 +24,7 @@ export class Solver {
    * @param  {World} world
    */
 
-  solve(dt: f32, world: World): f32 {
+  solve(dt: f32, worldBodies: Body[]): f32 {
     // Should return the number of iterations done!
     return 0;
   }

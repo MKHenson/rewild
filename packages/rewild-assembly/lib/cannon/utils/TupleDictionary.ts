@@ -1,5 +1,5 @@
 export class TupleDictionary<T> {
-  data: { keys: f32[] };
+  data: Map<string, T>;
   /**
    * @class TupleDictionary
    * @constructor
@@ -10,7 +10,7 @@ export class TupleDictionary<T> {
      * @property data
      * @type {Object}
      */
-    this.data = { keys: [] };
+    this.data = new Map();
   }
 
   /**
@@ -26,7 +26,7 @@ export class TupleDictionary<T> {
       j = i;
       i = temp;
     }
-    return this.data[i + "-" + j];
+    return this.data.get(i.toString() + "-" + j.toString());
   }
 
   /**
@@ -41,26 +41,14 @@ export class TupleDictionary<T> {
       j = i;
       i = temp;
     }
-    const key = i + "-" + j;
-
-    // Check if key already exists
-    if (!this.get(i, j)) {
-      this.data.keys.push(key);
-    }
-
-    this.data[key] = value;
+    const key = i.toString() + "-" + j.toString();
+    this.data.set(key, value);
   }
 
   /**
    * @method reset
    */
   reset(): void {
-    const data = this.data,
-      keys = data.keys;
-
-    while (keys.length > 0) {
-      const key = keys.pop();
-      delete data[key];
-    }
+    this.data.clear();
   }
 }

@@ -81,7 +81,7 @@ export class Heightfield extends Shape {
     minValue: f32 | null = null,
     elementSize: f32
   ) {
-    super(Shape.types.HEIGHTFIELD);
+    super(Shape.HEIGHTFIELD);
 
     /**
      * An array of numbers, or height values, that are spread out along the x axis.

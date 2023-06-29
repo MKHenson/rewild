@@ -14,7 +14,7 @@ export class Sphere extends Shape {
    * @author schteppe / http://github.com/schteppe
    */
   constructor(radius: f32 = 1.0) {
-    super(Shape.types.SPHERE);
+    super(Shape.SPHERE);
 
     /**
      * @property {Number} radius
@@ -28,7 +28,7 @@ export class Sphere extends Shape {
     this.updateBoundingSphereRadius();
   }
 
-  calculateLocalInertia(mass: f32, target = new Vec3()) {
+  calculateLocalInertia(mass: f32, target = new Vec3()): Vec3 {
     const I = (2.0 * mass * this.radius * this.radius) / 5.0;
     target.x = I;
     target.y = I;
@@ -36,7 +36,7 @@ export class Sphere extends Shape {
     return target;
   }
 
-  volume() {
+  volume(): f32 {
     return (4.0 * Math.PI * this.radius) / 3.0;
   }
 
