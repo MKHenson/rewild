@@ -1,0 +1,23 @@
+{
+  "name": "rewild-physics",
+  "version": "0.0.1",
+  "description": "The rewild physics engine",
+  "main": "./build/release.js",
+  "types": "./build/release.d.ts",
+  "devDependencies": {},
+  "scripts": {
+    "clean": "rimraf build",
+    "ts-check": "npx tsc --noEmit --project ./tsconfig.json",
+    "build": "npm run clean && npm run build --workspaces && node ./esbuild.js && npm run ts-check"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Webinate/rewild.git"
+  },
+  "author": "Mathew Henson",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Webinate/rewild/issues"
+  },
+  "homepage": "https://github.com/Webinate/rewild#readme"
+}
