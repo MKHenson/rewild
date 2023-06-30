@@ -3,7 +3,7 @@ import { World } from "../world/World";
 import { AABB } from "./AABB";
 import { Broadphase } from "./Broadphase";
 
-const tmpAABB = new AABB();
+// const tmpAABB = new AABB();
 
 export class NaiveBroadphase extends Broadphase {
   /**

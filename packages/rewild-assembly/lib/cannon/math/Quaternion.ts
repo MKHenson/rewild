@@ -2,9 +2,9 @@ import { Vec3 } from "./Vec3";
 
 const sfv_t1 = new Vec3(),
   sfv_t2 = new Vec3();
-const Quaternion_mult_va = new Vec3();
-const Quaternion_mult_vb = new Vec3();
-const Quaternion_mult_vaxvb = new Vec3();
+// const Quaternion_mult_va = new Vec3();
+// const Quaternion_mult_vb = new Vec3();
+// const Quaternion_mult_vaxvb = new Vec3();
 export class Quaternion {
   x: f32;
   y: f32;
@@ -119,8 +119,7 @@ export class Quaternion {
       this.x = a.x;
       this.y = a.y;
       this.z = a.z;
-      this.w =
-        Mathf.sqrt(Mathf.pow(u.norm(), 2) * Mathf.pow(v.norm(), 2)) + u.dot(v);
+      this.w = Mathf.sqrt(Mathf.pow(u.norm(), 2) * Mathf.pow(v.norm(), 2)) + u.dot(v);
       this.normalize();
     }
     return this;
@@ -195,9 +194,7 @@ export class Quaternion {
    * @method normalize
    */
   normalize(): Quaternion {
-    let l = Mathf.sqrt(
-      this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w
-    );
+    let l = Mathf.sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
     if (l == 0) {
       this.x = 0;
       this.y = 0;
@@ -220,13 +217,7 @@ export class Quaternion {
    * @author unphased, https://github.com/unphased
    */
   normalizeFast(): Quaternion {
-    const f =
-      (3.0 -
-        (this.x * this.x +
-          this.y * this.y +
-          this.z * this.z +
-          this.w * this.w)) /
-      2.0;
+    const f = (3.0 - (this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w)) / 2.0;
     if (f == 0) {
       this.x = 0;
       this.y = 0;
@@ -458,12 +449,7 @@ export class Quaternion {
    * @param  {Quaternion} target
    * @return {Quaternion} The "target" object
    */
-  integrate(
-    angularVelocity: Vec3,
-    dt: f32,
-    angularFactor: Vec3,
-    target = new Quaternion()
-  ): Quaternion {
+  integrate(angularVelocity: Vec3, dt: f32, angularFactor: Vec3, target = new Quaternion()): Quaternion {
     const ax = angularVelocity.x * angularFactor.x,
       ay = angularVelocity.y * angularFactor.y,
       az = angularVelocity.z * angularFactor.z,

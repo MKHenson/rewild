@@ -1,4 +1,6 @@
-import { Ray } from "../collision/Ray";
+import { Event } from "../../core/Event";
+import { Listener } from "../../core/EventDispatcher";
+// import { Ray } from "../collision/Ray";
 import { Constraint } from "../constraints/Constraint";
 import { Quaternion } from "../math/Quaternion";
 import { Transform } from "../math/Transform";
@@ -7,7 +9,7 @@ import { World } from "../world/World";
 import { Body } from "./Body";
 import { WheelInfo, WheelInfoOptions } from "./WheelInfo";
 
-export class RaycastVehicle {
+export class RaycastVehicle implements Listener {
   chassisBody: Body;
   wheelInfos: WheelInfo[];
   sliding: boolean;
@@ -17,7 +19,7 @@ export class RaycastVehicle {
   indexUpAxis: i32;
   constraints: Constraint[];
   currentVehicleSpeedKmHour: f32;
-  preStepCallback: () => void;
+  preStepCallback: null | (() => void);
 
   /**
    * Vehicle helper class that casts rays from the wheel positions towards the ground and applies forces.
@@ -76,6 +78,10 @@ export class RaycastVehicle {
     this.constraints = [];
   }
 
+  onEvent(event: Event): void {
+    if (this.preStepCallback && event.type === "preStep") this.preStepCallback();
+  }
+
   /**
    * Add a wheel. For information about the options, see WheelInfo.
    * @method addWheel
@@ -132,7 +138,7 @@ export class RaycastVehicle {
     this.preStepCallback = () => {
       that.updateVehicle(world.dt);
     };
-    world.addEventListener("preStep", this.preStepCallback);
+    world.addEventListener("preStep", this);
     this.world = world;
   }
 
@@ -280,7 +286,7 @@ export class RaycastVehicle {
   removeFromWorld(world: World): void {
     const constraints = this.constraints;
     world.remove(this.chassisBody);
-    world.removeEventListener("preStep", this.preStepCallback);
+    world.removeEventListener("preStep", this);
     this.world = null;
   }
 
@@ -311,7 +317,7 @@ export class RaycastVehicle {
 
     const object = raycastResult.body;
 
-    wheel.raycastResult.groundObject = 0;
+    // wheel.raycastResult.groundObject = 0;
 
     if (object) {
       depth = raycastResult.distance;
@@ -584,8 +590,12 @@ export class RaycastVehicle {
         // Scale the relative position in the up direction with rollInfluence.
         // If rollInfluence is 1, the impulse will be applied on the hitPoint (easy to roll over), if it is zero it will be applied in the same plane as the center of mass (not easy to roll over).
         chassisBody.vectorToLocalFrame(rel_pos, rel_pos);
-        rel_pos["xyz"[this.indexUpAxis]] *= wheel.rollInfluence;
-        chassisBody.vectorToWorldFrame(rel_pos, rel_pos);
+
+        if (this.indexUpAxis == 0) rel_pos.x *= wheel.rollInfluence;
+        else if (this.indexUpAxis == 1) rel_pos.y *= wheel.rollInfluence;
+        else if (this.indexUpAxis == 2)
+          // rel_pos["xyz"[this.indexUpAxis]] *= wheel.rollInfluence;
+          chassisBody.vectorToWorldFrame(rel_pos, rel_pos);
         chassisBody.applyImpulse(sideImp, rel_pos);
 
         //apply friction impulse on the ground
@@ -613,14 +623,14 @@ const resolveSingleBilateral_vel = new Vec3();
 const directions = [new Vec3(1, 0, 0), new Vec3(0, 1, 0), new Vec3(0, 0, 1)];
 const castRay_rayvector = new Vec3();
 const castRay_target = new Vec3();
-const tmpVec1 = new Vec3();
-const tmpVec2 = new Vec3();
-const tmpVec3 = new Vec3();
+// const tmpVec1 = new Vec3();
+// const tmpVec2 = new Vec3();
+// const tmpVec3 = new Vec3();
 const tmpVec4 = new Vec3();
 const tmpVec5 = new Vec3();
 const tmpVec6 = new Vec3();
-const tmpRay = new Ray();
-const torque = new Vec3();
+// const tmpRay = new Ray();
+// const torque = new Vec3();
 
 function calcRollingFriction(
   body0: Body,

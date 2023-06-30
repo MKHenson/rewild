@@ -1,14 +1,16 @@
+import { Event } from "../../core/Event";
+import { Listener } from "../../core/EventDispatcher";
 import { Body } from "../objects/Body";
-import { World } from "../world/World";
+import { BodyEvent, World } from "../world/World";
 import { AABB } from "./AABB";
 import { Broadphase } from "./Broadphase";
 
-export class SAPBroadphase extends Broadphase {
+export class SAPBroadphase extends Broadphase implements Listener {
   axisList: Body[];
   world: World | null;
   axisIndex: i32;
-  _addBodyHandler: (e: { body: Body }) => void;
-  _removeBodyHandler: (e: { body: Body }) => void;
+  // _addBodyHandler: (e: { body: Body }) => void;
+  // _removeBodyHandler: (e: { body: Body }) => void;
 
   /**
    * Sweep and prune broadphase along one axis.
@@ -42,21 +44,36 @@ export class SAPBroadphase extends Broadphase {
      */
     this.axisIndex = 0;
 
-    const axisList = this.axisList;
+    // const axisList = this.axisList;
 
-    this._addBodyHandler = function (e) {
-      axisList.push(e.body);
-    };
+    // this._addBodyHandler = function (e) {
+    //   axisList.push(e.body);
+    // };
 
-    this._removeBodyHandler = function (e) {
-      const idx = axisList.indexOf(e.body);
-      if (idx !== -1) {
-        axisList.splice(idx, 1);
-      }
-    };
+    // this._removeBodyHandler = function (e) {
+    //   const idx = axisList.indexOf(e.body);
+    //   if (idx != -1) {
+    //     axisList.splice(idx, 1);
+    //   }
+    // };
 
     if (world) {
       this.setWorld(world);
+    }
+  }
+
+  onEvent(event: Event): void {
+    const e = event as BodyEvent;
+
+    if (event.type == "addBody") {
+      this.axisList.push(e.body!);
+    } else if (event.type == "removeBody") {
+      const axisList = this.axisList;
+
+      const idx = axisList.indexOf(e.body!);
+      if (idx != -1) {
+        axisList.splice(idx, 1);
+      }
     }
   }
 
@@ -75,12 +92,12 @@ export class SAPBroadphase extends Broadphase {
     }
 
     // Remove old handlers, if any
-    world.removeEventListener("addBody", this._addBodyHandler);
-    world.removeEventListener("removeBody", this._removeBodyHandler);
+    world.removeEventListener("addBody", this);
+    world.removeEventListener("removeBody", this);
 
     // Add handlers to update the list of bodies.
-    world.addEventListener("addBody", this._addBodyHandler);
-    world.addEventListener("removeBody", this._removeBodyHandler);
+    world.addEventListener("addBody", this);
+    world.addEventListener("removeBody", this);
 
     this.world = world;
     this.dirty = true;
@@ -93,9 +110,11 @@ export class SAPBroadphase extends Broadphase {
    * @return {Array}
    */
   static insertionSortX(a: Body[]): Body[] {
+    let j: i32 = 0;
+
     for (let i: i32 = 1, l = a.length; i < l; i++) {
       const v = a[i];
-      for (let j: i32 = i - 1; j >= 0; j--) {
+      for (j = i - 1; j >= 0; j--) {
         if (a[j].aabb.lowerBound.x <= v.aabb.lowerBound.x) {
           break;
         }
@@ -113,9 +132,11 @@ export class SAPBroadphase extends Broadphase {
    * @return {Array}
    */
   static insertionSortY(a: Body[]): Body[] {
+    let j: i32 = 0;
+
     for (let i: i32 = 1, l = a.length; i < l; i++) {
       const v = a[i];
-      for (let j: i32 = i - 1; j >= 0; j--) {
+      for (j = i - 1; j >= 0; j--) {
         if (a[j].aabb.lowerBound.y <= v.aabb.lowerBound.y) {
           break;
         }
@@ -133,9 +154,10 @@ export class SAPBroadphase extends Broadphase {
    * @return {Array}
    */
   static insertionSortZ(a: Body[]): Body[] {
+    let j: i32 = 0;
     for (let i: i32 = 1, l = a.length; i < l; i++) {
       const v = a[i];
-      for (let j: i32 = i - 1; j >= 0; j--) {
+      for (j = i - 1; j >= 0; j--) {
         if (a[j].aabb.lowerBound.z <= v.aabb.lowerBound.z) {
           break;
         }
@@ -165,7 +187,7 @@ export class SAPBroadphase extends Broadphase {
     }
 
     // Look through the list
-    for (i = 0; i !== N; i++) {
+    for (i = 0; i != N; i++) {
       const bi = bodies[i];
 
       for (j = i + 1; j < N; j++) {
@@ -190,7 +212,7 @@ export class SAPBroadphase extends Broadphase {
     const N = axisList.length;
 
     // Update AABBs
-    for (const i = 0; i !== N; i++) {
+    for (let i: i32 = 0; i != N; i++) {
       const bi = axisList[i];
       if (bi.aabbNeedsUpdate) {
         bi.computeAABB();
@@ -198,11 +220,11 @@ export class SAPBroadphase extends Broadphase {
     }
 
     // Sort the list
-    if (axisIndex === 0) {
+    if (axisIndex == 0) {
       SAPBroadphase.insertionSortX(axisList);
-    } else if (axisIndex === 1) {
+    } else if (axisIndex == 1) {
       SAPBroadphase.insertionSortY(axisList);
-    } else if (axisIndex === 2) {
+    } else if (axisIndex == 2) {
       SAPBroadphase.insertionSortZ(axisList);
     }
   }
@@ -217,16 +239,16 @@ export class SAPBroadphase extends Broadphase {
    * @return {Boolean}
    */
   static checkBounds(bi: Body, bj: Body, axisIndex: i32): boolean {
-    let biPos: f32;
-    let bjPos: f32;
+    let biPos: f32 = 0;
+    let bjPos: f32 = 0;
 
-    if (axisIndex === 0) {
+    if (axisIndex == 0) {
       biPos = bi.position.x;
       bjPos = bj.position.x;
-    } else if (axisIndex === 1) {
+    } else if (axisIndex == 1) {
       biPos = bi.position.y;
       bjPos = bj.position.y;
-    } else if (axisIndex === 2) {
+    } else if (axisIndex == 2) {
       biPos = bi.position.z;
       bjPos = bj.position.z;
     }
@@ -306,19 +328,19 @@ export class SAPBroadphase extends Broadphase {
       this.dirty = false;
     }
 
-    const axisIndex = this.axisIndex;
-    let axis: string = "x";
-    if (axisIndex === 1) {
-      axis = "y";
-    }
-    if (axisIndex === 2) {
-      axis = "z";
-    }
+    // const axisIndex = this.axisIndex;
+    // let axis: i16 = "x";
+    // if (axisIndex == 1) {
+    //   axis = "y";
+    // }
+    // if (axisIndex == 2) {
+    //   axis = "z";
+    // }
 
     const axisList = this.axisList;
-    const lower = aabb.lowerBound[axis];
-    const upper = aabb.upperBound[axis];
-    for (const i = 0; i < axisList.length; i++) {
+    // const lower = axisIndex == 0 ? aabb.lowerBound.x : axisIndex == 1 ? aabb.lowerBound.y : aabb.lowerBound.z;
+    // const upper = axisIndex == 0 ? aabb.upperBound.x : axisIndex == 1 ? aabb.upperBound.y : aabb.upperBound.z;
+    for (let i: i32 = 0; i < axisList.length; i++) {
       const b = axisList[i];
 
       if (b.aabbNeedsUpdate) {

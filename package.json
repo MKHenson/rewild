@@ -59,6 +59,7 @@
   "workspaces": [
     "packages\\rewild-ui",
     "packages\\rewild-assembly",
-    "packages\\rewild-common"
+    "packages\\rewild-common",
+    "packages\\rewild-physics"
   ]
 }

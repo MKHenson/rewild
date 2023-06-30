@@ -98,8 +98,8 @@ export class World extends EventDispatcher {
   profile: Profile;
   accumulator: f32;
   subsystems: any[];
-  addBodyEvent: any;
-  removeBodyEvent: any;
+  // addBodyEvent: any;
+  // removeBodyEvent: any;
   idToBodyMap: Map<i32, Body>;
 
   /**
@@ -146,8 +146,7 @@ export class World extends EventDispatcher {
      * @type {Number}
      * @default 0
      */
-    this.quatNormalizeSkip =
-      options.quatNormalizeSkip !== undefined ? options.quatNormalizeSkip : 0;
+    this.quatNormalizeSkip = options.quatNormalizeSkip !== undefined ? options.quatNormalizeSkip : 0;
 
     /**
      * Set to true to use fast quaternion normalization. It is often enough accurate to use. If bodies tend to explode, set to false.
@@ -157,10 +156,7 @@ export class World extends EventDispatcher {
      * @see Quaternion.normalize
      * @default false
      */
-    this.quatNormalizeFast =
-      options.quatNormalizeFast !== undefined
-        ? options.quatNormalizeFast
-        : false;
+    this.quatNormalizeFast = options.quatNormalizeFast !== undefined ? options.quatNormalizeFast : false;
 
     /**
      * The wall-clock time since simulation start
@@ -194,10 +190,7 @@ export class World extends EventDispatcher {
      * @property broadphase
      * @type {Broadphase}
      */
-    this.broadphase =
-      options.broadphase !== undefined
-        ? options.broadphase
-        : new NaiveBroadphase();
+    this.broadphase = options.broadphase !== undefined ? options.broadphase : new NaiveBroadphase();
 
     /**
      * @property bodies
@@ -210,8 +203,7 @@ export class World extends EventDispatcher {
      * @property solver
      * @type {Solver}
      */
-    this.solver =
-      options.solver !== undefined ? options.solver : new GSSolver();
+    this.solver = options.solver !== undefined ? options.solver : new GSSolver();
 
     /**
      * @property constraints
@@ -267,12 +259,7 @@ export class World extends EventDispatcher {
      * @property defaultContactMaterial
      * @type {ContactMaterial}
      */
-    this.defaultContactMaterial = new ContactMaterial(
-      this.defaultMaterial,
-      this.defaultMaterial,
-      0.3,
-      0.0
-    );
+    this.defaultContactMaterial = new ContactMaterial(this.defaultMaterial, this.defaultMaterial, 0.3, 0.0);
 
     /**
      * @property doProfiling
@@ -303,26 +290,6 @@ export class World extends EventDispatcher {
      * @type {Array}
      */
     this.subsystems = [];
-
-    /**
-     * Dispatched after a body has been added to the world.
-     * @event addBody
-     * @param {Body} body The body that has been added to the world.
-     */
-    this.addBodyEvent = {
-      type: "addBody",
-      body: null,
-    };
-
-    /**
-     * Dispatched after a body has been removed from the world.
-     * @event removeBody
-     * @param {Body} body The body that has been removed from the world.
-     */
-    this.removeBodyEvent = {
-      type: "removeBody",
-      body: null,
-    };
 
     this.idToBodyMap = new Map();
 
@@ -387,9 +354,9 @@ export class World extends EventDispatcher {
       body.initQuaternion.copy(body.quaternion);
     }
     this.collisionMatrix.setNumObjects(this.bodies.length);
-    this.addBodyEvent.body = body;
+    addBodyEvent.body = body;
     this.idToBodyMap.set(body.id, body);
-    this.dispatchEvent(this.addBodyEvent);
+    this.dispatchEvent(addBodyEvent);
   }
 
   add(body: Body): void {
@@ -448,12 +415,7 @@ export class World extends EventDispatcher {
    * @param  {Function} callback
    * @return {boolean} True if any body was hit.
    */
-  raycastAll(
-    from: Vec3,
-    to: Vec3,
-    options: IntersectionOptions,
-    callback: Callback | null = null
-  ): boolean {
+  raycastAll(from: Vec3, to: Vec3, options: IntersectionOptions, callback: Callback | null = null): boolean {
     options.mode = Ray.ALL;
     options.from = from;
     options.to = to;
@@ -474,12 +436,7 @@ export class World extends EventDispatcher {
    * @param  {RaycastResult} result
    * @return {boolean} True if any body was hit.
    */
-  raycastAny(
-    from: Vec3,
-    to: Vec3,
-    options: IntersectionOptions,
-    result: RaycastResult
-  ) {
+  raycastAny(from: Vec3, to: Vec3, options: IntersectionOptions, result: RaycastResult) {
     options.mode = Ray.ANY;
     options.from = from;
     options.to = to;
@@ -500,12 +457,7 @@ export class World extends EventDispatcher {
    * @param  {RaycastResult} result
    * @return {boolean} True if any body was hit.
    */
-  raycastClosest(
-    from: Vec3,
-    to: Vec3,
-    options: IntersectionOptions,
-    result: RaycastResult
-  ) {
+  raycastClosest(from: Vec3, to: Vec3, options: IntersectionOptions, result: RaycastResult) {
     options.mode = Ray.CLOSEST;
     options.from = from;
     options.to = to;
@@ -533,9 +485,9 @@ export class World extends EventDispatcher {
       }
 
       this.collisionMatrix.setNumObjects(n);
-      this.removeBodyEvent.body = body;
+      removeBodyEvent.body = body;
       this.idToBodyMap.delete(body.id);
-      this.dispatchEvent(this.removeBodyEvent);
+      this.dispatchEvent(removeBodyEvent);
     }
   }
 
@@ -588,11 +540,7 @@ export class World extends EventDispatcher {
     this.contactmaterials.push(cmat);
 
     // Add current contact material to the material table
-    this.contactMaterialTable.set(
-      cmat.materials[0].id,
-      cmat.materials[1].id,
-      cmat
-    );
+    this.contactMaterialTable.set(cmat.materials[0].id, cmat.materials[1].id, cmat);
   }
 
   /**
@@ -686,11 +634,7 @@ export class World extends EventDispatcher {
     }
 
     // Update subsystems
-    for (
-      let i: i32 = 0, Nsubsystems = this.subsystems.length;
-      i !== Nsubsystems;
-      i++
-    ) {
+    for (let i: i32 = 0, Nsubsystems = this.subsystems.length; i !== Nsubsystems; i++) {
       this.subsystems[i].update();
     }
 
@@ -711,10 +655,7 @@ export class World extends EventDispatcher {
       const c = constraints[i];
       if (!c.collideConnected) {
         for (let j: i32 = p1.length - 1; j >= 0; j -= 1) {
-          if (
-            (c.bodyA === p1[j] && c.bodyB === p2[j]) ||
-            (c.bodyB === p1[j] && c.bodyA === p2[j])
-          ) {
+          if ((c.bodyA === p1[j] && c.bodyB === p2[j]) || (c.bodyB === p1[j] && c.bodyA === p2[j])) {
             p1.splice(j, 1);
             p2.splice(j, 1);
           }
@@ -781,9 +722,7 @@ export class World extends EventDispatcher {
       // Get collision properties
       let cm: ContactMaterial;
       if (bi.material && bj.material) {
-        cm =
-          this.getContactMaterial(bi.material, bj.material) ||
-          this.defaultContactMaterial;
+        cm = this.getContactMaterial(bi.material, bj.material) || this.defaultContactMaterial;
       } else {
         cm = this.defaultContactMaterial;
       }
@@ -1122,6 +1061,15 @@ export class CollideEvent extends Event {
   }
 }
 
+export class BodyEvent extends Event {
+  body: Body | null;
+
+  constructor(type: string) {
+    super(type);
+    this.body = null;
+  }
+}
+
 /**
  * Dispatched after the world has stepped forward in time.
  * @event postStep
@@ -1132,6 +1080,20 @@ const World_step_postStepEvent = new Event("postStep"); // Reusable event object
  * @event preStep
  */
 const World_step_preStepEvent = new Event("preStep");
+
+/**
+ * Dispatched after a body has been added to the world.
+ * @event addBody
+ * @param {Body} body The body that has been added to the world.
+ */
+const addBodyEvent = new BodyEvent("addBody");
+
+/**
+ * Dispatched after a body has been removed from the world.
+ * @event removeBody
+ * @param {Body} body The body that has been removed from the world.
+ */
+const removeBodyEvent = new BodyEvent("removeBody");
 
 const World_step_collideEvent = new CollideEvent(Body.COLLIDE_EVENT_NAME);
 
