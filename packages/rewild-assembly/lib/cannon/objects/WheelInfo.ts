@@ -75,6 +75,7 @@ export class WheelInfo {
   forwardImpulse: f32;
   raycastResult: RaycastResult;
   worldTransform: Transform;
+  slipInfo: f32;
 
   /**
    * @class WheelInfo
@@ -291,30 +292,32 @@ export class WheelInfo {
      * @property {boolean} isInContact
      */
     this.isInContact = false;
+
+    this.skidInfo = 0;
   }
 
-  updateWheel(chassis: Body): void {
-    const raycastResult = this.raycastResult;
+  // updateWheel(chassis: Body): void {
+  //   const raycastResult = this.raycastResult;
 
-    if (this.isInContact) {
-      const project = raycastResult.hitNormalWorld.dot(raycastResult.directionWorld);
-      raycastResult.hitPointWorld.vsub(chassis.position, relpos);
-      chassis.getVelocityAtWorldPoint(relpos, chassis_velocity_at_contactPoint);
-      const projVel = raycastResult.hitNormalWorld.dot(chassis_velocity_at_contactPoint);
-      if (project >= -0.1) {
-        this.suspensionRelativeVelocity = 0.0;
-        this.clippedInvContactDotSuspension = 1.0 / 0.1;
-      } else {
-        const inv = -1 / project;
-        this.suspensionRelativeVelocity = projVel * inv;
-        this.clippedInvContactDotSuspension = inv;
-      }
-    } else {
-      // Not in contact : position wheel in a nice (rest length) position
-      raycastResult.suspensionLength = this.suspensionRestLength;
-      this.suspensionRelativeVelocity = 0.0;
-      raycastResult.directionWorld.scale(-1, raycastResult.hitNormalWorld);
-      this.clippedInvContactDotSuspension = 1.0;
-    }
-  }
+  //   if (this.isInContact) {
+  //     const project = raycastResult.hitNormalWorld.dot(raycastResult.directionWorld);
+  //     raycastResult.hitPointWorld.vsub(chassis.position, relpos);
+  //     chassis.getVelocityAtWorldPoint(relpos, chassis_velocity_at_contactPoint);
+  //     const projVel = raycastResult.hitNormalWorld.dot(chassis_velocity_at_contactPoint);
+  //     if (project >= -0.1) {
+  //       this.suspensionRelativeVelocity = 0.0;
+  //       this.clippedInvContactDotSuspension = 1.0 / 0.1;
+  //     } else {
+  //       const inv = -1 / project;
+  //       this.suspensionRelativeVelocity = projVel * inv;
+  //       this.clippedInvContactDotSuspension = inv;
+  //     }
+  //   } else {
+  //     // Not in contact : position wheel in a nice (rest length) position
+  //     raycastResult.suspensionLength = this.suspensionRestLength;
+  //     this.suspensionRelativeVelocity = 0.0;
+  //     raycastResult.directionWorld.scale(-1, raycastResult.hitNormalWorld);
+  //     this.clippedInvContactDotSuspension = 1.0;
+  //   }
+  // }
 }

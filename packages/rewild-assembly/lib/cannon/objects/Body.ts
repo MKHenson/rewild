@@ -12,22 +12,22 @@ import { World } from "../world/World";
 const tmpVec = new Vec3();
 const tmpQuat = new Quaternion();
 
-const torque = new Vec3();
-const invI_tau_dt = new Vec3();
-const w = new Quaternion();
-const wq = new Quaternion();
+// const torque = new Vec3();
+// const invI_tau_dt = new Vec3();
+// const w = new Quaternion();
+// const wq = new Quaternion();
 
 const uiw_m1 = new Mat3(),
   uiw_m2 = new Mat3(),
   uiw_m3 = new Mat3();
-const Body_applyForce_r = new Vec3();
+// const Body_applyForce_r = new Vec3();
 const Body_applyForce_rotForce = new Vec3();
 const Body_applyLocalImpulse_worldImpulse = new Vec3();
 const Body_applyLocalImpulse_relativePoint = new Vec3();
 const Body_updateMassProperties_halfExtents = new Vec3();
 const computeAABB_shapeAABB = new AABB();
 
-const Body_applyImpulse_r = new Vec3();
+// const Body_applyImpulse_r = new Vec3();
 const Body_applyImpulse_velo = new Vec3();
 const Body_applyImpulse_rotVelo = new Vec3();
 const Body_applyLocalForce_worldForce = new Vec3();
@@ -150,18 +150,12 @@ export class Body extends EventDispatcher {
     /**
      * @property {Number} collisionFilterGroup
      */
-    this.collisionFilterGroup =
-      typeof options.collisionFilterGroup === "number"
-        ? options.collisionFilterGroup
-        : 1;
+    this.collisionFilterGroup = typeof options.collisionFilterGroup === "number" ? options.collisionFilterGroup : 1;
 
     /**
      * @property {Number} collisionFilterMask
      */
-    this.collisionFilterMask =
-      typeof options.collisionFilterMask === "number"
-        ? options.collisionFilterMask
-        : -1;
+    this.collisionFilterMask = typeof options.collisionFilterMask === "number" ? options.collisionFilterMask : -1;
 
     /**
      * Whether to produce contact forces when in contact with other bodies. Note that contacts will be generated, but they will be disabled.
@@ -250,8 +244,7 @@ export class Body extends EventDispatcher {
      * @property linearDamping
      * @type {Number}
      */
-    this.linearDamping =
-      typeof options.linearDamping === "number" ? options.linearDamping : 0.01;
+    this.linearDamping = typeof options.linearDamping === "number" ? options.linearDamping : 0.01;
 
     /**
      * One of: Body.DYNAMIC, Body.STATIC and Body.KINEMATIC.
@@ -269,8 +262,7 @@ export class Body extends EventDispatcher {
      * @type {Boolean}
      * @default true
      */
-    this.allowSleep =
-      typeof options.allowSleep !== "undefined" ? options.allowSleep : true;
+    this.allowSleep = typeof options.allowSleep !== "undefined" ? options.allowSleep : true;
 
     /**
      * Current sleep state.
@@ -285,10 +277,7 @@ export class Body extends EventDispatcher {
      * @type {Number}
      * @default 0.1
      */
-    this.sleepSpeedLimit =
-      typeof options.sleepSpeedLimit !== "undefined"
-        ? options.sleepSpeedLimit
-        : 0.1;
+    this.sleepSpeedLimit = typeof options.sleepSpeedLimit !== "undefined" ? options.sleepSpeedLimit : 0.1;
 
     /**
      * If the body has been sleepy for this sleepTimeLimit seconds, it is considered sleeping.
@@ -296,10 +285,7 @@ export class Body extends EventDispatcher {
      * @type {Number}
      * @default 1
      */
-    this.sleepTimeLimit =
-      typeof options.sleepTimeLimit !== "undefined"
-        ? options.sleepTimeLimit
-        : 1;
+    this.sleepTimeLimit = typeof options.sleepTimeLimit !== "undefined" ? options.sleepTimeLimit : 1;
 
     this.timeLastSleepy = 0;
 
@@ -412,18 +398,12 @@ export class Body extends EventDispatcher {
      * @property {Boolean} fixedRotation
      * @default false
      */
-    this.fixedRotation =
-      typeof options.fixedRotation !== "undefined"
-        ? options.fixedRotation
-        : false;
+    this.fixedRotation = typeof options.fixedRotation !== "undefined" ? options.fixedRotation : false;
 
     /**
      * @property {Number} angularDamping
      */
-    this.angularDamping =
-      typeof options.angularDamping !== "undefined"
-        ? options.angularDamping
-        : 0.01;
+    this.angularDamping = typeof options.angularDamping !== "undefined" ? options.angularDamping : 0.01;
 
     /**
      * Use this property to limit the motion along any world axis. (1,1,1) will allow motion along all axes while (0,0,0) allows none.
@@ -587,15 +567,9 @@ export class Body extends EventDispatcher {
         this.sleepState = Body.SLEEPY; // Sleepy
         this.timeLastSleepy = time;
         this.dispatchEvent(Body.sleepyEvent);
-      } else if (
-        sleepState === Body.SLEEPY &&
-        speedSquared > speedLimitSquared
-      ) {
+      } else if (sleepState === Body.SLEEPY && speedSquared > speedLimitSquared) {
         this.wakeUp(); // Wake up
-      } else if (
-        sleepState === Body.SLEEPY &&
-        time - this.timeLastSleepy > this.sleepTimeLimit
-      ) {
+      } else if (sleepState === Body.SLEEPY && time - this.timeLastSleepy > this.sleepTimeLimit) {
         this.sleep(); // Sleeping
         this.dispatchEvent(Body.sleepEvent);
       }
@@ -676,11 +650,7 @@ export class Body extends EventDispatcher {
    * @param {Quaternion} [_orientation]
    * @return {Body} The body object, for chainability.
    */
-  addShape(
-    shape: Shape,
-    _offset: Vec3 | null = null,
-    _orientation: Quaternion | null = null
-  ): Body {
+  addShape(shape: Shape, _offset: Vec3 | null = null, _orientation: Quaternion | null = null): Body {
     const offset = new Vec3();
     const orientation = new Quaternion();
 
@@ -754,12 +724,7 @@ export class Body extends EventDispatcher {
       shapeOrientations[i].mult(bodyQuat, orientation);
 
       // Get shape AABB
-      shape.calculateWorldAABB(
-        offset,
-        orientation,
-        shapeAABB.lowerBound,
-        shapeAABB.upperBound
-      );
+      shape.calculateWorldAABB(offset, orientation, shapeAABB.lowerBound, shapeAABB.upperBound);
 
       if (i === 0) {
         aabb.copy(shapeAABB);
@@ -951,10 +916,7 @@ export class Body extends EventDispatcher {
     this.previousPosition.copy(this.position);
     this.previousQuaternion.copy(this.quaternion);
 
-    if (
-      !(this.type === Body.DYNAMIC || this.type === Body.KINEMATIC) ||
-      this.sleepState === Body.SLEEPING
-    ) {
+    if (!(this.type === Body.DYNAMIC || this.type === Body.KINEMATIC) || this.sleepState === Body.SLEEPING) {
       // Only for dynamic
       return;
     }

@@ -1,3 +1,5 @@
+import { Event } from "../../core/Event";
+import { Listener } from "../../core/EventDispatcher";
 import { HingeConstraint } from "../constraints/HingeConstraint";
 import { Vec3 } from "../math/Vec3";
 import { Box } from "../shapes/Box";
@@ -8,7 +10,7 @@ import { Body, BodyOptions } from "./Body";
 const torque = new Vec3();
 const worldAxis = new Vec3();
 
-export class RigidVehicle {
+export class RigidVehicle implements Listener {
   wheelBodies: Body[];
   coordinateSystem: Vec3;
   chassisBody: Body;
@@ -121,7 +123,8 @@ export class RigidVehicle {
   setMotorSpeed(value: f32, wheelIndex: i32): void {
     const hingeConstraint = this.constraints[wheelIndex];
     hingeConstraint.enableMotor();
-    hingeConstraint.motorTargetVelocity = value;
+    hingeConstraint.setMotorSpeed(value);
+    // hingeConstraint.motorTargetVelocity = value;
   }
 
   /**
@@ -178,7 +181,13 @@ export class RigidVehicle {
       world.addConstraint(constraints[i]);
     }
 
-    world.addEventListener("preStep", this._update.bind(this));
+    world.addEventListener("preStep", this);
+  }
+
+  onEvent(event: Event): void {
+    if (event.type === "preStep") {
+      this._update();
+    }
   }
 
   _update(): void {

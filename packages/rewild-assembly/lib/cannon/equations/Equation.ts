@@ -3,18 +3,18 @@ import { Vec3 } from "../math/Vec3";
 import { Body } from "../objects/Body";
 
 const tmp = new Vec3();
-const zero = new Vec3();
+// const zero = new Vec3();
 const iMfi = new Vec3(),
   iMfj = new Vec3(),
   invIi_vmult_taui = new Vec3(),
   invIj_vmult_tauj = new Vec3();
 
-const addToWlambda_temp = new Vec3(),
-  addToWlambda_Gi = new Vec3(),
-  addToWlambda_Gj = new Vec3(),
-  addToWlambda_ri = new Vec3(),
-  addToWlambda_rj = new Vec3(),
-  addToWlambda_Mdiag = new Vec3();
+const addToWlambda_temp = new Vec3();
+// addToWlambda_Gi = new Vec3(),
+// addToWlambda_Gj = new Vec3(),
+// addToWlambda_ri = new Vec3(),
+// addToWlambda_rj = new Vec3(),
+// addToWlambda_Mdiag = new Vec3();
 
 export class Equation {
   id: i32;
@@ -208,10 +208,7 @@ export class Equation {
     bi.invInertiaWorldSolve.vmult(ti, invIi_vmult_taui);
     bj.invInertiaWorldSolve.vmult(tj, invIj_vmult_tauj);
 
-    return (
-      GA.multiplyVectors(iMfi, invIi_vmult_taui) +
-      GB.multiplyVectors(iMfj, invIj_vmult_tauj)
-    );
+    return GA.multiplyVectors(iMfi, invIi_vmult_taui) + GB.multiplyVectors(iMfj, invIj_vmult_tauj);
   }
 
   /**
@@ -254,16 +251,8 @@ export class Equation {
 
     // Add to linear velocity
     // v_lambda += inv(M) * delta_lamba * G
-    bi.vlambda.addScaledVector(
-      bi.invMassSolve * deltalambda,
-      GA.spatial,
-      bi.vlambda
-    );
-    bj.vlambda.addScaledVector(
-      bj.invMassSolve * deltalambda,
-      GB.spatial,
-      bj.vlambda
-    );
+    bi.vlambda.addScaledVector(bi.invMassSolve * deltalambda, GA.spatial, bi.vlambda);
+    bj.vlambda.addScaledVector(bj.invMassSolve * deltalambda, GB.spatial, bj.vlambda);
 
     // Add to angular velocity
     bi.invInertiaWorldSolve.vmult(GA.rotational, temp);

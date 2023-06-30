@@ -4,12 +4,13 @@ import { Body } from "../objects/Body";
 import { World } from "../world/World";
 import { AABB } from "./AABB";
 
-const bsc_dist = new Vec3();
-const Broadphase_collisionPairs_r = new Vec3(), // Temp objects
-  Broadphase_collisionPairs_normal = new Vec3(),
-  Broadphase_collisionPairs_quat = new Quaternion(),
-  Broadphase_collisionPairs_relpos = new Vec3();
-const Broadphase_makePairsUnique_temp: { keys: string[] } = { keys: [] },
+// const bsc_dist = new Vec3();
+const Broadphase_collisionPairs_r = new Vec3(); // Temp objects
+// Broadphase_collisionPairs_normal = new Vec3(),
+// Broadphase_collisionPairs_quat = new Quaternion(),
+// Broadphase_collisionPairs_relpos = new Vec3();
+const Broadphase_makePairsUnique_temp_keys: string[] = [];
+const Broadphase_makePairsUnique_temp: Map<string, i32> = new Map(),
   Broadphase_makePairsUnique_p1: Body[] = [],
   Broadphase_makePairsUnique_p2: Body[] = [];
 
@@ -53,7 +54,7 @@ export abstract class Broadphase {
    * @param {Array} p1 Empty array to be filled with body objects
    * @param {Array} p2 Empty array to be filled with body objects
    */
-  collisionPairs(world: World, p1: Body[], p2: Body[]): void;
+  abstract collisionPairs(world: World, p1: Body[], p2: Body[]): void;
 
   /**
    * Check if a body pair needs to be intersection tested at all.
@@ -150,6 +151,7 @@ export abstract class Broadphase {
    */
 
   makePairsUnique(pairs1: Body[], pairs2: Body[]): void {
+    const tKeys = Broadphase_makePairsUnique_temp_keys;
     const t = Broadphase_makePairsUnique_temp,
       p1 = Broadphase_makePairsUnique_p1,
       p2 = Broadphase_makePairsUnique_p2,
@@ -166,17 +168,18 @@ export abstract class Broadphase {
     for (let i: i32 = 0; i !== N; i++) {
       const id1 = p1[i].id,
         id2 = p2[i].id;
-      const key = id1 < id2 ? id1 + "," + id2 : id2 + "," + id1;
-      t[key] = i;
-      t.keys.push(key);
+      const key = id1 < id2 ? id1.toString() + "," + id2.toString() : id2.toString() + "," + id1.toString();
+      t.set(key, i);
+      tKeys.push(key);
+      // t.keys.push(key);
     }
 
     for (let i: i32 = 0; i != t.keys.length; i++) {
-      const key = t.keys.pop(),
-        pairIndex = t[key];
+      const key = tKeys.pop(), // t.keys.pop(),
+        pairIndex = t.get(key);
       pairs1.push(p1[pairIndex]);
       pairs2.push(p2[pairIndex]);
-      delete t[key];
+      t.delete(key);
     }
   }
 
@@ -187,18 +190,18 @@ export abstract class Broadphase {
    */
   setWorld(world: World): void {}
 
-  /**
-   * Check if the bounding spheres of two bodies overlap.
-   * @method boundingSphereCheck
-   * @param {Body} bodyA
-   * @param {Body} bodyB
-   * @return {boolean}
-   */
-  static boundingSphereCheck(bodyA: Body, bodyB: Body): boolean {
-    const dist = bsc_dist;
-    bodyA.position.vsub(bodyB.position, dist);
-    return Mathf.pow(bodyA.shape.boundingSphereRadius + bodyB.shape.boundingSphereRadius, 2) > dist.norm2();
-  }
+  // /**
+  //  * Check if the bounding spheres of two bodies overlap.
+  //  * @method boundingSphereCheck
+  //  * @param {Body} bodyA
+  //  * @param {Body} bodyB
+  //  * @return {boolean}
+  //  */
+  // static boundingSphereCheck(bodyA: Body, bodyB: Body): boolean {
+  //   const dist = bsc_dist;
+  //   bodyA.position.vsub(bodyB.position, dist);
+  //   return Mathf.pow(bodyA.shape.boundingSphereRadius + bodyB.shape.boundingSphereRadius, 2) > dist.norm2();
+  // }
 
   /**
    * Returns all the bodies within the AABB.
