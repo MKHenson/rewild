@@ -13,3 +13,7 @@ export * from "./ShaderConstants";
 export * from "./math";
 export * from "./TerrainConstants";
 export * from "./Utils";
+export * from "./Event";
+export * from "./EventDispatcher";
+export * from "./EventTargetable";
+export * from "./EventAttachable";
