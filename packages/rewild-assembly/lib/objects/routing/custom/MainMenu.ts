@@ -4,11 +4,11 @@ import {
   degToRad,
   ApplicationEventType,
   UIEventType,
+  Listener,
+  Event,
 } from "rewild-common";
 import { Container } from "../core/Container";
 import { uiSignaller } from "../../../extras/ui/uiSignalManager";
-import { Listener } from "../../../core/EventDispatcher";
-import { Event } from "../../../core/Event";
 import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
 import { Link } from "../core/Link";
 import { Portal } from "../core/Portal";

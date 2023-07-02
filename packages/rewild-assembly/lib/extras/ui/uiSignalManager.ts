@@ -1,7 +1,10 @@
-import { Event } from "../../core/Event";
 import { ApplicationEvent } from "./ApplicationEvent";
-import { ApplicationEventType, UIEventType } from "rewild-common";
-import { EventDispatcher } from "../../core/EventDispatcher";
+import {
+  ApplicationEventType,
+  Event,
+  EventDispatcher,
+  UIEventType,
+} from "rewild-common";
 import { onSignalReceived } from "../../Imports";
 
 const uiEvent: Event = new Event(UIEventType);
@@ -23,7 +26,9 @@ export class UISignalManager extends EventDispatcher {
 export function dispatchOnSignalEvent(eventType: ApplicationEventType): void {
   uiSignaller.onSignalEvent(eventType);
 }
-export function dispatchSignalClientEvent(eventType: ApplicationEventType): void {
+export function dispatchSignalClientEvent(
+  eventType: ApplicationEventType
+): void {
   uiSignaller.signalClientEvent(eventType);
 }
 

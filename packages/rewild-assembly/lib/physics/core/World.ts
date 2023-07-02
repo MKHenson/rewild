@@ -1,4 +1,11 @@
-import { SHAPE_BOX, SHAPE_SPHERE, SHAPE_CYLINDER, SHAPE_PLANE, BODY_DYNAMIC, BODY_STATIC } from "../constants";
+import {
+  SHAPE_BOX,
+  SHAPE_SPHERE,
+  SHAPE_CYLINDER,
+  SHAPE_PLANE,
+  BODY_DYNAMIC,
+  BODY_STATIC,
+} from "../constants";
 import { InfoDisplay } from "./Utils";
 import { BruteForceBroadPhase } from "../collision/broadphase/BruteForceBroadPhase";
 import { SAPBroadPhase } from "../collision/broadphase/sap/SAPBroadPhase";
@@ -34,8 +41,7 @@ import { Shape } from "../shape/Shape";
 import { Joint } from "../constraint/joint/Joint";
 import { CollisionDetector } from "../collision/narrowphase/CollisionDetector";
 import { ContactLink } from "../constraint/contact/ContactLink";
-import { EventDispatcher } from "../../core/EventDispatcher";
-import { Event } from "../../core/Event";
+import { EventDispatcher, Event } from "rewild-common";
 import { PhysicsObject } from "./PhysicsObject";
 
 const postLoop = new Event("post-loop");
@@ -129,7 +135,12 @@ export class World extends EventDispatcher {
         break;
     }
 
-    this.Btypes = ["None", "BruteForce", "Sweep & Prune", "Bounding Volume Tree"];
+    this.Btypes = [
+      "None",
+      "BruteForce",
+      "Sweep & Prune",
+      "Bounding Volume Tree",
+    ];
     this.broadPhaseType = this.Btypes[o.broadphase];
 
     // This is the detailed information of the performance.
@@ -174,27 +185,43 @@ export class World extends EventDispatcher {
       this.detectors[i].length = numShapeTypes;
     }
 
-    this.detectors[SHAPE_SPHERE][SHAPE_SPHERE] = new SphereSphereCollisionDetector();
-    this.detectors[SHAPE_SPHERE][SHAPE_BOX] = new SphereBoxCollisionDetector(false);
-    this.detectors[SHAPE_BOX][SHAPE_SPHERE] = new SphereBoxCollisionDetector(true);
+    this.detectors[SHAPE_SPHERE][SHAPE_SPHERE] =
+      new SphereSphereCollisionDetector();
+    this.detectors[SHAPE_SPHERE][SHAPE_BOX] = new SphereBoxCollisionDetector(
+      false
+    );
+    this.detectors[SHAPE_BOX][SHAPE_SPHERE] = new SphereBoxCollisionDetector(
+      true
+    );
     this.detectors[SHAPE_BOX][SHAPE_BOX] = new BoxBoxCollisionDetector();
 
     // CYLINDER add
-    this.detectors[SHAPE_CYLINDER][SHAPE_CYLINDER] = new CylinderCylinderCollisionDetector();
+    this.detectors[SHAPE_CYLINDER][SHAPE_CYLINDER] =
+      new CylinderCylinderCollisionDetector();
 
-    this.detectors[SHAPE_CYLINDER][SHAPE_BOX] = new BoxCylinderCollisionDetector(true);
-    this.detectors[SHAPE_BOX][SHAPE_CYLINDER] = new BoxCylinderCollisionDetector(false);
+    this.detectors[SHAPE_CYLINDER][SHAPE_BOX] =
+      new BoxCylinderCollisionDetector(true);
+    this.detectors[SHAPE_BOX][SHAPE_CYLINDER] =
+      new BoxCylinderCollisionDetector(false);
 
-    this.detectors[SHAPE_CYLINDER][SHAPE_SPHERE] = new SphereCylinderCollisionDetector(true);
-    this.detectors[SHAPE_SPHERE][SHAPE_CYLINDER] = new SphereCylinderCollisionDetector(false);
+    this.detectors[SHAPE_CYLINDER][SHAPE_SPHERE] =
+      new SphereCylinderCollisionDetector(true);
+    this.detectors[SHAPE_SPHERE][SHAPE_CYLINDER] =
+      new SphereCylinderCollisionDetector(false);
 
     // PLANE add
 
-    this.detectors[SHAPE_PLANE][SHAPE_SPHERE] = new SpherePlaneCollisionDetector(true);
-    this.detectors[SHAPE_SPHERE][SHAPE_PLANE] = new SpherePlaneCollisionDetector(false);
+    this.detectors[SHAPE_PLANE][SHAPE_SPHERE] =
+      new SpherePlaneCollisionDetector(true);
+    this.detectors[SHAPE_SPHERE][SHAPE_PLANE] =
+      new SpherePlaneCollisionDetector(false);
 
-    this.detectors[SHAPE_PLANE][SHAPE_BOX] = new BoxPlaneCollisionDetector(true);
-    this.detectors[SHAPE_BOX][SHAPE_PLANE] = new BoxPlaneCollisionDetector(false);
+    this.detectors[SHAPE_PLANE][SHAPE_BOX] = new BoxPlaneCollisionDetector(
+      true
+    );
+    this.detectors[SHAPE_BOX][SHAPE_PLANE] = new BoxPlaneCollisionDetector(
+      false
+    );
 
     // TETRA add
     //this.detectors[SHAPE_TETRA][SHAPE_TETRA] = new TetraTetraCollisionDetector();
@@ -266,7 +293,9 @@ export class World extends EventDispatcher {
    */
   addRigidBody(rigidBody: RigidBody): void {
     if (rigidBody.parent) {
-      throw new Error("It is not possible to be added to more than one world one of the rigid body");
+      throw new Error(
+        "It is not possible to be added to more than one world one of the rigid body"
+      );
     }
 
     rigidBody.setParent(this);
@@ -362,7 +391,9 @@ export class World extends EventDispatcher {
    */
   addJoint(joint: Joint): void {
     if (joint.parent) {
-      throw new Error("It is not possible to be added to more than one world one of the joint");
+      throw new Error(
+        "It is not possible to be added to more than one world one of the joint"
+      );
     }
     if (this.joints != null) (this.joints.prev = joint).next = this.joints;
     this.joints = joint;
@@ -554,7 +585,8 @@ export class World extends EventDispatcher {
       const b1 = contact!.body1!;
       const b2 = contact!.body2!;
 
-      if ((b1.isDynamic && !b1.sleeping) || (b2.isDynamic && !b2.sleeping)) contact!.updateManifold();
+      if ((b1.isDynamic && !b1.sleeping) || (b2.isDynamic && !b2.sleeping))
+        contact!.updateManifold();
 
       this.numContactPoints += contact!.manifold.numPoints;
       contact!.persisting = false;
@@ -684,7 +716,12 @@ export class World extends EventDispatcher {
         j = islandNumConstraints;
         while (j--) {
           if (j != 0) {
-            const swap = i32(((this.randX = (this.randX * this.randA + this.randB) & 0x7fffffff) / 2147483648.0) * j);
+            const swap = i32(
+              ((this.randX =
+                (this.randX * this.randA + this.randB) & 0x7fffffff) /
+                2147483648.0) *
+                j
+            );
             constraint = this.islandConstraints[j]!;
             this.islandConstraints[j] = this.islandConstraints[swap];
             this.islandConstraints[swap] = constraint;
@@ -777,7 +814,11 @@ export class World extends EventDispatcher {
   //   else return this.initBody(type, o);
   // }
 
-  initBody(type: string, o: BodyOptions, sc: ShapeConfig = new ShapeConfig()): RigidBody {
+  initBody(
+    type: string,
+    o: BodyOptions,
+    sc: ShapeConfig = new ShapeConfig()
+  ): RigidBody {
     const invScale = this.invScale;
 
     // body dynamic or static
@@ -891,7 +932,9 @@ export class World extends EventDispatcher {
     // }
 
     sc.relativePosition.set(posShape.x, posShape.y, posShape.z);
-    sc.relativeRotation.setQuat(new Quat().setFromEuler(rotShape.x, rotShape.y, rotShape.z));
+    sc.relativeRotation.setQuat(
+      new Quat().setFromEuler(rotShape.x, rotShape.y, rotShape.z)
+    );
     if (type == "sphere") shape = new Sphere(sc, size.x);
     else if (type == "cylinder") shape = new Cylinder(sc, size.x, size.y);
     else if (type == "box") shape = new Box(sc, size.x, size.y, size.z);
@@ -1003,14 +1046,18 @@ export class World extends EventDispatcher {
     switch (type) {
       case "jointDistance":
         joint = new DistanceJoint(jc, min, max);
-        if (spring != null) (joint as DistanceJoint).limitMotor.setSpring(spring[0], spring[1]);
-        if (motor != null) (joint as DistanceJoint).limitMotor.setMotor(motor[0], motor[1]);
+        if (spring != null)
+          (joint as DistanceJoint).limitMotor.setSpring(spring[0], spring[1]);
+        if (motor != null)
+          (joint as DistanceJoint).limitMotor.setMotor(motor[0], motor[1]);
         break;
       case "jointHinge":
       case "joint":
         joint = new HingeJoint(jc, min, max);
-        if (spring != null) (joint as HingeJoint).limitMotor.setSpring(spring[0], spring[1]); // soften the joint ex: 100, 0.2
-        if (motor != null) (joint as HingeJoint).limitMotor.setMotor(motor[0], motor[1]);
+        if (spring != null)
+          (joint as HingeJoint).limitMotor.setSpring(spring[0], spring[1]); // soften the joint ex: 100, 0.2
+        if (motor != null)
+          (joint as HingeJoint).limitMotor.setMotor(motor[0], motor[1]);
         break;
       case "jointPrisme":
         joint = new PrismaticJoint(jc, min, max);
@@ -1023,9 +1070,21 @@ export class World extends EventDispatcher {
         break;
       case "jointWheel":
         joint = new WheelJoint(jc);
-        if (limit != null) (joint as WheelJoint).rotationalLimitMotor1.setLimit(limit[0], limit[1]);
-        if (spring != null) (joint as WheelJoint).rotationalLimitMotor1.setSpring(spring[0], spring[1]);
-        if (motor != null) (joint as WheelJoint).rotationalLimitMotor1.setMotor(motor[0], motor[1]);
+        if (limit != null)
+          (joint as WheelJoint).rotationalLimitMotor1.setLimit(
+            limit[0],
+            limit[1]
+          );
+        if (spring != null)
+          (joint as WheelJoint).rotationalLimitMotor1.setSpring(
+            spring[0],
+            spring[1]
+          );
+        if (motor != null)
+          (joint as WheelJoint).rotationalLimitMotor1.setMotor(
+            motor[0],
+            motor[1]
+          );
         break;
     }
 

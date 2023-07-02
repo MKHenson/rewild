@@ -1,5 +1,4 @@
-import { Event } from "./core/Event";
-import { ApplicationEventType } from "rewild-common";
+import { ApplicationEventType, Event } from "rewild-common";
 import { Component } from "./core/Component";
 import { Camera } from "./cameras/Camera";
 import { Terrain } from "./terrain/Terrain";

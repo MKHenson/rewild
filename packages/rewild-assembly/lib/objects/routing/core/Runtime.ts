@@ -1,7 +1,6 @@
-import { Listener } from "../../../core/EventDispatcher";
+import { Listener, Event } from "rewild-common";
 import { WebGPURenderer } from "../../../renderers/WebGPURenderer";
 import { inputManager } from "../../../extras/io/InputManager";
-import { Event } from "../../../core/Event";
 import { Scene } from "../../../scenes/Scene";
 import { PerspectiveCamera } from "../../../cameras/PerspectiveCamera";
 import { Container } from "./Container";

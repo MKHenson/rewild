@@ -1,4 +1,4 @@
-import { EventAttachable } from "../../core/EventAttachable";
+import { EventAttachable } from "rewild-common";
 
 export class KeyboardEvent extends EventAttachable {
   constructor(public code: string) {

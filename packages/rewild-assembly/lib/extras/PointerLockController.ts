@@ -1,10 +1,8 @@
 import { Camera } from "../cameras/Camera";
-import { Event } from "../core/Event";
-import { Listener } from "../core/EventDispatcher";
 import { MouseEvent } from "./io/MouseEvent";
 import { KeyboardEvent } from "./io/KeyboardEvent";
 import { inputManager } from "./io/InputManager";
-import { Euler, EulerRotationOrder } from "rewild-common";
+import { Euler, EulerRotationOrder, Event, Listener } from "rewild-common";
 import { EngineVector3 } from "../math/Vector3";
 
 const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);

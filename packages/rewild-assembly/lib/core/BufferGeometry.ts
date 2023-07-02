@@ -1,7 +1,6 @@
 import { EngineVector3 } from "../math/Vector3";
 import { EngineVector2 } from "../math/Vector2";
 import { EngineBox3 } from "../math/Box3";
-import { EventDispatcher } from "./EventDispatcher";
 import {
   BaseAttribute,
   BufferAttribute,
@@ -9,12 +8,20 @@ import {
   Float32BufferAttribute,
   Uint32BufferAttribute,
 } from "./BufferAttribute";
-import { Sphere, Matrix3, generateUUID, Quaternion, AttributeType, Vector3 } from "rewild-common";
+import {
+  Sphere,
+  Matrix3,
+  generateUUID,
+  Quaternion,
+  AttributeType,
+  Vector3,
+  Event,
+  EventDispatcher,
+} from "rewild-common";
 import { TransformNode } from "./TransformNode";
 import { EngineMatrix4 } from "../math/Matrix4";
 import { ASError } from "./Error";
 import { GLBufferAttribute } from "./GLBufferAttribute";
-import { Event } from "./Event";
 import { toTypedArray } from "../utils";
 import { BridgeManager } from "../core/BridgeManager";
 
@@ -104,7 +111,13 @@ export class BufferGeometry extends EventDispatcher {
 
   setIndexes(indexes: u32[] | null): BufferGeometry {
     this.indexes = indexes
-      ? new Uint32BufferAttribute(toTypedArray<u32, Uint32Array>(indexes, Uint32Array.BYTES_PER_ELEMENT), 1)
+      ? new Uint32BufferAttribute(
+          toTypedArray<u32, Uint32Array>(
+            indexes,
+            Uint32Array.BYTES_PER_ELEMENT
+          ),
+          1
+        )
       : null;
     return this;
   }
@@ -161,7 +174,9 @@ export class BufferGeometry extends EventDispatcher {
   }
 
   applyMatrix4(matrix: EngineMatrix4): BufferGeometry {
-    const position = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION);
+    const position = this.getAttribute<Float32BufferAttribute>(
+      AttributeType.POSITION
+    );
 
     if (position) {
       BufferAttribute.applyMatrix4(matrix, position);
@@ -169,7 +184,9 @@ export class BufferGeometry extends EventDispatcher {
       position.needsUpdate = true;
     }
 
-    const normal = this.getAttribute<Float32BufferAttribute>(AttributeType.NORMAL);
+    const normal = this.getAttribute<Float32BufferAttribute>(
+      AttributeType.NORMAL
+    );
 
     if (normal != null) {
       const normalMatrix = new Matrix3().getNormalMatrix(matrix);
@@ -177,7 +194,9 @@ export class BufferGeometry extends EventDispatcher {
       normal.needsUpdate = true;
     }
 
-    const tangent = this.getAttribute<Float32BufferAttribute>(AttributeType.TANGENT);
+    const tangent = this.getAttribute<Float32BufferAttribute>(
+      AttributeType.TANGENT
+    );
 
     if (tangent != null) {
       BufferAttribute.transformDirection(matrix, tangent);
@@ -285,7 +304,13 @@ export class BufferGeometry extends EventDispatcher {
 
     this.setAttribute(
       AttributeType.POSITION,
-      new Float32BufferAttribute(toTypedArray<f32, Float32Array>(position, Float32Array.BYTES_PER_ELEMENT), 3)
+      new Float32BufferAttribute(
+        toTypedArray<f32, Float32Array>(
+          position,
+          Float32Array.BYTES_PER_ELEMENT
+        ),
+        3
+      )
     );
 
     return this;
@@ -296,8 +321,11 @@ export class BufferGeometry extends EventDispatcher {
       this.boundingBox = new EngineBox3();
     }
 
-    const position = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION);
-    const morphAttributesPosition = this.getMorphAttribute<Float32BufferAttribute>(AttributeType.POSITION);
+    const position = this.getAttribute<Float32BufferAttribute>(
+      AttributeType.POSITION
+    );
+    const morphAttributesPosition =
+      this.getMorphAttribute<Float32BufferAttribute>(AttributeType.POSITION);
 
     if (position && position instanceof GLBufferAttribute) {
       BridgeManager.getBridge().print(
@@ -338,7 +366,11 @@ export class BufferGeometry extends EventDispatcher {
       this.boundingBox!.makeEmpty();
     }
 
-    if (isNaN(this.boundingBox!.min.x) || isNaN(this.boundingBox!.min.y) || isNaN(this.boundingBox!.min.z)) {
+    if (
+      isNaN(this.boundingBox!.min.x) ||
+      isNaN(this.boundingBox!.min.y) ||
+      isNaN(this.boundingBox!.min.z)
+    ) {
       throw new ASError(
         'BufferGeometry.computeBoundingBox(): Computed min/max have NaN values. The "position" attribute is likely to have NaN values.'
       );
@@ -350,8 +382,11 @@ export class BufferGeometry extends EventDispatcher {
       this.boundingSphere = new Sphere();
     }
 
-    const position = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION);
-    const morphAttributesPosition = this.getMorphAttribute<Float32BufferAttribute>(AttributeType.POSITION);
+    const position = this.getAttribute<Float32BufferAttribute>(
+      AttributeType.POSITION
+    );
+    const morphAttributesPosition =
+      this.getMorphAttribute<Float32BufferAttribute>(AttributeType.POSITION);
 
     if (position && position instanceof GLBufferAttribute) {
       BridgeManager.getBridge().print(
@@ -416,7 +451,10 @@ export class BufferGeometry extends EventDispatcher {
               _vector.add(_offset);
             }
 
-            maxRadiusSq = Mathf.max(maxRadiusSq, center.distanceToSquared(_vector));
+            maxRadiusSq = Mathf.max(
+              maxRadiusSq,
+              center.distanceToSquared(_vector)
+            );
           }
         }
       }
@@ -453,17 +491,28 @@ export class BufferGeometry extends EventDispatcher {
       );
 
     const indices = index.array;
-    const positions = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION)!.array;
-    const normals = this.getAttribute<Float32BufferAttribute>(AttributeType.NORMAL)!.array;
-    const uvs = this.getAttribute<Float32BufferAttribute>(AttributeType.UV)!.array;
+    const positions = this.getAttribute<Float32BufferAttribute>(
+      AttributeType.POSITION
+    )!.array;
+    const normals = this.getAttribute<Float32BufferAttribute>(
+      AttributeType.NORMAL
+    )!.array;
+    const uvs = this.getAttribute<Float32BufferAttribute>(
+      AttributeType.UV
+    )!.array;
 
     const nVertices = positions.length / 3;
 
     if (!attributes.has(AttributeType.TANGENT)) {
-      this.setAttribute(AttributeType.TANGENT, new Float32BufferAttribute(new Float32Array(4 * nVertices), 4));
+      this.setAttribute(
+        AttributeType.TANGENT,
+        new Float32BufferAttribute(new Float32Array(4 * nVertices), 4)
+      );
     }
 
-    const tangents = this.getAttribute<Float32BufferAttribute>(AttributeType.TANGENT)!.array;
+    const tangents = this.getAttribute<Float32BufferAttribute>(
+      AttributeType.TANGENT
+    )!.array;
 
     const tan1: EngineVector3[] = [],
       tan2: EngineVector3[] = [];
@@ -503,8 +552,16 @@ export class BufferGeometry extends EventDispatcher {
 
       if (!isFinite(r)) return;
 
-      sdir.copy(vB).multiplyScalar(uvC.y).addScaledVector(vC, -uvB.y).multiplyScalar(r);
-      tdir.copy(vC).multiplyScalar(uvB.x).addScaledVector(vB, -uvC.x).multiplyScalar(r);
+      sdir
+        .copy(vB)
+        .multiplyScalar(uvC.y)
+        .addScaledVector(vC, -uvB.y)
+        .multiplyScalar(r);
+      tdir
+        .copy(vC)
+        .multiplyScalar(uvB.x)
+        .addScaledVector(vB, -uvC.x)
+        .multiplyScalar(r);
 
       tan1[a].add(sdir);
       tan1[b].add(sdir);
@@ -576,13 +633,20 @@ export class BufferGeometry extends EventDispatcher {
 
   computeVertexNormals(): void {
     const index = this.indexes;
-    const positionAttribute = this.getAttribute<Float32BufferAttribute>(AttributeType.POSITION);
+    const positionAttribute = this.getAttribute<Float32BufferAttribute>(
+      AttributeType.POSITION
+    );
 
     if (positionAttribute != null) {
-      let normalAttribute = this.getAttribute<Float32BufferAttribute>(AttributeType.NORMAL);
+      let normalAttribute = this.getAttribute<Float32BufferAttribute>(
+        AttributeType.NORMAL
+      );
 
       if (normalAttribute === null) {
-        normalAttribute = new BufferAttribute(new Float32Array(positionAttribute.count * 3), 3);
+        normalAttribute = new BufferAttribute(
+          new Float32Array(positionAttribute.count * 3),
+          3
+        );
         this.setAttribute(AttributeType.NORMAL, normalAttribute);
       } else {
         // reset existing normals to zero
@@ -681,7 +745,9 @@ export class BufferGeometry extends EventDispatcher {
   }
 
   normalizeNormals(): void {
-    const normals = this.getAttribute<Float32BufferAttribute>(AttributeType.NORMAL);
+    const normals = this.getAttribute<Float32BufferAttribute>(
+      AttributeType.NORMAL
+    );
     if (!normals) throw new Error("No normal attribute defined");
 
     for (let i = 0, il = normals.count; i < il; i++) {
@@ -877,7 +943,9 @@ export class BufferGeometry extends EventDispatcher {
 
     // index
 
-    const index = source.indexes ? new Uint32BufferAttribute(source.indexes.array.slice(0), 1) : null;
+    const index = source.indexes
+      ? new Uint32BufferAttribute(source.indexes.array.slice(0), 1)
+      : null;
 
     // attributes
 
@@ -956,11 +1024,19 @@ export function creatBufferGeometry(): BufferGeometry {
   return new BufferGeometry();
 }
 
-export function createBufferAttributeF32(array: Float32Array, itemSize: u32, normalized: boolean): BaseAttribute {
+export function createBufferAttributeF32(
+  array: Float32Array,
+  itemSize: u32,
+  normalized: boolean
+): BaseAttribute {
   return new Float32BufferAttribute(array, itemSize, normalized);
 }
 
-export function createBufferAttributeu32(array: Uint32Array, itemSize: u32, normalized: boolean): BaseAttribute {
+export function createBufferAttributeu32(
+  array: Uint32Array,
+  itemSize: u32,
+  normalized: boolean
+): BaseAttribute {
   return new Uint32BufferAttribute(array, itemSize, normalized);
 }
 
@@ -972,6 +1048,9 @@ export function setBufferAttribute(
   geometry.setAttribute(type, attributeBuffer);
 }
 
-export function setIndexAttribute(geometry: BufferGeometry, attributeBuffer: BaseAttribute): void {
+export function setIndexAttribute(
+  geometry: BufferGeometry,
+  attributeBuffer: BaseAttribute
+): void {
   geometry.setIndexAttribute(attributeBuffer as Uint32BufferAttribute);
 }

@@ -1,4 +1,4 @@
-import { EventDispatcher } from "./EventDispatcher";
+import { EventDispatcher } from "rewild-common";
 import { addComponent, TransformNode } from "./TransformNode";
 
 export class Component extends EventDispatcher {
