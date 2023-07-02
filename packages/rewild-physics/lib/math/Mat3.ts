@@ -187,7 +187,7 @@ export class Mat3 {
       k: i32 = n;
     let np: i32;
     const kp = 4; // num rows
-    let p: i32, els: i32;
+    let p: i32; // els: i32;
     do {
       i = k - n;
       if (eqns[i + nc * i] === 0) {
@@ -258,14 +258,15 @@ export class Mat3 {
    * @param {Number} value Optional. If provided, the matrix element will be set to this value.
    * @return {Number}
    */
-  e(row: i32, column: i32, value: f32 | undefined): f32 {
-    if (value === undefined) {
-      return this.elements[column + 3 * row];
-    } else {
-      // Set value
-      this.elements[column + 3 * row] = value;
-      return value;
-    }
+  e(row: i32, column: i32, value: f32): f32 {
+    // if (value == undefined) {
+    //   return this.elements[column + 3 * row];
+    // } else {
+    // Set value
+    this.elements[column + 3 * row] = value;
+    //   return value;
+    // }
+    return value;
   }
 
   /**
@@ -301,9 +302,7 @@ export class Mat3 {
    * @param {Mat3} target Optional. Target matrix to save in.
    * @return {Mat3} The solution x
    */
-  reverse(target: Mat3): Mat3 {
-    target = target || new Mat3();
-
+  reverse(target: Mat3 = new Mat3()): Mat3 {
     // Construct equations
     const nr: i32 = 3; // num rows
     const nc: i32 = 6; // num cols

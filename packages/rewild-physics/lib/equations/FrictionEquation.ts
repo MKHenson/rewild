@@ -28,10 +28,10 @@ export class FrictionEquation extends Equation {
   }
 
   computeB(h: f32): f32 {
-    const a = this.a,
-      b = this.b,
-      bi = this.bi,
-      bj = this.bj,
+    // const a = this.a,
+    const b = this.b,
+      // bi = this.bi,
+      // bj = this.bj,
       ri = this.ri,
       rj = this.rj,
       rixt = FrictionEquation_computeB_temp1,

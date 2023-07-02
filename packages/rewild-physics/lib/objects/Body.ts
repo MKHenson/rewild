@@ -149,12 +149,18 @@ export class Body extends EventDispatcher {
     /**
      * @property {Number} collisionFilterGroup
      */
-    this.collisionFilterGroup = typeof options.collisionFilterGroup === "number" ? options.collisionFilterGroup : 1;
+    this.collisionFilterGroup =
+      typeof options.collisionFilterGroup === "number"
+        ? options.collisionFilterGroup
+        : 1;
 
     /**
      * @property {Number} collisionFilterMask
      */
-    this.collisionFilterMask = typeof options.collisionFilterMask === "number" ? options.collisionFilterMask : -1;
+    this.collisionFilterMask =
+      typeof options.collisionFilterMask === "number"
+        ? options.collisionFilterMask
+        : -1;
 
     /**
      * Whether to produce contact forces when in contact with other bodies. Note that contacts will be generated, but they will be disabled.
@@ -243,7 +249,8 @@ export class Body extends EventDispatcher {
      * @property linearDamping
      * @type {Number}
      */
-    this.linearDamping = typeof options.linearDamping === "number" ? options.linearDamping : 0.01;
+    this.linearDamping =
+      typeof options.linearDamping === "number" ? options.linearDamping : 0.01;
 
     /**
      * One of: Body.DYNAMIC, Body.STATIC and Body.KINEMATIC.
@@ -261,7 +268,7 @@ export class Body extends EventDispatcher {
      * @type {Boolean}
      * @default true
      */
-    this.allowSleep = typeof options.allowSleep !== "undefined" ? options.allowSleep : true;
+    this.allowSleep = options.allowSleep;
 
     /**
      * Current sleep state.
@@ -276,7 +283,7 @@ export class Body extends EventDispatcher {
      * @type {Number}
      * @default 0.1
      */
-    this.sleepSpeedLimit = typeof options.sleepSpeedLimit !== "undefined" ? options.sleepSpeedLimit : 0.1;
+    this.sleepSpeedLimit = options.sleepSpeedLimit;
 
     /**
      * If the body has been sleepy for this sleepTimeLimit seconds, it is considered sleeping.
@@ -284,7 +291,7 @@ export class Body extends EventDispatcher {
      * @type {Number}
      * @default 1
      */
-    this.sleepTimeLimit = typeof options.sleepTimeLimit !== "undefined" ? options.sleepTimeLimit : 1;
+    this.sleepTimeLimit = options.sleepTimeLimit;
 
     this.timeLastSleepy = 0;
 
@@ -397,12 +404,12 @@ export class Body extends EventDispatcher {
      * @property {Boolean} fixedRotation
      * @default false
      */
-    this.fixedRotation = typeof options.fixedRotation !== "undefined" ? options.fixedRotation : false;
+    this.fixedRotation = options.fixedRotation;
 
     /**
      * @property {Number} angularDamping
      */
-    this.angularDamping = typeof options.angularDamping !== "undefined" ? options.angularDamping : 0.01;
+    this.angularDamping = options.angularDamping;
 
     /**
      * Use this property to limit the motion along any world axis. (1,1,1) will allow motion along all axes while (0,0,0) allows none.
@@ -566,9 +573,15 @@ export class Body extends EventDispatcher {
         this.sleepState = Body.SLEEPY; // Sleepy
         this.timeLastSleepy = time;
         this.dispatchEvent(Body.sleepyEvent);
-      } else if (sleepState === Body.SLEEPY && speedSquared > speedLimitSquared) {
+      } else if (
+        sleepState === Body.SLEEPY &&
+        speedSquared > speedLimitSquared
+      ) {
         this.wakeUp(); // Wake up
-      } else if (sleepState === Body.SLEEPY && time - this.timeLastSleepy > this.sleepTimeLimit) {
+      } else if (
+        sleepState === Body.SLEEPY &&
+        time - this.timeLastSleepy > this.sleepTimeLimit
+      ) {
         this.sleep(); // Sleeping
         this.dispatchEvent(Body.sleepEvent);
       }
@@ -649,7 +662,11 @@ export class Body extends EventDispatcher {
    * @param {Quaternion} [_orientation]
    * @return {Body} The body object, for chainability.
    */
-  addShape(shape: Shape, _offset: Vec3 | null = null, _orientation: Quaternion | null = null): Body {
+  addShape(
+    shape: Shape,
+    _offset: Vec3 | null = null,
+    _orientation: Quaternion | null = null
+  ): Body {
     const offset = new Vec3();
     const orientation = new Quaternion();
 
@@ -723,7 +740,12 @@ export class Body extends EventDispatcher {
       shapeOrientations[i].mult(bodyQuat, orientation);
 
       // Get shape AABB
-      shape.calculateWorldAABB(offset, orientation, shapeAABB.lowerBound, shapeAABB.upperBound);
+      shape.calculateWorldAABB(
+        offset,
+        orientation,
+        shapeAABB.lowerBound,
+        shapeAABB.upperBound
+      );
 
       if (i === 0) {
         aabb.copy(shapeAABB);
@@ -915,7 +937,10 @@ export class Body extends EventDispatcher {
     this.previousPosition.copy(this.position);
     this.previousQuaternion.copy(this.quaternion);
 
-    if (!(this.type === Body.DYNAMIC || this.type === Body.KINEMATIC) || this.sleepState === Body.SLEEPING) {
+    if (
+      !(this.type === Body.DYNAMIC || this.type === Body.KINEMATIC) ||
+      this.sleepState === Body.SLEEPING
+    ) {
       // Only for dynamic
       return;
     }
@@ -987,4 +1012,99 @@ export class BodyOptions {
     public angularFactor: Vec3 = new Vec3(1, 1, 1),
     public shape: Shape | null = null
   ) {}
+
+  setMass(value: f32): BodyOptions {
+    this.mass = value;
+    return this;
+  }
+
+  setPosition(value: Vec3): BodyOptions {
+    this.position = value;
+    return this;
+  }
+
+  setMaterial(value: Material): BodyOptions {
+    this.material = value;
+    return this;
+  }
+
+  setType(value: i32): BodyOptions {
+    this.type = value;
+    return this;
+  }
+
+  setLinearDamping(value: f32): BodyOptions {
+    this.linearDamping = value;
+    return this;
+  }
+
+  setAngularDamping(value: f32): BodyOptions {
+    this.angularDamping = value;
+    return this;
+  }
+
+  setAllowSleep(value: boolean): BodyOptions {
+    this.allowSleep = value;
+    return this;
+  }
+
+  setSleepSpeedLimit(value: f32): BodyOptions {
+    this.sleepSpeedLimit = value;
+    return this;
+  }
+
+  setSleepTimeLimit(value: f32): BodyOptions {
+    this.sleepTimeLimit = value;
+    return this;
+  }
+
+  setCollisionFilterGroup(value: i32): BodyOptions {
+    this.collisionFilterGroup = value;
+    return this;
+  }
+
+  setCollisionFilterMask(value: i32): BodyOptions {
+    this.collisionFilterMask = value;
+    return this;
+  }
+
+  setFixedRotation(value: boolean): BodyOptions {
+    this.fixedRotation = value;
+    return this;
+  }
+
+  setLinearFactor(value: Vec3): BodyOptions {
+    this.linearFactor = value;
+    return this;
+  }
+
+  setAngularFactor(value: Vec3): BodyOptions {
+    this.angularFactor = value;
+    return this;
+  }
+
+  setShape(value: Shape): BodyOptions {
+    this.shape = value;
+    return this;
+  }
+
+  setVelocity(value: Vec3): BodyOptions {
+    this.velocity = value;
+    return this;
+  }
+
+  setAngularVelocity(value: Vec3): BodyOptions {
+    this.angularVelocity = value;
+    return this;
+  }
+
+  setQuaternion(value: Quaternion): BodyOptions {
+    this.quaternion = value;
+    return this;
+  }
+
+  setLinearVelocity(value: Vec3): BodyOptions {
+    this.velocity = value;
+    return this;
+  }
 }

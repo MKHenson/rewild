@@ -6,10 +6,10 @@ const sfv_t1 = new Vec3(),
 // const Quaternion_mult_vb = new Vec3();
 // const Quaternion_mult_vaxvb = new Vec3();
 export class Quaternion {
-  x: f32;
-  y: f32;
-  z: f32;
-  w: f32;
+  private _x: f32;
+  private _y: f32;
+  private _z: f32;
+  private _w: f32;
 
   /**
    * A Quaternion describes a rotation in 3D space. The Quaternion is mathematically defined as Q = x*i + y*j + z*k + w, where (i,j,k) are imaginary basis vectors. (x,y,z) can be seen as a vector related to the axis of rotation, while the real multiplier, w, is related to the amount of rotation.
@@ -22,10 +22,44 @@ export class Quaternion {
    * @see http://en.wikipedia.org/wiki/Quaternion
    */
   constructor(x: f32 = 0, y: f32 = 0, z: f32 = 0, w: f32 = 1) {
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.w = w;
+    this._x = x;
+    this._y = y;
+    this._z = z;
+    this._w = w;
+  }
+
+  get x(): f32 {
+    return this._x;
+  }
+  set x(value: f32) {
+    // if (isNaN(value))
+    //   throw new Error("Quaternion.x: " + value + " is not a valid number.");
+
+    this._x = value;
+  }
+  get y(): f32 {
+    return this._y;
+  }
+  set y(value: f32) {
+    // if (isNaN(value))
+    //   throw new Error("Quaternion.y: " + value + " is not a valid number.");
+    this._y = value;
+  }
+  get z(): f32 {
+    return this._z;
+  }
+  set z(value: f32) {
+    // if (isNaN(value))
+    //   throw new Error("Quaternion.z: " + value + " is not a valid number.");
+    this._z = value;
+  }
+  get w(): f32 {
+    return this._w;
+  }
+  set w(value: f32) {
+    // if (isNaN(value))
+    //   throw new Error("Quaternion.w: " + value + " is not a valid number.");
+    this._w = value;
   }
 
   /**
@@ -119,7 +153,8 @@ export class Quaternion {
       this.x = a.x;
       this.y = a.y;
       this.z = a.z;
-      this.w = Mathf.sqrt(Mathf.pow(u.norm(), 2) * Mathf.pow(v.norm(), 2)) + u.dot(v);
+      this.w =
+        Mathf.sqrt(Mathf.pow(u.norm(), 2) * Mathf.pow(v.norm(), 2)) + u.dot(v);
       this.normalize();
     }
     return this;
@@ -194,7 +229,9 @@ export class Quaternion {
    * @method normalize
    */
   normalize(): Quaternion {
-    let l = Mathf.sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
+    let l = Mathf.sqrt(
+      this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w
+    );
     if (l == 0) {
       this.x = 0;
       this.y = 0;
@@ -217,7 +254,13 @@ export class Quaternion {
    * @author unphased, https://github.com/unphased
    */
   normalizeFast(): Quaternion {
-    const f = (3.0 - (this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w)) / 2.0;
+    const f =
+      (3.0 -
+        (this.x * this.x +
+          this.y * this.y +
+          this.z * this.z +
+          this.w * this.w)) /
+      2.0;
     if (f == 0) {
       this.x = 0;
       this.y = 0;
@@ -449,7 +492,12 @@ export class Quaternion {
    * @param  {Quaternion} target
    * @return {Quaternion} The "target" object
    */
-  integrate(angularVelocity: Vec3, dt: f32, angularFactor: Vec3, target = new Quaternion()): Quaternion {
+  integrate(
+    angularVelocity: Vec3,
+    dt: f32,
+    angularFactor: Vec3,
+    target = new Quaternion()
+  ): Quaternion {
     const ax = angularVelocity.x * angularFactor.x,
       ay = angularVelocity.y * angularFactor.y,
       az = angularVelocity.z * angularFactor.z,

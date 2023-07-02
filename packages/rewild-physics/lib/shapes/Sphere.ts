@@ -19,7 +19,7 @@ export class Sphere extends Shape {
     /**
      * @property {Number} radius
      */
-    this.radius = radius !== undefined ? radius : 1.0;
+    this.radius = radius;
 
     if (this.radius < 0) {
       throw new Error("The sphere radius cannot be negative.");

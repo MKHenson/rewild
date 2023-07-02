@@ -24,14 +24,19 @@ export class RigidVehicle implements Listener {
    * @constructor
    * @param {Body} [options.chassisBody]
    */
-  constructor(coordinateSystem: Vec3 = new Vec3(1, 2, 3), chassisBody: Body | null = null) {
+  constructor(
+    coordinateSystem: Vec3 | null = new Vec3(1, 2, 3),
+    chassisBody: Body | null = null
+  ) {
     this.wheelBodies = [];
 
     /**
      * @property coordinateSystem
      * @type {Vec3}
      */
-    this.coordinateSystem = typeof coordinateSystem === "undefined" ? new Vec3(1, 2, 3) : coordinateSystem.clone();
+    this.coordinateSystem = !coordinateSystem
+      ? new Vec3(1, 2, 3)
+      : coordinateSystem.clone();
 
     /**
      * @property {Body} chassisBody
@@ -89,7 +94,14 @@ export class RigidVehicle implements Listener {
     const axis = ax ? ax.clone() : new Vec3(0, 1, 0);
     this.wheelAxes.push(axis);
 
-    const hingeConstraint = new HingeConstraint(this.chassisBody, wheelBody, position, Vec3.ZERO, axis, axis);
+    const hingeConstraint = new HingeConstraint(
+      this.chassisBody,
+      wheelBody,
+      position,
+      Vec3.ZERO,
+      axis,
+      axis
+    );
     hingeConstraint.collideConnected = false;
     this.constraints.push(hingeConstraint);
 
