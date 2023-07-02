@@ -582,7 +582,7 @@ export class World extends EventDispatcher {
    *
    * @see http://bulletphysics.org/mediawiki-1.5.8/index.php/Stepping_The_World
    */
-  step(dt: f32, timeSinceLastCalled: f32, maxSubSteps: i32): void {
+  step(dt: f32, timeSinceLastCalled: f32, maxSubSteps: i32 = 20): void {
     maxSubSteps = maxSubSteps || 10;
     timeSinceLastCalled = timeSinceLastCalled || 0;
 

@@ -2,11 +2,9 @@ import { OrbitController } from "../../../extras/OrbitController";
 import { Container } from "../core/Container";
 import { inputManager } from "../../../extras/io/InputManager";
 import { KeyboardEvent } from "../../../extras/io/KeyboardEvent";
-import { Listener } from "../../../core/EventDispatcher";
 import { uiSignaller } from "../../../extras/ui/uiSignalManager";
-import { Event } from "../../../core/Event";
 import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
-import { UIEventType } from "rewild-common";
+import { UIEventType, Event, Listener } from "rewild-common";
 import { Link } from "../core/Link";
 import { TransformNode } from "../../../core/TransformNode";
 

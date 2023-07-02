@@ -1,6 +1,5 @@
-import { Event } from "../../core/Event";
+import { Event, EventDispatcher } from "rewild-common";
 import { MouseEvent } from "./MouseEvent";
-import { EventDispatcher } from "../../core/EventDispatcher";
 import { KeyboardEvent } from "./KeyboardEvent";
 
 const moveEventDown: Event = new Event("mousedown");

@@ -1,4 +1,4 @@
-import { EventAttachable } from "../../core/EventAttachable";
+import { EventAttachable } from "rewild-common";
 import { ApplicationEventType } from "rewild-common";
 
 export class ApplicationEvent extends EventAttachable {

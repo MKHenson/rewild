@@ -1,12 +1,10 @@
 import { Camera } from "../cameras/Camera";
 import { OrthographicCamera } from "../cameras/OrthographicCamera";
 import { PerspectiveCamera } from "../cameras/PerspectiveCamera";
-import { Event } from "../core/Event";
-import { Listener } from "../core/EventDispatcher";
 import { inputManager } from "./io/InputManager";
 import { MouseEvent } from "./io/MouseEvent";
 import { EngineMatrix4 } from "../math/Matrix4";
-import { Spherical, Quaternion } from "rewild-common";
+import { Spherical, Quaternion, Event, Listener } from "rewild-common";
 import { EngineVector2 } from "../math/Vector2";
 import { EngineVector3 } from "../math/Vector3";
 
@@ -141,7 +139,10 @@ export class OrbitController implements Listener {
     // for update speedup
     this.updateOffset = new EngineVector3();
     // so camera.up is the orbit axis
-    this.updateQuat = new Quaternion().setFromUnitVectors(object.up, new EngineVector3(0, 1, 0)) as Quaternion;
+    this.updateQuat = new Quaternion().setFromUnitVectors(
+      object.up,
+      new EngineVector3(0, 1, 0)
+    ) as Quaternion;
     this.updateQuatInverse = this.updateQuat.clone().invert() as Quaternion;
     this.updateLastPosition = new EngineVector3();
     this.updateLastQuaternion = new Quaternion();
@@ -209,9 +210,15 @@ export class OrbitController implements Listener {
       this.rotateDelta.subVectors(this.rotateEnd, this.rotateStart);
       // const element = this.domElement === document ? this.domElement.body : this.domElement;
       // rotating across whole screen goes 360 degrees around
-      this.rotateLeft(((2 * Mathf.PI * this.rotateDelta.x) / f32(event.targetWidth)) * this.rotateSpeed);
+      this.rotateLeft(
+        ((2 * Mathf.PI * this.rotateDelta.x) / f32(event.targetWidth)) *
+          this.rotateSpeed
+      );
       // rotating up and down along whole screen attempts to go 360, but limited to 180
-      this.rotateUp(((2 * Mathf.PI * this.rotateDelta.y) / f32(event.targetHeight)) * this.rotateSpeed);
+      this.rotateUp(
+        ((2 * Mathf.PI * this.rotateDelta.y) / f32(event.targetHeight)) *
+          this.rotateSpeed
+      );
       this.rotateStart.copy(this.rotateEnd);
       this.update();
     } else if (this.state === STATE.DOLLY) {
@@ -229,7 +236,12 @@ export class OrbitController implements Listener {
       if (this.enablePan === false) return;
       this.panEnd.set(f32(event.clientX), f32(event.clientY));
       this.panDelta.subVectors(this.panEnd, this.panStart);
-      this.pan(this.panDelta.x, this.panDelta.y, f32(event.targetWidth), f32(event.targetHeight));
+      this.pan(
+        this.panDelta.x,
+        this.panDelta.y,
+        f32(event.targetWidth),
+        f32(event.targetHeight)
+      );
       this.panStart.copy(this.panEnd);
       this.update();
     }
@@ -245,7 +257,11 @@ export class OrbitController implements Listener {
   }
 
   private onMouseWheel(event: MouseEvent): void {
-    if (this.enabled === false || this.enableZoom === false || (this.state != STATE.NONE && this.state != STATE.ROTATE))
+    if (
+      this.enabled === false ||
+      this.enableZoom === false ||
+      (this.state != STATE.NONE && this.state != STATE.ROTATE)
+    )
       return;
 
     // event.preventDefault();
@@ -285,7 +301,10 @@ export class OrbitController implements Listener {
     this.target0.copy(this.target);
     this.position0.copy(this.object.position);
     // Check whether the camera has zoom property
-    if (this._checkOrthographicCamera(this.object) || this._checkPerspectiveCamera(this.object)) {
+    if (
+      this._checkOrthographicCamera(this.object) ||
+      this._checkPerspectiveCamera(this.object)
+    ) {
       this.zoom0 = (this.object as OrthographicCamera).zoom;
     }
   }
@@ -308,17 +327,26 @@ export class OrbitController implements Listener {
     this.spherical.phi += this.sphericalDelta.phi;
 
     // restrict theta to be between desired limits
-    this.spherical.theta = Mathf.max(this.minAzimuthAngle, Mathf.min(this.maxAzimuthAngle, this.spherical.theta));
+    this.spherical.theta = Mathf.max(
+      this.minAzimuthAngle,
+      Mathf.min(this.maxAzimuthAngle, this.spherical.theta)
+    );
 
     // restrict phi to be between desired limits
-    this.spherical.phi = Mathf.max(this.minPolarAngle, Mathf.min(this.maxPolarAngle, this.spherical.phi));
+    this.spherical.phi = Mathf.max(
+      this.minPolarAngle,
+      Mathf.min(this.maxPolarAngle, this.spherical.phi)
+    );
 
     this.spherical.makeSafe();
 
     this.spherical.radius *= this.scale;
 
     // restrict radius to be between desired limits
-    this.spherical.radius = Mathf.max(this.minDistance, Mathf.min(this.maxDistance, this.spherical.radius));
+    this.spherical.radius = Mathf.max(
+      this.minDistance,
+      Mathf.min(this.maxDistance, this.spherical.radius)
+    );
 
     // move target to panned location
     this.target.add(this.panOffset);
@@ -388,13 +416,22 @@ export class OrbitController implements Listener {
       targetDistance *= Mathf.tan(((persCam.fov / 2) * Mathf.PI) / 180.0);
 
       // we actually don't use screenWidth, since perspective camera is fixed to screen height
-      this.panLeft((2 * deltaX * targetDistance) / clientHeight, persCam.matrix);
+      this.panLeft(
+        (2 * deltaX * targetDistance) / clientHeight,
+        persCam.matrix
+      );
       this.panUp((2 * deltaY * targetDistance) / clientHeight, persCam.matrix);
     } else if (this._checkOrthographicCamera(this.object)) {
       const ortho = this.object as OrthographicCamera;
       // orthographic
-      this.panLeft((deltaX * (ortho.right - ortho.left)) / ortho.zoom / clientWidth, ortho.matrix);
-      this.panUp((deltaY * (ortho.top - ortho.bottom)) / ortho.zoom / clientHeight, ortho.matrix);
+      this.panLeft(
+        (deltaX * (ortho.right - ortho.left)) / ortho.zoom / clientWidth,
+        ortho.matrix
+      );
+      this.panUp(
+        (deltaY * (ortho.top - ortho.bottom)) / ortho.zoom / clientHeight,
+        ortho.matrix
+      );
     } else {
       // camera neither orthographic nor perspective
       this.enablePan = false;
@@ -406,7 +443,10 @@ export class OrbitController implements Listener {
       this.scale /= dollyScale;
     } else if (this._checkOrthographicCamera(this.object)) {
       const ortho = this.object as OrthographicCamera;
-      ortho.zoom = Mathf.max(this.minZoom, Mathf.min(this.maxZoom, ortho.zoom * dollyScale));
+      ortho.zoom = Mathf.max(
+        this.minZoom,
+        Mathf.min(this.maxZoom, ortho.zoom * dollyScale)
+      );
       ortho.updateProjectionMatrix();
       this.zoomChanged = true;
     } else {
@@ -419,7 +459,10 @@ export class OrbitController implements Listener {
       this.scale *= dollyScale;
     } else if (this._checkOrthographicCamera(this.object)) {
       const ortho = this.object as OrthographicCamera;
-      ortho.zoom = Mathf.max(this.minZoom, Mathf.min(this.maxZoom, ortho.zoom / dollyScale));
+      ortho.zoom = Mathf.max(
+        this.minZoom,
+        Mathf.min(this.maxZoom, ortho.zoom / dollyScale)
+      );
       ortho.updateProjectionMatrix();
       this.zoomChanged = true;
     } else {

@@ -1,4 +1,3 @@
-import { EventDispatcher } from "../core/EventDispatcher";
 import {
   Blending,
   Side,
@@ -12,8 +11,9 @@ import {
   Precision,
   generateUUID,
   Plane,
+  EventDispatcher,
+  Event,
 } from "rewild-common";
-import { Event } from "../core/Event";
 import { EngineVector2 } from "../math/Vector2";
 
 let materialId: u32 = 0;
@@ -519,7 +519,10 @@ export class Material extends EventDispatcher {
       const sourceDefaultAttributeValues = source.defaultAttributeValues;
 
       for (let i: i32 = 0, l: i32 = defaultAttKeys.length; i < l; i++)
-        sourceDefaultAttributeValues!.set(defaultAttKeys[i], defaultAttributeValues.get(defaultAttKeys[i]));
+        sourceDefaultAttributeValues!.set(
+          defaultAttKeys[i],
+          defaultAttributeValues.get(defaultAttKeys[i])
+        );
     }
 
     // TODO:

@@ -1,4 +1,3 @@
-import { EventDispatcher } from "../core/EventDispatcher";
 import {
   Matrix3,
   Mapping,
@@ -8,10 +7,10 @@ import {
   TextureDataType,
   TextureEncoding,
   generateUUID,
+  Event,
+  EventDispatcher,
 } from "rewild-common";
 import { EngineVector2 } from "../math/Vector2";
-// import { ImageUtils } from "../extras/ImageUtils";
-import { Event } from "../core/Event";
 
 let textureId: u32 = 0;
 

@@ -4,25 +4,33 @@ import { AmbientLight } from "../../../lights/AmbientLight";
 import { DirectionalLight } from "../../../lights/DirectionalLight";
 import {
   Color,
-  degToRad,
   ApplicationEventType,
   UIEventType,
+  Listener,
+  Event,
 } from "rewild-common";
 import { Container } from "../core/Container";
 import { inputManager } from "../../../extras/io/InputManager";
 import { KeyboardEvent } from "../../../extras/io/KeyboardEvent";
-import { Listener } from "../../../core/EventDispatcher";
 import { uiSignaller } from "../../../extras/ui/uiSignalManager";
-import { Event } from "../../../core/Event";
 import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
 import { Link } from "../core/Link";
 import { TransformNode } from "../../../core/TransformNode";
 import { lock, unlock } from "../../../Imports";
 import { PlayerComponent } from "../../../components/PlayerComponent";
-import { BodyOptions, World, WorldOptions } from "../../../physics/core/World";
-import { RigidBody } from "../../../physics/core/RigidBody";
-import { ShapeConfig } from "../../../physics/shape/ShapeConfig";
+// import { BodyOptions, World, WorldOptions } from "../../../physics/core/World";
+// import { RigidBody } from "../../../physics/core/RigidBody";
+// import { ShapeConfig } from "../../../physics/shape/ShapeConfig";
 import { Vec3 } from "../../../physics/math/Vec3";
+import {
+  World,
+  WorldOptions,
+  NaiveBroadphase,
+  GSSolver,
+  Plane,
+  Body,
+  BodyOptions,
+} from "rewild-physics";
 
 const vec: Vec3 = new Vec3();
 
@@ -40,6 +48,9 @@ export class Level1 extends Container implements Listener {
   // private floor!: TransformNode;
   private skybox!: TransformNode;
   private ball!: TransformNode;
+
+  private lastCallTime: i32 = 0;
+  private resetCallTime: boolean = false;
   private sphereBody: RigidBody | null;
   private playerBody: RigidBody | null;
   private world: World | null;
@@ -83,9 +94,39 @@ export class Level1 extends Container implements Listener {
     this.orbitController = new OrbitController(this.runtime!.camera);
     this.pointerController = new PointerLockController(this.runtime!.camera);
 
+    // Setup physics world
     const physicsWorldOptions = new WorldOptions();
-    physicsWorldOptions.gravity.set(0, this.gravity, 0);
+    physicsWorldOptions.gravity.set(0, 0, this.gravity);
+
     this.world = new World(physicsWorldOptions);
+    this.world.broadphase = new NaiveBroadphase();
+    (this.world.solver as GSSolver).iterations = 10;
+    this.world.defaultContactMaterial.contactEquationStiffness = 1e7;
+    this.world.defaultContactMaterial.contactEquationRelaxation = 4;
+  }
+
+  updatePhysics(): void {
+    // Step world
+    var timeStep = 1 / 60;
+
+    var now = performance.now() / 1000;
+
+    if (!this.lastCallTime) {
+      // last call time not saved, cant guess elapsed time. Take a simple step.
+      this.world!.step(timeStep, 0);
+      this.lastCallTime = now;
+      return;
+    }
+
+    let timeSinceLastCall = now - this.lastCallTime;
+    if (this.resetCallTime) {
+      timeSinceLastCall = 0;
+      this.resetCallTime = false;
+    }
+
+    this.world!.step(timeStep, timeSinceLastCall);
+
+    this.lastCallTime = now;
   }
 
   onEvent(event: Event): void {
@@ -128,7 +169,8 @@ export class Level1 extends Container implements Listener {
     if (this.isPaused) return;
     super.onUpdate(delta, total);
 
-    this.world!.step();
+    this.updatePhysics();
+    // this.world!.step();
     this.totalTime += delta;
 
     const camera = this.runtime!.camera;
@@ -238,28 +280,31 @@ export class Level1 extends Container implements Listener {
     this.sphereBody!.connectMesh(this.ball);
 
     this.ball.position.set(0, 0, 0);
-    // this.floor.scale.set(200, 200, 200);
-    // this.floor.position.set(0, -0.1, 0);
-    // this.floor.rotation.x = -degToRad(90);
 
-    const floorOptions = new BodyOptions();
-    // floorOptions.pos.set(0, -40, 0);
-    //floorOptions.size.set(200, 80, 200);
-    floorOptions.pos.set(0, 0, 0);
-    floorOptions.rot.set(-90, 0, 0);
+    // GROUND PLANE
+    var groundShape = new Plane();
+    var groundBody = new Body(new BodyOptions().setMass(0));
 
-    const floorConfifg = new ShapeConfig();
-    floorConfifg.friction = 0.2;
-    floorConfifg.density = 100;
-    floorConfifg.restitution = 0.2;
-    this.world!.initBody("plane", floorOptions, floorConfifg);
+    // new CANNON.Body({ mass: 0 });
+    groundBody.addShape(groundShape);
+    this.world!.add(groundBody);
+
+    // const floorOptions = new BodyOptions();
+    // floorOptions.pos.set(0, 0, 0);
+    // floorOptions.rot.set(-90, 0, 0);
+
+    // const floorConfifg = new ShapeConfig();
+    // floorConfifg.friction = 0.2;
+    // floorConfifg.density = 100;
+    // floorConfifg.restitution = 0.2;
+    // this.world!.initBody("plane", floorOptions, floorConfifg);
 
     this.skybox.scale.set(5000, 5000, 5000);
     this.skybox.position.set(0, 0, 0);
 
     inputManager.addEventListener("keyup", this);
     uiSignaller.addEventListener(UIEventType, this);
-    this.world!.play();
+    // this.world!.play();
 
     if (!this.useOrbitController) lock();
   }

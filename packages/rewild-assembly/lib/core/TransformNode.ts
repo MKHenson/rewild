@@ -1,8 +1,14 @@
-import { Euler, IEulerChangeListener, Matrix3, Quaternion, IQuatChangeListener } from "rewild-common";
+import {
+  Euler,
+  IEulerChangeListener,
+  Matrix3,
+  Quaternion,
+  IQuatChangeListener,
+  Event,
+  EventDispatcher,
+} from "rewild-common";
 import { EngineMatrix4 } from "../math/Matrix4";
 import { EngineVector3 } from "../math/Vector3";
-import { Event } from "./Event";
-import { EventDispatcher } from "./EventDispatcher";
 import { Layers } from "./Layers";
 import { Camera } from "../cameras/Camera";
 import { Light } from "../lights/Light";
@@ -27,7 +33,10 @@ type TraverseCallback = (object: TransformNode) => void;
 const _addedEvent: Event = new Event("added");
 const _removedEvent: Event = new Event("removed");
 
-export class TransformNode extends EventDispatcher implements IQuatChangeListener, IEulerChangeListener {
+export class TransformNode
+  extends EventDispatcher
+  implements IQuatChangeListener, IEulerChangeListener
+{
   static DefaultUp: EngineVector3 = new EngineVector3(0, 1, 0);
   static DefaultMatrixAutoUpdate: boolean = true;
 
@@ -253,7 +262,9 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
   }
 
   worldToLocal(vector: EngineVector3): EngineVector3 {
-    return vector.applyMatrix4(_m1.copy(this.matrixWorld).invertSIMD()) as EngineVector3;
+    return vector.applyMatrix4(
+      _m1.copy(this.matrixWorld).invertSIMD()
+    ) as EngineVector3;
   }
 
   lookAt(x: f32, y: f32, z: f32): void {
@@ -383,7 +394,8 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
     const components = this.components;
     for (let i: i32 = 0, l = components.length; i < l; i++) {
       const component = unchecked(components[i]);
-      if (component instanceof MeshComponent) component.raycast(raycaster, intersects);
+      if (component instanceof MeshComponent)
+        component.raycast(raycaster, intersects);
     }
   }
 
@@ -432,7 +444,10 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
       if (this.parent === null) {
         this.matrixWorld.copy(this.matrix);
       } else {
-        this.matrixWorld.multiplyMatricesSIMD(this.parent!.matrixWorld, this.matrix);
+        this.matrixWorld.multiplyMatricesSIMD(
+          this.parent!.matrixWorld,
+          this.matrix
+        );
       }
 
       this.matrixWorldNeedsUpdate = false;
@@ -461,7 +476,10 @@ export class TransformNode extends EventDispatcher implements IQuatChangeListene
     if (this.parent === null) {
       this.matrixWorld.copy(this.matrix);
     } else {
-      this.matrixWorld.multiplyMatricesSIMD(this.parent!.matrixWorld, this.matrix);
+      this.matrixWorld.multiplyMatricesSIMD(
+        this.parent!.matrixWorld,
+        this.matrix
+      );
     }
 
     // update children
@@ -524,8 +542,12 @@ export function createTransformNode(name: string | null): TransformNode {
   return toReturn;
 }
 
-export function addChild(parent: TransformNode, child: TransformNode): TransformNode {
-  if (child === parent) throw new Error("Transform can't be added as a child of itself.");
+export function addChild(
+  parent: TransformNode,
+  child: TransformNode
+): TransformNode {
+  if (child === parent)
+    throw new Error("Transform can't be added as a child of itself.");
 
   if (child.parent != null) {
     removeChild(child.parent!, child);
@@ -561,9 +583,15 @@ export function getDataProperties(node: TransformNode): usize {
   return changetype<usize>(node.dataProperties);
 }
 
-export function addComponent(node: TransformNode, component: Component): TransformNode {
+export function addComponent(
+  node: TransformNode,
+  component: Component
+): TransformNode {
   if (component.transform) {
-    component.transform!.components.splice(component.transform!.components.indexOf(component), 1);
+    component.transform!.components.splice(
+      component.transform!.components.indexOf(component),
+      1
+    );
   }
 
   node.components.push(component);
@@ -571,7 +599,10 @@ export function addComponent(node: TransformNode, component: Component): Transfo
   return node;
 }
 
-export function removeChild(parent: TransformNode, child: TransformNode): TransformNode {
+export function removeChild(
+  parent: TransformNode,
+  child: TransformNode
+): TransformNode {
   const index = parent.children.indexOf(child);
 
   if (index != -1) {

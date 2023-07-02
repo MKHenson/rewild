@@ -1,9 +1,13 @@
 import { DirectionalLight } from "../../../lights/DirectionalLight";
-import { Color, ApplicationEventType, UIEventType } from "rewild-common";
+import {
+  Color,
+  ApplicationEventType,
+  UIEventType,
+  Event,
+  Listener,
+} from "rewild-common";
 import { Container } from "../core/Container";
 import { uiSignaller } from "../../../extras/ui/uiSignalManager";
-import { Listener } from "../../../core/EventDispatcher";
-import { Event } from "../../../core/Event";
 import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
 import { Link } from "../core/Link";
 
@@ -29,7 +33,8 @@ export class EditorContainer extends Container implements Listener {
 
   onEvent(event: Event): void {
     const uiEvent = event.attachment as ApplicationEvent;
-    if (uiEvent.eventType == ApplicationEventType.Quit) this.exit(this.getPortal("Exit")!, true);
+    if (uiEvent.eventType == ApplicationEventType.Quit)
+      this.exit(this.getPortal("Exit")!, true);
   }
 
   onUpdate(delta: f32, total: u32): void {}
