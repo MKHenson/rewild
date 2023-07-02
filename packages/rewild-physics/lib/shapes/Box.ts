@@ -4,7 +4,7 @@ import { ConvexPolyhedron } from "./ConvexPolyhedron";
 import { Shape } from "./Shape";
 
 const worldCornerTempPos = new Vec3();
-const worldCornerTempNeg = new Vec3();
+// const worldCornerTempNeg = new Vec3();
 
 const worldCornersTemp = [
   new Vec3(),
@@ -78,7 +78,7 @@ export class Box extends Shape {
       [1, 2, 6, 5], // +x
     ];
 
-    const axes = [new V(0, 0, 1), new V(0, 1, 0), new V(1, 0, 0)];
+    // const axes = [new V(0, 0, 1), new V(0, 1, 0), new V(1, 0, 0)];
 
     const h = new ConvexPolyhedron(vertices, indices);
     this.convexPolyhedronRepresentation = h;
@@ -121,7 +121,7 @@ export class Box extends Shape {
     sides[4].set(0, -ex.y, 0);
     sides[5].set(0, 0, -ex.z);
 
-    if (quat !== undefined) {
+    if (quat) {
       for (let i: i32 = 0; i !== sides.length; i++) {
         quat.vmult(sides[i], sides[i]);
       }

@@ -98,13 +98,16 @@ export class GridBroadphase extends Broadphase {
       binsizeY = (ymax - ymin) / ny,
       binsizeZ = (zmax - zmin) / nz;
 
-    const binRadius = Mathf.sqrt(binsizeX * binsizeX + binsizeY * binsizeY + binsizeZ * binsizeZ) * 0.5;
+    const binRadius =
+      Mathf.sqrt(
+        binsizeX * binsizeX + binsizeY * binsizeY + binsizeZ * binsizeZ
+      ) * 0.5;
 
     const SPHERE = Shape.SPHERE,
-      PLANE = Shape.PLANE,
-      BOX = Shape.BOX,
-      COMPOUND = Shape.COMPOUND,
-      CONVEXPOLYHEDRON = Shape.CONVEXPOLYHEDRON;
+      PLANE = Shape.PLANE;
+    // BOX = Shape.BOX,
+    // COMPOUND = Shape.COMPOUND,
+    // CONVEXPOLYHEDRON = Shape.CONVEXPOLYHEDRON;
 
     const bins = this.bins,
       binLengths = this.binLengths,
@@ -115,9 +118,9 @@ export class GridBroadphase extends Broadphase {
       binLengths[i] = 0;
     }
 
-    const ceil = Mathf.ceil;
-    const min = Mathf.min;
-    const max = Mathf.max;
+    // const ceil = Mathf.ceil;
+    // const min = Mathf.min;
+    // const max = Mathf.max;
 
     // Put all bodies into the bins
     for (let i: i32 = 0; i != N; i++) {
@@ -175,9 +178,21 @@ export class GridBroadphase extends Broadphase {
             const d = GridBroadphase_collisionPairs_d;
             d.set(xreset, yreset, zreset);
 
-            for (let xi: i32 = 0, xoff = 0; xi !== nx; xi++, xoff += xstep, d.y = yreset, d.x += binsizeX) {
-              for (let yi: i32 = 0, yoff = 0; yi !== ny; yi++, yoff += ystep, d.z = zreset, d.y += binsizeY) {
-                for (let zi: i32 = 0, zoff = 0; zi !== nz; zi++, zoff += zstep, d.z += binsizeZ) {
+            for (
+              let xi: i32 = 0, xoff = 0;
+              xi !== nx;
+              xi++, xoff += xstep, d.y = yreset, d.x += binsizeX
+            ) {
+              for (
+                let yi: i32 = 0, yoff = 0;
+                yi !== ny;
+                yi++, yoff += ystep, d.z = zreset, d.y += binsizeY
+              ) {
+                for (
+                  let zi: i32 = 0, zoff = 0;
+                  zi !== nz;
+                  zi++, zoff += zstep, d.z += binsizeZ
+                ) {
                   if (d.dot(planeNormal) < binRadius) {
                     const idx = xoff + yoff + zoff;
                     bins[idx][binLengths[idx]++] = bi;
@@ -282,9 +297,9 @@ function addBoxToBins(
   let xoff0 = ((x0 - xmin) * xmult) | 0,
     yoff0 = ((y0 - ymin) * ymult) | 0,
     zoff0 = ((z0 - zmin) * zmult) | 0,
-    xoff1 = ceil((x1 - xmin) * xmult),
-    yoff1 = ceil((y1 - ymin) * ymult),
-    zoff1 = ceil((z1 - zmin) * zmult);
+    xoff1 = Mathf.ceil((x1 - xmin) * xmult),
+    yoff1 = Mathf.ceil((y1 - ymin) * ymult),
+    zoff1 = Mathf.ceil((z1 - zmin) * zmult);
 
   if (xoff0 < 0) {
     xoff0 = 0;

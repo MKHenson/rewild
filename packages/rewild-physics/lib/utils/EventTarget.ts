@@ -2,6 +2,8 @@
 //  * Base class for objects that dispatches events.
 //  */
 // export class EventTarget {
+//   _listeners: any;
+
 //   constructor() {}
 
 //   /**
@@ -11,7 +13,7 @@
 //    * @param  {Function} listener
 //    * @return {EventTarget} The self object, for chainability.
 //    */
-//   addEventListener(type: string, listener) {
+//   addEventListener(type: string, listener: Function) {
 //     if (this._listeners === undefined) {
 //       this._listeners = {};
 //     }
@@ -32,7 +34,7 @@
 //    * @param  {Function} listener
 //    * @return {Boolean}
 //    */
-//   hasEventListener(type, listener) {
+//   hasEventListener(type: string, listener: Function) {
 //     if (this._listeners === undefined) {
 //       return false;
 //     }
@@ -52,7 +54,7 @@
 //    * @param  {String} type
 //    * @return {Boolean}
 //    */
-//   hasAnyEventListener(type) {
+//   hasAnyEventListener(type: string) {
 //     if (this._listeners === undefined) {
 //       return false;
 //     }

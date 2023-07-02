@@ -1,4 +1,4 @@
-import { Quaternion } from "../math/Quaternion";
+// import { Quaternion } from "../math/Quaternion";
 import { Vec3 } from "../math/Vec3";
 import { Body } from "../objects/Body";
 import { World } from "../world/World";
@@ -74,7 +74,8 @@ export abstract class Broadphase {
 
     // Check types
     if (
-      ((bodyA.type & Body.STATIC) !== 0 || bodyA.sleepState === Body.SLEEPING) &&
+      ((bodyA.type & Body.STATIC) !== 0 ||
+        bodyA.sleepState === Body.SLEEPING) &&
       ((bodyB.type & Body.STATIC) !== 0 || bodyB.sleepState === Body.SLEEPING)
     ) {
       // Both bodies are static or sleeping. Skip.
@@ -109,10 +110,18 @@ export abstract class Broadphase {
    * @param {Array} pairs2 bodyB is appended to this array if intersection
    */
 
-  doBoundingSphereBroadphase(bodyA: Body, bodyB: Body, pairs1: Body[], pairs2: Body[]): void {
+  doBoundingSphereBroadphase(
+    bodyA: Body,
+    bodyB: Body,
+    pairs1: Body[],
+    pairs2: Body[]
+  ): void {
     const r = Broadphase_collisionPairs_r;
     bodyB.position.vsub(bodyA.position, r);
-    const boundingRadiusSum2 = Mathf.pow(bodyA.boundingRadius + bodyB.boundingRadius, 2);
+    const boundingRadiusSum2 = Mathf.pow(
+      bodyA.boundingRadius + bodyB.boundingRadius,
+      2
+    );
     const norm2 = r.norm2();
     if (norm2 < boundingRadiusSum2) {
       pairs1.push(bodyA);
@@ -128,7 +137,12 @@ export abstract class Broadphase {
    * @param {Array} pairs1
    * @param {Array} pairs2
    */
-  doBoundingBoxBroadphase(bodyA: Body, bodyB: Body, pairs1: Body[], pairs2: Body[]): void {
+  doBoundingBoxBroadphase(
+    bodyA: Body,
+    bodyB: Body,
+    pairs1: Body[],
+    pairs2: Body[]
+  ): void {
     if (bodyA.aabbNeedsUpdate) {
       bodyA.computeAABB();
     }
@@ -168,15 +182,18 @@ export abstract class Broadphase {
     for (let i: i32 = 0; i !== N; i++) {
       const id1 = p1[i].id,
         id2 = p2[i].id;
-      const key = id1 < id2 ? id1.toString() + "," + id2.toString() : id2.toString() + "," + id1.toString();
+      const key =
+        id1 < id2
+          ? id1.toString() + "," + id2.toString()
+          : id2.toString() + "," + id1.toString();
       t.set(key, i);
       tKeys.push(key);
       // t.keys.push(key);
     }
 
     for (let i: i32 = 0; i != t.keys.length; i++) {
-      const key = tKeys.pop(), // t.keys.pop(),
-        pairIndex = t.get(key);
+      const key = tKeys.pop()!, // t.keys.pop(),
+        pairIndex = t.get(key)!;
       pairs1.push(p1[pairIndex]);
       pairs2.push(p2[pairIndex]);
       t.delete(key);

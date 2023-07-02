@@ -23,7 +23,7 @@ import { Narrowphase } from "./Narrowphase";
 
 export class WorldOptions {
   constructor(
-    public gravity: Vec3 = new Vec3(0, -9.82, 0),
+    public gravity: Vec3 = new Vec3(0, 0, 0),
     public allowSleep: boolean = false,
     public broadphase: Broadphase = new NaiveBroadphase(),
     public solver: Solver = new GSSolver(),
@@ -145,7 +145,7 @@ export class World extends EventDispatcher {
      * @type {Number}
      * @default 0
      */
-    this.quatNormalizeSkip = options.quatNormalizeSkip !== undefined ? options.quatNormalizeSkip : 0;
+    this.quatNormalizeSkip = options.quatNormalizeSkip;
 
     /**
      * Set to true to use fast quaternion normalization. It is often enough accurate to use. If bodies tend to explode, set to false.
@@ -155,7 +155,7 @@ export class World extends EventDispatcher {
      * @see Quaternion.normalize
      * @default false
      */
-    this.quatNormalizeFast = options.quatNormalizeFast !== undefined ? options.quatNormalizeFast : false;
+    this.quatNormalizeFast = options.quatNormalizeFast;
 
     /**
      * The wall-clock time since simulation start
@@ -189,7 +189,7 @@ export class World extends EventDispatcher {
      * @property broadphase
      * @type {Broadphase}
      */
-    this.broadphase = options.broadphase !== undefined ? options.broadphase : new NaiveBroadphase();
+    this.broadphase = options.broadphase;
 
     /**
      * @property bodies
@@ -202,7 +202,7 @@ export class World extends EventDispatcher {
      * @property solver
      * @type {Solver}
      */
-    this.solver = options.solver !== undefined ? options.solver : new GSSolver();
+    this.solver = options.solver;
 
     /**
      * @property constraints
@@ -258,7 +258,12 @@ export class World extends EventDispatcher {
      * @property defaultContactMaterial
      * @type {ContactMaterial}
      */
-    this.defaultContactMaterial = new ContactMaterial(this.defaultMaterial, this.defaultMaterial, 0.3, 0.0);
+    this.defaultContactMaterial = new ContactMaterial(
+      this.defaultMaterial,
+      this.defaultMaterial,
+      0.3,
+      0.0
+    );
 
     /**
      * @property doProfiling
@@ -414,7 +419,12 @@ export class World extends EventDispatcher {
    * @param  {Function} callback
    * @return {boolean} True if any body was hit.
    */
-  raycastAll(from: Vec3, to: Vec3, options: IntersectionOptions, callback: Callback | null = null): boolean {
+  raycastAll(
+    from: Vec3,
+    to: Vec3,
+    options: IntersectionOptions,
+    callback: Callback | null = null
+  ): boolean {
     options.mode = Ray.ALL;
     options.from = from;
     options.to = to;
@@ -435,7 +445,12 @@ export class World extends EventDispatcher {
    * @param  {RaycastResult} result
    * @return {boolean} True if any body was hit.
    */
-  raycastAny(from: Vec3, to: Vec3, options: IntersectionOptions, result: RaycastResult) {
+  raycastAny(
+    from: Vec3,
+    to: Vec3,
+    options: IntersectionOptions,
+    result: RaycastResult
+  ) {
     options.mode = Ray.ANY;
     options.from = from;
     options.to = to;
@@ -456,7 +471,12 @@ export class World extends EventDispatcher {
    * @param  {RaycastResult} result
    * @return {boolean} True if any body was hit.
    */
-  raycastClosest(from: Vec3, to: Vec3, options: IntersectionOptions, result: RaycastResult) {
+  raycastClosest(
+    from: Vec3,
+    to: Vec3,
+    options: IntersectionOptions,
+    result: RaycastResult
+  ) {
     options.mode = Ray.CLOSEST;
     options.from = from;
     options.to = to;
@@ -539,7 +559,11 @@ export class World extends EventDispatcher {
     this.contactmaterials.push(cmat);
 
     // Add current contact material to the material table
-    this.contactMaterialTable.set(cmat.materials[0].id, cmat.materials[1].id, cmat);
+    this.contactMaterialTable.set(
+      cmat.materials[0].id,
+      cmat.materials[1].id,
+      cmat
+    );
   }
 
   /**
@@ -633,7 +657,11 @@ export class World extends EventDispatcher {
     }
 
     // Update subsystems
-    for (let i: i32 = 0, Nsubsystems = this.subsystems.length; i !== Nsubsystems; i++) {
+    for (
+      let i: i32 = 0, Nsubsystems = this.subsystems.length;
+      i !== Nsubsystems;
+      i++
+    ) {
       this.subsystems[i].update();
     }
 
@@ -654,7 +682,10 @@ export class World extends EventDispatcher {
       const c = constraints[i];
       if (!c.collideConnected) {
         for (let j: i32 = p1.length - 1; j >= 0; j -= 1) {
-          if ((c.bodyA === p1[j] && c.bodyB === p2[j]) || (c.bodyB === p1[j] && c.bodyA === p2[j])) {
+          if (
+            (c.bodyA === p1[j] && c.bodyB === p2[j]) ||
+            (c.bodyB === p1[j] && c.bodyA === p2[j])
+          ) {
             p1.splice(j, 1);
             p2.splice(j, 1);
           }

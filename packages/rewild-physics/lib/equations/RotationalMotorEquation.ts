@@ -40,10 +40,10 @@ export class RotationalMotorEquation extends Equation {
   }
 
   computeB(h: f32): f32 {
-    const a = this.a,
-      b = this.b,
-      bi = this.bi,
-      bj = this.bj,
+    // const a = this.a,
+    const b = this.b,
+      // bi = this.bi,
+      // bj = this.bj,
       axisA = this.axisA,
       axisB = this.axisB,
       GA = this.jacobianElementA,

@@ -15,6 +15,7 @@ declare namespace f32 {
   export const EPSILON: f32;
   export const MAX_VALUE: f32;
   export const MIN_VALUE: f32;
+  export const NaN: f32;
 }
 
 declare namespace i32 {
@@ -27,3 +28,5 @@ declare function unchecked(val: any): any;
 declare function u32(val: number): number;
 declare function i32(val: number): number;
 declare function f32(val: number): number;
+
+declare function isNaN<T>(val: T): number;

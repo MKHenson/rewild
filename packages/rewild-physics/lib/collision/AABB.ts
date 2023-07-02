@@ -299,7 +299,7 @@ export class AABB {
    * @return {number}
    */
   overlapsRay(ray: Ray): boolean {
-    const t = 0;
+    // const t = 0;
 
     // ray.direction is unit direction vector of ray
     const dirFracX = 1 / ray._direction.x;
