@@ -1,4 +1,4 @@
-let globalRef = window as any;
+let globalRef = global as any;
 
 globalRef.Mathf = Math;
 globalRef.f32 = function (t: number) {

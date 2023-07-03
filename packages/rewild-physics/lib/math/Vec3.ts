@@ -60,7 +60,7 @@ export class Vec3 {
    * @param {Vec3} target Optional. Target to save in.
    * @return {Vec3}
    */
-  cross(a: Vec3, target = new Vec3()): Vec3 {
+  cross(a: Vec3, target: Vec3 = new Vec3()): Vec3 {
     const ax = a.x,
       ay = a.y,
       az = a.z,
@@ -141,18 +141,8 @@ export class Vec3 {
    * @see http://www8.cs.umu.se/kurser/TDBD24/VT06/lectures/Lecture6.pdf
    * @return {Mat3}
    */
-  crossmat() {
-    return new Mat3([
-      0,
-      -this.z,
-      this.y,
-      this.z,
-      0,
-      -this.x,
-      -this.y,
-      this.x,
-      0,
-    ]);
+  crossmat(): Mat3 {
+    return new Mat3([0, -this.z, this.y, this.z, 0, -this.x, -this.y, this.x, 0]);
   }
 
   /**
@@ -160,7 +150,7 @@ export class Vec3 {
    * @method normalize
    * @return {Number} Returns the norm of the vector
    */
-  normalize() {
+  normalize(): f32 {
     const x = this.x,
       y = this.y,
       z = this.z;
@@ -257,9 +247,7 @@ export class Vec3 {
     const px = p.x,
       py = p.y,
       pz = p.z;
-    return Mathf.sqrt(
-      (px - x) * (px - x) + (py - y) * (py - y) + (pz - z) * (pz - z)
-    );
+    return Mathf.sqrt((px - x) * (px - x) + (py - y) * (py - y) + (pz - z) * (pz - z));
   }
 
   /**
@@ -470,11 +458,7 @@ export class Vec3 {
    * @param {Number} precision
    */
   almostZero(precision: f32 = 1e-6): boolean {
-    if (
-      Mathf.abs(this.x) > precision ||
-      Mathf.abs(this.y) > precision ||
-      Mathf.abs(this.z) > precision
-    ) {
+    if (Mathf.abs(this.x) > precision || Mathf.abs(this.y) > precision || Mathf.abs(this.z) > precision) {
       return false;
     }
     return true;

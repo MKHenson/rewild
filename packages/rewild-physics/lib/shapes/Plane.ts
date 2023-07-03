@@ -31,7 +31,7 @@ export class Plane extends Shape {
     this.worldNormalNeedsUpdate = false;
   }
 
-  calculateLocalInertia(mass: f32, target = new Vec3()): Vec3 {
+  calculateLocalInertia(mass: f32, target: Vec3 = new Vec3()): Vec3 {
     return target;
   }
 
@@ -39,7 +39,7 @@ export class Plane extends Shape {
     return f32.MAX_VALUE; // The plane is infinite...
   }
 
-  calculateWorldAABB(pos: Vec3, quat: Quaternion, min: Vec3, max: Vec3) {
+  calculateWorldAABB(pos: Vec3, quat: Quaternion, min: Vec3, max: Vec3): void {
     // The plane AABB is infinite, except if the normal is pointing along any axis
     tempNormal.set(0, 0, 1); // Default plane normal is z
     quat.vmult(tempNormal, tempNormal);
@@ -69,6 +69,6 @@ export class Plane extends Shape {
   }
 
   updateBoundingSphereRadius(): void {
-    this.boundingSphereRadius = Number.MAX_VALUE;
+    this.boundingSphereRadius = f32.MAX_VALUE;
   }
 }

@@ -52,7 +52,7 @@ export class Box extends Shape {
    * Updates the local convex polyhedron representation used for some collisions.
    * @method updateConvexPolyhedronRepresentation
    */
-  updateConvexPolyhedronRepresentation() {
+  updateConvexPolyhedronRepresentation(): void {
     const sx = this.halfExtents.x;
     const sy = this.halfExtents.y;
     const sz = this.halfExtents.z;
@@ -138,11 +138,7 @@ export class Box extends Shape {
     this.boundingSphereRadius = this.halfExtents.norm();
   }
 
-  forEachWorldCorner(
-    pos: Vec3,
-    quat: Quaternion,
-    callback: (x: f32, y: f32, z: f32) => void
-  ): void {
+  forEachWorldCorner(pos: Vec3, quat: Quaternion, callback: (x: f32, y: f32, z: f32) => void): void {
     const e = this.halfExtents;
     const corners = [
       [e.x, e.y, e.z],
@@ -158,11 +154,7 @@ export class Box extends Shape {
       worldCornerTempPos.set(corners[i][0], corners[i][1], corners[i][2]);
       quat.vmult(worldCornerTempPos, worldCornerTempPos);
       pos.vadd(worldCornerTempPos, worldCornerTempPos);
-      callback(
-        worldCornerTempPos.x,
-        worldCornerTempPos.y,
-        worldCornerTempPos.z
-      );
+      callback(worldCornerTempPos.x, worldCornerTempPos.y, worldCornerTempPos.z);
     }
   }
 

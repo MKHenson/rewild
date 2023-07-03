@@ -41,7 +41,7 @@ export class DistanceConstraint extends Constraint {
     eq.maxForce = maxForce;
   }
 
-  update() {
+  update(): void {
     const bodyA = this.bodyA;
     const bodyB = this.bodyB;
     const eq = this.distanceEquation;

@@ -449,7 +449,7 @@ export class Trimesh extends Shape {
         max2 = norm2;
       }
     }
-    this.boundingSphereRadius = Math.sqrt(max2);
+    this.boundingSphereRadius = Mathf.sqrt(max2);
   }
 
   /**
@@ -543,9 +543,9 @@ export class Trimesh extends Shape {
         const u = (i / tubularSegments) * arc;
         const v = (j / radialSegments) * Mathf.PI * 2;
 
-        const x = (radius + tube * Math.cos(v)) * Math.cos(u);
-        const y = (radius + tube * Math.cos(v)) * Math.sin(u);
-        const z = tube * Math.sin(v);
+        const x = (radius + tube * Mathf.cos(v)) * Mathf.cos(u);
+        const y = (radius + tube * Mathf.cos(v)) * Mathf.sin(u);
+        const z = tube * Mathf.sin(v);
 
         vertices.push(x);
         vertices.push(y);

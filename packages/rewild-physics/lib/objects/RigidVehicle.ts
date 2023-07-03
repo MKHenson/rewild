@@ -24,19 +24,14 @@ export class RigidVehicle implements Listener {
    * @constructor
    * @param {Body} [options.chassisBody]
    */
-  constructor(
-    coordinateSystem: Vec3 | null = new Vec3(1, 2, 3),
-    chassisBody: Body | null = null
-  ) {
+  constructor(coordinateSystem: Vec3 | null = new Vec3(1, 2, 3), chassisBody: Body | null = null) {
     this.wheelBodies = [];
 
     /**
      * @property coordinateSystem
      * @type {Vec3}
      */
-    this.coordinateSystem = !coordinateSystem
-      ? new Vec3(1, 2, 3)
-      : coordinateSystem.clone();
+    this.coordinateSystem = !coordinateSystem ? new Vec3(1, 2, 3) : coordinateSystem.clone();
 
     /**
      * @property {Body} chassisBody
@@ -71,7 +66,7 @@ export class RigidVehicle implements Listener {
    * @param {Vec3} [options.axis] Axis of rotation of the wheel, locally defined in the chassis.
    * @param {Body} [options.body] The wheel body.
    */
-  addWheel(body: Body | null = null, pos: Vec3 | null = null, ax: Vec3) {
+  addWheel(body: Body | null = null, pos: Vec3 | null = null, ax: Vec3 | null = null): i32 {
     let wheelBody = body;
     if (!wheelBody) {
       const wheelOptions = new BodyOptions();
@@ -94,14 +89,7 @@ export class RigidVehicle implements Listener {
     const axis = ax ? ax.clone() : new Vec3(0, 1, 0);
     this.wheelAxes.push(axis);
 
-    const hingeConstraint = new HingeConstraint(
-      this.chassisBody,
-      wheelBody,
-      position,
-      Vec3.ZERO,
-      axis,
-      axis
-    );
+    const hingeConstraint = new HingeConstraint(this.chassisBody, wheelBody, position, Vec3.ZERO, axis, axis);
     hingeConstraint.collideConnected = false;
     this.constraints.push(hingeConstraint);
 

@@ -1,5 +1,9 @@
 import { Vec3 } from "./Vec3";
 
+export class AxisAngle {
+  constructor(public axis: Vec3 = new Vec3(), public angle: f32 = 0) {}
+}
+
 const sfv_t1 = new Vec3(),
   sfv_t2 = new Vec3();
 // const Quaternion_mult_va = new Vec3();
@@ -117,7 +121,7 @@ export class Quaternion {
    * @param {Vec3} [targetAxis] A vector object to reuse for storing the axis.
    * @return {Array} An array, first elemnt is the axis and the second is the angle in radians.
    */
-  toAxisAngle(targetAxis = new Vec3()): [Vec3, f32] {
+  toAxisAngle(targetAxis = new Vec3()): AxisAngle {
     this.normalize(); // if w>1 acos and sqrt will produce errors, this cant happen if quaternion is normalised
     const angle = 2 * Mathf.acos(this.w);
     const s = Mathf.sqrt(1 - this.w * this.w); // assuming quaternion normalised then w is less than 1, so term always positive.
@@ -132,7 +136,7 @@ export class Quaternion {
       targetAxis.y = this.y / s;
       targetAxis.z = this.z / s;
     }
-    return [targetAxis, angle];
+    return new AxisAngle(targetAxis, angle);
   }
 
   /**
@@ -153,8 +157,7 @@ export class Quaternion {
       this.x = a.x;
       this.y = a.y;
       this.z = a.z;
-      this.w =
-        Mathf.sqrt(Mathf.pow(u.norm(), 2) * Mathf.pow(v.norm(), 2)) + u.dot(v);
+      this.w = Mathf.sqrt(Mathf.pow(u.norm(), 2) * Mathf.pow(v.norm(), 2)) + u.dot(v);
       this.normalize();
     }
     return this;
@@ -168,7 +171,7 @@ export class Quaternion {
    * @return {Quaternion}
    */
 
-  mult(q: Quaternion, target = new Quaternion()): Quaternion {
+  mult(q: Quaternion, target: Quaternion = new Quaternion()): Quaternion {
     const ax = this.x,
       ay = this.y,
       az = this.z,
@@ -229,9 +232,7 @@ export class Quaternion {
    * @method normalize
    */
   normalize(): Quaternion {
-    let l = Mathf.sqrt(
-      this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w
-    );
+    let l = Mathf.sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
     if (l == 0) {
       this.x = 0;
       this.y = 0;
@@ -254,13 +255,7 @@ export class Quaternion {
    * @author unphased, https://github.com/unphased
    */
   normalizeFast(): Quaternion {
-    const f =
-      (3.0 -
-        (this.x * this.x +
-          this.y * this.y +
-          this.z * this.z +
-          this.w * this.w)) /
-      2.0;
+    const f: f32 = (3.0 - (this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w)) / 2.0;
     if (f == 0) {
       this.x = 0;
       this.y = 0;
@@ -282,7 +277,7 @@ export class Quaternion {
    * @param {Vec3} target Optional
    * @return {Vec3}
    */
-  vmult(v: Vec3, target = new Vec3()): Vec3 {
+  vmult(v: Vec3, target: Vec3 = new Vec3()): Vec3 {
     const x = v.x,
       y = v.y,
       z = v.z;
@@ -437,7 +432,7 @@ export class Quaternion {
    * @param {Quaternion} [target] A quaternion to store the result in. If not provided, a new one will be created.
    * @returns {Quaternion} The "target" object
    */
-  slerp(toQuat: Quaternion, t: f32, target = new Quaternion()) {
+  slerp(toQuat: Quaternion, t: f32, target: Quaternion = new Quaternion()): Quaternion {
     let ax = this.x,
       ay = this.y,
       az = this.z,
@@ -492,12 +487,7 @@ export class Quaternion {
    * @param  {Quaternion} target
    * @return {Quaternion} The "target" object
    */
-  integrate(
-    angularVelocity: Vec3,
-    dt: f32,
-    angularFactor: Vec3,
-    target = new Quaternion()
-  ): Quaternion {
+  integrate(angularVelocity: Vec3, dt: f32, angularFactor: Vec3, target: Quaternion = new Quaternion()): Quaternion {
     const ax = angularVelocity.x * angularFactor.x,
       ay = angularVelocity.y * angularFactor.y,
       az = angularVelocity.z * angularFactor.z,

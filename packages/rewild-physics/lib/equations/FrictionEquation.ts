@@ -27,7 +27,7 @@ export class FrictionEquation extends Equation {
     this.t = new Vec3(); // tangent
   }
 
-  computeB(h: f32): f32 {
+  computeB(h: f32, bParam: f32 = 0, hParam: f32 = 0): f32 {
     // const a = this.a,
     const b = this.b,
       // bi = this.bi,

@@ -64,13 +64,8 @@ export class Line3 {
     return t;
   }
 
-  closestPointToPoint(point: Vector3, clampToLine: boolean, target: Vector3): Vector3 {
+  closestPointToPoint(point: Vector3, clampToLine: boolean, target: Vector3 = new Vector3()): Vector3 {
     const t = this.closestPointToPointParameter(point, clampToLine);
-
-    if (target === undefined) {
-      console.warn("THREE.Line3: .closestPointToPoint() target is now required");
-      target = new Vector3();
-    }
 
     return this.delta(target).multiplyScalar(t).add(this.start);
   }

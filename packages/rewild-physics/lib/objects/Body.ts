@@ -149,18 +149,12 @@ export class Body extends EventDispatcher {
     /**
      * @property {Number} collisionFilterGroup
      */
-    this.collisionFilterGroup =
-      typeof options.collisionFilterGroup === "number"
-        ? options.collisionFilterGroup
-        : 1;
+    this.collisionFilterGroup = typeof options.collisionFilterGroup === "number" ? options.collisionFilterGroup : 1;
 
     /**
      * @property {Number} collisionFilterMask
      */
-    this.collisionFilterMask =
-      typeof options.collisionFilterMask === "number"
-        ? options.collisionFilterMask
-        : -1;
+    this.collisionFilterMask = typeof options.collisionFilterMask === "number" ? options.collisionFilterMask : -1;
 
     /**
      * Whether to produce contact forces when in contact with other bodies. Note that contacts will be generated, but they will be disabled.
@@ -249,8 +243,7 @@ export class Body extends EventDispatcher {
      * @property linearDamping
      * @type {Number}
      */
-    this.linearDamping =
-      typeof options.linearDamping === "number" ? options.linearDamping : 0.01;
+    this.linearDamping = typeof options.linearDamping === "number" ? options.linearDamping : 0.01;
 
     /**
      * One of: Body.DYNAMIC, Body.STATIC and Body.KINEMATIC.
@@ -468,7 +461,7 @@ export class Body extends EventDispatcher {
    * @param {Body} body The body that was involved in the collision.
    * @param {ContactEquation} contact The details of the collision.
    */
-  static COLLIDE_EVENT_NAME = "collide";
+  static COLLIDE_EVENT_NAME: string = "collide";
 
   /**
    * A dynamic body is fully simulated. Can be moved manually by the user, but normally they move according to forces. A dynamic body can collide with all body types. A dynamic body always has finite, non-zero mass.
@@ -521,7 +514,7 @@ export class Body extends EventDispatcher {
    * Dispatched after a sleeping body has woken up.
    * @event wakeup
    */
-  static wakeupEvent = new Event("wakeup");
+  static wakeupEvent: Event = new Event("wakeup");
 
   /**
    * Wake the body up.
@@ -551,13 +544,13 @@ export class Body extends EventDispatcher {
    * Dispatched after a body has gone in to the sleepy state.
    * @event sleepy
    */
-  static sleepyEvent = new Event("sleepy");
+  static sleepyEvent: Event = new Event("sleepy");
 
   /**
    * Dispatched after a body has fallen asleep.
    * @event sleep
    */
-  static sleepEvent = new Event("sleep");
+  static sleepEvent: Event = new Event("sleep");
 
   /**
    * Called every timestep to update internal sleep timer and change sleep state if needed.
@@ -573,15 +566,9 @@ export class Body extends EventDispatcher {
         this.sleepState = Body.SLEEPY; // Sleepy
         this.timeLastSleepy = time;
         this.dispatchEvent(Body.sleepyEvent);
-      } else if (
-        sleepState === Body.SLEEPY &&
-        speedSquared > speedLimitSquared
-      ) {
+      } else if (sleepState === Body.SLEEPY && speedSquared > speedLimitSquared) {
         this.wakeUp(); // Wake up
-      } else if (
-        sleepState === Body.SLEEPY &&
-        time - this.timeLastSleepy > this.sleepTimeLimit
-      ) {
+      } else if (sleepState === Body.SLEEPY && time - this.timeLastSleepy > this.sleepTimeLimit) {
         this.sleep(); // Sleeping
         this.dispatchEvent(Body.sleepEvent);
       }
@@ -662,11 +649,7 @@ export class Body extends EventDispatcher {
    * @param {Quaternion} [_orientation]
    * @return {Body} The body object, for chainability.
    */
-  addShape(
-    shape: Shape,
-    _offset: Vec3 | null = null,
-    _orientation: Quaternion | null = null
-  ): Body {
+  addShape(shape: Shape, _offset: Vec3 | null = null, _orientation: Quaternion | null = null): Body {
     const offset = new Vec3();
     const orientation = new Quaternion();
 
@@ -740,12 +723,7 @@ export class Body extends EventDispatcher {
       shapeOrientations[i].mult(bodyQuat, orientation);
 
       // Get shape AABB
-      shape.calculateWorldAABB(
-        offset,
-        orientation,
-        shapeAABB.lowerBound,
-        shapeAABB.upperBound
-      );
+      shape.calculateWorldAABB(offset, orientation, shapeAABB.lowerBound, shapeAABB.upperBound);
 
       if (i === 0) {
         aabb.copy(shapeAABB);
@@ -937,10 +915,7 @@ export class Body extends EventDispatcher {
     this.previousPosition.copy(this.position);
     this.previousQuaternion.copy(this.quaternion);
 
-    if (
-      !(this.type === Body.DYNAMIC || this.type === Body.KINEMATIC) ||
-      this.sleepState === Body.SLEEPING
-    ) {
+    if (!(this.type === Body.DYNAMIC || this.type === Body.KINEMATIC) || this.sleepState === Body.SLEEPING) {
       // Only for dynamic
       return;
     }

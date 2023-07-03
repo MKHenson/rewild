@@ -142,7 +142,7 @@ export class Mat3 {
    * @param {Vec3} v
    * @return {Mat3} The result.
    */
-  scale(v: Vec3, target = new Mat3()) {
+  scale(v: Vec3, target: Mat3 = new Mat3()): Mat3 {
     target = target || new Mat3();
     const e = this.elements,
       t = target.elements;
@@ -162,7 +162,7 @@ export class Mat3 {
    * @return {Vec3} The solution x
    * @todo should reuse arrays
    */
-  solve(b: Vec3, target = new Vec3()): Vec3 {
+  solve(b: Vec3, target: Vec3 = new Vec3()): Vec3 {
     target = target || new Vec3();
 
     // Construct equations
@@ -211,8 +211,7 @@ export class Mat3 {
           do {
             // do ligne( k ) = ligne( k ) - multiplier * ligne( i )
             p = kp - np;
-            eqns[p + nc * j] =
-              p <= i ? 0 : eqns[p + nc * j] - eqns[p + nc * i] * multiplier;
+            eqns[p + nc * j] = p <= i ? 0 : eqns[p + nc * j] - eqns[p + nc * i] * multiplier;
           } while (--np);
         }
       }
@@ -220,13 +219,8 @@ export class Mat3 {
 
     // Get the solution
     target.z = eqns[2 * nc + 3] / eqns[2 * nc + 2];
-    target.y =
-      (eqns[1 * nc + 3] - eqns[1 * nc + 2] * target.z) / eqns[1 * nc + 1];
-    target.x =
-      (eqns[0 * nc + 3] -
-        eqns[0 * nc + 2] * target.z -
-        eqns[0 * nc + 1] * target.y) /
-      eqns[0 * nc + 0];
+    target.y = (eqns[1 * nc + 3] - eqns[1 * nc + 2] * target.z) / eqns[1 * nc + 1];
+    target.x = (eqns[0 * nc + 3] - eqns[0 * nc + 2] * target.z - eqns[0 * nc + 1] * target.y) / eqns[0 * nc + 0];
 
     if (
       isNaN(target.x) ||
@@ -355,8 +349,7 @@ export class Mat3 {
           do {
             // do line( k ) = line( k ) - multiplier * line( i )
             p = kp - np;
-            eqns[p + nc * j] =
-              p <= i ? 0 : eqns[p + nc * j] - eqns[p + nc * i] * multiplier;
+            eqns[p + nc * j] = p <= i ? 0 : eqns[p + nc * j] - eqns[p + nc * i] * multiplier;
           } while (--np);
         }
       }
