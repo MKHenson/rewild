@@ -56,7 +56,9 @@ export class NoiseSimplex implements INoise {
     for (let i = 0; i < 256; i++) {
       const j = Mathf.floor(random.next() * (i + 1));
 
-      [p[i], p[j]] = [p[j], p[i]];
+      // [p[i], p[j]] = [p[j], p[i]];
+      p[i] = p[j];
+      p[j] = p[i];
     }
     for (let i = 0; i < 512; i++) {
       perm[i] = p[i & 255];

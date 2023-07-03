@@ -60,7 +60,7 @@ export class ContactEquation extends Equation {
     this.sj = null;
   }
 
-  computeB(h: f32): f32 {
+  computeB(h: f32, bParam: f32 = 0, hParam: f32 = 0): f32 {
     const a = this.a,
       b = this.b,
       bi = this.bi,
@@ -103,8 +103,7 @@ export class ContactEquation extends Equation {
 
     // Compute iteration
     const ePlusOne = this.restitution + 1;
-    const GW =
-      ePlusOne * vj.dot(n) - ePlusOne * vi.dot(n) + wj.dot(rjxn) - wi.dot(rixn);
+    const GW = ePlusOne * vj.dot(n) - ePlusOne * vi.dot(n) + wj.dot(rjxn) - wi.dot(rixn);
     const GiMf = this.computeGiMf();
 
     const B = -g * a - GW * b - h * GiMf;

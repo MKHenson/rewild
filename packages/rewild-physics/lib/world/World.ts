@@ -258,12 +258,7 @@ export class World extends EventDispatcher {
      * @property defaultContactMaterial
      * @type {ContactMaterial}
      */
-    this.defaultContactMaterial = new ContactMaterial(
-      this.defaultMaterial,
-      this.defaultMaterial,
-      0.3,
-      0.0
-    );
+    this.defaultContactMaterial = new ContactMaterial(this.defaultMaterial, this.defaultMaterial, 0.3, 0.0);
 
     /**
      * @property doProfiling
@@ -419,12 +414,7 @@ export class World extends EventDispatcher {
    * @param  {Function} callback
    * @return {boolean} True if any body was hit.
    */
-  raycastAll(
-    from: Vec3,
-    to: Vec3,
-    options: IntersectionOptions,
-    callback: Callback | null = null
-  ): boolean {
+  raycastAll(from: Vec3, to: Vec3, options: IntersectionOptions, callback: Callback | null = null): boolean {
     options.mode = Ray.ALL;
     options.from = from;
     options.to = to;
@@ -445,12 +435,7 @@ export class World extends EventDispatcher {
    * @param  {RaycastResult} result
    * @return {boolean} True if any body was hit.
    */
-  raycastAny(
-    from: Vec3,
-    to: Vec3,
-    options: IntersectionOptions,
-    result: RaycastResult
-  ) {
+  raycastAny(from: Vec3, to: Vec3, options: IntersectionOptions, result: RaycastResult): boolean {
     options.mode = Ray.ANY;
     options.from = from;
     options.to = to;
@@ -471,12 +456,7 @@ export class World extends EventDispatcher {
    * @param  {RaycastResult} result
    * @return {boolean} True if any body was hit.
    */
-  raycastClosest(
-    from: Vec3,
-    to: Vec3,
-    options: IntersectionOptions,
-    result: RaycastResult
-  ) {
+  raycastClosest(from: Vec3, to: Vec3, options: IntersectionOptions, result: RaycastResult): boolean {
     options.mode = Ray.CLOSEST;
     options.from = from;
     options.to = to;
@@ -559,11 +539,7 @@ export class World extends EventDispatcher {
     this.contactmaterials.push(cmat);
 
     // Add current contact material to the material table
-    this.contactMaterialTable.set(
-      cmat.materials[0].id,
-      cmat.materials[1].id,
-      cmat
-    );
+    this.contactMaterialTable.set(cmat.materials[0].id, cmat.materials[1].id, cmat);
   }
 
   /**
@@ -630,7 +606,7 @@ export class World extends EventDispatcher {
       doProfiling = this.doProfiling,
       profile = this.profile,
       DYNAMIC = Body.DYNAMIC,
-      profilingStart = 0,
+      profilingStart: f64 = 0,
       constraints = this.constraints,
       frictionEquationPool = World_step_frictionEquationPool,
       // gnorm = gravity.norm(),
@@ -657,11 +633,7 @@ export class World extends EventDispatcher {
     }
 
     // Update subsystems
-    for (
-      let i: i32 = 0, Nsubsystems = this.subsystems.length;
-      i !== Nsubsystems;
-      i++
-    ) {
+    for (let i: i32 = 0, Nsubsystems = this.subsystems.length; i !== Nsubsystems; i++) {
       this.subsystems[i].update();
     }
 
@@ -673,7 +645,7 @@ export class World extends EventDispatcher {
     p2.length = 0;
     this.broadphase.collisionPairs(this, p1, p2);
     if (doProfiling) {
-      profile.broadphase = performance.now() - profilingStart;
+      profile.broadphase = f32(performance.now() - profilingStart);
     }
 
     // Remove constrained pairs with collideConnected == false
@@ -682,10 +654,7 @@ export class World extends EventDispatcher {
       const c = constraints[i];
       if (!c.collideConnected) {
         for (let j: i32 = p1.length - 1; j >= 0; j -= 1) {
-          if (
-            (c.bodyA === p1[j] && c.bodyB === p2[j]) ||
-            (c.bodyB === p1[j] && c.bodyA === p2[j])
-          ) {
+          if ((c.bodyA === p1[j] && c.bodyB === p2[j]) || (c.bodyB === p1[j] && c.bodyA === p2[j])) {
             p1.splice(j, 1);
             p2.splice(j, 1);
           }
@@ -725,7 +694,7 @@ export class World extends EventDispatcher {
     );
 
     if (doProfiling) {
-      profile.narrowphase = performance.now() - profilingStart;
+      profile.narrowphase = f32(performance.now() - profilingStart);
     }
 
     // Loop over all collisions
@@ -768,8 +737,8 @@ export class World extends EventDispatcher {
         // mu = bi.material.friction * bj.material.friction;
         // }
 
-        if (bi.material.restitution >= 0 && bj.material.restitution >= 0) {
-          c.restitution = bi.material.restitution * bj.material.restitution;
+        if (bi.material!.restitution >= 0 && bj.material!.restitution >= 0) {
+          c.restitution = bi.material!.restitution * bj.material!.restitution;
         }
       }
 
@@ -869,7 +838,7 @@ export class World extends EventDispatcher {
     this.emitContactEvents();
 
     if (doProfiling) {
-      profile.makeContactConstraints = performance.now() - profilingStart;
+      profile.makeContactConstraints = f32(performance.now() - profilingStart);
       profilingStart = performance.now();
     }
 
@@ -897,7 +866,7 @@ export class World extends EventDispatcher {
     solver.solve(dt, this.bodies);
 
     if (doProfiling) {
-      profile.solve = performance.now() - profilingStart;
+      profile.solve = f32(performance.now() - profilingStart);
     }
 
     // Remove all contacts from solver
@@ -948,7 +917,7 @@ export class World extends EventDispatcher {
     this.broadphase.dirty = true;
 
     if (doProfiling) {
-      profile.integrate = performance.now() - profilingStart;
+      profile.integrate = f32(performance.now() - profilingStart);
     }
 
     // Update world time
@@ -1022,11 +991,8 @@ export class World extends EventDispatcher {
         beginShapeContactEvent.bodyB = shapeB ? shapeB.body : null;
         this.dispatchEvent(beginShapeContactEvent);
       }
-      beginShapeContactEvent.bodyA =
-        beginShapeContactEvent.bodyB =
-        beginShapeContactEvent.shapeA =
-        beginShapeContactEvent.shapeB =
-          null;
+      beginShapeContactEvent.bodyA = beginShapeContactEvent.bodyB = null;
+      beginShapeContactEvent.shapeA = beginShapeContactEvent.shapeB = null;
     }
 
     if (hasEndShapeContact) {
@@ -1039,11 +1005,8 @@ export class World extends EventDispatcher {
         endShapeContactEvent.bodyB = shapeB ? shapeB.body : null;
         this.dispatchEvent(endShapeContactEvent);
       }
-      endShapeContactEvent.bodyA =
-        endShapeContactEvent.bodyB =
-        endShapeContactEvent.shapeA =
-        endShapeContactEvent.shapeB =
-          null;
+      endShapeContactEvent.bodyA = endShapeContactEvent.bodyB = null;
+      endShapeContactEvent.shapeA = endShapeContactEvent.shapeB = null;
     }
   }
 

@@ -24,7 +24,7 @@ export class Solver {
    * @param  {World} world
    */
 
-  solve(dt: f32, worldBodies: Body[]): f32 {
+  solve(dt: f32, worldBodies: Body[]): i32 {
     // Should return the number of iterations done!
     return 0;
   }

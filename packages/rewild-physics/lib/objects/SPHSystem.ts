@@ -103,7 +103,7 @@ export class SPHSystem {
     }
   }
 
-  update() {
+  update(): void {
     const N = this.particles.length,
       dist = SPHSystem_update_dist,
       cs = this.speedOfSound,
@@ -180,12 +180,7 @@ export class SPHSystem {
 
         // Viscosity contribution
         neighbor.velocity.vsub(particle.velocity, u);
-        u.mult(
-          (1.0 / (0.0001 + this.densities[i] * this.densities[j])) *
-            this.viscosity *
-            neighbor.mass,
-          u
-        );
+        u.mult((1.0 / (0.0001 + this.densities[i] * this.densities[j])) * this.viscosity * neighbor.mass, u);
         nabla = this.nablaw(r);
         u.mult(nabla, u);
         // Add to viscosity acceleration
@@ -206,30 +201,20 @@ export class SPHSystem {
   w(r: f32): f32 {
     // 315
     const h = this.smoothingRadius;
-    return (
-      (315.0 / (64.0 * Mathf.PI * Mathf.pow(h, 9))) *
-      Mathf.pow(h * h - r * r, 3)
-    );
+    return (315.0 / (64.0 * Mathf.PI * Mathf.pow(h, 9))) * Mathf.pow(h * h - r * r, 3);
   }
 
   // calculate gradient of the weight function
   gradw(rVec: Vec3, resultVec: Vec3): void {
     const r = rVec.norm(),
       h = this.smoothingRadius;
-    rVec.mult(
-      (945.0 / (32.0 * Mathf.PI * Mathf.pow(h, 9))) *
-        Mathf.pow(h * h - r * r, 2),
-      resultVec
-    );
+    rVec.mult((945.0 / (32.0 * Mathf.PI * Mathf.pow(h, 9))) * Mathf.pow(h * h - r * r, 2), resultVec);
   }
 
   // Calculate nabla(W)
   nablaw(r: f32): f32 {
     const h = this.smoothingRadius;
-    const nabla =
-      (945.0 / (32.0 * Mathf.PI * Mathf.pow(h, 9))) *
-      (h * h - r * r) *
-      (7 * r * r - 3 * h * h);
+    const nabla = (945.0 / (32.0 * Mathf.PI * Mathf.pow(h, 9))) * (h * h - r * r) * (7 * r * r - 3 * h * h);
     return nabla;
   }
 }

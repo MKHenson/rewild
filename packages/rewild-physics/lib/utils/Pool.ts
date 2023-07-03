@@ -1,7 +1,6 @@
 export abstract class Pool<T> {
   static idCounter: i32 = 0;
   objects: Array<T>;
-  type: any;
 
   /**
    * For pooling objects that can be reused.
@@ -14,12 +13,6 @@ export abstract class Pool<T> {
      * @property {Array} objects
      */
     this.objects = [];
-
-    /**
-     * Constructor of the objects
-     * @property {mixed} type
-     */
-    this.type = Object;
   }
 
   /**

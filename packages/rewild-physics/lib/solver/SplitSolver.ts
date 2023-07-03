@@ -12,7 +12,7 @@ const SplitSolver_solve_dummyWorld: Body[] = []; // { bodies: [] }; // Temp obje
 
 const STATIC = Body.STATIC;
 
-function getUnvisitedNode(nodes: SolverNode[]) {
+function getUnvisitedNode(nodes: SolverNode[]): SolverNode | null {
   const Nnodes = nodes.length;
   for (let i: i32 = 0; i !== Nnodes; i++) {
     const node = nodes[i];
@@ -27,7 +27,7 @@ const queue: SolverNode[] = [];
 
 type VisitFunc = (node: SolverNode, bds: Body[], eqs: Equation[]) => void;
 
-function bfs(root: SolverNode, visitFunc: VisitFunc, bds: Body[], eqs: Equation[]) {
+function bfs(root: SolverNode, visitFunc: VisitFunc, bds: Body[], eqs: Equation[]): void {
   queue.push(root);
   root.visited = true;
   visitFunc(root, bds, eqs);
@@ -95,7 +95,7 @@ export class SplitSolver extends Solver {
     }
   }
 
-  createNode() {
+  createNode(): SolverNode {
     return new SolverNode();
   }
 

@@ -28,7 +28,7 @@ export class Sphere extends Shape {
     this.updateBoundingSphereRadius();
   }
 
-  calculateLocalInertia(mass: f32, target = new Vec3()): Vec3 {
+  calculateLocalInertia(mass: f32, target: Vec3 = new Vec3()): Vec3 {
     const I = (2.0 * mass * this.radius * this.radius) / 5.0;
     target.x = I;
     target.y = I;

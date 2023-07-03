@@ -20,6 +20,7 @@ declare namespace f32 {
 
 declare namespace i32 {
   export const MAX_VALUE: number;
+  export const NaN: number;
 }
 
 declare const Mathf: typeof Math;

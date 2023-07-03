@@ -47,12 +47,12 @@ export class GSSolver extends Solver {
       Nbodies = bodies.length,
       h = dt,
       // q,
-      B,
-      invC,
-      deltalambda,
-      deltalambdaTot,
-      GWlambda,
-      lambdaj;
+      B: f32,
+      invC: f32,
+      deltalambda: f32,
+      deltalambdaTot: f32,
+      GWlambda: f32,
+      lambdaj: f32;
 
     // Update solve mass
     if (Neq !== 0) {
@@ -135,7 +135,7 @@ export class GSSolver extends Solver {
 
       // Set the .multiplier property of each equation
       let l = equations.length;
-      const invDt = 1 / h;
+      const invDt: f32 = 1 / h;
       while (l--) {
         equations[l].multiplier = lambda[l] * invDt;
       }

@@ -10,7 +10,8 @@
     "clean": "rimraf build",
     "ts-check": "npx tsc --noEmit --project ./tsconfig.json",
     "build": "npm run clean && node ./esbuild.js && npm run ts-check",
-    "server": "live-server --port=9001 --entry-file=index.html"
+    "server": "live-server --port=9001 --entry-file=index.html",
+    "watch": "nodemon -e js,ts,tsx --watch lib/ -x \"npm run build\""
   },
   "repository": {
     "type": "git",

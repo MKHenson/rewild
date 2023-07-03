@@ -26,15 +26,15 @@ export class Particle extends Shape {
     return target;
   }
 
-  volume = function () {
+  volume(): i32 {
     return 0;
-  };
+  }
 
-  updateBoundingSphereRadius() {
+  updateBoundingSphereRadius(): void {
     this.boundingSphereRadius = 0;
   }
 
-  calculateWorldAABB(pos: Vec3, quat: Quaternion, min: Vec3, max: Vec3) {
+  calculateWorldAABB(pos: Vec3, quat: Quaternion, min: Vec3, max: Vec3): void {
     // Get each axis max
     min.copy(pos);
     max.copy(pos);

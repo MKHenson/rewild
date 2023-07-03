@@ -60,33 +60,17 @@ export class HingeConstraint extends PointToPointConstraint {
     /**
      * @property {RotationalEquation} rotationalEquation1
      */
-    const r1 = (this.rotationalEquation1 = new RotationalEquation(
-      bodyA,
-      bodyB,
-      axA,
-      axB,
-      maxForce
-    ));
+    const r1 = (this.rotationalEquation1 = new RotationalEquation(bodyA, bodyB, axA, axB, maxForce));
 
     /**
      * @property {RotationalEquation} rotationalEquation2
      */
-    const r2 = (this.rotationalEquation2 = new RotationalEquation(
-      bodyA,
-      bodyB,
-      axisA,
-      axB,
-      maxForce
-    ));
+    const r2 = (this.rotationalEquation2 = new RotationalEquation(bodyA, bodyB, axisA, axB, maxForce));
 
     /**
      * @property {RotationalMotorEquation} motorEquation
      */
-    const motor = (this.motorEquation = new RotationalMotorEquation(
-      bodyA,
-      bodyB,
-      maxForce
-    ));
+    const motor = (this.motorEquation = new RotationalMotorEquation(bodyA, bodyB, maxForce));
     motor.enabled = false; // Not enabled by default
 
     // Equations to be fed to the solver
@@ -98,7 +82,7 @@ export class HingeConstraint extends PointToPointConstraint {
   /**
    * @method enableMotor
    */
-  enableMotor() {
+  enableMotor(): void {
     this.motorEquation.enabled = true;
   }
 

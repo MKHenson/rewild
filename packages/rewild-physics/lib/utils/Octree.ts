@@ -47,7 +47,7 @@ export class OctreeNode {
     this.children = [];
   }
 
-  reset() {
+  reset(): void {
     this.children.length = this.data.length = 0;
   }
 
@@ -206,7 +206,7 @@ export class OctreeNode {
   /**
    * @method removeEmptyNodes
    */
-  removeEmptyNodes() {
+  removeEmptyNodes(): void {
     const queue: OctreeNode[] = [this];
     while (queue.length) {
       const node = queue.pop()!;
