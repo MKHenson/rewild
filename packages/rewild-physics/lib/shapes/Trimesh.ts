@@ -6,20 +6,20 @@ import { Vec3 } from "../math/Vec3";
 import { Octree } from "../utils/Octree";
 import { Shape } from "./Shape";
 
-const computeNormals_n = new Vec3();
-const unscaledAABB = new AABB();
-const getEdgeVector_va = new Vec3();
-const getEdgeVector_vb = new Vec3();
-const cb = new Vec3();
-const ab = new Vec3();
-const va = new Vec3();
-const vb = new Vec3();
-const vc = new Vec3();
-const cli_aabb = new AABB();
-const computeLocalAABB_worldVert = new Vec3();
+const computeNormals_n: Vec3 = new Vec3();
+const unscaledAABB: AABB = new AABB();
+const getEdgeVector_va: Vec3 = new Vec3();
+const getEdgeVector_vb: Vec3 = new Vec3();
+const cb: Vec3 = new Vec3();
+const ab: Vec3 = new Vec3();
+const va: Vec3 = new Vec3();
+const vb: Vec3 = new Vec3();
+const vc: Vec3 = new Vec3();
+const cli_aabb: AABB = new AABB();
+const computeLocalAABB_worldVert: Vec3 = new Vec3();
 // const tempWorldVertex = new Vec3();
-const calculateWorldAABB_frame = new Transform();
-const calculateWorldAABB_aabb = new AABB();
+const calculateWorldAABB_frame: Transform = new Transform();
+const calculateWorldAABB_aabb: AABB = new AABB();
 
 export class Trimesh extends Shape {
   vertices: Float32Array;
@@ -177,8 +177,10 @@ export class Trimesh extends Shape {
    * @param {Vec3} scale
    */
   setScale(scale: Vec3): void {
-    const wasUniform: boolean = this.scale.x === this.scale.y && this.scale.y === this.scale.z; // (this.scale.x === this.scale.y) === this.scale.z;
-    const isUniform = this.scale.x === this.scale.y && this.scale.x === this.scale.z; // (scale.x === scale.y) === scale.z;
+    const wasUniform: boolean =
+      this.scale.x === this.scale.y && this.scale.y === this.scale.z; // (this.scale.x === this.scale.y) === this.scale.z;
+    const isUniform =
+      this.scale.x === this.scale.y && this.scale.x === this.scale.z; // (scale.x === scale.y) === scale.z;
 
     if (!(wasUniform && isUniform)) {
       // Non-uniform scaling. Need to update normals.
@@ -218,7 +220,10 @@ export class Trimesh extends Shape {
   }
 
   private static add(a: i32, b: i32, edges: Map<string, boolean>): void {
-    const key = a < b ? a.toString() + "_" + b.toString() : b.toString() + "_" + a.toString();
+    const key =
+      a < b
+        ? a.toString() + "_" + b.toString()
+        : b.toString() + "_" + a.toString();
     edges.set(key, true);
   }
 
@@ -363,7 +368,11 @@ export class Trimesh extends Shape {
    */
   getNormal(i: i32, target: Vec3): Vec3 {
     const i3 = i * 3;
-    return target.set(this.normals[i3], this.normals[i3 + 1], this.normals[i3 + 2]);
+    return target.set(
+      this.normals[i3],
+      this.normals[i3 + 1],
+      this.normals[i3 + 2]
+    );
   }
 
   /**

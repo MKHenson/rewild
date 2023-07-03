@@ -15,11 +15,15 @@ const tmpAABB = new AABB();
 export class OctreeNode {
   root: OctreeNode | null;
   aabb: AABB;
-  data: any[];
+  data: i32[];
   children: OctreeNode[];
   maxDepth: i32 = 8;
 
-  constructor(root: OctreeNode | null = null, aabb: AABB | null = null, maxDepth: i32 = 8) {
+  constructor(
+    root: OctreeNode | null = null,
+    aabb: AABB | null = null,
+    maxDepth: i32 = 8
+  ) {
     /**
      * The root node
      * @property {OctreeNode} root
@@ -168,7 +172,7 @@ export class OctreeNode {
 
     const queue: OctreeNode[] = [this];
     while (queue.length) {
-      const node = queue.pop()!;
+      const node = queue.pop() as OctreeNode;
       if (node.aabb.overlaps(aabb)) {
         // Array.prototype.push.apply(result, node.data);
         for (let i: i32 = 0; i < node.data.length; i++) {

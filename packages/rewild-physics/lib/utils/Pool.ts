@@ -42,7 +42,7 @@ export abstract class Pool<T> {
     if (this.objects.length === 0) {
       return this.constructObject();
     } else {
-      return this.objects.pop()!;
+      return this.objects.pop() as T;
     }
   }
 

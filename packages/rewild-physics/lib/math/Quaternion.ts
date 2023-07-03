@@ -157,7 +157,8 @@ export class Quaternion {
       this.x = a.x;
       this.y = a.y;
       this.z = a.z;
-      this.w = Mathf.sqrt(Mathf.pow(u.norm(), 2) * Mathf.pow(v.norm(), 2)) + u.dot(v);
+      this.w =
+        Mathf.sqrt(Mathf.pow(u.norm(), 2) * Mathf.pow(v.norm(), 2)) + u.dot(v);
       this.normalize();
     }
     return this;
@@ -218,7 +219,7 @@ export class Quaternion {
    * @param {Quaternion} target
    * @return {Quaternion}
    */
-  conjugate(target = new Quaternion()): Quaternion {
+  conjugate(target: Quaternion = new Quaternion()): Quaternion {
     target.x = -this.x;
     target.y = -this.y;
     target.z = -this.z;
@@ -232,7 +233,9 @@ export class Quaternion {
    * @method normalize
    */
   normalize(): Quaternion {
-    let l = Mathf.sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
+    let l = Mathf.sqrt(
+      this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w
+    );
     if (l == 0) {
       this.x = 0;
       this.y = 0;
@@ -255,7 +258,13 @@ export class Quaternion {
    * @author unphased, https://github.com/unphased
    */
   normalizeFast(): Quaternion {
-    const f: f32 = (3.0 - (this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w)) / 2.0;
+    const f: f32 =
+      (3.0 -
+        (this.x * this.x +
+          this.y * this.y +
+          this.z * this.z +
+          this.w * this.w)) /
+      2.0;
     if (f == 0) {
       this.x = 0;
       this.y = 0;
@@ -432,7 +441,11 @@ export class Quaternion {
    * @param {Quaternion} [target] A quaternion to store the result in. If not provided, a new one will be created.
    * @returns {Quaternion} The "target" object
    */
-  slerp(toQuat: Quaternion, t: f32, target: Quaternion = new Quaternion()): Quaternion {
+  slerp(
+    toQuat: Quaternion,
+    t: f32,
+    target: Quaternion = new Quaternion()
+  ): Quaternion {
     let ax = this.x,
       ay = this.y,
       az = this.z,
@@ -487,7 +500,12 @@ export class Quaternion {
    * @param  {Quaternion} target
    * @return {Quaternion} The "target" object
    */
-  integrate(angularVelocity: Vec3, dt: f32, angularFactor: Vec3, target: Quaternion = new Quaternion()): Quaternion {
+  integrate(
+    angularVelocity: Vec3,
+    dt: f32,
+    angularFactor: Vec3,
+    target: Quaternion = new Quaternion()
+  ): Quaternion {
     const ax = angularVelocity.x * angularFactor.x,
       ay = angularVelocity.y * angularFactor.y,
       az = angularVelocity.z * angularFactor.z,
