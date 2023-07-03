@@ -23,6 +23,8 @@ declare namespace i32 {
   export const NaN: number;
 }
 
+declare function changetype<T>(val: any): T;
+
 declare const Mathf: typeof Math;
 
 declare function unchecked(val: any): any;

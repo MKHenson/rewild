@@ -27,7 +27,7 @@ export class AABB {
    * @param {Vec3}   [options.upperBound]
    * @param {Vec3}   [options.lowerBound]
    */
-  constructor(lowerBound = new Vec3(), upperBound = new Vec3()) {
+  constructor(lowerBound: Vec3 = new Vec3(), upperBound: Vec3 = new Vec3()) {
     this.lowerBound = lowerBound;
     this.upperBound = upperBound;
   }

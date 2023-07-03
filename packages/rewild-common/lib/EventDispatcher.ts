@@ -53,7 +53,9 @@ export class EventDispatcher extends EventTargetable {
    */
   hasAnyEventListener(type: string): bool {
     const listeners = this._listeners;
-    return listeners.has(type) && listeners.get(type)!.length > 0;
+    return (
+      listeners.has(type) && (listeners.get(type) as ListenerArray).length > 0
+    );
   }
 
   /**
