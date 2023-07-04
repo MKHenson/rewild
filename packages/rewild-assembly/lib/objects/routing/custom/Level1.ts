@@ -104,10 +104,10 @@ export class Level1 extends Container implements Listener {
     physicsWorldOptions.gravity.set(0, 0, this.gravity);
 
     this.world = new World(physicsWorldOptions);
-    this.world.broadphase = new NaiveBroadphase();
-    (this.world.solver as GSSolver).iterations = 10;
-    this.world.defaultContactMaterial.contactEquationStiffness = 1e7;
-    this.world.defaultContactMaterial.contactEquationRelaxation = 4;
+    this.world!.broadphase = new NaiveBroadphase();
+    (this.world!.solver as GSSolver).iterations = 10;
+    this.world!.defaultContactMaterial.contactEquationStiffness = 1e7;
+    this.world!.defaultContactMaterial.contactEquationRelaxation = 4;
   }
 
   updatePhysics(): void {
@@ -299,7 +299,7 @@ export class Level1 extends Container implements Listener {
       .setShape(new Sphere(1))
       .setMass(30);
     this.sphereBody = new Body(sphereOptions);
-    this.world!.add(this.sphereBody);
+    this.world!.add(this.sphereBody!);
     // sphereOptions.size.set(1, 1, 1);
     // sphereOptions.move = true;
     // sphereOptions.pos.set(0, 10, 0);

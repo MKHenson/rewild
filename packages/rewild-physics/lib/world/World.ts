@@ -29,7 +29,7 @@ export class WorldOptions {
     public broadphase: Broadphase = new NaiveBroadphase(),
     public solver: Solver = new GSSolver(),
     public quatNormalizeFast: boolean = false,
-    public quatNormalizeSkip: number = 0
+    public quatNormalizeSkip: i32 = 0
   ) {}
 }
 
@@ -84,23 +84,23 @@ export class World extends EventDispatcher {
   bodies: Body[];
   solver: Solver;
   constraints: Constraint[];
-  narrowphase: Narrowphase;
-  collisionMatrix: ArrayCollisionMatrix;
-  collisionMatrixPrevious: ArrayCollisionMatrix;
-  bodyOverlapKeeper: OverlapKeeper;
-  shapeOverlapKeeper: OverlapKeeper;
-  materials: Material[];
-  contactmaterials: ContactMaterial[];
-  contactMaterialTable: TupleDictionary<ContactMaterial>;
-  defaultMaterial: Material;
-  defaultContactMaterial: ContactMaterial;
+  narrowphase!: Narrowphase;
+  collisionMatrix!: ArrayCollisionMatrix;
+  collisionMatrixPrevious!: ArrayCollisionMatrix;
+  bodyOverlapKeeper!: OverlapKeeper;
+  shapeOverlapKeeper!: OverlapKeeper;
+  materials!: Material[];
+  contactmaterials!: ContactMaterial[];
+  contactMaterialTable!: TupleDictionary<ContactMaterial>;
+  defaultMaterial!: Material;
+  defaultContactMaterial!: ContactMaterial;
   doProfiling: boolean;
-  profile: Profile;
+  profile!: Profile;
   accumulator: f32;
-  subsystems: SPHSystem[];
+  subsystems!: SPHSystem[];
   // addBodyEvent: any;
   // removeBodyEvent: any;
-  idToBodyMap: Map<i32, Body>;
+  idToBodyMap!: Map<i32, Body>;
 
   /**
    * The physics world
@@ -276,13 +276,7 @@ export class World extends EventDispatcher {
      * @property profile
      * @type {Object}
      */
-    this.profile = {
-      solve: 0,
-      makeContactConstraints: 0,
-      broadphase: 0,
-      integrate: 0,
-      narrowphase: 0,
-    };
+    this.profile = new Profile();
 
     /**
      * Time accumulator for interpolation. See http://gafferongames.com/game-physics/fix-your-timestep/

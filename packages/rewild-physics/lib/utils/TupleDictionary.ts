@@ -26,7 +26,7 @@ export class TupleDictionary<T> {
       j = i;
       i = temp;
     }
-    return this.data.get(i.toString() + "-" + j.toString())!;
+    return this.data.get(i.toString() + "-" + j.toString()) as T;
   }
 
   /**

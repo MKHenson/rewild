@@ -37,7 +37,7 @@ export class Sphere extends Shape {
   }
 
   volume(): f32 {
-    return (4.0 * Math.PI * this.radius) / 3.0;
+    return (4.0 * Mathf.PI * this.radius) / 3.0;
   }
 
   updateBoundingSphereRadius(): void {

@@ -67,7 +67,7 @@ export class ConeEquation extends Equation {
     GA.rotational.copy(njxni);
     GB.rotational.copy(nixnj);
 
-    const g = Math.cos(this.angle) - ni.dot(nj),
+    const g = Mathf.cos(this.angle) - ni.dot(nj),
       GW = this.computeGW(),
       GiMf = this.computeGiMf();
 

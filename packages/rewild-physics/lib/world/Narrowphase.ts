@@ -84,7 +84,7 @@ export class Narrowphase {
   ): ContactEquation {
     let c: ContactEquation;
     if (this.contactPointPool.length) {
-      c = this.contactPointPool.pop()!;
+      c = this.contactPointPool.pop() as ContactEquation;
       c.bi = bi;
       c.bj = bj;
     } else {
@@ -148,10 +148,10 @@ export class Narrowphase {
       }
       const pool = this.frictionEquationPool;
       const c1 = pool.length
-        ? pool.pop()!
+        ? (pool.pop() as FrictionEquation)
         : new FrictionEquation(bodyA, bodyB, mug * reducedMass);
       const c2 = pool.length
-        ? pool.pop()!
+        ? (pool.pop() as FrictionEquation)
         : new FrictionEquation(bodyA, bodyB, mug * reducedMass);
 
       c1.bi = c2.bi = bodyA;
@@ -547,8 +547,10 @@ export class Narrowphase {
       // Get contact material
       let bodyContactMaterial: ContactMaterial | null = null;
       if (bi.material && bj.material) {
-        bodyContactMaterial =
-          world.getContactMaterial(bi.material, bj.material) || null;
+        bodyContactMaterial = world.getContactMaterial(
+          bi.material!,
+          bj.material!
+        );
       }
 
       const justTest =
@@ -588,8 +590,10 @@ export class Narrowphase {
           // Get collision material
           let shapeContactMaterial: ContactMaterial | null = null;
           if (si.material && sj.material) {
-            shapeContactMaterial =
-              world.getContactMaterial(si.material, sj.material) || null;
+            shapeContactMaterial = world.getContactMaterial(
+              si.material!,
+              sj.material!
+            );
           }
 
           this.currentContactMaterial =

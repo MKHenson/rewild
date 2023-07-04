@@ -29,7 +29,7 @@ export class Box extends Shape {
    * @property convexPolyhedronRepresentation
    * @type {ConvexPolyhedron}
    */
-  convexPolyhedronRepresentation: ConvexPolyhedron;
+  convexPolyhedronRepresentation!: ConvexPolyhedron;
 
   /**
    * A 3d box shape.
@@ -56,17 +56,16 @@ export class Box extends Shape {
     const sx = this.halfExtents.x;
     const sy = this.halfExtents.y;
     const sz = this.halfExtents.z;
-    const V = Vec3;
 
-    const vertices = [
-      new V(-sx, -sy, -sz),
-      new V(sx, -sy, -sz),
-      new V(sx, sy, -sz),
-      new V(-sx, sy, -sz),
-      new V(-sx, -sy, sz),
-      new V(sx, -sy, sz),
-      new V(sx, sy, sz),
-      new V(-sx, sy, sz),
+    const vertices: Vec3[] = [
+      new Vec3(-sx, -sy, -sz),
+      new Vec3(sx, -sy, -sz),
+      new Vec3(sx, sy, -sz),
+      new Vec3(-sx, sy, -sz),
+      new Vec3(-sx, -sy, sz),
+      new Vec3(sx, -sy, sz),
+      new Vec3(sx, sy, sz),
+      new Vec3(-sx, sy, sz),
     ];
 
     const indices: i32[][] = [
@@ -138,7 +137,11 @@ export class Box extends Shape {
     this.boundingSphereRadius = this.halfExtents.norm();
   }
 
-  forEachWorldCorner(pos: Vec3, quat: Quaternion, callback: (x: f32, y: f32, z: f32) => void): void {
+  forEachWorldCorner(
+    pos: Vec3,
+    quat: Quaternion,
+    callback: (x: f32, y: f32, z: f32) => void
+  ): void {
     const e = this.halfExtents;
     const corners = [
       [e.x, e.y, e.z],
@@ -154,7 +157,11 @@ export class Box extends Shape {
       worldCornerTempPos.set(corners[i][0], corners[i][1], corners[i][2]);
       quat.vmult(worldCornerTempPos, worldCornerTempPos);
       pos.vadd(worldCornerTempPos, worldCornerTempPos);
-      callback(worldCornerTempPos.x, worldCornerTempPos.y, worldCornerTempPos.z);
+      callback(
+        worldCornerTempPos.x,
+        worldCornerTempPos.y,
+        worldCornerTempPos.z
+      );
     }
   }
 

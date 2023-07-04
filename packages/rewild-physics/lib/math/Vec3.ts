@@ -1,9 +1,9 @@
 import { Mat3 } from "./Mat3";
 
 export class Vec3 {
-  private _x: f32;
-  private _y: f32;
-  private _z: f32;
+  private x: f32;
+  private y: f32;
+  private z: f32;
   static ZERO: Vec3 = new Vec3(0, 0, 0);
   static UNIT_X: Vec3 = new Vec3(1, 0, 0);
   static UNIT_Y: Vec3 = new Vec3(0, 1, 0);
@@ -22,36 +22,36 @@ export class Vec3 {
    *     console.log('x=' + v.x); // x=1
    */
   constructor(x: f32 = 0, y: f32 = 0, z: f32 = 0) {
-    this._x = x;
-    this._y = y;
-    this._z = z;
+    this.x = x;
+    this.y = y;
+    this.z = z;
   }
 
-  get x(): f32 {
-    return this._x;
-  }
-  set x(value: f32) {
-    // if (isNaN(value))
-    //   throw new Error("Vector.x: " + value + " is not a valid number.");
+  // get x(): f32 {
+  //   return this._x;
+  // }
+  // set x(value: f32) {
+  //   // if (isNaN(value))
+  //   //   throw new Error("Vector.x: " + value + " is not a valid number.");
 
-    this._x = value;
-  }
-  get y(): f32 {
-    return this._y;
-  }
-  set y(value: f32) {
-    // if (isNaN(value))
-    //   throw new Error("Vector.y: " + value + " is not a valid number.");
-    this._y = value;
-  }
-  get z(): f32 {
-    return this._z;
-  }
-  set z(value: f32) {
-    // if (isNaN(value))
-    //   throw new Error("Vector.z: " + value + " is not a valid number.");
-    this._z = value;
-  }
+  //   this._x = value;
+  // }
+  // get y(): f32 {
+  //   return this._y;
+  // }
+  // set y(value: f32) {
+  //   // if (isNaN(value))
+  //   //   throw new Error("Vector.y: " + value + " is not a valid number.");
+  //   this._y = value;
+  // }
+  // get z(): f32 {
+  //   return this._z;
+  // }
+  // set z(value: f32) {
+  //   // if (isNaN(value))
+  //   //   throw new Error("Vector.z: " + value + " is not a valid number.");
+  //   this._z = value;
+  // }
 
   /**
    * Vector cross product
@@ -142,7 +142,17 @@ export class Vec3 {
    * @return {Mat3}
    */
   crossmat(): Mat3 {
-    return new Mat3([0, -this.z, this.y, this.z, 0, -this.x, -this.y, this.x, 0]);
+    return new Mat3([
+      0,
+      -this.z,
+      this.y,
+      this.z,
+      0,
+      -this.x,
+      -this.y,
+      this.x,
+      0,
+    ]);
   }
 
   /**
@@ -156,7 +166,7 @@ export class Vec3 {
       z = this.z;
     const n = Mathf.sqrt(x * x + y * y + z * z);
     if (n > 0.0) {
-      const invN = 1 / n;
+      const invN: f32 = 1 / n;
       this.x *= invN;
       this.y *= invN;
       this.z *= invN;
@@ -247,7 +257,9 @@ export class Vec3 {
     const px = p.x,
       py = p.y,
       pz = p.z;
-    return Mathf.sqrt((px - x) * (px - x) + (py - y) * (py - y) + (pz - z) * (pz - z));
+    return Mathf.sqrt(
+      (px - x) * (px - x) + (py - y) * (py - y) + (pz - z) * (pz - z)
+    );
   }
 
   /**
@@ -369,7 +381,7 @@ export class Vec3 {
     const norm = this.norm();
     if (norm > 0.0) {
       const n = Vec3_tangents_n;
-      const inorm = 1 / norm;
+      const inorm: f32 = 1 / norm;
       n.set(this.x * inorm, this.y * inorm, this.z * inorm);
       const randVec = Vec3_tangents_randVec;
       if (Mathf.abs(n.x) < 0.9) {
@@ -393,7 +405,9 @@ export class Vec3 {
    * @return string
    */
   toString(): string {
-    return this.x + "," + this.y + "," + this.z;
+    return (
+      this.x.toString() + "," + this.y.toString() + "," + this.z.toString()
+    );
   }
 
   /**
@@ -458,7 +472,11 @@ export class Vec3 {
    * @param {Number} precision
    */
   almostZero(precision: f32 = 1e-6): boolean {
-    if (Mathf.abs(this.x) > precision || Mathf.abs(this.y) > precision || Mathf.abs(this.z) > precision) {
+    if (
+      Mathf.abs(this.x) > precision ||
+      Mathf.abs(this.y) > precision ||
+      Mathf.abs(this.z) > precision
+    ) {
       return false;
     }
     return true;
