@@ -58,7 +58,7 @@ export class RotationalEquation extends Equation {
     GA.rotational.copy(njxni);
     GB.rotational.copy(nixnj);
 
-    const g = Math.cos(this.maxAngle) - ni.dot(nj),
+    const g = Mathf.cos(this.maxAngle) - ni.dot(nj),
       GW = this.computeGW(),
       GiMf = this.computeGiMf();
 

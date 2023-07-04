@@ -102,7 +102,6 @@ export class ConvexPolyhedron extends Shape {
      * @type {Array}
      */
     this.faceNormals = [];
-    this.computeNormals();
 
     this.worldFaceNormalsNeedsUpdate = true;
     this.worldFaceNormals = []; // World transformed version of .faceNormals
@@ -120,6 +119,7 @@ export class ConvexPolyhedron extends Shape {
      */
     this.uniqueAxes = uniqueAxes ? uniqueAxes.slice(0) : null;
 
+    this.computeNormals();
     this.computeEdges();
     this.updateBoundingSphereRadius();
   }
@@ -172,7 +172,9 @@ export class ConvexPolyhedron extends Shape {
       // Check so all vertices exists for this face
       for (let j = 0; j < this.faces[i].length; j++) {
         if (!this.vertices[this.faces[i][j]]) {
-          throw new Error("Vertex " + this.faces[i][j] + " not found!");
+          throw new Error(
+            "Vertex " + this.faces[i][j].toString() + " not found!"
+          );
         }
       }
 
@@ -184,7 +186,7 @@ export class ConvexPolyhedron extends Shape {
       if (n.dot(vertex) < 0) {
         console.error(
           ".faceNormals[" +
-            i +
+            i.toString() +
             "] = Vec3(" +
             n.toString() +
             ") looks like it points into the shape? The vertices follow. Make sure they are ordered CCW around the normal, using the right hand rule."
@@ -192,7 +194,7 @@ export class ConvexPolyhedron extends Shape {
         for (let j = 0; j < this.faces[i].length; j++) {
           console.warn(
             ".vertices[" +
-              this.faces[i][j] +
+              this.faces[i][j].toString() +
               "] = Vec3(" +
               this.vertices[this.faces[i][j]].toString() +
               ")"
@@ -835,7 +837,7 @@ export class ConvexPolyhedron extends Shape {
         max2 = norm2;
       }
     }
-    this.boundingSphereRadius = Math.sqrt(max2);
+    this.boundingSphereRadius = Mathf.sqrt(max2);
   }
 
   /**
@@ -888,7 +890,7 @@ export class ConvexPolyhedron extends Shape {
    * @return {Number}
    */
   volume(): f32 {
-    return (4.0 * Math.PI * this.boundingSphereRadius) / 3.0;
+    return (4.0 * Mathf.PI * this.boundingSphereRadius) / 3.0;
   }
 
   /**

@@ -10,10 +10,10 @@ const sfv_t1 = new Vec3(),
 // const Quaternion_mult_vb = new Vec3();
 // const Quaternion_mult_vaxvb = new Vec3();
 export class Quaternion {
-  private _x: f32;
-  private _y: f32;
-  private _z: f32;
-  private _w: f32;
+  private x: f32;
+  private y: f32;
+  private z: f32;
+  private w: f32;
 
   /**
    * A Quaternion describes a rotation in 3D space. The Quaternion is mathematically defined as Q = x*i + y*j + z*k + w, where (i,j,k) are imaginary basis vectors. (x,y,z) can be seen as a vector related to the axis of rotation, while the real multiplier, w, is related to the amount of rotation.
@@ -26,45 +26,45 @@ export class Quaternion {
    * @see http://en.wikipedia.org/wiki/Quaternion
    */
   constructor(x: f32 = 0, y: f32 = 0, z: f32 = 0, w: f32 = 1) {
-    this._x = x;
-    this._y = y;
-    this._z = z;
-    this._w = w;
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.w = w;
   }
 
-  get x(): f32 {
-    return this._x;
-  }
-  set x(value: f32) {
-    // if (isNaN(value))
-    //   throw new Error("Quaternion.x: " + value + " is not a valid number.");
+  // get x(): f32 {
+  //   return this._x;
+  // }
+  // set x(value: f32) {
+  //   // if (isNaN(value))
+  //   //   throw new Error("Quaternion.x: " + value + " is not a valid number.");
 
-    this._x = value;
-  }
-  get y(): f32 {
-    return this._y;
-  }
-  set y(value: f32) {
-    // if (isNaN(value))
-    //   throw new Error("Quaternion.y: " + value + " is not a valid number.");
-    this._y = value;
-  }
-  get z(): f32 {
-    return this._z;
-  }
-  set z(value: f32) {
-    // if (isNaN(value))
-    //   throw new Error("Quaternion.z: " + value + " is not a valid number.");
-    this._z = value;
-  }
-  get w(): f32 {
-    return this._w;
-  }
-  set w(value: f32) {
-    // if (isNaN(value))
-    //   throw new Error("Quaternion.w: " + value + " is not a valid number.");
-    this._w = value;
-  }
+  //   this._x = value;
+  // }
+  // get y(): f32 {
+  //   return this._y;
+  // }
+  // set y(value: f32) {
+  //   // if (isNaN(value))
+  //   //   throw new Error("Quaternion.y: " + value + " is not a valid number.");
+  //   this._y = value;
+  // }
+  // get z(): f32 {
+  //   return this._z;
+  // }
+  // set z(value: f32) {
+  //   // if (isNaN(value))
+  //   //   throw new Error("Quaternion.z: " + value + " is not a valid number.");
+  //   this._z = value;
+  // }
+  // get w(): f32 {
+  //   return this._w;
+  // }
+  // set w(value: f32) {
+  //   // if (isNaN(value))
+  //   //   throw new Error("Quaternion.w: " + value + " is not a valid number.");
+  //   this._w = value;
+  // }
 
   /**
    * Set the value of the quaternion.

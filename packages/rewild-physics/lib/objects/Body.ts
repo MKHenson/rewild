@@ -455,7 +455,7 @@ export class Body extends EventDispatcher {
     this.wlambda = new Vec3();
 
     if (options.shape) {
-      this.addShape(options.shape);
+      this.addShape(options.shape!);
     }
 
     this.updateMassProperties();
@@ -568,7 +568,7 @@ export class Body extends EventDispatcher {
     if (this.allowSleep) {
       const sleepState = this.sleepState;
       const speedSquared = this.velocity.norm2() + this.angularVelocity.norm2();
-      const speedLimitSquared = Math.pow(this.sleepSpeedLimit, 2);
+      const speedLimitSquared = Mathf.pow(this.sleepSpeedLimit, 2);
       if (sleepState === Body.AWAKE && speedSquared < speedLimitSquared) {
         this.sleepState = Body.SLEEPY; // Sleepy
         this.timeLastSleepy = time;

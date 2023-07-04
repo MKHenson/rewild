@@ -21,7 +21,7 @@ export class Plane extends Shape {
     this.worldNormal = new Vec3();
     this.worldNormalNeedsUpdate = true;
 
-    this.boundingSphereRadius = Number.MAX_VALUE;
+    this.boundingSphereRadius = f32.MAX_VALUE;
   }
 
   computeWorldNormal(quat: Quaternion): void {

@@ -24,8 +24,8 @@ export class Cylinder extends ConvexPolyhedron {
       faces = [],
       bottomface = [],
       topface = [],
-      cos = Math.cos,
-      sin = Math.sin;
+      cos = Mathf.cos,
+      sin = Mathf.sin;
 
     // First bottom point
     verts.push(
@@ -38,8 +38,8 @@ export class Cylinder extends ConvexPolyhedron {
     topface.push(1);
 
     for (let i: i32 = 0; i < N; i++) {
-      const theta = ((2 * Math.PI) / N) * (i + 1);
-      const thetaN = ((2 * Math.PI) / N) * (i + 0.5);
+      const theta = ((2 * Mathf.PI) / N) * (i + 1);
+      const thetaN = ((2 * Mathf.PI) / N) * (i + 0.5);
       if (i < N - 1) {
         // Bottom
         verts.push(

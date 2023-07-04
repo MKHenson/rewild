@@ -130,12 +130,12 @@ export class AABB {
    * @param  {AABB} aabb
    */
   extend(aabb: AABB): void {
-    this.lowerBound.x = Math.min(this.lowerBound.x, aabb.lowerBound.x);
-    this.upperBound.x = Math.max(this.upperBound.x, aabb.upperBound.x);
-    this.lowerBound.y = Math.min(this.lowerBound.y, aabb.lowerBound.y);
-    this.upperBound.y = Math.max(this.upperBound.y, aabb.upperBound.y);
-    this.lowerBound.z = Math.min(this.lowerBound.z, aabb.lowerBound.z);
-    this.upperBound.z = Math.max(this.upperBound.z, aabb.upperBound.z);
+    this.lowerBound.x = Mathf.min(this.lowerBound.x, aabb.lowerBound.x);
+    this.upperBound.x = Mathf.max(this.upperBound.x, aabb.upperBound.x);
+    this.lowerBound.y = Mathf.min(this.lowerBound.y, aabb.lowerBound.y);
+    this.upperBound.y = Mathf.max(this.upperBound.y, aabb.upperBound.y);
+    this.lowerBound.z = Mathf.min(this.lowerBound.z, aabb.lowerBound.z);
+    this.upperBound.z = Mathf.max(this.upperBound.z, aabb.upperBound.z);
   }
 
   /**
@@ -314,15 +314,15 @@ export class AABB {
     const t5 = (this.lowerBound.z - ray.from.z) * dirFracZ;
     const t6 = (this.upperBound.z - ray.from.z) * dirFracZ;
 
-    // const tmin = Math.max(Math.max(Math.min(t1, t2), Math.min(t3, t4)));
-    // const tmax = Math.min(Math.min(Math.max(t1, t2), Math.max(t3, t4)));
-    const tmin = Math.max(
-      Math.max(Math.min(t1, t2), Math.min(t3, t4)),
-      Math.min(t5, t6)
+    // const tmin = Mathf.max(Mathf.max(Mathf.min(t1, t2), Mathf.min(t3, t4)));
+    // const tmax = Mathf.min(Mathf.min(Mathf.max(t1, t2), Mathf.max(t3, t4)));
+    const tmin = Mathf.max(
+      Mathf.max(Mathf.min(t1, t2), Mathf.min(t3, t4)),
+      Mathf.min(t5, t6)
     );
-    const tmax = Math.min(
-      Math.min(Math.max(t1, t2), Math.max(t3, t4)),
-      Math.max(t5, t6)
+    const tmax = Mathf.min(
+      Mathf.min(Mathf.max(t1, t2), Mathf.max(t3, t4)),
+      Mathf.max(t5, t6)
     );
 
     // if tmax < 0, ray (line) is intersecting AABB, but whole AABB is behing us

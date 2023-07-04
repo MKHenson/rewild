@@ -31,8 +31,8 @@ export class EventDispatcher extends EventTargetable {
       listeners.set(type, new Array<Listener>());
     }
 
-    if (listeners.get(type)!.indexOf(listener) === -1) {
-      listeners.get(type)!.push(listener);
+    if ((listeners.get(type) as ListenerArray).indexOf(listener) === -1) {
+      (listeners.get(type) as ListenerArray).push(listener);
     }
   }
 
@@ -44,7 +44,10 @@ export class EventDispatcher extends EventTargetable {
   hasEventListener(type: string, listener: Listener): bool {
     const listeners = this._listeners;
 
-    return listeners.has(type) && listeners.get(type)!.includes(listener);
+    return (
+      listeners.has(type) &&
+      (listeners.get(type) as ListenerArray).includes(listener)
+    );
   }
 
   /**
@@ -67,7 +70,7 @@ export class EventDispatcher extends EventTargetable {
     const listeners = this._listeners;
 
     if (listeners.has(type)) {
-      const listenerArray = listeners.get(type)!;
+      const listenerArray = listeners.get(type) as ListenerArray;
       const index = listenerArray.indexOf(listener);
 
       if (index != -1) {
@@ -84,7 +87,7 @@ export class EventDispatcher extends EventTargetable {
     const listeners = this._listeners;
 
     if (listeners.has(event.type)) {
-      const listenerArray = listeners.get(event.type)!;
+      const listenerArray = listeners.get(event.type) as ListenerArray;
 
       event.target = this;
 
