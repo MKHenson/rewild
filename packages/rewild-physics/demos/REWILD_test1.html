@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>cannon.js - single body on plane demo</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="css/style.css" type="text/css" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+    />
+  </head>
+  <body>
+    <script src="../build/index_bundle.js"></script>
+    <script src="./demo.js"></script>
+    <script src="../libs/dat.gui.js"></script>
+    <script src="../libs/Three.js"></script>
+    <script src="../libs/TrackballControls.js"></script>
+    <script src="../libs/Detector.js"></script>
+    <script src="../libs/Stats.js"></script>
+    <script src="../libs/smoothie.js"></script>
+    <script>
+      var SHADOW_MAP_WIDTH = 512;
+      var SHADOW_MAP_HEIGHT = 512;
+      var MARGIN = 0;
+      var SCREEN_WIDTH = window.innerWidth;
+      var SCREEN_HEIGHT = window.innerHeight - 2 * MARGIN;
+      var container, camera, scene, renderer, stats;
+      var NEAR = 5;
+      var FAR = 2000;
+      var lastCallTime = 0;
+      var resetCallTime = false;
+      var world;
+      var stepFrequency = 60;
+      var solidMaterial = new THREE.MeshLambertMaterial({ color: 0xdddddd });
+      var sphereBody;
+      var ball;
+
+      function start3D() {
+        container = document.createElement("div");
+        document.body.appendChild(container);
+
+        // Camera
+        camera = new THREE.PerspectiveCamera(
+          24,
+          SCREEN_WIDTH / SCREEN_HEIGHT,
+          NEAR,
+          FAR
+        );
+
+        camera.up.set(0, 0, 1);
+        camera.position.set(0, 30, 20);
+
+        // SCENE
+        scene = new THREE.Scene();
+        scene.fog = new THREE.Fog(0x222222, 1000, FAR);
+
+        // LIGHTS
+        ambient = new THREE.AmbientLight(0x222222);
+        scene.add(ambient);
+
+        light = new THREE.SpotLight(0xffffff);
+        light.position.set(30, 30, 40);
+        light.target.position.set(0, 0, 0);
+
+        light.castShadow = true;
+
+        light.shadowCameraNear = 10;
+        light.shadowCameraFar = 100; //camera.far;
+        light.shadowCameraFov = 30;
+
+        light.shadowMapBias = 0.0039;
+        light.shadowMapDarkness = 0.5;
+        light.shadowMapWidth = SHADOW_MAP_WIDTH;
+        light.shadowMapHeight = SHADOW_MAP_HEIGHT;
+
+        //light.shadowCameraVisible = true;
+
+        scene.add(light);
+        scene.add(camera);
+
+        // RENDERER
+        renderer = new THREE.WebGLRenderer({
+          clearColor: 0x000000,
+          clearAlpha: 1,
+          antialias: false,
+        });
+        renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+        renderer.domElement.style.position = "relative";
+        renderer.domElement.style.top = MARGIN + "px";
+        container.appendChild(renderer.domElement);
+
+        window.addEventListener("resize", onWindowResize);
+
+        renderer.setClearColor(scene.fog.color, 1);
+        renderer.autoClear = false;
+
+        renderer.shadowMapEnabled = true;
+        renderer.shadowMapSoft = true;
+
+        // Create controlls
+        controls = new THREE.TrackballControls(camera, renderer.domElement);
+        controls.rotateSpeed = 1.0;
+        controls.zoomSpeed = 1.2;
+        controls.panSpeed = 0.2;
+        controls.noZoom = false;
+        controls.noPan = false;
+        controls.staticMoving = false;
+        controls.dynamicDampingFactor = 0.3;
+        var radius = 100;
+        controls.minDistance = 0.0;
+        controls.maxDistance = radius * 1000;
+        controls.screen.width = SCREEN_WIDTH;
+        controls.screen.height = SCREEN_HEIGHT;
+
+        // Create plane
+        // var geometry = new THREE.PlaneGeometry(10, 10, 4, 4);
+        // var parentObj = new THREE.Object3D();
+        // var submesh = new THREE.Object3D();
+        // var mesh = new THREE.Mesh(geometry, solidMaterial);
+        // mesh.scale.set(100, 100, 100);
+
+        createPlane();
+        ball = createSphere();
+        // mesh.castShadow = true;
+        // mesh.receiveShadow = true;
+
+        // submesh.add(mesh);
+        // parentObj.add(submesh);
+
+        // parentObj.receiveShadow = true;
+        // parentObj.castShadow = true;
+        // if (parentObj.children) {
+        //   for (var i = 0; i < parentObj.children.length; i++) {
+        //     parentObj.children[i].castShadow = true;
+        //     parentObj.children[i].receiveShadow = true;
+        //     if (parentObj.children[i]) {
+        //       for (var j = 0; j < parentObj.children[i].length; j++) {
+        //         parentObj.children[i].children[j].castShadow = true;
+        //         parentObj.children[i].children[j].receiveShadow = true;
+        //       }
+        //     }
+        //   }
+        // }
+
+        // var o = body.shapeOffsets[l];
+        // var q = body.shapeOrientations[l];
+        // mesh.position.set(o.x, o.y, o.z);
+        // mesh.quaternion.set(q.x, q.y, q.z, q.w);
+
+        // scene.add(mesh);
+      }
+
+      function createMesh(mesh) {
+        const parentObj = new THREE.Object3D();
+        const submesh = new THREE.Object3D();
+
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+
+        submesh.add(mesh);
+        parentObj.add(submesh);
+
+        parentObj.receiveShadow = true;
+        parentObj.castShadow = true;
+        if (parentObj.children) {
+          for (var i = 0; i < parentObj.children.length; i++) {
+            parentObj.children[i].castShadow = true;
+            parentObj.children[i].receiveShadow = true;
+            if (parentObj.children[i]) {
+              for (var j = 0; j < parentObj.children[i].length; j++) {
+                parentObj.children[i].children[j].castShadow = true;
+                parentObj.children[i].children[j].receiveShadow = true;
+              }
+            }
+          }
+        }
+
+        scene.add(parentObj);
+        return parentObj;
+      }
+
+      function createPlane() {
+        var geometry = new THREE.PlaneGeometry(10, 10, 4, 4);
+        var mesh = new THREE.Mesh(geometry, solidMaterial);
+        mesh.scale.set(100, 100, 100);
+        createMesh(mesh);
+      }
+
+      function createSphere() {
+        var sphere_geometry = new THREE.SphereGeometry(1, 8, 8);
+        var mesh = new THREE.Mesh(sphere_geometry, solidMaterial);
+        return createMesh(mesh);
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        if (sphereBody) {
+          const bodyPos = sphereBody.interpolatedPosition;
+          const bodyQuat = sphereBody.interpolatedQuaternion;
+          ball.position.set(bodyPos.x, bodyPos.y, bodyPos.z);
+          ball.quaternion.set(bodyQuat.x, bodyQuat.y, bodyQuat.z, bodyQuat.w);
+        }
+
+        updatePhysics();
+        render();
+      }
+
+      function updatePhysics() {
+        // Step world
+        var timeStep = 1 / stepFrequency;
+
+        var now = performance.now() / 1000;
+
+        if (!lastCallTime) {
+          // last call time not saved, cant guess elapsed time. Take a simple step.
+          world.step(timeStep);
+          lastCallTime = now;
+          return;
+        }
+
+        var timeSinceLastCall = now - lastCallTime;
+        if (resetCallTime) {
+          timeSinceLastCall = 0;
+          resetCallTime = false;
+        }
+
+        world.step(timeStep, timeSinceLastCall, 20);
+
+        lastCallTime = now;
+      }
+
+      function render() {
+        controls.update();
+        renderer.clear();
+        renderer.render(scene, camera);
+      }
+
+      function onWindowResize(event) {
+        SCREEN_WIDTH = window.innerWidth;
+        SCREEN_HEIGHT = window.innerHeight;
+
+        renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+        camera.aspect = SCREEN_WIDTH / SCREEN_HEIGHT;
+        camera.updateProjectionMatrix();
+
+        controls.screen.width = SCREEN_WIDTH;
+        controls.screen.height = SCREEN_HEIGHT;
+
+        camera.radius = (SCREEN_WIDTH + SCREEN_HEIGHT) / 4;
+      }
+
+      start3D();
+      createBodyOnPlane();
+      animate();
+
+      // demo.addScene("Sphere", function () {
+      //   var sphereShape = new CANNON.Sphere(size);
+      //   createBodyOnPlane(demo, sphereShape);
+      // });
+
+      // demo.addScene("Box", function () {
+      //   var boxShape = new CANNON.Box(new CANNON.Vec3(size, size, size));
+      //   createBodyOnPlane(demo, boxShape);
+      // });
+
+      // demo.start();
+
+      function createBodyOnPlane(demo, shape) {
+        // Create world
+        world = new CANNON.World();
+        world.broadphase = new CANNON.NaiveBroadphase();
+        world.gravity.set(0, 0, -10);
+        world.solver.iterations = 10;
+
+        world.defaultContactMaterial.contactEquationStiffness = 1e7;
+        world.defaultContactMaterial.contactEquationRelaxation = 4;
+
+        // ground plane
+        var groundShape = new CANNON.Plane();
+        var groundBody = new CANNON.Body(new CANNON.BodyOptions().setMass(0));
+
+        // new CANNON.Body({ mass: 0 });
+        groundBody.addShape(groundShape);
+        world.addBody(groundBody);
+
+        // Sphere physics
+        const sphereOptions = new CANNON.BodyOptions()
+          .setPosition(new CANNON.Vec3(0, 10, 10))
+          .setShape(new CANNON.Sphere(1))
+          .setMass(30);
+
+        sphereBody = new Body(sphereOptions);
+
+        sphereBody.position.set(0, 10, 10);
+        sphereBody.velocity.set(0, 0, 0);
+        sphereBody.angularVelocity.set(0, 0, 0);
+
+        world.add(sphereBody);
+
+        ball.position.set(
+          sphereBody.position.x,
+          sphereBody.position.y,
+          sphereBody.position.z
+        );
+        ball.quaternion.set(
+          sphereBody.quaternion.x,
+          sphereBody.quaternion.y,
+          sphereBody.quaternion.z,
+          sphereBody.quaternion.w
+        );
+
+        // // Shape on plane
+        // var shapeBody = new CANNON.Body(new CANNON.BodyOptions().setMass(30));
+
+        // // new CANNON.Body({ mass: 30 });
+        // shapeBody.addShape(shape);
+        // var pos = new CANNON.Vec3(0, 0, size);
+        // shapeBody.position.set(0, size, size * 2);
+        // shapeBody.velocity.set(0, 0, 0);
+        // shapeBody.angularVelocity.set(0, 0, 0);
+        // world.addBody(shapeBody);
+        // // demo.addVisual(shapeBody);
+      }
+    </script>
+  </body>
+</html>

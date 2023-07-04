@@ -10,10 +10,10 @@ const sfv_t1 = new Vec3(),
 // const Quaternion_mult_vb = new Vec3();
 // const Quaternion_mult_vaxvb = new Vec3();
 export class Quaternion {
-  private x: f32;
-  private y: f32;
-  private z: f32;
-  private w: f32;
+  x: f32;
+  y: f32;
+  z: f32;
+  w: f32;
 
   /**
    * A Quaternion describes a rotation in 3D space. The Quaternion is mathematically defined as Q = x*i + y*j + z*k + w, where (i,j,k) are imaginary basis vectors. (x,y,z) can be seen as a vector related to the axis of rotation, while the real multiplier, w, is related to the amount of rotation.

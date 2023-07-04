@@ -1,9 +1,9 @@
 import { Mat3 } from "./Mat3";
 
 export class Vec3 {
-  private x: f32;
-  private y: f32;
-  private z: f32;
+  x: f32;
+  y: f32;
+  z: f32;
   static ZERO: Vec3 = new Vec3(0, 0, 0);
   static UNIT_X: Vec3 = new Vec3(1, 0, 0);
   static UNIT_Y: Vec3 = new Vec3(0, 1, 0);

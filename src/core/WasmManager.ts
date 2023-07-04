@@ -40,7 +40,9 @@ export class WasmManager {
     this.memory = new WebAssembly.Memory({ initial: 10000 });
     this.memoryU32 = new Uint32Array(this.memory.buffer);
 
-    const bindings: any = {};
+    const bindings: any = {
+      performanceNow: () => performance.now(),
+    };
 
     for (const bindable of bindables) Object.assign(bindings, bindable.createBinding());
 

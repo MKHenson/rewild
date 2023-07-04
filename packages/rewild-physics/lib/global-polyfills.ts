@@ -1,4 +1,4 @@
-let globalRef = global as any;
+let globalRef = window as any;
 
 globalRef.Mathf = Math;
 globalRef.f32 = function (t: number) {
@@ -21,3 +21,7 @@ globalRef.i32 = function (t: number) {
 
 globalRef.i32.MAX_VALUE = Number.MAX_VALUE;
 globalRef.i32.MIN_VALUE = Number.MIN_VALUE;
+
+globalRef.changetype = function (t: any) {
+  return t;
+};

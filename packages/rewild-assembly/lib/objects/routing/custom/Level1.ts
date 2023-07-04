@@ -16,7 +16,7 @@ import { uiSignaller } from "../../../extras/ui/uiSignalManager";
 import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
 import { Link } from "../core/Link";
 import { TransformNode } from "../../../core/TransformNode";
-import { lock, unlock } from "../../../Imports";
+import { lock, performanceNow, unlock } from "../../../Imports";
 import { PlayerComponent } from "../../../components/PlayerComponent";
 // import { BodyOptions, World, WorldOptions } from "../../../physics/core/World";
 // import { RigidBody } from "../../../physics/core/RigidBody";
@@ -113,7 +113,7 @@ export class Level1 extends Container implements Listener {
   updatePhysics(): void {
     // Step world
     const timeStep: f32 = 1.0 / 60.0;
-    const now = f32(performance.now() / 1000);
+    const now = f32(performanceNow() / 1000);
 
     if (!this.lastCallTime) {
       // last call time not saved, cant guess elapsed time. Take a simple step.
@@ -250,17 +250,17 @@ export class Level1 extends Container implements Listener {
         );
         obj.scale.set(5, height, 5);
 
-        // Shape on plane
-        const boxShape = new Box(new Vec3Physics(5, height, 5));
-        const shapeBody = new Body(
-          new BodyOptions()
-            .setMass(30)
-            .setPosition(
-              new Vec3Physics(obj.position.x, obj.position.y, obj.position.z)
-            )
-            .setShape(boxShape)
-        );
-        this.world!.add(shapeBody);
+        // // Shape on plane
+        // const boxShape = new Box(new Vec3Physics(5, height, 5));
+        // const shapeBody = new Body(
+        //   new BodyOptions()
+        //     .setMass(30)
+        //     .setPosition(
+        //       new Vec3Physics(obj.position.x, obj.position.y, obj.position.z)
+        //     )
+        //     .setShape(boxShape)
+        // );
+        // this.world!.add(shapeBody);
 
         // const options = new BodyOptions();
         // options.pos.set(obj.position.x, obj.position.y, obj.position.z);
@@ -295,7 +295,7 @@ export class Level1 extends Container implements Listener {
 
     // Sphere physics
     const sphereOptions = new BodyOptions()
-      .setPosition(new Vec3Physics(0, 10, 0))
+      .setPosition(new Vec3Physics(0, 0, 10))
       .setShape(new Sphere(1))
       .setMass(30);
     this.sphereBody = new Body(sphereOptions);
