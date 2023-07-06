@@ -56,7 +56,7 @@ export class Container extends Node {
 
       for (let c: i32 = 0, cl = components.length; c < cl; c++) {
         const component = unchecked(components[c]);
-        component.mount();
+        component.mount(this.runtime!);
       }
     }
 
@@ -75,7 +75,7 @@ export class Container extends Node {
 
       for (let c: i32 = 0, cl = components.length; c < cl; c++) {
         const component = unchecked(components[c]);
-        component.mount();
+        component.mount(this.runtime!);
       }
     }
     super.unMount();

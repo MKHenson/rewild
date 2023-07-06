@@ -1,8 +1,6 @@
 import { ApplicationEventType, Event } from "rewild-common";
 import { Component } from "./core/Component";
 import { Camera } from "./cameras/Camera";
-import { Terrain } from "./terrain/Terrain";
-import { TerrainChunk } from "./terrain/TerrainChunk";
 
 export declare function onSignalReceived(
   type: ApplicationEventType,

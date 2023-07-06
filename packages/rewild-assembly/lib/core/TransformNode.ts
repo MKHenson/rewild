@@ -152,6 +152,15 @@ export class TransformNode
     unchecked((this.dataProperties[6] = val));
   }
 
+  getComponent(name: string): Component | null {
+    const components = this.components;
+    for (let i: i32 = 0, l = components.length; i < l; i++) {
+      const component = unchecked(components[i]);
+      if (component.name == name) return component;
+    }
+    return null;
+  }
+
   onEulerChanged(euler: Euler): void {
     this.quaternion.setFromEuler(euler, false);
   }
