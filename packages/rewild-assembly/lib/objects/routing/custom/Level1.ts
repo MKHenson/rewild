@@ -16,26 +16,19 @@ import { KeyboardEvent } from "../../../extras/io/KeyboardEvent";
 import { uiSignaller } from "../../../extras/ui/uiSignalManager";
 import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
 import { Link } from "../core/Link";
-import { TransformNode } from "../../../core/TransformNode";
-import { lock, performanceNow, unlock } from "../../../Imports";
+import { TransformNode, addComponent } from "../../../core/TransformNode";
+import { lock, unlock } from "../../../Imports";
 import { PlayerComponent } from "../../../components/PlayerComponent";
-// import { BodyOptions, World, WorldOptions } from "../../../physics/core/World";
-// import { RigidBody } from "../../../physics/core/RigidBody";
-// import { ShapeConfig } from "../../../physics/shape/ShapeConfig";
 import { Vec3 } from "../../../physics/math/Vec3";
 import {
-  World,
-  WorldOptions,
-  NaiveBroadphase,
-  GSSolver,
   Plane,
   Body,
   BodyOptions,
-  Box,
   Vec3 as Vec3Physics,
   Sphere,
   Material,
 } from "rewild-physics";
+import { PhysicsComponent } from "../../../components/PhysicsComponent";
 
 const vec: Vec3 = new Vec3();
 
@@ -50,18 +43,12 @@ export class Level1 extends Container implements Listener {
   private direction2!: DirectionalLight;
   private direction3!: DirectionalLight;
   private ambient!: AmbientLight;
-  // private floor!: TransformNode;
   private skybox!: TransformNode;
   private ball!: TransformNode;
 
-  private lastCallTime: f32 = 0;
-  private resetCallTime: boolean = false;
-  // private sphereBody: RigidBody | null;
-  // private playerBody: RigidBody | null;
   private groundBody: Body | null;
-  private sphereBody: Body | null;
+  // private sphereBody: Body | null;
   private playerBody: Body | null;
-  private world: World | null;
 
   private gravity: f32 = -9.8;
 
@@ -69,8 +56,7 @@ export class Level1 extends Container implements Listener {
     super(name);
     this.totalTime = 0;
     this.isPaused = false;
-    this.world = null;
-    this.sphereBody = null;
+    // this.sphereBody = null;
     this.playerBody = null;
   }
 
@@ -102,16 +88,6 @@ export class Level1 extends Container implements Listener {
     this.orbitController = new OrbitController(this.runtime!.camera);
     this.pointerController = new PointerLockController(this.runtime!.camera);
 
-    // Setup physics world
-    const physicsWorldOptions = new WorldOptions();
-    physicsWorldOptions.gravity.set(0, this.gravity, 0);
-
-    this.world = new World(physicsWorldOptions);
-    this.world!.broadphase = new NaiveBroadphase();
-    (this.world!.solver as GSSolver).iterations = 10;
-    this.world!.defaultContactMaterial.contactEquationStiffness = 1e7;
-    this.world!.defaultContactMaterial.contactEquationRelaxation = 4;
-
     // GROUND PLANE
     this.groundBody = new Body(
       new BodyOptions()
@@ -125,13 +101,6 @@ export class Level1 extends Container implements Listener {
     );
 
     // Sphere physics
-    const sphereOptions = new BodyOptions()
-      .setPosition(new Vec3Physics(0, 0, 0))
-      .setShape(new Sphere(1))
-      .setMass(30)
-      .setMaterial(new Material("sphere", 0.1, 0.7));
-    this.sphereBody = new Body(sphereOptions);
-    this.sphereBody!.linearDamping = 0.05;
 
     // Player physics
     const playerOptions = new BodyOptions()
@@ -145,29 +114,6 @@ export class Level1 extends Container implements Listener {
       .setShape(new Sphere(1))
       .setType(Body.KINEMATIC);
     this.playerBody = new Body(playerOptions);
-  }
-
-  updatePhysics(): void {
-    // Step world
-    const timeStep: f32 = 1.0 / 60.0;
-    const now = f32(performanceNow() / 1000);
-
-    if (!this.lastCallTime) {
-      // last call time not saved, cant guess elapsed time. Take a simple step.
-      this.world!.step(timeStep, 0);
-      this.lastCallTime = now;
-      return;
-    }
-
-    let timeSinceLastCall = now - this.lastCallTime;
-    if (this.resetCallTime) {
-      timeSinceLastCall = 0;
-      this.resetCallTime = false;
-    }
-
-    this.world!.step(timeStep, timeSinceLastCall);
-
-    this.lastCallTime = now;
   }
 
   onEvent(event: Event): void {
@@ -210,8 +156,6 @@ export class Level1 extends Container implements Listener {
     if (this.isPaused) return;
     super.onUpdate(delta, total);
 
-    this.updatePhysics();
-    // this.world!.step();
     this.totalTime += delta;
 
     const camera = this.runtime!.camera;
@@ -223,16 +167,15 @@ export class Level1 extends Container implements Listener {
       if (yValue < 0) yValue = 0;
       camPos.set(camPos.x, yValue, camPos.z);
 
-      // this.playerBody!.setPosition(vec.set(camPos.x, camPos.y, camPos.z));
       this.playerBody!.position.set(camPos.x, camPos.y, camPos.z);
     }
 
-    if (this.sphereBody) {
-      const bodyPos = this.sphereBody!.interpolatedPosition;
-      const bodyQuat = this.sphereBody!.interpolatedQuaternion;
-      this.ball.position.set(bodyPos.x, bodyPos.y, bodyPos.z);
-      this.ball.quaternion.set(bodyQuat.x, bodyQuat.y, bodyQuat.z, bodyQuat.w);
-    }
+    // if (this.sphereBody) {
+    //   const bodyPos = this.sphereBody!.interpolatedPosition;
+    //   const bodyQuat = this.sphereBody!.interpolatedQuaternion;
+    //   this.ball.position.set(bodyPos.x, bodyPos.y, bodyPos.z);
+    //   this.ball.quaternion.set(bodyQuat.x, bodyQuat.y, bodyQuat.z, bodyQuat.w);
+    // }
 
     if (this.player.isDead) {
       this.orbitController.enabled = false;
@@ -253,14 +196,26 @@ export class Level1 extends Container implements Listener {
     super.mount();
     this.totalTime = 0;
     this.isPaused = false;
-    this.lastCallTime = 0;
+    this.runtime!.lastCallTime = 0;
 
     this.player = this.findObjectByName("player")!
       .components[0] as PlayerComponent;
     this.player.onRestart();
 
-    // this.floor = this.findObjectByName("floor")!;
     this.ball = this.findObjectByName("ball")!;
+
+    // TODO: Move this into client side
+    if (this.ball.components.length == 1) {
+      const sphereOptions = new BodyOptions()
+        .setPosition(new Vec3Physics(0, 0, 0))
+        .setShape(new Sphere(1))
+        .setMass(30)
+        .setMaterial(new Material("sphere", 0.1, 0.7));
+      const sphereBody = new Body(sphereOptions);
+      sphereBody.linearDamping = 0.05;
+      addComponent(this.ball, new PhysicsComponent(sphereBody));
+    }
+
     this.skybox = this.findObjectByName("skybox")!;
 
     // Possitive z comes out of screen
@@ -308,61 +263,21 @@ export class Level1 extends Container implements Listener {
       }
     }
 
-    // if (this.sphereBody != null) {
-    //   this.world!.removeRigidBody(this.sphereBody!);
-    //   this.world!.removeRigidBody(this.playerBody!);
-    // }
+    const world = this.runtime!.world;
+    world.add(this.groundBody!);
+    // world.add(this.sphereBody!);
+    world.add(this.playerBody!);
+    const component = this.ball.getComponent("physics") as PhysicsComponent;
 
-    // Player physics
-    // const playerOptions = new BodyOptions().setPosition(
-    //   new Vec3Physics(this.runtime!.camera.position.x, this.runtime!.camera.position.y, this.runtime!.camera.position.z)
-    // ).setShape(new Sphere(1));
-    // playerOptions.pos.set(
-    //   this.runtime!.camera.position.x,
-    //   this.runtime!.camera.position.y,
-    //   this.runtime!.camera.position.z
-    // );
-
-    // playerOptions.size.set(1, 1, 1);
-    // playerOptions.move = true;
-    // playerOptions.kinematic = true;
-    // this.playerBody = this.world!.initBody("sphere", playerOptions);
-
-    this.world!.add(this.groundBody!);
-    this.world!.add(this.sphereBody!);
-    this.world!.add(this.playerBody!);
-    this.sphereBody!.position.set(0, 20, 0);
-    this.sphereBody!.velocity.set(0, 0, 0);
-    this.sphereBody!.angularVelocity.set(0, 0, 0);
-    // sphereOptions.size.set(1, 1, 1);
-    // sphereOptions.move = true;
-    // sphereOptions.pos.set(0, 10, 0);
-    // const sphereConfifg = new ShapeConfig();
-    // sphereConfifg.friction = 0.2;
-    // sphereConfifg.density = 20.0;
-    // sphereConfifg.restitution = 0.9;
-
-    // this.sphereBody = this.world!.initBody("sphere", sphereOptions, sphereConfifg);
-    // this.sphereBody!.connectMesh(this.ball);
-
-    // this.ball.position.set(0, 0, 0);
-
-    // const floorOptions = new BodyOptions();
-    // floorOptions.pos.set(0, 0, 0);
-    // floorOptions.rot.set(-90, 0, 0);
-
-    // const floorConfifg = new ShapeConfig();
-    // floorConfifg.friction = 0.2;
-    // floorConfifg.density = 100;
-    // floorConfifg.restitution = 0.2;
-    // this.world!.initBody("plane", floorOptions, floorConfifg);
+    component.rigidBody.position.set(0, 20, 0);
+    component.rigidBody.velocity.set(0, 0, 0);
+    component.rigidBody.angularVelocity.set(0, 0, 0);
 
     this.skybox.scale.set(5000, 5000, 5000);
     this.skybox.position.set(0, 0, 0);
 
     inputManager.addEventListener("keyup", this);
     uiSignaller.addEventListener(UIEventType, this);
-    // this.world!.play();
 
     this.useOrbitController = false;
     lock();
@@ -370,11 +285,10 @@ export class Level1 extends Container implements Listener {
 
   unMount(): void {
     super.unMount();
-    // this.world!.stop();
-    // this.world!.clear();
-    this.world!.removeBody(this.groundBody!);
-    this.world!.removeBody(this.sphereBody!);
-    this.world!.removeBody(this.playerBody!);
+    const world = this.runtime!.world;
+    world.removeBody(this.groundBody!);
+    // world.removeBody(this.sphereBody!);
+    world.removeBody(this.playerBody!);
     this.orbitController.enabled = false;
     this.pointerController.enabled = false;
     inputManager.removeEventListener("keyup", this);

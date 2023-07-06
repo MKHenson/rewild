@@ -7,20 +7,34 @@ import { Container } from "./Container";
 import { Node } from "./Node";
 import { Portal } from "./Portal";
 import { addChild } from "../../../core/TransformNode";
+import { GSSolver, NaiveBroadphase, World, WorldOptions } from "rewild-physics";
+import { performanceNow } from "../../../Imports";
 
 export class Runtime implements Listener {
   renderer: WebGPURenderer;
   scene: Scene;
   camera: PerspectiveCamera;
+  world: World;
 
   private nodes: Node[];
   private activeNodes: Node[];
   private inactiveNodes: Node[];
+  public lastCallTime: f32 = 0;
+  private resetCallTime: boolean = false;
 
   constructor(width: f32, height: f32, renderer: WebGPURenderer) {
     this.nodes = [];
     this.activeNodes = [];
     this.inactiveNodes = [];
+
+    // Setup physics world
+    const physicsWorldOptions = new WorldOptions();
+    physicsWorldOptions.gravity.set(0, -9.8, 0);
+    this.world = new World(physicsWorldOptions);
+    this.world.broadphase = new NaiveBroadphase();
+    (this.world.solver as GSSolver).iterations = 10;
+    this.world.defaultContactMaterial.contactEquationStiffness = 1e7;
+    this.world.defaultContactMaterial.contactEquationRelaxation = 4;
 
     this.renderer = renderer;
     this.scene = new Scene();
@@ -79,9 +93,34 @@ export class Runtime implements Listener {
     container.runtime = null;
   }
 
+  updatePhysics(): void {
+    // Step world
+    const timeStep: f32 = 1.0 / 60.0;
+    const now = f32(performanceNow() / 1000);
+
+    if (!this.lastCallTime) {
+      // last call time not saved, cant guess elapsed time. Take a simple step.
+      this.world.step(timeStep, 0);
+      this.lastCallTime = now;
+      return;
+    }
+
+    let timeSinceLastCall = now - this.lastCallTime;
+    if (this.resetCallTime) {
+      timeSinceLastCall = 0;
+      this.resetCallTime = false;
+    }
+
+    this.world.step(timeStep, timeSinceLastCall);
+
+    this.lastCallTime = now;
+  }
+
   OnLoop(delta: f32, total: u32): void {
     const activeNodes = this.activeNodes;
     const inactiveNodes = this.inactiveNodes;
+
+    this.updatePhysics();
 
     // Unmount inactive nodes
     const numInactiveNodes = inactiveNodes.length;
