@@ -21,7 +21,7 @@ export class ArrayCollisionMatrix {
    * Get an element
    * @method get
    */
-  get(bi: Body, bj: Body): i32 {
+  get(bi: Body, bj: Body): boolean {
     let i = bi.index;
     let j = bj.index;
     if (j > i) {
@@ -29,7 +29,11 @@ export class ArrayCollisionMatrix {
       j = i;
       i = temp;
     }
-    return this.matrix[((i * (i + 1)) >> 1) + j - 1];
+
+    const index = ((i * (i + 1)) >> 1) + j - 1;
+
+    if (this.matrix.length <= index) return false;
+    return true; //this.matrix[index];
   }
 
   /**

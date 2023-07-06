@@ -302,7 +302,7 @@ export class World extends EventDispatcher {
    * @param {Material} m2
    * @return {ContactMaterial} The contact material if it was found.
    */
-  getContactMaterial(m1: Material, m2: Material): ContactMaterial {
+  getContactMaterial(m1: Material, m2: Material): ContactMaterial | null {
     return this.contactMaterialTable.get(m1.id, m2.id); //this.contactmaterials[this.mats2cmat[i+j*this.materials.length]];
   }
 

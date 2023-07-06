@@ -379,9 +379,7 @@ export class Quaternion {
    * @param {Number} z
    * @param {String} order The order to apply angles: 'XYZ' or 'YXZ' or any other combination
    */
-  setFromEuler(x: f32, y: f32, z: f32, order: string): Quaternion {
-    order = order || "XYZ";
-
+  setFromEuler(x: f32, y: f32, z: f32, order: string = "xyz"): Quaternion {
     const c1 = Mathf.cos(x / 2);
     const c2 = Mathf.cos(y / 2);
     const c3 = Mathf.cos(z / 2);

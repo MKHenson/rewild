@@ -8,6 +8,7 @@ import {
   UIEventType,
   Listener,
   Event,
+  degToRad,
 } from "rewild-common";
 import { Container } from "../core/Container";
 import { inputManager } from "../../../extras/io/InputManager";
@@ -33,6 +34,7 @@ import {
   Box,
   Vec3 as Vec3Physics,
   Sphere,
+  Material,
 } from "rewild-physics";
 
 const vec: Vec3 = new Vec3();
@@ -56,6 +58,7 @@ export class Level1 extends Container implements Listener {
   private resetCallTime: boolean = false;
   // private sphereBody: RigidBody | null;
   // private playerBody: RigidBody | null;
+  private groundBody: Body | null;
   private sphereBody: Body | null;
   private playerBody: Body | null;
   private world: World | null;
@@ -101,13 +104,47 @@ export class Level1 extends Container implements Listener {
 
     // Setup physics world
     const physicsWorldOptions = new WorldOptions();
-    physicsWorldOptions.gravity.set(0, 0, this.gravity);
+    physicsWorldOptions.gravity.set(0, this.gravity, 0);
 
     this.world = new World(physicsWorldOptions);
     this.world!.broadphase = new NaiveBroadphase();
     (this.world!.solver as GSSolver).iterations = 10;
     this.world!.defaultContactMaterial.contactEquationStiffness = 1e7;
     this.world!.defaultContactMaterial.contactEquationRelaxation = 4;
+
+    // GROUND PLANE
+    this.groundBody = new Body(
+      new BodyOptions()
+        .setMass(0)
+        .setShape(new Plane())
+        .setMaterial(new Material("ground", 0.3))
+    );
+    this.groundBody!.quaternion.setFromAxisAngle(
+      new Vec3Physics(1, 0, 0),
+      -degToRad(90)
+    );
+
+    // Sphere physics
+    const sphereOptions = new BodyOptions()
+      .setPosition(new Vec3Physics(0, 0, 0))
+      .setShape(new Sphere(1))
+      .setMass(30)
+      .setMaterial(new Material("sphere", 0.1, 0.7));
+    this.sphereBody = new Body(sphereOptions);
+    this.sphereBody!.linearDamping = 0.05;
+
+    // Player physics
+    const playerOptions = new BodyOptions()
+      .setPosition(
+        new Vec3Physics(
+          this.runtime!.camera.position.x,
+          this.runtime!.camera.position.y,
+          this.runtime!.camera.position.z
+        )
+      )
+      .setShape(new Sphere(1))
+      .setType(Body.KINEMATIC);
+    this.playerBody = new Body(playerOptions);
   }
 
   updatePhysics(): void {
@@ -187,6 +224,7 @@ export class Level1 extends Container implements Listener {
       camPos.set(camPos.x, yValue, camPos.z);
 
       // this.playerBody!.setPosition(vec.set(camPos.x, camPos.y, camPos.z));
+      this.playerBody!.position.set(camPos.x, camPos.y, camPos.z);
     }
 
     if (this.sphereBody) {
@@ -215,6 +253,7 @@ export class Level1 extends Container implements Listener {
     super.mount();
     this.totalTime = 0;
     this.isPaused = false;
+    this.lastCallTime = 0;
 
     this.player = this.findObjectByName("player")!
       .components[0] as PlayerComponent;
@@ -273,10 +312,6 @@ export class Level1 extends Container implements Listener {
     //   this.world!.removeRigidBody(this.sphereBody!);
     //   this.world!.removeRigidBody(this.playerBody!);
     // }
-    if (this.sphereBody != null) {
-      this.world!.removeBody(this.sphereBody!);
-      this.world!.removeBody(this.playerBody!);
-    }
 
     // Player physics
     // const playerOptions = new BodyOptions().setPosition(
@@ -293,13 +328,12 @@ export class Level1 extends Container implements Listener {
     // playerOptions.kinematic = true;
     // this.playerBody = this.world!.initBody("sphere", playerOptions);
 
-    // Sphere physics
-    const sphereOptions = new BodyOptions()
-      .setPosition(new Vec3Physics(0, 0, 10))
-      .setShape(new Sphere(1))
-      .setMass(30);
-    this.sphereBody = new Body(sphereOptions);
+    this.world!.add(this.groundBody!);
     this.world!.add(this.sphereBody!);
+    this.world!.add(this.playerBody!);
+    this.sphereBody!.position.set(0, 20, 0);
+    this.sphereBody!.velocity.set(0, 0, 0);
+    this.sphereBody!.angularVelocity.set(0, 0, 0);
     // sphereOptions.size.set(1, 1, 1);
     // sphereOptions.move = true;
     // sphereOptions.pos.set(0, 10, 0);
@@ -311,15 +345,7 @@ export class Level1 extends Container implements Listener {
     // this.sphereBody = this.world!.initBody("sphere", sphereOptions, sphereConfifg);
     // this.sphereBody!.connectMesh(this.ball);
 
-    this.ball.position.set(0, 0, 0);
-
-    // GROUND PLANE
-    var groundShape = new Plane();
-    var groundBody = new Body(new BodyOptions().setMass(0));
-
-    // new CANNON.Body({ mass: 0 });
-    groundBody.addShape(groundShape);
-    this.world!.add(groundBody);
+    // this.ball.position.set(0, 0, 0);
 
     // const floorOptions = new BodyOptions();
     // floorOptions.pos.set(0, 0, 0);
@@ -338,13 +364,17 @@ export class Level1 extends Container implements Listener {
     uiSignaller.addEventListener(UIEventType, this);
     // this.world!.play();
 
-    if (!this.useOrbitController) lock();
+    this.useOrbitController = false;
+    lock();
   }
 
   unMount(): void {
     super.unMount();
     // this.world!.stop();
     // this.world!.clear();
+    this.world!.removeBody(this.groundBody!);
+    this.world!.removeBody(this.sphereBody!);
+    this.world!.removeBody(this.playerBody!);
     this.orbitController.enabled = false;
     this.pointerController.enabled = false;
     inputManager.removeEventListener("keyup", this);
