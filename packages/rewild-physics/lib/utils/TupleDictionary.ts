@@ -19,14 +19,19 @@ export class TupleDictionary<T> {
    * @param  {Number} j
    * @return {Number}
    */
-  get(i: i32, j: i32): T {
+  get(i: i32, j: i32): T | null {
     if (i > j) {
       // swap
       const temp = j;
       j = i;
       i = temp;
     }
-    return this.data.get(i.toString() + "-" + j.toString()) as T;
+
+    const keyStr = i.toString() + "-" + j.toString();
+    if (this.data.has(keyStr) == false) {
+      return null;
+    }
+    return this.data.get(keyStr) as T;
   }
 
   /**
