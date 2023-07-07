@@ -203,19 +203,6 @@ export class Level1 extends Container implements Listener {
     this.player.onRestart();
 
     this.ball = this.findObjectByName("ball")!;
-
-    // TODO: Move this into client side
-    if (this.ball.components.length == 1) {
-      const sphereOptions = new BodyOptions()
-        .setPosition(new Vec3Physics(0, 0, 0))
-        .setShape(new Sphere(1))
-        .setMass(30)
-        .setMaterial(new Material("sphere", 0.1, 0.7));
-      const sphereBody = new Body(sphereOptions);
-      sphereBody.linearDamping = 0.05;
-      addComponent(this.ball, new PhysicsComponent(sphereBody));
-    }
-
     this.skybox = this.findObjectByName("skybox")!;
 
     // Possitive z comes out of screen
@@ -269,9 +256,9 @@ export class Level1 extends Container implements Listener {
     world.add(this.playerBody!);
     const component = this.ball.getComponent("physics") as PhysicsComponent;
 
-    component.rigidBody.position.set(0, 20, 0);
-    component.rigidBody.velocity.set(0, 0, 0);
-    component.rigidBody.angularVelocity.set(0, 0, 0);
+    // component.rigidBody.position.set(0, 20, 0);
+    // component.rigidBody.velocity.set(0, 0, 0);
+    // component.rigidBody.angularVelocity.set(0, 0, 0);
 
     this.skybox.scale.set(5000, 5000, 5000);
     this.skybox.position.set(0, 0, 0);
