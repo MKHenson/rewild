@@ -25,9 +25,16 @@ export class GameLoader {
     const box = geometryManager.getAsset("box");
     const sphere = geometryManager.getAsset("sphere");
 
+    const ball = this.createMesh(sphere, "simple", "ball");
+    const ballPhysics = wasm.createPhysicsComponent();
+    const properties = wasm.getFloat32Array(wasm.getPhysicsComponentProperties(ballPhysics as any));
+    properties[9] = 30; // mass
+    properties[1] = 20; // pos y
+    wasm.addComponent(ball.transform as any, ballPhysics);
+
     wasm.addAsset(containerLvl1Ptr, terrainManager.terrainPtr);
     wasm.addAsset(containerLvl1Ptr, this.createMesh(box, "skybox", "skybox").transform as any);
-    wasm.addAsset(containerLvl1Ptr, this.createMesh(sphere, "simple", "ball").transform as any);
+    wasm.addAsset(containerLvl1Ptr, ball.transform as any);
 
     for (let i = 0; i < 20; i++)
       wasm.addAsset(containerLvl1Ptr, this.createMesh(box, "concrete", `building-${i}`).transform as any);

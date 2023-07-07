@@ -57,7 +57,7 @@ export class Body extends EventDispatcher {
   allowSleep: boolean;
   sleepState: i32;
   sleepSpeedLimit: f32;
-  sleepTimeLimit: f32;
+  private sleepTimeLimit: f32;
   timeLastSleepy: f32;
   _wakeUpAfterNarrowphase: boolean;
   torque: Vec3;
@@ -70,13 +70,13 @@ export class Body extends EventDispatcher {
   shapes: Shape[];
   shapeOffsets: Vec3[];
   shapeOrientations: Quaternion[];
-  inertia: Vec3;
-  invInertia: Vec3;
+  private inertia: Vec3;
+  private invInertia: Vec3;
   invInertiaWorld: Mat3;
   invMassSolve: f32;
-  invInertiaSolve: Vec3;
+  private invInertiaSolve: Vec3;
   invInertiaWorldSolve: Mat3;
-  fixedRotation: boolean;
+  private fixedRotation: boolean;
   angularDamping: f32;
   linearFactor: Vec3;
   angularFactor: Vec3;
