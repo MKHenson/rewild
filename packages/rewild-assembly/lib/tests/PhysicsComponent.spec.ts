@@ -8,6 +8,13 @@ export function getPhysicsComponentMass(component: PhysicsComponent): f32 {
   return component.mass;
 }
 
+export function setPhysicsComponentMass(
+  component: PhysicsComponent,
+  val: f32
+): void {
+  component.mass = val;
+}
+
 export function getPhysicsComponentPosX(component: PhysicsComponent): f32 {
   return component.positionX;
 }
@@ -97,11 +104,4 @@ export function setPhysicsComponentAngVelY(
 
 export function getPhysicsComponentAngVelZ(component: PhysicsComponent): f32 {
   return component.angularVelocityZ;
-}
-
-export function setPhysicsComponentMass(
-  component: PhysicsComponent,
-  val: f32
-): void {
-  component.mass = val;
 }
