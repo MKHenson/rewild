@@ -6,18 +6,9 @@ export class PhysicsComponent extends Component {
   rigidBody: Body;
   dataProperties: Float32Array;
 
-  constructor() {
+  constructor(body: Body) {
     super("physics");
-
-    const sphereOptions = new BodyOptions()
-      .setPosition(new Vec3(0, 0, 0))
-      .setShape(new Sphere(1))
-      .setMass(30)
-      .setMaterial(new Material("sphere", 0.1, 0.7));
-    const sphereBody = new Body(sphereOptions);
-    sphereBody.linearDamping = 0.05;
-
-    this.rigidBody = sphereBody;
+    this.rigidBody = body;
     this.dataProperties = new Float32Array(10);
   }
 
@@ -121,8 +112,8 @@ export class PhysicsComponent extends Component {
   }
 }
 
-export function createPhysicsComponent(): Component {
-  return new PhysicsComponent();
+export function createPhysicsComponent(body: Body): Component {
+  return new PhysicsComponent(body);
 }
 
 export function getPhysicsComponentProperties(

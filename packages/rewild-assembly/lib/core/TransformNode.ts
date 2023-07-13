@@ -543,6 +543,9 @@ export class TransformNode
 
     return this;
   }
+
+  onAddedToParent(): void {}
+  onRemovedFromParent(): void {}
 }
 
 export function createTransformNode(name: string | null): TransformNode {
@@ -566,6 +569,7 @@ export function addChild(
   parent.children.push(child);
 
   _addedEvent.target = parent;
+  child.onAddedToParent();
   child.dispatchEvent(_addedEvent);
 
   return parent;
@@ -619,6 +623,7 @@ export function removeChild(
     parent.children.splice(index, 1);
 
     _removedEvent.target = parent;
+    child.onRemovedFromParent();
     child.dispatchEvent(_removedEvent);
   }
 
