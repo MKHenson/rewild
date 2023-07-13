@@ -26,7 +26,7 @@ export class GameLoader {
     const sphere = geometryManager.getAsset("sphere");
 
     const ball = this.createMesh(sphere, "simple", "ball");
-    const ballPhysics = wasm.createPhysicsComponent();
+    const ballPhysics = wasm.createPhysicsComponent(wasm.createBodyBall(1, 20));
     const properties = wasm.getFloat32Array(wasm.getPhysicsComponentProperties(ballPhysics as any));
     properties[9] = 30; // mass
     properties[1] = 20; // pos y

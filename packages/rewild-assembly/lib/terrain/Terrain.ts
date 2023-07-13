@@ -4,6 +4,10 @@ export class Terrain extends TransformNode {
   constructor() {
     super();
   }
+
+  onAddedToParent(): void {}
+
+  onRemovedFromParent(): void {}
 }
 
 export function createTerrain(name: string | null): TransformNode {

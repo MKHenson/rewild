@@ -1,9 +1,6 @@
 import { Sphere, BodyOptions, Material, Body } from "rewild-physics";
 
-export function Objects_Physics_CommonBodies_Ball(
-  radius: f32,
-  mass: f32
-): Body {
+export function createBodyBall(radius: f32, mass: f32): Body {
   const sphereOptions = new BodyOptions()
     .setShape(new Sphere(radius))
     .setMass(mass)
