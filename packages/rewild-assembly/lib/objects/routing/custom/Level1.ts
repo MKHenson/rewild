@@ -16,10 +16,9 @@ import { KeyboardEvent } from "../../../extras/io/KeyboardEvent";
 import { uiSignaller } from "../../../extras/ui/uiSignalManager";
 import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
 import { Link } from "../core/Link";
-import { TransformNode, addComponent } from "../../../core/TransformNode";
+import { TransformNode } from "../../../core/TransformNode";
 import { lock, unlock } from "../../../Imports";
 import { PlayerComponent } from "../../../components/PlayerComponent";
-import { Vec3 } from "../../../physics/math/Vec3";
 import {
   Plane,
   Body,
@@ -29,8 +28,6 @@ import {
   Material,
 } from "rewild-physics";
 import { PhysicsComponent } from "../../../components/PhysicsComponent";
-
-const vec: Vec3 = new Vec3();
 
 export class Level1 extends Container implements Listener {
   private orbitController!: OrbitController;
