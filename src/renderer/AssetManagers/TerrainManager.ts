@@ -1,10 +1,10 @@
 import { CHUNK_SIZE } from "rewild-common";
+import { wasm } from "rewild-wasmtime";
 import { Renderer } from "../Renderer";
 import { Geometry } from "../geometry/Geometry";
 import { TerrainPipeline } from "../../core/pipelines/terrain-pipeline/TerrainPipeline";
 import { meshManager } from "../MeshManager";
 import { pipelineManager } from "./PipelineManager";
-import { wasm } from "src/core/WasmManager";
 import { NoiseMap } from "../terrain/NoiseMap";
 import { textureManager } from "./TextureManager";
 import { CanvasTexture } from "src/core/textures/CanvasTexture";

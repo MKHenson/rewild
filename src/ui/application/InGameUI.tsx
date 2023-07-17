@@ -12,13 +12,13 @@ export class InGameUI extends Component<Props> {
     const [playerHunger, setPlayerHunger] = this.useState(100);
 
     const onFrameUpdate = () => {
-      if (this.props.renderer.player.health != playerHealth() && playerHungerElm) {
-        setPlayerHealth(this.props.renderer.player.health, false);
+      if (this.props.renderer.player.playerComponent.health != playerHealth() && playerHungerElm) {
+        setPlayerHealth(this.props.renderer.player.playerComponent.health, false);
         playerHealthElm.props = { ...playerHealthElm.props, value: playerHealth() };
       }
 
-      if (this.props.renderer.player.hunger != playerHunger() && playerHungerElm) {
-        setPlayerHunger(this.props.renderer.player.hunger, false);
+      if (this.props.renderer.player.playerComponent.hunger != playerHunger() && playerHungerElm) {
+        setPlayerHunger(this.props.renderer.player.playerComponent.hunger, false);
         playerHungerElm.props = { ...playerHungerElm.props, value: playerHunger() };
       }
     };

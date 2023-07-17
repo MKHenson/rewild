@@ -1,6 +1,5 @@
-import { InputManager } from "../core/InputManager";
-import { wasm } from "../core/WasmManager";
-import { IBindable } from "../core/IBindable";
+import { wasm, IBindable } from "rewild-wasmtime";
+import { Player } from "rewild-wasmtime";
 import { Clock } from "../core/Clock";
 import { pipelineManager } from "./AssetManagers/PipelineManager";
 import { geometryManager } from "./AssetManagers/GeometryManager";
@@ -13,8 +12,9 @@ import { LightingResource } from "../core/pipelines/resources/LightingResource";
 import { Pipeline } from "../core/pipelines/Pipeline";
 import { TransformResource } from "../core/pipelines/resources/TransformResource";
 import { PipelineResourceInstance } from "../core/pipelines/resources/PipelineResourceInstance";
-import { Player } from "../gameplay/Player";
+
 import { Pane3D } from "rewild-ui";
+import { InputManager } from "src/core/InputManager";
 
 const sampleCount = 4;
 export type UpdateCallback = () => void;

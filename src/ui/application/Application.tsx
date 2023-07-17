@@ -1,10 +1,9 @@
-import { IBindable } from "src/core/IBindable";
 import { ApplicationEventType } from "rewild-common";
 import { Pane3D, Route, navigate, RouterSwitch, Component, register, InfoBox } from "rewild-ui";
 import { UIEventManager } from "../../core/UIEventManager";
 import { Renderer } from "../../renderer/Renderer";
 import { GameLoader } from "../../core/GameLoader";
-import { WasmManager } from "../../core/WasmManager";
+import { WasmManager, IBindable } from "rewild-wasmtime";
 import { MainMenu } from "./MainMenu";
 import { ProjectEditorPage } from "./project-editor/ProjectEditorPage";
 import { ErrorType, StartError } from "./StartError";

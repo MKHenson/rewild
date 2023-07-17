@@ -1,9 +1,8 @@
 import { GroupType, AttributeType } from "rewild-common";
 import { Renderer } from "./Renderer";
 import { Pipeline } from "../core/pipelines/Pipeline";
-import { wasm } from "../core/WasmManager";
+import { wasm, Object3D } from "rewild-wasmtime";
 import { Geometry } from "./geometry/Geometry";
-import { Object3D } from "./Object3D";
 import { pipelineManager } from "./AssetManagers/PipelineManager";
 
 export class Mesh extends Object3D {
