@@ -1,8 +1,7 @@
 import { ApplicationEventType } from "rewild-common";
+import { wasm, IBindable } from "rewild-wasmtime";
 import EventDispatcher from "./EventDispatcher";
 import { ApplicationEvent } from "./events/ApplicationEvent";
-import { IBindable } from "./IBindable";
-import { wasm } from "./WasmManager";
 
 const uiEvent: ApplicationEvent = new ApplicationEvent();
 

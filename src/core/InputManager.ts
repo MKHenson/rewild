@@ -1,4 +1,4 @@
-import { wasm } from "./WasmManager";
+import { wasm } from "rewild-wasmtime";
 import { MouseEventType, KeyEventType } from "rewild-common";
 import { Pane3D } from "rewild-ui";
 

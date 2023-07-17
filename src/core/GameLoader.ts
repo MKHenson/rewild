@@ -1,4 +1,4 @@
-import { wasm } from "./WasmManager";
+import { wasm, PhysicsComponent } from "rewild-wasmtime";
 import { pipelineManager } from "../renderer/AssetManagers/PipelineManager";
 import { Mesh } from "../renderer/Mesh";
 import { ContainerTypes } from "rewild-common";
@@ -25,12 +25,11 @@ export class GameLoader {
     const box = geometryManager.getAsset("box");
     const sphere = geometryManager.getAsset("sphere");
 
+    const physicsComponent = new PhysicsComponent();
+    physicsComponent.mass = 30;
+    physicsComponent.positionY = 20;
     const ball = this.createMesh(sphere, "simple", "ball");
-    const ballPhysics = wasm.createPhysicsComponent(wasm.createBodyBall(1, 20));
-    const properties = wasm.getFloat32Array(wasm.getPhysicsComponentProperties(ballPhysics as any));
-    properties[9] = 30; // mass
-    properties[1] = 20; // pos y
-    wasm.addComponent(ball.transform as any, ballPhysics);
+    ball.addComponent(physicsComponent);
 
     wasm.addAsset(containerLvl1Ptr, terrainManager.terrainPtr);
     wasm.addAsset(containerLvl1Ptr, this.createMesh(box, "skybox", "skybox").transform as any);

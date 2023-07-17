@@ -1,5 +1,6 @@
-import { wasm } from "../core/WasmManager";
+import { wasm } from "./WasmManager";
 import { generateUUID } from "rewild-common";
+import { Component } from "./components";
 
 let objectId = 1;
 
@@ -31,5 +32,9 @@ export class Object3D {
 
   remove(child: Object3D) {
     wasm.removeChild(this.transform as any, child.transform as any);
+  }
+
+  addComponent(component: Component) {
+    wasm.addComponent(this.transform as any, component.pointer);
   }
 }
