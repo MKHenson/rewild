@@ -44,14 +44,14 @@ class MeshData {
     this.triangles = new Array(6 * (meshWidth - 1) * (meshHeight - 1));
   }
 
-  addTriangle(a: i32, b: i32, c: i32) {
+  addTriangle(a: i32, b: i32, c: i32): void {
     this.triangles[this.triangleIndex] = a;
     this.triangles[this.triangleIndex + 1] = b;
     this.triangles[this.triangleIndex + 2] = c;
     this.triangleIndex += 3;
   }
 
-  public createMesh(renderer: Renderer) {
+  public createMesh(renderer: Renderer): Mesh {
     const geometry = new Geometry();
 
     const data = new Float32Array(this.vertices.map((v) => v.toArray()).flat());
