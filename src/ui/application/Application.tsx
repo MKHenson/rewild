@@ -9,6 +9,7 @@ import { ProjectEditorPage } from "./project-editor/ProjectEditorPage";
 import { ErrorType, StartError } from "./StartError";
 import { InGame } from "./InGame";
 import { Auth } from "./Auth";
+import { terrainManager } from "../../renderer/AssetManagers/TerrainManager";
 
 interface Props {}
 
@@ -47,7 +48,7 @@ export class Application extends Component<Props> {
       gameLoader = new GameLoader(renderer);
       eventManager = new UIEventManager();
 
-      const bindables: IBindable[] = [renderer, eventManager];
+      const bindables: IBindable[] = [renderer, eventManager, terrainManager];
 
       try {
         await wasmManager.load(bindables);

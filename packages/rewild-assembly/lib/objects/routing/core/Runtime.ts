@@ -9,6 +9,7 @@ import { Portal } from "./Portal";
 import { addChild } from "../../../core/TransformNode";
 import { GSSolver, NaiveBroadphase, World, WorldOptions } from "rewild-physics";
 import { performanceNow } from "../../../Imports";
+import { Terrain } from "../../../terrain/Terrain";
 
 export class Runtime implements Listener {
   renderer: WebGPURenderer;
@@ -21,6 +22,7 @@ export class Runtime implements Listener {
   private inactiveNodes: Node[];
   public lastCallTime: f32 = 0;
   private resetCallTime: boolean = false;
+  private terrain: Terrain;
 
   constructor(width: f32, height: f32, renderer: WebGPURenderer) {
     this.nodes = [];
@@ -35,6 +37,7 @@ export class Runtime implements Listener {
     (this.world.solver as GSSolver).iterations = 10;
     this.world.defaultContactMaterial.contactEquationStiffness = 1e7;
     this.world.defaultContactMaterial.contactEquationRelaxation = 4;
+    this.terrain = new Terrain();
 
     this.renderer = renderer;
     this.scene = new Scene();
@@ -121,6 +124,7 @@ export class Runtime implements Listener {
     const inactiveNodes = this.inactiveNodes;
 
     this.updatePhysics();
+    this.terrain.update();
 
     // Unmount inactive nodes
     const numInactiveNodes = inactiveNodes.length;
