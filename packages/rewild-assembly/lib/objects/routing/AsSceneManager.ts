@@ -1,7 +1,7 @@
 import { Runtime } from "./core/Runtime";
 import { EngineVector4 } from "../../math/Vector4";
 import { WebGPURenderer } from "../../renderers/WebGPURenderer";
-import { Container } from ".";
+import { Container, Level, Node } from ".";
 
 let runtime: Runtime | null = null;
 const renderer = new WebGPURenderer();
@@ -25,10 +25,10 @@ export function update(total: u32, delta: f32): void {
   runtime!.OnLoop(delta, total);
 }
 
-export function addContainer(container: Container, activate: boolean): void {
-  runtime!.addContainer(container, activate);
+export function addNodeToRuntime(node: Node, activate: boolean): void {
+  runtime!.addNode(node, activate);
 }
 
-export function removeContainer(container: Container): void {
-  runtime!.removeContainer(container);
+export function removeNodeFromRuntime(container: Node): void {
+  runtime!.removeNode(container);
 }

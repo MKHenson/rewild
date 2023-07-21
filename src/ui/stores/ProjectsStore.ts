@@ -48,6 +48,8 @@ export class ProjectsStore extends Store<IProjectStore> {
 
       const newLevel: ILevel = {
         containers: [],
+        hasTerrain: true,
+        name: token.name || "",
         startEvent: token.startEvent || "",
         created: Timestamp.now(),
         lastModified: Timestamp.now(),

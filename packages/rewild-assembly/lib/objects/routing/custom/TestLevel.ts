@@ -13,7 +13,7 @@ export class TestLevel extends Container implements Listener {
   private sbybox!: TransformNode;
 
   constructor(name: string) {
-    super(name);
+    super(name, true);
   }
 
   init(): void {

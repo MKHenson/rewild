@@ -3,7 +3,6 @@ import { WebGPURenderer } from "../../../renderers/WebGPURenderer";
 import { inputManager } from "../../../extras/io/InputManager";
 import { Scene } from "../../../scenes/Scene";
 import { PerspectiveCamera } from "../../../cameras/PerspectiveCamera";
-import { Container } from "./Container";
 import { Node } from "./Node";
 import { Portal } from "./Portal";
 import { addChild } from "../../../core/TransformNode";
@@ -66,34 +65,35 @@ export class Runtime implements Listener {
     return null;
   }
 
-  addContainer(container: Container, activevate: boolean): void {
-    container.runtime = this;
-    this.nodes.push(container);
+  addNode(node: Node, activevate: boolean): void {
+    node.runtime = this;
+    this.nodes.push(node);
+
     if (activevate) {
-      container.active = true;
-      this.activeNodes.push(container);
-      console.log(`Activating ${container.name}`);
+      node.active = true;
+      this.activeNodes.push(node);
+      console.log(`Activating ${node.name}`);
     }
   }
 
-  removeContainer(container: Container): void {
-    const nodeIndex = this.nodes.indexOf(container);
-    const activeNodeIndex = this.activeNodes.indexOf(container);
-    const inactiveNodeIndex = this.inactiveNodes.indexOf(container);
+  removeNode(node: Node): void {
+    const nodeIndex = this.nodes.indexOf(node);
+    const activeNodeIndex = this.activeNodes.indexOf(node);
+    const inactiveNodeIndex = this.inactiveNodes.indexOf(node);
 
     if (nodeIndex == -1) throw new Error("Container does not exist");
 
-    this.nodes.splice(this.nodes.indexOf(container), 1);
+    this.nodes.splice(this.nodes.indexOf(node), 1);
 
     if (activeNodeIndex != -1) this.activeNodes.splice(activeNodeIndex, 1);
     if (inactiveNodeIndex != -1)
       this.inactiveNodes.splice(inactiveNodeIndex, 1);
-    if (container.active) {
-      container.unMount();
-      console.log(`Deactivating ${container.name}`);
+    if (node.active) {
+      node.unMount();
+      console.log(`Deactivating ${node.name}`);
     }
 
-    container.runtime = null;
+    node.runtime = null;
   }
 
   updatePhysics(): void {
