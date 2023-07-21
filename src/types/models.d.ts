@@ -67,8 +67,10 @@ declare module "models" {
 
   export interface ILevel {
     id?: string;
+    name: string;
     project: string;
     activeOnStartup: boolean;
+    hasTerrain: boolean;
     startEvent: string;
     created: Timestamp;
     lastModified: Timestamp;

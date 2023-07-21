@@ -12,10 +12,14 @@ export class Terrain extends TransformNode {
   update(): void {
     if (!this.isChunkLoaded) {
       this.isChunkLoaded = true;
-      createChunk(changetype<usize>(this));
+      createChunk(this);
     }
   }
 
-  onAddedToParent(): void {}
-  onRemovedFromParent(): void {}
+  onAddedToParent(): void {
+    console.log("Terrain added to parent");
+  }
+  onRemovedFromParent(): void {
+    console.log("Terrain removed from parent");
+  }
 }

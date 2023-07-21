@@ -5,18 +5,24 @@ export {
   init,
   resize,
   update,
-  addContainer,
-  removeContainer,
+  addNodeToRuntime,
+  removeNodeFromRuntime,
 } from "./objects/routing/AsSceneManager";
 export { createMeshPipelineInstance } from "./pipelines/MeshPipelineInstance";
 export { addPipelineAttribute } from "./pipelines/PipelineInstance";
 export { createMeshComponent } from "./components/MeshComponent";
 
 export * from "./components/index";
-export * from "./terrain/index";
+// export * from "./terrain/index";
 export * from "./objects/physics/index";
 
-export { createContainer, addAsset } from "./objects/routing";
+export {
+  createContainer,
+  addAsset,
+  addChildNode,
+  removeChildNode,
+  createLevel,
+} from "./objects/routing";
 export {
   getCameraProjectionInverseMatrix,
   getCameraProjectionMatrix,

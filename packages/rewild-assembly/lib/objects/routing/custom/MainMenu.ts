@@ -17,7 +17,7 @@ export class MainMenu extends Container implements Listener {
   private sun!: DirectionalLight;
 
   constructor(name: string) {
-    super(name, false);
+    super(name, true);
     this.portals.push(new Portal("Enter", this));
     this.portals.push(new Portal("Exit - Start Game", this));
     this.portals.push(new Portal("Exit - Start Editor", this));

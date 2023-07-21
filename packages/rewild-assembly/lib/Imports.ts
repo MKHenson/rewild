@@ -1,6 +1,7 @@
 import { ApplicationEventType, Event } from "rewild-common";
 import { Component } from "./core/Component";
 import { Camera } from "./cameras/Camera";
+import { TransformNode } from "./core/TransformNode";
 
 export declare function onSignalReceived(
   type: ApplicationEventType,
@@ -9,7 +10,7 @@ export declare function onSignalReceived(
 export declare function performanceNow(): f32;
 export declare function lock(): void;
 export declare function unlock(): void;
-export declare function createChunk(terrain: usize): void;
+export declare function createChunk(terrain: TransformNode): void;
 export declare function setupLights(
   numLights: u32,
   config: usize,

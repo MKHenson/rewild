@@ -48,7 +48,8 @@ export class Node {
 
   getPortal(name: string): Portal | null {
     const portals = this.portals;
-    for (let i: i32 = 0, l = portals.length; i < l; i++) if (portals[i].name == name) return portals[i];
+    for (let i: i32 = 0, l = portals.length; i < l; i++)
+      if (portals[i].name == name) return portals[i];
 
     return null;
   }
@@ -71,4 +72,12 @@ export class Node {
     if (turnOff) this.active = false;
     this.runtime!.sendSignal(exitPortal);
   }
+}
+
+export function addChildNode(parent: Node, child: Node): void {
+  parent.addChild(child);
+}
+
+export function removeChildNode(parent: Node, child: Node): void {
+  parent.removeChild(child);
 }

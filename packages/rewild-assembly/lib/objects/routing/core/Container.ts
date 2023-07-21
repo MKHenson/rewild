@@ -10,16 +10,16 @@ import { Component } from "../../../core/Component";
 export class Container extends Node {
   protected objects: TransformNode[];
   protected loaded: boolean;
+  activeOnStartup: boolean;
 
-  constructor(name: string, addDefaultPortals: boolean = true) {
+  constructor(name: string, activeOnStartup: boolean) {
     super(name);
     this.objects = [];
     this.loaded = false;
+    this.activeOnStartup = activeOnStartup;
 
-    if (addDefaultPortals) {
-      this.portals.push(new Portal("Enter", this));
-      this.portals.push(new Portal("Exit", this));
-    }
+    this.portals.push(new Portal("Enter", this));
+    this.portals.push(new Portal("Exit", this));
   }
 
   findObjectByName(name: string): TransformNode | null {
@@ -82,8 +82,8 @@ export class Container extends Node {
   }
 }
 
-export function createContainer(name: string): Container {
-  return new Container(name);
+export function createContainer(name: string, activeOnStartup: boolean): Node {
+  return new Container(name, activeOnStartup);
 }
 
 export function addAsset(container: Container, object: TransformNode): void {

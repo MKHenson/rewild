@@ -7,7 +7,7 @@ export class PhysicsComponent extends Component {
   constructor() {
     super(wasm.createPhysicsComponent(wasm.createBodyBall(1, 30)));
     this.propertiesView = wasm.getFloat32Array(
-      wasm.getPlayerComponentProperties(this.pointer)
+      wasm.getPhysicsComponentProperties(this.pointer)
     );
   }
 

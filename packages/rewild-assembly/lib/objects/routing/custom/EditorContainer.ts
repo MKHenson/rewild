@@ -15,7 +15,7 @@ export class EditorContainer extends Container implements Listener {
   private sun!: DirectionalLight;
 
   constructor(name: string) {
-    super(name);
+    super(name, true);
   }
 
   init(): void {

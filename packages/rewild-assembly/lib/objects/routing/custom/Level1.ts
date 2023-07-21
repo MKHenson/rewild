@@ -50,7 +50,7 @@ export class Level1 extends Container implements Listener {
   private gravity: f32 = -9.8;
 
   constructor(name: string) {
-    super(name);
+    super(name, true);
     this.totalTime = 0;
     this.isPaused = false;
     // this.sphereBody = null;
