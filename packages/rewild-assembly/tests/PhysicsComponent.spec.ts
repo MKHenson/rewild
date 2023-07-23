@@ -9,7 +9,7 @@ describe("PhysicsComponent", () => {
   });
 
   it("creates a transform node & live view of data properties", () => {
-    component = wasm.createPhysicsComponent();
+    component = wasm.createPhysicsComponent(wasm.createBodyBall(1, 30));
     array = wasm.getLiveF32Array(wasm.getPhysicsComponentProperties(component));
   });
 

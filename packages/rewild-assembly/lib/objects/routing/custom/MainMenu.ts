@@ -18,9 +18,9 @@ export class MainMenu extends Container implements Listener {
 
   constructor(name: string) {
     super(name, true);
-    this.portals.push(new Portal("Enter", this));
-    this.portals.push(new Portal("Exit - Start Game", this));
-    this.portals.push(new Portal("Exit - Start Editor", this));
+    this.addPortal(new Portal("Enter"));
+    this.addPortal(new Portal("Exit - Start Game"));
+    this.addPortal(new Portal("Exit - Start Editor"));
   }
 
   init(): void {

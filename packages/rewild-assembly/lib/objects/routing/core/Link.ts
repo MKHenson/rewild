@@ -15,3 +15,15 @@ export class Link {
     source.links.push(this);
   }
 }
+
+export function createLink(): Link {
+  return new Link();
+}
+
+export function connectLink(
+  link: Link,
+  source: Portal,
+  destination: Portal
+): void {
+  link.connect(source, destination);
+}

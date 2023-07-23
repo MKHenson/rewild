@@ -2,10 +2,29 @@ import { EngineMatrix4 } from "./math/Matrix4";
 import { Matrix4, Matrix3 } from "rewild-common";
 import { EngineVector3 } from "./math/Vector3";
 
+export {
+  addNodeToRuntime,
+  getRuntime,
+  init,
+  removeNodeFromRuntime,
+  update,
+} from "./objects/routing/AsSceneManager";
+export {
+  createContainer,
+  addChildNode,
+  connectLink,
+  createLink,
+  addNodePortal,
+  removeNodePortal,
+  createPortal,
+  exitNode,
+} from "../lib/objects/routing/index";
+export { createDebugNode } from "./tests/DebugNode";
 export * from "./tests/performance.spec";
 export * from "./tests/TransformNode.spec";
 export * from "./tests/PlayerComponent.spec";
 export * from "./tests/PhysicsComponent.spec";
+export * from "../lib/objects/physics/common-bodies";
 
 // prettier-ignore
 function newMatrix4(): EngineMatrix4 { return new EngineMatrix4(); }
