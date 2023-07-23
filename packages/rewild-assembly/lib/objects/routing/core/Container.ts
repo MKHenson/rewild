@@ -18,8 +18,8 @@ export class Container extends Node {
     this.loaded = false;
     this.activeOnStartup = activeOnStartup;
 
-    this.portals.push(new Portal("Enter", this));
-    this.portals.push(new Portal("Exit", this));
+    this.addPortal(new Portal("Enter"));
+    this.addPortal(new Portal("Exit"));
   }
 
   findObjectByName(name: string): TransformNode | null {

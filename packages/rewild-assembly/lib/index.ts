@@ -22,6 +22,12 @@ export {
   addChildNode,
   removeChildNode,
   createLevel,
+  createLink,
+  connectLink,
+  getNodePortal,
+  addNodePortal,
+  removeNodePortal,
+  createPortal,
 } from "./objects/routing";
 export {
   getCameraProjectionInverseMatrix,

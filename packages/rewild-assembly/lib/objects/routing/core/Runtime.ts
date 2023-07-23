@@ -161,33 +161,33 @@ export class Runtime implements Listener {
     const links = sourcePortal.links;
 
     // If the source is no longer active then remove it
-    if (!sourcePortal.node.active) {
-      if (activeNodes.indexOf(sourcePortal.node) != -1) {
-        activeNodes.splice(activeNodes.indexOf(sourcePortal.node), 1);
-        this.inactiveNodes.push(sourcePortal.node);
+    if (!sourcePortal.node!.active) {
+      if (activeNodes.indexOf(sourcePortal.node!) != -1) {
+        activeNodes.splice(activeNodes.indexOf(sourcePortal.node!), 1);
+        this.inactiveNodes.push(sourcePortal.node!);
 
-        console.log(`Deactivating ${sourcePortal.node.name}`);
+        console.log(`Deactivating ${sourcePortal.node!.name}`);
       }
     }
 
     for (let i: i32 = 0, l = links.length; i < l; i++) {
-      unchecked(links[i]).destinationPortal!.node.enter(
+      unchecked(links[i]).destinationPortal!.node!.enter(
         unchecked(links[i]).destinationPortal!
       );
 
       console.log(
         `Entering ${unchecked(links[i]).destinationPortal!.name} of ${
-          unchecked(links[i]).destinationPortal!.node.name
-        } which is active ${links[i].destinationPortal!.node.active}`
+          unchecked(links[i]).destinationPortal!.node!.name
+        } which is active ${links[i].destinationPortal!.node!.active}`
       );
 
       if (
-        activeNodes.indexOf(unchecked(links[i]).destinationPortal!.node) == -1
+        activeNodes.indexOf(unchecked(links[i]).destinationPortal!.node!) == -1
       ) {
-        activeNodes.push(unchecked(links[i]).destinationPortal!.node);
+        activeNodes.push(unchecked(links[i]).destinationPortal!.node!);
 
         console.log(
-          `Activating ${unchecked(links[i]).destinationPortal!.node.name}`
+          `Activating ${unchecked(links[i]).destinationPortal!.node!.name}`
         );
       }
     }

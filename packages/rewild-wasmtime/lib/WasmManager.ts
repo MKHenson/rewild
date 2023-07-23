@@ -5,6 +5,7 @@ export type Wasm = typeof __AdaptedExports & {
   getFloat32Array: (pointer: Number) => Float32Array;
   getUint32Array: (pointer: Number) => Uint32Array;
   getInt32Array: (pointer: Number) => Int32Array;
+  readString: (pointer: number) => string | null;
 };
 
 export let wasmManager: WasmManager;
@@ -23,8 +24,13 @@ export class WasmManager {
     wasmManager = this;
   }
 
-  private __liftTypedArray<T extends Float32Array | Int32Array | Int16Array | Uint32Array>(
-    constructor: Float32ArrayConstructor | Uint32ArrayConstructor | Int32ArrayConstructor,
+  private __liftTypedArray<
+    T extends Float32Array | Int32Array | Int16Array | Uint32Array
+  >(
+    constructor:
+      | Float32ArrayConstructor
+      | Uint32ArrayConstructor
+      | Int32ArrayConstructor,
     pointer: number
   ): T {
     const memoryU32 = this.memoryU32;
@@ -33,6 +39,21 @@ export class WasmManager {
       memoryU32[(pointer + 4) >>> 2],
       memoryU32[(pointer + 8) >>> 2] / constructor.BYTES_PER_ELEMENT
     ) as T;
+  }
+
+  private __liftString(pointer: number | null) {
+    if (!pointer) return null;
+    const end =
+        (pointer + new Uint32Array(this.memory.buffer)[(pointer - 4) >>> 2]) >>>
+        1,
+      memoryU16 = new Uint16Array(this.memory.buffer);
+    let start = pointer >>> 1,
+      string = "";
+    while (end - start > 1024)
+      string += String.fromCharCode(
+        ...memoryU16.subarray(start, (start += 1024))
+      );
+    return string + String.fromCharCode(...memoryU16.subarray(start, end));
   }
 
   async load(bindables: IBindable[]) {
@@ -44,18 +65,26 @@ export class WasmManager {
       performanceNow: () => performance.now(),
     };
 
-    for (const bindable of bindables) Object.assign(bindings, bindable.createBinding());
+    for (const bindable of bindables)
+      Object.assign(bindings, bindable.createBinding());
 
-    const obj = (await instantiate(await WebAssembly.compileStreaming(fetch("/release.wasm")), {
-      Imports: bindings,
-      env: {
-        memory: this.memory,
-      },
-    })) as Wasm;
+    const obj = (await instantiate(
+      await WebAssembly.compileStreaming(fetch("/release.wasm")),
+      {
+        Imports: bindings,
+        env: {
+          memory: this.memory,
+        },
+      }
+    )) as Wasm;
 
-    obj.getFloat32Array = (pointer) => this.__liftTypedArray(Float32Array, pointer.valueOf() >>> 0);
-    obj.getUint32Array = (pointer) => this.__liftTypedArray(Uint32Array, pointer.valueOf() >>> 0);
-    obj.getInt32Array = (pointer) => this.__liftTypedArray(Int32Array, pointer.valueOf() >>> 0);
+    obj.getFloat32Array = (pointer) =>
+      this.__liftTypedArray(Float32Array, pointer.valueOf() >>> 0);
+    obj.getUint32Array = (pointer) =>
+      this.__liftTypedArray(Uint32Array, pointer.valueOf() >>> 0);
+    obj.getInt32Array = (pointer) =>
+      this.__liftTypedArray(Int32Array, pointer.valueOf() >>> 0);
+    obj.readString = (pointer) => this.__liftString(pointer >>> 0);
 
     this.exports = obj;
     wasm = obj;

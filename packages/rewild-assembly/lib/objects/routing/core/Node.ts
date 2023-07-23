@@ -42,6 +42,23 @@ export class Node {
     return node;
   }
 
+  addPortal(portal: Portal): Portal {
+    if (this.portals.indexOf(portal) == -1) {
+      this.portals.push(portal);
+      portal.node = this;
+    }
+    return portal;
+  }
+
+  removePortal(portal: Portal): Portal {
+    const i = this.portals.indexOf(portal);
+    if (i != -1) {
+      this.portals.splice(i, 1);
+      portal.node = null;
+    }
+    return portal;
+  }
+
   init(): void {
     this.initialized = true;
   }
@@ -80,4 +97,20 @@ export function addChildNode(parent: Node, child: Node): void {
 
 export function removeChildNode(parent: Node, child: Node): void {
   parent.removeChild(child);
+}
+
+export function getNodePortal(node: Node, portalName: string): Portal | null {
+  return node.getPortal(portalName);
+}
+
+export function addNodePortal(node: Node, portal: Portal): void {
+  node.addPortal(portal);
+}
+
+export function removeNodePortal(node: Node, portal: Portal): void {
+  node.removePortal(portal);
+}
+
+export function exitNode(node: Node, portal: Portal, turnOff: boolean): void {
+  node.exit(portal, turnOff);
 }
