@@ -12,8 +12,12 @@ export class Container extends Node {
   protected loaded: boolean;
   activeOnStartup: boolean;
 
-  constructor(name: string, activeOnStartup: boolean) {
-    super(name);
+  constructor(
+    name: string,
+    activeOnStartup: boolean,
+    autoDispose: boolean = false
+  ) {
+    super(name, autoDispose);
     this.objects = [];
     this.loaded = false;
     this.activeOnStartup = activeOnStartup;
@@ -75,15 +79,19 @@ export class Container extends Node {
 
       for (let c: i32 = 0, cl = components.length; c < cl; c++) {
         const component = unchecked(components[c]);
-        component.mount(this.runtime!);
+        component.unMount(this.runtime!);
       }
     }
     super.unMount();
   }
 }
 
-export function createContainer(name: string, activeOnStartup: boolean): Node {
-  return new Container(name, activeOnStartup);
+export function createContainer(
+  name: string,
+  activeOnStartup: boolean,
+  autoDispose: boolean = false
+): Node {
+  return new Container(name, activeOnStartup, autoDispose);
 }
 
 export function addAsset(container: Container, object: TransformNode): void {

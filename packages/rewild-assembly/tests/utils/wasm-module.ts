@@ -9,13 +9,17 @@ const importObject = {
       nodeName: number,
       functionName: number,
       portalName: number
-    ) => {
-      console.log(
-        `${wasm.readString(nodeName)}.${wasm.readString(
-          functionName
-        )}(${wasm.readString(portalName)})`
-      );
-    },
+    ) => {},
+    transformCallback: (
+      transformName: number,
+      functionName: number,
+      data: number
+    ) => {},
+    componentCallback: (
+      componentName: number,
+      functionName: number,
+      data: number
+    ) => {},
     setupLights: (numLights, config, scene, direction) => {},
     renderComponents: (camera, meshComponents) => {},
     createChunk: (terrain) => {},

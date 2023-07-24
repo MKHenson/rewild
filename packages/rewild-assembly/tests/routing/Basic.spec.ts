@@ -14,7 +14,7 @@ describe("Basic Routing", () => {
 
   it("creates a runtime with a single debug node", () => {
     wasm.init(500, 500);
-    debugNode = wasm.createDebugNode("Test");
+    debugNode = wasm.createDebugNode("Test", true);
     const link = wasm.createLink();
     const portalEnter = wasm.createPortal("Enter");
     portalExit = wasm.createPortal("Exit");
@@ -25,11 +25,14 @@ describe("Basic Routing", () => {
   });
 
   it("has not called any functions yet", () => {
+    expect(wasm.getActiveNodeCount()).toBe(1);
+    expect(wasm.getNodeCount()).toBe(1);
     expect(nodeCallback).not.toHaveBeenCalled();
   });
 
   it("has mounted the debug node & called update once", () => {
     wasm.update(1, 1);
+    expect(wasm.getActiveNodeCount()).toBe(1);
     expect(nodeCallback).toHaveBeenCalledTimes(2);
     expect(nodeCallback).toHaveBeenNthCalledWith(1, "Test", "mount", "");
     expect(nodeCallback).toHaveBeenNthCalledWith(2, "Test", "onUpdate", "");
@@ -45,5 +48,7 @@ describe("Basic Routing", () => {
     wasm.update(1, 1);
     expect(nodeCallback).toHaveBeenCalledTimes(4);
     expect(nodeCallback).toHaveBeenNthCalledWith(4, "Test", "unMount", "");
+    expect(wasm.getActiveNodeCount()).toBe(0);
+    expect(wasm.getNodeCount()).toBe(0);
   });
 });

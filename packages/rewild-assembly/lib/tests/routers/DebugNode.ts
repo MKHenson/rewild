@@ -1,10 +1,10 @@
-import { Node } from "../objects/routing/core/Node";
-import { Portal } from "../objects/routing/core/Portal";
-import { nodeCallback } from "./Imports";
+import { Node } from "../../objects/routing/core/Node";
+import { Portal } from "../../objects/routing/core/Portal";
+import { nodeCallback } from "../Imports";
 
 export class DebugNode extends Node {
-  constructor(name: string) {
-    super(name);
+  constructor(name: string, autoDispose: boolean) {
+    super(name, autoDispose);
   }
 
   mount(): void {
@@ -33,6 +33,6 @@ export class DebugNode extends Node {
   }
 }
 
-export function createDebugNode(name: string): Node {
-  return new DebugNode(name);
+export function createDebugNode(name: string, autoDispose: boolean): Node {
+  return new DebugNode(name, autoDispose);
 }
