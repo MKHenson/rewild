@@ -8,18 +8,30 @@ export {
   init,
   removeNodeFromRuntime,
   update,
+  getActiveNodeCount,
+  getNodeCount,
 } from "./objects/routing/AsSceneManager";
+export {
+  addChild,
+  removeChild,
+  getVisibility,
+  setVisibility,
+  addComponent,
+} from "./core/TransformNode";
 export {
   createContainer,
   addChildNode,
   connectLink,
   createLink,
   addNodePortal,
+  getNodePortal,
   removeNodePortal,
   createPortal,
+  addAsset,
   exitNode,
 } from "../lib/objects/routing/index";
-export { createDebugNode } from "./tests/DebugNode";
+export * from "./tests/routers";
+export * from "./tests/helpers";
 export * from "./tests/performance.spec";
 export * from "./tests/TransformNode.spec";
 export * from "./tests/PlayerComponent.spec";

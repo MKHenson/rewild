@@ -32,3 +32,11 @@ export function addNodeToRuntime(node: Node, activate: boolean): void {
 export function removeNodeFromRuntime(container: Node): void {
   runtime!.removeNode(container);
 }
+
+export function getActiveNodeCount(): i32 {
+  return runtime!.activeNodes.length;
+}
+
+export function getNodeCount(): i32 {
+  return runtime!.nodes.length;
+}

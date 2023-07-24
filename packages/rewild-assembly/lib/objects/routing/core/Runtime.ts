@@ -16,8 +16,8 @@ export class Runtime implements Listener {
   camera: PerspectiveCamera;
   world: World;
 
-  private nodes: Node[];
-  private activeNodes: Node[];
+  readonly nodes: Node[];
+  readonly activeNodes: Node[];
   private inactiveNodes: Node[];
   public lastCallTime: f32 = 0;
   private resetCallTime: boolean = false;
@@ -132,6 +132,7 @@ export class Runtime implements Listener {
       for (let i: i32 = 0; i < numInactiveNodes; i++) {
         const node = unchecked(inactiveNodes[i]);
         node.unMount();
+        if (node.autoDispose) this.removeNode(node);
       }
 
       inactiveNodes.splice(0, numInactiveNodes);

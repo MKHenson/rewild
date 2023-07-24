@@ -9,10 +9,11 @@ export class Node {
   runtime: Runtime | null;
   initialized: boolean;
   mounted: boolean;
+  autoDispose: boolean;
   active: boolean;
   name: string;
 
-  constructor(name: string) {
+  constructor(name: string, autoDispose: boolean = true) {
     this.name = name;
     this.children = [];
     this.portals = [];
@@ -20,6 +21,7 @@ export class Node {
     this.parent = null;
     this.mounted = false;
     this.active = false;
+    this.autoDispose = autoDispose;
   }
 
   addChild(node: Node): Node {
