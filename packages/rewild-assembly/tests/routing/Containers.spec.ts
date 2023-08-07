@@ -49,14 +49,18 @@ describe("Container Routing Tests", () => {
       "onUpdate",
       ""
     );
+  });
 
+  it("has added the asset to the scene graph", () => {
     expect(transformCallback).toHaveBeenCalled();
     expect(transformCallback).toHaveBeenCalledWith(
       "TransformA",
       "onAddedToParent",
       ""
     );
+  });
 
+  it("has called the mount function on the asset component", () => {
     expect(componentCallback).toHaveBeenCalled();
     expect(componentCallback).toHaveBeenCalledWith(
       "TransformComponentA",
@@ -76,54 +80,33 @@ describe("Container Routing Tests", () => {
     );
   });
 
-  // onUpdate(delta: f32, total: u32): void {
-  //   super.onUpdate(delta, total);
-  //   componentCallback(this.name!, "onUpdate", "");
-  // }
-
-  // mount(runtime: Runtime): void {
-  //   super.mount(runtime);
-  //   componentCallback(this.name!, "mount", "");
-  // }
-
-  // unMount(runtime: Runtime): void {
-  //   super.unMount(runtime);
-  //   componentCallback(this.name!, "unMount", "");
-  // }
-
-  it("calls exitNode and subsequently exit on the container & removes assets", () => {
-    wasm.exitNode(container, portalExit, true);
-    expect(nodeCallback).toHaveBeenCalledTimes(4);
-    expect(nodeCallback).toHaveBeenNthCalledWith(
-      4,
-      "ContainerA",
-      "exit",
-      "Exit"
-    );
-  });
-
   it("unmounts the node on the next update", () => {
     transformCallback.mockClear();
     componentCallback.mockClear();
 
+    wasm.sendSignal(portalExit, true);
     wasm.update(1, 1);
-    expect(nodeCallback).toHaveBeenCalledTimes(5);
+    expect(nodeCallback).toHaveBeenCalledTimes(4);
     expect(nodeCallback).toHaveBeenNthCalledWith(
-      5,
+      4,
       "ContainerA",
       "unMount",
       ""
     );
     expect(wasm.getActiveNodeCount()).toBe(0);
     expect(wasm.getNodeCount()).toBe(0);
+  });
 
+  it("removes the asset from the scene graph", () => {
     expect(transformCallback).toHaveBeenCalled();
     expect(transformCallback).toHaveBeenCalledWith(
       "TransformA",
       "onRemovedFromParent",
       ""
     );
+  });
 
+  it("calls unmount on the component", () => {
     expect(componentCallback).toHaveBeenCalled();
     expect(componentCallback).toHaveBeenCalledWith(
       "TransformComponentA",

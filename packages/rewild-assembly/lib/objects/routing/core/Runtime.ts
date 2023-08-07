@@ -70,28 +70,24 @@ export class Runtime implements Listener {
     this.nodes.push(node);
 
     if (activevate) {
-      node.active = true;
       this.activeNodes.push(node);
-      console.log(`Activating ${node.name}`);
     }
   }
 
-  removeNode(node: Node): void {
+  removeNode(node: Node, removeFromInactiveNodes: boolean = true): void {
     const nodeIndex = this.nodes.indexOf(node);
     const activeNodeIndex = this.activeNodes.indexOf(node);
     const inactiveNodeIndex = this.inactiveNodes.indexOf(node);
 
-    if (nodeIndex == -1) throw new Error("Container does not exist");
+    if (nodeIndex != -1) this.nodes.splice(nodeIndex, 1);
 
-    this.nodes.splice(this.nodes.indexOf(node), 1);
-
-    if (activeNodeIndex != -1) this.activeNodes.splice(activeNodeIndex, 1);
-    if (inactiveNodeIndex != -1)
-      this.inactiveNodes.splice(inactiveNodeIndex, 1);
-    if (node.active) {
-      node.unMount();
-      console.log(`Deactivating ${node.name}`);
+    if (activeNodeIndex != -1) {
+      this.activeNodes.splice(activeNodeIndex, 1);
+      if (node.mounted) node.unMount();
     }
+
+    if (removeFromInactiveNodes && inactiveNodeIndex != -1)
+      this.inactiveNodes.splice(inactiveNodeIndex, 1);
 
     node.runtime = null;
   }
@@ -132,7 +128,8 @@ export class Runtime implements Listener {
       for (let i: i32 = 0; i < numInactiveNodes; i++) {
         const node = unchecked(inactiveNodes[i]);
         node.unMount();
-        if (node.autoDispose) this.removeNode(node);
+        console.log("Unmounting node: " + node.name);
+        if (node.autoDispose) this.removeNode(node, false);
       }
 
       inactiveNodes.splice(0, numInactiveNodes);
@@ -153,43 +150,58 @@ export class Runtime implements Listener {
     this.renderer.render(this.scene, this.camera);
   }
 
+  private deactivateNode(node: Node): void {
+    const activeNodes = this.activeNodes;
+    const inactiveNodes = this.inactiveNodes;
+    console.log(
+      "Deactivating child: " +
+        node.name +
+        " with " +
+        node.children.length.toString() +
+        " children"
+    );
+
+    for (let i: i32 = 0, l: i32 = node.children.length; i < l; i++) {
+      const child = unchecked(node.children[i]);
+
+      this.deactivateNode(child);
+    }
+
+    if (activeNodes.indexOf(node) != -1) {
+      activeNodes.splice(activeNodes.indexOf(node), 1);
+    }
+
+    if (inactiveNodes.indexOf(node) == -1) {
+      inactiveNodes.push(node);
+    }
+  }
+
   /**
    * Fires the signal from a source portal to a destination. Which in turn may start a new node
    * @param sourcePortal
    */
-  sendSignal(sourcePortal: Portal): void {
+  sendSignal(sourcePortal: Portal, turnOff: boolean): void {
     const activeNodes = this.activeNodes;
     const links = sourcePortal.links;
 
-    // If the source is no longer active then remove it
-    if (!sourcePortal.node!.active) {
-      if (activeNodes.indexOf(sourcePortal.node!) != -1) {
-        activeNodes.splice(activeNodes.indexOf(sourcePortal.node!), 1);
-        this.inactiveNodes.push(sourcePortal.node!);
+    console.log("sendSignal: " + sourcePortal.name + " " + turnOff.toString());
 
-        console.log(`Deactivating ${sourcePortal.node!.name}`);
-      }
+    // If the source is no longer active then remove it from the active nodes
+    if (turnOff) this.deactivateNode(sourcePortal.node!);
+
+    for (let i: i32 = 0, l: i32 = this.inactiveNodes.length; i < l; i++) {
+      console.log("deactivated node: " + unchecked(this.inactiveNodes[i]).name);
     }
 
+    // Enter each of the destination nodes
+    // and add them to the active nodes
     for (let i: i32 = 0, l = links.length; i < l; i++) {
-      unchecked(links[i]).destinationPortal!.node!.enter(
-        unchecked(links[i]).destinationPortal!
-      );
+      const link = unchecked(links[i]);
+      const destPortal = link.destinationPortal!;
+      destPortal.node!.enter(destPortal);
 
-      console.log(
-        `Entering ${unchecked(links[i]).destinationPortal!.name} of ${
-          unchecked(links[i]).destinationPortal!.node!.name
-        } which is active ${links[i].destinationPortal!.node!.active}`
-      );
-
-      if (
-        activeNodes.indexOf(unchecked(links[i]).destinationPortal!.node!) == -1
-      ) {
-        activeNodes.push(unchecked(links[i]).destinationPortal!.node!);
-
-        console.log(
-          `Activating ${unchecked(links[i]).destinationPortal!.node!.name}`
-        );
+      if (activeNodes.indexOf(destPortal.node!) == -1) {
+        activeNodes.push(destPortal.node!);
       }
     }
   }

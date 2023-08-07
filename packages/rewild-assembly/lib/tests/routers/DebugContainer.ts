@@ -8,33 +8,28 @@ export class DebugContainer extends Container {
   }
 
   mount(): void {
-    super.mount();
     nodeCallback(this.name, "mount", "");
+    super.mount();
   }
 
   addAsset(object: TransformNode): void {
-    super.addAsset(object);
     nodeCallback(this.name, "addAsset", object.name);
+    super.addAsset(object);
   }
 
   unMount(): void {
-    super.unMount();
     nodeCallback(this.name, "unMount", "");
+    super.unMount();
   }
 
   onUpdate(delta: f32, total: u32): void {
-    super.onUpdate(delta, total);
     nodeCallback(this.name, "onUpdate", "");
+    super.onUpdate(delta, total);
   }
 
   enter(portalEntered: Portal): void {
-    super.enter(portalEntered);
     nodeCallback(this.name, "enter", portalEntered.name);
-  }
-
-  exit(exitPortal: Portal, turnOff: boolean): void {
-    super.exit(exitPortal, turnOff);
-    nodeCallback(this.name, "exit", exitPortal.name);
+    super.enter(portalEntered);
   }
 }
 

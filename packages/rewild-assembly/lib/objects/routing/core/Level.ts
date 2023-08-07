@@ -4,8 +4,8 @@ import { Container } from "./Container";
 import { Link } from "./Link";
 
 export class Level extends Node {
-  constructor(name: string) {
-    super(name);
+  constructor(name: string, autoDispose: boolean = false) {
+    super(name, autoDispose);
 
     this.portals.push(new Portal("Enter", this));
     this.portals.push(new Portal("Exit", this));
@@ -13,6 +13,13 @@ export class Level extends Node {
 
   onUpdate(delta: f32, total: u32): void {
     super.onUpdate(delta, total);
+  }
+
+  mount(): void {
+    super.mount();
+
+    // Activate the enter portal
+    this.runtime!.sendSignal(this.getPortal("Enter")!, false);
   }
 
   addChild(node: Node): Node {
@@ -25,14 +32,20 @@ export class Level extends Node {
           this.getPortal("Enter")!,
           container.getPortal("Enter")!
         );
-        exitLink.connect(
-          container.getPortal("Exit")!,
-          this.getPortal("Enter")!
-        );
+        exitLink.connect(container.getPortal("Exit")!, this.getPortal("Exit")!);
       }
     }
 
     return super.addChild(node);
+  }
+
+  /** When an exit portal is trigged for a level, it will signal to the runtime to exit */
+  enter(portalEntered: Portal): void {
+    super.enter(portalEntered);
+
+    // Activate the exit portal
+    if (portalEntered.name == "Exit")
+      this.runtime!.sendSignal(this.getPortal("Exit")!, true);
   }
 }
 

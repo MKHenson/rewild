@@ -1,8 +1,9 @@
+import { Level } from "../../objects/routing";
 import { Node } from "../../objects/routing/core/Node";
 import { Portal } from "../../objects/routing/core/Portal";
 import { nodeCallback } from "../Imports";
 
-export class DebugNode extends Node {
+export class DebugLevel extends Level {
   constructor(name: string, autoDispose: boolean) {
     super(name, autoDispose);
   }
@@ -26,8 +27,14 @@ export class DebugNode extends Node {
     nodeCallback(this.name, "enter", portalEntered.name);
     super.enter(portalEntered);
   }
+
+  addChild(node: Node): Node {
+    nodeCallback(this.name, "addChild", node.name);
+    const result = super.addChild(node);
+    return result;
+  }
 }
 
-export function createDebugNode(name: string, autoDispose: boolean): Node {
-  return new DebugNode(name, autoDispose);
+export function createDebugLevel(name: string, autoDispose: boolean): Node {
+  return new DebugLevel(name, autoDispose);
 }
