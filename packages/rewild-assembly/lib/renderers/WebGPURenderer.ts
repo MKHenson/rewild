@@ -36,7 +36,6 @@ export class WebGPURenderer {
   }
 
   init(view: EngineVector4): void {
-    console.log(`Initializing WGPU renderer`);
     this.view = view;
   }
 

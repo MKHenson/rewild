@@ -71,8 +71,6 @@ export class Container extends Node {
     const objects = this.objects;
     let components: Component[];
 
-    console.log(this.name + " is unmounting and runtime ");
-
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
       components = objects[i].components;
       removeChild(this.runtime!.scene, unchecked(objects[i]));

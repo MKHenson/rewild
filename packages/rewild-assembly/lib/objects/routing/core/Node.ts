@@ -3,14 +3,13 @@ import { Portal } from "./Portal";
 
 export class Node {
   protected portals: Portal[];
-  protected children: Node[];
+  children: Node[];
   protected parent: Node | null;
 
   runtime: Runtime | null;
   initialized: boolean;
   mounted: boolean;
   autoDispose: boolean;
-  active: boolean;
   name: string;
 
   constructor(name: string, autoDispose: boolean = true) {
@@ -20,7 +19,6 @@ export class Node {
     this.initialized = false;
     this.parent = null;
     this.mounted = false;
-    this.active = false;
     this.autoDispose = autoDispose;
   }
 
@@ -56,7 +54,6 @@ export class Node {
     const i = this.portals.indexOf(portal);
     if (i != -1) {
       this.portals.splice(i, 1);
-      portal.node = null;
     }
     return portal;
   }
@@ -83,14 +80,7 @@ export class Node {
 
   onUpdate(delta: f32, total: u32): void {}
 
-  enter(portalEntered: Portal): void {
-    this.active = true;
-  }
-
-  exit(exitPortal: Portal, turnOff: boolean): void {
-    if (turnOff) this.active = false;
-    this.runtime!.sendSignal(exitPortal);
-  }
+  enter(portalEntered: Portal): void {}
 }
 
 export function addChildNode(parent: Node, child: Node): void {
@@ -111,8 +101,4 @@ export function addNodePortal(node: Node, portal: Portal): void {
 
 export function removeNodePortal(node: Node, portal: Portal): void {
   node.removePortal(portal);
-}
-
-export function exitNode(node: Node, portal: Portal, turnOff: boolean): void {
-  node.exit(portal, turnOff);
 }

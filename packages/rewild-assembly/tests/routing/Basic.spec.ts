@@ -38,16 +38,11 @@ describe("Basic Routing", () => {
     expect(nodeCallback).toHaveBeenNthCalledWith(2, "Test", "onUpdate", "");
   });
 
-  it("calls exitNode and subsequently exit on the debug node", () => {
-    wasm.exitNode(debugNode, portalExit, true);
-    expect(nodeCallback).toHaveBeenCalledTimes(3);
-    expect(nodeCallback).toHaveBeenNthCalledWith(3, "Test", "exit", "Exit");
-  });
-
   it("unmounts the node on the next update", () => {
+    wasm.sendSignal(portalExit, true);
     wasm.update(1, 1);
-    expect(nodeCallback).toHaveBeenCalledTimes(4);
-    expect(nodeCallback).toHaveBeenNthCalledWith(4, "Test", "unMount", "");
+    expect(nodeCallback).toHaveBeenCalledTimes(3);
+    expect(nodeCallback).toHaveBeenNthCalledWith(3, "Test", "unMount", "");
     expect(wasm.getActiveNodeCount()).toBe(0);
     expect(wasm.getNodeCount()).toBe(0);
   });

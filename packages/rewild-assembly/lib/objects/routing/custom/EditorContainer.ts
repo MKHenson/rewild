@@ -34,7 +34,7 @@ export class EditorContainer extends Container implements Listener {
   onEvent(event: Event): void {
     const uiEvent = event.attachment as ApplicationEvent;
     if (uiEvent.eventType == ApplicationEventType.Quit)
-      this.exit(this.getPortal("Exit")!, true);
+      this.runtime!.sendSignal(this.getPortal("Exit")!, true);
   }
 
   onUpdate(delta: f32, total: u32): void {}

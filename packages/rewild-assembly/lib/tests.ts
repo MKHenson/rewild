@@ -10,6 +10,7 @@ export {
   update,
   getActiveNodeCount,
   getNodeCount,
+  sendSignal,
 } from "./objects/routing/AsSceneManager";
 export {
   addChild,
@@ -28,7 +29,6 @@ export {
   removeNodePortal,
   createPortal,
   addAsset,
-  exitNode,
 } from "../lib/objects/routing/index";
 export * from "./tests/routers";
 export * from "./tests/helpers";

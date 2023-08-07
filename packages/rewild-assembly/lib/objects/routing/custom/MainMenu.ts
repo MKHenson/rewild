@@ -51,9 +51,9 @@ export class MainMenu extends Container implements Listener {
   onEvent(event: Event): void {
     const uiEvent = event.attachment as ApplicationEvent;
     if (uiEvent.eventType == ApplicationEventType.StartGame)
-      this.exit(this.getPortal("Exit - Start Game")!, true);
+      this.runtime!.sendSignal(this.getPortal("Exit - Start Game")!, true);
     else if (uiEvent.eventType == ApplicationEventType.StartEditor)
-      this.exit(this.getPortal("Exit - Start Editor")!, true);
+      this.runtime!.sendSignal(this.getPortal("Exit - Start Editor")!, true);
   }
 
   onUpdate(delta: f32, total: u32): void {

@@ -134,7 +134,7 @@ export class Level1 extends Container implements Listener {
     } else {
       const uiEvent = event.attachment as ApplicationEvent;
       if (uiEvent.eventType == ApplicationEventType.Quit)
-        this.exit(this.getPortal("Exit")!, true);
+        this.runtime!.sendSignal(this.getPortal("Exit")!, true);
       else if (uiEvent.eventType == ApplicationEventType.Resume) {
         this.isPaused = false;
         if (!this.useOrbitController) lock();
