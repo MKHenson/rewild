@@ -13,11 +13,11 @@ import { geometryManager } from "../renderer/AssetManagers/GeometryManager";
 /** Loads game files and assets and sends the created objects to wasm */
 export class GameLoader {
   renderer: Renderer;
-  loadedContainerPtrs: any[];
+  loadedPtrs: any[];
 
   constructor(renderer: Renderer) {
     this.renderer = renderer;
-    this.loadedContainerPtrs = [];
+    this.loadedPtrs = [];
   }
 
   async loadSystemContainers() {
@@ -66,7 +66,7 @@ export class GameLoader {
 
     for (const level of startupLevels) {
       const levelPtr = wasm.createLevel(level.name);
-      this.loadedContainerPtrs.push(levelPtr);
+      this.loadedPtrs.push(levelPtr);
       wasm.addNodeToRuntime(levelPtr, true);
 
       for (const container of level.containers) {
@@ -89,11 +89,11 @@ export class GameLoader {
   }
 
   unloadInitialLevels() {
-    for (const containerPtr of this.loadedContainerPtrs) {
+    for (const containerPtr of this.loadedPtrs) {
       wasm.removeNodeFromRuntime(containerPtr);
     }
 
-    this.loadedContainerPtrs.length = 0;
+    this.loadedPtrs.length = 0;
   }
 
   createMesh(geometry: Geometry, pipelineName: string, name?: string) {

@@ -1,6 +1,7 @@
 import { init, wasm } from "../utils/wasm-module";
 
 let nodeCallback = jest.fn();
+let createChunkCallback = jest.fn();
 
 describe("Level Routing Tests", () => {
   let level: any;
@@ -11,6 +12,7 @@ describe("Level Routing Tests", () => {
   beforeAll(async () => {
     await init({
       nodeCallback,
+      createChunk: createChunkCallback,
     });
   });
 
@@ -58,6 +60,10 @@ describe("Level Routing Tests", () => {
     );
     expect(nodeCallback).toHaveBeenNthCalledWith(4, "LevelA", "onUpdate", "");
     expect(wasm.getActiveNodeCount()).toBe(3);
+  });
+
+  it("should have added the terrain to the scene graph", () => {
+    expect(createChunkCallback).toHaveBeenCalled();
   });
 
   it("calls exit on the second container and completely exits all containers and levels", () => {
