@@ -27,7 +27,10 @@ export class Node {
       node.parent!.removeChild(node);
     }
 
-    if (this.children.indexOf(node) == -1) this.children.push(node);
+    if (this.children.indexOf(node) == -1) {
+      this.children.push(node);
+      node.runtime = this.runtime;
+    }
 
     node.parent = this;
     return node;

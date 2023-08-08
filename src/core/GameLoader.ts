@@ -89,8 +89,8 @@ export class GameLoader {
   }
 
   unloadInitialLevels() {
-    for (const containerPtr of this.loadedPtrs) {
-      wasm.removeNodeFromRuntime(containerPtr);
+    for (const ptr of this.loadedPtrs) {
+      wasm.removeNodeFromRuntime(ptr);
     }
 
     this.loadedPtrs.length = 0;
