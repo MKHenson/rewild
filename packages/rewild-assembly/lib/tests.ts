@@ -32,10 +32,10 @@ export {
 } from "../lib/objects/routing/index";
 export * from "./tests/routers";
 export * from "./tests/helpers";
-export * from "./tests/performance.spec";
-export * from "./tests/TransformNode.spec";
-export * from "./tests/PlayerComponent.spec";
-export * from "./tests/PhysicsComponent.spec";
+export * from "./tests/performance";
+export * from "./tests/TransformNode";
+export * from "./tests/PlayerComponent";
+export * from "./tests/PhysicsComponent";
 export * from "../lib/objects/physics/common-bodies";
 
 // prettier-ignore

@@ -8,7 +8,6 @@ import { Portal } from "./Portal";
 import { addChild } from "../../../core/TransformNode";
 import { GSSolver, NaiveBroadphase, World, WorldOptions } from "rewild-physics";
 import { performanceNow } from "../../../Imports";
-import { Terrain } from "../../../terrain/Terrain";
 
 export class Runtime implements Listener {
   renderer: WebGPURenderer;
@@ -21,7 +20,6 @@ export class Runtime implements Listener {
   private inactiveNodes: Node[];
   public lastCallTime: f32 = 0;
   private resetCallTime: boolean = false;
-  private terrain: Terrain;
 
   constructor(width: f32, height: f32, renderer: WebGPURenderer) {
     this.nodes = [];
@@ -36,7 +34,6 @@ export class Runtime implements Listener {
     (this.world.solver as GSSolver).iterations = 10;
     this.world.defaultContactMaterial.contactEquationStiffness = 1e7;
     this.world.defaultContactMaterial.contactEquationRelaxation = 4;
-    this.terrain = new Terrain();
 
     this.renderer = renderer;
     this.scene = new Scene();
@@ -120,7 +117,6 @@ export class Runtime implements Listener {
     const inactiveNodes = this.inactiveNodes;
 
     this.updatePhysics();
-    this.terrain.update();
 
     // Unmount inactive nodes
     const numInactiveNodes = inactiveNodes.length;
@@ -128,7 +124,6 @@ export class Runtime implements Listener {
       for (let i: i32 = 0; i < numInactiveNodes; i++) {
         const node = unchecked(inactiveNodes[i]);
         node.unMount();
-        console.log("Unmounting node: " + node.name);
         if (node.autoDispose) this.removeNode(node, false);
       }
 
@@ -153,13 +148,6 @@ export class Runtime implements Listener {
   private deactivateNode(node: Node): void {
     const activeNodes = this.activeNodes;
     const inactiveNodes = this.inactiveNodes;
-    console.log(
-      "Deactivating child: " +
-        node.name +
-        " with " +
-        node.children.length.toString() +
-        " children"
-    );
 
     for (let i: i32 = 0, l: i32 = node.children.length; i < l; i++) {
       const child = unchecked(node.children[i]);
@@ -184,14 +172,8 @@ export class Runtime implements Listener {
     const activeNodes = this.activeNodes;
     const links = sourcePortal.links;
 
-    console.log("sendSignal: " + sourcePortal.name + " " + turnOff.toString());
-
     // If the source is no longer active then remove it from the active nodes
     if (turnOff) this.deactivateNode(sourcePortal.node!);
-
-    for (let i: i32 = 0, l: i32 = this.inactiveNodes.length; i < l; i++) {
-      console.log("deactivated node: " + unchecked(this.inactiveNodes[i]).name);
-    }
 
     // Enter each of the destination nodes
     // and add them to the active nodes

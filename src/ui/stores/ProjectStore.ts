@@ -93,7 +93,7 @@ export class ProjectStore extends Store<IProjectStore> {
                 ...c.resource,
                 activeOnStartup: extractProp(c, "Active On Startup") as boolean,
                 baseContainer: extractProp(c, "Base Container") as string,
-                actors: c.children?.map((child) => ({ ...child.resource } as IActor)),
+                actors: c.children?.map((child) => ({ ...child.resource } as IActor)) || [],
               } as IContainer)
           ) || [],
         activeOnStartup: project.activeOnStartup,
