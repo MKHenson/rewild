@@ -49,8 +49,6 @@ export class GameLoader {
     wasm.addAsset(containerMainMenuPtr as any, this.createMesh(sphere, "earth").transform as any);
     wasm.addAsset(containerMainMenuPtr as any, this.createMesh(box, "stars", "skybox").transform as any);
 
-    wasm.addAsset(containerLvl1Ptr as any, this.renderer.player.transformPtr as any);
-
     wasm.addNodeToRuntime(containerLvl1Ptr, false);
     wasm.addNodeToRuntime(containerMainMenuPtr, true);
     wasm.addNodeToRuntime(containerEditorPtr, false);
@@ -66,6 +64,10 @@ export class GameLoader {
 
     for (const level of startupLevels) {
       const levelPtr = wasm.createLevel(level.name);
+
+      // Add player to level
+      wasm.addAsset(levelPtr as any, this.renderer.player.transformPtr as any);
+
       this.loadedPtrs.push(levelPtr);
       wasm.addNodeToRuntime(levelPtr, true);
 

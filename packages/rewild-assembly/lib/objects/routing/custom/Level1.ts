@@ -1,5 +1,3 @@
-import { OrbitController } from "../../../extras/OrbitController";
-import { PointerLockController } from "../../../extras/PointerLockController";
 import { AmbientLight } from "../../../lights/AmbientLight";
 import { DirectionalLight } from "../../../lights/DirectionalLight";
 import {
@@ -11,50 +9,31 @@ import {
   degToRad,
 } from "rewild-common";
 import { Container } from "../core/Container";
-import { inputManager } from "../../../extras/io/InputManager";
-import { KeyboardEvent } from "../../../extras/io/KeyboardEvent";
 import { uiSignaller } from "../../../extras/ui/uiSignalManager";
 import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
 import { Link } from "../core/Link";
 import { TransformNode } from "../../../core/TransformNode";
-import { lock, unlock } from "../../../Imports";
-import { PlayerComponent } from "../../../components/PlayerComponent";
 import {
   Plane,
   Body,
   BodyOptions,
   Vec3 as Vec3Physics,
-  Sphere,
   Material,
 } from "rewild-physics";
-import { PhysicsComponent } from "../../../components/PhysicsComponent";
 
 export class Level1 extends Container implements Listener {
-  private orbitController!: OrbitController;
-  private pointerController!: PointerLockController;
   private totalTime: f32;
-  private isPaused: boolean;
-  private useOrbitController: boolean;
-  private player!: PlayerComponent;
   private direction1!: DirectionalLight;
   private direction2!: DirectionalLight;
   private direction3!: DirectionalLight;
   private ambient!: AmbientLight;
   private skybox!: TransformNode;
   private ball!: TransformNode;
-
   private groundBody: Body | null;
-  // private sphereBody: Body | null;
-  private playerBody: Body | null;
-
-  private gravity: f32 = -9.8;
 
   constructor(name: string) {
     super(name, true);
     this.totalTime = 0;
-    this.isPaused = false;
-    // this.sphereBody = null;
-    this.playerBody = null;
   }
 
   init(): void {
@@ -81,10 +60,6 @@ export class Level1 extends Container implements Listener {
     this.ambient = new AmbientLight(new Color(1, 1, 1), 0.4);
     this.addAsset(this.ambient);
 
-    this.useOrbitController = false;
-    this.orbitController = new OrbitController(this.runtime!.camera);
-    this.pointerController = new PointerLockController(this.runtime!.camera);
-
     // GROUND PLANE
     this.groundBody = new Body(
       new BodyOptions()
@@ -96,61 +71,17 @@ export class Level1 extends Container implements Listener {
       new Vec3Physics(1, 0, 0),
       -degToRad(90)
     );
-
-    // Sphere physics
-
-    // Player physics
-    const playerOptions = new BodyOptions()
-      .setPosition(
-        new Vec3Physics(
-          this.runtime!.camera.position.x,
-          this.runtime!.camera.position.y,
-          this.runtime!.camera.position.z
-        )
-      )
-      .setShape(new Sphere(1))
-      .setType(Body.KINEMATIC);
-    this.playerBody = new Body(playerOptions);
   }
 
   onEvent(event: Event): void {
-    if (event.attachment instanceof KeyboardEvent) {
-      const keyEvent = event.attachment as KeyboardEvent;
-
-      if (!this.player.isDead) {
-        if (keyEvent.code == "Escape") {
-          this.isPaused = !this.isPaused;
-
-          if (this.isPaused) unlock();
-          else if (!this.useOrbitController) lock();
-
-          uiSignaller.signalClientEvent(ApplicationEventType.OpenInGameMenu);
-        } else if (keyEvent.code == "KeyC") {
-          this.useOrbitController = !this.useOrbitController;
-          if (!this.useOrbitController) lock();
-          else unlock();
-        }
-      }
-    } else {
+    if (event.attachment instanceof ApplicationEvent) {
       const uiEvent = event.attachment as ApplicationEvent;
       if (uiEvent.eventType == ApplicationEventType.Quit)
         this.runtime!.sendSignal(this.getPortal("Exit")!, true);
-      else if (uiEvent.eventType == ApplicationEventType.Resume) {
-        this.isPaused = false;
-        if (!this.useOrbitController) lock();
-      }
     }
-
-    this.pointerController.enabled = this.useOrbitController
-      ? false
-      : !this.isPaused && !this.player.isDead;
-    this.orbitController.enabled = this.useOrbitController
-      ? !this.isPaused && !this.player.isDead
-      : false;
   }
 
   onUpdate(delta: f32, total: u32): void {
-    if (this.isPaused) return;
     super.onUpdate(delta, total);
 
     this.totalTime += delta;
@@ -158,31 +89,6 @@ export class Level1 extends Container implements Listener {
     const camera = this.runtime!.camera;
     const camPos = camera.position;
     this.skybox.position.set(camPos.x, camPos.y, camPos.z);
-
-    if (!this.useOrbitController) {
-      let yValue = camPos.y + this.gravity * delta;
-      if (yValue < 0) yValue = 0;
-      camPos.set(camPos.x, yValue, camPos.z);
-
-      this.playerBody!.position.set(camPos.x, camPos.y, camPos.z);
-    }
-
-    // if (this.sphereBody) {
-    //   const bodyPos = this.sphereBody!.interpolatedPosition;
-    //   const bodyQuat = this.sphereBody!.interpolatedQuaternion;
-    //   this.ball.position.set(bodyPos.x, bodyPos.y, bodyPos.z);
-    //   this.ball.quaternion.set(bodyQuat.x, bodyQuat.y, bodyQuat.z, bodyQuat.w);
-    // }
-
-    if (this.player.isDead) {
-      this.orbitController.enabled = false;
-      this.pointerController.enabled = false;
-    }
-
-    if (this.orbitController && this.useOrbitController)
-      this.orbitController.update();
-    if (this.pointerController && !this.useOrbitController)
-      this.pointerController.update(delta);
   }
 
   getRandomArbitrary(min: f32, max: f32): f32 {
@@ -192,12 +98,7 @@ export class Level1 extends Container implements Listener {
   mount(): void {
     super.mount();
     this.totalTime = 0;
-    this.isPaused = false;
     this.runtime!.lastCallTime = 0;
-
-    this.player = this.findObjectByName("player")!
-      .components[0] as PlayerComponent;
-    this.player.onRestart();
 
     this.ball = this.findObjectByName("ball")!;
     this.skybox = this.findObjectByName("skybox")!;
@@ -205,8 +106,6 @@ export class Level1 extends Container implements Listener {
     // Possitive z comes out of screen
     this.runtime!.camera.position.set(0, 1, 50);
     this.runtime!.camera.lookAt(0, 0, 0);
-    this.orbitController.enabled = true;
-    this.pointerController.enabled = true;
 
     const objects = this.objects;
     for (let i: i32 = 0, l = objects.length; i < l; i++) {
@@ -249,33 +148,15 @@ export class Level1 extends Container implements Listener {
 
     const world = this.runtime!.world;
     world.add(this.groundBody!);
-    // world.add(this.sphereBody!);
-    world.add(this.playerBody!);
-    const component = this.ball.getComponent("physics") as PhysicsComponent;
-
-    // component.rigidBody.position.set(0, 20, 0);
-    // component.rigidBody.velocity.set(0, 0, 0);
-    // component.rigidBody.angularVelocity.set(0, 0, 0);
-
     this.skybox.scale.set(5000, 5000, 5000);
     this.skybox.position.set(0, 0, 0);
-
-    inputManager.addEventListener("keyup", this);
     uiSignaller.addEventListener(UIEventType, this);
-
-    this.useOrbitController = false;
-    lock();
   }
 
   unMount(): void {
     super.unMount();
     const world = this.runtime!.world;
     world.removeBody(this.groundBody!);
-    // world.removeBody(this.sphereBody!);
-    world.removeBody(this.playerBody!);
-    this.orbitController.enabled = false;
-    this.pointerController.enabled = false;
-    inputManager.removeEventListener("keyup", this);
     uiSignaller.removeEventListener(UIEventType, this);
   }
 }
