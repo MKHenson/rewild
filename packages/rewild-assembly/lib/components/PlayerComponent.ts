@@ -114,14 +114,15 @@ export class PlayerComponent extends Component implements Listener {
       }
     }
 
-    // Update controllers
-    this.pointerController!.enabled = useOrbitController
-      ? false
-      : !this.isPaused && !this.isDead;
+    console.log(`ORBIT IS ON ${this.useOrbitController.toString()}`);
 
-    this.orbitController!.enabled = useOrbitController
-      ? !this.isPaused && !this.isDead
-      : false;
+    if (this.useOrbitController) {
+      this.orbitController!.enabled = this.isPaused ? false : true;
+      this.pointerController!.enabled = false;
+    } else {
+      this.pointerController!.enabled = this.isPaused ? false : true;
+      this.orbitController!.enabled = false;
+    }
   }
 
   onUpdate(delta: f32, total: u32): void {
@@ -181,6 +182,8 @@ export class PlayerComponent extends Component implements Listener {
   onPlayerDied(): void {
     unlock();
     this.isDead = true;
+    this.pointerController!.enabled = false;
+    this.orbitController!.enabled = false;
     uiSignaller.signalClientEvent(ApplicationEventType.PlayerDied);
   }
 
