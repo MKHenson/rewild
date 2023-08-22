@@ -1,47 +1,11 @@
-import { IActor, IProperty, ITreeNode, ITreeNodeAction } from "models";
+import { ITreeNode, ITreeNodeAction } from "models";
 import { createUUID } from "rewild-ui";
 
-const baseActorTemplate: ITreeNode = {
+export const baseActorTemplate: ITreeNode = {
   canRename: true,
   canSelect: true,
   iconSize: "xs",
 };
-
-const baseActorProperties: IProperty[] = [
-  {
-    name: "Size",
-    type: "string",
-    value: "1",
-  },
-  {
-    name: "Speed",
-    type: "string",
-    value: "1",
-  },
-  {
-    name: "Geometry",
-    type: "enum",
-    value: "sphere",
-    options: [
-      { value: "sphere", label: "Sphere" },
-      { value: " box", label: "Box" },
-    ],
-  },
-];
-
-export const actorFactory: () => ITreeNode = () => ({
-  ...baseActorTemplate,
-  icon: "label_important",
-  resource: {
-    properties: [...baseActorProperties],
-    name: "Earth",
-    type: "actor",
-    id: createUUID(),
-    baseType: "static",
-    geometry: "sphere",
-    pipeline: "earth",
-  } as IActor,
-});
 
 export const containerFactory: () => ITreeNode = () => ({
   ...baseActorTemplate,

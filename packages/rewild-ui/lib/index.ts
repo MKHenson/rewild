@@ -27,3 +27,4 @@ export * from "./common/Tree";
 export * from "./common/TreeNode";
 export * from "./common/Typography";
 export * from "./common/Select";
+export * from "./common/Vec3";
