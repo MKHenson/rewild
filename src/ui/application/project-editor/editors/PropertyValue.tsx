@@ -1,7 +1,6 @@
-import { IOption } from "models";
-import { theme, Component, register, Switch, Typography, Select } from "rewild-ui";
-
-type PropType = "string" | "boolean" | "enum";
+import { IOption, PropType } from "models";
+import { Vector3 } from "rewild-common";
+import { theme, Component, register, Switch, Typography, Select, Vec3 } from "rewild-ui";
 
 interface Props<T> {
   label: string;
@@ -54,6 +53,17 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
           />
         );
 
+      if (type === "vec3")
+        return (
+          <Vec3
+            value={this.props.value as Vector3}
+            onChange={(e) => {
+              if (!this.props.onChange) return;
+              this.props.onChange(e as T);
+            }}
+          />
+        );
+
       return null;
     };
 
@@ -98,16 +108,3 @@ const StyledPropValue = cssStylesheet(css`
     background: ${theme.colors.subtle400};
   }
 `);
-
-// .properties > * {
-//     border-top: 1px solid ${theme.colors.onSurfaceLight};
-//     border-left: 1px solid ${theme.colors.onSurfaceLight};
-//     border-right: 1px solid ${theme.colors.onSurfaceLight};
-//   }
-//   .properties > *:nth-child(even) {
-//     border-left: none;
-//   }
-//   .properties > *:nth-last-child(1),
-//   .properties > *:nth-last-child(2) {
-//     border-bottom: 1px solid ${theme.colors.onSurfaceLight};
-//   }

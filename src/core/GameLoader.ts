@@ -31,14 +31,13 @@ export class GameLoader {
     const ball = this.createMesh(sphere, "simple", "ball");
     ball.addComponent(physicsComponent);
 
-    // wasm.addAsset(containerLvl1Ptr, terrainManager.terrainPtr);
     wasm.addAsset(containerLvl1Ptr as any, this.createMesh(box, "skybox", "skybox").transform as any);
     wasm.addAsset(containerLvl1Ptr as any, ball.transform as any);
 
-    for (let i = 0; i < 20; i++)
-      wasm.addAsset(containerLvl1Ptr as any, this.createMesh(box, "concrete", `building-${i}`).transform as any);
-    for (let i = 0; i < 20; i++)
-      wasm.addAsset(containerLvl1Ptr as any, this.createMesh(box, "crate", `crate-${i}`).transform as any);
+    // for (let i = 0; i < 20; i++)
+    //   wasm.addAsset(containerLvl1Ptr as any, this.createMesh(box, "concrete", `building-${i}`).transform as any);
+    // for (let i = 0; i < 20; i++)
+    //   wasm.addAsset(containerLvl1Ptr as any, this.createMesh(box, "crate", `crate-${i}`).transform as any);
 
     const containerTestPtr = wasm.createContainer(ContainerTypes.TestLevel, ContainerTypes.TestLevel, true);
     wasm.addAsset(containerTestPtr as any, this.createMesh(box, "skybox", "skybox").transform as any);
@@ -76,13 +75,20 @@ export class GameLoader {
         wasm.addChildNode(levelPtr, containerPtr);
 
         for (const actor of container.actors) {
-          if (actor.geometry && actor.pipeline) {
-            const geometry = actor.properties.find((prop) => prop.name === "Geometry")?.value;
+          const geometry = actor.properties.find((prop) => prop.name === "Geometry")?.value;
+          const pipeline = actor.properties.find((prop) => prop.name === "Pipeline")?.value;
+
+          if (geometry && pipeline) {
+            const newMesh = this.createMesh(geometry === "sphere" ? sphere : box, pipeline as string);
+
             const size = actor.properties.find((prop) => prop.name === "Size")?.value;
             const speed = actor.properties.find((prop) => prop.name === "Speed")?.value;
-            const newMesh = this.createMesh(geometry === "sphere" ? sphere : box, actor.pipeline);
-            const planetComponent = wasm.createPlanetComponent(size as number, speed as number);
-            wasm.addComponent(newMesh.transform as any, planetComponent as any);
+
+            if (size && speed) {
+              const planetComponent = wasm.createPlanetComponent(size as number, speed as number);
+              wasm.addComponent(newMesh.transform as any, planetComponent as any);
+            }
+
             wasm.addAsset(containerPtr as any, newMesh.transform as any);
           }
         }

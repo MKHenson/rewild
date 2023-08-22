@@ -111,14 +111,15 @@ export class Level1 extends Container implements Listener {
     for (let i: i32 = 0, l = objects.length; i < l; i++) {
       const obj = objects[i];
 
-      if (obj.name.includes("crate")) {
-        obj.position.set(
-          this.getRandomArbitrary(-100, 100),
-          0.5,
-          this.getRandomArbitrary(-100, 100)
-        );
-        obj.rotation.y = Mathf.random() * Mathf.PI;
-      } else if (obj.name.includes("building")) {
+      // if (obj.name.includes("crate")) {
+      //   obj.position.set(
+      //     this.getRandomArbitrary(-100, 100),
+      //     0.5,
+      //     this.getRandomArbitrary(-100, 100)
+      //   );
+      //   obj.rotation.y = Mathf.random() * Mathf.PI;
+      // } else
+      if (obj.name.includes("building")) {
         const height = this.getRandomArbitrary(5, 10);
         obj.position.set(
           this.getRandomArbitrary(-100, 100),
