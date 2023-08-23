@@ -3,6 +3,7 @@ import { PropertyValue } from "./PropertyValue";
 import { projectStore } from "../../../stores/ProjectStore";
 
 interface Props {}
+let lastFocussedProp = -1;
 
 @register("x-properties")
 export class Properties extends Component<Props> {
@@ -15,6 +16,7 @@ export class Properties extends Component<Props> {
       )
         this.render();
     });
+    lastFocussedProp = -1;
 
     return () => {
       const selectedResource = projectStoreProxy.selectedResource;
@@ -24,24 +26,32 @@ export class Properties extends Component<Props> {
           <Typography variant="h3">Properties</Typography>
           {selectedResource && (
             <div class="properties">
-              {selectedResource.properties.map((prop) => (
-                <PropertyValue
-                  label={prop.name}
-                  value={prop.value}
-                  type={prop.type}
-                  options={prop.options}
-                  onChange={(val) => {
-                    prop.value = val;
-                    projectStoreProxy.dirty = true;
-                  }}
-                />
-              ))}
-              <PropertyValue label="ID" value={selectedResource?.id} type="string" readonly />
+              {selectedResource.properties
+                .filter((p) => p.valueType !== "hidden")
+                .map((prop, index) => {
+                  return (
+                    <PropertyValue
+                      label={prop.label}
+                      value={prop.value}
+                      type={prop.valueType}
+                      options={prop.options}
+                      refocus={lastFocussedProp === index}
+                      onChange={(val) => {
+                        lastFocussedProp = index;
+                        prop.value = val;
+                        projectStoreProxy.dirty = true;
+                      }}
+                    />
+                  );
+                })}
+              <PropertyValue label="ID" value={selectedResource?.id} type="string" readonly refocus={false} />
               <PropertyValue
                 label="Name"
                 value={selectedResource.name}
                 type="string"
+                refocus={lastFocussedProp === -2}
                 onChange={(val) => {
+                  lastFocussedProp = -2;
                   selectedResource.name = val;
                   projectStoreProxy.dirty = true;
                 }}

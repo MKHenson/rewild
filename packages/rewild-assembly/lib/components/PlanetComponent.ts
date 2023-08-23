@@ -13,7 +13,6 @@ export class PlanetComponent extends Component {
   }
 
   mount(runtime: Runtime): void {
-    console.log(`Setting size to be ${this.size}`);
     this.transform!.scale.set(this.size, this.size, this.size);
     this.transform!.position.y += this.size;
   }

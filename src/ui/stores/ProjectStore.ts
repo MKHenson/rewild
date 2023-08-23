@@ -1,4 +1,4 @@
-import { ILevel, IProject, IResource, ITreeNode, IContainer, IActor } from "models";
+import { ILevel, IProject, IResource, ITreeNode, IContainer, IActor, PropertyType } from "models";
 import { Store } from "rewild-ui";
 import { getLevel as getLevelApi, patchLevel, patchProject, getProject as getProjectApi } from "../../api";
 import { Timestamp } from "firebase/firestore";
@@ -14,8 +14,8 @@ export interface IProjectStore {
   selectedResource: IResource | null;
 }
 
-function extractProp(node: ITreeNode, propName: string) {
-  const property = node.resource?.properties.find((property) => property.name === propName);
+function extractProp(node: ITreeNode, type: PropertyType) {
+  const property = node.resource?.properties.find((property) => property.type === type);
   return property?.value;
 }
 
@@ -91,8 +91,8 @@ export class ProjectStore extends Store<IProjectStore> {
             (c) =>
               ({
                 ...c.resource,
-                activeOnStartup: extractProp(c, "Active On Startup") as boolean,
-                baseContainer: extractProp(c, "Base Container") as string,
+                activeOnStartup: extractProp(c, "active") as boolean,
+                baseContainer: extractProp(c, "baseContainer") as string,
                 actors: c.children?.map((child) => ({ ...child.resource } as IActor)) || [],
               } as IContainer)
           ) || [],

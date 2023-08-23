@@ -72,6 +72,11 @@ export class Runtime implements Listener {
   }
 
   removeNode(node: Node, removeFromInactiveNodes: boolean = true): void {
+    for (let i: i32 = 0, l: i32 = node.children.length; i < l; i++) {
+      const child = unchecked(node.children[i]);
+      this.removeNode(child, removeFromInactiveNodes);
+    }
+
     const nodeIndex = this.nodes.indexOf(node);
     const activeNodeIndex = this.activeNodes.indexOf(node);
     const inactiveNodeIndex = this.inactiveNodes.indexOf(node);

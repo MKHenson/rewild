@@ -4,8 +4,16 @@ import { Portal } from "./Portal";
 import { Container } from "./Container";
 import { Link } from "./Link";
 import { Terrain } from "../../../terrain/Terrain";
+import {
+  ApplicationEventType,
+  Event,
+  Listener,
+  UIEventType,
+} from "rewild-common";
+import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
+import { uiSignaller } from "../../../extras/ui/uiSignalManager";
 
-export class Level extends Container {
+export class Level extends Container implements Listener {
   private terrain: Terrain;
 
   constructor(name: string, autoDispose: boolean = false) {
@@ -25,11 +33,21 @@ export class Level extends Container {
     // Activate the enter portal
     addChild(this.runtime!.scene, this.terrain);
     this.runtime!.sendSignal(this.getPortal("Enter")!, false);
+    uiSignaller.addEventListener(UIEventType, this);
   }
 
   unMount(): void {
     super.unMount();
     removeChild(this.runtime!.scene, this.terrain);
+    uiSignaller.removeEventListener(UIEventType, this);
+  }
+
+  onEvent(event: Event): void {
+    if (event.attachment instanceof ApplicationEvent) {
+      const uiEvent = event.attachment as ApplicationEvent;
+      if (uiEvent.eventType == ApplicationEventType.Quit)
+        this.runtime!.sendSignal(this.getPortal("Exit")!, true);
+    }
   }
 
   addChild(node: Node): Node {
