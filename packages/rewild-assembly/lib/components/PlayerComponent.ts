@@ -114,8 +114,6 @@ export class PlayerComponent extends Component implements Listener {
       }
     }
 
-    console.log(`ORBIT IS ON ${this.useOrbitController.toString()}`);
-
     if (this.useOrbitController) {
       this.orbitController!.enabled = this.isPaused ? false : true;
       this.pointerController!.enabled = false;

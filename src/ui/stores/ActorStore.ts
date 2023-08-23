@@ -1,7 +1,6 @@
-import { IActor, ITemplateTreeNode, ITreeNode, ITreeNodeAction } from "models";
+import { IActor, ITemplateTreeNode, ITreeNode, ITreeNodeAction, Vector3 } from "models";
 import { Store, createUUID } from "rewild-ui";
 import { baseActorTemplate } from "../utils/TemplateFactories";
-import { Vector3 } from "packages/rewild-common";
 
 export interface IActorStoreStore {
   nodes: ITreeNode[];
@@ -17,18 +16,21 @@ const actorTemplates: ITemplateTreeNode[] = [
       resource: {
         properties: [
           {
-            name: "Size",
-            type: "string",
+            label: "Size",
+            type: "size",
+            valueType: "string",
             value: "1",
           },
           {
-            name: "Speed",
-            type: "string",
+            label: "Speed",
+            type: "speed",
+            valueType: "string",
             value: "1",
           },
           {
-            name: "Geometry",
-            type: "enum",
+            label: "Geometry",
+            type: "geometry",
+            valueType: "enum",
             value: "sphere",
             options: [
               { value: "sphere", label: "Sphere" },
@@ -36,8 +38,9 @@ const actorTemplates: ITemplateTreeNode[] = [
             ],
           },
           {
-            name: "Pipeline",
-            type: "hidden",
+            label: "Pipeline",
+            type: "pipeline",
+            valueType: "hidden",
             value: "earth",
           },
         ],
@@ -60,19 +63,22 @@ const actorTemplates: ITemplateTreeNode[] = [
         type: "actor",
         properties: [
           {
-            name: "Geometry",
-            type: "hidden",
+            label: "Geometry",
+            type: "geometry",
+            valueType: "hidden",
             value: "box",
           },
           {
-            name: "Pipeline",
-            type: "hidden",
+            label: "Pipeline",
+            type: "pipeline",
+            valueType: "hidden",
             value: "crate",
           },
           {
-            name: "Position",
-            type: "vec3",
-            value: new Vector3(),
+            label: "Position",
+            type: "position",
+            valueType: "vec3",
+            value: [0, 0, 0] as Vector3,
           },
         ],
         baseType: "static",

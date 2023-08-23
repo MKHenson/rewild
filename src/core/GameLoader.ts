@@ -8,6 +8,7 @@ import { Renderer } from "../renderer/Renderer";
 import { getLevel } from "../api/levels";
 import { getProjects } from "../api/projects";
 import { geometryManager } from "../renderer/AssetManagers/GeometryManager";
+import { Vector3 } from "models";
 // import { terrainManager } from "src/renderer/AssetManagers/TerrainManager";
 
 /** Loads game files and assets and sends the created objects to wasm */
@@ -75,14 +76,17 @@ export class GameLoader {
         wasm.addChildNode(levelPtr, containerPtr);
 
         for (const actor of container.actors) {
-          const geometry = actor.properties.find((prop) => prop.name === "Geometry")?.value;
-          const pipeline = actor.properties.find((prop) => prop.name === "Pipeline")?.value;
+          const geometry = actor.properties.find((prop) => prop.type === "geometry")?.value;
+          const pipeline = actor.properties.find((prop) => prop.type === "pipeline")?.value;
 
           if (geometry && pipeline) {
-            const newMesh = this.createMesh(geometry === "sphere" ? sphere : box, pipeline as string);
+            const newMesh = this.createMesh(geometry === "sphere" ? sphere : box, pipeline as string, actor.name);
 
-            const size = actor.properties.find((prop) => prop.name === "Size")?.value;
-            const speed = actor.properties.find((prop) => prop.name === "Speed")?.value;
+            const position = actor.properties.find((prop) => prop.type === "position")?.value as Vector3;
+            wasm.setPosition(newMesh.transform as any, position[0], position[1], position[2]);
+
+            const size = actor.properties.find((prop) => prop.type === "size")?.value;
+            const speed = actor.properties.find((prop) => prop.type === "speed")?.value;
 
             if (size && speed) {
               const planetComponent = wasm.createPlanetComponent(size as number, speed as number);

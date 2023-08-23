@@ -4,7 +4,9 @@ import { Store } from "./Store";
 type RenderFn = () => void;
 type InitFn = () => null | JSX.ChildElement | JSX.ChildElement[];
 
-export function register<T extends CustomElementConstructor | JSX.ComponentStatic>(tagName: string) {
+export function register<
+  T extends CustomElementConstructor | JSX.ComponentStatic
+>(tagName: string) {
   return <U extends T>(constructor: U) => {
     // register component
     customElements.define(tagName, constructor as CustomElementConstructor);
@@ -19,7 +21,10 @@ export interface ComponentOptions<T> {
   shadow?: ShadowRootInit;
 }
 
-export abstract class Component<T = any> extends HTMLElement implements JSX.Component {
+export abstract class Component<T = any>
+  extends HTMLElement
+  implements JSX.Component
+{
   shadow: ShadowRoot | null;
   render: RenderFn;
   private trackedStores: UnsubscribeStoreFn[];
@@ -32,8 +37,11 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
   constructor(options?: ComponentOptions<T>) {
     super();
     this.trackedStores = [];
-    const useShadow = options?.useShadow === undefined ? true : options?.useShadow;
-    this.shadow = useShadow ? this.attachShadow(options?.shadow || { mode: "open" }) : null;
+    const useShadow =
+      options?.useShadow === undefined ? true : options?.useShadow;
+    this.shadow = useShadow
+      ? this.attachShadow(options?.shadow || { mode: "open" })
+      : null;
     this._props = options?.props as any;
   }
 
@@ -53,7 +61,10 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
         const curLengthChildren = children.length;
 
         // Remove children after the length index
-        if (lenOfExistingChildren > curLengthChildren && curLengthChildren > 0) {
+        if (
+          lenOfExistingChildren > curLengthChildren &&
+          curLengthChildren > 0
+        ) {
           for (let i = lenOfExistingChildren - 1; i > curLengthChildren; i--) {
             existingChildren[i].remove();
           }
@@ -61,7 +72,10 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
 
         for (let i = 0, l = curLengthChildren; i < l; i++) {
           // If the new node is exactly the same - skip it as we dont want to re-render
-          if (i < lenOfExistingChildren && children[i] === existingChildren[i]) {
+          if (
+            i < lenOfExistingChildren &&
+            children[i] === existingChildren[i]
+          ) {
             continue;
           }
           // New node is not the same, and at the same position of an existing element. So replace existing elm with new one.
@@ -137,7 +151,8 @@ export abstract class Component<T = any> extends HTMLElement implements JSX.Comp
 
     if (this.shadow) this.shadow.adoptedStyleSheets = [stylesheed];
     else if (!document.adoptedStyleSheets.includes(stylesheed))
-      document.adoptedStyleSheets = document.adoptedStyleSheets.concat(stylesheed);
+      document.adoptedStyleSheets =
+        document.adoptedStyleSheets.concat(stylesheed);
   }
 
   // connect component

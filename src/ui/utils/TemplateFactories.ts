@@ -23,13 +23,15 @@ export const containerFactory: () => ITreeNode = () => ({
     name: "New Container",
     properties: [
       {
-        name: "Base Container",
-        type: "string",
+        label: "Base Container",
+        type: "baseContainer",
+        valueType: "string",
         value: "",
       },
       {
-        name: "Active On Startup",
-        type: "boolean",
+        label: "Active On Startup",
+        type: "active",
+        valueType: "boolean",
         value: true,
       },
     ],

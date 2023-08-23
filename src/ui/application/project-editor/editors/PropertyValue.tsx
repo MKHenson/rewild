@@ -1,71 +1,85 @@
-import { IOption, PropType } from "models";
-import { Vector3 } from "rewild-common";
+import { IOption, PropValueType, Vector3 } from "models";
 import { theme, Component, register, Switch, Typography, Select, Vec3 } from "rewild-ui";
 
 interface Props<T> {
   label: string;
-  type: PropType;
+  type: PropValueType;
   value?: T;
   options?: IOption[];
   readonly?: boolean;
   onChange?: (newValue: T) => void;
+  refocus: boolean;
 }
 
 @register("x-property-value")
 export class PropertyValue<T extends any> extends Component<Props<T>> {
   init() {
-    const getEditor = (type: PropType) => {
-      if (type === "string")
-        return (
-          <input
-            class="string-val"
-            readOnly={this.props.readonly}
-            value={(this.props.value as string) || ""}
-            onblur={(e) => {
-              this.props.onChange?.(e.currentTarget.value as T);
-            }}
-            onkeydown={(e) => {
-              if (!this.props.onChange) return;
-              if (e.key === "Enter") this.props.onChange(e.currentTarget.value as T);
-            }}
-          />
-        );
-      if (type === "boolean")
-        return (
-          <Switch
-            checked={this.props.value as boolean}
-            onClick={(e) => {
-              if (!this.props.onChange) return;
-              this.props.onChange(!this.props.value as boolean as T);
-            }}
-          />
-        );
+    const getEditor = (type: PropValueType) => {
+      const value = this.props.value;
+      const onChange = this.props.onChange;
 
-      if (type === "enum")
-        return (
-          <Select
-            options={this.props.options || []}
-            value={this.props.value as string}
-            onChange={(e) => {
-              if (!this.props.onChange) return;
-              this.props.onChange(e as T);
-            }}
-          />
-        );
-
-      if (type === "vec3")
-        return (
-          <Vec3
-            value={this.props.value as Vector3}
-            onChange={(e) => {
-              if (!this.props.onChange) return;
-              this.props.onChange(e as T);
-            }}
-          />
-        );
-
-      return null;
+      switch (type) {
+        case "string":
+          return (
+            <input
+              class="string-val"
+              readOnly={this.props.readonly}
+              value={(value as string) || ""}
+              onblur={(e) => {
+                onChange?.(e.currentTarget.value as T);
+              }}
+              onkeydown={(e) => {
+                if (!onChange) return;
+                if (e.key === "Enter") onChange(e.currentTarget.value as T);
+              }}
+            />
+          );
+        case "boolean":
+          return (
+            <Switch
+              checked={value as boolean}
+              onClick={(e) => {
+                if (!onChange) return;
+                onChange(!value as boolean as T);
+              }}
+            />
+          );
+        case "enum":
+          return (
+            <Select
+              options={this.props.options || []}
+              value={value as string}
+              onChange={(e) => {
+                if (!onChange) return;
+                onChange(e as T);
+              }}
+            />
+          );
+        case "vec3":
+          return (
+            <Vec3
+              value={value as Vector3}
+              autoFocus={this.props.refocus}
+              onChange={(e) => {
+                if (!onChange) return;
+                onChange(e as T);
+              }}
+            />
+          );
+        default:
+          return null;
+      }
     };
+
+    this.onMount = this.props.refocus
+      ? () => {
+          const input = this.shadow?.querySelector(".string-val") as HTMLInputElement;
+          if (input) {
+            input.focus();
+            input.select();
+          }
+        }
+      : undefined;
 
     return () => [
       <div class="label">

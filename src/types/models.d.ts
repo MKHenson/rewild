@@ -2,7 +2,6 @@ declare module "models" {
   export type EditorType = "properties" | "ribbon" | "scene-graph" | "project-settings" | "actors";
   import type { Timestamp } from "firebase/firestore";
   import type { IconType } from "rewild-ui";
-  import { Vector3 } from "packages/rewild-common";
 
   export type FactoryKey = "actor" | "container";
 
@@ -20,15 +19,18 @@ declare module "models" {
     node: ITreeNode;
   }
 
-  export type PropType = "string" | "boolean" | "enum" | "hidden" | "vec3";
+  export type Vector3 = [number, number, number];
+  export type PropertyType = "size" | "speed" | "geometry" | "pipeline" | "position" | "active" | "baseContainer";
+  export type PropValueType = "string" | "boolean" | "enum" | "hidden" | "vec3";
   export type PropValue = string | boolean | number | Vector3;
   export type IOption = {
     value: string;
     label: string;
   };
   export type IProperty = {
-    name: string;
-    type: PropType;
+    label: string;
+    type: PropertyType;
+    valueType: PropValueType;
     value: PropValue;
     options?: IOption[];
   };

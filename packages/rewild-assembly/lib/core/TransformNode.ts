@@ -592,6 +592,16 @@ export function setId(node: TransformNode, value: i32): TransformNode {
   return node;
 }
 
+export function setPosition(
+  node: TransformNode,
+  x: f32,
+  y: f32,
+  z: f32
+): TransformNode {
+  node.position.set(x, y, z);
+  return node;
+}
+
 export function getDataProperties(node: TransformNode): usize {
   return changetype<usize>(node.dataProperties);
 }

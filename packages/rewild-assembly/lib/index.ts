@@ -45,6 +45,7 @@ export {
   getDataProperties,
   getId,
   setId,
+  setPosition,
   getTransformModelViewMatrix,
   getTransformNormalMatrix,
   getTransformWorldMatrix,
