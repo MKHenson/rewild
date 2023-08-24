@@ -28,6 +28,12 @@ const actorTemplates: ITemplateTreeNode[] = [
             value: "1",
           },
           {
+            label: "Rigid Body",
+            type: "actorLoaderPreset",
+            valueType: "hidden",
+            value: "planet",
+          },
+          {
             label: "Geometry",
             type: "geometry",
             valueType: "enum",
@@ -71,6 +77,12 @@ const actorTemplates: ITemplateTreeNode[] = [
           {
             label: "Pipeline",
             type: "pipeline",
+            valueType: "hidden",
+            value: "crate",
+          },
+          {
+            label: "Rigid Body",
+            type: "actorLoaderPreset",
             valueType: "hidden",
             value: "crate",
           },

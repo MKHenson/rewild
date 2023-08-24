@@ -4,8 +4,8 @@ import { Component } from "./Component";
 export class PhysicsComponent extends Component {
   propertiesView: Float32Array;
 
-  constructor() {
-    super(wasm.createPhysicsComponent(wasm.createBodyBall(1, 30)));
+  constructor(body: any) {
+    super(wasm.createPhysicsComponent(body));
     this.propertiesView = wasm.getFloat32Array(
       wasm.getPhysicsComponentProperties(this.pointer)
     );

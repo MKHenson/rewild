@@ -20,7 +20,15 @@ declare module "models" {
   }
 
   export type Vector3 = [number, number, number];
-  export type PropertyType = "size" | "speed" | "geometry" | "pipeline" | "position" | "active" | "baseContainer";
+  export type PropertyType =
+    | "size"
+    | "speed"
+    | "geometry"
+    | "pipeline"
+    | "position"
+    | "active"
+    | "baseContainer"
+    | "actorLoaderPreset";
   export type PropValueType = "string" | "boolean" | "enum" | "hidden" | "vec3";
   export type PropValue = string | boolean | number | Vector3;
   export type IOption = {

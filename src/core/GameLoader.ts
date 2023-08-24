@@ -8,7 +8,7 @@ import { Renderer } from "../renderer/Renderer";
 import { getLevel } from "../api/levels";
 import { getProjects } from "../api/projects";
 import { geometryManager } from "../renderer/AssetManagers/GeometryManager";
-import { Vector3 } from "models";
+import { LoaderPresetType, LoaderPresets } from "./loader-utils/LoaderPresets";
 // import { terrainManager } from "src/renderer/AssetManagers/TerrainManager";
 
 /** Loads game files and assets and sends the created objects to wasm */
@@ -26,7 +26,7 @@ export class GameLoader {
     const box = geometryManager.getAsset("box");
     const sphere = geometryManager.getAsset("sphere");
 
-    const physicsComponent = new PhysicsComponent();
+    const physicsComponent = new PhysicsComponent(wasm.createBodyBall(1, 30));
     physicsComponent.mass = 30;
     physicsComponent.positionY = 20;
     const ball = this.createMesh(sphere, "simple", "ball");
@@ -82,15 +82,12 @@ export class GameLoader {
           if (geometry && pipeline) {
             const newMesh = this.createMesh(geometry === "sphere" ? sphere : box, pipeline as string, actor.name);
 
-            const position = actor.properties.find((prop) => prop.type === "position")?.value as Vector3;
-            wasm.setPosition(newMesh.transform as any, position[0], position[1], position[2]);
+            const actorLoaderPreset = actor.properties.find((prop) => prop.type === "actorLoaderPreset")?.value;
 
-            const size = actor.properties.find((prop) => prop.type === "size")?.value;
-            const speed = actor.properties.find((prop) => prop.type === "speed")?.value;
-
-            if (size && speed) {
-              const planetComponent = wasm.createPlanetComponent(size as number, speed as number);
-              wasm.addComponent(newMesh.transform as any, planetComponent as any);
+            // If the actor has a rigid body type, add it to the mesh
+            if (actorLoaderPreset && LoaderPresets[actorLoaderPreset as LoaderPresetType]) {
+              const component = LoaderPresets[actorLoaderPreset as LoaderPresetType](actor);
+              newMesh.addComponent(component);
             }
 
             wasm.addAsset(containerPtr as any, newMesh.transform as any);
