@@ -1,5 +1,6 @@
 declare module "models" {
   export type EditorType = "properties" | "ribbon" | "scene-graph" | "project-settings" | "actors";
+  import { LoaderPresetType } from "src/core/loader-utils/LoaderPresets";
   import type { Timestamp } from "firebase/firestore";
   import type { IconType } from "rewild-ui";
 
@@ -95,10 +96,11 @@ declare module "models" {
     properties: IProperty[];
   }
 
-  export type BaseType = "static";
+  export type BaseType = "static" | "dynamic";
 
   export interface IActor extends IResource {
     baseType: BaseType;
+    actorLoaderPreset: LoaderPresetType;
     type: "actor";
   }
 

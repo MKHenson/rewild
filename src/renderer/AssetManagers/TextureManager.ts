@@ -12,45 +12,51 @@ class TextureManager extends AssetManager<Texture> {
   async initialize(renderer: Renderer) {
     const { device } = renderer;
 
-    this.assets.push(
-      new BitmapTexture("grid", MEDIA_URL + "uv-grid.jpg", device),
-      new BitmapTexture("crate", MEDIA_URL + "crate-wooden.jpg", device),
-      new BitmapTexture("earth", MEDIA_URL + "earth-day-2k.jpg", device),
-      new BitmapTexture(
-        "ground-coastal-1",
-        MEDIA_URL + "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png",
-        device
-      ),
-      new BitmapTexture(
-        "block-concrete-4",
-        MEDIA_URL + "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png",
-        device
-      ),
-      new BitmapCubeTexture(
+    const assets: [string, string | string[]][] = [
+      ["grid", "uv-grid.jpg"],
+      ["crate", "crate-wooden.jpg"],
+      ["basketball", "basketball.png"],
+      ["earth", "earth-day-2k.jpg"],
+      ["ground-coastal-1", "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png"],
+      ["block-concrete-4", "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png"],
+      [
         "desert-sky",
         [
-          MEDIA_URL + "skyboxes/desert/px.jpg",
-          MEDIA_URL + "skyboxes/desert/nx.jpg",
-          MEDIA_URL + "skyboxes/desert/py.jpg",
-          MEDIA_URL + "skyboxes/desert/ny.jpg",
-          MEDIA_URL + "skyboxes/desert/pz.jpg",
-          MEDIA_URL + "skyboxes/desert/nz.jpg",
+          "skyboxes/desert/px.jpg",
+          "skyboxes/desert/nx.jpg",
+          "skyboxes/desert/py.jpg",
+          "skyboxes/desert/ny.jpg",
+          "skyboxes/desert/pz.jpg",
+          "skyboxes/desert/nz.jpg",
         ],
-        device
-      ),
-      new BitmapCubeTexture(
+      ],
+      [
         "starry-sky",
         [
-          MEDIA_URL + "skyboxes/stars/left.png",
-          MEDIA_URL + "skyboxes/stars/right.png",
-          MEDIA_URL + "skyboxes/stars/top.png",
-          MEDIA_URL + "skyboxes/stars/bottom.png",
-          MEDIA_URL + "skyboxes/stars/front.png",
-          MEDIA_URL + "skyboxes/stars/back.png",
+          "skyboxes/stars/left.png",
+          "skyboxes/stars/right.png",
+          "skyboxes/stars/top.png",
+          "skyboxes/stars/bottom.png",
+          "skyboxes/stars/front.png",
+          "skyboxes/stars/back.png",
         ],
-        device
-      )
-    );
+      ],
+    ];
+
+    let texture: Texture;
+    for (const asset of assets) {
+      if (asset[1] instanceof Array) {
+        texture = new BitmapCubeTexture(
+          asset[0],
+          asset[1].map((url) => MEDIA_URL + url),
+          device
+        );
+      } else {
+        texture = new BitmapTexture(asset[0], MEDIA_URL + asset[1], device);
+      }
+
+      this.assets.push(texture);
+    }
 
     this.assets = await Promise.all(
       this.assets.map((texture) => {

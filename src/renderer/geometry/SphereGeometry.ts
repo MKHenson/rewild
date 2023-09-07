@@ -21,9 +21,10 @@ export class SphereGeometry extends Geometry {
     phiStart: f32 = 0,
     phiLength: f32 = Mathf.PI * 2,
     thetaStart: f32 = 0,
-    thetaLength: f32 = Mathf.PI
+    thetaLength: f32 = Mathf.PI,
+    name: string = "sphere"
   ) {
-    super("sphere");
+    super(name);
     this.parameters = {
       radius: radius,
       widthSegments: widthSegments,

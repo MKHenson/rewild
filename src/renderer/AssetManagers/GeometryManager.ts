@@ -13,6 +13,7 @@ export class GeometryManager extends AssetManager<Geometry> {
   async initialize(renderer: Renderer): Promise<void> {
     this.assets.push(
       new SphereGeometry(1, 64, 32).build(renderer),
+      new SphereGeometry(0.15, 64, 32, undefined, undefined, undefined, undefined, "ball").build(renderer),
       new BoxGeometry().build(renderer),
       new PlaneGeometry().build(renderer)
     );

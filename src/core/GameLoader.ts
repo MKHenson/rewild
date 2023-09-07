@@ -1,4 +1,4 @@
-import { wasm, PhysicsComponent } from "rewild-wasmtime";
+import { wasm } from "rewild-wasmtime";
 import { pipelineManager } from "../renderer/AssetManagers/PipelineManager";
 import { Mesh } from "../renderer/Mesh";
 import { ContainerTypes } from "rewild-common";
@@ -26,19 +26,7 @@ export class GameLoader {
     const box = geometryManager.getAsset("box");
     const sphere = geometryManager.getAsset("sphere");
 
-    const physicsComponent = new PhysicsComponent(wasm.createBodyBall(1, 30));
-    physicsComponent.mass = 30;
-    physicsComponent.positionY = 20;
-    const ball = this.createMesh(sphere, "simple", "ball");
-    ball.addComponent(physicsComponent);
-
     wasm.addAsset(containerLvl1Ptr as any, this.createMesh(box, "skybox", "skybox").transform as any);
-    wasm.addAsset(containerLvl1Ptr as any, ball.transform as any);
-
-    // for (let i = 0; i < 20; i++)
-    //   wasm.addAsset(containerLvl1Ptr as any, this.createMesh(box, "concrete", `building-${i}`).transform as any);
-    // for (let i = 0; i < 20; i++)
-    //   wasm.addAsset(containerLvl1Ptr as any, this.createMesh(box, "crate", `crate-${i}`).transform as any);
 
     const containerTestPtr = wasm.createContainer(ContainerTypes.TestLevel, ContainerTypes.TestLevel, true);
     wasm.addAsset(containerTestPtr as any, this.createMesh(box, "skybox", "skybox").transform as any);
@@ -59,9 +47,6 @@ export class GameLoader {
     const projects = await getProjects(true);
     const startupLevels = await Promise.all(projects.map((project) => getLevel(project.id)));
 
-    const box = geometryManager.getAsset("box");
-    const sphere = geometryManager.getAsset("sphere");
-
     for (const level of startupLevels) {
       const levelPtr = wasm.createLevel(level.name);
 
@@ -76,13 +61,13 @@ export class GameLoader {
         wasm.addChildNode(levelPtr, containerPtr);
 
         for (const actor of container.actors) {
-          const geometry = actor.properties.find((prop) => prop.type === "geometry")?.value;
-          const pipeline = actor.properties.find((prop) => prop.type === "pipeline")?.value;
+          const geometry = actor.properties.find((prop) => prop.type === "geometry")?.value as string;
+          const pipeline = actor.properties.find((prop) => prop.type === "pipeline")?.value as string;
 
           if (geometry && pipeline) {
-            const newMesh = this.createMesh(geometry === "sphere" ? sphere : box, pipeline as string, actor.name);
+            const newMesh = this.createMesh(geometryManager.getAsset(geometry), pipeline, actor.name);
 
-            const actorLoaderPreset = actor.properties.find((prop) => prop.type === "actorLoaderPreset")?.value;
+            const actorLoaderPreset = actor.actorLoaderPreset;
 
             // If the actor has a rigid body type, add it to the mesh
             if (actorLoaderPreset && LoaderPresets[actorLoaderPreset as LoaderPresetType]) {

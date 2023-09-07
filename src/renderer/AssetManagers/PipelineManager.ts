@@ -16,6 +16,7 @@ class PipelineManager extends AssetManager<Pipeline<any>> {
         uvScaleY: "30.0",
       }),
       new DebugPipeline("crate", { diffuseMap: textureManager.getAsset("crate"), NUM_DIR_LIGHTS: 0 }),
+      new DebugPipeline("basketball", { diffuseMap: textureManager.getAsset("basketball"), NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("simple", { NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("earth", { diffuseMap: textureManager.getAsset("earth"), NUM_DIR_LIGHTS: 0 }),
       new DebugPipeline("concrete", { diffuseMap: textureManager.getAsset("block-concrete-4"), NUM_DIR_LIGHTS: 0 }),

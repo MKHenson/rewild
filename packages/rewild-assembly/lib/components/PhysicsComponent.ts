@@ -1,6 +1,7 @@
 import { Body, BodyOptions, Material, Sphere, Vec3 } from "rewild-physics";
 import { Component } from "../core/Component";
 import { Runtime } from "../objects/routing";
+import { physicsManager } from "../objects/physics/PhysicsManager";
 
 export class PhysicsComponent extends Component {
   rigidBody: Body;
@@ -35,11 +36,11 @@ export class PhysicsComponent extends Component {
       this.angularVelocityZ
     );
     this.rigidBody.mass = this.mass;
-    runtime.world.add(this.rigidBody);
+    physicsManager.world.add(this.rigidBody);
   }
 
   unMount(runtime: Runtime): void {
-    runtime.world.removeBody(this.rigidBody);
+    physicsManager.world.removeBody(this.rigidBody);
   }
 
   get positionX(): f32 {

@@ -14,6 +14,7 @@ import { KeyboardEvent } from "../extras/io/KeyboardEvent";
 import { ApplicationEvent } from "../extras/ui/ApplicationEvent";
 import { Body, BodyOptions, Vec3, Sphere } from "rewild-physics";
 import { inputManager } from "../extras/io/InputManager";
+import { physicsManager } from "../objects/physics/PhysicsManager";
 
 export class PlayerComponent extends Component implements Listener {
   readonly dataProperties: Int32Array;
@@ -70,7 +71,7 @@ export class PlayerComponent extends Component implements Listener {
 
     this.orbitController!.enabled = false;
     this.pointerController!.enabled = true;
-    runtime.world.add(this.playerBody!);
+    physicsManager.world.add(this.playerBody!);
     lock();
   }
 
@@ -83,7 +84,7 @@ export class PlayerComponent extends Component implements Listener {
 
     this.orbitController!.enabled = false;
     this.pointerController!.enabled = false;
-    runtime.world.removeBody(this.playerBody!);
+    physicsManager.world.removeBody(this.playerBody!);
   }
 
   onEvent(event: Event): void {

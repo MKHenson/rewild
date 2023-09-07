@@ -1,6 +1,5 @@
 import { Box, Vec3, BodyOptions, Material, Body } from "rewild-physics";
-
-const boxMaterial = new Material("box", 0.1, 0.7);
+import { diffuseMaterial } from "../Materials";
 
 export function createBodyBox(
   width: f32,
@@ -11,7 +10,7 @@ export function createBodyBox(
   const boxOptions = new BodyOptions()
     .setShape(new Box(new Vec3(width, height, depth)))
     .setMass(mass)
-    .setMaterial(boxMaterial);
+    .setMaterial(diffuseMaterial);
 
   const boxBody = new Body(boxOptions);
   boxBody.linearDamping = 0.05;

@@ -28,12 +28,6 @@ const actorTemplates: ITemplateTreeNode[] = [
             value: "1",
           },
           {
-            label: "Rigid Body",
-            type: "actorLoaderPreset",
-            valueType: "hidden",
-            value: "planet",
-          },
-          {
             label: "Geometry",
             type: "geometry",
             valueType: "enum",
@@ -53,6 +47,7 @@ const actorTemplates: ITemplateTreeNode[] = [
         name: "Earth",
         type: "actor",
         id: createUUID(),
+        actorLoaderPreset: "planet",
         baseType: "static",
       } as IActor,
     }),
@@ -81,10 +76,39 @@ const actorTemplates: ITemplateTreeNode[] = [
             value: "crate",
           },
           {
-            label: "Rigid Body",
-            type: "actorLoaderPreset",
+            label: "Position",
+            type: "position",
+            valueType: "vec3",
+            value: [0, 0, 0] as Vector3,
+          },
+        ],
+        actorLoaderPreset: "crate",
+        baseType: "dynamic",
+      } as IActor,
+    }),
+  },
+  {
+    name: "Basketball",
+    factoryKey: "actor",
+    template: () => ({
+      ...baseActorTemplate,
+      icon: "label_important",
+      resource: {
+        name: "Basketball",
+        id: createUUID(),
+        type: "actor",
+        properties: [
+          {
+            label: "Geometry",
+            type: "geometry",
             valueType: "hidden",
-            value: "crate",
+            value: "ball",
+          },
+          {
+            label: "Pipeline",
+            type: "pipeline",
+            valueType: "hidden",
+            value: "basketball",
           },
           {
             label: "Position",
@@ -93,7 +117,8 @@ const actorTemplates: ITemplateTreeNode[] = [
             value: [0, 0, 0] as Vector3,
           },
         ],
-        baseType: "static",
+        baseType: "dynamic",
+        actorLoaderPreset: "ball",
       } as IActor,
     }),
   },

@@ -20,6 +20,8 @@ import {
   Vec3 as Vec3Physics,
   Material,
 } from "rewild-physics";
+import { physicsManager } from "../../physics/PhysicsManager";
+import { groundMaterial } from "../../physics/Materials";
 
 export class Level1 extends Container implements Listener {
   private totalTime: f32;
@@ -28,7 +30,7 @@ export class Level1 extends Container implements Listener {
   private direction3!: DirectionalLight;
   private ambient!: AmbientLight;
   private skybox!: TransformNode;
-  private ball!: TransformNode;
+  // private ball!: TransformNode;
   private groundBody: Body | null;
 
   constructor(name: string) {
@@ -65,7 +67,7 @@ export class Level1 extends Container implements Listener {
       new BodyOptions()
         .setMass(0)
         .setShape(new Plane())
-        .setMaterial(new Material("ground", 0.3))
+        .setMaterial(groundMaterial)
     );
     this.groundBody!.quaternion.setFromAxisAngle(
       new Vec3Physics(1, 0, 0),
@@ -98,9 +100,9 @@ export class Level1 extends Container implements Listener {
   mount(): void {
     super.mount();
     this.totalTime = 0;
-    this.runtime!.lastCallTime = 0;
+    physicsManager.reset();
 
-    this.ball = this.findObjectByName("ball")!;
+    // this.ball = this.findObjectByName("ball")!;
     this.skybox = this.findObjectByName("skybox")!;
 
     // Possitive z comes out of screen
@@ -147,7 +149,7 @@ export class Level1 extends Container implements Listener {
       }
     }
 
-    const world = this.runtime!.world;
+    const world = physicsManager.world;
     world.add(this.groundBody!);
     this.skybox.scale.set(5000, 5000, 5000);
     this.skybox.position.set(0, 0, 0);
@@ -156,7 +158,7 @@ export class Level1 extends Container implements Listener {
 
   unMount(): void {
     super.unMount();
-    const world = this.runtime!.world;
+    const world = physicsManager.world;
     world.removeBody(this.groundBody!);
     uiSignaller.removeEventListener(UIEventType, this);
   }
