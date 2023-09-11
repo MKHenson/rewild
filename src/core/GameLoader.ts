@@ -9,7 +9,6 @@ import { getLevel } from "../api/levels";
 import { getProjects } from "../api/projects";
 import { geometryManager } from "../renderer/AssetManagers/GeometryManager";
 import { LoaderPresetType, LoaderPresets } from "./loader-utils/LoaderPresets";
-// import { terrainManager } from "src/renderer/AssetManagers/TerrainManager";
 
 /** Loads game files and assets and sends the created objects to wasm */
 export class GameLoader {
@@ -28,9 +27,6 @@ export class GameLoader {
 
     wasm.addAsset(containerLvl1Ptr as any, this.createMesh(box, "skybox", "skybox").transform as any);
 
-    const containerTestPtr = wasm.createContainer(ContainerTypes.TestLevel, ContainerTypes.TestLevel, true);
-    wasm.addAsset(containerTestPtr as any, this.createMesh(box, "skybox", "skybox").transform as any);
-
     const containerMainMenuPtr = wasm.createContainer(ContainerTypes.MainMenu, ContainerTypes.MainMenu, true);
     const containerEditorPtr = wasm.createContainer(ContainerTypes.Editor, ContainerTypes.Editor, true);
 
@@ -40,7 +36,6 @@ export class GameLoader {
     wasm.addNodeToRuntime(containerLvl1Ptr, false);
     wasm.addNodeToRuntime(containerMainMenuPtr, true);
     wasm.addNodeToRuntime(containerEditorPtr, false);
-    wasm.addNodeToRuntime(containerTestPtr, false);
   }
 
   async loadInitialLevels() {
