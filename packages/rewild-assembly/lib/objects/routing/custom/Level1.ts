@@ -30,7 +30,6 @@ export class Level1 extends Container implements Listener {
   private direction3!: DirectionalLight;
   private ambient!: AmbientLight;
   private skybox!: TransformNode;
-  // private ball!: TransformNode;
   private groundBody: Body | null;
 
   constructor(name: string) {
@@ -102,7 +101,6 @@ export class Level1 extends Container implements Listener {
     this.totalTime = 0;
     physicsManager.reset();
 
-    // this.ball = this.findObjectByName("ball")!;
     this.skybox = this.findObjectByName("skybox")!;
 
     // Possitive z comes out of screen
@@ -113,14 +111,6 @@ export class Level1 extends Container implements Listener {
     for (let i: i32 = 0, l = objects.length; i < l; i++) {
       const obj = objects[i];
 
-      // if (obj.name.includes("crate")) {
-      //   obj.position.set(
-      //     this.getRandomArbitrary(-100, 100),
-      //     0.5,
-      //     this.getRandomArbitrary(-100, 100)
-      //   );
-      //   obj.rotation.y = Mathf.random() * Mathf.PI;
-      // } else
       if (obj.name.includes("building")) {
         const height = this.getRandomArbitrary(5, 10);
         obj.position.set(
@@ -129,23 +119,6 @@ export class Level1 extends Container implements Listener {
           this.getRandomArbitrary(-100, 100)
         );
         obj.scale.set(5, height, 5);
-
-        // // Shape on plane
-        // const boxShape = new Box(new Vec3Physics(5, height, 5));
-        // const shapeBody = new Body(
-        //   new BodyOptions()
-        //     .setMass(30)
-        //     .setPosition(
-        //       new Vec3Physics(obj.position.x, obj.position.y, obj.position.z)
-        //     )
-        //     .setShape(boxShape)
-        // );
-        // this.world!.add(shapeBody);
-
-        // const options = new BodyOptions();
-        // options.pos.set(obj.position.x, obj.position.y, obj.position.z);
-        // options.size.set(5, height, 5);
-        // this.world!.initBody("box", options);
       }
     }
 
