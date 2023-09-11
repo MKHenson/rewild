@@ -25,8 +25,6 @@ export class GameLoader {
     const box = geometryManager.getAsset("box");
     const sphere = geometryManager.getAsset("sphere");
 
-    wasm.addAsset(containerLvl1Ptr as any, this.createMesh(box, "skybox", "skybox").transform as any);
-
     const containerMainMenuPtr = wasm.createContainer(ContainerTypes.MainMenu, ContainerTypes.MainMenu, true);
     const containerEditorPtr = wasm.createContainer(ContainerTypes.Editor, ContainerTypes.Editor, true);
 

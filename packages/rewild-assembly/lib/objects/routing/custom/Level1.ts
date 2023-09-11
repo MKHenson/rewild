@@ -29,7 +29,6 @@ export class Level1 extends Container implements Listener {
   private direction2!: DirectionalLight;
   private direction3!: DirectionalLight;
   private ambient!: AmbientLight;
-  private skybox!: TransformNode;
   private groundBody: Body | null;
 
   constructor(name: string) {
@@ -84,12 +83,7 @@ export class Level1 extends Container implements Listener {
 
   onUpdate(delta: f32, total: u32): void {
     super.onUpdate(delta, total);
-
     this.totalTime += delta;
-
-    const camera = this.runtime!.camera;
-    const camPos = camera.position;
-    this.skybox.position.set(camPos.x, camPos.y, camPos.z);
   }
 
   getRandomArbitrary(min: f32, max: f32): f32 {
@@ -101,31 +95,12 @@ export class Level1 extends Container implements Listener {
     this.totalTime = 0;
     physicsManager.reset();
 
-    this.skybox = this.findObjectByName("skybox")!;
-
     // Possitive z comes out of screen
     this.runtime!.camera.position.set(0, 1, 50);
     this.runtime!.camera.lookAt(0, 0, 0);
 
-    const objects = this.objects;
-    for (let i: i32 = 0, l = objects.length; i < l; i++) {
-      const obj = objects[i];
-
-      if (obj.name.includes("building")) {
-        const height = this.getRandomArbitrary(5, 10);
-        obj.position.set(
-          this.getRandomArbitrary(-100, 100),
-          height / 2,
-          this.getRandomArbitrary(-100, 100)
-        );
-        obj.scale.set(5, height, 5);
-      }
-    }
-
     const world = physicsManager.world;
     world.add(this.groundBody!);
-    this.skybox.scale.set(5000, 5000, 5000);
-    this.skybox.position.set(0, 0, 0);
     uiSignaller.addEventListener(UIEventType, this);
   }
 

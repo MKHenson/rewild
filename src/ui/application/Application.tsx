@@ -10,6 +10,7 @@ import { ErrorType, StartError } from "./StartError";
 import { InGame } from "./InGame";
 import { Auth } from "./Auth";
 import { terrainManager } from "../../renderer/AssetManagers/TerrainManager";
+import { skyboxManager } from "src/renderer/AssetManagers/SkyboxManager";
 
 interface Props {}
 
@@ -48,7 +49,7 @@ export class Application extends Component<Props> {
       gameLoader = new GameLoader(renderer);
       eventManager = new UIEventManager();
 
-      const bindables: IBindable[] = [renderer, eventManager, terrainManager];
+      const bindables: IBindable[] = [renderer, eventManager, terrainManager, skyboxManager];
 
       try {
         await wasmManager.load(bindables);

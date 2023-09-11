@@ -3,7 +3,7 @@ import { addChild, removeChild } from "../../../core/TransformNode";
 import { Portal } from "./Portal";
 import { Container } from "./Container";
 import { Link } from "./Link";
-import { Terrain } from "../../../terrain/Terrain";
+import { Terrain } from "../../terrain/Terrain";
 import {
   ApplicationEventType,
   Event,
@@ -12,19 +12,23 @@ import {
 } from "rewild-common";
 import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
 import { uiSignaller } from "../../../extras/ui/uiSignalManager";
+import { Skybox } from "../../skybox/Skybox";
 
 export class Level extends Container implements Listener {
-  private terrain: Terrain;
+  terrain: Terrain;
+  skybox: Skybox;
 
   constructor(name: string, autoDispose: boolean = false) {
     super(name, autoDispose);
 
     this.terrain = new Terrain();
+    this.skybox = new Skybox();
   }
 
   onUpdate(delta: f32, total: u32): void {
     super.onUpdate(delta, total);
     this.terrain.update();
+    this.skybox.update(this.runtime!.camera);
   }
 
   mount(): void {
@@ -32,6 +36,7 @@ export class Level extends Container implements Listener {
 
     // Activate the enter portal
     addChild(this.runtime!.scene, this.terrain);
+    addChild(this.runtime!.scene, this.skybox);
     this.runtime!.sendSignal(this.getPortal("Enter")!, false);
     uiSignaller.addEventListener(UIEventType, this);
   }
@@ -39,6 +44,7 @@ export class Level extends Container implements Listener {
   unMount(): void {
     super.unMount();
     removeChild(this.runtime!.scene, this.terrain);
+    removeChild(this.runtime!.scene, this.skybox);
     uiSignaller.removeEventListener(UIEventType, this);
   }
 

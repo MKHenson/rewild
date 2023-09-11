@@ -1,5 +1,5 @@
-import { TransformNode } from "../core/TransformNode";
-import { createChunk } from "../../lib/Imports";
+import { TransformNode } from "../../core/TransformNode";
+import { createChunk } from "../../Imports";
 
 export class Terrain extends TransformNode {
   isChunkLoaded: boolean;

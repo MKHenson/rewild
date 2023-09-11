@@ -15,6 +15,7 @@ import { PipelineResourceInstance } from "../core/pipelines/resources/PipelineRe
 
 import { Pane3D } from "rewild-ui";
 import { InputManager } from "src/core/InputManager";
+import { skyboxManager } from "./AssetManagers/SkyboxManager";
 
 const sampleCount = 4;
 export type UpdateCallback = () => void;
@@ -104,6 +105,7 @@ export class Renderer implements IBindable {
     await pipelineManager.initialize(this);
     await geometryManager.initialize(this);
     await terrainManager.initialize(this);
+    await skyboxManager.initialize(this);
 
     // Initialize the wasm module
     wasm.init(canvas.width, canvas.height);
