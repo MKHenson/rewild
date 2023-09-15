@@ -515,7 +515,7 @@ export class Ray {
       const fi = faceList ? faceList[j] : j;
 
       const face = faces[fi];
-      const faceNormal = normals[fi];
+      const faceNormal = normals[fi]!;
       const q = quat;
       const x = position;
 
