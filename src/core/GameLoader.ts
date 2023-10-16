@@ -1,4 +1,4 @@
-import { wasm } from "rewild-wasmtime";
+import { Object3D, DirectionalLight, AmbientLight, wasm } from "rewild-wasmtime";
 import { pipelineManager } from "../renderer/AssetManagers/PipelineManager";
 import { Mesh } from "../renderer/Mesh";
 import { ContainerTypes } from "rewild-common";
@@ -54,21 +54,31 @@ export class GameLoader {
         wasm.addChildNode(levelPtr, containerPtr);
 
         for (const actor of container.actors) {
+          let object: Object3D | null = null;
+          const actorLoaderPreset = actor.actorLoaderPreset;
+
+          // If the actor has a geometry and pipeline then it must be a mesh
           const geometry = actor.properties.find((prop) => prop.type === "geometry")?.value as string;
           const pipeline = actor.properties.find((prop) => prop.type === "pipeline")?.value as string;
 
           if (geometry && pipeline) {
-            const newMesh = this.createMesh(geometryManager.getAsset(geometry), pipeline, actor.name);
-
-            const actorLoaderPreset = actor.actorLoaderPreset;
-
-            // If the actor has a rigid body type, add it to the mesh
-            if (actorLoaderPreset && LoaderPresets[actorLoaderPreset as LoaderPresetType]) {
-              const component = LoaderPresets[actorLoaderPreset as LoaderPresetType](actor);
-              newMesh.addComponent(component);
+            object = this.createMesh(geometryManager.getAsset(geometry), pipeline, actor.name);
+          } else if (actorLoaderPreset === "directional-light" || actorLoaderPreset === "ambient-light") {
+            if (actorLoaderPreset === "directional-light") {
+              object = new DirectionalLight(actor.name);
+            } else if (actorLoaderPreset === "ambient-light") {
+              object = new AmbientLight(actor.name);
             }
+          }
 
-            wasm.addAsset(containerPtr as any, newMesh.transform as any);
+          // Add the object to the container if it exists
+          if (object) {
+            wasm.addAsset(containerPtr as any, object.transform as any);
+
+            // If the actor has a preset
+            if (actorLoaderPreset && LoaderPresets[actorLoaderPreset as LoaderPresetType]) {
+              LoaderPresets[actorLoaderPreset as LoaderPresetType](actor, object);
+            }
           }
         }
       }

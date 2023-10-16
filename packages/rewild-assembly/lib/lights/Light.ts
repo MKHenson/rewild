@@ -1,5 +1,6 @@
 import { TransformNode } from "../core/TransformNode";
 import { Color } from "rewild-common";
+import { DirectionalLight } from "./DirectionalLight";
 
 export class Light extends TransformNode {
   isLight: boolean = true;
@@ -49,4 +50,21 @@ export class Light extends TransformNode {
   // 	return data;
 
   // }
+}
+
+export function setLightIntensity(light: Light, intensity: f32): Light {
+  light.intensity = intensity;
+  return light;
+}
+
+export function setLightColor(light: Light, r: f32, g: f32, b: f32): Light {
+  light.color.setRGB(r, g, b);
+  return light;
+}
+
+export function setLightTarget(light: Light, tx: f32, ty: f32, tz: f32): Light {
+  if (light instanceof DirectionalLight) {
+    (light as DirectionalLight).target.position.set(tx, ty, tz);
+  }
+  return light;
 }

@@ -124,6 +124,79 @@ const actorTemplates: ITemplateTreeNode[] = [
   },
 ];
 
+const lightTemplates: ITemplateTreeNode[] = [
+  {
+    name: "Directional",
+    factoryKey: "actor",
+    template: () => ({
+      ...baseActorTemplate,
+      icon: "label_important",
+      resource: {
+        name: "Direction Light",
+        id: createUUID(),
+        type: "actor",
+        properties: [
+          {
+            label: "Color",
+            type: "color",
+            valueType: "vec3",
+            value: [1, 1, 1] as Vector3,
+          },
+          {
+            label: "Position",
+            type: "position",
+            valueType: "vec3",
+            value: [0, 0, 0] as Vector3,
+          },
+          {
+            label: "Target",
+            type: "target",
+            valueType: "vec3",
+            value: [0, -1, 0] as Vector3,
+          },
+          {
+            label: "Intensity",
+            type: "intensity",
+            valueType: "string",
+            value: 3.1,
+          },
+        ],
+        actorLoaderPreset: "directional-light",
+        baseType: "light",
+      } as IActor,
+    }),
+  },
+  {
+    name: "Ambient",
+    factoryKey: "actor",
+    template: () => ({
+      ...baseActorTemplate,
+      icon: "label_important",
+      resource: {
+        name: "Ambient Light",
+        id: createUUID(),
+        type: "actor",
+        properties: [
+          {
+            label: "Color",
+            type: "color",
+            valueType: "vec3",
+            value: [1, 1, 1] as Vector3,
+          },
+          {
+            label: "Intensity",
+            type: "intensity",
+            valueType: "string",
+            value: 1,
+          },
+        ],
+        actorLoaderPreset: "ambient-light",
+        baseType: "light",
+      } as IActor,
+    }),
+  },
+];
+
 export class ActorStore extends Store<IActorStoreStore> {
   constructor() {
     super({
@@ -131,15 +204,34 @@ export class ActorStore extends Store<IActorStoreStore> {
         {
           name: "Actors",
           icon: "man",
-          children: actorTemplates.map((actor) => ({
-            icon: "label_important",
-            iconSize: "xs",
-            name: actor.name,
-            template: actor.template,
-            onDragStart(node) {
-              return { type: "treenode", node: { ...(node as ITemplateTreeNode).template() } } as ITreeNodeAction;
+          children: [
+            {
+              name: "Physical",
+              icon: "chair",
+              children: actorTemplates.map((actor) => ({
+                icon: "label_important",
+                iconSize: "xs",
+                name: actor.name,
+                template: actor.template,
+                onDragStart(node) {
+                  return { type: "treenode", node: { ...(node as ITemplateTreeNode).template() } } as ITreeNodeAction;
+                },
+              })),
             },
-          })),
+            {
+              name: "Lights",
+              icon: "lightbulb",
+              children: lightTemplates.map((actor) => ({
+                icon: "label_important",
+                iconSize: "xs",
+                name: actor.name,
+                template: actor.template,
+                onDragStart(node) {
+                  return { type: "treenode", node: { ...(node as ITemplateTreeNode).template() } } as ITreeNodeAction;
+                },
+              })),
+            },
+          ],
         },
       ],
     });

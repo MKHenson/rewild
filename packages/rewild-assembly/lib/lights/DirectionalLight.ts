@@ -35,3 +35,9 @@ export class DirectionalLight extends Light {
     return this;
   }
 }
+
+export function createDiectionalLight(name: string | null = null): Light {
+  const light = new DirectionalLight(new Color(1, 1, 1), 1);
+  if (name) light.name = name;
+  return light;
+}

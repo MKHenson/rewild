@@ -10,11 +10,11 @@ export class Object3D {
   id: number;
   uuid: string = generateUUID();
 
-  constructor(name?: string) {
+  constructor(name?: string, transform?: Number) {
     this.transform = 0;
     this.name = name || "";
     this.id = objectId++;
-    this.transform = wasm.createTransformNode(this.name);
+    this.transform = transform || wasm.createTransformNode(this.name);
     wasm.setId(this.transform as any, this.id);
   }
 
@@ -24,6 +24,10 @@ export class Object3D {
 
   get visibility() {
     return wasm.getVisibility(this.transform as any);
+  }
+
+  setPosition(x: number, y: number, z: number) {
+    wasm.setPosition(this.transform as any, x, y, z);
   }
 
   add(child: Object3D) {

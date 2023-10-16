@@ -27,9 +27,11 @@ declare module "models" {
     | "geometry"
     | "pipeline"
     | "position"
+    | "color"
+    | "target"
     | "active"
     | "baseContainer"
-    | "actorLoaderPreset";
+    | "intensity";
   export type PropValueType = "string" | "boolean" | "enum" | "hidden" | "vec3";
   export type PropValue = string | boolean | number | Vector3;
   export type IOption = {
@@ -96,7 +98,7 @@ declare module "models" {
     properties: IProperty[];
   }
 
-  export type BaseType = "static" | "dynamic";
+  export type BaseType = "static" | "dynamic" | "light";
 
   export interface IActor extends IResource {
     baseType: BaseType;
