@@ -38,8 +38,8 @@ export class Application extends Component<Props> {
 
     const onQuit = () => {
       navigate("/");
-      gameLoader.unloadInitialLevels();
       eventManager.triggerUIEvent(ApplicationEventType.Quit);
+      gameLoader.unloadInitialLevels();
     };
 
     const onCanvasReady = async (canvas: Pane3D) => {

@@ -10,6 +10,7 @@ export class Node {
   initialized: boolean;
   mounted: boolean;
   autoDispose: boolean;
+  isDisposed: boolean;
   name: string;
 
   constructor(name: string, autoDispose: boolean = true) {
@@ -17,9 +18,27 @@ export class Node {
     this.children = [];
     this.portals = [];
     this.initialized = false;
+    this.isDisposed = false;
     this.parent = null;
     this.mounted = false;
     this.autoDispose = autoDispose;
+  }
+
+  dispose(): void {
+    this.isDisposed = true;
+
+    for (let p: i32 = 0, pl: i32 = this.portals.length; p < pl; p++) {
+      const portal = unchecked(this.portals[p]);
+      portal.dispose();
+    }
+
+    for (let i: i32 = 0, l: i32 = this.children.length; i < l; i++) {
+      const child = unchecked(this.children[i]);
+      child.dispose();
+    }
+
+    this.parent = null;
+    this.runtime = null;
   }
 
   addChild(node: Node): Node {

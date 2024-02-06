@@ -74,9 +74,12 @@ export class Runtime implements Listener {
       if (node.mounted) node.unMount();
     }
 
-    if (removeFromInactiveNodes && inactiveNodeIndex != -1)
+    if (removeFromInactiveNodes && inactiveNodeIndex != -1) {
+      if (node.mounted) node.unMount();
       this.inactiveNodes.splice(inactiveNodeIndex, 1);
+    }
 
+    node.dispose();
     node.runtime = null;
   }
 
@@ -103,7 +106,10 @@ export class Runtime implements Listener {
       const node = unchecked(activeNodes[i]);
 
       if (!node.initialized) node.init();
-      if (!node.mounted) node.mount();
+      if (!node.mounted) {
+        if (node.isDisposed) throw new Error(`Node ${node.name} is disposed`);
+        node.mount();
+      }
     }
 
     for (let i: i32 = 0, l: i32 = activeNodes.length; i < l; i++) {
