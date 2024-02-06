@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./build",
+    "types": ["node", "rewild-common/types/types", "@webgpu/types", "jest"],
+    "paths": {
+      "*": ["/build/types.d.ts"],
+      "models": ["./types/ui-types.d.ts"]
+    }
+  }
+}

@@ -17,3 +17,4 @@ export * from "./Event";
 export * from "./EventDispatcher";
 export * from "./EventTargetable";
 export * from "./EventAttachable";
+export * from "./TypesPolyfill";

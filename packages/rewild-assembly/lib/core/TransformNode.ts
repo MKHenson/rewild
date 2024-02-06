@@ -622,6 +622,19 @@ export function addComponent(
   return node;
 }
 
+export function removeComponent(
+  node: TransformNode,
+  component: Component
+): TransformNode {
+  const index = node.components.indexOf(component);
+  if (index != -1) {
+    node.components.splice(index, 1);
+    component.transform = null;
+  }
+
+  return node;
+}
+
 export function removeChild(
   parent: TransformNode,
   child: TransformNode

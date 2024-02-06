@@ -58,6 +58,7 @@
   },
   "workspaces": [
     "packages\\rewild-ui",
+    "packages\\rewild-routing",
     "packages\\rewild-assembly",
     "packages\\rewild-common",
     "packages\\rewild-physics",

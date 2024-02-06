@@ -9,6 +9,7 @@ export class Object3D {
   name: string;
   id: number;
   uuid: string = generateUUID();
+  components: Component[] = [];
 
   constructor(name?: string, transform?: Number) {
     this.transform = 0;
@@ -40,5 +41,15 @@ export class Object3D {
 
   addComponent(component: Component) {
     wasm.addComponent(this.transform as any, component.pointer);
+
+    if (this.components.indexOf(component) === -1)
+      this.components.push(component);
+  }
+
+  removeComponent(component: Component) {
+    wasm.removeComponent(this.transform as any, component.pointer);
+
+    const index = this.components.indexOf(component);
+    if (index !== -1) this.components.splice(index, 1);
   }
 }

@@ -23,3 +23,19 @@ export class Component extends EventDispatcher {
     return this;
   }
 }
+
+export function onComponentUpdate(
+  component: Component,
+  delta: f32,
+  total: u32
+): void {
+  component.onUpdate(delta, total);
+}
+
+export function componentMount(component: Component, runtime: Runtime): void {
+  component.mount(runtime);
+}
+
+export function componentUnMount(component: Component, runtime: Runtime): void {
+  component.unMount(runtime);
+}

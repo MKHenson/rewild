@@ -21,7 +21,7 @@ declare namespace i32 {
 
 declare const Mathf: typeof Math;
 
-declare function unchecked(val: any): any;
+declare function unchecked<T>(val: T): T;
 declare function u32(val: number): number;
 declare function i32(val: number): number;
 declare function f32(val: number): number;
