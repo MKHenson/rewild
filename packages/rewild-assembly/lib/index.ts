@@ -42,6 +42,7 @@ export {
   getVisibility,
   setVisibility,
   addComponent,
+  removeComponent,
   getDataProperties,
   getId,
   setId,
@@ -50,6 +51,13 @@ export {
   getTransformNormalMatrix,
   getTransformWorldMatrix,
 } from "./core/TransformNode";
+
+export {
+  componentMount,
+  componentUnMount,
+  onComponentUpdate,
+} from "./core/Component";
+
 export {
   creatBufferGeometry,
   createBufferAttributeF32,
