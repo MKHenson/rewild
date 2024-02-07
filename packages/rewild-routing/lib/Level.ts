@@ -1,58 +1,52 @@
-import { Node } from "./Node";
-import { addChild, removeChild } from "../../../core/TransformNode";
-import { Portal } from "./Portal";
-import { Container } from "./Container";
-import { Link } from "./Link";
-import { Terrain } from "../../terrain/Terrain";
+import { Node } from './Node';
+import { Portal } from './Portal';
+import { Container } from './Container';
+import { Link } from './Link';
 import {
   ApplicationEventType,
   Event,
   Listener,
   UIEventType,
-} from "rewild-common";
-import { ApplicationEvent } from "../../../extras/ui/ApplicationEvent";
-import { uiSignaller } from "../../../extras/ui/uiSignalManager";
-import { Skybox } from "../../skybox/Skybox";
+} from 'rewild-common';
+import { ApplicationEvent } from './ApplicationEvent';
+import { Object3D, wasm } from 'rewild-wasmtime';
 
 export class Level extends Container implements Listener {
-  terrain: Terrain;
-  skybox: Skybox;
+  terrain: Object3D;
+  skybox: Object3D;
 
-  constructor(name: string, autoDispose: boolean = false) {
-    super(name, autoDispose);
+  constructor(
+    name: string,
+    parentObject3D: Object3D,
+    autoDispose: boolean = false
+  ) {
+    super(name, true, parentObject3D, autoDispose);
 
-    this.terrain = new Terrain();
-    this.skybox = new Skybox();
-  }
+    this.terrain = new Object3D('Terrain', wasm.createTerrain());
+    this.skybox = new Object3D('Skybox', wasm.createSkybox());
 
-  onUpdate(delta: f32, total: u32): void {
-    super.onUpdate(delta, total);
-    this.terrain.update();
-    this.skybox.update(this.runtime!.camera);
+    this.addAsset(this.terrain);
+    this.addAsset(this.skybox);
   }
 
   mount(): void {
     super.mount();
 
     // Activate the enter portal
-    addChild(this.runtime!.scene, this.terrain);
-    addChild(this.runtime!.scene, this.skybox);
-    this.runtime!.sendSignal(this.getPortal("Enter")!, false);
-    uiSignaller.addEventListener(UIEventType, this);
+    this.runtime!.sendSignal(this.getPortal('Enter')!, false);
+    this.runtime.addEventListener(UIEventType, this);
   }
 
   unMount(): void {
     super.unMount();
-    removeChild(this.runtime!.scene, this.terrain);
-    removeChild(this.runtime!.scene, this.skybox);
-    uiSignaller.removeEventListener(UIEventType, this);
+    this.runtime.removeEventListener(UIEventType, this);
   }
 
   onEvent(event: Event): void {
-    if (event.attachment instanceof ApplicationEvent) {
+    if (event instanceof ApplicationEvent) {
       const uiEvent = event.attachment as ApplicationEvent;
       if (uiEvent.eventType == ApplicationEventType.Quit)
-        this.runtime!.sendSignal(this.getPortal("Exit")!, true);
+        this.runtime!.sendSignal(this.getPortal('Exit')!, true);
     }
   }
 
@@ -62,11 +56,13 @@ export class Level extends Container implements Listener {
       if (container.activeOnStartup) {
         const entranceLink = new Link();
         const exitLink = new Link();
+
         entranceLink.connect(
-          this.getPortal("Enter")!,
-          container.getPortal("Enter")!
+          this.getPortal('Enter')!,
+          container.getPortal('Enter')!
         );
-        exitLink.connect(container.getPortal("Exit")!, this.getPortal("Exit")!);
+
+        exitLink.connect(container.getPortal('Exit')!, this.getPortal('Exit')!);
       }
     }
 
@@ -78,11 +74,7 @@ export class Level extends Container implements Listener {
     super.enter(portalEntered);
 
     // Activate the exit portal
-    if (portalEntered.name == "Exit")
-      this.runtime!.sendSignal(this.getPortal("Exit")!, true);
+    if (portalEntered.name == 'Exit')
+      this.runtime!.sendSignal(this.getPortal('Exit')!, true);
   }
-}
-
-export function createLevel(name: string): Node {
-  return new Level(name);
 }

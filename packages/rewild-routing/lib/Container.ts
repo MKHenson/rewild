@@ -1,29 +1,27 @@
-import {
-  addChild,
-  removeChild,
-  TransformNode,
-} from "../../../core/TransformNode";
-import { Node } from "./Node";
-import { Portal } from "./Portal";
-import { Component, Object3D } from "rewild-wasmtime";
+import { Node } from './Node';
+import { Portal } from './Portal';
+import { Component, Object3D, wasm } from 'rewild-wasmtime';
 
 export class Container extends Node {
   protected objects: Object3D[];
   protected loaded: boolean;
-  activeOnStartup: boolean;
+  readonly activeOnStartup: boolean;
+  private parentObject3D: Object3D;
 
   constructor(
     name: string,
     activeOnStartup: boolean,
+    parentObject3D: Object3D,
     autoDispose: boolean = false
   ) {
     super(name, autoDispose);
     this.objects = [];
     this.loaded = false;
+    this.parentObject3D = parentObject3D;
     this.activeOnStartup = activeOnStartup;
 
-    this.addPortal(new Portal("Enter"));
-    this.addPortal(new Portal("Exit"));
+    this.addPortal(new Portal('Enter'));
+    this.addPortal(new Portal('Exit'));
   }
 
   findObjectByName(name: string): Object3D | null {
@@ -33,21 +31,8 @@ export class Container extends Node {
     return null;
   }
 
-  addAsset(object: TransformNode): void {
+  addAsset(object: Object3D): void {
     this.objects.push(object);
-  }
-
-  onUpdate(delta: f32, total: u32): void {
-    const objects = this.objects;
-    let components: Component[];
-
-    for (let c: i32 = 0, cl = objects.length; c < cl; c++) {
-      components = objects[c].components;
-      for (let i: i32 = 0, l = components.length; i < l; i++) {
-        const component = unchecked(components[i]);
-        component.onUpdate(delta, total);
-      }
-    }
   }
 
   mount(): void {
@@ -56,12 +41,10 @@ export class Container extends Node {
 
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
       components = objects[i].components;
-      addChild(this.runtime!.scene, unchecked(objects[i]));
-
-      for (let c: i32 = 0, cl = components.length; c < cl; c++) {
-        const component = unchecked(components[c]);
-        component.mount(this.runtime!);
-      }
+      wasm.addChild(
+        this.parentObject3D.transform as any,
+        unchecked(objects[i].transform as any)
+      );
     }
 
     super.mount();
@@ -73,13 +56,12 @@ export class Container extends Node {
 
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
       components = objects[i].components;
-      removeChild(this.runtime!.scene, unchecked(objects[i]));
-
-      for (let c: i32 = 0, cl = components.length; c < cl; c++) {
-        const component = unchecked(components[c]);
-        component.unMount(this.runtime!);
-      }
+      wasm.removeChild(
+        this.parentObject3D.transform as any,
+        unchecked(objects[i].transform as any)
+      );
     }
+
     super.unMount();
   }
 }

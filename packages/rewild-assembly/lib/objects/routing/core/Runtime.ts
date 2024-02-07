@@ -1,12 +1,12 @@
-import { Listener, Event } from "rewild-common";
-import { WebGPURenderer } from "../../../renderers/WebGPURenderer";
-import { inputManager } from "../../../extras/io/InputManager";
-import { Scene } from "../../../scenes/Scene";
-import { PerspectiveCamera } from "../../../cameras/PerspectiveCamera";
-import { Node } from "./Node";
-import { Portal } from "./Portal";
-import { addChild } from "../../../core/TransformNode";
-import { physicsManager } from "../../physics/PhysicsManager";
+import { Listener, Event } from 'rewild-common';
+import { WebGPURenderer } from '../../../renderers/WebGPURenderer';
+import { inputManager } from '../../../extras/io/InputManager';
+import { Scene } from '../../../scenes/Scene';
+import { PerspectiveCamera } from '../../../cameras/PerspectiveCamera';
+import { Node } from './Node';
+import { Portal } from './Portal';
+import { addChild } from '../../../core/TransformNode';
+import { physicsManager } from '../../physics/PhysicsManager';
 
 export class Runtime implements Listener {
   renderer: WebGPURenderer;
@@ -34,7 +34,7 @@ export class Runtime implements Listener {
 
     addChild(this.scene, this.camera);
 
-    inputManager.addEventListener("mousemove", this);
+    inputManager.addEventListener('mousemove', this);
   }
 
   init(): void {}
@@ -88,6 +88,7 @@ export class Runtime implements Listener {
     const inactiveNodes = this.inactiveNodes;
 
     physicsManager.update();
+    this.scene.onUpdate(delta, total);
 
     // Unmount inactive nodes
     const numInactiveNodes = inactiveNodes.length;

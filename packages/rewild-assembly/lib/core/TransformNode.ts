@@ -545,6 +545,25 @@ export class TransformNode
     return this;
   }
 
+  onUpdate(delta: f32, total: u32): void {
+    const components = this.components;
+    const children = this.children;
+
+    let component: Component;
+    let child: TransformNode;
+
+    for (let i: i32 = 0, l = components.length; i < l; i++) {
+      component = unchecked(components[i]);
+      if (component instanceof BehaviourComponent)
+        (component as BehaviourComponent).onUpdate(delta, total);
+    }
+
+    for (let i: i32 = 0, l = children.length; i < l; i++) {
+      child = unchecked(children[i]);
+      child.onUpdate(delta, total);
+    }
+  }
+
   onAddedToParent(): void {
     const components = this.components;
     for (let i: i32 = 0, l = components.length; i < l; i++) {

@@ -1,6 +1,7 @@
-import { Camera } from "../../cameras/Camera";
-import { TransformNode } from "../../core/TransformNode";
-import { initializeSkybox } from "../../Imports";
+import { Camera } from '../../cameras/Camera';
+import { TransformNode } from '../../core/TransformNode';
+import { initializeSkybox } from '../../Imports';
+import { getRuntime } from '../routing/AsSceneManager';
 
 export class Skybox extends TransformNode {
   constructor() {
@@ -10,8 +11,15 @@ export class Skybox extends TransformNode {
     initializeSkybox(this);
   }
 
-  update(camera: Camera): void {
-    const camPos = camera.position;
+  onUpdate(delta: f32, total: u32): void {
+    super.onUpdate(delta, total);
+
+    const runtime = getRuntime();
+    const camPos = runtime.camera.position;
     this.position.set(camPos.x, camPos.y, camPos.z);
   }
+}
+
+export function createSkybox(): TransformNode {
+  return new Skybox();
 }

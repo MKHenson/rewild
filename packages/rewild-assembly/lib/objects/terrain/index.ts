@@ -1,1 +1,1 @@
-// export { createTerrain } from "./Terrain";
+export { createTerrain } from './Terrain';

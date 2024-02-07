@@ -1,38 +1,16 @@
-import { Listener, Event } from "rewild-common";
-import { WebGPURenderer } from "../../../renderers/WebGPURenderer";
-import { inputManager } from "../../../extras/io/InputManager";
-import { Scene } from "../../../scenes/Scene";
-import { PerspectiveCamera } from "../../../cameras/PerspectiveCamera";
-import { Node } from "./Node";
-import { Portal } from "./Portal";
-import { addChild } from "../../../core/TransformNode";
-import { physicsManager } from "../../physics/PhysicsManager";
+import { Node } from './Node';
+import { Portal } from './Portal';
 
-export class Runtime implements Listener {
-  renderer: WebGPURenderer;
-  scene: Scene;
-  camera: PerspectiveCamera;
+export class StateMachine {
   readonly nodes: Node[];
   readonly activeNodes: Node[];
   private inactiveNodes: Node[];
 
-  constructor(width: f32, height: f32, renderer: WebGPURenderer) {
+  constructor() {
     this.nodes = [];
     this.activeNodes = [];
     this.inactiveNodes = [];
-
-    this.renderer = renderer;
-    this.scene = new Scene();
-    this.camera = new PerspectiveCamera(45, f32(width) / f32(height), 0.1, 10000);
-    this.camera.position.set(0, 0, 10);
-    this.camera.lookAt(0, 0, 0);
-
-    addChild(this.scene, this.camera);
-
-    inputManager.addEventListener("mousemove", this);
   }
-
-  init(): void {}
 
   getNode(name: string): Node | null {
     const nodes = this.nodes;
@@ -82,8 +60,6 @@ export class Runtime implements Listener {
     const activeNodes = this.activeNodes;
     const inactiveNodes = this.inactiveNodes;
 
-    physicsManager.update();
-
     // Unmount inactive nodes
     const numInactiveNodes = inactiveNodes.length;
     if (numInactiveNodes) {
@@ -110,8 +86,6 @@ export class Runtime implements Listener {
     for (let i: i32 = 0, l: i32 = activeNodes.length; i < l; i++) {
       unchecked(activeNodes[i]).onUpdate(delta, total);
     }
-
-    this.renderer.render(this.scene, this.camera);
   }
 
   private deactivateNode(node: Node): void {
@@ -156,11 +130,4 @@ export class Runtime implements Listener {
       }
     }
   }
-
-  onResize(width: f32, height: f32): void {
-    this.camera.aspect = f32(width) / f32(height);
-    this.camera.updateProjectionMatrix();
-  }
-
-  onEvent(event: Event): void {}
 }

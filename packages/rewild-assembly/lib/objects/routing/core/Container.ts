@@ -38,20 +38,6 @@ export class Container extends Node {
     this.objects.push(object);
   }
 
-  onUpdate(delta: f32, total: u32): void {
-    const objects = this.objects;
-    let components: Component[];
-
-    for (let c: i32 = 0, cl = objects.length; c < cl; c++) {
-      components = objects[c].components;
-      for (let i: i32 = 0, l = components.length; i < l; i++) {
-        const component = unchecked(components[i]);
-        if (component instanceof BehaviourComponent)
-          (component as BehaviourComponent).onUpdate(delta, total);
-      }
-    }
-  }
-
   mount(): void {
     const objects = this.objects;
     let components: Component[];
