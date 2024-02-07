@@ -6,6 +6,7 @@ import {
 import { Node } from './Node';
 import { Portal } from './Portal';
 import { Component } from '../../../core/Component';
+import { BehaviourComponent } from '../../../components/BehaviourComponent';
 
 export class Container extends Node {
   protected objects: TransformNode[];
@@ -45,7 +46,8 @@ export class Container extends Node {
       components = objects[c].components;
       for (let i: i32 = 0, l = components.length; i < l; i++) {
         const component = unchecked(components[i]);
-        component.onUpdate(delta, total);
+        if (component instanceof BehaviourComponent)
+          (component as BehaviourComponent).onUpdate(delta, total);
       }
     }
   }
@@ -57,11 +59,6 @@ export class Container extends Node {
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
       components = objects[i].components;
       addChild(this.runtime!.scene, unchecked(objects[i]));
-
-      for (let c: i32 = 0, cl = components.length; c < cl; c++) {
-        const component = unchecked(components[c]);
-        component.mount();
-      }
     }
 
     super.mount();
@@ -74,11 +71,6 @@ export class Container extends Node {
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
       components = objects[i].components;
       removeChild(this.runtime!.scene, unchecked(objects[i]));
-
-      for (let c: i32 = 0, cl = components.length; c < cl; c++) {
-        const component = unchecked(components[c]);
-        component.unMount();
-      }
     }
     super.unMount();
   }

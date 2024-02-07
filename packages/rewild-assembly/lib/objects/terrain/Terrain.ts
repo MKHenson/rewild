@@ -1,5 +1,5 @@
-import { TransformNode } from "../../core/TransformNode";
-import { createChunk } from "../../Imports";
+import { TransformNode } from '../../core/TransformNode';
+import { createChunk } from '../../Imports';
 
 export class Terrain extends TransformNode {
   isChunkLoaded: boolean;
@@ -14,12 +14,5 @@ export class Terrain extends TransformNode {
       this.isChunkLoaded = true;
       createChunk(this);
     }
-  }
-
-  onAddedToParent(): void {
-    console.log("Terrain added to parent");
-  }
-  onRemovedFromParent(): void {
-    console.log("Terrain removed from parent");
   }
 }
