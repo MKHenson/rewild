@@ -1,8 +1,9 @@
 import { Body } from 'rewild-physics';
 import { Component } from '../core/Component';
 import { physicsManager } from '../objects/physics/PhysicsManager';
+import { BehaviourComponent } from './BehaviourComponent';
 
-export class PhysicsComponent extends Component {
+export class PhysicsComponent extends BehaviourComponent {
   rigidBody: Body;
   dataProperties: Float32Array;
 

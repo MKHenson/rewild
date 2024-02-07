@@ -1,4 +1,3 @@
-import { Component } from '../core/Component';
 import { uiSignaller } from '../extras/ui/uiSignalManager';
 import {
   ApplicationEventType,
@@ -16,8 +15,9 @@ import { Body, BodyOptions, Vec3, Sphere } from 'rewild-physics';
 import { inputManager } from '../extras/io/InputManager';
 import { physicsManager } from '../objects/physics/PhysicsManager';
 import { getRuntime } from '../tests';
+import { BehaviourComponent } from './BehaviourComponent';
 
-export class PlayerComponent extends Component implements Listener {
+export class PlayerComponent extends BehaviourComponent implements Listener {
   readonly dataProperties: Int32Array;
   private hungerTimer: f32;
   private criticalHungerTimer: f32;

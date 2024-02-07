@@ -1,6 +1,6 @@
-import { Component } from '../core/Component';
+import { BehaviourComponent } from './BehaviourComponent';
 
-export class PlanetComponent extends Component {
+export class PlanetComponent extends BehaviourComponent {
   private spinSpeed: f32;
   private size: f32;
 

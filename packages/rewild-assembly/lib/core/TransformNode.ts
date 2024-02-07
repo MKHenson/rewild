@@ -6,15 +6,16 @@ import {
   IQuatChangeListener,
   Event,
   EventDispatcher,
-} from "rewild-common";
-import { EngineMatrix4 } from "../math/Matrix4";
-import { EngineVector3 } from "../math/Vector3";
-import { Layers } from "./Layers";
-import { Camera } from "../cameras/Camera";
-import { Light } from "../lights/Light";
-import { Raycaster } from "./Raycaster";
-import { Intersection, MeshComponent } from "../components/MeshComponent";
-import { Component } from "./Component";
+} from 'rewild-common';
+import { EngineMatrix4 } from '../math/Matrix4';
+import { EngineVector3 } from '../math/Vector3';
+import { Layers } from './Layers';
+import { Camera } from '../cameras/Camera';
+import { Light } from '../lights/Light';
+import { Raycaster } from './Raycaster';
+import { Intersection, MeshComponent } from '../components/MeshComponent';
+import { Component } from './Component';
+import { BehaviourComponent } from '../components/BehaviourComponent';
 
 const _v1 = new EngineVector3();
 const _q1 = new Quaternion();
@@ -30,8 +31,8 @@ const _yAxis = new EngineVector3(0, 1, 0);
 const _zAxis = new EngineVector3(0, 0, 1);
 
 type TraverseCallback = (object: TransformNode) => void;
-const _addedEvent: Event = new Event("added");
-const _removedEvent: Event = new Event("removed");
+const _addedEvent: Event = new Event('added');
+const _removedEvent: Event = new Event('removed');
 
 export class TransformNode
   extends EventDispatcher
@@ -74,8 +75,8 @@ export class TransformNode
     this.modelViewMatrix = new EngineMatrix4();
     this.normalMatrix = new Matrix3();
 
-    this.name = "";
-    this.type = "Object3D";
+    this.name = '';
+    this.type = 'Object3D';
 
     this.parent = null;
     this.children = [];
@@ -544,8 +545,23 @@ export class TransformNode
     return this;
   }
 
-  onAddedToParent(): void {}
-  onRemovedFromParent(): void {}
+  onAddedToParent(): void {
+    const components = this.components;
+    for (let i: i32 = 0, l = components.length; i < l; i++) {
+      const component = unchecked(components[i]);
+      if (component instanceof BehaviourComponent)
+        (component as BehaviourComponent).mount();
+    }
+  }
+
+  onRemovedFromParent(): void {
+    const components = this.components;
+    for (let i: i32 = 0, l = components.length; i < l; i++) {
+      const component = unchecked(components[i]);
+      if (component instanceof BehaviourComponent)
+        (component as BehaviourComponent).unMount();
+    }
+  }
 }
 
 export function createTransformNode(name: string | null): TransformNode {
