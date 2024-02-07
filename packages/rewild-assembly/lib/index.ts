@@ -13,7 +13,6 @@ export { addPipelineAttribute } from './pipelines/PipelineInstance';
 export { createMeshComponent } from './components/MeshComponent';
 export * from './lights/index';
 export * from './components/index';
-// export * from "./terrain/index";
 export * from './objects/physics/index';
 
 export {
@@ -34,6 +33,7 @@ export {
   getCameraProjectionMatrix,
   getCameraWorldInverseMatrix,
 } from './cameras/Camera';
+export * from './objects';
 
 export {
   addChild,

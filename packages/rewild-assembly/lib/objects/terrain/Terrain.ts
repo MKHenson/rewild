@@ -9,10 +9,16 @@ export class Terrain extends TransformNode {
     this.isChunkLoaded = false;
   }
 
-  update(): void {
+  onUpdate(delta: f32, total: u32): void {
+    super.onUpdate(delta, total);
+
     if (!this.isChunkLoaded) {
       this.isChunkLoaded = true;
       createChunk(this);
     }
   }
+}
+
+export function createTerrain(): TransformNode {
+  return new Terrain();
 }
