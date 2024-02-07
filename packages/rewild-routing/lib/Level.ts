@@ -34,12 +34,12 @@ export class Level extends Container implements Listener {
 
     // Activate the enter portal
     this.runtime!.sendSignal(this.getPortal('Enter')!, false);
-    this.runtime.addEventListener(UIEventType, this);
+    this.runtime!.addEventListener(UIEventType, this);
   }
 
   unMount(): void {
     super.unMount();
-    this.runtime.removeEventListener(UIEventType, this);
+    this.runtime!.removeEventListener(UIEventType, this);
   }
 
   onEvent(event: Event): void {
