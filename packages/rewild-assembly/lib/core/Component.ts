@@ -1,6 +1,5 @@
-import { EventDispatcher } from "rewild-common";
-import { addComponent, TransformNode } from "./TransformNode";
-import { Runtime } from "../objects/routing";
+import { EventDispatcher } from 'rewild-common';
+import { addComponent, TransformNode } from './TransformNode';
 
 export class Component extends EventDispatcher {
   transform: TransformNode | null;
@@ -13,29 +12,11 @@ export class Component extends EventDispatcher {
   }
 
   onUpdate(delta: f32, total: u32): void {}
-
-  mount(runtime: Runtime): void {}
-
-  unMount(runtime: Runtime): void {}
+  mount(): void {}
+  unMount(): void {}
 
   copy(source: Component): Component {
     if (source.transform) addComponent(source.transform, this);
     return this;
   }
-}
-
-export function onComponentUpdate(
-  component: Component,
-  delta: f32,
-  total: u32
-): void {
-  component.onUpdate(delta, total);
-}
-
-export function componentMount(component: Component, runtime: Runtime): void {
-  component.mount(runtime);
-}
-
-export function componentUnMount(component: Component, runtime: Runtime): void {
-  component.unMount(runtime);
 }

@@ -1,20 +1,21 @@
-import { Component } from "../core/Component";
-import { uiSignaller } from "../extras/ui/uiSignalManager";
+import { Component } from '../core/Component';
+import { uiSignaller } from '../extras/ui/uiSignalManager';
 import {
   ApplicationEventType,
   Event,
   Listener,
   UIEventType,
-} from "rewild-common";
-import { lock, unlock } from "../Imports";
-import { Runtime } from "../objects/routing";
-import { OrbitController } from "../extras/OrbitController";
-import { PointerLockController } from "../extras/PointerLockController";
-import { KeyboardEvent } from "../extras/io/KeyboardEvent";
-import { ApplicationEvent } from "../extras/ui/ApplicationEvent";
-import { Body, BodyOptions, Vec3, Sphere } from "rewild-physics";
-import { inputManager } from "../extras/io/InputManager";
-import { physicsManager } from "../objects/physics/PhysicsManager";
+} from 'rewild-common';
+import { lock, unlock } from '../Imports';
+import { Runtime } from '../objects/routing';
+import { OrbitController } from '../extras/OrbitController';
+import { PointerLockController } from '../extras/PointerLockController';
+import { KeyboardEvent } from '../extras/io/KeyboardEvent';
+import { ApplicationEvent } from '../extras/ui/ApplicationEvent';
+import { Body, BodyOptions, Vec3, Sphere } from 'rewild-physics';
+import { inputManager } from '../extras/io/InputManager';
+import { physicsManager } from '../objects/physics/PhysicsManager';
+import { getRuntime } from '../tests';
 
 export class PlayerComponent extends Component implements Listener {
   readonly dataProperties: Int32Array;
@@ -42,12 +43,14 @@ export class PlayerComponent extends Component implements Listener {
     this.runtime = null;
   }
 
-  mount(runtime: Runtime): void {
-    super.mount(runtime);
+  mount(): void {
+    super.mount();
+
+    const runtime = getRuntime();
     this.runtime = runtime;
     this.isPaused = false;
 
-    inputManager.addEventListener("keyup", this);
+    inputManager.addEventListener('keyup', this);
     uiSignaller.addEventListener(UIEventType, this);
     this.onRestart();
 
@@ -75,11 +78,11 @@ export class PlayerComponent extends Component implements Listener {
     lock();
   }
 
-  unMount(runtime: Runtime): void {
-    super.unMount(runtime);
+  unMount(): void {
+    super.unMount();
     this.runtime = null;
 
-    inputManager.removeEventListener("keyup", this);
+    inputManager.removeEventListener('keyup', this);
     uiSignaller.removeEventListener(UIEventType, this);
 
     this.orbitController!.enabled = false;
@@ -94,14 +97,14 @@ export class PlayerComponent extends Component implements Listener {
       const keyEvent = event.attachment as KeyboardEvent;
 
       if (!this.isDead) {
-        if (keyEvent.code == "Escape") {
+        if (keyEvent.code == 'Escape') {
           this.isPaused = !this.isPaused;
 
           if (this.isPaused) unlock();
           else if (!useOrbitController) lock();
 
           uiSignaller.signalClientEvent(ApplicationEventType.OpenInGameMenu);
-        } else if (keyEvent.code == "KeyC") {
+        } else if (keyEvent.code == 'KeyC') {
           this.useOrbitController = !useOrbitController;
           if (!this.useOrbitController) lock();
           else unlock();
