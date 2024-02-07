@@ -2,10 +2,10 @@ import {
   addChild,
   removeChild,
   TransformNode,
-} from "../../../core/TransformNode";
-import { Node } from "./Node";
-import { Portal } from "./Portal";
-import { Component } from "../../../core/Component";
+} from '../../../core/TransformNode';
+import { Node } from './Node';
+import { Portal } from './Portal';
+import { Component } from '../../../core/Component';
 
 export class Container extends Node {
   protected objects: TransformNode[];
@@ -22,8 +22,8 @@ export class Container extends Node {
     this.loaded = false;
     this.activeOnStartup = activeOnStartup;
 
-    this.addPortal(new Portal("Enter"));
-    this.addPortal(new Portal("Exit"));
+    this.addPortal(new Portal('Enter'));
+    this.addPortal(new Portal('Exit'));
   }
 
   findObjectByName(name: string): TransformNode | null {
@@ -60,7 +60,7 @@ export class Container extends Node {
 
       for (let c: i32 = 0, cl = components.length; c < cl; c++) {
         const component = unchecked(components[c]);
-        component.mount(this.runtime!);
+        component.mount();
       }
     }
 
@@ -77,7 +77,7 @@ export class Container extends Node {
 
       for (let c: i32 = 0, cl = components.length; c < cl; c++) {
         const component = unchecked(components[c]);
-        component.unMount(this.runtime!);
+        component.unMount();
       }
     }
     super.unMount();
