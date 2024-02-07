@@ -1,75 +1,60 @@
-import { ApplicationEventType } from "rewild-common";
-import { Pane3D, Route, navigate, RouterSwitch, Component, register, InfoBox } from "rewild-ui";
-import { UIEventManager } from "../../core/UIEventManager";
-import { Renderer } from "../../renderer/Renderer";
-import { GameLoader } from "../../core/GameLoader";
-import { WasmManager, IBindable } from "rewild-wasmtime";
-import { MainMenu } from "./MainMenu";
-import { ProjectEditorPage } from "./project-editor/ProjectEditorPage";
-import { ErrorType, StartError } from "./StartError";
-import { InGame } from "./InGame";
-import { Auth } from "./Auth";
-import { terrainManager } from "../../renderer/AssetManagers/TerrainManager";
-import { skyboxManager } from "src/renderer/AssetManagers/SkyboxManager";
+import {
+  Pane3D,
+  Route,
+  navigate,
+  RouterSwitch,
+  Component,
+  register,
+  InfoBox,
+} from 'rewild-ui';
+import { MainMenu } from './MainMenu';
+import { ProjectEditorPage } from './project-editor/ProjectEditorPage';
+import { ErrorType, StartError } from './StartError';
+import { InGame } from './InGame';
+import { Auth } from './Auth';
+import { gameManager } from '../../core/GameManager';
 
 interface Props {}
 
-@register("x-application")
+@register('x-application')
 export class Application extends Component<Props> {
   init() {
-    let renderer: Renderer;
-    const [errorType, setErrorType] = this.useState<ErrorType>("OTHER");
-    const [errorMessage, setErrorMessage] = this.useState("");
+    const [errorType, setErrorType] = this.useState<ErrorType>('OTHER');
+    const [errorMessage, setErrorMessage] = this.useState('');
     const [ready, setReady] = this.useState(false);
 
-    let gameLoader: GameLoader;
-    let eventManager: UIEventManager;
-    const wasmManager: WasmManager = new WasmManager();
-
     const onStart = async () => {
-      navigate("/game");
-      await gameLoader.loadInitialLevels();
-      eventManager.triggerUIEvent(ApplicationEventType.StartGame);
+      navigate('/game');
+      await gameManager.onStart();
     };
 
     const onEditor = () => {
-      navigate("/editor");
+      navigate('/editor');
     };
 
     const onQuit = () => {
-      navigate("/");
-      eventManager.triggerUIEvent(ApplicationEventType.Quit);
-      gameLoader.unloadInitialLevels();
+      navigate('/');
+      gameManager.onQuit();
     };
 
     const onCanvasReady = async (canvas: Pane3D) => {
-      if (renderer) return;
-
-      renderer = new Renderer(canvas);
-      gameLoader = new GameLoader(renderer);
-      eventManager = new UIEventManager();
-
-      const bindables: IBindable[] = [renderer, eventManager, terrainManager, skyboxManager];
+      if (gameManager.renderer) return;
 
       try {
-        await wasmManager.load(bindables);
+        const hasWebgGPU = await gameManager.applicationStarted(canvas);
 
-        if (!renderer.hasWebGPU()) {
-          setErrorMessage("Your browser does not support WebGPU");
-          setErrorType("WGPU");
+        if (!hasWebgGPU) {
+          setErrorMessage('Your browser does not support WebGPU');
+          setErrorType('WGPU');
           return;
         }
 
-        await renderer.init();
-        await gameLoader.loadSystemContainers();
-
-        // Call the first frame so the containers can initialize
-        renderer.onFrame();
-
         setReady(true);
       } catch (err: unknown) {
-        setErrorMessage("An Error occurred while setting up the scene. Please check the console for more info.");
-        setErrorType("OTHER");
+        setErrorMessage(
+          'An Error occurred while setting up the scene. Please check the console for more info.'
+        );
+        setErrorType('OTHER');
         console.log(err);
       }
     };
@@ -90,8 +75,12 @@ export class Application extends Component<Props> {
           <Route
             path="/"
             onRender={(params) =>
-              errorMessage() !== "" ? (
-                <StartError open errorMsg={errorMessage()} errorType={errorType()} />
+              errorMessage() !== '' ? (
+                <StartError
+                  open
+                  errorMsg={errorMessage()}
+                  errorType={errorType()}
+                />
               ) : (
                 <MainMenu open onStart={onStart} onEditor={onEditor} />
               )
@@ -100,7 +89,13 @@ export class Application extends Component<Props> {
           {ready() ? (
             <Route
               path="/game"
-              onRender={() => <InGame renderer={renderer!} eventManager={eventManager!} onQuit={onQuit} />}
+              onRender={() => (
+                <InGame
+                  renderer={gameManager.renderer!}
+                  eventManager={gameManager.eventManager!}
+                  onQuit={onQuit}
+                />
+              )}
             />
           ) : undefined}
 
@@ -108,7 +103,11 @@ export class Application extends Component<Props> {
             <Route
               path="/editor"
               onRender={(params) => (
-                <ProjectEditorPage onQuit={onQuit} renderer={renderer!} eventManager={eventManager!} />
+                <ProjectEditorPage
+                  onQuit={onQuit}
+                  renderer={gameManager.renderer!}
+                  eventManager={gameManager.eventManager!}
+                />
               )}
             />
           ) : undefined}

@@ -1,11 +1,11 @@
-import { Runtime } from ".";
-import { Portal } from "./Portal";
+import { StateMachine } from './StateMachine';
+import { Portal } from './Portal';
 
 export class Node {
   portals: Portal[];
   parent: Node | null;
   children: Node[];
-  runtime: Runtime | null;
+  runtime: StateMachine | null;
   initialized: boolean;
   mounted: boolean;
   autoDispose: boolean;

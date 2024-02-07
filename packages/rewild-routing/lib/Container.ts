@@ -1,6 +1,6 @@
 import { Node } from './Node';
 import { Portal } from './Portal';
-import { Component, Object3D, wasm } from 'rewild-wasmtime';
+import { Object3D, wasm } from 'rewild-wasmtime';
 
 export class Container extends Node {
   protected objects: Object3D[];
@@ -37,10 +37,8 @@ export class Container extends Node {
 
   mount(): void {
     const objects = this.objects;
-    let components: Component[];
 
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      components = objects[i].components;
       wasm.addChild(
         this.parentObject3D.transform as any,
         unchecked(objects[i].transform as any)
@@ -52,10 +50,8 @@ export class Container extends Node {
 
   unMount(): void {
     const objects = this.objects;
-    let components: Component[];
 
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      components = objects[i].components;
       wasm.removeChild(
         this.parentObject3D.transform as any,
         unchecked(objects[i].transform as any)
