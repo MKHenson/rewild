@@ -1,5 +1,5 @@
-export * from "./extras/io";
-export * from "./extras/ui";
+export * from './extras/io';
+export * from './extras/ui';
 export {
   getRuntime,
   init,
@@ -7,14 +7,14 @@ export {
   update,
   addNodeToRuntime,
   removeNodeFromRuntime,
-} from "./objects/routing/AsSceneManager";
-export { createMeshPipelineInstance } from "./pipelines/MeshPipelineInstance";
-export { addPipelineAttribute } from "./pipelines/PipelineInstance";
-export { createMeshComponent } from "./components/MeshComponent";
-export * from "./lights/index";
-export * from "./components/index";
+} from './objects/routing/AsSceneManager';
+export { createMeshPipelineInstance } from './pipelines/MeshPipelineInstance';
+export { addPipelineAttribute } from './pipelines/PipelineInstance';
+export { createMeshComponent } from './components/MeshComponent';
+export * from './lights/index';
+export * from './components/index';
 // export * from "./terrain/index";
-export * from "./objects/physics/index";
+export * from './objects/physics/index';
 
 export {
   createContainer,
@@ -28,12 +28,12 @@ export {
   addNodePortal,
   removeNodePortal,
   createPortal,
-} from "./objects/routing";
+} from './objects/routing';
 export {
   getCameraProjectionInverseMatrix,
   getCameraProjectionMatrix,
   getCameraWorldInverseMatrix,
-} from "./cameras/Camera";
+} from './cameras/Camera';
 
 export {
   addChild,
@@ -50,13 +50,7 @@ export {
   getTransformModelViewMatrix,
   getTransformNormalMatrix,
   getTransformWorldMatrix,
-} from "./core/TransformNode";
-
-export {
-  componentMount,
-  componentUnMount,
-  onComponentUpdate,
-} from "./core/Component";
+} from './core/TransformNode';
 
 export {
   creatBufferGeometry,
@@ -64,7 +58,7 @@ export {
   setBufferAttribute,
   createBufferAttributeu32,
   setIndexAttribute,
-} from "./core/BufferGeometry";
+} from './core/BufferGeometry';
 
 export const Float32ArrayID = idof<Float32Array>();
 

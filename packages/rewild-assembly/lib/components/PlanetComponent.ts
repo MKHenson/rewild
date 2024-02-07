@@ -1,5 +1,4 @@
-import { Component } from "../core/Component";
-import { Runtime } from "../objects/routing";
+import { Component } from '../core/Component';
 
 export class PlanetComponent extends Component {
   private spinSpeed: f32;
@@ -12,7 +11,7 @@ export class PlanetComponent extends Component {
     this.size = size;
   }
 
-  mount(runtime: Runtime): void {
+  mount(): void {
     this.transform!.scale.set(this.size, this.size, this.size);
     this.transform!.position.y += this.size;
   }
