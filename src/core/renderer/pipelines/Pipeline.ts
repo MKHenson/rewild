@@ -1,10 +1,13 @@
-import { Renderer } from "../../renderer/Renderer";
-import { BindingData, PipelineResourceTemplate } from "./resources/PipelineResourceTemplate";
-import { PipelineResourceInstance } from "./resources/PipelineResourceInstance";
-import { GroupType, ResourceType } from "rewild-common";
-import "./shader-lib/Utils";
-import { Defines, shaderBuilder, SourceFragments } from "./shader-lib/Utils";
-import { VertexBufferLayout } from "./VertexBufferLayout";
+import { Renderer } from '../Renderer';
+import {
+  BindingData,
+  PipelineResourceTemplate,
+} from './resources/PipelineResourceTemplate';
+import { PipelineResourceInstance } from './resources/PipelineResourceInstance';
+import { GroupType, ResourceType } from 'rewild-common';
+import './shader-lib/Utils';
+import { Defines, shaderBuilder, SourceFragments } from './shader-lib/Utils';
+import { VertexBufferLayout } from './VertexBufferLayout';
 
 export class GroupMapping {
   index: number;
@@ -43,7 +46,12 @@ export abstract class Pipeline<T extends Defines<T>> {
   depthCompare: GPUCompareFunction;
   vertexLayouts: VertexBufferLayout[];
 
-  constructor(name: string, vertexSource: SourceFragments<T>, fragmentSource: SourceFragments<T>, defines: Defines<T>) {
+  constructor(
+    name: string,
+    vertexSource: SourceFragments<T>,
+    fragmentSource: SourceFragments<T>,
+    defines: Defines<T>
+  ) {
     this.name = name;
     this.renderPipeline = null;
     this.vertexSource = vertexSource;
@@ -56,12 +64,12 @@ export abstract class Pipeline<T extends Defines<T>> {
     this.groupMapping = new Map();
     this.groups = 0;
 
-    this.topology = "triangle-list";
-    this.cullMode = "back";
-    this.frontFace = "ccw";
-    this.depthFormat = "depth24plus";
+    this.topology = 'triangle-list';
+    this.cullMode = 'back';
+    this.frontFace = 'ccw';
+    this.depthFormat = 'depth24plus';
     this.depthWriteEnabled = true;
-    this.depthCompare = "less";
+    this.depthCompare = 'less';
   }
 
   set defines(defines: T) {
@@ -99,7 +107,10 @@ export abstract class Pipeline<T extends Defines<T>> {
   abstract onAddResources(): void;
 
   getTemplateByType(type: ResourceType, id?: string) {
-    if (id) return this.resourceTemplates.find((t) => t.resourceType === type && id === t.id);
+    if (id)
+      return this.resourceTemplates.find(
+        (t) => t.resourceType === type && id === t.id
+      );
     else return this.resourceTemplates.find((t) => t.resourceType === type);
   }
 
@@ -155,7 +166,7 @@ export abstract class Pipeline<T extends Defines<T>> {
     const fragSource = shaderBuilder(this.fragmentSource, this);
 
     this.renderPipeline = renderer.device.createRenderPipeline({
-      layout: "auto",
+      layout: 'auto',
       primitive: {
         topology: this.topology,
         cullMode: this.cullMode,
@@ -174,7 +185,7 @@ export abstract class Pipeline<T extends Defines<T>> {
         module: renderer.device.createShaderModule({
           code: vertSource,
         }),
-        entryPoint: "main",
+        entryPoint: 'main',
         buffers: this.vertexLayouts.map(
           (layout) =>
             ({
@@ -188,7 +199,7 @@ export abstract class Pipeline<T extends Defines<T>> {
         module: renderer.device.createShaderModule({
           code: fragSource,
         }),
-        entryPoint: "main",
+        entryPoint: 'main',
         targets: [{ format: renderer.format }],
       },
     });
@@ -201,7 +212,10 @@ export abstract class Pipeline<T extends Defines<T>> {
     const uniqueNewGroupKeys = templates
       .map((r) => r.groupType)
       .filter((value, index, self) => self.indexOf(value) === index);
-    const groupCache: Map<GroupType, { numInstances: number; bindData: Map<number, BindingData[]> }> = new Map();
+    const groupCache: Map<
+      GroupType,
+      { numInstances: number; bindData: Map<number, BindingData[]> }
+    > = new Map();
 
     // Remove any unused instances
     prevGroupKeys.forEach((key) => {
@@ -225,24 +239,37 @@ export abstract class Pipeline<T extends Defines<T>> {
         groupInstances.set(newKey, instances);
       }
 
-      groupCache.set(newKey, { bindData: new Map(), numInstances: numInstancesToCreate });
+      groupCache.set(newKey, {
+        bindData: new Map(),
+        numInstances: numInstancesToCreate,
+      });
     }
 
     // Initialize each template
     templates.forEach((resourceTemplate) => {
-      const { bindData, numInstances } = groupCache.get(resourceTemplate.groupType)!;
+      const { bindData, numInstances } = groupCache.get(
+        resourceTemplate.groupType
+      )!;
 
       for (let i = 0; i < numInstances; i++)
         if (bindData.has(i)) {
-          bindData.get(i)!.push(resourceTemplate.getBindingData(renderer, this.renderPipeline!));
+          bindData
+            .get(i)!
+            .push(
+              resourceTemplate.getBindingData(renderer, this.renderPipeline!)
+            );
         } else {
-          bindData.set(i, [resourceTemplate.getBindingData(renderer, this.renderPipeline!)]);
+          bindData.set(i, [
+            resourceTemplate.getBindingData(renderer, this.renderPipeline!),
+          ]);
         }
     });
 
     // Create the instances & bind groups
     groupCache.forEach((cache, groupType) => {
-      const instances: PipelineResourceInstance[] = new Array(cache.numInstances);
+      const instances: PipelineResourceInstance[] = new Array(
+        cache.numInstances
+      );
       const groupIndex = this.groupIndex(groupType);
 
       for (let i = 0; i < cache.numInstances; i++) {
@@ -250,15 +277,17 @@ export abstract class Pipeline<T extends Defines<T>> {
 
         // Join all the entries from each template
         // Also join all the collect each of the buffers we want to cache for the render queue
-        const entries: GPUBindGroupEntry[] = cache.bindData.get(i)!.reduce((accumulator, cur) => {
-          if (cur.buffer) {
-            if (!buffers) buffers = [cur.buffer];
-            else buffers.push(cur.buffer);
-          }
+        const entries: GPUBindGroupEntry[] = cache.bindData
+          .get(i)!
+          .reduce((accumulator, cur) => {
+            if (cur.buffer) {
+              if (!buffers) buffers = [cur.buffer];
+              else buffers.push(cur.buffer);
+            }
 
-          accumulator.push(...cur.binds);
-          return accumulator;
-        }, [] as GPUBindGroupEntry[]);
+            accumulator.push(...cur.binds);
+            return accumulator;
+          }, [] as GPUBindGroupEntry[]);
 
         const bindGroup = renderer.device.createBindGroup({
           label: GroupType[groupType],
@@ -266,7 +295,11 @@ export abstract class Pipeline<T extends Defines<T>> {
           entries,
         });
 
-        instances[i] = new PipelineResourceInstance(groupIndex, bindGroup, buffers);
+        instances[i] = new PipelineResourceInstance(
+          groupIndex,
+          bindGroup,
+          buffers
+        );
       }
 
       groupInstances.set(groupType, instances);
@@ -277,7 +310,10 @@ export abstract class Pipeline<T extends Defines<T>> {
     const template = this.getTemplateByGroup(type);
 
     if (template) {
-      const bindingData = template.getBindingData(renderer, this.renderPipeline!);
+      const bindingData = template.getBindingData(
+        renderer,
+        this.renderPipeline!
+      );
       const groupIndex = this.groupIndex(type);
 
       const bindGroup = renderer.device.createBindGroup({
@@ -295,6 +331,6 @@ export abstract class Pipeline<T extends Defines<T>> {
       const instanceArray = this.groupInstances.get(type)!;
       instanceArray.push(instances);
       return instanceArray.length - 1;
-    } else throw new Error("Pipeline does not use resource type");
+    } else throw new Error('Pipeline does not use resource type');
   }
 }

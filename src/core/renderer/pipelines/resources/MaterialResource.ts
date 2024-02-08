@@ -1,8 +1,12 @@
-import { Renderer } from "../../../renderer/Renderer";
-import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
-import { Defines } from "../shader-lib/Utils";
-import { Pipeline } from "../Pipeline";
-import { GroupType, ResourceType } from "rewild-common";
+import { Renderer } from '../../Renderer';
+import {
+  BindingData,
+  PipelineResourceTemplate,
+  Template,
+} from './PipelineResourceTemplate';
+import { Defines } from '../shader-lib/Utils';
+import { Pipeline } from '../Pipeline';
+import { GroupType, ResourceType } from 'rewild-common';
 
 export class MaterialResource extends PipelineResourceTemplate {
   binding: number;
@@ -11,7 +15,11 @@ export class MaterialResource extends PipelineResourceTemplate {
     super(GroupType.Material, ResourceType.Material);
   }
 
-  build<T extends Defines<T>>(renderer: Renderer, pipeline: Pipeline<T>, curBindIndex: number): Template {
+  build<T extends Defines<T>>(
+    renderer: Renderer,
+    pipeline: Pipeline<T>,
+    curBindIndex: number
+  ): Template {
     this.binding = curBindIndex;
     const group = pipeline.groupIndex(this.groupType);
 
@@ -24,10 +32,13 @@ export class MaterialResource extends PipelineResourceTemplate {
       0.5                 // Roughness
     ]);
 
-    const SIZE = Mathf.max(Float32Array.BYTES_PER_ELEMENT * initialValues.length, 48); // 48 is the min a size can be in WGPU
+    const SIZE = Mathf.max(
+      Float32Array.BYTES_PER_ELEMENT * initialValues.length,
+      48
+    ); // 48 is the min a size can be in WGPU
 
     const buffer = renderer.device.createBuffer({
-      label: "materialData",
+      label: 'materialData',
       size: SIZE,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true,
@@ -72,10 +83,13 @@ export class MaterialResource extends PipelineResourceTemplate {
       0,                  // Metalness
       0.5                 // Roughness
     ]);
-    const SIZE = Mathf.max(Float32Array.BYTES_PER_ELEMENT * initialValues.length, 48); // 48 is the min a size can be in WGPU
+    const SIZE = Mathf.max(
+      Float32Array.BYTES_PER_ELEMENT * initialValues.length,
+      48
+    ); // 48 is the min a size can be in WGPU
 
     const buffer = renderer.device.createBuffer({
-      label: "materialData",
+      label: 'materialData',
       size: SIZE,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true,

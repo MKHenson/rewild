@@ -1,32 +1,54 @@
-import { Renderer } from "../../renderer/Renderer";
-import { CircularProgress, Component, register } from "rewild-ui";
+import { Renderer } from '../../core/renderer/Renderer';
+import { CircularProgress, Component, register } from 'rewild-ui';
 
 type Props = {
   renderer: Renderer;
 };
 
-@register("x-in-game-ui")
+@register('x-in-game-ui')
 export class InGameUI extends Component<Props> {
   init() {
     const [playerHealth, setPlayerHealth] = this.useState(100);
     const [playerHunger, setPlayerHunger] = this.useState(100);
 
     const onFrameUpdate = () => {
-      if (this.props.renderer.player.playerComponent.health != playerHealth() && playerHungerElm) {
-        setPlayerHealth(this.props.renderer.player.playerComponent.health, false);
-        playerHealthElm.props = { ...playerHealthElm.props, value: playerHealth() };
+      if (
+        this.props.renderer.player.playerComponent.health != playerHealth() &&
+        playerHungerElm
+      ) {
+        setPlayerHealth(
+          this.props.renderer.player.playerComponent.health,
+          false
+        );
+        playerHealthElm.props = {
+          ...playerHealthElm.props,
+          value: playerHealth(),
+        };
       }
 
-      if (this.props.renderer.player.playerComponent.hunger != playerHunger() && playerHungerElm) {
-        setPlayerHunger(this.props.renderer.player.playerComponent.hunger, false);
-        playerHungerElm.props = { ...playerHungerElm.props, value: playerHunger() };
+      if (
+        this.props.renderer.player.playerComponent.hunger != playerHunger() &&
+        playerHungerElm
+      ) {
+        setPlayerHunger(
+          this.props.renderer.player.playerComponent.hunger,
+          false
+        );
+        playerHungerElm.props = {
+          ...playerHungerElm.props,
+          value: playerHunger(),
+        };
       }
     };
 
     this.props.renderer.updateCallbacks.push(onFrameUpdate);
 
-    const playerHealthElm = (<CircularProgress size={120} value={100} strokeSize={20} />) as CircularProgress;
-    const playerHungerElm = (<CircularProgress size={80} value={100} strokeSize={14} />) as CircularProgress;
+    const playerHealthElm = (
+      <CircularProgress size={120} value={100} strokeSize={20} />
+    ) as CircularProgress;
+    const playerHungerElm = (
+      <CircularProgress size={80} value={100} strokeSize={14} />
+    ) as CircularProgress;
 
     const elements = (
       <div>

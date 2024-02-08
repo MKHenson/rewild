@@ -1,14 +1,14 @@
-import { CHUNK_SIZE } from "rewild-common";
-import { IBindable, wasm } from "rewild-wasmtime";
-import { Renderer } from "../Renderer";
-import { Geometry } from "../geometry/Geometry";
-import { TerrainPipeline } from "../../core/pipelines/terrain-pipeline/TerrainPipeline";
-import { meshManager } from "../MeshManager";
-import { pipelineManager } from "./PipelineManager";
-import { NoiseMap } from "../terrain/NoiseMap";
-import { textureManager } from "./TextureManager";
-import { CanvasTexture } from "src/core/textures/CanvasTexture";
-import { MeshGenerator } from "../terrain/MeshGenerator";
+import { CHUNK_SIZE } from 'rewild-common';
+import { IBindable, wasm } from 'rewild-wasmtime';
+import { Renderer } from '../Renderer';
+import { Geometry } from '../geometry/Geometry';
+import { TerrainPipeline } from '../pipelines/terrain-pipeline/TerrainPipeline';
+import { meshManager } from '../MeshManager';
+import { pipelineManager } from './PipelineManager';
+import { NoiseMap } from '../terrain/NoiseMap';
+import { textureManager } from './TextureManager';
+import { CanvasTexture } from 'src/core/renderer/textures/CanvasTexture';
+import { MeshGenerator } from '../terrain/MeshGenerator';
 
 export class TerrainManager implements IBindable {
   geometry: Geometry;
@@ -28,12 +28,14 @@ export class TerrainManager implements IBindable {
 
   async initialize(renderer: Renderer): Promise<void> {
     this.renderer = renderer;
-    this.terrainPipeline = pipelineManager.getAsset("terrain");
+    this.terrainPipeline = pipelineManager.getAsset('terrain');
   }
 
   async createTerrainChunk(terrainPtr: any) {
     const canvas = this.noiseMap.generate().createCanvas();
-    const texture = textureManager.addTexture(new CanvasTexture("terrain1", canvas, this.renderer.device));
+    const texture = textureManager.addTexture(
+      new CanvasTexture('terrain1', canvas, this.renderer.device)
+    );
     await texture.load(this.renderer.device);
 
     this.terrainPipeline.defines = {

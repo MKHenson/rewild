@@ -4,16 +4,16 @@ import {
   AmbientLight,
   wasm,
 } from 'rewild-wasmtime';
-import { pipelineManager } from '../renderer/AssetManagers/PipelineManager';
-import { Mesh } from '../renderer/Mesh';
+import { pipelineManager } from './renderer/AssetManagers/PipelineManager';
+import { Mesh } from './renderer/Mesh';
 import { ContainerTypes } from 'rewild-common';
-import { meshManager } from '../renderer/MeshManager';
-import { Geometry } from '../renderer/geometry/Geometry';
-import { Renderer } from '../renderer/Renderer';
+import { meshManager } from './renderer/MeshManager';
+import { Geometry } from './renderer/geometry/Geometry';
+import { Renderer } from './renderer/Renderer';
 import { getLevel } from '../api/levels';
 import { getProjects } from '../api/projects';
 import { StateMachine } from 'rewild-routing';
-import { geometryManager } from '../renderer/AssetManagers/GeometryManager';
+import { geometryManager } from './renderer/AssetManagers/GeometryManager';
 import { LoaderPresetType, LoaderPresets } from './loader-utils/LoaderPresets';
 
 /** Loads game files and assets and sends the created objects to wasm */

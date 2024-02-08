@@ -1,21 +1,21 @@
-import { wasm, IBindable } from "rewild-wasmtime";
-import { Player } from "rewild-wasmtime";
-import { Clock } from "../core/Clock";
-import { pipelineManager } from "./AssetManagers/PipelineManager";
-import { geometryManager } from "./AssetManagers/GeometryManager";
-import { terrainManager } from "./AssetManagers/TerrainManager";
-import { textureManager } from "./AssetManagers/TextureManager";
-import { Mesh } from "./Mesh";
-import { ResourceType, GroupType, AttributeType } from "rewild-common";
-import { meshManager } from "./MeshManager";
-import { LightingResource } from "../core/pipelines/resources/LightingResource";
-import { Pipeline } from "../core/pipelines/Pipeline";
-import { TransformResource } from "../core/pipelines/resources/TransformResource";
-import { PipelineResourceInstance } from "../core/pipelines/resources/PipelineResourceInstance";
+import { wasm, IBindable } from 'rewild-wasmtime';
+import { Player } from 'rewild-wasmtime';
+import { Clock } from '../Clock';
+import { pipelineManager } from './AssetManagers/PipelineManager';
+import { geometryManager } from './AssetManagers/GeometryManager';
+import { terrainManager } from './AssetManagers/TerrainManager';
+import { textureManager } from './AssetManagers/TextureManager';
+import { Mesh } from './Mesh';
+import { ResourceType, GroupType, AttributeType } from 'rewild-common';
+import { meshManager } from './MeshManager';
+import { LightingResource } from './pipelines/resources/LightingResource';
+import { Pipeline } from './pipelines/Pipeline';
+import { TransformResource } from './pipelines/resources/TransformResource';
+import { PipelineResourceInstance } from './pipelines/resources/PipelineResourceInstance';
 
-import { Pane3D } from "rewild-ui";
-import { InputManager } from "src/core/InputManager";
-import { skyboxManager } from "./AssetManagers/SkyboxManager";
+import { Pane3D } from 'rewild-ui';
+import { InputManager } from 'src/core/InputManager';
+import { skyboxManager } from './AssetManagers/SkyboxManager';
 
 const sampleCount = 4;
 export type UpdateCallback = () => void;
@@ -78,20 +78,21 @@ export class Renderer implements IBindable {
   async init() {
     this.canvasSizeCache = this.canvasSize();
     const hasGPU = this.hasWebGPU();
-    if (!hasGPU) throw new Error("Your current browser does not support WebGPU!");
+    if (!hasGPU)
+      throw new Error('Your current browser does not support WebGPU!');
 
     const canvas = this.pane3D.canvas()!;
     this.inputManager = new InputManager(this.pane3D);
 
     const adapter = await navigator.gpu?.requestAdapter();
     const device = (await adapter?.requestDevice()) as GPUDevice;
-    const context = canvas.getContext("webgpu") as unknown as GPUCanvasContext;
+    const context = canvas.getContext('webgpu') as unknown as GPUCanvasContext;
     const format = navigator.gpu.getPreferredCanvasFormat();
 
     context.configure({
       device: device,
       format: format,
-      alphaMode: "premultiplied",
+      alphaMode: 'premultiplied',
     });
 
     this.device = device;
@@ -113,14 +114,14 @@ export class Renderer implements IBindable {
     this.player = new Player();
 
     // Setup events
-    window.addEventListener("resize", this.onResizeHandler);
+    window.addEventListener('resize', this.onResizeHandler);
     window.requestAnimationFrame(this.onFrameHandler);
     this.clock.start();
   }
 
   dispose() {
     this.disposed = true;
-    window.removeEventListener("resize", this.onResizeHandler);
+    window.removeEventListener('resize', this.onResizeHandler);
     this.inputManager?.dispose();
   }
 
@@ -137,7 +138,7 @@ export class Renderer implements IBindable {
     this.context.configure({
       device: this.device,
       format: this.format,
-      alphaMode: "premultiplied",
+      alphaMode: 'premultiplied',
     });
 
     this.renderTarget = this.device.createTexture({
@@ -149,7 +150,7 @@ export class Renderer implements IBindable {
 
     this.depthTexture = this.device.createTexture({
       size: this.presentationSize,
-      format: "depth24plus",
+      format: 'depth24plus',
       sampleCount: sampleCount,
       usage: GPUTextureUsage.RENDER_ATTACHMENT,
     });
@@ -181,7 +182,10 @@ export class Renderer implements IBindable {
   canvasSize() {
     const canvas = this.pane3D.canvas()!;
     const devicePixelRatio = 1; // TODO: Why does this not work? ---> window.devicePixelRatio || 1;
-    const size: [number, number] = [canvas.clientWidth * devicePixelRatio, canvas.clientHeight * devicePixelRatio];
+    const size: [number, number] = [
+      canvas.clientWidth * devicePixelRatio,
+      canvas.clientHeight * devicePixelRatio,
+    ];
     return size;
   }
 
@@ -202,14 +206,14 @@ export class Renderer implements IBindable {
           view: this.renderTargetView,
           resolveTarget: this.context.getCurrentTexture().createView(),
           clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 }, //background color
-          storeOp: "store",
-          loadOp: "clear",
+          storeOp: 'store',
+          loadOp: 'clear',
         },
       ],
       depthStencilAttachment: {
         view: this.depthTexture.createView(),
-        depthLoadOp: "clear",
-        depthStoreOp: "store",
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
         depthClearValue: 1,
       },
     });
@@ -244,7 +248,9 @@ export class Renderer implements IBindable {
     let instances: PipelineResourceInstance[];
     let instance: PipelineResourceInstance;
     const device = this.device;
-    const projectionMatrix = wasm.getFloat32Array(wasm.getCameraProjectionMatrix(camera as any));
+    const projectionMatrix = wasm.getFloat32Array(
+      wasm.getCameraProjectionMatrix(camera as any)
+    );
 
     for (let i = 0, l = meshes.length; i < l; i++) {
       mesh = meshes[i];
@@ -262,18 +268,36 @@ export class Renderer implements IBindable {
         pass.setPipeline(pipeline.renderPipeline!);
 
         // Set transform
-        const template = pipeline.getTemplateByGroup(GroupType.Transform)! as TransformResource;
+        const template = pipeline.getTemplateByGroup(
+          GroupType.Transform
+        )! as TransformResource;
         instances = pipeline.groupInstances.get(GroupType.Transform)!;
         const transformBuffer = instances[mesh.transformIndex].buffers![0];
 
         if (template.projectionOffset != -1)
-          device.queue.writeBuffer(transformBuffer, template.projectionOffset, projectionMatrix);
+          device.queue.writeBuffer(
+            transformBuffer,
+            template.projectionOffset,
+            projectionMatrix
+          );
         if (template.modelViewOffset != -1)
-          device.queue.writeBuffer(transformBuffer, template.modelViewOffset, mesh.modelViewMatrix);
+          device.queue.writeBuffer(
+            transformBuffer,
+            template.modelViewOffset,
+            mesh.modelViewMatrix
+          );
         if (template.modelOffset != -1)
-          device.queue.writeBuffer(transformBuffer, template.modelOffset, mesh.worldMatrix);
+          device.queue.writeBuffer(
+            transformBuffer,
+            template.modelOffset,
+            mesh.worldMatrix
+          );
         if (template.normalOffset != -1)
-          device.queue.writeBuffer(transformBuffer, template.normalOffset, mesh.normalMatrix);
+          device.queue.writeBuffer(
+            transformBuffer,
+            template.normalOffset,
+            mesh.normalMatrix
+          );
 
         // Set transform bind group
         instances = pipeline!.groupInstances.get(GroupType.Transform)!;
@@ -292,26 +316,45 @@ export class Renderer implements IBindable {
           let numVertices = 0;
 
           if (attributeMap) {
-            if (attributeMap.has(AttributeType.POSITION) && slotMap.has(AttributeType.POSITION)) {
-              const positionAttribute = attributeMap.get(AttributeType.POSITION)!;
-              numVertices = (positionAttribute.buffer as Float32Array).length / positionAttribute.itemSize;
+            if (
+              attributeMap.has(AttributeType.POSITION) &&
+              slotMap.has(AttributeType.POSITION)
+            ) {
+              const positionAttribute = attributeMap.get(
+                AttributeType.POSITION
+              )!;
+              numVertices =
+                (positionAttribute.buffer as Float32Array).length /
+                positionAttribute.itemSize;
 
-              pass.setVertexBuffer(slotMap.get(AttributeType.POSITION)!, positionAttribute.gpuBuffer!);
+              pass.setVertexBuffer(
+                slotMap.get(AttributeType.POSITION)!,
+                positionAttribute.gpuBuffer!
+              );
             }
 
-            if (attributeMap.has(AttributeType.NORMAL) && slotMap.has(AttributeType.NORMAL)) {
+            if (
+              attributeMap.has(AttributeType.NORMAL) &&
+              slotMap.has(AttributeType.NORMAL)
+            ) {
               pass.setVertexBuffer(
                 slotMap.get(AttributeType.NORMAL)!,
                 attributeMap.get(AttributeType.NORMAL)!.gpuBuffer!
               );
             }
 
-            if (attributeMap.has(AttributeType.UV) && slotMap.has(AttributeType.UV)) {
-              pass.setVertexBuffer(slotMap.get(AttributeType.UV)!, attributeMap.get(AttributeType.UV)!.gpuBuffer!);
+            if (
+              attributeMap.has(AttributeType.UV) &&
+              slotMap.has(AttributeType.UV)
+            ) {
+              pass.setVertexBuffer(
+                slotMap.get(AttributeType.UV)!,
+                attributeMap.get(AttributeType.UV)!.gpuBuffer!
+              );
             }
 
             if (mesh.geometry.indexBuffer) {
-              pass.setIndexBuffer(mesh.geometry.indexBuffer, "uint32");
+              pass.setIndexBuffer(mesh.geometry.indexBuffer, 'uint32');
               pass.drawIndexed(mesh.geometry.indices.length);
             } else if (numVertices) {
               pass.draw(numVertices, 1, 0, 0);
