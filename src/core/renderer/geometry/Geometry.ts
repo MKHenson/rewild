@@ -1,8 +1,8 @@
-import { wasm } from "rewild-wasmtime";
-import { AttributeType } from "rewild-common";
-import { createBufferFromF32, createIndexBufferU32 } from "../../core/Utils";
-import { Renderer } from "../Renderer";
-import { ClientVector3 } from "../../math/ClientVector3";
+import { wasm } from 'rewild-wasmtime';
+import { AttributeType } from 'rewild-common';
+import { createBufferFromF32, createIndexBufferU32 } from '../../Utils';
+import { Renderer } from '../Renderer';
+import { ClientVector3 } from '../../../math/ClientVector3';
 
 const _vector = new ClientVector3();
 
@@ -18,7 +18,10 @@ export class BufferGeometryGroup {
   }
 }
 
-export type BufferArray = ArrayBuffer & { [index: number]: number; length: number };
+export type BufferArray = ArrayBuffer & {
+  [index: number]: number;
+  length: number;
+};
 
 export class Attribute<T extends BufferArray> {
   itemSize: number;
@@ -126,7 +129,7 @@ export class Geometry {
 
   indexBuffer: GPUBuffer | null;
 
-  constructor(name: string = "") {
+  constructor(name: string = '') {
     this.name = name;
     this.attributes = new Map();
     this.groups = [];
@@ -153,7 +156,8 @@ export class Geometry {
       } else throw new Error(`Attribute ${AttributeType[key]} not recognised`);
     });
 
-    if (this.indices) this.indexBuffer = createIndexBufferU32(renderer.device, this.indices);
+    if (this.indices)
+      this.indexBuffer = createIndexBufferU32(renderer.device, this.indices);
     return this;
   }
 
@@ -170,14 +174,20 @@ export class Geometry {
 
     this.attributes.set(type, attribute);
     if (buffer instanceof Float32Array) {
-      const wasmAttribute = wasm.createBufferAttributeF32(buffer, attribute.itemSize, attribute.normalized);
+      const wasmAttribute = wasm.createBufferAttributeF32(
+        buffer,
+        attribute.itemSize,
+        attribute.normalized
+      );
       wasm.setBufferAttribute(this.bufferGeometry as any, type, wasmAttribute);
     }
   }
 
   normalizeNormals(): void {
-    const normalAttribute = this.attributes.get(AttributeType.NORMAL) as Attribute<Float32Array>;
-    if (!normalAttribute) throw new Error("No normal attribute defined");
+    const normalAttribute = this.attributes.get(
+      AttributeType.NORMAL
+    ) as Attribute<Float32Array>;
+    if (!normalAttribute) throw new Error('No normal attribute defined');
 
     for (let i = 0, il = normalAttribute.count; i < il; i++) {
       _vector.fromBufferAttribute(normalAttribute, i);
@@ -188,13 +198,20 @@ export class Geometry {
 
   computeVertexNormals(): void {
     const index = this.indices;
-    const positionAttribute = this.attributes.get(AttributeType.POSITION) as Attribute<Float32Array>;
+    const positionAttribute = this.attributes.get(
+      AttributeType.POSITION
+    ) as Attribute<Float32Array>;
 
     if (positionAttribute) {
-      let normalAttribute = this.attributes.get(AttributeType.NORMAL) as Attribute<Float32Array>;
+      let normalAttribute = this.attributes.get(
+        AttributeType.NORMAL
+      ) as Attribute<Float32Array>;
 
       if (!normalAttribute) {
-        normalAttribute = new Attribute(new Float32Array(positionAttribute.count * 3), 3);
+        normalAttribute = new Attribute(
+          new Float32Array(positionAttribute.count * 3),
+          3
+        );
         this.setAttribute(AttributeType.NORMAL, normalAttribute);
       } else {
         // reset existing normals to zero

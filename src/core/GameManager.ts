@@ -1,10 +1,10 @@
 import { Pane3D } from 'rewild-ui';
-import { Renderer } from '../renderer/Renderer';
+import { Renderer } from './renderer/Renderer';
 import { GameLoader } from './GameLoader';
 import { UIEventManager } from './UIEventManager';
 import { IBindable, WasmManager } from 'packages/rewild-wasmtime';
-import { terrainManager } from '../renderer/AssetManagers/TerrainManager';
-import { skyboxManager } from '../renderer/AssetManagers/SkyboxManager';
+import { terrainManager } from './renderer/AssetManagers/TerrainManager';
+import { skyboxManager } from './renderer/AssetManagers/SkyboxManager';
 import { ApplicationEventType } from 'packages/rewild-common';
 
 export class GameManager {

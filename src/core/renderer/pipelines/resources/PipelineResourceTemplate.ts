@@ -1,7 +1,7 @@
-import { Renderer } from "../../../renderer/Renderer";
-import { Pipeline } from "../Pipeline";
-import { GroupType, ResourceType } from "rewild-common";
-import { Defines } from "../shader-lib/Utils";
+import { Renderer } from '../../Renderer';
+import { Pipeline } from '../Pipeline';
+import { GroupType, ResourceType } from 'rewild-common';
+import { Defines } from '../shader-lib/Utils';
 
 export type Template = {
   group: number;
@@ -28,6 +28,13 @@ export abstract class PipelineResourceTemplate {
   }
 
   /** Creates the resource. Must return a group index*/
-  abstract build<T extends Defines<T>>(renderer: Renderer, pipeline: Pipeline<T>, curBindIndex: number): Template;
-  abstract getBindingData(renderer: Renderer, pipeline: GPURenderPipeline): BindingData;
+  abstract build<T extends Defines<T>>(
+    renderer: Renderer,
+    pipeline: Pipeline<T>,
+    curBindIndex: number
+  ): Template;
+  abstract getBindingData(
+    renderer: Renderer,
+    pipeline: GPURenderPipeline
+  ): BindingData;
 }

@@ -1,10 +1,14 @@
-import { Renderer } from "../../../renderer/Renderer";
-import { Texture } from "../../textures/Texture";
-import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
-import { Pipeline } from "../Pipeline";
-import { Defines } from "../shader-lib/Utils";
-import { GroupType, ResourceType } from "rewild-common";
-import { BitmapCubeTexture } from "../../textures/BitmapCubeTexture";
+import { Renderer } from '../../Renderer';
+import { Texture } from '../../textures/Texture';
+import {
+  BindingData,
+  PipelineResourceTemplate,
+  Template,
+} from './PipelineResourceTemplate';
+import { Pipeline } from '../Pipeline';
+import { Defines } from '../shader-lib/Utils';
+import { GroupType, ResourceType } from 'rewild-common';
+import { BitmapCubeTexture } from '../../textures/BitmapCubeTexture';
 
 export class TextureResource extends PipelineResourceTemplate {
   texture: Texture;
@@ -16,7 +20,11 @@ export class TextureResource extends PipelineResourceTemplate {
     this.texture = texture;
   }
 
-  build<T extends Defines<T>>(renderer: Renderer, pipeline: Pipeline<T>, curBindIndex: number): Template {
+  build<T extends Defines<T>>(
+    renderer: Renderer,
+    pipeline: Pipeline<T>,
+    curBindIndex: number
+  ): Template {
     this.samplerBind = curBindIndex;
     this.textureBind = curBindIndex + 1;
     const group = pipeline.groupIndex(this.groupType);
@@ -51,9 +59,9 @@ export class TextureResource extends PipelineResourceTemplate {
         {
           binding: this.textureBind,
           resource: this.texture!.gpuTexture.createView({
-            dimension: isCube ? "cube" : "2d",
-            aspect: "all",
-            label: isCube ? "Cube View Form" : "2D View Format",
+            dimension: isCube ? 'cube' : '2d',
+            aspect: 'all',
+            label: isCube ? 'Cube View Form' : '2D View Format',
             arrayLayerCount: isCube ? cubeTexture.src.length : undefined,
             baseArrayLayer: isCube ? 0 : undefined,
             baseMipLevel: 0,

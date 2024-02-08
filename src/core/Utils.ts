@@ -1,10 +1,11 @@
-import { GPUBufferUsageFlags } from "rewild-common";
-import { BufferArray } from "../renderer/geometry/Geometry";
+import { GPUBufferUsageFlags } from 'rewild-common';
+import { BufferArray } from './renderer/geometry/Geometry';
 
 export function createBufferFromF32(
   device: GPUDevice,
   data: Float32Array,
-  usageFlag: GPUBufferUsageFlags = GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  usageFlag: GPUBufferUsageFlags = GPUBufferUsage.VERTEX |
+    GPUBufferUsage.COPY_DST
 ) {
   const buffer = device.createBuffer({
     size: data.byteLength,
@@ -21,7 +22,8 @@ export function createBufferFromF32(
 export function createBuffer(
   device: GPUDevice,
   data: BufferArray,
-  usageFlag: GPUBufferUsageFlags = GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
+  usageFlag: GPUBufferUsageFlags = GPUBufferUsage.VERTEX |
+    GPUBufferUsage.COPY_DST
 ) {
   const buffer = device.createBuffer({
     size: data.byteLength,
@@ -39,7 +41,8 @@ export function createBuffer(
 export function createIndexBufferU32(
   device: GPUDevice,
   data: Uint32Array,
-  usageFlag: GPUBufferUsageFlags = GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
+  usageFlag: GPUBufferUsageFlags = GPUBufferUsage.INDEX |
+    GPUBufferUsage.COPY_DST
 ) {
   const buffer = device.createBuffer({
     size: data.byteLength,

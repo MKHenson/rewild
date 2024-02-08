@@ -1,29 +1,31 @@
-import { UIEventManager } from "../../core/UIEventManager";
-import { Renderer } from "../../renderer/Renderer";
-import { InGameMenu } from "./InGameMenu";
-import { ApplicationEvent } from "../../core/events/ApplicationEvent";
-import { ApplicationEventType, UIEventType } from "rewild-common";
-import { InGameUI } from "./InGameUI";
-import { GameOverMenu } from "./GameOverMenu";
-import { update } from "./FPSCounter";
-import { Component, register } from "rewild-ui";
+import { UIEventManager } from '../../core/UIEventManager';
+import { Renderer } from '../../core/renderer/Renderer';
+import { InGameMenu } from './InGameMenu';
+import { ApplicationEvent } from '../../core/events/ApplicationEvent';
+import { ApplicationEventType, UIEventType } from 'rewild-common';
+import { InGameUI } from './InGameUI';
+import { GameOverMenu } from './GameOverMenu';
+import { update } from './FPSCounter';
+import { Component, register } from 'rewild-ui';
 
 interface Props {
   renderer: Renderer;
   eventManager: UIEventManager;
   onQuit: () => void;
 }
-type ActiveMenu = "ingameMenu" | "gameOverMenu";
+type ActiveMenu = 'ingameMenu' | 'gameOverMenu';
 
-@register("x-in-game")
+@register('x-in-game')
 export class InGame extends Component<Props> {
   init() {
     const [modalOpen, setModalOpen] = this.useState(false);
-    const [activeMenu, setActiveMenu] = this.useState<ActiveMenu>("ingameMenu");
+    const [activeMenu, setActiveMenu] = this.useState<ActiveMenu>('ingameMenu');
 
     const onWasmUiEvent = (event: ApplicationEvent) => {
-      if (event.eventType === ApplicationEventType.OpenInGameMenu) setModalOpen(!modalOpen());
-      else if (event.eventType === ApplicationEventType.PlayerDied) setActiveMenu("gameOverMenu");
+      if (event.eventType === ApplicationEventType.OpenInGameMenu)
+        setModalOpen(!modalOpen());
+      else if (event.eventType === ApplicationEventType.PlayerDied)
+        setActiveMenu('gameOverMenu');
     };
 
     const onFrameUpdate = () => {
@@ -45,7 +47,10 @@ export class InGame extends Component<Props> {
     };
 
     this.onCleanup = () => {
-      this.props.renderer.updateCallbacks.splice(this.props.renderer.updateCallbacks.indexOf(onFrameUpdate), 1);
+      this.props.renderer.updateCallbacks.splice(
+        this.props.renderer.updateCallbacks.indexOf(onFrameUpdate),
+        1
+      );
       this.props.eventManager.removeEventListener(UIEventType, onWasmUiEvent);
     };
 
@@ -54,8 +59,12 @@ export class InGame extends Component<Props> {
     return () => (
       <div>
         <InGameUI renderer={this.props.renderer} />
-        {activeMenu() === "ingameMenu" ? (
-          <InGameMenu open={modalOpen()} onResumeClick={onResume} onQuitClick={onQuit} />
+        {activeMenu() === 'ingameMenu' ? (
+          <InGameMenu
+            open={modalOpen()}
+            onResumeClick={onResume}
+            onQuitClick={onQuit}
+          />
         ) : (
           <GameOverMenu onQuitClick={onQuit} open />
         )}

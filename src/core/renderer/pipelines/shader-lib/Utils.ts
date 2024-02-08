@@ -1,5 +1,5 @@
-import { Texture } from "../../textures/Texture";
-import { Pipeline } from "../Pipeline";
+import { Texture } from '../../textures/Texture';
+import { Pipeline } from '../Pipeline';
 
 export type Defines<T> = {
   [K in keyof T]: T[K];
@@ -27,21 +27,27 @@ export function shader<T extends Defines<T>>(
   };
 }
 
-export function shaderBuilder<T extends Defines<T>>(sourceFragments: SourceFragments<T>, pipeline: Pipeline<T>) {
-  let str = "";
+export function shaderBuilder<T extends Defines<T>>(
+  sourceFragments: SourceFragments<T>,
+  pipeline: Pipeline<T>
+) {
+  let str = '';
   sourceFragments.strings.forEach((string, i) => {
-    if (typeof sourceFragments.expressions[i] === "string" || typeof sourceFragments.expressions[i] === "number")
-      str += string + (sourceFragments.expressions[i] || "");
+    if (
+      typeof sourceFragments.expressions[i] === 'string' ||
+      typeof sourceFragments.expressions[i] === 'number'
+    )
+      str += string + (sourceFragments.expressions[i] || '');
     else if (sourceFragments.expressions[i]) {
       const fnOrText = sourceFragments.expressions[i];
-      if (typeof fnOrText === "string") {
+      if (typeof fnOrText === 'string') {
         str += string + fnOrText;
       } else {
         const expressionReturn = fnOrText(pipeline);
 
-        if (typeof expressionReturn === "string") {
+        if (typeof expressionReturn === 'string') {
           str += string + expressionReturn;
-        } else if (typeof expressionReturn === "number") {
+        } else if (typeof expressionReturn === 'number') {
           str += string + expressionReturn.toString();
         } else {
           str += string;

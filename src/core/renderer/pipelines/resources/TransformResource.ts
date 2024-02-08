@@ -1,9 +1,13 @@
-import { Renderer } from "../../../renderer/Renderer";
-import { UNIFORM_TYPES_MAP } from "./MemoryUtils";
-import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
-import { Pipeline } from "../Pipeline";
-import { Defines } from "../shader-lib/Utils";
-import { ResourceType, GroupType } from "rewild-common";
+import { Renderer } from '../../Renderer';
+import { UNIFORM_TYPES_MAP } from './MemoryUtils';
+import {
+  BindingData,
+  PipelineResourceTemplate,
+  Template,
+} from './PipelineResourceTemplate';
+import { Pipeline } from '../Pipeline';
+import { Defines } from '../shader-lib/Utils';
+import { ResourceType, GroupType } from 'rewild-common';
 
 export enum TransformType {
   Projection = 1,
@@ -43,7 +47,11 @@ export class TransformResource extends PipelineResourceTemplate {
       (requiresNormal ? UNIFORM_TYPES_MAP["mat3x3<f32>"] : 0);
   }
 
-  build<T extends Defines<T>>(renderer: Renderer, pipeline: Pipeline<T>, curBindIndex: number): Template {
+  build<T extends Defines<T>>(
+    renderer: Renderer,
+    pipeline: Pipeline<T>,
+    curBindIndex: number
+  ): Template {
     this.binding = curBindIndex;
     const group = pipeline.groupIndex(this.groupType);
 
@@ -60,25 +68,25 @@ export class TransformResource extends PipelineResourceTemplate {
     let curOffset = 0;
     if (requiresProjection) {
       this.projectionOffset = curOffset;
-      curOffset += UNIFORM_TYPES_MAP["mat4x4<f32>"];
+      curOffset += UNIFORM_TYPES_MAP['mat4x4<f32>'];
     }
     if (requiresModelView) {
       this.modelViewOffset = curOffset;
-      curOffset += UNIFORM_TYPES_MAP["mat4x4<f32>"];
+      curOffset += UNIFORM_TYPES_MAP['mat4x4<f32>'];
     }
     if (requiresModel) {
       this.modelOffset = curOffset;
-      curOffset += UNIFORM_TYPES_MAP["mat4x4<f32>"];
+      curOffset += UNIFORM_TYPES_MAP['mat4x4<f32>'];
     }
     if (requiresNormal) {
       this.normalOffset = curOffset;
-      curOffset += UNIFORM_TYPES_MAP["mat3x3<f32>"];
+      curOffset += UNIFORM_TYPES_MAP['mat3x3<f32>'];
     }
 
     const SIZEOF_MATRICES = this.getBufferSize();
 
     const buffer = renderer.device.createBuffer({
-      label: "transform",
+      label: 'transform',
       size: SIZEOF_MATRICES,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
@@ -109,7 +117,7 @@ export class TransformResource extends PipelineResourceTemplate {
     const SIZEOF_MATRICES = this.getBufferSize();
 
     const buffer = renderer.device.createBuffer({
-      label: "transform",
+      label: 'transform',
       size: SIZEOF_MATRICES,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });

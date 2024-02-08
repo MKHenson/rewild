@@ -1,9 +1,13 @@
-import { Renderer } from "../../../renderer/Renderer";
-import { UNIFORM_TYPES_MAP } from "./MemoryUtils";
-import { BindingData, PipelineResourceTemplate, Template } from "./PipelineResourceTemplate";
-import { GroupType, ResourceType } from "rewild-common";
-import { Defines } from "../shader-lib/Utils";
-import { Pipeline } from "../Pipeline";
+import { Renderer } from '../../Renderer';
+import { UNIFORM_TYPES_MAP } from './MemoryUtils';
+import {
+  BindingData,
+  PipelineResourceTemplate,
+  Template,
+} from './PipelineResourceTemplate';
+import { GroupType, ResourceType } from 'rewild-common';
+import { Defines } from '../shader-lib/Utils';
+import { Pipeline } from '../Pipeline';
 
 export class LightingResource extends PipelineResourceTemplate {
   static lightingConfig: GPUBuffer;
@@ -21,25 +25,31 @@ export class LightingResource extends PipelineResourceTemplate {
     super(GroupType.Material, ResourceType.Lighting);
   }
 
-  build<T extends Defines<T>>(renderer: Renderer, pipeline: Pipeline<T>, curBindIndex: number): Template {
+  build<T extends Defines<T>>(
+    renderer: Renderer,
+    pipeline: Pipeline<T>,
+    curBindIndex: number
+  ): Template {
     this.lightingConfigBinding = curBindIndex;
     this.sceneLightingBinding = curBindIndex + 1;
-    this.directionLightBinding = pipeline.defines.NUM_DIR_LIGHTS ? curBindIndex + 2 : -1;
+    this.directionLightBinding = pipeline.defines.NUM_DIR_LIGHTS
+      ? curBindIndex + 2
+      : -1;
     const group = pipeline.groupIndex(this.groupType);
 
     if (!LightingResource.lightingConfig) {
-      const LIGHTING_CONFIG_SIZE = UNIFORM_TYPES_MAP["u32"];
-      const SCENE_LIGHTING_BUFFER = UNIFORM_TYPES_MAP["vec4<f32>"];
+      const LIGHTING_CONFIG_SIZE = UNIFORM_TYPES_MAP['u32'];
+      const SCENE_LIGHTING_BUFFER = UNIFORM_TYPES_MAP['vec4<f32>'];
 
       LightingResource.lightingConfig = renderer.device.createBuffer({
-        label: "lightingConfigUniform",
+        label: 'lightingConfigUniform',
         size: LIGHTING_CONFIG_SIZE,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         mappedAtCreation: true,
       });
 
       LightingResource.sceneLightingBuffer = renderer.device.createBuffer({
-        label: "sceneLightingBuffer",
+        label: 'sceneLightingBuffer',
         size: SCENE_LIGHTING_BUFFER,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         mappedAtCreation: true,
@@ -58,21 +68,30 @@ export class LightingResource extends PipelineResourceTemplate {
       ]);
 
       // Set defaults
-      new Float32Array(LightingResource.lightingConfig.getMappedRange()).set(lightInofoDefaults);
+      new Float32Array(LightingResource.lightingConfig.getMappedRange()).set(
+        lightInofoDefaults
+      );
       LightingResource.lightingConfig.unmap();
 
-      new Float32Array(LightingResource.sceneLightingBuffer.getMappedRange()).set(sceneLightingBufferDefaults);
+      new Float32Array(
+        LightingResource.sceneLightingBuffer.getMappedRange()
+      ).set(sceneLightingBufferDefaults);
       LightingResource.sceneLightingBuffer.unmap();
     }
 
-    if (LightingResource.rebuildDirectionLights && LightingResource.numDirLights > 0) {
+    if (
+      LightingResource.rebuildDirectionLights &&
+      LightingResource.numDirLights > 0
+    ) {
       LightingResource.rebuildDirectionLights = false;
 
-      if (LightingResource.directionLightsBuffer) LightingResource.directionLightsBuffer.destroy();
+      if (LightingResource.directionLightsBuffer)
+        LightingResource.directionLightsBuffer.destroy();
 
       LightingResource.directionLightsBuffer = renderer.device.createBuffer({
-        label: "dirLightsBuffer",
-        size: UNIFORM_TYPES_MAP["vec4<f32>"] * 2 * LightingResource.numDirLights,
+        label: 'dirLightsBuffer',
+        size:
+          UNIFORM_TYPES_MAP['vec4<f32>'] * 2 * LightingResource.numDirLights,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
     }

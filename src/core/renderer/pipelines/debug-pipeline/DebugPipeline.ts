@@ -1,14 +1,17 @@
-import { Texture } from "../../textures/Texture";
-import { Pipeline } from "../Pipeline";
-import { LightingResource } from "../resources/LightingResource";
-import { MaterialResource } from "../resources/MaterialResource";
-import { TextureResource } from "../resources/TextureResource";
-import { TransformResource, TransformType } from "../resources/TransformResource";
-import { vertexShader } from "./DebugPipelineVS";
-import { fragmentShader } from "./DebugPipelineFS";
-import { VertexBufferLayout } from "../VertexBufferLayout";
-import { VertexAttribute } from "../VertexAttribute";
-import { AttributeType } from "rewild-common";
+import { Texture } from '../../textures/Texture';
+import { Pipeline } from '../Pipeline';
+import { LightingResource } from '../resources/LightingResource';
+import { MaterialResource } from '../resources/MaterialResource';
+import { TextureResource } from '../resources/TextureResource';
+import {
+  TransformResource,
+  TransformType,
+} from '../resources/TransformResource';
+import { vertexShader } from './DebugPipelineVS';
+import { fragmentShader } from './DebugPipelineFS';
+import { VertexBufferLayout } from '../VertexBufferLayout';
+import { VertexAttribute } from '../VertexAttribute';
+import { AttributeType } from 'rewild-common';
 
 export interface DebugDefines {
   uvScaleX?: string;
@@ -26,13 +29,13 @@ export class DebugPipeline extends Pipeline<DebugDefines> {
 
     this.vertexLayouts = [
       new VertexBufferLayout(Float32Array.BYTES_PER_ELEMENT * 3, [
-        new VertexAttribute(AttributeType.POSITION, 0, "float32x3", 0),
+        new VertexAttribute(AttributeType.POSITION, 0, 'float32x3', 0),
       ]),
       new VertexBufferLayout(Float32Array.BYTES_PER_ELEMENT * 3, [
-        new VertexAttribute(AttributeType.NORMAL, 1, "float32x3", 0),
+        new VertexAttribute(AttributeType.NORMAL, 1, 'float32x3', 0),
       ]),
       new VertexBufferLayout(Float32Array.BYTES_PER_ELEMENT * 2, [
-        new VertexAttribute(AttributeType.UV, 2, "float32x2", 0),
+        new VertexAttribute(AttributeType.UV, 2, 'float32x2', 0),
       ]),
     ];
   }
@@ -50,12 +53,12 @@ export class DebugPipeline extends Pipeline<DebugDefines> {
     this.addResourceTemplate(lightingResource);
 
     if (this.defines.diffuseMap) {
-      const resource = new TextureResource(this.defines.diffuseMap, "diffuse");
+      const resource = new TextureResource(this.defines.diffuseMap, 'diffuse');
       this.addResourceTemplate(resource);
     }
 
     if (this.defines.normalMap) {
-      const resource = new TextureResource(this.defines.normalMap, "normal");
+      const resource = new TextureResource(this.defines.normalMap, 'normal');
       this.addResourceTemplate(resource);
     }
   }
