@@ -1,8 +1,8 @@
-import { Renderer } from '../../core/renderer/Renderer';
+import { GameManager } from '../../core/GameManager';
 import { CircularProgress, Component, register } from 'rewild-ui';
 
 type Props = {
-  renderer: Renderer;
+  gameManager: GameManager;
 };
 
 @register('x-in-game-ui')
@@ -12,28 +12,18 @@ export class InGameUI extends Component<Props> {
     const [playerHunger, setPlayerHunger] = this.useState(100);
 
     const onFrameUpdate = () => {
-      if (
-        this.props.renderer.player.playerComponent.health != playerHealth() &&
-        playerHungerElm
-      ) {
-        setPlayerHealth(
-          this.props.renderer.player.playerComponent.health,
-          false
-        );
+      const player = this.props.gameManager.player;
+
+      if (player.playerComponent.health != playerHealth() && playerHungerElm) {
+        setPlayerHealth(player.playerComponent.health, false);
         playerHealthElm.props = {
           ...playerHealthElm.props,
           value: playerHealth(),
         };
       }
 
-      if (
-        this.props.renderer.player.playerComponent.hunger != playerHunger() &&
-        playerHungerElm
-      ) {
-        setPlayerHunger(
-          this.props.renderer.player.playerComponent.hunger,
-          false
-        );
+      if (player.playerComponent.hunger != playerHunger() && playerHungerElm) {
+        setPlayerHunger(player.playerComponent.hunger, false);
         playerHungerElm.props = {
           ...playerHungerElm.props,
           value: playerHunger(),
@@ -41,7 +31,7 @@ export class InGameUI extends Component<Props> {
       }
     };
 
-    this.props.renderer.updateCallbacks.push(onFrameUpdate);
+    this.props.gameManager.updateCallbacks.push(onFrameUpdate);
 
     const playerHealthElm = (
       <CircularProgress size={120} value={100} strokeSize={20} />

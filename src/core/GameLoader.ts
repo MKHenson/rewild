@@ -3,6 +3,7 @@ import {
   DirectionalLight,
   AmbientLight,
   wasm,
+  Player,
 } from 'rewild-wasmtime';
 import { pipelineManager } from './renderer/AssetManagers/PipelineManager';
 import { Mesh } from './renderer/Mesh';
@@ -60,7 +61,7 @@ export class GameLoader {
     wasm.addNodeToRuntime(containerEditorPtr, false);
   }
 
-  async loadInitialLevels() {
+  async loadInitialLevels(player: Player) {
     const projects = await getProjects(true);
     const startupLevels = await Promise.all(
       projects.map((project) => getLevel(project.id))
@@ -72,7 +73,7 @@ export class GameLoader {
       const levelPtr = wasm.createLevel(level.name);
 
       // Add player to level
-      wasm.addAsset(levelPtr as any, this.renderer.player.transformPtr as any);
+      wasm.addAsset(levelPtr as any, player.transformPtr as any);
 
       this.loadedPtrs.push(levelPtr);
       wasm.addNodeToRuntime(levelPtr, true);
