@@ -25,7 +25,7 @@ export class Application extends Component<Props> {
 
     const onStart = async () => {
       navigate('/game');
-      await gameManager.onStart();
+      await gameManager.onStartClick();
     };
 
     const onEditor = () => {
@@ -34,7 +34,7 @@ export class Application extends Component<Props> {
 
     const onQuit = () => {
       navigate('/');
-      gameManager.onQuit();
+      gameManager.onQuitClick();
     };
 
     const onCanvasReady = async (canvas: Pane3D) => {
@@ -91,7 +91,7 @@ export class Application extends Component<Props> {
               path="/game"
               onRender={() => (
                 <InGame
-                  renderer={gameManager.renderer!}
+                  gameManager={gameManager}
                   eventManager={gameManager.eventManager!}
                   onQuit={onQuit}
                 />

@@ -1,5 +1,4 @@
 import { UIEventManager } from '../../core/UIEventManager';
-import { Renderer } from '../../core/renderer/Renderer';
 import { InGameMenu } from './InGameMenu';
 import { ApplicationEvent } from '../../core/events/ApplicationEvent';
 import { ApplicationEventType, UIEventType } from 'rewild-common';
@@ -7,9 +6,10 @@ import { InGameUI } from './InGameUI';
 import { GameOverMenu } from './GameOverMenu';
 import { update } from './FPSCounter';
 import { Component, register } from 'rewild-ui';
+import { GameManager } from '../../core/GameManager';
 
 interface Props {
-  renderer: Renderer;
+  gameManager: GameManager;
   eventManager: UIEventManager;
   onQuit: () => void;
 }
@@ -42,13 +42,13 @@ export class InGame extends Component<Props> {
     };
 
     this.onMount = () => {
-      this.props.renderer.updateCallbacks.push(onFrameUpdate);
+      this.props.gameManager.updateCallbacks.push(onFrameUpdate);
       this.props.eventManager.addEventListener(UIEventType, onWasmUiEvent);
     };
 
     this.onCleanup = () => {
-      this.props.renderer.updateCallbacks.splice(
-        this.props.renderer.updateCallbacks.indexOf(onFrameUpdate),
+      this.props.gameManager.updateCallbacks.splice(
+        this.props.gameManager.updateCallbacks.indexOf(onFrameUpdate),
         1
       );
       this.props.eventManager.removeEventListener(UIEventType, onWasmUiEvent);
@@ -58,7 +58,7 @@ export class InGame extends Component<Props> {
 
     return () => (
       <div>
-        <InGameUI renderer={this.props.renderer} />
+        <InGameUI gameManager={this.props.gameManager} />
         {activeMenu() === 'ingameMenu' ? (
           <InGameMenu
             open={modalOpen()}

@@ -1,6 +1,4 @@
 import { wasm, IBindable } from 'rewild-wasmtime';
-import { Player } from 'rewild-wasmtime';
-import { Clock } from '../Clock';
 import { pipelineManager } from './AssetManagers/PipelineManager';
 import { geometryManager } from './AssetManagers/GeometryManager';
 import { terrainManager } from './AssetManagers/TerrainManager';
@@ -18,7 +16,6 @@ import { InputManager } from 'src/core/InputManager';
 import { skyboxManager } from './AssetManagers/SkyboxManager';
 
 const sampleCount = 4;
-export type UpdateCallback = () => void;
 
 export class Renderer implements IBindable {
   pane3D: Pane3D;
@@ -27,11 +24,8 @@ export class Renderer implements IBindable {
   format: GPUTextureFormat;
   inputManager: InputManager;
   buffers: GPUBuffer[];
-  clock: Clock;
-  player: Player;
 
   onResizeHandler: () => void;
-  onFrameHandler: () => void;
   disposed: boolean;
 
   renderTargetView: GPUTextureView;
@@ -42,8 +36,6 @@ export class Renderer implements IBindable {
   currentCommandEncoder: GPUCommandEncoder;
   private presentationSize: [number, number];
 
-  updateCallbacks: UpdateCallback[];
-
   canvasSizeCache: [number, number];
 
   constructor(canvas: Pane3D) {
@@ -51,9 +43,6 @@ export class Renderer implements IBindable {
     this.buffers = [];
     this.disposed = false;
     this.currentPass = null;
-    this.onFrameHandler = this.onFrame.bind(this);
-    this.clock = new Clock();
-    this.updateCallbacks = [];
   }
 
   lock() {
@@ -111,12 +100,8 @@ export class Renderer implements IBindable {
     // Initialize the wasm module
     wasm.init(canvas.width, canvas.height);
 
-    this.player = new Player();
-
     // Setup events
     window.addEventListener('resize', this.onResizeHandler);
-    window.requestAnimationFrame(this.onFrameHandler);
-    this.clock.start();
   }
 
   dispose() {
@@ -162,11 +147,6 @@ export class Renderer implements IBindable {
   }
 
   onFrame() {
-    const clock = this.clock;
-    window.requestAnimationFrame(this.onFrameHandler);
-    const callbacks = this.updateCallbacks;
-    for (const callback of callbacks) callback();
-
     if (this.disposed) return;
 
     // Check if we need to resize
@@ -175,8 +155,6 @@ export class Renderer implements IBindable {
     if (newSize[0] != w || newSize[1] != h) {
       this.onResize(newSize);
     }
-
-    wasm.update(clock.elapsedTime, clock.getDelta());
   }
 
   canvasSize() {
