@@ -1,7 +1,7 @@
-import { Light } from "./Light";
-import { DirectionalLightShadow } from "./DirectionalLightShadow";
-import { TransformNode } from "../core/TransformNode";
-import { Color } from "rewild-common";
+import { Light } from './Light';
+import { DirectionalLightShadow } from './DirectionalLightShadow';
+import { TransformNode } from '../core/TransformNode';
+import { Color } from 'rewild-common';
 
 export class DirectionalLight extends Light {
   target: TransformNode;
@@ -10,13 +10,12 @@ export class DirectionalLight extends Light {
   constructor(color: Color, intensity: f32) {
     super(color, intensity);
 
-    this.type = "DirectionalLight";
-
-    this.position.copy(TransformNode.DefaultUp);
+    this.type = 'DirectionalLight';
 
     this.target = new TransformNode();
     this.shadow = new DirectionalLightShadow();
 
+    this.position.copy(TransformNode.DefaultUp);
     this.updateMatrix();
   }
 

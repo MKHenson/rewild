@@ -1,12 +1,12 @@
-import { Event, EventDispatcher } from "rewild-common";
-import { AABB } from "../collision/AABB";
-import { Material } from "../material/Material";
-import { Mat3 } from "../math/Mat3";
-import { Quaternion } from "../math/Quaternion";
-import { Vec3 } from "../math/Vec3";
-import { Box } from "../shapes/Box";
-import { Shape } from "../shapes/Shape";
-import { World } from "../world/World";
+import { Event, EventDispatcher } from 'rewild-common';
+import { AABB } from '../collision/AABB';
+import { Material } from '../material/Material';
+import { Mat3 } from '../math/Mat3';
+import { Quaternion } from '../math/Quaternion';
+import { Vec3 } from '../math/Vec3';
+import { Box } from '../shapes/Box';
+import { Shape } from '../shapes/Shape';
+import { World } from '../world/World';
 
 const tmpVec = new Vec3();
 const tmpQuat = new Quaternion();
@@ -150,7 +150,7 @@ export class Body extends EventDispatcher {
      * @property {Number} collisionFilterGroup
      */
     this.collisionFilterGroup =
-      typeof options.collisionFilterGroup === "number"
+      typeof options.collisionFilterGroup === 'number'
         ? options.collisionFilterGroup
         : 1;
 
@@ -158,7 +158,7 @@ export class Body extends EventDispatcher {
      * @property {Number} collisionFilterMask
      */
     this.collisionFilterMask =
-      typeof options.collisionFilterMask === "number"
+      typeof options.collisionFilterMask === 'number'
         ? options.collisionFilterMask
         : -1;
 
@@ -193,23 +193,12 @@ export class Body extends EventDispatcher {
      */
     this.initPosition = new Vec3();
 
-    if (options.position) {
-      this.position.copy(options.position);
-      this.previousPosition.copy(options.position);
-      this.interpolatedPosition.copy(options.position);
-      this.initPosition.copy(options.position);
-    }
-
     /**
      * World space velocity of the body.
      * @property velocity
      * @type {Vec3}
      */
     this.velocity = new Vec3();
-
-    if (options.velocity) {
-      this.velocity.copy(options.velocity);
-    }
 
     /**
      * @property initVelocity
@@ -224,7 +213,7 @@ export class Body extends EventDispatcher {
      */
     this.force = new Vec3();
 
-    const mass = typeof options.mass === "number" ? options.mass : 0;
+    const mass = typeof options.mass === 'number' ? options.mass : 0;
 
     /**
      * @property mass
@@ -250,7 +239,7 @@ export class Body extends EventDispatcher {
      * @type {Number}
      */
     this.linearDamping =
-      typeof options.linearDamping === "number" ? options.linearDamping : 0.01;
+      typeof options.linearDamping === 'number' ? options.linearDamping : 0.01;
 
     /**
      * One of: Body.DYNAMIC, Body.STATIC and Body.KINEMATIC.
@@ -327,23 +316,12 @@ export class Body extends EventDispatcher {
      */
     this.interpolatedQuaternion = new Quaternion();
 
-    if (options.quaternion) {
-      this.quaternion.copy(options.quaternion);
-      this.initQuaternion.copy(options.quaternion);
-      this.previousQuaternion.copy(options.quaternion);
-      this.interpolatedQuaternion.copy(options.quaternion);
-    }
-
     /**
      * Angular velocity of the body, in world space. Think of the angular velocity as a vector, which the body rotates around. The length of this vector determines how fast (in radians per second) the body rotates.
      * @property angularVelocity
      * @type {Vec3}
      */
     this.angularVelocity = new Vec3();
-
-    if (options.angularVelocity) {
-      this.angularVelocity.copy(options.angularVelocity);
-    }
 
     /**
      * @property initAngularVelocity
@@ -416,18 +394,12 @@ export class Body extends EventDispatcher {
      * @property {Vec3} linearFactor
      */
     this.linearFactor = new Vec3(1, 1, 1);
-    if (options.linearFactor) {
-      this.linearFactor.copy(options.linearFactor);
-    }
 
     /**
      * Use this property to limit the rotational motion along any world axis. (1,1,1) will allow rotation along all axes while (0,0,0) allows none.
      * @property {Vec3} angularFactor
      */
     this.angularFactor = new Vec3(1, 1, 1);
-    if (options.angularFactor) {
-      this.angularFactor.copy(options.angularFactor);
-    }
 
     /**
      * World space bounding box of the body and its shapes.
@@ -454,6 +426,36 @@ export class Body extends EventDispatcher {
 
     this.wlambda = new Vec3();
 
+    if (options.position) {
+      this.position.copy(options.position);
+      this.previousPosition.copy(options.position);
+      this.interpolatedPosition.copy(options.position);
+      this.initPosition.copy(options.position);
+    }
+
+    if (options.velocity) {
+      this.velocity.copy(options.velocity);
+    }
+
+    if (options.quaternion) {
+      this.quaternion.copy(options.quaternion);
+      this.initQuaternion.copy(options.quaternion);
+      this.previousQuaternion.copy(options.quaternion);
+      this.interpolatedQuaternion.copy(options.quaternion);
+    }
+
+    if (options.angularVelocity) {
+      this.angularVelocity.copy(options.angularVelocity);
+    }
+
+    if (options.linearFactor) {
+      this.linearFactor.copy(options.linearFactor);
+    }
+
+    if (options.angularFactor) {
+      this.angularFactor.copy(options.angularFactor);
+    }
+
     if (options.shape) {
       this.addShape(options.shape!);
     }
@@ -468,7 +470,7 @@ export class Body extends EventDispatcher {
    * @param {Body} body The body that was involved in the collision.
    * @param {ContactEquation} contact The details of the collision.
    */
-  static COLLIDE_EVENT_NAME: string = "collide";
+  static COLLIDE_EVENT_NAME: string = 'collide';
 
   /**
    * A dynamic body is fully simulated. Can be moved manually by the user, but normally they move according to forces. A dynamic body can collide with all body types. A dynamic body always has finite, non-zero mass.
@@ -521,7 +523,7 @@ export class Body extends EventDispatcher {
    * Dispatched after a sleeping body has woken up.
    * @event wakeup
    */
-  static wakeupEvent: Event = new Event("wakeup");
+  static wakeupEvent: Event = new Event('wakeup');
 
   /**
    * Wake the body up.
@@ -551,13 +553,13 @@ export class Body extends EventDispatcher {
    * Dispatched after a body has gone in to the sleepy state.
    * @event sleepy
    */
-  static sleepyEvent: Event = new Event("sleepy");
+  static sleepyEvent: Event = new Event('sleepy');
 
   /**
    * Dispatched after a body has fallen asleep.
    * @event sleep
    */
-  static sleepEvent: Event = new Event("sleep");
+  static sleepEvent: Event = new Event('sleep');
 
   /**
    * Called every timestep to update internal sleep timer and change sleep state if needed.

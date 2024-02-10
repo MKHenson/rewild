@@ -1,12 +1,12 @@
-import { EngineMatrix4 } from "../math/Matrix4";
-import { EngineVector2 } from "../math/Vector2";
-import { EngineVector3 } from "../math/Vector3";
-import { EngineVector4 } from "../math/Vector4";
-import { Frustum } from "../math/Frustum";
-import { Camera } from "../cameras/Camera";
-import { Light } from "./Light";
-import { DirectionalLight } from "./DirectionalLight";
-import { SpotLight } from "./SpotLight";
+import { EngineMatrix4 } from '../math/EngineMatrix4';
+import { EngineVector2 } from '../math/Vector2';
+import { EngineVector3 } from '../math/Vector3';
+import { EngineVector4 } from '../math/Vector4';
+import { Frustum } from '../math/Frustum';
+import { Camera } from '../cameras/Camera';
+import { Light } from './Light';
+import { DirectionalLight } from './DirectionalLight';
+import { SpotLight } from './SpotLight';
 
 const _projScreenMatrix = new EngineMatrix4();
 const _lightPositionWorld = new EngineVector3();
@@ -78,7 +78,10 @@ export class LightShadow {
     shadowCamera.lookAt(_lookTarget.x, _lookTarget.y, _lookTarget.z);
     shadowCamera.updateMatrixWorld();
 
-    _projScreenMatrix.multiplyMatricesSIMD(shadowCamera.projectionMatrix, shadowCamera.matrixWorldInverse);
+    _projScreenMatrix.multiplyMatricesSIMD(
+      shadowCamera.projectionMatrix,
+      shadowCamera.matrixWorldInverse
+    );
     this._frustum.setFromProjectionMatrix(_projScreenMatrix);
 
     // prettier-ignore

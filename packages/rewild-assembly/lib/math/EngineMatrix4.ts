@@ -1,17 +1,17 @@
-import { EngineVector3 } from "./Vector3";
-import { Matrix4 } from "rewild-common";
+import { EngineVector3 } from './Vector3';
+import { Matrix4 } from 'rewild-common';
 
 export class EngineMatrix4 extends Matrix4 {
   constructor() {
     super();
   }
 
-  clone(): EngineMatrix4 {
-    return new EngineMatrix4().fromArray(this.elements) as EngineMatrix4;
+  clone(): Matrix4 {
+    return new EngineMatrix4().fromArray(this.elements);
   }
 
-  copy(m: EngineMatrix4): EngineMatrix4 {
-    return super.copy(m) as EngineMatrix4;
+  copy(m: Matrix4): Matrix4 {
+    return super.copy(m);
   }
 
   multiplySIMD(m: EngineMatrix4): EngineMatrix4 {
@@ -34,15 +34,52 @@ export class EngineMatrix4 extends Matrix4 {
 
     const swiz0000 = v128(0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3);
     const swiz1111 = v128(4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7);
-    const swiz2222 = v128(8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11);
-    const swiz3333 = v128(12, 13, 14, 15, 12, 13, 14, 15, 12, 13, 14, 15, 12, 13, 14, 15);
+    const swiz2222 = v128(
+      8,
+      9,
+      10,
+      11,
+      8,
+      9,
+      10,
+      11,
+      8,
+      9,
+      10,
+      11,
+      8,
+      9,
+      10,
+      11
+    );
+    const swiz3333 = v128(
+      12,
+      13,
+      14,
+      15,
+      12,
+      13,
+      14,
+      15,
+      12,
+      13,
+      14,
+      15,
+      12,
+      13,
+      14,
+      15
+    );
 
     const b0 = v128.load(be, 0);
     const out0 = f32x4.add(
       f32x4.mul(v128.swizzle(b0, swiz0000), a0),
       f32x4.add(
         f32x4.mul(v128.swizzle(b0, swiz1111), a1),
-        f32x4.add(f32x4.mul(v128.swizzle(b0, swiz2222), a2), f32x4.mul(v128.swizzle(b0, swiz3333), a3))
+        f32x4.add(
+          f32x4.mul(v128.swizzle(b0, swiz2222), a2),
+          f32x4.mul(v128.swizzle(b0, swiz3333), a3)
+        )
       )
     );
     v128.store(te, out0, 0);
@@ -52,7 +89,10 @@ export class EngineMatrix4 extends Matrix4 {
       f32x4.mul(v128.swizzle(b1, swiz0000), a0),
       f32x4.add(
         f32x4.mul(v128.swizzle(b1, swiz1111), a1),
-        f32x4.add(f32x4.mul(v128.swizzle(b1, swiz2222), a2), f32x4.mul(v128.swizzle(b1, swiz3333), a3))
+        f32x4.add(
+          f32x4.mul(v128.swizzle(b1, swiz2222), a2),
+          f32x4.mul(v128.swizzle(b1, swiz3333), a3)
+        )
       )
     );
     v128.store(te, out1, 16);
@@ -62,7 +102,10 @@ export class EngineMatrix4 extends Matrix4 {
       f32x4.mul(v128.swizzle(b2, swiz0000), a0),
       f32x4.add(
         f32x4.mul(v128.swizzle(b2, swiz1111), a1),
-        f32x4.add(f32x4.mul(v128.swizzle(b2, swiz2222), a2), f32x4.mul(v128.swizzle(b2, swiz3333), a3))
+        f32x4.add(
+          f32x4.mul(v128.swizzle(b2, swiz2222), a2),
+          f32x4.mul(v128.swizzle(b2, swiz3333), a3)
+        )
       )
     );
     v128.store(te, out2, 32);
@@ -72,7 +115,10 @@ export class EngineMatrix4 extends Matrix4 {
       f32x4.mul(v128.swizzle(b3, swiz0000), a0),
       f32x4.add(
         f32x4.mul(v128.swizzle(b3, swiz1111), a1),
-        f32x4.add(f32x4.mul(v128.swizzle(b3, swiz2222), a2), f32x4.mul(v128.swizzle(b3, swiz3333), a3))
+        f32x4.add(
+          f32x4.mul(v128.swizzle(b3, swiz2222), a2),
+          f32x4.mul(v128.swizzle(b3, swiz3333), a3)
+        )
       )
     );
     v128.store(te, out3, 48);
@@ -219,10 +265,33 @@ export class EngineMatrix4 extends Matrix4 {
 
     tmp1 = f32x4.div(f32x4.splat(1), det); // reciprocalApproximation
 
-    det = f32x4.sub(f32x4.add(tmp1, tmp1), f32x4.mul(det, f32x4.mul(tmp1, tmp1)));
-    det = v128.swizzle(det, v128(0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3)); // 0 0 0 0
+    det = f32x4.sub(
+      f32x4.add(tmp1, tmp1),
+      f32x4.mul(det, f32x4.mul(tmp1, tmp1))
+    );
+    det = v128.swizzle(
+      det,
+      v128(0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3)
+    ); // 0 0 0 0
     if (!det) {
-      return this.set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) as EngineMatrix4;
+      return this.set(
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ) as EngineMatrix4;
     }
 
     // Compute matrix inverse
@@ -236,7 +305,24 @@ export class EngineMatrix4 extends Matrix4 {
   scaleSIMD(v: EngineVector3): EngineMatrix4 {
     const swizXXXX = v128(0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3);
     const swizYYYY = v128(4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7);
-    const swizZZZZ = v128(8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11, 8, 9, 10, 11);
+    const swizZZZZ = v128(
+      8,
+      9,
+      10,
+      11,
+      8,
+      9,
+      10,
+      11,
+      8,
+      9,
+      10,
+      11,
+      8,
+      9,
+      10,
+      11
+    );
 
     const te = this.elements.dataStart;
     const vec = f32x4(v.x, v.y, v.z, 0);

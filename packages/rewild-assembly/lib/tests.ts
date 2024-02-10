@@ -1,6 +1,6 @@
-import { EngineMatrix4 } from "./math/Matrix4";
-import { Matrix4, Matrix3 } from "rewild-common";
-import { EngineVector3 } from "./math/Vector3";
+import { EngineMatrix4 } from './math/EngineMatrix4';
+import { Matrix4, Matrix3 } from 'rewild-common';
+import { EngineVector3 } from './math/Vector3';
 
 export {
   addNodeToRuntime,
@@ -11,14 +11,14 @@ export {
   getActiveNodeCount,
   getNodeCount,
   sendSignal,
-} from "./objects/routing/AsSceneManager";
+} from './objects/routing/AsSceneManager';
 export {
   addChild,
   removeChild,
   getVisibility,
   setVisibility,
   addComponent,
-} from "./core/TransformNode";
+} from './core/TransformNode';
 export {
   createContainer,
   addChildNode,
@@ -29,14 +29,14 @@ export {
   removeNodePortal,
   createPortal,
   addAsset,
-} from "../lib/objects/routing/index";
-export * from "./tests/routers";
-export * from "./tests/helpers";
-export * from "./tests/performance";
-export * from "./tests/TransformNode";
-export * from "./tests/PlayerComponent";
-export * from "./tests/PhysicsComponent";
-export * from "../lib/objects/physics/common-bodies";
+} from '../lib/objects/routing/index';
+export * from './tests/routers';
+export * from './tests/helpers';
+export * from './tests/performance';
+export * from './tests/TransformNode';
+export * from './tests/PlayerComponent';
+export * from './tests/PhysicsComponent';
+export * from '../lib/objects/physics/common-bodies';
 
 // prettier-ignore
 function newMatrix4(): EngineMatrix4 { return new EngineMatrix4(); }

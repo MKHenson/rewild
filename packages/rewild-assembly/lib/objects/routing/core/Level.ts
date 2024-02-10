@@ -15,14 +15,14 @@ import { uiSignaller } from '../../../extras/ui/uiSignalManager';
 import { Skybox } from '../../skybox/Skybox';
 
 export class Level extends Container implements Listener {
-  terrain: Terrain;
-  skybox: Skybox;
+  // terrain: Terrain;
+  // skybox: Skybox;
 
   constructor(name: string, autoDispose: boolean = false) {
     super(name, autoDispose);
 
-    this.terrain = new Terrain();
-    this.skybox = new Skybox();
+    // this.terrain = new Terrain();
+    // this.skybox = new Skybox();
   }
 
   onUpdate(delta: f32, total: u32): void {
@@ -33,16 +33,16 @@ export class Level extends Container implements Listener {
     super.mount();
 
     // Activate the enter portal
-    addChild(this.runtime!.scene, this.terrain);
-    addChild(this.runtime!.scene, this.skybox);
+    // addChild(this.runtime!.scene, this.terrain);
+    // addChild(this.runtime!.scene, this.skybox);
     this.runtime!.sendSignal(this.getPortal('Enter')!, false);
     uiSignaller.addEventListener(UIEventType, this);
   }
 
   unMount(): void {
     super.unMount();
-    removeChild(this.runtime!.scene, this.terrain);
-    removeChild(this.runtime!.scene, this.skybox);
+    // removeChild(this.runtime!.scene, this.terrain);
+    // removeChild(this.runtime!.scene, this.skybox);
     uiSignaller.removeEventListener(UIEventType, this);
   }
 

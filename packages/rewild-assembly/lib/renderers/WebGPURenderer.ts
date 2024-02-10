@@ -1,12 +1,12 @@
-import { Camera } from "../cameras/Camera";
-import { TransformNode } from "../core/TransformNode";
-import { EngineMatrix4 } from "../math/Matrix4";
-import { EngineVector4 } from "../math/Vector4";
-import { MeshComponent } from "../components/MeshComponent";
-import { WebGPULights } from "./WebGPULights";
-import { Light } from "../lights/Light";
-import { renderComponents } from "../Imports";
-import { Component } from "../core/Component";
+import { Camera } from '../cameras/Camera';
+import { TransformNode } from '../core/TransformNode';
+import { EngineMatrix4 } from '../math/EngineMatrix4';
+import { EngineVector4 } from '../math/Vector4';
+import { MeshComponent } from '../components/MeshComponent';
+import { WebGPULights } from './WebGPULights';
+import { Light } from '../lights/Light';
+import { renderComponents } from '../Imports';
+import { Component } from '../core/Component';
 
 export class RenderList {
   solids: Component[];

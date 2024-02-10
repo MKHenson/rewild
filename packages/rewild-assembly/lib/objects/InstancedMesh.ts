@@ -1,11 +1,11 @@
-import { InstancedBufferAttribute } from "../core/InstancedBufferAttribute";
-import { Intersection, MeshComponent } from "../components/MeshComponent";
-import { EngineMatrix4 } from "../math/Matrix4";
-import { Raycaster } from "../core/Raycaster";
-import { BufferGeometry } from "../core/BufferGeometry";
-import { Color } from "rewild-common";
-import { Event } from "../core/Event";
-import { MeshPipelineInstance } from "../pipelines/MeshPipelineInstance";
+import { InstancedBufferAttribute } from '../core/InstancedBufferAttribute';
+import { Intersection, MeshComponent } from '../components/MeshComponent';
+import { EngineMatrix4 } from '../math/EngineMatrix4';
+import { Raycaster } from '../core/Raycaster';
+import { BufferGeometry } from '../core/BufferGeometry';
+import { Color } from 'rewild-common';
+import { Event } from '../core/Event';
+import { MeshPipelineInstance } from '../pipelines/MeshPipelineInstance';
 
 const _instanceLocalMatrix = new EngineMatrix4();
 const _instanceWorldMatrix = new EngineMatrix4();
@@ -13,17 +13,24 @@ const _instanceWorldMatrix = new EngineMatrix4();
 const _instanceIntersects: Intersection[] = [];
 const _mesh = new MeshComponent();
 
-const disposeEvent: Event = new Event("dispose");
+const disposeEvent: Event = new Event('dispose');
 
 export class InstancedMesh extends MeshComponent {
   count: i32;
   instanceColor: InstancedBufferAttribute<f32, Float32Array> | null;
   instanceMatrix: InstancedBufferAttribute<f32, Float32Array>;
 
-  constructor(geometry: BufferGeometry, materials: MeshPipelineInstance[], count: i32) {
+  constructor(
+    geometry: BufferGeometry,
+    materials: MeshPipelineInstance[],
+    count: i32
+  ) {
     super(geometry, materials);
 
-    this.instanceMatrix = new InstancedBufferAttribute(new Float32Array(count * 16), 16);
+    this.instanceMatrix = new InstancedBufferAttribute(
+      new Float32Array(count * 16),
+      16
+    );
     this.instanceColor = null;
 
     this.count = count;
@@ -34,10 +41,15 @@ export class InstancedMesh extends MeshComponent {
   copy(source: InstancedMesh): InstancedMesh {
     super.copy(source);
 
-    this.instanceMatrix!.copy(source.instanceMatrix, source.instanceMatrix!.array.slice(0));
+    this.instanceMatrix!.copy(
+      source.instanceMatrix,
+      source.instanceMatrix!.array.slice(0)
+    );
 
     if (source.instanceColor != null)
-      this.instanceColor = source.instanceColor.clone(null) as InstancedBufferAttribute<f32, Float32Array>;
+      this.instanceColor = source.instanceColor.clone(
+        null
+      ) as InstancedBufferAttribute<f32, Float32Array>;
 
     this.count = source.count;
 
@@ -64,7 +76,10 @@ export class InstancedMesh extends MeshComponent {
 
       this.getMatrixAt(instanceId, _instanceLocalMatrix);
 
-      _instanceWorldMatrix.multiplyMatricesSIMD(matrixWorld, _instanceLocalMatrix);
+      _instanceWorldMatrix.multiplyMatricesSIMD(
+        matrixWorld,
+        _instanceLocalMatrix
+      );
 
       // the mesh represents this single instance
 
@@ -87,7 +102,10 @@ export class InstancedMesh extends MeshComponent {
 
   setColorAt(index: i32, color: Color): void {
     if (this.instanceColor === null) {
-      this.instanceColor = new InstancedBufferAttribute(new Float32Array(this.instanceMatrix.count * 3), 3);
+      this.instanceColor = new InstancedBufferAttribute(
+        new Float32Array(this.instanceMatrix.count * 3),
+        3
+      );
     }
 
     color.toF32Array(this.instanceColor.array, index * 3);
