@@ -40,6 +40,9 @@ export class Level extends Container implements Listener {
   unMount(): void {
     super.unMount();
     this.runtime!.removeEventListener(UIEventType, this);
+
+    this.terrain.dispose();
+    this.skybox.dispose();
   }
 
   onEvent(event: Event): void {

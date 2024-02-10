@@ -545,6 +545,8 @@ export class TransformNode
     return this;
   }
 
+  onDispose(): void {}
+
   onUpdate(delta: f32, total: u32): void {
     const components = this.components;
     const children = this.children;
@@ -655,6 +657,10 @@ export function addComponent(
   node.components.push(component);
   component.transform = node;
   return node;
+}
+
+export function disposeObject(node: TransformNode): void {
+  node.onDispose();
 }
 
 export function removeComponent(
