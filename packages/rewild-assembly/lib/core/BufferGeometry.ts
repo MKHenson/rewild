@@ -1,13 +1,13 @@
-import { EngineVector3 } from "../math/Vector3";
-import { EngineVector2 } from "../math/Vector2";
-import { EngineBox3 } from "../math/Box3";
+import { EngineVector3 } from '../math/Vector3';
+import { EngineVector2 } from '../math/Vector2';
+import { EngineBox3 } from '../math/Box3';
 import {
   BaseAttribute,
   BufferAttribute,
   CloneToken,
   Float32BufferAttribute,
   Uint32BufferAttribute,
-} from "./BufferAttribute";
+} from './BufferAttribute';
 import {
   Sphere,
   Matrix3,
@@ -17,13 +17,13 @@ import {
   Vector3,
   Event,
   EventDispatcher,
-} from "rewild-common";
-import { TransformNode } from "./TransformNode";
-import { EngineMatrix4 } from "../math/Matrix4";
-import { ASError } from "./Error";
-import { GLBufferAttribute } from "./GLBufferAttribute";
-import { toTypedArray } from "../utils";
-import { BridgeManager } from "../core/BridgeManager";
+} from 'rewild-common';
+import { TransformNode } from './TransformNode';
+import { EngineMatrix4 } from '../math/EngineMatrix4';
+import { ASError } from './Error';
+import { GLBufferAttribute } from './GLBufferAttribute';
+import { toTypedArray } from '../utils';
+import { BridgeManager } from '../core/BridgeManager';
 
 let _id = 0;
 
@@ -55,7 +55,7 @@ export class BufferGeometryGroup {
   }
 }
 
-const disposeEvent: Event = new Event("disposed");
+const disposeEvent: Event = new Event('disposed');
 
 export class BufferGeometry extends EventDispatcher {
   uuid: string;
@@ -86,8 +86,8 @@ export class BufferGeometry extends EventDispatcher {
 
     this.uuid = generateUUID();
 
-    this.name = "";
-    this.type = "BufferGeometry";
+    this.name = '';
+    this.type = 'BufferGeometry';
 
     this.indexes = null;
     this.attributes = new Map();
@@ -487,7 +487,7 @@ export class BufferGeometry extends EventDispatcher {
       !attributes.has(AttributeType.UV)
     )
       throw new ASError(
-        "BufferGeometry: .computeTangents() failed. Missing required attributes (index, position, normal or uv)"
+        'BufferGeometry: .computeTangents() failed. Missing required attributes (index, position, normal or uv)'
       );
 
     const indices = index.array;
@@ -748,7 +748,7 @@ export class BufferGeometry extends EventDispatcher {
     const normals = this.getAttribute<Float32BufferAttribute>(
       AttributeType.NORMAL
     );
-    if (!normals) throw new Error("No normal attribute defined");
+    if (!normals) throw new Error('No normal attribute defined');
 
     for (let i = 0, il = normals.count; i < il; i++) {
       _vector.fromBufferAttribute(normals, i);

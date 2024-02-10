@@ -1,6 +1,6 @@
-import { EngineMatrix4 } from "../math/Matrix4";
-import { TransformNode } from "../core/TransformNode";
-import { EngineVector3 } from "../math/Vector3";
+import { EngineMatrix4 } from '../math/EngineMatrix4';
+import { TransformNode } from '../core/TransformNode';
+import { EngineVector3 } from '../math/Vector3';
 
 export class Camera extends TransformNode {
   readonly matrixWorldInverse: EngineMatrix4 = new EngineMatrix4();
@@ -9,7 +9,7 @@ export class Camera extends TransformNode {
 
   constructor() {
     super();
-    this.type = "Camera";
+    this.type = 'Camera';
   }
 
   copy(source: Camera, recursive: boolean = true): Camera {
@@ -27,19 +27,25 @@ export class Camera extends TransformNode {
 
     const e = this.matrixWorld.elements;
 
-    return target.set(unchecked(-e[8]), unchecked(-e[9]), unchecked(-e[10])).normalize() as EngineVector3;
+    return target
+      .set(unchecked(-e[8]), unchecked(-e[9]), unchecked(-e[10]))
+      .normalize() as EngineVector3;
   }
 
   updateMatrixWorld(force: boolean = false): void {
     super.updateMatrixWorld(force);
 
-    this.matrixWorldInverse.copy(this.matrixWorld).invertSIMD();
+    (
+      this.matrixWorldInverse.copy(this.matrixWorld) as EngineMatrix4
+    ).invertSIMD();
   }
 
   updateWorldMatrix(updateParents: boolean, updateChildren: boolean): void {
     super.updateWorldMatrix(updateParents, updateChildren);
 
-    this.matrixWorldInverse.copy(this.matrixWorld).invertSIMD();
+    (
+      this.matrixWorldInverse.copy(this.matrixWorld) as EngineMatrix4
+    ).invertSIMD();
   }
 
   clone(recursive: boolean = false): TransformNode {

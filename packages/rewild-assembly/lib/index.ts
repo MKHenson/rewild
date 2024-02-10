@@ -7,6 +7,7 @@ export {
   update,
   addNodeToRuntime,
   removeNodeFromRuntime,
+  getScene,
 } from './objects/routing/AsSceneManager';
 export { createMeshPipelineInstance } from './pipelines/MeshPipelineInstance';
 export { addPipelineAttribute } from './pipelines/PipelineInstance';

@@ -1,9 +1,14 @@
-import { UsageType, Matrix3 } from "rewild-common";
-import { EngineMatrix4 } from "../math/Matrix4";
-import { EngineVector3 } from "../math/Vector3";
-import { BaseAttribute, CloneToken, Float32BufferAttribute, UpdateRange } from "./BufferAttribute";
+import { UsageType, Matrix3 } from 'rewild-common';
+import { EngineMatrix4 } from '../math/EngineMatrix4';
+import { EngineVector3 } from '../math/Vector3';
+import {
+  BaseAttribute,
+  CloneToken,
+  Float32BufferAttribute,
+  UpdateRange,
+} from './BufferAttribute';
 // import { BufferAttribute } from "./BufferAttribute";
-import { InterleavedBuffer } from "./InterleavedBuffer";
+import { InterleavedBuffer } from './InterleavedBuffer';
 
 const _vector = new EngineVector3();
 
@@ -11,9 +16,14 @@ export class InterleavedBufferAttribute extends BaseAttribute {
   data: InterleavedBuffer;
   offset: u32;
 
-  constructor(interleavedBuffer: InterleavedBuffer, itemSize: u32, offset: u32, normalized: boolean = false) {
+  constructor(
+    interleavedBuffer: InterleavedBuffer,
+    itemSize: u32,
+    offset: u32,
+    normalized: boolean = false
+  ) {
     super();
-    this.name = "";
+    this.name = '';
 
     this.data = interleavedBuffer;
     this.itemSize = itemSize;
@@ -176,7 +186,13 @@ export class InterleavedBufferAttribute extends BaseAttribute {
     return this;
   }
 
-  setXYZW(index: u32, x: f32, y: f32, z: f32, w: f32): InterleavedBufferAttribute {
+  setXYZW(
+    index: u32,
+    x: f32,
+    y: f32,
+    z: f32,
+    w: f32
+  ): InterleavedBufferAttribute {
     index = index * this.data.stride + this.offset;
 
     this.data.array[index + 0] = x;

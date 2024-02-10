@@ -1,8 +1,8 @@
-import { EngineVector3 } from "./Vector3";
-import { Sphere, Plane, Box3 } from "rewild-common";
-import { EngineMatrix4 } from "./Matrix4";
-import { MeshComponent } from "../components/MeshComponent";
-import { Sprite } from "../objects/Sprite";
+import { EngineVector3 } from './Vector3';
+import { Sphere, Plane, Box3 } from 'rewild-common';
+import { EngineMatrix4 } from './EngineMatrix4';
+import { MeshComponent } from '../components/MeshComponent';
+import { Sprite } from '../objects/Sprite';
 
 const _sphere = new Sphere();
 const _vector = new EngineVector3();
@@ -21,7 +21,14 @@ export class Frustum {
     this.planes = [p0, p1, p2, p3, p4, p5];
   }
 
-  set(p0: Plane, p1: Plane, p2: Plane, p3: Plane, p4: Plane, p5: Plane): Frustum {
+  set(
+    p0: Plane,
+    p1: Plane,
+    p2: Plane,
+    p3: Plane,
+    p4: Plane,
+    p5: Plane
+  ): Frustum {
     const planes = this.planes;
 
     planes[0].copy(p0);
@@ -64,12 +71,24 @@ export class Frustum {
       me14 = me[14],
       me15 = me[15];
 
-    planes[0].setComponents(me3 - me0, me7 - me4, me11 - me8, me15 - me12).normalize();
-    planes[1].setComponents(me3 + me0, me7 + me4, me11 + me8, me15 + me12).normalize();
-    planes[2].setComponents(me3 + me1, me7 + me5, me11 + me9, me15 + me13).normalize();
-    planes[3].setComponents(me3 - me1, me7 - me5, me11 - me9, me15 - me13).normalize();
-    planes[4].setComponents(me3 - me2, me7 - me6, me11 - me10, me15 - me14).normalize();
-    planes[5].setComponents(me3 + me2, me7 + me6, me11 + me10, me15 + me14).normalize();
+    planes[0]
+      .setComponents(me3 - me0, me7 - me4, me11 - me8, me15 - me12)
+      .normalize();
+    planes[1]
+      .setComponents(me3 + me0, me7 + me4, me11 + me8, me15 + me12)
+      .normalize();
+    planes[2]
+      .setComponents(me3 + me1, me7 + me5, me11 + me9, me15 + me13)
+      .normalize();
+    planes[3]
+      .setComponents(me3 - me1, me7 - me5, me11 - me9, me15 - me13)
+      .normalize();
+    planes[4]
+      .setComponents(me3 - me2, me7 - me6, me11 - me10, me15 - me14)
+      .normalize();
+    planes[5]
+      .setComponents(me3 + me2, me7 + me6, me11 + me10, me15 + me14)
+      .normalize();
 
     return this;
   }
@@ -79,7 +98,9 @@ export class Frustum {
 
     if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
 
-    _sphere.copy(geometry.boundingSphere!).applyMatrix4(object.transform!.matrixWorld);
+    _sphere
+      .copy(geometry.boundingSphere!)
+      .applyMatrix4(object.transform!.matrixWorld);
 
     return this.intersectsSphere(_sphere);
   }

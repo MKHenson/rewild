@@ -1,10 +1,10 @@
-import { LightShadow } from "./LightShadow";
-import { PerspectiveCamera } from "../cameras/PerspectiveCamera";
-import { EngineMatrix4 } from "../math/Matrix4";
-import { EngineVector2 } from "../math/Vector2";
-import { EngineVector3 } from "../math/Vector3";
-import { EngineVector4 } from "../math/Vector4";
-import { PointLight } from "./PointLight";
+import { LightShadow } from './LightShadow';
+import { PerspectiveCamera } from '../cameras/PerspectiveCamera';
+import { EngineMatrix4 } from '../math/EngineMatrix4';
+import { EngineVector2 } from '../math/Vector2';
+import { EngineVector3 } from '../math/Vector3';
+import { EngineVector4 } from '../math/Vector4';
+import { PointLight } from './PointLight';
 
 const _projScreenMatrix = new EngineMatrix4();
 const _lightPositionWorld = new EngineVector3();
@@ -88,9 +88,16 @@ export class PointLightShadow extends LightShadow {
     camera.lookAt(_lookTarget.x, _lookTarget.y, _lookTarget.z);
     camera.updateMatrixWorld();
 
-    shadowMatrix.makeTranslation(-_lightPositionWorld.x, -_lightPositionWorld.y, -_lightPositionWorld.z);
+    shadowMatrix.makeTranslation(
+      -_lightPositionWorld.x,
+      -_lightPositionWorld.y,
+      -_lightPositionWorld.z
+    );
 
-    _projScreenMatrix.multiplyMatricesSIMD(camera.projectionMatrix, camera.matrixWorldInverse);
+    _projScreenMatrix.multiplyMatricesSIMD(
+      camera.projectionMatrix,
+      camera.matrixWorldInverse
+    );
     this._frustum.setFromProjectionMatrix(_projScreenMatrix);
   }
 }

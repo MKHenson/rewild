@@ -13,7 +13,7 @@ import { Geometry } from './renderer/geometry/Geometry';
 import { Renderer } from './renderer/Renderer';
 import { getLevel } from '../api/levels';
 import { getProjects } from '../api/projects';
-import { StateMachine } from 'rewild-routing';
+import { Level, StateMachine } from 'rewild-routing';
 import { geometryManager } from './renderer/AssetManagers/GeometryManager';
 import { LoaderPresetType, LoaderPresets } from './loader-utils/LoaderPresets';
 
@@ -70,6 +70,10 @@ export class GameLoader {
     const stateMachine = new StateMachine();
 
     for (const level of startupLevels) {
+      stateMachine.addNode(
+        new Level(level.name, new Object3D('Scene', wasm.getScene())),
+        true
+      );
       const levelPtr = wasm.createLevel(level.name);
 
       // Add player to level

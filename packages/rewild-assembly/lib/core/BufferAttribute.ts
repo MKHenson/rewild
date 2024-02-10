@@ -1,8 +1,8 @@
-import { EngineVector4 } from "../math/Vector4";
-import { EngineVector3 } from "../math/Vector3";
-import { EngineVector2 } from "../math/Vector2";
-import { Color, UsageType, Matrix3 } from "rewild-common";
-import { EngineMatrix4 } from "../math/Matrix4";
+import { EngineVector4 } from '../math/Vector4';
+import { EngineVector3 } from '../math/Vector3';
+import { EngineVector2 } from '../math/Vector2';
+import { Color, UsageType, Matrix3 } from 'rewild-common';
+import { EngineMatrix4 } from '../math/EngineMatrix4';
 
 export class CloneToken {}
 const _vector = new EngineVector3();
@@ -27,7 +27,7 @@ export abstract class BaseAttribute {
   normalized: boolean;
 
   constructor() {
-    this.name = "";
+    this.name = '';
     this.itemSize = 0;
     this.onUploadCallback = null;
     this.normalized = false;
@@ -108,7 +108,10 @@ export class BufferAttribute<K, T extends TypedArray<K>> extends BaseAttribute {
     const attributeArray2 = attribute2.array;
 
     const attributeOffset: u32 = attribute2.itemSize * offset;
-    const length = Math.min(attributeArray2.length, attributeArray1.length - attributeOffset);
+    const length = Math.min(
+      attributeArray2.length,
+      attributeArray1.length - attributeOffset
+    );
 
     for (let i: i32 = 0, j: u32 = attributeOffset; i < length; i++, j++) {
       attributeArray1[j] = attributeArray2[i];
@@ -146,7 +149,11 @@ export class BufferAttribute<K, T extends TypedArray<K>> extends BaseAttribute {
     return this;
   }
 
-  copyAt(index1: u32, attribute: BufferAttribute<K, T>, index2: u32): BufferAttribute<K, T> {
+  copyAt(
+    index1: u32,
+    attribute: BufferAttribute<K, T>,
+    index2: u32
+  ): BufferAttribute<K, T> {
     index1 *= this.itemSize;
     index2 *= attribute.itemSize;
 
@@ -231,7 +238,10 @@ export class BufferAttribute<K, T extends TypedArray<K>> extends BaseAttribute {
     return buffer;
   }
 
-  static applyMatrix3(m: Matrix3, buffer: BufferAttribute<f32, Float32Array>): BufferAttribute<f32, Float32Array> {
+  static applyMatrix3(
+    m: Matrix3,
+    buffer: BufferAttribute<f32, Float32Array>
+  ): BufferAttribute<f32, Float32Array> {
     if (buffer.itemSize === 2) {
       for (let i = 0, l = buffer.count; i < l; i++) {
         _vector2.fromBufferAttribute(buffer, i);
@@ -268,7 +278,10 @@ export class BufferAttribute<K, T extends TypedArray<K>> extends BaseAttribute {
     return buffer;
   }
 
-  static applyNormalMatrix(m: Matrix3, buffer: BufferAttribute<f32, Float32Array>): BufferAttribute<f32, Float32Array> {
+  static applyNormalMatrix(
+    m: Matrix3,
+    buffer: BufferAttribute<f32, Float32Array>
+  ): BufferAttribute<f32, Float32Array> {
     for (let i: u32 = 0, l = buffer.count; i < l; i++) {
       _vector.x = buffer.getX(i);
       _vector.y = buffer.getY(i);
@@ -382,7 +395,11 @@ export class BufferAttribute<K, T extends TypedArray<K>> extends BaseAttribute {
   }
 
   clone(token: CloneToken | null): BufferAttribute<K, T> {
-    return new BufferAttribute<K, T>(this.array, this.itemSize, this.normalized).copy(this, this.array.slice(0) as T);
+    return new BufferAttribute<K, T>(
+      this.array,
+      this.itemSize,
+      this.normalized
+    ).copy(this, this.array.slice(0) as T);
   }
 
   // TODO:
@@ -417,8 +434,15 @@ export class Uint8BufferAttribute extends BufferAttribute<u8, Uint8Array> {
   }
 }
 
-export class Uint8ClampedBufferAttribute extends BufferAttribute<u8, Uint8ClampedArray> {
-  constructor(array: Uint8ClampedArray, itemSize: u32, normalized: boolean = false) {
+export class Uint8ClampedBufferAttribute extends BufferAttribute<
+  u8,
+  Uint8ClampedArray
+> {
+  constructor(
+    array: Uint8ClampedArray,
+    itemSize: u32,
+    normalized: boolean = false
+  ) {
     super(array, itemSize, normalized);
   }
 }

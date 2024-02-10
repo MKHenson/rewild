@@ -1,15 +1,25 @@
-import { EngineVector3 } from "../math/Vector3";
-import { EngineVector2 } from "../math/Vector2";
-import { Sphere, Ray, Triangle, Side, AttributeType, Vector3 } from "rewild-common";
-import { EngineMatrix4 } from "../math/Matrix4";
-import { TransformNode } from "../core/TransformNode";
-import { BufferGeometry } from "../core/BufferGeometry";
-import { MeshPipelineInstance } from "../pipelines/MeshPipelineInstance";
-import { Raycaster } from "../core/Raycaster";
-import { BufferAttribute, Float32BufferAttribute } from "../core/BufferAttribute";
-import { SkinnedMesh } from "../objects/SkinnedMesh";
-import { PipelineInstance } from "../pipelines/PipelineInstance";
-import { Component } from "../core/Component";
+import { EngineVector3 } from '../math/Vector3';
+import { EngineVector2 } from '../math/Vector2';
+import {
+  Sphere,
+  Ray,
+  Triangle,
+  Side,
+  AttributeType,
+  Vector3,
+} from 'rewild-common';
+import { EngineMatrix4 } from '../math/EngineMatrix4';
+import { TransformNode } from '../core/TransformNode';
+import { BufferGeometry } from '../core/BufferGeometry';
+import { MeshPipelineInstance } from '../pipelines/MeshPipelineInstance';
+import { Raycaster } from '../core/Raycaster';
+import {
+  BufferAttribute,
+  Float32BufferAttribute,
+} from '../core/BufferAttribute';
+import { SkinnedMesh } from '../objects/SkinnedMesh';
+import { PipelineInstance } from '../pipelines/PipelineInstance';
+import { Component } from '../core/Component';
 
 export class Face {
   public a: i32;
@@ -58,12 +68,14 @@ export class MeshComponent extends Component {
   geometry: BufferGeometry;
   morphTargetInfluences: f32[] | null;
   morphTargetDictionary: Map<string, i32> | null;
-  name: string;
 
-  constructor(geometry: BufferGeometry = new BufferGeometry(), pipelines: MeshPipelineInstance[] = []) {
+  constructor(
+    geometry: BufferGeometry = new BufferGeometry(),
+    pipelines: MeshPipelineInstance[] = []
+  ) {
     super();
 
-    this.name = "";
+    this.name = '';
     this.geometry = geometry;
     this.pipelines = pipelines;
     this.morphTargetInfluences = null;
@@ -88,12 +100,19 @@ export class MeshComponent extends Component {
       const morphTargetDictionary = this.morphTargetDictionary;
 
       for (let i: i32 = 0; i < keys.length; i++)
-        morphTargetDictionary!.set(unchecked(keys[i]), sourceMorphTargetDictionary.get(unchecked(keys[i])));
+        morphTargetDictionary!.set(
+          unchecked(keys[i]),
+          sourceMorphTargetDictionary.get(unchecked(keys[i]))
+        );
     }
 
     this.pipelines = new Array(source.pipelines.length);
     for (let i: i32 = 0; i < source.pipelines.length; i++)
-      unchecked((this.pipelines[i] = source.pipelines[i].clone() as MeshPipelineInstance));
+      unchecked(
+        (this.pipelines[i] = source.pipelines[
+          i
+        ].clone() as MeshPipelineInstance)
+      );
 
     this.geometry = source.geometry;
 
@@ -152,8 +171,12 @@ export class MeshComponent extends Component {
 
     const indexes = geometry.indexes;
 
-    const position = geometry.getAttribute<Float32BufferAttribute>(AttributeType.POSITION)!;
-    const morphPosition = geometry.getMorphAttribute<Float32BufferAttribute>(AttributeType.POSITION);
+    const position = geometry.getAttribute<Float32BufferAttribute>(
+      AttributeType.POSITION
+    )!;
+    const morphPosition = geometry.getMorphAttribute<Float32BufferAttribute>(
+      AttributeType.POSITION
+    );
     const morphTargetsRelative = geometry.morphTargetsRelative;
     const uv = geometry.getAttribute<Float32BufferAttribute>(AttributeType.UV);
     const uv2 = geometry.getAttribute<Float32BufferAttribute>(AttributeType.UV);
@@ -171,7 +194,10 @@ export class MeshComponent extends Component {
           const groupPipeline = unchecked(pipelines[group.materialIndex]);
 
           const start = Math.max(group.start, drawRange.start);
-          const end = Math.min(group.start + group.count, drawRange.start + drawRange.count);
+          const end = Math.min(
+            group.start + group.count,
+            drawRange.start + drawRange.count
+          );
 
           for (let j: u32 = u32(start), jl: u32 = u32(end); j < jl; j += 3) {
             const a = index.getX(j);
@@ -239,7 +265,10 @@ export class MeshComponent extends Component {
           const groupPipeline = unchecked(pipelines[group.materialIndex]);
 
           const start = Math.max(group.start, drawRange.start);
-          const end = Math.min(group.start + group.count, drawRange.start + drawRange.count);
+          const end = Math.min(
+            group.start + group.count,
+            drawRange.start + drawRange.count
+          );
 
           for (let j: i32 = i32(start), jl: i32 = i32(end); j < jl; j += 3) {
             const a = j;
@@ -317,7 +346,13 @@ function checkIntersection(
   if (pipeline.side === Side.BackSide) {
     intersect = ray.intersectTriangle(pC, pB, pA, true, point);
   } else {
-    intersect = ray.intersectTriangle(pA, pB, pC, pipeline.side != Side.DoubleSide, point);
+    intersect = ray.intersectTriangle(
+      pA,
+      pB,
+      pC,
+      pipeline.side != Side.DoubleSide,
+      point
+    );
   }
 
   if (intersect === null) return null;
@@ -325,7 +360,9 @@ function checkIntersection(
   _intersectionPointWorld.copy(point);
   _intersectionPointWorld.applyMatrix4(object.matrixWorld);
 
-  const distance: f32 = raycaster.ray.origin.distanceTo(_intersectionPointWorld);
+  const distance: f32 = raycaster.ray.origin.distanceTo(
+    _intersectionPointWorld
+  );
 
   if (distance < raycaster.near || distance > raycaster.far) return null;
 
@@ -466,7 +503,9 @@ export function createMeshComponent(
   pipeline: PipelineInstance,
   name: string | null = null
 ): Component {
-  const newMesh = new MeshComponent(geometry, [pipeline as MeshPipelineInstance]);
+  const newMesh = new MeshComponent(geometry, [
+    pipeline as MeshPipelineInstance,
+  ]);
   if (name) newMesh.name = name;
   return newMesh;
 }

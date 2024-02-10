@@ -1,6 +1,7 @@
 import { Camera } from "./Camera";
 import { RAD2DEG, DEG2RAD } from "rewild-common";
 import { ViewProperties } from "./ViewProperties";
+import { EngineMatrix4 } from "../math/EngineMatrix4";
 
 export class PerspectiveCamera extends Camera {
   fov: f32;
@@ -176,7 +177,7 @@ export class PerspectiveCamera extends Camera {
 
     this.projectionMatrix.makePerspective(left, left + width, top, top - height, near, this.far);
 
-    this.projectionMatrixInverse.copy(this.projectionMatrix).invertSIMD();
+    (this.projectionMatrixInverse.copy(this.projectionMatrix) as EngineMatrix4).invertSIMD();
   }
 
   // TODO

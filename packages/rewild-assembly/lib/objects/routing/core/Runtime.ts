@@ -5,8 +5,9 @@ import { Scene } from '../../../scenes/Scene';
 import { PerspectiveCamera } from '../../../cameras/PerspectiveCamera';
 import { Node } from './Node';
 import { Portal } from './Portal';
-import { addChild } from '../../../core/TransformNode';
+import { TransformNode, addChild } from '../../../core/TransformNode';
 import { physicsManager } from '../../physics/PhysicsManager';
+import { Transform } from 'rewild-physics';
 
 export class Runtime implements Listener {
   renderer: WebGPURenderer;

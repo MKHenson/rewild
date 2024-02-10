@@ -1,12 +1,12 @@
-import { Camera } from "../cameras/Camera";
-import { OrthographicCamera } from "../cameras/OrthographicCamera";
-import { PerspectiveCamera } from "../cameras/PerspectiveCamera";
-import { inputManager } from "./io/InputManager";
-import { MouseEvent } from "./io/MouseEvent";
-import { EngineMatrix4 } from "../math/Matrix4";
-import { Spherical, Quaternion, Event, Listener } from "rewild-common";
-import { EngineVector2 } from "../math/Vector2";
-import { EngineVector3 } from "../math/Vector3";
+import { Camera } from '../cameras/Camera';
+import { OrthographicCamera } from '../cameras/OrthographicCamera';
+import { PerspectiveCamera } from '../cameras/PerspectiveCamera';
+import { inputManager } from './io/InputManager';
+import { MouseEvent } from './io/MouseEvent';
+import { EngineMatrix4 } from '../math/EngineMatrix4';
+import { Spherical, Quaternion, Event, Listener } from 'rewild-common';
+import { EngineVector2 } from '../math/Vector2';
+import { EngineVector3 } from '../math/Vector3';
 
 enum STATE {
   NONE = -1,
@@ -126,12 +126,12 @@ export class OrbitController implements Listener {
     this.dampingFactor = 0.15;
 
     // for reset
-    this.target0 = this.target.clone();
-    this.position0 = this.object.position.clone();
+    this.target0 = new EngineVector3();
+    this.position0 = object.position.clone();
     this.zoom0 =
-      this.object instanceof PerspectiveCamera
-        ? (this.object as PerspectiveCamera).zoom
-        : (this.object as OrthographicCamera).zoom;
+      object instanceof PerspectiveCamera
+        ? (object as PerspectiveCamera).zoom
+        : (object as OrthographicCamera).zoom;
 
     // Set to false to disable panning
     this.enablePan = true;
@@ -139,11 +139,12 @@ export class OrbitController implements Listener {
     // for update speedup
     this.updateOffset = new EngineVector3();
     // so camera.up is the orbit axis
-    this.updateQuat = new Quaternion().setFromUnitVectors(
+    const updateQuat = new Quaternion().setFromUnitVectors(
       object.up,
       new EngineVector3(0, 1, 0)
     ) as Quaternion;
-    this.updateQuatInverse = this.updateQuat.clone().invert() as Quaternion;
+    this.updateQuat = updateQuat;
+    this.updateQuatInverse = updateQuat.clone().invert() as Quaternion;
     this.updateLastPosition = new EngineVector3();
     this.updateLastQuaternion = new Quaternion();
 
@@ -165,16 +166,16 @@ export class OrbitController implements Listener {
 
     this.state = STATE.NONE;
 
-    inputManager.addEventListener("wheel", this);
-    inputManager.addEventListener("mousedown", this);
+    inputManager.addEventListener('wheel', this);
+    inputManager.addEventListener('mousedown', this);
   }
 
   onEvent(event: Event): void {
     const mouseEvent = event.attachment as MouseEvent;
-    if (event.type === "mousedown") this.onMouseDown(mouseEvent);
-    else if (event.type === "mouseup") this.onMouseUp(mouseEvent);
-    else if (event.type === "mousemove") this.onMouseMove(mouseEvent);
-    else if (event.type === "wheel") this.onMouseWheel(mouseEvent);
+    if (event.type === 'mousedown') this.onMouseDown(mouseEvent);
+    else if (event.type === 'mouseup') this.onMouseUp(mouseEvent);
+    else if (event.type === 'mousemove') this.onMouseMove(mouseEvent);
+    else if (event.type === 'wheel') this.onMouseWheel(mouseEvent);
   }
 
   private onMouseDown(event: MouseEvent): void {
@@ -195,8 +196,8 @@ export class OrbitController implements Listener {
     }
 
     if (this.state != STATE.NONE) {
-      inputManager.addEventListener("mousemove", this);
-      inputManager.addEventListener("mouseup", this);
+      inputManager.addEventListener('mousemove', this);
+      inputManager.addEventListener('mouseup', this);
       //   this.dispatchEvent(START_EVENT);
     }
   }
@@ -249,8 +250,8 @@ export class OrbitController implements Listener {
 
   private onMouseUp(event: MouseEvent): void {
     if (this.enabled === false) return;
-    inputManager.removeEventListener("mousemove", this);
-    inputManager.removeEventListener("mouseup", this);
+    inputManager.removeEventListener('mousemove', this);
+    inputManager.removeEventListener('mouseup', this);
 
     //     this.dispatchEvent(END_EVENT);
     this.state = STATE.NONE;
@@ -496,15 +497,15 @@ export class OrbitController implements Listener {
 
   dispose(): void {
     // this.domElement.removeEventListener("contextmenu", this.onContextMenu, false);
-    inputManager.removeEventListener("mousedown", this);
-    inputManager.removeEventListener("wheel", this);
+    inputManager.removeEventListener('mousedown', this);
+    inputManager.removeEventListener('wheel', this);
 
     // this.domElement.removeEventListener("touchstart", this.onTouchStart, false);
     // this.domElement.removeEventListener("touchend", this.onTouchEnd, false);
     // this.domElement.removeEventListener("touchmove", this.onTouchMove, false);
 
-    inputManager.removeEventListener("mousemove", this);
-    inputManager.removeEventListener("mouseup", this);
+    inputManager.removeEventListener('mousemove', this);
+    inputManager.removeEventListener('mouseup', this);
 
     // this.window.removeEventListener("keydown", this.onKeyDown, false);
     //this.dispatchEvent( { type: 'dispose' } ); // should this be added here?

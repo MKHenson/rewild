@@ -1,26 +1,26 @@
 /* global performance */
-import { Event, EventDispatcher } from "rewild-common";
+import { Event, EventDispatcher } from 'rewild-common';
 // import { AABB } from "../collision/AABB";
-import { ArrayCollisionMatrix } from "../collision/ArrayCollisionMatrix";
-import { Broadphase } from "../collision/Broadphase";
-import { NaiveBroadphase } from "../collision/NaiveBroadphase";
-import { OverlapKeeper } from "../collision/OverlapKeeper";
-import { Callback, IntersectionOptions, Ray } from "../collision/Ray";
-import { RaycastResult } from "../collision/RaycastResult";
-import { Constraint } from "../constraints/Constraint";
-import { ContactEquation } from "../equations/ContactEquation";
-import { FrictionEquation } from "../equations/FrictionEquation";
-import { ContactMaterial } from "../material/ContactMaterial";
-import { Material } from "../material/Material";
+import { ArrayCollisionMatrix } from '../collision/ArrayCollisionMatrix';
+import { Broadphase } from '../collision/Broadphase';
+import { NaiveBroadphase } from '../collision/NaiveBroadphase';
+import { OverlapKeeper } from '../collision/OverlapKeeper';
+import { Callback, IntersectionOptions, Ray } from '../collision/Ray';
+import { RaycastResult } from '../collision/RaycastResult';
+import { Constraint } from '../constraints/Constraint';
+import { ContactEquation } from '../equations/ContactEquation';
+import { FrictionEquation } from '../equations/FrictionEquation';
+import { ContactMaterial } from '../material/ContactMaterial';
+import { Material } from '../material/Material';
 // import { Quaternion } from "../math/Quaternion";
-import { Vec3 } from "../math/Vec3";
-import { Body } from "../objects/Body";
-import { Shape } from "../shapes/Shape";
-import { GSSolver } from "../solver/GSSolver";
-import { Solver } from "../solver/Solver";
-import { TupleDictionary } from "../utils/TupleDictionary";
-import { Narrowphase } from "./Narrowphase";
-import { SPHSystem } from "../objects";
+import { Vec3 } from '../math/Vec3';
+import { Body } from '../objects/Body';
+import { Shape } from '../shapes/Shape';
+import { GSSolver } from '../solver/GSSolver';
+import { Solver } from '../solver/Solver';
+import { TupleDictionary } from '../utils/TupleDictionary';
+import { Narrowphase } from './Narrowphase';
+import { SPHSystem } from '../objects';
 
 export class WorldOptions {
   constructor(
@@ -181,9 +181,6 @@ export class World extends EventDispatcher {
      * @type {Vec3}
      */
     this.gravity = new Vec3();
-    if (options.gravity) {
-      this.gravity.copy(options.gravity);
-    }
 
     /**
      * The broadphase algorithm to use. Default is NaiveBroadphase
@@ -252,7 +249,7 @@ export class World extends EventDispatcher {
      */
     this.contactMaterialTable = new TupleDictionary();
 
-    this.defaultMaterial = new Material("default");
+    this.defaultMaterial = new Material('default');
 
     /**
      * This contact material is used if no suitable contactmaterial is found for a contact.
@@ -291,6 +288,10 @@ export class World extends EventDispatcher {
     this.subsystems = [];
 
     this.idToBodyMap = new Map();
+
+    if (options.gravity) {
+      this.gravity.copy(options.gravity);
+    }
 
     this.broadphase.setWorld(this);
   }
@@ -973,8 +974,8 @@ export class World extends EventDispatcher {
     additions.length = 0;
     removals.length = 0;
 
-    const hasBeginContact = this.hasAnyEventListener("beginContact");
-    const hasEndContact = this.hasAnyEventListener("endContact");
+    const hasBeginContact = this.hasAnyEventListener('beginContact');
+    const hasEndContact = this.hasAnyEventListener('endContact');
 
     if (hasBeginContact || hasEndContact) {
       this.bodyOverlapKeeper.getDiff(additions, removals);
@@ -1000,8 +1001,8 @@ export class World extends EventDispatcher {
 
     additions.length = removals.length = 0;
 
-    const hasBeginShapeContact = this.hasAnyEventListener("beginShapeContact");
-    const hasEndShapeContact = this.hasAnyEventListener("endShapeContact");
+    const hasBeginShapeContact = this.hasAnyEventListener('beginShapeContact');
+    const hasEndShapeContact = this.hasAnyEventListener('endShapeContact');
 
     if (hasBeginShapeContact || hasEndShapeContact) {
       this.shapeOverlapKeeper.getDiff(additions, removals);
@@ -1093,32 +1094,32 @@ export class BodyEvent extends Event {
  * Dispatched after the world has stepped forward in time.
  * @event postStep
  */
-const World_step_postStepEvent = new Event("postStep"); // Reusable event objects to save memory
+const World_step_postStepEvent = new Event('postStep'); // Reusable event objects to save memory
 /**
  * Dispatched before the world steps forward in time.
  * @event preStep
  */
-const World_step_preStepEvent = new Event("preStep");
+const World_step_preStepEvent = new Event('preStep');
 
 /**
  * Dispatched after a body has been added to the world.
  * @event addBody
  * @param {Body} body The body that has been added to the world.
  */
-const addBodyEvent = new BodyEvent("addBody");
+const addBodyEvent = new BodyEvent('addBody');
 
 /**
  * Dispatched after a body has been removed from the world.
  * @event removeBody
  * @param {Body} body The body that has been removed from the world.
  */
-const removeBodyEvent = new BodyEvent("removeBody");
+const removeBodyEvent = new BodyEvent('removeBody');
 
-const World_step_collideEvent = new CollideEvent(Body.COLLIDE_EVENT_NAME);
+const World_step_collideEvent = new CollideEvent('collide'); // new CollideEvent(Body.COLLIDE_EVENT_NAME);
 
 const additions: i32[] = [];
 const removals: i32[] = [];
-const beginContactEvent = new ContactEvent("beginContact");
-const endContactEvent = new ContactEvent("endContact");
-const beginShapeContactEvent = new ContactEvent("beginShapeContact");
-const endShapeContactEvent = new ContactEvent("endShapeContact");
+const beginContactEvent = new ContactEvent('beginContact');
+const endContactEvent = new ContactEvent('endContact');
+const beginShapeContactEvent = new ContactEvent('beginShapeContact');
+const endShapeContactEvent = new ContactEvent('endShapeContact');

@@ -7,7 +7,7 @@ import {
   Event,
   EventDispatcher,
 } from 'rewild-common';
-import { EngineMatrix4 } from '../math/Matrix4';
+import { EngineMatrix4 } from '../math/EngineMatrix4';
 import { EngineVector3 } from '../math/Vector3';
 import { Layers } from './Layers';
 import { Camera } from '../cameras/Camera';
@@ -38,8 +38,8 @@ export class TransformNode
   extends EventDispatcher
   implements IQuatChangeListener, IEulerChangeListener
 {
-  static DefaultUp: EngineVector3 = new EngineVector3(0, 1, 0);
   static DefaultMatrixAutoUpdate: boolean = true;
+  static DefaultUp: EngineVector3 = new EngineVector3(0, 1, 0);
 
   name: string;
   type: string;
@@ -81,12 +81,9 @@ export class TransformNode
     this.parent = null;
     this.children = [];
 
-    this.up = TransformNode.DefaultUp.clone();
-
     this.matrix = new EngineMatrix4();
     this.matrixWorld = new EngineMatrix4();
 
-    this.matrixAutoUpdate = TransformNode.DefaultMatrixAutoUpdate;
     this.matrixWorldNeedsUpdate = false;
 
     this.layers = new Layers();
@@ -99,6 +96,9 @@ export class TransformNode
     this.renderOrder = 0;
 
     // this.animations = [];
+
+    this.matrixAutoUpdate = true;
+    this.up = new EngineVector3(0, 1, 0);
 
     this.rotation._onChange(this);
     this.quaternion._onChange(this);
@@ -273,7 +273,7 @@ export class TransformNode
 
   worldToLocal(vector: EngineVector3): EngineVector3 {
     return vector.applyMatrix4(
-      _m1.copy(this.matrixWorld).invertSIMD()
+      (_m1.copy(this.matrixWorld) as EngineMatrix4).invertSIMD()
     ) as EngineVector3;
   }
 
@@ -328,7 +328,7 @@ export class TransformNode
 
     this.updateWorldMatrix(true, false);
 
-    _m1.copy(this.matrixWorld).invertSIMD();
+    (_m1.copy(this.matrixWorld) as EngineMatrix4).invertSIMD();
 
     const objectParent = object.parent;
     if (objectParent != null) {

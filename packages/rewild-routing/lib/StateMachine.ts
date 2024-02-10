@@ -132,4 +132,15 @@ export class StateMachine extends EventDispatcher {
       }
     }
   }
+
+  dispose(): void {
+    const nodes = this.nodes;
+    for (let i: i32 = 0, l = nodes.length; i < l; i++) {
+      this.removeNode(unchecked(nodes[i]), true);
+    }
+
+    this.nodes.length = 0;
+    this.activeNodes.length = 0;
+    this.inactiveNodes.length = 0;
+  }
 }

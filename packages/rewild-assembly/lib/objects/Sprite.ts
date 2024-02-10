@@ -1,19 +1,19 @@
-import { EngineVector2 } from "../math/Vector2";
-import { EngineVector3 } from "../math/Vector3";
-import { EngineMatrix4 } from "../math/Matrix4";
-import { Triangle, AttributeType } from "rewild-common";
-import { TransformNode } from "../core/TransformNode";
-import { BufferGeometry } from "../core/BufferGeometry";
-import { InterleavedBuffer } from "../core/InterleavedBuffer";
-import { InterleavedBufferAttribute } from "../core/InterleavedBufferAttribute";
-import { SpriteMaterial } from "../materials/SpriteMaterial";
-import { f32Array } from "../utils";
-import { Raycaster } from "../core/Raycaster";
-import { Intersection } from "../components/MeshComponent";
-import { PerspectiveCamera } from "../cameras/PerspectiveCamera";
-import { ASError } from "../core/Error";
+import { EngineVector2 } from '../math/Vector2';
+import { EngineVector3 } from '../math/Vector3';
+import { EngineMatrix4 } from '../math/EngineMatrix4';
+import { Triangle, AttributeType } from 'rewild-common';
+import { TransformNode } from '../core/TransformNode';
+import { BufferGeometry } from '../core/BufferGeometry';
+import { InterleavedBuffer } from '../core/InterleavedBuffer';
+import { InterleavedBufferAttribute } from '../core/InterleavedBufferAttribute';
+import { SpriteMaterial } from '../materials/SpriteMaterial';
+import { f32Array } from '../utils';
+import { Raycaster } from '../core/Raycaster';
+import { Intersection } from '../components/MeshComponent';
+import { PerspectiveCamera } from '../cameras/PerspectiveCamera';
+import { ASError } from '../core/Error';
 
-let _geometry: BufferGeometry;
+let _geometry: BufferGeometry | null = null;
 
 const _tempVec2 = new EngineVector2();
 const _intersectPoint = new EngineVector3();
@@ -40,18 +40,27 @@ export class Sprite extends TransformNode {
   constructor(material: SpriteMaterial) {
     super();
 
-    this.type = "Sprite";
+    this.type = 'Sprite';
 
-    if (_geometry === undefined) {
+    if (_geometry == null) {
       _geometry = new BufferGeometry();
 
-      const float32Array = f32Array([-0.5, -0.5, 0, 0, 0, 0.5, -0.5, 0, 1, 0, 0.5, 0.5, 0, 1, 1, -0.5, 0.5, 0, 0, 1]);
+      const float32Array = f32Array([
+        -0.5, -0.5, 0, 0, 0, 0.5, -0.5, 0, 1, 0, 0.5, 0.5, 0, 1, 1, -0.5, 0.5,
+        0, 0, 1,
+      ]);
 
       const interleavedBuffer = new InterleavedBuffer(float32Array, 5);
 
       _geometry.setIndexes([0, 1, 2, 0, 2, 3]);
-      _geometry.setAttribute(AttributeType.POSITION, new InterleavedBufferAttribute(interleavedBuffer, 3, 0, false));
-      _geometry.setAttribute(AttributeType.UV, new InterleavedBufferAttribute(interleavedBuffer, 2, 3, false));
+      _geometry.setAttribute(
+        AttributeType.POSITION,
+        new InterleavedBufferAttribute(interleavedBuffer, 3, 0, false)
+      );
+      _geometry.setAttribute(
+        AttributeType.UV,
+        new InterleavedBufferAttribute(interleavedBuffer, 2, 3, false)
+      );
     }
 
     this.geometry = _geometry;
@@ -62,17 +71,25 @@ export class Sprite extends TransformNode {
 
   raycast(raycaster: Raycaster, intersects: Intersection[]): void {
     if (raycaster.camera === null) {
-      throw new ASError('Sprite: "Raycaster.camera" needs to be set in order to raycast against sprites.');
+      throw new ASError(
+        'Sprite: "Raycaster.camera" needs to be set in order to raycast against sprites.'
+      );
     }
 
     _worldScale.setFromMatrixScale(this.matrixWorld);
 
     _viewWorldMatrix.copy(raycaster.camera!.matrixWorld);
-    this.modelViewMatrix.multiplyMatricesSIMD(raycaster.camera!.matrixWorldInverse, this.matrixWorld);
+    this.modelViewMatrix.multiplyMatricesSIMD(
+      raycaster.camera!.matrixWorldInverse,
+      this.matrixWorld
+    );
 
     _mvPosition.setFromMatrixPosition(this.modelViewMatrix);
 
-    if (raycaster.camera! instanceof PerspectiveCamera && this.material.sizeAttenuation === false) {
+    if (
+      raycaster.camera! instanceof PerspectiveCamera &&
+      this.material.sizeAttenuation === false
+    ) {
       _worldScale.multiplyScalar(-_mvPosition.z);
     }
 
@@ -87,23 +104,63 @@ export class Sprite extends TransformNode {
 
     const center = this.center;
 
-    transformVertex(_vA.set(-0.5, -0.5, 0) as EngineVector3, _mvPosition, center, _worldScale, sin, cos);
-    transformVertex(_vB.set(0.5, -0.5, 0) as EngineVector3, _mvPosition, center, _worldScale, sin, cos);
-    transformVertex(_vC.set(0.5, 0.5, 0) as EngineVector3, _mvPosition, center, _worldScale, sin, cos);
+    transformVertex(
+      _vA.set(-0.5, -0.5, 0) as EngineVector3,
+      _mvPosition,
+      center,
+      _worldScale,
+      sin,
+      cos
+    );
+    transformVertex(
+      _vB.set(0.5, -0.5, 0) as EngineVector3,
+      _mvPosition,
+      center,
+      _worldScale,
+      sin,
+      cos
+    );
+    transformVertex(
+      _vC.set(0.5, 0.5, 0) as EngineVector3,
+      _mvPosition,
+      center,
+      _worldScale,
+      sin,
+      cos
+    );
 
     _uvA.set(0, 0);
     _uvB.set(1, 0);
     _uvC.set(1, 1);
 
     // check first triangle
-    let intersect = raycaster.ray.intersectTriangle(_vA, _vB, _vC, false, _intersectPoint);
+    let intersect = raycaster.ray.intersectTriangle(
+      _vA,
+      _vB,
+      _vC,
+      false,
+      _intersectPoint
+    );
 
     if (intersect === null) {
       // check second triangle
-      transformVertex(_vB.set(-0.5, 0.5, 0) as EngineVector3, _mvPosition, center, _worldScale, sin, cos);
+      transformVertex(
+        _vB.set(-0.5, 0.5, 0) as EngineVector3,
+        _mvPosition,
+        center,
+        _worldScale,
+        sin,
+        cos
+      );
       _uvB.set(0, 1);
 
-      intersect = raycaster.ray.intersectTriangle(_vA, _vC, _vB, false, _intersectPoint);
+      intersect = raycaster.ray.intersectTriangle(
+        _vA,
+        _vC,
+        _vB,
+        false,
+        _intersectPoint
+      );
       if (intersect === null) {
         return;
       }
@@ -116,7 +173,16 @@ export class Sprite extends TransformNode {
     intersects.push({
       distance: distance,
       point: _intersectPoint.clone(),
-      uv: Triangle.getUV(_intersectPoint, _vA, _vB, _vC, _uvA, _uvB, _uvC, new EngineVector2()) as EngineVector2,
+      uv: Triangle.getUV(
+        _intersectPoint,
+        _vA,
+        _vB,
+        _vC,
+        _uvA,
+        _uvB,
+        _uvC,
+        new EngineVector2()
+      ) as EngineVector2,
       face: null,
       object: this,
       faceIndex: -1,

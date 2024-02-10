@@ -1,11 +1,30 @@
-import { EngineMatrix4 } from "../math/Matrix4";
-import { EngineVector3 } from "../math/Vector3";
+import { EngineMatrix4 } from '../math/EngineMatrix4';
+import { EngineVector3 } from '../math/Vector3';
 
 const _matrices: EngineMatrix4[] = new Array();
 
 function allocatePerfTest(numMatrices: i32): void {
   for (let i = 0; i < numMatrices; i++) {
-    _matrices.push(new EngineMatrix4().set(1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0) as EngineMatrix4);
+    _matrices.push(
+      new EngineMatrix4().set(
+        1,
+        0,
+        0,
+        0,
+        2,
+        0,
+        0,
+        0,
+        3,
+        0,
+        0,
+        0,
+        4,
+        0,
+        0,
+        0
+      ) as EngineMatrix4
+    );
   }
 }
 
@@ -13,7 +32,10 @@ function deallocatePerfTest(): void {
   _matrices.splice(0, _matrices.length);
 }
 
-function testPerformanceMat4Multiply(numMatrices: i32, useSimd: boolean = false): void {
+function testPerformanceMat4Multiply(
+  numMatrices: i32,
+  useSimd: boolean = false
+): void {
   const source = new EngineMatrix4();
   const matrices = _matrices;
   let m: EngineMatrix4;
@@ -30,7 +52,10 @@ function testPerformanceMat4Multiply(numMatrices: i32, useSimd: boolean = false)
   }
 }
 
-function testPerformanceMat4Scale(numMatrices: i32, useSimd: boolean = false): void {
+function testPerformanceMat4Scale(
+  numMatrices: i32,
+  useSimd: boolean = false
+): void {
   const matrices = _matrices;
   let m: EngineMatrix4;
   if (useSimd) {
@@ -46,7 +71,10 @@ function testPerformanceMat4Scale(numMatrices: i32, useSimd: boolean = false): v
   }
 }
 
-function testPerformanceMat4Inverse(numMatrices: i32, useSimd: boolean = false): void {
+function testPerformanceMat4Inverse(
+  numMatrices: i32,
+  useSimd: boolean = false
+): void {
   const matrices = _matrices;
   let m: EngineMatrix4;
   if (useSimd) {
@@ -62,7 +90,10 @@ function testPerformanceMat4Inverse(numMatrices: i32, useSimd: boolean = false):
   }
 }
 
-function testPerformanceMat4MultiplyScalar(numMatrices: i32, useSimd: boolean = false): void {
+function testPerformanceMat4MultiplyScalar(
+  numMatrices: i32,
+  useSimd: boolean = false
+): void {
   const matrices = _matrices;
   let m: EngineMatrix4;
   if (useSimd) {

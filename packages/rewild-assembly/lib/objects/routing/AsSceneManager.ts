@@ -1,7 +1,8 @@
-import { Runtime } from "./core/Runtime";
-import { EngineVector4 } from "../../math/Vector4";
-import { WebGPURenderer } from "../../renderers/WebGPURenderer";
-import { Node, Portal } from ".";
+import { Runtime } from './core/Runtime';
+import { EngineVector4 } from '../../math/Vector4';
+import { WebGPURenderer } from '../../renderers/WebGPURenderer';
+import { Node, Portal } from '.';
+import { TransformNode } from '../../core/TransformNode';
 
 let runtime: Runtime | null = null;
 const renderer = new WebGPURenderer();
@@ -42,4 +43,8 @@ export function getActiveNodeCount(): i32 {
 
 export function getNodeCount(): i32 {
   return runtime!.nodes.length;
+}
+
+export function getScene(): TransformNode {
+  return runtime!.scene;
 }

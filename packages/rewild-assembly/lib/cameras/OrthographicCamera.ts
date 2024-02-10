@@ -1,3 +1,4 @@
+import { EngineMatrix4 } from "../math/EngineMatrix4";
 import { Camera } from "./Camera";
 import { ViewProperties } from "./ViewProperties";
 
@@ -95,7 +96,7 @@ export class OrthographicCamera extends Camera {
 
     this.projectionMatrix.makeOrthographic(left, right, top, bottom, this.near, this.far);
 
-    this.projectionMatrixInverse.copy(this.projectionMatrix).invertSIMD();
+    (this.projectionMatrixInverse.copy(this.projectionMatrix) as EngineMatrix4).invertSIMD();
   }
 
   // toJSON( meta ) {
