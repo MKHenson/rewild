@@ -44,6 +44,7 @@ export {
   setVisibility,
   addComponent,
   removeComponent,
+  disposeObject,
   getDataProperties,
   getId,
   setId,

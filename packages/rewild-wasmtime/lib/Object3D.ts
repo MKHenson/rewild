@@ -1,6 +1,6 @@
-import { wasm } from "./WasmManager";
-import { generateUUID } from "rewild-common";
-import { Component } from "./components";
+import { wasm } from './WasmManager';
+import { generateUUID } from 'rewild-common';
+import { Component } from './components';
 
 let objectId = 1;
 
@@ -13,7 +13,7 @@ export class Object3D {
 
   constructor(name?: string, transform?: Number) {
     this.transform = 0;
-    this.name = name || "";
+    this.name = name || '';
     this.id = objectId++;
     this.transform = transform || wasm.createTransformNode(this.name);
     wasm.setId(this.transform as any, this.id);
@@ -51,5 +51,9 @@ export class Object3D {
 
     const index = this.components.indexOf(component);
     if (index !== -1) this.components.splice(index, 1);
+  }
+
+  dispose() {
+    wasm.disposeObject(this.transform as any);
   }
 }
