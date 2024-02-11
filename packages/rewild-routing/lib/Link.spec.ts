@@ -1,11 +1,11 @@
-import { Link } from "./Link";
-import { Portal } from "./Portal";
+import { Link } from './Link';
+import { Portal } from './Portal';
 
-describe("Routing - Link", () => {
-  it("can connect two portals to a link", () => {
+describe('Link', () => {
+  it('can connect two portals to a link', () => {
     const link = new Link();
-    const source = new Portal("source");
-    const destination = new Portal("destination");
+    const source = new Portal('source');
+    const destination = new Portal('destination');
 
     link.connect(source, destination);
 

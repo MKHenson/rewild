@@ -10,7 +10,6 @@ import { BehaviourComponent } from '../../../components/BehaviourComponent';
 
 export class Container extends Node {
   protected objects: TransformNode[];
-  protected loaded: boolean;
   activeOnStartup: boolean;
 
   constructor(
@@ -20,7 +19,6 @@ export class Container extends Node {
   ) {
     super(name, autoDispose);
     this.objects = [];
-    this.loaded = false;
     this.activeOnStartup = activeOnStartup;
 
     this.addPortal(new Portal('Enter'));

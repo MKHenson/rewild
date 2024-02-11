@@ -10,11 +10,14 @@ export class Object3D {
   id: number;
   uuid: string = generateUUID();
   components: Component[] = [];
+  children: Object3D[] = [];
+  isDisposed: boolean;
 
   constructor(name?: string, transform?: Number) {
     this.transform = 0;
     this.name = name || '';
     this.id = objectId++;
+    this.isDisposed = false;
     this.transform = transform || wasm.createTransformNode(this.name);
     wasm.setId(this.transform as any, this.id);
   }
@@ -33,9 +36,13 @@ export class Object3D {
 
   add(child: Object3D) {
     wasm.addChild(this.transform as any, child.transform as any);
+    this.children.push(child);
   }
 
   remove(child: Object3D) {
+    if (this.children.indexOf(child) === -1) return;
+
+    this.children.splice(this.children.indexOf(child), 1);
     wasm.removeChild(this.transform as any, child.transform as any);
   }
 
@@ -55,5 +62,6 @@ export class Object3D {
 
   dispose() {
     wasm.disposeObject(this.transform as any);
+    this.isDisposed = true;
   }
 }

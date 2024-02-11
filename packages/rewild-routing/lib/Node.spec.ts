@@ -1,35 +1,55 @@
-import { Node } from "./Node";
-import { Portal } from "./Portal";
+import { Node } from './Node';
+import { Portal } from './Portal';
 
-describe("Routing - Node", () => {
-  it("is not disposed by default", () => {
-    const node = new Node("test");
+describe('Node', () => {
+  it('is not disposed by default', () => {
+    const node = new Node('test');
     expect(node.isDisposed).toBe(false);
   });
 
-  it("is not mounted by default", () => {
-    const node = new Node("test");
+  it('is not mounted by default', () => {
+    const node = new Node('test');
     expect(node.mounted).toBe(false);
   });
 
-  it("is auto-disposed by default", () => {
-    const node = new Node("test");
+  it('is auto-disposed by default', () => {
+    const node = new Node('test');
     expect(node.autoDispose).toBe(true);
   });
 
-  it("can add a node as a child of this node", () => {
-    const parentNode = new Node("parent");
-    const childNode1 = new Node("child01");
+  it('is not initialized by default', () => {
+    const node = new Node('test');
+    expect(node.initialized).toBe(false);
+  });
+
+  it('becomes mounted when mounted is called', () => {
+    const node = new Node('test');
+    node.mount();
+    expect(node.mounted).toBe(true);
+  });
+
+  it('becomes unmounted when unmounted is called', () => {
+    const node = new Node('test');
+    node.mount();
+    expect(node.mounted).toBe(true);
+
+    node.unMount();
+    expect(node.mounted).toBe(false);
+  });
+
+  it('can add a node as a child of this node', () => {
+    const parentNode = new Node('parent');
+    const childNode1 = new Node('child01');
 
     parentNode.addChild(childNode1);
     expect(parentNode.children.length).toBe(1);
     expect(childNode1.parent).toBe(parentNode);
   });
 
-  it("can remove a node as a child of this node", () => {
-    const parentNode = new Node("parent");
-    const childNode1 = new Node("child01");
-    const childNode2 = new Node("child02");
+  it('can remove a node as a child of this node', () => {
+    const parentNode = new Node('parent');
+    const childNode1 = new Node('child01');
+    const childNode2 = new Node('child02');
     parentNode.addChild(childNode1).addChild(childNode2);
 
     parentNode.removeChild(childNode1);
@@ -38,10 +58,10 @@ describe("Routing - Node", () => {
     expect(childNode1.parent).toBe(null);
   });
 
-  it("will dispose all children when disposed", () => {
-    const parentNode = new Node("parent");
-    const childNode1 = new Node("child01");
-    const childNode2 = new Node("child02");
+  it('will dispose all children when disposed', () => {
+    const parentNode = new Node('parent');
+    const childNode1 = new Node('child01');
+    const childNode2 = new Node('child02');
     parentNode.addChild(childNode1).addChild(childNode2);
 
     parentNode.dispose();
@@ -51,19 +71,19 @@ describe("Routing - Node", () => {
     expect(parentNode.isDisposed).toBe(true);
   });
 
-  it("can add a portal to this node", () => {
-    const parentNode = new Node("parent");
-    const portal = new Portal("portal");
+  it('can add a portal to this node', () => {
+    const parentNode = new Node('parent');
+    const portal = new Portal('portal');
     parentNode.addPortal(portal);
 
     expect(parentNode.portals.length).toBe(1);
     expect(portal.node).toBe(parentNode);
   });
 
-  it("can remove a portal from this node", () => {
-    const parentNode = new Node("parent");
-    const portal1 = new Portal("portal01");
-    const portal2 = new Portal("portal02");
+  it('can remove a portal from this node', () => {
+    const parentNode = new Node('parent');
+    const portal1 = new Portal('portal01');
+    const portal2 = new Portal('portal02');
     parentNode.addPortal(portal1);
     parentNode.addPortal(portal2);
 
@@ -73,10 +93,10 @@ describe("Routing - Node", () => {
     expect(portal1.node).toBe(null);
   });
 
-  it("will dispose all portals when disposed", () => {
-    const parentNode = new Node("parent");
-    const portal1 = new Portal("portal01");
-    const portal2 = new Portal("portal02");
+  it('will dispose all portals when disposed', () => {
+    const parentNode = new Node('parent');
+    const portal1 = new Portal('portal01');
+    const portal2 = new Portal('portal02');
     parentNode.addPortal(portal1);
     parentNode.addPortal(portal2);
 
@@ -86,14 +106,14 @@ describe("Routing - Node", () => {
     expect(portal2.disposed).toBe(true);
   });
 
-  it("can get a portal by name", () => {
-    const parentNode = new Node("parent");
-    const portal1 = new Portal("portal01");
-    const portal2 = new Portal("portal02");
+  it('can get a portal by name', () => {
+    const parentNode = new Node('parent');
+    const portal1 = new Portal('portal01');
+    const portal2 = new Portal('portal02');
     parentNode.addPortal(portal1);
     parentNode.addPortal(portal2);
 
-    expect(parentNode.getPortal("portal01")).toBe(portal1);
-    expect(parentNode.getPortal("portal02")).toBe(portal2);
+    expect(parentNode.getPortal('portal01')).toBe(portal1);
+    expect(parentNode.getPortal('portal02')).toBe(portal2);
   });
 });
