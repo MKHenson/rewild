@@ -5,7 +5,7 @@ export class Node {
   portals: Portal[];
   parent: Node | null;
   children: Node[];
-  runtime: StateMachine | null;
+  stateMachine: StateMachine | null;
   initialized: boolean;
   mounted: boolean;
   autoDispose: boolean;
@@ -37,7 +37,7 @@ export class Node {
     }
 
     this.parent = null;
-    this.runtime = null;
+    this.stateMachine = null;
     this.children.length = 0;
     this.portals.length = 0;
   }
@@ -49,7 +49,7 @@ export class Node {
 
     if (this.children.indexOf(node) == -1) {
       this.children.push(node);
-      node.runtime = this.runtime;
+      node.stateMachine = this.stateMachine;
     }
 
     node.parent = this;

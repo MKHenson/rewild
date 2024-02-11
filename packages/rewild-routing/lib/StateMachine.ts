@@ -24,7 +24,7 @@ export class StateMachine extends EventDispatcher {
   }
 
   addNode(node: Node, activevate: boolean): void {
-    node.runtime = this;
+    node.stateMachine = this;
     this.nodes.push(node);
 
     if (activevate) {
@@ -32,10 +32,10 @@ export class StateMachine extends EventDispatcher {
     }
   }
 
-  removeNode(node: Node, removeFromInactiveNodes: boolean = true): void {
+  removeNode(node: Node): void {
     for (let i: i32 = 0, l: i32 = node.children.length; i < l; i++) {
       const child = unchecked(node.children[i]);
-      this.removeNode(child, removeFromInactiveNodes);
+      this.removeNode(child);
     }
 
     const nodeIndex = this.nodes.indexOf(node);
@@ -46,16 +46,15 @@ export class StateMachine extends EventDispatcher {
 
     if (activeNodeIndex != -1) {
       this.activeNodes.splice(activeNodeIndex, 1);
-      if (node.mounted) node.unMount();
     }
 
-    if (removeFromInactiveNodes && inactiveNodeIndex != -1) {
-      if (node.mounted) node.unMount();
+    if (inactiveNodeIndex != -1) {
       this.inactiveNodes.splice(inactiveNodeIndex, 1);
     }
 
+    if (node.mounted) node.unMount();
     node.dispose();
-    node.runtime = null;
+    node.stateMachine = null;
   }
 
   OnLoop(delta: f32, total: u32): void {
@@ -63,15 +62,13 @@ export class StateMachine extends EventDispatcher {
     const inactiveNodes = this.inactiveNodes;
 
     // Unmount inactive nodes
-    const numInactiveNodes = inactiveNodes.length;
-    if (numInactiveNodes) {
-      for (let i: i32 = 0; i < numInactiveNodes; i++) {
-        const node = unchecked(inactiveNodes[i]);
-        node.unMount();
-        if (node.autoDispose) this.removeNode(node, false);
-      }
 
-      inactiveNodes.splice(0, numInactiveNodes);
+    while (inactiveNodes.length) {
+      const node = inactiveNodes.pop();
+      if (!node) break;
+
+      node.unMount();
+      if (node.autoDispose) this.removeNode(node);
     }
 
     // Initialize and mount nodes
@@ -136,7 +133,7 @@ export class StateMachine extends EventDispatcher {
   dispose(): void {
     const nodes = this.nodes;
     for (let i: i32 = 0, l = nodes.length; i < l; i++) {
-      this.removeNode(unchecked(nodes[i]), true);
+      this.removeNode(unchecked(nodes[i]));
     }
 
     this.nodes.length = 0;

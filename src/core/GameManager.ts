@@ -16,7 +16,7 @@ export class GameManager {
   gameLoader: GameLoader;
   eventManager: UIEventManager;
   wasmManager: WasmManager;
-  stateMachine: StateMachine;
+  stateMachine: StateMachine | null;
   updateCallbacks: UpdateCallback[];
   player: Player;
 
@@ -70,7 +70,7 @@ export class GameManager {
     window.requestAnimationFrame(this.onFrameHandler);
     wasm.update(clock.elapsedTime, delta);
 
-    this.stateMachine.OnLoop(delta, clock.elapsedTime);
+    this.stateMachine?.OnLoop(delta, clock.elapsedTime);
     this.renderer!.onFrame();
   }
 
@@ -80,7 +80,8 @@ export class GameManager {
   }
 
   async onQuitClick() {
-    this.stateMachine.dispose();
+    this.stateMachine?.dispose();
+    this.stateMachine = null;
     this.eventManager.triggerUIEvent(ApplicationEventType.Quit);
     this.gameLoader.unloadInitialLevels();
     wasm.__collect();

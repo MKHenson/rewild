@@ -1,5 +1,5 @@
-import { Link } from "./Link";
-import { Node } from "./Node";
+import { Link } from './Link';
+import { Node } from './Node';
 
 export class Portal {
   node: Node | null;
@@ -23,13 +23,13 @@ export class Portal {
       const link = unchecked(this.links[i]);
       const sourcePortal = link.sourcePortal;
 
-      if (sourcePortal) {
+      if (sourcePortal && sourcePortal != this) {
         sourcePortal.links.splice(sourcePortal.links.indexOf(link), 1);
       }
 
       const destinationPortal = link.destinationPortal;
 
-      if (destinationPortal) {
+      if (destinationPortal && destinationPortal != this) {
         destinationPortal.links.splice(
           destinationPortal.links.indexOf(link),
           1

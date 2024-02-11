@@ -1,10 +1,9 @@
 import { Node } from './Node';
 import { Portal } from './Portal';
-import { Object3D, wasm } from 'rewild-wasmtime';
+import { Object3D } from 'rewild-wasmtime';
 
 export class Container extends Node {
   protected objects: Object3D[];
-  protected loaded: boolean;
   readonly activeOnStartup: boolean;
   private parentObject3D: Object3D;
 
@@ -16,7 +15,6 @@ export class Container extends Node {
   ) {
     super(name, autoDispose);
     this.objects = [];
-    this.loaded = false;
     this.parentObject3D = parentObject3D;
     this.activeOnStartup = activeOnStartup;
 
@@ -37,12 +35,10 @@ export class Container extends Node {
 
   mount(): void {
     const objects = this.objects;
+    const parentObject3D = this.parentObject3D;
 
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      wasm.addChild(
-        this.parentObject3D.transform as any,
-        unchecked(objects[i].transform as any)
-      );
+      parentObject3D.add(objects[i]);
     }
 
     super.mount();
@@ -50,12 +46,10 @@ export class Container extends Node {
 
   unMount(): void {
     const objects = this.objects;
+    const parentObject3D = this.parentObject3D;
 
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      wasm.removeChild(
-        this.parentObject3D.transform as any,
-        unchecked(objects[i].transform as any)
-      );
+      parentObject3D.remove(objects[i]);
     }
 
     super.unMount();

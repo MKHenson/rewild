@@ -12,8 +12,8 @@ import { ApplicationEvent } from './ApplicationEvent';
 import { Object3D, wasm } from 'rewild-wasmtime';
 
 export class Level extends Container implements Listener {
-  terrain: Object3D;
-  skybox: Object3D;
+  private terrain: Object3D;
+  private skybox: Object3D;
 
   constructor(
     name: string,
@@ -32,24 +32,27 @@ export class Level extends Container implements Listener {
   mount(): void {
     super.mount();
 
+    const stateMachine = this.stateMachine;
+    if (!stateMachine) return;
+
     // Activate the enter portal
-    this.runtime!.sendSignal(this.getPortal('Enter')!, false);
-    this.runtime!.addEventListener(UIEventType, this);
+    stateMachine.sendSignal(this.getPortal('Enter')!, false);
+    stateMachine.addEventListener(UIEventType, this);
   }
 
   unMount(): void {
     super.unMount();
-    this.runtime!.removeEventListener(UIEventType, this);
+    const stateMachine = this.stateMachine;
 
-    this.terrain.dispose();
-    this.skybox.dispose();
+    if (!stateMachine) return;
+    stateMachine.removeEventListener(UIEventType, this);
   }
 
   onEvent(event: Event): void {
     if (event instanceof ApplicationEvent) {
       const uiEvent = event.attachment as ApplicationEvent;
       if (uiEvent.eventType == ApplicationEventType.Quit)
-        this.runtime!.sendSignal(this.getPortal('Exit')!, true);
+        this.stateMachine!.sendSignal(this.getPortal('Exit')!, true);
     }
   }
 
@@ -78,6 +81,12 @@ export class Level extends Container implements Listener {
 
     // Activate the exit portal
     if (portalEntered.name == 'Exit')
-      this.runtime!.sendSignal(this.getPortal('Exit')!, true);
+      this.stateMachine!.sendSignal(this.getPortal('Exit')!, true);
+  }
+
+  dispose(): void {
+    super.dispose();
+    this.terrain.dispose();
+    this.skybox.dispose();
   }
 }
