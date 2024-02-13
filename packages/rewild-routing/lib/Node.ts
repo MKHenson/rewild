@@ -103,5 +103,5 @@ export class Node {
   }
 
   onUpdate(delta: f32, total: u32): void {}
-  enter(portalEntered: Portal): void {}
+  onPortalTriggered(portalEntered: Portal): void {}
 }

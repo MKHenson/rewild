@@ -61,27 +61,27 @@ export class Level extends Container implements Listener {
       const container = node as Container;
       if (container.activeOnStartup) {
         const entranceLink = new Link();
-        const exitLink = new Link();
 
         entranceLink.connect(
           this.getPortal('Enter')!,
           container.getPortal('Enter')!
         );
-
-        exitLink.connect(container.getPortal('Exit')!, this.getPortal('Exit')!);
       }
+
+      const exitLink = new Link();
+      exitLink.connect(container.getPortal('Exit')!, this.getPortal('Exit')!);
     }
 
     return super.addChild(node);
   }
 
   /** When an exit portal is trigged for a level, it will signal to the runtime to exit */
-  enter(portalEntered: Portal): void {
-    super.enter(portalEntered);
+  onPortalTriggered(portalEntered: Portal): void {
+    super.onPortalTriggered(portalEntered);
 
     // Activate the exit portal
     if (portalEntered.name == 'Exit')
-      this.stateMachine!.sendSignal(this.getPortal('Exit')!, true);
+      this.stateMachine!.sendSignal(portalEntered, true);
   }
 
   dispose(): void {
