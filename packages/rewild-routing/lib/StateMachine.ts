@@ -122,10 +122,13 @@ export class StateMachine extends EventDispatcher {
     for (let i: i32 = 0, l = links.length; i < l; i++) {
       const link = unchecked(links[i]);
       const destPortal = link.destinationPortal!;
-      destPortal.node!.enter(destPortal);
 
-      if (activeNodes.indexOf(destPortal.node!) == -1) {
-        activeNodes.push(destPortal.node!);
+      if (destPortal !== sourcePortal) {
+        if (activeNodes.indexOf(destPortal.node!) == -1) {
+          activeNodes.push(destPortal.node!);
+        }
+
+        destPortal.node!.onPortalTriggered(destPortal);
       }
     }
   }
