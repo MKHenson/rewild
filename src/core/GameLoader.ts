@@ -13,7 +13,7 @@ import { Geometry } from './renderer/geometry/Geometry';
 import { Renderer } from './renderer/Renderer';
 import { getLevel } from '../api/levels';
 import { getProjects } from '../api/projects';
-import { Level, StateMachine } from 'rewild-routing';
+import { Container, Level, StateMachine } from 'rewild-routing';
 import { geometryManager } from './renderer/AssetManagers/GeometryManager';
 import { LoaderPresetType, LoaderPresets } from './loader-utils/LoaderPresets';
 
@@ -70,25 +70,25 @@ export class GameLoader {
     const stateMachine = new StateMachine();
 
     for (const level of startupLevels) {
-      stateMachine.addNode(
-        new Level(level.name, new Object3D('Scene', wasm.getScene())),
-        true
+      const levelRouter = new Level(
+        player,
+        level.name,
+        new Object3D('Scene', wasm.getScene())
       );
-      const levelPtr = wasm.createLevel(level.name);
+      stateMachine.addNode(levelRouter, true);
 
-      // Add player to level
-      wasm.addAsset(levelPtr as any, player.transformPtr as any);
+      const levelPtr = wasm.createLevel(level.name);
 
       this.loadedPtrs.push(levelPtr);
       wasm.addNodeToRuntime(levelPtr, true);
 
       for (const container of level.containers) {
-        const containerPtr = wasm.createContainer(
+        const containerRouter = new Container(
           container.name,
-          ContainerTypes.Default,
-          container.activeOnStartup
+          container.activeOnStartup,
+          levelRouter.parentObject3D
         );
-        wasm.addChildNode(levelPtr, containerPtr);
+        levelRouter.addChild(containerRouter);
 
         for (const actor of container.actors) {
           let object: Object3D | null = null;
@@ -121,7 +121,7 @@ export class GameLoader {
 
           // Add the object to the container if it exists
           if (object) {
-            wasm.addAsset(containerPtr as any, object.transform as any);
+            levelRouter.addAsset(object);
 
             // If the actor has a preset
             if (

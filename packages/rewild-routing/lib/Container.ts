@@ -5,7 +5,7 @@ import { Object3D } from 'rewild-wasmtime';
 export class Container extends Node {
   protected objects: Object3D[];
   readonly activeOnStartup: boolean;
-  private parentObject3D: Object3D;
+  parentObject3D: Object3D;
 
   constructor(
     name: string,
