@@ -102,7 +102,7 @@ describe('StateMachine', () => {
     expect(node.initialized).toBe(true);
   });
 
-  it('will move activate a node by sending a signal. The active node will become inactive and unmouted and the destinations will become active', () => {
+  it('will activate nodes by sending a signal. The active node will become inactive and unmouted and the destination nodes will become active', () => {
     const stateMachine = new StateMachine();
     const node1 = new Node('test1');
     const node2 = new Node('test2');
@@ -110,8 +110,8 @@ describe('StateMachine', () => {
 
     // Link node1 to node2
     const exitPortal = node1.addPortal(new Portal('exit from test1'));
-    const entryToNode2 = node2.addPortal(new Portal('start'));
-    const entryToNode3 = node3.addPortal(new Portal('start'));
+    const entryToNode2 = node2.addPortal(new Portal('start node 2'));
+    const entryToNode3 = node3.addPortal(new Portal('start node 3'));
 
     new Link().connect(exitPortal, entryToNode2);
     new Link().connect(exitPortal, entryToNode3);

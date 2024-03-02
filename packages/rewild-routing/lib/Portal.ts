@@ -37,6 +37,7 @@ export class Portal {
       }
     }
 
+    this.links.length = 0;
     this.node = null;
   }
 }
