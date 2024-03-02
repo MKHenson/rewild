@@ -1,13 +1,12 @@
-import { wasm } from "../WasmManager";
-import { PlayerComponent } from "../components";
+import { Object3D } from '../Object3D';
+import { PlayerComponent } from '../components';
 
-export class Player {
+export class Player extends Object3D {
   playerComponent: PlayerComponent;
-  transformPtr: Number;
 
   constructor() {
-    this.transformPtr = wasm.createTransformNode("player");
+    super('Player');
     this.playerComponent = new PlayerComponent();
-    wasm.addComponent(this.transformPtr as any, this.playerComponent.pointer);
+    this.addComponent(this.playerComponent);
   }
 }
