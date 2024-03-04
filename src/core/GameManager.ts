@@ -83,6 +83,12 @@ export class GameManager {
     this.renderer!.onFrame();
   }
 
+  onEnterEditorMode() {
+    this.activeStateMachine?.OnLoop;
+    this.mainMenu!.deactivate();
+    this.eventManager.triggerUIEvent(ApplicationEventType.StartEditor);
+  }
+
   async onStartClick() {
     this.activeStateMachine?.OnLoop;
     this.mainMenu!.deactivate();
@@ -92,7 +98,7 @@ export class GameManager {
     this.eventManager.triggerUIEvent(ApplicationEventType.StartGame);
   }
 
-  async onQuitClick() {
+  onQuitClick() {
     this.stateMachine?.dispose();
     this.stateMachine = null;
     this.activeStateMachine = this.mainMenu;

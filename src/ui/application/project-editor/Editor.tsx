@@ -1,13 +1,14 @@
-import { Component, register } from "rewild-ui";
-import { projectStore } from "../../stores/ProjectStore";
-import { EditorGrid } from "./EditorGrid";
+import { Component, register } from 'rewild-ui';
+import { projectStore } from '../../stores/ProjectStore';
+import { EditorGrid } from './EditorGrid';
+import { gameManager } from 'src/core/GameManager';
 
 interface Props {
   onHome: () => void;
   projectId: string;
 }
 
-@register("x-editor")
+@register('x-editor')
 export class Editor extends Component<Props> {
   constructor() {
     super({ useShadow: false });
@@ -16,6 +17,7 @@ export class Editor extends Component<Props> {
   init() {
     this.onMount = () => {
       projectStore.getProject(this.props.projectId);
+      gameManager.onEnterEditorMode();
     };
 
     return () => <EditorGrid onHome={this.props.onHome} />;
