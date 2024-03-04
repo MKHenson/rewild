@@ -6,7 +6,7 @@ import {
   Object3D,
   PhysicsComponent,
   wasm,
-} from 'packages/rewild-wasmtime';
+} from 'rewild-wasmtime';
 import { geometryManager } from 'src/core/renderer/AssetManagers/GeometryManager';
 import { SphereGeometry } from 'src/core/renderer/geometry/SphereGeometry';
 

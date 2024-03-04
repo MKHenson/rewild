@@ -1,6 +1,6 @@
-import { ResourceType } from "packages/rewild-common";
-import { shader } from "../shader-lib/Utils";
-import type { TerrainDefines } from "./TerrainPipeline";
+import { ResourceType } from 'rewild-common';
+import { shader } from '../shader-lib/Utils';
+import type { TerrainDefines } from './TerrainPipeline';
 
 // prettier-ignore
 export const fragmentShader = shader<TerrainDefines>`

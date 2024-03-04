@@ -31,7 +31,7 @@ module.exports = {
   // ],
 
   // Indicates which provider should be used to instrument code for coverage
-  coverageProvider: "v8",
+  coverageProvider: 'v8',
 
   // A list of reporter names that Jest uses when writing coverage reports
   // coverageReporters: [
@@ -132,7 +132,7 @@ module.exports = {
   // runner: "jest-runner",
 
   // The paths to modules that run some code to configure or set up the testing environment before each test
-  // setupFiles: [],
+  setupFiles: ['./jest.setup.js'],
 
   // A list of paths to modules that run some code to configure or set up the testing framework before each test
   // setupFilesAfterEnv: [],
@@ -144,7 +144,7 @@ module.exports = {
   // snapshotSerializers: [],
 
   // The test environment that will be used for testing
-  // testEnvironment: "jest-environment-node",
+  testEnvironment: 'jsdom',
 
   // Options that will be passed to the testEnvironment
   // testEnvironmentOptions: {},
@@ -154,7 +154,7 @@ module.exports = {
 
   // The glob patterns Jest uses to detect test files
   testMatch: [
-    "<rootDir>/tests/**/*+(spec|test).[jt]s?(x)",
+    '<rootDir>/src/**/*+(spec|test).[jt]s?(x)',
     // "**/?(*.)+(spec|test).[tj]s?(x)"
   ],
 
@@ -173,7 +173,10 @@ module.exports = {
   // testRunner: "jest-circus/runner",
 
   // A map from regular expressions to paths to transformers
-  // transform: undefined,
+  // transform: {},
+  transform: {
+    '^.+\\.(js|jsx|ts|tsx|mjs)$': 'babel-jest',
+  },
 
   // An array of regexp pattern strings that are matched against all source file paths, matched files will skip transformation
   // transformIgnorePatterns: [

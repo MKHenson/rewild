@@ -74,9 +74,9 @@ function matrix4_multiplyMatrices(matrixA: EngineMatrix4, a: EngineMatrix4, b: E
 // prettier-ignore
 function matrix4_scaleSIMD(matrixA: EngineMatrix4, v: EngineVector3): EngineMatrix4 { return matrixA.scaleSIMD(v); }
 // prettier-ignore
-function matrix4_clone(matrixA: EngineMatrix4): EngineMatrix4 { return matrixA.clone(); }
+function matrix4_clone(matrixA: EngineMatrix4): EngineMatrix4 { return matrixA.clone() as EngineMatrix4; }
 // prettier-ignore
-function matrix4_copy(matrixA: EngineMatrix4, matrixB: EngineMatrix4): EngineMatrix4 {return  matrixA.copy(matrixB); }
+function matrix4_copy(matrixA: EngineMatrix4, matrixB: EngineMatrix4): EngineMatrix4 {return  matrixA.copy(matrixB) as EngineMatrix4; }
 // prettier-ignore
 function matrix4_transpose(matrixA: EngineMatrix4): Matrix4 {return  matrixA.transpose(); }
 // prettier-ignore

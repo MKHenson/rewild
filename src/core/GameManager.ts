@@ -2,12 +2,13 @@ import { Pane3D } from 'rewild-ui';
 import { Renderer } from './renderer/Renderer';
 import { GameLoader } from './GameLoader';
 import { UIEventManager } from './UIEventManager';
-import { IBindable, Player, WasmManager, wasm } from 'packages/rewild-wasmtime';
+import { IBindable, Player, WasmManager, wasm } from 'rewild-wasmtime';
 import { terrainManager } from './renderer/AssetManagers/TerrainManager';
 import { skyboxManager } from './renderer/AssetManagers/SkyboxManager';
-import { ApplicationEventType } from 'packages/rewild-common';
-import { StateMachine } from 'packages/rewild-routing';
+import { ApplicationEventType } from 'rewild-common';
+import { StateMachine } from 'rewild-routing';
 import { Clock } from './Clock';
+import { MainMenuStateMachine } from './routing/MainMenuStateMachine';
 
 export type UpdateCallback = () => void;
 
@@ -16,7 +17,9 @@ export class GameManager {
   gameLoader: GameLoader;
   eventManager: UIEventManager;
   wasmManager: WasmManager;
+  mainMenu: MainMenuStateMachine | null;
   stateMachine: StateMachine | null;
+  activeStateMachine: StateMachine | null;
   updateCallbacks: UpdateCallback[];
   player: Player;
 
@@ -25,6 +28,8 @@ export class GameManager {
 
   constructor() {
     this.renderer = null;
+    this.mainMenu = new MainMenuStateMachine();
+    this.stateMachine = null;
     this.clock = new Clock();
     this.onFrameHandler = this.onFrame.bind(this);
     this.updateCallbacks = [];
@@ -48,8 +53,12 @@ export class GameManager {
     if (!this.renderer.hasWebGPU()) return false;
 
     await this.renderer.init();
-    await this.gameLoader.loadSystemContainers();
+
+    this.activeStateMachine = this.mainMenu;
     this.player = new Player();
+
+    await this.mainMenu!.init(this.renderer);
+    this.mainMenu!.activate();
 
     // Call the first frame so the containers can initialize
     this.renderer.onFrame();
@@ -70,20 +79,25 @@ export class GameManager {
     window.requestAnimationFrame(this.onFrameHandler);
     wasm.update(clock.elapsedTime, delta);
 
-    this.stateMachine?.OnLoop(delta, clock.elapsedTime);
+    this.activeStateMachine?.OnLoop(delta, clock.elapsedTime);
     this.renderer!.onFrame();
   }
 
   async onStartClick() {
+    this.activeStateMachine?.OnLoop;
+    this.mainMenu!.deactivate();
     this.stateMachine = await this.gameLoader.loadInitialLevels(this.player);
+    this.activeStateMachine = this.stateMachine;
+
     this.eventManager.triggerUIEvent(ApplicationEventType.StartGame);
   }
 
   async onQuitClick() {
     this.stateMachine?.dispose();
     this.stateMachine = null;
+    this.activeStateMachine = this.mainMenu;
+    this.mainMenu!.activate();
     this.eventManager.triggerUIEvent(ApplicationEventType.Quit);
-    this.gameLoader.unloadInitialLevels();
     wasm.__collect();
   }
 }

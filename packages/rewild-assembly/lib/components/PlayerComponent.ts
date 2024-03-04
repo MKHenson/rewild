@@ -32,6 +32,9 @@ export class PlayerComponent extends BehaviourComponent implements Listener {
   constructor() {
     super();
 
+    this.playerBody = null;
+    this.orbitController = null;
+    this.pointerController = null;
     this.hungerTimer = 0;
     this.criticalHungerTimer = 0;
     this.dataProperties = new Int32Array(3);
