@@ -1,6 +1,6 @@
 import { Pane3D } from 'rewild-ui';
 import { Renderer } from './renderer/Renderer';
-import { GameLoader } from './GameLoader';
+import { loadInitialLevels } from './GameLoader';
 import { UIEventManager } from './UIEventManager';
 import { IBindable, Player, WasmManager, wasm } from 'rewild-wasmtime';
 import { terrainManager } from './renderer/AssetManagers/TerrainManager';
@@ -14,7 +14,6 @@ export type UpdateCallback = () => void;
 
 export class GameManager {
   renderer: Renderer | null;
-  gameLoader: GameLoader;
   eventManager: UIEventManager;
   wasmManager: WasmManager;
   mainMenu: MainMenuStateMachine | null;
@@ -37,7 +36,6 @@ export class GameManager {
 
   async applicationStarted(pane3D: Pane3D) {
     this.renderer = new Renderer(pane3D);
-    this.gameLoader = new GameLoader(this.renderer);
     this.eventManager = new UIEventManager();
     this.wasmManager = new WasmManager();
 
@@ -92,7 +90,7 @@ export class GameManager {
   async onStartClick() {
     this.activeStateMachine?.OnLoop;
     this.mainMenu!.deactivate();
-    this.stateMachine = await this.gameLoader.loadInitialLevels(this.player);
+    this.stateMachine = await loadInitialLevels(this.player, this.renderer!);
     this.activeStateMachine = this.stateMachine;
 
     this.eventManager.triggerUIEvent(ApplicationEventType.StartGame);

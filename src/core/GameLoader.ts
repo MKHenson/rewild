@@ -7,7 +7,6 @@ import {
 } from 'rewild-wasmtime';
 import { pipelineManager } from './renderer/AssetManagers/PipelineManager';
 import { Mesh } from './renderer/Mesh';
-import { ContainerTypes } from 'rewild-common';
 import { meshManager } from './renderer/MeshManager';
 import { Geometry } from './renderer/geometry/Geometry';
 import { Renderer } from './renderer/Renderer';
@@ -19,126 +18,88 @@ import { LoaderPresetType, LoaderPresets } from './loader-utils/LoaderPresets';
 import { InGameLevel } from './routing/InGameLevel';
 
 /** Loads game files and assets and sends the created objects to wasm */
-export class GameLoader {
-  renderer: Renderer;
 
-  constructor(renderer: Renderer) {
-    this.renderer = renderer;
-  }
+export async function loadInitialLevels(player: Player, renderer: Renderer) {
+  const projects = await getProjects(true);
+  const startupLevels = await Promise.all(
+    projects.map((project) => getLevel(project.id))
+  );
 
-  async loadSystemContainers() {
-    const containerLvl1Ptr = wasm.createContainer(
-      ContainerTypes.Level1,
-      ContainerTypes.Level1,
-      true
+  const stateMachine = new StateMachine();
+
+  for (const level of startupLevels) {
+    const levelRouter = new InGameLevel(
+      level.name,
+      new Object3D('Scene', wasm.getScene()),
+      false,
+      player
     );
-    const box = geometryManager.getAsset('box');
-    const sphere = geometryManager.getAsset('sphere');
+    stateMachine.addNode(levelRouter, true);
 
-    const containerMainMenuPtr = wasm.createContainer(
-      ContainerTypes.MainMenu,
-      ContainerTypes.MainMenu,
-      true
-    );
-    const containerEditorPtr = wasm.createContainer(
-      ContainerTypes.Editor,
-      ContainerTypes.Editor,
-      true
-    );
-
-    wasm.addAsset(
-      containerMainMenuPtr as any,
-      this.createMesh(sphere, 'earth').transform as any
-    );
-    wasm.addAsset(
-      containerMainMenuPtr as any,
-      this.createMesh(box, 'stars', 'skybox').transform as any
-    );
-
-    wasm.addNodeToRuntime(containerLvl1Ptr, false);
-    wasm.addNodeToRuntime(containerMainMenuPtr, true);
-    wasm.addNodeToRuntime(containerEditorPtr, false);
-  }
-
-  async loadInitialLevels(player: Player) {
-    const projects = await getProjects(true);
-    const startupLevels = await Promise.all(
-      projects.map((project) => getLevel(project.id))
-    );
-
-    const stateMachine = new StateMachine();
-
-    for (const level of startupLevels) {
-      const levelRouter = new InGameLevel(
-        level.name,
-        new Object3D('Scene', wasm.getScene()),
-        false,
-        player
+    for (const container of level.containers) {
+      const containerRouter = new Container(
+        container.name,
+        container.activeOnStartup,
+        levelRouter.parentObject3D
       );
-      stateMachine.addNode(levelRouter, true);
+      levelRouter.addChild(containerRouter);
 
-      for (const container of level.containers) {
-        const containerRouter = new Container(
-          container.name,
-          container.activeOnStartup,
-          levelRouter.parentObject3D
-        );
-        levelRouter.addChild(containerRouter);
+      for (const actor of container.actors) {
+        let object: Object3D | null = null;
+        const actorLoaderPreset = actor.actorLoaderPreset;
 
-        for (const actor of container.actors) {
-          let object: Object3D | null = null;
-          const actorLoaderPreset = actor.actorLoaderPreset;
+        // If the actor has a geometry and pipeline then it must be a mesh
+        const geometry = actor.properties.find(
+          (prop) => prop.type === 'geometry'
+        )?.value as string;
+        const pipeline = actor.properties.find(
+          (prop) => prop.type === 'pipeline'
+        )?.value as string;
 
-          // If the actor has a geometry and pipeline then it must be a mesh
-          const geometry = actor.properties.find(
-            (prop) => prop.type === 'geometry'
-          )?.value as string;
-          const pipeline = actor.properties.find(
-            (prop) => prop.type === 'pipeline'
-          )?.value as string;
-
-          if (geometry && pipeline) {
-            object = this.createMesh(
-              geometryManager.getAsset(geometry),
-              pipeline,
-              actor.name
-            );
-          } else if (
-            actorLoaderPreset === 'directional-light' ||
-            actorLoaderPreset === 'ambient-light'
-          ) {
-            if (actorLoaderPreset === 'directional-light') {
-              object = new DirectionalLight(actor.name);
-            } else if (actorLoaderPreset === 'ambient-light') {
-              object = new AmbientLight(actor.name);
-            }
+        if (geometry && pipeline) {
+          object = createMesh(
+            renderer,
+            geometryManager.getAsset(geometry),
+            pipeline,
+            actor.name
+          );
+        } else if (
+          actorLoaderPreset === 'directional-light' ||
+          actorLoaderPreset === 'ambient-light'
+        ) {
+          if (actorLoaderPreset === 'directional-light') {
+            object = new DirectionalLight(actor.name);
+          } else if (actorLoaderPreset === 'ambient-light') {
+            object = new AmbientLight(actor.name);
           }
+        }
 
-          // Add the object to the container if it exists
-          if (object) {
-            levelRouter.addAsset(object);
+        // Add the object to the container if it exists
+        if (object) {
+          levelRouter.addAsset(object);
 
-            // If the actor has a preset
-            if (
-              actorLoaderPreset &&
-              LoaderPresets[actorLoaderPreset as LoaderPresetType]
-            ) {
-              LoaderPresets[actorLoaderPreset as LoaderPresetType](
-                actor,
-                object
-              );
-            }
+          // If the actor has a preset
+          if (
+            actorLoaderPreset &&
+            LoaderPresets[actorLoaderPreset as LoaderPresetType]
+          ) {
+            LoaderPresets[actorLoaderPreset as LoaderPresetType](actor, object);
           }
         }
       }
     }
-
-    return stateMachine;
   }
 
-  createMesh(geometry: Geometry, pipelineName: string, name?: string) {
-    const pipeline = pipelineManager.getAsset(pipelineName)!;
-    const mesh = new Mesh(geometry, pipeline, this.renderer, name);
-    return meshManager.addMesh(mesh);
-  }
+  return stateMachine;
+}
+
+function createMesh(
+  renderer: Renderer,
+  geometry: Geometry,
+  pipelineName: string,
+  name?: string
+) {
+  const pipeline = pipelineManager.getAsset(pipelineName)!;
+  const mesh = new Mesh(geometry, pipeline, renderer, name);
+  return meshManager.addMesh(mesh);
 }
