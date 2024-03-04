@@ -8,6 +8,7 @@ export {
   addNodeToRuntime,
   removeNodeFromRuntime,
   getScene,
+  getCamera,
 } from './objects/routing/AsSceneManager';
 export { createMeshPipelineInstance } from './pipelines/MeshPipelineInstance';
 export { addPipelineAttribute } from './pipelines/PipelineInstance';
@@ -48,7 +49,10 @@ export {
   getDataProperties,
   getId,
   setId,
+  lookAt,
   setPosition,
+  setRotation,
+  setScale,
   getTransformModelViewMatrix,
   getTransformNormalMatrix,
   getTransformWorldMatrix,

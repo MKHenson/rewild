@@ -5,7 +5,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "npm run test --workspaces",
+    "test": "npm run unit-tests && npm run test --workspaces",
+    "unit-tests": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "benchmark": "cross-env TS_NODE_PROJECT=\"./tests/tsconfig.json\" node --experimental-wasi-unstable-preview1 --experimental-wasm-simd --require ts-node/register ./tests/benchmarks.ts",
     "clean": "rimraf public",
     "build": "npm run clean && npm run build --workspaces && node ./esbuild.js && npm run ts-check",

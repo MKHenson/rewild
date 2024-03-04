@@ -612,6 +612,16 @@ export function addChild(
   return parent;
 }
 
+export function lookAt(
+  node: TransformNode,
+  x: f32,
+  y: f32,
+  z: f32
+): TransformNode {
+  node.lookAt(x, y, z);
+  return node;
+}
+
 export function getVisibility(node: TransformNode): boolean {
   return node.visible;
 }
@@ -636,6 +646,26 @@ export function setPosition(
   z: f32
 ): TransformNode {
   node.position.set(x, y, z);
+  return node;
+}
+
+export function setScale(
+  node: TransformNode,
+  x: f32,
+  y: f32,
+  z: f32
+): TransformNode {
+  node.scale.set(x, y, z);
+  return node;
+}
+
+export function setRotation(
+  node: TransformNode,
+  x: f32,
+  y: f32,
+  z: f32
+): TransformNode {
+  node.rotation.set(x, y, z, Euler.DefaultOrder);
   return node;
 }
 

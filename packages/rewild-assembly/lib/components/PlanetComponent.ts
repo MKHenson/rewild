@@ -13,7 +13,6 @@ export class PlanetComponent extends BehaviourComponent {
 
   mount(): void {
     this.transform!.scale.set(this.size, this.size, this.size);
-    this.transform!.position.y += this.size;
   }
 
   onUpdate(delta: f32, total: u32): void {

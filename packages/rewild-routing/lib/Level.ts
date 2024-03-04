@@ -9,27 +9,15 @@ import {
   UIEventType,
 } from 'rewild-common';
 import { ApplicationEvent } from './ApplicationEvent';
-import { Object3D, Player, wasm } from 'rewild-wasmtime';
+import { Object3D } from 'rewild-wasmtime';
 
 export class Level extends Container implements Listener {
-  private terrain: Object3D;
-  private skybox: Object3D;
-  private player: Player;
-
   constructor(
-    player: Player,
     name: string,
     parentObject3D: Object3D,
     autoDispose: boolean = false
   ) {
     super(name, true, parentObject3D, autoDispose);
-
-    this.player = player;
-    this.terrain = new Object3D('Terrain', wasm.createTerrain());
-    this.skybox = new Object3D('Skybox', wasm.createSkybox());
-
-    this.addAsset(this.terrain);
-    this.addAsset(this.skybox);
   }
 
   mount(): void {
@@ -37,8 +25,6 @@ export class Level extends Container implements Listener {
 
     const stateMachine = this.stateMachine;
     if (!stateMachine) return;
-
-    this.parentObject3D.add(this.player);
 
     // Activate the enter portal
     stateMachine.sendSignal(this.getPortal('Enter')!, false);
@@ -50,8 +36,6 @@ export class Level extends Container implements Listener {
     const stateMachine = this.stateMachine;
 
     if (!stateMachine) return;
-
-    this.parentObject3D.remove(this.player);
 
     stateMachine.removeEventListener(UIEventType, this);
   }
@@ -94,7 +78,5 @@ export class Level extends Container implements Listener {
 
   dispose(): void {
     super.dispose();
-    this.terrain.dispose();
-    this.skybox.dispose();
   }
 }

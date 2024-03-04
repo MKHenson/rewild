@@ -12,12 +12,14 @@ export class Object3D {
   components: Component[] = [];
   children: Object3D[] = [];
   isDisposed: boolean;
+  disposeObject3D: boolean;
 
   constructor(name?: string, transform?: Number) {
     this.transform = 0;
     this.name = name || '';
     this.id = objectId++;
     this.isDisposed = false;
+    this.disposeObject3D = true;
     this.transform = transform || wasm.createTransformNode(this.name);
     wasm.setId(this.transform as any, this.id);
   }
@@ -32,6 +34,18 @@ export class Object3D {
 
   setPosition(x: number, y: number, z: number) {
     wasm.setPosition(this.transform as any, x, y, z);
+  }
+
+  setScale(x: number, y: number, z: number) {
+    wasm.setScale(this.transform as any, x, y, z);
+  }
+
+  setRotation(x: number, y: number, z: number) {
+    wasm.setRotation(this.transform as any, x, y, z);
+  }
+
+  lookAt(x: number, y: number, z: number) {
+    wasm.lookAt(this.transform as any, x, y, z);
   }
 
   add(child: Object3D) {
@@ -61,7 +75,7 @@ export class Object3D {
   }
 
   dispose() {
-    wasm.disposeObject(this.transform as any);
+    if (this.disposeObject3D) wasm.disposeObject(this.transform as any);
     this.isDisposed = true;
   }
 }

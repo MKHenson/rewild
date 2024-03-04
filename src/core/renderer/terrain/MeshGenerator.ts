@@ -1,8 +1,8 @@
-import { AttributeType, Vector2, Vector3 } from "packages/rewild-common";
-import { Geometry } from "../geometry/Geometry";
-import { Mesh } from "../Mesh";
-import { Renderer } from "../Renderer";
-import { pipelineManager } from "../AssetManagers/PipelineManager";
+import { AttributeType, Vector2, Vector3 } from 'rewild-common';
+import { Geometry } from '../geometry/Geometry';
+import { Mesh } from '../Mesh';
+import { Renderer } from '../Renderer';
+import { pipelineManager } from '../AssetManagers/PipelineManager';
 
 export class MeshGenerator {
   static generateTerrainMesh(heighMap: f32[][], heightMultiplier: f32 = 20) {
@@ -16,12 +16,24 @@ export class MeshGenerator {
 
     for (let y: i32 = 0; y < height; y++) {
       for (let x: i32 = 0; x < width; x++) {
-        meshData.vertices[vertexIndex] = new Vector3(topLeftX + x, heighMap[x][y] * heightMultiplier, topLeftZ - y);
+        meshData.vertices[vertexIndex] = new Vector3(
+          topLeftX + x,
+          heighMap[x][y] * heightMultiplier,
+          topLeftZ - y
+        );
         meshData.uvs[vertexIndex] = new Vector2(x / width, y / height);
 
         if (x < width - 1 && y < height - 1) {
-          meshData.addTriangle(vertexIndex, vertexIndex + width + 1, vertexIndex + width);
-          meshData.addTriangle(vertexIndex + width + 1, vertexIndex, vertexIndex + 1);
+          meshData.addTriangle(
+            vertexIndex,
+            vertexIndex + width + 1,
+            vertexIndex + width
+          );
+          meshData.addTriangle(
+            vertexIndex + width + 1,
+            vertexIndex,
+            vertexIndex + 1
+          );
         }
 
         vertexIndex++;
@@ -64,7 +76,7 @@ class MeshData {
 
     geometry.build(renderer);
 
-    const pipeline = pipelineManager.getAsset("terrain");
+    const pipeline = pipelineManager.getAsset('terrain');
     const mesh = new Mesh(geometry, pipeline, renderer);
     return mesh;
   }

@@ -48,3 +48,7 @@ export function getNodeCount(): i32 {
 export function getScene(): TransformNode {
   return runtime!.scene;
 }
+
+export function getCamera(): TransformNode {
+  return runtime!.camera;
+}

@@ -13,18 +13,17 @@ import { Geometry } from './renderer/geometry/Geometry';
 import { Renderer } from './renderer/Renderer';
 import { getLevel } from '../api/levels';
 import { getProjects } from '../api/projects';
-import { Container, Level, StateMachine } from 'rewild-routing';
+import { Container, StateMachine } from 'rewild-routing';
 import { geometryManager } from './renderer/AssetManagers/GeometryManager';
 import { LoaderPresetType, LoaderPresets } from './loader-utils/LoaderPresets';
+import { InGameLevel } from './routing/InGameLevel';
 
 /** Loads game files and assets and sends the created objects to wasm */
 export class GameLoader {
   renderer: Renderer;
-  loadedPtrs: any[];
 
   constructor(renderer: Renderer) {
     this.renderer = renderer;
-    this.loadedPtrs = [];
   }
 
   async loadSystemContainers() {
@@ -70,17 +69,13 @@ export class GameLoader {
     const stateMachine = new StateMachine();
 
     for (const level of startupLevels) {
-      const levelRouter = new Level(
-        player,
+      const levelRouter = new InGameLevel(
         level.name,
-        new Object3D('Scene', wasm.getScene())
+        new Object3D('Scene', wasm.getScene()),
+        false,
+        player
       );
       stateMachine.addNode(levelRouter, true);
-
-      const levelPtr = wasm.createLevel(level.name);
-
-      this.loadedPtrs.push(levelPtr);
-      wasm.addNodeToRuntime(levelPtr, true);
 
       for (const container of level.containers) {
         const containerRouter = new Container(
@@ -139,14 +134,6 @@ export class GameLoader {
     }
 
     return stateMachine;
-  }
-
-  unloadInitialLevels() {
-    for (const ptr of this.loadedPtrs) {
-      wasm.removeNodeFromRuntime(ptr);
-    }
-
-    this.loadedPtrs.length = 0;
   }
 
   createMesh(geometry: Geometry, pipelineName: string, name?: string) {

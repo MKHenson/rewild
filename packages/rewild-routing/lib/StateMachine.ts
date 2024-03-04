@@ -109,6 +109,7 @@ export class StateMachine extends EventDispatcher {
   /**
    * Fires the signal from a source portal to a destination. Which in turn may start a new node
    * @param sourcePortal
+   * @param turnOff Will deactivate the node, which takes it off the update loops
    */
   sendSignal(sourcePortal: Portal, turnOff: boolean): void {
     const activeNodes = this.activeNodes;
