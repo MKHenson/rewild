@@ -6,7 +6,7 @@ import {
   UIEventType,
 } from 'rewild-common';
 import { lock, unlock } from '../Imports';
-import { Runtime } from '../objects/routing';
+import { Runtime } from '../objects/Runtime';
 import { OrbitController } from '../extras/OrbitController';
 import { PointerLockController } from '../extras/PointerLockController';
 import { KeyboardEvent } from '../extras/io/KeyboardEvent';

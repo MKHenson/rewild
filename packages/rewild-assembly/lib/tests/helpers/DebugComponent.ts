@@ -1,8 +1,8 @@
-import { Component } from "../../core/Component";
-import { Runtime } from "../../objects/routing";
-import { componentCallback } from "../Imports";
+import { BehaviourComponent } from '../../components/BehaviourComponent';
+import { Component } from '../../core/Component';
+import { componentCallback } from '../Imports';
 
-export class DebugComponent extends Component {
+export class DebugComponent extends BehaviourComponent {
   constructor(name: string) {
     super();
     this.name = name;
@@ -10,17 +10,17 @@ export class DebugComponent extends Component {
 
   onUpdate(delta: f32, total: u32): void {
     super.onUpdate(delta, total);
-    componentCallback(this.name!, "onUpdate", "");
+    componentCallback(this.name!, 'onUpdate', '');
   }
 
-  mount(runtime: Runtime): void {
-    super.mount(runtime);
-    componentCallback(this.name!, "mount", "");
+  mount(): void {
+    super.mount();
+    componentCallback(this.name!, 'mount', '');
   }
 
-  unMount(runtime: Runtime): void {
-    super.unMount(runtime);
-    componentCallback(this.name!, "unMount", "");
+  unMount(): void {
+    super.unMount();
+    componentCallback(this.name!, 'unMount', '');
   }
 }
 

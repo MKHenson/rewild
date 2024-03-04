@@ -2,16 +2,7 @@ import { EngineMatrix4 } from './math/EngineMatrix4';
 import { Matrix4, Matrix3 } from 'rewild-common';
 import { EngineVector3 } from './math/Vector3';
 
-export {
-  addNodeToRuntime,
-  getRuntime,
-  init,
-  removeNodeFromRuntime,
-  update,
-  getActiveNodeCount,
-  getNodeCount,
-  sendSignal,
-} from './objects/routing/AsSceneManager';
+export { getRuntime, init, update } from './WasmManager';
 export {
   addChild,
   removeChild,
@@ -19,18 +10,6 @@ export {
   setVisibility,
   addComponent,
 } from './core/TransformNode';
-export {
-  createContainer,
-  addChildNode,
-  connectLink,
-  createLink,
-  addNodePortal,
-  getNodePortal,
-  removeNodePortal,
-  createPortal,
-  addAsset,
-} from '../lib/objects/routing/index';
-export * from './tests/routers';
 export * from './tests/helpers';
 export * from './tests/performance';
 export * from './tests/TransformNode';

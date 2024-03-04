@@ -1,7 +1,7 @@
 import { Camera } from '../../cameras/Camera';
 import { TransformNode } from '../../core/TransformNode';
 import { initializeSkybox } from '../../Imports';
-import { getRuntime } from '../routing/AsSceneManager';
+import { getRuntime } from '../../WasmManager';
 
 export class Skybox extends TransformNode {
   constructor() {
