@@ -15,7 +15,21 @@ export * from './tests/performance';
 export * from './tests/TransformNode';
 export * from './tests/PlayerComponent';
 export * from './tests/PhysicsComponent';
+export * from './tests/PhysicsUtils';
+export * from './tests/PhysicsHeightfield';
+export * from './tests/PhysicsWorld';
 export * from '../lib/objects/physics/common-bodies';
+
+export function f32Max(): f32 {
+  return f32.MAX_VALUE;
+}
+
+export function f32Min(): f32 {
+  return f32.MIN_VALUE;
+}
+export function f32NaN(): f32 {
+  return f32.NaN;
+}
 
 // prettier-ignore
 function newMatrix4(): EngineMatrix4 { return new EngineMatrix4(); }

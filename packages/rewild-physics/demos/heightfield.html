@@ -19,18 +19,19 @@
     <script src="../libs/Stats.js"></script>
     <script src="../libs/smoothie.js"></script>
     <script>
-      var demo = new CANNON.Demo();
+      var demo = new CANNON.Demo(); // ({ stepFrequency: 120 });
 
-      demo.addScene("Heightfield", function () {
+      demo.addScene('Heightfield', function () {
         // Init world
         var world = demo.getWorld();
+
         world.gravity.set(0, 0, -10);
         world.broadphase = new CANNON.NaiveBroadphase();
 
         // Create a matrix of height values
         var matrix = [];
-        var sizeX = 15,
-          sizeY = 15;
+        var sizeX = 10,
+          sizeY = 10;
         for (var i = 0; i < sizeX; i++) {
           matrix.push([]);
           for (var j = 0; j < sizeY; j++) {
@@ -40,6 +41,7 @@
               2;
             if (i === 0 || i === sizeX - 1 || j === 0 || j === sizeY - 1)
               height = 3;
+
             matrix[i].push(height);
           }
         }
@@ -50,7 +52,11 @@
 
         // new CANNON.Body({ mass: 0 });
         hfBody.addShape(hfShape);
-        hfBody.position.set((-sizeX * hfShape.elementSize) / 2, -20, -10);
+        hfBody.position.set(
+          (-sizeX * hfShape.elementSize) / 2,
+          (-sizeY * hfShape.elementSize) / 2,
+          -10
+        );
         world.addBody(hfBody);
         demo.addVisual(hfBody);
 
@@ -72,6 +78,16 @@
             demo.addVisual(sphereBody);
           }
         }
+        var sphereShape = new CANNON.Sphere(0.1);
+        var sphereBody = new CANNON.Body(
+          new CANNON.BodyOptions().setMass(mass)
+        );
+        // new CANNON.Body({ mass: mass });
+        sphereBody.addShape(sphereShape);
+        sphereBody.position.set(4, 4, 10);
+        sphereBody.position.vadd(hfBody.position, sphereBody.position);
+        world.addBody(sphereBody);
+        demo.addVisual(sphereBody);
       });
 
       demo.start();

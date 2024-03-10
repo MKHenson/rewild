@@ -1,4 +1,8 @@
 {
   "extends": "../../node_modules/assemblyscript/std/assembly.json",
-  "include": ["./**/*.ts", "tests/jest.config.ts"]
+  "include": [
+    "./**/*.ts",
+    "tests/jest.config.ts",
+    "lib/objects/terrain/TerrainChunk.ts"
+  ]
 }

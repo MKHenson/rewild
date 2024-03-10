@@ -1,5 +1,5 @@
 import { CHUNK_SIZE } from 'rewild-common';
-import { IBindable, wasm } from 'rewild-wasmtime';
+import { IBindable, Terrain } from 'rewild-wasmtime';
 import { Renderer } from '../Renderer';
 import { Geometry } from '../geometry/Geometry';
 import { TerrainPipeline } from '../pipelines/terrain-pipeline/TerrainPipeline';
@@ -15,9 +15,11 @@ export class TerrainManager implements IBindable {
   terrainPipeline: TerrainPipeline;
   renderer: Renderer;
   noiseMap: NoiseMap;
+  activeTerrains: Terrain[];
 
   constructor() {
     this.noiseMap = new NoiseMap(CHUNK_SIZE, 0.6, 4, 0.5, 2, [1.4, 0], 100);
+    this.activeTerrains = [];
   }
 
   createBinding() {
@@ -31,7 +33,28 @@ export class TerrainManager implements IBindable {
     this.terrainPipeline = pipelineManager.getAsset('terrain');
   }
 
-  async createTerrainChunk(terrainPtr: any) {
+  addTerrain() {
+    const newTerrain = new Terrain();
+    this.activeTerrains.push(newTerrain);
+    return newTerrain;
+  }
+
+  removeTerrain(terrain: Terrain) {
+    const index = this.activeTerrains.indexOf(terrain);
+    if (index !== -1) {
+      this.activeTerrains.splice(index, 1);
+    }
+  }
+
+  async createTerrainChunk(terrainPtr: any, chunkPtr: any) {
+    const terrain = this.activeTerrains.find(
+      (t) => t.transform.valueOf() === terrainPtr.valueOf()
+    );
+
+    if (!terrain) {
+      return;
+    }
+
     const canvas = this.noiseMap.generate().createCanvas();
     const texture = textureManager.addTexture(
       new CanvasTexture('terrain1', canvas, this.renderer.device)
@@ -43,9 +66,14 @@ export class TerrainManager implements IBindable {
     };
 
     const meshData = MeshGenerator.generateTerrainMesh(this.noiseMap.noiseMap);
-    const mesh = meshData.createMesh(this.renderer);
-    wasm.addChild(terrainPtr, mesh.transform as any);
-    return meshManager.addMesh(mesh);
+    const chunk = meshData.createMesh(this.renderer, chunkPtr);
+
+    terrain.add(chunk);
+
+    // wasm.addChild(terrainPtr, mesh.transform as any);
+    meshManager.addMesh(chunk);
+
+    return;
   }
 }
 

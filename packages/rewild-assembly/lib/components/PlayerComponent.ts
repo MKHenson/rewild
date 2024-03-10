@@ -160,11 +160,10 @@ export class PlayerComponent extends BehaviourComponent implements Listener {
     const camPos = camera.position;
 
     if (!this.useOrbitController) {
-      let yValue = camPos.y + this.gravity * delta;
-      if (yValue < 0) yValue = 0;
-      camPos.set(camPos.x, yValue, camPos.z);
-
-      this.playerBody!.position.set(camPos.x, camPos.y, camPos.z);
+      // let yValue = camPos.y + this.gravity * delta;
+      // if (yValue < 0) yValue = 0;
+      // camPos.set(camPos.x, yValue, camPos.z);
+      // this.playerBody!.position.set(camPos.x, camPos.y, camPos.z);
     }
 
     if (this.isDead) {

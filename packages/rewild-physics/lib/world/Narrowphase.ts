@@ -1,22 +1,22 @@
-import { AABB } from "../collision/AABB";
-import { Ray } from "../collision/Ray";
-import { ContactEquation } from "../equations/ContactEquation";
-import { Equation } from "../equations/Equation";
-import { FrictionEquation } from "../equations/FrictionEquation";
-import { ContactMaterial } from "../material/ContactMaterial";
-import { Quaternion } from "../math/Quaternion";
-import { Transform } from "../math/Transform";
-import { Vec3 } from "../math/Vec3";
-import { Body } from "../objects/Body";
-import { Box } from "../shapes/Box";
-import { ConvexPolyhedron, Point } from "../shapes/ConvexPolyhedron";
-import { Heightfield } from "../shapes/Heightfield";
-import { Plane } from "../shapes/Plane";
-import { Shape } from "../shapes/Shape";
-import { Sphere } from "../shapes/Sphere";
-import { Trimesh } from "../shapes/Trimesh";
-import { Vec3Pool } from "../utils/Vec3Pool";
-import { World } from "./World";
+import { AABB } from '../collision/AABB';
+import { Ray } from '../collision/Ray';
+import { ContactEquation } from '../equations/ContactEquation';
+import { Equation } from '../equations/Equation';
+import { FrictionEquation } from '../equations/FrictionEquation';
+import { ContactMaterial } from '../material/ContactMaterial';
+import { Quaternion } from '../math/Quaternion';
+import { Transform } from '../math/Transform';
+import { Vec3 } from '../math/Vec3';
+import { Body } from '../objects/Body';
+import { Box } from '../shapes/Box';
+import { ConvexPolyhedron, Point } from '../shapes/ConvexPolyhedron';
+import { Heightfield } from '../shapes/Heightfield';
+import { Plane } from '../shapes/Plane';
+import { Shape } from '../shapes/Shape';
+import { Sphere } from '../shapes/Sphere';
+import { Trimesh } from '../shapes/Trimesh';
+import { Vec3Pool } from '../utils/Vec3Pool';
+import { World } from './World';
 
 export class Narrowphase {
   contactPointPool: ContactEquation[];
@@ -758,9 +758,9 @@ export class Narrowphase {
     qj: Quaternion,
     bi: Body,
     bj: Body,
-    rsi: Shape,
-    rsj: Shape,
-    justTest: i32
+    rsi: Shape | null = null,
+    rsj: Shape | null = null,
+    justTest: i32 = 0
   ): boolean {
     if (justTest) {
       return xi.distanceSquared(xj) < Mathf.pow(si.radius + sj.radius, 2);
@@ -1450,6 +1450,7 @@ export class Narrowphase {
   ): boolean {
     const v3pool = this.v3pool;
     xi.vsub(xj, convex_to_sphere);
+
     const normals = sj.faceNormals;
     const faces = sj.faces;
     const verts = sj.vertices;
@@ -1463,7 +1464,7 @@ export class Narrowphase {
 
     // Check corners
     for (let i: i32 = 0; i != verts.length; i++) {
-      const v = verts[i];
+      const v = verts[i]!;
 
       // World position of corner
       const worldCorner = sphereConvex_worldCorner;
@@ -1515,7 +1516,8 @@ export class Narrowphase {
 
       // Get a world vertex from the face
       const worldPoint = sphereConvex_worldPoint;
-      qj.vmult(verts[face[0]], worldPoint);
+
+      qj.vmult(verts[face[0]]!, worldPoint);
       worldPoint.vadd(xj, worldPoint);
 
       // Get a point on the sphere, closest to the face normal
@@ -1530,7 +1532,6 @@ export class Narrowphase {
 
       // The penetration. Negative value means overlap.
       const penetration = penetrationVec.dot(worldNormal);
-
       const worldPointToSphere = sphereConvex_sphereToWorldPoint;
       xi.vsub(worldPoint, worldPointToSphere);
 
@@ -1539,7 +1540,7 @@ export class Narrowphase {
         const faceVerts: Vec3[] = []; // Face vertices, in world coords
         for (let j: i32 = 0, Nverts = face.length; j != Nverts; j++) {
           const worldVertex = v3pool.get();
-          qj.vmult(verts[face[j]], worldVertex);
+          qj.vmult(verts[face[j]]!, worldVertex);
           xj.vadd(worldVertex, worldVertex);
           faceVerts.push(worldVertex);
         }
@@ -1598,8 +1599,8 @@ export class Narrowphase {
             // Get two world transformed vertices
             const v1 = v3pool.get();
             const v2 = v3pool.get();
-            qj.vmult(verts[face[(j + 1) % face.length]], v1);
-            qj.vmult(verts[face[(j + 2) % face.length]], v2);
+            qj.vmult(verts[face[(j + 1) % face.length]]!, v1);
+            qj.vmult(verts[face[(j + 2) % face.length]]!, v2);
             xj.vadd(v1, v1);
             xj.vadd(v2, v2);
 
@@ -1765,7 +1766,7 @@ export class Narrowphase {
     const relpos = planeConvex_relpos;
     for (let i: i32 = 0; i != convexShape.vertices.length; i++) {
       // Get world convex vertex
-      worldVertex.copy(convexShape.vertices[i]);
+      worldVertex.copy(convexShape.vertices[i]!);
       convexQuat.vmult(worldVertex, worldVertex);
       convexPosition.vadd(worldVertex, worldVertex);
       worldVertex.vsub(planePosition, relpos);
@@ -2194,7 +2195,7 @@ export class Narrowphase {
         );
       } else {
         console.warn(
-          "Point found inside convex, but did not find penetrating face!"
+          'Point found inside convex, but did not find penetrating face!'
         );
       }
     }
@@ -2401,9 +2402,9 @@ export class Narrowphase {
     hfQuat: Quaternion,
     sphereBody: Body,
     hfBody: Body,
-    rsi: Shape,
-    rsj: Shape,
-    justTest: i32
+    rsi: Shape | null = null,
+    rsj: Shape | null = null,
+    justTest: i32 = 0
   ): boolean {
     const data = hfShape.data,
       radius = sphereShape.radius,
@@ -2481,6 +2482,7 @@ export class Narrowphase {
           hfShape.pillarOffset,
           worldPillarOffset
         );
+
         if (
           spherePos.distanceTo(worldPillarOffset) <
           hfShape.pillarConvex.boundingSphereRadius +

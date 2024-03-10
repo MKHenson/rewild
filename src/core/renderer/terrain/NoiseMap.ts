@@ -1,4 +1,10 @@
-import { create2DArray, INoise, NoisePerlin, inverseLerp, RandomNumberGenerator } from "rewild-common";
+import {
+  create2DArray,
+  INoise,
+  NoisePerlin,
+  inverseLerp,
+  RandomNumberGenerator,
+} from 'rewild-common';
 
 export class NoiseMap {
   mapWidth: u16;
@@ -62,19 +68,26 @@ export class NoiseMap {
     const offsets: Array<f32[]>[] = new Array(octaves);
     for (let i: i32 = 0; i < octaves; i++) {
       offsets[i] = [
-        [random.next(-100000, 100000) + offset[0], random.next(-100000, 100000) * 200000 - 100000 + offset[1]],
+        [
+          random.next(-100000, 100000) + offset[0],
+          random.next(-100000, 100000) * 200000 - 100000 + offset[1],
+        ],
       ];
     }
 
     for (let y: i32 = 0; y < mapHeight; y++) {
-      for (let x: i32 = 0; x < mapHeight; x++) {
+      for (let x: i32 = 0; x < mapWidth; x++) {
         let amplitude: f32 = 1;
         let frequency: f32 = 1;
         let noiseHeight: f32 = 0;
 
         for (let i: i32 = 0; i < octaves; i++) {
-          const sampleX = (f32(x - halfWidth) / f32(mapWidth) / scale) * frequency + offsets[i][0][0];
-          const sampleY = (f32(y - halfHeight) / f32(mapHeight) / scale) * frequency + offsets[i][0][1];
+          const sampleX =
+            (f32(x - halfWidth) / f32(mapWidth) / scale) * frequency +
+            offsets[i][0][0];
+          const sampleY =
+            (f32(y - halfHeight) / f32(mapHeight) / scale) * frequency +
+            offsets[i][0][1];
 
           let noiseValue = noise.get2D(sampleX, sampleY) * 2 - 1;
           noiseHeight += noiseValue * amplitude;
@@ -83,16 +96,37 @@ export class NoiseMap {
           frequency *= lacunarity;
         }
 
-        if (noiseHeight > maxNoiseHeight) maxNoiseHeight = noiseHeight;
-        else if (noiseHeight < minNoiseHeight) minNoiseHeight = noiseHeight;
+        // if (noiseHeight > maxNoiseHeight) maxNoiseHeight = noiseHeight;
+        // else if (noiseHeight < minNoiseHeight) minNoiseHeight = noiseHeight;
 
         noiseMap[x][y] = noiseHeight;
       }
     }
 
+    for (var i = 0; i < mapHeight; i++) {
+      for (var j = 0; j < mapWidth; j++) {
+        var height =
+          Math.cos((i / mapHeight) * Math.PI * 2) *
+            Math.cos((j / mapWidth) * Math.PI * 2) +
+          2;
+
+        if (i === 0 || i === mapHeight - 1 || j === 0 || j === mapWidth - 1)
+          height = 3;
+
+        if (height > maxNoiseHeight) maxNoiseHeight = height;
+        else if (height < minNoiseHeight) minNoiseHeight = height;
+
+        noiseMap[i][j] = height;
+      }
+    }
+
     for (let y: i32 = 0; y < mapHeight; y++) {
       for (let x: i32 = 0; x < mapWidth; x++) {
-        noiseMap[x][y] = inverseLerp(minNoiseHeight, maxNoiseHeight, noiseMap[x][y]);
+        noiseMap[x][y] = inverseLerp(
+          minNoiseHeight,
+          maxNoiseHeight,
+          noiseMap[x][y]
+        );
       }
     }
 
@@ -101,7 +135,7 @@ export class NoiseMap {
 
   public createCanvas() {
     const map = this.noiseMap;
-    const canvas = document.createElement("canvas") as HTMLCanvasElement;
+    const canvas = document.createElement('canvas') as HTMLCanvasElement;
     const width = map.length;
     const height = map[0].length;
 
@@ -118,7 +152,7 @@ export class NoiseMap {
       }
     }
 
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext('2d')!;
     const imageData = ctx.createImageData(width, height);
 
     for (let i = 0; i < noise.length; i++) {

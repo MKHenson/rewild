@@ -1,8 +1,8 @@
-import { AABB } from "../collision/AABB";
-import { Quaternion } from "../math/Quaternion";
-import { Vec3 } from "../math/Vec3";
-import { ConvexPolyhedron } from "./ConvexPolyhedron";
-import { Shape } from "./Shape";
+import { AABB } from '../collision/AABB';
+import { Quaternion } from '../math/Quaternion';
+import { Vec3 } from '../math/Vec3';
+import { ConvexPolyhedron } from './ConvexPolyhedron';
+import { Shape } from './Shape';
 
 const getHeightAt_idx: i32[] = [];
 const getHeightAt_weights = new Vec3();
@@ -100,6 +100,15 @@ export class Heightfield extends Shape {
      */
     this.elementSize = elementSize;
 
+    // "i_j_isUpper" => { convex: ..., offset: ... }
+    // for example:
+    // _cachedPillars["0_2_1"]
+    this._cachedPillars = new Map();
+
+    this.pillarConvex = new ConvexPolyhedron();
+    this.pillarOffset = new Vec3();
+    this.cacheEnabled = true;
+
     if (isNaN<f32>(minValue)) {
       this.updateMinValue();
     } else this.minValue = minValue;
@@ -108,17 +117,7 @@ export class Heightfield extends Shape {
       this.updateMaxValue();
     } else this.maxValue = maxValue;
 
-    this.cacheEnabled = true;
-
-    this.pillarConvex = new ConvexPolyhedron();
-    this.pillarOffset = new Vec3();
-
     this.updateBoundingSphereRadius();
-
-    // "i_j_isUpper" => { convex: ..., offset: ... }
-    // for example:
-    // _cachedPillars["0_2_1"]
-    this._cachedPillars = new Map();
   }
 
   /**
@@ -136,9 +135,10 @@ export class Heightfield extends Shape {
   updateMinValue(): void {
     const data = this.data;
     let minValue = data[0][0];
-    for (let i: i32 = 0; i !== data.length; i++) {
-      for (let j: i32 = 0; j !== data[i].length; j++) {
+    for (let i: i32 = 0; i != data.length; i++) {
+      for (let j: i32 = 0; j != data[i].length; j++) {
         const v = data[i][j];
+
         if (v < minValue) {
           minValue = v;
         }
@@ -154,8 +154,8 @@ export class Heightfield extends Shape {
   updateMaxValue(): void {
     const data = this.data;
     let maxValue = data[0][0];
-    for (let i: i32 = 0; i !== data.length; i++) {
-      for (let j: i32 = 0; j !== data[i].length; j++) {
+    for (let i: i32 = 0; i != data.length; i++) {
+      for (let j: i32 = 0; j != data[i].length; j++) {
         const v = data[i][j];
         if (v > maxValue) {
           maxValue = v;
@@ -235,12 +235,12 @@ export class Heightfield extends Shape {
    * @param  {boolean} clamp If the position should be clamped to the heightfield edge.
    * @return {boolean}
    */
-  getIndexOfPosition(x: f32, y: f32, result: f32[], clamp: boolean): boolean {
+  getIndexOfPosition(x: f32, y: f32, result: i32[], clamp: boolean): boolean {
     // Get the index of the data points to test against
     const w = this.elementSize;
     const data = this.data;
-    let xi = Mathf.floor(x / w);
-    let yi = Mathf.floor(y / w);
+    let xi = i32(Mathf.floor(x / w));
+    let yi = i32(Mathf.floor(y / w));
 
     result[0] = xi;
     result[1] = yi;
@@ -284,16 +284,17 @@ export class Heightfield extends Shape {
 
     const data = this.data;
     if (edgeClamp) {
-      xi = Mathf.min(data.length - 2, Mathf.max(0, xi));
-      yi = Mathf.min(data[0].length - 2, Mathf.max(0, yi));
+      xi = i32(Mathf.min(f32(data.length) - 2, Mathf.max(0, f32(xi))));
+      yi = i32(Mathf.min(f32(data[0].length) - 2, Mathf.max(0, f32(yi))));
     }
 
-    const elementSize = this.elementSize;
+    const elementSize = f32(this.elementSize);
     const lowerDist2 =
-      Mathf.pow(x / elementSize - xi, 2) + Mathf.pow(y / elementSize - yi, 2);
+      Mathf.pow(x / elementSize - f32(xi), 2) +
+      Mathf.pow(y / elementSize - f32(yi), 2);
     const upperDist2 =
-      Mathf.pow(x / elementSize - (xi + 1), 2) +
-      Mathf.pow(y / elementSize - (yi + 1), 2);
+      Mathf.pow(x / elementSize - (f32(xi) + 1), 2) +
+      Mathf.pow(y / elementSize - (f32(yi) + 1), 2);
     const upper = lowerDist2 > upperDist2;
     this.getTriangle(xi, yi, upper, a, b, c);
     return upper;
@@ -348,8 +349,8 @@ export class Heightfield extends Shape {
     let xi = idx[0];
     let yi = idx[1];
     if (edgeClamp) {
-      xi = Mathf.min(data.length - 2, Mathf.max(0, xi));
-      yi = Mathf.min(data[0].length - 2, Mathf.max(0, yi));
+      xi = i32(Mathf.min(f32(data.length) - 2, Mathf.max(0, f32(xi))));
+      yi = i32(Mathf.min(f32(data[0].length) - 2, Mathf.max(0, f32(yi))));
     }
     const upper = this.getTriangleAt(x, y, edgeClamp, a, b, c);
     barycentricWeights(x, y, a.x, a.y, b.x, b.y, c.x, c.y, getHeightAt_weights);
@@ -378,9 +379,9 @@ export class Heightfield extends Shape {
   ): string {
     return (
       xi.toString() +
-      "_" +
+      '_' +
       yi.toString() +
-      "_" +
+      '_' +
       (getUpperTriangle ? 1 : 0).toString()
     );
   }
@@ -390,9 +391,16 @@ export class Heightfield extends Shape {
     yi: i32,
     getUpperTriangle: boolean
   ): Pillar | null {
-    return this._cachedPillars.get(
-      this.getCacheConvexTrianglePillarKey(xi, yi, getUpperTriangle)
-    ) as Pillar;
+    const index = this.getCacheConvexTrianglePillarKey(
+      xi,
+      yi,
+      getUpperTriangle
+    );
+
+    if (this._cachedPillars.has(index))
+      return this._cachedPillars.get(index) as Pillar;
+
+    return null;
   }
 
   setCachedConvexTrianglePillar(
@@ -436,22 +444,38 @@ export class Heightfield extends Shape {
     c: Vec3
   ): void {
     const data = this.data;
-    const elementSize = this.elementSize;
+    const elementSize = f32(this.elementSize);
 
     if (upper) {
       // Top triangle verts
       a.set(
-        (xi + 1) * elementSize,
-        (yi + 1) * elementSize,
+        (f32(xi) + 1) * elementSize,
+        (f32(yi) + 1) * elementSize,
         data[xi + 1][yi + 1]
       );
-      b.set(xi * elementSize, (yi + 1) * elementSize, data[xi][yi + 1]);
-      c.set((xi + 1) * elementSize, yi * elementSize, data[xi + 1][yi]);
+      b.set(
+        f32(xi) * elementSize,
+        (f32(yi) + 1) * elementSize,
+        data[xi][yi + 1]
+      );
+      c.set(
+        (f32(xi) + 1) * elementSize,
+        f32(yi) * elementSize,
+        data[xi + 1][yi]
+      );
     } else {
       // Top triangle verts
-      a.set(xi * elementSize, yi * elementSize, data[xi][yi]);
-      b.set((xi + 1) * elementSize, yi * elementSize, data[xi + 1][yi]);
-      c.set(xi * elementSize, (yi + 1) * elementSize, data[xi][yi + 1]);
+      a.set(f32(xi) * elementSize, f32(yi) * elementSize, data[xi][yi]);
+      b.set(
+        (f32(xi) + 1) * elementSize,
+        f32(yi) * elementSize,
+        data[xi + 1][yi]
+      );
+      c.set(
+        f32(xi) * elementSize,
+        (f32(yi) + 1) * elementSize,
+        data[xi][yi + 1]
+      );
     }
   }
 
@@ -483,7 +507,6 @@ export class Heightfield extends Shape {
 
     const data = this.data;
     const elementSize = this.elementSize;
-    const faces = result.faces;
 
     // Reuse verts if possible
     result.vertices.length = 6;
@@ -494,12 +517,24 @@ export class Heightfield extends Shape {
     }
 
     // Reuse faces if possible
-    faces.length = 5;
-    for (let i: i32 = 0; i < 5; i++) {
-      if (!faces[i]) {
-        faces[i] = [];
+    if (result.faces.length == 0) {
+      const newFaces = new Array<i32[]>(5);
+
+      for (let i: i32 = 0; i < 5; i++) {
+        newFaces[i] = new Array<i32>();
       }
+
+      result.faces = newFaces;
     }
+
+    // result.faces = result.faces.length == 0 ? new Array<i32[] | null>(5) : result.faces;
+    const faces = result.faces;
+
+    // for (let i: i32 = 0; i < 5; i++) {
+    //   if (!faces[i]) {
+    //     faces[i] = new Array<i32>();
+    //   }
+    // }
 
     const verts = result.vertices;
 
@@ -516,22 +551,22 @@ export class Heightfield extends Shape {
       );
 
       // Top triangle verts
-      verts[0].set(-0.25 * elementSize, -0.25 * elementSize, data[xi][yi] - h);
-      verts[1].set(
+      verts[0]!.set(-0.25 * elementSize, -0.25 * elementSize, data[xi][yi] - h);
+      verts[1]!.set(
         0.75 * elementSize,
         -0.25 * elementSize,
         data[xi + 1][yi] - h
       );
-      verts[2].set(
+      verts[2]!.set(
         -0.25 * elementSize,
         0.75 * elementSize,
         data[xi][yi + 1] - h
       );
 
       // bottom triangle verts
-      verts[3].set(-0.25 * elementSize, -0.25 * elementSize, -h - 1);
-      verts[4].set(0.75 * elementSize, -0.25 * elementSize, -h - 1);
-      verts[5].set(-0.25 * elementSize, 0.75 * elementSize, -h - 1);
+      verts[3]!.set(-0.25 * elementSize, -0.25 * elementSize, -h - 1);
+      verts[4]!.set(0.75 * elementSize, -0.25 * elementSize, -h - 1);
+      verts[5]!.set(-0.25 * elementSize, 0.75 * elementSize, -h - 1);
 
       // top triangle
       faces[0][0] = 0;
@@ -569,26 +604,26 @@ export class Heightfield extends Shape {
       );
 
       // Top triangle verts
-      verts[0].set(
+      verts[0]!.set(
         0.25 * elementSize,
         0.25 * elementSize,
         data[xi + 1][yi + 1] - h
       );
-      verts[1].set(
+      verts[1]!.set(
         -0.75 * elementSize,
         0.25 * elementSize,
         data[xi][yi + 1] - h
       );
-      verts[2].set(
+      verts[2]!.set(
         0.25 * elementSize,
         -0.75 * elementSize,
         data[xi + 1][yi] - h
       );
 
       // bottom triangle verts
-      verts[3].set(0.25 * elementSize, 0.25 * elementSize, -h - 1);
-      verts[4].set(-0.75 * elementSize, 0.25 * elementSize, -h - 1);
-      verts[5].set(0.25 * elementSize, -0.75 * elementSize, -h - 1);
+      verts[3]!.set(0.25 * elementSize, 0.25 * elementSize, -h - 1);
+      verts[4]!.set(-0.75 * elementSize, 0.25 * elementSize, -h - 1);
+      verts[5]!.set(0.25 * elementSize, -0.75 * elementSize, -h - 1);
 
       // Top triangle
       faces[0][0] = 0;

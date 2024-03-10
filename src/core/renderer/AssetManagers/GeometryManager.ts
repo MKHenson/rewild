@@ -1,9 +1,9 @@
-import { BoxGeometry } from "../geometry/BoxGeometry";
-import { SphereGeometry } from "../geometry/SphereGeometry";
-import { PlaneGeometry } from "../geometry/PlaneGeometry";
-import { Renderer } from "../Renderer";
-import { AssetManager } from "./AssetManager";
-import { Geometry } from "../geometry/Geometry";
+import { BoxGeometry } from '../geometry/BoxGeometry';
+import { SphereGeometry } from '../geometry/SphereGeometry';
+import { PlaneGeometry } from '../geometry/PlaneGeometry';
+import { Renderer } from '../Renderer';
+import { AssetManager } from './AssetManager';
+import { Geometry } from '../geometry/Geometry';
 
 export class GeometryManager extends AssetManager<Geometry> {
   constructor() {
@@ -13,7 +13,16 @@ export class GeometryManager extends AssetManager<Geometry> {
   async initialize(renderer: Renderer): Promise<void> {
     this.assets.push(
       new SphereGeometry(1, 64, 32).build(renderer),
-      new SphereGeometry(0.15, 64, 32, undefined, undefined, undefined, undefined, "ball").build(renderer),
+      new SphereGeometry(
+        0.1,
+        64,
+        32,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'ball'
+      ).build(renderer),
       new BoxGeometry().build(renderer),
       new PlaneGeometry().build(renderer)
     );

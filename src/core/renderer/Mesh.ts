@@ -21,9 +21,10 @@ export class Mesh extends Object3D {
     geometry: Geometry,
     pipeline: Pipeline<any>,
     renderer: Renderer,
-    name?: string
+    name?: string,
+    transform?: number
   ) {
-    super(name);
+    super(name, transform);
 
     this.renderIndex = -1;
     this.geometry = geometry;
