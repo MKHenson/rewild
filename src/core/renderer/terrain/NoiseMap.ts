@@ -96,29 +96,59 @@ export class NoiseMap {
           frequency *= lacunarity;
         }
 
-        // if (noiseHeight > maxNoiseHeight) maxNoiseHeight = noiseHeight;
-        // else if (noiseHeight < minNoiseHeight) minNoiseHeight = noiseHeight;
+        if (noiseHeight > maxNoiseHeight) maxNoiseHeight = noiseHeight;
+        else if (noiseHeight < minNoiseHeight) minNoiseHeight = noiseHeight;
 
         noiseMap[x][y] = noiseHeight;
       }
     }
 
-    for (var i = 0; i < mapHeight; i++) {
-      for (var j = 0; j < mapWidth; j++) {
-        var height =
-          Math.cos((i / mapHeight) * Math.PI * 2) *
-            Math.cos((j / mapWidth) * Math.PI * 2) +
-          2;
+    // for (var i = 0; i < mapHeight; i++) {
+    //   for (var j = 0; j < mapWidth; j++) {
+    //     var height =
+    //       Math.cos((i / mapHeight) * Math.PI * 2) *
+    //         Math.cos((j / mapWidth) * Math.PI * 2) +
+    //       2;
 
-        if (i === 0 || i === mapHeight - 1 || j === 0 || j === mapWidth - 1)
-          height = 3;
+    //     if (i === 0 || i === mapHeight - 1 || j === 0 || j === mapWidth - 1)
+    //       height = 3;
 
-        if (height > maxNoiseHeight) maxNoiseHeight = height;
-        else if (height < minNoiseHeight) minNoiseHeight = height;
+    //     if (height > maxNoiseHeight) maxNoiseHeight = height;
+    //     else if (height < minNoiseHeight) minNoiseHeight = height;
 
-        noiseMap[i][j] = height;
-      }
-    }
+    //     noiseMap[i][j] = height;
+    //   }
+    // }
+
+    // noiseMap[0][0] = 0.5;
+    // noiseMap[0][1] = 1;
+    // noiseMap[0][2] = 0;
+    // noiseMap[0][3] = 0;
+    // noiseMap[1][0] = 0;
+    // noiseMap[1][1] = 0.25;
+    // noiseMap[1][2] = 0;
+    // noiseMap[1][3] = 0;
+    // noiseMap[2][0] = 0;
+    // noiseMap[2][1] = 0;
+    // noiseMap[2][2] = 0.25;
+    // noiseMap[2][3] = 0;
+    // noiseMap[3][0] = 0;
+    // noiseMap[3][1] = 0;
+    // noiseMap[3][2] = 0;
+    // noiseMap[3][3] = 0.5;
+
+    // maxNoiseHeight = 1;
+    // minNoiseHeight = 0;
+
+    // for (let y: i32 = 0; y < mapHeight; y++) {
+    //   for (let x: i32 = 0; x < mapWidth; x++) {
+    //     noiseMap[x][y] = inverseLerp(
+    //       minNoiseHeight,
+    //       maxNoiseHeight,
+    //       noiseMap[x][y]
+    //     );
+    //   }
+    // }
 
     for (let y: i32 = 0; y < mapHeight; y++) {
       for (let x: i32 = 0; x < mapWidth; x++) {

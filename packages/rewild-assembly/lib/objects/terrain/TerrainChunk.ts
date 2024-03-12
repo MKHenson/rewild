@@ -1,8 +1,11 @@
-import { Body, BodyOptions, Heightfield, Plane, Vec3 } from 'rewild-physics';
+import { Body, BodyOptions, ConvexPolyhedron, Vec3 } from 'rewild-physics';
 import { TransformNode } from '../../core/TransformNode';
 import { groundMaterial } from '../physics/Materials';
-import { degToRad } from 'rewild-common';
+import { AttributeType, degToRad } from 'rewild-common';
 import { physicsManager } from '../physics/PhysicsManager';
+import { BufferGeometry } from '../../core/BufferGeometry';
+import { Float32BufferAttribute } from '../../core/BufferAttribute';
+import { debugF32Array, debugUI32Array } from '../../Imports';
 
 export class TerrainChunk extends TransformNode {
   heightValues: Float32Array | null;
@@ -27,60 +30,44 @@ export class TerrainChunk extends TransformNode {
       physicsManager.world.removeBody(this.body!);
     }
   }
+}
 
-  createBodyPlane(mapSize: i32, unitSize: f32): Body {
-    // Create a matrix of height values
-    let matrix: f32[][] = [];
-    const heightValues = this.heightValues;
+export function generateChunkPhysicsBody(
+  chunk: TerrainChunk,
+  geometry: BufferGeometry
+): void {
+  // Get vertices
+  const verts: Vec3[] = [];
+  const faces: i32[][] = [];
+  const rawVertsAttribute = geometry.getAttribute<Float32BufferAttribute>(
+    AttributeType.POSITION
+  )!;
+  const indicesAttribute = geometry.getIndexes()!;
+  const vertsArray = rawVertsAttribute.getArray() as Float32Array;
 
-    for (let i: i32 = 0; i < mapSize; i++) {
-      let innerMatrix: f32[] = [];
-      matrix.push(innerMatrix);
+  debugF32Array(vertsArray);
+  debugUI32Array(indicesAttribute.array);
 
-      for (let j: i32 = 0; j < mapSize; j++) {
-        let height: f32 = heightValues![i * mapSize + j];
-        innerMatrix.push(height);
-      }
-    }
+  const terrainBody = new Body(
+    new BodyOptions().setMass(0).setMaterial(groundMaterial)
+  );
 
-    // // Create a matrix of height values
-    // const sizeX: i32 = mapSize,
-    //   sizeY: i32 = mapSize;
-    // for (let i: i32 = 0; i < sizeX; i++) {
-    //   matrix.push([]);
-    //   for (let j: i32 = 0; j < sizeY; j++) {
-    //     let height: f32 = 0.0;
-    //     matrix[i].push(height);
-    //   }
-    // }
-
-    // Create the heightfield
-    let shape = new Heightfield(matrix, f32.NaN, f32.NaN, unitSize);
-
-    let body = new Body(
-      new BodyOptions().setMass(0) // .setMaterial(groundMaterial)
-    );
-    body.addShape(shape);
-    body.position.set(
-      -(f32(mapSize) * unitSize) / 2,
-      0,
-      (f32(mapSize) * unitSize) / 2
-    );
-    // body.position.set(0, 0, 0);
-    body.quaternion.setFromAxisAngle(new Vec3(1, 0, 0), -degToRad(90));
-
-    // body.material = groundMaterial;
-
-    // const boxOptions = new BodyOptions()
-    //   .setMass(0)
-    //   .setShape(new Plane())
-    //   .setMaterial(groundMaterial);
-
-    // const body = new Body(boxOptions);
-    // body.quaternion.setFromAxisAngle(new Vec3(1, 0, 0), -degToRad(90));
-
-    return body;
+  for (let j: i32 = 0; j < vertsArray.length; j += 3) {
+    verts.push(new Vec3(vertsArray[j], vertsArray[j + 1], vertsArray[j + 2]));
   }
+
+  for (let j: i32 = 0; j < indicesAttribute.array.length; j += 3) {
+    faces.push([
+      indicesAttribute.array[j + 0],
+      indicesAttribute.array[j + 1],
+      indicesAttribute.array[j + 2],
+    ]);
+  }
+
+  // Construct polyhedron
+  const bunnyPart = new ConvexPolyhedron(verts, faces);
+  terrainBody.addShape(bunnyPart);
+  chunk.body = terrainBody;
 }
 
 export function generateTerrainChunkHeightmap(
@@ -89,12 +76,4 @@ export function generateTerrainChunkHeightmap(
 ): usize {
   chunk.heightValues = new Float32Array(mapSize * mapSize);
   return changetype<usize>(chunk.heightValues);
-}
-
-export function generateChunkPhysicsBody(
-  chunk: TerrainChunk,
-  mapSize: i32,
-  unitSize: f32
-): void {
-  chunk.body = chunk.createBodyPlane(mapSize, unitSize);
 }

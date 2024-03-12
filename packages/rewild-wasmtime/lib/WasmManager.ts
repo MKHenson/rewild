@@ -1,5 +1,5 @@
-import { instantiate, __AdaptedExports } from "rewild-assembly/build/release";
-import { IBindable } from "./IBindable";
+import { instantiate, __AdaptedExports } from 'rewild-assembly/build/release';
+import { IBindable } from './IBindable';
 
 export type Wasm = typeof __AdaptedExports & {
   getFloat32Array: (pointer: Number) => Float32Array;
@@ -48,7 +48,7 @@ export class WasmManager {
         1,
       memoryU16 = new Uint16Array(this.memory.buffer);
     let start = pointer >>> 1,
-      string = "";
+      string = '';
     while (end - start > 1024)
       string += String.fromCharCode(
         ...memoryU16.subarray(start, (start += 1024))
@@ -63,13 +63,22 @@ export class WasmManager {
 
     const bindings: any = {
       performanceNow: () => performance.now(),
+      debugF32Array: (pointer: number) => {
+        console.log(pointer);
+      },
+      debugI32Array: (pointer: number) => {
+        console.log(pointer);
+      },
+      debugUI32Array: (pointer: number) => {
+        console.log(pointer);
+      },
     };
 
     for (const bindable of bindables)
       Object.assign(bindings, bindable.createBinding());
 
     const obj = (await instantiate(
-      await WebAssembly.compileStreaming(fetch("/release.wasm")),
+      await WebAssembly.compileStreaming(fetch('/release.wasm')),
       {
         Imports: bindings,
         env: {

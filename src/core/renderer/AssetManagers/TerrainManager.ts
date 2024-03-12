@@ -43,6 +43,8 @@ export class TerrainManager implements IBindable {
     const index = this.activeTerrains.indexOf(terrain);
     if (index !== -1) {
       this.activeTerrains.splice(index, 1);
+
+      while (terrain.children.length) terrain.remove(terrain.children[0]);
     }
   }
 
@@ -69,8 +71,6 @@ export class TerrainManager implements IBindable {
     const chunk = meshData.createMesh(this.renderer, chunkPtr);
 
     terrain.add(chunk);
-
-    // wasm.addChild(terrainPtr, mesh.transform as any);
     meshManager.addMesh(chunk);
 
     return;

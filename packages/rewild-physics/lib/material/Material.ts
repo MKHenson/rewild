@@ -11,7 +11,7 @@ export class Material {
    * @param {object} [options]
    * @author schteppe
    */
-  constructor(name: string = "", friction: f32 = -1, restitution: f32 = -1) {
+  constructor(name: string = '', friction: f32 = -1, restitution: f32 = -1) {
     /**
      * @property name
      * @type {String}

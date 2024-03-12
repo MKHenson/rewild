@@ -158,7 +158,7 @@ export class MeshComponent extends Component {
 
     //
 
-    _inverseMatrix.copy(matrixWorld).invertSIMD();
+    (_inverseMatrix.copy(matrixWorld) as EngineMatrix4).invertSIMD();
     _ray.copy(raycaster.ray).applyMatrix4(_inverseMatrix);
 
     // Check boundingBox before continuing

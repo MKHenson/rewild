@@ -15,6 +15,9 @@ export declare function createChunk(
   terrain: TransformNode,
   chunk: TerrainChunk
 ): void;
+export declare function debugF32Array(array: Float32Array): void;
+export declare function debugI32Array(array: Int32Array): void;
+export declare function debugUI32Array(array: Uint32Array): void;
 export declare function initializeSkybox(skybox: TransformNode): void;
 export declare function setupLights(
   numLights: u32,

@@ -10,7 +10,6 @@ export class TerrainChunk extends Mesh {
   constructor(
     chunkPtr: any,
     mapSize: i32,
-    unitSize: f32,
     heights: f32[],
     geometry: Geometry,
     pipeline: Pipeline<any>,
@@ -25,6 +24,6 @@ export class TerrainChunk extends Mesh {
 
     this.heightValues.set(heights);
 
-    wasm.generateChunkPhysicsBody(chunkPtr, mapSize, unitSize);
+    wasm.generateChunkPhysicsBody(chunkPtr, geometry.bufferGeometry as any);
   }
 }

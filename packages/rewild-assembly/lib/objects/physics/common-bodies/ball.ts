@@ -1,5 +1,5 @@
-import { Sphere, BodyOptions, Material, Body } from "rewild-physics";
-import { bouncyMaterial } from "../Materials";
+import { Sphere, BodyOptions, Material, Body } from 'rewild-physics';
+import { bouncyMaterial } from '../Materials';
 
 export function createBodyBall(radius: f32, mass: f32): Body {
   const sphereOptions = new BodyOptions()
@@ -8,6 +8,6 @@ export function createBodyBall(radius: f32, mass: f32): Body {
     .setMaterial(bouncyMaterial);
 
   const sphereBody = new Body(sphereOptions);
-  sphereBody.linearDamping = 0.01;
+  sphereBody.linearDamping = 0.5;
   return sphereBody;
 }

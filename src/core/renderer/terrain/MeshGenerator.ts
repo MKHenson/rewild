@@ -8,8 +8,8 @@ export class MeshGenerator {
   static generateTerrainMesh(heighMap: f32[][], heightMultiplier: f32 = 1) {
     const width = heighMap.length;
     const height = heighMap[0].length;
-    const topLeftX = width / -2; // (width - 1) / -2;
-    const topLeftZ = height / 2; // (height - 1) / 2;
+    const topLeftX = (width - 1) / -2;
+    const topLeftZ = (height - 1) / 2;
 
     const meshData = new MeshData(width, height);
     let vertexIndex: i32 = 0;
@@ -106,7 +106,6 @@ class MeshData {
     const chunk = new TerrainChunk(
       chunkPtr,
       this.meshSize,
-      this.vertices[1].x - this.vertices[0].x,
       this.vertices.map((v) => v.y),
       geometry,
       pipeline,
