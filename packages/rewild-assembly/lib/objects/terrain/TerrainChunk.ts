@@ -5,7 +5,6 @@ import { AttributeType, degToRad } from 'rewild-common';
 import { physicsManager } from '../physics/PhysicsManager';
 import { BufferGeometry } from '../../core/BufferGeometry';
 import { Float32BufferAttribute } from '../../core/BufferAttribute';
-import { debugF32Array, debugUI32Array } from '../../Imports';
 
 export class TerrainChunk extends TransformNode {
   heightValues: Float32Array | null;
@@ -13,6 +12,7 @@ export class TerrainChunk extends TransformNode {
 
   constructor() {
     super();
+    this.name = 'TerrainChunk';
     this.heightValues = null;
     this.body = null;
   }
@@ -44,9 +44,6 @@ export function generateChunkPhysicsBody(
   )!;
   const indicesAttribute = geometry.getIndexes()!;
   const vertsArray = rawVertsAttribute.getArray() as Float32Array;
-
-  debugF32Array(vertsArray);
-  debugUI32Array(indicesAttribute.array);
 
   const terrainBody = new Body(
     new BodyOptions().setMass(0).setMaterial(groundMaterial)

@@ -1,5 +1,5 @@
-import { createUUID } from "../utils/createUUID";
-import { Component, register } from "../Component";
+import { createUUID } from '../utils/createUUID';
+import { Component, register } from '../Component';
 
 interface Props {
   size: number;
@@ -7,7 +7,7 @@ interface Props {
   value: number;
 }
 
-@register("x-circular-progress")
+@register('x-circular-progress')
 export class CircularProgress extends Component<Props> {
   init() {
     //https://codepen.io/JMChristensen/pen/AGbeEy
@@ -39,17 +39,16 @@ export class CircularProgress extends Component<Props> {
           height={size}
           viewBox={`0 0 ${size} ${size}`}
           version="1.1"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+          xmlns="http://www.w3.org/2000/svg">
           <linearGradient id={gradientId} x1="1" x2="0.5" y1="1" y2="0.5">
             <stop
               class="stop1"
-              stop-color={val() < 50 ? "#ff0000" : "#eeff50"}
+              stop-color={val() < 50 ? '#ff0000' : '#eeff50'}
               offset="0%"
             />
             <stop
               class="stop2"
-              stop-color={val() < 50 ? "#eeff50" : "#9198e5"}
+              stop-color={val() < 50 ? '#eeff50' : '#9198e5'}
               offset="100%"
             />
           </linearGradient>
@@ -60,8 +59,7 @@ export class CircularProgress extends Component<Props> {
             cy={this.props.size / 2}
             fill="transparent"
             stroke-dasharray={(c * 2).toFixed(2)}
-            stroke-dashoffset="0"
-          ></circle>
+            stroke-dashoffset="0"></circle>
           <circle
             id="bar"
             r={radius}
@@ -69,16 +67,15 @@ export class CircularProgress extends Component<Props> {
             cy={this.props.size / 2}
             fill="transparent"
             stroke-dasharray={(c * 2).toFixed(2)}
-            stroke={`url(#$gradient)`}
-          ></circle>
+            stroke={`url(#$gradient)`}></circle>
         </svg>
         <div class="label-section">{val()}</div>
       </div>
     );
 
-    const firstCircle = elm.querySelector("#first-circle") as SVGCircleElement;
-    const circleBar = elm.querySelector("#bar") as SVGCircleElement;
-    const labelSection = elm.querySelector(".label-section") as HTMLDivElement;
+    const firstCircle = elm.querySelector('#first-circle') as SVGCircleElement;
+    const circleBar = elm.querySelector('#bar') as SVGCircleElement;
+    const labelSection = elm.querySelector('.label-section') as HTMLDivElement;
     const outerDivSection = elm;
 
     return () => {
@@ -93,7 +90,7 @@ export class CircularProgress extends Component<Props> {
       this.style.height = `${size}px`;
       this.style.width = `${size}px`;
 
-      circleBar.style.strokeWidth = strokeSize + "px";
+      circleBar.style.strokeWidth = strokeSize + 'px';
       circleBar.style.stroke = `url(#${gradientId})`;
       circleBar.style.strokeDashoffset = `${pct}px`;
 

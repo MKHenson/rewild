@@ -405,7 +405,7 @@ export class TransformNode
     for (let i: i32 = 0, l = components.length; i < l; i++) {
       const component = unchecked(components[i]);
       if (component instanceof MeshComponent)
-        component.raycast(raycaster, intersects);
+        (component as MeshComponent).raycast(raycaster, intersects);
     }
   }
 

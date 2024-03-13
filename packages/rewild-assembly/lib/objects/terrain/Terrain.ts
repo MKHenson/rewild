@@ -12,6 +12,7 @@ export class Terrain extends TransformNode {
 
   constructor() {
     super();
+    this.name = 'Terrain';
     this.isChunkLoaded = false;
     // this.plane = this.createBodyPlane();
   }

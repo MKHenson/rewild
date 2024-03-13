@@ -16,6 +16,9 @@ import { inputManager } from '../extras/io/InputManager';
 import { physicsManager } from '../objects/physics/PhysicsManager';
 import { getRuntime } from '../tests';
 import { BehaviourComponent } from './BehaviourComponent';
+import { Raycaster } from '../core/Raycaster';
+import { EngineVector3 } from '../math/Vector3';
+import { Intersection } from './MeshComponent';
 
 export class PlayerComponent extends BehaviourComponent implements Listener {
   readonly dataProperties: Int32Array;
@@ -28,6 +31,11 @@ export class PlayerComponent extends BehaviourComponent implements Listener {
   private runtime: Runtime | null;
   private playerBody: Body | null;
   private gravity: f32 = -9.8;
+  private raycaster: Raycaster;
+  private rayOrigin: EngineVector3;
+  private rayDirection: EngineVector3;
+  private intersections: Intersection[];
+  private playerHeight: f32;
 
   constructor() {
     super();
@@ -38,12 +46,17 @@ export class PlayerComponent extends BehaviourComponent implements Listener {
     this.hungerTimer = 0;
     this.criticalHungerTimer = 0;
     this.dataProperties = new Int32Array(3);
-    this.dataProperties[0] = 100;
-    this.dataProperties[1] = 0;
-    this.dataProperties[2] = 100;
     this.useOrbitController = false;
     this.isPaused = false;
     this.runtime = null;
+    this.raycaster = new Raycaster();
+    this.rayOrigin = new EngineVector3();
+    this.rayDirection = new EngineVector3(0, -1, 0);
+    this.intersections = [];
+    this.playerHeight = 1.8;
+    this.dataProperties[0] = 100;
+    this.dataProperties[1] = 0;
+    this.dataProperties[2] = 100;
   }
 
   mount(): void {
@@ -159,9 +172,26 @@ export class PlayerComponent extends BehaviourComponent implements Listener {
     const camera = this.runtime!.camera;
     const camPos = camera.position;
 
+    this.rayOrigin.set(camPos.x, 1000, camPos.z);
+    this.raycaster.set(this.rayOrigin, this.rayDirection);
+
     if (!this.useOrbitController) {
+      this.intersections.length = 0;
+      const intersections = this.intersections;
+
+      this.raycaster.intersectObjects(
+        this.runtime!.scene.children,
+        true,
+        intersections
+      );
+
+      let minValue: f32 = this.playerHeight;
+      if (intersections.length > 0)
+        minValue = intersections[0].point.y + this.playerHeight;
+
       let yValue = camPos.y + this.gravity * delta;
-      if (yValue < 0) yValue = 0;
+      if (yValue < minValue) yValue = minValue;
+
       camPos.set(camPos.x, yValue, camPos.z);
       this.playerBody!.position.set(camPos.x, camPos.y, camPos.z);
     }

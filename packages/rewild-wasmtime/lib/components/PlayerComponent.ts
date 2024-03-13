@@ -1,5 +1,5 @@
-import { wasm } from "../WasmManager";
-import { Component } from "./Component";
+import { wasm } from '../WasmManager';
+import { Component } from './Component';
 
 export class PlayerComponent extends Component {
   propertiesView: Int32Array;
