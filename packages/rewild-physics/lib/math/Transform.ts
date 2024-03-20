@@ -1,14 +1,19 @@
-import { Quaternion } from "./Quaternion";
-import { Vec3 } from "./Vec3";
+import { Vec3 } from '../math/Vec3';
+import { Quaternion } from '../math/Quaternion';
 
-const tmpQuat = new Quaternion();
+export type TransformOptions = ConstructorParameters<typeof Transform>[0];
 
 /**
- * @class Transform
- * @constructor
+ * Transformation utilities.
  */
 export class Transform {
+  /**
+   * position
+   */
   position: Vec3;
+  /**
+   * quaternion
+   */
   quaternion: Quaternion;
 
   constructor(
@@ -20,12 +25,7 @@ export class Transform {
   }
 
   /**
-   * @static
-   * @method pointToLocaFrame
-   * @param {Vec3} position
-   * @param {Quaternion} quaternion
-   * @param {Vec3} worldPoint
-   * @param {Vec3} result
+   * pointToLocalFrame
    */
   static pointToLocalFrame(
     position: Vec3,
@@ -41,12 +41,8 @@ export class Transform {
 
   /**
    * Get a global point in local transform coordinates.
-   * @method pointToLocal
-   * @param  {Vec3} point
-   * @param  {Vec3} result
-   * @return {Vec3} The "result" vector object
    */
-  pointToLocal(worldPoint: Vec3, result: Vec3): Vec3 {
+  pointToLocal(worldPoint: Vec3, result: Vec3 = new Vec3()): Vec3 {
     return Transform.pointToLocalFrame(
       this.position,
       this.quaternion,
@@ -56,12 +52,7 @@ export class Transform {
   }
 
   /**
-   * @static
-   * @method pointToWorldFrame
-   * @param {Vec3} position
-   * @param {Vec3} quaternion
-   * @param {Vec3} localPoint
-   * @param {Vec3} result
+   * pointToWorldFrame
    */
   static pointToWorldFrame(
     position: Vec3,
@@ -76,12 +67,8 @@ export class Transform {
 
   /**
    * Get a local point in global transform coordinates.
-   * @method pointToWorld
-   * @param  {Vec3} point
-   * @param  {Vec3} result
-   * @return {Vec3} The "result" vector object
    */
-  pointToWorld(localPoint: Vec3, result: Vec3): Vec3 {
+  pointToWorld(localPoint: Vec3, result: Vec3 = new Vec3()): Vec3 {
     return Transform.pointToWorldFrame(
       this.position,
       this.quaternion,
@@ -90,20 +77,29 @@ export class Transform {
     );
   }
 
+  /**
+   * vectorToWorldFrame
+   */
   vectorToWorldFrame(localVector: Vec3, result: Vec3 = new Vec3()): Vec3 {
     this.quaternion.vmult(localVector, result);
     return result;
   }
 
+  /**
+   * vectorToWorldFrame
+   */
   static vectorToWorldFrame(
     quaternion: Quaternion,
     localVector: Vec3,
-    result: Vec3
+    result: Vec3 = new Vec3()
   ): Vec3 {
     quaternion.vmult(localVector, result);
     return result;
   }
 
+  /**
+   * vectorToLocalFrame
+   */
   static vectorToLocalFrame(
     position: Vec3,
     quaternion: Quaternion,
@@ -116,3 +112,5 @@ export class Transform {
     return result;
   }
 }
+
+const tmpQuat = new Quaternion();

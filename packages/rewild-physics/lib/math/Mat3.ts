@@ -1,33 +1,27 @@
-import { Quaternion } from "./Quaternion";
-import { Vec3 } from "./Vec3";
+import { Vec3 } from '../math/Vec3';
+import type { Quaternion } from '../math/Quaternion';
 
+/**
+ * A 3x3 matrix.
+ * Authored by {@link http://github.com/schteppe/ schteppe}
+ */
 export class Mat3 {
+  /**
+   * A vector of length 9, containing all matrix elements.
+   */
   elements: f32[];
 
   /**
-   * A 3x3 matrix.
-   * @class Mat3
-   * @constructor
-   * @param array elements Array of nine elements. Optional.
-   * @author schteppe / http://github.com/schteppe
+   * @param elements A vector of length 9, containing all matrix elements.
    */
-  constructor(elements: f32[] | null = null) {
-    /**
-     * A vector of length 9, containing all matrix elements
-     * @property {Array} elements
-     */
-    if (elements) {
-      this.elements = elements;
-    } else {
-      this.elements = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-    }
+  constructor(elements: f32[] = [0, 0, 0, 0, 0, 0, 0, 0, 0]) {
+    this.elements = elements;
   }
 
   /**
    * Sets the matrix to identity
-   * @method identity
-   * @todo Should perhaps be renamed to setIdentity() to be more clear.
-   * @todo Create another function that immediately creates an identity matrix eg. eye()
+   * @todo Should perhaps be renamed to `setIdentity()` to be more clear.
+   * @todo Create another function that immediately creates an identity matrix eg. `eye()`
    */
   identity(): void {
     const e = this.elements;
@@ -46,7 +40,6 @@ export class Mat3 {
 
   /**
    * Set all elements to zero
-   * @method setZero
    */
   setZero(): void {
     const e = this.elements;
@@ -63,41 +56,35 @@ export class Mat3 {
 
   /**
    * Sets the matrix diagonal elements from a Vec3
-   * @method setTrace
-   * @param {Vec3} vec3
    */
-  setTrace(vec3: Vec3): void {
+  setTrace(vector: Vec3): void {
     const e = this.elements;
-    e[0] = vec3.x;
-    e[4] = vec3.y;
-    e[8] = vec3.z;
+    e[0] = vector.x;
+    e[4] = vector.y;
+    e[8] = vector.z;
   }
 
   /**
    * Gets the matrix diagonal elements
-   * @method getTrace
-   * @return {Vec3}
    */
-  getTrace(target: Vec3 = new Vec3()): void {
+  getTrace(target: Vec3 = new Vec3()): Vec3 {
     const e = this.elements;
     target.x = e[0];
     target.y = e[4];
     target.z = e[8];
+    return target;
   }
 
   /**
    * Matrix-Vector multiplication
-   * @method vmult
-   * @param {Vec3} v The vector to multiply with
-   * @param {Vec3} target Optional, target to save the result in.
+   * @param v The vector to multiply with
+   * @param target Optional, target to save the result in.
    */
   vmult(v: Vec3, target: Vec3 = new Vec3()): Vec3 {
-    target = target || new Vec3();
-
-    const e = this.elements,
-      x = v.x,
-      y = v.y,
-      z = v.z;
+    const e = this.elements;
+    const x = v.x;
+    const y = v.y;
+    const z = v.z;
     target.x = e[0] * x + e[1] * y + e[2] * z;
     target.y = e[3] * x + e[4] * y + e[5] * z;
     target.z = e[6] * x + e[7] * y + e[8] * z;
@@ -107,8 +94,6 @@ export class Mat3 {
 
   /**
    * Matrix-scalar multiplication
-   * @method smult
-   * @param {Number} s
    */
   smult(s: f32): void {
     for (let i: i32 = 0; i < this.elements.length; i++) {
@@ -118,61 +103,79 @@ export class Mat3 {
 
   /**
    * Matrix multiplication
-   * @method mmult
-   * @param {Mat3} m Matrix to multiply with from left side.
-   * @return {Mat3} The result.
+   * @param matrix Matrix to multiply with from left side.
    */
-  mmult(m: Mat3, target: Mat3 = new Mat3()): Mat3 {
-    const r = target;
-    for (let i: i32 = 0; i < 3; i++) {
-      for (let j: i32 = 0; j < 3; j++) {
-        let sum: f32 = 0.0;
-        for (let k = 0; k < 3; k++) {
-          sum += m.elements[i + k * 3] * this.elements[k + j * 3];
-        }
-        r.elements[i + j * 3] = sum;
-      }
-    }
-    return r;
+  mmult(matrix: Mat3, target: Mat3 = new Mat3()): Mat3 {
+    const A = this.elements;
+    const B = matrix.elements;
+    const T = target.elements;
+
+    const a11 = A[0],
+      a12 = A[1],
+      a13 = A[2],
+      a21 = A[3],
+      a22 = A[4],
+      a23 = A[5],
+      a31 = A[6],
+      a32 = A[7],
+      a33 = A[8];
+
+    const b11 = B[0],
+      b12 = B[1],
+      b13 = B[2],
+      b21 = B[3],
+      b22 = B[4],
+      b23 = B[5],
+      b31 = B[6],
+      b32 = B[7],
+      b33 = B[8];
+
+    T[0] = a11 * b11 + a12 * b21 + a13 * b31;
+    T[1] = a11 * b12 + a12 * b22 + a13 * b32;
+    T[2] = a11 * b13 + a12 * b23 + a13 * b33;
+
+    T[3] = a21 * b11 + a22 * b21 + a23 * b31;
+    T[4] = a21 * b12 + a22 * b22 + a23 * b32;
+    T[5] = a21 * b13 + a22 * b23 + a23 * b33;
+
+    T[6] = a31 * b11 + a32 * b21 + a33 * b31;
+    T[7] = a31 * b12 + a32 * b22 + a33 * b32;
+    T[8] = a31 * b13 + a32 * b23 + a33 * b33;
+
+    return target;
   }
 
   /**
    * Scale each column of the matrix
-   * @method scale
-   * @param {Vec3} v
-   * @return {Mat3} The result.
    */
-  scale(v: Vec3, target: Mat3 = new Mat3()): Mat3 {
-    target = target || new Mat3();
-    const e = this.elements,
-      t = target.elements;
+  scale(vector: Vec3, target: Mat3 = new Mat3()): Mat3 {
+    const e = this.elements;
+    const t = target.elements;
     for (let i: i32 = 0; i !== 3; i++) {
-      t[3 * i + 0] = v.x * e[3 * i + 0];
-      t[3 * i + 1] = v.y * e[3 * i + 1];
-      t[3 * i + 2] = v.z * e[3 * i + 2];
+      t[3 * i + 0] = vector.x * e[3 * i + 0];
+      t[3 * i + 1] = vector.y * e[3 * i + 1];
+      t[3 * i + 2] = vector.z * e[3 * i + 2];
     }
     return target;
   }
 
   /**
    * Solve Ax=b
-   * @method solve
-   * @param {Vec3} b The right hand side
-   * @param {Vec3} target Optional. Target vector to save in.
-   * @return {Vec3} The solution x
+   * @param b The right hand side
+   * @param target Optional. Target vector to save in.
+   * @return The solution x
    * @todo should reuse arrays
    */
   solve(b: Vec3, target: Vec3 = new Vec3()): Vec3 {
-    target = target || new Vec3();
-
     // Construct equations
     const nr = 3; // num rows
     const nc = 4; // num cols
     const eqns: i32[] = [];
-    for (let i: i32 = 0; i < nr * nc; i++) {
+    let i: i32 = 0;
+    let j: i32 = 0;
+    for (i = 0; i < nr * nc; i++) {
       eqns.push(0);
     }
-    let i: i32, j: i32;
     for (i = 0; i < 3; i++) {
       for (j = 0; j < 3; j++) {
         eqns[i + nc * j] = this.elements[i + 3 * j];
@@ -183,17 +186,18 @@ export class Mat3 {
     eqns[3 + 4 * 2] = b.z;
 
     // Compute right upper triangular version of the matrix - Gauss elimination
-    let n: i32 = 3,
-      k: i32 = n;
-    let np: i32;
+    let n: i32 = 3;
+
+    const k: i32 = n;
+    let np: i32 = 0;
     const kp = 4; // num rows
-    let p: i32; // els: i32;
+    let p: i32 = 0;
     do {
       i = k - n;
-      if (eqns[i + nc * i] === 0) {
+      if (eqns[i + nc * i] == 0) {
         // the pivot is null, swap lines
         for (j = i + 1; j < k; j++) {
-          if (eqns[i + nc * j] !== 0) {
+          if (eqns[i + nc * j] != 0) {
             np = kp;
             do {
               // do ligne( i ) = ligne( i ) + ligne( k )
@@ -206,12 +210,13 @@ export class Mat3 {
       }
       if (eqns[i + nc * i] !== 0) {
         for (j = i + 1; j < k; j++) {
-          let multiplier: i32 = eqns[i + nc * j] / eqns[i + nc * i];
+          const multiplier: i32 = eqns[i + nc * j] / eqns[i + nc * i];
           np = kp;
           do {
             // do ligne( k ) = ligne( k ) - multiplier * ligne( i )
             p = kp - np;
-            eqns[p + nc * j] = p <= i ? 0 : eqns[p + nc * j] - eqns[p + nc * i] * multiplier;
+            eqns[p + nc * j] =
+              p <= i ? 0 : eqns[p + nc * j] - eqns[p + nc * i] * multiplier;
           } while (--np);
         }
       }
@@ -219,26 +224,23 @@ export class Mat3 {
 
     // Get the solution
     target.z = eqns[2 * nc + 3] / eqns[2 * nc + 2];
-    target.y = (eqns[1 * nc + 3] - eqns[1 * nc + 2] * target.z) / eqns[1 * nc + 1];
-    target.x = (eqns[0 * nc + 3] - eqns[0 * nc + 2] * target.z - eqns[0 * nc + 1] * target.y) / eqns[0 * nc + 0];
+    target.y =
+      (eqns[1 * nc + 3] - eqns[1 * nc + 2] * target.z) / eqns[1 * nc + 1];
+    target.x =
+      (eqns[0 * nc + 3] -
+        eqns[0 * nc + 2] * target.z -
+        eqns[0 * nc + 1] * target.y) /
+      eqns[0 * nc + 0];
 
     if (
-      isNaN(target.x) ||
-      isNaN(target.y) ||
-      isNaN(target.z) ||
+      isNaN<f32>(target.x) ||
+      isNaN<f32>(target.y) ||
+      isNaN<f32>(target.z) ||
       target.x === Infinity ||
       target.y === Infinity ||
       target.z === Infinity
     ) {
-      throw (
-        "Could not solve equation! Got x=[" +
-        target.toString() +
-        "], b=[" +
-        b.toString() +
-        "], A=[" +
-        this.toString() +
-        "]"
-      );
+      throw `Could not solve equation! Got x=[${target.toString()}], b=[${b.toString()}], A=[${this.toString()}]`;
     }
 
     return target;
@@ -246,44 +248,36 @@ export class Mat3 {
 
   /**
    * Get an element in the matrix by index. Index starts at 0, not 1!!!
-   * @method e
-   * @param {Number} row
-   * @param {Number} column
-   * @param {Number} value Optional. If provided, the matrix element will be set to this value.
-   * @return {Number}
+   * @param value If provided, the matrix element will be set to this value.
    */
-  e(row: i32, column: i32, value: f32): f32 {
-    // if (value == undefined) {
-    //   return this.elements[column + 3 * row];
-    // } else {
-    // Set value
-    this.elements[column + 3 * row] = value;
-    //   return value;
-    // }
-    return value;
+  e(row: i32, column: i32): f32;
+  e(row: i32, column: i32, value: f32): f32;
+  e(row: i32, column: i32, value?: f32): f32 {
+    if (value == undefined) {
+      return this.elements[column + 3 * row];
+    } else {
+      // Set value
+      this.elements[column + 3 * row] = value;
+      return value;
+    }
   }
 
   /**
    * Copy another matrix into this matrix object.
-   * @method copy
-   * @param {Mat3} source
-   * @return {Mat3} this
    */
-  copy(source: Mat3): Mat3 {
-    for (let i = 0; i < source.elements.length; i++) {
-      this.elements[i] = source.elements[i];
+  copy(matrix: Mat3): Mat3 {
+    for (let i = 0; i < matrix.elements.length; i++) {
+      this.elements[i] = matrix.elements[i];
     }
     return this;
   }
 
   /**
    * Returns a string representation of the matrix.
-   * @method toString
-   * @return string
    */
   toString(): string {
-    let r = "";
-    const sep = ",";
+    let r = '';
+    const sep = ',';
     for (let i = 0; i < 9; i++) {
       r += this.elements[i] + sep;
     }
@@ -292,19 +286,16 @@ export class Mat3 {
 
   /**
    * reverse the matrix
-   * @method reverse
-   * @param {Mat3} target Optional. Target matrix to save in.
-   * @return {Mat3} The solution x
+   * @param target Target matrix to save in.
+   * @return The solution x
    */
   reverse(target: Mat3 = new Mat3()): Mat3 {
     // Construct equations
     const nr: i32 = 3; // num rows
     const nc: i32 = 6; // num cols
-    const eqns: i32[] = [];
-    for (let i = 0; i < nr * nc; i++) {
-      eqns.push(0);
-    }
-    let i: i32, j: i32;
+    const eqns = reverse_eqns;
+    let i: i32 = 0;
+    let j: i32 = 0;
     for (i = 0; i < 3; i++) {
       for (j = 0; j < 3; j++) {
         eqns[i + nc * j] = this.elements[i + 3 * j];
@@ -321,8 +312,9 @@ export class Mat3 {
     eqns[5 + 6 * 2] = 1;
 
     // Compute right upper triangular version of the matrix - Gauss elimination
-    let n: i32 = 3,
-      k: i32 = n;
+    let n: i32 = 3;
+
+    const k: i32 = n;
     let np: i32;
     const kp: i32 = nc; // num rows
     let p: i32;
@@ -344,12 +336,13 @@ export class Mat3 {
       }
       if (eqns[i + nc * i] !== 0) {
         for (j = i + 1; j < k; j++) {
-          const multiplier = eqns[i + nc * j] / eqns[i + nc * i];
+          const multiplier: number = eqns[i + nc * j] / eqns[i + nc * i];
           np = kp;
           do {
             // do line( k ) = line( k ) - multiplier * line( i )
             p = kp - np;
-            eqns[p + nc * j] = p <= i ? 0 : eqns[p + nc * j] - eqns[p + nc * i] * multiplier;
+            eqns[p + nc * j] =
+              p <= i ? 0 : eqns[p + nc * j] - eqns[p + nc * i] * multiplier;
           } while (--np);
         }
       }
@@ -360,7 +353,7 @@ export class Mat3 {
     do {
       j = i - 1;
       do {
-        const multiplier = eqns[i + nc * j] / eqns[i + nc * i];
+        const multiplier: f32 = eqns[i + nc * j] / eqns[i + nc * i];
         np = nc;
         do {
           p = nc - np;
@@ -372,7 +365,7 @@ export class Mat3 {
     // operations on the diagonal
     i = 2;
     do {
-      const multiplier = 1 / eqns[i + nc * i];
+      const multiplier: f32 = 1 / eqns[i + nc * i];
       np = nc;
       do {
         p = nc - np;
@@ -385,8 +378,8 @@ export class Mat3 {
       j = 2;
       do {
         p = eqns[nr + j + nc * i];
-        if (isNaN(p) || p === Infinity) {
-          throw "Could not reverse! A=[" + this.toString() + "]";
+        if (isNaN<i32>(p) || p === Infinity) {
+          throw `Could not reverse! A=[${this.toString()}]`;
         }
         target.e(i, j, p);
       } while (j--);
@@ -397,27 +390,25 @@ export class Mat3 {
 
   /**
    * Set the matrix from a quaterion
-   * @method setRotationFromQuaternion
-   * @param {Quaternion} q
    */
   setRotationFromQuaternion(q: Quaternion): Mat3 {
-    const x = q.x,
-      y = q.y,
-      z = q.z,
-      w = q.w,
-      x2 = x + x,
-      y2 = y + y,
-      z2 = z + z,
-      xx = x * x2,
-      xy = x * y2,
-      xz = x * z2,
-      yy = y * y2,
-      yz = y * z2,
-      zz = z * z2,
-      wx = w * x2,
-      wy = w * y2,
-      wz = w * z2,
-      e = this.elements;
+    const x = q.x;
+    const y = q.y;
+    const z = q.z;
+    const w = q.w;
+    const x2 = x + x;
+    const y2 = y + y;
+    const z2 = z + z;
+    const xx = x * x2;
+    const xy = x * y2;
+    const xz = x * z2;
+    const yy = y * y2;
+    const yz = y * z2;
+    const zz = z * z2;
+    const wx = w * x2;
+    const wy = w * y2;
+    const wz = w * z2;
+    const e = this.elements;
 
     e[3 * 0 + 0] = 1 - (yy + zz);
     e[3 * 0 + 1] = xy - wz;
@@ -436,20 +427,35 @@ export class Mat3 {
 
   /**
    * Transpose the matrix
-   * @method transpose
-   * @param  {Mat3} target Where to store the result.
-   * @return {Mat3} The target Mat3, or a new Mat3 if target was omitted.
+   * @param target Optional. Where to store the result.
+   * @return The target Mat3, or a new Mat3 if target was omitted.
    */
   transpose(target: Mat3 = new Mat3()): Mat3 {
-    const Mt = target.elements,
-      M = this.elements;
+    const M = this.elements;
+    const T = target.elements;
+    let tmp;
 
-    for (let i = 0; i !== 3; i++) {
-      for (let j = 0; j !== 3; j++) {
-        Mt[3 * i + j] = M[3 * j + i];
-      }
-    }
+    //Set diagonals
+    T[0] = M[0];
+    T[4] = M[4];
+    T[8] = M[8];
+
+    tmp = M[1];
+    T[1] = M[3];
+    T[3] = tmp;
+
+    tmp = M[2];
+    T[2] = M[6];
+    T[6] = tmp;
+
+    tmp = M[5];
+    T[5] = M[7];
+    T[7] = tmp;
 
     return target;
   }
 }
+
+const reverse_eqns: f32[] = [
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];

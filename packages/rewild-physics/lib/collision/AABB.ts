@@ -1,32 +1,21 @@
-import { Quaternion } from "../math/Quaternion";
-import { Transform } from "../math/Transform";
-import { Vec3 } from "../math/Vec3";
-import { Ray } from "./Ray";
+import { Vec3 } from '../math/Vec3';
+import type { Ray } from '../collision/Ray';
+import type { Transform } from '../math/Transform';
+import type { Quaternion } from '../math/Quaternion';
 
-const tmp = new Vec3();
-const transformIntoFrame_corners = [
-  new Vec3(),
-  new Vec3(),
-  new Vec3(),
-  new Vec3(),
-  new Vec3(),
-  new Vec3(),
-  new Vec3(),
-  new Vec3(),
-];
-
+/**
+ * Axis aligned bounding box class.
+ */
 export class AABB {
+  /**
+   * The lower bound of the bounding box
+   */
   lowerBound: Vec3;
+  /**
+   * The upper bound of the bounding box
+   */
   upperBound: Vec3;
 
-  /**
-   * Axis aligned bounding box class.
-   * @class AABB
-   * @constructor
-   * @param {Object} [options]
-   * @param {Vec3}   [options.upperBound]
-   * @param {Vec3}   [options.lowerBound]
-   */
   constructor(lowerBound: Vec3 = new Vec3(), upperBound: Vec3 = new Vec3()) {
     this.lowerBound = lowerBound;
     this.upperBound = upperBound;
@@ -34,22 +23,18 @@ export class AABB {
 
   /**
    * Set the AABB bounds from a set of points.
-   * @method setFromPoints
-   * @param {Array} points An array of Vec3's.
-   * @param {Vec3} position
-   * @param {Quaternion} quaternion
-   * @param {number} skinSize
-   * @return {AABB} The self object
+   * @param points An array of Vec3's.
+   * @return The self object
    */
   setFromPoints(
     points: Vec3[],
-    position: Vec3 | null = null,
-    quaternion: Quaternion | null = null,
-    skinSize: f32 = 0
+    position?: Vec3,
+    quaternion?: Quaternion,
+    skinSize?: number
   ): AABB {
-    const l = this.lowerBound,
-      u = this.upperBound,
-      q = quaternion;
+    const l = this.lowerBound;
+    const u = this.upperBound;
+    const q = quaternion;
 
     // Set to the first point
     l.copy(points[0]);
@@ -106,9 +91,8 @@ export class AABB {
 
   /**
    * Copy bounds from an AABB to this AABB
-   * @method copy
-   * @param  {AABB} aabb Source to copy from
-   * @return {AABB} The this object, for chainability
+   * @param aabb Source to copy from
+   * @return The this object, for chainability
    */
   copy(aabb: AABB): AABB {
     this.lowerBound.copy(aabb.lowerBound);
@@ -118,7 +102,6 @@ export class AABB {
 
   /**
    * Clone an AABB
-   * @method clone
    */
   clone(): AABB {
     return new AABB().copy(this);
@@ -126,8 +109,6 @@ export class AABB {
 
   /**
    * Extend this AABB so that it covers the given AABB too.
-   * @method extend
-   * @param  {AABB} aabb
    */
   extend(aabb: AABB): void {
     this.lowerBound.x = Mathf.min(this.lowerBound.x, aabb.lowerBound.x);
@@ -140,15 +121,12 @@ export class AABB {
 
   /**
    * Returns true if the given AABB overlaps this AABB.
-   * @method overlaps
-   * @param  {AABB} aabb
-   * @return {Boolean}
    */
   overlaps(aabb: AABB): boolean {
-    const l1 = this.lowerBound,
-      u1 = this.upperBound,
-      l2 = aabb.lowerBound,
-      u2 = aabb.upperBound;
+    const l1 = this.lowerBound;
+    const u1 = this.upperBound;
+    const l2 = aabb.lowerBound;
+    const u2 = aabb.upperBound;
 
     //      l2        u2
     //      |---------|
@@ -167,22 +145,19 @@ export class AABB {
 
   // Mostly for debugging
   volume(): f32 {
-    const l = this.lowerBound,
-      u = this.upperBound;
+    const l = this.lowerBound;
+    const u = this.upperBound;
     return (u.x - l.x) * (u.y - l.y) * (u.z - l.z);
   }
 
   /**
    * Returns true if the given AABB is fully contained in this AABB.
-   * @method contains
-   * @param {AABB} aabb
-   * @return {Boolean}
    */
   contains(aabb: AABB): boolean {
-    const l1 = this.lowerBound,
-      u1 = this.upperBound,
-      l2 = aabb.lowerBound,
-      u2 = aabb.upperBound;
+    const l1 = this.lowerBound;
+    const u1 = this.upperBound;
+    const l2 = aabb.lowerBound;
+    const u2 = aabb.upperBound;
 
     //      l2        u2
     //      |---------|
@@ -199,17 +174,6 @@ export class AABB {
     );
   }
 
-  /**
-   * @method getCorners
-   * @param {Vec3} a
-   * @param {Vec3} b
-   * @param {Vec3} c
-   * @param {Vec3} d
-   * @param {Vec3} e
-   * @param {Vec3} f
-   * @param {Vec3} g
-   * @param {Vec3} h
-   */
   getCorners(
     a: Vec3,
     b: Vec3,
@@ -220,14 +184,14 @@ export class AABB {
     g: Vec3,
     h: Vec3
   ): void {
-    const l = this.lowerBound,
-      u = this.upperBound;
+    const l = this.lowerBound;
+    const u = this.upperBound;
 
     a.copy(l);
     b.set(u.x, l.y, l.z);
     c.set(u.x, u.y, l.z);
     d.set(l.x, u.y, u.z);
-    e.set(u.x, l.y, l.z);
+    e.set(u.x, l.y, u.z);
     f.set(l.x, u.y, l.z);
     g.set(l.x, l.y, u.z);
     h.copy(u);
@@ -235,10 +199,7 @@ export class AABB {
 
   /**
    * Get the representation of an AABB in another frame.
-   * @method toLocalFrame
-   * @param  {Transform} frame
-   * @param  {AABB} target
-   * @return {AABB} The "target" AABB object.
+   * @return The "target" AABB object.
    */
   toLocalFrame(frame: Transform, target: AABB): AABB {
     const corners = transformIntoFrame_corners;
@@ -255,7 +216,7 @@ export class AABB {
     this.getCorners(a, b, c, d, e, f, g, h);
 
     // Transform them to new local frame
-    for (let i: i32 = 0; i !== 8; i++) {
+    for (let i = 0; i !== 8; i++) {
       const corner = corners[i];
       frame.pointToLocal(corner, corner);
     }
@@ -265,10 +226,7 @@ export class AABB {
 
   /**
    * Get the representation of an AABB in the global frame.
-   * @method toWorldFrame
-   * @param  {Transform} frame
-   * @param  {AABB} target
-   * @return {AABB} The "target" AABB object.
+   * @return The "target" AABB object.
    */
   toWorldFrame(frame: Transform, target: AABB): AABB {
     const corners = transformIntoFrame_corners;
@@ -295,27 +253,26 @@ export class AABB {
 
   /**
    * Check if the AABB is hit by a ray.
-   * @param  {Ray} ray
-   * @return {number}
    */
   overlapsRay(ray: Ray): boolean {
-    // const t = 0;
+    const { direction, from } = ray;
+    // const t = 0
 
     // ray.direction is unit direction vector of ray
-    const dirFracX = 1 / ray._direction.x;
-    const dirFracY = 1 / ray._direction.y;
-    const dirFracZ = 1 / ray._direction.z;
+    const dirFracX = 1 / direction.x;
+    const dirFracY = 1 / direction.y;
+    const dirFracZ = 1 / direction.z;
 
     // this.lowerBound is the corner of AABB with minimal coordinates - left bottom, rt is maximal corner
-    const t1 = (this.lowerBound.x - ray.from.x) * dirFracX;
-    const t2 = (this.upperBound.x - ray.from.x) * dirFracX;
-    const t3 = (this.lowerBound.y - ray.from.y) * dirFracY;
-    const t4 = (this.upperBound.y - ray.from.y) * dirFracY;
-    const t5 = (this.lowerBound.z - ray.from.z) * dirFracZ;
-    const t6 = (this.upperBound.z - ray.from.z) * dirFracZ;
+    const t1 = (this.lowerBound.x - from.x) * dirFracX;
+    const t2 = (this.upperBound.x - from.x) * dirFracX;
+    const t3 = (this.lowerBound.y - from.y) * dirFracY;
+    const t4 = (this.upperBound.y - from.y) * dirFracY;
+    const t5 = (this.lowerBound.z - from.z) * dirFracZ;
+    const t6 = (this.upperBound.z - from.z) * dirFracZ;
 
-    // const tmin = Mathf.max(Mathf.max(Mathf.min(t1, t2), Mathf.min(t3, t4)));
-    // const tmax = Mathf.min(Mathf.min(Mathf.max(t1, t2), Mathf.max(t3, t4)));
+    // const tmin = Math.max(Math.max(Math.min(t1, t2), Math.min(t3, t4)));
+    // const tmax = Math.min(Math.min(Math.max(t1, t2), Math.max(t3, t4)));
     const tmin = Mathf.max(
       Mathf.max(Mathf.min(t1, t2), Mathf.min(t3, t4)),
       Mathf.min(t5, t6)
@@ -340,3 +297,16 @@ export class AABB {
     return true;
   }
 }
+
+const tmp = new Vec3();
+
+const transformIntoFrame_corners = [
+  new Vec3(),
+  new Vec3(),
+  new Vec3(),
+  new Vec3(),
+  new Vec3(),
+  new Vec3(),
+  new Vec3(),
+  new Vec3(),
+];
