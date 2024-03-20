@@ -69,7 +69,7 @@ export class InGameLevel extends Level {
     if (this.player) this.parentObject3D.add(this.player);
 
     const camera = new Camera();
-    camera.setPosition(0, 20, 20);
+    camera.setPosition(20, 0, 0);
     camera.lookAt(0, 0, 0);
   }
 

@@ -4,16 +4,16 @@ import { Vec3 } from '../math/Vec3';
 import { ConvexPolyhedron } from './ConvexPolyhedron';
 import { Shape } from './Shape';
 
-const getHeightAt_idx: i32[] = [];
-const getHeightAt_weights = new Vec3();
-const getHeightAt_a = new Vec3();
-const getHeightAt_b = new Vec3();
-const getHeightAt_c = new Vec3();
-const getNormalAt_a = new Vec3();
-const getNormalAt_b = new Vec3();
-const getNormalAt_c = new Vec3();
-const getNormalAt_e0 = new Vec3();
-const getNormalAt_e1 = new Vec3();
+export const getHeightAt_idx: i32[] = [];
+export const getHeightAt_weights = new Vec3();
+export const getHeightAt_a = new Vec3();
+export const getHeightAt_b = new Vec3();
+export const getHeightAt_c = new Vec3();
+export const getNormalAt_a = new Vec3();
+export const getNormalAt_b = new Vec3();
+export const getNormalAt_c = new Vec3();
+export const getNormalAt_e0 = new Vec3();
+export const getNormalAt_e1 = new Vec3();
 
 // from https://en.wikipedia.org/wiki/Barycentric_coordinate_system
 function barycentricWeights(
@@ -590,7 +590,7 @@ export class Heightfield extends Shape {
       faces[3][2] = 3;
       faces[3][3] = 4;
 
-      // +xy facing quad
+      // +x -z facing quad
       faces[4][0] = 4;
       faces[4][1] = 5;
       faces[4][2] = 2;

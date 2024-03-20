@@ -1,9 +1,14 @@
 export {
   createPlayerComponent,
-  getPlayerComponentProperties,
-} from "./PlayerComponent";
+  getPlayerHealth,
+  getPlayerHunger,
+  getPlayerIsDead,
+  setPlayerHealth,
+  setPlayerHunger,
+  setPlayerIsDead,
+} from './PlayerComponent';
 export {
   createPhysicsComponent,
   getPhysicsComponentProperties,
-} from "./PhysicsComponent";
-export { createPlanetComponent } from "./PlanetComponent";
+} from './PhysicsComponent';
+export { createPlanetComponent } from './PlanetComponent';

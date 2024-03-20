@@ -1,4 +1,4 @@
-import { Body, BodyOptions, ConvexPolyhedron, Vec3 } from 'rewild-physics';
+import { Body, BodyOptions, NewHeightfield, Vec3 } from 'rewild-physics';
 import { TransformNode } from '../../core/TransformNode';
 import { groundMaterial } from '../physics/Materials';
 import { AttributeType, degToRad } from 'rewild-common';
@@ -34,36 +34,44 @@ export class TerrainChunk extends TransformNode {
 
 export function generateChunkPhysicsBody(
   chunk: TerrainChunk,
-  geometry: BufferGeometry
+  geometry: BufferGeometry,
+  size: i32
 ): void {
-  // Get vertices
-  const verts: Vec3[] = [];
-  const faces: i32[][] = [];
   const rawVertsAttribute = geometry.getAttribute<Float32BufferAttribute>(
     AttributeType.POSITION
   )!;
-  const indicesAttribute = geometry.getIndexes()!;
+  const indexBuffer = geometry.indexes!.array;
   const vertsArray = rawVertsAttribute.getArray() as Float32Array;
 
+  const heights: f32[][] = new Array<f32[]>(size);
+  if (geometry.boundingBox == null) geometry.computeBoundingBox();
+
+  // Generate the heights array from the vertex and indices data
+  for (let i: i32 = 0; i < size; i++) {
+    heights[i] = new Array<f32>(size);
+
+    for (let j: i32 = 0; j < size; j++) {
+      const index = i * size + j;
+      const y = vertsArray[index * 3 + 1];
+      heights[i][j] = 0;
+    }
+  }
+
+  const heightmapShape = new NewHeightfield(heights);
   const terrainBody = new Body(
     new BodyOptions().setMass(0).setMaterial(groundMaterial)
   );
 
-  for (let j: i32 = 0; j < vertsArray.length; j += 3) {
-    verts.push(new Vec3(vertsArray[j], vertsArray[j + 1], vertsArray[j + 2]));
-  }
+  console.log(`geometry.boundingBox!.min.x = ${geometry.boundingBox!.min.x}`);
+  console.log(`geometry.boundingBox!.min.z = ${geometry.boundingBox!.min.z}`);
 
-  for (let j: i32 = 0; j < indicesAttribute.array.length; j += 3) {
-    faces.push([
-      indicesAttribute.array[j + 0],
-      indicesAttribute.array[j + 1],
-      indicesAttribute.array[j + 2],
-    ]);
-  }
-
-  // Construct polyhedron
-  const bunnyPart = new ConvexPolyhedron(verts, faces);
-  terrainBody.addShape(bunnyPart);
+  terrainBody.addShape(heightmapShape);
+  // terrainBody.position.set(
+  //   geometry.boundingBox!.min.x,
+  //   0,
+  //   geometry.boundingBox!.min.z
+  // );
+  // terrainBody.quaternion.setFromAxisAngle(new Vec3(1, 0, 0), -degToRad(15));
   chunk.body = terrainBody;
 }
 

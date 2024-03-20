@@ -40,30 +40,6 @@ export class MeshGenerator {
       }
     }
 
-    // var v0 = new Vector3();
-    // var v1 = new Vector3();
-    // var v2 = new Vector3();
-    // for (var xi = 0; xi < height - 1; xi++) {
-    //   for (var yi = 0; yi < width - 1; yi++) {
-    //     for (var k = 0; k < 2; k++) {
-    //       shape.getConvexTrianglePillar(xi, yi, k === 0);
-    //       v0.copy(shape.pillarConvex.vertices[0]);
-    //       v1.copy(shape.pillarConvex.vertices[1]);
-    //       v2.copy(shape.pillarConvex.vertices[2]);
-    //       v0.vadd(shape.pillarOffset, v0);
-    //       v1.vadd(shape.pillarOffset, v1);
-    //       v2.vadd(shape.pillarOffset, v2);
-    //       geometry.vertices.push(
-    //         new THREE.Vector3(v0.x, v0.y, v0.z),
-    //         new THREE.Vector3(v1.x, v1.y, v1.z),
-    //         new THREE.Vector3(v2.x, v2.y, v2.z)
-    //       );
-    //       var i = geometry.vertices.length - 3;
-    //       geometry.faces.push(new THREE.Face3(i, i + 1, i + 2));
-    //     }
-    //   }
-    // }
-
     return meshData;
   }
 }

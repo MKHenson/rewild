@@ -24,6 +24,10 @@ export class TerrainChunk extends Mesh {
 
     this.heightValues.set(heights);
 
-    wasm.generateChunkPhysicsBody(chunkPtr, geometry.bufferGeometry as any);
+    wasm.generateChunkPhysicsBody(
+      chunkPtr,
+      geometry.bufferGeometry as any,
+      mapSize
+    );
   }
 }

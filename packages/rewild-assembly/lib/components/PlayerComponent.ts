@@ -21,7 +21,9 @@ import { EngineVector3 } from '../math/Vector3';
 import { Intersection } from './MeshComponent';
 
 export class PlayerComponent extends BehaviourComponent implements Listener {
-  readonly dataProperties: Int32Array;
+  hunger: i32;
+  health: i32;
+  isDead: boolean;
   private hungerTimer: f32;
   private criticalHungerTimer: f32;
   private orbitController: OrbitController | null;
@@ -45,7 +47,7 @@ export class PlayerComponent extends BehaviourComponent implements Listener {
     this.pointerController = null;
     this.hungerTimer = 0;
     this.criticalHungerTimer = 0;
-    this.dataProperties = new Int32Array(3);
+
     this.useOrbitController = false;
     this.isPaused = false;
     this.runtime = null;
@@ -54,9 +56,9 @@ export class PlayerComponent extends BehaviourComponent implements Listener {
     this.rayDirection = new EngineVector3(0, -1, 0);
     this.intersections = [];
     this.playerHeight = 1.8;
-    this.dataProperties[0] = 100;
-    this.dataProperties[1] = 0;
-    this.dataProperties[2] = 100;
+    this.hunger = 100;
+    this.isDead = false;
+    this.health = 100;
   }
 
   mount(): void {
@@ -192,6 +194,8 @@ export class PlayerComponent extends BehaviourComponent implements Listener {
       let yValue = camPos.y + this.gravity * delta;
       if (yValue < minValue) yValue = minValue;
 
+      yValue = 0;
+
       camPos.set(camPos.x, yValue, camPos.z);
       this.playerBody!.position.set(camPos.x, camPos.y, camPos.z);
     }
@@ -220,36 +224,32 @@ export class PlayerComponent extends BehaviourComponent implements Listener {
     this.orbitController!.enabled = false;
     uiSignaller.signalClientEvent(ApplicationEventType.PlayerDied);
   }
-
-  get health(): i32 {
-    return this.dataProperties[0];
-  }
-
-  set health(val: i32) {
-    this.dataProperties[0] = val;
-  }
-
-  get isDead(): boolean {
-    return this.dataProperties[1] === 0 ? false : true;
-  }
-
-  set isDead(val: boolean) {
-    this.dataProperties[1] = val ? 1 : 0;
-  }
-
-  get hunger(): i32 {
-    return this.dataProperties[2];
-  }
-
-  set hunger(val: i32) {
-    this.dataProperties[2] = val;
-  }
 }
 
 export function createPlayerComponent(): PlayerComponent {
   return new PlayerComponent();
 }
 
-export function getPlayerComponentProperties(player: PlayerComponent): usize {
-  return changetype<usize>(player.dataProperties);
+export function getPlayerHunger(player: PlayerComponent): i32 {
+  return player.hunger;
+}
+
+export function setPlayerHunger(player: PlayerComponent, val: i32): void {
+  player.hunger = val;
+}
+
+export function getPlayerHealth(player: PlayerComponent): i32 {
+  return player.health;
+}
+
+export function setPlayerHealth(player: PlayerComponent, val: i32): void {
+  player.health = val;
+}
+
+export function getPlayerIsDead(player: PlayerComponent): boolean {
+  return player.isDead;
+}
+
+export function setPlayerIsDead(player: PlayerComponent, val: boolean): void {
+  player.isDead = val;
 }
