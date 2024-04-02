@@ -1,79 +1,86 @@
-import { Event, Listener } from "rewild-common";
+import { Vec3 } from '../math/Vec3';
+import { Body, BodyOptions } from '../objects/Body';
+import { Sphere } from '../shapes/Sphere';
+import { Box } from '../shapes/Box';
+import { HingeConstraint } from '../constraints/HingeConstraint';
+import { World } from '../world/World';
+import { Listener, Event } from 'rewild-common';
 
-import { HingeConstraint } from "../constraints/HingeConstraint";
-import { Vec3 } from "../math/Vec3";
-import { Box } from "../shapes/Box";
-import { Sphere } from "../shapes/Sphere";
-import { World } from "../world/World";
-import { Body, BodyOptions } from "./Body";
-
-const torque = new Vec3();
-const worldAxis = new Vec3();
-
+/**
+ * Simple vehicle helper class with spherical rigid body wheels.
+ */
 export class RigidVehicle implements Listener {
+  /**
+   * The bodies of the wheels.
+   */
   wheelBodies: Body[];
   coordinateSystem: Vec3;
+  /**
+   * The chassis body.
+   */
   chassisBody: Body;
+  /**
+   * The constraints.
+   */
   constraints: HingeConstraint[];
+  /**
+   * The wheel axes.
+   */
   wheelAxes: Vec3[];
+  /**
+   * The wheel forces.
+   */
   wheelForces: f32[];
 
-  /**
-   * Simple vehicle helper class with spherical rigid body wheels.
-   * @class RigidVehicle
-   * @constructor
-   * @param {Body} [options.chassisBody]
-   */
-  constructor(coordinateSystem: Vec3 | null = new Vec3(1, 2, 3), chassisBody: Body | null = null) {
+  constructor(
+    coordinateSystem: Vec3 | null = new Vec3(1, 2, 3),
+    chassisBody: Body | null = null
+  ) {
     this.wheelBodies = [];
+    this.coordinateSystem = !coordinateSystem
+      ? new Vec3(1, 2, 3)
+      : coordinateSystem.clone();
 
-    /**
-     * @property coordinateSystem
-     * @type {Vec3}
-     */
-    this.coordinateSystem = !coordinateSystem ? new Vec3(1, 2, 3) : coordinateSystem.clone();
-
-    /**
-     * @property {Body} chassisBody
-     */
-
-    if (!chassisBody) {
+    if (chassisBody) {
+      this.chassisBody = chassisBody;
+    } else {
       // No chassis body given. Create it!
-      const chassisShape = new Box(new Vec3(5, 2, 0.5));
       const bodyOptions = new BodyOptions();
       bodyOptions.mass = 1;
-      bodyOptions.shape = chassisShape;
+      bodyOptions.shape = new Box(new Vec3(5, 0.5, 2));
       this.chassisBody = new Body(bodyOptions);
-    } else this.chassisBody = chassisBody;
+    }
 
-    /**
-     * @property constraints
-     * @type {Array}
-     */
     this.constraints = [];
-
     this.wheelAxes = [];
     this.wheelForces = [];
   }
 
   /**
    * Add a wheel
-   * @method addWheel
-   * @param {object} options
-   * @param {boolean} [options.isFrontWheel]
-   * @param {Vec3} [options.position] Position of the wheel, locally in the chassis body.
-   * @param {Vec3} [options.direction] Slide direction of the wheel along the suspension.
-   * @param {Vec3} [options.axis] Axis of rotation of the wheel, locally defined in the chassis.
-   * @param {Body} [options.body] The wheel body.
    */
-  addWheel(body: Body | null = null, pos: Vec3 | null = null, ax: Vec3 | null = null): i32 {
-    let wheelBody = body;
-    if (!wheelBody) {
+  addWheel(
+    /** The wheel body */
+    body: Body | null = null,
+    /** Position of the wheel, locally in the chassis body. */
+    pos: Vec3 | null = null,
+    /** Axis of rotation of the wheel, locally defined in the chassis. */
+    ax: Vec3 | null = null,
+    /** Slide direction of the wheel along the suspension. */
+    direction: Vec3 | null = null
+  ): number {
+    let wheelBody: Body;
+
+    if (body) {
+      wheelBody = body;
+    } else {
+      // No wheel body given. Create it!
       const wheelOptions = new BodyOptions();
       wheelOptions.mass = 1;
       wheelOptions.shape = new Sphere(1.2);
       wheelBody = new Body(wheelOptions);
     }
+
     this.wheelBodies.push(wheelBody);
     this.wheelForces.push(0);
 
@@ -86,10 +93,17 @@ export class RigidVehicle implements Listener {
     wheelBody.position.set(worldPosition.x, worldPosition.y, worldPosition.z);
 
     // Constrain wheel
-    const axis = ax ? ax.clone() : new Vec3(0, 1, 0);
+    const axis = ax ? ax.clone() : new Vec3(0, 0, 1);
     this.wheelAxes.push(axis);
 
-    const hingeConstraint = new HingeConstraint(this.chassisBody, wheelBody, position, Vec3.ZERO, axis, axis);
+    const hingeConstraint = new HingeConstraint(
+      this.chassisBody,
+      wheelBody,
+      position,
+      Vec3.ZERO,
+      axis,
+      axis
+    );
     hingeConstraint.collideConnected = false;
     this.constraints.push(hingeConstraint);
 
@@ -98,40 +112,30 @@ export class RigidVehicle implements Listener {
 
   /**
    * Set the steering value of a wheel.
-   * @method setSteeringValue
-   * @param {number} value
-   * @param {integer} wheelIndex
    * @todo check coordinateSystem
    */
   setSteeringValue(value: f32, wheelIndex: i32): void {
     // Set angle of the hinge axis
     const axis = this.wheelAxes[wheelIndex];
 
-    const c = Mathf.cos(value),
-      s = Mathf.sin(value),
-      x = axis.x,
-      y = axis.y;
-    this.constraints[wheelIndex].axisA.set(c * x - s * y, s * x + c * y, 0);
+    const c = Mathf.cos(value);
+    const s = Mathf.sin(value);
+    const x = axis.x;
+    const z = axis.z;
+    this.constraints[wheelIndex].axisA.set(-c * x + s * z, 0, s * x + c * z);
   }
 
   /**
    * Set the target rotational speed of the hinge constraint.
-   * @method setMotorSpeed
-   * @param {number} value
-   * @param {integer} wheelIndex
    */
   setMotorSpeed(value: f32, wheelIndex: i32): void {
     const hingeConstraint = this.constraints[wheelIndex];
     hingeConstraint.enableMotor();
-    hingeConstraint.setMotorSpeed(value);
-    // hingeConstraint.motorTargetVelocity = value;
+    hingeConstraint.motorTargetVelocity = value;
   }
 
   /**
    * Set the target rotational speed of the hinge constraint.
-   * @method disableMotor
-   * @param {number} value
-   * @param {integer} wheelIndex
    */
   disableMotor(wheelIndex: i32): void {
     const hingeConstraint = this.constraints[wheelIndex];
@@ -140,9 +144,6 @@ export class RigidVehicle implements Listener {
 
   /**
    * Set the wheel force to apply on one of the wheels each time step
-   * @method setWheelForce
-   * @param  {number} value
-   * @param  {integer} wheelIndex
    */
   setWheelForce(value: f32, wheelIndex: i32): void {
     this.wheelForces[wheelIndex] = value;
@@ -150,9 +151,6 @@ export class RigidVehicle implements Listener {
 
   /**
    * Apply a torque on one of the wheels.
-   * @method applyWheelForce
-   * @param  {number} value
-   * @param  {integer} wheelIndex
    */
   applyWheelForce(value: f32, wheelIndex: i32): void {
     const axis = this.wheelAxes[wheelIndex];
@@ -166,8 +164,6 @@ export class RigidVehicle implements Listener {
 
   /**
    * Add the vehicle including its constraints to the world.
-   * @method addToWorld
-   * @param {World} world
    */
   addToWorld(world: World): void {
     const constraints = this.constraints;
@@ -181,16 +177,16 @@ export class RigidVehicle implements Listener {
       world.addConstraint(constraints[i]);
     }
 
-    world.addEventListener("preStep", this);
+    world.addEventListener('preStep', this);
   }
 
   onEvent(event: Event): void {
-    if (event.type === "preStep") {
+    if (event.type == 'preStep') {
       this._update();
     }
   }
 
-  _update(): void {
+  private _update(): void {
     const wheelForces = this.wheelForces;
     for (let i: i32 = 0; i < wheelForces.length; i++) {
       this.applyWheelForce(wheelForces[i], i);
@@ -199,15 +195,13 @@ export class RigidVehicle implements Listener {
 
   /**
    * Remove the vehicle including its constraints from the world.
-   * @method removeFromWorld
-   * @param {World} world
    */
   removeFromWorld(world: World): void {
     const constraints = this.constraints;
     const bodies = this.wheelBodies.concat([this.chassisBody]);
 
     for (let i: i32 = 0; i < bodies.length; i++) {
-      world.remove(bodies[i]);
+      world.removeBody(bodies[i]);
     }
 
     for (let i: i32 = 0; i < constraints.length; i++) {
@@ -217,8 +211,6 @@ export class RigidVehicle implements Listener {
 
   /**
    * Get current rotational velocity of a wheel
-   * @method getWheelSpeed
-   * @param {integer} wheelIndex
    */
   getWheelSpeed(wheelIndex: i32): f32 {
     const axis = this.wheelAxes[wheelIndex];
@@ -228,3 +220,7 @@ export class RigidVehicle implements Listener {
     return w.dot(worldAxis);
   }
 }
+
+const torque = new Vec3();
+
+const worldAxis = new Vec3();
