@@ -3,14 +3,16 @@ export class OverlapKeeper {
   previous: i32[];
 
   /**
-   * @class OverlapKeeper
-   * @constructor
+   * @todo Remove useless constructor
    */
   constructor() {
     this.current = [];
     this.previous = [];
   }
 
+  /**
+   * getKey
+   */
   getKey(i: i32, j: i32): i32 {
     if (j < i) {
       const temp = j;
@@ -21,19 +23,17 @@ export class OverlapKeeper {
   }
 
   /**
-   * @method set
-   * @param {Number} i
-   * @param {Number} j
+   * set
    */
   set(i: i32, j: i32): void {
     // Insertion sort. This way the diff will have linear complexity.
     const key = this.getKey(i, j);
     const current = this.current;
     let index: i32 = 0;
-    while (key < current.length && key > current[index]) {
+    while (key > current[index]) {
       index++;
     }
-    if (key < current.length && key == current[index]) {
+    if (key == current[index]) {
       return; // Pair was already added
     }
     for (let j: i32 = current.length - 1; j >= index; j--) {
@@ -43,7 +43,7 @@ export class OverlapKeeper {
   }
 
   /**
-   * @method tick
+   * tick
    */
   tick(): void {
     const tmp = this.current;
@@ -53,9 +53,7 @@ export class OverlapKeeper {
   }
 
   /**
-   * @method getDiff
-   * @param  {array} additions
-   * @param  {array} removals
+   * getDiff
    */
   getDiff(additions: i32[], removals: i32[]): void {
     const a = this.current;

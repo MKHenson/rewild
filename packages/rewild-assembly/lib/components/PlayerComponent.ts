@@ -77,7 +77,7 @@ export class PlayerComponent extends BehaviourComponent implements Listener {
 
     this.orbitController!.enabled = false;
     this.pointerController!.enabled = true;
-    physicsManager.world.add(this.playerBody!);
+    physicsManager.world.addBody(this.playerBody!);
     lock();
   }
 

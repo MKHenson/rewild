@@ -1,7 +1,7 @@
 import { Vec3 } from '../math/Vec3';
-import type { Ray } from '../collision/Ray';
-import type { Transform } from '../math/Transform';
-import type { Quaternion } from '../math/Quaternion';
+import { Ray } from '../collision/Ray';
+import { Transform } from '../math/Transform';
+import { Quaternion } from '../math/Quaternion';
 
 /**
  * Axis aligned bounding box class.
@@ -28,9 +28,9 @@ export class AABB {
    */
   setFromPoints(
     points: Vec3[],
-    position?: Vec3,
-    quaternion?: Quaternion,
-    skinSize?: number
+    position: Vec3 | null = null,
+    quaternion: Quaternion | null = null,
+    skinSize: f32 = 0
   ): AABB {
     const l = this.lowerBound;
     const u = this.upperBound;
@@ -255,7 +255,8 @@ export class AABB {
    * Check if the AABB is hit by a ray.
    */
   overlapsRay(ray: Ray): boolean {
-    const { direction, from } = ray;
+    const direction = ray.direction;
+    const from = ray.from;
     // const t = 0
 
     // ray.direction is unit direction vector of ray

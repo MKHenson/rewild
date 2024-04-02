@@ -1,6 +1,6 @@
-import { GSSolver, NaiveBroadphase, World, WorldOptions } from "rewild-physics";
-import { performanceNow } from "../../Imports";
-import { contactMaterials } from "./Materials";
+import { GSSolver, NaiveBroadphase, World, WorldOptions } from 'rewild-physics';
+import { performanceNow } from '../../Imports';
+import { contactMaterials } from './Materials';
 
 class PhysicsManager {
   world: World;

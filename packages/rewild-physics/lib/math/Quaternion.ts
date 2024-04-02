@@ -251,9 +251,9 @@ export class Quaternion {
    * @param order Three-character string, defaults to "YZX"
    */
   toEuler(target: Vec3, order: string = 'YZX'): void {
-    let heading: f32;
-    let attitude: f32;
-    let bank: f32;
+    let heading: f32 = 0;
+    let attitude: f32 = 0;
+    let bank: f32 = 0;
     const x = this.x;
     const y = this.y;
     const z = this.z;
@@ -288,8 +288,8 @@ export class Quaternion {
     }
 
     target.y = heading;
-    target.z = attitude as f32;
-    target.x = bank as f32;
+    target.z = attitude;
+    target.x = bank;
   }
 
   /**

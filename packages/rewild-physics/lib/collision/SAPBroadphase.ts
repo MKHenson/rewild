@@ -1,74 +1,53 @@
-import { Event, Listener } from "rewild-common";
-import { Body } from "../objects/Body";
-import { BodyEvent, World } from "../world/World";
-import { AABB } from "./AABB";
-import { Broadphase } from "./Broadphase";
+import { Broadphase } from '../collision/Broadphase';
+import { AABB } from '../collision/AABB';
+import { Body } from '../objects/Body';
+import { BodyEvent, World } from '../world/World';
+import { Event, Listener } from 'rewild-common';
 
+/**
+ * Sweep and prune broadphase along one axis.
+ */
 export class SAPBroadphase extends Broadphase implements Listener {
+  /**
+   * List of bodies currently in the broadphase.
+   */
   axisList: Body[];
-  world: World | null;
-  axisIndex: i32;
-  // _addBodyHandler: (e: { body: Body }) => void;
-  // _removeBodyHandler: (e: { body: Body }) => void;
 
   /**
-   * Sweep and prune broadphase along one axis.
-   *
-   * @class SAPBroadphase
-   * @constructor
-   * @param {World} [world]
-   * @extends Broadphase
+   * The world to search in.
    */
+  world: World | null;
+
+  /**
+   * Axis to sort the bodies along.
+   * Set to 0 for x axis, and 1 for y axis.
+   * For best performance, pick the axis where bodies are most distributed.
+   */
+  axisIndex: i32;
+
   constructor(world: World) {
     super();
 
-    /**
-     * List of bodies currently in the broadphase.
-     * @property axisList
-     * @type {Array}
-     */
     this.axisList = [];
-
-    /**
-     * The world to search in.
-     * @property world
-     * @type {World}
-     */
     this.world = null;
-
-    /**
-     * Axis to sort the bodies along. Set to 0 for x axis, and 1 for y axis. For best performance, choose an axis that the bodies are spread out more on.
-     * @property axisIndex
-     * @type {Number}
-     */
     this.axisIndex = 0;
-
-    // const axisList = this.axisList;
-
-    // this._addBodyHandler = function (e) {
-    //   axisList.push(e.body);
-    // };
-
-    // this._removeBodyHandler = function (e) {
-    //   const idx = axisList.indexOf(e.body);
-    //   if (idx != -1) {
-    //     axisList.splice(idx, 1);
-    //   }
-    // };
 
     if (world) {
       this.setWorld(world);
     }
   }
 
+  // private _addBodyHandler: (event: { body: Body }) => void;
+  // private _removeBodyHandler: (event: { body: Body }) => void;
+
+  // Note: these are identical, save for x/y/z lowerbound
   onEvent(event: Event): void {
     const e = event as BodyEvent;
+    const axisList = this.axisList;
 
-    if (event.type == "addBody") {
-      this.axisList.push(e.body!);
-    } else if (event.type == "removeBody") {
-      const axisList = this.axisList;
-
+    if (event.type == 'addBody') {
+      axisList.push((event as BodyEvent).body!);
+    } else if (event.type == 'removeBody') {
       const idx = axisList.indexOf(e.body!);
       if (idx != -1) {
         axisList.splice(idx, 1);
@@ -78,8 +57,6 @@ export class SAPBroadphase extends Broadphase implements Listener {
 
   /**
    * Change the world
-   * @method setWorld
-   * @param  {World} world
    */
   setWorld(world: World): void {
     // Clear the old axis array
@@ -91,28 +68,24 @@ export class SAPBroadphase extends Broadphase implements Listener {
     }
 
     // Remove old handlers, if any
-    world.removeEventListener("addBody", this);
-    world.removeEventListener("removeBody", this);
+    world.removeEventListener('addBody', this);
+    world.removeEventListener('removeBody', this);
 
     // Add handlers to update the list of bodies.
-    world.addEventListener("addBody", this);
-    world.addEventListener("removeBody", this);
+    world.addEventListener('addBody', this);
+    world.addEventListener('removeBody', this);
 
     this.world = world;
     this.dirty = true;
   }
 
   /**
-   * @static
-   * @method insertionSortX
-   * @param  {Array} a
-   * @return {Array}
+   * insertionSortX
    */
   static insertionSortX(a: Body[]): Body[] {
-    let j: i32 = 0;
-
     for (let i: i32 = 1, l = a.length; i < l; i++) {
       const v = a[i];
+      let j: i32 = 0;
       for (j = i - 1; j >= 0; j--) {
         if (a[j].aabb.lowerBound.x <= v.aabb.lowerBound.x) {
           break;
@@ -125,16 +98,12 @@ export class SAPBroadphase extends Broadphase implements Listener {
   }
 
   /**
-   * @static
-   * @method insertionSortY
-   * @param  {Array} a
-   * @return {Array}
+   * insertionSortY
    */
   static insertionSortY(a: Body[]): Body[] {
-    let j: i32 = 0;
-
     for (let i: i32 = 1, l = a.length; i < l; i++) {
       const v = a[i];
+      let j: i32 = 0;
       for (j = i - 1; j >= 0; j--) {
         if (a[j].aabb.lowerBound.y <= v.aabb.lowerBound.y) {
           break;
@@ -147,15 +116,12 @@ export class SAPBroadphase extends Broadphase implements Listener {
   }
 
   /**
-   * @static
-   * @method insertionSortZ
-   * @param  {Array} a
-   * @return {Array}
+   * insertionSortZ
    */
   static insertionSortZ(a: Body[]): Body[] {
-    let j: i32 = 0;
     for (let i: i32 = 1, l = a.length; i < l; i++) {
       const v = a[i];
+      let j: i32 = 0;
       for (j = i - 1; j >= 0; j--) {
         if (a[j].aabb.lowerBound.z <= v.aabb.lowerBound.z) {
           break;
@@ -169,16 +135,13 @@ export class SAPBroadphase extends Broadphase implements Listener {
 
   /**
    * Collect all collision pairs
-   * @method collisionPairs
-   * @param  {World} world
-   * @param  {Array} p1
-   * @param  {Array} p2
    */
   collisionPairs(world: World, p1: Body[], p2: Body[]): void {
-    const bodies = this.axisList,
-      N = bodies.length,
-      axisIndex = this.axisIndex;
-    let i: i32, j: i32;
+    const bodies = this.axisList;
+    const N = bodies.length;
+    const axisIndex = this.axisIndex;
+    let i: i32;
+    let j: i32;
 
     if (this.dirty) {
       this.sortList();
@@ -214,7 +177,7 @@ export class SAPBroadphase extends Broadphase implements Listener {
     for (let i: i32 = 0; i != N; i++) {
       const bi = axisList[i];
       if (bi.aabbNeedsUpdate) {
-        bi.computeAABB();
+        bi.updateAABB();
       }
     }
 
@@ -230,12 +193,6 @@ export class SAPBroadphase extends Broadphase implements Listener {
 
   /**
    * Check if the bounds of two bodies overlap, along the given SAP axis.
-   * @static
-   * @method checkBounds
-   * @param  {Body} bi
-   * @param  {Body} bj
-   * @param  {Number} axisIndex
-   * @return {Boolean}
    */
   static checkBounds(bi: Body, bj: Body, axisIndex: i32): boolean {
     let biPos: f32 = 0;
@@ -254,29 +211,26 @@ export class SAPBroadphase extends Broadphase implements Listener {
 
     const ri = bi.boundingRadius,
       rj = bj.boundingRadius,
-      // boundA1 = biPos - ri,
       boundA2 = biPos + ri,
       boundB1 = bjPos - rj;
-    // boundB2 = bjPos + rj;
 
     return boundB1 < boundA2;
   }
 
   /**
-   * Computes the variance of the body positions and estimates the best
-   * axis to use. Will automatically set property .axisIndex.
-   * @method autoDetectAxis
+   * Computes the variance of the body positions and estimates the best axis to use.
+   * Will automatically set property `axisIndex`.
    */
   autoDetectAxis(): void {
-    let sumX = 0,
-      sumX2 = 0,
-      sumY = 0,
-      sumY2 = 0,
-      sumZ = 0,
-      sumZ2 = 0,
-      bodies = this.axisList,
-      N = bodies.length,
-      invN = 1 / N;
+    let sumX: f32 = 0;
+    let sumX2: f32 = 0;
+    let sumY: f32 = 0;
+    let sumY2: f32 = 0;
+    let sumZ: f32 = 0;
+    let sumZ2: f32 = 0;
+    const bodies = this.axisList;
+    const N: i32 = bodies.length;
+    const invN: f32 = 1 / N;
 
     for (let i: i32 = 0; i != N; i++) {
       const b = bodies[i];
@@ -294,9 +248,9 @@ export class SAPBroadphase extends Broadphase implements Listener {
       sumZ2 += centerZ * centerZ;
     }
 
-    const varianceX = sumX2 - sumX * sumX * invN,
-      varianceY = sumY2 - sumY * sumY * invN,
-      varianceZ = sumZ2 - sumZ * sumZ * invN;
+    const varianceX = sumX2 - sumX * sumX * invN;
+    const varianceY = sumY2 - sumY * sumY * invN;
+    const varianceZ = sumZ2 - sumZ * sumZ * invN;
 
     if (varianceX > varianceY) {
       if (varianceX > varianceZ) {
@@ -313,37 +267,31 @@ export class SAPBroadphase extends Broadphase implements Listener {
 
   /**
    * Returns all the bodies within an AABB.
-   * @method aabbQuery
-   * @param  {World} world
-   * @param  {AABB} aabb
-   * @param {array} result An array to store resulting bodies in.
-   * @return {array}
+   * @param result An array to store resulting bodies in.
    */
-  aabbQuery(world: World, aabb: AABB, result: Body[]): Body[] {
-    result = result || [];
-
+  aabbQuery(world: World, aabb: AABB, result: Body[] = []): Body[] {
     if (this.dirty) {
       this.sortList();
       this.dirty = false;
     }
 
     // const axisIndex = this.axisIndex;
-    // let axis: i16 = "x";
-    // if (axisIndex == 1) {
-    //   axis = "y";
+    // let axis: 'x' | 'y' | 'z' = 'x';
+    // if (axisIndex === 1) {
+    //   axis = 'y';
     // }
-    // if (axisIndex == 2) {
-    //   axis = "z";
+    // if (axisIndex === 2) {
+    //   axis = 'z';
     // }
 
     const axisList = this.axisList;
-    // const lower = axisIndex == 0 ? aabb.lowerBound.x : axisIndex == 1 ? aabb.lowerBound.y : aabb.lowerBound.z;
-    // const upper = axisIndex == 0 ? aabb.upperBound.x : axisIndex == 1 ? aabb.upperBound.y : aabb.upperBound.z;
+    // const lower = aabb.lowerBound[axis];
+    // const upper = aabb.upperBound[axis];
     for (let i: i32 = 0; i < axisList.length; i++) {
       const b = axisList[i];
 
       if (b.aabbNeedsUpdate) {
-        b.computeAABB();
+        b.updateAABB();
       }
 
       if (b.aabb.overlaps(aabb)) {

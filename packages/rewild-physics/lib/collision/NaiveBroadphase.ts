@@ -1,17 +1,16 @@
-import { Body } from "../objects/Body";
-import { World } from "../world/World";
-import { AABB } from "./AABB";
-import { Broadphase } from "./Broadphase";
+import { Broadphase } from '../collision/Broadphase';
+import { AABB } from '../collision/AABB';
+import { Body } from '../objects/Body';
+import { World } from '../world/World';
 
-// const tmpAABB = new AABB();
-
+/**
+ * Naive broadphase implementation, used in lack of better ones.
+ *
+ * The naive broadphase looks at all possible pairs without restriction, therefore it has complexity N^2 _(which is bad)_
+ */
 export class NaiveBroadphase extends Broadphase {
   /**
-   * Naive broadphase implementation, used in lack of better ones.
-   * @class NaiveBroadphase
-   * @constructor
-   * @description The naive broadphase looks at all possible pairs without restriction, therefore it has complexity N^2 (which is bad)
-   * @extends Broadphase
+   * @todo Remove useless constructor
    */
   constructor() {
     super();
@@ -19,19 +18,16 @@ export class NaiveBroadphase extends Broadphase {
 
   /**
    * Get all the collision pairs in the physics world
-   * @method collisionPairs
-   * @param {World} world
-   * @param {Array} pairs1
-   * @param {Array} pairs2
    */
   collisionPairs(world: World, pairs1: Body[], pairs2: Body[]): void {
-    const bodies = world.bodies,
-      n = bodies.length;
-    let i: i32, j: i32, bi: Body, bj: Body;
+    const bodies = world.bodies;
+    const n = bodies.length;
+    let bi: Body;
+    let bj: Body;
 
     // Naive N^2 ftw!
-    for (i = 0; i !== n; i++) {
-      for (j = 0; j !== i; j++) {
+    for (let i: i32 = 0; i != n; i++) {
+      for (let j: i32 = 0; j != i; j++) {
         bi = bodies[i];
         bj = bodies[j];
 
@@ -46,20 +42,14 @@ export class NaiveBroadphase extends Broadphase {
 
   /**
    * Returns all the bodies within an AABB.
-   * @method aabbQuery
-   * @param  {World} world
-   * @param  {AABB} aabb
-   * @param {array} result An array to store resulting bodies in.
-   * @return {array}
+   * @param result An array to store resulting bodies in.
    */
-  aabbQuery(world: World, aabb: AABB, result: Body[]): Body[] {
-    result = result || [];
-
+  aabbQuery(world: World, aabb: AABB, result: Body[] = []): Body[] {
     for (let i: i32 = 0; i < world.bodies.length; i++) {
       const b = world.bodies[i];
 
       if (b.aabbNeedsUpdate) {
-        b.computeAABB();
+        b.updateAABB();
       }
 
       // Ugly hack until Body gets aabb

@@ -1,21 +1,19 @@
-import { AABB } from "../collision/AABB";
-import { Ray } from "../collision/Ray";
-import { Transform } from "../math/Transform";
-import { Vec3 } from "../math/Vec3";
-
-const halfDiagonal = new Vec3();
-const tmpAABB = new AABB();
+import { AABB } from '../collision/AABB';
+import { Vec3 } from '../math/Vec3';
+import { Transform } from '../math/Transform';
+import { Ray } from '../collision/Ray';
 
 /**
- * @class OctreeNode
- * @param {object} [options]
- * @param {Octree} [options.root]
- * @param {AABB} [options.aabb]
+ * OctreeNode
  */
-export class OctreeNode {
+class OctreeNode {
+  /** The root node */
   root: OctreeNode | null;
+  /** Boundary of this node */
   aabb: AABB;
+  /** Contained data at the current node level */
   data: i32[];
+  /** Children to this node */
   children: OctreeNode[];
   maxDepth: i32 = 8;
 
@@ -24,47 +22,28 @@ export class OctreeNode {
     aabb: AABB | null = null,
     maxDepth: i32 = 8
   ) {
-    /**
-     * The root node
-     * @property {OctreeNode} root
-     */
     this.root = root;
 
     this.maxDepth = maxDepth;
 
-    /**
-     * Boundary of this node
-     * @property {AABB} aabb
-     */
     this.aabb = aabb ? aabb.clone() : new AABB();
-
-    /**
-     * Contained data at the current node level.
-     * @property {Array} data
-     */
     this.data = [];
-
-    /**
-     * Children to this node
-     * @property {Array} children
-     */
     this.children = [];
   }
 
+  /**
+   * reset
+   */
   reset(): void {
     this.children.length = this.data.length = 0;
   }
 
   /**
    * Insert data into this node
-   * @method insert
-   * @param  {AABB} aabb
-   * @param  {object} elementData
-   * @return {boolean} True if successful, otherwise false
+   * @return True if successful, otherwise false
    */
   insert(aabb: AABB, elementData: i32, level: i32 = 0): boolean {
     const nodeData = this.data;
-    level = level || 0;
 
     // Ignore objects that do not belong in this node
     if (!this.aabb.contains(aabb)) {
@@ -72,8 +51,9 @@ export class OctreeNode {
     }
 
     const children = this.children;
+    const maxDepth = this.maxDepth || this.root!.maxDepth;
 
-    if (level < (this.maxDepth || this.root!.maxDepth)) {
+    if (level < maxDepth) {
       // Subdivide if there are no children yet
       let subdivided = false;
       if (!children.length) {
@@ -101,8 +81,7 @@ export class OctreeNode {
   }
 
   /**
-   * Create 8 equally sized children nodes and put them in the .children array.
-   * @method subdivide
+   * Create 8 equally sized children nodes and put them in the `children` array.
    */
   subdivide(): void {
     const aabb = this.aabb;
@@ -146,10 +125,7 @@ export class OctreeNode {
 
   /**
    * Get all data, potentially within an AABB
-   * @method aabbQuery
-   * @param  {AABB} aabb
-   * @param  {array} result
-   * @return {array} The "result" object
+   * @return The "result" object
    */
   aabbQuery(aabb: AABB, result: i32[]): i32[] {
     // const nodeData = this.data;
@@ -166,7 +142,7 @@ export class OctreeNode {
     // @todo unwrap recursion into a queue / loop, that's faster in JS
     // const children = this.children;
 
-    // for (const i = 0, N = this.children.length; i !== N; i++) {
+    // for (let i = 0, N = this.children.length; i !== N; i++) {
     //     children[i].aabbQuery(aabb, result);
     // }
 
@@ -191,15 +167,11 @@ export class OctreeNode {
 
   /**
    * Get all data, potentially intersected by a ray.
-   * @method rayQuery
-   * @param  {Ray} ray
-   * @param  {Transform} treeTransform
-   * @param  {array} result
-   * @return {array} The "result" object
+   * @return The "result" object
    */
   rayQuery(ray: Ray, treeTransform: Transform, result: i32[]): i32[] {
     // Use aabb query for now.
-    // @todo implement real ray query which needs less lookups
+    /** @todo implement real ray query which needs less lookups */
     ray.getAABB(tmpAABB);
     tmpAABB.toLocalFrame(treeTransform, tmpAABB);
     this.aabbQuery(tmpAABB, result);
@@ -208,42 +180,38 @@ export class OctreeNode {
   }
 
   /**
-   * @method removeEmptyNodes
+   * removeEmptyNodes
    */
   removeEmptyNodes(): void {
-    const queue: OctreeNode[] = [this];
-    while (queue.length) {
-      const node = queue.pop()!;
-      for (let i: i32 = node.children.length - 1; i >= 0; i--) {
-        if (!node.children[i].data.length) {
-          node.children.splice(i, 1);
-        }
-      }
-
-      // Array.prototype.push.apply(queue, node.children);
-      for (let i: i32 = 0; i < node.children.length; i++) {
-        queue.push(node.children[i]);
+    for (let i: i32 = this.children.length - 1; i >= 0; i--) {
+      this.children[i].removeEmptyNodes();
+      if (!this.children[i].children.length && !this.children[i].data.length) {
+        this.children.splice(i, 1);
       }
     }
   }
 }
 
 /**
- * @class Octree
- * @param {AABB} aabb The total AABB of the tree
- * @param {object} [options]
- * @param {number} [options.maxDepth=8]
- * @extends OctreeNode
+ * Octree
  */
 export class Octree extends OctreeNode {
+  /**
+   * Maximum subdivision depth
+   * @default 8
+   */
   maxDepth: i32;
+
+  /**
+   * @param aabb The total AABB of the tree
+   */
   constructor(aabb: AABB | null = null, maxDepth: i32 = 8) {
     super(null, aabb, maxDepth);
 
-    /**
-     * Maximum subdivision depth
-     * @property {number} maxDepth
-     */
     this.maxDepth = maxDepth;
   }
 }
+
+const halfDiagonal = new Vec3();
+
+const tmpAABB = new AABB();

@@ -1,56 +1,39 @@
-import { Quaternion } from "../math/Quaternion";
-import { Vec3 } from "../math/Vec3";
-import { ConvexPolyhedron } from "./ConvexPolyhedron";
-import { Shape } from "./Shape";
+import { Shape } from '../shapes/Shape';
+import { Vec3 } from '../math/Vec3';
+import { ConvexPolyhedron } from '../shapes/ConvexPolyhedron';
+import { Quaternion } from '../math/Quaternion';
 
-const worldCornerTempPos = new Vec3();
-// const worldCornerTempNeg = new Vec3();
-
-const worldCornersTemp = [
-  new Vec3(),
-  new Vec3(),
-  new Vec3(),
-  new Vec3(),
-  new Vec3(),
-  new Vec3(),
-  new Vec3(),
-  new Vec3(),
-];
-
+/**
+ * A 3d box shape.
+ * @example
+ *     const size = 1
+ *     const halfExtents = new CANNON.Vec3(size, size, size)
+ *     const boxShape = new CANNON.Box(halfExtents)
+ *     const boxBody = new CANNON.Body({ mass: 1, shape: boxShape })
+ *     world.addBody(boxBody)
+ */
 export class Box extends Shape {
   /**
-   * @property halfExtents
-   * @type {Vec3}
+   * The half extents of the box.
    */
   halfExtents: Vec3;
 
   /**
-   * Used by the contact generator to make contacts with other convex polyhedra for example
-   * @property convexPolyhedronRepresentation
-   * @type {ConvexPolyhedron}
+   * Used by the contact generator to make contacts with other convex polyhedra for example.
    */
-  convexPolyhedronRepresentation!: ConvexPolyhedron;
+  convexPolyhedronRepresentation: ConvexPolyhedron | null;
 
-  /**
-   * A 3d box shape.
-   * @class Box
-   * @constructor
-   * @param {Vec3} halfExtents
-   * @author schteppe
-   * @extends Shape
-   */
   constructor(halfExtents: Vec3) {
     super(Shape.BOX);
 
     this.halfExtents = halfExtents;
-
+    this.convexPolyhedronRepresentation = null;
     this.updateConvexPolyhedronRepresentation();
     this.updateBoundingSphereRadius();
   }
 
   /**
    * Updates the local convex polyhedron representation used for some collisions.
-   * @method updateConvexPolyhedronRepresentation
    */
   updateConvexPolyhedronRepresentation(): void {
     const sx = this.halfExtents.x;
@@ -68,7 +51,7 @@ export class Box extends Shape {
       new Vec3(-sx, sy, sz),
     ];
 
-    const indices: i32[][] = [
+    const faces: i32[][] = [
       [3, 2, 1, 0], // -z
       [4, 5, 6, 7], // +z
       [5, 4, 0, 1], // -y
@@ -77,21 +60,17 @@ export class Box extends Shape {
       [1, 2, 6, 5], // +x
     ];
 
-    // const axes = [new V(0, 0, 1), new V(0, 1, 0), new V(1, 0, 0)];
+    const axes = [new Vec3(0, 0, 1), new Vec3(0, 1, 0), new Vec3(1, 0, 0)];
 
-    const h = new ConvexPolyhedron(vertices, indices);
+    const h = new ConvexPolyhedron(vertices, faces, [], axes);
     this.convexPolyhedronRepresentation = h;
     h.material = this.material;
   }
 
   /**
-   * @method calculateLocalInertia
-   * @param  {Number} mass
-   * @param  {Vec3} target
-   * @return {Vec3}
+   * Calculate the inertia of the box.
    */
-  calculateLocalInertia(mass: f32, target: Vec3): Vec3 {
-    target = target || new Vec3();
+  calculateLocalInertia(mass: f32, target: Vec3 = new Vec3()): Vec3 {
     Box.calculateInertia(this.halfExtents, mass, target);
     return target;
   }
@@ -105,10 +84,8 @@ export class Box extends Shape {
 
   /**
    * Get the box 6 side normals
-   * @method getSideNormals
-   * @param {array}      sixTargetVectors An array of 6 vectors, to store the resulting side normals in.
-   * @param {Quaternion} quat             Orientation to apply to the normal vectors. If not provided, the vectors will be in respect to the local frame.
-   * @return {array}
+   * @param sixTargetVectors An array of 6 vectors, to store the resulting side normals in.
+   * @param quat Orientation to apply to the normal vectors. If not provided, the vectors will be in respect to the local frame.
    */
   getSideNormals(sixTargetVectors: Vec3[], quat: Quaternion): Vec3[] {
     const sides = sixTargetVectors;
@@ -129,14 +106,23 @@ export class Box extends Shape {
     return sides;
   }
 
+  /**
+   * Returns the volume of the box.
+   */
   volume(): f32 {
     return 8.0 * this.halfExtents.x * this.halfExtents.y * this.halfExtents.z;
   }
 
+  /**
+   * updateBoundingSphereRadius
+   */
   updateBoundingSphereRadius(): void {
-    this.boundingSphereRadius = this.halfExtents.norm();
+    this.boundingSphereRadius = this.halfExtents.length();
   }
 
+  /**
+   * forEachWorldCorner
+   */
   forEachWorldCorner(
     pos: Vec3,
     quat: Quaternion,
@@ -165,6 +151,9 @@ export class Box extends Shape {
     }
   }
 
+  /**
+   * calculateWorldAABB
+   */
   calculateWorldAABB(pos: Vec3, quat: Quaternion, min: Vec3, max: Vec3): void {
     const e = this.halfExtents;
     worldCornersTemp[0].set(e.x, e.y, e.z);
@@ -235,3 +224,16 @@ export class Box extends Shape {
     // });
   }
 }
+
+const worldCornerTempPos = new Vec3();
+
+const worldCornersTemp = [
+  new Vec3(),
+  new Vec3(),
+  new Vec3(),
+  new Vec3(),
+  new Vec3(),
+  new Vec3(),
+  new Vec3(),
+  new Vec3(),
+];

@@ -1,35 +1,32 @@
-import { ConeEquation } from "../equations/ConeEquation";
-import { RotationalEquation } from "../equations/RotationalEquation";
-import { Vec3 } from "../math/Vec3";
-import { Body } from "../objects/Body";
-import { PointToPointConstraint } from "./PointToPointConstraint";
+import { PointToPointConstraint } from '../constraints/PointToPointConstraint';
+import { ConeEquation } from '../equations/ConeEquation';
+import { RotationalEquation } from '../equations/RotationalEquation';
+import { Vec3 } from '../math/Vec3';
+import { Body } from '../objects/Body';
 
-// const ConeTwistConstraint_update_tmpVec1 = new Vec3();
-// const ConeTwistConstraint_update_tmpVec2 = new Vec3();
-
+/**
+ * A Cone Twist constraint, useful for ragdolls.
+ */
 export class ConeTwistConstraint extends PointToPointConstraint {
+  /**
+   * The axis direction for the constraint of the body A.
+   */
   axisA: Vec3;
+  /**
+   * The axis direction for the constraint of the body B.
+   */
   axisB: Vec3;
+  /**
+   * The aperture angle of the cone.
+   */
+  angle: number;
+  /**
+   * The twist angle of the joint.
+   */
+  twistAngle: number;
   coneEquation: ConeEquation;
   twistEquation: RotationalEquation;
-  angle: f32;
-  twistAngle: f32;
-  collideConnected: boolean;
 
-  /**
-   * @class ConeTwistConstraint
-   * @constructor
-   * @author schteppe
-   * @param {Body} bodyA
-   * @param {Body} bodyB
-   * @param {object} [options]
-   * @param {Vec3} [options.pivotA]
-   * @param {Vec3} [options.pivotB]
-   * @param {Vec3} [options.axisA]
-   * @param {Vec3} [options.axisB]
-   * @param {Number} [options.maxForce=1e6]
-   * @extends PointToPointConstraint
-   */
   constructor(
     bodyA: Body,
     bodyB: Body,
@@ -42,9 +39,14 @@ export class ConeTwistConstraint extends PointToPointConstraint {
     twistAngle: f32 = 0,
     collideConnected: boolean = true
   ) {
-    super(bodyA, pivotA ? pivotA.clone() : new Vec3(), bodyB, pivotB ? pivotB.clone() : new Vec3(), maxForce);
+    super(
+      bodyA,
+      pivotA ? pivotA.clone() : new Vec3(),
+      bodyB,
+      pivotB ? pivotB.clone() : new Vec3(),
+      maxForce
+    );
 
-    // Set pivot point in between
     this.axisA = axisA ? axisA.clone() : new Vec3();
     this.axisB = axisB ? axisB.clone() : new Vec3();
 
@@ -52,15 +54,22 @@ export class ConeTwistConstraint extends PointToPointConstraint {
 
     this.angle = angle;
 
-    /**
-     * @property {ConeEquation} coneEquation
-     */
-    const c = (this.coneEquation = new ConeEquation(bodyA, bodyB, axisA, axisB, maxForce, angle));
+    const c = (this.coneEquation = new ConeEquation(
+      bodyA,
+      bodyB,
+      axisA,
+      axisB,
+      maxForce,
+      angle
+    ));
 
-    /**
-     * @property {RotationalEquation} twistEquation
-     */
-    const t = (this.twistEquation = new RotationalEquation(bodyA, bodyB, axisA, axisB, maxForce));
+    const t = (this.twistEquation = new RotationalEquation(
+      bodyA,
+      bodyB,
+      axisA,
+      axisB,
+      maxForce
+    ));
     this.twistAngle = twistAngle;
 
     // Make the cone equation push the bodies toward the cone axis, not outward
@@ -76,10 +85,10 @@ export class ConeTwistConstraint extends PointToPointConstraint {
   }
 
   update(): void {
-    const bodyA = this.bodyA,
-      bodyB = this.bodyB,
-      cone = this.coneEquation,
-      twist = this.twistEquation;
+    const bodyA = this.bodyA;
+    const bodyB = this.bodyB;
+    const cone = this.coneEquation;
+    const twist = this.twistEquation;
 
     super.update();
 
@@ -98,3 +107,6 @@ export class ConeTwistConstraint extends PointToPointConstraint {
     twist.maxAngle = this.twistAngle;
   }
 }
+
+// const ConeTwistConstraint_update_tmpVec1 = new Vec3();
+// const ConeTwistConstraint_update_tmpVec2 = new Vec3();

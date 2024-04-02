@@ -1,8 +1,8 @@
 import { Body } from '../objects/Body';
 import { Vec3 } from '../math/Vec3';
-import { Quaternion } from '../math/Quaternion';
-import type { AABB } from '../collision/AABB';
-import type { World } from '../world/World';
+// import { Quaternion } from '../math/Quaternion';
+import { AABB } from '../collision/AABB';
+import { World } from '../world/World';
 
 /**
  * Base class for broadphase implementations
@@ -126,6 +126,7 @@ export abstract class Broadphase {
    */
   makePairsUnique(pairs1: Body[], pairs2: Body[]): void {
     const t = Broadphase_makePairsUnique_temp;
+    const tKeys = Broadphase_makePairsUnique_tempKeys;
     const p1 = Broadphase_makePairsUnique_p1;
     const p2 = Broadphase_makePairsUnique_p2;
     const N = pairs1.length;
@@ -143,11 +144,11 @@ export abstract class Broadphase {
       const id2 = p2[i].id;
       const key = id1 < id2 ? `${id1},${id2}` : `${id2},${id1}`;
       t.set(key, i);
-      t.keys.push(key);
+      tKeys.push(key);
     }
 
     for (let i: i32 = 0; i != t.keys.length; i++) {
-      const key = t.keys.pop();
+      const key = tKeys.pop()!;
       const pairIndex = t.get(key)!;
       pairs1.push(p1[pairIndex]);
       pairs2.push(p2[pairIndex]);
@@ -186,12 +187,13 @@ export abstract class Broadphase {
 // Temp objects
 const Broadphase_collisionPairs_r = new Vec3();
 
-const Broadphase_collisionPairs_normal = new Vec3();
-const Broadphase_collisionPairs_quat = new Quaternion();
-const Broadphase_collisionPairs_relpos = new Vec3();
+// const Broadphase_collisionPairs_normal = new Vec3();
+// const Broadphase_collisionPairs_quat = new Quaternion();
+// const Broadphase_collisionPairs_relpos = new Vec3();
 
-const Broadphase_makePairsUnique_temp: Record<string, any> = { keys: [] };
+const Broadphase_makePairsUnique_temp: Map<string, i32> = new Map();
+const Broadphase_makePairsUnique_tempKeys: string[] = [];
 const Broadphase_makePairsUnique_p1: Body[] = [];
 const Broadphase_makePairsUnique_p2: Body[] = [];
 
-const bsc_dist = new Vec3();
+// const bsc_dist = new Vec3();

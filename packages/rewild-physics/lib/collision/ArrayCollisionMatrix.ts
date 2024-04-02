@@ -1,4 +1,4 @@
-import type { Body } from '../objects/Body';
+import { Body } from '../objects/Body';
 
 /**
  * Collision "matrix".
@@ -18,8 +18,8 @@ export class ArrayCollisionMatrix {
    * Get an element
    */
   get(bi: Body, bj: Body): i32 {
-    let { index: i } = bi;
-    let { index: j } = bj;
+    let i = bi.index;
+    let j = bj.index;
     if (j > i) {
       const temp = j;
       j = i;
@@ -32,8 +32,8 @@ export class ArrayCollisionMatrix {
    * Set an element
    */
   set(bi: Body, bj: Body, value: boolean): void {
-    let { index: i } = bi;
-    let { index: j } = bj;
+    let i = bi.index;
+    let j = bj.index;
     if (j > i) {
       const temp = j;
       j = i;
