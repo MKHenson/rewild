@@ -1,52 +1,49 @@
-import { Vec3 } from "../math/Vec3";
-import { Body } from "./Body";
+import { Vec3 } from '../math/Vec3';
+import { Body } from '../objects/Body';
 
-const SPHSystem_getNeighbors_dist = new Vec3();
-// Temp vectors for calculation
-const SPHSystem_update_dist = new Vec3(),
-  SPHSystem_update_a_pressure = new Vec3(),
-  SPHSystem_update_a_visc = new Vec3(),
-  SPHSystem_update_gradW = new Vec3(),
-  SPHSystem_update_r_vec = new Vec3(),
-  SPHSystem_update_u = new Vec3(); // Relative velocity
-
+/**
+ * Smoothed-particle hydrodynamics system
+ * @todo Make parameters customizable in the constructor
+ */
 export class SPHSystem {
+  /**
+   * The particles array.
+   */
   particles: Body[];
+  /**
+   * Density of the system (kg/m3).
+   * @default 1
+   */
   density: f32;
+  /**
+   * Distance below which two particles are considered to be neighbors.
+   * It should be adjusted so there are about 15-20 neighbor particles within this radius.
+   * @default 1
+   */
   smoothingRadius: f32;
+  /**
+   * @default 1
+   */
   speedOfSound: f32;
+  /**
+   * Viscosity of the system.
+   * @default 0.01
+   */
   viscosity: f32;
+  /**
+   * @default 0.000001
+   */
   eps: f32;
+
   pressures: f32[];
   densities: f32[];
   neighbors: Body[][];
 
-  /**
-   * Smoothed-particle hydrodynamics system
-   * @class SPHSystem
-   * @constructor
-   */
   constructor() {
     this.particles = [];
-
-    /**
-     * Density of the system (kg/m3).
-     * @property {number} density
-     */
     this.density = 1;
-
-    /**
-     * Distance below which two particles are considered to be neighbors.
-     * It should be adjusted so there are about 15-20 neighbor particles within this radius.
-     * @property {number} smoothingRadius
-     */
     this.smoothingRadius = 1;
     this.speedOfSound = 1;
-
-    /**
-     * Viscosity of the system.
-     * @property {number} viscosity
-     */
     this.viscosity = 0.01;
     this.eps = 0.000001;
 
@@ -58,8 +55,6 @@ export class SPHSystem {
 
   /**
    * Add a particle to the system.
-   * @method add
-   * @param {Body} particle
    */
   add(particle: Body): void {
     this.particles.push(particle);
@@ -70,8 +65,6 @@ export class SPHSystem {
 
   /**
    * Remove a particle from the system.
-   * @method remove
-   * @param {Body} particle
    */
   remove(particle: Body): void {
     const idx = this.particles.indexOf(particle);
@@ -85,29 +78,26 @@ export class SPHSystem {
 
   /**
    * Get neighbors within smoothing volume, save in the array neighbors
-   * @method getNeighbors
-   * @param {Body} particle
-   * @param {Array} neighbors
    */
   getNeighbors(particle: Body, neighbors: Body[]): void {
-    const N = this.particles.length,
-      id = particle.id,
-      R2 = this.smoothingRadius * this.smoothingRadius,
-      dist = SPHSystem_getNeighbors_dist;
-    for (let i: i32 = 0; i !== N; i++) {
+    const N = this.particles.length;
+    const id = particle.id;
+    const R2 = this.smoothingRadius * this.smoothingRadius;
+    const dist = SPHSystem_getNeighbors_dist;
+    for (let i = 0; i !== N; i++) {
       const p = this.particles[i];
       p.position.vsub(particle.position, dist);
-      if (id !== p.id && dist.norm2() < R2) {
+      if (id !== p.id && dist.lengthSquared() < R2) {
         neighbors.push(p);
       }
     }
   }
 
   update(): void {
-    const N = this.particles.length,
-      dist = SPHSystem_update_dist,
-      cs = this.speedOfSound,
-      eps = this.eps;
+    const N = this.particles.length;
+    const dist = SPHSystem_update_dist;
+    const cs = this.speedOfSound;
+    const eps = this.eps;
 
     for (let i: i32 = 0; i !== N; i++) {
       const p = this.particles[i]; // Current particle
@@ -124,7 +114,7 @@ export class SPHSystem {
       for (let j: i32 = 0; j != numNeighbors; j++) {
         //printf("Current particle has position %f %f %f\n",objects[id].pos.x(),objects[id].pos.y(),objects[id].pos.z());
         p.position.vsub(neighbors[j].position, dist);
-        const len = dist.norm();
+        const len = dist.length();
 
         const weight = this.w(len);
         sum += neighbors[j].mass * weight;
@@ -166,7 +156,7 @@ export class SPHSystem {
 
         // Get r once for all..
         particle.position.vsub(neighbor.position, r_vec);
-        const r = r_vec.norm();
+        const r = r_vec.length();
 
         // Pressure contribution
         Pij =
@@ -175,26 +165,26 @@ export class SPHSystem {
             this.pressures[j] / (this.densities[j] * this.densities[j] + eps));
         this.gradw(r_vec, gradW);
         // Add to pressure acceleration
-        gradW.mult(Pij, gradW);
+        gradW.scale(Pij, gradW);
         a_pressure.vadd(gradW, a_pressure);
 
         // Viscosity contribution
         neighbor.velocity.vsub(particle.velocity, u);
-        u.mult(
+        u.scale(
           (1.0 / (0.0001 + this.densities[i] * this.densities[j])) *
             this.viscosity *
             neighbor.mass,
           u
         );
         nabla = this.nablaw(r);
-        u.mult(nabla, u);
+        u.scale(nabla, u);
         // Add to viscosity acceleration
         a_visc.vadd(u, a_visc);
       }
 
       // Calculate force
-      a_visc.mult(particle.mass, a_visc);
-      a_pressure.mult(particle.mass, a_pressure);
+      a_visc.scale(particle.mass, a_visc);
+      a_pressure.scale(particle.mass, a_pressure);
 
       // Add force to particles
       particle.force.vadd(a_visc, particle.force);
@@ -206,19 +196,15 @@ export class SPHSystem {
   w(r: f32): f32 {
     // 315
     const h = this.smoothingRadius;
-    return (
-      (315.0 / (64.0 * Mathf.PI * Mathf.pow(h, 9))) *
-      Mathf.pow(h * h - r * r, 3)
-    );
+    return (315.0 / (64.0 * Mathf.PI * h ** 9)) * (h * h - r * r) ** 3;
   }
 
   // calculate gradient of the weight function
   gradw(rVec: Vec3, resultVec: Vec3): void {
-    const r = rVec.norm(),
-      h = this.smoothingRadius;
-    rVec.mult(
-      (945.0 / (32.0 * Mathf.PI * Mathf.pow(h, 9))) *
-        Mathf.pow(h * h - r * r, 2),
+    const r = rVec.length();
+    const h = this.smoothingRadius;
+    rVec.scale(
+      (945.0 / (32.0 * Mathf.PI * h ** 9)) * (h * h - r * r) ** 2,
       resultVec
     );
   }
@@ -227,9 +213,20 @@ export class SPHSystem {
   nablaw(r: f32): f32 {
     const h = this.smoothingRadius;
     const nabla: f32 =
-      (945.0 / (32.0 * Mathf.PI * Mathf.pow(h, 9))) *
+      (945.0 / (32.0 * Mathf.PI * h ** 9)) *
       (h * h - r * r) *
       (7 * r * r - 3 * h * h);
     return nabla;
   }
 }
+
+const SPHSystem_getNeighbors_dist = new Vec3();
+
+// Temp vectors for calculation
+const SPHSystem_update_dist = new Vec3(); // Relative velocity
+
+const SPHSystem_update_a_pressure = new Vec3();
+const SPHSystem_update_a_visc = new Vec3();
+const SPHSystem_update_gradW = new Vec3();
+const SPHSystem_update_r_vec = new Vec3();
+const SPHSystem_update_u = new Vec3();

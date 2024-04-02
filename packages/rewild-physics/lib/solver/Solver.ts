@@ -1,61 +1,56 @@
-import { Equation } from "../equations/Equation";
-import { Body } from "../objects/Body";
+import { Equation } from '../equations/Equation';
+import { World } from '../world/World';
 
+/**
+ * Constraint equation solver base class.
+ */
 export class Solver {
-  equations: Equation[];
   /**
-   * Constraint equation solver base class.
-   * @class Solver
-   * @constructor
-   * @author schteppe / https://github.com/schteppe
+   * All equations to be solved
+   */
+  equations: Equation[];
+
+  /**
+   * @todo remove useless constructor
    */
   constructor() {
-    /**
-     * All equations to be solved
-     * @property {Array} equations
-     */
     this.equations = [];
   }
 
   /**
    * Should be implemented in subclasses!
-   * @method solve
-   * @param  {Number} dt
-   * @param  {World} world
+   * @todo use abstract
+   * @return number of iterations performed
    */
-
-  solve(dt: f32, worldBodies: Body[]): i32 {
-    // Should return the number of iterations done!
-    return 0;
+  solve(dt: f32, world: World): i32 {
+    return (
+      // Should return the number of iterations done!
+      0
+    );
   }
 
   /**
    * Add an equation
-   * @method addEquation
-   * @param {Equation} eq
    */
   addEquation(eq: Equation): void {
-    if (eq.enabled) {
+    if (eq.enabled && !eq.bi.isTrigger && !eq.bj.isTrigger) {
       this.equations.push(eq);
     }
   }
 
   /**
    * Remove an equation
-   * @method removeEquation
-   * @param {Equation} eq
    */
   removeEquation(eq: Equation): void {
-    var eqs = this.equations;
-    var i = eqs.indexOf(eq);
-    if (i !== -1) {
+    const eqs = this.equations;
+    const i = eqs.indexOf(eq);
+    if (i != -1) {
       eqs.splice(i, 1);
     }
   }
 
   /**
    * Add all equations
-   * @method removeAllEquations
    */
   removeAllEquations(): void {
     this.equations.length = 0;
