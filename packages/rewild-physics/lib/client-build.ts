@@ -1,16 +1,16 @@
-import "./global-polyfills";
-import { Event, EventAttachable, EventDispatcher } from "rewild-common";
+import './global-polyfills';
+import { Event, EventAttachable, EventDispatcher } from 'rewild-common';
 
-import * as collision from "./collision";
-import * as constraints from "./constraints";
-import * as equations from "./equations";
-import * as material from "./material";
-import * as math from "./math";
-import * as objects from "./objects";
-import * as shapes from "./shapes";
-import * as solver from "./solver";
-import * as utils from "./utils";
-import * as world from "./world";
+import * as collision from './collision';
+import * as constraints from './constraints';
+import * as equations from './equations';
+import * as material from './material';
+import * as math from './math';
+import * as objects from './objects';
+import * as shapes from './shapes';
+import * as solver from './solver';
+import * as utils from './utils';
+import * as world from './world';
 
 const allLibs = [
   collision,

@@ -1,107 +1,110 @@
-import { Vec3 } from "../math/Vec3";
-import { Body } from "./Body";
-
-const applyForce_r = new Vec3(),
-  applyForce_r_unit = new Vec3(),
-  applyForce_u = new Vec3(),
-  applyForce_f = new Vec3(),
-  applyForce_worldAnchorA = new Vec3(),
-  applyForce_worldAnchorB = new Vec3(),
-  applyForce_ri = new Vec3(),
-  applyForce_rj = new Vec3(),
-  applyForce_ri_x_f = new Vec3(),
-  applyForce_rj_x_f = new Vec3(),
-  applyForce_tmp = new Vec3();
+import { Vec3 } from '../math/Vec3';
+import { Body } from '../objects/Body';
 
 export class SpringOptions {
   constructor(
+    /**
+     * Rest length of the spring. A number > 0.
+     * @default 1
+     */
     public restLength: f32 = 1,
+    /**
+     * Stiffness of the spring. A number >= 0.
+     * @default 100
+     */
     public stiffness: f32 = 100,
+    /**
+     * Damping of the spring. A number >= 0.
+     * @default 1
+     */
     public damping: f32 = 1,
+    /**
+     * Where to hook the spring to body A, in world coordinates.
+     */
     public worldAnchorA: Vec3 | null = null,
+    /**
+     * Where to hook the spring to body B, in world coordinates.
+     */
     public worldAnchorB: Vec3 | null = null,
-    public localAnchorA: Vec3 | null = null,
-    public localAnchorB: Vec3 | null = null
+    /**
+     * Anchor for bodyA in local bodyA coordinates.
+     * Where to hook the spring to body A, in local body coordinates.
+     * @default new Vec3()
+     */
+    public localAnchorA: Vec3 = new Vec3(),
+    /**
+     * Anchor for bodyB in local bodyB coordinates.
+     * Where to hook the spring to body B, in local body coordinates.
+     * @default new Vec3()
+     */
+    public localAnchorB: Vec3 = new Vec3()
   ) {}
 }
 
+/**
+ * A spring, connecting two bodies.
+ * @example
+ *     const spring = new Spring(boxBody, sphereBody, {
+ *       restLength: 0,
+ *       stiffness: 50,
+ *       damping: 1,
+ *     })
+ *
+ *     // Compute the force after each step
+ *     world.addEventListener('postStep', (event) => {
+ *       spring.applyForce()
+ *     })
+ */
 export class Spring {
+  /**
+   * Rest length of the spring. A number > 0.
+   * @default 1
+   */
   restLength: f32;
-  stiffness: f32;
-  damping: f32;
-  bodyA: Body;
-  bodyB: Body;
-  localAnchorA: Vec3;
-  localAnchorB: Vec3;
-  worldAnchorA: Vec3;
-  worldAnchorB: Vec3;
 
   /**
-   * A spring, connecting two bodies.
-   *
-   * @class Spring
-   * @constructor
-   * @param {Body} bodyA
-   * @param {Body} bodyB
-   * @param {Object} [options]
-   * @param {number} [options.restLength]   A number > 0. Default: 1
-   * @param {number} [options.stiffness]    A number >= 0. Default: 100
-   * @param {number} [options.damping]      A number >= 0. Default: 1
-   * @param {Vec3}  [options.worldAnchorA] Where to hook the spring to body A, in world coordinates.
-   * @param {Vec3}  [options.worldAnchorB]
-   * @param {Vec3}  [options.localAnchorA] Where to hook the spring to body A, in local body coordinates.
-   * @param {Vec3}  [options.localAnchorB]
+   * Stiffness of the spring. A number >= 0.
+   * @default 100
    */
+  stiffness: f32;
+
+  /**
+   * Damping of the spring. A number >= 0.
+   * @default 1
+   */
+  damping: f32;
+
+  /**
+   * First connected body.
+   */
+  bodyA: Body;
+
+  /**
+   * Second connected body.
+   */
+  bodyB: Body;
+
+  /**
+   * Anchor for bodyA in local bodyA coordinates.
+   * Where to hook the spring to body A, in local body coordinates.
+   * @default new Vec3()
+   */
+  localAnchorA: Vec3;
+
+  /**
+   * Anchor for bodyB in local bodyB coordinates.
+   * Where to hook the spring to body B, in local body coordinates.
+   * @default new Vec3()
+   */
+  localAnchorB: Vec3;
+
   constructor(bodyA: Body, bodyB: Body, options = new SpringOptions()) {
-    options = options || {};
-
-    /**
-     * Rest length of the spring.
-     * @property restLength
-     * @type {number}
-     */
     this.restLength = options.restLength;
-
-    /**
-     * Stiffness of the spring.
-     * @property stiffness
-     * @type {number}
-     */
     this.stiffness = options.stiffness;
-
-    /**
-     * Damping of the spring.
-     * @property damping
-     * @type {number}
-     */
     this.damping = options.damping;
-
-    /**
-     * First connected body.
-     * @property bodyA
-     * @type {Body}
-     */
     this.bodyA = bodyA;
-
-    /**
-     * Second connected body.
-     * @property bodyB
-     * @type {Body}
-     */
     this.bodyB = bodyB;
-
-    /**
-     * Anchor for bodyA in local bodyA coordinates.
-     * @property localAnchorA
-     * @type {Vec3}
-     */
     this.localAnchorA = new Vec3();
-
-    /**
-     * Anchor for bodyB in local bodyB coordinates.
-     * @property localAnchorB
-     * @type {Vec3}
-     */
     this.localAnchorB = new Vec3();
 
     if (options.localAnchorA) {
@@ -120,8 +123,6 @@ export class Spring {
 
   /**
    * Set the anchor point on body A, using world coordinates.
-   * @method setWorldAnchorA
-   * @param {Vec3} worldAnchorA
    */
   setWorldAnchorA(worldAnchorA: Vec3): void {
     this.bodyA.pointToLocalFrame(worldAnchorA, this.localAnchorA);
@@ -129,8 +130,6 @@ export class Spring {
 
   /**
    * Set the anchor point on body B, using world coordinates.
-   * @method setWorldAnchorB
-   * @param {Vec3} worldAnchorB
    */
   setWorldAnchorB(worldAnchorB: Vec3): void {
     this.bodyB.pointToLocalFrame(worldAnchorB, this.localAnchorB);
@@ -138,8 +137,7 @@ export class Spring {
 
   /**
    * Get the anchor point on body A, in world coordinates.
-   * @method getWorldAnchorA
-   * @param {Vec3} result The vector to store the result in.
+   * @param result The vector to store the result in.
    */
   getWorldAnchorA(result: Vec3): void {
     this.bodyA.pointToWorldFrame(this.localAnchorA, result);
@@ -147,8 +145,7 @@ export class Spring {
 
   /**
    * Get the anchor point on body B, in world coordinates.
-   * @method getWorldAnchorB
-   * @param {Vec3} result The vector to store the result in.
+   * @param result The vector to store the result in.
    */
   getWorldAnchorB(result: Vec3): void {
     this.bodyB.pointToWorldFrame(this.localAnchorB, result);
@@ -156,26 +153,24 @@ export class Spring {
 
   /**
    * Apply the spring force to the connected bodies.
-   * @method applyForce
    */
   applyForce(): void {
-    const k = this.stiffness,
-      d = this.damping,
-      l = this.restLength,
-      bodyA = this.bodyA,
-      bodyB = this.bodyB,
-      r = applyForce_r,
-      r_unit = applyForce_r_unit,
-      u = applyForce_u,
-      f = applyForce_f,
-      tmp = applyForce_tmp;
-
-    const worldAnchorA = applyForce_worldAnchorA,
-      worldAnchorB = applyForce_worldAnchorB,
-      ri = applyForce_ri,
-      rj = applyForce_rj,
-      ri_x_f = applyForce_ri_x_f,
-      rj_x_f = applyForce_rj_x_f;
+    const k = this.stiffness;
+    const d = this.damping;
+    const l = this.restLength;
+    const bodyA = this.bodyA;
+    const bodyB = this.bodyB;
+    const r = applyForce_r;
+    const r_unit = applyForce_r_unit;
+    const u = applyForce_u;
+    const f = applyForce_f;
+    const tmp = applyForce_tmp;
+    const worldAnchorA = applyForce_worldAnchorA;
+    const worldAnchorB = applyForce_worldAnchorB;
+    const ri = applyForce_ri;
+    const rj = applyForce_rj;
+    const ri_x_f = applyForce_ri_x_f;
+    const rj_x_f = applyForce_rj_x_f;
 
     // Get world anchors
     this.getWorldAnchorA(worldAnchorA);
@@ -187,7 +182,7 @@ export class Spring {
 
     // Compute distance vector between world anchor points
     worldAnchorB.vsub(worldAnchorA, r);
-    const rlen = r.norm();
+    const rlen = r.length();
     r_unit.copy(r);
     r_unit.normalize();
 
@@ -201,7 +196,7 @@ export class Spring {
     u.vsub(tmp, u);
 
     // F = - k * ( x - L ) - D * ( u )
-    r_unit.mult(-k * (rlen - l) - d * u.dot(r_unit), f);
+    r_unit.scale(-k * (rlen - l) - d * u.dot(r_unit), f);
 
     // Add forces to bodies
     bodyA.force.vsub(f, bodyA.force);
@@ -214,3 +209,15 @@ export class Spring {
     bodyB.torque.vadd(rj_x_f, bodyB.torque);
   }
 }
+
+const applyForce_r = new Vec3();
+const applyForce_r_unit = new Vec3();
+const applyForce_u = new Vec3();
+const applyForce_f = new Vec3();
+const applyForce_worldAnchorA = new Vec3();
+const applyForce_worldAnchorB = new Vec3();
+const applyForce_ri = new Vec3();
+const applyForce_rj = new Vec3();
+const applyForce_ri_x_f = new Vec3();
+const applyForce_rj_x_f = new Vec3();
+const applyForce_tmp = new Vec3();

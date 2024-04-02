@@ -1,96 +1,110 @@
-import { Material } from "../material/Material";
-import { Quaternion } from "../math/Quaternion";
-import { Vec3 } from "../math/Vec3";
-import { Body } from "../objects/Body";
+import { Vec3 } from '../math/Vec3';
+import { Quaternion } from '../math/Quaternion';
+import { Body } from '../objects/Body';
+import { Material } from '../material/Material';
 
+/**
+ * Base class for shapes
+ */
 export abstract class Shape {
+  /**
+   * Identifier of the Shape.
+   */
   id: i32;
-  type: i32;
-  boundingSphereRadius: f32;
-  collisionResponse: boolean;
-  collisionFilterGroup: i32;
-  collisionFilterMask: i32;
-  material: Material | null;
-  body: Body | null;
 
   /**
-   * Base class for shapes
-   * @class Shape
-   * @constructor
-   * @param {object} [options]
-   * @param {number} [options.collisionFilterGroup=1]
-   * @param {number} [options.collisionFilterMask=-1]
-   * @param {number} [options.collisionResponse=true]
-   * @param {number} [options.material=null]
-   * @author schteppe
+   * The type of this shape. Must be set to an int > 0 by subclasses.
    */
+  type: i32;
+
+  /**
+   * The local bounding sphere radius of this shape.
+   */
+  boundingSphereRadius: f32;
+
+  /**
+   * Whether to produce contact forces when in contact with other bodies. Note that contacts will be generated, but they will be disabled.
+   * @default true
+   */
+  collisionResponse: boolean;
+
+  /**
+   * @default 1
+   */
+  collisionFilterGroup: i32;
+
+  /**
+   * @default -1
+   */
+  collisionFilterMask: i32;
+
+  /**
+   * Optional material of the shape that regulates contact properties.
+   */
+  material: Material | null;
+
+  /**
+   * The body to which the shape is added to.
+   */
+  body: Body | null;
+
+  static idCounter: i32 = 0;
+
   constructor(
+    /**
+     * The type of this shape.
+     */
     type: i32 = 0,
+    /**
+     * Whether to produce contact forces when in contact with other bodies.
+     * @default true
+     */
     collisionResponse: boolean = true,
+    /**
+     * @default 1
+     */
     collisionFilterGroup: i32 = 1,
+    /**
+     * @default -1
+     */
     collisionFilterMask: i32 = -1,
+    /**
+     * Optional material of the shape that regulates contact properties.
+     * @default null
+     * @todo check this, the material is passed to the body, right?
+     */
     material: Material | null = null
   ) {
-    /**
-     * Identifyer of the Shape.
-     * @property {number} id
-     */
     this.id = Shape.idCounter++;
-
-    /**
-     * The type of this shape. Must be set to an int > 0 by subclasses.
-     * @property type
-     * @type {Number}
-     * @see Shape.types
-     */
     this.type = type;
-
-    /**
-     * The local bounding sphere radius of this shape.
-     * @property {Number} boundingSphereRadius
-     */
     this.boundingSphereRadius = 0;
-
-    /**
-     * Whether to produce contact forces when in contact with other bodies. Note that contacts will be generated, but they will be disabled.
-     * @property {boolean} collisionResponse
-     */
     this.collisionResponse = collisionResponse;
-
-    /**
-     * @property {Number} collisionFilterGroup
-     */
     this.collisionFilterGroup = collisionFilterGroup;
-
-    /**
-     * @property {Number} collisionFilterMask
-     */
     this.collisionFilterMask = collisionFilterMask;
-
-    /**
-     * @property {Material} material
-     */
     this.material = material;
-
-    /**
-     * @property {Body} body
-     */
     this.body = null;
   }
 
   /**
-   * Computes the bounding sphere radius. The result is stored in the property .boundingSphereRadius
-   * @method updateBoundingSphereRadius
+   * Computes the bounding sphere radius.
+   * The result is stored in the property `.boundingSphereRadius`
    */
   abstract updateBoundingSphereRadius(): void;
 
   /**
    * Get the volume of this shape
-   * @method volume
-   * @return {Number}
    */
-  abstract volume(): void;
+  abstract volume(): f32;
 
+  /**
+   * Calculates the inertia in the local frame for this shape.
+   * @see http://en.wikipedia.org/wiki/List_of_moments_of_inertia
+   */
+  abstract calculateLocalInertia(mass: f32, target: Vec3): void;
+
+  /**
+   * @todo use abstract for these kind of methods
+   */
   abstract calculateWorldAABB(
     pos: Vec3,
     quat: Quaternion,
@@ -98,23 +112,6 @@ export abstract class Shape {
     max: Vec3
   ): void;
 
-  /**
-   * Calculates the inertia in the local frame for this shape.
-   * @method calculateLocalInertia
-   * @param {Number} mass
-   * @param {Vec3} target
-   * @see http://en.wikipedia.org/wiki/List_of_moments_of_inertia
-   */
-  abstract calculateLocalInertia(mass: f32, target: Vec3): void;
-
-  static idCounter: i32 = 0;
-
-  /**
-   * The available shape types.
-   * @static
-   * @property types
-   * @type {Object}
-   */
   static SPHERE: i16 = 1;
   static PLANE: i16 = 2;
   static BOX: i16 = 4;

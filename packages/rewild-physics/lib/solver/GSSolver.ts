@@ -1,74 +1,69 @@
-import { Body } from "../objects/Body";
-import { Solver } from "./Solver";
+import { Solver } from '../solver/Solver';
+import { World } from '../world/World';
 
-const GSSolver_solve_lambda: f32[] = []; // Just temporary number holders that we want to reuse each solve.
-const GSSolver_solve_invCs: f32[] = [];
-const GSSolver_solve_Bs: f32[] = [];
-
+/**
+ * Constraint equation Gauss-Seidel solver.
+ * @todo The spook parameters should be specified for each constraint, not globally.
+ * @see https://www8.cs.umu.se/kurser/5DV058/VT09/lectures/spooknotes.pdf
+ */
 export class GSSolver extends Solver {
+  /**
+   * The number of solver iterations determines quality of the constraints in the world.
+   * The more iterations, the more correct simulation. More iterations need more computations though. If you have a large gravity force in your world, you will need more iterations.
+   */
   iterations: i32;
+
+  /**
+   * When tolerance is reached, the system is assumed to be converged.
+   */
   tolerance: f32;
 
   /**
-   * Constraint equation Gauss-Seidel solver.
-   * @class GSSolver
-   * @constructor
-   * @todo The spook parameters should be specified for each constraint, not globally.
-   * @author schteppe / https://github.com/schteppe
-   * @see https://www8.cs.umu.se/kurser/5DV058/VT09/lectures/spooknotes.pdf
-   * @extends Solver
+   * @todo remove useless constructor
    */
   constructor() {
     super();
 
-    /**
-     * The number of solver iterations determines quality of the constraints in the world. The more iterations, the more correct simulation. More iterations need more computations though. If you have a large gravity force in your world, you will need more iterations.
-     * @property iterations
-     * @type {Number}
-     * @todo write more about solver and iterations in the wiki
-     */
     this.iterations = 10;
-
-    /**
-     * When tolerance is reached, the system is assumed to be converged.
-     * @property tolerance
-     * @type {Number}
-     */
     this.tolerance = 1e-7;
   }
 
-  solve(dt: f32, worldBodies: Body[]): i32 {
-    let iter: i32 = 0,
-      maxIter = this.iterations,
-      tolSquared = this.tolerance * this.tolerance,
-      equations = this.equations,
-      Neq = equations.length,
-      bodies = worldBodies, // world.bodies,
-      Nbodies = bodies.length,
-      h = dt,
-      // q,
-      B: f32,
-      invC: f32,
-      deltalambda: f32,
-      deltalambdaTot: f32,
-      GWlambda: f32,
-      lambdaj: f32;
+  /**
+   * Solve
+   * @return number of iterations performed
+   */
+  solve(dt: f32, world: World): i32 {
+    let iter: i32 = 0;
+    const maxIter = this.iterations;
+    const tolSquared = this.tolerance * this.tolerance;
+    const equations = this.equations;
+    const Neq = equations.length;
+    const bodies = world.bodies;
+    const Nbodies = bodies.length;
+    const h = dt;
+    // let q;
+    let B: f32;
+    let invC: f32;
+    let deltalambda: f32;
+    let deltalambdaTot: f32;
+    let GWlambda: f32;
+    let lambdaj: f32;
 
     // Update solve mass
-    if (Neq !== 0) {
+    if (Neq != 0) {
       for (let i: i32 = 0; i != Nbodies; i++) {
         bodies[i].updateSolveMassProperties();
       }
     }
 
-    // Things that does not change during iteration can be computed once
-    const invCs = GSSolver_solve_invCs,
-      Bs = GSSolver_solve_Bs,
-      lambda = GSSolver_solve_lambda;
+    // Things that do not change during iteration can be computed once
+    const invCs = GSSolver_solve_invCs;
+
+    const Bs = GSSolver_solve_Bs;
+    const lambda = GSSolver_solve_lambda;
     invCs.length = Neq;
     Bs.length = Neq;
     lambda.length = Neq;
-
     for (let i: i32 = 0; i !== Neq; i++) {
       const c = equations[i];
       lambda[i] = 0.0;
@@ -78,10 +73,10 @@ export class GSSolver extends Solver {
 
     if (Neq !== 0) {
       // Reset vlambda
-      for (let i: i32 = 0; i !== Nbodies; i++) {
-        const b = bodies[i],
-          vlambda = b.vlambda,
-          wlambda = b.wlambda;
+      for (let i: i32 = 0; i != Nbodies; i++) {
+        const b = bodies[i];
+        const vlambda = b.vlambda;
+        const wlambda = b.wlambda;
         vlambda.set(0, 0, 0);
         wlambda.set(0, 0, 0);
       }
@@ -121,10 +116,10 @@ export class GSSolver extends Solver {
       }
 
       // Add result to velocity
-      for (let i: i32 = 0; i !== Nbodies; i++) {
-        const b = bodies[i],
-          v = b.velocity,
-          w = b.angularVelocity;
+      for (let i: i32 = 0; i != Nbodies; i++) {
+        const b = bodies[i];
+        const v = b.velocity;
+        const w = b.angularVelocity;
 
         b.vlambda.vmul(b.linearFactor, b.vlambda);
         v.vadd(b.vlambda, v);
@@ -133,7 +128,7 @@ export class GSSolver extends Solver {
         w.vadd(b.wlambda, w);
       }
 
-      // Set the .multiplier property of each equation
+      // Set the `.multiplier` property of each equation
       let l = equations.length;
       const invDt: f32 = 1 / h;
       while (l--) {
@@ -144,3 +139,8 @@ export class GSSolver extends Solver {
     return iter;
   }
 }
+
+// Just temporary number holders that we want to reuse each iteration.
+const GSSolver_solve_lambda: f32[] = [];
+const GSSolver_solve_invCs: f32[] = [];
+const GSSolver_solve_Bs: f32[] = [];

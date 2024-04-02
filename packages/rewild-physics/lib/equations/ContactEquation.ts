@@ -1,86 +1,58 @@
-import { Vec3 } from "../math/Vec3";
-import { Body } from "../objects/Body";
-import { Shape } from "../shapes/Shape";
-import { Equation } from "./Equation";
+import { Equation } from '../equations/Equation';
+import { Vec3 } from '../math/Vec3';
+import { Body } from '../objects/Body';
 
-const ContactEquation_computeB_temp1 = new Vec3(); // Temp vectors
-const ContactEquation_computeB_temp2 = new Vec3();
-const ContactEquation_computeB_temp3 = new Vec3();
-const ContactEquation_getImpactVelocityAlongNormal_vi = new Vec3();
-const ContactEquation_getImpactVelocityAlongNormal_vj = new Vec3();
-const ContactEquation_getImpactVelocityAlongNormal_xi = new Vec3();
-const ContactEquation_getImpactVelocityAlongNormal_xj = new Vec3();
-const ContactEquation_getImpactVelocityAlongNormal_relVel = new Vec3();
-
+/**
+ * Contact/non-penetration constraint equation
+ */
 export class ContactEquation extends Equation {
-  ni: Vec3;
-  ri: Vec3;
-  rj: Vec3;
-  restitution: f32;
-  si: Shape | null;
-  sj: Shape | null;
-
   /**
-   * Contact/non-penetration constraint equation
-   * @class ContactEquation
-   * @constructor
-   * @author schteppe
-   * @param {Body} bodyA
-   * @param {Body} bodyB
-   * @extends Equation
+   * "bounciness": u1 = -e*u0
    */
+  restitution: f32;
+  /**
+   * World-oriented vector that goes from the center of bi to the contact point.
+   */
+  ri: Vec3;
+  /**
+   * World-oriented vector that starts in body j position and goes to the contact point.
+   */
+  rj: Vec3;
+  /**
+   * Contact normal, pointing out of body i.
+   */
+  ni: Vec3;
+
   constructor(bodyA: Body, bodyB: Body, maxForce: f32 = 1e6) {
     super(bodyA, bodyB, 0, maxForce);
 
-    /**
-     * @property restitution
-     * @type {Number}
-     */
-    this.restitution = 0.0; // "bounciness": u1 = -e*u0
-
-    /**
-     * World-oriented vector that goes from the center of bi to the contact point.
-     * @property {Vec3} ri
-     */
+    this.restitution = 0.0;
     this.ri = new Vec3();
-
-    /**
-     * World-oriented vector that starts in body j position and goes to the contact point.
-     * @property {Vec3} rj
-     */
     this.rj = new Vec3();
-
-    /**
-     * Contact normal, pointing out of body i.
-     * @property {Vec3} ni
-     */
     this.ni = new Vec3();
-
-    this.si = null;
-    this.sj = null;
   }
 
   computeB(h: f32, bParam: f32 = 0, hParam: f32 = 0): f32 {
-    const a = this.a,
-      b = this.b,
-      bi = this.bi,
-      bj = this.bj,
-      ri = this.ri,
-      rj = this.rj,
-      rixn = ContactEquation_computeB_temp1,
-      rjxn = ContactEquation_computeB_temp2,
-      vi = bi.velocity,
-      wi = bi.angularVelocity,
-      // fi = bi.force,
-      // taui = bi.torque,
-      vj = bj.velocity,
-      wj = bj.angularVelocity,
-      // fj = bj.force,
-      // tauj = bj.torque,
-      penetrationVec = ContactEquation_computeB_temp3,
-      GA = this.jacobianElementA,
-      GB = this.jacobianElementB,
-      n = this.ni;
+    const a = this.a;
+    const b = this.b;
+    const bi = this.bi;
+    const bj = this.bj;
+    const ri = this.ri;
+    const rj = this.rj;
+    const rixn = ContactEquation_computeB_temp1;
+    const rjxn = ContactEquation_computeB_temp2;
+    const vi = bi.velocity;
+    const wi = bi.angularVelocity;
+    // const fi = bi.force;
+    // const taui = bi.torque;
+    const vj = bj.velocity;
+    const wj = bj.angularVelocity;
+    // const fj = bj.force;
+    // const tauj = bj.torque;
+    const penetrationVec = ContactEquation_computeB_temp3;
+    const GA = this.jacobianElementA;
+    const GB = this.jacobianElementB;
+    const n = this.ni;
 
     // Caluclate cross products
     ri.cross(n, rixn);
@@ -103,7 +75,8 @@ export class ContactEquation extends Equation {
 
     // Compute iteration
     const ePlusOne = this.restitution + 1;
-    const GW = ePlusOne * vj.dot(n) - ePlusOne * vi.dot(n) + wj.dot(rjxn) - wi.dot(rixn);
+    const GW =
+      ePlusOne * vj.dot(n) - ePlusOne * vi.dot(n) + wj.dot(rjxn) - wi.dot(rixn);
     const GiMf = this.computeGiMf();
 
     const B = -g * a - GW * b - h * GiMf;
@@ -113,8 +86,6 @@ export class ContactEquation extends Equation {
 
   /**
    * Get the current relative velocity in the contact point.
-   * @method getImpactVelocityAlongNormal
-   * @return {number}
    */
   getImpactVelocityAlongNormal(): f32 {
     const vi = ContactEquation_getImpactVelocityAlongNormal_vi;
@@ -134,3 +105,13 @@ export class ContactEquation extends Equation {
     return this.ni.dot(relVel);
   }
 }
+
+const ContactEquation_computeB_temp1 = new Vec3(); // Temp vectors
+const ContactEquation_computeB_temp2 = new Vec3();
+const ContactEquation_computeB_temp3 = new Vec3();
+
+const ContactEquation_getImpactVelocityAlongNormal_vi = new Vec3();
+const ContactEquation_getImpactVelocityAlongNormal_vj = new Vec3();
+const ContactEquation_getImpactVelocityAlongNormal_xi = new Vec3();
+const ContactEquation_getImpactVelocityAlongNormal_xj = new Vec3();
+const ContactEquation_getImpactVelocityAlongNormal_relVel = new Vec3();

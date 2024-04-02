@@ -1,19 +1,22 @@
-import { Quaternion } from "../math/Quaternion";
-import { Vec3 } from "../math/Vec3";
-import { Shape } from "./Shape";
+import { Shape } from '../shapes/Shape';
+import { Vec3 } from '../math/Vec3';
+import { Quaternion } from '../math/Quaternion';
 
-const tempNormal = new Vec3();
-
+/**
+ * A plane, facing in the Z direction. The plane has its surface at z=0 and everything below z=0 is assumed to be solid plane. To make the plane face in some other direction than z, you must put it inside a Body and rotate that body. See the demos.
+ * @example
+ *     const planeShape = new CANNON.Plane()
+ *     const planeBody = new CANNON.Body({ mass: 0, shape:  planeShape })
+ *     planeBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0) // make it face up
+ *     world.addBody(planeBody)
+ */
 export class Plane extends Shape {
+  /** worldNormal */
   worldNormal: Vec3;
+  /** worldNormalNeedsUpdate */
   worldNormalNeedsUpdate: boolean;
-  /**
-   * A plane, facing in the Z direction. The plane has its surface at z=0 and everything below z=0 is assumed to be solid plane. To make the plane face in some other direction than z, you must put it inside a Body and rotate that body. See the demos.
-   * @class Plane
-   * @constructor
-   * @extends Shape
-   * @author schteppe
-   */
+  boundingSphereRadius: f32;
+
   constructor() {
     super(Shape.PLANE);
 
@@ -24,6 +27,7 @@ export class Plane extends Shape {
     this.boundingSphereRadius = f32.MAX_VALUE;
   }
 
+  /** computeWorldNormal */
   computeWorldNormal(quat: Quaternion): void {
     const n = this.worldNormal;
     n.set(0, 0, 1);
@@ -31,12 +35,15 @@ export class Plane extends Shape {
     this.worldNormalNeedsUpdate = false;
   }
 
-  calculateLocalInertia(mass: f32, target: Vec3 = new Vec3()): Vec3 {
+  calculateLocalInertia(mass: f32, target = new Vec3()): Vec3 {
     return target;
   }
 
   volume(): f32 {
-    return f32.MAX_VALUE; // The plane is infinite...
+    return (
+      // The plane is infinite...
+      f32.MAX_VALUE
+    );
   }
 
   calculateWorldAABB(pos: Vec3, quat: Quaternion, min: Vec3, max: Vec3): void {
@@ -49,21 +56,19 @@ export class Plane extends Shape {
 
     if (tempNormal.x == 1) {
       max.x = pos.x;
-    }
-    if (tempNormal.y == 1) {
-      max.y = pos.y;
-    }
-    if (tempNormal.z == 1) {
-      max.z = pos.z;
-    }
-
-    if (tempNormal.x == -1) {
+    } else if (tempNormal.x == -1) {
       min.x = pos.x;
     }
-    if (tempNormal.y == -1) {
+
+    if (tempNormal.y == 1) {
+      max.y = pos.y;
+    } else if (tempNormal.y == -1) {
       min.y = pos.y;
     }
-    if (tempNormal.z == -1) {
+
+    if (tempNormal.z == 1) {
+      max.z = pos.z;
+    } else if (tempNormal.z == -1) {
       min.z = pos.z;
     }
   }
@@ -72,3 +77,5 @@ export class Plane extends Shape {
     this.boundingSphereRadius = f32.MAX_VALUE;
   }
 }
+
+const tempNormal = new Vec3();

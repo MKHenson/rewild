@@ -36,7 +36,7 @@ export class PhysicsComponent extends BehaviourComponent {
       this.angularVelocityZ
     );
     this.rigidBody.mass = this.mass;
-    physicsManager.world.add(this.rigidBody);
+    physicsManager.world.addBody(this.rigidBody);
   }
 
   unMount(): void {

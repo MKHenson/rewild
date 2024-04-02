@@ -1,28 +1,22 @@
+/**
+ * For pooling objects that can be reused.
+ */
 export abstract class Pool<T> {
-  static idCounter: i32 = 0;
-  objects: Array<T>;
-
   /**
-   * For pooling objects that can be reused.
-   * @class Pool
-   * @constructor
+   * The objects array.
    */
-  constructor() {
-    /**
-     * The pooled objects
-     * @property {Array} objects
-     */
-    this.objects = [];
-  }
+  objects: T[] = [];
+  /**
+   * The type of the objects.
+   */
+  // type: any = Object;
 
   /**
    * Release an object after use
-   * @method release
-   * @param {Object} obj
    */
   release(toRelease: T[]): Pool<T> {
-    var Nargs = toRelease.length;
-    for (var i = 0; i != Nargs; i++) {
+    const Nargs = toRelease.length;
+    for (let i: i32 = 0; i != Nargs; i++) {
       this.objects.push(toRelease[i]);
     }
     return this;
@@ -35,8 +29,6 @@ export abstract class Pool<T> {
 
   /**
    * Get an object
-   * @method get
-   * @return {mixed}
    */
   get(): T {
     if (this.objects.length === 0) {
@@ -54,12 +46,10 @@ export abstract class Pool<T> {
   abstract constructObject(): T;
 
   /**
-   * @method resize
-   * @param {number} size
-   * @return {Pool} Self, for chaining
+   * @return Self, for chaining
    */
   resize(size: i32): Pool<T> {
-    var objects = this.objects;
+    const objects = this.objects;
 
     while (objects.length > size) {
       objects.pop();

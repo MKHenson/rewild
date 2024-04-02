@@ -1,5 +1,5 @@
 import { Vec3 } from '../math/Vec3';
-import type { Quaternion } from '../math/Quaternion';
+import { Quaternion } from '../math/Quaternion';
 
 /**
  * A 3x3 matrix.
@@ -250,10 +250,8 @@ export class Mat3 {
    * Get an element in the matrix by index. Index starts at 0, not 1!!!
    * @param value If provided, the matrix element will be set to this value.
    */
-  e(row: i32, column: i32): f32;
-  e(row: i32, column: i32, value: f32): f32;
-  e(row: i32, column: i32, value?: f32): f32 {
-    if (value == undefined) {
+  e(row: i32, column: i32, value: f32 = f32.NaN): f32 {
+    if (isNaN<f32>(value)) {
       return this.elements[column + 3 * row];
     } else {
       // Set value
@@ -433,7 +431,7 @@ export class Mat3 {
   transpose(target: Mat3 = new Mat3()): Mat3 {
     const M = this.elements;
     const T = target.elements;
-    let tmp;
+    let tmp: f32 = 0;
 
     //Set diagonals
     T[0] = M[0];

@@ -1,21 +1,20 @@
-import { ContactEquation } from "../equations/ContactEquation";
-import { Body } from "../objects/Body";
-import { Constraint } from "./Constraint";
+import { Constraint } from '../constraints/Constraint';
+import { ContactEquation } from '../equations/ContactEquation';
+import { Body } from '../objects/Body';
 
+/**
+ * Constrains two bodies to be at a constant distance from each others center of mass.
+ */
 export class DistanceConstraint extends Constraint {
+  /**
+   * The distance to keep. If undefined, it will be set to the current distance between bodyA and bodyB
+   */
   distance: f32;
   distanceEquation: ContactEquation;
 
   /**
-   * Constrains two bodies to be at a constant distance from each others center of mass.
-   * @class DistanceConstraint
-   * @constructor
-   * @author schteppe
-   * @param {Body} bodyA
-   * @param {Body} bodyB
-   * @param {Number} [distance] The distance to keep. If undefined, it will be set to the current distance between bodyA and bodyB
-   * @param {Number} [maxForce=1e6]
-   * @extends Constraint
+   * @param distance The distance to keep. If undefined, it will be set to the current distance between bodyA and bodyB.
+   * @param maxForce The maximum force that should be applied to constrain the bodies.
    */
   constructor(
     bodyA: Body,
@@ -25,14 +24,7 @@ export class DistanceConstraint extends Constraint {
   ) {
     super(bodyA, bodyB);
 
-    /**
-     * @property {number} distance
-     */
     this.distance = distance;
-
-    /**
-     * @property {ContactEquation} distanceEquation
-     */
     const eq = (this.distanceEquation = new ContactEquation(bodyA, bodyB));
     this.equations.push(eq);
 
@@ -41,6 +33,9 @@ export class DistanceConstraint extends Constraint {
     eq.maxForce = maxForce;
   }
 
+  /**
+   * update
+   */
   update(): void {
     const bodyA = this.bodyA;
     const bodyB = this.bodyB;
@@ -50,7 +45,7 @@ export class DistanceConstraint extends Constraint {
 
     bodyB.position.vsub(bodyA.position, normal);
     normal.normalize();
-    normal.mult(halfDist, eq.ri);
-    normal.mult(-halfDist, eq.rj);
+    normal.scale(halfDist, eq.ri);
+    normal.scale(-halfDist, eq.rj);
   }
 }

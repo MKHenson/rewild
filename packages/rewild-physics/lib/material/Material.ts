@@ -1,42 +1,32 @@
+/**
+ * Defines a physics material.
+ */
 export class Material {
+  /**
+   * Material name.
+   * If options is a string, name will be set to that string.
+   * @todo Deprecate this
+   */
   name: string;
+  /** Material id. */
   id: i32;
+  /**
+   * Friction for this material.
+   * If non-negative, it will be used instead of the friction given by ContactMaterials. If there's no matching ContactMaterial, the value from `defaultContactMaterial` in the World will be used.
+   */
   friction: f32;
+  /**
+   * Restitution for this material.
+   * If non-negative, it will be used instead of the restitution given by ContactMaterials. If there's no matching ContactMaterial, the value from `defaultContactMaterial` in the World will be used.
+   */
   restitution: f32;
 
-  /**
-   * Defines a physics material.
-   * @class Material
-   * @constructor
-   * @param {object} [options]
-   * @author schteppe
-   */
-  constructor(name: string = "", friction: f32 = -1, restitution: f32 = -1) {
-    /**
-     * @property name
-     * @type {String}
-     */
+  static idCounter: i32 = 0;
+
+  constructor(name: string = '', friction: f32 = -1, restitution: f32 = -1) {
     this.name = name;
-
-    /**
-     * material id.
-     * @property id
-     * @type {number}
-     */
     this.id = Material.idCounter++;
-
-    /**
-     * Friction for this material. If non-negative, it will be used instead of the friction given by ContactMaterials. If there's no matching ContactMaterial, the value from .defaultContactMaterial in the World will be used.
-     * @property {number} friction
-     */
     this.friction = friction;
-
-    /**
-     * Restitution for this material. If non-negative, it will be used instead of the restitution given by ContactMaterials. If there's no matching ContactMaterial, the value from .defaultContactMaterial in the World will be used.
-     * @property {number} restitution
-     */
     this.restitution = restitution;
   }
-
-  static idCounter: i32 = 0;
 }

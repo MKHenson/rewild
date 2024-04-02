@@ -1,8 +1,6 @@
 import { Vec3 } from '../math/Vec3';
 import { Quaternion } from '../math/Quaternion';
 
-export type TransformOptions = ConstructorParameters<typeof Transform>[0];
-
 /**
  * Transformation utilities.
  */

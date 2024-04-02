@@ -37,7 +37,7 @@ export class Terrain extends TransformNode {
 
   onAddedToParent(): void {
     super.onAddedToParent();
-    physicsManager.world.add(this.plane!);
+    physicsManager.world.addBody(this.plane!);
   }
 
   onRemovedFromParent(): void {

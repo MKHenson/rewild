@@ -1,53 +1,41 @@
-import { Vec3 } from "../math/Vec3";
-import { Body } from "../objects/Body";
-import { Equation } from "./Equation";
+import { Equation } from '../equations/Equation';
+import { Vec3 } from '../math/Vec3';
+import { Body } from '../objects/Body';
 
+/**
+ * Rotational motor constraint. Tries to keep the relative angular velocity of the bodies to a given value.
+ */
 export class RotationalMotorEquation extends Equation {
+  /**
+   * World oriented rotational axis.
+   */
   axisA: Vec3;
+  /**
+   * World oriented rotational axis.
+   */
   axisB: Vec3;
+  /**
+   * Motor velocity.
+   */
   targetVelocity: f32;
 
-  /**
-   * Rotational motor constraint. Tries to keep the relative angular velocity of the bodies to a given value.
-   * @class RotationalMotorEquation
-   * @constructor
-   * @author schteppe
-   * @param {Body} bodyA
-   * @param {Body} bodyB
-   * @param {Number} maxForce
-   * @extends Equation
-   */
   constructor(bodyA: Body, bodyB: Body, maxForce: f32 = 1e6) {
     super(bodyA, bodyB, -maxForce, maxForce);
 
-    /**
-     * World oriented rotational axis
-     * @property {Vec3} axisA
-     */
     this.axisA = new Vec3();
-
-    /**
-     * World oriented rotational axis
-     * @property {Vec3} axisB
-     */
-    this.axisB = new Vec3(); // World oriented rotational axis
-
-    /**
-     * Motor velocity
-     * @property {Number} targetVelocity
-     */
+    this.axisB = new Vec3();
     this.targetVelocity = 0;
   }
 
   computeB(h: f32): f32 {
-    // const a = this.a,
-    const b = this.b,
-      // bi = this.bi,
-      // bj = this.bj,
-      axisA = this.axisA,
-      axisB = this.axisB,
-      GA = this.jacobianElementA,
-      GB = this.jacobianElementB;
+    // const a = this.a;
+    const b = this.b;
+    // const bi = this.bi;
+    // const bj = this.bj;
+    const axisA = this.axisA;
+    const axisB = this.axisB;
+    const GA = this.jacobianElementA;
+    const GB = this.jacobianElementB;
 
     // g = 0
     // gdot = axisA * wi - axisB * wj
@@ -58,8 +46,8 @@ export class RotationalMotorEquation extends Equation {
     GA.rotational.copy(axisA);
     axisB.negate(GB.rotational);
 
-    const GW = this.computeGW() - this.targetVelocity,
-      GiMf = this.computeGiMf();
+    const GW = this.computeGW() - this.targetVelocity;
+    const GiMf = this.computeGiMf();
 
     const B = -GW * b - h * GiMf;
 

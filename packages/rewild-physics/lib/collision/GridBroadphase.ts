@@ -1,10 +1,10 @@
 import { Broadphase } from '../collision/Broadphase';
 import { Vec3 } from '../math/Vec3';
 import { Shape } from '../shapes/Shape';
-import type { Body } from '../objects/Body';
-import type { Sphere } from '../shapes/Sphere';
-import type { Plane } from '../shapes/Plane';
-import type { World } from '../world/World';
+import { Body } from '../objects/Body';
+import { Sphere } from '../shapes/Sphere';
+import { Plane } from '../shapes/Plane';
+import { World } from '../world/World';
 
 /**
  * Axis aligned uniform grid broadphase.
@@ -112,12 +112,12 @@ export class GridBroadphase extends Broadphase {
         binsizeX * binsizeX + binsizeY * binsizeY + binsizeZ * binsizeZ
       ) * 0.5;
 
-    const types = Shape.types;
-    const SPHERE = types.SPHERE;
-    const PLANE = types.PLANE;
-    const BOX = types.BOX;
-    const COMPOUND = types.COMPOUND;
-    const CONVEXPOLYHEDRON = types.CONVEXPOLYHEDRON;
+    // const types = Shape.types;
+    const SPHERE = Shape.SPHERE;
+    const PLANE = Shape.PLANE;
+    // const BOX = types.BOX;
+    // const COMPOUND = types.COMPOUND;
+    // const CONVEXPOLYHEDRON = types.CONVEXPOLYHEDRON;
     const bins = this.bins;
     const binLengths = this.binLengths;
     const Nbins = this.bins.length;
@@ -127,7 +127,7 @@ export class GridBroadphase extends Broadphase {
       binLengths[i] = 0;
     }
 
-    const ceil = Mathf.ceil;
+    // const ceil = Mathf.ceil;
 
     function addBoxToBins(
       x0: f32,
@@ -309,4 +309,4 @@ export class GridBroadphase extends Broadphase {
 }
 
 const GridBroadphase_collisionPairs_d = new Vec3();
-const GridBroadphase_collisionPairs_binPos = new Vec3();
+// const GridBroadphase_collisionPairs_binPos = new Vec3();
