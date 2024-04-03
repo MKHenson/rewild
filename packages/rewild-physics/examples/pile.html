@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       const demo = new Demo()
@@ -20,7 +21,7 @@
 
         // Plane -x
         const planeShapeXmin = new CANNON.Plane()
-        const planeXmin = new CANNON.Body({ mass: 0 })
+        const planeXmin = new CANNON.Body( new CANNON.BodyOptions().setMass(0) )
         planeXmin.addShape(planeShapeXmin)
         planeXmin.quaternion.setFromEuler(0, Math.PI / 2, 0)
         planeXmin.position.set(-5, 0, 0)
@@ -28,7 +29,7 @@
 
         // Plane +x
         const planeShapeXmax = new CANNON.Plane()
-        const planeXmax = new CANNON.Body({ mass: 0 })
+        const planeXmax = new CANNON.Body(new CANNON.BodyOptions().setMass(0))
         planeXmax.addShape(planeShapeXmax)
         planeXmax.quaternion.setFromEuler(0, -Math.PI / 2, 0)
         planeXmax.position.set(5, 0, 0)
@@ -36,7 +37,7 @@
 
         // Plane -z
         const planeShapeZmin = new CANNON.Plane()
-        const planeZmin = new CANNON.Body({ mass: 0 })
+        const planeZmin = new CANNON.Body(new CANNON.BodyOptions().setMass(0))
         planeZmin.addShape(planeShapeZmin)
         planeZmin.quaternion.setFromEuler(0, 0, 0)
         planeZmin.position.set(0, 0, -5)
@@ -44,7 +45,7 @@
 
         // Plane +z
         const planeShapeZmax = new CANNON.Plane()
-        const planeZmax = new CANNON.Body({ mass: 0 })
+        const planeZmax = new CANNON.Body(new CANNON.BodyOptions().setMass(0))
         planeZmax.addShape(planeShapeZmax)
         planeZmax.quaternion.setFromEuler(0, Math.PI, 0)
         planeZmax.position.set(0, 0, 5)
@@ -58,10 +59,7 @@
           // Sphere
           i++
           const sphereShape = new CANNON.Sphere(size)
-          const sphereBody = new CANNON.Body({
-            mass: 5,
-            position: new CANNON.Vec3(-size * 2 * Math.sin(i), size * 2 * 7, size * 2 * Math.cos(i)),
-          })
+          const sphereBody = new CANNON.Body(  new CANNON.BodyOptions().setMass(5).setPosition(new CANNON.Vec3(-size * 2 * Math.sin(i), size * 2 * 7, size * 2 * Math.cos(i)) ) ) 
           sphereBody.addShape(sphereShape)
           world.addBody(sphereBody)
           demo.addVisual(sphereBody)
@@ -97,7 +95,7 @@
 
         // Static ground plane
         const groundShape = new CANNON.Plane()
-        const groundBody = new CANNON.Body({ mass: 0 })
+        const groundBody = new CANNON.Body(new CANNON.BodyOptions().setMass(0))
         groundBody.addShape(groundShape)
         groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
         world.addBody(groundBody)

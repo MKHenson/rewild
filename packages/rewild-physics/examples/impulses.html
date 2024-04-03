@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       /**
@@ -30,7 +31,7 @@
         const world = setupWorld(demo)
 
         const shape = new CANNON.Sphere(radius)
-        const body = new CANNON.Body({ mass })
+        const body = new CANNON.Body( new CANNON.BodyOptions().setMass(mass) )
         body.addShape(shape)
         body.linearDamping = damping
         body.angularDamping = damping
@@ -46,7 +47,7 @@
         const world = setupWorld(demo)
 
         const shape = new CANNON.Sphere(radius)
-        const body = new CANNON.Body({ mass })
+        const body = new CANNON.Body( new CANNON.BodyOptions().setMass(mass) )
         body.addShape(shape)
         body.linearDamping = damping
         body.angularDamping = damping
@@ -64,7 +65,7 @@
         const world = setupWorld(demo)
 
         const shape = new CANNON.Sphere(radius)
-        const body = new CANNON.Body({ mass })
+        const body = new CANNON.Body( new CANNON.BodyOptions().setMass(mass) )
         body.addShape(shape)
         body.linearDamping = damping
         body.angularDamping = damping
@@ -80,7 +81,7 @@
         const world = setupWorld(demo)
 
         const shape = new CANNON.Sphere(radius)
-        const body = new CANNON.Body({ mass })
+        const body = new CANNON.Body( new CANNON.BodyOptions().setMass(mass) )
         body.addShape(shape)
         body.linearDamping = damping
         body.angularDamping = damping
@@ -98,7 +99,7 @@
         const world = setupWorld(demo)
 
         const shape = new CANNON.Sphere(radius)
-        const body = new CANNON.Body({ mass })
+        const body = new CANNON.Body(new CANNON.BodyOptions().setMass(mass))
         body.addShape(shape)
         body.linearDamping = damping
         body.angularDamping = damping
@@ -118,7 +119,7 @@
         const world = setupWorld(demo)
 
         const shape = new CANNON.Sphere(radius)
-        const body = new CANNON.Body({ mass })
+        const body = new CANNON.Body(new CANNON.BodyOptions().setMass(mass))
         body.addShape(shape)
         body.linearDamping = damping
         body.angularDamping = damping

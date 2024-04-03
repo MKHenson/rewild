@@ -387,7 +387,7 @@ export class Body extends EventDispatcher {
       this.velocity.copy(options.velocity);
     }
 
-    if (options.type == Body.STATIC) {
+    if (typeof options.type === typeof Body.STATIC) {
       this.type = options.type;
     }
 
@@ -996,7 +996,7 @@ export class BodyOptions {
     /**
      * Whether to produce contact forces when in contact with other bodies. Note that contacts will be generated, but they will be disabled - i.e. "collide" events will be raised, but forces will not be altered.
      */
-    public collisionResponse: boolean = false,
+    public collisionResponse: boolean = true,
     /**
      * When true the body behaves like a trigger. It does not collide
      * with other bodies but collision events are still triggered.
@@ -1007,6 +1007,11 @@ export class BodyOptions {
 
   setMass(value: f32): BodyOptions {
     this.mass = value;
+    return this;
+  }
+
+  setCollisionResponse(value: boolean): BodyOptions {
+    this.collisionResponse = value;
     return this;
   }
 

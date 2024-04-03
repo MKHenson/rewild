@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       /**
@@ -25,7 +26,7 @@
         // Create sphere
         const size = 1
         const sphere = new CANNON.Sphere(size)
-        const sphereBody = new CANNON.Body({ mass: 1 })
+        const sphereBody = new CANNON.Body(new CANNON.BodyOptions().setMass(1))
         sphereBody.addShape(sphere)
         sphereBody.position.set(0, size * 6, 0)
         world.addBody(sphereBody)
@@ -39,13 +40,13 @@
         sphereBody.sleepSpeedLimit = 0.1 // Body will feel sleepy if speed<1 (speed == norm of velocity)
         sphereBody.sleepTimeLimit = 1 // Body falls asleep after 1s of sleepiness
 
-        sphereBody.addEventListener('sleepy', (event) => {
+        sphereBody.addEventListener('sleepy', {onEvent: (event) => {
           console.log('The sphere is feeling sleepy...')
-        })
+        }})
 
-        sphereBody.addEventListener('sleep', (event) => {
+        sphereBody.addEventListener('sleep', {onEvent: (event) => {
           console.log('The sphere fell asleep!')
-        })
+        }})
       })
 
       // Wake up demo
@@ -55,7 +56,7 @@
         // Create sphere
         const size = 2
         const sphere = new CANNON.Sphere(size)
-        const sphereBody1 = new CANNON.Body({ mass: 1 })
+        const sphereBody1 = new CANNON.Body(new CANNON.BodyOptions().setMass(1))
         sphereBody1.addShape(sphere)
         sphereBody1.position.set(0, size, 0)
         world.addBody(sphereBody1)
@@ -65,7 +66,7 @@
         sphereBody1.sleep()
 
         // Create sphere that will wake up the first one
-        const sphereBody2 = new CANNON.Body({ mass: 1 })
+        const sphereBody2 = new CANNON.Body(new CANNON.BodyOptions().setMass(1))
         sphereBody2.addShape(sphere)
         sphereBody2.position.set(-size * 10, size, 0)
         sphereBody2.velocity.set(10, 0, 0)
@@ -84,9 +85,9 @@
         sphereBody1.sleepTimeLimit = 1
 
         // The body wakes up when it gets a new contact
-        sphereBody1.addEventListener('wakeup', (event) => {
+        sphereBody1.addEventListener('wakeup', { onEvent: (event) => {
           console.log('The sphere woke up!')
-        })
+        }})
       })
 
       // Wake up demo
@@ -96,7 +97,7 @@
         // Create sphere
         const size = 2
         const sphere = new CANNON.Sphere(size)
-        const sphereBody = new CANNON.Body({ mass: 1 })
+        const sphereBody = new CANNON.Body(new CANNON.BodyOptions().setMass(1))
         sphereBody.addShape(sphere)
         sphereBody.position.set(0, size, 0)
         world.addBody(sphereBody)
@@ -119,9 +120,9 @@
         }, 1000)
 
         // The body wakes up when it gets a new contact
-        sphereBody.addEventListener('wakeup', (event) => {
+        sphereBody.addEventListener('wakeup', {onEvent: (event) => {
           console.log('The sphere woke up!')
-        })
+        }})
       })
 
       demo.start()
@@ -139,7 +140,7 @@
 
         // Static ground plane
         const groundShape = new CANNON.Plane()
-        const groundBody = new CANNON.Body({ mass: 0 })
+        const groundBody = new CANNON.Body(new CANNON.BodyOptions().setMass(0))
         groundBody.addShape(groundShape)
         groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
         world.addBody(groundBody)

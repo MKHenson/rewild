@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       const demo = new Demo()
@@ -20,14 +21,14 @@
 
         // Create a static sphere
         const sphereShape = new CANNON.Sphere(0.1)
-        const sphereBody = new CANNON.Body({ mass: 0 })
+        const sphereBody = new CANNON.Body(new CANNON.BodyOptions().setMass(0))
         sphereBody.addShape(sphereShape)
         world.addBody(sphereBody)
         demo.addVisual(sphereBody)
 
         // Create a box body
         const boxShape = new CANNON.Box(new CANNON.Vec3(size, size, size * 0.3))
-        const boxBody = new CANNON.Body({ mass: 5 })
+        const boxBody = new CANNON.Body(new CANNON.BodyOptions().setMass(5))
         boxBody.addShape(boxShape)
         boxBody.position.set(size, -size, 0)
         world.addBody(boxBody)
@@ -42,9 +43,9 @@
         })
 
         // Compute the force after each step
-        world.addEventListener('postStep', (event) => {
+        world.addEventListener('postStep', {onEvent: (event) => {
           spring.applyForce()
-        })
+        }})
       })
 
       demo.start()

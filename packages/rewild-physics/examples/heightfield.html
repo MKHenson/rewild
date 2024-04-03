@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       const demo = new Demo()
@@ -35,10 +36,8 @@
         }
 
         // Create the heightfield
-        const heightfieldShape = new CANNON.Heightfield(matrix, {
-          elementSize: 1,
-        })
-        const heightfieldBody = new CANNON.Body({ mass: 0 })
+        const heightfieldShape = new CANNON.Heightfield(matrix, undefined, undefined, 1 )
+        const heightfieldBody = new CANNON.Body( new CANNON.BodyOptions().setMass(0) )
         heightfieldBody.addShape(heightfieldShape)
         heightfieldBody.position.set(
           -((sizeX - 1) * heightfieldShape.elementSize) / 2,
@@ -58,7 +57,7 @@
             }
 
             const sphereShape = new CANNON.Sphere(0.1)
-            const sphereBody = new CANNON.Body({ mass })
+            const sphereBody = new CANNON.Body( new CANNON.BodyOptions().setMass(mass) )
             sphereBody.addShape(sphereShape)
             sphereBody.position.set(i + 0.25, 3, -j + 0.25)
             sphereBody.position.vadd(heightfieldBody.position, sphereBody.position)
