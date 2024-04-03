@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       const demo = new Demo()
@@ -18,33 +19,32 @@
 
         // Build the car chassis
         const chassisShape = new CANNON.Box(new CANNON.Vec3(2, 0.5, 1))
-        const chassisBody = new CANNON.Body({ mass: 150 })
+        const chassisBody = new CANNON.Body( new CANNON.BodyOptions().setMass(150) )
         chassisBody.addShape(chassisShape)
         chassisBody.position.set(0, 4, 0)
         chassisBody.angularVelocity.set(0, 0.5, 0)
         demo.addVisual(chassisBody)
 
         // Create the vehicle
-        const vehicle = new CANNON.RaycastVehicle({
-          chassisBody,
-        })
+        const vehicle = new CANNON.RaycastVehicle(
+          chassisBody )
 
-        const wheelOptions = {
-          radius: 0.5,
-          directionLocal: new CANNON.Vec3(0, -1, 0),
-          suspensionStiffness: 30,
-          suspensionRestLength: 0.3,
-          frictionSlip: 1.4,
-          dampingRelaxation: 2.3,
-          dampingCompression: 4.4,
-          maxSuspensionForce: 100000,
-          rollInfluence: 0.01,
-          axleLocal: new CANNON.Vec3(0, 0, 1),
-          chassisConnectionPointLocal: new CANNON.Vec3(-1, 0, 1),
-          maxSuspensionTravel: 0.3,
-          customSlidingRotationalSpeed: -30,
-          useCustomSlidingRotationalSpeed: true,
-        }
+        const wheelOptions = new CANNON.WheelInfoOptions(); 
+        wheelOptions.radius= 0.5;
+        wheelOptions.directionLocal= new CANNON.Vec3(0, -1, 0);
+        wheelOptions.suspensionStiffness= 30;
+        wheelOptions.suspensionRestLength= 0.3;
+        wheelOptions.frictionSlip= 1.4;
+        wheelOptions.dampingRelaxation= 2.3;
+        wheelOptions.dampingCompression= 4.4;
+        wheelOptions.maxSuspensionForce= 100000;
+        wheelOptions.rollInfluence= 0.01;
+        wheelOptions.axleLocal= new CANNON.Vec3(0, 0, 1);
+        wheelOptions.chassisConnectionPointLocal= new CANNON.Vec3(-1, 0, 1);
+        wheelOptions.maxSuspensionTravel= 0.3;
+        wheelOptions.customSlidingRotationalSpeed= -30;
+        wheelOptions.useCustomSlidingRotationalSpeed= true;
+        
 
         wheelOptions.chassisConnectionPointLocal.set(-1, 0, 1)
         vehicle.addWheel(wheelOptions)
@@ -65,10 +65,7 @@
         const wheelMaterial = new CANNON.Material('wheel')
         vehicle.wheelInfos.forEach((wheel) => {
           const cylinderShape = new CANNON.Cylinder(wheel.radius, wheel.radius, wheel.radius / 2, 20)
-          const wheelBody = new CANNON.Body({
-            mass: 0,
-            material: wheelMaterial,
-          })
+          const wheelBody = new CANNON.Body( new CANNON.BodyOptions().setMass(0).setMaterial(wheelMaterial)) 
           wheelBody.type = CANNON.Body.KINEMATIC
           wheelBody.collisionFilterGroup = 0 // turn off collisions
           const quaternion = new CANNON.Quaternion().setFromEuler(-Math.PI / 2, 0, 0)
@@ -79,7 +76,7 @@
         })
 
         // Update the wheel bodies
-        world.addEventListener('postStep', () => {
+        world.addEventListener('postStep', {onEvent: () => {
           for (let i = 0; i < vehicle.wheelInfos.length; i++) {
             vehicle.updateWheelTransform(i)
             const transform = vehicle.wheelInfos[i].worldTransform
@@ -87,7 +84,7 @@
             wheelBody.position.copy(transform.position)
             wheelBody.quaternion.copy(transform.quaternion)
           }
-        })
+        }})
 
         // Add the ground
         const sizeX = 64
@@ -108,10 +105,8 @@
         }
 
         const groundMaterial = new CANNON.Material('ground')
-        const heightfieldShape = new CANNON.Heightfield(matrix, {
-          elementSize: 100 / sizeX,
-        })
-        const heightfieldBody = new CANNON.Body({ mass: 0, material: groundMaterial })
+        const heightfieldShape = new CANNON.Heightfield(matrix, undefined, undefined, 100 / sizeX )
+        const heightfieldBody = new CANNON.Body( new CANNON.BodyOptions().setMass(0).setMaterial(groundMaterial) )
         heightfieldBody.addShape(heightfieldShape)
         heightfieldBody.position.set(
           // -((sizeX - 1) * heightfieldShape.elementSize) / 2,

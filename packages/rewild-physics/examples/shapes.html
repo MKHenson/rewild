@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       const demo = new Demo()
@@ -31,15 +32,15 @@
           v.y += offset
           v.z += offset
         }
-        return new CANNON.ConvexPolyhedron({
+        return new CANNON.ConvexPolyhedron(
           vertices,
-          faces: [
+          [
             [0, 3, 2], // -x
             [0, 1, 3], // -y
             [0, 2, 1], // -z
             [1, 2, 3], // +xyz
           ],
-        })
+        )
       }
 
       demo.addScene('All shapes', () => {
@@ -50,7 +51,7 @@
 
         // Sphere shape
         const sphereShape = new CANNON.Sphere(size)
-        const sphereBody = new CANNON.Body({ mass })
+        const sphereBody = new CANNON.Body( new CANNON.BodyOptions().setMass(mass) )
         sphereBody.addShape(sphereShape)
         sphereBody.position.set(-size * 2, size + 1, size * 2)
         world.addBody(sphereBody)
@@ -58,7 +59,7 @@
 
         // Cylinder shape
         const cylinderShape = new CANNON.Cylinder(size, size, size * 2, 10)
-        const cylinderBody = new CANNON.Body({ mass })
+        const cylinderBody = new CANNON.Body( new CANNON.BodyOptions().setMass(mass)  )
         cylinderBody.addShape(cylinderShape)
         cylinderBody.position.set(size * 2, size + 1, size * 2)
         world.addBody(cylinderBody)
@@ -66,7 +67,7 @@
 
         // Cylinder shape 2
         const cylinderShape2 = new CANNON.Cylinder(size, size, size * 2, 10)
-        const cylinderBody2 = new CANNON.Body({ mass })
+        const cylinderBody2 = new CANNON.Body( new CANNON.BodyOptions().setMass(mass) )
         cylinderBody2.addShape(cylinderShape2)
         cylinderBody2.position.set(size * 2, size * 4 + 1, size * 2)
         cylinderBody2.quaternion.setFromEuler(Math.PI / 2, Math.PI / 2, 0)
@@ -75,21 +76,21 @@
 
         // Box shape
         const boxShape = new CANNON.Box(new CANNON.Vec3(size, size, size))
-        const boxBody = new CANNON.Body({ mass })
+        const boxBody = new CANNON.Body( new CANNON.BodyOptions().setMass(mass) )
         boxBody.addShape(boxShape)
         boxBody.position.set(size * 2, size + 1, -size * 2)
         world.addBody(boxBody)
         demo.addVisual(boxBody)
 
         // Particle - not a shape but still here to show how to use it.
-        const particle = new CANNON.Body({ mass })
+        const particle = new CANNON.Body( new CANNON.BodyOptions().setMass(mass) )
         particle.addShape(new CANNON.Particle())
         particle.position.set(size * 2, size + 1, size * 4)
         world.addBody(particle)
         demo.addVisual(particle)
 
         // Compound
-        const compoundBody = new CANNON.Body({ mass })
+        const compoundBody = new CANNON.Body(new CANNON.BodyOptions().setMass(mass))
         const shape = new CANNON.Box(new CANNON.Vec3(size * 0.5, size * 0.5, size * 0.5))
         compoundBody.addShape(shape, new CANNON.Vec3(0, size, 0))
         compoundBody.addShape(shape, new CANNON.Vec3(0, 0, 0))
@@ -101,7 +102,7 @@
 
         // ConvexPolyhedron tetra shape
         const polyhedronShape = createTetra()
-        const polyhedronBody = new CANNON.Body({ mass })
+        const polyhedronBody = new CANNON.Body(new CANNON.BodyOptions().setMass(mass))
         polyhedronBody.addShape(polyhedronShape)
         polyhedronBody.position.set(-size * 2, size + 1, -size * 2)
         world.addBody(polyhedronBody)
@@ -126,7 +127,7 @@
 
         // Static ground plane
         const groundShape = new CANNON.Plane()
-        const groundBody = new CANNON.Body({ mass: 0 })
+        const groundBody = new CANNON.Body(new CANNON.BodyOptions().setMass(0))
         groundBody.addShape(groundShape)
         groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
         world.addBody(groundBody)

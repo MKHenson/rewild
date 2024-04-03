@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       const demo = new Demo()
@@ -147,207 +148,160 @@
         )
 
         // Lower legs
-        const lowerLeftLeg = new CANNON.Body({
-          mass: 1,
-          position: new CANNON.Vec3(shouldersDistance / 2, 0, lowerLegLength / 2),
-        })
-        const lowerRightLeg = new CANNON.Body({
-          mass: 1,
-          position: new CANNON.Vec3(-shouldersDistance / 2, 0, lowerLegLength / 2),
-        })
+        const lowerLeftLeg = new CANNON.Body( new CANNON.BodyOptions().setMass(1).setPosition(new CANNON.Vec3(shouldersDistance / 2, 0, lowerLegLength / 2)) ) 
+        const lowerRightLeg = new CANNON.Body( new CANNON.BodyOptions().setMass(1).setPosition(new CANNON.Vec3(-shouldersDistance / 2, 0, lowerLegLength / 2)) )
         lowerLeftLeg.addShape(lowerLegShape)
         lowerRightLeg.addShape(lowerLegShape)
         bodies.push(lowerLeftLeg)
         bodies.push(lowerRightLeg)
 
         // Upper legs
-        const upperLeftLeg = new CANNON.Body({
-          mass: 1,
-          position: new CANNON.Vec3(
-            shouldersDistance / 2,
-            0,
-            lowerLeftLeg.position.z + lowerLegLength / 2 + upperLegLength / 2
-          ),
-        })
-        const upperRightLeg = new CANNON.Body({
-          mass: 1,
-          position: new CANNON.Vec3(
-            -shouldersDistance / 2,
-            0,
-            lowerRightLeg.position.z + lowerLegLength / 2 + upperLegLength / 2
-          ),
-        })
+        const upperLeftLeg = new CANNON.Body( new CANNON.BodyOptions().setMass(1).setPosition(new CANNON.Vec3(shouldersDistance / 2, 0, lowerLeftLeg.position.z + lowerLegLength / 2 + upperLegLength / 2)) ) 
+        const upperRightLeg = new CANNON.Body( new CANNON.BodyOptions().setMass(1).setPosition(new CANNON.Vec3(-shouldersDistance / 2, 0, lowerRightLeg.position.z + lowerLegLength / 2 + upperLegLength / 2)) )
         upperLeftLeg.addShape(upperLegShape)
         upperRightLeg.addShape(upperLegShape)
         bodies.push(upperLeftLeg)
         bodies.push(upperRightLeg)
 
         // Pelvis
-        const pelvis = new CANNON.Body({
-          mass: 1,
-          position: new CANNON.Vec3(0, 0, upperLeftLeg.position.z + upperLegLength / 2 + pelvisLength / 2),
-        })
+        const pelvis = new CANNON.Body( new CANNON.BodyOptions().setMass(1).setPosition(new CANNON.Vec3(0, 0, upperLeftLeg.position.z + upperLegLength / 2 + pelvisLength / 2)) ) 
         pelvis.addShape(pelvisShape)
         bodies.push(pelvis)
 
         // Upper body
-        const upperBody = new CANNON.Body({
-          mass: 1,
-          position: new CANNON.Vec3(0, 0, pelvis.position.z + pelvisLength / 2 + upperBodyLength / 2),
-        })
+        const upperBody = new CANNON.Body( new CANNON.BodyOptions().setMass(1).setPosition(new CANNON.Vec3(0, 0, pelvis.position.z + pelvisLength / 2 + upperBodyLength / 2)) ) 
         upperBody.addShape(upperBodyShape)
         bodies.push(upperBody)
 
         // Head
-        const head = new CANNON.Body({
-          mass: 1,
-          position: new CANNON.Vec3(0, 0, upperBody.position.z + upperBodyLength / 2 + headRadius + neckLength),
-        })
+        const head = new CANNON.Body(new CANNON.BodyOptions().setMass(1).setPosition(new CANNON.Vec3(0, 0, upperBody.position.z + upperBodyLength / 2 + headRadius + neckLength)) ) 
         head.addShape(headShape)
         bodies.push(head)
 
         // Upper arms
-        const upperLeftArm = new CANNON.Body({
-          mass: 1,
-          position: new CANNON.Vec3(
-            shouldersDistance / 2 + upperArmLength / 2,
-            0,
-            upperBody.position.z + upperBodyLength / 2
-          ),
-        })
-        const upperRightArm = new CANNON.Body({
-          mass: 1,
-          position: new CANNON.Vec3(
-            -shouldersDistance / 2 - upperArmLength / 2,
-            0,
-            upperBody.position.z + upperBodyLength / 2
-          ),
-        })
+        const upperLeftArm = new CANNON.Body( new CANNON.BodyOptions().setMass(1).setPosition(new CANNON.Vec3(shouldersDistance / 2 + upperArmLength / 2, 0, upperBody.position.z + upperBodyLength / 2)) ) 
+        const upperRightArm = new CANNON.Body(  new CANNON.BodyOptions().setMass(1).setPosition(new CANNON.Vec3(-shouldersDistance / 2 - upperArmLength / 2, 0, upperBody.position.z + upperBodyLength / 2)) ) 
         upperLeftArm.addShape(upperArmShape)
         upperRightArm.addShape(upperArmShape)
         bodies.push(upperLeftArm)
         bodies.push(upperRightArm)
 
         // Lower arms
-        const lowerLeftArm = new CANNON.Body({
-          mass: 1,
-          position: new CANNON.Vec3(
-            upperLeftArm.position.x + lowerArmLength / 2 + upperArmLength / 2,
-            0,
-            upperLeftArm.position.z
-          ),
-        })
-        const lowerRightArm = new CANNON.Body({
-          mass: 1,
-          position: new CANNON.Vec3(
-            upperRightArm.position.x - lowerArmLength / 2 - upperArmLength / 2,
-            0,
-            upperRightArm.position.z
-          ),
-        })
+        const lowerLeftArm = new CANNON.Body( new CANNON.BodyOptions().setMass(1).setPosition(new CANNON.Vec3(upperLeftArm.position.x + lowerArmLength / 2 + upperArmLength / 2, 0, upperLeftArm.position.z)) ) 
+        const lowerRightArm = new CANNON.Body( new CANNON.BodyOptions().setMass(1).setPosition(new CANNON.Vec3(upperRightArm.position.x - lowerArmLength / 2 - upperArmLength / 2, 0, upperRightArm.position.z)) ) 
         lowerLeftArm.addShape(lowerArmShape)
         lowerRightArm.addShape(lowerArmShape)
         bodies.push(lowerLeftArm)
         bodies.push(lowerRightArm)
 
         // Neck joint
-        const neckJoint = new CANNON.ConeTwistConstraint(head, upperBody, {
-          pivotA: new CANNON.Vec3(0, 0, -headRadius - neckLength / 2),
-          pivotB: new CANNON.Vec3(0, 0, upperBodyLength / 2),
-          axisA: CANNON.Vec3.UNIT_Z,
-          axisB: CANNON.Vec3.UNIT_Z,
+        const neckJoint = new CANNON.ConeTwistConstraint(head, upperBody, 
+          new CANNON.Vec3(0, 0, -headRadius - neckLength / 2),
+          new CANNON.Vec3(0, 0, upperBodyLength / 2),
+          CANNON.Vec3.UNIT_Z,
+          CANNON.Vec3.UNIT_Z,
+          undefined,
           angle,
           twistAngle,
-        })
+        )
         constraints.push(neckJoint)
 
         // Knee joints
-        const leftKneeJoint = new CANNON.ConeTwistConstraint(lowerLeftLeg, upperLeftLeg, {
-          pivotA: new CANNON.Vec3(0, 0, lowerLegLength / 2),
-          pivotB: new CANNON.Vec3(0, 0, -upperLegLength / 2),
-          axisA: CANNON.Vec3.UNIT_Z,
-          axisB: CANNON.Vec3.UNIT_Z,
+        const leftKneeJoint = new CANNON.ConeTwistConstraint(lowerLeftLeg, upperLeftLeg, 
+          new CANNON.Vec3(0, 0, lowerLegLength / 2),
+          new CANNON.Vec3(0, 0, -upperLegLength / 2),
+          CANNON.Vec3.UNIT_Z,
+          CANNON.Vec3.UNIT_Z,
+          undefined,
           angle,
           twistAngle,
-        })
-        const rightKneeJoint = new CANNON.ConeTwistConstraint(lowerRightLeg, upperRightLeg, {
-          pivotA: new CANNON.Vec3(0, 0, lowerLegLength / 2),
-          pivotB: new CANNON.Vec3(0, 0, -upperLegLength / 2),
-          axisA: CANNON.Vec3.UNIT_Z,
-          axisB: CANNON.Vec3.UNIT_Z,
+        )
+        const rightKneeJoint = new CANNON.ConeTwistConstraint(lowerRightLeg, upperRightLeg,
+          new CANNON.Vec3(0, 0, lowerLegLength / 2),
+          new CANNON.Vec3(0, 0, -upperLegLength / 2),
+          CANNON.Vec3.UNIT_Z,
+          CANNON.Vec3.UNIT_Z,
+          undefined,
           angle,
           twistAngle,
-        })
+        )
         constraints.push(leftKneeJoint)
         constraints.push(rightKneeJoint)
 
         // Hip joints
-        const leftHipJoint = new CANNON.ConeTwistConstraint(upperLeftLeg, pelvis, {
-          pivotA: new CANNON.Vec3(0, 0, upperLegLength / 2),
-          pivotB: new CANNON.Vec3(shouldersDistance / 2, 0, -pelvisLength / 2),
-          axisA: CANNON.Vec3.UNIT_Z,
-          axisB: CANNON.Vec3.UNIT_Z,
+        const leftHipJoint = new CANNON.ConeTwistConstraint(upperLeftLeg, pelvis, 
+          new CANNON.Vec3(0, 0, upperLegLength / 2),
+          new CANNON.Vec3(shouldersDistance / 2, 0, -pelvisLength / 2),
+          CANNON.Vec3.UNIT_Z,
+          CANNON.Vec3.UNIT_Z,
+          undefined,
           angle,
           twistAngle,
-        })
-        const rightHipJoint = new CANNON.ConeTwistConstraint(upperRightLeg, pelvis, {
-          pivotA: new CANNON.Vec3(0, 0, upperLegLength / 2),
-          pivotB: new CANNON.Vec3(-shouldersDistance / 2, 0, -pelvisLength / 2),
-          axisA: CANNON.Vec3.UNIT_Z,
-          axisB: CANNON.Vec3.UNIT_Z,
+        )
+        const rightHipJoint = new CANNON.ConeTwistConstraint(upperRightLeg, pelvis, 
+          new CANNON.Vec3(0, 0, upperLegLength / 2),
+          new CANNON.Vec3(-shouldersDistance / 2, 0, -pelvisLength / 2),
+          CANNON.Vec3.UNIT_Z,
+          CANNON.Vec3.UNIT_Z,
+          undefined,
           angle,
           twistAngle,
-        })
+        )
         constraints.push(leftHipJoint)
         constraints.push(rightHipJoint)
 
         // Spine
-        const spineJoint = new CANNON.ConeTwistConstraint(pelvis, upperBody, {
-          pivotA: new CANNON.Vec3(0, 0, pelvisLength / 2),
-          pivotB: new CANNON.Vec3(0, 0, -upperBodyLength / 2),
-          axisA: CANNON.Vec3.UNIT_Z,
-          axisB: CANNON.Vec3.UNIT_Z,
+        const spineJoint = new CANNON.ConeTwistConstraint(pelvis, upperBody, 
+          new CANNON.Vec3(0, 0, pelvisLength / 2),
+          new CANNON.Vec3(0, 0, -upperBodyLength / 2),
+          CANNON.Vec3.UNIT_Z,
+          CANNON.Vec3.UNIT_Z,
+          undefined,
           angle,
           twistAngle,
-        })
+        )
         constraints.push(spineJoint)
 
         // Shoulders
-        const leftShoulder = new CANNON.ConeTwistConstraint(upperBody, upperLeftArm, {
-          pivotA: new CANNON.Vec3(shouldersDistance / 2, 0, upperBodyLength / 2),
-          pivotB: new CANNON.Vec3(-upperArmLength / 2, 0, 0),
-          axisA: CANNON.Vec3.UNIT_X,
-          axisB: CANNON.Vec3.UNIT_X,
-          angle: angleShoulders,
-        })
-        const rightShoulder = new CANNON.ConeTwistConstraint(upperBody, upperRightArm, {
-          pivotA: new CANNON.Vec3(-shouldersDistance / 2, 0, upperBodyLength / 2),
-          pivotB: new CANNON.Vec3(upperArmLength / 2, 0, 0),
-          axisA: CANNON.Vec3.UNIT_X,
-          axisB: CANNON.Vec3.UNIT_X,
-          angle: angleShoulders,
+        const leftShoulder = new CANNON.ConeTwistConstraint(upperBody, upperLeftArm, 
+           new CANNON.Vec3(shouldersDistance / 2, 0, upperBodyLength / 2),
+           new CANNON.Vec3(-upperArmLength / 2, 0, 0),
+           CANNON.Vec3.UNIT_X,
+           CANNON.Vec3.UNIT_X,
+           undefined,
+          angleShoulders,
+        )
+        const rightShoulder = new CANNON.ConeTwistConstraint(upperBody, upperRightArm, 
+          new CANNON.Vec3(-shouldersDistance / 2, 0, upperBodyLength / 2),
+          new CANNON.Vec3(upperArmLength / 2, 0, 0),
+          CANNON.Vec3.UNIT_X,
+          CANNON.Vec3.UNIT_X,
+          undefined,
+          angleShoulders,
           twistAngle,
-        })
+        )
         constraints.push(leftShoulder)
         constraints.push(rightShoulder)
 
         // Elbow joint
-        const leftElbowJoint = new CANNON.ConeTwistConstraint(lowerLeftArm, upperLeftArm, {
-          pivotA: new CANNON.Vec3(-lowerArmLength / 2, 0, 0),
-          pivotB: new CANNON.Vec3(upperArmLength / 2, 0, 0),
-          axisA: CANNON.Vec3.UNIT_X,
-          axisB: CANNON.Vec3.UNIT_X,
+        const leftElbowJoint = new CANNON.ConeTwistConstraint(lowerLeftArm, upperLeftArm, 
+          new CANNON.Vec3(-lowerArmLength / 2, 0, 0),
+          new CANNON.Vec3(upperArmLength / 2, 0, 0),
+          CANNON.Vec3.UNIT_X,
+          CANNON.Vec3.UNIT_X,
+          undefined,
           angle,
           twistAngle,
-        })
-        const rightElbowJoint = new CANNON.ConeTwistConstraint(lowerRightArm, upperRightArm, {
-          pivotA: new CANNON.Vec3(lowerArmLength / 2, 0, 0),
-          pivotB: new CANNON.Vec3(-upperArmLength / 2, 0, 0),
-          axisA: CANNON.Vec3.UNIT_X,
-          axisB: CANNON.Vec3.UNIT_X,
+        )
+        const rightElbowJoint = new CANNON.ConeTwistConstraint(lowerRightArm, upperRightArm, 
+          new CANNON.Vec3(lowerArmLength / 2, 0, 0),
+          new CANNON.Vec3(-upperArmLength / 2, 0, 0),
+          CANNON.Vec3.UNIT_X,
+          CANNON.Vec3.UNIT_X,
+          undefined,
           angle,
           twistAngle,
-        })
+        )
         constraints.push(leftElbowJoint)
         constraints.push(rightElbowJoint)
 
@@ -360,7 +314,7 @@
 
         // Static ground plane
         const groundShape = new CANNON.Plane()
-        const groundBody = new CANNON.Body({ mass: 0 })
+        const groundBody = new CANNON.Body( new CANNON.BodyOptions().setMass(0) )
         groundBody.addShape(groundShape)
         groundBody.position.set(0, -1, 0)
         groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
@@ -372,7 +326,7 @@
 
       function createStaticSphere() {
         const sphereShape = new CANNON.Sphere(4)
-        const sphereBody = new CANNON.Body({ mass: 0 })
+        const sphereBody = new CANNON.Body( new CANNON.BodyOptions().setMass(0) )
         sphereBody.addShape(sphereShape)
         sphereBody.position.set(0, -1, 0)
         return sphereBody

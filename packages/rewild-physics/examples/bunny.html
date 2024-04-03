@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
       import { bunny } from './js/bunny.js'
 
@@ -22,7 +23,7 @@
       demo.addScene('Bunny', () => {
         const world = setupWorld(demo)
 
-        const bunnyBody = new CANNON.Body({ mass: 1 })
+        const bunnyBody = new CANNON.Body( new CANNON.BodyOptions().setMass(1) )
 
         for (let i = 0; i < bunny.length; i++) {
           const rawVertices = bunny[i].vertices
@@ -45,7 +46,7 @@
           const offset = new CANNON.Vec3(rawOffset[0], rawOffset[1], rawOffset[2])
 
           // Construct polyhedron
-          const bunnyPart = new CANNON.ConvexPolyhedron({ vertices, faces })
+          const bunnyPart = new CANNON.ConvexPolyhedron( vertices, faces )
 
           // Add to compound
           bunnyBody.addShape(bunnyPart, offset)
@@ -73,10 +74,7 @@
 
         // Static ground plane
         const groundShape = new CANNON.Plane()
-        const groundBody = new CANNON.Body({
-          mass: 0,
-          position: new CANNON.Vec3(0, -5, 0),
-        })
+        const groundBody = new CANNON.Body( new CANNON.BodyOptions().setMass(0).setPosition(new CANNON.Vec3(0, -5, 0)) )
         groundBody.addShape(groundShape)
         groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
         world.addBody(groundBody)

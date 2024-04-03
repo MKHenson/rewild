@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       /**
@@ -46,15 +47,12 @@
 
         // Materials
         const stone = new CANNON.Material('stone')
-        const stone_stone = new CANNON.ContactMaterial(stone, stone, {
-          friction: 0.3,
-          restitution: 0.2,
-        })
+        const stone_stone = new CANNON.ContactMaterial(stone, stone,  0.3, 0.2 )
         world.addContactMaterial(stone_stone)
 
         // Ground plane
         const groundShape = new CANNON.Plane()
-        const groundBody = new CANNON.Body({ mass: 0, material: stone })
+        const groundBody = new CANNON.Body( new CANNON.BodyOptions().setMass(0).setMaterial(stone) )
         groundBody.addShape(groundShape)
         groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
         world.addBody(groundBody)
@@ -62,7 +60,7 @@
 
         // Plane -x
         const planeShapeXmin = new CANNON.Plane()
-        const planeXmin = new CANNON.Body({ mass: 0, material: stone })
+        const planeXmin = new CANNON.Body( new CANNON.BodyOptions().setMass(0).setMaterial(stone) )
         planeXmin.addShape(planeShapeXmin)
         planeXmin.quaternion.setFromEuler(0, Math.PI / 2, 0)
         planeXmin.position.set(-5, 0, 0)
@@ -70,7 +68,7 @@
 
         // Plane +x
         const planeShapeXmax = new CANNON.Plane()
-        const planeXmax = new CANNON.Body({ mass: 0, material: stone })
+        const planeXmax = new CANNON.Body( new CANNON.BodyOptions().setMass(0).setMaterial(stone) )
         planeXmax.addShape(planeShapeXmax)
         planeXmax.quaternion.setFromEuler(0, -Math.PI / 2, 0)
         planeXmax.position.set(5, 0, 0)
@@ -78,7 +76,7 @@
 
         // Plane -z
         const planeShapeZmin = new CANNON.Plane()
-        const planeZmin = new CANNON.Body({ mass: 0, material: stone })
+        const planeZmin = new CANNON.Body( new CANNON.BodyOptions().setMass(0).setMaterial(stone) )
         planeZmin.addShape(planeShapeZmin)
         planeZmin.quaternion.setFromEuler(0, 0, 0)
         planeZmin.position.set(0, 0, -5)
@@ -86,7 +84,7 @@
 
         // Plane +z
         const planeShapeZmax = new CANNON.Plane()
-        const planeZmax = new CANNON.Body({ mass: 0, material: stone })
+        const planeZmax = new CANNON.Body( new CANNON.BodyOptions().setMass(0).setMaterial(stone) )
         planeZmax.addShape(planeShapeZmax)
         planeZmax.quaternion.setFromEuler(0, Math.PI, 0)
         planeZmax.position.set(0, 0, 5)
@@ -101,7 +99,7 @@
         for (let i = 0; i < nx; i++) {
           for (let j = 0; j < ny; j++) {
             for (let k = 0; k < nz; k++) {
-              const sphereBody = new CANNON.Body({ mass: 5, material: stone })
+              const sphereBody = new CANNON.Body( new CANNON.BodyOptions().setMass(5).setMaterial(stone) )
               sphereBody.addShape(sphereShape)
               sphereBody.position.set(
                 -(i * 2 - nx * 0.5 + (Math.random() - 0.5) * randRange),

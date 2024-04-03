@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       /**
@@ -39,32 +40,32 @@
 
         // Sphere
         const sphereShape = new CANNON.Sphere(size)
-        const sphereBody = new CANNON.Body({
-          mass,
-          position: new CANNON.Vec3(-5, 0, 0),
-          velocity: new CANNON.Vec3(5, 0, 0),
-          collisionFilterGroup: GROUP1, // Put the sphere in group 1
-          collisionFilterMask: GROUP2 | GROUP3, // It can only collide with group 2 and 3
-          shape: sphereShape,
-        })
+        const sphereBody = new CANNON.Body( 
+          new CANNON.BodyOptions()
+            .setMass(mass)
+            .setPosition(new CANNON.Vec3(-5, 0, 0))
+            .setVelocity(new CANNON.Vec3(5, 0, 0))
+            .setCollisionFilterGroup(GROUP1)
+            .setCollisionFilterMask(GROUP2 | GROUP3)
+            .setShape(sphereShape) );
+        
 
         // Box
-        const boxBody = new CANNON.Body({
-          mass: mass,
-          shape: new CANNON.Box(new CANNON.Vec3(size, size, size)),
-          collisionFilterGroup: GROUP2, // Put the box in group 2
-          collisionFilterMask: GROUP1, // It can only collide with group 1 (the sphere)
-        })
+        const boxBody = new CANNON.Body( new CANNON.BodyOptions() 
+          .setMass(mass)
+          .setShape(new CANNON.Box(new CANNON.Vec3(size, size, size)))
+          .setCollisionFilterGroup(GROUP2)
+          .setCollisionFilterMask(GROUP1) );
+         
 
         // Cylinder
         const cylinderShape = new CANNON.Cylinder(size, size, size * 2.2, 10)
-        const cylinderBody = new CANNON.Body({
-          mass,
-          shape: cylinderShape,
-          position: new CANNON.Vec3(5, 0, 0),
-          collisionFilterGroup: GROUP3, // Put the cylinder in group 3
-          collisionFilterMask: GROUP1, // It can only collide with group 1 (the sphere)
-        })
+        const cylinderBody = new CANNON.Body( new CANNON.BodyOptions() 
+          .setMass(mass)
+          .setShape(cylinderShape)
+          .setPosition(new CANNON.Vec3(5, 0, 0))
+          .setCollisionFilterGroup(GROUP3)
+          .setCollisionFilterMask(GROUP1) ); 
 
         // Add everything to the world and demo
         world.addBody(sphereBody)

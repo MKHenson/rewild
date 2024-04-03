@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       /**
@@ -26,11 +27,7 @@
         const tweenTime = 3 // seconds
 
         const boxShape = new CANNON.Box(new CANNON.Vec3(1, 1, 1))
-        const body = new CANNON.Body({
-          mass: 0,
-          type: CANNON.Body.KINEMATIC,
-          position: startPosition,
-        })
+        const body = new CANNON.Body( new CANNON.BodyOptions().setMass(0).setType(CANNON.Body.KINEMATIC).setPosition(startPosition) ) 
         body.addShape(boxShape)
         world.addBody(body)
         demo.addVisual(body)
@@ -63,11 +60,11 @@
           }
         }
 
-        world.addEventListener('postStep', postStepListener)
+        world.addEventListener('postStep', { onEvent: e => postStepListener(e)})
 
         // Remove listener when we change demo
         demo.addEventListener('destroy', () => {
-          world.removeEventListener('postStep', postStepListener)
+          world.removeEventListener('postStep', {onEvent: e => postStepListener(e)})
         })
       })
 

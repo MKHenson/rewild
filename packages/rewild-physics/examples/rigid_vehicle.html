@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       const demo = new Demo()
@@ -18,15 +19,15 @@
 
         // Build the car chassis
         const chassisShape = new CANNON.Box(new CANNON.Vec3(5, 0.5, 2))
-        const chassisBody = new CANNON.Body({ mass: 1 })
+        const chassisBody = new CANNON.Body(new CANNON.BodyOptions().setMass(1) )
         const centerOfMassAdjust = new CANNON.Vec3(0, -1, 0)
         chassisBody.addShape(chassisShape, centerOfMassAdjust)
         demo.addVisual(chassisBody)
 
         // Create the vehicle
-        const vehicle = new CANNON.RigidVehicle({
+        const vehicle = new CANNON.RigidVehicle( undefined,
           chassisBody,
-        })
+        )
 
         const mass = 1
         const axisWidth = 7
@@ -34,41 +35,41 @@
         const wheelMaterial = new CANNON.Material('wheel')
         const down = new CANNON.Vec3(0, -1, 0)
 
-        const wheelBody1 = new CANNON.Body({ mass, material: wheelMaterial })
+        const wheelBody1 = new CANNON.Body( new CANNON.BodyOptions().setMass(mass).setMaterial(wheelMaterial) )
         wheelBody1.addShape(wheelShape)
-        vehicle.addWheel({
-          body: wheelBody1,
-          position: new CANNON.Vec3(-5, 0, axisWidth / 2).vadd(centerOfMassAdjust),
-          axis: new CANNON.Vec3(0, 0, 1),
-          direction: down,
-        })
+        vehicle.addWheel(  
+           wheelBody1,
+           new CANNON.Vec3(-5, 0, axisWidth / 2).vadd(centerOfMassAdjust),
+           new CANNON.Vec3(0, 0, 1),
+           down,
+        )
 
-        const wheelBody2 = new CANNON.Body({ mass, material: wheelMaterial })
+        const wheelBody2 = new CANNON.Body( new CANNON.BodyOptions().setMass(mass).setMaterial(wheelMaterial) )
         wheelBody2.addShape(wheelShape)
-        vehicle.addWheel({
-          body: wheelBody2,
-          position: new CANNON.Vec3(-5, 0, -axisWidth / 2).vadd(centerOfMassAdjust),
-          axis: new CANNON.Vec3(0, 0, -1),
-          direction: down,
-        })
+        vehicle.addWheel(
+           wheelBody2,
+           new CANNON.Vec3(-5, 0, -axisWidth / 2).vadd(centerOfMassAdjust),
+           new CANNON.Vec3(0, 0, -1),
+           down,
+        )
 
-        const wheelBody3 = new CANNON.Body({ mass, material: wheelMaterial })
+        const wheelBody3 = new CANNON.Body( new CANNON.BodyOptions().setMass(mass).setMaterial(wheelMaterial) )
         wheelBody3.addShape(wheelShape)
-        vehicle.addWheel({
-          body: wheelBody3,
-          position: new CANNON.Vec3(5, 0, axisWidth / 2).vadd(centerOfMassAdjust),
-          axis: new CANNON.Vec3(0, 0, 1),
-          direction: down,
-        })
+        vehicle.addWheel(
+           wheelBody3,
+           new CANNON.Vec3(5, 0, axisWidth / 2).vadd(centerOfMassAdjust),
+           new CANNON.Vec3(0, 0, 1),
+           down,
+        )
 
-        const wheelBody4 = new CANNON.Body({ mass, material: wheelMaterial })
+        const wheelBody4 = new CANNON.Body( new CANNON.BodyOptions().setMass(mass).setMaterial(wheelMaterial) )
         wheelBody4.addShape(wheelShape)
-        vehicle.addWheel({
-          body: wheelBody4,
-          position: new CANNON.Vec3(5, 0, -axisWidth / 2).vadd(centerOfMassAdjust),
-          axis: new CANNON.Vec3(0, 0, -1),
-          direction: down,
-        })
+        vehicle.addWheel(
+           wheelBody4,
+           new CANNON.Vec3(5, 0, -axisWidth / 2).vadd(centerOfMassAdjust),
+           new CANNON.Vec3(0, 0, -1),
+           down,
+        )
 
         vehicle.wheelBodies.forEach((wheelBody) => {
           // Some damping to not spin wheels too fast
@@ -99,10 +100,8 @@
         }
 
         const groundMaterial = new CANNON.Material('ground')
-        const heightfieldShape = new CANNON.Heightfield(matrix, {
-          elementSize: 300 / sizeX,
-        })
-        const heightfieldBody = new CANNON.Body({ mass: 0, material: groundMaterial })
+        const heightfieldShape = new CANNON.Heightfield(matrix, undefined, undefined,  300 / sizeX, )
+        const heightfieldBody = new CANNON.Body( new CANNON.BodyOptions().setMass(0).setMaterial(groundMaterial) )
         heightfieldBody.addShape(heightfieldShape)
         heightfieldBody.position.set(
           (-(sizeX - 1) * heightfieldShape.elementSize) / 2,
@@ -114,11 +113,7 @@
         demo.addVisual(heightfieldBody)
 
         // Define interactions between wheels and ground
-        const wheel_ground = new CANNON.ContactMaterial(wheelMaterial, groundMaterial, {
-          friction: 0.3,
-          restitution: 0,
-          contactEquationStiffness: 1000,
-        })
+        const wheel_ground = new CANNON.ContactMaterial(wheelMaterial, groundMaterial,  0.3, 0, 1000 )
         world.addContactMaterial(wheel_ground)
 
         // Keybindings

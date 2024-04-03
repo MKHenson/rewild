@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       /**
@@ -25,7 +26,7 @@
         // Static ground plane
         const groundMaterial = new CANNON.Material('ground')
         const groundShape = new CANNON.Plane()
-        const groundBody = new CANNON.Body({ mass: 0, material: groundMaterial })
+        const groundBody = new CANNON.Body( new CANNON.BodyOptions().setMass(0).setMaterial(groundMaterial) )
         groundBody.addShape(groundShape)
         groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
         groundBody.position.y = -3
@@ -37,24 +38,21 @@
         // Wheels
         const wheelMaterial = new CANNON.Material('wheel')
         const wheelShape = new CANNON.Sphere(1.2)
-        const leftFrontWheel = new CANNON.Body({ mass, material: wheelMaterial })
+        const leftFrontWheel = new CANNON.Body( new CANNON.BodyOptions().setMass(mass).setMaterial(wheelMaterial) )
         leftFrontWheel.addShape(wheelShape)
-        const rightFrontWheel = new CANNON.Body({ mass, material: wheelMaterial })
+        const rightFrontWheel = new CANNON.Body( new CANNON.BodyOptions().setMass(mass).setMaterial(wheelMaterial) )
         rightFrontWheel.addShape(wheelShape)
-        const leftRearWheel = new CANNON.Body({ mass, material: wheelMaterial })
+        const leftRearWheel = new CANNON.Body(new CANNON.BodyOptions().setMass(mass).setMaterial(wheelMaterial) )
         leftRearWheel.addShape(wheelShape)
-        const rightRearWheel = new CANNON.Body({ mass, material: wheelMaterial })
+        const rightRearWheel = new CANNON.Body(new CANNON.BodyOptions().setMass(mass).setMaterial(wheelMaterial) )
         rightRearWheel.addShape(wheelShape)
 
         const chassisShape = new CANNON.Box(new CANNON.Vec3(5, 0.5, 2))
-        const chassis = new CANNON.Body({ mass })
+        const chassis = new CANNON.Body(new CANNON.BodyOptions().setMass(mass))
         chassis.addShape(chassisShape)
 
         // Define interaction between ground and wheels
-        const wheelGroundContactMaterial = new CANNON.ContactMaterial(groundMaterial, wheelMaterial, {
-          friction: 0.5,
-          restitution: 0.3,
-        })
+        const wheelGroundContactMaterial = new CANNON.ContactMaterial(groundMaterial, wheelMaterial,  0.5, 0.3 )
         world.addContactMaterial(wheelGroundContactMaterial)
 
         // Position constrain wheels
@@ -78,36 +76,16 @@
         rightFrontAxis.normalize()
 
         constraints.push(
-          new CANNON.HingeConstraint(chassis, leftFrontWheel, {
-            pivotA: new CANNON.Vec3(-5, 0, 5),
-            axisA: leftFrontAxis,
-            pivotB: zero,
-            axisB: leftAxis,
-          })
+          new CANNON.HingeConstraint(chassis, leftFrontWheel, new CANNON.Vec3(-5, 0, 5), leftFrontAxis, zero, leftAxis )
         )
         constraints.push(
-          new CANNON.HingeConstraint(chassis, rightFrontWheel, {
-            pivotA: new CANNON.Vec3(-5, 0, -5),
-            axisA: rightFrontAxis,
-            pivotB: zero,
-            axisB: rightAxis,
-          })
+          new CANNON.HingeConstraint(chassis, rightFrontWheel, new CANNON.Vec3(-5, 0, -5), rightFrontAxis, zero, rightAxis )
         )
         constraints.push(
-          new CANNON.HingeConstraint(chassis, leftRearWheel, {
-            pivotA: new CANNON.Vec3(5, 0, 5),
-            axisA: leftAxis,
-            pivotB: zero,
-            axisB: leftAxis,
-          })
+          new CANNON.HingeConstraint(chassis, leftRearWheel,  new CANNON.Vec3(5, 0, 5), leftAxis, zero, leftAxis )
         )
         constraints.push(
-          new CANNON.HingeConstraint(chassis, rightRearWheel, {
-            pivotA: new CANNON.Vec3(5, 0, -5),
-            axisA: rightAxis,
-            pivotB: zero,
-            axisB: rightAxis,
-          })
+          new CANNON.HingeConstraint(chassis, rightRearWheel,  new CANNON.Vec3(5, 0, -5), rightAxis, zero, rightAxis, )
         )
 
         constraints.forEach((constraint) => {
@@ -139,24 +117,24 @@
         const distance = size * 0.1
 
         const shape = new CANNON.Box(new CANNON.Vec3(size * 0.5, size * 0.5, size * 0.1))
-        const hingedBody = new CANNON.Body({ mass })
+        const hingedBody = new CANNON.Body( new CANNON.BodyOptions().setMass(mass) )
         hingedBody.addShape(shape)
         world.addBody(hingedBody)
         demo.addVisual(hingedBody)
 
-        const staticBody = new CANNON.Body({ mass: 0 })
+        const staticBody = new CANNON.Body( new CANNON.BodyOptions().setMass(0) )
         staticBody.addShape(shape)
         staticBody.position.y = size + distance * 2
         world.addBody(staticBody)
         demo.addVisual(staticBody)
 
         // Hinge it
-        const constraint = new CANNON.HingeConstraint(staticBody, hingedBody, {
-          pivotA: new CANNON.Vec3(0, -size * 0.5 - distance, 0),
-          axisA: new CANNON.Vec3(-1, 0, 0),
-          pivotB: new CANNON.Vec3(0, size * 0.5 + distance, 0),
-          axisB: new CANNON.Vec3(-1, 0, 0),
-        })
+        const constraint = new CANNON.HingeConstraint(staticBody, hingedBody, 
+          new CANNON.Vec3(0, -size * 0.5 - distance, 0),
+          new CANNON.Vec3(0, size * 0.5 + distance, 0),
+          new CANNON.Vec3(-1, 0, 0),
+          new CANNON.Vec3(-1, 0, 0),
+        )
         world.addConstraint(constraint)
       })
 

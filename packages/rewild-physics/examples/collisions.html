@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       /**
@@ -22,7 +23,7 @@
         const sphereShape = new CANNON.Sphere(1)
 
         // Sphere 1
-        const body1 = new CANNON.Body({ mass: 5 })
+        const body1 = new CANNON.Body( new CANNON.BodyOptions().setMass(5) )
         body1.addShape(sphereShape)
         body1.position.set(-5, 0, 0)
         body1.velocity.set(5, 0, 0)
@@ -31,7 +32,7 @@
         demo.addVisual(body1)
 
         // Sphere 2
-        const body2 = new CANNON.Body({ mass: 5 })
+        const body2 = new CANNON.Body(new CANNON.BodyOptions().setMass(5) )
         body2.addShape(sphereShape)
         body2.linearDamping = 0
         body2.position.set(5, 0, 0)
@@ -48,7 +49,7 @@
         const sphereShape = new CANNON.Sphere(1)
 
         // Box
-        const body1 = new CANNON.Body({ mass: 5 })
+        const body1 = new CANNON.Body(new CANNON.BodyOptions().setMass(5) )
         body1.addShape(boxShape)
         body1.position.set(-5, 0, 0)
         body1.velocity.set(5, 0, 0)
@@ -57,7 +58,7 @@
         demo.addVisual(body1)
 
         // Sphere
-        const body2 = new CANNON.Body({ mass: 5 })
+        const body2 = new CANNON.Body(new CANNON.BodyOptions().setMass(5) )
         body2.addShape(sphereShape)
         body2.position.set(5, 0, 0)
         body2.velocity.set(-5, 0, 0)
@@ -73,7 +74,7 @@
         const sphereShape = new CANNON.Sphere(1)
 
         // Box
-        const body1 = new CANNON.Body({ mass: 5 })
+        const body1 = new CANNON.Body(new CANNON.BodyOptions().setMass(5) )
         body1.addShape(boxShape)
         body1.position.set(-5, 0, 0)
         body1.velocity.set(5, 0, 0)
@@ -85,7 +86,7 @@
         demo.addVisual(body1)
 
         // Sphere
-        const body2 = new CANNON.Body({ mass: 5 })
+        const body2 = new CANNON.Body(new CANNON.BodyOptions().setMass(5) )
         body2.addShape(sphereShape)
         body2.position.set(5, 0, 0)
         body2.velocity.set(-5, 0, 0)
@@ -101,7 +102,7 @@
         const sphereShape = new CANNON.Sphere(1)
 
         // Box
-        const body1 = new CANNON.Body({ mass: 5 })
+        const body1 = new CANNON.Body(new CANNON.BodyOptions().setMass(5) )
         body1.addShape(boxShape)
         body1.position.set(-5, 0, 0)
         body1.velocity.set(5, 0, 0)
@@ -116,7 +117,7 @@
         demo.addVisual(body1)
 
         // Sphere
-        const body2 = new CANNON.Body({ mass: 5 })
+        const body2 = new CANNON.Body(new CANNON.BodyOptions().setMass(5) )
         body2.addShape(sphereShape)
         body2.position.set(5, 0, 0)
         body2.velocity.set(-5, 0, 0)

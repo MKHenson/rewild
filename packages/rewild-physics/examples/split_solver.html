@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
+    <script src="../build/index_bundle.js"></script>
     <script type="module">
-      import * as CANNON from '../dist/cannon-es.js'
+      // import * as CANNON from '../dist/cannon-es.js'
       import { Demo } from './js/Demo.js'
 
       /**
@@ -54,7 +55,7 @@
 
         // Static ground plane
         const groundShape = new CANNON.Plane()
-        const groundBody = new CANNON.Body({ mass: 0 })
+        const groundBody = new CANNON.Body(new CANNON.BodyOptions().setMass(0))
         groundBody.addShape(groundShape)
         groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
         world.addBody(groundBody)
@@ -69,7 +70,7 @@
         const N = 5
         for (let i = 0; i < N; i++) {
           for (let j = 0; j < N; j++) {
-            const shapeBody = new CANNON.Body({ mass: 1 })
+            const shapeBody = new CANNON.Body(new CANNON.BodyOptions().setMass(1))
             shapeBody.addShape(shape)
             shapeBody.position.set((i - N * 0.5) * size * 2 * 1.1, size * 1.05, (j - N * 0.5) * size * 2 * 1.1)
             world.addBody(shapeBody)
@@ -78,7 +79,7 @@
         }
 
         // Shape on top
-        const shapeBody = new CANNON.Body({ mass: 1 })
+        const shapeBody = new CANNON.Body(new CANNON.BodyOptions().setMass(1))
         shapeBody.addShape(shape)
         shapeBody.position.set(-size, size * 5, size)
         world.addBody(shapeBody)
