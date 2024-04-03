@@ -1,64 +1,64 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>cannon.js - fixedRotation demo</title>
     <meta charset="utf-8" />
+    <title>cannon.js - fixed rotation demo</title>
     <link rel="stylesheet" href="css/style.css" type="text/css" />
-    <meta
-      name="viewport"
-      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
-    <script src="../build/index_bundle.js"></script>
-    <script src="./demo.js"></script>
-    <script src="../libs/dat.gui.js"></script>
-    <script src="../libs/Three.js"></script>
-    <script src="../libs/TrackballControls.js"></script>
-    <script src="../libs/Detector.js"></script>
-    <script src="../libs/Stats.js"></script>
-    <script src="../libs/smoothie.js"></script>
-    <script>
-      var demo = new CANNON.Demo(),
-        size = 1.0;
+    <script type="module">
+      import * as CANNON from '../dist/cannon-es.js'
+      import { Demo } from './js/Demo.js'
 
-      demo.addScene("Fixed rotation", function () {
-        // Create world
-        var world = demo.getWorld();
-        world.broadphase = new CANNON.NaiveBroadphase();
+      /**
+       * Show behaviour of body with fixed rotation
+       */
 
-        // ground plane
-        var groundShape = new CANNON.Plane();
-        var groundBody = new CANNON.Body({ mass: 0 });
-        groundBody.addShape(groundShape);
-        world.addBody(groundBody);
-        demo.addVisual(groundBody);
+      const demo = new Demo()
+
+      demo.addScene('Fixed rotation', () => {
+        const world = setupWorld(demo)
+
+        const size = 1.0
 
         // Create a box with fixed rotation
-        var shape = new CANNON.Box(new CANNON.Vec3(size, size, size));
-        var boxBody = new CANNON.Body({ mass: 1 });
-        boxBody.addShape(shape);
-        boxBody.position.set(0, 0, size);
-        boxBody.fixedRotation = true;
-        boxBody.updateMassProperties();
-        world.addBody(boxBody);
-        demo.addVisual(boxBody);
+        const shape1 = new CANNON.Box(new CANNON.Vec3(size, size, size))
+        const boxBody1 = new CANNON.Body({ mass: 1 })
+        boxBody1.addShape(shape1)
+        boxBody1.position.set(0, size, 0)
+        boxBody1.fixedRotation = true
+        boxBody1.updateMassProperties()
+        world.addBody(boxBody1)
+        demo.addVisual(boxBody1)
 
         // Another one
-        var shape2 = new CANNON.Box(new CANNON.Vec3(size, size, size));
-        var boxBody2 = new CANNON.Body({ mass: 1 });
-        boxBody2.addShape(shape2);
-        boxBody2.position.set((size * 3) / 2, 0, size * 4);
-        boxBody2.fixedRotation = true;
-        boxBody2.updateMassProperties();
-        world.addBody(boxBody2);
-        demo.addVisual(boxBody2);
+        const shape2 = new CANNON.Box(new CANNON.Vec3(size, size, size))
+        const boxBody2 = new CANNON.Body({ mass: 1 })
+        boxBody2.addShape(shape2)
+        boxBody2.position.set(-(size * 3) / 2, size * 4, 0)
+        boxBody2.fixedRotation = true
+        boxBody2.updateMassProperties()
+        world.addBody(boxBody2)
+        demo.addVisual(boxBody2)
+      })
 
-        // Change gravity so the boxes will slide along x axis
-        world.gravity.set(0, 0, -10);
-      });
+      demo.start()
 
-      demo.start();
+      function setupWorld(demo) {
+        const world = demo.getWorld()
+        world.gravity.set(0, -10, 0)
+
+        // Static ground plane
+        const groundShape = new CANNON.Plane()
+        const groundBody = new CANNON.Body({ mass: 0 })
+        groundBody.addShape(groundShape)
+        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
+        world.addBody(groundBody)
+        demo.addVisual(groundBody)
+
+        return world
+      }
     </script>
   </body>
 </html>

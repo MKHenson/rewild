@@ -1,77 +1,86 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>cannon.js - jenga demo</title>
     <meta charset="utf-8" />
+    <title>cannon.js - jenga demo</title>
     <link rel="stylesheet" href="css/style.css" type="text/css" />
-    <meta
-      name="viewport"
-      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
-    <script src="../build/index_bundle.js"></script>
-    <script src="./demo.js"></script>
-    <script src="../libs/dat.gui.js"></script>
-    <script src="../libs/Three.js"></script>
-    <script src="../libs/TrackballControls.js"></script>
-    <script src="../libs/Detector.js"></script>
-    <script src="../libs/Stats.js"></script>
-    <script src="../libs/smoothie.js"></script>
-    <script>
-      var demo = new CANNON.Demo();
+    <script type="module">
+      import * as CANNON from '../dist/cannon-es.js'
+      import { Demo } from './js/Demo.js'
 
-      demo.addScene("jenga", function () {
-        var world = demo.getWorld();
-        //world.allowSleep = true;
-        world.gravity.set(0, 0, -5);
-        world.broadphase = new CANNON.NaiveBroadphase();
-        world.solver.iterations = 50;
+      const demo = new Demo()
 
-        world.defaultContactMaterial.contactEquationStiffness = 5e6;
-        world.defaultContactMaterial.contactEquationRelaxation = 3;
+      demo.addScene('Jenga', () => {
+        const world = setupWorld(demo)
 
-        // ground plane
-        var groundShape = new CANNON.Plane();
-        var groundBody = new CANNON.Body({
-          mass: 0,
-        });
-        groundBody.addShape(groundShape);
-        groundBody.position.set(-10, 0, 0);
-        world.addBody(groundBody);
-        demo.addVisual(groundBody);
+        const size = 0.5
+        const mass = 1
+        const gap = 0.02
 
-        var size = 0.5;
-        var mass = 1;
-        var gap = 0.02;
-        for (var i = 0; i < 10; i++) {
-          // Layers
-          for (var j = 0; j < 3; j++) {
-            var body = new CANNON.Body({ mass: mass });
+        // Layers
+        for (let i = 0; i < 10; i++) {
+          for (let j = 0; j < 3; j++) {
+            const body = new CANNON.Body({ mass })
 
-            var he = new CANNON.Vec3(size * 3, size, size);
-            var dx = 0;
-            var dy = 1;
+            let halfExtents
+            let dx
+            let dz
             if (i % 2 === 0) {
-              he.set(size, size * 3, size);
-              dx = 1;
-              dy = 0;
+              halfExtents = new CANNON.Vec3(size, size, size * 3)
+              dx = 1
+              dz = 0
+            } else {
+              halfExtents = new CANNON.Vec3(size * 3, size, size)
+              dx = 0
+              dz = 1
             }
-            var shape = new CANNON.Box(he);
-            body.addShape(shape);
+
+            const shape = new CANNON.Box(halfExtents)
+            body.addShape(shape)
             body.position.set(
               2 * (size + gap) * (j - 1) * dx,
-              2 * (size + gap) * (j - 1) * dy,
-              2 * (size + gap) * (i + 1)
-            );
+              2 * (size + gap) * (i + 1),
+              2 * (size + gap) * (j - 1) * dz
+            )
 
-            world.addBody(body);
-            demo.addVisual(body);
+            world.addBody(body)
+            demo.addVisual(body)
           }
         }
-      });
+      })
 
-      demo.start();
+      demo.start()
+
+      function setupWorld(demo) {
+        const world = demo.getWorld()
+        world.gravity.set(0, -5, 0)
+
+        // Max solver iterations: Use more for better force propagation, but keep in mind that it's not very computationally cheap!
+        world.solver.iterations = 50
+
+        // Tweak contact properties.
+        // Contact stiffness - use to make softer/harder contacts
+        world.defaultContactMaterial.contactEquationStiffness = 5e6
+
+        // Stabilization time in number of timesteps
+        world.defaultContactMaterial.contactEquationRelaxation = 3
+
+        // Uncomment to test with sleeeping bodies
+        // world.allowSleep = true
+
+        // Static ground plane
+        const groundShape = new CANNON.Plane()
+        const groundBody = new CANNON.Body({ mass: 0 })
+        groundBody.addShape(groundShape)
+        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
+        world.addBody(groundBody)
+        demo.addVisual(groundBody)
+
+        return world
+      }
     </script>
   </body>
 </html>

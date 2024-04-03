@@ -1,82 +1,77 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>cannon.js - tween demo</title>
     <meta charset="utf-8" />
+    <title>cannon.js - tween demo</title>
     <link rel="stylesheet" href="css/style.css" type="text/css" />
-    <meta
-      name="viewport"
-      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
-    <script src="../build/index_bundle.js"></script>
-    <script src="./demo.js"></script>
-    <script src="../libs/dat.gui.js"></script>
-    <script src="../libs/Three.js"></script>
-    <script src="../libs/TrackballControls.js"></script>
-    <script src="../libs/Detector.js"></script>
-    <script src="../libs/Stats.js"></script>
-    <script src="../libs/smoothie.js"></script>
-    <script>
-      var demo = new CANNON.Demo();
+    <script type="module">
+      import * as CANNON from '../dist/cannon-es.js'
+      import { Demo } from './js/Demo.js'
 
-      var postStepHandler;
+      /**
+       * Tween manually the position of a body.
+       */
 
-      demo.addScene("Tween box", function () {
-        var world = demo.getWorld();
+      const demo = new Demo()
+
+      demo.addScene('Tween box', () => {
+        const world = demo.getWorld()
 
         // Inputs
-        var startPosition = new CANNON.Vec3(5, 0, 2);
-        var endPosition = new CANNON.Vec3(-5, 0, 2);
-        var tweenTime = 3; // seconds
+        const startPosition = new CANNON.Vec3(-5, 2, 0)
+        const endPosition = new CANNON.Vec3(5, 2, 0)
+        const tweenTime = 3 // seconds
 
-        var body = new CANNON.Body({
+        const boxShape = new CANNON.Box(new CANNON.Vec3(1, 1, 1))
+        const body = new CANNON.Body({
           mass: 0,
           type: CANNON.Body.KINEMATIC,
           position: startPosition,
-        });
-        body.addShape(new CANNON.Box(new CANNON.Vec3(1, 1, 1)));
-        world.addBody(body);
-        demo.addVisual(body);
-
-        if (postStepHandler) {
-          world.removeEventListener("postStep", postStepHandler);
-        }
+        })
+        body.addShape(boxShape)
+        world.addBody(body)
+        demo.addVisual(body)
 
         // Compute direction vector and get total length of the path
-        var direction = new CANNON.Vec3();
-        endPosition.vsub(startPosition, direction);
-        var totalLength = direction.length();
-        direction.normalize();
+        const direction = new CANNON.Vec3()
+        endPosition.vsub(startPosition, direction)
+        const totalLength = direction.length()
+        direction.normalize()
 
-        var speed = totalLength / tweenTime;
-        direction.scale(speed, body.velocity);
+        const speed = totalLength / tweenTime
+        direction.scale(speed, body.velocity)
 
         // Save the start time
-        var startTime = world.time;
+        const startTime = world.time
 
-        var offset = new CANNON.Vec3();
+        const offset = new CANNON.Vec3()
 
-        postStepHandler = function () {
+        function postStepListener() {
           // Progress is a number where 0 is at start position and 1 is at end position
-          var progress = (world.time - startTime) / tweenTime;
+          const progress = (world.time - startTime) / tweenTime
 
           if (progress < 1) {
-            direction.scale(progress * totalLength, offset);
-            startPosition.vadd(offset, body.position);
+            direction.scale(progress * totalLength, offset)
+            startPosition.vadd(offset, body.position)
           } else {
-            body.velocity.set(0, 0, 0);
-            body.position.copy(endPosition);
-            world.removeEventListener("postStep", postStepHandler);
-            postStepHandler = null;
+            body.velocity.set(0, 0, 0)
+            body.position.copy(endPosition)
+            world.removeEventListener('postStep', postStepListener)
           }
-        };
+        }
 
-        world.addEventListener("postStep", postStepHandler);
-      });
+        world.addEventListener('postStep', postStepListener)
 
-      demo.start();
+        // Remove listener when we change demo
+        demo.addEventListener('destroy', () => {
+          world.removeEventListener('postStep', postStepListener)
+        })
+      })
+
+      demo.start()
     </script>
   </body>
 </html>

@@ -1,129 +1,106 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>cannon.js - friction demo</title>
     <meta charset="utf-8" />
+    <title>cannon.js - friction demo</title>
     <link rel="stylesheet" href="css/style.css" type="text/css" />
-    <meta
-      name="viewport"
-      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
-    <script src="../build/index_bundle.js"></script>
-    <script src="./demo.js"></script>
-    <script src="../libs/dat.gui.js"></script>
-    <script src="../libs/Three.js"></script>
-    <script src="../libs/TrackballControls.js"></script>
-    <script src="../libs/Detector.js"></script>
-    <script src="../libs/Stats.js"></script>
-    <script src="../libs/smoothie.js"></script>
-    <script>
+    <script type="module">
+      import * as CANNON from '../dist/cannon-es.js'
+      import { Demo } from './js/Demo.js'
+
       /**
        * How to set friction per material.
        */
 
-      var demo = new CANNON.Demo(),
-        size = 1.0;
+      const demo = new Demo()
 
-      demo.addScene("Friction", function () {
-        var shape = new CANNON.Box(new CANNON.Vec3(size, size, size));
+      demo.addScene('Friction', () => {
+        const world = setupWorld(demo)
 
-        // Create world
-        var world = demo.getWorld();
-        world.broadphase = new CANNON.NaiveBroadphase();
-        world.iterations = 10;
+        const size = 1.0
 
-        // Materials
-        var groundMaterial = new CANNON.Material();
-        groundMaterial.friction = 0.3;
-
-        // ground plane
-        var groundShape = new CANNON.Plane();
-        var groundBody = new CANNON.Body(
-          new CANNON.BodyOptions().setMass(0).setMaterial(groundMaterial)
-        );
-        // new CANNON.Body({ mass: 0, material: groundMaterial });
-        groundBody.addShape(groundShape);
-        world.addBody(groundBody);
-        demo.addVisual(groundBody);
+        // Static ground plane
+        const groundMaterial = new CANNON.Material('ground')
+        groundMaterial.friction = 0.3
+        const groundShape = new CANNON.Plane()
+        const groundBody = new CANNON.Body({ mass: 0, material: groundMaterial })
+        groundBody.addShape(groundShape)
+        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
+        world.addBody(groundBody)
+        demo.addVisual(groundBody)
 
         // Create a slippery material (friction coefficient = 0.0)
-        var slipperyMaterial = new CANNON.Material();
-        slipperyMaterial.friction = 0;
+        const slipperyMaterial = new CANNON.Material('slippery')
+        slipperyMaterial.friction = 0
 
         // Create slippery box
-        var boxBody = new CANNON.Body(
-          new CANNON.BodyOptions().setMass(1).setMaterial(slipperyMaterial)
-        );
-        // new CANNON.Body({ mass: 1, material: slipperyMaterial });
-        boxBody.addShape(shape);
-        boxBody.position.set(0, 0, 5);
-        world.addBody(boxBody);
-        demo.addVisual(boxBody);
+        const shape = new CANNON.Box(new CANNON.Vec3(size, size, size))
+        const boxBody1 = new CANNON.Body({ mass: 1, material: slipperyMaterial })
+        boxBody1.addShape(shape)
+        boxBody1.position.set(0, 5, 0)
+        world.addBody(boxBody1)
+        demo.addVisual(boxBody1)
 
         // Create box made of groundMaterial
-        var boxBody2 = new CANNON.Body(
-          new CANNON.BodyOptions().setMass(10).setMaterial(groundBody)
-        );
-        // new CANNON.Body({ mass: 10, material: groundMaterial });
-        boxBody2.addShape(shape);
-        boxBody2.position.set(size * 4, 0, 5);
-        world.addBody(boxBody2);
-        demo.addVisual(boxBody2);
+        const boxBody2 = new CANNON.Body({ mass: 10, material: groundMaterial })
+        boxBody2.addShape(shape)
+        boxBody2.position.set(-size * 4, 5, 0)
+        world.addBody(boxBody2)
+        demo.addVisual(boxBody2)
+      })
 
-        // Change gravity so the boxes will slide along x axis
-        world.gravity.set(-3, 0, -60);
-      });
+      demo.addScene('Per shape', () => {
+        const world = setupWorld(demo)
 
-      demo.addScene("PerShape", function () {
-        // Create world
-        var world = demo.getWorld();
-        world.broadphase = new CANNON.NaiveBroadphase();
-        world.iterations = 10;
+        const size = 1.0
 
-        // Materials
-        var groundMaterial = new CANNON.Material();
-        groundMaterial.friction = 0.3;
-
-        // ground plane
-        var groundShape = new CANNON.Plane();
-        groundShape.material = groundMaterial;
-        var groundBody = new CANNON.Body(new CANNON.BodyOptions().setMass(0));
-        //  new CANNON.Body({ mass: 0 });
-        groundBody.addShape(groundShape);
-        world.addBody(groundBody);
-        demo.addVisual(groundBody);
+        // Static ground plane
+        const groundMaterial = new CANNON.Material('ground')
+        groundMaterial.friction = 0.3
+        const groundShape = new CANNON.Plane()
+        groundShape.material = groundMaterial
+        const groundBody = new CANNON.Body({ mass: 0 })
+        groundBody.addShape(groundShape)
+        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
+        world.addBody(groundBody)
+        demo.addVisual(groundBody)
 
         // Create a slippery material (friction coefficient = 0.0)
-        var slipperyMaterial = new CANNON.Material();
-        slipperyMaterial.friction = 0;
+        const slipperyMaterial = new CANNON.Material('slippery')
+        slipperyMaterial.friction = 0
 
         // Create slippery box - will slide on the plane
-        var boxBody = new CANNON.Body(new CANNON.BodyOptions().setMass(1));
-        // new CANNON.Body({ mass: 1 });
-        var shape = new CANNON.Box(new CANNON.Vec3(size, size, size));
-        shape.material = slipperyMaterial;
-        boxBody.addShape(shape);
-        boxBody.position.set(0, 0, 5);
-        world.addBody(boxBody);
-        demo.addVisual(boxBody);
+        const shape1 = new CANNON.Box(new CANNON.Vec3(size, size, size))
+        shape1.material = slipperyMaterial
+        const boxBody1 = new CANNON.Body({ mass: 1 })
+        boxBody1.addShape(shape1)
+        boxBody1.position.set(0, 5, 0)
+        world.addBody(boxBody1)
+        demo.addVisual(boxBody1)
 
         // Create box made of groundMaterial - will not slide on the plane
-        var boxBody2 = new CANNON.Body(new CANNON.BodyOptions().setMass(10));
-        // new CANNON.Body({ mass: 10 });
-        var shape2 = new CANNON.Box(new CANNON.Vec3(size, size, size));
-        shape2.material = groundMaterial;
-        boxBody2.addShape(shape2);
-        boxBody2.position.set(size * 4, 0, 5);
-        world.addBody(boxBody2);
-        demo.addVisual(boxBody2);
+        const shape2 = new CANNON.Box(new CANNON.Vec3(size, size, size))
+        shape2.material = groundMaterial
+        const boxBody2 = new CANNON.Body({ mass: 10 })
+        boxBody2.addShape(shape2)
+        boxBody2.position.set(-size * 4, 5, 0)
+        world.addBody(boxBody2)
+        demo.addVisual(boxBody2)
+      })
 
-        // Change gravity so the boxes will slide along x axis
-        world.gravity.set(-3, 0, -60);
-      });
+      demo.start()
 
-      demo.start();
+      function setupWorld(demo) {
+        const world = demo.getWorld()
+
+        // Gravity set so the boxes will slide along x axis
+        world.gravity.set(3, -60, 0)
+
+        return world
+      }
     </script>
   </body>
 </html>

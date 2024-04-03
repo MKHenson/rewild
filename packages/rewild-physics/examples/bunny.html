@@ -1,92 +1,89 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>cannon.js - bunny demo</title>
     <meta charset="utf-8" />
+    <title>cannon.js - bunny convex hull demo</title>
     <link rel="stylesheet" href="css/style.css" type="text/css" />
-    <meta
-      name="viewport"
-      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
-    <script src="../build/index_bundle.js"></script>
-    <script src="./demo.js"></script>
-    <script src="../libs/dat.gui.js"></script>
-    <script src="../libs/Three.js"></script>
-    <script src="../libs/TrackballControls.js"></script>
-    <script src="../libs/Detector.js"></script>
-    <script src="../libs/Stats.js"></script>
-    <script src="../libs/smoothie.js"></script>
-    <script src="js/bunny.js"></script>
-    <script>
-      var demo = new CANNON.Demo();
+    <script type="module">
+      import * as CANNON from '../dist/cannon-es.js'
+      import { Demo } from './js/Demo.js'
+      import { bunny } from './js/bunny.js'
 
-      demo.addScene("Bunny", function () {
-        var world = demo.getWorld();
+      /**
+       * Demo of importing a convex hull generated with V-HACD.
+       * https://github.com/kmammou/v-hacd
+       */
 
-        world.gravity.set(0, 0, -20);
-        world.solver.iterations = 20;
-        world.defaultContactMaterial.contactEquationStiffness = 1e10;
-        world.defaultContactMaterial.contactEquationRelaxation = 10;
+      const demo = new Demo()
 
-        var bunnyBody = new CANNON.Body(new CANNON.BodyOptions().setMass(1));
-        for (var i = 0; i < bunny.length; i++) {
-          var rawVerts = bunny[i].verts;
-          var rawFaces = bunny[i].faces;
-          var rawOffset = bunny[i].offset;
+      demo.addScene('Bunny', () => {
+        const world = setupWorld(demo)
 
-          var verts = [],
-            faces = [],
-            offset;
+        const bunnyBody = new CANNON.Body({ mass: 1 })
+
+        for (let i = 0; i < bunny.length; i++) {
+          const rawVertices = bunny[i].vertices
+          const rawFaces = bunny[i].faces
+          const rawOffset = bunny[i].offset
 
           // Get vertices
-          for (var j = 0; j < rawVerts.length; j += 3) {
-            verts.push(
-              new CANNON.Vec3(rawVerts[j], rawVerts[j + 1], rawVerts[j + 2])
-            );
+          const vertices = []
+          for (let j = 0; j < rawVertices.length; j += 3) {
+            vertices.push(new CANNON.Vec3(rawVertices[j], rawVertices[j + 1], rawVertices[j + 2]))
           }
 
           // Get faces
-          for (var j = 0; j < rawFaces.length; j += 3) {
-            faces.push([rawFaces[j], rawFaces[j + 1], rawFaces[j + 2]]);
+          const faces = []
+          for (let j = 0; j < rawFaces.length; j += 3) {
+            faces.push([rawFaces[j], rawFaces[j + 1], rawFaces[j + 2]])
           }
 
           // Get offset
-          offset = new CANNON.Vec3(rawOffset[0], rawOffset[1], rawOffset[2]);
+          const offset = new CANNON.Vec3(rawOffset[0], rawOffset[1], rawOffset[2])
 
           // Construct polyhedron
-          var bunnyPart = new CANNON.ConvexPolyhedron(verts, faces);
+          const bunnyPart = new CANNON.ConvexPolyhedron({ vertices, faces })
 
           // Add to compound
-          bunnyBody.addShape(bunnyPart, offset);
+          bunnyBody.addShape(bunnyPart, offset)
         }
 
         // Create body
-        bunnyBody.quaternion.setFromAxisAngle(
-          new CANNON.Vec3(1, 0, 0),
-          -Math.PI / 2
-        );
-        var z180 = new CANNON.Quaternion();
-        z180.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), Math.PI);
-        bunnyBody.quaternion = z180.mult(bunnyBody.quaternion);
-        world.addBody(bunnyBody);
-        demo.addVisual(bunnyBody);
+        bunnyBody.quaternion.setFromEuler(Math.PI, 0, 0)
+        world.addBody(bunnyBody)
+        demo.addVisual(bunnyBody)
+      })
 
-        // ground plane
-        var groundShape = new CANNON.Plane();
-        var groundBody = new CANNON.Body(
-          new CANNON.BodyOptions()
-            .setMass(0)
-            .setPosition(new CANNON.Vec3(0, 0, -5))
-        );
+      demo.start()
 
-        groundBody.addShape(groundShape);
-        world.addBody(groundBody);
-        demo.addVisual(groundBody);
-      });
+      function setupWorld(demo) {
+        const world = demo.getWorld()
+        world.gravity.set(0, -20, 0)
 
-      demo.start();
+        // Max solver iterations: Use more for better force propagation, but keep in mind that it's not very computationally cheap!
+        world.solver.iterations = 20
+
+        // Tweak contact properties.
+        // Contact stiffness - use to make softer/harder contacts
+        world.defaultContactMaterial.contactEquationStiffness = 1e10
+        world.defaultContactMaterial.contactEquationRelaxation = 10
+
+        // Static ground plane
+        const groundShape = new CANNON.Plane()
+        const groundBody = new CANNON.Body({
+          mass: 0,
+          position: new CANNON.Vec3(0, -5, 0),
+        })
+        groundBody.addShape(groundShape)
+        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
+        world.addBody(groundBody)
+        demo.addVisual(groundBody)
+
+        return world
+      }
     </script>
   </body>
 </html>

@@ -1,65 +1,66 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>cannon.js - events demo</title>
     <meta charset="utf-8" />
+    <title>cannon.js - events demo</title>
     <link rel="stylesheet" href="css/style.css" type="text/css" />
-    <meta
-      name="viewport"
-      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
-    <script src="../build/index_bundle.js"></script>
-    <script src="./demo.js"></script>
-    <script src="../libs/dat.gui.js"></script>
-    <script src="../libs/Three.js"></script>
-    <script src="../libs/TrackballControls.js"></script>
-    <script src="../libs/Detector.js"></script>
-    <script src="../libs/Stats.js"></script>
-    <script src="../libs/smoothie.js"></script>
-    <script>
+    <script type="module">
+      import * as CANNON from '../dist/cannon-es.js'
+      import { Demo } from './js/Demo.js'
+
       /**
        * For demonstrating events.
        */
 
-      var demo = new CANNON.Demo();
-      var size = 1;
+      const demo = new Demo()
 
       demo.addScene("'collide' event", function () {
-        // Create world
-        var world = demo.getWorld();
+        const world = setupWorld(demo)
 
-        world.defaultContactMaterial.contactEquationStiffness = 5e7;
-        world.defaultContactMaterial.contactEquationRelaxation = 4;
-
-        world.gravity.set(0, 0, -20);
-
-        // ground plane
-        var groundShape = new CANNON.Plane();
-        var groundBody = new CANNON.Body({ mass: 0 });
-        groundBody.addShape(groundShape);
-        world.addBody(groundBody);
-        demo.addVisual(groundBody);
+        const size = 1
 
         // Sphere
-        var sphere = new CANNON.Sphere(size);
-        var sphereBody = new CANNON.Body({ mass: 30 });
-        sphereBody.addShape(sphere);
-        var pos = new CANNON.Vec3(0, 0, size);
-        sphereBody.position.set(0, 0, size * 6);
-        world.addBody(sphereBody);
-        demo.addVisual(sphereBody);
+        const sphere = new CANNON.Sphere(size)
+        const sphereBody = new CANNON.Body({ mass: 30 })
+        sphereBody.addShape(sphere)
+        sphereBody.position.set(0, size * 6, 0)
+        world.addBody(sphereBody)
+        demo.addVisual(sphereBody)
 
         // When a body collides with another body, they both dispatch the "collide" event.
-        sphereBody.addEventListener("collide", function (e) {
-          console.log("The sphere just collided with the ground!");
-          console.log("Collided with body:", e.body);
-          console.log("Contact between bodies:", e.contact);
-        });
-      });
+        sphereBody.addEventListener('collide', (event) => {
+          console.log('The sphere just collided with the ground!')
+          console.log('Collided with body:', event.body)
+          console.log('Contact between bodies:', event.contact)
+        })
+      })
 
-      demo.start();
+      demo.start()
+
+      function setupWorld(demo) {
+        const world = demo.getWorld()
+        world.gravity.set(0, -20, 0)
+
+        // Tweak contact properties.
+        // Contact stiffness - use to make softer/harder contacts
+        world.defaultContactMaterial.contactEquationStiffness = 5e7
+
+        // Stabilization time in number of timesteps
+        world.defaultContactMaterial.contactEquationRelaxation = 4
+
+        // Static ground plane
+        const groundShape = new CANNON.Plane()
+        const groundBody = new CANNON.Body({ mass: 0 })
+        groundBody.addShape(groundShape)
+        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0)
+        world.addBody(groundBody)
+        demo.addVisual(groundBody)
+
+        return world
+      }
     </script>
   </body>
 </html>
