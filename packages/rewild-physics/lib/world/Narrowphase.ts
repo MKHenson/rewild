@@ -1948,7 +1948,7 @@ export class Narrowphase {
     const worldPenetrationVec = convexParticle_worldPenetrationVec;
     let minPenetration_isNull: boolean = true;
     let minPenetration: f32 = 0;
-    let numDetectedFaces = 0;
+    // let numDetectedFaces = 0;
 
     // Convert particle position xi to local coords in the convex
     const local = convexParticle_local;
@@ -1986,7 +1986,7 @@ export class Narrowphase {
           minPenetration = penetration;
           penetratedFaceIndex = i;
           penetratedFaceNormal.copy(normal);
-          numDetectedFaces++;
+          // numDetectedFaces++;
         }
       }
 

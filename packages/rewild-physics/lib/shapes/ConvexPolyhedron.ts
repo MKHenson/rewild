@@ -263,7 +263,7 @@ export class ConvexPolyhedron extends Shape {
 
     let dmin: f32 = f32.MAX_VALUE;
     const hullA = this;
-    let curPlaneTests: i32 = 0;
+    // let curPlaneTests: i32 = 0;
 
     if (!hullA.uniqueAxes) {
       const numFacesA = faceListA ? faceListA.length : hullA.faces.length;
@@ -326,7 +326,7 @@ export class ConvexPolyhedron extends Shape {
 
         Worldnormal1.copy(hullB.faceNormals[fi]);
         quatB.vmult(Worldnormal1, Worldnormal1);
-        curPlaneTests++;
+        // curPlaneTests++;
         const d = hullA.testSepAxis(
           Worldnormal1,
           hullB,
@@ -349,7 +349,7 @@ export class ConvexPolyhedron extends Shape {
       for (let i: i32 = 0; i != hullB.uniqueAxes!.length; i++) {
         quatB.vmult(hullB.uniqueAxes![i], Worldnormal1);
 
-        curPlaneTests++;
+        // curPlaneTests++;
         const d = hullA.testSepAxis(
           Worldnormal1,
           hullB,

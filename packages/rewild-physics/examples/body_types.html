@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>cannon.js - body types demo</title>
     <meta charset="utf-8" />
+    <title>cannon.js - body types demo</title>
     <link rel="stylesheet" href="css/style.css" type="text/css" />
     <meta
       name="viewport"
@@ -11,95 +11,77 @@
   </head>
   <body>
     <script src="../build/index_bundle.js"></script>
-    <script src="./demo.js"></script>
-    <script src="../libs/dat.gui.js"></script>
-    <script src="../libs/Three.js"></script>
-    <script src="../libs/TrackballControls.js"></script>
-    <script src="../libs/Detector.js"></script>
-    <script src="../libs/Stats.js"></script>
-    <script src="../libs/smoothie.js"></script>
-    <script>
+    <script type="module">
+      // import * as CANNON from '../dist/cannon-es.js'
+      import { Demo } from './js/Demo.js';
+
       /**
        * Demos of the Body.type types.
        */
-      var demo = new CANNON.Demo();
-      var size = 2;
 
-      demo.addScene("Moving box", function () {
-        var world = setupWorld(demo);
+      const demo = new Demo();
 
-        var boxShape = new CANNON.Box(new CANNON.Vec3(size, size, size));
-        var sphereShape = new CANNON.Sphere(size);
+      demo.addScene('Moving box', () => {
+        const world = setupWorld(demo);
 
-        var mass = 5,
-          boxMass = 0;
+        const size = 2;
 
         // Kinematic Box
         // Does only collide with dynamic bodies, but does not respond to any force.
         // Its movement can be controlled by setting its velocity.
-        var b1 = new CANNON.Body(
+        const boxShape = new CANNON.Box(new CANNON.Vec3(size, size, size));
+        const boxBody = new CANNON.Body(
           new CANNON.BodyOptions()
-            .setMass(boxMass)
+            .setMass(0)
             .setType(CANNON.Body.KINEMATIC)
-            .setPosition(new CANNON.Vec3(0, 0, 0.5 * size))
+            .setPosition(new CANNON.Vec3(0, size * 0.5, 0))
         );
-
-        // new CANNON.Body({
-        //   mass: boxMass,
-        //   type: CANNON.Body.KINEMATIC,
-        //   position: new CANNON.Vec3(0, 0, 0.5 * size),
-        // });
-        b1.addShape(boxShape);
-        world.addBody(b1);
-        demo.addVisual(b1);
+        boxBody.addShape(boxShape);
+        world.addBody(boxBody);
+        demo.addVisual(boxBody);
 
         // To control the box movement we must set its velocity
-        b1.velocity.set(0, 0, 5);
-        setInterval(function () {
-          if (b1.velocity.z < 0) b1.velocity.set(0, 0, 5);
-          else b1.velocity.set(0, 0, -5);
+        boxBody.velocity.set(0, 5, 0);
+        setInterval(() => {
+          if (boxBody.velocity.y < 0) {
+            boxBody.velocity.set(0, 5, 0);
+          } else {
+            boxBody.velocity.set(0, -5, 0);
+          }
         }, 1000);
 
         // Dynamic Sphere
         // Dynamic bodies can collide with bodies of all other types.
-        var b2 = new CANNON.Body(
+        const sphereShape = new CANNON.Sphere(size);
+        const sphereBody = new CANNON.Body(
           new CANNON.BodyOptions()
-            .setMass(mass)
-            .setPosition(new CANNON.Vec3(0, 0, 3 * size))
+            .setMass(5)
+            .setPosition(new CANNON.Vec3(0, size * 3, 0))
         );
 
-        // new CANNON.Body({
-        //   mass: mass,
-        //   position: new CANNON.Vec3(0, 0, 3 * size),
-        // });
-        b2.addShape(sphereShape);
-        world.addBody(b2);
-        demo.addVisual(b2);
+        sphereBody.addShape(sphereShape);
+        world.addBody(sphereBody);
+        demo.addVisual(sphereBody);
       });
 
       demo.start();
 
       function setupWorld(demo) {
-        var world = demo.getWorld();
-        world.gravity.set(0, 0, -40);
-        world.broadphase = new CANNON.NaiveBroadphase();
-        world.solver.iterations = 10;
+        const world = demo.getWorld();
+        world.gravity.set(0, -40, 0);
 
+        // Tweak contact properties.
+        // Contact stiffness - use to make softer/harder contacts
         world.defaultContactMaterial.contactEquationStiffness = 1e8;
+
+        // Stabilization time in number of timesteps
         world.defaultContactMaterial.contactEquationRelaxation = 10;
 
         // Static ground plane
-        // Static bodies only interacts with dynamic bodies. Velocity is always zero.
-        var groundShape = new CANNON.Plane();
-        var mass = 0; // mass=0 will produce a static body automatically
-        var groundBody = new CANNON.Body(
-          new CANNON.BodyOptions().setMass(mass)
-        );
-
-        // new CANNON.Body({
-        //   mass: mass,
-        // });
+        const groundShape = new CANNON.Plane();
+        const groundBody = new CANNON.Body(new CANNON.BodyOptions().setMass(0));
         groundBody.addShape(groundShape);
+        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
         world.addBody(groundBody);
         demo.addVisual(groundBody);
 

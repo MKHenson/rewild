@@ -1,74 +1,57 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>cannon.js - callbacks demo</title>
     <meta charset="utf-8" />
+    <title>cannon.js - callbacks demo</title>
     <link rel="stylesheet" href="css/style.css" type="text/css" />
-    <meta
-      name="viewport"
-      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
-    />
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
   </head>
   <body>
-    <script src="../build/index_bundle.js"></script>
-    <script src="./demo.js"></script>
-    <script src="../libs/dat.gui.js"></script>
-    <script src="../libs/Three.js"></script>
-    <script src="../libs/TrackballControls.js"></script>
-    <script src="../libs/Detector.js"></script>
-    <script src="../libs/Stats.js"></script>
-    <script src="../libs/smoothie.js"></script>
-    <script>
+    <script type="module">
+      import * as CANNON from '../dist/cannon-es.js'
+      import { Demo } from './js/Demo.js'
+
       /**
-       * A demo showing how to use the preStep callback to add a force to a body.
-       * This will act like a force field.
+       * Demo usage of a preStep callback.
        */
 
-      var demo = new CANNON.Demo();
+      const demo = new Demo()
 
-      demo.addScene("Moon", function () {
-        var world = demo.getWorld();
+      demo.addScene('Moon', () => {
+        const world = demo.getWorld()
 
-        var mass = 5;
-        var moonShape = new CANNON.Sphere(0.5);
-        var planetShape = new CANNON.Sphere(3.5);
-        var moon = new CANNON.Body({
-          mass: mass,
-          position: new CANNON.Vec3(5, 0, 0),
-        });
-        moon.addShape(moonShape);
-        var planet = new CANNON.Body({ mass: 0 });
-        planet.addShape(planetShape);
+        const moonShape = new CANNON.Sphere(0.5)
+        const moon = new CANNON.Body({
+          mass: 5,
+          position: new CANNON.Vec3(-5, 0, 0),
+        })
+        moon.addShape(moonShape)
 
-        moon.velocity.set(0, 0, 8);
-        moon.linearDamping = 0.0;
+        moon.velocity.set(0, 8, 0)
+        moon.linearDamping = 0.0
 
-        // Use the preStep callback to apply the gravity force on the moon.
-        // This callback is evoked each timestep.
-        moon.preStep = function () {
-          // Get the vector pointing from the moon to the planet center
-          var moon_to_planet = new CANNON.Vec3();
-          this.position.negate(moon_to_planet);
+        const planetShape = new CANNON.Sphere(3.5)
+        const planet = new CANNON.Body({ mass: 0 })
+        planet.addShape(planetShape)
 
-          // Get distance from planet to moon
-          var distance = moon_to_planet.norm();
+        world.addEventListener('preStep', () => {
+          const moon_to_planet = new CANNON.Vec3()
+          moon.position.negate(moon_to_planet)
 
-          // Now apply force on moon
-          // Fore is pointing in the moon-planet direction
-          moon_to_planet.normalize();
-          moon_to_planet.mult(1500 / Math.pow(distance, 2), this.force);
-        };
+          const distance = moon_to_planet.length()
 
-        // We add the objects to the world to simulate them
-        world.addBody(moon);
-        world.addBody(planet);
+          moon_to_planet.normalize()
+          moon_to_planet.scale(1500 / Math.pow(distance, 2), moon.force)
+        })
 
-        // And we add them to the demo to make them visible
-        demo.addVisual(moon);
-        demo.addVisual(planet);
-      });
+        world.addBody(moon)
+        world.addBody(planet)
 
-      demo.start();
+        demo.addVisual(moon)
+        demo.addVisual(planet)
+      })
+
+      demo.start()
     </script>
   </body>
 </html>
