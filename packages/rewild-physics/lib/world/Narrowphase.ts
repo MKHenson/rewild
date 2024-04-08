@@ -517,7 +517,76 @@ export class Narrowphase {
         rsj,
         justTest
       );
-
+    else if (type == (Shape.PLANE | Shape.CYLINDER))
+      return this.planeConvex(
+        si as Plane,
+        sj as ConvexPolyhedron,
+        xi,
+        xj,
+        qi,
+        qj,
+        bi,
+        bj,
+        rsi,
+        rsj,
+        justTest
+      );
+    else if (type == (Shape.CYLINDER | Shape.CYLINDER))
+      return this.convexConvex(
+        si as ConvexPolyhedron,
+        sj as ConvexPolyhedron,
+        xi,
+        xj,
+        qi,
+        qj,
+        bi,
+        bj,
+        rsi,
+        rsj,
+        justTest
+      );
+    else if (type == (Shape.SPHERE | Shape.CYLINDER))
+      return this.sphereConvex(
+        si as Sphere,
+        sj as ConvexPolyhedron,
+        xi,
+        xj,
+        qi,
+        qj,
+        bi,
+        bj,
+        rsi,
+        rsj,
+        justTest
+      );
+    else if (type == (Shape.BOX | Shape.CYLINDER))
+      return this.boxConvex(
+        si as Box,
+        sj as ConvexPolyhedron,
+        xi,
+        xj,
+        qi,
+        qj,
+        bi,
+        bj,
+        rsi,
+        rsj,
+        justTest
+      );
+    else if (type == (Shape.CONVEXPOLYHEDRON | Shape.CYLINDER))
+      return this.convexConvex(
+        si as ConvexPolyhedron,
+        sj as ConvexPolyhedron,
+        xi,
+        xj,
+        qi,
+        qj,
+        bi,
+        bj,
+        rsi,
+        rsj,
+        justTest
+      );
     return false;
   }
 
