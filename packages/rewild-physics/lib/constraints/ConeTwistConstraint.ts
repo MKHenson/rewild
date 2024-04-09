@@ -37,7 +37,7 @@ export class ConeTwistConstraint extends PointToPointConstraint {
     maxForce: f32 = 1e6,
     angle: f32 = 0,
     twistAngle: f32 = 0,
-    collideConnected: boolean = true
+    collideConnected: boolean = false
   ) {
     super(
       bodyA,
