@@ -11,6 +11,7 @@ import * as shapes from './shapes';
 import * as solver from './solver';
 import * as utils from './utils';
 import * as world from './world';
+import * as wasm from './client-utils';
 
 const allLibs = [
   collision,
@@ -23,6 +24,7 @@ const allLibs = [
   solver,
   utils,
   world,
+  wasm,
 ];
 
 let globalRef = window as any;

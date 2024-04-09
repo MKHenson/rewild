@@ -10,7 +10,7 @@ const SplitSolver_solve_nodes: SplitSolverNode[] = []; // All allocated node obj
 const SplitSolver_solve_eqs: Equation[] = []; // Temp array
 // const SplitSolver_solve_bds: Body[] = []; // Temp array
 // const SplitSolver_solve_dummyWorld: { bodies: Body[] } = { bodies: [] }; // Temp object
-const SplitSolver_solve_dummyWorld: Body[] = [];
+const SplitSolver_solve_dummyWorld: (Body | null)[] = [];
 
 function getUnvisitedNode(nodes: SplitSolverNode[]): SplitSolverNode | null {
   const Nnodes = nodes.length;
@@ -37,7 +37,7 @@ function bfs(
   root.visited = true;
   visitFunc(root, bds, eqs);
   while (queue.length) {
-    const node = queue.pop()!;
+    const node = queue.pop();
     // Loop over unvisited child nodes
     let child: SplitSolverNode | null = null;
     while ((child = getUnvisitedNode(node.children))) {
@@ -79,12 +79,12 @@ export class SplitSolver extends Solver {
   /**
    * The number of solver iterations determines quality of the constraints in the world. The more iterations, the more correct simulation. More iterations need more computations though. If you have a large gravity force in your world, you will need more iterations.
    */
-  iterations: number;
+  iterations: i32;
 
   /**
    * When tolerance is reached, the system is assumed to be converged.
    */
-  tolerance: number;
+  tolerance: f32;
   /** subsolver */
   subsolver: GSSolver;
   nodes: SplitSolverNode[];
