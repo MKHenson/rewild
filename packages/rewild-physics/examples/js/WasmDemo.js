@@ -169,21 +169,21 @@ class Demo extends EventDispatcher {
         return;
       }
 
-      this.world.gravity.set(gx, this.settings.gy, this.settings.gz);
+      this.world.setGravity(gx, this.settings.gy, this.settings.gz);
     });
     worldFolder.add(this.settings, 'gy', -maxg, maxg).onChange((gy) => {
       if (isNaN(gy)) {
         return;
       }
 
-      this.world.gravity.set(this.settings.gx, gy, this.settings.gz);
+      this.world.setGravity(this.settings.gx, gy, this.settings.gz);
     });
     worldFolder.add(this.settings, 'gz', -maxg, maxg).onChange((gz) => {
       if (isNaN(gz)) {
         return;
       }
 
-      this.world.gravity.set(this.settings.gx, this.settings.gy, gz);
+      this.world.setGravity(this.settings.gx, this.settings.gy, gz);
     });
     worldFolder
       .add(this.settings, 'quatNormalizeSkip', 0, 50, 1)
@@ -573,7 +573,7 @@ class Demo extends EventDispatcher {
     this.scenes[n]();
 
     // Read the newly set data to the gui
-    this.settings.iterations = this.world.solver.iterations;
+    this.settings.iterations = this.world.worldIterations;
     this.settings.gx = this.world.gravity.x + 0.0;
     this.settings.gy = this.world.gravity.y + 0.0;
     this.settings.gz = this.world.gravity.z + 0.0;
@@ -968,12 +968,14 @@ class Demo extends EventDispatcher {
   }
 
   addVisual(body) {
-    if (!(body instanceof CANNON.Body)) {
+    if (!(body instanceof CANNON.ClientBody)) {
       throw new Error('The argument passed to addVisual() is not a body');
     }
 
     // if it's a particle paint it red, if it's a trigger paint it as green, otherwise just gray
-    const isParticle = body.shapes.every((s) => s instanceof CANNON.Particle);
+    const isParticle = body.shapes.every(
+      (s) => s instanceof CANNON.ClientParticle
+    );
     const material = isParticle
       ? this.particleMaterial
       : body.isTrigger

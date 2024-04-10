@@ -69,7 +69,7 @@ export class WasmManager {
       Object.assign(bindings, bindable.createBinding());
 
     const obj = (await instantiate(
-      await WebAssembly.compileStreaming(fetch('/release.wasm')),
+      await WebAssembly.compileStreaming(fetch('../build/release.wasm')),
       {
         // Imports: bindings,
         env: {
@@ -92,4 +92,9 @@ export class WasmManager {
     this.wasmMemoryBlock = this.memory!.buffer;
     this.wasmArrayBuffer = new Uint32Array(this.wasmMemoryBlock);
   }
+}
+
+export async function initializeWasm() {
+  const wasmManager = new WasmManager();
+  await wasmManager.load([]);
 }

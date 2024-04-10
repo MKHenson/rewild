@@ -11,7 +11,7 @@
     "test": "echo \"No tests specified\" && exit 0",
     "ts-check": "npx tsc --noEmit --project ./tsconfig.json",
     "asbuild": "asc lib/as-index.ts --target release",
-    "build": "npm run clean && node ./esbuild.js && npm run ts-check",
+    "build": "node ./esbuild.js && npm run ts-check",
     "start": "live-server --port=9001 --entry-file=index.html",
     "watch": "nodemon -e js,ts,tsx --watch lib/ -x \"npm run build\""
   },

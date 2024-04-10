@@ -1,10 +1,8 @@
 import { ClientShape } from './ClientShape';
 import { physicsWasm } from './WasmManager';
 
-export class ClientSphere extends ClientShape {
-  radius: number;
+export class ClientParticle extends ClientShape {
   constructor(radius: number) {
     super(physicsWasm.createShapeSphere(radius));
-    this.radius = radius;
   }
 }

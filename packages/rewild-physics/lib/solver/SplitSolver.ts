@@ -37,7 +37,7 @@ function bfs(
   root.visited = true;
   visitFunc(root, bds, eqs);
   while (queue.length) {
-    const node = queue.pop();
+    const node = queue.pop() as SplitSolverNode;
     // Loop over unvisited child nodes
     let child: SplitSolverNode | null = null;
     while ((child = getUnvisitedNode(node.children))) {

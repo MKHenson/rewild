@@ -13,6 +13,7 @@
     <script src="../build/index_bundle.js"></script>
     <script type="module">
       // import * as CANNON from '../dist/cannon-es.js'
+      await CANNON.initializeWasm();
       import { Demo } from './js/WasmDemo.js';
 
       /**
@@ -57,7 +58,7 @@
 
       function setupWorld(demo) {
         const world = demo.getWorld();
-        world.gravity.set(0, -10, 0);
+        world.setGravity(0, -10, 0);
 
         // Tweak contact properties.
         // Contact stiffness - use to make softer/harder contacts
@@ -69,10 +70,10 @@
         // Static ground plane
         const groundShape = new CANNON.ClientPlane();
         const groundBody = new CANNON.ClientBody(
-          new CANNON.BodyOptions().setMass(0)
+          new CANNON.ClientBodyOptions().setMass(0)
         );
         groundBody.addShape(groundShape);
-        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+        groundBody.setQuaternionFromEuler(-Math.PI / 2, 0, 0);
         world.addBody(groundBody);
         demo.addVisual(groundBody);
 
