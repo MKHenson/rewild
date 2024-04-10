@@ -8,7 +8,8 @@ export class ClientBodyOptions {
     this.ptr = physicsWasm.createBodyOptions();
   }
 
-  setMass(mass: number): void {
+  setMass(mass: number): ClientBodyOptions {
     physicsWasm.setBodyOptionsMass(this.ptr, mass);
+    return this;
   }
 }

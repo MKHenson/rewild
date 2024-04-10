@@ -30,12 +30,20 @@ export class OverlapKeeper {
     const key = this.getKey(i, j);
     const current = this.current;
     let index: i32 = 0;
-    while (key > current[index]) {
+
+    while (key < current.length && key > current[index]) {
       index++;
     }
-    if (key == current[index]) {
+    if (key < current.length && key == current[index]) {
       return; // Pair was already added
     }
+
+    // while (key > current[index]) {
+    //   index++;
+    // }
+    // if (key == current[index]) {
+    //   return; // Pair was already added
+    // }
     for (let j: i32 = current.length - 1; j >= index; j--) {
       current[j + 1] = current[j];
     }
