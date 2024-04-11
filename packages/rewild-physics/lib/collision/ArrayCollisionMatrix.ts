@@ -25,7 +25,10 @@ export class ArrayCollisionMatrix {
       j = i;
       i = temp;
     }
-    return this.matrix[((i * (i + 1)) >> 1) + j - 1];
+    // return this.matrix[((i * (i + 1)) >> 1) + j - 1];
+    const index = ((i * (i + 1)) >> 1) + j - 1;
+    if (this.matrix.length <= index) return 0;
+    return 1;
   }
 
   /**

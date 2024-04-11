@@ -1,9 +1,7 @@
-import { __Internref31 } from '../../build/release';
-
 export class ClientContactEquation {
-  ptr: __Internref31;
+  ptr: any;
 
-  constructor(ptr: __Internref31) {
+  constructor(ptr: any) {
     this.ptr = ptr;
   }
 }

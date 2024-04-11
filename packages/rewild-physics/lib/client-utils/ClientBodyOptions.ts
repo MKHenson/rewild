@@ -1,8 +1,7 @@
-import { __Internref64 } from '../../build/release';
 import { physicsWasm } from './WasmManager';
 
 export class ClientBodyOptions {
-  ptr: __Internref64;
+  ptr: any;
 
   constructor() {
     this.ptr = physicsWasm.createBodyOptions();
@@ -10,6 +9,31 @@ export class ClientBodyOptions {
 
   setMass(mass: number): ClientBodyOptions {
     physicsWasm.setBodyOptionsMass(this.ptr, mass);
+    return this;
+  }
+
+  setType(type: number): ClientBodyOptions {
+    physicsWasm.setBodyOptionsType(this.ptr, type);
+    return this;
+  }
+
+  setPosition(x: number, y: number, z: number): ClientBodyOptions {
+    physicsWasm.setBodyOptionsPosition(this.ptr, x, y, z);
+    return this;
+  }
+
+  setVelocity(x: number, y: number, z: number): ClientBodyOptions {
+    physicsWasm.setBodyOptionsVelocity(this.ptr, x, y, z);
+    return this;
+  }
+
+  setAngularVelocity(x: number, y: number, z: number): ClientBodyOptions {
+    physicsWasm.setBodyOptionsAngularVelocity(this.ptr, x, y, z);
+    return this;
+  }
+
+  setQuaternion(x: number, y: number, z: number, w: number): ClientBodyOptions {
+    physicsWasm.setBodyOptionsQuaternion(this.ptr, x, y, z, w);
     return this;
   }
 }
