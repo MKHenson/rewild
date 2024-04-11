@@ -34,7 +34,7 @@ export class ConvexPolyhedron extends Shape {
    */
   faces: i32[][];
   /** faceNormals */
-  faceNormals: Vec3[];
+  faceNormals: (Vec3 | null)[];
   /** worldVertices */
   worldVertices: Vec3[];
   /** worldVerticesNeedsUpdate */
@@ -60,7 +60,7 @@ export class ConvexPolyhedron extends Shape {
     /** Array of integer arrays, describing which vertices that is included in each face. */
     faces: i32[][] = [],
     /** normals */
-    normals: Vec3[] = [],
+    normals: (Vec3 | null)[] = [],
     /** axes */
     axes: Vec3[] = [],
     /** boundingSphereRadius */
@@ -141,7 +141,8 @@ export class ConvexPolyhedron extends Shape {
         }
       }
 
-      const n: Vec3 = this.faceNormals[i] || new Vec3();
+      const arrayVec = this.faceNormals[i];
+      const n: Vec3 = arrayVec ? arrayVec : new Vec3();
       this.getFaceNormal(i, n);
       n.negate(n);
       this.faceNormals[i] = n;
@@ -206,7 +207,7 @@ export class ConvexPolyhedron extends Shape {
     let dmax: f32 = -f32.MAX_VALUE;
 
     for (let face: i32 = 0; face < hullB.faces.length; face++) {
-      WorldNormal.copy(hullB.faceNormals[face]);
+      WorldNormal.copy(hullB.faceNormals[face]!);
       quatB.vmult(WorldNormal, WorldNormal);
       const d = WorldNormal.dot(separatingNormal);
       if (d > dmax) {
@@ -273,7 +274,7 @@ export class ConvexPolyhedron extends Shape {
         const fi = faceListA ? faceListA[i] : i;
 
         // Get world face normal
-        faceANormalWS3.copy(hullA.faceNormals[fi]);
+        faceANormalWS3.copy(hullA.faceNormals[fi]!);
         quatA.vmult(faceANormalWS3, faceANormalWS3);
 
         const d = hullA.testSepAxis(
@@ -324,7 +325,7 @@ export class ConvexPolyhedron extends Shape {
       for (let i: i32 = 0; i < numFacesB; i++) {
         const fi = faceListB ? faceListB[i] : i;
 
-        Worldnormal1.copy(hullB.faceNormals[fi]);
+        Worldnormal1.copy(hullB.faceNormals[fi]!);
         quatB.vmult(Worldnormal1, Worldnormal1);
         // curPlaneTests++;
         const d = hullA.testSepAxis(
@@ -458,7 +459,7 @@ export class ConvexPolyhedron extends Shape {
    */
   getPlaneConstantOfFace(face_i: i32): f32 {
     const f = this.faces[face_i];
-    const n = this.faceNormals[face_i];
+    const n = this.faceNormals[face_i]!;
     const v = this.vertices[f[0]];
     const c = -n.dot(v);
     return c;
@@ -497,7 +498,7 @@ export class ConvexPolyhedron extends Shape {
 
     // Find the face with normal closest to the separating axis
     for (let face: i32 = 0; face < hullA.faces.length; face++) {
-      faceANormalWS.copy(hullA.faceNormals[face]);
+      faceANormalWS.copy(hullA.faceNormals[face]!);
       quatA.vmult(faceANormalWS, faceANormalWS);
       const d = faceANormalWS.dot(separatingNormal);
       if (d < dmin) {
@@ -538,7 +539,7 @@ export class ConvexPolyhedron extends Shape {
       WorldEdge0.copy(edge0);
       quatA.vmult(WorldEdge0, WorldEdge0);
       posA.vadd(WorldEdge0, WorldEdge0);
-      worldPlaneAnormal1.copy(this.faceNormals[closestFaceA]);
+      worldPlaneAnormal1.copy(this.faceNormals[closestFaceA]!);
       quatA.vmult(worldPlaneAnormal1, worldPlaneAnormal1);
       posA.vadd(worldPlaneAnormal1, worldPlaneAnormal1);
       WorldEdge0.cross(worldPlaneAnormal1, planeNormalWS1);
@@ -548,7 +549,7 @@ export class ConvexPolyhedron extends Shape {
       posA.vadd(worldA1, worldA1);
 
       const otherFace = connectedFaces[i];
-      localPlaneNormal.copy(this.faceNormals[otherFace]);
+      localPlaneNormal.copy(this.faceNormals[otherFace]!);
       const localPlaneEq = this.getPlaneConstantOfFace(otherFace);
       planeNormalWS.copy(localPlaneNormal);
       quatA.vmult(planeNormalWS, planeNormalWS);
@@ -567,7 +568,7 @@ export class ConvexPolyhedron extends Shape {
     }
 
     // only keep contact points that are behind the witness face
-    localPlaneNormal.copy(this.faceNormals[closestFaceA]);
+    localPlaneNormal.copy(this.faceNormals[closestFaceA]!);
 
     const localPlaneEq = this.getPlaneConstantOfFace(closestFaceA);
     planeNormalWS.copy(localPlaneNormal);
@@ -714,7 +715,7 @@ export class ConvexPolyhedron extends Shape {
     const normals = this.faceNormals;
     const worldNormals = this.worldFaceNormals;
     for (let i: i32 = 0; i != N; i++) {
-      quat.vmult(normals[i], worldNormals[i]);
+      quat.vmult(normals[i]!, worldNormals[i]);
     }
 
     this.worldFaceNormalsNeedsUpdate = false;
@@ -817,7 +818,7 @@ export class ConvexPolyhedron extends Shape {
       }
       // Rotate face normals
       for (let i: i32 = 0; i < this.faceNormals.length; i++) {
-        const v = this.faceNormals[i];
+        const v = this.faceNormals[i]!;
         quat.vmult(v, v);
       }
       /*
@@ -852,7 +853,7 @@ export class ConvexPolyhedron extends Shape {
     this.getAveragePointLocal(pointInside);
 
     for (let i: i32 = 0; i < this.faces.length; i++) {
-      let n = normals[i];
+      let n = normals[i]!;
       const v = verts[faces[i][0]]; // We only need one point in the face
 
       // This dot product determines which side of the edge the point is

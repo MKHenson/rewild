@@ -355,8 +355,8 @@ class Demo extends EventDispatcher {
     this.contactMeshCache.restart();
     if (this.settings.contacts) {
       // if ci is even - use body i, else j
-      for (let i = 0; i < this.world.contacts.length; i++) {
-        const contact = this.world.contacts[i];
+      for (let i = 0; i < this.world.numContacts; i++) {
+        const contact = this.world.getContactAt(i);
 
         for (let ij = 0; ij < 2; ij++) {
           const mesh = this.contactMeshCache.request();
@@ -1019,7 +1019,9 @@ class Demo extends EventDispatcher {
     const body = bodies[0];
 
     // if it's a particle paint it red, otherwise just gray
-    const material = body.shapes.every((s) => s instanceof CANNON.Particle)
+    const material = body.shapes.every(
+      (s) => s instanceof CANNON.ClientParticle
+    )
       ? this.particleMaterial
       : this.currentMaterial;
 

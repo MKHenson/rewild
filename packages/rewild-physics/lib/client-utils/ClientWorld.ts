@@ -4,9 +4,13 @@ import { ClientBody } from './ClientBody';
 import { ClientVec3 } from './ClientVec3';
 import { physicsWasm } from './WasmManager';
 import { ClientContactMaterial } from './ClientContactMaterial';
+import { ClientContactEquation } from './ClientContactEquation';
+import { ClientConstraint } from './ClientConstraint';
 
 export class ClientWorld extends EventDispatcher {
   ptr: __Internref30;
+
+  constraints: ClientConstraint[] = [];
 
   constructor() {
     super();
@@ -23,11 +27,6 @@ export class ClientWorld extends EventDispatcher {
     };
   }
 
-  /** TODO: implment */
-  get constraints() {
-    return [];
-  }
-
   get gravity(): ClientVec3 {
     const vec3Ptr = physicsWasm.getWorldGravity(this.ptr);
     return new ClientVec3(vec3Ptr);
@@ -35,6 +34,25 @@ export class ClientWorld extends EventDispatcher {
 
   get defaultContactMaterial() {
     return new ClientContactMaterial(this);
+  }
+
+  get numContacts(): number {
+    return physicsWasm.getWorldNumContacts(this.ptr);
+  }
+
+  getContactAt(index: i32): ClientContactEquation {
+    const contactPtr = physicsWasm.getWorlContactAt(this.ptr, index);
+    return new ClientContactEquation(contactPtr);
+  }
+
+  removeConstraint(constraint: ClientConstraint): void {
+    this.constraints = this.constraints.filter((c) => c !== constraint);
+    physicsWasm.worldRemoveConstraint(this.ptr, constraint.ptr);
+  }
+
+  addConstraint(constraint: ClientConstraint): void {
+    this.constraints.push(constraint);
+    physicsWasm.worldAddConstraint(this.ptr, constraint.ptr);
   }
 
   setGravity(x: number, y: number, z: number): void {
