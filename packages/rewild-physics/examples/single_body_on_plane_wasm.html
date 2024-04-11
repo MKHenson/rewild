@@ -43,13 +43,13 @@
 
         const size = 2;
 
-        const boxShape = new CANNON.ClientBox(
-          new CANNON.Vec3(size, size, size)
-        );
+        const boxShape = new CANNON.ClientBox(size, size, size);
 
-        const body = new CANNON.Body(new CANNON.BodyOptions().setMass(30));
+        const body = new CANNON.ClientBody(
+          new CANNON.ClientBodyOptions().setMass(30)
+        );
         body.addShape(boxShape);
-        body.position.set(0, size * 2, size);
+        body.setPosition(0, size * 2, size);
         world.addBody(body);
         demo.addVisual(body);
       });

@@ -1,3 +1,5 @@
+import { Constraint } from './constraints';
+import { ContactEquation } from './equations';
 import { ContactMaterial } from './material';
 import { Quaternion, Vec3 } from './math';
 import { Body, BodyOptions } from './objects';
@@ -115,6 +117,25 @@ export function setBodyOptionsMass(options: BodyOptions, mass: f32): void {
 
 export function createBody(options: BodyOptions): Body {
   return new Body(options);
+}
+
+export function getWorldNumContacts(world: World): i32 {
+  return world.contacts.length;
+}
+
+export function getWorlContactAt(world: World, index: i32): ContactEquation {
+  return world.contacts[index];
+}
+
+export function worldAddConstraint(world: World, constraint: Constraint): void {
+  world.addConstraint(constraint);
+}
+
+export function worldRemoveConstraint(
+  world: World,
+  constraint: Constraint
+): void {
+  world.removeConstraint(constraint);
 }
 
 export function addBodyToWorld(world: World, body: Body): void {

@@ -1490,7 +1490,7 @@ export class Narrowphase {
       i != nfaces && found == false;
       i++
     ) {
-      const normal = normals[i];
+      const normal = normals[i]!;
       const face = faces[i];
 
       // Get world-transformed normal of the face
