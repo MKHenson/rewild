@@ -9,4 +9,6 @@ export { ClientBody } from './ClientBody';
 export { ClientParticle } from './ClientParticle';
 export { ClientVec3 } from './ClientVec3';
 export { ClientQuat } from './ClientQuat';
+export { ClientMaterial } from './ClientMaterial';
+export { ClientConstraint } from './ClientConstraint';
 export { WasmManager, physicsWasm, initializeWasm } from './WasmManager';

@@ -1,4 +1,4 @@
-import { ClientWorld } from './ClientWorld';
+import { ClientMaterial } from './ClientMaterial';
 import { physicsWasm } from './WasmManager';
 
 export class ClientContactMaterial {
@@ -6,8 +6,19 @@ export class ClientContactMaterial {
   _contactEquationStiffness: number;
   _contactEquationRelaxation: number;
 
-  constructor(world: ClientWorld) {
-    this.ptr = physicsWasm.getWorldContactMaterial(world.ptr);
+  constructor(
+    materialA: ClientMaterial | null,
+    materialB: ClientMaterial | null,
+    friction: number = -1,
+    restitution: number = -1,
+    ptr: any = physicsWasm.createContactMaterial(
+      materialA?.ptr,
+      materialB?.ptr,
+      friction,
+      restitution
+    )
+  ) {
+    this.ptr = ptr;
   }
 
   set contactEquationStiffness(value: number) {

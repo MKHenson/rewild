@@ -165,8 +165,8 @@ export function bodyToMesh(body, material) {
   });
 
   meshes.forEach((mesh, i) => {
-    const offset = body.shapeOffsets[i];
-    const orientation = body.shapeOrientations[i];
+    const offset = body.getShapeOffsetAt(i);
+    const orientation = body.getShapeOrientationAt(i);
     mesh.position.copy(offset);
     mesh.quaternion.copy(orientation);
 

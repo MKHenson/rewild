@@ -79,4 +79,9 @@ export class ClientBody {
     physicsWasm.setBodyMass(this.ptr, mass);
     return this;
   }
+
+  setLinearDamping(damping: number): ClientBody {
+    physicsWasm.setBodyLinearDamping(this.ptr, damping);
+    return this;
+  }
 }

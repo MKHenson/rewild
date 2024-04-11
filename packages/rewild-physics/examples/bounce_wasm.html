@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>cannon.js - bounce demo</title>
+    <link rel="stylesheet" href="css/style.css" type="text/css" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+    />
+  </head>
+  <body>
+    <script src="../build/index_bundle.js"></script>
+    <script type="module">
+      await CANNON.initializeWasm();
+      import { Demo } from './js/WasmDemo.js';
+
+      /**
+       * Demo of different bounciness.
+       */
+
+      const demo = new Demo();
+
+      demo.addScene('Bounce', () => {
+        const world = setupWorld(demo);
+
+        // Static ground plane
+        const groundMaterial = new CANNON.ClientMaterial('ground');
+        const groundShape = new CANNON.ClientPlane();
+        const groundBody = new CANNON.ClientBody(
+          new CANNON.ClientBodyOptions().setMass(0).setMaterial(groundMaterial)
+        );
+        groundBody.addShape(groundShape);
+        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+        world.addBody(groundBody);
+        demo.addVisual(groundBody);
+
+        const mass = 10;
+        const size = 1;
+        const height = 5;
+        const damping = 0.01;
+
+        const sphereShape = new CANNON.ClientSphere(size);
+
+        // Shape on plane
+        const mat1 = new CANNON.ClientMaterial();
+        const shapeBody1 = new CANNON.ClientBody(
+          new CANNON.ClientBodyOptions()
+            .setMass(mass)
+            .setMaterial(mat1)
+            .setPosition(-size * 3, height, size)
+        );
+        shapeBody1.addShape(sphereShape);
+        shapeBody1.setLinearDamping(damping);
+        world.addBody(shapeBody1);
+        demo.addVisual(shapeBody1);
+
+        const mat2 = new CANNON.ClientMaterial();
+        const shapeBody2 = new CANNON.ClientBody(
+          new CANNON.ClientBodyOptions()
+            .setMass(mass)
+            .setMaterial(mat2)
+            .setPosition(0, height, size)
+        );
+        shapeBody2.addShape(sphereShape);
+        shapeBody2.setLinearDamping(damping);
+        world.addBody(shapeBody2);
+        demo.addVisual(shapeBody2);
+
+        const mat3 = new CANNON.ClientMaterial();
+        const shapeBody3 = new CANNON.ClientBody(
+          new CANNON.ClientBodyOptions()
+            .setMass(mass)
+            .setMaterial(mat3)
+            .setPosition(size * 3, height, size)
+        );
+
+        shapeBody3.addShape(sphereShape);
+        shapeBody3.setLinearDamping(damping);
+        world.addBody(shapeBody3);
+        demo.addVisual(shapeBody3);
+
+        // Create contact material behaviour
+        const mat1_ground = new CANNON.ClientContactMaterial(
+          groundMaterial,
+          mat1,
+          0.0,
+          0.0
+        );
+        const mat2_ground = new CANNON.ClientContactMaterial(
+          groundMaterial,
+          mat2,
+          0.0,
+          0.7
+        );
+        const mat3_ground = new CANNON.ClientContactMaterial(
+          groundMaterial,
+          mat3,
+          0.0,
+          0.9
+        );
+
+        world.addContactMaterial(mat1_ground);
+        world.addContactMaterial(mat2_ground);
+        world.addContactMaterial(mat3_ground);
+      });
+
+      demo.start();
+
+      function setupWorld(demo) {
+        const world = demo.getWorld();
+        world.gravity.set(0, -10, 0);
+
+        return world;
+      }
+    </script>
+  </body>
+</html>

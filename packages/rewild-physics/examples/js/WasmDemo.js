@@ -5,7 +5,7 @@ import * as dat from 'https://unpkg.com/dat.gui@0.7.7/build/dat.gui.module.js';
 import { OrbitControls } from 'https://unpkg.com/three@0.122.0/examples/jsm/controls/OrbitControls.js';
 import { SmoothieChart, TimeSeries } from './smoothie.js';
 import { addTitle, addSourceButton } from './dom-utils.js';
-import { bodyToMesh } from './three-conversion-utils.js';
+import { bodyToMesh } from './three-conversion-utils-wasm.js';
 
 // Create time series for each profile label
 const lines = {};

@@ -1,3 +1,4 @@
+import { ClientMaterial } from './ClientMaterial';
 import { physicsWasm } from './WasmManager';
 
 export class ClientBodyOptions {
@@ -34,6 +35,16 @@ export class ClientBodyOptions {
 
   setQuaternion(x: number, y: number, z: number, w: number): ClientBodyOptions {
     physicsWasm.setBodyOptionsQuaternion(this.ptr, x, y, z, w);
+    return this;
+  }
+
+  setMaterial(material: ClientMaterial): ClientBodyOptions {
+    physicsWasm.setBodyOptionsMaterial(this.ptr, material.ptr);
+    return this;
+  }
+
+  setLinearDamping(damping: number): ClientBodyOptions {
+    physicsWasm.setBodyOptionsLinearDamping(this.ptr, damping);
     return this;
   }
 }
