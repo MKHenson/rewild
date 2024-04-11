@@ -10,11 +10,20 @@ export class ClientWorld extends EventDispatcher {
   ptr: any;
   gravity: ClientVec3;
   constraints: ClientConstraint[] = [];
+  defaultContactMaterial: ClientContactMaterial;
 
   constructor() {
     super();
     this.ptr = physicsWasm.createWorld();
     this.gravity = new ClientVec3(physicsWasm.getWorldGravity(this.ptr));
+
+    this.defaultContactMaterial = new ClientContactMaterial(
+      null,
+      null,
+      undefined,
+      undefined,
+      physicsWasm.getWorldContactMaterial(this.ptr)
+    );
   }
 
   get profile() {
@@ -27,12 +36,12 @@ export class ClientWorld extends EventDispatcher {
     };
   }
 
-  get defaultContactMaterial() {
-    return new ClientContactMaterial(this);
-  }
-
   get numContacts(): number {
     return physicsWasm.getWorldNumContacts(this.ptr);
+  }
+
+  addContactMaterial(contactMaterial: ClientContactMaterial): void {
+    physicsWasm.addContactMaterialToWorld(this.ptr, contactMaterial.ptr);
   }
 
   getContactAt(index: i32): ClientContactEquation {

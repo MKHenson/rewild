@@ -1,6 +1,6 @@
 import { Constraint } from './constraints';
 import { ContactEquation } from './equations';
-import { ContactMaterial } from './material';
+import { ContactMaterial, Material } from './material';
 import { Quaternion, Vec3 } from './math';
 import { Body, BodyOptions } from './objects';
 import { Box, Plane, Shape, Sphere } from './shapes';
@@ -78,6 +78,15 @@ export function getVec3Z(v: Vec3): f32 {
 
 export function setVec3Z(v: Vec3, z: f32): void {
   v.z = z;
+}
+
+export function createContactMaterial(
+  materialA: Material,
+  materialB: Material,
+  friction: f32 = -1,
+  restitution: f32 = -1
+): ContactMaterial {
+  return new ContactMaterial(materialA, materialB, friction, restitution);
 }
 
 export function getBodyPosition(body: Body): Vec3 {
@@ -188,6 +197,20 @@ export function setBodyOptionsQuaternion(
   options.quaternion.set(x, y, z, w);
 }
 
+export function setBodyOptionsMaterial(
+  options: BodyOptions,
+  material: Material
+): void {
+  options.material = material;
+}
+
+export function setBodyOptionsLinearDamping(
+  options: BodyOptions,
+  damping: f32
+): void {
+  options.linearDamping = damping;
+}
+
 export function createBody(options: BodyOptions): Body {
   return new Body(options);
 }
@@ -213,6 +236,13 @@ export function worldRemoveConstraint(
 
 export function addBodyToWorld(world: World, body: Body): void {
   world.addBody(body);
+}
+
+export function addContactMaterialToWorld(
+  world: World,
+  contactMaterial: ContactMaterial
+): void {
+  world.addContactMaterial(contactMaterial);
 }
 
 export function removeBodyFromWorld(world: World, body: Body): void {
@@ -247,6 +277,10 @@ export function setBodyPosition(body: Body, x: f32, y: f32, z: f32): void {
   body.position.set(x, y, z);
 }
 
+export function setBodyLinearDamping(body: Body, damping: f32): void {
+  body.linearDamping = damping;
+}
+
 export function isBodyTrigger(body: Body): boolean {
   return body.isTrigger;
 }
@@ -265,6 +299,14 @@ export function getBodyShapeOffsetAt(body: Body, index: i32): Vec3 {
 
 export function getBodyShapeOrientationAt(body: Body, index: i32): Quaternion {
   return body.shapeOrientations[index];
+}
+
+export function createMaterial(
+  name: string = '',
+  friction: f32 = -1,
+  restitution: f32 = -1
+): Material {
+  return new Material(name, friction, restitution);
 }
 
 export function setQuaternionFromEuler(
