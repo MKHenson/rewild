@@ -1,10 +1,9 @@
-import { __Internref4 } from '../../build/release';
 import { physicsWasm } from './WasmManager';
 
 export class ClientVec3 {
-  ptr: __Internref4;
+  ptr: any;
 
-  constructor(ptr: __Internref4) {
+  constructor(ptr: any) {
     this.ptr = ptr;
   }
 
@@ -12,11 +11,27 @@ export class ClientVec3 {
     return physicsWasm.getVec3X(this.ptr);
   }
 
+  set x(value: number) {
+    physicsWasm.setVec3X(this.ptr, value);
+  }
+
   get y() {
     return physicsWasm.getVec3Y(this.ptr);
   }
 
+  set y(value: number) {
+    physicsWasm.setVec3Y(this.ptr, value);
+  }
+
   get z() {
     return physicsWasm.getVec3Z(this.ptr);
+  }
+
+  set z(value: number) {
+    physicsWasm.setVec3Z(this.ptr, value);
+  }
+
+  set(x: number, y: number, z: number): void {
+    physicsWasm.setVec3(this.ptr, x, y, z);
   }
 }

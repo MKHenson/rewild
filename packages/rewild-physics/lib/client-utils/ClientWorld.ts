@@ -1,5 +1,4 @@
 import { EventDispatcher } from 'rewild-common';
-import { __Internref24, __Internref30 } from '../../build/release';
 import { ClientBody } from './ClientBody';
 import { ClientVec3 } from './ClientVec3';
 import { physicsWasm } from './WasmManager';
@@ -8,13 +7,14 @@ import { ClientContactEquation } from './ClientContactEquation';
 import { ClientConstraint } from './ClientConstraint';
 
 export class ClientWorld extends EventDispatcher {
-  ptr: __Internref30;
-
+  ptr: any;
+  gravity: ClientVec3;
   constraints: ClientConstraint[] = [];
 
   constructor() {
     super();
     this.ptr = physicsWasm.createWorld();
+    this.gravity = new ClientVec3(physicsWasm.getWorldGravity(this.ptr));
   }
 
   get profile() {
@@ -25,11 +25,6 @@ export class ClientWorld extends EventDispatcher {
       narrowphase: 0,
       solve: 0,
     };
-  }
-
-  get gravity(): ClientVec3 {
-    const vec3Ptr = physicsWasm.getWorldGravity(this.ptr);
-    return new ClientVec3(vec3Ptr);
   }
 
   get defaultContactMaterial() {

@@ -24,16 +24,32 @@ export function getQuatX(quat: Quaternion): f32 {
   return quat.x;
 }
 
+export function setQuatX(quat: Quaternion, x: f32): void {
+  quat.x = x;
+}
+
 export function getQuatY(quat: Quaternion): f32 {
   return quat.y;
+}
+
+export function setQuatY(quat: Quaternion, y: f32): void {
+  quat.y = y;
 }
 
 export function getQuatZ(quat: Quaternion): f32 {
   return quat.z;
 }
 
+export function setQuatZ(quat: Quaternion, z: f32): void {
+  quat.z = z;
+}
+
 export function getQuatW(quat: Quaternion): f32 {
   return quat.w;
+}
+
+export function setQuatW(quat: Quaternion, w: f32): void {
+  quat.w = w;
 }
 
 export function setVec3(v: Vec3, x: f32, y: f32, z: f32): void {
@@ -44,16 +60,32 @@ export function getVec3X(v: Vec3): f32 {
   return v.x;
 }
 
+export function setVec3X(v: Vec3, x: f32): void {
+  v.x = x;
+}
+
 export function getVec3Y(v: Vec3): f32 {
   return v.y;
+}
+
+export function setVec3Y(v: Vec3, y: f32): void {
+  v.y = y;
 }
 
 export function getVec3Z(v: Vec3): f32 {
   return v.z;
 }
 
+export function setVec3Z(v: Vec3, z: f32): void {
+  v.z = z;
+}
+
 export function getBodyPosition(body: Body): Vec3 {
   return body.position;
+}
+
+export function getBodyVelocity(body: Body): Vec3 {
+  return body.velocity;
 }
 
 export function getBodyQuaternion(body: Body): Quaternion {
@@ -113,6 +145,47 @@ export function createBodyOptions(): BodyOptions {
 
 export function setBodyOptionsMass(options: BodyOptions, mass: f32): void {
   options.mass = mass;
+}
+
+export function setBodyOptionsType(options: BodyOptions, type: i32): void {
+  options.type = type;
+}
+
+export function setBodyOptionsPosition(
+  options: BodyOptions,
+  x: f32,
+  y: f32,
+  z: f32
+): void {
+  options.position.set(x, y, z);
+}
+
+export function setBodyOptionsVelocity(
+  options: BodyOptions,
+  x: f32,
+  y: f32,
+  z: f32
+): void {
+  options.velocity.set(x, y, z);
+}
+
+export function setBodyOptionsAngularVelocity(
+  options: BodyOptions,
+  x: f32,
+  y: f32,
+  z: f32
+): void {
+  options.angularVelocity.set(x, y, z);
+}
+
+export function setBodyOptionsQuaternion(
+  options: BodyOptions,
+  x: f32,
+  y: f32,
+  z: f32,
+  w: f32
+): void {
+  options.quaternion.set(x, y, z, w);
 }
 
 export function createBody(options: BodyOptions): Body {
@@ -194,23 +267,13 @@ export function getBodyShapeOrientationAt(body: Body, index: i32): Quaternion {
   return body.shapeOrientations[index];
 }
 
-export function setBodyQuaternion(
-  body: Body,
-  x: f32,
-  y: f32,
-  z: f32,
-  w: f32
-): void {
-  body.quaternion.set(x, y, z, w);
-}
-
-export function setBodyQuaternionFromEuler(
-  body: Body,
+export function setQuaternionFromEuler(
+  quat: Quaternion,
   x: f32,
   y: f32,
   z: f32
 ): void {
-  body.quaternion.setFromEuler(x, y, z);
+  quat.setFromEuler(x, y, z);
 }
 
 export function setBodyVelocity(body: Body, x: f32, y: f32, z: f32): void {

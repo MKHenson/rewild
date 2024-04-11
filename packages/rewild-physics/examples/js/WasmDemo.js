@@ -169,21 +169,21 @@ class Demo extends EventDispatcher {
         return;
       }
 
-      this.world.setGravity(gx, this.settings.gy, this.settings.gz);
+      this.world.gravity.set(gx, this.settings.gy, this.settings.gz);
     });
     worldFolder.add(this.settings, 'gy', -maxg, maxg).onChange((gy) => {
       if (isNaN(gy)) {
         return;
       }
 
-      this.world.setGravity(this.settings.gx, gy, this.settings.gz);
+      this.world.gravity.set(this.settings.gx, gy, this.settings.gz);
     });
     worldFolder.add(this.settings, 'gz', -maxg, maxg).onChange((gz) => {
       if (isNaN(gz)) {
         return;
       }
 
-      this.world.setGravity(this.settings.gx, this.settings.gy, gz);
+      this.world.gravity.set(this.settings.gx, this.settings.gy, gz);
     });
     worldFolder
       .add(this.settings, 'quatNormalizeSkip', 0, 50, 1)

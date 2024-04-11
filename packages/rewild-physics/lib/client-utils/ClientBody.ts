@@ -1,4 +1,3 @@
-import { __Internref24, __Internref33 } from '../../build/release';
 import { ClientBodyOptions } from './ClientBodyOptions';
 import { ClientQuat } from './ClientQuat';
 import { ClientShape } from './ClientShape';
@@ -6,9 +5,10 @@ import { ClientVec3 } from './ClientVec3';
 import { physicsWasm } from './WasmManager';
 
 export class ClientBody {
-  ptr: __Internref24;
+  ptr: any;
   shapes: ClientShape[] = [];
   position: ClientVec3;
+  velocity: ClientVec3;
   quaternion: ClientQuat;
   interpolatedPosition: ClientVec3;
   interpolatedQuaternion: ClientQuat;
@@ -16,6 +16,7 @@ export class ClientBody {
   constructor(options: ClientBodyOptions) {
     this.ptr = physicsWasm.createBody(options.ptr);
     this.position = new ClientVec3(physicsWasm.getBodyPosition(this.ptr));
+    this.velocity = new ClientVec3(physicsWasm.getBodyVelocity(this.ptr));
     this.quaternion = new ClientQuat(physicsWasm.getBodyQuaternion(this.ptr));
     this.interpolatedPosition = new ClientVec3(
       physicsWasm.getBodyInterpolatedPosition(this.ptr)
@@ -61,16 +62,6 @@ export class ClientBody {
 
   setPosition(x: number, y: number, z: number): ClientBody {
     physicsWasm.setBodyPosition(this.ptr, x, y, z);
-    return this;
-  }
-
-  setQuaternion(x: number, y: number, z: number, w: number): ClientBody {
-    physicsWasm.setBodyQuaternion(this.ptr, x, y, z, w);
-    return this;
-  }
-
-  setQuaternionFromEuler(x: number, y: number, z: number): ClientBody {
-    physicsWasm.setBodyQuaternionFromEuler(this.ptr, x, y, z);
     return this;
   }
 
