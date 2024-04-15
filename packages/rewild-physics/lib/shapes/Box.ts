@@ -40,7 +40,7 @@ export class Box extends Shape {
     const sy = this.halfExtents.y;
     const sz = this.halfExtents.z;
 
-    const vertices: Vec3[] = [
+    const vertices: (Vec3 | null)[] = [
       new Vec3(-sx, -sy, -sz),
       new Vec3(sx, -sy, -sz),
       new Vec3(sx, sy, -sz),

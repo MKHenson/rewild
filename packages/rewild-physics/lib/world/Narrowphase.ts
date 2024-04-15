@@ -1450,7 +1450,7 @@ export class Narrowphase {
 
     // Check corners
     for (let i: i32 = 0; i != verts.length; i++) {
-      const v = verts[i];
+      const v = verts[i]!;
 
       // World position of corner
       const worldCorner = sphereConvex_worldCorner;
@@ -1499,7 +1499,7 @@ export class Narrowphase {
 
       // Get a world vertex from the face
       const worldPoint = sphereConvex_worldPoint;
-      qj.vmult(verts[face[0]], worldPoint);
+      qj.vmult(verts[face[0]]!, worldPoint);
       worldPoint.vadd(xj, worldPoint);
 
       // Get a point on the sphere, closest to the face normal
@@ -1523,7 +1523,7 @@ export class Narrowphase {
         const faceVerts: Vec3[] = []; // Face vertices, in world coords
         for (let j: i32 = 0, Nverts = face.length; j != Nverts; j++) {
           const worldVertex = v3pool.get();
-          qj.vmult(verts[face[j]], worldVertex);
+          qj.vmult(verts[face[j]]!, worldVertex);
           xj.vadd(worldVertex, worldVertex);
           faceVerts.push(worldVertex);
         }
@@ -1579,8 +1579,8 @@ export class Narrowphase {
             // Get two world transformed vertices
             const v1 = v3pool.get();
             const v2 = v3pool.get();
-            qj.vmult(verts[face[(j + 1) % face.length]], v1);
-            qj.vmult(verts[face[(j + 2) % face.length]], v2);
+            qj.vmult(verts[face[(j + 1) % face.length]]!, v1);
+            qj.vmult(verts[face[(j + 2) % face.length]]!, v2);
             xj.vadd(v1, v1);
             xj.vadd(v2, v2);
 
@@ -1730,7 +1730,7 @@ export class Narrowphase {
     const relpos = planeConvex_relpos;
     for (let i: i32 = 0; i != convexShape.vertices.length; i++) {
       // Get world convex vertex
-      worldVertex.copy(convexShape.vertices[i]);
+      worldVertex.copy(convexShape.vertices[i]!);
       convexQuat.vmult(worldVertex, worldVertex);
       convexPosition.vadd(worldVertex, worldVertex);
       worldVertex.vsub(planePosition, relpos);

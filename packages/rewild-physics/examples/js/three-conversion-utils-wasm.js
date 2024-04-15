@@ -84,9 +84,25 @@ export function shapeToGeometry(shape, { flatShading = true } = {}) {
         for (let yi = 0; yi < shape.data[xi].length - 1; yi++) {
           for (let k = 0; k < 2; k++) {
             shape.getConvexTrianglePillar(xi, yi, k === 0);
-            v0.copy(shape.pillarConvex.vertices[0]);
-            v1.copy(shape.pillarConvex.vertices[1]);
-            v2.copy(shape.pillarConvex.vertices[2]);
+            v0.set(
+              shape.getPillarXAt(0),
+              shape.getPillarYAt(0),
+              shape.getPillarZAt(0)
+            );
+            v1.set(
+              shape.getPillarXAt(1),
+              shape.getPillarYAt(1),
+              shape.getPillarZAt(1)
+            );
+            v2.set(
+              shape.getPillarXAt(2),
+              shape.getPillarYAt(2),
+              shape.getPillarZAt(2)
+            );
+            // v0.copy(shape.pillarConvex.vertices[0]);
+            // v1.copy(shape.pillarConvex.vertices[1]);
+            // v2.copy(shape.pillarConvex.vertices[2]);
+
             v0.vadd(shape.pillarOffset, v0);
             v1.vadd(shape.pillarOffset, v1);
             v2.vadd(shape.pillarOffset, v2);

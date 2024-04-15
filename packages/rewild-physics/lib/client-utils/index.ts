@@ -13,4 +13,5 @@ export { ClientMaterial } from './ClientMaterial';
 export { ClientConstraint } from './ClientConstraint';
 export { ClientConvexPolyhedron } from './ClientConvexPolyhedron';
 export { ClientSolver } from './ClientSolver';
+export { ClientHeightfield } from './ClientHeightfield';
 export { WasmManager, physicsWasm, initializeWasm } from './WasmManager';
