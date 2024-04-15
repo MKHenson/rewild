@@ -5,17 +5,20 @@ import { physicsWasm } from './WasmManager';
 import { ClientContactMaterial } from './ClientContactMaterial';
 import { ClientContactEquation } from './ClientContactEquation';
 import { ClientConstraint } from './ClientConstraint';
+import { ClientSolver } from './ClientSolver';
 
 export class ClientWorld extends EventDispatcher {
   ptr: any;
   gravity: ClientVec3;
   constraints: ClientConstraint[] = [];
   defaultContactMaterial: ClientContactMaterial;
+  solver: ClientSolver;
 
   constructor() {
     super();
     this.ptr = physicsWasm.createWorld();
     this.gravity = new ClientVec3(physicsWasm.getWorldGravity(this.ptr));
+    this.solver = new ClientSolver(this);
 
     this.defaultContactMaterial = new ClientContactMaterial(
       null,
