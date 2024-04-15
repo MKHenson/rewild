@@ -28,7 +28,7 @@ export class ConvexPolyhedronContactPoint {
 
 export class ConvexPolyhedron extends Shape {
   /** vertices */
-  vertices: Vec3[];
+  vertices: (Vec3 | null)[];
   /**
    * Array of integer arrays, indicating which vertices each face consists of
    */
@@ -56,7 +56,7 @@ export class ConvexPolyhedron extends Shape {
    */
   constructor(
     /** An array of Vec3's */
-    vertices: Vec3[] = [],
+    vertices: (Vec3 | null)[] = [],
     /** Array of integer arrays, describing which vertices that is included in each face. */
     faces: i32[][] = [],
     /** normals */
@@ -108,7 +108,7 @@ export class ConvexPolyhedron extends Shape {
       const numVertices = face.length;
       for (let j = 0; j !== numVertices; j++) {
         const k = (j + 1) % numVertices;
-        vertices[face[j]].vsub(vertices[face[k]], edge);
+        vertices[face[j]]!.vsub(vertices[face[k]]!, edge);
         edge.normalize();
         let found = false;
         for (let p: i32 = 0; p !== edges.length; p++) {
@@ -146,7 +146,7 @@ export class ConvexPolyhedron extends Shape {
       this.getFaceNormal(i, n);
       n.negate(n);
       this.faceNormals[i] = n;
-      const vertex = this.vertices[this.faces[i][0]];
+      const vertex = this.vertices[this.faces[i][0]]!;
       if (n.dot(vertex) < 0) {
         console.error(
           `.faceNormals[${i}] = Vec3(${n.toString()}) looks like it points into the shape? The vertices follow. Make sure they are ordered CCW around the normal, using the right hand rule.`
@@ -155,7 +155,7 @@ export class ConvexPolyhedron extends Shape {
           console.warn(
             `.vertices[${this.faces[i][j]}] = Vec3(${this.vertices[
               this.faces[i][j]
-            ].toString()})`
+            ]!.toString()})`
           );
         }
       }
@@ -167,9 +167,9 @@ export class ConvexPolyhedron extends Shape {
    */
   getFaceNormal(i: i32, target: Vec3): void {
     const f = this.faces[i];
-    const va = this.vertices[f[0]];
-    const vb = this.vertices[f[1]];
-    const vc = this.vertices[f[2]];
+    const va = this.vertices[f[0]]!;
+    const vb = this.vertices[f[1]]!;
+    const vc = this.vertices[f[2]]!;
     ConvexPolyhedron.computeNormal(va, vb, vc, target);
   }
 
@@ -219,7 +219,7 @@ export class ConvexPolyhedron extends Shape {
     const worldVertsB1: Vec3[] = [];
 
     for (let i: i32 = 0; i < hullB.faces[closestFaceB].length; i++) {
-      const b = hullB.vertices[hullB.faces[closestFaceB][i]];
+      const b = hullB.vertices[hullB.faces[closestFaceB][i]]!;
       const worldb = new Vec3();
       worldb.copy(b);
       quatB.vmult(worldb, worldb);
@@ -460,7 +460,7 @@ export class ConvexPolyhedron extends Shape {
   getPlaneConstantOfFace(face_i: i32): f32 {
     const f = this.faces[face_i];
     const n = this.faceNormals[face_i]!;
-    const v = this.vertices[f[0]];
+    const v = this.vertices[f[0]]!;
     const c = -n.dot(v);
     return c;
   }
@@ -533,8 +533,8 @@ export class ConvexPolyhedron extends Shape {
     // that are adjacent to the witness face
     const numVerticesA = polyA.length;
     for (let i: i32 = 0; i < numVerticesA; i++) {
-      const a = hullA.vertices[polyA[i]];
-      const b = hullA.vertices[polyA[(i + 1) % numVerticesA]];
+      const a = hullA.vertices[polyA[i]]!;
+      const b = hullA.vertices[polyA[(i + 1) % numVerticesA]]!;
       a.vsub(b, edge0);
       WorldEdge0.copy(edge0);
       quatA.vmult(WorldEdge0, WorldEdge0);
@@ -670,7 +670,7 @@ export class ConvexPolyhedron extends Shape {
     const verts = this.vertices;
     const worldVerts = this.worldVertices;
     for (let i: i32 = 0; i != this.vertices.length; i++) {
-      quat.vmult(verts[i], worldVerts[i]);
+      quat.vmult(verts[i]!, worldVerts[i]);
       position.vadd(worldVerts[i], worldVerts[i]);
     }
 
@@ -684,7 +684,7 @@ export class ConvexPolyhedron extends Shape {
     aabbmax.set(-f32.MAX_VALUE, -f32.MAX_VALUE, -f32.MAX_VALUE);
 
     for (let i: i32 = 0; i < this.vertices.length; i++) {
-      const v = vertices[i];
+      const v = vertices[i]!;
       if (v.x < aabbmin.x) {
         aabbmin.x = v.x;
       } else if (v.x > aabbmax.x) {
@@ -729,7 +729,7 @@ export class ConvexPolyhedron extends Shape {
     let max2: f32 = 0;
     const verts = this.vertices;
     for (let i: i32 = 0; i != verts.length; i++) {
-      const norm2 = verts[i].lengthSquared();
+      const norm2 = verts[i]!.lengthSquared();
       if (norm2 > max2) {
         max2 = norm2;
       }
@@ -750,7 +750,7 @@ export class ConvexPolyhedron extends Shape {
     let maxz: f32 = f32.MIN_VALUE;
     let tempWorldVertex = new Vec3();
     for (let i: i32 = 0; i < verts.length; i++) {
-      tempWorldVertex.copy(verts[i]);
+      tempWorldVertex.copy(verts[i]!);
       quat.vmult(tempWorldVertex, tempWorldVertex);
       pos.vadd(tempWorldVertex, tempWorldVertex);
       const v = tempWorldVertex;
@@ -796,7 +796,7 @@ export class ConvexPolyhedron extends Shape {
     const n = this.vertices.length;
     const verts = this.vertices;
     for (let i: i32 = 0; i < n; i++) {
-      target.vadd(verts[i], target);
+      target.vadd(verts[i]!, target);
     }
     target.scale(1 / f32(n), target);
     return target;
@@ -813,7 +813,7 @@ export class ConvexPolyhedron extends Shape {
     if (quat) {
       // Rotate vertices
       for (let i: i32 = 0; i < n; i++) {
-        const v = verts[i];
+        const v = verts[i]!;
         quat.vmult(v, v);
       }
       // Rotate face normals
@@ -832,7 +832,7 @@ export class ConvexPolyhedron extends Shape {
     // Apply offset
     if (offset) {
       for (let i: i32 = 0; i < n; i++) {
-        const v = verts[i];
+        const v = verts[i]!;
         v.vadd(offset, v);
       }
     }
@@ -854,7 +854,7 @@ export class ConvexPolyhedron extends Shape {
 
     for (let i: i32 = 0; i < this.faces.length; i++) {
       let n = normals[i]!;
-      const v = verts[faces[i][0]]; // We only need one point in the face
+      const v = verts[faces[i][0]]!; // We only need one point in the face
 
       // This dot product determines which side of the edge the point is
       const vToP = new Vec3();
@@ -901,10 +901,10 @@ export class ConvexPolyhedron extends Shape {
     Transform.pointToLocalFrame(pos, quat, localOrigin, localOrigin);
     const add = localOrigin.dot(localAxis);
 
-    min = max = vs[0].dot(localAxis);
+    min = max = vs[0]!.dot(localAxis);
 
     for (let i = 1; i < n; i++) {
-      const val = vs[i].dot(localAxis);
+      const val = vs[i]!.dot(localAxis);
 
       if (val > max) {
         max = val;

@@ -3,7 +3,14 @@ import { ContactEquation } from './equations';
 import { ContactMaterial, Material } from './material';
 import { Quaternion, Vec3 } from './math';
 import { Body, BodyOptions } from './objects';
-import { Box, ConvexPolyhedron, Plane, Shape, Sphere } from './shapes';
+import {
+  Box,
+  ConvexPolyhedron,
+  Heightfield,
+  Plane,
+  Shape,
+  Sphere,
+} from './shapes';
 import { GSSolver, Solver, SplitSolver } from './solver';
 import { World } from './world';
 
@@ -354,7 +361,7 @@ export function createConvexPolyhedron(
   faces: i32[],
   facesSize: i32
 ): Shape {
-  const verts = new Array<Vec3>();
+  const verts = new Array<Vec3 | null>();
   const facesArray = new Array<Array<i32>>();
 
   for (let i = 0; i < vertices.length; i += 3) {
@@ -370,4 +377,52 @@ export function createConvexPolyhedron(
   }
 
   return new ConvexPolyhedron(verts, facesArray);
+}
+
+export function createHeightfield(
+  data: f32[],
+  matrixSizeX: i32,
+  matrixSizeZ: i32,
+  elementSize: f32
+): Shape {
+  // Convert the f32[] to a f32[][] based on the matrix sizes
+  const matrix = new Array<Array<f32>>();
+  for (let i = 0; i < matrixSizeX; i++) {
+    const row = new Array<f32>();
+    for (let j = 0; j < matrixSizeZ; j++) {
+      row.push(data[i * matrixSizeZ + j]);
+    }
+    matrix.push(row);
+  }
+
+  return new Heightfield(matrix, f32.NaN, f32.NaN, elementSize);
+}
+
+export function getHeightfieldConvexTrianglePillar(
+  heightfield: Heightfield,
+  xi: i32,
+  yi: i32,
+  k: i32
+): void {
+  return heightfield.getConvexTrianglePillar(xi, yi, k === 0);
+}
+
+export function getHeightfieldPillarXAt(heightfield: Heightfield, i: i32): f32 {
+  return heightfield.pillarConvex.vertices[i]!.x;
+}
+
+export function getHeightfieldPillarYAt(heightfield: Heightfield, i: i32): f32 {
+  return heightfield.pillarConvex.vertices[i]!.y;
+}
+
+export function getHeightfieldPillarZAt(heightfield: Heightfield, i: i32): f32 {
+  return heightfield.pillarConvex.vertices[i]!.z;
+}
+
+export function getHeightfieldPillarOffset(heightfield: Heightfield): Vec3 {
+  return heightfield.pillarOffset;
+}
+
+export function vec3VAdd(v: Vec3, w: Vec3): Vec3 {
+  return v.vadd(w);
 }

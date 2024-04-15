@@ -75,6 +75,16 @@ export class Heightfield extends Shape {
     this.data = data;
     this.elementSize = elementSize;
 
+    this.cacheEnabled = true;
+
+    this.pillarConvex = new ConvexPolyhedron();
+    this.pillarOffset = new Vec3();
+
+    // "i_j_isUpper" => { convex: ..., offset: ... }
+    // for example:
+    // _cachedPillars["0_2_1"]
+    this._cachedPillars = new Map();
+
     if (isNaN<f32>(minValue)) {
       this.updateMinValue();
     } else this.minValue = minValue;
@@ -83,17 +93,7 @@ export class Heightfield extends Shape {
       this.updateMaxValue();
     } else this.maxValue = maxValue;
 
-    this.cacheEnabled = true;
-
-    this.pillarConvex = new ConvexPolyhedron();
-    this.pillarOffset = new Vec3();
-
     this.updateBoundingSphereRadius();
-
-    // "i_j_isUpper" => { convex: ..., offset: ... }
-    // for example:
-    // _cachedPillars["0_2_1"]
-    this._cachedPillars = new Map();
   }
 
   /**
@@ -335,10 +335,12 @@ export class Heightfield extends Shape {
     xi: i32,
     yi: i32,
     getUpperTriangle: boolean
-  ): HeightfieldPillar {
-    return this._cachedPillars.get(
-      this.getCacheConvexTrianglePillarKey(xi, yi, getUpperTriangle)
-    ) as HeightfieldPillar;
+  ): HeightfieldPillar | null {
+    const key = this.getCacheConvexTrianglePillarKey(xi, yi, getUpperTriangle);
+    if (this._cachedPillars.has(key))
+      return this._cachedPillars.get(key) as HeightfieldPillar;
+
+    return null;
   }
 
   setCachedConvexTrianglePillar(
@@ -452,22 +454,26 @@ export class Heightfield extends Shape {
       );
 
       // Top triangle verts
-      verts[0].set(-0.25 * elementSize, -0.25 * elementSize, data[xi][yi] - h);
-      verts[1].set(
+      verts[0]!.set(-0.25 * elementSize, -0.25 * elementSize, data[xi][yi] - h);
+      verts[1]!.set(
         0.75 * elementSize,
         -0.25 * elementSize,
         data[xi + 1][yi] - h
       );
-      verts[2].set(
+      verts[2]!.set(
         -0.25 * elementSize,
         0.75 * elementSize,
         data[xi][yi + 1] - h
       );
 
       // bottom triangle verts
-      verts[3].set(-0.25 * elementSize, -0.25 * elementSize, -Mathf.abs(h) - 1);
-      verts[4].set(0.75 * elementSize, -0.25 * elementSize, -Mathf.abs(h) - 1);
-      verts[5].set(-0.25 * elementSize, 0.75 * elementSize, -Mathf.abs(h) - 1);
+      verts[3]!.set(
+        -0.25 * elementSize,
+        -0.25 * elementSize,
+        -Mathf.abs(h) - 1
+      );
+      verts[4]!.set(0.75 * elementSize, -0.25 * elementSize, -Mathf.abs(h) - 1);
+      verts[5]!.set(-0.25 * elementSize, 0.75 * elementSize, -Mathf.abs(h) - 1);
 
       // top triangle
       faces[0][0] = 0;
@@ -505,26 +511,26 @@ export class Heightfield extends Shape {
       );
 
       // Top triangle verts
-      verts[0].set(
+      verts[0]!.set(
         0.25 * elementSize,
         0.25 * elementSize,
         data[xi + 1][yi + 1] - h
       );
-      verts[1].set(
+      verts[1]!.set(
         -0.75 * elementSize,
         0.25 * elementSize,
         data[xi][yi + 1] - h
       );
-      verts[2].set(
+      verts[2]!.set(
         0.25 * elementSize,
         -0.75 * elementSize,
         data[xi + 1][yi] - h
       );
 
       // bottom triangle verts
-      verts[3].set(0.25 * elementSize, 0.25 * elementSize, -Mathf.abs(h) - 1);
-      verts[4].set(-0.75 * elementSize, 0.25 * elementSize, -Mathf.abs(h) - 1);
-      verts[5].set(0.25 * elementSize, -0.75 * elementSize, -Mathf.abs(h) - 1);
+      verts[3]!.set(0.25 * elementSize, 0.25 * elementSize, -Mathf.abs(h) - 1);
+      verts[4]!.set(-0.75 * elementSize, 0.25 * elementSize, -Mathf.abs(h) - 1);
+      verts[5]!.set(0.25 * elementSize, -0.75 * elementSize, -Mathf.abs(h) - 1);
 
       // Top triangle
       faces[0][0] = 0;

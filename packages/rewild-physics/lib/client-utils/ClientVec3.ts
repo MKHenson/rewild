@@ -34,4 +34,9 @@ export class ClientVec3 {
   set(x: number, y: number, z: number): void {
     physicsWasm.setVec3(this.ptr, x, y, z);
   }
+
+  vadd(v: ClientVec3): ClientVec3 {
+    physicsWasm.vec3VAdd(this.ptr, v.ptr);
+    return this;
+  }
 }
