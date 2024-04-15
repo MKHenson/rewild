@@ -1,3 +1,4 @@
+import { Vec3 } from '../math';
 import { ClientBodyOptions } from './ClientBodyOptions';
 import { ClientQuat } from './ClientQuat';
 import { ClientShape } from './ClientShape';
@@ -48,8 +49,14 @@ export class ClientBody {
     return new ClientQuat(quatPtr);
   }
 
-  addShape(shape: ClientShape): ClientBody {
-    physicsWasm.addShapeToBody(this.ptr, shape.ptr);
+  addShape(shape: ClientShape, offset: Vec3 = new Vec3()): ClientBody {
+    physicsWasm.addShapeToBody(
+      this.ptr,
+      shape.ptr,
+      offset.x,
+      offset.y,
+      offset.z
+    );
     this.shapes.push(shape);
     return this;
   }

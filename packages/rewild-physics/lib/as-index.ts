@@ -3,8 +3,8 @@ import { ContactEquation } from './equations';
 import { ContactMaterial, Material } from './material';
 import { Quaternion, Vec3 } from './math';
 import { Body, BodyOptions } from './objects';
-import { Box, Plane, Shape, Sphere } from './shapes';
-import { GSSolver, SplitSolver } from './solver';
+import { Box, ConvexPolyhedron, Plane, Shape, Sphere } from './shapes';
+import { GSSolver, Solver, SplitSolver } from './solver';
 import { World } from './world';
 
 export function createWorld(): World {
@@ -265,8 +265,14 @@ export function createShapeSphere(radius: f32 = 1): Shape {
   return new Sphere(radius);
 }
 
-export function addShapeToBody(body: Body, shape: Shape): void {
-  body.addShape(shape);
+export function addShapeToBody(
+  body: Body,
+  shape: Shape,
+  offsetX: f32 = 0,
+  offsetY: f32 = 0,
+  offsetZ: f32 = 0
+): void {
+  body.addShape(shape, new Vec3(offsetX, offsetY, offsetZ));
 }
 
 export function removeShapeFromBody(body: Body, shape: Shape): void {
@@ -333,4 +339,35 @@ export function setBodyAngularVelocity(
 
 export function setBodyMass(body: Body, mass: f32): void {
   body.mass = mass;
+}
+
+export function getWorldSolver(world: World): Solver {
+  return world.solver;
+}
+
+export function setSolverIterations(solver: Solver, iterations: i32): void {
+  (solver as GSSolver).iterations = iterations;
+}
+
+export function createConvexPolyhedron(
+  vertices: f32[],
+  faces: i32[],
+  facesSize: i32
+): Shape {
+  const verts = new Array<Vec3>();
+  const facesArray = new Array<Array<i32>>();
+
+  for (let i = 0; i < vertices.length; i += 3) {
+    verts.push(new Vec3(vertices[i], vertices[i + 1], vertices[i + 2]));
+  }
+
+  for (let i = 0; i < faces.length; i += facesSize) {
+    const face = new Array<i32>();
+    for (let j = 0; j < facesSize; j++) {
+      face.push(faces[i + j]);
+    }
+    facesArray.push(face);
+  }
+
+  return new ConvexPolyhedron(verts, facesArray);
 }

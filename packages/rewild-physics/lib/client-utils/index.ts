@@ -11,4 +11,6 @@ export { ClientVec3 } from './ClientVec3';
 export { ClientQuat } from './ClientQuat';
 export { ClientMaterial } from './ClientMaterial';
 export { ClientConstraint } from './ClientConstraint';
+export { ClientConvexPolyhedron } from './ClientConvexPolyhedron';
+export { ClientSolver } from './ClientSolver';
 export { WasmManager, physicsWasm, initializeWasm } from './WasmManager';
