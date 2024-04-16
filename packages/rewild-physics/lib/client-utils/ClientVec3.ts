@@ -3,7 +3,7 @@ import { physicsWasm } from './WasmManager';
 export class ClientVec3 {
   ptr: any;
 
-  constructor(ptr: any) {
+  constructor(ptr: any = physicsWasm.createVec3()) {
     this.ptr = ptr;
   }
 
@@ -31,8 +31,9 @@ export class ClientVec3 {
     physicsWasm.setVec3Z(this.ptr, value);
   }
 
-  set(x: number, y: number, z: number): void {
+  set(x: number, y: number, z: number): ClientVec3 {
     physicsWasm.setVec3(this.ptr, x, y, z);
+    return this;
   }
 
   vadd(v: ClientVec3, target: ClientVec3): ClientVec3 {

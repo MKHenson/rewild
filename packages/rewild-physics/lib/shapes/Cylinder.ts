@@ -44,45 +44,51 @@ export class Cylinder extends ConvexPolyhedron {
     }
 
     const N = numSegments;
-    const vertices: Vec3[] = [];
+    const vertices: (Vec3 | null)[] = [];
     const axes: Vec3[] = [];
-    const faces: i32[][] = [];
+    const faces: (Array<i32> | null)[] = [];
     const bottomface: i32[] = [];
     const topface: i32[] = [];
-    const cos = Mathf.cos;
-    const sin = Mathf.sin;
 
     // First bottom point
     vertices.push(
-      new Vec3(-radiusBottom * sin(0), -height * 0.5, radiusBottom * cos(0))
+      new Vec3(
+        -radiusBottom * Mathf.sin(0),
+        -height * 0.5,
+        radiusBottom * Mathf.cos(0)
+      )
     );
     bottomface.push(0);
 
     // First top point
     vertices.push(
-      new Vec3(-radiusTop * sin(0), height * 0.5, radiusTop * cos(0))
+      new Vec3(
+        -radiusTop * Mathf.sin(0),
+        height * 0.5,
+        radiusTop * Mathf.cos(0)
+      )
     );
     topface.push(1);
 
     for (let i: i32 = 0; i < N; i++) {
-      const theta = ((2 * Mathf.PI) / N) * (i + 1);
-      const thetaN = ((2 * Mathf.PI) / N) * (i + 0.5);
+      const theta: f32 = ((2.0 * Mathf.PI) / f32(N)) * (f32(i) + 1);
+      const thetaN: f32 = ((2.0 * Mathf.PI) / f32(N)) * (f32(i) + 0.5);
       if (i < N - 1) {
         // Bottom
         vertices.push(
           new Vec3(
-            -radiusBottom * sin(theta),
+            -radiusBottom * Mathf.sin(theta),
             -height * 0.5,
-            radiusBottom * cos(theta)
+            radiusBottom * Mathf.cos(theta)
           )
         );
         bottomface.push(2 * i + 2);
         // Top
         vertices.push(
           new Vec3(
-            -radiusTop * sin(theta),
+            -radiusTop * Mathf.sin(theta),
             height * 0.5,
-            radiusTop * cos(theta)
+            radiusTop * Mathf.cos(theta)
           )
         );
         topface.push(2 * i + 3);
@@ -95,14 +101,14 @@ export class Cylinder extends ConvexPolyhedron {
 
       // Axis: we can cut off half of them if we have even number of segments
       if (N % 2 == 1 || i < N / 2) {
-        axes.push(new Vec3(-sin(thetaN), 0, cos(thetaN)));
+        axes.push(new Vec3(-Mathf.sin(thetaN), 0, Mathf.cos(thetaN)));
       }
     }
     faces.push(bottomface);
     axes.push(new Vec3(0, 1, 0));
 
     // Reorder top face
-    const temp = [];
+    const temp: i32[] = [];
     for (let i: i32 = 0; i < topface.length; i++) {
       temp.push(topface[topface.length - i - 1]);
     }
