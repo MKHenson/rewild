@@ -1491,7 +1491,7 @@ export class Narrowphase {
       i++
     ) {
       const normal = normals[i]!;
-      const face = faces[i];
+      const face = faces[i]!;
 
       // Get world-transformed normal of the face
       const worldNormal = sphereConvex_worldNormal;
@@ -2037,7 +2037,7 @@ export class Narrowphase {
       // For each world polygon in the polyhedra
       for (let i: i32 = 0, nfaces = sj.faces.length; i != nfaces; i++) {
         // Construct world face vertices
-        const verts = [sj.worldVertices[sj.faces[i][0]]];
+        const verts = [sj.worldVertices[sj.faces[i]![0]]];
         const normal = sj.worldFaceNormals[i];
 
         // Check how much the particle penetrates the polygon plane.

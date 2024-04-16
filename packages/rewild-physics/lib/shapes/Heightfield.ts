@@ -476,32 +476,32 @@ export class Heightfield extends Shape {
       verts[5]!.set(-0.25 * elementSize, 0.75 * elementSize, -Mathf.abs(h) - 1);
 
       // top triangle
-      faces[0][0] = 0;
-      faces[0][1] = 1;
-      faces[0][2] = 2;
+      faces[0]![0] = 0;
+      faces[0]![1] = 1;
+      faces[0]![2] = 2;
 
       // bottom triangle
-      faces[1][0] = 5;
-      faces[1][1] = 4;
-      faces[1][2] = 3;
+      faces[1]![0] = 5;
+      faces[1]![1] = 4;
+      faces[1]![2] = 3;
 
       // -x facing quad
-      faces[2][0] = 0;
-      faces[2][1] = 2;
-      faces[2][2] = 5;
-      faces[2][3] = 3;
+      faces[2]![0] = 0;
+      faces[2]![1] = 2;
+      faces[2]![2] = 5;
+      faces[2]![3] = 3;
 
       // -y facing quad
-      faces[3][0] = 1;
-      faces[3][1] = 0;
-      faces[3][2] = 3;
-      faces[3][3] = 4;
+      faces[3]![0] = 1;
+      faces[3]![1] = 0;
+      faces[3]![2] = 3;
+      faces[3]![3] = 4;
 
       // +xy facing quad
-      faces[4][0] = 4;
-      faces[4][1] = 5;
-      faces[4][2] = 2;
-      faces[4][3] = 1;
+      faces[4]![0] = 4;
+      faces[4]![1] = 5;
+      faces[4]![2] = 2;
+      faces[4]![3] = 1;
     } else {
       // Center of the triangle pillar - all polygons are given relative to this one
       offsetResult.set(
@@ -533,32 +533,32 @@ export class Heightfield extends Shape {
       verts[5]!.set(0.25 * elementSize, -0.75 * elementSize, -Mathf.abs(h) - 1);
 
       // Top triangle
-      faces[0][0] = 0;
-      faces[0][1] = 1;
-      faces[0][2] = 2;
+      faces[0]![0] = 0;
+      faces[0]![1] = 1;
+      faces[0]![2] = 2;
 
       // bottom triangle
-      faces[1][0] = 5;
-      faces[1][1] = 4;
-      faces[1][2] = 3;
+      faces[1]![0] = 5;
+      faces[1]![1] = 4;
+      faces[1]![2] = 3;
 
       // +x facing quad
-      faces[2][0] = 2;
-      faces[2][1] = 5;
-      faces[2][2] = 3;
-      faces[2][3] = 0;
+      faces[2]![0] = 2;
+      faces[2]![1] = 5;
+      faces[2]![2] = 3;
+      faces[2]![3] = 0;
 
       // +y facing quad
-      faces[3][0] = 3;
-      faces[3][1] = 4;
-      faces[3][2] = 1;
-      faces[3][3] = 0;
+      faces[3]![0] = 3;
+      faces[3]![1] = 4;
+      faces[3]![2] = 1;
+      faces[3]![3] = 0;
 
       // -xy facing quad
-      faces[4][0] = 1;
-      faces[4][1] = 4;
-      faces[4][2] = 5;
-      faces[4][3] = 2;
+      faces[4]![0] = 1;
+      faces[4]![1] = 4;
+      faces[4]![2] = 5;
+      faces[4]![3] = 2;
     }
 
     result.computeNormals();
