@@ -6,6 +6,7 @@ import { Body, BodyOptions } from './objects';
 import {
   Box,
   ConvexPolyhedron,
+  Cylinder,
   Heightfield,
   Plane,
   Shape,
@@ -85,6 +86,25 @@ export function getVec3Z(v: Vec3): f32 {
 
 export function setVec3Z(v: Vec3, z: f32): void {
   v.z = z;
+}
+
+export function createVec3(): Vec3 {
+  return new Vec3();
+}
+
+export function getBoxConvexPolyhedronRepresentation(
+  box: Shape
+): ConvexPolyhedron {
+  return (box as Box).convexPolyhedronRepresentation!;
+}
+
+export function createCylinder(
+  radiusTop: f32 = 1,
+  radiusBottom: f32 = 1,
+  height: f32 = 1,
+  numSegments: i32 = 8
+): Shape {
+  return new Cylinder(radiusTop, radiusBottom, height, numSegments);
 }
 
 export function createContactMaterial(

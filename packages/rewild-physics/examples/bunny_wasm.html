@@ -60,28 +60,8 @@
             rawOffset[2]
           );
 
-          // Convert the vertices array to a flat number array
-          const verticesArray = [];
-          for (let j = 0; j < vertices.length; j++) {
-            verticesArray.push(vertices[j].x);
-            verticesArray.push(vertices[j].y);
-            verticesArray.push(vertices[j].z);
-          }
-
-          // Convert the faces array to a flat number array
-          const facesArray = [];
-          for (let j = 0; j < faces.length; j++) {
-            facesArray.push(faces[j][0]);
-            facesArray.push(faces[j][1]);
-            facesArray.push(faces[j][2]);
-          }
-
           // Construct polyhedron
-          const bunnyPart = new CANNON.ClientConvexPolyhedron(
-            verticesArray,
-            facesArray,
-            3
-          );
+          const bunnyPart = new CANNON.ClientConvexPolyhedron(vertices, faces);
 
           // Add to compound
           bunnyBody.addShape(bunnyPart, offset);

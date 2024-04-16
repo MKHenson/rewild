@@ -6,21 +6,30 @@ export class ClientConvexPolyhedron extends ClientShape {
   vertices: Vec3[] = [];
   faces: number[][] = [];
 
-  constructor(vertices: number[], faces: number[], facesSize: number) {
-    super(physicsWasm.createConvexPolyhedron(vertices, faces, facesSize));
-
-    for (let i = 0; i < vertices.length; i += 3) {
-      this.vertices.push(
-        new Vec3(vertices[i], vertices[i + 1], vertices[i + 2])
-      );
+  constructor(vertices: Vec3[], faces: number[][], ptr?: any) {
+    // Convert the vertices array to a flat number array
+    const verticesArray: number[] = [];
+    for (let j = 0; j < vertices.length; j++) {
+      verticesArray.push(vertices[j].x);
+      verticesArray.push(vertices[j].y);
+      verticesArray.push(vertices[j].z);
     }
 
-    for (let i = 0; i < faces.length; i += facesSize) {
-      const face = new Array<number>();
-      for (let j = 0; j < facesSize; j++) {
-        face.push(faces[i + j]);
-      }
-      this.faces.push(face);
+    // Convert the faces array to a flat number array
+    const facesArray: number[] = [];
+    for (let j = 0; j < faces.length; j++) {
+      facesArray.push(faces[j][0]);
+      facesArray.push(faces[j][1]);
+      facesArray.push(faces[j][2]);
     }
+
+    super(
+      ptr
+        ? ptr
+        : physicsWasm.createConvexPolyhedron(verticesArray, facesArray, 3)
+    );
+
+    this.vertices = vertices;
+    this.faces = faces;
   }
 }
