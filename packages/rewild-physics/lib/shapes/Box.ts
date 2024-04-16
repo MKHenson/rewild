@@ -51,7 +51,7 @@ export class Box extends Shape {
       new Vec3(-sx, sy, sz),
     ];
 
-    const faces: i32[][] = [
+    const faces: (Array<i32> | null)[] = [
       [3, 2, 1, 0], // -z
       [4, 5, 6, 7], // +z
       [5, 4, 0, 1], // -y

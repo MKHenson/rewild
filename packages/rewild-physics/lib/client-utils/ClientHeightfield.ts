@@ -4,6 +4,7 @@ import { physicsWasm } from './WasmManager';
 
 export class ClientHeightfield extends ClientShape {
   data: number[][] = [];
+  elementSize: number;
 
   constructor(
     heightMatrix: number[][],
@@ -22,6 +23,7 @@ export class ClientHeightfield extends ClientShape {
     super(physicsWasm.createHeightfield(heights, sizeX, sizeZ, elementSize));
 
     this.data = heightMatrix;
+    this.elementSize = elementSize;
   }
 
   getConvexTrianglePillar(xi: number, yi: number, getUpperTriangle: boolean) {
@@ -29,20 +31,14 @@ export class ClientHeightfield extends ClientShape {
       this.ptr,
       xi,
       yi,
-      getUpperTriangle ? 1 : 0
+      getUpperTriangle
     );
   }
 
-  getPillarXAt(i: number): number {
-    return physicsWasm.getHeightfieldPillarXAt(this.ptr, i);
-  }
-
-  getPillarYAt(i: number): number {
-    return physicsWasm.getHeightfieldPillarYAt(this.ptr, i);
-  }
-
-  getPillarZAt(i: number): number {
-    return physicsWasm.getHeightfieldPillarZAt(this.ptr, i);
+  getPillarConvexAt(i: number): ClientVec3 {
+    return new ClientVec3(
+      physicsWasm.getHeightfieldPillarConvexAt(this.ptr, i)
+    );
   }
 
   get pillarOffset(): ClientVec3 {

@@ -598,7 +598,7 @@ export class Ray {
     for (let j: i32 = 0; !result.shouldStop && j < Nfaces; j++) {
       const fi = faceList ? faceList[j] : j;
 
-      const face = faces[fi];
+      const face = faces[fi]!;
       const faceNormal = normals[fi]!;
       const q = quat;
       const x = position;
@@ -607,7 +607,7 @@ export class Ray {
       // note: this works regardless of the direction of the face normal
 
       // Get plane point in world coordinates...
-      vector.copy(vertices[face[0]]);
+      vector.copy(vertices[face[0]]!);
       q.vmult(vector, vector);
       vector.vadd(x, vector);
 
@@ -640,14 +640,14 @@ export class Ray {
       intersectPoint.vadd(from, intersectPoint);
 
       // a is the point we compare points b and c with.
-      a.copy(vertices[face[0]]);
+      a.copy(vertices[face[0]]!);
       q.vmult(a, a);
       x.vadd(a, a);
 
       for (let i: i32 = 1; !result.shouldStop && i < face.length - 1; i++) {
         // Transform 3 vertices to world coords
-        b.copy(vertices[face[i]]);
-        c.copy(vertices[face[i + 1]]);
+        b.copy(vertices[face[i]]!);
+        c.copy(vertices[face[i + 1]]!);
         q.vmult(b, b);
         q.vmult(c, c);
         x.vadd(b, b);

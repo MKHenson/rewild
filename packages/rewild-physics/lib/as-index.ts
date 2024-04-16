@@ -362,7 +362,7 @@ export function createConvexPolyhedron(
   facesSize: i32
 ): Shape {
   const verts = new Array<Vec3 | null>();
-  const facesArray = new Array<Array<i32>>();
+  const facesArray: (Array<i32> | null)[] = [];
 
   for (let i = 0; i < vertices.length; i += 3) {
     verts.push(new Vec3(vertices[i], vertices[i + 1], vertices[i + 2]));
@@ -402,27 +402,22 @@ export function getHeightfieldConvexTrianglePillar(
   heightfield: Heightfield,
   xi: i32,
   yi: i32,
-  k: i32
+  k: boolean
 ): void {
-  return heightfield.getConvexTrianglePillar(xi, yi, k === 0);
+  return heightfield.getConvexTrianglePillar(xi, yi, k);
 }
 
-export function getHeightfieldPillarXAt(heightfield: Heightfield, i: i32): f32 {
-  return heightfield.pillarConvex.vertices[i]!.x;
-}
-
-export function getHeightfieldPillarYAt(heightfield: Heightfield, i: i32): f32 {
-  return heightfield.pillarConvex.vertices[i]!.y;
-}
-
-export function getHeightfieldPillarZAt(heightfield: Heightfield, i: i32): f32 {
-  return heightfield.pillarConvex.vertices[i]!.z;
+export function getHeightfieldPillarConvexAt(
+  heightfield: Heightfield,
+  i: i32
+): Vec3 {
+  return heightfield.pillarConvex.vertices[i]!;
 }
 
 export function getHeightfieldPillarOffset(heightfield: Heightfield): Vec3 {
   return heightfield.pillarOffset;
 }
 
-export function vec3VAdd(v: Vec3, w: Vec3): Vec3 {
-  return v.vadd(w);
+export function vec3VAdd(source: Vec3, v: Vec3, w: Vec3): Vec3 {
+  return source.vadd(v, w);
 }

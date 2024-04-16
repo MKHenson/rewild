@@ -32,7 +32,7 @@ export class ConvexPolyhedron extends Shape {
   /**
    * Array of integer arrays, indicating which vertices each face consists of
    */
-  faces: i32[][];
+  faces: (Array<i32> | null)[];
   /** faceNormals */
   faceNormals: (Vec3 | null)[];
   /** worldVertices */
@@ -58,7 +58,7 @@ export class ConvexPolyhedron extends Shape {
     /** An array of Vec3's */
     vertices: (Vec3 | null)[] = [],
     /** Array of integer arrays, describing which vertices that is included in each face. */
-    faces: i32[][] = [],
+    faces: (Array<i32> | null)[] = [],
     /** normals */
     normals: (Vec3 | null)[] = [],
     /** axes */
@@ -103,15 +103,15 @@ export class ConvexPolyhedron extends Shape {
 
     const edge = new Vec3();
 
-    for (let i: i32 = 0; i !== faces.length; i++) {
-      const face = faces[i];
+    for (let i: i32 = 0; i != faces.length; i++) {
+      const face = faces[i]!;
       const numVertices = face.length;
       for (let j = 0; j !== numVertices; j++) {
         const k = (j + 1) % numVertices;
         vertices[face[j]]!.vsub(vertices[face[k]]!, edge);
         edge.normalize();
         let found = false;
-        for (let p: i32 = 0; p !== edges.length; p++) {
+        for (let p: i32 = 0; p != edges.length; p++) {
           if (edges[p].almostEquals(edge) || edges[p].almostEquals(edge)) {
             found = true;
             break;
@@ -130,14 +130,15 @@ export class ConvexPolyhedron extends Shape {
    * Will reuse existing Vec3 objects in the `faceNormals` array if they exist.
    */
   computeNormals(): void {
-    this.faceNormals.length = this.faces.length;
+    const faces = this.faces;
+    this.faceNormals.length = faces.length;
 
     // Generate normals
     for (let i: i32 = 0; i < this.faces.length; i++) {
       // Check so all vertices exists for this face
-      for (let j = 0; j < this.faces[i].length; j++) {
-        if (!this.vertices[this.faces[i][j]]) {
-          throw new Error(`Vertex ${this.faces[i][j]} not found!`);
+      for (let j = 0; j < faces[i]!.length; j++) {
+        if (!this.vertices[faces[i]![j]]) {
+          throw new Error(`Vertex ${faces[i]![j]} not found!`);
         }
       }
 
@@ -146,15 +147,15 @@ export class ConvexPolyhedron extends Shape {
       this.getFaceNormal(i, n);
       n.negate(n);
       this.faceNormals[i] = n;
-      const vertex = this.vertices[this.faces[i][0]]!;
+      const vertex = this.vertices[faces[i]![0]]!;
       if (n.dot(vertex) < 0) {
         console.error(
           `.faceNormals[${i}] = Vec3(${n.toString()}) looks like it points into the shape? The vertices follow. Make sure they are ordered CCW around the normal, using the right hand rule.`
         );
-        for (let j: i32 = 0; j < this.faces[i].length; j++) {
+        for (let j: i32 = 0; j < faces[i]!.length; j++) {
           console.warn(
-            `.vertices[${this.faces[i][j]}] = Vec3(${this.vertices[
-              this.faces[i][j]
+            `.vertices[${faces[i]![j]}] = Vec3(${this.vertices[
+              faces[i]![j]
             ]!.toString()})`
           );
         }
@@ -166,7 +167,7 @@ export class ConvexPolyhedron extends Shape {
    * Compute the normal of a face from its vertices
    */
   getFaceNormal(i: i32, target: Vec3): void {
-    const f = this.faces[i];
+    const f = this.faces[i]!;
     const va = this.vertices[f[0]]!;
     const vb = this.vertices[f[1]]!;
     const vc = this.vertices[f[2]]!;
@@ -218,8 +219,8 @@ export class ConvexPolyhedron extends Shape {
 
     const worldVertsB1: Vec3[] = [];
 
-    for (let i: i32 = 0; i < hullB.faces[closestFaceB].length; i++) {
-      const b = hullB.vertices[hullB.faces[closestFaceB][i]]!;
+    for (let i: i32 = 0; i < hullB.faces[closestFaceB]!.length; i++) {
+      const b = hullB.vertices[hullB.faces[closestFaceB]![i]]!;
       const worldb = new Vec3();
       worldb.copy(b);
       quatB.vmult(worldb, worldb);
@@ -458,7 +459,7 @@ export class ConvexPolyhedron extends Shape {
    * @param face_i Index of the face
    */
   getPlaneConstantOfFace(face_i: i32): f32 {
-    const f = this.faces[face_i];
+    const f = this.faces[face_i]!;
     const n = this.faceNormals[face_i]!;
     const v = this.vertices[f[0]]!;
     const c = -n.dot(v);
@@ -511,14 +512,14 @@ export class ConvexPolyhedron extends Shape {
     }
 
     // Get the face and construct connected faces
-    const polyA = hullA.faces[closestFaceA];
+    const polyA = hullA.faces[closestFaceA]!;
     // polyA.connectedFaces = [];
     const connectedFaces: i32[] = [];
     for (let i: i32 = 0; i < hullA.faces.length; i++) {
-      for (let j = 0; j < hullA.faces[i].length; j++) {
+      for (let j = 0; j < hullA.faces[i]!.length; j++) {
         if (
           /* Sharing a vertex*/
-          polyA.indexOf(hullA.faces[i][j]) != -1 &&
+          polyA.indexOf(hullA.faces[i]![j]) != -1 &&
           /* Not the one we are looking for connections from */
           i != closestFaceA &&
           /* Not already added */
@@ -854,7 +855,7 @@ export class ConvexPolyhedron extends Shape {
 
     for (let i: i32 = 0; i < this.faces.length; i++) {
       let n = normals[i]!;
-      const v = verts[faces[i][0]]!; // We only need one point in the face
+      const v = verts[faces[i]![0]]!; // We only need one point in the face
 
       // This dot product determines which side of the edge the point is
       const vToP = new Vec3();
