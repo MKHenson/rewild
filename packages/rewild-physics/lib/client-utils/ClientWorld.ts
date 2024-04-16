@@ -25,6 +25,10 @@ export class ClientWorld extends EventDispatcher {
       null,
       undefined,
       undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
       physicsWasm.getWorldContactMaterial(this.ptr)
     );
   }

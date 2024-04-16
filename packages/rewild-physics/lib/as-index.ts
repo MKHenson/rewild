@@ -91,9 +91,22 @@ export function createContactMaterial(
   materialA: Material,
   materialB: Material,
   friction: f32 = -1,
-  restitution: f32 = -1
+  restitution: f32 = -1,
+  contactEquationStiffness: f32 = 1e7,
+  contactEquationRelaxation: f32 = 3,
+  frictionEquationStiffness: f32 = 1e7,
+  frictionEquationRelaxation: f32 = 3
 ): ContactMaterial {
-  return new ContactMaterial(materialA, materialB, friction, restitution);
+  return new ContactMaterial(
+    materialA,
+    materialB,
+    friction,
+    restitution,
+    contactEquationStiffness,
+    contactEquationRelaxation,
+    frictionEquationStiffness,
+    frictionEquationRelaxation
+  );
 }
 
 export function getBodyPosition(body: Body): Vec3 {

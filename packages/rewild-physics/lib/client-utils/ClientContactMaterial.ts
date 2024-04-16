@@ -11,11 +11,19 @@ export class ClientContactMaterial {
     materialB: ClientMaterial | null,
     friction: number = -1,
     restitution: number = -1,
+    contactEquationStiffness: f32 = 1e7,
+    contactEquationRelaxation: f32 = 3,
+    frictionEquationStiffness: f32 = 1e7,
+    frictionEquationRelaxation: f32 = 3,
     ptr: any = physicsWasm.createContactMaterial(
       materialA?.ptr,
       materialB?.ptr,
       friction,
-      restitution
+      restitution,
+      contactEquationStiffness,
+      contactEquationRelaxation,
+      frictionEquationStiffness,
+      frictionEquationRelaxation
     )
   ) {
     this.ptr = ptr;
