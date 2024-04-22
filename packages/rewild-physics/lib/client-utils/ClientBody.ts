@@ -1,6 +1,6 @@
 import { Vec3 } from '../math';
 import { ClientBodyOptions } from './ClientBodyOptions';
-import { ClientQuat } from './ClientQuat';
+import { ClientQuaternion } from './ClientQuat';
 import { ClientShape } from './ClientShape';
 import { ClientVec3 } from './ClientVec3';
 import { physicsWasm } from './WasmManager';
@@ -10,21 +10,31 @@ export class ClientBody {
   shapes: ClientShape[] = [];
   position: ClientVec3;
   velocity: ClientVec3;
-  quaternion: ClientQuat;
+  quaternion: ClientQuaternion;
   interpolatedPosition: ClientVec3;
-  interpolatedQuaternion: ClientQuat;
+  interpolatedQuaternion: ClientQuaternion;
 
   constructor(options: ClientBodyOptions) {
     this.ptr = physicsWasm.createBody(options.ptr);
     this.position = new ClientVec3(physicsWasm.getBodyPosition(this.ptr));
     this.velocity = new ClientVec3(physicsWasm.getBodyVelocity(this.ptr));
-    this.quaternion = new ClientQuat(physicsWasm.getBodyQuaternion(this.ptr));
+    this.quaternion = new ClientQuaternion(
+      physicsWasm.getBodyQuaternion(this.ptr)
+    );
     this.interpolatedPosition = new ClientVec3(
       physicsWasm.getBodyInterpolatedPosition(this.ptr)
     );
-    this.interpolatedQuaternion = new ClientQuat(
+    this.interpolatedQuaternion = new ClientQuaternion(
       physicsWasm.getBodyInterpolatedQuaternion(this.ptr)
     );
+  }
+
+  get linearDamping(): number {
+    return physicsWasm.getBodyLinearDamping(this.ptr);
+  }
+
+  set linearDamping(value: number) {
+    physicsWasm.setBodyLinearDamping(this.ptr, value);
   }
 
   get isTrigger(): boolean {
@@ -44,9 +54,9 @@ export class ClientBody {
     return new ClientVec3(vec3Ptr);
   }
 
-  getShapeOrientationAt(index: number): ClientQuat {
+  getShapeOrientationAt(index: number): ClientQuaternion {
     const quatPtr = physicsWasm.getBodyShapeOrientationAt(this.ptr, index);
-    return new ClientQuat(quatPtr);
+    return new ClientQuaternion(quatPtr);
   }
 
   addShape(shape: ClientShape, offset: Vec3 = new Vec3()): ClientBody {
