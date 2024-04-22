@@ -1,10 +1,10 @@
 import { physicsWasm } from './WasmManager';
 
-export class ClientQuat {
+export class ClientQuaternion {
   ptr: any;
 
-  constructor(ptr: any) {
-    this.ptr = ptr;
+  constructor(ptr?: any) {
+    this.ptr = ptr ? ptr : physicsWasm.createQuaternion();
   }
 
   get x(): number {
@@ -48,5 +48,15 @@ export class ClientQuat {
 
   setFromEuler(x: number, y: number, z: number): void {
     physicsWasm.setQuaternionFromEuler(this.ptr, x, y, z);
+  }
+
+  mult(quaternion: ClientQuaternion): ClientQuaternion {
+    return new ClientQuaternion(
+      physicsWasm.quatMultiply(this.ptr, quaternion.ptr)
+    );
+  }
+
+  copy(quaternion: ClientQuaternion): void {
+    physicsWasm.quatCopy(this.ptr, quaternion.ptr);
   }
 }

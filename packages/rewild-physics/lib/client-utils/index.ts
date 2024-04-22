@@ -8,7 +8,7 @@ export { ClientBodyOptions } from './ClientBodyOptions';
 export { ClientBody } from './ClientBody';
 export { ClientParticle } from './ClientParticle';
 export { ClientVec3 } from './ClientVec3';
-export { ClientQuat } from './ClientQuat';
+export { ClientQuaternion } from './ClientQuat';
 export { ClientMaterial } from './ClientMaterial';
 export { ClientConstraint } from './ClientConstraint';
 export { ClientConvexPolyhedron } from './ClientConvexPolyhedron';

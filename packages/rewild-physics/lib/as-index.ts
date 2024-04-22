@@ -92,6 +92,10 @@ export function createVec3(): Vec3 {
   return new Vec3();
 }
 
+export function createQuaternion(): Quaternion {
+  return new Quaternion();
+}
+
 export function getBoxConvexPolyhedronRepresentation(
   box: Shape
 ): ConvexPolyhedron {
@@ -323,6 +327,10 @@ export function setBodyPosition(body: Body, x: f32, y: f32, z: f32): void {
   body.position.set(x, y, z);
 }
 
+export function getBodyLinearDamping(body: Body): f32 {
+  return body.linearDamping;
+}
+
 export function setBodyLinearDamping(body: Body, damping: f32): void {
   body.linearDamping = damping;
 }
@@ -362,6 +370,18 @@ export function setQuaternionFromEuler(
   z: f32
 ): void {
   quat.setFromEuler(x, y, z);
+}
+
+export function quatCopy(source: Quaternion, target: Quaternion): void {
+  source.copy(target);
+}
+
+export function quatMultiply(
+  source: Quaternion,
+  quat: Quaternion,
+  target: Quaternion | null = null
+): Quaternion {
+  return source.mult(quat, target || new Quaternion());
 }
 
 export function setBodyVelocity(body: Body, x: f32, y: f32, z: f32): void {
