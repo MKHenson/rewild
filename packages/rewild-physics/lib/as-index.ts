@@ -401,6 +401,14 @@ export function setBodyMass(body: Body, mass: f32): void {
   body.mass = mass;
 }
 
+export function updateBodyMassProperties(body: Body): void {
+  body.updateMassProperties();
+}
+
+export function setBodyFixedRotation(body: Body, fixedRotation: boolean): void {
+  body.fixedRotation = fixedRotation;
+}
+
 export function getWorldSolver(world: World): Solver {
   return world.solver;
 }
@@ -473,4 +481,8 @@ export function getHeightfieldPillarOffset(heightfield: Heightfield): Vec3 {
 
 export function vec3VAdd(source: Vec3, v: Vec3, w: Vec3): Vec3 {
   return source.vadd(v, w);
+}
+
+export function setMaterialFriction(material: Material, friction: f32): void {
+  material.friction = friction;
 }

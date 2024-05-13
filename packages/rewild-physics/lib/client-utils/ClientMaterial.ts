@@ -10,4 +10,8 @@ export class ClientMaterial {
   ) {
     this.ptr = physicsWasm.createMaterial(name, friction, restitution);
   }
+
+  set friction(value: number) {
+    physicsWasm.setMaterialFriction(this.ptr, value);
+  }
 }

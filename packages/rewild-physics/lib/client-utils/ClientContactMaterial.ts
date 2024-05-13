@@ -31,7 +31,11 @@ export class ClientContactMaterial {
 
   set contactEquationStiffness(value: number) {
     this._contactEquationStiffness = value;
-    physicsWasm.setContactMaterialContactEquationData(this.ptr, value);
+    physicsWasm.setContactMaterialContactEquationData(
+      this.ptr,
+      value,
+      this._contactEquationRelaxation
+    );
   }
 
   get contactEquationStiffness(): number {
@@ -41,7 +45,7 @@ export class ClientContactMaterial {
   set contactEquationRelaxation(value: number) {
     physicsWasm.setContactMaterialContactEquationData(
       this.ptr,
-      undefined,
+      this._contactEquationStiffness,
       value
     );
     this._contactEquationRelaxation = value;

@@ -71,6 +71,15 @@ export class ClientBody {
     return this;
   }
 
+  set fixedRotation(value: boolean) {
+    physicsWasm.setBodyFixedRotation(this.ptr, value);
+  }
+
+  updateMassProperties(): ClientBody {
+    physicsWasm.updateBodyMassProperties(this.ptr);
+    return this;
+  }
+
   removeShape(shape: ClientShape): ClientBody {
     physicsWasm.removeShapeFromBody(this.ptr, shape.ptr);
     this.shapes = this.shapes.filter((s) => s !== shape);
