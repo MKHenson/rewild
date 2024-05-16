@@ -2,21 +2,36 @@ import { Constraint } from './constraints';
 import { ContactEquation } from './equations';
 import { ContactMaterial, Material } from './material';
 import { Quaternion, Vec3 } from './math';
-import { Body, BodyOptions } from './objects';
+import { Body, BodyOptions, Spring, SpringOptions } from './objects';
 import {
   Box,
   ConvexPolyhedron,
   Cylinder,
   Heightfield,
+  Particle,
   Plane,
   Shape,
   Sphere,
 } from './shapes';
 import { GSSolver, Solver, SplitSolver } from './solver';
 import { World } from './world';
+import { postStep } from './Imports';
+import { Event, Listener } from 'rewild-common';
+
+class CustomListener implements Listener {
+  onEvent(event: Event): void {
+    if (event.type === 'postStep') {
+      postStep();
+    }
+  }
+}
+
+const customListener = new CustomListener();
 
 export function createWorld(): World {
-  return new World();
+  const world = new World();
+  world.addEventListener('postStep', customListener);
+  return world;
 }
 
 export function stepWorld(
@@ -305,6 +320,10 @@ export function createShapeBox(x: f32, y: f32, z: f32): Shape {
   return new Box(new Vec3(x, y, z));
 }
 
+export function createShapeParticle(): Shape {
+  return new Particle();
+}
+
 export function createShapeSphere(radius: f32 = 1): Shape {
   return new Sphere(radius);
 }
@@ -485,4 +504,38 @@ export function vec3VAdd(source: Vec3, v: Vec3, w: Vec3): Vec3 {
 
 export function setMaterialFriction(material: Material, friction: f32): void {
   material.friction = friction;
+}
+
+export function createSpring(bodyA: Body, bodyB: Body): Spring {
+  return new Spring(bodyA, bodyB, new SpringOptions());
+}
+
+export function setSpringRestLength(spring: Spring, restLength: f32): void {
+  spring.restLength = restLength;
+}
+
+export function setSpringStiffness(spring: Spring, stiffness: f32): void {
+  spring.stiffness = stiffness;
+}
+
+export function setSpringDamping(spring: Spring, damping: f32): void {
+  spring.damping = damping;
+}
+
+export function setSpringLocalAnchorA(
+  spring: Spring,
+  localAnchorA: Vec3
+): void {
+  spring.localAnchorA = localAnchorA;
+}
+
+export function setSpringLocalAnchorB(
+  spring: Spring,
+  localAnchorB: Vec3
+): void {
+  spring.localAnchorB = localAnchorB;
+}
+
+export function applySpringForce(spring: Spring): void {
+  spring.applyForce();
 }

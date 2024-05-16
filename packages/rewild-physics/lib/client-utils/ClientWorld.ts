@@ -1,4 +1,4 @@
-import { EventDispatcher } from 'rewild-common';
+import { Event, EventDispatcher } from 'rewild-common';
 import { ClientBody } from './ClientBody';
 import { ClientVec3 } from './ClientVec3';
 import { physicsWasm } from './WasmManager';
@@ -19,6 +19,10 @@ export class ClientWorld extends EventDispatcher {
     this.ptr = physicsWasm.createWorld();
     this.gravity = new ClientVec3(physicsWasm.getWorldGravity(this.ptr));
     this.solver = new ClientSolver(this);
+
+    physicsWasm.postStep = () => {
+      this.dispatchEvent(new Event('postStep'));
+    };
 
     this.defaultContactMaterial = new ClientContactMaterial(
       null,

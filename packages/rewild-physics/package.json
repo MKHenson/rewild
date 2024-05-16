@@ -5,7 +5,6 @@
   "main": "./build/release.js",
   "type": "module",
   "types": "./build/release.d.ts",
-  "devDependencies": {},
   "scripts": {
     "clean": "rimraf build",
     "test": "echo \"No tests specified\" && exit 0",

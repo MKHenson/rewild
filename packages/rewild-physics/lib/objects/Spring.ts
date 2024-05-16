@@ -98,7 +98,11 @@ export class Spring {
    */
   localAnchorB: Vec3;
 
-  constructor(bodyA: Body, bodyB: Body, options = new SpringOptions()) {
+  constructor(
+    bodyA: Body,
+    bodyB: Body,
+    options: SpringOptions = new SpringOptions()
+  ) {
     this.restLength = options.restLength;
     this.stiffness = options.stiffness;
     this.damping = options.damping;
@@ -114,10 +118,10 @@ export class Spring {
       this.localAnchorB.copy(options.localAnchorB);
     }
     if (options.worldAnchorA) {
-      this.setWorldAnchorA(options.worldAnchorA);
+      this.setWorldAnchorA(options.worldAnchorA!);
     }
     if (options.worldAnchorB) {
-      this.setWorldAnchorB(options.worldAnchorB);
+      this.setWorldAnchorB(options.worldAnchorB!);
     }
   }
 
