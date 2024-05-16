@@ -504,7 +504,7 @@ export class Body extends EventDispatcher {
   /**
    * Convert a world point to local body frame.
    */
-  pointToLocalFrame(worldPoint: Vec3, result = new Vec3()): Vec3 {
+  pointToLocalFrame(worldPoint: Vec3, result: Vec3 = new Vec3()): Vec3 {
     worldPoint.vsub(this.position, result);
     this.quaternion.conjugate().vmult(result, result);
     return result;
@@ -513,7 +513,7 @@ export class Body extends EventDispatcher {
   /**
    * Convert a world vector to local body frame.
    */
-  vectorToLocalFrame(worldVector: Vec3, result = new Vec3()): Vec3 {
+  vectorToLocalFrame(worldVector: Vec3, result: Vec3 = new Vec3()): Vec3 {
     this.quaternion.conjugate().vmult(worldVector, result);
     return result;
   }
@@ -521,7 +521,7 @@ export class Body extends EventDispatcher {
   /**
    * Convert a local body point to world frame.
    */
-  pointToWorldFrame(localPoint: Vec3, result = new Vec3()): Vec3 {
+  pointToWorldFrame(localPoint: Vec3, result: Vec3 = new Vec3()): Vec3 {
     this.quaternion.vmult(localPoint, result);
     result.vadd(this.position, result);
     return result;
@@ -530,7 +530,7 @@ export class Body extends EventDispatcher {
   /**
    * Convert a local body point to world frame.
    */
-  vectorToWorldFrame(localVector: Vec3, result = new Vec3()): Vec3 {
+  vectorToWorldFrame(localVector: Vec3, result: Vec3 = new Vec3()): Vec3 {
     this.quaternion.vmult(localVector, result);
     return result;
   }

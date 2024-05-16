@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>cannon.js - spring demo</title>
+    <link rel="stylesheet" href="css/style.css" type="text/css" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+    />
+  </head>
+  <body>
+    <script src="../build/index_bundle.js"></script>
+    <script type="module">
+      await CANNON.initializeWasm();
+      import { Demo } from './js/WasmDemo.js';
+
+      const demo = new Demo();
+
+      demo.addScene('Flat box', () => {
+        const world = setupWorld(demo);
+
+        const size = 1;
+
+        // Create a static sphere
+        const sphereShape = new CANNON.ClientSphere(0.1);
+        const sphereBody = new CANNON.ClientBody(
+          new CANNON.ClientBodyOptions().setMass(0)
+        );
+        sphereBody.addShape(sphereShape);
+        world.addBody(sphereBody);
+        demo.addVisual(sphereBody);
+
+        // Create a box body
+        const boxShape = new CANNON.ClientBox(size, size, size * 0.3);
+        const boxBody = new CANNON.ClientBody(
+          new CANNON.ClientBodyOptions().setMass(5)
+        );
+        boxBody.addShape(boxShape);
+        boxBody.position.set(size, -size, 0);
+        world.addBody(boxBody);
+        demo.addVisual(boxBody);
+
+        const spring = new CANNON.ClientSpring(boxBody, sphereBody);
+        spring.setlocalAnchorA(new CANNON.ClientVec3().set(-size, size, 0));
+        spring.setlocalAnchorB(new CANNON.ClientVec3().set(0, 0, 0));
+        spring.setRestLength(0);
+        spring.setStiffness(50);
+        spring.setDamping(1);
+
+        // Compute the force after each step
+        world.addEventListener('postStep', {
+          onEvent: (event) => {
+            spring.applyForce();
+          },
+        });
+      });
+
+      demo.start();
+
+      function setupWorld(demo) {
+        const world = demo.getWorld();
+        world.gravity.set(0, -10, 0);
+
+        return world;
+      }
+    </script>
+  </body>
+</html>

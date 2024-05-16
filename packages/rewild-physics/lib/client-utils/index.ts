@@ -15,4 +15,5 @@ export { ClientConvexPolyhedron } from './ClientConvexPolyhedron';
 export { ClientSolver } from './ClientSolver';
 export { ClientHeightfield } from './ClientHeightfield';
 export { ClientCylinder } from './ClientCylinder';
+export { ClientSpring } from './ClientSpring';
 export { WasmManager, physicsWasm, initializeWasm } from './WasmManager';

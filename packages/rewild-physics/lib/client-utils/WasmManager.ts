@@ -6,6 +6,7 @@ export type Wasm = typeof __AdaptedExports & {
   getUint32Array: (pointer: Number) => Uint32Array;
   getInt32Array: (pointer: Number) => Int32Array;
   readString: (pointer: number) => string | null;
+  postStep?: () => void;
 };
 
 export let wasmManager: WasmManager;
@@ -63,6 +64,9 @@ export class WasmManager {
 
     const bindings: any = {
       performanceNow: () => performance.now(),
+      postStep: () => {
+        if (physicsWasm.postStep) physicsWasm.postStep();
+      },
     };
 
     for (const bindable of bindables)
@@ -71,7 +75,7 @@ export class WasmManager {
     const obj = (await instantiate(
       await WebAssembly.compileStreaming(fetch('../build/release.wasm')),
       {
-        // Imports: bindings,
+        Imports: bindings,
         env: {
           memory: this.memory,
         },
