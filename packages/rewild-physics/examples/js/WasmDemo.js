@@ -36,7 +36,7 @@ class Demo extends EventDispatcher {
 
     // Global settings
     this.settings = {
-      stepFrequency: 60,
+      stepFrequency: 180,
       quatNormalizeSkip: 2,
       quatNormalizeFast: true,
       gx: 0,

@@ -31,7 +31,7 @@ class PhysicsManager {
 
   update(): void {
     // Step world
-    const timeStep: f32 = 1.0 / 60.0;
+    const timeStep: f32 = 1.0 / 180.0;
     const now = f32(performanceNow() / 1000);
 
     if (!this.lastCallTime) {

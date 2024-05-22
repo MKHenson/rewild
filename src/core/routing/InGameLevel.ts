@@ -24,8 +24,14 @@ export class InGameLevel extends Level {
 
   mount(): void {
     super.mount();
-    if (this.player) this.parentObject3D.add(this.player);
+    if (this.player) {
+      this.player.setPosition(0, 0, -10);
+      this.parentObject3D.add(this.player);
+      this.player.camera.lookAt(0, 0, 0);
+    }
   }
+
+  onUpdate(delta: number, total: number): void {}
 
   unMount(): void {
     super.unMount();

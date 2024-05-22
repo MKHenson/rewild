@@ -475,7 +475,7 @@ export class World extends EventDispatcher {
    *     // Run the simulation independently of framerate every 1 / 60 ms
    *     world.fixedStep()
    */
-  fixedStep(dt: f32 = 1 / 60, maxSubSteps: i32 = 10): void {
+  fixedStep(dt: f32 = 1 / 180, maxSubSteps: i32 = 10): void {
     const time = performance.now() / 1000; // seconds
     if (!this.lastCallTime) {
       this.step(dt, undefined, maxSubSteps);
