@@ -28,3 +28,6 @@ service-account-credentials.json
 **/firebase-debug.log
 **/pubsub-debug.log
 **/tsconfig-compile.json
+
+# Rust specific code
+target/
