@@ -1,5 +1,5 @@
 use assembly::run;
 
 fn main() {
-    run();
+    pollster::block_on(run());
 }

@@ -1,0 +1,20 @@
+{
+  "name": "assembly",
+  "version": "0.0.1",
+  "description": "The assembly engine running the scene graph updates",
+  "devDependencies": {},
+  "scripts": {
+    "start": "cargo run",
+    "build-web": "wasm-pack build --target web"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Webinate/rewild.git"
+  },
+  "author": "Mathew Henson",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Webinate/rewild/issues"
+  },
+  "homepage": "https://github.com/Webinate/rewild#readme"
+}
