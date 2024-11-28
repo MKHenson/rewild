@@ -7,6 +7,7 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::WindowBuilder,
 };
+mod camera_controller;
 mod texture;
 
 #[cfg(target_arch = "wasm32")]
