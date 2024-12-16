@@ -1,5 +1,9 @@
+mod camera;
+mod gui;
+mod renderer;
 mod state;
 
+use renderer::Renderer;
 use state::State;
 use winit::{
     event::*,
@@ -47,8 +51,11 @@ pub async fn run() {
         let _ = window.request_inner_size(PhysicalSize::new(450, 400));
     }
 
+    let mut renderer = Renderer::new(&window).await;
+
     // State::new uses async code, so we're going to wait for it to finish
-    let mut state = State::new(&window).await;
+    let state = State::new(&renderer).await;
+    renderer.state = Some(state);
     let mut surface_configured = false;
 
     event_loop
@@ -57,8 +64,8 @@ pub async fn run() {
                 Event::WindowEvent {
                     ref event,
                     window_id,
-                } if window_id == state.window().id() => {
-                    if !state.input(event) {
+                } if window_id == renderer.window().id() => {
+                    if !renderer.input(event) {
                         // UPDATED!
                         match event {
                             WindowEvent::CloseRequested
@@ -74,23 +81,23 @@ pub async fn run() {
                             WindowEvent::Resized(physical_size) => {
                                 log::info!("physical_size: {physical_size:?}");
                                 surface_configured = true;
-                                state.resize(*physical_size);
+                                renderer.resize(*physical_size);
                             }
                             WindowEvent::RedrawRequested => {
                                 // This tells winit that we want another frame after this one
-                                state.window().request_redraw();
+                                renderer.window().request_redraw();
 
                                 if !surface_configured {
                                     return;
                                 }
 
-                                state.update();
-                                match state.render() {
+                                renderer.update();
+                                match renderer.render() {
                                     Ok(_) => {}
                                     // Reconfigure the surface if it's lost or outdated
                                     Err(
                                         wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated,
-                                    ) => state.resize(state.size),
+                                    ) => renderer.resize(renderer.size),
                                     // The system is out of memory, we should probably quit
                                     Err(wgpu::SurfaceError::OutOfMemory) => {
                                         log::error!("OutOfMemory");
@@ -135,11 +142,10 @@ impl Vertex {
 
 #[rustfmt::skip]
 const VERTICES: &[Vertex] = &[
-    Vertex { position: [-0.0868241, 0.49240386, 0.0], tex_coords: [0.4131759, 0.99240386], }, // A
-    Vertex { position: [-0.49513406, 0.06958647, 0.0], tex_coords: [0.0048659444, 0.56958647], }, // B
-    Vertex { position: [-0.21918549, -0.44939706, 0.0], tex_coords: [0.28081453, 0.05060294], }, // C
-    Vertex { position: [0.35966998, -0.3473291, 0.0], tex_coords: [0.85967, 0.1526709], }, // D
-    Vertex { position: [0.44147372, 0.2347359, 0.0], tex_coords: [0.9414737, 0.7347359], }, // E
+    Vertex { position: [0.0, 0.0, 0.0], tex_coords: [0.0, 0.0], }, // A
+    Vertex { position: [1.0, 0.0, 0.0], tex_coords: [1.0, 0.0], }, // B
+    Vertex { position: [0.0, 1.0, 0.0], tex_coords: [0.0, 1.0], }, // C
+    Vertex { position: [1.0, 1.0, 0.0], tex_coords: [1.0, 1.0], }, // D
 ];
 
-const INDICES: &[u16] = &[0, 1, 4, 1, 2, 4, 2, 3, 4];
+const INDICES: &[u16] = &[2, 1, 0, 2, 3, 1];

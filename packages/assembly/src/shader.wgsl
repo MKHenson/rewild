@@ -22,6 +22,13 @@ fn vs_main(
     var out: VertexOutput;
     out.tex_coords = model.tex_coords;
     out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0); // 2.
+    
+    // Transform the Normalized Device Coordinates for webgpu
+    out.clip_position = vec4<f32>(
+        model.position.x * 2.0 - 1.0,
+        1.0 - model.position.y * 2.0,
+        model.position.z, 1.0
+    );
     return out;
 }
 

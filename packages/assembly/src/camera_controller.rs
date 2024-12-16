@@ -1,8 +1,9 @@
-use crate::state::Camera;
 use winit::{
     event::*,
     keyboard::{KeyCode, PhysicalKey},
 };
+
+use crate::camera::Camera;
 
 pub struct CameraController {
     speed: f32,
