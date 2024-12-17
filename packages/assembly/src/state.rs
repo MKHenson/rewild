@@ -7,8 +7,10 @@ use winit::event::*;
 
 use crate::camera::Camera;
 use crate::camera_controller::CameraController;
+use crate::geometry::vertex::Vertex;
+use crate::geometry::Geometry;
 use crate::renderer::Renderer;
-use crate::{texture, Vertex, INDICES, VERTICES};
+use crate::texture;
 
 // We need this for Rust to store our data correctly for the shaders
 #[repr(C)]
@@ -33,6 +35,18 @@ impl CameraUniform {
     }
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct GuiElementUniform {
+    // We can't use cgmath with bytemuck directly, so we'll have
+    // to convert the Matrix4 into a 4x4 f32 array
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    pub radius: f32,
+}
+
 #[rustfmt::skip]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0,
@@ -42,27 +56,18 @@ pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
 );
 
 pub struct State {
-    // surface: wgpu::Surface<'a>,
-    // device: wgpu::Device,
-    // queue: wgpu::Queue,
-    // config: wgpu::SurfaceConfiguration,
-    // pub size: winit::dpi::PhysicalSize<u32>,
     pub render_pipeline: wgpu::RenderPipeline,
-    pub vertex_buffer: wgpu::Buffer,
-    pub index_buffer: wgpu::Buffer,
-    pub num_indices: u32,
     pub camera_controller: CameraController,
     pub diffuse_bind_group: wgpu::BindGroup,
-    pub diffuse_texture: texture::Texture,
-    // The window must be declared after the surface so
-    // it gets dropped after it as the surface contains
-    // unsafe references to the window's resources.
-    // window: &'a Window,
-    // cursor_x: f64,
+    // pub diffuse_texture: texture::Texture,
+    pub geometry: Geometry,
     pub camera: Camera,
     pub camera_uniform: CameraUniform,
+    pub gui_element_uniform: GuiElementUniform,
     pub camera_buffer: wgpu::Buffer,
+    pub gui_element_buffer: wgpu::Buffer,
     pub camera_bind_group: wgpu::BindGroup,
+    pub gui_element_bind_group: wgpu::BindGroup,
 }
 
 impl State {
@@ -89,9 +94,23 @@ impl State {
         let mut camera_uniform = CameraUniform::new();
         camera_uniform.update_view_proj(&camera);
 
+        let gui_element_uniform = GuiElementUniform {
+            x: 0.0,
+            y: 0.0,
+            width: 0.5,
+            height: 0.5,
+            radius: 0.05,
+        };
+
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
             contents: bytemuck::cast_slice(&[camera_uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let gui_element_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Gui Element Buffer"),
+            contents: bytemuck::cast_slice(&[gui_element_uniform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -119,19 +138,31 @@ impl State {
             label: Some("camera_bind_group"),
         });
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
+        let gui_element_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+                label: Some("gui_element_bind_group_layout"),
+            });
+
+        let gui_element_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &gui_element_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: gui_element_buffer.as_entire_binding(),
+            }],
+            label: Some("gui_element_bind_group"),
         });
 
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(&INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-
-        let num_indices = INDICES.len() as u32;
+        let geometry = Geometry::new(device);
 
         let shader = device.create_shader_module(ShaderModuleDescriptor {
             label: Some("Shader"),
@@ -186,7 +217,11 @@ impl State {
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[&texture_bind_group_layout, &camera_bind_group_layout],
+                bind_group_layouts: &[
+                    &texture_bind_group_layout,
+                    &camera_bind_group_layout,
+                    &gui_element_bind_group_layout,
+                ],
                 push_constant_ranges: &[],
             });
 
@@ -235,14 +270,14 @@ impl State {
             camera,
             camera_uniform,
             camera_buffer,
+            gui_element_buffer,
             camera_bind_group,
+            gui_element_uniform,
+            gui_element_bind_group,
             camera_controller,
-            num_indices,
             render_pipeline,
-            vertex_buffer,
             diffuse_bind_group,
-            diffuse_texture,
-            index_buffer,
+            geometry,
         }
     }
 
@@ -261,14 +296,22 @@ impl State {
             0,
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
+
+        queue.write_buffer(
+            &self.gui_element_buffer,
+            0,
+            bytemuck::cast_slice(&[self.gui_element_uniform]),
+        );
     }
 
     pub fn render(&self, render_pass: &mut RenderPass) {
+        let geometry = &self.geometry;
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
         render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+        render_pass.set_bind_group(2, &self.gui_element_bind_group, &[]);
+        render_pass.set_vertex_buffer(0, geometry.vertex_buffer.slice(..));
+        render_pass.set_index_buffer(geometry.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        render_pass.draw_indexed(0..geometry.num_indices, 0, 0..1);
     }
 }
