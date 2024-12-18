@@ -4,10 +4,8 @@ struct CameraUniform {
 };
 
 struct GUIElementUniform {
-    x: f32,
-    y: f32,
-    width: f32,
-    height: f32,
+    position:vec2<f32>,
+    size:vec2<f32>,
     radius: f32
 };
 
@@ -53,9 +51,9 @@ fn vs_main(
         vec2<f32>(1.0, 1.0)
     ); 
 
-    let pos = positions[vertex_index] * vec2<f32>(gui_element.width, gui_element.height) + vec2<f32>(gui_element.x, gui_element.y);
+    let pos = positions[vertex_index] * gui_element.size + gui_element.position;
     out.clip_position = vec4<f32>(pos.x * 2.0 - 1.0, 1.0 - pos.y * 2.0, model.position.z, 1.0);
-    out.local_position = positions[vertex_index] * vec2<f32>(gui_element.width, gui_element.height); // Pass local position to fragment shader
+    out.local_position = positions[vertex_index] * gui_element.size; // Pass local position to fragment shader
     
     return out;
 }
@@ -67,21 +65,23 @@ var t_diffuse: texture_2d<f32>;
 @group(0) @binding(1)
 var s_diffuse: sampler;
 
+@group(2) @binding(1)
+var<uniform> window_size: vec2<f32>;
+
 @fragment 
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let radius = gui_element.radius;
-    let size = vec2<f32>(gui_element.width, gui_element.height);
+    let normalized_radius = gui_element.radius / min(window_size.x, window_size.y);
 
-   // Calculate the distance from the fragment to the nearest corner
+    // Calculate the distance from the fragment to the nearest corner
     let corner_dist = vec2<f32>(
-        min(in.local_position.x, size.x - in.local_position.x),
-        min(in.local_position.y, size.y - in.local_position.y)
+        min(in.local_position.x, gui_element.size.x - in.local_position.x),
+        min(in.local_position.y, gui_element.size.y - in.local_position.y)
     );
 
     // Check if the fragment is outside the rounded corner radius
-    if corner_dist.x < radius && corner_dist.y < radius {
-        let dist = length(corner_dist - vec2<f32>(radius, radius));
-        if dist > radius {
+    if corner_dist.x < normalized_radius && corner_dist.y < normalized_radius {
+        let dist = length(corner_dist - vec2<f32>(normalized_radius, normalized_radius));
+        if dist > normalized_radius {
             discard;
         }
     }

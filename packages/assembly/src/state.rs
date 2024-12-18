@@ -45,6 +45,7 @@ pub struct GuiElementUniform {
     pub width: f32,
     pub height: f32,
     pub radius: f32,
+    _padding: f32,
 }
 
 #[rustfmt::skip]
@@ -66,8 +67,10 @@ pub struct State {
     pub gui_element_uniform: GuiElementUniform,
     pub camera_buffer: wgpu::Buffer,
     pub gui_element_buffer: wgpu::Buffer,
+    pub window_size_buffer: wgpu::Buffer,
     pub camera_bind_group: wgpu::BindGroup,
     pub gui_element_bind_group: wgpu::BindGroup,
+    pub window_size: [f32; 2],
 }
 
 impl State {
@@ -99,7 +102,8 @@ impl State {
             y: 0.0,
             width: 0.5,
             height: 0.5,
-            radius: 0.05,
+            radius: 20.0,
+            _padding: 0.0,
         };
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -111,6 +115,13 @@ impl State {
         let gui_element_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Gui Element Buffer"),
             contents: bytemuck::cast_slice(&[gui_element_uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let window_size = [size.width as f32, size.height as f32];
+        let window_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Window Size Buffer"),
+            contents: bytemuck::cast_slice(&window_size),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -140,25 +151,43 @@ impl State {
 
         let gui_element_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
                     },
-                    count: None,
-                }],
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
                 label: Some("gui_element_bind_group_layout"),
             });
 
         let gui_element_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &gui_element_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: gui_element_buffer.as_entire_binding(),
-            }],
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: gui_element_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: window_size_buffer.as_entire_binding(),
+                },
+            ],
             label: Some("gui_element_bind_group"),
         });
 
@@ -271,6 +300,7 @@ impl State {
             camera_uniform,
             camera_buffer,
             gui_element_buffer,
+            window_size_buffer,
             camera_bind_group,
             gui_element_uniform,
             gui_element_bind_group,
@@ -278,6 +308,7 @@ impl State {
             render_pipeline,
             diffuse_bind_group,
             geometry,
+            window_size,
         }
     }
 
@@ -301,6 +332,12 @@ impl State {
             &self.gui_element_buffer,
             0,
             bytemuck::cast_slice(&[self.gui_element_uniform]),
+        );
+
+        queue.write_buffer(
+            &self.window_size_buffer,
+            0,
+            bytemuck::cast_slice(&self.window_size),
         );
     }
 

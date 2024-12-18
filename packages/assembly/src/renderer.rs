@@ -103,6 +103,8 @@ impl<'a> Renderer<'a> {
         self.config.width = size.width;
         self.config.height = size.height;
         self.surface.configure(&self.device, &self.config);
+        let state = self.state.as_mut().unwrap();
+        state.window_size = [size.width as f32, size.height as f32];
     }
 
     #[allow(unused_variables)]
