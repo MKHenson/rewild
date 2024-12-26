@@ -5,6 +5,7 @@ mod material;
 mod renderer;
 mod state;
 
+use gui::gui_renderer::GuiRenderer;
 use renderer::Renderer;
 use state::State;
 use winit::{
@@ -57,7 +58,11 @@ pub async fn run() {
 
     // State::new uses async code, so we're going to wait for it to finish
     let state = State::new(&renderer).await;
+    let gui_renderer = GuiRenderer::new(&renderer);
+
     renderer.state = Some(state);
+    renderer.gui_renderer = Some(gui_renderer);
+
     let mut surface_configured = false;
 
     event_loop

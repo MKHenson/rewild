@@ -43,7 +43,7 @@ pub struct GuiElementUniform {
     pub width: f32,
     pub height: f32,
     pub radius: f32,
-    _padding: f32,
+    pub _padding: f32,
 }
 
 #[rustfmt::skip]

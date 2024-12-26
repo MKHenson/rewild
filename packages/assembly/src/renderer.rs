@@ -1,4 +1,4 @@
-use crate::state::State;
+use crate::{gui::gui_renderer::GuiRenderer, state::State};
 use std::iter;
 use winit::{event::*, window::Window};
 
@@ -13,6 +13,7 @@ pub struct Renderer<'a> {
     // unsafe references to the window's resources.
     window: &'a Window,
     pub state: Option<State>,
+    pub gui_renderer: Option<GuiRenderer>,
 }
 
 impl<'a> Renderer<'a> {
@@ -91,6 +92,7 @@ impl<'a> Renderer<'a> {
             size,
             window,
             state: None,
+            gui_renderer: None,
         };
     }
 
@@ -105,6 +107,9 @@ impl<'a> Renderer<'a> {
         self.surface.configure(&self.device, &self.config);
         let state = self.state.as_mut().unwrap();
         state.window_size = [size.width as f32, size.height as f32];
+
+        let gui_renderer = self.gui_renderer.as_mut().unwrap();
+        gui_renderer.window_size = [size.width as f32, size.height as f32];
     }
 
     #[allow(unused_variables)]
@@ -128,7 +133,10 @@ impl<'a> Renderer<'a> {
     pub fn update(&mut self) {
         // update the state and pass the renderer to it
         let state = self.state.as_mut().unwrap();
+        let gui_renderer = self.gui_renderer.as_mut().unwrap();
+
         state.update(&self.queue);
+        gui_renderer.update(&self.queue);
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -165,8 +173,10 @@ impl<'a> Renderer<'a> {
             });
 
             let state = self.state.as_ref().unwrap();
-
             state.render(&mut render_pass);
+
+            let gui_renderer = self.gui_renderer.as_ref().unwrap();
+            gui_renderer.render(&mut render_pass);
 
             // render_pass.set_pipeline(&state.render_pipeline);
             // render_pass.set_bind_group(0, &state.diffuse_bind_group, &[]);
