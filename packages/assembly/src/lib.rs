@@ -1,6 +1,7 @@
 mod camera;
 mod geometry;
 mod gui;
+mod material;
 mod renderer;
 mod state;
 

@@ -1,14 +1,12 @@
 use wgpu::util::DeviceExt;
-use wgpu::{
-    PrimitiveTopology, Queue, RenderPass, RenderPipelineDescriptor, ShaderModuleDescriptor,
-    ShaderSource,
-};
+use wgpu::{PrimitiveTopology, Queue, RenderPass, RenderPipelineDescriptor};
 use winit::event::*;
 
 use crate::camera::Camera;
 use crate::camera_controller::CameraController;
 use crate::geometry::vertex::Vertex;
 use crate::geometry::Geometry;
+use crate::material::shader::Shader;
 use crate::renderer::Renderer;
 use crate::texture;
 
@@ -193,10 +191,12 @@ impl State {
 
         let geometry = Geometry::new(device);
 
-        let shader = device.create_shader_module(ShaderModuleDescriptor {
-            label: Some("Shader"),
-            source: ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
-        });
+        let regular_shader = Shader::new(
+            device,
+            include_str!("material/shaders/shader.wgsl"),
+            "vs_main",
+            "fs_main",
+        );
 
         let diffuse_bytes = include_bytes!("disturb.jpg");
         let diffuse_texture =
@@ -259,14 +259,14 @@ impl State {
             cache: None,
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: "vs_main",
+                module: &regular_shader.shader_module,
+                entry_point: &regular_shader.vertex_entry_point,
                 buffers: &[Vertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: "fs_main",
+                module: &regular_shader.shader_module,
+                entry_point: &regular_shader.fragment_entry_point,
                 targets: &[Some(wgpu::ColorTargetState {
                     format: renderer.config.format,
                     blend: Some(wgpu::BlendState::REPLACE),
