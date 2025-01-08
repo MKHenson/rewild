@@ -1,0 +1,23 @@
+{
+  "name": "rewild-renderer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.ts",
+  "devDependencies": {},
+  "scripts": {
+    "clean": "rimraf build",
+    "build-all": "npm run clean && tsc",
+    "build": "npm run build-all",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Webinate/rewild.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Webinate/rewild/issues"
+  },
+  "homepage": "https://github.com/Webinate/rewild#readme"
+}

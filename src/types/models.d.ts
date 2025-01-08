@@ -4,7 +4,8 @@ declare module 'models' {
     | 'ribbon'
     | 'scene-graph'
     | 'project-settings'
-    | 'actors';
+    | 'actors'
+    | 'viewport';
   import { LoaderPresetType } from 'src/core/loader-utils/LoaderPresets';
   import type { Timestamp } from 'firebase/firestore';
   import type { IconType } from 'rewild-ui';
