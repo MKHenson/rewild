@@ -1,11 +1,11 @@
 /// <reference path="../../types.d.ts" />
 
-declare module "*.wasm" {
+declare module '*.wasm' {
   const content: string;
   export default content;
 }
 
-declare module "*.html" {
+declare module '*.html' {
   const content: string;
   export default content;
 }

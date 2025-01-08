@@ -1,8 +1,8 @@
-import { Component, register } from "../Component";
-import { theme } from "../theme";
+import { Component, register } from '../Component';
+import { theme } from '../theme';
 
-export type ButtonVariant = "contained" | "outlined" | "text";
-export type ButtonColor = "primary" | "secondary" | "error";
+export type ButtonVariant = 'contained' | 'outlined' | 'text';
+export type ButtonColor = 'primary' | 'secondary' | 'error';
 
 interface Props {
   disabled?: boolean;
@@ -11,23 +11,29 @@ interface Props {
   fullWidth?: boolean;
   onClick?: (e: MouseEvent) => void;
   class?: string;
+  id?: string;
 }
 
-@register("x-button")
+@register('x-button')
 export class Button extends Component<Props> {
   init() {
     if (this.props.onClick) this.onclick = this.props.onClick;
     const elm = <slot></slot>;
 
     return () => {
-      this.toggleAttribute("fullwidth", this.props.fullWidth || false);
-      this.toggleAttribute("disabled", this.props.disabled || false);
-      this.className = `${this.props.class || ""} ${
-        this.props.variant || "contained"
-      } ${this.props.color || "primary"}`;
+      this.setAttribute('id', this.props.id || '');
+      this.toggleAttribute('fullwidth', this.props.fullWidth || false);
+      this.toggleAttribute('disabled', this.props.disabled || false);
+      this.className = `${this.props.class || ''} ${
+        this.props.variant || 'contained'
+      } ${this.props.color || 'primary'}`;
 
       return elm;
     };
+  }
+
+  set disabled(val: boolean) {
+    this.props = { ...this.props, disabled: val };
   }
 
   getStyle() {

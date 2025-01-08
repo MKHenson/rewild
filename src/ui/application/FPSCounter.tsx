@@ -12,7 +12,8 @@ const end = (elm: HTMLElement) => {
     const value = (frameCount * 1000) / (time - prevTime);
     min = Math.min(min, value);
     max = Math.max(max, value);
-    elm.textContent = round(value) + " " + name + " (" + round(min) + "-" + round(max) + ")";
+    elm.textContent =
+      round(value) + ' ' + name + ' (' + round(min) + '-' + round(max) + ')';
 
     prevTime = time;
     frameCount = 0;

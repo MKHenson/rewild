@@ -1,11 +1,16 @@
-import { initializeApp, FirebaseOptions } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-import { getAuth } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
-import { auth as UIAuth } from "firebaseui";
-import { collection, QueryDocumentSnapshot, DocumentData, SnapshotOptions } from "firebase/firestore";
-import { IProject, ILevel } from "models";
-import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import { initializeApp, FirebaseOptions } from 'firebase/app';
+import { getAnalytics } from 'firebase/analytics';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { auth as UIAuth } from 'firebaseui';
+import {
+  collection,
+  QueryDocumentSnapshot,
+  DocumentData,
+  SnapshotOptions,
+} from 'firebase/firestore';
+import { IProject, ILevel } from 'models';
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -13,17 +18,17 @@ import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig: FirebaseOptions = {
-  apiKey: "AIzaSyBZduJ1GmPdMR2TBqV0ukBkeqG91vlP9Lg",
-  authDomain: "rewild-96f5b.firebaseapp.com",
-  projectId: "rewild-96f5b",
-  storageBucket: "rewild-96f5b.appspot.com",
-  messagingSenderId: "790922805889",
-  appId: "1:790922805889:web:13bbff536b49f6200c8380",
-  measurementId: "G-5JW3NFQVC1",
+  apiKey: 'AIzaSyBZduJ1GmPdMR2TBqV0ukBkeqG91vlP9Lg',
+  authDomain: 'rewild-96f5b.firebaseapp.com',
+  projectId: 'rewild-96f5b',
+  storageBucket: 'rewild-96f5b.appspot.com',
+  messagingSenderId: '790922805889',
+  appId: '1:790922805889:web:13bbff536b49f6200c8380',
+  measurementId: 'G-5JW3NFQVC1',
 };
 
-if (location.hostname === "127.0.0.1") {
-  firebaseConfig.databaseURL = "http://localhost:8080?ns=emulatorui";
+if (location.hostname === '127.0.0.1') {
+  firebaseConfig.databaseURL = 'http://localhost:8080?ns=emulatorui';
 }
 
 // Initialize Firebase
@@ -34,17 +39,22 @@ export const authUI = new UIAuth.AuthUI(auth);
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
 
-if (location.hostname === "127.0.0.1") {
-  connectFirestoreEmulator(db, "localhost", 8080);
-  connectFunctionsEmulator(functions, "localhost", 5002);
+if (location.hostname === '127.0.0.1') {
+  connectFirestoreEmulator(db, 'localhost', 8080);
+  connectFunctionsEmulator(functions, 'localhost', 5002);
 }
 
 const converter = <T>() => ({
   toFirestore: (data: T) => data,
-  fromFirestore: (snapshot: QueryDocumentSnapshot<DocumentData>, options?: SnapshotOptions) => snapshot.data() as T,
+  fromFirestore: (
+    snapshot: QueryDocumentSnapshot<DocumentData>,
+    options?: SnapshotOptions
+  ) => snapshot.data() as T,
 });
 
 export const dbs = {
-  projects: collection(db, "projects").withConverter<IProject>(converter<IProject>()),
-  levels: collection(db, "levels").withConverter<ILevel>(converter<ILevel>()),
+  projects: collection(db, 'projects').withConverter<IProject>(
+    converter<IProject>()
+  ),
+  levels: collection(db, 'levels').withConverter<ILevel>(converter<ILevel>()),
 };

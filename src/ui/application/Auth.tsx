@@ -1,25 +1,28 @@
-import { authUI } from "../../firebase";
-import { EmailAuthProvider, GoogleAuthProvider } from "firebase/auth";
-import { Avatar, Popup, Component, register } from "rewild-ui";
-import { authStore } from "../stores/AuthStore";
+import { authUI } from '../../firebase';
+import { EmailAuthProvider, GoogleAuthProvider } from 'firebase/auth';
+import { Avatar, Popup, Component, register } from 'rewild-ui';
+import { authStore } from '../stores/AuthStore';
 
 type Props = {};
 
 function initAuth(elm: Element) {
   authUI.start(elm, {
-    signInFlow: "popup",
+    signInFlow: 'popup',
     callbacks: {
       signInSuccessWithAuthResult: () => false,
     },
     signInOptions: [
-      { provider: EmailAuthProvider.PROVIDER_ID, signInMethod: EmailAuthProvider.EMAIL_LINK_SIGN_IN_METHOD },
+      {
+        provider: EmailAuthProvider.PROVIDER_ID,
+        signInMethod: EmailAuthProvider.EMAIL_LINK_SIGN_IN_METHOD,
+      },
       GoogleAuthProvider.PROVIDER_ID,
     ],
     // Other config options...
   });
 }
 
-@register("x-auth")
+@register('x-auth')
 export class Auth extends Component<Props> {
   signInSection: HTMLDivElement | null = null;
 
@@ -29,7 +32,7 @@ export class Auth extends Component<Props> {
     const [hasLoggedOutOnce, setHasLoggedOutOnce] = this.useState(false);
 
     this.onMount = () => {
-      const elm = this.shadow!.querySelector("#sign-in");
+      const elm = this.shadow!.querySelector('#sign-in');
       if (elm) initAuth(elm);
     };
 
@@ -44,9 +47,9 @@ export class Auth extends Component<Props> {
         }
 
         setMenuOpen(true);
-        const elm = this.shadow!.querySelector("#sign-in");
+        const elm = this.shadow!.querySelector('#sign-in');
         if (elm) {
-          setTimeout(() => (elm.className = "fadein"), 30);
+          setTimeout(() => (elm.className = 'fadein'), 30);
           initAuth(elm);
         }
       }
@@ -68,8 +71,7 @@ export class Auth extends Component<Props> {
             onClose={() => {
               setMenuOpen(false);
             }}
-            withBackground
-          >
+            withBackground>
             {this.signInSection}
           </Popup>
         </div>,

@@ -1,8 +1,17 @@
-import { IProject } from "models";
-import { Loading, Card, Popup, Component, register, Typography, Button, StyledMaterialIcon } from "rewild-ui";
-import { NewProjectForm } from "../NewProjectForm";
-import { createProject } from "./ProjectSelectorUtils";
-import { projectsStore } from "../../../stores/ProjectsStore";
+import { IProject } from 'models';
+import {
+  Loading,
+  Card,
+  Popup,
+  Component,
+  register,
+  Typography,
+  Button,
+  StyledMaterialIcon,
+} from 'rewild-ui';
+import { NewProjectForm } from '../NewProjectForm';
+import { createProject } from './ProjectSelectorUtils';
+import { projectsStore } from '../../../stores/ProjectsStore';
 
 interface Props {
   open: boolean;
@@ -10,7 +19,7 @@ interface Props {
   onOpen: (projectUid: string) => void;
 }
 
-@register("x-project-selector")
+@register('x-project-selector')
 export class ProjectSelector extends Component<Props> {
   init() {
     const projectStoreProxy = this.observeStore(projectsStore);
@@ -43,8 +52,11 @@ export class ProjectSelector extends Component<Props> {
       projectsStore.getProjects();
     };
 
-    const [newProject, setNewProject] = this.useState<Partial<IProject> | null>(null);
-    const [selectedProject, setSelectedProject] = this.useState<IProject | null>(null);
+    const [newProject, setNewProject] = this.useState<Partial<IProject> | null>(
+      null
+    );
+    const [selectedProject, setSelectedProject] =
+      this.useState<IProject | null>(null);
 
     return () => {
       const isProjectSelected = !!selectedProject();
@@ -61,12 +73,19 @@ export class ProjectSelector extends Component<Props> {
                 <span>Back</span>
               </Button>
             </div>
-            <div>{isProjectSelected && <Typography variant="h4">{selectedProject()!.name}</Typography>}</div>
+            <div>
+              {isProjectSelected && (
+                <Typography variant="h4">{selectedProject()!.name}</Typography>
+              )}
+            </div>
 
             <div class="projects">
               {isNewProject ? (
                 [
-                  <NewProjectForm project={newProject()} onChange={(project) => setNewProject(project, false)} />,
+                  <NewProjectForm
+                    project={newProject()}
+                    onChange={(project) => setNewProject(project, false)}
+                  />,
                   !!projectStoreProxy.error && projectStoreProxy.error,
                 ]
               ) : (
@@ -92,8 +111,7 @@ export class ProjectSelector extends Component<Props> {
                           button
                           raised
                           onClick={(e) => setSelectedProject(item)}
-                          pushed={selectedProject()?.id === item.id}
-                        >
+                          pushed={selectedProject()?.id === item.id}>
                           <Typography variant="h4">{item.name}</Typography>
                         </Card>
                       ))
@@ -105,25 +123,36 @@ export class ProjectSelector extends Component<Props> {
             <div>
               {isProjectSelected && [
                 <Typography variant="label">Description</Typography>,
-                <Typography variant="body1">{selectedProject()!.description}</Typography>,
+                <Typography variant="body1">
+                  {selectedProject()!.description}
+                </Typography>,
               ]}
             </div>
 
             <div class="actions">
               {isProjectSelected && (
-                <Button color="error" variant="text" fullWidth onClick={onDelete}>
+                <Button
+                  color="error"
+                  variant="text"
+                  fullWidth
+                  onClick={onDelete}>
                   Delete
                 </Button>
               )}
 
               {isProjectSelected && (
-                <Button onClick={(e) => props.onOpen(selectedProject()!.id!)} fullWidth>
+                <Button
+                  onClick={(e) => props.onOpen(selectedProject()!.id!)}
+                  fullWidth>
                   Open
                 </Button>
               )}
 
               {isNewProject && (
-                <Button onClick={onCreate} fullWidth disabled={loading || !isProjectValid()}>
+                <Button
+                  onClick={onCreate}
+                  fullWidth
+                  disabled={loading || !isProjectValid()}>
                   Create Project
                 </Button>
               )}

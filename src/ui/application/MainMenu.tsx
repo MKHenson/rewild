@@ -1,5 +1,13 @@
-import { authStore } from "../stores/AuthStore";
-import { Modal, Button, Typography, MaterialIcon, Loading, Component, register } from "rewild-ui";
+import { authStore } from '../stores/AuthStore';
+import {
+  Modal,
+  Button,
+  Typography,
+  MaterialIcon,
+  Loading,
+  Component,
+  register,
+} from 'rewild-ui';
 
 type Props = {
   open: boolean;
@@ -7,7 +15,7 @@ type Props = {
   onEditor: () => void;
 };
 
-@register("x-main-menu")
+@register('x-main-menu')
 export class MainMenu extends Component<Props> {
   init() {
     const authState = this.observeStore(authStore);
@@ -27,11 +35,11 @@ export class MainMenu extends Component<Props> {
             <Typography variant="h2" style={`text-align: center; margin: 0;`}>
               Rewild
             </Typography>
-          }
-        >
+          }>
           <div class="tag-line">
             <Typography variant="light" onClick={(e) => setCount(count() + 1)}>
-              Welcome to rewild. A game about exploration, natural history and saving the planet
+              Welcome to rewild. A game about exploration, natural history and
+              saving the planet
               <span>Count {count().toString()}</span>
             </Typography>
           </div>
@@ -48,10 +56,12 @@ export class MainMenu extends Component<Props> {
                 <span>Options</span>
               </Button>
               <Button
-                disabled={!authState.loggedIn || authState.user?.email !== "mat@webinate.net"}
+                disabled={
+                  !authState.loggedIn ||
+                  authState.user?.email !== 'mat@webinate.net'
+                }
                 onClick={props.onEditor}
-                fullWidth
-              >
+                fullWidth>
                 <MaterialIcon size="s" icon="build_circle" />
                 <span>Editor</span>
               </Button>

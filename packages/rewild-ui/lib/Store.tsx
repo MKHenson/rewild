@@ -1,4 +1,4 @@
-import { Signaller, Callback } from "./Signaller";
+import { Signaller, Callback } from './Signaller';
 
 /** Stores are used to created Proxied objects which can be observed, mutated and trigger renders on Components*/
 export class Store<T extends object> {
@@ -11,7 +11,7 @@ export class Store<T extends object> {
     this._defaultProxy = proxy;
   }
 
-  setTarget(data: Partial<T>) {
+  set(data: Partial<T>) {
     for (let i in data) this._defaultProxy[i] = data[i]!;
   }
 

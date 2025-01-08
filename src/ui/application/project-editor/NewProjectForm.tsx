@@ -1,12 +1,12 @@
-import { Component, register, Input, Field } from "rewild-ui";
-import { IProject } from "models";
+import { Component, register, Input, Field } from 'rewild-ui';
+import { IProject } from 'models';
 
 interface Props {
   project: Partial<IProject | null>;
   onChange: (project: Partial<IProject | null>) => void;
 }
 
-@register("x-new-project-form")
+@register('x-new-project-form')
 export class NewProjectForm extends Component<Props> {
   init() {
     let project = { ...this.props.project };

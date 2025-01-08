@@ -1,37 +1,38 @@
-import { ITreeNode, ITreeNodeAction } from "models";
-import { createUUID } from "rewild-ui";
+import { ITreeNode, ITreeNodeAction } from 'models';
+import { createUUID } from 'rewild-ui';
 
 export const baseActorTemplate: ITreeNode = {
   canRename: true,
   canSelect: true,
-  iconSize: "xs",
+  iconSize: 'xs',
 };
 
 export const containerFactory: () => ITreeNode = () => ({
   ...baseActorTemplate,
-  icon: "label",
+  icon: 'label',
   onDragOver(data, node) {
-    if (data?.type === "treenode" && (data as ITreeNodeAction).node) return true;
+    if (data?.type === 'treenode' && (data as ITreeNodeAction).node)
+      return true;
     return false;
   },
   onDrop(data, node) {
     return true;
   },
   resource: {
-    type: "container",
+    type: 'container',
     id: createUUID(),
-    name: "New Container",
+    name: 'New Container',
     properties: [
       {
-        label: "Base Container",
-        type: "baseContainer",
-        valueType: "string",
-        value: "",
+        label: 'Base Container',
+        type: 'baseContainer',
+        valueType: 'string',
+        value: '',
       },
       {
-        label: "Active On Startup",
-        type: "active",
-        valueType: "boolean",
+        label: 'Active On Startup',
+        type: 'active',
+        valueType: 'boolean',
         value: true,
       },
     ],

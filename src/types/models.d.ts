@@ -1,13 +1,18 @@
-declare module "models" {
-  export type EditorType = "properties" | "ribbon" | "scene-graph" | "project-settings" | "actors";
-  import { LoaderPresetType } from "src/core/loader-utils/LoaderPresets";
-  import type { Timestamp } from "firebase/firestore";
-  import type { IconType } from "rewild-ui";
+declare module 'models' {
+  export type EditorType =
+    | 'properties'
+    | 'ribbon'
+    | 'scene-graph'
+    | 'project-settings'
+    | 'actors';
+  import { LoaderPresetType } from 'src/core/loader-utils/LoaderPresets';
+  import type { Timestamp } from 'firebase/firestore';
+  import type { IconType } from 'rewild-ui';
 
-  export type FactoryKey = "actor" | "container";
+  export type FactoryKey = 'actor' | 'container';
 
   export interface IDragDropAction {
-    type: "cell-move" | "treenode";
+    type: 'cell-move' | 'treenode';
   }
 
   export interface IGridCellAction extends IDragDropAction {
@@ -22,17 +27,17 @@ declare module "models" {
 
   export type Vector3 = [number, number, number];
   export type PropertyType =
-    | "size"
-    | "speed"
-    | "geometry"
-    | "pipeline"
-    | "position"
-    | "color"
-    | "target"
-    | "active"
-    | "baseContainer"
-    | "intensity";
-  export type PropValueType = "string" | "boolean" | "enum" | "hidden" | "vec3";
+    | 'size'
+    | 'speed'
+    | 'geometry'
+    | 'pipeline'
+    | 'position'
+    | 'color'
+    | 'target'
+    | 'active'
+    | 'baseContainer'
+    | 'intensity';
+  export type PropValueType = 'string' | 'boolean' | 'enum' | 'hidden' | 'vec3';
   export type PropValue = string | boolean | number | Vector3;
   export type IOption = {
     value: string;
@@ -49,7 +54,7 @@ declare module "models" {
   export type ITreeNode = {
     name?: string;
     icon?: IconType;
-    iconSize?: "s" | "xs";
+    iconSize?: 's' | 'xs';
     canSelect?: boolean;
     canRename?: boolean;
     children?: ITreeNode[] | null;
@@ -94,22 +99,22 @@ declare module "models" {
   export interface IResource {
     id: string;
     name: string;
-    type: "container" | "actor";
+    type: 'container' | 'actor';
     properties: IProperty[];
   }
 
-  export type BaseType = "static" | "dynamic" | "light";
+  export type BaseType = 'static' | 'dynamic' | 'light';
 
   export interface IActor extends IResource {
     baseType: BaseType;
     actorLoaderPreset: LoaderPresetType;
-    type: "actor";
+    type: 'actor';
   }
 
   export interface IContainer extends IResource {
     baseContainer: string;
     activeOnStartup: boolean;
-    type: "container";
+    type: 'container';
     actors: IActor[];
   }
 

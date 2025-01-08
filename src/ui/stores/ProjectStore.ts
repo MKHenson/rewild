@@ -1,9 +1,22 @@
-import { ILevel, IProject, IResource, ITreeNode, IContainer, IActor, PropertyType } from "models";
-import { Store } from "rewild-ui";
-import { getLevel as getLevelApi, patchLevel, patchProject, getProject as getProjectApi } from "../../api";
-import { Timestamp } from "firebase/firestore";
-import { sceneGraphStore } from "./SceneGraphStore";
-import { createExporterObj } from "../utils/exportHelper";
+import {
+  ILevel,
+  IProject,
+  IResource,
+  ITreeNode,
+  IContainer,
+  IActor,
+  PropertyType,
+} from 'models';
+import { Store } from 'rewild-ui';
+import {
+  getLevel as getLevelApi,
+  patchLevel,
+  patchProject,
+  getProject as getProjectApi,
+} from '../../api';
+import { Timestamp } from 'firebase/firestore';
+import { sceneGraphStore } from './SceneGraphStore';
+import { createExporterObj } from '../utils/exportHelper';
 
 export interface IProjectStore {
   loading: boolean;
@@ -15,7 +28,9 @@ export interface IProjectStore {
 }
 
 function extractProp(node: ITreeNode, type: PropertyType) {
-  const property = node.resource?.properties.find((property) => property.type === type);
+  const property = node.resource?.properties.find(
+    (property) => property.type === type
+  );
   return property?.value;
 }
 
@@ -43,7 +58,7 @@ export class ProjectStore extends Store<IProjectStore> {
       this.defaultProxy.error = err.toString();
     }
 
-    this.setTarget({
+    this.set({
       loading: false,
       dirty: false,
     });
@@ -56,7 +71,9 @@ export class ProjectStore extends Store<IProjectStore> {
     project.lastModified = Timestamp.now();
 
     const { id, ...token } = project;
-    const containers = sceneGraphStore.defaultProxy.nodes.find((n) => n.name === "Containers")!.children;
+    const containers = sceneGraphStore.defaultProxy.nodes.find(
+      (n) => n.name === 'Containers'
+    )!.children;
 
     token.sceneGraph = {
       containers: containers || [],
@@ -70,7 +87,7 @@ export class ProjectStore extends Store<IProjectStore> {
       this.defaultProxy.error = err.toString();
     }
 
-    this.setTarget({
+    this.set({
       loading: false,
       dirty: false,
     });
@@ -81,7 +98,9 @@ export class ProjectStore extends Store<IProjectStore> {
     this.defaultProxy.loading = true;
 
     const project = this.defaultProxy.project!;
-    const containers = sceneGraphStore.defaultProxy.nodes.find((n) => n.name === "Containers")!.children;
+    const containers = sceneGraphStore.defaultProxy.nodes.find(
+      (n) => n.name === 'Containers'
+    )!.children;
 
     try {
       await patchLevel(project.level!, {
@@ -91,9 +110,12 @@ export class ProjectStore extends Store<IProjectStore> {
             (c) =>
               ({
                 ...c.resource,
-                activeOnStartup: extractProp(c, "active") as boolean,
-                baseContainer: extractProp(c, "baseContainer") as string,
-                actors: c.children?.map((child) => ({ ...child.resource } as IActor)) || [],
+                activeOnStartup: extractProp(c, 'active') as boolean,
+                baseContainer: extractProp(c, 'baseContainer') as string,
+                actors:
+                  c.children?.map(
+                    (child) => ({ ...child.resource } as IActor)
+                  ) || [],
               } as IContainer)
           ) || [],
         activeOnStartup: project.activeOnStartup,
@@ -105,7 +127,7 @@ export class ProjectStore extends Store<IProjectStore> {
 
     await this.getLevel(project.id!);
 
-    this.setTarget({
+    this.set({
       loading: false,
       dirty: false,
     });

@@ -1,5 +1,13 @@
-import { IOption, PropValueType, Vector3 } from "models";
-import { theme, Component, register, Switch, Typography, Select, Vec3 } from "rewild-ui";
+import { IOption, PropValueType, Vector3 } from 'models';
+import {
+  theme,
+  Component,
+  register,
+  Switch,
+  Typography,
+  Select,
+  Vec3,
+} from 'rewild-ui';
 
 interface Props<T> {
   label: string;
@@ -11,7 +19,7 @@ interface Props<T> {
   refocus: boolean;
 }
 
-@register("x-property-value")
+@register('x-property-value')
 export class PropertyValue<T extends any> extends Component<Props<T>> {
   init() {
     const getEditor = (type: PropValueType) => {
@@ -19,22 +27,22 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
       const onChange = this.props.onChange;
 
       switch (type) {
-        case "string":
+        case 'string':
           return (
             <input
               class="string-val"
               readOnly={this.props.readonly}
-              value={(value as string) || ""}
+              value={(value as string) || ''}
               onblur={(e) => {
                 onChange?.(e.currentTarget.value as T);
               }}
               onkeydown={(e) => {
                 if (!onChange) return;
-                if (e.key === "Enter") onChange(e.currentTarget.value as T);
+                if (e.key === 'Enter') onChange(e.currentTarget.value as T);
               }}
             />
           );
-        case "boolean":
+        case 'boolean':
           return (
             <Switch
               checked={value as boolean}
@@ -44,7 +52,7 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
               }}
             />
           );
-        case "enum":
+        case 'enum':
           return (
             <Select
               options={this.props.options || []}
@@ -55,7 +63,7 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
               }}
             />
           );
-        case "vec3":
+        case 'vec3':
           return (
             <Vec3
               value={value as Vector3}
@@ -73,7 +81,9 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
 
     this.onMount = this.props.refocus
       ? () => {
-          const input = this.shadow?.querySelector(".string-val") as HTMLInputElement;
+          const input = this.shadow?.querySelector(
+            '.string-val'
+          ) as HTMLInputElement;
           if (input) {
             input.focus();
             input.select();

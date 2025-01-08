@@ -1,5 +1,11 @@
-import { EditorType, IGridCellAction } from "models";
-import { startDragDrop, compelteDragDrop, curDragAction, Component, register } from "rewild-ui";
+import { EditorType, IGridCellAction } from 'models';
+import {
+  startDragDrop,
+  compelteDragDrop,
+  curDragAction,
+  Component,
+  register,
+} from 'rewild-ui';
 
 interface Props {
   rowStart: number;
@@ -15,7 +21,7 @@ interface Props {
     colStart: number,
     rowEnd: number,
     colEnd: number,
-    interaction: "drop" | "button"
+    interaction: 'drop' | 'button'
   ) => void;
 }
 
@@ -23,14 +29,14 @@ const onDragEndEvent = (e: DragEvent) => {
   e.preventDefault();
 };
 
-@register("x-grid-cell")
+@register('x-grid-cell')
 export class GridCell extends Component<Props> {
   init() {
     const onDragStart = (e: DragEvent) => {
       const props = this.props;
 
       startDragDrop<IGridCellAction>(e, {
-        type: "cell-move",
+        type: 'cell-move',
         editor: props.editor!,
         sizeX: props.colEnd - props.colStart,
         sizeY: props.rowEnd - props.rowStart,
@@ -61,10 +67,9 @@ export class GridCell extends Component<Props> {
                     props.colStart,
                     props.rowEnd,
                     props.colEnd - 1,
-                    "button"
+                    'button'
                   )
-                }
-              >
+                }>
                 -
               </div>
               <div
@@ -76,10 +81,9 @@ export class GridCell extends Component<Props> {
                     props.colStart,
                     props.rowEnd,
                     props.colEnd + 1,
-                    "button"
+                    'button'
                   )
-                }
-              >
+                }>
                 +
               </div>
               <div
@@ -91,10 +95,9 @@ export class GridCell extends Component<Props> {
                     props.colStart,
                     props.rowEnd - 1,
                     props.colEnd,
-                    "button"
+                    'button'
                   )
-                }
-              >
+                }>
                 -
               </div>
               <div
@@ -106,10 +109,9 @@ export class GridCell extends Component<Props> {
                     props.colStart,
                     props.rowEnd + 1,
                     props.colEnd,
-                    "button"
+                    'button'
                   )
-                }
-              >
+                }>
                 +
               </div>
             </div>
@@ -126,20 +128,20 @@ export class GridCell extends Component<Props> {
 
 /** Allow drop */
 const onDragOverEvent = (e: DragEvent) => {
-  if (!curDragAction || curDragAction.type !== "cell-move") return;
+  if (!curDragAction || curDragAction.type !== 'cell-move') return;
 
-  (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "true");
+  (e.currentTarget as HTMLDivElement).setAttribute('drop-active', 'true');
   e.preventDefault();
 };
 
 const onDragLeaveEvent = (e: DragEvent) => {
-  (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "");
+  (e.currentTarget as HTMLDivElement).setAttribute('drop-active', '');
   e.preventDefault();
 };
 
 const onDrop = (e: DragEvent) => {
   const props = (e.currentTarget as GridCell).props;
-  (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "");
+  (e.currentTarget as HTMLDivElement).setAttribute('drop-active', '');
   const json = compelteDragDrop<IGridCellAction>(e);
   if (!json) return;
 
@@ -152,7 +154,7 @@ const onDrop = (e: DragEvent) => {
     props.colStart,
     rowEnd < props.rowEnd ? props.rowEnd : rowEnd,
     colEnd < props.colEnd ? props.colEnd : colEnd,
-    "drop"
+    'drop'
   );
 };
 
@@ -176,7 +178,7 @@ const StyledGridCell = cssStylesheet(css`
     box-sizing: border-box;
     position: relative;
   }
-  :host([drop-active="true"]) {
+  :host([drop-active='true']) {
     background: #1e5ebf7f;
   }
   .sizer {
@@ -227,11 +229,12 @@ const StyledGridCell = cssStylesheet(css`
   .dragger {
     position: absolute;
     top: 0;
-    left: 0;
-    width: 100%;
+    left: 5px;
+    width: calc(100% - 10px);
     height: 5px;
     background: transparent;
     cursor: move;
+    border-radius: 5px 5px 0 0;
   }
   .content:hover .dragger {
     background: #3b5db4;

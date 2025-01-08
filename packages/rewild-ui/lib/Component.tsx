@@ -1,5 +1,5 @@
-import { Callback, UnsubscribeStoreFn } from "./Signaller";
-import { Store } from "./Store";
+import { Callback, UnsubscribeStoreFn } from './Signaller';
+import { Store } from './Store';
 
 type RenderFn = () => void;
 type InitFn = () => null | JSX.ChildElement | JSX.ChildElement[];
@@ -40,7 +40,7 @@ export abstract class Component<T = any>
     const useShadow =
       options?.useShadow === undefined ? true : options?.useShadow;
     this.shadow = useShadow
-      ? this.attachShadow(options?.shadow || { mode: "open" })
+      ? this.attachShadow(options?.shadow || { mode: 'open' })
       : null;
     this._props = options?.props as any;
   }
@@ -135,13 +135,16 @@ export abstract class Component<T = any>
     return [getValue, setValue];
   }
 
+  /**
+   * All components must implement this method. It must return a function that renders the component.
+   */
   abstract init(): InitFn;
 
   generateCss() {
     const css = this.getStyle();
     if (!css) return;
 
-    const cssIsStylesheetObj = !(typeof css === "string");
+    const cssIsStylesheetObj = !(typeof css === 'string');
     let stylesheed: CSSStyleSheet;
 
     if (!cssIsStylesheetObj) {

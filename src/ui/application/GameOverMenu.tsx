@@ -1,11 +1,11 @@
-import { Modal, Button, Typography, Component, register } from "rewild-ui";
+import { Modal, Button, Typography, Component, register } from 'rewild-ui';
 
 type Props = {
   open: boolean;
   onQuitClick: () => void;
 };
 
-@register("x-game-over-menu")
+@register('x-game-over-menu')
 export class GameOverMenu extends Component<Props> {
   init() {
     return () => (

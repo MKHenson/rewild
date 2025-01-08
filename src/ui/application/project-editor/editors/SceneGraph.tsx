@@ -1,11 +1,21 @@
-import { ITreeNode, ITemplateTreeNode } from "models";
-import { theme, StyledMaterialIcon, ButtonGroup, Button, Tree, Component, register, Typography, Card } from "rewild-ui";
-import { sceneGraphStore } from "../../../stores/SceneGraphStore";
-import { projectStore } from "../../../stores/ProjectStore";
+import { ITreeNode, ITemplateTreeNode } from 'models';
+import {
+  theme,
+  StyledMaterialIcon,
+  ButtonGroup,
+  Button,
+  Tree,
+  Component,
+  register,
+  Typography,
+  Card,
+} from 'rewild-ui';
+import { sceneGraphStore } from '../../../stores/SceneGraphStore';
+import { projectStore } from '../../../stores/ProjectStore';
 
 interface Props {}
 
-@register("x-scene-graph")
+@register('x-scene-graph')
 export class SceneGraph extends Component<Props> {
   keyUpDelegate: (e: KeyboardEvent) => void;
 
@@ -17,7 +27,12 @@ export class SceneGraph extends Component<Props> {
 
     this.keyUpDelegate = async (e: KeyboardEvent) => {
       const node = tree.getSelectedNode();
-      if (e.key === "F2" && selectedNodes().length === 1 && selectedNodes()[0].canRename && node) {
+      if (
+        e.key === 'F2' &&
+        selectedNodes().length === 1 &&
+        selectedNodes()[0].canRename &&
+        node
+      ) {
         const newName = await node.editName();
         projectStoreProxy.selectedResource!.name = newName;
       }
@@ -40,7 +55,8 @@ export class SceneGraph extends Component<Props> {
     const onSelectionChanged = (val: ITreeNode[]) => {
       setSelection(val);
 
-      if (val.length === 1 && val[0].resource) projectStoreProxy.selectedResource = val[0].resource!;
+      if (val.length === 1 && val[0].resource)
+        projectStoreProxy.selectedResource = val[0].resource!;
       else projectStoreProxy.selectedResource = null;
     };
 
@@ -49,14 +65,48 @@ export class SceneGraph extends Component<Props> {
     };
 
     this.onMount = () => {
-      document.addEventListener("keydown", this.keyUpDelegate);
+      document.addEventListener('keydown', this.keyUpDelegate);
     };
 
     this.onCleanup = () => {
-      document.removeEventListener("keydown", this.keyUpDelegate);
+      document.removeEventListener('keydown', this.keyUpDelegate);
     };
 
     let tree: Tree;
+
+    let html = (
+      <Card stretched>
+        <div class="content">
+          <div class="header">
+            <Typography variant="h3">Scene</Typography>
+          </div>
+          <div class="nodes"></div>
+          <div class="graph-actions">
+            <ButtonGroup>
+              <Button
+                disabled={
+                  selectedNodes().length == 0 ||
+                  !(selectedNodes()[0] as ITemplateTreeNode).template
+                }
+                variant="text"
+                id="add-scene-node"
+                onClick={onAdd}>
+                <StyledMaterialIcon icon="add_circle" size="s" />
+              </Button>
+              <Button
+                disabled={
+                  selectedNodes().length == 0 || !selectedNodes()[0].resource
+                }
+                variant="text"
+                id="delete-scene-node"
+                onClick={onDelete}>
+                <StyledMaterialIcon icon="delete" size="s" />
+              </Button>
+            </ButtonGroup>
+          </div>
+        </div>
+      </Card>
+    );
 
     return () => {
       tree = (
@@ -68,34 +118,20 @@ export class SceneGraph extends Component<Props> {
         />
       ) as Tree;
 
-      return (
-        <Card stretched>
-          <div class="content">
-            <div class="header">
-              <Typography variant="h3">Scene</Typography>
-            </div>
-            <div class="nodes">{tree}</div>
-            <div class="graph-actions">
-              <ButtonGroup>
-                <Button
-                  disabled={selectedNodes().length == 0 || !(selectedNodes()[0] as ITemplateTreeNode).template}
-                  variant="text"
-                  onClick={onAdd}
-                >
-                  <StyledMaterialIcon icon="add_circle" size="s" />
-                </Button>
-                <Button
-                  disabled={selectedNodes().length == 0 || !selectedNodes()[0].resource}
-                  variant="text"
-                  onClick={onDelete}
-                >
-                  <StyledMaterialIcon icon="delete" size="s" />
-                </Button>
-              </ButtonGroup>
-            </div>
-          </div>
-        </Card>
-      );
+      html.querySelector('.nodes')!.replaceChildren(tree);
+      const addSceneBtn = html.querySelector('#add-scene-node') as Button;
+      const deleteSceneBtn = html.querySelector('#delete-scene-node') as Button;
+
+      if (addSceneBtn)
+        addSceneBtn.disabled =
+          selectedNodes().length == 0 ||
+          !(selectedNodes()[0] as ITemplateTreeNode).template;
+
+      if (deleteSceneBtn)
+        deleteSceneBtn.disabled =
+          selectedNodes().length == 0 || !selectedNodes()[0].resource;
+
+      return html;
     };
   }
 

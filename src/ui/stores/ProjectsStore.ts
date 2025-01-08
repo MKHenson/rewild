@@ -1,5 +1,5 @@
-import { ILevel, IProject } from "models";
-import { Store } from "rewild-ui";
+import { ILevel, IProject } from 'models';
+import { Store } from 'rewild-ui';
 import {
   addLevel,
   addProject as addProjectApi,
@@ -8,12 +8,12 @@ import {
   deleteProject,
   getProjects as getProjectsApi,
   patchProject,
-} from "../../api";
-import { Timestamp, QueryDocumentSnapshot } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "../../firebase";
+} from '../../api';
+import { Timestamp, QueryDocumentSnapshot } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../firebase';
 
-const helloworld = httpsCallable(functions, "helloworld");
+const helloworld = httpsCallable(functions, 'helloworld');
 
 export interface IProjectStore {
   loading: boolean;
@@ -39,7 +39,7 @@ export class ProjectsStore extends Store<IProjectStore> {
   async addProject(token: Partial<IProject>) {
     if (!token) return;
     this.defaultProxy.loading = true;
-    this.defaultProxy.error = "";
+    this.defaultProxy.error = '';
 
     try {
       token.created = Timestamp.now();
@@ -49,8 +49,8 @@ export class ProjectsStore extends Store<IProjectStore> {
       const newLevel: ILevel = {
         containers: [],
         hasTerrain: true,
-        name: token.name || "",
-        startEvent: token.startEvent || "",
+        name: token.name || '',
+        startEvent: token.startEvent || '',
         created: Timestamp.now(),
         lastModified: Timestamp.now(),
         project: resp.id,
@@ -69,7 +69,7 @@ export class ProjectsStore extends Store<IProjectStore> {
 
   async removeProjects(id: string) {
     this.defaultProxy.loading = true;
-    this.defaultProxy.error = "";
+    this.defaultProxy.error = '';
 
     try {
       const project = await getProject(id);
@@ -91,7 +91,7 @@ export class ProjectsStore extends Store<IProjectStore> {
 
   // This is just a reference for the future
   async functionsTest() {
-    const functionResult = await helloworld({ foo: "bar" });
+    const functionResult = await helloworld({ foo: 'bar' });
     return functionResult.data;
   }
 }

@@ -1,4 +1,4 @@
-import { Timestamp } from "firebase/firestore";
+import { Timestamp } from 'firebase/firestore';
 
 export function createExporterObj(token: any): any {
   const serialized = JSON.stringify(token);
@@ -7,6 +7,7 @@ export function createExporterObj(token: any): any {
 
 export function JSONReviver(key: string, value: any): any {
   const timestamp = value as Timestamp | undefined;
-  if (timestamp && timestamp.seconds) return Timestamp.fromMillis(timestamp.seconds * 1000);
+  if (timestamp && timestamp.seconds)
+    return Timestamp.fromMillis(timestamp.seconds * 1000);
   return value;
 }

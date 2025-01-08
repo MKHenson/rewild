@@ -1,6 +1,6 @@
-import { ITemplateTreeNode, IProject, ITreeNode } from "models";
-import { traverseTree, Store } from "rewild-ui";
-import { containerFactory } from "../utils/TemplateFactories";
+import { ITemplateTreeNode, IProject, ITreeNode } from 'models';
+import { traverseTree, Store } from 'rewild-ui';
+import { containerFactory } from '../utils/TemplateFactories';
 
 export interface ISceneGraphStore {
   nodes: ITreeNode[];
@@ -16,13 +16,17 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
   buildTree(project: IProject) {
     this.defaultProxy.nodes = [
       {
-        name: "Containers",
-        factoryKey: "container",
+        name: 'Containers',
+        factoryKey: 'container',
         canSelect: true,
-        icon: "group_work",
-        id: "CONTAINERS",
+        icon: 'group_work',
+        id: 'CONTAINERS',
         template: containerFactory,
-        children: project.sceneGraph?.containers.map((node) => ({ ...containerFactory(), ...node })) || [],
+        children:
+          project.sceneGraph?.containers.map((node) => ({
+            ...containerFactory(),
+            ...node,
+          })) || [],
       } as ITemplateTreeNode,
     ];
   }

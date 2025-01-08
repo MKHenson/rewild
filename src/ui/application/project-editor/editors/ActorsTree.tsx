@@ -1,9 +1,9 @@
-import { Tree, Component, register, Typography, Card } from "rewild-ui";
-import { actorStore } from "../../../stores/ActorStore";
+import { Tree, Component, register, Typography, Card } from 'rewild-ui';
+import { actorStore } from '../../../stores/ActorStore';
 
 interface Props {}
 
-@register("x-actors-tree")
+@register('x-actors-tree')
 export class ActorsTree extends Component<Props> {
   init() {
     const actorStoreProxy = this.observeStore(actorStore);

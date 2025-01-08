@@ -1,18 +1,18 @@
-import { theme, Component, register, Typography, Card } from "rewild-ui";
-import { PropertyValue } from "./PropertyValue";
-import { projectStore } from "../../../stores/ProjectStore";
+import { theme, Component, register, Typography, Card } from 'rewild-ui';
+import { PropertyValue } from './PropertyValue';
+import { projectStore } from '../../../stores/ProjectStore';
 
 interface Props {}
 let lastFocussedProp = -1;
 
-@register("x-properties")
+@register('x-properties')
 export class Properties extends Component<Props> {
   init() {
     const projectStoreProxy = this.observeStore(projectStore, (prop) => {
       if (
-        prop === "selectedResource" ||
-        prop === "selectedResource.name" ||
-        prop.includes("selectedResource.properties")
+        prop === 'selectedResource' ||
+        prop === 'selectedResource.name' ||
+        prop.includes('selectedResource.properties')
       )
         this.render();
     });
@@ -27,7 +27,7 @@ export class Properties extends Component<Props> {
           {selectedResource && (
             <div class="properties">
               {selectedResource.properties
-                .filter((p) => p.valueType !== "hidden")
+                .filter((p) => p.valueType !== 'hidden')
                 .map((prop, index) => {
                   return (
                     <PropertyValue
@@ -44,7 +44,13 @@ export class Properties extends Component<Props> {
                     />
                   );
                 })}
-              <PropertyValue label="ID" value={selectedResource?.id} type="string" readonly refocus={false} />
+              <PropertyValue
+                label="ID"
+                value={selectedResource?.id}
+                type="string"
+                readonly
+                refocus={false}
+              />
               <PropertyValue
                 label="Name"
                 value={selectedResource.name}

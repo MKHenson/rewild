@@ -1,6 +1,6 @@
-import { wasm } from "rewild-wasmtime";
-import { MouseEventType, KeyEventType } from "rewild-common";
-import { Pane3D } from "rewild-ui";
+import { wasm } from 'rewild-wasmtime';
+import { MouseEventType, KeyEventType } from 'rewild-common';
+import { Pane3D } from 'rewild-ui';
 
 export class InputManager {
   pane3D: Pane3D;
@@ -29,14 +29,20 @@ export class InputManager {
     this.onPointerlockChangeHandler = this.onPointerlockChange.bind(this);
     this.onPointerlockErrorHandler = this.onPointerlockError.bind(this);
 
-    this.pane3D.addEventListener("mousedown", this.onDownHandler);
-    window.addEventListener("wheel", this.onWheelHandler);
-    window.addEventListener("mouseup", this.onUpHandler);
-    window.addEventListener("mousemove", this.onMoveHandler);
-    document.addEventListener("keydown", this.onKeyDownHandler);
-    document.addEventListener("keyup", this.onKeyUpHandler);
-    document.addEventListener("pointerlockchange", this.onPointerlockChangeHandler);
-    document.addEventListener("pointerlockerror", this.onPointerlockErrorHandler);
+    this.pane3D.addEventListener('mousedown', this.onDownHandler);
+    window.addEventListener('wheel', this.onWheelHandler);
+    window.addEventListener('mouseup', this.onUpHandler);
+    window.addEventListener('mousemove', this.onMoveHandler);
+    document.addEventListener('keydown', this.onKeyDownHandler);
+    document.addEventListener('keyup', this.onKeyUpHandler);
+    document.addEventListener(
+      'pointerlockchange',
+      this.onPointerlockChangeHandler
+    );
+    document.addEventListener(
+      'pointerlockerror',
+      this.onPointerlockErrorHandler
+    );
 
     this.reset();
   }
@@ -46,12 +52,12 @@ export class InputManager {
     } else {
       if (this.preventSignalEscOnLock) return;
       // Signal escape was pushed
-      this.sendKeyEvent(KeyEventType.KeyUp, { code: "Escape" });
+      this.sendKeyEvent(KeyEventType.KeyUp, { code: 'Escape' });
     }
   }
 
   private onPointerlockError() {
-    console.error("Unable to use Pointer Lock API");
+    console.error('Unable to use Pointer Lock API');
   }
 
   reset() {
@@ -81,7 +87,12 @@ export class InputManager {
   }
 
   private onWheel(e: WheelEvent) {
-    this.sendMouseEvent(MouseEventType.MouseWheel, e, this.canvasBounds, e.deltaY);
+    this.sendMouseEvent(
+      MouseEventType.MouseWheel,
+      e,
+      this.canvasBounds,
+      e.deltaY
+    );
   }
 
   private createMouseEvent(e: MouseEvent, bounds: DOMRect, delta: number = 0) {
@@ -105,29 +116,46 @@ export class InputManager {
     );
   }
 
-  private sendMouseEvent(type: MouseEventType, event: MouseEvent, bounds: DOMRect, delta: number): void {
+  private sendMouseEvent(
+    type: MouseEventType,
+    event: MouseEvent,
+    bounds: DOMRect,
+    delta: number
+  ): void {
     const wasmEvent = this.createMouseEvent(event, bounds, delta);
 
     if (type === MouseEventType.MouseUp) wasm.dispatchOnMouseDown(wasmEvent);
-    else if (type === MouseEventType.MouseMove) wasm.dispatchOnMouseMove(wasmEvent);
-    else if (type === MouseEventType.MouseDown) wasm.dispatchOnMouseDown(wasmEvent);
-    else if (type === MouseEventType.MouseWheel) wasm.dispatchOnWheel(wasmEvent);
+    else if (type === MouseEventType.MouseMove)
+      wasm.dispatchOnMouseMove(wasmEvent);
+    else if (type === MouseEventType.MouseDown)
+      wasm.dispatchOnMouseDown(wasmEvent);
+    else if (type === MouseEventType.MouseWheel)
+      wasm.dispatchOnWheel(wasmEvent);
   }
 
-  private sendKeyEvent(type: KeyEventType, event: Partial<KeyboardEvent>): void {
+  private sendKeyEvent(
+    type: KeyEventType,
+    event: Partial<KeyboardEvent>
+  ): void {
     const wasmEvent = wasm.createKeyboardEvent(event.code!);
     if (type === KeyEventType.KeyUp) wasm.dispatchOnKeyUp(wasmEvent);
     else if (type === KeyEventType.KeyDown) wasm.dispatchOnKeyDown(wasmEvent);
   }
 
   dispose() {
-    this.pane3D.removeEventListener("mousedown", this.onDownHandler);
-    window.removeEventListener("mouseup", this.onUpHandler);
-    window.removeEventListener("wheel", this.onWheelHandler);
-    window.removeEventListener("mousemove", this.onMoveHandler);
-    document.removeEventListener("keydown", this.onKeyDownHandler);
-    document.removeEventListener("keyup", this.onKeyUpHandler);
-    document.removeEventListener("pointerlockchange", this.onPointerlockChangeHandler);
-    document.removeEventListener("pointerlockerror", this.onPointerlockErrorHandler);
+    this.pane3D.removeEventListener('mousedown', this.onDownHandler);
+    window.removeEventListener('mouseup', this.onUpHandler);
+    window.removeEventListener('wheel', this.onWheelHandler);
+    window.removeEventListener('mousemove', this.onMoveHandler);
+    document.removeEventListener('keydown', this.onKeyDownHandler);
+    document.removeEventListener('keyup', this.onKeyUpHandler);
+    document.removeEventListener(
+      'pointerlockchange',
+      this.onPointerlockChangeHandler
+    );
+    document.removeEventListener(
+      'pointerlockerror',
+      this.onPointerlockErrorHandler
+    );
   }
 }

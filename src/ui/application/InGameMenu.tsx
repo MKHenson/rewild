@@ -1,4 +1,4 @@
-import { Modal, Button, Component, register } from "rewild-ui";
+import { Modal, Button, Component, register } from 'rewild-ui';
 
 type Props = {
   open: boolean;
@@ -6,7 +6,7 @@ type Props = {
   onQuitClick: () => void;
 };
 
-@register("x-in-game-menu")
+@register('x-in-game-menu')
 export class InGameMenu extends Component<Props> {
   init() {
     return () => (
