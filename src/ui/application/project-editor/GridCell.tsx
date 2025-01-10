@@ -43,82 +43,126 @@ export class GridCell extends Component<Props> {
       });
     };
 
+    const onClickRightShrink = (e: MouseEvent) => {
+      const props = this.props;
+      props.onEditorMoved(
+        props.editor!,
+        props.rowStart,
+        props.colStart,
+        props.rowEnd,
+        props.colEnd - 1,
+        'button'
+      );
+    };
+
+    const onClickRightExpand = (e: MouseEvent) => {
+      const props = this.props;
+      props.onEditorMoved(
+        props.editor!,
+        props.rowStart,
+        props.colStart,
+        props.rowEnd,
+        props.colEnd + 1,
+        'button'
+      );
+    };
+
+    const onClickHeightShrink = (e: MouseEvent) => {
+      const props = this.props;
+      props.onEditorMoved(
+        props.editor!,
+        props.rowStart,
+        props.colStart,
+        props.rowEnd - 1,
+        props.colEnd,
+        'button'
+      );
+    };
+
+    const onClickHeightExpand = (e: MouseEvent) => {
+      const props = this.props;
+      props.onEditorMoved(
+        props.editor!,
+        props.rowStart,
+        props.colStart,
+        props.rowEnd + 1,
+        props.colEnd,
+        'button'
+      );
+    };
+
     this.ondragover = onDragOverEvent;
     this.ondragleave = onDragLeaveEvent;
     this.ondragend = onDragEndEvent;
     this.ondrop = onDrop;
 
+    const gridElement = (
+      <div>
+        <div class="content">
+          <span class="editor-placeholder" />
+          <div class="dragger" draggable={true} ondragstart={onDragStart} />
+          <div class="sizer sizerRight_shrink" onclick={onClickRightShrink}>
+            -
+          </div>
+          <div class="sizer sizerRight_expand" onclick={onClickRightExpand}>
+            +
+          </div>
+          <div class="sizer sizerHeight_shrink" onclick={onClickHeightShrink}>
+            -
+          </div>
+          <div class="sizer sizerHeight_expand" onclick={onClickHeightExpand}>
+            +
+          </div>
+        </div>
+      </div>
+    );
+
     return () => {
       const props = this.props;
-      this.style.gridArea = `${props.rowStart} / ${props.colStart} / ${props.rowEnd} / ${props.colEnd}`;
-
-      return (
-        <div>
-          {props.hasElement && (
-            <div class="content">
-              {props.editorElm}
-              <div class="dragger" draggable={true} ondragstart={onDragStart} />
-              <div
-                class="sizer sizerRight_shrink"
-                onclick={(e) =>
-                  props.onEditorMoved(
-                    props.editor!,
-                    props.rowStart,
-                    props.colStart,
-                    props.rowEnd,
-                    props.colEnd - 1,
-                    'button'
-                  )
-                }>
-                -
-              </div>
-              <div
-                class="sizer sizerRight_expand"
-                onclick={(e) =>
-                  props.onEditorMoved(
-                    props.editor!,
-                    props.rowStart,
-                    props.colStart,
-                    props.rowEnd,
-                    props.colEnd + 1,
-                    'button'
-                  )
-                }>
-                +
-              </div>
-              <div
-                class="sizer sizerHeight_shrink"
-                onclick={(e) =>
-                  props.onEditorMoved(
-                    props.editor!,
-                    props.rowStart,
-                    props.colStart,
-                    props.rowEnd - 1,
-                    props.colEnd,
-                    'button'
-                  )
-                }>
-                -
-              </div>
-              <div
-                class="sizer sizerHeight_expand"
-                onclick={(e) =>
-                  props.onEditorMoved(
-                    props.editor!,
-                    props.rowStart,
-                    props.colStart,
-                    props.rowEnd + 1,
-                    props.colEnd,
-                    'button'
-                  )
-                }>
-                +
-              </div>
-            </div>
-          )}
-        </div>
+      this.setGridArea(
+        props.rowStart,
+        props.colStart,
+        props.rowEnd,
+        props.colEnd
       );
+      this.setEditor(
+        props.editorElm,
+        gridElement.querySelector('.editor-placeholder') as HTMLElement
+      );
+
+      return gridElement;
     };
+  }
+
+  setGridArea(
+    rowStart: number,
+    colStart: number,
+    rowEnd: number,
+    colEnd: number
+  ) {
+    this.style.gridArea = `${rowStart} / ${colStart} / ${rowEnd} / ${colEnd}`;
+    this._props.rowStart = rowStart;
+    this._props.colStart = colStart;
+    this._props.rowEnd = rowEnd;
+    this._props.colEnd = colEnd;
+  }
+
+  setEditor(editor?: JSX.Element | null, parent?: HTMLElement | null) {
+    this.setAttribute('data-has-element', editor ? 'true' : 'false');
+
+    const placeholder =
+      parent || this.shadowRoot!.querySelector('.editor-placeholder');
+    if (!placeholder) return;
+
+    // Remove all children inside the placeholder and replace with editor
+    while (placeholder.firstChild) {
+      placeholder.removeChild(placeholder.firstChild);
+    }
+
+    if (editor) {
+      placeholder.appendChild(editor);
+      this._props.editorElm = editor;
+    }
   }
 
   getStyle() {
@@ -180,6 +224,9 @@ const StyledGridCell = cssStylesheet(css`
   }
   :host([drop-active='true']) {
     background: #1e5ebf7f;
+  }
+  :host([data-has-element='false']) .content {
+    display: none;
   }
   .sizer {
     transition: 0.3s width, 0.3s height, 0.3s opacity;

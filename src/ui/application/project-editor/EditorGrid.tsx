@@ -45,32 +45,19 @@ function createCells(workspaceCells: IWorkspaceCell[]): IWorkspaceCell[] {
 @register('x-editor-grid')
 export class EditorGrid extends Component<Props> {
   init() {
-    const [cells, setCells] = this.useState<IWorkspaceCell[]>([]);
-
     const projectStoreProxy = this.observeStore(
       projectStore,
       (prop, prevVal, val) => {
         if (
           prop === 'project' ||
           prop === 'project.workspace.cells' ||
-          prop === 'error'
+          prop === 'error' ||
+          prop === 'loading'
         ) {
-          setCells(createCells(projectStoreProxy.project!.workspace.cells));
+          this.render();
         }
       }
     );
-
-    const mapped = (type?: EditorType) => {
-      if (!type) return null;
-      if (type === 'properties') return <Properties />;
-      if (type === 'scene-graph') return <SceneGraph />;
-      if (type === 'viewport') return <EditorViewport />;
-      if (type === 'project-settings') return <ProjectSettings />;
-      if (type === 'ribbon')
-        return <RibbonButtons onHome={this.props.onHome} />;
-      if (type === 'actors') return <ActorsTree />;
-      return null;
-    };
 
     const onCellsUpdated = (
       type: EditorType,
@@ -159,6 +146,34 @@ export class EditorGrid extends Component<Props> {
       projectStoreProxy.project!.workspace.cells = newCells;
     };
 
+    // First create all the cells we're going to work with
+    const allCells: GridCell[] = [];
+    const cellsCache: { [id: string]: GridCell } = {};
+    for (let y = 0; y < numRows; y++)
+      for (let x = 0; x < numColumns; x++) {
+        const newCell = (
+          <GridCell
+            rowStart={y + 1}
+            colStart={x + 1}
+            rowEnd={y + 2}
+            colEnd={x + 2}
+            onEditorMoved={onCellsUpdated}
+          />
+        ) as GridCell;
+        cellsCache[`${x + 1}-${y + 1}`] = newCell;
+        allCells.push(newCell);
+      }
+
+    // Now create each of the editors
+    const editors: { [key in EditorType]: HTMLElement } = {
+      properties: <Properties />,
+      'scene-graph': <SceneGraph />,
+      viewport: <EditorViewport />,
+      'project-settings': <ProjectSettings />,
+      ribbon: <RibbonButtons onHome={this.props.onHome} />,
+      actors: <ActorsTree />,
+    };
+
     return () => {
       if (projectStoreProxy.error)
         return (
@@ -167,25 +182,36 @@ export class EditorGrid extends Component<Props> {
           </InfoBox>
         );
 
-      return projectStoreProxy.project! ? (
-        cells().map((cell, i) => {
-          const editor = mapped(cell.editor);
-          return (
-            <GridCell
-              rowStart={cell.rowStart}
-              rowEnd={cell.rowEnd}
-              colStart={cell.colStart}
-              colEnd={cell.colEnd}
-              editor={cell.editor}
-              hasElement={!!editor}
-              editorElm={editor || undefined}
-              onEditorMoved={onCellsUpdated}
-            />
-          );
-        })
-      ) : (
-        <Loading />
-      );
+      if (projectStoreProxy.loading) return <Loading />;
+
+      // For each render
+      // Reset each of the cells to their original position and area and remove any editor it may have had
+      for (let y = 0; y < numRows; y++)
+        for (let x = 0; x < numColumns; x++) {
+          const gridCell = cellsCache[`${x + 1}-${y + 1}`];
+          gridCell.setGridArea(y + 1, x + 1, y + 2, x + 2);
+          gridCell.setEditor(null);
+          gridCell._props.editor = undefined;
+        }
+
+      // Now for each cell in the project, assign it to its grid cell, set the area, and the editor
+      projectStoreProxy.project?.workspace.cells.forEach((cell) => {
+        if (!cell.editor) return;
+
+        const editor = editors[cell.editor];
+        const cellId = `${cell.colStart}-${cell.rowStart}`;
+        const gridCell = cellsCache[cellId];
+        gridCell.setGridArea(
+          cell.rowStart,
+          cell.colStart,
+          cell.rowEnd,
+          cell.colEnd
+        );
+        gridCell.setEditor(editor);
+        gridCell._props.editor = cell.editor;
+      });
+
+      return allCells;
     };
   }
 

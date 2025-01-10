@@ -1,4 +1,4 @@
-import { Callback, UnsubscribeStoreFn } from './Signaller';
+import { Callback, UnsubscribeStoreFn, RescribeStoreFn } from './Signaller';
 import { Store } from './Store';
 
 type RenderFn = () => void;
@@ -27,7 +27,9 @@ export abstract class Component<T = any>
 {
   shadow: ShadowRoot | null;
   render: RenderFn;
-  private trackedStores: UnsubscribeStoreFn[];
+  private trackedUnsubscribes: UnsubscribeStoreFn[];
+  private trackedSubscribes: RescribeStoreFn[];
+
   onMount?: () => void;
   onCleanup?: () => void;
 
@@ -36,7 +38,8 @@ export abstract class Component<T = any>
 
   constructor(options?: ComponentOptions<T>) {
     super();
-    this.trackedStores = [];
+    this.trackedUnsubscribes = [];
+    this.trackedSubscribes = [];
     const useShadow =
       options?.useShadow === undefined ? true : options?.useShadow;
     this.shadow = useShadow
@@ -112,8 +115,9 @@ export abstract class Component<T = any>
    * @returns
    */
   observeStore<K extends object>(store: Store<K>, cb?: Callback<K>) {
-    const [val, unsubscribe] = store.createProxy(cb || this.render);
-    this.trackedStores.push(unsubscribe);
+    const [val, unsubscribe, rescribe] = store.createProxy(cb || this.render);
+    this.trackedUnsubscribes.push(unsubscribe);
+    this.trackedSubscribes.push(rescribe);
     return val;
   }
 
@@ -163,10 +167,11 @@ export abstract class Component<T = any>
     this.generateCss();
     this.render();
     this.onMount?.();
+    for (const resubscribeFn of this.trackedSubscribes) resubscribeFn?.();
   }
 
   disconnectedCallback() {
     this.onCleanup?.();
-    for (const soreUnsubscribeFn of this.trackedStores) soreUnsubscribeFn();
+    for (const unsubscribeFn of this.trackedUnsubscribes) unsubscribeFn();
   }
 }

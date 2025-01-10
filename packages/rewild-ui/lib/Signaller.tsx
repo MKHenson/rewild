@@ -15,6 +15,7 @@ type DotNestedKeys<T> = T extends Date | Function | Array<any>
   : never;
 
 export type UnsubscribeStoreFn = () => void;
+export type RescribeStoreFn = undefined | (() => void);
 export type Callback<T> = (
   prop: DotNestedKeys<T>,
   prevValue: any,
@@ -34,7 +35,7 @@ export class Signaller<T extends object> {
   }
 
   /** Creates a proxy of the store's target*/
-  proxy(cb?: Callback<T>): [T, UnsubscribeStoreFn] {
+  proxy(cb?: Callback<T>): [T, UnsubscribeStoreFn, RescribeStoreFn] {
     const listeners = this.listeners;
 
     if (cb) listeners.push(cb);
@@ -42,10 +43,11 @@ export class Signaller<T extends object> {
     return [
       new Proxy<T>(this.target, this.setHandlers()),
       (() =>
-        this.listeners.splice(
+        listeners.splice(
           listeners.findIndex((val) => val === cb),
           1
         )) as UnsubscribeStoreFn,
+      cb ? () => listeners.push(cb) : undefined,
     ];
   }
 
