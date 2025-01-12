@@ -47,7 +47,7 @@ export class Signaller<T extends object> {
           listeners.findIndex((val) => val === cb),
           1
         )) as UnsubscribeStoreFn,
-      cb ? () => listeners.push(cb) : undefined,
+      cb ? () => listeners.includes(cb) || listeners.push(cb) : undefined,
     ];
   }
 
