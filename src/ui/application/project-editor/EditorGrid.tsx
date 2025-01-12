@@ -1,6 +1,6 @@
 import { GridCell } from './GridCell';
 import { RibbonButtons } from './editors/RibbonButtons';
-import { EditorType, IWorkspaceCell } from 'models';
+import { EditorType } from 'models';
 import { Loading, Component, register, InfoBox } from 'rewild-ui';
 import { SceneGraph } from './editors/SceneGraph';
 import { ProjectSettings } from './editors/ProjectSettings';
@@ -14,33 +14,6 @@ interface Props {
 
 const numColumns = 5;
 const numRows = 5;
-
-function createCells(workspaceCells: IWorkspaceCell[]): IWorkspaceCell[] {
-  const toRet: IWorkspaceCell[] = [];
-  for (let y = 0; y < numRows; y++)
-    for (let x = 0; x < numColumns; x++) {
-      const workspace = workspaceCells.find(
-        (cell) => cell.colStart === x + 1 && cell.rowStart === y + 1
-      );
-      toRet.push({
-        rowStart: y + 1,
-        colStart: x + 1,
-        rowEnd: workspace
-          ? workspace.rowEnd <= y + 2
-            ? y + 2
-            : workspace.rowEnd
-          : y + 2,
-        colEnd: workspace
-          ? workspace.colEnd <= x + 2
-            ? x + 2
-            : workspace.colEnd
-          : x + 2,
-        editor: workspace?.editor,
-      });
-    }
-
-  return toRet;
-}
 
 @register('x-editor-grid')
 export class EditorGrid extends Component<Props> {
