@@ -5,11 +5,13 @@ interface Props {}
 
 @register('x-editor-viewport')
 export class EditorViewport extends Component<Props> {
+  renderer: Renderer;
+
   init() {
-    const renderer = new Renderer();
+    this.renderer = new Renderer();
     const onCanvasReady = async (pane3D: Pane3D) => {
       try {
-        await renderer.init(pane3D.canvas()!);
+        await this.renderer.init(pane3D);
       } catch (err: unknown) {}
     };
 
@@ -22,6 +24,10 @@ export class EditorViewport extends Component<Props> {
 
   getStyle() {
     return StyledContainer;
+  }
+
+  dispose() {
+    this.renderer.dispose();
   }
 }
 

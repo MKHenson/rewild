@@ -42,8 +42,8 @@ export const createDefaultWorkspace = (): IWorkspace => {
       {
         editor: 'viewport',
         colStart: 2,
-        colEnd: 4,
-        rowStart: 3,
+        colEnd: 5,
+        rowStart: 2,
         rowEnd: 6,
       },
     ],

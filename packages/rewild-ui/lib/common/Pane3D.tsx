@@ -1,43 +1,48 @@
-import { Component, register } from "../Component";
+import { Component, register } from '../Component';
 
 interface Props {
   onCanvasReady: (canvas: Pane3D) => void;
+  onResize?: (canvas: Pane3D) => void;
 }
 
-@register("x-pane-3d")
+@register('x-pane-3d')
 export class Pane3D extends Component<Props> {
   onResizeDelegate: (e?: UIEvent) => void;
+  // observer: ResizeObserver;
 
   init() {
     this.onResizeDelegate = this.onResize.bind(this);
 
     this.onMount = () => {
-      window.addEventListener("resize", this.onResizeDelegate);
+      window.addEventListener('resize', this.onResizeDelegate);
       this.onResizeDelegate();
 
       const canvas = this.canvas();
+
       if (canvas) this.props.onCanvasReady(this);
     };
 
     this.onCleanup = () => {
-      window.removeEventListener("resize", this.onResizeDelegate);
+      window.removeEventListener('resize', this.onResizeDelegate);
     };
 
-    return () => (
+    const element = (
       <div>
         <canvas></canvas>
       </div>
     );
+    return () => element;
   }
 
   private onResize(e?: UIEvent) {
-    const canvas = this.shadow!.querySelector("canvas")!;
+    const canvas = this.shadow!.querySelector('canvas')!;
     canvas.width = this.clientWidth;
     canvas.height = this.clientHeight;
+    this.props.onResize?.(this);
   }
 
   canvas() {
-    const canvas = this.shadow!.querySelector("canvas");
+    const canvas = this.shadow!.querySelector('canvas');
     return canvas;
   }
 
