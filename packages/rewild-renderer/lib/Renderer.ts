@@ -37,8 +37,11 @@ export class Renderer {
   renderTarget: GPUTexture | undefined;
   presentationFormat: GPUTextureFormat;
   initialized: boolean;
+  private onFrameHandler: () => void;
 
-  constructor() {}
+  constructor() {
+    this.onFrameHandler = this.onFrame.bind(this);
+  }
 
   async init(pane: Pane3D) {
     if (this.initialized) return;
@@ -103,19 +106,19 @@ export class Renderer {
       },
     });
 
-    const frame = () => {
-      if (this.disposed) return;
-
-      this.render();
-      requestAnimationFrame(frame);
-    };
-
-    requestAnimationFrame(frame);
+    requestAnimationFrame(this.onFrameHandler);
 
     this.initialized = true;
     this.context = context;
     this.device = device;
     this.pipeline = pipeline;
+  }
+
+  onFrame() {
+    if (this.disposed) return;
+
+    this.render();
+    requestAnimationFrame(this.onFrameHandler);
   }
 
   dispose() {

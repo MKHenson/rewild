@@ -7,6 +7,15 @@ import {
   register,
 } from 'rewild-ui';
 
+type CellUpdatedCallback = (
+  type: EditorType,
+  rowStart: number,
+  colStart: number,
+  rowEnd: number,
+  colEnd: number,
+  interaction: 'drop' | 'button'
+) => void;
+
 interface Props {
   rowStart: number;
   rowEnd: number;
@@ -15,14 +24,7 @@ interface Props {
   hasElement?: boolean;
   editorElm?: JSX.Element;
   editor?: EditorType;
-  onEditorMoved: (
-    type: EditorType,
-    rowStart: number,
-    colStart: number,
-    rowEnd: number,
-    colEnd: number,
-    interaction: 'drop' | 'button'
-  ) => void;
+  onEditorMoved: CellUpdatedCallback;
 }
 
 const onDragEndEvent = (e: DragEvent) => {
@@ -41,6 +43,30 @@ export class GridCell extends Component<Props> {
         sizeX: props.colEnd - props.colStart,
         sizeY: props.rowEnd - props.rowStart,
       });
+    };
+
+    const onClickLeftShrink = (e: MouseEvent) => {
+      const props = this.props;
+      props.onEditorMoved(
+        props.editor!,
+        props.rowStart,
+        props.colStart + 1,
+        props.rowEnd,
+        props.colEnd,
+        'button'
+      );
+    };
+
+    const onClickLeftExpand = (e: MouseEvent) => {
+      const props = this.props;
+      props.onEditorMoved(
+        props.editor!,
+        props.rowStart,
+        props.colStart - 1,
+        props.rowEnd,
+        props.colEnd,
+        'button'
+      );
     };
 
     const onClickRightShrink = (e: MouseEvent) => {
@@ -101,6 +127,12 @@ export class GridCell extends Component<Props> {
         <div class="content">
           <span class="editor-placeholder" />
           <div class="dragger" draggable={true} ondragstart={onDragStart} />
+          <div class="sizer sizerLeft_shrink" onclick={onClickLeftShrink}>
+            -
+          </div>
+          <div class="sizer sizerLeft_expand" onclick={onClickLeftExpand}>
+            +
+          </div>
           <div class="sizer sizerRight_shrink" onclick={onClickRightShrink}>
             -
           </div>
@@ -119,6 +151,7 @@ export class GridCell extends Component<Props> {
 
     return () => {
       const props = this.props;
+
       this.setGridArea(
         props.rowStart,
         props.colStart,
@@ -145,6 +178,12 @@ export class GridCell extends Component<Props> {
     this._props.colStart = colStart;
     this._props.rowEnd = rowEnd;
     this._props.colEnd = colEnd;
+
+    if (colEnd - colStart === 1) this.setAttribute('data-is-one-col', 'true');
+    else this.removeAttribute('data-is-one-col');
+
+    if (rowEnd - rowStart === 1) this.setAttribute('data-is-one-row', 'true');
+    else this.removeAttribute('data-is-one-row');
   }
 
   setEditor(editor?: JSX.Element | null, parent?: HTMLElement | null) {
@@ -212,6 +251,7 @@ const StyledGridCell = cssStylesheet(css`
 
   :host {
     min-height: 0;
+    min-width: 0;
   }
 
   .content {
@@ -222,6 +262,14 @@ const StyledGridCell = cssStylesheet(css`
     box-sizing: border-box;
     position: relative;
   }
+  :host([data-is-one-col='true']) .sizerRight_shrink,
+  :host([data-is-one-col='true']) .sizerLeft_shrink {
+    display: none;
+  }
+  :host([data-is-one-row='true']) .sizerHeight_shrink {
+    display: none;
+  }
+
   :host([drop-active='true']) {
     background: #1e5ebf7f;
   }
@@ -246,6 +294,14 @@ const StyledGridCell = cssStylesheet(css`
   }
   .sizer:active {
     transform: scale(0.8);
+  }
+  .sizerLeft_shrink {
+    left: -0;
+    top: calc(50% - 8px);
+  }
+  .sizerLeft_expand {
+    left: -0;
+    top: calc(50% + 8px);
   }
   .sizerRight_shrink {
     right: -0;

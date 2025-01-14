@@ -42,17 +42,8 @@ export class EditorGrid extends Component<Props> {
     ) => {
       projectStoreProxy.dirty = true;
       const cells = projectStoreProxy.project!.workspace.cells;
-      let dir: 'up' | 'down' | 'left' | 'right' | 'none' = 'none';
-
       const newCells = cells.map((cell) => {
         if (cell.editor === type) {
-          if (interaction === 'button') {
-            if (rowEnd > cell.rowEnd) dir = 'down';
-            else if (rowEnd < cell.rowEnd) dir = 'up';
-            else if (colEnd < cell.colEnd) dir = 'left';
-            else if (colEnd > cell.colEnd) dir = 'right';
-          }
-
           return {
             ...cell,
             editor: type,
@@ -65,51 +56,8 @@ export class EditorGrid extends Component<Props> {
         return cell;
       });
 
+      // Keep the cells within the bounds of the grid
       newCells.forEach((cell) => {
-        for (const otherCell of newCells) {
-          if (otherCell === cell) continue;
-
-          if (
-            (dir === 'down' || dir === 'up') &&
-            otherCell.colStart === cell.colStart && // Same column
-            otherCell.rowStart === cell.rowEnd - (dir === 'down' ? 1 : -1) // At a horizontal join
-          ) {
-            // If the 'cell' is above the otherCell
-            if (cell.rowStart < otherCell.rowStart) {
-              if (dir === 'down') {
-                // If this is the last row
-                if (otherCell.rowStart + 1 >= 6) {
-                  otherCell.rowStart = 5;
-                  cell.rowEnd -= 1;
-                } else {
-                  otherCell.rowStart += 1;
-                }
-              } else {
-                otherCell.rowStart -= 1;
-              }
-            }
-          } else if (
-            (dir === 'left' || dir === 'right') &&
-            otherCell.rowStart === cell.rowStart && // Same row
-            otherCell.colStart === cell.colEnd - (dir === 'right' ? 1 : -1) // At a horizontal join
-          ) {
-            // If the 'cell' is above the otherCell
-            if (cell.colStart < otherCell.colStart) {
-              if (dir === 'right') {
-                // If this is the last row
-                if (otherCell.colStart + 1 >= 6) {
-                  otherCell.colStart = 5;
-                  cell.colEnd -= 1;
-                } else {
-                  otherCell.colStart += 1;
-                }
-              } else {
-                otherCell.colStart -= 1;
-              }
-            }
-          }
-        }
-
         cell.colStart = cell.colStart > 6 ? 6 : cell.colStart;
         cell.rowStart = cell.rowStart > 6 ? 6 : cell.rowStart;
         cell.colEnd = cell.colEnd > 6 ? 6 : cell.colEnd;
