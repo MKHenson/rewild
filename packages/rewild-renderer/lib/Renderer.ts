@@ -1,25 +1,38 @@
 import { Pane3D } from 'rewild-ui';
 
 const triangleVertWGSL = `
+struct OurVertexShaderOutput {
+  @builtin(position) position: vec4f,
+  @location(0) color: vec4f,
+};
+
+
 @vertex
-fn main(
+fn vs(
   @builtin(vertex_index) VertexIndex : u32
-) -> @builtin(position) vec4f {
+) -> OurVertexShaderOutput {
   var pos = array<vec2f, 3>(
-    vec2(0.0, 0.5),
-    vec2(-0.5, -0.5),
-    vec2(0.5, -0.5)
+    vec2f(0.0, 0.5),
+    vec2f(-0.5, -0.5),
+    vec2f(0.5, -0.5)
   );
 
-  return vec4f(pos[VertexIndex], 0.0, 1.0);
-}`;
+  var color = array<vec4f, 3>(
+    vec4f(1.0, 0.0, 0.0, 0.5), // red
+    vec4f(0.0, 1.0, 0.0, 0.5), // green
+    vec4f(0.0, 0.0, 1.0, 0.5)  // blue
+  );
 
-const redFragWGSL = `
-@fragment
-fn main() -> @location(0) vec4f {
-  return vec4(1.0, 0.0, 0.0, 1.0);
+  var output: OurVertexShaderOutput;
+  output.position = vec4f(pos[VertexIndex], 0.0, 1.0);
+  output.color = color[VertexIndex];
+  return output;
 }
-`;
+  
+@fragment
+fn fs(fsInput: OurVertexShaderOutput) -> @location(0) vec4f {
+  return fsInput.color;
+}`;
 
 const sampleCount = 4;
 
@@ -79,19 +92,19 @@ export class Renderer {
       format: this.presentationFormat,
     });
 
+    const module = device.createShaderModule({
+      code: triangleVertWGSL,
+    });
+
     const pipeline = device.createRenderPipeline({
       layout: 'auto',
       vertex: {
-        entryPoint: 'main',
-        module: device.createShaderModule({
-          code: triangleVertWGSL,
-        }),
+        entryPoint: 'vs',
+        module,
       },
       fragment: {
-        entryPoint: 'main',
-        module: device.createShaderModule({
-          code: redFragWGSL,
-        }),
+        entryPoint: 'fs',
+        module,
         targets: [
           {
             format: this.presentationFormat,
