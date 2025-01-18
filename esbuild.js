@@ -1,4 +1,5 @@
 import * as esbuild from 'esbuild';
+import fs from 'fs';
 import { copy } from 'esbuild-plugin-copy';
 
 const copyPluginDetails = {
@@ -63,7 +64,7 @@ const wgslPlugin = {
     build.onLoad({ filter: /\.wgsl$/ }, async (args) => {
       const contents = await fs.promises.readFile(args.path, 'utf8');
       return {
-        contents: `export default ${JSON.stringify(contents)}`,
+        contents: contents,
         loader: 'text',
       };
     });
