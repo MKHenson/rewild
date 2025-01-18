@@ -7,6 +7,7 @@
       "@webgpu/types",
       "rewild-ui/types/jsx",
       "rewild-ui/types/jsx-base",
+      "rewild-renderer/types/wgsl",
       "jest"
     ],
     "paths": {
