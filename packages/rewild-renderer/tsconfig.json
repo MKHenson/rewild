@@ -2,6 +2,14 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./build",
-    "types": ["node", "rewild-common/types/types", "@webgpu/types", "jest"]
-  }
+    "resolveJsonModule": true,
+    "types": [
+      "node",
+      "rewild-common/types/types",
+      "./types/wgsl.d.ts",
+      "@webgpu/types",
+      "jest"
+    ]
+  },
+  "include": ["lib/**/*.wgsl", "lib/**/*.ts"]
 }

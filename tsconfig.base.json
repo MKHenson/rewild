@@ -25,6 +25,7 @@
     "module": "ESNext",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
-    "inlineSourceMap": false
+    "inlineSourceMap": false,
+    "resolveJsonModule": true
   }
 }
