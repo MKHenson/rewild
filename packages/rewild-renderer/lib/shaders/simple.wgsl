@@ -3,19 +3,13 @@ struct OurVertexShaderOutput {
   @location(0) color: vec4f,
 };
 
-// Doesnt change much 
-struct OurStruct {
-  color: vec4f,
-  offset: vec2f,
-};
-
-// Does change much
-struct OtherStruct {
-  scale: vec2f,
-};
 
 struct Vertex {
-  position: vec2f,
+  @location(0) position: vec2f,
+  @location(1) color: vec4f,
+  @location(2) offset: vec2f,
+  @location(3) scale: vec2f,
+  @location(4) perVertexColor: vec3f,
 };
 
 struct VSOutput {
@@ -23,24 +17,15 @@ struct VSOutput {
   @location(0) color: vec4f,
 }
 
-@group(0) @binding(0) var<storage, read> ourStructs: array<OurStruct>;
-@group(0) @binding(1) var<storage, read> otherStructs: array<OtherStruct>;
-@group(0) @binding(2) var<storage, read> pos: array<Vertex>;
-
 @vertex
 fn vs(
-  @builtin(vertex_index) vertexIndex : u32,
-  @builtin(instance_index) instanceIndex: u32
+  vert: Vertex
 ) -> VSOutput {
-
-  let otherStruct = otherStructs[instanceIndex];
-  let ourStruct = ourStructs[instanceIndex];
 
   var vsOut: VSOutput;
   vsOut.position = vec4f(
-      pos[vertexIndex].position * otherStruct.scale + ourStruct.offset, 0.0, 1.0);
-
-  vsOut.color = ourStruct.color;
+      vert.position * vert.scale + vert.offset, 0.0, 1.0);
+  vsOut.color = vert.color * vec4f(vert.perVertexColor, 1);
   return vsOut;
 }
 
