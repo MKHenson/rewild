@@ -11,5 +11,5 @@
       "jest"
     ]
   },
-  "include": ["lib/**/*.wgsl", "lib/**/*.ts"]
+  "include": ["lib/**/*.wgsl", "lib/**/*.ts", "types/**/*.d.ts"]
 }
