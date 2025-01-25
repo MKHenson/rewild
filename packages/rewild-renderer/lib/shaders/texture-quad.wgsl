@@ -29,7 +29,7 @@ struct Uniforms {
   let xy = pos[vertexIndex];
   vsOutput.position = vec4f(xy * uni.scale + uni.offset, 0.0, 1.0);
   // vsOutput.position = vec4f(xy, 0.0, 1.0);
-  vsOutput.texcoord = vec2f(xy.x, 1.0 - xy.y);
+  vsOutput.texcoord = vec2f(xy.x, xy.y);
   return vsOutput;
 }
 

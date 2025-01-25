@@ -1,8 +1,12 @@
 import { IRenderable } from '../../types/interfaces';
 import { Renderer } from '../Renderer';
 import shader from '../shaders/texture-quad.wgsl';
+import {
+  createTextureFromSource,
+  loadImageBitmap,
+} from '../utils/ImageLoaders';
 
-export class QuadRenderer implements IRenderable {
+export class LoadedImageQuad implements IRenderable {
   bindGroup: GPUBindGroup;
   texture: GPUTexture;
   pipeline: GPURenderPipeline;
@@ -16,42 +20,16 @@ export class QuadRenderer implements IRenderable {
       code: shader,
     });
 
-    const kTextureWidth = 5;
-    const kTextureHeight = 7;
-    const _ = [255, 0, 0, 255]; // red
-    const y = [255, 255, 0, 255]; // yellow
-    const b = [0, 0, 255, 255]; // blue
-
-    // Disable prettier for this array as it's easier to read this way
-    // prettier-ignore
-    const textureData = new Uint8Array([
-      b, _, _, _, _,
-      _, y, y, y, _,
-      _, y, _, _, _,
-      _, y, y, _, _,
-      _, y, _, _, _,
-      _, y, _, _, _,
-      _, _, _, _, _,
-    ].flat());
-
-    this.texture = device.createTexture({
-      size: [kTextureWidth, kTextureHeight],
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-    });
-
-    device.queue.writeTexture(
-      { texture: this.texture },
-      textureData,
-      { bytesPerRow: kTextureWidth * 4 },
-      { width: kTextureWidth, height: kTextureHeight }
-    );
+    const MEDIA_URL = process.env.MEDIA_URL;
+    const url = `${MEDIA_URL}utils/f-texture.png`;
+    const source = await loadImageBitmap(url);
+    this.texture = createTextureFromSource(device, source, 'rgba8unorm', false);
 
     const sampler = device.createSampler({
       addressModeU: 'repeat',
       addressModeV: 'repeat',
-      magFilter: 'nearest',
-      minFilter: 'nearest',
+      magFilter: 'linear',
+      minFilter: 'linear',
     });
 
     const pipeline = device.createRenderPipeline({
@@ -82,8 +60,21 @@ export class QuadRenderer implements IRenderable {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // create a typedarray to hold the values for the uniforms in JavaScript
+    // offsets to the various uniform values in float32 indices
+    const kScaleOffset = 0;
+    const kOffsetOffset = 2;
+
+    // compute a scale that will draw our 0 to 1 clip space quad
+    // 2x2 pixels in the canvas.
+    const scaleX = 1; // canvas.width * 0.1;
+    const scaleY = 1; // canvas.height * 0.1;
+
     this.uniformValues = new Float32Array(uniformBufferSize / 4);
+    this.uniformValues.set([scaleX, scaleY], kScaleOffset); // set the scale
+    this.uniformValues.set([-1, -1], kOffsetOffset); // set the offset
+
+    // copy the values from JavaScript to the GPU
+    device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformValues);
 
     this.bindGroup = device.createBindGroup({
       layout: pipeline.getBindGroupLayout(0),
@@ -99,26 +90,6 @@ export class QuadRenderer implements IRenderable {
   }
 
   render(renderer: Renderer, pass: GPURenderPassEncoder) {
-    const { device } = renderer;
-
-    // offsets to the various uniform values in float32 indices
-    const kScaleOffset = 0;
-    const kOffsetOffset = 2;
-
-    // compute a scale that will draw our 0 to 1 clip space quad
-    // 2x2 pixels in the canvas.
-    const scaleX = 0.1; // canvas.width * 0.1;
-    const scaleY = 0.1; // canvas.height * 0.1;
-
-    this.uniformValues.set([scaleX, scaleY], kScaleOffset); // set the scale
-    this.uniformValues.set(
-      [0.5 + Math.sin(0.01 * 0.25) * 0.1, 0.5 + -0.1],
-      kOffsetOffset
-    ); // set the offset
-
-    // copy the values from JavaScript to the GPU
-    device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformValues);
-
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.bindGroup);
     pass.draw(6);

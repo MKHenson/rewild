@@ -12,7 +12,9 @@ export class EditorViewport extends Component<Props> {
     const onCanvasReady = async (pane3D: Pane3D) => {
       try {
         await this.renderer.init(pane3D);
-      } catch (err: unknown) {}
+      } catch (err: unknown) {
+        console.error(err);
+      }
     };
 
     const canvas = (<Pane3D onCanvasReady={onCanvasReady} />) as Pane3D;
