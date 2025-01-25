@@ -2,6 +2,7 @@ import { Pane3D } from 'rewild-ui';
 import { IRenderable } from '../types/interfaces';
 import { CirclesRenderer } from './renderables.ts/CirclesRenderer';
 import { QuadRenderer } from './renderables.ts/QuadRenderer';
+import { LoadedImageQuad } from './renderables.ts/LoadedImageQuad';
 
 export class Renderer {
   device: GPUDevice;
@@ -62,8 +63,8 @@ export class Renderer {
     this.device = device;
 
     this.renderables = await Promise.all(
-      [new CirclesRenderer(), new QuadRenderer()].map((renderable) =>
-        renderable.initialize(this)
+      [new CirclesRenderer(), new QuadRenderer(), new LoadedImageQuad()].map(
+        (renderable) => renderable.initialize(this)
       )
     );
 
