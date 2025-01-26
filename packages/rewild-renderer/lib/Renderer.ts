@@ -3,6 +3,7 @@ import { IRenderable } from '../types/interfaces';
 import { CirclesRenderer } from './renderables.ts/CirclesRenderer';
 import { QuadRenderer } from './renderables.ts/QuadRenderer';
 import { LoadedImageQuad } from './renderables.ts/LoadedImageQuad';
+import { GuiRenderer } from './renderables.ts/GuiRenderer';
 
 export class Renderer {
   device: GPUDevice;
@@ -63,9 +64,12 @@ export class Renderer {
     this.device = device;
 
     this.renderables = await Promise.all(
-      [new CirclesRenderer(), new QuadRenderer(), new LoadedImageQuad()].map(
-        (renderable) => renderable.initialize(this)
-      )
+      [
+        new CirclesRenderer(),
+        new QuadRenderer(),
+        new LoadedImageQuad(),
+        new GuiRenderer(),
+      ].map((renderable) => renderable.initialize(this))
     );
 
     requestAnimationFrame(this.onFrameHandler);
