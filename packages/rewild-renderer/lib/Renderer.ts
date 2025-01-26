@@ -3,6 +3,7 @@ import { IRenderable } from '../types/interfaces';
 import { CirclesRenderer } from './renderables.ts/CirclesRenderer';
 import { QuadRenderer } from './renderables.ts/QuadRenderer';
 import { LoadedImageQuad } from './renderables.ts/LoadedImageQuad';
+import { DrawF } from './renderables.ts/DrawF';
 import { GuiRenderer } from './renderables.ts/GuiRenderer';
 
 export class Renderer {
@@ -68,6 +69,7 @@ export class Renderer {
         new CirclesRenderer(),
         new QuadRenderer(),
         new LoadedImageQuad(),
+        new DrawF(),
         new GuiRenderer(),
       ].map((renderable) => renderable.initialize(this))
     );

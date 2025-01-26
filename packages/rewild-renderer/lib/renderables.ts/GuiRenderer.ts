@@ -5,30 +5,15 @@ import guiShader from '../shaders/gui.wgsl';
 function createFVertices() {
   // prettier-ignore
   const vertexData = new Float32Array([
-    // left column
     0, 0,
-    30, 0,
-    0, 150,
-    30, 150,
- 
-    // top rung
-    30, 0,
-    100, 0,
-    30, 30,
-    100, 30,
- 
-    // middle rung
-    30, 60,
-    70, 60,
-    30, 90,
-    70, 90,
+    1, 0,
+    0, 1,
+    1, 1,
   ]);
 
   // prettier-ignore
   const indexData = new Uint32Array([
-    0,  1,  2,    2,  1,  3,  // left column
-    4,  5,  6,    6,  5,  7,  // top run
-    8,  9, 10,   10,  9, 11,  // middle run
+    0,  1,  2,    2,  1,  3
   ]);
 
   return {
@@ -42,16 +27,48 @@ export class GuiRenderer implements IRenderable {
   bindGroup: GPUBindGroup;
   numVertices: number;
   vertexBuffer: GPUBuffer;
+  instanceBuffer: GPUBuffer;
   indexBuffer: GPUBuffer;
   pipeline: GPURenderPipeline;
   uniformBuffer: GPUBuffer;
   uniformValues: Float32Array;
-  colorValue: Float32Array;
   resolutionValue: Float32Array;
-  translationValue: Float32Array;
+  prevNumElements: i32;
+
+  elements: {
+    x: f32;
+    y: f32;
+    width: f32;
+    height: f32;
+  }[];
 
   async initialize(renderer: Renderer) {
-    const { device, presentationFormat } = renderer;
+    const { device, presentationFormat, pane } = renderer;
+    this.prevNumElements = 0;
+
+    pane.canvas()!.addEventListener('click', () => {
+      this.elements.push({
+        x: Math.random() * 800,
+        y: Math.random() * 800,
+        width: Math.random() * 500,
+        height: Math.random() * 300,
+      });
+    });
+
+    this.elements = [
+      {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+      },
+      {
+        x: 500,
+        y: 700,
+        width: 50,
+        height: 40,
+      },
+    ];
 
     const module = device.createShaderModule({
       code: guiShader,
@@ -70,6 +87,14 @@ export class GuiRenderer implements IRenderable {
               { shaderLocation: 0, offset: 0, format: 'float32x2' }, // position
             ],
           },
+          {
+            arrayStride: 4 * 4, // (4) floats, 4 bytes each
+            stepMode: 'instance',
+            attributes: [
+              { shaderLocation: 1, offset: 0, format: 'float32x2' }, // offset
+              { shaderLocation: 2, offset: 8, format: 'float32x2' }, // size
+            ],
+          },
         ],
       },
       fragment: {
@@ -78,6 +103,18 @@ export class GuiRenderer implements IRenderable {
         targets: [
           {
             format: presentationFormat,
+            blend: {
+              color: {
+                srcFactor: 'src-alpha',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add',
+              },
+              alpha: {
+                srcFactor: 'one',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add',
+              },
+            },
           },
         ],
       },
@@ -86,8 +123,8 @@ export class GuiRenderer implements IRenderable {
       },
     });
 
-    // color, resolution, translation
-    const uniformBufferSize = (4 + 2 + 2) * 4;
+    // resolution size of the canvas stored as a vec2
+    const uniformBufferSize = 2 * 4;
     this.uniformBuffer = device.createBuffer({
       label: 'uniforms',
       size: uniformBufferSize,
@@ -95,29 +132,15 @@ export class GuiRenderer implements IRenderable {
     });
 
     this.uniformValues = new Float32Array(uniformBufferSize / 4);
+    this.resolutionValue = this.uniformValues.subarray(0, 2);
 
-    // offsets to the various uniform values in float32 indices
-    const kColorOffset = 0;
-    const kResolutionOffset = 4;
-    const kTranslationOffset = 6;
+    this.bindGroup = device.createBindGroup({
+      label: 'bind group for object',
+      layout: this.pipeline.getBindGroupLayout(0),
+      entries: [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
+    });
 
-    this.colorValue = this.uniformValues.subarray(
-      kColorOffset,
-      kColorOffset + 4
-    );
-    this.resolutionValue = this.uniformValues.subarray(
-      kResolutionOffset,
-      kResolutionOffset + 2
-    );
-    this.translationValue = this.uniformValues.subarray(
-      kTranslationOffset,
-      kTranslationOffset + 2
-    );
-
-    // The color will not change so let's set it once at init time
-    this.colorValue.set([Math.random(), Math.random(), Math.random(), 1]);
-
-    // Set up the vertex and index buffers
+    // Set up the vertex and index buffers for the quad
     const { vertexData, indexData, numVertices } = createFVertices();
     this.numVertices = numVertices;
 
@@ -126,6 +149,7 @@ export class GuiRenderer implements IRenderable {
       size: vertexData.byteLength,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     });
+
     device.queue.writeBuffer(this.vertexBuffer, 0, vertexData);
 
     this.indexBuffer = device.createBuffer({
@@ -133,13 +157,26 @@ export class GuiRenderer implements IRenderable {
       size: indexData.byteLength,
       usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
     });
+
     device.queue.writeBuffer(this.indexBuffer, 0, indexData);
 
-    this.bindGroup = device.createBindGroup({
-      label: 'bind group for object',
-      layout: this.pipeline.getBindGroupLayout(0),
-      entries: [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
+    // Now create the buffers for the element data
+    const elementData = new Float32Array(this.elements.length * 4);
+    for (let i = 0; i < this.elements.length; i++) {
+      const element = this.elements[i];
+      elementData.set(
+        [element.x, element.y, element.width, element.height],
+        i * 4
+      );
+    }
+
+    this.instanceBuffer = device.createBuffer({
+      label: 'element buffer',
+      size: elementData.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     });
+
+    device.queue.writeBuffer(this.instanceBuffer, 0, elementData);
 
     return this;
   }
@@ -148,18 +185,38 @@ export class GuiRenderer implements IRenderable {
     const { device, pane } = renderer;
     const canvas = pane.canvas()!;
 
+    if (this.elements.length !== this.prevNumElements) {
+      const elementData = new Float32Array(this.elements.length * 4);
+      for (let i = 0; i < this.elements.length; i++) {
+        const element = this.elements[i];
+        elementData.set(
+          [element.x, element.y, element.width, element.height],
+          i * 4
+        );
+      }
+      this.instanceBuffer.destroy();
+      this.instanceBuffer = device.createBuffer({
+        label: 'element buffer',
+        size: elementData.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      });
+
+      device.queue.writeBuffer(this.instanceBuffer, 0, elementData);
+      this.prevNumElements = this.elements.length;
+    }
+
     pass.setPipeline(this.pipeline);
     pass.setVertexBuffer(0, this.vertexBuffer);
+    pass.setVertexBuffer(1, this.instanceBuffer);
     pass.setIndexBuffer(this.indexBuffer, 'uint32');
 
     // Set the uniform values in our JavaScript side Float32Array
     this.resolutionValue.set([canvas.width, canvas.height]);
-    this.translationValue.set([Math.random() * 100, Math.random() * 100]);
 
     // upload the uniform values to the uniform buffer
     device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformValues);
 
     pass.setBindGroup(0, this.bindGroup);
-    pass.drawIndexed(this.numVertices);
+    pass.drawIndexed(this.numVertices, this.elements.length);
   }
 }
