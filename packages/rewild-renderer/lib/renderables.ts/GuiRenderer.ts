@@ -121,6 +121,11 @@ export class GuiRenderer implements IRenderable {
       multisample: {
         count: renderer.sampleCount,
       },
+      depthStencil: {
+        format: 'depth24plus',
+        depthWriteEnabled: false,
+        depthCompare: 'less',
+      },
     });
 
     // resolution size of the canvas stored as a vec2

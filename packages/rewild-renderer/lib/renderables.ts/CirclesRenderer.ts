@@ -66,6 +66,11 @@ export class CirclesRenderer implements IRenderable {
       multisample: {
         count: renderer.sampleCount,
       },
+      depthStencil: {
+        format: 'depth24plus',
+        depthWriteEnabled: false,
+        depthCompare: 'less',
+      },
     });
 
     // a typed array we can use to update the changingStorageBuffer

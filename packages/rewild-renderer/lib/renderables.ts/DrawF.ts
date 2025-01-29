@@ -81,6 +81,11 @@ export class DrawF implements IRenderable {
           },
         ],
       },
+      depthStencil: {
+        format: 'depth24plus',
+        depthWriteEnabled: true,
+        depthCompare: 'less',
+      },
       multisample: {
         count: renderer.sampleCount,
       },

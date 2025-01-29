@@ -66,6 +66,11 @@ export class QuadRenderer implements IRenderable {
         module,
         targets: [{ format: presentationFormat }],
       },
+      depthStencil: {
+        format: 'depth24plus',
+        depthWriteEnabled: false,
+        depthCompare: 'less',
+      },
       multisample: {
         count: renderer.sampleCount,
       },

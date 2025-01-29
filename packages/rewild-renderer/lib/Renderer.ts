@@ -5,6 +5,7 @@ import { QuadRenderer } from './renderables.ts/QuadRenderer';
 import { LoadedImageQuad } from './renderables.ts/LoadedImageQuad';
 import { DrawF } from './renderables.ts/DrawF';
 import { GuiRenderer } from './renderables.ts/GuiRenderer';
+import { CubeRenderer } from './renderables.ts/CubeRenderer';
 
 export class Renderer {
   device: GPUDevice;
@@ -20,6 +21,7 @@ export class Renderer {
   private renderTargetView: GPUTextureView | undefined;
   private renderTarget: GPUTexture | undefined;
   private initialized: boolean;
+  private depthTexture: GPUTexture;
 
   private onFrameHandler: () => void;
 
@@ -67,6 +69,7 @@ export class Renderer {
     this.renderables = await Promise.all(
       [
         new CirclesRenderer(),
+        new CubeRenderer(),
         new QuadRenderer(),
         new LoadedImageQuad(),
         new DrawF(),
@@ -118,6 +121,13 @@ export class Renderer {
         usage: GPUTextureUsage.RENDER_ATTACHMENT,
       });
 
+      this.depthTexture = device.createTexture({
+        size: [canvas.width, canvas.height],
+        format: 'depth24plus',
+        sampleCount: this.sampleCount,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+
       renderTargetView = renderTarget.createView();
       this.renderTarget = renderTarget;
       this.renderTargetView = renderTargetView;
@@ -144,6 +154,12 @@ export class Renderer {
             storeOp: 'store',
           },
         ],
+        depthStencilAttachment: {
+          view: this.depthTexture.createView(),
+          depthClearValue: 1.0,
+          depthLoadOp: 'clear',
+          depthStoreOp: 'store',
+        },
       };
 
       const pass = encoder.beginRenderPass(renderPassDescriptor);
