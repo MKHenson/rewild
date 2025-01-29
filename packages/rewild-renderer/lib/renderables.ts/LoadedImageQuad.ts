@@ -47,6 +47,11 @@ export class LoadedImageQuad implements IRenderable {
       multisample: {
         count: renderer.sampleCount,
       },
+      depthStencil: {
+        format: 'depth24plus',
+        depthWriteEnabled: false,
+        depthCompare: 'less',
+      },
     });
 
     // create a buffer for the uniform values
