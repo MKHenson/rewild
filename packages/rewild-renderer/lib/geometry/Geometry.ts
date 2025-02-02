@@ -1,65 +1,65 @@
-export class Geometry {
-  vertices: Float32Array;
-  indices: Uint16Array;
-  normals: Float32Array;
-  uvs: Float32Array;
-
-  constructor() {
-    this.vertices = new Float32Array();
-    this.indices = new Uint16Array();
-    this.normals = new Float32Array();
-    this.uvs = new Float32Array();
-  }
+export class GeometryGroup {
+  public start: i32;
+  public count: i32;
+  public materialIndex: i32;
 }
 
-export const cubeVertexSize = 4 * 10; // Byte size of one cube vertex.
-export const cubePositionOffset = 0;
-export const cubeColorOffset = 4 * 4; // Byte offset of cube vertex color attribute.
-export const cubeUVOffset = 4 * 8;
-export const cubeVertexCount = 36;
+export class Geometry {
+  vertices: Float32Array;
+  indices?: Uint16Array;
+  normals?: Float32Array;
+  uvs?: Float32Array;
+  groups: GeometryGroup[];
 
-// prettier-ignore
-export const cubeVertexArray = new Float32Array([
-  // float4 position, float4 color, float2 uv,
-  1, -1, 1, 1,   1, 0, 1, 1,  0, 1,
-  -1, -1, 1, 1,  0, 0, 1, 1,  1, 1,
-  -1, -1, -1, 1, 0, 0, 0, 1,  1, 0,
-  1, -1, -1, 1,  1, 0, 0, 1,  0, 0,
-  1, -1, 1, 1,   1, 0, 1, 1,  0, 1,
-  -1, -1, -1, 1, 0, 0, 0, 1,  1, 0,
+  vertexBuffer: GPUBuffer;
+  normalBuffer: GPUBuffer;
+  uvBuffer: GPUBuffer;
+  indexBuffer: GPUBuffer;
 
-  1, 1, 1, 1,    1, 1, 1, 1,  0, 1,
-  1, -1, 1, 1,   1, 0, 1, 1,  1, 1,
-  1, -1, -1, 1,  1, 0, 0, 1,  1, 0,
-  1, 1, -1, 1,   1, 1, 0, 1,  0, 0,
-  1, 1, 1, 1,    1, 1, 1, 1,  0, 1,
-  1, -1, -1, 1,  1, 0, 0, 1,  1, 0,
+  constructor() {
+    this.groups = [];
+  }
 
-  -1, 1, 1, 1,   0, 1, 1, 1,  0, 1,
-  1, 1, 1, 1,    1, 1, 1, 1,  1, 1,
-  1, 1, -1, 1,   1, 1, 0, 1,  1, 0,
-  -1, 1, -1, 1,  0, 1, 0, 1,  0, 0,
-  -1, 1, 1, 1,   0, 1, 1, 1,  0, 1,
-  1, 1, -1, 1,   1, 1, 0, 1,  1, 0,
+  build(device: GPUDevice) {
+    this.vertexBuffer = device.createBuffer({
+      size: this.vertices.byteLength,
+      usage: GPUBufferUsage.VERTEX,
+      mappedAtCreation: true,
+    });
+    new Float32Array(this.vertexBuffer.getMappedRange()).set(this.vertices);
+    this.vertexBuffer.unmap();
 
-  -1, -1, 1, 1,  0, 0, 1, 1,  0, 1,
-  -1, 1, 1, 1,   0, 1, 1, 1,  1, 1,
-  -1, 1, -1, 1,  0, 1, 0, 1,  1, 0,
-  -1, -1, -1, 1, 0, 0, 0, 1,  0, 0,
-  -1, -1, 1, 1,  0, 0, 1, 1,  0, 1,
-  -1, 1, -1, 1,  0, 1, 0, 1,  1, 0,
+    if (this.normals) {
+      this.normalBuffer = device.createBuffer({
+        label: 'normal buffer data',
+        size: this.normals.byteLength,
+        usage: GPUBufferUsage.VERTEX,
+        mappedAtCreation: true,
+      });
+      new Float32Array(this.normalBuffer.getMappedRange()).set(this.normals);
+      this.normalBuffer.unmap();
+    }
 
-  1, 1, 1, 1,    1, 1, 1, 1,  0, 1,
-  -1, 1, 1, 1,   0, 1, 1, 1,  1, 1,
-  -1, -1, 1, 1,  0, 0, 1, 1,  1, 0,
-  -1, -1, 1, 1,  0, 0, 1, 1,  1, 0,
-  1, -1, 1, 1,   1, 0, 1, 1,  0, 0,
-  1, 1, 1, 1,    1, 1, 1, 1,  0, 1,
+    if (this.uvs) {
+      this.uvBuffer = device.createBuffer({
+        label: 'uv buffer data',
+        size: this.uvs.byteLength,
+        usage: GPUBufferUsage.VERTEX,
+        mappedAtCreation: true,
+      });
+      new Float32Array(this.uvBuffer.getMappedRange()).set(this.uvs);
+      this.uvBuffer.unmap();
+    }
 
-  1, -1, -1, 1,  1, 0, 0, 1,  0, 1,
-  -1, -1, -1, 1, 0, 0, 0, 1,  1, 1,
-  -1, 1, -1, 1,  0, 1, 0, 1,  1, 0,
-  1, 1, -1, 1,   1, 1, 0, 1,  0, 0,
-  1, -1, -1, 1,  1, 0, 0, 1,  0, 1,
-  -1, 1, -1, 1,  0, 1, 0, 1,  1, 0,
-]);
+    if (this.indices) {
+      this.indexBuffer = device.createBuffer({
+        label: 'index buffer data',
+        size: this.indices.byteLength,
+        usage: GPUBufferUsage.INDEX,
+        mappedAtCreation: true,
+      });
+      new Uint16Array(this.indexBuffer.getMappedRange()).set(this.indices);
+      this.indexBuffer.unmap();
+    }
+  }
+}
