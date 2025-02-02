@@ -2,21 +2,21 @@ import { mat4, vec3 } from 'wgpu-matrix';
 import { IRenderable } from '../../types/interfaces';
 import { Geometry } from '../geometry/Geometry';
 import { Renderer } from '../Renderer';
-import shader from '../shaders/cube.wgsl';
+import shader from '../shaders/plane.wgsl';
 import {
   createTextureFromSource,
   loadImageBitmap,
 } from '../utils/ImageLoaders';
-import { BoxGeometryFactory } from '../geometry/BoxGeometryFactory';
+import { PlaneGeometryFactory } from '../geometry/PlaneGeometryFactory';
 
-export class CubeRenderer implements IRenderable {
+export class PlaneRenderer implements IRenderable {
   bindGroup: GPUBindGroup;
   texture: GPUTexture;
   pipeline: GPURenderPipeline;
   uniformBuffer: GPUBuffer;
   uniformValues: Float32Array;
   // verticesBuffer: GPUBuffer;
-  cube: Geometry;
+  plane: Geometry;
 
   async initialize(renderer: Renderer) {
     const { device, presentationFormat } = renderer;
@@ -25,8 +25,8 @@ export class CubeRenderer implements IRenderable {
       code: shader,
     });
 
-    this.cube = BoxGeometryFactory.new(1, 1, 1, 1, 1, 1);
-    this.cube.build(device);
+    this.plane = PlaneGeometryFactory.new(0.5, 0.5, 1, 1);
+    this.plane.build(device);
 
     // Create a texture from the image.
     const MEDIA_URL = process.env.MEDIA_URL;
@@ -42,7 +42,7 @@ export class CubeRenderer implements IRenderable {
     });
 
     const pipeline = device.createRenderPipeline({
-      label: 'cube render pipeline',
+      label: 'plane render pipeline',
       layout: 'auto',
       vertex: {
         entryPoint: 'vs',
@@ -121,7 +121,7 @@ export class CubeRenderer implements IRenderable {
     });
 
     this.bindGroup = device.createBindGroup({
-      label: 'cube bind group',
+      label: 'plane bind group',
       layout: pipeline.getBindGroupLayout(0),
       entries: [
         {
@@ -161,6 +161,9 @@ export class CubeRenderer implements IRenderable {
       projectionMatrix,
       modelViewProjectionMatrix
     );
+
+    mat4.identity(transformationMatrix);
+
     device.queue.writeBuffer(
       this.uniformBuffer,
       0,
@@ -171,10 +174,10 @@ export class CubeRenderer implements IRenderable {
 
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.bindGroup);
-    pass.setVertexBuffer(0, this.cube.vertexBuffer);
-    pass.setVertexBuffer(1, this.cube.uvBuffer);
-    pass.setIndexBuffer(this.cube.indexBuffer, 'uint16');
-    pass.drawIndexed(this.cube.indices!.length);
+    pass.setVertexBuffer(0, this.plane.vertexBuffer);
+    pass.setVertexBuffer(1, this.plane.uvBuffer);
+    pass.setIndexBuffer(this.plane.indexBuffer, 'uint16');
+    pass.drawIndexed(this.plane.indices!.length);
   }
 }
 
@@ -183,7 +186,7 @@ function getTransformationMatrix(
   modelViewProjectionMatrix: Float32Array
 ) {
   const viewMatrix = mat4.identity();
-  mat4.translate(viewMatrix, vec3.fromValues(0, 0, -5), viewMatrix);
+  mat4.translate(viewMatrix, vec3.fromValues(0, 0, -20), viewMatrix);
   const now = Date.now() / 1000;
   mat4.rotate(
     viewMatrix,

@@ -6,6 +6,7 @@ import { LoadedImageQuad } from './renderables.ts/LoadedImageQuad';
 import { DrawF } from './renderables.ts/DrawF';
 import { GuiRenderer } from './renderables.ts/GuiRenderer';
 import { CubeRenderer } from './renderables.ts/CubeRenderer';
+import { PlaneRenderer } from './renderables.ts/PlaneRenderer';
 
 export class Renderer {
   device: GPUDevice;
@@ -72,8 +73,9 @@ export class Renderer {
         new CubeRenderer(),
         new QuadRenderer(),
         new LoadedImageQuad(),
-        new DrawF(),
         new GuiRenderer(),
+        new DrawF(),
+        new PlaneRenderer(),
       ].map((renderable) => renderable.initialize(this))
     );
 
