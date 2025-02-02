@@ -1,5 +1,6 @@
 struct Uniforms {
-  modelViewProjectionMatrix : mat4x4f,
+  projMatrix : mat4x4f,
+  modelViewMatrix: mat4x4f,
 }
 @binding(0) @group(0) var<uniform> uniforms : Uniforms;
 
@@ -14,7 +15,12 @@ fn vs(
   @location(1) uv : vec2f
 ) -> VertexOutput {
   var output : VertexOutput;
-  output.Position = uniforms.modelViewProjectionMatrix * position;
+  
+
+  var mvPosition = vec4<f32>( position.xyz, 1.0 );
+  mvPosition = uniforms.modelViewMatrix * mvPosition;
+  output.Position = uniforms.projMatrix * mvPosition;
+
   output.fragUV = uv;
   return output;
 }
@@ -26,5 +32,5 @@ fn vs(
 fn fs(
   @location(0) fragUV: vec2f
 ) -> @location(0) vec4f {
-  return textureSample(myTexture, mySampler, fragUV) * vec4f(1.0, 1.0, 1.0, 0.7);
+  return textureSample(myTexture, mySampler, fragUV) * vec4f(1.0, 1.0, 1.0, 1);
 }
