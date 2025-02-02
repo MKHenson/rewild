@@ -103,6 +103,8 @@ export class QuadRenderer implements IRenderable {
     return this;
   }
 
+  update(): void {}
+
   render(renderer: Renderer, pass: GPURenderPassEncoder) {
     const { device } = renderer;
 

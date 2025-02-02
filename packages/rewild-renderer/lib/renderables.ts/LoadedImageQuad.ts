@@ -94,6 +94,8 @@ export class LoadedImageQuad implements IRenderable {
     return this;
   }
 
+  update(): void {}
+
   render(renderer: Renderer, pass: GPURenderPassEncoder) {
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.bindGroup);

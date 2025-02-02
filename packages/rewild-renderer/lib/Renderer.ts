@@ -7,6 +7,9 @@ import { DrawF } from './renderables.ts/DrawF';
 import { GuiRenderer } from './renderables.ts/GuiRenderer';
 import { CubeRenderer } from './renderables.ts/CubeRenderer';
 import { PlaneRenderer } from './renderables.ts/PlaneRenderer';
+import { PerspectiveCamera } from './core/PerspectiveCamera';
+import { Transform } from './core/Transform';
+import { Camera } from './core/Camera';
 
 export class Renderer {
   device: GPUDevice;
@@ -23,23 +26,36 @@ export class Renderer {
   private renderTarget: GPUTexture | undefined;
   private initialized: boolean;
   private depthTexture: GPUTexture;
+  perspectiveCam: PerspectiveCamera;
+  scene: Transform;
+  private currentRenderList: RenderList;
 
   private onFrameHandler: () => void;
 
   constructor() {
     this.onFrameHandler = this.onFrame.bind(this);
+    this.scene = new Transform();
   }
 
   async init(pane: Pane3D) {
     if (this.initialized) return;
 
     this.disposed = false;
+    this.currentRenderList = new RenderList();
     this.initialized = false;
     this.pane = pane;
     this.renderables = [];
     const canvas = pane.canvas()!;
     this.prevWidth = canvas.clientWidth;
     this.prevHeight = canvas.clientHeight;
+
+    this.perspectiveCam = new PerspectiveCamera(
+      65,
+      canvas.width / canvas.height
+    );
+    this.scene.addChild(this.perspectiveCam.camera.transform);
+    this.perspectiveCam.camera.transform.position.set(0, 0, 5);
+    this.perspectiveCam.camera.lookAt(0, 0, 0);
 
     const adapter = await navigator.gpu?.requestAdapter();
     const device = await adapter?.requestDevice();
@@ -115,6 +131,9 @@ export class Renderer {
         renderTarget.destroy();
       }
 
+      this.perspectiveCam.aspect = canvas.width / canvas.height;
+      this.perspectiveCam.updateProjectionMatrix();
+
       // Resize the multisampled render target to match the new canvas size.
       renderTarget = device.createTexture({
         size: [canvas.width, canvas.height],
@@ -138,8 +157,53 @@ export class Renderer {
     }
   }
 
+  // TODO: Will come back later to flesh this out
+  projectObject(transform: Transform, camera: Camera): void {
+    if (transform.visible === false) return;
+
+    this.currentRenderList.solids.push(transform);
+
+    for (let i = 0, l = transform.children.length; i < l; i++)
+      this.projectObject(unchecked(transform.children[i]), camera);
+  }
+
   render() {
+    const pCamera = this.perspectiveCam;
+
+    for (const renderable of this.renderables) {
+      renderable.update(this);
+    }
+
+    // update scene graph
+    this.scene.updateMatrixWorld();
+
+    // update camera matrices and frustum
+    if (pCamera.camera.transform.parent === null)
+      pCamera.camera.transform.updateMatrixWorld();
+
+    // Clear the render list before projecting objects
+    this.currentRenderList.reset();
+
+    // Project objects in the scene. Collect those that are to be rendererd
+    this.projectObject(this.scene, pCamera.camera);
+
+    let transform: Transform | null;
+    const solids = this.currentRenderList.solids;
+    for (let i: i32 = 0, l: i32 = solids.length; i < l; i++) {
+      transform = solids[i];
+      if (!transform) return;
+
+      transform.modelViewMatrix.multiplyMatrices(
+        pCamera.camera.matrixWorldInverse,
+        transform.matrixWorld
+      );
+
+      transform.normalMatrix.getNormalMatrix(transform.modelViewMatrix);
+    }
+
+    // Gets the device render targets ready. Checks for things like canvas resize
     this.prepareRender();
+
     const device = this.device;
     const context = this.context;
     let renderTargetView = this.renderTargetView;
@@ -165,9 +229,10 @@ export class Renderer {
       };
 
       const pass = encoder.beginRenderPass(renderPassDescriptor);
+      const camera = this.perspectiveCam;
 
       for (const renderable of this.renderables) {
-        renderable.render(this, pass);
+        renderable.render(this, pass, camera.camera);
       }
 
       pass.end();
@@ -175,5 +240,17 @@ export class Renderer {
       const commandBuffer = encoder.finish();
       device.queue.submit([commandBuffer]);
     }
+  }
+}
+
+export class RenderList {
+  solids: Transform[];
+
+  constructor() {
+    this.solids = [];
+  }
+
+  reset(): void {
+    this.solids.splice(0, this.solids.length);
   }
 }

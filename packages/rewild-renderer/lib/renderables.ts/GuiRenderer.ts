@@ -186,6 +186,8 @@ export class GuiRenderer implements IRenderable {
     return this;
   }
 
+  update(): void {}
+
   render(renderer: Renderer, pass: GPURenderPassEncoder) {
     const { device, pane } = renderer;
     const canvas = pane.canvas()!;
