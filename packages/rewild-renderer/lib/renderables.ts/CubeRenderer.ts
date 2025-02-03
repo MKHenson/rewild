@@ -18,6 +18,7 @@ export class CubeRenderer implements IRenderable {
   cube: Geometry;
   cube1Transform: Transform;
   cube2Transform: Transform;
+  cube3Transform: Transform;
 
   transforms: Float32Array;
   instanceBuffer: GPUBuffer;
@@ -27,14 +28,19 @@ export class CubeRenderer implements IRenderable {
 
     this.cube1Transform = new Transform();
     this.cube2Transform = new Transform();
+    this.cube3Transform = new Transform();
     const module = device.createShaderModule({
       code: shader,
     });
 
     renderer.scene.addChild(this.cube1Transform);
     this.cube1Transform.addChild(this.cube2Transform);
-    this.cube2Transform.position.set(0, 0, 5);
+    this.cube2Transform.position.set(0, 0, 1);
     this.cube2Transform.scale.set(0.5, 0.5, 0.5);
+
+    this.cube2Transform.addChild(this.cube3Transform);
+    this.cube3Transform.position.set(0, 0, 1);
+    this.cube3Transform.scale.set(0.2, 0.2, 0.2);
 
     this.cube = BoxGeometryFactory.new(1, 1, 1, 1, 1, 1);
     this.cube.build(device);
@@ -123,7 +129,7 @@ export class CubeRenderer implements IRenderable {
 
     // Fill the transforms with the identity matrix
     // Set a section of the buffer to the identity matrix
-    this.transforms = new Float32Array(16 * 2);
+    this.transforms = new Float32Array(16 * 3);
     this.transforms.set(this.cube1Transform.modelViewMatrix.elements, 0);
     this.transforms.set(this.cube2Transform.modelViewMatrix.elements, 16);
 
@@ -165,27 +171,26 @@ export class CubeRenderer implements IRenderable {
     return this;
   }
 
-  update(renderer: Renderer): void {
-    const now = Date.now() / 1000;
-
-    const camera = renderer.perspectiveCam.camera;
-
-    // Rotate the camera around the origin over time
-    camera.transform.position.set(Math.sin(now) * 10, 0, Math.cos(now) * 10);
-    camera.lookAt(0, 0, 0);
-
+  update(renderer: Renderer, deltaTime: number, totalDeltaTime: number): void {
     this.cube1Transform.position.set(0, 0, 0);
     this.cube1Transform.rotation.set(
-      -Math.sin(now * 2),
-      Math.cos(now * 2),
+      -Math.sin(totalDeltaTime * 0.001 * 2),
+      Math.cos(totalDeltaTime * 0.001 * 2),
       0,
       EulerRotationOrder.XYZ
     );
 
     this.cube2Transform.rotation.set(
-      this.cube2Transform.rotation.x + now / 100,
+      totalDeltaTime * 0.003,
       0,
       0,
+      EulerRotationOrder.XYZ
+    );
+
+    this.cube3Transform.rotation.set(
+      0,
+      0,
+      totalDeltaTime * 0.005,
       EulerRotationOrder.XYZ
     );
   }
@@ -195,6 +200,7 @@ export class CubeRenderer implements IRenderable {
 
     this.transforms.set(this.cube1Transform.modelViewMatrix.elements, 0);
     this.transforms.set(this.cube2Transform.modelViewMatrix.elements, 16);
+    this.transforms.set(this.cube3Transform.modelViewMatrix.elements, 32);
     device.queue.writeBuffer(this.instanceBuffer, 0, this.transforms);
 
     device.queue.writeBuffer(
@@ -218,6 +224,6 @@ export class CubeRenderer implements IRenderable {
     pass.setVertexBuffer(0, this.cube.vertexBuffer);
     pass.setVertexBuffer(1, this.cube.uvBuffer);
     pass.setIndexBuffer(this.cube.indexBuffer, 'uint16');
-    pass.drawIndexed(this.cube.indices!.length, 2);
+    pass.drawIndexed(this.cube.indices!.length, 3);
   }
 }
