@@ -1,6 +1,8 @@
 import { IRenderable } from '../../types/interfaces';
 import { Renderer } from '../Renderer';
 import shader from '../shaders/texture-quad.wgsl';
+import { samplerManager } from '../textures/SamplerManager';
+import { textureManager } from '../textures/TextureManager';
 
 export class QuadRenderer implements IRenderable {
   bindGroup: GPUBindGroup;
@@ -16,43 +18,9 @@ export class QuadRenderer implements IRenderable {
       code: shader,
     });
 
-    const kTextureWidth = 5;
-    const kTextureHeight = 7;
-    const _ = [255, 0, 0, 255]; // red
-    const y = [255, 255, 0, 255]; // yellow
-    const b = [0, 0, 255, 255]; // blue
-
-    // Disable prettier for this array as it's easier to read this way
-    // prettier-ignore
-    const textureData = new Uint8Array([
-      b, _, _, _, _,
-      _, y, y, y, _,
-      _, y, _, _, _,
-      _, y, y, _, _,
-      _, y, _, _, _,
-      _, y, _, _, _,
-      _, _, _, _, _,
-    ].flat());
-
-    this.texture = device.createTexture({
-      size: [kTextureWidth, kTextureHeight],
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-    });
-
-    device.queue.writeTexture(
-      { texture: this.texture },
-      textureData,
-      { bytesPerRow: kTextureWidth * 4 },
-      { width: kTextureWidth, height: kTextureHeight }
-    );
-
-    const sampler = device.createSampler({
-      addressModeU: 'repeat',
-      addressModeV: 'repeat',
-      magFilter: 'nearest',
-      minFilter: 'nearest',
-    });
+    const texture = textureManager.get('f-data');
+    const sampler = samplerManager.get('nearest-simple');
+    this.texture = texture.gpuTexture;
 
     const pipeline = device.createRenderPipeline({
       label: 'hardcoded textured quad pipeline',

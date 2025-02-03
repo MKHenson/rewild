@@ -1,10 +1,8 @@
 import { IRenderable } from '../../types/interfaces';
 import { Renderer } from '../Renderer';
 import shader from '../shaders/texture-quad.wgsl';
-import {
-  createTextureFromSource,
-  loadImageBitmap,
-} from '../utils/ImageLoaders';
+import { samplerManager } from '../textures/SamplerManager';
+import { textureManager } from '../textures/TextureManager';
 
 export class LoadedImageQuad implements IRenderable {
   bindGroup: GPUBindGroup;
@@ -20,17 +18,9 @@ export class LoadedImageQuad implements IRenderable {
       code: shader,
     });
 
-    const MEDIA_URL = process.env.MEDIA_URL;
-    const url = `${MEDIA_URL}utils/f-texture.png`;
-    const source = await loadImageBitmap(url);
-    this.texture = createTextureFromSource(device, source, 'rgba8unorm', false);
-
-    const sampler = device.createSampler({
-      addressModeU: 'repeat',
-      addressModeV: 'repeat',
-      magFilter: 'linear',
-      minFilter: 'linear',
-    });
+    const sampler = samplerManager.get('linear');
+    const texture = textureManager.get('f-texture');
+    this.texture = texture.gpuTexture;
 
     const pipeline = device.createRenderPipeline({
       label: 'hardcoded textured quad pipeline',

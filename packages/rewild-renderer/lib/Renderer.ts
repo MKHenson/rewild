@@ -10,6 +10,8 @@ import { PlaneRenderer } from './renderables.ts/PlaneRenderer';
 import { PerspectiveCamera } from './core/PerspectiveCamera';
 import { Transform } from './core/Transform';
 import { Camera } from './core/Camera';
+import { textureManager } from './textures/TextureManager';
+import { samplerManager } from './textures/SamplerManager';
 
 export class Renderer {
   device: GPUDevice;
@@ -82,6 +84,9 @@ export class Renderer {
     this.initialized = true;
     this.context = context;
     this.device = device;
+
+    await samplerManager.initialize(this);
+    await textureManager.initialize(this);
 
     this.renderables = await Promise.all(
       [

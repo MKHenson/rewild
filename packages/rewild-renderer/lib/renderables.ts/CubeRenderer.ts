@@ -10,6 +10,8 @@ import { BoxGeometryFactory } from '../geometry/BoxGeometryFactory';
 import { Camera } from '../core/Camera';
 import { Transform } from '../core/Transform';
 import { EulerRotationOrder } from 'rewild-common';
+import { textureManager } from '../textures/TextureManager';
+import { samplerManager } from '../textures/SamplerManager';
 
 export class CubeRenderer implements IRenderable {
   bindGroup: GPUBindGroup;
@@ -17,7 +19,6 @@ export class CubeRenderer implements IRenderable {
   pipeline: GPURenderPipeline;
   uniformBuffer: GPUBuffer;
   uniformValues: Float32Array;
-  // verticesBuffer: GPUBuffer;
   cube: Geometry;
   cube1Transform: Transform;
   cube2Transform: Transform;
@@ -48,12 +49,8 @@ export class CubeRenderer implements IRenderable {
     const source = await loadImageBitmap(url);
     this.texture = createTextureFromSource(device, source, 'rgba8unorm', false);
 
-    const sampler = device.createSampler({
-      addressModeU: 'repeat',
-      addressModeV: 'repeat',
-      magFilter: 'linear',
-      minFilter: 'linear',
-    });
+    this.texture = textureManager.get('f-texture').gpuTexture;
+    const sampler = samplerManager.get('linear');
 
     const pipeline = device.createRenderPipeline({
       label: 'cube render pipeline',
