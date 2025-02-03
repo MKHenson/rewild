@@ -3,11 +3,9 @@ import { IRenderable } from '../../types/interfaces';
 import { Geometry } from '../geometry/Geometry';
 import { Renderer } from '../Renderer';
 import shader from '../shaders/plane.wgsl';
-import {
-  createTextureFromSource,
-  loadImageBitmap,
-} from '../utils/ImageLoaders';
 import { PlaneGeometryFactory } from '../geometry/PlaneGeometryFactory';
+import { samplerManager } from '../textures/SamplerManager';
+import { textureManager } from '../textures/TextureManager';
 
 export class PlaneRenderer implements IRenderable {
   bindGroup: GPUBindGroup;
@@ -28,18 +26,9 @@ export class PlaneRenderer implements IRenderable {
     this.plane = PlaneGeometryFactory.new(0.5, 0.5, 1, 1);
     this.plane.build(device);
 
-    // Create a texture from the image.
-    const MEDIA_URL = process.env.MEDIA_URL;
-    const url = `${MEDIA_URL}utils/f-texture.png`;
-    const source = await loadImageBitmap(url);
-    this.texture = createTextureFromSource(device, source, 'rgba8unorm', false);
-
-    const sampler = device.createSampler({
-      addressModeU: 'repeat',
-      addressModeV: 'repeat',
-      magFilter: 'linear',
-      minFilter: 'linear',
-    });
+    const sampler = samplerManager.get('nearest-simple');
+    const texture = textureManager.get('grid-data');
+    this.texture = texture.gpuTexture;
 
     const pipeline = device.createRenderPipeline({
       label: 'plane render pipeline',
