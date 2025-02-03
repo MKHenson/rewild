@@ -19,17 +19,25 @@ export class CubeRenderer implements IRenderable {
   uniformValues: Float32Array;
   // verticesBuffer: GPUBuffer;
   cube: Geometry;
-  cubeTransform: Transform;
+  cube1Transform: Transform;
+  cube2Transform: Transform;
+
+  transforms: Float32Array;
+  instanceBuffer: GPUBuffer;
 
   async initialize(renderer: Renderer) {
     const { device, presentationFormat } = renderer;
 
-    this.cubeTransform = new Transform();
+    this.cube1Transform = new Transform();
+    this.cube2Transform = new Transform();
     const module = device.createShaderModule({
       code: shader,
     });
 
-    renderer.scene.addChild(this.cubeTransform);
+    renderer.scene.addChild(this.cube1Transform);
+    this.cube1Transform.addChild(this.cube2Transform);
+    this.cube2Transform.position.set(0, 0, 5);
+    this.cube2Transform.scale.set(0.5, 0.5, 0.5);
 
     this.cube = BoxGeometryFactory.new(1, 1, 1, 1, 1, 1);
     this.cube.build(device);
@@ -120,11 +128,24 @@ export class CubeRenderer implements IRenderable {
       },
     });
 
-    const uniformBufferSize = 4 * 16 * 2; // 4x4 matrix (x2)
+    const uniformBufferSize = 4 * 16 * 1; // 4x4 matrix (x1)
     this.uniformBuffer = device.createBuffer({
       size: uniformBufferSize,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+
+    // Fill the transforms with the identity matrix
+    // Set a section of the buffer to the identity matrix
+    this.transforms = new Float32Array(16 * 2);
+    this.transforms.set(this.cube1Transform.modelViewMatrix.elements, 0);
+    this.transforms.set(this.cube2Transform.modelViewMatrix.elements, 16);
+
+    this.instanceBuffer = device.createBuffer({
+      label: 'element buffer',
+      size: this.transforms.byteLength,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(this.instanceBuffer, 0, this.transforms);
 
     this.bindGroup = device.createBindGroup({
       label: 'cube bind group',
@@ -144,6 +165,12 @@ export class CubeRenderer implements IRenderable {
           binding: 2,
           resource: this.texture.createView(),
         },
+        {
+          binding: 3,
+          resource: {
+            buffer: this.instanceBuffer,
+          },
+        },
       ],
     });
 
@@ -160,8 +187,8 @@ export class CubeRenderer implements IRenderable {
     camera.transform.position.set(Math.sin(now) * 10, 0, Math.cos(now) * 10);
     camera.lookAt(0, 0, 0);
 
-    this.cubeTransform.position.set(0, 0, 0);
-    this.cubeTransform.rotation.set(
+    this.cube1Transform.position.set(0, 0, 0);
+    this.cube1Transform.rotation.set(
       -Math.sin(now * 2),
       Math.cos(now * 2),
       0,
@@ -172,6 +199,10 @@ export class CubeRenderer implements IRenderable {
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {
     const { device } = renderer;
 
+    this.transforms.set(this.cube1Transform.modelViewMatrix.elements, 0);
+    this.transforms.set(this.cube2Transform.modelViewMatrix.elements, 16);
+    device.queue.writeBuffer(this.instanceBuffer, 0, this.transforms);
+
     device.queue.writeBuffer(
       this.uniformBuffer,
       0,
@@ -180,19 +211,19 @@ export class CubeRenderer implements IRenderable {
       camera.projectionMatrix.elements.byteLength
     );
 
-    device.queue.writeBuffer(
-      this.uniformBuffer,
-      4 * 16,
-      this.cubeTransform.modelViewMatrix.elements.buffer,
-      this.cubeTransform.modelViewMatrix.elements.byteOffset,
-      this.cubeTransform.modelViewMatrix.elements.byteLength
-    );
+    // device.queue.writeBuffer(
+    //   this.uniformBuffer,
+    //   4 * 16,
+    //   this.cube1Transform.modelViewMatrix.elements.buffer,
+    //   this.cube1Transform.modelViewMatrix.elements.byteOffset,
+    //   this.cube1Transform.modelViewMatrix.elements.byteLength
+    // );
 
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.bindGroup);
     pass.setVertexBuffer(0, this.cube.vertexBuffer);
     pass.setVertexBuffer(1, this.cube.uvBuffer);
     pass.setIndexBuffer(this.cube.indexBuffer, 'uint16');
-    pass.drawIndexed(this.cube.indices!.length);
+    pass.drawIndexed(this.cube.indices!.length, 2);
   }
 }
