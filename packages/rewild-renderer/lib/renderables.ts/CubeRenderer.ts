@@ -2,10 +2,6 @@ import { IRenderable } from '../../types/interfaces';
 import { Geometry } from '../geometry/Geometry';
 import { Renderer } from '../Renderer';
 import shader from '../shaders/cube.wgsl';
-import {
-  createTextureFromSource,
-  loadImageBitmap,
-} from '../utils/ImageLoaders';
 import { BoxGeometryFactory } from '../geometry/BoxGeometryFactory';
 import { Camera } from '../core/Camera';
 import { Transform } from '../core/Transform';
@@ -42,12 +38,6 @@ export class CubeRenderer implements IRenderable {
 
     this.cube = BoxGeometryFactory.new(1, 1, 1, 1, 1, 1);
     this.cube.build(device);
-
-    // Create a texture from the image.
-    const MEDIA_URL = process.env.MEDIA_URL;
-    const url = `${MEDIA_URL}utils/f-texture.png`;
-    const source = await loadImageBitmap(url);
-    this.texture = createTextureFromSource(device, source, 'rgba8unorm', false);
 
     this.texture = textureManager.get('f-texture').gpuTexture;
     const sampler = samplerManager.get('linear');
@@ -188,6 +178,13 @@ export class CubeRenderer implements IRenderable {
     this.cube1Transform.rotation.set(
       -Math.sin(now * 2),
       Math.cos(now * 2),
+      0,
+      EulerRotationOrder.XYZ
+    );
+
+    this.cube2Transform.rotation.set(
+      this.cube2Transform.rotation.x + now / 100,
+      0,
       0,
       EulerRotationOrder.XYZ
     );
