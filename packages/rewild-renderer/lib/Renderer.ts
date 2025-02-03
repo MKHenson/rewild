@@ -32,6 +32,9 @@ export class Renderer {
   scene: Transform;
   private currentRenderList: RenderList;
 
+  private lastTime: number;
+  private totalDeltaTime: number;
+
   private onFrameHandler: () => void;
 
   constructor() {
@@ -99,6 +102,9 @@ export class Renderer {
         new PlaneRenderer(),
       ].map((renderable) => renderable.initialize(this))
     );
+
+    this.lastTime = performance.now();
+    this.totalDeltaTime = 0;
 
     requestAnimationFrame(this.onFrameHandler);
   }
@@ -173,10 +179,15 @@ export class Renderer {
   }
 
   render() {
+    const currentTime = performance.now();
+    const deltaTime = currentTime - this.lastTime;
+    this.totalDeltaTime += deltaTime;
+    this.lastTime = currentTime;
+
     const pCamera = this.perspectiveCam;
 
     for (const renderable of this.renderables) {
-      renderable.update(this);
+      renderable.update(this, deltaTime, this.totalDeltaTime);
     }
 
     // update scene graph
