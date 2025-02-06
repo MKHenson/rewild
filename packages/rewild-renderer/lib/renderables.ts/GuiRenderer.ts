@@ -124,7 +124,7 @@ export class GuiRenderer implements IRenderable {
       depthStencil: {
         format: 'depth24plus',
         depthWriteEnabled: false,
-        depthCompare: 'less',
+        depthCompare: 'always',
       },
     });
 
