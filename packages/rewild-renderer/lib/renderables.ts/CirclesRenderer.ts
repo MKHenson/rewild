@@ -1,6 +1,6 @@
 import { IRenderable } from '../../types/interfaces';
 import { Renderer } from '../Renderer';
-import simpleShader from '../shaders/simple.wgsl';
+import simpleShader from '../shaders/circles.wgsl';
 
 export class CirclesRenderer implements IRenderable {
   bindGroup: GPUBindGroup;

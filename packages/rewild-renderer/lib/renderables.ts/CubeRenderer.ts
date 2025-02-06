@@ -211,14 +211,6 @@ export class CubeRenderer implements IRenderable {
       camera.projectionMatrix.elements.byteLength
     );
 
-    // device.queue.writeBuffer(
-    //   this.uniformBuffer,
-    //   4 * 16,
-    //   this.cube1Transform.modelViewMatrix.elements.buffer,
-    //   this.cube1Transform.modelViewMatrix.elements.byteOffset,
-    //   this.cube1Transform.modelViewMatrix.elements.byteLength
-    // );
-
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.bindGroup);
     pass.setVertexBuffer(0, this.cube.vertexBuffer);

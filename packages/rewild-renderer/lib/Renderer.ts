@@ -6,7 +6,7 @@ import { LoadedImageQuad } from './renderables.ts/LoadedImageQuad';
 import { DrawF } from './renderables.ts/DrawF';
 import { GuiRenderer } from './renderables.ts/GuiRenderer';
 import { CubeRenderer } from './renderables.ts/CubeRenderer';
-import { PlaneRenderer } from './renderables.ts/PlaneRenderer';
+import { PlaneRenderer } from './renderables.ts/vbo';
 import { PerspectiveCamera } from './core/PerspectiveCamera';
 import { Transform } from './core/Transform';
 import { Camera } from './core/Camera';
@@ -97,9 +97,9 @@ export class Renderer {
         new CubeRenderer(),
         new QuadRenderer(),
         new LoadedImageQuad(),
-        new GuiRenderer(),
         new DrawF(),
         new PlaneRenderer(),
+        new GuiRenderer(),
       ].map((renderable) => renderable.initialize(this))
     );
 

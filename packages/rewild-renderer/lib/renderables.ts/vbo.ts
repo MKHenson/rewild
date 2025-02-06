@@ -1,8 +1,7 @@
-import { mat4, vec3 } from 'wgpu-matrix';
 import { IRenderable } from '../../types/interfaces';
 import { Geometry } from '../geometry/Geometry';
 import { Renderer } from '../Renderer';
-import shader from '../shaders/plane.wgsl';
+import shader from '../shaders/vbo.wgsl';
 import { PlaneGeometryFactory } from '../geometry/PlaneGeometryFactory';
 import { samplerManager } from '../textures/SamplerManager';
 import { textureManager } from '../textures/TextureManager';
@@ -11,9 +10,6 @@ export class PlaneRenderer implements IRenderable {
   bindGroup: GPUBindGroup;
   texture: GPUTexture;
   pipeline: GPURenderPipeline;
-  uniformBuffer: GPUBuffer;
-  uniformValues: Float32Array;
-  // verticesBuffer: GPUBuffer;
   plane: Geometry;
 
   async initialize(renderer: Renderer) {
@@ -23,7 +19,7 @@ export class PlaneRenderer implements IRenderable {
       code: shader,
     });
 
-    this.plane = PlaneGeometryFactory.new(0.5, 0.5, 1, 1);
+    this.plane = PlaneGeometryFactory.new(2, 2, 1, 1);
     this.plane.build(device);
 
     const sampler = samplerManager.get('nearest-simple');
@@ -97,16 +93,10 @@ export class PlaneRenderer implements IRenderable {
       // Enable depth testing so that the fragment closest to the camera
       // is rendered in front.
       depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: 'less',
+        depthWriteEnabled: false,
+        depthCompare: 'always',
         format: 'depth24plus',
       },
-    });
-
-    const uniformBufferSize = 4 * 16; // 4x4 matrix
-    this.uniformBuffer = device.createBuffer({
-      size: uniformBufferSize,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
     this.bindGroup = device.createBindGroup({
@@ -115,16 +105,10 @@ export class PlaneRenderer implements IRenderable {
       entries: [
         {
           binding: 0,
-          resource: {
-            buffer: this.uniformBuffer,
-          },
-        },
-        {
-          binding: 1,
           resource: sampler,
         },
         {
-          binding: 2,
+          binding: 1,
           resource: this.texture.createView(),
         },
       ],
@@ -137,32 +121,6 @@ export class PlaneRenderer implements IRenderable {
   update(): void {}
 
   render(renderer: Renderer, pass: GPURenderPassEncoder) {
-    const { device, pane } = renderer;
-    const canvas = pane.canvas()!;
-    const aspect = canvas.width / canvas.height;
-    const projectionMatrix: Float32Array = mat4.perspective(
-      (2 * Math.PI) / 5,
-      aspect,
-      1,
-      100.0
-    );
-    const modelViewProjectionMatrix: Float32Array = mat4.create();
-
-    const transformationMatrix = getTransformationMatrix(
-      projectionMatrix,
-      modelViewProjectionMatrix
-    );
-
-    mat4.identity(transformationMatrix);
-
-    device.queue.writeBuffer(
-      this.uniformBuffer,
-      0,
-      transformationMatrix.buffer,
-      transformationMatrix.byteOffset,
-      transformationMatrix.byteLength
-    );
-
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.bindGroup);
     pass.setVertexBuffer(0, this.plane.vertexBuffer);
@@ -170,22 +128,4 @@ export class PlaneRenderer implements IRenderable {
     pass.setIndexBuffer(this.plane.indexBuffer, 'uint16');
     pass.drawIndexed(this.plane.indices!.length);
   }
-}
-
-function getTransformationMatrix(
-  projectionMatrix: Float32Array,
-  modelViewProjectionMatrix: Float32Array
-) {
-  const viewMatrix = mat4.identity();
-  mat4.translate(viewMatrix, vec3.fromValues(0, 0, -20), viewMatrix);
-  const now = Date.now() / 1000;
-  mat4.rotate(
-    viewMatrix,
-    vec3.fromValues(Math.sin(now), Math.cos(now), 0),
-    1,
-    viewMatrix
-  );
-
-  mat4.multiply(projectionMatrix, viewMatrix, modelViewProjectionMatrix);
-  return modelViewProjectionMatrix;
 }
