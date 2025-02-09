@@ -5,13 +5,14 @@ import { QuadRenderer } from './renderables.ts/QuadRenderer';
 import { LoadedImageQuad } from './renderables.ts/LoadedImageQuad';
 import { DrawF } from './renderables.ts/DrawF';
 import { GuiRenderer } from './renderables.ts/GuiRenderer';
-import { CubeRenderer } from './renderables.ts/CubeRenderer';
+import { CubesRenderer } from './renderables.ts/CubesRenderer';
 import { PlaneRenderer } from './renderables.ts/vbo';
 import { PerspectiveCamera } from './core/PerspectiveCamera';
 import { Transform } from './core/Transform';
 import { Camera } from './core/Camera';
 import { textureManager } from './textures/TextureManager';
 import { samplerManager } from './textures/SamplerManager';
+import { CubeRenderer } from './renderables.ts/CubeRenderer';
 
 export class Renderer {
   device: GPUDevice;
@@ -94,10 +95,11 @@ export class Renderer {
     this.renderables = await Promise.all(
       [
         new CirclesRenderer(),
-        new CubeRenderer(),
+        new CubesRenderer(),
         new QuadRenderer(),
         new LoadedImageQuad(),
         new DrawF(),
+        new CubeRenderer(),
         new PlaneRenderer(),
         new GuiRenderer(),
       ].map((renderable) => renderable.initialize(this))
