@@ -62,4 +62,20 @@ export class Geometry {
       this.indexBuffer.unmap();
     }
   }
+
+  getGPUVertexBufferLayouts(): GPUVertexBufferLayout[] {
+    return [
+      {
+        arrayStride: 3 * 4,
+        stepMode: 'vertex',
+        attributes: [
+          {
+            format: 'float32x3',
+            offset: 0,
+            shaderLocation: 0,
+          },
+        ],
+      },
+    ];
+  }
 }
