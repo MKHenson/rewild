@@ -30,6 +30,8 @@ export interface ITransformAttachment {
   worldMatrixUpdated(source: Transform): void;
 }
 
+export interface IVisual {}
+
 export class Transform implements IQuatChangeListener, IEulerChangeListener {
   static DefaultMatrixAutoUpdate: boolean = true;
   static DefaultUp: Vector3 = new Vector3(0, 1, 0);
@@ -45,6 +47,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
   matrixAutoUpdate: boolean;
   visible: boolean = true;
   attachments: ITransformAttachment[];
+  renderable: IVisual | null;
 
   readonly position: Vector3;
   readonly rotation: Euler;
@@ -59,6 +62,8 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
     this.dataProperties = new Int32Array(7);
 
     this.attachments = [];
+    this.renderable = null;
+
     this.position = new Vector3();
     this.rotation = new Euler();
     this.quaternion = new Quaternion();

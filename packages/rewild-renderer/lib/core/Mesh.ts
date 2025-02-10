@@ -1,32 +1,36 @@
 import { Geometry } from '../geometry/Geometry';
-import { IMaterial } from '../materials/IMaterial';
-import { Transform } from './Transform';
+import { IMaterialPass } from '../materials/IMaterialPass';
+import { IVisual, Transform } from './Transform';
 
-export class Mesh {
+export class Mesh implements IVisual {
   geometry: Geometry;
-  material: IMaterial;
+  material: IMaterialPass;
   transform: Transform;
 
   constructor(
     geometry: Geometry,
-    material: IMaterial,
+    material: IMaterialPass,
     transform: Transform = new Transform()
   ) {
     this.geometry = geometry;
     this.transform = transform;
 
+    transform.renderable = this;
+
     this.setMaterial(material);
   }
 
-  setMaterial(material: IMaterial) {
+  setMaterial(material: IMaterialPass) {
     if (this.material) {
-      this.material.meshManager.onUnassignedFromMesh(this);
+      this.material.perMeshTracker?.onUnassignedFromMesh(this);
+      this.material.sharedUniformsTracker?.onUnassignedFromMesh(this);
     }
 
     if (!material.isGeometryCompatible(this.geometry))
       throw new Error('Material is not compatible with geometry');
 
     this.material = material;
-    material.meshManager.onAssignedToMesh(this);
+    material.perMeshTracker?.onAssignedToMesh(this);
+    material.sharedUniformsTracker?.onAssignedToMesh(this);
   }
 }

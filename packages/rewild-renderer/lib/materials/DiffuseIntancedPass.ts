@@ -1,41 +1,42 @@
 import { Geometry } from '../geometry/Geometry';
-import { IMaterial, SharedBindGroup } from './IMaterial';
-import shader from '../shaders/diffuse.wgsl';
+import { IMaterialPass } from './IMaterialPass';
+import shader from '../shaders/diffuse-instanced.wgsl';
 import { Renderer } from '..';
-import { ProjModelView } from './uniforms/ProjModelView';
-import { textureManager } from '../textures/TextureManager';
-import { samplerManager } from '../textures/SamplerManager';
-import { MaterialMeshManager } from './MaterialMeshManager';
+import { SharedUniformsTracker } from './SharedUniformsTracker';
+import { Mesh } from '../core/Mesh';
+import { Camera } from '../core/Camera';
+import { Projection } from './uniforms/Projection';
+import { InstanceMatrices } from './uniforms/InstanceMatrices';
+import { Diffuse } from './uniforms/Diffuse';
 
-export class MaterialDiffuse implements IMaterial {
+const sharedBindgroupIndex = 0;
+const projectionGroup = 1;
+const instancesGroup = 2;
+
+export class DiffuseIntancedPass implements IMaterialPass {
   pipeline: GPURenderPipeline;
-  sharedBindGroup: SharedBindGroup;
-
-  meshManager: MaterialMeshManager;
+  perMeshTracker: SharedUniformsTracker;
   requiresRebuild: boolean = true;
-
-  private _texture: GPUTexture;
-  private _sampler: GPUSampler;
+  diffuse: Diffuse;
 
   constructor() {
-    this.meshManager = new MaterialMeshManager(this, () => [
-      new ProjModelView(0),
+    this.diffuse = new Diffuse(sharedBindgroupIndex);
+
+    this.perMeshTracker = new SharedUniformsTracker(this, [
+      this.diffuse,
+      new Projection(projectionGroup),
+      new InstanceMatrices(instancesGroup),
     ]);
   }
 
   init(renderer: Renderer): void {
     const { device, presentationFormat } = renderer;
-
-    if (!this._texture)
-      this._texture = textureManager.get('grid-data').gpuTexture;
-    if (!this._sampler) this._sampler = samplerManager.get('linear');
-
     const module = device.createShaderModule({
       code: shader,
     });
 
     this.pipeline = device.createRenderPipeline({
-      label: 'cube render pipeline',
+      label: 'Diffuse Instanced Pass',
       layout: 'auto',
       vertex: {
         entryPoint: 'vs',
@@ -106,52 +107,26 @@ export class MaterialDiffuse implements IMaterial {
         format: 'depth24plus',
       },
     });
-
-    this.createSharedBindGroup(renderer);
-  }
-
-  private createSharedBindGroup(renderer: Renderer): void {
-    const { device } = renderer;
-
-    const sharedBindgroupIndex = 1;
-
-    this.sharedBindGroup = {
-      group: sharedBindgroupIndex,
-      bindGroup: device.createBindGroup({
-        layout: this.pipeline.getBindGroupLayout(sharedBindgroupIndex),
-        entries: [
-          {
-            binding: 0,
-            resource: this._sampler,
-          },
-          {
-            binding: 1,
-            resource: this._texture.createView(),
-          },
-        ],
-      }),
-    };
-  }
-
-  set texture(texture: GPUTexture) {
-    this._texture = texture;
-    this.requiresRebuild = true;
-  }
-
-  get texture(): GPUTexture {
-    return this._texture;
-  }
-
-  set sampler(sampler: GPUSampler) {
-    this._sampler = sampler;
-    this.requiresRebuild = true;
-  }
-
-  get sampler(): GPUSampler {
-    return this._sampler;
   }
 
   isGeometryCompatible(geometry: Geometry): boolean {
     return !!(geometry.vertices && geometry.uvs);
+  }
+
+  render(
+    renderer: Renderer,
+    pass: GPURenderPassEncoder,
+    camera: Camera,
+    meshes: Mesh[],
+    geometry: Geometry
+  ): void {
+    pass.setPipeline(this.pipeline);
+    pass.setVertexBuffer(0, geometry.vertexBuffer);
+    pass.setVertexBuffer(1, geometry.uvBuffer);
+    pass.setIndexBuffer(geometry.indexBuffer, 'uint16');
+
+    this.perMeshTracker.prepareMeshUniforms(renderer, pass, camera, meshes);
+    const numIndices = geometry.indices!.length;
+    pass.drawIndexed(numIndices, meshes.length);
   }
 }
