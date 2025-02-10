@@ -1,9 +1,9 @@
 import { Renderer } from '../..';
-import { IPerMeshUniformBuffer } from '../../../types/IUniformBuffer';
+import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 
-export class ProjModelView implements IPerMeshUniformBuffer {
+export class Projection implements ISharedUniformBuffer {
   buffer: GPUBuffer;
   group: number;
   bindGroup: GPUBindGroup;
@@ -26,7 +26,7 @@ export class ProjModelView implements IPerMeshUniformBuffer {
 
     this.destroy();
 
-    const uniformBufferSize = 4 * 16 * 2; // 4x4 matrix (x2)
+    const uniformBufferSize = 4 * 16 * 1; // 4x4 matrix (x1)
     this.buffer = device.createBuffer({
       size: uniformBufferSize,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -45,25 +45,17 @@ export class ProjModelView implements IPerMeshUniformBuffer {
     });
   }
 
-  prepare(renderer: Renderer, camera: Camera, mesh: Mesh): void {
+  setNumInstances(numInstances: number): void {}
+
+  prepare(renderer: Renderer, camera: Camera, meshes: Mesh[]): void {
     const { device } = renderer;
     const cameraElements = camera.projectionMatrix.elements;
-    const modelViewElements = mesh.transform.modelViewMatrix.elements;
-
     device.queue.writeBuffer(
       this.buffer,
       0,
       cameraElements.buffer,
       cameraElements.byteOffset,
       cameraElements.byteLength
-    );
-
-    device.queue.writeBuffer(
-      this.buffer,
-      64,
-      modelViewElements.buffer,
-      modelViewElements.byteOffset,
-      modelViewElements.byteLength
     );
   }
 }

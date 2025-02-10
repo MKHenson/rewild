@@ -13,6 +13,9 @@ import { Camera } from './core/Camera';
 import { textureManager } from './textures/TextureManager';
 import { samplerManager } from './textures/SamplerManager';
 import { CubeRenderer } from './renderables.ts/CubeRenderer';
+import { Geometry } from './geometry/Geometry';
+import { IMaterialPass } from './materials/IMaterialPass';
+import { Mesh } from './core/Mesh';
 
 export class Renderer {
   device: GPUDevice;
@@ -180,6 +183,48 @@ export class Renderer {
       this.projectObject(unchecked(transform.children[i]), camera);
   }
 
+  organizeMeshes() {
+    // Organize all meshes so that they are grouped by material as well as geometry
+    // This is done to minimize the number of draw calls
+
+    const transforms = this.currentRenderList.solids;
+    const renderList: {
+      geometry: Geometry;
+      meshes: Mesh[];
+      pass: IMaterialPass;
+    }[] = [];
+
+    let transform: Transform | null;
+    let geometry: Geometry | null;
+    let material: IMaterialPass | null;
+    let mesh: Mesh;
+
+    for (let i: i32 = 0, l: i32 = transforms.length; i < l; i++) {
+      transform = transforms[i];
+
+      if (transform.renderable && transform.renderable instanceof Mesh) {
+        mesh = transform.renderable as Mesh;
+        geometry = mesh.geometry;
+        material = mesh.material;
+
+        const listItem = renderList.find(
+          (item) => item.geometry === geometry && item.pass === material
+        );
+        if (listItem) {
+          listItem.meshes.push(mesh);
+        } else {
+          renderList.push({
+            geometry,
+            meshes: [mesh],
+            pass: material,
+          });
+        }
+      }
+    }
+
+    return renderList;
+  }
+
   render() {
     const currentTime = performance.now();
     const deltaTime = currentTime - this.lastTime;
@@ -219,6 +264,8 @@ export class Renderer {
       transform.normalMatrix.getNormalMatrix(transform.modelViewMatrix);
     }
 
+    const renderList = this.organizeMeshes();
+
     // Gets the device render targets ready. Checks for things like canvas resize
     this.prepareRender();
 
@@ -251,6 +298,10 @@ export class Renderer {
 
       for (const renderable of this.renderables) {
         renderable.render(this, pass, camera.camera);
+      }
+
+      for (const item of renderList) {
+        item.pass.render(this, pass, camera.camera, item.meshes, item.geometry);
       }
 
       pass.end();
