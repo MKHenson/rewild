@@ -5,7 +5,6 @@ import { QuadRenderer } from './renderables.ts/QuadRenderer';
 import { LoadedImageQuad } from './renderables.ts/LoadedImageQuad';
 import { DrawF } from './renderables.ts/DrawF';
 import { GuiRenderer } from './renderables.ts/GuiRenderer';
-import { CubesRenderer } from './renderables.ts/CubesRenderer';
 import { PlaneRenderer } from './renderables.ts/vbo';
 import { PerspectiveCamera } from './core/PerspectiveCamera';
 import { Transform } from './core/Transform';
@@ -98,7 +97,6 @@ export class Renderer {
     this.renderables = await Promise.all(
       [
         new CirclesRenderer(),
-        new CubesRenderer(),
         new QuadRenderer(),
         new LoadedImageQuad(),
         new DrawF(),
