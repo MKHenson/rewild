@@ -1,11 +1,5 @@
 import { Pane3D } from 'rewild-ui';
 import { IRenderable } from '../types/interfaces';
-import { CirclesRenderer } from './renderables.ts/CirclesRenderer';
-import { QuadRenderer } from './renderables.ts/QuadRenderer';
-import { LoadedImageQuad } from './renderables.ts/LoadedImageQuad';
-import { DrawF } from './renderables.ts/DrawF';
-import { GuiRenderer } from './renderables.ts/GuiRenderer';
-import { PlaneRenderer } from './renderables.ts/vbo';
 import { PerspectiveCamera } from './core/PerspectiveCamera';
 import { Transform } from './core/Transform';
 import { Camera } from './core/Camera';
@@ -95,15 +89,7 @@ export class Renderer {
     await textureManager.initialize(this);
 
     this.renderables = await Promise.all(
-      [
-        new CirclesRenderer(),
-        new QuadRenderer(),
-        new LoadedImageQuad(),
-        new DrawF(),
-        new CubeRenderer(),
-        new PlaneRenderer(),
-        new GuiRenderer(),
-      ].map((renderable) => renderable.initialize(this))
+      [new CubeRenderer()].map((renderable) => renderable.initialize(this))
     );
 
     this.lastTime = performance.now();
