@@ -20,6 +20,7 @@ export class DiffuseIntancedPass implements IMaterialPass {
   diffuse: Diffuse;
 
   constructor() {
+    this.requiresRebuild = true;
     this.diffuse = new Diffuse(sharedBindgroupIndex);
 
     this.perMeshTracker = new SharedUniformsTracker(this, [
@@ -30,6 +31,7 @@ export class DiffuseIntancedPass implements IMaterialPass {
   }
 
   init(renderer: Renderer): void {
+    this.requiresRebuild = false;
     const { device, presentationFormat } = renderer;
     const module = device.createShaderModule({
       code: shader,
