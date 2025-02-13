@@ -5,6 +5,7 @@ export class GeometryGroup {
 }
 
 export class Geometry {
+  requiresBuild: boolean = true;
   vertices: Float32Array;
   indices?: Uint16Array;
   normals?: Float32Array;
@@ -18,6 +19,7 @@ export class Geometry {
 
   constructor() {
     this.groups = [];
+    this.requiresBuild = true;
   }
 
   build(device: GPUDevice) {

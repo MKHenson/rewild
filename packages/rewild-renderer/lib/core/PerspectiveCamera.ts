@@ -1,8 +1,9 @@
 import { Camera } from './Camera';
 import { RAD2DEG, DEG2RAD } from 'rewild-common';
 import { ViewProperties } from './ViewProperties';
+import { ICameraController } from '../../types/ICamera';
 
-export class PerspectiveCamera {
+export class PerspectiveCamera implements ICameraController {
   fov: f32;
   zoom: f32;
   near: f32;
@@ -13,6 +14,8 @@ export class PerspectiveCamera {
   filmOffset: f32;
   view: ViewProperties | null;
   camera: Camera;
+  isOrthographicCamera: boolean = false;
+  isPerspectiveCamera: boolean = true;
 
   constructor(
     fov: f32 = 50,

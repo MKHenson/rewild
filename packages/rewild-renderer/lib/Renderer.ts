@@ -9,6 +9,9 @@ import { CubeRenderer } from './renderables.ts/CubeRenderer';
 import { Geometry } from './geometry/Geometry';
 import { IMaterialPass } from './materials/IMaterialPass';
 import { Mesh } from './core/Mesh';
+import { IRenderGroup } from '../types/IRenderGroup';
+import { Atmosphere } from './core/Atmosphere';
+import { TrackballControler } from './input/TrackballController';
 
 export class Renderer {
   device: GPUDevice;
@@ -28,6 +31,8 @@ export class Renderer {
   perspectiveCam: PerspectiveCamera;
   scene: Transform;
   private currentRenderList: RenderList;
+  private atmosphere: Atmosphere;
+  private camController: TrackballControler;
 
   private lastTime: number;
   private totalDeltaTime: number;
@@ -37,6 +42,7 @@ export class Renderer {
   constructor() {
     this.onFrameHandler = this.onFrame.bind(this);
     this.scene = new Transform();
+    this.atmosphere = new Atmosphere();
   }
 
   async init(pane: Pane3D) {
@@ -58,6 +64,11 @@ export class Renderer {
     this.scene.addChild(this.perspectiveCam.camera.transform);
     this.perspectiveCam.camera.transform.position.set(0, 0, 5);
     this.perspectiveCam.camera.lookAt(0, 0, 0);
+
+    this.camController = new TrackballControler(
+      this.perspectiveCam,
+      pane.canvas()!
+    );
 
     const adapter = await navigator.gpu?.requestAdapter();
     const device = await adapter?.requestDevice();
@@ -100,6 +111,8 @@ export class Renderer {
 
   onFrame() {
     if (this.disposed) return;
+
+    this.camController.update();
 
     this.render();
     requestAnimationFrame(this.onFrameHandler);
@@ -172,11 +185,7 @@ export class Renderer {
     // This is done to minimize the number of draw calls
 
     const transforms = this.currentRenderList.solids;
-    const renderList: {
-      geometry: Geometry;
-      meshes: Mesh[];
-      pass: IMaterialPass;
-    }[] = [];
+    const renderList: IRenderGroup[] = [];
 
     let transform: Transform | null;
     let geometry: Geometry | null;
@@ -207,6 +216,19 @@ export class Renderer {
     }
 
     return renderList;
+  }
+
+  renderGroupings(
+    renderGroup: IRenderGroup[],
+    pass: GPURenderPassEncoder,
+    camera: Camera
+  ) {
+    for (const item of renderGroup) {
+      if (item.geometry.requiresBuild) item.geometry.build(this.device);
+      if (item.pass.requiresRebuild) item.pass.init(this);
+
+      item.pass.render(this, pass, camera, item.meshes, item.geometry);
+    }
   }
 
   render() {
@@ -284,10 +306,8 @@ export class Renderer {
         renderable.render(this, pass, camera.camera);
       }
 
-      for (const item of renderList) {
-        item.pass.render(this, pass, camera.camera, item.meshes, item.geometry);
-      }
-
+      this.atmosphere.render(this, pass, camera.camera);
+      this.renderGroupings(renderList, pass, camera.camera);
       pass.end();
 
       const commandBuffer = encoder.finish();

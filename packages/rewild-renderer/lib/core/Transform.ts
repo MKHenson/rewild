@@ -26,7 +26,7 @@ type TraverseCallback = (object: Transform) => void;
 const _addedEvent: Event = new Event('added');
 const _removedEvent: Event = new Event('removed');
 
-export interface ITransformAttachment {
+export interface ITransformObserver {
   worldMatrixUpdated(source: Transform): void;
 }
 
@@ -46,7 +46,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
   matrixWorldNeedsUpdate: boolean;
   matrixAutoUpdate: boolean;
   visible: boolean = true;
-  attachments: ITransformAttachment[];
+  observers: ITransformObserver[];
   renderable: IVisual | null;
 
   readonly position: Vector3;
@@ -61,7 +61,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
   constructor() {
     this.dataProperties = new Int32Array(7);
 
-    this.attachments = [];
+    this.observers = [];
     this.renderable = null;
 
     this.position = new Vector3();
@@ -371,7 +371,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
       children[i].updateMatrixWorld(force);
     }
 
-    const attachments = this.attachments;
+    const attachments = this.observers;
     for (let i = 0, l = attachments.length; i < l; i++) {
       attachments[i].worldMatrixUpdated(this);
     }
@@ -402,7 +402,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
       }
     }
 
-    const attachments = this.attachments;
+    const attachments = this.observers;
     for (let i = 0, l = attachments.length; i < l; i++) {
       attachments[i].worldMatrixUpdated(this);
     }

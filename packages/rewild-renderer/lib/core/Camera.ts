@@ -1,7 +1,7 @@
 import { Vector3, Matrix4 } from 'rewild-common';
-import { ITransformAttachment, Transform } from './Transform';
+import { ITransformObserver, Transform } from './Transform';
 
-export class Camera implements ITransformAttachment {
+export class Camera implements ITransformObserver {
   readonly transform: Transform;
   readonly matrixWorldInverse: Matrix4 = new Matrix4();
   readonly projectionMatrix: Matrix4 = new Matrix4();
@@ -9,7 +9,7 @@ export class Camera implements ITransformAttachment {
 
   constructor() {
     this.transform = new Transform();
-    this.transform.attachments.push(this);
+    this.transform.observers.push(this);
   }
 
   copy(source: Camera): Camera {

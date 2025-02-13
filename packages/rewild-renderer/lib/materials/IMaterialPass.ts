@@ -6,6 +6,7 @@ import { Geometry } from '../geometry/Geometry';
 
 export interface IMaterialPass {
   pipeline: GPURenderPipeline;
+  requiresRebuild: boolean;
   perMeshTracker?: IMeshTracker;
   sharedUniformsTracker?: IMeshTracker;
   init(renderer: Renderer): void;

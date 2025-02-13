@@ -11,7 +11,7 @@ import { Diffuse } from './uniforms/Diffuse';
 
 const sharedBindgroupIndex = 1;
 
-export class DiffusePass implements IMaterialPass {
+export class AtmosphereMaterial implements IMaterialPass {
   pipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;

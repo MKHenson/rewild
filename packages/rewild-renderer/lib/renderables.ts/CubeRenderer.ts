@@ -37,10 +37,6 @@ export class CubeRenderer implements IRenderable {
     this.initialMesh = new Mesh(geometry, diffuseMaterial);
     renderer.scene.addChild(this.initialMesh.transform);
     this.instances.push(this.initialMesh);
-
-    geometry.build(renderer.device);
-    instancedMaterial.init(renderer);
-    diffuseMaterial.init(renderer);
     return this;
   }
 
