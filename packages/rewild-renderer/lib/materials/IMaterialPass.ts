@@ -14,8 +14,8 @@ export interface IMaterialPass {
     renderer: Renderer,
     pass: GPURenderPassEncoder,
     camera: Camera,
-    meshes: Mesh[],
-    geometry: Geometry
+    meshes?: Mesh[],
+    geometry?: Geometry
   ): void;
   isGeometryCompatible(geometry: Geometry): boolean;
 }

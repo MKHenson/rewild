@@ -1,6 +1,6 @@
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from './IMaterialPass';
-import shader from '../shaders/diffuse.wgsl';
+import shader from '../shaders/atmosphere.wgsl';
 import { Renderer } from '..';
 import { ProjModelView } from './uniforms/ProjModelView';
 import { PerMeshTracker } from './PerMeshTracker';
@@ -8,6 +8,9 @@ import { SharedUniformsTracker } from './SharedUniformsTracker';
 import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { Diffuse } from './uniforms/Diffuse';
+import { samplerManager } from '../textures/SamplerManager';
+import { textureManager } from '../textures/TextureManager';
+import { Matrix4 } from 'rewild-common';
 
 const sharedBindgroupIndex = 1;
 
@@ -17,9 +20,17 @@ export class AtmosphereMaterial implements IMaterialPass {
   requiresRebuild: boolean = true;
   sharedUniformsTracker: SharedUniformsTracker;
   diffuse: Diffuse;
+  bindGroup: GPUBindGroup;
+  uniformBuffer: GPUBuffer;
+
+  cameraView: Matrix4;
+  viewDirectionProjectionInverse: Matrix4;
 
   constructor() {
     this.requiresRebuild = true;
+    this.cameraView = new Matrix4();
+    this.viewDirectionProjectionInverse = new Matrix4();
+
     this.diffuse = new Diffuse(sharedBindgroupIndex);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       this.diffuse,
@@ -37,108 +48,81 @@ export class AtmosphereMaterial implements IMaterialPass {
     });
 
     this.pipeline = device.createRenderPipeline({
-      label: 'Diffuse Pass',
+      label: 'Atmosphere Plane Pass',
       layout: 'auto',
       vertex: {
-        entryPoint: 'vs',
         module,
-        buffers: [
-          {
-            arrayStride: 4 * 3,
-            attributes: [
-              {
-                // position
-                shaderLocation: 0,
-                offset: 0,
-                format: 'float32x3',
-              },
-            ],
-          },
-          {
-            arrayStride: 4 * 2,
-            attributes: [
-              {
-                // uv
-                shaderLocation: 1,
-                offset: 0,
-                format: 'float32x2',
-              },
-            ],
-          },
-        ],
+        entryPoint: 'vs',
       },
       fragment: {
-        entryPoint: 'fs',
         module,
-        targets: [
-          {
-            format: presentationFormat,
-            blend: {
-              color: {
-                srcFactor: 'src-alpha',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add',
-              },
-              alpha: {
-                srcFactor: 'one',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add',
-              },
-            },
-          },
-        ],
+        targets: [{ format: presentationFormat }],
+        entryPoint: 'fs',
+      },
+      depthStencil: {
+        depthWriteEnabled: true,
+        depthCompare: 'less-equal',
+        format: 'depth24plus',
       },
       multisample: {
         count: renderer.sampleCount,
       },
-      primitive: {
-        topology: 'triangle-list',
+    });
 
-        // Backface culling since the cube is solid piece of geometry.
-        // Faces pointing away from the camera will be occluded by faces
-        // pointing toward the camera.
-        cullMode: 'back',
-        frontFace: 'ccw',
-      },
-      // Enable depth testing so that the fragment closest to the camera
-      // is rendered in front.
-      depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: 'less',
-        format: 'depth24plus',
-      },
+    // viewDirectionProjectionInverse
+    const uniformBufferSize = 16 * 4;
+    this.uniformBuffer = device.createBuffer({
+      label: 'uniforms for atmosphere plane',
+      size: uniformBufferSize,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const sampler = samplerManager.get('linear');
+    const texture = textureManager.get('desert-sky');
+
+    this.bindGroup = device.createBindGroup({
+      label: 'bind group for object',
+      layout: this.pipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: this.uniformBuffer } },
+        { binding: 1, resource: sampler },
+        {
+          binding: 2,
+          resource: texture.gpuTexture.createView({ dimension: 'cube' }),
+        },
+      ],
     });
   }
 
   isGeometryCompatible(geometry: Geometry): boolean {
-    return !!(geometry.vertices && geometry.uvs);
+    return !!geometry.vertices;
   }
 
   render(
     renderer: Renderer,
     pass: GPURenderPassEncoder,
     camera: Camera,
-    meshes: Mesh[],
-    geometry: Geometry
+    meshes?: Mesh[],
+    geometry?: Geometry
   ): void {
+    const { device } = renderer;
     pass.setPipeline(this.pipeline);
-    pass.setVertexBuffer(0, geometry.vertexBuffer);
-    pass.setVertexBuffer(1, geometry.uvBuffer);
-    pass.setIndexBuffer(geometry.indexBuffer, 'uint16');
+    pass.setBindGroup(0, this.bindGroup);
 
-    this.sharedUniformsTracker.prepareMeshUniforms(
-      renderer,
-      pass,
-      camera,
-      meshes
+    this.cameraView.extractRotation(camera.transform.matrixWorld);
+    const viewProjection = this.viewDirectionProjectionInverse.multiplyMatrices(
+      camera.projectionMatrix,
+      this.cameraView
     );
+    viewProjection.invert();
 
-    const tracker = this.perMeshTracker;
-    const numIndices = geometry.indices!.length;
-
-    for (const mesh of meshes) {
-      tracker.prepareMeshUniforms(mesh, renderer, pass, camera);
-      pass.drawIndexed(numIndices);
-    }
+    // upload the uniform values to the uniform buffer
+    device.queue.writeBuffer(
+      this.uniformBuffer,
+      0,
+      viewProjection.elements.buffer
+    );
+    pass.setBindGroup(0, this.bindGroup);
+    pass.draw(3);
   }
 }
