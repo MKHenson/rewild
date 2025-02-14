@@ -306,8 +306,8 @@ export class Renderer {
         renderable.render(this, pass, camera.camera);
       }
 
-      this.atmosphere.render(this, pass, camera.camera);
       this.renderGroupings(renderList, pass, camera.camera);
+      this.atmosphere.render(this, pass, camera.camera);
       pass.end();
 
       const commandBuffer = encoder.finish();
