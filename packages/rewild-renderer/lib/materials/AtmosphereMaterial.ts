@@ -1,6 +1,6 @@
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from './IMaterialPass';
-import shader from '../shaders/atmosphere.wgsl';
+import shader from '../shaders/atmospherePlane.wgsl';
 import { Renderer } from '..';
 import { ProjModelView } from './uniforms/ProjModelView';
 import { PerMeshTracker } from './PerMeshTracker';
