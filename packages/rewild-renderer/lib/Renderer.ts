@@ -10,7 +10,7 @@ import { Geometry } from './geometry/Geometry';
 import { IMaterialPass } from './materials/IMaterialPass';
 import { Mesh } from './core/Mesh';
 import { IRenderGroup } from '../types/IRenderGroup';
-import { Atmosphere } from './core/Atmosphere';
+import { AtmosphereSkybox } from './core/AtmosphereSkybox';
 import { TrackballControler } from './input/TrackballController';
 
 export class Renderer {
@@ -31,18 +31,19 @@ export class Renderer {
   perspectiveCam: PerspectiveCamera;
   scene: Transform;
   private currentRenderList: RenderList;
-  private atmosphere: Atmosphere;
+  private atmosphere: AtmosphereSkybox;
   private camController: TrackballControler;
 
-  private lastTime: number;
-  private totalDeltaTime: number;
+  lastTime: number;
+  delta: number;
+  totalDeltaTime: number;
 
   private onFrameHandler: () => void;
 
   constructor() {
     this.onFrameHandler = this.onFrame.bind(this);
     this.scene = new Transform();
-    this.atmosphere = new Atmosphere();
+    this.atmosphere = new AtmosphereSkybox();
   }
 
   async init(pane: Pane3D) {
@@ -104,6 +105,7 @@ export class Renderer {
     );
 
     this.lastTime = performance.now();
+    this.delta = 0;
     this.totalDeltaTime = 0;
 
     requestAnimationFrame(this.onFrameHandler);
@@ -234,6 +236,7 @@ export class Renderer {
   render() {
     const currentTime = performance.now();
     const deltaTime = currentTime - this.lastTime;
+    this.delta = deltaTime;
     this.totalDeltaTime += deltaTime;
     this.lastTime = currentTime;
 
