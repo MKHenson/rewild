@@ -162,7 +162,7 @@ export class AtmosphereCubeMaterial implements IMaterialPass {
       1 // mieDirectionalG
     );
 
-    this.elevation += renderer.delta * 0.0001;
+    this.elevation += renderer.delta * 0.001;
 
     const phi = degToRad(90 - this.elevation);
     const theta = degToRad(this.azimuth);
