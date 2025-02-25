@@ -23,7 +23,7 @@ export class CubeRenderer implements IRenderable {
         newMesh.transform.position.set(-5 + this.instances.length, 0, 0);
       } else if (e.ctrlKey) {
         instancedMaterial.diffuse.texture =
-          textureManager.get('f-texture').gpuTexture;
+          textureManager.get('rgba-noise-256').gpuTexture;
       } else {
         instancedMaterial.diffuse.sampler =
           samplerManager.get('nearest-simple');

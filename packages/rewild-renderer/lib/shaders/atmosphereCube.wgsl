@@ -147,13 +147,6 @@ struct OutputStruct {
 };
 var<private> output : OutputStruct;
 
-// fn jodieReinhardTonemap(c: vec3f) -> vec3f{
-//     let l: f32 = dot(c, vec3(0.2126, 0.7152, 0.0722));
-//     var tc: vec3f = c / (c + 1.0);
-
-//     return mix(c / (l + 1.0), tc, tc);
-// }
-
 /*
 Next we'll define the main scattering function.
 This traces a ray from start to end and takes a certain amount of samples along this ray, in order to calculate the color.
@@ -337,9 +330,9 @@ fn calculate_scattering(
     
 	// calculate and return the final color
     return (
-        	phase_ray * beta_ray * total_ray // rayleigh color
-       		+ phase_mie * beta_mie * total_mie // mie
-            + opt_i.x * beta_ambient // and ambient
+		phase_ray * beta_ray * total_ray // rayleigh color
+		+ phase_mie * beta_mie * total_mie // mie
+		+ opt_i.x * beta_ambient // and ambient
     ) * light_intensity + scene_color * opacity; // now make sure the background is rendered correctly
 }
 
@@ -354,57 +347,22 @@ fn fs( @location( 0 ) vSunE : f32,
 
 	let direction: vec3f = normalize( vWorldPosition - object.cameraPosition );
 
-	// optical length
-	// cutoff angle at 90 to avoid singularity in next formula.
-	let zenithAngle: f32 = acos( max( 0.0, dot( object.up, direction ) ) );
-	let inverse: f32 = 1.0 / ( cos( zenithAngle ) + 0.15 * pow( 93.885 - ( ( zenithAngle * 180.0 ) / pi ), -1.253 ) );
-	let sR: f32 = rayleighZenithLength * inverse;
-	let sM: f32 = mieZenithLength * inverse;
-
-	// combined extinction factor
-	let Fex: vec3f = exp( -( vBetaR * sR + vBetaM * sM ) );
-
 	// in scattering
 	let cosTheta: f32 = dot( direction, vSunDirection );
 
-	let rPhase: f32 = rayleighPhase( cosTheta * 0.5 + 0.5 );
-	let betaRTheta: vec3f = vBetaR * rPhase;
-
-	let mPhase: f32 = hgPhase( cosTheta, object.mieDirectionalG );
-	let betaMTheta: vec3f = vBetaM * mPhase;
-
-	var Lin: vec3f = pow( vSunE * ( ( betaRTheta + betaMTheta ) / ( vBetaR + vBetaM ) ) * ( 1.0 - Fex ), vec3( 1.5 ) );
-	Lin *= mix( vec3( 1.0 ), pow( vSunE * ( ( betaRTheta + betaMTheta ) / ( vBetaR + vBetaM ) ) * Fex, vec3( 1.0 / 2.0 ) ), clamp( pow( 1.0 - dot( object.up, vSunDirection ), 5.0 ), 0.0, 1.0 ) );
-
-	// nightsky
-	let theta: f32 = acos( direction.y ); // elevation --> y-axis, [-pi/2, pi/2]
-	let phi: f32 = atan2( direction.z, direction.x ); // azimuth --> x-axis [-pi/2, pi/2]
-	let uv: vec2f = vec2( phi, theta ) / vec2( 2.0 * pi, pi ) + vec2( 0.5, 0.0 );
-	var L0: vec3f = vec3( 0.1 ) * Fex;
-
 	// composition + solar disc
 	let sundisk: f32 = smoothstep( sunAngularDiameterCos, sunAngularDiameterCos + 0.00018, cosTheta );
-	L0 += ( vSunE * 19000.0 * Fex ) * sundisk;
-
-	let texColor: vec3f = ( Lin + L0 ) * 0.04 + vec3( 0.0, 0.0003, 0.00075 );
-	let retColor: vec3f = pow( texColor, vec3( 1.0 / ( 1.2 + ( 1.2 * vSunfade ) ) ) );
-
-
+	
 	// the color of this pixel
     var col: vec3f = vec3(0.0);
 
-	
-
 	// max dist, essentially the scene depth
 	let sceneDepth = 100000000000.0;
-
-	// the camera vector (ray direction of this pixel)
-	let camera_vector = normalize(vWorldPosition - object.cameraPosition);
     
     // get the atmosphere color
     col += calculate_scattering(
     	vec3f(0.0, PLANET_RADIUS, 0.0) + object.cameraPosition,				// the position of the camera
-        camera_vector, 					// the camera vector (ray direction of this pixel)
+        direction, 					// the camera vector (ray direction of this pixel)
         sceneDepth, 					// max dist, essentially the scene depth
         vec3f(0.0,0.0,0.0),				// scene color, the color of the current pixel being rendered
         vSunDirection, 					// light direction
@@ -430,6 +388,5 @@ fn fs( @location( 0 ) vSunE : f32,
     col = 1.0 - exp(-col / 1.2);
 
 	output.color = vec4f( col.rgb, 1.0 ); 
-	
 	return output;
-} 
+}
