@@ -1,8 +1,9 @@
 import { ITexture } from './ITexture';
-import { TextureProperties } from './Texture';
+import { mipMapGenerator } from './MipMapGenerator';
+import { TextureProperties, getNumMipmaps } from './Texture';
 
 export class DataTexture implements ITexture {
-  data: Uint8Array;
+  data: Uint8Array | Uint8ClampedArray;
   width: number;
   height: number;
   properties: TextureProperties;
@@ -10,7 +11,7 @@ export class DataTexture implements ITexture {
 
   constructor(
     properties: TextureProperties,
-    data: Uint8Array,
+    data: Uint8Array | Uint8ClampedArray,
     width: number,
     height: number
   ) {
@@ -24,7 +25,14 @@ export class DataTexture implements ITexture {
     this.gpuTexture = device.createTexture({
       size: [this.width, this.height],
       format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      dimension: '2d',
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+      mipLevelCount: this.properties.generateMipmaps
+        ? getNumMipmaps(this.width, this.height)
+        : 1,
     });
 
     device.queue.writeTexture(
@@ -33,6 +41,10 @@ export class DataTexture implements ITexture {
       { bytesPerRow: this.width * 4 },
       { width: this.width, height: this.height }
     );
+
+    if (this.gpuTexture.mipLevelCount > 1) {
+      mipMapGenerator.generateMips(device, this.gpuTexture);
+    }
 
     return this;
   }

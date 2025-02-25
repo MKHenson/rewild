@@ -10,6 +10,9 @@ const MEDIA_URL = process.env.MEDIA_URL;
 const assets: [string, string | string[]][] = [
   ['grid', 'uv-grid.jpg'],
   ['f-texture', 'utils/f-texture.png'],
+  ['bw-noise-64', 'utils/bw-noise-64.png'],
+  ['pebbles-512', 'utils/pebbles-512.png'],
+  ['rgba-noise-256', 'utils/rgba-noise-256.png'],
   ['crate', 'crate-wooden.jpg'],
   ['basketball', 'basketball.png'],
   ['earth', 'earth-day-2k.jpg'],
@@ -140,6 +143,29 @@ class TextureManager {
         gridTextureData,
         gridTextureWidth,
         gridTextureHeight
+      )
+    );
+
+    // Create noise texture
+    const width = 256;
+    const height = 256;
+    const data = new Uint8ClampedArray(width * height * 4);
+
+    for (let i = 0; i < data.length; i++) {
+      data[i] = Math.floor(Math.random() * 255);
+
+      // Set alpha to 255
+      if (i % 4 === 3) {
+        data[i] = 255;
+      }
+    }
+
+    this.addTexture(
+      new DataTexture(
+        new TextureProperties('data-rgba-noise-256', false),
+        data,
+        width,
+        height
       )
     );
   }

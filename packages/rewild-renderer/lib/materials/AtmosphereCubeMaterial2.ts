@@ -1,6 +1,6 @@
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from './IMaterialPass';
-import shader from '../shaders/atmosphereWithWeather.wgsl';
+import shader from '../shaders/atmosphereWithWeather2.wgsl';
 import { Renderer } from '..';
 import { ProjModelView } from './uniforms/ProjModelView';
 import { PerMeshTracker } from './PerMeshTracker';
@@ -38,7 +38,7 @@ function generateNoiseData(size: number): Float32Array {
   return data;
 }
 
-export class AtmosphereCubeMaterial implements IMaterialPass {
+export class AtmosphereCubeMaterial2 implements IMaterialPass {
   pipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
@@ -164,13 +164,17 @@ export class AtmosphereCubeMaterial implements IMaterialPass {
         },
         {
           binding: 1,
+          resource: samplerManager.get('linear'),
+        },
+        {
+          binding: 2,
           resource: textureManager
             .get('rgba-noise-256')
             .gpuTexture.createView(),
         },
         {
-          binding: 2,
-          resource: samplerManager.get('linear'),
+          binding: 3,
+          resource: textureManager.get('pebbles-512').gpuTexture.createView(),
         },
       ],
     });

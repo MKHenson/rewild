@@ -41,6 +41,9 @@ class SamplerManager {
         minFilter: 'linear',
         mipmapFilter: 'linear',
         label: 'linear',
+        addressModeU: 'repeat',
+        addressModeV: 'repeat',
+        addressModeW: 'repeat',
       })
     );
 
