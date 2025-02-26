@@ -104,12 +104,12 @@ const EE: f32 = 1000.0;
 // ========================================================
 // Cloud parameters
 const EARTH_RADIUS: f32 = 6300e3;
-const CLOUD_START: f32 = 800.0;
-const CLOUD_HEIGHT: f32 = 1200.0;
+const CLOUD_START: f32 = 1000.0;
+const CLOUD_HEIGHT: f32 = 1400.0;
 const SUN_POWER: vec3f = vec3(1.0,0.9,0.6) * 800.;
 const LOW_SCATTER: vec3f = vec3(1.0, 0.7, 0.5);
 // Define a constant variable for cloudiness
-const CLOUDINESS: f32 = 0.5; 
+// const CLOUDINESS: f32 = 1.0; 
 // ========================================================
 
 
@@ -389,86 +389,60 @@ fn fs(
 	let direction: vec3f = normalize( vWorldPosition - object.cameraPosition );
 
 	// in scattering
-	let cosTheta: f32 = dot( direction, vSunDirection );
+	// var cosTheta: f32 = dot( direction, vSunDirection );
+    var cosTheta = dot( direction, vec3f(0.0, 1.0, 0.0) );
 
 	// composition + solar disc
-	let sunMask: f32 = smoothstep( 0, 0.58, cosTheta );
+	let hemisphereMask: f32 = smoothstep( -0.3, 0.1, cosTheta );
 	
-	// the initial color of this pixel
-    var nightSky: vec3f = DrawNightSky(direction, fragCoord.xy);
-
-    // // In this next section
-	// // max dist, essentially the scene depth
-	// let sceneDepth = 100000000000.0;
+	
     
-    // // get the atmosphere color
-    // let scattering = calculate_scattering(
-    // 	vec3f(0.0, PLANET_RADIUS, 0.0) + object.cameraPosition,				// the position of the camera
-    //     direction, 					// the camera vector (ray direction of this pixel)
-    //     sceneDepth, 					// max dist, essentially the scene depth
-    //     vec3f(0.0,0.0,0.0),				// scene color, the color of the current pixel being rendered
-    //     vSunDirection, 					// light direction
-    //     vec3f(40.0),					// light intensity, 40 looks nice
-    //     PLANET_POS,						// position of the planet
-    //     PLANET_RADIUS,                  // radius of the planet in meters
-    //     ATMOS_RADIUS,                   // radius of the atmosphere in meters
-    //     RAY_BETA,						// Rayleigh scattering coefficient
-    //     MIE_BETA,                       // Mie scattering coefficient
-    //     ABSORPTION_BETA,                // Absorbtion coefficient
-    //     AMBIENT_BETA,					// ambient scattering, turned off for now. This causes the air to glow a bit when no light reaches it
-    //     G,                          	// Mie preferred scattering direction
-    //     HEIGHT_RAY,                     // Rayleigh scale height
-    //     HEIGHT_MIE,                     // Mie scale height
-    //     HEIGHT_ABSORPTION,				// the height at which the most absorption happens
-    //     ABSORPTION_FALLOFF,				// how fast the absorption falls off from the absorption height 
-    //     PRIMARY_STEPS, 					// steps in the ray direction 
-    //     LIGHT_STEPS 					// steps in the light direction
-    // );
-
-    // // Calculate the opacity of the atmosphere based on the sun's position and view direction
-    // let sunVisibility: f32 = clamp(dot(vSunDirection, vec3f(0.0, 1.0, 0.0)), -1.0, 1.0);
-    // let adjustedOpacity: vec3f = exp(-(RAY_BETA * scattering.x + MIE_BETA * scattering.y + ABSORPTION_BETA * scattering.z)) * sunVisibility;
-
-    // // This is a mask we apply to the stars so they cut off nicely below the horizon
-    // let upperHemisphereMask: f32 = clamp( dot( direction, vec3f(0.0, 1.0, 0.0) ) * 6.0, 0.0, 1.0 );
-    // col = mix(col * upperHemisphereMask, scattering, adjustedOpacity);
-
-    
-
-// 	// apply exposure, removing this makes the brighter colors look ugly
-//     // you can play around with removing this
-//     // col = 1.0 - exp(-col / 1.2);
-
-
-
-    let dir = direction;
-    let org = object.cameraPosition;    
-	var color = vec3f(.0);
-    let sun_direction = vSunDirection;
-    
-	var fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS);
-    let mu = dot(sun_direction, dir);
-    
-    // Sky
-    // if( fogDistance == -1. ) {
-        color = skyRay(org, dir, sun_direction, false); 
-        fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS+160.0);
-    // }
-   
-    
-    let fogPhase = 0.5 * HenyeyGreenstein(mu, 0.9) + 0.5 * HenyeyGreenstein(mu, -0.6);
-
-    output.color = vec4f( mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * vec3f( 0.55, 0.8, 1.0 ), color, exp(-0.0003 * fogDistance )), 1.0 );
-    
-    // Adjust exposure
-    let atmosphereWithSunAndClouds = vec3f( 1.0 - exp(-output.color.rgb / 8.6));
-    output.color = vec4f( mix( nightSky, atmosphereWithSunAndClouds, sunMask), 1.0 );
-    return output;
+    // The area on the horizon where the sun and earth meet
+    if ( hemisphereMask < 1 && hemisphereMask > 0.0 ) {
+        let nightSky: vec3f = DrawNightSky(direction, fragCoord.xy);
+        let atmosphereWithSunAndClouds = DrawCloudsAndSky( direction, object.cameraPosition, vSunDirection );
+        output.color = vec4f( mix( nightSky, atmosphereWithSunAndClouds, hemisphereMask), 1.0 );
+        // output.color = vec4f( 1.0, 0.0, 0.0, 1.0 );
+        return output;
+    }
+    // The area below the horizon (not visible)
+    else if ( hemisphereMask <= 0.0 ) {
+        let nightSky: vec3f = DrawNightSky(direction, fragCoord.xy);
+        output.color = vec4f( nightSky, 1.0 );
+        return output;
+    }
+    // The area above the horizon
+    else {
+        let atmosphereWithSunAndClouds = DrawCloudsAndSky( direction, object.cameraPosition, vSunDirection );
+        output.color = vec4f( atmosphereWithSunAndClouds, 1.0 );
+        return output;
+    } 
 }
 
 
 
+fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec3f {
+	var color = vec3f(.0);
+    
+	var fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS);
+    let mu = dot(vSunDirection, dir);
+    
+    color = skyRay(org, dir, vSunDirection, false); 
 
+    fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 160.0);
+
+    // Cloudiness is from 0 to 1. Lets get a number 
+    let fogSunIntensityModifier = mix( 1.0, 0.7, object.cloudiness );
+    let darknessModifier = mix( 1.0, 0.18, object.cloudiness );
+
+    let fogPhase = 0.5 * HenyeyGreenstein(mu, 0.9 * fogSunIntensityModifier) + 0.5 * HenyeyGreenstein(mu, -0.6);
+
+    color = mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * vec3f( 0.55, 0.8, 1.0 ), color, exp(-0.0003 * fogDistance )) * darknessModifier;
+    
+    // Adjust exposure
+    let atmosphereWithSunAndClouds = vec3f( 1.0 - exp(-color / 8.6));
+    return atmosphereWithSunAndClouds;
+}
 
 
 
@@ -583,7 +557,7 @@ struct CloudResult {
 
 fn clouds(position: vec3f, fast: bool) -> CloudResult {
     // Speed at which clouds move, based on time
-    let cloudMovementSpeed = object.iTime * 0.001;
+    let cloudMovementSpeed = object.iTime * 0.004 * mix(1.0, 0.3, object.cloudiness);
     var p = position;
 
     var result: CloudResult;
@@ -598,13 +572,13 @@ fn clouds(position: vec3f, fast: bool) -> CloudResult {
     p.z += cloudMovementSpeed * 10.3;
     
     // Sample the large-scale weather pattern
-    let largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -0.00005 * p.zx, 0.0).x - 0.18) * 5.0, 0.0, 3.0 * CLOUDINESS);
+    let largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -0.00005 * p.zx, 0.0).x - 0.18) * 5.0, 0.0, 2.0 * object.cloudiness);
 
     // Move the clouds in the x direction
     p.x += cloudMovementSpeed * 8.3;
     
     // Sample the smaller-scale weather pattern and combine with large-scale pattern
-    var weather: f32 = largeWeather * max( clamp( pow(CLOUDINESS, 3.1), 0.0, 1.0 ), textureSampleLevel(pebblesTexture, noiseSampler, 0.0002 * p.zx, 0.0).x - 0.28) / 0.72;
+    var weather: f32 = largeWeather * max( clamp( pow(object.cloudiness, 12.1), 0.0, 1.0 ), textureSampleLevel(pebblesTexture, noiseSampler, 0.0002 * p.zx, 0.0).x - 0.28) / 0.72;
     
     // Apply smoothstep to the cloud height to create a smooth transition
     weather *= smoothstep(0.0, 0.5, cloudHeight) * smoothstep(1.0, 0.5, cloudHeight);
@@ -796,9 +770,25 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, fast: bool) -> vec
 
     // If not in fast mode, add some additional clouds to the sky    
     if (!fast) {
+        let cloudMovementSpeed = object.iTime * 0.00004 * object.cloudiness;
+
+        // Create a rotation matrix around the x-axis
+        let cosAngle = cos(cloudMovementSpeed);
+        let sinAngle = sin(cloudMovementSpeed);
+        let rotationMatrix = mat3x3<f32>(
+            vec3f(1.0, 0.0, 0.0),
+            vec3f(0.0, cosAngle, -sinAngle),
+            vec3f(0.0, sinAngle, cosAngle)
+        );
+
+        // Rotate the direction vector
+        let rotatedDir = rotationMatrix * dir;
+        
         // Adds clouds at a higher altitude (1000 meters above the atmosphere)
-        let intersectionPoint = cameraPos + intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END + 1000.0) * dir;
-        color += transmittance * vec3f(3.0) * max(0.0, fbm(vec3f(1.0, 1.0, 1.8) * intersectionPoint * 0.002) - 0.4);
+        var intersectionPoint = cameraPos + intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END + 1000.0) * rotatedDir;
+        
+        let cloudCoverFactor=  mix( 0.6, 0.01, object.cloudiness );
+        color += transmittance * vec3f(3.0) * max(0.0, fbm(vec3f(1.0, 1.0, 1.8) * intersectionPoint * 0.002) - cloudCoverFactor);
     }
 
     // Calculate the background color based on the direction of the ray

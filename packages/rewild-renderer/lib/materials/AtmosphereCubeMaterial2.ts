@@ -52,10 +52,12 @@ export class AtmosphereCubeMaterial2 implements IMaterialPass {
 
   elevation: f32;
   azimuth: f32;
+  cloudiness: f32;
 
   constructor() {
     this.azimuth = 180;
     this.elevation = 2;
+    this.cloudiness = 0.0;
 
     this.requiresRebuild = true;
     this.cameraView = new Matrix4();
@@ -72,9 +74,16 @@ export class AtmosphereCubeMaterial2 implements IMaterialPass {
 
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
-    const { device, presentationFormat } = renderer;
+    const { device, presentationFormat, pane } = renderer;
     const module = device.createShaderModule({
       code: shader,
+    });
+
+    pane.canvas()!.addEventListener('mousemove', (e) => {
+      // this.cloudiness = (e.clientY / pane.canvas()!.height);
+      // Set the cloudiness as 0 when the mouse is at the bottom of the canvas
+      // and 1 when it is at the top
+      this.cloudiness = 1 - e.clientY / pane.canvas()!.height;
     });
 
     this.pipeline = device.createRenderPipeline({
@@ -206,8 +215,8 @@ export class AtmosphereCubeMaterial2 implements IMaterialPass {
 
     this.elevation += renderer.delta * 0.01;
 
-    // cloudiness is a value between -0.5 and 0.5
-    const cloudiness = -0.1;
+    // cloudiness is a value between -0.5 and 0.5 for atmosphereWithWeather and 0 and 1 for atmosphereWithWeather2
+    const cloudiness = this.cloudiness;
 
     const phi = degToRad(90 - this.elevation);
     const theta = degToRad(this.azimuth);
