@@ -31,360 +31,60 @@ var noiseTexture: texture_2d<f32>;
 @group( 0 ) @binding( 3 ) 
 var pebblesTexture: texture_2d<f32>;
 
-// @group(0) @binding(1) var<storage, read> noiseBuffer: array<f32>;
-
-
 // varyings
 struct VaryingsStruct {
-	@location( 0 ) vSunE : f32,
-	@location( 1 ) vBetaR : vec3<f32>,
-	@location( 2 ) vWorldPosition : vec3<f32>,
-	@location( 3 ) positionLocal : vec3<f32>,
-	@location( 4 ) vSunDirection : vec3<f32>,
-	@location( 5 ) vBetaM : vec3<f32>,
-	@location( 6 ) vSunfade : f32,
+	@location( 0 ) vWorldPosition : vec3<f32>,
+	@location( 1 ) vSunDirection : vec3<f32>,
 	@builtin( position ) Vertex : vec4<f32>
 };
 var<private> varyings: VaryingsStruct;
 
-// ============================================================================
-// first, lets define some constants to use (planet radius, position, and scattering coefficients)
-const PLANET_POS  = vec3f(0.0); /* the position of the planet */
-const PLANET_RADIUS  = 6371e3; /* radius of the planet */
-const ATMOS_RADIUS = 6431e3; /* radius of the atmosphere */
+struct OutputStruct {
+	@location(0) color: vec4<f32>
+};
+var<private> output: OutputStruct;
+var<private> sunDotUp: f32;
 
-// scattering coeffs
-const RAY_BETA=vec3f(5.5e-6, 13.0e-6, 22.4e-6); /* rayleigh, affects the color of the sky */
-const MIE_BETA= vec3f(21e-6); /* mie, affects the color of the blob around the sun */
-const AMBIENT_BETA= vec3f(0.0); /* ambient, affects the scattering color when there is no lighting from the sun */
-const ABSORPTION_BETA= vec3f(2.04e-5, 4.97e-5, 1.95e-6); /* what color gets absorbed by the atmosphere (Due to things like ozone) */
-const G= 0.78; /* mie scattering direction, or how big the blob around the sun is */
+struct CloudResult {
+    sky: f32,
+    cloudHeight: f32
+};
 
-// and the heights (how far to go up before the scattering has no effect)
-const HEIGHT_RAY = 6e3; /* rayleigh height */
-const HEIGHT_MIE = 1.2e3; /* and mie */
-const HEIGHT_ABSORPTION = 80e3; /* at what height the absorption is at it's maximum */
-const ABSORPTION_FALLOFF = 8e3; /* how much the absorption decreases the further away it gets from the maximum height */
-
-// and the steps (more looks better, but is slower)
-// the primary step has the most effect on looks
-
-// and these on desktop
-const PRIMARY_STEPS = 8; // 32 /* primary steps, affects quality the most */
-const LIGHT_STEPS = 4; // 8 /* light steps, how much steps in the light direction are taken */
-// ============================================================================
-
-
-// constants for atmospheric scattering
-const e : f32 = 2.71828182845904523536028747135266249775724709369995957;
 const pi: f32 = 3.141592653589793238462643383279502884197169;
-
-// wavelength of used primaries, according to preetham
-const lambda: vec3f = vec3f( 680E-9, 550E-9, 450E-9 );
-// this pre-calculation replaces older TotalRayleigh(vec3 lambda) function:
-// (8.0 * pow(pi, 3.0) * pow(pow(n, 2.0) - 1.0, 2.0) * (6.0 + 3.0 * pn)) / (3.0 * N * pow(lambda, vec3(4.0)) * (6.0 - 7.0 * pn))
-const totalRayleigh: vec3f = vec3( 5.804542996261093E-6, 1.3562911419845635E-5, 3.0265902468824876E-5 );
-
-// mie stuff
-// K coefficient for the primaries
-const v: f32 = 4.0;
-const K: vec3f = vec3( 0.686, 0.678, 0.666 );
-// MieConst = pi * pow( ( 2.0 * pi ) / lambda, vec3( v - 2.0 ) ) * K
-const MieConst: vec3f = vec3( 1.8399918514433978E14, 2.7798023919660528E14, 4.0790479543861094E14 );
-
-// earth shadow hack
-// cutoffAngle = pi / 1.95;
-const cutoffAngle: f32 = 1.6110731556870734;
-const steepness: f32 = 1.5;
-const EE: f32 = 1000.0;
-
-
+const cloudAmbientDayColor = vec3f(0.2, 0.5, 1.0);
+const cloudAmbientNightColor = vec3f(0.1, 0.2, 0.5);
+const fogColorDay = vec3f( 0.55, 0.8, 1.0 );
+const fogColorEvening = vec3f( 0.75, 0.7, 0.5 );
 
 // WEATHER STUFF
 // ========================================================
 // Cloud parameters
 const EARTH_RADIUS: f32 = 6300e3;
 const CLOUD_START: f32 = 1000.0;
-const CLOUD_HEIGHT: f32 = 1400.0;
+const CLOUD_HEIGHT: f32 = 1200.0;
 const SUN_POWER: vec3f = vec3(1.0,0.9,0.6) * 800.;
 const LOW_SCATTER: vec3f = vec3(1.0, 0.7, 0.5);
-// Define a constant variable for cloudiness
-// const CLOUDINESS: f32 = 1.0; 
+
 // ========================================================
-
-
-
-
 // NIGHT SKY STUFF
 const galaxyNormal = vec3f(0.577, 0.577, 0.577); // Which direction the galaxy is facing
 const galaxyCenterDir = vec3f(-0.707, 0, 0.707); // The direction of the center of the galaxy
 
-fn sunIntensity( zenithAngleCos: f32 ) -> f32 {
-	let zenithAngleCosClamped = clamp( zenithAngleCos, -1.0, 1.0 );
-	return EE * max( 0.0, 1.0 - pow( e, -( ( cutoffAngle - acos( zenithAngleCosClamped ) ) / steepness ) ) );
-}
-
-fn totalMie( T: f32 ) -> vec3f {
-	let c: f32 = ( 0.2 * T ) * 10E-18;
-	return 0.434 * c * MieConst;
-}
-
 @vertex
 fn vs( @location( 0 ) position : vec3<f32> ) -> VaryingsStruct {
-
 	var worldPosition: vec4f = object.modelMatrix * vec4( position, 1.0 );
 	varyings.vWorldPosition = worldPosition.xyz;
-
 	varyings.Vertex = object.projectionMatrix * object.modelViewMatrix * vec4( position, 1.0 );
 	varyings.Vertex.z = varyings.Vertex.w; // set z to camera.far
-
 	varyings.vSunDirection = normalize( object.sunPosition );
-	varyings.vSunE = sunIntensity( dot( varyings.vSunDirection, object.up ) );
-	varyings.vSunfade = 1.0 - clamp( 1.0 - exp( ( object.sunPosition.y / 450000.0 ) ), 0.0, 1.0 );
-
-	let rayleighCoefficient: f32 = object.rayleigh - ( 1.0 * ( 1.0 - varyings.vSunfade ) );
-
-	// extinction (absorption + out scattering)
-	// rayleigh coefficients
-	varyings.vBetaR = totalRayleigh * rayleighCoefficient;
-
-	// mie coefficients
-	varyings.vBetaM = totalMie( object.turbidity ) * object.mieCoefficient;
-
 	return varyings;
-}
-
-
-// constants for atmospheric scattering
-const n: f32 = 1.0003; // refractive index of air
-const N: f32 = 2.545E25; // number of molecules per unit volume for air at 288.15K and 1013mb (sea level -45 celsius)
-
-// optical length at zenith for molecules
-const rayleighZenithLength: f32 = 8.4E3;
-const mieZenithLength: f32 = 1.25E3;
-const sunSize: f32 = 1;
-// 66 arc seconds -> degrees, and the cosine of that
-const sunAngularDiameterCos: f32 = 0.999856676946448443553574619906976478926848692873900859324 - (0.0001 * sunSize);
-
-// 3.0 / ( 16.0 * pi )
-const THREE_OVER_SIXTEENPI: f32 = 0.05968310365946075;
-// 1.0 / ( 4.0 * pi )
-const ONE_OVER_FOURPI: f32 = 0.07957747154594767;
-
-fn rayleighPhase( cosTheta: f32 ) -> f32 {
-	return THREE_OVER_SIXTEENPI * ( 1.0 + pow( cosTheta, 2.0 ) );
-}
-
-fn hgPhase( cosTheta: f32, g: f32 ) -> f32 {
-	let g2: f32 = pow( g, 2.0 );
-	let inverse: f32 = 1.0 / pow( 1.0 - 2.0 * g * cosTheta + g2, 1.5 );
-	return ONE_OVER_FOURPI * ( ( 1.0 - g2 ) * inverse );
-}
-
-struct OutputStruct {
-	@location(0) color: vec4<f32>
-};
-var<private> output : OutputStruct;
-
-/*
-Next we'll define the main scattering function.
-This traces a ray from start to end and takes a certain amount of samples along this ray, in order to calculate the color.
-For every sample, we'll also trace a ray in the direction of the light, 
-because the color that reaches the sample also changes due to scattering
-*/
-fn calculate_scattering(
-	camPos: vec3f, 				// the start of the ray (the camera position)
-    dir: vec3f, 					// the direction of the ray (the camera vector)
-    max_dist: f32, 			// the maximum distance the ray can travel (because something is in the way, like an object)
-    scene_color: vec3f,			// the color of the scene
-    light_dir: vec3f, 			// the direction of the light
-    light_intensity: vec3f,		// how bright the light is, affects the brightness of the atmosphere
-    planet_position: vec3f, 		// the position of the planet
-    planet_radius: f32, 		// the radius of the planet
-    atmo_radius: f32, 			// the radius of the atmosphere
-    beta_ray: vec3f, 				// the amount rayleigh scattering scatters the colors (for earth: causes the blue atmosphere)
-    beta_mie: vec3f, 				// the amount mie scattering scatters colors
-    beta_absorption: vec3f,   	// how much air is absorbed
-    beta_ambient: vec3f,			// the amount of scattering that always occurs, cna help make the back side of the atmosphere a bit brighter
-    g: f32, 					// the direction mie scatters the light in (like a cone). closer to -1 means more towards a single direction
-    height_ray: f32, 			// how high do you have to go before there is no rayleigh scattering?
-    height_mie: f32, 			// the same, but for mie
-    height_absorption: f32,	// the height at which the most absorption happens
-    absorption_falloff: f32,	// how fast the absorption falls off from the absorption height
-    steps_i: i32, 				// the amount of steps along the 'primary' ray, more looks better but slower
-    steps_l: i32 				// the amount of steps along the light ray, more looks better but slower
-) -> vec3f {
-	var start = camPos;
-    // add an offset to the camera position, so that the atmosphere is in the correct position
-    start -= planet_position;
-    // calculate the start and end position of the ray, as a distance along the ray
-    // we do this with a ray sphere intersect
-    var a: f32 = dot(dir, dir);
-    var b: f32 = 2.0 * dot(dir, start);
-    var c: f32 = dot(start, start) - (atmo_radius * atmo_radius);
-    var d: f32 = (b * b) - 4.0 * a * c;
-    
-    // stop early if there is no intersect
-    if (d < 0.0) {
-		return scene_color;
-	}
-    
-    // calculate the ray length
-    var ray_length: vec2f = vec2f(
-        max((-b - sqrt(d)) / (2.0 * a), 0.0),
-        min((-b + sqrt(d)) / (2.0 * a), max_dist)
-    );
-    
-    // if the ray did not hit the atmosphere, return a black color
-    if (ray_length.x > ray_length.y) {
-		return scene_color;
-	}
-
-    // prevent the mie glow from appearing if there's an object in front of the camera
-    let allow_mie = max_dist > ray_length.y;
-    // make sure the ray is no longer than allowed
-    ray_length.y = min(ray_length.y, max_dist);
-    ray_length.x = max(ray_length.x, 0.0);
-    // get the step size of the ray
-    let step_size_i: f32 = (ray_length.y - ray_length.x) / f32(steps_i);
-    
-    // next, set how far we are along the ray, so we can calculate the position of the sample
-    // if the camera is outside the atmosphere, the ray should start at the edge of the atmosphere
-    // if it's inside, it should start at the position of the camera
-    // the min statement makes sure of that
-    var ray_pos_i: f32 = ray_length.x + step_size_i * 0.5;
-    
-    // these are the values we use to gather all the scattered light
-    var total_ray: vec3f = vec3(0.0); // for rayleigh
-    var total_mie: vec3f = vec3(0.0); // for mie
-    
-    // initialize the optical depth. This is used to calculate how much air was in the ray
-    var opt_i: vec3f = vec3(0.0);
-    
-    // also init the scale height, avoids some vec2's later on
-    let scale_height: vec2f = vec2(height_ray, height_mie);
-    
-    // Calculate the Rayleigh and Mie phases.
-    // This is the color that will be scattered for this ray
-    // mu, mumu and gg are used quite a lot in the calculation, so to speed it up, precalculate them
-    let mu: f32 = dot(dir, light_dir);
-    let mumu: f32 = mu * mu;
-    let gg: f32 = g * g;
-    let phase_ray: f32 = 3.0 / (50.2654824574 /* (16 * pi) */) * (1.0 + mumu);
-    var phase_mie: f32 = 0.0;
-	
-	if ( allow_mie ) {
-		phase_mie = 3.0 / (25.1327412287 /* (8 * pi) */) * ((1.0 - gg) * (mumu + 1.0)) / (pow(1.0 + gg - 2.0 * mu * g, 1.5) * (2.0 + gg));
-	}
-    
-    // now we need to sample the 'primary' ray. this ray gathers the light that gets scattered onto it
-    for (var i: i32 = 0; i < steps_i; i++) {
-        
-        // calculate where we are along this ray
-        let pos_i: vec3f = start + dir * ray_pos_i;
-        
-        // and how high we are above the surface
-        let height_i: f32 = length(pos_i) - planet_radius;
-        
-        // now calculate the density of the particles (both for rayleigh and mie)
-        var density: vec3f = vec3(exp(-height_i / scale_height), 0.0);
-        
-        // and the absorption density. this is for ozone, which scales together with the rayleigh, 
-        // but absorbs the most at a specific height, so use the sech function for a nice curve falloff for this height
-        // clamp it to avoid it going out of bounds. This prevents weird black spheres on the night side
-        let denom: f32 = (height_absorption - height_i) / absorption_falloff;
-        density.z = (1.0 / (denom * denom + 1.0)) * density.x;
-        
-        // multiply it by the step size here
-        // we are going to use the density later on as well
-        density *= step_size_i;
-        
-        // Add these densities to the optical depth, so that we know how many particles are on this ray.
-        opt_i += density;
-        
-        // Calculate the step size of the light ray.
-        // again with a ray sphere intersect
-        // a, b, c and d are already defined
-        a = dot(light_dir, light_dir);
-        b = 2.0 * dot(light_dir, pos_i);
-        c = dot(pos_i, pos_i) - (atmo_radius * atmo_radius);
-        d = (b * b) - 4.0 * a * c;
-
-        // no early stopping, this one should always be inside the atmosphere
-        // calculate the ray length
-        let step_size_l: f32 = (-b + sqrt(d)) / (2.0 * a * f32(steps_l));
-
-        // and the position along this ray
-        // this time we are sure the ray is in the atmosphere, so set it to 0
-        var ray_pos_l: f32 = step_size_l * 0.5;
-
-        // and the optical depth of this ray
-        var opt_l: vec3f = vec3(0.0);
-            
-        // now sample the light ray
-        // this is similar to what we did before
-        for (var l: i32 = 0; l < steps_l; l++) {
-
-            // calculate where we are along this ray
-            let pos_l: vec3f = pos_i + light_dir * ray_pos_l;
-
-            // the heigth of the position
-            let height_l: f32 = length(pos_l) - planet_radius;
-
-            // calculate the particle density, and add it
-            // this is a bit verbose
-            // first, set the density for ray and mie
-            var density_l: vec3f = vec3(exp(-height_l / scale_height), 0.0);
-            
-            // then, the absorption
-            let denom: f32 = (height_absorption - height_l) / absorption_falloff;
-            density_l.z = (1.0 / (denom * denom + 1.0)) * density_l.x;
-            
-            // multiply the density by the step size
-            density_l *= step_size_l;
-            
-            // and add it to the total optical depth
-            opt_l += density_l;
-            
-            // and increment where we are along the light ray.
-            ray_pos_l += step_size_l;
-            
-        }
-        
-        // Now we need to calculate the attenuation
-        // this is essentially how much light reaches the current sample point due to scattering
-        let attn: vec3f = exp(-beta_ray * (opt_i.x + opt_l.x) - beta_mie * (opt_i.y + opt_l.y) - beta_absorption * (opt_i.z + opt_l.z));
-
-        // accumulate the scattered light (how much will be scattered towards the camera)
-        total_ray += density.x * attn;
-        total_mie += density.y * attn;
-
-        // and increment the position on this ray
-        ray_pos_i += step_size_i;
-    	
-    }
-    
-    // calculate how much light can pass through the atmosphere
-    let opacity: vec3f = exp(-(beta_mie * opt_i.y + beta_ray * opt_i.x + beta_absorption * opt_i.z));
-    
-	// calculate and return the final color
-    return (
-		phase_ray * beta_ray * total_ray // rayleigh color
-		+ phase_mie * beta_mie * total_mie // mie
-		+ opt_i.x * beta_ambient // and ambient
-    ) * light_intensity + scene_color * opacity; // now make sure the background is rendered correctly
 }
 
 @fragment
 fn fs( 
      @builtin(position) fragCoord: vec4<f32>,
-    @location( 0 ) vSunE : f32,
-	@location( 1 ) vBetaR : vec3<f32>,
-	@location( 2 ) vWorldPosition : vec3<f32>,
-	@location( 3 ) positionLocal : vec3<f32>,
-	@location( 4 ) vSunDirection : vec3<f32>,
-	@location( 5 ) vBetaM : vec3<f32>,
-	@location( 6 ) vSunfade : f32 ) -> OutputStruct {
+	@location( 0 ) vWorldPosition : vec3<f32>,
+	@location( 1 ) vSunDirection : vec3<f32> ) -> OutputStruct {
 
 	let direction: vec3f = normalize( vWorldPosition - object.cameraPosition );
 
@@ -400,12 +100,12 @@ fn fs(
     // The area on the horizon where the sun and earth meet
     if ( hemisphereMask < 1 && hemisphereMask > 0.0 ) {
         let nightSky: vec3f = DrawNightSky(direction, fragCoord.xy);
-        let atmosphereWithSunAndClouds = DrawCloudsAndSky( direction, object.cameraPosition, vSunDirection );
+        let atmosphereWithSunAndClouds = DrawCloudsAndSky( direction, object.cameraPosition, vSunDirection, nightSky );
         output.color = vec4f( mix( nightSky, atmosphereWithSunAndClouds, hemisphereMask), 1.0 );
         // output.color = vec4f( 1.0, 0.0, 0.0, 1.0 );
         return output;
     }
-    // The area below the horizon (not visible)
+    // The area below the horizon
     else if ( hemisphereMask <= 0.0 ) {
         let nightSky: vec3f = DrawNightSky(direction, fragCoord.xy);
         output.color = vec4f( nightSky, 1.0 );
@@ -413,44 +113,171 @@ fn fs(
     }
     // The area above the horizon
     else {
-        let atmosphereWithSunAndClouds = DrawCloudsAndSky( direction, object.cameraPosition, vSunDirection );
+        let nightSky: vec3f = DrawNightSky(direction, fragCoord.xy);
+        let atmosphereWithSunAndClouds = DrawCloudsAndSky( direction, object.cameraPosition, vSunDirection, nightSky );
         output.color = vec4f( atmosphereWithSunAndClouds, 1.0 );
         return output;
     } 
 }
 
-
-
-fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec3f {
-	var color = vec3f(.0);
-    
-	var fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS);
-    let mu = dot(vSunDirection, dir);
-    
-    color = skyRay(org, dir, vSunDirection, false); 
-
-    fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 160.0);
-
-    // Cloudiness is from 0 to 1. Lets get a number 
-    let fogSunIntensityModifier = mix( 1.0, 0.7, object.cloudiness );
-    let darknessModifier = mix( 1.0, 0.18, object.cloudiness );
-
-    let fogPhase = 0.5 * HenyeyGreenstein(mu, 0.9 * fogSunIntensityModifier) + 0.5 * HenyeyGreenstein(mu, -0.6);
-
-    color = mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * vec3f( 0.55, 0.8, 1.0 ), color, exp(-0.0003 * fogDistance )) * darknessModifier;
-    
-    // Adjust exposure
-    let atmosphereWithSunAndClouds = vec3f( 1.0 - exp(-color / 8.6));
-    return atmosphereWithSunAndClouds;
-}
-
-
-
-
 // ============================================================================
 // CLOUD RENDERING
 // ============================================================================
 
+fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f, nightSky: vec3f ) -> vec3f {
+	var color = vec3f(.0);
+    
+    sunDotUp = dot(vSunDirection, vec3f(0.0, 1.0, 0.0));
+
+	let sunInSkyMask = clamp( pow(1.75 + 1.75 * sunDotUp, 1.0), 0.0, 1.0 );
+    let mu = dot(vSunDirection, dir) * sunInSkyMask;
+    
+    color = skyRay(org, dir, vSunDirection, false, nightSky); 
+
+    let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 160.0);
+
+    // Cloudiness is from 0 to 1. Lets get a number 
+    let fogSunIntensityModifier = mix( 1.0, 0.7, object.cloudiness );
+    let darknessModifier = mix( 1.0, 0.18, clamp(pow(object.cloudiness, 6.0), 0.0, 1.0) );
+
+    let fogPhase = 0.5 * HenyeyGreenstein(mu, 0.9 * fogSunIntensityModifier) + 0.5 * HenyeyGreenstein(mu, -0.6);
+
+    var fogColor = mix( fogColorEvening, fogColorDay, clamp( sunDotUp, 0.0, 1.0 ) );
+
+    // Reduce the fog color as the sun goes into the evening
+    fogColor = fogColor * mix( 0.5, 1.0, sunDotUp );
+   
+
+    color = mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * fogColor, color, exp(-0.0003 * fogDistance )) * darknessModifier;
+    
+    // Adjust exposure
+    var atmosphereWithSunAndClouds = vec3f( 1.0 - exp(-color / 8.6));
+
+    // atmosphereWithSunAndClouds = vec3f(mu);
+
+    return atmosphereWithSunAndClouds;
+}
+
+fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, fast: bool, nightSky: vec3f) -> vec3f {
+    // Constants for the start and end of the atmosphere
+    const ATM_START: f32 = EARTH_RADIUS + CLOUD_START;
+    const ATM_END: f32 = ATM_START + CLOUD_HEIGHT;
+
+    // Number of samples for ray marching
+    var nbSample = 35;
+    if (fast) {
+        nbSample = 13;
+    }
+
+    // Initialize the color to black
+    var color = vec3f(0.0);
+
+    // Calculate the intersection of the ray with the start and end of the atmosphere
+    let distToAtmStart = intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_START);
+    let distToAtmEnd = intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END);
+
+    // Calculate the starting position of the ray inside the atmosphere
+    var rayStartPosition = cameraPos + distToAtmStart * dir;
+    let stepS = (distToAtmEnd - distToAtmStart) / f32(nbSample);
+
+    // Initialize the transmittance to 1 (no light absorbed)
+    var transmittance = 1.0;
+    let mu = dot(sun_direction, dir);
+
+    // Calculate the phase function for Mie scattering
+    let phaseFunction = numericalMieFit(mu);
+    rayStartPosition += dir * stepS * hash1(dot(dir, vec3f(12.256, 2.646, 6.356)) + object.iTime * 0.00001);
+
+    let sunDotUp3 = pow(sunDotUp, 3.0);
+
+    // If the ray is pointing upwards
+    if (dir.y > 0.015) {
+        for (var i = 0; i < nbSample; i++) {
+            var cloudHeight: f32;
+            let result = clouds(rayStartPosition, fast);
+            let density = result.sky;
+            cloudHeight = result.cloudHeight;
+
+            // If there is cloud density at this sample point
+            if (density > 0.0) {
+                // Calculate the light intensity scattered by the clouds
+                let intensity = lightRay(rayStartPosition, phaseFunction, density, mu, sun_direction, cloudHeight, fast);
+
+                // Calculate the ambient light 
+                // Calulate the ambient color based on the time of day and the sun direction
+                let cloudAmbientColor = mix(cloudAmbientNightColor, cloudAmbientDayColor, sunDotUp);
+
+                let ambient = (0.5 + 0.6 * cloudHeight) * cloudAmbientColor * 6.5 + vec3f(0.8) * max(0.0, 1.0 - 2.0 * cloudHeight);
+
+                // Calculate the radiance (light emitted by the clouds)
+                var radiance = ambient + ( SUN_POWER * intensity * mix( vec3f(0.8, 0.5, 0.3), vec3f(1.0), clamp(sunDotUp3, 0.0, 1.0) ) );
+                radiance *= density;
+                color += transmittance * (radiance - radiance * exp(-density * stepS)) / density; // By Seb Hillaire
+                transmittance *= exp(-density * stepS);
+
+                // If the transmittance is very low, stop the loop
+                if (transmittance <= 0.05) {
+                    break;
+                }
+            }
+
+            // Move to the next sample point
+            rayStartPosition += dir * stepS;
+        }
+    }
+
+    // If not in fast mode, add some additional clouds to the sky    
+    if (!fast) {
+        let cloudMovementSpeed = object.iTime * 0.00004 * object.cloudiness;
+
+        // Create a rotation matrix around the x-axis
+        let cosAngle = cos(cloudMovementSpeed);
+        let sinAngle = sin(cloudMovementSpeed);
+        let rotationMatrix = mat3x3<f32>(
+            vec3f(1.0, 0.0, 0.0),
+            vec3f(0.0, cosAngle, -sinAngle),
+            vec3f(0.0, sinAngle, cosAngle)
+        );
+
+        // Rotate the direction vector
+        let rotatedDir = rotationMatrix * dir;
+        
+        // Adds clouds at a higher altitude (1000 meters above the atmosphere)
+        var intersectionPoint = cameraPos + intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END + 1000.0) * rotatedDir;
+        
+        let cloudCoverFactor = mix( 0.6, 0.01, object.cloudiness );
+        color += transmittance * mix(cloudAmbientNightColor, vec3f(2.0), sunDotUp) * max( 0.0, fbm(vec3f(1.0, 1.0, 1.8) * intersectionPoint * 0.002) - cloudCoverFactor);
+    }
+
+    let up = dot(sun_direction, vec3f(0.0, 1.0, 0.0));
+
+    let portionOfNightSky = pow(0.5 + 0.5 * up, 2.0);
+    let portionOfDaySky = pow(0.5 + 0.5 * mu, 15.0);
+    let dayNightSkyRatio = clamp(portionOfNightSky + portionOfDaySky, 0.0, 1.0);
+
+    // Calculate the background color based on the direction of the ray
+    var background = 
+
+        mix( nightSky * 10.0, 
+            
+            // A dark blue color for most of the sky mixed with a light blue color closer the sun
+            6.0 * mix(vec3f(0.2, 0.52, 1.0), vec3f(0.8, 0.95, 1.0), portionOfDaySky) + 
+            
+            // a white haze at the horizon that fades out with altitude
+            mix(vec3f(3.5), vec3f(0.0), min(1.0, 2.3 * dir.y)),
+
+        dayNightSkyRatio );
+
+    // If not in fast mode, draw the sun disk
+    if (!fast) {
+        background += transmittance * vec3f(1e4 * smoothstep(0.9998, 1.0, mu));
+    }
+
+    // Add the background color to the final color
+    color += background * transmittance;
+
+    return color;
+}
 
 // Noise generation functions (by iq)
 fn hash1( n: f32 ) -> f32 {
@@ -468,7 +295,6 @@ fn noise3( x: vec3f ) -> f32 {
 	let uv = ( p.xy + vec2f( 37.0, 17.0 ) * p.z) + f.xy;
     let rg = textureSampleLevel( noiseTexture, noiseSampler, (uv + 0.5 ) / 256.0, 0.0).yx;
 	return mix( rg.x, rg.y, f.z );
-
 }
 
 /**
@@ -547,14 +373,6 @@ fn intersectSphere(origin: vec3f, dir: vec3f, spherePos: vec3f, sphereRad: f32) 
     return t0;
 }
 
-struct CloudResult {
-    sky: f32,
-    cloudHeight: f32
-};
-
-
-
-
 fn clouds(position: vec3f, fast: bool) -> CloudResult {
     // Speed at which clouds move, based on time
     let cloudMovementSpeed = object.iTime * 0.004 * mix(1.0, 0.3, object.cloudiness);
@@ -572,7 +390,7 @@ fn clouds(position: vec3f, fast: bool) -> CloudResult {
     p.z += cloudMovementSpeed * 10.3;
     
     // Sample the large-scale weather pattern
-    let largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -0.00005 * p.zx, 0.0).x - 0.18) * 5.0, 0.0, 2.0 * object.cloudiness);
+    let largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -0.00005 * p.zx, 0.0).x - 0.18) * 5.0 *  object.cloudiness, 0.0, 2.0);
 
     // Move the clouds in the x direction
     p.x += cloudMovementSpeed * 8.3;
@@ -582,6 +400,7 @@ fn clouds(position: vec3f, fast: bool) -> CloudResult {
     
     // Apply smoothstep to the cloud height to create a smooth transition
     weather *= smoothstep(0.0, 0.5, cloudHeight) * smoothstep(1.0, 0.5, cloudHeight);
+    
     // Shape the clouds using a power function
     let cloudShape: f32 = pow(weather, 0.3 + 1.5 * smoothstep(0.2, 0.5, cloudHeight));
     
@@ -691,6 +510,11 @@ fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_d
         cloudHeight = result.cloudHeight;
         lighRayDen += result.sky;
     }
+
+     // Calculate the angle between the sun direction and the vertical direction (y-axis)
+    let sunAngle = dot(sun_direction, vec3f(0.0, 1.0, 0.0));
+    // Apply a gradient-based reduction to the light intensity if the sun is below the horizon
+    let sunIntensityModifier = smoothstep(0.0, 0.1, sunAngle);
     
     // If in fast mode, return a simplified calculation
     if (fast) {
@@ -702,108 +526,10 @@ fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_d
     // Calculate the Beer's law attenuation
     let beersLaw: f32 = exp(-stepL * lighRayDen) + 0.5 * scatterAmount * exp(-0.1 * stepL * lighRayDen) + scatterAmount * 0.4 * exp(-0.02 * stepL * lighRayDen);
     // Return the final light intensity
-    return beersLaw * phaseFunction * mix(0.05 + 1.5 * pow(min(1.0, dC * 8.5), 0.3 + 5.5 * cloudHeight), 1.0, clamp(lighRayDen * 0.4, 0.0, 1.0));
+    return sunIntensityModifier * beersLaw * phaseFunction * mix(0.05 + 1.5 * pow(min(1.0, dC * 8.5), 0.3 + 5.5 * cloudHeight), 1.0, clamp(lighRayDen * 0.4, 0.0, 1.0));
 }
 
-fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, fast: bool) -> vec3f {
-    // Constants for the start and end of the atmosphere
-    const ATM_START: f32 = EARTH_RADIUS + CLOUD_START;
-    const ATM_END: f32 = ATM_START + CLOUD_HEIGHT;
 
-    // Number of samples for ray marching
-    var nbSample = 35;
-    if (fast) {
-        nbSample = 13;
-    }
-
-    // Initialize the color to black
-    var color = vec3f(0.0);
-
-    // Calculate the intersection of the ray with the start and end of the atmosphere
-    let distToAtmStart = intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_START);
-    let distToAtmEnd = intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END);
-
-    // Calculate the starting position of the ray inside the atmosphere
-    var rayStartPosition = cameraPos + distToAtmStart * dir;
-    let stepS = (distToAtmEnd - distToAtmStart) / f32(nbSample);
-
-    // Initialize the transmittance to 1 (no light absorbed)
-    var transmittance = 1.0;
-    let mu = dot(sun_direction, dir);
-
-    // Calculate the phase function for Mie scattering
-    let phaseFunction = numericalMieFit(mu);
-    rayStartPosition += dir * stepS * hash1(dot(dir, vec3f(12.256, 2.646, 6.356)) + object.iTime * 0.00001);
-
-    // If the ray is pointing upwards
-    if (dir.y > 0.015) {
-        for (var i = 0; i < nbSample; i++) {
-            var cloudHeight: f32;
-            let result = clouds(rayStartPosition, fast);
-            let density = result.sky;
-            cloudHeight = result.cloudHeight;
-
-            // If there is cloud density at this sample point
-            if (density > 0.0) {
-                // Calculate the light intensity scattered by the clouds
-                let intensity = lightRay(rayStartPosition, phaseFunction, density, mu, sun_direction, cloudHeight, fast);
-
-                // Calculate the ambient light
-                let ambient = (0.5 + 0.6 * cloudHeight) * vec3f(0.2, 0.5, 1.0) * 6.5 + vec3f(0.8) * max(0.0, 1.0 - 2.0 * cloudHeight);
-
-                // Calculate the radiance (light emitted by the clouds)
-                var radiance = ambient + SUN_POWER * intensity;
-                radiance *= density;
-                color += transmittance * (radiance - radiance * exp(-density * stepS)) / density; // By Seb Hillaire
-                transmittance *= exp(-density * stepS);
-
-                // If the transmittance is very low, stop the loop
-                if (transmittance <= 0.05) {
-                    break;
-                }
-            }
-
-            // Move to the next sample point
-            rayStartPosition += dir * stepS;
-        }
-    }
-
-    // If not in fast mode, add some additional clouds to the sky    
-    if (!fast) {
-        let cloudMovementSpeed = object.iTime * 0.00004 * object.cloudiness;
-
-        // Create a rotation matrix around the x-axis
-        let cosAngle = cos(cloudMovementSpeed);
-        let sinAngle = sin(cloudMovementSpeed);
-        let rotationMatrix = mat3x3<f32>(
-            vec3f(1.0, 0.0, 0.0),
-            vec3f(0.0, cosAngle, -sinAngle),
-            vec3f(0.0, sinAngle, cosAngle)
-        );
-
-        // Rotate the direction vector
-        let rotatedDir = rotationMatrix * dir;
-        
-        // Adds clouds at a higher altitude (1000 meters above the atmosphere)
-        var intersectionPoint = cameraPos + intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END + 1000.0) * rotatedDir;
-        
-        let cloudCoverFactor=  mix( 0.6, 0.01, object.cloudiness );
-        color += transmittance * vec3f(3.0) * max(0.0, fbm(vec3f(1.0, 1.0, 1.8) * intersectionPoint * 0.002) - cloudCoverFactor);
-    }
-
-    // Calculate the background color based on the direction of the ray
-    var background = 6.0 * mix(vec3f(0.2, 0.52, 1.0), vec3f(0.8, 0.95, 1.0), pow(0.5 + 0.5 * mu, 15.0)) + mix(vec3f(3.5), vec3f(0.0), min(1.0, 2.3 * dir.y));
-
-    // If not in fast mode, draw the sun disk
-    if (!fast) {
-        background += transmittance * vec3f(1e4 * smoothstep(0.9998, 1.0, mu));
-    }
-
-    // Add the background color to the final color
-    color += background * transmittance;
-
-    return color;
-}
 
 /**
  * The HenyeyGreenstein function calculates the Henyey-Greenstein phase function.
@@ -820,11 +546,9 @@ fn HenyeyGreenstein( mu: f32, inG: f32)  -> f32 {
 	return ( 1. - inG * inG ) / ( pow( 1. + inG * inG - 2.0 * inG * mu, 1.5 ) * 4.0 * pi );
 }
 
-
 // ============================================================================
 // NIGHT RENDERING THINGS 
 // ============================================================================
-
 
 fn DrawNightSky(dir2: vec3f, fragCoord: vec2f ) -> vec3f {
     let dir = dir2 + vec3f( 0.0, 0.0, object.iTime * 0.0000005 );
