@@ -53,10 +53,10 @@ const offsets = array<vec2i, 8>(
   return blur(clouds, q, vec2<f32>(1.0) / object.resolution);
 }
 
-const samples: i32 = 5;
+const samples: i32 = 4;
 const LOD: i32 = 1;  // gaussian done on MIPmap at scale LOD
 const sLOD: i32 = 1 << u32(LOD); // was originally ( 1 << u32(LOD) )  tile size = 2^LOD
-const sigma: f32 = f32(samples) * 0.22;
+const sigma: f32 = f32(samples) * 0.25;
 
 fn gaussian(i: vec2<f32>) -> f32 {
     let i2 = i / sigma;

@@ -63,7 +63,7 @@ const fogColorEvening = vec3f( 0.75, 0.7, 0.5 );
 // ========================================================
 // Cloud parameters
 const EARTH_RADIUS: f32 = 6300e3;
-const CLOUD_START: f32 = 800.0;
+const CLOUD_START: f32 = 1200.0;
 const CLOUD_HEIGHT: f32 = 600.0;
 const SUN_POWER: vec3f = vec3(1.0,0.9,0.6) * 1200.;
 const LOW_SCATTER: vec3f = vec3(1.0, 0.7, 0.5);
@@ -136,10 +136,10 @@ fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
     let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 200.0);
 
     // Cloudiness is from 0 to 1. Lets get a number 
-    let fogSunIntensityModifier = mix( 1.0, 0.7, object.cloudiness );
-    let darknessModifier = mix( 1.0, 0.18, clamp(pow(object.cloudiness, 6.0), 0.0, 1.0) );
+    let fogSunIntensityModifier = mix( 1.0, 1.0, object.cloudiness );
+    let darknessModifier = mix( 1.0, 0.08, clamp(pow(object.cloudiness, 6.0), 0.0, 1.0) );
 
-    let fogPhase = 0.8 * HenyeyGreenstein(mu, 0.9 * fogSunIntensityModifier) + 0.5 * HenyeyGreenstein(mu, -0.6);
+    let fogPhase = 0.8 * HenyeyGreenstein(mu, 0.6 * fogSunIntensityModifier) + 0.5 * HenyeyGreenstein(mu, -0.6);
 
     var fogColor = mix( fogColorEvening, fogColorDay, clamp( sunDotUp, 0.0, 1.0 ) );
 
@@ -166,7 +166,7 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, fast: bool) -> vec
     const ATM_END: f32 = ATM_START + CLOUD_HEIGHT;
 
     // Number of samples for ray marching
-    var nbSample = 35;
+    var nbSample = 46;
     if (fast) {
         nbSample = 13;
     }
@@ -228,7 +228,30 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, fast: bool) -> vec
         }
     }
 
-    color += transmittance;
+    // color += transmittance;
+
+    let up = dot(sun_direction, vec3f(0.0, 1.0, 0.0));
+    let portionOfNightSky = pow(0.5 + 0.5 * up, 2.0);
+    let portionOfDaySky = pow(0.5 + 0.5 * mu, 15.0);
+    let dayNightSkyRatio = clamp(portionOfNightSky + portionOfDaySky, 0.0, 1.0);
+
+    // Calculate the background color based on the direction of the ray
+    var background = 
+        mix( vec3f(0.0) * 10.0, 
+            
+            // A dark blue color for most of the sky mixed with a light blue color closer the sun
+            6.0 * mix(vec3f(0.2, 0.52, 1.0), vec3f(0.8, 0.95, 1.0), portionOfDaySky) + 
+            
+            // a white haze at the horizon that fades out with altitude
+            mix(vec3f(3.5), vec3f(0.0), min(1.0, 2.3 * dir.y)),
+
+        dayNightSkyRatio );
+
+    // If not in fast mode, draw the sun disk
+    background += transmittance * vec3f(1e4 * smoothstep(0.9998, 1.0, mu));
+
+    color += background * transmittance;
+
     return vec4f(color, 1.0 - transmittance);
 }
 

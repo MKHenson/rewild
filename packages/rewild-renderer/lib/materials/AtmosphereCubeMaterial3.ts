@@ -81,11 +81,14 @@ export class AtmosphereCubeMaterial3 implements IMaterialPass {
   taaTexture: GPUTexture;
   prevTaaTexture: GPUTexture;
 
+  sunPosition: Vector3;
+
   constructor() {
     this.azimuth = 180;
     this.elevation = 2;
     this.cloudiness = 0.0;
     this.upDot = 0.0;
+    this.sunPosition = new Vector3();
     this.requiresRebuild = true;
 
     this.perMeshTracker = new PerMeshTracker(this, () => [
@@ -496,9 +499,9 @@ export class AtmosphereCubeMaterial3 implements IMaterialPass {
     const phi = degToRad(90 - this.elevation);
     const theta = degToRad(this.azimuth);
 
-    const sunPosition = new Vector3().setFromSphericalCoords(1, phi, theta);
+    const sunPosition = this.sunPosition.setFromSphericalCoords(1, phi, theta);
 
-    const upDot = sunPosition.dot(new Vector3(0, 1, 0));
+    const upDot = sunPosition.dot(Vector3.UP);
     this.upDot = upDot;
 
     const sizeOfMat4 = 4 * 4;
@@ -695,13 +698,21 @@ export class AtmosphereCubeMaterial3 implements IMaterialPass {
 
   private renderTAA(renderer: Renderer) {
     const { device } = renderer;
-    let clearColorValue = 0.0;
-    if (this.upDot > 0.3) {
-      clearColorValue = 0.4;
-    } else if (this.upDot > -0.3) {
-      clearColorValue = 0.1;
+    let clearColorValue = 0.3;
+    let additionalRed = 0;
+
+    // if (this.upDot >= 0) {
+    //   clearColorValue = lerp(0.1, 0.6, this.upDot);
+    // } else {
+    //   clearColorValue = lerp(0.1, 0.0, smoothStep(0, -1, this.upDot));
+    // }
+    if (this.upDot >= 0.3) {
+      clearColorValue = lerp(0.4, 0.8, smoothStep(0.3, 1, this.upDot));
+    } else if (this.upDot >= -0.4) {
+      clearColorValue = lerp(0.3, 0.4, smoothStep(-0.4, 0.3, this.upDot));
+      // additionalRed = lerp(0.0, 0.6, smoothStep(-0.4, 0.3, this.upDot));
     } else {
-      clearColorValue = 0.0;
+      clearColorValue = lerp(0.1, 0.3, smoothStep(-1, 0.3, this.upDot));
     }
 
     const commandEncoder = device.createCommandEncoder();
@@ -709,7 +720,12 @@ export class AtmosphereCubeMaterial3 implements IMaterialPass {
       colorAttachments: [
         {
           view: this.taaTexture.createView(),
-          clearValue: [clearColorValue, clearColorValue, clearColorValue, 0.0],
+          clearValue: [
+            clearColorValue + additionalRed,
+            clearColorValue + additionalRed / 2,
+            clearColorValue,
+            0.0,
+          ],
           loadOp: 'clear',
           storeOp: 'store',
         },
@@ -774,4 +790,17 @@ export class AtmosphereCubeMaterial3 implements IMaterialPass {
     this.renderTAA(renderer);
     this.finalPass(renderer, pass, camera);
   }
+}
+
+function clamp(value: f32, min: f32, max: f32): f32 {
+  return Math.min(Math.max(value, min), max);
+}
+
+function smoothStep(edge0: f32, edge1: f32, x: f32): f32 {
+  const t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
+  return t * t * (3.0 - 2.0 * t);
+}
+
+function lerp(a: f32, b: f32, t: f32): f32 {
+  return a + t * (b - a);
 }

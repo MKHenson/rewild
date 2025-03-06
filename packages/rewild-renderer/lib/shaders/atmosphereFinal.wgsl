@@ -94,7 +94,7 @@ const fogColorEvening = vec3f( 0.75, 0.7, 0.5 );
  
 
   // Apply smoothstep to the cloud alpha to soften edges
-  let smoothAlpha = smoothstep(0.5, 0.8, clouds.a ); 
+  let smoothAlpha = smoothstep(0.0, 1.0, clouds.a ); 
   let preMultipliedClouds = vec4<f32>(clouds.rgb * smoothAlpha, smoothAlpha);
 
   // Blend sky and clouds based on alpha
@@ -112,34 +112,10 @@ const fogColorEvening = vec3f( 0.75, 0.7, 0.5 );
 
   // // Calculate the direction from the camera to the world position
   // let dir = normalize( worldPos.xyz - object.cameraPosition );
-
-
-  // let sunDotUp = dot(dir, vec3f(0.0, 1.0, 0.0));
-
-	// let sunInSkyMask = clamp( pow(0.2 + 1.2 * sunDotUp, 1.0), 0.0, 1.0 );
-  // let mu = dot(vSunDirection, dir);
-
-  // let fogDistance = intersectSphere(object.cameraPosition, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 160.0);
-
-  // // Cloudiness is from 0 to 1. Lets get a number 
-  // let fogSunIntensityModifier = 1.0; // mix( 1.0, 0.7, object.cloudiness );
-  // let darknessModifier = 1.0; // mix( 1.0, 0.18, clamp(pow(object.cloudiness, 6.0), 0.0, 1.0) );
-
-  // let fogPhase = 0.8 * HenyeyGreenstein(mu, 0.9 * fogSunIntensityModifier) + 0.5 * HenyeyGreenstein(mu, -0.9);
-
-  // var fogColor =  mix( fogColorEvening, fogColorDay, clamp( sunDotUp, 0.0, 1.0 ) );
-
-  // fogColor = vec3f( 1.0 - exp(-fogColor / 8.6)) / 20.0;
-
-  // // Reduce the fog color as the sun goes into the evening
-  // fogColor = fogColor * mix( 0.5, 1.0, sunDotUp );
-
-  // var color = mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * fogColor, blendedColor.xyz, exp(-0.0003 * fogDistance )) * darknessModifier;
-  
-  // color = vec3f( 1.0 - exp(-color / 8.6));
+ 
 
   // let test = dot(dir, vSunDirection);
-  return vec4f( blendedColor.rgb, blendedColor.a  );
+  return vec4f( adjustContrast(1.1, blendedColor.rgb), blendedColor.a  );
 }
 
 fn getViewPosition(uv: vec2<f32>, linearDepth: f32, invProjectionMatrix: mat4x4<f32>) -> vec4<f32> {
@@ -222,4 +198,8 @@ fn intersectSphere(origin: vec3f, dir: vec3f, spherePos: vec3f, sphereRad: f32) 
 
     // Return the nearest intersection point
     return t0;
+}
+
+fn adjustContrast( contrast: f32, input: vec3f ) -> vec3f {
+    return (input - 0.5) * contrast + 0.5;
 }
