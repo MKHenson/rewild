@@ -1,12 +1,14 @@
-import { Cylindrical } from "./Cylindrical";
-import { Euler } from "./Euler";
-import * as MathUtils from "./MathUtils";
-import { Matrix3 } from "./Matrix3";
-import { Matrix4 } from "./Matrix4";
-import { Quaternion } from "./Quaternion";
-import { Spherical } from "./Spherical";
+import { Cylindrical } from './Cylindrical';
+import { Euler } from './Euler';
+import * as MathUtils from './MathUtils';
+import { Matrix3 } from './Matrix3';
+import { Matrix4 } from './Matrix4';
+import { Quaternion } from './Quaternion';
+import { Spherical } from './Spherical';
 
 export class Vector3 {
+  static UP = new Vector3(0, 1, 0);
+
   isVector3: boolean = true;
   x: f32;
   y: f32;
@@ -313,7 +315,9 @@ export class Vector3 {
   clampLength(min: f32, max: f32): Vector3 {
     const length = this.length();
 
-    return this.divideScalar(length || 1).multiplyScalar(Mathf.max(min, Mathf.min(max, length)));
+    return this.divideScalar(length || 1).multiplyScalar(
+      Mathf.max(min, Mathf.min(max, length))
+    );
   }
 
   floor(): Vector3 {
@@ -465,7 +469,11 @@ export class Vector3 {
   }
 
   manhattanDistanceTo(v: Vector3): f32 {
-    return Mathf.abs(this.x - v.x) + Mathf.abs(this.y - v.y) + Mathf.abs(this.z - v.z);
+    return (
+      Mathf.abs(this.x - v.x) +
+      Mathf.abs(this.y - v.y) +
+      Mathf.abs(this.z - v.z)
+    );
   }
 
   setFromSpherical(s: Spherical): Vector3 {

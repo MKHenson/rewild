@@ -126,8 +126,8 @@ fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f, nightSky: vec3
     let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 160.0);
 
     // Cloudiness is from 0 to 1. Lets get a number 
-    let fogSunIntensityModifier = mix( 1.0, 0.9, object.cloudiness );
-    let darknessModifier = mix( 1.0, 0.18, clamp(pow(object.cloudiness, 6.0), 0.0, 1.0) );
+    let fogSunIntensityModifier = mix( 1.0, 0.95, object.cloudiness );
+    let darknessModifier = mix( 1.0, 0.18, clamp(pow(object.cloudiness, 9.0), 0.0, 1.0) );
 
     let fogPhase = 0.8 * HenyeyGreenstein(mu, 0.9 * fogSunIntensityModifier) + 0.5 * HenyeyGreenstein(mu, -0.6);
 
@@ -168,10 +168,10 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, fast: bool, nightS
     let rotatedDir = rotationMatrix * dir;
     
     // Adds clouds at a higher altitude (1000 meters above the atmosphere)
-    var intersectionPoint = cameraPos + intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END + 1000.0) * rotatedDir;
+    var intersectionPoint = cameraPos + intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END + 2000.0) * rotatedDir;
     
     let cloudCoverFactor = mix( 0.6, 0.3, object.cloudiness );
-    color += mix(cloudAmbientNightColor, vec3f(2.0), sunDotUp) * max( 0.0, fbm(vec3f(1.0, 1.0, 1.8) * intersectionPoint * 0.002) - cloudCoverFactor) * 2.0;
+    color += mix(cloudAmbientNightColor, vec3f(2.0), sunDotUp) * max( 0.0, fbm(vec3f(1.0, 1.0, 1.8) * intersectionPoint * 0.001) - cloudCoverFactor) * 2.0;
 
     let up = dot(sun_direction, vec3f(0.0, 1.0, 0.0));
     let portionOfNightSky = pow(0.5 + 0.5 * up, 2.0);
