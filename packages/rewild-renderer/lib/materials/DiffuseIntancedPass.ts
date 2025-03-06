@@ -14,7 +14,7 @@ const projectionGroup = 1;
 const instancesGroup = 2;
 
 export class DiffuseIntancedPass implements IMaterialPass {
-  pipeline: GPURenderPipeline;
+  cloudsPipeline: GPURenderPipeline;
   perMeshTracker: SharedUniformsTracker;
   requiresRebuild: boolean = true;
   diffuse: Diffuse;
@@ -37,7 +37,7 @@ export class DiffuseIntancedPass implements IMaterialPass {
       code: shader,
     });
 
-    this.pipeline = device.createRenderPipeline({
+    this.cloudsPipeline = device.createRenderPipeline({
       label: 'Diffuse Instanced Pass',
       layout: 'auto',
       vertex: {
@@ -122,7 +122,7 @@ export class DiffuseIntancedPass implements IMaterialPass {
     meshes: Mesh[],
     geometry: Geometry
   ): void {
-    pass.setPipeline(this.pipeline);
+    pass.setPipeline(this.cloudsPipeline);
     pass.setVertexBuffer(0, geometry.vertexBuffer);
     pass.setVertexBuffer(1, geometry.uvBuffer);
     pass.setIndexBuffer(geometry.indexBuffer, 'uint16');

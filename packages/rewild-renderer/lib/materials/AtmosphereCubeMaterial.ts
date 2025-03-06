@@ -39,7 +39,7 @@ function generateNoiseData(size: number): Float32Array {
 }
 
 export class AtmosphereCubeMaterial implements IMaterialPass {
-  pipeline: GPURenderPipeline;
+  cloudsPipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
   sharedUniformsTracker: SharedUniformsTracker;
@@ -77,7 +77,7 @@ export class AtmosphereCubeMaterial implements IMaterialPass {
       code: shader,
     });
 
-    this.pipeline = device.createRenderPipeline({
+    this.cloudsPipeline = device.createRenderPipeline({
       label: 'Atmosphere Plane Pass',
       layout: 'auto',
       vertex: {
@@ -156,7 +156,7 @@ export class AtmosphereCubeMaterial implements IMaterialPass {
 
     this.bindGroup = device.createBindGroup({
       label: 'bind group for cube atmosphere',
-      layout: this.pipeline.getBindGroupLayout(0),
+      layout: this.cloudsPipeline.getBindGroupLayout(0),
       entries: [
         {
           binding: 0,
@@ -189,7 +189,7 @@ export class AtmosphereCubeMaterial implements IMaterialPass {
   ): void {
     const { device, pane } = renderer;
     const canvas = pane.canvas()!;
-    pass.setPipeline(this.pipeline);
+    pass.setPipeline(this.cloudsPipeline);
     pass.setVertexBuffer(0, geometry!.vertexBuffer);
     pass.setVertexBuffer(1, geometry!.uvBuffer);
     pass.setIndexBuffer(geometry!.indexBuffer, 'uint16');

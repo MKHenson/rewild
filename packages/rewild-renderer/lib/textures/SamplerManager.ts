@@ -1,6 +1,12 @@
 import { Renderer } from '../Renderer';
 
-export type SamplerType = 'mip-generator' | 'nearest-simple' | 'linear';
+export type SamplerType =
+  | 'mip-generator'
+  | 'nearest-simple'
+  | 'non-filtering'
+  | 'linear'
+  | 'linear-clamped'
+  | 'depth-comparison';
 
 class SamplerManager {
   samplers: Map<SamplerType, GPUSampler>;
@@ -34,6 +40,36 @@ class SamplerManager {
       })
     );
 
+    // Add the non-filtering sampler
+    this.addSampler(
+      'non-filtering',
+      device.createSampler({
+        magFilter: 'nearest',
+        minFilter: 'nearest',
+        mipmapFilter: 'nearest',
+        compare: 'less-equal',
+        label: 'non-filtering',
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge',
+        addressModeW: 'clamp-to-edge',
+      })
+    );
+
+    // Add a depth comparison sampler
+    this.addSampler(
+      'depth-comparison',
+      device.createSampler({
+        magFilter: 'linear', // Use a valid filter mode
+        minFilter: 'linear', // Use a valid filter mode
+        mipmapFilter: 'linear', // Use a valid filter mode
+        compare: 'less-equal', // Set the compare property separately
+        label: 'depth-sampler',
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge',
+        addressModeW: 'clamp-to-edge',
+      })
+    );
+
     this.addSampler(
       'linear',
       device.createSampler({
@@ -44,6 +80,19 @@ class SamplerManager {
         addressModeU: 'repeat',
         addressModeV: 'repeat',
         addressModeW: 'repeat',
+      })
+    );
+
+    this.addSampler(
+      'linear-clamped',
+      device.createSampler({
+        magFilter: 'linear',
+        minFilter: 'linear',
+        mipmapFilter: 'linear',
+        label: 'linear',
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge',
+        addressModeW: 'clamp-to-edge',
       })
     );
 

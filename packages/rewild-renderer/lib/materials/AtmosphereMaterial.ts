@@ -15,7 +15,7 @@ import { Matrix4 } from 'rewild-common';
 const sharedBindgroupIndex = 1;
 
 export class AtmosphereMaterial implements IMaterialPass {
-  pipeline: GPURenderPipeline;
+  cloudsPipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
   sharedUniformsTracker: SharedUniformsTracker;
@@ -47,7 +47,7 @@ export class AtmosphereMaterial implements IMaterialPass {
       code: shader,
     });
 
-    this.pipeline = device.createRenderPipeline({
+    this.cloudsPipeline = device.createRenderPipeline({
       label: 'Atmosphere Plane Pass',
       layout: 'auto',
       vertex: {
@@ -82,7 +82,7 @@ export class AtmosphereMaterial implements IMaterialPass {
 
     this.bindGroup = device.createBindGroup({
       label: 'bind group for object',
-      layout: this.pipeline.getBindGroupLayout(0),
+      layout: this.cloudsPipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: this.uniformBuffer } },
         { binding: 1, resource: sampler },
@@ -106,7 +106,7 @@ export class AtmosphereMaterial implements IMaterialPass {
     geometry?: Geometry
   ): void {
     const { device } = renderer;
-    pass.setPipeline(this.pipeline);
+    pass.setPipeline(this.cloudsPipeline);
     pass.setBindGroup(0, this.bindGroup);
 
     this.cameraView.extractRotation(camera.transform.matrixWorld);
