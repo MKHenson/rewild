@@ -1,6 +1,6 @@
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from './IMaterialPass';
-import shader from '../shaders/atmosphereWithWeather2.wgsl';
+import shader from '../shaders/atmosphereCloudsPass.wgsl';
 import { Renderer } from '..';
 import { ProjModelView } from './uniforms/ProjModelView';
 import { PerMeshTracker } from './PerMeshTracker';
@@ -21,10 +21,6 @@ const uniformBufferSize =
   4 * 4 + // cameraPosition
   4 * 4 + // sunPosition
   4 * 4 + // up
-  4 + // rayleigh
-  4 + // turbidity
-  4 + // mieCoefficient
-  4 + // mieDirectionalG
   4 + // iTime
   4 + // resolutionX
   4 + // resolutionY
@@ -39,7 +35,7 @@ function generateNoiseData(size: number): Float32Array {
 }
 
 export class AtmosphereCubeMaterial2 implements IMaterialPass {
-  pipeline: GPURenderPipeline;
+  cloudsPipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
   sharedUniformsTracker: SharedUniformsTracker;
@@ -86,7 +82,7 @@ export class AtmosphereCubeMaterial2 implements IMaterialPass {
       this.cloudiness = 1 - e.clientY / pane.canvas()!.height;
     });
 
-    this.pipeline = device.createRenderPipeline({
+    this.cloudsPipeline = device.createRenderPipeline({
       label: 'Atmosphere Plane Pass',
       layout: 'auto',
       vertex: {
@@ -119,7 +115,21 @@ export class AtmosphereCubeMaterial2 implements IMaterialPass {
       },
       fragment: {
         module,
-        targets: [{ format: presentationFormat }],
+        targets: [
+          {
+            format: presentationFormat,
+            blend: {
+              color: {
+                srcFactor: 'src-alpha',
+                dstFactor: 'one-minus-src-alpha',
+              },
+              alpha: {
+                srcFactor: 'src-alpha',
+                dstFactor: 'one-minus-src-alpha',
+              },
+            },
+          },
+        ],
         entryPoint: 'fs',
       },
       depthStencil: {
@@ -165,7 +175,7 @@ export class AtmosphereCubeMaterial2 implements IMaterialPass {
 
     this.bindGroup = device.createBindGroup({
       label: 'bind group for cube atmosphere',
-      layout: this.pipeline.getBindGroupLayout(0),
+      layout: this.cloudsPipeline.getBindGroupLayout(0),
       entries: [
         {
           binding: 0,
@@ -202,7 +212,7 @@ export class AtmosphereCubeMaterial2 implements IMaterialPass {
   ): void {
     const { device, pane } = renderer;
     const canvas = pane.canvas()!;
-    pass.setPipeline(this.pipeline);
+    pass.setPipeline(this.cloudsPipeline);
     pass.setVertexBuffer(0, geometry!.vertexBuffer);
     pass.setVertexBuffer(1, geometry!.uvBuffer);
     pass.setIndexBuffer(geometry!.indexBuffer, 'uint16');
@@ -245,18 +255,9 @@ export class AtmosphereCubeMaterial2 implements IMaterialPass {
     ); // sunPosition
     uniformData.set([0, 1, 0], sizeOfMat4 * 3 + sizeOfVec4 * 2); // up
     uniformData.set(
-      [
-        1,
-        2,
-        0.005,
-        0.8,
-        renderer.totalDeltaTime,
-        canvas.width,
-        canvas.height,
-        cloudiness,
-      ],
+      [renderer.totalDeltaTime, canvas.width, canvas.height, cloudiness],
       sizeOfMat4 * 3 + sizeOfVec4 * 3
-    ); // rayleigh, turbidity, mieCoefficient, mieDirectionalG
+    );
 
     // upload the uniform values to the uniform buffer
     device.queue.writeBuffer(this.uniformBuffer, 0, uniformData.buffer);

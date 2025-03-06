@@ -1,5 +1,5 @@
 // uniforms
-struct objectStruct {
+struct ObjectStruct {
 	modelMatrix : mat4x4<f32>,
 	projectionMatrix : mat4x4<f32>,
 	modelViewMatrix : mat4x4<f32>,
@@ -16,7 +16,7 @@ struct objectStruct {
 };
 
 @group( 0 ) @binding( 0 ) 
-var<uniform> object : objectStruct;
+var<uniform> object: ObjectStruct;
 
 @group( 0 ) @binding( 1 )
 var noiseSampler: sampler;
@@ -26,13 +26,6 @@ var noiseTexture: texture_2d<f32>;
 
 @group( 0 ) @binding( 3 ) 
 var pebblesTexture: texture_2d<f32>;
-
-@group( 0 ) @binding( 4 )
-var depthTexture: texture_depth_2d;
-
-@group( 0 ) @binding( 5 )
-var depthSampler: sampler_comparison;
-
 
 // varyings
 struct VaryingsStruct {
@@ -49,7 +42,7 @@ var<private> output: OutputStruct;
 var<private> sunDotUp: f32;
 
 struct CloudResult {
-    density: f32,
+    sky: f32,
     cloudHeight: f32
 };
 
@@ -63,11 +56,15 @@ const fogColorEvening = vec3f( 0.75, 0.7, 0.5 );
 // ========================================================
 // Cloud parameters
 const EARTH_RADIUS: f32 = 6300e3;
-const CLOUD_START: f32 = 800.0;
-const CLOUD_HEIGHT: f32 = 600.0;
-const SUN_POWER: vec3f = vec3(1.0,0.9,0.6) * 1200.;
+const CLOUD_START: f32 = 1000.0;
+const CLOUD_HEIGHT: f32 = 1200.0;
+const SUN_POWER: vec3f = vec3(1.0,0.9,0.6) * 800.;
 const LOW_SCATTER: vec3f = vec3(1.0, 0.7, 0.5);
 
+// ========================================================
+// NIGHT SKY STUFF
+const galaxyNormal = vec3f(0.577, 0.577, 0.577); // Which direction the galaxy is facing
+const galaxyCenterDir = vec3f(-0.707, 0, 0.707); // The direction of the center of the galaxy
 
 @vertex
 fn vs( @location( 0 ) position : vec3<f32> ) -> VaryingsStruct {
@@ -85,34 +82,35 @@ fn fs(
 	@location( 0 ) vWorldPosition : vec3<f32>,
 	@location( 1 ) vSunDirection : vec3<f32> ) -> OutputStruct {
 
-    // Define uv based on fragCoord
-    let uv = fragCoord.xy / vec2(object.resolutionX, object.resolutionY);
-
-    // Do not draw pixel if blocked by something in the z-buffer
-    let rawDepth = textureSampleCompare( depthTexture, depthSampler, uv, 1 );
-    if (rawDepth < 1.0) {
-        // output.color = vec4<f32>(0.0, 0.0, 0.0, 0.0); // Set to fully transparent
-        // return output;
-    }
-
 	let direction: vec3f = normalize( vWorldPosition - object.cameraPosition );
 
 	// in scattering
+	// var cosTheta: f32 = dot( direction, vSunDirection );
     var cosTheta = dot( direction, vec3f(0.0, 1.0, 0.0) );
 
 	// composition + solar disc
-	let hemisphereMask: f32 = smoothstep( 0, 0.1, cosTheta );
-
-	// The area below the horizon
-    if ( hemisphereMask <= 0.0 ) {
-        output.color = vec4f( 0.0,0.0,0.0, 0.0 );
+	let hemisphereMask: f32 = smoothstep( -0.3, 0.1, cosTheta );
+	
+	
+    
+    // The area on the horizon where the sun and earth meet
+    if ( hemisphereMask < 1 && hemisphereMask > 0.0 ) {
+        let nightSky: vec3f = DrawNightSky(direction, fragCoord.xy);
+        let atmosphereWithSunAndClouds = DrawCloudsAndSky( direction, object.cameraPosition, vSunDirection, nightSky );
+        output.color = vec4f( mix( nightSky, atmosphereWithSunAndClouds, hemisphereMask), 1.0 );
+        // output.color = vec4f( 1.0, 0.0, 0.0, 1.0 );
+        return output;
+    }
+    // The area below the horizon
+    else if ( hemisphereMask <= 0.0 ) {
+        output.color = vec4f( 0.0,0.0,0.0, 1.0 );
         return output;
     }
     // The area above the horizon
     else {
-        
-        let atmosphereWithSunAndClouds = DrawCloudsAndSky( direction, object.cameraPosition, vSunDirection,  );
-        output.color = atmosphereWithSunAndClouds;
+        let nightSky: vec3f = DrawNightSky(direction, fragCoord.xy);
+        let atmosphereWithSunAndClouds = DrawCloudsAndSky( direction, object.cameraPosition, vSunDirection, nightSky );
+        output.color = vec4f( atmosphereWithSunAndClouds, 1.0 );
         return output;
     } 
 }
@@ -121,19 +119,17 @@ fn fs(
 // CLOUD RENDERING
 // ============================================================================
 
-fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
-	var color = vec4f(.0);
+fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f, nightSky: vec3f ) -> vec3f {
+	var color = vec3f(.0);
     
     sunDotUp = dot(vSunDirection, vec3f(0.0, 1.0, 0.0));
- 
-    color = skyRay(org, dir, vSunDirection, false); 
-
- 
 
 	let sunInSkyMask = clamp( pow(1.75 + 1.75 * sunDotUp, 1.0), 0.0, 1.0 );
     let mu = dot(vSunDirection, dir) * sunInSkyMask;
+    
+    color = skyRay(org, dir, vSunDirection, false, nightSky); 
 
-    let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 200.0);
+    let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 160.0);
 
     // Cloudiness is from 0 to 1. Lets get a number 
     let fogSunIntensityModifier = mix( 1.0, 0.7, object.cloudiness );
@@ -146,21 +142,15 @@ fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
     // Reduce the fog color as the sun goes into the evening
     fogColor = fogColor * mix( 0.5, 1.0, sunDotUp );
 
-    return vec4f( mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * fogColor, color.xyz, exp(-0.0003 * fogDistance )) * darknessModifier, mix( 0.4, color.a, exp(-0.0001 * fogDistance ) )  );
+    color = mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * fogColor, color, exp(-0.0003 * fogDistance )) * darknessModifier;
     
-    ////  Adjust exposure
-    // var atmosphereWithSunAndClouds = vec3f( 1.0 - exp(-color / 8.6));
-
-    // return atmosphereWithSunAndClouds;
-
-
     // Adjust exposure
-    // var atmosphereWithSunAndClouds = vec3f( 1.0 - exp(-color.xyz / 8.6));
+    var atmosphereWithSunAndClouds = vec3f( 1.0 - exp(-color / 8.6));
 
-    // return vec4f(atmosphereWithSunAndClouds, color.w);
+    return atmosphereWithSunAndClouds;
 }
 
-fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, fast: bool) -> vec4f {
+fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, fast: bool, nightSky: vec3f) -> vec3f {
     // Constants for the start and end of the atmosphere
     const ATM_START: f32 = EARTH_RADIUS + CLOUD_START;
     const ATM_END: f32 = ATM_START + CLOUD_HEIGHT;
@@ -197,7 +187,7 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, fast: bool) -> vec
         for (var i = 0; i < nbSample; i++) {
             var cloudHeight: f32;
             let result = clouds(rayStartPosition, fast);
-            let density = result.density;
+            let density = result.sky;
             cloudHeight = result.cloudHeight;
 
             // If there is cloud density at this sample point
@@ -228,8 +218,57 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, fast: bool) -> vec
         }
     }
 
-    color += transmittance;
-    return vec4f(color, 1.0 - transmittance);
+    // If not in fast mode, add some additional clouds to the sky    
+    if (!fast) {
+        let cloudMovementSpeed = object.iTime * 0.00004 * object.cloudiness;
+
+        // Create a rotation matrix around the x-axis
+        let cosAngle = cos(cloudMovementSpeed);
+        let sinAngle = sin(cloudMovementSpeed);
+        let rotationMatrix = mat3x3<f32>(
+            vec3f(1.0, 0.0, 0.0),
+            vec3f(0.0, cosAngle, -sinAngle),
+            vec3f(0.0, sinAngle, cosAngle)
+        );
+
+        // Rotate the direction vector
+        let rotatedDir = rotationMatrix * dir;
+        
+        // Adds clouds at a higher altitude (1000 meters above the atmosphere)
+        var intersectionPoint = cameraPos + intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END + 1000.0) * rotatedDir;
+        
+        let cloudCoverFactor = mix( 0.6, 0.01, object.cloudiness );
+        color += transmittance * mix(cloudAmbientNightColor, vec3f(2.0), sunDotUp) * max( 0.0, fbm(vec3f(1.0, 1.0, 1.8) * intersectionPoint * 0.002) - cloudCoverFactor);
+    }
+
+    let up = dot(sun_direction, vec3f(0.0, 1.0, 0.0));
+
+    let portionOfNightSky = pow(0.5 + 0.5 * up, 2.0);
+    let portionOfDaySky = pow(0.5 + 0.5 * mu, 15.0);
+    let dayNightSkyRatio = clamp(portionOfNightSky + portionOfDaySky, 0.0, 1.0);
+
+    // Calculate the background color based on the direction of the ray
+    var background = 
+
+        mix( nightSky * 10.0, 
+            
+            // A dark blue color for most of the sky mixed with a light blue color closer the sun
+            6.0 * mix(vec3f(0.2, 0.52, 1.0), vec3f(0.8, 0.95, 1.0), portionOfDaySky) + 
+            
+            // a white haze at the horizon that fades out with altitude
+            mix(vec3f(3.5), vec3f(0.0), min(1.0, 2.3 * dir.y)),
+
+        dayNightSkyRatio );
+
+    // If not in fast mode, draw the sun disk
+    if (!fast) {
+        background += transmittance * vec3f(1e4 * smoothstep(0.9998, 1.0, mu));
+    }
+
+    // Add the background color to the final color
+    color += background * transmittance;
+
+    return color;
 }
 
 // Noise generation functions (by iq)
@@ -349,7 +388,7 @@ fn clouds(position: vec3f, fast: bool) -> CloudResult {
     p.x += cloudMovementSpeed * 8.3;
     
     // Sample the smaller-scale weather pattern and combine with large-scale pattern
-    var weather: f32 = largeWeather * max( clamp( pow(object.cloudiness, 6.1), 0.0, 1.0 ), textureSampleLevel(pebblesTexture, noiseSampler, 0.0002 * p.zx, 0.0).x - 0.28) / 0.72;
+    var weather: f32 = largeWeather * max( clamp( pow(object.cloudiness, 12.1), 0.0, 1.0 ), textureSampleLevel(pebblesTexture, noiseSampler, 0.0002 * p.zx, 0.0).x - 0.28) / 0.72;
     
     // Apply smoothstep to the cloud height to create a smooth transition
     weather *= smoothstep(0.0, 0.5, cloudHeight) * smoothstep(1.0, 0.5, cloudHeight);
@@ -359,7 +398,7 @@ fn clouds(position: vec3f, fast: bool) -> CloudResult {
     
     // If the cloud shape is zero, return early
     if (cloudShape <= 0.0) {
-        result.density = 0.0;
+        result.sky = 0.0;
         return result;
     }
 
@@ -370,13 +409,13 @@ fn clouds(position: vec3f, fast: bool) -> CloudResult {
 
     // If the cloud density is zero, return early
     if (den <= 0.0) {
-        result.density = 0.0;
+        result.sky = 0.0;
         return result;
     }
     
     // If in fast mode, return a simplified cloud density
     if (fast) {
-        result.density = largeWeather * 0.2 * min(1.0, 5.0 * den);
+        result.sky = largeWeather * 0.2 * min(1.0, 5.0 * den);
         return result; 
     }
 
@@ -385,8 +424,8 @@ fn clouds(position: vec3f, fast: bool) -> CloudResult {
     // Calculate the final cloud density using fbm
     den = max(0.0, den - 0.2 * fbm(p * 0.05));
     
-    // Calculate the final density value based on the cloud density and weather pattern
-    result.density = largeWeather * 0.2 * min(1.0, 5.0 * den);
+    // Calculate the final sky value based on the cloud density and weather pattern
+    result.sky = largeWeather * 0.2 * min(1.0, 5.0 * den);
     return result; 
 }
 
@@ -438,7 +477,7 @@ fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_d
     var rayStartPos = rayStartPosition;
     
     // Number of samples for light ray marching
-    var nbSampleLight = 55;
+    var nbSampleLight = 20;
     if (fast) {
         nbSampleLight = 7;
     }
@@ -459,9 +498,9 @@ fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_d
     // Sample the light ray
     for (var j = 0; j < nbSampleLight; j++) {
         // Get the cloud density and height at the current sample point
-        let result = clouds( rayStartPos + sun_direction * f32(j) * stepL, fast);
+        let result = clouds(rayStartPos + sun_direction * f32(j) * stepL, fast);
         cloudHeight = result.cloudHeight;
-        lighRayDen += result.density;
+        lighRayDen += result.sky;
     }
 
      // Calculate the angle between the sun direction and the vertical direction (y-axis)
@@ -497,4 +536,121 @@ fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_d
  */
 fn HenyeyGreenstein( mu: f32, inG: f32)  -> f32 {
 	return ( 1. - inG * inG ) / ( pow( 1. + inG * inG - 2.0 * inG * mu, 1.5 ) * 4.0 * pi );
+}
+
+// ============================================================================
+// NIGHT RENDERING THINGS 
+// ============================================================================
+
+fn DrawNightSky(dir2: vec3f, fragCoord: vec2f ) -> vec3f {
+    let dir = dir2 + vec3f( 0.0, 0.0, object.iTime * 0.0000005 );
+    let ar = (object.resolutionX / object.resolutionY) * 200.0;
+
+    // Rotation angle based on time
+    let rotationAngle = object.iTime * 0.00001; // Adjust the speed of rotation as needed
+
+    // Rotation matrix around the Y-axis
+    let cosAngle = cos(rotationAngle);
+    let sinAngle = sin(rotationAngle);
+    let rotationMatrix = mat3x3<f32>(
+        vec3f(cosAngle, -sinAngle, 0.0),
+        vec3f(sinAngle, cosAngle, 0.0),
+        vec3f(0.0, 0.0, 1.0)
+    );
+
+    // Apply the rotation to the direction vector
+    let rotatedDir = rotationMatrix * dir;
+	let yp = dirToYawPitch(rotatedDir);
+
+	// Stars (noise-based)
+	var starIntensity = mix(-1.5, 2.0, noiseForStars(500.0 * rotatedDir) + 0.10 * noiseForStars(2.0 * rotatedDir));
+	starIntensity = clamp(starIntensity, 0.0, 1.0);
+	let starColor = vec3f(
+		0.7 + 0.3 * noiseForStars(100.0 * rotatedDir),
+		0.7 + 0.3 * noiseForStars(103.0 * rotatedDir),
+		0.7 + 0.3 * noiseForStars(106.0 * rotatedDir)
+	);
+	let stars = starIntensity * starColor;
+
+	// Stars (pixel perfect)
+	let starScale = 30.0;
+	let ypm = vec2f( // This is to make the stars more evenly distributed
+		yp.x / pi,
+		sin(yp.y)
+	);
+
+	let cell = floor(ypm * starScale);
+	var randPos = vec2f(  // Copilot-generated, may not be the best, but looks fine
+		fract(sin(dot(cell, vec2f(127.1, 311.7))) * 43758.5453),
+		fract(sin(dot(cell, vec2f(269.5, 183.3))) * 43758.5453)
+	);
+	randPos = mix(vec2f(0.1), vec2f(0.9), randPos); // Avoid the edges, where the stars can clip in and out
+	let starYpm = (cell + randPos) / starScale;
+	let starYp = vec2f( // This undoes the above transformation
+		starYpm.x * pi,
+		asin(starYpm.y)
+	);
+
+	let starUvVec3 = rotatedDir;
+	var starUv = starUvVec3.xy / starUvVec3.z;
+	starUv.x /= ar;
+
+	let starCoord = (starUv + 1.0) / 2.0 * vec2f(object.resolutionX, object.resolutionY);
+	var starIntensity2 = 0.0;
+
+	if (all(floor(starCoord) == floor(fragCoord))) { // Apparently fragCoord has values that end in .5?
+		starIntensity2 = fract(sin(dot(cell, vec2f(113.5, 271.9))) * 43758.5453);
+		starIntensity2 *= 0.7 + 0.7 * noiseForStars(20.0 * rotatedDir) + 0.4*noiseForStars(2.0 * rotatedDir);
+	}
+
+	let stars2 = vec3f(starIntensity2);
+
+	// Galaxy
+	var galaxyPlane = 8.0 * dot(galaxyNormal, rotatedDir);
+	galaxyPlane = 1.0 / (galaxyPlane * galaxyPlane + 1.0);
+	var galaxyCenter = dot(galaxyCenterDir, rotatedDir) * 0.5 + 0.5;
+	galaxyCenter = galaxyCenter * galaxyCenter;
+	let galaxyIntensity = galaxyPlane * galaxyCenter;
+	let galaxyColor = vec3f(0.5, 0.5, 1.0);
+	let galaxy = 0.8 * galaxyIntensity * galaxyColor;
+
+	// Dust
+	var d = 0.0;
+	d += 1.00 * noiseForStars(10.0 * rotatedDir);
+	d += 0.50 * noiseForStars(20.0 * rotatedDir);
+	d += 0.25 * noiseForStars(100.0 * rotatedDir);
+	d += 0.20 * noiseForStars(200.0 * rotatedDir);
+	let dustColor = vec3f(0.5, 0.4, 0.3);
+	let dust = vec3f(1.0 - (d * 0.6 + 1.2) * galaxyPlane * galaxyCenter) + dustColor;
+
+	let color = stars + stars2 + galaxy * dust;
+	return color;
+}
+
+fn hashForStars( p: vec3f ) -> vec3f {
+	let p2 = vec3f( dot(p,vec3f(127.1,311.7, 74.7)),
+			  dot(p,vec3f(269.5,183.3,246.1)),
+			  dot(p,vec3f(113.5,271.9,124.6)));
+
+	return -1.0 + 2.0 * fract( sin( p2 ) *43758.5453123 );
+}
+
+fn dirToYawPitch( dir: vec3f ) -> vec2f {
+	return vec2f(atan2(dir.x, dir.z), asin(dir.y));
+}
+
+fn noiseForStars( p: vec3f ) -> f32
+{
+    let i = floor( p );
+    let f = fract( p );
+    let u = f*f*(3.0-2.0*f);
+
+    return mix( mix( mix( dot( hashForStars( i + vec3f(0.0,0.0,0.0) ), f - vec3f(0.0,0.0,0.0) ), 
+                          dot( hashForStars( i + vec3f(1.0,0.0,0.0) ), f - vec3f(1.0,0.0,0.0) ), u.x),
+                     mix( dot( hashForStars( i + vec3f(0.0,1.0,0.0) ), f - vec3f(0.0,1.0,0.0) ), 
+                          dot( hashForStars( i + vec3f(1.0,1.0,0.0) ), f - vec3f(1.0,1.0,0.0) ), u.x), u.y),
+                mix( mix( dot( hashForStars( i + vec3f(0.0,0.0,1.0) ), f - vec3f(0.0,0.0,1.0) ), 
+                          dot( hashForStars( i + vec3f(1.0,0.0,1.0) ), f - vec3f(1.0,0.0,1.0) ), u.x),
+                     mix( dot( hashForStars( i + vec3f(0.0,1.0,1.0) ), f - vec3f(0.0,1.0,1.0) ), 
+                          dot( hashForStars( i + vec3f(1.0,1.0,1.0) ), f - vec3f(1.0,1.0,1.0) ), u.x), u.y), u.z );
 }

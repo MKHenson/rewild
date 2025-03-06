@@ -12,7 +12,7 @@ import { Diffuse } from './uniforms/Diffuse';
 const sharedBindgroupIndex = 1;
 
 export class DiffusePass implements IMaterialPass {
-  pipeline: GPURenderPipeline;
+  cloudsPipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
   sharedUniformsTracker: SharedUniformsTracker;
@@ -36,7 +36,7 @@ export class DiffusePass implements IMaterialPass {
       code: shader,
     });
 
-    this.pipeline = device.createRenderPipeline({
+    this.cloudsPipeline = device.createRenderPipeline({
       label: 'Diffuse Pass',
       layout: 'auto',
       vertex: {
@@ -121,7 +121,7 @@ export class DiffusePass implements IMaterialPass {
     meshes: Mesh[],
     geometry: Geometry
   ): void {
-    pass.setPipeline(this.pipeline);
+    pass.setPipeline(this.cloudsPipeline);
     pass.setVertexBuffer(0, geometry.vertexBuffer);
     pass.setVertexBuffer(1, geometry.uvBuffer);
     pass.setIndexBuffer(geometry.indexBuffer, 'uint16');

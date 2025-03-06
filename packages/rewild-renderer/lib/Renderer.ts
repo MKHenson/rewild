@@ -17,7 +17,7 @@ export class Renderer {
   device: GPUDevice;
   presentationFormat: GPUTextureFormat;
   pane: Pane3D;
-  sampleCount = 4;
+  sampleCount = 1;
 
   private context: GPUCanvasContext;
   private renderables: IRenderable[];
@@ -27,7 +27,9 @@ export class Renderer {
   private renderTargetView: GPUTextureView | undefined;
   private renderTarget: GPUTexture | undefined;
   private initialized: boolean;
-  private depthTexture: GPUTexture;
+  public depthTexture: GPUTexture;
+  public depthReadTexture: GPUTexture;
+
   perspectiveCam: PerspectiveCamera;
   scene: Transform;
   private currentRenderList: RenderList;
@@ -159,9 +161,21 @@ export class Renderer {
 
       this.depthTexture = device.createTexture({
         size: [canvas.width, canvas.height],
+        label: 'depth-texture-writable',
         format: 'depth24plus',
         sampleCount: this.sampleCount,
-        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        usage:
+          GPUTextureUsage.COPY_SRC |
+          GPUTextureUsage.RENDER_ATTACHMENT |
+          GPUTextureUsage.TEXTURE_BINDING,
+      });
+
+      this.depthReadTexture = device.createTexture({
+        size: [canvas.width, canvas.height],
+        label: 'depth-texture-readable',
+        format: 'depth24plus',
+        sampleCount: this.sampleCount,
+        usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
       });
 
       renderTargetView = renderTarget.createView();
@@ -283,13 +297,17 @@ export class Renderer {
     let renderTargetView = this.renderTargetView;
 
     if (renderTargetView) {
-      const encoder = device.createCommandEncoder();
-      const renderPassDescriptor: GPURenderPassDescriptor = {
+      const encoder = device.createCommandEncoder({
+        label: 'main pass encoder',
+      });
+
+      const pass = encoder.beginRenderPass({
         colorAttachments: [
           {
-            view: renderTargetView,
-            resolveTarget: context.getCurrentTexture().createView(),
-            clearValue: [0.2, 0.2, 0.2, 1.0],
+            // view: renderTargetView,
+            // resolveTarget: context.getCurrentTexture().createView(),
+            view: context.getCurrentTexture().createView(),
+            clearValue: [0.0, 0.0, 0.0, 1.0],
             loadOp: 'clear',
             storeOp: 'store',
           },
@@ -300,9 +318,8 @@ export class Renderer {
           depthLoadOp: 'clear',
           depthStoreOp: 'store',
         },
-      };
+      });
 
-      const pass = encoder.beginRenderPass(renderPassDescriptor);
       const camera = this.perspectiveCam;
 
       for (const renderable of this.renderables) {
@@ -310,11 +327,30 @@ export class Renderer {
       }
 
       this.renderGroupings(renderList, pass, camera.camera);
-      this.atmosphere.render(this, pass, camera.camera);
       pass.end();
+      device.queue.submit([encoder.finish()]);
 
-      const commandBuffer = encoder.finish();
-      device.queue.submit([commandBuffer]);
+      // Create a new encoder for the post-processing pass
+      const postProcessingEncoder = device.createCommandEncoder({
+        label: 'post-processing encoder',
+      });
+
+      const postProcessingPass = postProcessingEncoder.beginRenderPass({
+        colorAttachments: [
+          {
+            // view: renderTargetView,
+            // resolveTarget: context.getCurrentTexture().createView(),
+            view: context.getCurrentTexture().createView(),
+            loadOp: 'load',
+            storeOp: 'store',
+          },
+        ],
+      });
+
+      this.atmosphere.render(this, postProcessingPass, camera.camera);
+      postProcessingPass.end();
+
+      device.queue.submit([postProcessingEncoder.finish()]);
     }
   }
 }
