@@ -62,7 +62,7 @@ var<uniform> object: ObjectStruct;
   let originalColor = textureSampleLevel( ourTexture, ourSampler, uv, 0.0);
   sum = vec4f( mix(originalColor.xyz, sum.xyz / NUM_SAMPLES, BLOOM_AMOUNT), originalColor.w );
 
-  let exposure = 0.07 * ( 1.0 + 0.2 * sin( 0.5 ) * sin( 1.8  ));
+  let exposure = 0.06;// * ( 1.0 + 0.2 * sin( 0.5 ) * sin( 1.8  ));
   return vec4f(tonemapACES( exposure * sum.xyz ), sum.w); 
 }
 
