@@ -58,12 +58,14 @@ const cloudAmbientDayColor = vec3f(0.2, 0.5, 1.0);
 const cloudAmbientNightColor = vec3f(0.1, 0.2, 0.5);
 const fogColorDay = vec3f( 0.55, 0.8, 1.0 );
 const fogColorEvening = vec3f( 0.75, 0.7, 0.5 );
+const NUM_CLOUD_SAMPLES = 55;
+const NUM_LIGHT_SAMPLES = 25;
 
 // WEATHER STUFF
 // ========================================================
 // Cloud parameters
 const EARTH_RADIUS: f32 = 6300e3;
-const CLOUD_START: f32 = 1200.0;
+const CLOUD_START: f32 = 600.0;
 const CLOUD_HEIGHT: f32 = 600.0;
 const SUN_POWER: vec3f = vec3(1.0,0.9,0.6) * 1200.;
 const LOW_SCATTER: vec3f = vec3(1.0, 0.7, 0.5);
@@ -133,7 +135,7 @@ fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
 	let sunInSkyMask = clamp( pow(1.75 + 1.75 * sunDotUp, 1.0), 0.0, 1.0 );
     let mu = dot(vSunDirection, dir) * sunInSkyMask;
 
-    let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 200.0);
+    let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 100.0);
 
     // Cloudiness is from 0 to 1. Lets get a number 
     let fogSunIntensityModifier = mix( 1.0, 1.0, object.cloudiness );
@@ -146,8 +148,16 @@ fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
     // Reduce the fog color as the sun goes into the evening
     fogColor = fogColor * mix( 0.5, 1.0, sunDotUp );
 
-    return vec4f( mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * fogColor, color.xyz, exp(-0.0003 * fogDistance )) * darknessModifier, mix( 0.4, color.a, exp(-0.0001 * fogDistance ) )  );
-    
+    // Calculate the height of the clouds above the camera
+    let cloudHeightAboveCamera = max(0.0, dir.y);
+
+    // Adjust the fog effect based its distance 
+    let fogFactor = exp(-0.0002 * fogDistance);
+
+    let fogAffectedAlpha = mix( 0.4, color.a, fogFactor );
+
+    return vec4f( mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * fogColor, color.xyz, exp(-0.0003 * fogDistance )) * darknessModifier, fogAffectedAlpha );
+
     ////  Adjust exposure
     // var atmosphereWithSunAndClouds = vec3f( 1.0 - exp(-color / 8.6));
 
@@ -166,7 +176,7 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, fast: bool) -> vec
     const ATM_END: f32 = ATM_START + CLOUD_HEIGHT;
 
     // Number of samples for ray marching
-    var nbSample = 46;
+    var nbSample = NUM_CLOUD_SAMPLES;
     if (fast) {
         nbSample = 13;
     }
@@ -347,7 +357,7 @@ fn intersectSphere(origin: vec3f, dir: vec3f, spherePos: vec3f, sphereRad: f32) 
 
     // Return the nearest intersection point
     return t0;
-}
+} 
 
 fn clouds(position: vec3f, fast: bool) -> CloudResult {
     // Speed at which clouds move, based on time
@@ -366,13 +376,13 @@ fn clouds(position: vec3f, fast: bool) -> CloudResult {
     p.z += cloudMovementSpeed * 10.3;
     
     // Sample the large-scale weather pattern
-    let largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -0.00005 * p.zx, 0.0).x - 0.18) * 5.0 *  object.cloudiness, 0.0, 2.0);
+    var largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -0.00005 * p.zx, 0.0).x - 0.18) * 5.0 *  object.cloudiness, 0.0, 2.0);
 
     // Move the clouds in the x direction
     p.x += cloudMovementSpeed * 8.3;
     
     // Sample the smaller-scale weather pattern and combine with large-scale pattern
-    var weather: f32 = largeWeather * max( clamp( pow(object.cloudiness, 6.1), 0.0, 1.0 ), textureSampleLevel(pebblesTexture, noiseSampler, 0.0002 * p.zx, 0.0).x - 0.28) / 0.72;
+    var weather: f32 = largeWeather * max( clamp( pow(object.cloudiness, 6.1), 0.0, 1.0 ), textureSampleLevel(pebblesTexture, noiseSampler, 0.0002 * p.zx, 0.0).x - 0.28) / 0.52;
     
     // Apply smoothstep to the cloud height to create a smooth transition
     weather *= smoothstep(0.0, 0.5, cloudHeight) * smoothstep(1.0, 0.5, cloudHeight);
@@ -461,7 +471,7 @@ fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_d
     var rayStartPos = rayStartPosition;
     
     // Number of samples for light ray marching
-    var nbSampleLight = 55;
+    var nbSampleLight = NUM_LIGHT_SAMPLES;
     if (fast) {
         nbSampleLight = 7;
     }
