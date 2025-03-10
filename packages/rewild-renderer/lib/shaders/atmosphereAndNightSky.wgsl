@@ -55,7 +55,7 @@ const fogColorEvening = vec3f( 0.75, 0.7, 0.5 );
 const EARTH_RADIUS: f32 = 6300e3;
 const CLOUD_START: f32 = 1000.0;
 const CLOUD_HEIGHT: f32 = 1200.0;
-const SUN_POWER: vec3f = vec3(1.0,0.9,0.6) * 800.;
+const SUN_POWER: vec3f = vec3(1.0,0.9,0.6) * 1200.;
 const LOW_SCATTER: vec3f = vec3(1.0, 0.7, 0.5);
 
 // ========================================================

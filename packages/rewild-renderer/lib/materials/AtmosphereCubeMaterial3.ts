@@ -701,18 +701,14 @@ export class AtmosphereCubeMaterial3 implements IMaterialPass {
     let clearColorValue = 0.3;
     let additionalRed = 0;
 
-    // if (this.upDot >= 0) {
-    //   clearColorValue = lerp(0.1, 0.6, this.upDot);
-    // } else {
-    //   clearColorValue = lerp(0.1, 0.0, smoothStep(0, -1, this.upDot));
-    // }
     if (this.upDot >= 0.3) {
       clearColorValue = lerp(0.4, 0.8, smoothStep(0.3, 1, this.upDot));
-    } else if (this.upDot >= -0.4) {
-      clearColorValue = lerp(0.3, 0.4, smoothStep(-0.4, 0.3, this.upDot));
-      // additionalRed = lerp(0.0, 0.6, smoothStep(-0.4, 0.3, this.upDot));
+    } else if (this.upDot >= -0.1) {
+      clearColorValue = lerp(0.1, 0.4, smoothStep(-0.4, 0.3, this.upDot));
+      additionalRed = lerp(0.2, 0.0, smoothStep(-0.4, 0.3, this.upDot));
     } else {
-      clearColorValue = lerp(0.1, 0.3, smoothStep(-1, 0.3, this.upDot));
+      clearColorValue = lerp(0.01, 0.1, smoothStep(-1, 0.3, this.upDot));
+      additionalRed = lerp(0.0, 0.2, smoothStep(-1, 0.3, this.upDot));
     }
 
     const commandEncoder = device.createCommandEncoder();

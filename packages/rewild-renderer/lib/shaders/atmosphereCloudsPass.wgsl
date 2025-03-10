@@ -58,7 +58,7 @@ const cloudAmbientDayColor = vec3f(0.2, 0.5, 1.0);
 const cloudAmbientNightColor = vec3f(0.1, 0.2, 0.5);
 const fogColorDay = vec3f( 0.55, 0.8, 1.0 );
 const fogColorEvening = vec3f( 0.75, 0.7, 0.5 );
-const NUM_CLOUD_SAMPLES = 55;
+const NUM_CLOUD_SAMPLES = 70;
 const NUM_LIGHT_SAMPLES = 25;
 
 // WEATHER STUFF
@@ -130,6 +130,9 @@ fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
  
     color = skyRay(org, dir, vSunDirection, false); 
 
+
+    var cosTheta = dot( vSunDirection, vec3f(0.0, 1.0, 0.0) );
+	let hemisphereMask: f32 = smoothstep( -0.3, 0.1, cosTheta );
  
 
 	let sunInSkyMask = clamp( pow(1.75 + 1.75 * sunDotUp, 1.0), 0.0, 1.0 );
@@ -141,7 +144,7 @@ fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
     let fogSunIntensityModifier = mix( 1.0, 1.0, object.cloudiness );
     let darknessModifier = mix( 1.0, 0.08, clamp(pow(object.cloudiness, 6.0), 0.0, 1.0) );
 
-    let fogPhase = 0.8 * HenyeyGreenstein(mu, 0.6 * fogSunIntensityModifier) + 0.5 * HenyeyGreenstein(mu, -0.6);
+    let fogPhase = 0.8 * HenyeyGreenstein(mu, 0.6 * fogSunIntensityModifier) + 0.5 * HenyeyGreenstein(mu, -0.1);
 
     var fogColor = mix( fogColorEvening, fogColorDay, clamp( sunDotUp, 0.0, 1.0 ) );
 
@@ -152,12 +155,17 @@ fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
     let cloudHeightAboveCamera = max(0.0, dir.y);
 
     // Adjust the fog effect based its distance 
-    let fogFactor = exp(-0.0002 * fogDistance);
+    let fogFactor = exp(-0.0001 * fogDistance);
 
     let fogAffectedAlpha = mix( 0.4, color.a, fogFactor );
 
-    return vec4f( mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * fogColor, color.xyz, exp(-0.0003 * fogDistance )) * darknessModifier, fogAffectedAlpha );
+    var total = vec4f( mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * fogColor, color.xyz, exp(-0.0003 * fogDistance )) * darknessModifier, fogAffectedAlpha );
 
+    
+    // total = vec4f( (total.xyz - 0.5) * ( 1.0 + smoothstep( 0.2, -0.5, hemisphereMask ) + 0.5 ) , total.w );
+    
+
+    return vec4f( total.xyz, total.w );
     ////  Adjust exposure
     // var atmosphereWithSunAndClouds = vec3f( 1.0 - exp(-color / 8.6));
 
