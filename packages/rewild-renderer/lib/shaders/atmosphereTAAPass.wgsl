@@ -79,7 +79,7 @@ const offsets = array<vec2i, 8>(
     
   history = clamp(history, colorMin, colorMax);
   
-	return vec4f(YCoCgToRGB(mix(newFrame, history, 0.60)), newFrameSample.a);
+	return vec4f(YCoCgToRGB(mix(newFrame, history, 0.75)), newFrameSample.a);
 }
 
 

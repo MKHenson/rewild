@@ -7,7 +7,7 @@ import { Quaternion } from './Quaternion';
 import { Spherical } from './Spherical';
 
 export class Vector3 {
-  static UP = new Vector3(0, 1, 0);
+  static UP: Vector3 = new Vector3(0, 1, 0);
 
   isVector3: boolean = true;
   x: f32;

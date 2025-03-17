@@ -15,6 +15,7 @@ import { Camera } from '../core/Camera';
 import { degToRad, Vector3 } from 'rewild-common';
 import { textureManager } from '../textures/TextureManager';
 import { samplerManager } from '../textures/SamplerManager';
+import { CanvasSizeWatcher } from '../utils/CanvasSizeWatcher';
 
 const uniformBufferSize =
   16 * 4 + // modelMatrix
@@ -83,10 +84,12 @@ export class AtmosphereCubeMaterial3 implements IMaterialPass {
 
   sunPosition: Vector3;
 
+  canvasSizeWatcher: CanvasSizeWatcher;
+
   constructor() {
     this.azimuth = 180;
-    this.elevation = 2;
-    this.cloudiness = 0.0;
+    this.elevation = -1;
+    this.cloudiness = 0.5;
     this.upDot = 0.0;
     this.sunPosition = new Vector3();
     this.requiresRebuild = true;
@@ -120,6 +123,8 @@ export class AtmosphereCubeMaterial3 implements IMaterialPass {
     });
 
     const canvas = pane.canvas()!;
+
+    this.canvasSizeWatcher = new CanvasSizeWatcher(canvas);
 
     const scaleFactor = 0.6;
 
@@ -164,12 +169,12 @@ export class AtmosphereCubeMaterial3 implements IMaterialPass {
       usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
     });
 
-    canvas.addEventListener('mousemove', (e) => {
-      // this.cloudiness = (e.clientY / pane.canvas()!.height);
-      // Set the cloudiness as 0 when the mouse is at the bottom of the canvas
-      // and 1 when it is at the top
-      this.cloudiness = 1 - e.clientY / pane.canvas()!.height;
-    });
+    // canvas.addEventListener('mousemove', (e) => {
+    //   // this.cloudiness = (e.clientY / pane.canvas()!.height);
+    //   // Set the cloudiness as 0 when the mouse is at the bottom of the canvas
+    //   // and 1 when it is at the top
+    //   this.cloudiness = 1 - e.clientY / pane.canvas()!.height;
+    // });
 
     this.cloudsPipeline = device.createRenderPipeline({
       label: 'Atmosphere Plane Pass',
@@ -491,7 +496,7 @@ export class AtmosphereCubeMaterial3 implements IMaterialPass {
     // prettier-ignore
     const uniformData = new Float32Array(alignedUniformBufferSize / 4);
 
-    this.elevation += renderer.delta * 0.01;
+    this.elevation += renderer.delta * 0.001;
 
     // cloudiness is a value between -0.5 and 0.5 for atmosphereWithWeather and 0 and 1 for atmosphereWithWeather2
     const cloudiness = this.cloudiness;
@@ -527,7 +532,7 @@ export class AtmosphereCubeMaterial3 implements IMaterialPass {
     ); // sunPosition
     uniformData.set([0, 1, 0], sizeOfMat4 * 3 + sizeOfVec4 * 2); // up
     uniformData.set(
-      [renderer.totalDeltaTime, width, height, cloudiness],
+      [renderer.totalDeltaTime * 0.3, width, height, cloudiness],
       sizeOfMat4 * 3 + sizeOfVec4 * 3
     );
 
@@ -780,6 +785,8 @@ export class AtmosphereCubeMaterial3 implements IMaterialPass {
     meshes?: Mesh[],
     geometry?: Geometry
   ): void {
+    if (this.canvasSizeWatcher.hasResized()) this.init(renderer);
+
     this.renderClouds(renderer, camera, meshes, geometry);
     this.renderAtmosphere(renderer, camera, meshes, geometry);
     this.renderBloomPass(renderer);
