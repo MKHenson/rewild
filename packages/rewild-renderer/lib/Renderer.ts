@@ -12,6 +12,7 @@ import { Mesh } from './core/Mesh';
 import { IRenderGroup } from '../types/IRenderGroup';
 import { AtmosphereSkybox } from './core/AtmosphereSkybox';
 import { TrackballControler } from './input/TrackballController';
+import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
 
 export class Renderer {
   device: GPUDevice;
@@ -22,19 +23,17 @@ export class Renderer {
   private context: GPUCanvasContext;
   private renderables: IRenderable[];
   private disposed: boolean;
-  private prevWidth: number;
-  private prevHeight: number;
   private renderTargetView: GPUTextureView | undefined;
   private renderTarget: GPUTexture | undefined;
   private initialized: boolean;
   public depthTexture: GPUTexture;
-  public depthReadTexture: GPUTexture;
 
   perspectiveCam: PerspectiveCamera;
   scene: Transform;
   private currentRenderList: RenderList;
   private atmosphere: AtmosphereSkybox;
   private camController: TrackballControler;
+  private canvasSizeWatcher: CanvasSizeWatcher;
 
   lastTime: number;
   delta: number;
@@ -57,8 +56,11 @@ export class Renderer {
     this.pane = pane;
     this.renderables = [];
     const canvas = pane.canvas()!;
-    this.prevWidth = canvas.clientWidth;
-    this.prevHeight = canvas.clientHeight;
+
+    // this.prevWidth = canvas.clientWidth;
+    // this.prevHeight = canvas.clientHeight;
+
+    this.canvasSizeWatcher = new CanvasSizeWatcher(canvas);
 
     this.perspectiveCam = new PerspectiveCamera(
       65,
@@ -110,6 +112,7 @@ export class Renderer {
     this.delta = 0;
     this.totalDeltaTime = 0;
 
+    this.resizeRenderTargets();
     requestAnimationFrame(this.onFrameHandler);
   }
 
@@ -126,64 +129,50 @@ export class Renderer {
     this.disposed = true;
   }
 
-  prepareRender() {
+  resizeRenderTargets() {
     const device = this.device;
     const canvas = this.pane.canvas()!;
-    const currentWidth = canvas.width;
-    const currentHeight = canvas.height;
     let renderTargetView = this.renderTargetView;
     let renderTarget = this.renderTarget;
 
     // If the canvas size changing we need to reallocate the render target.
     // We also need to set the physical size of the canvas to match the computed size.
-    if (
-      (currentWidth !== this.prevWidth ||
-        currentHeight !== this.prevHeight ||
-        !renderTargetView) &&
-      currentWidth &&
-      currentHeight
-    ) {
-      if (renderTarget !== undefined) {
-        // Destroy the previous render target
-        renderTarget.destroy();
-      }
+    // if (!renderTargetView) {
+    const currentWidth = canvas.width || 1;
+    const currentHeight = canvas.height || 1;
 
-      this.perspectiveCam.aspect = canvas.width / canvas.height;
-      this.perspectiveCam.updateProjectionMatrix();
-
-      // Resize the multisampled render target to match the new canvas size.
-      renderTarget = device.createTexture({
-        size: [canvas.width, canvas.height],
-        sampleCount: this.sampleCount,
-        format: this.presentationFormat,
-        usage: GPUTextureUsage.RENDER_ATTACHMENT,
-      });
-
-      this.depthTexture = device.createTexture({
-        size: [canvas.width, canvas.height],
-        label: 'depth-texture-writable',
-        format: 'depth24plus',
-        sampleCount: this.sampleCount,
-        usage:
-          GPUTextureUsage.COPY_SRC |
-          GPUTextureUsage.RENDER_ATTACHMENT |
-          GPUTextureUsage.TEXTURE_BINDING,
-      });
-
-      this.depthReadTexture = device.createTexture({
-        size: [canvas.width, canvas.height],
-        label: 'depth-texture-readable',
-        format: 'depth24plus',
-        sampleCount: this.sampleCount,
-        usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.TEXTURE_BINDING,
-      });
-
-      renderTargetView = renderTarget.createView();
-      this.renderTarget = renderTarget;
-      this.renderTargetView = renderTargetView;
-      this.prevHeight = currentHeight;
-      this.prevWidth = currentWidth;
+    if (renderTarget !== undefined) {
+      // Destroy the previous render target
+      renderTarget.destroy();
     }
+
+    this.perspectiveCam.aspect = currentWidth / currentHeight;
+    this.perspectiveCam.updateProjectionMatrix();
+
+    // Resize the multisampled render target to match the new canvas size.
+    renderTarget = device.createTexture({
+      size: [currentWidth, currentHeight],
+      sampleCount: this.sampleCount,
+      format: this.presentationFormat,
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+    if (this.depthTexture) this.depthTexture.destroy();
+
+    this.depthTexture = device.createTexture({
+      size: [currentWidth, currentHeight],
+      label: 'depth-texture-writable',
+      format: 'depth24plus',
+      sampleCount: this.sampleCount,
+      usage:
+        GPUTextureUsage.COPY_SRC |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    renderTargetView = renderTarget.createView();
+    this.renderTarget = renderTarget;
+    this.renderTargetView = renderTargetView;
   }
 
   // TODO: Will come back later to flesh this out
@@ -290,7 +279,7 @@ export class Renderer {
     const renderList = this.organizeMeshes();
 
     // Gets the device render targets ready. Checks for things like canvas resize
-    this.prepareRender();
+    if (this.canvasSizeWatcher.hasResized()) this.resizeRenderTargets();
 
     const device = this.device;
     const context = this.context;
