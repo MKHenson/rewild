@@ -3,32 +3,6 @@ struct ObjectStruct {
     iTime: f32,
 };
 
-struct OurVertexShaderOutput {
-  @builtin(position) position: vec4f, 
-};
-
-
-@vertex fn vs(
-  @builtin(vertex_index) vertexIndex : u32
-) -> OurVertexShaderOutput {
-  let pos = array(
-    // 1st triangle
-    vec2f(-1.0, -1.0),  // bottom-left
-    vec2f( 1.0, -1.0),  // bottom-right
-    vec2f(-1.0,  1.0),  // top-left
-
-    // 2nd triangle
-    vec2f(-1.0,  1.0),  // top-left
-    vec2f( 1.0, -1.0),  // bottom-right
-    vec2f( 1.0,  1.0),  // top-right
-  );
-
-  var vsOutput: OurVertexShaderOutput;
-  let xy = pos[vertexIndex];
-  vsOutput.position = vec4f(xy, 0.0, 1.0);
-  return vsOutput;
-}
-
 @group(0) @binding(0) 
 var ourSampler: sampler;
 
@@ -53,12 +27,12 @@ var<uniform> object: ObjectStruct;
   {
       let r = blurRadius * f32(i) / NUM_SAMPLES;
       let phi = (f32(i) / NUM_SAMPLES + phiOffset) * 2.0 * 3.1415926;
-      let uv = uv + vec2(sin(phi), cos(phi))*r; 
+      let uv = uv + vec2(sin(phi), cos(phi)) * r; 
 
       sum += textureSampleLevel( ourTexture, ourSampler, uv, 0.0);
   }
 
-  let BLOOM_AMOUNT = 0.3; 
+  let BLOOM_AMOUNT = 0.1; 
   let originalColor = textureSampleLevel( ourTexture, ourSampler, uv, 0.0);
   sum = vec4f( mix(originalColor.xyz, sum.xyz / NUM_SAMPLES, BLOOM_AMOUNT), originalColor.w );
 

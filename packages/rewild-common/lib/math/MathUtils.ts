@@ -1,8 +1,8 @@
-import { Quaternion } from "./Quaternion";
+import { Quaternion } from './Quaternion';
 
 const _lut: string[] = [];
 for (let i = 0; i < 256; i++) {
-  _lut[i] = (i < 16 ? "0" : "") + i.toString(16);
+  _lut[i] = (i < 16 ? '0' : '') + i.toString(16);
 }
 
 let _seed = 1234567;
@@ -22,16 +22,16 @@ export function generateUUID(): string {
     _lut[(d0 >> 8) & 0xff] +
     _lut[(d0 >> 16) & 0xff] +
     _lut[(d0 >> 24) & 0xff] +
-    "-" +
+    '-' +
     _lut[d1 & 0xff] +
     _lut[(d1 >> 8) & 0xff] +
-    "-" +
+    '-' +
     _lut[((d1 >> 16) & 0x0f) | 0x40] +
     _lut[(d1 >> 24) & 0xff] +
-    "-" +
+    '-' +
     _lut[(d2 & 0x3f) | 0x80] +
     _lut[(d2 >> 8) & 0xff] +
-    "-" +
+    '-' +
     _lut[(d2 >> 16) & 0xff] +
     _lut[(d2 >> 24) & 0xff] +
     _lut[d3 & 0xff] +
@@ -147,7 +147,13 @@ export function floorPowerOfTwo(value: f32): f32 {
   return Mathf.pow(2, Mathf.floor(Mathf.log(value) / Mathf.LN2));
 }
 
-export function setQuaternionFromProperEuler(q: Quaternion, a: f32, b: f32, c: f32, order: string): void {
+export function setQuaternionFromProperEuler(
+  q: Quaternion,
+  a: f32,
+  b: f32,
+  c: f32,
+  order: string
+): void {
   // Intrinsic Proper Euler Angles - see https://en.wikipedia.org/wiki/Euler_angles
 
   // rotations are applied to the axes in the order specified by 'order'
@@ -170,31 +176,34 @@ export function setQuaternionFromProperEuler(q: Quaternion, a: f32, b: f32, c: f
   const s3_1 = sin((c - a) / 2);
 
   switch (order) {
-    case "XYX":
+    case 'XYX':
       q.set(c2 * s13, s2 * c1_3, s2 * s1_3, c2 * c13);
       break;
 
-    case "YZY":
+    case 'YZY':
       q.set(s2 * s1_3, c2 * s13, s2 * c1_3, c2 * c13);
       break;
 
-    case "ZXZ":
+    case 'ZXZ':
       q.set(s2 * c1_3, s2 * s1_3, c2 * s13, c2 * c13);
       break;
 
-    case "XZX":
+    case 'XZX':
       q.set(c2 * s13, s2 * s3_1, s2 * c3_1, c2 * c13);
       break;
 
-    case "YXY":
+    case 'YXY':
       q.set(s2 * c3_1, c2 * s13, s2 * s3_1, c2 * c13);
       break;
 
-    case "ZYZ":
+    case 'ZYZ':
       q.set(s2 * s3_1, s2 * c3_1, c2 * s13, c2 * c13);
       break;
 
     default:
-      console.warn("THREE.MathUtils: .setQuaternionFromProperEuler() encountered an unknown order: " + order);
+      console.warn(
+        'THREE.MathUtils: .setQuaternionFromProperEuler() encountered an unknown order: ' +
+          order
+      );
   }
 }

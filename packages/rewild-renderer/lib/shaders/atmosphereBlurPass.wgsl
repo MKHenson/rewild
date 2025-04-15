@@ -2,31 +2,6 @@ struct ObjectStruct {
     resolution: vec2f,
     iTime: f32,
 };
-struct OurVertexShaderOutput {
-  @builtin(position) position: vec4f, 
-};
-
-
-@vertex fn vs(
-  @builtin(vertex_index) vertexIndex : u32
-) -> OurVertexShaderOutput {
-  let pos = array(
-    // 1st triangle
-    vec2f(-1.0, -1.0),  // bottom-left
-    vec2f( 1.0, -1.0),  // bottom-right
-    vec2f(-1.0,  1.0),  // top-left
-
-    // 2nd triangle
-    vec2f(-1.0,  1.0),  // top-left
-    vec2f( 1.0, -1.0),  // bottom-right
-    vec2f( 1.0,  1.0),  // top-right
-  );
-
-  var vsOutput: OurVertexShaderOutput;
-  let xy = pos[vertexIndex];
-  vsOutput.position = vec4f(xy, 0.0, 1.0);
-  return vsOutput;
-}
 
 @group(0) @binding(0) 
 var clouds: texture_2d<f32>;
@@ -56,7 +31,7 @@ const offsets = array<vec2i, 8>(
 const samples: i32 = 4;
 const LOD: i32 = 1;  // gaussian done on MIPmap at scale LOD
 const sLOD: i32 = 1 << u32(LOD); // was originally ( 1 << u32(LOD) )  tile size = 2^LOD
-const sigma: f32 = f32(samples) * 0.25;
+const sigma: f32 = f32(samples) * 0.40;
 
 fn gaussian(i: vec2<f32>) -> f32 {
     let i2 = i / sigma;

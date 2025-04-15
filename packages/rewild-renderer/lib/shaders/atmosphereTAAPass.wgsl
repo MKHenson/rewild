@@ -2,31 +2,6 @@ struct ObjectStruct {
     resolution: vec2f,
     iTime: f32,
 };
-struct OurVertexShaderOutput {
-  @builtin(position) position: vec4f, 
-};
-
-
-@vertex fn vs(
-  @builtin(vertex_index) vertexIndex : u32
-) -> OurVertexShaderOutput {
-  let pos = array(
-    // 1st triangle
-    vec2f(-1.0, -1.0),  // bottom-left
-    vec2f( 1.0, -1.0),  // bottom-right
-    vec2f(-1.0,  1.0),  // top-left
-
-    // 2nd triangle
-    vec2f(-1.0,  1.0),  // top-left
-    vec2f( 1.0, -1.0),  // bottom-right
-    vec2f( 1.0,  1.0),  // top-right
-  );
-
-  var vsOutput: OurVertexShaderOutput;
-  let xy = pos[vertexIndex];
-  vsOutput.position = vec4f(xy, 0.0, 1.0);
-  return vsOutput;
-}
 
 @group(0) @binding(0) 
 var clouds: texture_2d<f32>;
@@ -79,7 +54,7 @@ const offsets = array<vec2i, 8>(
     
   history = clamp(history, colorMin, colorMax);
   
-	return vec4f(YCoCgToRGB(mix(newFrame, history, 0.75)), newFrameSample.a);
+	return vec4f(YCoCgToRGB(mix(newFrame, history, 0.80)), newFrameSample.a);
 }
 
 

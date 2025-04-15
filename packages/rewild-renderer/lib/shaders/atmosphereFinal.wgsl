@@ -7,35 +7,7 @@ struct ObjectStruct {
     sunPosition: vec3f,
     cameraPosition: vec3f,
     padding0: f32,
-};
-
-struct OurVertexShaderOutput {
-  @builtin(position) position: vec4f, 
-  @location(0) vSunDirection : vec3<f32>
-};
-
-
-@vertex fn vs(
-  @builtin(vertex_index) vertexIndex : u32
-) -> OurVertexShaderOutput {
-  let pos = array(
-    // 1st triangle
-    vec2f(-1.0, -1.0),  // bottom-left
-    vec2f( 1.0, -1.0),  // bottom-right
-    vec2f(-1.0,  1.0),  // top-left
-
-    // 2nd triangle
-    vec2f(-1.0,  1.0),  // top-left
-    vec2f( 1.0, -1.0),  // bottom-right
-    vec2f( 1.0,  1.0),  // top-right
-  );
-
-  var vsOutput: OurVertexShaderOutput;
-  let xy = pos[vertexIndex];
-  vsOutput.position = vec4f(xy, 0.0, 1.0);
-  vsOutput.vSunDirection = normalize( object.sunPosition );
-  return vsOutput;
-}
+}; 
 
 @group(0) @binding(0) 
 var sky: texture_2d<f32>;
@@ -52,8 +24,6 @@ var cloudsSampler: sampler;
 @group( 0 ) @binding( 4 )
 var depthTexture: texture_depth_2d;
 
-// @group( 0 ) @binding( 5 )
-// var depthSampler: sampler_comparison;
 
 // WEATHER STUFF
 // ========================================================
@@ -71,7 +41,6 @@ const fogColorEvening = vec3f( 0.75, 0.7, 0.5 );
 
 @fragment fn fs( 
   @builtin(position) fragCoord: vec4<f32>,
-  @location(0) vSunDirection : vec3<f32>
   ) -> @location(0) vec4f {
   // Define uv based on fragCoord
   let uv = fragCoord.xy / vec2(object.resolution);
