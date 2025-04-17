@@ -136,7 +136,7 @@ fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f, nightSky: vec3
     // Reduce the fog color as the sun goes into the evening
     fogColor = fogColor * mix( 0.5, 1.0, sunDotUp );
 
-    color = mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * fogColor, color, exp(-0.0003 * fogDistance )) * darknessModifier;
+    color = mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * fogColor, color, exp(-0.0006 * fogDistance )) * darknessModifier;
     
     // Adjust exposure
     var atmosphereWithSunAndClouds = vec3f( 1.0 - exp(-color / 8.6));
