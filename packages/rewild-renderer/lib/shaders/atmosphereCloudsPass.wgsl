@@ -157,22 +157,6 @@ fn DrawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
     let fogAffectedAlpha = mix( 0.4, color.a, fogFactor );
 
     return vec4f( mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * fogColor, color.xyz, exp(-0.0003 * fogDistance )) * darknessModifier, fogAffectedAlpha );
-
-    
-    // total = vec4f( (total.xyz - 0.5) * ( 1.0 + smoothstep( 0.2, -0.5, hemisphereMask ) + 0.5 ) , total.w );
-    
-
-    
-    ////  Adjust exposure
-    // var atmosphereWithSunAndClouds = vec3f( 1.0 - exp(-color / 8.6));
-
-    // return atmosphereWithSunAndClouds;
-
-
-    // Adjust exposure
-    // var atmosphereWithSunAndClouds = vec3f( 1.0 - exp(-color.xyz / 8.6));
-
-    // return vec4f(atmosphereWithSunAndClouds, color.w);
 }
 
 fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, fast: bool) -> vec4f {

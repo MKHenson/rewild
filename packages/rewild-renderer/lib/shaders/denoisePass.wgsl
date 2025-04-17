@@ -1,5 +1,5 @@
 
-const SAMPLES = 1;  // HIGHER = NICER = SLOWER
+const SAMPLES = 80;  // HIGHER = NICER = SLOWER
 const DISTRIBUTION_BIAS = 0.6; // between 0. and 1.
 const PIXEL_MULTIPLIER =  1.5; // between 1. and 3. (keep low)
 const INVERSE_HUE_TOLERANCE = 20.0; // (2. - 30.)

@@ -1,5 +1,5 @@
 import { Renderer } from '..';
-import { AtmosphereMaterial } from '../materials/AtmosphereMaterial';
+import { AtmosphereMaterial } from '../materials/sky/AtmosphereMaterial';
 import { Camera } from './Camera';
 
 export class Atmosphere {

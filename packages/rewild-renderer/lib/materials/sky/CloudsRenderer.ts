@@ -1,52 +1,20 @@
-import { Vector3 } from 'rewild-common';
-import { Camera } from '../core/Camera';
-import { Mesh } from '../core/Mesh';
-import { Renderer } from '../Renderer';
-import shader from '../shaders/atmosphereCloudsPass.wgsl';
-import { samplerManager } from '../textures/SamplerManager';
-import { textureManager } from '../textures/TextureManager';
-import { Geometry } from '../geometry/Geometry';
-
-const uniformBufferSize =
-  16 * 4 + // modelMatrix
-  16 * 4 + // projectionMatrix
-  16 * 4 + // modelViewMatrix
-  4 * 4 + // cameraPosition
-  4 * 4 + // sunPosition
-  4 * 4 + // up
-  4 + // iTime
-  4 + // resolutionX
-  4 + // resolutionY
-  4; // cloudiness
-
-// Align the buffer size to the next multiple of 256
-const alignedUniformBufferSize = Math.ceil(uniformBufferSize / 256) * 256;
+import { Renderer } from '../../Renderer';
+import shader from '../../shaders/atmosphereCloudsPass.wgsl';
+import { samplerManager } from '../../textures/SamplerManager';
+import { textureManager } from '../../textures/TextureManager';
+import { Geometry } from '../../geometry/Geometry';
 
 export class CloudsRenderer {
   renderTarget: GPUTexture;
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
-  uniformBuffer: GPUBuffer;
-  cloudiness: number;
-  sunPosition: Vector3;
-  uniformData: Float32Array;
 
-  constructor(sunPosition: Vector3) {
-    this.cloudiness = 0.5;
-    this.sunPosition = sunPosition;
-    this.uniformData = new Float32Array(alignedUniformBufferSize / 4);
-  }
+  constructor() {}
 
-  init(renderer: Renderer) {
+  init(renderer: Renderer, uniformBuffer: GPUBuffer) {
     const { device, pane } = renderer;
     const canvas = pane.canvas()!;
     const scaleFactor = 0.6;
-
-    this.uniformBuffer = device.createBuffer({
-      label: 'uniforms for atmosphere cube',
-      size: alignedUniformBufferSize,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
 
     const module = device.createShaderModule({
       code: shader,
@@ -113,7 +81,7 @@ export class CloudsRenderer {
       entries: [
         {
           binding: 0,
-          resource: { buffer: this.uniformBuffer },
+          resource: { buffer: uniformBuffer },
         },
         {
           binding: 1,
@@ -141,47 +109,8 @@ export class CloudsRenderer {
     });
   }
 
-  update(
-    renderer: Renderer,
-    camera: Camera,
-    width: number,
-    height: number,
-    meshes?: Mesh[]
-  ) {
-    const cloudiness = this.cloudiness;
-    const sunPosition = this.sunPosition;
-    const uniformData = this.uniformData;
-
-    uniformData.set(meshes![0].transform.matrixWorld.elements, 0); // modelMatrix
-    uniformData.set(camera.projectionMatrix.elements, 16); // projectionMatrix
-    uniformData.set(meshes![0].transform.modelViewMatrix.elements, 32); // modelViewMatrix
-    uniformData.set(
-      [
-        camera.transform.position.x,
-        camera.transform.position.y,
-        camera.transform.position.z,
-      ],
-      48
-    ); // cameraPosition
-    uniformData.set([sunPosition.x, sunPosition.y, sunPosition.z], 52); // sunPosition
-    uniformData.set([0, 1, 0], 56); // up
-    uniformData.set(
-      [renderer.totalDeltaTime * 0.3, width, height, cloudiness],
-      60
-    );
-
-    return uniformData;
-  }
-
-  render(
-    renderer: Renderer,
-    camera: Camera,
-    meshes?: Mesh[],
-    geometry?: Geometry
-  ) {
-    const { device } = renderer;
-    const commandEncoder = device.createCommandEncoder();
-    const cloudPass = commandEncoder.beginRenderPass({
+  render(encoder: GPUCommandEncoder, geometry: Geometry) {
+    const cloudPass = encoder.beginRenderPass({
       colorAttachments: [
         {
           view: this.renderTarget.createView(),
@@ -196,23 +125,8 @@ export class CloudsRenderer {
     cloudPass.setVertexBuffer(0, geometry!.vertexBuffer);
     cloudPass.setVertexBuffer(1, geometry!.uvBuffer);
     cloudPass.setIndexBuffer(geometry!.indexBuffer, 'uint16');
-
-    const uniformData = this.update(
-      renderer,
-      camera,
-      this.renderTarget.width,
-      this.renderTarget.height,
-      meshes
-    );
-
-    // upload the uniform values to the uniform buffer
-    device.queue.writeBuffer(this.uniformBuffer, 0, uniformData.buffer);
-
     cloudPass.setBindGroup(0, this.bindGroup);
     cloudPass.drawIndexed(geometry!.indices!.length);
     cloudPass.end();
-
-    const commandBuffer = commandEncoder.finish();
-    device.queue.submit([commandBuffer]);
   }
 }
