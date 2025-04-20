@@ -68,7 +68,8 @@ export class SkyRenderer {
         16 * 4 + // modelMatrix
         16 * 4 + // projectionMatrix
         16 * 4 + // modelViewMatrix
-        4 * 4 + // cameraPosition
+        3 * 4 + // cameraPosition
+        4 + // resolutionScale
         4 * 4 + // sunPosition
         4 * 4 + // up
         4 + // iTime
@@ -94,11 +95,11 @@ export class SkyRenderer {
     this.bloomPass.sourceTexture = this.cloudsPass.renderTarget;
     this.bloomPass.init(renderer);
 
-    this.taaPass.sourceTexture = this.bloomPass.renderTarget;
-    this.taaPass.init(renderer);
+    this.blurPass.sourceTexture = this.bloomPass.renderTarget;
+    this.blurPass.init(renderer);
 
     this.finalPass.atmosphereTexture = this.atmospherePass.renderTarget;
-    this.finalPass.cloudsTexture = this.taaPass.renderTarget;
+    this.finalPass.cloudsTexture = this.blurPass.renderTarget;
     this.finalPass.init(renderer);
   }
 
@@ -128,6 +129,7 @@ export class SkyRenderer {
         camera.transform.position.x,
         camera.transform.position.y,
         camera.transform.position.z,
+        this.cloudsPass.resolutionScale,
       ],
       48
     ); // cameraPosition
@@ -173,7 +175,7 @@ export class SkyRenderer {
     device.queue.submit([commandBuffer]);
 
     this.bloomPass.render(renderer);
-    this.taaPass.render(renderer);
+    this.blurPass.render(renderer);
 
     this.finalPass.azimuth = this.azimuth;
     this.finalPass.elevation = this.elevation;

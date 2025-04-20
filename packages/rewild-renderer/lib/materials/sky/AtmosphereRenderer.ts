@@ -1,5 +1,6 @@
 import { Renderer } from '../../Renderer';
-import shader from '../../shaders/atmosphereAndNightSky.wgsl';
+import commonShaderFns from '../../shaders/atmosphere/common.wgsl';
+import shader from '../../shaders/atmosphere/atmosphere.wgsl';
 import { samplerManager } from '../../textures/SamplerManager';
 import { textureManager } from '../../textures/TextureManager';
 import { Geometry } from '../../geometry/Geometry';
@@ -16,7 +17,7 @@ export class AtmosphereRenderer {
     const canvas = pane.canvas()!;
 
     const module = device.createShaderModule({
-      code: shader,
+      code: shader + commonShaderFns,
     });
 
     this.renderTarget = device.createTexture({
@@ -91,6 +92,14 @@ export class AtmosphereRenderer {
           resource: textureManager
             .get('rgba-noise-256')
             .gpuTexture.createView(),
+        },
+        {
+          binding: 3,
+          resource: renderer.depthTexture.createView(),
+        },
+        {
+          binding: 4,
+          resource: samplerManager.get('depth-comparison'),
         },
       ],
     });

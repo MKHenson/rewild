@@ -1,5 +1,6 @@
 import { Renderer } from '../../Renderer';
-import shader from '../../shaders/atmosphereCloudsPass.wgsl';
+import commonShaderFns from '../../shaders/atmosphere/common.wgsl';
+import shader from '../../shaders/atmosphere/clouds.wgsl';
 import { samplerManager } from '../../textures/SamplerManager';
 import { textureManager } from '../../textures/TextureManager';
 import { Geometry } from '../../geometry/Geometry';
@@ -8,20 +9,27 @@ export class CloudsRenderer {
   renderTarget: GPUTexture;
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
+  resolutionScale: number;
 
-  constructor() {}
+  constructor() {
+    this.resolutionScale = 0.5;
+  }
 
   init(renderer: Renderer, uniformBuffer: GPUBuffer) {
     const { device, pane } = renderer;
     const canvas = pane.canvas()!;
-    const scaleFactor = 0.6;
+    const resolutionScale = this.resolutionScale;
 
     const module = device.createShaderModule({
-      code: shader,
+      code: shader + commonShaderFns,
     });
 
     this.renderTarget = device.createTexture({
-      size: [canvas.width * scaleFactor, canvas.height * scaleFactor, 1],
+      size: [
+        canvas.width * resolutionScale,
+        canvas.height * resolutionScale,
+        1,
+      ],
       label: 'clouds render target',
       format: 'rgba16float',
       usage:
