@@ -112,7 +112,7 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, nightSky: vec3f) -
     var intersectionPoint = cameraPos + intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END + 2000.0) * rotatedDir;
     
     let cloudCoverFactor = mix( 0.6, 0.3, object.cloudiness );
-    color += mix(CLOUD_AMBIENT_NIGHT_COLOR, vec3f(2.0), sunDotUp) * max( 0.0, fbm(vec3f(1.0, 1.0, 1.8) * intersectionPoint * 0.001) - cloudCoverFactor) * 2.0;
+    color += mix(FOG_COLOR_STORM, vec3f(2.0), sunDotUp) * max( 0.0, fbm(vec3f(1.0, 1.0, 1.8) * intersectionPoint * 0.001) - cloudCoverFactor) * 2.0;
 
     let background = getAtmosphereColor(sun_direction, dir, mu, nightSky * 10.0);
 

@@ -43,7 +43,7 @@ export class SkyRenderer {
   constructor() {
     this.azimuth = 180;
     this.elevation = -2;
-    this.cloudiness = 0.5;
+    this.cloudiness = 0.7;
     this.upDot = 0.0;
     this.sunPosition = new Vector3();
     this.requiresRebuild = true;
@@ -103,6 +103,8 @@ export class SkyRenderer {
     this.finalPass.init(renderer);
   }
 
+  addingCloudiness: boolean = false;
+
   update(
     renderer: Renderer,
     camera: Camera,
@@ -111,6 +113,16 @@ export class SkyRenderer {
     transform: Transform
   ) {
     this.elevation += renderer.delta * 0.002;
+
+    // change the cloudiness over time between 0 and 1
+    if (this.cloudiness > 1) {
+      this.addingCloudiness = false;
+    } else if (this.cloudiness < 0) {
+      this.addingCloudiness = true;
+    }
+
+    this.cloudiness +=
+      renderer.delta * (this.addingCloudiness ? 0.0001 : -0.0001);
 
     const phi = degToRad(90 - this.elevation);
     const theta = degToRad(this.azimuth);

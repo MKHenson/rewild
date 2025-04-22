@@ -1,5 +1,5 @@
  
-const NUM_CLOUD_SAMPLES = 70;
+const NUM_CLOUD_SAMPLES = 80;
 const NUM_LIGHT_SAMPLES = 25;
 
 struct CloudResult {
@@ -73,7 +73,7 @@ fn drawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
     color = skyRay(org, dir, vSunDirection); 
 
     let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 300.0);
-    let cloudAlphaAffectedByFogDistance min( exp(-0.00015 * fogDistance ), color.a )
+    let cloudAlphaAffectedByFogDistance = min( exp(-0.00015 * fogDistance ), color.a );
     
     return vec4f( getFogColor( dir, org, vSunDirection, color.rgb ), cloudAlphaAffectedByFogDistance);
 }
@@ -90,7 +90,7 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     var color = vec3f(0.0);
 
     // Calculate the intersection of the ray with the start and end of the atmosphere
-    let distToAtmStart = intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_START);
+    var distToAtmStart = intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_START);
     let distToAtmEnd = intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END);
 
     // Calculate the starting position of the ray inside the atmosphere
@@ -122,7 +122,9 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
 
                 // Calculate the ambient light 
                 // Calulate the ambient color based on the time of day and the sun direction
-                let cloudAmbientColor = mix(CLOUD_AMBIENT_NIGHT_COLOR, CLOUD_AMBIENT_DAY_COLOR, sunDotUp);
+                
+                var cloudAmbientColor = mix(CLOUD_AMBIENT_NIGHT_COLOR, CLOUD_AMBIENT_EVENING_COLOR, smoothstep(-0.2, 0.2, sunDotUp));
+                cloudAmbientColor = mix(cloudAmbientColor, CLOUD_AMBIENT_DAY_COLOR, smoothstep(0.2, 0.8, sunDotUp));
 
                 let ambient = (0.5 + 0.6 * cloudHeight) * cloudAmbientColor * 6.5 + vec3f(0.8) * max(0.0, 1.0 - 2.0 * cloudHeight);
 
@@ -167,13 +169,13 @@ fn clouds(position: vec3f) -> CloudResult {
     p.z += cloudMovementSpeed * 10.3;
     
     // Sample the large-scale weather pattern
-    var largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -0.00005 * p.zx, 0.0).x - 0.18) * 5.0 *  object.cloudiness, 0.0, 2.0);
+    var largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -0.00005 * p.zx, 0.0).x - 0.18) * 5.0 *  object.cloudiness, 0.0, 6.0);
 
     // Move the clouds in the x direction
     p.x += cloudMovementSpeed * 8.3;
     
     // Sample the smaller-scale weather pattern and combine with large-scale pattern
-    var weather: f32 = largeWeather * max( clamp( pow(object.cloudiness, 6.1), 0.0, 1.0 ), textureSampleLevel(pebblesTexture, noiseSampler, 0.0002 * p.zx, 0.0).x - 0.28) / 0.52;
+    var weather: f32 = largeWeather * max( clamp( pow(object.cloudiness, 12.1), 0.0, 1.0 ), textureSampleLevel(pebblesTexture, noiseSampler, 0.0001 * p.zx, 0.0).x - 0.28) / 0.52;
     
     // Apply smoothstep to the cloud height to create a smooth transition
     weather *= smoothstep(0.0, 0.5, cloudHeight) * smoothstep(1.0, 0.5, cloudHeight);

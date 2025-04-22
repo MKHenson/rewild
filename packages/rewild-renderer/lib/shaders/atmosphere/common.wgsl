@@ -1,10 +1,13 @@
 const PI: f32 = 3.141592653589793238462643383279502884197169;
 const FOG_COLOR_DAY = vec3f( 0.55, 0.8, 1.0 );
-const FOG_COLOR_EVENING = vec3f( 0.75, 0.7, 0.5 );
-const CLOUD_AMBIENT_DAY_COLOR = vec3f(0.2, 0.5, 1.0);
-const CLOUD_AMBIENT_NIGHT_COLOR = vec3f(0.1, 0.2, 0.5);
+const FOG_COLOR_NIGHT = vec3f( 0.23, 0.25, 0.37 );
+const FOG_COLOR_EVENING = vec3f( 0.32, 0.12, 0.0 ); //  vec3f( 0.75, 0.7, 0.5 );
+const FOG_COLOR_STORM = vec3f( 0.35, 0.37, 0.25 );
+const CLOUD_AMBIENT_DAY_COLOR = vec3f(0.5, 0.8, 1.0);
+const CLOUD_AMBIENT_EVENING_COLOR = vec3f( 0.11, 0.13, 0.17 );
+const CLOUD_AMBIENT_NIGHT_COLOR = vec3f( 0.10, 0.12, 0.17);
 const EARTH_RADIUS: f32 = 6300e3;
-const CLOUD_START: f32 = 600.0;
+const CLOUD_START: f32 = 1200.0;
 const CLOUD_HEIGHT: f32 = 600.0;
 const SUN_POWER: vec3f = vec3(1.0,0.9,0.6) * 1200.;
 const LOW_SCATTER: vec3f = vec3(1.0, 0.7, 0.5);
@@ -162,12 +165,16 @@ fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3
     let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 300.0);
 
     // Cloudiness is from 0 to 1. Lets get a number 
-    let fogSunIntensityModifier = mix( 1.0, 0.95, object.cloudiness );
+    let fogSunIntensityModifier = mix( 1.0, 0.85, object.cloudiness );
     let darknessModifier = mix( 1.0, 0.08, clamp(pow(object.cloudiness, 6.0), 0.0, 1.0) );
 
-    let fogPhase = 0.8 * HenyeyGreenstein(mu, 0.75 * fogSunIntensityModifier); // + 0.5 * HenyeyGreenstein(mu, -0.6);
+    let fogPhase = 0.4 * HenyeyGreenstein(mu, 0.80 ) * fogSunIntensityModifier; // + 0.5 * HenyeyGreenstein(mu, -0.6);
 
-    var fogColor = mix( FOG_COLOR_EVENING, FOG_COLOR_DAY, clamp( sunDotUp, 0.0, 1.0 ) );
+    var fogColor = mix(FOG_COLOR_NIGHT, FOG_COLOR_EVENING, smoothstep(-0.2, 0.2, sunDotUp));
+    fogColor = mix(fogColor, FOG_COLOR_DAY, smoothstep(0.2, 0.8, sunDotUp));
+
+
+    fogColor = mix( fogColor, FOG_COLOR_STORM, object.cloudiness );
 
     // Reduce the fog color as the sun goes into the evening
     fogColor = fogColor * mix( 0.5, 1.0, sunDotUp );
@@ -177,7 +184,7 @@ fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3
 
 fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec3f ) -> vec3f {
     let up = dot(sun_direction, vec3f(0.0, 1.0, 0.0));
-    let portionOfNightSky = pow(0.5 + 0.5 * up, 2.0);
+    let portionOfNightSky = pow(0.5 + 0.5 * up, 0.8);
     let portionOfDaySky = pow(0.5 + 0.5 * mu, 15.0);
     let dayNightSkyRatio = clamp(portionOfNightSky + portionOfDaySky, 0.0, 1.0);
 
