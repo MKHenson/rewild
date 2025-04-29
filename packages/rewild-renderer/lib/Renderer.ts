@@ -11,6 +11,7 @@ import { IMaterialPass } from './materials/IMaterialPass';
 import { Mesh } from './core/Mesh';
 import { IRenderGroup } from '../types/IRenderGroup';
 import { AtmosphereSkybox } from './core/AtmosphereSkybox';
+import { TerrainRenderer } from './renderers/terrain/TerrainRenderer';
 import { TrackballControler } from './input/TrackballController';
 import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
 
@@ -27,6 +28,7 @@ export class Renderer {
   private renderTarget: GPUTexture | undefined;
   private initialized: boolean;
   public depthTexture: GPUTexture;
+  public terrainRenderer: TerrainRenderer;
 
   perspectiveCam: PerspectiveCamera;
   scene: Transform;
@@ -45,6 +47,7 @@ export class Renderer {
     this.onFrameHandler = this.onFrame.bind(this);
     this.scene = new Transform();
     this.atmosphere = new AtmosphereSkybox();
+    this.terrainRenderer = new TerrainRenderer();
   }
 
   async init(pane: Pane3D) {
@@ -103,6 +106,7 @@ export class Renderer {
 
     await samplerManager.initialize(this);
     await textureManager.initialize(this);
+    await this.terrainRenderer.init(this);
 
     this.renderables = await Promise.all(
       [new CubeRenderer()].map((renderable) => renderable.initialize(this))
@@ -310,6 +314,8 @@ export class Renderer {
       });
 
       const camera = this.perspectiveCam;
+
+      this.terrainRenderer.render(this, pass, camera.camera);
 
       for (const renderable of this.renderables) {
         renderable.render(this, pass, camera.camera);
