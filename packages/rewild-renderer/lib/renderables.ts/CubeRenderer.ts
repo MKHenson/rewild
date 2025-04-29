@@ -35,7 +35,7 @@ export class CubeRenderer implements IRenderable {
     const geometry = BoxGeometryFactory.new(1, 1, 1, 1, 1, 1);
 
     this.initialMesh = new Mesh(geometry, diffuseMaterial);
-    renderer.scene.addChild(this.initialMesh.transform);
+    // renderer.scene.addChild(this.initialMesh.transform);
     this.instances.push(this.initialMesh);
     return this;
   }
