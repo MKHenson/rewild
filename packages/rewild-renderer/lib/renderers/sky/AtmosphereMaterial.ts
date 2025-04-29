@@ -1,13 +1,13 @@
 import { Geometry } from '../../geometry/Geometry';
-import { IMaterialPass } from '../IMaterialPass';
+import { IMaterialPass } from '../../materials/IMaterialPass';
 import shader from '../shaders/atmospherePlane.wgsl';
 import { Renderer } from '../..';
-import { ProjModelView } from '../uniforms/ProjModelView';
-import { PerMeshTracker } from '../PerMeshTracker';
-import { SharedUniformsTracker } from '../SharedUniformsTracker';
+import { ProjModelView } from '../../materials/uniforms/ProjModelView';
+import { PerMeshTracker } from '../../materials/PerMeshTracker';
+import { SharedUniformsTracker } from '../../materials/SharedUniformsTracker';
 import { Mesh } from '../../core/Mesh';
 import { Camera } from '../../core/Camera';
-import { Diffuse } from '../uniforms/Diffuse';
+import { Diffuse } from '../../materials/uniforms/Diffuse';
 import { samplerManager } from '../../textures/SamplerManager';
 import { textureManager } from '../../textures/TextureManager';
 import { Matrix4 } from 'rewild-common';

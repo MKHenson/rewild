@@ -1,7 +1,7 @@
 import { Renderer } from '..';
 import { BoxGeometryFactory } from '../geometry/BoxGeometryFactory';
 import { Geometry } from '../geometry/Geometry';
-import { SkyRenderer } from '../materials/sky/SkyRenderer';
+import { SkyRenderer } from '../renderers/sky/SkyRenderer';
 import { Camera } from './Camera';
 import { Transform } from './Transform';
 

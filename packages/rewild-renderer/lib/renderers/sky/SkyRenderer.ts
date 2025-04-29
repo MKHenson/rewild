@@ -1,7 +1,7 @@
 import { Geometry } from '../../geometry/Geometry';
 import { Renderer } from '../..';
-import { PerMeshTracker } from '../PerMeshTracker';
-import { SharedUniformsTracker } from '../SharedUniformsTracker';
+import { PerMeshTracker } from '../../materials/PerMeshTracker';
+import { SharedUniformsTracker } from '../../materials/SharedUniformsTracker';
 import { Transform } from '../../core/Transform';
 import { Camera } from '../../core/Camera';
 import { degToRad, Vector3 } from 'rewild-common';
@@ -113,16 +113,6 @@ export class SkyRenderer {
     transform: Transform
   ) {
     this.elevation += renderer.delta * 0.002;
-
-    // change the cloudiness over time between 0 and 1
-    if (this.cloudiness > 1) {
-      this.addingCloudiness = false;
-    } else if (this.cloudiness < 0) {
-      this.addingCloudiness = true;
-    }
-
-    this.cloudiness +=
-      renderer.delta * (this.addingCloudiness ? 0.0001 : -0.0001);
 
     const phi = degToRad(90 - this.elevation);
     const theta = degToRad(this.azimuth);
