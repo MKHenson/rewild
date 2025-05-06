@@ -32,7 +32,8 @@ export class ProjectsStore extends Store<IProjectStore> {
 
   async getProjects(page?: QueryDocumentSnapshot<IProject>) {
     this.defaultProxy.loading = true;
-    this.defaultProxy.projects = await getProjectsApi(false, page);
+    const resp = await getProjectsApi(false, page);
+    this.defaultProxy.projects = resp;
     this.defaultProxy.loading = false;
   }
 
@@ -57,7 +58,7 @@ export class ProjectsStore extends Store<IProjectStore> {
         activeOnStartup: token.activeOnStartup || true,
       };
       const levelResp = await addLevel(newLevel);
-      patchProject(resp, { level: levelResp.id });
+      patchProject(resp.id, { level: levelResp.id });
 
       await this.getProjects();
     } catch (err: any) {

@@ -55,13 +55,7 @@ export class MainMenu extends Component<Props> {
               <Button onClick={onOptionsClick} fullWidth disabled>
                 <span>Options</span>
               </Button>
-              <Button
-                disabled={
-                  !authState.loggedIn ||
-                  authState.user?.email !== 'mat@webinate.net'
-                }
-                onClick={props.onEditor}
-                fullWidth>
+              <Button onClick={props.onEditor} fullWidth>
                 <MaterialIcon size="s" icon="build_circle" />
                 <span>Editor</span>
               </Button>
