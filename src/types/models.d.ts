@@ -70,6 +70,29 @@ declare module 'models' {
     template: () => ITreeNode;
   }
 
+  export interface IDataTable<T> {
+    getOne(id: string): Promise<(T & { id: string }) | null>;
+    getMany(query: IDataTableQuery<T>): Promise<{
+      items: (T & { id: string })[];
+      cursor: string | number | Partial<T>;
+    }>;
+
+    remove(id: string): Promise<boolean>;
+    add(token: T): Promise<T & { id: string }>;
+    patch(id: string, token: Partial<T>): Promise<void>;
+  }
+
+  export interface IDataTableQuery<Query> {
+    limit?: number;
+    cursor?: string | number | unknown;
+    where?: [
+      keyof Query,
+      '==' | '!=' | '<' | '<=' | '>' | '>=',
+      number | string | boolean
+    ][];
+    sort?: [keyof Query, 'asc' | 'desc'][];
+  }
+
   export interface IProject {
     id?: string;
     level: string;

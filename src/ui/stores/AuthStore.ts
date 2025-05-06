@@ -6,23 +6,34 @@ import {
 import { auth } from '../../firebase';
 import { Store } from 'rewild-ui';
 
+interface IUser {
+  displayName: string | null;
+  email: string | null;
+  photoURL: string | null;
+  emailVerified: boolean;
+  type: 'guest' | 'user';
+}
+
 interface IAuth {
   loading: boolean;
   loggedIn: boolean;
-  user: {
-    displayName: string | null;
-    email: string | null;
-    photoURL: string | null;
-    emailVerified: boolean;
-  } | null;
+  user: IUser;
 }
+
+const guestUser: IUser = {
+  displayName: 'Guest',
+  email: null,
+  photoURL: null,
+  emailVerified: false,
+  type: 'guest',
+};
 
 export class AuthStore extends Store<IAuth> {
   constructor() {
     super({
       loading: true,
       loggedIn: false,
-      user: null,
+      user: guestUser,
     });
 
     onAuthStateChanged(auth, (user) => {
@@ -33,10 +44,11 @@ export class AuthStore extends Store<IAuth> {
           email: user.email,
           emailVerified: user.emailVerified,
           photoURL: user.photoURL,
+          type: 'user',
         };
       } else {
         this.defaultProxy.loggedIn = false;
-        this.defaultProxy.user = null;
+        this.defaultProxy.user = { ...guestUser };
       }
 
       this.defaultProxy.loading = false;
