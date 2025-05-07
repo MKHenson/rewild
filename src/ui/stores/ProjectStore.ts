@@ -14,7 +14,6 @@ import {
   patchProject,
   getProject as getProjectApi,
 } from '../../api';
-import { Timestamp } from 'firebase/firestore';
 import { sceneGraphStore } from './SceneGraphStore';
 import { createExporterObj } from '../utils/exportHelper';
 
@@ -51,9 +50,9 @@ export class ProjectStore extends Store<IProjectStore> {
 
     try {
       const resp = await getProjectApi(projectId);
-      this.defaultProxy.project = { ...resp, id: projectId };
+      this.defaultProxy.project = { ...(resp as IProject), id: projectId };
 
-      await this.getLevel(resp.id);
+      await this.getLevel(resp!.id);
     } catch (err: any) {
       this.defaultProxy.error = err.toString();
     }
@@ -68,7 +67,7 @@ export class ProjectStore extends Store<IProjectStore> {
 
   async updateProject() {
     const project = this.defaultProxy.project!;
-    project.lastModified = Timestamp.now();
+    project.lastModified = Date.now();
 
     const { id, ...token } = project;
     const containers = sceneGraphStore.defaultProxy.nodes.find(
@@ -104,7 +103,7 @@ export class ProjectStore extends Store<IProjectStore> {
 
     try {
       await patchLevel(project.level!, {
-        lastModified: Timestamp.now(),
+        lastModified: Date.now(),
         containers:
           containers?.map(
             (c) =>

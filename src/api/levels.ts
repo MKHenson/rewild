@@ -1,55 +1,37 @@
-import {
-  addDoc,
-  deleteDoc,
-  doc,
-  DocumentReference,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  QueryConstraint,
-  QueryDocumentSnapshot,
-  startAfter,
-  updateDoc,
-  where,
-} from "firebase/firestore";
-import { dbs } from "../firebase";
-import { ILevel } from "models";
+import { ILevel } from 'models';
+import { db } from '../database/database';
 
 export async function getLevel(projectId: string) {
-  const resp = await query<ILevel>(dbs.levels, where("project", "==", projectId));
-  const toRet = await getDocs(resp);
-  const levels = toRet.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+  const allLevels = await db.levels.getMany({
+    where: [['project', '==', projectId]],
+  });
 
-  if (levels.length === 0) throw new Error("No level found for project");
+  const levels = allLevels.items;
+
+  if (levels.length === 0) throw new Error('No level found for this project');
+
   return levels.at(0)!;
 }
 
-export async function getLevels(projectId: string, page?: QueryDocumentSnapshot<ILevel>) {
-  const resp = await query<ILevel>(
-    dbs.levels,
-    ...([
-      where("project", "==", projectId),
-      orderBy("created", "desc"),
-      limit(30),
-      page ? startAfter(page) : undefined,
-    ].filter((q) => !!q) as QueryConstraint[])
-  );
-  const toRet = await getDocs(resp);
-  return toRet.docs.map((doc) => ({ ...doc.data(), id: doc.id }));
+export async function getLevels(projectId: string, page?: any) {
+  const allLevels = await db.levels.getMany({
+    where: [['project', '==', projectId]],
+    cursor: page,
+    limit: 30,
+    sort: [['created', 'desc']],
+  });
+
+  return allLevels.items;
 }
 
 export async function addLevel(token: Partial<ILevel>) {
-  const resp = await addDoc(dbs.levels, token);
-  return resp;
+  return await db.levels.add(token as ILevel);
 }
 
 export async function deleteLevel(id: string) {
-  const docRef = await doc(dbs.levels, id);
-  await deleteDoc(docRef);
+  await db.levels.remove(id);
 }
 
-export async function patchLevel(id: DocumentReference<Partial<ILevel>> | string, token: Partial<ILevel>) {
-  const docRef = typeof id === "string" ? await doc(dbs.levels, id) : id;
-  await updateDoc(docRef, token);
+export async function patchLevel(id: string, token: Partial<ILevel>) {
+  await db.levels.patch(id, token as ILevel);
 }

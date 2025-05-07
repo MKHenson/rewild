@@ -9,7 +9,6 @@ import {
   getProjects as getProjectsApi,
   patchProject,
 } from '../../api';
-import { Timestamp, QueryDocumentSnapshot } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase';
 
@@ -30,7 +29,7 @@ export class ProjectsStore extends Store<IProjectStore> {
     });
   }
 
-  async getProjects(page?: QueryDocumentSnapshot<IProject>) {
+  async getProjects(page?: any) {
     this.defaultProxy.loading = true;
     const resp = await getProjectsApi(false, page);
     this.defaultProxy.projects = resp;
@@ -43,8 +42,8 @@ export class ProjectsStore extends Store<IProjectStore> {
     this.defaultProxy.error = '';
 
     try {
-      token.created = Timestamp.now();
-      token.lastModified = Timestamp.now();
+      token.created = Date.now();
+      token.lastModified = Date.now();
       const resp = await addProjectApi(token);
 
       const newLevel: ILevel = {
@@ -52,8 +51,8 @@ export class ProjectsStore extends Store<IProjectStore> {
         hasTerrain: true,
         name: token.name || '',
         startEvent: token.startEvent || '',
-        created: Timestamp.now(),
-        lastModified: Timestamp.now(),
+        created: Date.now(),
+        lastModified: Date.now(),
         project: resp.id,
         activeOnStartup: token.activeOnStartup || true,
       };
@@ -75,7 +74,7 @@ export class ProjectsStore extends Store<IProjectStore> {
     try {
       const project = await getProject(id);
       await deleteProject(id);
-      await deleteLevel(project.level);
+      await deleteLevel(project!.level);
       await this.getProjects();
     } catch (err: any) {
       this.defaultProxy.error = err.toString();
@@ -86,7 +85,7 @@ export class ProjectsStore extends Store<IProjectStore> {
 
   async updateProject(project: IProject) {
     const { id, ...token } = project;
-    token.lastModified = Timestamp.now();
+    token.lastModified = Date.now();
     await patchProject(id!, token);
   }
 

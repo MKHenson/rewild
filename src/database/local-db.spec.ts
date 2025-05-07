@@ -191,4 +191,45 @@ describe('Local database tests', () => {
     expect(rows.items[0]).toStrictEqual(allRows.items.at(-1));
     expect(rows.cursor).toEqual(allRows.items.length);
   });
+
+  it('can sort items', async () => {
+    const local = getLocalTable();
+
+    for (let i = 0; i < 4; i++) {
+      await local.add({ name: 'Cleo ' + i, type: 'sorted cat', age: i });
+    }
+
+    let allRows = await local.getMany({
+      where: [['type', '==', 'sorted cat']],
+      sort: [['age', 'asc']],
+    });
+
+    expect(allRows.items.length).toEqual(4);
+    expect(allRows.items[0].name).toEqual('Cleo 0');
+    expect(allRows.items[1].name).toEqual('Cleo 1');
+    expect(allRows.items[2].name).toEqual('Cleo 2');
+    expect(allRows.items[3].name).toEqual('Cleo 3');
+    expect(allRows.cursor).toEqual(4); // cursor should be 4
+
+    allRows = await local.getMany({
+      where: [['type', '==', 'sorted cat']],
+      sort: [['age', 'desc']],
+    });
+
+    expect(allRows.items.length).toEqual(4);
+    expect(allRows.items[0].name).toEqual('Cleo 3');
+    expect(allRows.items[1].name).toEqual('Cleo 2');
+    expect(allRows.items[2].name).toEqual('Cleo 1');
+    expect(allRows.items[3].name).toEqual('Cleo 0');
+    expect(allRows.cursor).toEqual(4); // cursor should be 4
+
+    allRows = await local.getMany({
+      where: [['type', '==', 'sorted cat']],
+      sort: [['age', 'desc']],
+      cursor: 3,
+    });
+
+    expect(allRows.items.length).toEqual(1);
+    expect(allRows.items[0].name).toEqual('Cleo 0');
+  });
 });

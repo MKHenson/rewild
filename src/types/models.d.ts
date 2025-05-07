@@ -7,7 +7,6 @@ declare module 'models' {
     | 'actors'
     | 'viewport';
   import { LoaderPresetType } from 'src/core/loader-utils/LoaderPresets';
-  import type { Timestamp } from 'firebase/firestore';
   import type { IconType } from 'rewild-ui';
 
   export type FactoryKey = 'actor' | 'container';
@@ -104,8 +103,8 @@ declare module 'models' {
     sceneGraph: {
       containers: ITreeNode[];
     };
-    created: Timestamp;
-    lastModified: Timestamp;
+    created: number;
+    lastModified: number;
   }
 
   export interface ILevel {
@@ -115,8 +114,8 @@ declare module 'models' {
     activeOnStartup: boolean;
     hasTerrain: boolean;
     startEvent: string;
-    created: Timestamp;
-    lastModified: Timestamp;
+    created: number;
+    lastModified: number;
     containers: IContainer[];
   }
 

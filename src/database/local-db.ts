@@ -38,6 +38,19 @@ export class LocalDataTable<T> implements IDataTable<T> {
       idsToFetch.map((id) => this.getOne(id))
     )) as (T & { id: string })[];
 
+    if (q.sort) {
+      for (const [prop, order] of q.sort) {
+        allItems = allItems.sort((a, b) => {
+          const aValue = a[prop as unknown as keyof T];
+          const bValue = b[prop as unknown as keyof T];
+
+          if (aValue < bValue) return order === 'asc' ? -1 : 1;
+          if (aValue > bValue) return order === 'asc' ? 1 : -1;
+          return 0;
+        });
+      }
+    }
+
     let filteredItems = allItems.filter((item) => {
       if (!item) return false;
 
@@ -122,7 +135,7 @@ export class LocalDataTable<T> implements IDataTable<T> {
   async patch(id: string, token: Partial<T>): Promise<void> {
     const existing = await this.getOne(id);
     if (existing) {
-      localStorage.addItem(
+      localStorage.setItem(
         `${this.prefix}.${id}`,
         JSON.stringify({ ...existing, ...token })
       );
