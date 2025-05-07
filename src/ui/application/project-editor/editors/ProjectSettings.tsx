@@ -32,11 +32,11 @@ export class ProjectSettings extends Component<Props> {
               <Typography variant="body2">{project.name}</Typography>
               <Typography variant="label">Last Modified</Typography>
               <Typography variant="body2">
-                <Date date={project.lastModified!.toDate()} />
+                <Date date={project.lastModified!} />
               </Typography>
               <Typography variant="label">Last Published</Typography>
               <Typography variant="body2">
-                <Date date={level?.lastModified?.toDate()} />
+                <Date date={level?.lastModified} />
               </Typography>
               <Typography variant="label">Active on Startup</Typography>
               <Switch
