@@ -1,6 +1,5 @@
 import { Renderer } from '../../Renderer';
 import { Geometry } from '../../geometry/Geometry';
-import { PlaneGeometryFactory } from '../../geometry/PlaneGeometryFactory';
 import shader from '../../shaders/terrain.wgsl';
 import { DataTexture } from '../../textures/DataTexture';
 import { ITexture } from '../../textures/ITexture';
@@ -9,13 +8,19 @@ import { textureManager } from '../../textures/TextureManager';
 import { generateNoiseMap } from './Noise';
 import { samplerManager } from '../../textures/SamplerManager';
 import { Camera } from '../../core/Camera';
+import { generateTerrainMesh } from './MeshGenerator';
+import { ProjModelView } from '../../materials/uniforms/ProjModelView';
+import { Transform } from '../../core/Transform';
 
 export class TerrainRenderer {
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
+  projModelView: ProjModelView;
 
   terrainTexture: ITexture;
   plane: Geometry;
+
+  transform: Transform = new Transform();
 
   constructor() {}
 
@@ -49,12 +54,25 @@ export class TerrainRenderer {
 
     this.terrainTexture.load(device);
 
-    this.plane = PlaneGeometryFactory.new(2, 2, 1, 1);
+    const meshData = generateTerrainMesh(noise, width, height);
+    this.plane = new Geometry();
+
+    this.plane.vertices = new Float32Array(
+      meshData.vertices.map((v) => v.toArray()).flat()
+    );
+    this.plane.uvs = new Float32Array(
+      meshData.uvs.map((v) => v.toArray()).flat()
+    );
+    this.plane.indices = new Uint16Array(meshData.triangles);
+
+    // this.plane = PlaneGeometryFactory.new(2, 2, 1, 1);
     this.plane.build(device);
 
     const module = device.createShaderModule({
       code: shader,
     });
+
+    this.projModelView = new ProjModelView(1);
 
     this.pipeline = device.createRenderPipeline({
       label: 'terrain render pipeline',
@@ -112,10 +130,12 @@ export class TerrainRenderer {
       // is rendered in front.
       depthStencil: {
         depthWriteEnabled: true,
-        depthCompare: 'less',
+        depthCompare: 'greater',
         format: 'depth24plus',
       },
     });
+
+    this.projModelView.build(renderer, this.pipeline.getBindGroupLayout(1));
 
     this.bindGroup = device.createBindGroup({
       label: 'plane bind group',
@@ -135,7 +155,9 @@ export class TerrainRenderer {
 
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {
     pass.setPipeline(this.pipeline);
+    this.projModelView.prepare(renderer, camera, this.transform);
     pass.setBindGroup(0, this.bindGroup);
+    pass.setBindGroup(1, this.projModelView.bindGroup);
     pass.setVertexBuffer(0, this.plane.vertexBuffer);
     pass.setVertexBuffer(1, this.plane.uvBuffer);
     pass.setIndexBuffer(this.plane.indexBuffer, 'uint16');

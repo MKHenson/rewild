@@ -57,7 +57,7 @@ export class PerMeshTracker implements IMeshTracker {
         );
       }
 
-      uniform.prepare(renderer, camera, mesh);
+      uniform.prepare(renderer, camera, mesh.transform);
       pass.setBindGroup(uniform.group, uniform.bindGroup);
     }
   }

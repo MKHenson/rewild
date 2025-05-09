@@ -1,7 +1,7 @@
 import { Renderer } from '../..';
 import { IPerMeshUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
-import { Mesh } from '../../core/Mesh';
+import { Transform } from '../../core/Transform';
 
 export class ProjModelView implements IPerMeshUniformBuffer {
   buffer: GPUBuffer;
@@ -45,10 +45,10 @@ export class ProjModelView implements IPerMeshUniformBuffer {
     });
   }
 
-  prepare(renderer: Renderer, camera: Camera, mesh: Mesh): void {
+  prepare(renderer: Renderer, camera: Camera, transform: Transform): void {
     const { device } = renderer;
     const cameraElements = camera.projectionMatrix.elements;
-    const modelViewElements = mesh.transform.modelViewMatrix.elements;
+    const modelViewElements = transform.modelViewMatrix.elements;
 
     device.queue.writeBuffer(
       this.buffer,
