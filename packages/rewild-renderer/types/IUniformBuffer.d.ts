@@ -1,6 +1,7 @@
 import { Renderer } from '../lib';
 import { Camera } from '../lib/core/Camera';
 import { Mesh } from '../lib/core/Mesh';
+import { Transform } from '../lib/core/Transform';
 
 export interface IUniformBuffer {
   group: number;
@@ -11,7 +12,7 @@ export interface IUniformBuffer {
 }
 
 export interface IPerMeshUniformBuffer extends IUniformBuffer {
-  prepare(renderer: Renderer, camera: Camera, mesh: Mesh): void;
+  prepare(renderer: Renderer, camera: Camera, mesh: Transform): void;
 }
 
 export interface ISharedUniformBuffer extends IUniformBuffer {
