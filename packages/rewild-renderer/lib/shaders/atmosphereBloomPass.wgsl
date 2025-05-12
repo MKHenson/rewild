@@ -17,7 +17,7 @@ var<uniform> object: ObjectStruct;
   @builtin(position) fragCoord: vec4<f32> 
   ) -> @location(0) vec4f {
   let uv = fragCoord.xy / object.resolution.xy;
-  let blurRadius = vec2f(10.0) / object.resolution.xy;
+  let blurRadius = vec2f(5.0) / object.resolution.xy;
   let time = object.iTime * 0.001;
 
   var sum = vec4f(0.0);
@@ -33,7 +33,7 @@ var<uniform> object: ObjectStruct;
       sum += textureSampleLevel( ourTexture, ourSampler, uv, 0.0);
   }
 
-  let BLOOM_AMOUNT = 0.01; 
+  let BLOOM_AMOUNT = 0.03; 
   let originalColor = textureSampleLevel( ourTexture, ourSampler, uv, 0.0);
   sum = vec4f( mix(originalColor.xyz, sum.xyz / NUM_SAMPLES, BLOOM_AMOUNT), originalColor.w );
 

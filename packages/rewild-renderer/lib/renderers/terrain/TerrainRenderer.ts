@@ -65,7 +65,6 @@ export class TerrainRenderer {
     );
     this.plane.indices = new Uint16Array(meshData.triangles);
 
-    // this.plane = PlaneGeometryFactory.new(2, 2, 1, 1);
     this.plane.build(device);
 
     const module = device.createShaderModule({
@@ -130,16 +129,16 @@ export class TerrainRenderer {
       // is rendered in front.
       depthStencil: {
         depthWriteEnabled: true,
-        depthCompare: 'greater',
+        depthCompare: 'less',
         format: 'depth24plus',
       },
     });
 
-    this.projModelView.build(renderer, this.pipeline.getBindGroupLayout(1));
+    this.projModelView.build(renderer, this.pipeline.getBindGroupLayout(0));
 
     this.bindGroup = device.createBindGroup({
-      label: 'plane bind group',
-      layout: this.pipeline.getBindGroupLayout(0),
+      label: 'terrain textures',
+      layout: this.pipeline.getBindGroupLayout(1),
       entries: [
         {
           binding: 0,
@@ -154,10 +153,16 @@ export class TerrainRenderer {
   }
 
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {
+    this.transform.updateMatrixWorld();
+    this.transform.modelViewMatrix.multiplyMatrices(
+      camera.matrixWorldInverse,
+      this.transform.matrixWorld
+    );
+
     pass.setPipeline(this.pipeline);
     this.projModelView.prepare(renderer, camera, this.transform);
-    pass.setBindGroup(0, this.bindGroup);
-    pass.setBindGroup(1, this.projModelView.bindGroup);
+    pass.setBindGroup(1, this.bindGroup);
+    pass.setBindGroup(0, this.projModelView.bindGroup);
     pass.setVertexBuffer(0, this.plane.vertexBuffer);
     pass.setVertexBuffer(1, this.plane.uvBuffer);
     pass.setIndexBuffer(this.plane.indexBuffer, 'uint16');

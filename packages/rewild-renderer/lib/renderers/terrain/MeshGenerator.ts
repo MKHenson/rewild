@@ -13,13 +13,13 @@ export function generateTerrainMesh(
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const heightValue = heightmap[y * width + x];
-      meshData.vertices[vertexIndex].set(
+      const heightValue = heightmap[y * width + x] * 10;
+      meshData.vertices[vertexIndex] = new Vector3(
         topLeftX + x,
         heightValue,
         topLeftZ - y
       );
-      meshData.uvs[vertexIndex].set(x / width, y / height);
+      meshData.uvs[vertexIndex] = new Vector2(x / width, y / height);
 
       if (x < width - 1 && y < height - 1) {
         meshData.addTriangle(
@@ -49,8 +49,8 @@ export class MeshData {
   triangleIndex: number = 0;
 
   constructor(width: number, height: number) {
-    this.vertices = new Array(width * height).fill(new Vector3(0, 0, 0));
-    this.uvs = new Array(width * height).fill(new Vector2(0, 0));
+    this.vertices = new Array(width * height);
+    this.uvs = new Array(width * height);
     this.triangles = new Array((width - 1) * (height - 1) * 6).fill(0);
   }
 

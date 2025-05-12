@@ -12,7 +12,7 @@ export class CloudsRenderer {
   resolutionScale: number;
 
   constructor() {
-    this.resolutionScale = 0.5;
+    this.resolutionScale = 0.8;
   }
 
   init(renderer: Renderer, uniformBuffer: GPUBuffer) {
