@@ -22,20 +22,38 @@ export class TerrainRenderer {
 
   transform: Transform = new Transform();
 
+  readonly mapChunkSize = 241;
+  #_levelOfDetail: number = 0; // Must be any int from 0 to 6
+
+  simplify: HTMLButtonElement | null = null;
+
   constructor() {}
 
   init(renderer: Renderer) {
     const { device, presentationFormat } = renderer;
 
-    const width = 100;
-    const height = 100;
+    if (!this.simplify) {
+      this.simplify = document.createElement('button');
+      this.simplify.innerText = 'Simplify';
+      this.simplify.style.position = 'absolute';
+      this.simplify.style.top = '0px';
+      this.simplify.onclick = () => {
+        this.levelOfDetail = this.#_levelOfDetail + 1;
+        this.init(renderer);
+      };
+      document.body.appendChild(this.simplify);
+    }
 
-    const noise = generateNoiseMap(width, height, 24);
+    const mapChunkSize = this.mapChunkSize;
+    // const width = mapChunkSize;
+    // const height = mapChunkSize;
+
+    const noise = generateNoiseMap(mapChunkSize, mapChunkSize, 24);
 
     // Convert this noise map of f32 to a u8 texture. Each pixel will be a shader of grey
     // (0-255) based on the noise value.
-    const data = new Uint8Array(width * height * 4);
-    for (let i = 0; i < width * height; i++) {
+    const data = new Uint8Array(mapChunkSize * mapChunkSize * 4);
+    for (let i = 0; i < mapChunkSize * mapChunkSize; i++) {
       const value = Math.floor(Math.min(1, Math.max(0, noise[i])) * 255);
       data[i * 4] = value;
       data[i * 4 + 1] = value;
@@ -47,14 +65,19 @@ export class TerrainRenderer {
       new DataTexture(
         new TextureProperties('terrain1', false),
         data,
-        width,
-        height
+        mapChunkSize,
+        mapChunkSize
       )
     );
 
     this.terrainTexture.load(device);
 
-    const meshData = generateTerrainMesh(noise, width, height);
+    const meshData = generateTerrainMesh(
+      noise,
+      mapChunkSize,
+      mapChunkSize,
+      this.#_levelOfDetail
+    );
     this.plane = new Geometry();
 
     this.plane.vertices = new Float32Array(
@@ -150,6 +173,23 @@ export class TerrainRenderer {
         },
       ],
     });
+  }
+
+  get levelOfDetail() {
+    return this.#_levelOfDetail;
+  }
+
+  set levelOfDetail(value: number) {
+    this.#_levelOfDetail = value;
+
+    if (this.#_levelOfDetail > 6) {
+      this.#_levelOfDetail = 6;
+    } else if (this.#_levelOfDetail < 0) {
+      this.#_levelOfDetail = 0;
+    }
+
+    // Ensure its an integer
+    this.#_levelOfDetail = Math.floor(this.#_levelOfDetail);
   }
 
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {

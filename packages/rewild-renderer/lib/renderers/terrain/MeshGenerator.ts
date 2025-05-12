@@ -3,17 +3,22 @@ import { Vector2, Vector3 } from 'rewild-common';
 export function generateTerrainMesh(
   heightmap: Float32Array,
   width: number,
-  height: number
+  height: number,
+  levelOfDetail: number,
+  noiseScale: number = 10
 ) {
   const topLeftX = (width - 1) / -2;
   const topLeftZ = (height - 1) / 2;
 
-  const meshData = new MeshData(width, height);
+  let meshSimplificationIncrement = levelOfDetail === 0 ? 1 : levelOfDetail * 2;
+  let verticesPerLine = (width - 1) / meshSimplificationIncrement + 1;
+
+  const meshData = new MeshData(verticesPerLine, verticesPerLine);
   let vertexIndex = 0;
 
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const heightValue = heightmap[y * width + x] * 10;
+  for (let y = 0; y < height; y += meshSimplificationIncrement) {
+    for (let x = 0; x < width; x += meshSimplificationIncrement) {
+      const heightValue = heightmap[y * width + x] * noiseScale;
       meshData.vertices[vertexIndex] = new Vector3(
         topLeftX + x,
         heightValue,
@@ -24,11 +29,11 @@ export function generateTerrainMesh(
       if (x < width - 1 && y < height - 1) {
         meshData.addTriangle(
           vertexIndex,
-          vertexIndex + width + 1,
-          vertexIndex + width
+          vertexIndex + verticesPerLine + 1,
+          vertexIndex + verticesPerLine
         );
         meshData.addTriangle(
-          vertexIndex + width + 1,
+          vertexIndex + verticesPerLine + 1,
           vertexIndex,
           vertexIndex + 1
         );
