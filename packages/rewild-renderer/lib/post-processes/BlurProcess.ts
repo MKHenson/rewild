@@ -24,7 +24,7 @@ export class BlurProcess implements IPostProcess {
   sourceTexture: GPUTexture | null;
 
   constructor() {
-    this.scaleFactor = 1;
+    this.scaleFactor = 0.8;
     this.sourceTexture = null;
   }
 

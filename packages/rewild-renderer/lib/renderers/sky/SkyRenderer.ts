@@ -95,11 +95,15 @@ export class SkyRenderer {
     this.bloomPass.sourceTexture = this.cloudsPass.renderTarget;
     this.bloomPass.init(renderer);
 
-    this.blurPass.sourceTexture = this.bloomPass.renderTarget;
-    this.blurPass.init(renderer);
+    // this.blurPass.sourceTexture = this.bloomPass.renderTarget;
+    // this.blurPass.init(renderer);
+
+    this.taaPass.sourceTexture = this.bloomPass.renderTarget;
+    this.taaPass.init(renderer);
 
     this.finalPass.atmosphereTexture = this.atmospherePass.renderTarget;
     this.finalPass.cloudsTexture = this.blurPass.renderTarget;
+    this.finalPass.cloudsTexture = this.taaPass.renderTarget;
     this.finalPass.init(renderer);
   }
 
@@ -177,7 +181,8 @@ export class SkyRenderer {
     device.queue.submit([commandBuffer]);
 
     this.bloomPass.render(renderer);
-    this.blurPass.render(renderer);
+    // this.blurPass.render(renderer);
+    this.taaPass.render(renderer);
 
     this.finalPass.azimuth = this.azimuth;
     this.finalPass.elevation = this.elevation;

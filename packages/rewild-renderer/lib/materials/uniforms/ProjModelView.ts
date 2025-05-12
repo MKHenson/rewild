@@ -33,6 +33,7 @@ export class ProjModelView implements IPerMeshUniformBuffer {
     });
 
     this.bindGroup = device.createBindGroup({
+      label: 'proj-model-view bind group',
       layout: pipelineLayout,
       entries: [
         {

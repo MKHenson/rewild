@@ -1,6 +1,6 @@
  
 const NUM_CLOUD_SAMPLES = 80;
-const NUM_LIGHT_SAMPLES = 25;
+const NUM_LIGHT_SAMPLES = 20;
 
 struct CloudResult {
     density: f32,

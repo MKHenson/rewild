@@ -35,5 +35,5 @@ fn vs(
 fn fs(
   @location(0) fragUV: vec2f
 ) -> @location(0) vec4f {
-  return textureSample(myTexture, mySampler, fragUV) * vec4f(1.0, 1.0, 1.0, 1);
+  return textureSample(myTexture, mySampler, fragUV);
 }
