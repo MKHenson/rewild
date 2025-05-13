@@ -1,36 +1,44 @@
 import { Renderer } from '../../Renderer';
 import { Geometry } from '../../geometry/Geometry';
-import shader from '../../shaders/terrain.wgsl';
 import { DataTexture } from '../../textures/DataTexture';
 import { ITexture } from '../../textures/ITexture';
 import { TextureProperties } from '../../textures/Texture';
 import { textureManager } from '../../textures/TextureManager';
 import { generateNoiseMap } from './Noise';
-import { samplerManager } from '../../textures/SamplerManager';
 import { Camera } from '../../core/Camera';
 import { generateTerrainMesh } from './MeshGenerator';
-import { ProjModelView } from '../../materials/uniforms/ProjModelView';
-import { Transform } from '../../core/Transform';
+import { Mesh } from '../../core/Mesh';
+import { TerrainPass } from '../../materials/TerrainPass';
+import { Box3, Vector2, Vector3 } from 'rewild-common';
+import { PlaneGeometryFactory } from '../../geometry/PlaneGeometryFactory';
+import { DiffusePass } from '../../materials/DiffusePass';
+import { samplerManager } from '../../textures/SamplerManager';
 
 export class TerrainRenderer {
-  pipeline: GPURenderPipeline;
-  bindGroup: GPUBindGroup;
-  projModelView: ProjModelView;
-
   terrainTexture: ITexture;
-  plane: Geometry;
+  geometry: Geometry;
+  mesh: Mesh;
 
-  transform: Transform = new Transform();
+  maxViewDst = 300;
+  viewerPosition: Vector3;
+  chunkSize: i32;
+  chunksVisibleInViewDst: i32;
+  terrainChunks: Map<string, TerrainChunk>;
+  terrainChunksVisibleLastUpdate: TerrainChunk[];
 
-  readonly mapChunkSize = 241;
-  #_levelOfDetail: number = 0; // Must be any int from 0 to 6
+  readonly mapChunkSizeLod = 241;
+  private _levelOfDetail: number = 0; // Must be any int from 0 to 6
 
   simplify: HTMLButtonElement | null = null;
 
-  constructor() {}
+  constructor() {
+    this.terrainChunks = new Map();
+    this.viewerPosition = new Vector3();
+    this.terrainChunksVisibleLastUpdate = [];
+  }
 
   init(renderer: Renderer) {
-    const { device, presentationFormat } = renderer;
+    const { device } = renderer;
 
     if (!this.simplify) {
       this.simplify = document.createElement('button');
@@ -38,15 +46,15 @@ export class TerrainRenderer {
       this.simplify.style.position = 'absolute';
       this.simplify.style.top = '0px';
       this.simplify.onclick = () => {
-        this.levelOfDetail = this.#_levelOfDetail + 1;
+        this.levelOfDetail = this._levelOfDetail + 1;
         this.init(renderer);
       };
       document.body.appendChild(this.simplify);
     }
 
-    const mapChunkSize = this.mapChunkSize;
-    // const width = mapChunkSize;
-    // const height = mapChunkSize;
+    const mapChunkSize = this.mapChunkSizeLod;
+    this.chunkSize = mapChunkSize - 1;
+    this.chunksVisibleInViewDst = Math.round(this.maxViewDst / mapChunkSize); // 4 chunks visible in view distance
 
     const noise = generateNoiseMap(mapChunkSize, mapChunkSize, 24);
 
@@ -76,136 +84,139 @@ export class TerrainRenderer {
       noise,
       mapChunkSize,
       mapChunkSize,
-      this.#_levelOfDetail
+      this._levelOfDetail
     );
-    this.plane = new Geometry();
+    this.geometry = new Geometry();
 
-    this.plane.vertices = new Float32Array(
+    this.geometry.vertices = new Float32Array(
       meshData.vertices.map((v) => v.toArray()).flat()
     );
-    this.plane.uvs = new Float32Array(
+    this.geometry.uvs = new Float32Array(
       meshData.uvs.map((v) => v.toArray()).flat()
     );
-    this.plane.indices = new Uint16Array(meshData.triangles);
+    this.geometry.indices = new Uint16Array(meshData.triangles);
+    this.geometry.build(device);
 
-    this.plane.build(device);
-
-    const module = device.createShaderModule({
-      code: shader,
-    });
-
-    this.projModelView = new ProjModelView(1);
-
-    this.pipeline = device.createRenderPipeline({
-      label: 'terrain render pipeline',
-      layout: 'auto',
-      vertex: {
-        entryPoint: 'vs',
-        module,
-        buffers: [
-          {
-            arrayStride: 4 * 3,
-            attributes: [
-              {
-                // position
-                shaderLocation: 0,
-                offset: 0,
-                format: 'float32x3',
-              },
-            ],
-          },
-          {
-            arrayStride: 4 * 2,
-            attributes: [
-              {
-                // uv
-                shaderLocation: 1,
-                offset: 0,
-                format: 'float32x2',
-              },
-            ],
-          },
-        ],
-      },
-      fragment: {
-        entryPoint: 'fs',
-        module,
-        targets: [
-          {
-            format: presentationFormat,
-          },
-        ],
-      },
-      multisample: {
-        count: renderer.sampleCount,
-      },
-      primitive: {
-        topology: 'triangle-list',
-
-        // Backface culling since the cube is solid piece of geometry.
-        // Faces pointing away from the camera will be occluded by faces
-        // pointing toward the camera.
-        cullMode: 'back',
-        frontFace: 'ccw',
-      },
-      // Enable depth testing so that the fragment closest to the camera
-      // is rendered in front.
-      depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: 'less',
-        format: 'depth24plus',
-      },
-    });
-
-    this.projModelView.build(renderer, this.pipeline.getBindGroupLayout(0));
-
-    this.bindGroup = device.createBindGroup({
-      label: 'terrain textures',
-      layout: this.pipeline.getBindGroupLayout(1),
-      entries: [
-        {
-          binding: 0,
-          resource: samplerManager.get('nearest-simple'),
-        },
-        {
-          binding: 1,
-          resource: this.terrainTexture.gpuTexture.createView(),
-        },
-      ],
-    });
+    const terrainPass = new TerrainPass();
+    terrainPass.terrainUniforms.texture = this.terrainTexture.gpuTexture;
+    this.mesh = new Mesh(this.geometry, terrainPass);
+    renderer.scene.addChild(this.mesh.transform);
   }
 
   get levelOfDetail() {
-    return this.#_levelOfDetail;
+    return this._levelOfDetail;
   }
 
   set levelOfDetail(value: number) {
-    this.#_levelOfDetail = value;
+    this._levelOfDetail = value;
 
-    if (this.#_levelOfDetail > 6) {
-      this.#_levelOfDetail = 6;
-    } else if (this.#_levelOfDetail < 0) {
-      this.#_levelOfDetail = 0;
+    if (this._levelOfDetail > 6) {
+      this._levelOfDetail = 6;
+    } else if (this._levelOfDetail < 0) {
+      this._levelOfDetail = 0;
     }
 
     // Ensure its an integer
-    this.#_levelOfDetail = Math.floor(this.#_levelOfDetail);
+    this._levelOfDetail = Math.floor(this._levelOfDetail);
   }
 
-  render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {
-    this.transform.updateMatrixWorld();
-    this.transform.modelViewMatrix.multiplyMatrices(
-      camera.matrixWorldInverse,
-      this.transform.matrixWorld
+  private updateVisibleChunks(camera: Camera, renderer: Renderer) {
+    this.viewerPosition.set(
+      camera.transform.position.x,
+      0,
+      camera.transform.position.z
     );
 
-    pass.setPipeline(this.pipeline);
-    this.projModelView.prepare(renderer, camera, this.transform);
-    pass.setBindGroup(1, this.bindGroup);
-    pass.setBindGroup(0, this.projModelView.bindGroup);
-    pass.setVertexBuffer(0, this.plane.vertexBuffer);
-    pass.setVertexBuffer(1, this.plane.uvBuffer);
-    pass.setIndexBuffer(this.plane.indexBuffer, 'uint16');
-    pass.drawIndexed(this.plane.indices!.length);
+    for (const chunk of this.terrainChunksVisibleLastUpdate) {
+      chunk.setVisible(false);
+    }
+
+    // Clear the last update array
+    this.terrainChunksVisibleLastUpdate.length = 0;
+
+    const currentChunkCoordX = Math.round(
+      this.viewerPosition.x / this.chunkSize
+    );
+    const currentChunkCoordY = Math.round(
+      this.viewerPosition.z / this.chunkSize
+    );
+
+    const chunksVisibleInViewDst = this.chunksVisibleInViewDst;
+
+    for (
+      let yOffset = -chunksVisibleInViewDst;
+      yOffset <= chunksVisibleInViewDst;
+      yOffset++
+    ) {
+      for (
+        let xOffset = -chunksVisibleInViewDst;
+        xOffset <= chunksVisibleInViewDst;
+        xOffset++
+      ) {
+        const viewedChunkCoord = new Vector2(
+          currentChunkCoordX + xOffset,
+          currentChunkCoordY + yOffset
+        );
+
+        const mapId = `${viewedChunkCoord.x}:${viewedChunkCoord.y}`;
+
+        if (this.terrainChunks.has(mapId)) {
+          const chunk = this.terrainChunks.get(mapId)!;
+          chunk.updateTerrainChunk(this.viewerPosition, this);
+
+          if (chunk.mesh.visible) {
+            this.terrainChunksVisibleLastUpdate.push(chunk);
+          }
+        } else {
+          const newChunk = new TerrainChunk(viewedChunkCoord, this.chunkSize);
+          renderer.scene.addChild(newChunk.mesh.transform);
+          this.terrainChunks.set(mapId, newChunk);
+        }
+      }
+    }
+  }
+
+  update(renderer: Renderer, camera: Camera) {
+    this.updateVisibleChunks(camera, renderer);
+  }
+
+  render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {}
+}
+
+export class TerrainChunk {
+  position: Vector2;
+  mesh: Mesh;
+  bounds: Box3;
+
+  constructor(coord: Vector2, size: i32) {
+    this.position = coord.multiplyScalar(size);
+
+    const diffuse = new DiffusePass();
+    diffuse.diffuse.sampler = samplerManager.get('nearest-simple');
+    this.mesh = new Mesh(PlaneGeometryFactory.new(1, 1), diffuse);
+    this.mesh.transform.position.set(this.position.x, 0, this.position.y);
+    this.mesh.transform.rotateX(-Math.PI / 2);
+    this.mesh.transform.scale.set(size, size, size);
+
+    this.bounds = new Box3();
+    this.bounds.setFromCenterAndSize(
+      this.mesh.transform.position,
+      this.mesh.transform.scale
+    );
+    this.setVisible(false);
+  }
+
+  updateTerrainChunk(viewerPos: Vector3, terrainRenderer: TerrainRenderer) {
+    const viewerDistFromNearestEdge = this.bounds.distanceToPoint(viewerPos);
+    const isVisible = viewerDistFromNearestEdge <= terrainRenderer.maxViewDst;
+    this.setVisible(isVisible);
+  }
+
+  setVisible(visible: boolean) {
+    if (visible) {
+      this.mesh.visible = true;
+    } else {
+      this.mesh.visible = false;
+    }
   }
 }

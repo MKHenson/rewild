@@ -6,6 +6,7 @@ export class Mesh implements IVisual {
   geometry: Geometry;
   material: IMaterialPass;
   transform: Transform;
+  visible: boolean;
 
   constructor(
     geometry: Geometry,
@@ -14,6 +15,7 @@ export class Mesh implements IVisual {
   ) {
     this.geometry = geometry;
     this.transform = transform;
+    this.visible = true;
 
     transform.renderable = this;
 

@@ -125,6 +125,8 @@ export class Renderer {
 
     this.camController.update();
 
+    this.terrainRenderer.update(this, this.perspectiveCam.camera);
+
     this.render();
     requestAnimationFrame(this.onFrameHandler);
   }
@@ -206,6 +208,9 @@ export class Renderer {
 
       if (transform.renderable && transform.renderable instanceof Mesh) {
         mesh = transform.renderable as Mesh;
+
+        if (mesh.visible === false) continue;
+
         geometry = mesh.geometry;
         material = mesh.material;
 

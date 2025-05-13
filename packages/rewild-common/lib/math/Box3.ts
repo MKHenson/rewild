@@ -1,8 +1,8 @@
-import { Matrix4 } from "./Matrix4";
-import { Plane } from "./Plane";
-import { Sphere } from "./Sphere";
-import { Triangle } from "./Triangle";
-import { Vector3 } from "./Vector3";
+import { Matrix4 } from './Matrix4';
+import { Plane } from './Plane';
+import { Sphere } from './Sphere';
+import { Triangle } from './Triangle';
+import { Vector3 } from './Vector3';
 
 export class Box3 {
   isBox3: boolean = true;
@@ -90,15 +90,23 @@ export class Box3 {
   isEmpty(): boolean {
     // this is a more robust check for empty than ( volume <= 0 ) because volume can get positive with two negative axes
 
-    return this.max.x < this.min.x || this.max.y < this.min.y || this.max.z < this.min.z;
+    return (
+      this.max.x < this.min.x ||
+      this.max.y < this.min.y ||
+      this.max.z < this.min.z
+    );
   }
 
   getCenter(target: Vector3): Vector3 {
-    return this.isEmpty() ? target.set(0, 0, 0) : target.addVectors(this.min, this.max).multiplyScalar(0.5);
+    return this.isEmpty()
+      ? target.set(0, 0, 0)
+      : target.addVectors(this.min, this.max).multiplyScalar(0.5);
   }
 
   getSize(target: Vector3): Vector3 {
-    return this.isEmpty() ? target.set(0, 0, 0) : target.subVectors(this.max, this.min);
+    return this.isEmpty()
+      ? target.set(0, 0, 0)
+      : target.subVectors(this.max, this.min);
   }
 
   expandByPoint(point: Vector3): Box3 {
@@ -172,7 +180,9 @@ export class Box3 {
     this.clampPoint(sphere.center, _vector);
 
     // If that point is inside the sphere, the AABB and sphere intersect.
-    return _vector.distanceToSquared(sphere.center) <= sphere.radius * sphere.radius;
+    return (
+      _vector.distanceToSquared(sphere.center) <= sphere.radius * sphere.radius
+    );
   }
 
   intersectsPlane(plane: Plane): boolean {
@@ -373,18 +383,31 @@ const _extents = new Vector3();
 const _triangleNormal = new Vector3();
 const _testAxis = new Vector3();
 
-function satForAxes(axes: f32[], v0: Vector3, v1: Vector3, v2: Vector3, extents: Vector3): boolean {
+function satForAxes(
+  axes: f32[],
+  v0: Vector3,
+  v1: Vector3,
+  v2: Vector3,
+  extents: Vector3
+): boolean {
   for (let i = 0, j = axes.length - 3; i <= j; i += 3) {
     _testAxis.fromArray(axes, i);
     // project the aabb onto the seperating axis
     const r =
-      extents.x * Mathf.abs(_testAxis.x) + extents.y * Mathf.abs(_testAxis.y) + extents.z * Mathf.abs(_testAxis.z);
+      extents.x * Mathf.abs(_testAxis.x) +
+      extents.y * Mathf.abs(_testAxis.y) +
+      extents.z * Mathf.abs(_testAxis.z);
     // project all 3 vertices of the triangle onto the seperating axis
     const p0 = v0.dot(_testAxis);
     const p1 = v1.dot(_testAxis);
     const p2 = v2.dot(_testAxis);
     // actual test, basically see if either of the most extreme of the triangle points intersects r
-    if (Mathf.max(-Mathf.max(Mathf.max(p0, p1), p2), Mathf.min(Mathf.min(p0, p1), p2)) > r) {
+    if (
+      Mathf.max(
+        -Mathf.max(Mathf.max(p0, p1), p2),
+        Mathf.min(Mathf.min(p0, p1), p2)
+      ) > r
+    ) {
       // points of the projected triangle are outside the projected half-length of the aabb
       // the axis is seperating and we can exit
       return false;
