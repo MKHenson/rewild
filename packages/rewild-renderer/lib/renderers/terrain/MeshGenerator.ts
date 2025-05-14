@@ -1,4 +1,5 @@
 import { Vector2, Vector3 } from 'rewild-common';
+import { Geometry } from '../../geometry/Geometry';
 
 export function generateTerrainMesh(
   heightmap: Float32Array,
@@ -65,5 +66,15 @@ export class MeshData {
     this.triangles[this.triangleIndex + 2] = c;
 
     this.triangleIndex += 3;
+  }
+
+  toGeometry() {
+    const geometry = new Geometry();
+    geometry.vertices = new Float32Array(
+      this.vertices.map((v) => v.toArray()).flat()
+    );
+    geometry.uvs = new Float32Array(this.uvs.map((v) => v.toArray()).flat());
+    geometry.indices = new Uint16Array(this.triangles);
+    return geometry;
   }
 }

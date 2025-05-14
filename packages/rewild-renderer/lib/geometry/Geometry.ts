@@ -63,6 +63,8 @@ export class Geometry {
       new Uint16Array(this.indexBuffer.getMappedRange()).set(this.indices);
       this.indexBuffer.unmap();
     }
+
+    this.requiresBuild = false;
   }
 
   getGPUVertexBufferLayouts(): GPUVertexBufferLayout[] {
