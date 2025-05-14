@@ -1,18 +1,14 @@
 import { Renderer } from '../../Renderer';
 import { Geometry } from '../../geometry/Geometry';
-import { DataTexture } from '../../textures/DataTexture';
 import { ITexture } from '../../textures/ITexture';
-import { TextureProperties } from '../../textures/Texture';
-import { textureManager } from '../../textures/TextureManager';
-import { generateNoiseMap } from './Noise';
+// import { generateNoiseMap } from './Noise';
 import { Camera } from '../../core/Camera';
-import { generateTerrainMesh } from './MeshGenerator';
+// import { generateTerrainMesh } from './MeshGenerator';
 import { Mesh } from '../../core/Mesh';
-import { TerrainPass } from '../../materials/TerrainPass';
-import { Box3, Vector2, Vector3 } from 'rewild-common';
-import { PlaneGeometryFactory } from '../../geometry/PlaneGeometryFactory';
-import { DiffusePass } from '../../materials/DiffusePass';
-import { samplerManager } from '../../textures/SamplerManager';
+// import { TerrainPass } from '../../materials/TerrainPass';
+import { Vector2, Vector3 } from 'rewild-common';
+// import { noiseToTexture } from './NoiseToTexture';
+import { TerrainChunk } from './TerrainChunk';
 
 export class TerrainRenderer {
   terrainTexture: ITexture;
@@ -38,7 +34,7 @@ export class TerrainRenderer {
   }
 
   init(renderer: Renderer) {
-    const { device } = renderer;
+    // const { device } = renderer;
 
     if (!this.simplify) {
       this.simplify = document.createElement('button');
@@ -56,51 +52,26 @@ export class TerrainRenderer {
     this.chunkSize = mapChunkSize - 1;
     this.chunksVisibleInViewDst = Math.round(this.maxViewDst / mapChunkSize); // 4 chunks visible in view distance
 
-    const noise = generateNoiseMap(mapChunkSize, mapChunkSize, 24);
+    // const noise = generateNoiseMap(mapChunkSize, mapChunkSize, 24);
 
-    // Convert this noise map of f32 to a u8 texture. Each pixel will be a shader of grey
-    // (0-255) based on the noise value.
-    const data = new Uint8Array(mapChunkSize * mapChunkSize * 4);
-    for (let i = 0; i < mapChunkSize * mapChunkSize; i++) {
-      const value = Math.floor(Math.min(1, Math.max(0, noise[i])) * 255);
-      data[i * 4] = value;
-      data[i * 4 + 1] = value;
-      data[i * 4 + 2] = value;
-      data[i * 4 + 3] = 255; // alpha
-    }
+    // this.terrainTexture = noiseToTexture(mapChunkSize, mapChunkSize, noise);
 
-    this.terrainTexture = textureManager.addTexture(
-      new DataTexture(
-        new TextureProperties('terrain1', false),
-        data,
-        mapChunkSize,
-        mapChunkSize
-      )
-    );
+    // const meshData = generateTerrainMesh(
+    //   noise,
+    //   mapChunkSize,
+    //   mapChunkSize,
+    //   this._levelOfDetail
+    // );
 
-    this.terrainTexture.load(device);
+    // this.geometry = meshData.toGeometry();
 
-    const meshData = generateTerrainMesh(
-      noise,
-      mapChunkSize,
-      mapChunkSize,
-      this._levelOfDetail
-    );
-    this.geometry = new Geometry();
+    // this.terrainTexture.load(device);
+    // this.geometry.build(device);
 
-    this.geometry.vertices = new Float32Array(
-      meshData.vertices.map((v) => v.toArray()).flat()
-    );
-    this.geometry.uvs = new Float32Array(
-      meshData.uvs.map((v) => v.toArray()).flat()
-    );
-    this.geometry.indices = new Uint16Array(meshData.triangles);
-    this.geometry.build(device);
-
-    const terrainPass = new TerrainPass();
-    terrainPass.terrainUniforms.texture = this.terrainTexture.gpuTexture;
-    this.mesh = new Mesh(this.geometry, terrainPass);
-    renderer.scene.addChild(this.mesh.transform);
+    // const terrainPass = new TerrainPass();
+    // terrainPass.terrainUniforms.texture = this.terrainTexture.gpuTexture;
+    // this.mesh = new Mesh(this.geometry, terrainPass);
+    // renderer.scene.addChild(this.mesh.transform);
   }
 
   get levelOfDetail() {
@@ -169,7 +140,9 @@ export class TerrainRenderer {
           }
         } else {
           const newChunk = new TerrainChunk(viewedChunkCoord, this.chunkSize);
-          renderer.scene.addChild(newChunk.mesh.transform);
+          newChunk.load(this.chunkSize, this._levelOfDetail, renderer);
+
+          renderer.scene.addChild(newChunk.transform);
           this.terrainChunks.set(mapId, newChunk);
         }
       }
@@ -181,42 +154,4 @@ export class TerrainRenderer {
   }
 
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {}
-}
-
-export class TerrainChunk {
-  position: Vector2;
-  mesh: Mesh;
-  bounds: Box3;
-
-  constructor(coord: Vector2, size: i32) {
-    this.position = coord.multiplyScalar(size);
-
-    const diffuse = new DiffusePass();
-    diffuse.diffuse.sampler = samplerManager.get('nearest-simple');
-    this.mesh = new Mesh(PlaneGeometryFactory.new(1, 1), diffuse);
-    this.mesh.transform.position.set(this.position.x, 0, this.position.y);
-    this.mesh.transform.rotateX(-Math.PI / 2);
-    this.mesh.transform.scale.set(size, size, size);
-
-    this.bounds = new Box3();
-    this.bounds.setFromCenterAndSize(
-      this.mesh.transform.position,
-      this.mesh.transform.scale
-    );
-    this.setVisible(false);
-  }
-
-  updateTerrainChunk(viewerPos: Vector3, terrainRenderer: TerrainRenderer) {
-    const viewerDistFromNearestEdge = this.bounds.distanceToPoint(viewerPos);
-    const isVisible = viewerDistFromNearestEdge <= terrainRenderer.maxViewDst;
-    this.setVisible(isVisible);
-  }
-
-  setVisible(visible: boolean) {
-    if (visible) {
-      this.mesh.visible = true;
-    } else {
-      this.mesh.visible = false;
-    }
-  }
 }
