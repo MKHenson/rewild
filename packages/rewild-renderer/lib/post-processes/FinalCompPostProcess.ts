@@ -41,8 +41,7 @@ export class FinalCompPostProcess implements IPostProcess {
   }
 
   init(renderer: Renderer): IPostProcess {
-    const { device, pane, presentationFormat } = renderer;
-    const canvas = pane.canvas()!;
+    const { device, canvas, presentationFormat } = renderer;
     const scaleFactor = this.scaleFactor;
 
     const module = device.createShaderModule({
@@ -120,7 +119,7 @@ export class FinalCompPostProcess implements IPostProcess {
     const theta = degToRad(this.azimuth);
     const sunPosition = tempVec.setFromSphericalCoords(1, phi, theta);
 
-    const canvas = renderer.pane.canvas()!;
+    const canvas = renderer.canvas;
 
     uniformData.set(camera.projectionMatrixInverse.elements, 0); // modelMatrix
     uniformData.set(camera.transform.matrixWorld.elements, 16); // modelMatrix

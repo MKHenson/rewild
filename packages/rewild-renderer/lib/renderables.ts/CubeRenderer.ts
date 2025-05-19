@@ -13,9 +13,9 @@ export class CubeRenderer implements IRenderable {
   initialMesh: Mesh;
 
   async initialize(renderer: Renderer) {
-    const pane = renderer.pane;
+    const canvas = renderer.canvas;
 
-    pane.canvas()!.addEventListener('click', (e) => {
+    canvas.addEventListener('click', (e) => {
       if (!e.ctrlKey && !e.shiftKey) {
         const newMesh = new Mesh(geometry, instancedMaterial);
         renderer.scene.addChild(newMesh.transform);

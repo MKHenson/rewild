@@ -3,13 +3,7 @@
   "compilerOptions": {
     "outDir": "./build",
     "resolveJsonModule": true,
-    "types": [
-      "node",
-      "rewild-common/types/types",
-      "./types/wgsl.d.ts",
-      "@webgpu/types",
-      "jest"
-    ]
+    "types": ["node", "rewild-common/types/types", "@webgpu/types", "jest"]
   },
   "include": ["lib/**/*.wgsl", "lib/**/*.ts", "types/**/*.d.ts"]
 }

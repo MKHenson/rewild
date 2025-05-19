@@ -59,8 +59,7 @@ export class SkyRenderer {
 
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
-    const { pane, device } = renderer;
-    const canvas = pane.canvas()!;
+    const { canvas, device } = renderer;
     this.canvasSizeWatcher = new CanvasSizeWatcher(canvas);
 
     if (!this.uniformBuffer) {
@@ -158,8 +157,7 @@ export class SkyRenderer {
   ): void {
     if (this.canvasSizeWatcher.hasResized()) this.init(renderer);
 
-    const { pane, device } = renderer;
-    const canvas = pane.canvas()!;
+    const { canvas, device } = renderer;
 
     const uniformData = this.update(
       renderer,

@@ -13,8 +13,7 @@ export class AtmosphereRenderer {
   constructor() {}
 
   init(renderer: Renderer, uniformBuffer: GPUBuffer) {
-    const { device, pane } = renderer;
-    const canvas = pane.canvas()!;
+    const { device, canvas } = renderer;
 
     const module = device.createShaderModule({
       code: shader + commonShaderFns,

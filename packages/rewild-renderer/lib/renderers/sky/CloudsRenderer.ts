@@ -16,8 +16,7 @@ export class CloudsRenderer {
   }
 
   init(renderer: Renderer, uniformBuffer: GPUBuffer) {
-    const { device, pane } = renderer;
-    const canvas = pane.canvas()!;
+    const { device, canvas } = renderer;
     const resolutionScale = this.resolutionScale;
 
     const module = device.createShaderModule({

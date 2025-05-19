@@ -29,8 +29,7 @@ export class DenoiseProcess implements IPostProcess {
   }
 
   init(renderer: Renderer): IPostProcess {
-    const { device, pane } = renderer;
-    const canvas = pane.canvas()!;
+    const { device, canvas } = renderer;
     const scaleFactor = this.scaleFactor;
 
     // Try to get the previous post process
