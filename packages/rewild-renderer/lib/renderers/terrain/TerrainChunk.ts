@@ -3,17 +3,19 @@ import { DiffusePass } from '../../materials/DiffusePass';
 import { Mesh } from '../../core/Mesh';
 import { samplerManager } from '../../textures/SamplerManager';
 import { TerrainRenderer } from './TerrainRenderer';
-import { generateNoiseMap } from './Noise';
-import { noiseToTexture } from './NoiseToTexture';
-import { generateTerrainMesh } from './MeshGenerator';
 import { Renderer } from '../..';
 import { Transform } from '../../core/Transform';
+import { textureManager } from '../../textures/TextureManager';
+import { DataTexture } from '../../textures/DataTexture';
+import { TextureProperties } from '../../textures/Texture';
+import { Geometry } from '../../geometry/Geometry';
 
 const temp: Vector3 = new Vector3();
 
 export class TerrainChunk {
   position: Vector2;
   mesh: Mesh;
+  _visible: boolean = false;
   bounds: Box3;
   transform: Transform;
 
@@ -31,37 +33,72 @@ export class TerrainChunk {
   }
 
   async load(chunkSize: i32, lod: i32, renderer: Renderer) {
-    const noise = generateNoiseMap(chunkSize, chunkSize, 24);
-    const texture = noiseToTexture(chunkSize, chunkSize, noise);
-    const meshData = generateTerrainMesh(noise, chunkSize, chunkSize, lod);
+    const workerTest = new Worker('/terrainWorker.js', {
+      type: 'module',
+    });
 
-    const geometry = meshData.toGeometry();
+    workerTest.postMessage({ type: 'start', chunkSize, lod });
 
-    texture.load(renderer.device);
-    geometry.build(renderer.device);
+    workerTest.onmessage = (event) => {
+      const { texture, vertices, uvs, indices } = event.data;
+      console.log(
+        'Received data from worker:',
+        texture,
+        vertices,
+        uvs,
+        indices
+      );
 
-    const diffuse = new DiffusePass();
-    diffuse.diffuse.sampler = samplerManager.get('linear');
-    diffuse.diffuse.texture = texture.gpuTexture;
+      const terrainTexture = textureManager.addTexture(
+        new DataTexture(
+          new TextureProperties('terrain1', false),
+          texture,
+          chunkSize,
+          chunkSize
+        )
+      );
 
-    this.mesh = new Mesh(geometry, diffuse);
-    // this.mesh.transform.rotateX(-Math.PI / 2);
-    this.transform.addChild(this.mesh.transform);
+      const geometry = new Geometry();
+      geometry.vertices = vertices;
+      geometry.uvs = uvs;
+      geometry.indices = indices;
 
-    this.setVisible(false);
+      terrainTexture.load(renderer.device);
+      geometry.build(renderer.device);
+
+      const diffuse = new DiffusePass();
+      diffuse.diffuse.sampler = samplerManager.get('linear');
+      diffuse.diffuse.texture = terrainTexture.gpuTexture;
+
+      this.mesh = new Mesh(geometry, diffuse);
+      this.transform.addChild(this.mesh.transform);
+      this.visible = false;
+
+      workerTest.terminate();
+    };
   }
 
   updateTerrainChunk(viewerPos: Vector3, terrainRenderer: TerrainRenderer) {
     const viewerDistFromNearestEdge = this.bounds.distanceToPoint(viewerPos);
     const isVisible = viewerDistFromNearestEdge <= terrainRenderer.maxViewDst;
-    this.setVisible(isVisible);
+    this.visible = isVisible;
   }
 
-  setVisible(visible: boolean) {
+  set visible(visible: boolean) {
     if (visible) {
-      this.mesh.visible = true;
+      this._visible = true;
+      if (this.mesh) {
+        this.mesh.visible = true;
+      }
     } else {
-      this.mesh.visible = false;
+      this._visible = false;
+      if (this.mesh) {
+        this.mesh.visible = false;
+      }
     }
+  }
+
+  get visible() {
+    return this._visible;
   }
 }

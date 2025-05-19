@@ -73,12 +73,16 @@ const wgslPlugin = {
 
 async function watch() {
   let ctx = await esbuild.context({
-    entryPoints: ['./src/index.tsx'],
+    entryPoints: {
+      main: './src/index.tsx',
+      terrainWorker:
+        'rewild-renderer/lib/renderers/terrain/worker/TerrainWorker.ts',
+    },
     bundle: true,
     sourcemap: true,
     external: [],
     tsconfig: './src/tsconfig.json',
-    outfile: `./public/index_bundle.js`,
+    outdir: './public',
     define: defines,
     plugins: [examplePlugin, wgslPlugin, copy(copyPluginDetails)],
   });
@@ -90,10 +94,14 @@ async function build() {
   copyPluginDetails.assets.forEach((asset) => (asset.watch = false));
 
   await esbuild.build({
-    entryPoints: ['./src/index.tsx'],
+    entryPoints: {
+      main: './src/index.tsx',
+      terrainWorker:
+        'rewild-renderer/lib/renderers/terrain/worker/TerrainWorker.ts',
+    },
     bundle: true,
     tsconfig: './src/tsconfig.json',
-    outfile: `./public/index_bundle.js`,
+    outdir: './public',
     define: defines,
     plugins: [examplePlugin, copy(copyPluginDetails)],
   });

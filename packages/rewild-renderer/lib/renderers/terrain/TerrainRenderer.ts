@@ -1,13 +1,9 @@
 import { Renderer } from '../../Renderer';
 import { Geometry } from '../../geometry/Geometry';
 import { ITexture } from '../../textures/ITexture';
-// import { generateNoiseMap } from './Noise';
 import { Camera } from '../../core/Camera';
-// import { generateTerrainMesh } from './MeshGenerator';
 import { Mesh } from '../../core/Mesh';
-// import { TerrainPass } from '../../materials/TerrainPass';
 import { Vector2, Vector3 } from 'rewild-common';
-// import { noiseToTexture } from './NoiseToTexture';
 import { TerrainChunk } from './TerrainChunk';
 
 export class TerrainRenderer {
@@ -34,8 +30,6 @@ export class TerrainRenderer {
   }
 
   init(renderer: Renderer) {
-    // const { device } = renderer;
-
     if (!this.simplify) {
       this.simplify = document.createElement('button');
       this.simplify.innerText = 'Simplify';
@@ -51,27 +45,6 @@ export class TerrainRenderer {
     const mapChunkSize = this.mapChunkSizeLod;
     this.chunkSize = mapChunkSize - 1;
     this.chunksVisibleInViewDst = Math.round(this.maxViewDst / mapChunkSize); // 4 chunks visible in view distance
-
-    // const noise = generateNoiseMap(mapChunkSize, mapChunkSize, 24);
-
-    // this.terrainTexture = noiseToTexture(mapChunkSize, mapChunkSize, noise);
-
-    // const meshData = generateTerrainMesh(
-    //   noise,
-    //   mapChunkSize,
-    //   mapChunkSize,
-    //   this._levelOfDetail
-    // );
-
-    // this.geometry = meshData.toGeometry();
-
-    // this.terrainTexture.load(device);
-    // this.geometry.build(device);
-
-    // const terrainPass = new TerrainPass();
-    // terrainPass.terrainUniforms.texture = this.terrainTexture.gpuTexture;
-    // this.mesh = new Mesh(this.geometry, terrainPass);
-    // renderer.scene.addChild(this.mesh.transform);
   }
 
   get levelOfDetail() {
@@ -99,7 +72,7 @@ export class TerrainRenderer {
     );
 
     for (const chunk of this.terrainChunksVisibleLastUpdate) {
-      chunk.setVisible(false);
+      chunk.visible = false;
     }
 
     // Clear the last update array
@@ -135,7 +108,7 @@ export class TerrainRenderer {
           const chunk = this.terrainChunks.get(mapId)!;
           chunk.updateTerrainChunk(this.viewerPosition, this);
 
-          if (chunk.mesh.visible) {
+          if (chunk.visible) {
             this.terrainChunksVisibleLastUpdate.push(chunk);
           }
         } else {
