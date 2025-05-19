@@ -70,16 +70,16 @@ export class AtmosphereCubeMaterial2 implements IMaterialPass {
 
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
-    const { device, presentationFormat, pane } = renderer;
+    const { device, presentationFormat, canvas } = renderer;
     const module = device.createShaderModule({
       code: shader,
     });
 
-    pane.canvas()!.addEventListener('mousemove', (e) => {
+    canvas.addEventListener('mousemove', (e) => {
       // this.cloudiness = (e.clientY / pane.canvas()!.height);
       // Set the cloudiness as 0 when the mouse is at the bottom of the canvas
       // and 1 when it is at the top
-      this.cloudiness = 1 - e.clientY / pane.canvas()!.height;
+      this.cloudiness = 1 - e.clientY / canvas.height;
     });
 
     this.cloudsPipeline = device.createRenderPipeline({
@@ -210,8 +210,7 @@ export class AtmosphereCubeMaterial2 implements IMaterialPass {
     meshes?: Mesh[],
     geometry?: Geometry
   ): void {
-    const { device, pane } = renderer;
-    const canvas = pane.canvas()!;
+    const { device, canvas } = renderer;
     pass.setPipeline(this.cloudsPipeline);
     pass.setVertexBuffer(0, geometry!.vertexBuffer);
     pass.setVertexBuffer(1, geometry!.uvBuffer);

@@ -152,8 +152,7 @@ export class DrawF implements IRenderable {
   update(): void {}
 
   render(renderer: Renderer, pass: GPURenderPassEncoder) {
-    const { device, pane } = renderer;
-    const canvas = pane.canvas()!;
+    const { device, canvas } = renderer;
 
     pass.setPipeline(this.pipeline);
     pass.setVertexBuffer(0, this.vertexBuffer);

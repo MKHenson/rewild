@@ -187,8 +187,7 @@ export class AtmosphereCubeMaterial implements IMaterialPass {
     meshes?: Mesh[],
     geometry?: Geometry
   ): void {
-    const { device, pane } = renderer;
-    const canvas = pane.canvas()!;
+    const { device, canvas } = renderer;
     pass.setPipeline(this.cloudsPipeline);
     pass.setVertexBuffer(0, geometry!.vertexBuffer);
     pass.setVertexBuffer(1, geometry!.uvBuffer);

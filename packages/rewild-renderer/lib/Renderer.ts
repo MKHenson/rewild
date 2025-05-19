@@ -1,4 +1,3 @@
-import { Pane3D } from 'rewild-ui';
 import { IRenderable } from '../types/interfaces';
 import { PerspectiveCamera } from './core/PerspectiveCamera';
 import { Transform } from './core/Transform';
@@ -18,7 +17,7 @@ import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
 export class Renderer {
   device: GPUDevice;
   presentationFormat: GPUTextureFormat;
-  pane: Pane3D;
+  canvas: HTMLCanvasElement;
   sampleCount = 1;
 
   private context: GPUCanvasContext;
@@ -50,15 +49,14 @@ export class Renderer {
     this.terrainRenderer = new TerrainRenderer();
   }
 
-  async init(pane: Pane3D) {
+  async init(canvas: HTMLCanvasElement) {
     if (this.initialized) return;
 
     this.disposed = false;
     this.currentRenderList = new RenderList();
     this.initialized = false;
-    this.pane = pane;
+    this.canvas = canvas;
     this.renderables = [];
-    const canvas = pane.canvas()!;
 
     // this.prevWidth = canvas.clientWidth;
     // this.prevHeight = canvas.clientHeight;
@@ -73,10 +71,7 @@ export class Renderer {
     this.perspectiveCam.camera.transform.position.set(0, 0, 5);
     this.perspectiveCam.camera.lookAt(0, 0, 0);
 
-    this.camController = new TrackballControler(
-      this.perspectiveCam,
-      pane.canvas()!
-    );
+    this.camController = new TrackballControler(this.perspectiveCam, canvas);
 
     const adapter = await navigator.gpu?.requestAdapter();
     const device = await adapter?.requestDevice();
@@ -137,7 +132,7 @@ export class Renderer {
 
   resizeRenderTargets() {
     const device = this.device;
-    const canvas = this.pane.canvas()!;
+    const canvas = this.canvas;
     let renderTargetView = this.renderTargetView;
     let renderTarget = this.renderTarget;
 

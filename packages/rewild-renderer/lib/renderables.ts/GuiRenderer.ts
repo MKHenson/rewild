@@ -43,10 +43,10 @@ export class GuiRenderer implements IRenderable {
   }[];
 
   async initialize(renderer: Renderer) {
-    const { device, presentationFormat, pane } = renderer;
+    const { device, presentationFormat, canvas } = renderer;
     this.prevNumElements = 0;
 
-    pane.canvas()!.addEventListener('click', () => {
+    canvas.addEventListener('click', () => {
       this.elements.push({
         x: Math.random() * 800,
         y: Math.random() * 800,
@@ -189,8 +189,7 @@ export class GuiRenderer implements IRenderable {
   update(): void {}
 
   render(renderer: Renderer, pass: GPURenderPassEncoder) {
-    const { device, pane } = renderer;
-    const canvas = pane.canvas()!;
+    const { device, canvas } = renderer;
 
     if (this.elements.length !== this.prevNumElements) {
       const elementData = new Float32Array(this.elements.length * 4);

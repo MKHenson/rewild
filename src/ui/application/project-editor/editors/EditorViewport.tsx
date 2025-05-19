@@ -11,7 +11,7 @@ export class EditorViewport extends Component<Props> {
     this.renderer = new Renderer();
     const onCanvasReady = async (pane3D: Pane3D) => {
       try {
-        await this.renderer.init(pane3D);
+        await this.renderer.init(pane3D.canvas()!);
       } catch (err: unknown) {
         console.error(err);
       }
