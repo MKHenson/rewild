@@ -1,11 +1,21 @@
 import './SetupWorkerUtils';
 import { generateTerrainMesh } from '../MeshGenerator';
 import { generateNoiseMap } from '../Noise';
+import { Vector2 } from 'rewild-common';
 
 self.onmessage = async (event: MessageEvent) => {
-  const { chunkSize, lod } = event.data;
+  const { chunkSize, lod, position } = event.data;
 
-  const noise = generateNoiseMap(chunkSize, chunkSize, 24);
+  const noise = generateNoiseMap(
+    chunkSize,
+    chunkSize,
+    24,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    new Vector2(position.x, position.y)
+  );
 
   // Convert this noise map of f32 to a u8 texture. Each pixel will be a shader of grey
   // (0-255) based on the noise value.

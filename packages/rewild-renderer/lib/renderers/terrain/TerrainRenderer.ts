@@ -6,18 +6,33 @@ import { Mesh } from '../../core/Mesh';
 import { Vector2, Vector3 } from 'rewild-common';
 import { TerrainChunk } from './TerrainChunk';
 
+export class LOFInfo {
+  lod: i32;
+  visibleDstThreshold: f32;
+}
+
+const viewerMoveThresholdForChunkUpdate = 25;
+const sqrViewerMoveThresholdForChunkUpdate =
+  viewerMoveThresholdForChunkUpdate * viewerMoveThresholdForChunkUpdate;
+
 export class TerrainRenderer {
   terrainTexture: ITexture;
   geometry: Geometry;
   mesh: Mesh;
+  viewPosOld: Vector3;
 
-  maxViewDst = 300;
   viewerPosition: Vector3;
   chunkSize: i32;
   chunksVisibleInViewDst: i32;
   terrainChunks: Map<string, TerrainChunk>;
   terrainChunksVisibleLastUpdate: TerrainChunk[];
+  detailLevels: LOFInfo[] = [
+    { lod: 0, visibleDstThreshold: 200 },
+    { lod: 1, visibleDstThreshold: 400 },
+    { lod: 2, visibleDstThreshold: 600 },
+  ];
 
+  _hasInitiallyUpdatedTerrain: boolean = false;
   readonly mapChunkSizeLod = 241;
   private _levelOfDetail: number = 0; // Must be any int from 0 to 6
 
@@ -27,6 +42,10 @@ export class TerrainRenderer {
     this.terrainChunks = new Map();
     this.viewerPosition = new Vector3();
     this.terrainChunksVisibleLastUpdate = [];
+  }
+
+  get maxViewDst() {
+    return this.detailLevels.at(-1)!.visibleDstThreshold;
   }
 
   init(renderer: Renderer) {
@@ -64,13 +83,7 @@ export class TerrainRenderer {
     this._levelOfDetail = Math.floor(this._levelOfDetail);
   }
 
-  private updateVisibleChunks(camera: Camera, renderer: Renderer) {
-    this.viewerPosition.set(
-      camera.transform.position.x,
-      0,
-      camera.transform.position.z
-    );
-
+  private updateVisibleChunks(renderer: Renderer) {
     for (const chunk of this.terrainChunksVisibleLastUpdate) {
       chunk.visible = false;
     }
@@ -112,7 +125,12 @@ export class TerrainRenderer {
             this.terrainChunksVisibleLastUpdate.push(chunk);
           }
         } else {
-          const newChunk = new TerrainChunk(viewedChunkCoord, this.chunkSize);
+          const newChunk = new TerrainChunk(
+            viewedChunkCoord,
+            this.chunkSize,
+            this.detailLevels
+          );
+          newChunk.visible = true;
           newChunk.load(this.chunkSize, this._levelOfDetail, renderer);
 
           renderer.scene.addChild(newChunk.transform);
@@ -123,7 +141,28 @@ export class TerrainRenderer {
   }
 
   update(renderer: Renderer, camera: Camera) {
-    this.updateVisibleChunks(camera, renderer);
+    this.viewerPosition.set(
+      camera.transform.position.x,
+      0,
+      camera.transform.position.z
+    );
+
+    if (!this.viewPosOld) {
+      this.viewPosOld = new Vector3();
+      this.viewPosOld.copy(this.viewerPosition);
+    }
+
+    if (!this._hasInitiallyUpdatedTerrain) {
+      this.updateVisibleChunks(renderer);
+      this._hasInitiallyUpdatedTerrain = true;
+    } else if (
+      this.viewPosOld.distanceToSquared(this.viewerPosition) >
+      sqrViewerMoveThresholdForChunkUpdate
+    ) {
+      this.viewPosOld.copy(this.viewerPosition);
+
+      this.updateVisibleChunks(renderer);
+    }
   }
 
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {}
