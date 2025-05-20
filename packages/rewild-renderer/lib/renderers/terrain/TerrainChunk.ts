@@ -2,7 +2,7 @@ import { Box3, Vector2, Vector3 } from 'rewild-common';
 import { DiffusePass } from '../../materials/DiffusePass';
 import { Mesh } from '../../core/Mesh';
 import { samplerManager } from '../../textures/SamplerManager';
-import { TerrainRenderer } from './TerrainRenderer';
+import { LOFInfo, TerrainRenderer } from './TerrainRenderer';
 import { Renderer } from '../..';
 import { Transform } from '../../core/Transform';
 import { textureManager } from '../../textures/TextureManager';
@@ -18,9 +18,19 @@ export class TerrainChunk {
   _visible: boolean = false;
   bounds: Box3;
   transform: Transform;
+  detailLevels: LOFInfo[];
+  lodMesh: LODMesh[];
+  previousLodIndex: i32;
 
-  constructor(coord: Vector2, size: i32) {
+  constructor(coord: Vector2, size: i32, detailLevels: LOFInfo[]) {
     this.position = coord.multiplyScalar(size);
+    this.previousLodIndex = -1;
+    this.detailLevels = detailLevels;
+
+    this.lodMesh = new Array<LODMesh>(detailLevels.length);
+    for (let i = 0; i < detailLevels.length; i++) {
+      this.lodMesh[i] = new LODMesh(detailLevels[i].lod);
+    }
 
     this.transform = new Transform();
     this.transform.position.set(this.position.x, 0, this.position.y);
@@ -37,7 +47,12 @@ export class TerrainChunk {
       type: 'module',
     });
 
-    workerTest.postMessage({ type: 'start', chunkSize, lod });
+    workerTest.postMessage({
+      type: 'start',
+      chunkSize,
+      lod,
+      position: this.position,
+    });
 
     workerTest.onmessage = (event) => {
       const { texture, vertices, uvs, indices } = event.data;
@@ -72,7 +87,7 @@ export class TerrainChunk {
 
       this.mesh = new Mesh(geometry, diffuse);
       this.transform.addChild(this.mesh.transform);
-      this.visible = false;
+      this.visible = this._visible;
 
       workerTest.terminate();
     };
@@ -82,6 +97,30 @@ export class TerrainChunk {
     const viewerDistFromNearestEdge = this.bounds.distanceToPoint(viewerPos);
     const isVisible = viewerDistFromNearestEdge <= terrainRenderer.maxViewDst;
     this.visible = isVisible;
+
+    if (isVisible) {
+      let lodIndex = 0;
+
+      for (let i = 0; i < this.detailLevels.length - 1; i++) {
+        const detailLevel = this.detailLevels[i];
+        if (viewerDistFromNearestEdge > detailLevel.visibleDstThreshold) {
+          lodIndex = i + 1;
+        } else {
+          break;
+        }
+
+        if (this.previousLodIndex !== lodIndex) {
+          const lodMesh = this.lodMesh[lodIndex];
+          if (lodMesh.hasMesh) {
+            // Draw this mesh lodMesh
+            lodMesh.mesh;
+            this.previousLodIndex = lodIndex;
+          } else if (!lodMesh.hasRequestedMesh) {
+            lodMesh.requestMesh();
+          }
+        }
+      }
+    }
   }
 
   set visible(visible: boolean) {
@@ -100,5 +139,25 @@ export class TerrainChunk {
 
   get visible() {
     return this._visible;
+  }
+}
+
+export class LODMesh {
+  mesh: Mesh;
+  lod: i32;
+  hasRequestedMesh: boolean;
+  hasMesh: boolean;
+
+  constructor(lod: i32) {
+    this.lod = lod;
+    this.hasRequestedMesh = false;
+    this.hasMesh = false;
+  }
+
+  requestMesh() {
+    if (this.hasRequestedMesh) {
+      return;
+    }
+    this.hasRequestedMesh = true;
   }
 }
