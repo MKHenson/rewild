@@ -41,11 +41,11 @@ export function generateNoiseMap(
 
   const rng = seededRandom(seed);
 
-  const octaveOffsets: Vector2[] = [];
+  const octaveOffsets: Vector2[] = new Array(octaves);
   for (let i = 0; i < octaves; i++) {
-    const offsetX = rng() * 10000 + offset.x;
-    const offsetY = rng() * 10000 + offset.y;
-    octaveOffsets.push(new Vector2(offsetX, offsetY));
+    const offsetX = rng() * 200000 - 100000 + offset.x;
+    const offsetY = rng() * 200000 - 100000 + offset.y;
+    octaveOffsets[i] = new Vector2(offsetX, offsetY);
   }
 
   if (scale <= 0) {
@@ -66,16 +66,12 @@ export function generateNoiseMap(
 
       for (let o = 0; o < octaves; o++) {
         const sampleX =
-          ((x - halfWidth) / scale) * frequency + octaveOffsets[o].x;
+          ((x - halfWidth + octaveOffsets[o].x) / scale) * frequency;
         const sampleY =
-          ((y - halfHeight) / scale) * frequency + octaveOffsets[o].y;
+          ((y - halfHeight - octaveOffsets[o].y) / scale) * frequency;
 
-        let value = perlin.perlin2(sampleX, sampleY) * amplitude;
-
-        // Normalize the value to be between 0 and 1
-        value = (value + 1) / 2; // Perlin noise ranges from -1 to 1
-
-        noiseValue += value;
+        let perlinValue = perlin.perlin2(sampleX, sampleY);
+        noiseValue += perlinValue * amplitude;
 
         amplitude *= persistence;
         frequency *= lacunarity;
@@ -91,17 +87,19 @@ export function generateNoiseMap(
     }
   }
 
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      // Normalize the noise value to be between 0 and 1
+  // NOTE: THIS BREAKS THE TERRAIN SEAM. Because the noise is not continuous across the edges of the map.
 
-      noiseMap[x + y * width] = inverseLerp(
-        minNoiseValue,
-        maxNoiseValue,
-        noiseMap[x + y * width]
-      );
-    }
-  }
+  // for (let y = 0; y < height; y++) {
+  //   for (let x = 0; x < width; x++) {
+  //     // Normalize the noise value to be between 0 and 1
+
+  //     noiseMap[x + y * width] = inverseLerp(
+  //       minNoiseValue,
+  //       maxNoiseValue,
+  //       noiseMap[x + y * width]
+  //     );
+  //   }
+  // }
 
   return noiseMap;
 }

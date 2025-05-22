@@ -56,13 +56,6 @@ export class TerrainChunk {
 
     workerTest.onmessage = (event) => {
       const { texture, vertices, uvs, indices } = event.data;
-      console.log(
-        'Received data from worker:',
-        texture,
-        vertices,
-        uvs,
-        indices
-      );
 
       const terrainTexture = textureManager.addTexture(
         new DataTexture(
@@ -82,7 +75,7 @@ export class TerrainChunk {
       geometry.build(renderer.device);
 
       const diffuse = new DiffusePass();
-      diffuse.diffuse.sampler = samplerManager.get('linear');
+      diffuse.diffuse.sampler = samplerManager.get('linear-clamped');
       diffuse.diffuse.texture = terrainTexture.gpuTexture;
 
       this.mesh = new Mesh(geometry, diffuse);
