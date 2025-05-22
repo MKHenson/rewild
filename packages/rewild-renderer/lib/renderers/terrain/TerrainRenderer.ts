@@ -131,7 +131,7 @@ export class TerrainRenderer {
             this.detailLevels
           );
           newChunk.visible = true;
-          newChunk.load(this.chunkSize, this._levelOfDetail, renderer);
+          newChunk.load(this.mapChunkSizeLod, this._levelOfDetail, renderer);
 
           renderer.scene.addChild(newChunk.transform);
           this.terrainChunks.set(mapId, newChunk);
