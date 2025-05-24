@@ -27,9 +27,9 @@ export class TerrainRenderer {
   terrainChunks: Map<string, TerrainChunk>;
   terrainChunksVisibleLastUpdate: TerrainChunk[];
   detailLevels: LOFInfo[] = [
-    { lod: 0, visibleDstThreshold: 200 },
-    { lod: 1, visibleDstThreshold: 400 },
-    { lod: 2, visibleDstThreshold: 600 },
+    { lod: 0, visibleDstThreshold: 600 },
+    { lod: 5, visibleDstThreshold: 800 },
+    { lod: 6, visibleDstThreshold: 1000 },
   ];
 
   _hasInitiallyUpdatedTerrain: boolean = false;
@@ -63,7 +63,7 @@ export class TerrainRenderer {
 
     const mapChunkSize = this.mapChunkSizeLod;
     this.chunkSize = mapChunkSize - 1;
-    this.chunksVisibleInViewDst = Math.round(this.maxViewDst / mapChunkSize); // 4 chunks visible in view distance
+    this.chunksVisibleInViewDst = Math.round(this.maxViewDst / mapChunkSize);
   }
 
   get levelOfDetail() {
@@ -119,7 +119,7 @@ export class TerrainRenderer {
 
         if (this.terrainChunks.has(mapId)) {
           const chunk = this.terrainChunks.get(mapId)!;
-          chunk.updateTerrainChunk(this.viewerPosition, this);
+          chunk.updateTerrainChunk(this.viewerPosition, this, renderer);
 
           if (chunk.visible) {
             this.terrainChunksVisibleLastUpdate.push(chunk);
@@ -128,11 +128,10 @@ export class TerrainRenderer {
           const newChunk = new TerrainChunk(
             viewedChunkCoord,
             this.chunkSize,
+            this.mapChunkSizeLod,
             this.detailLevels
           );
-          newChunk.visible = true;
-          newChunk.load(this.mapChunkSizeLod, this._levelOfDetail, renderer);
-
+          newChunk.visible = false;
           renderer.scene.addChild(newChunk.transform);
           this.terrainChunks.set(mapId, newChunk);
         }
@@ -154,7 +153,9 @@ export class TerrainRenderer {
 
     if (!this._hasInitiallyUpdatedTerrain) {
       this.updateVisibleChunks(renderer);
-      this._hasInitiallyUpdatedTerrain = true;
+
+      if (this.terrainChunksVisibleLastUpdate.length > 0)
+        this._hasInitiallyUpdatedTerrain = true;
     } else if (
       this.viewPosOld.distanceToSquared(this.viewerPosition) >
       sqrViewerMoveThresholdForChunkUpdate
