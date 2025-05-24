@@ -32,7 +32,7 @@ export class Renderer {
   perspectiveCam: PerspectiveCamera;
   scene: Transform;
   private currentRenderList: RenderList;
-  private atmosphere: AtmosphereSkybox;
+  atmosphere: AtmosphereSkybox;
   private camController: TrackballControler;
   private canvasSizeWatcher: CanvasSizeWatcher;
 

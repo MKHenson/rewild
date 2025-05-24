@@ -28,6 +28,33 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
             ...node,
           })) || [],
       } as ITemplateTreeNode,
+      {
+        name: 'Sky',
+        factoryKey: 'sky',
+        canRename: false,
+        canSelect: true,
+        icon: 'wb_sunny',
+        id: 'SKY',
+        resource: {
+          id: 'SKY',
+          name: 'Sky',
+          type: 'actor',
+          properties: [
+            {
+              label: 'Cloudiness',
+              type: 'cloudiness',
+              valueType: 'string',
+              value: '0.7',
+            },
+            {
+              label: 'Foginess',
+              type: 'foginess',
+              valueType: 'string',
+              value: '0.3',
+            },
+          ],
+        },
+      } as ITreeNode,
     ];
   }
 
