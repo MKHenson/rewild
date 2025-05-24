@@ -1,5 +1,5 @@
 import { Box3, Vector2, Vector3 } from 'rewild-common';
-import { DiffusePass } from '../../materials/DiffusePass';
+import { TerrainPass } from '../../materials/TerrainPass';
 import { Mesh } from '../../core/Mesh';
 import { samplerManager } from '../../textures/SamplerManager';
 import { LOFInfo, TerrainRenderer } from './TerrainRenderer';
@@ -14,32 +14,123 @@ const temp: Vector3 = new Vector3();
 
 export class TerrainChunk {
   position: Vector2;
-  mesh: Mesh;
   _visible: boolean = false;
   bounds: Box3;
   transform: Transform;
   detailLevels: LOFInfo[];
   lodMesh: LODMesh[];
-  previousLodIndex: i32;
+  chunkSize: i32;
 
-  constructor(coord: Vector2, size: i32, detailLevels: LOFInfo[]) {
+  constructor(
+    coord: Vector2,
+    size: i32,
+    chunkSize: i32,
+    detailLevels: LOFInfo[]
+  ) {
     this.position = coord.multiplyScalar(size);
-    this.previousLodIndex = -1;
+    this.chunkSize = chunkSize;
     this.detailLevels = detailLevels;
 
     this.lodMesh = new Array<LODMesh>(detailLevels.length);
-    for (let i = 0; i < detailLevels.length; i++) {
-      this.lodMesh[i] = new LODMesh(detailLevels[i].lod);
-    }
 
     this.transform = new Transform();
     this.transform.position.set(this.position.x, 0, this.position.y);
+
+    for (let i = 0; i < detailLevels.length; i++) {
+      this.lodMesh[i] = new LODMesh(
+        detailLevels[i].lod,
+        this.transform,
+        this.position,
+        chunkSize
+      );
+    }
 
     this.bounds = new Box3();
     this.bounds.setFromCenterAndSize(
       this.transform.position,
       temp.set(size, 0, size)
     );
+  }
+
+  updateTerrainChunk(
+    viewerPos: Vector3,
+    terrainRenderer: TerrainRenderer,
+    renderer: Renderer
+  ) {
+    const viewerDistFromNearestEdge =
+      this.transform.position.distanceTo(viewerPos);
+    const isVisible = viewerDistFromNearestEdge <= terrainRenderer.maxViewDst;
+    this.visible = isVisible;
+
+    for (const lod of this.lodMesh) {
+      if (lod.mesh) {
+        lod.mesh.visible = false;
+      }
+    }
+
+    if (isVisible) {
+      let lodIndex = 0;
+
+      for (let i = 0; i < this.detailLevels.length - 1; i++) {
+        const detailLevel = this.detailLevels[i];
+        if (viewerDistFromNearestEdge > detailLevel.visibleDstThreshold) {
+          lodIndex = i + 1;
+        } else {
+          break;
+        }
+      }
+
+      const lodMesh = this.lodMesh[lodIndex];
+      if (lodMesh.mesh) {
+        lodMesh.mesh.visible = true;
+      } else if (!lodMesh.hasRequestedMesh) {
+        lodMesh.requestMesh(renderer);
+      }
+    }
+  }
+
+  set visible(visible: boolean) {
+    if (visible) {
+      this._visible = true;
+      this.transform.visible = true;
+    } else {
+      this._visible = false;
+      this.transform.visible = false;
+    }
+  }
+
+  get visible() {
+    return this._visible;
+  }
+}
+
+export class LODMesh {
+  mesh: Mesh;
+  lod: i32;
+  position: Vector2;
+  hasRequestedMesh: boolean;
+  transform: Transform;
+  chunkSize: i32;
+
+  constructor(
+    lod: i32,
+    transform: Transform,
+    position: Vector2,
+    chunkSize: i32
+  ) {
+    this.lod = lod;
+    this.hasRequestedMesh = false;
+    this.transform = transform;
+    this.chunkSize = chunkSize;
+    this.position = position;
+  }
+
+  requestMesh(renderer: Renderer) {
+    if (this.hasRequestedMesh) {
+      return;
+    }
+    this.hasRequestedMesh = true;
+    this.load(this.chunkSize, this.lod, renderer);
   }
 
   async load(chunkSize: i32, lod: i32, renderer: Renderer) {
@@ -74,83 +165,15 @@ export class TerrainChunk {
       terrainTexture.load(renderer.device);
       geometry.build(renderer.device);
 
-      const diffuse = new DiffusePass();
-      diffuse.diffuse.sampler = samplerManager.get('linear-clamped');
-      diffuse.diffuse.texture = terrainTexture.gpuTexture;
+      const terrainPass = new TerrainPass();
+      terrainPass.terrainUniforms.sampler =
+        samplerManager.get('linear-clamped');
+      terrainPass.terrainUniforms.texture = terrainTexture.gpuTexture;
 
-      this.mesh = new Mesh(geometry, diffuse);
+      this.mesh = new Mesh(geometry, terrainPass);
       this.transform.addChild(this.mesh.transform);
-      this.visible = this._visible;
 
       workerTest.terminate();
     };
-  }
-
-  updateTerrainChunk(viewerPos: Vector3, terrainRenderer: TerrainRenderer) {
-    const viewerDistFromNearestEdge = this.bounds.distanceToPoint(viewerPos);
-    const isVisible = viewerDistFromNearestEdge <= terrainRenderer.maxViewDst;
-    this.visible = isVisible;
-
-    if (isVisible) {
-      let lodIndex = 0;
-
-      for (let i = 0; i < this.detailLevels.length - 1; i++) {
-        const detailLevel = this.detailLevels[i];
-        if (viewerDistFromNearestEdge > detailLevel.visibleDstThreshold) {
-          lodIndex = i + 1;
-        } else {
-          break;
-        }
-
-        if (this.previousLodIndex !== lodIndex) {
-          const lodMesh = this.lodMesh[lodIndex];
-          if (lodMesh.hasMesh) {
-            // Draw this mesh lodMesh
-            lodMesh.mesh;
-            this.previousLodIndex = lodIndex;
-          } else if (!lodMesh.hasRequestedMesh) {
-            lodMesh.requestMesh();
-          }
-        }
-      }
-    }
-  }
-
-  set visible(visible: boolean) {
-    if (visible) {
-      this._visible = true;
-      if (this.mesh) {
-        this.mesh.visible = true;
-      }
-    } else {
-      this._visible = false;
-      if (this.mesh) {
-        this.mesh.visible = false;
-      }
-    }
-  }
-
-  get visible() {
-    return this._visible;
-  }
-}
-
-export class LODMesh {
-  mesh: Mesh;
-  lod: i32;
-  hasRequestedMesh: boolean;
-  hasMesh: boolean;
-
-  constructor(lod: i32) {
-    this.lod = lod;
-    this.hasRequestedMesh = false;
-    this.hasMesh = false;
-  }
-
-  requestMesh() {
-    if (this.hasRequestedMesh) {
-      return;
-    }
-    this.hasRequestedMesh = true;
   }
 }
