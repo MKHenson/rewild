@@ -1,5 +1,6 @@
 import { Component, register, Pane3D } from 'rewild-ui';
 import { Renderer } from 'rewild-renderer';
+import { projectStore } from 'src/ui/stores/ProjectStore';
 
 interface Props {}
 
@@ -9,6 +10,36 @@ export class EditorViewport extends Component<Props> {
 
   init() {
     this.renderer = new Renderer();
+
+    this.observeStore(projectStore, (e) => {
+      if (e.includes('selectedResource.properties')) {
+        if (projectStore.target.selectedResource?.id === 'SKY') {
+          const cloudiness =
+            projectStore.target.selectedResource.properties.find(
+              (p) => p.type === 'cloudiness'
+            );
+
+          const foginess = projectStore.target.selectedResource.properties.find(
+            (p) => p.type === 'foginess'
+          );
+
+          if (cloudiness) {
+            this.renderer.atmosphere.skyRenderer.cloudiness = parseFloat(
+              cloudiness.value as string
+            );
+          }
+
+          if (foginess) {
+            this.renderer.atmosphere.skyRenderer.foginess = parseFloat(
+              foginess.value as string
+            );
+          }
+        }
+      }
+
+      return false; // Prevent further processing
+    });
+
     const onCanvasReady = async (pane3D: Pane3D) => {
       try {
         await this.renderer.init(pane3D.canvas()!);

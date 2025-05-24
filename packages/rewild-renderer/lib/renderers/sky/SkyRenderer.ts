@@ -32,6 +32,7 @@ export class SkyRenderer {
   elevation: f32;
   azimuth: f32;
   cloudiness: f32;
+  foginess: f32;
   upDot: f32;
   sunPosition: Vector3;
 
@@ -44,6 +45,7 @@ export class SkyRenderer {
     this.azimuth = 180;
     this.elevation = -2;
     this.cloudiness = 0.7;
+    this.foginess = 0.3;
     this.upDot = 0.0;
     this.sunPosition = new Vector3();
     this.requiresRebuild = true;
@@ -74,7 +76,8 @@ export class SkyRenderer {
         4 + // iTime
         4 + // resolutionX
         4 + // resolutionY
-        4; // cloudiness
+        4 + // cloudiness
+        4; // foginess
 
       // Align the buffer size to the next multiple of 256
       const alignedUniformBufferSize = Math.ceil(uniformBufferSize / 256) * 256;
@@ -141,7 +144,7 @@ export class SkyRenderer {
     uniformData.set([sunPosition.x, sunPosition.y, sunPosition.z], 52); // sunPosition
     uniformData.set([0, 1, 0], 56); // up
     uniformData.set(
-      [renderer.totalDeltaTime * 0.3, width, height, cloudiness],
+      [renderer.totalDeltaTime * 0.3, width, height, cloudiness, this.foginess],
       60
     );
 

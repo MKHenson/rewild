@@ -72,8 +72,9 @@ fn drawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
 	var color = vec4f(.0);   
     color = skyRay(org, dir, vSunDirection); 
 
-    let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + 300.0);
-    let cloudAlphaAffectedByFogDistance = min( exp(-0.00015 * fogDistance ), color.a );
+    let fogDensity = mix(0.00003, 0.00009, object.foginess);
+    let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + CLOUD_START);
+    let cloudAlphaAffectedByFogDistance = min( exp(-fogDensity * fogDistance ), color.a );
     
     return vec4f( getFogColor( dir, org, vSunDirection, color.rgb ), cloudAlphaAffectedByFogDistance);
 }

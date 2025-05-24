@@ -9,7 +9,7 @@ declare module 'models' {
   import { LoaderPresetType } from 'src/core/loader-utils/LoaderPresets';
   import type { IconType } from 'rewild-ui';
 
-  export type FactoryKey = 'actor' | 'container';
+  export type FactoryKey = 'actor' | 'container' | 'sky';
 
   export interface IDragDropAction {
     type: 'cell-move' | 'treenode';
@@ -32,6 +32,8 @@ declare module 'models' {
     | 'geometry'
     | 'pipeline'
     | 'position'
+    | 'cloudiness'
+    | 'foginess'
     | 'color'
     | 'target'
     | 'active'
