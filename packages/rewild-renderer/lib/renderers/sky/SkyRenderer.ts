@@ -30,6 +30,7 @@ export class SkyRenderer {
   finalPass: FinalCompPostProcess;
 
   elevation: f32;
+  dayNightCycle: boolean = false;
   azimuth: f32;
   cloudiness: f32;
   foginess: f32;
@@ -43,7 +44,7 @@ export class SkyRenderer {
 
   constructor() {
     this.azimuth = 180;
-    this.elevation = -2;
+    this.elevation = -0;
     this.cloudiness = 0.7;
     this.foginess = 0.3;
     this.upDot = 0.0;
@@ -118,7 +119,7 @@ export class SkyRenderer {
     height: number,
     transform: Transform
   ) {
-    this.elevation += renderer.delta * 0.002;
+    if (this.dayNightCycle) this.elevation += renderer.delta * 0.002;
 
     const phi = degToRad(90 - this.elevation);
     const theta = degToRad(this.azimuth);

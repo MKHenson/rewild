@@ -34,22 +34,37 @@ declare module 'models' {
     | 'position'
     | 'cloudiness'
     | 'foginess'
+    | 'sun_elevation'
+    | 'day_night_cycle'
     | 'color'
     | 'target'
     | 'active'
     | 'baseContainer'
     | 'intensity';
-  export type PropValueType = 'string' | 'boolean' | 'enum' | 'hidden' | 'vec3';
+  export type PropValueType =
+    | 'string'
+    | 'boolean'
+    | 'enum'
+    | 'hidden'
+    | 'vec3'
+    | 'float';
   export type PropValue = string | boolean | number | Vector3;
   export type IOption = {
     value: string;
     label: string;
+  };
+  export type IValueOptions = {
+    min?: number;
+    max?: number;
+    step?: number;
+    precision?: number;
   };
   export type IProperty = {
     label: string;
     type: PropertyType;
     valueType: PropValueType;
     value: PropValue;
+    valueOptions?: IValueOptions;
     options?: IOption[];
   };
 

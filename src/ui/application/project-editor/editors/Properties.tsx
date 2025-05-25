@@ -35,6 +35,7 @@ export class Properties extends Component<Props> {
                       value={prop.value}
                       type={prop.valueType}
                       options={prop.options}
+                      valueOptions={prop.valueOptions}
                       refocus={lastFocussedProp === index}
                       onChange={(val) => {
                         lastFocussedProp = index;

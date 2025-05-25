@@ -23,17 +23,33 @@ export class EditorViewport extends Component<Props> {
             (p) => p.type === 'foginess'
           );
 
-          if (cloudiness) {
-            this.renderer.atmosphere.skyRenderer.cloudiness = parseFloat(
-              cloudiness.value as string
+          const elevation =
+            projectStore.target.selectedResource.properties.find(
+              (p) => p.type === 'sun_elevation'
             );
+
+          const dayNightCycle =
+            projectStore.target.selectedResource.properties.find(
+              (p) => p.type === 'day_night_cycle'
+            );
+
+          if (cloudiness) {
+            this.renderer.atmosphere.skyRenderer.cloudiness =
+              cloudiness.value as number;
           }
 
           if (foginess) {
-            this.renderer.atmosphere.skyRenderer.foginess = parseFloat(
-              foginess.value as string
-            );
+            this.renderer.atmosphere.skyRenderer.foginess =
+              foginess.value as number;
           }
+
+          if (elevation) {
+            this.renderer.atmosphere.skyRenderer.elevation =
+              elevation.value as number;
+          }
+
+          this.renderer.atmosphere.skyRenderer.dayNightCycle =
+            dayNightCycle?.value as boolean;
         }
       }
 
