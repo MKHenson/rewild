@@ -1,4 +1,4 @@
-import { IOption, PropValueType, Vector3 } from 'models';
+import { IOption, IValueOptions, PropValueType, Vector3 } from 'models';
 import {
   theme,
   Component,
@@ -7,6 +7,7 @@ import {
   Typography,
   Select,
   Vec3,
+  NumberInput,
 } from 'rewild-ui';
 
 interface Props<T> {
@@ -14,6 +15,7 @@ interface Props<T> {
   type: PropValueType;
   value?: T;
   options?: IOption[];
+  valueOptions?: IValueOptions;
   readonly?: boolean;
   onChange?: (newValue: T) => void;
   refocus: boolean;
@@ -30,7 +32,7 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
         case 'string':
           return (
             <input
-              class="string-val"
+              class="input-val"
               readOnly={this.props.readonly}
               value={(value as string) || ''}
               onblur={(e) => {
@@ -39,6 +41,21 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
               onkeydown={(e) => {
                 if (!onChange) return;
                 if (e.key === 'Enter') onChange(e.currentTarget.value as T);
+              }}
+            />
+          );
+        case 'float':
+          return (
+            <NumberInput
+              className="input-val"
+              min={this.props.valueOptions?.min}
+              max={this.props.valueOptions?.max}
+              step={this.props.valueOptions?.step}
+              precision={this.props.valueOptions?.precision}
+              disabled={this.props.readonly}
+              value={(value as number) || 0}
+              onChange={(e) => {
+                onChange?.(e as T);
               }}
             />
           );
@@ -82,7 +99,7 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
     this.onMount = this.props.refocus
       ? () => {
           const input = this.shadow?.querySelector(
-            '.string-val'
+            '.input-val'
           ) as HTMLInputElement;
           if (input) {
             input.focus();
@@ -120,7 +137,7 @@ const StyledPropValue = cssStylesheet(css`
     border-right: 1px solid ${theme.colors.onSurfaceLight};
   }
 
-  .string-val {
+  .input-val {
     width: 100%;
     outline: none;
     border: none;

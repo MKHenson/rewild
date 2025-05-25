@@ -72,7 +72,7 @@ fn drawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
 	var color = vec4f(.0);   
     color = skyRay(org, dir, vSunDirection); 
 
-    let fogDensity = mix(0.00003, 0.00009, object.foginess);
+    let fogDensity = mix(0.00001, 0.00009, object.foginess);
     let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + CLOUD_START);
     let cloudAlphaAffectedByFogDistance = min( exp(-fogDensity * fogDistance ), color.a );
     
@@ -155,7 +155,8 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
 
 fn clouds(position: vec3f) -> CloudResult {
     // Speed at which clouds move, based on time
-    let cloudMovementSpeed = object.iTime * 0.004 * mix(1.0, 0.3, object.cloudiness);
+    let cloudinessSpeedFactor = smoothstep(0.9, 1.0, object.cloudiness);
+    let cloudMovementSpeed = object.iTime * 0.004 * mix(1.0, 3.0, cloudinessSpeedFactor);
     var p = position;
 
     var result: CloudResult;
@@ -170,7 +171,7 @@ fn clouds(position: vec3f) -> CloudResult {
     p.z += cloudMovementSpeed * 10.3;
     
     // Sample the large-scale weather pattern
-    var largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -0.00005 * p.zx, 0.0).x - 0.18) * 5.0 *  object.cloudiness, 0.0, 6.0);
+    var largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -mix(0.00005, 0.00002, object.cloudiness) * p.zx, 0.0).x - 0.18) * 5.0 *  object.cloudiness, 0.0, 6.0);
 
     // Move the clouds in the x direction
     p.x += cloudMovementSpeed * 8.3;
