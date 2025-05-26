@@ -155,8 +155,9 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
 
 fn clouds(position: vec3f) -> CloudResult {
     // Speed at which clouds move, based on time
+    let windDirection = vec3f(1.0, 0.0, -1.0) * object.windiness;
     let cloudinessSpeedFactor = smoothstep(0.9, 1.0, object.cloudiness);
-    let cloudMovementSpeed = object.iTime * 0.004 * mix(1.0, 3.0, cloudinessSpeedFactor);
+    let cloudMovementSpeed = object.iTime * 0.01 * mix(1.0, 3.0, cloudinessSpeedFactor);
     var p = position;
 
     var result: CloudResult;
@@ -168,13 +169,13 @@ fn clouds(position: vec3f) -> CloudResult {
     result.cloudHeight = cloudHeight;
 
     // Move the clouds in the z direction
-    p.z += cloudMovementSpeed * 10.3;
+    p += windDirection * cloudMovementSpeed * 10.3;
     
     // Sample the large-scale weather pattern
-    var largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -mix(0.00005, 0.00002, object.cloudiness) * p.zx, 0.0).x - 0.18) * 5.0 *  object.cloudiness, 0.0, 6.0);
+    var largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -mix(0.00005, 0.000015, object.cloudiness) * p.zx, 0.0).x - 0.18) * 5.0 *  object.cloudiness, 0.0, 6.0);
 
     // Move the clouds in the x direction
-    p.x += cloudMovementSpeed * 8.3;
+    p += windDirection * cloudMovementSpeed * 8.3;
     
     // Sample the smaller-scale weather pattern and combine with large-scale pattern
     var weather: f32 = largeWeather * max( clamp( pow(object.cloudiness, 12.1), 0.0, 1.0 ), textureSampleLevel(pebblesTexture, noiseSampler, 0.0001 * p.zx, 0.0).x - 0.28) / 0.52;
@@ -192,7 +193,7 @@ fn clouds(position: vec3f) -> CloudResult {
     }
 
     // Move the clouds further in the x direction
-    p.x += cloudMovementSpeed * 12.3;
+    p += windDirection * cloudMovementSpeed * 12.3;
 
     // Calculate the cloud density using fractal Brownian motion (fbm)
     var den = max(0.0, cloudShape - 0.7 * fbm(p * 0.01));
@@ -204,7 +205,7 @@ fn clouds(position: vec3f) -> CloudResult {
     }
     
     // Move the clouds in the y direction
-    p.y += cloudMovementSpeed * 15.2;
+    p += windDirection * cloudMovementSpeed * 15.2;
 
     // Calculate the final cloud density using fbm
     den = max(0.0, den - 0.2 * fbm(p * 0.05));

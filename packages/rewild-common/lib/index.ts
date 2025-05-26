@@ -14,6 +14,7 @@ export * from './TerrainConstants';
 export * from './Utils';
 export * from './Event';
 export * from './EventDispatcher';
+export * from './Dispatcher';
 export * from './EventTargetable';
 export * from './EventAttachable';
 export * from './TypesPolyfill';

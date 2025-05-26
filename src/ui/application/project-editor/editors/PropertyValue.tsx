@@ -4,14 +4,12 @@ import {
   Component,
   register,
   Switch,
-  Typography,
   Select,
   Vec3,
   NumberInput,
 } from 'rewild-ui';
 
 interface Props<T> {
-  label: string;
   type: PropValueType;
   value?: T;
   options?: IOption[];
@@ -108,12 +106,7 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
         }
       : undefined;
 
-    return () => [
-      <div class="label">
-        <Typography variant="label">{this.props.label}</Typography>
-      </div>,
-      <div class="value">{getEditor(this.props.type)}</div>,
-    ];
+    return () => [getEditor(this.props.type)];
   }
 
   getStyle() {
@@ -122,21 +115,6 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
 }
 
 const StyledPropValue = cssStylesheet(css`
-  :host {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    border-bottom: 1px solid ${theme.colors.onSurfaceLight};
-  }
-
-  .label {
-    border-right: 1px solid ${theme.colors.onSurfaceLight};
-    border-left: 1px solid ${theme.colors.onSurfaceLight};
-  }
-
-  .value {
-    border-right: 1px solid ${theme.colors.onSurfaceLight};
-  }
-
   .input-val {
     width: 100%;
     outline: none;

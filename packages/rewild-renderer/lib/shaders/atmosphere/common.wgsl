@@ -32,7 +32,8 @@ struct ObjectStruct {
     resolutionX: f32,
     resolutionY: f32,
     cloudiness: f32,
-    foginess: f32
+    foginess: f32,
+    windiness: f32
 };
 
 struct OutputStruct {

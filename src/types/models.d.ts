@@ -34,8 +34,9 @@ declare module 'models' {
     | 'position'
     | 'cloudiness'
     | 'foginess'
-    | 'sun_elevation'
-    | 'day_night_cycle'
+    | 'windiness'
+    | 'elevation'
+    | 'dayNightCycle'
     | 'color'
     | 'target'
     | 'active'
@@ -119,6 +120,13 @@ declare module 'models' {
     workspace: IWorkspace;
     sceneGraph: {
       containers: ITreeNode[];
+      atmosphere: {
+        elevation: PropValue;
+        cloudiness: PropValue;
+        foginess: PropValue;
+        windiness: PropValue;
+        dayNightCycle: PropValue;
+      };
     };
     created: number;
     lastModified: number;

@@ -1,6 +1,11 @@
 import { Component, register, Pane3D } from 'rewild-ui';
 import { Renderer } from 'rewild-renderer';
-import { projectStore } from 'src/ui/stores/ProjectStore';
+import { projectStore, ProjectStoreEvents } from 'src/ui/stores/ProjectStore';
+import { Subscriber } from 'node_modules/rewild-common';
+import {
+  syncFromEditorResource,
+  SyncRendererFromProject,
+} from './utils/RendererSync';
 
 interface Props {}
 
@@ -11,45 +16,27 @@ export class EditorViewport extends Component<Props> {
   init() {
     this.renderer = new Renderer();
 
+    const onProjectLoaded: Subscriber<ProjectStoreEvents> = (event) => {
+      if (event.kind === 'loading-completed') {
+        SyncRendererFromProject(this.renderer, event.project);
+      }
+    };
+
+    this.onMount = () => {
+      projectStore.dispatcher.add(onProjectLoaded);
+    };
+
+    this.onCleanup = () => {
+      projectStore.dispatcher.remove(onProjectLoaded);
+    };
+
     this.observeStore(projectStore, (e) => {
       if (e.includes('selectedResource.properties')) {
         if (projectStore.target.selectedResource?.id === 'SKY') {
-          const cloudiness =
-            projectStore.target.selectedResource.properties.find(
-              (p) => p.type === 'cloudiness'
-            );
-
-          const foginess = projectStore.target.selectedResource.properties.find(
-            (p) => p.type === 'foginess'
+          syncFromEditorResource(
+            projectStore.target.selectedResource.id,
+            this.renderer
           );
-
-          const elevation =
-            projectStore.target.selectedResource.properties.find(
-              (p) => p.type === 'sun_elevation'
-            );
-
-          const dayNightCycle =
-            projectStore.target.selectedResource.properties.find(
-              (p) => p.type === 'day_night_cycle'
-            );
-
-          if (cloudiness) {
-            this.renderer.atmosphere.skyRenderer.cloudiness =
-              cloudiness.value as number;
-          }
-
-          if (foginess) {
-            this.renderer.atmosphere.skyRenderer.foginess =
-              foginess.value as number;
-          }
-
-          if (elevation) {
-            this.renderer.atmosphere.skyRenderer.elevation =
-              elevation.value as number;
-          }
-
-          this.renderer.atmosphere.skyRenderer.dayNightCycle =
-            dayNightCycle?.value as boolean;
         }
       }
 

@@ -1,7 +1,7 @@
 import './SetupWorkerUtils';
 import { generateTerrainMesh } from '../MeshGenerator';
 import { generateNoiseMap } from '../Noise';
-import { Vector2 } from 'rewild-common';
+import { clamp, lerp, Vector2 } from 'rewild-common';
 
 self.onmessage = async (event: MessageEvent) => {
   const { chunkSize, lod, position } = event.data;
@@ -21,10 +21,10 @@ self.onmessage = async (event: MessageEvent) => {
   // (0-255) based on the noise value.
   const textureValues = new Uint8Array(chunkSize * chunkSize * 4);
   for (let i = 0; i < chunkSize * chunkSize; i++) {
-    const value = Math.floor(Math.min(1, Math.max(0, noise[i])) * 255);
-    textureValues[i * 4] = value;
-    textureValues[i * 4 + 1] = value;
-    textureValues[i * 4 + 2] = value;
+    const noiseValue = clamp(noise[i], 0, 1);
+    textureValues[i * 4] = lerp(0.51 * 255, 255, noiseValue);
+    textureValues[i * 4 + 1] = lerp(0.31 * 255, 255, noiseValue);
+    textureValues[i * 4 + 2] = lerp(0.21 * 255, 255, noiseValue);
     textureValues[i * 4 + 3] = 255; // alpha
   }
 
