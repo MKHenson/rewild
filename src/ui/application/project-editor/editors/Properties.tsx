@@ -1,4 +1,4 @@
-import { theme, Component, register, Typography, Card } from 'rewild-ui';
+import { Component, register, Typography, Card } from 'rewild-ui';
 import { PropertyValue } from './PropertyValue';
 import { projectStore } from '../../../stores/ProjectStore';
 
