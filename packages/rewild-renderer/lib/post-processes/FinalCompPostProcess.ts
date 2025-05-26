@@ -3,9 +3,10 @@ import { Renderer } from '../Renderer';
 import shader from '../shaders/atmosphereFinal.wgsl';
 import { samplerManager } from '../textures/SamplerManager';
 import vertexScreenQuadShader from '../shaders/utils/vertexScreenQuad.wgsl';
+import commonShaderFns from '../shaders/atmosphere/fog.wgsl';
 import { PostProcessManager } from './PostProcessManager';
 import { Camera } from '../core/Camera';
-import { degToRad, Vector3 } from 'rewild-common';
+import { degToRad, Matrix4, Vector3 } from 'rewild-common';
 
 const finalUniformBufferSize =
   64 + // invProjectionMatrix
@@ -14,11 +15,14 @@ const finalUniformBufferSize =
   4 + // cloudiness
   16 + // sunPosition
   16 + // cameraPosition
-  4; // padding
+  4 + // padding
+  4 + // foginess
+  0;
 
 const alignedUniformBufferSize = Math.ceil(finalUniformBufferSize / 256) * 256;
 const tempVec = new Vector3();
 const uniformData = new Float32Array(alignedUniformBufferSize / 4);
+const invViewProjectionMatrix = new Matrix4();
 
 export class FinalCompPostProcess implements IPostProcess {
   renderTarget: GPUTexture;
@@ -45,7 +49,7 @@ export class FinalCompPostProcess implements IPostProcess {
     const scaleFactor = this.scaleFactor;
 
     const module = device.createShaderModule({
-      code: shader,
+      code: commonShaderFns + shader,
     });
 
     const vertexScreenQuadModule = device.createShaderModule({
@@ -121,7 +125,11 @@ export class FinalCompPostProcess implements IPostProcess {
 
     const canvas = renderer.canvas;
 
-    uniformData.set(camera.projectionMatrixInverse.elements, 0); // modelMatrix
+    invViewProjectionMatrix
+      .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+      .invert();
+
+    uniformData.set(invViewProjectionMatrix.elements, 0); // modelMatrix
     uniformData.set(camera.transform.matrixWorld.elements, 16); // modelMatrix
 
     uniformData.set(
@@ -138,6 +146,7 @@ export class FinalCompPostProcess implements IPostProcess {
         camera.transform.position.y,
         camera.transform.position.z,
         0, //
+        renderer.atmosphere.skyRenderer.foginess,
       ],
       32
     );
