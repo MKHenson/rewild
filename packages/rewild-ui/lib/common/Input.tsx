@@ -1,16 +1,18 @@
-import { Component, register } from "../Component";
-import { theme } from "../theme";
+import { Component, register } from '../Component';
+import { theme } from '../theme';
 
 interface Props {
   value?: string;
   placeholder?: string;
   autoFocus?: boolean;
+  disabled?: boolean;
   fullWidth?: boolean;
+  className?: string;
   onChange?: (val: string) => void;
   onClick?: (e: MouseEvent) => void;
 }
 
-@register("x-input")
+@register('x-input')
 export class Input extends Component<Props> {
   init() {
     const onClick = (e: MouseEvent) => {
@@ -23,27 +25,33 @@ export class Input extends Component<Props> {
 
     this.onMount = () => {
       if (this.props.autoFocus) {
-        const elm = this.shadow!.querySelector("input")!;
+        const elm = this.shadow!.querySelector('input')!;
         elm.focus();
         elm.setSelectionRange(0, this.props.value?.length || null);
       }
     };
 
-    return () => (
-      <div class={`input ${this.props.fullWidth ? "fullwidth" : ""}`}>
-        <input
-          autofocus={this.props.autoFocus}
-          value={this.props.value || ""}
-          onclick={onClick}
-          placeholder={this.props.placeholder || ""}
-          onchange={
-            this.props.onChange
-              ? (e) => this.props.onChange!(e.currentTarget.value)
-              : undefined
-          }
-        />
+    const elm = (
+      <div>
+        <input />
       </div>
     );
+
+    return () => {
+      elm.className = `input ${this.props.fullWidth ? 'fullwidth' : ''}`;
+
+      const input = elm.children[0] as HTMLInputElement;
+      input.className = this.props.className || '';
+      input.autofocus = this.props.autoFocus || false;
+      input.disabled = this.props.disabled || false;
+      input.value = this.props.value?.toString() || '';
+      input.onclick = onClick;
+      input.onchange = this.props.onChange
+        ? (e) => this.props.onChange!(input.value)
+        : null;
+
+      return elm;
+    };
   }
 
   getStyle() {

@@ -16,6 +16,7 @@ import {
 } from '../../api';
 import { sceneGraphStore } from './SceneGraphStore';
 import { createExporterObj } from '../utils/exportHelper';
+import { Dispatcher } from 'rewild-common';
 
 export interface IProjectStore {
   loading: boolean;
@@ -33,7 +34,13 @@ function extractProp(node: ITreeNode, type: PropertyType) {
   return property?.value;
 }
 
+export type ProjectStoreEvents =
+  | { kind: 'loading-completed'; project: IProject }
+  | { kind: 'loading-initiated' };
+
 export class ProjectStore extends Store<IProjectStore> {
+  dispatcher: Dispatcher<ProjectStoreEvents>;
+
   constructor() {
     super({
       loading: false,
@@ -43,10 +50,13 @@ export class ProjectStore extends Store<IProjectStore> {
       error: undefined,
       selectedResource: null,
     });
+
+    this.dispatcher = new Dispatcher<ProjectStoreEvents>();
   }
 
   async getProject(projectId: string) {
     this.defaultProxy.loading = true;
+    this.dispatcher.dispatch({ kind: 'loading-initiated' });
 
     try {
       const resp = await getProjectApi(projectId);
@@ -63,6 +73,10 @@ export class ProjectStore extends Store<IProjectStore> {
     });
 
     sceneGraphStore.buildTree(this.target.project!);
+    this.dispatcher.dispatch({
+      kind: 'loading-completed',
+      project: this.target.project!,
+    });
   }
 
   async updateProject() {
@@ -76,6 +90,9 @@ export class ProjectStore extends Store<IProjectStore> {
 
     token.sceneGraph = {
       containers: containers || [],
+      atmosphere: {
+        ...sceneGraphStore.buildObjectFromProperties('SKY')!,
+      },
     };
 
     this.defaultProxy.loading = true;

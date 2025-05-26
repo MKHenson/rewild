@@ -29,40 +29,46 @@ export class Properties extends Component<Props> {
               {selectedResource.properties
                 .filter((p) => p.valueType !== 'hidden')
                 .map((prop, index) => {
-                  return (
-                    <PropertyValue
-                      label={prop.label}
-                      value={prop.value}
-                      type={prop.valueType}
-                      options={prop.options}
-                      valueOptions={prop.valueOptions}
-                      refocus={lastFocussedProp === index}
-                      onChange={(val) => {
-                        lastFocussedProp = index;
-                        prop.value = val;
-                        projectStoreProxy.dirty = true;
-                      }}
-                    />
-                  );
+                  return [
+                    <Typography variant="label">{prop.label}</Typography>,
+                    <div class="value">
+                      <PropertyValue
+                        value={prop.value}
+                        type={prop.valueType}
+                        options={prop.options}
+                        valueOptions={prop.valueOptions}
+                        refocus={lastFocussedProp === index}
+                        onChange={(val) => {
+                          lastFocussedProp = index;
+                          prop.value = val;
+                          projectStoreProxy.dirty = true;
+                        }}
+                      />
+                    </div>,
+                  ].flat();
                 })}
-              <PropertyValue
-                label="ID"
-                value={selectedResource?.id}
-                type="string"
-                readonly
-                refocus={false}
-              />
-              <PropertyValue
-                label="Name"
-                value={selectedResource.name}
-                type="string"
-                refocus={lastFocussedProp === -2}
-                onChange={(val) => {
-                  lastFocussedProp = -2;
-                  selectedResource.name = val;
-                  projectStoreProxy.dirty = true;
-                }}
-              />
+              <Typography variant="label">ID</Typography>
+              <div class="value">
+                <PropertyValue
+                  value={selectedResource?.id}
+                  type="string"
+                  readonly
+                  refocus={false}
+                />
+              </div>
+              <Typography variant="label">Name</Typography>
+              <div class="value">
+                <PropertyValue
+                  value={selectedResource.name}
+                  type="string"
+                  refocus={lastFocussedProp === -2}
+                  onChange={(val) => {
+                    lastFocussedProp = -2;
+                    selectedResource.name = val;
+                    projectStoreProxy.dirty = true;
+                  }}
+                />
+              </div>
             </div>
           )}
         </Card>
@@ -83,6 +89,8 @@ const StyledPropGrid = cssStylesheet(css`
   }
 
   .properties {
-    border-top: 1px solid ${theme.colors.onSurfaceLight};
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    align-items: center;
   }
 `);

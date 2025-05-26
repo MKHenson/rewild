@@ -1,4 +1,10 @@
-import { ITemplateTreeNode, IProject, ITreeNode } from 'models';
+import {
+  ITemplateTreeNode,
+  IProject,
+  ITreeNode,
+  PropertyType,
+  PropValue,
+} from 'models';
 import { traverseTree, Store } from 'rewild-ui';
 import { containerFactory } from '../utils/TemplateFactories';
 
@@ -44,7 +50,7 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
               label: 'Cloudiness',
               type: 'cloudiness',
               valueType: 'float',
-              value: 0.7,
+              value: project.sceneGraph?.atmosphere?.cloudiness || 0.7,
               valueOptions: {
                 min: 0,
                 max: 1,
@@ -56,7 +62,19 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
               label: 'Foginess',
               type: 'foginess',
               valueType: 'float',
-              value: 0.3,
+              value: project.sceneGraph?.atmosphere?.foginess || 0.3,
+              valueOptions: {
+                min: 0,
+                max: 1,
+                step: 0.01,
+                precision: 2,
+              },
+            },
+            {
+              label: 'Windiness',
+              type: 'windiness',
+              valueType: 'float',
+              value: project.sceneGraph?.atmosphere?.windiness || 0.5,
               valueOptions: {
                 min: 0,
                 max: 1,
@@ -66,9 +84,9 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
             },
             {
               label: 'Sun Elevation',
-              type: 'sun_elevation',
+              type: 'elevation',
               valueType: 'float',
-              value: 0,
+              value: project.sceneGraph?.atmosphere?.elevation || 80,
               valueOptions: {
                 min: -360,
                 max: 360,
@@ -78,14 +96,50 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
             },
             {
               label: 'Day Night Cycle',
-              type: 'day_night_cycle',
+              type: 'dayNightCycle',
               valueType: 'boolean',
-              value: false,
+              value: project.sceneGraph?.atmosphere?.dayNightCycle || false,
             },
           ],
         },
       } as ITreeNode,
     ];
+  }
+
+  findNodeById(
+    id: string,
+    nodes: ITreeNode[] | null = this._defaultProxy.nodes
+  ): ITreeNode | null {
+    if (!nodes) return null;
+
+    for (const node of nodes) {
+      if (node.resource?.id === id) {
+        return node;
+      }
+
+      if (node.children) {
+        const found = this.findNodeById(id, node.children);
+        if (found) {
+          return found;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  buildObjectFromProperties(id: string) {
+    const node = this.findNodeById(id);
+    if (!node) {
+      return null;
+    }
+
+    const obj = node.resource?.properties.reduce((acc, cur) => {
+      acc[cur.type] = cur.value;
+      return acc;
+    }, {} as { [key in PropertyType]: PropValue });
+
+    return obj;
   }
 
   removeNode = (node: ITreeNode) => {

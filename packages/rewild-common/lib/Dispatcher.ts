@@ -1,13 +1,13 @@
-type Listener<T> = (event: T) => void;
+export type Subscriber<T> = (event: T) => void;
 
 export class Dispatcher<T> {
-  listeners: Listener<T>[] = [];
+  listeners: Subscriber<T>[] = [];
 
-  add(listener: Listener<T>) {
+  add(listener: Subscriber<T>) {
     this.listeners.push(listener);
   }
 
-  remove(listener: Listener<T>) {
+  remove(listener: Subscriber<T>) {
     const index = this.listeners.indexOf(listener);
     if (index !== -1) {
       this.listeners.splice(index, 1);

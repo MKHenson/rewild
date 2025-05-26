@@ -98,11 +98,10 @@ export class NumberInput extends Component<Props> {
     );
 
     return () => {
-      elm.className = `input ${this.props.fullWidth ? 'fullwidth' : ''} ${
-        this.props.className || ''
-      }`;
+      elm.className = `input ${this.props.fullWidth ? 'fullwidth' : ''}`;
       elm.onmousedown = onMouseDown;
       const input = elm.children[0] as HTMLInputElement;
+      input.className = this.props.className || '';
       input.autofocus = this.props.autoFocus || false;
       input.disabled = this.props.disabled || false;
       input.value = this.props.value?.toString() || '';
