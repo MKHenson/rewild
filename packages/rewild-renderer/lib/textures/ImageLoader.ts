@@ -8,18 +8,20 @@ export class ImageLoader {
   async loadImages(paths: string[]) {
     const promises = paths.map((src) => {
       return new Promise<ImageBitmap>(function (resolve, reject) {
-        const img = document.createElement("img");
-        img.crossOrigin = "Anonymous";
+        const img = document.createElement('img');
+        img.crossOrigin = 'Anonymous';
         img.src = src;
-        img
-          .decode()
-          .then((result) => {
-            return createImageBitmap(img);
-          })
-          .then((data) => {
-            resolve(data);
-          })
-          .catch((err) => reject(err));
+        img.onload = () => {
+          createImageBitmap(img)
+            .then((data) => {
+              resolve(data);
+            })
+            .catch((err) => reject(err));
+        };
+
+        img.onerror = (err) => {
+          reject(err);
+        };
       });
     });
 

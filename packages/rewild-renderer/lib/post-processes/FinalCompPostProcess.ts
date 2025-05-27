@@ -3,6 +3,7 @@ import { Renderer } from '../Renderer';
 import shader from '../shaders/atmosphereFinal.wgsl';
 import { samplerManager } from '../textures/SamplerManager';
 import vertexScreenQuadShader from '../shaders/utils/vertexScreenQuad.wgsl';
+import constantsFn from '../shaders/atmosphere/constants.wgsl';
 import commonShaderFns from '../shaders/atmosphere/fog.wgsl';
 import { PostProcessManager } from './PostProcessManager';
 import { Camera } from '../core/Camera';
@@ -49,7 +50,7 @@ export class FinalCompPostProcess implements IPostProcess {
     const scaleFactor = this.scaleFactor;
 
     const module = device.createShaderModule({
-      code: commonShaderFns + shader,
+      code: constantsFn + commonShaderFns + shader,
     });
 
     const vertexScreenQuadModule = device.createShaderModule({

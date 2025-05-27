@@ -39,7 +39,7 @@ fn fs(
 	// in scattering
 	// var cosTheta: f32 = dot( direction, vSunDirection );
     var cosTheta = dot( direction, vec3f(0.0, 1.0, 0.0) );
-	let hemisphereMask: f32 = smoothstep( -0.3, 0.1, cosTheta );
+	let hemisphereMask: f32 = smoothstep( -0.3, -0.1, cosTheta );
 
      // Define uv based on fragCoord
     let uv = fragCoord.xy / vec2(object.resolutionX, object.resolutionY);

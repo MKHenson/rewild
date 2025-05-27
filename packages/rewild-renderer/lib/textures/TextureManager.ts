@@ -17,6 +17,10 @@ const assets: [string, string | string[]][] = [
   ['basketball', 'basketball.png'],
   ['earth', 'earth-day-2k.jpg'],
   [
+    'rocky-mountain-texture-seamless',
+    'nature/landscapes/rocky-mountain-texture-seamless.png',
+  ],
+  [
     'ground-coastal-1',
     'nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png',
   ],

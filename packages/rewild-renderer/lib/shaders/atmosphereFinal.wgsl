@@ -50,17 +50,31 @@ var<private> sunDotUp: f32;
   var blendedColor = sky * (1.0 - preMultipliedClouds.a) + preMultipliedClouds;
    
   let worldPos = worldFromScreenCoord( uv, rawDepth );
-  let fogFactor = 1.0 - saturate( worldPos.y + 10.0 / 10.0 );
 
-  let dir: vec3f = normalize( worldPos - object.cameraPosition );
-  let sunDirection: vec3f = normalize( object.sunPosition - object.cameraPosition );
-  
-  sunDotUp = dot(sunDirection, vec3f(0.0, 1.0, 0.0));
+  if ( rawDepth < 1.0 ) {
+    let startHeigh = -10.0;
+    let endHeight = mix(2.0, 10.0, object.foginess);
+    let startDistance = mix( 200.0, 0.0, object.foginess );
+    let endDistance = mix( 800.0, 300.0, object.foginess );
 
-  let fogColor = getFogColor( dir, object.cameraPosition, sunDirection, blendedColor.rgb );
+    // Height based fog
+    let t = saturate( (worldPos.y - startHeigh) / (endHeight - startHeigh) );
+    let heightFogFactor = 1.0 - pow( t, 3.0 );
 
-  if (rawDepth < 1.0) {
-    return vec4f( fogColor, max(blendedColor.a, fogFactor) );
+    // Distance based fog
+    let distance = length(worldPos - object.cameraPosition);
+    let distanceFogFactor = saturate( (distance - startDistance) / (endDistance - startDistance) );
+
+    // Adjust blending based on fog factors
+    let fogFactor = saturate( distanceFogFactor + ( heightFogFactor * smoothstep( 0.0, 0.3, saturate( distance / endDistance ) ) ) );
+
+    let dir: vec3f = normalize( worldPos - object.cameraPosition );
+    let sunDirection: vec3f = normalize( object.sunPosition );
+
+    sunDotUp = dot(sunDirection, vec3f(0.0, 1.0, 0.0));
+
+    let fogColor = getFogColor( dir, object.cameraPosition, sunDirection, blendedColor.rgb );
+    return vec4f( 1.0 - exp( -fogColor / 8.6 ), max(blendedColor.a, fogFactor) );
   }
 
   return vec4f( adjustContrast(1.1, blendedColor.rgb), blendedColor.a );

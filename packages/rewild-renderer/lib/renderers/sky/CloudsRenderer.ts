@@ -1,5 +1,7 @@
 import { Renderer } from '../../Renderer';
 import commonShaderFns from '../../shaders/atmosphere/common.wgsl';
+import constantsFns from '../../shaders/atmosphere/constants.wgsl';
+import fogFns from '../../shaders/atmosphere/fog.wgsl';
 import shader from '../../shaders/atmosphere/clouds.wgsl';
 import { samplerManager } from '../../textures/SamplerManager';
 import { textureManager } from '../../textures/TextureManager';
@@ -20,7 +22,7 @@ export class CloudsRenderer {
     const resolutionScale = this.resolutionScale;
 
     const module = device.createShaderModule({
-      code: shader + commonShaderFns,
+      code: shader + constantsFns + fogFns + commonShaderFns,
     });
 
     this.renderTarget = device.createTexture({

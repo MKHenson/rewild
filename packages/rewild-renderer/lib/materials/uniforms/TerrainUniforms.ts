@@ -10,8 +10,10 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   bindGroup: GPUBindGroup;
   requiresUpdate: boolean;
 
+  private _albedoTexture: GPUTexture;
   private _texture: GPUTexture;
   private _sampler: GPUSampler;
+  private _seamlessSampler: GPUSampler;
 
   constructor(group: number) {
     this.group = group;
@@ -25,7 +27,11 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
     if (!this._texture)
       this._texture = textureManager.get('grid-data').gpuTexture;
+    if (!this._albedoTexture)
+      this._albedoTexture = textureManager.get('grid-data').gpuTexture;
     if (!this._sampler) this._sampler = samplerManager.get('linear');
+    if (!this._seamlessSampler)
+      this._seamlessSampler = samplerManager.get('linear');
 
     this.bindGroup = device.createBindGroup({
       label: 'terrain textures',
@@ -38,6 +44,14 @@ export class TerrainUniforms implements ISharedUniformBuffer {
         {
           binding: 1,
           resource: this._texture.createView(),
+        },
+        {
+          binding: 2,
+          resource: this._albedoTexture.createView(),
+        },
+        {
+          binding: 3,
+          resource: this._seamlessSampler,
         },
       ],
     });
@@ -54,6 +68,15 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     return this._texture;
   }
 
+  set albedoTexture(texture: GPUTexture) {
+    this._albedoTexture = texture;
+    this.requiresUpdate = true;
+  }
+
+  get albedoTexture(): GPUTexture {
+    return this._albedoTexture;
+  }
+
   set sampler(sampler: GPUSampler) {
     this._sampler = sampler;
     this.requiresUpdate = true;
@@ -61,6 +84,15 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
   get sampler(): GPUSampler {
     return this._sampler;
+  }
+
+  get seamlessSampler(): GPUSampler {
+    return this._seamlessSampler;
+  }
+
+  set seamlessSampler(sampler: GPUSampler) {
+    this._seamlessSampler = sampler;
+    this.requiresUpdate = true;
   }
 
   setNumInstances(numInstances: number): void {}
