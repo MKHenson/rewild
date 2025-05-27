@@ -1,40 +1,3 @@
-const PI: f32 = 3.141592653589793238462643383279502884197169;
-const FOG_COLOR_DAY = vec3f( 0.55, 0.8, 1.0 );
-const FOG_COLOR_NIGHT = vec3f( 0.23, 0.25, 0.37 );
-const FOG_COLOR_EVENING = vec3f( 0.32, 0.12, 0.0 ); //  vec3f( 0.75, 0.7, 0.5 );
-const FOG_COLOR_STORM = vec3f( 0.35, 0.37, 0.25 );
-const CLOUD_AMBIENT_DAY_COLOR = vec3f(0.5, 0.8, 1.0);
-const CLOUD_AMBIENT_EVENING_COLOR = vec3f( 0.11, 0.13, 0.17 );
-const CLOUD_AMBIENT_NIGHT_COLOR = vec3f( 0.10, 0.12, 0.17);
-const EARTH_RADIUS: f32 = 6300e3;
-const CLOUD_START: f32 = 1200.0;
-const CLOUD_HEIGHT: f32 = 600.0;
-const SUN_POWER: vec3f = vec3(1.0,0.9,0.6) * 1200.;
-const LOW_SCATTER: vec3f = vec3(1.0, 0.7, 0.5);
-
-
-struct ObjectStruct {
-	modelMatrix : mat4x4<f32>,
-	projectionMatrix : mat4x4<f32>,
-	modelViewMatrix : mat4x4<f32>,
-	cameraPosition : vec3<f32>,
-    resolutionScale: f32,
-	sunPosition : vec3<f32>,
-    padding2: f32, // Padding to align the next field
-	up : vec3<f32>,
-    padding3: f32, // Padding to align the next field
-	iTime: f32,
-    resolutionX: f32,
-    resolutionY: f32,
-    cloudiness: f32,
-    foginess: f32,
-    windiness: f32
-};
-
-struct OutputStruct {
-	@location(0) color: vec4<f32>
-};
-
 
 
 /**
@@ -104,15 +67,15 @@ fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3
     var fogColor = mix(FOG_COLOR_NIGHT, FOG_COLOR_EVENING, smoothstep(-0.2, 0.2, sunDotUp));
     fogColor = mix(fogColor, FOG_COLOR_DAY, smoothstep(0.2, 0.8, sunDotUp));
 
+    let stormFactor = saturate( (object.cloudiness - 0.8) / 0.2 );
+    fogColor = mix( fogColor, FOG_COLOR_STORM, stormFactor );
 
-    fogColor = mix( fogColor, FOG_COLOR_STORM, object.cloudiness );
-
-    let fogDensity = mix( 0.00005, 0.0008, foginess );
+    let fogDensity = mix( 0.00002, 0.0008, foginess );
 
     // Reduce the fog color as the sun goes into the evening
     fogColor = fogColor * mix( 0.5, 1.0, sunDotUp );
 
-    return mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER + 10.0 * fogColor * darknessModifier, originalColor.xyz, exp(-fogDensity * fogDistance ));
+    return mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER * mix(1.0, 0.3, smoothstep( 0.8, 1.0, object.cloudiness )) + 10.0 * fogColor * darknessModifier, originalColor.xyz, exp(-fogDensity * fogDistance ));
 }
 
 fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec3f ) -> vec3f {

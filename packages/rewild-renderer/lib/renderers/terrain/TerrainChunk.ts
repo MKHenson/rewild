@@ -169,6 +169,9 @@ export class LODMesh {
       terrainPass.terrainUniforms.sampler =
         samplerManager.get('linear-clamped');
       terrainPass.terrainUniforms.texture = terrainTexture.gpuTexture;
+      terrainPass.terrainUniforms.albedoTexture = textureManager.get(
+        'rocky-mountain-texture-seamless'
+      ).gpuTexture;
 
       this.mesh = new Mesh(geometry, terrainPass);
       this.transform.addChild(this.mesh.transform);

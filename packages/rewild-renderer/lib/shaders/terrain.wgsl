@@ -30,10 +30,33 @@ fn vs(
 
 @group(1) @binding(0) var mySampler: sampler;
 @group(1) @binding(1) var myTexture: texture_2d<f32>;
+@group(1) @binding(2) var albedoTexture: texture_2d<f32>;
+@group(1) @binding(3) var seamlessSampler: sampler;
 
 @fragment
 fn fs(
   @location(0) fragUV: vec2f,
 ) -> @location(0) vec4f {
-  return textureSample(myTexture, mySampler, fragUV);
+  // Scale the UVs to reduce tiling
+  let scaledUV = fragUV * 25.0;
+
+  // Generate a random offset based on UVs
+  let k = textureSample(albedoTexture, seamlessSampler, scaledUV * 0.005).x; // Variation pattern
+  let index = k * 8.0;
+  let i = floor(index);
+  let f = fract(index);
+
+  // Compute offsets for virtual patterns
+  let offa = sin(vec2f(3.0, 7.0) * (i + 0.0));
+  let offb = sin(vec2f(3.0, 7.0) * (i + 1.0));
+
+  // Sample the two closest virtual patterns
+  let cola = textureSample(albedoTexture, seamlessSampler, scaledUV + offa).rgb;
+  let colb = textureSample(albedoTexture, seamlessSampler, scaledUV + offb).rgb;
+
+  // Interpolate between the two virtual patterns
+  let blendedColor = mix(cola, colb, smoothstep(0.2, 0.8, f - 0.1 * dot(cola - colb, vec3f(1.0, 1.0, 1.0))));
+
+  // Combine the textures
+  return textureSample(myTexture, mySampler, fragUV) * vec4f(blendedColor, 1.0);
 }
