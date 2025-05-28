@@ -1,8 +1,8 @@
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from '../materials/IMaterialPass';
-import { IVisual, Transform } from './Transform';
+import { IComponent, Transform } from './Transform';
 
-export class Mesh implements IVisual {
+export class Mesh implements IComponent {
   geometry: Geometry;
   material: IMaterialPass;
   transform: Transform;
@@ -17,7 +17,7 @@ export class Mesh implements IVisual {
     this.transform = transform;
     this.visible = true;
 
-    transform.renderable = this;
+    transform.component = this;
 
     this.setMaterial(material);
   }

@@ -1,8 +1,12 @@
+import { Vector3 } from 'rewild-common';
+
 export class GeometryGroup {
   public start: i32;
   public count: i32;
   public materialIndex: i32;
 }
+
+const _vector: Vector3 = new Vector3();
 
 export class Geometry {
   requiresBuild: boolean = true;
@@ -81,5 +85,85 @@ export class Geometry {
         ],
       },
     ];
+  }
+
+  normalizeNormals(): void {
+    const normals = this.normals;
+    if (!normals) return;
+
+    for (let i = 0; i < normals.length; i += 3) {
+      _vector.set(normals[i], normals[i + 1], normals[i + 2]);
+      _vector.normalize();
+      normals[i] = _vector.x;
+      normals[i + 1] = _vector.y;
+      normals[i + 2] = _vector.z;
+    }
+  }
+
+  computeNormals(): void {
+    const indices = this.indices;
+    const vertices = this.vertices;
+
+    if (vertices) {
+      if (!this.normals) {
+        this.normals = new Float32Array(vertices.length);
+      } else {
+        this.normals.fill(0);
+      }
+
+      const pA = new Vector3();
+      const pB = new Vector3();
+      const pC = new Vector3();
+      const nA = new Vector3();
+      const nB = new Vector3();
+      const nC = new Vector3();
+      const cB = new Vector3();
+      const aB = new Vector3();
+
+      if (indices) {
+        for (let i = 0; i < indices.length; i += 3) {
+          const vA = indices[i];
+          const vB = indices[i + 1];
+          const vC = indices[i + 2];
+
+          pA.fromBuffer(vA * 3, vertices);
+          pB.fromBuffer(vB * 3, vertices);
+          pC.fromBuffer(vC * 3, vertices);
+
+          cB.subVectors(pC, pB);
+          aB.subVectors(pA, pB);
+          cB.cross(aB);
+
+          nA.fromBuffer(vA * 3, this.normals);
+          nB.fromBuffer(vB * 3, this.normals);
+          nC.fromBuffer(vC * 3, this.normals);
+
+          nA.add(cB);
+          nB.add(cB);
+          nC.add(cB);
+
+          this.normals.set([nA.x, nA.y, nA.z], vA * 3);
+          this.normals.set([nB.x, nB.y, nB.z], vB * 3);
+          this.normals.set([nC.x, nC.y, nC.z], vC * 3);
+        }
+      } else {
+        for (let i = 0; i < vertices.length; i += 9) {
+          pA.fromBuffer(i, vertices);
+          pB.fromBuffer(i + 3, vertices);
+          pC.fromBuffer(i + 6, vertices);
+
+          cB.subVectors(pC, pB);
+          aB.subVectors(pA, pB);
+          cB.cross(aB);
+
+          this.normals.set([cB.x, cB.y, cB.z], i);
+          this.normals.set([cB.x, cB.y, cB.z], i + 3);
+          this.normals.set([cB.x, cB.y, cB.z], i + 6);
+        }
+      }
+    }
+
+    this.normalizeNormals();
+    this.requiresBuild = true;
   }
 }

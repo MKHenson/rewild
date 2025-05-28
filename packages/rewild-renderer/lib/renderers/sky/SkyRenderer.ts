@@ -4,7 +4,7 @@ import { PerMeshTracker } from '../../materials/PerMeshTracker';
 import { SharedUniformsTracker } from '../../materials/SharedUniformsTracker';
 import { Transform } from '../../core/Transform';
 import { Camera } from '../../core/Camera';
-import { degToRad, Vector3 } from 'rewild-common';
+import { Color, degToRad, Vector3 } from 'rewild-common';
 import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
 import { CloudsRenderer } from './CloudsRenderer';
 import { TAAPostProcess } from '../../post-processes/TAAPostProcess';
@@ -13,6 +13,7 @@ import { BlurProcess } from '../../post-processes/BlurProcess';
 import { FinalCompPostProcess } from '../../post-processes/FinalCompPostProcess';
 import { AtmosphereRenderer } from './AtmosphereRenderer';
 import { DenoiseProcess } from '../../post-processes/DenoiseProcess';
+import { DirectionLight } from '../../core/lights/DirectionLight';
 
 export class SkyRenderer {
   perMeshTracker: PerMeshTracker;
@@ -36,22 +37,30 @@ export class SkyRenderer {
   foginess: f32;
   windiness: f32;
   upDot: f32;
-  sunPosition: Vector3;
+  sun: DirectionLight;
 
   uniformBuffer: GPUBuffer;
   uniformData: Float32Array;
 
   canvasSizeWatcher: CanvasSizeWatcher;
 
-  constructor() {
+  _dayColor: Color;
+  _eveColor: Color;
+
+  constructor(parent: Transform) {
     this.azimuth = 180;
     this.elevation = -0;
     this.cloudiness = 0.7;
     this.foginess = 0.3;
     this.windiness = 0.5;
     this.upDot = 0.0;
-    this.sunPosition = new Vector3();
+    this.sun = new DirectionLight();
+    this.sun.intensity = 2.0;
+    parent.addChild(this.sun.transform);
     this.requiresRebuild = true;
+
+    this._dayColor = new Color(1, 1, 1);
+    this._eveColor = new Color(0.32, 0.12, 0.0);
 
     this.cloudsPass = new CloudsRenderer();
     this.atmospherePass = new AtmosphereRenderer();
@@ -129,10 +138,17 @@ export class SkyRenderer {
     const theta = degToRad(this.azimuth);
 
     const cloudiness = this.cloudiness;
-    const sunPosition = this.sunPosition;
+    const sunPosition = this.sun.transform.position;
     const uniformData = this.uniformData;
 
-    sunPosition.setFromSphericalCoords(1, phi, theta);
+    const sunRadius = 100;
+    sunPosition.setFromSphericalCoords(sunRadius, phi, theta);
+
+    this.sun.color.lerpColors(
+      this._eveColor,
+      this._dayColor,
+      sunPosition.y / sunRadius
+    );
 
     uniformData.set(transform.matrixWorld.elements, 0); // modelMatrix
     uniformData.set(camera.projectionMatrix.elements, 16); // projectionMatrix

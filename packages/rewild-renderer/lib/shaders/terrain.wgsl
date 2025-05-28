@@ -4,14 +4,24 @@ struct Uniforms {
 }
 @binding(0) @group(0) var<uniform> uniforms : Uniforms;
 
+struct Lightint {
+  direciton : vec3f,
+  intensity : f32,
+  color : vec3f,
+  padding : f32,
+}
+@binding(0) @group(2) var<uniform> lighting : Lightint;
+
 struct VertexInput {
     @location(0) position : vec4<f32>,
     @location(1) uv : vec2<f32>,
+    @location(2) normal : vec3<f32>,
 };
 
 struct VertexOutput {
   @builtin(position) Position : vec4f,
   @location(0) fragUV : vec2f,
+  @location(1) normal : vec3f,
 }
 
 @vertex
@@ -25,6 +35,7 @@ fn vs(
   output.Position = uniforms.projMatrix * mvPosition;
 
   output.fragUV = input.uv;
+  output.normal = input.normal;
   return output;
 }
 
@@ -36,6 +47,7 @@ fn vs(
 @fragment
 fn fs(
   @location(0) fragUV: vec2f,
+  @location(1) normal: vec3f,
 ) -> @location(0) vec4f {
   // Scale the UVs to reduce tiling
   let scaledUV = fragUV * 25.0;
@@ -57,6 +69,9 @@ fn fs(
   // Interpolate between the two virtual patterns
   let blendedColor = mix(cola, colb, smoothstep(0.2, 0.8, f - 0.1 * dot(cola - colb, vec3f(1.0, 1.0, 1.0))));
 
+  let normalizedNormal = normalize(normal);
+  let directionLighting = dot(  normalizedNormal, -lighting.direciton) * lighting.intensity * lighting.color;
+
   // Combine the textures
-  return textureSample(myTexture, mySampler, fragUV) * vec4f(blendedColor, 1.0);
+  return textureSample(myTexture, mySampler, fragUV) * vec4f(blendedColor * directionLighting, 1.0);
 }

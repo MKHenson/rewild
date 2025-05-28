@@ -161,6 +161,7 @@ export class LODMesh {
       geometry.vertices = vertices;
       geometry.uvs = uvs;
       geometry.indices = indices;
+      geometry.computeNormals();
 
       terrainTexture.load(renderer.device);
       geometry.build(renderer.device);
