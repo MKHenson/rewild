@@ -30,7 +30,7 @@ export interface ITransformObserver {
   worldMatrixUpdated(source: Transform): void;
 }
 
-export interface IVisual {}
+export interface IComponent {}
 
 export class Transform implements IQuatChangeListener, IEulerChangeListener {
   static DefaultMatrixAutoUpdate: boolean = true;
@@ -47,7 +47,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
   matrixAutoUpdate: boolean;
   visible: boolean = true;
   observers: ITransformObserver[];
-  renderable: IVisual | null;
+  component: IComponent | null;
 
   readonly position: Vector3;
   readonly rotation: Euler;
@@ -62,7 +62,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
     this.dataProperties = new Int32Array(7);
 
     this.observers = [];
-    this.renderable = null;
+    this.component = null;
 
     this.position = new Vector3();
     this.rotation = new Euler();

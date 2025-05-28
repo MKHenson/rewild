@@ -15,27 +15,20 @@ export class AtmosphereSkybox {
     this.initialized = false;
     this.geometry = BoxGeometryFactory.new();
     this.transform = new Transform();
-    this.skyRenderer = new SkyRenderer();
+    this.skyRenderer = new SkyRenderer(this.transform);
     this.transform.scale.set(1000, 1000, 1000);
     this.transform.updateMatrixWorld();
   }
 
-  render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {
+  update(renderer: Renderer, camera: Camera) {
     this.transform.position.set(
       camera.transform.position.x,
       camera.transform.position.y,
       camera.transform.position.z
     );
+  }
 
-    this.transform.updateMatrixWorld();
-
-    this.transform.modelViewMatrix.multiplyMatrices(
-      camera.matrixWorldInverse,
-      this.transform.matrixWorld
-    );
-
-    this.transform.normalMatrix.getNormalMatrix(this.transform.modelViewMatrix);
-
+  render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {
     if (!this.initialized) {
       this.geometry.build(renderer.device);
       this.skyRenderer.init(renderer);

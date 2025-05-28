@@ -13,6 +13,8 @@ import { AtmosphereSkybox } from './core/AtmosphereSkybox';
 import { TerrainRenderer } from './renderers/terrain/TerrainRenderer';
 import { TrackballControler } from './input/TrackballController';
 import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
+import { RenderList } from './core/RenderList';
+import { Light } from './core/lights/Light';
 
 export class Renderer {
   device: GPUDevice;
@@ -31,10 +33,11 @@ export class Renderer {
 
   perspectiveCam: PerspectiveCamera;
   scene: Transform;
-  private currentRenderList: RenderList;
+  currentRenderList: RenderList;
   atmosphere: AtmosphereSkybox;
   private camController: TrackballControler;
   private canvasSizeWatcher: CanvasSizeWatcher;
+  private renderGroups: IRenderGroup[];
 
   lastTime: number;
   delta: number;
@@ -47,6 +50,9 @@ export class Renderer {
     this.scene = new Transform();
     this.atmosphere = new AtmosphereSkybox();
     this.terrainRenderer = new TerrainRenderer();
+    this.renderGroups = [];
+
+    this.scene.addChild(this.atmosphere.transform);
   }
 
   async init(canvas: HTMLCanvasElement) {
@@ -57,9 +63,6 @@ export class Renderer {
     this.initialized = false;
     this.canvas = canvas;
     this.renderables = [];
-
-    // this.prevWidth = canvas.clientWidth;
-    // this.prevHeight = canvas.clientHeight;
 
     this.canvasSizeWatcher = new CanvasSizeWatcher(canvas);
 
@@ -120,6 +123,7 @@ export class Renderer {
 
     this.camController.update();
 
+    this.atmosphere.update(this, this.perspectiveCam.camera);
     this.terrainRenderer.update(this, this.perspectiveCam.camera);
 
     this.render();
@@ -182,6 +186,10 @@ export class Renderer {
 
     this.currentRenderList.solids.push(transform);
 
+    if (transform.component instanceof Light) {
+      this.currentRenderList.lights.push(transform.component as Light);
+    }
+
     for (let i = 0, l = transform.children.length; i < l; i++)
       this.projectObject(unchecked(transform.children[i]), camera);
   }
@@ -191,7 +199,8 @@ export class Renderer {
     // This is done to minimize the number of draw calls
 
     const transforms = this.currentRenderList.solids;
-    const renderList: IRenderGroup[] = [];
+    const renderList = this.renderGroups;
+    renderList.length = 0; // Clear the render list
 
     let transform: Transform | null;
     let geometry: Geometry | null;
@@ -201,8 +210,10 @@ export class Renderer {
     for (let i: i32 = 0, l: i32 = transforms.length; i < l; i++) {
       transform = transforms[i];
 
-      if (transform.renderable && transform.renderable instanceof Mesh) {
-        mesh = transform.renderable as Mesh;
+      const component = transform.component;
+
+      if (component && component instanceof Mesh) {
+        mesh = component as Mesh;
 
         if (mesh.visible === false) continue;
 
@@ -347,17 +358,5 @@ export class Renderer {
 
       device.queue.submit([postProcessingEncoder.finish()]);
     }
-  }
-}
-
-export class RenderList {
-  solids: Transform[];
-
-  constructor() {
-    this.solids = [];
-  }
-
-  reset(): void {
-    this.solids.splice(0, this.solids.length);
   }
 }

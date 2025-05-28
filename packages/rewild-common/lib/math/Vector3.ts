@@ -193,6 +193,13 @@ export class Vector3 {
     return this.applyQuaternion(_quaternion.setFromAxisAngle(axis, angle));
   }
 
+  fromBuffer(index: i32, array: Float32Array): Vector3 {
+    this.x = array[index];
+    this.y = array[index + 1];
+    this.z = array[index + 2];
+    return this;
+  }
+
   applyMatrix3(m: Matrix3): Vector3 {
     const x = this.x,
       y = this.y,
