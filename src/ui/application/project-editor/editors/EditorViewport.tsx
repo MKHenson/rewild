@@ -12,6 +12,7 @@ interface Props {}
 @register('x-editor-viewport')
 export class EditorViewport extends Component<Props> {
   renderer: Renderer;
+  hasInitialized = false;
 
   init() {
     this.renderer = new Renderer();
@@ -45,6 +46,9 @@ export class EditorViewport extends Component<Props> {
 
     const onCanvasReady = async (pane3D: Pane3D) => {
       try {
+        if (this.hasInitialized) return; // Prevent re-initialization
+        this.hasInitialized = true;
+
         await this.renderer.init(pane3D.canvas()!);
       } catch (err: unknown) {
         console.error(err);
