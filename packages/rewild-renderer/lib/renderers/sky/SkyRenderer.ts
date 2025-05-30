@@ -4,7 +4,7 @@ import { PerMeshTracker } from '../../materials/PerMeshTracker';
 import { SharedUniformsTracker } from '../../materials/SharedUniformsTracker';
 import { Transform } from '../../core/Transform';
 import { Camera } from '../../core/Camera';
-import { Color, degToRad, Vector3 } from 'rewild-common';
+import { Color, degToRad } from 'rewild-common';
 import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
 import { CloudsRenderer } from './CloudsRenderer';
 import { TAAPostProcess } from '../../post-processes/TAAPostProcess';

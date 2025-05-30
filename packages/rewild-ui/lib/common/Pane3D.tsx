@@ -31,11 +31,24 @@ export class Pane3D extends Component<Props> {
         <canvas></canvas>
       </div>
     );
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target === this.shadowRoot?.host) {
+          this.onResize();
+        }
+      }
+    });
+
+    observer.observe(element);
+
     return () => element;
   }
 
   private onResize(e?: UIEvent) {
-    const canvas = this.shadow!.querySelector('canvas')!;
+    const canvas = this.canvas();
+    if (!canvas) return;
+
     canvas.width = this.clientWidth;
     canvas.height = this.clientHeight;
     this.props.onResize?.(this);

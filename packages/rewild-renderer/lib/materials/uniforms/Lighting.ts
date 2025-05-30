@@ -3,8 +3,6 @@ import { Renderer } from '../..';
 import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
-import { samplerManager } from '../../textures/SamplerManager';
-import { textureManager } from '../../textures/TextureManager';
 import { DirectionLight } from '../../core/lights/DirectionLight';
 
 export class Lighting implements ISharedUniformBuffer {

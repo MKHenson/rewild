@@ -1,7 +1,7 @@
 import { Component, register } from 'rewild-ui';
 import { projectStore } from '../../stores/ProjectStore';
-import { EditorGrid } from './EditorGrid';
 import { gameManager } from 'src/core/GameManager';
+import { PaneManager } from './PaneManager';
 
 interface Props {
   onHome: () => void;
@@ -20,7 +20,9 @@ export class Editor extends Component<Props> {
       gameManager.onEnterEditorMode();
     };
 
-    return () => <EditorGrid onHome={this.props.onHome} />;
+    const paneManager = <PaneManager onHome={this.props.onHome} />;
+
+    return () => paneManager;
   }
 
   getStyle() {
