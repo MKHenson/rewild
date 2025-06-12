@@ -1,5 +1,5 @@
-import { instantiate, __AdaptedExports } from "rewild-assembly/build/release";
-import { IBindable } from "./IBindable";
+import { instantiate, __AdaptedExports } from 'rewild-assembly/build/release';
+import { IBindable } from './IBindable';
 
 export type Wasm = typeof __AdaptedExports & {
   getFloat32Array: (pointer: Number) => Float32Array;
@@ -48,7 +48,7 @@ export class WasmManager {
         1,
       memoryU16 = new Uint16Array(this.memory.buffer);
     let start = pointer >>> 1,
-      string = "";
+      string = '';
     while (end - start > 1024)
       string += String.fromCharCode(
         ...memoryU16.subarray(start, (start += 1024))
@@ -69,7 +69,7 @@ export class WasmManager {
       Object.assign(bindings, bindable.createBinding());
 
     const obj = (await instantiate(
-      await WebAssembly.compileStreaming(fetch("/release.wasm")),
+      await WebAssembly.compileStreaming(fetch('/release.wasm')),
       {
         Imports: bindings,
         env: {
@@ -78,13 +78,13 @@ export class WasmManager {
       }
     )) as Wasm;
 
-    obj.getFloat32Array = (pointer) =>
+    obj.getFloat32Array = (pointer: Number) =>
       this.__liftTypedArray(Float32Array, pointer.valueOf() >>> 0);
-    obj.getUint32Array = (pointer) =>
+    obj.getUint32Array = (pointer: Number) =>
       this.__liftTypedArray(Uint32Array, pointer.valueOf() >>> 0);
-    obj.getInt32Array = (pointer) =>
+    obj.getInt32Array = (pointer: Number) =>
       this.__liftTypedArray(Int32Array, pointer.valueOf() >>> 0);
-    obj.readString = (pointer) => this.__liftString(pointer >>> 0);
+    obj.readString = (pointer: number) => this.__liftString(pointer >>> 0);
 
     this.exports = obj;
     wasm = obj;

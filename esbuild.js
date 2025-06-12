@@ -99,6 +99,9 @@ async function build() {
       terrainWorker:
         'rewild-renderer/lib/renderers/terrain/worker/TerrainWorker.ts',
     },
+    loader: {
+      '.wgsl': 'text', // Add this line to handle .wgsl files
+    },
     bundle: true,
     tsconfig: './src/tsconfig.json',
     outdir: './public',
