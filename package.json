@@ -9,6 +9,7 @@
     "unit-tests": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "benchmark": "cross-env TS_NODE_PROJECT=\"./tests/tsconfig.json\" node --experimental-wasi-unstable-preview1 --experimental-wasm-simd --require ts-node/register ./tests/benchmarks.ts",
     "clean": "rimraf public",
+    "build-ci": "npm run build --workspaces && node ./esbuild.js && npm run ts-check",
     "build": "npm run clean && npm run build --workspaces && node ./esbuild.js && npm run ts-check",
     "ts-check": "npx tsc --noEmit --project src/tsconfig.json",
     "ts-check-watch": "npx tsc --noEmit --watch --project src/tsconfig.json",
