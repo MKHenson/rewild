@@ -1,4 +1,4 @@
-import { instantiate, __AdaptedExports } from '../../../public/release';
+import { instantiate, __AdaptedExports } from 'rewild-assembly/build/release';
 import { IBindable } from './IBindable';
 
 export type Wasm = typeof __AdaptedExports & {
