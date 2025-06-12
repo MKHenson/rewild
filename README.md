@@ -2,7 +2,9 @@
 
 Rewild is a game about time travel and natural history. Built with WASM and WebGPU
 
-Checkout the 🦕[Demo](https://rewild-96f5b.web.app/)🦖
+Checkout the 🦕[Demo](https://rewild-96f5b.web.app/)🦖 (WIP)
+
+![Engine Pic](editor.png)
 
 ### How do I get set up?
 
