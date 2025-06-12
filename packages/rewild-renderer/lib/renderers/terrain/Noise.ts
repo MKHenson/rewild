@@ -1,4 +1,4 @@
-import { inverseLerp, Perlin, Vector2 } from 'rewild-common';
+import { Perlin, Vector2 } from 'rewild-common';
 
 function seededRandom(seed: number): () => number {
   let value = seed % 2147483647;
