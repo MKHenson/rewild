@@ -55,7 +55,7 @@ export class Renderer {
     this.scene.addChild(this.atmosphere.transform);
   }
 
-  async init(canvas: HTMLCanvasElement) {
+  async init(canvas: HTMLCanvasElement, autoFrame = true) {
     if (this.initialized) return;
 
     this.disposed = false;
@@ -115,7 +115,7 @@ export class Renderer {
     this.totalDeltaTime = 0;
 
     this.resizeRenderTargets();
-    requestAnimationFrame(this.onFrameHandler);
+    if (autoFrame) requestAnimationFrame(this.onFrameHandler);
   }
 
   onFrame() {
@@ -248,6 +248,14 @@ export class Renderer {
       if (item.pass.requiresRebuild) item.pass.init(this);
 
       item.pass.render(this, pass, camera, item.meshes, item.geometry);
+    }
+  }
+
+  hasWebGPU() {
+    if (!navigator.gpu) {
+      return false;
+    } else {
+      return true;
     }
   }
 

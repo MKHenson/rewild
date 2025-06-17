@@ -1,15 +1,15 @@
 import {
-  Pane3D,
+  // Pane3D,
   Route,
   navigate,
   RouterSwitch,
   Component,
   register,
-  InfoBox,
+  // InfoBox,
 } from 'rewild-ui';
 import { MainMenu } from './MainMenu';
 import { ProjectEditorPage } from './project-editor/ProjectEditorPage';
-import { ErrorType, StartError } from './StartError';
+// import { ErrorType, StartError } from './StartError';
 import { InGame } from './InGame';
 import { Auth } from './Auth';
 import { gameManager } from '../../core/GameManager';
@@ -19,13 +19,13 @@ interface Props {}
 @register('x-application')
 export class Application extends Component<Props> {
   init() {
-    const [errorType, setErrorType] = this.useState<ErrorType>('OTHER');
-    const [errorMessage, setErrorMessage] = this.useState('');
-    const [ready, setReady] = this.useState(false);
+    // const [errorType, setErrorType] = this.useState<ErrorType>('OTHER');
+    // const [errorMessage, setErrorMessage] = this.useState('');
+    // const [ready, setReady] = this.useState(false);
 
     const onStart = async () => {
       navigate('/game');
-      await gameManager.onStartClick();
+      // await gameManager.onStartClick();
     };
 
     const onEditor = () => {
@@ -34,83 +34,91 @@ export class Application extends Component<Props> {
 
     const onQuit = () => {
       navigate('/');
-      gameManager.onQuitClick();
+      // gameManager.onQuitClick();
     };
 
-    const onCanvasReady = async (canvas: Pane3D) => {
-      if (gameManager.renderer) return;
+    // const hasWebGPU = () => {
+    //   if (!navigator.gpu) {
+    //     return false;
+    //   } else {
+    //     return true;
+    //   }
+    // }
 
-      try {
-        const hasWebgGPU = await gameManager.applicationStarted(canvas);
+    // const onCanvasReady = async () => {
+    //   try {
+    //     const hasWebgGPU = hasWebGPU();
 
-        if (!hasWebgGPU) {
-          setErrorMessage('Your browser does not support WebGPU');
-          setErrorType('WGPU');
-          return;
-        }
+    //     if (!hasWebgGPU) {
+    //       setErrorMessage('Your browser does not support WebGPU');
+    //       setErrorType('WGPU');
+    //       return;
+    //     }
 
-        setReady(true);
-      } catch (err: unknown) {
-        setErrorMessage(
-          'An Error occurred while setting up the scene. Please check the console for more info.'
-        );
-        setErrorType('OTHER');
-        console.log(err);
-      }
-    };
+    //     setReady(true);
+    //   } catch (err: unknown) {
+    //     setErrorMessage(
+    //       'An Error occurred while setting up the scene. Please check the console for more info.'
+    //     );
+    //     setErrorType('OTHER');
+    //     console.log(err);
+    //   }
+    // };
 
-    const canvas = (<Pane3D onCanvasReady={onCanvasReady} />) as Pane3D;
+    const canvas = <div class="background" />;
 
     return () => {
-      if (errorMessage())
-        return (
-          <InfoBox title="Error" variant="error">
-            {errorMessage()}
-          </InfoBox>
-        );
+      // if (errorMessage())
+      //   return (
+      //     <InfoBox title="Error" variant="error">
+      //       {errorMessage()}
+      //     </InfoBox>
+      //   );
 
       return [
         canvas,
         <RouterSwitch>
           <Route
             path="/"
-            onRender={(params) =>
-              errorMessage() !== '' ? (
-                <StartError
-                  open
-                  errorMsg={errorMessage()}
-                  errorType={errorType()}
-                />
-              ) : (
+            onRender={
+              (params) => (
+                // errorMessage() !== '' ? (
+                //   <StartError
+                //     open
+                //     errorMsg={errorMessage()}
+                //     errorType={errorType()}
+                //   />
+                // ) : (
                 <MainMenu open onStart={onStart} onEditor={onEditor} />
               )
+              // )
             }
           />
-          {ready() ? (
-            <Route
-              path="/game"
-              onRender={() => (
-                <InGame
-                  gameManager={gameManager}
-                  eventManager={gameManager.eventManager!}
-                  onQuit={onQuit}
-                />
-              )}
-            />
-          ) : undefined}
+          {/* {ready() ? ( */}
+          <Route
+            path="/game"
+            onRender={() => (
+              <InGame
+                gameManager={gameManager}
+                eventManager={gameManager.eventManager!}
+                onQuit={onQuit}
+              />
+            )}
+          />
+          {/* ) : undefined} */}
 
-          {ready() ? (
-            <Route
-              path="/editor"
-              onRender={(params) => (
-                <ProjectEditorPage
-                  onQuit={onQuit}
-                  renderer={gameManager.renderer!}
-                  eventManager={gameManager.eventManager!}
-                />
-              )}
-            />
-          ) : undefined}
+          {/* {ready() ? ( */}
+          <Route
+            path="/editor"
+            onRender={(params) => (
+              <ProjectEditorPage
+                onQuit={onQuit}
+                // renderer={gameManager.renderer!}
+                // eventManager={gameManager.eventManager!}
+              />
+            )}
+          />
+          {/* ) : undefined} */}
         </RouterSwitch>,
         <Auth />,
       ];
@@ -124,6 +132,13 @@ export class Application extends Component<Props> {
         height: 100%;
         margin: 0;
         display: block;
+      }
+
+      .background {
+        height: 100%;
+        background-image: url('/earth.jpg');
+        background-size: cover;
+        background-position: center;
       }
     `;
   }

@@ -34,7 +34,7 @@ export class Pane3D extends Component<Props> {
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        if (entry.target === this.shadowRoot?.host) {
+        if (entry.target === this.canvas()?.parentElement) {
           this.onResize();
         }
       }

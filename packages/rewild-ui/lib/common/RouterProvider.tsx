@@ -1,19 +1,19 @@
-import { Component, register } from "../Component";
+import { Component, register } from '../Component';
 
 const ROUTER_TYPES = {
-    hash: "hash",
-    history: "history",
-  },
-  defer = (x: () => void) => {
-    setTimeout(() => x(), 10);
-  };
+  hash: 'hash',
+  history: 'history',
+};
+// const defer = (x: () => void) => {
+//   setTimeout(() => x(), 10);
+// };
 
 interface Props {
-  type?: "hash" | "history";
+  type?: 'hash' | 'history';
 }
 
 function createUrl(isHash: boolean, href: string) {
-  if (isHash && href.startsWith("#")) {
+  if (isHash && href.startsWith('#')) {
     href = href.substr(1);
   }
   return new URL(href, document.location.origin);
@@ -22,16 +22,16 @@ function createUrl(isHash: boolean, href: string) {
 export function navigate(path: string, isHash = false) {
   const url = createUrl(isHash, path);
   window.history.pushState({ path: path }, path, url.origin + url.pathname);
-  window.dispatchEvent(new CustomEvent("history-pushed"));
+  window.dispatchEvent(new CustomEvent('history-pushed'));
 }
 
 /**
  * A simple SPA Router
  */
-@register("x-router-provider")
+@register('x-router-provider')
 export class RouterProvider extends Component<Props> {
   constructor() {
-    super({ props: { type: "history" }, useShadow: false });
+    super({ props: { type: 'history' }, useShadow: false });
   }
 
   init() {
@@ -60,14 +60,14 @@ export class RouterProvider extends Component<Props> {
    */
   listen() {
     if (this.isHashRouter) {
-      window.addEventListener("hashchange", this.hashChanged.bind(this));
-      defer(() => this.tryNav(document.location.hash.substr(1)));
+      window.addEventListener('hashchange', this.hashChanged.bind(this));
+      // defer(() => this.tryNav(document.location.hash.substr(1)));
     } else {
-      let href = document.location.origin;
-      href += document.location.pathname;
+      // let href = document.location.origin;
+      // href += document.location.pathname;
 
-      document.addEventListener("click", this.onNavClick.bind(this));
-      defer(() => this.tryNav(href));
+      document.addEventListener('click', this.onNavClick.bind(this));
+      // defer(() => this.tryNav(href));
     }
     return this;
   }
@@ -78,22 +78,26 @@ export class RouterProvider extends Component<Props> {
 
   private findRoute(url: string) {
     const test =
-      "/" +
+      '/' +
       url
         .match(/([A-Za-z_0-9.]*)/gm)
         ?.filter((u) => !!u)
-        .join("/");
+        .join('/');
     return test;
   }
 
   private tryNav(href: string) {
     const url = createUrl(this.isHashRouter, href);
-    if (url.protocol.startsWith("http")) {
+    if (url.protocol.startsWith('http')) {
       const routePath = this.findRoute(url.pathname);
       if (routePath) {
-        if (this.props.type === "history") {
-          window.history.pushState({ path: routePath }, routePath, url.origin + url.pathname);
-          window.dispatchEvent(new CustomEvent("history-pushed"));
+        if (this.props.type === 'history') {
+          window.history.pushState(
+            { path: routePath },
+            routePath,
+            url.origin + url.pathname
+          );
+          window.dispatchEvent(new CustomEvent('history-pushed'));
         }
         return true;
       }
@@ -107,7 +111,7 @@ export class RouterProvider extends Component<Props> {
    */
   private onNavClick(e: MouseEvent) {
     const element = e.composedPath().at(0) as HTMLElement;
-    const href = (element.closest("[href]") as HTMLAnchorElement)?.href;
+    const href = (element.closest('[href]') as HTMLAnchorElement)?.href;
     if (href && this.tryNav(href)) {
       e.preventDefault();
     }

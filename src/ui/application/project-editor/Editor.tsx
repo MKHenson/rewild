@@ -1,6 +1,6 @@
 import { Component, register } from 'rewild-ui';
 import { projectStore } from '../../stores/ProjectStore';
-import { gameManager } from 'src/core/GameManager';
+// import { gameManager } from 'src/core/GameManager';
 import { PaneManager } from './PaneManager';
 
 interface Props {
@@ -17,7 +17,7 @@ export class Editor extends Component<Props> {
   init() {
     this.onMount = () => {
       projectStore.getProject(this.props.projectId);
-      gameManager.onEnterEditorMode();
+      // gameManager.onEnterEditorMode();
     };
 
     const paneManager = <PaneManager onHome={this.props.onHome} />;
