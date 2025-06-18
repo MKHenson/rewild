@@ -1,3 +1,4 @@
+import { Renderer } from '..';
 import { ImageLoader } from './ImageLoader';
 import { ITexture } from './ITexture';
 import { TextureProperties } from './Texture';
@@ -12,7 +13,8 @@ export class BitmapCubeTexture implements ITexture {
     this.properties = properties;
   }
 
-  async load(device: GPUDevice) {
+  async load(renderer: Renderer) {
+    const { device } = renderer;
     const loader = await new ImageLoader().loadImages(this.src);
 
     this.gpuTexture = device.createTexture({

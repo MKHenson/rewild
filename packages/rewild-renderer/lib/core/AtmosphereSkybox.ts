@@ -28,6 +28,11 @@ export class AtmosphereSkybox {
     );
   }
 
+  dispose() {
+    this.geometry.dispose();
+    this.skyRenderer.dispose();
+  }
+
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {
     if (!this.initialized) {
       this.geometry.build(renderer.device);

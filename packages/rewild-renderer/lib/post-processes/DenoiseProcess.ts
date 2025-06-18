@@ -1,7 +1,6 @@
 import { IPostProcess } from '../../types/IPostProcess';
 import { Renderer } from '../Renderer';
 import shader from '../shaders/denoisePass.wgsl';
-import { samplerManager } from '../textures/SamplerManager';
 import vertexScreenQuadShader from '../shaders/utils/vertexScreenQuad.wgsl';
 import { PostProcessManager } from './PostProcessManager';
 
@@ -91,11 +90,20 @@ export class DenoiseProcess implements IPostProcess {
       entries: [
         { binding: 0, resource: texture.createView() },
         { binding: 1, resource: { buffer: this.uniformBuffer } },
-        { binding: 2, resource: samplerManager.get('linear-clamped') },
+        { binding: 2, resource: renderer.samplerManager.get('linear-clamped') },
       ],
     });
 
     return this;
+  }
+
+  dispose(): void {
+    if (this.renderTarget) {
+      this.renderTarget.destroy();
+    }
+    if (this.uniformBuffer) {
+      this.uniformBuffer.destroy();
+    }
   }
 
   render(renderer: Renderer) {

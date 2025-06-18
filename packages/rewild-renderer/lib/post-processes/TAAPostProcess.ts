@@ -1,7 +1,6 @@
 import { IPostProcess } from '../../types/IPostProcess';
 import { Renderer } from '../Renderer';
 import taaShader from '../shaders/atmosphereTAAPass.wgsl';
-import { samplerManager } from '../textures/SamplerManager';
 import vertexScreenQuadShader from '../shaders/utils/vertexScreenQuad.wgsl';
 import { PostProcessManager } from './PostProcessManager';
 
@@ -109,11 +108,23 @@ export class TAAPostProcess implements IPostProcess {
         { binding: 0, resource: texture!.createView() },
         { binding: 1, resource: this.prevTaaTexture.createView() },
         { binding: 2, resource: { buffer: this.uniformBuffer } },
-        { binding: 3, resource: samplerManager.get('linear-clamped') },
+        { binding: 3, resource: renderer.samplerManager.get('linear-clamped') },
       ],
     });
 
     return this;
+  }
+
+  dispose(): void {
+    if (this.renderTarget) {
+      this.renderTarget.destroy();
+    }
+    if (this.prevTaaTexture) {
+      this.prevTaaTexture.destroy();
+    }
+    if (this.uniformBuffer) {
+      this.uniformBuffer.destroy();
+    }
   }
 
   render(renderer: Renderer) {

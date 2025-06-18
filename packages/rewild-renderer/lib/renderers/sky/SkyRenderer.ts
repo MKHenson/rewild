@@ -218,4 +218,12 @@ export class SkyRenderer {
     this.finalPass.cloudiness = this.cloudiness;
     this.finalPass.render(renderer, pass, camera);
   }
+
+  dispose() {
+    this.taaPass.dispose();
+    this.blurPass.dispose();
+    this.bloomPass.dispose();
+    this.denoisePass.dispose();
+    this.finalPass.dispose();
+  }
 }

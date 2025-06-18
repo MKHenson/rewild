@@ -14,6 +14,8 @@ interface Props {
 
 @register('x-pane-manager')
 export class PaneManager extends Component<Props> {
+  viewport: EditorViewport;
+
   init() {
     const projectStoreProxy = this.observeStore(
       projectStore,
@@ -33,6 +35,8 @@ export class PaneManager extends Component<Props> {
       ribbon: <RibbonButtons onHome={this.props.onHome} />,
       actors: <ActorsTree />,
     };
+
+    this.viewport = editors.viewport as EditorViewport;
 
     const layout = (
       <SplitPane
@@ -81,6 +85,10 @@ export class PaneManager extends Component<Props> {
 
       return layout;
     };
+  }
+
+  dispose() {
+    this.viewport.dispose();
   }
 
   getStyle() {

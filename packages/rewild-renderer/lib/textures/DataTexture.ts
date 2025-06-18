@@ -1,5 +1,6 @@
+import { Renderer } from '..';
 import { ITexture } from './ITexture';
-import { mipMapGenerator } from './MipMapGenerator';
+import { MipMapGenerator } from './MipMapGenerator';
 import { TextureProperties, getNumMipmaps } from './Texture';
 
 export class DataTexture implements ITexture {
@@ -8,6 +9,7 @@ export class DataTexture implements ITexture {
   height: number;
   properties: TextureProperties;
   gpuTexture: GPUTexture;
+  static mipMapGenerator: MipMapGenerator;
 
   constructor(
     properties: TextureProperties,
@@ -19,9 +21,14 @@ export class DataTexture implements ITexture {
     this.width = width;
     this.height = height;
     this.properties = properties;
+
+    if (!DataTexture.mipMapGenerator) {
+      DataTexture.mipMapGenerator = new MipMapGenerator();
+    }
   }
 
-  async load(device: GPUDevice) {
+  async load(renderer: Renderer) {
+    const { device } = renderer;
     this.gpuTexture = device.createTexture({
       size: [this.width, this.height],
       format: 'rgba8unorm',
@@ -43,7 +50,7 @@ export class DataTexture implements ITexture {
     );
 
     if (this.gpuTexture.mipLevelCount > 1) {
-      mipMapGenerator.generateMips(device, this.gpuTexture);
+      DataTexture.mipMapGenerator.generateMips(device, this.gpuTexture);
     }
 
     return this;

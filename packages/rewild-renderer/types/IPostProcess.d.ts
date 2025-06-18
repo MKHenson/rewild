@@ -5,4 +5,5 @@ export interface IPostProcess {
   renderTarget: GPUTexture;
   manager: PostProcessManager;
   init(renderer: Renderer): IPostProcess;
+  dispose(): void;
 }

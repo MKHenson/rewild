@@ -20,6 +20,10 @@ export class Editor extends Component<Props> {
       // gameManager.onEnterEditorMode();
     };
 
+    this.onCleanup = () => {
+      (paneManager as PaneManager).dispose();
+    };
+
     const paneManager = <PaneManager onHome={this.props.onHome} />;
 
     return () => paneManager;
