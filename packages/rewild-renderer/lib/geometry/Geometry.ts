@@ -26,6 +26,13 @@ export class Geometry {
     this.requiresBuild = true;
   }
 
+  dispose() {
+    this.vertexBuffer?.destroy();
+    this.normalBuffer?.destroy();
+    this.uvBuffer?.destroy();
+    this.indexBuffer?.destroy();
+  }
+
   build(device: GPUDevice) {
     this.vertexBuffer = device.createBuffer({
       size: this.vertices.byteLength,

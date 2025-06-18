@@ -1,7 +1,8 @@
+import { Renderer } from '..';
 import { TextureProperties } from './Texture';
 
 export interface ITexture {
   gpuTexture: GPUTexture;
   properties: TextureProperties;
-  load(device: GPUDevice): Promise<ITexture>;
+  load(device: Renderer): Promise<ITexture>;
 }

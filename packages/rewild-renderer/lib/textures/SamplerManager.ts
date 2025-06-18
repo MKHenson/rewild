@@ -8,7 +8,7 @@ export type SamplerType =
   | 'linear-clamped'
   | 'depth-comparison';
 
-class SamplerManager {
+export class SamplerManager {
   samplers: Map<SamplerType, GPUSampler>;
   initialized: boolean;
 
@@ -106,10 +106,13 @@ class SamplerManager {
     this.initialized = true;
   }
 
+  dispose() {
+    this.samplers.clear();
+    this.initialized = false;
+  }
+
   addSampler(id: SamplerType, sampler: GPUSampler) {
     this.samplers.set(id, sampler);
     return sampler;
   }
 }
-
-export const samplerManager = new SamplerManager();

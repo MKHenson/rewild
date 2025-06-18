@@ -2,8 +2,8 @@ import { IRenderable } from '../types/interfaces';
 import { PerspectiveCamera } from './core/PerspectiveCamera';
 import { Transform } from './core/Transform';
 import { Camera } from './core/Camera';
-import { textureManager } from './textures/TextureManager';
-import { samplerManager } from './textures/SamplerManager';
+import { TextureManager } from './textures/TextureManager';
+import { SamplerManager } from './textures/SamplerManager';
 import { CubeRenderer } from './renderables.ts/CubeRenderer';
 import { Geometry } from './geometry/Geometry';
 import { IMaterialPass } from './materials/IMaterialPass';
@@ -15,6 +15,7 @@ import { TrackballControler } from './input/TrackballController';
 import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
 import { RenderList } from './core/RenderList';
 import { Light } from './core/lights/Light';
+import { MipMapGenerator } from './textures/MipMapGenerator';
 
 export class Renderer {
   device: GPUDevice;
@@ -30,6 +31,9 @@ export class Renderer {
   private initialized: boolean;
   public depthTexture: GPUTexture;
   public terrainRenderer: TerrainRenderer;
+  textureManager: TextureManager;
+  samplerManager: SamplerManager;
+  mipmapGenerator: MipMapGenerator;
 
   perspectiveCam: PerspectiveCamera;
   scene: Transform;
@@ -84,6 +88,7 @@ export class Renderer {
     if (!context) throw new Error('need a browser that supports WebGPU');
 
     device.lost.then((info) => {
+      if (this.disposed) return;
       console.error(`WebGPU device was lost: ${info.message}`);
 
       // 'reason' will be 'destroyed' if we intentionally destroy the device.
@@ -102,8 +107,12 @@ export class Renderer {
     this.context = context;
     this.device = device;
 
-    await samplerManager.initialize(this);
-    await textureManager.initialize(this);
+    this.textureManager = new TextureManager();
+    this.samplerManager = new SamplerManager();
+    this.mipmapGenerator = new MipMapGenerator();
+
+    await this.samplerManager.initialize(this);
+    await this.textureManager.initialize(this);
     await this.terrainRenderer.init(this);
 
     this.renderables = await Promise.all(
@@ -132,6 +141,17 @@ export class Renderer {
 
   dispose() {
     this.disposed = true;
+    this.initialized = false;
+    this.renderables.length = 0; // Clear the renderables
+    this.renderTarget?.destroy();
+    this.depthTexture?.destroy();
+    this.camController.dispose();
+    this.device.destroy();
+    this.renderGroups.length = 0; // Clear the render groups
+    this.currentRenderList.reset();
+    this.atmosphere.dispose();
+    this.textureManager.dispose();
+    this.samplerManager.dispose();
   }
 
   resizeRenderTargets() {

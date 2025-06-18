@@ -3,8 +3,6 @@ import commonShaderFns from '../../shaders/atmosphere/common.wgsl';
 import constantsFns from '../../shaders/atmosphere/constants.wgsl';
 import fogFns from '../../shaders/atmosphere/fog.wgsl';
 import shader from '../../shaders/atmosphere/clouds.wgsl';
-import { samplerManager } from '../../textures/SamplerManager';
-import { textureManager } from '../../textures/TextureManager';
 import { Geometry } from '../../geometry/Geometry';
 
 export class CloudsRenderer {
@@ -94,17 +92,19 @@ export class CloudsRenderer {
         },
         {
           binding: 1,
-          resource: samplerManager.get('linear'),
+          resource: renderer.samplerManager.get('linear'),
         },
         {
           binding: 2,
-          resource: textureManager
+          resource: renderer.textureManager
             .get('rgba-noise-256')
             .gpuTexture.createView(),
         },
         {
           binding: 3,
-          resource: textureManager.get('pebbles-512').gpuTexture.createView(),
+          resource: renderer.textureManager
+            .get('pebbles-512')
+            .gpuTexture.createView(),
         },
         {
           binding: 4,
@@ -112,7 +112,7 @@ export class CloudsRenderer {
         },
         {
           binding: 5,
-          resource: samplerManager.get('depth-comparison'),
+          resource: renderer.samplerManager.get('depth-comparison'),
         },
       ],
     });
@@ -137,5 +137,9 @@ export class CloudsRenderer {
     cloudPass.setBindGroup(0, this.bindGroup);
     cloudPass.drawIndexed(geometry!.indices!.length);
     cloudPass.end();
+  }
+
+  dispose() {
+    this.renderTarget.destroy();
   }
 }

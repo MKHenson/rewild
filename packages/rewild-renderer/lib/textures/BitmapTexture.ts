@@ -1,7 +1,8 @@
 import { ImageLoader } from './ImageLoader';
 import { ITexture } from './ITexture';
 import { getNumMipmaps, TextureProperties } from './Texture';
-import { mipMapGenerator } from './MipMapGenerator';
+
+import { Renderer } from '..';
 
 export class BitmapTexture implements ITexture {
   properties: TextureProperties;
@@ -13,7 +14,8 @@ export class BitmapTexture implements ITexture {
     this.properties = name;
   }
 
-  async load(device: GPUDevice) {
+  async load(renderer: Renderer) {
+    const { device } = renderer;
     const loader = await new ImageLoader().loadImages([this.src]);
 
     this.gpuTexture = device.createTexture({
@@ -40,7 +42,7 @@ export class BitmapTexture implements ITexture {
     );
 
     if (this.gpuTexture.mipLevelCount > 1) {
-      mipMapGenerator.generateMips(device, this.gpuTexture);
+      renderer.mipmapGenerator.generateMips(device, this.gpuTexture);
     }
 
     return this;

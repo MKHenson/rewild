@@ -52,7 +52,7 @@ const assets: [string, string | string[]][] = [
   ],
 ];
 
-class TextureManager {
+export class TextureManager {
   textures: Map<string, ITexture>;
   initialized: boolean;
 
@@ -69,8 +69,6 @@ class TextureManager {
 
   async initialize(renderer: Renderer) {
     if (this.initialized) return;
-
-    const { device } = renderer;
 
     let texture: ITexture;
     for (const asset of assets) {
@@ -93,7 +91,7 @@ class TextureManager {
 
     await Promise.all(
       Array.from(this.textures.values()).map((texture) => {
-        return texture.load(device);
+        return texture.load(renderer);
       })
     );
 
@@ -178,6 +176,12 @@ class TextureManager {
     this.textures.set(texture.properties.name, texture);
     return texture;
   }
-}
 
-export const textureManager = new TextureManager();
+  dispose() {
+    this.textures.forEach((texture) => {
+      texture.gpuTexture.destroy();
+    });
+    this.textures.clear();
+    this.initialized = false;
+  }
+}

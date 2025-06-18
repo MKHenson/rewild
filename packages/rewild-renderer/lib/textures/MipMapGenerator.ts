@@ -1,7 +1,6 @@
-import { samplerManager } from './SamplerManager';
 import mipmapShader from '../shaders/mipmap-generator.wgsl';
 
-class MipMapGenerator {
+export class MipMapGenerator {
   module: GPUShaderModule;
   pipelineByFormat: Partial<{ [key in GPUTextureFormat]: GPURenderPipeline }>;
   sampler: GPUSampler;
@@ -19,7 +18,9 @@ class MipMapGenerator {
         code: mipmapShader,
       });
 
-      this.sampler = samplerManager.get('mip-generator');
+      this.sampler = device.createSampler({
+        minFilter: 'linear',
+      });
     }
 
     if (!pipelines[texture.format]) {
@@ -87,5 +88,3 @@ class MipMapGenerator {
     device.queue.submit([commandBuffer]);
   }
 }
-
-export const mipMapGenerator = new MipMapGenerator();

@@ -1,11 +1,9 @@
 import { Box3, Vector2, Vector3 } from 'rewild-common';
 import { TerrainPass } from '../../materials/TerrainPass';
 import { Mesh } from '../../core/Mesh';
-import { samplerManager } from '../../textures/SamplerManager';
 import { LOFInfo, TerrainRenderer } from './TerrainRenderer';
 import { Renderer } from '../..';
 import { Transform } from '../../core/Transform';
-import { textureManager } from '../../textures/TextureManager';
 import { DataTexture } from '../../textures/DataTexture';
 import { TextureProperties } from '../../textures/Texture';
 import { Geometry } from '../../geometry/Geometry';
@@ -148,7 +146,7 @@ export class LODMesh {
     workerTest.onmessage = (event) => {
       const { texture, vertices, uvs, indices } = event.data;
 
-      const terrainTexture = textureManager.addTexture(
+      const terrainTexture = renderer.textureManager.addTexture(
         new DataTexture(
           new TextureProperties('terrain1', false),
           texture,
@@ -163,14 +161,14 @@ export class LODMesh {
       geometry.indices = indices;
       geometry.computeNormals();
 
-      terrainTexture.load(renderer.device);
+      terrainTexture.load(renderer);
       geometry.build(renderer.device);
 
       const terrainPass = new TerrainPass();
       terrainPass.terrainUniforms.sampler =
-        samplerManager.get('linear-clamped');
+        renderer.samplerManager.get('linear-clamped');
       terrainPass.terrainUniforms.texture = terrainTexture.gpuTexture;
-      terrainPass.terrainUniforms.albedoTexture = textureManager.get(
+      terrainPass.terrainUniforms.albedoTexture = renderer.textureManager.get(
         'rocky-mountain-texture-seamless'
       ).gpuTexture;
 

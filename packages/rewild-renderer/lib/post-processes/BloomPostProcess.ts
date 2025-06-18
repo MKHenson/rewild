@@ -1,7 +1,6 @@
 import { IPostProcess } from '../../types/IPostProcess';
 import { Renderer } from '../Renderer';
 import bloomShader from '../shaders/atmosphereBloomPass.wgsl';
-import { samplerManager } from '../textures/SamplerManager';
 import vertexScreenQuadShader from '../shaders/utils/vertexScreenQuad.wgsl';
 import { PostProcessManager } from './PostProcessManager';
 
@@ -89,13 +88,24 @@ export class BloomPostProcess implements IPostProcess {
       label: 'bind group for atmosphere bloom pass',
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: samplerManager.get('linear-clamped') },
+        { binding: 0, resource: renderer.samplerManager.get('linear-clamped') },
         { binding: 1, resource: texture.createView() },
         { binding: 2, resource: { buffer: this.uniformBuffer } },
       ],
     });
 
     return this;
+  }
+
+  dispose(): void {
+    if (this.renderTarget) {
+      this.renderTarget.destroy();
+      this.renderTarget = null as any;
+    }
+    if (this.uniformBuffer) {
+      this.uniformBuffer.destroy();
+      this.uniformBuffer = null as any;
+    }
   }
 
   render(renderer: Renderer) {

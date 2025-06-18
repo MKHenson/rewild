@@ -2,8 +2,6 @@ import { Renderer } from '../..';
 import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
-import { samplerManager } from '../../textures/SamplerManager';
-import { textureManager } from '../../textures/TextureManager';
 
 export class TerrainUniforms implements ISharedUniformBuffer {
   group: number;
@@ -26,12 +24,12 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     const { device } = renderer;
 
     if (!this._texture)
-      this._texture = textureManager.get('grid-data').gpuTexture;
+      this._texture = renderer.textureManager.get('grid-data').gpuTexture;
     if (!this._albedoTexture)
-      this._albedoTexture = textureManager.get('grid-data').gpuTexture;
-    if (!this._sampler) this._sampler = samplerManager.get('linear');
+      this._albedoTexture = renderer.textureManager.get('grid-data').gpuTexture;
+    if (!this._sampler) this._sampler = renderer.samplerManager.get('linear');
     if (!this._seamlessSampler)
-      this._seamlessSampler = samplerManager.get('linear');
+      this._seamlessSampler = renderer.samplerManager.get('linear');
 
     this.bindGroup = device.createBindGroup({
       label: 'terrain textures',

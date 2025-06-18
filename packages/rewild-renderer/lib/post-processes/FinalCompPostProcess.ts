@@ -1,7 +1,6 @@
 import { IPostProcess } from '../../types/IPostProcess';
 import { Renderer } from '../Renderer';
 import shader from '../shaders/atmosphereFinal.wgsl';
-import { samplerManager } from '../textures/SamplerManager';
 import vertexScreenQuadShader from '../shaders/utils/vertexScreenQuad.wgsl';
 import constantsFn from '../shaders/atmosphere/constants.wgsl';
 import commonShaderFns from '../shaders/atmosphere/fog.wgsl';
@@ -108,7 +107,7 @@ export class FinalCompPostProcess implements IPostProcess {
         { binding: 0, resource: this.atmosphereTexture!.createView() },
         { binding: 1, resource: this.cloudsTexture!.createView() },
         { binding: 2, resource: { buffer: this.uniformBuffer } },
-        { binding: 3, resource: samplerManager.get('linear-clamped') },
+        { binding: 3, resource: renderer.samplerManager.get('linear-clamped') },
         {
           binding: 4,
           resource: renderer.depthTexture.createView(),
@@ -117,6 +116,15 @@ export class FinalCompPostProcess implements IPostProcess {
     });
 
     return this;
+  }
+
+  dispose(): void {
+    if (this.renderTarget) {
+      this.renderTarget.destroy();
+    }
+    if (this.uniformBuffer) {
+      this.uniformBuffer.destroy();
+    }
   }
 
   private setupFinalPassUniforms(renderer: Renderer, camera: Camera) {
