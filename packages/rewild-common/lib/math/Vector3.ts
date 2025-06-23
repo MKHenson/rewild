@@ -62,6 +62,18 @@ export class Vector3 {
     return this;
   }
 
+  project(matrixWorldInverse: Matrix4, projectionMatrix: Matrix4): Vector3 {
+    return this.applyMatrix4(matrixWorldInverse).applyMatrix4(
+      projectionMatrix
+    ) as Vector3;
+  }
+
+  unproject(projectionMatrixInverse: Matrix4, matrixWorld: Matrix4): Vector3 {
+    return this.applyMatrix4(projectionMatrixInverse).applyMatrix4(
+      matrixWorld
+    ) as Vector3;
+  }
+
   setComponent(index: u32, value: f32): Vector3 {
     switch (index) {
       case 0:

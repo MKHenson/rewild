@@ -1,5 +1,6 @@
 import { Color } from 'rewild-common';
 import { IComponent } from '../Transform';
+import { Raycaster, Intersection } from '../Raycaster';
 
 export class Light implements IComponent {
   color: Color;
@@ -9,4 +10,6 @@ export class Light implements IComponent {
     this.color = color;
     this.intensity = intensity;
   }
+
+  raycast(raycaster: Raycaster, intersects: Intersection[]) {}
 }

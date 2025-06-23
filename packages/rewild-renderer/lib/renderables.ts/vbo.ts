@@ -3,8 +3,6 @@ import { Geometry } from '../geometry/Geometry';
 import { Renderer } from '../Renderer';
 import shader from '../shaders/vbo.wgsl';
 import { PlaneGeometryFactory } from '../geometry/PlaneGeometryFactory';
-import { samplerManager } from '../textures/SamplerManager';
-import { textureManager } from '../textures/TextureManager';
 
 export class PlaneRenderer implements IRenderable {
   bindGroup: GPUBindGroup;
@@ -22,8 +20,8 @@ export class PlaneRenderer implements IRenderable {
     this.plane = PlaneGeometryFactory.new(2, 2, 1, 1);
     this.plane.build(device);
 
-    const sampler = samplerManager.get('nearest-simple');
-    const texture = textureManager.get('grid-data');
+    const sampler = renderer.samplerManager.get('nearest-simple');
+    const texture = renderer.textureManager.get('grid-data');
     this.texture = texture.gpuTexture;
 
     const pipeline = device.createRenderPipeline({

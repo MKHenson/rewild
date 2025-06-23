@@ -1,8 +1,6 @@
 import { IRenderable } from '../../types/interfaces';
 import { Renderer } from '../Renderer';
 import shader from '../shaders/texture-quad.wgsl';
-import { samplerManager } from '../textures/SamplerManager';
-import { textureManager } from '../textures/TextureManager';
 
 export class QuadRenderer implements IRenderable {
   bindGroup: GPUBindGroup;
@@ -18,8 +16,8 @@ export class QuadRenderer implements IRenderable {
       code: shader,
     });
 
-    const texture = textureManager.get('f-data');
-    const sampler = samplerManager.get('nearest-simple');
+    const texture = renderer.textureManager.get('f-data');
+    const sampler = renderer.samplerManager.get('nearest-simple');
     this.texture = texture.gpuTexture;
 
     const pipeline = device.createRenderPipeline({

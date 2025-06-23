@@ -1,4 +1,12 @@
-import { Vector3 } from 'rewild-common';
+import {
+  Box3,
+  Matrix3,
+  Matrix4,
+  Quaternion,
+  Sphere,
+  Vector3,
+} from 'rewild-common';
+import { Transform } from '../core/Transform';
 
 export class GeometryGroup {
   public start: i32;
@@ -7,6 +15,10 @@ export class GeometryGroup {
 }
 
 const _vector: Vector3 = new Vector3();
+const _box = new Box3();
+const _offset = new Vector3();
+const _m1 = new Matrix4();
+const _obj = new Transform();
 
 export class Geometry {
   requiresBuild: boolean = true;
@@ -16,14 +28,21 @@ export class Geometry {
   uvs?: Float32Array;
   groups: GeometryGroup[];
 
+  _todoTangents: Float32Array;
+
   vertexBuffer: GPUBuffer;
   normalBuffer: GPUBuffer;
   uvBuffer: GPUBuffer;
   indexBuffer: GPUBuffer;
 
+  boundingBox: Box3 | null;
+  boundingSphere: Sphere | null;
+
   constructor() {
     this.groups = [];
     this.requiresBuild = true;
+    this.boundingBox = null;
+    this.boundingSphere = null;
   }
 
   dispose() {
@@ -31,6 +50,223 @@ export class Geometry {
     this.normalBuffer?.destroy();
     this.uvBuffer?.destroy();
     this.indexBuffer?.destroy();
+  }
+
+  applyMatrix4(matrix: Matrix4): Geometry {
+    const verts = this.vertices;
+    const normals = this.normals;
+    const tangents = this._todoTangents;
+
+    for (let i = 0, l = verts.length; i < l; i += 3) {
+      _vector.x = verts[i];
+      _vector.y = verts[i + 1];
+      _vector.z = verts[i + 2];
+      _vector.applyMatrix4(matrix);
+
+      verts[i] = _vector.x;
+      verts[i + 1] = _vector.y;
+      verts[i + 2] = _vector.z;
+    }
+
+    if (normals) {
+      const normalMatrix = new Matrix3().getNormalMatrix(matrix);
+
+      for (let i = 0, l = verts.length; i < l; i += 3) {
+        _vector.x = normals[i];
+        _vector.y = normals[i + 1];
+        _vector.z = normals[i + 2];
+
+        _vector.applyNormalMatrix(normalMatrix);
+        normals[i] = _vector.x;
+        normals[i + 1] = _vector.y;
+        normals[i + 2] = _vector.z;
+      }
+    }
+
+    if (tangents) {
+      for (let i = 0, l = verts.length; i < l; i += 3) {
+        _vector.x = tangents[i];
+        _vector.y = tangents[i + 1];
+        _vector.z = tangents[i + 2];
+
+        _vector.transformDirection(matrix);
+        tangents[i] = _vector.x;
+        tangents[i + 1] = _vector.y;
+        tangents[i + 2] = _vector.z;
+      }
+    }
+
+    if (this.boundingBox != null) {
+      this.computeBoundingBox();
+    }
+
+    if (this.boundingSphere != null) {
+      this.computeBoundingSphere();
+    }
+
+    return this;
+  }
+
+  computeBoundingBox(): void {
+    if (this.boundingBox === null) {
+      this.boundingBox = new Box3();
+    }
+
+    const verts = this.vertices;
+
+    if (!verts) {
+      console.error(
+        'Geometry.computeBoundingBox(): requires vertices. Alternatively set "mesh.frustumCulled" to "false".'
+      );
+
+      this.boundingBox!.set(
+        new Vector3(-Infinity, -Infinity, -Infinity),
+        new Vector3(+Infinity, +Infinity, +Infinity)
+      );
+
+      return;
+    }
+
+    if (verts != null) {
+      this.boundingBox.setFromF32Array(verts);
+    } else {
+      this.boundingBox!.makeEmpty();
+    }
+
+    if (
+      isNaN(this.boundingBox!.min.x) ||
+      isNaN(this.boundingBox!.min.y) ||
+      isNaN(this.boundingBox!.min.z)
+    ) {
+      throw new Error(
+        'Geometry.computeBoundingBox(): Computed min/max have NaN values. The "position" attribute is likely to have NaN values.'
+      );
+    }
+  }
+
+  computeBoundingSphere(): void {
+    if (this.boundingSphere === null) {
+      this.boundingSphere = new Sphere();
+    }
+
+    const verts = this.vertices;
+
+    if (!verts) {
+      console.error(
+        'Geometry.computeBoundingSphere(): requires a manual verts. Alternatively set "mesh.frustumCulled" to "false".'
+      );
+      this.boundingSphere!.set(new Vector3(), Infinity);
+      return;
+    }
+
+    if (verts) {
+      // first, find the center of the bounding sphere
+
+      const center = this.boundingSphere!.center;
+
+      _box.setFromF32Array(verts);
+
+      _box.getCenter(center);
+
+      // second, try to find a boundingSphere with a radius smaller than the
+      // boundingSphere of the boundingBox: sqrt(3) smaller in the best case
+
+      let maxRadiusSq: f32 = 0;
+
+      for (let i: u32 = 0, il = verts.length; i < il; i += 3) {
+        _vector.x = verts[i];
+        _vector.y = verts[i + 1];
+        _vector.z = verts[i + 2];
+
+        maxRadiusSq = Mathf.max(maxRadiusSq, center.distanceToSquared(_vector));
+      }
+
+      this.boundingSphere!.radius = Mathf.sqrt(maxRadiusSq);
+
+      if (isNaN(this.boundingSphere!.radius)) {
+        throw new Error(
+          'Geometry.computeBoundingSphere(): Computed radius is NaN. The "position" attribute is likely to have NaN values.'
+        );
+      }
+    }
+  }
+
+  applyQuaternion(q: Quaternion): Geometry {
+    _m1.makeRotationFromQuaternion(q);
+
+    this.applyMatrix4(_m1);
+
+    return this;
+  }
+
+  rotateX(angle: f32): Geometry {
+    // rotate geometry around world x-axis
+
+    _m1.makeRotationX(angle);
+
+    this.applyMatrix4(_m1);
+
+    return this;
+  }
+
+  rotateY(angle: f32): Geometry {
+    // rotate geometry around world y-axis
+
+    _m1.makeRotationY(angle);
+
+    this.applyMatrix4(_m1);
+
+    return this;
+  }
+
+  rotateZ(angle: f32): Geometry {
+    // rotate geometry around world z-axis
+
+    _m1.makeRotationZ(angle);
+
+    this.applyMatrix4(_m1);
+
+    return this;
+  }
+
+  translate(x: f32, y: f32, z: f32): Geometry {
+    // translate geometry
+
+    _m1.makeTranslation(x, y, z);
+
+    this.applyMatrix4(_m1);
+
+    return this;
+  }
+
+  scale(x: f32, y: f32, z: f32): Geometry {
+    // scale geometry
+
+    _m1.makeScale(x, y, z);
+
+    this.applyMatrix4(_m1);
+
+    return this;
+  }
+
+  lookAt(vector: Vector3): Geometry {
+    _obj.lookAt(vector.x, vector.y, vector.z, false);
+
+    _obj.updateMatrix();
+
+    this.applyMatrix4(_obj.matrix);
+
+    return this;
+  }
+
+  center(): Geometry {
+    this.computeBoundingBox();
+
+    this.boundingBox!.getCenter(_offset).negate();
+
+    this.translate(_offset.x, _offset.y, _offset.z);
+
+    return this;
   }
 
   build(device: GPUDevice) {
@@ -76,6 +312,20 @@ export class Geometry {
     }
 
     this.requiresBuild = false;
+  }
+
+  setFromPoints(points: Vector3[]): Geometry {
+    const position: f32[] = [];
+
+    for (let i = 0, l = points.length; i < l; i++) {
+      const point = points[i];
+      position.push(point.x);
+      position.push(point.y);
+      position.push(point.z);
+    }
+
+    this.vertices = new Float32Array(position);
+    return this;
   }
 
   getGPUVertexBufferLayouts(): GPUVertexBufferLayout[] {

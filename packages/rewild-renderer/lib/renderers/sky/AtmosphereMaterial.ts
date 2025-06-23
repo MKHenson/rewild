@@ -8,8 +8,6 @@ import { SharedUniformsTracker } from '../../materials/SharedUniformsTracker';
 import { Mesh } from '../../core/Mesh';
 import { Camera } from '../../core/Camera';
 import { Diffuse } from '../../materials/uniforms/Diffuse';
-import { samplerManager } from '../../textures/SamplerManager';
-import { textureManager } from '../../textures/TextureManager';
 import { Matrix4 } from 'rewild-common';
 
 const sharedBindgroupIndex = 1;
@@ -77,8 +75,8 @@ export class AtmosphereMaterial implements IMaterialPass {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    const sampler = samplerManager.get('linear');
-    const texture = textureManager.get('desert-sky');
+    const sampler = renderer.samplerManager.get('linear');
+    const texture = renderer.textureManager.get('desert-sky');
 
     this.bindGroup = device.createBindGroup({
       label: 'bind group for object',

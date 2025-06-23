@@ -1,13 +1,9 @@
-import { Camera } from '../cameras/Camera';
-import { OrthographicCamera } from '../cameras/OrthographicCamera';
-import { PerspectiveCamera } from '../cameras/PerspectiveCamera';
-import { Ray } from 'rewild-common';
-import { EngineVector2 } from '../math/Vector2';
-import { EngineVector3 } from '../math/Vector3';
-import { Intersection } from '../components/MeshComponent';
+import { Ray, Vector2, Vector3 } from 'rewild-common';
 import { Layers } from './Layers';
-import { TransformNode } from './TransformNode';
-
+import { ICameraController } from '../../types/ICamera';
+import { PerspectiveCamera } from './PerspectiveCamera';
+import { OrthographicCamera } from './OrthographicCamera';
+import { Transform } from './Transform';
 // export class RayCasterParams {
 //   public Mesh: Mesh | null;
 //   Line: { threshold: 1 };
@@ -20,13 +16,13 @@ export class Raycaster {
   ray: Ray;
   near: f32;
   far: f32;
-  camera: Camera | null;
+  camera: ICameraController | null;
   layers: Layers;
   // params: RayCasterParams;
 
   constructor(
-    origin: EngineVector3 = new EngineVector3(),
-    direction: EngineVector3 = new EngineVector3(),
+    origin: Vector3 = new Vector3(),
+    direction: Vector3 = new Vector3(),
     near: f32 = 0,
     far: f32 = Infinity
   ) {
@@ -47,17 +43,20 @@ export class Raycaster {
     // };
   }
 
-  set(origin: EngineVector3, direction: EngineVector3): void {
+  set(origin: Vector3, direction: Vector3): void {
     // direction is assumed to be normalized (for accurate distance calculations)
     this.ray.set(origin, direction);
   }
 
-  setFromCamera(coords: EngineVector2, camera: Camera): void {
+  setFromCamera(coords: Vector2, camera: ICameraController): void {
     if (camera && camera instanceof PerspectiveCamera) {
       const pCam = camera as PerspectiveCamera;
-      this.ray.origin.setFromMatrixPosition(pCam.matrixWorld);
-      (this.ray.direction.set(coords.x, coords.y, 0.5) as EngineVector3)
-        .unprojectCamera(camera)
+      this.ray.origin.setFromMatrixPosition(pCam.camera.transform.matrixWorld);
+      (this.ray.direction.set(coords.x, coords.y, 0.5) as Vector3)
+        .unproject(
+          camera.camera.projectionMatrixInverse,
+          camera.camera.transform.matrixWorld
+        )
         .sub(this.ray.origin)
         .normalize();
       this.camera = camera;
@@ -68,15 +67,20 @@ export class Raycaster {
           coords.x,
           coords.y,
           (oCam.near + oCam.far) / (oCam.near - oCam.far)
-        ) as EngineVector3
-      ).unprojectCamera(oCam); // set origin in plane of camera
-      this.ray.direction.set(0, 0, -1).transformDirection(oCam.matrixWorld);
+        ) as Vector3
+      ).unproject(
+        oCam.camera.projectionMatrixInverse,
+        camera.camera.transform.matrixWorld
+      ); // set origin in plane of camera
+      this.ray.direction
+        .set(0, 0, -1)
+        .transformDirection(oCam.camera.transform.matrixWorld);
       this.camera = oCam;
     }
   }
 
   intersectObject(
-    object: TransformNode,
+    object: Transform,
     recursive: boolean = false,
     intersects: Intersection[] = []
   ): Intersection[] {
@@ -88,7 +92,7 @@ export class Raycaster {
   }
 
   intersectObjects(
-    objects: TransformNode[],
+    objects: Transform[],
     recursive: boolean = false,
     intersects: Intersection[] = []
   ): Intersection[] {
@@ -107,7 +111,7 @@ function ascSort(a: Intersection, b: Intersection): i32 {
 }
 
 function intersectObject(
-  object: TransformNode,
+  object: Transform,
   raycaster: Raycaster,
   intersects: Intersection[],
   recursive: boolean
@@ -123,4 +127,23 @@ function intersectObject(
       intersectObject(children[i], raycaster, intersects, true);
     }
   }
+}
+
+export class Face {
+  public a: i32;
+  public b: i32;
+  public c: i32;
+  public normal: Vector3;
+  public materialIndex: i32;
+}
+
+export class Intersection {
+  public distance: f32;
+  public point: Vector3;
+  public object: Transform;
+  public faceIndex: i32;
+  public face: Face | null;
+  public uv: Vector2 | null;
+  public uv2: Vector2 | null;
+  public instanceId: i32;
 }

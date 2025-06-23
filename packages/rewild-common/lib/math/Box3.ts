@@ -50,6 +50,35 @@ export class Box3 {
     return this;
   }
 
+  setFromF32Array(array: Float32Array): Box3 {
+    let minX: f32 = +Infinity;
+    let minY: f32 = +Infinity;
+    let minZ: f32 = +Infinity;
+
+    let maxX: f32 = -Infinity;
+    let maxY: f32 = -Infinity;
+    let maxZ: f32 = -Infinity;
+
+    for (let i = 0, l = array.length; i < l; i += 3) {
+      const x = array[i];
+      const y = array[i + 1];
+      const z = array[i + 2];
+
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (z < minZ) minZ = z;
+
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+      if (z > maxZ) maxZ = z;
+    }
+
+    this.min.set(minX, minY, minZ);
+    this.max.set(maxX, maxY, maxZ);
+
+    return this;
+  }
+
   setFromPoints(points: Vector3[]): Box3 {
     this.makeEmpty();
 

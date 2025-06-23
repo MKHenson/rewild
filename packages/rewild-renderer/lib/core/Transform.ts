@@ -8,6 +8,8 @@ import {
   IQuatChangeListener,
   Event,
 } from 'rewild-common';
+import { Intersection, Raycaster } from './Raycaster';
+import { Layers } from './Layers';
 
 const _v1 = new Vector3();
 const _q1 = new Quaternion();
@@ -30,7 +32,9 @@ export interface ITransformObserver {
   worldMatrixUpdated(source: Transform): void;
 }
 
-export interface IComponent {}
+export interface IComponent {
+  raycast: (raycaster: Raycaster, intersects: Intersection[]) => void;
+}
 
 export class Transform implements IQuatChangeListener, IEulerChangeListener {
   static DefaultMatrixAutoUpdate: boolean = true;
@@ -55,6 +59,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
   readonly scale: Vector3;
   readonly modelViewMatrix: Matrix4;
   readonly normalMatrix: Matrix3;
+  readonly layers: Layers;
 
   readonly dataProperties: Int32Array;
 
@@ -63,6 +68,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
 
     this.observers = [];
     this.component = null;
+    this.layers = new Layers();
 
     this.position = new Vector3();
     this.rotation = new Euler();
@@ -95,6 +101,10 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
 
   onQuatChanged(quat: Quaternion): void {
     this.rotation.setFromQuaternion(quat, Euler.DefaultOrder, false);
+  }
+
+  raycast(raycaster: Raycaster, intersects: Intersection[]): void {
+    this.component?.raycast(raycaster, intersects);
   }
 
   applyMatrix4(matrix: Matrix4): void {

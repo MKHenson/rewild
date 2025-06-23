@@ -1,3 +1,4 @@
+import { Renderer } from '..';
 import { ITexture } from './ITexture';
 import { TextureProperties } from './Texture';
 
@@ -11,8 +12,8 @@ export class CanvasTexture implements ITexture {
     this.properties = properties;
   }
 
-  async load(device: GPUDevice) {
-    this.gpuTexture = device.createTexture({
+  async load(renderer: Renderer) {
+    this.gpuTexture = renderer.device.createTexture({
       size: {
         width: this.canvas.width,
         height: this.canvas.height,
@@ -27,7 +28,7 @@ export class CanvasTexture implements ITexture {
         GPUTextureUsage.RENDER_ATTACHMENT,
     });
 
-    device.queue.copyExternalImageToTexture(
+    renderer.device.queue.copyExternalImageToTexture(
       { source: this.canvas },
       { texture: this.gpuTexture },
       [this.canvas.width, this.canvas.height]

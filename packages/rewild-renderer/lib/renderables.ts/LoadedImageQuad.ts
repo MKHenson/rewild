@@ -1,8 +1,6 @@
 import { IRenderable } from '../../types/interfaces';
 import { Renderer } from '../Renderer';
 import shader from '../shaders/texture-quad.wgsl';
-import { samplerManager } from '../textures/SamplerManager';
-import { textureManager } from '../textures/TextureManager';
 
 export class LoadedImageQuad implements IRenderable {
   bindGroup: GPUBindGroup;
@@ -18,8 +16,8 @@ export class LoadedImageQuad implements IRenderable {
       code: shader,
     });
 
-    const sampler = samplerManager.get('linear');
-    const texture = textureManager.get('f-texture');
+    const sampler = renderer.samplerManager.get('linear');
+    const texture = renderer.textureManager.get('f-texture');
     this.texture = texture.gpuTexture;
 
     const pipeline = device.createRenderPipeline({

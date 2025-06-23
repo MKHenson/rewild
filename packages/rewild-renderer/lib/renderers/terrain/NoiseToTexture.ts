@@ -1,11 +1,12 @@
+import { Renderer } from '../..';
 import { DataTexture } from '../../textures/DataTexture';
 import { TextureProperties } from '../../textures/Texture';
-import { textureManager } from '../../textures/TextureManager';
 
 export function noiseToTexture(
   width: number,
   height: number,
-  noise: Float32Array
+  noise: Float32Array,
+  renderer: Renderer
 ) {
   // Convert this noise map of f32 to a u8 texture. Each pixel will be a shader of grey
   // (0-255) based on the noise value.
@@ -18,7 +19,7 @@ export function noiseToTexture(
     data[i * 4 + 3] = 255; // alpha
   }
 
-  const terrainTexture = textureManager.addTexture(
+  const terrainTexture = renderer.textureManager.addTexture(
     new DataTexture(
       new TextureProperties('terrain1', false),
       data,
