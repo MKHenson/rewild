@@ -17,8 +17,10 @@ export class DiffusePass implements IMaterialPass {
   requiresRebuild: boolean = true;
   sharedUniformsTracker: SharedUniformsTracker;
   diffuse: Diffuse;
+  side: GPUFrontFace;
 
   constructor() {
+    this.side = 'ccw';
     this.requiresRebuild = true;
     this.diffuse = new Diffuse(sharedBindgroupIndex);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
@@ -98,7 +100,7 @@ export class DiffusePass implements IMaterialPass {
         // Faces pointing away from the camera will be occluded by faces
         // pointing toward the camera.
         cullMode: 'back',
-        frontFace: 'ccw',
+        frontFace: this.side,
       },
       // Enable depth testing so that the fragment closest to the camera
       // is rendered in front.

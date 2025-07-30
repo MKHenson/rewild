@@ -1,5 +1,5 @@
-import { Matrix4 } from "./Matrix4";
-import { Quaternion } from "./Quaternion";
+import { Matrix4 } from './Matrix4';
+import { Quaternion } from './Quaternion';
 
 export class Vector4 {
   x: f32;
@@ -48,6 +48,19 @@ export class Vector4 {
     return this;
   }
 
+  fromBufferAttributeJs(
+    attribute: Float32Array,
+    index: i32,
+    itemSize: i32
+  ): Vector4 {
+    this.x = attribute[index * itemSize];
+    this.y = attribute[index * itemSize + 1];
+    this.z = attribute[index * itemSize + 2];
+    this.w = attribute[index * itemSize + 3];
+
+    return this;
+  }
+
   setX(x: f32): Vector4 {
     this.x = x;
 
@@ -87,7 +100,7 @@ export class Vector4 {
         this.w = value;
         break;
       default:
-        throw new Error("index is out of range: " + index);
+        throw new Error('index is out of range: ' + index);
     }
 
     return this;
@@ -104,7 +117,7 @@ export class Vector4 {
       case 3:
         return this.w;
       default:
-        throw new Error("index is out of range: " + index);
+        throw new Error('index is out of range: ' + index);
     }
   }
 
@@ -262,7 +275,11 @@ export class Vector4 {
       m32: f32 = te[6],
       m33: f32 = te[10];
 
-    if (Mathf.abs(m12 - m21) < epsilon && Mathf.abs(m13 - m31) < epsilon && Mathf.abs(m23 - m32) < epsilon) {
+    if (
+      Mathf.abs(m12 - m21) < epsilon &&
+      Mathf.abs(m13 - m31) < epsilon &&
+      Mathf.abs(m23 - m32) < epsilon
+    ) {
       // singularity found
       // first check for identity matrix which must have +1 for all terms
       // in leading diagonal and zero in other terms
@@ -336,7 +353,11 @@ export class Vector4 {
 
     // as we have reached here there are no singularities so we can handle normally
 
-    let s: f32 = Mathf.sqrt((m32 - m23) * (m32 - m23) + (m13 - m31) * (m13 - m31) + (m21 - m12) * (m21 - m12)); // used to normalize
+    let s: f32 = Mathf.sqrt(
+      (m32 - m23) * (m32 - m23) +
+        (m13 - m31) * (m13 - m31) +
+        (m21 - m12) * (m21 - m12)
+    ); // used to normalize
 
     if (Mathf.abs(s) < 0.001) s = 1;
 
@@ -392,7 +413,9 @@ export class Vector4 {
   clampLength(min: f32, max: f32): Vector4 {
     const length = this.length();
 
-    return this.divideScalar(length || 1).multiplyScalar(Mathf.max(min, Mathf.min(max, length)));
+    return this.divideScalar(length || 1).multiplyScalar(
+      Mathf.max(min, Mathf.min(max, length))
+    );
   }
 
   floor(): Vector4 {
@@ -445,15 +468,24 @@ export class Vector4 {
   }
 
   lengthSq(): f32 {
-    return this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w;
+    return (
+      this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w
+    );
   }
 
   length(): f32 {
-    return Mathf.sqrt(this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w);
+    return Mathf.sqrt(
+      this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w
+    );
   }
 
   manhattanLength(): f32 {
-    return Mathf.abs(this.x) + Mathf.abs(this.y) + Mathf.abs(this.z) + Mathf.abs(this.w);
+    return (
+      Mathf.abs(this.x) +
+      Mathf.abs(this.y) +
+      Mathf.abs(this.z) +
+      Mathf.abs(this.w)
+    );
   }
 
   normalize(): Vector4 {

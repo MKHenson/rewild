@@ -1,7 +1,8 @@
-import { Vector3 } from "./Vector3";
-import { Plane } from "./Plane";
-import { Vector2 } from "./Vector2";
-import { Box3 } from "./Box3";
+import { Vector3 } from './Vector3';
+import { Plane } from './Plane';
+import { Vector2 } from './Vector2';
+import { Box3 } from './Box3';
+import { Vector4 } from './Vector4';
 
 const _v0 = new Vector3();
 const _v1 = new Vector3();
@@ -15,6 +16,10 @@ const _vap = new Vector3();
 const _vbp = new Vector3();
 const _vcp = new Vector3();
 
+const _v40 = new Vector4();
+const _v41 = new Vector4();
+const _v42 = new Vector4();
+
 export class Triangle {
   a: Vector3;
   b: Vector3;
@@ -26,7 +31,12 @@ export class Triangle {
     this.c = c;
   }
 
-  static getNormal(a: Vector3, b: Vector3, c: Vector3, target: Vector3): Vector3 {
+  static getNormal(
+    a: Vector3,
+    b: Vector3,
+    c: Vector3,
+    target: Vector3
+  ): Vector3 {
     target.subVectors(c, b);
     _v0.subVectors(a, b);
     target.cross(_v0);
@@ -41,7 +51,13 @@ export class Triangle {
 
   // static/instance method to calculate barycentric coordinates
   // based on: http://www.blackpawn.com/texts/pointinpoly/default.html
-  static getBarycoord(point: Vector3, a: Vector3, b: Vector3, c: Vector3, target: Vector3): Vector3 {
+  static getBarycoord(
+    point: Vector3,
+    a: Vector3,
+    b: Vector3,
+    c: Vector3,
+    target: Vector3
+  ): Vector3 {
     _v0.subVectors(c, a);
     _v1.subVectors(b, a);
     _v2.subVectors(point, a);
@@ -69,7 +85,12 @@ export class Triangle {
     return target.set(1 - u - v, v, u);
   }
 
-  static containsPoint(point: Vector3, a: Vector3, b: Vector3, c: Vector3): boolean {
+  static containsPoint(
+    point: Vector3,
+    a: Vector3,
+    b: Vector3,
+    c: Vector3
+  ): boolean {
     this.getBarycoord(point, a, b, c, _v3);
 
     return _v3.x >= 0 && _v3.y >= 0 && _v3.x + _v3.y <= 1;
@@ -95,12 +116,42 @@ export class Triangle {
     return target;
   }
 
-  static isFrontFacing(a: Vector3, b: Vector3, c: Vector3, direction: Vector3): boolean {
+  static isFrontFacing(
+    a: Vector3,
+    b: Vector3,
+    c: Vector3,
+    direction: Vector3
+  ): boolean {
     _v0.subVectors(c, b);
     _v1.subVectors(a, b);
 
     // strictly front facing
     return _v0.cross(_v1).dot(direction) < 0 ? true : false;
+  }
+
+  static getInterpolatedAttribute(
+    attr: Float32Array,
+    i1: i32,
+    i2: i32,
+    i3: i32,
+    barycord: Vector3,
+    target: Vector3 | Vector2,
+    itemSize: i32
+  ): Vector3 | Vector2 {
+    _v40.setScalar(0);
+    _v41.setScalar(0);
+    _v42.setScalar(0);
+
+    _v40.fromBufferAttributeJs(attr, i1, itemSize);
+    _v41.fromBufferAttributeJs(attr, i2, itemSize);
+    _v42.fromBufferAttributeJs(attr, i3, itemSize);
+
+    target.setScalar(0);
+    target.addScaledVector(_v40, barycord.x);
+    target.addScaledVector(_v41, barycord.y);
+    target.addScaledVector(_v42, barycord.z);
+
+    return target;
   }
 
   set(a: Vector3, b: Vector3, c: Vector3): Triangle {
@@ -111,7 +162,12 @@ export class Triangle {
     return this;
   }
 
-  setFromPointsAndIndices(points: Vector3[], i0: u32, i1: u32, i2: u32): Triangle {
+  setFromPointsAndIndices(
+    points: Vector3[],
+    i0: u32,
+    i1: u32,
+    i2: u32
+  ): Triangle {
     this.a.copy(points[i0]);
     this.b.copy(points[i1]);
     this.c.copy(points[i2]);
@@ -157,7 +213,13 @@ export class Triangle {
     return Triangle.getBarycoord(point, this.a, this.b, this.c, target);
   }
 
-  getUV(point: Vector3, uv1: Vector2, uv2: Vector2, uv3: Vector2, target: Vector2): Vector2 {
+  getUV(
+    point: Vector3,
+    uv1: Vector2,
+    uv2: Vector2,
+    uv3: Vector2,
+    target: Vector2
+  ): Vector2 {
     return Triangle.getUV(point, this.a, this.b, this.c, uv1, uv2, uv3, target);
   }
 
@@ -243,6 +305,10 @@ export class Triangle {
   }
 
   equals(triangle: Triangle): boolean {
-    return triangle.a.equals(this.a) && triangle.b.equals(this.b) && triangle.c.equals(this.c);
+    return (
+      triangle.a.equals(this.a) &&
+      triangle.b.equals(this.b) &&
+      triangle.c.equals(this.c)
+    );
   }
 }

@@ -5,6 +5,7 @@ import { Matrix3 } from './Matrix3';
 import { Matrix4 } from './Matrix4';
 import { Quaternion } from './Quaternion';
 import { Spherical } from './Spherical';
+import { Vector4 } from './Vector4';
 
 export class Vector3 {
   static UP: Vector3 = new Vector3(0, 1, 0);
@@ -58,6 +59,18 @@ export class Vector3 {
 
   setZ(z: f32): Vector3 {
     this.z = z;
+
+    return this;
+  }
+
+  fromBufferAttributeJS(
+    attribute: Float32Array,
+    index: i32,
+    itemSize: i32
+  ): Vector3 {
+    this.x = attribute[index * itemSize];
+    this.y = attribute[index * itemSize + 1];
+    this.z = attribute[index * itemSize + 2];
 
     return this;
   }
@@ -141,7 +154,7 @@ export class Vector3 {
     return this;
   }
 
-  addScaledVector(v: Vector3, s: f32): Vector3 {
+  addScaledVector(v: Vector3 | Vector4, s: f32): Vector3 {
     this.x += v.x * s;
     this.y += v.y * s;
     this.z += v.z * s;

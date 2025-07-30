@@ -26,6 +26,7 @@ export class Geometry {
   indices?: Uint16Array;
   normals?: Float32Array;
   uvs?: Float32Array;
+  uvs1?: Float32Array;
   groups: GeometryGroup[];
 
   _todoTangents: Float32Array;
@@ -33,10 +34,12 @@ export class Geometry {
   vertexBuffer: GPUBuffer;
   normalBuffer: GPUBuffer;
   uvBuffer: GPUBuffer;
+  uv1Buffer: GPUBuffer;
   indexBuffer: GPUBuffer;
 
   boundingBox: Box3 | null;
   boundingSphere: Sphere | null;
+  drawRange = { start: 0, count: Infinity };
 
   constructor() {
     this.groups = [];
@@ -297,6 +300,17 @@ export class Geometry {
         mappedAtCreation: true,
       });
       new Float32Array(this.uvBuffer.getMappedRange()).set(this.uvs);
+      this.uvBuffer.unmap();
+    }
+
+    if (this.uvs1) {
+      this.uv1Buffer = device.createBuffer({
+        label: 'uv1 buffer data',
+        size: this.uvs1.byteLength,
+        usage: GPUBufferUsage.VERTEX,
+        mappedAtCreation: true,
+      });
+      new Float32Array(this.uvBuffer.getMappedRange()).set(this.uvs1);
       this.uvBuffer.unmap();
     }
 
