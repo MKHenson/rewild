@@ -3,14 +3,15 @@ import { TerrainPass } from '../../materials/TerrainPass';
 import { Mesh } from '../../core/Mesh';
 import { LOFInfo, TerrainRenderer } from './TerrainRenderer';
 import { Renderer } from '../..';
-import { Transform } from '../../core/Transform';
+import { IComponent, Transform } from '../../core/Transform';
 import { DataTexture } from '../../textures/DataTexture';
 import { TextureProperties } from '../../textures/Texture';
 import { Geometry } from '../../geometry/Geometry';
+import { Raycaster, Intersection } from '../../core/Raycaster';
 
 const temp: Vector3 = new Vector3();
 
-export class TerrainChunk {
+export class TerrainChunk implements IComponent {
   position: Vector2;
   _visible: boolean = false;
   bounds: Box3;
@@ -32,6 +33,7 @@ export class TerrainChunk {
     this.lodMesh = new Array<LODMesh>(detailLevels.length);
 
     this.transform = new Transform();
+    this.transform.component = this;
     this.transform.position.set(this.position.x, 0, this.position.y);
 
     for (let i = 0; i < detailLevels.length; i++) {
@@ -48,6 +50,15 @@ export class TerrainChunk {
       this.transform.position,
       temp.set(size, 0, size)
     );
+  }
+
+  raycast(raycaster: Raycaster, intersects: Intersection[]) {
+    for (const chunk of this.lodMesh) {
+      if (chunk.mesh && chunk.mesh.visible) {
+        // const mesh = chunk.mesh;
+        // mesh.raycast(raycaster, intersects);
+      }
+    }
   }
 
   updateTerrainChunk(

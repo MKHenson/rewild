@@ -1,4 +1,6 @@
-import { Matrix3 } from "./Matrix3";
+import { Matrix3 } from './Matrix3';
+import { Vector3 } from './Vector3';
+import { Vector4 } from './Vector4';
 
 export class Vector2 {
   isVector2: boolean = true;
@@ -61,7 +63,7 @@ export class Vector2 {
         this.y = value;
         break;
       default:
-        throw new Error("index is out of range: " + index);
+        throw new Error('index is out of range: ' + index);
     }
 
     return this;
@@ -74,7 +76,7 @@ export class Vector2 {
       case 1:
         return this.y;
       default:
-        throw new Error("index is out of range: " + index);
+        throw new Error('index is out of range: ' + index);
     }
   }
 
@@ -110,7 +112,7 @@ export class Vector2 {
     return this;
   }
 
-  addScaledVector(v: Vector2, s: f32): Vector2 {
+  addScaledVector(v: Vector2 | Vector3 | Vector4, s: f32): Vector2 {
     this.x += v.x * s;
     this.y += v.y * s;
 
@@ -207,7 +209,9 @@ export class Vector2 {
   clampLength(min: f32, max: f32): Vector2 {
     const length = this.length();
 
-    return this.divideScalar(length || 1).multiplyScalar(Mathf.max(min, Mathf.min(max, length)));
+    return this.divideScalar(length || 1).multiplyScalar(
+      Mathf.max(min, Mathf.min(max, length))
+    );
   }
 
   floor(): Vector2 {

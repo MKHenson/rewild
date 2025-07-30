@@ -1,11 +1,14 @@
 import { Component, register, Pane3D } from 'rewild-ui';
-import { Renderer } from 'rewild-renderer';
+import { Mesh, Renderer } from 'rewild-renderer';
 import { projectStore, ProjectStoreEvents } from 'src/ui/stores/ProjectStore';
-import { Subscriber } from 'node_modules/rewild-common';
+import { Subscriber, Vector2 } from 'rewild-common';
 import {
   syncFromEditorResource,
   SyncRendererFromProject,
 } from './utils/RendererSync';
+import { BoxGeometryFactory } from 'rewild-renderer/lib/geometry/BoxGeometryFactory';
+import { DiffusePass } from 'rewild-renderer/lib/materials/DiffusePass';
+import { Raycaster } from 'rewild-renderer/lib/core/Raycaster';
 
 interface Props {}
 
@@ -13,6 +16,8 @@ interface Props {}
 export class EditorViewport extends Component<Props> {
   renderer: Renderer;
   hasInitialized = false;
+
+  circle: Mesh;
 
   init() {
     this.renderer = new Renderer();
@@ -50,8 +55,37 @@ export class EditorViewport extends Component<Props> {
         this.hasInitialized = true;
 
         await this.renderer.init(pane3D.canvas()!);
+
+        pane3D.onclick = onClick;
+
+        this.circle = new Mesh(BoxGeometryFactory.new(), new DiffusePass());
+        this.renderer.scene.addChild(this.circle.transform);
       } catch (err: unknown) {
         console.error(err);
+      }
+    };
+
+    const onClick = (event: MouseEvent) => {
+      const pointer = new Vector2();
+      const raycaster = new Raycaster();
+
+      const rect = canvas.getBoundingClientRect();
+
+      pointer.set(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+
+      raycaster.setFromCamera(pointer, this.renderer.perspectiveCam);
+      const intersects = raycaster.intersectObjects(
+        [this.renderer.scene],
+        true
+      );
+
+      if (intersects.length > 0) {
+        const intersection = intersects[0];
+        console.log('Intersection:', intersection);
+        this.circle.transform.position.copy(intersection.point);
       }
     };
 

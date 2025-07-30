@@ -140,10 +140,13 @@ export class Face {
 export class Intersection {
   public distance: f32;
   public point: Vector3;
+  public normal: Vector3;
   public object: Transform;
   public faceIndex: i32;
   public face: Face | null;
   public uv: Vector2 | null;
+  public uv1: Vector2 | null;
   public uv2: Vector2 | null;
+  public barycoord: Vector3 | null;
   public instanceId: i32;
 }

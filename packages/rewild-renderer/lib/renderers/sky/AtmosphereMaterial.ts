@@ -20,12 +20,14 @@ export class AtmosphereMaterial implements IMaterialPass {
   diffuse: Diffuse;
   bindGroup: GPUBindGroup;
   uniformBuffer: GPUBuffer;
+  side: GPUFrontFace;
 
   cameraView: Matrix4;
   viewDirectionProjectionInverse: Matrix4;
 
   constructor() {
     this.requiresRebuild = true;
+    this.side = 'ccw';
     this.cameraView = new Matrix4();
     this.viewDirectionProjectionInverse = new Matrix4();
 
