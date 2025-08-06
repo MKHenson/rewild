@@ -9,12 +9,12 @@ import {
   UIEventType,
 } from 'rewild-common';
 import { ApplicationEvent } from './ApplicationEvent';
-import { Object3D } from 'rewild-wasmtime';
+import { IAsset } from './IAsset';
 
 export class Level extends Container implements Listener {
   constructor(
     name: string,
-    parentObject3D: Object3D,
+    parentObject3D: IAsset,
     autoDispose: boolean = false
   ) {
     super(name, true, parentObject3D, autoDispose);

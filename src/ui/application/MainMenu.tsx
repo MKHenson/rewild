@@ -46,7 +46,7 @@ export class MainMenu extends Component<Props> {
             </div>
           ) : (
             <div class="styled-buttons">
-              <Button onClick={props.onStart} fullWidth disabled>
+              <Button onClick={props.onStart} fullWidth>
                 <span>New Game (WIP)</span>
               </Button>
               <Button onClick={onOptionsClick} fullWidth disabled>

@@ -1,5 +1,6 @@
 import { Cylindrical } from './Cylindrical';
 import { Euler } from './Euler';
+import { IVector } from './IVector';
 import * as MathUtils from './MathUtils';
 import { Matrix3 } from './Matrix3';
 import { Matrix4 } from './Matrix4';
@@ -7,7 +8,7 @@ import { Quaternion } from './Quaternion';
 import { Spherical } from './Spherical';
 import { Vector4 } from './Vector4';
 
-export class Vector3 {
+export class Vector3 implements IVector {
   static UP: Vector3 = new Vector3(0, 1, 0);
 
   isVector3: boolean = true;
@@ -154,10 +155,18 @@ export class Vector3 {
     return this;
   }
 
-  addScaledVector(v: Vector3 | Vector4, s: f32): Vector3 {
-    this.x += v.x * s;
-    this.y += v.y * s;
-    this.z += v.z * s;
+  addScaledVector(v: IVector, s: f32): IVector {
+    if (v instanceof Vector3) {
+      const vec3 = v as Vector3;
+      this.x += vec3.x * s;
+      this.y += vec3.y * s;
+      this.z += vec3.z * s;
+    } else if (v instanceof Vector4) {
+      const vec4 = v as Vector4;
+      this.x += vec4.x * s;
+      this.y += vec4.y * s;
+      this.z += vec4.z * s;
+    }
 
     return this;
   }

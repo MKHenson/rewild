@@ -112,6 +112,10 @@ export class DiffusePass implements IMaterialPass {
     });
   }
 
+  dispose(): void {
+    this.diffuse.destroy();
+  }
+
   isGeometryCompatible(geometry: Geometry): boolean {
     return !!(geometry.vertices && geometry.uvs);
   }

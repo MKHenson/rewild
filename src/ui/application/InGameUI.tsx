@@ -1,55 +1,47 @@
-import { GameManager } from '../../core/GameManager';
+import { Player } from 'src/core/routing/Player';
 import { CircularProgress, Component, register } from 'rewild-ui';
 
 type Props = {
-  gameManager: GameManager;
+  player: Player;
 };
 
 @register('x-in-game-ui')
 export class InGameUI extends Component<Props> {
+  playerHealthElm: CircularProgress | null = null;
+  playerHungerElm: CircularProgress | null = null;
+
   init() {
-    const [playerHealth, setPlayerHealth] = this.useState(100);
-    const [playerHunger, setPlayerHunger] = this.useState(100);
-
-    const onFrameUpdate = () => {
-      const player = this.props.gameManager.player;
-
-      if (player.playerComponent.health != playerHealth() && playerHungerElm) {
-        setPlayerHealth(player.playerComponent.health, false);
-        playerHealthElm.props = {
-          ...playerHealthElm.props,
-          value: playerHealth(),
-        };
-      }
-
-      if (player.playerComponent.hunger != playerHunger() && playerHungerElm) {
-        setPlayerHunger(player.playerComponent.hunger, false);
-        playerHungerElm.props = {
-          ...playerHungerElm.props,
-          value: playerHunger(),
-        };
-      }
-    };
-
-    this.props.gameManager.updateCallbacks.push(onFrameUpdate);
-
-    const playerHealthElm = (
+    this.playerHealthElm = (
       <CircularProgress size={120} value={100} strokeSize={20} />
     ) as CircularProgress;
-    const playerHungerElm = (
+    this.playerHungerElm = (
       <CircularProgress size={80} value={100} strokeSize={14} />
     ) as CircularProgress;
 
     const elements = (
       <div>
         <div class="footer">
-          {playerHealthElm}
-          {playerHungerElm}
+          {this.playerHealthElm}
+          {this.playerHungerElm}
         </div>
       </div>
     );
 
     return () => elements;
+  }
+
+  update() {
+    const player = this.props.player;
+
+    this.playerHealthElm!.props = {
+      ...this.playerHealthElm!.props,
+      value: player.health,
+    };
+
+    this.playerHungerElm!.props = {
+      ...this.playerHungerElm!.props,
+      value: player.hunger,
+    };
   }
 
   getStyle() {
@@ -61,6 +53,8 @@ const StyledContainer = cssStylesheet(css`
   :host {
     width: 100%;
     height: 100%;
+    top: 0;
+    left: 0;
     position: absolute;
     pointer-events: none;
   }
@@ -76,7 +70,7 @@ const StyledContainer = cssStylesheet(css`
     height: 5%;
     min-height: 50px;
     position: absolute;
-    bottom: 30px;
+    bottom: 40px;
     margin: 0 0 0 5%;
     border-radius: 10px;
     box-sizing: border-box;

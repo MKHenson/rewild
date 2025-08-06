@@ -1,8 +1,9 @@
+import { IVector } from './IVector';
 import { Matrix3 } from './Matrix3';
 import { Vector3 } from './Vector3';
 import { Vector4 } from './Vector4';
 
-export class Vector2 {
+export class Vector2 implements IVector {
   isVector2: boolean = true;
   x: f32;
   y: f32;
@@ -112,9 +113,20 @@ export class Vector2 {
     return this;
   }
 
-  addScaledVector(v: Vector2 | Vector3 | Vector4, s: f32): Vector2 {
-    this.x += v.x * s;
-    this.y += v.y * s;
+  addScaledVector(v: IVector, s: f32): Vector2 {
+    if (v instanceof Vector2) {
+      const vec2 = v as Vector2;
+      this.x += vec2.x * s;
+      this.y += vec2.y * s;
+    } else if (v instanceof Vector3) {
+      const vec3 = v as Vector3;
+      this.x += vec3.x * s;
+      this.y += vec3.y * s;
+    } else if (v instanceof Vector4) {
+      const vec4 = v as Vector4;
+      this.x += vec4.x * s;
+      this.y += vec4.y * s;
+    }
 
     return this;
   }

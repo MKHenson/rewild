@@ -47,6 +47,8 @@ export class Renderer {
   delta: number;
   totalDeltaTime: number;
 
+  onUpdate: (() => void) | null = null;
+
   private onFrameHandler: () => void;
 
   constructor() {
@@ -130,6 +132,8 @@ export class Renderer {
   onFrame() {
     if (this.disposed) return;
 
+    this.onUpdate?.();
+
     this.camController.update();
 
     this.atmosphere.update(this, this.perspectiveCam.camera);
@@ -140,6 +144,7 @@ export class Renderer {
   }
 
   dispose() {
+    this.terrainRenderer.dispose();
     this.disposed = true;
     this.initialized = false;
     this.renderables.length = 0; // Clear the renderables
