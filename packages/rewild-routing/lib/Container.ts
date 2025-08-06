@@ -1,16 +1,16 @@
+import { IAsset } from './IAsset';
 import { Node } from './Node';
 import { Portal } from './Portal';
-import { Object3D } from 'rewild-wasmtime';
 
 export class Container extends Node {
-  protected objects: Object3D[];
+  protected objects: IAsset[];
   readonly activeOnStartup: boolean;
-  parentObject3D: Object3D;
+  parentObject3D: IAsset;
 
   constructor(
     name: string,
     activeOnStartup: boolean,
-    parentObject3D: Object3D,
+    parentObject3D: IAsset,
     autoDispose: boolean = false
   ) {
     super(name, autoDispose);
@@ -22,14 +22,14 @@ export class Container extends Node {
     this.addPortal(new Portal('Exit'));
   }
 
-  findObjectByName(name: string): Object3D | null {
+  findObjectByName(name: string): IAsset | null {
     const objects = this.objects;
     for (let i: i32 = 0, l = objects.length; i < l; i++)
       if (unchecked(objects[i]).name == name) return unchecked(objects[i]);
     return null;
   }
 
-  addAsset(object: Object3D): void {
+  addAsset(object: IAsset): void {
     this.objects.push(object);
   }
 

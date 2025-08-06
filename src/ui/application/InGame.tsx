@@ -1,16 +1,9 @@
-import { UIEventManager } from '../../core/UIEventManager';
 import { InGameMenu } from './InGameMenu';
-import { ApplicationEvent } from '../../core/events/ApplicationEvent';
-import { ApplicationEventType, UIEventType } from 'rewild-common';
-import { InGameUI } from './InGameUI';
 import { GameOverMenu } from './GameOverMenu';
-import { update } from './FPSCounter';
 import { Component, register } from 'rewild-ui';
-import { GameManager } from '../../core/GameManager';
+import { ViewportStateMachine } from './ViewportStateMachine';
 
 interface Props {
-  gameManager: GameManager;
-  eventManager: UIEventManager;
   onQuit: () => void;
 }
 type ActiveMenu = 'ingameMenu' | 'gameOverMenu';
@@ -19,22 +12,10 @@ type ActiveMenu = 'ingameMenu' | 'gameOverMenu';
 export class InGame extends Component<Props> {
   init() {
     const [modalOpen, setModalOpen] = this.useState(false);
-    const [activeMenu, setActiveMenu] = this.useState<ActiveMenu>('ingameMenu');
-
-    const onWasmUiEvent = (event: ApplicationEvent) => {
-      if (event.eventType === ApplicationEventType.OpenInGameMenu)
-        setModalOpen(!modalOpen());
-      else if (event.eventType === ApplicationEventType.PlayerDied)
-        setActiveMenu('gameOverMenu');
-    };
-
-    const onFrameUpdate = () => {
-      if (fpsDiv) update(fpsDiv);
-    };
+    const [activeMenu] = this.useState<ActiveMenu>('ingameMenu');
 
     const onResume = () => {
       setModalOpen(false);
-      this.props.eventManager.triggerUIEvent(ApplicationEventType.Resume);
     };
 
     const onQuit = () => {
@@ -42,23 +23,28 @@ export class InGame extends Component<Props> {
     };
 
     this.onMount = () => {
-      this.props.gameManager.updateCallbacks.push(onFrameUpdate);
-      this.props.eventManager.addEventListener(UIEventType, onWasmUiEvent);
+      document.addEventListener('keydown', onKeyDown);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!modalOpen() && event.key === 'Escape') {
+        setModalOpen(true);
+      } else if (event.key === 'Escape') {
+        setModalOpen(false);
+      }
     };
 
     this.onCleanup = () => {
-      this.props.gameManager.updateCallbacks.splice(
-        this.props.gameManager.updateCallbacks.indexOf(onFrameUpdate),
-        1
-      );
-      this.props.eventManager.removeEventListener(UIEventType, onWasmUiEvent);
+      document.removeEventListener('keydown', onKeyDown);
+      (viewport as ViewportStateMachine).dispose();
     };
 
     const fpsDiv = <div class="fps-counter">0</div>;
+    const viewport = <ViewportStateMachine />;
 
     return () => (
       <div>
-        <InGameUI gameManager={this.props.gameManager} />
+        {viewport}
         {activeMenu() === 'ingameMenu' ? (
           <InGameMenu
             open={modalOpen()}

@@ -11,6 +11,7 @@ export interface IMaterialPass {
   perMeshTracker?: IMeshTracker;
   sharedUniformsTracker?: IMeshTracker;
   init(renderer: Renderer): void;
+  dispose(): void;
   render(
     renderer: Renderer,
     pass: GPURenderPassEncoder,

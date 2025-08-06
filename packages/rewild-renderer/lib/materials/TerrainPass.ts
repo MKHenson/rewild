@@ -36,6 +36,11 @@ export class TerrainPass implements IMaterialPass {
     ]);
   }
 
+  dispose(): void {
+    this.terrainUniforms.destroy();
+    this.lightingUniforms.destroy();
+  }
+
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
     const { device, presentationFormat } = renderer;

@@ -3,6 +3,7 @@ import { Plane } from './Plane';
 import { Vector2 } from './Vector2';
 import { Box3 } from './Box3';
 import { Vector4 } from './Vector4';
+import { IVector } from './IVector';
 
 const _v0 = new Vector3();
 const _v1 = new Vector3();
@@ -135,9 +136,9 @@ export class Triangle {
     i2: i32,
     i3: i32,
     barycord: Vector3,
-    target: Vector3 | Vector2,
+    target: IVector,
     itemSize: i32
-  ): Vector3 | Vector2 {
+  ): IVector {
     _v40.setScalar(0);
     _v41.setScalar(0);
     _v42.setScalar(0);
@@ -269,7 +270,7 @@ export class Triangle {
     if (vc <= 0 && d1 >= 0 && d3 <= 0) {
       v = d1 / (d1 - d3);
       // edge region of AB; barycentric coords (1-v, v, 0)
-      return target.copy(a).addScaledVector(_vab, v);
+      return target.copy(a).addScaledVector(_vab, v) as Vector3;
     }
 
     _vcp.subVectors(p, c);
@@ -284,7 +285,7 @@ export class Triangle {
     if (vb <= 0 && d2 >= 0 && d6 <= 0) {
       w = d2 / (d2 - d6);
       // edge region of AC; barycentric coords (1-w, 0, w)
-      return target.copy(a).addScaledVector(_vac, w);
+      return target.copy(a).addScaledVector(_vac, w) as Vector3;
     }
 
     const va = d3 * d6 - d5 * d4;
@@ -292,7 +293,7 @@ export class Triangle {
       _vbc.subVectors(c, b);
       w = (d4 - d3) / (d4 - d3 + (d5 - d6));
       // edge region of BC; barycentric coords (0, 1-w, w)
-      return target.copy(b).addScaledVector(_vbc, w); // edge region of BC
+      return target.copy(b).addScaledVector(_vbc, w) as Vector3; // edge region of BC
     }
 
     // face region
@@ -301,7 +302,10 @@ export class Triangle {
     v = vb * denom;
     w = vc * denom;
 
-    return target.copy(a).addScaledVector(_vab, v).addScaledVector(_vac, w);
+    return target
+      .copy(a)
+      .addScaledVector(_vab, v)
+      .addScaledVector(_vac, w) as Vector3;
   }
 
   equals(triangle: Triangle): boolean {

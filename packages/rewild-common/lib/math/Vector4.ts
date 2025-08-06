@@ -1,7 +1,8 @@
+import { IVector } from './IVector';
 import { Matrix4 } from './Matrix4';
 import { Quaternion } from './Quaternion';
 
-export class Vector4 {
+export class Vector4 implements IVector {
   x: f32;
   y: f32;
   z: f32;

@@ -61,6 +61,15 @@ export class TerrainChunk implements IComponent {
     }
   }
 
+  dispose() {
+    for (const lod of this.lodMesh) {
+      if (lod.mesh) {
+        lod.mesh.geometry.dispose();
+        lod.mesh.material.dispose();
+      }
+    }
+  }
+
   updateTerrainChunk(
     viewerPos: Vector3,
     terrainRenderer: TerrainRenderer,

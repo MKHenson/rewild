@@ -12,7 +12,6 @@ import { ProjectEditorPage } from './project-editor/ProjectEditorPage';
 // import { ErrorType, StartError } from './StartError';
 import { InGame } from './InGame';
 import { Auth } from './Auth';
-import { gameManager } from '../../core/GameManager';
 
 interface Props {}
 
@@ -95,16 +94,7 @@ export class Application extends Component<Props> {
             }
           />
           {/* {ready() ? ( */}
-          <Route
-            path="/game"
-            onRender={() => (
-              <InGame
-                gameManager={gameManager}
-                eventManager={gameManager.eventManager!}
-                onQuit={onQuit}
-              />
-            )}
-          />
+          <Route path="/game" onRender={() => <InGame onQuit={onQuit} />} />
           {/* ) : undefined} */}
 
           {/* {ready() ? ( */}

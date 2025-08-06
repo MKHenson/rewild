@@ -1,8 +1,5 @@
 import { Renderer } from '../../Renderer';
-import { Geometry } from '../../geometry/Geometry';
-import { ITexture } from '../../textures/ITexture';
 import { Camera } from '../../core/Camera';
-import { Mesh } from '../../core/Mesh';
 import { Vector2, Vector3 } from 'rewild-common';
 import { TerrainChunk } from './TerrainChunk';
 
@@ -16,11 +13,7 @@ const sqrViewerMoveThresholdForChunkUpdate =
   viewerMoveThresholdForChunkUpdate * viewerMoveThresholdForChunkUpdate;
 
 export class TerrainRenderer {
-  terrainTexture: ITexture;
-  geometry: Geometry;
-  mesh: Mesh;
   viewPosOld: Vector3;
-
   viewerPosition: Vector3;
   chunkSize: i32;
   chunksVisibleInViewDst: i32;
@@ -36,8 +29,6 @@ export class TerrainRenderer {
   readonly mapChunkSizeLod = 241;
   private _levelOfDetail: number = 0; // Must be any int from 0 to 6
 
-  simplify: HTMLButtonElement | null = null;
-
   constructor() {
     this.terrainChunks = new Map();
     this.viewerPosition = new Vector3();
@@ -49,18 +40,6 @@ export class TerrainRenderer {
   }
 
   init(renderer: Renderer) {
-    if (!this.simplify) {
-      this.simplify = document.createElement('button');
-      this.simplify.innerText = 'Simplify';
-      this.simplify.style.position = 'absolute';
-      this.simplify.style.top = '0px';
-      this.simplify.onclick = () => {
-        this.levelOfDetail = this._levelOfDetail + 1;
-        this.init(renderer);
-      };
-      document.body.appendChild(this.simplify);
-    }
-
     const mapChunkSize = this.mapChunkSizeLod;
     this.chunkSize = mapChunkSize - 1;
     this.chunksVisibleInViewDst = Math.round(this.maxViewDst / mapChunkSize);
@@ -167,4 +146,12 @@ export class TerrainRenderer {
   }
 
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {}
+
+  dispose() {
+    for (const chunk of this.terrainChunks.values()) {
+      chunk.dispose();
+    }
+    this.terrainChunks.clear();
+    this.terrainChunksVisibleLastUpdate.length = 0;
+  }
 }
