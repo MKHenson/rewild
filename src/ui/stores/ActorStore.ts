@@ -45,7 +45,7 @@ const actorTemplates: ITemplateTreeNode[] = [
           },
           {
             label: 'Pipeline',
-            type: 'pipeline',
+            type: 'material',
             valueType: 'hidden',
             value: 'earth',
           },
@@ -77,7 +77,7 @@ const actorTemplates: ITemplateTreeNode[] = [
           },
           {
             label: 'Pipeline',
-            type: 'pipeline',
+            type: 'material',
             valueType: 'hidden',
             value: 'crate',
           },
@@ -112,7 +112,7 @@ const actorTemplates: ITemplateTreeNode[] = [
           },
           {
             label: 'Pipeline',
-            type: 'pipeline',
+            type: 'material',
             valueType: 'hidden',
             value: 'basketball',
           },

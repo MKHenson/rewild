@@ -40,6 +40,11 @@ export class AtmosphereMaterial implements IMaterialPass {
     ]);
   }
 
+  dispose(): void {
+    this.diffuse.destroy();
+    this.uniformBuffer.destroy();
+  }
+
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
     const { device, presentationFormat } = renderer;

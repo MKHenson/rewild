@@ -1,4 +1,5 @@
 import { WasmManager } from 'rewild-wasmtime';
+import { IAsset } from './IAsset';
 
 // Mock the wasm object in the rewild-wasmtime module
 jest.doMock('rewild-wasmtime/lib/WasmManager', () => {
@@ -17,3 +18,27 @@ jest.doMock('rewild-wasmtime/lib/WasmManager', () => {
 });
 
 WasmManager;
+
+export class Asset3D implements IAsset {
+  name: string;
+  id: number;
+  children: IAsset[] = [];
+
+  constructor(name: string, id: number) {
+    this.name = name;
+    this.id = id;
+  }
+
+  add(child: IAsset): IAsset {
+    this.children.push(child);
+    return child;
+  }
+
+  remove(child: IAsset): IAsset {
+    const index = this.children.indexOf(child);
+    if (index > -1) {
+      this.children.splice(index, 1);
+    }
+    return child;
+  }
+}

@@ -1,9 +1,9 @@
 import { BitmapCubeTexture } from '../textures/BitmapCubeTexture';
 import { BitmapTexture } from '../textures/BitmapTexture';
 import { Renderer } from '../Renderer';
-import { ITexture } from './ITexture';
-import { TextureProperties } from './Texture';
-import { DataTexture } from './DataTexture';
+import { ITexture } from '../textures/ITexture';
+import { TextureProperties } from '../textures/Texture';
+import { DataTexture } from '../textures/DataTexture';
 
 const MEDIA_URL = process.env.MEDIA_URL;
 
