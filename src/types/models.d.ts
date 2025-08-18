@@ -30,7 +30,7 @@ declare module 'models' {
     | 'size'
     | 'speed'
     | 'geometry'
-    | 'pipeline'
+    | 'material'
     | 'position'
     | 'cloudiness'
     | 'foginess'

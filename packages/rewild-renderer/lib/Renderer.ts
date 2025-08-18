@@ -2,8 +2,6 @@ import { IRenderable } from '../types/interfaces';
 import { PerspectiveCamera } from './core/PerspectiveCamera';
 import { Transform } from './core/Transform';
 import { Camera } from './core/Camera';
-import { TextureManager } from './textures/TextureManager';
-import { SamplerManager } from './textures/SamplerManager';
 import { CubeRenderer } from './renderables.ts/CubeRenderer';
 import { Geometry } from './geometry/Geometry';
 import { IMaterialPass } from './materials/IMaterialPass';
@@ -16,6 +14,10 @@ import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
 import { RenderList } from './core/RenderList';
 import { Light } from './core/lights/Light';
 import { MipMapGenerator } from './textures/MipMapGenerator';
+import { TextureManager } from './managers/TextureManager';
+import { SamplerManager } from './managers/SamplerManager';
+import { GeometryManager } from './managers/GeometryManager';
+import { MaterialManager } from './managers/MaterialManager';
 
 export class Renderer {
   device: GPUDevice;
@@ -32,7 +34,9 @@ export class Renderer {
   public depthTexture: GPUTexture;
   public terrainRenderer: TerrainRenderer;
   textureManager: TextureManager;
+  geometryManager: GeometryManager;
   samplerManager: SamplerManager;
+  materialManager: MaterialManager;
   mipmapGenerator: MipMapGenerator;
 
   perspectiveCam: PerspectiveCamera;
@@ -111,10 +115,14 @@ export class Renderer {
 
     this.textureManager = new TextureManager();
     this.samplerManager = new SamplerManager();
+    this.geometryManager = new GeometryManager();
+    this.materialManager = new MaterialManager();
     this.mipmapGenerator = new MipMapGenerator();
 
     await this.samplerManager.initialize(this);
     await this.textureManager.initialize(this);
+    await this.geometryManager.initialize(this);
+    await this.materialManager.initialize(this);
     await this.terrainRenderer.init(this);
 
     this.renderables = await Promise.all(
@@ -157,6 +165,8 @@ export class Renderer {
     this.atmosphere.dispose();
     this.textureManager.dispose();
     this.samplerManager.dispose();
+    this.geometryManager.dispose();
+    this.materialManager.dispose();
   }
 
   resizeRenderTargets() {
