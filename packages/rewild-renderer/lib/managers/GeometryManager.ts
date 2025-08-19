@@ -1,6 +1,7 @@
 import { BoxGeometryFactory } from '../geometry/BoxGeometryFactory';
 import { Geometry } from '../geometry/Geometry';
 import { PlaneGeometryFactory } from '../geometry/PlaneGeometryFactory';
+import { SphereGeometryFactory } from '../geometry/SphereGeometryFactory';
 import { Renderer } from '../Renderer';
 
 export class GeometryManager {
@@ -23,7 +24,7 @@ export class GeometryManager {
     const { device } = renderer;
 
     this.addGeometry('box', BoxGeometryFactory.new());
-    this.addGeometry('sphere', BoxGeometryFactory.new());
+    this.addGeometry('sphere', SphereGeometryFactory.new());
     this.addGeometry('plane', PlaneGeometryFactory.new());
 
     await Promise.all(

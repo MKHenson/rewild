@@ -18,6 +18,11 @@ const copyPluginDetails = {
       watch: true,
     },
     {
+      from: ['./templates/template-library.json'],
+      to: ['./public/templates/template-library.json'],
+      watch: true,
+    },
+    {
       from: ['./packages/rewild-assembly/build/release.wasm'],
       to: ['./public/release.wasm'],
       watch: true,

@@ -70,14 +70,8 @@ const actorTemplates: ITemplateTreeNode[] = [
         type: 'actor',
         properties: [
           {
-            label: 'Geometry',
-            type: 'geometry',
-            valueType: 'hidden',
-            value: 'box',
-          },
-          {
-            label: 'Pipeline',
-            type: 'material',
+            label: 'TemplateId',
+            type: 'templateId',
             valueType: 'hidden',
             value: 'crate',
           },
@@ -105,14 +99,8 @@ const actorTemplates: ITemplateTreeNode[] = [
         type: 'actor',
         properties: [
           {
-            label: 'Geometry',
-            type: 'geometry',
-            valueType: 'hidden',
-            value: 'ball',
-          },
-          {
-            label: 'Pipeline',
-            type: 'material',
+            label: 'TemplateId',
+            type: 'templateId',
             valueType: 'hidden',
             value: 'basketball',
           },

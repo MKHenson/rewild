@@ -3,7 +3,7 @@ import { Renderer } from 'rewild-renderer';
 import { sceneGraphStore } from 'src/ui/stores/SceneGraphStore';
 
 export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
-  const atmosphere = project.sceneGraph.atmosphere;
+  const atmosphere = project.sceneGraph?.atmosphere;
 
   if (atmosphere) {
     renderer.atmosphere.skyRenderer.cloudiness = atmosphere.cloudiness as f32;

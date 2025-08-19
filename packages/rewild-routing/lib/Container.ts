@@ -1,11 +1,15 @@
+import { Dispatcher } from 'rewild-common';
 import { IAsset } from './IAsset';
 import { Node } from './Node';
 import { Portal } from './Portal';
+
+type ContainerEvent = { kind: 'loading'; loadingPercent: f32 };
 
 export class Container extends Node {
   protected objects: IAsset[];
   readonly activeOnStartup: boolean;
   parentObject3D: IAsset;
+  dispatcher: Dispatcher<ContainerEvent>;
 
   constructor(
     name: string,
@@ -17,9 +21,22 @@ export class Container extends Node {
     this.objects = [];
     this.parentObject3D = parentObject3D;
     this.activeOnStartup = activeOnStartup;
+    this.dispatcher = new Dispatcher<ContainerEvent>();
 
     this.addPortal(new Portal('Enter'));
     this.addPortal(new Portal('Exit'));
+  }
+
+  protected onLoadingUpdate(): void {
+    const objects = this.objects;
+    const numAssets = objects.length;
+    let numAssetsLoaded: i32 = 0;
+
+    for (let i: i32 = 0, l = objects.length; i < l; i++)
+      if (objects[i].loaded) numAssetsLoaded++;
+
+    const loadingPercent = numAssetsLoaded / numAssets;
+    this.dispatcher.dispatch({ kind: 'loading', loadingPercent });
   }
 
   findObjectByName(name: string): IAsset | null {
@@ -36,9 +53,15 @@ export class Container extends Node {
   mount(): void {
     const objects = this.objects;
     const parentObject3D = this.parentObject3D;
-
+    this.onLoadingUpdate();
+    let object: IAsset;
     for (let i: i32 = 0, l: i32 = objects.length; i < l; i++) {
-      parentObject3D.add(objects[i]);
+      object = objects[i];
+      if (object.loaded) {
+        object.load().then(() => this.onLoadingUpdate());
+      }
+      parentObject3D.add(object);
+      object.mount();
     }
 
     super.mount();

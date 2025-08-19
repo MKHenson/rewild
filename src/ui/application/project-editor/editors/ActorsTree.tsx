@@ -6,7 +6,7 @@ interface Props {}
 @register('x-actors-tree')
 export class ActorsTree extends Component<Props> {
   init() {
-    const actorStoreProxy = this.observeStore(actorStore);
+    const actorStoreTarget = actorStore.target;
 
     return () => {
       return (
@@ -16,7 +16,7 @@ export class ActorsTree extends Component<Props> {
               <Typography variant="h3">Actors</Typography>
             </div>
             <div class="nodes">
-              <Tree rootNodes={actorStoreProxy.nodes} />
+              <Tree rootNodes={actorStoreTarget.nodes} />
             </div>
           </div>
         </Card>
