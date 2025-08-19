@@ -1,0 +1,20 @@
+{
+  "assets": [
+    {
+      "name": "crate",
+      "type": "asset",
+      "resource": {
+        "materialId": "crate",
+        "geometryId": "box"
+      }
+    },
+    {
+      "name": "basketball",
+      "type": "asset",
+      "resource": {
+        "materialId": "basketball",
+        "geometryId": "sphere"
+      }
+    }
+  ]
+}

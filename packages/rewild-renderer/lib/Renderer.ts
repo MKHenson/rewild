@@ -27,10 +27,12 @@ export class Renderer {
 
   private context: GPUCanvasContext;
   private renderables: IRenderable[];
-  private disposed: boolean;
+  disposed: boolean;
   private renderTargetView: GPUTextureView | undefined;
   private renderTarget: GPUTexture | undefined;
   private initialized: boolean;
+  private autoFrame: boolean;
+
   public depthTexture: GPUTexture;
   public terrainRenderer: TerrainRenderer;
   textureManager: TextureManager;
@@ -51,11 +53,10 @@ export class Renderer {
   delta: number;
   totalDeltaTime: number;
 
-  onUpdate: (() => void) | null = null;
-
   private onFrameHandler: () => void;
 
   constructor() {
+    this.autoFrame = true;
     this.onFrameHandler = this.onFrame.bind(this);
     this.scene = new Transform();
     this.atmosphere = new AtmosphereSkybox();
@@ -66,6 +67,7 @@ export class Renderer {
   }
 
   async init(canvas: HTMLCanvasElement, autoFrame = true) {
+    this.autoFrame = autoFrame;
     if (this.initialized) return;
 
     this.disposed = false;
@@ -134,13 +136,11 @@ export class Renderer {
     this.totalDeltaTime = 0;
 
     this.resizeRenderTargets();
-    if (autoFrame) requestAnimationFrame(this.onFrameHandler);
+    if (this.autoFrame) requestAnimationFrame(this.onFrameHandler);
   }
 
   onFrame() {
     if (this.disposed) return;
-
-    this.onUpdate?.();
 
     this.camController.update();
 
@@ -148,7 +148,8 @@ export class Renderer {
     this.terrainRenderer.update(this, this.perspectiveCam.camera);
 
     this.render();
-    requestAnimationFrame(this.onFrameHandler);
+
+    if (this.autoFrame) requestAnimationFrame(this.onFrameHandler);
   }
 
   dispose() {

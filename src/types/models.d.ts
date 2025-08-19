@@ -6,7 +6,6 @@ declare module 'models' {
     | 'project-settings'
     | 'actors'
     | 'viewport';
-  import { LoaderPresetType } from 'src/core/loader-utils/LoaderPresets';
   import type { IconType } from 'rewild-ui';
 
   export type FactoryKey = 'actor' | 'container' | 'sky';
@@ -29,7 +28,7 @@ declare module 'models' {
   export type PropertyType =
     | 'size'
     | 'speed'
-    | 'geometry'
+    | 'templateId'
     | 'material'
     | 'position'
     | 'cloudiness'
@@ -155,7 +154,6 @@ declare module 'models' {
 
   export interface IActor extends IResource {
     baseType: BaseType;
-    actorLoaderPreset: LoaderPresetType;
     type: 'actor';
   }
 
@@ -177,4 +175,25 @@ declare module 'models' {
     rowEnd: number;
     editor?: EditorType;
   }
+
+  export interface ITemplateItems {
+    assets: ITemplateItem[];
+  }
+
+  export interface ITemplateItemBase {
+    name: string;
+  }
+
+  export interface IAsset {
+    materialId: string;
+    geometryId: string;
+  }
+
+  export interface ICharacter extends IAsset {
+    abilities: string[];
+  }
+
+  export type ITemplateItem =
+    | (ITemplateItemBase & { type: 'asset'; resource: IAsset })
+    | (ITemplateItemBase & { type: 'character'; resource: ICharacter });
 }

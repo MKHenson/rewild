@@ -19,9 +19,7 @@ export class InGameLevel extends Level {
     super.mount();
     if (this.player) {
       this.player.cameraController.camera.transform.position.set(0, 0, -10);
-      (this.parentObject3D as Asset3D).transform.addChild(
-        this.player.cameraController.camera.transform
-      );
+      this.parentObject3D.add(this.player.asset);
       this.player.cameraController.camera.lookAt(0, 0, 0);
     }
   }
@@ -30,10 +28,7 @@ export class InGameLevel extends Level {
 
   unMount(): void {
     super.unMount();
-    if (this.player)
-      (this.parentObject3D as Asset3D).transform.removeChild(
-        this.player.cameraController.camera.transform
-      );
+    if (this.player) this.parentObject3D.remove(this.player.asset);
   }
 
   dispose(): void {

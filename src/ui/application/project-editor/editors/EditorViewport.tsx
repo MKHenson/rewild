@@ -6,7 +6,7 @@ import {
   syncFromEditorResource,
   SyncRendererFromProject,
 } from './utils/RendererSync';
-import { BoxGeometryFactory } from 'rewild-renderer/lib/geometry/BoxGeometryFactory';
+import { SphereGeometryFactory } from 'rewild-renderer/lib/geometry/SphereGeometryFactory';
 import { DiffusePass } from 'rewild-renderer/lib/materials/DiffusePass';
 import { Raycaster } from 'rewild-renderer/lib/core/Raycaster';
 
@@ -58,7 +58,7 @@ export class EditorViewport extends Component<Props> {
 
         pane3D.onclick = onClick;
 
-        this.circle = new Mesh(BoxGeometryFactory.new(), new DiffusePass());
+        this.circle = new Mesh(SphereGeometryFactory.new(), new DiffusePass());
         this.renderer.scene.addChild(this.circle.transform);
       } catch (err: unknown) {
         console.error(err);

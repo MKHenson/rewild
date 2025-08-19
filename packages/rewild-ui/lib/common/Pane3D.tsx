@@ -7,8 +7,7 @@ interface Props {
 
 @register('x-pane-3d')
 export class Pane3D extends Component<Props> {
-  onResizeDelegate: (e?: UIEvent) => void;
-  // observer: ResizeObserver;
+  private onResizeDelegate: (e?: UIEvent) => void;
 
   init() {
     this.onResizeDelegate = this.onResize.bind(this);

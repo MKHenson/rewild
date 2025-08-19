@@ -1,16 +1,30 @@
+import { Vector3 } from 'rewild-common';
 import { Transform } from 'rewild-renderer';
 import { IAsset } from 'rewild-routing/lib/IAsset';
 
 export class Asset3D implements IAsset {
   transform: Transform;
   children: IAsset[] = [];
+  loaded: boolean;
+  initialPosition: Vector3;
 
   constructor(transform: Transform) {
     this.transform = transform;
+    this.loaded = false;
+    this.initialPosition = new Vector3();
   }
 
   get name(): string {
     return this.transform.name;
+  }
+
+  async load() {
+    this.loaded = true;
+    return this;
+  }
+
+  mount(): void {
+    this.transform.position.copy(this.initialPosition);
   }
 
   add(child: IAsset): IAsset {
@@ -19,6 +33,7 @@ export class Asset3D implements IAsset {
     }
 
     this.children.push(child);
+    if (child instanceof Asset3D) this.transform.addChild(child.transform);
     return child;
   }
 
@@ -26,6 +41,8 @@ export class Asset3D implements IAsset {
     const index = this.children.indexOf(child);
     if (index > -1) {
       this.children.splice(index, 1);
+
+      if (child instanceof Asset3D) this.transform.removeChild(child.transform);
     }
     return child;
   }

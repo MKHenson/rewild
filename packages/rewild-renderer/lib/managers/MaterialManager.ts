@@ -15,6 +15,11 @@ const allMaterials: IMaterial[] = [
     type: 'diffuse',
     diffuseMap: 'crate',
   },
+  {
+    id: 'basketball',
+    type: 'diffuse',
+    diffuseMap: 'basketball',
+  },
 ];
 
 export class MaterialManager {

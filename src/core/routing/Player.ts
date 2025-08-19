@@ -1,8 +1,10 @@
 import { ICameraController } from 'rewild-renderer';
 import { Node } from 'rewild-routing';
+import { Asset3D } from './Asset3D';
 
 export class Player extends Node {
   cameraController: ICameraController;
+  asset: Asset3D;
   hunger: f32;
   health: f32;
 
@@ -12,8 +14,9 @@ export class Player extends Node {
     this.health = 100.0; // Default health value
   }
 
-  setCameraController(cameraController: ICameraController): void {
+  setCamera(cameraController: ICameraController): void {
     this.cameraController = cameraController;
+    this.asset = new Asset3D(cameraController.camera.transform);
   }
 
   mount(): void {

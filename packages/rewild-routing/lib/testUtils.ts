@@ -23,11 +23,17 @@ export class Asset3D implements IAsset {
   name: string;
   id: number;
   children: IAsset[] = [];
+  loaded: boolean;
 
   constructor(name: string, id: number) {
     this.name = name;
     this.id = id;
   }
+
+  async load() {
+    return this;
+  }
+  mount(): void {}
 
   add(child: IAsset): IAsset {
     this.children.push(child);

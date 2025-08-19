@@ -81,6 +81,8 @@ export class Signaller<T extends object> {
    * This function will strip all proxies from the object and its children
    */
   private stripProxies(obj: any) {
+    if (obj === null) return;
+
     let toReturn = obj;
     if (obj.__isProxy) {
       toReturn = obj.__source;
