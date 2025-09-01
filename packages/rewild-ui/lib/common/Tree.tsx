@@ -1,6 +1,6 @@
-import { Component, register } from "../Component";
-import { ITreeNode } from "models";
-import { TreeNode } from "./TreeNode";
+import { ITreeNode } from '../../types/ui-types';
+import { Component, register } from '../Component';
+import { TreeNode } from './TreeNode';
 
 interface TreeProps {
   rootNodes: ITreeNode[];
@@ -9,7 +9,10 @@ interface TreeProps {
   onDrop?: (node: ITreeNode) => void;
 }
 
-export function traverseTree(rootNodes: ITreeNode[], onNode: (node: ITreeNode, parent: ITreeNode | null) => boolean) {
+export function traverseTree(
+  rootNodes: ITreeNode[],
+  onNode: (node: ITreeNode, parent: ITreeNode | null) => boolean
+) {
   function traverseNode(node: ITreeNode, parent: ITreeNode | null): boolean {
     const complete = onNode(node, parent);
 
@@ -27,7 +30,7 @@ export function traverseTree(rootNodes: ITreeNode[], onNode: (node: ITreeNode, p
   for (const root of rootNodes) if (traverseNode(root, null)) return;
 }
 
-@register("x-tree")
+@register('x-tree')
 export class Tree extends Component<TreeProps> {
   init() {
     return () => {
@@ -49,7 +52,9 @@ export class Tree extends Component<TreeProps> {
   }
 
   getSelectedNode(): TreeNode | null {
-    const nodes = Array.from(this.shadow!.querySelectorAll("x-treenode")) as TreeNode[];
+    const nodes = Array.from(
+      this.shadow!.querySelectorAll('x-treenode')
+    ) as TreeNode[];
     let selectedNode: TreeNode | null;
     for (const node of nodes) {
       if (node.selected) return node;

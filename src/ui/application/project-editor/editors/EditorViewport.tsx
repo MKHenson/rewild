@@ -66,14 +66,21 @@ export class EditorViewport extends Component<Props> {
     };
 
     const onClick = (event: MouseEvent) => {
+      const point = get3DCoords(event.clientX, event.clientY);
+      if (point) {
+        this.circle.transform.position.copy(point);
+      }
+    };
+
+    const get3DCoords = (clientX: i32, clientY: i32) => {
       const pointer = new Vector2();
       const raycaster = new Raycaster();
 
-      const rect = canvas.getBoundingClientRect();
+      const rect = pane3D.getBoundingClientRect();
 
       pointer.set(
-        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        -((event.clientY - rect.top) / rect.height) * 2 + 1
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1
       );
 
       raycaster.setFromCamera(pointer, this.renderer.perspectiveCam);
@@ -84,15 +91,16 @@ export class EditorViewport extends Component<Props> {
 
       if (intersects.length > 0) {
         const intersection = intersects[0];
-        console.log('Intersection:', intersection);
-        this.circle.transform.position.copy(intersection.point);
+        return intersection.point;
       }
+
+      return null;
     };
 
-    const canvas = (<Pane3D onCanvasReady={onCanvasReady} />) as Pane3D;
+    const pane3D = (<Pane3D onCanvasReady={onCanvasReady} />) as Pane3D;
 
     return () => {
-      return canvas;
+      return pane3D;
     };
   }
 

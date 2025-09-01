@@ -1,13 +1,17 @@
-import { Typography } from "./Typography";
-import { MaterialIcon, StyledMaterialIcon } from "./MaterialIcon";
-import { Component, register } from "../Component";
-import { theme } from "../theme";
-import { IDragDropAction, ITreeNode, ITreeNodeAction } from "models";
+import { Typography } from './Typography';
+import { MaterialIcon, StyledMaterialIcon } from './MaterialIcon';
+import { Component, register } from '../Component';
+import { theme } from '../theme';
 import {
   compelteDragDrop,
   curDragAction,
   startDragDrop,
-} from "../utils/dragDrop";
+} from '../utils/dragDrop';
+import {
+  IDragDropAction,
+  ITreeNode,
+  ITreeNodeAction,
+} from '../../types/ui-types';
 
 interface NodeProps {
   node: ITreeNode;
@@ -16,15 +20,15 @@ interface NodeProps {
   onDrop?: (node: ITreeNode) => void;
 }
 
-@register("x-treenode")
+@register('x-treenode')
 export class TreeNode extends Component<NodeProps> {
   selected: boolean = false;
 
   editName(): Promise<string> {
     return new Promise<string>((resolve) => {
-      const node = this.shadow!.querySelector(".treenode-text") as HTMLElement;
-      node.contentEditable = "true";
-      node.classList.add("editting");
+      const node = this.shadow!.querySelector('.treenode-text') as HTMLElement;
+      node.contentEditable = 'true';
+      node.classList.add('editting');
       node.focus();
 
       const range = document.createRange();
@@ -36,21 +40,21 @@ export class TreeNode extends Component<NodeProps> {
       const onDeactivate = (event: Event) => {
         if (
           (event as KeyboardEvent).key !== undefined &&
-          (event as KeyboardEvent).key !== "Enter"
+          (event as KeyboardEvent).key !== 'Enter'
         ) {
           return;
         }
 
-        node.contentEditable = "false";
-        node.classList.remove("editting");
-        const newName = (node.textContent || "").trim();
-        node.removeEventListener("blur", onDeactivate);
-        node.removeEventListener("keydown", onDeactivate);
+        node.contentEditable = 'false';
+        node.classList.remove('editting');
+        const newName = (node.textContent || '').trim();
+        node.removeEventListener('blur', onDeactivate);
+        node.removeEventListener('keydown', onDeactivate);
         resolve(newName);
       };
 
-      node.addEventListener("blur", onDeactivate);
-      node.addEventListener("keydown", onDeactivate);
+      node.addEventListener('blur', onDeactivate);
+      node.addEventListener('keydown', onDeactivate);
     });
   }
 
@@ -102,7 +106,7 @@ export class TreeNode extends Component<NodeProps> {
     const onDragOverEvent = (e: DragEvent) => {
       if (!this.props.node.onDragOver!(curDragAction, this.props.node)) return;
 
-      (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "true");
+      (e.currentTarget as HTMLDivElement).setAttribute('drop-active', 'true');
       e.preventDefault();
       e.stopPropagation();
     };
@@ -114,8 +118,9 @@ export class TreeNode extends Component<NodeProps> {
       return (
         <div class="treenode">
           <div
-            class={"tree-content" + (this.selected ? " selected-treenode" : "")}
-          >
+            class={
+              'tree-content' + (this.selected ? ' selected-treenode' : '')
+            }>
             {props.node.children && props.node.children.length ? (
               expanded() ? (
                 <MaterialIcon
@@ -141,14 +146,13 @@ export class TreeNode extends Component<NodeProps> {
               ondragover={props.node.onDragOver ? onDragOverEvent : undefined}
               ondragleave={onDragLeaveEvent}
               ondragend={onDragEndEvent}
-              ondrop={props.node.onDrop ? onDrop : undefined}
-            >
+              ondrop={props.node.onDrop ? onDrop : undefined}>
               <Typography variant="body2">
                 {props.node.icon && (
                   <span class="node-icon">
                     <StyledMaterialIcon
                       icon={props.node.icon}
-                      size={props.node.iconSize || "s"}
+                      size={props.node.iconSize || 's'}
                     />
                   </span>
                 )}
@@ -177,7 +181,7 @@ export class TreeNode extends Component<NodeProps> {
 
   getSelectedNode(): TreeNode | null {
     const nodes = Array.from(
-      this.shadow!.querySelectorAll("x-treenode")
+      this.shadow!.querySelectorAll('x-treenode')
     ) as TreeNode[];
     let selectedNode: TreeNode | null;
     for (const node of nodes) {
@@ -197,7 +201,7 @@ export class TreeNode extends Component<NodeProps> {
 }
 
 const onDragLeaveEvent = (e: DragEvent) => {
-  (e.currentTarget as HTMLDivElement).setAttribute("drop-active", "");
+  (e.currentTarget as HTMLDivElement).setAttribute('drop-active', '');
   e.preventDefault();
   e.stopPropagation();
 };
@@ -216,7 +220,7 @@ const StyledTreeNode = cssStylesheet(css`
     display: inline-block;
   }
 
-  .treenode-drop-area[drop-active="true"] {
+  .treenode-drop-area[drop-active='true'] {
     background: #1e5ebf7f;
   }
 

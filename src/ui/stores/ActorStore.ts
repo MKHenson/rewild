@@ -1,15 +1,15 @@
 import {
   IActor,
+  IResource,
   ITemplateTreeNode,
-  ITreeNode,
   ITreeNodeAction,
   Vector3,
 } from 'models';
-import { Store, createUUID } from 'rewild-ui';
+import { ITreeNode, Store, createUUID } from 'rewild-ui';
 import { baseActorTemplate } from '../utils/TemplateFactories';
 
 export interface IActorStoreStore {
-  nodes: ITreeNode[];
+  nodes: ITreeNode<IResource>[];
 }
 
 const actorTemplates: ITemplateTreeNode[] = [

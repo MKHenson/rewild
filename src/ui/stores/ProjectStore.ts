@@ -1,12 +1,4 @@
-import {
-  ILevel,
-  IProject,
-  IResource,
-  ITreeNode,
-  IContainer,
-  IActor,
-  PropertyType,
-} from 'models';
+import { ILevel, IProject, IResource, IContainer, IActor } from 'models';
 import { Store } from 'rewild-ui';
 import {
   getLevel as getLevelApi,
@@ -25,13 +17,6 @@ export interface IProjectStore {
   level: ILevel | null;
   project: IProject | null;
   selectedResource: IResource | null;
-}
-
-function extractProp(node: ITreeNode, type: PropertyType) {
-  const property = node.resource?.properties.find(
-    (property) => property.type === type
-  );
-  return property?.value;
 }
 
 export type ProjectStoreEvents =
@@ -72,7 +57,7 @@ export class ProjectStore extends Store<IProjectStore> {
       dirty: false,
     });
 
-    sceneGraphStore.buildTree(this.target.project!);
+    sceneGraphStore.buildTreeFromProject(this.target.project!);
     this.dispatcher.dispatch({
       kind: 'loading-completed',
       project: this.target.project!,
@@ -84,12 +69,25 @@ export class ProjectStore extends Store<IProjectStore> {
     project.lastModified = Date.now();
 
     const { id, ...token } = project;
-    const containers = sceneGraphStore.defaultProxy.nodes.find(
+    const containerNodes = sceneGraphStore.defaultProxy.nodes.find(
       (n) => n.name === 'Containers'
     )!.children;
 
     token.sceneGraph = {
-      containers: containers || [],
+      containers:
+        containerNodes?.map(
+          (containerNode) =>
+            ({
+              ...containerNode.resource,
+              actors: containerNode.children?.map((child) => ({
+                ...child.resource,
+              })),
+              activeOnStartup: sceneGraphStore.getNodePropertyValue(
+                containerNode,
+                'active'
+              ),
+            } as IContainer)
+        ) || [],
       atmosphere: {
         ...sceneGraphStore.buildObjectFromProperties('SKY')!,
       },
@@ -126,8 +124,10 @@ export class ProjectStore extends Store<IProjectStore> {
             (c) =>
               ({
                 ...c.resource,
-                activeOnStartup: extractProp(c, 'active') as boolean,
-                baseContainer: extractProp(c, 'baseContainer') as string,
+                activeOnStartup: sceneGraphStore.getNodePropertyValue(
+                  c,
+                  'active'
+                ),
                 actors:
                   c.children?.map(
                     (child) => ({ ...child.resource } as IActor)

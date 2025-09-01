@@ -1,5 +1,5 @@
-import { ITreeNode, ITreeNodeAction } from 'models';
-import { createUUID } from 'rewild-ui';
+import { IResource, ITreeNodeAction } from 'models';
+import { createUUID, ITreeNode } from 'rewild-ui';
 
 export const baseActorTemplate: ITreeNode = {
   canRename: true,
@@ -7,7 +7,7 @@ export const baseActorTemplate: ITreeNode = {
   iconSize: 'xs',
 };
 
-export const containerFactory: () => ITreeNode = () => ({
+export const containerFactory: () => ITreeNode<IResource> = () => ({
   ...baseActorTemplate,
   icon: 'label',
   onDragOver(data, node) {
@@ -23,12 +23,6 @@ export const containerFactory: () => ITreeNode = () => ({
     id: createUUID(),
     name: 'New Container',
     properties: [
-      {
-        label: 'Base Container',
-        type: 'baseContainer',
-        valueType: 'string',
-        value: '',
-      },
       {
         label: 'Active On Startup',
         type: 'active',

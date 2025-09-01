@@ -1,25 +1,30 @@
 import {
   ITemplateTreeNode,
   IProject,
-  ITreeNode,
   PropertyType,
   PropValue,
+  IResource,
 } from 'models';
-import { traverseTree, Store } from 'rewild-ui';
-import { containerFactory } from '../utils/TemplateFactories';
+import { traverseTree, Store, ITreeNode } from 'rewild-ui';
+import {
+  containerFactory,
+  baseActorTemplate,
+} from '../utils/TemplateFactories';
 
 export interface ISceneGraphStore {
-  nodes: ITreeNode[];
+  nodes: ITreeNode<IResource>[];
+  selectedContainerId: string | null;
 }
 
 export class SceneGraphStore extends Store<ISceneGraphStore> {
   constructor() {
     super({
       nodes: [],
+      selectedContainerId: null,
     });
   }
 
-  buildTree(project: IProject) {
+  buildTreeFromProject(project: IProject) {
     this.defaultProxy.nodes = [
       {
         name: 'Containers',
@@ -29,10 +34,23 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
         id: 'CONTAINERS',
         template: containerFactory,
         children:
-          project.sceneGraph?.containers.map((node) => ({
-            ...containerFactory(),
-            ...node,
-          })) || [],
+          project.sceneGraph?.containers.map(
+            (node) =>
+              ({
+                ...containerFactory(),
+                name: node.name,
+                resource: node,
+                children: node.actors?.map(
+                  (actor) =>
+                    ({
+                      ...baseActorTemplate,
+                      icon: 'label',
+                      name: actor.name,
+                      resource: actor,
+                    } as ITreeNode)
+                ),
+              } as ITreeNode)
+          ) || [],
       } as ITemplateTreeNode,
       {
         name: 'Sky',
@@ -102,14 +120,14 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
             },
           ],
         },
-      } as ITreeNode,
+      } as ITreeNode<IResource>,
     ];
   }
 
   findNodeById(
     id: string,
-    nodes: ITreeNode[] | null = this._defaultProxy.nodes
-  ): ITreeNode | null {
+    nodes: ITreeNode<IResource>[] | null = this._defaultProxy.nodes
+  ): ITreeNode<IResource> | null {
     if (!nodes) return null;
 
     for (const node of nodes) {
@@ -142,7 +160,17 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
     return obj;
   }
 
-  removeNode = (node: ITreeNode) => {
+  getNodePropertyValue(
+    node: ITreeNode<IResource>,
+    propertyType: PropertyType
+  ): PropValue | null {
+    const property = node.resource?.properties.find(
+      (prop) => prop.type === propertyType
+    );
+    return property ? property.value : null;
+  }
+
+  removeNode = (node: ITreeNode<IResource>) => {
     traverseTree(this.defaultProxy.nodes, (n, parent) => {
       if (n === node) {
         parent!.children = parent!.children!.filter((child) => child !== node);

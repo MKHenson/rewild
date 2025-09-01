@@ -1,7 +1,7 @@
-import type { IconType } from "../lib/common/MaterialIcon";
+import type { IconType } from '../lib/common/MaterialIcon';
 
 export interface IDragDropAction {
-  type: "cell-move" | "treenode";
+  type: 'cell-move' | 'treenode';
 }
 
 export interface IGridCellAction extends IDragDropAction {
@@ -17,7 +17,7 @@ export interface ITreeNodeAction<T = any> extends IDragDropAction {
 export type ITreeNode<T = any> = {
   name?: string;
   icon?: IconType;
-  iconSize?: "s" | "xs";
+  iconSize?: 's' | 'xs';
   canSelect?: boolean;
   canRename?: boolean;
   children?: ITreeNode<T>[] | null;

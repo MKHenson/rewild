@@ -1,4 +1,4 @@
-import { ITreeNode, ITemplateTreeNode } from 'models';
+import { IResource, ITemplateTreeNode } from 'models';
 import {
   theme,
   StyledMaterialIcon,
@@ -9,6 +9,7 @@ import {
   register,
   Typography,
   Card,
+  ITreeNode,
 } from 'rewild-ui';
 import { sceneGraphStore } from '../../../stores/SceneGraphStore';
 import { projectStore } from '../../../stores/ProjectStore';
@@ -20,7 +21,9 @@ export class SceneGraph extends Component<Props> {
   keyUpDelegate: (e: KeyboardEvent) => void;
 
   init() {
-    const [selectedNodes, setSelectedNodes] = this.useState<ITreeNode[]>([]);
+    const [selectedNodes, setSelectedNodes] = this.useState<
+      ITreeNode<IResource>[]
+    >([]);
 
     const sceneGraphStoreProxy = this.observeStore(sceneGraphStore);
     const projectStoreProxy = this.observeStore(projectStore);

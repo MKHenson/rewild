@@ -4,8 +4,7 @@
     "outDir": "./build",
     "types": ["node", "@webgpu/types", "jest"],
     "paths": {
-      "*": ["/build/types.d.ts"],
-      "models": ["./types/ui-types.d.ts"]
+      "*": ["/build/types.d.ts"]
     }
   }
 }

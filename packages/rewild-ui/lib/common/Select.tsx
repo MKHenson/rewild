@@ -1,6 +1,6 @@
-import { MaterialIcon } from "./MaterialIcon";
-import { Component, register } from "../Component";
-import { theme } from "../theme";
+import { MaterialIcon } from './MaterialIcon';
+import { Component, register } from '../Component';
+import { theme } from '../theme';
 
 type OptionType = { value: string; label: string };
 
@@ -10,7 +10,7 @@ interface Props {
   onChange?: (value: string) => void;
 }
 
-@register("x-select")
+@register('x-select')
 export class Select extends Component<Props> {
   init() {
     const [showDropDown, setShowDropDown] = this.useState(false);
@@ -23,7 +23,7 @@ export class Select extends Component<Props> {
         document.body.appendChild(options);
 
         setTimeout(
-          () => document.body.addEventListener("click", handleElsewhereClicked),
+          () => document.body.addEventListener('click', handleElsewhereClicked),
           30
         );
       } else if (options.parentElement) {
@@ -34,12 +34,12 @@ export class Select extends Component<Props> {
 
     // Create event cleanup function
     const cleanup = () => {
-      document.body.removeEventListener("click", handleElsewhereClicked);
+      document.body.removeEventListener('click', handleElsewhereClicked);
     };
 
     const handleElsewhereClicked = (e: MouseEvent) => {
       cleanup();
-      if ((e.target as HTMLElement).classList.contains("option")) return;
+      if ((e.target as HTMLElement).classList.contains('option')) return;
       setShowDropDown(false);
     };
 
@@ -75,10 +75,10 @@ export class Select extends Component<Props> {
       }
 
       // Position options under this element
-      const rect = this.parentElement!.getBoundingClientRect();
-      options.style.top = rect.bottom + "px";
-      options.style.left = rect.left + "px";
-      options.style.width = rect.width + "px";
+      const rect = this.getBoundingClientRect();
+      options.style.top = rect.bottom + 'px';
+      options.style.left = rect.left + 'px';
+      options.style.width = rect.width + 'px';
 
       return (
         <div class="select" onmouseup={handleShowOptions}>
@@ -99,7 +99,7 @@ export class Select extends Component<Props> {
   }
 }
 
-@register("x-option")
+@register('x-option')
 export class Option extends Component<{
   option: OptionType;
   selected?: boolean;
@@ -107,7 +107,7 @@ export class Option extends Component<{
 }> {
   init() {
     return () => (
-      this.classList.toggle("selected", this.props.selected),
+      this.classList.toggle('selected', this.props.selected),
       (
         <div class="option" onclick={this.props.onclick}>
           {this.props.option.label}
@@ -121,10 +121,10 @@ export class Option extends Component<{
   }
 }
 
-@register("x-options")
+@register('x-options')
 export class Options extends Component {
   init() {
-    this.className = "options";
+    this.className = 'options';
     return () => <slot />;
   }
 

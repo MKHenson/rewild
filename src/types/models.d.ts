@@ -6,22 +6,12 @@ declare module 'models' {
     | 'project-settings'
     | 'actors'
     | 'viewport';
-  import type { IconType } from 'rewild-ui';
+  import type { IDragDropAction, ITreeNode } from 'rewild-ui';
 
   export type FactoryKey = 'actor' | 'container' | 'sky';
 
-  export interface IDragDropAction {
-    type: 'cell-move' | 'treenode';
-  }
-
-  export interface IGridCellAction extends IDragDropAction {
-    editor: string;
-    sizeX: number;
-    sizeY: number;
-  }
-
   export interface ITreeNodeAction extends IDragDropAction {
-    node: ITreeNode;
+    node: ITreeNode<IResource>;
   }
 
   export type Vector3 = [number, number, number];
@@ -39,7 +29,6 @@ declare module 'models' {
     | 'color'
     | 'target'
     | 'active'
-    | 'baseContainer'
     | 'intensity';
   export type PropValueType =
     | 'string'
@@ -68,22 +57,9 @@ declare module 'models' {
     options?: IOption[];
   };
 
-  export type ITreeNode = {
-    name?: string;
-    icon?: IconType;
-    iconSize?: 's' | 'xs';
-    canSelect?: boolean;
-    canRename?: boolean;
-    children?: ITreeNode[] | null;
-    resource?: IResource;
-    onDragOver?: (data: IDragDropAction | null, node: ITreeNode) => boolean;
-    onDrop?: (data: IDragDropAction, node: ITreeNode) => boolean;
-    onDragStart?: (node: ITreeNode) => IDragDropAction;
-  };
-
-  export interface ITemplateTreeNode extends ITreeNode {
+  export interface ITemplateTreeNode extends ITreeNode<IResource> {
     factoryKey: FactoryKey;
-    template: () => ITreeNode;
+    template: () => ITreeNode<IResource>;
   }
 
   export interface IDataTable<T> {
@@ -118,7 +94,7 @@ declare module 'models' {
     startEvent: string;
     workspace: IWorkspace;
     sceneGraph: {
-      containers: ITreeNode[];
+      containers: IContainer[];
       atmosphere: {
         elevation: PropValue;
         cloudiness: PropValue;
@@ -158,7 +134,6 @@ declare module 'models' {
   }
 
   export interface IContainer extends IResource {
-    baseContainer: string;
     activeOnStartup: boolean;
     type: 'container';
     actors: IActor[];

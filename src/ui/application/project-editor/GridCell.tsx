@@ -1,4 +1,5 @@
-import { EditorType, IGridCellAction } from 'models';
+import { EditorType } from 'models';
+import { IGridCellAction } from 'rewild-ui';
 import {
   startDragDrop,
   compelteDragDrop,
