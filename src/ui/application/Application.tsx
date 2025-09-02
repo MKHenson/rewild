@@ -1,15 +1,6 @@
-import {
-  // Pane3D,
-  Route,
-  navigate,
-  RouterSwitch,
-  Component,
-  register,
-  // InfoBox,
-} from 'rewild-ui';
+import { Route, navigate, RouterSwitch, Component, register } from 'rewild-ui';
 import { MainMenu } from './MainMenu';
 import { ProjectEditorPage } from './project-editor/ProjectEditorPage';
-// import { ErrorType, StartError } from './StartError';
 import { InGame } from './InGame';
 import { Auth } from './Auth';
 
@@ -18,13 +9,8 @@ interface Props {}
 @register('x-application')
 export class Application extends Component<Props> {
   init() {
-    // const [errorType, setErrorType] = this.useState<ErrorType>('OTHER');
-    // const [errorMessage, setErrorMessage] = this.useState('');
-    // const [ready, setReady] = this.useState(false);
-
     const onStart = async () => {
       navigate('/game');
-      // await gameManager.onStartClick();
     };
 
     const onEditor = () => {
@@ -33,82 +19,25 @@ export class Application extends Component<Props> {
 
     const onQuit = () => {
       navigate('/');
-      // gameManager.onQuitClick();
     };
-
-    // const hasWebGPU = () => {
-    //   if (!navigator.gpu) {
-    //     return false;
-    //   } else {
-    //     return true;
-    //   }
-    // }
-
-    // const onCanvasReady = async () => {
-    //   try {
-    //     const hasWebgGPU = hasWebGPU();
-
-    //     if (!hasWebgGPU) {
-    //       setErrorMessage('Your browser does not support WebGPU');
-    //       setErrorType('WGPU');
-    //       return;
-    //     }
-
-    //     setReady(true);
-    //   } catch (err: unknown) {
-    //     setErrorMessage(
-    //       'An Error occurred while setting up the scene. Please check the console for more info.'
-    //     );
-    //     setErrorType('OTHER');
-    //     console.log(err);
-    //   }
-    // };
 
     const canvas = <div class="background" />;
 
     return () => {
-      // if (errorMessage())
-      //   return (
-      //     <InfoBox title="Error" variant="error">
-      //       {errorMessage()}
-      //     </InfoBox>
-      //   );
-
       return [
         canvas,
         <RouterSwitch>
           <Route
             path="/"
-            onRender={
-              (params) => (
-                // errorMessage() !== '' ? (
-                //   <StartError
-                //     open
-                //     errorMsg={errorMessage()}
-                //     errorType={errorType()}
-                //   />
-                // ) : (
-                <MainMenu open onStart={onStart} onEditor={onEditor} />
-              )
-              // )
-            }
-          />
-          {/* {ready() ? ( */}
-          <Route path="/game" onRender={() => <InGame onQuit={onQuit} />} />
-          {/* ) : undefined} */}
-
-          {/* {ready() ? ( */}
-          <Route
-            path="/editor"
             onRender={(params) => (
-              <ProjectEditorPage
-                onQuit={onQuit}
-                // renderer={gameManager.renderer!}
-                // eventManager={gameManager.eventManager!}
-              />
+              <MainMenu open onStart={onStart} onEditor={onEditor} />
             )}
           />
-          {/* ) : undefined} */}
+          <Route path="/game" onRender={() => <InGame onQuit={onQuit} />} />
+          <Route
+            path="/editor"
+            onRender={(params) => <ProjectEditorPage onQuit={onQuit} />}
+          />
         </RouterSwitch>,
         <Auth />,
       ];

@@ -1,4 +1,11 @@
-import { Tree, Component, register, Typography, Card } from 'rewild-ui';
+import {
+  Tree,
+  Component,
+  register,
+  Typography,
+  Card,
+  Loading,
+} from 'rewild-ui';
 import { actorStore } from '../../../stores/ActorStore';
 
 interface Props {}
@@ -6,7 +13,12 @@ interface Props {}
 @register('x-actors-tree')
 export class ActorsTree extends Component<Props> {
   init() {
-    const actorStoreTarget = actorStore.target;
+    const actorStoreProxy = this.observeStore(actorStore);
+
+    this.onMount = () => {
+      if (!actorStore.nodes.length && !actorStoreProxy.loading)
+        actorStore.loadTemplate();
+    };
 
     return () => {
       return (
@@ -16,7 +28,11 @@ export class ActorsTree extends Component<Props> {
               <Typography variant="h3">Actors</Typography>
             </div>
             <div class="nodes">
-              <Tree rootNodes={actorStoreTarget.nodes} />
+              {actorStoreProxy.loading ? (
+                <Loading />
+              ) : (
+                <Tree rootNodes={actorStore.nodes} />
+              )}
             </div>
           </div>
         </Card>

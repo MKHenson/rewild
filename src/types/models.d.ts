@@ -6,7 +6,7 @@ declare module 'models' {
     | 'project-settings'
     | 'actors'
     | 'viewport';
-  import type { IDragDropAction, ITreeNode } from 'rewild-ui';
+  import type { IDragDropAction, ITreeNode, IconType } from 'rewild-ui';
 
   export type FactoryKey = 'actor' | 'container' | 'sky';
 
@@ -29,6 +29,7 @@ declare module 'models' {
     | 'color'
     | 'target'
     | 'active'
+    | 'geometry'
     | 'intensity';
   export type PropValueType =
     | 'string'
@@ -48,11 +49,15 @@ declare module 'models' {
     step?: number;
     precision?: number;
   };
+
+  export type IPropertyValue = {
+    type: PropertyType;
+    value: PropValue;
+  };
+
   export type IProperty = {
     label: string;
-    type: PropertyType;
     valueType: PropValueType;
-    value: PropValue;
     valueOptions?: IValueOptions;
     options?: IOption[];
   };
@@ -92,7 +97,6 @@ declare module 'models' {
     description: string;
     activeOnStartup: boolean;
     startEvent: string;
-    workspace: IWorkspace;
     sceneGraph: {
       containers: IContainer[];
       atmosphere: {
@@ -123,7 +127,7 @@ declare module 'models' {
     id: string;
     name: string;
     type: 'container' | 'actor';
-    properties: IProperty[];
+    properties: IPropertyValue[];
   }
 
   export type BaseType = 'static' | 'dynamic' | 'light';
@@ -149,6 +153,19 @@ declare module 'models' {
     colEnd: number;
     rowEnd: number;
     editor?: EditorType;
+  }
+
+  export interface IActorTemplates {
+    'actor-templates': {
+      name: string;
+      icon: IconType;
+      actors: {
+        name: string;
+        actorLoaderPreset: string;
+        baseType: BaseType;
+        properties: IPropertyValue[];
+      }[];
+    }[];
   }
 
   export interface ITemplateItems {

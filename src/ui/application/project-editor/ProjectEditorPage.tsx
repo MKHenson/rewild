@@ -1,13 +1,8 @@
 import { Editor } from './Editor';
-// import { Renderer } from '../../../core/renderer/Renderer';
-// import { UIEventManager } from '../../../core/UIEventManager';
-// import { ApplicationEventType } from 'rewild-common';
 import { ProjectSelector } from './projectSelector/ProjectSelector';
 import { navigate, RouterSwitch, Route, Component, register } from 'rewild-ui';
 
 interface Props {
-  // renderer: Renderer;
-  // eventManager: UIEventManager;
   onQuit: () => void;
 }
 
@@ -18,9 +13,7 @@ export class ProjectEditorPage extends Component<Props> {
       this.props.onQuit();
     };
 
-    this.onMount = () => {
-      // this.props.eventManager.triggerUIEvent(ApplicationEventType.StartEditor);
-    };
+    this.onMount = () => {};
 
     return () => (
       <RouterSwitch>

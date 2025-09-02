@@ -8,9 +8,9 @@ import {
   Typography,
   Button,
   StyledMaterialIcon,
+  createUUID,
 } from 'rewild-ui';
 import { NewProjectForm } from '../NewProjectForm';
-import { createProject } from './ProjectSelectorUtils';
 import { projectsStore } from '../../../stores/ProjectsStore';
 
 interface Props {
@@ -44,7 +44,13 @@ export class ProjectSelector extends Component<Props> {
     };
 
     const onNewProject = () => {
-      setNewProject(createProject());
+      setNewProject({
+        id: createUUID(),
+        name: 'New Project',
+        description: '',
+        activeOnStartup: true,
+        startEvent: '',
+      });
       setSelectedProject(null);
     };
 

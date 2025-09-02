@@ -1,6 +1,7 @@
 import { Component, register, Typography, Card } from 'rewild-ui';
 import { PropertyValue } from './PropertyValue';
 import { projectStore } from '../../../stores/ProjectStore';
+import { propertyTemplates } from './utils/PropertyTemplates';
 
 interface Props {}
 let lastFocussedProp = -1;
@@ -27,16 +28,17 @@ export class Properties extends Component<Props> {
           {selectedResource && (
             <div class="properties">
               {selectedResource.properties
-                .filter((p) => p.valueType !== 'hidden')
+                .filter((p) => propertyTemplates[p.type].valueType !== 'hidden')
                 .map((prop, index) => {
+                  const template = propertyTemplates[prop.type];
                   return [
-                    <Typography variant="label">{prop.label}</Typography>,
+                    <Typography variant="label">{template.label}</Typography>,
                     <div class="value">
                       <PropertyValue
                         value={prop.value}
-                        type={prop.valueType}
-                        options={prop.options}
-                        valueOptions={prop.valueOptions}
+                        type={template.valueType}
+                        options={template.options}
+                        valueOptions={template.valueOptions}
                         refocus={lastFocussedProp === index}
                         onChange={(val) => {
                           lastFocussedProp = index;

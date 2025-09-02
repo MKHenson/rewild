@@ -18,8 +18,8 @@ const copyPluginDetails = {
       watch: true,
     },
     {
-      from: ['./templates/template-library.json'],
-      to: ['./public/templates/template-library.json'],
+      from: ['./templates/**/*'], // Match all files and subfolders in the templates folder
+      to: ['./public/templates'], // Destination folder
       watch: true,
     },
     {

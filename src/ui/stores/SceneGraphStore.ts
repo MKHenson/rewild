@@ -44,7 +44,7 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
                   (actor) =>
                     ({
                       ...baseActorTemplate,
-                      icon: 'label',
+                      icon: 'label_important',
                       name: actor.name,
                       resource: actor,
                     } as ITreeNode)
@@ -65,57 +65,23 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
           type: 'actor',
           properties: [
             {
-              label: 'Cloudiness',
               type: 'cloudiness',
-              valueType: 'float',
               value: project.sceneGraph?.atmosphere?.cloudiness || 0.7,
-              valueOptions: {
-                min: 0,
-                max: 1,
-                step: 0.01,
-                precision: 2,
-              },
             },
             {
-              label: 'Foginess',
               type: 'foginess',
-              valueType: 'float',
               value: project.sceneGraph?.atmosphere?.foginess || 0.3,
-              valueOptions: {
-                min: 0,
-                max: 1,
-                step: 0.01,
-                precision: 2,
-              },
             },
             {
-              label: 'Windiness',
               type: 'windiness',
-              valueType: 'float',
               value: project.sceneGraph?.atmosphere?.windiness || 0.5,
-              valueOptions: {
-                min: 0,
-                max: 1,
-                step: 0.01,
-                precision: 2,
-              },
             },
             {
-              label: 'Sun Elevation',
               type: 'elevation',
-              valueType: 'float',
               value: project.sceneGraph?.atmosphere?.elevation || 80,
-              valueOptions: {
-                min: -360,
-                max: 360,
-                step: 1,
-                precision: 2,
-              },
             },
             {
-              label: 'Day Night Cycle',
               type: 'dayNightCycle',
-              valueType: 'boolean',
               value: project.sceneGraph?.atmosphere?.dayNightCycle || false,
             },
           ],

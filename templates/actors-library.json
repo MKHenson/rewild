@@ -1,0 +1,107 @@
+{
+  "actor-templates": [
+    {
+      "name": "Physical",
+      "icon": "chair",
+      "actors": [
+        {
+          "name": "Earth",
+          "properties": [
+            {
+              "type": "size",
+              "value": 1
+            },
+            {
+              "type": "speed",
+              "value": 1
+            },
+            {
+              "type": "geometry",
+              "value": "sphere"
+            },
+            {
+              "type": "material",
+              "value": "earth"
+            }
+          ],
+          "actorLoaderPreset": "planet",
+          "baseType": "static"
+        },
+        {
+          "name": "Crate",
+          "properties": [
+            {
+              "type": "templateId",
+              "value": "cate"
+            },
+            {
+              "type": "position",
+              "value": [0, 0, 0]
+            }
+          ],
+          "actorLoaderPreset": "crate",
+          "baseType": "dynamic"
+        },
+        {
+          "name": "Basketball",
+          "properties": [
+            {
+              "type": "templateId",
+              "value": "basketball"
+            },
+            {
+              "type": "position",
+              "value": [0, 0, 0]
+            }
+          ],
+          "actorLoaderPreset": "ball",
+          "baseType": "dynamic"
+        }
+      ]
+    },
+    {
+      "name": "Lights",
+      "icon": "lightbulb",
+      "actors": [
+        {
+          "name": "Directional",
+          "properties": [
+            {
+              "type": "intensity",
+              "value": 3.1
+            },
+            {
+              "type": "color",
+              "value": [1, 1, 1]
+            },
+            {
+              "type": "position",
+              "value": [0, 0, 0]
+            },
+            {
+              "type": "target",
+              "value": [0, -1, 0]
+            }
+          ],
+          "baseType": "light",
+          "actorLoaderPreset": "directional-light"
+        },
+        {
+          "name": "Ambient",
+          "properties": [
+            {
+              "type": "intensity",
+              "value": 1
+            },
+            {
+              "type": "color",
+              "value": [1, 1, 1]
+            }
+          ],
+          "baseType": "light",
+          "actorLoaderPreset": "ambient-light"
+        }
+      ]
+    }
+  ]
+}
