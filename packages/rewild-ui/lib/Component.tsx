@@ -29,12 +29,13 @@ export abstract class Component<T = any>
   render: RenderFn;
   private trackedUnsubscribes: UnsubscribeStoreFn[];
   private trackedSubscribes: RescribeStoreFn[];
+  private mergedCss: CSSStyleSheet;
 
   onMount?: () => void;
   onCleanup?: () => void;
 
   // specify the property on the element instance type
-  _props: T & JSX.PropsWithChildren;
+  _props: T & JSX.PropsWithChildren & { css?: string };
 
   constructor(options?: ComponentOptions<T>) {
     super();
@@ -46,6 +47,17 @@ export abstract class Component<T = any>
       ? this.attachShadow(options?.shadow || { mode: 'open' })
       : null;
     this._props = options?.props as any;
+  }
+
+  protected mergeCss(curStyle: CSSStyleSheet, css: string) {
+    let hybridCss = css + '\n';
+
+    const rules = curStyle.cssRules;
+    for (let i = 0, l = rules.length; i < l; i++) {
+      hybridCss += rules[i].cssText + '\n';
+    }
+
+    return cssStylesheet(hybridCss);
   }
 
   _createRenderer() {
@@ -99,11 +111,11 @@ export abstract class Component<T = any>
     const fn = this.init();
   }
 
-  get props(): T & JSX.PropsWithChildren {
+  get props(): T & JSX.PropsWithChildren & { css?: string } {
     return this._props;
   }
 
-  set props(val: T & JSX.PropsWithChildren) {
+  set props(val: T & JSX.PropsWithChildren & { css?: string }) {
     this._props = val || ({} as any);
     this.render();
   }
@@ -156,10 +168,16 @@ export abstract class Component<T = any>
       stylesheed.replaceSync(css);
     } else stylesheed = css;
 
-    if (this.shadow) this.shadow.adoptedStyleSheets = [stylesheed];
-    else if (!document.adoptedStyleSheets.includes(stylesheed))
-      document.adoptedStyleSheets =
-        document.adoptedStyleSheets.concat(stylesheed);
+    this.mergedCss = stylesheed;
+    if (this.props.css) {
+      this.mergedCss = this.mergeCss(stylesheed, this.props.css);
+    }
+
+    if (this.shadow) this.shadow.adoptedStyleSheets = [this.mergedCss];
+    else if (!document.adoptedStyleSheets.includes(this.mergedCss))
+      document.adoptedStyleSheets = document.adoptedStyleSheets.concat(
+        this.mergedCss
+      );
   }
 
   // connect component
