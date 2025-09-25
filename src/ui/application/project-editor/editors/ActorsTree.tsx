@@ -50,7 +50,7 @@ const StyleSceneGraph = cssStylesheet(css`
     display: grid;
     height: 100%;
     width: 100%;
-    grid-template-rows: 20px 1fr 30px;
+    grid-template-rows: 26px 1fr 30px;
   }
 
   .nodes {
