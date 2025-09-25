@@ -6,6 +6,7 @@ interface TreeProps {
   rootNodes: ITreeNode[];
   selectedNodes?: ITreeNode[];
   onSelectionChanged?: (nodes: ITreeNode[]) => void;
+  onNodeDblClick?: (node: ITreeNode) => void;
   onDrop?: (node: ITreeNode) => void;
 }
 
@@ -43,6 +44,7 @@ export class Tree extends Component<TreeProps> {
               selectedNodes={props.selectedNodes}
               onSelectionChanged={props.onSelectionChanged}
               node={node}
+              onNodeDblClick={props.onNodeDblClick}
               onDrop={this.props.onDrop}
             />
           ))}
@@ -73,11 +75,14 @@ export class Tree extends Component<TreeProps> {
 }
 
 const StyledTree = cssStylesheet(css`
+  :host {
+    display: block;
+  }
   div {
     width: 100%;
     height: 100%;
     box-sizing: border-box;
     overflow: auto;
-    padding: 1rem 0;
+    padding: 0.5rem 0;
   }
 `);

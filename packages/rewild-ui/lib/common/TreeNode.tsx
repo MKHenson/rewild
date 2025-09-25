@@ -17,6 +17,7 @@ interface NodeProps {
   node: ITreeNode;
   selectedNodes?: ITreeNode[];
   onSelectionChanged?: (nodes: ITreeNode[]) => void;
+  onNodeDblClick?: (node: ITreeNode) => void;
   onDrop?: (node: ITreeNode) => void;
 }
 
@@ -89,6 +90,11 @@ export class TreeNode extends Component<NodeProps> {
       } else props.onSelectionChanged([props.node]);
     };
 
+    const handleNodeDblClick = (e: MouseEvent) => {
+      const props = this.props;
+      if (props.onNodeDblClick) props.onNodeDblClick(props.node);
+    };
+
     const onDrop = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -143,6 +149,7 @@ export class TreeNode extends Component<NodeProps> {
               draggable
               ondragstart={props.node.onDragStart ? onDragStart : undefined}
               onclick={handleNodeClick}
+              ondblclick={handleNodeDblClick}
               ondragover={props.node.onDragOver ? onDragOverEvent : undefined}
               ondragleave={onDragLeaveEvent}
               ondragend={onDragEndEvent}
@@ -168,6 +175,7 @@ export class TreeNode extends Component<NodeProps> {
                 <TreeNode
                   selectedNodes={props.selectedNodes}
                   onSelectionChanged={props.onSelectionChanged}
+                  onNodeDblClick={props.onNodeDblClick}
                   node={node}
                   onDrop={this.props.onDrop}
                 />
