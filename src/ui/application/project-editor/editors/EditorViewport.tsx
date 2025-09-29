@@ -30,7 +30,19 @@ export class EditorViewport extends Component<Props> {
 
   init() {
     this.renderer = new Renderer();
-    const sceneGraphStoreProxy = this.observeStore(sceneGraphStore);
+    const sceneGraphStoreProxy = this.observeStore(sceneGraphStore, (e) => {
+      if (e === 'selectedContainerId') return true;
+      if (e.includes('selectedResource.properties')) {
+        if (sceneGraphStore.target.selectedResource?.id === 'SKY') {
+          syncFromEditorResource(
+            sceneGraphStore.target.selectedResource.id,
+            this.renderer
+          );
+        }
+      }
+
+      return false; // Prevent further processing
+    });
 
     const onProjectLoaded: Subscriber<ProjectStoreEvents> = (event) => {
       if (event.kind === 'loading-completed') {
@@ -45,19 +57,6 @@ export class EditorViewport extends Component<Props> {
     this.onCleanup = () => {
       projectStore.dispatcher.remove(onProjectLoaded);
     };
-
-    this.observeStore(projectStore, (e) => {
-      if (e.includes('selectedResource.properties')) {
-        if (sceneGraphStore.target.selectedResource?.id === 'SKY') {
-          syncFromEditorResource(
-            sceneGraphStore.target.selectedResource.id,
-            this.renderer
-          );
-        }
-      }
-
-      return false; // Prevent further processing
-    });
 
     const onCanvasReady = async (pane3D: Pane3D) => {
       try {

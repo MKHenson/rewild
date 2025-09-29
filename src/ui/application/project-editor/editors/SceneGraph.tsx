@@ -15,7 +15,7 @@ import {
   sceneGraphStore,
 } from '../../../stores/SceneGraphStore';
 import { projectStore } from '../../../stores/ProjectStore';
-import { Subscriber } from 'node_modules/rewild-common';
+import { Subscriber } from 'rewild-common';
 
 interface Props {}
 

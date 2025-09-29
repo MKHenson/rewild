@@ -60,6 +60,10 @@ body,
   margin: 0;
 }
 
+* {
+  font-family: var(--font-family);
+}
+
 html {
   color: var(--on-surface);
   background: #333;

@@ -1,4 +1,4 @@
-import { ILevel, IProject, IContainer, IActor } from 'models';
+import { ILevel, IProject, IContainer, IActor, IContainerPod } from 'models';
 import { Store } from 'rewild-ui';
 import {
   getLevel as getLevelApi,
@@ -24,6 +24,7 @@ export type ProjectStoreEvents =
 
 export class ProjectStore extends Store<IProjectStore> {
   dispatcher: Dispatcher<ProjectStoreEvents>;
+  containerPods: IContainerPod[];
 
   constructor() {
     super({
@@ -34,6 +35,7 @@ export class ProjectStore extends Store<IProjectStore> {
       error: undefined,
     });
 
+    this.containerPods = [];
     this.dispatcher = new Dispatcher<ProjectStoreEvents>();
   }
 
