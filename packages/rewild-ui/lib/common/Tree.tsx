@@ -78,11 +78,4 @@ const StyledTree = cssStylesheet(css`
   :host {
     display: block;
   }
-  div {
-    width: 100%;
-    height: 100%;
-    box-sizing: border-box;
-    overflow: auto;
-    padding: 0.5rem 0;
-  }
 `);

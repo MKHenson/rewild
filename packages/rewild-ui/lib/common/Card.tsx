@@ -1,5 +1,5 @@
-import { Component, register } from "../Component";
-import { theme } from "../theme";
+import { Component, register } from '../Component';
+import { theme } from '../theme';
 
 interface Props {
   pushed?: boolean;
@@ -10,16 +10,16 @@ interface Props {
   onClick?: (e: MouseEvent) => void;
 }
 
-@register("x-card")
+@register('x-card')
 export class Card extends Component<Props> {
   init() {
     const elm = <slot></slot>;
     return () => {
-      this.toggleAttribute("button", this.props.button);
-      this.toggleAttribute("disabled", this.props.disabled || false);
-      this.classList.toggle("pushed", this.props.pushed || false);
-      this.classList.toggle("raised", this.props.raised || false);
-      this.toggleAttribute("stretched", this.props.stretched || false);
+      this.toggleAttribute('button', this.props.button);
+      this.toggleAttribute('disabled', this.props.disabled || false);
+      this.classList.toggle('pushed', this.props.pushed || false);
+      this.classList.toggle('raised', this.props.raised || false);
+      this.toggleAttribute('stretched', this.props.stretched || false);
       if (!this.props.disabled && this.props.onClick)
         this.onclick = this.props.onClick;
       return elm;
@@ -34,10 +34,10 @@ export class Card extends Component<Props> {
 const StyledCard = cssStylesheet(css`
   :host {
     display: block;
-    padding: 1rem;
+    padding: 0.5rem 1rem;
     background-color: ${theme?.colors.surface};
     box-sizing: border-box;
-    border-radius: 5px;
+    overflow: auto;
   }
 
   :host([stretched]) {

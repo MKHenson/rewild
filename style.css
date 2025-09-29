@@ -40,6 +40,10 @@
   --on-error-500: #fff;
   --on-error-600: #fff;
 
+  --font-size-s: 12px;
+  --font-size-m: 14px;
+  --font-size-l: 16px;
+
   --font-family: Roboto, sans-serif;
 
   --shadow-short-1: 2px 2px 4px rgb(0 0 0 / 25%);
