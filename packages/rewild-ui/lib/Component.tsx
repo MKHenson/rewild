@@ -50,12 +50,14 @@ export abstract class Component<T = any>
   }
 
   protected mergeCss(curStyle: CSSStyleSheet, css: string) {
-    let hybridCss = css + '\n';
+    let hybridCss = '';
 
     const rules = curStyle.cssRules;
     for (let i = 0, l = rules.length; i < l; i++) {
       hybridCss += rules[i].cssText + '\n';
     }
+
+    hybridCss += '\n' + css;
 
     return cssStylesheet(hybridCss);
   }
