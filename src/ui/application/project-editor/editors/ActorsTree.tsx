@@ -1,11 +1,4 @@
-import {
-  Tree,
-  Component,
-  register,
-  Typography,
-  Card,
-  Loading,
-} from 'rewild-ui';
+import { Tree, Component, register, Card, Loading } from 'rewild-ui';
 import { actorStore } from '../../../stores/ActorStore';
 
 interface Props {}
@@ -24,16 +17,11 @@ export class ActorsTree extends Component<Props> {
       return (
         <Card stretched>
           <div class="content">
-            <div class="header">
-              <Typography variant="h3">Actors</Typography>
-            </div>
-            <div class="nodes">
-              {actorStoreProxy.loading ? (
-                <Loading />
-              ) : (
-                <Tree rootNodes={actorStore.nodes} />
-              )}
-            </div>
+            {actorStoreProxy.loading ? (
+              <Loading />
+            ) : (
+              <Tree rootNodes={actorStore.nodes} />
+            )}
           </div>
         </Card>
       );
@@ -47,14 +35,7 @@ export class ActorsTree extends Component<Props> {
 
 const StyleSceneGraph = cssStylesheet(css`
   .content {
-    display: grid;
     height: 100%;
     width: 100%;
-    grid-template-rows: 26px 1fr 30px;
-  }
-
-  .nodes {
-    max-height: 100%;
-    overflow: hidden;
   }
 `);

@@ -2,6 +2,7 @@ import { Component, register, Typography, Card } from 'rewild-ui';
 import { PropertyValue } from './PropertyValue';
 import { projectStore } from '../../../stores/ProjectStore';
 import { propertyTemplates } from './utils/PropertyTemplates';
+import { sceneGraphStore } from 'src/ui/stores/SceneGraphStore';
 
 interface Props {}
 let lastFocussedProp = -1;
@@ -9,7 +10,7 @@ let lastFocussedProp = -1;
 @register('x-properties')
 export class Properties extends Component<Props> {
   init() {
-    const projectStoreProxy = this.observeStore(projectStore, (prop) => {
+    const sceneGraphStoreProxy = this.observeStore(sceneGraphStore, (prop) => {
       if (
         prop === 'selectedResource' ||
         prop === 'selectedResource.name' ||
@@ -20,11 +21,10 @@ export class Properties extends Component<Props> {
     lastFocussedProp = -1;
 
     return () => {
-      const selectedResource = projectStoreProxy.selectedResource;
+      const selectedResource = sceneGraphStoreProxy.selectedResource;
 
       return (
         <Card stretched>
-          <Typography variant="h3">Properties</Typography>
           {selectedResource && (
             <div class="properties">
               {selectedResource.properties
@@ -43,7 +43,7 @@ export class Properties extends Component<Props> {
                         onChange={(val) => {
                           lastFocussedProp = index;
                           prop.value = val;
-                          projectStoreProxy.dirty = true;
+                          projectStore.defaultProxy.dirty = true;
                         }}
                       />
                     </div>,
@@ -67,7 +67,7 @@ export class Properties extends Component<Props> {
                   onChange={(val) => {
                     lastFocussedProp = -2;
                     selectedResource.name = val;
-                    projectStoreProxy.dirty = true;
+                    projectStore.defaultProxy.dirty = true;
                   }}
                 />
               </div>

@@ -25,7 +25,6 @@ export class ProjectSettings extends Component<Props> {
       const { project, level } = projectStoreProxy;
       return (
         <Card stretched>
-          <Typography variant="h3">Project Settings</Typography>
           {project ? (
             <div>
               <Typography variant="label">Name</Typography>

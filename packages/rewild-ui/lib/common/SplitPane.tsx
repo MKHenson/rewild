@@ -1,10 +1,13 @@
 import { Component, register } from '../Component';
+import { theme } from '../theme';
 
 interface Props {
   mode?: 'horizontal' | 'vertical';
   pane1: JSX.Element;
   pane2?: JSX.Element;
   initalRatio?: string;
+  pane1Title?: string;
+  pane2Title?: string;
 }
 
 @register('x-split-pane')
@@ -62,9 +65,19 @@ export class SplitPane extends Component<Props> {
 
     const container = (
       <div>
-        <div class="left" />
+        <div class="left">
+          <div class="tabs">
+            <div class="tab"></div>
+          </div>
+          <div class="content" />
+        </div>
         <div class="divider" />
-        <div class="right" />
+        <div class="right">
+          <div class="tabs">
+            <div class="tab"></div>
+          </div>
+          <div class="content" />
+        </div>
         <div class="dragger" />
       </div>
     );
@@ -73,6 +86,11 @@ export class SplitPane extends Component<Props> {
     const divider = container.children[1] as HTMLElement;
     const pane2 = container.children[2] as HTMLElement;
     const dragger = container.children[3] as HTMLElement;
+
+    const pane1Content = pane1.querySelector('.content') as HTMLElement;
+    const pane2Content = pane2.querySelector('.content') as HTMLElement;
+    const pane1Tab = pane1.querySelector('.tab') as HTMLElement;
+    const pane2Tab = pane2.querySelector('.tab') as HTMLElement;
 
     if (!this.props.pane2) {
       divider.style.display = 'none';
@@ -89,11 +107,16 @@ export class SplitPane extends Component<Props> {
       container.classList.toggle('vertical', !isHorizontal);
       container.classList.toggle('horizontal', isHorizontal);
 
-      if (this.props.pane1 && this.props.pane1.parentElement !== pane1) {
-        pane1.appendChild(this.props.pane1);
+      pane1Tab.textContent = this.props.pane1Title || '';
+      pane2Tab.textContent = this.props.pane2Title || '';
+      pane1Tab.toggleAttribute('empty', pane1Tab.textContent === '');
+      pane2Tab.toggleAttribute('empty', pane2Tab.textContent === '');
+
+      if (this.props.pane1 && this.props.pane1.parentElement !== pane1Content) {
+        pane1Content.appendChild(this.props.pane1);
       }
-      if (this.props.pane2 && this.props.pane2.parentElement !== pane2) {
-        pane2.appendChild(this.props.pane2);
+      if (this.props.pane2 && this.props.pane2.parentElement !== pane2Content) {
+        pane2Content.appendChild(this.props.pane2);
       }
 
       return container;
@@ -142,11 +165,36 @@ const StyledPane3D = cssStylesheet(css`
   :host .right {
     flex: 1;
     overflow: hidden;
+
+    display: flex;
+    flex-direction: column;
   }
 
   :host .dragger {
     position: absolute;
     background: red;
+    display: none;
+  }
+
+  :host .left .content,
+  :host .right .content {
+    overflow: hidden;
+    flex-grow: 1;
+  }
+
+  .tabs {
+    background: ${theme.colors.subtle600};
+    flex-grow: 0;
+  }
+
+  .tab {
+    background: ${theme.colors.surface};
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: ${theme.colors.fontSizeMedium};
+  }
+
+  .tab[empty] {
     display: none;
   }
 `);

@@ -40,7 +40,7 @@ export class PaneManager extends Component<Props> {
 
     const layout = (
       <SplitPane
-        initalRatio="40px"
+        initalRatio="42px"
         mode="horizontal"
         pane1={editors.ribbon}
         pane2={
@@ -56,6 +56,8 @@ export class PaneManager extends Component<Props> {
                     mode="horizontal"
                     pane1={editors['project-settings']}
                     pane2={editors.actors}
+                    pane1Title="Project Settings"
+                    pane2Title="Actors"
                   />
                 }
                 pane2={editors.viewport}
@@ -66,6 +68,8 @@ export class PaneManager extends Component<Props> {
                 mode="horizontal"
                 pane1={editors.properties}
                 pane2={editors['scene-graph']}
+                pane1Title="Properties"
+                pane2Title="Scene Graph"
               />
             }
           />
