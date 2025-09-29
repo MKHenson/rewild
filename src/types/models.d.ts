@@ -137,22 +137,18 @@ declare module 'models' {
     type: 'actor';
   }
 
+  export interface IContainerPod {
+    asset3D: {
+      id: string;
+      position: Vector3;
+    }[];
+  }
+
   export interface IContainer extends IResource {
     activeOnStartup: boolean;
     type: 'container';
+    pod: IContainerPod;
     actors: IActor[];
-  }
-
-  export interface IWorkspace {
-    cells: IWorkspaceCell[];
-  }
-
-  interface IWorkspaceCell {
-    colStart: number;
-    rowStart: number;
-    colEnd: number;
-    rowEnd: number;
-    editor?: EditorType;
   }
 
   export interface IActorTemplates {

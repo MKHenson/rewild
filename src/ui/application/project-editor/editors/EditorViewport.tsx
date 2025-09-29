@@ -1,4 +1,11 @@
-import { Component, register, Pane3D } from 'rewild-ui';
+import {
+  Component,
+  register,
+  Pane3D,
+  curDragAction,
+  compelteDragDrop,
+  theme,
+} from 'rewild-ui';
 import { Mesh, Renderer } from 'rewild-renderer';
 import { projectStore, ProjectStoreEvents } from 'src/ui/stores/ProjectStore';
 import { Subscriber, Vector2 } from 'rewild-common';
@@ -9,6 +16,8 @@ import {
 import { SphereGeometryFactory } from 'rewild-renderer/lib/geometry/SphereGeometryFactory';
 import { DiffusePass } from 'rewild-renderer/lib/materials/DiffusePass';
 import { Raycaster } from 'rewild-renderer/lib/core/Raycaster';
+import { sceneGraphStore } from 'src/ui/stores/SceneGraphStore';
+import { ITreeNodeAction } from 'models';
 
 interface Props {}
 
@@ -21,6 +30,7 @@ export class EditorViewport extends Component<Props> {
 
   init() {
     this.renderer = new Renderer();
+    const sceneGraphStoreProxy = this.observeStore(sceneGraphStore);
 
     const onProjectLoaded: Subscriber<ProjectStoreEvents> = (event) => {
       if (event.kind === 'loading-completed') {
@@ -38,9 +48,9 @@ export class EditorViewport extends Component<Props> {
 
     this.observeStore(projectStore, (e) => {
       if (e.includes('selectedResource.properties')) {
-        if (projectStore.target.selectedResource?.id === 'SKY') {
+        if (sceneGraphStore.target.selectedResource?.id === 'SKY') {
           syncFromEditorResource(
-            projectStore.target.selectedResource.id,
+            sceneGraphStore.target.selectedResource.id,
             this.renderer
           );
         }
@@ -97,9 +107,62 @@ export class EditorViewport extends Component<Props> {
       return null;
     };
 
+    const onDragOverEvent = (e: DragEvent) => {
+      if (
+        curDragAction?.type !== 'treenode' ||
+        !(curDragAction as ITreeNodeAction).node.resource?.properties.find(
+          (p) => p.type === 'templateId'
+        )
+      ) {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const onDrop = (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const json = compelteDragDrop<ITreeNodeAction>(e);
+      if (!json) return;
+
+      if (sceneGraphStore.defaultProxy.selectedResource?.id) {
+        const selectedNode = sceneGraphStore.findNodeById(
+          sceneGraphStore.defaultProxy.selectedResource.id
+        );
+
+        if (selectedNode) {
+          const position = json.node.resource?.properties.find(
+            (p) => p.type === 'position'
+          );
+
+          if (position) {
+            const point = get3DCoords(e.clientX, e.clientY);
+            if (point) {
+              position.value = [point.x, point.y, point.z];
+            }
+
+            selectedNode.children = selectedNode.children
+              ? selectedNode.children.concat([{ ...json.node }])
+              : [json.node];
+
+            projectStore.defaultProxy.dirty = true;
+          }
+        }
+      }
+    };
+
     const pane3D = (<Pane3D onCanvasReady={onCanvasReady} />) as Pane3D;
 
+    pane3D.ondragover = onDragOverEvent;
+    pane3D.ondrop = onDrop;
+
     return () => {
+      this.toggleAttribute(
+        'activated',
+        !!sceneGraphStoreProxy.selectedContainerId
+      );
       return pane3D;
     };
   }
@@ -118,5 +181,10 @@ const StyledContainer = cssStylesheet(css`
     height: 100%;
     width: 100%;
     display: block;
+    box-sizing: border-box;
+  }
+
+  :host([activated]) {
+    border: 2px dashed ${theme.colors.success400};
   }
 `);

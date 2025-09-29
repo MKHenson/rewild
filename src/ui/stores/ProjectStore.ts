@@ -1,4 +1,4 @@
-import { ILevel, IProject, IResource, IContainer, IActor } from 'models';
+import { ILevel, IProject, IContainer, IActor } from 'models';
 import { Store } from 'rewild-ui';
 import {
   getLevel as getLevelApi,
@@ -16,7 +16,6 @@ export interface IProjectStore {
   error?: string;
   level: ILevel | null;
   project: IProject | null;
-  selectedResource: IResource | null;
 }
 
 export type ProjectStoreEvents =
@@ -33,7 +32,6 @@ export class ProjectStore extends Store<IProjectStore> {
       level: null,
       project: null,
       error: undefined,
-      selectedResource: null,
     });
 
     this.dispatcher = new Dispatcher<ProjectStoreEvents>();
@@ -69,7 +67,7 @@ export class ProjectStore extends Store<IProjectStore> {
     project.lastModified = Date.now();
 
     const { id, ...token } = project;
-    const containerNodes = sceneGraphStore.defaultProxy.nodes.find(
+    const containerNodes = sceneGraphStore.nodes.find(
       (n) => n.name === 'Containers'
     )!.children;
 
@@ -112,7 +110,7 @@ export class ProjectStore extends Store<IProjectStore> {
     this.defaultProxy.loading = true;
 
     const project = this.defaultProxy.project!;
-    const containers = sceneGraphStore.defaultProxy.nodes.find(
+    const containers = sceneGraphStore.nodes.find(
       (n) => n.name === 'Containers'
     )!.children;
 

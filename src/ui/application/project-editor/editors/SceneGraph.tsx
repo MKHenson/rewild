@@ -7,12 +7,15 @@ import {
   Tree,
   Component,
   register,
-  Typography,
   Card,
   ITreeNode,
 } from 'rewild-ui';
-import { sceneGraphStore } from '../../../stores/SceneGraphStore';
+import {
+  SceneGraphEvents,
+  sceneGraphStore,
+} from '../../../stores/SceneGraphStore';
 import { projectStore } from '../../../stores/ProjectStore';
+import { Subscriber } from 'node_modules/rewild-common';
 
 interface Props {}
 
@@ -28,6 +31,12 @@ export class SceneGraph extends Component<Props> {
     const sceneGraphStoreProxy = this.observeStore(sceneGraphStore);
     const projectStoreProxy = this.observeStore(projectStore);
 
+    const onSceneGraphEvent: Subscriber<SceneGraphEvents> = (event) => {
+      if (event.kind === 'nodes-initialized') {
+        this.render();
+      }
+    };
+
     this.keyUpDelegate = async (e: KeyboardEvent) => {
       const node = tree.getSelectedNode();
       if (
@@ -37,7 +46,7 @@ export class SceneGraph extends Component<Props> {
         node
       ) {
         const newName = await node.editName();
-        projectStoreProxy.selectedResource!.name = newName;
+        sceneGraphStoreProxy.selectedResource!.name = newName;
       }
     };
 
@@ -55,34 +64,39 @@ export class SceneGraph extends Component<Props> {
       setSelection([]);
     };
 
-    const onSelectionChanged = (val: ITreeNode[]) => {
+    const onSelectionChanged = (val: ITreeNode<IResource>[]) => {
       setSelection(val);
 
       if (val.length === 1 && val[0].resource)
-        projectStoreProxy.selectedResource = val[0].resource!;
-      else projectStoreProxy.selectedResource = null;
+        sceneGraphStoreProxy.selectedResource = val[0].resource!;
+      else sceneGraphStoreProxy.selectedResource = null;
     };
 
-    const onDrop = (val: ITreeNode) => {
+    const handleNodeDblClick = (node: ITreeNode<IResource>) => {
+      if (node.resource?.type === 'container') {
+        sceneGraphStoreProxy.selectedContainerId = node.resource.id;
+      }
+    };
+
+    const onDrop = (val: ITreeNode<IResource>) => {
       projectStoreProxy.dirty = true;
     };
 
     this.onMount = () => {
       document.addEventListener('keydown', this.keyUpDelegate);
+      sceneGraphStore.dispatcher.add(onSceneGraphEvent);
     };
 
     this.onCleanup = () => {
       document.removeEventListener('keydown', this.keyUpDelegate);
+      sceneGraphStore.dispatcher.remove(onSceneGraphEvent);
     };
 
     let tree: Tree;
 
     let html = (
-      <Card stretched>
+      <Card stretched css={CardCss}>
         <div class="content">
-          <div class="header">
-            <Typography variant="h3">Scene</Typography>
-          </div>
           <div class="nodes"></div>
           <div class="graph-actions">
             <ButtonGroup>
@@ -114,10 +128,20 @@ export class SceneGraph extends Component<Props> {
     return () => {
       tree = (
         <Tree
+          css={TreeCss}
           onSelectionChanged={onSelectionChanged}
+          onNodeDblClick={handleNodeDblClick}
           selectedNodes={selectedNodes()}
           onDrop={onDrop}
-          rootNodes={sceneGraphStoreProxy.nodes}
+          rootNodes={
+            sceneGraphStoreProxy.selectedContainerId
+              ? [
+                  sceneGraphStore.findNodeById(
+                    sceneGraphStoreProxy.selectedContainerId
+                  )!,
+                ]
+              : sceneGraphStore.nodes
+          }
         />
       ) as Tree;
 
@@ -143,12 +167,34 @@ export class SceneGraph extends Component<Props> {
   }
 }
 
+const CardCss = css`
+  :host {
+    padding: 0;
+  }
+`;
+
+const TreeCss = css`
+  :host {
+    height: 100%;
+  }
+`;
+
 const StyleSceneGraph = cssStylesheet(css`
+  :host {
+    display: block;
+    height: 100%;
+    box-sizing: border-box;
+  }
+
   .content {
     display: grid;
     height: 100%;
     width: 100%;
-    grid-template-rows: 26px 1fr 30px;
+    grid-template-rows: 1fr 36px;
+  }
+
+  .graph-actions {
+    border-top: 1px solid ${theme.colors.subtle500};
   }
 
   .graph-actions button {
@@ -157,6 +203,8 @@ const StyleSceneGraph = cssStylesheet(css`
   }
   .nodes {
     max-height: 100%;
-    overflow: hidden;
+    overflow: auto;
+    padding: 0.5rem;
+    box-sizing: border-box;
   }
 `);

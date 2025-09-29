@@ -10,22 +10,34 @@ import {
   containerFactory,
   baseActorTemplate,
 } from '../utils/TemplateFactories';
+import { Dispatcher } from 'rewild-common';
 
 export interface ISceneGraphStore {
-  nodes: ITreeNode<IResource>[];
   selectedContainerId: string | null;
+  selectedResource: IResource | null;
 }
 
+export type SceneGraphEvents = {
+  kind: 'nodes-initialized';
+  nodes: ITreeNode<IResource>[];
+};
+
 export class SceneGraphStore extends Store<ISceneGraphStore> {
+  nodes: ITreeNode<IResource>[];
+  dispatcher: Dispatcher<SceneGraphEvents>;
+
   constructor() {
     super({
-      nodes: [],
       selectedContainerId: null,
+      selectedResource: null,
     });
+
+    this.dispatcher = new Dispatcher();
+    this.nodes = [];
   }
 
   buildTreeFromProject(project: IProject) {
-    this.defaultProxy.nodes = [
+    this.nodes = [
       {
         name: 'Containers',
         factoryKey: 'container',
@@ -88,11 +100,13 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
         },
       } as ITreeNode<IResource>,
     ];
+
+    this.dispatcher.dispatch({ kind: 'nodes-initialized', nodes: this.nodes });
   }
 
   findNodeById(
     id: string,
-    nodes: ITreeNode<IResource>[] | null = this._defaultProxy.nodes
+    nodes: ITreeNode<IResource>[] | null = this.nodes
   ): ITreeNode<IResource> | null {
     if (!nodes) return null;
 
@@ -137,7 +151,7 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
   }
 
   removeNode = (node: ITreeNode<IResource>) => {
-    traverseTree(this.defaultProxy.nodes, (n, parent) => {
+    traverseTree(this.nodes, (n, parent) => {
       if (n === node) {
         parent!.children = parent!.children!.filter((child) => child !== node);
         return true;
