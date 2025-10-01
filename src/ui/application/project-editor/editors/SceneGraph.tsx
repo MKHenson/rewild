@@ -32,7 +32,7 @@ export class SceneGraph extends Component<Props> {
     const projectStoreProxy = this.observeStore(projectStore);
 
     const onSceneGraphEvent: Subscriber<SceneGraphEvents> = (event) => {
-      if (event.kind === 'nodes-initialized') {
+      if (event.kind === 'nodes-updated') {
         this.render();
       }
     };
@@ -56,7 +56,6 @@ export class SceneGraph extends Component<Props> {
 
     const onAdd = () => {
       sceneGraphStore.createChildNode(selectedNodes()[0] as ITemplateTreeNode);
-      this.render();
     };
 
     const onDelete = () => {
@@ -73,8 +72,15 @@ export class SceneGraph extends Component<Props> {
     };
 
     const handleNodeDblClick = (node: ITreeNode<IResource>) => {
-      if (node.resource?.type === 'container') {
+      if (node === goBackTreeNode)
+        sceneGraphStoreProxy.selectedContainerId = null;
+      else if (node.resource && node.resource.type === 'container') {
         sceneGraphStoreProxy.selectedContainerId = node.resource.id;
+
+        if (!projectStore.containerPods[node.resource.id])
+          projectStore.containerPods[node.resource.id] = {
+            asset3D: [],
+          };
       }
     };
 
@@ -93,6 +99,12 @@ export class SceneGraph extends Component<Props> {
     };
 
     let tree: Tree;
+    const goBackTreeNode: ITreeNode = {
+      canRename: false,
+      canSelect: false,
+      icon: 'chevron_left',
+      name: '..',
+    };
 
     let html = (
       <Card stretched css={CardCss}>
@@ -136,6 +148,7 @@ export class SceneGraph extends Component<Props> {
           rootNodes={
             sceneGraphStoreProxy.selectedContainerId
               ? [
+                  goBackTreeNode,
                   sceneGraphStore.findNodeById(
                     sceneGraphStoreProxy.selectedContainerId
                   )!,
