@@ -59,6 +59,7 @@ export class Renderer {
     this.autoFrame = true;
     this.onFrameHandler = this.onFrame.bind(this);
     this.scene = new Transform();
+    this.scene.matrixAutoUpdate = false;
     this.atmosphere = new AtmosphereSkybox();
     this.terrainRenderer = new TerrainRenderer();
     this.renderGroups = [];
