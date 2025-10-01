@@ -6,18 +6,18 @@ import {
   compelteDragDrop,
   theme,
 } from 'rewild-ui';
-import { Mesh, Renderer } from 'rewild-renderer';
+import { Renderer } from 'rewild-renderer';
 import { projectStore, ProjectStoreEvents } from 'src/ui/stores/ProjectStore';
 import { Subscriber, Vector2 } from 'rewild-common';
 import {
   syncFromEditorResource,
   SyncRendererFromProject,
 } from './utils/RendererSync';
-import { SphereGeometryFactory } from 'rewild-renderer/lib/geometry/SphereGeometryFactory';
-import { DiffusePass } from 'rewild-renderer/lib/materials/DiffusePass';
 import { Raycaster } from 'rewild-renderer/lib/core/Raycaster';
 import { sceneGraphStore } from 'src/ui/stores/SceneGraphStore';
 import { ITreeNodeAction } from 'models';
+import { TemplateLoader } from 'src/core/TemplateLoader';
+import { Asset3D } from 'src/core/routing/Asset3D';
 
 interface Props {}
 
@@ -25,13 +25,14 @@ interface Props {}
 export class EditorViewport extends Component<Props> {
   renderer: Renderer;
   hasInitialized = false;
-
-  circle: Mesh;
+  templateLoader: TemplateLoader;
 
   init() {
     this.renderer = new Renderer();
+    this.templateLoader = new TemplateLoader();
+
     const sceneGraphStoreProxy = this.observeStore(sceneGraphStore, (e) => {
-      if (e === 'selectedContainerId') return true;
+      if (e === 'selectedContainerId') return this.render();
       if (e.includes('selectedResource.properties')) {
         if (sceneGraphStore.target.selectedResource?.id === 'SKY') {
           syncFromEditorResource(
@@ -40,8 +41,6 @@ export class EditorViewport extends Component<Props> {
           );
         }
       }
-
-      return false; // Prevent further processing
     });
 
     const onProjectLoaded: Subscriber<ProjectStoreEvents> = (event) => {
@@ -64,11 +63,9 @@ export class EditorViewport extends Component<Props> {
         this.hasInitialized = true;
 
         await this.renderer.init(pane3D.canvas()!);
+        await this.templateLoader.load();
 
         pane3D.onclick = onClick;
-
-        this.circle = new Mesh(SphereGeometryFactory.new(), new DiffusePass());
-        this.renderer.scene.addChild(this.circle.transform);
       } catch (err: unknown) {
         console.error(err);
       }
@@ -77,7 +74,7 @@ export class EditorViewport extends Component<Props> {
     const onClick = (event: MouseEvent) => {
       const point = get3DCoords(event.clientX, event.clientY);
       if (point) {
-        this.circle.transform.position.copy(point);
+        // Check if we're clicking something?
       }
     };
 
@@ -106,7 +103,14 @@ export class EditorViewport extends Component<Props> {
       return null;
     };
 
+    const onDragLeave = (e: DragEvent) => {
+      this.toggleAttribute('container-not-activated', false);
+    };
+
     const onDragOverEvent = (e: DragEvent) => {
+      if (!sceneGraphStore.target.selectedContainerId) {
+        this.toggleAttribute('container-not-activated', true);
+      }
       if (
         curDragAction?.type !== 'treenode' ||
         !(curDragAction as ITreeNodeAction).node.resource?.properties.find(
@@ -120,41 +124,49 @@ export class EditorViewport extends Component<Props> {
       e.stopPropagation();
     };
 
-    const onDrop = (e: DragEvent) => {
+    const onDrop = async (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      this.toggleAttribute('container-not-activated', false);
+
+      const activeContainerId = sceneGraphStore.target.selectedContainerId;
+
+      // No container is active - exit early
+      if (!activeContainerId) return;
+
       const json = compelteDragDrop<ITreeNodeAction>(e);
       if (!json) return;
 
-      if (sceneGraphStore.defaultProxy.selectedResource?.id) {
-        const selectedNode = sceneGraphStore.findNodeById(
-          sceneGraphStore.defaultProxy.selectedResource.id
+      const point = get3DCoords(e.clientX, e.clientY);
+
+      if (point && json.node.resource) {
+        // Update the container pod with the transform position
+        projectStore.containerPods[activeContainerId].asset3D.push({
+          id: json.node.resource.id,
+          position: [point.x, point.y, point.z],
+        });
+
+        // Add the node to the scene graph
+        const newNode = sceneGraphStore.addNode(
+          json.node,
+          sceneGraphStore.findNodeById(activeContainerId)
         );
 
-        if (selectedNode) {
-          const position = json.node.resource?.properties.find(
-            (p) => p.type === 'position'
-          );
+        sceneGraphStoreProxy.selectedResource = newNode.resource || null;
 
-          if (position) {
-            const point = get3DCoords(e.clientX, e.clientY);
-            if (point) {
-              position.value = [point.x, point.y, point.z];
-            }
-
-            selectedNode.children = selectedNode.children
-              ? selectedNode.children.concat([{ ...json.node }])
-              : [json.node];
-
-            projectStore.defaultProxy.dirty = true;
-          }
-        }
+        const createdResource = (await this.templateLoader.createResource(
+          json.node.resource,
+          this.renderer
+        )) as Asset3D;
+        createdResource.transform.position.set(point.x, point.y, point.z);
+        this.renderer.scene.addChild(createdResource.transform);
       }
     };
 
     const pane3D = (<Pane3D onCanvasReady={onCanvasReady} />) as Pane3D;
 
     pane3D.ondragover = onDragOverEvent;
+    pane3D.ondragleave = onDragLeave;
     pane3D.ondrop = onDrop;
 
     return () => {
@@ -181,9 +193,33 @@ const StyledContainer = cssStylesheet(css`
     width: 100%;
     display: block;
     box-sizing: border-box;
+    position: relative;
   }
 
-  :host([activated]) {
-    border: 2px dashed ${theme.colors.success400};
+  :host([activated])::after {
+    content: '';
+    border: 2px dashed ${theme.colors.onSurfaceBorder};
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    pointer-events: none;
+    box-sizing: border-box;
+  }
+
+  :host([container-not-activated])::after {
+    content: 'No active container. Double click a container in the scene graph to activate one.';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: ${theme.colors.surface};
+    color: ${theme.colors.onSurface};
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    text-align: center;
+    z-index: 10;
+    pointer-events: none;
   }
 `);

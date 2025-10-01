@@ -11,6 +11,7 @@ import {
   baseActorTemplate,
 } from '../utils/TemplateFactories';
 import { Dispatcher } from 'rewild-common';
+import { projectStore } from './ProjectStore';
 
 export interface ISceneGraphStore {
   selectedContainerId: string | null;
@@ -18,7 +19,7 @@ export interface ISceneGraphStore {
 }
 
 export type SceneGraphEvents = {
-  kind: 'nodes-initialized';
+  kind: 'nodes-updated';
   nodes: ITreeNode<IResource>[];
 };
 
@@ -33,7 +34,14 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
     });
 
     this.dispatcher = new Dispatcher();
+    this.dispatcher.add(this.handleSceneGraphEvent);
     this.nodes = [];
+  }
+
+  handleSceneGraphEvent(event: SceneGraphEvents) {
+    if (event.kind === 'nodes-updated') {
+      projectStore.defaultProxy.dirty = true;
+    }
   }
 
   buildTreeFromProject(project: IProject) {
@@ -101,7 +109,7 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
       } as ITreeNode<IResource>,
     ];
 
-    this.dispatcher.dispatch({ kind: 'nodes-initialized', nodes: this.nodes });
+    this.dispatcher.dispatch({ kind: 'nodes-updated', nodes: this.nodes });
   }
 
   findNodeById(
@@ -159,11 +167,27 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
 
       return false;
     });
+
+    this.dispatcher.dispatch({ kind: 'nodes-updated', nodes: this.nodes });
   };
 
   createChildNode(selectedNode: ITemplateTreeNode) {
     const newNode = selectedNode.template();
     selectedNode.children = (selectedNode.children || []).concat(newNode);
+    this.dispatcher.dispatch({ kind: 'nodes-updated', nodes: this.nodes });
+  }
+
+  addNode(
+    node: ITreeNode<IResource>,
+    parent?: ITreeNode<IResource> | null
+  ): ITreeNode<IResource> {
+    if (parent && !parent.children) parent.children = [];
+
+    let nodes = parent?.children || this.nodes;
+
+    nodes.push(node);
+    this.dispatcher.dispatch({ kind: 'nodes-updated', nodes: this.nodes });
+    return node;
   }
 }
 

@@ -24,7 +24,7 @@ export type ProjectStoreEvents =
 
 export class ProjectStore extends Store<IProjectStore> {
   dispatcher: Dispatcher<ProjectStoreEvents>;
-  containerPods: IContainerPod[];
+  containerPods: { [id: string]: IContainerPod };
 
   constructor() {
     super({
@@ -35,7 +35,7 @@ export class ProjectStore extends Store<IProjectStore> {
       error: undefined,
     });
 
-    this.containerPods = [];
+    this.containerPods = {};
     this.dispatcher = new Dispatcher<ProjectStoreEvents>();
   }
 
