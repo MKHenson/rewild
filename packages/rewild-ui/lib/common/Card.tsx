@@ -15,7 +15,7 @@ export class Card extends Component<Props> {
   init() {
     const elm = <slot></slot>;
     return () => {
-      this.toggleAttribute('button', this.props.button);
+      this.toggleAttribute('button', this.props.button || false);
       this.toggleAttribute('disabled', this.props.disabled || false);
       this.classList.toggle('pushed', this.props.pushed || false);
       this.classList.toggle('raised', this.props.raised || false);
