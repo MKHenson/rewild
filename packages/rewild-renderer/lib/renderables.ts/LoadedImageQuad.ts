@@ -67,7 +67,13 @@ export class LoadedImageQuad implements IRenderable {
     this.uniformValues.set([-1, -1], kOffsetOffset); // set the offset
 
     // copy the values from JavaScript to the GPU
-    device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformValues);
+    device.queue.writeBuffer(
+      this.uniformBuffer,
+      0,
+      this.uniformValues.buffer,
+      this.uniformValues.byteOffset,
+      this.uniformValues.byteLength
+    );
 
     this.bindGroup = device.createBindGroup({
       layout: pipeline.getBindGroupLayout(0),

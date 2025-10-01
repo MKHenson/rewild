@@ -90,7 +90,13 @@ export class QuadRenderer implements IRenderable {
     ); // set the offset
 
     // copy the values from JavaScript to the GPU
-    device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformValues);
+    device.queue.writeBuffer(
+      this.uniformBuffer,
+      0,
+      this.uniformValues.buffer,
+      this.uniformValues.byteOffset,
+      this.uniformValues.byteLength
+    );
 
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.bindGroup);

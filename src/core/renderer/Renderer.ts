@@ -256,25 +256,33 @@ export class Renderer implements IBindable {
           device.queue.writeBuffer(
             transformBuffer,
             template.projectionOffset,
-            projectionMatrix
+            projectionMatrix.buffer,
+            projectionMatrix.byteOffset,
+            projectionMatrix.byteLength
           );
         if (template.modelViewOffset != -1)
           device.queue.writeBuffer(
             transformBuffer,
             template.modelViewOffset,
-            mesh.modelViewMatrix
+            mesh.modelViewMatrix.buffer,
+            mesh.modelViewMatrix.byteOffset,
+            mesh.modelViewMatrix.byteLength
           );
         if (template.modelOffset != -1)
           device.queue.writeBuffer(
             transformBuffer,
             template.modelOffset,
-            mesh.worldMatrix
+            mesh.worldMatrix.buffer,
+            mesh.worldMatrix.byteOffset,
+            mesh.worldMatrix.byteLength
           );
         if (template.normalOffset != -1)
           device.queue.writeBuffer(
             transformBuffer,
             template.normalOffset,
-            mesh.normalMatrix
+            mesh.normalMatrix.buffer,
+            mesh.normalMatrix.byteOffset,
+            mesh.normalMatrix.byteLength
           );
 
         // Set transform bind group
@@ -302,7 +310,7 @@ export class Renderer implements IBindable {
                 AttributeType.POSITION
               )!;
               numVertices =
-                (positionAttribute.buffer as Float32Array).length /
+                (positionAttribute.buffer as unknown as Float32Array).length /
                 positionAttribute.itemSize;
 
               pass.setVertexBuffer(
@@ -370,19 +378,37 @@ export class Renderer implements IBindable {
     buffer = LightingResource.lightingConfig;
     if (buffer) {
       const info = wasm.getUint32Array(configArrayPtr);
-      device.queue.writeBuffer(buffer, 0, info);
+      device.queue.writeBuffer(
+        buffer,
+        0,
+        info.buffer,
+        info.byteOffset,
+        info.byteLength
+      );
     }
 
     buffer = LightingResource.sceneLightingBuffer;
     if (buffer) {
       const ambientLights = wasm.getFloat32Array(sceneArrayPtr);
-      device.queue.writeBuffer(buffer, 0, ambientLights);
+      device.queue.writeBuffer(
+        buffer,
+        0,
+        ambientLights.buffer,
+        ambientLights.byteOffset,
+        ambientLights.byteLength
+      );
     }
 
     buffer = LightingResource.directionLightsBuffer;
     if (buffer) {
       const dirLights = wasm.getFloat32Array(directionArrayPtr);
-      device.queue.writeBuffer(buffer, 0, dirLights);
+      device.queue.writeBuffer(
+        buffer,
+        0,
+        dirLights.buffer,
+        dirLights.byteOffset,
+        dirLights.byteLength
+      );
     }
   }
 }
