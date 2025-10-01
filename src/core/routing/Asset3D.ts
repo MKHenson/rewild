@@ -18,6 +18,18 @@ export class Asset3D implements IAsset {
     return this.transform.name;
   }
 
+  set name(value: string) {
+    this.transform.name = value;
+  }
+
+  get id(): string {
+    return this.transform.id;
+  }
+
+  set id(value: string) {
+    this.transform.id = value;
+  }
+
   async load() {
     this.loaded = true;
     return this;

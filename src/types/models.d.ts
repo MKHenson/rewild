@@ -172,16 +172,16 @@ declare module 'models' {
     name: string;
   }
 
-  export interface IAsset {
+  export interface IResource3D {
     materialId: string;
     geometryId: string;
   }
 
-  export interface ICharacter extends IAsset {
+  export interface ICharacter extends IResource3D {
     abilities: string[];
   }
 
   export type ITemplateItem =
-    | (ITemplateItemBase & { type: 'asset'; resource: IAsset })
+    | (ITemplateItemBase & { type: 'asset'; resource: IResource3D })
     | (ITemplateItemBase & { type: 'character'; resource: ICharacter });
 }

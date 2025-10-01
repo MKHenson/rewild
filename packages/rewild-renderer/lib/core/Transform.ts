@@ -41,6 +41,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
   static DefaultUp: Vector3 = new Vector3(0, 1, 0);
 
   name: string;
+  id: string;
   type: string;
   parent: Transform | null;
   children: Transform[];
@@ -78,6 +79,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
     this.normalMatrix = new Matrix3();
 
     this.name = '';
+    this.id = '';
     this.type = 'Object3D';
 
     this.parent = null;
