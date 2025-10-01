@@ -32,11 +32,7 @@
           "properties": [
             {
               "type": "templateId",
-              "value": "cate"
-            },
-            {
-              "type": "position",
-              "value": [0, 0, 0]
+              "value": "crate"
             }
           ],
           "actorLoaderPreset": "crate",
@@ -48,10 +44,6 @@
             {
               "type": "templateId",
               "value": "basketball"
-            },
-            {
-              "type": "position",
-              "value": [0, 0, 0]
             }
           ],
           "actorLoaderPreset": "ball",
