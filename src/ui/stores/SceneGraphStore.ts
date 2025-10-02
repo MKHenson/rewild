@@ -18,10 +18,13 @@ export interface ISceneGraphStore {
   selectedResource: IResource | null;
 }
 
-export type SceneGraphEvents = {
-  kind: 'nodes-updated';
-  nodes: ITreeNode<IResource>[];
-};
+export type SceneGraphEvents =
+  | {
+      kind: 'nodes-updated';
+      nodes: ITreeNode<IResource>[];
+    }
+  | { kind: 'container-activated'; container: ITreeNode<IResource> }
+  | { kind: 'container-deactivated'; container: ITreeNode<IResource> };
 
 export class SceneGraphStore extends Store<ISceneGraphStore> {
   nodes: ITreeNode<IResource>[];
@@ -44,6 +47,26 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
     }
   }
 
+  setActiveContainer(id: string | null) {
+    const currentContainerId = this.target.selectedContainerId;
+
+    this.defaultProxy.selectedContainerId = id;
+    if (id) {
+      const node = this.findNodeById(id)!;
+      this.dispatcher.dispatch({
+        kind: 'container-activated',
+        container: node,
+      });
+    } else if (currentContainerId) {
+      const node = this.findNodeById(currentContainerId)!;
+
+      this.dispatcher.dispatch({
+        kind: 'container-deactivated',
+        container: node,
+      });
+    }
+  }
+
   buildTreeFromProject(project: IProject) {
     this.nodes = [
       {
@@ -55,12 +78,12 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
         template: containerFactory,
         children:
           project.sceneGraph?.containers.map(
-            (node) =>
+            (container) =>
               ({
                 ...containerFactory(),
-                name: node.name,
-                resource: node,
-                children: node.actors?.map(
+                name: container.name,
+                resource: container,
+                children: container.actors?.map(
                   (actor) =>
                     ({
                       ...baseActorTemplate,

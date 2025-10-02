@@ -14,7 +14,10 @@ import {
   SyncRendererFromProject,
 } from './utils/RendererSync';
 import { Raycaster } from 'rewild-renderer/lib/core/Raycaster';
-import { sceneGraphStore } from 'src/ui/stores/SceneGraphStore';
+import {
+  SceneGraphEvents,
+  sceneGraphStore,
+} from 'src/ui/stores/SceneGraphStore';
 import { ITreeNodeAction } from 'models';
 import { TemplateLoader } from 'src/core/TemplateLoader';
 import { Asset3D } from 'src/core/routing/Asset3D';
@@ -43,18 +46,65 @@ export class EditorViewport extends Component<Props> {
       }
     });
 
-    const onProjectLoaded: Subscriber<ProjectStoreEvents> = (event) => {
+    const onProjectEvent: Subscriber<ProjectStoreEvents> = (event) => {
       if (event.kind === 'loading-completed') {
         SyncRendererFromProject(this.renderer, event.project);
       }
     };
 
+    const onSceneGraphEvent: Subscriber<SceneGraphEvents> = async (event) => {
+      if (event.kind === 'container-activated') {
+        const containerNode = event.container;
+        const container = event.container!.resource!;
+
+        if (!projectStore.containerPods[container.id])
+          projectStore.containerPods[container.id] = {
+            asset3D: [],
+          };
+
+        // Add the node to the scene graph
+        if (containerNode.children) {
+          for (const childNode of containerNode.children) {
+            const createdResource = (await this.templateLoader.createResource(
+              childNode.resource!,
+              this.renderer
+            )) as Asset3D;
+
+            const assetPodData = projectStore.containerPods[
+              container.id
+            ].asset3D.find((asset) => asset.id === childNode.resource!.id);
+
+            if (assetPodData) {
+              createdResource.transform.position.set(
+                assetPodData.position[0],
+                assetPodData.position[1],
+                assetPodData.position[2]
+              );
+              this.renderer.scene.addChild(createdResource.transform);
+            }
+          }
+        }
+      } else if (event.kind === 'container-deactivated') {
+        const containerNode = event.container;
+        if (containerNode.children) {
+          for (const childNode of containerNode.children) {
+            const toRemove = this.renderer.scene.children.find(
+              (c) => c.id === childNode.resource!.id
+            );
+            if (toRemove) this.renderer.scene.removeChild(toRemove);
+          }
+        }
+      }
+    };
+
     this.onMount = () => {
-      projectStore.dispatcher.add(onProjectLoaded);
+      projectStore.dispatcher.add(onProjectEvent);
+      sceneGraphStore.dispatcher.add(onSceneGraphEvent);
     };
 
     this.onCleanup = () => {
-      projectStore.dispatcher.remove(onProjectLoaded);
+      projectStore.dispatcher.remove(onProjectEvent);
+      sceneGraphStore.dispatcher.remove(onSceneGraphEvent);
     };
 
     const onCanvasReady = async (pane3D: Pane3D) => {
