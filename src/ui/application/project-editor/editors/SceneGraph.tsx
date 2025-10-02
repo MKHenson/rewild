@@ -59,7 +59,12 @@ export class SceneGraph extends Component<Props> {
     };
 
     const onDelete = () => {
-      sceneGraphStore.removeNode(selectedNodes()[0]);
+      const selectedNode = selectedNodes()[0];
+      if (selectedNode.resource?.type === 'container') {
+        delete projectStore.containerPods[selectedNode.resource.id];
+      }
+
+      sceneGraphStore.removeNode(selectedNode);
       setSelection([]);
     };
 
@@ -72,16 +77,9 @@ export class SceneGraph extends Component<Props> {
     };
 
     const handleNodeDblClick = (node: ITreeNode<IResource>) => {
-      if (node === goBackTreeNode)
-        sceneGraphStoreProxy.selectedContainerId = null;
-      else if (node.resource && node.resource.type === 'container') {
-        sceneGraphStoreProxy.selectedContainerId = node.resource.id;
-
-        if (!projectStore.containerPods[node.resource.id])
-          projectStore.containerPods[node.resource.id] = {
-            asset3D: [],
-          };
-      }
+      if (node === goBackTreeNode) sceneGraphStore.setActiveContainer(null);
+      else if (node.resource && node.resource.type === 'container')
+        sceneGraphStore.setActiveContainer(node.resource.id);
     };
 
     const onDrop = (val: ITreeNode<IResource>) => {

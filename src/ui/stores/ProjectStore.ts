@@ -57,7 +57,17 @@ export class ProjectStore extends Store<IProjectStore> {
       dirty: false,
     });
 
-    sceneGraphStore.buildTreeFromProject(this.target.project!);
+    // Initialize all container pods from their containers
+    const project = this.defaultProxy.project!;
+
+    this.containerPods = {};
+    project.sceneGraph.containers.forEach((container) => {
+      this.containerPods[container.id] = container.pod || {
+        asset3D: [],
+      };
+    });
+
+    sceneGraphStore.buildTreeFromProject(project);
     this.dispatcher.dispatch({
       kind: 'loading-completed',
       project: this.target.project!,
@@ -86,6 +96,9 @@ export class ProjectStore extends Store<IProjectStore> {
                 containerNode,
                 'active'
               ),
+              pod: containerNode.resource?.id
+                ? this.containerPods[containerNode.resource?.id]
+                : { asset3D: [] },
             } as IContainer)
         ) || [],
       atmosphere: {
