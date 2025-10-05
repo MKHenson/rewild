@@ -11,7 +11,7 @@ interface Props {}
 @register('x-viewport-statemachine')
 export class ViewportStateMachine extends Component<Props> {
   renderer: Renderer;
-  stateMachine: StateMachine;
+  stateMachine: StateMachine | null;
   hasInitialized: boolean = false;
   player: Player;
 
@@ -27,7 +27,7 @@ export class ViewportStateMachine extends Component<Props> {
       const delta = clock.getDelta();
       const total = clock.getElapsedTime();
 
-      this.stateMachine.OnLoop(delta, total);
+      this.stateMachine?.OnLoop(delta, total);
       this.renderer.onFrame();
 
       if (!this.renderer.disposed) window.requestAnimationFrame(onFrame);
@@ -40,8 +40,9 @@ export class ViewportStateMachine extends Component<Props> {
 
         await this.renderer.init(pane3D.canvas()!, false);
         this.player.setCamera(this.renderer.perspectiveCam);
-
         this.stateMachine = await loadInitialLevels(this.player, this.renderer);
+
+        if (!this.stateMachine) throw new Error('Could not load statemachine');
 
         // Start the rendering loop
         window.requestAnimationFrame(onFrame);
@@ -68,7 +69,7 @@ export class ViewportStateMachine extends Component<Props> {
   }
 
   dispose() {
-    this.stateMachine.dispose();
+    this.stateMachine?.dispose();
     this.renderer.dispose();
   }
 }

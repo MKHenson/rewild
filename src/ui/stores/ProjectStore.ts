@@ -1,5 +1,5 @@
 import { ILevel, IProject, IContainer, IActor, IContainerPod } from 'models';
-import { Store } from 'rewild-ui';
+import { Store, createUUID } from 'rewild-ui';
 import {
   getLevel as getLevelApi,
   patchLevel,
@@ -39,6 +39,29 @@ export class ProjectStore extends Store<IProjectStore> {
     this.dispatcher = new Dispatcher<ProjectStoreEvents>();
   }
 
+  static createProject(): IProject {
+    return {
+      id: createUUID(),
+      name: 'New Project',
+      description: '',
+      activeOnStartup: true,
+      created: Date.now(),
+      lastModified: Date.now(),
+      level: '',
+      startEvent: '',
+      sceneGraph: {
+        atmosphere: {
+          cloudiness: 0.7,
+          foginess: 0.3,
+          windiness: 0.5,
+          elevation: 80,
+          dayNightCycle: false,
+        },
+        containers: [],
+      },
+    };
+  }
+
   async getProject(projectId: string) {
     this.defaultProxy.loading = true;
     this.dispatcher.dispatch({ kind: 'loading-initiated' });
@@ -61,7 +84,7 @@ export class ProjectStore extends Store<IProjectStore> {
     const project = this.defaultProxy.project!;
 
     this.containerPods = {};
-    project.sceneGraph.containers.forEach((container) => {
+    project.sceneGraph?.containers?.forEach((container) => {
       this.containerPods[container.id] = container.pod || {
         asset3D: [],
       };
@@ -137,6 +160,9 @@ export class ProjectStore extends Store<IProjectStore> {
             (c) =>
               ({
                 ...c.resource,
+                pod: c.resource?.id
+                  ? this.containerPods[c.resource?.id]
+                  : { asset3D: [] },
                 activeOnStartup: sceneGraphStore.getNodePropertyValue(
                   c,
                   'active'
