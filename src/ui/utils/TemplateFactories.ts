@@ -12,7 +12,7 @@ export const containerFactory: () => ITreeNode<IResource> = () => ({
   icon: 'label',
   onDragOver(data, node) {
     if (data?.type === 'treenode' && (data as ITreeNodeAction).node)
-      return true;
+      return false;
     return false;
   },
   onDrop(data, node) {
