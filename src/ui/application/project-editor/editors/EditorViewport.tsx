@@ -163,9 +163,7 @@ export class EditorViewport extends Component<Props> {
       }
       if (
         curDragAction?.type !== 'treenode' ||
-        !(curDragAction as ITreeNodeAction).node.resource?.properties.find(
-          (p) => p.type === 'templateId'
-        )
+        !(curDragAction as ITreeNodeAction).node.resource?.templateId
       ) {
         return;
       }

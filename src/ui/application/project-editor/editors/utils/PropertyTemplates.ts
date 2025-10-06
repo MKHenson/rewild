@@ -49,10 +49,6 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
     label: 'Day Night Cycle',
     valueType: 'boolean',
   },
-  templateId: {
-    label: 'TemplateId',
-    valueType: 'hidden',
-  },
   position: {
     label: 'Position',
     valueType: 'vec3',

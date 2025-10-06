@@ -1,16 +1,18 @@
 import { Vector3 } from 'rewild-common';
 import { Transform } from 'rewild-renderer';
-import { IAsset } from 'rewild-routing/lib/IAsset';
+import { IAsset, IBehaviour } from 'rewild-routing';
 
 export class Asset3D implements IAsset {
   transform: Transform;
   children: IAsset[] = [];
   loaded: boolean;
   initialPosition: Vector3;
+  behaviours: IBehaviour[];
 
   constructor(transform: Transform) {
     this.transform = transform;
     this.loaded = false;
+    this.behaviours = [];
     this.initialPosition = new Vector3();
   }
 
@@ -33,6 +35,20 @@ export class Asset3D implements IAsset {
   async load() {
     this.loaded = true;
     return this;
+  }
+
+  addBehavior(behavior: IBehaviour): void {
+    if (this.behaviours.includes(behavior)) return; // Avoid duplicates
+    this.behaviours.push(behavior);
+    behavior.onAdded?.(this);
+  }
+
+  removeBehavior(behavior: IBehaviour): void {
+    const index = this.behaviours.indexOf(behavior);
+    if (index > -1) {
+      this.behaviours.splice(index, 1);
+      behavior.onRemoved?.(this);
+    }
   }
 
   mount(): void {

@@ -163,7 +163,7 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
       return null;
     }
 
-    const obj = node.resource?.properties.reduce((acc, cur) => {
+    const obj = node.resource?.properties?.reduce((acc, cur) => {
       acc[cur.type] = cur.value;
       return acc;
     }, {} as { [key in PropertyType]: PropValue });
@@ -175,7 +175,7 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
     node: ITreeNode<IResource>,
     propertyType: PropertyType
   ): PropValue | null {
-    const property = node.resource?.properties.find(
+    const property = node.resource?.properties?.find(
       (prop) => prop.type === propertyType
     );
     return property ? property.value : null;

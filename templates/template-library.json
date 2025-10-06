@@ -15,6 +15,15 @@
         "materialId": "basketball",
         "geometryId": "sphere"
       }
+    },
+    {
+      "name": "earth",
+      "type": "asset",
+      "behaviors": ["spin"],
+      "resource": {
+        "materialId": "earth",
+        "geometryId": "sphere"
+      }
     }
   ]
 }

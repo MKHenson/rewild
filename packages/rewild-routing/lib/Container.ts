@@ -77,4 +77,16 @@ export class Container extends Node {
 
     super.unMount();
   }
+
+  onUpdate(delta: f32, total: u32): void {
+    super.onUpdate(delta, total);
+    const objects = this.objects;
+    for (const obj of objects) {
+      if (obj.behaviours) {
+        for (const behavior of obj.behaviours) {
+          behavior.onUpdate(delta, total, obj);
+        }
+      }
+    }
+  }
 }

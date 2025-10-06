@@ -18,7 +18,6 @@ declare module 'models' {
   export type PropertyType =
     | 'size'
     | 'speed'
-    | 'templateId'
     | 'material'
     | 'position'
     | 'cloudiness'
@@ -127,13 +126,11 @@ declare module 'models' {
     id: string;
     name: string;
     type: 'container' | 'actor';
-    properties: IPropertyValue[];
+    properties?: IPropertyValue[];
+    templateId?: string;
   }
 
-  export type BaseType = 'static' | 'dynamic' | 'light';
-
   export interface IActor extends IResource {
-    baseType: BaseType;
     type: 'actor';
   }
 
@@ -157,9 +154,8 @@ declare module 'models' {
       icon: IconType;
       actors: {
         name: string;
-        actorLoaderPreset: string;
-        baseType: BaseType;
-        properties: IPropertyValue[];
+        templateId?: string;
+        properties?: IPropertyValue[];
       }[];
     }[];
   }
@@ -170,6 +166,7 @@ declare module 'models' {
 
   export interface ITemplateItemBase {
     name: string;
+    behaviors?: string[];
   }
 
   export interface IResource3D {

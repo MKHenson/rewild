@@ -24,30 +24,15 @@
               "value": "earth"
             }
           ],
-          "actorLoaderPreset": "planet",
-          "baseType": "static"
+          "templateId": "earth"
         },
         {
           "name": "Crate",
-          "properties": [
-            {
-              "type": "templateId",
-              "value": "crate"
-            }
-          ],
-          "actorLoaderPreset": "crate",
-          "baseType": "dynamic"
+          "templateId": "crate"
         },
         {
           "name": "Basketball",
-          "properties": [
-            {
-              "type": "templateId",
-              "value": "basketball"
-            }
-          ],
-          "actorLoaderPreset": "ball",
-          "baseType": "dynamic"
+          "templateId": "basketball"
         }
       ]
     },
@@ -75,8 +60,7 @@
               "value": [0, -1, 0]
             }
           ],
-          "baseType": "light",
-          "actorLoaderPreset": "directional-light"
+          "templateId": "directional-light"
         },
         {
           "name": "Ambient",
@@ -90,8 +74,7 @@
               "value": [1, 1, 1]
             }
           ],
-          "baseType": "light",
-          "actorLoaderPreset": "ambient-light"
+          "templateId": "ambient-light"
         }
       ]
     }
