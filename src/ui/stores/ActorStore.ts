@@ -46,7 +46,7 @@ export class ActorStore extends Store<IActorStoreStore> {
                   resource: {
                     ...actor,
                     id: createUUID(),
-                    type: 'actor',
+                    type: actor.type || 'actor',
                   },
                 }),
                 onDragStart(node) {

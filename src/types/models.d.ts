@@ -122,10 +122,11 @@ declare module 'models' {
     containers: IContainer[];
   }
 
+  export type ResourceType = 'container' | 'actor' | 'player-start';
   export interface IResource {
     id: string;
     name: string;
-    type: 'container' | 'actor';
+    type: ResourceType;
     properties?: IPropertyValue[];
     templateId?: string;
   }
@@ -155,6 +156,7 @@ declare module 'models' {
       actors: {
         name: string;
         templateId?: string;
+        type?: ResourceType;
         properties?: IPropertyValue[];
       }[];
     }[];

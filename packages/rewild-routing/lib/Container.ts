@@ -48,6 +48,15 @@ export class Container extends Node {
 
   addAsset(object: IAsset): void {
     this.objects.push(object);
+    object.stateMachine = this.stateMachine;
+  }
+
+  removeAsset(object: IAsset): void {
+    const index = this.objects.indexOf(object);
+    if (index > -1) {
+      this.objects.splice(index, 1);
+      object.stateMachine = null;
+    }
   }
 
   mount(): void {

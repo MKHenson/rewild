@@ -1,11 +1,12 @@
 import { Vector3 } from 'rewild-common';
 import { Transform } from 'rewild-renderer';
-import { IAsset, IBehaviour } from 'rewild-routing';
+import { IAsset, IBehaviour, StateMachine } from 'rewild-routing';
 
 export class Asset3D implements IAsset {
   transform: Transform;
   children: IAsset[] = [];
   loaded: boolean;
+  stateMachine: StateMachine | null;
   initialPosition: Vector3;
   behaviours: IBehaviour[];
 
