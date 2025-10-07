@@ -5,14 +5,14 @@ import { Asset3D } from './testUtils';
 
 describe('Level', () => {
   it('creates and adds a terrain and skybox asset', () => {
-    const level = new Level('Test', new Asset3D('Test', 1));
+    const level = new Level('Test', new Asset3D('Test', '1'));
 
     expect(level.findObjectByName('Terrain')).toBeDefined();
     expect(level.findObjectByName('Skybox')).toBeDefined();
   });
 
   it('deactivates when its called via onPortalTriggered by an Exit portal ', () => {
-    const level = new Level('Test', new Asset3D('Test', 1));
+    const level = new Level('Test', new Asset3D('Test', '1'));
     const stateMachine = new StateMachine();
     stateMachine.addNode(level, true);
 
@@ -28,8 +28,12 @@ describe('Level', () => {
   });
 
   it('will link containers that have activeOnStartup set to true to the start event', () => {
-    const level = new Level('Test', new Asset3D('Test', 1));
-    const container = new Container('Container', true, new Asset3D('Test', 1));
+    const level = new Level('Test', new Asset3D('Test', '1'));
+    const container = new Container(
+      'Container',
+      true,
+      new Asset3D('Test', '1')
+    );
     const stateMachine = new StateMachine();
     stateMachine.addNode(level, true);
 
@@ -46,8 +50,12 @@ describe('Level', () => {
   });
 
   it('will activate its Enter portal on a mount, and activate any containers added to it', () => {
-    const level = new Level('Test', new Asset3D('Test', 1));
-    const container = new Container('Container', true, new Asset3D('Test', 1));
+    const level = new Level('Test', new Asset3D('Test', '1'));
+    const container = new Container(
+      'Container',
+      true,
+      new Asset3D('Test', '1')
+    );
     const stateMachine = new StateMachine();
     stateMachine.addNode(level, true);
     level.addChild(container);
@@ -63,8 +71,12 @@ describe('Level', () => {
   });
 
   it('will deactivate when any of its container Exit portals are triggered', () => {
-    const level = new Level('Test', new Asset3D('Test', 1));
-    const container = new Container('Container', true, new Asset3D('Test', 1));
+    const level = new Level('Test', new Asset3D('Test', '1'));
+    const container = new Container(
+      'Container',
+      true,
+      new Asset3D('Test', '1')
+    );
     const stateMachine = new StateMachine();
     stateMachine.addNode(level, true);
     level.addChild(container);
