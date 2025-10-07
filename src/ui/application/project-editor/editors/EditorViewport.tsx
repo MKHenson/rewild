@@ -161,10 +161,11 @@ export class EditorViewport extends Component<Props> {
       if (!sceneGraphStore.target.selectedContainerId) {
         this.toggleAttribute('container-not-activated', true);
       }
-      if (
-        curDragAction?.type !== 'treenode' ||
-        !(curDragAction as ITreeNodeAction).node.resource?.templateId
-      ) {
+
+      const node = (curDragAction as ITreeNodeAction).node;
+
+      if (curDragAction?.type !== 'treenode') return;
+      if (node.resource?.type === 'actor' && !node.resource?.templateId) {
         return;
       }
 

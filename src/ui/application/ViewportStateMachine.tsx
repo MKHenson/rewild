@@ -5,13 +5,14 @@ import { InGameUI } from './InGameUI';
 import { StateMachine } from 'rewild-routing';
 import { Clock } from 'src/core/Clock';
 import { loadInitialLevels } from 'src/core/GameLoader';
+import { StateMachineData } from 'src/core/routing/Types';
 
 interface Props {}
 
 @register('x-viewport-statemachine')
 export class ViewportStateMachine extends Component<Props> {
   renderer: Renderer;
-  stateMachine: StateMachine | null;
+  stateMachine: StateMachine<StateMachineData> | null;
   hasInitialized: boolean = false;
   player: Player;
 

@@ -16,14 +16,14 @@ export class ContainerWithState extends Container {
   }
 
   mount() {
-    super.mount();
     const pod = this.resource.pod;
-
     this.objects.forEach((asset) => {
       const containerAssetData = pod.asset3D.find((a) => a.id === asset.id);
       if (containerAssetData && asset instanceof Asset3D) {
-        asset.transform.position.fromArray(containerAssetData.position);
+        asset.initialPosition.fromArray(containerAssetData.position);
       }
     });
+
+    super.mount();
   }
 }

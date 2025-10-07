@@ -38,6 +38,21 @@ describe('Container', () => {
     expect(parent.children.length).toBe(1);
   });
 
+  it('removes assets correctly', () => {
+    const container = new Container('Test', true, new Asset3D('Test', '1'));
+    const asset1 = new Asset3D('Asset1', '2');
+    const asset2 = new Asset3D('Asset2', '3');
+    container.addAsset(asset1);
+    container.addAsset(asset2);
+
+    expect(container.findObjectByName('Asset1')).toBe(asset1);
+    expect(container.findObjectByName('Asset2')).toBe(asset2);
+
+    container.removeAsset(asset1);
+    expect(container.findObjectByName('Asset1')).toBeNull();
+    expect(container.findObjectByName('Asset2')).toBe(asset2);
+  });
+
   it('removes objects from the parent object when unmounted', () => {
     const parent = new Asset3D('Parent', '1');
     const childObject = new Asset3D('Child', '2');

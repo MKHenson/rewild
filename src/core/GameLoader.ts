@@ -7,6 +7,7 @@ import { Renderer } from 'rewild-renderer';
 import { Player } from './routing/Player';
 import { TemplateLoader } from './TemplateLoader';
 import { ContainerWithState } from './routing/ContainerWithState';
+import { StateMachineData } from './routing/Types';
 
 /** Loads game files and assets and sends the created objects to wasm */
 
@@ -18,7 +19,7 @@ export async function loadInitialLevels(player: Player, renderer: Renderer) {
   if (!project) return null;
 
   const level = await getLevel(project.id);
-  const stateMachine = new StateMachine();
+  const stateMachine = new StateMachine<StateMachineData>({ renderer, player });
 
   // Load the sky properties
   const skyRenderer = renderer.atmosphere.skyRenderer;

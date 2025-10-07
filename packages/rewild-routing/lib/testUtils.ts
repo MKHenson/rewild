@@ -1,6 +1,7 @@
 import { WasmManager } from 'rewild-wasmtime';
 import { IAsset } from './IAsset';
 import { IBehaviour } from './IBehaviour';
+import { StateMachine } from './StateMachine';
 
 // Mock the wasm object in the rewild-wasmtime module
 jest.doMock('rewild-wasmtime/lib/WasmManager', () => {
@@ -23,6 +24,7 @@ WasmManager;
 export class Asset3D implements IAsset {
   name: string;
   id: string;
+  stateMachine: StateMachine | null = null;
   children: IAsset[] = [];
   loaded: boolean;
   behaviours: IBehaviour[];

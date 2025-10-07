@@ -3,6 +3,7 @@ import { IAsset } from 'rewild-routing/lib/IAsset';
 import { Mesh, Renderer } from 'rewild-renderer';
 import { Asset3D } from './routing/Asset3D';
 import { behaviourManager } from './routing/BehaviourManager';
+import { PlayerStart } from './routing/PlayerStart';
 
 export class TemplateLoader {
   templateLibrary: ITemplateItems;
@@ -22,7 +23,9 @@ export class TemplateLoader {
 
     let toReturn: IAsset;
 
-    if (template?.type === 'asset') {
+    if (actor?.type === 'player-start') {
+      toReturn = new PlayerStart();
+    } else if (template?.type === 'asset') {
       if (template.resource.geometryId && template.resource.materialId) {
         const mesh = new Mesh(
           renderer.geometryManager.get(template.resource.geometryId),
