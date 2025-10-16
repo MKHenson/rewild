@@ -45,7 +45,7 @@ export class Renderer {
   scene: Transform;
   currentRenderList: RenderList;
   atmosphere: AtmosphereSkybox;
-  private camController: TrackballControler;
+  camController: TrackballControler;
   private canvasSizeWatcher: CanvasSizeWatcher;
   private renderGroups: IRenderGroup[];
 

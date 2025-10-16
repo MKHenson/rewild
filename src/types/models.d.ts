@@ -29,15 +29,21 @@ declare module 'models' {
     | 'target'
     | 'active'
     | 'geometry'
-    | 'intensity';
+    | 'intensity'
+    | 'camera-transform';
   export type PropValueType =
     | 'string'
     | 'boolean'
     | 'enum'
-    | 'hidden'
     | 'vec3'
-    | 'float';
-  export type PropValue = string | boolean | number | Vector3;
+    | 'float'
+    | 'object';
+
+  export type PropValueObject = Record<
+    string,
+    string | boolean | number | Vector3
+  >;
+  export type PropValue = string | boolean | number | Vector3 | PropValueObject;
   export type IOption = {
     value: string;
     label: string;
@@ -54,9 +60,13 @@ declare module 'models' {
     value: PropValue;
   };
 
+  export type CustomEditorType = 'camera-capture';
+
   export type IProperty = {
     label: string;
     valueType: PropValueType;
+    hidden?: boolean;
+    customEditor?: CustomEditorType;
     valueOptions?: IValueOptions;
     options?: IOption[];
   };

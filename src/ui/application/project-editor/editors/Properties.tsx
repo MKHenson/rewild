@@ -28,9 +28,7 @@ export class Properties extends Component<Props> {
           {selectedResource && (
             <div class="properties">
               {selectedResource.properties
-                ?.filter(
-                  (p) => propertyTemplates[p.type].valueType !== 'hidden'
-                )
+                ?.filter((p) => !propertyTemplates[p.type].hidden)
                 .map((prop, index) => {
                   const template = propertyTemplates[prop.type];
                   return [
@@ -38,6 +36,7 @@ export class Properties extends Component<Props> {
                     <div class="value">
                       <PropertyValue
                         value={prop.value}
+                        customEditor={template.customEditor}
                         type={template.valueType}
                         options={template.options}
                         valueOptions={template.valueOptions}
