@@ -71,7 +71,7 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
   },
   material: {
     label: 'Pipeline',
-    valueType: 'hidden',
+    valueType: 'string',
   },
   color: {
     label: 'Color',
@@ -84,5 +84,10 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
   intensity: {
     label: 'Intensity',
     valueType: 'float',
+  },
+  'camera-transform': {
+    label: 'Camera Transform',
+    valueType: 'object',
+    customEditor: 'camera-capture',
   },
 };

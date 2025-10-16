@@ -6,7 +6,16 @@
       "actors": [
         {
           "name": "Player Start",
-          "type": "player-start"
+          "type": "player-start",
+          "properties": [
+            {
+              "type": "camera-transform",
+              "value": {
+                "position": [0, -10.0, -10.0],
+                "lookat": [0, 0, 0]
+              }
+            }
+          ]
         }
       ]
     },

@@ -14,16 +14,16 @@ export class TemplateLoader {
     ).then((res) => res.json())) as ITemplateItems;
   }
 
-  async createResource(actor: IResource, renderer: Renderer) {
-    const template = actor.templateId
+  async createResource(resource: IResource, renderer: Renderer) {
+    const template = resource.templateId
       ? this.templateLibrary.assets.find(
-          (asset) => asset.name === actor.templateId
+          (asset) => asset.name === resource.templateId
         )
       : null;
 
-    let toReturn: IAsset;
+    let toReturn: IAsset<IResource>;
 
-    if (actor?.type === 'player-start') {
+    if (resource?.type === 'player-start') {
       toReturn = new PlayerStart();
     } else if (template?.type === 'asset') {
       if (template.resource.geometryId && template.resource.materialId) {
@@ -45,10 +45,12 @@ export class TemplateLoader {
           (toReturn as Asset3D).addBehavior(behavior);
         }
       }
-    } else throw new Error(`Could not find template for actor ${actor.name}`);
+    } else
+      throw new Error(`Could not find template for actor ${resource.name}`);
 
-    toReturn.name = actor.name;
-    toReturn.id = actor.id;
+    toReturn.name = resource.name;
+    toReturn.id = resource.id;
+    toReturn.data = resource;
     return toReturn;
   }
 }

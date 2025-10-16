@@ -1,14 +1,16 @@
+import { IResource } from 'models';
 import { Vector3 } from 'rewild-common';
 import { Transform } from 'rewild-renderer';
 import { IAsset, IBehaviour, StateMachine } from 'rewild-routing';
 
-export class Asset3D implements IAsset {
+export class Asset3D implements IAsset<IResource> {
   transform: Transform;
   children: IAsset[] = [];
   loaded: boolean;
   stateMachine: StateMachine | null;
   initialPosition: Vector3;
   behaviours: IBehaviour[];
+  data: IResource;
 
   constructor(transform: Transform) {
     this.transform = transform;

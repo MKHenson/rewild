@@ -1,4 +1,11 @@
-import { IOption, IValueOptions, PropValueType, Vector3 } from 'models';
+import {
+  CustomEditorType,
+  IOption,
+  IValueOptions,
+  PropValueObject,
+  PropValueType,
+  Vector3,
+} from 'models';
 import {
   theme,
   Component,
@@ -8,9 +15,11 @@ import {
   Vec3,
   NumberInput,
 } from 'rewild-ui';
+import { CameraCapture } from './custom-value-editors/CameraCapture';
 
 interface Props<T> {
   type: PropValueType;
+  customEditor?: CustomEditorType;
   value?: T;
   options?: IOption[];
   valueOptions?: IValueOptions;
@@ -25,6 +34,16 @@ export class PropertyValue<T extends any> extends Component<Props<T>> {
     const getEditor = (type: PropValueType) => {
       const value = this.props.value;
       const onChange = this.props.onChange;
+
+      if (this.props.customEditor === 'camera-capture') {
+        return (
+          <CameraCapture
+            readOnly={this.props.readonly}
+            value={value as PropValueObject}
+            onChange={(value) => onChange?.(value as T)}
+          />
+        );
+      }
 
       switch (type) {
         case 'string':

@@ -24,6 +24,10 @@ import { Asset3D } from 'src/core/routing/Asset3D';
 
 interface Props {}
 
+export interface ViewportEventDetails {
+  renderer: Renderer | null;
+}
+
 @register('x-editor-viewport')
 export class EditorViewport extends Component<Props> {
   renderer: Renderer;
@@ -97,14 +101,23 @@ export class EditorViewport extends Component<Props> {
       }
     };
 
+    const onRequestRendererEvent = (event: Event) => {
+      ((event as CustomEvent).detail as ViewportEventDetails).renderer =
+        this.renderer;
+    };
+
     this.onMount = () => {
       projectStore.dispatcher.add(onProjectEvent);
       sceneGraphStore.dispatcher.add(onSceneGraphEvent);
+
+      // Listen for custom event to get the renderer
+      document.addEventListener('request-renderer', onRequestRendererEvent);
     };
 
     this.onCleanup = () => {
       projectStore.dispatcher.remove(onProjectEvent);
       sceneGraphStore.dispatcher.remove(onSceneGraphEvent);
+      document.removeEventListener('request-renderer', onRequestRendererEvent);
     };
 
     const onCanvasReady = async (pane3D: Pane3D) => {
