@@ -9,7 +9,7 @@ import { Mesh } from './core/Mesh';
 import { IRenderGroup } from '../types/IRenderGroup';
 import { AtmosphereSkybox } from './core/AtmosphereSkybox';
 import { TerrainRenderer } from './renderers/terrain/TerrainRenderer';
-import { TrackballControler } from './input/TrackballController';
+import { TrackballController } from './input/TrackballController';
 import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
 import { RenderList } from './core/RenderList';
 import { Light } from './core/lights/Light';
@@ -18,6 +18,7 @@ import { TextureManager } from './managers/TextureManager';
 import { SamplerManager } from './managers/SamplerManager';
 import { GeometryManager } from './managers/GeometryManager';
 import { MaterialManager } from './managers/MaterialManager';
+import { IController } from './input/IController';
 
 export class Renderer {
   device: GPUDevice;
@@ -45,7 +46,7 @@ export class Renderer {
   scene: Transform;
   currentRenderList: RenderList;
   atmosphere: AtmosphereSkybox;
-  camController: TrackballControler;
+  camController: IController;
   private canvasSizeWatcher: CanvasSizeWatcher;
   private renderGroups: IRenderGroup[];
 
@@ -87,7 +88,7 @@ export class Renderer {
     this.perspectiveCam.camera.transform.position.set(0, 0, 5);
     this.perspectiveCam.camera.lookAt(0, 0, 0);
 
-    this.camController = new TrackballControler(this.perspectiveCam, canvas);
+    this.camController = new TrackballController(this.perspectiveCam, canvas);
 
     const adapter = await navigator.gpu?.requestAdapter();
     const device = await adapter?.requestDevice();
@@ -140,10 +141,17 @@ export class Renderer {
     if (this.autoFrame) requestAnimationFrame(this.onFrameHandler);
   }
 
+  setCamController(controller: IController) {
+    this.camController.dispose();
+    this.camController = controller;
+    this.camController.connect(this.canvas);
+    this.camController.onWindowResize();
+  }
+
   onFrame() {
     if (this.disposed) return;
 
-    this.camController.update();
+    this.camController.update(this.delta * 0.01);
 
     this.atmosphere.update(this, this.perspectiveCam.camera);
     this.terrainRenderer.update(this, this.perspectiveCam.camera);
@@ -339,7 +347,10 @@ export class Renderer {
     const renderList = this.organizeMeshes();
 
     // Gets the device render targets ready. Checks for things like canvas resize
-    if (this.canvasSizeWatcher.hasResized()) this.resizeRenderTargets();
+    if (this.canvasSizeWatcher.hasResized()) {
+      this.resizeRenderTargets();
+      this.camController.onWindowResize();
+    }
 
     const device = this.device;
     const context = this.context;

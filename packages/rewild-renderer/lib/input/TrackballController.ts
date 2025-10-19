@@ -1,6 +1,7 @@
 import { clamp, Quaternion, Vector2, Vector3 } from 'rewild-common';
 import { ICameraController } from '../../types/ICamera';
 import { OrthographicCamera } from '../core/OrthographicCamera';
+import { IController } from './IController';
 
 const _changeEvent = { type: 'change' };
 const _startEvent = { type: 'start' };
@@ -43,7 +44,7 @@ const _objectUpDirection = new Vector3();
 const _objectSidewaysDirection = new Vector3();
 const _moveDirection = new Vector3();
 
-export class TrackballControler {
+export class TrackballController implements IController {
   /**
    * The 3D object that is managed by the controls.
    */
@@ -207,8 +208,7 @@ export class TrackballControler {
 
     if (domElement !== null) {
       this.connect();
-
-      this.handleResize();
+      this.onWindowResize();
     }
 
     // force an update at start
@@ -247,7 +247,7 @@ export class TrackballControler {
     this.disconnect();
   }
 
-  handleResize() {
+  onWindowResize() {
     const box = this.domElement.getBoundingClientRect();
     // adjustments come from similar code in the jquery offset() function
     const d = this.domElement.ownerDocument.documentElement;
@@ -327,6 +327,11 @@ export class TrackballControler {
 
     this._lastPosition.copy(this.object.camera.transform.position);
     this._lastZoom = this.object.zoom;
+  }
+
+  lookAt(x: number, y: number, z: number) {
+    this.target.set(x, y, z);
+    return this;
   }
 
   _panCamera() {

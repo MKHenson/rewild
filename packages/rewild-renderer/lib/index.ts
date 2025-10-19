@@ -7,3 +7,4 @@ export * from './core/Mesh';
 export * from './geometry/Geometry';
 export * from './core/lights';
 export * from './materials/IMaterialPass';
+export * from './input';

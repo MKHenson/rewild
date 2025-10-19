@@ -1,5 +1,5 @@
 import { Component, Pane3D, register } from 'rewild-ui';
-import { Renderer } from 'rewild-renderer';
+import { FirstPersonControls, Renderer } from 'rewild-renderer';
 import { Player } from 'src/core/routing/Player';
 import { InGameUI } from './InGameUI';
 import { StateMachine } from 'rewild-routing';
@@ -40,6 +40,12 @@ export class ViewportStateMachine extends Component<Props> {
         this.hasInitialized = true;
 
         await this.renderer.init(pane3D.canvas()!, false);
+        this.renderer.setCamController(
+          new FirstPersonControls(
+            this.renderer.perspectiveCam,
+            pane3D.canvas()!
+          )
+        );
         this.player.setCamera(this.renderer.perspectiveCam);
         this.stateMachine = await loadInitialLevels(this.player, this.renderer);
 
