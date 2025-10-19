@@ -1,6 +1,7 @@
-import { PropValueObject } from 'models';
+import { PropValueObject, Vector3 } from 'models';
 import { Button, Component, register } from 'rewild-ui';
-import { ViewportEventDetails } from '../EditorViewport';
+import { getActiveRenderer } from '../utils/getActiveRenderer';
+import { TrackballController } from 'node_modules/rewild-renderer/lib/input/TrackballController';
 
 interface Props {
   readOnly?: boolean;
@@ -11,29 +12,41 @@ interface Props {
 @register('x-camera-capture')
 export class CameraCapture extends Component<Props> {
   init() {
-    const onMouseClick = (e: MouseEvent) => {
-      // Create an event on the document to request the renderer
-      const details = { renderer: null } as ViewportEventDetails;
-      const event = new CustomEvent('request-renderer', {
-        detail: details,
-      });
-
-      document.dispatchEvent(event);
-
-      const target = details.renderer?.camController.target;
-      const position =
-        details.renderer?.perspectiveCam.camera.transform.position;
+    const onCaptureClick = (e: MouseEvent) => {
+      const renderer = getActiveRenderer();
+      const target = (renderer?.camController as TrackballController).target;
+      const position = renderer?.perspectiveCam.camera.transform.position;
+      const up = renderer?.perspectiveCam.camera.transform.up;
 
       this.props.onChange?.({
         position: position ? [position.x, position.y, position.z] : [0, 0, 0],
+        up: up ? [up.x, up.y, up.z] : [0, 0, 0],
         target: target ? [target.x, target.y, target.z] : [0, 0, 0],
       });
     };
 
+    const onRestoreClick = (e: MouseEvent) => {
+      const renderer = getActiveRenderer();
+      const target = (renderer?.camController as TrackballController).target;
+      const position = renderer?.perspectiveCam.camera.transform.position;
+      const up = renderer?.perspectiveCam.camera.transform.up;
+      position?.fromArray(this.props.value?.position as Vector3);
+      up?.fromArray(this.props.value?.up as Vector3);
+      target?.fromArray(this.props.value?.target as Vector3);
+    };
+
     const elm = (
-      <Button disabled={this.props.readOnly} onClick={onMouseClick}>
-        Capture
-      </Button>
+      <div>
+        <Button disabled={this.props.readOnly} onClick={onCaptureClick}>
+          Capture
+        </Button>
+        <Button
+          variant="text"
+          disabled={this.props.readOnly}
+          onClick={onRestoreClick}>
+          Restore
+        </Button>
+      </div>
     );
 
     return () => {
