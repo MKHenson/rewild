@@ -21,13 +21,14 @@ jest.doMock('rewild-wasmtime/lib/WasmManager', () => {
 
 WasmManager;
 
-export class Asset3D implements IAsset {
+export class Asset3D<T = any> implements IAsset<T> {
   name: string;
   id: string;
   stateMachine: StateMachine | null = null;
   children: IAsset[] = [];
   loaded: boolean;
   behaviours: IBehaviour[];
+  data: T;
 
   constructor(name: string, id: string) {
     this.name = name;

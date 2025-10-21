@@ -163,7 +163,11 @@ export class DrawF implements IRenderable {
     this.translationValue.set([0, 0]);
 
     // upload the uniform values to the uniform buffer
-    device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformValues);
+    device.queue.writeBuffer(
+      this.uniformBuffer,
+      0,
+      this.uniformValues as BufferSource
+    );
 
     pass.setBindGroup(0, this.bindGroup);
     pass.drawIndexed(this.numVertices);

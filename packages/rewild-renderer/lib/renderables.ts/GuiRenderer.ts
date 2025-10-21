@@ -220,7 +220,11 @@ export class GuiRenderer implements IRenderable {
     this.resolutionValue.set([canvas.width, canvas.height]);
 
     // upload the uniform values to the uniform buffer
-    device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformValues);
+    device.queue.writeBuffer(
+      this.uniformBuffer,
+      0,
+      this.uniformValues as BufferSource
+    );
 
     pass.setBindGroup(0, this.bindGroup);
     pass.drawIndexed(this.numVertices, this.elements.length);

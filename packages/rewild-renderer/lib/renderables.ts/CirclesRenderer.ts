@@ -153,7 +153,11 @@ export class CirclesRenderer implements IRenderable {
     });
 
     // upload all scales at once
-    device.queue.writeBuffer(this.changingVertexBuffer, 0, this.vertexValues);
+    device.queue.writeBuffer(
+      this.changingVertexBuffer,
+      0,
+      this.vertexValues as BufferSource
+    );
 
     pass.setBindGroup(0, this.bindGroup);
     pass.draw(this.numVertices, kNumObjects); // ca

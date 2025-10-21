@@ -18,7 +18,7 @@
     "forceConsistentCasingInFileNames": true,
     "preserveConstEnums": true,
     "pretty": true,
-    "skipLibCheck": false,
+    "skipLibCheck": true,
     "lib": ["dom", "es2022"],
     "moduleResolution": "node",
     "target": "ESNext",
