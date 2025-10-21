@@ -1,36 +1,61 @@
-import { Typography } from "./Typography";
-import { Component, register } from "../Component";
-import { theme } from "../theme";
-import { MaterialIcon } from "./MaterialIcon";
+import { Typography } from './Typography';
+import { Component, register } from '../Component';
+import { theme } from '../theme';
+import { IconType, MaterialIcon } from './MaterialIcon';
 
 interface Props {
-  variant: "info" | "error";
+  variant: 'info' | 'error' | 'warning';
   title: string;
   required?: boolean;
 }
 
-@register("x-info-box")
+@register('x-info-box')
 export class InfoBox extends Component<Props> {
   init() {
-    return () => (
-      <div class={this.props.variant}>
-        <div class="icon">
-          {this.props.variant === "info" ? (
-            <MaterialIcon icon="info" style={`color: ${theme.colors.onPrimary600};`} />
-          ) : (
-            <MaterialIcon icon="error" style={`color: ${theme.colors.onError600};`} />
-          )}
-        </div>
-        <div class="content">
-          <Typography variant="label">{this.props.title}</Typography>
-          <div>
-            <Typography variant="body1">
-              <slot></slot>
-            </Typography>
+    return () => {
+      const variant = this.props.variant;
+
+      const getIcon = (): IconType => {
+        switch (variant) {
+          case 'info':
+            return 'info';
+          case 'error':
+            return 'error';
+          case 'warning':
+            return 'warning';
+        }
+      };
+
+      const getMaterialIconColor = (): string => {
+        switch (variant) {
+          case 'info':
+            return theme.colors.onPrimary600;
+          case 'error':
+            return theme.colors.onError600;
+          case 'warning':
+            return theme.colors.warning600;
+        }
+      };
+
+      return (
+        <div class={variant}>
+          <div class="icon">
+            <MaterialIcon
+              icon={getIcon()}
+              style={`color: ${getMaterialIconColor()};`}
+            />
+          </div>
+          <div class="content">
+            <Typography variant="label">{this.props.title}</Typography>
+            <div>
+              <Typography variant="body1">
+                <slot></slot>
+              </Typography>
+            </div>
           </div>
         </div>
-      </div>
-    );
+      );
+    };
   }
 
   getStyle() {
@@ -52,6 +77,11 @@ const StyledInfoBox = cssStylesheet(css`
   .error {
     color: ${theme!.colors.onError600};
     background: ${theme!.colors.error400};
+  }
+
+  .warning {
+    color: ${theme!.colors.onWarning600};
+    background: ${theme!.colors.warning400};
   }
 
   :host > div {

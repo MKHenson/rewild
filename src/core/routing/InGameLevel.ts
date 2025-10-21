@@ -24,7 +24,9 @@ export class InGameLevel extends Level {
     }
   }
 
-  onUpdate(delta: number, total: number): void {}
+  onUpdate(delta: number, total: number): void {
+    // this.player.onUpdate(delta, total);
+  }
 
   unMount(): void {
     super.unMount();

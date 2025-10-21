@@ -141,10 +141,13 @@ export class Renderer {
     if (this.autoFrame) requestAnimationFrame(this.onFrameHandler);
   }
 
-  setCamController(controller: IController) {
+  setCamController(
+    controller: IController,
+    element: HTMLElement = this.canvas
+  ) {
     this.camController.dispose();
     this.camController = controller;
-    this.camController.connect(this.canvas);
+    this.camController.connect(element);
     this.camController.onWindowResize();
   }
 

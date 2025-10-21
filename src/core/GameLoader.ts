@@ -36,6 +36,7 @@ export async function loadInitialLevels(player: Player, renderer: Renderer) {
     false,
     player
   );
+  stateMachine.addNode(player, true);
   stateMachine.addNode(levelRouter, true);
 
   for (const container of level.containers) {

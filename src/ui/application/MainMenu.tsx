@@ -7,6 +7,7 @@ import {
   Loading,
   Component,
   register,
+  InfoBox,
 } from 'rewild-ui';
 
 type Props = {
@@ -39,6 +40,13 @@ export class MainMenu extends Component<Props> {
               Welcome to rewild. A game about exploration, natural history and
               saving the planet
             </Typography>
+            <InfoBox variant="warning" title="Attention">
+              For now the game requires access to a restricted database. You can
+              however use the editor and build a local experience which you can
+              run yourself. Just open the editor, save your work and then click
+              the New Game button. You will need at least one container in order
+              to experience anything.
+            </InfoBox>
           </div>
           {authState.loading ? (
             <div style={`text-align: center;`}>
