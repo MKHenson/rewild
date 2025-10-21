@@ -25,7 +25,7 @@
   "license": "ISC",
   "homepage": "https://bitbucket.org/MathewKHenson/rewild-web#readme",
   "dependencies": {
-    "@types/node": "18.15.11",
+    "@types/node": "24.9.1",
     "date-fns": "2.29.3",
     "esbuild": "0.17.18",
     "firebase": "^9.10.0",
@@ -53,9 +53,9 @@
     "prettier": "2.3.2",
     "raw-loader": "^4.0.2",
     "rimraf": "3.0.2",
-    "ts-loader": "9.2.3",
-    "ts-node": "10.7.0",
-    "typescript": "4.9.4"
+    "ts-loader": "9.5.4",
+    "ts-node": "10.9.2",
+    "typescript": "5.9.3"
   },
   "workspaces": [
     "packages\\rewild-ui",

@@ -138,8 +138,8 @@ export class StateMachine<T = any> extends EventDispatcher {
 
   dispose(): void {
     const nodes = this.nodes;
-    for (let i: i32 = 0, l = nodes.length; i < l; i++) {
-      this.removeNode(unchecked(nodes[i]));
+    while (nodes.length) {
+      this.removeNode(nodes[0]);
     }
 
     this.nodes.length = 0;

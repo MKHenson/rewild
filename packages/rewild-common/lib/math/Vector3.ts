@@ -10,6 +10,7 @@ import { Vector4 } from './Vector4';
 
 export class Vector3 implements IVector {
   static UP: Vector3 = new Vector3(0, 1, 0);
+  static DOWN: Vector3 = new Vector3(0, -1, 0);
 
   isVector3: boolean = true;
   x: f32;

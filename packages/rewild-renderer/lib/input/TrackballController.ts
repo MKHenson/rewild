@@ -215,7 +215,10 @@ export class TrackballController implements IController {
     this.update();
   }
 
-  connect() {
+  connect(element?: HTMLElement | null) {
+    if (this.domElement !== null) this.disconnect();
+    if (element) this.domElement = element;
+
     window.addEventListener('keydown', this._onKeyDown);
     window.addEventListener('keyup', this._onKeyUp);
 

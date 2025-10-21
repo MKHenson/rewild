@@ -18,6 +18,10 @@
   --success-500: #037d3e;
   --success-600: #005328;
 
+  --warning-400: #d8942d;
+  --warning-500: #b8822c;
+  --warning-600: #8c5e1e;
+
   --subtle-400: #f5f5f5;
   --subtle-500: #e2e2e2;
   --subtle-600: #d5d5d5;
@@ -39,6 +43,10 @@
   --on-error-400: #fff;
   --on-error-500: #fff;
   --on-error-600: #fff;
+
+  --on-warning-400: #fff;
+  --on-warning-500: #fff;
+  --on-warning-600: #fff;
 
   --font-size-s: 12px;
   --font-size-m: 14px;

@@ -2,6 +2,7 @@ import { InGameMenu } from './InGameMenu';
 import { GameOverMenu } from './GameOverMenu';
 import { Component, register } from 'rewild-ui';
 import { ViewportStateMachine } from './ViewportStateMachine';
+import { PointerLockController } from 'node_modules/rewild-renderer';
 
 interface Props {
   onQuit: () => void;
@@ -16,6 +17,10 @@ export class InGame extends Component<Props> {
 
     const onResume = () => {
       setModalOpen(false);
+      (
+        (viewport as ViewportStateMachine).renderer
+          .camController as PointerLockController
+      ).lock();
     };
 
     const onQuit = () => {
@@ -34,13 +39,17 @@ export class InGame extends Component<Props> {
       }
     };
 
+    const onUnlock = () => {
+      setModalOpen(true);
+    };
+
     this.onCleanup = () => {
       document.removeEventListener('keydown', onKeyDown);
       (viewport as ViewportStateMachine).dispose();
     };
 
     const fpsDiv = <div class="fps-counter">0</div>;
-    const viewport = <ViewportStateMachine />;
+    const viewport = <ViewportStateMachine onUnlock={onUnlock} />;
 
     return () => (
       <div>

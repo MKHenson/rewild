@@ -18,7 +18,7 @@ export class BufferGeometryGroup {
   }
 }
 
-export type BufferArray = ArrayBuffer & {
+export type BufferArray = ArrayBufferView & {
   [index: number]: number;
   length: number;
 };

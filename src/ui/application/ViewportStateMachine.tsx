@@ -1,5 +1,9 @@
 import { Component, Pane3D, register } from 'rewild-ui';
-import { FirstPersonControls, Renderer } from 'rewild-renderer';
+import {
+  PointerLockController,
+  PointerLockEventType,
+  Renderer,
+} from 'rewild-renderer';
 import { Player } from 'src/core/routing/Player';
 import { InGameUI } from './InGameUI';
 import { StateMachine } from 'rewild-routing';
@@ -7,7 +11,9 @@ import { Clock } from 'src/core/Clock';
 import { loadInitialLevels } from 'src/core/GameLoader';
 import { StateMachineData } from 'src/core/routing/Types';
 
-interface Props {}
+interface Props {
+  onUnlock: () => void;
+}
 
 @register('x-viewport-statemachine')
 export class ViewportStateMachine extends Component<Props> {
@@ -15,6 +21,20 @@ export class ViewportStateMachine extends Component<Props> {
   stateMachine: StateMachine<StateMachineData> | null;
   hasInitialized: boolean = false;
   player: Player;
+  camController: PointerLockController;
+
+  handleOnPointerLockChange = (event: PointerLockEventType) => {
+    switch (event.type) {
+      case 'lock':
+        break;
+      case 'unlock':
+        this.props.onUnlock();
+        break;
+      case 'change':
+        // Handle pointer change
+        break;
+    }
+  };
 
   init() {
     this.renderer = new Renderer();
@@ -40,12 +60,12 @@ export class ViewportStateMachine extends Component<Props> {
         this.hasInitialized = true;
 
         await this.renderer.init(pane3D.canvas()!, false);
-        this.renderer.setCamController(
-          new FirstPersonControls(
-            this.renderer.perspectiveCam,
-            pane3D.canvas()!
-          )
+        this.camController = new PointerLockController(
+          this.renderer.perspectiveCam,
+          document.body
         );
+
+        this.renderer.setCamController(this.camController, document.body);
         this.player.setCamera(this.renderer.perspectiveCam);
         this.stateMachine = await loadInitialLevels(this.player, this.renderer);
 
@@ -54,6 +74,10 @@ export class ViewportStateMachine extends Component<Props> {
         // Start the rendering loop
         window.requestAnimationFrame(onFrame);
         clock.start();
+
+        this.camController.lock();
+
+        this.camController.dispatcher.add(this.handleOnPointerLockChange);
       } catch (err: unknown) {
         console.error(err);
       }
@@ -76,8 +100,10 @@ export class ViewportStateMachine extends Component<Props> {
   }
 
   dispose() {
+    this.camController.dispatcher.remove(this.handleOnPointerLockChange);
     this.stateMachine?.dispose();
     this.renderer.dispose();
+    this.camController.dispose();
   }
 }
 

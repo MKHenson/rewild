@@ -44,7 +44,7 @@ export class DataTexture implements ITexture {
 
     device.queue.writeTexture(
       { texture: this.gpuTexture },
-      this.data,
+      this.data as BufferSource,
       { bytesPerRow: this.width * 4 },
       { width: this.width, height: this.height }
     );
