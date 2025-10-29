@@ -8,8 +8,10 @@ import { SharedUniformsTracker } from './SharedUniformsTracker';
 import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { Diffuse } from './uniforms/Diffuse';
+import { Lighting } from './uniforms/Lighting';
 
 const sharedBindgroupIndex = 1;
+const lightingGroupIndex = 2;
 
 export class DiffusePass implements IMaterialPass {
   cloudsPipeline: GPURenderPipeline;
@@ -17,14 +19,17 @@ export class DiffusePass implements IMaterialPass {
   requiresRebuild: boolean = true;
   sharedUniformsTracker: SharedUniformsTracker;
   diffuse: Diffuse;
+  lightingUniforms: Lighting;
   side: GPUFrontFace;
 
   constructor() {
     this.side = 'ccw';
     this.requiresRebuild = true;
     this.diffuse = new Diffuse(sharedBindgroupIndex);
+    this.lightingUniforms = new Lighting(lightingGroupIndex);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       this.diffuse,
+      this.lightingUniforms,
     ]);
     this.perMeshTracker = new PerMeshTracker(this, () => [
       new ProjModelView(0),
@@ -64,6 +69,17 @@ export class DiffusePass implements IMaterialPass {
                 shaderLocation: 1,
                 offset: 0,
                 format: 'float32x2',
+              },
+            ],
+          },
+          {
+            arrayStride: 4 * 3,
+            attributes: [
+              {
+                // normal
+                shaderLocation: 2,
+                offset: 0,
+                format: 'float32x3',
               },
             ],
           },
@@ -117,7 +133,7 @@ export class DiffusePass implements IMaterialPass {
   }
 
   isGeometryCompatible(geometry: Geometry): boolean {
-    return !!(geometry.vertices && geometry.uvs);
+    return !!(geometry.vertices && geometry.uvs && geometry.normals);
   }
 
   render(
@@ -130,6 +146,7 @@ export class DiffusePass implements IMaterialPass {
     pass.setPipeline(this.cloudsPipeline);
     pass.setVertexBuffer(0, geometry.vertexBuffer);
     pass.setVertexBuffer(1, geometry.uvBuffer);
+    pass.setVertexBuffer(2, geometry.normalBuffer);
     pass.setIndexBuffer(geometry.indexBuffer, 'uint16');
 
     this.sharedUniformsTracker.prepareMeshUniforms(

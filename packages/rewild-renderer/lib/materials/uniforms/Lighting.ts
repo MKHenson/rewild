@@ -81,6 +81,10 @@ export class Lighting implements ISharedUniformBuffer {
       }
     }
 
+    // Transform light direction to view space using the view matrix rotation part
+    // The view matrix inverse rotation transforms world directions to view space
+    direction.transformDirection(camera.matrixWorldInverse).normalize();
+
     this.lighting[0] = direction.x;
     this.lighting[1] = direction.y;
     this.lighting[2] = direction.z;

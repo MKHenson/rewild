@@ -1,16 +1,17 @@
 struct Uniforms {
+  normalMatrix: mat3x3f,
   projMatrix : mat4x4f,
   modelViewMatrix : mat4x4<f32>,
 }
-@binding(0) @group(0) var<uniform> uniforms : Uniforms;
+@group(0) @binding(0) var<uniform> uniforms : Uniforms;
 
-struct Lightint {
-  direciton : vec3f,
+struct Lighting {
+  direction : vec3f,
   intensity : f32,
   color : vec3f,
   padding : f32,
 }
-@binding(0) @group(2) var<uniform> lighting : Lightint;
+@group(2) @binding(0) var<uniform> lighting : Lighting;
 
 struct VertexInput {
     @location(0) position : vec4<f32>,
@@ -35,7 +36,7 @@ fn vs(
   output.Position = uniforms.projMatrix * mvPosition;
 
   output.fragUV = input.uv;
-  output.normal = input.normal;
+  output.normal = uniforms.normalMatrix * input.normal;
   return output;
 }
 
@@ -70,7 +71,7 @@ fn fs(
   let blendedColor = mix(cola, colb, smoothstep(0.2, 0.8, f - 0.1 * dot(cola - colb, vec3f(1.0, 1.0, 1.0))));
 
   let normalizedNormal = normalize(normal);
-  let directionLighting = dot(  normalizedNormal, -lighting.direciton) * lighting.intensity * lighting.color;
+  let directionLighting = dot(  normalizedNormal, -lighting.direction) * lighting.intensity * lighting.color;
 
   // Combine the textures
   return textureSample(myTexture, mySampler, fragUV) * vec4f(blendedColor * directionLighting, 1.0);

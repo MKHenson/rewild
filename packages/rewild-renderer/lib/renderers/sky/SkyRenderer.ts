@@ -46,6 +46,7 @@ export class SkyRenderer {
 
   _dayColor: Color;
   _eveColor: Color;
+  _nightColor: Color;
 
   constructor(parent: Transform) {
     this.azimuth = 180;
@@ -61,6 +62,7 @@ export class SkyRenderer {
 
     this._dayColor = new Color(1, 1, 1);
     this._eveColor = new Color(0.32, 0.12, 0.0);
+    this._nightColor = new Color(0.05, 0.05, 0.2);
 
     this.cloudsPass = new CloudsRenderer();
     this.atmospherePass = new AtmosphereRenderer();
@@ -144,11 +146,19 @@ export class SkyRenderer {
     const sunRadius = 100;
     sunPosition.setFromSphericalCoords(sunRadius, phi, theta);
 
-    this.sun.color.lerpColors(
-      this._eveColor,
-      this._dayColor,
-      sunPosition.y / sunRadius
-    );
+    // Lerp sun color based on elevation
+    // When sun is at the horizon (y=0), use eveColor, when at zenith (y=sunRadius), use dayColor
+    const t = Math.max(sunPosition.y / sunRadius, 0);
+    this.sun.color.lerpColors(this._eveColor, this._dayColor, t);
+
+    if (sunPosition.y < 0) {
+      // Below horizon, use night color
+      this.sun.color.lerpColors(
+        this._nightColor,
+        this._eveColor,
+        1 + sunPosition.y / sunRadius
+      );
+    }
 
     uniformData.set(transform.matrixWorld.elements, 0); // modelMatrix
     uniformData.set(camera.projectionMatrix.elements, 16); // projectionMatrix

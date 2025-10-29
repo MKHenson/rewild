@@ -26,7 +26,7 @@ export class ProjModelView implements IPerMeshUniformBuffer {
 
     this.destroy();
 
-    const uniformBufferSize = 4 * 16 * 2; // 4x4 matrix (x2)
+    const uniformBufferSize = 48 + 64 + 64; // mat3x3f (48 bytes) + 2x mat4x4f (64 bytes each) = 176 bytes
     this.buffer = device.createBuffer({
       size: uniformBufferSize,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -51,9 +51,20 @@ export class ProjModelView implements IPerMeshUniformBuffer {
     const cameraElements = camera.projectionMatrix.elements;
     const modelViewElements = transform.modelViewMatrix.elements;
 
+    // Use the existing normalMatrix that's computed in the renderer (like Three.js)
+    const normalElements = transform.normalMatrix.elements;
+
     device.queue.writeBuffer(
       this.buffer,
       0,
+      normalElements.buffer,
+      normalElements.byteOffset,
+      normalElements.byteLength
+    );
+
+    device.queue.writeBuffer(
+      this.buffer,
+      48,
       cameraElements.buffer,
       cameraElements.byteOffset,
       cameraElements.byteLength
@@ -61,7 +72,7 @@ export class ProjModelView implements IPerMeshUniformBuffer {
 
     device.queue.writeBuffer(
       this.buffer,
-      64,
+      112,
       modelViewElements.buffer,
       modelViewElements.byteOffset,
       modelViewElements.byteLength
