@@ -8,6 +8,7 @@ import { Pane3D } from 'rewild-ui';
 import { Player } from './routing/Player';
 import { Clock } from './Clock';
 import { loadInitialLevels } from './GameLoader';
+import { World, ColliderDesc, RigidBodyDesc } from '@dimforge/rapier3d';
 
 export class GameManager {
   renderer: Renderer;
@@ -16,6 +17,7 @@ export class GameManager {
   player: Player;
   camController: PointerLockController;
   clock: Clock;
+  physicsWorld: World;
   onUnlock: () => void;
   PointerLockChangedDelegate: (event: PointerLockEventType) => void;
 
@@ -54,12 +56,36 @@ export class GameManager {
       this.clock.start();
       this.camController.lock();
 
+      this.initPhysics();
+
       this.camController.dispatcher.add(this.PointerLockChangedDelegate);
       return true;
     } catch (err: unknown) {
       console.error(err);
       return false;
     }
+  }
+
+  initPhysics() {
+    // Use the RAPIER module here.
+    let gravity = { x: 0.0, y: -9.81, z: 0.0 };
+    this.physicsWorld = new World(gravity);
+
+    // Create the ground
+    let groundColliderDesc = ColliderDesc.cuboid(10.0, 0.1, 10.0);
+    this.physicsWorld.createCollider(groundColliderDesc);
+
+    // // Create a dynamic rigid-body.
+    // let rigidBodyDesc = RigidBodyDesc.dynamic().setTranslation(
+    //   0.0,
+    //   1.0,
+    //   0.0
+    // );
+    // let rigidBody = this.physicsWorld.createRigidBody(rigidBodyDesc);
+
+    // // Create a cuboid collider attached to the dynamic rigidBody.
+    // let colliderDesc = ColliderDesc.cuboid(0.5, 0.5, 0.5);
+    // let collider = this.physicsWorld.createCollider(colliderDesc, rigidBody);
   }
 
   handleOnPointerLockChange(event: PointerLockEventType) {
@@ -77,9 +103,15 @@ export class GameManager {
 
   onUpdate() {
     const clock = this.clock;
-
     const delta = clock.getDelta();
     const total = clock.getElapsedTime();
+
+    // Step the simulation forward.
+    this.physicsWorld.step();
+
+    // // Get and print the rigid-body's position.
+    // let position = rigidBody.translation();
+    // console.log('Rigid-body position: ', position.x, position.y);
 
     this.stateMachine?.OnLoop(delta, total);
     this.renderer.onFrame();
