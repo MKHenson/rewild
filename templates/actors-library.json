@@ -38,6 +38,10 @@
           "templateId": "crate"
         },
         {
+          "name": "Pill",
+          "templateId": "pill"
+        },
+        {
           "name": "Basketball",
           "templateId": "basketball"
         }

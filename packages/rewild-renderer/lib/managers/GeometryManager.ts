@@ -1,4 +1,5 @@
 import { BoxGeometryFactory } from '../geometry/BoxGeometryFactory';
+import { CapsuleGeometryFactory } from '../geometry/CapsuleGeometryFactory';
 import { Geometry } from '../geometry/Geometry';
 import { PlaneGeometryFactory } from '../geometry/PlaneGeometryFactory';
 import { SphereGeometryFactory } from '../geometry/SphereGeometryFactory';
@@ -24,6 +25,7 @@ export class GeometryManager {
     const { device } = renderer;
 
     this.addGeometry('box', BoxGeometryFactory.new());
+    this.addGeometry('capsule', CapsuleGeometryFactory.new());
     this.addGeometry('sphere', SphereGeometryFactory.new());
     this.addGeometry('plane', PlaneGeometryFactory.new());
 

@@ -17,6 +17,14 @@
       }
     },
     {
+      "name": "pill",
+      "type": "asset",
+      "resource": {
+        "materialId": "basketball",
+        "geometryId": "capsule"
+      }
+    },
+    {
       "name": "earth",
       "type": "asset",
       "behaviors": ["spin"],
