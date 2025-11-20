@@ -83,6 +83,10 @@ async function watch() {
       terrainWorker:
         'rewild-renderer/lib/renderers/terrain/worker/TerrainWorker.ts',
     },
+    loader: {
+      '.wgsl': 'text',
+      '.wasm': 'file',
+    },
     bundle: true,
     sourcemap: true,
     external: [],
@@ -106,6 +110,7 @@ async function build() {
     },
     loader: {
       '.wgsl': 'text', // Add this line to handle .wgsl files
+      '.wasm': 'file', // Handles .wasm files
     },
     bundle: true,
     tsconfig: './src/tsconfig.json',
