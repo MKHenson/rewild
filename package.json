@@ -25,6 +25,7 @@
   "license": "ISC",
   "homepage": "https://bitbucket.org/MathewKHenson/rewild-web#readme",
   "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
     "@types/node": "24.9.1",
     "date-fns": "2.29.3",
     "esbuild": "0.17.18",
@@ -39,7 +40,6 @@
     "@babel/preset-typescript": "^7.21.4",
     "@types/jest": "^29.5.0",
     "@webgpu/types": "0.1.21",
-    "@dimforge/rapier3d": "*",
     "babel-jest": "^29.5.0",
     "cross-env": "7.0.3",
     "esbuild-plugin-copy": "^2.1.1",

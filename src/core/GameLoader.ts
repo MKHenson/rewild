@@ -8,18 +8,27 @@ import { Player } from './routing/Player';
 import { TemplateLoader } from './TemplateLoader';
 import { ContainerWithState } from './routing/ContainerWithState';
 import { StateMachineData } from './routing/Types';
+import { GameManager } from './GameManager';
 
 /** Loads game files and assets and sends the created objects to wasm */
 
-export async function loadInitialLevels(player: Player, renderer: Renderer) {
+export async function loadInitialLevels(
+  player: Player,
+  gameManager: GameManager
+) {
   const templateLoader = new TemplateLoader();
+  const renderer: Renderer = gameManager.renderer;
   await templateLoader.load();
 
   const project = (await getProjects(true)).at(0);
   if (!project) return null;
 
   const level = await getLevel(project.id);
-  const stateMachine = new StateMachine<StateMachineData>({ renderer, player });
+  const stateMachine = new StateMachine<StateMachineData>({
+    renderer,
+    player,
+    gameManager,
+  });
 
   // Load the sky properties
   const skyRenderer = renderer.atmosphere.skyRenderer;

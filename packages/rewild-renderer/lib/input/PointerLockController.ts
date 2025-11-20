@@ -75,6 +75,10 @@ export class PointerLockController implements IController {
   private movingBackward: boolean;
   private movingLeft: boolean;
   private movingRight: boolean;
+  public jumpRequested: boolean = false;
+
+  moveCamera: boolean = false;
+  movementVector: Vector3 = new Vector3(0, 0, 0);
 
   dispatcher: Dispatcher<PointerLockEventType>;
 
@@ -127,6 +131,7 @@ export class PointerLockController implements IController {
     else if (e.code == 'KeyS') this.movingBackward = true;
     else if (e.code == 'KeyA') this.movingLeft = true;
     else if (e.code == 'KeyD') this.movingRight = true;
+    else if (e.code == 'Space') this.jumpRequested = true;
   }
 
   private onKeyUp(e: KeyboardEvent): void {
@@ -134,6 +139,7 @@ export class PointerLockController implements IController {
     else if (e.code == 'KeyS') this.movingBackward = false;
     else if (e.code == 'KeyA') this.movingLeft = false;
     else if (e.code == 'KeyD') this.movingRight = false;
+    else if (e.code == 'Space') this.jumpRequested = false;
   }
 
   lookAt(x: number, y: number, z: number): void {
@@ -147,6 +153,10 @@ export class PointerLockController implements IController {
   onWindowResize(): void {}
   update(delta: number): void {
     if (!this.enabled) return;
+
+    // Clear movement vector after applying so it doesn't accumulate across frames.
+    this.movementVector.set(0, 0, 0);
+
     if (this.movingForward) this.moveForward(this.moveSpeed * delta);
     else if (this.movingBackward) this.moveForward(-this.moveSpeed * delta);
     if (this.movingRight) this.moveRight(this.moveSpeed * delta);
@@ -221,7 +231,10 @@ export class PointerLockController implements IController {
     const camera = this.object;
     // Get the actual forward direction of the camera (including vertical component)
     this.getDirection(_vector);
-    camera.camera.transform.position.addScaledVector(_vector, distance);
+
+    if (this.moveCamera)
+      camera.camera.transform.position.addScaledVector(_vector, distance);
+    else this.movementVector.addScaledVector(_vector, distance);
   }
 
   /**
@@ -233,7 +246,10 @@ export class PointerLockController implements IController {
     if (this.enabled === false) return;
     const camera = this.object;
     _vector.setFromMatrixColumn(camera.camera.transform.matrix, 0);
-    camera.camera.transform.position.addScaledVector(_vector, distance);
+
+    if (this.moveCamera)
+      camera.camera.transform.position.addScaledVector(_vector, distance);
+    else this.movementVector.addScaledVector(_vector, distance);
   }
 
   /**

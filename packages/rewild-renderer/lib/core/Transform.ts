@@ -20,9 +20,9 @@ const _position = new Vector3();
 const _scale = new Vector3();
 const _quaternion = new Quaternion();
 
-const _xAxis = new Vector3(1, 0, 0);
-const _yAxis = new Vector3(0, 1, 0);
-const _zAxis = new Vector3(0, 0, 1);
+export const xAxis = new Vector3(1, 0, 0);
+export const yAxis = new Vector3(0, 1, 0);
+export const zAxis = new Vector3(0, 0, 1);
 
 type TraverseCallback = (object: Transform) => void;
 const _addedEvent: Event = new Event('added');
@@ -169,15 +169,15 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
   }
 
   rotateX(angle: f32): Transform {
-    return this.rotateOnAxis(_xAxis, angle);
+    return this.rotateOnAxis(xAxis, angle);
   }
 
   rotateY(angle: f32): Transform {
-    return this.rotateOnAxis(_yAxis, angle);
+    return this.rotateOnAxis(yAxis, angle);
   }
 
   rotateZ(angle: f32): Transform {
-    return this.rotateOnAxis(_zAxis, angle);
+    return this.rotateOnAxis(zAxis, angle);
   }
 
   translateOnAxis(axis: Vector3, distance: f32): Transform {
@@ -192,15 +192,15 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
   }
 
   translateX(distance: f32): Transform {
-    return this.translateOnAxis(_xAxis, distance);
+    return this.translateOnAxis(xAxis, distance);
   }
 
   translateY(distance: f32): Transform {
-    return this.translateOnAxis(_yAxis, distance);
+    return this.translateOnAxis(yAxis, distance);
   }
 
   translateZ(distance: f32): Transform {
-    return this.translateOnAxis(_zAxis, distance);
+    return this.translateOnAxis(zAxis, distance);
   }
 
   localToWorld(vector: Vector3): Vector3 {

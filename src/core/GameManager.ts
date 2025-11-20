@@ -8,7 +8,7 @@ import { Pane3D } from 'rewild-ui';
 import { Player } from './routing/Player';
 import { Clock } from './Clock';
 import { loadInitialLevels } from './GameLoader';
-import { World, ColliderDesc, RigidBodyDesc } from '@dimforge/rapier3d';
+import { World } from '@dimforge/rapier3d-compat';
 
 export class GameManager {
   renderer: Renderer;
@@ -17,6 +17,7 @@ export class GameManager {
   player: Player;
   camController: PointerLockController;
   clock: Clock;
+  RAPIER: typeof import('@dimforge/rapier3d-compat');
   physicsWorld: World;
   onUnlock: () => void;
   PointerLockChangedDelegate: (event: PointerLockEventType) => void;
@@ -48,7 +49,7 @@ export class GameManager {
 
       this.renderer.setCamController(this.camController, document.body);
       this.player.setCamera(this.renderer.perspectiveCam);
-      const stateMachine = await loadInitialLevels(this.player, this.renderer);
+      const stateMachine = await loadInitialLevels(this.player, this);
 
       if (!stateMachine) throw new Error('Could not load statemachine');
 
@@ -56,7 +57,7 @@ export class GameManager {
       this.clock.start();
       this.camController.lock();
 
-      this.initPhysics();
+      await this.initPhysics();
 
       this.camController.dispatcher.add(this.PointerLockChangedDelegate);
       return true;
@@ -66,13 +67,20 @@ export class GameManager {
     }
   }
 
-  initPhysics() {
+  async initPhysics() {
+    this.RAPIER = await import('@dimforge/rapier3d-compat');
+    await this.RAPIER.init();
+
     // Use the RAPIER module here.
     let gravity = { x: 0.0, y: -9.81, z: 0.0 };
-    this.physicsWorld = new World(gravity);
+    this.physicsWorld = new this.RAPIER.World(gravity);
 
     // Create the ground
-    let groundColliderDesc = ColliderDesc.cuboid(10.0, 0.1, 10.0);
+    let groundColliderDesc = this.RAPIER.ColliderDesc.cuboid(
+      1000.0,
+      0.1,
+      1000.0
+    );
     this.physicsWorld.createCollider(groundColliderDesc);
 
     // // Create a dynamic rigid-body.

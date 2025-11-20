@@ -8,11 +8,13 @@ import {
 } from 'rewild-common';
 import { ICameraController } from '../../types/ICamera';
 import { IController } from './IController';
+import { xAxis, yAxis, zAxis } from '../core/Transform';
 
 const _lookDirection = new Vector3();
 const _spherical = new Spherical();
 const _target = new Vector3();
 const _targetPosition = new Vector3();
+const _v1 = new Vector3();
 
 export class FirstPersonControls implements IController {
   object: ICameraController;
@@ -31,6 +33,9 @@ export class FirstPersonControls implements IController {
   verticalMin: f32;
   verticalMax: f32;
   mouseDragOn: boolean;
+
+  moveCamera: boolean = true;
+  movementVector: Vector3 = new Vector3(0, 0, 0);
 
   // internals
   private _autoSpeedFactor: f32;
@@ -171,6 +176,8 @@ export class FirstPersonControls implements IController {
   }
 
   update(delta: f32) {
+    this.movementVector.set(0, 0, 0);
+
     if (this.enabled === false) return;
 
     if (this.heightSpeed) {
@@ -188,21 +195,34 @@ export class FirstPersonControls implements IController {
 
     const actualMoveSpeed = delta * this.movementSpeed;
 
-    if (this._moveForward || (this.autoForward && !this._moveBackward))
-      this.object.camera.transform.translateZ(
-        -(actualMoveSpeed + this._autoSpeedFactor)
-      );
-    if (this._moveBackward)
-      this.object.camera.transform.translateZ(actualMoveSpeed);
+    if (this.moveCamera) {
+      if (this._moveForward || (this.autoForward && !this._moveBackward))
+        this.object.camera.transform.translateZ(
+          -(actualMoveSpeed + this._autoSpeedFactor)
+        );
+      if (this._moveBackward)
+        this.object.camera.transform.translateZ(actualMoveSpeed);
 
-    if (this._moveLeft)
-      this.object.camera.transform.translateX(-actualMoveSpeed);
-    if (this._moveRight)
-      this.object.camera.transform.translateX(actualMoveSpeed);
+      if (this._moveLeft)
+        this.object.camera.transform.translateX(-actualMoveSpeed);
+      if (this._moveRight)
+        this.object.camera.transform.translateX(actualMoveSpeed);
 
-    if (this._moveUp) this.object.camera.transform.translateY(actualMoveSpeed);
-    if (this._moveDown)
-      this.object.camera.transform.translateY(-actualMoveSpeed);
+      if (this._moveUp)
+        this.object.camera.transform.translateY(actualMoveSpeed);
+      if (this._moveDown)
+        this.object.camera.transform.translateY(-actualMoveSpeed);
+    } else {
+      if (this._moveForward || (this.autoForward && !this._moveBackward))
+        this.translateOnAxis(zAxis, -(actualMoveSpeed + this._autoSpeedFactor));
+      if (this._moveBackward) this.translateOnAxis(zAxis, actualMoveSpeed);
+
+      if (this._moveLeft) this.translateOnAxis(xAxis, -actualMoveSpeed);
+      if (this._moveRight) this.translateOnAxis(xAxis, actualMoveSpeed);
+
+      if (this._moveUp) this.translateOnAxis(yAxis, actualMoveSpeed);
+      if (this._moveDown) this.translateOnAxis(yAxis, -actualMoveSpeed);
+    }
 
     let actualLookSpeed = delta * this.lookSpeed;
 
@@ -238,6 +258,12 @@ export class FirstPersonControls implements IController {
       _targetPosition.y,
       _targetPosition.z
     );
+  }
+
+  private translateOnAxis(axis: Vector3, distance: f32) {
+    _v1.copy(axis).applyQuaternion(this.object.camera.transform.quaternion);
+    this.movementVector.add(_v1.multiplyScalar(distance));
+    return this;
   }
 
   _setOrientation() {
