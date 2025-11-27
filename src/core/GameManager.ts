@@ -8,7 +8,8 @@ import { Pane3D } from 'rewild-ui';
 import { Player } from './routing/Player';
 import { Clock } from './Clock';
 import { loadInitialLevels } from './GameLoader';
-import { World } from '@dimforge/rapier3d-compat';
+import { RigidBody, World } from '@dimforge/rapier3d-compat';
+import { TerrainEvent } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
 
 export class GameManager {
   renderer: Renderer;
@@ -21,6 +22,8 @@ export class GameManager {
   physicsWorld: World;
   onUnlock: () => void;
   PointerLockChangedDelegate: (event: PointerLockEventType) => void;
+  TerrainEventDelegate: (event: TerrainEvent) => void;
+  terrainRapierBodyMap: Map<string, RigidBody>;
 
   constructor(player: Player, onUnlock: () => void) {
     this.hasInitialized = false;
@@ -30,6 +33,8 @@ export class GameManager {
     this.clock = new Clock();
     this.onUnlock = onUnlock;
     this.PointerLockChangedDelegate = this.handleOnPointerLockChange.bind(this);
+    this.TerrainEventDelegate = this.onTerrainEvent.bind(this);
+    this.terrainRapierBodyMap = new Map();
   }
 
   lock() {
@@ -41,6 +46,7 @@ export class GameManager {
       if (this.hasInitialized) return false; // Prevent re-initialization
       this.hasInitialized = true;
 
+      await this.initPhysics();
       await this.renderer.init(pane3D.canvas()!, false);
       this.camController = new PointerLockController(
         this.renderer.perspectiveCam,
@@ -51,19 +57,66 @@ export class GameManager {
       this.player.setCamera(this.renderer.perspectiveCam);
       const stateMachine = await loadInitialLevels(this.player, this);
 
+      this.renderer.terrainRenderer.dispatcher.add(this.TerrainEventDelegate);
+
       if (!stateMachine) throw new Error('Could not load statemachine');
 
       this.stateMachine = stateMachine;
       this.clock.start();
       this.camController.lock();
-
-      await this.initPhysics();
-
       this.camController.dispatcher.add(this.PointerLockChangedDelegate);
       return true;
     } catch (err: unknown) {
       console.error(err);
       return false;
+    }
+  }
+
+  private onTerrainEvent(event: TerrainEvent) {
+    switch (event.type) {
+      case 'chunk-loaded':
+        if (event.lod.lod === 0) {
+          // Create a stable trimesh collider for the ground using the loaded mesh
+          const mesh = event.lod.mesh;
+          if (mesh?.geometry?.vertices && mesh?.geometry?.indices) {
+            const verts = new Float32Array(mesh.geometry.vertices);
+            const inds = new Uint32Array(mesh.geometry.indices);
+            const triDesc = this.RAPIER.ColliderDesc.trimesh(verts, inds);
+            const rb = this.physicsWorld.createRigidBody(
+              this.RAPIER.RigidBodyDesc.fixed().setTranslation(
+                event.chunk.position.x,
+                0,
+                event.chunk.position.y
+              )
+            );
+            // Tag this rigid body so hits can be identified as terrain later
+            rb.userData = { isTerrain: true };
+            const collider = this.physicsWorld.createCollider(triDesc, rb);
+
+            const TERRAIN_BIT = 1;
+            const TERRAIN_GROUPS = (TERRAIN_BIT << 16) | TERRAIN_BIT;
+            collider.setCollisionGroups(TERRAIN_GROUPS);
+
+            this.terrainRapierBodyMap.set(event.chunk.id, rb);
+          }
+        }
+        break;
+      case 'chunk-disposed':
+        // Handle chunk disposed event if needed
+        const rb = this.terrainRapierBodyMap.get(event.chunk.id);
+        if (rb) {
+          // Remove all colliders associated with this rigid body
+          const numColliders = rb.numColliders();
+          for (let i = 0; i < numColliders; i++) {
+            const collider = rb.collider(i);
+            this.physicsWorld.removeCollider(collider, false);
+          }
+          this.physicsWorld.removeRigidBody(rb);
+          this.terrainRapierBodyMap.delete(
+            `${event.chunk.position.x},${event.chunk.position.y}`
+          );
+        }
+        break;
     }
   }
 
@@ -75,25 +128,30 @@ export class GameManager {
     let gravity = { x: 0.0, y: -9.81, z: 0.0 };
     this.physicsWorld = new this.RAPIER.World(gravity);
 
-    // Create the ground
-    let groundColliderDesc = this.RAPIER.ColliderDesc.cuboid(
-      1000.0,
-      0.1,
-      1000.0
-    );
-    this.physicsWorld.createCollider(groundColliderDesc);
+    // THIS WORKS
+    // let groundColliderDesc = this.RAPIER.ColliderDesc.cuboid(50.0, 0.1, 50.0);
+    // this.physicsWorld.createCollider(groundColliderDesc);
 
-    // // Create a dynamic rigid-body.
-    // let rigidBodyDesc = RigidBodyDesc.dynamic().setTranslation(
-    //   0.0,
-    //   1.0,
-    //   0.0
+    // THIS Doesnt WORK - but should
+    // Inside your initialized GameManager (after `await this.RAPIER.init()` and world creation)
+    // const R = this.RAPIER;
+
+    // const rows = 2;
+    // const cols = 2;
+    // const heights = new Float32Array([0, 0, 0, 0]);
+    // // Non-zero X/Z spacing; Y=1 for height scale.
+    // const hfDesc = R.ColliderDesc.heightfield(
+    //   rows,
+    //   cols,
+    //   heights,
+    //   new R.Vector3(1, 1, 1)
     // );
-    // let rigidBody = this.physicsWorld.createRigidBody(rigidBodyDesc);
 
-    // // Create a cuboid collider attached to the dynamic rigidBody.
-    // let colliderDesc = ColliderDesc.cuboid(0.5, 0.5, 0.5);
-    // let collider = this.physicsWorld.createCollider(colliderDesc, rigidBody);
+    // // Attach to a fixed rigid body (safer than collider-only)
+    // const rb = this.physicsWorld.createRigidBody(
+    //   R.RigidBodyDesc.fixed().setTranslation(0, 0, 0)
+    // );
+    // this.physicsWorld.createCollider(hfDesc, rb);
   }
 
   handleOnPointerLockChange(event: PointerLockEventType) {
@@ -126,9 +184,11 @@ export class GameManager {
   }
 
   dispose() {
-    this.camController.dispatcher.remove(this.PointerLockChangedDelegate);
     this.stateMachine?.dispose();
     this.renderer.dispose();
     this.camController.dispose();
+
+    this.camController.dispatcher.remove(this.PointerLockChangedDelegate);
+    this.renderer.terrainRenderer.dispatcher.remove(this.TerrainEventDelegate);
   }
 }
