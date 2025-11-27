@@ -1,12 +1,16 @@
 import { Renderer } from '../../Renderer';
 import { Camera } from '../../core/Camera';
-import { Vector2, Vector3 } from 'rewild-common';
-import { TerrainChunk } from './TerrainChunk';
+import { Dispatcher, Vector2, Vector3 } from 'rewild-common';
+import { LODMesh, TerrainChunk, TerrainChunkEvent } from './TerrainChunk';
 
 export class LOFInfo {
   lod: i32;
   visibleDstThreshold: f32;
 }
+
+export type TerrainEvent =
+  | { type: 'chunk-loaded'; chunk: TerrainChunk; lod: LODMesh }
+  | { type: 'chunk-disposed'; chunk: TerrainChunk };
 
 const viewerMoveThresholdForChunkUpdate = 25;
 const sqrViewerMoveThresholdForChunkUpdate =
@@ -24,6 +28,8 @@ export class TerrainRenderer {
     { lod: 5, visibleDstThreshold: 800 },
     { lod: 6, visibleDstThreshold: 1000 },
   ];
+  dispatcher: Dispatcher<TerrainEvent>;
+  private onChunkLoadedDelegate: (event: TerrainChunkEvent) => void;
 
   _hasInitiallyUpdatedTerrain: boolean = false;
   readonly mapChunkSizeLod = 241;
@@ -33,6 +39,8 @@ export class TerrainRenderer {
     this.terrainChunks = new Map();
     this.viewerPosition = new Vector3();
     this.terrainChunksVisibleLastUpdate = [];
+    this.dispatcher = new Dispatcher<TerrainEvent>();
+    this.onChunkLoadedDelegate = this.onChunkLoaded.bind(this);
   }
 
   get maxViewDst() {
@@ -43,6 +51,14 @@ export class TerrainRenderer {
     const mapChunkSize = this.mapChunkSizeLod;
     this.chunkSize = mapChunkSize - 1;
     this.chunksVisibleInViewDst = Math.round(this.maxViewDst / mapChunkSize);
+  }
+
+  private onChunkLoaded(event: TerrainChunkEvent) {
+    this.dispatcher.dispatch({
+      type: 'chunk-loaded',
+      chunk: event.chunk,
+      lod: event.mesh,
+    });
   }
 
   get levelOfDetail() {
@@ -110,6 +126,8 @@ export class TerrainRenderer {
             this.mapChunkSizeLod,
             this.detailLevels
           );
+
+          newChunk.dispatcher.add(this.onChunkLoadedDelegate);
           newChunk.visible = false;
           renderer.scene.addChild(newChunk.transform);
           this.terrainChunks.set(mapId, newChunk);
@@ -148,7 +166,10 @@ export class TerrainRenderer {
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {}
 
   dispose() {
+    const dispatcher = this.dispatcher;
     for (const chunk of this.terrainChunks.values()) {
+      dispatcher.dispatch({ type: 'chunk-disposed', chunk });
+      chunk.dispatcher.remove(this.onChunkLoadedDelegate);
       chunk.dispose();
     }
     this.terrainChunks.clear();

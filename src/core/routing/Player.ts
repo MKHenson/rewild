@@ -28,8 +28,9 @@ export class Player extends Node {
   capsuleBody: RigidBody;
   collider: Collider;
   controller: IController;
-  private verticalVelocity: f32 = 0.0;
-  private grounded: boolean = false;
+  verticalVelocity: f32 = 0.0;
+  grounded: boolean = false;
+  terrainLoaded: boolean = false;
 
   constructor(name: string, autoDispose: boolean = false) {
     super(name, autoDispose);
@@ -61,9 +62,12 @@ export class Player extends Node {
       this.rapierWorld = stateData.gameManager.physicsWorld;
 
       // Create kinematic position-based rigid body (character controllers need kinematic bodies)
-      // Capsule total half-height = height/2 + radius = 0.9/2 + 0.5 = 0.95; spawn so bottom rests on floor y=0.
       const rigidBodyDesc =
-        RigidBodyDesc.kinematicPositionBased().setTranslation(0, 0.95, -10);
+        RigidBodyDesc.kinematicPositionBased().setTranslation(
+          this.cameraController.camera.transform.position.x,
+          this.cameraController.camera.transform.position.y - 1.8,
+          this.cameraController.camera.transform.position.z
+        );
 
       this.capsuleBody = this.rapierWorld.createRigidBody(rigidBodyDesc);
 
@@ -91,6 +95,40 @@ export class Player extends Node {
   }
 
   onUpdate(delta: f32, total: u32): void {
+    const stateData = this.stateMachine?.data as StateMachineData;
+    const R = stateData?.gameManager?.RAPIER;
+    // Raycast below to decide if gravity should be enabled.
+    let gravityEnabled = true;
+
+    // Only turn on gravity if terrain is loaded below player
+    if (!this.terrainLoaded && R && this.rapierWorld && this.capsuleBody) {
+      const pos = this.capsuleBody.translation();
+      const origin = { x: pos.x, y: pos.y + 2, z: pos.z };
+      const dir = { x: 0, y: -1, z: 0 };
+      const ray = new R.Ray(origin, dir);
+      const maxToi = 100.0;
+      const solid = true;
+
+      // Only consider terrain colliders via InteractionGroups filter
+      const TERRAIN_BIT = 1;
+      const TERRAIN_GROUPS = (TERRAIN_BIT << 16) | TERRAIN_BIT;
+
+      const hit = this.rapierWorld.castRay(
+        ray,
+        maxToi,
+        solid,
+        R.QueryFilterFlags.EXCLUDE_DYNAMIC | R.QueryFilterFlags.EXCLUDE_SENSORS,
+        TERRAIN_GROUPS,
+        undefined,
+        this.capsuleBody
+      );
+
+      if (hit) {
+        this.terrainLoaded = true;
+      }
+
+      gravityEnabled = !!hit;
+    }
     const pointerController = this.controller as PointerLockController;
     const movementVector = pointerController.movementVector;
 
@@ -103,13 +141,17 @@ export class Player extends Node {
     }
 
     // Gravity integration using velocity for kinematic body.
-    const gravity = -9.81; // m/s^2
+    const gravity = gravityEnabled ? -9.81 : 0.0; // m/s^2
     const dt = delta / 0.5; // delta received in ms
-    if (!this.grounded) this.verticalVelocity += gravity * dt;
+
+    // Disable gravity/vertical movement if no terrain is detected below
+    if (!gravityEnabled) {
+      this.verticalVelocity = 0.0;
+    } else if (!this.grounded) this.verticalVelocity += gravity * dt;
     else if (this.verticalVelocity <= 0.0) this.verticalVelocity = 0.0; // keep upward velocity if jump just applied
     const desiredMove = new RapierVector3(
       movementVector.x,
-      this.verticalVelocity * dt,
+      gravityEnabled ? this.verticalVelocity * dt : 0.0,
       movementVector.z
     );
 
@@ -120,6 +162,7 @@ export class Player extends Node {
 
     // Read the result.
     let correctedMovement = this.characterController.computedMovement();
+
     // Treat as grounded only if descending or stationary vertically.
     const controllerGrounded = this.characterController.computedGrounded();
     this.grounded = controllerGrounded && this.verticalVelocity <= 0.0;

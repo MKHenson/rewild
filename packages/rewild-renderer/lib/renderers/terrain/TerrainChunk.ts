@@ -1,4 +1,4 @@
-import { Box3, Vector2, Vector3 } from 'rewild-common';
+import { Box3, Dispatcher, Vector2, Vector3 } from 'rewild-common';
 import { TerrainPass } from '../../materials/TerrainPass';
 import { Mesh } from '../../core/Mesh';
 import { LOFInfo, TerrainRenderer } from './TerrainRenderer';
@@ -11,6 +11,11 @@ import { Raycaster, Intersection } from '../../core/Raycaster';
 
 const temp: Vector3 = new Vector3();
 
+export type TerrainChunkEvent = {
+  type: 'mesh-loaded';
+  mesh: LODMesh;
+  chunk: TerrainChunk;
+};
 export class TerrainChunk implements IComponent {
   position: Vector2;
   _visible: boolean = false;
@@ -19,6 +24,8 @@ export class TerrainChunk implements IComponent {
   detailLevels: LOFInfo[];
   lodMesh: LODMesh[];
   chunkSize: i32;
+  dispatcher: Dispatcher<TerrainChunkEvent>;
+  id: string;
 
   constructor(
     coord: Vector2,
@@ -26,9 +33,11 @@ export class TerrainChunk implements IComponent {
     chunkSize: i32,
     detailLevels: LOFInfo[]
   ) {
+    this.id = `${coord.x},${coord.y}`;
     this.position = coord.multiplyScalar(size);
     this.chunkSize = chunkSize;
     this.detailLevels = detailLevels;
+    this.dispatcher = new Dispatcher<TerrainChunkEvent>();
 
     this.lodMesh = new Array<LODMesh>(detailLevels.length);
 
@@ -39,7 +48,7 @@ export class TerrainChunk implements IComponent {
     for (let i = 0; i < detailLevels.length; i++) {
       this.lodMesh[i] = new LODMesh(
         detailLevels[i].lod,
-        this.transform,
+        this,
         this.position,
         chunkSize
       );
@@ -127,18 +136,19 @@ export class LODMesh {
   lod: i32;
   position: Vector2;
   hasRequestedMesh: boolean;
-  transform: Transform;
+  chunk: TerrainChunk;
   chunkSize: i32;
+  heights: Float32Array;
 
   constructor(
     lod: i32,
-    transform: Transform,
+    chunk: TerrainChunk,
     position: Vector2,
     chunkSize: i32
   ) {
     this.lod = lod;
     this.hasRequestedMesh = false;
-    this.transform = transform;
+    this.chunk = chunk;
     this.chunkSize = chunkSize;
     this.position = position;
   }
@@ -181,6 +191,11 @@ export class LODMesh {
       geometry.indices = indices;
       geometry.computeNormals();
 
+      this.heights = new Float32Array(vertices.length / 3);
+      for (let i = 0, j = 0; i < vertices.length; i += 3, j++) {
+        this.heights[j] = vertices[i + 1];
+      }
+
       terrainTexture.load(renderer);
       geometry.build(renderer.device);
 
@@ -193,7 +208,12 @@ export class LODMesh {
       ).gpuTexture;
 
       this.mesh = new Mesh(geometry, terrainPass);
-      this.transform.addChild(this.mesh.transform);
+      this.chunk.transform.addChild(this.mesh.transform);
+      this.chunk.dispatcher.dispatch({
+        type: 'mesh-loaded',
+        mesh: this,
+        chunk: this.chunk,
+      });
 
       workerTest.terminate();
     };
