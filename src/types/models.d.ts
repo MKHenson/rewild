@@ -15,6 +15,7 @@ declare module 'models' {
   }
 
   export type Vector3 = [number, number, number];
+  export type Vector4 = [number, number, number, number];
   export type PropertyType =
     | 'size'
     | 'speed'
@@ -149,6 +150,7 @@ declare module 'models' {
     asset3D: {
       id: string;
       position: Vector3;
+      rotation: Vector4;
     }[];
   }
 
@@ -184,6 +186,22 @@ declare module 'models' {
   export interface IResource3D {
     materialId: string;
     geometryId: string;
+    physics?: {
+      mass?: number;
+      friction?: number;
+      restitution?: number;
+      bodyType?: 'dynamic' | 'fixed' | 'kinematic';
+      shape?:
+        | {
+            type: 'box';
+            // Full extents (width, height, depth). Will be converted to half-extents for Rapier.
+            size: [number, number, number];
+          }
+        | {
+            type: 'sphere';
+            radius: number;
+          };
+    };
   }
 
   export interface ICharacter extends IResource3D {

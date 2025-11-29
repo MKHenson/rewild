@@ -102,9 +102,12 @@ export class TreeNode extends Component<NodeProps> {
       if (!json) return;
 
       if (!this.props.node.onDrop!(json, this.props.node)) return;
+
+      json.node.parent = this.props.node;
       this.props.node.children = this.props.node.children
         ? this.props.node.children.concat(json.node)
         : [json.node];
+
       this.props.onDrop?.(this.props.node);
     };
 

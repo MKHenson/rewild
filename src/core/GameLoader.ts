@@ -58,7 +58,8 @@ export async function loadInitialLevels(
     for (const actor of container.actors) {
       let object = (await templateLoader.createResource(
         actor,
-        renderer
+        gameManager.renderer,
+        gameManager
       )) as Asset3D;
 
       containerRouter.addAsset(object);

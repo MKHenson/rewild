@@ -46,6 +46,10 @@ export class Container extends Node {
     return null;
   }
 
+  get assets(): IAsset[] {
+    return this.objects;
+  }
+
   addAsset(object: IAsset): void {
     this.objects.push(object);
     object.stateMachine = this.stateMachine;

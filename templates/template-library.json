@@ -5,7 +5,14 @@
       "type": "asset",
       "resource": {
         "materialId": "crate",
-        "geometryId": "box"
+        "geometryId": "box",
+        "physics": {
+          "bodyType": "dynamic",
+          "mass": 2.0,
+          "shape": { "type": "box", "size": [1, 1, 1] },
+          "friction": 0.8,
+          "restitution": 0.1
+        }
       }
     },
     {
@@ -13,7 +20,14 @@
       "type": "asset",
       "resource": {
         "materialId": "basketball",
-        "geometryId": "sphere"
+        "geometryId": "sphere",
+        "physics": {
+          "bodyType": "dynamic",
+          "mass": 1.0,
+          "shape": { "type": "sphere", "radius": 1.0 },
+          "friction": 0.5,
+          "restitution": 0.7
+        }
       }
     },
     {

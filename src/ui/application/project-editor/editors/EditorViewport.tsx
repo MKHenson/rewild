@@ -6,9 +6,9 @@ import {
   compelteDragDrop,
   theme,
 } from 'rewild-ui';
-import { Renderer } from 'rewild-renderer';
+import { Mesh, Renderer } from 'rewild-renderer';
 import { projectStore, ProjectStoreEvents } from 'src/ui/stores/ProjectStore';
-import { Subscriber, Vector2 } from 'rewild-common';
+import { Quaternion, Subscriber, Vector2, Vector3 } from 'rewild-common';
 import {
   syncFromEditorResource,
   SyncRendererFromProject,
@@ -84,6 +84,17 @@ export class EditorViewport extends Component<Props> {
                 assetPodData.position[1],
                 assetPodData.position[2]
               );
+              if (assetPodData.rotation) {
+                createdResource.transform.rotation.setFromQuaternion(
+                  new Quaternion(
+                    assetPodData.rotation[0],
+                    assetPodData.rotation[1],
+                    assetPodData.rotation[2],
+                    assetPodData.rotation[3]
+                  )
+                );
+              }
+
               this.renderer.scene.addChild(createdResource.transform);
             }
           }
@@ -97,6 +108,20 @@ export class EditorViewport extends Component<Props> {
             );
             if (toRemove) this.renderer.scene.removeChild(toRemove);
           }
+        }
+      } else if (event.kind === 'node-removed') {
+        if (event.node.resource?.type === 'actor') {
+          const container = event.node.parent!;
+          projectStore.containerPods[container.resource!.id].asset3D =
+            projectStore.containerPods[container.resource!.id].asset3D.filter(
+              (asset) => asset.id !== event.node.resource!.id
+            );
+
+          const toRemove = this.renderer.scene.children.find(
+            (c) => c.id === event.node.resource!.id
+          );
+
+          if (toRemove) this.renderer.scene.removeChild(toRemove);
         }
       }
     };
@@ -160,7 +185,7 @@ export class EditorViewport extends Component<Props> {
 
       if (intersects.length > 0) {
         const intersection = intersects[0];
-        return intersection.point;
+        return intersection;
       }
 
       return null;
@@ -199,13 +224,49 @@ export class EditorViewport extends Component<Props> {
       const json = compelteDragDrop<ITreeNodeAction>(e);
       if (!json) return;
 
-      const point = get3DCoords(e.clientX, e.clientY);
+      const intersection = get3DCoords(e.clientX, e.clientY);
+      const point = intersection?.point;
 
       if (point && json.node.resource) {
+        const createdResource = (await this.templateLoader.createResource(
+          json.node.resource,
+          this.renderer
+        )) as Asset3D;
+
+        if (createdResource.transform.component instanceof Mesh) {
+          createdResource.transform.component.geometry.computeBoundingBox();
+          const bbox = createdResource.transform.component.geometry.boundingBox;
+          if (bbox) {
+            const size = bbox.getSize(new Vector3());
+            point.y += size.y / 2;
+          }
+        }
+
+        // get rotation quaternion from intersection face normal
+        const normal = intersection!.face!.normal;
+        const up = new Vector3(0, 1, 0);
+        const dot = up.dot(normal);
+        let rotation: [number, number, number, number];
+
+        if (dot < -0.9999) {
+          // 180 degree rotation
+          rotation = [0, 0, 1, 0];
+        } else if (dot > 0.9999) {
+          // No rotation
+          rotation = [0, 0, 0, 1];
+        } else {
+          const axis = up.cross(normal).normalize();
+          const angle = Math.acos(dot);
+          const halfAngle = angle / 2;
+          const s = Math.sin(halfAngle);
+          rotation = [axis.x * s, axis.y * s, axis.z * s, Math.cos(halfAngle)];
+        }
+
         // Update the container pod with the transform position
         projectStore.containerPods[activeContainerId].asset3D.push({
           id: json.node.resource.id,
           position: [point.x, point.y, point.z],
+          rotation,
         });
 
         // Add the node to the scene graph
@@ -216,11 +277,10 @@ export class EditorViewport extends Component<Props> {
 
         sceneGraphStoreProxy.selectedResource = newNode.resource || null;
 
-        const createdResource = (await this.templateLoader.createResource(
-          json.node.resource,
-          this.renderer
-        )) as Asset3D;
         createdResource.transform.position.set(point.x, point.y, point.z);
+        createdResource.transform.rotation.setFromQuaternion(
+          new Quaternion(rotation[0], rotation[1], rotation[2], rotation[3])
+        );
         this.renderer.scene.addChild(createdResource.transform);
       }
     };

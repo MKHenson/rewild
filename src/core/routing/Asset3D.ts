@@ -1,5 +1,5 @@
 import { IResource } from 'models';
-import { Vector3 } from 'rewild-common';
+import { Quaternion, Vector3 } from 'rewild-common';
 import { Transform } from 'rewild-renderer';
 import { IAsset, IBehaviour, StateMachine } from 'rewild-routing';
 
@@ -9,6 +9,7 @@ export class Asset3D implements IAsset<IResource> {
   loaded: boolean;
   stateMachine: StateMachine | null;
   initialPosition: Vector3;
+  initialRotation: Quaternion;
   behaviours: IBehaviour[];
   data: IResource;
 
@@ -17,6 +18,7 @@ export class Asset3D implements IAsset<IResource> {
     this.loaded = false;
     this.behaviours = [];
     this.initialPosition = new Vector3();
+    this.initialRotation = new Quaternion();
   }
 
   get name(): string {
@@ -54,8 +56,16 @@ export class Asset3D implements IAsset<IResource> {
     }
   }
 
+  getBehavioursByName(name: string): IBehaviour[] {
+    return this.behaviours.filter((behaviour) => behaviour.name === name);
+  }
+
   mount(): void {
     this.transform.position.copy(this.initialPosition);
+    this.transform.rotation.setFromQuaternion(this.initialRotation);
+    this.behaviours.forEach((behavior) => {
+      behavior.onMount?.(this);
+    });
   }
 
   add(child: IAsset): IAsset {

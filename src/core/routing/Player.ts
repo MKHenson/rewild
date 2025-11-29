@@ -16,6 +16,7 @@ import {
   Vector3 as RapierVector3,
   Collider,
 } from '@dimforge/rapier3d-compat';
+import { RigidBodyBehaviour } from './behaviours/RigidBodyBehaviour';
 
 export class Player extends Node {
   cameraController: ICameraController;
@@ -84,6 +85,11 @@ export class Player extends Node {
       // Create the controller.
       this.characterController =
         this.rapierWorld.createCharacterController(offset);
+
+      // Allow the character to push dynamic bodies it collides with
+      this.characterController.setApplyImpulsesToDynamicBodies(true);
+      // Set a reasonable mass so impulses have effect (kg)
+      this.characterController.setCharacterMass(80.0);
     }
   }
 
@@ -125,6 +131,15 @@ export class Player extends Node {
 
       if (hit) {
         this.terrainLoaded = true;
+
+        this.stateMachine?.getAllAssets().forEach((asset) => {
+          const asset3D = asset as Asset3D;
+          asset3D.behaviours.forEach((behaviour) => {
+            if (behaviour.name !== 'rigid-body') return;
+            const rbBehaviour = behaviour as RigidBodyBehaviour;
+            rbBehaviour.rb.setEnabled(true);
+          });
+        });
       }
 
       gravityEnabled = !!hit;
