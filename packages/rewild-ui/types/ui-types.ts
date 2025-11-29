@@ -20,6 +20,7 @@ export type ITreeNode<T = any> = {
   iconSize?: 's' | 'xs';
   canSelect?: boolean;
   canRename?: boolean;
+  parent?: ITreeNode<T> | null;
   children?: ITreeNode<T>[] | null;
   resource?: T;
   onDragOver?: (data: IDragDropAction | null, node: ITreeNode<T>) => boolean;

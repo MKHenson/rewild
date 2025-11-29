@@ -21,6 +21,15 @@ export class ContainerWithState extends Container {
       const containerAssetData = pod.asset3D.find((a) => a.id === asset.id);
       if (containerAssetData && asset instanceof Asset3D) {
         asset.initialPosition.fromArray(containerAssetData.position);
+
+        if (containerAssetData.rotation) {
+          asset.initialRotation.set(
+            containerAssetData.rotation[0],
+            containerAssetData.rotation[1],
+            containerAssetData.rotation[2],
+            containerAssetData.rotation[3]
+          );
+        }
       }
     });
 

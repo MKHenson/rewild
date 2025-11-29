@@ -1,6 +1,8 @@
 import { EventDispatcher } from 'rewild-common';
 import { Node } from './Node';
 import { Portal } from './Portal';
+import { Container } from './Container';
+import { IAsset } from './IAsset';
 
 export class StateMachine<T = any> extends EventDispatcher {
   readonly nodes: Node[];
@@ -14,6 +16,42 @@ export class StateMachine<T = any> extends EventDispatcher {
     this.activeNodes = [];
     this.inactiveNodes = [];
     this.data = data;
+  }
+
+  getAllNodesByType(
+    type: typeof Node,
+    node?: Node,
+    toReturn: Node[] = []
+  ): Node[] {
+    const nodes = node?.children || this.nodes;
+
+    for (let i: i32 = 0, l = nodes.length; i < l; i++) {
+      const node = nodes[i];
+      this.getAllNodesByType(type, node, toReturn);
+
+      if (node instanceof type) {
+        toReturn.push(node);
+      }
+    }
+
+    return toReturn;
+  }
+
+  getAllAssets(node?: Node, toReturn: IAsset[] = []): IAsset[] {
+    const nodes = node?.children || this.nodes;
+
+    for (let i: i32 = 0, l = nodes.length; i < l; i++) {
+      const node = nodes[i];
+      this.getAllAssets(node, toReturn);
+
+      if (node instanceof Container) {
+        for (const asset of node.assets) {
+          toReturn.push(asset);
+        }
+      }
+    }
+
+    return toReturn;
   }
 
   getNode(name: string): Node | null {

@@ -24,6 +24,10 @@ export type SceneGraphEvents =
       nodes: ITreeNode<IResource>[];
     }
   | { kind: 'container-activated'; container: ITreeNode<IResource> }
+  | {
+      kind: 'node-removed';
+      node: ITreeNode<IResource>;
+    }
   | { kind: 'container-deactivated'; container: ITreeNode<IResource> };
 
 export class SceneGraphStore extends Store<ISceneGraphStore> {
@@ -132,6 +136,20 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
       } as ITreeNode<IResource>,
     ];
 
+    const reParentNodes = (
+      nodes: ITreeNode<IResource>[],
+      parent: ITreeNode<IResource> | null
+    ) => {
+      for (const node of nodes) {
+        node.parent = parent;
+        if (node.children) {
+          reParentNodes(node.children, node);
+        }
+      }
+    };
+
+    reParentNodes(this.nodes, null);
+
     this.dispatcher.dispatch({ kind: 'nodes-updated', nodes: this.nodes });
   }
 
@@ -190,8 +208,10 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
 
       return false;
     });
-
+    this.dispatcher.dispatch({ kind: 'node-removed', node: node });
     this.dispatcher.dispatch({ kind: 'nodes-updated', nodes: this.nodes });
+
+    node.parent = null;
   };
 
   createChildNode(selectedNode: ITemplateTreeNode) {
@@ -207,6 +227,7 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
     if (parent && !parent.children) parent.children = [];
 
     let nodes = parent?.children || this.nodes;
+    node.parent = parent || null;
 
     nodes.push(node);
     this.dispatcher.dispatch({ kind: 'nodes-updated', nodes: this.nodes });
