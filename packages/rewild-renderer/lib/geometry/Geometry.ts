@@ -23,7 +23,7 @@ const _obj = new Transform();
 export class Geometry {
   requiresBuild: boolean = true;
   vertices: Float32Array;
-  indices?: Uint16Array;
+  indices?: Uint32Array;
   normals?: Float32Array;
   uvs?: Float32Array;
   uvs1?: Float32Array;
@@ -321,7 +321,7 @@ export class Geometry {
         usage: GPUBufferUsage.INDEX,
         mappedAtCreation: true,
       });
-      new Uint16Array(this.indexBuffer.getMappedRange()).set(this.indices);
+      new Uint32Array(this.indexBuffer.getMappedRange()).set(this.indices);
       this.indexBuffer.unmap();
     }
 

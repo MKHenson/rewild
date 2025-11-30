@@ -40,6 +40,8 @@
     "@babel/preset-typescript": "^7.21.4",
     "@types/jest": "^29.5.0",
     "@webgpu/types": "0.1.21",
+    "@loaders.gl/core": "4.3.4",
+    "@loaders.gl/gltf": "4.3.4",
     "babel-jest": "^29.5.0",
     "cross-env": "7.0.3",
     "esbuild-plugin-copy": "^2.1.1",

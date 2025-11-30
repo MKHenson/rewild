@@ -129,7 +129,7 @@ export class DiffuseIntancedPass implements IMaterialPass {
     pass.setPipeline(this.cloudsPipeline);
     pass.setVertexBuffer(0, geometry.vertexBuffer);
     pass.setVertexBuffer(1, geometry.uvBuffer);
-    pass.setIndexBuffer(geometry.indexBuffer, 'uint16');
+    pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
 
     this.perMeshTracker.prepareMeshUniforms(renderer, pass, camera, meshes);
     const numIndices = geometry.indices!.length;

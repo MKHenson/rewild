@@ -50,6 +50,18 @@
           "shape": { "type": "sphere", "radius": 1.0 }
         }
       }
+    },
+    {
+      "name": "monkey-head",
+      "type": "asset",
+      "resource": {
+        "materialId": "earth",
+        "geometryId": "monkey",
+        "physics": {
+          "bodyType": "fixed",
+          "shape": { "type": "sphere", "radius": 1.0 }
+        }
+      }
     }
   ]
 }

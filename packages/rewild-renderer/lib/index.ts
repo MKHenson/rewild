@@ -7,4 +7,6 @@ export * from './core/Mesh';
 export * from './geometry/Geometry';
 export * from './core/lights';
 export * from './materials/IMaterialPass';
+export * from './materials/DiffusePass';
 export * from './input';
+export * from './core/GltfLoader';

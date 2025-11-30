@@ -119,7 +119,7 @@ export class AtmosphereRenderer {
     cloudPass.setPipeline(this.pipeline);
     cloudPass.setVertexBuffer(0, geometry!.vertexBuffer);
     cloudPass.setVertexBuffer(1, geometry!.uvBuffer);
-    cloudPass.setIndexBuffer(geometry!.indexBuffer, 'uint16');
+    cloudPass.setIndexBuffer(geometry!.indexBuffer, 'uint32');
     cloudPass.setBindGroup(0, this.bindGroup);
     cloudPass.drawIndexed(geometry!.indices!.length);
     cloudPass.end();

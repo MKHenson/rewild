@@ -164,7 +164,7 @@ export class BoxGeometryFactory {
     // prettier-ignore
     builder.buildPlane(0, 1, 2, -1, -1, width, height, -depth, widthSegments, heightSegments, 5, geometry); // nz
 
-    geometry.indices = new Uint16Array(builder.indices);
+    geometry.indices = new Uint32Array(builder.indices);
     geometry.vertices = new Float32Array(builder.vertices);
     geometry.normals = new Float32Array(builder.normals);
     geometry.uvs = new Float32Array(builder.uvs);

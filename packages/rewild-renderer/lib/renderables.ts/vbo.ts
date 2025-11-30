@@ -123,7 +123,7 @@ export class PlaneRenderer implements IRenderable {
     pass.setBindGroup(0, this.bindGroup);
     pass.setVertexBuffer(0, this.plane.vertexBuffer);
     pass.setVertexBuffer(1, this.plane.uvBuffer);
-    pass.setIndexBuffer(this.plane.indexBuffer, 'uint16');
+    pass.setIndexBuffer(this.plane.indexBuffer, 'uint32');
     pass.drawIndexed(this.plane.indices!.length);
   }
 }

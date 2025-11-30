@@ -1,3 +1,4 @@
+import { loadGLTF } from '../core/GltfLoader';
 import { BoxGeometryFactory } from '../geometry/BoxGeometryFactory';
 import { CapsuleGeometryFactory } from '../geometry/CapsuleGeometryFactory';
 import { Geometry } from '../geometry/Geometry';
@@ -34,6 +35,12 @@ export class GeometryManager {
         return geometry.build(device);
       })
     );
+
+    const geometry = new Geometry();
+    await loadGLTF(process.env.MEDIA_URL + 'models/monkey.glb', geometry);
+
+    // load geometry
+    this.addGeometry('monkey', geometry);
 
     this.initialized = true;
   }
