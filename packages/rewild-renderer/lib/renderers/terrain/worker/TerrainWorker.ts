@@ -34,7 +34,7 @@ self.onmessage = async (event: MessageEvent) => {
     meshData.vertices.map((v) => v.toArray()).flat()
   );
   const uvs = new Float32Array(meshData.uvs.map((v) => v.toArray()).flat());
-  const indices = new Uint16Array(meshData.triangles);
+  const indices = new Uint32Array(meshData.triangles);
 
   // Send the generated mesh data back to the main thread
   self.postMessage(

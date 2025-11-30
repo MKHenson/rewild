@@ -63,7 +63,7 @@ export class PlaneGeometryFactory {
       }
     }
 
-    geometry.indices = new Uint16Array(indices);
+    geometry.indices = new Uint32Array(indices);
     geometry.vertices = new Float32Array(vertices);
     geometry.normals = new Float32Array(normals);
     geometry.uvs = new Float32Array(uvs);

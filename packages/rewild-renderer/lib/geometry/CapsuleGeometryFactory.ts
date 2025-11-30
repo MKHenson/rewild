@@ -60,7 +60,7 @@ export class CapsuleGeometryFactory {
     // generate geometry
     builder.generateTorso(parameters, alpha);
 
-    geometry.indices = new Uint16Array(builder.indices);
+    geometry.indices = new Uint32Array(builder.indices);
     geometry.vertices = new Float32Array(builder.vertices);
     geometry.normals = new Float32Array(builder.normals);
     geometry.uvs = new Float32Array(builder.uvs);

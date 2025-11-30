@@ -147,7 +147,7 @@ export class DiffusePass implements IMaterialPass {
     pass.setVertexBuffer(0, geometry.vertexBuffer);
     pass.setVertexBuffer(1, geometry.uvBuffer);
     pass.setVertexBuffer(2, geometry.normalBuffer);
-    pass.setIndexBuffer(geometry.indexBuffer, 'uint16');
+    pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
 
     this.sharedUniformsTracker.prepareMeshUniforms(
       renderer,

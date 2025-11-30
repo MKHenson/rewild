@@ -34,6 +34,10 @@
           "templateId": "earth"
         },
         {
+          "name": "Monkey Head",
+          "templateId": "monkey-head"
+        },
+        {
           "name": "Crate",
           "templateId": "crate"
         },
