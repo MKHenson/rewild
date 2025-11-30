@@ -28,7 +28,8 @@ export type SceneGraphEvents =
       kind: 'node-removed';
       node: ITreeNode<IResource>;
     }
-  | { kind: 'container-deactivated'; container: ITreeNode<IResource> };
+  | { kind: 'container-deactivated'; container: ITreeNode<IResource> }
+  | { kind: 'resource-selected'; node: ITreeNode<IResource> | null };
 
 export class SceneGraphStore extends Store<ISceneGraphStore> {
   nodes: ITreeNode<IResource>[];
@@ -213,6 +214,11 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
 
     node.parent = null;
   };
+
+  setSelectedNode(node: ITreeNode<IResource> | null) {
+    this.defaultProxy.selectedResource = node ? node.resource || null : null;
+    this.dispatcher.dispatch({ kind: 'resource-selected', node });
+  }
 
   createChildNode(selectedNode: ITemplateTreeNode) {
     const newNode = selectedNode.template();

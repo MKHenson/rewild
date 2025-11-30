@@ -34,6 +34,8 @@ export class SceneGraph extends Component<Props> {
     const onSceneGraphEvent: Subscriber<SceneGraphEvents> = (event) => {
       if (event.kind === 'nodes-updated') {
         this.render();
+      } else if (event.kind === 'resource-selected' && event.node) {
+        setSelectedNodes([event.node]);
       }
     };
 

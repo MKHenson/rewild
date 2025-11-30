@@ -44,7 +44,11 @@
       "behaviors": ["spin"],
       "resource": {
         "materialId": "earth",
-        "geometryId": "sphere"
+        "geometryId": "sphere",
+        "physics": {
+          "bodyType": "fixed",
+          "shape": { "type": "sphere", "radius": 1.0 }
+        }
       }
     }
   ]

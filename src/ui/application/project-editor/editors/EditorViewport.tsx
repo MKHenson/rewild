@@ -160,9 +160,14 @@ export class EditorViewport extends Component<Props> {
     };
 
     const onClick = (event: MouseEvent) => {
-      const point = get3DCoords(event.clientX, event.clientY);
-      if (point) {
-        // Check if we're clicking something?
+      const intersection = get3DCoords(event.clientX, event.clientY);
+      if (intersection && intersection.object.component instanceof Mesh) {
+        const clickedNode = sceneGraphStore.findNodeById(
+          intersection.object.id
+        );
+        if (clickedNode) {
+          sceneGraphStore.setSelectedNode(clickedNode || null);
+        }
       }
     };
 
@@ -275,7 +280,7 @@ export class EditorViewport extends Component<Props> {
           sceneGraphStore.findNodeById(activeContainerId)
         );
 
-        sceneGraphStoreProxy.selectedResource = newNode.resource || null;
+        sceneGraphStore.setSelectedNode(newNode || null);
 
         createdResource.transform.position.set(point.x, point.y, point.z);
         createdResource.transform.rotation.setFromQuaternion(
@@ -290,6 +295,7 @@ export class EditorViewport extends Component<Props> {
     pane3D.ondragover = onDragOverEvent;
     pane3D.ondragleave = onDragLeave;
     pane3D.ondrop = onDrop;
+    pane3D.onclick = onClick;
 
     return () => {
       this.toggleAttribute(

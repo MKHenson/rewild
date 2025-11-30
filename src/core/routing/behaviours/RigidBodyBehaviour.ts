@@ -11,15 +11,17 @@ export class RigidBodyBehaviour implements IBehaviour {
   name: string;
   rb: RigidBody;
   quat: Quaternion;
+  isFixed: boolean;
 
   constructor(rb: RigidBody) {
     this.name = 'rigid-body';
     this.rb = rb;
     this.quat = new Quaternion();
+    this.isFixed = rb.isFixed();
   }
 
   onUpdate(delta: f32, total: u32, asset: IAsset): void {
-    if (asset instanceof Asset3D && asset.transform) {
+    if (!this.isFixed && asset instanceof Asset3D && asset.transform) {
       const position = this.rb.translation();
       const rotation = this.rb.rotation();
       this.quat.set(rotation.x, rotation.y, rotation.z, rotation.w);
