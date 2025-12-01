@@ -2,30 +2,13 @@ import { DiffuseIntancedPass } from '../materials/DiffuseIntancedPass';
 import { DiffusePass } from '../materials/DiffusePass';
 import { IMaterialPass } from '../materials/IMaterialPass';
 import { Renderer } from '../Renderer';
+import { IMaterialsTemplate } from './types';
 
 export interface IMaterial {
   type: 'diffuse' | 'diffuse-instanced';
   id: string;
   diffuseMap?: string;
 }
-
-const allMaterials: IMaterial[] = [
-  {
-    id: 'crate',
-    type: 'diffuse',
-    diffuseMap: 'crate',
-  },
-  {
-    id: 'basketball',
-    type: 'diffuse',
-    diffuseMap: 'basketball',
-  },
-  {
-    id: 'earth',
-    type: 'diffuse',
-    diffuseMap: 'earth',
-  },
-];
 
 export class MaterialManager {
   materials: Map<string, IMaterialPass>;
@@ -42,31 +25,35 @@ export class MaterialManager {
     return toRet;
   }
 
-  async initialize(renderer: Renderer) {
+  async initialize(renderer: Renderer, templates: IMaterialsTemplate) {
     if (this.initialized) return;
 
-    for (const material of allMaterials) {
+    templates.materials.forEach((materialTemplate) => {
       let materialPass: IMaterialPass;
 
-      switch (material.type) {
+      switch (materialTemplate.type) {
         case 'diffuse':
           materialPass = new DiffusePass();
-          if (material.diffuseMap)
+          if (materialTemplate.diffuseMap)
             (materialPass as DiffusePass).diffuse.texture =
-              renderer.textureManager.get(material.diffuseMap).gpuTexture;
+              renderer.textureManager.get(
+                materialTemplate.diffuseMap
+              ).gpuTexture;
           break;
         case 'diffuse-instanced':
           materialPass = new DiffuseIntancedPass();
-          if (material.diffuseMap)
+          if (materialTemplate.diffuseMap)
             (materialPass as DiffuseIntancedPass).diffuse.texture =
-              renderer.textureManager.get(material.diffuseMap).gpuTexture;
+              renderer.textureManager.get(
+                materialTemplate.diffuseMap
+              ).gpuTexture;
           break;
         default:
-          throw new Error(`Unknown material type: ${material.type}`);
+          throw new Error(`Unknown material type: ${materialTemplate.type}`);
       }
 
-      this.addMaterial(material.id, materialPass);
-    }
+      this.addMaterial(materialTemplate.name, materialPass);
+    });
 
     this.initialized = true;
   }

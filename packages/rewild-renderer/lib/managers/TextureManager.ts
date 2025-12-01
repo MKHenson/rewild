@@ -4,53 +4,9 @@ import { Renderer } from '../Renderer';
 import { ITexture } from '../textures/ITexture';
 import { TextureProperties } from '../textures/Texture';
 import { DataTexture } from '../textures/DataTexture';
+import { IMaterialsTemplate } from './types';
 
 const MEDIA_URL = process.env.MEDIA_URL;
-
-const assets: [string, string | string[]][] = [
-  ['grid', 'uv-grid.jpg'],
-  ['f-texture', 'utils/f-texture.png'],
-  ['bw-noise-64', 'utils/bw-noise-64.png'],
-  ['pebbles-512', 'utils/pebbles-512.png'],
-  ['rgba-noise-256', 'utils/rgba-noise-256.png'],
-  ['crate', 'crate-wooden.jpg'],
-  ['basketball', 'basketball.png'],
-  ['earth', 'earth-day-2k.jpg'],
-  [
-    'rocky-mountain-texture-seamless',
-    'nature/landscapes/rocky-mountain-texture-seamless.png',
-  ],
-  [
-    'ground-coastal-1',
-    'nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png',
-  ],
-  [
-    'block-concrete-4',
-    'construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png',
-  ],
-  [
-    'desert-sky',
-    [
-      'skyboxes/desert/px.jpg',
-      'skyboxes/desert/nx.jpg',
-      'skyboxes/desert/py.jpg',
-      'skyboxes/desert/ny.jpg',
-      'skyboxes/desert/pz.jpg',
-      'skyboxes/desert/nz.jpg',
-    ],
-  ],
-  [
-    'starry-sky',
-    [
-      'skyboxes/stars/left.png',
-      'skyboxes/stars/right.png',
-      'skyboxes/stars/top.png',
-      'skyboxes/stars/bottom.png',
-      'skyboxes/stars/front.png',
-      'skyboxes/stars/back.png',
-    ],
-  ],
-];
 
 export class TextureManager {
   textures: Map<string, ITexture>;
@@ -67,25 +23,28 @@ export class TextureManager {
     return toRet;
   }
 
-  async initialize(renderer: Renderer) {
+  async initialize(renderer: Renderer, template: IMaterialsTemplate) {
     if (this.initialized) return;
 
-    let texture: ITexture;
-    for (const asset of assets) {
-      if (asset[1] instanceof Array) {
+    template.textures.forEach((textureTemplate) => {
+      let texture: ITexture;
+      if (textureTemplate.type === 'cubemap' && textureTemplate.urls) {
         texture = new BitmapCubeTexture(
-          new TextureProperties(asset[0]),
-          asset[1].map((url) => MEDIA_URL + url)
+          new TextureProperties(textureTemplate.name),
+          textureTemplate.urls.map((url) => MEDIA_URL + url)
+        );
+      } else if (textureTemplate.url) {
+        texture = new BitmapTexture(
+          new TextureProperties(textureTemplate.name),
+          MEDIA_URL + textureTemplate.url
         );
       } else {
-        texture = new BitmapTexture(
-          new TextureProperties(asset[0]),
-          MEDIA_URL + asset[1]
+        throw new Error(
+          `Texture template ${textureTemplate.name} is missing url(s)`
         );
       }
-
-      this.textures.set(asset[0], texture);
-    }
+      this.textures.set(textureTemplate.name, texture);
+    });
 
     this.createDataTextures();
 

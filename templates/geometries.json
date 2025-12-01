@@ -1,0 +1,10 @@
+{
+  "wardrobe": {
+    "type": "gltf",
+    "url": "models/wardrobe/wardrobe1.glb"
+  },
+  "monkey": {
+    "type": "gltf",
+    "url": "models/monkey.glb"
+  }
+}

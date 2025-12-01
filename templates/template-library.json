@@ -62,6 +62,18 @@
           "shape": { "type": "sphere", "radius": 1.0 }
         }
       }
+    },
+    {
+      "name": "wardrobe",
+      "type": "asset",
+      "resource": {
+        "materialId": "wardrobe",
+        "geometryId": "wardrobe",
+        "physics": {
+          "bodyType": "fixed",
+          "shape": { "type": "box", "size": [0.6, 1.7, 1] }
+        }
+      }
     }
   ]
 }

@@ -38,6 +38,10 @@
           "templateId": "monkey-head"
         },
         {
+          "name": "Wardrobe",
+          "templateId": "wardrobe"
+        },
+        {
           "name": "Crate",
           "templateId": "crate"
         },

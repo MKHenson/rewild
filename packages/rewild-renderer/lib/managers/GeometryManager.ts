@@ -5,6 +5,7 @@ import { Geometry } from '../geometry/Geometry';
 import { PlaneGeometryFactory } from '../geometry/PlaneGeometryFactory';
 import { SphereGeometryFactory } from '../geometry/SphereGeometryFactory';
 import { Renderer } from '../Renderer';
+import { IGeometryTemplates } from './types';
 
 export class GeometryManager {
   geometries: Map<string, Geometry>;
@@ -25,22 +26,29 @@ export class GeometryManager {
     if (this.initialized) return;
     const { device } = renderer;
 
+    const geometriesToLoad = (await fetch('/templates/geometries.json').then(
+      (res) => res.json()
+    )) as IGeometryTemplates;
+
     this.addGeometry('box', BoxGeometryFactory.new());
     this.addGeometry('capsule', CapsuleGeometryFactory.new());
     this.addGeometry('sphere', SphereGeometryFactory.new());
     this.addGeometry('plane', PlaneGeometryFactory.new());
+
+    for (const key in geometriesToLoad) {
+      const geometryTemplate = geometriesToLoad[key];
+      if (geometryTemplate.type === 'gltf') {
+        const geometry = new Geometry();
+        await loadGLTF(process.env.MEDIA_URL + geometryTemplate.url, geometry);
+        this.addGeometry(key, geometry);
+      }
+    }
 
     await Promise.all(
       Array.from(this.geometries.values()).map((geometry) => {
         return geometry.build(device);
       })
     );
-
-    const geometry = new Geometry();
-    await loadGLTF(process.env.MEDIA_URL + 'models/monkey.glb', geometry);
-
-    // load geometry
-    this.addGeometry('monkey', geometry);
 
     this.initialized = true;
   }
@@ -54,7 +62,7 @@ export class GeometryManager {
     this.initialized = false;
   }
 
-  addGeometry(id: string, geometry: Geometry) {
+  addGeometry(id: string, geometry: Geometry): Geometry {
     this.geometries.set(id, geometry);
     return geometry;
   }
