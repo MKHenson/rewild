@@ -1,0 +1,98 @@
+{
+  "textures": [
+    {
+      "name": "grid",
+      "url": "uv-grid.jpg"
+    },
+    {
+      "name": "f-texture",
+      "url": "utils/f-texture.png"
+    },
+    {
+      "name": "bw-noise-64",
+      "url": "utils/bw-noise-64.png"
+    },
+    {
+      "name": "pebbles-512",
+      "url": "utils/pebbles-512.png"
+    },
+    {
+      "name": "rgba-noise-256",
+      "url": "utils/rgba-noise-256.png"
+    },
+    {
+      "name": "crate",
+      "url": "crate-wooden.jpg"
+    },
+    {
+      "name": "wardrobe",
+      "url": "models/wardrobe/wardrobe.jpg"
+    },
+    {
+      "name": "basketball",
+      "url": "basketball.png"
+    },
+    {
+      "name": "earth",
+      "url": "earth-day-2k.jpg"
+    },
+    {
+      "name": "rocky-mountain-texture-seamless",
+      "url": "nature/landscapes/rocky-mountain-texture-seamless.png"
+    },
+    {
+      "name": "ground-coastal-1",
+      "url": "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png"
+    },
+    {
+      "name": "block-concrete-4",
+      "url": "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png"
+    },
+    {
+      "name": "desert-sky",
+      "type": "cubemap",
+      "urls": [
+        "skyboxes/desert/px.jpg",
+        "skyboxes/desert/nx.jpg",
+        "skyboxes/desert/py.jpg",
+        "skyboxes/desert/ny.jpg",
+        "skyboxes/desert/pz.jpg",
+        "skyboxes/desert/nz.jpg"
+      ]
+    },
+    {
+      "name": "starry-sky",
+      "type": "cubemap",
+      "urls": [
+        "skyboxes/stars/left.png",
+        "skyboxes/stars/right.png",
+        "skyboxes/stars/top.png",
+        "skyboxes/stars/bottom.png",
+        "skyboxes/stars/front.png",
+        "skyboxes/stars/back.png"
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "crate",
+      "type": "diffuse",
+      "diffuseMap": "crate"
+    },
+    {
+      "name": "basketball",
+      "type": "diffuse",
+      "diffuseMap": "basketball"
+    },
+    {
+      "name": "earth",
+      "type": "diffuse",
+      "diffuseMap": "earth"
+    },
+    {
+      "name": "wardrobe",
+      "type": "diffuse",
+      "diffuseMap": "wardrobe"
+    }
+  ]
+}

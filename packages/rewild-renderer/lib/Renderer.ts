@@ -19,6 +19,7 @@ import { SamplerManager } from './managers/SamplerManager';
 import { GeometryManager } from './managers/GeometryManager';
 import { MaterialManager } from './managers/MaterialManager';
 import { IController } from './input/IController';
+import { IMaterialsTemplate } from './managers/types';
 
 export class Renderer {
   device: GPUDevice;
@@ -123,10 +124,14 @@ export class Renderer {
     this.materialManager = new MaterialManager();
     this.mipmapGenerator = new MipMapGenerator();
 
+    const materialsTemplate = (await fetch('/templates/materials.json').then(
+      (res) => res.json()
+    )) as IMaterialsTemplate;
+
     await this.samplerManager.initialize(this);
-    await this.textureManager.initialize(this);
+    await this.textureManager.initialize(this, materialsTemplate);
     await this.geometryManager.initialize(this);
-    await this.materialManager.initialize(this);
+    await this.materialManager.initialize(this, materialsTemplate);
     await this.terrainRenderer.init(this);
 
     this.renderables = await Promise.all(
