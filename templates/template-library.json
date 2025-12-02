@@ -71,7 +71,7 @@
         "geometryId": "wardrobe",
         "physics": {
           "bodyType": "fixed",
-          "shape": { "type": "box", "size": [0.6, 1.7, 1] }
+          "shape": { "type": "box", "size": [1, 2, 0.65] }
         }
       }
     }
