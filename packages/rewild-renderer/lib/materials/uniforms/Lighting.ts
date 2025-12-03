@@ -5,8 +5,12 @@ import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 import { DirectionLight } from '../../core/lights/DirectionLight';
 
+const MAX_LIGHTS = 4;
+
 export class Lighting implements ISharedUniformBuffer {
-  lighting: Float32Array = new Float32Array(8);
+  lightingData: ArrayBuffer;
+  lightingFloats: Float32Array;
+  lightingInts: Uint32Array;
   private _direction: Vector3;
   private _color: Color;
 
@@ -20,6 +24,13 @@ export class Lighting implements ISharedUniformBuffer {
     this.requiresUpdate = true;
     this._direction = new Vector3();
     this._color = new Color();
+
+    // 8 floats per light * MAX_LIGHTS + 4 floats (numLights + padding)
+    const structSize = 8 * 4;
+    const totalSize = MAX_LIGHTS * structSize + 16;
+    this.lightingData = new ArrayBuffer(totalSize);
+    this.lightingFloats = new Float32Array(this.lightingData);
+    this.lightingInts = new Uint32Array(this.lightingData);
   }
 
   destroy(): void {
@@ -34,15 +45,8 @@ export class Lighting implements ISharedUniformBuffer {
 
     this.destroy();
 
-    const uniformBufferSize =
-      4 * 3 + // direction
-      4 * 1 + // intensity
-      4 * 3 + // color
-      4 * 1 + // padding
-      0;
-
     this.buffer = device.createBuffer({
-      size: uniformBufferSize,
+      size: this.lightingData.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -65,41 +69,47 @@ export class Lighting implements ISharedUniformBuffer {
 
     const direction = this._direction;
     const color = this._color;
-
-    // Set the direction and color of the light
-    this._direction.set(0, 1, 0);
-    let intensity = 0.0;
+    let lightCount = 0;
+    let offset = 0;
 
     for (const light of renderer.currentRenderList.lights) {
+      if (lightCount >= MAX_LIGHTS) break;
+
       if (light instanceof DirectionLight) {
         direction
           .subVectors(light.target.position, light.transform.position)
           .normalize();
 
+        // Transform light direction to view space using the view matrix rotation part
+        // The view matrix inverse rotation transforms world directions to view space
+        direction.transformDirection(camera.matrixWorldInverse).normalize();
         color.copy(light.color);
-        intensity += light.intensity;
+
+        this.lightingFloats[offset + 0] = direction.x;
+        this.lightingFloats[offset + 1] = direction.y;
+        this.lightingFloats[offset + 2] = direction.z;
+        this.lightingFloats[offset + 3] = light.intensity;
+        this.lightingFloats[offset + 4] = color.r;
+        this.lightingFloats[offset + 5] = color.g;
+        this.lightingFloats[offset + 6] = color.b;
+        this.lightingFloats[offset + 7] = 0.0; // Padding
+
+        offset += 8;
+        lightCount++;
       }
     }
 
-    // Transform light direction to view space using the view matrix rotation part
-    // The view matrix inverse rotation transforms world directions to view space
-    direction.transformDirection(camera.matrixWorldInverse).normalize();
-
-    this.lighting[0] = direction.x;
-    this.lighting[1] = direction.y;
-    this.lighting[2] = direction.z;
-    this.lighting[3] = intensity;
-    this.lighting[4] = color.r;
-    this.lighting[5] = color.g;
-    this.lighting[6] = color.b;
-    this.lighting[7] = 0.0; // Padding
+    // Set numLights
+    // The lights array takes MAX_LIGHTS * 8 floats.
+    // So numLights is at index MAX_LIGHTS * 8 in the float/int array.
+    this.lightingInts[MAX_LIGHTS * 8] = lightCount;
 
     device.queue.writeBuffer(
       this.buffer,
       0,
-      this.lighting.buffer,
-      this.lighting.byteOffset,
-      this.lighting.byteLength
+      this.lightingData,
+      0,
+      this.lightingData.byteLength
     );
   }
 }
