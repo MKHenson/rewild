@@ -8,10 +8,12 @@ import { Camera } from '../core/Camera';
 import { Projection } from './uniforms/Projection';
 import { InstanceMatrices } from './uniforms/InstanceMatrices';
 import { Diffuse } from './uniforms/Diffuse';
+import { Lighting } from './uniforms/Lighting';
 
 const sharedBindgroupIndex = 0;
 const projectionGroup = 1;
 const instancesGroup = 2;
+const lightingGroup = 3;
 
 export class DiffuseIntancedPass implements IMaterialPass {
   cloudsPipeline: GPURenderPipeline;
@@ -29,6 +31,7 @@ export class DiffuseIntancedPass implements IMaterialPass {
       this.diffuse,
       new Projection(projectionGroup),
       new InstanceMatrices(instancesGroup),
+      new Lighting(lightingGroup),
     ]);
   }
 
@@ -65,6 +68,17 @@ export class DiffuseIntancedPass implements IMaterialPass {
                 shaderLocation: 1,
                 offset: 0,
                 format: 'float32x2',
+              },
+            ],
+          },
+          {
+            arrayStride: 4 * 3,
+            attributes: [
+              {
+                // normal
+                shaderLocation: 2,
+                offset: 0,
+                format: 'float32x3',
               },
             ],
           },
@@ -116,7 +130,7 @@ export class DiffuseIntancedPass implements IMaterialPass {
   dispose(): void {}
 
   isGeometryCompatible(geometry: Geometry): boolean {
-    return !!(geometry.vertices && geometry.uvs);
+    return !!(geometry.vertices && geometry.uvs && geometry.normals);
   }
 
   render(
@@ -129,6 +143,7 @@ export class DiffuseIntancedPass implements IMaterialPass {
     pass.setPipeline(this.cloudsPipeline);
     pass.setVertexBuffer(0, geometry.vertexBuffer);
     pass.setVertexBuffer(1, geometry.uvBuffer);
+    pass.setVertexBuffer(2, geometry.normalBuffer);
     pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
 
     this.perMeshTracker.prepareMeshUniforms(renderer, pass, camera, meshes);
