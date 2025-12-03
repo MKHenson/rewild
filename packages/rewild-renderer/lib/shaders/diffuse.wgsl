@@ -5,13 +5,24 @@ struct Uniforms {
 }
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
 
-struct Lighting {
+const MAX_LIGHTS = 4;
+
+struct Light {
   direction : vec3f,
   intensity : f32,
   color : vec3f,
   padding : f32,
 }
-@group(2) @binding(0) var<uniform> lighting : Lighting;
+
+struct LightingUniforms {
+  lights : array<Light, MAX_LIGHTS>,
+  numLights : u32,
+  padding1 : f32,
+  padding2 : f32,
+  padding3 : f32,
+}
+
+@group(2) @binding(0) var<uniform> lighting : LightingUniforms;
 
 struct VertexInput {
     @location(0) position : vec4<f32>,
@@ -50,6 +61,13 @@ fn fs(
 ) -> @location(0) vec4f {
 
   let normalizedNormal = normalize(normal);
-  let directionLighting = dot(  normalizedNormal, -lighting.direction) * lighting.intensity * lighting.color;
-  return textureSample(myTexture, mySampler, fragUV) * vec4f(directionLighting, 1.0);
+  var totalLight = vec3f(0.0, 0.0, 0.0);
+
+  for (var i: u32 = 0; i < lighting.numLights; i++) {
+      let light = lighting.lights[i];
+      let diffuse = max(dot(normalizedNormal, -light.direction), 0.0);
+      totalLight += diffuse * light.intensity * light.color;
+  }
+
+  return textureSample(myTexture, mySampler, fragUV) * vec4f(totalLight, 1.0);
 }
