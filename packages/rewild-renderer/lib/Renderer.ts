@@ -20,8 +20,6 @@ import { GeometryManager } from './managers/GeometryManager';
 import { MaterialManager } from './managers/MaterialManager';
 import { IController } from './input/IController';
 import { IMaterialsTemplate } from './managers/types';
-import { DirectionLight } from './core/lights';
-import { Color } from 'rewild-common';
 
 export class Renderer {
   device: GPUDevice;
@@ -143,11 +141,6 @@ export class Renderer {
     this.lastTime = performance.now();
     this.delta = 0;
     this.totalDeltaTime = 0;
-
-    const ambient = new DirectionLight(new Color(0, 0, 1), 3);
-    ambient.transform.position.set(10, -1, 0);
-    ambient.target.position.set(0, 0, 0);
-    this.scene.addChild(ambient.transform);
 
     this.resizeRenderTargets();
     if (this.autoFrame) requestAnimationFrame(this.onFrameHandler);
