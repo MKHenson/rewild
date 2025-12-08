@@ -9,13 +9,13 @@ export class InstanceMatrices implements ISharedUniformBuffer {
   buffer: GPUBuffer;
   group: number;
   bindGroup: GPUBindGroup;
-  requiresUpdate: boolean;
+  requiresBuild: boolean;
   numInstances: number;
   private _normalMatrix: Matrix3;
 
   constructor(group: number) {
     this.group = group;
-    this.requiresUpdate = true;
+    this.requiresBuild = true;
     this.numInstances = 0;
     this._normalMatrix = new Matrix3();
   }
@@ -31,7 +31,7 @@ export class InstanceMatrices implements ISharedUniformBuffer {
 
     this.destroy();
 
-    this.requiresUpdate = false;
+    this.requiresBuild = false;
     if (this.numInstances === 0) return;
 
     // 16 floats for modelViewMatrix + 12 floats for normalMatrix (padded)
@@ -61,7 +61,7 @@ export class InstanceMatrices implements ISharedUniformBuffer {
 
   setNumInstances(numInstances: number): void {
     this.numInstances = numInstances;
-    this.requiresUpdate = true;
+    this.requiresBuild = true;
   }
 
   prepare(renderer: Renderer, camera: Camera, meshes: Mesh[]): void {

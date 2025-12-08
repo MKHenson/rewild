@@ -17,11 +17,11 @@ export class Lighting implements ISharedUniformBuffer {
   group: number;
   buffer: GPUBuffer;
   bindGroup: GPUBindGroup;
-  requiresUpdate: boolean;
+  requiresBuild: boolean;
 
   constructor(group: number) {
     this.group = group;
-    this.requiresUpdate = true;
+    this.requiresBuild = true;
     this._direction = new Vector3();
     this._color = new Color();
 
@@ -41,7 +41,7 @@ export class Lighting implements ISharedUniformBuffer {
 
   build(renderer: Renderer, pipelineLayout: GPUBindGroupLayout): void {
     const { device } = renderer;
-    this.requiresUpdate = false;
+    this.requiresBuild = false;
 
     this.destroy();
 

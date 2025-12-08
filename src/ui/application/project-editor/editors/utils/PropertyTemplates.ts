@@ -85,6 +85,10 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
     label: 'Intensity',
     valueType: 'float',
   },
+  radius: {
+    label: 'Radius',
+    valueType: 'float',
+  },
   'camera-transform': {
     label: 'Camera Transform',
     valueType: 'object',

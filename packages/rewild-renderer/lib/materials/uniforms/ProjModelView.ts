@@ -7,11 +7,11 @@ export class ProjModelView implements IPerMeshUniformBuffer {
   buffer: GPUBuffer;
   group: number;
   bindGroup: GPUBindGroup;
-  requiresUpdate: boolean;
+  requiresBuild: boolean;
 
   constructor(group: number) {
     this.group = group;
-    this.requiresUpdate = true;
+    this.requiresBuild = true;
   }
 
   destroy(): void {
@@ -22,7 +22,7 @@ export class ProjModelView implements IPerMeshUniformBuffer {
 
   build(renderer: Renderer, pipelineLayout: GPUBindGroupLayout): void {
     const { device } = renderer;
-    this.requiresUpdate = false;
+    this.requiresBuild = false;
 
     this.destroy();
 

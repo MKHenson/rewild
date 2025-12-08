@@ -93,6 +93,10 @@
       "name": "wardrobe",
       "type": "diffuse",
       "diffuseMap": "wardrobe"
+    },
+    {
+      "name": "basic-wireframe",
+      "type": "wireframe"
     }
   ]
 }
