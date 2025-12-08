@@ -31,6 +31,7 @@ declare module 'models' {
     | 'active'
     | 'geometry'
     | 'intensity'
+    | 'radius'
     | 'camera-transform';
   export type PropValueType =
     | 'string'
@@ -204,11 +205,18 @@ declare module 'models' {
     };
   }
 
+  export interface ILight {
+    radius: number;
+    color: Vector3;
+    intensity: number;
+  }
+
   export interface ICharacter extends IResource3D {
     abilities: string[];
   }
 
   export type ITemplateItem =
     | (ITemplateItemBase & { type: 'asset'; resource: IResource3D })
+    | (ITemplateItemBase & { type: 'light'; resource: ILight })
     | (ITemplateItemBase & { type: 'character'; resource: ICharacter });
 }

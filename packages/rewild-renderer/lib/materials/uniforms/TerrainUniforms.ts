@@ -6,7 +6,7 @@ import { Mesh } from '../../core/Mesh';
 export class TerrainUniforms implements ISharedUniformBuffer {
   group: number;
   bindGroup: GPUBindGroup;
-  requiresUpdate: boolean;
+  requiresBuild: boolean;
 
   private _albedoTexture: GPUTexture;
   private _texture: GPUTexture;
@@ -15,7 +15,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
   constructor(group: number) {
     this.group = group;
-    this.requiresUpdate = true;
+    this.requiresBuild = true;
   }
 
   destroy(): void {}
@@ -54,12 +54,12 @@ export class TerrainUniforms implements ISharedUniformBuffer {
       ],
     });
 
-    this.requiresUpdate = false;
+    this.requiresBuild = false;
   }
 
   set texture(texture: GPUTexture) {
     this._texture = texture;
-    this.requiresUpdate = true;
+    this.requiresBuild = true;
   }
 
   get texture(): GPUTexture {
@@ -68,7 +68,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
   set albedoTexture(texture: GPUTexture) {
     this._albedoTexture = texture;
-    this.requiresUpdate = true;
+    this.requiresBuild = true;
   }
 
   get albedoTexture(): GPUTexture {
@@ -77,7 +77,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
   set sampler(sampler: GPUSampler) {
     this._sampler = sampler;
-    this.requiresUpdate = true;
+    this.requiresBuild = true;
   }
 
   get sampler(): GPUSampler {
@@ -90,7 +90,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
   set seamlessSampler(sampler: GPUSampler) {
     this._seamlessSampler = sampler;
-    this.requiresUpdate = true;
+    this.requiresBuild = true;
   }
 
   setNumInstances(numInstances: number): void {}

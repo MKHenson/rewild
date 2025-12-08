@@ -6,14 +6,14 @@ import { Mesh } from '../../core/Mesh';
 export class Diffuse implements ISharedUniformBuffer {
   group: number;
   bindGroup: GPUBindGroup;
-  requiresUpdate: boolean;
+  requiresBuild: boolean;
 
   private _texture: GPUTexture;
   private _sampler: GPUSampler;
 
   constructor(group: number) {
     this.group = group;
-    this.requiresUpdate = true;
+    this.requiresBuild = true;
   }
 
   destroy(): void {}
@@ -39,12 +39,12 @@ export class Diffuse implements ISharedUniformBuffer {
       ],
     });
 
-    this.requiresUpdate = false;
+    this.requiresBuild = false;
   }
 
   set texture(texture: GPUTexture) {
     this._texture = texture;
-    this.requiresUpdate = true;
+    this.requiresBuild = true;
   }
 
   get texture(): GPUTexture {
@@ -53,7 +53,7 @@ export class Diffuse implements ISharedUniformBuffer {
 
   set sampler(sampler: GPUSampler) {
     this._sampler = sampler;
-    this.requiresUpdate = true;
+    this.requiresBuild = true;
   }
 
   get sampler(): GPUSampler {

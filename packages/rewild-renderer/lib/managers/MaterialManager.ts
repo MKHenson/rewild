@@ -1,6 +1,7 @@
 import { DiffuseIntancedPass } from '../materials/DiffuseIntancedPass';
 import { DiffusePass } from '../materials/DiffusePass';
 import { IMaterialPass } from '../materials/IMaterialPass';
+import { WireframePass } from '../materials/WireframePass';
 import { Renderer } from '../Renderer';
 import { IMaterialsTemplate } from './types';
 
@@ -39,6 +40,9 @@ export class MaterialManager {
               renderer.textureManager.get(
                 materialTemplate.diffuseMap
               ).gpuTexture;
+          break;
+        case 'wireframe':
+          materialPass = new WireframePass();
           break;
         case 'diffuse-instanced':
           materialPass = new DiffuseIntancedPass();

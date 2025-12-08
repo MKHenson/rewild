@@ -50,7 +50,7 @@ export class PerMeshTracker implements IMeshTracker {
     for (let i = 0, l = uniforms.length; i < l; i++) {
       uniform = uniforms[i];
 
-      if (uniform.requiresUpdate) {
+      if (uniform.requiresBuild) {
         uniform.build(
           renderer,
           material.cloudsPipeline.getBindGroupLayout(uniform.group)

@@ -6,7 +6,7 @@ import { Transform } from '../lib/core/Transform';
 export interface IUniformBuffer {
   group: number;
   bindGroup: GPUBindGroup;
-  requiresUpdate: boolean;
+  requiresBuild: boolean;
   destroy(): void;
   build(renderer: Renderer, pipelineLayout: GPUBindGroupLayout): void;
 }

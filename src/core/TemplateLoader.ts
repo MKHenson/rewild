@@ -31,6 +31,12 @@ export class TemplateLoader {
 
     if (resource?.type === 'player-start') {
       toReturn = new PlayerStart();
+    } else if (template?.type === 'light') {
+      const mesh = new Mesh(
+        renderer.geometryManager.get('sphere'),
+        renderer.materialManager.get('basic-wireframe')
+      );
+      toReturn = new Asset3D(mesh.transform);
     } else if (template?.type === 'asset') {
       if (template.resource.geometryId && template.resource.materialId) {
         const mesh = new Mesh(

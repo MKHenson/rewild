@@ -82,6 +82,24 @@
           "templateId": "directional-light"
         },
         {
+          "name": "Point",
+          "properties": [
+            {
+              "type": "intensity",
+              "value": 3.1
+            },
+            {
+              "type": "color",
+              "value": [1, 1, 1]
+            },
+            {
+              "type": "radius",
+              "value": 10
+            }
+          ],
+          "templateId": "point-light"
+        },
+        {
           "name": "Ambient",
           "properties": [
             {

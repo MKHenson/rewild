@@ -7,7 +7,7 @@ export interface IMaterialsTemplate {
   }[];
   materials: {
     name: string;
-    type: 'diffuse' | 'diffuse-instanced';
+    type: 'diffuse' | 'diffuse-instanced' | 'wireframe';
     diffuseMap?: string;
   }[];
 }
