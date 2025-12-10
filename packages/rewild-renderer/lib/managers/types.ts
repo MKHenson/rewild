@@ -9,6 +9,8 @@ export interface IMaterialsTemplate {
     name: string;
     type: 'diffuse' | 'diffuse-instanced' | 'wireframe';
     diffuseMap?: string;
+    color?: [number, number, number];
+    opacity?: number;
   }[];
 }
 

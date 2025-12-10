@@ -145,7 +145,7 @@ export class TrackballController implements IController {
     this.minZoom = 0;
     this.maxZoom = Infinity;
 
-    this.keys = ['KeyA' /*A*/, 'KeyS' /*S*/, 'KeyD' /*D*/];
+    this.keys = ['KeyA' /*A*/, 'KeyS' /*S*/, 'ShiftLeft' /*Shift*/];
 
     this.mouseButtons = {
       LEFT: MOUSE.ROTATE,

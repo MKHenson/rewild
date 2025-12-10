@@ -95,8 +95,10 @@
       "diffuseMap": "wardrobe"
     },
     {
-      "name": "basic-wireframe",
-      "type": "wireframe"
+      "name": "light-wireframe",
+      "type": "wireframe",
+      "color": [1.0, 1.0, 1.0],
+      "opacity": 0.1
     }
   ]
 }
