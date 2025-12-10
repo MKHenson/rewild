@@ -213,6 +213,17 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
     ) as Vector3;
   }
 
+  findObjectById(id: string): Transform | null {
+    if (this.id === id) return this;
+
+    for (const child of this.children) {
+      const found = child.findObjectById(id);
+      if (found) return found;
+    }
+
+    return null;
+  }
+
   /**
    * Rotates object to face the target position.
    * @param x - The x coordinate of the target position.

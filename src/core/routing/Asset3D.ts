@@ -1,4 +1,4 @@
-import { IResource } from 'models';
+import { IResource, PropertyType, PropValue } from 'models';
 import { Quaternion, Vector3 } from 'rewild-common';
 import { Transform } from 'rewild-renderer';
 import { IAsset, IBehaviour, StateMachine } from 'rewild-routing';
@@ -40,6 +40,15 @@ export class Asset3D implements IAsset<IResource> {
   async load() {
     this.loaded = true;
     return this;
+  }
+
+  buildObjectFromProperties(resource: IResource = this.data) {
+    const obj = resource.properties?.reduce((acc, cur) => {
+      acc[cur.type] = cur.value;
+      return acc;
+    }, {} as { [key in PropertyType]: PropValue });
+
+    return obj;
   }
 
   addBehavior(behavior: IBehaviour): void {

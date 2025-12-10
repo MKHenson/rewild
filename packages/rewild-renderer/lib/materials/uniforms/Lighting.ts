@@ -4,6 +4,7 @@ import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 import { DirectionLight } from '../../core/lights/DirectionLight';
+import { PointLight } from '../../core/lights/PointLight';
 
 const MAX_LIGHTS = 4;
 
@@ -12,6 +13,7 @@ export class Lighting implements ISharedUniformBuffer {
   lightingFloats: Float32Array;
   lightingInts: Uint32Array;
   private _direction: Vector3;
+  private _position: Vector3;
   private _color: Color;
 
   group: number;
@@ -23,6 +25,7 @@ export class Lighting implements ISharedUniformBuffer {
     this.group = group;
     this.requiresBuild = true;
     this._direction = new Vector3();
+    this._position = new Vector3();
     this._color = new Color();
 
     // 8 floats per light * MAX_LIGHTS + 4 floats (numLights + padding)
@@ -68,6 +71,7 @@ export class Lighting implements ISharedUniformBuffer {
     const { device } = renderer;
 
     const direction = this._direction;
+    const position = this._position;
     const color = this._color;
     let lightCount = 0;
     let offset = 0;
@@ -92,7 +96,23 @@ export class Lighting implements ISharedUniformBuffer {
         this.lightingFloats[offset + 4] = color.r;
         this.lightingFloats[offset + 5] = color.g;
         this.lightingFloats[offset + 6] = color.b;
-        this.lightingFloats[offset + 7] = 0.0; // Padding
+        this.lightingFloats[offset + 7] = -1.0; // Directional light
+
+        offset += 8;
+        lightCount++;
+      } else if (light instanceof PointLight) {
+        position.setFromMatrixPosition(light.transform.matrixWorld);
+        position.applyMatrix4(camera.matrixWorldInverse);
+        color.copy(light.color);
+
+        this.lightingFloats[offset + 0] = position.x;
+        this.lightingFloats[offset + 1] = position.y;
+        this.lightingFloats[offset + 2] = position.z;
+        this.lightingFloats[offset + 3] = light.intensity;
+        this.lightingFloats[offset + 4] = color.r;
+        this.lightingFloats[offset + 5] = color.g;
+        this.lightingFloats[offset + 6] = color.b;
+        this.lightingFloats[offset + 7] = light.radius; // Point light
 
         offset += 8;
         lightCount++;

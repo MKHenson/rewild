@@ -41,7 +41,7 @@ export class EditorViewport extends Component<Props> {
     const sceneGraphStoreProxy = this.observeStore(sceneGraphStore, (e) => {
       if (e === 'selectedContainerId') return this.render();
       if (e.includes('selectedResource.properties')) {
-        if (sceneGraphStore.target.selectedResource?.id === 'SKY') {
+        if (sceneGraphStore.target.selectedResource?.id) {
           syncFromEditorResource(
             sceneGraphStore.target.selectedResource.id,
             this.renderer
@@ -96,6 +96,7 @@ export class EditorViewport extends Component<Props> {
               }
 
               this.renderer.scene.addChild(createdResource.transform);
+              syncFromEditorResource(createdResource.id, this.renderer);
             }
           }
         }
@@ -163,7 +164,7 @@ export class EditorViewport extends Component<Props> {
       const intersection = get3DCoords(event.clientX, event.clientY);
       if (intersection && intersection.object.component instanceof Mesh) {
         const clickedNode = sceneGraphStore.findNodeById(
-          intersection.object.id
+          intersection.object.id || intersection.object.parent?.id || ''
         );
         if (clickedNode) {
           sceneGraphStore.setSelectedNode(clickedNode || null);

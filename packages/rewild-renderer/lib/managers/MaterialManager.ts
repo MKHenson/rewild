@@ -1,3 +1,4 @@
+import { Color } from 'rewild-common';
 import { DiffuseIntancedPass } from '../materials/DiffuseIntancedPass';
 import { DiffusePass } from '../materials/DiffusePass';
 import { IMaterialPass } from '../materials/IMaterialPass';
@@ -43,6 +44,14 @@ export class MaterialManager {
           break;
         case 'wireframe':
           materialPass = new WireframePass();
+          (materialPass as WireframePass).wireframeUniforms.color =
+            new Color().setRGB(
+              materialTemplate.color?.[0] ?? 1,
+              materialTemplate.color?.[1] ?? 1,
+              materialTemplate.color?.[2] ?? 1
+            );
+          (materialPass as WireframePass).wireframeUniforms.opacity =
+            materialTemplate.opacity || 1;
           break;
         case 'diffuse-instanced':
           materialPass = new DiffuseIntancedPass();

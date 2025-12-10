@@ -1,11 +1,12 @@
 import { IResource, ITemplateItems } from 'models';
 import { IAsset } from 'rewild-routing/lib/IAsset';
-import { Mesh, Renderer } from 'rewild-renderer';
+import { Mesh, PointLight, Renderer } from 'rewild-renderer';
 import { Asset3D } from './routing/Asset3D';
 import { behaviourManager } from './routing/BehaviourManager';
 import { PlayerStart } from './routing/PlayerStart';
 import { GameManager } from './GameManager';
 import { RigidBodyBehaviour } from './routing/behaviours/RigidBodyBehaviour';
+import { LightAsset } from './routing/LightAsset';
 
 export class TemplateLoader {
   templateLibrary: ITemplateItems;
@@ -32,11 +33,13 @@ export class TemplateLoader {
     if (resource?.type === 'player-start') {
       toReturn = new PlayerStart();
     } else if (template?.type === 'light') {
-      const mesh = new Mesh(
-        renderer.geometryManager.get('sphere'),
-        renderer.materialManager.get('basic-wireframe')
-      );
-      toReturn = new Asset3D(mesh.transform);
+      toReturn = new LightAsset(new PointLight());
+      if (toReturn instanceof LightAsset) {
+        toReturn.initializeValues(resource || template.resource);
+
+        // If no game manager then its in the editor
+        if (!gameManager) toReturn.addVisualHelper(renderer);
+      }
     } else if (template?.type === 'asset') {
       if (template.resource.geometryId && template.resource.materialId) {
         const mesh = new Mesh(
@@ -117,6 +120,8 @@ export class TemplateLoader {
     toReturn.name = resource.name;
     toReturn.id = resource.id;
     toReturn.data = resource;
+    if (toReturn instanceof Asset3D) toReturn.transform.name = resource.name;
+
     return toReturn;
   }
 }

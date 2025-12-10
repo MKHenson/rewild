@@ -6,10 +6,10 @@ struct Uniforms {
 const MAX_LIGHTS = 4;
 
 struct Light {
-  direction : vec3f,
+  positionOrDirection : vec3f,
   intensity : f32,
   color : vec3f,
-  padding : f32,
+  range : f32,
 }
 
 struct LightingUniforms {
@@ -41,6 +41,7 @@ struct VertexOutput {
   @builtin(position) Position : vec4f,
   @location(0) fragUV : vec2f,
   @location(1) normal : vec3f,
+  @location(2) viewPosition : vec3f,
 }
 
 
@@ -56,6 +57,7 @@ fn vs(
   var mvPosition = vec4<f32>( input.position.xyz, 1.0 );
   mvPosition = modelViewMatrix * mvPosition;
   output.Position = uniforms.projMatrix * mvPosition;
+  output.viewPosition = mvPosition.xyz;
 
   output.normal = transform.normalMatrix * input.normal;
 
@@ -69,15 +71,32 @@ fn vs(
 @fragment
 fn fs(
   @location(0) fragUV: vec2f,
-  @location(1) normal: vec3f
+  @location(1) normal: vec3f,
+  @location(2) viewPosition: vec3f
 ) -> @location(0) vec4f {
   let normalizedNormal = normalize(normal);
   var totalLight = vec3f(0.0, 0.0, 0.0);
 
   for (var i: u32 = 0; i < lighting.numLights; i++) {
       let light = lighting.lights[i];
-      let diffuse = max(dot(normalizedNormal, -light.direction), 0.0);
-      totalLight += diffuse * light.intensity * light.color;
+      var diffuse = 0.0;
+      var attenuation = 1.0;
+
+      if (light.range < 0.0) {
+        diffuse = max(dot(normalizedNormal, -light.positionOrDirection), 0.0);
+      } else {
+        let lightVec = light.positionOrDirection - viewPosition;
+        let distance = length(lightVec);
+        if (distance < light.range) {
+           let lightDir = normalize(lightVec);
+           diffuse = max(dot(normalizedNormal, lightDir), 0.0);
+           attenuation = max(0.0, 1.0 - distance / light.range);
+        } else {
+           attenuation = 0.0;
+        }
+      }
+
+      totalLight += diffuse * light.intensity * light.color * attenuation;
   }
 
   return textureSample(myTexture, mySampler, fragUV) * vec4f(totalLight, 1.0);
