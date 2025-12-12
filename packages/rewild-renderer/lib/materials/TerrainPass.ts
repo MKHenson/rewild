@@ -15,7 +15,7 @@ const lightingGroupIndex = 2;
 
 export class TerrainPass implements IMaterialPass {
   side: GPUFrontFace;
-  cloudsPipeline: GPURenderPipeline;
+  pipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
   sharedUniformsTracker: SharedUniformsTracker;
@@ -48,7 +48,7 @@ export class TerrainPass implements IMaterialPass {
       code: shader,
     });
 
-    this.cloudsPipeline = device.createRenderPipeline({
+    this.pipeline = device.createRenderPipeline({
       label: 'terrain render pipeline',
       layout: 'auto',
       vertex: {
@@ -132,7 +132,7 @@ export class TerrainPass implements IMaterialPass {
     meshes: Mesh[],
     geometry: Geometry
   ): void {
-    pass.setPipeline(this.cloudsPipeline);
+    pass.setPipeline(this.pipeline);
     pass.setVertexBuffer(0, geometry.vertexBuffer);
     pass.setVertexBuffer(1, geometry.uvBuffer);
     pass.setVertexBuffer(2, geometry.normalBuffer);

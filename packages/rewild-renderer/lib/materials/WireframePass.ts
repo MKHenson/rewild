@@ -13,7 +13,7 @@ const projectionIndex = 0;
 const wireframeBindgroupIndex = 1;
 
 export class WireframePass implements IMaterialPass {
-  cloudsPipeline: GPURenderPipeline;
+  pipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
   sharedUniformsTracker: SharedUniformsTracker;
@@ -39,7 +39,7 @@ export class WireframePass implements IMaterialPass {
       code: shader,
     });
 
-    this.cloudsPipeline = device.createRenderPipeline({
+    this.pipeline = device.createRenderPipeline({
       label: 'Wireframe Pass',
       layout: 'auto',
       vertex: {
@@ -117,7 +117,7 @@ export class WireframePass implements IMaterialPass {
     meshes: Mesh[],
     geometry: Geometry
   ): void {
-    pass.setPipeline(this.cloudsPipeline);
+    pass.setPipeline(this.pipeline);
     pass.setVertexBuffer(0, geometry.vertexBuffer);
     pass.setVertexBuffer(2, geometry.normalBuffer);
     pass.setIndexBuffer(geometry.indexBuffer, 'uint32');

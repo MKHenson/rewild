@@ -53,7 +53,7 @@ export class PerMeshTracker implements IMeshTracker {
       if (uniform.requiresBuild) {
         uniform.build(
           renderer,
-          material.cloudsPipeline.getBindGroupLayout(uniform.group)
+          material.pipeline.getBindGroupLayout(uniform.group)
         );
       }
 

@@ -5,7 +5,7 @@ import { Mesh } from '../core/Mesh';
 import { Geometry } from '../geometry/Geometry';
 
 export interface IMaterialPass {
-  cloudsPipeline: GPURenderPipeline;
+  pipeline: GPURenderPipeline;
   requiresRebuild: boolean;
   side: GPUFrontFace;
   perMeshTracker?: IMeshTracker;
