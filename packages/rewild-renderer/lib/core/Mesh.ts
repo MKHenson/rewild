@@ -10,6 +10,7 @@ import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from '../materials/IMaterialPass';
 import { Face, Intersection, Raycaster } from './Raycaster';
 import { IComponent, Transform } from './Transform';
+import { IMeshComponent, IRaycaster } from '../../types/interfaces';
 
 const _sphere = new Sphere();
 const _ray = new Ray();
@@ -23,7 +24,7 @@ const _vC = new Vector3();
 const _intersectionPoint = new Vector3();
 const _inverseMatrix = new Matrix4();
 
-export class Mesh implements IComponent {
+export class Mesh implements IComponent, IMeshComponent {
   geometry: Geometry;
   material: IMaterialPass;
   transform: Transform;
@@ -77,48 +78,50 @@ export class Mesh implements IComponent {
     return target;
   }
 
-  raycast(raycaster: Raycaster, intersects: Intersection[]) {
-    const geometry = this.geometry;
-    const material = this.material;
-    const matrixWorld = this.transform.matrixWorld;
+  raycast(raycaster: IRaycaster, intersects: Intersection[]) {
+    if (raycaster instanceof Raycaster) {
+      const geometry = this.geometry;
+      const material = this.material;
+      const matrixWorld = this.transform.matrixWorld;
 
-    if (material === undefined) return;
+      if (material === undefined) return;
 
-    // test with bounding sphere in world space
+      // test with bounding sphere in world space
 
-    if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
+      if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
 
-    _sphere.copy(geometry.boundingSphere!);
-    _sphere.applyMatrix4(matrixWorld);
+      _sphere.copy(geometry.boundingSphere!);
+      _sphere.applyMatrix4(matrixWorld);
 
-    // check distance from ray origin to bounding sphere
+      // check distance from ray origin to bounding sphere
 
-    _ray.copy(raycaster.ray).recast(raycaster.near);
+      _ray.copy(raycaster.ray).recast(raycaster.near);
 
-    if (_sphere.containsPoint(_ray.origin) === false) {
-      if (_ray.intersectSphere(_sphere, _sphereHitAt) === null) return;
+      if (_sphere.containsPoint(_ray.origin) === false) {
+        if (_ray.intersectSphere(_sphere, _sphereHitAt) === null) return;
 
-      if (
-        _ray.origin.distanceToSquared(_sphereHitAt) >
-        (raycaster.far - raycaster.near) ** 2
-      )
-        return;
+        if (
+          _ray.origin.distanceToSquared(_sphereHitAt) >
+          (raycaster.far - raycaster.near) ** 2
+        )
+          return;
+      }
+
+      // convert ray to local space of mesh
+
+      _inverseMatrix.copy(matrixWorld).invert();
+      _ray.copy(raycaster.ray).applyMatrix4(_inverseMatrix);
+
+      // test with bounding box in local space
+
+      if (geometry.boundingBox !== null) {
+        if (_ray.intersectsBox(geometry.boundingBox) === false) return;
+      }
+
+      // test for intersections with geometry
+
+      this._computeIntersections(raycaster, intersects, _ray);
     }
-
-    // convert ray to local space of mesh
-
-    _inverseMatrix.copy(matrixWorld).invert();
-    _ray.copy(raycaster.ray).applyMatrix4(_inverseMatrix);
-
-    // test with bounding box in local space
-
-    if (geometry.boundingBox !== null) {
-      if (_ray.intersectsBox(geometry.boundingBox) === false) return;
-    }
-
-    // test for intersections with geometry
-
-    this._computeIntersections(raycaster, intersects, _ray);
   }
 
   _computeIntersections(

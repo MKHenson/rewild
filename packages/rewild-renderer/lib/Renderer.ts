@@ -20,6 +20,7 @@ import { GeometryManager } from './managers/GeometryManager';
 import { MaterialManager } from './managers/MaterialManager';
 import { IController } from './input/IController';
 import { IMaterialsTemplate } from './managers/types';
+import { GuiRenderer } from './renderables.ts/GuiRenderer';
 
 export class Renderer {
   device: GPUDevice;
@@ -45,6 +46,7 @@ export class Renderer {
 
   perspectiveCam: PerspectiveCamera;
   scene: Transform;
+  ui: Transform;
   currentRenderList: RenderList;
   atmosphere: AtmosphereSkybox;
   camController: IController;
@@ -54,6 +56,7 @@ export class Renderer {
   lastTime: number;
   delta: number;
   totalDeltaTime: number;
+  guiRenderer: GuiRenderer;
 
   private onFrameHandler: () => void;
 
@@ -62,6 +65,8 @@ export class Renderer {
     this.onFrameHandler = this.onFrame.bind(this);
     this.scene = new Transform();
     this.scene.matrixAutoUpdate = false;
+    this.ui = new Transform();
+    this.ui.matrixAutoUpdate = false;
     this.atmosphere = new AtmosphereSkybox();
     this.terrainRenderer = new TerrainRenderer();
     this.renderGroups = [];
@@ -77,6 +82,7 @@ export class Renderer {
     this.currentRenderList = new RenderList();
     this.initialized = false;
     this.canvas = canvas;
+    this.guiRenderer = new GuiRenderer();
     this.renderables = [];
 
     this.canvasSizeWatcher = new CanvasSizeWatcher(canvas);
@@ -138,6 +144,8 @@ export class Renderer {
       [new CubeRenderer()].map((renderable) => renderable.initialize(this))
     );
 
+    this.guiRenderer.initialize(this);
+
     this.lastTime = performance.now();
     this.delta = 0;
     this.totalDeltaTime = 0;
@@ -185,6 +193,7 @@ export class Renderer {
     this.samplerManager.dispose();
     this.geometryManager.dispose();
     this.materialManager.dispose();
+    this.geometryManager.dispose();
   }
 
   resizeRenderTargets() {
@@ -327,6 +336,7 @@ export class Renderer {
 
     // update scene graph
     this.scene.updateMatrixWorld();
+    this.ui.updateMatrixWorld();
 
     // update camera matrices and frustum
     if (pCamera.camera.transform.parent === null)
@@ -421,6 +431,29 @@ export class Renderer {
       postProcessingPass.end();
 
       device.queue.submit([postProcessingEncoder.finish()]);
+
+      // Now render any remaining renderables like the GUI
+      // Create a new encoder for the post-processing pass
+      const guiEncoder = device.createCommandEncoder({
+        label: 'GUI encoder',
+      });
+
+      const guiPass = guiEncoder.beginRenderPass({
+        colorAttachments: [
+          {
+            // view: renderTargetView,
+            // resolveTarget: context.getCurrentTexture().createView(),
+            view: context.getCurrentTexture().createView(),
+            clearValue: [0.0, 0.0, 0.0, 0.0],
+            loadOp: 'load',
+            storeOp: 'store',
+          },
+        ],
+      });
+
+      this.guiRenderer.render(this, guiPass);
+      guiPass.end();
+      device.queue.submit([guiEncoder.finish()]);
     }
   }
 }

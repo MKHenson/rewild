@@ -8,8 +8,9 @@ import {
   IQuatChangeListener,
   Event,
 } from 'rewild-common';
-import { Intersection, Raycaster } from './Raycaster';
+import { Intersection } from './Raycaster';
 import { Layers } from './Layers';
+import { IRaycaster } from '../../types/interfaces';
 
 const _v1 = new Vector3();
 const _q1 = new Quaternion();
@@ -33,7 +34,7 @@ export interface ITransformObserver {
 }
 
 export interface IComponent {
-  raycast: (raycaster: Raycaster, intersects: Intersection[]) => void;
+  raycast: (raycaster: IRaycaster, intersects: Intersection[]) => void;
 }
 
 export class Transform implements IQuatChangeListener, IEulerChangeListener {
@@ -105,7 +106,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
     this.rotation.setFromQuaternion(quat, Euler.DefaultOrder, false);
   }
 
-  raycast(raycaster: Raycaster, intersects: Intersection[]): void {
+  raycast(raycaster: IRaycaster, intersects: Intersection[]): void {
     this.component?.raycast(raycaster, intersects);
   }
 

@@ -4,14 +4,16 @@ struct Uniforms {
  
 struct Vertex {
   @location(0) position: vec2f,
-  @location(1) offset: vec2f,
-  @location(2) size: vec2f,
+  @location(1) uv: vec2f,
+  @location(2) offset: vec2f,
+  @location(3) size: vec2f,
 };
  
 struct VSOutput {
   @builtin(position) position: vec4f,
   @location(0) localPos: vec2f,
-  @location(1) size: vec2f
+  @location(1) size: vec2f,
+  @location(2) uv: vec2f
 };
  
 @group(0) @binding(0) var<uniform> uni: Uniforms;
@@ -36,6 +38,7 @@ struct VSOutput {
   vsOut.position = vec4f(clipSpace, 0.0, 1.0);
   vsOut.localPos = vert.position * vert.size;
   vsOut.size = vert.size;
+  vsOut.uv = vert.uv;
   return vsOut;
 }
  
@@ -51,5 +54,5 @@ struct VSOutput {
     discard;
   }
 
-  return vec4f(1.0, 0.0, 0.0, 0.6f);
+  return vec4f(1.0, vsOut.uv.x, vsOut.uv.y, 0.6f);
 }

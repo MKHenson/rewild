@@ -5,6 +5,7 @@ import { IMaterialPass } from '../materials/IMaterialPass';
 import { WireframePass } from '../materials/WireframePass';
 import { Renderer } from '../Renderer';
 import { IMaterialsTemplate } from './types';
+import { UIElementPass } from '../materials/UIElementPass';
 
 export interface IMaterial {
   type: 'diffuse' | 'diffuse-instanced';
@@ -29,6 +30,9 @@ export class MaterialManager {
 
   async initialize(renderer: Renderer, templates: IMaterialsTemplate) {
     if (this.initialized) return;
+
+    const uiMaterial = new UIElementPass();
+    this.addMaterial('ui-material', uiMaterial);
 
     templates.materials.forEach((materialTemplate) => {
       let materialPass: IMaterialPass;
