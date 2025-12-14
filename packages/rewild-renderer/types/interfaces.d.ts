@@ -1,4 +1,4 @@
-import { Renderer, Transform } from '../lib';
+import { Geometry, IMaterialPass, Renderer, Transform } from '../lib';
 import { Camera } from '../lib/core/Camera';
 
 interface IRenderable {
@@ -9,6 +9,9 @@ interface IRenderable {
 
 interface IMeshComponent {
   transform: Transform;
+  geometry: Geometry;
+  material: IMaterialPass;
+  visible: boolean;
 }
 
 export interface IRaycaster {

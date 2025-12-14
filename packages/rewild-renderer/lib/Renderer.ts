@@ -21,6 +21,7 @@ import { MaterialManager } from './managers/MaterialManager';
 import { IController } from './input/IController';
 import { IMaterialsTemplate } from './managers/types';
 import { GuiRenderer } from './renderables.ts/GuiRenderer';
+import { UIElement } from './core/UiElement';
 
 export class Renderer {
   device: GPUDevice;
@@ -256,11 +257,21 @@ export class Renderer {
       this.projectObject(unchecked(transform.children[i]), camera);
   }
 
-  organizeMeshes() {
+  collectUIElements(transform: Transform): void {
+    if (transform.visible === false) return;
+
+    if (transform.component instanceof UIElement) {
+      this.currentRenderList.uiElements.push(transform);
+    }
+
+    for (let i = 0, l = transform.children.length; i < l; i++)
+      this.collectUIElements(unchecked(transform.children[i]));
+  }
+
+  organizeMeshes(transforms: Transform[]) {
     // Organize all meshes so that they are grouped by material as well as geometry
     // This is done to minimize the number of draw calls
 
-    const transforms = this.currentRenderList.solids;
     const renderList = this.renderGroups;
     renderList.length = 0; // Clear the render list
 
@@ -274,7 +285,10 @@ export class Renderer {
 
       const component = transform.component;
 
-      if (component && component instanceof Mesh) {
+      if (
+        (component && component instanceof Mesh) ||
+        component instanceof UIElement
+      ) {
         mesh = component as Mesh;
 
         if (mesh.visible === false) continue;
@@ -347,6 +361,7 @@ export class Renderer {
 
     // Project objects in the scene. Collect those that are to be rendererd
     this.projectObject(this.scene, pCamera.camera);
+    this.collectUIElements(this.ui);
 
     let transform: Transform | null;
     const solids = this.currentRenderList.solids;
@@ -362,7 +377,7 @@ export class Renderer {
       transform.normalMatrix.getNormalMatrix(transform.modelViewMatrix);
     }
 
-    const renderList = this.organizeMeshes();
+    const renderList = this.organizeMeshes(this.currentRenderList.solids);
 
     // Gets the device render targets ready. Checks for things like canvas resize
     if (this.canvasSizeWatcher.hasResized()) {
@@ -432,6 +447,10 @@ export class Renderer {
 
       device.queue.submit([postProcessingEncoder.finish()]);
 
+      const uiRenderList = this.organizeMeshes(
+        this.currentRenderList.uiElements
+      );
+
       // Now render any remaining renderables like the GUI
       // Create a new encoder for the post-processing pass
       const guiEncoder = device.createCommandEncoder({
@@ -452,6 +471,7 @@ export class Renderer {
       });
 
       this.guiRenderer.render(this, guiPass);
+      // this.renderGroupings(uiRenderList, guiPass, camera.camera);
       guiPass.end();
       device.queue.submit([guiEncoder.finish()]);
     }

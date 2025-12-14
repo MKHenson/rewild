@@ -1,14 +1,14 @@
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from './IMaterialPass';
-import shader from '../shaders/diffuse.wgsl';
+import shader from '../shaders/gui.wgsl';
 import { Renderer } from '..';
-import { ProjModelView } from './uniforms/ProjModelView';
 import { PerMeshTracker } from './PerMeshTracker';
 import { SharedUniformsTracker } from './SharedUniformsTracker';
 import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { Diffuse } from './uniforms/Diffuse';
 import { Lighting } from './uniforms/Lighting';
+import { UIElementShared } from './uniforms/UIElementShared';
 
 const sharedBindgroupIndex = 1;
 const lightingGroupIndex = 2;
@@ -28,37 +28,30 @@ export class UIElementPass implements IMaterialPass {
     this.diffuse = new Diffuse(sharedBindgroupIndex);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
-      this.diffuse,
-      this.lightingUniforms,
+      new UIElementShared(0),
     ]);
-    this.perMeshTracker = new PerMeshTracker(this, () => [
-      new ProjModelView(0),
-    ]);
+    this.perMeshTracker = new PerMeshTracker(this, () => []);
   }
 
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
     const { device, presentationFormat } = renderer;
+
     const module = device.createShaderModule({
       code: shader,
     });
 
     this.pipeline = device.createRenderPipeline({
-      label: 'Diffuse Pass',
+      label: 'gui pipeline',
       layout: 'auto',
       vertex: {
         entryPoint: 'vs',
         module,
         buffers: [
           {
-            arrayStride: 4 * 3,
+            arrayStride: 2 * 4, // (2) floats, 4 bytes each
             attributes: [
-              {
-                // position
-                shaderLocation: 0,
-                offset: 0,
-                format: 'float32x3',
-              },
+              { shaderLocation: 0, offset: 0, format: 'float32x2' }, // position
             ],
           },
           {
@@ -73,14 +66,11 @@ export class UIElementPass implements IMaterialPass {
             ],
           },
           {
-            arrayStride: 4 * 3,
+            arrayStride: 4 * 4, // (4) floats, 4 bytes each
+            stepMode: 'instance',
             attributes: [
-              {
-                // normal
-                shaderLocation: 2,
-                offset: 0,
-                format: 'float32x3',
-              },
+              { shaderLocation: 2, offset: 0, format: 'float32x2' }, // offset
+              { shaderLocation: 3, offset: 8, format: 'float32x2' }, // size
             ],
           },
         ],
@@ -109,22 +99,6 @@ export class UIElementPass implements IMaterialPass {
       multisample: {
         count: renderer.sampleCount,
       },
-      primitive: {
-        topology: 'triangle-list',
-
-        // Backface culling since the cube is solid piece of geometry.
-        // Faces pointing away from the camera will be occluded by faces
-        // pointing toward the camera.
-        cullMode: 'back',
-        frontFace: this.side,
-      },
-      // Enable depth testing so that the fragment closest to the camera
-      // is rendered in front.
-      depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: 'less',
-        format: 'depth24plus',
-      },
     });
   }
 
@@ -146,7 +120,6 @@ export class UIElementPass implements IMaterialPass {
     pass.setPipeline(this.pipeline);
     pass.setVertexBuffer(0, geometry.vertexBuffer);
     pass.setVertexBuffer(1, geometry.uvBuffer);
-    pass.setVertexBuffer(2, geometry.normalBuffer);
     pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
 
     this.sharedUniformsTracker.prepareMeshUniforms(
