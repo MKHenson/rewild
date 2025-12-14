@@ -7,7 +7,8 @@ import { IComponent, Transform } from '../../core/Transform';
 import { DataTexture } from '../../textures/DataTexture';
 import { TextureProperties } from '../../textures/Texture';
 import { Geometry } from '../../geometry/Geometry';
-import { Raycaster, Intersection } from '../../core/Raycaster';
+import { Intersection } from '../../core/Raycaster';
+import { IRaycaster } from '../../../types/interfaces';
 
 const temp: Vector3 = new Vector3();
 
@@ -61,7 +62,7 @@ export class TerrainChunk implements IComponent {
     );
   }
 
-  raycast(raycaster: Raycaster, intersects: Intersection[]) {
+  raycast(raycaster: IRaycaster, intersects: Intersection[]) {
     for (const chunk of this.lodMesh) {
       if (chunk.mesh && chunk.mesh.visible) {
         // const mesh = chunk.mesh;

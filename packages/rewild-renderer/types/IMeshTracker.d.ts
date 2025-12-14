@@ -1,8 +1,8 @@
 import { Renderer } from '../lib';
 import { Camera } from '../lib/core/Camera';
-import { Mesh } from '../lib/core/Mesh';
+import { IMeshComponent } from './interfaces';
 
 interface IMeshTracker {
-  onAssignedToMesh(mesh: Mesh): void;
-  onUnassignedFromMesh(mesh: Mesh): void;
+  onAssignedToMesh(mesh: IMeshComponent): void;
+  onUnassignedFromMesh(mesh: IMeshComponent): void;
 }

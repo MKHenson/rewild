@@ -4,21 +4,14 @@ import { ICameraController } from '../../types/ICamera';
 import { PerspectiveCamera } from './PerspectiveCamera';
 import { OrthographicCamera } from './OrthographicCamera';
 import { Transform } from './Transform';
-// export class RayCasterParams {
-//   public Mesh: Mesh | null;
-//   Line: { threshold: 1 };
-//   LOD: {};
-//   Points: { threshold: 1 };
-//   Sprite: {};
-// }
+import { IRaycaster } from '../../types/interfaces';
 
-export class Raycaster {
+export class Raycaster implements IRaycaster {
   ray: Ray;
   near: f32;
   far: f32;
   camera: ICameraController | null;
   layers: Layers;
-  // params: RayCasterParams;
 
   constructor(
     origin: Vector3 = new Vector3(),
@@ -33,14 +26,6 @@ export class Raycaster {
     this.far = far;
     this.camera = null;
     this.layers = new Layers();
-
-    // this.params = {
-    //   Mesh: {},
-    //   Line: { threshold: 1 },
-    //   LOD: {},
-    //   Points: { threshold: 1 },
-    //   Sprite: {},
-    // };
   }
 
   set(origin: Vector3, direction: Vector3): void {
@@ -105,6 +90,45 @@ export class Raycaster {
     return intersects;
   }
 }
+export class UIRaycaster implements IRaycaster {
+  layers: Layers;
+  origin: Vector3;
+
+  constructor(origin: Vector3 = new Vector3()) {
+    this.origin = origin;
+    this.layers = new Layers();
+  }
+
+  set(x: f32, y: f32): void {
+    this.origin.set(x, y, 0);
+  }
+
+  intersectObject(
+    object: Transform,
+    recursive: boolean = false,
+    intersects: Intersection[] = []
+  ): Intersection[] {
+    intersectObject(object, this, intersects, recursive);
+
+    intersects.sort(ascSort);
+
+    return intersects;
+  }
+
+  intersectObjects(
+    objects: Transform[],
+    recursive: boolean = false,
+    intersects: Intersection[] = []
+  ): Intersection[] {
+    for (let i = 0, l = objects.length; i < l; i++) {
+      intersectObject(objects[i], this, intersects, recursive);
+    }
+
+    intersects.sort(ascSort);
+
+    return intersects;
+  }
+}
 
 function ascSort(a: Intersection, b: Intersection): i32 {
   return i32(a.distance) - i32(b.distance);
@@ -112,7 +136,7 @@ function ascSort(a: Intersection, b: Intersection): i32 {
 
 function intersectObject(
   object: Transform,
-  raycaster: Raycaster,
+  raycaster: IRaycaster,
   intersects: Intersection[],
   recursive: boolean
 ): void {

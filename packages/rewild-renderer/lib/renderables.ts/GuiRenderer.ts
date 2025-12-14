@@ -1,74 +1,59 @@
 import { IRenderable } from '../../types/interfaces';
+import { UIElement } from '../core/UiElement';
+import { Geometry } from '../geometry/Geometry';
+import { GUIGeometryFactory } from '../geometry/GUIGeometryFactory';
 import { Renderer } from '../Renderer';
 import guiShader from '../shaders/gui.wgsl';
 
-function createFVertices() {
-  // prettier-ignore
-  const vertexData = new Float32Array([
-    0, 0,
-    1, 0,
-    0, 1,
-    1, 1,
-  ]);
-
-  // prettier-ignore
-  const indexData = new Uint32Array([
-    0,  1,  2,    2,  1,  3
-  ]);
-
-  return {
-    vertexData,
-    indexData,
-    numVertices: indexData.length,
-  };
-}
-
 export class GuiRenderer implements IRenderable {
   bindGroup: GPUBindGroup;
-  numVertices: number;
-  vertexBuffer: GPUBuffer;
+
   instanceBuffer: GPUBuffer;
-  indexBuffer: GPUBuffer;
   pipeline: GPURenderPipeline;
   uniformBuffer: GPUBuffer;
   uniformValues: Float32Array;
   resolutionValue: Float32Array;
   prevNumElements: i32;
 
-  elements: {
-    x: f32;
-    y: f32;
-    width: f32;
-    height: f32;
-  }[];
+  geometry: Geometry;
+
+  dispose(): void {
+    this.geometry.dispose();
+  }
 
   async initialize(renderer: Renderer) {
     const { device, presentationFormat, canvas } = renderer;
     this.prevNumElements = 0;
 
-    canvas.addEventListener('click', () => {
-      this.elements.push({
-        x: Math.random() * 800,
-        y: Math.random() * 800,
-        width: Math.random() * 500,
-        height: Math.random() * 300,
-      });
+    this.geometry = GUIGeometryFactory.new();
+    this.geometry.build(renderer.device);
+    const uiMaterial = renderer.materialManager.get('ui-material');
+
+    canvas.addEventListener('click', (e) => {
+      if (!e.altKey) return;
+
+      const newElement = new UIElement(this.geometry, uiMaterial);
+      renderer.ui.addChild(newElement.transform);
+      newElement.x = Math.random() * 800;
+      newElement.y = Math.random() * 800;
+      newElement.width = Math.random() * 500;
+      newElement.height = Math.random() * 300;
     });
 
-    this.elements = [
-      {
-        x: 0,
-        y: 0,
-        width: 100,
-        height: 100,
-      },
-      {
-        x: 500,
-        y: 700,
-        width: 50,
-        height: 40,
-      },
-    ];
+    const elmA = new UIElement(this.geometry, uiMaterial);
+    const elmB = new UIElement(this.geometry, uiMaterial);
+    renderer.ui.addChild(elmA.transform);
+    renderer.ui.addChild(elmB.transform);
+
+    elmA.x = 0;
+    elmA.y = 0;
+    elmA.width = 100;
+    elmA.height = 100;
+
+    elmB.x = 500;
+    elmB.y = 700;
+    elmB.width = 50;
+    elmB.height = 40;
 
     const module = device.createShaderModule({
       code: guiShader,
@@ -88,11 +73,22 @@ export class GuiRenderer implements IRenderable {
             ],
           },
           {
+            arrayStride: 4 * 2,
+            attributes: [
+              {
+                // uv
+                shaderLocation: 1,
+                offset: 0,
+                format: 'float32x2',
+              },
+            ],
+          },
+          {
             arrayStride: 4 * 4, // (4) floats, 4 bytes each
             stepMode: 'instance',
             attributes: [
-              { shaderLocation: 1, offset: 0, format: 'float32x2' }, // offset
-              { shaderLocation: 2, offset: 8, format: 'float32x2' }, // size
+              { shaderLocation: 2, offset: 0, format: 'float32x2' }, // offset
+              { shaderLocation: 3, offset: 8, format: 'float32x2' }, // size
             ],
           },
         ],
@@ -121,11 +117,6 @@ export class GuiRenderer implements IRenderable {
       multisample: {
         count: renderer.sampleCount,
       },
-      depthStencil: {
-        format: 'depth24plus',
-        depthWriteEnabled: false,
-        depthCompare: 'always',
-      },
     });
 
     // resolution size of the canvas stored as a vec2
@@ -145,30 +136,10 @@ export class GuiRenderer implements IRenderable {
       entries: [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
     });
 
-    // Set up the vertex and index buffers for the quad
-    const { vertexData, indexData, numVertices } = createFVertices();
-    this.numVertices = numVertices;
-
-    this.vertexBuffer = device.createBuffer({
-      label: 'vertex buffer vertices',
-      size: vertexData.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
-
-    device.queue.writeBuffer(this.vertexBuffer, 0, vertexData);
-
-    this.indexBuffer = device.createBuffer({
-      label: 'index buffer',
-      size: indexData.byteLength,
-      usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-    });
-
-    device.queue.writeBuffer(this.indexBuffer, 0, indexData);
-
     // Now create the buffers for the element data
-    const elementData = new Float32Array(this.elements.length * 4);
-    for (let i = 0; i < this.elements.length; i++) {
-      const element = this.elements[i];
+    const elementData = new Float32Array(renderer.ui.children.length * 4);
+    for (let i = 0; i < renderer.ui.children.length; i++) {
+      const element = renderer.ui.children[i].component as UIElement;
       elementData.set(
         [element.x, element.y, element.width, element.height],
         i * 4
@@ -190,11 +161,12 @@ export class GuiRenderer implements IRenderable {
 
   render(renderer: Renderer, pass: GPURenderPassEncoder) {
     const { device, canvas } = renderer;
+    const geometry = this.geometry;
 
-    if (this.elements.length !== this.prevNumElements) {
-      const elementData = new Float32Array(this.elements.length * 4);
-      for (let i = 0; i < this.elements.length; i++) {
-        const element = this.elements[i];
+    if (renderer.ui.children.length !== this.prevNumElements) {
+      const elementData = new Float32Array(renderer.ui.children.length * 4);
+      for (let i = 0; i < renderer.ui.children.length; i++) {
+        const element = renderer.ui.children[i].component as UIElement;
         elementData.set(
           [element.x, element.y, element.width, element.height],
           i * 4
@@ -208,13 +180,14 @@ export class GuiRenderer implements IRenderable {
       });
 
       device.queue.writeBuffer(this.instanceBuffer, 0, elementData);
-      this.prevNumElements = this.elements.length;
+      this.prevNumElements = renderer.ui.children.length;
     }
 
     pass.setPipeline(this.pipeline);
-    pass.setVertexBuffer(0, this.vertexBuffer);
-    pass.setVertexBuffer(1, this.instanceBuffer);
-    pass.setIndexBuffer(this.indexBuffer, 'uint32');
+    pass.setVertexBuffer(0, geometry.vertexBuffer);
+    pass.setVertexBuffer(1, geometry.uvBuffer);
+    pass.setVertexBuffer(2, this.instanceBuffer);
+    pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
 
     // Set the uniform values in our JavaScript side Float32Array
     this.resolutionValue.set([canvas.width, canvas.height]);
@@ -227,6 +200,9 @@ export class GuiRenderer implements IRenderable {
     );
 
     pass.setBindGroup(0, this.bindGroup);
-    pass.drawIndexed(this.numVertices, this.elements.length);
+    pass.drawIndexed(
+      geometry.indices?.length || 0,
+      renderer.ui.children.length
+    );
   }
 }
