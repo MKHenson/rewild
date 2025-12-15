@@ -20,10 +20,12 @@ fn sin_01(x: f32) -> f32 {
  
 @fragment fn fs(vsOut: VSOutput) -> @location(0) vec4f {
   let borderRadius = 10.0;
+  let borderSize = 1.0;
+  let softness = 1.0;
 
-  if (isOutsideBorderRadius(vsOut, borderRadius)) {
-    discard;
-  }
+  let dist = getDistanceFromRoundedBox(vsOut, borderRadius);
+  let alpha = 1.0 - smoothstep(0.0, softness, dist);
+  let borderMix = smoothstep(-borderSize - softness, -borderSize + softness, dist);
 
   let healthFlashingOpacity = mix( mix(0.5, 0.9, sin_01(uni.totalTime / 50.0f)), 1.0, healthData.playerHealth );
 
@@ -40,7 +42,11 @@ fn sin_01(x: f32) -> f32 {
   let mixedHealthAndBg = select( backgroundColor, originalColor, isHealth );
 
   let borderColor = vec4f(0.3, 0.3, 0.3, 0.9);
-  let finalColor = drawBorder(vsOut, mixedHealthAndBg, borderColor, borderRadius, 1.0);
+  let finalColor = mix(mixedHealthAndBg, borderColor, borderMix);
 
-  return vec4f( finalColor.xyz, healthFlashingOpacity );
+  if (alpha <= 0.0) {
+    discard;
+  }
+
+  return vec4f( finalColor.xyz, healthFlashingOpacity * alpha );
 }

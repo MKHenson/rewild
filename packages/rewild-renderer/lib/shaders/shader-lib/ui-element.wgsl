@@ -45,6 +45,17 @@ fn createVSOutput(vert: Vertex, global: UISharedUniforms, instanceData: UIInstan
   return vsOut;
 }
 
+fn sdRoundedBox(p: vec2f, b: vec2f, r: f32) -> f32 {
+  let q = abs(p) - b + vec2f(r);
+  return length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0) - r;
+}
+
+fn getDistanceFromRoundedBox(vsOut: VSOutput, radius: f32) -> f32 {
+  let halfSize = vsOut.size / 2.0;
+  let centerPos = vsOut.localPos - halfSize;
+  return sdRoundedBox(centerPos, halfSize, radius);
+}
+
 fn isOutsideBorderRadius(vsOut: VSOutput, radius: f32) -> bool {
   let halfSize = radius;
   let localPos = vsOut.localPos;
