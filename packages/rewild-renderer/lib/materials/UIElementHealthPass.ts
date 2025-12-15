@@ -1,6 +1,6 @@
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from './IMaterialPass';
-import shader from '../shaders/gui-instanced.wgsl';
+import shader from '../shaders/gui-instanced-healthbar.wgsl';
 import { Renderer } from '..';
 import { PerMeshTracker } from './PerMeshTracker';
 import { SharedUniformsTracker } from './SharedUniformsTracker';
@@ -8,8 +8,9 @@ import { Camera } from '../core/Camera';
 import { UIElementShared } from './uniforms/UIElementShared';
 import { UIElementInstanceData } from './uniforms/UIElementInstanceData';
 import { UIElement } from '../core/UIElement';
+import { UIElementHealth } from './uniforms/UIElementHealth';
 
-export class UIElementPass implements IMaterialPass {
+export class UIElementHealthPass implements IMaterialPass {
   pipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
@@ -22,8 +23,13 @@ export class UIElementPass implements IMaterialPass {
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       new UIElementShared(0),
       new UIElementInstanceData(1),
+      new UIElementHealth(2),
     ]);
     this.perMeshTracker = new PerMeshTracker(this, () => []);
+  }
+
+  get healthUniforms(): UIElementHealth {
+    return this.sharedUniformsTracker.uniforms[2] as UIElementHealth;
   }
 
   init(renderer: Renderer): void {

@@ -18,6 +18,15 @@ export class PerMeshTracker implements IMeshTracker {
     this.materialPass = pass;
   }
 
+  dispose(): void {
+    this.meshUniforms.forEach((uniformBuffers) => {
+      uniformBuffers.forEach((uniformBuffer) => {
+        uniformBuffer.destroy();
+      });
+    });
+    this.meshUniforms.clear();
+  }
+
   onAssignedToMesh(mesh: IMeshComponent): void {
     if (!this.meshUniforms.has(mesh)) {
       const uniformBuffers = this.callback();

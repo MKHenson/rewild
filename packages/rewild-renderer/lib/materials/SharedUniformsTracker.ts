@@ -16,6 +16,12 @@ export class SharedUniformsTracker implements IMeshTracker {
     this.meshes = [];
   }
 
+  dispose(): void {
+    this.uniforms.forEach((uniform) => {
+      uniform.destroy();
+    });
+  }
+
   onAssignedToMesh(mesh: IMeshComponent): void {
     if (!this.meshes.includes(mesh)) {
       this.meshes.push(mesh);

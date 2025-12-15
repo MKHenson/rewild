@@ -37,8 +37,8 @@ export class TerrainPass implements IMaterialPass {
   }
 
   dispose(): void {
-    this.terrainUniforms.destroy();
-    this.lightingUniforms.destroy();
+    this.sharedUniformsTracker.dispose();
+    this.perMeshTracker.dispose();
   }
 
   init(renderer: Renderer): void {
