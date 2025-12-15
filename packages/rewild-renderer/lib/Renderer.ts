@@ -1,4 +1,4 @@
-import { IRenderable } from '../types/interfaces';
+import { IMeshComponent, IRenderable } from '../types/interfaces';
 import { PerspectiveCamera } from './core/PerspectiveCamera';
 import { Transform } from './core/Transform';
 import { Camera } from './core/Camera';
@@ -20,7 +20,7 @@ import { GeometryManager } from './managers/GeometryManager';
 import { MaterialManager } from './managers/MaterialManager';
 import { IController } from './input/IController';
 import { IMaterialsTemplate } from './managers/types';
-import { GuiRenderer } from './renderables.ts/GuiRenderer';
+import { GuiManager } from './renderables.ts/GuiManager';
 import { UIElement } from './core/UIElement';
 
 export class Renderer {
@@ -42,6 +42,7 @@ export class Renderer {
   textureManager: TextureManager;
   geometryManager: GeometryManager;
   samplerManager: SamplerManager;
+  guiManager: GuiManager;
   materialManager: MaterialManager;
   mipmapGenerator: MipMapGenerator;
 
@@ -57,7 +58,6 @@ export class Renderer {
   lastTime: number;
   delta: number;
   totalDeltaTime: number;
-  guiRenderer: GuiRenderer;
 
   private onFrameHandler: () => void;
 
@@ -83,7 +83,6 @@ export class Renderer {
     this.currentRenderList = new RenderList();
     this.initialized = false;
     this.canvas = canvas;
-    this.guiRenderer = new GuiRenderer();
     this.renderables = [];
 
     this.canvasSizeWatcher = new CanvasSizeWatcher(canvas);
@@ -130,6 +129,7 @@ export class Renderer {
     this.geometryManager = new GeometryManager();
     this.materialManager = new MaterialManager();
     this.mipmapGenerator = new MipMapGenerator();
+    this.guiManager = new GuiManager();
 
     const materialsTemplate = (await fetch('/templates/materials.json').then(
       (res) => res.json()
@@ -145,7 +145,7 @@ export class Renderer {
       [new CubeRenderer()].map((renderable) => renderable.initialize(this))
     );
 
-    this.guiRenderer.initialize(this);
+    this.guiManager.initialize(this);
 
     this.lastTime = performance.now();
     this.delta = 0;
@@ -195,6 +195,7 @@ export class Renderer {
     this.geometryManager.dispose();
     this.materialManager.dispose();
     this.geometryManager.dispose();
+    this.guiManager.dispose();
   }
 
   resizeRenderTargets() {
@@ -268,7 +269,7 @@ export class Renderer {
       this.collectUIElements(unchecked(transform.children[i]));
   }
 
-  organizeMeshes(transforms: Transform[]) {
+  organizeVisuals(transforms: Transform[]) {
     // Organize all meshes so that they are grouped by material as well as geometry
     // This is done to minimize the number of draw calls
 
@@ -278,7 +279,7 @@ export class Renderer {
     let transform: Transform | null;
     let geometry: Geometry | null;
     let material: IMaterialPass | null;
-    let mesh: Mesh;
+    let mesh: IMeshComponent;
 
     for (let i: i32 = 0, l: i32 = transforms.length; i < l; i++) {
       transform = transforms[i];
@@ -286,10 +287,10 @@ export class Renderer {
       const component = transform.component;
 
       if (
-        (component && component instanceof Mesh) ||
-        component instanceof UIElement
+        component &&
+        (component instanceof Mesh || component instanceof UIElement)
       ) {
-        mesh = component as Mesh;
+        mesh = component;
 
         if (mesh.visible === false) continue;
 
@@ -377,7 +378,7 @@ export class Renderer {
       transform.normalMatrix.getNormalMatrix(transform.modelViewMatrix);
     }
 
-    const renderList = this.organizeMeshes(this.currentRenderList.solids);
+    const renderList = this.organizeVisuals(this.currentRenderList.solids);
 
     // Gets the device render targets ready. Checks for things like canvas resize
     if (this.canvasSizeWatcher.hasResized()) {
@@ -447,7 +448,7 @@ export class Renderer {
 
       device.queue.submit([postProcessingEncoder.finish()]);
 
-      const uiRenderList = this.organizeMeshes(
+      const uiRenderList = this.organizeVisuals(
         this.currentRenderList.uiElements
       );
 
@@ -460,8 +461,6 @@ export class Renderer {
       const guiPass = guiEncoder.beginRenderPass({
         colorAttachments: [
           {
-            // view: renderTargetView,
-            // resolveTarget: context.getCurrentTexture().createView(),
             view: context.getCurrentTexture().createView(),
             clearValue: [0.0, 0.0, 0.0, 0.0],
             loadOp: 'load',
@@ -470,7 +469,6 @@ export class Renderer {
         ],
       });
 
-      // this.guiRenderer.render(this, guiPass);
       this.renderGroupings(uiRenderList, guiPass, camera.camera);
       guiPass.end();
       device.queue.submit([guiEncoder.finish()]);

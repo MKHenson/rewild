@@ -2,6 +2,7 @@ import { loadGLTF } from '../core/GltfLoader';
 import { BoxGeometryFactory } from '../geometry/BoxGeometryFactory';
 import { CapsuleGeometryFactory } from '../geometry/CapsuleGeometryFactory';
 import { Geometry } from '../geometry/Geometry';
+import { GUIGeometryFactory } from '../geometry/GUIGeometryFactory';
 import { PlaneGeometryFactory } from '../geometry/PlaneGeometryFactory';
 import { SphereGeometryFactory } from '../geometry/SphereGeometryFactory';
 import { Renderer } from '../Renderer';
@@ -34,6 +35,7 @@ export class GeometryManager {
     this.addGeometry('capsule', CapsuleGeometryFactory.new());
     this.addGeometry('sphere', SphereGeometryFactory.new());
     this.addGeometry('plane', PlaneGeometryFactory.new());
+    this.addGeometry('gui-quad', GUIGeometryFactory.new());
 
     for (const key in geometriesToLoad) {
       const geometryTemplate = geometriesToLoad[key];
