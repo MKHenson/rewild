@@ -3,7 +3,7 @@ import { IMaterialPass } from '../materials/IMaterialPass';
 import { Intersection, UIRaycaster } from './Raycaster';
 import { IComponent, Transform } from './Transform';
 import { IMeshComponent, IRaycaster } from '../../types/interfaces';
-import { Matrix4, Vector3 } from 'rewild-common';
+import { Color, Matrix4, Vector3 } from 'rewild-common';
 
 const _inverseMatrix: Matrix4 = new Matrix4();
 const _intersectionPointWorld: Vector3 = new Vector3();
@@ -15,6 +15,8 @@ export class UIElement implements IComponent, IMeshComponent {
   visible: boolean;
   private _width: f32;
   private _height: f32;
+  private _backgroundColor: Color;
+  private _backgroundColorAlpha: f32 = 1.0;
 
   constructor(
     geometry: Geometry,
@@ -26,6 +28,8 @@ export class UIElement implements IComponent, IMeshComponent {
     this.visible = true;
 
     transform.component = this;
+    this.backgroundColor = new Color(0.3, 0.3, 0.3);
+    this.backgroundColorAlpha = 0.9;
 
     this.setMaterial(material);
   }
@@ -68,6 +72,22 @@ export class UIElement implements IComponent, IMeshComponent {
 
   set height(value: f32) {
     this._height = value;
+  }
+
+  get backgroundColor(): Color {
+    return this._backgroundColor;
+  }
+
+  set backgroundColor(value: Color) {
+    this._backgroundColor = value;
+  }
+
+  get backgroundColorAlpha(): f32 {
+    return this._backgroundColorAlpha;
+  }
+
+  set backgroundColorAlpha(value: f32) {
+    this._backgroundColorAlpha = value;
   }
 
   raycast(raycaster: IRaycaster, intersects: Intersection[]) {

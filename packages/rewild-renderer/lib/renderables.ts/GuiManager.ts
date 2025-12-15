@@ -49,6 +49,7 @@ export class GuiManager {
     elmB.y = 50;
     elmB.width = 100;
     elmB.height = 100;
+    elmB.backgroundColor.setRGB(0.9, 0.9, 0.9);
 
     healthBar.width = 250;
     healthBar.height = 40;
