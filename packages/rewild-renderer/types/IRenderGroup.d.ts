@@ -1,9 +1,9 @@
-import { Mesh } from '../lib/core/Mesh';
 import { Geometry } from '../lib/geometry/Geometry';
 import { IMaterialPass } from '../lib/materials/IMaterialPass';
+import { IMeshComponent } from './interfaces';
 
 export interface IRenderGroup {
   geometry: Geometry;
-  meshes: Mesh[];
+  meshes: IMeshComponent[];
   pass: IMaterialPass;
 }
