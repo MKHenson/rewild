@@ -6,6 +6,7 @@ struct UISharedUniforms {
 struct UIInstanceData {
   offset: vec2f,
   size: vec2f,
+  backgroundColor: vec4f,
 };
  
 struct Vertex {
@@ -18,7 +19,8 @@ struct VSOutput {
   @builtin(position) position: vec4f,
   @location(0) localPos: vec2f,
   @location(1) size: vec2f,
-  @location(2) uv: vec2f
+  @location(2) uv: vec2f,
+  @location(3) color: vec4f
 };
 
 fn createVSOutput(vert: Vertex, global: UISharedUniforms, instanceData: UIInstanceData) -> VSOutput {
@@ -42,6 +44,7 @@ fn createVSOutput(vert: Vertex, global: UISharedUniforms, instanceData: UIInstan
   vsOut.localPos = vert.position * instanceData.size;
   vsOut.size = instanceData.size;
   vsOut.uv = vert.uv;
+  vsOut.color = instanceData.backgroundColor;
   return vsOut;
 }
 

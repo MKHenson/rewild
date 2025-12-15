@@ -2,7 +2,10 @@ import { Renderer } from '../..';
 import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { UIElement } from '../../core/UIElement';
+import { Vector3 } from 'rewild-common';
 
+const floatsPerInstance = 8; // x, y, width, height, color.r, color.g, color.b, color.a
+const _v3 = new Vector3();
 export class UIElementInstanceData implements ISharedUniformBuffer {
   instanceData: Float32Array;
   buffer: GPUBuffer;
@@ -31,7 +34,6 @@ export class UIElementInstanceData implements ISharedUniformBuffer {
     this.requiresBuild = false;
     if (this.numInstances === 0) return;
 
-    const floatsPerInstance = 4;
     this.instanceData = new Float32Array(floatsPerInstance * this.numInstances);
 
     const uniformBufferSize = 4 * floatsPerInstance * this.numInstances;
@@ -65,16 +67,21 @@ export class UIElementInstanceData implements ISharedUniformBuffer {
 
     const { device } = renderer;
     const transforms = this.instanceData;
-    const floatsPerInstance = 4;
 
     let element: UIElement;
     for (let i = 0, l = elements.length; i < l; i++) {
       element = elements[i];
+      element.transform.getWorldPosition(_v3);
+
       const offset = i * floatsPerInstance;
-      transforms[offset + 0] = element.x;
-      transforms[offset + 1] = element.y;
+      transforms[offset + 0] = _v3.x;
+      transforms[offset + 1] = _v3.y;
       transforms[offset + 2] = element.width;
       transforms[offset + 3] = element.height;
+      transforms[offset + 4] = element.backgroundColor.r;
+      transforms[offset + 5] = element.backgroundColor.g;
+      transforms[offset + 6] = element.backgroundColor.b;
+      transforms[offset + 7] = element.backgroundColorAlpha;
     }
 
     device.queue.writeBuffer(
