@@ -1,7 +1,7 @@
 import { Renderer } from '..';
 import { IMeshTracker } from '../../types/IMeshTracker';
+import { IMeshComponent } from '../../types/interfaces';
 import { Camera } from '../core/Camera';
-import { Mesh } from '../core/Mesh';
 import { Geometry } from '../geometry/Geometry';
 
 export interface IMaterialPass {
@@ -16,7 +16,7 @@ export interface IMaterialPass {
     renderer: Renderer,
     pass: GPURenderPassEncoder,
     camera: Camera,
-    meshes?: Mesh[],
+    meshes?: IMeshComponent[],
     geometry?: Geometry
   ): void;
   isGeometryCompatible(geometry: Geometry): boolean;

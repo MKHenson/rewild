@@ -1,7 +1,8 @@
 import { IRenderable } from '../../types/interfaces';
-import { UIElement } from '../core/UiElement';
+import { UIElement } from '../core/UIElement';
 import { Geometry } from '../geometry/Geometry';
 import { GUIGeometryFactory } from '../geometry/GUIGeometryFactory';
+import { UIElementHealthPass } from '../materials/UIElementHealthPass';
 import { Renderer } from '../Renderer';
 import guiShader from '../shaders/gui.wgsl';
 
@@ -28,9 +29,16 @@ export class GuiRenderer implements IRenderable {
     this.geometry = GUIGeometryFactory.new();
     this.geometry.build(renderer.device);
     const uiMaterial = renderer.materialManager.get('ui-material');
+    const uiHealthMaterial = renderer.materialManager.get(
+      'ui-health-material'
+    ) as UIElementHealthPass;
 
     canvas.addEventListener('click', (e) => {
-      if (!e.altKey) return;
+      if (!e.altKey) {
+        uiHealthMaterial.healthUniforms.health += 0.1;
+        return;
+      }
+      uiHealthMaterial.healthUniforms.health -= 0.1;
 
       const newElement = new UIElement(this.geometry, uiMaterial);
       renderer.ui.addChild(newElement.transform);
@@ -41,19 +49,19 @@ export class GuiRenderer implements IRenderable {
     });
 
     const elmA = new UIElement(this.geometry, uiMaterial);
-    const elmB = new UIElement(this.geometry, uiMaterial);
+    const healthBar = new UIElement(this.geometry, uiHealthMaterial);
     renderer.ui.addChild(elmA.transform);
-    renderer.ui.addChild(elmB.transform);
+    renderer.ui.addChild(healthBar.transform);
 
     elmA.x = 0;
     elmA.y = 0;
     elmA.width = 100;
     elmA.height = 100;
 
-    elmB.x = 500;
-    elmB.y = 700;
-    elmB.width = 50;
-    elmB.height = 40;
+    healthBar.width = 250;
+    healthBar.height = 40;
+    healthBar.x = renderer.canvas.width / 2 - healthBar.width / 2;
+    healthBar.y = renderer.canvas.height - healthBar.height - 30;
 
     const module = device.createShaderModule({
       code: guiShader,

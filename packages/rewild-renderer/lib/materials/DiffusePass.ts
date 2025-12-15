@@ -129,7 +129,8 @@ export class DiffusePass implements IMaterialPass {
   }
 
   dispose(): void {
-    this.diffuse.destroy();
+    this.sharedUniformsTracker.dispose();
+    this.perMeshTracker.dispose();
   }
 
   isGeometryCompatible(geometry: Geometry): boolean {

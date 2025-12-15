@@ -21,7 +21,7 @@ import { MaterialManager } from './managers/MaterialManager';
 import { IController } from './input/IController';
 import { IMaterialsTemplate } from './managers/types';
 import { GuiRenderer } from './renderables.ts/GuiRenderer';
-import { UIElement } from './core/UiElement';
+import { UIElement } from './core/UIElement';
 
 export class Renderer {
   device: GPUDevice;
@@ -470,8 +470,8 @@ export class Renderer {
         ],
       });
 
-      this.guiRenderer.render(this, guiPass);
-      // this.renderGroupings(uiRenderList, guiPass, camera.camera);
+      // this.guiRenderer.render(this, guiPass);
+      this.renderGroupings(uiRenderList, guiPass, camera.camera);
       guiPass.end();
       device.queue.submit([guiEncoder.finish()]);
     }

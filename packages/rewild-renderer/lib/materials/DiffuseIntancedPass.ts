@@ -127,7 +127,9 @@ export class DiffuseIntancedPass implements IMaterialPass {
     });
   }
 
-  dispose(): void {}
+  dispose(): void {
+    this.perMeshTracker.dispose();
+  }
 
   isGeometryCompatible(geometry: Geometry): boolean {
     return !!(geometry.vertices && geometry.uvs && geometry.normals);

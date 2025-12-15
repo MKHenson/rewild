@@ -29,8 +29,7 @@ export class UIElementShared implements ISharedUniformBuffer {
 
     this.destroy();
 
-    // resolution size of the canvas stored as a vec2
-    const uniformBufferSize = 2 * 4;
+    const uniformBufferSize = 4 * 4;
     this.uniformBuffer = device.createBuffer({
       label: 'uniforms',
       size: uniformBufferSize,
@@ -38,7 +37,10 @@ export class UIElementShared implements ISharedUniformBuffer {
     });
 
     this.uniformValues = new Float32Array(uniformBufferSize / 4);
-    this.resolutionValue = this.uniformValues.subarray(0, 2);
+    this.resolutionValue = this.uniformValues.subarray(
+      0,
+      uniformBufferSize / 4
+    );
 
     this.bindGroup = device.createBindGroup({
       label: 'bind group for object',
@@ -53,7 +55,12 @@ export class UIElementShared implements ISharedUniformBuffer {
     const { device } = renderer;
 
     // Set the uniform values in our JavaScript side Float32Array
-    this.resolutionValue.set([renderer.canvas.width, renderer.canvas.height]);
+    this.resolutionValue.set([
+      renderer.canvas.width,
+      renderer.canvas.height,
+      renderer.totalDeltaTime,
+      0,
+    ]);
 
     // upload the uniform values to the uniform buffer
     device.queue.writeBuffer(
