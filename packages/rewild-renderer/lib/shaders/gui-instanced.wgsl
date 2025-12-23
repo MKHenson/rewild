@@ -10,9 +10,9 @@
 }
  
 @fragment fn fs(vsOut: VSOutput) -> @location(0) vec4f {
-  let radius = 0.0;
+  let radius = vsOut.borderRadius;
   let borderSize = 1.0;
-  let softness = 1.0;
+  let softness = 0.5;
 
   let dist = getDistanceFromRoundedBox(vsOut, radius);
 
@@ -20,8 +20,7 @@
   let borderMix = smoothstep(-borderSize - softness, -borderSize + softness, dist);
 
   let originalColor = vsOut.color;
-  
-  let borderColor = vec4f(1.0, 0.0, 0.0, 1.0);
+  let borderColor = vsOut.borderColor;
 
   let mixedColor = mix(originalColor, borderColor, borderMix);
 

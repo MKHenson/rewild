@@ -4,7 +4,7 @@ import { Camera } from '../../core/Camera';
 import { UIElement } from '../../core/UIElement';
 import { Vector3 } from 'rewild-common';
 
-const floatsPerInstance = 8; // x, y, width, height, color.r, color.g, color.b, color.a
+const floatsPerInstance = 16; // x, y, width, height, color.r, color.g, color.b, color.a, borderColor.r, borderColor.g, borderColor.b, borderColor.a, borderRadius (3 padding)
 const _v3 = new Vector3();
 export class UIElementInstanceData implements ISharedUniformBuffer {
   instanceData: Float32Array;
@@ -82,6 +82,11 @@ export class UIElementInstanceData implements ISharedUniformBuffer {
       transforms[offset + 5] = element.backgroundColor.g;
       transforms[offset + 6] = element.backgroundColor.b;
       transforms[offset + 7] = element.backgroundColorAlpha;
+      transforms[offset + 8] = element.borderColor.r;
+      transforms[offset + 9] = element.borderColor.g;
+      transforms[offset + 10] = element.borderColor.b;
+      transforms[offset + 11] = element.borderColorAlpha;
+      transforms[offset + 12] = element.borderRadius;
     }
 
     device.queue.writeBuffer(

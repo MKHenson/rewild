@@ -7,6 +7,11 @@ struct UIInstanceData {
   offset: vec2f,
   size: vec2f,
   backgroundColor: vec4f,
+  borderColor: vec4f,
+  borderRadius: f32,
+  pad1: f32,
+  pad2: f32,
+  pad3: f32,
 };
  
 struct Vertex {
@@ -20,7 +25,9 @@ struct VSOutput {
   @location(0) localPos: vec2f,
   @location(1) size: vec2f,
   @location(2) uv: vec2f,
-  @location(3) color: vec4f
+  @location(3) color: vec4f,
+  @location(4) borderColor: vec4f,
+  @location(5) borderRadius: f32,
 };
 
 fn createVSOutput(vert: Vertex, global: UISharedUniforms, instanceData: UIInstanceData) -> VSOutput {
@@ -45,6 +52,8 @@ fn createVSOutput(vert: Vertex, global: UISharedUniforms, instanceData: UIInstan
   vsOut.size = instanceData.size;
   vsOut.uv = vert.uv;
   vsOut.color = instanceData.backgroundColor;
+  vsOut.borderColor = instanceData.borderColor;
+  vsOut.borderRadius = instanceData.borderRadius;
   return vsOut;
 }
 

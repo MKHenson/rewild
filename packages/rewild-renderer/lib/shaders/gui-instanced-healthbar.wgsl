@@ -19,9 +19,9 @@ fn sin_01(x: f32) -> f32 {
 }
  
 @fragment fn fs(vsOut: VSOutput) -> @location(0) vec4f {
-  let borderRadius = 10.0;
+  let borderRadius = vsOut.borderRadius;
   let borderSize = 1.0;
-  let softness = 1.0;
+  let softness = 0.5;
 
   let dist = getDistanceFromRoundedBox(vsOut, borderRadius);
   let alpha = 1.0 - smoothstep(0.0, softness, dist);
@@ -41,7 +41,7 @@ fn sin_01(x: f32) -> f32 {
 
   let mixedHealthAndBg = select( backgroundColor, originalColor, isHealth );
 
-  let borderColor = vec4f(0.3, 0.3, 0.3, 0.9);
+  let borderColor = vsOut.borderColor;
   let finalColor = mix(mixedHealthAndBg, borderColor, borderMix);
 
   if (alpha <= 0.0) {
