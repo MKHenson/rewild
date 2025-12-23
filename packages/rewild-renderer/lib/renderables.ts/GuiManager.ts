@@ -30,6 +30,7 @@ export class GuiManager {
       newElement.y = Math.random() * 800;
       newElement.width = Math.random() * 500;
       newElement.height = Math.random() * 300;
+      newElement.borderRadius = 10;
     });
 
     const elmA = this.createElement(uiMaterial);
@@ -39,6 +40,7 @@ export class GuiManager {
     renderer.ui.addChild(elmA.transform);
     elmA.transform.addChild(elmB.transform);
     renderer.ui.addChild(healthBar.transform);
+    healthBar.borderRadius = 20;
 
     elmA.x = 100;
     elmA.y = 100;

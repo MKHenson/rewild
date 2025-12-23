@@ -17,6 +17,9 @@ export class UIElement implements IComponent, IMeshComponent {
   private _height: f32;
   private _backgroundColor: Color;
   private _backgroundColorAlpha: f32 = 1.0;
+  private _borderColor: Color;
+  private _borderColorAlpha: f32 = 1.0;
+  private _borderRadius: f32 = 0.0;
 
   constructor(
     geometry: Geometry,
@@ -30,8 +33,19 @@ export class UIElement implements IComponent, IMeshComponent {
     transform.component = this;
     this.backgroundColor = new Color(0.3, 0.3, 0.3);
     this.backgroundColorAlpha = 0.9;
+    this.borderColor = new Color(0.1, 0.1, 0.1);
+    this.borderColorAlpha = 0.9;
+    this.borderRadius = 0.0;
 
     this.setMaterial(material);
+  }
+
+  get borderRadius(): f32 {
+    return this._borderRadius;
+  }
+
+  set borderRadius(value: f32) {
+    this._borderRadius = value;
   }
 
   get x(): f32 {
@@ -88,6 +102,22 @@ export class UIElement implements IComponent, IMeshComponent {
 
   set backgroundColorAlpha(value: f32) {
     this._backgroundColorAlpha = value;
+  }
+
+  get borderColor(): Color {
+    return this._borderColor;
+  }
+
+  set borderColor(value: Color) {
+    this._borderColor = value;
+  }
+
+  get borderColorAlpha(): f32 {
+    return this._borderColorAlpha;
+  }
+
+  set borderColorAlpha(value: f32) {
+    this._borderColorAlpha = value;
   }
 
   raycast(raycaster: IRaycaster, intersects: Intersection[]) {
