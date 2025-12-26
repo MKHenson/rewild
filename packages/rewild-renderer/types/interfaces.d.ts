@@ -29,3 +29,11 @@ export interface IRaycaster {
     intersects: Intersection[] = []
   ): Intersection[];
 }
+
+export interface IComponent {
+  raycast: (raycaster: IRaycaster, intersects: Intersection[]) => void;
+}
+
+export interface ITransformObserver {
+  worldMatrixUpdated(source: ITransform): void;
+}

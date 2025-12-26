@@ -9,8 +9,8 @@ import {
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from '../materials/IMaterialPass';
 import { Face, Intersection, Raycaster } from './Raycaster';
-import { IComponent, Transform } from './Transform';
-import { IMeshComponent, IRaycaster } from '../../types/interfaces';
+import { Transform } from './Transform';
+import { IComponent, IMeshComponent, IRaycaster } from '../../types/interfaces';
 
 const _sphere = new Sphere();
 const _ray = new Ray();

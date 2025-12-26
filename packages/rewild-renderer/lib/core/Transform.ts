@@ -10,7 +10,11 @@ import {
 } from 'rewild-common';
 import { Intersection } from './Raycaster';
 import { Layers } from './Layers';
-import { IRaycaster } from '../../types/interfaces';
+import {
+  IComponent,
+  IRaycaster,
+  ITransformObserver,
+} from '../../types/interfaces';
 
 const _v1 = new Vector3();
 const _q1 = new Quaternion();
@@ -28,14 +32,6 @@ export const zAxis = new Vector3(0, 0, 1);
 type TraverseCallback = (object: Transform) => void;
 const _addedEvent: Event = new Event('added');
 const _removedEvent: Event = new Event('removed');
-
-export interface ITransformObserver {
-  worldMatrixUpdated(source: Transform): void;
-}
-
-export interface IComponent {
-  raycast: (raycaster: IRaycaster, intersects: Intersection[]) => void;
-}
 
 export class Transform implements IQuatChangeListener, IEulerChangeListener {
   static DefaultMatrixAutoUpdate: boolean = true;

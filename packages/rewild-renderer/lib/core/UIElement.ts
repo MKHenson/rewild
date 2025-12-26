@@ -1,8 +1,8 @@
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from '../materials/IMaterialPass';
 import { Intersection, UIRaycaster } from './Raycaster';
-import { IComponent, Transform } from './Transform';
-import { IMeshComponent, IRaycaster } from '../../types/interfaces';
+import { Transform } from './Transform';
+import { IComponent, IMeshComponent, IRaycaster } from '../../types/interfaces';
 import { Color, Matrix4, Vector3 } from 'rewild-common';
 
 const _inverseMatrix: Matrix4 = new Matrix4();

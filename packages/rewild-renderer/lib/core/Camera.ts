@@ -1,5 +1,6 @@
 import { Vector3, Matrix4 } from 'rewild-common';
-import { ITransformObserver, Transform } from './Transform';
+import { Transform } from './Transform';
+import { ITransformObserver } from '../../types/interfaces';
 
 export class Camera implements ITransformObserver {
   readonly transform: Transform;
