@@ -17,12 +17,14 @@ import {
   Collider,
 } from '@dimforge/rapier3d-compat';
 import { RigidBodyBehaviour } from './behaviours/RigidBodyBehaviour';
+import { UIElementHealthPass } from 'node_modules/rewild-renderer/lib/materials/UIElementHealthPass';
+import { clamp } from 'node_modules/rewild-common';
 
 export class Player extends Node {
   cameraController: ICameraController;
   asset: Asset3D;
-  hunger: f32;
-  health: f32;
+  private _hunger: f32;
+  private _health: f32;
   raycaster: Raycaster;
   rapierWorld: World;
   characterController: KinematicCharacterController;
@@ -32,11 +34,12 @@ export class Player extends Node {
   verticalVelocity: f32 = 0.0;
   grounded: boolean = false;
   terrainLoaded: boolean = false;
+  uiHealthBar: UIElementHealthPass;
 
   constructor(name: string, autoDispose: boolean = false) {
     super(name, autoDispose);
-    this.hunger = 100.0; // Default hunger value
-    this.health = 100.0; // Default health value
+    this._hunger = 100.0; // Default hunger value
+    this._health = 100.0; // Default health value
     this.raycaster = new Raycaster();
     // Rapier fields will be initialized in mount
   }
@@ -51,8 +54,24 @@ export class Player extends Node {
 
     const stateData = this.stateMachine?.data as StateMachineData;
 
-    this.hunger = 100.0; // Reset hunger on mount
-    this.health = 100.0; // Reset health on mount
+    if (!this.uiHealthBar) {
+      this.uiHealthBar = stateData.renderer.materialManager.get(
+        'ui-health-material'
+      ) as UIElementHealthPass;
+      const healthBar = stateData.renderer.guiManager.createElement(
+        this.uiHealthBar
+      );
+      stateData.renderer.ui.addChild(healthBar.transform);
+      healthBar.borderRadius = 20;
+      healthBar.width = 0.4;
+      healthBar.height = 0.05;
+      healthBar.x = 0.3;
+      healthBar.y = 0.92;
+      healthBar.percentageBasedCalculation = true;
+    }
+
+    this._hunger = 100.0; // Reset hunger on mount
+    this._health = 100.0; // Reset health on mount
     this.cameraController.camera.transform.position.set(0, 0, -10); // Reset position
     this.cameraController.camera.lookAt(0, 0, 0);
     this.controller = stateData.renderer.camController;
@@ -91,6 +110,23 @@ export class Player extends Node {
       // Set a reasonable mass so impulses have effect (kg)
       this.characterController.setCharacterMass(80.0);
     }
+  }
+
+  get hunger(): f32 {
+    return this._hunger;
+  }
+
+  set hunger(value: f32) {
+    this._hunger = clamp(value, 0.0, 100.0);
+  }
+
+  get health(): f32 {
+    return this._health;
+  }
+
+  set health(value: f32) {
+    this._health = clamp(value, 0.0, 100.0);
+    this.uiHealthBar.healthUniforms.health = this._health / 100.0;
   }
 
   unMount(): void {
@@ -180,6 +216,13 @@ export class Player extends Node {
 
     // Treat as grounded only if descending or stationary vertically.
     const controllerGrounded = this.characterController.computedGrounded();
+
+    // Do a fall damage check
+    if (controllerGrounded && this.verticalVelocity < -15.0) {
+      const damage = (Math.abs(this.verticalVelocity) - 15.0) * 10.0;
+      this.health -= damage;
+    }
+
     this.grounded = controllerGrounded && this.verticalVelocity <= 0.0;
     if (this.grounded && this.verticalVelocity < 0) this.verticalVelocity = 0.0;
 
