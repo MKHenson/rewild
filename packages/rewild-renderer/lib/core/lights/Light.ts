@@ -1,7 +1,7 @@
 import { Color } from 'rewild-common';
-import { IComponent, Transform } from '../Transform';
+import { Transform } from '../Transform';
 import { Intersection } from '../Raycaster';
-import { IRaycaster } from '../../../types/interfaces';
+import { IComponent, IRaycaster } from '../../../types/interfaces';
 
 export class Light implements IComponent {
   color: Color;

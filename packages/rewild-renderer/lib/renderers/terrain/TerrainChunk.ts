@@ -3,12 +3,12 @@ import { TerrainPass } from '../../materials/TerrainPass';
 import { Mesh } from '../../core/Mesh';
 import { LOFInfo, TerrainRenderer } from './TerrainRenderer';
 import { Renderer } from '../..';
-import { IComponent, Transform } from '../../core/Transform';
+import { Transform } from '../../core/Transform';
 import { DataTexture } from '../../textures/DataTexture';
 import { TextureProperties } from '../../textures/Texture';
 import { Geometry } from '../../geometry/Geometry';
 import { Intersection } from '../../core/Raycaster';
-import { IRaycaster } from '../../../types/interfaces';
+import { IComponent, IRaycaster } from '../../../types/interfaces';
 
 const temp: Vector3 = new Vector3();
 
