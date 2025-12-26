@@ -30,10 +30,11 @@ export class GuiManager {
     const healthBar = this.createElement(uiHealthMaterial);
     renderer.ui.addChild(healthBar.transform);
     healthBar.borderRadius = 20;
-    healthBar.width = 250;
-    healthBar.height = 40;
-    healthBar.x = renderer.canvas.width / 2 - healthBar.width / 2;
-    healthBar.y = renderer.canvas.height - healthBar.height - 30;
+    healthBar.width = 0.4;
+    healthBar.height = 0.05;
+    healthBar.x = 0.3;
+    healthBar.y = 0.92;
+    healthBar.percentageBasedCalculation = true;
 
     return this;
   }

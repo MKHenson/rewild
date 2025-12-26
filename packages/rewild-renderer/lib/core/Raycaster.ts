@@ -5,6 +5,7 @@ import { PerspectiveCamera } from './PerspectiveCamera';
 import { OrthographicCamera } from './OrthographicCamera';
 import { Transform } from './Transform';
 import { IRaycaster } from '../../types/interfaces';
+import { Renderer } from '..';
 
 export class Raycaster implements IRaycaster {
   ray: Ray;
@@ -93,8 +94,10 @@ export class Raycaster implements IRaycaster {
 export class UIRaycaster implements IRaycaster {
   layers: Layers;
   origin: Vector3;
+  renderer: Renderer;
 
-  constructor(origin: Vector3 = new Vector3()) {
+  constructor(renderer: Renderer, origin: Vector3 = new Vector3()) {
+    this.renderer = renderer;
     this.origin = origin;
     this.layers = new Layers();
   }

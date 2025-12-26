@@ -3,16 +3,15 @@ import { IMaterialPass } from '../materials/IMaterialPass';
 import { Intersection, UIRaycaster } from './Raycaster';
 import { Transform } from './Transform';
 import { IComponent, IMeshComponent, IRaycaster } from '../../types/interfaces';
-import { Color, Matrix4, Vector3 } from 'rewild-common';
-
-const _inverseMatrix: Matrix4 = new Matrix4();
-const _intersectionPointWorld: Vector3 = new Vector3();
+import { Color } from 'rewild-common';
+import { Renderer } from '..';
 
 export class UIElement implements IComponent, IMeshComponent {
   geometry: Geometry;
   material: IMaterialPass;
   transform: Transform;
   visible: boolean;
+  percentageBasedCalculation: boolean;
   private _width: f32;
   private _height: f32;
   private _backgroundColor: Color;
@@ -36,6 +35,7 @@ export class UIElement implements IComponent, IMeshComponent {
     this.borderColor = new Color(0.1, 0.1, 0.1);
     this.borderColorAlpha = 0.9;
     this.borderRadius = 0.0;
+    this.percentageBasedCalculation = false;
 
     this.setMaterial(material);
   }
@@ -120,25 +120,91 @@ export class UIElement implements IComponent, IMeshComponent {
     this._borderColorAlpha = value;
   }
 
+  getHeight(renderer: Renderer, transform: Transform = this.transform): f32 {
+    const component = transform.component;
+
+    if (component instanceof UIElement) {
+      if (component.percentageBasedCalculation) {
+        let parentHeight = transform.parent
+          ? this.getHeight(renderer, transform.parent)
+          : renderer.canvas.height;
+        return parentHeight * component.height;
+      } else return component.height;
+    }
+
+    return renderer.canvas.height;
+  }
+
+  getWidth(renderer: Renderer, transform: Transform = this.transform): f32 {
+    const component = transform.component;
+
+    if (component instanceof UIElement) {
+      if (component.percentageBasedCalculation) {
+        let parentWidth = transform.parent
+          ? this.getWidth(renderer, transform.parent)
+          : renderer.canvas.width;
+        return parentWidth * component.width;
+      } else return component.width;
+    }
+
+    return renderer.canvas.width;
+  }
+
+  getX(renderer: Renderer, transform: Transform = this.transform): f32 {
+    const component = transform.component;
+
+    if (component instanceof UIElement) {
+      if (component.percentageBasedCalculation) {
+        let parentWidth = transform.parent
+          ? this.getWidth(renderer, transform.parent)
+          : renderer.canvas.width;
+
+        const xProportion = parentWidth * component.x;
+        return transform.parent
+          ? this.getX(renderer, transform.parent) + xProportion
+          : xProportion;
+      } else
+        return transform.parent
+          ? this.getX(renderer, transform.parent) + component.x
+          : component.x;
+    }
+
+    return 0;
+  }
+
+  getY(renderer: Renderer, transform: Transform = this.transform): f32 {
+    const component = transform.component;
+    if (component instanceof UIElement) {
+      if (component.percentageBasedCalculation) {
+        let parentHeight = transform.parent
+          ? this.getHeight(renderer, transform.parent)
+          : renderer.canvas.height;
+        const yProportion = parentHeight * component.y;
+        return transform.parent
+          ? this.getY(renderer, transform.parent) + yProportion
+          : yProportion;
+      } else
+        return transform.parent
+          ? this.getY(renderer, transform.parent) + component.y
+          : component.y;
+    }
+    return 0;
+  }
+
   raycast(raycaster: IRaycaster, intersects: Intersection[]) {
     if (raycaster instanceof UIRaycaster) {
       const uiRaycaster = raycaster as UIRaycaster;
       const origin = uiRaycaster.origin;
-      const matrixWorld = this.transform.matrixWorld;
-
-      _inverseMatrix.copy(matrixWorld).invert();
-      _intersectionPointWorld
-        .set(origin.x, origin.y, 0)
-        .applyMatrix4(_inverseMatrix);
-
-      const localX = _intersectionPointWorld.x;
-      const localY = _intersectionPointWorld.y;
+      const x = this.getX(uiRaycaster.renderer);
+      const y = this.getY(uiRaycaster.renderer);
+      const width = this.getWidth(uiRaycaster.renderer);
+      const height = this.getHeight(uiRaycaster.renderer);
 
       if (
-        localX >= 0 &&
-        localX <= this._width &&
-        localY >= 0 &&
-        localY <= this._height
+        origin.x >= x &&
+        origin.x <= x + width &&
+        origin.y >= y &&
+        origin.y <= y + height
       ) {
         const intersection = new Intersection();
         intersection.distance = 0;
