@@ -67,17 +67,24 @@ export class UIElementInstanceData implements ISharedUniformBuffer {
 
     const { device } = renderer;
     const transforms = this.instanceData;
+    let width = 0;
+    let height = 0;
 
     let element: UIElement;
     for (let i = 0, l = elements.length; i < l; i++) {
       element = elements[i];
       element.transform.getWorldPosition(_v3);
 
+      width = element.getWidth(renderer);
+      height = element.getHeight(renderer);
+
       const offset = i * floatsPerInstance;
-      transforms[offset + 0] = _v3.x;
-      transforms[offset + 1] = _v3.y;
-      transforms[offset + 2] = element.width;
-      transforms[offset + 3] = element.height;
+      transforms[offset + 0] = element.getX(renderer);
+      transforms[offset + 1] = element.getY(renderer);
+
+      transforms[offset + 2] = width;
+      transforms[offset + 3] = height;
+
       transforms[offset + 4] = element.backgroundColor.r;
       transforms[offset + 5] = element.backgroundColor.g;
       transforms[offset + 6] = element.backgroundColor.b;

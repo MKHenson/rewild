@@ -175,7 +175,7 @@ export class EditorViewport extends Component<Props> {
     const get3DCoords = (clientX: i32, clientY: i32) => {
       const pointer = new Vector2();
       const raycaster = new Raycaster();
-      const uiRaycaster = new UIRaycaster();
+      const uiRaycaster = new UIRaycaster(this.renderer);
 
       const rect = pane3D.getBoundingClientRect();
 
