@@ -24,11 +24,17 @@ export class UIElementText implements ISharedUniformBuffer {
   private _text: string;
   private _options: MsdfTextFormattingOptions;
 
-  constructor(group: number, text: string = 'hello') {
+  constructor(
+    group: number,
+    text: string = `Hello World. \nThis is a test of MSDF text rendering.\nIsn't it great?`
+  ) {
     this.group = group;
     this.requiresBuild = true;
     this.requiresUpdate = true;
     this.text = text;
+    this._options = {
+      centered: true,
+    };
   }
 
   destroy(): void {

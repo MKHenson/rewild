@@ -25,8 +25,9 @@ struct FormattedText {
   chars: array<vec3f>,
 };
 
-struct Viewport {
-  size: vec2f,
+struct Camera {
+  projection: mat4x4f,
+  view: mat4x4f,
 };
 
 // Font bindings
@@ -35,27 +36,19 @@ struct Viewport {
 @group(0) @binding(2) var<storage> chars: array<Char>;
 
 // Text bindings
-@group(1) @binding(0) var<uniform> viewport: Viewport;
+@group(1) @binding(0) var<uniform> camera: Camera;
 @group(1) @binding(1) var<storage> text: FormattedText;
 
 @vertex
-fn vs(input : VertexInput) -> VertexOutput {
+fn vertexMain(input : VertexInput) -> VertexOutput {
   let textElement = text.chars[input.instance];
   let char = chars[u32(textElement.z)];
   let charPos = (pos[input.vertex] * char.size + textElement.xy + char.offset) * text.scale;
-  
-  var output : VertexOutput;
-  let worldPos = text.transform * vec4f(charPos, 0.0, 1.0);
-  output.position = worldPos;
-  
-  // vec4f(
-  //   (worldPos.x / viewport.size.x) * 2.0 - 1.0,
-  //   1.0 - (worldPos.y / viewport.size.y) * 2.0,
-  //   0.0,
-  //   1.0
-  // ) + vec4f(charPos, 0.0, 1.0); 
 
-  output.texcoord = pos[input.vertex] * vec2f(1.0, -1.0);
+  var output : VertexOutput;
+  output.position = camera.projection * camera.view * text.transform * vec4f(charPos, 0, 1);
+
+  output.texcoord = pos[input.vertex] * vec2f(1, -1);
   output.texcoord *= char.texExtent;
   output.texcoord += char.texOffset;
   return output;
@@ -69,7 +62,7 @@ fn sampleMsdf(texcoord: vec2f) -> f32 {
 // Antialiasing technique from Paul Houx 
 // https://github.com/Chlumsky/msdfgen/issues/22#issuecomment-234958005
 @fragment
-fn fs(input : VertexOutput) -> @location(0) vec4f {
+fn fragmentMain(input : VertexOutput) -> @location(0) vec4f {
   // pxRange (AKA distanceRange) comes from the msdfgen tool. Don McCurdy's tool
   // uses the default which is 4.
   let pxRange = 4.0;
