@@ -20,15 +20,7 @@ struct Vertex {
   @builtin(instance_index) instanceIndex: u32,
 };
  
-struct VSOutput {
-  @builtin(position) position: vec4f,
-  @location(0) localPos: vec2f,
-  @location(1) size: vec2f,
-  @location(2) uv: vec2f,
-  @location(3) color: vec4f,
-  @location(4) borderColor: vec4f,
-  @location(5) borderRadius: f32,
-};
+
 
 fn createVSOutput(vert: Vertex, global: UISharedUniforms, instanceData: UIInstanceData) -> VSOutput {
   var vsOut: VSOutput;

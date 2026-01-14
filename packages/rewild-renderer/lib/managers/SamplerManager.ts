@@ -6,6 +6,7 @@ export type SamplerType =
   | 'non-filtering'
   | 'linear'
   | 'linear-clamped'
+  | 'msdf-sampler'
   | 'depth-comparison';
 
 export class SamplerManager {
@@ -37,6 +38,17 @@ export class SamplerManager {
         addressModeU: 'repeat',
         addressModeV: 'repeat',
         addressModeW: 'repeat',
+      })
+    );
+
+    this.addSampler(
+      'msdf-sampler',
+      device.createSampler({
+        label: 'MSDF text sampler',
+        minFilter: 'linear',
+        magFilter: 'linear',
+        mipmapFilter: 'linear',
+        maxAnisotropy: 16,
       })
     );
 

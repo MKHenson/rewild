@@ -1,6 +1,17 @@
 
 #include "./shader-lib/ui-element.wgsl"
 
+struct VSOutput {
+  @builtin(position) position: vec4f,
+  @location(0) localPos: vec2f,
+  @location(1) size: vec2f,
+  @location(2) uv: vec2f,
+  @location(3) color: vec4f,
+  @location(4) borderColor: vec4f,
+  @location(5) borderRadius: f32,
+  @location(6) texcoord : vec2f,
+};
+
 struct HealthbarData {
   playerHealth: f32,
 }

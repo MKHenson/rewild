@@ -24,6 +24,11 @@ const copyPluginDetails = {
       watch: true,
     },
     {
+      from: ['./static/**/*'], // Match all files and subfolders in the static folder
+      to: ['./public'], // Destination folder
+      watch: true,
+    },
+    {
       from: ['./packages/rewild-assembly/build/release.wasm'],
       to: ['./public/release.wasm'],
       watch: true,

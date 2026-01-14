@@ -1,6 +1,16 @@
 
 #include "./shader-lib/ui-element.wgsl"
 
+struct VSOutput {
+  @builtin(position) position: vec4f,
+  @location(0) localPos: vec2f,
+  @location(1) size: vec2f,
+  @location(2) uv: vec2f,
+  @location(3) color: vec4f,
+  @location(4) borderColor: vec4f,
+  @location(5) borderRadius: f32,
+};
+
 @group(0) @binding(0) var<uniform> uni: UISharedUniforms;
 @group(1) @binding(0) var<storage, read> uiInstanceData: array<UIInstanceData>;
  
