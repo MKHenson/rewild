@@ -22,6 +22,7 @@ import { IController } from './input/IController';
 import { IMaterialsTemplate } from './managers/types';
 import { GuiManager } from './renderables.ts/GuiManager';
 import { UIElement } from './core/UIElement';
+import { FontManager } from './managers/FontManager';
 
 export class Renderer {
   device: GPUDevice;
@@ -42,6 +43,7 @@ export class Renderer {
   textureManager: TextureManager;
   geometryManager: GeometryManager;
   samplerManager: SamplerManager;
+  fontManager: FontManager;
   guiManager: GuiManager;
   materialManager: MaterialManager;
   mipmapGenerator: MipMapGenerator;
@@ -126,6 +128,7 @@ export class Renderer {
 
     this.textureManager = new TextureManager();
     this.samplerManager = new SamplerManager();
+    this.fontManager = new FontManager();
     this.geometryManager = new GeometryManager();
     this.materialManager = new MaterialManager();
     this.mipmapGenerator = new MipMapGenerator();
@@ -136,6 +139,7 @@ export class Renderer {
     )) as IMaterialsTemplate;
 
     await this.samplerManager.initialize(this);
+    await this.fontManager.initialize(this);
     await this.textureManager.initialize(this, materialsTemplate);
     await this.geometryManager.initialize(this);
     await this.materialManager.initialize(this, materialsTemplate);
@@ -192,6 +196,7 @@ export class Renderer {
     this.atmosphere.dispose();
     this.textureManager.dispose();
     this.samplerManager.dispose();
+    this.fontManager.dispose();
     this.geometryManager.dispose();
     this.materialManager.dispose();
     this.geometryManager.dispose();
@@ -453,7 +458,6 @@ export class Renderer {
       );
 
       // Now render any remaining renderables like the GUI
-      // Create a new encoder for the post-processing pass
       const guiEncoder = device.createCommandEncoder({
         label: 'GUI encoder',
       });

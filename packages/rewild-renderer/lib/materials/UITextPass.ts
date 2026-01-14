@@ -1,45 +1,35 @@
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from './IMaterialPass';
-import shader from '../shaders/gui-instanced-healthbar.wgsl';
+import shader from '../shaders/msdf-character.wgsl';
 import { Renderer } from '..';
 import { PerMeshTracker } from './PerMeshTracker';
 import { SharedUniformsTracker } from './SharedUniformsTracker';
 import { Camera } from '../core/Camera';
-import { UIElementShared } from './uniforms/UIElementShared';
-import { UIElementInstanceData } from './uniforms/UIElementInstanceData';
 import { UIElement } from '../core/UIElement';
-import { UIElementHealth } from './uniforms/UIElementHealth';
-import { UITextPass } from './UITextPass';
+import { UIElementFont } from './uniforms/UIElementFont';
+import { UIElementText } from './uniforms/UIElementText';
 
-export class UIElementHealthPass implements IMaterialPass {
+export class UITextPass implements IMaterialPass {
   pipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
   sharedUniformsTracker: SharedUniformsTracker;
   side: GPUFrontFace;
-
-  textPass: UITextPass;
+  textUniform: UIElementText;
 
   constructor() {
     this.side = 'ccw';
-    this.textPass = new UITextPass();
     this.requiresRebuild = true;
+    this.textUniform = new UIElementText(1);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
-      new UIElementShared(0),
-      new UIElementInstanceData(1),
-      new UIElementHealth(2),
+      new UIElementFont(0),
+      this.textUniform,
     ]);
     this.perMeshTracker = new PerMeshTracker(this, () => []);
   }
 
-  get healthUniforms(): UIElementHealth {
-    return this.sharedUniformsTracker.uniforms[2] as UIElementHealth;
-  }
-
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
-
-    this.textPass.init(renderer);
     const { device, presentationFormat } = renderer;
 
     const module = device.createShaderModule({
@@ -47,30 +37,11 @@ export class UIElementHealthPass implements IMaterialPass {
     });
 
     this.pipeline = device.createRenderPipeline({
-      label: 'gui healthpass pipeline',
+      label: 'msdf text pipeline',
       layout: 'auto',
       vertex: {
         entryPoint: 'vs',
         module,
-        buffers: [
-          {
-            arrayStride: 2 * 4, // (2) floats, 4 bytes each
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: 'float32x2' }, // position
-            ],
-          },
-          {
-            arrayStride: 4 * 2,
-            attributes: [
-              {
-                // uv
-                shaderLocation: 1,
-                offset: 0,
-                format: 'float32x2',
-              },
-            ],
-          },
-        ],
       },
       fragment: {
         entryPoint: 'fs',
@@ -82,16 +53,18 @@ export class UIElementHealthPass implements IMaterialPass {
               color: {
                 srcFactor: 'src-alpha',
                 dstFactor: 'one-minus-src-alpha',
-                operation: 'add',
               },
               alpha: {
                 srcFactor: 'one',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add',
+                dstFactor: 'one',
               },
             },
           },
         ],
+      },
+      primitive: {
+        topology: 'triangle-strip',
+        stripIndexFormat: 'uint32',
       },
       multisample: {
         count: renderer.sampleCount,
@@ -102,11 +75,10 @@ export class UIElementHealthPass implements IMaterialPass {
   dispose(): void {
     this.sharedUniformsTracker.dispose();
     this.perMeshTracker.dispose();
-    this.textPass.dispose();
   }
 
   isGeometryCompatible(geometry: Geometry): boolean {
-    return !!(geometry.vertices && geometry.uvs);
+    return false;
   }
 
   render(
@@ -117,10 +89,6 @@ export class UIElementHealthPass implements IMaterialPass {
     geometry: Geometry
   ): void {
     pass.setPipeline(this.pipeline);
-    pass.setVertexBuffer(0, geometry.vertexBuffer);
-    pass.setVertexBuffer(1, geometry.uvBuffer);
-    pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
-
     this.sharedUniformsTracker.prepareMeshUniforms(
       renderer,
       pass,
@@ -128,9 +96,6 @@ export class UIElementHealthPass implements IMaterialPass {
       elements
     );
 
-    const numIndices = geometry.indices!.length;
-    pass.drawIndexed(numIndices, elements.length);
-
-    this.textPass.render(renderer, pass, camera, elements, geometry);
+    pass.draw(4, this.textUniform.textMeasurements.printedCharCount);
   }
 }
