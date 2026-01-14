@@ -46,15 +46,24 @@ fn vs(input : VertexInput) -> VertexOutput {
   
   var output : VertexOutput;
   let worldPos = text.transform * vec4f(charPos, 0.0, 1.0);
-  output.position = worldPos;
-  
-  // vec4f(
-  //   (worldPos.x / viewport.size.x) * 2.0 - 1.0,
-  //   1.0 - (worldPos.y / viewport.size.y) * 2.0,
-  //   0.0,
-  //   1.0
-  // ) + vec4f(charPos, 0.0, 1.0); 
 
+  let fontSizeInPixels = 12.0;
+  let posXYInPixels = vec2f(100.0, 100.00);
+  let position = vec2f(charPos.x, -charPos.y) + posXYInPixels;
+ 
+  // convert the position from pixels to a 0.0 to 1.0 value
+  let zeroToOne = position / viewport.size.xy;
+ 
+  // convert from 0 <-> 1 to 0 <-> 2
+  let zeroToTwo = zeroToOne * 2.0;
+ 
+  // covert from 0 <-> 2 to -1 <-> +1 (clip space)
+  let flippedClipSpace = zeroToTwo - 1.0;
+ 
+  // flip Y
+  let clipSpace = flippedClipSpace * vec2f(1, -1);
+  
+  output.position = vec4f(clipSpace, 0.0, 1.0); 
   output.texcoord = pos[input.vertex] * vec2f(1.0, -1.0);
   output.texcoord *= char.texExtent;
   output.texcoord += char.texOffset;

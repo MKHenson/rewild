@@ -23,6 +23,7 @@ export class UIElementText implements ISharedUniformBuffer {
 
   private _text: string;
   private _options: MsdfTextFormattingOptions;
+  private _fontSizeInPixels: number = 42;
 
   constructor(
     group: number,
@@ -33,8 +34,10 @@ export class UIElementText implements ISharedUniformBuffer {
     this.requiresUpdate = true;
     this.text = text;
     this._options = {
-      centered: true,
+      centered: false,
     };
+
+    this.fontSizeInPixels = 14;
   }
 
   destroy(): void {
@@ -54,6 +57,17 @@ export class UIElementText implements ISharedUniformBuffer {
   public set text(value: string) {
     if (this._text !== value) {
       this._text = value;
+      this.requiresBuild = true;
+    }
+  }
+
+  public get fontSizeInPixels(): number {
+    return this._fontSizeInPixels;
+  }
+
+  public set fontSizeInPixels(value: number) {
+    if (this._fontSizeInPixels !== value) {
+      this._fontSizeInPixels = value;
       this.requiresBuild = true;
     }
   }
@@ -189,7 +203,7 @@ export class UIElementText implements ISharedUniformBuffer {
     textArray[17] = 0;
     textArray[18] = 0;
     textArray[19] = 1;
-    textArray[20] = 1 / 512; // Pixel scale
+    textArray[20] = this._fontSizeInPixels / font.size; // Pixel scale
 
     if (options.centered) {
       this.textMeasurements = this.measureText(font, text);

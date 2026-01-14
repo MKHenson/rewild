@@ -31,7 +31,8 @@ export class MsdfFont {
     public bindGroup: GPUBindGroup,
     public lineHeight: number,
     public chars: { [x: number]: MsdfChar },
-    public kernings: KerningMap
+    public kernings: KerningMap,
+    public size: number
   ) {
     const charArray = Object.values(chars);
     this.charCount = charArray.length;
@@ -344,7 +345,8 @@ export class MsdfTextRenderer {
       bindGroup,
       json.common.lineHeight,
       chars,
-      kernings
+      kernings,
+      json.info.size
     );
   }
 
