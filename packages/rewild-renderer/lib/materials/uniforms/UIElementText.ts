@@ -24,6 +24,9 @@ export class UIElementText implements ISharedUniformBuffer {
   private _text: string;
   private _options: MsdfTextFormattingOptions;
   private _fontSizeInPixels: number = 42;
+  private _x: number;
+  private _y: number;
+  private _width: number;
 
   constructor(
     group: number,
@@ -38,6 +41,9 @@ export class UIElementText implements ISharedUniformBuffer {
     };
 
     this.fontSizeInPixels = 14;
+    this.x = 200;
+    this.y = 200;
+    this.width = 100;
   }
 
   destroy(): void {
@@ -47,6 +53,39 @@ export class UIElementText implements ISharedUniformBuffer {
 
     if (this.viewportBuffer) {
       this.viewportBuffer.destroy();
+    }
+  }
+
+  public get x(): number {
+    return this._x;
+  }
+
+  public set x(value: number) {
+    if (this._x !== value) {
+      this._x = value;
+      this.requiresBuild = true;
+    }
+  }
+
+  public get y(): number {
+    return this._y;
+  }
+
+  public set y(value: number) {
+    if (this._y !== value) {
+      this._y = value;
+      this.requiresBuild = true;
+    }
+  }
+
+  public get width(): number {
+    return this._width;
+  }
+
+  public set width(value: number) {
+    if (this._width !== value) {
+      this._width = value;
+      this.requiresBuild = true;
     }
   }
 
@@ -97,6 +136,7 @@ export class UIElementText implements ISharedUniformBuffer {
   measureText(
     font: MsdfFont,
     text: string,
+    widthLimit: number,
     charCallback?: (x: number, y: number, line: number, char: MsdfChar) => void
   ): MsdfTextMeasurements {
     let maxWidth = 0;
@@ -133,8 +173,20 @@ export class UIElementText implements ISharedUniformBuffer {
               font.getChar(charCode)
             );
           }
-          textOffsetX += font.getXAdvance(charCode, nextCharCode);
-          printedCharCount++;
+          const advancedAmount = font.getXAdvance(charCode, nextCharCode);
+
+          if (textOffsetX + advancedAmount <= widthLimit) {
+            textOffsetX += advancedAmount;
+            printedCharCount++;
+          } else {
+            // Exceeded width limit, move to next line.
+            lineWidths.push(textOffsetX);
+            line++;
+            maxWidth = Math.max(maxWidth, textOffsetX);
+            textOffsetX = 0;
+            textOffsetY -= font.lineHeight;
+            printedCharCount++;
+          }
         }
       }
     }
@@ -173,45 +225,23 @@ export class UIElementText implements ISharedUniformBuffer {
 
     const textBuffer = device.createBuffer({
       label: 'msdf text buffer',
-      size: (text.length + 6) * Float32Array.BYTES_PER_ELEMENT * 4,
+      size: text.length * Float32Array.BYTES_PER_ELEMENT * 4,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       mappedAtCreation: true,
     });
 
     const textArray = new Float32Array(textBuffer.getMappedRange());
-    let offset = 24; // Accounts for the values managed by MsdfText internally.
-
-    // Set the first part of the text array as an identity matrix and default pixel scale
-    textArray[0] = 1.0;
-    textArray[1] = 0;
-    textArray[2] = 0;
-    textArray[3] = 0;
-    textArray[4] = 0;
-    textArray[5] = 1.0;
-    textArray[6] = 0;
-    textArray[7] = 0;
-    textArray[8] = 0;
-    textArray[9] = 0;
-    textArray[10] = 1.0;
-    textArray[11] = 0;
-    textArray[12] = 0;
-    textArray[13] = 0;
-    textArray[14] = 0;
-    textArray[15] = 1.0;
-
-    textArray[16] = 1.0;
-    textArray[17] = 0;
-    textArray[18] = 0;
-    textArray[19] = 1;
-    textArray[20] = this._fontSizeInPixels / font.size; // Pixel scale
+    let offset = 0; // Accounts for the values managed by MsdfText internally.
+    const widthLimit = this._width / (this._fontSizeInPixels / font.size);
 
     if (options.centered) {
-      this.textMeasurements = this.measureText(font, text);
+      this.textMeasurements = this.measureText(font, text, widthLimit);
 
       // Is this call doing anything?
       this.measureText(
         font,
         text,
+        widthLimit,
         (textX: number, textY: number, line: number, char: MsdfChar) => {
           const lineOffset =
             this.textMeasurements.width * -0.5 -
@@ -229,6 +259,7 @@ export class UIElementText implements ISharedUniformBuffer {
       this.textMeasurements = this.measureText(
         font,
         text,
+        widthLimit,
         (textX: number, textY: number, line: number, char: MsdfChar) => {
           textArray[offset] = textX;
           textArray[offset + 1] = textY;
@@ -239,6 +270,26 @@ export class UIElementText implements ISharedUniformBuffer {
     }
 
     textBuffer.unmap();
+
+    const textPropertiesBuffer = device.createBuffer({
+      label: 'msdf text buffer',
+      size: 8 * Float32Array.BYTES_PER_ELEMENT,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true,
+    });
+
+    const textPropertiesArray = new Float32Array(
+      textPropertiesBuffer.getMappedRange()
+    );
+    textPropertiesArray[0] = this._x;
+    textPropertiesArray[1] = this._y;
+    textPropertiesArray[2] = this._fontSizeInPixels / font.size;
+    textPropertiesArray[3] = 0.0;
+    textPropertiesArray[4] = options.color ? options.color[0] : 1.0;
+    textPropertiesArray[5] = options.color ? options.color[1] : 1.0;
+    textPropertiesArray[6] = options.color ? options.color[2] : 1.0;
+    textPropertiesArray[7] = options.color ? options.color[3] : 1.0;
+    textPropertiesBuffer.unmap();
 
     this.bindGroup = device.createBindGroup({
       label: 'msdf text bind group',
@@ -251,6 +302,10 @@ export class UIElementText implements ISharedUniformBuffer {
         {
           binding: 1,
           resource: { buffer: textBuffer },
+        },
+        {
+          binding: 2,
+          resource: { buffer: textPropertiesBuffer },
         },
       ],
     });
