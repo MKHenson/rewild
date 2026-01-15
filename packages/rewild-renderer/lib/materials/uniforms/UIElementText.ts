@@ -27,6 +27,7 @@ export class UIElementText implements ISharedUniformBuffer {
   private _x: number;
   private _y: number;
   private _width: number;
+  private _wordWrap: boolean = true;
 
   constructor(
     group: number,
@@ -44,6 +45,7 @@ export class UIElementText implements ISharedUniformBuffer {
     this.x = 200;
     this.y = 200;
     this.width = 100;
+    this.wordWrap = true;
   }
 
   destroy(): void {
@@ -74,6 +76,17 @@ export class UIElementText implements ISharedUniformBuffer {
   public set y(value: number) {
     if (this._y !== value) {
       this._y = value;
+      this.requiresBuild = true;
+    }
+  }
+
+  public get wordWrap(): boolean {
+    return this._wordWrap;
+  }
+
+  public set wordWrap(value: boolean) {
+    if (this._wordWrap !== value) {
+      this._wordWrap = value;
       this.requiresBuild = true;
     }
   }
@@ -137,6 +150,7 @@ export class UIElementText implements ISharedUniformBuffer {
     font: MsdfFont,
     text: string,
     widthLimit: number,
+    wordWrap: boolean,
     charCallback?: (x: number, y: number, line: number, char: MsdfChar) => void
   ): MsdfTextMeasurements {
     let maxWidth = 0;
@@ -147,6 +161,21 @@ export class UIElementText implements ISharedUniformBuffer {
     let line = 0;
     let printedCharCount = 0;
     let nextCharCode = text.charCodeAt(0);
+    let lastWasWhitespace = true;
+
+    const getWordWidth = (startIndex: number): number => {
+      let width = 0;
+      let curr = startIndex;
+      while (curr < text.length) {
+        const c = text.charCodeAt(curr);
+        if (c === 32 || c === 10 || c === 13) break;
+        const n = curr < text.length - 1 ? text.charCodeAt(curr + 1) : -1;
+        width += font.getXAdvance(c, n);
+        curr++;
+      }
+      return width;
+    };
+
     for (let i = 0; i < text.length; ++i) {
       const charCode = nextCharCode;
       nextCharCode = i < text.length - 1 ? text.charCodeAt(i + 1) : -1;
@@ -158,13 +187,29 @@ export class UIElementText implements ISharedUniformBuffer {
           maxWidth = Math.max(maxWidth, textOffsetX);
           textOffsetX = 0;
           textOffsetY -= font.lineHeight;
+          lastWasWhitespace = true;
+          break;
         case 13: // CR
+          lastWasWhitespace = true;
           break;
         case 32: // Space
           // For spaces, advance the offset without actually adding a character.
           textOffsetX += font.getXAdvance(charCode);
+          lastWasWhitespace = true;
           break;
         default: {
+          if (wordWrap && lastWasWhitespace) {
+            const wordWidth = getWordWidth(i);
+            if (textOffsetX > 0 && textOffsetX + wordWidth > widthLimit) {
+              lineWidths.push(textOffsetX);
+              line++;
+              maxWidth = Math.max(maxWidth, textOffsetX);
+              textOffsetX = 0;
+              textOffsetY -= font.lineHeight;
+            }
+          }
+          lastWasWhitespace = false;
+
           if (charCallback) {
             charCallback(
               textOffsetX,
@@ -234,14 +279,22 @@ export class UIElementText implements ISharedUniformBuffer {
     let offset = 0; // Accounts for the values managed by MsdfText internally.
     const widthLimit = this._width / (this._fontSizeInPixels / font.size);
 
+    const wordWrap = this._wordWrap;
+
     if (options.centered) {
-      this.textMeasurements = this.measureText(font, text, widthLimit);
+      this.textMeasurements = this.measureText(
+        font,
+        text,
+        widthLimit,
+        wordWrap
+      );
 
       // Is this call doing anything?
       this.measureText(
         font,
         text,
         widthLimit,
+        wordWrap,
         (textX: number, textY: number, line: number, char: MsdfChar) => {
           const lineOffset =
             this.textMeasurements.width * -0.5 -
@@ -260,6 +313,7 @@ export class UIElementText implements ISharedUniformBuffer {
         font,
         text,
         widthLimit,
+        wordWrap,
         (textX: number, textY: number, line: number, char: MsdfChar) => {
           textArray[offset] = textX;
           textArray[offset + 1] = textY;
