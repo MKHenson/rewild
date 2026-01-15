@@ -60,11 +60,18 @@ export interface MsdfTextMeasurements {
   width: number;
   height: number;
   lineWidths: number[];
+  spacesPerLine: number[];
   printedCharCount: number;
 }
 
 export interface MsdfTextFormattingOptions {
   centered?: boolean;
-  pixelScale?: number;
+  justify?: boolean;
+  x?: number;
+  y?: number;
+  fontSize?: number;
+  wordWrap?: boolean;
+  maxWidth?: number;
+  centered?: boolean;
   color?: [number, number, number, number];
 }
