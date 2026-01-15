@@ -18,11 +18,15 @@ struct Char {
   offset: vec2f,
 };
 
-struct FormattedText {
-  transform: mat4x4f,
-  color: vec4f,
-  scale: f32,
+struct Characters {
   chars: array<vec3f>,
+};
+
+struct TextProperties {
+  position: vec2f,
+  scale: f32,
+  padding0: f32,
+  color: vec4f
 };
 
 struct Viewport {
@@ -36,19 +40,17 @@ struct Viewport {
 
 // Text bindings
 @group(1) @binding(0) var<uniform> viewport: Viewport;
-@group(1) @binding(1) var<storage> text: FormattedText;
+@group(1) @binding(1) var<storage> text: Characters;
+@group(1) @binding(2) var<uniform> textProperties: TextProperties;
 
 @vertex
 fn vs(input : VertexInput) -> VertexOutput {
   let textElement = text.chars[input.instance];
   let char = chars[u32(textElement.z)];
-  let charPos = (pos[input.vertex] * char.size + textElement.xy + char.offset) * text.scale;
+  let charPos = (pos[input.vertex] * char.size + textElement.xy + char.offset) * textProperties.scale;
   
   var output : VertexOutput;
-  let worldPos = text.transform * vec4f(charPos, 0.0, 1.0);
-
-  let fontSizeInPixels = 12.0;
-  let posXYInPixels = vec2f(100.0, 100.00);
+  let posXYInPixels = textProperties.position;
   let position = vec2f(charPos.x, -charPos.y) + posXYInPixels;
  
   // convert the position from pixels to a 0.0 to 1.0 value
@@ -97,5 +99,5 @@ fn fs(input : VertexOutput) -> @location(0) vec4f {
     discard;
   }
 
-  return vec4f(text.color.rgb, text.color.a * alpha);
+  return vec4f(textProperties.color.rgb, textProperties.color.a * alpha);
 }
