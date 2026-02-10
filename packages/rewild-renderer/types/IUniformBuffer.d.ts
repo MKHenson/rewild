@@ -12,7 +12,7 @@ export interface IUniformBuffer {
 }
 
 export interface IPerMeshUniformBuffer extends IUniformBuffer {
-  prepare(renderer: Renderer, camera: Camera, mesh: Transform): void;
+  prepare(renderer: Renderer, camera: Camera, transform: Transform): void;
 }
 
 export interface ISharedUniformBuffer extends IUniformBuffer {

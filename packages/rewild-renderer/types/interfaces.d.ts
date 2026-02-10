@@ -67,11 +67,7 @@ export interface MsdfTextMeasurements {
 export interface MsdfTextFormattingOptions {
   centered?: boolean;
   justify?: boolean;
-  x?: number;
-  y?: number;
   fontSize?: number;
   wordWrap?: boolean;
-  maxWidth?: number;
-  centered?: boolean;
   color?: [number, number, number, number];
 }
