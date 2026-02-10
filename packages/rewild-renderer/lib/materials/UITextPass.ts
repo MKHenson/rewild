@@ -8,6 +8,7 @@ import { Camera } from '../core/Camera';
 import { UIElement } from '../core/UIElement';
 import { UIElementFont } from './uniforms/UIElementFont';
 import { UIElementText } from './uniforms/UIElementText';
+import { MsdfTextFormattingOptions } from '../../types/interfaces';
 
 export class UITextPass implements IMaterialPass {
   pipeline: GPURenderPipeline;
@@ -16,19 +17,21 @@ export class UITextPass implements IMaterialPass {
   sharedUniformsTracker: SharedUniformsTracker;
   side: GPUFrontFace;
   textUniform: UIElementText;
+  uiFont: UIElementFont;
+  private renderBundle: GPURenderBundle | null = null;
 
-  constructor() {
+  constructor(text: string = '', options?: MsdfTextFormattingOptions) {
     this.side = 'ccw';
     this.requiresRebuild = true;
-    this.textUniform = new UIElementText(1);
-    this.sharedUniformsTracker = new SharedUniformsTracker(this, [
-      new UIElementFont(0),
-    ]);
+    this.textUniform = new UIElementText(1, text, options);
+    (this.uiFont = new UIElementFont(0)),
+      (this.sharedUniformsTracker = new SharedUniformsTracker(this, []));
     this.perMeshTracker = new PerMeshTracker(this, () => []);
   }
 
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
+    this.renderBundle = null;
     const { device, presentationFormat } = renderer;
 
     const module = device.createShaderModule({
@@ -74,6 +77,7 @@ export class UITextPass implements IMaterialPass {
   dispose(): void {
     this.sharedUniformsTracker.dispose();
     this.perMeshTracker.dispose();
+    this.renderBundle = null;
   }
 
   isGeometryCompatible(geometry: Geometry): boolean {
@@ -87,26 +91,44 @@ export class UITextPass implements IMaterialPass {
     elements: UIElement[],
     geometry: Geometry
   ): void {
-    pass.setPipeline(this.pipeline);
-    this.sharedUniformsTracker.prepareMeshUniforms(
-      renderer,
-      pass,
-      camera,
-      elements
-    );
+    const fontUniform = this.uiFont;
 
+    // Build font bind group if needed
+    if (fontUniform.requiresBuild) {
+      fontUniform.build(
+        renderer,
+        this.pipeline.getBindGroupLayout(fontUniform.group)
+      );
+      this.renderBundle = null;
+    }
+
+    // Build text uniform if needed
     if (this.textUniform.requiresBuild) {
       this.textUniform.build(
         renderer,
         this.pipeline.getBindGroupLayout(this.textUniform.group)
       );
+      this.renderBundle = null;
     }
 
+    // Prepare text buffers (may flag requiresBuild for next frame)
     for (const mesh of elements) {
       this.textUniform.prepare(renderer, camera, mesh.transform);
     }
 
-    pass.setBindGroup(this.textUniform.group, this.textUniform.bindGroup);
-    pass.draw(4, this.textUniform.textMeasurements.printedCharCount);
+    // Record render bundle if invalidated
+    if (!this.renderBundle) {
+      const encoder = renderer.device.createRenderBundleEncoder({
+        colorFormats: [renderer.presentationFormat],
+        sampleCount: renderer.sampleCount,
+      });
+      encoder.setPipeline(this.pipeline);
+      encoder.setBindGroup(fontUniform.group, fontUniform.bindGroup);
+      encoder.setBindGroup(this.textUniform.group, this.textUniform.bindGroup);
+      encoder.draw(4, this.textUniform.textMeasurements.printedCharCount);
+      this.renderBundle = encoder.finish();
+    }
+
+    pass.executeBundles([this.renderBundle]);
   }
 }
