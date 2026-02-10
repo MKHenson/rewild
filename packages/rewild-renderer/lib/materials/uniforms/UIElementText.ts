@@ -287,7 +287,7 @@ export class UIElementText {
               -0.5;
 
           textArray[offset] = textX + lineOffset;
-          textArray[offset + 1] = textY + this.textMeasurements.height * 0.5;
+          textArray[offset + 1] = textY;
           textArray[offset + 2] = char.charIndex;
           offset += 4;
         }
@@ -391,8 +391,13 @@ export class UIElementText {
 
     // Check if element position changed (position is externally driven,
     // so we must check every frame)
-    const elementX = element.getX(renderer);
-    const elementY = element.getY(renderer);
+    let elementX = element.getX(renderer);
+    let elementY = element.getY(renderer);
+
+    // When centered, position the text at the center of the element bounds
+    if (this._options.centered) {
+      elementX += elementWidth / 2;
+    }
 
     if (
       this.textPropertiesValues[0] !== elementX ||
