@@ -22,10 +22,13 @@ export class UIElementHealthPass implements IMaterialPass {
 
   constructor() {
     this.side = 'ccw';
-    this.textPass = new UITextPass('This is a health bar', {
-      centered: true,
-      fontSize: 14,
-    });
+    this.textPass = new UITextPass(
+      'This is a health bar. This is a health bar. This is a health bar. This is a health bar. This is a health bar. This is a health bar. ',
+      {
+        centered: false,
+        fontSize: 14,
+      }
+    );
     this.requiresRebuild = true;
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       new UIElementShared(0),
