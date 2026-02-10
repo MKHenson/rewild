@@ -29,19 +29,20 @@ export class UIElementText {
 
   constructor(
     group: number,
-    text: string = `Hello World. \nThis is a test of MSDF text rendering.\nIsn't it great?`
-  ) {
-    this.group = group;
-    this.requiresBuild = true;
-    this.requiresUpdate = true;
-    this.text = text;
-    this._options = {
+    text: string = `Hello World. \nThis is a test of MSDF text rendering.\nIsn't it great?`,
+    options: MsdfTextFormattingOptions = {
       centered: false,
       justify: false,
       color: [1, 1, 1, 1],
       fontSize: 12,
       wordWrap: true,
-    };
+    }
+  ) {
+    this.group = group;
+    this.requiresBuild = true;
+    this.requiresUpdate = true;
+    this.text = text;
+    this._options = options;
   }
 
   public get text(): string {

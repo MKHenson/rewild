@@ -1,9 +1,6 @@
 import { Renderer } from '../..';
-import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
-import { Camera } from '../../core/Camera';
-import { Mesh } from '../../core/Mesh';
 
-export class UIElementFont implements ISharedUniformBuffer {
+export class UIElementFont {
   buffer: GPUBuffer;
   group: number;
   bindGroup: GPUBindGroup;
@@ -46,8 +43,4 @@ export class UIElementFont implements ISharedUniformBuffer {
       ],
     });
   }
-
-  setNumInstances(numInstances: number): void {}
-
-  prepare(renderer: Renderer, camera: Camera, meshes: Mesh[]): void {}
 }
