@@ -9,7 +9,7 @@ export class UIElementFont implements ISharedUniformBuffer {
   bindGroup: GPUBindGroup;
   requiresBuild: boolean;
 
-  constructor(group: number, text: string = 'Hello World') {
+  constructor(group: number) {
     this.group = group;
     this.requiresBuild = true;
   }
@@ -49,20 +49,5 @@ export class UIElementFont implements ISharedUniformBuffer {
 
   setNumInstances(numInstances: number): void {}
 
-  prepare(renderer: Renderer, camera: Camera, meshes: Mesh[]): void {
-    // const { device } = renderer;
-    // // Set the uniform values in our JavaScript side Float32Array
-    // this.resolutionValue.set([
-    //   renderer.canvas.width,
-    //   renderer.canvas.height,
-    //   renderer.totalDeltaTime,
-    //   0,
-    // ]);
-    // // upload the uniform values to the uniform buffer
-    // device.queue.writeBuffer(
-    //   this.uniformBuffer,
-    //   0,
-    //   this.uniformValues as BufferSource
-    // );
-  }
+  prepare(renderer: Renderer, camera: Camera, meshes: Mesh[]): void {}
 }

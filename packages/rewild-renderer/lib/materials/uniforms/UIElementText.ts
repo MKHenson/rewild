@@ -4,12 +4,12 @@ import {
   MsdfTextFormattingOptions,
   MsdfTextMeasurements,
 } from '../../../types/interfaces';
-import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
+import { Transform } from '../../core/Transform';
 import { UIElement } from '../../core/UIElement';
 import { MsdfFont } from '../../fonts/MsdfFont';
 
-export class UIElementText implements ISharedUniformBuffer {
+export class UIElementText {
   buffer: GPUBuffer;
   group: number;
   bindGroup: GPUBindGroup;
@@ -18,11 +18,14 @@ export class UIElementText implements ISharedUniformBuffer {
   textMeasurements: MsdfTextMeasurements;
 
   viewportBuffer: GPUBuffer;
-  // uniformValues: Float32Array;
   viewportValues: Float32Array;
+
+  textPropertiesBuffer: GPUBuffer;
+  textPropertiesValues: Float32Array;
 
   private _text: string;
   private _options: MsdfTextFormattingOptions;
+  private _lastMaxWidth: number;
 
   constructor(
     group: number,
@@ -37,10 +40,7 @@ export class UIElementText implements ISharedUniformBuffer {
       justify: false,
       color: [1, 1, 1, 1],
       fontSize: 12,
-      maxWidth: 100,
       wordWrap: true,
-      x: 200,
-      y: 200,
     };
   }
 
@@ -60,6 +60,10 @@ export class UIElementText implements ISharedUniformBuffer {
 
     if (this.viewportBuffer) {
       this.viewportBuffer.destroy();
+    }
+
+    if (this.textPropertiesBuffer) {
+      this.textPropertiesBuffer.destroy();
     }
   }
 
@@ -99,6 +103,7 @@ export class UIElementText implements ISharedUniformBuffer {
     let spacesInCurrentLine = 0;
 
     let textOffsetX = 0;
+
     // When justifying, we need a separate cursor for the visual position (with gaps)
     // vs the logical position (for wrapping calculations).
     let renderOffsetX = 0;
@@ -253,8 +258,8 @@ export class UIElementText implements ISharedUniformBuffer {
 
     const textArray = new Float32Array(textBuffer.getMappedRange());
     let offset = 0; // Accounts for the values managed by MsdfText internally.
-    const widthLimit =
-      this._options.maxWidth! / (this._options.fontSize! / font.size);
+    const maxWidth = this._lastMaxWidth || 100;
+    const widthLimit = maxWidth / (this._options.fontSize! / font.size);
 
     const wordWrap = this._options.wordWrap || false;
 
@@ -267,7 +272,6 @@ export class UIElementText implements ISharedUniformBuffer {
         null
       );
 
-      // Is this call doing anything?
       this.measureText(
         font,
         text,
@@ -313,25 +317,33 @@ export class UIElementText implements ISharedUniformBuffer {
 
     textBuffer.unmap();
 
-    const textPropertiesBuffer = device.createBuffer({
-      label: 'msdf text buffer',
-      size: 8 * Float32Array.BYTES_PER_ELEMENT,
+    const textPropertiesBufferSize = 8 * Float32Array.BYTES_PER_ELEMENT;
+    this.textPropertiesBuffer = device.createBuffer({
+      label: 'msdf text properties',
+      size: textPropertiesBufferSize,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
     });
 
-    const textPropertiesArray = new Float32Array(
-      textPropertiesBuffer.getMappedRange()
+    this.textPropertiesValues = new Float32Array(8);
+    // x, y will be set dynamically in prepare() from the UIElement
+    this.textPropertiesValues[0] = 0;
+    this.textPropertiesValues[1] = 0;
+    this.textPropertiesValues[2] = this._options.fontSize! / font.size;
+    this.textPropertiesValues[3] = 0.0;
+    this.textPropertiesValues[4] = options.color ? options.color[0] : 1.0;
+    this.textPropertiesValues[5] = options.color ? options.color[1] : 1.0;
+    this.textPropertiesValues[6] = options.color ? options.color[2] : 1.0;
+    this.textPropertiesValues[7] = options.color ? options.color[3] : 1.0;
+
+    // Write the initial static properties (fontSize, color) to the buffer.
+    // x/y (indices 0,1) will be written in prepare() from the UIElement.
+    device.queue.writeBuffer(
+      this.textPropertiesBuffer,
+      0,
+      this.textPropertiesValues.buffer,
+      0,
+      this.textPropertiesValues.byteLength
     );
-    textPropertiesArray[0] = this._options.x!;
-    textPropertiesArray[1] = this._options.y!;
-    textPropertiesArray[2] = this._options.fontSize! / font.size;
-    textPropertiesArray[3] = 0.0;
-    textPropertiesArray[4] = options.color ? options.color[0] : 1.0;
-    textPropertiesArray[5] = options.color ? options.color[1] : 1.0;
-    textPropertiesArray[6] = options.color ? options.color[2] : 1.0;
-    textPropertiesArray[7] = options.color ? options.color[3] : 1.0;
-    textPropertiesBuffer.unmap();
 
     this.bindGroup = device.createBindGroup({
       label: 'msdf text bind group',
@@ -347,7 +359,7 @@ export class UIElementText implements ISharedUniformBuffer {
         },
         {
           binding: 2,
-          resource: { buffer: textPropertiesBuffer },
+          resource: { buffer: this.textPropertiesBuffer },
         },
       ],
     });
@@ -355,7 +367,13 @@ export class UIElementText implements ISharedUniformBuffer {
 
   setNumInstances(numInstances: number): void {}
 
-  prepare(renderer: Renderer, camera: Camera, elements: UIElement[]): void {
+  prepare(renderer: Renderer, camera: Camera, transform: Transform): void {
+    const element = transform.component as UIElement;
+    if (!element) return;
+
+    const { device } = renderer;
+
+    // Check if viewport size changed
     if (
       this.viewportValues[0] !== renderer.canvas.width ||
       this.viewportValues[1] !== renderer.canvas.height
@@ -363,20 +381,48 @@ export class UIElementText implements ISharedUniformBuffer {
       this.requiresUpdate = true;
     }
 
-    if (!this.requiresUpdate) return;
+    // Check if element width changed (used as maxWidth for text wrapping)
+    const elementWidth = element.getWidth(renderer);
+    if (this._lastMaxWidth !== elementWidth) {
+      this._lastMaxWidth = elementWidth;
+      this.requiresBuild = true;
+    }
 
-    const { device } = renderer;
+    // Check if element position changed (position is externally driven,
+    // so we must check every frame)
+    const elementX = element.getX(renderer);
+    const elementY = element.getY(renderer);
+
+    if (
+      this.textPropertiesValues[0] !== elementX ||
+      this.textPropertiesValues[1] !== elementY
+    ) {
+      this.textPropertiesValues[0] = elementX;
+      this.textPropertiesValues[1] = elementY;
+      this.requiresUpdate = true;
+    }
+
+    if (!this.requiresUpdate) return;
     this.requiresUpdate = false;
 
+    // Write viewport
     this.viewportValues[0] = renderer.canvas.width;
     this.viewportValues[1] = renderer.canvas.height;
-
     device.queue.writeBuffer(
       this.viewportBuffer,
       0,
       this.viewportValues.buffer,
       0,
       this.viewportValues.byteLength
+    );
+
+    // Write text properties (position, fontSize, color)
+    device.queue.writeBuffer(
+      this.textPropertiesBuffer,
+      0,
+      this.textPropertiesValues.buffer,
+      0,
+      this.textPropertiesValues.byteLength
     );
   }
 }

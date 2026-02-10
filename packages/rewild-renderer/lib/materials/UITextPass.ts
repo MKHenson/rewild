@@ -23,7 +23,6 @@ export class UITextPass implements IMaterialPass {
     this.textUniform = new UIElementText(1);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       new UIElementFont(0),
-      this.textUniform,
     ]);
     this.perMeshTracker = new PerMeshTracker(this, () => []);
   }
@@ -96,6 +95,18 @@ export class UITextPass implements IMaterialPass {
       elements
     );
 
+    if (this.textUniform.requiresBuild) {
+      this.textUniform.build(
+        renderer,
+        this.pipeline.getBindGroupLayout(this.textUniform.group)
+      );
+    }
+
+    for (const mesh of elements) {
+      this.textUniform.prepare(renderer, camera, mesh.transform);
+    }
+
+    pass.setBindGroup(this.textUniform.group, this.textUniform.bindGroup);
     pass.draw(4, this.textUniform.textMeasurements.printedCharCount);
   }
 }
