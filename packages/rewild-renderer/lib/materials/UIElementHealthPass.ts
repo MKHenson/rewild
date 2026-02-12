@@ -9,7 +9,6 @@ import { UIElementShared } from './uniforms/UIElementShared';
 import { UIElementInstanceData } from './uniforms/UIElementInstanceData';
 import { UIElement } from '../core/UIElement';
 import { UIElementHealth } from './uniforms/UIElementHealth';
-import { UITextPass } from './UITextPass';
 
 export class UIElementHealthPass implements IMaterialPass {
   pipeline: GPURenderPipeline;
@@ -18,17 +17,8 @@ export class UIElementHealthPass implements IMaterialPass {
   sharedUniformsTracker: SharedUniformsTracker;
   side: GPUFrontFace;
 
-  textPass: UITextPass;
-
   constructor() {
     this.side = 'ccw';
-    this.textPass = new UITextPass(
-      'This is a health bar. This is a health bar. This is a health bar. This is a health bar. This is a health bar. This is a health bar. ',
-      {
-        centered: false,
-        fontSize: 14,
-      }
-    );
     this.requiresRebuild = true;
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       new UIElementShared(0),
@@ -45,7 +35,6 @@ export class UIElementHealthPass implements IMaterialPass {
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
 
-    this.textPass.init(renderer);
     const { device, presentationFormat } = renderer;
 
     const module = device.createShaderModule({
@@ -108,7 +97,6 @@ export class UIElementHealthPass implements IMaterialPass {
   dispose(): void {
     this.sharedUniformsTracker.dispose();
     this.perMeshTracker.dispose();
-    this.textPass.dispose();
   }
 
   isGeometryCompatible(geometry: Geometry): boolean {
@@ -136,7 +124,5 @@ export class UIElementHealthPass implements IMaterialPass {
 
     const numIndices = geometry.indices!.length;
     pass.drawIndexed(numIndices, elements.length);
-
-    this.textPass.render(renderer, pass, camera, elements, geometry);
   }
 }

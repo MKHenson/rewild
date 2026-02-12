@@ -2,9 +2,15 @@ import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from '../materials/IMaterialPass';
 import { Intersection, UIRaycaster } from './Raycaster';
 import { Transform } from './Transform';
-import { IComponent, IMeshComponent, IRaycaster } from '../../types/interfaces';
+import {
+  IComponent,
+  IMeshComponent,
+  IRaycaster,
+  MsdfTextFormattingOptions,
+} from '../../types/interfaces';
 import { Color } from 'rewild-common';
 import { Renderer } from '..';
+import { TextRenderer } from './text-renderer/TextRenderer';
 
 export class UIElement implements IComponent, IMeshComponent {
   geometry: Geometry;
@@ -12,6 +18,10 @@ export class UIElement implements IComponent, IMeshComponent {
   transform: Transform;
   visible: boolean;
   percentageBasedCalculation: boolean;
+
+  private _text?: string;
+  private _textRenderer: TextRenderer | null = null;
+  private _textOptions: MsdfTextFormattingOptions;
   private _width: f32;
   private _height: f32;
   private _backgroundColor: Color;
@@ -37,7 +47,43 @@ export class UIElement implements IComponent, IMeshComponent {
     this.borderRadius = 0.0;
     this.percentageBasedCalculation = false;
 
+    this._textOptions = { fontSize: 14, wordWrap: true };
     this.setMaterial(material);
+  }
+
+  get text(): string | undefined {
+    return this._text;
+  }
+
+  set text(value: string | undefined) {
+    this._text = value;
+    if (value) {
+      if (!this._textRenderer) {
+        this._textRenderer = new TextRenderer(value, this._textOptions);
+      } else {
+        this._textRenderer.textUniform.text = value;
+      }
+    } else {
+      if (this._textRenderer) {
+        this._textRenderer.dispose();
+        this._textRenderer = null;
+      }
+    }
+  }
+
+  get textRenderer(): TextRenderer | null {
+    return this._textRenderer;
+  }
+
+  get textOptions(): MsdfTextFormattingOptions {
+    return this._textOptions;
+  }
+
+  set textOptions(value: MsdfTextFormattingOptions) {
+    this._textOptions = value;
+    if (this._textRenderer) {
+      this._textRenderer.textUniform.options = value;
+    }
   }
 
   get borderRadius(): f32 {

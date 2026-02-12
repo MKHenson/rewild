@@ -151,6 +151,34 @@ export class Renderer {
 
     this.guiManager.initialize(this);
 
+    const element = this.guiManager.createElement(
+      this.materialManager.get('ui-material')
+    );
+    const element2 = this.guiManager.createElement(
+      this.materialManager.get('ui-material')
+    );
+    this.ui.addChild(element.transform);
+
+    element.x = 0.3;
+    element.y = 0.2;
+    element.percentageBasedCalculation = true;
+    element.width = 0.3;
+    element.height = 0.1;
+    element.borderRadius = 10;
+    element.backgroundColor.setRGB(0.3, 0.3, 0.3);
+    element.text = 'Hello, World!';
+
+    element2.x = 0.5;
+    element2.y = 0;
+    element2.percentageBasedCalculation = true;
+    element2.width = 0.5;
+    element2.height = 1;
+    element2.backgroundColorAlpha = 1;
+    element.backgroundColor.setRGB(1, 0, 0);
+    element2.text =
+      'This is a vertical text element.It supports multiple lines. And word wrap if enabled in the text options.';
+    element.transform.addChild(element2.transform);
+
     this.lastTime = performance.now();
     this.delta = 0;
     this.totalDeltaTime = 0;
@@ -453,29 +481,53 @@ export class Renderer {
 
       device.queue.submit([postProcessingEncoder.finish()]);
 
-      const uiRenderList = this.organizeVisuals(
-        this.currentRenderList.uiElements
-      );
+      // Render UI elements one at a time so text is interleaved
+      // with element quads for correct z-ordering (painter's algorithm).
+      // Each element gets its own encoder+pass+submit so that the shared
+      // storage buffer writes (via queue.writeBuffer) are consumed before
+      // the next element overwrites them.
+      for (const transform of this.currentRenderList.uiElements) {
+        const element = transform.component as UIElement;
+        if (!element?.visible) continue;
 
-      // Now render any remaining renderables like the GUI
-      const guiEncoder = device.createCommandEncoder({
-        label: 'GUI encoder',
-      });
+        const materialPass = element.material;
+        if (element.geometry.requiresBuild) element.geometry.build(this.device);
+        if (materialPass.requiresRebuild) materialPass.init(this);
 
-      const guiPass = guiEncoder.beginRenderPass({
-        colorAttachments: [
-          {
-            view: context.getCurrentTexture().createView(),
-            clearValue: [0.0, 0.0, 0.0, 0.0],
-            loadOp: 'load',
-            storeOp: 'store',
-          },
-        ],
-      });
+        const guiEncoder = device.createCommandEncoder({
+          label: 'GUI encoder',
+        });
 
-      this.renderGroupings(uiRenderList, guiPass, camera.camera);
-      guiPass.end();
-      device.queue.submit([guiEncoder.finish()]);
+        const guiPass = guiEncoder.beginRenderPass({
+          colorAttachments: [
+            {
+              view: context.getCurrentTexture().createView(),
+              clearValue: [0.0, 0.0, 0.0, 0.0],
+              loadOp: 'load',
+              storeOp: 'store',
+            },
+          ],
+        });
+
+        // Draw the element quad
+        materialPass.render(
+          this,
+          guiPass,
+          camera.camera,
+          [element],
+          element.geometry
+        );
+
+        // Draw text on top of this element, before the next element
+        const textRenderer = element.textRenderer;
+        if (textRenderer) {
+          if (textRenderer.requiresRebuild) textRenderer.init(this);
+          textRenderer.render(this, guiPass, camera.camera, element);
+        }
+
+        guiPass.end();
+        device.queue.submit([guiEncoder.finish()]);
+      }
     }
   }
 }
