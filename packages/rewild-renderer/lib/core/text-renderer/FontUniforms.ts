@@ -1,6 +1,6 @@
 import { Renderer } from '../..';
 
-export class UIElementFont {
+export class FontUniforms {
   buffer: GPUBuffer;
   group: number;
   bindGroup: GPUBindGroup;

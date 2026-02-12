@@ -1,32 +1,28 @@
-import { Geometry } from '../geometry/Geometry';
-import { IMaterialPass } from './IMaterialPass';
-import shader from '../shaders/msdf-character.wgsl';
-import { Renderer } from '..';
-import { PerMeshTracker } from './PerMeshTracker';
-import { SharedUniformsTracker } from './SharedUniformsTracker';
-import { Camera } from '../core/Camera';
-import { UIElement } from '../core/UIElement';
-import { UIElementFont } from './uniforms/UIElementFont';
-import { UIElementText } from './uniforms/UIElementText';
-import { MsdfTextFormattingOptions } from '../../types/interfaces';
+import shader from '../../shaders/msdf-character.wgsl';
+import { Renderer } from '../..';
+import { PerMeshTracker } from '../../materials/PerMeshTracker';
+import { SharedUniformsTracker } from '../../materials/SharedUniformsTracker';
+import { Camera } from '../Camera';
+import { UIElement } from '../UIElement';
+import { FontUniforms } from './FontUniforms';
+import { TextUniforms } from './TextUniforms';
+import { MsdfTextFormattingOptions } from '../../../types/interfaces';
 
-export class UITextPass implements IMaterialPass {
+export class TextRenderer {
   pipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
   sharedUniformsTracker: SharedUniformsTracker;
   side: GPUFrontFace;
-  textUniform: UIElementText;
-  uiFont: UIElementFont;
+  textUniform: TextUniforms;
+  uiFont: FontUniforms;
   private renderBundle: GPURenderBundle | null = null;
 
   constructor(text: string = '', options?: MsdfTextFormattingOptions) {
     this.side = 'ccw';
     this.requiresRebuild = true;
-    this.textUniform = new UIElementText(1, text, options);
-    (this.uiFont = new UIElementFont(0)),
-      (this.sharedUniformsTracker = new SharedUniformsTracker(this, []));
-    this.perMeshTracker = new PerMeshTracker(this, () => []);
+    this.textUniform = new TextUniforms(1, text, options);
+    this.uiFont = new FontUniforms(0);
   }
 
   init(renderer: Renderer): void {
@@ -80,16 +76,11 @@ export class UITextPass implements IMaterialPass {
     this.renderBundle = null;
   }
 
-  isGeometryCompatible(geometry: Geometry): boolean {
-    return false;
-  }
-
   render(
     renderer: Renderer,
     pass: GPURenderPassEncoder,
     camera: Camera,
-    elements: UIElement[],
-    geometry: Geometry
+    element: UIElement
   ): void {
     const fontUniform = this.uiFont;
 
@@ -111,10 +102,7 @@ export class UITextPass implements IMaterialPass {
       this.renderBundle = null;
     }
 
-    // Prepare text buffers (may flag requiresBuild for next frame)
-    for (const mesh of elements) {
-      this.textUniform.prepare(renderer, camera, mesh.transform);
-    }
+    this.textUniform.prepare(renderer, camera, element.transform);
 
     // Record render bundle if invalidated
     if (!this.renderBundle) {

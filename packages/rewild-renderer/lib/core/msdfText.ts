@@ -464,6 +464,7 @@ export class MsdfTextRenderer {
           maxWidth = Math.max(maxWidth, textOffsetX);
           textOffsetX = 0;
           textOffsetY -= font.lineHeight;
+          break;
         case 13: // CR
           break;
         case 32: // Space

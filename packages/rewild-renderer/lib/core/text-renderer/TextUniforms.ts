@@ -4,12 +4,12 @@ import {
   MsdfTextFormattingOptions,
   MsdfTextMeasurements,
 } from '../../../types/interfaces';
-import { Camera } from '../../core/Camera';
-import { Transform } from '../../core/Transform';
-import { UIElement } from '../../core/UIElement';
+import { Camera } from '../Camera';
+import { Transform } from '../Transform';
+import { UIElement } from '../UIElement';
 import { MsdfFont } from '../../fonts/MsdfFont';
 
-export class UIElementText {
+export class TextUniforms {
   buffer: GPUBuffer;
   group: number;
   bindGroup: GPUBindGroup;
@@ -76,19 +76,6 @@ export class UIElementText {
     this._options = value;
     this.requiresBuild = true;
   }
-
-  //  setColor(r: number, g: number, b: number, a: number = 1.0) {
-  //   this.bufferArray[16] = r;
-  //   this.bufferArray[17] = g;
-  //   this.bufferArray[18] = b;
-  //   this.bufferArray[19] = a;
-  //   this.bufferArrayDirty = true;
-  // }
-
-  // setPixelScale(pixelScale: number) {
-  //   this.bufferArray[20] = pixelScale;
-  //   this.bufferArrayDirty = true;
-  // }
 
   measureText(
     font: MsdfFont,
