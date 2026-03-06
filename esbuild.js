@@ -37,15 +37,15 @@ const defines = {
   ),
 };
 
-let examplePlugin = {
-  name: 'example',
+const logPlugin = {
+  name: 'log',
   setup(build) {
     build.onStart(() => {
       console.log('build started');
-    }),
-      build.onEnd((result) => {
-        console.log(`build ended with ${result.errors.length} errors`);
-      });
+    });
+    build.onEnd((result) => {
+      console.log(`build ended with ${result.errors.length} errors`);
+    });
   },
 };
 
@@ -104,8 +104,8 @@ const wgslInlineIncludePlugin = {
   },
 };
 
-async function watch() {
-  let ctx = await esbuild.context({
+function getConfig() {
+  return {
     entryPoints: {
       main: './src/index.tsx',
       terrainWorker:
@@ -117,35 +117,22 @@ async function watch() {
     },
     bundle: true,
     sourcemap: true,
-    external: [],
     tsconfig: './src/tsconfig.json',
     outdir: './public',
     define: defines,
-    plugins: [examplePlugin, wgslInlineIncludePlugin, copy(copyPluginDetails)],
-  });
+    plugins: [logPlugin, wgslInlineIncludePlugin, copy(copyPluginDetails)],
+  };
+}
+
+async function watch() {
+  let ctx = await esbuild.context(getConfig());
   await ctx.watch({});
   console.log('Watching...');
 }
 
 async function build() {
   copyPluginDetails.assets.forEach((asset) => (asset.watch = false));
-
-  await esbuild.build({
-    entryPoints: {
-      main: './src/index.tsx',
-      terrainWorker:
-        'rewild-renderer/lib/renderers/terrain/worker/TerrainWorker.ts',
-    },
-    loader: {
-      '.wgsl': 'text', // Add this line to handle .wgsl files
-      '.wasm': 'file', // Handles .wasm files
-    },
-    bundle: true,
-    tsconfig: './src/tsconfig.json',
-    outdir: './public',
-    define: defines,
-    plugins: [examplePlugin, wgslInlineIncludePlugin, copy(copyPluginDetails)],
-  });
+  await esbuild.build(getConfig());
 }
 
 if (process.argv.join('').includes('watch')) watch();
