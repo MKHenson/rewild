@@ -2,7 +2,7 @@
   "name": "rewild-common",
   "version": "1.0.0",
   "description": "A common set of files & standards",
-  "main": "index.js",
+  "main": "index.ts",
   "devDependencies": {
     "rimraf": "5.0.0",
     "typescript": "4.9.4"
