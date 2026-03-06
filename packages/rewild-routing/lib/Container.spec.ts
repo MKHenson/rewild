@@ -1,20 +1,6 @@
 import { Container } from './Container';
 import { Asset3D } from './testUtils';
 
-// Mock the wasm object in the rewild-wasmtime module
-jest.mock('rewild-wasmtime/lib/WasmManager', () => {
-  const wasm = {
-    setId: jest.fn(),
-    disposeObject: jest.fn(),
-    addChild: jest.fn(),
-    removeChild: jest.fn(),
-  };
-
-  return {
-    wasm,
-  };
-});
-
 describe('Container', () => {
   it('creates a container with the correct defaults', () => {
     const container = new Container('Test', true, new Asset3D('Test', '1'));

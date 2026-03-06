@@ -28,26 +28,6 @@ const copyPluginDetails = {
       to: ['./public'], // Destination folder
       watch: true,
     },
-    {
-      from: ['./packages/rewild-assembly/build/release.wasm'],
-      to: ['./public/release.wasm'],
-      watch: true,
-    },
-    {
-      from: ['./packages/rewild-assembly/build/release.wasm.map'],
-      to: ['./public/release.wasm.map'],
-      watch: true,
-    },
-    {
-      from: ['./packages/rewild-assembly/build/release.js'],
-      to: ['./public/release.js'],
-      watch: true,
-    },
-    {
-      from: ['./packages/rewild-assembly/build/release.d.ts'],
-      to: ['./public/release.d.ts'],
-      watch: true,
-    },
   ],
 };
 
