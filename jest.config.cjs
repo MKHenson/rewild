@@ -9,7 +9,7 @@ module.exports = {
   setupFiles: ['./jest.setup.js'],
   testEnvironment: 'jsdom',
   testMatch: ['<rootDir>/src/**/*+(spec|test).[jt]s?(x)'],
-  transform: {
-    '^.+\\.(js|jsx|ts|tsx|mjs)$': 'babel-jest',
-  },
+      transform: {
+        '^.+\\.[jt]sx?$': '<rootDir>/jest.transform.cjs',
+      },
 };

@@ -4,11 +4,11 @@
   "description": "Game about exploring earth's history",
   "type": "module",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "test": "npm run unit-tests && npm run test --workspaces --if-present",
-    "unit-tests": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "unit-tests": "jest",
     "clean": "rimraf public",
     "build": "npm run clean && node ./esbuild.js && npm run ts-check",
     "ts-check": "tsc --noEmit --project src/tsconfig.json",
@@ -31,15 +31,11 @@
     "firebaseui": "^6.0.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.21.4",
-    "@babel/preset-env": "^7.21.4",
-    "@babel/preset-typescript": "^7.21.4",
     "@loaders.gl/core": "4.3.4",
     "@loaders.gl/gltf": "4.3.4",
     "@types/jest": "^29.5.0",
     "@types/node": "24.9.1",
     "@webgpu/types": "0.1.21",
-    "babel-jest": "^29.5.0",
     "esbuild": "0.17.18",
     "esbuild-plugin-copy": "^2.1.1",
     "jest": "^29.5.0",

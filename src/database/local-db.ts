@@ -1,4 +1,4 @@
-import { IDataTable, IDataTableQuery } from 'models';
+import type { IDataTable, IDataTableQuery } from 'models';
 import { generateUUID } from 'rewild-common';
 
 export class LocalDataTable<T> implements IDataTable<T> {
