@@ -1,4 +1,4 @@
-import { Store } from '../lib/Store';
+import { Store } from './Store';
 
 interface IReference {}
 interface IPerson extends IReference {
