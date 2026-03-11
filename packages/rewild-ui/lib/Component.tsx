@@ -82,7 +82,7 @@ export abstract class Component<T = any>
           lenOfExistingChildren > curLengthChildren &&
           curLengthChildren > 0
         ) {
-          for (let i = lenOfExistingChildren - 1; i > curLengthChildren; i--) {
+          for (let i = lenOfExistingChildren - 1; i >= curLengthChildren; i--) {
             existingChildren[i].remove();
           }
         }
