@@ -1,9 +1,9 @@
-import { Button } from "./Button";
-import { Popup } from "./Popup";
-import { Typography } from "./Typography";
-import { Component, register } from "../Component";
+import { Button } from './Button';
+import { Popup } from './Popup';
+import { Typography } from './Typography';
+import { Component, register } from '../Component';
 
-interface Props {
+export interface ModalProps {
   title?: JSX.Element | string;
   open: boolean;
   withBackground?: boolean;
@@ -13,8 +13,8 @@ interface Props {
   onOk?: () => void;
 }
 
-@register("x-modal")
-export class Modal extends Component<Props> {
+@register('x-modal')
+export class Modal extends Component<ModalProps> {
   constructor() {
     super({ props: { withBackground: true } });
   }
@@ -31,17 +31,20 @@ export class Modal extends Component<Props> {
     };
 
     return () => (
-      <Popup open={this.props.open} onClose={this.props.onClose} withBackground={this.props.withBackground}>
-        {typeof this.props.title === "string" ? (
+      <Popup
+        open={this.props.open}
+        onClose={this.props.onClose}
+        withBackground={this.props.withBackground}>
+        {typeof this.props.title === 'string' ? (
           <Typography variant="h2">{this.props.title}</Typography>
         ) : (
-          this.props.title || ""
+          this.props.title || ''
         )}
         <div class="content">
           <slot></slot>
         </div>
         {this.props.hideConfirmButtons ? (
-          ""
+          ''
         ) : (
           <div class="button-container">
             <Button onClick={handleCancel} class="cancel" variant="outlined">

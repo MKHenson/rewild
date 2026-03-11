@@ -1,14 +1,14 @@
-import { Component, register } from "../Component";
-import { theme } from "../theme";
+import { Component, register } from '../Component';
+import { theme } from '../theme';
 
-interface Props {
+export interface PopupProps {
   open: boolean;
   withBackground?: boolean;
   onClose?: () => void;
 }
 
-@register("x-popup")
-export class Popup extends Component<Props> {
+@register('x-popup')
+export class Popup extends Component<PopupProps> {
   constructor() {
     super({ props: { withBackground: true } });
   }
@@ -16,20 +16,19 @@ export class Popup extends Component<Props> {
   init() {
     return () => {
       const handleClick = (e: MouseEvent) => {
-        if ((e.target as HTMLElement).classList.contains("wrapper")) {
+        if ((e.target as HTMLElement).classList.contains('wrapper')) {
           this.props.onClose && this.props.onClose();
         }
       };
 
-      this.toggleAttribute("open", this.props.open);
+      this.toggleAttribute('open', this.props.open);
 
       return (
         <div
-          class={`wrapper popup ${this.props.open ? "visible" : ""} ${
-            this.props.withBackground ? "withBackground" : ""
+          class={`wrapper popup ${this.props.open ? 'visible' : ''} ${
+            this.props.withBackground ? 'withBackground' : ''
           }`}
-          onclick={handleClick}
-        >
+          onclick={handleClick}>
           <div class="modal">
             <slot></slot>
           </div>
