@@ -83,23 +83,24 @@ export abstract class Component<T = any>
           curLengthChildren > 0
         ) {
           for (let i = lenOfExistingChildren - 1; i >= curLengthChildren; i--) {
-            existingChildren[i].remove();
+            try {
+              existingChildren[i]?.remove();
+            } catch (_) {}
           }
         }
 
         for (let i = 0, l = curLengthChildren; i < l; i++) {
+          const existingChild = parent.childNodes[i];
           // If the new node is exactly the same - skip it as we dont want to re-render
-          if (
-            i < lenOfExistingChildren &&
-            children[i] === existingChildren[i]
-          ) {
+          if (existingChild && children[i] === existingChild) {
             continue;
           }
           // New node is not the same, and at the same position of an existing element. So replace existing elm with new one.
-          else if (i < lenOfExistingChildren) {
-            const childToReplace = parent.childNodes[i];
-            parent.insertBefore(children[i] as Node, childToReplace);
-            childToReplace.remove();
+          else if (existingChild) {
+            parent.insertBefore(children[i] as Node, existingChild);
+            try {
+              existingChild.remove();
+            } catch (_) {}
           } else parent.append(children[i] as Node);
         }
       } else {
