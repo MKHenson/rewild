@@ -119,7 +119,7 @@ export abstract class Component<T = any>
 
   set props(val: T & JSX.PropsWithChildren & { css?: string }) {
     this._props = val || ({} as any);
-    this.render();
+    this.render?.();
   }
 
   /**
@@ -139,13 +139,13 @@ export abstract class Component<T = any>
     return null;
   }
 
-  useState<T>(defaultValue: T): [() => T, (val: T, render?: boolean) => void] {
+  useState<S>(defaultValue: S): [() => S, (val: S, render?: boolean) => void] {
     let value = defaultValue;
 
-    const getValue = (): T => {
+    const getValue = (): S => {
       return value;
     };
-    const setValue = (newValue: T, render = true) => {
+    const setValue = (newValue: S, render = true) => {
       if (newValue === value) return;
       value = newValue;
       if (render) this.render();
@@ -163,16 +163,16 @@ export abstract class Component<T = any>
     if (!css) return;
 
     const cssIsStylesheetObj = !(typeof css === 'string');
-    let stylesheed: CSSStyleSheet;
+    let stylesheet: CSSStyleSheet;
 
     if (!cssIsStylesheetObj) {
-      stylesheed = new CSSStyleSheet();
-      stylesheed.replaceSync(css);
-    } else stylesheed = css;
+      stylesheet = new CSSStyleSheet();
+      stylesheet.replaceSync(css);
+    } else stylesheet = css;
 
-    this.mergedCss = stylesheed;
-    if (this.props.css) {
-      this.mergedCss = this.mergeCss(stylesheed, this.props.css);
+    this.mergedCss = stylesheet;
+    if (this.props?.css) {
+      this.mergedCss = this.mergeCss(stylesheet, this.props.css);
     }
 
     if (this.shadow) this.shadow.adoptedStyleSheets = [this.mergedCss];
@@ -193,5 +193,12 @@ export abstract class Component<T = any>
   disconnectedCallback() {
     this.onCleanup?.();
     for (const unsubscribeFn of this.trackedUnsubscribes) unsubscribeFn();
+
+    // Remove document-level stylesheets added by non-shadow components
+    if (!this.shadow && this.mergedCss) {
+      document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
+        (s) => s !== this.mergedCss
+      );
+    }
   }
 }

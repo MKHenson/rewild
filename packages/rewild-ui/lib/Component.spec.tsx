@@ -266,6 +266,15 @@ describe('Component', () => {
       c.props = null as any;
       expect(c._props).toEqual({});
     });
+
+    it('setter does not throw if called before _createRenderer', () => {
+      const c = new TestComponent({ props: { label: 'early' } });
+      // render is undefined at this point — setter should guard against it
+      expect(() => {
+        c.props = { label: 'updated' } as any;
+      }).not.toThrow();
+      expect(c._props.label).toBe('updated');
+    });
   });
 
   // ------ useState ------
@@ -453,6 +462,29 @@ describe('Component', () => {
       const c = setup(NoShadowStyledComponent, undefined);
       c.generateCss();
       expect(document.adoptedStyleSheets.length).toBe(before + 1);
+    });
+
+    it('removes document stylesheet on disconnect for non-shadow component', () => {
+      class NoShadowCleanup extends Component {
+        constructor() {
+          super({ useShadow: false, props: {} });
+        }
+        init() {
+          return () => null;
+        }
+        getStyle() {
+          return 'div { color: purple; }';
+        }
+      }
+      customElements.define('x-no-shadow-cleanup', NoShadowCleanup);
+
+      const before = document.adoptedStyleSheets.length;
+      const c = setup(NoShadowCleanup, undefined);
+      c.generateCss();
+      expect(document.adoptedStyleSheets.length).toBe(before + 1);
+
+      c.disconnectedCallback();
+      expect(document.adoptedStyleSheets.length).toBe(before);
     });
   });
 
