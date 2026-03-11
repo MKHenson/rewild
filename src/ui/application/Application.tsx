@@ -3,6 +3,7 @@ import { MainMenu } from './MainMenu';
 import { ProjectEditorPage } from './project-editor/ProjectEditorPage';
 import { InGame } from './InGame';
 import { Auth } from './Auth';
+import { ConfirmationModal } from './ConfirmationModal';
 
 interface Props {}
 
@@ -40,6 +41,7 @@ export class Application extends Component<Props> {
           />
         </RouterSwitch>,
         <Auth />,
+        <ConfirmationModal />,
       ];
     };
   }

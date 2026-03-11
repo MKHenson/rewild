@@ -12,6 +12,7 @@ import {
 import { NewProjectForm } from '../NewProjectForm';
 import { projectsStore } from '../../../stores/ProjectsStore';
 import { ProjectStore } from 'src/ui/stores/ProjectStore';
+import { confirmationStore } from '../../../stores/ConfirmationStore';
 
 interface Props {
   open: boolean;
@@ -29,8 +30,17 @@ export class ProjectSelector extends Component<Props> {
       setNewProject(null);
     };
 
-    const onDelete = async () => {
-      await projectsStore.removeProjects(selectedProject()!.id!);
+    const onDelete = () => {
+      const project = selectedProject()!;
+      confirmationStore.show(
+        'Delete Project',
+        `Are you sure you want to delete "${project.name}"? This action cannot be undone.`,
+        async () => {
+          await projectsStore.removeProjects(project.id!);
+          setSelectedProject(null);
+        },
+        { okLabel: 'Delete', okColor: 'error' }
+      );
     };
 
     const onBack = () => {

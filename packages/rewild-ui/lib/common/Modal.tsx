@@ -1,4 +1,4 @@
-import { Button } from './Button';
+import { Button, ButtonVariant, ButtonColor } from './Button';
 import { Popup } from './Popup';
 import { Typography } from './Typography';
 import { Component, register } from '../Component';
@@ -8,6 +8,13 @@ export interface ModalProps {
   open: boolean;
   withBackground?: boolean;
   hideConfirmButtons?: boolean;
+  okLabel?: string;
+  cancelLabel?: string;
+  okColor?: ButtonColor;
+  okVariant?: ButtonVariant;
+  cancelVariant?: ButtonVariant;
+  hideOk?: boolean;
+  hideCancel?: boolean;
   onClose?: () => void;
   onCancel?: () => void;
   onOk?: () => void;
@@ -36,23 +43,32 @@ export class Modal extends Component<ModalProps> {
         onClose={this.props.onClose}
         withBackground={this.props.withBackground}>
         {typeof this.props.title === 'string' ? (
-          <Typography variant="h2">{this.props.title}</Typography>
+          <Typography variant="h3">{this.props.title}</Typography>
         ) : (
           this.props.title || ''
         )}
         <div class="content">
           <slot></slot>
         </div>
-        {this.props.hideConfirmButtons ? (
-          ''
-        ) : (
+        {this.props.hideConfirmButtons ? null : (
           <div class="button-container">
-            <Button onClick={handleCancel} class="cancel" variant="outlined">
-              Cancel
-            </Button>
-            <Button onClick={handleOk} class="ok">
-              Okay
-            </Button>
+            {this.props.hideCancel ? null : (
+              <Button
+                onClick={handleCancel}
+                class="cancel"
+                variant={this.props.cancelVariant || 'text'}>
+                {this.props.cancelLabel || 'Cancel'}
+              </Button>
+            )}
+            {this.props.hideOk ? null : (
+              <Button
+                onClick={handleOk}
+                class="ok"
+                color={this.props.okColor}
+                variant={this.props.okVariant}>
+                {this.props.okLabel || 'Okay'}
+              </Button>
+            )}
           </div>
         )}
       </Popup>
@@ -72,6 +88,6 @@ const StyledModal = cssStylesheet(css`
     margin: 0 0 0 4px;
   }
   .content {
-    padding: 0.5rem 0;
+    padding: 0rem 0 1.5rem 0;
   }
 `);
