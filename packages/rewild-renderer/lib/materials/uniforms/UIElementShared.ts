@@ -4,13 +4,13 @@ import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 
 export class UIElementShared implements ISharedUniformBuffer {
-  buffer: GPUBuffer;
   group: number;
   bindGroup: GPUBindGroup;
   requiresBuild: boolean;
   uniformBuffer: GPUBuffer;
   uniformValues: Float32Array;
-  resolutionValue: Float32Array;
+  private _lastWidth: number = 0;
+  private _lastHeight: number = 0;
 
   constructor(group: number) {
     this.group = group;
@@ -18,8 +18,8 @@ export class UIElementShared implements ISharedUniformBuffer {
   }
 
   destroy(): void {
-    if (this.buffer) {
-      this.buffer.destroy();
+    if (this.uniformBuffer) {
+      this.uniformBuffer.destroy();
     }
   }
 
@@ -37,10 +37,6 @@ export class UIElementShared implements ISharedUniformBuffer {
     });
 
     this.uniformValues = new Float32Array(uniformBufferSize / 4);
-    this.resolutionValue = this.uniformValues.subarray(
-      0,
-      uniformBufferSize / 4
-    );
 
     this.bindGroup = device.createBindGroup({
       label: 'bind group for object',
@@ -52,18 +48,19 @@ export class UIElementShared implements ISharedUniformBuffer {
   setNumInstances(numInstances: number): void {}
 
   prepare(renderer: Renderer, camera: Camera, meshes: Mesh[]): void {
-    const { device } = renderer;
+    const width = renderer.canvas.width;
+    const height = renderer.canvas.height;
 
-    // Set the uniform values in our JavaScript side Float32Array
-    this.resolutionValue.set([
-      renderer.canvas.width,
-      renderer.canvas.height,
-      renderer.totalDeltaTime,
-      0,
-    ]);
+    if (width !== this._lastWidth || height !== this._lastHeight) {
+      this._lastWidth = width;
+      this._lastHeight = height;
+      this.uniformValues[0] = width;
+      this.uniformValues[1] = height;
+    }
 
-    // upload the uniform values to the uniform buffer
-    device.queue.writeBuffer(
+    this.uniformValues[2] = renderer.totalDeltaTime;
+
+    renderer.device.queue.writeBuffer(
       this.uniformBuffer,
       0,
       this.uniformValues as BufferSource

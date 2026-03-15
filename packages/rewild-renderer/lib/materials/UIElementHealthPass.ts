@@ -1,5 +1,4 @@
 import { Geometry } from '../geometry/Geometry';
-import { IMaterialPass } from './IMaterialPass';
 import shader from '../shaders/gui-instanced-healthbar.wgsl';
 import { Renderer } from '..';
 import { PerMeshTracker } from './PerMeshTracker';
@@ -9,8 +8,9 @@ import { UIElementShared } from './uniforms/UIElementShared';
 import { UIElementInstanceData } from './uniforms/UIElementInstanceData';
 import { UIElement } from '../core/UIElement';
 import { UIElementHealth } from './uniforms/UIElementHealth';
+import { IUIElementPass } from './IUIElementPass';
 
-export class UIElementHealthPass implements IMaterialPass {
+export class UIElementHealthPass implements IUIElementPass {
   pipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
@@ -103,6 +103,40 @@ export class UIElementHealthPass implements IMaterialPass {
     return !!(geometry.vertices && geometry.uvs);
   }
 
+  /** Upload all uniform data for the given elements in one batch. */
+  prepareUniforms(
+    renderer: Renderer,
+    camera: Camera,
+    elements: UIElement[]
+  ): void {
+    const uniforms = this.sharedUniformsTracker.uniforms;
+    for (let i = 0, l = uniforms.length; i < l; i++) {
+      const uniform = uniforms[i];
+      if (uniform.requiresBuild) {
+        uniform.build(
+          renderer,
+          this.pipeline.getBindGroupLayout(uniform.group)
+        );
+      }
+      uniform.prepare(renderer, camera, elements);
+    }
+  }
+
+  /** Set pipeline, vertex/index buffers, and bind groups on the pass. */
+  setPassState(pass: GPURenderPassEncoder, geometry: Geometry): void {
+    pass.setPipeline(this.pipeline);
+    pass.setVertexBuffer(0, geometry.vertexBuffer);
+    pass.setVertexBuffer(1, geometry.uvBuffer);
+    pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
+    const uniforms = this.sharedUniformsTracker.uniforms;
+    for (let i = 0, l = uniforms.length; i < l; i++) {
+      const uniform = uniforms[i];
+      if (uniform.bindGroup) {
+        pass.setBindGroup(uniform.group, uniform.bindGroup);
+      }
+    }
+  }
+
   render(
     renderer: Renderer,
     pass: GPURenderPassEncoder,
@@ -110,18 +144,8 @@ export class UIElementHealthPass implements IMaterialPass {
     elements: UIElement[],
     geometry: Geometry
   ): void {
-    pass.setPipeline(this.pipeline);
-    pass.setVertexBuffer(0, geometry.vertexBuffer);
-    pass.setVertexBuffer(1, geometry.uvBuffer);
-    pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
-
-    this.sharedUniformsTracker.prepareMeshUniforms(
-      renderer,
-      pass,
-      camera,
-      elements
-    );
-
+    this.prepareUniforms(renderer, camera, elements);
+    this.setPassState(pass, geometry);
     const numIndices = geometry.indices!.length;
     pass.drawIndexed(numIndices, elements.length);
   }

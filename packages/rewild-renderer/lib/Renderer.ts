@@ -23,6 +23,7 @@ import { IMaterialsTemplate } from './managers/types';
 import { GuiManager } from './managers/GuiManager';
 import { UIElement } from './core/UIElement';
 import { FontManager } from './managers/FontManager';
+import { IUIElementPass } from './materials/IUIElementPass';
 
 export class Renderer {
   device: GPUDevice;
@@ -62,6 +63,9 @@ export class Renderer {
   totalDeltaTime: number;
 
   private onFrameHandler: () => void;
+  private uiVisibleElements: UIElement[] = [];
+  private uiElementsByMaterial = new Map<IMaterialPass, UIElement[]>();
+  private uiInstanceCounters = new Map<IMaterialPass, number>();
 
   constructor() {
     this.autoFrame = true;
@@ -503,18 +507,42 @@ export class Renderer {
 
       device.queue.submit([postProcessingEncoder.finish()]);
 
-      // Render UI elements one at a time so text is interleaved
-      // with element quads for correct z-ordering (painter's algorithm).
-      // Each element gets its own encoder+pass+submit so that the shared
-      // storage buffer writes (via queue.writeBuffer) are consumed before
-      // the next element overwrites them.
+      // Render all UI elements in a single pass. Instance data for every
+      // visible element is uploaded once, and each element is drawn via
+      // firstInstance indexing so the shader reads the correct slot.
+      // Text is interleaved between element quads for correct z-ordering.
+      const visibleElements = this.uiVisibleElements;
+      visibleElements.length = 0;
       for (const transform of this.currentRenderList.uiElements) {
         const element = transform.component as UIElement;
         if (!element?.visible) continue;
-
-        const materialPass = element.material;
         if (element.geometry.requiresBuild) element.geometry.build(this.device);
-        if (materialPass.requiresRebuild) materialPass.init(this);
+        if (element.material.requiresRebuild) element.material.init(this);
+        visibleElements.push(element);
+      }
+
+      if (visibleElements.length > 0) {
+        // Group elements by material for uniform preparation
+        const elementsByMaterial = this.uiElementsByMaterial;
+        elementsByMaterial.clear();
+        for (const element of visibleElements) {
+          const mat = element.material;
+          let group = elementsByMaterial.get(mat);
+          if (!group) {
+            group = [];
+            elementsByMaterial.set(mat, group);
+          }
+          group.push(element);
+        }
+
+        // Prepare uniforms for each material (uploads instance data to GPU)
+        for (const [mat, elements] of elementsByMaterial) {
+          (mat as IUIElementPass).prepareUniforms(
+            this,
+            camera.camera,
+            elements
+          );
+        }
 
         const guiEncoder = device.createCommandEncoder({
           label: 'GUI encoder',
@@ -524,27 +552,41 @@ export class Renderer {
           colorAttachments: [
             {
               view: context.getCurrentTexture().createView(),
-              clearValue: [0.0, 0.0, 0.0, 0.0],
               loadOp: 'load',
               storeOp: 'store',
             },
           ],
         });
 
-        // Draw the element quad
-        materialPass.render(
-          this,
-          guiPass,
-          camera.camera,
-          [element],
-          element.geometry
-        );
+        let currentMaterial: IMaterialPass | null = null;
+        let needsStateReset = true;
+        const instanceCounters = this.uiInstanceCounters;
+        instanceCounters.clear();
 
-        // Draw text on top of this element, before the next element
-        const textRenderer = element.textRenderer;
-        if (textRenderer) {
-          if (textRenderer.requiresRebuild) textRenderer.init(this);
-          textRenderer.render(this, guiPass, element);
+        for (let i = 0; i < visibleElements.length; i++) {
+          const element = visibleElements[i];
+          const mat = element.material;
+
+          if (mat !== currentMaterial || needsStateReset) {
+            (mat as IUIElementPass).setPassState(guiPass, element.geometry);
+            currentMaterial = mat;
+            needsStateReset = false;
+          }
+
+          const instanceIdx = instanceCounters.get(mat) || 0;
+          instanceCounters.set(mat, instanceIdx + 1);
+
+          const numIndices = element.geometry.indices!.length;
+          guiPass.drawIndexed(numIndices, 1, 0, 0, instanceIdx);
+
+          // Draw text on top of this element
+          const textRenderer = element.textRenderer;
+          if (textRenderer) {
+            if (textRenderer.requiresRebuild) textRenderer.init(this);
+            textRenderer.render(this, guiPass, element);
+            // executeBundles clears all pass state — restore before next quad
+            needsStateReset = true;
+          }
         }
 
         guiPass.end();
