@@ -20,7 +20,7 @@ import { GeometryManager } from './managers/GeometryManager';
 import { MaterialManager } from './managers/MaterialManager';
 import { IController } from './input/IController';
 import { IMaterialsTemplate } from './managers/types';
-import { GuiManager } from './renderables.ts/GuiManager';
+import { GuiManager } from './managers/GuiManager';
 import { UIElement } from './core/UIElement';
 import { FontManager } from './managers/FontManager';
 
