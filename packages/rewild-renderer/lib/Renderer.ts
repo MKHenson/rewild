@@ -173,11 +173,33 @@ export class Renderer {
     element2.percentageBasedCalculation = true;
     element2.width = 0.5;
     element2.height = 1;
+    element2.borderRadius = 10;
     element2.backgroundColorAlpha = 1;
-    element.backgroundColor.setRGB(1, 0, 0);
+    element2.backgroundColor.setRGB(1, 0, 0);
     element2.text =
-      'This is a vertical text element.It supports multiple lines. And word wrap if enabled in the text options.';
+      'This is a vertical text element. Its a child.It supports multiple lines. And word wrap if enabled in the text options.';
     element.transform.addChild(element2.transform);
+
+    element.dispatcher.add((e) => {
+      if (e.type === 'click') {
+        console.log('Clicked element 1:', e.target.transform.id);
+      }
+    });
+
+    element2.dispatcher.add((e) => {
+      if (e.type === 'click') {
+        e.stopPropagation(); // Stop the event from bubbling up to the parent element
+        console.log('Clicked element 2:', e.target.transform.id);
+      } else if (e.type === 'mouseenter') {
+        element2.backgroundColor.setRGB(0.8, 0.0, 0);
+      } else if (e.type === 'mouseleave') {
+        element2.backgroundColor.setRGB(1, 0.0, 0.0);
+      } else if (e.type === 'mousedown') {
+        element2.backgroundColor.setRGB(0.5, 0.0, 0);
+      } else if (e.type === 'mouseup') {
+        element2.backgroundColor.setRGB(0.8, 0.0, 0);
+      }
+    });
 
     this.lastTime = performance.now();
     this.delta = 0;

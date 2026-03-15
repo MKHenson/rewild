@@ -13,7 +13,7 @@ import {
   syncFromEditorResource,
   SyncRendererFromProject,
 } from './utils/RendererSync';
-import { Raycaster, UIRaycaster } from 'rewild-renderer/lib/core/Raycaster';
+import { Raycaster } from 'rewild-renderer/lib/core/Raycaster';
 import {
   SceneGraphEvents,
   sceneGraphStore,
@@ -175,7 +175,6 @@ export class EditorViewport extends Component<Props> {
     const get3DCoords = (clientX: i32, clientY: i32) => {
       const pointer = new Vector2();
       const raycaster = new Raycaster();
-      const uiRaycaster = new UIRaycaster(this.renderer);
 
       const rect = pane3D.getBoundingClientRect();
 
@@ -189,16 +188,6 @@ export class EditorViewport extends Component<Props> {
         [this.renderer.scene],
         true
       );
-
-      uiRaycaster.set(clientX - rect.left, clientY - rect.top);
-      const intersectsUI = uiRaycaster.intersectObjects(
-        [this.renderer.ui],
-        true
-      );
-
-      if (intersectsUI.length > 0) {
-        console.log('UI element clicked: ' + intersectsUI.length);
-      }
 
       if (intersects.length > 0) {
         const intersection = intersects[0];

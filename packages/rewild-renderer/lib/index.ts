@@ -10,3 +10,5 @@ export * from './materials/IMaterialPass';
 export * from './materials/DiffusePass';
 export * from './input';
 export * from './core/GltfLoader';
+export * from './core/UIElement';
+export * from './core/UIPointerEvent';

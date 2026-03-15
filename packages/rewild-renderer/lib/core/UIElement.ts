@@ -8,9 +8,10 @@ import {
   IRaycaster,
   MsdfTextFormattingOptions,
 } from '../../types/interfaces';
-import { Color } from 'rewild-common';
+import { Color, Dispatcher } from 'rewild-common';
 import { Renderer } from '..';
 import { TextRenderer } from './text-renderer/TextRenderer';
+import { UIPointerEvent } from './UIPointerEvent';
 
 export class UIElement implements IComponent, IMeshComponent {
   geometry: Geometry;
@@ -18,6 +19,7 @@ export class UIElement implements IComponent, IMeshComponent {
   transform: Transform;
   visible: boolean;
   percentageBasedCalculation: boolean;
+  dispatcher: Dispatcher<UIPointerEvent>;
 
   private _text?: string;
   private _textRenderer: TextRenderer | null = null;
@@ -38,6 +40,7 @@ export class UIElement implements IComponent, IMeshComponent {
     this.geometry = geometry;
     this.transform = transform;
     this.visible = true;
+    this.dispatcher = new Dispatcher<UIPointerEvent>();
 
     transform.component = this;
     this.backgroundColor = new Color(0.3, 0.3, 0.3);
