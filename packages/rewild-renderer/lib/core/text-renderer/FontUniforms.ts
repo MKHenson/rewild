@@ -1,7 +1,6 @@
 import { Renderer } from '../..';
 
 export class FontUniforms {
-  buffer: GPUBuffer;
   group: number;
   bindGroup: GPUBindGroup;
   requiresBuild: boolean;
@@ -11,11 +10,7 @@ export class FontUniforms {
     this.requiresBuild = true;
   }
 
-  destroy(): void {
-    if (this.buffer) {
-      this.buffer.destroy();
-    }
-  }
+  destroy(): void {}
 
   build(renderer: Renderer, pipelineLayout: GPUBindGroupLayout): void {
     const { device } = renderer;

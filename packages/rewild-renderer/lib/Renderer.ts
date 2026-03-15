@@ -544,7 +544,7 @@ export class Renderer {
         const textRenderer = element.textRenderer;
         if (textRenderer) {
           if (textRenderer.requiresRebuild) textRenderer.init(this);
-          textRenderer.render(this, guiPass, camera.camera, element);
+          textRenderer.render(this, guiPass, element);
         }
 
         guiPass.end();

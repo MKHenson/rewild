@@ -1,8 +1,5 @@
 import shader from '../../shaders/msdf-character.wgsl';
 import { Renderer } from '../..';
-import { PerMeshTracker } from '../../materials/PerMeshTracker';
-import { SharedUniformsTracker } from '../../materials/SharedUniformsTracker';
-import { Camera } from '../Camera';
 import { UIElement } from '../UIElement';
 import { FontUniforms } from './FontUniforms';
 import { TextUniforms } from './TextUniforms';
@@ -10,9 +7,7 @@ import { MsdfTextFormattingOptions } from '../../../types/interfaces';
 
 export class TextRenderer {
   pipeline: GPURenderPipeline;
-  perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
-  sharedUniformsTracker: SharedUniformsTracker;
   side: GPUFrontFace;
   textUniform: TextUniforms;
   uiFont: FontUniforms;
@@ -54,7 +49,7 @@ export class TextRenderer {
               },
               alpha: {
                 srcFactor: 'one',
-                dstFactor: 'one',
+                dstFactor: 'one-minus-src-alpha',
               },
             },
           },
@@ -71,15 +66,14 @@ export class TextRenderer {
   }
 
   dispose(): void {
-    this.sharedUniformsTracker.dispose();
-    this.perMeshTracker.dispose();
+    this.textUniform.destroy();
+    this.uiFont.destroy();
     this.renderBundle = null;
   }
 
   render(
     renderer: Renderer,
     pass: GPURenderPassEncoder,
-    camera: Camera,
     element: UIElement
   ): void {
     const fontUniform = this.uiFont;
@@ -93,6 +87,13 @@ export class TextRenderer {
       this.renderBundle = null;
     }
 
+    // Check if element width changed — triggers text rebuild
+    const elementWidth = element.getWidth(renderer);
+    if (this.textUniform.lastMaxWidth !== elementWidth) {
+      this.textUniform.lastMaxWidth = elementWidth;
+      this.textUniform.requiresBuild = true;
+    }
+
     // Build text uniform if needed
     if (this.textUniform.requiresBuild) {
       this.textUniform.build(
@@ -102,7 +103,7 @@ export class TextRenderer {
       this.renderBundle = null;
     }
 
-    this.textUniform.prepare(renderer, camera, element.transform);
+    this.textUniform.prepare(renderer, element.transform);
 
     // Record render bundle if invalidated
     if (!this.renderBundle) {

@@ -4,28 +4,27 @@ import {
   MsdfTextFormattingOptions,
   MsdfTextMeasurements,
 } from '../../../types/interfaces';
-import { Camera } from '../Camera';
 import { Transform } from '../Transform';
 import { UIElement } from '../UIElement';
 import { MsdfFont } from '../../fonts/MsdfFont';
 
 export class TextUniforms {
-  buffer: GPUBuffer;
   group: number;
   bindGroup: GPUBindGroup;
   requiresBuild: boolean;
   requiresUpdate: boolean;
   textMeasurements: MsdfTextMeasurements;
+  lastMaxWidth: number;
 
   viewportBuffer: GPUBuffer;
   viewportValues: Float32Array;
 
+  textStorageBuffer: GPUBuffer;
   textPropertiesBuffer: GPUBuffer;
   textPropertiesValues: Float32Array;
 
   private _text: string;
   private _options: MsdfTextFormattingOptions;
-  private _lastMaxWidth: number;
 
   constructor(
     group: number,
@@ -55,12 +54,12 @@ export class TextUniforms {
   }
 
   destroy(): void {
-    if (this.buffer) {
-      this.buffer.destroy();
-    }
-
     if (this.viewportBuffer) {
       this.viewportBuffer.destroy();
+    }
+
+    if (this.textStorageBuffer) {
+      this.textStorageBuffer.destroy();
     }
 
     if (this.textPropertiesBuffer) {
@@ -237,21 +236,12 @@ export class TextUniforms {
     this.viewportValues[0] = renderer.canvas.width;
     this.viewportValues[1] = renderer.canvas.height;
 
-    const textBuffer = device.createBuffer({
-      label: 'msdf text buffer',
-      size: text.length * Float32Array.BYTES_PER_ELEMENT * 4,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
-    });
-
-    const textArray = new Float32Array(textBuffer.getMappedRange());
-    let offset = 0; // Accounts for the values managed by MsdfText internally.
-    const maxWidth = this._lastMaxWidth || 100;
+    const maxWidth = this.lastMaxWidth || renderer.canvas.width;
     const widthLimit = maxWidth / (this._options.fontSize! / font.size);
-
     const wordWrap = this._options.wordWrap || false;
 
-    if (options.centered) {
+    if (options.centered || options.justify) {
+      // Two-pass: measure first for line widths/spacing, then fill buffer
       this.textMeasurements = this.measureText(
         font,
         text,
@@ -259,6 +249,21 @@ export class TextUniforms {
         wordWrap,
         null
       );
+
+      this.textStorageBuffer = device.createBuffer({
+        label: 'msdf text buffer',
+        size:
+          Math.max(1, this.textMeasurements.printedCharCount) *
+          Float32Array.BYTES_PER_ELEMENT *
+          4,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        mappedAtCreation: true,
+      });
+
+      const textArray = new Float32Array(
+        this.textStorageBuffer.getMappedRange()
+      );
+      let offset = 0;
 
       this.measureText(
         font,
@@ -267,33 +272,42 @@ export class TextUniforms {
         wordWrap,
         options.justify ? this.textMeasurements : null,
         (textX: number, textY: number, line: number, char: MsdfChar) => {
-          const lineOffset =
-            this.textMeasurements.width * -0.5 -
-            (this.textMeasurements.width -
-              this.textMeasurements.lineWidths[line]) *
-              -0.5;
-
-          textArray[offset] = textX + lineOffset;
+          let x = textX;
+          if (options.centered) {
+            const lineOffset =
+              this.textMeasurements.width * -0.5 -
+              (this.textMeasurements.width -
+                this.textMeasurements.lineWidths[line]) *
+                -0.5;
+            x += lineOffset;
+          }
+          textArray[offset] = x;
           textArray[offset + 1] = textY;
           textArray[offset + 2] = char.charIndex;
           offset += 4;
         }
       );
+      this.textStorageBuffer.unmap();
     } else {
+      // Single-pass: measure and fill buffer simultaneously
+      this.textStorageBuffer = device.createBuffer({
+        label: 'msdf text buffer',
+        size: Math.max(1, text.length) * Float32Array.BYTES_PER_ELEMENT * 4,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        mappedAtCreation: true,
+      });
+
+      const textArray = new Float32Array(
+        this.textStorageBuffer.getMappedRange()
+      );
+      let offset = 0;
+
       this.textMeasurements = this.measureText(
         font,
         text,
         widthLimit,
         wordWrap,
-        null
-      );
-
-      this.measureText(
-        font,
-        text,
-        widthLimit,
-        wordWrap,
-        options.justify ? this.textMeasurements : null,
+        null,
         (textX: number, textY: number, line: number, char: MsdfChar) => {
           textArray[offset] = textX;
           textArray[offset + 1] = textY;
@@ -301,9 +315,8 @@ export class TextUniforms {
           offset += 4;
         }
       );
+      this.textStorageBuffer.unmap();
     }
-
-    textBuffer.unmap();
 
     const textPropertiesBufferSize = 8 * Float32Array.BYTES_PER_ELEMENT;
     this.textPropertiesBuffer = device.createBuffer({
@@ -343,7 +356,7 @@ export class TextUniforms {
         },
         {
           binding: 1,
-          resource: { buffer: textBuffer },
+          resource: { buffer: this.textStorageBuffer },
         },
         {
           binding: 2,
@@ -353,9 +366,9 @@ export class TextUniforms {
     });
   }
 
-  setNumInstances(numInstances: number): void {}
+  prepare(renderer: Renderer, transform: Transform): void {
+    if (!this.viewportValues) return;
 
-  prepare(renderer: Renderer, camera: Camera, transform: Transform): void {
     const element = transform.component as UIElement;
     if (!element) return;
 
@@ -369,13 +382,6 @@ export class TextUniforms {
       this.requiresUpdate = true;
     }
 
-    // Check if element width changed (used as maxWidth for text wrapping)
-    const elementWidth = element.getWidth(renderer);
-    if (this._lastMaxWidth !== elementWidth) {
-      this._lastMaxWidth = elementWidth;
-      this.requiresBuild = true;
-    }
-
     // Check if element position changed (position is externally driven,
     // so we must check every frame)
     let elementX = element.getX(renderer);
@@ -383,7 +389,7 @@ export class TextUniforms {
 
     // When centered, position the text at the center of the element bounds
     if (this._options.centered) {
-      elementX += elementWidth / 2;
+      elementX += element.getWidth(renderer) / 2;
     }
 
     if (
