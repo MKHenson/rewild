@@ -1,6 +1,8 @@
 import { loadGLTF } from '../core/GltfLoader';
 import { BoxGeometryFactory } from '../geometry/BoxGeometryFactory';
 import { CapsuleGeometryFactory } from '../geometry/CapsuleGeometryFactory';
+import { ConeGeometryFactory } from '../geometry/ConeGeometryFactory';
+import { CylinderGeometryFactory } from '../geometry/CylinderGeometryFactory';
 import { Geometry } from '../geometry/Geometry';
 import { GUIGeometryFactory } from '../geometry/GUIGeometryFactory';
 import { PlaneGeometryFactory } from '../geometry/PlaneGeometryFactory';
@@ -33,6 +35,8 @@ export class GeometryManager {
 
     this.addGeometry('box', BoxGeometryFactory.new());
     this.addGeometry('capsule', CapsuleGeometryFactory.new());
+    this.addGeometry('cone', ConeGeometryFactory.new());
+    this.addGeometry('cylinder', CylinderGeometryFactory.new());
     this.addGeometry('sphere', SphereGeometryFactory.new());
     this.addGeometry('plane', PlaneGeometryFactory.new());
     this.addGeometry('gui-quad', GUIGeometryFactory.new());

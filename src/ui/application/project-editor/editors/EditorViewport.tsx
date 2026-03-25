@@ -7,6 +7,7 @@ import {
   theme,
 } from 'rewild-ui';
 import { Mesh, Renderer } from 'rewild-renderer';
+import { Gizmo } from 'rewild-renderer/lib/helpers/Gizmo';
 import { projectStore, ProjectStoreEvents } from 'src/ui/stores/ProjectStore';
 import { Quaternion, Subscriber, Vector2, Vector3 } from 'rewild-common';
 import {
@@ -33,6 +34,7 @@ export class EditorViewport extends Component<Props> {
   renderer: Renderer;
   hasInitialized = false;
   templateLoader: TemplateLoader;
+  gizmo: Gizmo;
 
   init() {
     this.renderer = new Renderer();
@@ -153,6 +155,9 @@ export class EditorViewport extends Component<Props> {
 
         await this.renderer.init(pane3D.canvas()!);
         await this.templateLoader.load();
+
+        this.gizmo = new Gizmo();
+        this.renderer.scene.addChild(this.gizmo.transform);
 
         pane3D.onclick = onClick;
       } catch (err: unknown) {

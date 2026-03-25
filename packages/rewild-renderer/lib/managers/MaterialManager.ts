@@ -1,6 +1,7 @@
 import { Color } from 'rewild-common';
 import { DiffuseIntancedPass } from '../materials/DiffuseIntancedPass';
 import { DiffusePass } from '../materials/DiffusePass';
+import { GizmoPass } from '../materials/GizmoPass';
 import { IMaterialPass } from '../materials/IMaterialPass';
 import { WireframePass } from '../materials/WireframePass';
 import { Renderer } from '../Renderer';
@@ -65,6 +66,16 @@ export class MaterialManager {
               renderer.textureManager.get(
                 materialTemplate.diffuseMap
               ).gpuTexture;
+          break;
+        case 'gizmo':
+          materialPass = new GizmoPass();
+          (materialPass as GizmoPass).gizmoUniforms.color = new Color().setRGB(
+            materialTemplate.color?.[0] ?? 1,
+            materialTemplate.color?.[1] ?? 1,
+            materialTemplate.color?.[2] ?? 1
+          );
+          (materialPass as GizmoPass).gizmoUniforms.opacity =
+            materialTemplate.opacity ?? 1;
           break;
         default:
           throw new Error(`Unknown material type: ${materialTemplate.type}`);
