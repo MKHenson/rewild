@@ -10,6 +10,7 @@ import {
 } from 'rewild-common';
 import { Intersection } from './Raycaster';
 import { Layers } from './Layers';
+import { RenderLayer } from './RenderLayer';
 import {
   IComponent,
   IRaycaster,
@@ -58,6 +59,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
   readonly modelViewMatrix: Matrix4;
   readonly normalMatrix: Matrix3;
   readonly layers: Layers;
+  renderLayer: RenderLayer = RenderLayer.Scene;
 
   readonly dataProperties: Int32Array;
 

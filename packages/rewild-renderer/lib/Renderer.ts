@@ -12,6 +12,7 @@ import { TerrainRenderer } from './renderers/terrain/TerrainRenderer';
 import { TrackballController } from './input/TrackballController';
 import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
 import { RenderList } from './core/RenderList';
+import { RenderLayer } from './core/RenderLayer';
 import { Light } from './core/lights/Light';
 import { MipMapGenerator } from './textures/MipMapGenerator';
 import { TextureManager } from './managers/TextureManager';
@@ -57,6 +58,7 @@ export class Renderer {
   camController: IController;
   private canvasSizeWatcher: CanvasSizeWatcher;
   private renderGroups: IRenderGroup[];
+  private overlayRenderGroups: IRenderGroup[];
 
   lastTime: number;
   delta: number;
@@ -77,6 +79,7 @@ export class Renderer {
     this.atmosphere = new AtmosphereSkybox();
     this.terrainRenderer = new TerrainRenderer();
     this.renderGroups = [];
+    this.overlayRenderGroups = [];
 
     this.scene.addChild(this.atmosphere.transform);
   }
@@ -246,6 +249,7 @@ export class Renderer {
     this.camController.dispose();
     this.device.destroy();
     this.renderGroups.length = 0; // Clear the render groups
+    this.overlayRenderGroups.length = 0;
     this.currentRenderList.reset();
     this.atmosphere.dispose();
     this.textureManager.dispose();
@@ -304,17 +308,35 @@ export class Renderer {
   }
 
   // TODO: Will come back later to flesh this out
-  projectObject(transform: Transform, camera: Camera): void {
+  projectObject(
+    transform: Transform,
+    camera: Camera,
+    layerOverride?: RenderLayer
+  ): void {
     if (transform.visible === false) return;
 
-    this.currentRenderList.solids.push(transform);
+    const layer = layerOverride ?? transform.renderLayer;
+
+    if (layer === RenderLayer.Overlay) {
+      this.currentRenderList.overlay.push(transform);
+    } else {
+      this.currentRenderList.solids.push(transform);
+    }
 
     if (transform.component instanceof Light) {
       this.currentRenderList.lights.push(transform.component as Light);
     }
 
+    // Children inherit the overlay layer from their ancestor
+    const childOverride =
+      layer === RenderLayer.Overlay ? RenderLayer.Overlay : undefined;
+
     for (let i = 0, l = transform.children.length; i < l; i++)
-      this.projectObject(unchecked(transform.children[i]), camera);
+      this.projectObject(
+        unchecked(transform.children[i]),
+        camera,
+        childOverride
+      );
   }
 
   collectUIElements(transform: Transform): void {
@@ -328,12 +350,11 @@ export class Renderer {
       this.collectUIElements(unchecked(transform.children[i]));
   }
 
-  organizeVisuals(transforms: Transform[]) {
+  organizeVisuals(transforms: Transform[], target: IRenderGroup[]) {
     // Organize all meshes so that they are grouped by material as well as geometry
     // This is done to minimize the number of draw calls
 
-    const renderList = this.renderGroups;
-    renderList.length = 0; // Clear the render list
+    target.length = 0; // Clear the render list
 
     let transform: Transform | null;
     let geometry: Geometry | null;
@@ -356,13 +377,13 @@ export class Renderer {
         geometry = mesh.geometry;
         material = mesh.material;
 
-        const listItem = renderList.find(
+        const listItem = target.find(
           (item) => item.geometry === geometry && item.pass === material
         );
         if (listItem) {
           listItem.meshes.push(mesh);
         } else {
-          renderList.push({
+          target.push({
             geometry,
             meshes: [mesh],
             pass: material,
@@ -371,7 +392,7 @@ export class Renderer {
       }
     }
 
-    return renderList;
+    return target;
   }
 
   renderGroupings(
@@ -437,7 +458,29 @@ export class Renderer {
       transform.normalMatrix.getNormalMatrix(transform.modelViewMatrix);
     }
 
-    const renderList = this.organizeVisuals(this.currentRenderList.solids);
+    const renderList = this.organizeVisuals(
+      this.currentRenderList.solids,
+      this.renderGroups
+    );
+
+    // Compute modelViewMatrix for overlay transforms
+    const overlayTransforms = this.currentRenderList.overlay;
+    for (let i: i32 = 0, l: i32 = overlayTransforms.length; i < l; i++) {
+      transform = overlayTransforms[i];
+      if (!transform) continue;
+
+      transform.modelViewMatrix.multiplyMatrices(
+        pCamera.camera.matrixWorldInverse,
+        transform.matrixWorld
+      );
+
+      transform.normalMatrix.getNormalMatrix(transform.modelViewMatrix);
+    }
+
+    const overlayRenderList = this.organizeVisuals(
+      overlayTransforms,
+      this.overlayRenderGroups
+    );
 
     // Gets the device render targets ready. Checks for things like canvas resize
     if (this.canvasSizeWatcher.hasResized()) {
@@ -506,6 +549,33 @@ export class Renderer {
       postProcessingPass.end();
 
       device.queue.submit([postProcessingEncoder.finish()]);
+
+      // Overlay pass: renders on top of scene + sky with depth cleared
+      if (overlayRenderList.length > 0) {
+        const overlayEncoder = device.createCommandEncoder({
+          label: 'overlay pass encoder',
+        });
+
+        const overlayPass = overlayEncoder.beginRenderPass({
+          colorAttachments: [
+            {
+              view: context.getCurrentTexture().createView(),
+              loadOp: 'load',
+              storeOp: 'store',
+            },
+          ],
+          depthStencilAttachment: {
+            view: this.depthTexture.createView(),
+            depthClearValue: 1.0,
+            depthLoadOp: 'clear',
+            depthStoreOp: 'store',
+          },
+        });
+
+        this.renderGroupings(overlayRenderList, overlayPass, camera.camera);
+        overlayPass.end();
+        device.queue.submit([overlayEncoder.finish()]);
+      }
 
       // Render all UI elements in a single pass. Instance data for every
       // visible element is uploaded once, and each element is drawn via

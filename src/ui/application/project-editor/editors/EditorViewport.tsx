@@ -6,7 +6,7 @@ import {
   compelteDragDrop,
   theme,
 } from 'rewild-ui';
-import { Mesh, Renderer } from 'rewild-renderer';
+import { Mesh, Renderer, Transform } from 'rewild-renderer';
 import { Gizmo } from 'rewild-renderer/lib/helpers/Gizmo';
 import { projectStore, ProjectStoreEvents } from 'src/ui/stores/ProjectStore';
 import { Quaternion, Subscriber, Vector2, Vector3 } from 'rewild-common';
@@ -160,6 +160,7 @@ export class EditorViewport extends Component<Props> {
         this.renderer.scene.addChild(this.gizmo.transform);
 
         pane3D.onclick = onClick;
+        pane3D.onmousemove = onMouseMove;
       } catch (err: unknown) {
         console.error(err);
       }
@@ -177,7 +178,19 @@ export class EditorViewport extends Component<Props> {
       }
     };
 
-    const get3DCoords = (clientX: i32, clientY: i32) => {
+    const onMouseMove = (event: MouseEvent) => {
+      if (!this.gizmo) return;
+      const intersection = get3DCoords(event.clientX, event.clientY, [
+        this.gizmo.transform,
+      ]);
+      const hoveredMesh =
+        intersection?.object.component instanceof Mesh
+          ? (intersection.object.component as Mesh)
+          : null;
+      this.gizmo.updateHover(hoveredMesh);
+    };
+
+    const get3DCoords = (clientX: i32, clientY: i32, targets?: Transform[]) => {
       const pointer = new Vector2();
       const raycaster = new Raycaster();
 
@@ -190,7 +203,7 @@ export class EditorViewport extends Component<Props> {
 
       raycaster.setFromCamera(pointer, this.renderer.perspectiveCam);
       const intersects = raycaster.intersectObjects(
-        [this.renderer.scene],
+        targets ?? [this.renderer.scene],
         true
       );
 
@@ -317,6 +330,7 @@ export class EditorViewport extends Component<Props> {
   }
 
   dispose() {
+    this.gizmo?.dispose();
     this.renderer.dispose();
   }
 }
