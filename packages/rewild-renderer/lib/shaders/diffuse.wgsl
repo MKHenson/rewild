@@ -1,9 +1,11 @@
 #include "./shader-lib/total-lighting.wgsl"
+#include "./shader-lib/selection-tint.wgsl"
 
 struct Uniforms {
   normalMatrix: mat3x3f,
   projMatrix : mat4x4f,
   modelViewMatrix : mat4x4<f32>,
+  selected: f32,
 }
 
 struct VertexInput {
@@ -52,5 +54,7 @@ fn fs(
   
   #include "./shader-lib/total-lighting.frag.wgsl"
 
-  return textureSample(myTexture, mySampler, fragUV) * vec4f(totalLight, 1.0);
+  var color = textureSample(myTexture, mySampler, fragUV) * vec4f(totalLight, 1.0);
+
+  return applySelectionTint(color, 0.35f);
 }

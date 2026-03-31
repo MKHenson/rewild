@@ -8,10 +8,12 @@ export class ProjModelView implements IPerMeshUniformBuffer {
   group: number;
   bindGroup: GPUBindGroup;
   requiresBuild: boolean;
+  private _selectedArray: Float32Array;
 
   constructor(group: number) {
     this.group = group;
     this.requiresBuild = true;
+    this._selectedArray = new Float32Array(4); // vec4 aligned, only [0] used
   }
 
   destroy(): void {
@@ -26,7 +28,7 @@ export class ProjModelView implements IPerMeshUniformBuffer {
 
     this.destroy();
 
-    const uniformBufferSize = 48 + 64 + 64; // mat3x3f (48 bytes) + 2x mat4x4f (64 bytes each) = 176 bytes
+    const uniformBufferSize = 48 + 64 + 64 + 16; // mat3x3f (48) + 2x mat4x4f (64 each) + selected vec4f (16) = 192 bytes
     this.buffer = device.createBuffer({
       size: uniformBufferSize,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -76,6 +78,15 @@ export class ProjModelView implements IPerMeshUniformBuffer {
       modelViewElements.buffer,
       modelViewElements.byteOffset,
       modelViewElements.byteLength
+    );
+
+    this._selectedArray[0] = transform.selected ? 1.0 : 0.0;
+    device.queue.writeBuffer(
+      this.buffer,
+      176,
+      this._selectedArray.buffer,
+      this._selectedArray.byteOffset,
+      this._selectedArray.byteLength
     );
   }
 }

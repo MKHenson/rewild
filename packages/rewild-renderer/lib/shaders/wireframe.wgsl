@@ -1,7 +1,10 @@
+#include "./shader-lib/selection-tint.wgsl"
+
 struct Uniforms {
   normalMatrix: mat3x3f,
   projMatrix : mat4x4f,
   modelViewMatrix : mat4x4<f32>,
+  selected: f32,
 }
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
 
@@ -33,5 +36,7 @@ fn vs(
 
 @fragment
 fn fs() -> @location(0) vec4f {
-  return wireframeUniforms.color;
+  var color = wireframeUniforms.color;
+
+  return applySelectionTint(color, 1.0f);
 }
