@@ -59,7 +59,21 @@ export class EditorViewport extends Component<Props> {
     };
 
     const onSceneGraphEvent: Subscriber<SceneGraphEvents> = async (event) => {
-      if (event.kind === 'container-activated') {
+      if (event.kind === 'resource-selected') {
+        if (event.node?.resource) {
+          const selectedTransform = this.renderer.scene.findObjectById(
+            event.node.resource.id
+          );
+          if (selectedTransform && this.gizmo) {
+            this.gizmo.transform.position.copy(selectedTransform.position);
+            if (!this.gizmo.transform.parent) {
+              this.renderer.scene.addChild(this.gizmo.transform);
+            }
+          }
+        } else if (this.gizmo?.transform.parent) {
+          this.renderer.scene.removeChild(this.gizmo.transform);
+        }
+      } else if (event.kind === 'container-activated') {
         const containerNode = event.container;
         const container = event.container!.resource!;
 
@@ -157,7 +171,6 @@ export class EditorViewport extends Component<Props> {
         await this.templateLoader.load();
 
         this.gizmo = new Gizmo();
-        this.renderer.scene.addChild(this.gizmo.transform);
 
         pane3D.onclick = onClick;
         pane3D.onmousemove = onMouseMove;
@@ -169,17 +182,25 @@ export class EditorViewport extends Component<Props> {
     const onClick = (event: MouseEvent) => {
       const intersection = get3DCoords(event.clientX, event.clientY);
       if (intersection && intersection.object.component instanceof Mesh) {
-        const clickedNode = sceneGraphStore.findNodeById(
-          intersection.object.id || intersection.object.parent?.id || ''
-        );
-        if (clickedNode) {
-          sceneGraphStore.setSelectedNode(clickedNode || null);
+        // Walk up the Transform parent chain to find the root scene graph node
+        let current: Transform | null = intersection.object;
+        let clickedNode = null;
+        while (current && current !== this.renderer.scene) {
+          clickedNode = sceneGraphStore.findNodeById(current.id);
+          if (clickedNode) break;
+          current = current.parent;
         }
+        if (clickedNode) {
+          sceneGraphStore.setSelectedNode(clickedNode);
+        } else sceneGraphStore.setSelectedNode(null);
+      } else {
+        // Clicked empty space — deselect
+        sceneGraphStore.setSelectedNode(null);
       }
     };
 
     const onMouseMove = (event: MouseEvent) => {
-      if (!this.gizmo) return;
+      if (!this.gizmo || !this.gizmo.transform.parent) return;
       const intersection = get3DCoords(event.clientX, event.clientY, [
         this.gizmo.transform,
       ]);
