@@ -35,6 +35,7 @@ export class EditorViewport extends Component<Props> {
   hasInitialized = false;
   templateLoader: TemplateLoader;
   gizmo: Gizmo;
+  selectedTransform: Transform | null = null;
 
   init() {
     this.renderer = new Renderer();
@@ -58,16 +59,34 @@ export class EditorViewport extends Component<Props> {
       }
     };
 
+    const setTransformSelected = (transform: Transform, value: boolean) => {
+      transform.selected = value;
+      transform.traverse((child) => {
+        child.selected = value;
+      });
+    };
+
     const onSceneGraphEvent: Subscriber<SceneGraphEvents> = async (event) => {
       if (event.kind === 'resource-selected') {
+        // Clear previous selection tint
+        if (this.selectedTransform) {
+          setTransformSelected(this.selectedTransform, false);
+          this.selectedTransform = null;
+        }
+
         if (event.node?.resource) {
           const selectedTransform = this.renderer.scene.findObjectById(
             event.node.resource.id
           );
-          if (selectedTransform && this.gizmo) {
-            this.gizmo.transform.position.copy(selectedTransform.position);
-            if (!this.gizmo.transform.parent) {
-              this.renderer.scene.addChild(this.gizmo.transform);
+          if (selectedTransform) {
+            setTransformSelected(selectedTransform, true);
+            this.selectedTransform = selectedTransform;
+
+            if (this.gizmo) {
+              this.gizmo.transform.position.copy(selectedTransform.position);
+              if (!this.gizmo.transform.parent) {
+                this.renderer.scene.addChild(this.gizmo.transform);
+              }
             }
           }
         } else if (this.gizmo?.transform.parent) {

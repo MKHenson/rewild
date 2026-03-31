@@ -60,6 +60,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
   readonly normalMatrix: Matrix3;
   readonly layers: Layers;
   renderLayer: RenderLayer = RenderLayer.Scene;
+  selected: boolean = false;
 
   readonly dataProperties: Int32Array;
 
