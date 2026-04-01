@@ -152,6 +152,10 @@ export class FirstPersonControls implements IController {
     this.disconnect();
   }
 
+  cancelInteraction() {
+    // No-op for first person controller
+  }
+
   /**
    * Must be called if the application window is resized.
    */

@@ -31,6 +31,12 @@ export interface IController {
   onWindowResize(): void;
 
   /**
+   * Cancel any in-progress interaction (e.g. orbit/pan/zoom) and reset internal
+   * state. Call this when an external system (like a gizmo) takes over mouse input.
+   */
+  cancelInteraction(): void;
+
+  /**
    * Disconnects the controls from the DOM.
    */
   disconnect(): void;
