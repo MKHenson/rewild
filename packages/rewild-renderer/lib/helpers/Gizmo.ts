@@ -188,6 +188,27 @@ export class Gizmo {
     }
   }
 
+  /** Identify which gizmo part a mesh belongs to, or null if not part of the gizmo. */
+  identifyMesh(
+    mesh: Mesh | null
+  ):
+    | 'axis-x'
+    | 'axis-y'
+    | 'axis-z'
+    | 'plane-xy'
+    | 'plane-xz'
+    | 'plane-yz'
+    | null {
+    if (!mesh) return null;
+    if (mesh === this.xShaftMesh || mesh === this.xHeadMesh) return 'axis-x';
+    if (mesh === this.yShaftMesh || mesh === this.yHeadMesh) return 'axis-y';
+    if (mesh === this.zShaftMesh || mesh === this.zHeadMesh) return 'axis-z';
+    if (mesh === this.xyPlaneMesh) return 'plane-xy';
+    if (mesh === this.xzPlaneMesh) return 'plane-xz';
+    if (mesh === this.yzPlaneMesh) return 'plane-yz';
+    return null;
+  }
+
   /** Update hover highlight based on the hovered mesh (or null for no hover). */
   updateHover(hoveredMesh: Mesh | null): void {
     // Axes: each axis has shaft + head meshes sharing one material

@@ -702,6 +702,15 @@ export class TrackballController implements IController {
     this.dispatchEvent(_endEvent);
   }
 
+  cancelInteraction() {
+    this.state = _STATE.NONE;
+    this.keyState = _STATE.NONE;
+    this._movePrev.copy(this._moveCurr);
+    this._zoomStart.copy(this._zoomEnd);
+    this._panStart.copy(this._panEnd);
+    this._lastAngle = 0;
+  }
+
   onMouseWheel(event: WheelEvent) {
     if (this.enabled === false) return;
 

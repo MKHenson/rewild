@@ -208,6 +208,10 @@ export class PointerLockController implements IController {
     this.disconnect();
   }
 
+  cancelInteraction() {
+    // No-op for pointer lock controller
+  }
+
   /**
    * Returns the look direction of the camera.
    *

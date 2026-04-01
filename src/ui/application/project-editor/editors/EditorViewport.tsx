@@ -9,7 +9,7 @@ import {
 import { Mesh, Renderer, Transform } from 'rewild-renderer';
 import { Gizmo } from 'rewild-renderer/lib/helpers/Gizmo';
 import { projectStore, ProjectStoreEvents } from 'src/ui/stores/ProjectStore';
-import { Quaternion, Subscriber, Vector2, Vector3 } from 'rewild-common';
+import { Quaternion, Subscriber, Vector2 } from 'rewild-common';
 import {
   syncFromEditorResource,
   SyncRendererFromProject,
@@ -22,6 +22,11 @@ import {
 import { ITreeNodeAction } from 'models';
 import { TemplateLoader } from 'src/core/TemplateLoader';
 import { Asset3D } from 'src/core/routing/Asset3D';
+import { GizmoDragController } from './utils/GizmoDragController';
+import {
+  computeObjectHalfHeight,
+  computeRotationFromNormal,
+} from './utils/WorldPlacement';
 
 interface Props {}
 
@@ -35,7 +40,9 @@ export class EditorViewport extends Component<Props> {
   hasInitialized = false;
   templateLoader: TemplateLoader;
   gizmo: Gizmo;
+  dragController: GizmoDragController;
   selectedTransform: Transform | null = null;
+  private didDrag = false;
 
   init() {
     this.renderer = new Renderer();
@@ -190,15 +197,27 @@ export class EditorViewport extends Component<Props> {
         await this.templateLoader.load();
 
         this.gizmo = new Gizmo();
+        this.dragController = new GizmoDragController(
+          this.renderer,
+          this.gizmo
+        );
 
         pane3D.onclick = onClick;
+        pane3D.onmousedown = onMouseDown;
         pane3D.onmousemove = onMouseMove;
+        pane3D.onmouseup = onMouseUp;
       } catch (err: unknown) {
         console.error(err);
       }
     };
 
     const onClick = (event: MouseEvent) => {
+      // Suppress selection when a drag just completed
+      if (this.didDrag) {
+        this.didDrag = false;
+        return;
+      }
+
       const intersection = get3DCoords(event.clientX, event.clientY);
       if (intersection && intersection.object.component instanceof Mesh) {
         // Walk up the Transform parent chain to find the root scene graph node
@@ -218,8 +237,41 @@ export class EditorViewport extends Component<Props> {
       }
     };
 
+    const onMouseDown = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      if (
+        !this.gizmo ||
+        !this.gizmo.transform.parent ||
+        !this.selectedTransform
+      )
+        return;
+
+      const intersection = get3DCoords(event.clientX, event.clientY, [
+        this.gizmo.transform,
+      ]);
+      if (!intersection) return;
+
+      const started = this.dragController.tryStartDrag(
+        intersection,
+        this.selectedTransform,
+        this.renderer.perspectiveCam.camera.transform
+      );
+      if (started) {
+        this.didDrag = true;
+        this.renderer.camController.cancelInteraction();
+        this.renderer.camController.enabled = false;
+      }
+    };
+
     const onMouseMove = (event: MouseEvent) => {
       if (!this.gizmo || !this.gizmo.transform.parent) return;
+
+      if (this.dragController.isDragging) {
+        const raycaster = createRaycaster(event.clientX, event.clientY);
+        this.dragController.updateDrag(raycaster.ray, event.altKey);
+        return;
+      }
+
       const intersection = get3DCoords(event.clientX, event.clientY, [
         this.gizmo.transform,
       ]);
@@ -230,18 +282,43 @@ export class EditorViewport extends Component<Props> {
       this.gizmo.updateHover(hoveredMesh);
     };
 
-    const get3DCoords = (clientX: i32, clientY: i32, targets?: Transform[]) => {
+    const onMouseUp = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      if (!this.dragController.isDragging) return;
+
+      this.renderer.camController.enabled = true;
+      const result = this.dragController.endDrag();
+      if (result && this.selectedTransform) {
+        // Find the container that owns this node
+        const node = sceneGraphStore.findNodeById(this.selectedTransform.id);
+        const containerId = node?.parent?.resource?.id;
+        if (containerId && projectStore.containerPods[containerId]) {
+          const asset = projectStore.containerPods[containerId].asset3D.find(
+            (a) => a.id === this.selectedTransform!.id
+          );
+          if (asset) {
+            asset.position = result.position;
+            asset.rotation = result.rotation;
+          }
+        }
+        projectStore.defaultProxy.dirty = true;
+      }
+    };
+
+    const createRaycaster = (clientX: i32, clientY: i32): Raycaster => {
       const pointer = new Vector2();
       const raycaster = new Raycaster();
-
       const rect = pane3D.getBoundingClientRect();
-
       pointer.set(
         ((clientX - rect.left) / rect.width) * 2 - 1,
         -((clientY - rect.top) / rect.height) * 2 + 1
       );
-
       raycaster.setFromCamera(pointer, this.renderer.perspectiveCam);
+      return raycaster;
+    };
+
+    const get3DCoords = (clientX: i32, clientY: i32, targets?: Transform[]) => {
+      const raycaster = createRaycaster(clientX, clientY);
       const intersects = raycaster.intersectObjects(
         targets ?? [this.renderer.scene],
         true
@@ -297,34 +374,11 @@ export class EditorViewport extends Component<Props> {
           this.renderer
         )) as Asset3D;
 
-        if (createdResource.transform.component instanceof Mesh) {
-          createdResource.transform.component.geometry.computeBoundingBox();
-          const bbox = createdResource.transform.component.geometry.boundingBox;
-          if (bbox) {
-            const size = bbox.getSize(new Vector3());
-            point.y += size.y / 2;
-          }
-        }
+        const halfHeight = computeObjectHalfHeight(createdResource.transform);
+        point.y += halfHeight;
 
-        // get rotation quaternion from intersection face normal
         const normal = intersection!.face!.normal;
-        const up = new Vector3(0, 1, 0);
-        const dot = up.dot(normal);
-        let rotation: [number, number, number, number];
-
-        if (dot < -0.9999) {
-          // 180 degree rotation
-          rotation = [0, 0, 1, 0];
-        } else if (dot > 0.9999) {
-          // No rotation
-          rotation = [0, 0, 0, 1];
-        } else {
-          const axis = up.cross(normal).normalize();
-          const angle = Math.acos(dot);
-          const halfAngle = angle / 2;
-          const s = Math.sin(halfAngle);
-          rotation = [axis.x * s, axis.y * s, axis.z * s, Math.cos(halfAngle)];
-        }
+        const rotation = computeRotationFromNormal(normal);
 
         // Update the container pod with the transform position
         projectStore.containerPods[activeContainerId].asset3D.push({
