@@ -9,7 +9,8 @@ import {
 import { Mesh, Renderer, Transform } from 'rewild-renderer';
 import { Gizmo } from 'rewild-renderer/lib/helpers/Gizmo';
 import { projectStore, ProjectStoreEvents } from 'src/ui/stores/ProjectStore';
-import { Quaternion, Subscriber, Vector2 } from 'rewild-common';
+import { Quaternion, Subscriber, Vector2, Vector3 } from 'rewild-common';
+import { ITransformObserver } from 'rewild-renderer/types/interfaces';
 import {
   syncFromEditorResource,
   SyncRendererFromProject,
@@ -43,6 +44,7 @@ export class EditorViewport extends Component<Props> {
   dragController: GizmoDragController;
   selectedTransform: Transform | null = null;
   private didDrag = false;
+  private cameraObserver: ITransformObserver | null = null;
 
   init() {
     this.renderer = new Renderer();
@@ -94,6 +96,7 @@ export class EditorViewport extends Component<Props> {
               if (!this.gizmo.transform.parent) {
                 this.renderer.scene.addChild(this.gizmo.transform);
               }
+              this.updateGizmoScale();
             }
           }
         } else if (this.gizmo?.transform.parent) {
@@ -174,18 +177,31 @@ export class EditorViewport extends Component<Props> {
         this.renderer;
     };
 
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'Equal' || event.code === 'NumpadAdd') {
+        this.gizmo?.increaseSize();
+        this.updateGizmoScale();
+      } else if (event.code === 'Minus' || event.code === 'NumpadSubtract') {
+        this.gizmo?.decreaseSize();
+        this.updateGizmoScale();
+      }
+    };
+
     this.onMount = () => {
       projectStore.dispatcher.add(onProjectEvent);
       sceneGraphStore.dispatcher.add(onSceneGraphEvent);
 
       // Listen for custom event to get the renderer
       document.addEventListener('request-renderer', onRequestRendererEvent);
+      document.addEventListener('keydown', onKeyDown);
     };
 
     this.onCleanup = () => {
       projectStore.dispatcher.remove(onProjectEvent);
       sceneGraphStore.dispatcher.remove(onSceneGraphEvent);
       document.removeEventListener('request-renderer', onRequestRendererEvent);
+      document.removeEventListener('keydown', onKeyDown);
+      this.removeCameraObserver();
     };
 
     const onCanvasReady = async (pane3D: Pane3D) => {
@@ -201,6 +217,8 @@ export class EditorViewport extends Component<Props> {
           this.renderer,
           this.gizmo
         );
+
+        this.installCameraObserver();
 
         pane3D.onclick = onClick;
         pane3D.onmousedown = onMouseDown;
@@ -423,7 +441,39 @@ export class EditorViewport extends Component<Props> {
     return StyledContainer;
   }
 
+  private _cameraWorldPos = new Vector3();
+  private _updatingGizmoScale = false;
+
+  private updateGizmoScale(): void {
+    if (this._updatingGizmoScale) return;
+    if (!this.gizmo || !this.gizmo.transform.parent) return;
+    this._updatingGizmoScale = true;
+    this.renderer.perspectiveCam.camera.transform.getWorldPosition(
+      this._cameraWorldPos
+    );
+    this.gizmo.updateScale(this._cameraWorldPos);
+    this._updatingGizmoScale = false;
+  }
+
+  private installCameraObserver(): void {
+    this.cameraObserver = {
+      worldMatrixUpdated: () => this.updateGizmoScale(),
+    };
+    this.renderer.perspectiveCam.camera.transform.observers.push(
+      this.cameraObserver
+    );
+  }
+
+  private removeCameraObserver(): void {
+    if (!this.cameraObserver) return;
+    const observers = this.renderer.perspectiveCam.camera.transform.observers;
+    const idx = observers.indexOf(this.cameraObserver);
+    if (idx !== -1) observers.splice(idx, 1);
+    this.cameraObserver = null;
+  }
+
   dispose() {
+    this.removeCameraObserver();
     this.gizmo?.dispose();
     this.renderer.dispose();
   }
