@@ -1,4 +1,4 @@
-import { Color } from 'rewild-common';
+import { Color, Vector3 } from 'rewild-common';
 import { Mesh } from '../core/Mesh';
 import { Transform } from '../core/Transform';
 import { ConeGeometryFactory } from '../geometry/ConeGeometryFactory';
@@ -17,6 +17,13 @@ const PLANE_OFFSET = PLANE_SIZE / 2;
 const PLANE_DEFAULT_OPACITY = 0.0;
 const DEFAULT_OPACITY = 0.7;
 const HIGHLIGHT_OPACITY = 1.0;
+
+const BASE_SCALE_FACTOR = 0.15;
+const SCALE_STEP = 0.1;
+const MIN_USER_SCALE = 0.3;
+const MAX_USER_SCALE = 3.0;
+
+const _camDist = new Vector3();
 
 export class Gizmo {
   transform: Transform;
@@ -38,6 +45,8 @@ export class Gizmo {
   xyMaterial: GizmoPass;
   xzMaterial: GizmoPass;
   yzMaterial: GizmoPass;
+
+  userSizeMultiplier = 1.0;
 
   private shaftGeometry: Geometry;
   private headGeometry: Geometry;
@@ -236,6 +245,29 @@ export class Gizmo {
         hoveredMesh === mesh ? HIGHLIGHT_OPACITY : PLANE_DEFAULT_OPACITY
       );
     }
+  }
+
+  updateScale(cameraPosition: Vector3): void {
+    const distance = _camDist
+      .copy(cameraPosition)
+      .sub(this.transform.position)
+      .length();
+    const s = distance * BASE_SCALE_FACTOR * this.userSizeMultiplier;
+    this.transform.scale.set(s, s, s);
+  }
+
+  increaseSize(): void {
+    this.userSizeMultiplier = Math.min(
+      this.userSizeMultiplier + SCALE_STEP,
+      MAX_USER_SCALE
+    );
+  }
+
+  decreaseSize(): void {
+    this.userSizeMultiplier = Math.max(
+      this.userSizeMultiplier - SCALE_STEP,
+      MIN_USER_SCALE
+    );
   }
 
   dispose(): void {
