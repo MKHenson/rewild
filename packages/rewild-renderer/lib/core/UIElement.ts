@@ -4,7 +4,7 @@ import { Intersection, UIRaycaster } from './Raycaster';
 import { Transform } from './Transform';
 import {
   IComponent,
-  IMeshComponent,
+  IVisualComponent,
   IRaycaster,
   MsdfTextFormattingOptions,
 } from '../../types/interfaces';
@@ -13,7 +13,7 @@ import { Renderer } from '..';
 import { TextRenderer } from './text-renderer/TextRenderer';
 import { UIPointerEvent } from './UIPointerEvent';
 
-export class UIElement implements IComponent, IMeshComponent {
+export class UIElement implements IComponent, IVisualComponent {
   geometry: Geometry;
   material: IMaterialPass;
   transform: Transform;

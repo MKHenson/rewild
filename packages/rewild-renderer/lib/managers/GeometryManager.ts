@@ -39,6 +39,7 @@ export class GeometryManager {
     this.addGeometry('cylinder', CylinderGeometryFactory.new());
     this.addGeometry('sphere', SphereGeometryFactory.new());
     this.addGeometry('plane', PlaneGeometryFactory.new());
+    this.addGeometry('sprite-quad', PlaneGeometryFactory.new(1, 1));
     this.addGeometry('gui-quad', GUIGeometryFactory.new());
 
     for (const key in geometriesToLoad) {

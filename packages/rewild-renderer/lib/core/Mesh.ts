@@ -10,7 +10,11 @@ import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from '../materials/IMaterialPass';
 import { Face, Intersection, Raycaster } from './Raycaster';
 import { Transform } from './Transform';
-import { IComponent, IMeshComponent, IRaycaster } from '../../types/interfaces';
+import {
+  IComponent,
+  IVisualComponent,
+  IRaycaster,
+} from '../../types/interfaces';
 
 const _sphere = new Sphere();
 const _ray = new Ray();
@@ -24,7 +28,7 @@ const _vC = new Vector3();
 const _intersectionPoint = new Vector3();
 const _inverseMatrix = new Matrix4();
 
-export class Mesh implements IComponent, IMeshComponent {
+export class Mesh implements IComponent, IVisualComponent {
   geometry: Geometry;
   material: IMaterialPass;
   transform: Transform;

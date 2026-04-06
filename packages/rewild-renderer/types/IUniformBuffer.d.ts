@@ -17,5 +17,5 @@ export interface IPerMeshUniformBuffer extends IUniformBuffer {
 
 export interface ISharedUniformBuffer extends IUniformBuffer {
   setNumInstances(numInstances: number): void;
-  prepare(renderer: Renderer, camera: Camera, meshes: IMeshComponent[]): void;
+  prepare(renderer: Renderer, camera: Camera, meshes: IVisualComponent[]): void;
 }

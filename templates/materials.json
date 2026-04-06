@@ -49,6 +49,10 @@
       "url": "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png"
     },
     {
+      "name": "light-32",
+      "url": "icons/editor/light-32.png"
+    },
+    {
       "name": "desert-sky",
       "type": "cubemap",
       "urls": [
