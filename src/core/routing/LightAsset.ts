@@ -8,6 +8,7 @@ import {
 } from 'rewild-renderer';
 import { Asset3D } from './Asset3D';
 import { IResource, Vector3 } from 'models';
+import { InteractionLayer } from 'src/core/InteractionLayer';
 
 export class LightAsset extends Asset3D {
   constructor(light: Light) {
@@ -22,6 +23,9 @@ export class LightAsset extends Asset3D {
     );
 
     mesh.transform.name = `${this.transform.name}-light-helper`;
+    mesh.transform.userData.isHelper = true;
+    mesh.transform.layers.set(InteractionLayer.Helper);
+    mesh.transform.visible = false;
     this.transform.addChild(mesh.transform);
 
     // Add a 3D sprite icon at the light's position
@@ -36,6 +40,7 @@ export class LightAsset extends Asset3D {
     );
     sprite.rotationOffset = Math.PI; // upside down
     sprite.transform.name = `${this.transform.name}-light-sprite`;
+    sprite.transform.layers.set(InteractionLayer.Helper);
     sprite.transform.scale.set(0.3, 0.3, 0.3);
     this.transform.addChild(sprite.transform);
   }
