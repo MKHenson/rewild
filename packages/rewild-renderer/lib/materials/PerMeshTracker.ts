@@ -3,12 +3,12 @@ import { IMaterialPass } from './IMaterialPass';
 import { Camera } from '../core/Camera';
 import { IMeshTracker } from '../../types/IMeshTracker';
 import { IPerMeshUniformBuffer } from '../../types/IUniformBuffer';
-import { IMeshComponent } from '../../types/interfaces';
+import { IVisualComponent } from '../../types/interfaces';
 
 export type GetUniformsCallback = () => IPerMeshUniformBuffer[];
 
 export class PerMeshTracker implements IMeshTracker {
-  meshUniforms: Map<IMeshComponent, IPerMeshUniformBuffer[]> = new Map();
+  meshUniforms: Map<IVisualComponent, IPerMeshUniformBuffer[]> = new Map();
 
   callback: GetUniformsCallback;
   materialPass: IMaterialPass;
@@ -27,14 +27,14 @@ export class PerMeshTracker implements IMeshTracker {
     this.meshUniforms.clear();
   }
 
-  onAssignedToMesh(mesh: IMeshComponent): void {
+  onAssignedToMesh(mesh: IVisualComponent): void {
     if (!this.meshUniforms.has(mesh)) {
       const uniformBuffers = this.callback();
       this.meshUniforms.set(mesh, uniformBuffers);
     }
   }
 
-  onUnassignedFromMesh(mesh: IMeshComponent): void {
+  onUnassignedFromMesh(mesh: IVisualComponent): void {
     if (this.meshUniforms.has(mesh)) {
       this.meshUniforms.get(mesh)!.forEach((uniformBuffer) => {
         uniformBuffer.destroy();
@@ -45,7 +45,7 @@ export class PerMeshTracker implements IMeshTracker {
   }
 
   prepareMeshUniforms(
-    mesh: IMeshComponent,
+    mesh: IVisualComponent,
     renderer: Renderer,
     pass: GPURenderPassEncoder,
     camera: Camera

@@ -1,4 +1,4 @@
-import { IMeshComponent, IRenderable } from '../types/interfaces';
+import { IVisualComponent, IRenderable } from '../types/interfaces';
 import { PerspectiveCamera } from './core/PerspectiveCamera';
 import { Transform } from './core/Transform';
 import { Camera } from './core/Camera';
@@ -25,6 +25,7 @@ import { GuiManager } from './managers/GuiManager';
 import { UIElement } from './core/UIElement';
 import { FontManager } from './managers/FontManager';
 import { IUIElementPass } from './materials/IUIElementPass';
+import { Sprite3D } from './core/Sprite3D';
 
 export class Renderer {
   device: GPUDevice;
@@ -359,7 +360,7 @@ export class Renderer {
     let transform: Transform | null;
     let geometry: Geometry | null;
     let material: IMaterialPass | null;
-    let mesh: IMeshComponent;
+    let mesh: IVisualComponent;
 
     for (let i: i32 = 0, l: i32 = transforms.length; i < l; i++) {
       transform = transforms[i];
@@ -368,7 +369,9 @@ export class Renderer {
 
       if (
         component &&
-        (component instanceof Mesh || component instanceof UIElement)
+        (component instanceof Mesh ||
+          component instanceof UIElement ||
+          component instanceof Sprite3D)
       ) {
         mesh = component;
 

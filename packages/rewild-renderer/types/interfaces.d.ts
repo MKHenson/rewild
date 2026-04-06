@@ -7,7 +7,7 @@ interface IRenderable {
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera): void;
 }
 
-interface IMeshComponent {
+interface IVisualComponent {
   transform: Transform;
   geometry: Geometry;
   material: IMaterialPass;

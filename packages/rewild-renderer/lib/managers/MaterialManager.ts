@@ -3,6 +3,7 @@ import { DiffuseIntancedPass } from '../materials/DiffuseIntancedPass';
 import { DiffusePass } from '../materials/DiffusePass';
 import { GizmoPass } from '../materials/GizmoPass';
 import { IMaterialPass } from '../materials/IMaterialPass';
+import { SpritePass } from '../materials/SpritePass';
 import { WireframePass } from '../materials/WireframePass';
 import { Renderer } from '../Renderer';
 import { IMaterialsTemplate } from './types';
@@ -76,6 +77,22 @@ export class MaterialManager {
           );
           (materialPass as GizmoPass).gizmoUniforms.opacity =
             materialTemplate.opacity ?? 1;
+          break;
+        case 'sprite':
+          materialPass = new SpritePass();
+          (materialPass as SpritePass).spriteUniforms.diffuseColor =
+            new Color().setRGB(
+              materialTemplate.color?.[0] ?? 1,
+              materialTemplate.color?.[1] ?? 1,
+              materialTemplate.color?.[2] ?? 1
+            );
+          (materialPass as SpritePass).spriteUniforms.diffuseAlpha =
+            materialTemplate.opacity ?? 1;
+          if (materialTemplate.diffuseMap)
+            (materialPass as SpritePass).spriteUniforms.texture =
+              renderer.textureManager.get(
+                materialTemplate.diffuseMap
+              ).gpuTexture;
           break;
         default:
           throw new Error(`Unknown material type: ${materialTemplate.type}`);

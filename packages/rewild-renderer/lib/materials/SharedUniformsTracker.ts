@@ -3,10 +3,10 @@ import { IMaterialPass } from './IMaterialPass';
 import { Camera } from '../core/Camera';
 import { IMeshTracker } from '../../types/IMeshTracker';
 import { ISharedUniformBuffer } from '../../types/IUniformBuffer';
-import { IMeshComponent } from '../../types/interfaces';
+import { IVisualComponent } from '../../types/interfaces';
 
 export class SharedUniformsTracker implements IMeshTracker {
-  meshes: IMeshComponent[];
+  meshes: IVisualComponent[];
   uniforms: ISharedUniformBuffer[];
   materialPass: IMaterialPass;
 
@@ -22,7 +22,7 @@ export class SharedUniformsTracker implements IMeshTracker {
     });
   }
 
-  onAssignedToMesh(mesh: IMeshComponent): void {
+  onAssignedToMesh(mesh: IVisualComponent): void {
     if (!this.meshes.includes(mesh)) {
       this.meshes.push(mesh);
       this.uniforms.forEach((uniform) => {
@@ -31,7 +31,7 @@ export class SharedUniformsTracker implements IMeshTracker {
     }
   }
 
-  onUnassignedFromMesh(mesh: IMeshComponent): void {
+  onUnassignedFromMesh(mesh: IVisualComponent): void {
     if (this.meshes.includes(mesh)) {
       this.meshes.splice(this.meshes.indexOf(mesh), 1);
       this.uniforms.forEach((uniform) => {
@@ -44,7 +44,7 @@ export class SharedUniformsTracker implements IMeshTracker {
     renderer: Renderer,
     pass: GPURenderPassEncoder,
     camera: Camera,
-    meshes: IMeshComponent[]
+    meshes: IVisualComponent[]
   ): void {
     const material = this.materialPass;
 
