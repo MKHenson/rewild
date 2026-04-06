@@ -6,7 +6,8 @@ import {
   compelteDragDrop,
   theme,
 } from 'rewild-ui';
-import { Mesh, Renderer, Transform } from 'rewild-renderer';
+import { Mesh, Renderer, Sprite3D, Transform } from 'rewild-renderer';
+import { InteractionLayer } from 'src/core/InteractionLayer';
 import { Gizmo } from 'rewild-renderer/lib/helpers/Gizmo';
 import { projectStore, ProjectStoreEvents } from 'src/ui/stores/ProjectStore';
 import { Quaternion, Subscriber, Vector2, Vector3 } from 'rewild-common';
@@ -72,6 +73,9 @@ export class EditorViewport extends Component<Props> {
       transform.selected = value;
       transform.traverse((child) => {
         child.selected = value;
+        if (child.userData.isHelper) {
+          child.visible = value;
+        }
       });
     };
 
@@ -237,7 +241,11 @@ export class EditorViewport extends Component<Props> {
       }
 
       const intersection = get3DCoords(event.clientX, event.clientY);
-      if (intersection && intersection.object.component instanceof Mesh) {
+      if (
+        intersection &&
+        (intersection.object.component instanceof Mesh ||
+          intersection.object.component instanceof Sprite3D)
+      ) {
         // Walk up the Transform parent chain to find the root scene graph node
         let current: Transform | null = intersection.object;
         let clickedNode = null;
@@ -332,6 +340,7 @@ export class EditorViewport extends Component<Props> {
         -((clientY - rect.top) / rect.height) * 2 + 1
       );
       raycaster.setFromCamera(pointer, this.renderer.perspectiveCam);
+      raycaster.layers.enable(InteractionLayer.Helper); // Include helper layer for selection/hover
       return raycaster;
     };
 

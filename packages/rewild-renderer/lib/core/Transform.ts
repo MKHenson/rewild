@@ -49,6 +49,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
   matrixWorldNeedsUpdate: boolean;
   matrixAutoUpdate: boolean;
   visible: boolean = true;
+  userData: Record<string, unknown> = {};
   observers: ITransformObserver[];
   component: IComponent | null;
 

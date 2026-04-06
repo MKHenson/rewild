@@ -143,7 +143,7 @@ function intersectObject(
   intersects: Intersection[],
   recursive: boolean
 ): void {
-  if (object.layers.test(raycaster.layers)) {
+  if (object.visible && object.layers.test(raycaster.layers)) {
     object.raycast(raycaster, intersects);
   }
 
