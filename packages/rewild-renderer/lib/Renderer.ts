@@ -5,7 +5,6 @@ import { Camera } from './core/Camera';
 import { CubeRenderer } from './renderables.ts/CubeRenderer';
 import { Geometry } from './geometry/Geometry';
 import { IMaterialPass } from './materials/IMaterialPass';
-import { Mesh } from './core/Mesh';
 import { IRenderGroup } from '../types/IRenderGroup';
 import { AtmosphereSkybox } from './core/AtmosphereSkybox';
 import { TerrainRenderer } from './renderers/terrain/TerrainRenderer';
@@ -25,7 +24,7 @@ import { GuiManager } from './managers/GuiManager';
 import { UIElement } from './core/UIElement';
 import { FontManager } from './managers/FontManager';
 import { IUIElementPass } from './materials/IUIElementPass';
-import { Sprite3D } from './core/Sprite3D';
+import { isVisualComponent } from './typeGuards';
 
 export class Renderer {
   device: GPUDevice;
@@ -325,7 +324,7 @@ export class Renderer {
     }
 
     if (transform.component instanceof Light) {
-      this.currentRenderList.lights.push(transform.component as Light);
+      this.currentRenderList.lights.push(transform.component);
     }
 
     // Children inherit the overlay layer from their ancestor
@@ -367,12 +366,7 @@ export class Renderer {
 
       const component = transform.component;
 
-      if (
-        component &&
-        (component instanceof Mesh ||
-          component instanceof UIElement ||
-          component instanceof Sprite3D)
-      ) {
+      if (component && isVisualComponent(component)) {
         mesh = component;
 
         if (mesh.visible === false) continue;

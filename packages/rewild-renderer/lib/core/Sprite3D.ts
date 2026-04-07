@@ -9,12 +9,15 @@ import {
   IVisualComponent,
   IRaycaster,
 } from '../../types/interfaces';
+import { IS_VISUAL_COMPONENT } from '../typeGuards';
 
 const _sphere = new Sphere();
 const _worldPos = new Vector3();
 const _hitTarget = new Vector3();
 
 export class Sprite3D implements IComponent, IVisualComponent {
+  readonly [IS_VISUAL_COMPONENT] = true as const;
+
   geometry: Geometry;
   material: IMaterialPass;
   transform: Transform;

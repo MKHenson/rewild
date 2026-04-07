@@ -15,6 +15,7 @@ import {
   IVisualComponent,
   IRaycaster,
 } from '../../types/interfaces';
+import { IS_VISUAL_COMPONENT } from '../typeGuards';
 
 const _sphere = new Sphere();
 const _ray = new Ray();
@@ -29,6 +30,8 @@ const _intersectionPoint = new Vector3();
 const _inverseMatrix = new Matrix4();
 
 export class Mesh implements IComponent, IVisualComponent {
+  readonly [IS_VISUAL_COMPONENT] = true as const;
+
   geometry: Geometry;
   material: IMaterialPass;
   transform: Transform;

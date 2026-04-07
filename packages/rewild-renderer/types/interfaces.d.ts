@@ -1,13 +1,20 @@
-import { Geometry, IMaterialPass, Renderer, Transform } from '../lib';
+import {
+  Geometry,
+  IMaterialPass,
+  IS_VISUAL_COMPONENT,
+  Renderer,
+  Transform,
+} from '../lib';
 import { Camera } from '../lib/core/Camera';
 
-interface IRenderable {
+export interface IRenderable {
   initialize(renderer: Renderer): Promise<IRenderable>;
   update(renderer: Renderer, delta: number, totalTime: number): void;
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera): void;
 }
 
-interface IVisualComponent {
+export interface IVisualComponent {
+  readonly [IS_VISUAL_COMPONENT]: true;
   transform: Transform;
   geometry: Geometry;
   material: IMaterialPass;

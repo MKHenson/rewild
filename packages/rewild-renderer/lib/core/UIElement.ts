@@ -8,12 +8,15 @@ import {
   IRaycaster,
   MsdfTextFormattingOptions,
 } from '../../types/interfaces';
+import { IS_VISUAL_COMPONENT } from '../typeGuards';
 import { Color, Dispatcher } from 'rewild-common';
 import { Renderer } from '..';
 import { TextRenderer } from './text-renderer/TextRenderer';
 import { UIPointerEvent } from './UIPointerEvent';
 
 export class UIElement implements IComponent, IVisualComponent {
+  readonly [IS_VISUAL_COMPONENT] = true as const;
+
   geometry: Geometry;
   material: IMaterialPass;
   transform: Transform;
@@ -242,12 +245,11 @@ export class UIElement implements IComponent, IVisualComponent {
 
   raycast(raycaster: IRaycaster, intersects: Intersection[]) {
     if (raycaster instanceof UIRaycaster) {
-      const uiRaycaster = raycaster as UIRaycaster;
-      const origin = uiRaycaster.origin;
-      const x = this.getX(uiRaycaster.renderer);
-      const y = this.getY(uiRaycaster.renderer);
-      const width = this.getWidth(uiRaycaster.renderer);
-      const height = this.getHeight(uiRaycaster.renderer);
+      const origin = raycaster.origin;
+      const x = this.getX(raycaster.renderer);
+      const y = this.getY(raycaster.renderer);
+      const width = this.getWidth(raycaster.renderer);
+      const height = this.getHeight(raycaster.renderer);
 
       if (
         origin.x >= x &&

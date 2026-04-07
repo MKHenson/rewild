@@ -15,3 +15,4 @@ export * from './input';
 export * from './core/GltfLoader';
 export * from './core/UIElement';
 export * from './core/UIPointerEvent';
+export * from './typeGuards';
