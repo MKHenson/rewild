@@ -182,8 +182,8 @@ export class Vector2 implements IVector {
       y = this.y;
     const e = m.elements;
 
-    this.x = e[0] * x + e[3] * y + e[6];
-    this.y = e[1] * x + e[4] * y + e[7];
+    this.x = e[0] * x + e[4] * y + e[8];
+    this.y = e[1] * x + e[5] * y + e[9];
 
     return this;
   }

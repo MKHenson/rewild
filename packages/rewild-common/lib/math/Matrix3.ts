@@ -1,5 +1,5 @@
-import { Matrix4 } from "./Matrix4";
-import { Vector3 } from "./Vector3";
+import { Matrix4 } from './Matrix4';
+import { Vector3 } from './Vector3';
 
 export class Matrix3 {
   isMatrix3: boolean = true;
@@ -10,7 +10,17 @@ export class Matrix3 {
     this.set(1, 0, 0, 0, 1, 0, 0, 0, 1);
   }
 
-  set(n11: f32, n12: f32, n13: f32, n21: f32, n22: f32, n23: f32, n31: f32, n32: f32, n33: f32): Matrix3 {
+  set(
+    n11: f32,
+    n12: f32,
+    n13: f32,
+    n21: f32,
+    n22: f32,
+    n23: f32,
+    n31: f32,
+    n32: f32,
+    n33: f32
+  ): Matrix3 {
     const te = this.elements;
 
     te[0] = n11;
@@ -147,7 +157,9 @@ export class Matrix3 {
       h = te[9],
       i = te[10];
 
-    return a * e * i - a * f * h - b * d * i + b * f * g + c * d * h - c * e * g;
+    return (
+      a * e * i - a * f * h - b * d * i + b * f * g + c * d * h - c * e * g
+    );
   }
 
   invert(): Matrix3 {
@@ -222,7 +234,15 @@ export class Matrix3 {
     return this;
   }
 
-  setUvTransform(tx: f32, ty: f32, sx: f32, sy: f32, rotation: f32, cx: f32, cy: f32): Matrix3 {
+  setUvTransform(
+    tx: f32,
+    ty: f32,
+    sx: f32,
+    sy: f32,
+    rotation: f32,
+    cx: f32,
+    cy: f32
+  ): Matrix3 {
     const c: f32 = Mathf.cos(rotation);
     const s: f32 = Mathf.sin(rotation);
 
@@ -283,7 +303,7 @@ export class Matrix3 {
 
     te[0] += tx * te[2];
     te[4] += tx * te[6];
-    te[7] += tx * te[10];
+    te[8] += tx * te[10];
     te[1] += ty * te[2];
     te[5] += ty * te[6];
     te[9] += ty * te[10];

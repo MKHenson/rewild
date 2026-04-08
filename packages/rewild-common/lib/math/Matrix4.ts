@@ -1,8 +1,8 @@
-import { Vector3 } from "./Vector3";
-import { EulerRotationOrder } from "./EulerOrder";
-import { Euler } from "./Euler";
-import { Matrix3 } from "./Matrix3";
-import { Quaternion } from "./Quaternion";
+import { Vector3 } from './Vector3';
+import { EulerRotationOrder } from './EulerOrder';
+import { Euler } from './Euler';
+import { Matrix3 } from './Matrix3';
+import { Quaternion } from './Quaternion';
 
 export class Matrix4 {
   isMatrix4: boolean = true;
@@ -101,7 +101,24 @@ export class Matrix4 {
   setFromMatrix3(m: Matrix3): Matrix4 {
     const me = m.elements;
 
-    this.set(me[0], me[3], me[6], 0, me[1], me[4], me[7], 0, me[2], me[5], me[8], 0, 0, 0, 0, 1);
+    this.set(
+      me[0],
+      me[4],
+      me[8],
+      0,
+      me[1],
+      me[5],
+      me[9],
+      0,
+      me[2],
+      me[6],
+      me[10],
+      0,
+      0,
+      0,
+      0,
+      1
+    );
 
     return this;
   }
@@ -115,7 +132,24 @@ export class Matrix4 {
   }
 
   makeBasis(xAxis: Vector3, yAxis: Vector3, zAxis: Vector3): Matrix4 {
-    this.set(xAxis.x, yAxis.x, zAxis.x, 0, xAxis.y, yAxis.y, zAxis.y, 0, xAxis.z, yAxis.z, zAxis.z, 0, 0, 0, 0, 1);
+    this.set(
+      xAxis.x,
+      yAxis.x,
+      zAxis.x,
+      0,
+      xAxis.y,
+      yAxis.y,
+      zAxis.y,
+      0,
+      xAxis.z,
+      yAxis.z,
+      zAxis.z,
+      0,
+      0,
+      0,
+      0,
+      1
+    );
 
     return this;
   }
@@ -156,7 +190,7 @@ export class Matrix4 {
   makeRotationFromEuler(euler: Euler): Matrix4 {
     if (!(euler && euler.isEuler)) {
       console.error(
-        "THREE.Matrix4: .makeRotationFromEuler() now expects a Euler rotation rather than a Vector3 and order."
+        'THREE.Matrix4: .makeRotationFromEuler() now expects a Euler rotation rather than a Vector3 and order.'
       );
     }
 
@@ -447,12 +481,33 @@ export class Matrix4 {
 
     return (
       n41 *
-        (+n14 * n23 * n32 - n13 * n24 * n32 - n14 * n22 * n33 + n12 * n24 * n33 + n13 * n22 * n34 - n12 * n23 * n34) +
+        (+n14 * n23 * n32 -
+          n13 * n24 * n32 -
+          n14 * n22 * n33 +
+          n12 * n24 * n33 +
+          n13 * n22 * n34 -
+          n12 * n23 * n34) +
       n42 *
-        (+n11 * n23 * n34 - n11 * n24 * n33 + n14 * n21 * n33 - n13 * n21 * n34 + n13 * n24 * n31 - n14 * n23 * n31) +
+        (+n11 * n23 * n34 -
+          n11 * n24 * n33 +
+          n14 * n21 * n33 -
+          n13 * n21 * n34 +
+          n13 * n24 * n31 -
+          n14 * n23 * n31) +
       n43 *
-        (+n11 * n24 * n32 - n11 * n22 * n34 - n14 * n21 * n32 + n12 * n21 * n34 + n14 * n22 * n31 - n12 * n24 * n31) +
-      n44 * (-n13 * n22 * n31 - n11 * n23 * n32 + n11 * n22 * n33 + n13 * n21 * n32 - n12 * n21 * n33 + n12 * n23 * n31)
+        (+n11 * n24 * n32 -
+          n11 * n22 * n34 -
+          n14 * n21 * n32 +
+          n12 * n21 * n34 +
+          n14 * n22 * n31 -
+          n12 * n24 * n31) +
+      n44 *
+        (-n13 * n22 * n31 -
+          n11 * n23 * n32 +
+          n11 * n22 * n33 +
+          n13 * n21 * n32 -
+          n12 * n21 * n33 +
+          n12 * n23 * n31)
     );
   }
 
@@ -512,82 +567,163 @@ export class Matrix4 {
       n34: f32 = unchecked(te[14]),
       n44: f32 = unchecked(te[15]),
       t11: f32 =
-        n23 * n34 * n42 - n24 * n33 * n42 + n24 * n32 * n43 - n22 * n34 * n43 - n23 * n32 * n44 + n22 * n33 * n44,
+        n23 * n34 * n42 -
+        n24 * n33 * n42 +
+        n24 * n32 * n43 -
+        n22 * n34 * n43 -
+        n23 * n32 * n44 +
+        n22 * n33 * n44,
       t12: f32 =
-        n14 * n33 * n42 - n13 * n34 * n42 - n14 * n32 * n43 + n12 * n34 * n43 + n13 * n32 * n44 - n12 * n33 * n44,
+        n14 * n33 * n42 -
+        n13 * n34 * n42 -
+        n14 * n32 * n43 +
+        n12 * n34 * n43 +
+        n13 * n32 * n44 -
+        n12 * n33 * n44,
       t13: f32 =
-        n13 * n24 * n42 - n14 * n23 * n42 + n14 * n22 * n43 - n12 * n24 * n43 - n13 * n22 * n44 + n12 * n23 * n44,
+        n13 * n24 * n42 -
+        n14 * n23 * n42 +
+        n14 * n22 * n43 -
+        n12 * n24 * n43 -
+        n13 * n22 * n44 +
+        n12 * n23 * n44,
       t14: f32 =
-        n14 * n23 * n32 - n13 * n24 * n32 - n14 * n22 * n33 + n12 * n24 * n33 + n13 * n22 * n34 - n12 * n23 * n34;
+        n14 * n23 * n32 -
+        n13 * n24 * n32 -
+        n14 * n22 * n33 +
+        n12 * n24 * n33 +
+        n13 * n22 * n34 -
+        n12 * n23 * n34;
 
     const det: f32 = n11 * t11 + n21 * t12 + n31 * t13 + n41 * t14;
 
-    if (det === 0) return this.set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    if (det === 0)
+      return this.set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     const detInv: f32 = 1 / det;
 
     unchecked((te[0] = t11 * detInv));
     unchecked(
       (te[1] =
-        (n24 * n33 * n41 - n23 * n34 * n41 - n24 * n31 * n43 + n21 * n34 * n43 + n23 * n31 * n44 - n21 * n33 * n44) *
+        (n24 * n33 * n41 -
+          n23 * n34 * n41 -
+          n24 * n31 * n43 +
+          n21 * n34 * n43 +
+          n23 * n31 * n44 -
+          n21 * n33 * n44) *
         detInv)
     );
     unchecked(
       (te[2] =
-        (n22 * n34 * n41 - n24 * n32 * n41 + n24 * n31 * n42 - n21 * n34 * n42 - n22 * n31 * n44 + n21 * n32 * n44) *
+        (n22 * n34 * n41 -
+          n24 * n32 * n41 +
+          n24 * n31 * n42 -
+          n21 * n34 * n42 -
+          n22 * n31 * n44 +
+          n21 * n32 * n44) *
         detInv)
     );
     unchecked(
       (te[3] =
-        (n23 * n32 * n41 - n22 * n33 * n41 - n23 * n31 * n42 + n21 * n33 * n42 + n22 * n31 * n43 - n21 * n32 * n43) *
+        (n23 * n32 * n41 -
+          n22 * n33 * n41 -
+          n23 * n31 * n42 +
+          n21 * n33 * n42 +
+          n22 * n31 * n43 -
+          n21 * n32 * n43) *
         detInv)
     );
     unchecked((te[4] = t12 * detInv));
     unchecked(
       (te[5] =
-        (n13 * n34 * n41 - n14 * n33 * n41 + n14 * n31 * n43 - n11 * n34 * n43 - n13 * n31 * n44 + n11 * n33 * n44) *
+        (n13 * n34 * n41 -
+          n14 * n33 * n41 +
+          n14 * n31 * n43 -
+          n11 * n34 * n43 -
+          n13 * n31 * n44 +
+          n11 * n33 * n44) *
         detInv)
     );
     unchecked(
       (te[6] =
-        (n14 * n32 * n41 - n12 * n34 * n41 - n14 * n31 * n42 + n11 * n34 * n42 + n12 * n31 * n44 - n11 * n32 * n44) *
+        (n14 * n32 * n41 -
+          n12 * n34 * n41 -
+          n14 * n31 * n42 +
+          n11 * n34 * n42 +
+          n12 * n31 * n44 -
+          n11 * n32 * n44) *
         detInv)
     );
     unchecked(
       (te[7] =
-        (n12 * n33 * n41 - n13 * n32 * n41 + n13 * n31 * n42 - n11 * n33 * n42 - n12 * n31 * n43 + n11 * n32 * n43) *
+        (n12 * n33 * n41 -
+          n13 * n32 * n41 +
+          n13 * n31 * n42 -
+          n11 * n33 * n42 -
+          n12 * n31 * n43 +
+          n11 * n32 * n43) *
         detInv)
     );
     unchecked((te[8] = t13 * detInv));
     unchecked(
       (te[9] =
-        (n14 * n23 * n41 - n13 * n24 * n41 - n14 * n21 * n43 + n11 * n24 * n43 + n13 * n21 * n44 - n11 * n23 * n44) *
+        (n14 * n23 * n41 -
+          n13 * n24 * n41 -
+          n14 * n21 * n43 +
+          n11 * n24 * n43 +
+          n13 * n21 * n44 -
+          n11 * n23 * n44) *
         detInv)
     );
     unchecked(
       (te[10] =
-        (n12 * n24 * n41 - n14 * n22 * n41 + n14 * n21 * n42 - n11 * n24 * n42 - n12 * n21 * n44 + n11 * n22 * n44) *
+        (n12 * n24 * n41 -
+          n14 * n22 * n41 +
+          n14 * n21 * n42 -
+          n11 * n24 * n42 -
+          n12 * n21 * n44 +
+          n11 * n22 * n44) *
         detInv)
     );
     unchecked(
       (te[11] =
-        (n13 * n22 * n41 - n12 * n23 * n41 - n13 * n21 * n42 + n11 * n23 * n42 + n12 * n21 * n43 - n11 * n22 * n43) *
+        (n13 * n22 * n41 -
+          n12 * n23 * n41 -
+          n13 * n21 * n42 +
+          n11 * n23 * n42 +
+          n12 * n21 * n43 -
+          n11 * n22 * n43) *
         detInv)
     );
     unchecked((te[12] = t14 * detInv));
     unchecked(
       (te[13] =
-        (n13 * n24 * n31 - n14 * n23 * n31 + n14 * n21 * n33 - n11 * n24 * n33 - n13 * n21 * n34 + n11 * n23 * n34) *
+        (n13 * n24 * n31 -
+          n14 * n23 * n31 +
+          n14 * n21 * n33 -
+          n11 * n24 * n33 -
+          n13 * n21 * n34 +
+          n11 * n23 * n34) *
         detInv)
     );
     unchecked(
       (te[14] =
-        (n14 * n22 * n31 - n12 * n24 * n31 - n14 * n21 * n32 + n11 * n24 * n32 + n12 * n21 * n34 - n11 * n22 * n34) *
+        (n14 * n22 * n31 -
+          n12 * n24 * n31 -
+          n14 * n21 * n32 +
+          n11 * n24 * n32 +
+          n12 * n21 * n34 -
+          n11 * n22 * n34) *
         detInv)
     );
     unchecked(
       (te[15] =
-        (n12 * n23 * n31 - n13 * n22 * n31 + n13 * n21 * n32 - n11 * n23 * n32 - n12 * n21 * n33 + n11 * n22 * n33) *
+        (n12 * n23 * n31 -
+          n13 * n22 * n31 +
+          n13 * n21 * n32 -
+          n11 * n23 * n32 -
+          n12 * n21 * n33 +
+          n11 * n22 * n33) *
         detInv)
     );
 
@@ -755,7 +891,11 @@ export class Matrix4 {
     return this;
   }
 
-  decompose(position: Vector3, quaternion: Quaternion, scale: Vector3): Matrix4 {
+  decompose(
+    position: Vector3,
+    quaternion: Quaternion,
+    scale: Vector3
+  ): Matrix4 {
     const te = this.elements;
 
     let sx: f32 = _v1.set(te[0], te[1], te[2]).length();
@@ -798,7 +938,14 @@ export class Matrix4 {
     return this;
   }
 
-  makePerspective(left: f32, right: f32, top: f32, bottom: f32, near: f32, far: f32): Matrix4 {
+  makePerspective(
+    left: f32,
+    right: f32,
+    top: f32,
+    bottom: f32,
+    near: f32,
+    far: f32
+  ): Matrix4 {
     const te = this.elements;
     const x: f32 = (2 * near) / (right - left);
     const y: f32 = (2 * near) / (top - bottom);
@@ -828,7 +975,14 @@ export class Matrix4 {
     return this;
   }
 
-  makeOrthographic(left: f32, right: f32, top: f32, bottom: f32, near: f32, far: f32): Matrix4 {
+  makeOrthographic(
+    left: f32,
+    right: f32,
+    top: f32,
+    bottom: f32,
+    near: f32,
+    far: f32
+  ): Matrix4 {
     const te = this.elements;
     const w: f32 = 1.0 / (right - left);
     const h: f32 = 1.0 / (top - bottom);

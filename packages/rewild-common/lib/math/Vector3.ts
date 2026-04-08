@@ -241,9 +241,9 @@ export class Vector3 implements IVector {
       z = this.z;
     const e = m.elements;
 
-    this.x = e[0] * x + e[3] * y + e[6] * z;
-    this.y = e[1] * x + e[4] * y + e[7] * z;
-    this.z = e[2] * x + e[5] * y + e[8] * z;
+    this.x = e[0] * x + e[4] * y + e[8] * z;
+    this.y = e[1] * x + e[5] * y + e[9] * z;
+    this.z = e[2] * x + e[6] * y + e[10] * z;
 
     return this;
   }
@@ -571,7 +571,7 @@ export class Vector3 implements IVector {
   }
 
   setFromMatrix3Column(m: Matrix3, index: u32): Vector3 {
-    return this.fromF32Array(m.elements, index * 3);
+    return this.fromF32Array(m.elements, index * 4);
   }
 
   equals(v: Vector3): boolean {

@@ -1,8 +1,8 @@
-import * as MathUtils from "./MathUtils";
-import { Matrix4 } from "./Matrix4";
-import { Vector3 } from "./Vector3";
-import { Euler } from "./Euler";
-import { EulerRotationOrder } from "./EulerOrder";
+import * as MathUtils from './MathUtils';
+import { Matrix4 } from './Matrix4';
+import { Vector3 } from './Vector3';
+import { Euler } from './Euler';
+import { EulerRotationOrder } from './EulerOrder';
 
 export interface IQuatChangeListener {
   onQuatChanged(quat: Quaternion): void;
@@ -193,7 +193,7 @@ export class Quaternion {
     return this;
   }
 
-  setFromEuler(euler: Euler, update: boolean): Quaternion {
+  setFromEuler(euler: Euler, update: boolean = false): Quaternion {
     const x = euler._x,
       y = euler._y,
       z = euler._z,
@@ -258,7 +258,9 @@ export class Quaternion {
         break;
 
       default:
-        throw new Error("Quaternion: .setFromEuler() encountered an unknown order");
+        throw new Error(
+          'Quaternion: .setFromEuler() encountered an unknown order'
+        );
     }
 
     if (update != false) this.onChangeCallback();
@@ -409,11 +411,21 @@ export class Quaternion {
   }
 
   lengthSq(): f32 {
-    return this._x * this._x + this._y * this._y + this._z * this._z + this._w * this._w;
+    return (
+      this._x * this._x +
+      this._y * this._y +
+      this._z * this._z +
+      this._w * this._w
+    );
   }
 
   length(): f32 {
-    return Mathf.sqrt(this._x * this._x + this._y * this._y + this._z * this._z + this._w * this._w);
+    return Mathf.sqrt(
+      this._x * this._x +
+        this._y * this._y +
+        this._z * this._z +
+        this._w * this._w
+    );
   }
 
   normalize(): Quaternion {
@@ -537,7 +549,10 @@ export class Quaternion {
 
   equals(quaternion: Quaternion): boolean {
     return (
-      quaternion._x === this._x && quaternion._y === this._y && quaternion._z === this._z && quaternion._w === this._w
+      quaternion._x === this._x &&
+      quaternion._y === this._y &&
+      quaternion._z === this._z &&
+      quaternion._w === this._w
     );
   }
 
