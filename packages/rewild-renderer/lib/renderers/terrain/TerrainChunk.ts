@@ -190,6 +190,7 @@ export class LODMesh {
       geometry.vertices = vertices;
       geometry.uvs = uvs;
       geometry.indices = indices;
+      geometry.computeBVH();
       geometry.computeNormals();
 
       this.heights = new Float32Array(vertices.length / 3);

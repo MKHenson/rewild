@@ -125,9 +125,27 @@ export class Mesh implements IComponent, IVisualComponent {
         if (_ray.intersectsBox(geometry.boundingBox) === false) return;
       }
 
-      // test for intersections with geometry
+      // Use BVH if available on the geometry
+      if (geometry.bvh) {
+        // BVH works in local space so pass 0/Infinity for near/far;
+        // world-space distance filtering happens after the transform below.
+        const bvhHits: Intersection[] = [];
+        geometry.bvh.raycast(_ray, material.side, 0, Infinity, bvhHits);
 
-      this._computeIntersections(raycaster, intersects, _ray);
+        // Transform hit points from local to world space and apply near/far
+        for (let i = 0, l = bvhHits.length; i < l; i++) {
+          const hit = bvhHits[i];
+          hit.point.applyMatrix4(matrixWorld);
+          hit.distance = raycaster.ray.origin.distanceTo(hit.point);
+          if (hit.distance < raycaster.near || hit.distance > raycaster.far)
+            continue;
+          hit.object = this.transform;
+          intersects.push(hit);
+        }
+      } else {
+        // Fall back to existing brute-force method
+        this._computeIntersections(raycaster, intersects, _ray);
+      }
     }
   }
 
