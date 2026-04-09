@@ -1,4 +1,4 @@
-import { Ray, Vector3 } from 'rewild-common';
+import { Ray, Triangle, Vector3 } from 'rewild-common';
 import { Geometry } from '../geometry/Geometry';
 import { Intersection, Face } from '../core/Raycaster';
 import { BVHNode, BVHOptions, DEFAULT_BVH_OPTIONS } from './BVHNode';
@@ -193,9 +193,9 @@ export class BVH {
       const i1 = triIndices[t * 3 + 1];
       const i2 = triIndices[t * 3 + 2];
 
-      _vA.fromBuffer(i0, vertices);
-      _vB.fromBuffer(i1, vertices);
-      _vC.fromBuffer(i2, vertices);
+      _vA.fromBuffer(i0 * 3, vertices);
+      _vB.fromBuffer(i1 * 3, vertices);
+      _vC.fromBuffer(i2 * 3, vertices);
 
       const hit = this.intersectTriangle(ray, side, _vA, _vB, _vC, _hitPoint);
       if (hit === null) continue;
@@ -212,6 +212,8 @@ export class BVH {
       face.a = i0;
       face.b = i1;
       face.c = i2;
+      face.normal = new Vector3();
+      Triangle.getNormal(_vA, _vB, _vC, face.normal);
       intersection.face = face;
 
       intersects.push(intersection);
@@ -239,9 +241,9 @@ export class BVH {
       const i1 = triIndices[t * 3 + 1];
       const i2 = triIndices[t * 3 + 2];
 
-      _vA.fromBuffer(i0, vertices);
-      _vB.fromBuffer(i1, vertices);
-      _vC.fromBuffer(i2, vertices);
+      _vA.fromBuffer(i0 * 3, vertices);
+      _vB.fromBuffer(i1 * 3, vertices);
+      _vC.fromBuffer(i2 * 3, vertices);
 
       const hit = this.intersectTriangle(ray, side, _vA, _vB, _vC, _hitPoint);
       if (hit === null) continue;
@@ -259,9 +261,9 @@ export class BVH {
     if (closestTriIndex === -1) return null;
 
     // Re-intersect the winning triangle to get the exact hit point.
-    _vA.fromBuffer(closestI0, vertices);
-    _vB.fromBuffer(closestI1, vertices);
-    _vC.fromBuffer(closestI2, vertices);
+    _vA.fromBuffer(closestI0 * 3, vertices);
+    _vB.fromBuffer(closestI1 * 3, vertices);
+    _vC.fromBuffer(closestI2 * 3, vertices);
     this.intersectTriangle(ray, side, _vA, _vB, _vC, _hitPoint);
 
     const closest = new Intersection();
@@ -273,6 +275,8 @@ export class BVH {
     face.a = closestI0;
     face.b = closestI1;
     face.c = closestI2;
+    face.normal = new Vector3();
+    Triangle.getNormal(_vA, _vB, _vC, face.normal);
     closest.face = face;
 
     return closest;

@@ -7,6 +7,8 @@ import {
   Vector3,
 } from 'rewild-common';
 import { Transform } from '../core/Transform';
+import { BVH } from '../acceleration/BVH';
+import { BVHOptions } from '../acceleration/BVHNode';
 
 export class GeometryGroup {
   public start: i32;
@@ -41,11 +43,16 @@ export class Geometry {
   boundingSphere: Sphere | null;
   drawRange = { start: 0, count: Infinity };
 
+  bvh: BVH | null;
+  bvhNeedsUpdate: boolean;
+
   constructor() {
     this.groups = [];
     this.requiresBuild = true;
     this.boundingBox = null;
     this.boundingSphere = null;
+    this.bvh = null;
+    this.bvhNeedsUpdate = false;
   }
 
   dispose() {
@@ -53,6 +60,16 @@ export class Geometry {
     this.normalBuffer?.destroy();
     this.uvBuffer?.destroy();
     this.indexBuffer?.destroy();
+    this.disposeBVH();
+  }
+
+  computeBVH(options?: Partial<BVHOptions>): void {
+    this.bvh = new BVH(this, options);
+    this.bvhNeedsUpdate = false;
+  }
+
+  disposeBVH(): void {
+    this.bvh = null;
   }
 
   applyMatrix4(matrix: Matrix4): Geometry {
