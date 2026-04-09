@@ -6,6 +6,7 @@ import { OrthographicCamera } from './OrthographicCamera';
 import { Transform } from './Transform';
 import { IRaycaster } from '../../types/interfaces';
 import { Renderer } from '..';
+import { SceneBVH } from '../acceleration/SceneBVH';
 
 export class Raycaster implements IRaycaster {
   ray: Ray;
@@ -85,6 +86,22 @@ export class Raycaster implements IRaycaster {
     for (let i = 0, l = objects.length; i < l; i++) {
       intersectObject(objects[i], this, intersects, recursive);
     }
+
+    intersects.sort(ascSort);
+
+    return intersects;
+  }
+
+  /**
+   * Raycast against the entire scene using BVH acceleration.
+   * The SceneBVH narrows candidates by AABB, then delegates to each
+   * object's component raycast (which may use a per-geometry BVH).
+   */
+  intersectBVHScene(
+    sceneBVH: SceneBVH,
+    intersects: Intersection[] = []
+  ): Intersection[] {
+    sceneBVH.raycast(this, intersects);
 
     intersects.sort(ascSort);
 

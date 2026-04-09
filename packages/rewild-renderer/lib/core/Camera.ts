@@ -30,9 +30,7 @@ export class Camera implements ITransformObserver {
 
     const e = this.transform.matrixWorld.elements;
 
-    return target
-      .set(unchecked(-e[8]), unchecked(-e[9]), unchecked(-e[10]))
-      .normalize() as Vector3;
+    return target.set(-e[8], -e[9], -e[10]).normalize() as Vector3;
   }
 
   lookAt(x: f32, y: f32, z: f32): void {

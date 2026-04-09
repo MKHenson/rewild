@@ -57,7 +57,7 @@ export class StateMachine<T = any> extends EventDispatcher {
   getNode(name: string): Node | null {
     const nodes = this.nodes;
     for (let i: i32 = 0, l = nodes.length; i < l; i++) {
-      if (unchecked(nodes[i]).name == name) return unchecked(nodes[i]);
+      if (nodes[i].name == name) return nodes[i];
     }
 
     return null;
@@ -74,7 +74,7 @@ export class StateMachine<T = any> extends EventDispatcher {
 
   removeNode(node: Node): void {
     for (let i: i32 = 0, l: i32 = node.children.length; i < l; i++) {
-      const child = unchecked(node.children[i]);
+      const child = node.children[i];
       this.removeNode(child);
     }
 
@@ -113,7 +113,7 @@ export class StateMachine<T = any> extends EventDispatcher {
 
     // Initialize and mount nodes
     for (let i: i32 = 0, l: i32 = activeNodes.length; i < l; i++) {
-      const node = unchecked(activeNodes[i]);
+      const node = activeNodes[i];
 
       if (!node.initialized) node.init();
       if (!node.mounted) {
@@ -123,7 +123,7 @@ export class StateMachine<T = any> extends EventDispatcher {
     }
 
     for (let i: i32 = 0, l: i32 = activeNodes.length; i < l; i++) {
-      unchecked(activeNodes[i]).onUpdate(delta, total);
+      activeNodes[i].onUpdate(delta, total);
     }
   }
 
@@ -132,7 +132,7 @@ export class StateMachine<T = any> extends EventDispatcher {
     const inactiveNodes = this.inactiveNodes;
 
     for (let i: i32 = 0, l: i32 = node.children.length; i < l; i++) {
-      const child = unchecked(node.children[i]);
+      const child = node.children[i];
 
       this.deactivateNode(child);
     }
@@ -161,7 +161,7 @@ export class StateMachine<T = any> extends EventDispatcher {
     // Enter each of the destination nodes
     // and add them to the active nodes
     for (let i: i32 = 0, l = links.length; i < l; i++) {
-      const link = unchecked(links[i]);
+      const link = links[i];
       const destPortal = link.destinationPortal!;
 
       if (destPortal !== sourcePortal) {

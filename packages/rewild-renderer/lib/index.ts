@@ -16,3 +16,5 @@ export * from './core/GltfLoader';
 export * from './core/UIElement';
 export * from './core/UIPointerEvent';
 export * from './typeGuards';
+export * from './acceleration';
+export * from './core/Raycaster';

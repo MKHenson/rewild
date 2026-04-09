@@ -42,7 +42,7 @@ export class Container extends Node {
   findObjectByName(name: string): IAsset | null {
     const objects = this.objects;
     for (let i: i32 = 0, l = objects.length; i < l; i++)
-      if (unchecked(objects[i]).name == name) return unchecked(objects[i]);
+      if (objects[i].name == name) return objects[i];
     return null;
   }
 
