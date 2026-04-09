@@ -606,6 +606,12 @@ export class Renderer {
         ],
       });
 
+      // Ensure atmosphere matrices are up-to-date (its transform is not
+      // part of the solids list when BVH culling is active).
+      this.atmosphere.transform.modelViewMatrix.multiplyMatrices(
+        camera.camera.matrixWorldInverse,
+        this.atmosphere.transform.matrixWorld
+      );
       this.atmosphere.render(this, postProcessingPass, camera.camera);
       postProcessingPass.end();
 
