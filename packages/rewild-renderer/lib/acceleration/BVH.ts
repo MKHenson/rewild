@@ -9,6 +9,8 @@ const _vB = new Vector3();
 const _vC = new Vector3();
 const _hitPoint = new Vector3();
 const _boxTarget = new Vector3();
+const _leftCenter = new Vector3();
+const _rightCenter = new Vector3();
 
 /**
  * BVH acceleration structure for per-geometry raycasting.
@@ -136,13 +138,11 @@ export class BVH {
     let secondChild = node.rightChild;
 
     if (firstChild && secondChild) {
-      const leftCenter = new Vector3();
-      const rightCenter = new Vector3();
-      firstChild.boundingBox.getCenter(leftCenter);
-      secondChild.boundingBox.getCenter(rightCenter);
+      firstChild.boundingBox.getCenter(_leftCenter);
+      secondChild.boundingBox.getCenter(_rightCenter);
 
-      const leftDist = ray.origin.distanceToSquared(leftCenter);
-      const rightDist = ray.origin.distanceToSquared(rightCenter);
+      const leftDist = ray.origin.distanceToSquared(_leftCenter);
+      const rightDist = ray.origin.distanceToSquared(_rightCenter);
 
       if (rightDist < leftDist) {
         firstChild = node.rightChild;
@@ -228,8 +228,11 @@ export class BVH {
   ): Intersection | null {
     const { triIndices, vertices } = this;
     const end = node.triangleOffset + node.triangleCount;
-    let closest: Intersection | null = null;
     let closestDist = far;
+    let closestTriIndex = -1;
+    let closestI0 = 0;
+    let closestI1 = 0;
+    let closestI2 = 0;
 
     for (let t = node.triangleOffset; t < end; t++) {
       const i0 = triIndices[t * 3];
@@ -247,17 +250,30 @@ export class BVH {
       if (distance < near || distance > closestDist) continue;
 
       closestDist = distance;
-      closest = new Intersection();
-      closest.distance = distance;
-      closest.point = hit.clone();
-      closest.faceIndex = t;
-
-      const face = new Face();
-      face.a = i0;
-      face.b = i1;
-      face.c = i2;
-      closest.face = face;
+      closestTriIndex = t;
+      closestI0 = i0;
+      closestI1 = i1;
+      closestI2 = i2;
     }
+
+    if (closestTriIndex === -1) return null;
+
+    // Re-intersect the winning triangle to get the exact hit point.
+    _vA.fromBuffer(closestI0, vertices);
+    _vB.fromBuffer(closestI1, vertices);
+    _vC.fromBuffer(closestI2, vertices);
+    this.intersectTriangle(ray, side, _vA, _vB, _vC, _hitPoint);
+
+    const closest = new Intersection();
+    closest.distance = closestDist;
+    closest.point = _hitPoint.clone();
+    closest.faceIndex = closestTriIndex;
+
+    const face = new Face();
+    face.a = closestI0;
+    face.b = closestI1;
+    face.c = closestI2;
+    closest.face = face;
 
     return closest;
   }

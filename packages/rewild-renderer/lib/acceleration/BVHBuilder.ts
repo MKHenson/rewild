@@ -35,6 +35,21 @@ export class BVHBuilder {
   /** Total number of triangles. */
   triCount: i32;
 
+  // --- Cached SAH workspace arrays (fixed size, reused across recursive calls) ---
+  private sahBucketCounts = new Int32Array(SAH_BUCKETS);
+  private sahBucketBBoxMin = new Float32Array(SAH_BUCKETS * 3);
+  private sahBucketBBoxMax = new Float32Array(SAH_BUCKETS * 3);
+  private sahLeftArea = new Float32Array(SAH_BUCKETS - 1);
+  private sahLeftCount = new Int32Array(SAH_BUCKETS - 1);
+  private sahRightArea = new Float32Array(SAH_BUCKETS - 1);
+  private sahRightCount = new Int32Array(SAH_BUCKETS - 1);
+
+  // --- Cached split result object (reused across calls) ---
+  private splitResult: { axis: i32; index: i32 } = { axis: 0, index: 0 };
+
+  // --- Cached partition buffer (grown as needed) ---
+  private partitionBuffer: Float32Array = new Float32Array(0);
+
   constructor(
     vertices: Float32Array,
     indices: Uint32Array | undefined,
@@ -247,12 +262,13 @@ export class BVHBuilder {
           ? nodeBounds.min.y
           : nodeBounds.min.z;
 
-      // Bin triangles into buckets by centroid.
-      const bucketCounts = new Int32Array(SAH_BUCKETS);
-      const bucketBBoxMin = new Float32Array(SAH_BUCKETS * 3);
-      const bucketBBoxMax = new Float32Array(SAH_BUCKETS * 3);
+      // Reuse cached SAH workspace arrays.
+      const bucketCounts = this.sahBucketCounts;
+      const bucketBBoxMin = this.sahBucketBBoxMin;
+      const bucketBBoxMax = this.sahBucketBBoxMax;
 
-      // Initialize bucket bboxes to empty.
+      // Reset buckets.
+      bucketCounts.fill(0);
       for (let b = 0; b < SAH_BUCKETS; b++) {
         const bo = b * 3;
         bucketBBoxMin[bo] = Infinity;
@@ -292,10 +308,15 @@ export class BVHBuilder {
       // Sweep from left and right to compute costs for each split plane.
       // leftArea[i]  = surface area of union of buckets [0..i]
       // leftCount[i] = triangle count in buckets [0..i]
-      const leftArea = new Float32Array(SAH_BUCKETS - 1);
-      const leftCount = new Int32Array(SAH_BUCKETS - 1);
-      const rightArea = new Float32Array(SAH_BUCKETS - 1);
-      const rightCount = new Int32Array(SAH_BUCKETS - 1);
+      const leftArea = this.sahLeftArea;
+      const leftCount = this.sahLeftCount;
+      const rightArea = this.sahRightArea;
+      const rightCount = this.sahRightCount;
+
+      leftArea.fill(0);
+      leftCount.fill(0);
+      rightArea.fill(0);
+      rightCount.fill(0);
 
       // Left sweep.
       let lMinX = Infinity,
@@ -377,7 +398,9 @@ export class BVHBuilder {
     // No useful split found — let the caller create a leaf.
     const leafCost = INTERSECTION_COST * count;
     if (bestCost >= leafCost) {
-      return { axis: bestAxis, index: start };
+      this.splitResult.axis = bestAxis;
+      this.splitResult.index = start;
+      return this.splitResult;
     }
 
     // Partition triOrder[start..end) so that the first (bestSplitIndex-start)
@@ -392,7 +415,9 @@ export class BVHBuilder {
       bestSplitIndex - start
     );
 
-    return { axis: bestAxis, index: bestSplitIndex };
+    this.splitResult.axis = bestAxis;
+    this.splitResult.index = bestSplitIndex;
+    return this.splitResult;
   }
 
   /**
@@ -447,7 +472,9 @@ export class BVHBuilder {
       left = (start + end) >> 1;
     }
 
-    return { axis, index: left };
+    this.splitResult.axis = axis;
+    this.splitResult.index = left;
+    return this.splitResult;
   }
 
   /**
@@ -463,8 +490,15 @@ export class BVHBuilder {
     _nodeBounds: Box3,
     leftCount: i32
   ): void {
+    const size = end - start;
+
+    // Grow the cached buffer if needed (only allocates when size increases).
+    if (this.partitionBuffer.length < size) {
+      this.partitionBuffer = new Float32Array(size);
+    }
+    const centroids = this.partitionBuffer;
+
     // Collect centroid values for the axis.
-    const centroids = new Float32Array(end - start);
     for (let i = start; i < end; i++) {
       centroids[i - start] = info.centroids[triOrder[i] * 3 + axis];
     }
