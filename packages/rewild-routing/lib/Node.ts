@@ -27,12 +27,12 @@ export class Node {
     this.isDisposed = true;
 
     for (let p: i32 = 0, pl: i32 = this.portals.length; p < pl; p++) {
-      const portal = unchecked(this.portals[p]);
+      const portal = this.portals[p];
       portal.dispose();
     }
 
     for (let i: i32 = 0, l: i32 = this.children.length; i < l; i++) {
-      const child = unchecked(this.children[i]);
+      const child = this.children[i];
       child.dispose();
     }
 

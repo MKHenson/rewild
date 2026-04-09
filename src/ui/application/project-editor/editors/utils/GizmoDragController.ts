@@ -129,6 +129,7 @@ export class GizmoDragController {
 
         this.transform.position.copy(_newPosition);
         this.gizmo.transform.position.copy(_newPosition);
+        this.renderer.sceneBVH?.markObjectMoved(this.transform);
         return;
       }
       // Fall through to constraint-plane math if world raycast misses
@@ -150,6 +151,7 @@ export class GizmoDragController {
 
     this.transform.position.copy(_newPosition);
     this.gizmo.transform.position.copy(_newPosition);
+    this.renderer.sceneBVH?.markObjectMoved(this.transform);
   }
 
   endDrag(): {

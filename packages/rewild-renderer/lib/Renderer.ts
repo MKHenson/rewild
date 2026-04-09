@@ -1,3 +1,4 @@
+import { Frustum, Matrix4, WebGPUCoordinateSystem } from 'rewild-common';
 import { IVisualComponent, IRenderable } from '../types/interfaces';
 import { PerspectiveCamera } from './core/PerspectiveCamera';
 import { Transform } from './core/Transform';
@@ -25,6 +26,10 @@ import { UIElement } from './core/UIElement';
 import { FontManager } from './managers/FontManager';
 import { IUIElementPass } from './materials/IUIElementPass';
 import { isVisualComponent } from './typeGuards';
+import { SceneBVH } from './acceleration/SceneBVH';
+
+const _projScreenMatrix = new Matrix4();
+const _frustum = new Frustum();
 
 export class Renderer {
   device: GPUDevice;
@@ -69,6 +74,12 @@ export class Renderer {
   private uiElementsByMaterial = new Map<IMaterialPass, UIElement[]>();
   private uiInstanceCounters = new Map<IMaterialPass, number>();
 
+  /** Optional scene-level BVH for spatial acceleration (frustum culling, raycasting). */
+  sceneBVH: SceneBVH | null = null;
+
+  /** When true, sceneBVH.update() is called automatically each frame. */
+  sceneBVHAutoUpdate: boolean = false;
+
   constructor() {
     this.autoFrame = true;
     this.onFrameHandler = this.onFrame.bind(this);
@@ -80,6 +91,9 @@ export class Renderer {
     this.terrainRenderer = new TerrainRenderer();
     this.renderGroups = [];
     this.overlayRenderGroups = [];
+
+    this.sceneBVH = new SceneBVH(this.scene);
+    this.sceneBVHAutoUpdate = true;
 
     this.scene.addChild(this.atmosphere.transform);
   }
@@ -251,6 +265,8 @@ export class Renderer {
     this.renderGroups.length = 0; // Clear the render groups
     this.overlayRenderGroups.length = 0;
     this.currentRenderList.reset();
+    this.sceneBVH?.dispose();
+    this.sceneBVH = null;
     this.atmosphere.dispose();
     this.textureManager.dispose();
     this.samplerManager.dispose();
@@ -332,11 +348,32 @@ export class Renderer {
       layer === RenderLayer.Overlay ? RenderLayer.Overlay : undefined;
 
     for (let i = 0, l = transform.children.length; i < l; i++)
-      this.projectObject(
-        unchecked(transform.children[i]),
-        camera,
-        childOverride
-      );
+      this.projectObject(transform.children[i], camera, childOverride);
+  }
+
+  /**
+   * Lightweight scene traversal that only collects lights and overlay
+   * transforms. Used when the scene BVH handles solid-object culling.
+   */
+  private collectLightsAndOverlays(
+    transform: Transform,
+    isOverlay: boolean = false
+  ): void {
+    if (transform.visible === false) return;
+
+    const overlay = isOverlay || transform.renderLayer === RenderLayer.Overlay;
+
+    if (overlay) {
+      this.currentRenderList.overlay.push(transform);
+    }
+
+    if (transform.component instanceof Light) {
+      this.currentRenderList.lights.push(transform.component);
+    }
+
+    for (let i = 0, l = transform.children.length; i < l; i++) {
+      this.collectLightsAndOverlays(transform.children[i], overlay);
+    }
   }
 
   collectUIElements(transform: Transform): void {
@@ -347,7 +384,7 @@ export class Renderer {
     }
 
     for (let i = 0, l = transform.children.length; i < l; i++)
-      this.collectUIElements(unchecked(transform.children[i]));
+      this.collectUIElements(transform.children[i]);
   }
 
   organizeVisuals(transforms: Transform[], target: IRenderGroup[]) {
@@ -434,11 +471,38 @@ export class Renderer {
     if (pCamera.camera.transform.parent === null)
       pCamera.camera.transform.updateMatrixWorld();
 
+    // Auto-update scene BVH if enabled
+    if (this.sceneBVHAutoUpdate && this.sceneBVH) {
+      this.sceneBVH.update();
+    }
+
     // Clear the render list before projecting objects
     this.currentRenderList.reset();
 
-    // Project objects in the scene. Collect those that are to be rendererd
-    this.projectObject(this.scene, pCamera.camera);
+    // Project objects in the scene. Collect those that are to be rendered.
+    // When a scene BVH is available, use frustum culling to avoid
+    // visiting the entire scene graph.
+    if (this.sceneBVH) {
+      // Build the view-projection matrix and extract frustum planes.
+      _projScreenMatrix.multiplyMatrices(
+        pCamera.camera.projectionMatrix,
+        pCamera.camera.matrixWorldInverse
+      );
+      _frustum.setFromProjectionMatrix(
+        _projScreenMatrix,
+        WebGPUCoordinateSystem
+      );
+
+      // BVH frustum cull returns only visible visual-component transforms.
+      this.sceneBVH.frustumCull(_frustum, this.currentRenderList.solids);
+
+      // Lights and overlays are not tracked by the scene BVH, so collect
+      // them with the traditional traversal.
+      this.collectLightsAndOverlays(this.scene);
+    } else {
+      this.projectObject(this.scene, pCamera.camera);
+    }
+
     this.collectUIElements(this.ui);
 
     let transform: Transform | null;

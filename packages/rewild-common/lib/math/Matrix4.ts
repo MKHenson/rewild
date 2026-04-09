@@ -212,94 +212,94 @@ export class Matrix4 {
         be = b * e,
         bf = b * f;
 
-      unchecked((te[0] = c * e));
-      unchecked((te[4] = -c * f));
-      unchecked((te[8] = d));
+      te[0] = c * e;
+      te[4] = -c * f;
+      te[8] = d;
 
-      unchecked((te[1] = af + be * d));
-      unchecked((te[5] = ae - bf * d));
-      unchecked((te[9] = -b * c));
+      te[1] = af + be * d;
+      te[5] = ae - bf * d;
+      te[9] = -b * c;
 
-      unchecked((te[2] = bf - ae * d));
-      unchecked((te[6] = be + af * d));
-      unchecked((te[10] = a * c));
+      te[2] = bf - ae * d;
+      te[6] = be + af * d;
+      te[10] = a * c;
     } else if (euler.order === EulerRotationOrder.YXZ) {
       const ce = c * e,
         cf = c * f,
         de = d * e,
         df = d * f;
 
-      unchecked((te[0] = ce + df * b));
-      unchecked((te[4] = de * b - cf));
-      unchecked((te[8] = a * d));
+      te[0] = ce + df * b;
+      te[4] = de * b - cf;
+      te[8] = a * d;
 
-      unchecked((te[1] = a * f));
-      unchecked((te[5] = a * e));
-      unchecked((te[9] = -b));
+      te[1] = a * f;
+      te[5] = a * e;
+      te[9] = -b;
 
-      unchecked((te[2] = cf * b - de));
-      unchecked((te[6] = df + ce * b));
-      unchecked((te[10] = a * c));
+      te[2] = cf * b - de;
+      te[6] = df + ce * b;
+      te[10] = a * c;
     } else if (euler.order === EulerRotationOrder.ZXY) {
       const ce = c * e,
         cf = c * f,
         de = d * e,
         df = d * f;
 
-      unchecked((te[0] = ce - df * b));
-      unchecked((te[4] = -a * f));
-      unchecked((te[8] = de + cf * b));
-      unchecked((te[1] = cf + de * b));
-      unchecked((te[5] = a * e));
-      unchecked((te[9] = df - ce * b));
-      unchecked((te[2] = -a * d));
-      unchecked((te[6] = b));
-      unchecked((te[10] = a * c));
+      te[0] = ce - df * b;
+      te[4] = -a * f;
+      te[8] = de + cf * b;
+      te[1] = cf + de * b;
+      te[5] = a * e;
+      te[9] = df - ce * b;
+      te[2] = -a * d;
+      te[6] = b;
+      te[10] = a * c;
     } else if (euler.order === EulerRotationOrder.ZYX) {
       const ae = a * e,
         af = a * f,
         be = b * e,
         bf = b * f;
 
-      unchecked((te[0] = c * e));
-      unchecked((te[4] = be * d - af));
-      unchecked((te[8] = ae * d + bf));
-      unchecked((te[1] = c * f));
-      unchecked((te[5] = bf * d + ae));
-      unchecked((te[9] = af * d - be));
-      unchecked((te[2] = -d));
-      unchecked((te[6] = b * c));
-      unchecked((te[10] = a * c));
+      te[0] = c * e;
+      te[4] = be * d - af;
+      te[8] = ae * d + bf;
+      te[1] = c * f;
+      te[5] = bf * d + ae;
+      te[9] = af * d - be;
+      te[2] = -d;
+      te[6] = b * c;
+      te[10] = a * c;
     } else if (euler.order === EulerRotationOrder.YZX) {
       const ac = a * c,
         ad = a * d,
         bc = b * c,
         bd = b * d;
 
-      unchecked((te[0] = c * e));
-      unchecked((te[4] = bd - ac * f));
-      unchecked((te[8] = bc * f + ad));
-      unchecked((te[1] = f));
-      unchecked((te[5] = a * e));
-      unchecked((te[9] = -b * e));
-      unchecked((te[2] = -d * e));
-      unchecked((te[6] = ad * f + bc));
-      unchecked((te[10] = ac - bd * f));
+      te[0] = c * e;
+      te[4] = bd - ac * f;
+      te[8] = bc * f + ad;
+      te[1] = f;
+      te[5] = a * e;
+      te[9] = -b * e;
+      te[2] = -d * e;
+      te[6] = ad * f + bc;
+      te[10] = ac - bd * f;
     } else if (euler.order === EulerRotationOrder.XZY) {
       const ac = a * c,
         ad = a * d,
         bc = b * c,
         bd = b * d;
 
-      unchecked((te[0] = c * e));
-      unchecked((te[4] = -f));
-      unchecked((te[8] = d * e));
-      unchecked((te[1] = ac * f + bd));
-      unchecked((te[5] = a * e));
-      unchecked((te[9] = ad * f - bc));
-      unchecked((te[2] = bc * f - ad));
-      unchecked((te[6] = b * e));
-      unchecked((te[10] = bd * f + ac));
+      te[0] = c * e;
+      te[4] = -f;
+      te[8] = d * e;
+      te[1] = ac * f + bd;
+      te[5] = a * e;
+      te[9] = ad * f - bc;
+      te[2] = bc * f - ad;
+      te[6] = b * e;
+      te[10] = bd * f + ac;
     }
 
     // bottom row
@@ -376,59 +376,59 @@ export class Matrix4 {
     const be = b.elements;
     const te = this.elements;
 
-    const a11 = unchecked(ae[0]),
-      a12 = unchecked(ae[4]),
-      a13 = unchecked(ae[8]),
-      a14 = unchecked(ae[12]);
-    const a21 = unchecked(ae[1]),
-      a22 = unchecked(ae[5]),
-      a23 = unchecked(ae[9]),
-      a24 = unchecked(ae[13]);
-    const a31 = unchecked(ae[2]),
-      a32 = unchecked(ae[6]),
-      a33 = unchecked(ae[10]),
-      a34 = unchecked(ae[14]);
-    const a41 = unchecked(ae[3]),
-      a42 = unchecked(ae[7]),
-      a43 = unchecked(ae[11]),
-      a44 = unchecked(ae[15]);
+    const a11 = ae[0],
+      a12 = ae[4],
+      a13 = ae[8],
+      a14 = ae[12];
+    const a21 = ae[1],
+      a22 = ae[5],
+      a23 = ae[9],
+      a24 = ae[13];
+    const a31 = ae[2],
+      a32 = ae[6],
+      a33 = ae[10],
+      a34 = ae[14];
+    const a41 = ae[3],
+      a42 = ae[7],
+      a43 = ae[11],
+      a44 = ae[15];
 
-    const b11 = unchecked(be[0]),
-      b12 = unchecked(be[4]),
-      b13 = unchecked(be[8]),
-      b14 = unchecked(be[12]);
-    const b21 = unchecked(be[1]),
-      b22 = unchecked(be[5]),
-      b23 = unchecked(be[9]),
-      b24 = unchecked(be[13]);
-    const b31 = unchecked(be[2]),
-      b32 = unchecked(be[6]),
-      b33 = unchecked(be[10]),
-      b34 = unchecked(be[14]);
-    const b41 = unchecked(be[3]),
-      b42 = unchecked(be[7]),
-      b43 = unchecked(be[11]),
-      b44 = unchecked(be[15]);
+    const b11 = be[0],
+      b12 = be[4],
+      b13 = be[8],
+      b14 = be[12];
+    const b21 = be[1],
+      b22 = be[5],
+      b23 = be[9],
+      b24 = be[13];
+    const b31 = be[2],
+      b32 = be[6],
+      b33 = be[10],
+      b34 = be[14];
+    const b41 = be[3],
+      b42 = be[7],
+      b43 = be[11],
+      b44 = be[15];
 
-    unchecked((te[0] = a11 * b11 + a12 * b21 + a13 * b31 + a14 * b41));
-    unchecked((te[4] = a11 * b12 + a12 * b22 + a13 * b32 + a14 * b42));
-    unchecked((te[8] = a11 * b13 + a12 * b23 + a13 * b33 + a14 * b43));
-    unchecked((te[12] = a11 * b14 + a12 * b24 + a13 * b34 + a14 * b44));
+    te[0] = a11 * b11 + a12 * b21 + a13 * b31 + a14 * b41;
+    te[4] = a11 * b12 + a12 * b22 + a13 * b32 + a14 * b42;
+    te[8] = a11 * b13 + a12 * b23 + a13 * b33 + a14 * b43;
+    te[12] = a11 * b14 + a12 * b24 + a13 * b34 + a14 * b44;
 
-    unchecked((te[1] = a21 * b11 + a22 * b21 + a23 * b31 + a24 * b41));
-    unchecked((te[5] = a21 * b12 + a22 * b22 + a23 * b32 + a24 * b42));
-    unchecked((te[9] = a21 * b13 + a22 * b23 + a23 * b33 + a24 * b43));
-    unchecked((te[13] = a21 * b14 + a22 * b24 + a23 * b34 + a24 * b44));
+    te[1] = a21 * b11 + a22 * b21 + a23 * b31 + a24 * b41;
+    te[5] = a21 * b12 + a22 * b22 + a23 * b32 + a24 * b42;
+    te[9] = a21 * b13 + a22 * b23 + a23 * b33 + a24 * b43;
+    te[13] = a21 * b14 + a22 * b24 + a23 * b34 + a24 * b44;
 
-    unchecked((te[2] = a31 * b11 + a32 * b21 + a33 * b31 + a34 * b41));
-    unchecked((te[6] = a31 * b12 + a32 * b22 + a33 * b32 + a34 * b42));
-    unchecked((te[10] = a31 * b13 + a32 * b23 + a33 * b33 + a34 * b43));
-    unchecked((te[14] = a31 * b14 + a32 * b24 + a33 * b34 + a34 * b44));
+    te[2] = a31 * b11 + a32 * b21 + a33 * b31 + a34 * b41;
+    te[6] = a31 * b12 + a32 * b22 + a33 * b32 + a34 * b42;
+    te[10] = a31 * b13 + a32 * b23 + a33 * b33 + a34 * b43;
+    te[14] = a31 * b14 + a32 * b24 + a33 * b34 + a34 * b44;
 
-    unchecked((te[3] = a41 * b11 + a42 * b21 + a43 * b31 + a44 * b41));
-    unchecked((te[7] = a41 * b12 + a42 * b22 + a43 * b32 + a44 * b42));
-    unchecked((te[11] = a41 * b13 + a42 * b23 + a43 * b33 + a44 * b43));
-    unchecked((te[15] = a41 * b14 + a42 * b24 + a43 * b34 + a44 * b44));
+    te[3] = a41 * b11 + a42 * b21 + a43 * b31 + a44 * b41;
+    te[7] = a41 * b12 + a42 * b22 + a43 * b32 + a44 * b42;
+    te[11] = a41 * b13 + a42 * b23 + a43 * b33 + a44 * b43;
+    te[15] = a41 * b14 + a42 * b24 + a43 * b34 + a44 * b44;
 
     return this;
   }
@@ -436,22 +436,22 @@ export class Matrix4 {
   multiplyScalar(s: f32): Matrix4 {
     const te = this.elements;
 
-    unchecked((te[0] *= s));
-    unchecked((te[4] *= s));
-    unchecked((te[8] *= s));
-    unchecked((te[12] *= s));
-    unchecked((te[1] *= s));
-    unchecked((te[5] *= s));
-    unchecked((te[9] *= s));
-    unchecked((te[13] *= s));
-    unchecked((te[2] *= s));
-    unchecked((te[6] *= s));
-    unchecked((te[10] *= s));
-    unchecked((te[14] *= s));
-    unchecked((te[3] *= s));
-    unchecked((te[7] *= s));
-    unchecked((te[11] *= s));
-    unchecked((te[15] *= s));
+    te[0] *= s;
+    te[4] *= s;
+    te[8] *= s;
+    te[12] *= s;
+    te[1] *= s;
+    te[5] *= s;
+    te[9] *= s;
+    te[13] *= s;
+    te[2] *= s;
+    te[6] *= s;
+    te[10] *= s;
+    te[14] *= s;
+    te[3] *= s;
+    te[7] *= s;
+    te[11] *= s;
+    te[15] *= s;
 
     return this;
   }
@@ -459,22 +459,22 @@ export class Matrix4 {
   determinant(): f32 {
     const te = this.elements;
 
-    const n11 = unchecked(te[0]),
-      n12 = unchecked(te[4]),
-      n13 = unchecked(te[8]),
-      n14 = unchecked(te[12]);
-    const n21 = unchecked(te[1]),
-      n22 = unchecked(te[5]),
-      n23 = unchecked(te[9]),
-      n24 = unchecked(te[13]);
-    const n31 = unchecked(te[2]),
-      n32 = unchecked(te[6]),
-      n33 = unchecked(te[10]),
-      n34 = unchecked(te[14]);
-    const n41 = unchecked(te[3]),
-      n42 = unchecked(te[7]),
-      n43 = unchecked(te[11]),
-      n44 = unchecked(te[15]);
+    const n11 = te[0],
+      n12 = te[4],
+      n13 = te[8],
+      n14 = te[12];
+    const n21 = te[1],
+      n22 = te[5],
+      n23 = te[9],
+      n24 = te[13];
+    const n31 = te[2],
+      n32 = te[6],
+      n33 = te[10],
+      n34 = te[14];
+    const n41 = te[3],
+      n42 = te[7],
+      n43 = te[11],
+      n44 = te[15];
 
     //TODO: make this more efficient
     //( based on http://www.euclideanspace.com/maths/algebra/matrix/functions/inverse/fourD/index.htm )
@@ -515,24 +515,24 @@ export class Matrix4 {
     const te = this.elements;
     let tmp: f32;
 
-    unchecked((tmp = te[1]));
-    unchecked((te[1] = te[4]));
-    unchecked((te[4] = tmp));
-    unchecked((tmp = te[2]));
-    unchecked((te[2] = te[8]));
-    unchecked((te[8] = tmp));
-    unchecked((tmp = te[6]));
-    unchecked((te[6] = te[9]));
-    unchecked((te[9] = tmp));
-    unchecked((tmp = te[3]));
-    unchecked((te[3] = te[12]));
-    unchecked((te[12] = tmp));
-    unchecked((tmp = te[7]));
-    unchecked((te[7] = te[13]));
-    unchecked((te[13] = tmp));
-    unchecked((tmp = te[11]));
-    unchecked((te[11] = te[14]));
-    unchecked((te[14] = tmp));
+    tmp = te[1];
+    te[1] = te[4];
+    te[4] = tmp;
+    tmp = te[2];
+    te[2] = te[8];
+    te[8] = tmp;
+    tmp = te[6];
+    te[6] = te[9];
+    te[9] = tmp;
+    tmp = te[3];
+    te[3] = te[12];
+    te[12] = tmp;
+    tmp = te[7];
+    te[7] = te[13];
+    te[13] = tmp;
+    tmp = te[11];
+    te[11] = te[14];
+    te[14] = tmp;
 
     return this;
   }
@@ -540,9 +540,9 @@ export class Matrix4 {
   setPosition(x: f32, y: f32, z: f32): Matrix4 {
     const te = this.elements;
 
-    unchecked((te[12] = x));
-    unchecked((te[13] = y));
-    unchecked((te[14] = z));
+    te[12] = x;
+    te[13] = y;
+    te[14] = z;
 
     return this;
   }
@@ -550,22 +550,22 @@ export class Matrix4 {
   invert(): Matrix4 {
     // based on http://www.euclideanspace.com/maths/algebra/matrix/functions/inverse/fourD/index.htm
     const te = this.elements,
-      n11: f32 = unchecked(te[0]),
-      n21: f32 = unchecked(te[1]),
-      n31: f32 = unchecked(te[2]),
-      n41: f32 = unchecked(te[3]),
-      n12: f32 = unchecked(te[4]),
-      n22: f32 = unchecked(te[5]),
-      n32: f32 = unchecked(te[6]),
-      n42: f32 = unchecked(te[7]),
-      n13: f32 = unchecked(te[8]),
-      n23: f32 = unchecked(te[9]),
-      n33: f32 = unchecked(te[10]),
-      n43: f32 = unchecked(te[11]),
-      n14: f32 = unchecked(te[12]),
-      n24: f32 = unchecked(te[13]),
-      n34: f32 = unchecked(te[14]),
-      n44: f32 = unchecked(te[15]),
+      n11: f32 = te[0],
+      n21: f32 = te[1],
+      n31: f32 = te[2],
+      n41: f32 = te[3],
+      n12: f32 = te[4],
+      n22: f32 = te[5],
+      n32: f32 = te[6],
+      n42: f32 = te[7],
+      n13: f32 = te[8],
+      n23: f32 = te[9],
+      n33: f32 = te[10],
+      n43: f32 = te[11],
+      n14: f32 = te[12],
+      n24: f32 = te[13],
+      n34: f32 = te[14],
+      n44: f32 = te[15],
       t11: f32 =
         n23 * n34 * n42 -
         n24 * n33 * n42 +
@@ -602,130 +602,106 @@ export class Matrix4 {
 
     const detInv: f32 = 1 / det;
 
-    unchecked((te[0] = t11 * detInv));
-    unchecked(
-      (te[1] =
-        (n24 * n33 * n41 -
-          n23 * n34 * n41 -
-          n24 * n31 * n43 +
-          n21 * n34 * n43 +
-          n23 * n31 * n44 -
-          n21 * n33 * n44) *
-        detInv)
-    );
-    unchecked(
-      (te[2] =
-        (n22 * n34 * n41 -
-          n24 * n32 * n41 +
-          n24 * n31 * n42 -
-          n21 * n34 * n42 -
-          n22 * n31 * n44 +
-          n21 * n32 * n44) *
-        detInv)
-    );
-    unchecked(
-      (te[3] =
-        (n23 * n32 * n41 -
-          n22 * n33 * n41 -
-          n23 * n31 * n42 +
-          n21 * n33 * n42 +
-          n22 * n31 * n43 -
-          n21 * n32 * n43) *
-        detInv)
-    );
-    unchecked((te[4] = t12 * detInv));
-    unchecked(
-      (te[5] =
-        (n13 * n34 * n41 -
-          n14 * n33 * n41 +
-          n14 * n31 * n43 -
-          n11 * n34 * n43 -
-          n13 * n31 * n44 +
-          n11 * n33 * n44) *
-        detInv)
-    );
-    unchecked(
-      (te[6] =
-        (n14 * n32 * n41 -
-          n12 * n34 * n41 -
-          n14 * n31 * n42 +
-          n11 * n34 * n42 +
-          n12 * n31 * n44 -
-          n11 * n32 * n44) *
-        detInv)
-    );
-    unchecked(
-      (te[7] =
-        (n12 * n33 * n41 -
-          n13 * n32 * n41 +
-          n13 * n31 * n42 -
-          n11 * n33 * n42 -
-          n12 * n31 * n43 +
-          n11 * n32 * n43) *
-        detInv)
-    );
-    unchecked((te[8] = t13 * detInv));
-    unchecked(
-      (te[9] =
-        (n14 * n23 * n41 -
-          n13 * n24 * n41 -
-          n14 * n21 * n43 +
-          n11 * n24 * n43 +
-          n13 * n21 * n44 -
-          n11 * n23 * n44) *
-        detInv)
-    );
-    unchecked(
-      (te[10] =
-        (n12 * n24 * n41 -
-          n14 * n22 * n41 +
-          n14 * n21 * n42 -
-          n11 * n24 * n42 -
-          n12 * n21 * n44 +
-          n11 * n22 * n44) *
-        detInv)
-    );
-    unchecked(
-      (te[11] =
-        (n13 * n22 * n41 -
-          n12 * n23 * n41 -
-          n13 * n21 * n42 +
-          n11 * n23 * n42 +
-          n12 * n21 * n43 -
-          n11 * n22 * n43) *
-        detInv)
-    );
-    unchecked((te[12] = t14 * detInv));
-    unchecked(
-      (te[13] =
-        (n13 * n24 * n31 -
-          n14 * n23 * n31 +
-          n14 * n21 * n33 -
-          n11 * n24 * n33 -
-          n13 * n21 * n34 +
-          n11 * n23 * n34) *
-        detInv)
-    );
-    unchecked(
-      (te[14] =
-        (n14 * n22 * n31 -
-          n12 * n24 * n31 -
-          n14 * n21 * n32 +
-          n11 * n24 * n32 +
-          n12 * n21 * n34 -
-          n11 * n22 * n34) *
-        detInv)
-    );
-    unchecked(
-      (te[15] =
-        (n12 * n23 * n31 -
-          n13 * n22 * n31 +
-          n13 * n21 * n32 -
-          n11 * n23 * n32 -
-          n12 * n21 * n33 +
-          n11 * n22 * n33) *
-        detInv)
-    );
+    te[0] = t11 * detInv;
+    te[1] =
+      (n24 * n33 * n41 -
+        n23 * n34 * n41 -
+        n24 * n31 * n43 +
+        n21 * n34 * n43 +
+        n23 * n31 * n44 -
+        n21 * n33 * n44) *
+      detInv;
+    te[2] =
+      (n22 * n34 * n41 -
+        n24 * n32 * n41 +
+        n24 * n31 * n42 -
+        n21 * n34 * n42 -
+        n22 * n31 * n44 +
+        n21 * n32 * n44) *
+      detInv;
+    te[3] =
+      (n23 * n32 * n41 -
+        n22 * n33 * n41 -
+        n23 * n31 * n42 +
+        n21 * n33 * n42 +
+        n22 * n31 * n43 -
+        n21 * n32 * n43) *
+      detInv;
+    te[4] = t12 * detInv;
+    te[5] =
+      (n13 * n34 * n41 -
+        n14 * n33 * n41 +
+        n14 * n31 * n43 -
+        n11 * n34 * n43 -
+        n13 * n31 * n44 +
+        n11 * n33 * n44) *
+      detInv;
+    te[6] =
+      (n14 * n32 * n41 -
+        n12 * n34 * n41 -
+        n14 * n31 * n42 +
+        n11 * n34 * n42 +
+        n12 * n31 * n44 -
+        n11 * n32 * n44) *
+      detInv;
+    te[7] =
+      (n12 * n33 * n41 -
+        n13 * n32 * n41 +
+        n13 * n31 * n42 -
+        n11 * n33 * n42 -
+        n12 * n31 * n43 +
+        n11 * n32 * n43) *
+      detInv;
+    te[8] = t13 * detInv;
+    te[9] =
+      (n14 * n23 * n41 -
+        n13 * n24 * n41 -
+        n14 * n21 * n43 +
+        n11 * n24 * n43 +
+        n13 * n21 * n44 -
+        n11 * n23 * n44) *
+      detInv;
+    te[10] =
+      (n12 * n24 * n41 -
+        n14 * n22 * n41 +
+        n14 * n21 * n42 -
+        n11 * n24 * n42 -
+        n12 * n21 * n44 +
+        n11 * n22 * n44) *
+      detInv;
+    te[11] =
+      (n13 * n22 * n41 -
+        n12 * n23 * n41 -
+        n13 * n21 * n42 +
+        n11 * n23 * n42 +
+        n12 * n21 * n43 -
+        n11 * n22 * n43) *
+      detInv;
+    te[12] = t14 * detInv;
+    te[13] =
+      (n13 * n24 * n31 -
+        n14 * n23 * n31 +
+        n14 * n21 * n33 -
+        n11 * n24 * n33 -
+        n13 * n21 * n34 +
+        n11 * n23 * n34) *
+      detInv;
+    te[14] =
+      (n14 * n22 * n31 -
+        n12 * n24 * n31 -
+        n14 * n21 * n32 +
+        n11 * n24 * n32 +
+        n12 * n21 * n34 -
+        n11 * n22 * n34) *
+      detInv;
+    te[15] =
+      (n12 * n23 * n31 -
+        n13 * n22 * n31 +
+        n13 * n21 * n32 -
+        n11 * n23 * n32 -
+        n12 * n21 * n33 +
+        n11 * n22 * n33) *
+      detInv;
 
     return this;
   }
@@ -736,18 +712,18 @@ export class Matrix4 {
       y: f32 = v.y,
       z: f32 = v.z;
 
-    unchecked((te[0] *= x));
-    unchecked((te[4] *= y));
-    unchecked((te[8] *= z));
-    unchecked((te[1] *= x));
-    unchecked((te[5] *= y));
-    unchecked((te[9] *= z));
-    unchecked((te[2] *= x));
-    unchecked((te[6] *= y));
-    unchecked((te[10] *= z));
-    unchecked((te[3] *= x));
-    unchecked((te[7] *= y));
-    unchecked((te[11] *= z));
+    te[0] *= x;
+    te[4] *= y;
+    te[8] *= z;
+    te[1] *= x;
+    te[5] *= y;
+    te[9] *= z;
+    te[2] *= x;
+    te[6] *= y;
+    te[10] *= z;
+    te[3] *= x;
+    te[7] *= y;
+    te[11] *= z;
 
     return this;
   }

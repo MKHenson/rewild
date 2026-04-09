@@ -464,18 +464,26 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
 
   onDispose(): void {}
 
+  /**
+   * Monotonically increasing counter, bumped whenever a child is added or
+   * removed anywhere in this subtree. Ancestor versions are bumped too, so
+   * checking the root's version detects deep structural changes.
+   */
+  structureVersion: number = 0;
+
   addChild(child: Transform): Transform {
     if (child === this)
       throw new Error("Transform can't be added as a child of itself.");
 
     if (child.parent != null) {
-      this.removeChild(child);
+      child.parent.removeChild(child);
     }
 
     child.parent = this;
     this.children.push(child);
 
     _addedEvent.target = parent;
+    this.bubbleStructureVersion();
     return this;
   }
 
@@ -487,8 +495,18 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
       this.children.splice(index, 1);
 
       _removedEvent.target = this;
+      this.bubbleStructureVersion();
     }
 
     return this;
+  }
+
+  /** Increment structureVersion on this node and all ancestors. */
+  private bubbleStructureVersion(): void {
+    let node: Transform | null = this;
+    while (node !== null) {
+      node.structureVersion++;
+      node = node.parent;
+    }
   }
 }

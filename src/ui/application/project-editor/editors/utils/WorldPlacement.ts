@@ -87,7 +87,7 @@ export function raycastMouseToWorld(
   _raycaster.far = maxDistance;
   _raycaster.ray.copy(mouseRay);
 
-  const intersects = _raycaster.intersectObjects([renderer.scene], true);
+  const intersects = _raycaster.intersectBVHScene(renderer.sceneBVH!);
 
   for (const hit of intersects) {
     if (

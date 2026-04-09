@@ -20,7 +20,7 @@ export class Portal {
     this.disposed = true;
 
     for (let i: i32 = 0, l: i32 = this.links.length; i < l; i++) {
-      const link = unchecked(this.links[i]);
+      const link = this.links[i];
       const sourcePortal = link.sourcePortal;
 
       if (sourcePortal && sourcePortal != this) {
