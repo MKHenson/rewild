@@ -3,6 +3,7 @@ import { Geometry } from '../geometry/Geometry';
 import { Intersection, Face } from '../core/Raycaster';
 import { BVHNode, BVHOptions, DEFAULT_BVH_OPTIONS } from './BVHNode';
 import { BVHBuilder } from './BVHBuilder';
+import { BVHWorkerManager } from './BVHWorkerManager';
 
 const _vA = new Vector3();
 const _vB = new Vector3();
@@ -34,6 +35,16 @@ export class BVH {
   /** Reference to the source geometry's vertex buffer. */
   private vertices: Float32Array;
 
+  /**
+   * True when the BVH tree is fully built and ready for queries.
+   * False during an async worker build — raycasting falls back to
+   * brute-force until this becomes true.
+   */
+  isReady: boolean = false;
+
+  /**
+   * Build a BVH synchronously. Suitable for small/medium geometries.
+   */
   constructor(geometry: Geometry, options?: Partial<BVHOptions>) {
     this.options = { ...DEFAULT_BVH_OPTIONS, ...options };
     this.vertices = geometry.vertices;
@@ -45,6 +56,52 @@ export class BVH {
     );
     this.root = builder.build();
     this.triIndices = builder.triIndices;
+    this.isReady = true;
+  }
+
+  /**
+   * Build a BVH asynchronously using a Web Worker.
+   * Returns a BVH instance with `isReady = false` that will be populated
+   * when the worker completes. The returned promise resolves when ready.
+   *
+   * Falls back to synchronous build if the triangle count is below
+   * `asyncThreshold`.
+   */
+  static async buildAsync(
+    geometry: Geometry,
+    workerManager: BVHWorkerManager,
+    options?: Partial<BVHOptions>,
+    asyncThreshold: i32 = 10000
+  ): Promise<BVH> {
+    const mergedOptions: BVHOptions = { ...DEFAULT_BVH_OPTIONS, ...options };
+    const triCount = geometry.indices
+      ? (geometry.indices.length / 3) | 0
+      : (geometry.vertices.length / 3 / 3) | 0;
+
+    if (triCount < asyncThreshold) {
+      // Small geometry — build synchronously.
+      return new BVH(geometry, options);
+    }
+
+    // Create a shell BVH that will be populated when the worker finishes.
+    const bvh = Object.create(BVH.prototype) as BVH;
+    bvh.options = mergedOptions;
+    bvh.vertices = geometry.vertices;
+    bvh.root = new BVHNode(); // placeholder
+    bvh.triIndices = new Uint32Array(0); // placeholder
+    bvh.isReady = false;
+
+    const result = await workerManager.buildAsync(
+      geometry.vertices,
+      geometry.indices,
+      mergedOptions
+    );
+
+    bvh.root = result.root;
+    bvh.triIndices = result.triIndices;
+    bvh.isReady = true;
+
+    return bvh;
   }
 
   /**
@@ -67,6 +124,7 @@ export class BVH {
     far: f32,
     intersects: Intersection[]
   ): void {
+    if (!this.isReady) return;
     this.raycastNode(this.root, ray, side, near, far, intersects);
   }
 
@@ -79,6 +137,7 @@ export class BVH {
     near: f32,
     far: f32
   ): Intersection | null {
+    if (!this.isReady) return null;
     return this.raycastFirstNode(this.root, ray, side, near, far);
   }
 

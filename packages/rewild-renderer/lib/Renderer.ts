@@ -27,6 +27,8 @@ import { FontManager } from './managers/FontManager';
 import { IUIElementPass } from './materials/IUIElementPass';
 import { isVisualComponent } from './typeGuards';
 import { SceneBVH } from './acceleration/SceneBVH';
+import { BVHConfig, DEFAULT_BVH_CONFIG } from './acceleration/BVHConfig';
+import { BVHWorkerManager } from './acceleration/BVHWorkerManager';
 
 const _projScreenMatrix = new Matrix4();
 const _frustum = new Frustum();
@@ -80,6 +82,12 @@ export class Renderer {
   /** When true, sceneBVH.update() is called automatically each frame. */
   sceneBVHAutoUpdate: boolean = false;
 
+  /** Global BVH configuration. Controls auto-compute, async builds, and refit. */
+  bvhConfig: BVHConfig;
+
+  /** Shared worker manager for async BVH builds. Created lazily. */
+  bvhWorkerManager: BVHWorkerManager | null = null;
+
   constructor() {
     this.autoFrame = true;
     this.onFrameHandler = this.onFrame.bind(this);
@@ -92,8 +100,17 @@ export class Renderer {
     this.renderGroups = [];
     this.overlayRenderGroups = [];
 
-    this.sceneBVH = new SceneBVH(this.scene);
-    this.sceneBVHAutoUpdate = true;
+    // Apply default BVH config.
+    this.bvhConfig = { ...DEFAULT_BVH_CONFIG };
+
+    if (this.bvhConfig.enableSceneBVH) {
+      this.sceneBVH = new SceneBVH(this.scene);
+    }
+    this.sceneBVHAutoUpdate = this.bvhConfig.sceneBVHAutoUpdate;
+
+    if (this.bvhConfig.asyncBuildThreshold > 0) {
+      this.bvhWorkerManager = new BVHWorkerManager();
+    }
 
     this.scene.addChild(this.atmosphere.transform);
   }
@@ -267,6 +284,8 @@ export class Renderer {
     this.currentRenderList.reset();
     this.sceneBVH?.dispose();
     this.sceneBVH = null;
+    this.bvhWorkerManager?.dispose();
+    this.bvhWorkerManager = null;
     this.atmosphere.dispose();
     this.textureManager.dispose();
     this.samplerManager.dispose();
@@ -275,6 +294,20 @@ export class Renderer {
     this.materialManager.dispose();
     this.geometryManager.dispose();
     this.guiManager.dispose();
+  }
+
+  /**
+   * Walk the render groups and refit any per-geometry BVHs whose
+   * underlying vertex data has been modified (bvhNeedsUpdate === true).
+   */
+  private refitDirtyGeometryBVHs(): void {
+    for (const group of this.renderGroups) {
+      const geom = group.geometry;
+      if (geom.bvhNeedsUpdate && geom.bvh && geom.bvh.isReady) {
+        geom.bvh.refit();
+        geom.bvhNeedsUpdate = false;
+      }
+    }
   }
 
   resizeRenderTargets() {
@@ -435,7 +468,12 @@ export class Renderer {
     camera: Camera
   ) {
     for (const item of renderGroup) {
-      if (item.geometry.requiresBuild) item.geometry.build(this.device);
+      if (item.geometry.requiresBuild)
+        item.geometry.build(
+          this.device,
+          this.bvhConfig,
+          this.bvhWorkerManager ?? undefined
+        );
       if (item.pass.requiresRebuild) item.pass.init(this);
 
       item.pass.render(this, pass, camera, item.meshes, item.geometry);
@@ -473,7 +511,15 @@ export class Renderer {
 
     // Auto-update scene BVH if enabled
     if (this.sceneBVHAutoUpdate && this.sceneBVH) {
+      if (this.bvhConfig.sceneBVHUpdateThreshold !== undefined) {
+        this.sceneBVH.updateThreshold = this.bvhConfig.sceneBVHUpdateThreshold;
+      }
       this.sceneBVH.update();
+    }
+
+    // Auto-refit per-geometry BVHs when vertices have been modified.
+    if (this.bvhConfig.autoRefitGeometryBVH) {
+      this.refitDirtyGeometryBVHs();
     }
 
     // Clear the render list before projecting objects
@@ -653,7 +699,12 @@ export class Renderer {
       for (const transform of this.currentRenderList.uiElements) {
         const element = transform.component as UIElement;
         if (!element?.visible) continue;
-        if (element.geometry.requiresBuild) element.geometry.build(this.device);
+        if (element.geometry.requiresBuild)
+          element.geometry.build(
+            this.device,
+            this.bvhConfig,
+            this.bvhWorkerManager ?? undefined
+          );
         if (element.material.requiresRebuild) element.material.init(this);
         visibleElements.push(element);
       }
