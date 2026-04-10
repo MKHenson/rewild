@@ -53,7 +53,11 @@ export class GeometryManager {
 
     await Promise.all(
       Array.from(this.geometries.values()).map((geometry) => {
-        return geometry.build(device);
+        return geometry.build(
+          device,
+          renderer.bvhConfig,
+          renderer.bvhWorkerManager ?? undefined
+        );
       })
     );
 

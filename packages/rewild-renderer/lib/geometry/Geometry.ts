@@ -9,6 +9,8 @@ import {
 import { Transform } from '../core/Transform';
 import { BVH } from '../acceleration/BVH';
 import { BVHOptions } from '../acceleration/BVHNode';
+import { BVHConfig } from '../acceleration/BVHConfig';
+import { BVHWorkerManager } from '../acceleration/BVHWorkerManager';
 
 export class GeometryGroup {
   public start: i32;
@@ -65,6 +67,28 @@ export class Geometry {
 
   computeBVH(options?: Partial<BVHOptions>): void {
     this.bvh = new BVH(this, options);
+    this.bvhNeedsUpdate = false;
+  }
+
+  /**
+   * Build a BVH asynchronously using a Web Worker for large geometries.
+   * Falls back to synchronous build if the geometry is below the async
+   * threshold. The returned promise resolves when the BVH is ready.
+   *
+   * While the worker is running, `this.bvh` is set but `bvh.isReady`
+   * is false — raycasting will fall back to brute-force until complete.
+   */
+  async computeBVHAsync(
+    workerManager: BVHWorkerManager,
+    options?: Partial<BVHOptions>,
+    asyncThreshold: i32 = 10000
+  ): Promise<void> {
+    this.bvh = await BVH.buildAsync(
+      this,
+      workerManager,
+      options,
+      asyncThreshold
+    );
     this.bvhNeedsUpdate = false;
   }
 
@@ -289,7 +313,11 @@ export class Geometry {
     return this;
   }
 
-  build(device: GPUDevice) {
+  build(
+    device: GPUDevice,
+    bvhConfig?: BVHConfig,
+    workerManager?: BVHWorkerManager
+  ) {
     this.vertexBuffer = device.createBuffer({
       size: this.vertices.byteLength,
       usage: GPUBufferUsage.VERTEX,
@@ -343,6 +371,38 @@ export class Geometry {
     }
 
     this.requiresBuild = false;
+
+    // Auto-compute BVH if enabled and geometry exceeds threshold.
+    if (bvhConfig?.autoComputeGeometryBVH && !this.bvh) {
+      const triCount = this.getTriangleCount();
+      if (triCount >= bvhConfig.autoComputeThreshold) {
+        const options: Partial<BVHOptions> = {
+          strategy: bvhConfig.geometryBVHStrategy,
+          maxDepth: bvhConfig.geometryBVHMaxDepth,
+          maxLeafTriangles: bvhConfig.geometryBVHMaxLeafTriangles,
+        };
+
+        if (workerManager && triCount >= bvhConfig.asyncBuildThreshold) {
+          // Large geometry — build in worker (fire-and-forget).
+          this.computeBVHAsync(
+            workerManager,
+            options,
+            bvhConfig.asyncBuildThreshold
+          );
+        } else {
+          // Small/medium geometry — build synchronously.
+          this.computeBVH(options);
+        }
+      }
+    }
+  }
+
+  /** Return the number of triangles in this geometry. */
+  getTriangleCount(): i32 {
+    if (this.indices) {
+      return (this.indices.length / 3) | 0;
+    }
+    return (this.vertices.length / 3 / 3) | 0;
   }
 
   setFromPoints(points: Vector3[]): Geometry {

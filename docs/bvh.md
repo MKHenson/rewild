@@ -495,104 +495,195 @@ const sceneIntersects = raycaster.intersectScene(renderer.sceneBVH);
 - Optimized for each use case
 - Backward compatible - existing code unchanged
 
-### Phase 4: Configuration & Control
+### Phase 4: Configuration & Control ✅ COMPLETE
 
-#### 4.1 Global Configuration
+#### 4.1 Global Configuration (`lib/acceleration/BVHConfig.ts`)
 
-Add to renderer initialization or config:
+A single `BVHConfig` interface controls all BVH behaviour. The Renderer holds
+a `bvhConfig` property initialised from `DEFAULT_BVH_CONFIG`.
 
 ```typescript
 export interface BVHConfig {
-  // Per-geometry BVH
-  autoComputeGeometryBVH: boolean; // Auto-build BVH for new geometries
-  geometryBVHStrategy: 'sah' | 'center' | 'average';
-  geometryBVHMaxDepth: number;
-  geometryBVHMaxLeafTriangles: number;
+  // ── Per-geometry BVH ──
+  autoComputeGeometryBVH: boolean; // Auto-build BVH on geometry.build()
+  autoComputeThreshold: i32; // Triangle count threshold (default: 1000)
+  geometryBVHStrategy: BVHStrategy; // 'sah' | 'center' (default: 'sah')
+  geometryBVHMaxDepth: i32; // Default: 32
+  geometryBVHMaxLeafTriangles: i32; // Default: 8
 
-  // Scene BVH
-  enableSceneBVH: boolean;
-  sceneBVHAutoUpdate: boolean;
-  sceneBVHUpdateThreshold: number; // Num moved objects before rebuild
+  // ── Async (worker) builds ──
+  asyncBuildThreshold: i32; // Triangles before using worker (default: 10000)
+
+  // ── Scene BVH ──
+  enableSceneBVH: boolean; // Create SceneBVH on Renderer (default: true)
+  sceneBVHAutoUpdate: boolean; // Auto-call sceneBVH.update() each frame
+  sceneBVHUpdateThreshold: f32; // Moved-object fraction triggering rebuild (0.1)
+
+  // ── Dynamic refit ──
+  autoRefitGeometryBVH: boolean; // Auto-refit dirty BVHs in render loop
 }
 ```
 
-#### 4.2 Hybrid Build Strategy
+**Defaults:**
 
-Implement smart build triggers:
+- Auto-compute enabled for geometries ≥ 1 000 triangles
+- Async worker builds for geometries ≥ 10 000 triangles
+- Scene BVH enabled with auto-update
+- Automatic per-geometry refit in the render loop
+
+**Usage — customise at startup:**
 
 ```typescript
-// Auto-build for large geometries
-geometry.build(device);
-if (geometry.vertices.length > 1000 && config.autoComputeGeometryBVH) {
-  geometry.computeBVH();
-}
-
-// Manual build for control
-const geometry = new SphereGeometry(10, 64, 64);
-geometry.computeBVH({ strategy: 'sah' });
+renderer.bvhConfig.autoComputeThreshold = 500; // lower threshold
+renderer.bvhConfig.asyncBuildThreshold = 5000; // earlier async builds
+renderer.bvhConfig.autoRefitGeometryBVH = false; // manual refit only
 ```
 
-#### 4.3 Dynamic Mesh Refit
+#### 4.2 Automatic BVH on Geometry Build
+
+`Geometry.build()` now accepts optional `bvhConfig` and `workerManager`
+parameters. The Renderer passes these automatically when building
+geometries in `renderGroupings()`.
 
 ```typescript
-// When animating vertices
+build(
+  device: GPUDevice,
+  bvhConfig?: BVHConfig,
+  workerManager?: BVHWorkerManager
+) {
+  // ... GPU buffer creation (unchanged) ...
+  this.requiresBuild = false;
+
+  // Auto-compute BVH if enabled and geometry exceeds threshold.
+  if (bvhConfig?.autoComputeGeometryBVH && !this.bvh) {
+    const triCount = this.getTriangleCount();
+    if (triCount >= bvhConfig.autoComputeThreshold) {
+      if (workerManager && triCount >= bvhConfig.asyncBuildThreshold) {
+        // Large geometry — build in worker (fire-and-forget).
+        this.computeBVHAsync(workerManager, options, bvhConfig.asyncBuildThreshold);
+      } else {
+        // Small/medium geometry — build synchronously.
+        this.computeBVH(options);
+      }
+    }
+  }
+}
+```
+
+**Key design decisions:**
+
+- `bvhConfig` is **optional** — callers like `AtmosphereSkybox.build()` and
+  `vbo.build()` continue working without changes.
+- Existing `computeBVH()` still works for manual control.
+- The `!this.bvh` guard prevents double-building (e.g. terrain chunks that
+  call `computeBVH()` before `build()`).
+
+#### 4.3 Async BVH Building (Web Worker)
+
+Large geometries (≥ 10 000 triangles by default) are built in a dedicated
+Web Worker to avoid frame drops.
+
+**Architecture:**
+
+```
+Main thread                           Worker thread
+───────────                           ─────────────
+Geometry.computeBVHAsync()
+  → BVHWorkerManager.buildAsync()
+    → copies vertices + indices
+    → postMessage (transfer)  ───────→  BVHBuilder.build()
+                                        serializeBVH()
+    ← postMessage (transfer)  ←───────  SerializedBVH
+  ← deserializeBVH()
+  ← BVH.isReady = true
+```
+
+**Files created:**
+
+| File                  | Purpose                                                    |
+| --------------------- | ---------------------------------------------------------- |
+| `BVHConfig.ts`        | Config interface and defaults                              |
+| `BVHSerializer.ts`    | Flat-array serialisation of BVH tree for `postMessage`     |
+| `BVHWorkerManager.ts` | Worker lifecycle, request routing, promise management      |
+| `worker/BVHWorker.ts` | Worker entry point — imports BVHBuilder, serialises result |
+
+**Serialisation format:** Each `BVHNode` is packed into 11 consecutive floats
+(isLeaf, bbox min/max xyz, triOffset, triCount, leftIdx, rightIdx). This
+allows zero-copy transfer via `Transferable` buffers.
+
+**Worker entry point** is compiled as a separate esbuild bundle
+(`bvhWorker.js`) alongside `terrainWorker.js` — sharing the same source
+classes (`BVHBuilder`, `BVHNode`, `Vector3` etc.) without duplication.
+
+**Graceful fallback:** While the worker is running, `BVH.isReady = false`.
+`raycast()` and `raycastFirst()` check this flag and return early, so
+`Mesh.raycast()` falls back to brute-force until the BVH is ready.
+
+**Usage — manual async build:**
+
+```typescript
+const geometry = new SomeComplexGeometry();
+await geometry.computeBVHAsync(renderer.bvhWorkerManager!);
+// geometry.bvh.isReady === true
+```
+
+#### 4.4 Dynamic Mesh Refit
+
+When geometry vertices are modified at runtime (morph targets, procedural
+animation, terrain deformation), the BVH must be updated.
+
+**Automatic refit in render loop** (enabled by default):
+
+```typescript
+// In user code — mark geometry as dirty after modifying vertices:
 geometry.vertices[index] = newValue;
-geometry.vertexBuffer.update(...);
 geometry.bvhNeedsUpdate = true;
 
-// In render loop
-if (geometry.bvhNeedsUpdate && geometry.bvh?.options.enableRefit) {
-  geometry.bvh.refit();
-  geometry.bvhNeedsUpdate = false;
-}
+// In Renderer.render() — automatic refit happens before culling:
+// renderer.bvhConfig.autoRefitGeometryBVH = true (default)
 ```
 
-#### 4.4 Async BVH Building
+The Renderer walks all current render groups each frame and calls
+`geometry.bvh.refit()` on any geometry with `bvhNeedsUpdate === true` and
+`bvh.isReady === true`. Refit is much faster than rebuild — it updates
+bounding boxes bottom-up without restructuring the tree.
 
-For large geometries, build BVH in worker thread to avoid frame drops:
+**Manual refit** (when `autoRefitGeometryBVH = false`):
 
 ```typescript
-// lib/acceleration/BVHWorker.ts
-export class BVHWorkerManager {
-  private worker: Worker;
-
-  async buildBVH(geometry: Geometry, options: BVHOptions): Promise<BVHNode> {
-    // Transfer geometry data to worker
-    const geometryData = {
-      vertices: geometry.vertices,
-      indices: geometry.indices,
-    };
-
-    return new Promise((resolve) => {
-      this.worker.postMessage({ type: 'build', data: geometryData, options });
-      this.worker.onmessage = (e) => {
-        if (e.data.type === 'complete') {
-          resolve(e.data.bvh);
-        }
-      };
-    });
-  }
-}
-
-// Usage in Geometry
-async computeBVH(options?: Partial<BVHOptions>): Promise<void> {
-  const triangleCount = this.indices ? this.indices.length / 3 : this.vertices.length / 9;
-
-  if (triangleCount < 1000) {
-    // Small geometry: build synchronously
-    this.bvh = new BVH(this, options);
-    this.bvh.isReady = true;
-  } else {
-    // Large geometry: build in worker
-    this.bvh = new BVH(this, options);
-    this.bvh.isReady = false;
-
-    const bvhData = await workerManager.buildBVH(this, this.bvh.options);
-    this.bvh.root = bvhData;
-    this.bvh.isReady = true;
-  }
-}
+geometry.vertices[index] = newValue;
+geometry.bvh?.refit();
+geometry.bvhNeedsUpdate = false;
 ```
+
+#### 4.5 Renderer Integration
+
+**New properties on `Renderer`:**
+
+```typescript
+bvhConfig: BVHConfig; // Global configuration
+bvhWorkerManager: BVHWorkerManager | null; // Shared worker (created if asyncBuildThreshold > 0)
+```
+
+**Constructor** applies `DEFAULT_BVH_CONFIG`, creates SceneBVH and worker
+manager based on config. The scene BVH threshold is synced from config
+each frame.
+
+**Render loop additions:**
+
+1. Scene BVH threshold synced from `bvhConfig.sceneBVHUpdateThreshold`
+2. `refitDirtyGeometryBVHs()` called before frustum culling
+3. `geometry.build()` receives config + worker manager
+
+**Disposal:** Worker is terminated and cleaned up in `renderer.dispose()`.
+
+**Impact on existing code:**
+
+- All existing `geometry.build(device)` calls continue to work (new params
+  are optional).
+- TerrainChunk already calls `computeBVH()` before `build()`, so the
+  auto-compute guard (`!this.bvh`) prevents double-builds.
+- No breaking changes to public API.
 
 ### Phase 5: Advanced Features
 
@@ -628,24 +719,28 @@ For instanced rendering with BVH:
 ```
 packages/rewild-renderer/
 ├── lib/
-│   ├── acceleration/           # New directory
-│   │   ├── BVHNode.ts         # Core node structure
-│   │   ├── BVHBuilder.ts      # Build strategies (SAH, center)
-│   │   ├── BVH.ts             # Per-geometry BVH (lives in geometry.bvh)
-│   │   ├── SceneBVH.ts        # Scene-level BVH
-│   │   ├── BVHWorker.ts       # Worker manager for async builds
-│   │   ├── BVHUtils.ts        # Helper functions
-│   │   └── index.ts           # Exports
+│   ├── acceleration/
+│   │   ├── BVHNode.ts              # Core node structure + BVHOptions
+│   │   ├── BVHBuilder.ts           # SAH & center split strategies
+│   │   ├── BVH.ts                  # Per-geometry BVH (+ isReady, buildAsync)
+│   │   ├── BVHConfig.ts            # ★ Phase 4: Global config interface + defaults
+│   │   ├── BVHSerializer.ts        # ★ Phase 4: Flat-array serialise/deserialise
+│   │   ├── BVHWorkerManager.ts     # ★ Phase 4: Worker lifecycle + promise routing
+│   │   ├── SceneBVH.ts             # Scene-level BVH
+│   │   ├── SceneBVHNode.ts         # Scene BVH node (holds Transform[])
+│   │   ├── BVHUtils.ts             # countNodes, countLeaves, getMaxDepth
+│   │   ├── index.ts                # Re-exports everything
+│   │   └── worker/
+│   │       └── BVHWorker.ts        # ★ Phase 4: Web Worker entry point
 │   ├── core/
-│   │   ├── Mesh.ts            # Modified: use BVH in raycast
-│   │   ├── Raycaster.ts       # Modified: scene BVH integration
+│   │   ├── Mesh.ts                 # Modified: uses geometry.bvh in raycast
+│   │   ├── Raycaster.ts            # Modified: intersectBVHScene method
 │   │   └── ...
 │   ├── geometry/
-│   │   ├── Geometry.ts        # Modified: add BVH properties/methods
+│   │   ├── Geometry.ts             # Modified: computeBVHAsync, auto-compute in build
 │   │   └── ...
-│   └── Renderer.ts            # Modified: scene BVH integration
-├── workers/                    # New directory
-│   └── bvh-builder.worker.ts  # Web worker for BVH construction
+│   └── Renderer.ts                 # Modified: bvhConfig, bvhWorkerManager, auto-refit
+├── esbuild.js                      # Modified: bvhWorker entry point added
 ```
 
 ## Testing Strategy
@@ -679,10 +774,10 @@ packages/rewild-renderer/
 
 ### Gradual Adoption
 
-1. **Phase 1**: Add BVH to high-poly meshes only
-2. **Phase 2**: Enable scene BVH for culling
-3. **Phase 3**: Make BVH default for all geometries > threshold
-4. **Phase 4**: Eventually deprecate non-BVH paths
+1. **Phase 1**: ✅ Core BVH foundation — data structures, builder, raycasting
+2. **Phase 2**: ✅ Per-geometry BVH on Geometry, transparent Mesh integration
+3. **Phase 3**: ✅ Scene-level BVH for frustum culling and scene raycasting
+4. **Phase 4**: ✅ Global config, auto-compute, async worker builds, dynamic refit
 
 ## Implementation Decisions
 
@@ -696,14 +791,28 @@ packages/rewild-renderer/
 
 2. **Build Timing**: ✅ Async/Worker for large geometries
 
-   - Synchronous for small meshes (< 1000 triangles)
-   - Worker thread for large meshes (> 1000 triangles)
-   - Fall back to brute-force raycasting until BVH ready
-   - Add `geometry.bvh.isReady` flag
+   - Synchronous for geometries < 10 000 triangles
+   - Worker thread for geometries ≥ 10 000 triangles
+   - Auto-compute on `geometry.build()` for geometries ≥ 1 000 triangles
+   - Fall back to brute-force raycasting until BVH ready (`bvh.isReady`)
+   - Thresholds configurable via `BVHConfig`
 
 3. **Debug Visualization**: ✅ Not needed in initial implementation
+
    - Can be added later as separate debug tool if needed
    - Focus on core functionality first
+
+4. **Dynamic Refit**: ✅ Automatic in render loop
+
+   - Renderer checks `bvhNeedsUpdate` for all render-group geometries each frame
+   - Refit is bottom-up AABB recalculation (much faster than rebuild)
+   - Can be disabled via `bvhConfig.autoRefitGeometryBVH = false`
+
+5. **Worker Architecture**: ✅ Separate esbuild entry point
+   - Shares source classes with main bundle (BVHBuilder, BVHNode, Vector3, etc.)
+   - Serialisation via flat Float32Array — zero overhead for structured clone
+   - Single shared worker instance managed by `BVHWorkerManager`
+   - Request/response multiplexed via integer IDs
 
 ## References
 

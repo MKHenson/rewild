@@ -110,6 +110,7 @@ function getConfig() {
       main: './src/index.tsx',
       terrainWorker:
         'rewild-renderer/lib/renderers/terrain/worker/TerrainWorker.ts',
+      bvhWorker: 'rewild-renderer/lib/acceleration/worker/BVHWorker.ts',
     },
     loader: {
       '.wgsl': 'text',

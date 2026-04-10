@@ -190,7 +190,6 @@ export class LODMesh {
       geometry.vertices = vertices;
       geometry.uvs = uvs;
       geometry.indices = indices;
-      geometry.computeBVH();
       geometry.computeNormals();
 
       this.heights = new Float32Array(vertices.length / 3);
@@ -199,7 +198,11 @@ export class LODMesh {
       }
 
       terrainTexture.load(renderer);
-      geometry.build(renderer.device);
+      geometry.build(
+        renderer.device,
+        renderer.bvhConfig,
+        renderer.bvhWorkerManager ?? undefined
+      );
 
       const terrainPass = new TerrainPass();
       terrainPass.terrainUniforms.sampler =
