@@ -108,7 +108,7 @@ export class BloomPostProcess implements IPostProcess {
     }
   }
 
-  render(renderer: Renderer) {
+  render(renderer: Renderer, timestampWrites?: GPURenderPassTimestampWrites) {
     const { device } = renderer;
 
     uniformData.set([
@@ -129,6 +129,7 @@ export class BloomPostProcess implements IPostProcess {
           storeOp: 'store',
         },
       ],
+      timestampWrites,
     });
 
     bloomPass.setPipeline(this.pipeline);

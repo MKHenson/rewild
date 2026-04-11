@@ -138,7 +138,11 @@ export class Renderer {
     this.camController = new TrackballController(this.perspectiveCam, canvas);
 
     const adapter = await navigator.gpu?.requestAdapter();
-    const device = await adapter?.requestDevice();
+    const requiredFeatures: GPUFeatureName[] = [];
+    if (adapter?.features.has('timestamp-query')) {
+      requiredFeatures.push('timestamp-query');
+    }
+    const device = await adapter?.requestDevice({ requiredFeatures });
     if (!device) throw new Error('need a browser that supports WebGPU');
 
     const context = canvas.getContext('webgpu');
