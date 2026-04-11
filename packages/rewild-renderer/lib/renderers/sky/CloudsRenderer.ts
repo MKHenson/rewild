@@ -118,7 +118,11 @@ export class CloudsRenderer {
     });
   }
 
-  render(encoder: GPUCommandEncoder, geometry: Geometry) {
+  render(
+    encoder: GPUCommandEncoder,
+    geometry: Geometry,
+    timestampWrites?: GPURenderPassTimestampWrites
+  ) {
     const cloudPass = encoder.beginRenderPass({
       colorAttachments: [
         {
@@ -128,6 +132,7 @@ export class CloudsRenderer {
           storeOp: 'store',
         },
       ],
+      timestampWrites,
     });
 
     cloudPass.setPipeline(this.pipeline);

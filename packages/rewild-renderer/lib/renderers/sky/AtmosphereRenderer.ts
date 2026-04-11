@@ -12,7 +12,7 @@ export class AtmosphereRenderer {
 
   constructor() {}
 
-  init(renderer: Renderer, uniformBuffer: GPUBuffer) {
+  init(renderer: Renderer, uniformBuffer: GPUBuffer, nightSkyCubemap: GPUTexture) {
     const { device, canvas } = renderer;
 
     const module = device.createShaderModule({
@@ -100,11 +100,19 @@ export class AtmosphereRenderer {
           binding: 4,
           resource: renderer.samplerManager.get('depth-comparison'),
         },
+        {
+          binding: 5,
+          resource: nightSkyCubemap.createView({ dimension: 'cube' }),
+        },
       ],
     });
   }
 
-  render(encoder: GPUCommandEncoder, geometry: Geometry) {
+  render(
+    encoder: GPUCommandEncoder,
+    geometry: Geometry,
+    timestampWrites?: GPURenderPassTimestampWrites
+  ) {
     const cloudPass = encoder.beginRenderPass({
       colorAttachments: [
         {
@@ -114,6 +122,7 @@ export class AtmosphereRenderer {
           storeOp: 'store',
         },
       ],
+      timestampWrites,
     });
 
     cloudPass.setPipeline(this.pipeline);

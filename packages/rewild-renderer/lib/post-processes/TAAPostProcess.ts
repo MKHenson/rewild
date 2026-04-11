@@ -127,7 +127,7 @@ export class TAAPostProcess implements IPostProcess {
     }
   }
 
-  render(renderer: Renderer) {
+  render(renderer: Renderer, timestampWrites?: GPURenderPassTimestampWrites) {
     const { device } = renderer;
 
     // Copy the taaTexture to the prevTaaTexture for first pass
@@ -157,6 +157,7 @@ export class TAAPostProcess implements IPostProcess {
           storeOp: 'store',
         },
       ],
+      timestampWrites,
     });
 
     uniformData.set([
