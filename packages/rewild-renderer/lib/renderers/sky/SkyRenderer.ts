@@ -14,6 +14,7 @@ import { FinalCompPostProcess } from '../../post-processes/FinalCompPostProcess'
 import { AtmosphereRenderer } from './AtmosphereRenderer';
 import { DenoiseProcess } from '../../post-processes/DenoiseProcess';
 import { DirectionLight } from '../../core/lights/DirectionLight';
+import { PerformanceMonitor } from '../../utils/PerformanceMonitor';
 
 export class SkyRenderer {
   perMeshTracker: PerMeshTracker;
@@ -48,6 +49,8 @@ export class SkyRenderer {
   _eveColor: Color;
   _nightColor: Color;
 
+  perfMonitor: PerformanceMonitor;
+
   constructor(parent: Transform) {
     this.azimuth = 180;
     this.elevation = -0;
@@ -71,6 +74,7 @@ export class SkyRenderer {
     this.blurPass = new BlurProcess();
     this.bloomPass = new BloomPostProcess();
     this.finalPass = new FinalCompPostProcess();
+    this.perfMonitor = new PerformanceMonitor();
   }
 
   init(renderer: Renderer): void {
@@ -123,6 +127,22 @@ export class SkyRenderer {
     this.finalPass.cloudsTexture = this.blurPass.renderTarget;
     this.finalPass.cloudsTexture = this.taaPass.renderTarget;
     this.finalPass.init(renderer);
+
+    this.perfMonitor.init(device, [
+      'sky-clouds',
+      'sky-atmosphere',
+      'sky-bloom',
+      'sky-taa',
+    ]);
+
+    (window as any).startSkyPerfCapture = () => {
+      this.perfMonitor.enabled = true;
+      console.log('Sky performance capture started');
+    };
+    (window as any).stopSkyPerfCapture = () => {
+      this.perfMonitor.enabled = false;
+      console.log('Sky performance capture stopped');
+    };
   }
 
   addingCloudiness: boolean = false;
@@ -213,23 +233,40 @@ export class SkyRenderer {
 
     const commandEncoder = device.createCommandEncoder();
 
-    this.cloudsPass.render(commandEncoder, geometry);
-    this.atmospherePass.render(commandEncoder, geometry);
+    this.cloudsPass.render(
+      commandEncoder,
+      geometry,
+      this.perfMonitor.getTimestampWrites('sky-clouds')
+    );
+    this.atmospherePass.render(
+      commandEncoder,
+      geometry,
+      this.perfMonitor.getTimestampWrites('sky-atmosphere')
+    );
 
     const commandBuffer = commandEncoder.finish();
     device.queue.submit([commandBuffer]);
 
-    this.bloomPass.render(renderer);
+    this.bloomPass.render(
+      renderer,
+      this.perfMonitor.getTimestampWrites('sky-bloom')
+    );
     // this.blurPass.render(renderer);
-    this.taaPass.render(renderer);
+    this.taaPass.render(
+      renderer,
+      this.perfMonitor.getTimestampWrites('sky-taa')
+    );
 
     this.finalPass.azimuth = this.azimuth;
     this.finalPass.elevation = this.elevation;
     this.finalPass.cloudiness = this.cloudiness;
     this.finalPass.render(renderer, pass, camera);
+
+    this.perfMonitor.resolveAndLog();
   }
 
   dispose() {
+    this.perfMonitor.dispose();
     this.taaPass.dispose();
     this.blurPass.dispose();
     this.bloomPass.dispose();

@@ -104,7 +104,11 @@ export class AtmosphereRenderer {
     });
   }
 
-  render(encoder: GPUCommandEncoder, geometry: Geometry) {
+  render(
+    encoder: GPUCommandEncoder,
+    geometry: Geometry,
+    timestampWrites?: GPURenderPassTimestampWrites
+  ) {
     const cloudPass = encoder.beginRenderPass({
       colorAttachments: [
         {
@@ -114,6 +118,7 @@ export class AtmosphereRenderer {
           storeOp: 'store',
         },
       ],
+      timestampWrites,
     });
 
     cloudPass.setPipeline(this.pipeline);
