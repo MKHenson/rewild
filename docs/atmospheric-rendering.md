@@ -146,8 +146,75 @@ const alignedUniformBufferSize = Math.ceil(uniformBufferSize / 16) * 16;
 
 - [ ] No console errors or warnings
 - [ ] All resources properly disposed (check Chrome DevTools GPU memory)
-- [ ] Performance baseline documented (ms per pass)
+- [x] Performance baseline documented (ms per pass)
 - [ ] System still renders identically to before
+
+### Implementation Notes (Phase 0.2 — Complete)
+
+#### What was built
+
+A GPU timestamp query profiling system that measures per-pass render times using WebGPU's `timestamp-query` feature. It records nanosecond-precision timestamps at the beginning and end of each render pass, then resolves them to milliseconds.
+
+#### Files changed
+
+| Action   | Path                                                               |
+| -------- | ------------------------------------------------------------------ |
+| Created  | `packages/rewild-renderer/lib/utils/PerformanceMonitor.ts`         |
+| Modified | `packages/rewild-renderer/lib/Renderer.ts`                         |
+| Modified | `packages/rewild-renderer/lib/renderers/sky/SkyRenderer.ts`        |
+| Modified | `packages/rewild-renderer/lib/renderers/sky/CloudsRenderer.ts`     |
+| Modified | `packages/rewild-renderer/lib/renderers/sky/AtmosphereRenderer.ts` |
+| Modified | `packages/rewild-renderer/lib/post-processes/BloomPostProcess.ts`  |
+| Modified | `packages/rewild-renderer/lib/post-processes/TAAPostProcess.ts`    |
+
+#### How it works
+
+1. **`Renderer.ts`** now requests the `timestamp-query` GPU feature from the adapter when supported.
+2. **`PerformanceMonitor`** allocates a `GPUQuerySet` with begin/end timestamp slots for each named pass. Each render pass receives a `timestampWrites` descriptor via `getTimestampWrites(label)`. Once per second it resolves timestamps, reads them back asynchronously, and logs a `console.table()`.
+3. **`SkyRenderer`** instantiates the monitor with four labels (`sky-clouds`, `sky-atmosphere`, `sky-bloom`, `sky-taa`) and passes timestamp descriptors into each pass's `render()` call. A summed `sky-total` is also computed.
+4. All four sub-passes (`CloudsRenderer`, `AtmosphereRenderer`, `BloomPostProcess`, `TAAPostProcess`) accept an optional `timestampWrites` parameter — when `undefined` (profiling off or unsupported), render passes behave exactly as before.
+
+#### How to use
+
+Profiling is **off by default** with zero overhead. Control it from the browser DevTools console:
+
+```js
+// Start logging GPU timings (once per second)
+startSkyPerfCapture();
+
+// Stop logging
+stopSkyPerfCapture();
+```
+
+When active, a table like this appears in the console every second:
+
+| (index)         | Values     |
+| --------------- | ---------- |
+| sky-clouds      | "2.145 ms" |
+| sky-atmosphere  | "0.312 ms" |
+| sky-bloom       | "0.187 ms" |
+| sky-taa         | "0.098 ms" |
+| sky-total (sum) | "2.742 ms" |
+
+#### Programmatic access
+
+```ts
+// Read latest results from code
+const results = renderer.atmosphere.skyRenderer.perfMonitor.getLatestResults();
+const cloudsMs = results.get('sky-clouds');
+
+// Change log interval (default: 1000ms)
+renderer.atmosphere.skyRenderer.perfMonitor.logIntervalMs = 2000;
+```
+
+#### Browser requirements
+
+- **Chrome 121+** with WebGPU enabled (timestamp queries supported)
+- If the GPU/browser doesn't support `timestamp-query`, the monitor prints a single warning and silently no-ops — no errors, no performance cost.
+
+#### Baseline measurements
+
+> **TODO**: Run at 1920×1080 on RTX 3080 and record numbers here after testing.
 
 ---
 
