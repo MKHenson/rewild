@@ -1,6 +1,3 @@
-const GALAXY_NORMAL = vec3f(0.577, 0.577, 0.577); // Which direction the galaxy is facing
-const GALAXY_CENTER_DIR = vec3f(-0.707, 0, 0.707); // The direction of the center of the galaxy
-
 struct CloudResult {
   sky: f32,
   cloudHeight: f32
@@ -21,10 +18,29 @@ var depthTexture: texture_depth_2d;
 @group( 0 ) @binding( 4 )
 var depthSampler: sampler_comparison;
 
+@group( 0 ) @binding( 5 )
+var nightSkyCubemap: texture_cube<f32>;
+
 var<private> varyings: VaryingsStruct;
 var<private> output: OutputStruct;
 var<private> sunDotUp: f32;
 
+fn sampleNightSky(direction: vec3f) -> vec3f {
+    // Apply time-based rotation (moved from drawNightSky)
+    let dir = direction + vec3f( 0.0, 0.0, object.iTime * 0.0000005 );
+
+    let rotationAngle = object.iTime * 0.00001;
+    let cosAngle = cos(rotationAngle);
+    let sinAngle = sin(rotationAngle);
+    let rotationMatrix = mat3x3<f32>(
+        vec3f(cosAngle, -sinAngle, 0.0),
+        vec3f(sinAngle, cosAngle, 0.0),
+        vec3f(0.0, 0.0, 1.0)
+    );
+
+    let rotatedDir = rotationMatrix * dir;
+    return textureSampleLevel(nightSkyCubemap, noiseSampler, rotatedDir, 0.0).rgb;
+}
 
 @fragment
 fn fs( 
@@ -53,7 +69,7 @@ fn fs(
 
     // The area on the horizon where the sun and earth meet
     if ( hemisphereMask < 1 && hemisphereMask > 0.0 ) {
-        let nightSky: vec3f = drawNightSky(direction, fragCoord.xy);
+        let nightSky: vec3f = sampleNightSky(direction);
         let atmosphereWithSunAndClouds = drawCloudsAndSky( direction, object.cameraPosition, vSunDirection, nightSky );
         output.color = vec4f( mix( nightSky, atmosphereWithSunAndClouds, hemisphereMask), 1.0 );
         // output.color = vec4f( 1.0, 0.0, 0.0, 1.0 );
@@ -66,7 +82,7 @@ fn fs(
     }
     // The area above the horizon
     else {
-        let nightSky: vec3f = drawNightSky(direction, fragCoord.xy);
+        let nightSky: vec3f = sampleNightSky(direction);
         let atmosphereWithSunAndClouds = drawCloudsAndSky( direction, object.cameraPosition, vSunDirection, nightSky );
         output.color = vec4f( atmosphereWithSunAndClouds, 1.0 );
         // output.color = vec4f(  0.0, 0.0, 1.0, 1.0 );
@@ -121,92 +137,3 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, nightSky: vec3f) -
     return color;
 }
 
-fn drawNightSky(dir2: vec3f, fragCoord: vec2f ) -> vec3f {
-    let dir = dir2 + vec3f( 0.0, 0.0, object.iTime * 0.0000005 );
-    let ar = (object.resolutionX / object.resolutionY) * 200.0;
-
-    // Rotation angle based on time
-    let rotationAngle = object.iTime * 0.00001; // Adjust the speed of rotation as needed
-
-    // Rotation matrix around the Y-axis
-    let cosAngle = cos(rotationAngle);
-    let sinAngle = sin(rotationAngle);
-    let rotationMatrix = mat3x3<f32>(
-        vec3f(cosAngle, -sinAngle, 0.0),
-        vec3f(sinAngle, cosAngle, 0.0),
-        vec3f(0.0, 0.0, 1.0)
-    );
-
-    // Apply the rotation to the direction vector
-    let rotatedDir = rotationMatrix * dir;
-	let yp = dirToYawPitch(rotatedDir);
-
-	// Stars (noise-based)
-	var starIntensity = mix(-1.5, 2.0, proceduralNoise3D(500.0 * rotatedDir) + 0.10 * proceduralNoise3D(2.0 * rotatedDir));
-	starIntensity = clamp(starIntensity, 0.0, 1.0);
-	let starColor = vec3f(
-		0.7 + 0.3 * proceduralNoise3D(100.0 * rotatedDir),
-		0.7 + 0.3 * proceduralNoise3D(103.0 * rotatedDir),
-		0.7 + 0.3 * proceduralNoise3D(106.0 * rotatedDir)
-	);
-	let stars = starIntensity * starColor;
-
-	// Stars (pixel perfect)
-	let starScale = 30.0;
-	let ypm = vec2f( // This is to make the stars more evenly distributed
-		yp.x / PI,
-		sin(yp.y)
-	);
-
-	let cell = floor(ypm * starScale);
-	var randPos = vec2f(  // Copilot-generated, may not be the best, but looks fine
-		fract(sin(dot(cell, vec2f(127.1, 311.7))) * 43758.5453),
-		fract(sin(dot(cell, vec2f(269.5, 183.3))) * 43758.5453)
-	);
-	randPos = mix(vec2f(0.1), vec2f(0.9), randPos); // Avoid the edges, where the stars can clip in and out
-	let starYpm = (cell + randPos) / starScale;
-	let starYp = vec2f( // This undoes the above transformation
-		starYpm.x * PI,
-		asin(starYpm.y)
-	);
-
-	let starUvVec3 = rotatedDir;
-	var starUv = starUvVec3.xy / starUvVec3.z;
-	starUv.x /= ar;
-
-	let starCoord = (starUv + 1.0) / 2.0 * vec2f(object.resolutionX, object.resolutionY);
-	var starIntensity2 = 0.0;
-
-	if (all(floor(starCoord) == floor(fragCoord))) { // Apparently fragCoord has values that end in .5?
-		starIntensity2 = fract(sin(dot(cell, vec2f(113.5, 271.9))) * 43758.5453);
-		starIntensity2 *= 0.7 + 0.7 * proceduralNoise3D(20.0 * rotatedDir) + 0.4 * proceduralNoise3D(2.0 * rotatedDir);
-	}
-
-	let stars2 = vec3f(starIntensity2);
-
-	// Galaxy
-	var galaxyPlane = 8.0 * dot(GALAXY_NORMAL, rotatedDir);
-	galaxyPlane = 1.0 / (galaxyPlane * galaxyPlane + 1.0);
-	var galaxyCenter = dot(GALAXY_CENTER_DIR, rotatedDir) * 0.5 + 0.5;
-	galaxyCenter = galaxyCenter * galaxyCenter;
-	let galaxyIntensity = galaxyPlane * galaxyCenter;
-	let galaxyColor = vec3f(0.5, 0.5, 1.0);
-	let galaxy = 0.8 * galaxyIntensity * galaxyColor;
-
-	// Dust
-	var d = 0.0;
-	d += 1.00 * proceduralNoise3D(10.0 * rotatedDir);
-	d += 0.50 * proceduralNoise3D(20.0 * rotatedDir);
-	d += 0.25 * proceduralNoise3D(100.0 * rotatedDir);
-	d += 0.20 * proceduralNoise3D(200.0 * rotatedDir);
-	let dustColor = vec3f(0.5, 0.4, 0.3);
-	let dust = vec3f(1.0 - (d * 0.6 + 1.2) * galaxyPlane * galaxyCenter) + dustColor;
-
-	let color = stars + stars2 + galaxy * dust;
-	return color;
-}
- 
-
-fn dirToYawPitch( dir: vec3f ) -> vec2f {
-	return vec2f(atan2(dir.x, dir.z), asin(dir.y));
-} 

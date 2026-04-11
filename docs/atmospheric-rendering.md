@@ -409,6 +409,62 @@ If performance doesn't improve or visual issues occur:
 2. Delete `NightSkyCubemapRenderer`
 3. Revert atmosphere.wgsl changes
 
+### Implementation Notes (Phase 1 — Complete)
+
+#### What was built
+
+A one-time cubemap renderer that bakes the entire night sky (stars, galaxy, dust) into a 1024×1024×6 `rgba16float` cubemap at initialization. The atmosphere shader then samples this cubemap with time-based rotation instead of computing 7+ procedural noise calls per pixel.
+
+#### Files changed
+
+| Action   | Path                                                                    |
+| -------- | ----------------------------------------------------------------------- |
+| Created  | `packages/rewild-renderer/lib/renderers/sky/NightSkyCubemapRenderer.ts` |
+| Created  | `packages/rewild-renderer/lib/shaders/atmosphere/nightSky.wgsl`         |
+| Modified | `packages/rewild-renderer/lib/shaders/atmosphere/atmosphere.wgsl`       |
+| Modified | `packages/rewild-renderer/lib/renderers/sky/AtmosphereRenderer.ts`      |
+| Modified | `packages/rewild-renderer/lib/renderers/sky/SkyRenderer.ts`             |
+
+#### How it works
+
+1. **`NightSkyCubemapRenderer`** creates a 1024×1024×6 `rgba16float` cubemap and renders all 6 faces in a single command encoder submission at init. Each face gets a per-face uniform buffer with the face index and resolution. Uses a full-screen quad vertex shader with `getCubeDirection()` to compute world-space direction per pixel. Only runs once (guarded by `initialized` flag); subsequent `init()` calls are no-ops.
+
+2. **`nightSky.wgsl`** is a standalone shader containing the full `drawNightSky()` logic extracted from `atmosphere.wgsl` — noise-based stars, pixel-perfect stars, galaxy plane/center, and dust — adapted to work with cubemap face directions instead of screen-space fragCoord.
+
+3. **`atmosphere.wgsl`** was updated:
+
+   - Removed: `drawNightSky()`, `dirToYawPitch()`, `GALAXY_NORMAL`, `GALAXY_CENTER_DIR`
+   - Added: `nightSkyCubemap` binding at slot 5 (`texture_cube<f32>`)
+   - Added: `sampleNightSky(direction)` function that applies time-based Z-axis rotation + slow drift, then samples the cubemap via `textureSampleLevel` (explicit LOD required since the call is inside non-uniform control flow from the depth test early-out)
+
+4. **`AtmosphereRenderer.ts`** now accepts `nightSkyCubemap: GPUTexture` in `init()` and binds it as a cube view at binding 5. Reuses the existing `noiseSampler` (binding 1, linear repeat) for cubemap sampling.
+
+5. **`SkyRenderer.ts`** creates `NightSkyCubemapRenderer`, initializes it before the atmosphere pass, passes the cubemap through, and disposes it on cleanup.
+
+#### Key implementation decisions
+
+- **`rgba16float` format** instead of the originally planned `rgba8unorm` — HDR values from star brightness require >1.0 range; 8-bit would clip bright stars.
+- **1024×1024 resolution** (increased from initial 512) — 512 was visibly blurry on larger screens due to bilinear interpolation of the sharp star features.
+- **`textureSampleLevel` instead of `textureSample`** — WebGPU/WGSL requires uniform control flow for implicit-LOD sampling. The atmosphere shader's early depth-test `if` creates non-uniform control flow, so explicit LOD 0.0 is used.
+- **Reused `noiseSampler`** instead of adding a dedicated cubemap sampler — the existing linear repeat sampler works correctly for cubemap sampling and avoids an extra binding slot.
+
+#### Performance results
+
+| Pass           | Phase 0  | Phase 1  | Change          |
+| -------------- | -------- | -------- | --------------- |
+| sky-clouds     | 2.154 ms | 2.140 ms | ~0 (unchanged)  |
+| sky-atmosphere | 0.141 ms | 0.023 ms | **−84% (6.1×)** |
+| sky-bloom      | 0.027 ms | 0.027 ms | ~0 (unchanged)  |
+| sky-taa        | 0.016 ms | 0.016 ms | ~0 (unchanged)  |
+| **sky-total**  | 2.337 ms | 2.206 ms | **−0.131 ms**   |
+
+The atmosphere pass speedup (~6×) is expected: a single `textureSampleLevel` replaces 7+ `proceduralNoise3D` calls (each doing 8 hash lookups with interpolation), plus galaxy and dust computations.
+
+#### Memory cost
+
+- 1024 × 1024 × 6 faces × 8 bytes (rgba16float) = **~48 MB**
+- One-time GPU startup cost: ~100ms for cubemap generation (6 full-screen passes with procedural noise)
+
 ---
 
 ## Phase 2: Cloud Shadows on Terrain (8-12 hours)

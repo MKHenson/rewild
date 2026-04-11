@@ -2,8 +2,16 @@ Each of these performance captures are taken at eye level with half the sky visi
 
 # Current performance Capture (phase 0)
 
-sky-clouds '0.989 ms'
-sky-atmosphere '0.054 ms'
-sky-bloom '0.015 ms'
-sky-taa '0.009 ms'
-sky-total (sum) '1.067 ms'
+sky-clouds '2.154 ms'
+sky-atmosphere '0.141 ms'
+sky-bloom '0.027 ms'
+sky-taa '0.016 ms'
+sky-total (sum) '2.337 ms'
+
+# Current performance Capture (phase 1)
+
+sky-clouds '2.140 ms'
+sky-atmosphere '0.023 ms'
+sky-bloom '0.027 ms'
+sky-taa '0.016 ms'
+sky-total (sum) '2.206 ms'

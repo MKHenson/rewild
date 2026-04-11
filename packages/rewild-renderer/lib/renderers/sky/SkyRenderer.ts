@@ -15,6 +15,7 @@ import { AtmosphereRenderer } from './AtmosphereRenderer';
 import { DenoiseProcess } from '../../post-processes/DenoiseProcess';
 import { DirectionLight } from '../../core/lights/DirectionLight';
 import { PerformanceMonitor } from '../../utils/PerformanceMonitor';
+import { NightSkyCubemapRenderer } from './NightSkyCubemapRenderer';
 
 export class SkyRenderer {
   perMeshTracker: PerMeshTracker;
@@ -30,6 +31,7 @@ export class SkyRenderer {
   bloomPass: BloomPostProcess;
   denoisePass: DenoiseProcess;
   finalPass: FinalCompPostProcess;
+  nightSkyRenderer: NightSkyCubemapRenderer;
 
   elevation: f32;
   dayNightCycle: boolean = false;
@@ -74,6 +76,7 @@ export class SkyRenderer {
     this.blurPass = new BlurProcess();
     this.bloomPass = new BloomPostProcess();
     this.finalPass = new FinalCompPostProcess();
+    this.nightSkyRenderer = new NightSkyCubemapRenderer();
     this.perfMonitor = new PerformanceMonitor();
   }
 
@@ -112,7 +115,8 @@ export class SkyRenderer {
     }
 
     this.cloudsPass.init(renderer, this.uniformBuffer);
-    this.atmospherePass.init(renderer, this.uniformBuffer);
+    this.nightSkyRenderer.init(renderer);
+    this.atmospherePass.init(renderer, this.uniformBuffer, this.nightSkyRenderer.cubemap);
 
     this.bloomPass.sourceTexture = this.cloudsPass.renderTarget;
     this.bloomPass.init(renderer);
@@ -267,6 +271,7 @@ export class SkyRenderer {
 
   dispose() {
     this.perfMonitor.dispose();
+    this.nightSkyRenderer.dispose();
     this.taaPass.dispose();
     this.blurPass.dispose();
     this.bloomPass.dispose();
