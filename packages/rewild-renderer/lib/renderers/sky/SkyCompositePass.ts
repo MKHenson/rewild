@@ -1,11 +1,11 @@
-import { IPostProcess } from '../../types/IPostProcess';
-import { Renderer } from '../Renderer';
-import shader from '../shaders/atmosphereFinal.wgsl';
-import vertexScreenQuadShader from '../shaders/utils/vertexScreenQuad.wgsl';
-import constantsFn from '../shaders/atmosphere/constants.wgsl';
-import commonShaderFns from '../shaders/atmosphere/fog.wgsl';
-import { PostProcessManager } from './PostProcessManager';
-import { Camera } from '../core/Camera';
+import { IPostProcess } from '../../../types/IPostProcess';
+import { Renderer } from '../../Renderer';
+import shader from '../../shaders/sky/skyComposite.wgsl';
+import vertexScreenQuadShader from '../../shaders/utils/vertexScreenQuad.wgsl';
+import constantsFn from '../../shaders/sky/skyConstants.wgsl';
+import commonShaderFns from '../../shaders/sky/fog.wgsl';
+import { PostProcessManager } from '../../post-processes/PostProcessManager';
+import { Camera } from '../../core/Camera';
 import { degToRad, Matrix4, Vector3 } from 'rewild-common';
 
 const finalUniformBufferSize =
@@ -26,7 +26,7 @@ const tempVec = new Vector3();
 const uniformData = new Float32Array(alignedUniformBufferSize / 4);
 const invViewProjectionMatrix = new Matrix4();
 
-export class FinalCompPostProcess implements IPostProcess {
+export class SkyCompositePass implements IPostProcess {
   renderTarget: GPUTexture;
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
@@ -163,9 +163,9 @@ export class FinalCompPostProcess implements IPostProcess {
         camera.transform.position.y,
         camera.transform.position.z,
         0, //
-        renderer.atmosphere.skyRenderer.foginess,
-        renderer.atmosphere.skyRenderer.cloudShadowRenderer.config.worldSize,
-        renderer.atmosphere.skyRenderer.fogShadowIntensity,
+        renderer.sky.skyRenderer.foginess,
+        renderer.sky.skyRenderer.cloudShadowRenderer.config.worldSize,
+        renderer.sky.skyRenderer.fogShadowIntensity,
       ],
       32
     );

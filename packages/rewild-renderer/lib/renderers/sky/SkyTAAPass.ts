@@ -1,8 +1,8 @@
-import { IPostProcess } from '../../types/IPostProcess';
-import { Renderer } from '../Renderer';
-import taaShader from '../shaders/atmosphereTAAPass.wgsl';
-import vertexScreenQuadShader from '../shaders/utils/vertexScreenQuad.wgsl';
-import { PostProcessManager } from './PostProcessManager';
+import { IPostProcess } from '../../../types/IPostProcess';
+import { Renderer } from '../../Renderer';
+import taaShader from '../../shaders/sky/skyTAA.wgsl';
+import vertexScreenQuadShader from '../../shaders/utils/vertexScreenQuad.wgsl';
+import { PostProcessManager } from '../../post-processes/PostProcessManager';
 
 const bloomPassUniformBufferSize =
   2 * 4 + // (resolutionX, resolutionY)
@@ -13,7 +13,7 @@ const alignedUniformBufferSize =
 
 const uniformData = new Float32Array(alignedUniformBufferSize / 4);
 
-export class TAAPostProcess implements IPostProcess {
+export class SkyTAAPass implements IPostProcess {
   renderTarget: GPUTexture;
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;

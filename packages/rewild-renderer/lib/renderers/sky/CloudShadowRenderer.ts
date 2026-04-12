@@ -1,8 +1,8 @@
 import { Renderer } from '../../Renderer';
-import shader from '../../shaders/atmosphere/cloudShadow.wgsl';
-import constantsFns from '../../shaders/atmosphere/constants.wgsl';
-import cloudNoiseFns from '../../shaders/atmosphere/cloudNoise.wgsl';
-import cloudDensityFns from '../../shaders/atmosphere/cloudDensity.wgsl';
+import shader from '../../shaders/sky/cloudShadow.wgsl';
+import constantsFns from '../../shaders/sky/skyConstants.wgsl';
+import cloudNoiseFns from '../../shaders/sky/cloudNoise.wgsl';
+import cloudDensityFns from '../../shaders/sky/cloudDensity.wgsl';
 
 export interface CloudShadowConfig {
   resolution: number;

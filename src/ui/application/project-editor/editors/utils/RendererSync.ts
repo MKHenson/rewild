@@ -6,11 +6,11 @@ export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
   const atmosphere = project.sceneGraph?.atmosphere;
 
   if (atmosphere) {
-    renderer.atmosphere.skyRenderer.cloudiness = atmosphere.cloudiness as f32;
-    renderer.atmosphere.skyRenderer.foginess = atmosphere.foginess as f32;
-    renderer.atmosphere.skyRenderer.elevation = atmosphere.elevation as f32;
-    renderer.atmosphere.skyRenderer.windiness = atmosphere.windiness as f32;
-    renderer.atmosphere.skyRenderer.dayNightCycle =
+    renderer.sky.skyRenderer.cloudiness = atmosphere.cloudiness as f32;
+    renderer.sky.skyRenderer.foginess = atmosphere.foginess as f32;
+    renderer.sky.skyRenderer.elevation = atmosphere.elevation as f32;
+    renderer.sky.skyRenderer.windiness = atmosphere.windiness as f32;
+    renderer.sky.skyRenderer.dayNightCycle =
       atmosphere.dayNightCycle as boolean;
   }
 
@@ -29,7 +29,7 @@ export function syncFromEditorResource(id: string, renderer: Renderer) {
   const editorResource = sceneGraphStore.buildObjectFromProperties(id);
   const sceneObject = renderer.scene.findObjectById(id);
   if (id === 'SKY' && editorResource) {
-    const skyRenderer = renderer.atmosphere.skyRenderer;
+    const skyRenderer = renderer.sky.skyRenderer;
     skyRenderer.cloudiness = editorResource.cloudiness as f32;
     skyRenderer.foginess = editorResource.foginess as f32;
     skyRenderer.elevation = editorResource.elevation as f32;

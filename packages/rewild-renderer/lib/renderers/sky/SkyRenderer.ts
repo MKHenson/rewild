@@ -6,16 +6,16 @@ import { Transform } from '../../core/Transform';
 import { Camera } from '../../core/Camera';
 import { Color, degToRad } from 'rewild-common';
 import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
-import { CloudsRenderer } from './CloudsRenderer';
-import { TAAPostProcess } from '../../post-processes/TAAPostProcess';
-import { BloomPostProcess } from '../../post-processes/BloomPostProcess';
-import { BlurProcess } from '../../post-processes/BlurProcess';
-import { FinalCompPostProcess } from '../../post-processes/FinalCompPostProcess';
-import { AtmosphereRenderer } from './AtmosphereRenderer';
-import { DenoiseProcess } from '../../post-processes/DenoiseProcess';
+import { CloudRenderer } from './CloudRenderer';
+import { SkyTAAPass } from './SkyTAAPass';
+import { SkyBloomPass } from './SkyBloomPass';
+import { SkyBlurPass } from './SkyBlurPass';
+import { SkyCompositePass } from './SkyCompositePass';
+import { SkyGradientRenderer } from './SkyGradientRenderer';
+import { SkyDenoisePass } from './SkyDenoisePass';
 import { DirectionLight } from '../../core/lights/DirectionLight';
 import { PerformanceMonitor } from '../../utils/PerformanceMonitor';
-import { NightSkyCubemapRenderer } from './NightSkyCubemapRenderer';
+import { StarfieldRenderer } from './StarfieldRenderer';
 import { CloudShadowRenderer } from './CloudShadowRenderer';
 
 export class SkyRenderer {
@@ -25,14 +25,14 @@ export class SkyRenderer {
 
   cloudsBindGroup: GPUBindGroup;
   atmosphereBindGroup: GPUBindGroup;
-  cloudsPass: CloudsRenderer;
-  atmospherePass: AtmosphereRenderer;
-  taaPass: TAAPostProcess;
-  blurPass: BlurProcess;
-  bloomPass: BloomPostProcess;
-  denoisePass: DenoiseProcess;
-  finalPass: FinalCompPostProcess;
-  nightSkyRenderer: NightSkyCubemapRenderer;
+  cloudsPass: CloudRenderer;
+  atmospherePass: SkyGradientRenderer;
+  taaPass: SkyTAAPass;
+  blurPass: SkyBlurPass;
+  bloomPass: SkyBloomPass;
+  denoisePass: SkyDenoisePass;
+  finalPass: SkyCompositePass;
+  starfieldRenderer: StarfieldRenderer;
   cloudShadowRenderer: CloudShadowRenderer;
 
   elevation: f32;
@@ -73,14 +73,14 @@ export class SkyRenderer {
     this._eveColor = new Color(0.32, 0.12, 0.0);
     this._nightColor = new Color(0.05, 0.05, 0.2);
 
-    this.cloudsPass = new CloudsRenderer();
-    this.atmospherePass = new AtmosphereRenderer();
-    this.taaPass = new TAAPostProcess();
-    this.denoisePass = new DenoiseProcess();
-    this.blurPass = new BlurProcess();
-    this.bloomPass = new BloomPostProcess();
-    this.finalPass = new FinalCompPostProcess();
-    this.nightSkyRenderer = new NightSkyCubemapRenderer();
+    this.cloudsPass = new CloudRenderer();
+    this.atmospherePass = new SkyGradientRenderer();
+    this.taaPass = new SkyTAAPass();
+    this.denoisePass = new SkyDenoisePass();
+    this.blurPass = new SkyBlurPass();
+    this.bloomPass = new SkyBloomPass();
+    this.finalPass = new SkyCompositePass();
+    this.starfieldRenderer = new StarfieldRenderer();
     this.cloudShadowRenderer = new CloudShadowRenderer({
       resolution: 1024,
       worldSize: 5000,
@@ -124,12 +124,12 @@ export class SkyRenderer {
     }
 
     this.cloudsPass.init(renderer, this.uniformBuffer);
-    this.nightSkyRenderer.init(renderer);
+    this.starfieldRenderer.init(renderer);
     this.cloudShadowRenderer.init(renderer);
     this.atmospherePass.init(
       renderer,
       this.uniformBuffer,
-      this.nightSkyRenderer.cubemap
+      this.starfieldRenderer.cubemap
     );
 
     this.bloomPass.sourceTexture = this.cloudsPass.renderTarget;
@@ -316,7 +316,7 @@ export class SkyRenderer {
 
   dispose() {
     this.perfMonitor.dispose();
-    this.nightSkyRenderer.dispose();
+    this.starfieldRenderer.dispose();
     this.cloudShadowRenderer.dispose();
     this.taaPass.dispose();
     this.blurPass.dispose();

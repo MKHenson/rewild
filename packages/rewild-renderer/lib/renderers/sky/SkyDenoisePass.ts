@@ -1,8 +1,8 @@
-import { IPostProcess } from '../../types/IPostProcess';
-import { Renderer } from '../Renderer';
-import bloomShader from '../shaders/atmosphereBloomPass.wgsl';
-import vertexScreenQuadShader from '../shaders/utils/vertexScreenQuad.wgsl';
-import { PostProcessManager } from './PostProcessManager';
+import { IPostProcess } from '../../../types/IPostProcess';
+import { Renderer } from '../../Renderer';
+import shader from '../../shaders/denoisePass.wgsl';
+import vertexScreenQuadShader from '../../shaders/utils/vertexScreenQuad.wgsl';
+import { PostProcessManager } from '../../post-processes/PostProcessManager';
 
 const bloomPassUniformBufferSize =
   2 * 4 + // (resolutionX, resolutionY)
@@ -13,7 +13,7 @@ const alignedUniformBufferSize =
 
 const uniformData = new Float32Array(alignedUniformBufferSize / 4);
 
-export class BloomPostProcess implements IPostProcess {
+export class SkyDenoisePass implements IPostProcess {
   renderTarget: GPUTexture;
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
@@ -23,7 +23,7 @@ export class BloomPostProcess implements IPostProcess {
   sourceTexture: GPUTexture | null;
 
   constructor() {
-    this.scaleFactor = 0.75;
+    this.scaleFactor = 0.6;
     this.sourceTexture = null;
   }
 
@@ -43,7 +43,7 @@ export class BloomPostProcess implements IPostProcess {
     }
 
     const module = device.createShaderModule({
-      code: bloomShader,
+      code: shader,
     });
 
     const vertexScreenQuadModule = device.createShaderModule({
@@ -52,7 +52,7 @@ export class BloomPostProcess implements IPostProcess {
 
     this.renderTarget = device.createTexture({
       size: [canvas.width * scaleFactor, canvas.height * scaleFactor, 1],
-      label: 'bloom render target',
+      label: 'denoise render target',
       format: 'rgba8unorm',
       usage:
         GPUTextureUsage.RENDER_ATTACHMENT |
@@ -61,7 +61,7 @@ export class BloomPostProcess implements IPostProcess {
     });
 
     this.pipeline = device.createRenderPipeline({
-      label: 'atmosphere bloom pipeline',
+      label: 'denoise postprocess pipeline',
       layout: 'auto',
       vertex: {
         entryPoint: 'vs',
@@ -79,18 +79,18 @@ export class BloomPostProcess implements IPostProcess {
     });
 
     this.uniformBuffer = device.createBuffer({
-      label: 'uniforms for atmosphere bloom pass',
+      label: 'uniforms for denoise pass',
       size: alignedUniformBufferSize,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
     this.bindGroup = device.createBindGroup({
-      label: 'bind group for atmosphere bloom pass',
+      label: 'bind group for denoise pass',
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: renderer.samplerManager.get('linear-clamped') },
-        { binding: 1, resource: texture.createView() },
-        { binding: 2, resource: { buffer: this.uniformBuffer } },
+        { binding: 0, resource: texture.createView() },
+        { binding: 1, resource: { buffer: this.uniformBuffer } },
+        { binding: 2, resource: renderer.samplerManager.get('linear-clamped') },
       ],
     });
 
@@ -100,15 +100,13 @@ export class BloomPostProcess implements IPostProcess {
   dispose(): void {
     if (this.renderTarget) {
       this.renderTarget.destroy();
-      this.renderTarget = null as any;
     }
     if (this.uniformBuffer) {
       this.uniformBuffer.destroy();
-      this.uniformBuffer = null as any;
     }
   }
 
-  render(renderer: Renderer, timestampWrites?: GPURenderPassTimestampWrites) {
+  render(renderer: Renderer) {
     const { device } = renderer;
 
     uniformData.set([
@@ -129,7 +127,6 @@ export class BloomPostProcess implements IPostProcess {
           storeOp: 'store',
         },
       ],
-      timestampWrites,
     });
 
     bloomPass.setPipeline(this.pipeline);

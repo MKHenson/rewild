@@ -31,7 +31,7 @@ export async function loadInitialLevels(
   });
 
   // Load the sky properties
-  const skyRenderer = renderer.atmosphere.skyRenderer;
+  const skyRenderer = renderer.sky.skyRenderer;
   skyRenderer.cloudiness = project.sceneGraph.atmosphere.cloudiness as f32;
   skyRenderer.foginess = project.sceneGraph.atmosphere.foginess as f32;
   skyRenderer.windiness = project.sceneGraph.atmosphere.windiness as f32;

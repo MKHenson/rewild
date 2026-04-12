@@ -5,7 +5,7 @@ import { SkyRenderer } from '../renderers/sky/SkyRenderer';
 import { Camera } from './Camera';
 import { Transform } from './Transform';
 
-export class AtmosphereSkybox {
+export class Sky {
   transform: Transform;
   geometry: Geometry;
   skyRenderer: SkyRenderer;
