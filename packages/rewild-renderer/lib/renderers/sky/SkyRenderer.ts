@@ -191,21 +191,30 @@ export class SkyRenderer {
     const sunPosition = this.sun.transform.position;
     const uniformData = this.uniformData;
 
-    const sunRadius = 100;
-    sunPosition.setFromSphericalCoords(sunRadius, phi, theta);
+    // Sun orbital distance (arbitrary units for spherical coordinate placement)
+    const sunOrbitDistance = 100;
+    sunPosition.setFromSphericalCoords(sunOrbitDistance, phi, theta);
 
-    // Lerp sun color based on elevation
-    // When sun is at the horizon (y=0), use eveColor, when at zenith (y=sunRadius), use dayColor
-    const t = Math.max(sunPosition.y / sunRadius, 0);
-    this.sun.color.lerpColors(this._eveColor, this._dayColor, t);
+    // Normalized sun elevation: -1 = nadir, 0 = horizon, +1 = zenith.
+    // Same value as sunDotUp in the sky shaders.
+    const sunDotUp = sunPosition.y / sunOrbitDistance;
+    this.upDot = sunDotUp;
 
-    if (sunPosition.y < 0) {
-      // Below horizon, use night color
-      this.sun.color.lerpColors(
-        this._nightColor,
-        this._eveColor,
-        1 + sunPosition.y / sunRadius
-      );
+    // Directional light color — transitions aligned with shader dusk/dawn at ±10%:
+    //   sunDotUp < -0.1  → full night (dark blue moonlight)
+    //   -0.1  to  0.0    → night → evening (warm orange)
+    //    0.0  to  0.3    → evening → day (orange fades to white sunlight)
+    //   sunDotUp > 0.3   → full daylight (white)
+    if (sunDotUp < -0.1) {
+      this.sun.color.copy(this._nightColor);
+    } else if (sunDotUp < 0.0) {
+      const t = (sunDotUp + 0.1) / 0.1;
+      this.sun.color.lerpColors(this._nightColor, this._eveColor, t);
+    } else if (sunDotUp < 0.3) {
+      const t = sunDotUp / 0.3;
+      this.sun.color.lerpColors(this._eveColor, this._dayColor, t);
+    } else {
+      this.sun.color.copy(this._dayColor);
     }
 
     uniformData.set(transform.matrixWorld.elements, 0); // modelMatrix

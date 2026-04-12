@@ -52,10 +52,10 @@ fn fs(
 
 	let direction: vec3f = normalize( vWorldPosition - object.cameraPosition );
 
-	// in scattering
-	// var cosTheta: f32 = dot( direction, vSunDirection );
-    var cosTheta = dot( direction, vec3f(0.0, 1.0, 0.0) );
-	let hemisphereMask: f32 = smoothstep( -0.3, -0.1, cosTheta );
+	// Vertical component of view direction: 1.0 = looking straight up, -1.0 = straight down
+    var viewVertical = dot( direction, vec3f(0.0, 1.0, 0.0) );
+	// Smooth transition: 0 = below horizon, 1 = above horizon
+	let hemisphereMask: f32 = smoothstep( -0.3, -0.1, viewVertical );
 
      // Define uv based on fragCoord
     let uv = fragCoord.xy / vec2(object.resolutionX, object.resolutionY);
@@ -67,24 +67,24 @@ fn fs(
         return output;
     }
 
-    // The area on the horizon where the sun and earth meet
+    // Horizon transition band: blend between night sky below and atmosphere above
     if ( hemisphereMask < 1 && hemisphereMask > 0.0 ) {
         let nightSky: vec3f = sampleNightSky(direction);
-        let atmosphereWithSunAndClouds = drawCloudsAndSky( direction, object.cameraPosition, vSunDirection, nightSky );
-        output.color = vec4f( mix( nightSky, atmosphereWithSunAndClouds, hemisphereMask), 1.0 );
+        let atmosphereColor = drawCloudsAndSky( direction, object.cameraPosition, vSunDirection, nightSky );
+        output.color = vec4f( mix( nightSky, atmosphereColor, hemisphereMask), 1.0 );
         // output.color = vec4f( 1.0, 0.0, 0.0, 1.0 );
         return output;
     }
-    // The area below the horizon
+    // Below horizon: black
     else if ( hemisphereMask <= 0.0 ) {
         output.color = vec4f( 0.0, 0.0, 0.0, 1.0 );
         return output;
     }
-    // The area above the horizon
+    // Above horizon: full atmosphere
     else {
         let nightSky: vec3f = sampleNightSky(direction);
-        let atmosphereWithSunAndClouds = drawCloudsAndSky( direction, object.cameraPosition, vSunDirection, nightSky );
-        output.color = vec4f( atmosphereWithSunAndClouds, 1.0 );
+        let atmosphereColor = drawCloudsAndSky( direction, object.cameraPosition, vSunDirection, nightSky );
+        output.color = vec4f( atmosphereColor, 1.0 );
         // output.color = vec4f(  0.0, 0.0, 1.0, 1.0 );
         return output;
     } 
@@ -128,7 +128,7 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, nightSky: vec3f) -
     var intersectionPoint = cameraPos + intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END + 2000.0) * rotatedDir;
     
     let cloudCoverFactor = mix( 0.6, 0.3, object.cloudiness );
-    color += mix(FOG_COLOR_STORM, vec3f(2.0), sunDotUp) * max( 0.0, fbm(vec3f(1.0, 1.0, 1.8) * intersectionPoint * 0.001) - cloudCoverFactor) * 2.0;
+    color += mix(FOG_COLOR_STORM, vec3f(2.0), saturate(sunDotUp)) * max( 0.0, fbm(vec3f(1.0, 1.0, 1.8) * intersectionPoint * 0.001) - cloudCoverFactor) * 2.0;
 
     let background = getAtmosphereColor(sun_direction, dir, mu, nightSky * 10.0);
 

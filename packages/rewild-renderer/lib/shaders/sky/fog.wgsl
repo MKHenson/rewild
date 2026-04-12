@@ -55,57 +55,89 @@ fn intersectSphere(origin: vec3f, dir: vec3f, spherePos: vec3f, sphereRad: f32) 
 
 
 fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3f ) -> vec3f {
-	let sunInSkyMask = clamp( pow(1.75 + 1.75 * sunDotUp, 1.0), 0.0, 1.0 );
-    let mu = dot(vSunDirection, dir) * sunInSkyMask;
+    // Sun visibility: fades sun-driven scattering during dusk/dawn (sunDotUp ±0.1).
+    // 0 = sun below horizon (no direct scatter), 1 = sun above horizon (full scatter)
+    let sunVisibility = smoothstep(-0.1, 0.1, sunDotUp);
+    let mu = dot(vSunDirection, dir) * sunVisibility;
 
     let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + CLOUD_START);
     let foginess = object.foginess;
-    let darknessModifier = mix( 1.0, 0.2, clamp(pow(object.cloudiness, 6.0), 0.0, 1.0) );
 
-    let fogPhase = mix(0.4, 0.2, foginess * object.cloudiness) * HenyeyGreenstein(mu, mix( 0.8, 0.7, foginess * object.cloudiness ) ); // + 0.5 * HenyeyGreenstein(mu, -0.6);
+    // Cloud occlusion: clouds block sunlight from reaching the lower atmosphere.
+    // At 0% cloudiness = full sun, at 100% = only ~5% of sunlight penetrates.
+    // Uses a squared curve so light clouds have modest effect, heavy clouds are dramatic.
+    let cloudOcclusion = mix(1.0, 0.05, pow(object.cloudiness, 2.0));
 
-    var fogColor = mix(FOG_COLOR_NIGHT, FOG_COLOR_EVENING, smoothstep(-0.2, 0.2, sunDotUp));
-    fogColor = mix(fogColor, FOG_COLOR_DAY, smoothstep(0.2, 0.8, sunDotUp));
+    // Combined sun strength: elevation + cloud cover
+    let effectiveSunStrength = sunVisibility * cloudOcclusion;
+
+    // Henyey-Greenstein forward scattering (g=0.76 base, reduced in stormy/foggy conditions)
+    let fogPhase = mix(0.4, 0.2, foginess * object.cloudiness) * HenyeyGreenstein(mu, mix( 0.76, 0.68, foginess * object.cloudiness ) );
+
+    // Fog color transitions: night → evening (at horizon) → day
+    var fogColor = mix(FOG_COLOR_NIGHT, FOG_COLOR_EVENING, smoothstep(-0.1, 0.0, sunDotUp));
+    fogColor = mix(fogColor, FOG_COLOR_DAY, smoothstep(0.0, 0.3, sunDotUp));
 
     let stormFactor = saturate( (object.cloudiness - 0.8) / 0.2 );
     fogColor = mix( fogColor, FOG_COLOR_STORM, stormFactor );
 
     let fogDensity = mix( 0.00002, 0.0008, foginess );
 
-    // Reduce the fog color as the sun goes into the evening
-    fogColor = fogColor * mix( 0.5, 1.0, sunDotUp );
+    // Fog brightness: scales with both sun elevation and cloud cover.
+    // Overcast skies produce dimmer, flatter fog even during daylight.
+    let fogBrightness = mix(0.01, 1.0, effectiveSunStrength);
+    fogColor = fogColor * fogBrightness;
 
-    return mix( fogPhase * 0.1 * LOW_SCATTER * SUN_POWER * mix(1.0, 0.3, smoothstep( 0.8, 1.0, object.cloudiness )) + 10.0 * fogColor * darknessModifier, originalColor.xyz, exp(-fogDensity * fogDistance ));
+    // Sun scatter contribution: warm forward-scattering glow from the sun.
+    // Gated by sun elevation AND cloud cover — heavy clouds block the direct
+    // sun beam that drives forward scattering in the fog layer.
+    let sunScatter = effectiveSunStrength * fogPhase * 0.1 * LOW_SCATTER * SUN_POWER;
+
+    return mix( sunScatter + 10.0 * fogColor, originalColor.xyz, exp(-fogDensity * fogDistance ));
 }
 
 fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec3f ) -> vec3f {
-    let up = dot(sun_direction, vec3f(0.0, 1.0, 0.0));
-    let portionOfNightSky = pow(0.5 + 0.5 * up, 0.8);
-    let portionOfDaySky = pow(0.5 + 0.5 * mu, 15.0);
-    let dayNightSkyRatio = clamp(portionOfNightSky + portionOfDaySky, 0.0, 1.0);
+    // Day-night blend factor: 0 = full night, 1 = full day.
+    // Dusk/dawn transition occurs at sunDotUp ±0.1 (~6° above/below horizon).
+    let dayFactor = smoothstep(-0.1, 0.1, sunDotUp);
 
+    // Sun proximity gradient: bright near the sun, dark away from it.
+    // Drives the warm glow around the sun and sky color variation by view angle.
+    let sunProximity = pow(max(0.0, 0.5 + 0.5 * mu), 15.0);
 
-    let skyPinkFactor = smoothstep( -0.3, 0.5, sunDotUp );
-    let darkerBlue = vec3f(0.2, 0.52, 1.0);
-    let lighterBlue = vec3f(0.8, 0.95, 1.0);
+    // During twilight only, sun proximity extends a subtle warm glow toward the sun.
+    // Fades to zero once the sun is fully below the horizon.
+    let twilightGlow = sunProximity * smoothstep(-0.1, 0.05, sunDotUp) * (1.0 - dayFactor);
+    let dayNightRatio = clamp(dayFactor + twilightGlow * 0.5, 0.0, 1.0);
 
-    let redyPink = vec3f( 0.95, 0.3, 0.2 );
-    let deepOrange = vec3f( 1.0, 0.5, 0.2 );
+    // Sun elevation blend for sky color palette:
+    // 0 = sunset/sunrise warm colors, 1 = daytime cool colors
+    let sunElevationBlend = smoothstep(-0.05, 0.15, sunDotUp);
 
-    var dayTimeColor = 
-        // mix between the colors of the sky at different times of day
-        6.0 * mix( mix( redyPink, darkerBlue, skyPinkFactor ), mix( deepOrange, lighterBlue, skyPinkFactor ), portionOfDaySky ) + 
-        
-        // a white haze at the horizon that fades out with altitude
-        mix(vec3f(3.5), vec3f(0.0), min(1.0, 2.3 * dir.y));
+    // Sky color palette
+    let deepBlue = vec3f(0.2, 0.52, 1.0);       // Away from sun, daytime
+    let paleBlue = vec3f(0.8, 0.95, 1.0);        // Toward sun, daytime
+    let sunsetRed = vec3f(0.95, 0.3, 0.2);       // Away from sun, sunset
+    let sunsetOrange = vec3f(1.0, 0.5, 0.2);     // Toward sun, sunset
 
-    // Calculate the background color based on the direction of the ray
-    var background = mix( nightColor, dayTimeColor, dayNightSkyRatio );
+    // Blend sky colors by sun elevation and viewing angle relative to sun
+    let skyColor = mix(
+        mix(sunsetRed, deepBlue, sunElevationBlend),
+        mix(sunsetOrange, paleBlue, sunElevationBlend),
+        sunProximity
+    );
 
-    // Draw the sun disk
-    background += vec3f(1e4 * smoothstep(0.9998, 1.0, mu));
+    // Sky brightness: dimmer at sunset, full brightness at noon
+    let skyBrightness = mix(2.0, 6.0, smoothstep(0.0, 0.3, sunDotUp));
 
-    return background;
+    // Horizon haze: atmospheric scattering brightens the horizon.
+    // Fades with altitude and scales with daylight (minimal at night).
+    let horizonHaze = mix(0.3, 3.5, dayFactor) * max(0.0, 1.0 - 2.3 * dir.y);
+
+    var dayTimeColor = skyBrightness * skyColor + vec3f(horizonHaze);
+
+    // Blend between night sky and daytime atmosphere
+    return mix( nightColor, dayTimeColor, dayNightRatio );
 }
 
 /**
