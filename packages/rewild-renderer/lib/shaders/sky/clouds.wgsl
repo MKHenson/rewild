@@ -145,7 +145,26 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
 
     color += background * pow(transmittance, 2.0);
 
-    return vec4f(color, 1.0 - transmittance);
+    // Sun disc: drawn only in this pass so clouds naturally occlude it via transmittance.
+    // Atmospheric extinction fades the disc during dusk/dawn (sunDotUp ±0.1).
+    let sunExtinction = smoothstep(-0.1, 0.1, sunDotUp);
+
+    // Atmospheric optical depth: at the horizon, sunlight traverses ~25-40x more
+    // atmosphere than overhead (airmass). This naturally dims the sun disc at low
+    // elevations — matching the real-world effect where the setting sun appears dim
+    // and red even on a clear day. Without this, the 500.0 intensity overwhelms
+    // cloud transmittance because horizontal rays graze the bottom of the cloud
+    // layer where density is shaped to be near zero.
+    let airmass = 1.0 / max(sunDotUp, 0.04);
+    let atmosphericDimming = exp(-0.15 * airmass);
+
+    let sunDisc = 500.0 * smoothstep(0.9998, 1.0, mu) * sunExtinction * atmosphericDimming;
+    color += vec3f(sunDisc) * pow(transmittance, 2.0);
+
+    // Alpha: cloud coverage OR sun disc presence.
+    // Ensures the sun is visible through the composite even when there are no clouds.
+    let sunAlpha = smoothstep(0.9995, 1.0, mu) * sunExtinction;
+    return vec4f(color, max(1.0 - transmittance, sunAlpha));
 }
 
 fn clouds(position: vec3f) -> CloudDensityResult {
