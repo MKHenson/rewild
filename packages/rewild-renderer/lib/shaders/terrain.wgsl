@@ -1,4 +1,5 @@
 #include "./shader-lib/total-lighting.wgsl"
+#include "./shader-lib/cloud-shadow.wgsl"
 
 struct Uniforms {
   normalMatrix: mat3x3f,
@@ -25,6 +26,9 @@ struct VertexOutput {
 @group(1) @binding(2) var albedoTexture: texture_2d<f32>;
 @group(1) @binding(3) var seamlessSampler: sampler;
 @group(2) @binding(0) var<uniform> lighting : LightingUniforms;
+@group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
+@group(3) @binding(1) var cloudShadowSampler: sampler;
+@group(3) @binding(2) var<uniform> cloudShadowParams: CloudShadowParams;
 
 @vertex
 fn vs(
@@ -71,7 +75,8 @@ fn fs(
   let normalizedNormal = normalize(normal);  
   
   #include "./shader-lib/total-lighting.frag.wgsl"
+  #include "./shader-lib/cloud-shadow.frag.wgsl"
 
-  // Combine the textures
-  return textureSample(myTexture, mySampler, fragUV) * vec4f(blendedColor, 1.0) * vec4f(totalLight, 1.0);
+  // Combine the textures with lighting and cloud shadow
+  return textureSample(myTexture, mySampler, fragUV) * vec4f(blendedColor, 1.0) * vec4f(totalLight * cloudShadowFactor, 1.0);
 }
