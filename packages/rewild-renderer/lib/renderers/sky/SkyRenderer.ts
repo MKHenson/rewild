@@ -16,6 +16,7 @@ import { DenoiseProcess } from '../../post-processes/DenoiseProcess';
 import { DirectionLight } from '../../core/lights/DirectionLight';
 import { PerformanceMonitor } from '../../utils/PerformanceMonitor';
 import { NightSkyCubemapRenderer } from './NightSkyCubemapRenderer';
+import { CloudShadowRenderer } from './CloudShadowRenderer';
 
 export class SkyRenderer {
   perMeshTracker: PerMeshTracker;
@@ -32,12 +33,14 @@ export class SkyRenderer {
   denoisePass: DenoiseProcess;
   finalPass: FinalCompPostProcess;
   nightSkyRenderer: NightSkyCubemapRenderer;
+  cloudShadowRenderer: CloudShadowRenderer;
 
   elevation: f32;
   dayNightCycle: boolean = false;
   azimuth: f32;
   cloudiness: f32;
   foginess: f32;
+  fogShadowIntensity: f32;
   windiness: f32;
   upDot: f32;
   sun: DirectionLight;
@@ -58,6 +61,7 @@ export class SkyRenderer {
     this.elevation = -0;
     this.cloudiness = 0.7;
     this.foginess = 0.3;
+    this.fogShadowIntensity = 0.6;
     this.windiness = 0.5;
     this.upDot = 0.0;
     this.sun = new DirectionLight();
@@ -77,6 +81,11 @@ export class SkyRenderer {
     this.bloomPass = new BloomPostProcess();
     this.finalPass = new FinalCompPostProcess();
     this.nightSkyRenderer = new NightSkyCubemapRenderer();
+    this.cloudShadowRenderer = new CloudShadowRenderer({
+      resolution: 1024,
+      worldSize: 5000,
+      updateFrequency: 2,
+    });
     this.perfMonitor = new PerformanceMonitor();
   }
 
@@ -116,7 +125,12 @@ export class SkyRenderer {
 
     this.cloudsPass.init(renderer, this.uniformBuffer);
     this.nightSkyRenderer.init(renderer);
-    this.atmospherePass.init(renderer, this.uniformBuffer, this.nightSkyRenderer.cubemap);
+    this.cloudShadowRenderer.init(renderer);
+    this.atmospherePass.init(
+      renderer,
+      this.uniformBuffer,
+      this.nightSkyRenderer.cubemap
+    );
 
     this.bloomPass.sourceTexture = this.cloudsPass.renderTarget;
     this.bloomPass.init(renderer);
@@ -130,9 +144,11 @@ export class SkyRenderer {
     this.finalPass.atmosphereTexture = this.atmospherePass.renderTarget;
     this.finalPass.cloudsTexture = this.blurPass.renderTarget;
     this.finalPass.cloudsTexture = this.taaPass.renderTarget;
+    this.finalPass.cloudShadowMap = this.cloudShadowRenderer.shadowMap;
     this.finalPass.init(renderer);
 
     this.perfMonitor.init(device, [
+      'sky-cloud-shadow',
       'sky-clouds',
       'sky-atmosphere',
       'sky-bloom',
@@ -146,6 +162,14 @@ export class SkyRenderer {
     (window as any).stopSkyPerfCapture = () => {
       this.perfMonitor.enabled = false;
       console.log('Sky performance capture stopped');
+    };
+
+    (window as any).toggleCloudShadowDebug = () => {
+      const config = this.cloudShadowRenderer.config;
+      console.log(
+        `Cloud Shadow Map: ${config.resolution}x${config.resolution}, ` +
+          `worldSize=${config.worldSize}m, updateFreq=every ${config.updateFrequency} frames`
+      );
     };
   }
 
@@ -237,6 +261,27 @@ export class SkyRenderer {
 
     const commandEncoder = device.createCommandEncoder();
 
+    // Render cloud shadow map (every N frames)
+    const sunPosition = this.sun.transform.position;
+    const sunDir = Math.sqrt(
+      sunPosition.x * sunPosition.x +
+        sunPosition.y * sunPosition.y +
+        sunPosition.z * sunPosition.z
+    );
+    this.cloudShadowRenderer.render(
+      device,
+      commandEncoder,
+      camera.transform.position.x,
+      camera.transform.position.z,
+      renderer.totalDeltaTime * 0.3,
+      this.cloudiness,
+      this.windiness,
+      sunPosition.x / sunDir,
+      sunPosition.y / sunDir,
+      sunPosition.z / sunDir,
+      this.perfMonitor.getTimestampWrites('sky-cloud-shadow')
+    );
+
     this.cloudsPass.render(
       commandEncoder,
       geometry,
@@ -272,6 +317,7 @@ export class SkyRenderer {
   dispose() {
     this.perfMonitor.dispose();
     this.nightSkyRenderer.dispose();
+    this.cloudShadowRenderer.dispose();
     this.taaPass.dispose();
     this.blurPass.dispose();
     this.bloomPass.dispose();

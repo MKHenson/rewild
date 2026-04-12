@@ -88,6 +88,19 @@ export class Renderer {
   /** Shared worker manager for async BVH builds. Created lazily. */
   bvhWorkerManager: BVHWorkerManager | null = null;
 
+  /** Returns the cloud shadow map texture, or null if not yet initialized. */
+  get cloudShadowMap(): GPUTexture | null {
+    return this.atmosphere?.skyRenderer?.cloudShadowRenderer?.shadowMap ?? null;
+  }
+
+  /** Returns the cloud shadow world size for UV calculation. */
+  get cloudShadowWorldSize(): number {
+    return (
+      this.atmosphere?.skyRenderer?.cloudShadowRenderer?.config?.worldSize ??
+      5000
+    );
+  }
+
   constructor() {
     this.autoFrame = true;
     this.onFrameHandler = this.onFrame.bind(this);

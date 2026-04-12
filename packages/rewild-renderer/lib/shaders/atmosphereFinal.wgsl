@@ -8,6 +8,8 @@ struct FinalUniformStruct {
     cameraPosition: vec3f,
     padding0: f32,
     foginess: f32,
+    shadowWorldSize: f32,
+    shadowIntensity: f32,
 }; 
 
 @group(0) @binding(0) 
@@ -24,6 +26,9 @@ var cloudsSampler: sampler;
 
 @group( 0 ) @binding( 4 )
 var depthTexture: texture_depth_2d;
+
+@group(0) @binding(5)
+var cloudShadowMap: texture_2d<f32>;
 
 var<private> sunDotUp: f32;
 
@@ -73,8 +78,22 @@ var<private> sunDotUp: f32;
 
     sunDotUp = dot(sunDirection, vec3f(0.0, 1.0, 0.0));
 
+    // Sample cloud shadow to darken fog under clouds
+    let shadowUV = vec2f(
+      (worldPos.x - object.cameraPosition.x) / object.shadowWorldSize + 0.5,
+      (worldPos.z - object.cameraPosition.z) / object.shadowWorldSize + 0.5
+    );
+    var fogShadowFactor = 1.0;
+    if (shadowUV.x >= 0.0 && shadowUV.x <= 1.0 && shadowUV.y >= 0.0 && shadowUV.y <= 1.0) {
+      let edgeFade = smoothstep(0.0, 0.05, shadowUV.x) * smoothstep(1.0, 0.95, shadowUV.x)
+                   * smoothstep(0.0, 0.05, shadowUV.y) * smoothstep(1.0, 0.95, shadowUV.y);
+      let shadowDensity = textureSampleLevel(cloudShadowMap, cloudsSampler, shadowUV, 0.0).r;
+      fogShadowFactor = 1.0 - (shadowDensity * object.shadowIntensity * edgeFade);
+      fogShadowFactor = max(fogShadowFactor, 0.3);
+    }
+
     let fogColor = getFogColor( dir, object.cameraPosition, sunDirection, blendedColor.rgb );
-    return vec4f( 1.0 - exp( -fogColor / 8.6 ), max(blendedColor.a, fogFactor) );
+    return vec4f( 1.0 - exp( -fogColor * mix(1.0, fogShadowFactor, fogFactor) / 8.6 ), max(blendedColor.a, fogFactor) );
   }
 
   return vec4f( adjustContrast(1.1, blendedColor.rgb), blendedColor.a );

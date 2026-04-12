@@ -2,11 +2,6 @@
 const NUM_CLOUD_SAMPLES = 80;
 const NUM_LIGHT_SAMPLES = 20;
 
-struct CloudResult {
-    density: f32,
-    cloudHeight: f32
-};
-
 @group( 0 ) @binding( 0 ) 
 var<uniform> object : ObjectStruct;
 
@@ -153,67 +148,8 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     return vec4f(color, 1.0 - transmittance);
 }
 
-fn clouds(position: vec3f) -> CloudResult {
-    // Speed at which clouds move, based on time
-    let windDirection = vec3f(1.0, 0.0, -1.0) * object.windiness;
-    let cloudinessSpeedFactor = smoothstep(0.9, 1.0, object.cloudiness);
-    let cloudMovementSpeed = object.iTime * 0.01 * mix(1.0, 3.0, cloudinessSpeedFactor);
-    var p = position;
-
-    var result: CloudResult;
-    // Calculate the height above the Earth's surface
-    let atmoHeight: f32 = length(p - vec3f(0.0, -EARTH_RADIUS, 0.0)) - EARTH_RADIUS;
-    
-    // Normalize the cloud height to a range of 0 to 1
-    let cloudHeight = clamp((atmoHeight - CLOUD_START) / CLOUD_HEIGHT, 0.0, 1.0);
-    result.cloudHeight = cloudHeight;
-
-    // Move the clouds in the z direction
-    p += windDirection * cloudMovementSpeed * 10.3;
-    
-    // Sample the large-scale weather pattern
-    var largeWeather: f32 = clamp((textureSampleLevel(pebblesTexture, noiseSampler, -mix(0.00005, 0.000015, object.cloudiness) * p.zx, 0.0).x - 0.18) * 5.0 *  object.cloudiness, 0.0, 6.0);
-
-    // Move the clouds in the x direction
-    p += windDirection * cloudMovementSpeed * 8.3;
-    
-    // Sample the smaller-scale weather pattern and combine with large-scale pattern
-    var weather: f32 = largeWeather * max( clamp( pow(object.cloudiness, 12.1), 0.0, 1.0 ), textureSampleLevel(pebblesTexture, noiseSampler, 0.0001 * p.zx, 0.0).x - 0.28) / 0.52;
-    
-    // Apply smoothstep to the cloud height to create a smooth transition
-    weather *= smoothstep(0.0, 0.5, cloudHeight) * smoothstep(1.0, 0.5, cloudHeight);
-    
-    // Shape the clouds using a power function
-    let cloudShape: f32 = pow(weather, 0.3 + 1.5 * smoothstep(0.2, 0.5, cloudHeight));
-    
-    // If the cloud shape is zero, return early
-    if (cloudShape <= 0.0) {
-        result.density = 0.0;
-        return result;
-    }
-
-    // Move the clouds further in the x direction
-    p += windDirection * cloudMovementSpeed * 12.3;
-
-    // Calculate the cloud density using fractal Brownian motion (fbm)
-    var den = max(0.0, cloudShape - 0.7 * fbm(p * 0.01));
-
-    // If the cloud density is zero, return early
-    if (den <= 0.0) {
-        result.density = 0.0;
-        return result;
-    }
-    
-    // Move the clouds in the y direction
-    p += windDirection * cloudMovementSpeed * 15.2;
-
-    // Calculate the final cloud density using fbm
-    den = max(0.0, den - 0.2 * fbm(p * 0.05));
-    
-    // Calculate the final density value based on the cloud density and weather pattern
-    result.density = largeWeather * 0.2 * min(1.0, 5.0 * den);
-
-    return result; 
+fn clouds(position: vec3f) -> CloudDensityResult {
+    return cloudDensity(position, object.windiness, object.cloudiness, object.iTime);
 }
 
 /**

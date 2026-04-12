@@ -17,6 +17,8 @@ const finalUniformBufferSize =
   16 + // cameraPosition
   4 + // padding
   4 + // foginess
+  4 + // shadowWorldSize
+  4 + // shadowIntensity
   0;
 
 const alignedUniformBufferSize = Math.ceil(finalUniformBufferSize / 256) * 256;
@@ -33,6 +35,7 @@ export class FinalCompPostProcess implements IPostProcess {
   scaleFactor: number;
   atmosphereTexture: GPUTexture | null;
   cloudsTexture: GPUTexture | null;
+  cloudShadowMap: GPUTexture | null;
 
   cloudiness: number;
   elevation: number;
@@ -42,6 +45,7 @@ export class FinalCompPostProcess implements IPostProcess {
     this.scaleFactor = 1;
     this.atmosphereTexture = null;
     this.cloudsTexture = null;
+    this.cloudShadowMap = null;
   }
 
   init(renderer: Renderer): IPostProcess {
@@ -112,6 +116,10 @@ export class FinalCompPostProcess implements IPostProcess {
           binding: 4,
           resource: renderer.depthTexture.createView(),
         },
+        {
+          binding: 5,
+          resource: this.cloudShadowMap!.createView(),
+        },
       ],
     });
 
@@ -156,6 +164,8 @@ export class FinalCompPostProcess implements IPostProcess {
         camera.transform.position.z,
         0, //
         renderer.atmosphere.skyRenderer.foginess,
+        renderer.atmosphere.skyRenderer.cloudShadowRenderer.config.worldSize,
+        renderer.atmosphere.skyRenderer.fogShadowIntensity,
       ],
       32
     );
