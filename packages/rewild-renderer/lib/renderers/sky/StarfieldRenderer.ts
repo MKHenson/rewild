@@ -1,9 +1,9 @@
 import { Renderer } from '../../Renderer';
-import nightSkyShader from '../../shaders/atmosphere/nightSky.wgsl';
+import nightSkyShader from '../../shaders/sky/starfield.wgsl';
 
 const CUBEMAP_SIZE = 1024;
 
-export class NightSkyCubemapRenderer {
+export class StarfieldRenderer {
   cubemap: GPUTexture;
   private initialized = false;
 

@@ -1,18 +1,22 @@
 import { Renderer } from '../../Renderer';
-import commonShaderFns from '../../shaders/atmosphere/common.wgsl';
-import constantsFns from '../../shaders/atmosphere/constants.wgsl';
-import fogFns from '../../shaders/atmosphere/fog.wgsl';
-import shader from '../../shaders/atmosphere/atmosphere.wgsl';
+import commonShaderFns from '../../shaders/sky/skyCommon.wgsl';
+import constantsFns from '../../shaders/sky/skyConstants.wgsl';
+import fogFns from '../../shaders/sky/fog.wgsl';
+import shader from '../../shaders/sky/skyGradient.wgsl';
 import { Geometry } from '../../geometry/Geometry';
 
-export class AtmosphereRenderer {
+export class SkyGradientRenderer {
   renderTarget: GPUTexture;
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
 
   constructor() {}
 
-  init(renderer: Renderer, uniformBuffer: GPUBuffer, nightSkyCubemap: GPUTexture) {
+  init(
+    renderer: Renderer,
+    uniformBuffer: GPUBuffer,
+    nightSkyCubemap: GPUTexture
+  ) {
     const { device, canvas } = renderer;
 
     const module = device.createShaderModule({

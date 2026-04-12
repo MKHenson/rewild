@@ -1,12 +1,12 @@
 import { Renderer } from '../../Renderer';
-import commonShaderFns from '../../shaders/atmosphere/common.wgsl';
-import constantsFns from '../../shaders/atmosphere/constants.wgsl';
-import fogFns from '../../shaders/atmosphere/fog.wgsl';
-import cloudDensityFns from '../../shaders/atmosphere/cloudDensity.wgsl';
-import shader from '../../shaders/atmosphere/clouds.wgsl';
+import commonShaderFns from '../../shaders/sky/skyCommon.wgsl';
+import constantsFns from '../../shaders/sky/skyConstants.wgsl';
+import fogFns from '../../shaders/sky/fog.wgsl';
+import cloudDensityFns from '../../shaders/sky/cloudDensity.wgsl';
+import shader from '../../shaders/sky/clouds.wgsl';
 import { Geometry } from '../../geometry/Geometry';
 
-export class CloudsRenderer {
+export class CloudRenderer {
   renderTarget: GPUTexture;
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;

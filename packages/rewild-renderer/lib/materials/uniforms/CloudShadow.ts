@@ -74,8 +74,7 @@ export class CloudShadow implements ISharedUniformBuffer {
 
     if (!this.buffer || !this.bindGroup) return;
 
-    const shadowRenderer =
-      renderer.atmosphere?.skyRenderer?.cloudShadowRenderer;
+    const shadowRenderer = renderer.sky?.skyRenderer?.cloudShadowRenderer;
     if (!shadowRenderer) return;
 
     // Inverse view matrix (camera world matrix) for view→world conversion
