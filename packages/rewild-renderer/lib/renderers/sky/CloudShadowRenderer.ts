@@ -13,7 +13,7 @@ export interface CloudShadowConfig {
 const DEFAULT_CONFIG: CloudShadowConfig = {
   resolution: 1024,
   worldSize: 5000,
-  updateFrequency: 2,
+  updateFrequency: 6,
 };
 
 export class CloudShadowRenderer {
