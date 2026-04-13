@@ -1,10 +1,7 @@
-import { Geometry } from '../../geometry/Geometry';
 import { Renderer } from '../..';
-import { PerMeshTracker } from '../../materials/PerMeshTracker';
-import { SharedUniformsTracker } from '../../materials/SharedUniformsTracker';
 import { Transform } from '../../core/Transform';
 import { Camera } from '../../core/Camera';
-import { Color, degToRad } from 'rewild-common';
+import { Color, degToRad, Matrix4 } from 'rewild-common';
 import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
 import { CloudRenderer } from './CloudRenderer';
 import { SkyTAAPass } from './SkyTAAPass';
@@ -19,12 +16,9 @@ import { StarfieldRenderer } from './StarfieldRenderer';
 import { CloudShadowRenderer } from './CloudShadowRenderer';
 
 export class SkyRenderer {
-  perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
-  sharedUniformsTracker: SharedUniformsTracker;
+  private invViewProjectionMatrix = new Matrix4();
 
-  cloudsBindGroup: GPUBindGroup;
-  atmosphereBindGroup: GPUBindGroup;
   cloudsPass: CloudRenderer;
   atmospherePass: SkyGradientRenderer;
   taaPass: SkyTAAPass;
@@ -96,9 +90,7 @@ export class SkyRenderer {
 
     if (!this.uniformBuffer) {
       const uniformBufferSize =
-        16 * 4 + // modelMatrix
-        16 * 4 + // projectionMatrix
-        16 * 4 + // modelViewMatrix
+        16 * 4 + // invViewProjectionMatrix
         3 * 4 + // cameraPosition
         4 + // resolutionScale
         4 * 4 + // sunPosition
@@ -175,13 +167,7 @@ export class SkyRenderer {
 
   addingCloudiness: boolean = false;
 
-  update(
-    renderer: Renderer,
-    camera: Camera,
-    width: number,
-    height: number,
-    transform: Transform
-  ) {
+  update(renderer: Renderer, camera: Camera, width: number, height: number) {
     if (this.dayNightCycle) this.elevation += renderer.delta * 0.002;
 
     const phi = degToRad(90 - this.elevation);
@@ -217,9 +203,12 @@ export class SkyRenderer {
       this.sun.color.copy(this._dayColor);
     }
 
-    uniformData.set(transform.matrixWorld.elements, 0); // modelMatrix
-    uniformData.set(camera.projectionMatrix.elements, 16); // projectionMatrix
-    uniformData.set(transform.modelViewMatrix.elements, 32); // modelViewMatrix
+    // Compute inverse view-projection matrix for ray reconstruction
+    this.invViewProjectionMatrix
+      .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+      .invert();
+
+    uniformData.set(this.invViewProjectionMatrix.elements, 0); // invViewProjectionMatrix
     uniformData.set(
       [
         camera.transform.position.x,
@@ -227,10 +216,10 @@ export class SkyRenderer {
         camera.transform.position.z,
         this.cloudsPass.resolutionScale,
       ],
-      48
-    ); // cameraPosition
-    uniformData.set([sunPosition.x, sunPosition.y, sunPosition.z], 52); // sunPosition
-    uniformData.set([0, 1, 0], 56); // up
+      16
+    ); // cameraPosition + resolutionScale
+    uniformData.set([sunPosition.x, sunPosition.y, sunPosition.z], 20); // sunPosition
+    uniformData.set([0, 1, 0], 24); // up
     uniformData.set(
       [
         renderer.totalDeltaTime * 0.3,
@@ -241,19 +230,13 @@ export class SkyRenderer {
         this.windiness,
         camera.transform.position.y,
       ],
-      60
+      28
     );
 
     return uniformData;
   }
 
-  render(
-    renderer: Renderer,
-    pass: GPURenderPassEncoder,
-    camera: Camera,
-    transform: Transform,
-    geometry: Geometry
-  ): void {
+  render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera): void {
     if (this.canvasSizeWatcher.hasResized()) this.init(renderer);
 
     const { canvas, device } = renderer;
@@ -262,8 +245,7 @@ export class SkyRenderer {
       renderer,
       camera,
       canvas.width,
-      canvas.height,
-      transform
+      canvas.height
     );
 
     // upload the uniform values to the uniform buffer
@@ -294,12 +276,10 @@ export class SkyRenderer {
 
     this.cloudsPass.render(
       commandEncoder,
-      geometry,
       this.perfMonitor.getTimestampWrites('sky-clouds')
     );
     this.atmospherePass.render(
       commandEncoder,
-      geometry,
       this.perfMonitor.getTimestampWrites('sky-atmosphere')
     );
 
