@@ -43,10 +43,12 @@ struct VertexShaderOutput {
   vsOutput.position = vec4f(xy, 0.0, 1.0);
 
   // Map clip-space [-1,1] to world XZ centered on shadow.center
+  // Negate Y: clip Y=+1 is texture row 0 (UV.y=0), so we need to flip
+  // so that UV.y=0 maps to worldZ = centerZ - halfSize (south)
   let halfSize = shadow.worldSize * 0.5;
   vsOutput.worldXZ = vec2f(
     shadow.centerX + xy.x * halfSize,
-    shadow.centerZ + xy.y * halfSize
+    shadow.centerZ - xy.y * halfSize
   );
 
   return vsOutput;
