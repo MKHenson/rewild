@@ -57,6 +57,21 @@ var<private> sunDotUp: f32;
   let worldPos = worldFromScreenCoord( uv, rawDepth );
 
   if ( rawDepth < 1.0 ) {
+    // When camera is above/inside the cloud layer, terrain below the cloud top
+    // should be occluded by clouds. The blended sky+cloud texture already
+    // contains the correct view through the cloud volume. Without this check,
+    // the terrain fog branch double-processes the cloud data and produces dark
+    // output because getFogColor + tone mapping are designed for ground-level viewing.
+    let cameraAltitude = object.cameraPosition.y;
+    let aboveCloudBlend = smoothstep(CLOUD_START, CLOUD_START + 100.0, cameraAltitude);
+    let terrainBelowClouds = smoothstep(CLOUD_START + CLOUD_HEIGHT + 100.0, CLOUD_START, worldPos.y);
+    let cloudOcclusion = aboveCloudBlend * terrainBelowClouds * blendedColor.a;
+
+    if (cloudOcclusion > 0.99) {
+      // Terrain fully occluded by clouds — use sky+cloud view directly
+      return vec4f(adjustContrast(1.1, blendedColor.rgb), 1.0);
+    }
+
     let startHeigh = -10.0;
     let endHeight = mix(2.0, 10.0, object.foginess);
     let startDistance = mix( 200.0, 0.0, object.foginess );
@@ -93,7 +108,15 @@ var<private> sunDotUp: f32;
     }
 
     let fogColor = getFogColor( dir, object.cameraPosition, sunDirection, blendedColor.rgb );
-    return vec4f( 1.0 - exp( -fogColor * mix(1.0, fogShadowFactor, fogFactor) / 8.6 ), max(blendedColor.a, fogFactor) );
+    let fogResult = vec4f( 1.0 - exp( -fogColor * mix(1.0, fogShadowFactor, fogFactor) / 8.6 ), max(blendedColor.a, fogFactor) );
+
+    // Partial cloud occlusion: blend terrain fog with cloud-occluded sky view
+    if (cloudOcclusion > 0.0) {
+      let skyResult = vec4f(adjustContrast(1.1, blendedColor.rgb), 1.0);
+      return mix(fogResult, skyResult, cloudOcclusion);
+    }
+
+    return fogResult;
   }
 
   return vec4f( adjustContrast(1.1, blendedColor.rgb), blendedColor.a );

@@ -53,6 +53,40 @@ fn intersectSphere(origin: vec3f, dir: vec3f, spherePos: vec3f, sphereRad: f32) 
     return t0;
 }
 
+/**
+ * Result of a sphere intersection that returns both hit distances.
+ * tNear is the smaller root, tFar the larger. Both may be negative
+ * (sphere behind the ray). hit is false when the ray misses entirely.
+ */
+struct SphereHit {
+  tNear: f32,
+  tFar: f32,
+  hit: bool,
+};
+
+/**
+ * Returns both intersection distances of a ray with a sphere.
+ * Unlike intersectSphere(), this does not discard negative roots — the caller
+ * can decide which root(s) to use based on camera altitude relative to the sphere.
+ */
+fn intersectSphereBoth(origin: vec3f, dir: vec3f, spherePos: vec3f, sphereRad: f32) -> SphereHit {
+    let oc = origin - spherePos;
+    // Half-b optimisation (a = 1 for normalised dir)
+    let halfB = dot(dir, oc);
+    let c = dot(oc, oc) - sphereRad * sphereRad;
+    let quarterDisc = halfB * halfB - c;
+
+    if (quarterDisc < 0.0) {
+        return SphereHit(-1.0, -1.0, false);
+    }
+
+    let sqrtDisc = sqrt(quarterDisc);
+    let tNear = -halfB - sqrtDisc;
+    let tFar  = -halfB + sqrtDisc;
+
+    return SphereHit(tNear, tFar, true);
+}
+
 
 fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3f ) -> vec3f {
     // Sun visibility: fades sun-driven scattering during dusk/dawn (sunDotUp ±0.1).
