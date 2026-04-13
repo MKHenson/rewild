@@ -3,7 +3,6 @@ import commonShaderFns from '../../shaders/sky/skyCommon.wgsl';
 import constantsFns from '../../shaders/sky/skyConstants.wgsl';
 import fogFns from '../../shaders/sky/fog.wgsl';
 import shader from '../../shaders/sky/skyGradient.wgsl';
-import { Geometry } from '../../geometry/Geometry';
 
 export class SkyGradientRenderer {
   renderTarget: GPUTexture;
@@ -37,30 +36,6 @@ export class SkyGradientRenderer {
       vertex: {
         module: module,
         entryPoint: 'vs',
-        buffers: [
-          {
-            arrayStride: 4 * 3,
-            attributes: [
-              {
-                // position
-                shaderLocation: 0,
-                offset: 0,
-                format: 'float32x3',
-              },
-            ],
-          },
-          {
-            arrayStride: 4 * 2,
-            attributes: [
-              {
-                // uv
-                shaderLocation: 1,
-                offset: 0,
-                format: 'float32x2',
-              },
-            ],
-          },
-        ],
       },
       fragment: {
         module: module,
@@ -70,11 +45,6 @@ export class SkyGradientRenderer {
           },
         ],
         entryPoint: 'fs',
-      },
-      primitive: {
-        topology: 'triangle-list',
-        cullMode: 'back',
-        frontFace: 'cw',
       },
     });
 
@@ -114,7 +84,6 @@ export class SkyGradientRenderer {
 
   render(
     encoder: GPUCommandEncoder,
-    geometry: Geometry,
     timestampWrites?: GPURenderPassTimestampWrites
   ) {
     const cloudPass = encoder.beginRenderPass({
@@ -130,11 +99,8 @@ export class SkyGradientRenderer {
     });
 
     cloudPass.setPipeline(this.pipeline);
-    cloudPass.setVertexBuffer(0, geometry!.vertexBuffer);
-    cloudPass.setVertexBuffer(1, geometry!.uvBuffer);
-    cloudPass.setIndexBuffer(geometry!.indexBuffer, 'uint32');
     cloudPass.setBindGroup(0, this.bindGroup);
-    cloudPass.drawIndexed(geometry!.indices!.length);
+    cloudPass.draw(6);
     cloudPass.end();
   }
 
