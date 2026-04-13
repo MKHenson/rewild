@@ -239,6 +239,7 @@ export class SkyRenderer {
         cloudiness,
         this.foginess,
         this.windiness,
+        camera.transform.position.y,
       ],
       60
     );

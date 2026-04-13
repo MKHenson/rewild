@@ -35,19 +35,35 @@ fn fs(
 
     let direction: vec3f = normalize( vWorldPosition - object.cameraPosition );
 
+    // Calculate camera altitude relative to cloud layer for hemisphere masking
+    let earthCenter = vec3f(0.0, -EARTH_RADIUS, 0.0);
+    let camHeight = length(object.cameraPosition - earthCenter);
+    const ATM_START_FS = EARTH_RADIUS + CLOUD_START;
+
     // in scattering
     var cosTheta = dot( direction, vec3f(0.0, 1.0, 0.0) );
-	let hemisphereMask: f32 = smoothstep( 0, 0.1, cosTheta );
 
     // Define uv based on fragCoord
     let uv = fragCoord.xy / vec2(object.resolutionX * object.resolutionScale, object.resolutionY * object.resolutionScale);
 
-    // Do not draw pixel if blocked by something in the z-buffer
+    if (camHeight >= ATM_START_FS) {
+        // Inside or above clouds — skip depth early-out so clouds render over
+        // distant terrain. skyRay() handles early-out when the ray misses the
+        // cloud shell entirely.
+        let atmosphereWithSunAndClouds = drawCloudsAndSky( direction, object.cameraPosition, vSunDirection );
+        output.color = atmosphereWithSunAndClouds;
+        return output;
+    }
+
+    // Below clouds: do not draw pixel if blocked by something in the z-buffer
     let rawDepth = textureSampleCompare( depthTexture, depthSampler, uv, 1 );
     if (rawDepth < 1.0) {
          output.color = vec4f( 0.0, 0.0, 0.0, 0.0 );
         return output;
     }
+
+    // Below clouds — original hemisphere mask: only render upward
+	let hemisphereMask: f32 = smoothstep( 0, 0.1, cosTheta );
 
 	// The area below the horizon
     if ( hemisphereMask <= 0.0 ) {
@@ -67,31 +83,97 @@ fn drawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
 	var color = vec4f(.0);   
     color = skyRay(org, dir, vSunDirection); 
 
-    let fogDensity = mix(0.00001, 0.00009, object.foginess);
-    let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + CLOUD_START);
-    let cloudAlphaAffectedByFogDistance = min( exp(-fogDensity * fogDistance ), color.a );
+    let earthCenter = vec3f(0.0, -EARTH_RADIUS, 0.0);
+    let camHeight = length(org - earthCenter);
+    const ATM_START_DCS = EARTH_RADIUS + CLOUD_START;
+
+    var cloudAlpha = color.a;
+    if (camHeight < ATM_START_DCS) {
+        // Only apply distance-based fog alpha attenuation when below clouds
+        let fogDensity = mix(0.00001, 0.00009, object.foginess);
+        let fogDistance = intersectSphere(org, dir, earthCenter, ATM_START_DCS);
+        cloudAlpha = min( exp(-fogDensity * fogDistance ), color.a );
+    }
     
-    return vec4f( getFogColor( dir, org, vSunDirection, color.rgb ), cloudAlphaAffectedByFogDistance);
+    return vec4f( getFogColor( dir, org, vSunDirection, color.rgb ), cloudAlpha);
 }
 
 fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
-    // Constants for the start and end of the atmosphere
+    // Constants for the cloud shell boundaries
     const ATM_START: f32 = EARTH_RADIUS + CLOUD_START;
     const ATM_END: f32 = ATM_START + CLOUD_HEIGHT;
+    const CLOUD_FOG_DENSITY: f32 = 0.003;
+    const TRANSITION_ZONE: f32 = 50.0;
 
-    // Number of samples for ray marching
-    var nbSample = NUM_CLOUD_SAMPLES;
+    let earthCenter = vec3f(0.0, -EARTH_RADIUS, 0.0);
+    let camHeight = length(cameraPos - earthCenter);
+
+    // Intersect with both sphere shells (inner = cloud base, outer = cloud top)
+    let hitInner = intersectSphereBoth(cameraPos, dir, earthCenter, ATM_START);
+    let hitOuter = intersectSphereBoth(cameraPos, dir, earthCenter, ATM_END);
+
+    var tStart: f32;
+    var tEnd: f32;
+    var isInsideClouds = false;
+
+    if (camHeight < ATM_START) {
+        // Case 1: Below clouds
+        // Camera is inside both spheres → tFar is the exit for each
+        if (!hitInner.hit) { return vec4f(0.0); }
+        tStart = hitInner.tFar;   // Exit of inner sphere = entry into cloud layer
+        tEnd = hitOuter.tFar;     // Exit of outer sphere = exit from cloud layer
+    } else if (camHeight <= ATM_END) {
+        // Case 2: Inside cloud layer
+        // Camera is outside inner sphere, inside outer sphere
+        isInsideClouds = true;
+        tStart = 0.0;
+        if (hitInner.hit && hitInner.tNear > 0.0) {
+            // Ray hits inner sphere — cloud volume ends at inner sphere entry
+            tEnd = hitInner.tNear;
+        } else {
+            // Ray misses inner sphere — cloud volume ends at outer sphere exit
+            tEnd = hitOuter.tFar;
+        }
+        tEnd = min(tEnd, 2000.0); // Cap ray length for performance
+    } else {
+        // Case 3: Above clouds
+        // Camera is outside both spheres (above)
+        if (!hitOuter.hit || hitOuter.tNear < 0.0) { return vec4f(0.0); }
+        tStart = hitOuter.tNear;  // Entry into outer sphere = entry into cloud layer
+        if (hitInner.hit && hitInner.tNear > 0.0) {
+            // Ray hits inner sphere = exit from cloud layer
+            tEnd = hitInner.tNear;
+        } else {
+            // Ray skims through outer sphere without hitting inner
+            tEnd = hitOuter.tFar;
+        }
+    }
+
+    if (tStart >= tEnd || tEnd <= 0.0) { return vec4f(0.0); }
+
+    // Check if ray hits the Earth — don't render clouds behind the planet
+    let hitEarth = intersectSphereBoth(cameraPos, dir, earthCenter, EARTH_RADIUS);
+    if (hitEarth.hit && hitEarth.tNear > 0.0) {
+        tEnd = min(tEnd, hitEarth.tNear);
+        if (tStart >= tEnd) { return vec4f(0.0); }
+    }
+
+    // Adaptive sample count based on ray length and altitude case
+    let rayLength = tEnd - tStart;
+    var nbSample = i32(f32(NUM_CLOUD_SAMPLES) * min(1.0, rayLength / 2000.0));
+    if (isInsideClouds) {
+        nbSample = i32(f32(nbSample) * 0.3); // 70% fewer samples inside clouds
+    }
+    nbSample = max(nbSample, 8); // Floor at 8 samples minimum
 
     // Initialize the color to black
     var color = vec3f(0.0);
 
-    // Calculate the intersection of the ray with the start and end of the atmosphere
-    var distToAtmStart = intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_START);
-    let distToAtmEnd = intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), ATM_END);
+    // Step size for ray marching
+    let stepS = rayLength / f32(nbSample);
 
-    // Calculate the starting position of the ray inside the atmosphere
-    var rayStartPosition = cameraPos + distToAtmStart * dir;
-    let stepS = (distToAtmEnd - distToAtmStart) / f32(nbSample);
+    // Calculate the starting position of the ray
+    var rayStartPosition = cameraPos + tStart * dir;
 
     // Initialize the transmittance to 1 (no light absorbed)
     var transmittance = 1.0;
@@ -103,42 +185,49 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
 
     let sunDotUp3 = pow(sunDotUp, 3.0);
 
-    // If the ray is pointing upwards
-    if (dir.y > 0.015) {
-        for (var i = 0; i < nbSample; i++) {
-            var cloudHeight: f32;
-            let result = clouds(rayStartPosition);
-            let density = result.density;
-            cloudHeight = result.cloudHeight;
+    // Ray march through the cloud volume
+    for (var i = 0; i < nbSample; i++) {
+        var cloudHeight: f32;
+        let result = clouds(rayStartPosition);
+        let density = result.density;
+        cloudHeight = result.cloudHeight;
 
-            // If there is cloud density at this sample point
-            if (density > 0.0) {
-                // Calculate the light intensity scattered by the clouds
-                let intensity = lightRay(rayStartPosition, phaseFunction, density, mu, sun_direction, cloudHeight);
+        // If there is cloud density at this sample point
+        if (density > 0.0) {
+            // Calculate the light intensity scattered by the clouds
+            let intensity = lightRay(rayStartPosition, phaseFunction, density, mu, sun_direction, cloudHeight);
 
-                // Calculate the ambient light 
-                // Calulate the ambient color based on the time of day and the sun direction
-                
-                var cloudAmbientColor = mix(CLOUD_AMBIENT_NIGHT_COLOR, CLOUD_AMBIENT_EVENING_COLOR, smoothstep(-0.2, 0.2, sunDotUp));
-                cloudAmbientColor = mix(cloudAmbientColor, CLOUD_AMBIENT_DAY_COLOR, smoothstep(0.2, 0.8, sunDotUp));
+            // Calculate the ambient light color based on time of day
+            var cloudAmbientColor = mix(CLOUD_AMBIENT_NIGHT_COLOR, CLOUD_AMBIENT_EVENING_COLOR, smoothstep(-0.2, 0.2, sunDotUp));
+            cloudAmbientColor = mix(cloudAmbientColor, CLOUD_AMBIENT_DAY_COLOR, smoothstep(0.2, 0.8, sunDotUp));
 
-                let ambient = (0.5 + 0.6 * cloudHeight) * cloudAmbientColor * 6.5 + vec3f(0.8) * max(0.0, 1.0 - 2.0 * cloudHeight);
+            let ambient = (0.5 + 0.6 * cloudHeight) * cloudAmbientColor * 6.5 + vec3f(0.8) * max(0.0, 1.0 - 2.0 * cloudHeight);
 
-                // Calculate the radiance (light emitted by the clouds)
-                var radiance = ambient + ( SUN_POWER * intensity * mix( vec3f(0.8, 0.5, 0.3), vec3f(1.0), clamp(sunDotUp3, 0.0, 1.0) ) );
-                radiance *= density;
-                color += transmittance * (radiance - radiance * exp(-density * stepS)) / density; // By Seb Hillaire
-                transmittance *= exp(-density * stepS);
+            // Calculate the radiance (light emitted by the clouds)
+            var radiance = ambient + ( SUN_POWER * intensity * mix( vec3f(0.8, 0.5, 0.3), vec3f(1.0), clamp(sunDotUp3, 0.0, 1.0) ) );
+            radiance *= density;
+            color += transmittance * (radiance - radiance * exp(-density * stepS)) / density; // By Seb Hillaire
+            transmittance *= exp(-density * stepS);
 
-                // If the transmittance is very low, stop the loop
-                if (transmittance <= 0.05) {
-                    break;
-                }
+            // If the transmittance is very low, stop the loop
+            if (transmittance <= 0.05) {
+                break;
             }
-
-            // Move to the next sample point
-            rayStartPosition += dir * stepS;
         }
+
+        // Move to the next sample point
+        rayStartPosition += dir * stepS;
+    }
+
+    // Cloud interior fog effect — provides immersive in-cloud experience
+    // Uses smooth transition zone to avoid visual popping at altitude boundaries
+    let insideBlend = smoothstep(ATM_START - TRANSITION_ZONE, ATM_START + TRANSITION_ZONE, camHeight)
+                    * (1.0 - smoothstep(ATM_END - TRANSITION_ZONE, ATM_END + TRANSITION_ZONE, camHeight));
+    if (insideBlend > 0.0) {
+        let fogAmount = 1.0 - exp(-CLOUD_FOG_DENSITY * rayLength);
+        var cloudFogColor = mix(CLOUD_AMBIENT_NIGHT_COLOR, CLOUD_AMBIENT_EVENING_COLOR, smoothstep(-0.2, 0.2, sunDotUp));
+        cloudFogColor = mix(cloudFogColor, CLOUD_AMBIENT_DAY_COLOR, smoothstep(0.2, 0.8, sunDotUp));
+        color = mix(color, cloudFogColor * 0.5, fogAmount * insideBlend);
     }
 
     let background = getAtmosphereColor(sun_direction, dir, mu, vec3f(0.0));
@@ -164,7 +253,15 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     // Alpha: cloud coverage OR sun disc presence.
     // Ensures the sun is visible through the composite even when there are no clouds.
     let sunAlpha = smoothstep(0.9995, 1.0, mu) * sunExtinction;
-    return vec4f(color, max(1.0 - transmittance, sunAlpha));
+    var alpha = max(1.0 - transmittance, sunAlpha);
+
+    // Inside clouds: boost alpha with fog contribution for smooth transition
+    if (insideBlend > 0.0) {
+        let fogAlpha = 1.0 - exp(-CLOUD_FOG_DENSITY * rayLength);
+        alpha = max(alpha, fogAlpha * insideBlend);
+    }
+
+    return vec4f(color, alpha);
 }
 
 fn clouds(position: vec3f) -> CloudDensityResult {
