@@ -61,12 +61,6 @@ export class SkyGradientRenderer {
           resource: renderer.samplerManager.get('linear'),
         },
         {
-          binding: 2,
-          resource: renderer.textureManager
-            .get('rgba-noise-256')
-            .gpuTexture.createView(),
-        },
-        {
           binding: 3,
           resource: renderer.depthTexture.createView(),
         },

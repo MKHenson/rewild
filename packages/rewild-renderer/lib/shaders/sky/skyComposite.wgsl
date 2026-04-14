@@ -107,8 +107,28 @@ var<private> sunDotUp: f32;
       fogShadowFactor = max(fogShadowFactor, 0.3);
     }
 
-    let fogColor = getFogColor( dir, object.cameraPosition, sunDirection, blendedColor.rgb );
-    let fogResult = vec4f( 1.0 - exp( -fogColor * mix(1.0, fogShadowFactor, fogFactor) / 8.6 ), max(blendedColor.a, fogFactor) );
+    // getFogColor uses intersectSphere against the cloud-base sphere. When the
+    // camera is at or above that sphere, the forward intersection distance is
+    // near-zero (the camera just crossed the sphere surface). Because fog density
+    // is calibrated for tens-of-km scale, exp(-density * ~0) ≈ 1 and originalColor
+    // (which is 0 — sky is transparent over terrain pixels above the cloud layer)
+    // dominates the mix, producing solid-black terrain.
+    // Fix: above CLOUD_START, build the fog colour directly from time-of-day
+    // constants — the same values getFogColor would return at infinite fogDistance.
+    var rawFogColor: vec3f;
+    let cameraAlt = object.cameraPosition.y;
+    if (cameraAlt >= CLOUD_START) {
+        var fc = mix(FOG_COLOR_NIGHT, FOG_COLOR_EVENING, smoothstep(-0.1, 0.0, sunDotUp));
+        fc = mix(fc, FOG_COLOR_DAY, smoothstep(0.0, 0.3, sunDotUp));
+        let stormFactor = saturate((object.cloudiness - 0.8) / 0.2);
+        fc = mix(fc, FOG_COLOR_STORM, stormFactor);
+        let cloudOcc = mix(1.0, 0.05, pow(object.cloudiness, 2.0));
+        let brightness = mix(0.01, 1.0, smoothstep(-0.1, 0.1, sunDotUp) * cloudOcc);
+        rawFogColor = fc * brightness * 10.0;
+    } else {
+        rawFogColor = getFogColor( dir, object.cameraPosition, sunDirection, blendedColor.rgb );
+    }
+    let fogResult = vec4f( 1.0 - exp( -rawFogColor * mix(1.0, fogShadowFactor, fogFactor) / 8.6 ), max(blendedColor.a, fogFactor) );
 
     // Partial cloud occlusion: blend terrain fog with cloud-occluded sky view
     if (cloudOcclusion > 0.0) {
