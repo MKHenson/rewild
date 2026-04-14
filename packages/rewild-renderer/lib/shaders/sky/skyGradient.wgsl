@@ -1,15 +1,10 @@
-struct CloudResult {
-  sky: f32,
-  cloudHeight: f32
-};
-
-@group( 0 ) @binding( 0 ) 
+@group( 0 ) @binding( 0 )
 var<uniform> object: ObjectStruct;
 
 @group( 0 ) @binding( 1 )
 var noiseSampler: sampler;
 
-@group( 0 ) @binding( 2 ) 
+@group( 0 ) @binding( 2 )
 var noiseTexture: texture_2d<f32>;
 
 @group( 0 ) @binding( 3 )
@@ -63,20 +58,27 @@ fn fs(
      // Define uv based on fragCoord
     let uv = fragCoord.xy / vec2(object.resolutionX, object.resolutionY);
 
+    // Depth test must be in uniform control flow — sample once before any branching.
+    let rawDepth = textureSampleCompare( depthTexture, depthSampler, uv, 1 );
+
     if (camHeight >= ATM_START_FS) {
-        // Inside or above clouds — skip depth early-out so atmosphere renders
-        // over distant terrain when looking down from altitude.
-        // Fade out stars when looking down from high altitude
+        // Inside or above clouds — still discard terrain pixels so the sky's
+        // alpha=1.0 blue doesn't bleed into the composite fog calculation.
+        // The composite pass's cloudOcclusion logic handles cloud-over-terrain.
+        if (rawDepth < 1.0) {
+            output.color = vec4f( 0.0, 0.0, 0.0, 0.0 );
+            return output;
+        }
+        // No terrain — render sky. Fade out stars when looking down.
         let nightSky: vec3f = sampleNightSky(direction);
         let downFade = smoothstep(-0.1, 0.1, viewVertical);
         let adjustedNightSky = nightSky * downFade;
-        let atmosphereColor = drawCloudsAndSky( direction, object.cameraPosition, vSunDirection, adjustedNightSky );
+        let atmosphereColor = drawSkyAndHorizonFog( direction, object.cameraPosition, vSunDirection, adjustedNightSky );
         output.color = vec4f( atmosphereColor, 1.0 );
         return output;
     }
 
     // Below clouds: do not draw pixel if blocked by something in the z-buffer
-    let rawDepth = textureSampleCompare( depthTexture, depthSampler, uv, 1 );
     if (rawDepth < 1.0) {
          output.color = vec4f( 0.0, 0.0, 0.0, 0.0 );
         return output;
@@ -93,7 +95,7 @@ fn fs(
     // so the color exactly matches what's at the horizon edge (no palette mismatch).
     let horizonDir = normalize(vec3f(direction.x, max(0.001, direction.y), direction.z));
     let horizonNightSky = sampleNightSky(horizonDir) * starVisibility;
-    let horizonFog = drawCloudsAndSky(horizonDir, object.cameraPosition, vSunDirection, horizonNightSky);
+    let horizonFog = drawSkyAndHorizonFog(horizonDir, object.cameraPosition, vSunDirection, horizonNightSky);
 
     // Below clouds — original hemisphere masking
 	// Smooth transition: 0 = below horizon, 1 = above horizon
@@ -102,7 +104,7 @@ fn fs(
     // Horizon transition band: blend between below-horizon color and atmosphere above
     if ( hemisphereMask < 1 && hemisphereMask > 0.0 ) {
         let nightSky: vec3f = sampleNightSky(direction);
-        let atmosphereColor = drawCloudsAndSky( direction, object.cameraPosition, vSunDirection, nightSky );
+        let atmosphereColor = drawSkyAndHorizonFog( direction, object.cameraPosition, vSunDirection, nightSky );
         output.color = vec4f( mix( horizonFog, atmosphereColor, hemisphereMask), 1.0 );
         return output;
     }
@@ -114,60 +116,19 @@ fn fs(
     // Above horizon: full atmosphere
     else {
         let nightSky: vec3f = sampleNightSky(direction);
-        let atmosphereColor = drawCloudsAndSky( direction, object.cameraPosition, vSunDirection, nightSky );
+        let atmosphereColor = drawSkyAndHorizonFog( direction, object.cameraPosition, vSunDirection, nightSky );
         output.color = vec4f( atmosphereColor, 1.0 );
         return output;
     } 
 }
 
-fn drawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f, nightSky: vec3f ) -> vec3f {
-    var color = vec3f(.0);   
-    color = skyRay(org, dir, vSunDirection, nightSky); 
-	color = getFogColor( dir, org, vSunDirection, color.rgb );
+fn drawSkyAndHorizonFog(dir: vec3f, org: vec3f, vSunDirection: vec3f, nightSky: vec3f ) -> vec3f {
+    let mu = dot(vSunDirection, dir);
+    var color = getAtmosphereColor(vSunDirection, dir, mu, nightSky * 10.0);
+    color = getFogColor( dir, org, vSunDirection, color.rgb );
 
     // Adjust exposure
     var colorAdjustedExposure = vec3f( 1.0 - exp(-color / 8.6));
     return colorAdjustedExposure;
-}
-
-
-fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f, nightSky: vec3f) -> vec3f {
-    // Constants for the start and end of the atmosphere
-    const ATM_START: f32 = EARTH_RADIUS + CLOUD_START;
-    const ATM_END: f32 = ATM_START + CLOUD_HEIGHT;
-    const WISP_RADIUS: f32 = ATM_END + 2000.0;
-
-    // Initialize the color to black
-    var color = vec3f(0.0);
-
-    let mu = dot(sun_direction, dir);
-    let cloudMovementSpeed = object.iTime * 0.00004 * mix(1.0, 0.3, object.cloudiness);
-
-   // Create a rotation matrix around the z-axis
-    let cosAngle = cos(cloudMovementSpeed);
-    let sinAngle = sin(cloudMovementSpeed);
-    let rotationMatrix = mat3x3<f32>(
-        vec3f(cosAngle, -sinAngle, 0.0),
-        vec3f(sinAngle, cosAngle, 0.0),
-        vec3f(0.0, 0.0, 1.0)
-    );
-
-    // Rotate the direction vector
-    let rotatedDir = rotationMatrix * dir;
-    
-    // High-altitude wisps — guard against camera being above the wisp sphere
-    let wispDist = intersectSphere(cameraPos, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), WISP_RADIUS);
-    if (wispDist > 0.0) {
-        var intersectionPoint = cameraPos + wispDist * rotatedDir;
-    
-        let cloudCoverFactor = mix( 0.6, 0.3, object.cloudiness );
-        color += mix(FOG_COLOR_STORM, vec3f(2.0), saturate(sunDotUp)) * max( 0.0, fbm(vec3f(1.0, 1.0, 1.8) * intersectionPoint * 0.001) - cloudCoverFactor) * 2.0;
-    }
-
-    let background = getAtmosphereColor(sun_direction, dir, mu, nightSky * 10.0);
-
-    // Add the background color to the final color
-    color += background;
-    return color;
 }
 

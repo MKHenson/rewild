@@ -50,7 +50,7 @@ fn fs(
         // Inside or above clouds — skip depth early-out so clouds render over
         // distant terrain. skyRay() handles early-out when the ray misses the
         // cloud shell entirely.
-        let atmosphereWithSunAndClouds = drawCloudsAndSky( direction, object.cameraPosition, vSunDirection );
+        let atmosphereWithSunAndClouds = drawCloudsHorizonFog( direction, object.cameraPosition, vSunDirection );
         output.color = atmosphereWithSunAndClouds;
         return output;
     }
@@ -72,29 +72,36 @@ fn fs(
     }
     // The area above the horizon
     else {
-        let atmosphereWithSunAndClouds = drawCloudsAndSky( direction, object.cameraPosition, vSunDirection,  );
+        let atmosphereWithSunAndClouds = drawCloudsHorizonFog( direction, object.cameraPosition, vSunDirection );
         output.color = atmosphereWithSunAndClouds;
         return output;
     } 
 }
 
 
-fn drawCloudsAndSky(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
-	var color = vec4f(.0);   
-    color = skyRay(org, dir, vSunDirection); 
+fn drawCloudsHorizonFog(dir: vec3f, org: vec3f, vSunDirection: vec3f ) -> vec4f {
+	var color = vec4f(.0);
+    color = skyRay(org, dir, vSunDirection);
 
     let earthCenter = vec3f(0.0, -EARTH_RADIUS, 0.0);
     let camHeight = length(org - earthCenter);
     const ATM_START_DCS = EARTH_RADIUS + CLOUD_START;
 
-    var cloudAlpha = color.a;
-    if (camHeight < ATM_START_DCS) {
-        // Only apply distance-based fog alpha attenuation when below clouds
-        let fogDensity = mix(0.00001, 0.00009, object.foginess);
-        let fogDistance = intersectSphere(org, dir, earthCenter, ATM_START_DCS);
-        cloudAlpha = min( exp(-fogDensity * fogDistance ), color.a );
+    if (camHeight >= ATM_START_DCS) {
+        // Inside or above clouds: skyRay already integrates cloud lighting and applies
+        // interior fog via insideBlend. getFogColor uses the cloud-base sphere for fog
+        // distance — from inside the layer, downward rays get a positive distance
+        // (heavy fog) while upward rays get fogDistance=-1 (no intersection), producing
+        // exp(+density) ≈ 1 which skips fog entirely. That asymmetry creates a hard
+        // brightness seam at dir.y=0. Return the raw skyRay result directly.
+        return color;
     }
-    
+
+    // Below clouds: attenuate cloud alpha by distance-based fog and apply ground fog.
+    let fogDensity = mix(0.00001, 0.00009, object.foginess);
+    let fogDistance = intersectSphere(org, dir, earthCenter, ATM_START_DCS);
+    let cloudAlpha = min( exp(-fogDensity * fogDistance ), color.a );
+
     return vec4f( getFogColor( dir, org, vSunDirection, color.rgb ), cloudAlpha);
 }
 
@@ -102,8 +109,6 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     // Constants for the cloud shell boundaries
     const ATM_START: f32 = EARTH_RADIUS + CLOUD_START;
     const ATM_END: f32 = ATM_START + CLOUD_HEIGHT;
-    const CLOUD_FOG_DENSITY: f32 = 0.003;
-    const TRANSITION_ZONE: f32 = 50.0;
 
     let earthCenter = vec3f(0.0, -EARTH_RADIUS, 0.0);
     let camHeight = length(cameraPos - earthCenter);
@@ -219,17 +224,6 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
         rayStartPosition += dir * stepS;
     }
 
-    // Cloud interior fog effect — provides immersive in-cloud experience
-    // Uses smooth transition zone to avoid visual popping at altitude boundaries
-    let insideBlend = smoothstep(ATM_START - TRANSITION_ZONE, ATM_START + TRANSITION_ZONE, camHeight)
-                    * (1.0 - smoothstep(ATM_END - TRANSITION_ZONE, ATM_END + TRANSITION_ZONE, camHeight));
-    if (insideBlend > 0.0) {
-        let fogAmount = 1.0 - exp(-CLOUD_FOG_DENSITY * rayLength);
-        var cloudFogColor = mix(CLOUD_AMBIENT_NIGHT_COLOR, CLOUD_AMBIENT_EVENING_COLOR, smoothstep(-0.2, 0.2, sunDotUp));
-        cloudFogColor = mix(cloudFogColor, CLOUD_AMBIENT_DAY_COLOR, smoothstep(0.2, 0.8, sunDotUp));
-        color = mix(color, cloudFogColor * 0.5, fogAmount * insideBlend);
-    }
-
     let background = getAtmosphereColor(sun_direction, dir, mu, vec3f(0.0));
 
     color += background * pow(transmittance, 2.0);
@@ -253,13 +247,7 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     // Alpha: cloud coverage OR sun disc presence.
     // Ensures the sun is visible through the composite even when there are no clouds.
     let sunAlpha = smoothstep(0.9995, 1.0, mu) * sunExtinction;
-    var alpha = max(1.0 - transmittance, sunAlpha);
-
-    // Inside clouds: boost alpha with fog contribution for smooth transition
-    if (insideBlend > 0.0) {
-        let fogAlpha = 1.0 - exp(-CLOUD_FOG_DENSITY * rayLength);
-        alpha = max(alpha, fogAlpha * insideBlend);
-    }
+    let alpha = max(1.0 - transmittance, sunAlpha);
 
     return vec4f(color, alpha);
 }

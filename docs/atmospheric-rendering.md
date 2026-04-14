@@ -330,7 +330,7 @@ fn fs(...) -> OutputStruct {
   let nightSky = textureSample(nightSkyCubemap, cubemapSampler, rotatedDir).rgb;
 
   // Continue with existing atmosphere blending...
-  let atmosphereWithSunAndClouds = drawCloudsAndSky(direction, object.cameraPosition, vSunDirection, nightSky);
+  let atmosphereWithSunAndClouds = drawSkyAndHorizonFog(direction, object.cameraPosition, vSunDirection, nightSky);
   // ...
 }
 

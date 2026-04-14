@@ -95,6 +95,7 @@ fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3
     let mu = dot(vSunDirection, dir) * sunVisibility;
 
     let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + CLOUD_START);
+    let fogDistanceToEarth = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS);
     let foginess = object.foginess;
 
     // Cloud occlusion: clouds block sunlight from reaching the lower atmosphere.
@@ -127,6 +128,10 @@ fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3
     // sun beam that drives forward scattering in the fog layer.
     let sunScatter = effectiveSunStrength * fogPhase * 0.1 * LOW_SCATTER * SUN_POWER;
 
+    // Above clouds
+    if ( fogDistanceToEarth - fogDistance > 0 ) {
+        return sunScatter + 10.0 * fogColor;
+    }
     return mix( sunScatter + 10.0 * fogColor, originalColor.xyz, exp(-fogDensity * fogDistance ));
 }
 
@@ -164,14 +169,27 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     // Sky brightness: dimmer at sunset, full brightness at noon
     let skyBrightness = mix(2.0, 6.0, smoothstep(0.0, 0.3, sunDotUp));
 
-    // Horizon haze: atmospheric scattering brightens the horizon.
-    // Fades with altitude and scales with daylight (minimal at night).
-    let horizonHaze = mix(0.3, 3.5, dayFactor) * max(0.0, 1.0 - 2.3 * dir.y);
+    // Altitude-based atmosphere thinning:
+    // As the camera rises above the cloud layer the atmosphere gradually thins toward
+    // black space. Full sky at/below cloud top (~1100 m), fades to nothing at ~15 km.
+    // This gives the "going into space" effect — blue sky → dark blue → black, with
+    // stars becoming visible through the thinning atmosphere even during daytime.
+    let camAlt = object.cameraPosition.y;
+    let atmosphereDensity = 1.0 - smoothstep(1100.0, 12000.0, camAlt);
 
-    var dayTimeColor = skyBrightness * skyColor + vec3f(horizonHaze);
+    // Horizon haze: atmospheric scattering brightens the horizon.
+    // Fades with altitude (thinner air) and scales with daylight (minimal at night).
+    let horizonHaze = mix(0.3, 3.5, dayFactor) * max(0.0, 1.0 - 2.3 * dir.y) * atmosphereDensity;
+
+    // Sky colour scales with atmospheric density; at high altitude the sky dims toward black
+    var dayTimeColor = skyBrightness * skyColor * atmosphereDensity + vec3f(horizonHaze);
+
+    // At high altitude the daytime atmosphere fades, letting the night sky (stars/space)
+    // show through — even during the day, which is physically correct for near-space.
+    let effectiveDayNight = dayNightRatio * atmosphereDensity;
 
     // Blend between night sky and daytime atmosphere
-    return mix( nightColor, dayTimeColor, dayNightRatio );
+    return mix( nightColor, dayTimeColor, effectiveDayNight );
 }
 
 /**

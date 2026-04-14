@@ -129,7 +129,7 @@ When inside the cloud layer, reduce ray sample count significantly and apply dis
 
 - [ ] The atmosphere pass also does sphere intersection math for fog/sky blending. Apply the same altitude-aware logic to prevent artifacts when above the atmosphere's reference sphere
 - [ ] This is less critical than the clouds fix since the atmosphere shader is cheaper and the visual issues are subtler, but it needs to be done for consistency
-- [ ] Verify that the `drawCloudsAndSky()` call passes correct direction vectors regardless of camera altitude
+- [ ] Verify that the `drawSkyAndHorizonFog()` call passes correct direction vectors regardless of camera altitude
 
 ### 3.5: Update cloud shadow renderer for altitude
 
