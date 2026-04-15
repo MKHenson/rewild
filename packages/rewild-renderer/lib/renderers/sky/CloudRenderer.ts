@@ -1,81 +1,60 @@
 import { Renderer } from '../../Renderer';
-import commonShaderFns from '../../shaders/atmosphere/common.wgsl';
-import constantsFns from '../../shaders/atmosphere/constants.wgsl';
-import fogFns from '../../shaders/atmosphere/fog.wgsl';
-import shader from '../../shaders/atmosphere/atmosphere.wgsl';
-import { Geometry } from '../../geometry/Geometry';
+import commonShaderFns from '../../shaders/sky/skyCommon.wgsl';
+import constantsFns from '../../shaders/sky/skyConstants.wgsl';
+import fogFns from '../../shaders/sky/fog.wgsl';
+import cloudDensityFns from '../../shaders/sky/cloudDensity.wgsl';
+import shader from '../../shaders/sky/clouds.wgsl';
 
-export class AtmosphereRenderer {
+export class CloudRenderer {
   renderTarget: GPUTexture;
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
+  resolutionScale: number;
 
-  constructor() {}
+  constructor() {
+    this.resolutionScale = 0.8;
+  }
 
   init(renderer: Renderer, uniformBuffer: GPUBuffer) {
     const { device, canvas } = renderer;
+    const resolutionScale = this.resolutionScale;
 
     const module = device.createShaderModule({
-      code: shader + constantsFns + fogFns + commonShaderFns,
+      code: shader + constantsFns + fogFns + commonShaderFns + cloudDensityFns,
     });
 
     this.renderTarget = device.createTexture({
-      size: [canvas.width, canvas.height, 1],
-      label: 'atmosphere render target',
-      format: 'rgba8unorm',
+      size: [
+        canvas.width * resolutionScale,
+        canvas.height * resolutionScale,
+        1,
+      ],
+      label: 'clouds render target',
+      format: 'rgba16float',
       usage:
         GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
 
     this.pipeline = device.createRenderPipeline({
-      label: 'Atmosphere & Night Pipeline',
+      label: 'Clouds Post Process Pass',
       layout: 'auto',
       vertex: {
-        module: module,
+        module,
         entryPoint: 'vs',
-        buffers: [
-          {
-            arrayStride: 4 * 3,
-            attributes: [
-              {
-                // position
-                shaderLocation: 0,
-                offset: 0,
-                format: 'float32x3',
-              },
-            ],
-          },
-          {
-            arrayStride: 4 * 2,
-            attributes: [
-              {
-                // uv
-                shaderLocation: 1,
-                offset: 0,
-                format: 'float32x2',
-              },
-            ],
-          },
-        ],
       },
       fragment: {
-        module: module,
+        module,
         targets: [
           {
-            format: 'rgba8unorm',
+            format: 'rgba16float',
           },
         ],
         entryPoint: 'fs',
       },
-      primitive: {
-        topology: 'triangle-list',
-        cullMode: 'back',
-        frontFace: 'cw',
-      },
     });
 
     this.bindGroup = device.createBindGroup({
-      label: 'bind group for atmosphere & nightsky',
+      label: 'bind group for atmosphere clouds',
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
         {
@@ -94,17 +73,26 @@ export class AtmosphereRenderer {
         },
         {
           binding: 3,
-          resource: renderer.depthTexture.createView(),
+          resource: renderer.textureManager
+            .get('pebbles-512')
+            .gpuTexture.createView(),
         },
         {
           binding: 4,
+          resource: renderer.depthTexture.createView(),
+        },
+        {
+          binding: 5,
           resource: renderer.samplerManager.get('depth-comparison'),
         },
       ],
     });
   }
 
-  render(encoder: GPUCommandEncoder, geometry: Geometry) {
+  render(
+    encoder: GPUCommandEncoder,
+    timestampWrites?: GPURenderPassTimestampWrites
+  ) {
     const cloudPass = encoder.beginRenderPass({
       colorAttachments: [
         {
@@ -114,14 +102,12 @@ export class AtmosphereRenderer {
           storeOp: 'store',
         },
       ],
+      timestampWrites,
     });
 
     cloudPass.setPipeline(this.pipeline);
-    cloudPass.setVertexBuffer(0, geometry!.vertexBuffer);
-    cloudPass.setVertexBuffer(1, geometry!.uvBuffer);
-    cloudPass.setIndexBuffer(geometry!.indexBuffer, 'uint32');
     cloudPass.setBindGroup(0, this.bindGroup);
-    cloudPass.drawIndexed(geometry!.indices!.length);
+    cloudPass.draw(6);
     cloudPass.end();
   }
 

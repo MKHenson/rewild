@@ -6,9 +6,7 @@ struct VaryingsStruct {
 };
 
 struct ObjectStruct {
-	modelMatrix : mat4x4<f32>,
-	projectionMatrix : mat4x4<f32>,
-	modelViewMatrix : mat4x4<f32>,
+	invViewProjectionMatrix : mat4x4<f32>,
 	cameraPosition : vec3<f32>,
     resolutionScale: f32,
 	sunPosition : vec3<f32>,
@@ -20,7 +18,8 @@ struct ObjectStruct {
     resolutionY: f32,
     cloudiness: f32,
     foginess: f32,
-    windiness: f32
+    windiness: f32,
+    cameraAltitude: f32,
 };
 
 struct OutputStruct {
@@ -94,11 +93,25 @@ fn fbm( position: vec3f )  -> f32 {
 }
 
 @vertex
-fn vs( @location( 0 ) position : vec3<f32> ) -> VaryingsStruct {
-	var worldPosition: vec4f = object.modelMatrix * vec4( position, 1.0 );
-	varyings.vWorldPosition = worldPosition.xyz;
-	varyings.Vertex = object.projectionMatrix * object.modelViewMatrix * vec4( position, 1.0 );
-	varyings.Vertex.z = varyings.Vertex.w; // set z to camera.far
+fn vs( @builtin(vertex_index) vertexIndex : u32 ) -> VaryingsStruct {
+	let pos = array(
+		vec2f(-1.0, -1.0),
+		vec2f( 1.0, -1.0),
+		vec2f(-1.0,  1.0),
+		vec2f(-1.0,  1.0),
+		vec2f( 1.0, -1.0),
+		vec2f( 1.0,  1.0),
+	);
+
+	let xy = pos[vertexIndex];
+
+	// Reconstruct a far-plane world position from clip-space corner
+	let clipPos = vec4f(xy.x, xy.y, 1.0, 1.0);
+	let worldPosH = object.invViewProjectionMatrix * clipPos;
+	let worldPos = worldPosH.xyz / worldPosH.w;
+
+	varyings.vWorldPosition = worldPos;
+	varyings.Vertex = vec4f(xy, 0.0, 1.0);
 	varyings.vSunDirection = normalize( object.sunPosition );
 	return varyings;
 }

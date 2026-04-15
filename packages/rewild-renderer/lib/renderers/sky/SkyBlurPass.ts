@@ -1,8 +1,8 @@
-import { IPostProcess } from '../../types/IPostProcess';
-import { Renderer } from '../Renderer';
-import shader from '../shaders/denoisePass.wgsl';
-import vertexScreenQuadShader from '../shaders/utils/vertexScreenQuad.wgsl';
-import { PostProcessManager } from './PostProcessManager';
+import { IPostProcess } from '../../../types/IPostProcess';
+import { Renderer } from '../../Renderer';
+import blurShader from '../../shaders/sky/skyBlur.wgsl';
+import vertexScreenQuadShader from '../../shaders/utils/vertexScreenQuad.wgsl';
+import { PostProcessManager } from '../../post-processes/PostProcessManager';
 
 const bloomPassUniformBufferSize =
   2 * 4 + // (resolutionX, resolutionY)
@@ -13,7 +13,7 @@ const alignedUniformBufferSize =
 
 const uniformData = new Float32Array(alignedUniformBufferSize / 4);
 
-export class DenoiseProcess implements IPostProcess {
+export class SkyBlurPass implements IPostProcess {
   renderTarget: GPUTexture;
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
@@ -23,7 +23,7 @@ export class DenoiseProcess implements IPostProcess {
   sourceTexture: GPUTexture | null;
 
   constructor() {
-    this.scaleFactor = 0.6;
+    this.scaleFactor = 0.8;
     this.sourceTexture = null;
   }
 
@@ -43,7 +43,7 @@ export class DenoiseProcess implements IPostProcess {
     }
 
     const module = device.createShaderModule({
-      code: shader,
+      code: blurShader,
     });
 
     const vertexScreenQuadModule = device.createShaderModule({
@@ -52,7 +52,7 @@ export class DenoiseProcess implements IPostProcess {
 
     this.renderTarget = device.createTexture({
       size: [canvas.width * scaleFactor, canvas.height * scaleFactor, 1],
-      label: 'denoise render target',
+      label: 'blur render target',
       format: 'rgba8unorm',
       usage:
         GPUTextureUsage.RENDER_ATTACHMENT |
@@ -61,7 +61,7 @@ export class DenoiseProcess implements IPostProcess {
     });
 
     this.pipeline = device.createRenderPipeline({
-      label: 'denoise postprocess pipeline',
+      label: 'blur postprocess pipeline',
       layout: 'auto',
       vertex: {
         entryPoint: 'vs',
@@ -79,13 +79,13 @@ export class DenoiseProcess implements IPostProcess {
     });
 
     this.uniformBuffer = device.createBuffer({
-      label: 'uniforms for denoise pass',
+      label: 'uniforms for atmosphere blur pass',
       size: alignedUniformBufferSize,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
     this.bindGroup = device.createBindGroup({
-      label: 'bind group for denoise pass',
+      label: 'bind group for atmosphere blur pass',
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: texture.createView() },

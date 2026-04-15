@@ -7,7 +7,7 @@ import { CubeRenderer } from './renderables.ts/CubeRenderer';
 import { Geometry } from './geometry/Geometry';
 import { IMaterialPass } from './materials/IMaterialPass';
 import { IRenderGroup } from '../types/IRenderGroup';
-import { AtmosphereSkybox } from './core/AtmosphereSkybox';
+import { Sky } from './core/Sky';
 import { TerrainRenderer } from './renderers/terrain/TerrainRenderer';
 import { TrackballController } from './input/TrackballController';
 import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
@@ -61,7 +61,7 @@ export class Renderer {
   scene: Transform;
   ui: Transform;
   currentRenderList: RenderList;
-  atmosphere: AtmosphereSkybox;
+  sky: Sky;
   camController: IController;
   private canvasSizeWatcher: CanvasSizeWatcher;
   private renderGroups: IRenderGroup[];
@@ -88,6 +88,18 @@ export class Renderer {
   /** Shared worker manager for async BVH builds. Created lazily. */
   bvhWorkerManager: BVHWorkerManager | null = null;
 
+  /** Returns the cloud shadow map texture, or null if not yet initialized. */
+  get cloudShadowMap(): GPUTexture | null {
+    return this.sky?.skyRenderer?.cloudShadowRenderer?.shadowMap ?? null;
+  }
+
+  /** Returns the cloud shadow world size for UV calculation. */
+  get cloudShadowWorldSize(): number {
+    return (
+      this.sky?.skyRenderer?.cloudShadowRenderer?.config?.worldSize ?? 5000
+    );
+  }
+
   constructor() {
     this.autoFrame = true;
     this.onFrameHandler = this.onFrame.bind(this);
@@ -95,7 +107,7 @@ export class Renderer {
     this.scene.matrixAutoUpdate = false;
     this.ui = new Transform();
     this.ui.matrixAutoUpdate = false;
-    this.atmosphere = new AtmosphereSkybox();
+    this.sky = new Sky();
     this.terrainRenderer = new TerrainRenderer();
     this.renderGroups = [];
     this.overlayRenderGroups = [];
@@ -112,7 +124,7 @@ export class Renderer {
       this.bvhWorkerManager = new BVHWorkerManager();
     }
 
-    this.scene.addChild(this.atmosphere.transform);
+    this.scene.addChild(this.sky.transform);
   }
 
   async init(canvas: HTMLCanvasElement, autoFrame = true) {
@@ -138,7 +150,11 @@ export class Renderer {
     this.camController = new TrackballController(this.perspectiveCam, canvas);
 
     const adapter = await navigator.gpu?.requestAdapter();
-    const device = await adapter?.requestDevice();
+    const requiredFeatures: GPUFeatureName[] = [];
+    if (adapter?.features.has('timestamp-query')) {
+      requiredFeatures.push('timestamp-query');
+    }
+    const device = await adapter?.requestDevice({ requiredFeatures });
     if (!device) throw new Error('need a browser that supports WebGPU');
 
     const context = canvas.getContext('webgpu');
@@ -262,7 +278,7 @@ export class Renderer {
 
     this.camController.update(this.delta * 0.01);
 
-    this.atmosphere.update(this, this.perspectiveCam.camera);
+    this.sky.update(this, this.perspectiveCam.camera);
     this.terrainRenderer.update(this, this.perspectiveCam.camera);
 
     this.render();
@@ -286,7 +302,7 @@ export class Renderer {
     this.sceneBVH = null;
     this.bvhWorkerManager?.dispose();
     this.bvhWorkerManager = null;
-    this.atmosphere.dispose();
+    this.sky.dispose();
     this.textureManager.dispose();
     this.samplerManager.dispose();
     this.fontManager.dispose();
@@ -652,13 +668,13 @@ export class Renderer {
         ],
       });
 
-      // Ensure atmosphere matrices are up-to-date (its transform is not
+      // Ensure sky matrices are up-to-date (its transform is not
       // part of the solids list when BVH culling is active).
-      this.atmosphere.transform.modelViewMatrix.multiplyMatrices(
+      this.sky.transform.modelViewMatrix.multiplyMatrices(
         camera.camera.matrixWorldInverse,
-        this.atmosphere.transform.matrixWorld
+        this.sky.transform.matrixWorld
       );
-      this.atmosphere.render(this, postProcessingPass, camera.camera);
+      this.sky.render(this, postProcessingPass, camera.camera);
       postProcessingPass.end();
 
       device.queue.submit([postProcessingEncoder.finish()]);

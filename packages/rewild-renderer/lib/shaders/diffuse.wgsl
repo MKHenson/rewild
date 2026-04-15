@@ -1,5 +1,6 @@
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/selection-tint.wgsl"
+#include "./shader-lib/cloud-shadow.wgsl"
 
 struct Uniforms {
   normalMatrix: mat3x3f,
@@ -25,6 +26,9 @@ struct VertexOutput {
 @group(1) @binding(0) var mySampler: sampler;
 @group(1) @binding(1) var myTexture: texture_2d<f32>;
 @group(2) @binding(0) var<uniform> lighting : LightingUniforms;
+@group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
+@group(3) @binding(1) var cloudShadowSampler: sampler;
+@group(3) @binding(2) var<uniform> cloudShadowParams: CloudShadowParams;
 
 @vertex
 fn vs(
@@ -53,8 +57,9 @@ fn fs(
   let normalizedNormal = normalize(normal);
   
   #include "./shader-lib/total-lighting.frag.wgsl"
+  #include "./shader-lib/cloud-shadow.frag.wgsl"
 
-  var color = textureSample(myTexture, mySampler, fragUV) * vec4f(totalLight, 1.0);
+  var color = textureSample(myTexture, mySampler, fragUV) * vec4f(totalLight * cloudShadowFactor, 1.0);
 
   return applySelectionTint(color, 0.35f);
 }

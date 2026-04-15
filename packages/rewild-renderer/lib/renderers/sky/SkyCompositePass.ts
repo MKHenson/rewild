@@ -1,11 +1,11 @@
-import { IPostProcess } from '../../types/IPostProcess';
-import { Renderer } from '../Renderer';
-import shader from '../shaders/atmosphereFinal.wgsl';
-import vertexScreenQuadShader from '../shaders/utils/vertexScreenQuad.wgsl';
-import constantsFn from '../shaders/atmosphere/constants.wgsl';
-import commonShaderFns from '../shaders/atmosphere/fog.wgsl';
-import { PostProcessManager } from './PostProcessManager';
-import { Camera } from '../core/Camera';
+import { IPostProcess } from '../../../types/IPostProcess';
+import { Renderer } from '../../Renderer';
+import shader from '../../shaders/sky/skyComposite.wgsl';
+import vertexScreenQuadShader from '../../shaders/utils/vertexScreenQuad.wgsl';
+import constantsFn from '../../shaders/sky/skyConstants.wgsl';
+import commonShaderFns from '../../shaders/sky/fog.wgsl';
+import { PostProcessManager } from '../../post-processes/PostProcessManager';
+import { Camera } from '../../core/Camera';
 import { degToRad, Matrix4, Vector3 } from 'rewild-common';
 
 const finalUniformBufferSize =
@@ -17,6 +17,8 @@ const finalUniformBufferSize =
   16 + // cameraPosition
   4 + // padding
   4 + // foginess
+  4 + // shadowWorldSize
+  4 + // shadowIntensity
   0;
 
 const alignedUniformBufferSize = Math.ceil(finalUniformBufferSize / 256) * 256;
@@ -24,7 +26,7 @@ const tempVec = new Vector3();
 const uniformData = new Float32Array(alignedUniformBufferSize / 4);
 const invViewProjectionMatrix = new Matrix4();
 
-export class FinalCompPostProcess implements IPostProcess {
+export class SkyCompositePass implements IPostProcess {
   renderTarget: GPUTexture;
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
@@ -33,6 +35,8 @@ export class FinalCompPostProcess implements IPostProcess {
   scaleFactor: number;
   atmosphereTexture: GPUTexture | null;
   cloudsTexture: GPUTexture | null;
+  cloudShadowMap: GPUTexture | null;
+  godRaysTexture: GPUTexture | null;
 
   cloudiness: number;
   elevation: number;
@@ -42,6 +46,8 @@ export class FinalCompPostProcess implements IPostProcess {
     this.scaleFactor = 1;
     this.atmosphereTexture = null;
     this.cloudsTexture = null;
+    this.cloudShadowMap = null;
+    this.godRaysTexture = null;
   }
 
   init(renderer: Renderer): IPostProcess {
@@ -112,6 +118,14 @@ export class FinalCompPostProcess implements IPostProcess {
           binding: 4,
           resource: renderer.depthTexture.createView(),
         },
+        {
+          binding: 5,
+          resource: this.cloudShadowMap!.createView(),
+        },
+        {
+          binding: 6,
+          resource: this.godRaysTexture!.createView(),
+        },
       ],
     });
 
@@ -155,7 +169,9 @@ export class FinalCompPostProcess implements IPostProcess {
         camera.transform.position.y,
         camera.transform.position.z,
         0, //
-        renderer.atmosphere.skyRenderer.foginess,
+        renderer.sky.skyRenderer.foginess,
+        renderer.sky.skyRenderer.cloudShadowRenderer.config.worldSize,
+        renderer.sky.skyRenderer.fogShadowIntensity,
       ],
       32
     );
