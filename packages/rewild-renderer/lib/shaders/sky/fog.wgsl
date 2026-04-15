@@ -128,7 +128,8 @@ fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3
     // sun beam that drives forward scattering in the fog layer.
     let sunScatter = effectiveSunStrength * fogPhase * 0.1 * LOW_SCATTER * SUN_POWER;
 
-    // Above clouds
+    // Camera above clouds looking down at earth: render as solid fog layer.
+    // Fires when fogDistance = -1 (no cloud-sphere exit ahead) and fogDistanceToEarth > 0.
     if ( fogDistanceToEarth - fogDistance > 0 ) {
         return sunScatter + 10.0 * fogColor;
     }
