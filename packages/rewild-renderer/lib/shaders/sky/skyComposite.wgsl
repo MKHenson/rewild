@@ -30,25 +30,31 @@ var depthTexture: texture_depth_2d;
 @group(0) @binding(5)
 var cloudShadowMap: texture_2d<f32>;
 
+@group(0) @binding(6)
+var godRaysTexture: texture_2d<f32>;
+
 var<private> sunDotUp: f32;
 
 
-@fragment fn fs( 
+@fragment fn fs(
   @builtin(position) fragCoord: vec4<f32>,
   ) -> @location(0) vec4f {
   // Define uv based on fragCoord
   let uv = fragCoord.xy / vec2(object.resolution);
+
+  // Sample god rays once — additively blended into every output path
+  let godRays = textureSampleLevel(godRaysTexture, cloudsSampler, uv, 0);
 
   // Convert uv to texture coordinates
   let texCoord = vec2<i32>(uv * vec2<f32>(textureDimensions(depthTexture)));
 
   // Load the depth value directly
   let rawDepth = textureLoad(depthTexture, texCoord, 0);
-  
+
   // Do not draw pixel if blocked by something in the z-buffer
   let sky = textureSampleLevel( sky, cloudsSampler, uv, 0 );
   let clouds = textureSampleLevel( clouds, cloudsSampler, uv, 0 );
- 
+
   let preMultipliedClouds = vec4<f32>(clouds.rgb * clouds.a, clouds.a);
 
   // Blend sky and clouds based on alpha
@@ -69,7 +75,8 @@ var<private> sunDotUp: f32;
 
     if (cloudOcclusion > 0.99) {
       // Terrain fully occluded by clouds — use sky+cloud view directly
-      return vec4f(adjustContrast(1.1, blendedColor.rgb), 1.0);
+      let occludedColor = adjustContrast(1.1, blendedColor.rgb) + godRays.rgb;
+      return vec4f(occludedColor, 1.0);
     }
 
     let startHeigh = -10.0;
@@ -133,13 +140,14 @@ var<private> sunDotUp: f32;
     // Partial cloud occlusion: blend terrain fog with cloud-occluded sky view
     if (cloudOcclusion > 0.0) {
       let skyResult = vec4f(adjustContrast(1.1, blendedColor.rgb), 1.0);
-      return mix(fogResult, skyResult, cloudOcclusion);
+      let blended = mix(fogResult, skyResult, cloudOcclusion);
+      return vec4f(blended.rgb + godRays.rgb, blended.a);
     }
 
-    return fogResult;
+    return vec4f(fogResult.rgb + godRays.rgb, fogResult.a);
   }
 
-  return vec4f( adjustContrast(1.1, blendedColor.rgb), blendedColor.a );
+  return vec4f( adjustContrast(1.1, blendedColor.rgb) + godRays.rgb, blendedColor.a );
 }
 
 fn worldFromScreenCoord( coord: vec2f, depthSample: f32 ) -> vec3f {
