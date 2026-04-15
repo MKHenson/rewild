@@ -24,3 +24,12 @@ sky-atmosphere '0.022 ms'
 sky-bloom '0.027 ms'
 sky-taa '0.016 ms'
 sky-total (sum) '2.192 ms'
+
+# Current performance Capture (phase 3)
+
+sky-cloud-shadow '0.339 ms'
+sky-clouds '0.749 ms'
+sky-atmosphere '0.011 ms'
+sky-bloom '0.014 ms'
+sky-taa '0.010 ms'
+sky-total (sum) '1.122 ms'
