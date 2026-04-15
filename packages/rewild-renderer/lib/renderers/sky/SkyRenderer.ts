@@ -14,6 +14,7 @@ import { DirectionLight } from '../../core/lights/DirectionLight';
 import { PerformanceMonitor } from '../../utils/PerformanceMonitor';
 import { StarfieldRenderer } from './StarfieldRenderer';
 import { CloudShadowRenderer } from './CloudShadowRenderer';
+import { GodRaysPostProcess } from '../../post-processes/GodRaysPostProcess';
 
 export class SkyRenderer {
   requiresRebuild: boolean = true;
@@ -26,6 +27,7 @@ export class SkyRenderer {
   bloomPass: SkyBloomPass;
   denoisePass: SkyDenoisePass;
   finalPass: SkyCompositePass;
+  godRaysPass: GodRaysPostProcess;
   starfieldRenderer: StarfieldRenderer;
   cloudShadowRenderer: CloudShadowRenderer;
 
@@ -38,6 +40,20 @@ export class SkyRenderer {
   windiness: f32;
   upDot: f32;
   sun: DirectionLight;
+
+  // God rays tunables (updatable at runtime without pipeline recreation)
+  /** Master on/off switch. When false the god ray pass is skipped entirely each frame. */
+  godRayEnabled: boolean = true;
+  /** Master brightness multiplier (range 0–3). Scales the final ray intensity on top of the
+   *  per-frame horizon fade. 0 = invisible, 1 = default, >1 = exaggerated shafts. */
+  godRayIntensity: number = 1.0;
+  /** How far the radial blur rays extend from the sun toward the screen edges (range 0.1–1.0).
+   *  Low values (0.2) give short subtle rays; high values (0.8) give long dramatic shafts. */
+  godRayDensity: number = 0.8;
+  /** Per-step brightness falloff along each ray (range 0.8–0.99).
+   *  Lower values (0.85) concentrate light near the sun; higher values (0.98) let rays
+   *  reach further across the screen before fading out. */
+  godRayDecay: number = 0.98;
 
   uniformBuffer: GPUBuffer;
   uniformData: Float32Array;
@@ -73,6 +89,7 @@ export class SkyRenderer {
     this.denoisePass = new SkyDenoisePass();
     this.blurPass = new SkyBlurPass();
     this.bloomPass = new SkyBloomPass();
+    this.godRaysPass = new GodRaysPostProcess();
     this.finalPass = new SkyCompositePass();
     this.starfieldRenderer = new StarfieldRenderer();
     this.cloudShadowRenderer = new CloudShadowRenderer({
@@ -133,10 +150,14 @@ export class SkyRenderer {
     this.taaPass.sourceTexture = this.bloomPass.renderTarget;
     this.taaPass.init(renderer);
 
+    this.godRaysPass.cloudTexture = this.cloudsPass.renderTarget;
+    this.godRaysPass.init(renderer);
+
     this.finalPass.atmosphereTexture = this.atmospherePass.renderTarget;
     this.finalPass.cloudsTexture = this.blurPass.renderTarget;
     this.finalPass.cloudsTexture = this.taaPass.renderTarget;
     this.finalPass.cloudShadowMap = this.cloudShadowRenderer.shadowMap;
+    this.finalPass.godRaysTexture = this.godRaysPass.renderTarget;
     this.finalPass.init(renderer);
 
     this.perfMonitor.init(device, [
@@ -144,6 +165,7 @@ export class SkyRenderer {
       'sky-clouds',
       'sky-atmosphere',
       'sky-bloom',
+      'sky-god-rays',
       'sky-taa',
     ]);
 
@@ -291,6 +313,20 @@ export class SkyRenderer {
       this.perfMonitor.getTimestampWrites('sky-bloom')
     );
     // this.blurPass.render(renderer);
+
+    // Sync god ray config tunables then render
+    this.godRaysPass.config.enabled = this.godRayEnabled;
+    this.godRaysPass.config.density = this.godRayDensity;
+    this.godRaysPass.config.decay = this.godRayDecay;
+    this.godRaysPass.intensityScale = this.godRayIntensity;
+    this.godRaysPass.render(
+      renderer,
+      sunPosition,
+      camera,
+      this.upDot,
+      this.perfMonitor.getTimestampWrites('sky-god-rays')
+    );
+
     this.taaPass.render(
       renderer,
       this.perfMonitor.getTimestampWrites('sky-taa')
@@ -311,6 +347,7 @@ export class SkyRenderer {
     this.taaPass.dispose();
     this.blurPass.dispose();
     this.bloomPass.dispose();
+    this.godRaysPass.dispose();
     this.denoisePass.dispose();
     this.finalPass.dispose();
   }
