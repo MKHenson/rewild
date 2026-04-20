@@ -43,3 +43,13 @@ sky-bloom '0.013 ms'
 sky-god-rays '0.027 ms'
 sky-taa '0.008 ms'
 sky-total (sum) '1.398 ms'
+
+# Current performance Capture (phase 5)
+
+sky-cloud-shadow '0.311 ms'
+sky-clouds '1.081 ms'
+sky-atmosphere '0.017 ms'
+sky-bloom '0.020 ms'
+sky-god-rays '0.058 ms'
+sky-bilateral '0.024 ms'
+sky-total (sum) '1.512 ms'

@@ -23,7 +23,19 @@ var depthSampler: sampler_comparison;
 var<private> varyings: VaryingsStruct;
 var<private> output: OutputStruct;
 var<private> sunDotUp: f32;
+var<private> currentFragCoord: vec2<f32>;
 
+// Dynamic LOD: reduce sample count for peripheral, distant, and grazing-angle pixels.
+// Returns a [0,1] factor: 0 = full quality (NUM_CLOUD_SAMPLES), 1 = minimum quality (16 samples).
+fn calculateCloudLOD(fragCoord: vec2<f32>, dir: vec3<f32>, rayLength: f32) -> f32 {
+    let screenSize = vec2<f32>(object.resolutionX * object.resolutionScale, object.resolutionY * object.resolutionScale);
+    let screenCenter = screenSize * 0.5;
+    let distFromCenter = length(fragCoord - screenCenter) / length(screenCenter);
+    let screenLOD = smoothstep(0.3, 1.0, distFromCenter);
+    let distanceLOD = smoothstep(1000.0, 5000.0, rayLength);
+    let angleLOD = smoothstep(0.3, 0.0, abs(dir.y)) * 0.3;
+    return max(screenLOD, max(distanceLOD, angleLOD));
+}
 
 @fragment
 fn fs( 
@@ -32,6 +44,7 @@ fn fs(
 	@location( 1 ) vSunDirection : vec3<f32> ) -> OutputStruct {
 
     sunDotUp = dot(vSunDirection, vec3f(0.0, 1.0, 0.0));
+    currentFragCoord = fragCoord.xy;
 
     let direction: vec3f = normalize( vWorldPosition - object.cameraPosition );
 
@@ -170,6 +183,10 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
         nbSample = i32(f32(nbSample) * 0.3); // 70% fewer samples inside clouds
     }
     nbSample = max(nbSample, 8); // Floor at 8 samples minimum
+
+    // Dynamic LOD: scale sample count by screen position, ray distance, and view angle
+    let lod = calculateCloudLOD(currentFragCoord, dir, rayLength);
+    nbSample = max(i32(mix(f32(nbSample), 16.0, lod)), 8);
 
     // Initialize the color to black
     var color = vec3f(0.0);
