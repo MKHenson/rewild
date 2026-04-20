@@ -3,8 +3,8 @@ import { Transform } from '../../core/Transform';
 import { Camera } from '../../core/Camera';
 import { Color, degToRad, Matrix4 } from 'rewild-common';
 import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
-import { CloudRenderer } from './CloudRenderer';
-import { SkyTAAPass } from './SkyTAAPass';
+import { TemporalCloudRenderer } from './TemporalCloudRenderer';
+import { SkyBilateralPass } from './SkyBilateralPass';
 import { SkyBloomPass } from './SkyBloomPass';
 import { SkyBlurPass } from './SkyBlurPass';
 import { SkyCompositePass } from './SkyCompositePass';
@@ -20,9 +20,13 @@ export class SkyRenderer {
   requiresRebuild: boolean = true;
   private invViewProjectionMatrix = new Matrix4();
 
-  cloudsPass: CloudRenderer;
+  /** Current frame's view-projection matrix — stored so it can be passed to the
+   *  temporal renderer as prevViewProjMatrix on the next frame. */
+  private viewProjMatrix = new Matrix4();
+
+  cloudsPass: TemporalCloudRenderer;
   atmospherePass: SkyGradientRenderer;
-  taaPass: SkyTAAPass;
+  bilateralPass: SkyBilateralPass;
   blurPass: SkyBlurPass;
   bloomPass: SkyBloomPass;
   denoisePass: SkyDenoisePass;
@@ -83,9 +87,9 @@ export class SkyRenderer {
     this._eveColor = new Color(0.32, 0.12, 0.0);
     this._nightColor = new Color(0.05, 0.05, 0.2);
 
-    this.cloudsPass = new CloudRenderer();
+    this.cloudsPass = new TemporalCloudRenderer();
     this.atmospherePass = new SkyGradientRenderer();
-    this.taaPass = new SkyTAAPass();
+    this.bilateralPass = new SkyBilateralPass();
     this.denoisePass = new SkyDenoisePass();
     this.blurPass = new SkyBlurPass();
     this.bloomPass = new SkyBloomPass();
@@ -141,21 +145,24 @@ export class SkyRenderer {
       this.starfieldRenderer.cubemap
     );
 
-    this.bloomPass.sourceTexture = this.cloudsPass.renderTarget;
+    // Gaussian blur runs first on the full-res HDR cloud texture.
+    // This softens cloud edges before tonemapping, giving a fluffy look.
+    this.blurPass.sourceTexture = this.cloudsPass.renderTarget;
+    this.blurPass.init(renderer);
+
+    // Bloom operates on the blurred cloud texture.
+    this.bloomPass.sourceTexture = this.blurPass.renderTarget;
     this.bloomPass.init(renderer);
 
-    // this.blurPass.sourceTexture = this.bloomPass.renderTarget;
-    // this.blurPass.init(renderer);
-
-    this.taaPass.sourceTexture = this.bloomPass.renderTarget;
-    this.taaPass.init(renderer);
+    // Bilateral filter replaces TAA: edge-preserving smoothing with no ghosting.
+    this.bilateralPass.sourceTexture = this.bloomPass.renderTarget;
+    this.bilateralPass.init(renderer);
 
     this.godRaysPass.cloudTexture = this.cloudsPass.renderTarget;
     this.godRaysPass.init(renderer);
 
     this.finalPass.atmosphereTexture = this.atmospherePass.renderTarget;
-    this.finalPass.cloudsTexture = this.blurPass.renderTarget;
-    this.finalPass.cloudsTexture = this.taaPass.renderTarget;
+    this.finalPass.cloudsTexture = this.bilateralPass.renderTarget;
     this.finalPass.cloudShadowMap = this.cloudShadowRenderer.shadowMap;
     this.finalPass.godRaysTexture = this.godRaysPass.renderTarget;
     this.finalPass.init(renderer);
@@ -166,7 +173,7 @@ export class SkyRenderer {
       'sky-atmosphere',
       'sky-bloom',
       'sky-god-rays',
-      'sky-taa',
+      'sky-bilateral',
     ]);
 
     (window as any).startSkyPerfCapture = () => {
@@ -225,10 +232,13 @@ export class SkyRenderer {
       this.sun.color.copy(this._dayColor);
     }
 
-    // Compute inverse view-projection matrix for ray reconstruction
-    this.invViewProjectionMatrix
-      .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
-      .invert();
+    // Compute view-projection matrix (forward) and its inverse for ray reconstruction.
+    // The forward matrix is needed by the temporal renderer for reprojection.
+    this.viewProjMatrix.multiplyMatrices(
+      camera.projectionMatrix,
+      camera.matrixWorldInverse
+    );
+    this.invViewProjectionMatrix.copy(this.viewProjMatrix).invert();
 
     uniformData.set(this.invViewProjectionMatrix.elements, 0); // invViewProjectionMatrix
     uniformData.set(
@@ -296,6 +306,9 @@ export class SkyRenderer {
       this.perfMonitor.getTimestampWrites('sky-cloud-shadow')
     );
 
+    // Update temporal state: teleport detection + store prev view-proj for next frame's reprojection
+    this.cloudsPass.updateTemporalState(camera, this.viewProjMatrix);
+
     this.cloudsPass.render(
       commandEncoder,
       this.perfMonitor.getTimestampWrites('sky-clouds')
@@ -308,11 +321,12 @@ export class SkyRenderer {
     const commandBuffer = commandEncoder.finish();
     device.queue.submit([commandBuffer]);
 
+    this.blurPass.render(renderer);
+
     this.bloomPass.render(
       renderer,
       this.perfMonitor.getTimestampWrites('sky-bloom')
     );
-    // this.blurPass.render(renderer);
 
     // Sync god ray config tunables then render
     this.godRaysPass.config.enabled = this.godRayEnabled;
@@ -327,9 +341,10 @@ export class SkyRenderer {
       this.perfMonitor.getTimestampWrites('sky-god-rays')
     );
 
-    this.taaPass.render(
+    this.bilateralPass.render(
       renderer,
-      this.perfMonitor.getTimestampWrites('sky-taa')
+      this.invViewProjectionMatrix.elements,
+      this.perfMonitor.getTimestampWrites('sky-bilateral')
     );
 
     this.finalPass.azimuth = this.azimuth;
@@ -344,7 +359,7 @@ export class SkyRenderer {
     this.perfMonitor.dispose();
     this.starfieldRenderer.dispose();
     this.cloudShadowRenderer.dispose();
-    this.taaPass.dispose();
+    this.bilateralPass.dispose();
     this.blurPass.dispose();
     this.bloomPass.dispose();
     this.godRaysPass.dispose();
