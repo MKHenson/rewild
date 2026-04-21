@@ -151,28 +151,3 @@ geometry.computeBVHAsync()
 The worker is a separate esbuild entry point (`bvhWorker.js`) that shares source classes with the main bundle. BVH trees are serialised as flat typed arrays for efficient `postMessage` transfer.
 
 The `BVHWorkerManager` is created automatically by the Renderer when `asyncBuildThreshold > 0`. Access it via `renderer.bvhWorkerManager`. It is disposed in `renderer.dispose()`.
-
-## File Structure
-
-```
-packages/rewild-renderer/lib/
-├── acceleration/
-│   ├── BVH.ts                  # Per-geometry BVH (sync/async build, raycast, refit)
-│   ├── BVHBuilder.ts           # Tree construction (SAH + center split strategies)
-│   ├── BVHConfig.ts            # BVHConfig interface + DEFAULT_BVH_CONFIG
-│   ├── BVHNode.ts              # Node class, BVHOptions interface
-│   ├── BVHSerializer.ts        # Serialize/deserialize for worker transfer
-│   ├── BVHUtils.ts             # countNodes(), countLeaves(), getMaxDepth()
-│   ├── BVHWorkerManager.ts     # Worker lifecycle + request routing
-│   ├── SceneBVH.ts             # Scene-level BVH (frustumCull, raycast, queryBox, queryRadius)
-│   ├── SceneBVHNode.ts         # Scene BVH node (holds Transform[])
-│   ├── index.ts                # Re-exports all types
-│   └── worker/
-│       └── BVHWorker.ts        # Web Worker entry point (separate esbuild bundle)
-├── core/
-│   ├── Mesh.ts                 # Uses geometry.bvh in raycast when available
-│   └── Raycaster.ts            # intersectBVHScene() method
-├── geometry/
-│   └── Geometry.ts             # computeBVH(), computeBVHAsync(), auto-compute in build()
-└── Renderer.ts                 # bvhConfig, bvhWorkerManager, auto-refit loop
-```
