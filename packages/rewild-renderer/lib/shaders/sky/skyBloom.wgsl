@@ -20,25 +20,39 @@ var<uniform> object: ObjectStruct;
   let blurRadius = vec2f(5.0) / object.resolution.xy;
   let time = object.iTime * 0.001;
 
-  var sum = vec4f(0.0);
   let NUM_SAMPLES = 10.0;
-  let phiOffset = hash(dot(fragCoord.xy, vec2(1.12,2.251)) + time * 0.0001);
+  let BLOOM_AMOUNT = 0.001;
+  let BLOOM_THRESHOLD = 0.6;
+  let jitterSeed = hash(dot(fragCoord.xy, vec2(1.12, 2.251)) + time * 0.0001);
 
-  for(var i: i32 = 0; i < i32(NUM_SAMPLES); i++)
+  var bloomSum = vec4f(0.0);
+  var bloomWeight = 0.0;
+
+  for(var i: i32 = 1; i <= i32(NUM_SAMPLES); i++)
   {
-      let r = blurRadius * f32(i) / NUM_SAMPLES;
-      let phi = (f32(i) / NUM_SAMPLES + phiOffset) * 2.0 * 3.1415926;
-      let uv = uv + vec2(sin(phi), cos(phi)) * r; 
-
-      sum += textureSampleLevel( ourTexture, ourSampler, uv, 0.0);
+      let fi = f32(i) / NUM_SAMPLES;
+      // Golden angle spiral gives uniform coverage with no visible rings
+      let phi = f32(i) * 2.399963 + jitterSeed * 6.2831853;
+      let r = blurRadius * sqrt(fi);
+      let sampleUV = uv + vec2(sin(phi), cos(phi)) * r;
+      let s = textureSampleLevel(ourTexture, ourSampler, sampleUV, 0.0);
+      let brightness = dot(s.rgb, vec3f(0.2126, 0.7152, 0.0722));
+      let gaussWeight = exp(-fi * fi * 3.0);
+      let contribution = max(0.0, brightness - BLOOM_THRESHOLD) * gaussWeight;
+      bloomSum += s * contribution;
+      bloomWeight += contribution;
   }
 
-  let BLOOM_AMOUNT = 0.03; 
-  let originalColor = textureSampleLevel( ourTexture, ourSampler, uv, 0.0);
-  sum = vec4f( mix(originalColor.xyz, sum.xyz / NUM_SAMPLES, BLOOM_AMOUNT), originalColor.w );
+  let originalColor = textureSampleLevel(ourTexture, ourSampler, uv, 0.0);
+  var bloom = vec4f(0.0);
+  if (bloomWeight > 0.0) {
+      bloom = bloomSum / bloomWeight;
+  }
 
-  let exposure = 0.06;// * ( 1.0 + 0.2 * sin( 0.5 ) * sin( 1.8  ));
-  return vec4f(tonemapACES( exposure * sum.xyz ), sum.w); 
+  let exposure = 0.05;
+  let tonemapped = tonemapACES(exposure * originalColor.rgb);
+  let finalRGB = clamp(tonemapped + bloom.rgb * BLOOM_AMOUNT, vec3f(0.0), vec3f(1.0));
+  return vec4f(finalRGB, originalColor.w);
 }
 
 
