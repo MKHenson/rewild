@@ -96,7 +96,7 @@ export class TemporalCloudRenderer {
   private uniformUint32 = new Uint32Array(this.uniformRawBuffer);
 
   constructor() {
-    this.resolutionScale = 1.0;
+    this.resolutionScale = 1;
   }
 
   // ────────────────────────────────────────────

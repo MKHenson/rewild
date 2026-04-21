@@ -23,7 +23,7 @@ export class SkyBloomPass implements IPostProcess {
   sourceTexture: GPUTexture | null;
 
   constructor() {
-    this.scaleFactor = 0.75;
+    this.scaleFactor = 0.8;
     this.sourceTexture = null;
   }
 
