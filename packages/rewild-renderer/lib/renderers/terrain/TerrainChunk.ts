@@ -1,7 +1,7 @@
 import { Box3, Dispatcher, Vector2, Vector3 } from 'rewild-common';
 import { TerrainPass } from '../../materials/TerrainPass';
 import { Mesh } from '../../core/Mesh';
-import { LOFInfo, TerrainRenderer } from './TerrainRenderer';
+import { LODInfo, TerrainRenderer } from './TerrainRenderer';
 import { Renderer } from '../..';
 import { Transform } from '../../core/Transform';
 import { DataTexture } from '../../textures/DataTexture';
@@ -23,7 +23,7 @@ export class TerrainChunk implements IComponent {
   _visible: boolean = false;
   bounds: Box3;
   transform: Transform;
-  detailLevels: LOFInfo[];
+  detailLevels: LODInfo[];
   lodMesh: LODMesh[];
   chunkSize: i32;
   dispatcher: Dispatcher<TerrainChunkEvent>;
@@ -33,7 +33,7 @@ export class TerrainChunk implements IComponent {
     coord: Vector2,
     size: i32,
     chunkSize: i32,
-    detailLevels: LOFInfo[]
+    detailLevels: LODInfo[]
   ) {
     this.id = `${coord.x},${coord.y}`;
     this.position = coord.multiplyScalar(size);
@@ -118,7 +118,10 @@ export class TerrainChunk implements IComponent {
       const lodMesh = this.lodMesh[lodIndex];
       if (lodMesh.gpuState === 'ready') {
         lodMesh.mesh.visible = true;
-      } else if (lodMesh.gpuState === 'none' || lodMesh.gpuState === 'unloaded') {
+      } else if (
+        lodMesh.gpuState === 'none' ||
+        lodMesh.gpuState === 'unloaded'
+      ) {
         lodMesh.requestMesh(renderer, terrainRenderer.workerPool);
       }
     }
@@ -195,7 +198,12 @@ export class LODMesh {
     });
   }
 
-  async load(chunkSize: i32, lod: i32, renderer: Renderer, pool: TerrainWorkerPool) {
+  async load(
+    chunkSize: i32,
+    lod: i32,
+    renderer: Renderer,
+    pool: TerrainWorkerPool
+  ) {
     const { texture, vertices, uvs, indices } = await pool.enqueue({
       chunkSize,
       lod,
