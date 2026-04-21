@@ -55,9 +55,8 @@ var<private> sunDotUp: f32;
   let sky = textureSampleLevel( sky, cloudsSampler, uv, 0 );
   let clouds = textureSampleLevel( clouds, cloudsSampler, uv, 0 );
 
+  // Blend sky and cumulus clouds (cirrus is already composited inside the cloud pass)
   let preMultipliedClouds = vec4<f32>(clouds.rgb * clouds.a, clouds.a);
-
-  // Blend sky and clouds based on alpha
   var blendedColor = sky * (1.0 - preMultipliedClouds.a) + preMultipliedClouds;
    
   let worldPos = worldFromScreenCoord( uv, rawDepth );

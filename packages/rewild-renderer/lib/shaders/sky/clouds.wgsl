@@ -241,6 +241,15 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
         rayStartPosition += dir * stepS;
     }
 
+    // Cirrus: blend high-altitude ice layer using remaining transmittance.
+    if (transmittance > 0.05 && object.cirrusOpacity > 0.0) {
+        let cir = cirrusRaySample(cameraPos, dir, sun_direction);
+        if (cir.a > 0.0) {
+            color += transmittance * cir.rgb * cir.a;
+            transmittance *= (1.0 - cir.a);
+        }
+    }
+
     let background = getAtmosphereColor(sun_direction, dir, mu, vec3f(0.0));
 
     color += background * pow(transmittance, 2.0);

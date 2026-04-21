@@ -20,6 +20,8 @@ struct ObjectStruct {
     foginess: f32,
     windiness: f32,
     cameraAltitude: f32,
+    cirrusCoverage: f32,
+    cirrusOpacity: f32,
 };
 
 struct OutputStruct {
