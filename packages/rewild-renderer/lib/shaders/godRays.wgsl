@@ -47,18 +47,17 @@ fn fs(
     let rd = textureSample(cloudTexture, linearSampler, uniforms.sunScreenPos + vec2( 0.0, -r)).a;
     let ringAlpha = (ra + rb + rc + rd) * 0.25;
 
-    // Bell-shaped visibility: god rays need CONTRAST between cloud shadow and clear
-    // gaps. In uniform clear sky (ringAlpha~0) there is no contrast — every sample
-    // has the same transmittance, producing only a flat overbrightening glow.
-    // In fully overcast sky (ringAlpha~1) the sun is blocked entirely.
-    // Rays are strongest at middling coverage (~0.2-0.5) where gaps exist.
+    // Gate: rays are always visible unless the sun is heavily blocked by clouds.
+    // In clear sky the sun disc itself is the bright source — the march accumulates
+    // a uniform illumination that the distance falloff turns into a radial glow.
+    // In partial cloud the contrast between opaque cloud and clear gaps creates
+    // distinct shafts. Only heavy overcast (ringAlpha > ~0.7) kills the effect.
     //
-    //  ringAlpha=0.00 (clear sky)  -> sunVisibility=0.0  (no rays, no contrast)
-    //  ringAlpha=0.15 (thin cloud) -> sunVisibility~0.7
-    //  ringAlpha=0.35 (partial)    -> sunVisibility=1.0  (full rays)
-    //  ringAlpha=0.70 (heavy)      -> sunVisibility~0.5
+    //  ringAlpha=0.00 (clear sky)  -> sunVisibility=1.0  (full glow from disc)
+    //  ringAlpha=0.35 (partial)    -> sunVisibility=1.0  (shafts through gaps)
+    //  ringAlpha=0.65 (heavy)      -> sunVisibility~0.6
     //  ringAlpha=0.90 (overcast)   -> sunVisibility=0.0  (sun fully blocked)
-    let sunVisibility = smoothstep(0.0, 0.2, ringAlpha) * (1.0 - smoothstep(0.55, 0.95, ringAlpha));
+    let sunVisibility = 1.0 - smoothstep(0.55, 0.90, ringAlpha);
 
     // --- Radial blur march (pixel -> sun) ---
     // Forward direction gives the correct radial shaft pattern: highest-weight
