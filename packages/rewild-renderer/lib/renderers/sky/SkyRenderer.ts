@@ -50,7 +50,7 @@ export class SkyRenderer {
   godRayEnabled: boolean = true;
   /** Master brightness multiplier (range 0–3). Scales the final ray intensity on top of the
    *  per-frame horizon fade. 0 = invisible, 1 = default, >1 = exaggerated shafts. */
-  godRayIntensity: number = 1.0;
+  godRayIntensity: number = 2.0;
   /** How far the radial blur rays extend from the sun toward the screen edges (range 0.1–1.0).
    *  Low values (0.2) give short subtle rays; high values (0.8) give long dramatic shafts. */
   godRayDensity: number = 0.8;
@@ -60,7 +60,7 @@ export class SkyRenderer {
   godRayDecay: number = 0.98;
 
   cirrusCoverage: number = 0.35;
-  cirrusOpacity: number = 0.13;
+  cirrusOpacity: number = 0.1;
 
   uniformBuffer: GPUBuffer;
   uniformData: Float32Array;
