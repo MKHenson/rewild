@@ -4,7 +4,7 @@ import { Dispatcher, Vector2, Vector3 } from 'rewild-common';
 import { LODMesh, TerrainChunk, TerrainChunkEvent } from './TerrainChunk';
 import { TerrainWorkerPool } from './TerrainWorkerPool';
 
-export class LOFInfo {
+export class LODInfo {
   lod: i32;
   visibleDstThreshold: f32;
 }
@@ -25,7 +25,7 @@ export class TerrainRenderer {
   chunksVisibleInViewDst: i32;
   terrainChunks: Map<string, TerrainChunk>;
   terrainChunksVisibleLastUpdate: TerrainChunk[];
-  detailLevels: LOFInfo[] = [
+  detailLevels: LODInfo[] = [
     { lod: 0, visibleDstThreshold: 600 },
     { lod: 5, visibleDstThreshold: 800 },
     { lod: 6, visibleDstThreshold: 1000 },
