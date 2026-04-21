@@ -110,7 +110,7 @@ export class TerrainRenderer {
           currentChunkCoordY + yOffset
         );
 
-        const mapId = `${viewedChunkCoord.x}:${viewedChunkCoord.y}`;
+        const mapId = `${viewedChunkCoord.x},${viewedChunkCoord.y}`;
 
         if (this.terrainChunks.has(mapId)) {
           const chunk = this.terrainChunks.get(mapId)!;
