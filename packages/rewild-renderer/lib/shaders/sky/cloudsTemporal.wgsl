@@ -15,8 +15,8 @@
 // SYNC NOTE: if skyRay() or drawCloudsHorizonFog() change in clouds.wgsl, mirror the
 // changes here.  The LOD system (calculateCloudLOD) must be kept identical.
 
-const NUM_CLOUD_SAMPLES = 120;
-const NUM_LIGHT_SAMPLES = 20;
+const NUM_CLOUD_SAMPLES = 80;
+const NUM_LIGHT_SAMPLES = 25;
 
 // ──────────────────────────────────────────────
 // Group 0: standard cloud shader bindings
