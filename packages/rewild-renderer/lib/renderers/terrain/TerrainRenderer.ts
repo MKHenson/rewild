@@ -2,6 +2,7 @@ import { Renderer } from '../../Renderer';
 import { Camera } from '../../core/Camera';
 import { Dispatcher, Vector2, Vector3 } from 'rewild-common';
 import { LODMesh, TerrainChunk, TerrainChunkEvent } from './TerrainChunk';
+import { TerrainWorkerPool } from './TerrainWorkerPool';
 
 export class LOFInfo {
   lod: i32;
@@ -29,6 +30,7 @@ export class TerrainRenderer {
     { lod: 6, visibleDstThreshold: 1000 },
   ];
   dispatcher: Dispatcher<TerrainEvent>;
+  workerPool: TerrainWorkerPool;
   private onChunkLoadedDelegate: (event: TerrainChunkEvent) => void;
 
   _hasInitiallyUpdatedTerrain: boolean = false;
@@ -51,6 +53,7 @@ export class TerrainRenderer {
     const mapChunkSize = this.mapChunkSizeLod;
     this.chunkSize = mapChunkSize - 1;
     this.chunksVisibleInViewDst = Math.round(this.maxViewDst / mapChunkSize);
+    this.workerPool = new TerrainWorkerPool();
   }
 
   private onChunkLoaded(event: TerrainChunkEvent) {
@@ -174,5 +177,6 @@ export class TerrainRenderer {
     }
     this.terrainChunks.clear();
     this.terrainChunksVisibleLastUpdate.length = 0;
+    this.workerPool.dispose();
   }
 }

@@ -9,6 +9,7 @@ import { TextureProperties } from '../../textures/Texture';
 import { Geometry } from '../../geometry/Geometry';
 import { Intersection } from '../../core/Raycaster';
 import { IComponent, IRaycaster } from '../../../types/interfaces';
+import { TerrainWorkerPool } from './TerrainWorkerPool';
 
 const temp: Vector3 = new Vector3();
 
@@ -112,7 +113,7 @@ export class TerrainChunk implements IComponent {
       if (lodMesh.mesh) {
         lodMesh.mesh.visible = true;
       } else if (!lodMesh.hasRequestedMesh) {
-        lodMesh.requestMesh(renderer);
+        lodMesh.requestMesh(renderer, terrainRenderer.workerPool);
       }
     }
   }
@@ -154,73 +155,62 @@ export class LODMesh {
     this.position = position;
   }
 
-  requestMesh(renderer: Renderer) {
+  requestMesh(renderer: Renderer, pool: TerrainWorkerPool) {
     if (this.hasRequestedMesh) {
       return;
     }
     this.hasRequestedMesh = true;
-    this.load(this.chunkSize, this.lod, renderer);
+    this.load(this.chunkSize, this.lod, renderer, pool);
   }
 
-  async load(chunkSize: i32, lod: i32, renderer: Renderer) {
-    const workerTest = new Worker('/terrainWorker.js', {
-      type: 'module',
-    });
-
-    workerTest.postMessage({
-      type: 'start',
+  async load(chunkSize: i32, lod: i32, renderer: Renderer, pool: TerrainWorkerPool) {
+    const { texture, vertices, uvs, indices } = await pool.enqueue({
       chunkSize,
       lod,
       position: this.position,
     });
 
-    workerTest.onmessage = (event) => {
-      const { texture, vertices, uvs, indices } = event.data;
+    const terrainTexture = renderer.textureManager.addTexture(
+      new DataTexture(
+        new TextureProperties('terrain1', false),
+        texture,
+        chunkSize,
+        chunkSize
+      )
+    );
 
-      const terrainTexture = renderer.textureManager.addTexture(
-        new DataTexture(
-          new TextureProperties('terrain1', false),
-          texture,
-          chunkSize,
-          chunkSize
-        )
-      );
+    const geometry = new Geometry();
+    geometry.vertices = vertices;
+    geometry.uvs = uvs;
+    geometry.indices = indices;
+    geometry.computeNormals();
 
-      const geometry = new Geometry();
-      geometry.vertices = vertices;
-      geometry.uvs = uvs;
-      geometry.indices = indices;
-      geometry.computeNormals();
+    this.heights = new Float32Array(vertices.length / 3);
+    for (let i = 0, j = 0; i < vertices.length; i += 3, j++) {
+      this.heights[j] = vertices[i + 1];
+    }
 
-      this.heights = new Float32Array(vertices.length / 3);
-      for (let i = 0, j = 0; i < vertices.length; i += 3, j++) {
-        this.heights[j] = vertices[i + 1];
-      }
+    terrainTexture.load(renderer);
+    geometry.build(
+      renderer.device,
+      renderer.bvhConfig,
+      renderer.bvhWorkerManager ?? undefined
+    );
 
-      terrainTexture.load(renderer);
-      geometry.build(
-        renderer.device,
-        renderer.bvhConfig,
-        renderer.bvhWorkerManager ?? undefined
-      );
+    const terrainPass = new TerrainPass();
+    terrainPass.terrainUniforms.sampler =
+      renderer.samplerManager.get('linear-clamped');
+    terrainPass.terrainUniforms.texture = terrainTexture.gpuTexture;
+    terrainPass.terrainUniforms.albedoTexture = renderer.textureManager.get(
+      'rocky-mountain-texture-seamless'
+    ).gpuTexture;
 
-      const terrainPass = new TerrainPass();
-      terrainPass.terrainUniforms.sampler =
-        renderer.samplerManager.get('linear-clamped');
-      terrainPass.terrainUniforms.texture = terrainTexture.gpuTexture;
-      terrainPass.terrainUniforms.albedoTexture = renderer.textureManager.get(
-        'rocky-mountain-texture-seamless'
-      ).gpuTexture;
-
-      this.mesh = new Mesh(geometry, terrainPass);
-      this.chunk.transform.addChild(this.mesh.transform);
-      this.chunk.dispatcher.dispatch({
-        type: 'mesh-loaded',
-        mesh: this,
-        chunk: this.chunk,
-      });
-
-      workerTest.terminate();
-    };
+    this.mesh = new Mesh(geometry, terrainPass);
+    this.chunk.transform.addChild(this.mesh.transform);
+    this.chunk.dispatcher.dispatch({
+      type: 'mesh-loaded',
+      mesh: this,
+      chunk: this.chunk,
+    });
   }
 }
