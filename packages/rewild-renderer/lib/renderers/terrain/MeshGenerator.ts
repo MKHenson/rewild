@@ -1,5 +1,3 @@
-import { Vector2, Vector3 } from 'rewild-common';
-
 export function generateTerrainMesh(
   heightmap: Float32Array,
   width: number,
@@ -10,8 +8,8 @@ export function generateTerrainMesh(
   const topLeftX = (width - 1) / -2;
   const topLeftZ = (height - 1) / 2;
 
-  let meshSimplificationIncrement = levelOfDetail === 0 ? 1 : levelOfDetail * 2;
-  let verticesPerLine = (width - 1) / meshSimplificationIncrement + 1;
+  const meshSimplificationIncrement = levelOfDetail === 0 ? 1 : levelOfDetail * 2;
+  const verticesPerLine = (width - 1) / meshSimplificationIncrement + 1;
 
   const meshData = new MeshData(verticesPerLine, verticesPerLine);
   let vertexIndex = 0;
@@ -19,12 +17,7 @@ export function generateTerrainMesh(
   for (let y = 0; y < height; y += meshSimplificationIncrement) {
     for (let x = 0; x < width; x += meshSimplificationIncrement) {
       const heightValue = heightmap[y * width + x] * noiseScale;
-      meshData.vertices[vertexIndex] = new Vector3(
-        topLeftX + x,
-        heightValue,
-        topLeftZ - y
-      );
-      meshData.uvs[vertexIndex] = new Vector2(x / width, y / height);
+      meshData.setVertex(vertexIndex, topLeftX + x, heightValue, topLeftZ - y, x / width, y / height);
 
       if (x < width - 1 && y < height - 1) {
         meshData.addTriangle(
@@ -46,24 +39,32 @@ export function generateTerrainMesh(
   return meshData;
 }
 
-export class MeshData {
-  vertices: Vector3[];
-  uvs: Vector2[];
-  triangles: number[];
+// Interleaved layout per vertex: [x, y, z, u, v]
+export const MESH_STRIDE = 5;
 
+export class MeshData {
+  interleaved: Float32Array;
+  triangles: Uint32Array;
   triangleIndex: number = 0;
 
   constructor(width: number, height: number) {
-    this.vertices = new Array(width * height);
-    this.uvs = new Array(width * height);
-    this.triangles = new Array((width - 1) * (height - 1) * 6).fill(0);
+    this.interleaved = new Float32Array(width * height * MESH_STRIDE);
+    this.triangles = new Uint32Array((width - 1) * (height - 1) * 6);
+  }
+
+  setVertex(index: number, x: number, y: number, z: number, u: number, v: number) {
+    const base = index * MESH_STRIDE;
+    this.interleaved[base]     = x;
+    this.interleaved[base + 1] = y;
+    this.interleaved[base + 2] = z;
+    this.interleaved[base + 3] = u;
+    this.interleaved[base + 4] = v;
   }
 
   addTriangle(a: number, b: number, c: number) {
-    this.triangles[this.triangleIndex] = a;
+    this.triangles[this.triangleIndex]     = a;
     this.triangles[this.triangleIndex + 1] = b;
     this.triangles[this.triangleIndex + 2] = c;
-
     this.triangleIndex += 3;
   }
 }

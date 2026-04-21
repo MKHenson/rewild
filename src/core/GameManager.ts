@@ -101,22 +101,19 @@ export class GameManager {
           }
         }
         break;
-      case 'chunk-disposed':
-        // Handle chunk disposed event if needed
+      case 'chunk-unloaded':
+      case 'chunk-disposed': {
         const rb = this.terrainRapierBodyMap.get(event.chunk.id);
         if (rb) {
-          // Remove all colliders associated with this rigid body
           const numColliders = rb.numColliders();
           for (let i = 0; i < numColliders; i++) {
-            const collider = rb.collider(i);
-            this.physicsWorld.removeCollider(collider, false);
+            this.physicsWorld.removeCollider(rb.collider(i), false);
           }
           this.physicsWorld.removeRigidBody(rb);
-          this.terrainRapierBodyMap.delete(
-            `${event.chunk.position.x},${event.chunk.position.y}`
-          );
+          this.terrainRapierBodyMap.delete(event.chunk.id);
         }
         break;
+      }
     }
   }
 

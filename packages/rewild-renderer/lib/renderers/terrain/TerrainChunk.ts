@@ -72,10 +72,16 @@ export class TerrainChunk implements IComponent {
     }
   }
 
+  unloadGPU() {
+    for (const lod of this.lodMesh) {
+      lod.unloadGPU();
+    }
+  }
+
   dispose() {
     for (const lod of this.lodMesh) {
       if (lod.mesh) {
-        lod.mesh.geometry.dispose();
+        if (lod.gpuState === 'ready') lod.mesh.geometry.dispose();
         lod.mesh.material.dispose();
       }
     }
@@ -110,9 +116,9 @@ export class TerrainChunk implements IComponent {
       }
 
       const lodMesh = this.lodMesh[lodIndex];
-      if (lodMesh.mesh) {
+      if (lodMesh.gpuState === 'ready') {
         lodMesh.mesh.visible = true;
-      } else if (!lodMesh.hasRequestedMesh) {
+      } else if (lodMesh.gpuState === 'none' || lodMesh.gpuState === 'unloaded') {
         lodMesh.requestMesh(renderer, terrainRenderer.workerPool);
       }
     }
@@ -133,11 +139,13 @@ export class TerrainChunk implements IComponent {
   }
 }
 
+export type LODMeshGPUState = 'none' | 'requested' | 'ready' | 'unloaded';
+
 export class LODMesh {
   mesh: Mesh;
   lod: i32;
   position: Vector2;
-  hasRequestedMesh: boolean;
+  gpuState: LODMeshGPUState;
   chunk: TerrainChunk;
   chunkSize: i32;
   heights: Float32Array;
@@ -149,18 +157,42 @@ export class LODMesh {
     chunkSize: i32
   ) {
     this.lod = lod;
-    this.hasRequestedMesh = false;
+    this.gpuState = 'none';
     this.chunk = chunk;
     this.chunkSize = chunkSize;
     this.position = position;
   }
 
   requestMesh(renderer: Renderer, pool: TerrainWorkerPool) {
-    if (this.hasRequestedMesh) {
+    if (this.gpuState === 'unloaded') {
+      this.reuploadGPU(renderer);
       return;
     }
-    this.hasRequestedMesh = true;
+    if (this.gpuState !== 'none') return;
+    this.gpuState = 'requested';
     this.load(this.chunkSize, this.lod, renderer, pool);
+  }
+
+  unloadGPU() {
+    if (this.gpuState !== 'ready') return;
+    this.mesh.geometry.dispose();
+    this.mesh.transform.visible = false;
+    this.gpuState = 'unloaded';
+  }
+
+  private async reuploadGPU(renderer: Renderer) {
+    this.gpuState = 'requested';
+    this.mesh.geometry.build(
+      renderer.device,
+      renderer.bvhConfig,
+      renderer.bvhWorkerManager ?? undefined
+    );
+    this.gpuState = 'ready';
+    this.chunk.dispatcher.dispatch({
+      type: 'mesh-loaded',
+      mesh: this,
+      chunk: this.chunk,
+    });
   }
 
   async load(chunkSize: i32, lod: i32, renderer: Renderer, pool: TerrainWorkerPool) {
@@ -207,6 +239,7 @@ export class LODMesh {
 
     this.mesh = new Mesh(geometry, terrainPass);
     this.chunk.transform.addChild(this.mesh.transform);
+    this.gpuState = 'ready';
     this.chunk.dispatcher.dispatch({
       type: 'mesh-loaded',
       mesh: this,

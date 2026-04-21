@@ -11,6 +11,7 @@ export class LOFInfo {
 
 export type TerrainEvent =
   | { type: 'chunk-loaded'; chunk: TerrainChunk; lod: LODMesh }
+  | { type: 'chunk-unloaded'; chunk: TerrainChunk }
   | { type: 'chunk-disposed'; chunk: TerrainChunk };
 
 const viewerMoveThresholdForChunkUpdate = 25;
@@ -47,6 +48,10 @@ export class TerrainRenderer {
 
   get maxViewDst() {
     return this.detailLevels.at(-1)!.visibleDstThreshold;
+  }
+
+  get evictDistance() {
+    return this.maxViewDst * 2;
   }
 
   init(renderer: Renderer) {
@@ -136,6 +141,35 @@ export class TerrainRenderer {
           this.terrainChunks.set(mapId, newChunk);
         }
       }
+    }
+
+    // Eviction pass — runs after visible chunk processing so we never
+    // evict something that was just visited above.
+    const evictDistance = this.evictDistance;
+    const maxViewDst = this.maxViewDst;
+    const viewerPos = this.viewerPosition;
+    const toFullEvict: string[] = [];
+
+    for (const [key, chunk] of this.terrainChunks) {
+      const dist = chunk.transform.position.distanceTo(viewerPos);
+      if (dist > evictDistance) {
+        toFullEvict.push(key);
+      } else if (dist > maxViewDst) {
+        const hadGPU = chunk.lodMesh.some((lod) => lod.gpuState === 'ready');
+        chunk.unloadGPU();
+        if (hadGPU) {
+          this.dispatcher.dispatch({ type: 'chunk-unloaded', chunk });
+        }
+      }
+    }
+
+    for (const key of toFullEvict) {
+      const chunk = this.terrainChunks.get(key)!;
+      this.dispatcher.dispatch({ type: 'chunk-disposed', chunk });
+      chunk.dispatcher.remove(this.onChunkLoadedDelegate);
+      chunk.dispose();
+      renderer.scene.removeChild(chunk.transform);
+      this.terrainChunks.delete(key);
     }
   }
 
