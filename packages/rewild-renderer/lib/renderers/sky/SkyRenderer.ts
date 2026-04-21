@@ -59,6 +59,9 @@ export class SkyRenderer {
    *  reach further across the screen before fading out. */
   godRayDecay: number = 0.98;
 
+  cirrusCoverage: number = 0.35;
+  cirrusOpacity: number = 0.13;
+
   uniformBuffer: GPUBuffer;
   uniformData: Float32Array;
 
@@ -114,14 +117,17 @@ export class SkyRenderer {
         16 * 4 + // invViewProjectionMatrix
         3 * 4 + // cameraPosition
         4 + // resolutionScale
-        4 * 4 + // sunPosition
-        4 * 4 + // up
+        4 * 4 + // sunPosition (vec3 + padding2)
+        4 * 4 + // up (vec3 + padding3)
         4 + // iTime
         4 + // resolutionX
         4 + // resolutionY
         4 + // cloudiness
         4 + // foginess
         4 + // windiness
+        4 + // cameraAltitude
+        4 + // cirrusCoverage
+        4 + // cirrusOpacity
         0;
 
       // Align the buffer size to the next multiple of 256
@@ -261,6 +267,8 @@ export class SkyRenderer {
         this.foginess,
         this.windiness,
         camera.transform.position.y,
+        this.cirrusCoverage,
+        this.cirrusOpacity,
       ],
       28
     );

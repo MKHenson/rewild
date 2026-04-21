@@ -5,6 +5,7 @@ import commonShaderFns from '../../shaders/sky/skyCommon.wgsl';
 import constantsFns from '../../shaders/sky/skyConstants.wgsl';
 import fogFns from '../../shaders/sky/fog.wgsl';
 import cloudDensityFns from '../../shaders/sky/cloudDensity.wgsl';
+import cirrusFns from '../../shaders/sky/cloudsCirrus.wgsl';
 import temporalShader from '../../shaders/sky/cloudsTemporal.wgsl';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -115,6 +116,7 @@ export class TemporalCloudRenderer {
         temporalShader +
         constantsFns +
         fogFns +
+        cirrusFns +
         commonShaderFns +
         cloudDensityFns,
     });
