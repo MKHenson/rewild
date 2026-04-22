@@ -15,7 +15,10 @@ import { PerformanceMonitor } from '../../utils/PerformanceMonitor';
 import { StarfieldRenderer } from './StarfieldRenderer';
 import { CloudShadowRenderer } from './CloudShadowRenderer';
 import { GodRaysPostProcess } from '../../post-processes/GodRaysPostProcess';
-import { PrecipitationPostProcess } from '../../post-processes/PrecipitationPostProcess';
+import {
+  RainParticlePass,
+  RainParticleParams,
+} from '../../post-processes/RainParticlePass';
 
 export class SkyRenderer {
   requiresRebuild: boolean = true;
@@ -33,7 +36,7 @@ export class SkyRenderer {
   denoisePass: SkyDenoisePass;
   finalPass: SkyCompositePass;
   godRaysPass: GodRaysPostProcess;
-  precipitationPass: PrecipitationPostProcess;
+  rainPass: RainParticlePass;
   starfieldRenderer: StarfieldRenderer;
   cloudShadowRenderer: CloudShadowRenderer;
 
@@ -68,6 +71,8 @@ export class SkyRenderer {
   precipitation: number = 0.0;
   temperature: number = 0.5;
   shelterAmount: number = 0.0;
+
+  private pendingRainParams: RainParticleParams | null = null;
 
   uniformBuffer: GPUBuffer;
   uniformData: Float32Array;
@@ -104,7 +109,7 @@ export class SkyRenderer {
     this.blurPass = new SkyBlurPass();
     this.bloomPass = new SkyBloomPass();
     this.godRaysPass = new GodRaysPostProcess();
-    this.precipitationPass = new PrecipitationPostProcess();
+    this.rainPass = new RainParticlePass();
     this.finalPass = new SkyCompositePass();
     this.starfieldRenderer = new StarfieldRenderer();
     this.cloudShadowRenderer = new CloudShadowRenderer({
@@ -180,13 +185,12 @@ export class SkyRenderer {
     this.godRaysPass.cloudTexture = this.cloudsPass.renderTarget;
     this.godRaysPass.init(renderer);
 
-    this.precipitationPass.init(renderer);
+    this.rainPass.init(renderer);
 
     this.finalPass.atmosphereTexture = this.atmospherePass.renderTarget;
     this.finalPass.cloudsTexture = this.bilateralPass.renderTarget;
     this.finalPass.cloudShadowMap = this.cloudShadowRenderer.shadowMap;
     this.finalPass.godRaysTexture = this.godRaysPass.renderTarget;
-    this.finalPass.precipitationTexture = this.precipitationPass.renderTarget;
     this.finalPass.init(renderer);
 
     this.perfMonitor.init(device, [
@@ -290,10 +294,16 @@ export class SkyRenderer {
     );
     // Float index 37 = _skyPad0 (left as 0)
     // Normalize windDirection before writing
-    const wdLen = Math.sqrt(this.windDirection.x * this.windDirection.x + this.windDirection.y * this.windDirection.y);
+    const wdLen = Math.sqrt(
+      this.windDirection.x * this.windDirection.x +
+        this.windDirection.y * this.windDirection.y
+    );
     const wdx = wdLen > 0 ? this.windDirection.x / wdLen : 1;
     const wdy = wdLen > 0 ? this.windDirection.y / wdLen : 0;
-    uniformData.set([wdx, wdy, this.precipitation, this.temperature, this.shelterAmount], 38);
+    uniformData.set(
+      [wdx, wdy, this.precipitation, this.temperature, this.shelterAmount],
+      38
+    );
 
     return uniformData;
   }
@@ -378,18 +388,36 @@ export class SkyRenderer {
     );
 
     if (this.precipitation > 0) {
-      this.precipitationPass.render(renderer, {
-        windDirection: { x: this.windDirection.x, y: this.windDirection.y },
-        windSpeed: this.windiness * 0.3,
-        gustStrength: this.windiness * this.windiness,
-        precipitation: this.precipitation,
-        temperature: this.temperature,
-        shelterAmount: this.shelterAmount,
+      const wdLen = Math.hypot(this.windDirection.x, this.windDirection.y);
+      const wdx = wdLen > 0 ? this.windDirection.x / wdLen : 1;
+      const wdy = wdLen > 0 ? this.windDirection.y / wdLen : 0;
+      // Wind speed in m/s: 0 = calm, 1 = 10 m/s (enough to lean rain ~46° at max windiness)
+      const baseSpeed = this.windiness * 10.0;
+      const t = renderer.totalDeltaTime / 1000;
+      // Gust oscillation ranges approx -1..+1
+      const gustAmp =
+        Math.sin(t * 0.41) * 0.5 +
+        Math.sin(t * 1.17) * 0.3 +
+        Math.sin(t * 2.73) * 0.2;
+      // Gust fraction scales with windiness: calm wind = no gusts, full wind = ±40% variation
+      const gustFraction = this.windiness * 0.95;
+      const effSpeed = baseSpeed * (1.0 + gustFraction * gustAmp);
+      const rainParams: RainParticleParams = {
+        viewProj: this.viewProjMatrix.elements,
         cameraX: camera.transform.position.x,
+        cameraY: camera.transform.position.y,
         cameraZ: camera.transform.position.z,
-      });
+        windDirX: -wdx,
+        windDirY: -wdy,
+        windSpeed: baseSpeed,
+        windSpeedEff: effSpeed,
+        temperature: this.temperature,
+        precipitation: this.precipitation * (1 - this.shelterAmount),
+      };
+      this.rainPass.simulate(renderer, rainParams, renderer.delta);
+      this.pendingRainParams = rainParams;
     } else {
-      this.precipitationPass.clear(renderer);
+      this.pendingRainParams = null;
     }
 
     this.finalPass.azimuth = this.azimuth;
@@ -400,6 +428,13 @@ export class SkyRenderer {
     this.perfMonitor.resolveAndLog();
   }
 
+  /** Called after the sky compositor is submitted — renders rain directly onto the canvas. */
+  postRender(renderer: Renderer): void {
+    if (this.pendingRainParams) {
+      this.rainPass.render(renderer, this.pendingRainParams);
+    }
+  }
+
   dispose() {
     this.perfMonitor.dispose();
     this.starfieldRenderer.dispose();
@@ -408,7 +443,7 @@ export class SkyRenderer {
     this.blurPass.dispose();
     this.bloomPass.dispose();
     this.godRaysPass.dispose();
-    this.precipitationPass.dispose();
+    this.rainPass.dispose();
     this.denoisePass.dispose();
     this.finalPass.dispose();
   }

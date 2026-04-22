@@ -33,9 +33,6 @@ var cloudShadowMap: texture_2d<f32>;
 @group(0) @binding(6)
 var godRaysTexture: texture_2d<f32>;
 
-@group(0) @binding(7)
-var precipitationTexture: texture_2d<f32>;
-
 var<private> sunDotUp: f32;
 
 
@@ -45,9 +42,8 @@ var<private> sunDotUp: f32;
   // Define uv based on fragCoord
   let uv = fragCoord.xy / vec2(object.resolution);
 
-  // Sample god rays and precipitation once — additively blended into every output path
+  // Sample god rays — additively blended into every output path
   let godRays = textureSampleLevel(godRaysTexture, cloudsSampler, uv, 0);
-  let precip  = textureSampleLevel(precipitationTexture, cloudsSampler, uv, 0);
 
   // Convert uv to texture coordinates
   let texCoord = vec2<i32>(uv * vec2<f32>(textureDimensions(depthTexture)));
@@ -78,7 +74,7 @@ var<private> sunDotUp: f32;
 
     if (cloudOcclusion > 0.99) {
       // Terrain fully occluded by clouds — use sky+cloud view directly
-      let occludedColor = adjustContrast(1.1, blendedColor.rgb) + godRays.rgb + precip.rgb;
+      let occludedColor = adjustContrast(1.1, blendedColor.rgb) + godRays.rgb;
       return vec4f(occludedColor, 1.0);
     }
 
@@ -144,13 +140,13 @@ var<private> sunDotUp: f32;
     if (cloudOcclusion > 0.0) {
       let skyResult = vec4f(adjustContrast(1.1, blendedColor.rgb), 1.0);
       let blended = mix(fogResult, skyResult, cloudOcclusion);
-      return vec4f(blended.rgb + godRays.rgb + precip.rgb, blended.a);
+      return vec4f(blended.rgb + godRays.rgb, blended.a);
     }
 
-    return vec4f(fogResult.rgb + godRays.rgb + precip.rgb, fogResult.a);
+    return vec4f(fogResult.rgb + godRays.rgb, fogResult.a);
   }
 
-  return vec4f( adjustContrast(1.1, blendedColor.rgb) + godRays.rgb + precip.rgb, blendedColor.a );
+  return vec4f( adjustContrast(1.1, blendedColor.rgb) + godRays.rgb, blendedColor.a );
 }
 
 fn worldFromScreenCoord( coord: vec2f, depthSample: f32 ) -> vec3f {

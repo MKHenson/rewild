@@ -30,4 +30,8 @@ export class Sky {
 
     this.skyRenderer.render(renderer, pass, camera);
   }
+
+  postRender(renderer: Renderer): void {
+    this.skyRenderer.postRender(renderer);
+  }
 }
