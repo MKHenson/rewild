@@ -279,7 +279,7 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
 }
 
 fn clouds(position: vec3f) -> CloudDensityResult {
-    return cloudDensity(position, object.windiness, object.cloudiness, object.iTime);
+    return cloudDensity(position, object.windiness, object.cloudiness, object.iTime, object.windDirection);
 }
 
 /**

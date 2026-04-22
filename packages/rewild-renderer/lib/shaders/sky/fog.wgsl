@@ -116,6 +116,11 @@ fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3
     let stormFactor = saturate( (object.cloudiness - 0.8) / 0.2 );
     fogColor = mix( fogColor, FOG_COLOR_STORM, stormFactor );
 
+    // W1.3: shift horizon fog toward neutral gray under overcast (daytime only)
+    let overcastDayFactor_fog = smoothstep(-0.05, 0.15, sunDotUp);
+    let overcastFactor_fog    = smoothstep(0.5, 0.9, object.cloudiness) * overcastDayFactor_fog;
+    fogColor = mix(fogColor, vec3f(0.63, 0.63, 0.63), overcastFactor_fog);
+
     let fogDensity = mix( 0.00002, 0.0008, foginess );
 
     // Fog brightness: scales with both sun elevation and cloud cover.
@@ -141,9 +146,15 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     // Dusk/dawn transition occurs at sunDotUp ±0.1 (~6° above/below horizon).
     let dayFactor = smoothstep(-0.1, 0.1, sunDotUp);
 
+    // Overcast factor: 0 at clear sky, ramps to 1 at heavy overcast.
+    // Gated by day so the night sky is completely unaffected.
+    let overcastDayFactor = smoothstep(-0.05, 0.15, sunDotUp);
+    let overcastFactor    = smoothstep(0.7, 0.95, object.cloudiness) * overcastDayFactor;
+
     // Sun proximity gradient: bright near the sun, dark away from it.
-    // Drives the warm glow around the sun and sky color variation by view angle.
-    let sunProximity = pow(max(0.0, 0.5 + 0.5 * mu), 15.0);
+    // Soften the sun halo edge under cloud cover (sharp clear-sky halo → diffuse glow).
+    let sunSharpness  = mix(15.0, 3.0, overcastFactor);
+    let sunProximity = pow(max(0.0, 0.5 + 0.5 * mu), sunSharpness);
 
     // During twilight only, sun proximity extends a subtle warm glow toward the sun.
     // Fades to zero once the sun is fully below the horizon.
@@ -161,14 +172,20 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     let sunsetOrange = vec3f(1.0, 0.5, 0.2);     // Toward sun, sunset
 
     // Blend sky colors by sun elevation and viewing angle relative to sun
-    let skyColor = mix(
+    let skyColorClear = mix(
         mix(sunsetRed, deepBlue, sunElevationBlend),
         mix(sunsetOrange, paleBlue, sunElevationBlend),
         sunProximity
     );
 
-    // Sky brightness: dimmer at sunset, full brightness at noon
+    // W1.2: shift sky toward pale overcast gray under heavy cloud cover
+    let overcastZenith = vec3f(0.82, 0.85, 0.90);
+    let skyColor = mix(skyColorClear, overcastZenith, overcastFactor);
+
+    // Sky brightness: dimmer at sunset, full brightness at noon.
+    // W1.4: dim the sun contribution through clouds (0.15 at full overcast).
     let skyBrightness = mix(2.0, 6.0, smoothstep(0.0, 0.3, sunDotUp));
+    let sunDim = mix(1.0, 0.15, overcastFactor);
 
     // Altitude-based atmosphere thinning:
     // As the camera rises above the cloud layer the atmosphere gradually thins toward
@@ -183,7 +200,7 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     let horizonHaze = mix(0.3, 3.5, dayFactor) * max(0.0, 1.0 - 2.3 * dir.y) * atmosphereDensity;
 
     // Sky colour scales with atmospheric density; at high altitude the sky dims toward black
-    var dayTimeColor = skyBrightness * skyColor * atmosphereDensity + vec3f(horizonHaze);
+    var dayTimeColor = skyBrightness * skyColor * atmosphereDensity * sunDim + vec3f(horizonHaze);
 
     // At high altitude the daytime atmosphere fades, letting the night sky (stars/space)
     // show through — even during the day, which is physically correct for near-space.

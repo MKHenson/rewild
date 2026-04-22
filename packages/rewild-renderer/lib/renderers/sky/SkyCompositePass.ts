@@ -38,6 +38,7 @@ export class SkyCompositePass implements IPostProcess {
   cloudShadowMap: GPUTexture | null;
   godRaysTexture: GPUTexture | null;
 
+  precipitationTexture: GPUTexture | null;
   cloudiness: number;
   elevation: number;
   azimuth: number;
@@ -48,6 +49,7 @@ export class SkyCompositePass implements IPostProcess {
     this.cloudsTexture = null;
     this.cloudShadowMap = null;
     this.godRaysTexture = null;
+    this.precipitationTexture = null;
   }
 
   init(renderer: Renderer): IPostProcess {
@@ -125,6 +127,10 @@ export class SkyCompositePass implements IPostProcess {
         {
           binding: 6,
           resource: this.godRaysTexture!.createView(),
+        },
+        {
+          binding: 7,
+          resource: this.precipitationTexture!.createView(),
         },
       ],
     });

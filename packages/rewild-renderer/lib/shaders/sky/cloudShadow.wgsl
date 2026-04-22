@@ -89,7 +89,7 @@ const NUM_SHADOW_SAMPLES: i32 = 32;
     // Offset XZ based on sun angle: at height h, light arrives from an XZ offset
     let xzOffset = sunDir.xz * (h * invSunY);
     let samplePos = vec3f(worldXZ.x + xzOffset.x, sampleY, worldXZ.y + xzOffset.y);
-    let density = cloudDensity(samplePos, shadow.windiness, shadow.cloudiness, shadow.iTime).density;
+    let density = cloudDensity(samplePos, shadow.windiness, shadow.cloudiness, shadow.iTime, vec2f(1.0, 0.0)).density;
     totalDensity += density * stepSize;
   }
 

@@ -22,6 +22,11 @@ struct ObjectStruct {
     cameraAltitude: f32,
     cirrusCoverage: f32,
     cirrusOpacity: f32,
+    _skyPad0: f32,           // padding: aligns windDirection to 8-byte boundary (byte 152)
+    windDirection: vec2<f32>, // byte 152
+    precipitation: f32,       // byte 160
+    temperature: f32,         // byte 164
+    shelterAmount: f32,       // byte 168
 };
 
 struct OutputStruct {

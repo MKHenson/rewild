@@ -54,6 +54,8 @@ export class ProjectStore extends Store<IProjectStore> {
           cloudiness: 0.7,
           foginess: 0.3,
           windiness: 0.5,
+          precipitation: 0.0,
+          temperature: 0.5,
           elevation: 80,
           dayNightCycle: false,
         },
