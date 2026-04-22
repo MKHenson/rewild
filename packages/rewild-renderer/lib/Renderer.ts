@@ -496,6 +496,10 @@ export class Renderer {
     }
   }
 
+  getCurrentTextureView(): GPUTextureView {
+    return this.context.getCurrentTexture().createView();
+  }
+
   hasWebGPU() {
     if (!navigator.gpu) {
       return false;
@@ -678,6 +682,10 @@ export class Renderer {
       postProcessingPass.end();
 
       device.queue.submit([postProcessingEncoder.finish()]);
+
+      // Render precipitation directly onto the canvas after the sky compositor so
+      // particles are visible against both terrain and sky (not gated through fog alpha).
+      this.sky.postRender(this);
 
       // Overlay pass: renders on top of scene + sky with depth cleared
       if (overlayRenderList.length > 0) {
