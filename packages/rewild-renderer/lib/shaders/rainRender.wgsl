@@ -10,6 +10,8 @@
 struct Particle {
     position: vec3<f32>,
     seed:     f32,
+    velocity: vec3<f32>,
+    _pad:     f32,
 }
 
 // RenderUniforms layout (must match RainParticlePass.ts):
@@ -28,7 +30,7 @@ struct RenderUniforms {
     windDir:      vec2<f32>,
     windSpeed:    f32,
     precipitation: f32,
-    _pad0:        f32,
+    sunUpDot:     f32,  // sun elevation: -1=night, 0=horizon, +1=zenith
     _pad1:        f32,
     _pad2:        f32,
     _pad3:        f32,
@@ -61,10 +63,17 @@ fn vs(
     let rainFactor = u.temperature;  // 0 = snow, 1 = rain
 
     // ── Rain streak geometry ──────────────────────────────────────────────
-    // Velocity direction: down + wind lean
-    let fallSpeed = mix(1.0, 9.5, rainFactor);
-    let windVel   = vec3f(u.windDir.x * u.windSpeed, 0.0, u.windDir.y * u.windSpeed);
-    let velDir    = normalize(windVel + vec3f(0.0, -fallSpeed, 0.0));
+    // Use the particle's stored velocity for streak direction so bounce arcs
+    // show an upward streak rather than a downward one.
+    let fallSpeed  = mix(1.0, 9.5, rainFactor);
+    let windVel    = vec3f(u.windDir.x * u.windSpeed, 0.0, u.windDir.y * u.windSpeed);
+    let pvLen      = length(p.velocity);
+    var velDir: vec3f;
+    if (pvLen > 0.05) {
+        velDir = p.velocity / pvLen;
+    } else {
+        velDir = normalize(windVel + vec3f(0.0, -fallSpeed, 0.0));
+    }
 
     let toCamera = normalize(u.cameraPos - p.position);
 
@@ -125,11 +134,24 @@ fn fs(in: VertexOutput) -> @location(0) vec4f {
     let snowAlpha = smoothstep(1.0, 0.2, snowDist) * 0.55;
 
     // ── Blend, apply precipitation & near-fade ────────────────────────────
-    let alpha = mix(snowAlpha, rainAlpha, rainFactor) * u.precipitation * in.nearFade;
+    let alpha = mix(snowAlpha, rainAlpha, rainFactor) * in.nearFade;
 
     let rainColor = vec3f(0.76, 0.83, 0.91);
     let snowColor = vec3f(0.95, 0.97, 1.00);
     let color     = mix(snowColor, rainColor, rainFactor);
 
-    return vec4f(color, alpha);
+    // Time-of-day tint: night → dusk/dawn → day
+    let s = u.sunUpDot;
+    var tint: vec3f;
+    if (s < -0.1) {
+        tint = vec3f(0.10, 0.12, 0.30);
+    } else if (s < 0.0) {
+        tint = mix(vec3f(0.10, 0.12, 0.30), vec3f(0.80, 0.50, 0.20), (s + 0.1) / 0.1);
+    } else if (s < 0.3) {
+        tint = mix(vec3f(0.80, 0.50, 0.20), vec3f(1.0, 1.0, 1.0), s / 0.3);
+    } else {
+        tint = vec3f(1.0, 1.0, 1.0);
+    }
+
+    return vec4f(color * tint, alpha);
 }
