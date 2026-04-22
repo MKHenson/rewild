@@ -403,7 +403,8 @@ export class SkyRenderer {
       const gustFraction = this.windiness * 0.95;
       const effSpeed = baseSpeed * (1.0 + gustFraction * gustAmp);
       const rainParams: RainParticleParams = {
-        viewProj: this.viewProjMatrix.elements,
+        viewProj:    this.viewProjMatrix.elements,
+        viewProjInv: this.invViewProjectionMatrix.elements,
         cameraX: camera.transform.position.x,
         cameraY: camera.transform.position.y,
         cameraZ: camera.transform.position.z,
@@ -413,6 +414,7 @@ export class SkyRenderer {
         windSpeedEff: effSpeed,
         temperature: this.temperature,
         precipitation: this.precipitation * (1 - this.shelterAmount),
+        sunUpDot: this.upDot,
       };
       this.rainPass.simulate(renderer, rainParams, renderer.delta);
       this.pendingRainParams = rainParams;
