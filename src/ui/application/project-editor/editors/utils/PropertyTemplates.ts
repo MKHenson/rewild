@@ -49,6 +49,26 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
     label: 'Day Night Cycle',
     valueType: 'boolean',
   },
+  precipitation: {
+    label: 'Precipitation',
+    valueType: 'float',
+    valueOptions: {
+      min: 0,
+      max: 1,
+      step: 0.01,
+      precision: 2,
+    },
+  },
+  temperature: {
+    label: 'Temperature',
+    valueType: 'float',
+    valueOptions: {
+      min: 0,
+      max: 1,
+      step: 0.01,
+      precision: 2,
+    },
+  },
   position: {
     label: 'Position',
     valueType: 'vec3',

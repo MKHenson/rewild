@@ -7,15 +7,15 @@ struct CloudDensityResult {
   cloudHeight: f32,
 };
 
-fn cloudDensity(position: vec3f, windiness: f32, cloudiness: f32, iTime: f32) -> CloudDensityResult {
-  let windDirection = vec3f(1.0, 0.0, -1.0) * windiness;
+fn cloudDensity(position: vec3f, windiness: f32, cloudiness: f32, iTime: f32, windDirection: vec2f) -> CloudDensityResult {
+  let windDir3D = vec3f(windDirection.x, 0.0, windDirection.y);
   let cloudinessSpeedFactor = smoothstep(0.9, 1.0, cloudiness);
   let cloudMovementSpeed = iTime * 0.01 * mix(1.0, 3.0, cloudinessSpeedFactor);
 
   // Single coherent wind offset — all layers move together as one mass
-  let windOffset = windDirection * cloudMovementSpeed * 10.3;
+  let windOffset = windDir3D * windiness * cloudMovementSpeed * 10.3;
   // Small turbulence offset for FBM detail layers (subtle internal cloud motion)
-  let turbulenceOffset = windDirection * cloudMovementSpeed * 1.5;
+  let turbulenceOffset = windDir3D * windiness * cloudMovementSpeed * 1.5;
   var p = position + windOffset;
 
   var result: CloudDensityResult;

@@ -24,6 +24,8 @@ declare module 'models' {
     | 'cloudiness'
     | 'foginess'
     | 'windiness'
+    | 'precipitation'
+    | 'temperature'
     | 'elevation'
     | 'dayNightCycle'
     | 'color'
@@ -115,6 +117,8 @@ declare module 'models' {
         cloudiness: PropValue;
         foginess: PropValue;
         windiness: PropValue;
+        precipitation: PropValue;
+        temperature: PropValue;
         dayNightCycle: PropValue;
       };
     };

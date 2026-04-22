@@ -1,7 +1,7 @@
 import { Renderer } from '../..';
 import { Transform } from '../../core/Transform';
 import { Camera } from '../../core/Camera';
-import { Color, degToRad, Matrix4 } from 'rewild-common';
+import { Color, degToRad, Matrix4, Vector2 } from 'rewild-common';
 import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
 import { TemporalCloudRenderer } from './TemporalCloudRenderer';
 import { SkyBilateralPass } from './SkyBilateralPass';
@@ -15,6 +15,7 @@ import { PerformanceMonitor } from '../../utils/PerformanceMonitor';
 import { StarfieldRenderer } from './StarfieldRenderer';
 import { CloudShadowRenderer } from './CloudShadowRenderer';
 import { GodRaysPostProcess } from '../../post-processes/GodRaysPostProcess';
+import { PrecipitationPostProcess } from '../../post-processes/PrecipitationPostProcess';
 
 export class SkyRenderer {
   requiresRebuild: boolean = true;
@@ -32,6 +33,7 @@ export class SkyRenderer {
   denoisePass: SkyDenoisePass;
   finalPass: SkyCompositePass;
   godRaysPass: GodRaysPostProcess;
+  precipitationPass: PrecipitationPostProcess;
   starfieldRenderer: StarfieldRenderer;
   cloudShadowRenderer: CloudShadowRenderer;
 
@@ -61,6 +63,11 @@ export class SkyRenderer {
 
   cirrusCoverage: number = 0.35;
   cirrusOpacity: number = 0.1;
+
+  windDirection: Vector2 = new Vector2(1, 0);
+  precipitation: number = 0.0;
+  temperature: number = 0.5;
+  shelterAmount: number = 0.0;
 
   uniformBuffer: GPUBuffer;
   uniformData: Float32Array;
@@ -97,6 +104,7 @@ export class SkyRenderer {
     this.blurPass = new SkyBlurPass();
     this.bloomPass = new SkyBloomPass();
     this.godRaysPass = new GodRaysPostProcess();
+    this.precipitationPass = new PrecipitationPostProcess();
     this.finalPass = new SkyCompositePass();
     this.starfieldRenderer = new StarfieldRenderer();
     this.cloudShadowRenderer = new CloudShadowRenderer({
@@ -128,6 +136,11 @@ export class SkyRenderer {
         4 + // cameraAltitude
         4 + // cirrusCoverage
         4 + // cirrusOpacity
+        4 + // _skyPad0 (aligns windDirection)
+        2 * 4 + // windDirection (vec2)
+        4 + // precipitation
+        4 + // temperature
+        4 + // shelterAmount
         0;
 
       // Align the buffer size to the next multiple of 256
@@ -167,10 +180,13 @@ export class SkyRenderer {
     this.godRaysPass.cloudTexture = this.cloudsPass.renderTarget;
     this.godRaysPass.init(renderer);
 
+    this.precipitationPass.init(renderer);
+
     this.finalPass.atmosphereTexture = this.atmospherePass.renderTarget;
     this.finalPass.cloudsTexture = this.bilateralPass.renderTarget;
     this.finalPass.cloudShadowMap = this.cloudShadowRenderer.shadowMap;
     this.finalPass.godRaysTexture = this.godRaysPass.renderTarget;
+    this.finalPass.precipitationTexture = this.precipitationPass.renderTarget;
     this.finalPass.init(renderer);
 
     this.perfMonitor.init(device, [
@@ -272,6 +288,12 @@ export class SkyRenderer {
       ],
       28
     );
+    // Float index 37 = _skyPad0 (left as 0)
+    // Normalize windDirection before writing
+    const wdLen = Math.sqrt(this.windDirection.x * this.windDirection.x + this.windDirection.y * this.windDirection.y);
+    const wdx = wdLen > 0 ? this.windDirection.x / wdLen : 1;
+    const wdy = wdLen > 0 ? this.windDirection.y / wdLen : 0;
+    uniformData.set([wdx, wdy, this.precipitation, this.temperature, this.shelterAmount], 38);
 
     return uniformData;
   }
@@ -355,6 +377,21 @@ export class SkyRenderer {
       this.perfMonitor.getTimestampWrites('sky-bilateral')
     );
 
+    if (this.precipitation > 0) {
+      this.precipitationPass.render(renderer, {
+        windDirection: { x: this.windDirection.x, y: this.windDirection.y },
+        windSpeed: this.windiness * 0.3,
+        gustStrength: this.windiness * this.windiness,
+        precipitation: this.precipitation,
+        temperature: this.temperature,
+        shelterAmount: this.shelterAmount,
+        cameraX: camera.transform.position.x,
+        cameraZ: camera.transform.position.z,
+      });
+    } else {
+      this.precipitationPass.clear(renderer);
+    }
+
     this.finalPass.azimuth = this.azimuth;
     this.finalPass.elevation = this.elevation;
     this.finalPass.cloudiness = this.cloudiness;
@@ -371,6 +408,7 @@ export class SkyRenderer {
     this.blurPass.dispose();
     this.bloomPass.dispose();
     this.godRaysPass.dispose();
+    this.precipitationPass.dispose();
     this.denoisePass.dispose();
     this.finalPass.dispose();
   }

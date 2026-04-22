@@ -35,6 +35,9 @@ export async function loadInitialLevels(
   skyRenderer.cloudiness = project.sceneGraph.atmosphere.cloudiness as f32;
   skyRenderer.foginess = project.sceneGraph.atmosphere.foginess as f32;
   skyRenderer.windiness = project.sceneGraph.atmosphere.windiness as f32;
+  skyRenderer.precipitation = project.sceneGraph.atmosphere
+    .precipitation as f32;
+  skyRenderer.temperature = project.sceneGraph.atmosphere.temperature as f32;
   skyRenderer.elevation = project.sceneGraph.atmosphere.elevation as f32;
   skyRenderer.dayNightCycle = project.sceneGraph.atmosphere
     .dayNightCycle as boolean;

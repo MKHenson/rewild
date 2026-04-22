@@ -125,6 +125,14 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
               value: project.sceneGraph?.atmosphere?.windiness || 0.5,
             },
             {
+              type: 'temperature',
+              value: project.sceneGraph?.atmosphere?.temperature || 0.5,
+            },
+            {
+              type: 'precipitation',
+              value: project.sceneGraph?.atmosphere?.precipitation || 0.0,
+            },
+            {
               type: 'elevation',
               value: project.sceneGraph?.atmosphere?.elevation || 80,
             },
