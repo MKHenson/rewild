@@ -75,7 +75,6 @@ export class SkyRenderer {
   windDirection: Vector2 = new Vector2(1, 0);
   precipitation: number = 0.0;
   temperature: number = 0.5;
-  shelterAmount: number = 0.0;
   lightningFlash: number = 0.0;
 
   private pendingBoltStrike: LightningStrike | null = null;
@@ -156,7 +155,6 @@ export class SkyRenderer {
         2 * 4 + // windDirection (vec2)
         4 + // precipitation
         4 + // temperature
-        4 + // shelterAmount
         4 + // lightningBoost
         0;
 
@@ -314,7 +312,7 @@ export class SkyRenderer {
     const wdx = wdLen > 0 ? this.windDirection.x / wdLen : 1;
     const wdy = wdLen > 0 ? this.windDirection.y / wdLen : 0;
     uniformData.set(
-      [wdx, wdy, this.precipitation, this.temperature, this.shelterAmount, 0.0],
+      [wdx, wdy, this.precipitation, this.temperature, 0.0],
       38
     );
 
@@ -336,8 +334,8 @@ export class SkyRenderer {
       cfwdZ
     );
 
-    // lightningBoost drives cloud ambient flash (float index 43)
-    uniformData[43] = strike.flashIntensity * 0.6;
+    // lightningBoost drives cloud ambient flash (float index 42)
+    uniformData[42] = strike.flashIntensity * 0.6;
 
     // lightningFlash is read by SkyCompositePass.setupFinalPassUniforms
     this.lightningFlash = strike.flashIntensity;
@@ -458,7 +456,7 @@ export class SkyRenderer {
         windSpeed: baseSpeed,
         windSpeedEff: effSpeed,
         temperature: this.temperature,
-        precipitation: this.precipitation * (1 - this.shelterAmount),
+        precipitation: this.precipitation,
         sunUpDot: this.upDot,
       };
       this.rainPass.simulate(renderer, rainParams, renderer.delta);
