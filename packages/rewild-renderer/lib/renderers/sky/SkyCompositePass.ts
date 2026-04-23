@@ -19,6 +19,7 @@ const finalUniformBufferSize =
   4 + // foginess
   4 + // shadowWorldSize
   4 + // shadowIntensity
+  4 + // lightningFlash
   0;
 
 const alignedUniformBufferSize = Math.ceil(finalUniformBufferSize / 256) * 256;
@@ -172,6 +173,7 @@ export class SkyCompositePass implements IPostProcess {
         renderer.sky.skyRenderer.foginess,
         renderer.sky.skyRenderer.cloudShadowRenderer.config.worldSize,
         renderer.sky.skyRenderer.fogShadowIntensity,
+        renderer.sky.skyRenderer.lightningFlash,
       ],
       32
     );
