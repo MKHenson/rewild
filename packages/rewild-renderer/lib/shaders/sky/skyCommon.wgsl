@@ -27,6 +27,7 @@ struct ObjectStruct {
     precipitation: f32,       // byte 160
     temperature: f32,         // byte 164
     shelterAmount: f32,       // byte 168
+    lightningBoost: f32,      // byte 172
 };
 
 struct OutputStruct {

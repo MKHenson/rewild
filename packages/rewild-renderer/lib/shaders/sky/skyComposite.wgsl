@@ -10,6 +10,7 @@ struct FinalUniformStruct {
     foginess: f32,
     shadowWorldSize: f32,
     shadowIntensity: f32,
+    lightningFlash: f32,
 }; 
 
 @group(0) @binding(0) 
@@ -45,6 +46,10 @@ var<private> sunDotUp: f32;
   // Sample god rays — additively blended into every output path
   let godRays = textureSampleLevel(godRaysTexture, cloudsSampler, uv, 0);
 
+  // Lightning screen flash: brightest at centre, dimmed at edges
+  let flashVignette = 1.0 - smoothstep(0.3, 1.0, length(uv - vec2<f32>(0.5, 0.5)));
+  let flash = object.lightningFlash * 0.7 * (0.6 + flashVignette * 0.4);
+
   // Convert uv to texture coordinates
   let texCoord = vec2<i32>(uv * vec2<f32>(textureDimensions(depthTexture)));
 
@@ -74,7 +79,7 @@ var<private> sunDotUp: f32;
 
     if (cloudOcclusion > 0.99) {
       // Terrain fully occluded by clouds — use sky+cloud view directly
-      let occludedColor = adjustContrast(1.1, blendedColor.rgb) + godRays.rgb;
+      let occludedColor = adjustContrast(1.1, blendedColor.rgb) + godRays.rgb + flash;
       return vec4f(occludedColor, 1.0);
     }
 
@@ -140,13 +145,13 @@ var<private> sunDotUp: f32;
     if (cloudOcclusion > 0.0) {
       let skyResult = vec4f(adjustContrast(1.1, blendedColor.rgb), 1.0);
       let blended = mix(fogResult, skyResult, cloudOcclusion);
-      return vec4f(blended.rgb + godRays.rgb, blended.a);
+      return vec4f(blended.rgb + godRays.rgb + flash, blended.a);
     }
 
-    return vec4f(fogResult.rgb + godRays.rgb, fogResult.a);
+    return vec4f(fogResult.rgb + godRays.rgb + flash, fogResult.a);
   }
 
-  return vec4f( adjustContrast(1.1, blendedColor.rgb) + godRays.rgb, blendedColor.a );
+  return vec4f( adjustContrast(1.1, blendedColor.rgb) + godRays.rgb + flash, blendedColor.a );
 }
 
 fn worldFromScreenCoord( coord: vec2f, depthSample: f32 ) -> vec3f {

@@ -19,6 +19,9 @@ import {
   RainParticlePass,
   RainParticleParams,
 } from '../../post-processes/RainParticlePass';
+import { LightningController } from './LightningController';
+import { LightningBoltPass } from '../../post-processes/LightningBoltPass';
+import type { LightningStrike } from './LightningController';
 
 export class SkyRenderer {
   requiresRebuild: boolean = true;
@@ -37,6 +40,8 @@ export class SkyRenderer {
   finalPass: SkyCompositePass;
   godRaysPass: GodRaysPostProcess;
   rainPass: RainParticlePass;
+  lightning: LightningController;
+  lightningBoltPass: LightningBoltPass;
   starfieldRenderer: StarfieldRenderer;
   cloudShadowRenderer: CloudShadowRenderer;
 
@@ -71,6 +76,10 @@ export class SkyRenderer {
   precipitation: number = 0.0;
   temperature: number = 0.5;
   shelterAmount: number = 0.0;
+  lightningFlash: number = 0.0;
+
+  private pendingBoltStrike: LightningStrike | null = null;
+  private lastCameraPos: [number, number, number] = [0, 0, 0];
 
   private pendingRainParams: RainParticleParams | null = null;
 
@@ -110,6 +119,8 @@ export class SkyRenderer {
     this.bloomPass = new SkyBloomPass();
     this.godRaysPass = new GodRaysPostProcess();
     this.rainPass = new RainParticlePass();
+    this.lightning = new LightningController();
+    this.lightningBoltPass = new LightningBoltPass();
     this.finalPass = new SkyCompositePass();
     this.starfieldRenderer = new StarfieldRenderer();
     this.cloudShadowRenderer = new CloudShadowRenderer({
@@ -146,6 +157,7 @@ export class SkyRenderer {
         4 + // precipitation
         4 + // temperature
         4 + // shelterAmount
+        4 + // lightningBoost
         0;
 
       // Align the buffer size to the next multiple of 256
@@ -186,6 +198,7 @@ export class SkyRenderer {
     this.godRaysPass.init(renderer);
 
     this.rainPass.init(renderer);
+    this.lightningBoltPass.init(renderer);
 
     this.finalPass.atmosphereTexture = this.atmospherePass.renderTarget;
     this.finalPass.cloudsTexture = this.bilateralPass.renderTarget;
@@ -301,9 +314,37 @@ export class SkyRenderer {
     const wdx = wdLen > 0 ? this.windDirection.x / wdLen : 1;
     const wdy = wdLen > 0 ? this.windDirection.y / wdLen : 0;
     uniformData.set(
-      [wdx, wdy, this.precipitation, this.temperature, this.shelterAmount],
+      [wdx, wdy, this.precipitation, this.temperature, this.shelterAmount, 0.0],
       38
     );
+
+    // Extract XZ camera forward from the world matrix (-Z column)
+    const m = camera.transform.matrixWorld.elements;
+    const fwX = -m[8];
+    const fwZ = -m[10];
+    const fwLen = Math.sqrt(fwX * fwX + fwZ * fwZ);
+    const cfwdX = fwLen > 0.001 ? fwX / fwLen : 0;
+    const cfwdZ = fwLen > 0.001 ? fwZ / fwLen : 1;
+
+    // Advance lightning state machine
+    const strike = this.lightning.update(
+      renderer.delta,
+      this.cloudiness,
+      this.precipitation,
+      camera.transform.position,
+      cfwdX,
+      cfwdZ
+    );
+
+    // lightningBoost drives cloud ambient flash (float index 43)
+    uniformData[43] = strike.flashIntensity * 0.6;
+
+    // lightningFlash is read by SkyCompositePass.setupFinalPassUniforms
+    this.lightningFlash = strike.flashIntensity;
+
+    this.lastCameraPos[0] = camera.transform.position.x;
+    this.lastCameraPos[1] = camera.transform.position.y;
+    this.lastCameraPos[2] = camera.transform.position.z;
 
     return uniformData;
   }
@@ -387,6 +428,10 @@ export class SkyRenderer {
       this.perfMonitor.getTimestampWrites('sky-bilateral')
     );
 
+    // Store bolt for postRender (renders before rain so it sits behind particles)
+    const currentStrike = this.lightning.currentStrike;
+    this.pendingBoltStrike = currentStrike.boltVisible ? currentStrike : null;
+
     if (this.precipitation > 0) {
       const wdLen = Math.hypot(this.windDirection.x, this.windDirection.y);
       const wdx = wdLen > 0 ? this.windDirection.x / wdLen : 1;
@@ -403,7 +448,7 @@ export class SkyRenderer {
       const gustFraction = this.windiness * 0.95;
       const effSpeed = baseSpeed * (1.0 + gustFraction * gustAmp);
       const rainParams: RainParticleParams = {
-        viewProj:    this.viewProjMatrix.elements,
+        viewProj: this.viewProjMatrix.elements,
         viewProjInv: this.invViewProjectionMatrix.elements,
         cameraX: camera.transform.position.x,
         cameraY: camera.transform.position.y,
@@ -430,11 +475,34 @@ export class SkyRenderer {
     this.perfMonitor.resolveAndLog();
   }
 
-  /** Called after the sky compositor is submitted — renders rain directly onto the canvas. */
+  /** Called after the sky compositor is submitted — renders bolt then rain onto the canvas. */
   postRender(renderer: Renderer): void {
+    if (this.pendingBoltStrike) {
+      this.lightningBoltPass.render(
+        renderer,
+        this.pendingBoltStrike,
+        this.viewProjMatrix.elements,
+        this.lastCameraPos
+      );
+    }
     if (this.pendingRainParams) {
       this.rainPass.render(renderer, this.pendingRainParams);
     }
+  }
+
+  /** Current lightning flash intensity (0–1). Read each frame by the game's
+   *  directional light system to lerp the light colour toward white. */
+  get lightningFlashIntensity(): number {
+    return this.lightning.currentStrike.flashIntensity;
+  }
+
+  /**
+   * Trigger a lightning strike immediately.
+   * @param worldPos  - optional world-space XZ strike position [x, y, z];
+   *                    Y is ignored — the bolt always starts at cloud base altitude.
+   */
+  triggerLightning(worldPos?: [number, number, number]): void {
+    this.lightning.triggerStrike(worldPos);
   }
 
   dispose() {
@@ -446,6 +514,7 @@ export class SkyRenderer {
     this.bloomPass.dispose();
     this.godRaysPass.dispose();
     this.rainPass.dispose();
+    this.lightningBoltPass.dispose();
     this.denoisePass.dispose();
     this.finalPass.dispose();
   }
