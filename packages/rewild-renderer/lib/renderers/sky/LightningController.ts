@@ -3,8 +3,13 @@ import { Vector3 } from 'rewild-common';
 export interface LightningStrike {
   flashIntensity: number;
   boltVisible: boolean;
-  boltPath: Float32Array | null;
-  boltBranches: Float32Array[];
+  /** Pre-allocated flat vec3 array; valid point count is boltPathPtCount. */
+  boltPath: Float32Array;
+  boltPathPtCount: number;
+  /** Always 3 pre-allocated arrays; boltBranchCount tells how many are active. */
+  boltBranches: [Float32Array, Float32Array, Float32Array];
+  boltBranchPtCounts: [number, number, number];
+  boltBranchCount: number;
   boltIntensity: number;
 }
 
@@ -28,8 +33,12 @@ const FRACTAL_LEVELS = 4;
 const BASE_DISPLACEMENT = 80;
 // Minimum and maximum gap (ms) between chained lightning strikes
 const CHAIN_GAP_MS: [number, number] = [50, 200];
-const MIN_LIGHTNING_DISTANCE = 1000;
-const MAX_LIGHTNING_DISTANCE = 2000;
+const MIN_LIGHTNING_DISTANCE = 700;
+const MAX_LIGHTNING_DISTANCE = 1200;
+
+// Max point counts after N midpoint-subdivision levels: 2^N + 1
+const MAX_MAIN_PTS = (1 << FRACTAL_LEVELS) + 1; // 17
+const MAX_BRANCH_PTS = (1 << 3) + 1; //  9
 
 function seededRand(seed: number): number {
   const x = Math.sin(seed + 1.9898) * 43758.5453;
@@ -40,19 +49,36 @@ export class LightningController {
   private phase: Phase = 'idle';
   private phaseTimer = 0;
   private nextStrikeIn = 8000;
-  private pendingWorldPos: [number, number, number] | null = null;
   private chainCount = 0;
   private chainGap = 0;
   private seed = 0;
 
-  // Store the last strike position for distance-based flash attenuation
-  private lastStrikePos: [number, number, number] | null = null;
+  // Strike position stored in-place (no per-strike allocation)
+  private readonly strikePos = new Float32Array(3);
+  private hasStrikePos = false;
+
+  // Pending manually-triggered position
+  private readonly pendingPos = new Float32Array(3);
+  private hasPendingPos = false;
+
+  // Ping-pong work buffers for fractal subdivision — no allocations during generation
+  private readonly genBufA = new Float32Array(MAX_MAIN_PTS * 3);
+  private readonly genBufB = new Float32Array(MAX_MAIN_PTS * 3);
+  private readonly branchBufA = new Float32Array(MAX_BRANCH_PTS * 3);
+  private readonly branchBufB = new Float32Array(MAX_BRANCH_PTS * 3);
 
   readonly currentStrike: LightningStrike = {
     flashIntensity: 0,
     boltVisible: false,
-    boltPath: null,
-    boltBranches: [],
+    boltPath: new Float32Array(MAX_MAIN_PTS * 3),
+    boltPathPtCount: 0,
+    boltBranches: [
+      new Float32Array(MAX_BRANCH_PTS * 3),
+      new Float32Array(MAX_BRANCH_PTS * 3),
+      new Float32Array(MAX_BRANCH_PTS * 3),
+    ],
+    boltBranchPtCounts: [0, 0, 0],
+    boltBranchCount: 0,
     boltIntensity: 0,
   };
 
@@ -61,8 +87,9 @@ export class LightningController {
    * @param deltaMs        - frame time in milliseconds
    * @param cloudiness     - 0–1
    * @param precipitation  - 0–1
-   * @param cameraPos      - world-space camera position [x, y, z]
-   * @param cameraFwdXZ    - normalised forward direction in XZ plane [x, z]
+   * @param cameraPos      - world-space camera position
+   * @param cameraFwdX     - normalised forward X in XZ plane
+   * @param cameraFwdZ     - normalised forward Z in XZ plane
    */
   update(
     deltaMs: number,
@@ -78,10 +105,10 @@ export class LightningController {
 
     // Compute attenuation factor for flash based on distance to camera
     let flashAttenuation = 1;
-    if (this.lastStrikePos) {
-      const dx = cameraPos.x - this.lastStrikePos[0];
-      const dy = cameraPos.y - this.lastStrikePos[1];
-      const dz = cameraPos.z - this.lastStrikePos[2];
+    if (this.hasStrikePos) {
+      const dx = cameraPos.x - this.strikePos[0];
+      const dy = cameraPos.y - this.strikePos[1];
+      const dz = cameraPos.z - this.strikePos[2];
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
       // 1.0 at 0m, 0.5 at 1000m, 0.2 at 2500m, 0.1 at 4000m, never below 0.05
       flashAttenuation = Math.max(0.05, 1 / (1 + dist / 1000));
@@ -98,7 +125,7 @@ export class LightningController {
         }
 
         this.nextStrikeIn -= deltaMs;
-        if (this.nextStrikeIn <= 0 || this.pendingWorldPos !== null) {
+        if (this.nextStrikeIn <= 0 || this.hasPendingPos) {
           this.beginStrike(cameraPos, cameraFwdX, cameraFwdZ);
         }
         break;
@@ -160,7 +187,14 @@ export class LightningController {
    *                    if omitted, position is auto-generated near the camera.
    */
   triggerStrike(worldPos?: [number, number, number]): void {
-    this.pendingWorldPos = worldPos ?? null;
+    if (worldPos) {
+      this.pendingPos[0] = worldPos[0];
+      this.pendingPos[1] = worldPos[1];
+      this.pendingPos[2] = worldPos[2];
+      this.hasPendingPos = true;
+    } else {
+      this.hasPendingPos = false;
+    }
     this.nextStrikeIn = 0;
     if (this.phase !== 'idle') {
       this.phase = 'idle';
@@ -178,9 +212,10 @@ export class LightningController {
     let strikeX: number;
     let strikeZ: number;
 
-    if (this.pendingWorldPos) {
-      [strikeX, , strikeZ] = this.pendingWorldPos;
-      this.pendingWorldPos = null;
+    if (this.hasPendingPos) {
+      strikeX = this.pendingPos[0];
+      strikeZ = this.pendingPos[2];
+      this.hasPendingPos = false;
     } else {
       // Rotate camera forward by a random angle ±45° then pick a random distance
       const angle = (Math.random() - 0.5) * (Math.PI / 2);
@@ -194,23 +229,19 @@ export class LightningController {
       strikeZ = cameraPos.z + dirZ * dist;
     }
 
-    // Store the last strike position for attenuation
-    this.lastStrikePos = [strikeX, CLOUD_BASE_Y, strikeZ];
+    // Store strike position in-place for flash attenuation
+    this.strikePos[0] = strikeX;
+    this.strikePos[1] = CLOUD_BASE_Y;
+    this.strikePos[2] = strikeZ;
+    this.hasStrikePos = true;
 
     const seed = ++this.seed;
-    const start: [number, number, number] = [strikeX, CLOUD_BASE_Y, strikeZ];
-    const end: [number, number, number] = [
-      strikeX + (Math.random() - 0.5) * 20,
-      -50, // below terrain; depth test clips the bolt at the surface
-      strikeZ + (Math.random() - 0.5) * 20,
-    ];
+    const endX = strikeX + (Math.random() - 0.5) * 20;
+    const endZ = strikeZ + (Math.random() - 0.5) * 20;
 
-    const { path, branches } = this.generateBolt(start, end, seed);
+    this.generateBolt(strikeX, CLOUD_BASE_Y, strikeZ, endX, -50, endZ, seed);
 
-    this.currentStrike.boltPath = path;
-    this.currentStrike.boltBranches = branches;
     this.currentStrike.boltIntensity = 0.7 + Math.random() * 0.3;
-
     this.phase = 'bolt';
     this.phaseTimer = BOLT_MS;
     // Gap between chained lightning strikes, controlled by CHAIN_GAP_MS
@@ -218,80 +249,128 @@ export class LightningController {
       CHAIN_GAP_MS[0] + Math.random() * (CHAIN_GAP_MS[1] - CHAIN_GAP_MS[0]);
   }
 
+  /**
+   * Subdivide a path one fractal level using midpoint displacement.
+   * Reads ptCount points from src, writes (ptCount*2 - 1) points to dst.
+   * Returns the new point count. Zero-allocation.
+   */
+  private subdividePath(
+    src: Float32Array,
+    dst: Float32Array,
+    ptCount: number,
+    seedX: number,
+    seedZ: number,
+    scale: number
+  ): number {
+    let di = 0;
+    for (let i = 0; i < ptCount - 1; i++) {
+      const s = i * 3;
+      const ax = src[s],
+        ay = src[s + 1],
+        az = src[s + 2];
+      const bx = src[s + 3],
+        by = src[s + 4],
+        bz = src[s + 5];
+      dst[di++] = ax;
+      dst[di++] = ay;
+      dst[di++] = az;
+      dst[di++] = (ax + bx) * 0.5 + (seededRand(seedX + i * 7) - 0.5) * scale;
+      dst[di++] = (ay + by) * 0.5;
+      dst[di++] = (az + bz) * 0.5 + (seededRand(seedZ + i * 11) - 0.5) * scale;
+    }
+    const last = (ptCount - 1) * 3;
+    dst[di++] = src[last];
+    dst[di++] = src[last + 1];
+    dst[di] = src[last + 2];
+    return ptCount * 2 - 1;
+  }
+
+  /**
+   * Generate bolt geometry directly into currentStrike buffers.
+   * Uses pre-allocated ping-pong buffers — no heap allocations.
+   */
   private generateBolt(
-    start: [number, number, number],
-    end: [number, number, number],
+    startX: number,
+    startY: number,
+    startZ: number,
+    endX: number,
+    endY: number,
+    endZ: number,
     seed: number
-  ): { path: Float32Array; branches: Float32Array[] } {
-    let pts: [number, number, number][] = [start, end];
+  ): void {
+    const strike = this.currentStrike;
+
+    // ── Main path ──────────────────────────────────────────────────────────
+    this.genBufA[0] = startX;
+    this.genBufA[1] = startY;
+    this.genBufA[2] = startZ;
+    this.genBufA[3] = endX;
+    this.genBufA[4] = endY;
+    this.genBufA[5] = endZ;
+
+    let cur = this.genBufA;
+    let next = this.genBufB;
+    let ptCount = 2;
 
     for (let level = 0; level < FRACTAL_LEVELS; level++) {
-      const newPts: [number, number, number][] = [];
       const scale = BASE_DISPLACEMENT / Math.pow(2, level);
-      for (let i = 0; i < pts.length - 1; i++) {
-        const p0 = pts[i];
-        const p1 = pts[i + 1];
-        const mid: [number, number, number] = [
-          (p0[0] + p1[0]) / 2 +
-            (seededRand(seed + level * 13 + i * 7) - 0.5) * scale,
-          (p0[1] + p1[1]) / 2,
-          (p0[2] + p1[2]) / 2 +
-            (seededRand(seed + level * 17 + i * 11) - 0.5) * scale,
-        ];
-        newPts.push(p0, mid);
-      }
-      newPts.push(pts[pts.length - 1]);
-      pts = newPts;
+      ptCount = this.subdividePath(
+        cur,
+        next,
+        ptCount,
+        seed + level * 13,
+        seed + level * 17,
+        scale
+      );
+      const tmp = cur;
+      cur = next;
+      next = tmp;
     }
 
+    // Copy result to pre-allocated output (no allocation)
+    for (let i = 0, n = ptCount * 3; i < n; i++) strike.boltPath[i] = cur[i];
+    strike.boltPathPtCount = ptCount;
+
+    // ── Branches ───────────────────────────────────────────────────────────
     const numBranches = 2 + Math.floor(Math.random() * 2);
-    const branches: Float32Array[] = [];
+    strike.boltBranchCount = numBranches;
 
     for (let b = 0; b < numBranches; b++) {
-      const branchFrom = Math.floor(pts.length * (0.2 + Math.random() * 0.4));
-      const bp0 = pts[branchFrom];
-      const bEnd: [number, number, number] = [
-        bp0[0] + (seededRand(seed + b * 100) - 0.5) * 200,
-        bp0[1] - (100 + Math.random() * 200),
-        bp0[2] + (seededRand(seed + b * 101) - 0.5) * 200,
-      ];
+      const branchFrom = Math.floor(ptCount * (0.2 + Math.random() * 0.4));
+      const bi = branchFrom * 3;
+      const bp0x = cur[bi],
+        bp0y = cur[bi + 1],
+        bp0z = cur[bi + 2];
 
-      let bPts: [number, number, number][] = [bp0, bEnd];
+      this.branchBufA[0] = bp0x;
+      this.branchBufA[1] = bp0y;
+      this.branchBufA[2] = bp0z;
+      this.branchBufA[3] = bp0x + (seededRand(seed + b * 100) - 0.5) * 200;
+      this.branchBufA[4] = bp0y - (100 + Math.random() * 200);
+      this.branchBufA[5] = bp0z + (seededRand(seed + b * 101) - 0.5) * 200;
+
+      let bCur = this.branchBufA;
+      let bNext = this.branchBufB;
+      let bPtCount = 2;
+
       for (let level = 0; level < 3; level++) {
-        const newBPts: [number, number, number][] = [];
         const scale = 30 / Math.pow(2, level);
-        for (let i = 0; i < bPts.length - 1; i++) {
-          const p0 = bPts[i];
-          const p1 = bPts[i + 1];
-          const mid: [number, number, number] = [
-            (p0[0] + p1[0]) / 2 +
-              (seededRand(seed + b * 200 + level * 13 + i * 7) - 0.5) * scale,
-            (p0[1] + p1[1]) / 2,
-            (p0[2] + p1[2]) / 2 +
-              (seededRand(seed + b * 201 + level * 17 + i * 11) - 0.5) * scale,
-          ];
-          newBPts.push(p0, mid);
-        }
-        newBPts.push(bPts[bPts.length - 1]);
-        bPts = newBPts;
+        bPtCount = this.subdividePath(
+          bCur,
+          bNext,
+          bPtCount,
+          seed + b * 200 + level * 13,
+          seed + b * 201 + level * 17,
+          scale
+        );
+        const tmp = bCur;
+        bCur = bNext;
+        bNext = tmp;
       }
 
-      const arr = new Float32Array(bPts.length * 3);
-      for (let i = 0; i < bPts.length; i++) {
-        arr[i * 3] = bPts[i][0];
-        arr[i * 3 + 1] = bPts[i][1];
-        arr[i * 3 + 2] = bPts[i][2];
-      }
-      branches.push(arr);
+      const dest = strike.boltBranches[b];
+      for (let i = 0, n = bPtCount * 3; i < n; i++) dest[i] = bCur[i];
+      strike.boltBranchPtCounts[b] = bPtCount;
     }
-
-    const path = new Float32Array(pts.length * 3);
-    for (let i = 0; i < pts.length; i++) {
-      path[i * 3] = pts[i][0];
-      path[i * 3 + 1] = pts[i][1];
-      path[i * 3 + 2] = pts[i][2];
-    }
-
-    return { path, branches };
   }
 }

@@ -478,11 +478,14 @@ export class SkyRenderer {
   /** Called after the sky compositor is submitted — renders bolt then rain onto the canvas. */
   postRender(renderer: Renderer): void {
     if (this.pendingBoltStrike) {
+      // Match fog.wgsl: mix(0.00002, 0.0008, foginess)
+      const fogDensity = 0.00002 + 0.00078 * this.foginess;
       this.lightningBoltPass.render(
         renderer,
         this.pendingBoltStrike,
         this.viewProjMatrix.elements,
-        this.lastCameraPos
+        this.lastCameraPos,
+        fogDensity,
       );
     }
     if (this.pendingRainParams) {

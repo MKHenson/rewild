@@ -5,14 +5,16 @@
 //  [19]     halfWidth        f32          ( 4 bytes)
 //  [20]     intensity        f32          ( 4 bytes)
 //  [21]     branchScale      f32          ( 4 bytes)  branch opacity multiplier
-//  [22..23] _pad             vec2<f32>    ( 8 bytes)
+//  [22]     fogDensity       f32          ( 4 bytes)  exp(-fogDensity * dist) attenuation
+//  [23]     _pad             f32          ( 4 bytes)
 struct BoltUniforms {
   viewProjMatrix: mat4x4<f32>,
   cameraPosition: vec3<f32>,
   halfWidth:      f32,
   intensity:      f32,
   branchScale:    f32,
-  _pad:           vec2<f32>,
+  fogDensity:     f32,
+  _pad:           f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: BoltUniforms;
@@ -34,7 +36,8 @@ struct VertexInput {
 
 struct VertexOutput {
   @builtin(position) position: vec4<f32>,
-  @location(0)       perpDist: f32,   // -1..+1 across the ribbon width
+  @location(0)       perpDist: f32,       // -1..+1 across the ribbon width
+  @location(1)       worldPos: vec3<f32>, // for fog distance computation
 }
 
 @vertex
@@ -53,6 +56,7 @@ fn vs(input: VertexInput) -> VertexOutput {
   let worldPos = pos + perp * (uniforms.halfWidth * input.side);
   out.position = uniforms.viewProjMatrix * vec4<f32>(worldPos, 1.0);
   out.perpDist = input.side;
+  out.worldPos = worldPos;
 
   return out;
 }
@@ -67,6 +71,13 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
   let brightness = glow + core;
 
   // White-blue tint: slightly warmer toward the edge
-  let tint  = vec3<f32>(0.88 + 0.12 * (1.0 - d), 0.92 + 0.08 * (1.0 - d), 1.0);
-  return vec4<f32>(tint * brightness, brightness);
+  let tint = vec3<f32>(0.88 + 0.12 * (1.0 - d), 0.92 + 0.08 * (1.0 - d), 1.0);
+
+  // Exponential distance fog — attenuates additive contribution so the bolt
+  // fades into heavy fog rather than punching through it.
+  let dist      = length(input.worldPos - uniforms.cameraPosition);
+  let fogFactor = exp(-uniforms.fogDensity * dist);
+
+  let alpha = brightness * fogFactor;
+  return vec4<f32>(tint * brightness, alpha);
 }
