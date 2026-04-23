@@ -28,6 +28,8 @@ const FRACTAL_LEVELS = 4;
 const BASE_DISPLACEMENT = 80;
 // Minimum and maximum gap (ms) between chained lightning strikes
 const CHAIN_GAP_MS: [number, number] = [50, 200];
+const MIN_LIGHTNING_DISTANCE = 1000;
+const MAX_LIGHTNING_DISTANCE = 2000;
 
 function seededRand(seed: number): number {
   const x = Math.sin(seed + 1.9898) * 43758.5453;
@@ -42,6 +44,9 @@ export class LightningController {
   private chainCount = 0;
   private chainGap = 0;
   private seed = 0;
+
+  // Store the last strike position for distance-based flash attenuation
+  private lastStrikePos: [number, number, number] | null = null;
 
   readonly currentStrike: LightningStrike = {
     flashIntensity: 0,
@@ -70,6 +75,17 @@ export class LightningController {
     const strike = this.currentStrike;
     const stormActive =
       cloudiness > MIN_CLOUDINESS && precipitation > MIN_PRECIPITATION;
+
+    // Compute attenuation factor for flash based on distance to camera
+    let flashAttenuation = 1;
+    if (this.lastStrikePos) {
+      const dx = cameraPos.x - this.lastStrikePos[0];
+      const dy = cameraPos.y - this.lastStrikePos[1];
+      const dz = cameraPos.z - this.lastStrikePos[2];
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      // 1.0 at 0m, 0.5 at 1000m, 0.2 at 2500m, 0.1 at 4000m, never below 0.05
+      flashAttenuation = Math.max(0.05, 1 / (1 + dist / 1000));
+    }
 
     switch (this.phase) {
       case 'idle': {
@@ -102,7 +118,7 @@ export class LightningController {
 
       case 'flash': {
         strike.boltVisible = false;
-        strike.flashIntensity = strike.boltIntensity;
+        strike.flashIntensity = strike.boltIntensity * flashAttenuation;
         this.phaseTimer -= deltaMs;
         if (this.phaseTimer <= 0) {
           this.phase = 'fade';
@@ -114,7 +130,7 @@ export class LightningController {
       case 'fade': {
         strike.boltVisible = false;
         strike.flashIntensity =
-          strike.boltIntensity * (this.phaseTimer / FADE_MS);
+          strike.boltIntensity * (this.phaseTimer / FADE_MS) * flashAttenuation;
         this.phaseTimer -= deltaMs;
         if (this.phaseTimer <= 0) {
           // Chain lightning: max 2 follow-on strikes, each only 40% likely
@@ -172,10 +188,14 @@ export class LightningController {
       const sin = Math.sin(angle);
       const dirX = cameraFwdX * cos - cameraFwdZ * sin;
       const dirZ = cameraFwdX * sin + cameraFwdZ * cos;
-      const dist = 600 + Math.random() * 1000;
+      const dist =
+        MIN_LIGHTNING_DISTANCE + Math.random() * MAX_LIGHTNING_DISTANCE;
       strikeX = cameraPos.x + dirX * dist;
       strikeZ = cameraPos.z + dirZ * dist;
     }
+
+    // Store the last strike position for attenuation
+    this.lastStrikePos = [strikeX, CLOUD_BASE_Y, strikeZ];
 
     const seed = ++this.seed;
     const start: [number, number, number] = [strikeX, CLOUD_BASE_Y, strikeZ];
