@@ -211,7 +211,7 @@ export class Renderer {
     const element2 = this.guiManager.createElement(
       this.materialManager.get('ui-material')
     );
-    this.ui.addChild(element.transform);
+    // this.ui.addChild(element.transform);
 
     element.x = 0.3;
     element.y = 0.2;
