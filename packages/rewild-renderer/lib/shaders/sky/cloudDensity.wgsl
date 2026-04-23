@@ -27,8 +27,9 @@ fn cloudDensity(position: vec3f, windiness: f32, cloudiness: f32, iTime: f32, wi
   result.cloudHeight = cloudHeight;
 
   // Sample the large-scale weather pattern
+  let weatherThreshold = mix(0.18, 0.04, smoothstep(0.7, 1.0, cloudiness));
   var largeWeather: f32 = clamp(
-    (textureSampleLevel(pebblesTexture, noiseSampler, -mix(0.00005, 0.000015, cloudiness) * p.zx, 0.0).x - 0.18) * 5.0 * cloudiness,
+    (textureSampleLevel(pebblesTexture, noiseSampler, -mix(0.00005, 0.000015, cloudiness) * p.zx, 0.0).x - weatherThreshold) * 5.0 * cloudiness,
     0.0, 6.0
   );
 
@@ -52,7 +53,8 @@ fn cloudDensity(position: vec3f, windiness: f32, cloudiness: f32, iTime: f32, wi
 
   // Calculate the cloud density using fractal Brownian motion (fbm)
   // Turbulence offset gives subtle internal motion without breaking the cloud shape
-  var den = max(0.0, cloudShape - 0.7 * fbm((p + turbulenceOffset) * 0.01));
+  let fbmErosion = mix(0.7, 0.25, smoothstep(0.7, 1.0, cloudiness));
+  var den = max(0.0, cloudShape - fbmErosion * fbm((p + turbulenceOffset) * 0.01));
 
   // If the cloud density is zero, return early
   if (den <= 0.0) {
