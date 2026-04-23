@@ -26,8 +26,7 @@ struct ObjectStruct {
     windDirection: vec2<f32>, // byte 152
     precipitation: f32,       // byte 160
     temperature: f32,         // byte 164
-    shelterAmount: f32,       // byte 168
-    lightningBoost: f32,      // byte 172
+    lightningBoost: f32,      // byte 168
 };
 
 struct OutputStruct {
