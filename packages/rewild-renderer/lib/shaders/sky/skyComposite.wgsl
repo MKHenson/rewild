@@ -34,6 +34,9 @@ var cloudShadowMap: texture_2d<f32>;
 @group(0) @binding(6)
 var godRaysTexture: texture_2d<f32>;
 
+@group(0) @binding(7)
+var bloomHighlights: texture_2d<f32>;
+
 var<private> sunDotUp: f32;
 
 
@@ -58,10 +61,19 @@ var<private> sunDotUp: f32;
 
   // Do not draw pixel if blocked by something in the z-buffer
   let sky = textureSampleLevel( sky, cloudsSampler, uv, 0 );
-  let clouds = textureSampleLevel( clouds, cloudsSampler, uv, 0 );
+  let cloudsHDR = textureSampleLevel( clouds, cloudsSampler, uv, 0 );
+
+  // Add HDR bloom highlights to the cloud colour before tonemapping.
+  // Tonemapping the sum together lets the ACES shoulder naturally compress
+  // overbright areas into a smooth glow rather than a hard LDR ring.
+  let bloom = textureSampleLevel( bloomHighlights, cloudsSampler, uv, 0 );
+  let cloudsWithBloom = vec4f(cloudsHDR.rgb + bloom.rgb, cloudsHDR.a);
+
+  // Tonemap HDR clouds (+ bloom) to LDR before blending with the LDR atmosphere.
+  let cloudsTonemap = vec4f(tonemapACES(0.05 * cloudsWithBloom.rgb), cloudsWithBloom.a);
 
   // Blend sky and cumulus clouds (cirrus is already composited inside the cloud pass)
-  let preMultipliedClouds = vec4<f32>(clouds.rgb * clouds.a, clouds.a);
+  let preMultipliedClouds = vec4<f32>(cloudsTonemap.rgb * cloudsTonemap.a, cloudsTonemap.a);
   var blendedColor = sky * (1.0 - preMultipliedClouds.a) + preMultipliedClouds;
    
   let worldPos = worldFromScreenCoord( uv, rawDepth );
@@ -79,7 +91,7 @@ var<private> sunDotUp: f32;
 
     if (cloudOcclusion > 0.99) {
       // Terrain fully occluded by clouds — use sky+cloud view directly
-      let occludedColor = adjustContrast(1.1, blendedColor.rgb) + godRays.rgb + flash;
+      let occludedColor = blendedColor.rgb + godRays.rgb + flash;
       return vec4f(occludedColor, 1.0);
     }
 
@@ -143,7 +155,7 @@ var<private> sunDotUp: f32;
 
     // Partial cloud occlusion: blend terrain fog with cloud-occluded sky view
     if (cloudOcclusion > 0.0) {
-      let skyResult = vec4f(adjustContrast(1.1, blendedColor.rgb), 1.0);
+      let skyResult = vec4f(blendedColor.rgb, 1.0);
       let blended = mix(fogResult, skyResult, cloudOcclusion);
       return vec4f(blended.rgb + godRays.rgb + flash, blended.a);
     }
@@ -151,7 +163,7 @@ var<private> sunDotUp: f32;
     return vec4f(fogResult.rgb + godRays.rgb + flash, fogResult.a);
   }
 
-  return vec4f( adjustContrast(1.1, blendedColor.rgb) + godRays.rgb + flash, blendedColor.a );
+  return vec4f( blendedColor.rgb + godRays.rgb + flash, blendedColor.a );
 }
 
 fn worldFromScreenCoord( coord: vec2f, depthSample: f32 ) -> vec3f {
@@ -161,6 +173,12 @@ fn worldFromScreenCoord( coord: vec2f, depthSample: f32 ) -> vec3f {
   return posWorld;
 }
 
-fn adjustContrast( contrast: f32, input: vec3f ) -> vec3f {
-    return (input - 0.5) * contrast + 0.5;
+// https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+fn tonemapACES(x: vec3f) -> vec3f {
+    let a = 2.51;
+    let b = 0.03;
+    let c = 2.43;
+    let d = 0.59;
+    let e = 0.14;
+    return clamp((x*(a*x+b))/(x*(c*x+d)+e), vec3f(0.0), vec3f(1.0));
 }

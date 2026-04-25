@@ -32,9 +32,32 @@ export class SkyBilateralPass {
   renderTarget: GPUTexture;
   sourceTexture: GPUTexture | null;
 
-  sigmaSpatial: number = 3.0;
-  sigmaRange: number = 0.05;
-  sigmaFar: number = 6.0;
+  /**
+   * sigmaSpatial: Blur radius (in texels) for overhead/nearby clouds.
+   * Higher values increase softening of close cloud edges.
+   * Default: 4.0
+   */
+  sigmaSpatial: number = 1.5;
+
+  /**
+   * sigmaRange: Edge-stop in log-luminance space (fog-independent).
+   * The shader compares log(1+lum) rather than raw HDR luminance, so this value
+   * is stable regardless of foginess. A cloud-sky boundary always produces a
+   * log-diff of ~1.9; within-cloud temporal artifacts produce ~0.1–0.2.
+   * - 0.5: sharp cloud edges, only internal cloud noise blended
+   * - 1.5: some boundary blending (averages the 2×2 temporal checkerboard at edges)
+   * - 3.0: very soft edges, heavy blending across cloud-sky boundaries
+   * Default: 1.5
+   */
+  sigmaRange: number = 0.5;
+
+  /**
+   * sigmaFar: Blur radius (in texels) for distant/horizon clouds.
+   * Must be >= sigmaSpatial so the Gaussian widens with distance rather than
+   * shrinking (which was the original bug that left medium-distance clouds pixelated).
+   * Default: 6.0
+   */
+  sigmaFar: number = 1.5;
 
   private pipeline: GPURenderPipeline;
   private bindGroup: GPUBindGroup;
@@ -58,7 +81,7 @@ export class SkyBilateralPass {
     this.renderTarget = device.createTexture({
       size: [w, h, 1],
       label: 'sky bilateral output',
-      format: 'rgba8unorm',
+      format: 'rgba16float',
       usage:
         GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
@@ -70,7 +93,7 @@ export class SkyBilateralPass {
       fragment: {
         module,
         entryPoint: 'fs',
-        targets: [{ format: 'rgba8unorm' }],
+        targets: [{ format: 'rgba16float' }],
       },
     });
 

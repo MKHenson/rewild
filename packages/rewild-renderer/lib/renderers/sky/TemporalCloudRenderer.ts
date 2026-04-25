@@ -23,8 +23,17 @@ const TEMPORAL_UNIFORM_BYTE_SIZE = 80;
 const ALIGNED_TEMPORAL_UNIFORM_SIZE =
   Math.ceil(TEMPORAL_UNIFORM_BYTE_SIZE / 256) * 256;
 
-/** Default EMA weight for reprojected pixels (0 = all history, 1 = all current). */
-const DEFAULT_BLEND_FACTOR = 0.6;
+/**
+ * Adaptive blend factor for freshly-raymarched pixels.
+ * STILL: camera not moving → accumulate many frames → less noise (~10 effective samples).
+ * MOVING: camera rotating → prefer fresh data → avoids smear artefacts.
+ * Interpolated each frame based on measured rotation rate.
+ */
+const BLEND_FACTOR_STILL = 0.1;
+const BLEND_FACTOR_MOVING = 0.6;
+
+/** Rotation rate (°/frame) at which the blend factor reaches BLEND_FACTOR_MOVING. */
+const MOVEMENT_RAMP_DEG = 3.0;
 
 /**
  * Camera jump thresholds that trigger history invalidation.
@@ -36,10 +45,10 @@ const TELEPORT_ROTATION_THRESHOLD = Math.PI / 8;
 /**
  * TemporalCloudRenderer replaces CloudRenderer in SkyRenderer.
  *
- * Each frame only 1/16 of pixels are raymarched (4×4 checkerboard pattern).
- * The remaining 15/16 pixels are reprojected from the previous frame's
- * accumulated history via direction-based reprojection.  An exponential
- * moving-average blend (blendFactor ≈ 0.6) smooths convergence and hides
+ * Each frame only 1/4 of pixels are raymarched (2×2 checkerboard pattern).
+ * The remaining 3/4 pixels are reprojected from the previous frame's
+ * accumulated history via direction-based reprojection.  An adaptive EMA
+ * blend (BLEND_FACTOR_STILL..BLEND_FACTOR_MOVING) smooths convergence and
  * the checkerboard seam as the pattern cycles through all 4 groups.
  *
  * History is invalidated (full re-render) on first frame, after a camera
@@ -66,7 +75,7 @@ export class TemporalCloudRenderer {
   /** Stored on init so render() can write uniforms without a renderer reference. */
   private device: GPUDevice;
 
-  /** Frame counter cycling 0-15 to select the active checkerboard group. */
+  /** Frame counter cycling 0-3 to select the active 2×2 checkerboard group. */
   private currentFrame = 0;
 
   /** False until the first frame has been fully rendered. */
@@ -90,13 +99,16 @@ export class TemporalCloudRenderer {
   private lastQuatZ = NaN;
   private lastQuatW = NaN;
 
+  /** Adaptive EMA weight for freshly-raymarched pixels, updated each frame. */
+  private currentBlendFactor = BLEND_FACTOR_STILL;
+
   /** Shared ArrayBuffer backing both float32 and uint32 typed-array views. */
   private uniformRawBuffer = new ArrayBuffer(ALIGNED_TEMPORAL_UNIFORM_SIZE);
   private uniformFloat32 = new Float32Array(this.uniformRawBuffer);
   private uniformUint32 = new Uint32Array(this.uniformRawBuffer);
 
   constructor() {
-    this.resolutionScale = 1;
+    this.resolutionScale = 0.8;
   }
 
   // ────────────────────────────────────────────
@@ -248,6 +260,15 @@ export class TemporalCloudRenderer {
       if (positionDelta > TELEPORT_POSITION_THRESHOLD || rotationExceeded) {
         this.historyValid = false;
       }
+
+      // Adaptive blend: increase toward BLEND_FACTOR_MOVING as rotation rate rises.
+      // quatDot = cos(θ/2) so 2·acos(quatDot) gives the full rotation angle in radians.
+      const rotAngleDeg =
+        (2.0 * Math.acos(Math.min(quatDot, 1.0)) * 180) / Math.PI;
+      const movementFactor = Math.min(rotAngleDeg / MOVEMENT_RAMP_DEG, 1.0);
+      this.currentBlendFactor =
+        BLEND_FACTOR_STILL +
+        movementFactor * (BLEND_FACTOR_MOVING - BLEND_FACTOR_STILL);
     }
 
     // ── Store current frame's data in the "last" slot for next frame ──
@@ -306,6 +327,7 @@ export class TemporalCloudRenderer {
     // ── Advance temporal state ──
     // Mark history valid after the first frame has been written
     this.historyValid = true;
+    // this.currentFrame = (this.currentFrame + 1) % 4;
     this.currentFrame = (this.currentFrame + 1) % 4;
   }
 
@@ -327,7 +349,7 @@ export class TemporalCloudRenderer {
     u32[17] = this.historyValid ? 1 : 0;
 
     // blendFactor at byte offset 72 → float32 index 18
-    f32[18] = DEFAULT_BLEND_FACTOR;
+    f32[18] = this.currentBlendFactor;
 
     // _padding at byte offset 76 → float32 index 19
     f32[19] = 0.0;

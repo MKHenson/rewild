@@ -363,9 +363,15 @@ fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_d
     // Calculate the scattering amount based on the angle between the light ray and the view direction
     let scatterAmount: f32 = mix(0.008, 1.0, smoothstep(0.96, 0.0, mu));
     
-    // Calculate the Beer's law attenuation
-    let beersLaw: f32 = exp(-stepL * lighRayDen) + 0.5 * scatterAmount * exp(-0.1 * stepL * lighRayDen) + scatterAmount * 0.4 * exp(-0.02 * stepL * lighRayDen);
-    
-    // Return the final light intensity
-    return sunIntensityModifier * beersLaw * phaseFunction * mix(0.05 + 1.5 * pow(min(1.0, dC * 8.5), 0.3 + 5.5 * cloudHeight), 1.0, clamp(lighRayDen * 0.4, 0.0, 1.0));
+    // Calculate the Beer's law attenuation.
+    // The second and third terms approximate multiple scattering: light that has
+    // bounced through the cloud volume and still reaches shadowed interiors.
+    let beersLaw: f32 = exp(-stepL * lighRayDen) + 0.6 * scatterAmount * exp(-0.1 * stepL * lighRayDen) + scatterAmount * 0.5 * exp(-0.02 * stepL * lighRayDen);
+
+    // Return the final light intensity.
+    // The mix() is a height-dependent powder effect: it darkens thin cloud surfaces
+    // (small dC) near the top (high cloudHeight) to simulate fine droplet absorption.
+    // The floor is raised from 0.05→0.15 so fragmented clouds at low cloudiness don't
+    // get the harsh dark edges that made boundaries look artificially sharp.
+    return sunIntensityModifier * beersLaw * phaseFunction * mix(0.25 + 1.35 * pow(min(1.0, dC * 8.5), 0.3 + 5.5 * cloudHeight), 1.0, clamp(lighRayDen * 0.4, 0.0, 1.0));
 }

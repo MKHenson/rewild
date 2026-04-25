@@ -83,7 +83,7 @@ export class CloudShadow implements ISharedUniformBuffer {
     this.shadowData[16] = shadowRenderer.config.worldSize;
     this.shadowData[17] = camera.transform.position.x;
     this.shadowData[18] = camera.transform.position.z;
-    this.shadowData[19] = 0.7; // shadow intensity
+    this.shadowData[19] = renderer.sky.skyRenderer.fogIntensity; // shadow intensity
 
     device.queue.writeBuffer(this.buffer, 0, this.shadowData.buffer);
   }

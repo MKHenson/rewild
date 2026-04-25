@@ -1,71 +1,89 @@
-struct ObjectStruct { 
-    resolution: vec2f,
-    iTime: f32,
+// Two-pass separable Gaussian bloom.
+//
+// Pass 1 (horizontal=1): reads bilateral HDR clouds, extracts pixels above
+//   bloomThreshold (in exposure-adjusted luminance), applies horizontal
+//   Gaussian weights, writes to an intermediate rgba16float texture.
+//
+// Pass 2 (horizontal=0): reads the intermediate, applies vertical Gaussian
+//   weights (no threshold — extraction already done), writes final HDR
+//   bloom highlights to renderTarget.
+//
+// The composite pass adds the renderTarget to the HDR cloud colour BEFORE
+// tonemapping, so the ACES shoulder naturally compresses bright+bloom into
+// a smooth glow with no LDR ring artefact.
+
+struct ObjectStruct {
+    resolution:     vec2f,
+    iTime:          f32,
+    bloomAmount:    f32,
+    bloomThreshold: f32,
+    horizontal:     f32,   // 1.0 = H extraction pass, 0.0 = V blur pass
 };
 
-@group(0) @binding(0) 
-var ourSampler: sampler;
+@group(0) @binding(0) var ourSampler: sampler;
+@group(0) @binding(1) var ourTexture: texture_2d<f32>;
+@group(0) @binding(2) var<uniform> object: ObjectStruct;
 
-@group(0) @binding(1) 
-var ourTexture: texture_2d<f32>;
+@vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
+  let pos = array<vec2f, 6>(
+    vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),
+    vec2f(-1.0,  1.0), vec2f(1.0, -1.0), vec2f( 1.0, 1.0),
+  );
+  return vec4f(pos[i], 0.0, 1.0);
+}
 
-@group( 0 ) @binding( 2 ) 
-var<uniform> object: ObjectStruct;
+@fragment fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
+  let uv         = fragCoord.xy / object.resolution;
+  let texelSize  = 1.0 / object.resolution;
+  let isH        = object.horizontal > 0.5;
+  let dir        = select(vec2f(0.0, texelSize.y), vec2f(texelSize.x, 0.0), isH);
 
+  let EXPOSURE = 0.05;
+  let SIGMA    = 8.0;
+  let KNEE     = 0.08; 
+  let RADIUS   = 15;
 
-@fragment fn fs( 
-  @builtin(position) fragCoord: vec4<f32> 
-  ) -> @location(0) vec4f {
-  let uv = fragCoord.xy / object.resolution.xy;
-  let blurRadius = vec2f(5.0) / object.resolution.xy;
-  let time = object.iTime * 0.001;
+  var bloomSum    = vec3f(0.0);
+  var totalWeight = 0.0;
 
-  let NUM_SAMPLES = 10.0;
-  let BLOOM_AMOUNT = 0.001;
-  let BLOOM_THRESHOLD = 0.6;
-  let jitterSeed = hash(dot(fragCoord.xy, vec2(1.12, 2.251)) + time * 0.0001);
+  for (var i: i32 = -RADIUS; i <= RADIUS; i++) {
+    let sampleUV = uv + dir * f32(i);
+    let s        = textureSampleLevel(ourTexture, ourSampler, sampleUV, 0.0);
+    let gaussW   = gaussian(f32(i), SIGMA);
 
-  var bloomSum = vec4f(0.0);
-  var bloomWeight = 0.0;
+    if (isH) {
+      // Horizontal pass: only accumulate pixels above the bloom threshold.
+      let exposedLum = dot(EXPOSURE * s.rgb, vec3f(0.2126, 0.7152, 0.0722));
+      let excess     = softKnee(exposedLum, object.bloomThreshold, KNEE);
+      bloomSum += s.rgb * excess * gaussW;
+    } else {
+      // Vertical pass: blur the H-extracted highlights, no re-thresholding.
+      bloomSum += s.rgb * gaussW;
+    }
 
-  for(var i: i32 = 1; i <= i32(NUM_SAMPLES); i++)
-  {
-      let fi = f32(i) / NUM_SAMPLES;
-      // Golden angle spiral gives uniform coverage with no visible rings
-      let phi = f32(i) * 2.399963 + jitterSeed * 6.2831853;
-      let r = blurRadius * sqrt(fi);
-      let sampleUV = uv + vec2(sin(phi), cos(phi)) * r;
-      let s = textureSampleLevel(ourTexture, ourSampler, sampleUV, 0.0);
-      let brightness = dot(s.rgb, vec3f(0.2126, 0.7152, 0.0722));
-      let gaussWeight = exp(-fi * fi * 3.0);
-      let contribution = max(0.0, brightness - BLOOM_THRESHOLD) * gaussWeight;
-      bloomSum += s * contribution;
-      bloomWeight += contribution;
+    totalWeight += gaussW;
   }
 
-  let originalColor = textureSampleLevel(ourTexture, ourSampler, uv, 0.0);
-  var bloom = vec4f(0.0);
-  if (bloomWeight > 0.0) {
-      bloom = bloomSum / bloomWeight;
+  var result = vec3f(0.0);
+  if (totalWeight > 0.0) {
+    result = bloomSum / totalWeight;
   }
 
-  let exposure = 0.05;
-  let tonemapped = tonemapACES(exposure * originalColor.rgb);
-  let finalRGB = clamp(tonemapped + bloom.rgb * BLOOM_AMOUNT, vec3f(0.0), vec3f(1.0));
-  return vec4f(finalRGB, originalColor.w);
+  // bloomAmount is applied once, on the final (vertical) pass only.
+  let scale = select(object.bloomAmount, 1.0, isH);
+  return vec4f(result * scale, 1.0);
 }
 
 
-fn hash( n: f32 ) -> f32 {
-    return fract(sin(n)*43758.5453);
+fn gaussian(x: f32, sigma: f32) -> f32 {
+  return exp(-0.5 * x * x / (sigma * sigma));
 }
 
-// https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
-fn tonemapACES( x: vec3f ) -> vec3f {
-    let a = 2.51;
-    let b = 0.03;
-    let c = 2.43;
-    let d = 0.59;
-    let e = 0.14;
-    return (x*(a*x+b))/(x*(c*x+d)+e);
+fn softKnee(x: f32, threshold: f32, knee: f32) -> f32 {
+  let lower = threshold - knee;
+  let upper = threshold + knee;
+  if (x <= lower) { return 0.0; }
+  if (x >= upper) { return x - threshold; }
+  let t = (x - lower) / (2.0 * knee);
+  return knee * t * t;
 }
