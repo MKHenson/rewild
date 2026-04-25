@@ -6,7 +6,6 @@ import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
 import { TemporalCloudRenderer } from './TemporalCloudRenderer';
 import { SkyBilateralPass } from './SkyBilateralPass';
 import { SkyBloomPass } from './SkyBloomPass';
-import { SkyBlurPass } from './SkyBlurPass';
 import { SkyCompositePass } from './SkyCompositePass';
 import { SkyGradientRenderer } from './SkyGradientRenderer';
 import { SkyDenoisePass } from './SkyDenoisePass';
@@ -34,7 +33,6 @@ export class SkyRenderer {
   cloudsPass: TemporalCloudRenderer;
   atmospherePass: SkyGradientRenderer;
   bilateralPass: SkyBilateralPass;
-  blurPass: SkyBlurPass;
   bloomPass: SkyBloomPass;
   denoisePass: SkyDenoisePass;
   finalPass: SkyCompositePass;
@@ -51,6 +49,7 @@ export class SkyRenderer {
   cloudiness: f32;
   foginess: f32;
   fogShadowIntensity: f32;
+  fogIntensity: f32;
   windiness: f32;
   upDot: f32;
   sun: DirectionLight;
@@ -98,7 +97,8 @@ export class SkyRenderer {
     this.elevation = -0;
     this.cloudiness = 0.7;
     this.foginess = 0.3;
-    this.fogShadowIntensity = 0.6;
+    this.fogShadowIntensity = 0.31;
+    this.fogIntensity = 0.5;
     this.windiness = 0.5;
     this.upDot = 0.0;
     this.sun = new DirectionLight();
@@ -114,7 +114,6 @@ export class SkyRenderer {
     this.atmospherePass = new SkyGradientRenderer();
     this.bilateralPass = new SkyBilateralPass();
     this.denoisePass = new SkyDenoisePass();
-    this.blurPass = new SkyBlurPass();
     this.bloomPass = new SkyBloomPass();
     this.godRaysPass = new GodRaysPostProcess();
     this.rainPass = new RainParticlePass();
@@ -179,17 +178,8 @@ export class SkyRenderer {
       this.starfieldRenderer.cubemap
     );
 
-    // Gaussian blur runs first on the full-res HDR cloud texture.
-    // This softens cloud edges before tonemapping, giving a fluffy look.
-    this.blurPass.sourceTexture = this.cloudsPass.renderTarget;
-    this.blurPass.init(renderer);
-
-    // Bloom operates on the blurred cloud texture.
-    this.bloomPass.sourceTexture = this.blurPass.renderTarget;
-    this.bloomPass.init(renderer);
-
-    // Bilateral filter replaces TAA: edge-preserving smoothing with no ghosting.
-    this.bilateralPass.sourceTexture = this.bloomPass.renderTarget;
+    // Bilateral reads HDR clouds directly — edge-preserving smoothing, no ghosting.
+    this.bilateralPass.sourceTexture = this.cloudsPass.renderTarget;
     this.bilateralPass.init(renderer);
 
     this.godRaysPass.cloudTexture = this.cloudsPass.renderTarget;
@@ -198,19 +188,24 @@ export class SkyRenderer {
     this.rainPass.init(renderer);
     this.lightningBoltPass.init(renderer);
 
+    // Bloom extracts HDR highlights from bilateral clouds; composite adds them before tonemapping.
+    this.bloomPass.sourceTexture = this.bilateralPass.renderTarget;
+    this.bloomPass.init(renderer);
+
     this.finalPass.atmosphereTexture = this.atmospherePass.renderTarget;
     this.finalPass.cloudsTexture = this.bilateralPass.renderTarget;
     this.finalPass.cloudShadowMap = this.cloudShadowRenderer.shadowMap;
     this.finalPass.godRaysTexture = this.godRaysPass.renderTarget;
+    this.finalPass.bloomTexture = this.bloomPass.renderTarget;
     this.finalPass.init(renderer);
 
     this.perfMonitor.init(device, [
       'sky-cloud-shadow',
       'sky-clouds',
       'sky-atmosphere',
-      'sky-bloom',
       'sky-god-rays',
       'sky-bilateral',
+      'sky-bloom',
     ]);
 
     (window as any).startSkyPerfCapture = () => {
@@ -311,10 +306,7 @@ export class SkyRenderer {
     );
     const wdx = wdLen > 0 ? this.windDirection.x / wdLen : 1;
     const wdy = wdLen > 0 ? this.windDirection.y / wdLen : 0;
-    uniformData.set(
-      [wdx, wdy, this.precipitation, this.temperature, 0.0],
-      38
-    );
+    uniformData.set([wdx, wdy, this.precipitation, this.temperature, 0.0], 38);
 
     // Extract XZ camera forward from the world matrix (-Z column)
     const m = camera.transform.matrixWorld.elements;
@@ -400,13 +392,6 @@ export class SkyRenderer {
     const commandBuffer = commandEncoder.finish();
     device.queue.submit([commandBuffer]);
 
-    this.blurPass.render(renderer);
-
-    this.bloomPass.render(
-      renderer,
-      this.perfMonitor.getTimestampWrites('sky-bloom')
-    );
-
     // Sync god ray config tunables then render
     this.godRaysPass.config.enabled = this.godRayEnabled;
     this.godRaysPass.config.density = this.godRayDensity;
@@ -468,6 +453,10 @@ export class SkyRenderer {
     this.finalPass.azimuth = this.azimuth;
     this.finalPass.elevation = this.elevation;
     this.finalPass.cloudiness = this.cloudiness;
+    this.bloomPass.render(
+      renderer,
+      this.perfMonitor.getTimestampWrites('sky-bloom')
+    );
     this.finalPass.render(renderer, pass, camera);
 
     this.perfMonitor.resolveAndLog();
@@ -483,7 +472,7 @@ export class SkyRenderer {
         this.pendingBoltStrike,
         this.viewProjMatrix.elements,
         this.lastCameraPos,
-        fogDensity,
+        fogDensity
       );
     }
     if (this.pendingRainParams) {
@@ -511,7 +500,6 @@ export class SkyRenderer {
     this.starfieldRenderer.dispose();
     this.cloudShadowRenderer.dispose();
     this.bilateralPass.dispose();
-    this.blurPass.dispose();
     this.bloomPass.dispose();
     this.godRaysPass.dispose();
     this.rainPass.dispose();

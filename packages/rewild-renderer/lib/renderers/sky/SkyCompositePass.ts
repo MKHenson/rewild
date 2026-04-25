@@ -28,7 +28,7 @@ const uniformData = new Float32Array(alignedUniformBufferSize / 4);
 const invViewProjectionMatrix = new Matrix4();
 
 export class SkyCompositePass implements IPostProcess {
-  renderTarget: GPUTexture;
+  renderTarget: GPUTexture; // unused — composite renders directly to swapchain pass
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
   uniformBuffer: GPUBuffer;
@@ -38,6 +38,7 @@ export class SkyCompositePass implements IPostProcess {
   cloudsTexture: GPUTexture | null;
   cloudShadowMap: GPUTexture | null;
   godRaysTexture: GPUTexture | null;
+  bloomTexture: GPUTexture | null;
 
   cloudiness: number;
   elevation: number;
@@ -49,11 +50,11 @@ export class SkyCompositePass implements IPostProcess {
     this.cloudsTexture = null;
     this.cloudShadowMap = null;
     this.godRaysTexture = null;
+    this.bloomTexture = null;
   }
 
   init(renderer: Renderer): IPostProcess {
-    const { device, canvas, presentationFormat } = renderer;
-    const scaleFactor = this.scaleFactor;
+    const { device, presentationFormat } = renderer;
 
     const module = device.createShaderModule({
       code: constantsFn + commonShaderFns + shader,
@@ -61,16 +62,6 @@ export class SkyCompositePass implements IPostProcess {
 
     const vertexScreenQuadModule = device.createShaderModule({
       code: vertexScreenQuadShader,
-    });
-
-    this.renderTarget = device.createTexture({
-      size: [canvas.width * scaleFactor, canvas.height * scaleFactor, 1],
-      label: 'final comp render target',
-      format: 'rgba8unorm',
-      usage:
-        GPUTextureUsage.RENDER_ATTACHMENT |
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_SRC,
     });
 
     this.pipeline = device.createRenderPipeline({
@@ -115,18 +106,10 @@ export class SkyCompositePass implements IPostProcess {
         { binding: 1, resource: this.cloudsTexture!.createView() },
         { binding: 2, resource: { buffer: this.uniformBuffer } },
         { binding: 3, resource: renderer.samplerManager.get('linear-clamped') },
-        {
-          binding: 4,
-          resource: renderer.depthTexture.createView(),
-        },
-        {
-          binding: 5,
-          resource: this.cloudShadowMap!.createView(),
-        },
-        {
-          binding: 6,
-          resource: this.godRaysTexture!.createView(),
-        },
+        { binding: 4, resource: renderer.depthTexture.createView() },
+        { binding: 5, resource: this.cloudShadowMap!.createView() },
+        { binding: 6, resource: this.godRaysTexture!.createView() },
+        { binding: 7, resource: this.bloomTexture!.createView() },
       ],
     });
 
@@ -134,12 +117,7 @@ export class SkyCompositePass implements IPostProcess {
   }
 
   dispose(): void {
-    if (this.renderTarget) {
-      this.renderTarget.destroy();
-    }
-    if (this.uniformBuffer) {
-      this.uniformBuffer.destroy();
-    }
+    this.uniformBuffer?.destroy();
   }
 
   private setupFinalPassUniforms(renderer: Renderer, camera: Camera) {
@@ -153,8 +131,8 @@ export class SkyCompositePass implements IPostProcess {
       .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
       .invert();
 
-    uniformData.set(invViewProjectionMatrix.elements, 0); // modelMatrix
-    uniformData.set(camera.transform.matrixWorld.elements, 16); // modelMatrix
+    uniformData.set(invViewProjectionMatrix.elements, 0);
+    uniformData.set(camera.transform.matrixWorld.elements, 16);
 
     uniformData.set(
       [
@@ -169,7 +147,7 @@ export class SkyCompositePass implements IPostProcess {
         camera.transform.position.x,
         camera.transform.position.y,
         camera.transform.position.z,
-        0, //
+        0,
         renderer.sky.skyRenderer.foginess,
         renderer.sky.skyRenderer.cloudShadowRenderer.config.worldSize,
         renderer.sky.skyRenderer.fogShadowIntensity,

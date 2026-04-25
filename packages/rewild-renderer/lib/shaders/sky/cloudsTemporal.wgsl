@@ -132,8 +132,8 @@ fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_d
     let sunAngle = dot(sun_direction, vec3f(0.0, 1.0, 0.0));
     let sunIntensityModifier = smoothstep(0.0, 0.1, sunAngle);
     let scatterAmount: f32 = mix(0.008, 1.0, smoothstep(0.96, 0.0, mu));
-    let beersLaw: f32 = exp(-stepL * lighRayDen) + 0.5 * scatterAmount * exp(-0.1 * stepL * lighRayDen) + scatterAmount * 0.4 * exp(-0.02 * stepL * lighRayDen);
-    return sunIntensityModifier * beersLaw * phaseFunction * mix(0.05 + 1.5 * pow(min(1.0, dC * 8.5), 0.3 + 5.5 * cloudHeight), 1.0, clamp(lighRayDen * 0.4, 0.0, 1.0));
+    let beersLaw: f32 = exp(-stepL * lighRayDen) + 0.9 * scatterAmount * exp(-0.1 * stepL * lighRayDen) + scatterAmount * 0.5 * exp(-0.02 * stepL * lighRayDen);
+    return sunIntensityModifier * beersLaw * phaseFunction * mix(0.85 + 1.35 * pow(min(1.0, dC * 8.5), 0.3 + 5.5 * cloudHeight), 1.0, clamp(lighRayDen * 0.4, 0.0, 1.0));
 }
 
 fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
@@ -354,14 +354,33 @@ fn fs(
 
     // ── Exponential moving-average blend with history ──
     //
-    // blendFactor = 1.0 when history is invalid (fast convergence on first frame).
-    // blendFactor ≈ 0.15 during normal operation (stability over responsiveness).
-    // For freshly-raymarched pixels (isThisPixelsTurn) we still go through the EMA
-    // so that a pixel doesn't visibly pop every 16 frames when it gets refreshed.
+    //  • historyValid == 0: first frame / after teleport — use fresh value directly.
+    //
+    //  • Fresh (isThisPixelsTurn): blend toward history at blendFactor.
+    //    blendFactor is adaptive (TS side): low when camera is still (~0.1, many
+    //    frames averaged → less noise), high when rotating (~0.6, fast convergence
+    //    → no smear).
+    //
+    //  • Reprojected: the reprojected sample IS already temporally accumulated
+    //    history — use it directly.  Mixing it with stale currentUV history was
+    //    the cause of the smearing artefact on camera movement.
 
-    let blendFactor = select(temporal.blendFactor, 1.0, temporal.historyValid == 0u);
     // textureSampleLevel required (non-uniform control flow from depth test above).
     let historyColor = textureSampleLevel(historyTexture, historySampler, currentUV, 0.0);
-    output.color = mix(historyColor, pixelColor, blendFactor);
+    var finalColor: vec4f;
+
+    if (temporal.historyValid == 0u) {
+        finalColor = pixelColor;
+    } else if (isThisPixelsTurn) {
+        // Boost blend when clouds are animating so fresh raymarches converge faster,
+        // preventing pixel-age differences from showing as static-camera smear.
+        let windBoost = clamp(object.windiness * 2.0, 0.0, 0.4);
+        let effectiveBlend = min(temporal.blendFactor + windBoost, 1.0);
+        finalColor = mix(historyColor, pixelColor, effectiveBlend);
+    } else {
+        finalColor = pixelColor;
+    }
+
+    output.color = finalColor;
     return output;
 }

@@ -18,7 +18,7 @@
 struct SkyBilateralUniforms {
     resolution        : vec2<f32>,   // width, height in pixels
     sigmaSpatial      : f32,         // near spatial sigma in texels (overhead clouds)
-    sigmaRange        : f32,         // luminance edge-stop sigma (try 0.05–0.20)
+    sigmaRange        : f32,         // log-luminance edge-stop (try 0.5–3.0; see logLuminance())
     sigmaFar          : f32,         // far spatial sigma (horizon clouds, try 4.0–10.0)
     _pad0             : f32,
     _pad1             : vec2<f32>,
@@ -29,8 +29,14 @@ struct SkyBilateralUniforms {
 @group(0) @binding(1) var sourceSampler: sampler;
 @group(0) @binding(2) var<uniform> uniforms: SkyBilateralUniforms;
 
-fn luminance(c: vec3<f32>) -> f32 {
-    return dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
+fn logLuminance(c: vec3<f32>) -> f32 {
+    // Log-luminance compresses the HDR range so the range-sigma is fog-independent.
+    // In linear HDR space, a cloud-sky luminance diff can be 10–12 when foginess=0
+    // but only 1–3 when fog attenuates distant clouds, causing the edge-stop to
+    // behave completely differently based on foginess. In log space the same
+    // cloud-sky boundary always produces a diff of ~1.9 regardless of fog level,
+    // so sigmaRange tuning is stable across all foginess settings.
+    return log(1.0 + dot(c, vec3<f32>(0.2126, 0.7152, 0.0722)));
 }
 
 @vertex
@@ -56,23 +62,25 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
     let dir  = normalize(far.xyz / far.w - near.xyz / near.w);
 
     // distanceFactor: 1 at horizon (dir.y ≈ 0), 0 overhead (dir.y ≈ 1).
-    let distanceFactor = smoothstep(0.4, 0.0, abs(dir.y));
+    // Wider transition range (0.6 instead of 0.4) so clouds at 25–35° elevation
+    // (medium distance, above the fog band) still receive meaningful far-sigma blur.
+    let distanceFactor = smoothstep(0.6, 0.0, abs(dir.y));
 
     let sigmaS = mix(max(uniforms.sigmaSpatial, 0.5), max(uniforms.sigmaFar, 0.5), distanceFactor);
 
     let center    = textureSampleLevel(sourceTexture, sourceSampler, uv, 0.0);
-    let centerLum = luminance(center.rgb);
+    let centerLum = logLuminance(center.rgb);
 
     var result      = vec4f(0.0);
     var totalWeight = 0.0;
 
-    // 5×5 kernel (±2 texels)
-    for (var y: i32 = -2; y <= 2; y++) {
-        for (var x: i32 = -2; x <= 2; x++) {
+    // 9×9 kernel (±4 texels)
+    for (var y: i32 = -4; y <= 4; y++) {
+        for (var x: i32 = -4; x <= 4; x++) {
             let offset   = vec2f(f32(x), f32(y));
             let sampleUV = uv + offset * texel;
             let s        = textureSampleLevel(sourceTexture, sourceSampler, sampleUV, 0.0);
-            let sLum     = luminance(s.rgb);
+            let sLum     = logLuminance(s.rgb);
 
             let d2      = dot(offset, offset);
             let lumDiff = sLum - centerLum;
