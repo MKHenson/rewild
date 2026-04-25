@@ -45,6 +45,7 @@ export class EditorViewport extends Component<Props> {
   dragController: GizmoDragController;
   selectedTransform: Transform | null = null;
   private didDrag = false;
+  private mouseDownPos = { x: 0, y: 0 };
   private cameraObserver: ITransformObserver | null = null;
 
   init() {
@@ -265,6 +266,9 @@ export class EditorViewport extends Component<Props> {
 
     const onMouseDown = (event: MouseEvent) => {
       if (event.button !== 0) return;
+      this.mouseDownPos.x = event.clientX;
+      this.mouseDownPos.y = event.clientY;
+      this.didDrag = false;
       if (
         !this.gizmo ||
         !this.gizmo.transform.parent ||
@@ -290,6 +294,14 @@ export class EditorViewport extends Component<Props> {
     };
 
     const onMouseMove = (event: MouseEvent) => {
+      // Detect camera drag: left button held and moved beyond a small threshold.
+      // Sets didDrag so the subsequent click event doesn't deselect the object.
+      if ((event.buttons & 1) && !this.dragController.isDragging) {
+        const dx = event.clientX - this.mouseDownPos.x;
+        const dy = event.clientY - this.mouseDownPos.y;
+        if (dx * dx + dy * dy > 25) this.didDrag = true;
+      }
+
       if (!this.gizmo || !this.gizmo.transform.parent) return;
 
       if (this.dragController.isDragging) {
