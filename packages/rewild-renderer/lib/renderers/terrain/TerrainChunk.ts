@@ -116,13 +116,32 @@ export class TerrainChunk implements IComponent {
       }
 
       const lodMesh = this.lodMesh[lodIndex];
+
+      if (lodMesh.gpuState === 'none' || lodMesh.gpuState === 'unloaded') {
+        lodMesh.requestMesh(renderer, terrainRenderer.workerPool);
+      }
+
       if (lodMesh.gpuState === 'ready') {
         lodMesh.mesh.visible = true;
-      } else if (
-        lodMesh.gpuState === 'none' ||
-        lodMesh.gpuState === 'unloaded'
-      ) {
-        lodMesh.requestMesh(renderer, terrainRenderer.workerPool);
+      } else {
+        // Target LOD not ready — show nearest available LOD to prevent a pop.
+        // Prefer coarser LODs (higher index, loaded first on approach); fall
+        // back to finer LODs (lower index, retained from a prior close pass).
+        let shown = false;
+        for (let i = lodIndex + 1; i < this.lodMesh.length && !shown; i++) {
+          if (this.lodMesh[i].gpuState === 'ready') {
+            this.lodMesh[i].mesh.visible = true;
+            shown = true;
+          }
+        }
+        if (!shown) {
+          for (let i = lodIndex - 1; i >= 0 && !shown; i--) {
+            if (this.lodMesh[i].gpuState === 'ready') {
+              this.lodMesh[i].mesh.visible = true;
+              shown = true;
+            }
+          }
+        }
       }
     }
   }
@@ -190,6 +209,7 @@ export class LODMesh {
       renderer.bvhConfig,
       renderer.bvhWorkerManager ?? undefined
     );
+    this.mesh.transform.visible = true;
     this.gpuState = 'ready';
     this.chunk.dispatcher.dispatch({
       type: 'mesh-loaded',
@@ -204,7 +224,7 @@ export class LODMesh {
     renderer: Renderer,
     pool: TerrainWorkerPool
   ) {
-    const { texture, vertices, uvs, indices } = await pool.enqueue({
+    const { texture, vertices, uvs, normals, indices } = await pool.enqueue({
       chunkSize,
       lod,
       position: this.position,
@@ -221,9 +241,9 @@ export class LODMesh {
 
     const geometry = new Geometry();
     geometry.vertices = vertices;
+    geometry.normals = normals; // pre-computed in worker using main-mesh triangles only
     geometry.uvs = uvs;
     geometry.indices = indices;
-    geometry.computeNormals();
 
     this.heights = new Float32Array(vertices.length / 3);
     for (let i = 0, j = 0; i < vertices.length; i += 3, j++) {

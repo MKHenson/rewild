@@ -26,13 +26,16 @@ export class TerrainRenderer {
   terrainChunks: Map<string, TerrainChunk>;
   terrainChunksVisibleLastUpdate: TerrainChunk[];
   detailLevels: LODInfo[] = [
-    { lod: 0, visibleDstThreshold: 600 },
-    { lod: 5, visibleDstThreshold: 800 },
-    { lod: 6, visibleDstThreshold: 1000 },
+    { lod: 0, visibleDstThreshold: 200 },
+    { lod: 1, visibleDstThreshold: 400 },
+    { lod: 2, visibleDstThreshold: 600 },
+    { lod: 3, visibleDstThreshold: 800 },
+    { lod: 4, visibleDstThreshold: 1000 },
   ];
   dispatcher: Dispatcher<TerrainEvent>;
   workerPool: TerrainWorkerPool;
   private onChunkLoadedDelegate: (event: TerrainChunkEvent) => void;
+  private _needsVisibilityUpdate: boolean = false;
 
   _hasInitiallyUpdatedTerrain: boolean = false;
   readonly mapChunkSizeLod = 241;
@@ -62,6 +65,7 @@ export class TerrainRenderer {
   }
 
   private onChunkLoaded(event: TerrainChunkEvent) {
+    this._needsVisibilityUpdate = true;
     this.dispatcher.dispatch({
       type: 'chunk-loaded',
       chunk: event.chunk,
@@ -139,6 +143,7 @@ export class TerrainRenderer {
           newChunk.visible = false;
           renderer.scene.addChild(newChunk.transform);
           this.terrainChunks.set(mapId, newChunk);
+          newChunk.updateTerrainChunk(this.viewerPosition, this, renderer);
         }
       }
     }
@@ -195,7 +200,10 @@ export class TerrainRenderer {
       sqrViewerMoveThresholdForChunkUpdate
     ) {
       this.viewPosOld.copy(this.viewerPosition);
-
+      this._needsVisibilityUpdate = false;
+      this.updateVisibleChunks(renderer);
+    } else if (this._needsVisibilityUpdate) {
+      this._needsVisibilityUpdate = false;
       this.updateVisibleChunks(renderer);
     }
   }

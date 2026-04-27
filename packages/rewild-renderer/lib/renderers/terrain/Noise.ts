@@ -17,27 +17,17 @@ export function generateNoiseMap(
   seed: number = 100,
   octaves: number = 4,
   persistence: number = 0.5,
-  lacunarity: number = 1.75,
+  lacunarity: number = 2.0,
   offset: Vector2 = new Vector2(0, 0)
 ): Float32Array {
   const perlin = new Perlin(seed);
   const noiseMap = new Float32Array(width * height);
 
-  if (octaves < 1) {
-    octaves = 1; // Ensure at least one octave
-  }
-  if (persistence < 0) {
-    persistence = 0; // Ensure non-negative persistence
-  }
-  if (lacunarity < 1) {
-    lacunarity = 1; // Ensure lacunarity is at least 1
-  }
-  if (width <= 0 || height <= 0) {
-    throw new Error('Width and height must be positive integers.');
-  }
-  if (scale <= 0) {
-    throw new Error('Scale must be a positive number.');
-  }
+  if (octaves < 1) octaves = 1;
+  if (persistence < 0) persistence = 0;
+  if (lacunarity < 1) lacunarity = 1;
+  if (width <= 0 || height <= 0) throw new Error('Width and height must be positive integers.');
+  if (scale <= 0) throw new Error('Scale must be a positive number.');
 
   const rng = seededRandom(seed);
 
@@ -48,15 +38,8 @@ export function generateNoiseMap(
     octaveOffsets[i] = new Vector2(offsetX, offsetY);
   }
 
-  if (scale <= 0) {
-    scale = 0.0001; // Avoid division by zero or negative scale
-  }
-
-  let maxNoiseValue = Number.MIN_VALUE;
-  let minNoiseValue = Number.MAX_VALUE;
-
-  let halfWidth = width / 2;
-  let halfHeight = height / 2;
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -65,41 +48,26 @@ export function generateNoiseMap(
       let noiseValue = 0;
 
       for (let o = 0; o < octaves; o++) {
-        const sampleX =
-          ((x - halfWidth + octaveOffsets[o].x) / scale) * frequency;
-        const sampleY =
-          ((y - halfHeight - octaveOffsets[o].y) / scale) * frequency;
+        const sampleX = ((x - halfWidth + octaveOffsets[o].x) / scale) * frequency;
+        const sampleY = ((y - halfHeight - octaveOffsets[o].y) / scale) * frequency;
 
-        let perlinValue = perlin.perlin2(sampleX, sampleY);
-        noiseValue += perlinValue * amplitude;
+        noiseValue += perlin.simplex2(sampleX, sampleY) * amplitude;
 
         amplitude *= persistence;
         frequency *= lacunarity;
-      }
-
-      if (noiseValue > maxNoiseValue) {
-        maxNoiseValue = noiseValue;
-      } else if (noiseValue < minNoiseValue) {
-        minNoiseValue = noiseValue;
       }
 
       noiseMap[x + y * width] = noiseValue;
     }
   }
 
-  // NOTE: THIS BREAKS THE TERRAIN SEAM. Because the noise is not continuous across the edges of the map.
-
-  // for (let y = 0; y < height; y++) {
-  //   for (let x = 0; x < width; x++) {
-  //     // Normalize the noise value to be between 0 and 1
-
-  //     noiseMap[x + y * width] = inverseLerp(
-  //       minNoiseValue,
-  //       maxNoiseValue,
-  //       noiseMap[x + y * width]
-  //     );
-  //   }
-  // }
+  // Normalize to [0,1] using the theoretical max amplitude for this octave/persistence
+  // combination. Because this is a fixed constant (not per-chunk min/max), normalization
+  // is continuous across chunk boundaries — no seams.
+  const maxAmplitude = (1 - Math.pow(persistence, octaves)) / (1 - persistence);
+  for (let i = 0; i < noiseMap.length; i++) {
+    noiseMap[i] = (noiseMap[i] / maxAmplitude + 1) * 0.5;
+  }
 
   return noiseMap;
 }

@@ -8,6 +8,7 @@ export interface TerrainWorkerResponse {
   texture: Uint8Array;
   vertices: Float32Array;
   uvs: Float32Array;
+  normals: Float32Array;
   indices: Uint32Array;
 }
 
