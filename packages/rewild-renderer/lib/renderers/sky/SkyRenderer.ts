@@ -34,7 +34,6 @@ export class SkyRenderer {
   atmospherePass: SkyGradientRenderer;
   bilateralPass: SkyBilateralPass;
   bloomPass: SkyBloomPass;
-  denoisePass: SkyDenoisePass;
   finalPass: SkyCompositePass;
   godRaysPass: GodRaysPostProcess;
   rainPass: RainParticlePass;
@@ -113,7 +112,6 @@ export class SkyRenderer {
     this.cloudsPass = new TemporalCloudRenderer();
     this.atmospherePass = new SkyGradientRenderer();
     this.bilateralPass = new SkyBilateralPass();
-    this.denoisePass = new SkyDenoisePass();
     this.bloomPass = new SkyBloomPass();
     this.godRaysPass = new GodRaysPostProcess();
     this.rainPass = new RainParticlePass();
@@ -504,7 +502,6 @@ export class SkyRenderer {
     this.godRaysPass.dispose();
     this.rainPass.dispose();
     this.lightningBoltPass.dispose();
-    this.denoisePass.dispose();
     this.finalPass.dispose();
   }
 }
