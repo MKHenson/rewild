@@ -8,7 +8,6 @@ import { SkyBilateralPass } from './SkyBilateralPass';
 import { SkyBloomPass } from './SkyBloomPass';
 import { SkyCompositePass } from './SkyCompositePass';
 import { SkyGradientRenderer } from './SkyGradientRenderer';
-import { SkyDenoisePass } from './SkyDenoisePass';
 import { DirectionLight } from '../../core/lights/DirectionLight';
 import { PerformanceMonitor } from '../../utils/PerformanceMonitor';
 import { StarfieldRenderer } from './StarfieldRenderer';
