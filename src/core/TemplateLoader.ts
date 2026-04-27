@@ -73,7 +73,7 @@ export class TemplateLoader {
 
         // Create the rigid body
         const rb = gameManager.physicsWorld.createRigidBody(rbDesc);
-        (toReturn as Asset3D).addBehavior(new RigidBodyBehaviour(rb));
+        (toReturn as Asset3D).addBehavior(new RigidBodyBehaviour(rb, gameManager.renderer.sceneBVH));
 
         rb.setEnabled(false); // Start disabled until mounted
 

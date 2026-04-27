@@ -110,7 +110,6 @@ export class SceneBVH {
     if (movedCount === 0) return;
 
     const totalCount = this.objects.length;
-
     if (totalCount === 0) return;
 
     if (movedCount / totalCount > this.updateThreshold) {
@@ -358,9 +357,8 @@ export class SceneBVH {
 
   // ───────────────────── Refit ─────────────────────
 
-  /** Refit world boxes for moved objects, then update BVH bounds bottom-up. */
+  /** Refit world boxes for manually-marked moved objects only, then update BVH bounds bottom-up. */
   private refitMoved(): void {
-    // Update world boxes for moved objects.
     for (const transform of this.movedObjects) {
       const idx = this.objects.indexOf(transform);
       if (idx === -1) continue;
@@ -374,7 +372,6 @@ export class SceneBVH {
       box.applyMatrix4(transform.matrixWorld);
     }
 
-    // Bottom-up refit of the tree.
     if (this.root) {
       this.refitNode(this.root);
     }
