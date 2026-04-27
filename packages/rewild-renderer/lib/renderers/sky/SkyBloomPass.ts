@@ -8,6 +8,10 @@ const UNIFORM_FLOATS = 6; // resolution(2) + iTime + bloomAmount + bloomThreshol
 const ALIGNED_SIZE = Math.ceil((UNIFORM_FLOATS * 4) / 256) * 256;
 const TEMPORAL_ALIGNED_SIZE = Math.ceil((1 * 4) / 256) * 256; // blendFactor f32
 
+/** Bloom runs at this fraction of the canvas resolution. Half-res is sufficient
+ *  for a blurry highlight pass and halves texture memory + bandwidth. */
+const BLOOM_SCALE = 0.5;
+
 /**
  * Three-pass bloom: horizontal extraction → vertical blur → temporal stabilization.
  *
@@ -52,19 +56,25 @@ export class SkyBloomPass implements IPostProcess {
   private temporalUniforms: GPUBuffer;
   private historyTexture: GPUTexture; // previous frame's renderTarget
 
+  private bw: number = 1; // scaled bloom width
+  private bh: number = 1; // scaled bloom height
+
   constructor() {
     this.sourceTexture = null;
   }
 
   init(renderer: Renderer): IPostProcess {
+    this.dispose();
+
     const { device, canvas } = renderer;
 
     const src = this.sourceTexture;
     if (!src)
       throw new Error('SkyBloomPass: sourceTexture must be set before init()');
 
-    const w = canvas.width;
-    const h = canvas.height;
+    this.bw = Math.max(1, Math.floor(canvas.width * BLOOM_SCALE));
+    this.bh = Math.max(1, Math.floor(canvas.height * BLOOM_SCALE));
+    const { bw, bh } = this;
 
     // --- Gaussian bloom pipeline (passes 1 & 2) ---
     const bloomModule = device.createShaderModule({ code: bloomShader });
@@ -83,7 +93,7 @@ export class SkyBloomPass implements IPostProcess {
     const sampler = renderer.samplerManager.get('linear-clamped');
 
     this.extractTarget = device.createTexture({
-      size: [w, h, 1],
+      size: [bw, bh, 1],
       label: 'sky bloom H-pass intermediate',
       format: 'rgba16float',
       usage:
@@ -91,7 +101,7 @@ export class SkyBloomPass implements IPostProcess {
     });
 
     this.vPassTarget = device.createTexture({
-      size: [w, h, 1],
+      size: [bw, bh, 1],
       label: 'sky bloom V-pass intermediate',
       format: 'rgba16float',
       usage:
@@ -145,7 +155,7 @@ export class SkyBloomPass implements IPostProcess {
     // renderTarget: the stabilized bloom that composite reads.
     // Needs COPY_SRC so we can copy it into historyTexture after each frame.
     this.renderTarget = device.createTexture({
-      size: [w, h, 1],
+      size: [bw, bh, 1],
       label: 'sky bloom stabilized highlights',
       format: 'rgba16float',
       usage:
@@ -157,7 +167,7 @@ export class SkyBloomPass implements IPostProcess {
     // historyTexture: previous frame's stabilized bloom (starts as black).
     // Needs COPY_DST so renderTarget can be copied into it each frame.
     this.historyTexture = device.createTexture({
-      size: [w, h, 1],
+      size: [bw, bh, 1],
       label: 'sky bloom history',
       format: 'rgba16float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
@@ -201,18 +211,17 @@ export class SkyBloomPass implements IPostProcess {
   }
 
   render(renderer: Renderer, timestampWrites?: GPURenderPassTimestampWrites) {
-    const { device, canvas } = renderer;
-    const w = canvas.width;
-    const h = canvas.height;
+    const { device } = renderer;
+    const { bw, bh } = this;
     const t = renderer.totalDeltaTime;
 
     // Write all uniform buffers before opening the command encoder.
     const hData = new Float32Array(ALIGNED_SIZE / 4);
-    hData.set([w, h, t, this.bloomAmount, this.bloomThreshold, 1.0]);
+    hData.set([bw, bh, t, this.bloomAmount, this.bloomThreshold, 1.0]);
     device.queue.writeBuffer(this.hUniforms, 0, hData.buffer);
 
     const vData = new Float32Array(ALIGNED_SIZE / 4);
-    vData.set([w, h, t, this.bloomAmount, this.bloomThreshold, 0.0]);
+    vData.set([bw, bh, t, this.bloomAmount, this.bloomThreshold, 0.0]);
     device.queue.writeBuffer(this.vUniforms, 0, vData.buffer);
 
     const temporalData = new Float32Array(TEMPORAL_ALIGNED_SIZE / 4);
@@ -275,7 +284,7 @@ export class SkyBloomPass implements IPostProcess {
     encoder.copyTextureToTexture(
       { texture: this.renderTarget },
       { texture: this.historyTexture },
-      [w, h, 1]
+      [bw, bh, 1]
     );
 
     device.queue.submit([encoder.finish()]);
