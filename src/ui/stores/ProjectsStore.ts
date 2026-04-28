@@ -9,10 +9,6 @@ import {
   getProjects as getProjectsApi,
   patchProject,
 } from '../../api';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../firebase';
-
-const helloworld = httpsCallable(functions, 'helloworld');
 
 export interface IProjectStore {
   loading: boolean;
@@ -89,10 +85,8 @@ export class ProjectsStore extends Store<IProjectStore> {
     await patchProject(id!, token);
   }
 
-  // This is just a reference for the future
   async functionsTest() {
-    const functionResult = await helloworld({ foo: 'bar' });
-    return functionResult.data;
+    throw new Error('functionsTest: not implemented');
   }
 }
 

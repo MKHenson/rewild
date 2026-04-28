@@ -1,9 +1,4 @@
-import {
-  onAuthStateChanged,
-  signOut,
-  signInWithEmailAndPassword,
-} from 'firebase/auth';
-import { auth } from '../../firebase';
+import { authService } from '../../auth/auth-service';
 import { Store } from 'rewild-ui';
 
 interface IUser {
@@ -36,7 +31,7 @@ export class AuthStore extends Store<IAuth> {
       user: guestUser,
     });
 
-    onAuthStateChanged(auth, (user) => {
+    authService.onAuthStateChanged((user) => {
       if (user) {
         this.defaultProxy.loggedIn = true;
         this.defaultProxy.user = {
@@ -57,12 +52,12 @@ export class AuthStore extends Store<IAuth> {
 
   async signOut() {
     this.defaultProxy.loading = true;
-    await signOut(auth);
+    await authService.signOut();
   }
 
   async signIn(email: string, password: string) {
     this.defaultProxy.loading = true;
-    await signInWithEmailAndPassword(auth, email, password);
+    await authService.signIn(email, password);
   }
 }
 

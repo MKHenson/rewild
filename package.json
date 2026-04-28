@@ -26,9 +26,7 @@
   "homepage": "https://bitbucket.org/MathewKHenson/rewild-web#readme",
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
-    "date-fns": "2.29.3",
-    "firebase": "^9.10.0",
-    "firebaseui": "^6.0.1"
+    "date-fns": "2.29.3"
   },
   "devDependencies": {
     "@loaders.gl/core": "4.3.4",
