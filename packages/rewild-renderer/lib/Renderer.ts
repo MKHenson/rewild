@@ -144,7 +144,7 @@ export class Renderer {
       canvas.width / canvas.height
     );
     this.scene.addChild(this.perspectiveCam.camera.transform);
-    this.perspectiveCam.camera.transform.position.set(0, 0, 5);
+    this.perspectiveCam.camera.transform.position.set(0, 20, 50);
     this.perspectiveCam.camera.lookAt(0, 0, 0);
 
     this.camController = new TrackballController(this.perspectiveCam, canvas);
