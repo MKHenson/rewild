@@ -1,9 +1,0 @@
-overwrite: true
-schema: "./schema.graphql"
-documents: null
-generates:
-  ./models.ts:
-    plugins:
-      - "typescript"
-    config:
-      enumsAsTypes: true
