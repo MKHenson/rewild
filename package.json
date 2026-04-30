@@ -15,7 +15,8 @@
     "ts-check-watch": "tsc --noEmit --watch --project src/tsconfig.json",
     "watch": "node ./esbuild.js --watch",
     "start": "npm-run-all --parallel server watch ts-check-watch",
-    "server": "live-server --port=9001 --entry-file=index.html --open=/ ./public"
+    "server": "live-server --port=9001 --entry-file=index.html --open=/ ./public",
+    "generate:types": "cd server && .\\gradlew.bat generateSpec && npx openapi-typescript ../openapi.json -o ../src/types/api.ts"
   },
   "repository": {
     "type": "git",
