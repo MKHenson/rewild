@@ -1,0 +1,999 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "RE-WILD API",
+        "description": "Mycelium — offline-first sync backend for RE-WILD",
+        "version": "0.0.1"
+    },
+    "externalDocs": {
+        "url": "/"
+    },
+    "servers": [],
+    "tags": [],
+    "paths": {
+        "/health": {
+            "get": {
+                "tags": [],
+                "parameters": [],
+                "responses": {},
+                "deprecated": false
+            }
+        },
+        "/api/projects": {
+            "get": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "List projects",
+                "description": "Returns all projects for the authenticated user",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/com.rewild.models.Project"
+                                    },
+                                    "title": "List<Project>"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "post": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "Create project",
+                "description": "Creates a new project",
+                "parameters": [],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.models.Project"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "201": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.Project"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/projects/{id}": {
+            "get": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "Get project",
+                "description": "Returns a project by ID",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Project ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.Project"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "put": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "Update project",
+                "description": "Replaces an existing project",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Project ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.models.Project"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.Project"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "delete": {
+                "tags": [
+                    "Projects"
+                ],
+                "summary": "Delete project",
+                "description": "Deletes a project and its associated levels",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Project ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Project deleted",
+                        "headers": {}
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/levels": {
+            "get": {
+                "tags": [
+                    "Levels"
+                ],
+                "summary": "List levels",
+                "description": "Returns all levels for the authenticated user",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/com.rewild.models.Level"
+                                    },
+                                    "title": "List<Level>"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "post": {
+                "tags": [
+                    "Levels"
+                ],
+                "summary": "Create level",
+                "description": "Creates a new level",
+                "parameters": [],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.models.Level"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "201": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.Level"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/levels/{id}": {
+            "get": {
+                "tags": [
+                    "Levels"
+                ],
+                "summary": "Get level",
+                "description": "Returns a level by ID",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Level ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.Level"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "put": {
+                "tags": [
+                    "Levels"
+                ],
+                "summary": "Update level",
+                "description": "Replaces an existing level",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Level ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.models.Level"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.Level"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            },
+            "delete": {
+                "tags": [
+                    "Levels"
+                ],
+                "summary": "Delete level",
+                "description": "Deletes a level by ID",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Level ID",
+                        "required": true,
+                        "deprecated": false,
+                        "explode": false,
+                        "schema": {
+                            "type": "string",
+                            "title": "String"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Level deleted",
+                        "headers": {}
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/sync": {
+            "post": {
+                "tags": [
+                    "Sync"
+                ],
+                "summary": "Sync",
+                "description": "Bidirectional sync: push dirty local records and pull server-side changes since lastSyncedAt",
+                "parameters": [],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.models.SyncRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.SyncResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "com.rewild.models.Project": {
+                "type": "object",
+                "properties": {
+                    "activeOnStartup": {
+                        "type": "boolean",
+                        "title": "Boolean"
+                    },
+                    "description": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "levelId": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "sceneGraph": {
+                        "$ref": "#/components/schemas/com.rewild.models.SceneGraph"
+                    },
+                    "startEvent": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "syncError": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    },
+                    "syncedAt": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    },
+                    "updatedAt": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    },
+                    "userId": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "activeOnStartup",
+                    "description",
+                    "id",
+                    "name",
+                    "sceneGraph",
+                    "startEvent",
+                    "syncedAt",
+                    "updatedAt",
+                    "userId"
+                ],
+                "title": "Project"
+            },
+            "com.rewild.models.SceneGraph": {
+                "type": "object",
+                "properties": {
+                    "atmosphere": {
+                        "$ref": "#/components/schemas/com.rewild.models.Atmosphere"
+                    },
+                    "containers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/com.rewild.models.Container"
+                        },
+                        "title": "List<Container>"
+                    }
+                },
+                "required": [
+                    "atmosphere",
+                    "containers"
+                ],
+                "title": "SceneGraph"
+            },
+            "com.rewild.models.Atmosphere": {
+                "type": "object",
+                "properties": {
+                    "cloudiness": {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement"
+                    },
+                    "dayNightCycle": {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement2"
+                    },
+                    "elevation": {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement3"
+                    },
+                    "foginess": {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement4"
+                    },
+                    "precipitation": {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement5"
+                    },
+                    "temperature": {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement6"
+                    },
+                    "windiness": {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement7"
+                    }
+                },
+                "required": [
+                    "cloudiness",
+                    "dayNightCycle",
+                    "elevation",
+                    "foginess",
+                    "precipitation",
+                    "temperature",
+                    "windiness"
+                ],
+                "title": "Atmosphere"
+            },
+            "kotlinx.serialization.json.JsonElement": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {},
+                        "title": "JsonArray"
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonPrimitive"
+                    }
+                ],
+                "title": "JsonElement"
+            },
+            "kotlinx.serialization.json.JsonPrimitive": {
+                "anyOf": [
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonLiteral"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonNull"
+                    }
+                ],
+                "title": "JsonPrimitive"
+            },
+            "kotlinx.serialization.json.JsonLiteral": {
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "isString": {
+                        "type": "boolean",
+                        "title": "Boolean"
+                    }
+                },
+                "required": [
+                    "content",
+                    "isString"
+                ],
+                "title": "JsonLiteral"
+            },
+            "kotlinx.serialization.json.JsonNull": {
+                "type": "object",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "isString": {
+                        "type": "boolean",
+                        "title": "Boolean"
+                    }
+                },
+                "required": [
+                    "content",
+                    "isString"
+                ],
+                "title": "JsonNull"
+            },
+            "kotlinx.serialization.json.JsonElement2": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {},
+                        "title": "JsonArray"
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonPrimitive"
+                    }
+                ],
+                "title": "JsonElement"
+            },
+            "kotlinx.serialization.json.JsonElement3": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {},
+                        "title": "JsonArray"
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonPrimitive"
+                    }
+                ],
+                "title": "JsonElement"
+            },
+            "kotlinx.serialization.json.JsonElement4": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {},
+                        "title": "JsonArray"
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonPrimitive"
+                    }
+                ],
+                "title": "JsonElement"
+            },
+            "kotlinx.serialization.json.JsonElement5": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {},
+                        "title": "JsonArray"
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonPrimitive"
+                    }
+                ],
+                "title": "JsonElement"
+            },
+            "kotlinx.serialization.json.JsonElement6": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {},
+                        "title": "JsonArray"
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonPrimitive"
+                    }
+                ],
+                "title": "JsonElement"
+            },
+            "kotlinx.serialization.json.JsonElement7": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {},
+                        "title": "JsonArray"
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonPrimitive"
+                    }
+                ],
+                "title": "JsonElement"
+            },
+            "com.rewild.models.Container": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "properties": {
+                        "type": [
+                            "null",
+                            "array"
+                        ],
+                        "items": {
+                            "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement"
+                        },
+                        "title": "List<JsonElement>"
+                    },
+                    "templateId": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "activeOnStartup": {
+                        "type": "boolean",
+                        "title": "Boolean"
+                    },
+                    "actors": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/com.rewild.models.Actor"
+                        },
+                        "title": "List<Actor>"
+                    },
+                    "pod": {
+                        "$ref": "#/components/schemas/com.rewild.models.ContainerPod"
+                    }
+                },
+                "required": [
+                    "activeOnStartup",
+                    "actors",
+                    "id",
+                    "name",
+                    "pod",
+                    "type"
+                ],
+                "title": "Container"
+            },
+            "kotlinx.serialization.json.JsonElement8": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {},
+                        "title": "JsonArray"
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonPrimitive"
+                    }
+                ],
+                "title": "JsonElement"
+            },
+            "com.rewild.models.Actor": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "properties": {
+                        "type": [
+                            "null",
+                            "array"
+                        ],
+                        "items": {
+                            "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement"
+                        },
+                        "title": "List<JsonElement>"
+                    },
+                    "templateId": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    },
+                    "type": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "type"
+                ],
+                "title": "Actor"
+            },
+            "com.rewild.models.ContainerPod": {
+                "type": "object",
+                "properties": {
+                    "asset3D": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/com.rewild.models.Asset3D"
+                        },
+                        "title": "List<Asset3D>"
+                    }
+                },
+                "required": [
+                    "asset3D"
+                ],
+                "title": "ContainerPod"
+            },
+            "com.rewild.models.Asset3D": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "position": {
+                        "type": "array",
+                        "items": {
+                            "type": "number",
+                            "format": "float",
+                            "title": "Float"
+                        },
+                        "title": "List<Float>"
+                    },
+                    "rotation": {
+                        "type": "array",
+                        "items": {
+                            "type": "number",
+                            "format": "float",
+                            "title": "Float"
+                        },
+                        "title": "List<Float>"
+                    }
+                },
+                "required": [
+                    "id",
+                    "position",
+                    "rotation"
+                ],
+                "title": "Asset3D"
+            },
+            "com.rewild.models.Level": {
+                "type": "object",
+                "properties": {
+                    "activeOnStartup": {
+                        "type": "boolean",
+                        "title": "Boolean"
+                    },
+                    "containers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/com.rewild.models.Container"
+                        },
+                        "title": "List<Container>"
+                    },
+                    "hasTerrain": {
+                        "type": "boolean",
+                        "title": "Boolean"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "name": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "projectId": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "startEvent": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "syncError": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "title": "String"
+                    },
+                    "syncedAt": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    },
+                    "updatedAt": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    },
+                    "userId": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "activeOnStartup",
+                    "containers",
+                    "hasTerrain",
+                    "id",
+                    "name",
+                    "projectId",
+                    "startEvent",
+                    "syncedAt",
+                    "updatedAt",
+                    "userId"
+                ],
+                "title": "Level"
+            },
+            "com.rewild.models.SyncRecord": {
+                "type": "object",
+                "properties": {
+                    "collection": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "updatedAt": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    }
+                },
+                "required": [
+                    "collection",
+                    "data",
+                    "id",
+                    "updatedAt"
+                ],
+                "title": "SyncRecord"
+            },
+            "com.rewild.models.SyncRequest": {
+                "type": "object",
+                "properties": {
+                    "lastSyncedAt": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    },
+                    "records": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/com.rewild.models.SyncRecord"
+                        },
+                        "title": "List<SyncRecord>"
+                    }
+                },
+                "required": [
+                    "lastSyncedAt",
+                    "records"
+                ],
+                "title": "SyncRequest"
+            },
+            "com.rewild.models.SyncResponse": {
+                "type": "object",
+                "properties": {
+                    "records": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/com.rewild.models.SyncRecord"
+                        },
+                        "title": "List<SyncRecord>"
+                    },
+                    "syncedAt": {
+                        "type": "integer",
+                        "format": "int64",
+                        "title": "Long"
+                    }
+                },
+                "required": [
+                    "records",
+                    "syncedAt"
+                ],
+                "title": "SyncResponse"
+            }
+        },
+        "examples": {}
+    },
+    "webhooks": {}
+}

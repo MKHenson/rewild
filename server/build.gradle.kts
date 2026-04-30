@@ -20,6 +20,13 @@ kotlin {
     jvmToolchain(21)
 }
 
+tasks.register<JavaExec>("generateSpec") {
+    description = "Generates openapi.json by booting a spec-only server (no DB required)"
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("com.rewild.GenerateSpecKt")
+    dependsOn("classes")
+}
+
 tasks.named<JavaExec>("run") {
     val envFile = file(".env")
     if (envFile.exists()) {
@@ -48,7 +55,7 @@ dependencies {
     implementation("org.postgresql:postgresql:42.7.3")
     implementation("org.flywaydb:flyway-core:$flywayVersion")
     implementation("org.flywaydb:flyway-database-postgresql:$flywayVersion")
-    implementation("io.bkbn:kompendium-core:3.14.4")
+    implementation("io.github.smiley4:ktor-openapi:5.0.0")
     implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("ch.qos.logback:logback-classic:1.5.6")
     testImplementation("io.ktor:ktor-server-test-host-jvm")
