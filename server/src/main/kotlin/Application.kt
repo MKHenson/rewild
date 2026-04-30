@@ -1,5 +1,6 @@
 package com.rewild
 
+import com.rewild.db.DatabaseFactory
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -8,6 +9,8 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
 fun Application.module() {
+    DatabaseFactory.init(this)
+
     install(ContentNegotiation) {
         json()
     }

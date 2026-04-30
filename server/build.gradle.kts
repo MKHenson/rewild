@@ -20,6 +20,17 @@ kotlin {
     jvmToolchain(21)
 }
 
+tasks.named<JavaExec>("run") {
+    val envFile = file(".env")
+    if (envFile.exists()) {
+        envFile.readLines()
+            .filter { it.isNotBlank() && !it.startsWith("#") }
+            .map { it.split("=", limit = 2) }
+            .filter { it.size == 2 }
+            .forEach { (key, value) -> environment(key.trim(), value.trim()) }
+    }
+}
+
 repositories {
     mavenCentral()
 }
@@ -38,6 +49,7 @@ dependencies {
     implementation("org.flywaydb:flyway-core:$flywayVersion")
     implementation("org.flywaydb:flyway-database-postgresql:$flywayVersion")
     implementation("io.bkbn:kompendium-core:3.14.4")
+    implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("ch.qos.logback:logback-classic:1.5.6")
     testImplementation("io.ktor:ktor-server-test-host-jvm")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
