@@ -1,4 +1,5 @@
-import { authService } from '../../auth/auth-service';
+import { authService } from '../../api/auth/auth-service';
+import { db } from '../../database/database';
 import { Store } from 'rewild-ui';
 
 interface IUser {
@@ -23,29 +24,33 @@ const guestUser: IUser = {
   type: 'guest',
 };
 
+function toStoreUser(user: NonNullable<ReturnType<typeof authService.getUser>>): IUser {
+  return {
+    displayName: user.displayName,
+    email: user.email,
+    emailVerified: user.emailVerified,
+    photoURL: user.photoURL,
+    type: 'user',
+  };
+}
+
 export class AuthStore extends Store<IAuth> {
   constructor() {
+    const currentUser = authService.getUser();
     super({
-      loading: true,
-      loggedIn: false,
-      user: guestUser,
+      loading: false,
+      loggedIn: currentUser !== null,
+      user: currentUser ? toStoreUser(currentUser) : { ...guestUser },
     });
 
-    authService.onAuthStateChanged((user) => {
+    authService.onAuthStateChanged.add((user) => {
       if (user) {
         this.defaultProxy.loggedIn = true;
-        this.defaultProxy.user = {
-          displayName: user.displayName,
-          email: user.email,
-          emailVerified: user.emailVerified,
-          photoURL: user.photoURL,
-          type: 'user',
-        };
+        this.defaultProxy.user = toStoreUser(user);
       } else {
         this.defaultProxy.loggedIn = false;
         this.defaultProxy.user = { ...guestUser };
       }
-
       this.defaultProxy.loading = false;
     });
   }
@@ -58,6 +63,7 @@ export class AuthStore extends Store<IAuth> {
   async signIn(email: string, password: string) {
     this.defaultProxy.loading = true;
     await authService.signIn(email, password);
+    await db.sync.run();
   }
 }
 

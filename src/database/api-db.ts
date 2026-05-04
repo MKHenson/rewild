@@ -1,9 +1,6 @@
 import type { IDataTable, IDataTableQuery } from 'models';
+import { apiFetch } from '../api/auth/api-client';
 
-/**
- * REST-backed data table targeting the Ktor server.
- * Replaces FirestoreDataTable. Methods are stubs until the server is implemented.
- */
 export class ApiDataTable<T> implements IDataTable<T> {
   private readonly collection: string;
 
@@ -15,11 +12,15 @@ export class ApiDataTable<T> implements IDataTable<T> {
     throw new Error(`ApiDataTable(${this.collection}).getOne: not implemented`);
   }
 
-  async getMany<Query = T>(_query: IDataTableQuery<Query>): Promise<{
+  async getMany<Query = T>(
+    _query: IDataTableQuery<Query>
+  ): Promise<{
     items: (T & { id: string })[];
     cursor: string | number | Partial<T>;
   }> {
-    throw new Error(`ApiDataTable(${this.collection}).getMany: not implemented`);
+    throw new Error(
+      `ApiDataTable(${this.collection}).getMany: not implemented`
+    );
   }
 
   async remove(_id: string): Promise<boolean> {
@@ -32,5 +33,9 @@ export class ApiDataTable<T> implements IDataTable<T> {
 
   async patch(_id: string, _token: Partial<T>): Promise<void> {
     throw new Error(`ApiDataTable(${this.collection}).patch: not implemented`);
+  }
+
+  protected fetch(path: string, init?: RequestInit): Promise<Response> {
+    return apiFetch(`/api/${this.collection}${path}`, init);
   }
 }
