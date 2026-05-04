@@ -19,6 +19,112 @@
                 "deprecated": false
             }
         },
+        "/api/auth/register": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Register",
+                "description": "Creates a new user account and returns a JWT access token",
+                "parameters": [],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.auth.RegisterRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "201": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.auth.AuthResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/auth/login": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Login",
+                "description": "Authenticates with email and password and returns a JWT access token",
+                "parameters": [],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.auth.LoginRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.auth.AuthResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/auth/refresh": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Refresh token",
+                "description": "Issues a new access token using the refresh token cookie",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.auth.AuthResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/auth/logout": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Logout",
+                "description": "Revokes the refresh token and clears the auth cookie",
+                "parameters": [],
+                "responses": {
+                    "204": {
+                        "description": "Logged out",
+                        "headers": {}
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/api/projects": {
             "get": {
                 "tags": [
@@ -387,6 +493,55 @@
     },
     "components": {
         "schemas": {
+            "com.rewild.auth.RegisterRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "password": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "email",
+                    "password"
+                ],
+                "title": "RegisterRequest"
+            },
+            "com.rewild.auth.AuthResponse": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "token"
+                ],
+                "title": "AuthResponse"
+            },
+            "com.rewild.auth.LoginRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "password": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "email",
+                    "password"
+                ],
+                "title": "LoginRequest"
+            },
             "com.rewild.models.Project": {
                 "type": "object",
                 "properties": {
@@ -438,7 +593,10 @@
                         "title": "Long"
                     },
                     "userId": {
-                        "type": "string",
+                        "type": [
+                            "null",
+                            "string"
+                        ],
                         "title": "String"
                     }
                 },
@@ -450,8 +608,7 @@
                     "sceneGraph",
                     "startEvent",
                     "syncedAt",
-                    "updatedAt",
-                    "userId"
+                    "updatedAt"
                 ],
                 "title": "Project"
             },
@@ -900,7 +1057,10 @@
                         "title": "Long"
                     },
                     "userId": {
-                        "type": "string",
+                        "type": [
+                            "null",
+                            "string"
+                        ],
                         "title": "String"
                     }
                 },
@@ -913,8 +1073,7 @@
                     "projectId",
                     "startEvent",
                     "syncedAt",
-                    "updatedAt",
-                    "userId"
+                    "updatedAt"
                 ],
                 "title": "Level"
             },
