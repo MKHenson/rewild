@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Level(
     val id: String,
-    val userId: String,
+    val userId: String? = null,
     val projectId: String,
     val name: String,
     val activeOnStartup: Boolean,
