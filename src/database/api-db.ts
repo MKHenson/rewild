@@ -1,7 +1,7 @@
-import type { IDataTable, IDataTableQuery } from 'models';
+import type { IDataTableQuery } from 'models';
 import { apiFetch } from '../api/auth/api-client';
 
-export class ApiDataTable<T> implements IDataTable<T> {
+export class ApiDataTable<T> {
   private readonly collection: string;
 
   constructor(collection: string) {

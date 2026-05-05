@@ -39,7 +39,6 @@ export class ProjectsStore extends Store<IProjectStore> {
 
     try {
       token.created = Date.now();
-      token.lastModified = Date.now();
       const resp = await addProjectApi(token);
 
       const newLevel: ILevel = {
@@ -48,7 +47,6 @@ export class ProjectsStore extends Store<IProjectStore> {
         name: token.name || '',
         startEvent: token.startEvent || '',
         created: Date.now(),
-        lastModified: Date.now(),
         project: resp.id,
         activeOnStartup: token.activeOnStartup || true,
       };
@@ -81,7 +79,6 @@ export class ProjectsStore extends Store<IProjectStore> {
 
   async updateProject(project: IProject) {
     const { id, ...token } = project;
-    token.lastModified = Date.now();
     await patchProject(id!, token);
   }
 

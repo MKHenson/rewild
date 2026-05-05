@@ -80,17 +80,14 @@ declare module 'models' {
     template: () => ITreeNode<IResource>;
   }
 
-  export interface IDataTable<T> {
-    getOne(id: string): Promise<(T & { id: string }) | null>;
-    getMany(query: IDataTableQuery<T>): Promise<{
-      items: (T & { id: string })[];
-      cursor: string | number | Partial<T>;
-    }>;
-
-    remove(id: string): Promise<boolean>;
-    add(token: T): Promise<T & { id: string }>;
-    patch(id: string, token: Partial<T>): Promise<void>;
+  // TODO: replace with server-generated types from OpenAPI once models stabilise
+  export interface SyncableRecord {
+    updatedAt: number;
+    syncedAt: number;
+    syncError: string | null;
   }
+
+  export type StoredRecord<T> = T & SyncableRecord & { id: string };
 
   export interface IDataTableQuery<Query> {
     limit?: number;
@@ -123,7 +120,6 @@ declare module 'models' {
       };
     };
     created: number;
-    lastModified: number;
   }
 
   export interface ILevel {
@@ -134,7 +130,6 @@ declare module 'models' {
     hasTerrain: boolean;
     startEvent: string;
     created: number;
-    lastModified: number;
     containers: IContainer[];
   }
 
