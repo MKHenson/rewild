@@ -38,7 +38,6 @@ export class ProjectsStore extends Store<IProjectStore> {
     this.defaultProxy.error = '';
 
     try {
-      token.created = Date.now();
       const resp = await addProjectApi(token);
 
       const newLevel: ILevel = {
@@ -46,12 +45,11 @@ export class ProjectsStore extends Store<IProjectStore> {
         hasTerrain: true,
         name: token.name || '',
         startEvent: token.startEvent || '',
-        created: Date.now(),
-        project: resp.id,
+        projectId: resp.id,
         activeOnStartup: token.activeOnStartup || true,
       };
       const levelResp = await addLevel(newLevel);
-      patchProject(resp.id, { level: levelResp.id });
+      patchProject(resp.id, { levelId: levelResp.id });
 
       await this.getProjects();
     } catch (err: any) {
@@ -68,7 +66,7 @@ export class ProjectsStore extends Store<IProjectStore> {
     try {
       const project = await getProject(id);
       await deleteProject(id);
-      await deleteLevel(project!.level);
+      await deleteLevel(project!.levelId);
       await this.getProjects();
     } catch (err: any) {
       this.defaultProxy.error = err.toString();

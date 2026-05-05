@@ -3,7 +3,7 @@ import { db } from '../database/database';
 
 export async function getLevel(projectId: string) {
   const allLevels = await db.levels.getMany({
-    where: [['project', '==', projectId]],
+    where: [['projectId', '==', projectId]],
   });
 
   const levels = allLevels.items;
@@ -15,7 +15,7 @@ export async function getLevel(projectId: string) {
 
 export async function getLevels(projectId: string, page?: any) {
   const allLevels = await db.levels.getMany({
-    where: [['project', '==', projectId]],
+    where: [['projectId', '==', projectId]],
     cursor: page,
     limit: 30,
     sort: [['created', 'desc']],

@@ -1,4 +1,3 @@
-import type { IDataTableQuery } from 'models';
 import { apiFetch } from '../api/auth/api-client';
 
 export class ApiDataTable<T> {
@@ -8,34 +7,33 @@ export class ApiDataTable<T> {
     this.collection = collection;
   }
 
-  async getOne(_id: string): Promise<(T & { id: string }) | null> {
-    throw new Error(`ApiDataTable(${this.collection}).getOne: not implemented`);
+  async getOne(id: string): Promise<(T & { id: string }) | null> {
+    const res = await apiFetch(`/api/${this.collection}/${id}`);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`GET ${this.collection}/${id} failed: ${res.status}`);
+    return res.json();
   }
 
-  async getMany<Query = T>(
-    _query: IDataTableQuery<Query>
-  ): Promise<{
-    items: (T & { id: string })[];
-    cursor: string | number | Partial<T>;
-  }> {
-    throw new Error(
-      `ApiDataTable(${this.collection}).getMany: not implemented`
-    );
+  async getAll(): Promise<(T & { id: string })[]> {
+    const res = await apiFetch(`/api/${this.collection}`);
+    if (!res.ok) throw new Error(`GET ${this.collection} failed: ${res.status}`);
+    return res.json();
   }
 
-  async remove(_id: string): Promise<boolean> {
-    throw new Error(`ApiDataTable(${this.collection}).remove: not implemented`);
+  async put(record: T & { id: string }): Promise<T & { id: string }> {
+    const res = await apiFetch(`/api/${this.collection}/${record.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record),
+    });
+    if (!res.ok) throw new Error(`PUT ${this.collection}/${record.id} failed: ${res.status}`);
+    return res.json();
   }
 
-  async add(_token: T): Promise<T & { id: string }> {
-    throw new Error(`ApiDataTable(${this.collection}).add: not implemented`);
-  }
-
-  async patch(_id: string, _token: Partial<T>): Promise<void> {
-    throw new Error(`ApiDataTable(${this.collection}).patch: not implemented`);
-  }
-
-  protected fetch(path: string, init?: RequestInit): Promise<Response> {
-    return apiFetch(`/api/${this.collection}${path}`, init);
+  async remove(id: string): Promise<boolean> {
+    const res = await apiFetch(`/api/${this.collection}/${id}`, { method: 'DELETE' });
+    if (res.status === 404) return false;
+    if (!res.ok) throw new Error(`DELETE ${this.collection}/${id} failed: ${res.status}`);
+    return true;
   }
 }

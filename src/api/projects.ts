@@ -5,7 +5,7 @@ export async function getProjects(onlyStartup: boolean, cursor?: any) {
   const resp = await db.projects.getMany({
     limit: 30,
     cursor,
-    sort: [['created', 'desc']],
+    sort: [['updatedAt', 'desc']],
     where: onlyStartup ? [['activeOnStartup', '==', true]] : undefined,
   });
 

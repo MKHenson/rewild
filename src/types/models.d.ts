@@ -102,7 +102,7 @@ declare module 'models' {
 
   export interface IProject {
     id?: string;
-    level: string;
+    levelId: string;
     name: string;
     description: string;
     activeOnStartup: boolean;
@@ -119,17 +119,15 @@ declare module 'models' {
         dayNightCycle: PropValue;
       };
     };
-    created: number;
   }
 
   export interface ILevel {
     id?: string;
     name: string;
-    project: string;
+    projectId: string;
     activeOnStartup: boolean;
     hasTerrain: boolean;
     startEvent: string;
-    created: number;
     containers: IContainer[];
   }
 
