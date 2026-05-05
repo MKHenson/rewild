@@ -1,7 +1,18 @@
-import type { IDataTable, IDataTableQuery } from 'models';
+import type { IDataTableQuery, SyncableRecord } from 'models';
 import { generateUUID } from 'rewild-common';
 
-export class LocalDataTable<T> implements IDataTable<T> {
+type StoredRecord<T> = T & SyncableRecord & { id: string };
+
+function withSyncDefaults<T>(record: T & { id: string }): StoredRecord<T> {
+  return {
+    updatedAt: 0,
+    syncedAt: 0,
+    syncError: null,
+    ...record,
+  } as StoredRecord<T>;
+}
+
+export class LocalDataTable<T> {
   db: string;
   collection: string;
 
@@ -14,11 +25,11 @@ export class LocalDataTable<T> implements IDataTable<T> {
     return `${this.db}.${this.collection}`;
   }
 
-  async getOne(id: string) {
+  async getOne(id: string): Promise<StoredRecord<T> | null> {
     try {
       const storageStr = localStorage.getItem(`${this.prefix}.${id}`);
       if (storageStr) {
-        return JSON.parse(storageStr) as T & { id: string };
+        return withSyncDefaults(JSON.parse(storageStr) as T & { id: string });
       }
     } catch {}
 
@@ -36,7 +47,7 @@ export class LocalDataTable<T> implements IDataTable<T> {
 
     let allItems = (await Promise.all(
       idsToFetch.map((id) => this.getOne(id))
-    )) as (T & { id: string })[];
+    )) as StoredRecord<T>[];
 
     if (q.sort) {
       for (const [prop, order] of q.sort) {
@@ -117,19 +128,22 @@ export class LocalDataTable<T> implements IDataTable<T> {
     return existingUids;
   }
 
-  async add(token: T) {
+  async add(token: T): Promise<StoredRecord<T>> {
     const newUid = generateUUID();
-    const tokenWithId = { ...token, id: newUid };
-    localStorage.setItem(
-      `${this.prefix}.${newUid}`,
-      JSON.stringify(tokenWithId)
-    );
+    const record: StoredRecord<T> = {
+      ...token,
+      id: newUid,
+      updatedAt: Date.now(),
+      syncedAt: 0,
+      syncError: null,
+    };
+    localStorage.setItem(`${this.prefix}.${newUid}`, JSON.stringify(record));
 
     const existingUids = this.getAllItemUids();
     existingUids.push(newUid);
     localStorage.setItem(this.prefix, JSON.stringify(existingUids));
 
-    return tokenWithId;
+    return record;
   }
 
   async patch(id: string, token: Partial<T>): Promise<void> {
@@ -137,8 +151,18 @@ export class LocalDataTable<T> implements IDataTable<T> {
     if (existing) {
       localStorage.setItem(
         `${this.prefix}.${id}`,
-        JSON.stringify({ ...existing, ...token })
+        JSON.stringify({ ...existing, ...token, updatedAt: Date.now() })
       );
     }
+  }
+
+  async getDirty(): Promise<StoredRecord<T>[]> {
+    const allItemIds = this.getAllItemUids();
+    const allItems = await Promise.all(allItemIds.map((id) => this.getOne(id)));
+    const dirty: StoredRecord<T>[] = [];
+    for (const item of allItems) {
+      if (item !== null && item.updatedAt > item.syncedAt) dirty.push(item);
+    }
+    return dirty;
   }
 }

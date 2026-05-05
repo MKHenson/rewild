@@ -1,4 +1,4 @@
-import { ILevel, IProject, IContainer, IActor, IContainerPod } from 'models';
+import { ILevel, IProject, IContainer, IActor, IContainerPod, StoredRecord } from 'models';
 import { Store, createUUID } from 'rewild-ui';
 import {
   getLevel as getLevelApi,
@@ -14,8 +14,8 @@ export interface IProjectStore {
   loading: boolean;
   dirty: boolean;
   error?: string;
-  level: ILevel | null;
-  project: IProject | null;
+  level: StoredRecord<ILevel> | null;
+  project: StoredRecord<IProject> | null;
 }
 
 export type ProjectStoreEvents =
@@ -46,7 +46,6 @@ export class ProjectStore extends Store<IProjectStore> {
       description: '',
       activeOnStartup: true,
       created: Date.now(),
-      lastModified: Date.now(),
       level: '',
       startEvent: '',
       sceneGraph: {
@@ -70,7 +69,7 @@ export class ProjectStore extends Store<IProjectStore> {
 
     try {
       const resp = await getProjectApi(projectId);
-      this.defaultProxy.project = { ...(resp as IProject), id: projectId };
+      this.defaultProxy.project = resp;
 
       await this.getLevel(resp!.id);
     } catch (err: any) {
@@ -101,8 +100,6 @@ export class ProjectStore extends Store<IProjectStore> {
 
   async updateProject() {
     const project = this.defaultProxy.project!;
-    project.lastModified = Date.now();
-
     const { id, ...token } = project;
     const containerNodes = sceneGraphStore.nodes.find(
       (n) => n.name === 'Containers'
@@ -156,7 +153,6 @@ export class ProjectStore extends Store<IProjectStore> {
 
     try {
       await patchLevel(project.level!, {
-        lastModified: Date.now(),
         containers:
           containers?.map(
             (c) =>

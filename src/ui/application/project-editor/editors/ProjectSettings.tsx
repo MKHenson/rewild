@@ -9,7 +9,7 @@ import {
   register,
 } from 'rewild-ui';
 import { projectStore } from '../../../stores/ProjectStore';
-import { IProject } from 'models';
+import { StoredRecord, IProject } from 'models';
 
 interface Props {}
 
@@ -31,11 +31,11 @@ export class ProjectSettings extends Component<Props> {
               <Typography variant="body2">{project.name}</Typography>
               <Typography variant="label">Last Modified</Typography>
               <Typography variant="body2">
-                <Date date={project.lastModified!} />
+                <Date date={project.updatedAt!} />
               </Typography>
               <Typography variant="label">Last Published</Typography>
               <Typography variant="body2">
-                <Date date={level?.lastModified} />
+                <Date date={level?.updatedAt} />
               </Typography>
               <Typography variant="label">Active on Startup</Typography>
               <Switch
@@ -67,7 +67,7 @@ export class ProjectSettings extends Component<Props> {
                   <Button
                     fullWidth
                     onClick={(e) => {
-                      projectStoreProxy.project = updatedProject() as IProject;
+                      projectStoreProxy.project = updatedProject() as StoredRecord<IProject>;
                       projectStore.updateProject();
                     }}>
                     Save

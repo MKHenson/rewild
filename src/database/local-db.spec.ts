@@ -24,11 +24,15 @@ describe('Local database tests', () => {
   it('correctly adds an item to the table', async () => {
     const local = getLocalTable();
     const newItem = await local.add({ age: 1, type: 'cat' });
-    expect(newItem).toEqual({ id: expect.any(String), age: 1, type: 'cat' });
+    expect(newItem).toEqual(
+      expect.objectContaining({ id: expect.any(String), age: 1, type: 'cat' })
+    );
 
     const results = await local.getMany({});
     expect(results.items.length).toEqual(1);
-    expect(results.items[0]).toEqual({ id: newItem.id, age: 1, type: 'cat' });
+    expect(results.items[0]).toEqual(
+      expect.objectContaining({ id: newItem.id, age: 1, type: 'cat' })
+    );
   });
 
   it('correctly adds multiple items to the table and has persisted value from previous test', async () => {
@@ -190,6 +194,99 @@ describe('Local database tests', () => {
     expect(rows.items.length).toEqual(1);
     expect(rows.items[0]).toStrictEqual(allRows.items.at(-1));
     expect(rows.cursor).toEqual(allRows.items.length);
+  });
+
+  describe('sync tracking fields', () => {
+    it('sets updatedAt, syncedAt=0, syncError=null on add', async () => {
+      const local = getLocalTable();
+      const before = Date.now();
+      const item = await local.add({ type: 'sync-cat' });
+      const after = Date.now();
+
+      expect(item.updatedAt).toBeGreaterThanOrEqual(before);
+      expect(item.updatedAt).toBeLessThanOrEqual(after);
+      expect(item.syncedAt).toBe(0);
+      expect(item.syncError).toBeNull();
+    });
+
+    it('updates updatedAt on patch', async () => {
+      const local = getLocalTable();
+      const item = await local.add({ type: 'patch-cat' });
+      const originalUpdatedAt = item.updatedAt;
+
+      await new Promise((r) => setTimeout(r, 5));
+      await local.patch(item.id, { type: 'patched-cat' });
+
+      const updated = await local.getOne(item.id);
+      expect(updated!.updatedAt).toBeGreaterThan(originalUpdatedAt);
+      expect(updated!.type).toBe('patched-cat');
+    });
+
+    it('preserves syncedAt and syncError across patch', async () => {
+      const local = getLocalTable();
+      const item = await local.add({ type: 'sync-preserve-cat' });
+
+      await local.patch(item.id, { syncedAt: 9999, syncError: 'timeout' } as any);
+      const patched = await local.getOne(item.id);
+
+      expect(patched!.syncedAt).toBe(9999);
+      expect(patched!.syncError).toBe('timeout');
+    });
+
+    it('applies sync field defaults when reading legacy records', async () => {
+      const local = getLocalTable();
+      const uid = 'legacy-id-001';
+      localStorage.setItem(
+        `${local.prefix}.${uid}`,
+        JSON.stringify({ id: uid, type: 'legacy-cat' })
+      );
+      localStorage.setItem(
+        local.prefix,
+        JSON.stringify([...(JSON.parse(localStorage.getItem(local.prefix) || '[]')), uid])
+      );
+
+      const record = await local.getOne(uid);
+      expect(record!.updatedAt).toBe(0);
+      expect(record!.syncedAt).toBe(0);
+      expect(record!.syncError).toBeNull();
+      expect(record!.type).toBe('legacy-cat');
+    });
+
+    it('getDirty returns records where updatedAt > syncedAt', async () => {
+      const local = getLocalTable();
+      const item1 = await local.add({ type: 'dirty-cat' });
+      const item2 = await local.add({ type: 'dirty-cat' });
+
+      // Simulate synced record: set syncedAt = updatedAt
+      await local.patch(item2.id, { syncedAt: item2.updatedAt } as any);
+      // Re-fetch to ensure syncedAt was stored; bump updatedAt back below syncedAt by patching syncedAt high
+      const synced = await local.getOne(item2.id);
+      // updatedAt was bumped by patch, so patch syncedAt to match
+      await local.patch(item2.id, { syncedAt: synced!.updatedAt } as any);
+
+      const dirty = await local.getDirty();
+      const dirtyIds = dirty.map((d) => d.id);
+
+      expect(dirtyIds).toContain(item1.id);
+      expect(dirtyIds).not.toContain(item2.id);
+    });
+
+    it('legacy records with updatedAt=0 and syncedAt=0 are not dirty', async () => {
+      const local = getLocalTable();
+      const uid = 'legacy-clean-001';
+      localStorage.setItem(
+        `${local.prefix}.${uid}`,
+        JSON.stringify({ id: uid, type: 'legacy-clean' })
+      );
+      localStorage.setItem(
+        local.prefix,
+        JSON.stringify([...(JSON.parse(localStorage.getItem(local.prefix) || '[]')), uid])
+      );
+
+      const dirty = await local.getDirty();
+      const dirtyIds = dirty.map((d) => d.id);
+      expect(dirtyIds).not.toContain(uid);
+    });
   });
 
   it('can sort items', async () => {
