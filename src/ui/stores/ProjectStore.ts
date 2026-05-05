@@ -45,8 +45,7 @@ export class ProjectStore extends Store<IProjectStore> {
       name: 'New Project',
       description: '',
       activeOnStartup: true,
-      created: Date.now(),
-      level: '',
+      levelId: '',
       startEvent: '',
       sceneGraph: {
         atmosphere: {
@@ -152,7 +151,7 @@ export class ProjectStore extends Store<IProjectStore> {
     )!.children;
 
     try {
-      await patchLevel(project.level!, {
+      await patchLevel(project.levelId!, {
         containers:
           containers?.map(
             (c) =>
