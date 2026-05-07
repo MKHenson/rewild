@@ -1,15 +1,11 @@
 package com.rewild.auth
 
-import com.rewild.db.tables.RefreshTokensTable
-import com.rewild.db.tables.UsersTable
-import com.zaxxer.hikari.HikariConfig
-import com.zaxxer.hikari.HikariDataSource
-import org.flywaydb.core.Flyway
-import org.jetbrains.exposed.sql.Database
+import com.rewild.makeTestJwtService
+import com.rewild.startTestDatabase
+import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
 import org.junit.AfterClass
 import org.junit.BeforeClass
 import org.junit.Test
-import org.testcontainers.containers.PostgreSQLContainer
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -18,40 +14,20 @@ import kotlin.test.assertNull
 class AuthServiceTest {
 
     companion object {
-        private val postgres = PostgreSQLContainer<Nothing>("postgres:16")
+        private lateinit var postgres: EmbeddedPostgres
         private lateinit var authService: AuthService
 
         @BeforeClass
         @JvmStatic
         fun setup() {
-            postgres.start()
-
-            Flyway.configure()
-                .dataSource(postgres.jdbcUrl, postgres.username, postgres.password)
-                .load()
-                .migrate()
-
-            val hikari = HikariConfig().apply {
-                jdbcUrl = postgres.jdbcUrl
-                username = postgres.username
-                password = postgres.password
-                driverClassName = "org.postgresql.Driver"
-                maximumPoolSize = 5
-            }
-            Database.connect(HikariDataSource(hikari))
-
-            val jwtService = JwtService(
-                secret = "test-secret-1234567890",
-                issuer = "http://localhost",
-                audience = "rewild-api"
-            )
-            authService = AuthService(jwtService)
+            postgres = startTestDatabase()
+            authService = AuthService(makeTestJwtService())
         }
 
         @AfterClass
         @JvmStatic
         fun teardown() {
-            postgres.stop()
+            postgres.close()
         }
     }
 

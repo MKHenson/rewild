@@ -27,6 +27,7 @@ tasks.register<JavaExec>("generateSpec") {
     dependsOn("classes")
 }
 
+
 tasks.named<JavaExec>("run") {
     val envFile = file(".env")
     if (envFile.exists()) {
@@ -61,5 +62,5 @@ dependencies {
     implementation("at.favre.lib:bcrypt:0.10.2")
     testImplementation("io.ktor:ktor-server-test-host-jvm")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
-    testImplementation("org.testcontainers:postgresql:1.20.4")
+    testImplementation("io.zonky.test:embedded-postgres:2.0.7")
 }
