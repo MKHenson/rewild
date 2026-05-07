@@ -23,6 +23,18 @@ export class AuthService {
     return this.token ? this.decodeUser(this.token) : null;
   }
 
+  getUserId(): string | null {
+    if (!this.token) return null;
+    try {
+      const payload = JSON.parse(
+        atob(this.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
+      ) as { userId?: string };
+      return payload.userId ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async refreshToken(): Promise<string | null> {
     try {
       const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
