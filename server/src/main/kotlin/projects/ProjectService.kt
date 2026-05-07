@@ -8,6 +8,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
 import org.jetbrains.exposed.sql.transactions.transaction
 
 private val json = Json { ignoreUnknownKeys = true }
@@ -66,6 +67,12 @@ class ProjectService {
         }
 
         record
+    }
+
+    fun getAllNewerThan(userId: String, since: Long): List<Project> = transaction {
+        ProjectsTable.selectAll()
+            .where { (ProjectsTable.userId eq userId) and (ProjectsTable.updatedAt greater since) }
+            .map { it.toProject() }
     }
 
     fun delete(userId: String, id: String): DeleteResult = transaction {

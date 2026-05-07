@@ -36,27 +36,25 @@ fun startTestDatabase(): EmbeddedPostgres {
 fun makeTestJwtService() = JwtService("test-secret-1234567890", "http://localhost", "rewild-api")
 
 fun ApplicationTestBuilder.installTestAuth(jwtService: JwtService, routes: Route.() -> Unit) {
-    application {
-        install(ContentNegotiation) { json() }
-        install(Authentication) {
-            jwt("auth-jwt") {
-                realm = "rewild-api"
-                verifier(jwtService.makeVerifier())
-                validate { credential ->
-                    if (credential.payload.getClaim("userId").asString() != null)
-                        JWTPrincipal(credential.payload)
-                    else null
-                }
-                challenge { _, _ ->
-                    call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Token is invalid or expired"))
-                }
+    install(ContentNegotiation) { json() }
+    install(Authentication) {
+        jwt("auth-jwt") {
+            realm = "rewild-api"
+            verifier(jwtService.makeVerifier())
+            validate { credential ->
+                if (credential.payload.getClaim("userId").asString() != null)
+                    JWTPrincipal(credential.payload)
+                else null
+            }
+            challenge { _, _ ->
+                call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Token is invalid or expired"))
             }
         }
-        routing {
-            route("/api") {
-                authenticate("auth-jwt") {
-                    routes()
-                }
+    }
+    routing {
+        route("/api") {
+            authenticate("auth-jwt") {
+                routes()
             }
         }
     }
