@@ -3,13 +3,14 @@ package com.rewild
 import com.rewild.auth.*
 import com.rewild.common.ErrorResponse
 import com.rewild.db.DatabaseFactory
+import com.rewild.levels.LevelService
+import com.rewild.levels.levelRoutes
 import com.rewild.models.*
+import com.rewild.projects.ProjectService
+import com.rewild.projects.projectRoutes
 import io.github.smiley4.ktoropenapi.OpenApi
-import io.github.smiley4.ktoropenapi.delete
-import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.openApi
 import io.github.smiley4.ktoropenapi.post
-import io.github.smiley4.ktoropenapi.put
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -60,6 +61,9 @@ private fun Application.configureAuth(jwtService: JwtService) {
 }
 
 private fun Application.configureApi(authService: AuthService, secureCookies: Boolean, protected: Boolean) {
+    val projectService = ProjectService()
+    val levelService = LevelService()
+
     install(ContentNegotiation) { json() }
 
     install(OpenApi) {
@@ -82,131 +86,15 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
 
             if (protected) {
                 authenticate("auth-jwt") {
-                    projectRoutes()
-                    levelRoutes()
+                    projectRoutes(projectService)
+                    levelRoutes(levelService)
                     syncRoutes()
                 }
             } else {
-                projectRoutes()
-                levelRoutes()
+                projectRoutes(projectService)
+                levelRoutes(levelService)
                 syncRoutes()
             }
-        }
-    }
-}
-
-private fun Route.projectRoutes() {
-    route("/projects") {
-        get({
-            tags("Projects")
-            summary = "List projects"
-            description = "Returns all projects for the authenticated user"
-            response {
-                code(HttpStatusCode.OK) { body<List<Project>>() }
-            }
-        }) { call.respond(HttpStatusCode.NotImplemented) }
-
-        post({
-            tags("Projects")
-            summary = "Create project"
-            description = "Creates a new project"
-            request { body<Project>() }
-            response {
-                code(HttpStatusCode.Created) { body<Project>() }
-            }
-        }) { call.respond(HttpStatusCode.NotImplemented) }
-
-        route("/{id}") {
-            get({
-                tags("Projects")
-                summary = "Get project"
-                description = "Returns a project by ID"
-                request { pathParameter<String>("id") { description = "Project ID" } }
-                response {
-                    code(HttpStatusCode.OK) { body<Project>() }
-                }
-            }) { call.respond(HttpStatusCode.NotImplemented) }
-
-            put({
-                tags("Projects")
-                summary = "Update project"
-                description = "Replaces an existing project"
-                request {
-                    pathParameter<String>("id") { description = "Project ID" }
-                    body<Project>()
-                }
-                response {
-                    code(HttpStatusCode.OK) { body<Project>() }
-                }
-            }) { call.respond(HttpStatusCode.NotImplemented) }
-
-            delete({
-                tags("Projects")
-                summary = "Delete project"
-                description = "Deletes a project and its associated levels"
-                request { pathParameter<String>("id") { description = "Project ID" } }
-                response {
-                    code(HttpStatusCode.NoContent) { description = "Project deleted" }
-                }
-            }) { call.respond(HttpStatusCode.NotImplemented) }
-        }
-    }
-}
-
-private fun Route.levelRoutes() {
-    route("/levels") {
-        get({
-            tags("Levels")
-            summary = "List levels"
-            description = "Returns all levels for the authenticated user"
-            response {
-                code(HttpStatusCode.OK) { body<List<Level>>() }
-            }
-        }) { call.respond(HttpStatusCode.NotImplemented) }
-
-        post({
-            tags("Levels")
-            summary = "Create level"
-            description = "Creates a new level"
-            request { body<Level>() }
-            response {
-                code(HttpStatusCode.Created) { body<Level>() }
-            }
-        }) { call.respond(HttpStatusCode.NotImplemented) }
-
-        route("/{id}") {
-            get({
-                tags("Levels")
-                summary = "Get level"
-                description = "Returns a level by ID"
-                request { pathParameter<String>("id") { description = "Level ID" } }
-                response {
-                    code(HttpStatusCode.OK) { body<Level>() }
-                }
-            }) { call.respond(HttpStatusCode.NotImplemented) }
-
-            put({
-                tags("Levels")
-                summary = "Update level"
-                description = "Replaces an existing level"
-                request {
-                    pathParameter<String>("id") { description = "Level ID" }
-                    body<Level>()
-                }
-                response {
-                    code(HttpStatusCode.OK) { body<Level>() }
-                }
-            }) { call.respond(HttpStatusCode.NotImplemented) }
-
-            delete({
-                tags("Levels")
-                summary = "Delete level"
-                description = "Deletes a level by ID"
-                request { pathParameter<String>("id") { description = "Level ID" } }
-                response {
-                    code(HttpStatusCode.NoContent) { description = "Level deleted" }
-                }
-            }) { call.respond(HttpStatusCode.NotImplemented) }
         }
     }
 }

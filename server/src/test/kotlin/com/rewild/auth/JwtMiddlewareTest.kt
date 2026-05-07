@@ -11,16 +11,13 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.testing.*
+import com.rewild.makeTestJwtService
 import org.junit.Test
 import kotlin.test.assertEquals
 
 class JwtMiddlewareTest {
 
-    private val testJwtService = JwtService(
-        secret = "test-secret-1234567890",
-        issuer = "http://localhost",
-        audience = "rewild-api"
-    )
+    private val testJwtService = makeTestJwtService()
 
     private fun ApplicationTestBuilder.installTestApp() {
         application {
