@@ -165,4 +165,25 @@ export class LocalDataTable<T> {
     }
     return dirty;
   }
+
+  async markSynced(id: string, syncedAt: number, syncError: string | null): Promise<void> {
+    const existing = await this.getOne(id);
+    if (existing) {
+      localStorage.setItem(
+        `${this.prefix}.${id}`,
+        JSON.stringify({ ...existing, syncedAt, syncError })
+      );
+    }
+  }
+
+  async putSynced(record: T & { id: string; updatedAt: number }, syncedAt: number): Promise<void> {
+    const isNew = !localStorage.getItem(`${this.prefix}.${record.id}`);
+    const stored: StoredRecord<T> = { ...record, syncedAt, syncError: null };
+    localStorage.setItem(`${this.prefix}.${record.id}`, JSON.stringify(stored));
+    if (isNew) {
+      const existingUids = this.getAllItemUids();
+      existingUids.push(record.id);
+      localStorage.setItem(this.prefix, JSON.stringify(existingUids));
+    }
+  }
 }
