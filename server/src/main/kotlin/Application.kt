@@ -8,6 +8,8 @@ import com.rewild.levels.levelRoutes
 import com.rewild.models.*
 import com.rewild.projects.ProjectService
 import com.rewild.projects.projectRoutes
+import com.rewild.sync.SyncService
+import com.rewild.sync.syncRoutes
 import io.github.smiley4.ktoropenapi.OpenApi
 import io.github.smiley4.ktoropenapi.openApi
 import io.github.smiley4.ktoropenapi.post
@@ -63,6 +65,7 @@ private fun Application.configureAuth(jwtService: JwtService) {
 private fun Application.configureApi(authService: AuthService, secureCookies: Boolean, protected: Boolean) {
     val projectService = ProjectService()
     val levelService = LevelService()
+    val syncService = SyncService(projectService, levelService)
 
     install(ContentNegotiation) { json() }
 
@@ -88,27 +91,14 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
                 authenticate("auth-jwt") {
                     projectRoutes(projectService)
                     levelRoutes(levelService)
-                    syncRoutes()
+                    syncRoutes(syncService)
                 }
             } else {
                 projectRoutes(projectService)
                 levelRoutes(levelService)
-                syncRoutes()
+                syncRoutes(syncService)
             }
         }
     }
 }
 
-private fun Route.syncRoutes() {
-    route("/sync") {
-        post({
-            tags("Sync")
-            summary = "Sync"
-            description = "Bidirectional sync: push dirty local records and pull server-side changes since lastSyncedAt"
-            request { body<SyncRequest>() }
-            response {
-                code(HttpStatusCode.OK) { body<SyncResponse>() }
-            }
-        }) { call.respond(HttpStatusCode.NotImplemented) }
-    }
-}
