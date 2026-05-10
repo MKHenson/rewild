@@ -1,11 +1,13 @@
-import { ILevel, IProject } from 'models';
 import { authService } from '../api/auth/auth-service';
 import { SyncEngine } from '../api/sync/sync-engine';
-import { LocalDataTable } from './local-db';
+import { LocalAssetStore } from './local-asset-store';
+import { LocalLevelTable } from './local-level-table';
+import { LocalProjectTable } from './local-project-table';
 
 export class Database {
-  readonly projects = new LocalDataTable<IProject>('rewild', 'projects');
-  readonly levels = new LocalDataTable<ILevel>('rewild', 'levels');
+  readonly projects = new LocalProjectTable();
+  readonly levels = new LocalLevelTable();
+  readonly assets = new LocalAssetStore();
   readonly sync = new SyncEngine({ projects: this.projects, levels: this.levels }, authService);
 }
 
