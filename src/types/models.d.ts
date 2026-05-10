@@ -131,6 +131,12 @@ declare module 'models' {
     containers: IContainer[];
   }
 
+  export interface IAsset {
+    levelId: string;
+    assetType: string;
+    filename: string;
+  }
+
   export type ResourceType = 'container' | 'actor' | 'player-start';
   export interface IResource {
     id: string;
