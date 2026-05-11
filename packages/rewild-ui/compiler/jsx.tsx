@@ -60,7 +60,7 @@ function appendChildren(element: HTMLElement | SVGElement, children: JSX.ChildEl
 
       if (element instanceof SVGElement) continue;
 
-      element.innerText += child;
+      element.appendChild(document.createTextNode(String(child)));
       continue;
     }
 
