@@ -24,7 +24,9 @@ const guestUser: IUser = {
   type: 'guest',
 };
 
-function toStoreUser(user: NonNullable<ReturnType<typeof authService.getUser>>): IUser {
+function toStoreUser(
+  user: NonNullable<ReturnType<typeof authService.getUser>>
+): IUser {
   return {
     displayName: user.displayName,
     email: user.email,
@@ -62,8 +64,13 @@ export class AuthStore extends Store<IAuth> {
 
   async signIn(email: string, password: string) {
     this.defaultProxy.loading = true;
-    await authService.signIn(email, password);
-    await db.sync.run();
+    try {
+      await authService.signIn(email, password);
+      await db.sync.run();
+    } catch (err) {
+      this.defaultProxy.loading = false;
+      throw err;
+    }
   }
 }
 
