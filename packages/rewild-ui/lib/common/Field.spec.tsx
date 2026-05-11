@@ -28,6 +28,6 @@ describe('Field', () => {
 
     const required = field.shadow?.querySelector('.required');
     expect(required).not.toBeNull();
-    expect((required as HTMLSpanElement).innerText.endsWith('*')).toBe(true);
+    expect((required as HTMLSpanElement).textContent?.endsWith('*')).toBe(true);
   });
 });

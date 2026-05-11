@@ -14,7 +14,7 @@ describe('Date', () => {
 
     const content =
       (dateElm.shadow?.querySelector('div') as HTMLDivElement | null)
-        ?.innerText || '';
+        ?.textContent || '';
     expect(content.trim().endsWith('-')).toBe(true);
   });
 
@@ -30,7 +30,7 @@ describe('Date', () => {
 
     const content =
       (dateElm.shadow?.querySelector('div') as HTMLDivElement | null)
-        ?.innerText || '';
+        ?.textContent || '';
     expect(content).toContain('2020');
     expect(content.includes(',')).toBe(false);
   });
