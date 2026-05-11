@@ -150,37 +150,6 @@
                     }
                 },
                 "deprecated": false
-            },
-            "post": {
-                "tags": [
-                    "Projects"
-                ],
-                "summary": "Create project",
-                "description": "Creates a new project",
-                "parameters": [],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/com.rewild.models.Project"
-                            }
-                        }
-                    },
-                    "required": false
-                },
-                "responses": {
-                    "201": {
-                        "headers": {},
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/com.rewild.models.Project"
-                                }
-                            }
-                        }
-                    }
-                },
-                "deprecated": false
             }
         },
         "/api/projects/{id}": {
@@ -214,6 +183,16 @@
                                 }
                             }
                         }
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 },
                 "deprecated": false
@@ -222,8 +201,8 @@
                 "tags": [
                     "Projects"
                 ],
-                "summary": "Update project",
-                "description": "Replaces an existing project",
+                "summary": "Create or update project",
+                "description": "Upserts a project by ID. Path ID takes precedence over any ID in the request body.",
                 "parameters": [
                     {
                         "name": "id",
@@ -258,6 +237,16 @@
                                 }
                             }
                         }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 },
                 "deprecated": false
@@ -267,7 +256,7 @@
                     "Projects"
                 ],
                 "summary": "Delete project",
-                "description": "Deletes a project and its associated levels",
+                "description": "Deletes a project and cascades to its associated levels",
                 "parameters": [
                     {
                         "name": "id",
@@ -286,6 +275,26 @@
                     "204": {
                         "description": "Project deleted",
                         "headers": {}
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 },
                 "deprecated": false
@@ -310,37 +319,6 @@
                                         "$ref": "#/components/schemas/com.rewild.models.Level"
                                     },
                                     "title": "List<Level>"
-                                }
-                            }
-                        }
-                    }
-                },
-                "deprecated": false
-            },
-            "post": {
-                "tags": [
-                    "Levels"
-                ],
-                "summary": "Create level",
-                "description": "Creates a new level",
-                "parameters": [],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/com.rewild.models.Level"
-                            }
-                        }
-                    },
-                    "required": false
-                },
-                "responses": {
-                    "201": {
-                        "headers": {},
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/com.rewild.models.Level"
                                 }
                             }
                         }
@@ -380,6 +358,16 @@
                                 }
                             }
                         }
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 },
                 "deprecated": false
@@ -388,8 +376,8 @@
                 "tags": [
                     "Levels"
                 ],
-                "summary": "Update level",
-                "description": "Replaces an existing level",
+                "summary": "Create or update level",
+                "description": "Upserts a level by ID. Path ID takes precedence over any ID in the request body.",
                 "parameters": [
                     {
                         "name": "id",
@@ -424,6 +412,16 @@
                                 }
                             }
                         }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 },
                 "deprecated": false
@@ -452,6 +450,26 @@
                     "204": {
                         "description": "Level deleted",
                         "headers": {}
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
                     }
                 },
                 "deprecated": false
@@ -482,6 +500,123 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/com.rewild.models.SyncResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/assets": {
+            "get": {
+                "tags": [
+                    "Assets"
+                ],
+                "summary": "List assets",
+                "description": "Returns all confirmed assets for the authenticated user",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/com.rewild.models.Asset"
+                                    },
+                                    "title": "List<Asset>"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/assets/upload-url": {
+            "post": {
+                "tags": [
+                    "Assets"
+                ],
+                "summary": "Request presigned upload URL",
+                "description": "Validates level ownership and returns a presigned PUT URL for direct upload to object storage",
+                "parameters": [],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.models.UploadUrlRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.models.UploadUrlResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/assets/confirm": {
+            "post": {
+                "tags": [
+                    "Assets"
+                ],
+                "summary": "Confirm asset upload",
+                "description": "Marks an asset as confirmed after successful direct upload. Purges stale unconfirmed records older than 1 hour.",
+                "parameters": [],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.models.ConfirmRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "204": {
+                        "description": "Confirmed",
+                        "headers": {}
+                    },
+                    "404": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
                                 }
                             }
                         }
@@ -1005,6 +1140,19 @@
                 ],
                 "title": "Asset3D"
             },
+            "com.rewild.common.ErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "error"
+                ],
+                "title": "ErrorResponse"
+            },
             "com.rewild.models.Level": {
                 "type": "object",
                 "properties": {
@@ -1150,6 +1298,98 @@
                     "syncedAt"
                 ],
                 "title": "SyncResponse"
+            },
+            "com.rewild.models.Asset": {
+                "type": "object",
+                "properties": {
+                    "assetType": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "filename": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "id": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "levelId": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "publicUrl": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "assetType",
+                    "filename",
+                    "id",
+                    "levelId",
+                    "publicUrl"
+                ],
+                "title": "Asset"
+            },
+            "com.rewild.models.UploadUrlRequest": {
+                "type": "object",
+                "properties": {
+                    "assetType": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "filename": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "levelId": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "assetType",
+                    "filename",
+                    "levelId"
+                ],
+                "title": "UploadUrlRequest"
+            },
+            "com.rewild.models.UploadUrlResponse": {
+                "type": "object",
+                "properties": {
+                    "publicUrl": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "storageKey": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "uploadUrl": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "publicUrl",
+                    "storageKey",
+                    "uploadUrl"
+                ],
+                "title": "UploadUrlResponse"
+            },
+            "com.rewild.models.ConfirmRequest": {
+                "type": "object",
+                "properties": {
+                    "storageKey": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "storageKey"
+                ],
+                "title": "ConfirmRequest"
             }
         },
         "examples": {}
