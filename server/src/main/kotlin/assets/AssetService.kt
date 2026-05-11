@@ -13,7 +13,7 @@ import java.util.UUID
 private const val ONE_HOUR_MS = 3_600_000L
 
 class AssetService(
-    private val s3: S3Client?,
+    private val s3: S3Signer?,
     private val bucketName: String,
     private val bucketBaseUrl: String
 ) {
