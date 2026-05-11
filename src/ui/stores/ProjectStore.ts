@@ -1,4 +1,11 @@
-import { ILevel, IProject, IContainer, IActor, IContainerPod, StoredRecord } from 'models';
+import {
+  ILevel,
+  IProject,
+  IContainer,
+  IActor,
+  IContainerPod,
+  StoredRecord,
+} from 'models';
 import { Store, createUUID } from 'rewild-ui';
 import {
   getLevel as getLevelApi,
@@ -9,6 +16,7 @@ import {
 import { sceneGraphStore } from './SceneGraphStore';
 import { createExporterObj } from '../utils/exportHelper';
 import { Dispatcher } from 'rewild-common';
+import { db } from 'src/database/database';
 
 export interface IProjectStore {
   loading: boolean;
@@ -139,6 +147,8 @@ export class ProjectStore extends Store<IProjectStore> {
       loading: false,
       dirty: false,
     });
+
+    db.syncAll(); // background — errors captured on records via syncError
   }
 
   async publish() {

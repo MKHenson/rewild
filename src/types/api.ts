@@ -219,33 +219,7 @@ export interface paths {
             };
         };
         put?: never;
-        /**
-         * Create project
-         * @description Creates a new project
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["com.rewild.models.Project"];
-                };
-            };
-            responses: {
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["com.rewild.models.Project"];
-                    };
-                };
-            };
-        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -283,11 +257,19 @@ export interface paths {
                         "application/json": components["schemas"]["com.rewild.models.Project"];
                     };
                 };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
             };
         };
         /**
-         * Update project
-         * @description Replaces an existing project
+         * Create or update project
+         * @description Upserts a project by ID. Path ID takes precedence over any ID in the request body.
          */
         put: {
             parameters: {
@@ -313,12 +295,20 @@ export interface paths {
                         "application/json": components["schemas"]["com.rewild.models.Project"];
                     };
                 };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
             };
         };
         post?: never;
         /**
          * Delete project
-         * @description Deletes a project and its associated levels
+         * @description Deletes a project and cascades to its associated levels
          */
         delete: {
             parameters: {
@@ -338,6 +328,22 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
                 };
             };
         };
@@ -377,33 +383,7 @@ export interface paths {
             };
         };
         put?: never;
-        /**
-         * Create level
-         * @description Creates a new level
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["com.rewild.models.Level"];
-                };
-            };
-            responses: {
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["com.rewild.models.Level"];
-                    };
-                };
-            };
-        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -441,11 +421,19 @@ export interface paths {
                         "application/json": components["schemas"]["com.rewild.models.Level"];
                     };
                 };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
             };
         };
         /**
-         * Update level
-         * @description Replaces an existing level
+         * Create or update level
+         * @description Upserts a level by ID. Path ID takes precedence over any ID in the request body.
          */
         put: {
             parameters: {
@@ -469,6 +457,14 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["com.rewild.models.Level"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
                     };
                 };
             };
@@ -496,6 +492,22 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
                 };
             };
         };
@@ -536,6 +548,151 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["com.rewild.models.SyncResponse"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List assets
+         * @description Returns all confirmed assets for the authenticated user
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.models.Asset"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assets/upload-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request presigned upload URL
+         * @description Validates level ownership and returns a presigned PUT URL for direct upload to object storage
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["com.rewild.models.UploadUrlRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.models.UploadUrlResponse"];
+                    };
+                };
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assets/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm asset upload
+         * @description Marks an asset as confirmed after successful direct upload. Purges stale unconfirmed records older than 1 hour.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["com.rewild.models.ConfirmRequest"];
+                };
+            };
+            responses: {
+                /** @description Confirmed */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
                     };
                 };
             };
@@ -708,6 +865,11 @@ export interface components {
             /** List<Float> */
             rotation: number[];
         };
+        /** ErrorResponse */
+        "com.rewild.common.ErrorResponse": {
+            /** String */
+            error: string;
+        };
         /** Level */
         "com.rewild.models.Level": {
             /** Boolean */
@@ -774,6 +936,42 @@ export interface components {
              * Format: int64
              */
             syncedAt: number;
+        };
+        /** Asset */
+        "com.rewild.models.Asset": {
+            /** String */
+            assetType: string;
+            /** String */
+            filename: string;
+            /** String */
+            id: string;
+            /** String */
+            levelId: string;
+            /** String */
+            publicUrl: string;
+        };
+        /** UploadUrlRequest */
+        "com.rewild.models.UploadUrlRequest": {
+            /** String */
+            assetType: string;
+            /** String */
+            filename: string;
+            /** String */
+            levelId: string;
+        };
+        /** UploadUrlResponse */
+        "com.rewild.models.UploadUrlResponse": {
+            /** String */
+            publicUrl: string;
+            /** String */
+            storageKey: string;
+            /** String */
+            uploadUrl: string;
+        };
+        /** ConfirmRequest */
+        "com.rewild.models.ConfirmRequest": {
+            /** String */
+            storageKey: string;
         };
     };
     responses: never;

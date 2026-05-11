@@ -1,6 +1,7 @@
 val ktorVersion = "3.0.3"
 val exposedVersion = "0.55.0"
 val flywayVersion = "10.13.0"
+val awsVersion = "2.29.0"
 
 plugins {
     kotlin("jvm") version "2.0.21"
@@ -60,6 +61,7 @@ dependencies {
     implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("ch.qos.logback:logback-classic:1.5.6")
     implementation("at.favre.lib:bcrypt:0.10.2")
+    implementation("software.amazon.awssdk:s3:$awsVersion")
     testImplementation("io.ktor:ktor-server-test-host-jvm")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     testImplementation("io.zonky.test:embedded-postgres:2.0.7")

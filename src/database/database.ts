@@ -9,6 +9,11 @@ export class Database {
   readonly levels = new LocalLevelTable();
   readonly assets = new LocalAssetStore();
   readonly sync = new SyncEngine({ projects: this.projects, levels: this.levels }, authService);
+
+  async syncAll(): Promise<void> {
+    await this.sync.run();
+    await this.assets.sync();
+  }
 }
 
 export const db = new Database();

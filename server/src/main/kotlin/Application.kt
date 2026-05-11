@@ -1,5 +1,8 @@
 package com.rewild
 
+import com.rewild.assets.AssetService
+import com.rewild.assets.S3Client
+import com.rewild.assets.assetRoutes
 import com.rewild.auth.*
 import com.rewild.common.ErrorResponse
 import com.rewild.db.DatabaseFactory
@@ -67,6 +70,19 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
     val levelService = LevelService()
     val syncService = SyncService(projectService, levelService)
 
+    fun str(key: String) = environment.config.propertyOrNull(key)?.getString() ?: ""
+    val s3Endpoint = str("storage.s3Endpoint")
+    val s3 = if (s3Endpoint.isNotEmpty()) S3Client(
+        endpoint = s3Endpoint,
+        accessKey = str("storage.s3AccessKey"),
+        secretKey = str("storage.s3SecretKey")
+    ) else null
+    val assetService = AssetService(
+        s3 = s3,
+        bucketName = str("storage.bucketName"),
+        bucketBaseUrl = str("storage.bucketBaseUrl")
+    )
+
     install(ContentNegotiation) { json() }
 
     install(OpenApi) {
@@ -92,11 +108,13 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
                     projectRoutes(projectService)
                     levelRoutes(levelService)
                     syncRoutes(syncService)
+                    assetRoutes(assetService)
                 }
             } else {
                 projectRoutes(projectService)
                 levelRoutes(levelService)
                 syncRoutes(syncService)
+                assetRoutes(assetService)
             }
         }
     }

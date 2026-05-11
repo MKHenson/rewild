@@ -1,4 +1,6 @@
 import type { IAsset } from 'models';
+import { confirmUpload, listServerAssets, requestUploadUrl } from '../api/assets/asset-api';
+import { authService } from '../api/auth/auth-service';
 import { LocalDataTable } from './local-db';
 
 export class LocalAssetStore extends LocalDataTable<IAsset> {
@@ -30,6 +32,44 @@ export class LocalAssetStore extends LocalDataTable<IAsset> {
       return await file.arrayBuffer();
     } catch {
       return null;
+    }
+  }
+
+  async sync(): Promise<void> {
+    if (!authService.getToken()) return;
+
+    // Push: upload all dirty assets via the presigned URL flow
+    const dirty = await this.getDirty();
+    for (const asset of dirty) {
+      try {
+        const binary = await this.read(asset.levelId, asset.assetType, asset.filename);
+        if (!binary) continue;
+
+        const { uploadUrl, storageKey } = await requestUploadUrl(asset.levelId, asset.assetType, asset.filename);
+        const uploadRes = await fetch(uploadUrl, { method: 'PUT', body: binary });
+        if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`);
+
+        await confirmUpload(storageKey);
+        await this.markSynced(asset.id, Date.now(), null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Sync failed';
+        await this.markSynced(asset.id, asset.syncedAt, msg);
+      }
+    }
+
+    // Pull: fetch server assets not present in OPFS and cache them locally
+    const serverAssets = await listServerAssets();
+    for (const serverAsset of serverAssets) {
+      const existing = await this.read(serverAsset.levelId, serverAsset.assetType, serverAsset.filename);
+      if (existing) continue;
+
+      try {
+        const res = await fetch(serverAsset.publicUrl);
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+        const data = await res.arrayBuffer();
+        const id = await this.write(serverAsset.levelId, serverAsset.assetType, serverAsset.filename, data);
+        await this.markSynced(id, Date.now(), null);
+      } catch {}
     }
   }
 
