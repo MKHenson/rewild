@@ -10,12 +10,16 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 import java.net.URI
 import java.time.Duration
 
+interface S3Signer {
+    fun presignPut(bucket: String, key: String, ttlMinutes: Long = 15): String
+}
+
 class S3Client(
     endpoint: String,
     accessKey: String,
     secretKey: String,
     region: String = "fr-par"
-) {
+) : S3Signer {
     private val presigner: S3Presigner = S3Presigner.builder()
         .endpointOverride(URI.create(endpoint))
         .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)))
@@ -24,7 +28,7 @@ class S3Client(
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build()
 
-    fun presignPut(bucket: String, key: String, ttlMinutes: Long = 15): String {
+    override fun presignPut(bucket: String, key: String, ttlMinutes: Long): String {
         val putRequest = PutObjectRequest.builder().bucket(bucket).key(key).build()
         val presignRequest = PutObjectPresignRequest.builder()
             .signatureDuration(Duration.ofMinutes(ttlMinutes))
