@@ -1,5 +1,6 @@
 import '../../compiler/jsx';
 import { Button } from './Button';
+import { fireClick } from '../test-utils';
 
 type ButtonOptions = NonNullable<ConstructorParameters<typeof Button>[0]>;
 type ButtonProps = ButtonOptions['props'];
@@ -17,7 +18,7 @@ describe('Button', () => {
     expect(button.hasAttribute('disabled')).toBe(false);
   });
 
-  it('applies props to class name and attributes', () => {
+  it('applies props to class name and attributes', async () => {
     const onClick = jest.fn();
     const props: ButtonProps = {
       id: 'save-btn',
@@ -43,7 +44,7 @@ describe('Button', () => {
     expect(button.hasAttribute('fullwidth')).toBe(true);
     expect(button.hasAttribute('disabled')).toBe(true);
 
-    button.dispatchEvent(new MouseEvent('click'));
+    await fireClick(button);
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 

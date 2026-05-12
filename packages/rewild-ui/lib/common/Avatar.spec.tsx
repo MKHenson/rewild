@@ -1,5 +1,6 @@
 import '../../compiler/jsx';
 import { Avatar } from './Avatar';
+import { fireClick } from '../test-utils';
 
 type AvatarOptions = NonNullable<ConstructorParameters<typeof Avatar>[0]>;
 type AvatarProps = AvatarOptions['props'];
@@ -18,7 +19,7 @@ describe('Avatar', () => {
     expect(root?.querySelector('img')).toBeNull();
   });
 
-  it('renders image and wires host click handler', () => {
+  it('renders image and wires host click handler', async () => {
     const onClick = jest.fn();
     const props: AvatarProps = {
       src: 'https://example.com/avatar.png',
@@ -28,7 +29,7 @@ describe('Avatar', () => {
 
     avatar._createRenderer();
     avatar.render();
-    avatar.dispatchEvent(new MouseEvent('click'));
+    await fireClick(avatar);
 
     const img = avatar.shadow?.querySelector('img');
     expect(img).not.toBeNull();

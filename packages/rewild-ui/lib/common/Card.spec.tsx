@@ -1,5 +1,6 @@
 import '../../compiler/jsx';
 import { Card } from './Card';
+import { fireClick } from '../test-utils';
 
 type CardOptions = NonNullable<ConstructorParameters<typeof Card>[0]>;
 type CardProps = CardOptions['props'];
@@ -25,7 +26,7 @@ describe('Card', () => {
     expect(card.classList.contains('raised')).toBe(true);
   });
 
-  it('wires click handler when enabled', () => {
+  it('wires click handler when enabled', async () => {
     const onClick = jest.fn();
     const props: CardProps = {
       disabled: false,
@@ -35,12 +36,12 @@ describe('Card', () => {
 
     card._createRenderer();
     card.render();
-    card.dispatchEvent(new MouseEvent('click'));
+    await fireClick(card);
 
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it('does not wire click handler when disabled', () => {
+  it('does not wire click handler when disabled', async () => {
     const onClick = jest.fn();
     const props: CardProps = {
       disabled: true,
@@ -50,7 +51,7 @@ describe('Card', () => {
 
     card._createRenderer();
     card.render();
-    card.dispatchEvent(new MouseEvent('click'));
+    await fireClick(card);
 
     expect(onClick).not.toHaveBeenCalled();
   });

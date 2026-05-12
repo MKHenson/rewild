@@ -2,18 +2,15 @@ import { LocalDataTable } from '../../database/local-db';
 import { authService } from '../auth/auth-service';
 import type { components } from '../../types/api';
 import { SyncEngine } from './sync-engine';
+import { mockResponse } from '../../test-utils';
 
 type SyncRequest = components['schemas']['com.rewild.models.SyncRequest'];
 type SyncRecord = components['schemas']['com.rewild.models.SyncRecord'];
 
 type FakeProject = { name: string };
 
-function mockOkResponse(body: unknown): Response {
-  return { ok: true, status: 200, json: () => Promise.resolve(body) } as unknown as Response;
-}
-
 function syncResponse(overrides: { syncedAt?: number; records?: SyncRecord[] } = {}): Response {
-  return mockOkResponse({ syncedAt: 1000, records: [], ...overrides });
+  return mockResponse(200, { syncedAt: 1000, records: [], ...overrides });
 }
 
 function getRequestBody(): SyncRequest {

@@ -1,5 +1,6 @@
 import '../../compiler/jsx';
 import { MaterialIcon } from './MaterialIcon';
+import { fireClick } from '../test-utils';
 
 type MaterialIconOptions = NonNullable<
   ConstructorParameters<typeof MaterialIcon>[0]
@@ -48,7 +49,7 @@ describe('MaterialIcon', () => {
     expect(span?.className).toContain(expectedClass);
   });
 
-  it('wires click handler to span', () => {
+  it('wires click handler to span', async () => {
     const onClick = jest.fn();
     const props: MaterialIconProps = { icon: 'delete', onClick };
     const icon = new MaterialIcon({ props });
@@ -57,7 +58,7 @@ describe('MaterialIcon', () => {
     icon.render();
 
     const span = icon.shadow?.querySelector('span') as HTMLSpanElement;
-    span.click();
+    await fireClick(span);
 
     expect(onClick).toHaveBeenCalledTimes(1);
   });

@@ -1,5 +1,6 @@
 import '../../compiler/jsx';
 import { Typography } from './Typography';
+import { fireClick } from '../test-utils';
 
 type TypographyOptions = NonNullable<
   ConstructorParameters<typeof Typography>[0]
@@ -43,7 +44,7 @@ describe('Typography', () => {
     expect(slot).not.toBeNull();
   });
 
-  it('wires click handler', () => {
+  it('wires click handler', async () => {
     const onClick = jest.fn();
     const props: TypographyProps = { variant: 'h2', onClick };
     const typo = new Typography({ props });
@@ -52,7 +53,7 @@ describe('Typography', () => {
     typo.render();
 
     const div = typo.shadow?.querySelector('div') as HTMLDivElement;
-    div.click();
+    await fireClick(div);
 
     expect(onClick).toHaveBeenCalledTimes(1);
   });

@@ -1,5 +1,6 @@
 import '../../compiler/jsx';
 import { NumberInput } from './NumberInput';
+import { fireEvent } from '../test-utils';
 
 type NumberInputOptions = NonNullable<
   ConstructorParameters<typeof NumberInput>[0]
@@ -53,7 +54,7 @@ describe('NumberInput', () => {
     expect(input.className).toBe('custom');
   });
 
-  it('calls onChange on blur with parsed value', () => {
+  it('calls onChange on blur with parsed value', async () => {
     const onChange = jest.fn();
     const props: NumberInputProps = { value: 10, onChange };
     const cmp = new NumberInput({ props });
@@ -63,7 +64,7 @@ describe('NumberInput', () => {
 
     const input = cmp.shadow?.querySelector('input') as HTMLInputElement;
     input.value = '25';
-    input.dispatchEvent(new Event('blur'));
+    await fireEvent(input, new Event('blur'));
 
     expect(onChange).toHaveBeenCalledWith(25);
   });
