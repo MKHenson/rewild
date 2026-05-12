@@ -31,6 +31,8 @@ export abstract class Component<T = any>
   private trackedSubscribes: RescribeStoreFn[];
   private mergedCss: CSSStyleSheet;
 
+  private _renderScheduled = false;
+
   onMount?: () => void;
   onCleanup?: () => void;
 
@@ -149,7 +151,13 @@ export abstract class Component<T = any>
     const setValue = (newValue: S, render = true) => {
       if (newValue === value) return;
       value = newValue;
-      if (render) this.render();
+      if (render && !this._renderScheduled) {
+        this._renderScheduled = true;
+        queueMicrotask(() => {
+          this._renderScheduled = false;
+          this.render();
+        });
+      }
     };
     return [getValue, setValue];
   }

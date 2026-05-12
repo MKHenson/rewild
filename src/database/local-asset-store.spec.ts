@@ -1,6 +1,7 @@
 import { LocalAssetStore } from './local-asset-store';
 import { authService } from '../api/auth/auth-service';
 import { installOPFSMock } from './opfs-mock';
+import { mockResponse, mockFetch } from '../test-utils';
 
 describe('LocalAssetStore', () => {
   let store: LocalAssetStore;
@@ -108,19 +109,6 @@ describe('LocalAssetStore', () => {
   });
 
   describe('sync()', () => {
-    function mockFetch(responses: Response[]) {
-      let i = 0;
-      global.fetch = jest.fn(() => Promise.resolve(responses[i++]));
-    }
-
-    function ok(body?: unknown): Response {
-      return { ok: true, status: 200, json: () => Promise.resolve(body) } as unknown as Response;
-    }
-
-    function fail(status: number): Response {
-      return { ok: false, status, json: () => Promise.resolve(null) } as unknown as Response;
-    }
-
     beforeEach(() => {
       jest.spyOn(authService, 'getToken').mockReturnValue(null);
       jest.spyOn(authService, 'refreshToken').mockResolvedValue(null);
@@ -143,16 +131,16 @@ describe('LocalAssetStore', () => {
       jest.spyOn(authService, 'getToken').mockReturnValue('token');
       await store.write('level1', 'chunk', 'a.bin', new Uint8Array([1, 2, 3]).buffer);
 
-      mockFetch([
+      mockFetch(
         // POST /api/assets/upload-url
-        ok({ uploadUrl: 'http://minio/presigned', publicUrl: 'http://minio/public/a.bin', storageKey: 'levels/level1/chunk/a.bin' }),
+        mockResponse(200, { uploadUrl: 'http://minio/presigned', publicUrl: 'http://minio/public/a.bin', storageKey: 'levels/level1/chunk/a.bin' }),
         // PUT to presigned URL (direct to S3)
-        ok(),
+        mockResponse(200),
         // POST /api/assets/confirm
-        ok(),
+        mockResponse(200),
         // GET /api/assets (pull phase — empty, nothing to download)
-        ok([]),
-      ]);
+        mockResponse(200, []),
+      );
 
       await store.sync();
 
@@ -164,14 +152,14 @@ describe('LocalAssetStore', () => {
       jest.spyOn(authService, 'getToken').mockReturnValue('token');
       const id = await store.write('level1', 'chunk', 'b.bin', new Uint8Array([9]).buffer);
 
-      mockFetch([
+      mockFetch(
         // POST /api/assets/upload-url
-        ok({ uploadUrl: 'http://minio/presigned', publicUrl: 'http://minio/public/b.bin', storageKey: 'levels/level1/chunk/b.bin' }),
+        mockResponse(200, { uploadUrl: 'http://minio/presigned', publicUrl: 'http://minio/public/b.bin', storageKey: 'levels/level1/chunk/b.bin' }),
         // PUT to presigned URL — fails
-        fail(503),
+        mockResponse(503),
         // GET /api/assets (pull phase)
-        ok([]),
-      ]);
+        mockResponse(200, []),
+      );
 
       await store.sync();
 
@@ -184,12 +172,12 @@ describe('LocalAssetStore', () => {
       jest.spyOn(authService, 'getToken').mockReturnValue('token');
       const binary = new Uint8Array([7, 8, 9]);
 
-      mockFetch([
+      mockFetch(
         // GET /api/assets — server has one asset the client doesn't
-        ok([{ id: 'srv-1', levelId: 'level-remote', assetType: 'chunk', filename: 'remote.bin', publicUrl: 'http://minio/remote.bin' }]),
+        mockResponse(200, [{ id: 'srv-1', levelId: 'level-remote', assetType: 'chunk', filename: 'remote.bin', publicUrl: 'http://minio/remote.bin' }]),
         // GET publicUrl — the binary content
         { ok: true, status: 200, arrayBuffer: () => Promise.resolve(binary.buffer) } as unknown as Response,
-      ]);
+      );
 
       // No dirty assets, so push phase is skipped
       await store.sync();
@@ -206,12 +194,8 @@ describe('LocalAssetStore', () => {
         .then(r => r.items[0].id);
       await store.markSynced(id, Date.now(), null);
 
-      mockFetch([
-        ok([{ id: 'srv-1', levelId: 'level1', assetType: 'chunk', filename: 'already.bin', publicUrl: 'http://minio/already.bin' }]),
-      ]);
-
       global.fetch = jest.fn()
-        .mockResolvedValueOnce(ok([{ id: 'srv-1', levelId: 'level1', assetType: 'chunk', filename: 'already.bin', publicUrl: 'http://minio/already.bin' }]));
+        .mockResolvedValueOnce(mockResponse(200, [{ id: 'srv-1', levelId: 'level1', assetType: 'chunk', filename: 'already.bin', publicUrl: 'http://minio/already.bin' }]));
 
       await store.sync();
 

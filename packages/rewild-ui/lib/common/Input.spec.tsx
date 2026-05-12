@@ -1,5 +1,6 @@
 import '../../compiler/jsx';
 import { Input } from './Input';
+import { fireClick, fireEvent } from '../test-utils';
 
 type InputOptions = NonNullable<ConstructorParameters<typeof Input>[0]>;
 type InputProps = InputOptions['props'];
@@ -24,7 +25,7 @@ describe('Input', () => {
     expect(input?.value).toBe('hello');
   });
 
-  it('calls onChange with latest input value', () => {
+  it('calls onChange with latest input value', async () => {
     const onChange = jest.fn();
     const props: InputProps = { onChange };
     const inputCmp = new Input({ props });
@@ -34,13 +35,13 @@ describe('Input', () => {
 
     const input = inputCmp.shadow?.querySelector('input') as HTMLInputElement;
     input.value = 'updated';
-    input.dispatchEvent(new Event('change'));
+    await fireEvent(input, new Event('change'));
 
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith('updated');
   });
 
-  it('calls onClick when input is clicked', () => {
+  it('calls onClick when input is clicked', async () => {
     const onClick = jest.fn();
     const props: InputProps = { onClick, value: 'abc' };
     const inputCmp = new Input({ props });
@@ -49,7 +50,7 @@ describe('Input', () => {
     inputCmp.render();
 
     const input = inputCmp.shadow?.querySelector('input') as HTMLInputElement;
-    input.dispatchEvent(new MouseEvent('click'));
+    await fireClick(input);
 
     expect(onClick).toHaveBeenCalledTimes(1);
   });

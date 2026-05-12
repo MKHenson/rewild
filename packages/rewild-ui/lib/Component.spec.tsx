@@ -1,6 +1,7 @@
 import '../compiler/jsx';
 import { Component, register, ComponentOptions } from './Component';
 import { Store } from './Store';
+import { flushMicrotasks } from './test-utils';
 
 // ---------------------------------------------------------------------------
 // Helpers – minimal concrete subclass for testing
@@ -285,13 +286,14 @@ describe('Component', () => {
       expect(c.getCounter()).toBe(0);
     });
 
-    it('setter updates value and triggers re-render', () => {
+    it('setter updates value and triggers re-render', async () => {
       const c = setup(StatefulComponent, { props: {} });
       const renderSpy = jest.fn(c.render);
       c.render = renderSpy;
 
       c.setCounter(5);
       expect(c.getCounter()).toBe(5);
+      await flushMicrotasks();
       expect(renderSpy).toHaveBeenCalledTimes(1);
     });
 

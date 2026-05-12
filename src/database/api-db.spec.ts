@@ -1,15 +1,8 @@
 import { ApiDataTable } from './api-db';
 import { authService } from '../api/auth/auth-service';
+import { mockResponse } from '../test-utils';
 
 type Widget = { name: string; value: number };
-
-function mockResponse(status: number, body?: unknown): Response {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: () => Promise.resolve(body),
-  } as unknown as Response;
-}
 
 describe('ApiDataTable', () => {
   let table: ApiDataTable<Widget>;

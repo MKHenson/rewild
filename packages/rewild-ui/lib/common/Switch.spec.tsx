@@ -1,5 +1,6 @@
 import '../../compiler/jsx';
 import { Switch } from './Switch';
+import { fireClick } from '../test-utils';
 
 type SwitchOptions = NonNullable<ConstructorParameters<typeof Switch>[0]>;
 type SwitchProps = SwitchOptions['props'];
@@ -29,7 +30,7 @@ describe('Switch', () => {
     expect(div?.className).toContain('checked');
   });
 
-  it('toggles checked state on click', () => {
+  it('toggles checked state on click', async () => {
     const onClick = jest.fn();
     const props: SwitchProps = { checked: false, onClick };
     const sw = new Switch({ props });
@@ -38,14 +39,14 @@ describe('Switch', () => {
     sw.render();
 
     const div = sw.shadow?.querySelector('div') as HTMLDivElement;
-    div.click();
+    await fireClick(div);
 
     expect(sw.checked).toBe(true);
     expect(div.className).toContain('checked');
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it('toggles back to unchecked on second click', () => {
+  it('toggles back to unchecked on second click', async () => {
     const props: SwitchProps = { checked: true };
     const sw = new Switch({ props });
 
@@ -53,7 +54,7 @@ describe('Switch', () => {
     sw.render();
 
     const div = sw.shadow?.querySelector('div') as HTMLDivElement;
-    div.click();
+    await fireClick(div);
 
     expect(sw.checked).toBe(false);
     expect(div.className).not.toContain('checked');

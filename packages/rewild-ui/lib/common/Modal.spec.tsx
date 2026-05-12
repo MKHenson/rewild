@@ -1,5 +1,6 @@
 import '../../compiler/jsx';
 import { Modal, ModalProps } from './Modal';
+import { fireClick } from '../test-utils';
 
 describe('Modal', () => {
   function createModal(overrides: Partial<ModalProps> = {}) {
@@ -44,7 +45,7 @@ describe('Modal', () => {
     expect(buttons?.length).toBe(0);
   });
 
-  it('calls onCancel and onClose when cancel is clicked', () => {
+  it('calls onCancel and onClose when cancel is clicked', async () => {
     const onCancel = jest.fn();
     const onClose = jest.fn();
     const modal = createModal({ open: true, onCancel, onClose });
@@ -54,13 +55,13 @@ describe('Modal', () => {
     const buttons = popup?.querySelectorAll('x-button');
     expect(buttons?.length).toBe(2);
     const cancelBtn = buttons![0] as HTMLElement;
-    cancelBtn.dispatchEvent(new MouseEvent('click'));
+    await fireClick(cancelBtn);
 
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onOk and onClose when ok is clicked', () => {
+  it('calls onOk and onClose when ok is clicked', async () => {
     const onOk = jest.fn();
     const onClose = jest.fn();
     const modal = createModal({ open: true, onOk, onClose });
@@ -69,7 +70,7 @@ describe('Modal', () => {
     const buttons = popup?.querySelectorAll('x-button');
     expect(buttons?.length).toBe(2);
     const okBtn = buttons![1] as HTMLElement;
-    okBtn.dispatchEvent(new MouseEvent('click'));
+    await fireClick(okBtn);
 
     expect(onOk).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);

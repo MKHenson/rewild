@@ -1,5 +1,6 @@
 import '../../compiler/jsx';
 import { Popup, PopupProps } from './Popup';
+import { fireClick } from '../test-utils';
 
 describe('Popup', () => {
   function createPopup(overrides: Partial<PopupProps> = {}) {
@@ -49,13 +50,13 @@ describe('Popup', () => {
     expect(modal?.querySelector('slot')).not.toBeNull();
   });
 
-  it('calls onClose when wrapper is clicked', () => {
+  it('calls onClose when wrapper is clicked', async () => {
     const onClose = jest.fn();
     const popup = createPopup({ open: true, onClose });
 
     const wrapper = popup.shadow?.querySelector('.wrapper') as HTMLDivElement;
     wrapper.classList.add('wrapper');
-    wrapper.click();
+    await fireClick(wrapper);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
