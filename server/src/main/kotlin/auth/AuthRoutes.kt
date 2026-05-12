@@ -25,7 +25,7 @@ fun Route.authRoutes(authService: AuthService, secureCookies: Boolean) {
                 }
             }) {
                 val req = call.receive<RegisterRequest>()
-                val tokens = authService.register(req.email, req.password)
+                val tokens = authService.register(req.email, req.password, req.username)
                     ?: return@post call.respond(HttpStatusCode.Conflict, ErrorResponse("Email already registered"))
                 call.setRefreshCookie(tokens.refreshToken, secureCookies)
                 call.respond(HttpStatusCode.Created, AuthResponse(tokens.accessToken))

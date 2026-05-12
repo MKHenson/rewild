@@ -1,4 +1,5 @@
 import * as esbuild from 'esbuild';
+import * as http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { copy } from 'esbuild-plugin-copy';
@@ -131,10 +132,37 @@ async function watch() {
   console.log('Watching...');
 }
 
+async function serve() {
+  const ctx = await esbuild.context(getConfig());
+  await ctx.watch();
+  const { host, port: esbuildPort } = await ctx.serve({ servedir: './public' });
+
+  http.createServer((req, res) => {
+    const isApi = req.url?.startsWith('/api');
+    const options = {
+      hostname: isApi ? 'localhost' : host,
+      port: isApi ? 8080 : esbuildPort,
+      path: req.url,
+      method: req.method,
+      headers: req.headers,
+    };
+    const proxy = http.request(options, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res, { end: true });
+    });
+    proxy.on('error', () => {
+      res.writeHead(502);
+      res.end('Backend unavailable');
+    });
+    req.pipe(proxy, { end: true });
+  }).listen(9001, () => console.log('Dev server: http://localhost:9001'));
+}
+
 async function build() {
   copyPluginDetails.assets.forEach((asset) => (asset.watch = false));
   await esbuild.build(getConfig());
 }
 
-if (process.argv.join('').includes('watch')) watch();
+if (process.argv.join('').includes('serve')) serve();
+else if (process.argv.join('').includes('watch')) watch();
 else build();

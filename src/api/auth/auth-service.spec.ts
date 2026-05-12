@@ -73,6 +73,61 @@ describe('AuthService', () => {
     });
   });
 
+  describe('register', () => {
+    it('stores the JWT in memory after successful registration', async () => {
+      const token = makeToken({ email: 'new@example.com' });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ token }),
+      });
+
+      await service.register('new@example.com', 'password', 'newuser');
+
+      expect(service.getToken()).toBe(token);
+    });
+
+    it('dispatches the decoded user to listeners on success', async () => {
+      const token = makeToken({ email: 'new@example.com' });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ token }),
+      });
+
+      const listener = jest.fn();
+      service.onAuthStateChanged.add(listener);
+
+      await service.register('new@example.com', 'password', 'newuser');
+
+      expect(listener).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'new@example.com' })
+      );
+    });
+
+    it('sends email, password, and username in the request body', async () => {
+      const token = makeToken({ email: 'new@example.com' });
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: true,
+        json: async () => ({ token }),
+      });
+
+      await service.register('new@example.com', 'secret', 'newuser');
+
+      const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+      expect(body).toEqual({ email: 'new@example.com', password: 'secret', username: 'newuser' });
+    });
+
+    it('throws and does not store a token when registration fails', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue({
+        ok: false,
+        status: 409,
+        text: async () => 'Email already in use',
+      });
+
+      await expect(service.register('taken@example.com', 'password', 'user')).rejects.toThrow('Email already in use');
+      expect(service.getToken()).toBeNull();
+    });
+  });
+
   describe('signOut', () => {
     it('clears the in-memory token and dispatches null to listeners', async () => {
       const token = makeToken({ email: 'test@example.com' });

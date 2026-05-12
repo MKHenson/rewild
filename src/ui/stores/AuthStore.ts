@@ -5,6 +5,7 @@ import { Store } from 'rewild-ui';
 interface IUser {
   displayName: string | null;
   email: string | null;
+  username: string | null;
   photoURL: string | null;
   emailVerified: boolean;
   type: 'guest' | 'user';
@@ -19,6 +20,7 @@ interface IAuth {
 const guestUser: IUser = {
   displayName: 'Guest',
   email: null,
+  username: null,
   photoURL: null,
   emailVerified: false,
   type: 'guest',
@@ -30,6 +32,7 @@ function toStoreUser(
   return {
     displayName: user.displayName,
     email: user.email,
+    username: user.username,
     emailVerified: user.emailVerified,
     photoURL: user.photoURL,
     type: 'user',
@@ -66,6 +69,17 @@ export class AuthStore extends Store<IAuth> {
     this.defaultProxy.loading = true;
     try {
       await authService.signIn(email, password);
+      await db.sync.run();
+    } catch (err) {
+      this.defaultProxy.loading = false;
+      throw err;
+    }
+  }
+
+  async register(email: string, password: string, username: string) {
+    this.defaultProxy.loading = true;
+    try {
+      await authService.register(email, password, username);
       await db.sync.run();
     } catch (err) {
       this.defaultProxy.loading = false;

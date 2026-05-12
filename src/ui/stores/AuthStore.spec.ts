@@ -9,6 +9,7 @@ describe('AuthStore', () => {
   beforeEach(() => {
     jest.spyOn(authService, 'signIn').mockResolvedValue(undefined);
     jest.spyOn(authService, 'signOut').mockResolvedValue(undefined);
+    jest.spyOn(authService, 'register').mockResolvedValue(undefined);
     jest.spyOn(db.sync, 'run').mockResolvedValue(undefined);
     store = new AuthStore();
   });
@@ -50,6 +51,29 @@ describe('AuthStore', () => {
     });
   });
 
+  describe('register', () => {
+    it('calls authService.register with the provided credentials', async () => {
+      await store.register('new@example.com', 'secret', 'newuser');
+      expect(authService.register).toHaveBeenCalledWith('new@example.com', 'secret', 'newuser');
+    });
+
+    it('calls db.sync.run after successful registration', async () => {
+      await store.register('new@example.com', 'secret', 'newuser');
+      expect(db.sync.run).toHaveBeenCalled();
+    });
+
+    it('propagates an error when registration fails', async () => {
+      jest.spyOn(authService, 'register').mockRejectedValue(new Error('Email already in use'));
+      await expect(store.register('taken@example.com', 'secret', 'user')).rejects.toThrow('Email already in use');
+    });
+
+    it('does not call db.sync.run when registration fails', async () => {
+      jest.spyOn(authService, 'register').mockRejectedValue(new Error('Email already in use'));
+      await store.register('taken@example.com', 'secret', 'user').catch(() => {});
+      expect(db.sync.run).not.toHaveBeenCalled();
+    });
+  });
+
   describe('signOut', () => {
     it('calls authService.signOut', async () => {
       await store.signOut();
@@ -62,6 +86,7 @@ describe('AuthStore', () => {
       authService.onAuthStateChanged.dispatch({
         email: 'user@example.com',
         displayName: null,
+        username: null,
         photoURL: null,
         emailVerified: true,
       });
@@ -73,6 +98,7 @@ describe('AuthStore', () => {
       authService.onAuthStateChanged.dispatch({
         email: 'user@example.com',
         displayName: null,
+        username: null,
         photoURL: null,
         emailVerified: true,
       });

@@ -63,6 +63,22 @@ function fillForm(auth: Auth, email: string, password: string) {
   ).value = password;
 }
 
+function fillRegisterForm(auth: Auth, email: string, password: string, confirmPassword: string, username: string) {
+  (auth.shadow?.querySelector('input[type="email"]') as HTMLInputElement).value = email;
+  const passwordInputs = auth.shadow?.querySelectorAll('input[type="password"]') as NodeListOf<HTMLInputElement>;
+  passwordInputs[0].value = password;
+  passwordInputs[1].value = confirmPassword;
+  (auth.shadow?.querySelector('input[type="text"]') as HTMLInputElement).value = username;
+}
+
+function switchToRegister(auth: Auth) {
+  (auth.shadow?.querySelector('span.switch-view') as HTMLSpanElement).click();
+}
+
+function switchToSignIn(auth: Auth) {
+  (auth.shadow?.querySelector('span.switch-view') as HTMLSpanElement).click();
+}
+
 function submitForm(auth: Auth) {
   (
     auth.shadow?.querySelector('form.sign-in-form') as HTMLFormElement
@@ -75,6 +91,7 @@ describe('Auth', () => {
     jest.spyOn(authService, 'refreshToken').mockResolvedValue(null);
     jest.spyOn(authStore, 'signIn').mockResolvedValue(undefined);
     jest.spyOn(authStore, 'signOut').mockResolvedValue(undefined);
+    jest.spyOn(authStore, 'register').mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -263,6 +280,88 @@ describe('Auth', () => {
           ) as HTMLInputElement
         ).value
       ).toBe('');
+    });
+  });
+
+  describe('registration view', () => {
+    it('switches to the registration view when "Register" link is clicked', () => {
+      const auth = createAuth(guestState);
+      (auth.shadow?.querySelector('button.sign-in-btn') as HTMLButtonElement).click();
+      switchToRegister(auth);
+      expect(auth.shadow?.querySelector('form.sign-in-form h3.form-title')?.textContent).toBe('Create Account');
+    });
+
+    it('shows email, username, password, and confirm-password inputs on the register view', () => {
+      const auth = createAuth(guestState);
+      switchToRegister(auth);
+      expect(auth.shadow?.querySelector('input[type="email"]')).not.toBeNull();
+      expect(auth.shadow?.querySelector('input[type="text"]')).not.toBeNull();
+      const passwordInputs = auth.shadow?.querySelectorAll('input[type="password"]');
+      expect(passwordInputs?.length).toBe(2);
+    });
+
+    it('switches back to sign-in view when "Sign in" link is clicked on register view', () => {
+      const auth = createAuth(guestState);
+      switchToRegister(auth);
+      switchToSignIn(auth);
+      expect(auth.shadow?.querySelector('form.sign-in-form h3.form-title')?.textContent).toBe('Sign In');
+    });
+
+    it('calls authStore.register with entered credentials on submit', async () => {
+      const auth = createAuth(guestState);
+      switchToRegister(auth);
+      fillRegisterForm(auth, 'new@example.com', 'secret', 'secret', 'newuser');
+      submitForm(auth);
+      await flushPromises();
+      expect(authStore.register).toHaveBeenCalledWith('new@example.com', 'secret', 'newuser');
+    });
+
+    it('closes popup after successful registration', async () => {
+      const auth = createAuth(guestState);
+      (auth.shadow?.querySelector('button.sign-in-btn') as HTMLButtonElement).click();
+      switchToRegister(auth);
+      fillRegisterForm(auth, 'new@example.com', 'secret', 'secret', 'newuser');
+      submitForm(auth);
+      await flushPromises();
+      expect((auth.shadow?.querySelector('x-popup') as Popup)._props.open).toBe(false);
+    });
+
+    it('displays inline error when registration fails', async () => {
+      jest.spyOn(authStore, 'register').mockRejectedValue(new Error('Email already in use'));
+      const auth = createAuth(guestState);
+      switchToRegister(auth);
+      fillRegisterForm(auth, 'taken@example.com', 'secret', 'secret', 'user');
+      submitForm(auth);
+      await flushPromises();
+      expect(auth.shadow?.querySelector('.auth-error')).not.toBeNull();
+    });
+
+    it('does not call authStore.register when passwords do not match', async () => {
+      const auth = createAuth(guestState);
+      switchToRegister(auth);
+      fillRegisterForm(auth, 'new@example.com', 'secret', 'different', 'newuser');
+      submitForm(auth);
+      await flushPromises();
+      expect(authStore.register).not.toHaveBeenCalled();
+      expect(auth.shadow?.querySelector('.field-error')).not.toBeNull();
+    });
+
+    it('does not call authStore.register when username is empty', async () => {
+      const auth = createAuth(guestState);
+      switchToRegister(auth);
+      fillRegisterForm(auth, 'new@example.com', 'secret', 'secret', '');
+      submitForm(auth);
+      await flushPromises();
+      expect(authStore.register).not.toHaveBeenCalled();
+    });
+
+    it('clears inputs and resets to sign-in view when popup is closed from register view', () => {
+      const auth = createAuth(guestState);
+      switchToRegister(auth);
+      fillRegisterForm(auth, 'new@example.com', 'secret', 'secret', 'newuser');
+      (auth.shadow?.querySelector('x-popup') as Popup)._props.onClose!();
+      expect(auth.shadow?.querySelector('form.sign-in-form h3.form-title')?.textContent).toBe('Sign In');
+      expect((auth.shadow?.querySelector('input[type="email"]') as HTMLInputElement).value).toBe('');
     });
   });
 

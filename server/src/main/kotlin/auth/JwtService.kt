@@ -13,12 +13,13 @@ class JwtService(
 ) {
     private val algorithm = Algorithm.HMAC256(secret)
 
-    fun generateToken(userId: String, email: String): String =
+    fun generateToken(userId: String, email: String, username: String): String =
         JWT.create()
             .withIssuer(issuer)
             .withAudience(audience)
             .withClaim("userId", userId)
             .withClaim("email", email)
+            .withClaim("username", username)
             .withExpiresAt(Date.from(Instant.now().plusSeconds(15 * 60)))
             .sign(algorithm)
 
