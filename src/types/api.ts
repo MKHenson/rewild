@@ -713,6 +713,8 @@ export interface components {
             email: string;
             /** String */
             password: string;
+            /** String */
+            username: string;
         };
         /** AuthResponse */
         "com.rewild.auth.AuthResponse": {

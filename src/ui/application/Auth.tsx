@@ -3,6 +3,7 @@ import { authStore } from '../stores/AuthStore';
 import { authService } from '../../api/auth/auth-service';
 
 type Props = {};
+type View = 'signIn' | 'register';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -11,17 +12,24 @@ export class Auth extends Component<Props> {
   init() {
     const auth = this.observeStore(authStore);
     const [menuOpen, setMenuOpen] = this.useState(false);
+    const [view, setView] = this.useState<View>('signIn');
     const [error, setError] = this.useState<string | null>(null);
     const [emailError, setEmailError] = this.useState<string | null>(null);
     const [passwordError, setPasswordError] = this.useState<string | null>(null);
+    const [confirmPasswordError, setConfirmPasswordError] = this.useState<string | null>(null);
+    const [usernameError, setUsernameError] = this.useState<string | null>(null);
     const [submitting, setSubmitting] = this.useState(false);
 
     // Stable refs — created once so typed values survive re-renders
     const emailInput = (<input type="email" placeholder="Email" />) as HTMLInputElement;
     const passwordInput = (<input type="password" placeholder="Password" />) as HTMLInputElement;
+    const confirmPasswordInput = (<input type="password" placeholder="Confirm password" />) as HTMLInputElement;
+    const usernameInput = (<input type="text" placeholder="Username" />) as HTMLInputElement;
 
     emailInput.oninput = () => { if (emailError()) setEmailError(null); };
     passwordInput.oninput = () => { if (passwordError()) setPasswordError(null); };
+    confirmPasswordInput.oninput = () => { if (confirmPasswordError()) setConfirmPasswordError(null); };
+    usernameInput.oninput = () => { if (usernameError()) setUsernameError(null); };
 
     this.onMount = async () => {
       if (!authService.getUser()) {
@@ -29,16 +37,34 @@ export class Auth extends Component<Props> {
       }
     };
 
-    const closeMenu = () => {
-      setMenuOpen(false);
+    const clearFields = () => {
+      emailInput.value = '';
+      passwordInput.value = '';
+      confirmPasswordInput.value = '';
+      usernameInput.value = '';
+    };
+
+    const clearErrors = () => {
       setError(null);
       setEmailError(null);
       setPasswordError(null);
-      emailInput.value = '';
-      passwordInput.value = '';
+      setConfirmPasswordError(null);
+      setUsernameError(null);
     };
 
-    const validate = (): boolean => {
+    const closeMenu = () => {
+      setMenuOpen(false);
+      setView('signIn');
+      clearErrors();
+      clearFields();
+    };
+
+    const switchView = (v: View) => {
+      setView(v);
+      clearErrors();
+    };
+
+    const validateSignIn = (): boolean => {
       let valid = true;
       const email = emailInput.value.trim();
       if (!email) {
@@ -59,21 +85,73 @@ export class Auth extends Component<Props> {
       return valid;
     };
 
-    const onSubmit = async (e: Event) => {
+    const validateRegister = (): boolean => {
+      let valid = true;
+      const email = emailInput.value.trim();
+      if (!email) {
+        setEmailError('Email is required');
+        valid = false;
+      } else if (!EMAIL_RE.test(email)) {
+        setEmailError('Enter a valid email address');
+        valid = false;
+      } else {
+        setEmailError(null);
+      }
+      if (!passwordInput.value) {
+        setPasswordError('Password is required');
+        valid = false;
+      } else {
+        setPasswordError(null);
+      }
+      if (!confirmPasswordInput.value) {
+        setConfirmPasswordError('Please confirm your password');
+        valid = false;
+      } else if (confirmPasswordInput.value !== passwordInput.value) {
+        setConfirmPasswordError('Passwords do not match');
+        valid = false;
+      } else {
+        setConfirmPasswordError(null);
+      }
+      if (!usernameInput.value.trim()) {
+        setUsernameError('Username is required');
+        valid = false;
+      } else {
+        setUsernameError(null);
+      }
+      return valid;
+    };
+
+    const onSignInSubmit = async (e: Event) => {
       e.preventDefault();
       if (submitting()) return;
-      if (!validate()) return;
+      if (!validateSignIn()) return;
       setError(null);
       setSubmitting(true);
       try {
         await authStore.signIn(emailInput.value.trim(), passwordInput.value);
+        clearFields();
+        clearErrors();
         setMenuOpen(false);
-        emailInput.value = '';
-        passwordInput.value = '';
-        setEmailError(null);
-        setPasswordError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Sign-in failed');
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
+    const onRegisterSubmit = async (e: Event) => {
+      e.preventDefault();
+      if (submitting()) return;
+      if (!validateRegister()) return;
+      setError(null);
+      setSubmitting(true);
+      try {
+        await authStore.register(emailInput.value.trim(), passwordInput.value, usernameInput.value.trim());
+        clearFields();
+        clearErrors();
+        setMenuOpen(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Registration failed');
       } finally {
         setSubmitting(false);
       }
@@ -87,6 +165,8 @@ export class Auth extends Component<Props> {
     return () => {
       emailInput.className = emailError() ? 'invalid' : '';
       passwordInput.className = passwordError() ? 'invalid' : '';
+      confirmPasswordInput.className = confirmPasswordError() ? 'invalid' : '';
+      usernameInput.className = usernameError() ? 'invalid' : '';
 
       if (auth.loggedIn) {
         return (
@@ -105,11 +185,47 @@ export class Auth extends Component<Props> {
         );
       }
 
+      if (view() === 'register') {
+        return (
+          <div class="auth-root">
+            <button class="sign-in-btn" onclick={() => setMenuOpen(true)}>Sign In</button>
+            <Popup open={menuOpen()} onClose={closeMenu} withBackground>
+              <form class="sign-in-form" onsubmit={onRegisterSubmit}>
+                <h3 class="form-title">Create Account</h3>
+                <div class="field-wrap">
+                  {emailInput}
+                  {emailError() ? <p class="field-error">{emailError()}</p> : null}
+                </div>
+                <div class="field-wrap">
+                  {usernameInput}
+                  {usernameError() ? <p class="field-error">{usernameError()}</p> : null}
+                </div>
+                <div class="field-wrap">
+                  {passwordInput}
+                  {passwordError() ? <p class="field-error">{passwordError()}</p> : null}
+                </div>
+                <div class="field-wrap">
+                  {confirmPasswordInput}
+                  {confirmPasswordError() ? <p class="field-error">{confirmPasswordError()}</p> : null}
+                </div>
+                {error() ? <p class="auth-error">{error()}</p> : null}
+                <button type="submit" disabled={submitting()}>
+                  {submitting() ? 'Creating account...' : 'Create Account'}
+                </button>
+                <span class="switch-view" onclick={() => switchView('signIn')}>
+                  Already have an account? Sign in
+                </span>
+              </form>
+            </Popup>
+          </div>
+        );
+      }
+
       return (
         <div class="auth-root">
           <button class="sign-in-btn" onclick={() => setMenuOpen(true)}>Sign In</button>
           <Popup open={menuOpen()} onClose={closeMenu} withBackground>
-            <form class="sign-in-form" onsubmit={onSubmit}>
+            <form class="sign-in-form" onsubmit={onSignInSubmit}>
               <h3 class="form-title">Sign In</h3>
               <div class="field-wrap">
                 {emailInput}
@@ -123,6 +239,9 @@ export class Auth extends Component<Props> {
               <button type="submit" disabled={submitting()}>
                 {submitting() ? 'Signing in...' : 'Sign In'}
               </button>
+              <span class="switch-view" onclick={() => switchView('register')}>
+                Don't have an account? Register
+              </span>
             </form>
           </Popup>
         </div>
@@ -222,6 +341,18 @@ export class Auth extends Component<Props> {
         color: ${theme.colors.error400};
         font-size: ${theme.colors.fontSizeSmall};
         margin: 0;
+      }
+
+      .switch-view {
+        cursor: pointer;
+        color: ${theme.colors.primary400};
+        font-size: ${theme.colors.fontSizeSmall};
+        text-align: center;
+        text-decoration: underline;
+      }
+
+      .switch-view:hover {
+        color: ${theme.colors.primary500};
       }
 
       .user-panel {

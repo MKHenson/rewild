@@ -13,7 +13,7 @@ class AuthService(private val jwtService: JwtService) {
 
     data class TokenPair(val accessToken: String, val refreshToken: String)
 
-    fun register(email: String, password: String): TokenPair? {
+    fun register(email: String, password: String, username: String): TokenPair? {
         val exists = transaction {
             UsersTable.selectAll().where { UsersTable.email eq email }.count() > 0
         }
@@ -27,12 +27,13 @@ class AuthService(private val jwtService: JwtService) {
             UsersTable.insert {
                 it[id] = userId
                 it[UsersTable.email] = email
+                it[UsersTable.username] = username
                 it[passwordHash] = hash
                 it[createdAt] = now
             }
         }
 
-        return issueTokenPair(userId, email)
+        return issueTokenPair(userId, email, username)
     }
 
     fun login(email: String, password: String): TokenPair? {
@@ -43,7 +44,7 @@ class AuthService(private val jwtService: JwtService) {
         val result = BCrypt.verifyer().verify(password.toCharArray(), user[UsersTable.passwordHash])
         if (!result.verified) return null
 
-        return issueTokenPair(user[UsersTable.id], email)
+        return issueTokenPair(user[UsersTable.id], email, user[UsersTable.username])
     }
 
     fun refresh(token: String): TokenPair? {
@@ -62,12 +63,13 @@ class AuthService(private val jwtService: JwtService) {
 
         val userId = row[RefreshTokensTable.userId]
         val email = row[UsersTable.email]
+        val username = row[UsersTable.username]
 
         transaction {
             RefreshTokensTable.deleteWhere { RefreshTokensTable.token eq token }
         }
 
-        return issueTokenPair(userId, email)
+        return issueTokenPair(userId, email, username)
     }
 
     fun revoke(token: String) {
@@ -76,8 +78,8 @@ class AuthService(private val jwtService: JwtService) {
         }
     }
 
-    private fun issueTokenPair(userId: String, email: String): TokenPair {
-        val accessToken = jwtService.generateToken(userId, email)
+    private fun issueTokenPair(userId: String, email: String, username: String): TokenPair {
+        val accessToken = jwtService.generateToken(userId, email, username)
         val refreshToken = UUID.randomUUID().toString()
         val now = Instant.now().toEpochMilli()
 

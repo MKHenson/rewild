@@ -638,11 +638,16 @@
                     "password": {
                         "type": "string",
                         "title": "String"
+                    },
+                    "username": {
+                        "type": "string",
+                        "title": "String"
                     }
                 },
                 "required": [
                     "email",
-                    "password"
+                    "password",
+                    "username"
                 ],
                 "title": "RegisterRequest"
             },
