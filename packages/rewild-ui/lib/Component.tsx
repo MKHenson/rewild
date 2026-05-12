@@ -67,6 +67,10 @@ export abstract class Component<T = any>
   _createRenderer() {
     const parent = this.shadow ? this.shadow : this;
     this.render = () => {
+      const focused = (this.shadow
+        ? this.shadow.activeElement
+        : document.activeElement) as HTMLElement | null;
+
       // Generates new DOM
       let children = fn();
 
@@ -111,6 +115,8 @@ export abstract class Component<T = any>
           parent.lastChild!.remove();
         }
       }
+
+      if (focused && parent.contains(focused)) focused.focus();
     };
 
     const fn = this.init();
