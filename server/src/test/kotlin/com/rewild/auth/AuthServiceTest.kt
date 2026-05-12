@@ -33,7 +33,7 @@ class AuthServiceTest {
 
     @Test
     fun `register returns token pair`() {
-        val result = authService.register("register@test.com", "password123")
+        val result = authService.register("register@test.com", "password123", "register-user")
         assertNotNull(result)
         assert(result!!.accessToken.isNotEmpty())
         assert(result.refreshToken.isNotEmpty())
@@ -41,21 +41,21 @@ class AuthServiceTest {
 
     @Test
     fun `register with duplicate email returns null`() {
-        authService.register("dup@test.com", "password123")
-        val result = authService.register("dup@test.com", "password123")
+        authService.register("dup@test.com", "password123", "dup-user")
+        val result = authService.register("dup@test.com", "password123", "dup-user")
         assertNull(result)
     }
 
     @Test
     fun `login with valid credentials returns token pair`() {
-        authService.register("login@test.com", "password123")
+        authService.register("login@test.com", "password123", "login-user")
         val result = authService.login("login@test.com", "password123")
         assertNotNull(result)
     }
 
     @Test
     fun `login with wrong password returns null`() {
-        authService.register("wrongpw@test.com", "password123")
+        authService.register("wrongpw@test.com", "password123", "wrongpw-user")
         val result = authService.login("wrongpw@test.com", "wrongpassword")
         assertNull(result)
     }
@@ -68,7 +68,7 @@ class AuthServiceTest {
 
     @Test
     fun `refresh with valid token returns new token pair`() {
-        val initial = authService.register("refresh@test.com", "password123")!!
+        val initial = authService.register("refresh@test.com", "password123", "refresh-user")!!
         val refreshed = authService.refresh(initial.refreshToken)
         assertNotNull(refreshed)
         assertNotEquals(initial.refreshToken, refreshed!!.refreshToken)
@@ -82,7 +82,7 @@ class AuthServiceTest {
 
     @Test
     fun `revoke removes refresh token`() {
-        val tokens = authService.register("revoke@test.com", "password123")!!
+        val tokens = authService.register("revoke@test.com", "password123", "revoke-user")!!
         authService.revoke(tokens.refreshToken)
         val result = authService.refresh(tokens.refreshToken)
         assertNull(result)
@@ -90,7 +90,7 @@ class AuthServiceTest {
 
     @Test
     fun `refresh token rotation invalidates old token`() {
-        val initial = authService.register("rotate@test.com", "password123")!!
+        val initial = authService.register("rotate@test.com", "password123", "rotate-user")!!
         authService.refresh(initial.refreshToken)
         val result = authService.refresh(initial.refreshToken)
         assertNull(result)

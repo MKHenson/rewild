@@ -21,26 +21,43 @@ class SyncService(
     fun sync(userId: String, request: SyncRequest): SyncResponse {
         val now = System.currentTimeMillis()
 
-        // Push phase: upsert each incoming record if it is newer than the server version.
-        // userId is always derived from the JWT — the value in the record body is ignored.
+        // Split incoming records by collection for ordered processing.
+        val projectRecords = mutableListOf<Pair<SyncRecord, Project>>()
+        val levelRecords = mutableListOf<Pair<SyncRecord, Level>>()
         for (record in request.records) {
             when (record.collection) {
-                "projects" -> {
-                    val incoming = json.decodeFromJsonElement<Project>(record.data)
-                    val existing = projectService.getById(userId, record.id)
-                    if (existing == null || record.updatedAt > existing.updatedAt) {
-                        projectService.upsert(userId, incoming.copy(userId = userId, syncedAt = now, syncError = null))
-                    }
-                }
-                "levels" -> {
-                    val incoming = json.decodeFromJsonElement<Level>(record.data)
-                    val existing = levelService.getById(userId, record.id)
-                    if (existing == null || record.updatedAt > existing.updatedAt) {
-                        levelService.upsert(userId, incoming.copy(userId = userId, syncedAt = now, syncError = null))
-                    }
-                }
+                "projects" -> projectRecords.add(record to json.decodeFromJsonElement(record.data))
+                "levels" -> levelRecords.add(record to json.decodeFromJsonElement(record.data))
                 // Unknown collections are silently skipped.
             }
+        }
+
+        // Push phase — three passes to resolve the circular FK between projects and levels:
+        //   levels.project_id  → projects(id)  NOT NULL
+        //   projects.level_id  → levels(id)    nullable
+        //
+        // Pass 1: insert/update projects with levelId = null so that levels can satisfy
+        //         their project_id FK in pass 2.
+        val projectsNeedingLevelId = mutableListOf<Pair<SyncRecord, Project>>()
+        for ((record, incoming) in projectRecords) {
+            val existing = projectService.getById(userId, record.id)
+            if (existing == null || record.updatedAt > existing.updatedAt) {
+                projectService.upsert(userId, incoming.copy(userId = userId, levelId = null, syncedAt = now, syncError = null))
+                if (incoming.levelId != null) projectsNeedingLevelId.add(record to incoming)
+            }
+        }
+
+        // Pass 2: upsert levels — projects exist now so project_id FK is satisfied.
+        for ((record, incoming) in levelRecords) {
+            val existing = levelService.getById(userId, record.id)
+            if (existing == null || record.updatedAt > existing.updatedAt) {
+                levelService.upsert(userId, incoming.copy(userId = userId, syncedAt = now, syncError = null))
+            }
+        }
+
+        // Pass 3: patch levelId back onto the projects that needed it — levels exist now.
+        for ((_, incoming) in projectsNeedingLevelId) {
+            projectService.upsert(userId, incoming.copy(userId = userId, syncedAt = now, syncError = null))
         }
 
         // Pull phase: return everything the client hasn't seen yet.

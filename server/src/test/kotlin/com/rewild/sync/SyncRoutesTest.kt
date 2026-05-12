@@ -114,7 +114,7 @@ class SyncRoutesTest {
     @Test
     fun `empty sync returns 200 with syncedAt and no records`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken("user-empty-sync", "user-empty-sync@test.com")
+        val token = jwtService.generateToken("user-empty-sync", "user-empty-sync@test.com", "user-empty-sync")
         val response = client.post("/api/sync") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
@@ -130,7 +130,7 @@ class SyncRoutesTest {
     fun `upserts incoming project when server has no existing record`() = testApplication {
         installTestApp()
         val userId = "user-push-new"
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
 
         client.post("/api/sync") {
             header(HttpHeaders.Authorization, "Bearer $token")
@@ -145,7 +145,7 @@ class SyncRoutesTest {
     fun `skips incoming record when server version is newer`() = testApplication {
         installTestApp()
         val userId = "user-server-newer"
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
         projectService.upsert(userId, makeProject("server-newer-proj", updatedAt = 5000L, name = "ServerVersion"))
 
         client.post("/api/sync") {
@@ -164,7 +164,7 @@ class SyncRoutesTest {
     fun `upserts incoming record when client version is newer`() = testApplication {
         installTestApp()
         val userId = "user-client-newer"
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
         projectService.upsert(userId, makeProject("client-newer-proj", updatedAt = 1000L, name = "OldServer"))
 
         client.post("/api/sync") {
@@ -183,7 +183,7 @@ class SyncRoutesTest {
     fun `overwrites userId from JWT regardless of value in record body`() = testApplication {
         installTestApp()
         val userId = "user-jwt-owns"
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
         val project = makeProject("jwt-owned-proj").copy(userId = "attacker-id")
 
         client.post("/api/sync") {
@@ -201,7 +201,7 @@ class SyncRoutesTest {
     fun `lastSyncedAt 0 returns full dataset for user`() = testApplication {
         installTestApp()
         val userId = "user-full-pull"
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
         projectService.upsert(userId, makeProject("full-pull-1", updatedAt = 1000L))
         projectService.upsert(userId, makeProject("full-pull-2", updatedAt = 2000L))
         projectService.upsert("other-user", makeProject("full-pull-other", updatedAt = 1000L))
@@ -223,7 +223,7 @@ class SyncRoutesTest {
     fun `returns only records newer than lastSyncedAt`() = testApplication {
         installTestApp()
         val userId = "user-partial-pull"
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
         projectService.upsert(userId, makeProject("partial-old", updatedAt = 1000L))
         projectService.upsert(userId, makeProject("partial-new", updatedAt = 5000L))
 
@@ -243,7 +243,7 @@ class SyncRoutesTest {
     fun `handles projects and levels in a single request`() = testApplication {
         installTestApp()
         val userId = "user-mixed"
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
 
         client.post("/api/sync") {
             header(HttpHeaders.Authorization, "Bearer $token")
@@ -261,7 +261,7 @@ class SyncRoutesTest {
     @Test
     fun `response includes syncedAt timestamp`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken("user-ts", "user-ts@test.com")
+        val token = jwtService.generateToken("user-ts", "user-ts@test.com", "user-ts")
         val before = System.currentTimeMillis()
 
         val response = client.post("/api/sync") {
@@ -279,7 +279,7 @@ class SyncRoutesTest {
     fun `sets syncedAt on upserted records`() = testApplication {
         installTestApp()
         val userId = "user-syncedAt-set"
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
         val before = System.currentTimeMillis()
 
         client.post("/api/sync") {
@@ -295,5 +295,59 @@ class SyncRoutesTest {
         val stored = projectService.getById(userId, "synced-at-proj")
         assertNotNull(stored)
         assertTrue(stored.syncedAt in before..after)
+    }
+
+    @Test
+    fun `syncing new project with levelId and level together sets levelId correctly`() = testApplication {
+        installTestApp()
+        val userId = "user-circular-fk"
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
+
+        // Project first in the request — the original failing order.
+        val project = makeProject("circular-proj").copy(levelId = "circular-level")
+        val level = makeLevel("circular-level").copy(projectId = "circular-proj")
+
+        val response = client.post("/api/sync") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(SyncRequest(
+                lastSyncedAt = 0,
+                records = listOf(project.toSyncRecord(), level.toSyncRecord())
+            )))
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val storedProject = projectService.getById(userId, "circular-proj")
+        val storedLevel = levelService.getById(userId, "circular-level")
+        assertNotNull(storedProject)
+        assertNotNull(storedLevel)
+        assertEquals("circular-level", storedProject.levelId)
+    }
+
+    @Test
+    fun `syncing new project with levelId resolves circular FK when level record arrives first`() = testApplication {
+        installTestApp()
+        val userId = "user-circular-fk-rev"
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
+
+        // Level first in the request — also previously broken.
+        val project = makeProject("circular-proj-rev").copy(levelId = "circular-level-rev")
+        val level = makeLevel("circular-level-rev").copy(projectId = "circular-proj-rev")
+
+        val response = client.post("/api/sync") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(SyncRequest(
+                lastSyncedAt = 0,
+                records = listOf(level.toSyncRecord(), project.toSyncRecord())
+            )))
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val storedProject = projectService.getById(userId, "circular-proj-rev")
+        val storedLevel = levelService.getById(userId, "circular-level-rev")
+        assertNotNull(storedProject)
+        assertNotNull(storedLevel)
+        assertEquals("circular-level-rev", storedProject.levelId)
     }
 }

@@ -63,7 +63,7 @@ class JwtMiddlewareTest {
     @Test
     fun `request with valid token passes through`() = testApplication {
         installTestApp()
-        val token = testJwtService.generateToken("user-123", "test@example.com")
+        val token = testJwtService.generateToken("user-123", "test@example.com", "user-123")
         val response = client.get("/protected") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -73,7 +73,7 @@ class JwtMiddlewareTest {
     @Test
     fun `request with tampered token returns 401`() = testApplication {
         installTestApp()
-        val token = testJwtService.generateToken("user-123", "test@example.com")
+        val token = testJwtService.generateToken("user-123", "test@example.com", "user-123")
         val tampered = token.dropLast(5) + "XXXXX"
         val response = client.get("/protected") {
             header(HttpHeaders.Authorization, "Bearer $tampered")

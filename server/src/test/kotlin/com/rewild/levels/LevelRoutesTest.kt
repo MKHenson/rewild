@@ -106,7 +106,7 @@ class LevelRoutesTest {
         service.upsert(listUserId, makeLevel("list-level-1", listProjectId))
         service.upsert(USER_B, makeLevel("list-level-2", PROJECT_B))
 
-        val token = jwtService.generateToken(listUserId, "$listUserId@test.com")
+        val token = jwtService.generateToken(listUserId, "$listUserId@test.com", listUserId)
         val response = client.get("/api/levels") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -121,7 +121,7 @@ class LevelRoutesTest {
         installTestApp()
         service.upsert(USER_A, makeLevel("get-own-level", PROJECT_A))
 
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com")
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
         val response = client.get("/api/levels/get-own-level") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -135,7 +135,7 @@ class LevelRoutesTest {
         installTestApp()
         service.upsert(USER_A, makeLevel("other-user-level", PROJECT_A))
 
-        val token = jwtService.generateToken(USER_B, "$USER_B@test.com")
+        val token = jwtService.generateToken(USER_B, "$USER_B@test.com", USER_B)
         val response = client.get("/api/levels/other-user-level") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -145,7 +145,7 @@ class LevelRoutesTest {
     @Test
     fun `GET level by id for missing record returns 404`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com")
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
         val response = client.get("/api/levels/does-not-exist-level") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -155,7 +155,7 @@ class LevelRoutesTest {
     @Test
     fun `PUT level creates new record`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com")
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
         val level = makeLevel("put-create-level", PROJECT_A, "Created via PUT")
 
         val response = client.put("/api/levels/put-create-level") {
@@ -175,7 +175,7 @@ class LevelRoutesTest {
         installTestApp()
         service.upsert(USER_A, makeLevel("put-update-level", PROJECT_A, "Original"))
 
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com")
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
         val updated = makeLevel("put-update-level", PROJECT_A, "Updated")
 
         val response = client.put("/api/levels/put-update-level") {
@@ -193,7 +193,7 @@ class LevelRoutesTest {
         installTestApp()
         service.upsert(USER_A, makeLevel("owned-level", PROJECT_A))
 
-        val token = jwtService.generateToken(USER_B, "$USER_B@test.com")
+        val token = jwtService.generateToken(USER_B, "$USER_B@test.com", USER_B)
         val response = client.put("/api/levels/owned-level") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
@@ -207,7 +207,7 @@ class LevelRoutesTest {
         installTestApp()
         service.upsert(USER_A, makeLevel("delete-me-level", PROJECT_A))
 
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com")
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
         val response = client.delete("/api/levels/delete-me-level") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -224,7 +224,7 @@ class LevelRoutesTest {
         installTestApp()
         service.upsert(USER_A, makeLevel("del-other-level", PROJECT_A))
 
-        val token = jwtService.generateToken(USER_B, "$USER_B@test.com")
+        val token = jwtService.generateToken(USER_B, "$USER_B@test.com", USER_B)
         val response = client.delete("/api/levels/del-other-level") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -234,7 +234,7 @@ class LevelRoutesTest {
     @Test
     fun `DELETE missing level returns 404`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com")
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
         val response = client.delete("/api/levels/no-such-level") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -244,7 +244,7 @@ class LevelRoutesTest {
     @Test
     fun `PUT uses path id not body id`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com")
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
         val level = makeLevel("level-body-id-ignored", PROJECT_A)
 
         val response = client.put("/api/levels/level-path-id-wins") {

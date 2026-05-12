@@ -157,7 +157,7 @@ class AssetRoutesTest {
         insertConfirmedAsset("list-asset-1", userId, levelId, "levels/$levelId/chunk/a.bin")
         insertConfirmedAsset("list-asset-2", USER_A, LEVEL_A, "levels/$LEVEL_A/chunk/b.bin")
 
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
         val response = client.get("/api/assets") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -171,7 +171,7 @@ class AssetRoutesTest {
     @Test
     fun `GET assets returns empty list when user has no confirmed assets`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken("no-assets-user", "no-assets@test.com")
+        val token = jwtService.generateToken("no-assets-user", "no-assets@test.com", "no-assets-user")
         val response = client.get("/api/assets") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -185,7 +185,7 @@ class AssetRoutesTest {
     @Test
     fun `upload-url returns presigned URL for owned level`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com")
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
         val response = client.post("/api/assets/upload-url") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
@@ -202,7 +202,7 @@ class AssetRoutesTest {
     @Test
     fun `upload-url returns 403 when level does not belong to user`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken(USER_B, "$USER_B@test.com")
+        val token = jwtService.generateToken(USER_B, "$USER_B@test.com", USER_B)
         val response = client.post("/api/assets/upload-url") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
@@ -214,7 +214,7 @@ class AssetRoutesTest {
     @Test
     fun `upload-url returns 403 for a level that does not exist`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com")
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
         val response = client.post("/api/assets/upload-url") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
@@ -233,7 +233,7 @@ class AssetRoutesTest {
         projectService.upsert(userId, makeProject("confirm-proj"))
         levelService.upsert(userId, makeLevel(levelId, "confirm-proj"))
 
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
 
         // First request the upload URL so an unconfirmed record exists
         client.post("/api/assets/upload-url") {
@@ -262,7 +262,7 @@ class AssetRoutesTest {
     @Test
     fun `confirm returns 404 for an unknown storage key`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken(USER_A, "$USER_A@test.com")
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
         val response = client.post("/api/assets/confirm") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
@@ -274,7 +274,7 @@ class AssetRoutesTest {
     @Test
     fun `confirm returns 404 when storage key belongs to another user`() = testApplication {
         installTestApp()
-        val userAToken = jwtService.generateToken(USER_A, "$USER_A@test.com")
+        val userAToken = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
 
         // USER_A requests an upload URL (creates unconfirmed record)
         client.post("/api/assets/upload-url") {
@@ -284,7 +284,7 @@ class AssetRoutesTest {
         }
 
         // USER_B tries to confirm it
-        val userBToken = jwtService.generateToken(USER_B, "$USER_B@test.com")
+        val userBToken = jwtService.generateToken(USER_B, "$USER_B@test.com", USER_B)
         val storageKey = "levels/$LEVEL_A/chunk/other-user.bin"
         val response = client.post("/api/assets/confirm") {
             header(HttpHeaders.Authorization, "Bearer $userBToken")

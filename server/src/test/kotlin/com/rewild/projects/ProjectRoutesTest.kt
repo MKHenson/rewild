@@ -85,7 +85,7 @@ class ProjectRoutesTest {
         service.upsert(userId, makeProject("list-proj-1"))
         service.upsert("other-user", makeProject("list-proj-2"))
 
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
         val response = client.get("/api/projects") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -100,7 +100,7 @@ class ProjectRoutesTest {
         installTestApp()
         service.upsert("user-get-own", makeProject("get-own-proj"))
 
-        val token = jwtService.generateToken("user-get-own", "user-get-own@test.com")
+        val token = jwtService.generateToken("user-get-own", "user-get-own@test.com", "user-get-own")
         val response = client.get("/api/projects/get-own-proj") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -114,7 +114,7 @@ class ProjectRoutesTest {
         installTestApp()
         service.upsert("user-owner", makeProject("other-user-proj"))
 
-        val token = jwtService.generateToken("user-not-owner", "notowner@test.com")
+        val token = jwtService.generateToken("user-not-owner", "notowner@test.com", "user-not-owner")
         val response = client.get("/api/projects/other-user-proj") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -124,7 +124,7 @@ class ProjectRoutesTest {
     @Test
     fun `GET project by id for missing record returns 404`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken("user-any", "user-any@test.com")
+        val token = jwtService.generateToken("user-any", "user-any@test.com", "user-any")
         val response = client.get("/api/projects/does-not-exist") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -134,7 +134,7 @@ class ProjectRoutesTest {
     @Test
     fun `PUT project creates new record`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken("user-put-create", "user-put-create@test.com")
+        val token = jwtService.generateToken("user-put-create", "user-put-create@test.com", "user-put-create")
         val project = makeProject("put-create-proj", "Created via PUT")
 
         val response = client.put("/api/projects/put-create-proj") {
@@ -155,7 +155,7 @@ class ProjectRoutesTest {
         val userId = "user-put-update"
         service.upsert(userId, makeProject("put-update-proj", "Original"))
 
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
         val updated = makeProject("put-update-proj", "Updated")
 
         val response = client.put("/api/projects/put-update-proj") {
@@ -173,7 +173,7 @@ class ProjectRoutesTest {
         installTestApp()
         service.upsert("user-proj-owner", makeProject("owned-proj"))
 
-        val token = jwtService.generateToken("user-proj-intruder", "intruder@test.com")
+        val token = jwtService.generateToken("user-proj-intruder", "intruder@test.com", "user-proj-intruder")
         val response = client.put("/api/projects/owned-proj") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
@@ -188,7 +188,7 @@ class ProjectRoutesTest {
         val userId = "user-delete-proj"
         service.upsert(userId, makeProject("delete-me-proj"))
 
-        val token = jwtService.generateToken(userId, "$userId@test.com")
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
         val response = client.delete("/api/projects/delete-me-proj") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -205,7 +205,7 @@ class ProjectRoutesTest {
         installTestApp()
         service.upsert("user-del-owner", makeProject("del-other-proj"))
 
-        val token = jwtService.generateToken("user-del-intruder", "delintruder@test.com")
+        val token = jwtService.generateToken("user-del-intruder", "delintruder@test.com", "user-del-intruder")
         val response = client.delete("/api/projects/del-other-proj") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -215,7 +215,7 @@ class ProjectRoutesTest {
     @Test
     fun `DELETE missing project returns 404`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken("user-del-missing", "delmissing@test.com")
+        val token = jwtService.generateToken("user-del-missing", "delmissing@test.com", "user-del-missing")
         val response = client.delete("/api/projects/no-such-proj") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
@@ -225,7 +225,7 @@ class ProjectRoutesTest {
     @Test
     fun `PUT uses path id not body id`() = testApplication {
         installTestApp()
-        val token = jwtService.generateToken("user-id-check", "idcheck@test.com")
+        val token = jwtService.generateToken("user-id-check", "idcheck@test.com", "user-id-check")
         val project = makeProject("body-id-ignored")
 
         val response = client.put("/api/projects/path-id-wins") {
