@@ -1,3 +1,4 @@
+import 'fake-indexeddb/auto';
 import { setupGlobalPolyfill } from "rewild-common/lib/TypesPolyfill";
 
 setupGlobalPolyfill(global);

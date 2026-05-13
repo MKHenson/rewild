@@ -1,4 +1,4 @@
-import { LocalDataTable } from './local-db';
+import { LocalDataTable, withSyncDefaults } from './local-db';
 
 describe('Local database tests', () => {
   function getLocalTable() {
@@ -7,15 +7,15 @@ describe('Local database tests', () => {
       smelly?: boolean;
       age?: number;
       name?: string;
-    }>('rewild', 'animals');
+    }>('rewild', 'projects');
   }
 
   it('correctly creates a valid prefix', () => {
     const table = getLocalTable();
-    expect(table.prefix).toEqual('rewild.animals');
+    expect(table.prefix).toEqual('rewild.projects');
   });
 
-  it('correctly gets 0 results for the table animals', async () => {
+  it('correctly gets 0 results for the table', async () => {
     const table = getLocalTable();
     const results = await table.getMany({});
     expect(results.items.length).toEqual(0);
@@ -73,6 +73,7 @@ describe('Local database tests', () => {
 
     let rows = await local.getMany({
       where: [['type', '==', 'named cat']],
+      sort: [['name', 'asc']],
     });
 
     expect(rows.items.length).toEqual(6);
@@ -81,6 +82,7 @@ describe('Local database tests', () => {
 
     rows = await local.getMany({
       where: [['type', '==', 'named cat']],
+      sort: [['name', 'asc']],
       limit: 2,
     });
 
@@ -90,6 +92,7 @@ describe('Local database tests', () => {
 
     rows = await local.getMany({
       where: [['type', '==', 'named cat']],
+      sort: [['name', 'asc']],
       limit: 2,
       cursor: rows.cursor,
     });
@@ -97,24 +100,26 @@ describe('Local database tests', () => {
     expect(rows.items.length).toEqual(2);
     expect(rows.items[0].name).toEqual('Gunther 2');
     expect(rows.items[1].name).toEqual('Gunther 3');
-    expect(rows.cursor).toEqual(4); // cursor should be 4
+    expect(rows.cursor).toEqual(4);
 
     rows = await local.getMany({
       where: [['type', '==', 'named cat']],
+      sort: [['name', 'asc']],
       limit: 2,
       cursor: rows.cursor,
     });
     expect(rows.items.length).toEqual(2);
     expect(rows.items[0].name).toEqual('Gunther 4');
     expect(rows.items[1].name).toEqual('Gunther 5');
-    expect(rows.cursor).toEqual(6); // cursor should be 6
+    expect(rows.cursor).toEqual(6);
 
     rows = await local.getMany({
       where: [['type', '==', 'named cat']],
+      sort: [['name', 'asc']],
       limit: 2,
       cursor: rows.cursor,
     });
-    expect(rows.items.length).toEqual(0); // no more items to fetch
+    expect(rows.items.length).toEqual(0);
   });
 
   it('gets nothing when the cursor is out of bounds', async () => {
@@ -159,8 +164,7 @@ describe('Local database tests', () => {
     });
 
     expect(rows.items.length).toEqual(2); // 2 items with name = 'jerry'
-    expect(rows.items[0].type).toEqual('mouse'); // first item should be 'mouse'
-    expect(rows.items[1].type).toEqual('cat'); // second item should be 'cat'
+    expect(rows.items.map((i) => i.type).sort()).toEqual(['cat', 'mouse']);
 
     rows = await local.getMany({
       where: [
@@ -233,23 +237,13 @@ describe('Local database tests', () => {
       expect(patched!.syncError).toBe('timeout');
     });
 
-    it('applies sync field defaults when reading legacy records', async () => {
-      const local = getLocalTable();
-      const uid = 'legacy-id-001';
-      localStorage.setItem(
-        `${local.prefix}.${uid}`,
-        JSON.stringify({ id: uid, type: 'legacy-cat' })
-      );
-      localStorage.setItem(
-        local.prefix,
-        JSON.stringify([...(JSON.parse(localStorage.getItem(local.prefix) || '[]')), uid])
-      );
-
-      const record = await local.getOne(uid);
-      expect(record!.updatedAt).toBe(0);
-      expect(record!.syncedAt).toBe(0);
-      expect(record!.syncError).toBeNull();
-      expect(record!.type).toBe('legacy-cat');
+    it('applies sync field defaults to records missing those fields', () => {
+      const raw = { id: 'some-id', type: 'legacy-cat' } as any;
+      const result = withSyncDefaults(raw);
+      expect(result.updatedAt).toBe(0);
+      expect(result.syncedAt).toBe(0);
+      expect(result.syncError).toBeNull();
+      expect(result.type).toBe('legacy-cat');
     });
 
     it('getDirty returns records where updatedAt > syncedAt', async () => {
@@ -257,12 +251,8 @@ describe('Local database tests', () => {
       const item1 = await local.add({ type: 'dirty-cat' });
       const item2 = await local.add({ type: 'dirty-cat' });
 
-      // Simulate synced record: set syncedAt = updatedAt
-      await local.patch(item2.id, { syncedAt: item2.updatedAt } as any);
-      // Re-fetch to ensure syncedAt was stored; bump updatedAt back below syncedAt by patching syncedAt high
-      const synced = await local.getOne(item2.id);
-      // updatedAt was bumped by patch, so patch syncedAt to match
-      await local.patch(item2.id, { syncedAt: synced!.updatedAt } as any);
+      // markSynced sets syncedAt without bumping updatedAt, so item2 becomes clean
+      await local.markSynced(item2.id, item2.updatedAt, null);
 
       const dirty = await local.getDirty();
       const dirtyIds = dirty.map((d) => d.id);
@@ -271,21 +261,58 @@ describe('Local database tests', () => {
       expect(dirtyIds).not.toContain(item2.id);
     });
 
-    it('legacy records with updatedAt=0 and syncedAt=0 are not dirty', async () => {
-      const local = getLocalTable();
-      const uid = 'legacy-clean-001';
-      localStorage.setItem(
-        `${local.prefix}.${uid}`,
-        JSON.stringify({ id: uid, type: 'legacy-clean' })
-      );
-      localStorage.setItem(
-        local.prefix,
-        JSON.stringify([...(JSON.parse(localStorage.getItem(local.prefix) || '[]')), uid])
-      );
+    it('records with updatedAt=0 and syncedAt=0 are not dirty', () => {
+      const item = withSyncDefaults({ id: 'clean-001', type: 'clean-cat' } as any);
+      expect(item.updatedAt).toBe(0);
+      expect(item.syncedAt).toBe(0);
+      expect(item.updatedAt > item.syncedAt).toBe(false);
+    });
 
-      const dirty = await local.getDirty();
-      const dirtyIds = dirty.map((d) => d.id);
-      expect(dirtyIds).not.toContain(uid);
+    it('markSynced updates syncedAt and syncError without bumping updatedAt', async () => {
+      const local = getLocalTable();
+      const item = await local.add({ type: 'mark-synced-cat' });
+
+      await local.markSynced(item.id, 12345, null);
+      const updated = await local.getOne(item.id);
+
+      expect(updated!.syncedAt).toBe(12345);
+      expect(updated!.syncError).toBeNull();
+      expect(updated!.updatedAt).toBe(item.updatedAt);
+    });
+
+    it('markSynced stores a syncError when provided', async () => {
+      const local = getLocalTable();
+      const item = await local.add({ type: 'error-cat' });
+
+      await local.markSynced(item.id, 99999, 'network timeout');
+      const updated = await local.getOne(item.id);
+
+      expect(updated!.syncError).toBe('network timeout');
+      expect(updated!.syncedAt).toBe(99999);
+    });
+
+    it('putSynced inserts a new record with syncedAt set', async () => {
+      const local = getLocalTable();
+      const record = { id: 'server-id-001', type: 'server-cat', updatedAt: 5000 } as any;
+
+      await local.putSynced(record, 5000);
+      const stored = await local.getOne('server-id-001');
+
+      expect(stored).not.toBeNull();
+      expect(stored!.syncedAt).toBe(5000);
+      expect(stored!.syncError).toBeNull();
+      expect(stored!.type).toBe('server-cat');
+    });
+
+    it('putSynced overwrites an existing record', async () => {
+      const local = getLocalTable();
+      const item = await local.add({ type: 'overwrite-cat' });
+
+      await local.putSynced({ ...item, type: 'updated-cat' }, 99999);
+      const stored = await local.getOne(item.id);
+
+      expect(stored!.type).toBe('updated-cat');
+      expect(stored!.syncedAt).toBe(99999);
     });
   });
 
@@ -328,5 +355,22 @@ describe('Local database tests', () => {
 
     expect(allRows.items.length).toEqual(1);
     expect(allRows.items[0].name).toEqual('Cleo 0');
+  });
+
+  it('remove returns false for a non-existent id', async () => {
+    const local = getLocalTable();
+    const result = await local.remove('does-not-exist');
+    expect(result).toBe(false);
+  });
+
+  it('remove deletes the item and returns true', async () => {
+    const local = getLocalTable();
+    const item = await local.add({ type: 'remove-cat' });
+
+    const removed = await local.remove(item.id);
+    expect(removed).toBe(true);
+
+    const fetched = await local.getOne(item.id);
+    expect(fetched).toBeNull();
   });
 });

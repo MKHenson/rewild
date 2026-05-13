@@ -1,4 +1,4 @@
-import { LocalDataTable } from '../../database/local-db';
+import { LocalDataTable, clearDatabase } from '../../database/local-db';
 import { authService } from '../auth/auth-service';
 import type { components } from '../../types/api';
 import { SyncEngine } from './sync-engine';
@@ -22,7 +22,8 @@ describe('SyncEngine', () => {
   let levels: LocalDataTable<FakeProject>;
   let engine: SyncEngine;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await clearDatabase('rewild');
     localStorage.clear();
     projects = new LocalDataTable('rewild', 'projects');
     levels = new LocalDataTable('rewild', 'levels');
