@@ -2,11 +2,13 @@ import { LocalAssetStore } from './local-asset-store';
 import { authService } from '../api/auth/auth-service';
 import { installOPFSMock } from './opfs-mock';
 import { mockResponse, mockFetch } from '../test-utils';
+import { clearDatabase } from './local-db';
 
 describe('LocalAssetStore', () => {
   let store: LocalAssetStore;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await clearDatabase('rewild');
     localStorage.clear();
     installOPFSMock();
     store = new LocalAssetStore();
