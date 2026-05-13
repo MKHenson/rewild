@@ -9,8 +9,11 @@ public/
 # Log files
 *.log
 
+.env
+
 node_modules/
 build/
+assets/
 
 **/node_modules/*
 **/.firebase

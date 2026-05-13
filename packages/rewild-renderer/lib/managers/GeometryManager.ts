@@ -46,7 +46,7 @@ export class GeometryManager {
       const geometryTemplate = geometriesToLoad[key];
       if (geometryTemplate.type === 'gltf') {
         const geometry = new Geometry();
-        await loadGLTF(process.env.MEDIA_URL + geometryTemplate.url, geometry);
+        await loadGLTF(process.env.SHARED_ASSETS_BASE_URL + geometryTemplate.url, geometry);
         this.addGeometry(key, geometry);
       }
     }

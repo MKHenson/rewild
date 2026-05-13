@@ -1,5 +1,6 @@
 import * as esbuild from 'esbuild';
 import * as http from 'http';
+import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { copy } from 'esbuild-plugin-copy';
@@ -33,8 +34,8 @@ const copyPluginDetails = {
 };
 
 const defines = {
-  'process.env.MEDIA_URL': JSON.stringify(
-    'https://storage.googleapis.com/rewild-6809/'
+  'process.env.SHARED_ASSETS_BASE_URL': JSON.stringify(
+    process.env.SHARED_ASSETS_BASE_URL || 'http://localhost:9001/assets/shared/'
   ),
 };
 
@@ -132,13 +133,54 @@ async function watch() {
   console.log('Watching...');
 }
 
+const MIME_TYPES = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.hdr': 'application/octet-stream',
+  '.bin': 'application/octet-stream',
+  '.gltf': 'model/gltf+json',
+  '.glb': 'model/gltf-binary',
+  '.ktx2': 'image/ktx2',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg',
+  '.wav': 'audio/wav',
+};
+
 async function serve() {
   const ctx = await esbuild.context(getConfig());
   await ctx.watch();
   const { host, port: esbuildPort } = await ctx.serve({ servedir: './public' });
 
+  const assetsDir = path.join(process.cwd(), 'assets', 'shared');
+
   http.createServer((req, res) => {
     const isApi = req.url?.startsWith('/api');
+    const isSharedAsset = req.url?.startsWith('/assets/shared/');
+
+    if (isSharedAsset) {
+      const requestPath = req.url.split('?')[0];
+      const filePath = path.normalize(path.join(process.cwd(), requestPath));
+      if (!filePath.startsWith(assetsDir)) {
+        res.writeHead(403);
+        res.end('Forbidden');
+        return;
+      }
+      const ext = path.extname(filePath).toLowerCase();
+      const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+      fs.stat(filePath, (err) => {
+        if (err) {
+          res.writeHead(404);
+          res.end('Not found');
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': contentType });
+        fs.createReadStream(filePath).pipe(res);
+      });
+      return;
+    }
+
     const options = {
       hostname: isApi ? 'localhost' : host,
       port: isApi ? 8080 : esbuildPort,
@@ -146,7 +188,18 @@ async function serve() {
       method: req.method,
       headers: req.headers,
     };
+    const hasExtension = path.extname(req.url.split('?')[0]) !== '';
     const proxy = http.request(options, (proxyRes) => {
+      if (proxyRes.statusCode === 404 && !isApi && !hasExtension) {
+        proxyRes.resume();
+        const indexPath = path.join(process.cwd(), 'public', 'index.html');
+        fs.readFile(indexPath, (err, data) => {
+          if (err) { res.writeHead(500); res.end('Internal server error'); return; }
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end(data);
+        });
+        return;
+      }
       res.writeHead(proxyRes.statusCode, proxyRes.headers);
       proxyRes.pipe(res, { end: true });
     });
@@ -155,7 +208,14 @@ async function serve() {
       res.end('Backend unavailable');
     });
     req.pipe(proxy, { end: true });
-  }).listen(9001, () => console.log('Dev server: http://localhost:9001'));
+  }).listen(9001, () => {
+    const url = 'http://localhost:9001';
+    console.log(`Dev server: ${url}`);
+    const cmd = process.platform === 'win32' ? `start ${url}` :
+                process.platform === 'darwin' ? `open ${url}` :
+                `xdg-open ${url}`;
+    exec(cmd);
+  });
 }
 
 async function build() {

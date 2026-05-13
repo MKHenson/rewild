@@ -6,27 +6,12 @@ Checkout the 🦕[Demo](https://rewild-96f5b.web.app/)🦖 (WIP)
 
 ![Engine Pic](./docs/images/editor.png)
 
-### How do I get set up?
+## Installation
 
-Clone the project and install the dependencies
+- [Client Installation](./docs/client-installation.md)
+- [Server Installation](./docs/server-installation.md)
 
-```
-npm intall
-```
-
-Build the project
-
-```
-npm run build
-```
-
-Run the project
-
-```
-npm run start
-```
-
-## Engine Feature
+## Engine Features
 
 - Procedural endless terrain
 - Weather system

@@ -16,7 +16,9 @@
     "watch": "node ./esbuild.js --watch",
     "start": "npm-run-all --parallel serve ts-check-watch",
     "serve": "node ./esbuild.js --serve",
-    "generate:types": "cd server && .\\gradlew.bat generateSpec && npx openapi-typescript ../openapi.json -o ../src/types/api.ts"
+    "generate:types": "cd server && .\\gradlew.bat generateSpec && npx openapi-typescript ../openapi.json -o ../src/types/api.ts",
+    "assets:pull": "node --env-file=.env scripts/assets-pull.js",
+    "assets:push": "node --env-file=.env scripts/assets-push.js"
   },
   "repository": {
     "type": "git",

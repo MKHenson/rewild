@@ -6,7 +6,7 @@ import { TextureProperties } from '../textures/Texture';
 import { DataTexture } from '../textures/DataTexture';
 import { IMaterialsTemplate } from './types';
 
-const MEDIA_URL = process.env.MEDIA_URL;
+const MEDIA_URL = process.env.SHARED_ASSETS_BASE_URL;
 
 export class TextureManager {
   textures: Map<string, ITexture>;
