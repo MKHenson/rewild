@@ -1,6 +1,6 @@
 val ktorVersion = "3.0.3"
 val exposedVersion = "0.55.0"
-val flywayVersion = "10.13.0"
+val flywayVersion = "9.22.3"
 val awsVersion = "2.29.0"
 
 plugins {
@@ -57,7 +57,6 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
     implementation("org.postgresql:postgresql:42.7.3")
     implementation("org.flywaydb:flyway-core:$flywayVersion")
-    implementation("org.flywaydb:flyway-database-postgresql:$flywayVersion")
     implementation("io.github.smiley4:ktor-openapi:5.0.0")
     implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("ch.qos.logback:logback-classic:1.5.6")

@@ -5,7 +5,6 @@ import com.zaxxer.hikari.HikariDataSource
 import io.ktor.server.application.*
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.sql.Database
-
 object DatabaseFactory {
     fun init(application: Application) {
         val config = application.environment.config
@@ -15,6 +14,8 @@ object DatabaseFactory {
 
         Flyway.configure()
             .dataSource(url, user, password)
+            .locations("classpath:db/migration")
+            .validateMigrationNaming(true)
             .load()
             .migrate()
 
