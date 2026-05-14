@@ -7,8 +7,7 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "test": "npm run unit-tests && npm run test --workspaces --if-present",
-    "unit-tests": "jest",
+    "test": "jest && npm run test --workspaces --if-present",
     "clean": "rimraf public",
     "build": "npm run clean && node ./esbuild.js && npm run ts-check",
     "ts-check": "tsc --noEmit --project src/tsconfig.json",

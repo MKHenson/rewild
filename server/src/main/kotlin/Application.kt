@@ -23,6 +23,7 @@ import io.ktor.server.application.*
 import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 
@@ -82,6 +83,23 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
         bucketName = str("storage.bucketName"),
         bucketBaseUrl = str("storage.bucketBaseUrl")
     )
+
+    val corsOrigin = environment.config.propertyOrNull("cors.allowedOrigin")?.getString()
+    install(CORS) {
+        if (corsOrigin.isNullOrEmpty()) {
+            anyHost()
+        } else {
+            val uri = java.net.URI(corsOrigin)
+            allowHost(uri.host, schemes = listOf(uri.scheme))
+        }
+        allowHeader(HttpHeaders.ContentType)
+        allowHeader(HttpHeaders.Authorization)
+        allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Delete)
+        allowCredentials = true
+    }
 
     install(ContentNegotiation) { json() }
 

@@ -37,6 +37,9 @@ const defines = {
   'process.env.SHARED_ASSETS_BASE_URL': JSON.stringify(
     process.env.SHARED_ASSETS_BASE_URL || 'http://localhost:9001/assets/shared/'
   ),
+  'process.env.API_BASE_URL': JSON.stringify(
+    process.env.API_BASE_URL || ''
+  ),
 };
 
 const logPlugin = {

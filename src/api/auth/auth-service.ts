@@ -13,6 +13,8 @@ export interface IAuthUser {
   emailVerified: boolean;
 }
 
+const API_BASE_URL = process.env.API_BASE_URL ?? '';
+
 export class AuthService {
   private token: string | null = null;
   readonly onAuthStateChanged = new Dispatcher<IAuthUser | null>();
@@ -39,7 +41,7 @@ export class AuthService {
 
   async refreshToken(): Promise<string | null> {
     try {
-      const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
+      const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, { method: 'POST', credentials: 'include' });
       if (!res.ok) {
         this.clearToken();
         return null;
@@ -54,7 +56,7 @@ export class AuthService {
   }
 
   async signIn(email: string, password: string): Promise<void> {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password } satisfies LoginRequest),
@@ -66,7 +68,7 @@ export class AuthService {
   }
 
   async register(email: string, password: string, username: string): Promise<void> {
-    const res = await fetch('/api/auth/register', {
+    const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, username } satisfies RegisterRequest),
@@ -81,7 +83,7 @@ export class AuthService {
   }
 
   async signOut(): Promise<void> {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+    await fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
     this.clearToken();
   }
 
