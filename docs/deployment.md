@@ -42,16 +42,18 @@ Triggers on push to `main` when any of these paths change:
 Triggers on push to `main` when anything under `server/` changes.
 
 **What it does:**
-1. Logs in to the Scaleway Container Registry
-2. Builds a Docker image from `server/Dockerfile`
-3. Pushes the image to `rg.fr-par.scw.cloud/rewild/rewild-server:latest`
-4. Scaleway detects the new image and automatically redeploys the Serverless Container
+1. Runs the server test suite (`./gradlew test`)
+2. Logs in to the Scaleway Container Registry
+3. Builds a Docker image from `server/Dockerfile`
+4. Pushes the image to `rg.fr-par.scw.cloud/rewild/rewild-server:latest`
+5. Triggers a redeploy of the Serverless Container via the Scaleway CLI
 
 **Required GitHub secrets:**
 | Secret | Value |
 |---|---|
-| `SCW_ACCESS_KEY` | Scaleway access key |
 | `SCW_SECRET_KEY` | Scaleway secret key |
+| `SCW_PROJECT_ID` | Scaleway project ID (Organisation → Projects) |
+| `SCW_CONTAINER_ID` | Container UUID (visible in the Scaleway console container settings) |
 
 ---
 
@@ -93,9 +95,14 @@ echo "<your-scaleway-secret-key>" | docker login rg.fr-par.scw.cloud -u nologin 
 cd server
 docker build -t rg.fr-par.scw.cloud/rewild/rewild-server:latest .
 
-# Push — Scaleway redeploys automatically
+# Push the image
 docker push rg.fr-par.scw.cloud/rewild/rewild-server:latest
+
+# Trigger redeploy (install Scaleway CLI first if needed)
+scw container container deploy <container-id> region=fr-par
 ```
+
+> Scaleway does **not** redeploy automatically when a new image is pushed with the same tag. The `scw container container deploy` command is required to pick up the new image.
 
 ---
 
