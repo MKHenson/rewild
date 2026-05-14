@@ -1,0 +1,61 @@
+name: Deploy Client
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'packages/**'
+      - 'static/**'
+      - 'templates/**'
+      - 'index.html'
+      - 'style.css'
+      - 'esbuild.js'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        env:
+          SHARED_ASSETS_BASE_URL: ${{ secrets.SHARED_ASSETS_BASE_URL }}
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+        run: npm run build
+
+      - name: Inject cache-busting version into index.html
+        run: |
+          sed -i "s|/main.js|/main.js?v=${{ github.sha }}|g" ./public/index.html
+          sed -i "s|/style.css|/style.css?v=${{ github.sha }}|g" ./public/index.html
+
+      - name: Deploy to Scaleway Object Storage
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.SCW_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.SCW_SECRET_KEY }}
+        run: |
+          aws s3 cp ./public/index.html s3://${{ secrets.CLIENT_BUCKET_NAME }}/index.html \
+            --endpoint-url https://s3.fr-par.scw.cloud \
+            --cache-control "no-cache, no-store" \
+            --content-type "text/html"
+
+          aws s3 sync ./public s3://${{ secrets.CLIENT_BUCKET_NAME }} \
+            --endpoint-url https://s3.fr-par.scw.cloud \
+            --exclude "index.html" \
+            --cache-control "max-age=31536000, immutable" \
+            --delete

@@ -1,0 +1,30 @@
+name: Deploy Server
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'server/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        working-directory: server
+        run: ./gradlew test --no-daemon
+
+      - name: Log in to Scaleway Container Registry
+        run: echo "${{ secrets.SCW_SECRET_KEY }}" | docker login rg.fr-par.scw.cloud -u nologin --password-stdin
+
+      - name: Build Docker image
+        working-directory: server
+        run: docker build -t rg.fr-par.scw.cloud/rewild/rewild-server:latest .
+
+      - name: Push Docker image
+        run: docker push rg.fr-par.scw.cloud/rewild/rewild-server:latest

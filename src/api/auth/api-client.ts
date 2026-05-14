@@ -1,5 +1,7 @@
 import { authService } from './auth-service';
 
+const API_BASE_URL = process.env.API_BASE_URL ?? '';
+
 let refreshPromise: Promise<string | null> | null = null;
 
 function withBearer(init: RequestInit | undefined, token: string): RequestInit {
@@ -8,11 +10,16 @@ function withBearer(init: RequestInit | undefined, token: string): RequestInit {
   return { ...init, headers };
 }
 
+function toAbsolute(input: RequestInfo | URL): RequestInfo | URL {
+  return typeof input === 'string' ? API_BASE_URL + input : input;
+}
+
 export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const url = toAbsolute(input);
   const token = authService.getToken();
   const reqInit = token ? withBearer(init, token) : init;
 
-  const res = await fetch(input, reqInit);
+  const res = await fetch(url, reqInit);
 
   if (res.status !== 401) return res;
 
@@ -25,5 +32,5 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   const newToken = await refreshPromise;
   if (!newToken) return res;
 
-  return fetch(input, withBearer(init, newToken));
+  return fetch(url, withBearer(init, newToken));
 }
