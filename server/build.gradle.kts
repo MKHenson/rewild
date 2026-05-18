@@ -61,6 +61,7 @@ dependencies {
     implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("ch.qos.logback:logback-classic:1.5.6")
     implementation("at.favre.lib:bcrypt:0.10.2")
+    implementation("com.sun.mail:jakarta.mail:2.0.1")
     implementation("software.amazon.awssdk:s3:$awsVersion")
     testImplementation("io.ktor:ktor-server-test-host-jvm")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")

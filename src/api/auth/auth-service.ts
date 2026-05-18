@@ -4,6 +4,8 @@ import { Dispatcher } from 'rewild-common';
 type AuthResponse = components['schemas']['com.rewild.auth.AuthResponse'];
 type LoginRequest = components['schemas']['com.rewild.auth.LoginRequest'];
 type RegisterRequest = components['schemas']['com.rewild.auth.RegisterRequest'];
+type ForgotPasswordRequest = components['schemas']['com.rewild.auth.ForgotPasswordRequest'];
+type ResetPasswordRequest = components['schemas']['com.rewild.auth.ResetPasswordRequest'];
 
 export interface IAuthUser {
   displayName: string | null;
@@ -77,6 +79,31 @@ export class AuthService {
     if (!res.ok) {
       const msg = await res.text().catch(() => '');
       throw new Error(msg || 'Registration failed');
+    }
+    const { token } = (await res.json()) as AuthResponse;
+    this.setToken(token);
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email } satisfies ForgotPasswordRequest),
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Request failed');
+  }
+
+  async resetPassword(resetToken: string, newPassword: string): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: resetToken, password: newPassword } satisfies ResetPasswordRequest),
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null) as { error?: string } | null;
+      throw new Error(body?.error || 'Reset failed');
     }
     const { token } = (await res.json()) as AuthResponse;
     this.setToken(token);

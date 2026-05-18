@@ -52,10 +52,12 @@ jobs:
           aws s3 cp ./public/index.html s3://${{ secrets.CLIENT_BUCKET_NAME }}/index.html \
             --endpoint-url https://s3.fr-par.scw.cloud \
             --cache-control "no-cache, no-store" \
-            --content-type "text/html"
+            --content-type "text/html" \
+            --acl public-read
 
           aws s3 sync ./public s3://${{ secrets.CLIENT_BUCKET_NAME }} \
             --endpoint-url https://s3.fr-par.scw.cloud \
             --exclude "index.html" \
             --cache-control "max-age=31536000, immutable" \
+            --acl public-read \
             --delete

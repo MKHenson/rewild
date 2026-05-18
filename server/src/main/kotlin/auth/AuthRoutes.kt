@@ -83,6 +83,41 @@ fun Route.authRoutes(authService: AuthService, secureCookies: Boolean) {
                 call.respond(HttpStatusCode.NoContent)
             }
         }
+
+        route("/forgot-password") {
+            post({
+                tags("Auth")
+                summary = "Forgot password"
+                description = "Sends a password reset email if the address is registered. Always returns 200 to prevent account enumeration."
+                request { body<ForgotPasswordRequest>() }
+                response {
+                    code(HttpStatusCode.OK) { description = "Request accepted" }
+                }
+            }) {
+                val req = call.receive<ForgotPasswordRequest>()
+                authService.forgotPassword(req.email)
+                call.respond(HttpStatusCode.OK)
+            }
+        }
+
+        route("/reset-password") {
+            post({
+                tags("Auth")
+                summary = "Reset password"
+                description = "Resets the user's password using a valid time-limited token and signs them in"
+                request { body<ResetPasswordRequest>() }
+                response {
+                    code(HttpStatusCode.OK) { body<AuthResponse>() }
+                    code(HttpStatusCode.BadRequest) { body<ErrorResponse>() }
+                }
+            }) {
+                val req = call.receive<ResetPasswordRequest>()
+                val tokens = authService.resetPassword(req.token, req.password)
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid or expired reset token"))
+                call.setRefreshCookie(tokens.refreshToken, secureCookies)
+                call.respond(HttpStatusCode.OK, AuthResponse(tokens.accessToken))
+            }
+        }
     }
 }
 

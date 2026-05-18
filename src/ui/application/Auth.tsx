@@ -3,7 +3,7 @@ import { authStore } from '../stores/AuthStore';
 import { authService } from '../../api/auth/auth-service';
 
 type Props = {};
-type View = 'signIn' | 'register';
+type View = 'signIn' | 'register' | 'forgotPassword';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -19,6 +19,7 @@ export class Auth extends Component<Props> {
     const [confirmPasswordError, setConfirmPasswordError] = this.useState<string | null>(null);
     const [usernameError, setUsernameError] = this.useState<string | null>(null);
     const [submitting, setSubmitting] = this.useState(false);
+    const [forgotSent, setForgotSent] = this.useState(false);
 
     // Stable refs — created once so typed values survive re-renders
     const emailInput = (<input type="email" placeholder="Email" />) as HTMLInputElement;
@@ -55,12 +56,14 @@ export class Auth extends Component<Props> {
     const closeMenu = () => {
       setMenuOpen(false);
       setView('signIn');
+      setForgotSent(false);
       clearErrors();
       clearFields();
     };
 
     const switchView = (v: View) => {
       setView(v);
+      setForgotSent(false);
       clearErrors();
     };
 
@@ -157,6 +160,31 @@ export class Auth extends Component<Props> {
       }
     };
 
+    const onForgotPasswordSubmit = async (e: Event) => {
+      e.preventDefault();
+      if (submitting()) return;
+      const email = emailInput.value.trim();
+      if (!email) {
+        setEmailError('Email is required');
+        return;
+      }
+      if (!EMAIL_RE.test(email)) {
+        setEmailError('Enter a valid email address');
+        return;
+      }
+      setEmailError(null);
+      setError(null);
+      setSubmitting(true);
+      try {
+        await authService.forgotPassword(email);
+        setForgotSent(true);
+      } catch {
+        setError('Something went wrong. Please try again.');
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
     const onSignOut = async () => {
       setMenuOpen(false);
       await authStore.signOut();
@@ -180,6 +208,42 @@ export class Auth extends Component<Props> {
                 <p class="user-email">{auth.user?.email || ''}</p>
                 <span class="sign-out" onclick={onSignOut}>Sign out</span>
               </div>
+            </Popup>
+          </div>
+        );
+      }
+
+      if (view() === 'forgotPassword') {
+        return (
+          <div class="auth-root">
+            <button class="sign-in-btn" onclick={() => setMenuOpen(true)}>Sign In</button>
+            <Popup open={menuOpen()} onClose={closeMenu} withBackground>
+              {forgotSent() ? (
+                <div class="sign-in-form">
+                  <h3 class="form-title">Check your email</h3>
+                  <p class="auth-info">
+                    If that address is registered, we've sent a reset link. Check your inbox.
+                  </p>
+                  <span class="switch-view" onclick={() => switchView('signIn')}>
+                    Back to sign in
+                  </span>
+                </div>
+              ) : (
+                <form class="sign-in-form" onsubmit={onForgotPasswordSubmit}>
+                  <h3 class="form-title">Reset password</h3>
+                  <div class="field-wrap">
+                    {emailInput}
+                    {emailError() ? <p class="field-error">{emailError()}</p> : null}
+                  </div>
+                  {error() ? <p class="auth-error">{error()}</p> : null}
+                  <button type="submit" disabled={submitting()}>
+                    {submitting() ? 'Sending...' : 'Send reset link'}
+                  </button>
+                  <span class="switch-view" onclick={() => switchView('signIn')}>
+                    Back to sign in
+                  </span>
+                </form>
+              )}
             </Popup>
           </div>
         );
@@ -239,6 +303,9 @@ export class Auth extends Component<Props> {
               <button type="submit" disabled={submitting()}>
                 {submitting() ? 'Signing in...' : 'Sign In'}
               </button>
+              <span class="switch-view" onclick={() => switchView('forgotPassword')}>
+                Forgot password?
+              </span>
               <span class="switch-view" onclick={() => switchView('register')}>
                 Don't have an account? Register
               </span>
@@ -341,6 +408,13 @@ export class Auth extends Component<Props> {
         color: ${theme.colors.error400};
         font-size: ${theme.colors.fontSizeSmall};
         margin: 0;
+      }
+
+      .auth-info {
+        color: ${theme.colors.onSurface};
+        font-size: ${theme.colors.fontSizeSmall};
+        margin: 0;
+        line-height: 1.5;
       }
 
       .switch-view {

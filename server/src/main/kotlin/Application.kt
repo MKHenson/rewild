@@ -4,6 +4,7 @@ import com.rewild.assets.AssetService
 import com.rewild.assets.S3Client
 import com.rewild.assets.assetRoutes
 import com.rewild.auth.*
+import com.rewild.email.EmailService
 import com.rewild.common.ErrorResponse
 import com.rewild.db.DatabaseFactory
 import com.rewild.levels.LevelService
@@ -35,7 +36,15 @@ fun Application.module() {
         issuer = config.property("jwt.issuer").getString(),
         audience = config.property("jwt.audience").getString()
     )
-    val authService = AuthService(jwtService)
+    val emailService = EmailService(
+        host = config.propertyOrNull("email.host")?.getString() ?: "smtp.tem.scw.cloud",
+        port = config.propertyOrNull("email.port")?.getString()?.toIntOrNull() ?: 465,
+        username = config.propertyOrNull("email.username")?.getString() ?: "",
+        password = config.propertyOrNull("email.password")?.getString() ?: "",
+        from = config.propertyOrNull("email.from")?.getString() ?: "noreply@paintedpolygons.com",
+    )
+    val appUrl = config.propertyOrNull("email.appUrl")?.getString() ?: "https://paintedpolygons.com"
+    val authService = AuthService(jwtService, emailService, appUrl)
     val secureCookies = config.propertyOrNull("cookies.secure")?.getString()?.toBoolean() ?: true
 
     configureAuth(jwtService)
