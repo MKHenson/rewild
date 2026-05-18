@@ -188,6 +188,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/forgot-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Forgot password
+         * @description Sends a password reset email if the address is registered. Always returns 200 to prevent account enumeration.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["com.rewild.auth.ForgotPasswordRequest"];
+                };
+            };
+            responses: {
+                /** @description Request accepted */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset password
+         * @description Resets the user's password using a valid time-limited token and signs them in
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["com.rewild.auth.ResetPasswordRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.auth.AuthResponse"];
+                    };
+                };
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -728,6 +819,23 @@ export interface components {
             /** String */
             password: string;
         };
+        /** ForgotPasswordRequest */
+        "com.rewild.auth.ForgotPasswordRequest": {
+            /** String */
+            email: string;
+        };
+        /** ResetPasswordRequest */
+        "com.rewild.auth.ResetPasswordRequest": {
+            /** String */
+            password: string;
+            /** String */
+            token: string;
+        };
+        /** ErrorResponse */
+        "com.rewild.common.ErrorResponse": {
+            /** String */
+            error: string;
+        };
         /** Project */
         "com.rewild.models.Project": {
             /** Boolean */
@@ -866,11 +974,6 @@ export interface components {
             position: number[];
             /** List<Float> */
             rotation: number[];
-        };
-        /** ErrorResponse */
-        "com.rewild.common.ErrorResponse": {
-            /** String */
-            error: string;
         };
         /** Level */
         "com.rewild.models.Level": {

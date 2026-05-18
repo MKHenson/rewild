@@ -4,6 +4,7 @@ import { ProjectEditorPage } from './project-editor/ProjectEditorPage';
 import { InGame } from './InGame';
 import { Auth } from './Auth';
 import { ConfirmationModal } from './ConfirmationModal';
+import { ResetPassword } from './ResetPassword';
 
 interface Props {}
 
@@ -39,6 +40,7 @@ export class Application extends Component<Props> {
             path="/editor"
             onRender={(params) => <ProjectEditorPage onQuit={onQuit} />}
           />
+          <Route path="/reset-password" onRender={() => <ResetPassword />} />
         </RouterSwitch>,
         <Auth />,
         <ConfirmationModal />,

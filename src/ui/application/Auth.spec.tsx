@@ -3,7 +3,11 @@ import { Auth } from './Auth';
 import { authStore } from '../stores/AuthStore';
 import { authService } from '../../api/auth/auth-service';
 import { Avatar, Popup } from 'rewild-ui';
-import { flushMicrotasks, fireClick, fireEvent } from 'rewild-ui/lib/test-utils';
+import {
+  flushMicrotasks,
+  fireClick,
+  fireEvent,
+} from 'rewild-ui/lib/test-utils';
 
 type AuthState = {
   loggedIn: boolean;
@@ -84,8 +88,22 @@ function fillRegisterForm(
     username;
 }
 
+function getSwitchViewSpans(auth: Auth): Element[] {
+  return Array.from(auth.shadow?.querySelectorAll('span.switch-view') ?? []);
+}
+
 async function switchToRegister(auth: Auth) {
-  await fireClick(auth.shadow?.querySelector('span.switch-view')!);
+  const span = getSwitchViewSpans(auth).find((s) =>
+    s.textContent?.includes('Register')
+  )!;
+  await fireClick(span);
+}
+
+async function switchToForgotPassword(auth: Auth) {
+  const span = getSwitchViewSpans(auth).find((s) =>
+    s.textContent?.includes('Forgot')
+  )!;
+  await fireClick(span);
 }
 
 async function switchToSignIn(auth: Auth) {
@@ -93,13 +111,17 @@ async function switchToSignIn(auth: Auth) {
 }
 
 async function submitForm(auth: Auth) {
-  await fireEvent(auth.shadow?.querySelector('form.sign-in-form')!, new Event('submit'));
+  await fireEvent(
+    auth.shadow?.querySelector('form.sign-in-form')!,
+    new Event('submit')
+  );
 }
 
 describe('Auth', () => {
   beforeEach(() => {
     jest.spyOn(authService, 'getUser').mockReturnValue(null);
     jest.spyOn(authService, 'refreshToken').mockResolvedValue(null);
+    jest.spyOn(authService, 'forgotPassword').mockResolvedValue(undefined);
     jest.spyOn(authStore, 'signIn').mockResolvedValue(undefined);
     jest.spyOn(authStore, 'signOut').mockResolvedValue(undefined);
     jest.spyOn(authStore, 'register').mockResolvedValue(undefined);
@@ -194,6 +216,13 @@ describe('Auth', () => {
       (auth.shadow?.querySelector('x-popup') as Popup)._props.onClose!();
       await flushMicrotasks();
       expect(auth.shadow?.querySelector('.auth-error')).toBeNull();
+    });
+
+    it('shows "Forgot password?" and "Register" links on the sign-in form', () => {
+      const auth = createAuth(guestState);
+      const spans = getSwitchViewSpans(auth);
+      expect(spans.some((s) => s.textContent?.includes('Forgot'))).toBe(true);
+      expect(spans.some((s) => s.textContent?.includes('Register'))).toBe(true);
     });
   });
 
@@ -383,6 +412,129 @@ describe('Auth', () => {
         (auth.shadow?.querySelector('input[type="email"]') as HTMLInputElement)
           .value
       ).toBe('');
+    });
+  });
+
+  describe('forgot-password view', () => {
+    it('switches to forgot-password view when "Forgot password?" is clicked', async () => {
+      const auth = createAuth(guestState);
+      await switchToForgotPassword(auth);
+      expect(
+        auth.shadow?.querySelector('form.sign-in-form h3.form-title')
+          ?.textContent
+      ).toBe('Reset password');
+    });
+
+    it('shows email input on forgot-password view', async () => {
+      const auth = createAuth(guestState);
+      await switchToForgotPassword(auth);
+      expect(auth.shadow?.querySelector('input[type="email"]')).not.toBeNull();
+    });
+
+    it('does not call forgotPassword when email is empty', async () => {
+      const auth = createAuth(guestState);
+      await switchToForgotPassword(auth);
+      await submitForm(auth);
+      expect(authService.forgotPassword).not.toHaveBeenCalled();
+    });
+
+    it('shows field error when email is empty', async () => {
+      const auth = createAuth(guestState);
+      await switchToForgotPassword(auth);
+      await submitForm(auth);
+      expect(auth.shadow?.querySelector('.field-error')).not.toBeNull();
+    });
+
+    it('does not call forgotPassword when email format is invalid', async () => {
+      const auth = createAuth(guestState);
+      await switchToForgotPassword(auth);
+      (
+        auth.shadow?.querySelector('input[type="email"]') as HTMLInputElement
+      ).value = 'not-an-email';
+      await submitForm(auth);
+      expect(authService.forgotPassword).not.toHaveBeenCalled();
+    });
+
+    it('calls authService.forgotPassword with the entered email', async () => {
+      const auth = createAuth(guestState);
+      await switchToForgotPassword(auth);
+      (
+        auth.shadow?.querySelector('input[type="email"]') as HTMLInputElement
+      ).value = 'user@example.com';
+      await submitForm(auth);
+      expect(authService.forgotPassword).toHaveBeenCalledWith(
+        'user@example.com'
+      );
+    });
+
+    it('shows confirmation message after successful submit', async () => {
+      const auth = createAuth(guestState);
+      await switchToForgotPassword(auth);
+      (
+        auth.shadow?.querySelector('input[type="email"]') as HTMLInputElement
+      ).value = 'user@example.com';
+      await submitForm(auth);
+      expect(auth.shadow?.querySelector('.auth-info')).not.toBeNull();
+    });
+
+    it('hides the form and shows confirmation text after successful submit', async () => {
+      const auth = createAuth(guestState);
+      await switchToForgotPassword(auth);
+      (
+        auth.shadow?.querySelector('input[type="email"]') as HTMLInputElement
+      ).value = 'user@example.com';
+      await submitForm(auth);
+      expect(auth.shadow?.querySelector('form.sign-in-form')).toBeNull();
+      expect(auth.shadow?.querySelector('h3.form-title')?.textContent).toBe(
+        'Check your email'
+      );
+    });
+
+    it('shows auth-error when forgotPassword throws', async () => {
+      jest
+        .spyOn(authService, 'forgotPassword')
+        .mockRejectedValue(new Error('Network error'));
+      const auth = createAuth(guestState);
+      await switchToForgotPassword(auth);
+      (
+        auth.shadow?.querySelector('input[type="email"]') as HTMLInputElement
+      ).value = 'user@example.com';
+      await submitForm(auth);
+      expect(auth.shadow?.querySelector('.auth-error')).not.toBeNull();
+    });
+
+    it('switches back to sign-in view from forgot-password', async () => {
+      const auth = createAuth(guestState);
+      await switchToForgotPassword(auth);
+      await switchToSignIn(auth);
+      expect(
+        auth.shadow?.querySelector('form.sign-in-form h3.form-title')
+          ?.textContent
+      ).toBe('Sign In');
+    });
+
+    it('resets confirmation state when navigating away and back to forgot-password', async () => {
+      const auth = createAuth(guestState);
+      await switchToForgotPassword(auth);
+      (
+        auth.shadow?.querySelector('input[type="email"]') as HTMLInputElement
+      ).value = 'user@example.com';
+      await submitForm(auth);
+      await switchToSignIn(auth);
+      await switchToForgotPassword(auth);
+      expect(auth.shadow?.querySelector('.auth-info')).toBeNull();
+      expect(auth.shadow?.querySelector('form.sign-in-form')).not.toBeNull();
+    });
+
+    it('clears forgot-password state when popup is closed', async () => {
+      const auth = createAuth(guestState);
+      await switchToForgotPassword(auth);
+      (auth.shadow?.querySelector('x-popup') as Popup)._props.onClose!();
+      await flushMicrotasks();
+      expect(
+        auth.shadow?.querySelector('form.sign-in-form h3.form-title')
+          ?.textContent
+      ).toBe('Sign In');
     });
   });
 

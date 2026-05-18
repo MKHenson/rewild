@@ -125,6 +125,76 @@
                 "deprecated": false
             }
         },
+        "/api/auth/forgot-password": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Forgot password",
+                "description": "Sends a password reset email if the address is registered. Always returns 200 to prevent account enumeration.",
+                "parameters": [],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.auth.ForgotPasswordRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "description": "Request accepted",
+                        "headers": {}
+                    }
+                },
+                "deprecated": false
+            }
+        },
+        "/api/auth/reset-password": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Reset password",
+                "description": "Resets the user's password using a valid time-limited token and signs them in",
+                "parameters": [],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.auth.ResetPasswordRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.auth.AuthResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/api/projects": {
             "get": {
                 "tags": [
@@ -682,6 +752,50 @@
                 ],
                 "title": "LoginRequest"
             },
+            "com.rewild.auth.ForgotPasswordRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "email"
+                ],
+                "title": "ForgotPasswordRequest"
+            },
+            "com.rewild.auth.ResetPasswordRequest": {
+                "type": "object",
+                "properties": {
+                    "password": {
+                        "type": "string",
+                        "title": "String"
+                    },
+                    "token": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "password",
+                    "token"
+                ],
+                "title": "ResetPasswordRequest"
+            },
+            "com.rewild.common.ErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "error"
+                ],
+                "title": "ErrorResponse"
+            },
             "com.rewild.models.Project": {
                 "type": "object",
                 "properties": {
@@ -1144,19 +1258,6 @@
                     "rotation"
                 ],
                 "title": "Asset3D"
-            },
-            "com.rewild.common.ErrorResponse": {
-                "type": "object",
-                "properties": {
-                    "error": {
-                        "type": "string",
-                        "title": "String"
-                    }
-                },
-                "required": [
-                    "error"
-                ],
-                "title": "ErrorResponse"
             },
             "com.rewild.models.Level": {
                 "type": "object",
