@@ -240,9 +240,9 @@ export class Vector4 implements IVector {
 
     // q is assumed to be normalized
 
-    this.w = 2 * Mathf.acos(q.w);
+    this.w = 2 * Math.acos(q.w);
 
-    const s = Mathf.sqrt(1 - q.w * q.w);
+    const s = Math.sqrt(1 - q.w * q.w);
 
     if (s < 0.0001) {
       this.x = 1;
@@ -277,19 +277,19 @@ export class Vector4 implements IVector {
       m33: f32 = te[10];
 
     if (
-      Mathf.abs(m12 - m21) < epsilon &&
-      Mathf.abs(m13 - m31) < epsilon &&
-      Mathf.abs(m23 - m32) < epsilon
+      Math.abs(m12 - m21) < epsilon &&
+      Math.abs(m13 - m31) < epsilon &&
+      Math.abs(m23 - m32) < epsilon
     ) {
       // singularity found
       // first check for identity matrix which must have +1 for all terms
       // in leading diagonal and zero in other terms
 
       if (
-        Mathf.abs(m12 + m21) < epsilon2 &&
-        Mathf.abs(m13 + m31) < epsilon2 &&
-        Mathf.abs(m23 + m32) < epsilon2 &&
-        Mathf.abs(m11 + m22 + m33 - 3) < epsilon2
+        Math.abs(m12 + m21) < epsilon2 &&
+        Math.abs(m13 + m31) < epsilon2 &&
+        Math.abs(m23 + m32) < epsilon2 &&
+        Math.abs(m11 + m22 + m33 - 3) < epsilon2
       ) {
         // this singularity is identity matrix so angle = 0
 
@@ -300,7 +300,7 @@ export class Vector4 implements IVector {
 
       // otherwise this singularity is angle = 180
 
-      angle = Mathf.PI;
+      angle = Math.PI;
 
       const xx: f32 = (m11 + 1) / 2;
       const yy: f32 = (m22 + 1) / 2;
@@ -317,7 +317,7 @@ export class Vector4 implements IVector {
           y = 0.707106781;
           z = 0.707106781;
         } else {
-          x = Mathf.sqrt(xx);
+          x = Math.sqrt(xx);
           y = xy / x;
           z = xz / x;
         }
@@ -329,7 +329,7 @@ export class Vector4 implements IVector {
           y = 0;
           z = 0.707106781;
         } else {
-          y = Mathf.sqrt(yy);
+          y = Math.sqrt(yy);
           x = xy / y;
           z = yz / y;
         }
@@ -341,7 +341,7 @@ export class Vector4 implements IVector {
           y = 0.707106781;
           z = 0;
         } else {
-          z = Mathf.sqrt(zz);
+          z = Math.sqrt(zz);
           x = xz / z;
           y = yz / z;
         }
@@ -354,13 +354,13 @@ export class Vector4 implements IVector {
 
     // as we have reached here there are no singularities so we can handle normally
 
-    let s: f32 = Mathf.sqrt(
+    let s: f32 = Math.sqrt(
       (m32 - m23) * (m32 - m23) +
         (m13 - m31) * (m13 - m31) +
         (m21 - m12) * (m21 - m12)
     ); // used to normalize
 
-    if (Mathf.abs(s) < 0.001) s = 1;
+    if (Math.abs(s) < 0.001) s = 1;
 
     // prevent divide by zero, should not happen if matrix is orthogonal and should be
     // caught by singularity test above, but I've left it in just in case
@@ -368,25 +368,25 @@ export class Vector4 implements IVector {
     this.x = (m32 - m23) / s;
     this.y = (m13 - m31) / s;
     this.z = (m21 - m12) / s;
-    this.w = Mathf.acos((m11 + m22 + m33 - 1) / 2);
+    this.w = Math.acos((m11 + m22 + m33 - 1) / 2);
 
     return this;
   }
 
   min(v: Vector4): Vector4 {
-    this.x = Mathf.min(this.x, v.x);
-    this.y = Mathf.min(this.y, v.y);
-    this.z = Mathf.min(this.z, v.z);
-    this.w = Mathf.min(this.w, v.w);
+    this.x = Math.min(this.x, v.x);
+    this.y = Math.min(this.y, v.y);
+    this.z = Math.min(this.z, v.z);
+    this.w = Math.min(this.w, v.w);
 
     return this;
   }
 
   max(v: Vector4): Vector4 {
-    this.x = Mathf.max(this.x, v.x);
-    this.y = Mathf.max(this.y, v.y);
-    this.z = Mathf.max(this.z, v.z);
-    this.w = Mathf.max(this.w, v.w);
+    this.x = Math.max(this.x, v.x);
+    this.y = Math.max(this.y, v.y);
+    this.z = Math.max(this.z, v.z);
+    this.w = Math.max(this.w, v.w);
 
     return this;
   }
@@ -394,19 +394,19 @@ export class Vector4 implements IVector {
   clamp(min: Vector4, max: Vector4): Vector4 {
     // assumes min < max, componentwise
 
-    this.x = Mathf.max(min.x, Mathf.min(max.x, this.x));
-    this.y = Mathf.max(min.y, Mathf.min(max.y, this.y));
-    this.z = Mathf.max(min.z, Mathf.min(max.z, this.z));
-    this.w = Mathf.max(min.w, Mathf.min(max.w, this.w));
+    this.x = Math.max(min.x, Math.min(max.x, this.x));
+    this.y = Math.max(min.y, Math.min(max.y, this.y));
+    this.z = Math.max(min.z, Math.min(max.z, this.z));
+    this.w = Math.max(min.w, Math.min(max.w, this.w));
 
     return this;
   }
 
   clampScalar(minVal: f32, maxVal: f32): Vector4 {
-    this.x = Mathf.max(minVal, Mathf.min(maxVal, this.x));
-    this.y = Mathf.max(minVal, Mathf.min(maxVal, this.y));
-    this.z = Mathf.max(minVal, Mathf.min(maxVal, this.z));
-    this.w = Mathf.max(minVal, Mathf.min(maxVal, this.w));
+    this.x = Math.max(minVal, Math.min(maxVal, this.x));
+    this.y = Math.max(minVal, Math.min(maxVal, this.y));
+    this.z = Math.max(minVal, Math.min(maxVal, this.z));
+    this.w = Math.max(minVal, Math.min(maxVal, this.w));
 
     return this;
   }
@@ -415,42 +415,42 @@ export class Vector4 implements IVector {
     const length = this.length();
 
     return this.divideScalar(length || 1).multiplyScalar(
-      Mathf.max(min, Mathf.min(max, length))
+      Math.max(min, Math.min(max, length))
     );
   }
 
   floor(): Vector4 {
-    this.x = Mathf.floor(this.x);
-    this.y = Mathf.floor(this.y);
-    this.z = Mathf.floor(this.z);
-    this.w = Mathf.floor(this.w);
+    this.x = Math.floor(this.x);
+    this.y = Math.floor(this.y);
+    this.z = Math.floor(this.z);
+    this.w = Math.floor(this.w);
 
     return this;
   }
 
   ceil(): Vector4 {
-    this.x = Mathf.ceil(this.x);
-    this.y = Mathf.ceil(this.y);
-    this.z = Mathf.ceil(this.z);
-    this.w = Mathf.ceil(this.w);
+    this.x = Math.ceil(this.x);
+    this.y = Math.ceil(this.y);
+    this.z = Math.ceil(this.z);
+    this.w = Math.ceil(this.w);
 
     return this;
   }
 
   round(): Vector4 {
-    this.x = Mathf.round(this.x);
-    this.y = Mathf.round(this.y);
-    this.z = Mathf.round(this.z);
-    this.w = Mathf.round(this.w);
+    this.x = Math.round(this.x);
+    this.y = Math.round(this.y);
+    this.z = Math.round(this.z);
+    this.w = Math.round(this.w);
 
     return this;
   }
 
   roundToZero(): Vector4 {
-    this.x = this.x < 0 ? Mathf.ceil(this.x) : Mathf.floor(this.x);
-    this.y = this.y < 0 ? Mathf.ceil(this.y) : Mathf.floor(this.y);
-    this.z = this.z < 0 ? Mathf.ceil(this.z) : Mathf.floor(this.z);
-    this.w = this.w < 0 ? Mathf.ceil(this.w) : Mathf.floor(this.w);
+    this.x = this.x < 0 ? Math.ceil(this.x) : Math.floor(this.x);
+    this.y = this.y < 0 ? Math.ceil(this.y) : Math.floor(this.y);
+    this.z = this.z < 0 ? Math.ceil(this.z) : Math.floor(this.z);
+    this.w = this.w < 0 ? Math.ceil(this.w) : Math.floor(this.w);
 
     return this;
   }
@@ -475,17 +475,14 @@ export class Vector4 implements IVector {
   }
 
   length(): f32 {
-    return Mathf.sqrt(
+    return Math.sqrt(
       this.x * this.x + this.y * this.y + this.z * this.z + this.w * this.w
     );
   }
 
   manhattanLength(): f32 {
     return (
-      Mathf.abs(this.x) +
-      Mathf.abs(this.y) +
-      Mathf.abs(this.z) +
-      Mathf.abs(this.w)
+      Math.abs(this.x) + Math.abs(this.y) + Math.abs(this.z) + Math.abs(this.w)
     );
   }
 
@@ -538,10 +535,10 @@ export class Vector4 implements IVector {
   }
 
   random(): Vector4 {
-    this.x = Mathf.random();
-    this.y = Mathf.random();
-    this.z = Mathf.random();
-    this.w = Mathf.random();
+    this.x = Math.random();
+    this.y = Math.random();
+    this.z = Math.random();
+    this.w = Math.random();
 
     return this;
   }

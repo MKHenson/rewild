@@ -10,7 +10,7 @@ export class CylinderGeometryFactory {
     heightSegments: u32 = 1,
     openEnded: boolean = false,
     thetaStart: f32 = 0,
-    thetaLength: f32 = Mathf.PI * 2
+    thetaLength: f32 = Math.PI * 2
   ) {
     const geometry = new Geometry();
 
@@ -47,8 +47,8 @@ export class CylinderGeometryFactory {
 
         const theta: f32 = u * thetaLength + thetaStart;
 
-        const sinTheta: f32 = Mathf.sin(theta);
-        const cosTheta: f32 = Mathf.cos(theta);
+        const sinTheta: f32 = Math.sin(theta);
+        const cosTheta: f32 = Math.cos(theta);
 
         // vertex
         vertex.x = currentRadius * sinTheta;
@@ -133,8 +133,8 @@ export class CylinderGeometryFactory {
         const u: f32 = x / radialSegments;
         const theta: f32 = u * thetaLength + thetaStart;
 
-        const cosTheta: f32 = Mathf.cos(theta);
-        const sinTheta: f32 = Mathf.sin(theta);
+        const cosTheta: f32 = Math.cos(theta);
+        const sinTheta: f32 = Math.sin(theta);
 
         // vertex
         vertex.x = capRadius * sinTheta;

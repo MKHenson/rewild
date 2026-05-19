@@ -23,7 +23,7 @@ export class CapsuleGeometryFactory {
     capsTopSegments: u16 = 4,
     capsBottomSegments: u16 = 4,
     thetaStart: f32 = 0,
-    thetaLength: f32 = Mathf.PI * 2
+    thetaLength: f32 = Math.PI * 2
   ) {
     const parameters: CapsuleGeometryParameters = {
       radiusTop: radiusTop,
@@ -45,7 +45,7 @@ export class CapsuleGeometryFactory {
     const geometry = new Geometry();
 
     // Alpha is the angle such that Math.PI/2 - alpha is the cone part angle.
-    const alpha: f32 = Mathf.acos((radiusBottom - radiusTop) / height);
+    const alpha: f32 = Math.acos((radiusBottom - radiusTop) / height);
     const vertexCount =
       (radialSegments + 1) *
       (heightSegments + 1 + capsBottomSegments + capsTopSegments);
@@ -98,8 +98,8 @@ class CapsuleGeometryBuilder {
     const normal = new Vector3();
     const vertex = new Vector3();
 
-    const cosAlpha = Mathf.cos(alpha);
-    const sinAlpha = Mathf.sin(alpha);
+    const cosAlpha = Math.cos(alpha);
+    const sinAlpha = Math.sin(alpha);
 
     const cone_length: f32 = new Vector2(
       params.radiusTop * sinAlpha,
@@ -117,7 +117,7 @@ class CapsuleGeometryBuilder {
     const vl: f32 =
       params.radiusTop * alpha +
       cone_length +
-      params.radiusBottom * (Mathf.PI / 2 - alpha);
+      params.radiusBottom * (Math.PI / 2 - alpha);
 
     // generate vertices, normals and uvs
 
@@ -125,12 +125,12 @@ class CapsuleGeometryBuilder {
     for (y = 0; y <= params.capsTopSegments; y++) {
       const indexRow: u16[] = [];
 
-      const a: f32 = Mathf.PI / 2 - alpha * (y / params.capsTopSegments);
+      const a: f32 = Math.PI / 2 - alpha * (y / params.capsTopSegments);
 
       v += (params.radiusTop * alpha) / params.capsTopSegments;
 
-      const cosA = Mathf.cos(a);
-      const sinA = Mathf.sin(a);
+      const cosA = Math.cos(a);
+      const sinA = Math.sin(a);
 
       // calculate the radius of the current row
       const radius = cosA * params.radiusTop;
@@ -140,8 +140,8 @@ class CapsuleGeometryBuilder {
 
         const theta = u * params.thetaLength + params.thetaStart;
 
-        const sinTheta = Mathf.sin(theta);
-        const cosTheta = Mathf.cos(theta);
+        const sinTheta = Math.sin(theta);
+        const cosTheta = Math.cos(theta);
 
         // vertex
         vertex.x = radius * sinTheta;
@@ -198,8 +198,8 @@ class CapsuleGeometryBuilder {
 
         const theta: f32 = u * params.thetaLength + params.thetaStart;
 
-        const sinTheta: f32 = Mathf.sin(theta);
-        const cosTheta: f32 = Mathf.cos(theta);
+        const sinTheta: f32 = Math.sin(theta);
+        const cosTheta: f32 = Math.cos(theta);
 
         // vertex
         vertex.x = radius * sinTheta;
@@ -243,14 +243,14 @@ class CapsuleGeometryBuilder {
       const indexRow: u16[] = [];
 
       const a: f32 =
-        Mathf.PI / 2 -
+        Math.PI / 2 -
         alpha -
-        (Mathf.PI - alpha) * (y / params.capsBottomSegments);
+        (Math.PI - alpha) * (y / params.capsBottomSegments);
 
       v += (params.radiusBottom * alpha) / params.capsBottomSegments;
 
-      const cosA: f32 = Mathf.cos(a);
-      const sinA: f32 = Mathf.sin(a);
+      const cosA: f32 = Math.cos(a);
+      const sinA: f32 = Math.sin(a);
 
       // calculate the radius of the current row
       const radius = cosA * params.radiusBottom;
@@ -260,8 +260,8 @@ class CapsuleGeometryBuilder {
 
         const theta: f32 = u * params.thetaLength + params.thetaStart;
 
-        const sinTheta: f32 = Mathf.sin(theta);
-        const cosTheta: f32 = Mathf.cos(theta);
+        const sinTheta: f32 = Math.sin(theta);
+        const cosTheta: f32 = Math.cos(theta);
 
         // vertex
         vertex.x = radius * sinTheta;

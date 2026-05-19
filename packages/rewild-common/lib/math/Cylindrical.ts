@@ -2,7 +2,7 @@
  * Ref: https://en.wikipedia.org/wiki/Cylindrical_coordinate_system
  */
 
-import { Vector3 } from "./Vector3";
+import { Vector3 } from './Vector3';
 
 export class Cylindrical {
   radius: f32;
@@ -38,8 +38,8 @@ export class Cylindrical {
   }
 
   setFromCartesianCoords(x: f32, y: f32, z: f32): Cylindrical {
-    this.radius = Mathf.sqrt(x * x + z * z);
-    this.theta = Mathf.atan2(x, z);
+    this.radius = Math.sqrt(x * x + z * z);
+    this.theta = Math.atan2(x, z);
     this.y = y;
 
     return this;

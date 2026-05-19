@@ -1,4 +1,4 @@
-import { INoise } from "./Noise";
+import { INoise } from './Noise';
 
 export class NoisePerlin implements INoise {
   seed: i32;
@@ -39,7 +39,7 @@ export class NoisePerlin implements INoise {
   private randomInt(max: i32): i32 {
     // Implement a simple linear congruential generator
     this.seed = (this.seed * 1664525 + 1013904223) % 2 ** 32;
-    return i32((f32(this.seed) / f32(2 ** 32)) * f32(max));
+    return (this.seed / 2 ** 32) * max;
   }
 
   /**
@@ -65,10 +65,10 @@ export class NoisePerlin implements INoise {
    * Compute Perlin noise at coordinates x, y
    */
   get2D(xin: f32, yin: f32): f32 {
-    const X = i32(Mathf.floor(xin)) & 255,
-      Y = i32(Mathf.floor(yin)) & 255;
-    const x = xin - Mathf.floor(xin),
-      y = yin - Mathf.floor(yin);
+    const X = Math.floor(xin) & 255,
+      Y = Math.floor(yin) & 255;
+    const x = xin - Math.floor(xin),
+      y = yin - Math.floor(yin);
     const u = this.fade(x),
       v = this.fade(y);
     const A = this.p[X] + Y,

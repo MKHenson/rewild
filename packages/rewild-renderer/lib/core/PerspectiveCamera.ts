@@ -69,7 +69,7 @@ export class PerspectiveCamera implements ICameraController {
     /** see {@link http://www.bobatkins.com/photography/technical/field_of_view.html} */
     const vExtentSlope = (0.5 * this.getFilmHeight()) / focalLength;
 
-    this.fov = RAD2DEG * 2 * Mathf.atan(vExtentSlope);
+    this.fov = RAD2DEG * 2 * Math.atan(vExtentSlope);
     this.updateProjectionMatrix();
   }
 
@@ -77,25 +77,25 @@ export class PerspectiveCamera implements ICameraController {
    * Calculates the focal length from the current .fov and .filmGauge.
    */
   getFocalLength(): f32 {
-    const vExtentSlope = Mathf.tan(DEG2RAD * 0.5 * this.fov);
+    const vExtentSlope = Math.tan(DEG2RAD * 0.5 * this.fov);
 
     return (0.5 * this.getFilmHeight()) / vExtentSlope;
   }
 
   getEffectiveFOV(): f32 {
     return (
-      RAD2DEG * 2 * Mathf.atan(Mathf.tan(DEG2RAD * 0.5 * this.fov) / this.zoom)
+      RAD2DEG * 2 * Math.atan(Math.tan(DEG2RAD * 0.5 * this.fov) / this.zoom)
     );
   }
 
   getFilmWidth(): f32 {
     // film not completely covered in portrait format (aspect < 1)
-    return this.filmGauge * Mathf.min(this.aspect, 1);
+    return this.filmGauge * Math.min(this.aspect, 1);
   }
 
   getFilmHeight(): f32 {
     // film not completely covered in landscape format (aspect > 1)
-    return this.filmGauge / Mathf.max(this.aspect, 1);
+    return this.filmGauge / Math.max(this.aspect, 1);
   }
 
   /**
@@ -166,7 +166,7 @@ export class PerspectiveCamera implements ICameraController {
 
   updateProjectionMatrix(): void {
     const near: f32 = this.near;
-    let top: f32 = (near * Mathf.tan(DEG2RAD * 0.5 * this.fov)) / this.zoom;
+    let top: f32 = (near * Math.tan(DEG2RAD * 0.5 * this.fov)) / this.zoom;
     let height: f32 = 2 * top;
     let width: f32 = this.aspect * height;
     let left: f32 = -0.5 * width;

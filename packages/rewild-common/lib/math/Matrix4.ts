@@ -199,12 +199,12 @@ export class Matrix4 {
     const x = euler.x,
       y = euler.y,
       z = euler.z;
-    const a = Mathf.cos(x),
-      b = Mathf.sin(x);
-    const c = Mathf.cos(y),
-      d = Mathf.sin(y);
-    const e = Mathf.cos(z),
-      f = Mathf.sin(z);
+    const a = Math.cos(x),
+      b = Math.sin(x);
+    const c = Math.cos(y),
+      d = Math.sin(y);
+    const e = Math.cos(z),
+      f = Math.sin(z);
 
     if (euler.order === EulerRotationOrder.XYZ) {
       const ae = a * e,
@@ -337,7 +337,7 @@ export class Matrix4 {
     if (_x.lengthSq() === 0) {
       // up and z are parallel
 
-      if (Mathf.abs(up.z) === 1) {
+      if (Math.abs(up.z) === 1) {
         _z.x += 0.0001;
       } else {
         _z.z += 0.0001;
@@ -735,10 +735,10 @@ export class Matrix4 {
     const scaleYSq: f32 = te[4] * te[4] + te[5] * te[5] + te[6] * te[6];
     const scaleZSq: f32 = te[8] * te[8] + te[9] * te[9] + te[10] * te[10];
 
-    //Mathf.max only takes two arguments, have to do it twice.
-    let maxScale: f32 = Mathf.max(scaleXSq, scaleYSq);
-    maxScale = Mathf.max(maxScale, scaleZSq);
-    return Mathf.sqrt(maxScale);
+    //Math.max only takes two arguments, have to do it twice.
+    let maxScale: f32 = Math.max(scaleXSq, scaleYSq);
+    maxScale = Math.max(maxScale, scaleZSq);
+    return Math.sqrt(maxScale);
   }
 
   makeTranslation(x: f32, y: f32, z: f32): Matrix4 {
@@ -748,8 +748,8 @@ export class Matrix4 {
   }
 
   makeRotationX(theta: f32): Matrix4 {
-    const c: f32 = Mathf.cos(theta),
-      s: f32 = Mathf.sin(theta);
+    const c: f32 = Math.cos(theta),
+      s: f32 = Math.sin(theta);
 
     this.set(1, 0, 0, 0, 0, c, -s, 0, 0, s, c, 0, 0, 0, 0, 1);
 
@@ -757,8 +757,8 @@ export class Matrix4 {
   }
 
   makeRotationY(theta: f32): Matrix4 {
-    const c: f32 = Mathf.cos(theta),
-      s: f32 = Mathf.sin(theta);
+    const c: f32 = Math.cos(theta),
+      s: f32 = Math.sin(theta);
 
     this.set(c, 0, s, 0, 0, 1, 0, 0, -s, 0, c, 0, 0, 0, 0, 1);
 
@@ -766,8 +766,8 @@ export class Matrix4 {
   }
 
   makeRotationZ(theta: f32): Matrix4 {
-    const c: f32 = Mathf.cos(theta),
-      s: f32 = Mathf.sin(theta);
+    const c: f32 = Math.cos(theta),
+      s: f32 = Math.sin(theta);
 
     this.set(c, -s, 0, 0, s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
 
@@ -777,8 +777,8 @@ export class Matrix4 {
   makeRotationAxis(axis: Vector3, angle: f32): Matrix4 {
     // Based on http://www.gamedev.net/reference/articles/article1199.asp
 
-    const c: f32 = Mathf.cos(angle);
-    const s: f32 = Mathf.sin(angle);
+    const c: f32 = Math.cos(angle);
+    const s: f32 = Math.sin(angle);
     const t: f32 = 1 - c;
     const x: f32 = axis.x,
       y: f32 = axis.y,

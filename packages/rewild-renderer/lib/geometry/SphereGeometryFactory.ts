@@ -7,16 +7,16 @@ export class SphereGeometryFactory {
     widthSegments: u32 = 32,
     heightSegments: u32 = 16,
     phiStart: f32 = 0,
-    phiLength: f32 = Mathf.PI * 2,
+    phiLength: f32 = Math.PI * 2,
     thetaStart: f32 = 0,
-    thetaLength: f32 = Mathf.PI
+    thetaLength: f32 = Math.PI
   ) {
     const geometry = new Geometry();
 
     widthSegments = <u32>Math.max(3, Math.floor(widthSegments));
     heightSegments = <u32>Math.max(2, Math.floor(heightSegments));
 
-    const thetaEnd: f32 = Mathf.min(thetaStart + thetaLength, Mathf.PI);
+    const thetaEnd: f32 = Math.min(thetaStart + thetaLength, Math.PI);
 
     let index: u32 = 0;
     const grid: u32[][] = [];
@@ -41,7 +41,7 @@ export class SphereGeometryFactory {
 
       if (iy == 0 && thetaStart == 0) {
         uOffset = 0.5 / widthSegments;
-      } else if (iy == heightSegments && thetaEnd == Mathf.PI) {
+      } else if (iy == heightSegments && thetaEnd == Math.PI) {
         uOffset = -0.5 / widthSegments;
       }
 
@@ -51,13 +51,13 @@ export class SphereGeometryFactory {
         // vertex
         vertex.x =
           -radius *
-          Mathf.cos(phiStart + u * phiLength) *
-          Mathf.sin(thetaStart + v * thetaLength);
-        vertex.y = radius * Mathf.cos(thetaStart + v * thetaLength);
+          Math.cos(phiStart + u * phiLength) *
+          Math.sin(thetaStart + v * thetaLength);
+        vertex.y = radius * Math.cos(thetaStart + v * thetaLength);
         vertex.z =
           radius *
-          Mathf.sin(phiStart + u * phiLength) *
-          Mathf.sin(thetaStart + v * thetaLength);
+          Math.sin(phiStart + u * phiLength) *
+          Math.sin(thetaStart + v * thetaLength);
 
         vertices.push(vertex.x);
         vertices.push(vertex.y);
@@ -92,7 +92,7 @@ export class SphereGeometryFactory {
           indices.push(b);
           indices.push(d);
         }
-        if (iy != heightSegments - 1 || thetaEnd < Mathf.PI) {
+        if (iy != heightSegments - 1 || thetaEnd < Math.PI) {
           indices.push(b);
           indices.push(c);
           indices.push(d);

@@ -1,17 +1,15 @@
-import { EventDispatcher } from 'rewild-common';
 import { Node } from './Node';
 import { Portal } from './Portal';
 import { Container } from './Container';
 import { IAsset } from './IAsset';
 
-export class StateMachine<T = any> extends EventDispatcher {
+export class StateMachine<T = any> {
   readonly nodes: Node[];
   readonly activeNodes: Node[];
   private inactiveNodes: Node[];
   data: T | null = null;
 
   constructor(data: T | null = null) {
-    super();
     this.nodes = [];
     this.activeNodes = [];
     this.inactiveNodes = [];

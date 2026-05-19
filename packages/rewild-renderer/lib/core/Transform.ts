@@ -6,7 +6,6 @@ import {
   Matrix3,
   Matrix4,
   IQuatChangeListener,
-  Event,
 } from 'rewild-common';
 import { Intersection } from './Raycaster';
 import { Layers } from './Layers';
@@ -31,8 +30,6 @@ export const yAxis = new Vector3(0, 1, 0);
 export const zAxis = new Vector3(0, 0, 1);
 
 type TraverseCallback = (object: Transform) => void;
-const _addedEvent: Event = new Event('added');
-const _removedEvent: Event = new Event('removed');
 
 export class Transform implements IQuatChangeListener, IEulerChangeListener {
   static DefaultMatrixAutoUpdate: boolean = true;
@@ -482,7 +479,6 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
     child.parent = this;
     this.children.push(child);
 
-    _addedEvent.target = parent;
     this.bubbleStructureVersion();
     return this;
   }
@@ -494,7 +490,6 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
       child.parent = null;
       this.children.splice(index, 1);
 
-      _removedEvent.target = this;
       this.bubbleStructureVersion();
     }
 

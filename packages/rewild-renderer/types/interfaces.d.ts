@@ -7,12 +7,6 @@ import {
 } from '../lib';
 import { Camera } from '../lib/core/Camera';
 
-export interface IRenderable {
-  initialize(renderer: Renderer): Promise<IRenderable>;
-  update(renderer: Renderer, delta: number, totalTime: number): void;
-  render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera): void;
-}
-
 export interface IVisualComponent {
   readonly [IS_VISUAL_COMPONENT]: true;
   transform: Transform;

@@ -1,7 +1,7 @@
-import { Box3 } from "./Box3";
-import { Matrix4 } from "./Matrix4";
-import { Plane } from "./Plane";
-import { Vector3 } from "./Vector3";
+import { Box3 } from './Box3';
+import { Matrix4 } from './Matrix4';
+import { Plane } from './Plane';
+import { Vector3 } from './Vector3';
 
 const _box = new Box3();
 const _v1 = new Vector3();
@@ -36,10 +36,10 @@ export class Sphere {
     let maxRadiusSq = 0;
 
     for (let i = 0, il = points.length; i < il; i++) {
-      maxRadiusSq = Mathf.max(maxRadiusSq, center.distanceToSquared(points[i]));
+      maxRadiusSq = Math.max(maxRadiusSq, center.distanceToSquared(points[i]));
     }
 
-    this.radius = Mathf.sqrt(maxRadiusSq);
+    this.radius = Math.sqrt(maxRadiusSq);
 
     return this;
   }
@@ -73,7 +73,9 @@ export class Sphere {
   intersectsSphere(sphere: Sphere): boolean {
     const radiusSum = this.radius + sphere.radius;
 
-    return sphere.center.distanceToSquared(this.center) <= radiusSum * radiusSum;
+    return (
+      sphere.center.distanceToSquared(this.center) <= radiusSum * radiusSum
+    );
   }
 
   intersectsBox(box: Box3): boolean {
@@ -81,7 +83,7 @@ export class Sphere {
   }
 
   intersectsPlane(plane: Plane): boolean {
-    return Mathf.abs(plane.distanceToPoint(this.center)) <= this.radius;
+    return Math.abs(plane.distanceToPoint(this.center)) <= this.radius;
   }
 
   clampPoint(point: Vector3, target: Vector3): Vector3 {
@@ -131,7 +133,7 @@ export class Sphere {
     const lengthSq = _toPoint.lengthSq();
 
     if (lengthSq > this.radius * this.radius) {
-      const length = Mathf.sqrt(lengthSq);
+      const length = Math.sqrt(lengthSq);
       const missingRadiusHalf = (length - this.radius) * 0.5;
 
       // Nudge this sphere towards the target point. Add half the missing distance to radius,
@@ -152,7 +154,10 @@ export class Sphere {
     // 1) Enclose the farthest point on the other sphere into this sphere.
     // 2) Enclose the opposite point of the farthest point into this sphere.
 
-    _toFarthestPoint.subVectors(sphere.center, this.center).normalize().multiplyScalar(sphere.radius);
+    _toFarthestPoint
+      .subVectors(sphere.center, this.center)
+      .normalize()
+      .multiplyScalar(sphere.radius);
 
     this.expandByPoint(_v1.copy(sphere.center).add(_toFarthestPoint));
     this.expandByPoint(_v1.copy(sphere.center).sub(_toFarthestPoint));

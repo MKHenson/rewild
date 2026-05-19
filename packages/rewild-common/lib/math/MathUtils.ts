@@ -7,15 +7,15 @@ for (let i = 0; i < 256; i++) {
 
 let _seed = 1234567;
 
-export const DEG2RAD: f32 = Mathf.PI / 180;
-export const RAD2DEG: f32 = 180 / Mathf.PI;
+export const DEG2RAD: f32 = Math.PI / 180;
+export const RAD2DEG: f32 = 180 / Math.PI;
 
 // http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript/21963136#21963136
 export function generateUUID(): string {
-  const d0: u32 = u32(Mathf.random() * 0xffffffff) | 0;
-  const d1: u32 = u32(Mathf.random() * 0xffffffff) | 0;
-  const d2: u32 = u32(Mathf.random() * 0xffffffff) | 0;
-  const d3: u32 = u32(Mathf.random() * 0xffffffff) | 0;
+  const d0: u32 = (Math.random() * 0xffffffff) | 0;
+  const d1: u32 = (Math.random() * 0xffffffff) | 0;
+  const d2: u32 = (Math.random() * 0xffffffff) | 0;
+  const d3: u32 = (Math.random() * 0xffffffff) | 0;
 
   const uuid: string =
     _lut[d0 & 0xff] +
@@ -44,7 +44,7 @@ export function generateUUID(): string {
 }
 
 export function clamp(value: f32, min: f32, max: f32): f32 {
-  return Mathf.max(min, Mathf.min(max, value));
+  return Math.max(min, Math.min(max, value));
 }
 
 // compute euclidian modulo of m % n
@@ -74,12 +74,12 @@ export function lerp(x: f32, y: f32, t: f32): f32 {
 
 // http://www.rorydriscoll.com/2016/03/07/frame-rate-independent-damping-using-lerp/
 export function damp(x: f32, y: f32, lambda: f32, dt: f32): f32 {
-  return lerp(x, y, 1 - Mathf.exp(-lambda * dt));
+  return lerp(x, y, 1 - Math.exp(-lambda * dt));
 }
 
 // https://www.desmos.com/calculator/vcsjnyz7x4
 export function pingpong(x: f32, length: f32 = 1): f32 {
-  return length - Mathf.abs(euclideanModulo(x, length * 2) - length);
+  return length - Math.abs(euclideanModulo(x, length * 2) - length);
 }
 
 // http://en.wikipedia.org/wiki/Smoothstep
@@ -103,17 +103,17 @@ export function smootherstep(x: f32, min: f32, max: f32): f32 {
 
 // Random integer from <low, high> interval
 export function randInt(low: f32, high: f32): f32 {
-  return low + Mathf.floor(Mathf.random() * (high - low + 1));
+  return low + Math.floor(Math.random() * (high - low + 1));
 }
 
 // Random float from <low, high> interval
 export function randFloat(low: f32, high: f32): f32 {
-  return low + Mathf.random() * (high - low);
+  return low + Math.random() * (high - low);
 }
 
 // Random float from <-range/2, range/2> interval
 export function randFloatSpread(range: f32): f32 {
-  return range * (0.5 - Mathf.random());
+  return range * (0.5 - Math.random());
 }
 
 // Deterministic pseudo-random float in the interval [ 0, 1 ]
@@ -140,11 +140,11 @@ export function isPowerOfTwo(value: f32): boolean {
 }
 
 export function ceilPowerOfTwo(value: f32): f32 {
-  return Mathf.pow(2, Mathf.ceil(Mathf.log(value) / Mathf.LN2));
+  return Math.pow(2, Math.ceil(Math.log(value) / Math.LN2));
 }
 
 export function floorPowerOfTwo(value: f32): f32 {
-  return Mathf.pow(2, Mathf.floor(Mathf.log(value) / Mathf.LN2));
+  return Math.pow(2, Math.floor(Math.log(value) / Math.LN2));
 }
 
 export function setQuaternionFromProperEuler(
@@ -160,8 +160,8 @@ export function setQuaternionFromProperEuler(
   // rotation by angle 'a' is applied first, then by angle 'b', then by angle 'c'
   // angles are in radians
 
-  const cos = Mathf.cos;
-  const sin = Mathf.sin;
+  const cos = Math.cos;
+  const sin = Math.sin;
 
   const c2 = cos(b / 2);
   const s2 = sin(b / 2);

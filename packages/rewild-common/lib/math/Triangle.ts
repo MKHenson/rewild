@@ -44,7 +44,7 @@ export class Triangle {
 
     const targetLengthSq = target.lengthSq();
     if (targetLengthSq > 0) {
-      return target.multiplyScalar(1 / Mathf.sqrt(targetLengthSq));
+      return target.multiplyScalar(1 / Math.sqrt(targetLengthSq));
     }
 
     return target.set(0, 0, 0);

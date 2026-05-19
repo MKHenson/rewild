@@ -12,14 +12,15 @@ export class Vector3Test {
 
   magnitude(v: Vector3Test | null): f32 {
     //Only get the magnitude of this vector
-    if (v === null) return Mathf.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+    if (v === null)
+      return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
 
     //Get magnitude based on another vector
     var x = v.x - this.x,
       y = v.y - this.y,
       z = v.y - this.z;
 
-    return Mathf.sqrt(x * x + y * y + z * z);
+    return Math.sqrt(x * x + y * y + z * z);
   }
 
   normalize(): Vector3Test {
@@ -136,8 +137,14 @@ export class Matrix4Test {
   }
 
   //from glMatrix
-  static perspective(out: Float32Array, fovy: f32, aspect: f32, near: f32, far: f32): void {
-    var f: f32 = 1.0 / Mathf.tan(fovy / 2),
+  static perspective(
+    out: Float32Array,
+    fovy: f32,
+    aspect: f32,
+    near: f32,
+    far: f32
+  ): void {
+    var f: f32 = 1.0 / Math.tan(fovy / 2),
       nf: f32 = 1 / (near - far);
     out[0] = f / aspect;
     out[1] = 0;
@@ -157,7 +164,15 @@ export class Matrix4Test {
     out[15] = 0;
   }
 
-  static ortho(out: Float32Array, left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32): void {
+  static ortho(
+    out: Float32Array,
+    left: f32,
+    right: f32,
+    bottom: f32,
+    top: f32,
+    near: f32,
+    far: f32
+  ): void {
     var lr: f32 = 1 / (left - right),
       bt: f32 = 1 / (bottom - top),
       nf: f32 = 1 / (near - far);
@@ -255,7 +270,8 @@ export class Matrix4Test {
       b10: f32 = a21 * a33 - a23 * a31,
       b11: f32 = a22 * a33 - a23 * a32,
       // Calculate the determinant
-      det: f32 = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+      det: f32 =
+        b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
 
     if (!det) return null;
 
@@ -310,7 +326,11 @@ export class Matrix4Test {
   }
 
   //https://github.com/toji/gl-matrix/blob/master/src/gl-matrix/vec4.js, vec4.transformMat4
-  static transformVec4(out: Float32Array, v: Float32Array, m: Float32Array): Float32Array {
+  static transformVec4(
+    out: Float32Array,
+    v: Float32Array,
+    m: Float32Array
+  ): Float32Array {
     out[0] = m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12] * v[3];
     out[1] = m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13] * v[3];
     out[2] = m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14] * v[3];
@@ -320,7 +340,11 @@ export class Matrix4Test {
 
   //From glMatrix
   //Multiple two mat4 together
-  static mult(out: Float32Array, a: Float32Array, b: Float32Array): Float32Array {
+  static mult(
+    out: Float32Array,
+    a: Float32Array,
+    b: Float32Array
+  ): Float32Array {
     var a00: f32 = a[0],
       a01: f32 = a[1],
       a02: f32 = a[2],
@@ -396,8 +420,8 @@ export class Matrix4Test {
   }
 
   static rotateY(out: Float32Array, rad: f32): Float32Array {
-    var s: f32 = Mathf.sin(rad),
-      c: f32 = Mathf.cos(rad),
+    var s: f32 = Math.sin(rad),
+      c: f32 = Math.cos(rad),
       a00: f32 = out[0],
       a01: f32 = out[1],
       a02: f32 = out[2],
@@ -420,8 +444,8 @@ export class Matrix4Test {
   }
 
   static rotateX(out: Float32Array, rad: f32): Float32Array {
-    var s: f32 = Mathf.sin(rad),
-      c: f32 = Mathf.cos(rad),
+    var s: f32 = Math.sin(rad),
+      c: f32 = Math.cos(rad),
       a10: f32 = out[4],
       a11: f32 = out[5],
       a12: f32 = out[6],
@@ -444,8 +468,8 @@ export class Matrix4Test {
   }
 
   static rotateZ(out: Float32Array, rad: f32): Float32Array {
-    var s: f32 = Mathf.sin(rad),
-      c: f32 = Mathf.cos(rad),
+    var s: f32 = Math.sin(rad),
+      c: f32 = Math.cos(rad),
       a00: f32 = out[0],
       a01: f32 = out[1],
       a02: f32 = out[2],
@@ -471,7 +495,7 @@ export class Matrix4Test {
     let x: f32 = axis[0],
       y: f32 = axis[1],
       z: f32 = axis[2],
-      len: u32 = Mathf.sqrt(x * x + y * y + z * z),
+      len: u32 = Math.sqrt(x * x + y * y + z * z),
       s: f32,
       c: f32,
       t: f32,
@@ -497,7 +521,7 @@ export class Matrix4Test {
       b21: f32,
       b22: f32;
 
-    if (Mathf.abs(len) < 0.000001) {
+    if (Math.abs(len) < 0.000001) {
       return;
     }
 
@@ -506,8 +530,8 @@ export class Matrix4Test {
     y *= len;
     z *= len;
 
-    s = Mathf.sin(rad);
-    c = Mathf.cos(rad);
+    s = Math.sin(rad);
+    c = Math.cos(rad);
     t = 1 - c;
 
     a00 = out[0];
@@ -581,7 +605,8 @@ export class Matrix4Test {
       b10: f32 = a21 * a33 - a23 * a31,
       b11: f32 = a22 * a33 - a23 * a32,
       // Calculate the determinant
-      det: f32 = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+      det: f32 =
+        b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
 
     if (!det) return false;
     det = 1.0 / det;

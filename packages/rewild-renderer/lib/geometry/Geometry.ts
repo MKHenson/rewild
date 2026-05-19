@@ -222,10 +222,10 @@ export class Geometry {
         _vector.y = verts[i + 1];
         _vector.z = verts[i + 2];
 
-        maxRadiusSq = Mathf.max(maxRadiusSq, center.distanceToSquared(_vector));
+        maxRadiusSq = Math.max(maxRadiusSq, center.distanceToSquared(_vector));
       }
 
-      this.boundingSphere!.radius = Mathf.sqrt(maxRadiusSq);
+      this.boundingSphere!.radius = Math.sqrt(maxRadiusSq);
 
       if (isNaN(this.boundingSphere!.radius)) {
         throw new Error(
