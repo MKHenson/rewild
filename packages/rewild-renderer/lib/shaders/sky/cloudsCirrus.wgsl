@@ -18,19 +18,33 @@ fn fbm2(p: vec3f) -> f32 {
     var f = 0.5000 * noise3(pos);
     pos = m * pos * 2.02;
     f += 0.2500 * noise3(pos);
+    pos = m * pos * 2.02;
+    f += 0.1250 * noise3(pos);
+    pos = m * pos * 2.02;
+    f += 0.0625 * noise3(pos);
     return f;
 }
 
 fn cirrusDensityAt(position: vec3f) -> f32 {
     let windDirection = vec3f(1.0, 0.0, -1.0);
-    let windOffset  = vec3f(object.iTime * 0.00085 * object.windiness, 0.0, 0.0) * windDirection;
+    let windOffset  = vec3f(object.iTime * 0.00035 * object.windiness, 0.0, 0.0) * windDirection;
     let noisePos    = position * 0.0002 + windOffset;
-    let stretchPos  = vec3f(noisePos.x * 4.0, noisePos.y * 0.05, noisePos.z * 1.5);
-    let n           = fbm2(stretchPos);
+    // Strongly elongated along the wind axis — 3x vs 1x creates strand-like shapes
+    let stretchPos  = vec3f(noisePos.x * 0.35, noisePos.y * 8.0, noisePos.z * 1.0);
+
+    // Domain warp: displace perpendicular to wind with a coarse noise field.
+    // This tears the smooth blobs into fibrous tendrils.
+    let warp = noise3(stretchPos * vec3f(0.35, 1.0, 0.9) + vec3f(3.7, 0.0, 1.9)) * 0.45;
+    let warpedPos   = stretchPos + vec3f(0.0, 0.0, warp);
+
+    let n           = fbm2(warpedPos);
     // threshold maps coverage [0,1] → [0.58, 0.10], landing in the bulk of the
     // fbm2 distribution so coverage=0.3 produces ~30 % sky coverage.
-    let threshold   = 0.58 - object.cirrusCoverage * object.cloudiness * 0.48;
-    return clamp((n - threshold) / 0.12, 0.0, 1.0);
+    let threshold   = 0.58 - object.cirrusCoverage * smoothstep(0, 0.5, object.cloudiness) * 0.48;
+    // Wide ramp: 2.5x wider transition zone gives a broad soft feathering region
+    let rawDensity  = clamp((n - threshold) / 0.30, 0.0, 1.0);
+    // Squaring keeps the feathering zone nearly transparent — edges blend into sky
+    return rawDensity * rawDensity;
 }
 
 fn cirrusLighting(sunDotDir: f32) -> vec3f {
