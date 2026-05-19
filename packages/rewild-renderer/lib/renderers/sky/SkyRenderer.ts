@@ -66,8 +66,8 @@ export class SkyRenderer {
    *  reach further across the screen before fading out. */
   godRayDecay: number = 0.98;
 
-  cirrusCoverage: number = 0.35;
-  cirrusOpacity: number = 0.1;
+  cirrusCoverage: number = 0.2;
+  cirrusOpacity: number = 0.25;
 
   windDirection: Vector2 = new Vector2(1, 0);
   precipitation: number = 0.0;
