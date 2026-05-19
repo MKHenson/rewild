@@ -153,7 +153,17 @@ export class SceneGraph extends Component<Props> {
                     sceneGraphStoreProxy.selectedContainerId
                   )!,
                 ]
-              : sceneGraphStore.nodes
+              : sceneGraphStore.nodes.map((node) =>
+                  (node as ITemplateTreeNode).factoryKey === 'container'
+                    ? {
+                        ...node,
+                        children: node.children?.map((c) => ({
+                          ...c,
+                          children: undefined,
+                        })),
+                      }
+                    : node
+                )
           }
         />
       ) as Tree;
