@@ -31,7 +31,10 @@ describe('AuthStore', () => {
   describe('signIn', () => {
     it('calls authService.signIn with the provided credentials', async () => {
       await store.signIn('user@example.com', 'secret');
-      expect(authService.signIn).toHaveBeenCalledWith('user@example.com', 'secret');
+      expect(authService.signIn).toHaveBeenCalledWith(
+        'user@example.com',
+        'secret'
+      );
     });
 
     it('calls db.sync.run after a successful sign-in', async () => {
@@ -40,12 +43,18 @@ describe('AuthStore', () => {
     });
 
     it('propagates an error when sign-in fails', async () => {
-      jest.spyOn(authService, 'signIn').mockRejectedValue(new Error('Invalid credentials'));
-      await expect(store.signIn('bad@example.com', 'wrong')).rejects.toThrow('Invalid credentials');
+      jest
+        .spyOn(authService, 'signIn')
+        .mockRejectedValue(new Error('Invalid credentials'));
+      await expect(store.signIn('bad@example.com', 'wrong')).rejects.toThrow(
+        'Invalid credentials'
+      );
     });
 
     it('does not call db.sync.run when sign-in fails', async () => {
-      jest.spyOn(authService, 'signIn').mockRejectedValue(new Error('Invalid credentials'));
+      jest
+        .spyOn(authService, 'signIn')
+        .mockRejectedValue(new Error('Invalid credentials'));
       await store.signIn('bad@example.com', 'wrong').catch(() => {});
       expect(db.sync.run).not.toHaveBeenCalled();
     });
@@ -54,7 +63,11 @@ describe('AuthStore', () => {
   describe('register', () => {
     it('calls authService.register with the provided credentials', async () => {
       await store.register('new@example.com', 'secret', 'newuser');
-      expect(authService.register).toHaveBeenCalledWith('new@example.com', 'secret', 'newuser');
+      expect(authService.register).toHaveBeenCalledWith(
+        'new@example.com',
+        'secret',
+        'newuser'
+      );
     });
 
     it('calls db.sync.run after successful registration', async () => {
@@ -63,13 +76,21 @@ describe('AuthStore', () => {
     });
 
     it('propagates an error when registration fails', async () => {
-      jest.spyOn(authService, 'register').mockRejectedValue(new Error('Email already in use'));
-      await expect(store.register('taken@example.com', 'secret', 'user')).rejects.toThrow('Email already in use');
+      jest
+        .spyOn(authService, 'register')
+        .mockRejectedValue(new Error('Email already in use'));
+      await expect(
+        store.register('taken@example.com', 'secret', 'user')
+      ).rejects.toThrow('Email already in use');
     });
 
     it('does not call db.sync.run when registration fails', async () => {
-      jest.spyOn(authService, 'register').mockRejectedValue(new Error('Email already in use'));
-      await store.register('taken@example.com', 'secret', 'user').catch(() => {});
+      jest
+        .spyOn(authService, 'register')
+        .mockRejectedValue(new Error('Email already in use'));
+      await store
+        .register('taken@example.com', 'secret', 'user')
+        .catch(() => {});
       expect(db.sync.run).not.toHaveBeenCalled();
     });
   });
@@ -86,7 +107,6 @@ describe('AuthStore', () => {
       authService.onAuthStateChanged.dispatch({
         email: 'user@example.com',
         displayName: null,
-        username: null,
         photoURL: null,
         emailVerified: true,
       });
@@ -98,7 +118,6 @@ describe('AuthStore', () => {
       authService.onAuthStateChanged.dispatch({
         email: 'user@example.com',
         displayName: null,
-        username: null,
         photoURL: null,
         emailVerified: true,
       });

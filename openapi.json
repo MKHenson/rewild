@@ -195,6 +195,49 @@
                 "deprecated": false
             }
         },
+        "/api/auth/google": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Google sign-in",
+                "description": "Validates a Google ID token, finds or creates the user, and returns a JWT access token",
+                "parameters": [],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/com.rewild.auth.GoogleAuthRequest"
+                            }
+                        }
+                    },
+                    "required": false
+                },
+                "responses": {
+                    "200": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.auth.AuthResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "headers": {},
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/com.rewild.common.ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "deprecated": false
+            }
+        },
         "/api/projects": {
             "get": {
                 "tags": [
@@ -701,6 +744,10 @@
             "com.rewild.auth.RegisterRequest": {
                 "type": "object",
                 "properties": {
+                    "displayName": {
+                        "type": "string",
+                        "title": "String"
+                    },
                     "email": {
                         "type": "string",
                         "title": "String"
@@ -708,16 +755,12 @@
                     "password": {
                         "type": "string",
                         "title": "String"
-                    },
-                    "username": {
-                        "type": "string",
-                        "title": "String"
                     }
                 },
                 "required": [
+                    "displayName",
                     "email",
-                    "password",
-                    "username"
+                    "password"
                 ],
                 "title": "RegisterRequest"
             },
@@ -795,6 +838,19 @@
                     "error"
                 ],
                 "title": "ErrorResponse"
+            },
+            "com.rewild.auth.GoogleAuthRequest": {
+                "type": "object",
+                "properties": {
+                    "idToken": {
+                        "type": "string",
+                        "title": "String"
+                    }
+                },
+                "required": [
+                    "idToken"
+                ],
+                "title": "GoogleAuthRequest"
             },
             "com.rewild.models.Project": {
                 "type": "object",

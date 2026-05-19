@@ -25,7 +25,7 @@ fun Route.authRoutes(authService: AuthService, secureCookies: Boolean) {
                 }
             }) {
                 val req = call.receive<RegisterRequest>()
-                val tokens = authService.register(req.email, req.password, req.username)
+                val tokens = authService.register(req.email, req.password, req.displayName)
                     ?: return@post call.respond(HttpStatusCode.Conflict, ErrorResponse("Email already registered"))
                 call.setRefreshCookie(tokens.refreshToken, secureCookies)
                 call.respond(HttpStatusCode.Created, AuthResponse(tokens.accessToken))
@@ -114,6 +114,25 @@ fun Route.authRoutes(authService: AuthService, secureCookies: Boolean) {
                 val req = call.receive<ResetPasswordRequest>()
                 val tokens = authService.resetPassword(req.token, req.password)
                     ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid or expired reset token"))
+                call.setRefreshCookie(tokens.refreshToken, secureCookies)
+                call.respond(HttpStatusCode.OK, AuthResponse(tokens.accessToken))
+            }
+        }
+
+        route("/google") {
+            post({
+                tags("Auth")
+                summary = "Google sign-in"
+                description = "Validates a Google ID token, finds or creates the user, and returns a JWT access token"
+                request { body<GoogleAuthRequest>() }
+                response {
+                    code(HttpStatusCode.OK) { body<AuthResponse>() }
+                    code(HttpStatusCode.Unauthorized) { body<ErrorResponse>() }
+                }
+            }) {
+                val req = call.receive<GoogleAuthRequest>()
+                val tokens = authService.googleAuth(req.idToken)
+                    ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Invalid Google token"))
                 call.setRefreshCookie(tokens.refreshToken, secureCookies)
                 call.respond(HttpStatusCode.OK, AuthResponse(tokens.accessToken))
             }

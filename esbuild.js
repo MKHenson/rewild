@@ -5,6 +5,20 @@ import fs from 'fs';
 import path from 'path';
 import { copy } from 'esbuild-plugin-copy';
 
+// Load .env into process.env (shell env vars take precedence)
+if (fs.existsSync('.env')) {
+  fs.readFileSync('.env', 'utf8')
+    .split('\n')
+    .filter(line => line.trim() && !line.startsWith('#'))
+    .forEach(line => {
+      const eqIdx = line.indexOf('=');
+      if (eqIdx === -1) return;
+      const key = line.slice(0, eqIdx).trim();
+      const value = line.slice(eqIdx + 1).trim();
+      if (key && !(key in process.env)) process.env[key] = value;
+    });
+}
+
 const copyPluginDetails = {
   // this is equal to process.cwd(), which means we use cwd path as base path to resolve `to` path
   // if not specified, this plugin uses ESBuild.build outdir/outfile options as base path.
@@ -39,6 +53,9 @@ const defines = {
   ),
   'process.env.API_BASE_URL': JSON.stringify(
     process.env.API_BASE_URL || ''
+  ),
+  'process.env.GOOGLE_CLIENT_ID': JSON.stringify(
+    process.env.GOOGLE_CLIENT_ID || ''
   ),
 };
 
@@ -203,7 +220,9 @@ async function serve() {
         });
         return;
       }
-      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      const headers = { ...proxyRes.headers };
+      delete headers['cross-origin-opener-policy'];
+      res.writeHead(proxyRes.statusCode, headers);
       proxyRes.pipe(res, { end: true });
     });
     proxy.on('error', () => {

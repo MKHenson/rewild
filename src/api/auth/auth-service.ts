@@ -4,13 +4,13 @@ import { Dispatcher } from 'rewild-common';
 type AuthResponse = components['schemas']['com.rewild.auth.AuthResponse'];
 type LoginRequest = components['schemas']['com.rewild.auth.LoginRequest'];
 type RegisterRequest = components['schemas']['com.rewild.auth.RegisterRequest'];
+type GoogleAuthRequest = components['schemas']['com.rewild.auth.GoogleAuthRequest'];
 type ForgotPasswordRequest = components['schemas']['com.rewild.auth.ForgotPasswordRequest'];
 type ResetPasswordRequest = components['schemas']['com.rewild.auth.ResetPasswordRequest'];
 
 export interface IAuthUser {
   displayName: string | null;
   email: string | null;
-  username: string | null;
   photoURL: string | null;
   emailVerified: boolean;
 }
@@ -69,17 +69,29 @@ export class AuthService {
     this.setToken(token);
   }
 
-  async register(email: string, password: string, username: string): Promise<void> {
+  async register(email: string, password: string, displayName: string): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, username } satisfies RegisterRequest),
+      body: JSON.stringify({ email, password, displayName } satisfies RegisterRequest),
       credentials: 'include',
     });
     if (!res.ok) {
       const msg = await res.text().catch(() => '');
       throw new Error(msg || 'Registration failed');
     }
+    const { token } = (await res.json()) as AuthResponse;
+    this.setToken(token);
+  }
+
+  async googleSignIn(idToken: string): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken } satisfies GoogleAuthRequest),
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Google sign-in failed');
     const { token } = (await res.json()) as AuthResponse;
     this.setToken(token);
   }
@@ -128,10 +140,15 @@ export class AuthService {
     try {
       const payload = JSON.parse(
         atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
-      ) as { email?: string; username?: string };
-      return { displayName: null, email: payload.email ?? null, username: payload.username ?? null, photoURL: null, emailVerified: false };
+      ) as { email?: string; displayName?: string; photoUrl?: string };
+      return {
+        displayName: payload.displayName ?? null,
+        email: payload.email ?? null,
+        photoURL: payload.photoUrl ?? null,
+        emailVerified: false,
+      };
     } catch {
-      return { displayName: null, email: null, username: null, photoURL: null, emailVerified: false };
+      return { displayName: null, email: null, photoURL: null, emailVerified: false };
     }
   }
 }

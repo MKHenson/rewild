@@ -279,6 +279,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/google": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Google sign-in
+         * @description Validates a Google ID token, finds or creates the user, and returns a JWT access token
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["com.rewild.auth.GoogleAuthRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.auth.AuthResponse"];
+                    };
+                };
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["com.rewild.common.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -801,11 +851,11 @@ export interface components {
         /** RegisterRequest */
         "com.rewild.auth.RegisterRequest": {
             /** String */
+            displayName: string;
+            /** String */
             email: string;
             /** String */
             password: string;
-            /** String */
-            username: string;
         };
         /** AuthResponse */
         "com.rewild.auth.AuthResponse": {
@@ -835,6 +885,11 @@ export interface components {
         "com.rewild.common.ErrorResponse": {
             /** String */
             error: string;
+        };
+        /** GoogleAuthRequest */
+        "com.rewild.auth.GoogleAuthRequest": {
+            /** String */
+            idToken: string;
         };
         /** Project */
         "com.rewild.models.Project": {
