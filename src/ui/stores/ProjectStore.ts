@@ -88,8 +88,9 @@ export class ProjectStore extends Store<IProjectStore> {
       dirty: false,
     });
 
-    // Initialize all container pods from their containers
-    const project = this.defaultProxy.project!;
+    // Use this.target (not this.defaultProxy) — Proxy-wrapped objects cannot be
+    // structured-cloned by IndexedDB, causing DataCloneError on save.
+    const project = this.target.project!;
 
     this.containerPods = {};
     project.sceneGraph?.containers?.forEach((container) => {
