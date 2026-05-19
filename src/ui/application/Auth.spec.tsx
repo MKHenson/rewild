@@ -18,7 +18,6 @@ type AuthState = {
     displayName: string | null;
     photoURL: string | null;
     emailVerified: boolean;
-    username: string | null;
   };
 };
 
@@ -31,7 +30,6 @@ const guestState: AuthState = {
     displayName: 'Guest',
     photoURL: null,
     emailVerified: false,
-    username: null,
   },
 };
 
@@ -45,7 +43,6 @@ function loggedInState(email: string): AuthState {
       displayName: email,
       photoURL: null,
       emailVerified: true,
-      username: null,
     },
   };
 }
@@ -74,7 +71,7 @@ function fillRegisterForm(
   email: string,
   password: string,
   confirmPassword: string,
-  username: string
+  displayName: string
 ) {
   (
     auth.shadow?.querySelector('input[type="email"]') as HTMLInputElement
@@ -85,7 +82,7 @@ function fillRegisterForm(
   passwordInputs[0].value = password;
   passwordInputs[1].value = confirmPassword;
   (auth.shadow?.querySelector('input[type="text"]') as HTMLInputElement).value =
-    username;
+    displayName;
 }
 
 function getSwitchViewSpans(auth: Auth): Element[] {
@@ -320,7 +317,7 @@ describe('Auth', () => {
       ).toBe('Create Account');
     });
 
-    it('shows email, username, password, and confirm-password inputs on the register view', async () => {
+    it('shows email, display name, password, and confirm-password inputs on the register view', async () => {
       const auth = createAuth(guestState);
       await switchToRegister(auth);
       expect(auth.shadow?.querySelector('input[type="email"]')).not.toBeNull();
@@ -390,7 +387,7 @@ describe('Auth', () => {
       expect(auth.shadow?.querySelector('.field-error')).not.toBeNull();
     });
 
-    it('does not call authStore.register when username is empty', async () => {
+    it('does not call authStore.register when display name is empty', async () => {
       const auth = createAuth(guestState);
       await switchToRegister(auth);
       fillRegisterForm(auth, 'new@example.com', 'secret', 'secret', '');
@@ -595,7 +592,6 @@ describe('Auth', () => {
         displayName: null,
         photoURL: null,
         emailVerified: true,
-        username: null,
       });
       const auth = createAuth(loggedInState('user@example.com'));
       await auth.onMount!();

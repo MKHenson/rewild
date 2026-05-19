@@ -44,7 +44,8 @@ fun Application.module() {
         from = config.propertyOrNull("email.from")?.getString() ?: "noreply@paintedpolygons.com",
     )
     val appUrl = config.propertyOrNull("email.appUrl")?.getString() ?: "https://paintedpolygons.com"
-    val authService = AuthService(jwtService, emailService, appUrl)
+    val googleClientId = config.propertyOrNull("google.clientId")?.getString() ?: ""
+    val authService = AuthService(jwtService, emailService, appUrl, googleClientId)
     val secureCookies = config.propertyOrNull("cookies.secure")?.getString()?.toBoolean() ?: true
 
     configureAuth(jwtService)

@@ -7,6 +7,31 @@ type View = 'signIn' | 'register' | 'forgotPassword';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const GOOGLE_G = (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      fill="#4285F4"
+    />
+    <path
+      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      fill="#34A853"
+    />
+    <path
+      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"
+      fill="#FBBC05"
+    />
+    <path
+      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+      fill="#EA4335"
+    />
+  </svg>
+) as unknown as HTMLElement;
+
 @register('x-auth')
 export class Auth extends Component<Props> {
   init() {
@@ -15,34 +40,83 @@ export class Auth extends Component<Props> {
     const [view, setView] = this.useState<View>('signIn');
     const [error, setError] = this.useState<string | null>(null);
     const [emailError, setEmailError] = this.useState<string | null>(null);
-    const [passwordError, setPasswordError] = this.useState<string | null>(null);
-    const [confirmPasswordError, setConfirmPasswordError] = this.useState<string | null>(null);
-    const [usernameError, setUsernameError] = this.useState<string | null>(null);
+    const [passwordError, setPasswordError] = this.useState<string | null>(
+      null
+    );
+    const [confirmPasswordError, setConfirmPasswordError] = this.useState<
+      string | null
+    >(null);
+    const [displayNameError, setDisplayNameError] = this.useState<
+      string | null
+    >(null);
     const [submitting, setSubmitting] = this.useState(false);
     const [forgotSent, setForgotSent] = this.useState(false);
+    const [googleReady, setGoogleReady] = this.useState(false);
 
     // Stable refs — created once so typed values survive re-renders
-    const emailInput = (<input type="email" placeholder="Email" />) as HTMLInputElement;
-    const passwordInput = (<input type="password" placeholder="Password" />) as HTMLInputElement;
-    const confirmPasswordInput = (<input type="password" placeholder="Confirm password" />) as HTMLInputElement;
-    const usernameInput = (<input type="text" placeholder="Username" />) as HTMLInputElement;
+    const emailInput = (
+      <input type="email" placeholder="Email" />
+    ) as HTMLInputElement;
+    const passwordInput = (
+      <input type="password" placeholder="Password" />
+    ) as HTMLInputElement;
+    const confirmPasswordInput = (
+      <input type="password" placeholder="Confirm password" />
+    ) as HTMLInputElement;
+    const displayNameInput = (
+      <input type="text" placeholder="Display name" />
+    ) as HTMLInputElement;
 
-    emailInput.oninput = () => { if (emailError()) setEmailError(null); };
-    passwordInput.oninput = () => { if (passwordError()) setPasswordError(null); };
-    confirmPasswordInput.oninput = () => { if (confirmPasswordError()) setConfirmPasswordError(null); };
-    usernameInput.oninput = () => { if (usernameError()) setUsernameError(null); };
+    emailInput.oninput = () => {
+      if (emailError()) setEmailError(null);
+    };
+    passwordInput.oninput = () => {
+      if (passwordError()) setPasswordError(null);
+    };
+    confirmPasswordInput.oninput = () => {
+      if (confirmPasswordError()) setConfirmPasswordError(null);
+    };
+    displayNameInput.oninput = () => {
+      if (displayNameError()) setDisplayNameError(null);
+    };
+
+    // Off-screen container for the Google-rendered button (popup flow, works in incognito)
+    const googleHiddenContainer = document.createElement('div');
+    googleHiddenContainer.style.cssText = 'position:fixed;bottom:-200px;left:-200px;opacity:0;pointer-events:none;';
+    document.body.appendChild(googleHiddenContainer);
 
     this.onMount = async () => {
       if (!authService.getUser()) {
         await authService.refreshToken();
       }
+      loadGoogleSdk(() => {
+        const g = (window as GoogleWindow).google;
+        if (!g) return;
+        g.accounts.id.initialize({
+          client_id: process.env.GOOGLE_CLIENT_ID ?? '',
+          callback: async ({ credential }) => {
+            setSubmitting(true);
+            setError(null);
+            try {
+              await authStore.googleSignIn(credential);
+              closeMenu();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'Google sign-in failed');
+            } finally {
+              setSubmitting(false);
+            }
+          },
+        });
+        g.accounts.id.renderButton(googleHiddenContainer, { type: 'standard', size: 'large' });
+        setGoogleReady(true);
+      });
     };
 
     const clearFields = () => {
       emailInput.value = '';
       passwordInput.value = '';
       confirmPasswordInput.value = '';
-      usernameInput.value = '';
+      displayNameInput.value = '';
     };
 
     const clearErrors = () => {
@@ -50,7 +124,7 @@ export class Auth extends Component<Props> {
       setEmailError(null);
       setPasswordError(null);
       setConfirmPasswordError(null);
-      setUsernameError(null);
+      setDisplayNameError(null);
     };
 
     const closeMenu = () => {
@@ -115,11 +189,11 @@ export class Auth extends Component<Props> {
       } else {
         setConfirmPasswordError(null);
       }
-      if (!usernameInput.value.trim()) {
-        setUsernameError('Username is required');
+      if (!displayNameInput.value.trim()) {
+        setDisplayNameError('Display name is required');
         valid = false;
       } else {
-        setUsernameError(null);
+        setDisplayNameError(null);
       }
       return valid;
     };
@@ -149,7 +223,11 @@ export class Auth extends Component<Props> {
       setError(null);
       setSubmitting(true);
       try {
-        await authStore.register(emailInput.value.trim(), passwordInput.value, usernameInput.value.trim());
+        await authStore.register(
+          emailInput.value.trim(),
+          passwordInput.value,
+          displayNameInput.value.trim()
+        );
         clearFields();
         clearErrors();
         setMenuOpen(false);
@@ -185,6 +263,12 @@ export class Auth extends Component<Props> {
       }
     };
 
+    const onGoogleSignIn = () => {
+      if (submitting()) return;
+      const btn = googleHiddenContainer.querySelector<HTMLElement>('[role="button"]');
+      btn?.click();
+    };
+
     const onSignOut = async () => {
       setMenuOpen(false);
       await authStore.signOut();
@@ -194,19 +278,23 @@ export class Auth extends Component<Props> {
       emailInput.className = emailError() ? 'invalid' : '';
       passwordInput.className = passwordError() ? 'invalid' : '';
       confirmPasswordInput.className = confirmPasswordError() ? 'invalid' : '';
-      usernameInput.className = usernameError() ? 'invalid' : '';
+      displayNameInput.className = displayNameError() ? 'invalid' : '';
 
       if (auth.loggedIn) {
         return (
           <div class="auth-root">
             <Avatar
+              size="s"
+              css={AvatarCss}
               src={auth.user?.photoURL || undefined}
               onClick={() => setMenuOpen(!menuOpen())}
             />
             <Popup open={menuOpen()} onClose={closeMenu} withBackground>
               <div class="user-panel">
                 <p class="user-email">{auth.user?.email || ''}</p>
-                <span class="sign-out" onclick={onSignOut}>Sign out</span>
+                <span class="sign-out" onclick={onSignOut}>
+                  Sign out
+                </span>
               </div>
             </Popup>
           </div>
@@ -216,15 +304,20 @@ export class Auth extends Component<Props> {
       if (view() === 'forgotPassword') {
         return (
           <div class="auth-root">
-            <button class="sign-in-btn" onclick={() => setMenuOpen(true)}>Sign In</button>
+            <button class="sign-in-btn" onclick={() => setMenuOpen(true)}>
+              Sign In
+            </button>
             <Popup open={menuOpen()} onClose={closeMenu} withBackground>
               {forgotSent() ? (
                 <div class="sign-in-form">
                   <h3 class="form-title">Check your email</h3>
                   <p class="auth-info">
-                    If that address is registered, we've sent a reset link. Check your inbox.
+                    If that address is registered, we've sent a reset link.
+                    Check your inbox.
                   </p>
-                  <span class="switch-view" onclick={() => switchView('signIn')}>
+                  <span
+                    class="switch-view"
+                    onclick={() => switchView('signIn')}>
                     Back to sign in
                   </span>
                 </div>
@@ -233,13 +326,17 @@ export class Auth extends Component<Props> {
                   <h3 class="form-title">Reset password</h3>
                   <div class="field-wrap">
                     {emailInput}
-                    {emailError() ? <p class="field-error">{emailError()}</p> : null}
+                    {emailError() ? (
+                      <p class="field-error">{emailError()}</p>
+                    ) : null}
                   </div>
                   {error() ? <p class="auth-error">{error()}</p> : null}
                   <button type="submit" disabled={submitting()}>
                     {submitting() ? 'Sending...' : 'Send reset link'}
                   </button>
-                  <span class="switch-view" onclick={() => switchView('signIn')}>
+                  <span
+                    class="switch-view"
+                    onclick={() => switchView('signIn')}>
                     Back to sign in
                   </span>
                 </form>
@@ -252,25 +349,35 @@ export class Auth extends Component<Props> {
       if (view() === 'register') {
         return (
           <div class="auth-root">
-            <button class="sign-in-btn" onclick={() => setMenuOpen(true)}>Sign In</button>
+            <button class="sign-in-btn" onclick={() => setMenuOpen(true)}>
+              Sign In
+            </button>
             <Popup open={menuOpen()} onClose={closeMenu} withBackground>
               <form class="sign-in-form" onsubmit={onRegisterSubmit}>
                 <h3 class="form-title">Create Account</h3>
                 <div class="field-wrap">
                   {emailInput}
-                  {emailError() ? <p class="field-error">{emailError()}</p> : null}
+                  {emailError() ? (
+                    <p class="field-error">{emailError()}</p>
+                  ) : null}
                 </div>
                 <div class="field-wrap">
-                  {usernameInput}
-                  {usernameError() ? <p class="field-error">{usernameError()}</p> : null}
+                  {displayNameInput}
+                  {displayNameError() ? (
+                    <p class="field-error">{displayNameError()}</p>
+                  ) : null}
                 </div>
                 <div class="field-wrap">
                   {passwordInput}
-                  {passwordError() ? <p class="field-error">{passwordError()}</p> : null}
+                  {passwordError() ? (
+                    <p class="field-error">{passwordError()}</p>
+                  ) : null}
                 </div>
                 <div class="field-wrap">
                   {confirmPasswordInput}
-                  {confirmPasswordError() ? <p class="field-error">{confirmPasswordError()}</p> : null}
+                  {confirmPasswordError() ? (
+                    <p class="field-error">{confirmPasswordError()}</p>
+                  ) : null}
                 </div>
                 {error() ? <p class="auth-error">{error()}</p> : null}
                 <button type="submit" disabled={submitting()}>
@@ -287,23 +394,41 @@ export class Auth extends Component<Props> {
 
       return (
         <div class="auth-root">
-          <button class="sign-in-btn" onclick={() => setMenuOpen(true)}>Sign In</button>
+          <button class="sign-in-btn" onclick={() => setMenuOpen(true)}>
+            Sign In
+          </button>
           <Popup open={menuOpen()} onClose={closeMenu} withBackground>
             <form class="sign-in-form" onsubmit={onSignInSubmit}>
               <h3 class="form-title">Sign In</h3>
               <div class="field-wrap">
                 {emailInput}
-                {emailError() ? <p class="field-error">{emailError()}</p> : null}
+                {emailError() ? (
+                  <p class="field-error">{emailError()}</p>
+                ) : null}
               </div>
               <div class="field-wrap">
                 {passwordInput}
-                {passwordError() ? <p class="field-error">{passwordError()}</p> : null}
+                {passwordError() ? (
+                  <p class="field-error">{passwordError()}</p>
+                ) : null}
               </div>
               {error() ? <p class="auth-error">{error()}</p> : null}
               <button type="submit" disabled={submitting()}>
                 {submitting() ? 'Signing in...' : 'Sign In'}
               </button>
-              <span class="switch-view" onclick={() => switchView('forgotPassword')}>
+              {googleReady() ? (
+                <button
+                  type="button"
+                  class="google-btn"
+                  onclick={onGoogleSignIn}
+                  disabled={submitting()}>
+                  {GOOGLE_G}
+                  Continue with Google
+                </button>
+              ) : null}
+              <span
+                class="switch-view"
+                onclick={() => switchView('forgotPassword')}>
                 Forgot password?
               </span>
               <span class="switch-view" onclick={() => switchView('register')}>
@@ -322,15 +447,20 @@ export class Auth extends Component<Props> {
         position: absolute;
         top: 0;
         right: 0;
-        padding: 1rem;
+        padding: 2px 4px;
+      }
+
+      :host .avatar {
+        cursor: pointer;
       }
 
       .sign-in-btn {
         cursor: pointer;
-        background: none;
-        border: 1px solid rgba(255, 255, 255, 0.7);
-        color: white;
+        background: ${theme.colors.surface};
+        border: 1px solid ${theme.colors.onSurfaceBorder};
+        color: ${theme.colors.onSurface};
         padding: 0.4rem 1rem;
+        margin: 4px 4px;
         border-radius: 4px;
         font-size: ${theme.colors.fontSizeSmall};
         font-family: var(--font-family);
@@ -404,6 +534,32 @@ export class Auth extends Component<Props> {
         cursor: not-allowed;
       }
 
+      .google-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.6rem;
+        background: ${theme.colors.surface};
+        color: ${theme.colors.onSurface};
+        border: 1px solid ${theme.colors.onSurfaceBorder};
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: ${theme.colors.fontSizeSmall};
+        font-family: var(--font-family);
+        transition: border-color 0.2s, background 0.2s;
+      }
+
+      .google-btn:hover {
+        border-color: ${theme.colors.primary400};
+        background: ${theme.colors.subtle400};
+      }
+
+      .google-btn:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+      }
+
       .auth-error {
         color: ${theme.colors.error400};
         font-size: ${theme.colors.fontSizeSmall};
@@ -455,4 +611,38 @@ export class Auth extends Component<Props> {
       }
     `;
   }
+}
+
+const AvatarCss = css`
+  :host {
+    cursor: pointer;
+  }
+`;
+
+interface GoogleWindow {
+  google?: {
+    accounts: {
+      id: {
+        initialize(config: {
+          client_id: string;
+          callback: (res: { credential: string }) => void;
+        }): void;
+        renderButton(container: HTMLElement, options: { type?: string; size?: string; width?: string | number }): void;
+        prompt(): void;
+      };
+    };
+  };
+}
+
+function loadGoogleSdk(onReady: () => void): void {
+  if ((window as GoogleWindow).google) {
+    onReady();
+    return;
+  }
+  const script = document.createElement('script');
+  script.src = 'https://accounts.google.com/gsi/client';
+  script.async = true;
+  script.defer = true;
+  script.onload = onReady;
+  document.head.appendChild(script);
 }
