@@ -2,16 +2,9 @@ import { Node } from './Node';
 import { Portal } from './Portal';
 import { Container } from './Container';
 import { Link } from './Link';
-import {
-  ApplicationEventType,
-  Event,
-  Listener,
-  UIEventType,
-} from 'rewild-common';
-import { ApplicationEvent } from './ApplicationEvent';
 import { IAsset } from './IAsset';
 
-export class Level extends Container implements Listener {
+export class Level extends Container {
   constructor(
     name: string,
     parentObject3D: IAsset,
@@ -28,7 +21,6 @@ export class Level extends Container implements Listener {
 
     // Activate the enter portal
     stateMachine.sendSignal(this.getPortal('Enter')!, false);
-    stateMachine.addEventListener(UIEventType, this);
   }
 
   unMount(): void {
@@ -36,16 +28,6 @@ export class Level extends Container implements Listener {
     const stateMachine = this.stateMachine;
 
     if (!stateMachine) return;
-
-    stateMachine.removeEventListener(UIEventType, this);
-  }
-
-  onEvent(event: Event): void {
-    if (event instanceof ApplicationEvent) {
-      const uiEvent = event.attachment as ApplicationEvent;
-      if (uiEvent.eventType == ApplicationEventType.Quit)
-        this.stateMachine!.sendSignal(this.getPortal('Exit')!, true);
-    }
   }
 
   addChild(node: Node): Node {

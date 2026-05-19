@@ -12,8 +12,8 @@ export class PlaneGeometryFactory {
     const width_half: f32 = width / 2;
     const height_half: f32 = height / 2;
 
-    const gridX: u32 = u32(Math.floor(widthSegments));
-    const gridY: u32 = u32(Math.floor(heightSegments));
+    const gridX: u32 = Math.floor(widthSegments);
+    const gridY: u32 = Math.floor(heightSegments);
 
     const gridX1: u32 = gridX + 1;
     const gridY1: u32 = gridY + 1;

@@ -243,8 +243,8 @@ export class Matrix3 {
     cx: f32,
     cy: f32
   ): Matrix3 {
-    const c: f32 = Mathf.cos(rotation);
-    const s: f32 = Mathf.sin(rotation);
+    const c: f32 = Math.cos(rotation);
+    const s: f32 = Math.sin(rotation);
 
     this.set(
       sx * c,
@@ -275,8 +275,8 @@ export class Matrix3 {
   }
 
   rotate(theta: f32): Matrix3 {
-    const c: f32 = Mathf.cos(theta);
-    const s: f32 = Mathf.sin(theta);
+    const c: f32 = Math.cos(theta);
+    const s: f32 = Math.sin(theta);
 
     const te = this.elements;
 

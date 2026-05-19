@@ -1,4 +1,4 @@
-import { INoise } from "./Noise";
+import { INoise } from './Noise';
 
 class Random {
   private value: i32;
@@ -54,7 +54,7 @@ export class NoiseSimplex implements INoise {
     const perm = this.perm;
 
     for (let i = 0; i < 256; i++) {
-      const j = Mathf.floor(random.next() * (i + 1));
+      const j = Math.floor(random.next() * (i + 1));
 
       // [p[i], p[j]] = [p[j], p[i]];
       p[i] = p[j];
@@ -70,12 +70,12 @@ export class NoiseSimplex implements INoise {
     const grad3 = NoiseSimplex.grad3;
     const perm = this.perm;
 
-    const F2: f32 = 0.5 * (Mathf.sqrt(3.0) - 1.0);
-    const G2: f32 = (3.0 - Mathf.sqrt(3.0)) / 6.0;
+    const F2: f32 = 0.5 * (Math.sqrt(3.0) - 1.0);
+    const G2: f32 = (3.0 - Math.sqrt(3.0)) / 6.0;
 
     const s: f32 = (xin + yin) * F2;
-    const i: i32 = Mathf.floor(xin + s);
-    const j: i32 = Mathf.floor(yin + s);
+    const i: i32 = Math.floor(xin + s);
+    const j: i32 = Math.floor(yin + s);
 
     const t: f32 = (i + j) * G2;
     const X0: f32 = i - t;

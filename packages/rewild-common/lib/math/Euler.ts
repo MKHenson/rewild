@@ -1,8 +1,8 @@
-import { Quaternion } from "./Quaternion";
-import { Vector3 } from "./Vector3";
-import { Matrix4 } from "./Matrix4";
-import { clamp } from "./MathUtils";
-import { EulerRotationOrder } from "./EulerOrder";
+import { Quaternion } from './Quaternion';
+import { Vector3 } from './Vector3';
+import { Matrix4 } from './Matrix4';
+import { clamp } from './MathUtils';
+import { EulerRotationOrder } from './EulerOrder';
 
 const _matrix = new Matrix4();
 const _quaternion = new Quaternion();
@@ -30,7 +30,12 @@ export class Euler {
 
   static DefaultOrder: EulerRotationOrder = 0; // TODO: This is supposed to be EulerRotationOrder.XYZ but it keeps failing >:/
 
-  constructor(x: f32 = 0, y: f32 = 0, z: f32 = 0, order: EulerRotationOrder = Euler.DefaultOrder) {
+  constructor(
+    x: f32 = 0,
+    y: f32 = 0,
+    z: f32 = 0,
+    order: EulerRotationOrder = Euler.DefaultOrder
+  ) {
     this._x = x;
     this._y = y;
     this._z = z;
@@ -100,7 +105,11 @@ export class Euler {
     return this;
   }
 
-  setFromRotationMatrix(m: Matrix4, order: EulerRotationOrder = Euler.DefaultOrder, update: boolean = true): Euler {
+  setFromRotationMatrix(
+    m: Matrix4,
+    order: EulerRotationOrder = Euler.DefaultOrder,
+    update: boolean = true
+  ): Euler {
     // assumes the upper 3x3 of m is a pure rotation matrix (i.e, unscaled)
 
     const te = m.elements;
@@ -118,85 +127,87 @@ export class Euler {
 
     switch (order) {
       case EulerRotationOrder.XYZ:
-        this._y = Mathf.asin(clamp(m13, -1, 1));
+        this._y = Math.asin(clamp(m13, -1, 1));
 
-        if (Mathf.abs(m13) < 0.9999999) {
-          this._x = Mathf.atan2(-m23, m33);
-          this._z = Mathf.atan2(-m12, m11);
+        if (Math.abs(m13) < 0.9999999) {
+          this._x = Math.atan2(-m23, m33);
+          this._z = Math.atan2(-m12, m11);
         } else {
-          this._x = Mathf.atan2(m32, m22);
+          this._x = Math.atan2(m32, m22);
           this._z = 0;
         }
 
         break;
 
       case EulerRotationOrder.YXZ:
-        this._x = Mathf.asin(-clamp(m23, -1, 1));
+        this._x = Math.asin(-clamp(m23, -1, 1));
 
-        if (Mathf.abs(m23) < 0.9999999) {
-          this._y = Mathf.atan2(m13, m33);
-          this._z = Mathf.atan2(m21, m22);
+        if (Math.abs(m23) < 0.9999999) {
+          this._y = Math.atan2(m13, m33);
+          this._z = Math.atan2(m21, m22);
         } else {
-          this._y = Mathf.atan2(-m31, m11);
+          this._y = Math.atan2(-m31, m11);
           this._z = 0;
         }
 
         break;
 
       case EulerRotationOrder.ZXY:
-        this._x = Mathf.asin(clamp(m32, -1, 1));
+        this._x = Math.asin(clamp(m32, -1, 1));
 
-        if (Mathf.abs(m32) < 0.9999999) {
-          this._y = Mathf.atan2(-m31, m33);
-          this._z = Mathf.atan2(-m12, m22);
+        if (Math.abs(m32) < 0.9999999) {
+          this._y = Math.atan2(-m31, m33);
+          this._z = Math.atan2(-m12, m22);
         } else {
           this._y = 0;
-          this._z = Mathf.atan2(m21, m11);
+          this._z = Math.atan2(m21, m11);
         }
 
         break;
 
       case EulerRotationOrder.ZYX:
-        this._y = Mathf.asin(-clamp(m31, -1, 1));
+        this._y = Math.asin(-clamp(m31, -1, 1));
 
-        if (Mathf.abs(m31) < 0.9999999) {
-          this._x = Mathf.atan2(m32, m33);
-          this._z = Mathf.atan2(m21, m11);
+        if (Math.abs(m31) < 0.9999999) {
+          this._x = Math.atan2(m32, m33);
+          this._z = Math.atan2(m21, m11);
         } else {
           this._x = 0;
-          this._z = Mathf.atan2(-m12, m22);
+          this._z = Math.atan2(-m12, m22);
         }
 
         break;
 
       case EulerRotationOrder.YZX:
-        this._z = Mathf.asin(clamp(m21, -1, 1));
+        this._z = Math.asin(clamp(m21, -1, 1));
 
-        if (Mathf.abs(m21) < 0.9999999) {
-          this._x = Mathf.atan2(-m23, m22);
-          this._y = Mathf.atan2(-m31, m11);
+        if (Math.abs(m21) < 0.9999999) {
+          this._x = Math.atan2(-m23, m22);
+          this._y = Math.atan2(-m31, m11);
         } else {
           this._x = 0;
-          this._y = Mathf.atan2(m13, m33);
+          this._y = Math.atan2(m13, m33);
         }
 
         break;
 
       case EulerRotationOrder.XZY:
-        this._z = Mathf.asin(-clamp(m12, -1, 1));
+        this._z = Math.asin(-clamp(m12, -1, 1));
 
-        if (Mathf.abs(m12) < 0.9999999) {
-          this._x = Mathf.atan2(m32, m22);
-          this._y = Mathf.atan2(m13, m11);
+        if (Math.abs(m12) < 0.9999999) {
+          this._x = Math.atan2(m32, m22);
+          this._y = Math.atan2(m13, m11);
         } else {
-          this._x = Mathf.atan2(-m23, m33);
+          this._x = Math.atan2(-m23, m33);
           this._y = 0;
         }
 
         break;
 
       default:
-        throw new Error(`THREE.Euler: .setFromRotationMatrix() encountered an unknown order: ${order}`);
+        throw new Error(
+          `THREE.Euler: .setFromRotationMatrix() encountered an unknown order: ${order}`
+        );
     }
 
     this._order = order;
@@ -206,7 +217,11 @@ export class Euler {
     return this;
   }
 
-  setFromQuaternion(q: Quaternion, order: EulerRotationOrder = Euler.DefaultOrder, update: boolean = true): Euler {
+  setFromQuaternion(
+    q: Quaternion,
+    order: EulerRotationOrder = Euler.DefaultOrder,
+    update: boolean = true
+  ): Euler {
     _matrix.makeRotationFromQuaternion(q);
 
     return this.setFromRotationMatrix(_matrix, order, update);
@@ -225,7 +240,12 @@ export class Euler {
   }
 
   equals(euler: Euler): boolean {
-    return euler._x === this._x && euler._y === this._y && euler._z === this._z && euler._order === this._order;
+    return (
+      euler._x === this._x &&
+      euler._y === this._y &&
+      euler._z === this._z &&
+      euler._order === this._order
+    );
   }
 
   fromArray(array: f32[]): Euler {

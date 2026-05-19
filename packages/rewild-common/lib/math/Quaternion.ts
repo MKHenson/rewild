@@ -73,12 +73,12 @@ export class Quaternion {
         sqrSin = 1 - cos * cos;
 
       // Skip the Slerp for tiny steps to avoid numeric problems:
-      if (sqrSin > f32.EPSILON) {
-        const sin = Mathf.sqrt(sqrSin),
-          len = Mathf.atan2(sin, cos * dir);
+      if (sqrSin > Number.EPSILON) {
+        const sin = Math.sqrt(sqrSin),
+          len = Math.atan2(sin, cos * dir);
 
-        s = Mathf.sin(s * len) / sin;
-        t = Mathf.sin(t * len) / sin;
+        s = Math.sin(s * len) / sin;
+        t = Math.sin(t * len) / sin;
       }
 
       const tDir = t * dir;
@@ -90,7 +90,7 @@ export class Quaternion {
 
       // Normalize in case we just did a lerp:
       if (s === 1 - t) {
-        const f = 1 / Mathf.sqrt(x0 * x0 + y0 * y0 + z0 * z0 + w0 * w0);
+        const f = 1 / Math.sqrt(x0 * x0 + y0 * y0 + z0 * z0 + w0 * w0);
 
         x0 *= f;
         y0 *= f;
@@ -203,8 +203,8 @@ export class Quaternion {
     // 	20696-function-to-convert-between-dcm-euler-angles-quaternions-and-euler-vectors/
     //	content/SpinCalc.m
 
-    const cos = Mathf.cos;
-    const sin = Mathf.sin;
+    const cos = Math.cos;
+    const sin = Math.sin;
 
     const c1 = cos(x / 2);
     const c2 = cos(y / 2);
@@ -274,12 +274,12 @@ export class Quaternion {
     // assumes axis is normalized
 
     const halfAngle: f32 = angle / 2,
-      s: f32 = Mathf.sin(halfAngle);
+      s: f32 = Math.sin(halfAngle);
 
     this._x = axis.x * s;
     this._y = axis.y * s;
     this._z = axis.z * s;
-    this._w = Mathf.cos(halfAngle);
+    this._w = Math.cos(halfAngle);
 
     this.onChangeCallback();
 
@@ -304,28 +304,28 @@ export class Quaternion {
       trace: f32 = m11 + m22 + m33;
 
     if (trace > 0) {
-      const s: f32 = 0.5 / Mathf.sqrt(trace + 1.0);
+      const s: f32 = 0.5 / Math.sqrt(trace + 1.0);
 
       this._w = 0.25 / s;
       this._x = (m32 - m23) * s;
       this._y = (m13 - m31) * s;
       this._z = (m21 - m12) * s;
     } else if (m11 > m22 && m11 > m33) {
-      const s: f32 = 2.0 * Mathf.sqrt(1.0 + m11 - m22 - m33);
+      const s: f32 = 2.0 * Math.sqrt(1.0 + m11 - m22 - m33);
 
       this._w = (m32 - m23) / s;
       this._x = 0.25 * s;
       this._y = (m12 + m21) / s;
       this._z = (m13 + m31) / s;
     } else if (m22 > m33) {
-      const s: f32 = 2.0 * Mathf.sqrt(1.0 + m22 - m11 - m33);
+      const s: f32 = 2.0 * Math.sqrt(1.0 + m22 - m11 - m33);
 
       this._w = (m13 - m31) / s;
       this._x = (m12 + m21) / s;
       this._y = 0.25 * s;
       this._z = (m23 + m32) / s;
     } else {
-      const s: f32 = 2.0 * Mathf.sqrt(1.0 + m33 - m11 - m22);
+      const s: f32 = 2.0 * Math.sqrt(1.0 + m33 - m11 - m22);
 
       this._w = (m21 - m12) / s;
       this._x = (m13 + m31) / s;
@@ -342,12 +342,12 @@ export class Quaternion {
 
     let r = vFrom.dot(vTo) + 1;
 
-    if (r < f32.EPSILON) {
+    if (r < Number.EPSILON) {
       // vFrom and vTo point in opposite directions
 
       r = 0;
 
-      if (Mathf.abs(vFrom.x) > Mathf.abs(vFrom.z)) {
+      if (Math.abs(vFrom.x) > Math.abs(vFrom.z)) {
         this._x = -vFrom.y;
         this._y = vFrom.x;
         this._z = 0;
@@ -371,7 +371,7 @@ export class Quaternion {
   }
 
   angleTo(q: Quaternion): f32 {
-    return 2 * Mathf.acos(Mathf.abs(MathUtils.clamp(this.dot(q), -1, 1)));
+    return 2 * Math.acos(Math.abs(MathUtils.clamp(this.dot(q), -1, 1)));
   }
 
   rotateTowards(q: Quaternion, step: f32): Quaternion {
@@ -379,7 +379,7 @@ export class Quaternion {
 
     if (angle === 0) return this;
 
-    const t = Mathf.min(1, step / angle);
+    const t = Math.min(1, step / angle);
 
     this.slerp(q, t);
 
@@ -420,7 +420,7 @@ export class Quaternion {
   }
 
   length(): f32 {
-    return Mathf.sqrt(
+    return Math.sqrt(
       this._x * this._x +
         this._y * this._y +
         this._z * this._z +
@@ -515,7 +515,7 @@ export class Quaternion {
 
     const sqrSinHalfTheta = 1.0 - cosHalfTheta * cosHalfTheta;
 
-    if (sqrSinHalfTheta <= f32.EPSILON) {
+    if (sqrSinHalfTheta <= Number.EPSILON) {
       const s = 1 - t;
       this._w = s * w + t * this._w;
       this._x = s * x + t * this._x;
@@ -528,10 +528,10 @@ export class Quaternion {
       return this;
     }
 
-    const sinHalfTheta = Mathf.sqrt(sqrSinHalfTheta);
-    const halfTheta = Mathf.atan2(sinHalfTheta, cosHalfTheta);
-    const ratioA = Mathf.sin((1 - t) * halfTheta) / sinHalfTheta,
-      ratioB = Mathf.sin(t * halfTheta) / sinHalfTheta;
+    const sinHalfTheta = Math.sqrt(sqrSinHalfTheta);
+    const halfTheta = Math.atan2(sinHalfTheta, cosHalfTheta);
+    const ratioA = Math.sin((1 - t) * halfTheta) / sinHalfTheta,
+      ratioB = Math.sin(t * halfTheta) / sinHalfTheta;
 
     this._w = w * ratioA + this._w * ratioB;
     this._x = x * ratioA + this._x * ratioB;

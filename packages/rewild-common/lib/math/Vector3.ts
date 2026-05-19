@@ -321,17 +321,17 @@ export class Vector3 implements IVector {
   }
 
   min(v: Vector3): Vector3 {
-    this.x = Mathf.min(this.x, v.x);
-    this.y = Mathf.min(this.y, v.y);
-    this.z = Mathf.min(this.z, v.z);
+    this.x = Math.min(this.x, v.x);
+    this.y = Math.min(this.y, v.y);
+    this.z = Math.min(this.z, v.z);
 
     return this;
   }
 
   max(v: Vector3): Vector3 {
-    this.x = Mathf.max(this.x, v.x);
-    this.y = Mathf.max(this.y, v.y);
-    this.z = Mathf.max(this.z, v.z);
+    this.x = Math.max(this.x, v.x);
+    this.y = Math.max(this.y, v.y);
+    this.z = Math.max(this.z, v.z);
 
     return this;
   }
@@ -339,17 +339,17 @@ export class Vector3 implements IVector {
   clamp(min: Vector3, max: Vector3): Vector3 {
     // assumes min < max, componentwise
 
-    this.x = Mathf.max(min.x, Mathf.min(max.x, this.x));
-    this.y = Mathf.max(min.y, Mathf.min(max.y, this.y));
-    this.z = Mathf.max(min.z, Mathf.min(max.z, this.z));
+    this.x = Math.max(min.x, Math.min(max.x, this.x));
+    this.y = Math.max(min.y, Math.min(max.y, this.y));
+    this.z = Math.max(min.z, Math.min(max.z, this.z));
 
     return this;
   }
 
   clampScalar(minVal: f32, maxVal: f32): Vector3 {
-    this.x = Mathf.max(minVal, Mathf.min(maxVal, this.x));
-    this.y = Mathf.max(minVal, Mathf.min(maxVal, this.y));
-    this.z = Mathf.max(minVal, Mathf.min(maxVal, this.z));
+    this.x = Math.max(minVal, Math.min(maxVal, this.x));
+    this.y = Math.max(minVal, Math.min(maxVal, this.y));
+    this.z = Math.max(minVal, Math.min(maxVal, this.z));
 
     return this;
   }
@@ -358,38 +358,38 @@ export class Vector3 implements IVector {
     const length = this.length();
 
     return this.divideScalar(length || 1).multiplyScalar(
-      Mathf.max(min, Mathf.min(max, length))
+      Math.max(min, Math.min(max, length))
     );
   }
 
   floor(): Vector3 {
-    this.x = Mathf.floor(this.x);
-    this.y = Mathf.floor(this.y);
-    this.z = Mathf.floor(this.z);
+    this.x = Math.floor(this.x);
+    this.y = Math.floor(this.y);
+    this.z = Math.floor(this.z);
 
     return this;
   }
 
   ceil(): Vector3 {
-    this.x = Mathf.ceil(this.x);
-    this.y = Mathf.ceil(this.y);
-    this.z = Mathf.ceil(this.z);
+    this.x = Math.ceil(this.x);
+    this.y = Math.ceil(this.y);
+    this.z = Math.ceil(this.z);
 
     return this;
   }
 
   round(): Vector3 {
-    this.x = Mathf.round(this.x);
-    this.y = Mathf.round(this.y);
-    this.z = Mathf.round(this.z);
+    this.x = Math.round(this.x);
+    this.y = Math.round(this.y);
+    this.z = Math.round(this.z);
 
     return this;
   }
 
   roundToZero(): Vector3 {
-    this.x = this.x < 0 ? Mathf.ceil(this.x) : Mathf.floor(this.x);
-    this.y = this.y < 0 ? Mathf.ceil(this.y) : Mathf.floor(this.y);
-    this.z = this.z < 0 ? Mathf.ceil(this.z) : Mathf.floor(this.z);
+    this.x = this.x < 0 ? Math.ceil(this.x) : Math.floor(this.x);
+    this.y = this.y < 0 ? Math.ceil(this.y) : Math.floor(this.y);
+    this.z = this.z < 0 ? Math.ceil(this.z) : Math.floor(this.z);
 
     return this;
   }
@@ -413,11 +413,11 @@ export class Vector3 implements IVector {
   }
 
   length(): f32 {
-    return Mathf.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
+    return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
   }
 
   manhattanLength(): f32 {
-    return Mathf.abs(this.x) + Mathf.abs(this.y) + Mathf.abs(this.z);
+    return Math.abs(this.x) + Math.abs(this.y) + Math.abs(this.z);
   }
 
   normalize(): Vector3 {
@@ -487,19 +487,19 @@ export class Vector3 implements IVector {
   }
 
   angleTo(v: Vector3): f32 {
-    const denominator = Mathf.sqrt(this.lengthSq() * v.lengthSq());
+    const denominator = Math.sqrt(this.lengthSq() * v.lengthSq());
 
-    if (denominator === 0) return Mathf.PI / 2;
+    if (denominator === 0) return Math.PI / 2;
 
     const theta = this.dot(v) / denominator;
 
     // clamp, to handle numerical problems
 
-    return Mathf.acos(MathUtils.clamp(theta, -1, 1));
+    return Math.acos(MathUtils.clamp(theta, -1, 1));
   }
 
   distanceTo(v: Vector3): f32 {
-    return Mathf.sqrt(this.distanceToSquared(v));
+    return Math.sqrt(this.distanceToSquared(v));
   }
 
   distanceToSquared(v: Vector3): f32 {
@@ -512,9 +512,7 @@ export class Vector3 implements IVector {
 
   manhattanDistanceTo(v: Vector3): f32 {
     return (
-      Mathf.abs(this.x - v.x) +
-      Mathf.abs(this.y - v.y) +
-      Mathf.abs(this.z - v.z)
+      Math.abs(this.x - v.x) + Math.abs(this.y - v.y) + Math.abs(this.z - v.z)
     );
   }
 
@@ -523,11 +521,11 @@ export class Vector3 implements IVector {
   }
 
   setFromSphericalCoords(radius: f32, phi: f32, theta: f32): Vector3 {
-    const sinPhiRadius = Mathf.sin(phi) * radius;
+    const sinPhiRadius = Math.sin(phi) * radius;
 
-    this.x = sinPhiRadius * Mathf.sin(theta);
-    this.y = Mathf.cos(phi) * radius;
-    this.z = sinPhiRadius * Mathf.cos(theta);
+    this.x = sinPhiRadius * Math.sin(theta);
+    this.y = Math.cos(phi) * radius;
+    this.z = sinPhiRadius * Math.cos(theta);
 
     return this;
   }
@@ -537,9 +535,9 @@ export class Vector3 implements IVector {
   }
 
   setFromCylindricalCoords(radius: f32, theta: f32, y: f32): Vector3 {
-    this.x = radius * Mathf.sin(theta);
+    this.x = radius * Math.sin(theta);
     this.y = y;
-    this.z = radius * Mathf.cos(theta);
+    this.z = radius * Math.cos(theta);
 
     return this;
   }
@@ -603,9 +601,9 @@ export class Vector3 implements IVector {
   }
 
   random(): Vector3 {
-    this.x = Mathf.random();
-    this.y = Mathf.random();
-    this.z = Mathf.random();
+    this.x = Math.random();
+    this.y = Math.random();
+    this.z = Math.random();
 
     return this;
   }

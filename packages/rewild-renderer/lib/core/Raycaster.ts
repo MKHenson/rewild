@@ -151,7 +151,7 @@ export class UIRaycaster implements IRaycaster {
 }
 
 function ascSort(a: Intersection, b: Intersection): i32 {
-  return i32(a.distance) - i32(b.distance);
+  return a.distance - b.distance;
 }
 
 function intersectObject(

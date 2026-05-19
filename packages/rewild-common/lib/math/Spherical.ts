@@ -5,8 +5,8 @@
  * The azimuthal angle (theta) is measured from the positive z-axis.
  */
 
-import * as MathUtils from "./MathUtils";
-import { Vector3 } from "./Vector3";
+import * as MathUtils from './MathUtils';
+import { Vector3 } from './Vector3';
 
 export class Spherical {
   radius: f32;
@@ -40,7 +40,7 @@ export class Spherical {
   // restrict phi to be betwee EPS and PI-EPS
   makeSafe(): Spherical {
     const EPS: f32 = 0.000001;
-    this.phi = Mathf.max(EPS, Mathf.min(Mathf.PI - EPS, this.phi));
+    this.phi = Math.max(EPS, Math.min(Math.PI - EPS, this.phi));
 
     return this;
   }
@@ -50,14 +50,14 @@ export class Spherical {
   }
 
   setFromCartesianCoords(x: f32, y: f32, z: f32): Spherical {
-    this.radius = Mathf.sqrt(x * x + y * y + z * z);
+    this.radius = Math.sqrt(x * x + y * y + z * z);
 
     if (this.radius === 0) {
       this.theta = 0;
       this.phi = 0;
     } else {
-      this.theta = Mathf.atan2(x, z);
-      this.phi = Mathf.acos(MathUtils.clamp(y / this.radius, -1, 1));
+      this.theta = Math.atan2(x, z);
+      this.phi = Math.acos(MathUtils.clamp(y / this.radius, -1, 1));
     }
 
     return this;

@@ -189,15 +189,15 @@ export class Vector2 implements IVector {
   }
 
   min(v: Vector2): Vector2 {
-    this.x = Mathf.min(this.x, v.x);
-    this.y = Mathf.min(this.y, v.y);
+    this.x = Math.min(this.x, v.x);
+    this.y = Math.min(this.y, v.y);
 
     return this;
   }
 
   max(v: Vector2): Vector2 {
-    this.x = Mathf.max(this.x, v.x);
-    this.y = Mathf.max(this.y, v.y);
+    this.x = Math.max(this.x, v.x);
+    this.y = Math.max(this.y, v.y);
 
     return this;
   }
@@ -205,15 +205,15 @@ export class Vector2 implements IVector {
   clamp(min: Vector2, max: Vector2): Vector2 {
     // assumes min < max, componentwise
 
-    this.x = Mathf.max(min.x, Mathf.min(max.x, this.x));
-    this.y = Mathf.max(min.y, Mathf.min(max.y, this.y));
+    this.x = Math.max(min.x, Math.min(max.x, this.x));
+    this.y = Math.max(min.y, Math.min(max.y, this.y));
 
     return this;
   }
 
   clampScalar(minVal: f32, maxVal: f32): Vector2 {
-    this.x = Mathf.max(minVal, Mathf.min(maxVal, this.x));
-    this.y = Mathf.max(minVal, Mathf.min(maxVal, this.y));
+    this.x = Math.max(minVal, Math.min(maxVal, this.x));
+    this.y = Math.max(minVal, Math.min(maxVal, this.y));
 
     return this;
   }
@@ -222,34 +222,34 @@ export class Vector2 implements IVector {
     const length = this.length();
 
     return this.divideScalar(length || 1).multiplyScalar(
-      Mathf.max(min, Mathf.min(max, length))
+      Math.max(min, Math.min(max, length))
     );
   }
 
   floor(): Vector2 {
-    this.x = Mathf.floor(this.x);
-    this.y = Mathf.floor(this.y);
+    this.x = Math.floor(this.x);
+    this.y = Math.floor(this.y);
 
     return this;
   }
 
   ceil(): Vector2 {
-    this.x = Mathf.ceil(this.x);
-    this.y = Mathf.ceil(this.y);
+    this.x = Math.ceil(this.x);
+    this.y = Math.ceil(this.y);
 
     return this;
   }
 
   round(): Vector2 {
-    this.x = Mathf.round(this.x);
-    this.y = Mathf.round(this.y);
+    this.x = Math.round(this.x);
+    this.y = Math.round(this.y);
 
     return this;
   }
 
   roundToZero(): Vector2 {
-    this.x = this.x < 0 ? Mathf.ceil(this.x) : Mathf.floor(this.x);
-    this.y = this.y < 0 ? Mathf.ceil(this.y) : Mathf.floor(this.y);
+    this.x = this.x < 0 ? Math.ceil(this.x) : Math.floor(this.x);
+    this.y = this.y < 0 ? Math.ceil(this.y) : Math.floor(this.y);
 
     return this;
   }
@@ -274,11 +274,11 @@ export class Vector2 implements IVector {
   }
 
   length(): f32 {
-    return Mathf.sqrt(this.x * this.x + this.y * this.y);
+    return Math.sqrt(this.x * this.x + this.y * this.y);
   }
 
   manhattanLength(): f32 {
-    return Mathf.abs(this.x) + Mathf.abs(this.y);
+    return Math.abs(this.x) + Math.abs(this.y);
   }
 
   normalize(): Vector2 {
@@ -287,12 +287,12 @@ export class Vector2 implements IVector {
 
   angle(): f32 {
     // computes the angle in radians with respect to the positive x-axis
-    const angle = Mathf.atan2(-this.y, -this.x) + Mathf.PI;
+    const angle = Math.atan2(-this.y, -this.x) + Math.PI;
     return angle;
   }
 
   distanceTo(v: Vector2): f32 {
-    return Mathf.sqrt(this.distanceToSquared(v));
+    return Math.sqrt(this.distanceToSquared(v));
   }
 
   distanceToSquared(v: Vector2): f32 {
@@ -302,7 +302,7 @@ export class Vector2 implements IVector {
   }
 
   manhattanDistanceTo(v: Vector2): f32 {
-    return Mathf.abs(this.x - v.x) + Mathf.abs(this.y - v.y);
+    return Math.abs(this.x - v.x) + Math.abs(this.y - v.y);
   }
 
   setLength(length: f32): Vector2 {
@@ -342,8 +342,8 @@ export class Vector2 implements IVector {
   }
 
   rotateAround(center: Vector2, angle: f32): Vector2 {
-    const c = Mathf.cos(angle),
-      s = Mathf.sin(angle);
+    const c = Math.cos(angle),
+      s = Math.sin(angle);
 
     const x = this.x - center.x;
     const y = this.y - center.y;
@@ -355,8 +355,8 @@ export class Vector2 implements IVector {
   }
 
   random(): Vector2 {
-    this.x = Mathf.random();
-    this.y = Mathf.random();
+    this.x = Math.random();
+    this.y = Math.random();
 
     return this;
   }

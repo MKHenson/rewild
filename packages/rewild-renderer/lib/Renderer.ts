@@ -1,9 +1,8 @@
 import { Frustum, Matrix4, WebGPUCoordinateSystem } from 'rewild-common';
-import { IVisualComponent, IRenderable } from '../types/interfaces';
+import { IVisualComponent } from '../types/interfaces';
 import { PerspectiveCamera } from './core/PerspectiveCamera';
 import { Transform } from './core/Transform';
 import { Camera } from './core/Camera';
-import { CubeRenderer } from './renderables.ts/CubeRenderer';
 import { Geometry } from './geometry/Geometry';
 import { IMaterialPass } from './materials/IMaterialPass';
 import { IRenderGroup } from '../types/IRenderGroup';
@@ -40,7 +39,6 @@ export class Renderer {
   sampleCount = 1;
 
   private context: GPUCanvasContext;
-  private renderables: IRenderable[];
   disposed: boolean;
   private renderTargetView: GPUTextureView | undefined;
   private renderTarget: GPUTexture | undefined;
@@ -135,7 +133,6 @@ export class Renderer {
     this.currentRenderList = new RenderList();
     this.initialized = false;
     this.canvas = canvas;
-    this.renderables = [];
 
     this.canvasSizeWatcher = new CanvasSizeWatcher(canvas);
 
@@ -198,10 +195,6 @@ export class Renderer {
     await this.geometryManager.initialize(this);
     await this.materialManager.initialize(this, materialsTemplate);
     await this.terrainRenderer.init(this);
-
-    this.renderables = await Promise.all(
-      [new CubeRenderer()].map((renderable) => renderable.initialize(this))
-    );
 
     this.guiManager.initialize(this);
 
@@ -290,7 +283,6 @@ export class Renderer {
     this.terrainRenderer.dispose();
     this.disposed = true;
     this.initialized = false;
-    this.renderables.length = 0; // Clear the renderables
     this.renderTarget?.destroy();
     this.depthTexture?.destroy();
     this.camController.dispose();
@@ -517,10 +509,6 @@ export class Renderer {
 
     const pCamera = this.perspectiveCam;
 
-    for (const renderable of this.renderables) {
-      renderable.update(this, deltaTime, this.totalDeltaTime);
-    }
-
     // update scene graph
     this.scene.updateMatrixWorld();
     this.ui.updateMatrixWorld();
@@ -646,10 +634,6 @@ export class Renderer {
       const camera = this.perspectiveCam;
 
       this.terrainRenderer.render(this, pass, camera.camera);
-
-      for (const renderable of this.renderables) {
-        renderable.render(this, pass, camera.camera);
-      }
 
       this.renderGroupings(renderList, pass, camera.camera);
       pass.end();

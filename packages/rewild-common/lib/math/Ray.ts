@@ -1,8 +1,8 @@
-import { Box3 } from "./Box3";
-import { Matrix4 } from "./Matrix4";
-import { Plane } from "./Plane";
-import { Sphere } from "./Sphere";
-import { Vector3 } from "./Vector3";
+import { Box3 } from './Box3';
+import { Matrix4 } from './Matrix4';
+import { Plane } from './Plane';
+import { Sphere } from './Sphere';
+import { Vector3 } from './Vector3';
 
 const _vector = new Vector3();
 const _segCenter = new Vector3();
@@ -17,7 +17,10 @@ export class Ray {
   origin: Vector3;
   direction: Vector3;
 
-  constructor(origin: Vector3 = new Vector3(), direction: Vector3 = new Vector3(0, 0, -1)) {
+  constructor(
+    origin: Vector3 = new Vector3(),
+    direction: Vector3 = new Vector3(0, 0, -1)
+  ) {
     this.origin = origin;
     this.direction = direction;
   }
@@ -61,15 +64,20 @@ export class Ray {
       return target.copy(this.origin);
     }
 
-    return target.copy(this.direction).multiplyScalar(directionDistance).add(this.origin);
+    return target
+      .copy(this.direction)
+      .multiplyScalar(directionDistance)
+      .add(this.origin);
   }
 
   distanceToPoint(point: Vector3): f32 {
-    return Mathf.sqrt(this.distanceSqToPoint(point));
+    return Math.sqrt(this.distanceSqToPoint(point));
   }
 
   distanceSqToPoint(point: Vector3): f32 {
-    const directionDistance = _vector.subVectors(point, this.origin).dot(this.direction);
+    const directionDistance = _vector
+      .subVectors(point, this.origin)
+      .dot(this.direction);
 
     // point behind the ray
 
@@ -77,12 +85,20 @@ export class Ray {
       return this.origin.distanceToSquared(point);
     }
 
-    _vector.copy(this.direction).multiplyScalar(directionDistance).add(this.origin);
+    _vector
+      .copy(this.direction)
+      .multiplyScalar(directionDistance)
+      .add(this.origin);
 
     return _vector.distanceToSquared(point);
   }
 
-  distanceSqToSegment(v0: Vector3, v1: Vector3, optionalPointOnRay: Vector3, optionalPointOnSegment: Vector3): f32 {
+  distanceSqToSegment(
+    v0: Vector3,
+    v1: Vector3,
+    optionalPointOnRay: Vector3,
+    optionalPointOnSegment: Vector3
+  ): f32 {
     // from http://www.geometrictools.com/GTEngine/Include/Mathematics/GteDistRaySegment.h
     // It returns the min distance between the ray and the segment
     // defined by v0 and v1
@@ -99,7 +115,7 @@ export class Ray {
     const b0: f32 = _diff.dot(this.direction);
     const b1: f32 = -_diff.dot(_segDir);
     const c: f32 = _diff.lengthSq();
-    const det: f32 = Mathf.abs(1 - a01 * a01);
+    const det: f32 = Math.abs(1 - a01 * a01);
     let s0: f32, s1: f32, sqrDist: f32, extDet: f32;
 
     if (det > 0) {
@@ -118,39 +134,44 @@ export class Ray {
             const invDet = 1 / det;
             s0 *= invDet;
             s1 *= invDet;
-            sqrDist = s0 * (s0 + a01 * s1 + 2 * b0) + s1 * (a01 * s0 + s1 + 2 * b1) + c;
+            sqrDist =
+              s0 * (s0 + a01 * s1 + 2 * b0) + s1 * (a01 * s0 + s1 + 2 * b1) + c;
           } else {
             // region 1
 
             s1 = segExtent;
-            s0 = Mathf.max(0, -(a01 * s1 + b0));
+            s0 = Math.max(0, -(a01 * s1 + b0));
             sqrDist = -s0 * s0 + s1 * (s1 + 2 * b1) + c;
           }
         } else {
           // region 5
 
           s1 = -segExtent;
-          s0 = Mathf.max(0, -(a01 * s1 + b0));
+          s0 = Math.max(0, -(a01 * s1 + b0));
           sqrDist = -s0 * s0 + s1 * (s1 + 2 * b1) + c;
         }
       } else {
         if (s1 <= -extDet) {
           // region 4
 
-          s0 = Mathf.max(0, -(-a01 * segExtent + b0));
-          s1 = s0 > 0 ? -segExtent : Mathf.min(Mathf.max(-segExtent, -b1), segExtent);
+          s0 = Math.max(0, -(-a01 * segExtent + b0));
+          s1 =
+            s0 > 0
+              ? -segExtent
+              : Math.min(Math.max(-segExtent, -b1), segExtent);
           sqrDist = -s0 * s0 + s1 * (s1 + 2 * b1) + c;
         } else if (s1 <= extDet) {
           // region 3
 
           s0 = 0;
-          s1 = Mathf.min(Mathf.max(-segExtent, -b1), segExtent);
+          s1 = Math.min(Math.max(-segExtent, -b1), segExtent);
           sqrDist = s1 * (s1 + 2 * b1) + c;
         } else {
           // region 2
 
-          s0 = Mathf.max(0, -(a01 * segExtent + b0));
-          s1 = s0 > 0 ? segExtent : Mathf.min(Mathf.max(-segExtent, -b1), segExtent);
+          s0 = Math.max(0, -(a01 * segExtent + b0));
+          s1 =
+            s0 > 0 ? segExtent : Math.min(Math.max(-segExtent, -b1), segExtent);
           sqrDist = -s0 * s0 + s1 * (s1 + 2 * b1) + c;
         }
       }
@@ -158,12 +179,15 @@ export class Ray {
       // Ray and segment are parallel.
 
       s1 = a01 > 0 ? -segExtent : segExtent;
-      s0 = Mathf.max(0, -(a01 * s1 + b0));
+      s0 = Math.max(0, -(a01 * s1 + b0));
       sqrDist = -s0 * s0 + s1 * (s1 + 2 * b1) + c;
     }
 
     if (optionalPointOnRay) {
-      optionalPointOnRay.copy(this.direction).multiplyScalar(s0).add(this.origin);
+      optionalPointOnRay
+        .copy(this.direction)
+        .multiplyScalar(s0)
+        .add(this.origin);
     }
 
     if (optionalPointOnSegment) {
@@ -181,7 +205,7 @@ export class Ray {
 
     if (d2 > radius2) return null;
 
-    const thc = Mathf.sqrt(radius2 - d2);
+    const thc = Math.sqrt(radius2 - d2);
 
     // t0 = first intersect point - entrance on front of sphere
     const t0 = tca - thc;
@@ -202,7 +226,9 @@ export class Ray {
   }
 
   intersectsSphere(sphere: Sphere): boolean {
-    return this.distanceSqToPoint(sphere.center) <= sphere.radius * sphere.radius;
+    return (
+      this.distanceSqToPoint(sphere.center) <= sphere.radius * sphere.radius
+    );
   }
 
   distanceToPlane(plane: Plane): f32 | null {
@@ -315,7 +341,13 @@ export class Ray {
     return this.intersectBox(box, _vector) != null;
   }
 
-  intersectTriangle(a: Vector3, b: Vector3, c: Vector3, backfaceCulling: boolean, target: Vector3): Vector3 | null {
+  intersectTriangle(
+    a: Vector3,
+    b: Vector3,
+    c: Vector3,
+    backfaceCulling: boolean,
+    target: Vector3
+  ): Vector3 | null {
     // Compute the offset origin, edges, and normal.
 
     // from http://www.geometrictools.com/GTEngine/Include/Mathematics/GteIntrRay3Triangle3.h
@@ -343,7 +375,8 @@ export class Ray {
     }
 
     _diff.subVectors(this.origin, a);
-    const DdQxE2 = sign * this.direction.dot(_edge2.crossVectors(_diff, _edge2));
+    const DdQxE2 =
+      sign * this.direction.dot(_edge2.crossVectors(_diff, _edge2));
 
     // b1 < 0, no intersection
     if (DdQxE2 < 0) {
@@ -382,7 +415,9 @@ export class Ray {
   }
 
   equals(ray: Ray): boolean {
-    return ray.origin.equals(this.origin) && ray.direction.equals(this.direction);
+    return (
+      ray.origin.equals(this.origin) && ray.direction.equals(this.direction)
+    );
   }
 
   clone(): Ray {
