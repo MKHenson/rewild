@@ -32,7 +32,7 @@ jobs:
       - name: Redeploy Scaleway Container
         run: |
           curl -s https://raw.githubusercontent.com/scaleway/scaleway-cli/master/scripts/get.sh | sh
-          scw container container deploy ${{ secrets.SCW_CONTAINER_ID }} region=fr-par
+          scw container container redeploy ${{ secrets.SCW_CONTAINER_ID }} region=fr-par
         env:
           SCW_SECRET_KEY: ${{ secrets.SCW_SECRET_KEY }}
           SCW_DEFAULT_PROJECT_ID: ${{ secrets.SCW_PROJECT_ID }}

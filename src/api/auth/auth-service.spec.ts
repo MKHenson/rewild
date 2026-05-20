@@ -68,7 +68,9 @@ describe('AuthService', () => {
     it('throws and does not store a token on a failed login', async () => {
       (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 401 });
 
-      await expect(service.signIn('bad@example.com', 'wrong')).rejects.toThrow();
+      await expect(
+        service.signIn('bad@example.com', 'wrong')
+      ).rejects.toThrow();
       expect(service.getToken()).toBeNull();
     });
   });
@@ -103,7 +105,7 @@ describe('AuthService', () => {
       );
     });
 
-    it('sends email, password, and username in the request body', async () => {
+    it('sends email, password, and displayName in the request body', async () => {
       const token = makeToken({ email: 'new@example.com' });
       (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
@@ -112,8 +114,14 @@ describe('AuthService', () => {
 
       await service.register('new@example.com', 'secret', 'newuser');
 
-      const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
-      expect(body).toEqual({ email: 'new@example.com', password: 'secret', username: 'newuser' });
+      const body = JSON.parse(
+        (global.fetch as jest.Mock).mock.calls[0][1].body
+      );
+      expect(body).toEqual({
+        email: 'new@example.com',
+        password: 'secret',
+        displayName: 'newuser',
+      });
     });
 
     it('throws and does not store a token when registration fails', async () => {
@@ -123,7 +131,9 @@ describe('AuthService', () => {
         text: async () => 'Email already in use',
       });
 
-      await expect(service.register('taken@example.com', 'password', 'user')).rejects.toThrow('Email already in use');
+      await expect(
+        service.register('taken@example.com', 'password', 'user')
+      ).rejects.toThrow('Email already in use');
       expect(service.getToken()).toBeNull();
     });
   });
