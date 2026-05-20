@@ -12,6 +12,7 @@ on:
       - 'index.html'
       - 'style.css'
       - 'esbuild.js'
+  workflow_dispatch:
 
 jobs:
   deploy:
