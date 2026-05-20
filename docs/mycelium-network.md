@@ -256,7 +256,86 @@ A full persistent `syncLog` table is deferred until there is a concrete user nee
 
 ---
 
+### Shared Asset Storage
+
+**Creator-controlled, publicly readable assets**
+
+Shared assets (sky textures, terrain materials, default meshes, etc.) are owned and published by the project creator. Users never upload to this bucket — it is a read-only CDN for the application.
+
+All shared assets live in a dedicated Scaleway Object Storage bucket (`rewild-shared`), separate from user-level assets. The bucket is fully public — no authentication is required to fetch any asset.
+
+**URL structure**
+
+Assets are organised by type under a flat prefix:
+
+```
+{SHARED_ASSETS_BASE_URL}/sky/milky-way.hdr
+{SHARED_ASSETS_BASE_URL}/terrain/grass-albedo.png
+{SHARED_ASSETS_BASE_URL}/lut/colour-grade.png
+```
+
+`SHARED_ASSETS_BASE_URL` is an environment variable — never hardcoded. In production it points at the Scaleway bucket. In local development it points at `http://localhost:3000/assets/shared` (served from the local filesystem by the dev server). The client code is identical in both environments.
+
+**Referencing assets in code**
+
+```typescript
+const SKY_TEXTURE = `${env.SHARED_ASSETS_BASE_URL}/sky/milky-way.hdr`;
+```
+
+**Local development**
+
+The local `assets/shared/` folder is a mirror of the bucket. Two npm scripts manage the sync using the AWS CLI against Scaleway's S3-compatible endpoint:
+
+```bash
+npm run assets:pull   # download the latest bucket contents to assets/shared/
+npm run assets:push   # upload local changes to the bucket
+```
+
+The esbuild dev server serves `assets/shared/` as a static directory at `/assets/shared`, so the URL prefix resolves identically to production. This means all assets work fully offline once pulled.
+
+`assets/shared/` is committed to `.gitignore`. Assets are the source of truth in the bucket, not the repository.
+
+**Environment variables**
+
+| Variable | Local dev | Production |
+|---|---|---|
+| `SHARED_ASSETS_BASE_URL` | `http://localhost:3000/assets/shared` | `https://rewild-shared.s3.<region>.scw.cloud` |
+| `SHARED_BUCKET_NAME` | `rewild-shared` | `rewild-shared` |
+| `SHARED_S3_ENDPOINT` | `https://s3.<region>.scw.cloud` | `https://s3.<region>.scw.cloud` |
+| `SHARED_S3_ACCESS_KEY` | your Scaleway access key | set in CI / deploy config |
+| `SHARED_S3_SECRET_KEY` | your Scaleway secret key | set in CI / deploy config |
+
+The S3 credentials are only needed locally when running `assets:push` or `assets:pull`. The running application never needs them — it only reads public URLs.
+
+**Publishing new assets**
+
+```bash
+# Add or update a file in assets/shared/, then:
+npm run assets:push
+```
+
+`aws s3 sync` uploads only changed files. No server redeploy required.
+
+---
+
 ### Binary Asset Storage
+
+**Offline-first: local storage via OPFS**
+
+Binary assets follow the same offline-first principle as records. The [Origin Private File System (OPFS)](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system) is the local store for all binary data — terrain chunks, heightmaps, and any other large binary files. OPFS is designed for this use case: it handles large sequential reads and writes efficiently, has higher storage limits than IndexedDB, and is well-suited to game-scale data.
+
+Assets are always written to OPFS first. This works fully offline with no authentication required. Each asset is tracked with local metadata (id, levelId, assetType, filename, syncedAt) so the sync layer knows what has and hasn't been pushed to the server.
+
+On login, the sync engine pushes any unsynced local assets to object storage and caches any server-side assets the client is missing locally. The presigned URL flow is the upload mechanism for this sync — not a direct write path.
+
+```
+Offline / unauthenticated:
+  write binary data → OPFS (always available)
+
+On login / sync:
+  unsynced local assets → presigned PUT URL → object storage
+  server assets not in OPFS → fetch public URL → cache in OPFS
+```
 
 **Single public bucket, organized by level**
 
@@ -488,15 +567,3 @@ docker push rg.<region>.scw.cloud/<namespace>/rewild-server:latest
 ```
 
 A GitHub Actions workflow can automate the build and push on merge to `main`.
-
----
-
-### Current Code Status
-
-| File | Status | Notes |
-|---|---|---|
-| `src/database/local-db.ts` | Keep | Core local store, needs `updatedAt`/`syncedAt` fields added to writes |
-| `src/database/firestore-db.ts` | Remove | Replaced by `ApiDataTable` |
-| `src/database/database.ts` | Refactor | Remove `goOnline()`, add `SyncEngine` |
-| `src/firebase.ts` | Remove | Firebase dependency removed entirely |
-| `models/` package | Migrate | Hand-authored interfaces replaced by generated types from OpenAPI as each model stabilises on the server |

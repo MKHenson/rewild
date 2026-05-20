@@ -11,6 +11,10 @@ Checkout the 🦕[Demo](https://rewild-client.s3-website.fr-par.scw.cloud)🦖 (
 - [Client Installation](./docs/client-installation.md)
 - [Server Installation](./docs/server-installation.md)
 
+## Architecture
+
+- [Server & Sync Architecture](./docs/mycelium-network.md)
+
 ## Deployment
 
 - [Deployment Guide](./docs/deployment.md)
