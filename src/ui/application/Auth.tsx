@@ -80,10 +80,9 @@ export class Auth extends Component<Props> {
       if (displayNameError()) setDisplayNameError(null);
     };
 
-    // Off-screen container for the Google-rendered button (popup flow, works in incognito)
-    const googleHiddenContainer = document.createElement('div');
-    googleHiddenContainer.style.cssText = 'position:fixed;bottom:-200px;left:-200px;opacity:0;pointer-events:none;';
-    document.body.appendChild(googleHiddenContainer);
+    // Container for Google's rendered button — sits underneath our visual layer
+    const googleBtnContainer = document.createElement('div');
+    googleBtnContainer.style.cssText = 'display:flex;justify-content:center;overflow:hidden;';
 
     this.onMount = async () => {
       if (!authService.getUser()) {
@@ -107,7 +106,7 @@ export class Auth extends Component<Props> {
             }
           },
         });
-        g.accounts.id.renderButton(googleHiddenContainer, { type: 'standard', size: 'large' });
+        g.accounts.id.renderButton(googleBtnContainer, { type: 'standard', size: 'large', width: '400' });
         setGoogleReady(true);
       });
     };
@@ -263,12 +262,6 @@ export class Auth extends Component<Props> {
       }
     };
 
-    const onGoogleSignIn = () => {
-      if (submitting()) return;
-      const btn = googleHiddenContainer.querySelector<HTMLElement>('[role="button"]');
-      btn?.click();
-    };
-
     const onSignOut = async () => {
       setMenuOpen(false);
       await authStore.signOut();
@@ -417,14 +410,13 @@ export class Auth extends Component<Props> {
                 {submitting() ? 'Signing in...' : 'Sign In'}
               </button>
               {googleReady() ? (
-                <button
-                  type="button"
-                  class="google-btn"
-                  onclick={onGoogleSignIn}
-                  disabled={submitting()}>
-                  {GOOGLE_G}
-                  Continue with Google
-                </button>
+                <div class={`google-btn-outer${submitting() ? ' google-btn-outer--disabled' : ''}`}>
+                  {googleBtnContainer as unknown as HTMLElement}
+                  <div class="google-btn-visual" aria-hidden="true">
+                    {GOOGLE_G}
+                    Continue with Google
+                  </div>
+                </div>
               ) : null}
               <span
                 class="switch-view"
@@ -534,30 +526,38 @@ export class Auth extends Component<Props> {
         cursor: not-allowed;
       }
 
-      .google-btn {
+      .google-btn-outer {
+        position: relative;
+        overflow: hidden;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .google-btn-outer--disabled {
+        opacity: 0.65;
+        pointer-events: none;
+      }
+
+      .google-btn-visual {
+        position: absolute;
+        inset: 0;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 0.5rem;
-        padding: 0.6rem;
         background: ${theme.colors.surface};
         color: ${theme.colors.onSurface};
         border: 1px solid ${theme.colors.onSurfaceBorder};
         border-radius: 4px;
-        cursor: pointer;
         font-size: ${theme.colors.fontSizeSmall};
         font-family: var(--font-family);
+        pointer-events: none;
         transition: border-color 0.2s, background 0.2s;
       }
 
-      .google-btn:hover {
+      .google-btn-outer:hover .google-btn-visual {
         border-color: ${theme.colors.primary400};
         background: ${theme.colors.subtle400};
-      }
-
-      .google-btn:disabled {
-        opacity: 0.65;
-        cursor: not-allowed;
       }
 
       .auth-error {
