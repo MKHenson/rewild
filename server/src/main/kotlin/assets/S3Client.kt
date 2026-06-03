@@ -20,13 +20,21 @@ class S3Client(
     secretKey: String,
     region: String = "fr-par"
 ) : S3Signer {
-    private val presigner: S3Presigner = S3Presigner.builder()
-        .endpointOverride(URI.create(endpoint))
-        .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)))
-        .region(Region.of(region))
-        // MinIO and Scaleway both require path-style access
-        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-        .build()
+    private val presigner: S3Presigner
+
+    init {
+        // AWS SDK v2 can't parse the AWS CLI v2 nested format (s3 = \n  key = value)
+        // in ~/.aws/config. Since we configure everything programmatically, redirect
+        // to a nonexistent path so the SDK silently skips loading any profile file.
+        System.setProperty("aws.configFile", "nonexistent-aws-config")
+        presigner = S3Presigner.builder()
+            .endpointOverride(URI.create(endpoint))
+            .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)))
+            .region(Region.of(region))
+            // MinIO and Scaleway both require path-style access
+            .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+            .build()
+    }
 
     override fun presignPut(bucket: String, key: String, ttlMinutes: Long): String {
         val putRequest = PutObjectRequest.builder().bucket(bucket).key(key).build()
