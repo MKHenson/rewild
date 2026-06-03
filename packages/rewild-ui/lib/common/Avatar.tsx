@@ -13,14 +13,20 @@ interface Props {
 @register("x-avatar")
 export class Avatar extends Component<Props> {
   init() {
-    const img = (<img />) as HTMLImageElement;
+    const img = (<img referrerpolicy="no-referrer" />) as HTMLImageElement;
+    const [imgError, setImgError] = this.useState(false);
+
+    img.onerror = () => setImgError(true);
 
     return () => {
       this.onclick = this.props.onClick || null;
       this.dataset.size = this.props.size ?? 'l';
 
-      if (this.props.src) {
-        if (img.src !== this.props.src) img.src = this.props.src;
+      if (this.props.src && !imgError()) {
+        if (img.src !== this.props.src) {
+          img.src = this.props.src;
+          setImgError(false);
+        }
         return <div class="avatar">{img}</div>;
       }
       return <div class="avatar"><MaterialIcon icon="person" /></div>;
