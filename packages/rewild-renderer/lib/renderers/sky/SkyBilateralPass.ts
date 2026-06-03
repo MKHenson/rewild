@@ -49,7 +49,7 @@ export class SkyBilateralPass {
    * - 3.0: very soft edges, heavy blending across cloud-sky boundaries
    * Default: 1.5
    */
-  sigmaRange: number = 0.5;
+  sigmaRange: number = 1.5;
 
   /**
    * sigmaFar: Blur radius (in texels) for distant/horizon clouds.
