@@ -1,5 +1,8 @@
-// HDR scale applied before ACES. Matches the old per-pass 0.05 cloud scale so
-// cloud brightness is preserved; stars/sky now store native HDR values.
+// Exposure constant: maps HDR scene values into the ACES tone curve's useful range.
+// At 0.045, blue sky ~7 HDR → ACES(0.31) ≈ 0.31; clouds at 40 HDR → ACES(1.8) ≈ 0.91;
+// uncapped sun corona at ~290 HDR → ACES(13.05) clamps to 1.0 (by ACES design).
+// The sky cap at 100 HDR (in blend pass) prevents sun scatter from over-brightening
+// semi-transparent cloud edges while still allowing the full sun to shine through sky-only pixels.
 const HDR_SCALE: f32 = 0.05;
 
 struct FinalUniformStruct {
@@ -85,8 +88,8 @@ var<private> sunDotUp: f32;
       return vec4f(occludedColor, 1.0);
     }
 
-    let startHeigh = -10.0;
-    let endHeight = mix(2.0, 10.0, object.foginess);
+    let startHeigh = -160.0;
+    let endHeight = mix(2.0, 50.0, object.foginess);
     let startDistance = mix( 200.0, 0.0, object.foginess );
     let endDistance = mix( 800.0, 300.0, object.foginess );
 

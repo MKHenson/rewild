@@ -38,7 +38,7 @@ struct ObjectStruct {
   let isH        = object.horizontal > 0.5;
   let dir        = select(vec2f(0.0, texelSize.y), vec2f(texelSize.x, 0.0), isH);
 
-  let EXPOSURE = 0.05;
+  let EXPOSURE = 0.03;
   let SIGMA    = 8.0;
   let KNEE     = 0.08; 
   let RADIUS   = 15;
