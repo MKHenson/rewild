@@ -36,8 +36,9 @@ export class SkyBloomPass implements IPostProcess {
   bloomAmount: number = 0.01;
 
   /** Threshold in exposure-adjusted luminance (EXPOSURE * raw_luminance).
-   *  0.25 ≈ sunlit cloud tops; 0.4 ≈ only the very brightest highlights. */
-  bloomThreshold: number = 0.2;
+   *  With EXPOSURE=0.05, threshold 0.25 ≈ HDR lum ~7 — daytime sky (~7 HDR, lum
+   *  ~0.245) stays just below; bright stars (8+ HDR) and cloud tops bloom. */
+  bloomThreshold: number = 0.35;
 
   /** History weight for temporal stabilization. Higher = smoother but slower
    *  to respond to new bright areas. Range 0–1; default 0.85. */

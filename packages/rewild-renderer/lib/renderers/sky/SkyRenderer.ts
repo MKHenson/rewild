@@ -185,16 +185,19 @@ export class SkyRenderer {
     this.rainPass.init(renderer);
     this.lightningBoltPass.init(renderer);
 
-    // Bloom extracts HDR highlights from bilateral clouds; composite adds them before tonemapping.
-    this.bloomPass.sourceTexture = this.bilateralPass.renderTarget;
-    this.bloomPass.init(renderer);
-
+    // Blend sub-pass creates intermediateTarget (sky HDR + clouds HDR, no tonemap).
+    // Bloom then sources from the full composite so stars and atmospheric glow contribute.
     this.finalPass.atmosphereTexture = this.atmospherePass.renderTarget;
     this.finalPass.cloudsTexture = this.bilateralPass.renderTarget;
     this.finalPass.cloudShadowMap = this.cloudShadowRenderer.shadowMap;
     this.finalPass.godRaysTexture = this.godRaysPass.renderTarget;
+    this.finalPass.initBlend(renderer);
+
+    this.bloomPass.sourceTexture = this.finalPass.intermediateTarget;
+    this.bloomPass.init(renderer);
+
     this.finalPass.bloomTexture = this.bloomPass.renderTarget;
-    this.finalPass.init(renderer);
+    this.finalPass.initFinal(renderer);
 
     this.perfMonitor.init(device, [
       'sky-cloud-shadow',
@@ -407,6 +410,10 @@ export class SkyRenderer {
       this.invViewProjectionMatrix.elements,
       this.perfMonitor.getTimestampWrites('sky-bilateral')
     );
+
+    // Blend sub-pass: sky HDR + bilateral HDR → intermediateTarget (no tonemap).
+    // Must run before bloom so the full scene feeds the bloom threshold pass.
+    this.finalPass.renderBlend(renderer);
 
     // Store bolt for postRender (renders before rain so it sits behind particles)
     const currentStrike = this.lightning.currentStrike;

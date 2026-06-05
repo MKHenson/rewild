@@ -1,4 +1,11 @@
-struct FinalUniformStruct { 
+// Exposure constant: maps HDR scene values into the ACES tone curve's useful range.
+// At 0.045, blue sky ~7 HDR → ACES(0.31) ≈ 0.31; clouds at 40 HDR → ACES(1.8) ≈ 0.91;
+// uncapped sun corona at ~290 HDR → ACES(13.05) clamps to 1.0 (by ACES design).
+// The sky cap at 100 HDR (in blend pass) prevents sun scatter from over-brightening
+// semi-transparent cloud edges while still allowing the full sun to shine through sky-only pixels.
+const HDR_SCALE: f32 = 0.05;
+
+struct FinalUniformStruct {
     invViewProjectionMatrix: mat4x4<f32>,
     invViewMatrix: mat4x4<f32>,
     resolution: vec2f,
@@ -11,30 +18,27 @@ struct FinalUniformStruct {
     shadowWorldSize: f32,
     shadowIntensity: f32,
     lightningFlash: f32,
-}; 
+};
 
-@group(0) @binding(0) 
-var sky: texture_2d<f32>;
+@group(0) @binding(0)
+var intermediateHDR: texture_2d<f32>;
 
-@group(0) @binding(1) 
-var clouds: texture_2d<f32>;
-
-@group( 0 ) @binding(2) 
+@group(0) @binding(1)
 var<uniform> object: FinalUniformStruct;
 
-@group(0) @binding(3)
+@group(0) @binding(2)
 var cloudsSampler: sampler;
 
-@group( 0 ) @binding( 4 )
+@group( 0 ) @binding(3)
 var depthTexture: texture_depth_2d;
 
-@group(0) @binding(5)
+@group(0) @binding(4)
 var cloudShadowMap: texture_2d<f32>;
 
-@group(0) @binding(6)
+@group(0) @binding(5)
 var godRaysTexture: texture_2d<f32>;
 
-@group(0) @binding(7)
+@group(0) @binding(6)
 var bloomHighlights: texture_2d<f32>;
 
 var<private> sunDotUp: f32;
@@ -59,24 +63,12 @@ var<private> sunDotUp: f32;
   // Load the depth value directly
   let rawDepth = textureLoad(depthTexture, texCoord, 0);
 
-  // Do not draw pixel if blocked by something in the z-buffer
-  let sky = textureSampleLevel( sky, cloudsSampler, uv, 0 );
-  let cloudsHDR = textureSampleLevel( clouds, cloudsSampler, uv, 0 );
-
-  // Add HDR bloom highlights to the cloud colour before tonemapping.
-  // Tonemapping the sum together lets the ACES shoulder naturally compress
-  // overbright areas into a smooth glow rather than a hard LDR ring.
-  let bloom = textureSampleLevel( bloomHighlights, cloudsSampler, uv, 0 );
-  let cloudsWithBloom = vec4f(cloudsHDR.rgb + bloom.rgb, cloudsHDR.a);
-
-  // Tonemap HDR clouds (+ bloom) to LDR before blending with the LDR atmosphere.
-  let cloudsTonemap = vec4f(tonemapACES(0.05 * cloudsWithBloom.rgb), cloudsWithBloom.a);
-
-  // Blend sky and cumulus clouds (cirrus is already composited inside the cloud pass)
-  let preMultipliedClouds = vec4<f32>(cloudsTonemap.rgb * cloudsTonemap.a, cloudsTonemap.a);
-  var blendedColor = sky * (1.0 - preMultipliedClouds.a) + preMultipliedClouds;
-   
-  let worldPos = worldFromScreenCoord( uv, rawDepth );
+  // Sample the HDR composite (sky + clouds pre-blended by the blend sub-pass)
+  // and the HDR bloom highlights (sourced from the same composite).
+  // Adding bloom before ACES lets the shoulder naturally compress overbright
+  // areas into a smooth glow rather than a hard LDR ring.
+  let hdrBlend = textureSampleLevel(intermediateHDR, cloudsSampler, uv, 0);
+  let bloom    = textureSampleLevel(bloomHighlights, cloudsSampler, uv, 0);
 
   if ( rawDepth < 1.0 ) {
     // When camera is above/inside the cloud layer, terrain below the cloud top
@@ -86,17 +78,18 @@ var<private> sunDotUp: f32;
     // output because getFogColor + tone mapping are designed for ground-level viewing.
     let cameraAltitude = object.cameraPosition.y;
     let aboveCloudBlend = smoothstep(CLOUD_START, CLOUD_START + 100.0, cameraAltitude);
+    let worldPos = worldFromScreenCoord( uv, rawDepth );
     let terrainBelowClouds = smoothstep(CLOUD_START + CLOUD_HEIGHT + 100.0, CLOUD_START, worldPos.y);
-    let cloudOcclusion = aboveCloudBlend * terrainBelowClouds * blendedColor.a;
+    let cloudOcclusion = aboveCloudBlend * terrainBelowClouds * hdrBlend.a;
 
     if (cloudOcclusion > 0.99) {
-      // Terrain fully occluded by clouds — use sky+cloud view directly
-      let occludedColor = blendedColor.rgb + godRays.rgb + flash;
+      // Terrain fully occluded by clouds — tonemap and use sky+cloud view directly
+      let occludedColor = tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb)) + godRays.rgb + flash;
       return vec4f(occludedColor, 1.0);
     }
 
-    let startHeigh = -10.0;
-    let endHeight = mix(2.0, 10.0, object.foginess);
+    let startHeigh = -160.0;
+    let endHeight = mix(2.0, 50.0, object.foginess);
     let startDistance = mix( 200.0, 0.0, object.foginess );
     let endDistance = mix( 800.0, 300.0, object.foginess );
 
@@ -149,13 +142,16 @@ var<private> sunDotUp: f32;
         let brightness = mix(0.01, 1.0, smoothstep(-0.1, 0.1, sunDotUp) * cloudOcc);
         rawFogColor = fc * brightness * 10.0;
     } else {
-        rawFogColor = getFogColor( dir, object.cameraPosition, sunDirection, blendedColor.rgb );
+        rawFogColor = getFogColor( dir, object.cameraPosition, sunDirection, hdrBlend.rgb );
     }
-    let fogResult = vec4f( 1.0 - exp( -rawFogColor * mix(1.0, fogShadowFactor, fogFactor) / 8.6 ), max(blendedColor.a, fogFactor) );
+
+    // Single ACES pass over the full HDR fog value — no separate exp curve.
+    let fogTonemapped = tonemapACES(HDR_SCALE * rawFogColor * mix(1.0, fogShadowFactor, fogFactor));
+    let fogResult = vec4f(fogTonemapped, max(hdrBlend.a, fogFactor));
 
     // Partial cloud occlusion: blend terrain fog with cloud-occluded sky view
     if (cloudOcclusion > 0.0) {
-      let skyResult = vec4f(blendedColor.rgb, 1.0);
+      let skyResult = vec4f(tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb)), 1.0);
       let blended = mix(fogResult, skyResult, cloudOcclusion);
       return vec4f(blended.rgb + godRays.rgb + flash, blended.a);
     }
@@ -163,7 +159,9 @@ var<private> sunDotUp: f32;
     return vec4f(fogResult.rgb + godRays.rgb + flash, fogResult.a);
   }
 
-  return vec4f( blendedColor.rgb + godRays.rgb + flash, blendedColor.a );
+  // Sky pixel: single ACES over the full HDR composite (sky + clouds + bloom)
+  let tonemapped = tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb));
+  return vec4f(tonemapped + godRays.rgb + flash, hdrBlend.a);
 }
 
 fn worldFromScreenCoord( coord: vec2f, depthSample: f32 ) -> vec3f {

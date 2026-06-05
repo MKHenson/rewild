@@ -148,6 +148,7 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
 
     // Overcast factor: 0 at clear sky, ramps to 1 at heavy overcast.
     // Gated by day so the night sky is completely unaffected.
+    // Greying begins at 50% cloudiness for more natural overcast appearance.
     let overcastDayFactor = smoothstep(-0.05, 0.15, sunDotUp);
     let overcastFactor    = smoothstep(0.7, 0.95, object.cloudiness) * overcastDayFactor;
 
@@ -179,7 +180,7 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     );
 
     // W1.2: shift sky toward pale overcast gray under heavy cloud cover
-    let overcastZenith = vec3f(0.82, 0.85, 0.90);
+    let overcastZenith = vec3f(0.92, 0.95, 0.90);
     let skyColor = mix(skyColorClear, overcastZenith, overcastFactor);
 
     // Sky brightness: dimmer at sunset, full brightness at noon.
