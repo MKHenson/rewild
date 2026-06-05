@@ -67,9 +67,13 @@ struct VertexOutput {
   let uv = fragCoord.xy / uniforms.faceSize;
   let dir = getCubeDirection(uniforms.faceIndex, uv);
 
-  // Stars (noise-based) — boosted slightly to compensate for removed pixel-perfect stars
-  var starIntensity = mix(-1.2, 2.0, proceduralNoise3D(500.0 * dir) + 0.10 * proceduralNoise3D(2.0 * dir));
-  starIntensity = clamp(starIntensity, 0.0, 1.0);
+  // Stars (noise-based) — HDR: power curve concentrates intensity at noise peaks.
+  // Bright stars store values > 1 in rgba16float; dim stars → 0. No clamp.
+  // pow(4)*300: noise peaks ≈ 0.45 → ~1 HDR (faint), ≈ 0.50 → ~8 HDR (blooms),
+  // ≈ 0.55 → ~21 HDR (bright halo). Most sky stays at 0; only the top few percent
+  // of noise peaks produce visible stars.
+  var starIntensity = max(0.0, mix(-1.2, 2.0, proceduralNoise3D(500.0 * dir) + 0.10 * proceduralNoise3D(2.0 * dir)));
+  starIntensity = pow(starIntensity, 4.0) * 300.0;
   let starColor = vec3f(
     0.7 + 0.3 * proceduralNoise3D(100.0 * dir),
     0.7 + 0.3 * proceduralNoise3D(103.0 * dir),
@@ -84,7 +88,9 @@ struct VertexOutput {
   galaxyCenter = galaxyCenter * galaxyCenter;
   let galaxyIntensity = galaxyPlane * galaxyCenter;
   let galaxyColor = vec3f(0.5, 0.5, 1.0);
-  let galaxy = 0.8 * galaxyIntensity * galaxyColor;
+  // 8.0 (was 0.8) restores the 10× amplification that used to live in skyGradient.wgsl
+  // so the galaxy stores genuine HDR values in the rgba16float cubemap.
+  let galaxy = 8.0 * galaxyIntensity * galaxyColor;
 
   // Dust
   var d = 0.0;

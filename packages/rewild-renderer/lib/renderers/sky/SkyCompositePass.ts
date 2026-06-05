@@ -1,6 +1,7 @@
 import { IPostProcess } from '../../../types/IPostProcess';
 import { Renderer } from '../../Renderer';
 import shader from '../../shaders/sky/skyComposite.wgsl';
+import blendShader from '../../shaders/sky/skyBlend.wgsl';
 import vertexScreenQuadShader from '../../shaders/utils/vertexScreenQuad.wgsl';
 import constantsFn from '../../shaders/sky/skyConstants.wgsl';
 import commonShaderFns from '../../shaders/sky/fog.wgsl';
@@ -23,12 +24,15 @@ const finalUniformBufferSize =
   0;
 
 const alignedUniformBufferSize = Math.ceil(finalUniformBufferSize / 256) * 256;
+const BLEND_UNIFORM_SIZE = Math.ceil(8 / 256) * 256; // resolution vec2f
+
 const tempVec = new Vector3();
 const uniformData = new Float32Array(alignedUniformBufferSize / 4);
 const invViewProjectionMatrix = new Matrix4();
 
 export class SkyCompositePass implements IPostProcess {
   renderTarget: GPUTexture; // unused — composite renders directly to swapchain pass
+  intermediateTarget: GPUTexture; // HDR sky+clouds blend; fed to bloom and final pass
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
   uniformBuffer: GPUBuffer;
@@ -44,6 +48,10 @@ export class SkyCompositePass implements IPostProcess {
   elevation: number;
   azimuth: number;
 
+  private blendPipeline: GPURenderPipeline;
+  private blendBindGroup: GPUBindGroup;
+  private blendUniformBuffer: GPUBuffer;
+
   constructor() {
     this.scaleFactor = 1;
     this.atmosphereTexture = null;
@@ -53,7 +61,62 @@ export class SkyCompositePass implements IPostProcess {
     this.bloomTexture = null;
   }
 
-  init(renderer: Renderer): IPostProcess {
+  /**
+   * Phase 1: creates the intermediateTarget and the blend pipeline that reads
+   * atmosphereTexture + cloudsTexture and writes an HDR sky+clouds blend with no
+   * tonemapping. Call this before initialising the bloom pass so that
+   * intermediateTarget can be used as the bloom source.
+   */
+  initBlend(renderer: Renderer): void {
+    const { device, canvas } = renderer;
+
+    this.intermediateTarget = device.createTexture({
+      size: [canvas.width, canvas.height, 1],
+      label: 'sky intermediate HDR',
+      format: 'rgba16float',
+      usage:
+        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    const blendModule = device.createShaderModule({ code: blendShader });
+
+    this.blendPipeline = device.createRenderPipeline({
+      label: 'sky HDR blend pipeline',
+      layout: 'auto',
+      vertex: { entryPoint: 'vs', module: blendModule },
+      fragment: {
+        entryPoint: 'fs',
+        module: blendModule,
+        targets: [{ format: 'rgba16float' }],
+      },
+    });
+
+    this.blendUniformBuffer = device.createBuffer({
+      label: 'sky blend uniforms',
+      size: BLEND_UNIFORM_SIZE,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const sampler = renderer.samplerManager.get('linear-clamped');
+
+    this.blendBindGroup = device.createBindGroup({
+      label: 'sky blend bind group',
+      layout: this.blendPipeline.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: this.atmosphereTexture!.createView() },
+        { binding: 1, resource: this.cloudsTexture!.createView() },
+        { binding: 2, resource: { buffer: this.blendUniformBuffer } },
+        { binding: 3, resource: sampler },
+      ],
+    });
+  }
+
+  /**
+   * Phase 2: creates the final tonemap pipeline that reads intermediateTarget +
+   * bloom and outputs to the swapchain. Call this after the bloom pass is
+   * initialised so that bloomTexture is available.
+   */
+  initFinal(renderer: Renderer): IPostProcess {
     const { device, presentationFormat } = renderer;
 
     const module = device.createShaderModule({
@@ -102,22 +165,29 @@ export class SkyCompositePass implements IPostProcess {
       label: 'bind group for atmosphere final pass',
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: this.atmosphereTexture!.createView() },
-        { binding: 1, resource: this.cloudsTexture!.createView() },
-        { binding: 2, resource: { buffer: this.uniformBuffer } },
-        { binding: 3, resource: renderer.samplerManager.get('linear-clamped') },
-        { binding: 4, resource: renderer.depthTexture.createView() },
-        { binding: 5, resource: this.cloudShadowMap!.createView() },
-        { binding: 6, resource: this.godRaysTexture!.createView() },
-        { binding: 7, resource: this.bloomTexture!.createView() },
+        { binding: 0, resource: this.intermediateTarget.createView() },
+        { binding: 1, resource: { buffer: this.uniformBuffer } },
+        { binding: 2, resource: renderer.samplerManager.get('linear-clamped') },
+        { binding: 3, resource: renderer.depthTexture.createView() },
+        { binding: 4, resource: this.cloudShadowMap!.createView() },
+        { binding: 5, resource: this.godRaysTexture!.createView() },
+        { binding: 6, resource: this.bloomTexture!.createView() },
       ],
     });
 
     return this;
   }
 
+  /** Legacy single-call init: calls initBlend then initFinal (requires bloomTexture set). */
+  init(renderer: Renderer): IPostProcess {
+    this.initBlend(renderer);
+    return this.initFinal(renderer);
+  }
+
   dispose(): void {
     this.uniformBuffer?.destroy();
+    this.intermediateTarget?.destroy();
+    this.blendUniformBuffer?.destroy();
   }
 
   private setupFinalPassUniforms(renderer: Renderer, camera: Camera) {
@@ -156,6 +226,33 @@ export class SkyCompositePass implements IPostProcess {
       32
     );
     return uniformData;
+  }
+
+  /** Blend sub-pass: sky HDR + clouds HDR → intermediateTarget (no tonemap). */
+  renderBlend(renderer: Renderer): void {
+    const { device, canvas } = renderer;
+
+    const blendData = new Float32Array(BLEND_UNIFORM_SIZE / 4);
+    blendData[0] = canvas.width;
+    blendData[1] = canvas.height;
+    device.queue.writeBuffer(this.blendUniformBuffer, 0, blendData.buffer);
+
+    const encoder = device.createCommandEncoder();
+    const pass = encoder.beginRenderPass({
+      colorAttachments: [
+        {
+          view: this.intermediateTarget.createView(),
+          clearValue: [0, 0, 0, 0],
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
+      ],
+    });
+    pass.setPipeline(this.blendPipeline);
+    pass.setBindGroup(0, this.blendBindGroup);
+    pass.draw(6);
+    pass.end();
+    device.queue.submit([encoder.finish()]);
   }
 
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {

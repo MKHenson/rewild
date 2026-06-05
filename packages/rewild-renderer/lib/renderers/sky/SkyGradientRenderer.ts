@@ -25,7 +25,7 @@ export class SkyGradientRenderer {
     this.renderTarget = device.createTexture({
       size: [canvas.width, canvas.height, 1],
       label: 'atmosphere render target',
-      format: 'rgba8unorm',
+      format: 'rgba16float',
       usage:
         GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
@@ -41,7 +41,7 @@ export class SkyGradientRenderer {
         module: module,
         targets: [
           {
-            format: 'rgba8unorm',
+            format: 'rgba16float',
           },
         ],
         entryPoint: 'fs',

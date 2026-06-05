@@ -124,11 +124,8 @@ fn fs(
 
 fn drawSkyAndHorizonFog(dir: vec3f, org: vec3f, vSunDirection: vec3f, nightSky: vec3f ) -> vec3f {
     let mu = dot(vSunDirection, dir);
-    var color = getAtmosphereColor(vSunDirection, dir, mu, nightSky * 10.0);
+    var color = getAtmosphereColor(vSunDirection, dir, mu, nightSky);
     color = getFogColor( dir, org, vSunDirection, color.rgb );
-
-    // Adjust exposure
-    var colorAdjustedExposure = vec3f( 1.0 - exp(-color / 8.6));
-    return colorAdjustedExposure;
+    return color;
 }
 
