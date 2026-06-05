@@ -69,10 +69,11 @@ fn fs(
             output.color = vec4f( 0.0, 0.0, 0.0, 0.0 );
             return output;
         }
-        // No terrain — render sky. Fade out stars when looking down.
+        // No terrain — render sky. Fade out stars when looking down and when clouds are thick.
         let nightSky: vec3f = sampleNightSky(direction);
         let downFade = smoothstep(-0.1, 0.1, viewVertical);
-        let adjustedNightSky = nightSky * downFade;
+        let cloudinessFade = 1.0 - object.cloudiness;
+        let adjustedNightSky = nightSky * downFade * cloudinessFade;
         let atmosphereColor = drawSkyAndHorizonFog( direction, object.cameraPosition, vSunDirection, adjustedNightSky );
         output.color = vec4f( atmosphereColor, 1.0 );
         return output;
@@ -93,8 +94,9 @@ fn fs(
 
     // Below-horizon color: evaluate the atmosphere at a horizon-clamped direction
     // so the color exactly matches what's at the horizon edge (no palette mismatch).
+    // Stars fade with cloud coverage.
     let horizonDir = normalize(vec3f(direction.x, max(0.001, direction.y), direction.z));
-    let horizonNightSky = sampleNightSky(horizonDir) * starVisibility;
+    let horizonNightSky = sampleNightSky(horizonDir) * starVisibility * (1.0 - object.cloudiness);
     let horizonFog = drawSkyAndHorizonFog(horizonDir, object.cameraPosition, vSunDirection, horizonNightSky);
 
     // Below clouds — original hemisphere masking
@@ -103,7 +105,7 @@ fn fs(
 
     // Horizon transition band: blend between below-horizon color and atmosphere above
     if ( hemisphereMask < 1 && hemisphereMask > 0.0 ) {
-        let nightSky: vec3f = sampleNightSky(direction);
+        let nightSky: vec3f = sampleNightSky(direction) * (1.0 - object.cloudiness);
         let atmosphereColor = drawSkyAndHorizonFog( direction, object.cameraPosition, vSunDirection, nightSky );
         output.color = vec4f( mix( horizonFog, atmosphereColor, hemisphereMask), 1.0 );
         return output;
@@ -115,7 +117,7 @@ fn fs(
     }
     // Above horizon: full atmosphere
     else {
-        let nightSky: vec3f = sampleNightSky(direction);
+        let nightSky: vec3f = sampleNightSky(direction) * (1.0 - object.cloudiness);
         let atmosphereColor = drawSkyAndHorizonFog( direction, object.cameraPosition, vSunDirection, nightSky );
         output.color = vec4f( atmosphereColor, 1.0 );
         return output;

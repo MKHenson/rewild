@@ -24,14 +24,12 @@ struct BlendUniformStruct {
     let sky    = textureSampleLevel(skyTexture,    texSampler, uv, 0);
     let clouds = textureSampleLevel(cloudsTexture, texSampler, uv, 0);
 
-    // The atmosphere's sun-scatter term peaks at ~290 HDR near the sun.
-    // Without a bound, the sky background bleeds into semi-transparent cloud
-    // pixels and inflates the intermediate: ACES(0.05*(290*0.2 + 80*0.8)) ≈ 0.998.
-    // Cap sky to 20 HDR — the equivalent of the old exp pre-tonemap ceiling
-    // (1-exp(-x/8.6) → 1.0 LDR → 20 HDR at HDR_SCALE=0.05).
-    // Stars/galaxy in the cubemap are ≤ ~20 HDR, so they pass through unchanged.
-    let skyCapped = vec4f(min(sky.rgb, vec3f(20.0)), sky.a);
-
+    // Cap sky at 60 HDR to prevent thin clouds from appearing opaque-white when in front of
+    // the bright sun. With HDR_SCALE=0.045: cap at 60 → ACES(2.7) ≈ 0.957 (bright but not
+    // peak white). A thin cloud (alpha=0.2) in front: 60*0.8 + cloud*0.2 ≈ 58 → ACES(2.61)
+    // ≈ 0.954 (shows some cloud instead of pure white). Sun disk (no cloud) still appears
+    // bright and visible even when capped.
+    let skyCapped = vec4f(min(sky.rgb, vec3f(60.0)), sky.a);
     let preMultClouds = vec4f(clouds.rgb * clouds.a, clouds.a);
     return skyCapped * (1.0 - preMultClouds.a) + preMultClouds;
 }
