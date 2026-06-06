@@ -133,7 +133,10 @@ fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_d
     let sunIntensityModifier = smoothstep(0.0, 0.1, sunAngle);
     let scatterAmount: f32 = mix(0.008, 1.0, smoothstep(0.96, 0.0, mu));
     let beersLaw: f32 = exp(-stepL * lighRayDen) + 0.9 * scatterAmount * exp(-0.1 * stepL * lighRayDen) + scatterAmount * 0.5 * exp(-0.02 * stepL * lighRayDen);
-    return sunIntensityModifier * beersLaw * phaseFunction * mix(0.85 + 1.35 * pow(min(1.0, dC * 8.5), 0.3 + 5.5 * cloudHeight), 1.0, clamp(lighRayDen * 0.4, 0.0, 1.0));
+    // Thin cloud absorption: caps forward-scattered sun brightness for low-density clouds.
+    // Low lighRayDen → 0.25 floor; thick clouds → 1.0 (unchanged). Tune 1.2 and 0.25.
+    let thinCloudDim = mix(0.25, 1.0, 1.0 - exp(-lighRayDen * 1.2));
+    return sunIntensityModifier * beersLaw * phaseFunction * mix(0.85 + 1.35 * pow(min(1.0, dC * 8.5), 0.3 + 5.5 * cloudHeight), 1.0, clamp(lighRayDen * 0.4, 0.0, 1.0)) * thinCloudDim;
 }
 
 fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {

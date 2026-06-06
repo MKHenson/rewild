@@ -37,7 +37,7 @@ export class SkyBilateralPass {
    * Higher values increase softening of close cloud edges.
    * Default: 4.0
    */
-  sigmaSpatial: number = 1.5;
+  sigmaSpatial: number = 1.1;
 
   /**
    * sigmaRange: Edge-stop in log-luminance space (fog-independent).
@@ -57,7 +57,7 @@ export class SkyBilateralPass {
    * shrinking (which was the original bug that left medium-distance clouds pixelated).
    * Default: 6.0
    */
-  sigmaFar: number = 1.5;
+  sigmaFar: number = 1.2;
 
   private pipeline: GPURenderPipeline;
   private bindGroup: GPUBindGroup;

@@ -80,7 +80,7 @@ struct VertexOutput {
   // ≈ 0.55 → ~126 HDR (prominent halo). Most sky stays at 0; only the top few percent
   // of noise peaks produce visible stars. 3x multiplier from 300 enables selective bloom.
   var starIntensity = max(0.0, mix(-1.2, 2.0, proceduralNoise3D(500.0 * dir) + 0.10 * proceduralNoise3D(2.0 * dir)));
-  starIntensity = pow(starIntensity, 4.0) * 900.0;
+  starIntensity = pow(starIntensity, 4.0) * 1900.0;
   let starColor = vec3f(
     0.7 + 0.3 * proceduralNoise3D(100.0 * dir),
     0.7 + 0.3 * proceduralNoise3D(103.0 * dir),

@@ -33,12 +33,12 @@ export class SkyBloomPass implements IPostProcess {
 
   /** Scales the HDR highlight added to clouds before tonemapping.
    *  Range 0–3; default 1.2. Higher = brighter glow. */
-  bloomAmount: number = 0.01;
+  bloomAmount: number = 0.86;
 
   /** Threshold in exposure-adjusted luminance (EXPOSURE * raw_luminance).
    *  With EXPOSURE=0.05, threshold 0.25 ≈ HDR lum ~7 — daytime sky (~7 HDR, lum
    *  ~0.245) stays just below; bright stars (8+ HDR) and cloud tops bloom. */
-  bloomThreshold: number = 0.35;
+  bloomThreshold: number = 0.05;
 
   /** History weight for temporal stabilization. Higher = smoother but slower
    *  to respond to new bright areas. Range 0–1; default 0.85. */

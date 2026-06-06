@@ -3,7 +3,7 @@
 // uncapped sun corona at ~290 HDR → ACES(13.05) clamps to 1.0 (by ACES design).
 // The sky cap at 100 HDR (in blend pass) prevents sun scatter from over-brightening
 // semi-transparent cloud edges while still allowing the full sun to shine through sky-only pixels.
-const HDR_SCALE: f32 = 0.05;
+const HDR_SCALE: f32 = 0.06;
 
 struct FinalUniformStruct {
     invViewProjectionMatrix: mat4x4<f32>,

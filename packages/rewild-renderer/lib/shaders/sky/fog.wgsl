@@ -167,7 +167,7 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     let sunElevationBlend = smoothstep(-0.05, 0.15, sunDotUp);
 
     // Sky color palette
-    let deepBlue = vec3f(0.2, 0.52, 1.0);       // Away from sun, daytime
+    let deepBlue = vec3f(0.4, 0.62, 1.0);       // Away from sun, daytime
     let paleBlue = vec3f(0.8, 0.95, 1.0);        // Toward sun, daytime
     let sunsetRed = vec3f(0.95, 0.3, 0.2);       // Away from sun, sunset
     let sunsetOrange = vec3f(1.0, 0.5, 0.2);     // Toward sun, sunset
