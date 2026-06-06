@@ -20,11 +20,13 @@ var<private> varyings: VaryingsStruct;
 var<private> output: OutputStruct;
 var<private> sunDotUp: f32;
 
+const STAR_ROTATION_OFFSET: f32 = -1.8; // radians
+
 fn sampleNightSky(direction: vec3f) -> vec3f {
     // Apply time-based rotation (moved from drawNightSky)
     let dir = direction + vec3f( 0.0, 0.0, object.iTime * 0.0000005 );
 
-    let rotationAngle = object.iTime * 0.00001;
+    let rotationAngle = STAR_ROTATION_OFFSET + object.iTime * 0.00001;
     let cosAngle = cos(rotationAngle);
     let sinAngle = sin(rotationAngle);
     let rotationMatrix = mat3x3<f32>(
