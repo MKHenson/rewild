@@ -64,25 +64,37 @@ export class SceneGraph extends Component<Props> {
       setSelectedNodes(val);
     };
 
+    // Resolve a (possibly spread-copied) node back to its original in the store.
+    // Nodes in rootNodes are copied each render, so mutations must target originals.
+    const resolveOriginal = (
+      sel: ITreeNode<IResource>
+    ): ITreeNode<IResource> | null => {
+      if (sel.resource) return sceneGraphStore.findNodeById(sel.resource.id);
+      return sceneGraphStore.nodes.find((n) => n.name === sel.name) ?? null;
+    };
+
     const onAdd = () => {
-      sceneGraphStore.createChildNode(selectedNodes()[0] as ITemplateTreeNode);
+      const original = resolveOriginal(
+        selectedNodes()[0]
+      ) as ITemplateTreeNode | null;
+      if (original) sceneGraphStore.createChildNode(original);
     };
 
     const onDelete = () => {
-      const selectedNode = selectedNodes()[0];
-      if (selectedNode.resource?.type === 'container') {
-        delete projectStore.containerPods[selectedNode.resource.id];
-      }
+      const original = resolveOriginal(selectedNodes()[0]);
+      if (!original) return;
 
-      sceneGraphStore.removeNode(selectedNode);
+      if (original.resource?.type === 'container') {
+        delete projectStore.containerPods[original.resource.id];
+      }
+      sceneGraphStore.removeNode(original);
       setSelection([]);
     };
 
     const onSelectionChanged = (val: ITreeNode<IResource>[]) => {
       setSelection(val);
 
-      if (val.length === 1 && val[0].resource)
-        sceneGraphStore.setSelectedNode(val[0]);
+      if (val.length === 1) sceneGraphStore.setSelectedNode(val[0]);
       else sceneGraphStore.setSelectedNode(null);
     };
 
