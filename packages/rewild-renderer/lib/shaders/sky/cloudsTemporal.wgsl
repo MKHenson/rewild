@@ -238,13 +238,18 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     let background = getAtmosphereColor(sun_direction, dir, mu, vec3f(0.0));
     color += background * pow(transmittance, 2.0);
 
-    let sunExtinction = smoothstep(-0.1, 0.1, sunDotUp);
+    let sunExtinction = smoothstep(-0.12, 0.0, sunDotUp);
     let airmass = 1.0 / max(sunDotUp, 0.04);
-    let atmosphericDimming = exp(-0.15 * airmass);
-    let sunDisc = 500.0 * smoothstep(0.9998, 1.0, mu) * sunExtinction * atmosphericDimming;
+    let atmosphericDimming = exp(-0.08 * airmass);
+    // Sun disc grows near the horizon (lower threshold = larger angular radius).
+    let horizonFactor = 1.0 - smoothstep(0.0, 0.2, sunDotUp);
+    let discEdge  = mix(0.9998, 0.9990, horizonFactor);
+    let alphaEdge = mix(0.9995, 0.9987, horizonFactor);
+    let discBrightness = mix(1000.0, 3000.0, horizonFactor);
+    let sunDisc = discBrightness * smoothstep(discEdge, 1.0, mu) * sunExtinction * atmosphericDimming;
     color += vec3f(sunDisc) * pow(transmittance, 2.0);
 
-    let sunAlpha = smoothstep(0.9995, 1.0, mu) * sunExtinction;
+    let sunAlpha = smoothstep(alphaEdge, 1.0, mu) * sunExtinction;
     let alpha = max(1.0 - transmittance, sunAlpha);
     return vec4f(color, alpha);
 }
