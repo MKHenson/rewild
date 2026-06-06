@@ -5,18 +5,13 @@ import {
   PropValue,
   IResource,
 } from 'models';
-import { traverseTree, Store, ITreeNode } from 'rewild-ui';
+import { traverseTree, ITreeNode } from 'rewild-ui';
 import {
   containerFactory,
   baseActorTemplate,
 } from '../utils/TemplateFactories';
 import { Dispatcher } from 'rewild-common';
 import { projectStore } from './ProjectStore';
-
-export interface ISceneGraphStore {
-  selectedContainerId: string | null;
-  selectedResource: IResource | null;
-}
 
 export type SceneGraphEvents =
   | {
@@ -31,31 +26,29 @@ export type SceneGraphEvents =
   | { kind: 'container-deactivated'; container: ITreeNode<IResource> }
   | { kind: 'resource-selected'; node: ITreeNode<IResource> | null };
 
-export class SceneGraphStore extends Store<ISceneGraphStore> {
+export class SceneGraphStore {
+  selectedContainerId: string | null = null;
+  selectedResource: IResource | null = null;
+
   nodes: ITreeNode<IResource>[];
-  dispatcher: Dispatcher<SceneGraphEvents>;
+  readonly dispatcher = new Dispatcher<SceneGraphEvents>();
 
   constructor() {
-    super({
-      selectedContainerId: null,
-      selectedResource: null,
-    });
-
-    this.dispatcher = new Dispatcher();
     this.dispatcher.add(this.handleSceneGraphEvent);
     this.nodes = [];
   }
 
   handleSceneGraphEvent(event: SceneGraphEvents) {
     if (event.kind === 'nodes-updated') {
-      projectStore.defaultProxy.dirty = true;
+      projectStore.dirty = true;
+      projectStore.dispatcher.dispatch({ kind: 'changed' });
     }
   }
 
   setActiveContainer(id: string | null) {
-    const currentContainerId = this.target.selectedContainerId;
+    const currentContainerId = this.selectedContainerId;
 
-    this.defaultProxy.selectedContainerId = id;
+    this.selectedContainerId = id;
     if (id) {
       const node = this.findNodeById(id)!;
       this.dispatcher.dispatch({
@@ -224,7 +217,7 @@ export class SceneGraphStore extends Store<ISceneGraphStore> {
   };
 
   setSelectedNode(node: ITreeNode<IResource> | null) {
-    this.defaultProxy.selectedResource = node ? node.resource || null : null;
+    this.selectedResource = node ? node.resource || null : null;
     this.dispatcher.dispatch({ kind: 'resource-selected', node });
   }
 

@@ -16,13 +16,13 @@ interface Props {}
 @register('x-project-settings')
 export class ProjectSettings extends Component<Props> {
   init() {
-    const projectStoreProxy = this.observeStore(projectStore);
+    this.on(projectStore.dispatcher);
     const [updatedProject, setUpdatedProject] = this.useState({
-      ...projectStoreProxy.project,
+      ...projectStore.project,
     });
 
     return () => {
-      const { project, level } = projectStoreProxy;
+      const { project, level } = projectStore;
       return (
         <Card stretched>
           {project ? (
@@ -67,7 +67,7 @@ export class ProjectSettings extends Component<Props> {
                   <Button
                     fullWidth
                     onClick={(e) => {
-                      projectStoreProxy.project = updatedProject() as StoredRecord<IProject>;
+                      projectStore.project = updatedProject() as StoredRecord<IProject>;
                       projectStore.updateProject();
                     }}>
                     Save

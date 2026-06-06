@@ -5,6 +5,7 @@ import {
   ButtonGroup,
   Button,
   Tree,
+  traverseTree,
   Component,
   register,
   Card,
@@ -28,16 +29,19 @@ export class SceneGraph extends Component<Props> {
       ITreeNode<IResource>[]
     >([]);
 
-    const sceneGraphStoreProxy = this.observeStore(sceneGraphStore);
-    const projectStoreProxy = this.observeStore(projectStore);
-
     const onSceneGraphEvent: Subscriber<SceneGraphEvents> = (event) => {
-      if (event.kind === 'nodes-updated') {
+      if (
+        event.kind === 'nodes-updated' ||
+        event.kind === 'container-activated' ||
+        event.kind === 'container-deactivated'
+      ) {
         this.render();
-      } else if (event.kind === 'resource-selected' && event.node) {
-        setSelectedNodes([event.node]);
+      } else if (event.kind === 'resource-selected') {
+        setSelectedNodes(event.node ? [event.node] : []);
       }
     };
+
+    this.on(sceneGraphStore.dispatcher, onSceneGraphEvent);
 
     this.keyUpDelegate = async (e: KeyboardEvent) => {
       const node = tree.getSelectedNode();
@@ -48,7 +52,11 @@ export class SceneGraph extends Component<Props> {
         node
       ) {
         const newName = await node.editName();
-        sceneGraphStoreProxy.selectedResource!.name = newName;
+        sceneGraphStore.selectedResource!.name = newName;
+        sceneGraphStore.dispatcher.dispatch({
+          kind: 'nodes-updated',
+          nodes: sceneGraphStore.nodes,
+        });
       }
     };
 
@@ -74,8 +82,8 @@ export class SceneGraph extends Component<Props> {
       setSelection(val);
 
       if (val.length === 1 && val[0].resource)
-        sceneGraphStoreProxy.selectedResource = val[0].resource!;
-      else sceneGraphStoreProxy.selectedResource = null;
+        sceneGraphStore.setSelectedNode(val[0]);
+      else sceneGraphStore.setSelectedNode(null);
     };
 
     const handleNodeDblClick = (node: ITreeNode<IResource>) => {
@@ -85,17 +93,16 @@ export class SceneGraph extends Component<Props> {
     };
 
     const onDrop = (val: ITreeNode<IResource>) => {
-      projectStoreProxy.dirty = true;
+      projectStore.dirty = true;
+      projectStore.dispatcher.dispatch({ kind: 'changed' });
     };
 
     this.onMount = () => {
       document.addEventListener('keydown', this.keyUpDelegate);
-      sceneGraphStore.dispatcher.add(onSceneGraphEvent);
     };
 
     this.onCleanup = () => {
       document.removeEventListener('keydown', this.keyUpDelegate);
-      sceneGraphStore.dispatcher.remove(onSceneGraphEvent);
     };
 
     let tree: Tree;
@@ -138,33 +145,56 @@ export class SceneGraph extends Component<Props> {
     );
 
     return () => {
+      const rootNodes: ITreeNode<IResource>[] =
+        sceneGraphStore.selectedContainerId
+          ? [
+              goBackTreeNode,
+              sceneGraphStore.findNodeById(
+                sceneGraphStore.selectedContainerId
+              )!,
+            ]
+          : sceneGraphStore.nodes.map((node) =>
+              (node as ITemplateTreeNode).factoryKey === 'container'
+                ? {
+                    ...node,
+                    children: node.children?.map((c) => ({
+                      ...c,
+                      children: undefined,
+                    })),
+                  }
+                : node
+            );
+
+      // Container nodes are spread-copied in rootNodes on each render, so
+      // selectedNodes state holds stale references that fail Array.includes.
+      // Reconcile against the current rootNodes by resource ID before passing.
+      const currentSelected = selectedNodes().reduce<ITreeNode<IResource>[]>(
+        (acc, sel) => {
+          let found: ITreeNode<IResource> | undefined;
+          traverseTree(rootNodes, (n) => {
+            const match = sel.resource
+              ? (n as ITreeNode<IResource>).resource?.id === sel.resource.id
+              : n.name === sel.name;
+            if (match) {
+              found = n as ITreeNode<IResource>;
+              return true;
+            }
+            return false;
+          });
+          if (found) acc.push(found);
+          return acc;
+        },
+        []
+      );
+
       tree = (
         <Tree
           css={TreeCss}
           onSelectionChanged={onSelectionChanged}
           onNodeDblClick={handleNodeDblClick}
-          selectedNodes={selectedNodes()}
+          selectedNodes={currentSelected}
           onDrop={onDrop}
-          rootNodes={
-            sceneGraphStoreProxy.selectedContainerId
-              ? [
-                  goBackTreeNode,
-                  sceneGraphStore.findNodeById(
-                    sceneGraphStoreProxy.selectedContainerId
-                  )!,
-                ]
-              : sceneGraphStore.nodes.map((node) =>
-                  (node as ITemplateTreeNode).factoryKey === 'container'
-                    ? {
-                        ...node,
-                        children: node.children?.map((c) => ({
-                          ...c,
-                          children: undefined,
-                        })),
-                      }
-                    : node
-                )
-          }
+          rootNodes={rootNodes}
         />
       ) as Tree;
 

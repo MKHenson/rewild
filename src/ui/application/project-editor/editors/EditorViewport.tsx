@@ -52,23 +52,13 @@ export class EditorViewport extends Component<Props> {
     this.renderer = new Renderer();
     this.templateLoader = new TemplateLoader();
 
-    const sceneGraphStoreProxy = this.observeStore(sceneGraphStore, (e) => {
-      if (e === 'selectedContainerId') return this.render();
-      if (e.includes('selectedResource.properties')) {
-        if (sceneGraphStore.target.selectedResource?.id) {
-          syncFromEditorResource(
-            sceneGraphStore.target.selectedResource.id,
-            this.renderer
-          );
-        }
-      }
-    });
-
     const onProjectEvent: Subscriber<ProjectStoreEvents> = (event) => {
       if (event.kind === 'loading-completed') {
         SyncRendererFromProject(this.renderer, event.project);
       }
     };
+
+    this.on(projectStore.dispatcher, onProjectEvent);
 
     const setTransformSelected = (transform: Transform, value: boolean) => {
       transform.selected = value;
@@ -82,7 +72,6 @@ export class EditorViewport extends Component<Props> {
 
     const onSceneGraphEvent: Subscriber<SceneGraphEvents> = async (event) => {
       if (event.kind === 'resource-selected') {
-        // Clear previous selection tint
         if (this.selectedTransform) {
           setTransformSelected(this.selectedTransform, false);
           this.selectedTransform = null;
@@ -116,7 +105,6 @@ export class EditorViewport extends Component<Props> {
             asset3D: [],
           };
 
-        // Add the node to the scene graph
         if (containerNode.children) {
           for (const childNode of containerNode.children) {
             const createdResource = (await this.templateLoader.createResource(
@@ -150,6 +138,7 @@ export class EditorViewport extends Component<Props> {
             }
           }
         }
+        this.render();
       } else if (event.kind === 'container-deactivated') {
         const containerNode = event.container;
         if (containerNode.children) {
@@ -160,6 +149,7 @@ export class EditorViewport extends Component<Props> {
             if (toRemove) this.renderer.scene.removeChild(toRemove);
           }
         }
+        this.render();
       } else if (event.kind === 'node-removed') {
         if (event.node.resource?.type === 'actor') {
           const container = event.node.parent!;
@@ -174,8 +164,17 @@ export class EditorViewport extends Component<Props> {
 
           if (toRemove) this.renderer.scene.removeChild(toRemove);
         }
+      } else if (event.kind === 'nodes-updated') {
+        if (sceneGraphStore.selectedResource?.id) {
+          syncFromEditorResource(
+            sceneGraphStore.selectedResource.id,
+            this.renderer
+          );
+        }
       }
     };
+
+    this.on(sceneGraphStore.dispatcher, onSceneGraphEvent);
 
     const onRequestRendererEvent = (event: Event) => {
       ((event as CustomEvent).detail as ViewportEventDetails).renderer =
@@ -193,17 +192,11 @@ export class EditorViewport extends Component<Props> {
     };
 
     this.onMount = () => {
-      projectStore.dispatcher.add(onProjectEvent);
-      sceneGraphStore.dispatcher.add(onSceneGraphEvent);
-
-      // Listen for custom event to get the renderer
       document.addEventListener('request-renderer', onRequestRendererEvent);
       document.addEventListener('keydown', onKeyDown);
     };
 
     this.onCleanup = () => {
-      projectStore.dispatcher.remove(onProjectEvent);
-      sceneGraphStore.dispatcher.remove(onSceneGraphEvent);
       document.removeEventListener('request-renderer', onRequestRendererEvent);
       document.removeEventListener('keydown', onKeyDown);
       this.removeCameraObserver();
@@ -211,7 +204,7 @@ export class EditorViewport extends Component<Props> {
 
     const onCanvasReady = async (pane3D: Pane3D) => {
       try {
-        if (this.hasInitialized) return; // Prevent re-initialization
+        if (this.hasInitialized) return;
         this.hasInitialized = true;
 
         await this.renderer.init(pane3D.canvas()!);
@@ -235,7 +228,6 @@ export class EditorViewport extends Component<Props> {
     };
 
     const onClick = (event: MouseEvent) => {
-      // Suppress selection when a drag just completed
       if (this.didDrag) {
         this.didDrag = false;
         return;
@@ -247,7 +239,6 @@ export class EditorViewport extends Component<Props> {
         (intersection.object.component instanceof Mesh ||
           intersection.object.component instanceof Sprite3D)
       ) {
-        // Walk up the Transform parent chain to find the root scene graph node
         let current: Transform | null = intersection.object;
         let clickedNode = null;
         while (current && current !== this.renderer.scene) {
@@ -259,7 +250,6 @@ export class EditorViewport extends Component<Props> {
           sceneGraphStore.setSelectedNode(clickedNode);
         } else sceneGraphStore.setSelectedNode(null);
       } else {
-        // Clicked empty space — deselect
         sceneGraphStore.setSelectedNode(null);
       }
     };
@@ -294,9 +284,7 @@ export class EditorViewport extends Component<Props> {
     };
 
     const onMouseMove = (event: MouseEvent) => {
-      // Detect camera drag: left button held and moved beyond a small threshold.
-      // Sets didDrag so the subsequent click event doesn't deselect the object.
-      if ((event.buttons & 1) && !this.dragController.isDragging) {
+      if (event.buttons & 1 && !this.dragController.isDragging) {
         const dx = event.clientX - this.mouseDownPos.x;
         const dy = event.clientY - this.mouseDownPos.y;
         if (dx * dx + dy * dy > 25) this.didDrag = true;
@@ -327,7 +315,6 @@ export class EditorViewport extends Component<Props> {
       this.renderer.camController.enabled = true;
       const result = this.dragController.endDrag();
       if (result && this.selectedTransform) {
-        // Find the container that owns this node
         const node = sceneGraphStore.findNodeById(this.selectedTransform.id);
         const containerId = node?.parent?.resource?.id;
         if (containerId && projectStore.containerPods[containerId]) {
@@ -339,7 +326,8 @@ export class EditorViewport extends Component<Props> {
             asset.rotation = result.rotation;
           }
         }
-        projectStore.defaultProxy.dirty = true;
+        projectStore.dirty = true;
+        projectStore.dispatcher.dispatch({ kind: 'changed' });
       }
     };
 
@@ -352,7 +340,7 @@ export class EditorViewport extends Component<Props> {
         -((clientY - rect.top) / rect.height) * 2 + 1
       );
       raycaster.setFromCamera(pointer, this.renderer.perspectiveCam);
-      raycaster.layers.enable(InteractionLayer.Helper); // Include helper layer for selection/hover
+      raycaster.layers.enable(InteractionLayer.Helper);
       return raycaster;
     };
 
@@ -376,7 +364,7 @@ export class EditorViewport extends Component<Props> {
     };
 
     const onDragOverEvent = (e: DragEvent) => {
-      if (!sceneGraphStore.target.selectedContainerId) {
+      if (!sceneGraphStore.selectedContainerId) {
         this.toggleAttribute('container-not-activated', true);
       }
 
@@ -396,9 +384,8 @@ export class EditorViewport extends Component<Props> {
       e.stopPropagation();
       this.toggleAttribute('container-not-activated', false);
 
-      const activeContainerId = sceneGraphStore.target.selectedContainerId;
+      const activeContainerId = sceneGraphStore.selectedContainerId;
 
-      // No container is active - exit early
       if (!activeContainerId) return;
 
       const json = compelteDragDrop<ITreeNodeAction>(e);
@@ -419,14 +406,12 @@ export class EditorViewport extends Component<Props> {
         const normal = intersection!.face!.normal;
         const rotation = computeRotationFromNormal(normal);
 
-        // Update the container pod with the transform position
         projectStore.containerPods[activeContainerId].asset3D.push({
           id: json.node.resource.id,
           position: [point.x, point.y, point.z],
           rotation,
         });
 
-        // Add the node to the scene graph
         const newNode = sceneGraphStore.addNode(
           json.node,
           sceneGraphStore.findNodeById(activeContainerId)
@@ -450,10 +435,7 @@ export class EditorViewport extends Component<Props> {
     pane3D.onclick = onClick;
 
     return () => {
-      this.toggleAttribute(
-        'activated',
-        !!sceneGraphStoreProxy.selectedContainerId
-      );
+      this.toggleAttribute('activated', !!sceneGraphStore.selectedContainerId);
       return pane3D;
     };
   }

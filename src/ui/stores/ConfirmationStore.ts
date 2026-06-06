@@ -1,4 +1,5 @@
-import { Store, ButtonColor } from 'rewild-ui';
+import { ButtonColor } from 'rewild-ui';
+import { Dispatcher } from 'rewild-common';
 
 export interface ConfirmationOptions {
   okLabel?: string;
@@ -6,28 +7,19 @@ export interface ConfirmationOptions {
   okColor?: ButtonColor;
 }
 
-interface IConfirmation {
-  open: boolean;
-  title: string;
-  message: string;
+export type ConfirmationStoreEvents = { kind: 'show' } | { kind: 'close' };
+
+export class ConfirmationStore {
+  open = false;
+  title = '';
+  message = '';
   okLabel?: string;
   cancelLabel?: string;
   okColor?: ButtonColor;
-}
 
-export class ConfirmationStore extends Store<IConfirmation> {
+  readonly dispatcher = new Dispatcher<ConfirmationStoreEvents>();
+
   private _onConfirm: (() => void) | null = null;
-
-  constructor() {
-    super({
-      open: false,
-      title: '',
-      message: '',
-      okLabel: undefined,
-      cancelLabel: undefined,
-      okColor: undefined,
-    });
-  }
 
   show(
     title: string,
@@ -36,12 +28,13 @@ export class ConfirmationStore extends Store<IConfirmation> {
     options?: ConfirmationOptions
   ) {
     this._onConfirm = onConfirm;
-    this.defaultProxy.title = title;
-    this.defaultProxy.message = message;
-    this.defaultProxy.okLabel = options?.okLabel;
-    this.defaultProxy.cancelLabel = options?.cancelLabel;
-    this.defaultProxy.okColor = options?.okColor;
-    this.defaultProxy.open = true;
+    this.title = title;
+    this.message = message;
+    this.okLabel = options?.okLabel;
+    this.cancelLabel = options?.cancelLabel;
+    this.okColor = options?.okColor;
+    this.open = true;
+    this.dispatcher.dispatch({ kind: 'show' });
   }
 
   confirm() {
@@ -51,7 +44,8 @@ export class ConfirmationStore extends Store<IConfirmation> {
 
   close() {
     this._onConfirm = null;
-    this.defaultProxy.open = false;
+    this.open = false;
+    this.dispatcher.dispatch({ kind: 'close' });
   }
 }
 

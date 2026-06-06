@@ -19,7 +19,7 @@ type Props = {
 @register('x-main-menu')
 export class MainMenu extends Component<Props> {
   init() {
-    const authState = this.observeStore(authStore);
+    this.on(authStore.dispatcher);
     const onOptionsClick = () => {};
 
     return () => {
@@ -48,7 +48,7 @@ export class MainMenu extends Component<Props> {
               to experience anything.
             </InfoBox>
           </div>
-          {authState.loading ? (
+          {authStore.loading ? (
             <div style={`text-align: center;`}>
               <Loading />
             </div>

@@ -35,7 +35,7 @@ const GOOGLE_G = (
 @register('x-auth')
 export class Auth extends Component<Props> {
   init() {
-    const auth = this.observeStore(authStore);
+    this.on(authStore.dispatcher);
     const [menuOpen, setMenuOpen] = this.useState(false);
     const [view, setView] = this.useState<View>('signIn');
     const [error, setError] = this.useState<string | null>(null);
@@ -273,18 +273,18 @@ export class Auth extends Component<Props> {
       confirmPasswordInput.className = confirmPasswordError() ? 'invalid' : '';
       displayNameInput.className = displayNameError() ? 'invalid' : '';
 
-      if (auth.loggedIn) {
+      if (authStore.loggedIn) {
         return (
           <div class="auth-root">
             <Avatar
               size="s"
               css={AvatarCss}
-              src={auth.user?.photoURL || undefined}
+              src={authStore.user?.photoURL || undefined}
               onClick={() => setMenuOpen(!menuOpen())}
             />
             <Popup open={menuOpen()} onClose={closeMenu} withBackground>
               <div class="user-panel">
-                <p class="user-email">{auth.user?.email || ''}</p>
+                <p class="user-email">{authStore.user?.email || ''}</p>
                 <span class="sign-out" onclick={onSignOut}>
                   Sign out
                 </span>

@@ -1,6 +1,4 @@
 export * from './Component';
-export * from './Signaller';
-export * from './Store';
 export * from './theme';
 export * from './utils/createUUID';
 export * from './utils/dragDrop';

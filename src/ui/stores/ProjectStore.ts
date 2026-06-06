@@ -6,7 +6,7 @@ import {
   IContainerPod,
   StoredRecord,
 } from 'models';
-import { Store, createUUID } from 'rewild-ui';
+import { createUUID } from 'rewild-ui';
 import {
   getLevel as getLevelApi,
   patchLevel,
@@ -18,33 +18,23 @@ import { createExporterObj } from '../utils/exportHelper';
 import { Dispatcher } from 'rewild-common';
 import { db } from 'src/database/database';
 
-export interface IProjectStore {
-  loading: boolean;
-  dirty: boolean;
-  error?: string;
-  level: StoredRecord<ILevel> | null;
-  project: StoredRecord<IProject> | null;
-}
-
 export type ProjectStoreEvents =
   | { kind: 'loading-completed'; project: IProject }
-  | { kind: 'loading-initiated' };
+  | { kind: 'loading-initiated' }
+  | { kind: 'changed' };
 
-export class ProjectStore extends Store<IProjectStore> {
-  dispatcher: Dispatcher<ProjectStoreEvents>;
+export class ProjectStore {
+  loading = false;
+  dirty = false;
+  error?: string;
+  level: StoredRecord<ILevel> | null = null;
+  project: StoredRecord<IProject> | null = null;
+
+  readonly dispatcher = new Dispatcher<ProjectStoreEvents>();
   containerPods: { [id: string]: IContainerPod };
 
   constructor() {
-    super({
-      loading: false,
-      dirty: false,
-      level: null,
-      project: null,
-      error: undefined,
-    });
-
     this.containerPods = {};
-    this.dispatcher = new Dispatcher<ProjectStoreEvents>();
   }
 
   static createProject(): IProject {
@@ -71,26 +61,24 @@ export class ProjectStore extends Store<IProjectStore> {
   }
 
   async getProject(projectId: string) {
-    this.defaultProxy.loading = true;
+    this.loading = true;
     this.dispatcher.dispatch({ kind: 'loading-initiated' });
+    this.dispatcher.dispatch({ kind: 'changed' });
 
     try {
       const resp = await getProjectApi(projectId);
-      this.defaultProxy.project = resp;
+      this.project = resp;
 
       await this.getLevel(resp!.id);
     } catch (err: any) {
-      this.defaultProxy.error = err.toString();
+      this.error = err.toString();
     }
 
-    this.set({
-      loading: false,
-      dirty: false,
-    });
+    this.loading = false;
+    this.dirty = false;
+    this.dispatcher.dispatch({ kind: 'changed' });
 
-    // Use this.target (not this.defaultProxy) — Proxy-wrapped objects cannot be
-    // structured-cloned by IndexedDB, causing DataCloneError on save.
-    const project = this.target.project!;
+    const project = this.project!;
 
     this.containerPods = {};
     project.sceneGraph?.containers?.forEach((container) => {
@@ -102,12 +90,12 @@ export class ProjectStore extends Store<IProjectStore> {
     sceneGraphStore.buildTreeFromProject(project);
     this.dispatcher.dispatch({
       kind: 'loading-completed',
-      project: this.target.project!,
+      project: this.project!,
     });
   }
 
   async updateProject() {
-    const project = this.defaultProxy.project!;
+    const project = this.project!;
     const { id, ...token } = project;
     const containerNodes = sceneGraphStore.nodes.find(
       (n) => n.name === 'Containers'
@@ -136,27 +124,28 @@ export class ProjectStore extends Store<IProjectStore> {
       },
     };
 
-    this.defaultProxy.loading = true;
+    this.loading = true;
+    this.dispatcher.dispatch({ kind: 'changed' });
 
     try {
       await patchProject(id!, createExporterObj(token));
     } catch (err: any) {
-      this.defaultProxy.error = err.toString();
+      this.error = err.toString();
     }
 
-    this.set({
-      loading: false,
-      dirty: false,
-    });
+    this.loading = false;
+    this.dirty = false;
+    this.dispatcher.dispatch({ kind: 'changed' });
 
     db.syncAll(); // background — errors captured on records via syncError
   }
 
   async publish() {
     await this.updateProject();
-    this.defaultProxy.loading = true;
+    this.loading = true;
+    this.dispatcher.dispatch({ kind: 'changed' });
 
-    const project = this.defaultProxy.project!;
+    const project = this.project!;
     const containers = sceneGraphStore.nodes.find(
       (n) => n.name === 'Containers'
     )!.children;
@@ -185,20 +174,19 @@ export class ProjectStore extends Store<IProjectStore> {
         startEvent: project.startEvent,
       });
     } catch (err: any) {
-      this.defaultProxy.error = err.toString();
+      this.error = err.toString();
     }
 
     await this.getLevel(project.id!);
 
-    this.set({
-      loading: false,
-      dirty: false,
-    });
+    this.loading = false;
+    this.dirty = false;
+    this.dispatcher.dispatch({ kind: 'changed' });
   }
 
   async getLevel(projectId: string) {
     const level = await getLevelApi(projectId);
-    this.defaultProxy.level = level;
+    this.level = level;
   }
 }
 

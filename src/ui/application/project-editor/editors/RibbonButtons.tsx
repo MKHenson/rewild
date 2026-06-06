@@ -16,12 +16,12 @@ interface Props {
 @register('x-ribbon-buttons')
 export class RibbonButtons extends Component<Props> {
   init() {
-    const projectStoreProxy = this.observeStore(projectStore, (prop) => {
-      if (prop === 'dirty' || prop === 'loading') this.render();
+    this.on(projectStore.dispatcher, (event) => {
+      if (event.kind === 'changed') this.render();
     });
 
     return () => {
-      const { loading, dirty } = projectStoreProxy;
+      const { loading, dirty } = projectStore;
 
       return (
         <Card stretched>

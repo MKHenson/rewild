@@ -1,6 +1,6 @@
 import '../compiler/jsx';
 import { Component, register, ComponentOptions } from './Component';
-import { Store } from './Store';
+import { Dispatcher } from 'rewild-common';
 import { flushMicrotasks } from './test-utils';
 
 // ---------------------------------------------------------------------------
@@ -105,16 +105,21 @@ class StatefulComponent extends Component {
 }
 customElements.define('x-stateful', StatefulComponent);
 
-// A component that uses observeStore
+type CounterEvent = { kind: 'changed'; value: number };
+
+// A component that uses this.on()
 class ObserverComponent extends Component {
-  storeProxy!: { value: number };
+  value = 0;
+  dispatcher = new Dispatcher<CounterEvent>();
 
   init() {
-    const store = new Store({ value: 0 });
-    this.storeProxy = this.observeStore(store);
+    this.on(this.dispatcher, (event) => {
+      this.value = event.value;
+      this.render();
+    });
     const span = document.createElement('span');
     return () => {
-      span.textContent = String(this.storeProxy.value);
+      span.textContent = String(this.value);
       return span;
     };
   }
@@ -317,39 +322,35 @@ describe('Component', () => {
     });
   });
 
-  // ------ observeStore ------
+  // ------ this.on() ------
 
-  describe('observeStore', () => {
-    it('returns a proxy of the store target', () => {
+  describe('on', () => {
+    it('starts with initial value rendered', () => {
       const c = setup(ObserverComponent, { props: {} });
-      expect(c.storeProxy.value).toBe(0);
+      expect(c.shadow!.querySelector('span')!.textContent).toBe('0');
     });
 
-    it('triggers render when store value changes', () => {
+    it('triggers render when dispatcher fires', () => {
       const c = setup(ObserverComponent, { props: {} });
-
-      // The store callback was bound to the original render, so check DOM output
-      c.storeProxy.value = 42;
-      const span = c.shadow!.querySelector('span');
-      expect(span!.textContent).toBe('42');
+      c.dispatcher.dispatch({ kind: 'changed', value: 42 });
+      expect(c.shadow!.querySelector('span')!.textContent).toBe('42');
     });
 
-    it('accepts a custom callback instead of render', () => {
+    it('accepts a custom handler', () => {
       const cb = jest.fn();
+      const dispatcher = new Dispatcher<{ kind: 'ping' }>();
 
-      class CustomCbComponent extends Component {
+      class CustomHandlerComponent extends Component {
         init() {
-          const store = new Store({ x: 1 });
-          const proxy = this.observeStore(store, cb);
-          (this as any)._storeProxy = proxy;
+          this.on(dispatcher, cb);
           return () => null;
         }
       }
-      customElements.define('x-custom-cb', CustomCbComponent);
+      customElements.define('x-custom-handler', CustomHandlerComponent);
 
-      const c = setup(CustomCbComponent, { props: {} });
-      (c as any)._storeProxy.x = 99;
-      expect(cb).toHaveBeenCalled();
+      setup(CustomHandlerComponent, { props: {} });
+      dispatcher.dispatch({ kind: 'ping' });
+      expect(cb).toHaveBeenCalledWith({ kind: 'ping' });
     });
   });
 
@@ -511,29 +512,28 @@ describe('Component', () => {
       expect(onMount).toHaveBeenCalledTimes(1);
     });
 
-    it('connectedCallback resubscribes tracked stores', () => {
+    it('connectedCallback resubscribes tracked dispatchers', () => {
       const c = setup(ObserverComponent, { props: {} });
       // Simulate disconnect then reconnect
       c.disconnectedCallback();
 
-      // After disconnect the store listener should be removed.
+      // After disconnect the dispatcher listener should be removed.
       // connectedCallback should resubscribe.
       const renderSpy = jest.fn(c.render);
       c.render = renderSpy;
       c.connectedCallback();
 
-      c.storeProxy.value = 100;
+      c.dispatcher.dispatch({ kind: 'changed', value: 100 });
       expect(renderSpy).toHaveBeenCalled();
     });
 
-    it('disconnectedCallback calls onCleanup and unsubscribes stores', () => {
+    it('disconnectedCallback calls onCleanup and unsubscribes dispatchers', () => {
       const onCleanup = jest.fn();
+      const dispatcher = new Dispatcher<{ kind: 'tick' }>();
 
       class CleanableComponent extends Component {
-        storeProxy!: { n: number };
         init() {
-          const store = new Store({ n: 0 });
-          this.storeProxy = this.observeStore(store);
+          this.on(dispatcher, () => {});
           return () => null;
         }
       }
@@ -544,6 +544,8 @@ describe('Component', () => {
 
       c.disconnectedCallback();
       expect(onCleanup).toHaveBeenCalledTimes(1);
+      // listener should be removed
+      expect(dispatcher.listeners.length).toBe(0);
     });
 
     it('skips onMount/onCleanup when not defined', () => {

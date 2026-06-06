@@ -1,5 +1,4 @@
-import { Callback, UnsubscribeStoreFn, RescribeStoreFn } from './Signaller';
-import { Store } from './Store';
+import { Dispatcher, Subscriber } from 'rewild-common';
 
 type RenderFn = () => void;
 type InitFn = () => null | JSX.ChildElement | JSX.ChildElement[];
@@ -27,8 +26,8 @@ export abstract class Component<T = any>
 {
   shadow: ShadowRoot | null;
   render: RenderFn;
-  private trackedUnsubscribes: UnsubscribeStoreFn[];
-  private trackedSubscribes: RescribeStoreFn[];
+  private trackedUnsubscribes: (() => void)[];
+  private trackedSubscribes: (() => void)[];
   private mergedCss: CSSStyleSheet;
 
   private _renderScheduled = false;
@@ -67,9 +66,9 @@ export abstract class Component<T = any>
   _createRenderer() {
     const parent = this.shadow ? this.shadow : this;
     this.render = () => {
-      const focused = (this.shadow
-        ? this.shadow.activeElement
-        : document.activeElement) as HTMLElement | null;
+      const focused = (
+        this.shadow ? this.shadow.activeElement : document.activeElement
+      ) as HTMLElement | null;
 
       // Generates new DOM
       let children = fn();
@@ -131,17 +130,12 @@ export abstract class Component<T = any>
     this.render?.();
   }
 
-  /**
-   * Registers a store we want to observe. Any changes made to the object will cause a render. If you do not want to render on all occassions you can filter when renders ocurr using the path parameter
-   * @param store The store we want to observer
-   * @param path [Optional] Path can be specified using dot notation to only render if the propety name matches. For example "foo.bar" will trigger a render for any change to fields of bar or beyond (foo.bar.baz = 1 or even foo.bar.baz.gar = 1)
-   * @returns
-   */
-  observeStore<K extends object>(store: Store<K>, cb?: Callback<K>) {
-    const [val, unsubscribe, rescribe] = store.createProxy(cb || this.render);
-    this.trackedUnsubscribes.push(unsubscribe);
-    this.trackedSubscribes.push(rescribe);
-    return val;
+  on<T>(dispatcher: Dispatcher<T>, handler: Subscriber<T> = this.render): void {
+    dispatcher.add(handler);
+    this.trackedUnsubscribes.push(() => dispatcher.remove(handler));
+    this.trackedSubscribes.push(() => {
+      if (!dispatcher.listeners.includes(handler)) dispatcher.add(handler);
+    });
   }
 
   getStyle(): string | CSSStyleSheet | null {

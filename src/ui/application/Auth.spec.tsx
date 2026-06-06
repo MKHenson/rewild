@@ -48,9 +48,9 @@ function loggedInState(email: string): AuthState {
 }
 
 function createAuth(state: AuthState = guestState): Auth {
-  jest
-    .spyOn(authStore, 'createProxy')
-    .mockReturnValue([state, jest.fn(), jest.fn()]);
+  authStore.loggedIn = state.loggedIn;
+  authStore.loading = state.loading;
+  authStore.user = state.user;
   const auth = new Auth();
   auth._createRenderer();
   auth.render();

@@ -1,6 +1,6 @@
 import { authService } from '../../api/auth/auth-service';
 import { db } from '../../database/database';
-import { Store } from 'rewild-ui';
+import { Dispatcher } from 'rewild-common';
 
 interface IUser {
   displayName: string | null;
@@ -10,11 +10,7 @@ interface IUser {
   type: 'guest' | 'user';
 }
 
-interface IAuth {
-  loading: boolean;
-  loggedIn: boolean;
-  user: IUser;
-}
+export type AuthStoreEvents = { kind: 'changed' };
 
 const guestUser: IUser = {
   displayName: 'Guest',
@@ -36,61 +32,72 @@ function toStoreUser(
   };
 }
 
-export class AuthStore extends Store<IAuth> {
+export class AuthStore {
+  loading = false;
+  loggedIn: boolean;
+  user: IUser;
+
+  readonly dispatcher = new Dispatcher<AuthStoreEvents>();
+
   constructor() {
     const currentUser = authService.getUser();
-    super({
-      loading: false,
-      loggedIn: currentUser !== null,
-      user: currentUser ? toStoreUser(currentUser) : { ...guestUser },
-    });
+    this.loggedIn = currentUser !== null;
+    this.user = currentUser ? toStoreUser(currentUser) : { ...guestUser };
 
     authService.onAuthStateChanged.add((user) => {
       if (user) {
-        this.defaultProxy.loggedIn = true;
-        this.defaultProxy.user = toStoreUser(user);
+        this.loggedIn = true;
+        this.user = toStoreUser(user);
       } else {
-        this.defaultProxy.loggedIn = false;
-        this.defaultProxy.user = { ...guestUser };
+        this.loggedIn = false;
+        this.user = { ...guestUser };
       }
-      this.defaultProxy.loading = false;
+      this.loading = false;
+      this.dispatcher.dispatch({ kind: 'changed' });
     });
   }
 
   async signOut() {
-    this.defaultProxy.loading = true;
+    this.loading = true;
+    this.dispatcher.dispatch({ kind: 'changed' });
     await authService.signOut();
   }
 
   async signIn(email: string, password: string) {
-    this.defaultProxy.loading = true;
+    this.loading = true;
+    this.dispatcher.dispatch({ kind: 'changed' });
     try {
       await authService.signIn(email, password);
       await db.sync.run();
     } catch (err) {
-      this.defaultProxy.loading = false;
+      this.loading = false;
+      this.dispatcher.dispatch({ kind: 'changed' });
       throw err;
     }
   }
 
   async register(email: string, password: string, displayName: string) {
-    this.defaultProxy.loading = true;
+    this.loading = true;
+    this.dispatcher.dispatch({ kind: 'changed' });
     try {
       await authService.register(email, password, displayName);
       await db.sync.run();
     } catch (err) {
-      this.defaultProxy.loading = false;
+      this.loading = false;
+      this.dispatcher.dispatch({ kind: 'changed' });
       throw err;
     }
   }
 
   async googleSignIn(idToken: string) {
-    this.defaultProxy.loading = true;
+    this.loading = true;
+    this.dispatcher.dispatch({ kind: 'changed' });
     try {
       await authService.googleSignIn(idToken);
       await db.sync.run();
     } catch (err) {
-      this.defaultProxy.loading = false;
+      this.loading = false;
+      this.dispatcher.dispatch({ kind: 'changed' });
       throw err;
     }
   }

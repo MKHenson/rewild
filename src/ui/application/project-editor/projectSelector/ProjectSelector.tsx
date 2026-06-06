@@ -23,7 +23,7 @@ interface Props {
 @register('x-project-selector')
 export class ProjectSelector extends Component<Props> {
   init() {
-    const projectStoreProxy = this.observeStore(projectsStore);
+    this.on(projectsStore.dispatcher);
 
     const onCreate = async () => {
       await projectsStore.addProject(newProject()!);
@@ -72,7 +72,7 @@ export class ProjectSelector extends Component<Props> {
       const isProjectSelected = !!selectedProject();
       const isNewProject = !!newProject();
       const props = this.props;
-      const loading = projectStoreProxy.loading;
+      const loading = projectsStore.loading;
 
       return (
         <Popup open={props.open}>
@@ -96,7 +96,7 @@ export class ProjectSelector extends Component<Props> {
                     project={newProject()}
                     onChange={(project) => setNewProject(project, false)}
                   />,
-                  !!projectStoreProxy.error && projectStoreProxy.error,
+                  !!projectsStore.error && projectsStore.error,
                 ]
               ) : (
                 <div class="projects-list">
@@ -108,15 +108,15 @@ export class ProjectSelector extends Component<Props> {
                       Add New Project
                     </Typography>
                   </Card>
-                  {loading || projectStoreProxy.error ? (
-                    projectStoreProxy.error ? (
-                      projectStoreProxy.error
+                  {loading || projectsStore.error ? (
+                    projectsStore.error ? (
+                      projectsStore.error
                     ) : (
                       <Loading />
                     )
                   ) : undefined}
                   {!loading
-                    ? projectStoreProxy.projects.map((item) => (
+                    ? projectsStore.projects.map((item) => (
                         <Card
                           button
                           raised

@@ -1,5 +1,4 @@
 import { ILevel, IProject } from 'models';
-import { Store } from 'rewild-ui';
 import {
   addLevel,
   addProject as addProjectApi,
@@ -9,33 +8,31 @@ import {
   getProjects as getProjectsApi,
   patchProject,
 } from '../../api';
+import { Dispatcher } from 'rewild-common';
 
-export interface IProjectStore {
-  loading: boolean;
+export type ProjectsStoreEvents = { kind: 'changed' };
+
+export class ProjectsStore {
+  loading = false;
   error?: string;
-  projects: IProject[];
-}
+  projects: IProject[] = [];
 
-export class ProjectsStore extends Store<IProjectStore> {
-  constructor() {
-    super({
-      loading: false,
-      projects: [],
-      error: undefined,
-    });
-  }
+  readonly dispatcher = new Dispatcher<ProjectsStoreEvents>();
 
   async getProjects(page?: any) {
-    this.defaultProxy.loading = true;
+    this.loading = true;
+    this.dispatcher.dispatch({ kind: 'changed' });
     const resp = await getProjectsApi(false, page);
-    this.defaultProxy.projects = resp;
-    this.defaultProxy.loading = false;
+    this.projects = resp;
+    this.loading = false;
+    this.dispatcher.dispatch({ kind: 'changed' });
   }
 
   async addProject(token: Partial<IProject>) {
     if (!token) return;
-    this.defaultProxy.loading = true;
-    this.defaultProxy.error = '';
+    this.loading = true;
+    this.error = '';
+    this.dispatcher.dispatch({ kind: 'changed' });
 
     try {
       const resp = await addProjectApi(token);
@@ -53,15 +50,17 @@ export class ProjectsStore extends Store<IProjectStore> {
 
       await this.getProjects();
     } catch (err: any) {
-      this.defaultProxy.error = err.toString();
+      this.error = err.toString();
     }
 
-    this.defaultProxy.loading = false;
+    this.loading = false;
+    this.dispatcher.dispatch({ kind: 'changed' });
   }
 
   async removeProjects(id: string) {
-    this.defaultProxy.loading = true;
-    this.defaultProxy.error = '';
+    this.loading = true;
+    this.error = '';
+    this.dispatcher.dispatch({ kind: 'changed' });
 
     try {
       const project = await getProject(id);
@@ -69,10 +68,11 @@ export class ProjectsStore extends Store<IProjectStore> {
       await deleteLevel(project!.levelId);
       await this.getProjects();
     } catch (err: any) {
-      this.defaultProxy.error = err.toString();
+      this.error = err.toString();
     }
 
-    this.defaultProxy.loading = false;
+    this.loading = false;
+    this.dispatcher.dispatch({ kind: 'changed' });
   }
 
   async updateProject(project: IProject) {

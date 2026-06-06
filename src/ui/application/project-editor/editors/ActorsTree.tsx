@@ -6,10 +6,10 @@ interface Props {}
 @register('x-actors-tree')
 export class ActorsTree extends Component<Props> {
   init() {
-    const actorStoreProxy = this.observeStore(actorStore);
+    this.on(actorStore.dispatcher);
 
     this.onMount = () => {
-      if (!actorStore.nodes.length && !actorStoreProxy.loading)
+      if (!actorStore.nodes.length && !actorStore.loading)
         actorStore.loadTemplate();
     };
 
@@ -17,7 +17,7 @@ export class ActorsTree extends Component<Props> {
       return (
         <Card stretched>
           <div class="content">
-            {actorStoreProxy.loading ? (
+            {actorStore.loading ? (
               <Loading />
             ) : (
               <Tree rootNodes={actorStore.nodes} />

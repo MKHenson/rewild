@@ -20,11 +20,11 @@ describe('AuthStore', () => {
 
   describe('initial state', () => {
     it('is not logged in when authService has no user', () => {
-      expect(store.target.loggedIn).toBe(false);
+      expect(store.loggedIn).toBe(false);
     });
 
     it('is not loading initially', () => {
-      expect(store.target.loading).toBe(false);
+      expect(store.loading).toBe(false);
     });
   });
 
@@ -110,8 +110,8 @@ describe('AuthStore', () => {
         photoURL: null,
         emailVerified: true,
       });
-      expect(store.target.loggedIn).toBe(true);
-      expect(store.target.user.email).toBe('user@example.com');
+      expect(store.loggedIn).toBe(true);
+      expect(store.user.email).toBe('user@example.com');
     });
 
     it('resets to guest when auth state changes to null', () => {
@@ -122,14 +122,14 @@ describe('AuthStore', () => {
         emailVerified: true,
       });
       authService.onAuthStateChanged.dispatch(null);
-      expect(store.target.loggedIn).toBe(false);
-      expect(store.target.user.email).toBeNull();
+      expect(store.loggedIn).toBe(false);
+      expect(store.user.email).toBeNull();
     });
 
     it('sets loading to false after auth state change', () => {
-      store.defaultProxy.loading = true;
+      store.loading = true;
       authService.onAuthStateChanged.dispatch(null);
-      expect(store.target.loading).toBe(false);
+      expect(store.loading).toBe(false);
     });
   });
 });

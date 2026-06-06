@@ -4,26 +4,21 @@ import {
   ITemplateTreeNode,
   ITreeNodeAction,
 } from 'models';
-import { ITreeNode, Store, createUUID } from 'rewild-ui';
+import { ITreeNode, createUUID } from 'rewild-ui';
 import { baseActorTemplate } from '../utils/TemplateFactories';
+import { Dispatcher } from 'rewild-common';
 
-export interface IActorStoreStore {
-  loading: boolean;
-}
+export type ActorStoreEvents = { kind: 'changed' };
 
-export class ActorStore extends Store<IActorStoreStore> {
-  nodes: ITreeNode<IResource>[];
+export class ActorStore {
+  loading = false;
+  nodes: ITreeNode<IResource>[] = [];
 
-  constructor() {
-    super({
-      loading: false,
-    });
-
-    this.nodes = [];
-  }
+  readonly dispatcher = new Dispatcher<ActorStoreEvents>();
 
   async loadTemplate() {
-    this.defaultProxy.loading = true;
+    this.loading = true;
+    this.dispatcher.dispatch({ kind: 'changed' });
 
     const actorTemplates = (await fetch('/templates/actors-library.json').then(
       (res) => res.json()
@@ -62,7 +57,8 @@ export class ActorStore extends Store<IActorStoreStore> {
         } as ITreeNode<IResource>)
     );
 
-    this.defaultProxy.loading = false;
+    this.loading = false;
+    this.dispatcher.dispatch({ kind: 'changed' });
   }
 }
 

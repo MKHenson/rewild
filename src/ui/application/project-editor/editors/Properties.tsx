@@ -10,18 +10,14 @@ let lastFocussedProp = -1;
 @register('x-properties')
 export class Properties extends Component<Props> {
   init() {
-    const sceneGraphStoreProxy = this.observeStore(sceneGraphStore, (prop) => {
-      if (
-        prop === 'selectedResource' ||
-        prop === 'selectedResource.name' ||
-        prop.includes('selectedResource.properties')
-      )
+    this.on(sceneGraphStore.dispatcher, (event) => {
+      if (event.kind === 'resource-selected' || event.kind === 'nodes-updated')
         this.render();
     });
     lastFocussedProp = -1;
 
     return () => {
-      const selectedResource = sceneGraphStoreProxy.selectedResource;
+      const selectedResource = sceneGraphStore.selectedResource;
 
       return (
         <Card stretched>
@@ -44,7 +40,14 @@ export class Properties extends Component<Props> {
                         onChange={(val) => {
                           lastFocussedProp = index;
                           prop.value = val;
-                          projectStore.defaultProxy.dirty = true;
+                          projectStore.dirty = true;
+                          projectStore.dispatcher.dispatch({
+                            kind: 'changed',
+                          });
+                          sceneGraphStore.dispatcher.dispatch({
+                            kind: 'nodes-updated',
+                            nodes: sceneGraphStore.nodes,
+                          });
                         }}
                       />
                     </div>,
@@ -68,7 +71,12 @@ export class Properties extends Component<Props> {
                   onChange={(val) => {
                     lastFocussedProp = -2;
                     selectedResource.name = val;
-                    projectStore.defaultProxy.dirty = true;
+                    projectStore.dirty = true;
+                    projectStore.dispatcher.dispatch({ kind: 'changed' });
+                    sceneGraphStore.dispatcher.dispatch({
+                      kind: 'nodes-updated',
+                      nodes: sceneGraphStore.nodes,
+                    });
                   }}
                 />
               </div>

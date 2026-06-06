@@ -17,14 +17,9 @@ export class PaneManager extends Component<Props> {
   viewport: EditorViewport;
 
   init() {
-    const projectStoreProxy = this.observeStore(
-      projectStore,
-      (prop, prevVal, val) => {
-        if (prop === 'loading') {
-          this.render();
-        }
-      }
-    );
+    this.on(projectStore.dispatcher, (event) => {
+      if (event.kind === 'changed') this.render();
+    });
 
     // Now create each of the editors
     const editors: { [key in EditorType]: HTMLElement } = {
@@ -78,14 +73,14 @@ export class PaneManager extends Component<Props> {
     );
 
     return () => {
-      if (projectStoreProxy.error)
+      if (projectStore.error)
         return (
           <InfoBox title="Error" variant="error">
-            {projectStoreProxy.error}
+            {projectStore.error}
           </InfoBox>
         );
 
-      if (projectStoreProxy.loading) return <Loading />;
+      if (projectStore.loading) return <Loading />;
 
       return layout;
     };

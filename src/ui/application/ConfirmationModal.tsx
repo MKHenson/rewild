@@ -6,7 +6,7 @@ interface Props {}
 @register('x-confirmation-modal')
 export class ConfirmationModal extends Component<Props> {
   init() {
-    const storeProxy = this.observeStore(confirmationStore);
+    this.on(confirmationStore.dispatcher);
 
     const onOk = () => {
       confirmationStore.confirm();
@@ -18,15 +18,15 @@ export class ConfirmationModal extends Component<Props> {
 
     return () => (
       <Modal
-        open={storeProxy.open}
-        title={storeProxy.title}
-        okLabel={storeProxy.okLabel}
-        cancelLabel={storeProxy.cancelLabel}
-        okColor={storeProxy.okColor}
+        open={confirmationStore.open}
+        title={confirmationStore.title}
+        okLabel={confirmationStore.okLabel}
+        cancelLabel={confirmationStore.cancelLabel}
+        okColor={confirmationStore.okColor}
         onOk={onOk}
         onCancel={onCancel}
         onClose={onCancel}>
-        <Typography variant="body1">{storeProxy.message}</Typography>
+        <Typography variant="body1">{confirmationStore.message}</Typography>
       </Modal>
     );
   }
