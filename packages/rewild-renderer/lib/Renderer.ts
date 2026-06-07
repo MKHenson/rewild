@@ -8,7 +8,7 @@ import { IMaterialPass } from './materials/IMaterialPass';
 import { IRenderGroup } from '../types/IRenderGroup';
 import { Sky } from './core/Sky';
 import { TerrainRenderer } from './renderers/terrain/TerrainRenderer';
-import { TrackballController } from './input/TrackballController';
+import { OrbitController } from './input/OrbitController';
 import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
 import { RenderList } from './core/RenderList';
 import { RenderLayer } from './core/RenderLayer';
@@ -144,7 +144,7 @@ export class Renderer {
     this.perspectiveCam.camera.transform.position.set(0, 20, 50);
     this.perspectiveCam.camera.lookAt(0, 0, 0);
 
-    this.camController = new TrackballController(this.perspectiveCam, canvas);
+    this.camController = new OrbitController(this.perspectiveCam, canvas);
 
     const adapter = await navigator.gpu?.requestAdapter();
     const requiredFeatures: GPUFeatureName[] = [];

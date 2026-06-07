@@ -1,7 +1,7 @@
 import { PropValueObject, Vector3 } from 'models';
 import { Button, Component, register } from 'rewild-ui';
 import { getActiveRenderer } from '../utils/getActiveRenderer';
-import { TrackballController } from 'node_modules/rewild-renderer/lib/input/TrackballController';
+import { OrbitController } from 'node_modules/rewild-renderer/lib/input/OrbitController';
 
 interface Props {
   readOnly?: boolean;
@@ -14,7 +14,7 @@ export class CameraCapture extends Component<Props> {
   init() {
     const onCaptureClick = (e: MouseEvent) => {
       const renderer = getActiveRenderer();
-      const target = (renderer?.camController as TrackballController).target;
+      const target = (renderer?.camController as OrbitController).target;
       const position = renderer?.perspectiveCam.camera.transform.position;
       const up = renderer?.perspectiveCam.camera.transform.up;
 
@@ -27,7 +27,7 @@ export class CameraCapture extends Component<Props> {
 
     const onRestoreClick = (e: MouseEvent) => {
       const renderer = getActiveRenderer();
-      const target = (renderer?.camController as TrackballController).target;
+      const target = (renderer?.camController as OrbitController).target;
       const position = renderer?.perspectiveCam.camera.transform.position;
       const up = renderer?.perspectiveCam.camera.transform.up;
       position?.fromArray(this.props.value?.position as Vector3);
