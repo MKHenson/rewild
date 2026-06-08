@@ -1,7 +1,8 @@
 import { PropValueObject, Vector3 } from 'models';
 import { Button, Component, register } from 'rewild-ui';
 import { getActiveRenderer } from '../utils/getActiveRenderer';
-import { OrbitController } from 'node_modules/rewild-renderer/lib/input/OrbitController';
+import { OrbitController } from 'rewild-renderer';
+import { ViewportEventDetails } from '../EditorViewport';
 
 interface Props {
   readOnly?: boolean;
@@ -9,14 +10,22 @@ interface Props {
   onChange?: (val: PropValueObject) => void;
 }
 
+const details: ViewportEventDetails = { renderer: null, orbitController: null };
+const event = new CustomEvent('request-renderer', { detail: details });
+
+function getActiveOrbitController(): OrbitController | null {
+  document.dispatchEvent(event);
+  return event.detail.orbitController;
+}
+
 @register('x-camera-capture')
 export class CameraCapture extends Component<Props> {
   init() {
     const onCaptureClick = (e: MouseEvent) => {
       const renderer = getActiveRenderer();
-      const target = (renderer?.camController as OrbitController).target;
-      const position = renderer?.perspectiveCam.camera.transform.position;
-      const up = renderer?.perspectiveCam.camera.transform.up;
+      const target = getActiveOrbitController()?.target;
+      const position = renderer?.camera.camera.transform.position;
+      const up = renderer?.camera.camera.transform.up;
 
       this.props.onChange?.({
         position: position ? [position.x, position.y, position.z] : [0, 0, 0],
@@ -27,9 +36,9 @@ export class CameraCapture extends Component<Props> {
 
     const onRestoreClick = (e: MouseEvent) => {
       const renderer = getActiveRenderer();
-      const target = (renderer?.camController as OrbitController).target;
-      const position = renderer?.perspectiveCam.camera.transform.position;
-      const up = renderer?.perspectiveCam.camera.transform.up;
+      const target = getActiveOrbitController()?.target;
+      const position = renderer?.camera.camera.transform.position;
+      const up = renderer?.camera.camera.transform.up;
       position?.fromArray(this.props.value?.position as Vector3);
       up?.fromArray(this.props.value?.up as Vector3);
       target?.fromArray(this.props.value?.target as Vector3);

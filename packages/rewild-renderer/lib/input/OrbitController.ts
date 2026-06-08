@@ -67,6 +67,12 @@ export class OrbitController implements IController {
   maxPolarAngle: f32;
   minAzimuthAngle: f32;
   maxAzimuthAngle: f32;
+  /** Clearance (world units) the camera and target must keep above the terrain surface.
+   *  When getTerrainHeight is null, acts as an absolute Y floor instead. */
+  minCameraY: f32;
+  /** Optional callback that returns terrain Y at a world (x, z) position, or null when
+   *  the terrain chunk is not loaded there yet. */
+  getTerrainHeight: ((x: number, z: number) => number | null) | null;
 
   enableDamping: boolean;
   dampingFactor: f32;
@@ -153,6 +159,8 @@ export class OrbitController implements IController {
     this.maxPolarAngle = Math.PI;
     this.minAzimuthAngle = -Infinity;
     this.maxAzimuthAngle = Infinity;
+    this.minCameraY = 0;
+    this.getTerrainHeight = null;
 
     this.enableDamping = false;
     this.dampingFactor = 0.05;
@@ -381,6 +389,12 @@ export class OrbitController implements IController {
     this.target.clampLength(this.minTargetRadius, this.maxTargetRadius);
     this.target.add(this.cursor);
 
+    // Keep the orbit target above terrain
+    if (this.getTerrainHeight) {
+      const th = this.getTerrainHeight(this.target.x, this.target.z);
+      if (th !== null) this.target.y = Math.max(this.target.y, th + this.minCameraY);
+    }
+
     // Scale radius (zoom)
     const prevRadius = this._spherical.radius;
     this._spherical.radius = this._clampDistance(this._spherical.radius * this._scale);
@@ -392,6 +406,14 @@ export class OrbitController implements IController {
     _v.applyQuaternion(this._quatInverse);
 
     position.copy(this.target).add(_v);
+
+    // Keep the camera above terrain
+    if (this.getTerrainHeight) {
+      const th = this.getTerrainHeight(position.x, position.z);
+      if (th !== null && position.y < th + this.minCameraY) {
+        position.y = th + this.minCameraY;
+      }
+    }
 
     this.object.camera.lookAt(this.target.x, this.target.y, this.target.z);
 

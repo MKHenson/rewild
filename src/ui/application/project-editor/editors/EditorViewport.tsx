@@ -7,6 +7,7 @@ import {
   theme,
 } from 'rewild-ui';
 import { Mesh, Renderer, Sprite3D, Transform } from 'rewild-renderer';
+import { OrbitController } from 'rewild-renderer/lib/input/OrbitController';
 import { InteractionLayer } from 'src/core/InteractionLayer';
 import { Gizmo } from 'rewild-renderer/lib/helpers/Gizmo';
 import { projectStore, ProjectStoreEvents } from 'src/ui/stores/ProjectStore';
@@ -28,17 +29,20 @@ import { GizmoDragController } from './utils/GizmoDragController';
 import {
   computeObjectHalfHeight,
   computeRotationFromNormal,
+  raycastToSurface,
 } from './utils/WorldPlacement';
 
 interface Props {}
 
 export interface ViewportEventDetails {
   renderer: Renderer | null;
+  orbitController: OrbitController | null;
 }
 
 @register('x-editor-viewport')
 export class EditorViewport extends Component<Props> {
   renderer: Renderer;
+  orbitController: OrbitController | null = null;
   hasInitialized = false;
   templateLoader: TemplateLoader;
   gizmo: Gizmo;
@@ -177,8 +181,9 @@ export class EditorViewport extends Component<Props> {
     this.on(sceneGraphStore.dispatcher, onSceneGraphEvent);
 
     const onRequestRendererEvent = (event: Event) => {
-      ((event as CustomEvent).detail as ViewportEventDetails).renderer =
-        this.renderer;
+      const detail = (event as CustomEvent).detail as ViewportEventDetails;
+      detail.renderer = this.renderer;
+      detail.orbitController = this.orbitController;
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -208,6 +213,12 @@ export class EditorViewport extends Component<Props> {
         this.hasInitialized = true;
 
         await this.renderer.init(pane3D.canvas()!);
+        this.orbitController = new OrbitController(this.renderer.camera, pane3D.canvas()!);
+        this.orbitController.minCameraY = 0.5;
+        this.orbitController.getTerrainHeight = (x, z) => {
+          const hit = raycastToSurface(this.renderer, this._terrainRayPos.set(x, 0, z));
+          return hit?.point.y ?? null;
+        };
         await this.templateLoader.load();
 
         this.gizmo = new Gizmo();
@@ -274,12 +285,12 @@ export class EditorViewport extends Component<Props> {
       const started = this.dragController.tryStartDrag(
         intersection,
         this.selectedTransform,
-        this.renderer.perspectiveCam.camera.transform
+        this.renderer.camera.camera.transform
       );
       if (started) {
         this.didDrag = true;
-        this.renderer.camController.cancelInteraction();
-        this.renderer.camController.enabled = false;
+        this.orbitController?.cancelInteraction();
+        if (this.orbitController) this.orbitController.enabled = false;
       }
     };
 
@@ -312,7 +323,7 @@ export class EditorViewport extends Component<Props> {
       if (event.button !== 0) return;
       if (!this.dragController.isDragging) return;
 
-      this.renderer.camController.enabled = true;
+      if (this.orbitController) this.orbitController.enabled = true;
       const result = this.dragController.endDrag();
       if (result && this.selectedTransform) {
         const node = sceneGraphStore.findNodeById(this.selectedTransform.id);
@@ -339,7 +350,7 @@ export class EditorViewport extends Component<Props> {
         ((clientX - rect.left) / rect.width) * 2 - 1,
         -((clientY - rect.top) / rect.height) * 2 + 1
       );
-      raycaster.setFromCamera(pointer, this.renderer.perspectiveCam);
+      raycaster.setFromCamera(pointer, this.renderer.camera);
       raycaster.layers.enable(InteractionLayer.Helper);
       return raycaster;
     };
@@ -445,13 +456,14 @@ export class EditorViewport extends Component<Props> {
   }
 
   private _cameraWorldPos = new Vector3();
+  private _terrainRayPos = new Vector3();
   private _updatingGizmoScale = false;
 
   private updateGizmoScale(): void {
     if (this._updatingGizmoScale) return;
     if (!this.gizmo || !this.gizmo.transform.parent) return;
     this._updatingGizmoScale = true;
-    this.renderer.perspectiveCam.camera.transform.getWorldPosition(
+    this.renderer.camera.camera.transform.getWorldPosition(
       this._cameraWorldPos
     );
     this.gizmo.updateScale(this._cameraWorldPos);
@@ -462,21 +474,23 @@ export class EditorViewport extends Component<Props> {
     this.cameraObserver = {
       worldMatrixUpdated: () => this.updateGizmoScale(),
     };
-    this.renderer.perspectiveCam.camera.transform.observers.push(
+    this.renderer.camera.camera.transform.observers.push(
       this.cameraObserver
     );
   }
 
   private removeCameraObserver(): void {
     if (!this.cameraObserver) return;
-    const observers = this.renderer.perspectiveCam.camera.transform.observers;
+    const observers = this.renderer.camera.camera.transform.observers;
     const idx = observers.indexOf(this.cameraObserver);
     if (idx !== -1) observers.splice(idx, 1);
     this.cameraObserver = null;
   }
 
+
   dispose() {
     this.removeCameraObserver();
+    this.orbitController?.dispose();
     this.gizmo?.dispose();
     this.renderer.dispose();
   }

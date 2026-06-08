@@ -50,14 +50,13 @@ export class PlayerStart extends Asset3D {
       console.log(pos.x);
     }
 
-    sm.data?.renderer.perspectiveCam.camera.transform.position.fromArray(
-      startPos
-    );
-    sm.data?.renderer.perspectiveCam.camera.transform.up.fromArray(upPos);
-    sm.data?.renderer.camController.lookAt(
+    sm.data?.renderer.camera.camera.transform.position.fromArray(startPos);
+    sm.data?.renderer.camera.camera.transform.up.fromArray(upPos);
+    sm.data?.renderer.camera.camera.lookAt(
       lookAtPos[0],
       lookAtPos[1],
       lookAtPos[2]
     );
+    player?.syncLookFromCamera();
   }
 }

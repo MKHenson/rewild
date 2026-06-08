@@ -1,8 +1,4 @@
-import {
-  ICameraController,
-  IController,
-  PointerLockController,
-} from 'rewild-renderer';
+import { ICameraController } from 'rewild-renderer';
 import { Node } from 'rewild-routing';
 import { Asset3D } from './Asset3D';
 import { StateMachineData } from './Types';
@@ -18,7 +14,13 @@ import {
 } from '@dimforge/rapier3d-compat';
 import { RigidBodyBehaviour } from './behaviours/RigidBodyBehaviour';
 import { UIElementHealthPass } from 'node_modules/rewild-renderer/lib/materials/UIElementHealthPass';
-import { clamp } from 'node_modules/rewild-common';
+import { clamp, Euler, EulerRotationOrder } from 'node_modules/rewild-common';
+
+const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);
+const _PI_HALF = Math.PI / 2 - 0.01;
+const _MOUSE_SENSITIVITY = 0.002;
+const _MOVE_SPEED: f32 = 3.0;
+const _RUN_MULTIPLIER: f32 = 2.5;
 
 export class Player extends Node {
   cameraController: ICameraController;
@@ -30,23 +32,56 @@ export class Player extends Node {
   characterController: KinematicCharacterController;
   capsuleBody: RigidBody;
   collider: Collider;
-  controller: IController;
   verticalVelocity: f32 = 0.0;
   grounded: boolean = false;
   terrainLoaded: boolean = false;
   uiHealthBar: UIElementHealthPass;
 
+  // Pointer-lock / mouse-look state
+  private _yaw: f32 = 0;
+  private _pitch: f32 = 0;
+  private _movingForward = false;
+  private _movingBackward = false;
+  private _movingLeft = false;
+  private _movingRight = false;
+  private _sprinting = false;
+  jumpRequested: boolean = false;
+  private _isLocked = false;
+  private _canvas: HTMLCanvasElement | null = null;
+
+  private _onMouseMove: (e: MouseEvent) => void;
+  private _onKeyDown: (e: KeyboardEvent) => void;
+  private _onKeyUp: (e: KeyboardEvent) => void;
+  private _onPointerlockChange: () => void;
+  private _onCanvasClick: () => void;
+
   constructor(name: string, autoDispose: boolean = false) {
     super(name, autoDispose);
-    this._hunger = 100.0; // Default hunger value
-    this._health = 100.0; // Default health value
+    this._hunger = 100.0;
+    this._health = 100.0;
     this.raycaster = new Raycaster();
-    // Rapier fields will be initialized in mount
+
+    this._onMouseMove = this._handleMouseMove.bind(this);
+    this._onKeyDown = this._handleKeyDown.bind(this);
+    this._onKeyUp = this._handleKeyUp.bind(this);
+    this._onPointerlockChange = this._handlePointerlockChange.bind(this);
+    this._onCanvasClick = this._handleCanvasClick.bind(this);
   }
 
   setCamera(cameraController: ICameraController): void {
     this.cameraController = cameraController;
     this.asset = new Asset3D(cameraController.camera.transform);
+  }
+
+  requestLock() {
+    document.body.requestPointerLock();
+  }
+
+  /** Sync internal yaw/pitch from the camera quaternion (e.g. after an external lookAt). */
+  syncLookFromCamera() {
+    _euler.setFromQuaternion(this.cameraController.camera.transform.quaternion);
+    this._yaw = _euler.y;
+    this._pitch = _euler.x;
   }
 
   mount(): void {
@@ -70,18 +105,22 @@ export class Player extends Node {
       healthBar.percentageBasedCalculation = true;
     }
 
-    this._hunger = 100.0; // Reset hunger on mount
-    this._health = 100.0; // Reset health on mount
-    this.cameraController.camera.transform.position.set(0, 0, -10); // Reset position
+    this._hunger = 100.0;
+    this._health = 100.0;
+    this.cameraController.camera.transform.position.set(0, 0, -10);
     this.cameraController.camera.lookAt(0, 0, 0);
-    this.controller = stateData.renderer.camController;
-    // Ensure controller writes into movementVector instead of directly moving camera.
-    (this.controller as PointerLockController).moveCamera = false;
+    this.syncLookFromCamera();
+
+    this._canvas = stateData.renderer.canvas;
+    document.addEventListener('mousemove', this._onMouseMove);
+    document.addEventListener('pointerlockchange', this._onPointerlockChange);
+    document.addEventListener('keydown', this._onKeyDown);
+    document.addEventListener('keyup', this._onKeyUp);
+    this._canvas.addEventListener('click', this._onCanvasClick);
 
     if (!this.characterController) {
       this.rapierWorld = stateData.gameManager.physicsWorld;
 
-      // Create kinematic position-based rigid body (character controllers need kinematic bodies)
       const rigidBodyDesc =
         RigidBodyDesc.kinematicPositionBased().setTranslation(
           this.cameraController.camera.transform.position.x,
@@ -91,23 +130,17 @@ export class Player extends Node {
 
       this.capsuleBody = this.rapierWorld.createRigidBody(rigidBodyDesc);
 
-      // Create capsule collider for player
-      const capsuleDesc = ColliderDesc.capsule(0.9, 0.5); // height, radius
-
+      const capsuleDesc = ColliderDesc.capsule(0.9, 0.5);
       this.collider = this.rapierWorld.createCollider(
         capsuleDesc,
         this.capsuleBody
       );
 
-      // The gap the controller will leave between the character and its environment.
       let offset = 0.01;
-      // Create the controller.
       this.characterController =
         this.rapierWorld.createCharacterController(offset);
 
-      // Allow the character to push dynamic bodies it collides with
       this.characterController.setApplyImpulsesToDynamicBodies(true);
-      // Set a reasonable mass so impulses have effect (kg)
       this.characterController.setCharacterMass(80.0);
     }
   }
@@ -132,17 +165,33 @@ export class Player extends Node {
   unMount(): void {
     super.unMount();
 
-    // Remove the controller once we are done with it.
+    document.removeEventListener('mousemove', this._onMouseMove);
+    document.removeEventListener(
+      'pointerlockchange',
+      this._onPointerlockChange
+    );
+    document.removeEventListener('keydown', this._onKeyDown);
+    document.removeEventListener('keyup', this._onKeyUp);
+    this._canvas?.removeEventListener('click', this._onCanvasClick);
+
+    if (document.pointerLockElement) document.exitPointerLock();
+    this._canvas = null;
+
     this.rapierWorld.removeCharacterController(this.characterController);
   }
 
   onUpdate(delta: f32, total: u32): void {
+    // Apply mouse look to camera
+    _euler.set(this._pitch, this._yaw, 0, EulerRotationOrder.YXZ);
+    this.cameraController.camera.transform.quaternion.setFromEuler(
+      _euler,
+      true
+    );
+
     const stateData = this.stateMachine?.data as StateMachineData;
     const R = stateData?.gameManager?.RAPIER;
-    // Raycast below to decide if gravity should be enabled.
     let gravityEnabled = true;
 
-    // Only turn on gravity if terrain is loaded below player
     if (!this.terrainLoaded && R && this.rapierWorld && this.capsuleBody) {
       const pos = this.capsuleBody.translation();
       const origin = { x: pos.x, y: pos.y + 2, z: pos.z };
@@ -151,7 +200,6 @@ export class Player extends Node {
       const maxToi = 100.0;
       const solid = true;
 
-      // Only consider terrain colliders via InteractionGroups filter
       const TERRAIN_BIT = 1;
       const TERRAIN_GROUPS = (TERRAIN_BIT << 16) | TERRAIN_BIT;
 
@@ -180,30 +228,56 @@ export class Player extends Node {
 
       gravityEnabled = !!hit;
     }
-    const pointerController = this.controller as PointerLockController;
-    const movementVector = pointerController.movementVector;
 
-    // Jump impulse (approx for ~2.1m jump height now for clarity).
+    // Jump
     const JUMP_IMPULSE: f32 = 10.5;
-    if (pointerController.jumpRequested && this.grounded) {
-      this.verticalVelocity = JUMP_IMPULSE;
-      this.grounded = false;
-      pointerController.jumpRequested = false; // one-shot consume
+    if (this.jumpRequested) {
+      if (this.grounded) {
+        this.verticalVelocity = JUMP_IMPULSE;
+        this.grounded = false;
+      }
+      this.jumpRequested = false;
     }
 
-    // Gravity integration using velocity for kinematic body.
-    const gravity = gravityEnabled ? -9.81 : 0.0; // m/s^2
-    const dt = delta / 0.5; // delta received in ms
+    const gravity = gravityEnabled ? -9.81 : 0.0;
+    const dt = delta / 0.5;
 
-    // Disable gravity/vertical movement if no terrain is detected below
     if (!gravityEnabled) {
       this.verticalVelocity = 0.0;
-    } else if (!this.grounded) this.verticalVelocity += gravity * dt;
-    else if (this.verticalVelocity <= 0.0) this.verticalVelocity = 0.0; // keep upward velocity if jump just applied
+    } else if (!this.grounded) {
+      this.verticalVelocity += gravity * dt;
+    } else if (this.verticalVelocity <= 0.0) {
+      this.verticalVelocity = 0.0;
+    }
+
+    // Compute horizontal movement from key state (yaw-relative, XZ plane only)
+    const sinYaw = Math.sin(this._yaw);
+    const cosYaw = Math.cos(this._yaw);
+    const speed = _MOVE_SPEED * (this._sprinting ? _RUN_MULTIPLIER : 1.0);
+    let moveX: f32 = 0;
+    let moveZ: f32 = 0;
+
+    if (this._movingForward) {
+      moveX -= sinYaw * speed * dt;
+      moveZ -= cosYaw * speed * dt;
+    }
+    if (this._movingBackward) {
+      moveX += sinYaw * speed * dt;
+      moveZ += cosYaw * speed * dt;
+    }
+    if (this._movingRight) {
+      moveX += cosYaw * speed * dt;
+      moveZ -= sinYaw * speed * dt;
+    }
+    if (this._movingLeft) {
+      moveX -= cosYaw * speed * dt;
+      moveZ += sinYaw * speed * dt;
+    }
+
     const desiredMove = new RapierVector3(
-      movementVector.x,
+      moveX,
       gravityEnabled ? this.verticalVelocity * dt : 0.0,
-      movementVector.z
+      moveZ
     );
 
     this.characterController.computeColliderMovement(
@@ -211,13 +285,10 @@ export class Player extends Node {
       desiredMove
     );
 
-    // Read the result.
     let correctedMovement = this.characterController.computedMovement();
 
-    // Treat as grounded only if descending or stationary vertically.
     const controllerGrounded = this.characterController.computedGrounded();
 
-    // Do a fall damage check
     if (controllerGrounded && this.verticalVelocity < -15.0) {
       const damage = (Math.abs(this.verticalVelocity) - 15.0) * 10.0;
       this.health -= damage;
@@ -226,27 +297,52 @@ export class Player extends Node {
     this.grounded = controllerGrounded && this.verticalVelocity <= 0.0;
     if (this.grounded && this.verticalVelocity < 0) this.verticalVelocity = 0.0;
 
-    // Get current position
     const currentPos = this.capsuleBody.translation();
-
-    // Apply the movement to the kinematic body
     this.capsuleBody.setNextKinematicTranslation({
       x: currentPos.x + correctedMovement.x,
       y: currentPos.y + correctedMovement.y,
       z: currentPos.z + correctedMovement.z,
     });
 
-    // Sync camera to collider position (with eye-level offset)
     const pos = this.capsuleBody.translation();
     this.cameraController.camera.transform.position.set(
       pos.x,
       pos.y + 1.8,
       pos.z
     );
-
-    // Clear horizontal movement so next frame starts fresh (vertical managed separately).
-    movementVector.set(0, 0, 0);
   }
 
-  // get3DCoords no longer needed with Rapier physics
+  private _handleMouseMove(e: MouseEvent) {
+    if (!this._isLocked) return;
+    this._yaw -= e.movementX * _MOUSE_SENSITIVITY;
+    this._pitch -= e.movementY * _MOUSE_SENSITIVITY;
+    this._pitch = Math.max(-_PI_HALF, Math.min(_PI_HALF, this._pitch));
+  }
+
+  private _handleKeyDown(e: KeyboardEvent) {
+    if (e.code === 'KeyW') this._movingForward = true;
+    else if (e.code === 'KeyS') this._movingBackward = true;
+    else if (e.code === 'KeyA') this._movingLeft = true;
+    else if (e.code === 'KeyD') this._movingRight = true;
+    else if (e.code === 'Space') this.jumpRequested = true;
+    else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight')
+      this._sprinting = true;
+  }
+
+  private _handleKeyUp(e: KeyboardEvent) {
+    if (e.code === 'KeyW') this._movingForward = false;
+    else if (e.code === 'KeyS') this._movingBackward = false;
+    else if (e.code === 'KeyA') this._movingLeft = false;
+    else if (e.code === 'KeyD') this._movingRight = false;
+    else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight')
+      this._sprinting = false;
+  }
+
+  private _handlePointerlockChange() {
+    this._isLocked = !!document.pointerLockElement;
+  }
+
+  private _handleCanvasClick() {
+    if (!this._isLocked) document.body.requestPointerLock();
+  }
 }

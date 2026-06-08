@@ -1,9 +1,5 @@
 import { StateMachine } from 'rewild-routing';
-import {
-  PointerLockController,
-  PointerLockEventType,
-  Renderer,
-} from 'rewild-renderer';
+import { Renderer } from 'rewild-renderer';
 import { Pane3D } from 'rewild-ui';
 import { Player } from './routing/Player';
 import { Clock } from './Clock';
@@ -16,12 +12,11 @@ export class GameManager {
   stateMachine: StateMachine;
   hasInitialized: boolean;
   player: Player;
-  camController: PointerLockController;
   clock: Clock;
   RAPIER: typeof import('@dimforge/rapier3d-compat');
   physicsWorld: World;
   onUnlock: () => void;
-  PointerLockChangedDelegate: (event: PointerLockEventType) => void;
+  private _onPointerlockChange: () => void;
   TerrainEventDelegate: (event: TerrainEvent) => void;
   terrainRapierBodyMap: Map<string, RigidBody>;
 
@@ -32,29 +27,24 @@ export class GameManager {
     this.player = player;
     this.clock = new Clock();
     this.onUnlock = onUnlock;
-    this.PointerLockChangedDelegate = this.handleOnPointerLockChange.bind(this);
+    this._onPointerlockChange = this._handlePointerlockChange.bind(this);
     this.TerrainEventDelegate = this.onTerrainEvent.bind(this);
     this.terrainRapierBodyMap = new Map();
   }
 
   lock() {
-    this.camController.lock();
+    this.player.requestLock();
   }
 
   async init(pane3D: Pane3D) {
     try {
-      if (this.hasInitialized) return false; // Prevent re-initialization
+      if (this.hasInitialized) return false;
       this.hasInitialized = true;
 
       await this.initPhysics();
       await this.renderer.init(pane3D.canvas()!, false);
-      this.camController = new PointerLockController(
-        this.renderer.perspectiveCam,
-        document.body
-      );
 
-      this.renderer.setCamController(this.camController, document.body);
-      this.player.setCamera(this.renderer.perspectiveCam);
+      this.player.setCamera(this.renderer.camera);
       const stateMachine = await loadInitialLevels(this.player, this);
 
       this.renderer.terrainRenderer.dispatcher.add(this.TerrainEventDelegate);
@@ -63,8 +53,10 @@ export class GameManager {
 
       this.stateMachine = stateMachine;
       this.clock.start();
-      this.camController.lock();
-      this.camController.dispatcher.add(this.PointerLockChangedDelegate);
+
+      document.addEventListener('pointerlockchange', this._onPointerlockChange);
+      this.player.requestLock();
+
       return true;
     } catch (err: unknown) {
       console.error(err);
@@ -76,7 +68,6 @@ export class GameManager {
     switch (event.type) {
       case 'chunk-loaded':
         if (event.lod.lod === 0) {
-          // Create a stable trimesh collider for the ground using the loaded mesh
           const mesh = event.lod.mesh;
           if (mesh?.geometry?.vertices && mesh?.geometry?.indices) {
             const verts = new Float32Array(mesh.geometry.vertices);
@@ -89,7 +80,6 @@ export class GameManager {
                 event.chunk.position.y
               )
             );
-            // Tag this rigid body so hits can be identified as terrain later
             rb.userData = { isTerrain: true };
             const collider = this.physicsWorld.createCollider(triDesc, rb);
 
@@ -121,46 +111,13 @@ export class GameManager {
     this.RAPIER = await import('@dimforge/rapier3d-compat');
     await this.RAPIER.init();
 
-    // Use the RAPIER module here.
     let gravity = { x: 0.0, y: -9.81, z: 0.0 };
     this.physicsWorld = new this.RAPIER.World(gravity);
-
-    // THIS WORKS
-    // let groundColliderDesc = this.RAPIER.ColliderDesc.cuboid(50.0, 0.1, 50.0);
-    // this.physicsWorld.createCollider(groundColliderDesc);
-
-    // THIS Doesnt WORK - but should
-    // Inside your initialized GameManager (after `await this.RAPIER.init()` and world creation)
-    // const R = this.RAPIER;
-
-    // const rows = 2;
-    // const cols = 2;
-    // const heights = new Float32Array([0, 0, 0, 0]);
-    // // Non-zero X/Z spacing; Y=1 for height scale.
-    // const hfDesc = R.ColliderDesc.heightfield(
-    //   rows,
-    //   cols,
-    //   heights,
-    //   new R.Vector3(1, 1, 1)
-    // );
-
-    // // Attach to a fixed rigid body (safer than collider-only)
-    // const rb = this.physicsWorld.createRigidBody(
-    //   R.RigidBodyDesc.fixed().setTranslation(0, 0, 0)
-    // );
-    // this.physicsWorld.createCollider(hfDesc, rb);
   }
 
-  handleOnPointerLockChange(event: PointerLockEventType) {
-    switch (event.type) {
-      case 'lock':
-        break;
-      case 'unlock':
-        this.onUnlock();
-        break;
-      case 'change':
-        // Handle pointer change
-        break;
+  private _handlePointerlockChange() {
+    if (!document.pointerLockElement) {
+      this.onUnlock();
     }
   }
 
@@ -169,12 +126,7 @@ export class GameManager {
     const delta = clock.getDelta();
     const total = clock.getElapsedTime();
 
-    // Step the simulation forward.
     this.physicsWorld.step();
-
-    // // Get and print the rigid-body's position.
-    // let position = rigidBody.translation();
-    // console.log('Rigid-body position: ', position.x, position.y);
 
     this.stateMachine?.OnLoop(delta, total);
     this.renderer.onFrame();
@@ -183,9 +135,7 @@ export class GameManager {
   dispose() {
     this.stateMachine?.dispose();
     this.renderer.dispose();
-    this.camController.dispose();
-
-    this.camController.dispatcher.remove(this.PointerLockChangedDelegate);
+    document.removeEventListener('pointerlockchange', this._onPointerlockChange);
     this.renderer.terrainRenderer.dispatcher.remove(this.TerrainEventDelegate);
   }
 }

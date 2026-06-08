@@ -8,7 +8,6 @@ import { IMaterialPass } from './materials/IMaterialPass';
 import { IRenderGroup } from '../types/IRenderGroup';
 import { Sky } from './core/Sky';
 import { TerrainRenderer } from './renderers/terrain/TerrainRenderer';
-import { OrbitController } from './input/OrbitController';
 import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
 import { RenderList } from './core/RenderList';
 import { RenderLayer } from './core/RenderLayer';
@@ -18,7 +17,6 @@ import { TextureManager } from './managers/TextureManager';
 import { SamplerManager } from './managers/SamplerManager';
 import { GeometryManager } from './managers/GeometryManager';
 import { MaterialManager } from './managers/MaterialManager';
-import { IController } from './input/IController';
 import { IMaterialsTemplate } from './managers/types';
 import { GuiManager } from './managers/GuiManager';
 import { UIElement } from './core/UIElement';
@@ -55,12 +53,11 @@ export class Renderer {
   materialManager: MaterialManager;
   mipmapGenerator: MipMapGenerator;
 
-  perspectiveCam: PerspectiveCamera;
+  camera: PerspectiveCamera;
   scene: Transform;
   ui: Transform;
   currentRenderList: RenderList;
   sky: Sky;
-  camController: IController;
   private canvasSizeWatcher: CanvasSizeWatcher;
   private renderGroups: IRenderGroup[];
   private overlayRenderGroups: IRenderGroup[];
@@ -136,15 +133,13 @@ export class Renderer {
 
     this.canvasSizeWatcher = new CanvasSizeWatcher(canvas);
 
-    this.perspectiveCam = new PerspectiveCamera(
+    this.camera = new PerspectiveCamera(
       65,
       canvas.width / canvas.height
     );
-    this.scene.addChild(this.perspectiveCam.camera.transform);
-    this.perspectiveCam.camera.transform.position.set(0, 20, 50);
-    this.perspectiveCam.camera.lookAt(0, 0, 0);
-
-    this.camController = new OrbitController(this.perspectiveCam, canvas);
+    this.scene.addChild(this.camera.camera.transform);
+    this.camera.camera.transform.position.set(0, 20, 50);
+    this.camera.camera.lookAt(0, 0, 0);
 
     const adapter = await navigator.gpu?.requestAdapter();
     const requiredFeatures: GPUFeatureName[] = [];
@@ -256,23 +251,11 @@ export class Renderer {
     if (this.autoFrame) requestAnimationFrame(this.onFrameHandler);
   }
 
-  setCamController(
-    controller: IController,
-    element: HTMLElement = this.canvas
-  ) {
-    this.camController.dispose();
-    this.camController = controller;
-    this.camController.connect(element);
-    this.camController.onWindowResize();
-  }
-
   onFrame() {
     if (this.disposed) return;
 
-    this.camController.update(this.delta * 0.01);
-
-    this.sky.update(this, this.perspectiveCam.camera);
-    this.terrainRenderer.update(this, this.perspectiveCam.camera);
+    this.sky.update(this, this.camera.camera);
+    this.terrainRenderer.update(this, this.camera.camera);
 
     this.render();
 
@@ -285,7 +268,6 @@ export class Renderer {
     this.initialized = false;
     this.renderTarget?.destroy();
     this.depthTexture?.destroy();
-    this.camController.dispose();
     this.device.destroy();
     this.renderGroups.length = 0; // Clear the render groups
     this.overlayRenderGroups.length = 0;
@@ -335,8 +317,8 @@ export class Renderer {
       renderTarget.destroy();
     }
 
-    this.perspectiveCam.aspect = currentWidth / currentHeight;
-    this.perspectiveCam.updateProjectionMatrix();
+    this.camera.aspect = currentWidth / currentHeight;
+    this.camera.updateProjectionMatrix();
 
     // Resize the multisampled render target to match the new canvas size.
     renderTarget = device.createTexture({
@@ -507,7 +489,7 @@ export class Renderer {
     this.totalDeltaTime += deltaTime;
     this.lastTime = currentTime;
 
-    const pCamera = this.perspectiveCam;
+    const pCamera = this.camera;
 
     // update scene graph
     this.scene.updateMatrixWorld();
@@ -600,7 +582,6 @@ export class Renderer {
     // Gets the device render targets ready. Checks for things like canvas resize
     if (this.canvasSizeWatcher.hasResized()) {
       this.resizeRenderTargets();
-      this.camController.onWindowResize();
     }
 
     const device = this.device;
@@ -631,7 +612,7 @@ export class Renderer {
         },
       });
 
-      const camera = this.perspectiveCam;
+      const camera = this.camera;
 
       this.terrainRenderer.render(this, pass, camera.camera);
 
