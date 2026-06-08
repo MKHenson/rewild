@@ -245,7 +245,7 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     let horizonFactor = 1.0 - smoothstep(0.0, 0.2, sunDotUp);
     let discEdge  = mix(0.9998, 0.9990, horizonFactor);
     let alphaEdge = mix(0.9995, 0.9987, horizonFactor);
-    let discBrightness = mix(1000.0, 3000.0, horizonFactor);
+    let discBrightness = mix(1000.0, 9000.0, horizonFactor);
     let sunDisc = discBrightness * smoothstep(discEdge, 1.0, mu) * sunExtinction * atmosphericDimming;
     color += vec3f(sunDisc) * pow(transmittance, 2.0);
 
