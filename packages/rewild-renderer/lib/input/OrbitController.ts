@@ -389,12 +389,6 @@ export class OrbitController implements IController {
     this.target.clampLength(this.minTargetRadius, this.maxTargetRadius);
     this.target.add(this.cursor);
 
-    // Keep the orbit target above terrain
-    if (this.getTerrainHeight) {
-      const th = this.getTerrainHeight(this.target.x, this.target.z);
-      if (th !== null) this.target.y = Math.max(this.target.y, th + this.minCameraY);
-    }
-
     // Scale radius (zoom)
     const prevRadius = this._spherical.radius;
     this._spherical.radius = this._clampDistance(this._spherical.radius * this._scale);
