@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.transactions.transaction
 
 private val json = Json { ignoreUnknownKeys = true }
@@ -17,7 +18,7 @@ class ProjectService {
 
     fun getAll(userId: String): List<Project> = transaction {
         ProjectsTable.selectAll()
-            .where { ProjectsTable.userId eq userId }
+            .where { (ProjectsTable.userId eq userId) and ProjectsTable.deletedAt.isNull() }
             .map { it.toProject() }
     }
 
@@ -50,6 +51,7 @@ class ProjectService {
                 it[sceneGraph] = json.encodeToString(record.sceneGraph)
                 it[updatedAt] = record.updatedAt
                 it[syncedAt] = record.syncedAt
+                it[deletedAt] = record.deletedAt
                 it[syncError] = record.syncError
             }
         } else {
@@ -62,6 +64,7 @@ class ProjectService {
                 it[sceneGraph] = json.encodeToString(record.sceneGraph)
                 it[updatedAt] = record.updatedAt
                 it[syncedAt] = record.syncedAt
+                it[deletedAt] = record.deletedAt
                 it[syncError] = record.syncError
             }
         }
@@ -98,6 +101,7 @@ class ProjectService {
         sceneGraph = json.decodeFromString<SceneGraph>(this[ProjectsTable.sceneGraph]),
         updatedAt = this[ProjectsTable.updatedAt],
         syncedAt = this[ProjectsTable.syncedAt],
+        deletedAt = this[ProjectsTable.deletedAt],
         syncError = this[ProjectsTable.syncError]
     )
 }

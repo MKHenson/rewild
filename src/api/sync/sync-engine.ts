@@ -97,6 +97,15 @@ export class SyncEngine {
     for (const incoming of response.records) {
       const table = this.tables[incoming.collection];
       if (!table) continue;
+
+      const deletedAt = (incoming.data as { deletedAt?: number | null }).deletedAt;
+      if (deletedAt) {
+        // Tombstone from the server — physically remove the local record.
+        await table.hardRemove(incoming.id);
+        this.logEvent({ collection: incoming.collection, recordId: incoming.id, status: 'pulled' });
+        continue;
+      }
+
       const local = await table.getOne(incoming.id);
       if (local && local.updatedAt > local.syncedAt) continue; // local wins
       await table.putSynced(

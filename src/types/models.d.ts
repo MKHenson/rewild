@@ -84,6 +84,7 @@ declare module 'models' {
   export interface SyncableRecord {
     updatedAt: number;
     syncedAt: number;
+    deletedAt: number | null;
     syncError: string | null;
   }
 

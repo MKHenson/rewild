@@ -249,6 +249,98 @@ describe('SyncEngine', () => {
     });
   });
 
+  describe('tombstone handling', () => {
+    it('includes soft-deleted (tombstone) records in the push payload', async () => {
+      const p = await projects.add({ name: 'To Be Deleted' });
+      await projects.markSynced(p.id, p.updatedAt, null); // clean
+      await projects.remove(p.id); // soft delete — dirty tombstone
+
+      await engine.run();
+
+      const body = getRequestBody();
+      const pushed = body.records.find((r) => r.id === p.id);
+      expect(pushed).toBeDefined();
+      expect((pushed!.data as { deletedAt: unknown }).deletedAt).toBeGreaterThan(0);
+    });
+
+    it('physically removes a tombstone received from the server', async () => {
+      const serverId = 'server-tombstone-id';
+      const deletedAt = Date.now();
+
+      (global.fetch as jest.Mock).mockResolvedValue(
+        syncResponse({
+          syncedAt: 5000,
+          records: [
+            {
+              collection: 'projects',
+              id: serverId,
+              updatedAt: deletedAt,
+              data: { id: serverId, name: 'Deleted On Server', updatedAt: deletedAt, deletedAt },
+            },
+          ],
+        })
+      );
+
+      // Seed the record locally so hardRemove has something to act on
+      await projects.putSynced({ id: serverId, name: 'Deleted On Server', updatedAt: deletedAt - 1000 } as any, 0);
+
+      await engine.run();
+
+      const local = await projects.getOne(serverId);
+      expect(local).toBeNull();
+    });
+
+    it('logs a pulled event when a tombstone is received from the server', async () => {
+      const deletedAt = Date.now();
+      (global.fetch as jest.Mock).mockResolvedValue(
+        syncResponse({
+          syncedAt: 5000,
+          records: [
+            {
+              collection: 'projects',
+              id: 'tombstone-log-id',
+              updatedAt: deletedAt,
+              data: { id: 'tombstone-log-id', deletedAt },
+            },
+          ],
+        })
+      );
+
+      await engine.run();
+
+      const pulled = engine.log.filter((e) => e.status === 'pulled' && e.recordId === 'tombstone-log-id');
+      expect(pulled).toHaveLength(1);
+    });
+
+    it('calls hardRemove (not putSynced) for a tombstone received from the server', async () => {
+      const putSyncedSpy = jest.spyOn(projects, 'putSynced');
+      const hardRemoveSpy = jest.spyOn(projects, 'hardRemove');
+      const deletedAt = Date.now();
+
+      (global.fetch as jest.Mock).mockResolvedValue(
+        syncResponse({
+          syncedAt: 5000,
+          records: [
+            {
+              collection: 'projects',
+              id: 'tombstone-routing-id',
+              updatedAt: deletedAt,
+              data: { id: 'tombstone-routing-id', deletedAt },
+            },
+          ],
+        })
+      );
+
+      await engine.run();
+
+      expect(hardRemoveSpy).toHaveBeenCalledWith('tombstone-routing-id');
+      expect(putSyncedSpy).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'tombstone-routing-id' }),
+        expect.anything()
+      );
+    });
+  });
+
   describe('in-memory event log', () => {
     it('logs a pushed event for each dirty record sent successfully', async () => {
       await projects.add({ name: 'A' });

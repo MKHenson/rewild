@@ -14,5 +14,6 @@ data class Project(
     val sceneGraph: SceneGraph,
     val updatedAt: Long,
     val syncedAt: Long = 0,
+    val deletedAt: Long? = null,
     val syncError: String? = null
 )

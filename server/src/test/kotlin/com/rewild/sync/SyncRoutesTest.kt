@@ -325,6 +325,85 @@ class SyncRoutesTest {
     }
 
     @Test
+    fun `syncing a tombstone project stores deletedAt on server`() = testApplication {
+        installTestApp()
+        val userId = "user-tombstone-push"
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
+        val deletedAt = System.currentTimeMillis()
+        val project = makeProject("tombstone-push-proj", updatedAt = deletedAt).copy(deletedAt = deletedAt)
+
+        client.post("/api/sync") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(SyncRequest(lastSyncedAt = 0, records = listOf(project.toSyncRecord()))))
+        }
+
+        val all = projectService.getAllNewerThan(userId, 0)
+        val stored = all.find { it.id == "tombstone-push-proj" }
+        assertNotNull(stored)
+        assertEquals(deletedAt, stored.deletedAt)
+    }
+
+    @Test
+    fun `tombstone is included in pull response so clients can remove it`() = testApplication {
+        installTestApp()
+        val userId = "user-tombstone-pull"
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
+        val deletedAt = System.currentTimeMillis() - 1000
+        val project = makeProject("tombstone-pull-proj", updatedAt = deletedAt).copy(deletedAt = deletedAt)
+        projectService.upsert(userId, project)
+
+        val response = client.post("/api/sync") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(SyncRequest(lastSyncedAt = 0, records = emptyList())))
+        }
+
+        val body = json.decodeFromString<SyncResponse>(response.bodyAsText())
+        val tombstone = body.records.find { it.id == "tombstone-pull-proj" }
+        assertNotNull(tombstone)
+        val storedDeletedAt = tombstone.data["deletedAt"]?.toString()?.toLongOrNull()
+        assertEquals(deletedAt, storedDeletedAt)
+    }
+
+    @Test
+    fun `tombstone project is not returned by getAll REST endpoint`() = testApplication {
+        installTestApp()
+        val userId = "user-tombstone-list"
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
+        val deletedAt = System.currentTimeMillis()
+        projectService.upsert(userId, makeProject("tombstone-visible", name = "Visible"))
+        projectService.upsert(userId, makeProject("tombstone-hidden", name = "Hidden", updatedAt = deletedAt).copy(deletedAt = deletedAt))
+
+        val response = client.get("/api/projects") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+
+        val projects = json.decodeFromString<List<Project>>(response.bodyAsText())
+        val ids = projects.map { it.id }
+        assertTrue("tombstone-visible" in ids)
+        assertTrue("tombstone-hidden" !in ids)
+    }
+
+    @Test
+    fun `tombstone project with levelId skips pass 3 and does not fail on missing level FK`() = testApplication {
+        installTestApp()
+        val userId = "user-tombstone-fk"
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
+        val deletedAt = System.currentTimeMillis()
+        // Tombstone with a levelId pointing to a level that does not exist — pass 3 must be skipped
+        val project = makeProject("tombstone-fk-proj", updatedAt = deletedAt).copy(levelId = "non-existent-level", deletedAt = deletedAt)
+
+        val response = client.post("/api/sync") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(SyncRequest(lastSyncedAt = 0, records = listOf(project.toSyncRecord()))))
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+    }
+
+    @Test
     fun `syncing new project with levelId resolves circular FK when level record arrives first`() = testApplication {
         installTestApp()
         val userId = "user-circular-fk-rev"

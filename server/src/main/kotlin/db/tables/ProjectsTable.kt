@@ -15,6 +15,7 @@ object ProjectsTable : Table("projects") {
     val updatedAt = long("updated_at")
     val syncedAt = long("synced_at")
     val syncError = text("sync_error").nullable()
+    val deletedAt = long("deleted_at").nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

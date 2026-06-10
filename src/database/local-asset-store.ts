@@ -81,7 +81,7 @@ export class LocalAssetStore extends LocalDataTable<IAsset> {
     } catch {}
 
     const result = await this.getMany({ where: [['levelId', '==', levelId]] });
-    await Promise.all(result.items.map((item) => this.remove(item.id)));
+    await Promise.all(result.items.map((item) => this.hardRemove(item.id)));
   }
 
   private async findMetadata(levelId: string, assetType: string, filename: string) {

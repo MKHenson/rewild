@@ -14,5 +14,6 @@ data class Level(
     val containers: List<Container>,
     val updatedAt: Long,
     val syncedAt: Long = 0,
+    val deletedAt: Long? = null,
     val syncError: String? = null
 )

@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.greater
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.transactions.transaction
 
 private val json = Json { ignoreUnknownKeys = true }
@@ -17,7 +18,7 @@ class LevelService {
 
     fun getAll(userId: String): List<Level> = transaction {
         LevelsTable.selectAll()
-            .where { LevelsTable.userId eq userId }
+            .where { (LevelsTable.userId eq userId) and LevelsTable.deletedAt.isNull() }
             .map { it.toLevel() }
     }
 
@@ -50,6 +51,7 @@ class LevelService {
                 it[containers] = json.encodeToString(record.containers)
                 it[updatedAt] = record.updatedAt
                 it[syncedAt] = record.syncedAt
+                it[deletedAt] = record.deletedAt
                 it[syncError] = record.syncError
             }
         } else {
@@ -62,6 +64,7 @@ class LevelService {
                 it[containers] = json.encodeToString(record.containers)
                 it[updatedAt] = record.updatedAt
                 it[syncedAt] = record.syncedAt
+                it[deletedAt] = record.deletedAt
                 it[syncError] = record.syncError
             }
         }
@@ -98,6 +101,7 @@ class LevelService {
         containers = json.decodeFromString<List<Container>>(this[LevelsTable.containers]),
         updatedAt = this[LevelsTable.updatedAt],
         syncedAt = this[LevelsTable.syncedAt],
+        deletedAt = this[LevelsTable.deletedAt],
         syncError = this[LevelsTable.syncError]
     )
 }

@@ -243,7 +243,14 @@ describe('Local database tests', () => {
       expect(result.updatedAt).toBe(0);
       expect(result.syncedAt).toBe(0);
       expect(result.syncError).toBeNull();
+      expect(result.deletedAt).toBeNull();
       expect(result.type).toBe('legacy-cat');
+    });
+
+    it('sets deletedAt: null on add', async () => {
+      const local = getLocalTable();
+      const item = await local.add({ type: 'new-cat' });
+      expect(item.deletedAt).toBeNull();
     });
 
     it('getDirty returns records where updatedAt > syncedAt', async () => {
@@ -363,7 +370,7 @@ describe('Local database tests', () => {
     expect(result).toBe(false);
   });
 
-  it('remove deletes the item and returns true', async () => {
+  it('remove soft-deletes the item: getOne returns null but record is kept as a tombstone', async () => {
     const local = getLocalTable();
     const item = await local.add({ type: 'remove-cat' });
 
@@ -372,5 +379,84 @@ describe('Local database tests', () => {
 
     const fetched = await local.getOne(item.id);
     expect(fetched).toBeNull();
+  });
+
+  describe('soft delete (tombstoning)', () => {
+    it('remove sets deletedAt and bumps updatedAt so the tombstone is dirty', async () => {
+      const local = getLocalTable();
+      const item = await local.add({ type: 'dirty-tombstone-cat' });
+      await local.markSynced(item.id, item.updatedAt, null); // make it clean
+
+      const before = Date.now();
+      await local.remove(item.id);
+
+      const dirty = await local.getDirty();
+      const tombstone = dirty.find((r) => r.id === item.id);
+      expect(tombstone).toBeDefined();
+      expect(tombstone!.deletedAt).toBeGreaterThanOrEqual(before);
+      expect(tombstone!.updatedAt).toBeGreaterThanOrEqual(before);
+    });
+
+    it('getMany excludes tombstoned records', async () => {
+      const local = getLocalTable();
+      const live = await local.add({ type: 'tombstone-visible-cat' });
+      const deleted = await local.add({ type: 'tombstone-visible-cat' });
+      await local.remove(deleted.id);
+
+      const rows = await local.getMany({ where: [['type', '==', 'tombstone-visible-cat']] });
+      const ids = rows.items.map((i) => i.id);
+      expect(ids).toContain(live.id);
+      expect(ids).not.toContain(deleted.id);
+    });
+
+    it('getDirty includes tombstoned records so they are pushed to the server', async () => {
+      const local = getLocalTable();
+      const item = await local.add({ type: 'sync-tombstone-cat' });
+      await local.markSynced(item.id, item.updatedAt, null); // clean
+      await local.remove(item.id); // soft delete — dirty again
+
+      const dirty = await local.getDirty();
+      expect(dirty.map((r) => r.id)).toContain(item.id);
+    });
+
+    it('hardRemove physically deletes the record so getDirty does not include it', async () => {
+      const local = getLocalTable();
+      const item = await local.add({ type: 'hard-remove-cat' });
+
+      await local.hardRemove(item.id);
+
+      const dirty = await local.getDirty();
+      expect(dirty.map((r) => r.id)).not.toContain(item.id);
+    });
+
+    it('hardRemove on a non-existent id is a no-op', async () => {
+      const local = getLocalTable();
+      await expect(local.hardRemove('does-not-exist')).resolves.toBeUndefined();
+    });
+
+    it('putSynced preserves deletedAt from incoming record, hiding it from getOne', async () => {
+      const local = getLocalTable();
+      const deletedAt = Date.now();
+      await local.putSynced(
+        { id: 'srv-tombstone', type: 'server-deleted-cat', updatedAt: 5000, deletedAt } as any,
+        5000
+      );
+
+      // getOne returns null because deletedAt is set on the stored record
+      const result = await local.getOne('srv-tombstone');
+      expect(result).toBeNull();
+    });
+
+    it('putSynced defaults deletedAt to null when the incoming record has none', async () => {
+      const local = getLocalTable();
+      await local.putSynced(
+        { id: 'srv-live', type: 'server-live-cat', updatedAt: 5000 } as any,
+        5000
+      );
+
+      const result = await local.getOne('srv-live');
+      expect(result).not.toBeNull();
+      expect(result!.deletedAt).toBeNull();
+    });
   });
 });

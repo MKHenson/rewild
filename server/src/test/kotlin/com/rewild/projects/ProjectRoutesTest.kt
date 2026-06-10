@@ -20,6 +20,7 @@ import org.junit.BeforeClass
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class ProjectRoutesTest {
 
@@ -93,6 +94,25 @@ class ProjectRoutesTest {
         val projects = json.decodeFromString<List<Project>>(response.bodyAsText())
         assertEquals(1, projects.size)
         assertEquals("list-proj-1", projects[0].id)
+    }
+
+    @Test
+    fun `GET projects does not return tombstoned projects`() = testApplication {
+        installTestApp()
+        val userId = "user-tombstone-list-proj"
+        val deletedAt = System.currentTimeMillis()
+        service.upsert(userId, makeProject("tombstone-visible-proj"))
+        service.upsert(userId, makeProject("tombstone-hidden-proj").copy(deletedAt = deletedAt, updatedAt = deletedAt))
+
+        val token = jwtService.generateToken(userId, "$userId@test.com", userId)
+        val response = client.get("/api/projects") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val projects = json.decodeFromString<List<Project>>(response.bodyAsText())
+        val ids = projects.map { it.id }
+        assertTrue("tombstone-visible-proj" in ids)
+        assertTrue("tombstone-hidden-proj" !in ids)
     }
 
     @Test

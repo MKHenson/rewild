@@ -56,7 +56,9 @@ class SyncService(
         }
 
         // Pass 3: patch levelId back onto the projects that needed it — levels exist now.
+        // Skip tombstones: their levelId is irrelevant and the level may no longer exist.
         for ((_, incoming) in projectsNeedingLevelId) {
+            if (incoming.deletedAt != null) continue
             projectService.upsert(userId, incoming.copy(userId = userId, syncedAt = now, syncError = null))
         }
 

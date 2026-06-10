@@ -1,0 +1,2 @@
+ALTER TABLE projects ADD COLUMN deleted_at BIGINT NULL;
+ALTER TABLE levels ADD COLUMN deleted_at BIGINT NULL;

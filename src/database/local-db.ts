@@ -9,6 +9,7 @@ export function withSyncDefaults<T>(
   return {
     updatedAt: 0,
     syncedAt: 0,
+    deletedAt: null,
     syncError: null,
     ...record,
   } as StoredRecord<T>;
@@ -86,7 +87,9 @@ export class LocalDataTable<T> {
   async getOne(id: string): Promise<StoredRecord<T> | null> {
     const store = await this.openStore('readonly');
     const result = await idbReq<StoredRecord<T> | undefined>(store.get(id));
-    return result ? withSyncDefaults(result) : null;
+    if (!result) return null;
+    const record = withSyncDefaults(result);
+    return record.deletedAt ? null : record;
   }
 
   async getMany<Query = T>(q: IDataTableQuery<Query>) {
@@ -111,6 +114,7 @@ export class LocalDataTable<T> {
     }
 
     const filteredItems = allItems.filter((item) => {
+      if (item.deletedAt != null) return false;
       if (!q.where) return true;
       for (const [prop, comparitor, value] of q.where) {
         const entryValue = item[prop as unknown as keyof T];
@@ -149,10 +153,18 @@ export class LocalDataTable<T> {
     const db = await openDatabase(this.db);
     const tx = db.transaction(this.collection, 'readwrite');
     const store = tx.objectStore(this.collection);
-    const existing = await idbReq<StoredRecord<T> | undefined>(store.get(id));
-    if (!existing) return false;
-    await idbReq(store.delete(id));
+    const raw = await idbReq<StoredRecord<T> | undefined>(store.get(id));
+    if (!raw) return false;
+    const existing = withSyncDefaults(raw);
+    // Guarantee updatedAt > syncedAt even if called in the same millisecond as markSynced.
+    const now = Math.max(Date.now(), existing.syncedAt + 1);
+    await idbReq(store.put({ ...existing, deletedAt: now, updatedAt: now }));
     return true;
+  }
+
+  async hardRemove(id: string): Promise<void> {
+    const store = await this.openStore('readwrite');
+    await idbReq(store.delete(id));
   }
 
   async add(token: T): Promise<StoredRecord<T>> {
@@ -161,6 +173,7 @@ export class LocalDataTable<T> {
       id: generateUUID(),
       updatedAt: Date.now(),
       syncedAt: 0,
+      deletedAt: null,
       syncError: null,
     };
     const store = await this.openStore('readwrite');
@@ -209,10 +222,15 @@ export class LocalDataTable<T> {
   }
 
   async putSynced(
-    record: T & { id: string; updatedAt: number },
+    record: T & { id: string; updatedAt: number; deletedAt?: number | null },
     syncedAt: number
   ): Promise<void> {
-    const stored: StoredRecord<T> = { ...record, syncedAt, syncError: null };
+    const stored: StoredRecord<T> = {
+      deletedAt: null,
+      ...record,
+      syncedAt,
+      syncError: null,
+    };
     const store = await this.openStore('readwrite');
     await idbReq(store.put(stored));
   }
