@@ -3,6 +3,7 @@ import { Node } from 'rewild-routing';
 import { Asset3D } from './Asset3D';
 import { StateMachineData } from './Types';
 import { Raycaster } from 'node_modules/rewild-renderer/lib/core/Raycaster';
+import { SpotLight } from 'node_modules/rewild-renderer/lib/core/lights/SpotLight';
 import {
   World,
   RigidBody,
@@ -14,13 +15,19 @@ import {
 } from '@dimforge/rapier3d-compat';
 import { RigidBodyBehaviour } from './behaviours/RigidBodyBehaviour';
 import { UIElementHealthPass } from 'node_modules/rewild-renderer/lib/materials/UIElementHealthPass';
-import { clamp, Euler, EulerRotationOrder } from 'node_modules/rewild-common';
+import {
+  clamp,
+  Color,
+  Euler,
+  EulerRotationOrder,
+} from 'node_modules/rewild-common';
 
 const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);
 const _PI_HALF = Math.PI / 2 - 0.01;
 const _MOUSE_SENSITIVITY = 0.002;
 const _MOVE_SPEED: f32 = 3.0;
 const _RUN_MULTIPLIER: f32 = 2.5;
+const _DEG2RAD = Math.PI / 180;
 
 export class Player extends Node {
   cameraController: ICameraController;
@@ -48,6 +55,10 @@ export class Player extends Node {
   jumpRequested: boolean = false;
   private _isLocked = false;
   private _canvas: HTMLCanvasElement | null = null;
+
+  private _flashlight: SpotLight | null = null;
+  private _flashlightOn: boolean = false;
+  private static readonly _FLASHLIGHT_INTENSITY: f32 = 3.5;
 
   private _onMouseMove: (e: MouseEvent) => void;
   private _onKeyDown: (e: KeyboardEvent) => void;
@@ -118,6 +129,19 @@ export class Player extends Node {
     document.addEventListener('keyup', this._onKeyUp);
     this._canvas.addEventListener('click', this._onCanvasClick);
 
+    if (!this._flashlight) {
+      const flash = new SpotLight(
+        new Color(1, 0.95, 0.85),
+        Player._FLASHLIGHT_INTENSITY
+      );
+      flash.range = 40.0;
+      flash.innerAngle = 10 * _DEG2RAD;
+      flash.outerAngle = 25 * _DEG2RAD;
+      this._flashlight = flash;
+    }
+    this._flashlight.intensity = 0.0; // off by default
+    stateData.renderer.scene.addChild(this._flashlight.transform);
+
     if (!this.characterController) {
       this.rapierWorld = stateData.gameManager.physicsWorld;
 
@@ -176,6 +200,10 @@ export class Player extends Node {
 
     if (document.pointerLockElement) document.exitPointerLock();
     this._canvas = null;
+
+    if (this._flashlight) {
+      this._flashlight.transform.removeFromParent();
+    }
 
     this.rapierWorld.removeCharacterController(this.characterController);
   }
@@ -305,11 +333,24 @@ export class Player extends Node {
     });
 
     const pos = this.capsuleBody.translation();
-    this.cameraController.camera.transform.position.set(
-      pos.x,
-      pos.y + 1.8,
-      pos.z
-    );
+    const camX = pos.x;
+    const camY = pos.y + 1.8;
+    const camZ = pos.z;
+    this.cameraController.camera.transform.position.set(camX, camY, camZ);
+
+    if (this._flashlight) {
+      // Always track camera so the cone direction is valid when toggled on.
+      this._flashlight.transform.position.set(camX, camY, camZ);
+      const sinYaw = Math.sin(this._yaw);
+      const cosYaw = Math.cos(this._yaw);
+      const sinPitch = Math.sin(this._pitch);
+      const cosPitch = Math.cos(this._pitch);
+      this._flashlight.target.position.set(
+        camX - sinYaw * cosPitch,
+        camY + sinPitch,
+        camZ - cosYaw * cosPitch
+      );
+    }
   }
 
   private _handleMouseMove(e: MouseEvent) {
@@ -327,6 +368,12 @@ export class Player extends Node {
     else if (e.code === 'Space') this.jumpRequested = true;
     else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight')
       this._sprinting = true;
+    else if (e.code === 'KeyF' && this._flashlight) {
+      this._flashlightOn = !this._flashlightOn;
+      this._flashlight.intensity = this._flashlightOn
+        ? Player._FLASHLIGHT_INTENSITY
+        : 0.0;
+    }
   }
 
   private _handleKeyUp(e: KeyboardEvent) {
