@@ -1,3 +1,5 @@
+![Mycelium Network](../images/mycelium.png)
+
 ## Server Strategy — Mycelium
 
 Mycelium is the underground fungal network that connects trees and plants, enabling them to share nutrients and communicate beneath the surface. It is the hidden infrastructure that makes everything above ground possible. This backend initiative takes the same role in RE-WILD — invisible to the user, but the layer that connects devices, persists data, and keeps the world alive across sessions.

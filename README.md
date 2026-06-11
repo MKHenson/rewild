@@ -13,7 +13,8 @@ Checkout the 🦕[Demo](https://rewild-client.s3-website.fr-par.scw.cloud)🦖 (
 
 ## Architecture
 
-- [Server & Sync Architecture](./docs/mycelium-network.md)
+- [Server & Sync Architecture](./docs/milestones/mycelium-network.md)
+- [Lighting](./docs/milestones/foxfire-lighting.md)
 
 ## Deployment
 
