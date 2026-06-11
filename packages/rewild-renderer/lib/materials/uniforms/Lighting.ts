@@ -6,7 +6,12 @@ import { Mesh } from '../../core/Mesh';
 import { DirectionLight } from '../../core/lights/DirectionLight';
 import { PointLight } from '../../core/lights/PointLight';
 
-const MAX_LIGHTS = 4;
+const MAX_LIGHTS = 32;
+// Buffer layout: 16-byte header (numLights u32 + 12 bytes implicit padding) then lights array.
+// Matches the WGSL struct: struct LightingUniforms { numLights: u32, lights: array<Light> }
+// where array<Light> is 16-byte aligned (Light stride = 32 bytes = 8 floats).
+const HEADER_BYTES = 16;
+const LIGHT_STRIDE_FLOATS = 8;
 
 export class Lighting implements ISharedUniformBuffer {
   lightingData: ArrayBuffer;
@@ -28,9 +33,7 @@ export class Lighting implements ISharedUniformBuffer {
     this._position = new Vector3();
     this._color = new Color();
 
-    // 8 floats per light * MAX_LIGHTS + 4 floats (numLights + padding)
-    const structSize = 8 * 4;
-    const totalSize = MAX_LIGHTS * structSize + 16;
+    const totalSize = HEADER_BYTES + MAX_LIGHTS * LIGHT_STRIDE_FLOATS * 4;
     this.lightingData = new ArrayBuffer(totalSize);
     this.lightingFloats = new Float32Array(this.lightingData);
     this.lightingInts = new Uint32Array(this.lightingData);
@@ -50,7 +53,7 @@ export class Lighting implements ISharedUniformBuffer {
 
     this.buffer = device.createBuffer({
       size: this.lightingData.byteLength,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
 
     this.bindGroup = device.createBindGroup({
@@ -74,7 +77,8 @@ export class Lighting implements ISharedUniformBuffer {
     const position = this._position;
     const color = this._color;
     let lightCount = 0;
-    let offset = 0;
+    // Lights start at byte offset HEADER_BYTES (16), which is float index 4.
+    let offset = HEADER_BYTES / 4;
 
     for (const light of renderer.currentRenderList.lights) {
       if (lightCount >= MAX_LIGHTS) break;
@@ -98,7 +102,7 @@ export class Lighting implements ISharedUniformBuffer {
         this.lightingFloats[offset + 6] = color.b;
         this.lightingFloats[offset + 7] = -1.0; // Directional light
 
-        offset += 8;
+        offset += LIGHT_STRIDE_FLOATS;
         lightCount++;
       } else if (light instanceof PointLight) {
         position.setFromMatrixPosition(light.transform.matrixWorld);
@@ -114,15 +118,13 @@ export class Lighting implements ISharedUniformBuffer {
         this.lightingFloats[offset + 6] = color.b;
         this.lightingFloats[offset + 7] = light.radius; // Point light
 
-        offset += 8;
+        offset += LIGHT_STRIDE_FLOATS;
         lightCount++;
       }
     }
 
-    // Set numLights
-    // The lights array takes MAX_LIGHTS * 8 floats.
-    // So numLights is at index MAX_LIGHTS * 8 in the float/int array.
-    this.lightingInts[MAX_LIGHTS * 8] = lightCount;
+    // numLights at byte offset 0 (index 0 of the uint32 view)
+    this.lightingInts[0] = lightCount;
 
     device.queue.writeBuffer(
       this.buffer,
