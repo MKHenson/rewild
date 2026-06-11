@@ -25,7 +25,7 @@ struct VertexOutput {
 
 @group(1) @binding(0) var<uniform> uniforms : Uniforms;
 @group(2) @binding(0) var<storage, read> transforms : array<Transform>;
-@group(3) @binding(0) var<uniform> lighting : LightingUniforms;
+@group(3) @binding(0) var<storage, read> lighting : LightingUniforms;
 
 @vertex
 fn vs(

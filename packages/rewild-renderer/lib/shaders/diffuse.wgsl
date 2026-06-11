@@ -25,7 +25,7 @@ struct VertexOutput {
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
 @group(1) @binding(0) var mySampler: sampler;
 @group(1) @binding(1) var myTexture: texture_2d<f32>;
-@group(2) @binding(0) var<uniform> lighting : LightingUniforms;
+@group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
 @group(3) @binding(2) var<uniform> cloudShadowParams: CloudShadowParams;

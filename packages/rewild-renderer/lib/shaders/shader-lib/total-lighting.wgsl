@@ -1,5 +1,3 @@
-const MAX_LIGHTS = 4;
-
 struct Light {
   positionOrDirection : vec3f,
   intensity : f32,
@@ -8,9 +6,6 @@ struct Light {
 }
 
 struct LightingUniforms {
-  lights : array<Light, MAX_LIGHTS>,
   numLights : u32,
-  padding1 : f32,
-  padding2 : f32,
-  padding3 : f32,
+  lights : array<Light>,
 }
