@@ -6,14 +6,26 @@ import { IVisualComponent } from '../../../types/interfaces';
 import shader from '../../shaders/shadow-depth.wgsl';
 
 export const SHADOW_MAP_SIZE = 2048;
+export const NUM_CASCADES = 3;
 
-// XY half-size (world units) for the shadow ortho frustum.
-// Capping this prevents the shadow map covering the full camera far distance (~2000 units),
-// which would leave only ~1 texel per world unit. At 300 units: 600/2048 ≈ 0.29 units/texel.
-const SHADOW_HALF_SIZE = 100;
+// Each cascade occupies one 1024×1024 quadrant of the 2048×2048 atlas.
+const CASCADE_SIZE = SHADOW_MAP_SIZE / 2;
 
-// NDC corners used to reconstruct view frustum in world space.
-// The camera projection matrix uses OpenGL convention (near → -1, far → +1).
+// Maximum view-space distance (world units) that receives shadows.
+// Keeps the far cascade resolution acceptable despite the camera's 2000-unit far plane.
+const SHADOW_CASCADE_FAR = 500;
+
+// Practical-split blend factor λ: 0 = uniform spacing, 1 = logarithmic spacing.
+const CSM_LAMBDA = 0.5;
+
+// Atlas pixel offset [x, y] for each cascade.
+// Layout: cascade 0 = top-left, cascade 1 = top-right, cascade 2 = bottom-left.
+// Bottom-right quadrant (1024, 1024) is reserved for the spot light shadow map.
+const CASCADE_VIEWPORT_X = [0, CASCADE_SIZE, 0];
+const CASCADE_VIEWPORT_Y = [0, 0, CASCADE_SIZE];
+
+// NDC corners used to reconstruct the view frustum in world space.
+// Camera projection uses OpenGL convention: near → NDC Z = -1, far → NDC Z = +1.
 const NDC_NEAR_Z = -1;
 const NDC_FAR_Z = 1;
 const NDC_CORNERS: [number, number, number][] = [
@@ -28,24 +40,33 @@ const NDC_CORNERS: [number, number, number][] = [
 ];
 
 interface MeshShadowUniforms {
-  buffer: GPUBuffer;
-  bindGroup: GPUBindGroup;
+  buffers: [GPUBuffer, GPUBuffer, GPUBuffer];
+  bindGroups: [GPUBindGroup, GPUBindGroup, GPUBindGroup];
 }
 
 export class DirectionalShadowRenderer {
   shadowDepthTexture: GPUTexture;
-  /** Light view-projection matrix — updated each frame, read by DirectionalShadow uniform. */
-  lightVP: Matrix4;
+  /** Per-cascade light VP matrices — updated each frame, read by ShadowUniforms.prepare(). */
+  lightVPs: [Matrix4, Matrix4, Matrix4];
+  /**
+   * View-space depth at which each cascade ends.
+   *   [0] = end of cascade 0  (cascadeSplits.x in shader)
+   *   [1] = end of cascade 1  (cascadeSplits.y in shader)
+   *   [2] = SHADOW_CASCADE_FAR (cascadeSplits.z in shader)
+   *   [3] = unused
+   */
+  cascadeSplitDistances: Float32Array;
 
   private pipeline: GPURenderPipeline;
   private meshUniforms: Map<IVisualComponent, MeshShadowUniforms>;
 
-  // Pre-allocated per-frame math objects — never allocated inside render().
+  // Pre-allocated per-frame math — never allocated inside render().
   private _lightViewWorld: Matrix4;
   private _lightView: Matrix4;
   private _lightProj: Matrix4;
   private _shadowMVP: Matrix4;
-  private _frustumCorners: Vector3[];
+  private _frustumCorners: Vector3[];   // 8 full-frustum corners (near + far planes)
+  private _cascadeCorners: Vector3[];   // 8 sub-frustum corners for the current cascade
   private _lightPos: Vector3;
   private _frustumCenter: Vector3;
   private _lightDir: Vector3;
@@ -53,13 +74,15 @@ export class DirectionalShadowRenderer {
   private _matData: Float32Array;
 
   constructor() {
-    this.lightVP = new Matrix4();
+    this.lightVPs = [new Matrix4(), new Matrix4(), new Matrix4()];
+    this.cascadeSplitDistances = new Float32Array(4);
     this.meshUniforms = new Map();
     this._lightViewWorld = new Matrix4();
     this._lightView = new Matrix4();
     this._lightProj = new Matrix4();
     this._shadowMVP = new Matrix4();
     this._frustumCorners = Array.from({ length: 8 }, () => new Vector3());
+    this._cascadeCorners = Array.from({ length: 8 }, () => new Vector3());
     this._lightPos = new Vector3();
     this._frustumCenter = new Vector3();
     this._lightDir = new Vector3();
@@ -70,6 +93,8 @@ export class DirectionalShadowRenderer {
   init(renderer: Renderer): void {
     const { device } = renderer;
 
+    // 2048×2048 atlas split into four 1024×1024 quadrants.
+    // Cascades 0/1/2 use top-left / top-right / bottom-left; bottom-right is reserved.
     this.shadowDepthTexture = device.createTexture({
       label: 'directional shadow depth',
       size: [SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 1],
@@ -119,11 +144,11 @@ export class DirectionalShadowRenderer {
     const sun = renderer.sky?.skyRenderer?.sun;
     if (!sun) return;
 
-    this._computeLightVP(camera, sun.transform.position);
+    this._computeCascadeLightVPs(camera, sun.transform.position);
 
     const { device } = renderer;
 
-    // Ensure per-mesh uniform buffers exist and draw (geometry must already be built).
+    // Ensure per-mesh uniform buffers exist (geometry must already be built).
     for (const item of renderList) {
       if (item.geometry.requiresBuild) continue;
       for (const mesh of item.meshes) {
@@ -131,9 +156,24 @@ export class DirectionalShadowRenderer {
       }
     }
 
+    // Write all 3 cascade shadow MVPs for every mesh before opening the render pass.
+    // Buffer writes must happen outside the pass so each cascade draw sees its own matrix.
+    for (const item of renderList) {
+      if (item.geometry.requiresBuild) continue;
+      for (const mesh of item.meshes) {
+        const uniforms = this.meshUniforms.get(mesh);
+        if (!uniforms) continue;
+        for (let c = 0; c < NUM_CASCADES; c++) {
+          this._shadowMVP.multiplyMatrices(this.lightVPs[c], mesh.transform.matrixWorld);
+          this._matData.set(this._shadowMVP.elements);
+          device.queue.writeBuffer(uniforms.buffers[c], 0, this._matData.buffer);
+        }
+      }
+    }
+
     const depthView = this.shadowDepthTexture.createView();
     const pass = encoder.beginRenderPass({
-      label: 'directional shadow pass',
+      label: 'directional shadow pass (CSM)',
       colorAttachments: [],
       depthStencilAttachment: {
         view: depthView,
@@ -145,28 +185,29 @@ export class DirectionalShadowRenderer {
 
     pass.setPipeline(this.pipeline);
 
-    for (const item of renderList) {
-      if (item.geometry.requiresBuild) continue;
+    // Render all 3 cascades in a single pass — setViewport routes each into its atlas quadrant.
+    for (let c = 0; c < NUM_CASCADES; c++) {
+      pass.setViewport(
+        CASCADE_VIEWPORT_X[c], CASCADE_VIEWPORT_Y[c],
+        CASCADE_SIZE, CASCADE_SIZE,
+        0, 1
+      );
 
-      const geo = item.geometry;
-      pass.setVertexBuffer(0, geo.vertexBuffer);
-      pass.setIndexBuffer(geo.indexBuffer, 'uint32');
-      const numIndices = geo.indices!.length;
+      for (const item of renderList) {
+        if (item.geometry.requiresBuild) continue;
 
-      for (const mesh of item.meshes) {
-        const uniforms = this.meshUniforms.get(mesh);
-        if (!uniforms) continue;
+        const geo = item.geometry;
+        pass.setVertexBuffer(0, geo.vertexBuffer);
+        pass.setIndexBuffer(geo.indexBuffer, 'uint32');
+        const numIndices = geo.indices!.length;
 
-        // Compute per-mesh shadow MVP: lightVP * mesh world matrix
-        this._shadowMVP.multiplyMatrices(
-          this.lightVP,
-          mesh.transform.matrixWorld
-        );
-        this._matData.set(this._shadowMVP.elements);
-        device.queue.writeBuffer(uniforms.buffer, 0, this._matData.buffer);
+        for (const mesh of item.meshes) {
+          const uniforms = this.meshUniforms.get(mesh);
+          if (!uniforms) continue;
 
-        pass.setBindGroup(0, uniforms.bindGroup);
-        pass.drawIndexed(numIndices);
+          pass.setBindGroup(0, uniforms.bindGroups[c]);
+          pass.drawIndexed(numIndices);
+        }
       }
     }
 
@@ -175,8 +216,8 @@ export class DirectionalShadowRenderer {
 
   dispose(): void {
     this.shadowDepthTexture?.destroy();
-    for (const { buffer } of this.meshUniforms.values()) {
-      buffer.destroy();
+    for (const { buffers } of this.meshUniforms.values()) {
+      for (const buf of buffers) buf.destroy();
     }
     this.meshUniforms.clear();
   }
@@ -184,50 +225,42 @@ export class DirectionalShadowRenderer {
   private _ensureMeshUniforms(device: GPUDevice, mesh: IVisualComponent): void {
     if (this.meshUniforms.has(mesh)) return;
 
-    const buffer = device.createBuffer({
-      label: 'shadow mesh MVP',
-      size: 64,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
+    const buffers = [0, 1, 2].map(() =>
+      device.createBuffer({
+        label: 'shadow mesh MVP',
+        size: 64,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+    ) as [GPUBuffer, GPUBuffer, GPUBuffer];
 
-    const bindGroup = device.createBindGroup({
-      label: 'shadow mesh bind group',
-      layout: this.pipeline.getBindGroupLayout(0),
-      entries: [{ binding: 0, resource: { buffer } }],
-    });
+    const bindGroups = buffers.map((buffer) =>
+      device.createBindGroup({
+        label: 'shadow mesh bind group',
+        layout: this.pipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: { buffer } }],
+      })
+    ) as [GPUBindGroup, GPUBindGroup, GPUBindGroup];
 
-    this.meshUniforms.set(mesh, { buffer, bindGroup });
+    this.meshUniforms.set(mesh, { buffers, bindGroups });
   }
 
-  private _computeLightVP(
+  private _computeCascadeLightVPs(
     camera: PerspectiveCamera,
     sunPosition: Vector3
   ): void {
-    // --- Frustum corners in world space ---
     const camCamera = camera.camera;
     const projInv = camCamera.projectionMatrixInverse;
     const camWorld = camCamera.transform.matrixWorld;
-    let minX = Infinity,
-      maxX = -Infinity;
-    let minY = Infinity,
-      maxY = -Infinity;
-    let minZ = Infinity,
-      maxZ = -Infinity;
+    const camNear = camera.near;
+    const camFar = camera.far;
 
-    // Compute frustum center for positioning the light
-    this._frustumCenter.set(0, 0, 0);
+    // --- Full-frustum corners in world space ---
     for (let i = 0; i < 8; i++) {
       const [nx, ny, nz] = NDC_CORNERS[i];
       this._frustumCorners[i].set(nx, ny, nz).unproject(projInv, camWorld);
-      this._frustumCenter.x += this._frustumCorners[i].x;
-      this._frustumCenter.y += this._frustumCorners[i].y;
-      this._frustumCenter.z += this._frustumCorners[i].z;
     }
-    this._frustumCenter.x /= 8;
-    this._frustumCenter.y /= 8;
-    this._frustumCenter.z /= 8;
 
-    // --- Light view matrix (rotation only, then positioned behind the scene) ---
+    // --- Light orientation (shared across all cascades) ---
     const sunLen = Math.sqrt(
       sunPosition.x * sunPosition.x +
         sunPosition.y * sunPosition.y +
@@ -240,14 +273,66 @@ export class DirectionalShadowRenderer {
       sunPosition.z / sunLen
     );
 
-    // Choose a stable up vector — if sun is nearly vertical use world X
     if (Math.abs(this._lightDir.y) > 0.99) {
       this._lightUp.set(1, 0, 0);
     } else {
       this._lightUp.set(0, 1, 0);
     }
 
-    // Light eye = frustum center + lightDir * large distance
+    // --- Practical-split cascade distances ---
+    // cascadeSplitDistances[i] is the VIEW-SPACE depth where cascade i ends.
+    const shadowFar = Math.min(camFar, SHADOW_CASCADE_FAR);
+    for (let i = 1; i <= NUM_CASCADES; i++) {
+      const cLog = camNear * Math.pow(shadowFar / camNear, i / NUM_CASCADES);
+      const cUni = camNear + (shadowFar - camNear) * (i / NUM_CASCADES);
+      this.cascadeSplitDistances[i - 1] = CSM_LAMBDA * cLog + (1 - CSM_LAMBDA) * cUni;
+    }
+    this.cascadeSplitDistances[3] = 0; // unused w component
+
+    // --- Compute one light VP per cascade ---
+    let splitNear = camNear;
+    for (let c = 0; c < NUM_CASCADES; c++) {
+      const splitFar = this.cascadeSplitDistances[c];
+
+      // Lerp fractions along the full frustum edges to get the cascade sub-frustum.
+      // The frustum edges are linear in world space, so lerp is exact.
+      const tNear = (splitNear - camNear) / (camFar - camNear);
+      const tFar  = (splitFar  - camNear) / (camFar - camNear);
+
+      for (let j = 0; j < 4; j++) {
+        const nj = this._frustumCorners[j];     // near-plane corner j
+        const fj = this._frustumCorners[j + 4]; // far-plane corner j
+        // Near face of this cascade sub-frustum
+        this._cascadeCorners[j].set(
+          nj.x + (fj.x - nj.x) * tNear,
+          nj.y + (fj.y - nj.y) * tNear,
+          nj.z + (fj.z - nj.z) * tNear
+        );
+        // Far face of this cascade sub-frustum
+        this._cascadeCorners[j + 4].set(
+          nj.x + (fj.x - nj.x) * tFar,
+          nj.y + (fj.y - nj.y) * tFar,
+          nj.z + (fj.z - nj.z) * tFar
+        );
+      }
+
+      this._computeLightVPForCascade(c);
+      splitNear = splitFar;
+    }
+  }
+
+  private _computeLightVPForCascade(cascadeIndex: number): void {
+    // Cascade sub-frustum center for light positioning
+    this._frustumCenter.set(0, 0, 0);
+    for (let i = 0; i < 8; i++) {
+      this._frustumCenter.x += this._cascadeCorners[i].x;
+      this._frustumCenter.y += this._cascadeCorners[i].y;
+      this._frustumCenter.z += this._cascadeCorners[i].z;
+    }
+    this._frustumCenter.x /= 8;
+    this._frustumCenter.y /= 8;
+    this._frustumCenter.z /= 8;
+
     const orbitDist = 2000;
     this._lightPos.set(
       this._frustumCenter.x + this._lightDir.x * orbitDist,
@@ -255,41 +340,21 @@ export class DirectionalShadowRenderer {
       this._frustumCenter.z + this._lightDir.z * orbitDist
     );
 
-    // Build light world matrix: lookAt gives rotation, setPosition adds translation
-    this._lightViewWorld.lookAt(
-      this._lightPos,
-      this._frustumCenter,
-      this._lightUp
-    );
-    this._lightViewWorld.setPosition(
-      this._lightPos.x,
-      this._lightPos.y,
-      this._lightPos.z
-    );
-
-    // Light view = inverse of its world matrix
+    this._lightViewWorld.lookAt(this._lightPos, this._frustumCenter, this._lightUp);
+    this._lightViewWorld.setPosition(this._lightPos.x, this._lightPos.y, this._lightPos.z);
     this._lightView.copy(this._lightViewWorld).invert();
 
-    // --- Fit ortho bounds to frustum corners in light space ---
-    for (let i = 0; i < 8; i++) {
-      const w = this._frustumCorners[i];
-      // applyMatrix4 modifies in place — use a temporary copy via the corner itself
-      const lx =
-        this._lightView.elements[0] * w.x +
-        this._lightView.elements[4] * w.y +
-        this._lightView.elements[8] * w.z +
-        this._lightView.elements[12];
-      const ly =
-        this._lightView.elements[1] * w.x +
-        this._lightView.elements[5] * w.y +
-        this._lightView.elements[9] * w.z +
-        this._lightView.elements[13];
-      const lz =
-        this._lightView.elements[2] * w.x +
-        this._lightView.elements[6] * w.y +
-        this._lightView.elements[10] * w.z +
-        this._lightView.elements[14];
+    // Fit ortho bounds tightly to the cascade sub-frustum corners in light space
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
 
+    const lve = this._lightView.elements;
+    for (let i = 0; i < 8; i++) {
+      const w = this._cascadeCorners[i];
+      const lx = lve[0] * w.x + lve[4] * w.y + lve[8]  * w.z + lve[12];
+      const ly = lve[1] * w.x + lve[5] * w.y + lve[9]  * w.z + lve[13];
+      const lz = lve[2] * w.x + lve[6] * w.y + lve[10] * w.z + lve[14];
       if (lx < minX) minX = lx;
       if (lx > maxX) maxX = lx;
       if (ly < minY) minY = ly;
@@ -298,37 +363,18 @@ export class DirectionalShadowRenderer {
       if (lz > maxZ) maxZ = lz;
     }
 
-    // Center the shadow XY on the camera position (not the frustum centroid).
-    // This keeps the high-resolution area near the player regardless of far-plane distance.
-    const camPos = camCamera.transform.position;
-    const lve = this._lightView.elements;
-    const lcx =
-      lve[0] * camPos.x + lve[4] * camPos.y + lve[8] * camPos.z + lve[12];
-    const lcy =
-      lve[1] * camPos.x + lve[5] * camPos.y + lve[9] * camPos.z + lve[13];
-    minX = lcx - SHADOW_HALF_SIZE;
-    maxX = lcx + SHADOW_HALF_SIZE;
-    minY = lcy - SHADOW_HALF_SIZE;
-    maxY = lcy + SHADOW_HALF_SIZE;
-
-    // Extend Z so casters just behind/ahead of the frustum still cast shadows.
+    // Extend Z to catch shadow casters just outside the sub-frustum slice
     minZ -= 50;
     maxZ += 50;
 
-    // Light-space Z is negative (geometry is in front of the -Z looking camera).
-    // _makeOrthoWebGPU expects positive near/far distances, so negate.
     const nearDist = Math.max(0.1, -maxZ);
     const farDist = Math.max(nearDist + 1, -minZ);
 
-    // --- WebGPU-correct orthographic projection ---
-    // Maps near→Z=0, far→Z=1 (WebGPU depth convention)
     this._makeOrthoWebGPU(minX, maxX, maxY, minY, nearDist, farDist);
-
-    // lightVP = lightProj * lightView
-    this.lightVP.multiplyMatrices(this._lightProj, this._lightView);
+    this.lightVPs[cascadeIndex].multiplyMatrices(this._lightProj, this._lightView);
   }
 
-  /** Orthographic projection matrix using WebGPU depth convention [0, 1]. */
+  /** Builds an orthographic projection matrix using WebGPU depth convention [0, 1]. */
   private _makeOrthoWebGPU(
     left: number,
     right: number,
@@ -342,21 +388,9 @@ export class DirectionalShadowRenderer {
     const p = 1 / (far - near);
     const te = this._lightProj.elements;
 
-    te[0] = 2 * w;
-    te[4] = 0;
-    te[8] = 0;
-    te[12] = -(right + left) * w;
-    te[1] = 0;
-    te[5] = 2 * h;
-    te[9] = 0;
-    te[13] = -(top + bottom) * h;
-    te[2] = 0;
-    te[6] = 0;
-    te[10] = -p;
-    te[14] = -near * p;
-    te[3] = 0;
-    te[7] = 0;
-    te[11] = 0;
-    te[15] = 1;
+    te[0]  = 2 * w;  te[4]  = 0;      te[8]  = 0;   te[12] = -(right + left) * w;
+    te[1]  = 0;      te[5]  = 2 * h;  te[9]  = 0;   te[13] = -(top + bottom) * h;
+    te[2]  = 0;      te[6]  = 0;      te[10] = -p;  te[14] = -near * p;
+    te[3]  = 0;      te[7]  = 0;      te[11] = 0;   te[15] = 1;
   }
 }
