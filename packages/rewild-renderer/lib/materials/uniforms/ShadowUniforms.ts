@@ -3,6 +3,7 @@ import { Renderer } from '../..';
 import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { IVisualComponent } from '../../../types/interfaces';
+import { NUM_CASCADES } from '../../renderers/shadow/DirectionalShadowRenderer';
 
 const _tempMat = new Matrix4();
 
@@ -23,14 +24,14 @@ export class ShadowUniforms implements ISharedUniformBuffer {
 
   // invViewMatrix (16) + worldSize, centerX, centerZ, shadowIntensity (4) = 20 floats
   private cloudData: Float32Array;
-  // lightMVPFromView (16 floats)
+  // 3 × lightMVPFromView (mat4x4f = 16 floats each) + cascadeSplits (vec4f = 4 floats) = 52 floats / 208 bytes
   private directionalData: Float32Array;
 
   constructor(group: number) {
     this.group = group;
     this.requiresBuild = true;
     this.cloudData = new Float32Array(20);
-    this.directionalData = new Float32Array(16);
+    this.directionalData = new Float32Array(NUM_CASCADES * 16 + 4);
   }
 
   get buffer(): GPUBuffer {
@@ -57,10 +58,10 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // Directional shadow params: lightMVPFromView (mat4x4f = 64 bytes)
+    // Directional shadow params: 3 × lightMVPFromView (192 bytes) + cascadeSplits vec4f (16 bytes) = 208 bytes
     this.directionalBuffer = device.createBuffer({
       label: 'directional shadow params',
-      size: 64,
+      size: 208,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -102,12 +103,16 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       device.queue.writeBuffer(this.cloudBuffer, 0, this.cloudData.buffer);
     }
 
-    // --- Directional shadow ---
+    // --- Directional shadow (CSM) ---
     const dirShadowRenderer = renderer.directionalShadowRenderer;
     if (dirShadowRenderer) {
-      // lightMVPFromView = lightVP * camera.matrixWorld (transforms view-space position to light clip space)
-      _tempMat.multiplyMatrices(dirShadowRenderer.lightVP, camera.transform.matrixWorld);
-      this.directionalData.set(_tempMat.elements, 0);
+      // lightMVPFromView[i] = lightVPs[i] * camera.matrixWorld
+      // Transforms a view-space position into cascade i's light clip space.
+      for (let i = 0; i < NUM_CASCADES; i++) {
+        _tempMat.multiplyMatrices(dirShadowRenderer.lightVPs[i], camera.transform.matrixWorld);
+        this.directionalData.set(_tempMat.elements, i * 16);
+      }
+      this.directionalData.set(dirShadowRenderer.cascadeSplitDistances, NUM_CASCADES * 16);
       device.queue.writeBuffer(this.directionalBuffer, 0, this.directionalData.buffer);
     }
   }
