@@ -26,6 +26,7 @@ import { isVisualComponent } from './typeGuards';
 import { SceneBVH } from './acceleration/SceneBVH';
 import { BVHConfig, DEFAULT_BVH_CONFIG } from './acceleration/BVHConfig';
 import { BVHWorkerManager } from './acceleration/BVHWorkerManager';
+import { DirectionalShadowRenderer } from './renderers/shadow/DirectionalShadowRenderer';
 
 const _projScreenMatrix = new Matrix4();
 const _frustum = new Frustum();
@@ -83,6 +84,12 @@ export class Renderer {
   /** Shared worker manager for async BVH builds. Created lazily. */
   bvhWorkerManager: BVHWorkerManager | null = null;
 
+  directionalShadowRenderer: DirectionalShadowRenderer;
+
+  // Pre-allocated lists for shadow caster collection — bypasses camera frustum culling.
+  private _shadowCasters: Transform[] = [];
+  private _shadowGroups: IRenderGroup[] = [];
+
   /** Returns the cloud shadow map texture, or null if not yet initialized. */
   get cloudShadowMap(): GPUTexture | null {
     return this.sky?.skyRenderer?.cloudShadowRenderer?.shadowMap ?? null;
@@ -95,6 +102,11 @@ export class Renderer {
     );
   }
 
+  /** Returns the directional (sun) shadow depth texture, or null if not yet initialized. */
+  get directionalShadowMap(): GPUTexture | null {
+    return this.directionalShadowRenderer?.shadowDepthTexture ?? null;
+  }
+
   constructor() {
     this.autoFrame = true;
     this.onFrameHandler = this.onFrame.bind(this);
@@ -104,6 +116,7 @@ export class Renderer {
     this.ui.matrixAutoUpdate = false;
     this.sky = new Sky();
     this.terrainRenderer = new TerrainRenderer();
+    this.directionalShadowRenderer = new DirectionalShadowRenderer();
     this.renderGroups = [];
     this.overlayRenderGroups = [];
 
@@ -190,6 +203,7 @@ export class Renderer {
     await this.geometryManager.initialize(this);
     await this.materialManager.initialize(this, materialsTemplate);
     await this.terrainRenderer.init(this);
+    this.directionalShadowRenderer.init(this);
 
     this.guiManager.initialize(this);
 
@@ -264,6 +278,7 @@ export class Renderer {
 
   dispose() {
     this.terrainRenderer.dispose();
+    this.directionalShadowRenderer.dispose();
     this.disposed = true;
     this.initialized = false;
     this.renderTarget?.destroy();
@@ -396,6 +411,16 @@ export class Renderer {
 
     for (let i = 0, l = transform.children.length; i < l; i++) {
       this.collectLightsAndOverlays(transform.children[i], overlay);
+    }
+  }
+
+  private collectShadowCasters(transform: Transform, target: Transform[]): void {
+    if (transform.visible === false) return;
+    if (transform.component && isVisualComponent(transform.component)) {
+      target.push(transform);
+    }
+    for (let i = 0, l = transform.children.length; i < l; i++) {
+      this.collectShadowCasters(transform.children[i], target);
     }
   }
 
@@ -592,6 +617,14 @@ export class Renderer {
       const encoder = device.createCommandEncoder({
         label: 'main pass encoder',
       });
+
+      // Directional shadow pass — depth-only, runs before the main color pass.
+      // Shadow casters are collected from the full scene, not the camera-culled renderList,
+      // so objects outside the camera frustum still cast visible shadows.
+      this._shadowCasters.length = 0;
+      this.collectShadowCasters(this.scene, this._shadowCasters);
+      const shadowRenderList = this.organizeVisuals(this._shadowCasters, this._shadowGroups);
+      this.directionalShadowRenderer.render(encoder, shadowRenderList, this.camera, this);
 
       const pass = encoder.beginRenderPass({
         colorAttachments: [

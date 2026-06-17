@@ -1,5 +1,6 @@
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
+#include "./shader-lib/directional-shadow.wgsl"
 
 struct Uniforms {
   normalMatrix: mat3x3f,
@@ -29,6 +30,9 @@ struct VertexOutput {
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
 @group(3) @binding(2) var<uniform> cloudShadowParams: CloudShadowParams;
+@group(3) @binding(3) var directionalShadowMap: texture_depth_2d;
+@group(3) @binding(4) var directionalShadowSampler: sampler_comparison;
+@group(3) @binding(5) var<uniform> directionalShadowParams: DirectionalShadowParams;
 
 @vertex
 fn vs(
@@ -72,11 +76,15 @@ fn fs(
   // Interpolate between the two virtual patterns
   let blendedColor = mix(cola, colb, smoothstep(0.2, 0.8, f - 0.1 * dot(cola - colb, vec3f(1.0, 1.0, 1.0))));
 
-  let normalizedNormal = normalize(normal);  
-  
+  let normalizedNormal = normalize(normal);
+
   #include "./shader-lib/total-lighting.frag.wgsl"
   #include "./shader-lib/cloud-shadow.frag.wgsl"
+  #include "./shader-lib/directional-shadow.frag.wgsl"
 
-  // Combine the textures with lighting and cloud shadow
-  return textureSample(myTexture, mySampler, fragUV) * vec4f(blendedColor, 1.0) * vec4f(totalLight * cloudShadowFactor, 1.0);
+  // Shadow gates and cloud transmittance apply only to the directional (sun) term.
+  let shadedLight = directionalLight * cloudShadowFactor * directionalShadowFactor + otherLight;
+
+  // Combine the textures with lighting
+  return textureSample(myTexture, mySampler, fragUV) * vec4f(blendedColor, 1.0) * vec4f(shadedLight, 1.0);
 }

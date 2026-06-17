@@ -9,11 +9,11 @@ import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { Diffuse } from './uniforms/Diffuse';
 import { Lighting } from './uniforms/Lighting';
-import { CloudShadow } from './uniforms/CloudShadow';
+import { ShadowUniforms } from './uniforms/ShadowUniforms';
 
 const sharedBindgroupIndex = 1;
 const lightingGroupIndex = 2;
-const cloudShadowGroupIndex = 3;
+const shadowGroupIndex = 3;
 
 export class DiffusePass implements IMaterialPass {
   pipeline: GPURenderPipeline;
@@ -22,7 +22,7 @@ export class DiffusePass implements IMaterialPass {
   sharedUniformsTracker: SharedUniformsTracker;
   diffuse: Diffuse;
   lightingUniforms: Lighting;
-  cloudShadowUniforms: CloudShadow;
+  shadowUniforms: ShadowUniforms;
   side: GPUFrontFace;
 
   constructor() {
@@ -30,11 +30,11 @@ export class DiffusePass implements IMaterialPass {
     this.requiresRebuild = true;
     this.diffuse = new Diffuse(sharedBindgroupIndex);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
-    this.cloudShadowUniforms = new CloudShadow(cloudShadowGroupIndex);
+    this.shadowUniforms = new ShadowUniforms(shadowGroupIndex);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       this.diffuse,
       this.lightingUniforms,
-      this.cloudShadowUniforms,
+      this.shadowUniforms,
     ]);
     this.perMeshTracker = new PerMeshTracker(this, () => [
       new ProjModelView(0),

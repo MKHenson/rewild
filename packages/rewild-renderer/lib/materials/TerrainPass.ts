@@ -9,11 +9,11 @@ import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { TerrainUniforms } from './uniforms/TerrainUniforms';
 import { Lighting } from './uniforms/Lighting';
-import { CloudShadow } from './uniforms/CloudShadow';
+import { ShadowUniforms } from './uniforms/ShadowUniforms';
 
 const sharedBindgroupIndex = 1;
 const lightingGroupIndex = 2;
-const cloudShadowGroupIndex = 3;
+const shadowGroupIndex = 3;
 
 export class TerrainPass implements IMaterialPass {
   side: GPUFrontFace;
@@ -23,18 +23,18 @@ export class TerrainPass implements IMaterialPass {
   sharedUniformsTracker: SharedUniformsTracker;
   terrainUniforms: TerrainUniforms;
   lightingUniforms: Lighting;
-  cloudShadowUniforms: CloudShadow;
+  shadowUniforms: ShadowUniforms;
 
   constructor() {
     this.side = 'ccw';
     this.requiresRebuild = true;
     this.terrainUniforms = new TerrainUniforms(sharedBindgroupIndex);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
-    this.cloudShadowUniforms = new CloudShadow(cloudShadowGroupIndex);
+    this.shadowUniforms = new ShadowUniforms(shadowGroupIndex);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       this.terrainUniforms,
       this.lightingUniforms,
-      this.cloudShadowUniforms,
+      this.shadowUniforms,
     ]);
     this.perMeshTracker = new PerMeshTracker(this, () => [
       new ProjModelView(0),
