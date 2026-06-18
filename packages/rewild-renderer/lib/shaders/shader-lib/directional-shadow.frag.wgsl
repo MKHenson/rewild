@@ -32,20 +32,7 @@
   let _shadowUV = _cascadeUV * 0.5 + _uvOffset;
   let _shadowDepth = _projCoords.z; // already [0,1] from WebGPU-correct ortho matrix
   let _bias = 0.0002;
-
-  // Unrolled 3×3 PCF — 9 taps spaced 1 atlas texel apart (atlas = 2048×2048).
-  let _ts = 1.0 / 2048.0;
-  var _shadowSum = 0.0;
-  _shadowSum += textureSampleCompare(directionalShadowMap, directionalShadowSampler, _shadowUV + vec2f(-_ts, -_ts), _shadowDepth - _bias);
-  _shadowSum += textureSampleCompare(directionalShadowMap, directionalShadowSampler, _shadowUV + vec2f( 0.0, -_ts), _shadowDepth - _bias);
-  _shadowSum += textureSampleCompare(directionalShadowMap, directionalShadowSampler, _shadowUV + vec2f( _ts, -_ts), _shadowDepth - _bias);
-  _shadowSum += textureSampleCompare(directionalShadowMap, directionalShadowSampler, _shadowUV + vec2f(-_ts,  0.0), _shadowDepth - _bias);
-  _shadowSum += textureSampleCompare(directionalShadowMap, directionalShadowSampler, _shadowUV,                    _shadowDepth - _bias);
-  _shadowSum += textureSampleCompare(directionalShadowMap, directionalShadowSampler, _shadowUV + vec2f( _ts,  0.0), _shadowDepth - _bias);
-  _shadowSum += textureSampleCompare(directionalShadowMap, directionalShadowSampler, _shadowUV + vec2f(-_ts,  _ts), _shadowDepth - _bias);
-  _shadowSum += textureSampleCompare(directionalShadowMap, directionalShadowSampler, _shadowUV + vec2f( 0.0,  _ts), _shadowDepth - _bias);
-  _shadowSum += textureSampleCompare(directionalShadowMap, directionalShadowSampler, _shadowUV + vec2f( _ts,  _ts), _shadowDepth - _bias);
-  let _shadowSample = _shadowSum / 9.0;
+  let _shadowSample = pcfSample3x3(directionalShadowMap, directionalShadowSampler, _shadowUV, _shadowDepth - _bias);
 
   // Apply shadow only when the fragment falls within the cascade's local UV coverage.
   let _inShadowBounds = (_cascadeUV.x > 0.001 && _cascadeUV.x < 0.999 &&

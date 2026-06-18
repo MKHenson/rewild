@@ -1,5 +1,6 @@
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
+#include "./shader-lib/pcf.wgsl"
 #include "./shader-lib/directional-shadow.wgsl"
 
 struct Uniforms {
