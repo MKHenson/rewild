@@ -416,7 +416,7 @@ export class Renderer {
 
   private collectShadowCasters(transform: Transform, target: Transform[]): void {
     if (transform.visible === false) return;
-    if (transform.component && isVisualComponent(transform.component)) {
+    if (transform.component && isVisualComponent(transform.component) && transform.component.castShadow !== false) {
       target.push(transform);
     }
     for (let i = 0, l = transform.children.length; i < l; i++) {

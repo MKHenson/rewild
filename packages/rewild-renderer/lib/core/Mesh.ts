@@ -36,6 +36,7 @@ export class Mesh implements IComponent, IVisualComponent {
   material: IMaterialPass;
   transform: Transform;
   visible: boolean;
+  castShadow: boolean;
 
   constructor(
     geometry: Geometry,
@@ -45,6 +46,7 @@ export class Mesh implements IComponent, IVisualComponent {
     this.geometry = geometry;
     this.transform = transform;
     this.visible = true;
+    this.castShadow = true;
 
     transform.component = this;
 

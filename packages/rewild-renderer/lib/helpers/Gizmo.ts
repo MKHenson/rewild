@@ -113,6 +113,7 @@ export class Gizmo {
       this.xyMaterial,
       xyTransform
     );
+    this.xyPlaneMesh.castShadow = false;
     this.transform.addChild(this.xyPlaneMesh.transform);
 
     // XZ plane (rotate the default XY plane -90° around X)
@@ -125,6 +126,7 @@ export class Gizmo {
       this.xzMaterial,
       xzTransform
     );
+    this.xzPlaneMesh.castShadow = false;
     this.transform.addChild(this.xzPlaneMesh.transform);
 
     // YZ plane (rotate the default XY plane 90° around Y)
@@ -137,6 +139,7 @@ export class Gizmo {
       this.yzMaterial,
       yzTransform
     );
+    this.yzPlaneMesh.castShadow = false;
     this.transform.addChild(this.yzPlaneMesh.transform);
   }
 
@@ -158,10 +161,12 @@ export class Gizmo {
     const shaftTransform = new Transform();
     shaftTransform.position.y = SHAFT_HEIGHT / 2;
     const shaft = new Mesh(this.shaftGeometry, material, shaftTransform);
+    shaft.castShadow = false;
 
     const headTransform = new Transform();
     headTransform.position.y = SHAFT_HEIGHT + HEAD_HEIGHT / 2;
     const head = new Mesh(this.headGeometry, material, headTransform);
+    head.castShadow = false;
 
     root.addChild(shaft.transform);
     root.addChild(head.transform);
