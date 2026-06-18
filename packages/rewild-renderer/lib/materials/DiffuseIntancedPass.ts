@@ -5,15 +5,15 @@ import { Renderer } from '..';
 import { SharedUniformsTracker } from './SharedUniformsTracker';
 import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
-import { Projection } from './uniforms/Projection';
-import { InstanceMatrices } from './uniforms/InstanceMatrices';
 import { Diffuse } from './uniforms/Diffuse';
 import { Lighting } from './uniforms/Lighting';
+import { ShadowUniforms } from './uniforms/ShadowUniforms';
+import { ProjectionAndInstances } from './uniforms/ProjectionAndInstances';
 
 const sharedBindgroupIndex = 0;
-const projectionGroup = 1;
-const instancesGroup = 2;
-const lightingGroup = 3;
+const projectionAndInstancesGroup = 1;
+const lightingGroup = 2;
+const shadowGroup = 3;
 
 export class DiffuseIntancedPass implements IMaterialPass {
   pipeline: GPURenderPipeline;
@@ -29,9 +29,9 @@ export class DiffuseIntancedPass implements IMaterialPass {
 
     this.perMeshTracker = new SharedUniformsTracker(this, [
       this.diffuse,
-      new Projection(projectionGroup),
-      new InstanceMatrices(instancesGroup),
+      new ProjectionAndInstances(projectionAndInstancesGroup),
       new Lighting(lightingGroup),
+      new ShadowUniforms(shadowGroup),
     ]);
   }
 
@@ -110,15 +110,9 @@ export class DiffuseIntancedPass implements IMaterialPass {
       },
       primitive: {
         topology: 'triangle-list',
-
-        // Backface culling since the cube is solid piece of geometry.
-        // Faces pointing away from the camera will be occluded by faces
-        // pointing toward the camera.
         cullMode: 'back',
         frontFace: this.side,
       },
-      // Enable depth testing so that the fragment closest to the camera
-      // is rendered in front.
       depthStencil: {
         depthWriteEnabled: true,
         depthCompare: 'less',
