@@ -13,6 +13,7 @@ export interface IVisualComponent {
   geometry: Geometry;
   material: IMaterialPass;
   visible: boolean;
+  castShadow?: boolean;
 }
 
 export interface IRaycaster {
