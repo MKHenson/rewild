@@ -1,4 +1,7 @@
 #include "./shader-lib/total-lighting.wgsl"
+#include "./shader-lib/cloud-shadow.wgsl"
+#include "./shader-lib/pcf.wgsl"
+#include "./shader-lib/directional-shadow.wgsl"
 
 struct Uniforms {
   projMatrix : mat4x4f,
@@ -23,9 +26,22 @@ struct VertexOutput {
   @location(2) viewPosition : vec3f,
 }
 
+@group(0) @binding(0) var mySampler: sampler;
+@group(0) @binding(1) var myTexture: texture_2d<f32>;
+
+// Projection (binding 0) and instance transforms (binding 1) share group 1
+// to leave group 2 for lighting and group 3 for shadow — WebGPU allows 4 groups max.
 @group(1) @binding(0) var<uniform> uniforms : Uniforms;
-@group(2) @binding(0) var<storage, read> transforms : array<Transform>;
-@group(3) @binding(0) var<storage, read> lighting : LightingUniforms;
+@group(1) @binding(1) var<storage, read> transforms : array<Transform>;
+
+@group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
+
+@group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
+@group(3) @binding(1) var cloudShadowSampler: sampler;
+@group(3) @binding(2) var<uniform> cloudShadowParams: CloudShadowParams;
+@group(3) @binding(3) var directionalShadowMap: texture_depth_2d;
+@group(3) @binding(4) var directionalShadowSampler: sampler_comparison;
+@group(3) @binding(5) var<uniform> directionalShadowParams: DirectionalShadowParams;
 
 @vertex
 fn vs(
@@ -47,9 +63,6 @@ fn vs(
   return output;
 }
 
-@group(0) @binding(0) var mySampler: sampler;
-@group(0) @binding(1) var myTexture: texture_2d<f32>;
-
 @fragment
 fn fs(
   @location(0) fragUV: vec2f,
@@ -57,8 +70,12 @@ fn fs(
   @location(2) viewPosition: vec3f
 ) -> @location(0) vec4f {
   let normalizedNormal = normalize(normal);
-  
-  #include "./shader-lib/total-lighting.frag.wgsl"
 
-  return textureSample(myTexture, mySampler, fragUV) * vec4f(totalLight, 1.0);
+  #include "./shader-lib/total-lighting.frag.wgsl"
+  #include "./shader-lib/cloud-shadow.frag.wgsl"
+  #include "./shader-lib/directional-shadow.frag.wgsl"
+
+  let shadedLight = directionalLight * cloudShadowFactor * directionalShadowFactor + otherLight;
+
+  return textureSample(myTexture, mySampler, fragUV) * vec4f(shadedLight, 1.0);
 }

@@ -17,6 +17,5 @@
 
       let shadowDensity = textureSampleLevel(cloudShadowMap, cloudShadowSampler, shadowUV, 0.0).r;
       cloudShadowFactor = 1.0 - (shadowDensity * cloudShadowParams.shadowIntensity * edgeFade);
-      cloudShadowFactor = max(cloudShadowFactor, 0.3); // Never fully black
     }
   }
