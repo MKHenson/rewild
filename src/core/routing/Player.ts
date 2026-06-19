@@ -27,6 +27,11 @@ const _PI_HALF = Math.PI / 2 - 0.01;
 const _MOUSE_SENSITIVITY = 0.002;
 const _MOVE_SPEED: f32 = 3.0;
 const _RUN_MULTIPLIER: f32 = 2.5;
+const _CROUCH_SPEED_MULTIPLIER: f32 = 0.5;
+const _STANDING_EYE_HEIGHT: f32 = 1.8;
+const _CROUCH_EYE_HEIGHT: f32 = 0.9;
+// Flashlight hangs below the camera eye line (chest/hip level) to create natural shadow offset.
+const _FLASHLIGHT_BODY_DROP: f32 = 0.8;
 const _DEG2RAD = Math.PI / 180;
 
 export class Player extends Node {
@@ -58,6 +63,7 @@ export class Player extends Node {
 
   private _flashlight: SpotLight | null = null;
   private _flashlightOn: boolean = false;
+  private _crouching: boolean = false;
   private static readonly _FLASHLIGHT_INTENSITY: f32 = 3.5;
 
   private _onMouseMove: (e: MouseEvent) => void;
@@ -137,6 +143,7 @@ export class Player extends Node {
       flash.range = 40.0;
       flash.innerAngle = 10 * _DEG2RAD;
       flash.outerAngle = 25 * _DEG2RAD;
+      flash.castShadow = true;
       this._flashlight = flash;
     }
     this._flashlight.intensity = 0.0; // off by default
@@ -281,7 +288,13 @@ export class Player extends Node {
     // Compute horizontal movement from key state (yaw-relative, XZ plane only)
     const sinYaw = Math.sin(this._yaw);
     const cosYaw = Math.cos(this._yaw);
-    const speed = _MOVE_SPEED * (this._sprinting ? _RUN_MULTIPLIER : 1.0);
+    const eyeHeight = this._crouching
+      ? _CROUCH_EYE_HEIGHT
+      : _STANDING_EYE_HEIGHT;
+    const speed =
+      _MOVE_SPEED *
+      (this._sprinting ? _RUN_MULTIPLIER : 1.0) *
+      (this._crouching ? _CROUCH_SPEED_MULTIPLIER : 1.0);
     let moveX: f32 = 0;
     let moveZ: f32 = 0;
 
@@ -334,20 +347,21 @@ export class Player extends Node {
 
     const pos = this.capsuleBody.translation();
     const camX = pos.x;
-    const camY = pos.y + 1.8;
+    const camY = pos.y + eyeHeight;
     const camZ = pos.z;
     this.cameraController.camera.transform.position.set(camX, camY, camZ);
 
     if (this._flashlight) {
-      // Always track camera so the cone direction is valid when toggled on.
-      this._flashlight.transform.position.set(camX, camY, camZ);
+      const flashY = camY - _FLASHLIGHT_BODY_DROP;
+      this._flashlight.transform.position.set(camX, flashY, camZ);
       const sinYaw = Math.sin(this._yaw);
       const cosYaw = Math.cos(this._yaw);
       const sinPitch = Math.sin(this._pitch);
       const cosPitch = Math.cos(this._pitch);
+      // Target is 1 unit along the camera look direction from the flashlight position (not the eye).
       this._flashlight.target.position.set(
         camX - sinYaw * cosPitch,
-        camY + sinPitch,
+        flashY + sinPitch,
         camZ - cosYaw * cosPitch
       );
     }
@@ -368,6 +382,7 @@ export class Player extends Node {
     else if (e.code === 'Space') this.jumpRequested = true;
     else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight')
       this._sprinting = true;
+    else if (e.code === 'KeyC') this._crouching = !this._crouching;
     else if (e.code === 'KeyF' && this._flashlight) {
       this._flashlightOn = !this._flashlightOn;
       this._flashlight.intensity = this._flashlightOn
