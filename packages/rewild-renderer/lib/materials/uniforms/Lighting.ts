@@ -82,6 +82,8 @@ export class Lighting implements ISharedUniformBuffer {
     // Lights start at byte offset HEADER_BYTES (16), which is float index 4.
     let offset = HEADER_BYTES / 4;
 
+    renderer.shadowCastingSpotLightIndex = -1;
+
     for (const light of renderer.currentRenderList.lights) {
       if (lightCount >= MAX_LIGHTS) break;
 
@@ -165,6 +167,10 @@ export class Lighting implements ISharedUniformBuffer {
         this.lightingFloats[offset + 13] = light.outerAngle;
         this.lightingFloats[offset + 14] = 0.0;
         this.lightingFloats[offset + 15] = 0.0;
+
+        if (light.castShadow) {
+          renderer.shadowCastingSpotLightIndex = lightCount;
+        }
 
         offset += LIGHT_STRIDE_FLOATS;
         lightCount++;

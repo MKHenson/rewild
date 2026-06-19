@@ -26,6 +26,7 @@ export class LightAsset extends Asset3D {
     mesh.transform.userData.isHelper = true;
     mesh.transform.layers.set(InteractionLayer.Helper);
     mesh.transform.visible = false;
+    mesh.castShadow = false;
     this.transform.addChild(mesh.transform);
 
     // Add a 3D sprite icon at the light's position

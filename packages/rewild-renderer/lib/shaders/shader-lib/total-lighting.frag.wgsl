@@ -1,7 +1,9 @@
   // directionalLight: contribution from the sun only (affected by geometry shadows).
-  // otherLight: point and spot lights (not shadow-occluded).
+  // otherLight: point lights and non-shadow-casting spot lights.
+  // shadowCastingSpotContrib: the one shadow-casting spot light (multiplied by spotShadowFactor later).
   var directionalLight = vec3f(0.0, 0.0, 0.0);
   var otherLight = vec3f(0.0, 0.0, 0.0);
+  var shadowCastingSpotContrib = vec3f(0.0, 0.0, 0.0);
 
   for (var i: u32 = 0; i < lighting.numLights; i++) {
       let light = lighting.lights[i];
@@ -38,7 +40,12 @@
         } else {
           attenuation = 0.0;
         }
-        otherLight += diffuse * light.intensity * light.color * attenuation;
+        let _contrib = diffuse * light.intensity * light.color * attenuation;
+        if (spotLightShadowParams.hasSpotShadow != 0u && i == spotLightShadowParams.lightIndex) {
+          shadowCastingSpotContrib += _contrib;
+        } else {
+          otherLight += _contrib;
+        }
       }
   }
 
