@@ -11,14 +11,16 @@ const _tempMat = new Matrix4();
  * Manages bind group 3 — all shadow resources for a material pass.
  *
  * Bindings 0–2: cloud shadow (transmittance map, linear sampler, params buffer)
- * Bindings 3–5: directional shadow (depth texture, comparison sampler, params buffer)
+ * Bindings 3–5: shadow atlas (depth texture, comparison sampler, directional params buffer)
+ * Binding  6:   spot light shadow params buffer
  *
- * Both are packed into a single bind group because WebGPU limits bind groups to 4 (0–3).
+ * All packed into a single bind group because WebGPU limits bind groups to 4 (0–3).
  */
 export class ShadowUniforms implements ISharedUniformBuffer {
   group: number;
   cloudBuffer: GPUBuffer;
   directionalBuffer: GPUBuffer;
+  spotBuffer: GPUBuffer;
   bindGroup: GPUBindGroup;
   requiresBuild: boolean;
 
@@ -26,12 +28,19 @@ export class ShadowUniforms implements ISharedUniformBuffer {
   private cloudData: Float32Array;
   // 3 × lightMVPFromView (mat4x4f = 16 floats each) + cascadeSplits (vec4f = 4 floats) = 52 floats / 208 bytes
   private directionalData: Float32Array;
+  // lightMVPFromView (mat4x4f = 16 floats) + lightIndex (u32) + hasSpotShadow (u32) + 2× pad = 80 bytes
+  private spotData: ArrayBuffer;
+  private spotFloats: Float32Array;
+  private spotInts: Uint32Array;
 
   constructor(group: number) {
     this.group = group;
     this.requiresBuild = true;
     this.cloudData = new Float32Array(20);
     this.directionalData = new Float32Array(NUM_CASCADES * 16 + 4);
+    this.spotData = new ArrayBuffer(80);
+    this.spotFloats = new Float32Array(this.spotData);
+    this.spotInts = new Uint32Array(this.spotData);
   }
 
   get buffer(): GPUBuffer {
@@ -41,6 +50,7 @@ export class ShadowUniforms implements ISharedUniformBuffer {
   destroy(): void {
     this.cloudBuffer?.destroy();
     this.directionalBuffer?.destroy();
+    this.spotBuffer?.destroy();
   }
 
   setNumInstances(_numInstances: number): void {}
@@ -65,10 +75,17 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    const cloudShadowMap = renderer.cloudShadowMap;
-    const directionalShadowMap = renderer.directionalShadowMap;
+    // Spot light shadow params: lightMVPFromView (64 bytes) + lightIndex u32 + hasSpotShadow u32 + 2× pad = 80 bytes
+    this.spotBuffer = device.createBuffer({
+      label: 'spot light shadow params',
+      size: 80,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
 
-    if (!cloudShadowMap || !directionalShadowMap) {
+    const cloudShadowMap = renderer.cloudShadowMap;
+    const shadowAtlas = renderer.shadowAtlas;
+
+    if (!cloudShadowMap || !shadowAtlas) {
       this.requiresBuild = true;
       return;
     }
@@ -80,17 +97,19 @@ export class ShadowUniforms implements ISharedUniformBuffer {
         { binding: 0, resource: cloudShadowMap.createView() },
         { binding: 1, resource: renderer.samplerManager.get('linear-clamped') },
         { binding: 2, resource: { buffer: this.cloudBuffer } },
-        // Directional shadow (bindings 3–5)
-        { binding: 3, resource: directionalShadowMap.createView({ aspect: 'depth-only' }) },
+        // Shadow atlas — directional cascades + spot quadrant (bindings 3–5)
+        { binding: 3, resource: shadowAtlas.createView({ aspect: 'depth-only' }) },
         { binding: 4, resource: renderer.samplerManager.get('depth-comparison') },
         { binding: 5, resource: { buffer: this.directionalBuffer } },
+        // Spot light shadow params (binding 6)
+        { binding: 6, resource: { buffer: this.spotBuffer } },
       ],
     });
   }
 
   prepare(renderer: Renderer, camera: Camera, _meshes: IVisualComponent[]): void {
     const { device } = renderer;
-    if (!this.cloudBuffer || !this.directionalBuffer || !this.bindGroup) return;
+    if (!this.cloudBuffer || !this.directionalBuffer || !this.spotBuffer || !this.bindGroup) return;
 
     // --- Cloud shadow ---
     const shadowRenderer = renderer.sky?.skyRenderer?.cloudShadowRenderer;
@@ -115,5 +134,21 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       this.directionalData.set(dirShadowRenderer.cascadeSplitDistances, NUM_CASCADES * 16);
       device.queue.writeBuffer(this.directionalBuffer, 0, this.directionalData.buffer);
     }
+
+    // --- Spot light shadow ---
+    const spotRenderer = renderer.spotLightShadowRenderer;
+    if (spotRenderer?.hasSpotShadow) {
+      // lightMVPFromView = lightVP * camera.matrixWorld
+      // Transforms a view-space position into spot light clip space.
+      _tempMat.multiplyMatrices(spotRenderer.lightVP, camera.transform.matrixWorld);
+      this.spotFloats.set(_tempMat.elements, 0);
+      this.spotInts[16] = renderer.shadowCastingSpotLightIndex;
+      this.spotInts[17] = 1; // hasSpotShadow = true
+      this.spotInts[18] = 0;
+      this.spotInts[19] = 0;
+    } else {
+      this.spotInts[17] = 0; // hasSpotShadow = false — shader skips PCF
+    }
+    device.queue.writeBuffer(this.spotBuffer, 0, this.spotData);
   }
 }

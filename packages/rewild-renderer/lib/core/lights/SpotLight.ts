@@ -7,6 +7,7 @@ export class SpotLight extends Light {
   range: f32;
   innerAngle: f32;
   outerAngle: f32;
+  castShadow: boolean;
 
   constructor(color: Color = new Color(1, 1, 1), intensity: f32 = 1.0) {
     super(color, intensity);
@@ -15,5 +16,6 @@ export class SpotLight extends Light {
     this.range = 15.0;
     this.innerAngle = Math.PI / 12; // 15°
     this.outerAngle = Math.PI / 8;  // 22.5°
+    this.castShadow = false;
   }
 }

@@ -22,6 +22,7 @@ export class Sprite3D implements IComponent, IVisualComponent {
   material: IMaterialPass;
   transform: Transform;
   visible: boolean;
+  castShadow: boolean;
 
   /** When true, the sprite floats to the screen edge when off-camera. When false, it is hidden. */
   alwaysOnScreen: boolean;
@@ -34,6 +35,7 @@ export class Sprite3D implements IComponent, IVisualComponent {
     this.material = material;
     this.transform = new Transform();
     this.visible = true;
+    this.castShadow = false;
     this.alwaysOnScreen = false;
     this.rotationOffset = 0;
 

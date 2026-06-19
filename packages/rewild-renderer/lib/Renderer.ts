@@ -27,6 +27,7 @@ import { SceneBVH } from './acceleration/SceneBVH';
 import { BVHConfig, DEFAULT_BVH_CONFIG } from './acceleration/BVHConfig';
 import { BVHWorkerManager } from './acceleration/BVHWorkerManager';
 import { DirectionalShadowRenderer } from './renderers/shadow/DirectionalShadowRenderer';
+import { SpotLightShadowRenderer } from './renderers/shadow/SpotLightShadowRenderer';
 
 const _projScreenMatrix = new Matrix4();
 const _frustum = new Frustum();
@@ -85,6 +86,9 @@ export class Renderer {
   bvhWorkerManager: BVHWorkerManager | null = null;
 
   directionalShadowRenderer: DirectionalShadowRenderer;
+  spotLightShadowRenderer: SpotLightShadowRenderer;
+  /** GPU storage-buffer index of the shadow-casting spot light; -1 when none. Set by Lighting.prepare(). */
+  shadowCastingSpotLightIndex: number = -1;
 
   // Pre-allocated lists for shadow caster collection — bypasses camera frustum culling.
   private _shadowCasters: Transform[] = [];
@@ -102,8 +106,8 @@ export class Renderer {
     );
   }
 
-  /** Returns the directional (sun) shadow depth texture, or null if not yet initialized. */
-  get directionalShadowMap(): GPUTexture | null {
+  /** Returns the shared shadow atlas (directional cascades + spot light quadrant), or null if not yet initialized. */
+  get shadowAtlas(): GPUTexture | null {
     return this.directionalShadowRenderer?.shadowDepthTexture ?? null;
   }
 
@@ -117,6 +121,7 @@ export class Renderer {
     this.sky = new Sky();
     this.terrainRenderer = new TerrainRenderer();
     this.directionalShadowRenderer = new DirectionalShadowRenderer();
+    this.spotLightShadowRenderer = new SpotLightShadowRenderer();
     this.renderGroups = [];
     this.overlayRenderGroups = [];
 
@@ -204,6 +209,7 @@ export class Renderer {
     await this.materialManager.initialize(this, materialsTemplate);
     await this.terrainRenderer.init(this);
     this.directionalShadowRenderer.init(this);
+    this.spotLightShadowRenderer.init(this);
 
     this.guiManager.initialize(this);
 
@@ -279,6 +285,7 @@ export class Renderer {
   dispose() {
     this.terrainRenderer.dispose();
     this.directionalShadowRenderer.dispose();
+    this.spotLightShadowRenderer.dispose();
     this.disposed = true;
     this.initialized = false;
     this.renderTarget?.destroy();
@@ -625,6 +632,7 @@ export class Renderer {
       this.collectShadowCasters(this.scene, this._shadowCasters);
       const shadowRenderList = this.organizeVisuals(this._shadowCasters, this._shadowGroups);
       this.directionalShadowRenderer.render(encoder, shadowRenderList, this.camera, this);
+      this.spotLightShadowRenderer.render(encoder, shadowRenderList, this.camera, this);
 
       const pass = encoder.beginRenderPass({
         colorAttachments: [

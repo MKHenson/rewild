@@ -2,6 +2,7 @@
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"
 #include "./shader-lib/directional-shadow.wgsl"
+#include "./shader-lib/spot-light-shadow.wgsl"
 
 struct Uniforms {
   projMatrix : mat4x4f,
@@ -39,9 +40,10 @@ struct VertexOutput {
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
 @group(3) @binding(2) var<uniform> cloudShadowParams: CloudShadowParams;
-@group(3) @binding(3) var directionalShadowMap: texture_depth_2d;
-@group(3) @binding(4) var directionalShadowSampler: sampler_comparison;
+@group(3) @binding(3) var shadowAtlas: texture_depth_2d;
+@group(3) @binding(4) var shadowSampler: sampler_comparison;
 @group(3) @binding(5) var<uniform> directionalShadowParams: DirectionalShadowParams;
+@group(3) @binding(6) var<uniform> spotLightShadowParams: SpotLightShadowParams;
 
 @vertex
 fn vs(
@@ -74,8 +76,11 @@ fn fs(
   #include "./shader-lib/total-lighting.frag.wgsl"
   #include "./shader-lib/cloud-shadow.frag.wgsl"
   #include "./shader-lib/directional-shadow.frag.wgsl"
+  #include "./shader-lib/spot-light-shadow.frag.wgsl"
 
-  let shadedLight = directionalLight * cloudShadowFactor * directionalShadowFactor + otherLight;
+  let shadedLight = directionalLight * cloudShadowFactor * directionalShadowFactor
+                  + otherLight
+                  + shadowCastingSpotContrib * spotShadowFactor;
 
   return textureSample(myTexture, mySampler, fragUV) * vec4f(shadedLight, 1.0);
 }
