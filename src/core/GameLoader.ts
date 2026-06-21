@@ -9,6 +9,7 @@ import { TemplateLoader } from './TemplateLoader';
 import { ContainerWithState } from './routing/ContainerWithState';
 import { StateMachineData } from './routing/Types';
 import { GameManager } from './GameManager';
+import { LightingTester } from './routing/LightingTester';
 
 /** Loads game files and assets and sends the created objects to wasm */
 
@@ -50,6 +51,7 @@ export async function loadInitialLevels(
   );
   stateMachine.addNode(player, true);
   stateMachine.addNode(levelRouter, true);
+  stateMachine.addNode(new LightingTester(), true);
 
   for (const container of level.containers) {
     const containerRouter = new ContainerWithState(

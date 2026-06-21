@@ -151,10 +151,7 @@ export class Renderer {
 
     this.canvasSizeWatcher = new CanvasSizeWatcher(canvas);
 
-    this.camera = new PerspectiveCamera(
-      65,
-      canvas.width / canvas.height
-    );
+    this.camera = new PerspectiveCamera(65, canvas.width / canvas.height);
     this.scene.addChild(this.camera.camera.transform);
     this.camera.camera.transform.position.set(0, 20, 50);
     this.camera.camera.lookAt(0, 0, 0);
@@ -421,9 +418,16 @@ export class Renderer {
     }
   }
 
-  private collectShadowCasters(transform: Transform, target: Transform[]): void {
+  private collectShadowCasters(
+    transform: Transform,
+    target: Transform[]
+  ): void {
     if (transform.visible === false) return;
-    if (transform.component && isVisualComponent(transform.component) && transform.component.castShadow !== false) {
+    if (
+      transform.component &&
+      isVisualComponent(transform.component) &&
+      transform.component.castShadow !== false
+    ) {
       target.push(transform);
     }
     for (let i = 0, l = transform.children.length; i < l; i++) {
@@ -551,7 +555,6 @@ export class Renderer {
     // When a scene BVH is available, use frustum culling to avoid
     // visiting the entire scene graph.
     if (this.sceneBVH) {
-      // Build the view-projection matrix and extract frustum planes.
       _projScreenMatrix.multiplyMatrices(
         pCamera.camera.projectionMatrix,
         pCamera.camera.matrixWorldInverse
@@ -630,9 +633,22 @@ export class Renderer {
       // so objects outside the camera frustum still cast visible shadows.
       this._shadowCasters.length = 0;
       this.collectShadowCasters(this.scene, this._shadowCasters);
-      const shadowRenderList = this.organizeVisuals(this._shadowCasters, this._shadowGroups);
-      this.directionalShadowRenderer.render(encoder, shadowRenderList, this.camera, this);
-      this.spotLightShadowRenderer.render(encoder, shadowRenderList, this.camera, this);
+      const shadowRenderList = this.organizeVisuals(
+        this._shadowCasters,
+        this._shadowGroups
+      );
+      this.directionalShadowRenderer.render(
+        encoder,
+        shadowRenderList,
+        this.camera,
+        this
+      );
+      this.spotLightShadowRenderer.render(
+        encoder,
+        shadowRenderList,
+        this.camera,
+        this
+      );
 
       const pass = encoder.beginRenderPass({
         colorAttachments: [
