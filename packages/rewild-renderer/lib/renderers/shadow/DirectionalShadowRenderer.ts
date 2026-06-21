@@ -4,6 +4,7 @@ import { PerspectiveCamera } from '../../core/PerspectiveCamera';
 import { IRenderGroup } from '../../../types/IRenderGroup';
 import { IVisualComponent } from '../../../types/interfaces';
 import shader from '../../shaders/shadow-depth.wgsl';
+import { ShadowDebugRenderer } from './ShadowDebugRenderer';
 
 export const SHADOW_MAP_SIZE = 2048;
 export const NUM_CASCADES = 3;
@@ -47,6 +48,9 @@ interface MeshShadowUniforms {
 
 export class DirectionalShadowRenderer {
   shadowDepthTexture: GPUTexture;
+  debugRenderer: ShadowDebugRenderer;
+  /** True while shadow cascade debug tint is active — read by ShadowUniforms to set debugMode uniform. */
+  debugMode: boolean = false;
   /** Per-cascade light VP matrices — updated each frame, read by ShadowUniforms.prepare(). */
   lightVPs: [Matrix4, Matrix4, Matrix4];
   /**
@@ -75,6 +79,7 @@ export class DirectionalShadowRenderer {
   private _matData: Float32Array;
 
   constructor() {
+    this.debugRenderer = new ShadowDebugRenderer();
     this.lightVPs = [new Matrix4(), new Matrix4(), new Matrix4()];
     this.cascadeSplitDistances = new Float32Array(4);
     this.meshUniforms = new Map();
@@ -134,6 +139,19 @@ export class DirectionalShadowRenderer {
         depthBiasSlopeScale: 2.0,
       },
     });
+
+    this.debugRenderer.init(renderer, this.shadowDepthTexture);
+
+    (window as any).startShadowDebug = () => {
+      this.debugMode = true;
+      this.debugRenderer.enabled = true;
+      console.log('Shadow debug ON — cascade tint: red=0 green=1 blue=2 | atlas viewer: bottom-left');
+    };
+    (window as any).stopShadowDebug = () => {
+      this.debugMode = false;
+      this.debugRenderer.enabled = false;
+      console.log('Shadow debug OFF');
+    };
   }
 
   render(

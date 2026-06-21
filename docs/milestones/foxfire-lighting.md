@@ -80,3 +80,7 @@ shadow casters ──▶ ShadowPass (depth-only)                                
   Mitigations available if needed: fewer/staggered cascade updates, tighter caster culling, moderate
   atlas resolution (e.g. 2048² split into cascades).
 - Only the sun + one spot light cast shadows — shadow cost does **not** scale with total light count.
+
+## Debugger
+
+- You can turn the cascade shadow map debugger on and off in the console with the functions startShadowDebug() & stopShadowDebug()

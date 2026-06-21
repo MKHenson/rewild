@@ -46,3 +46,13 @@
   directionalShadowFactor = mix(1.0, directionalShadowFactor, _sunElevationFade);
   // Clamp shadow darkness — prevents pitch-black shadows where ambient light would exist.
   directionalShadowFactor = mix(0.25, 1.0, directionalShadowFactor);
+  // Debug tint: colours each cascade region (red=0, green=1, blue=2) when debugMode is on.
+  var cascadeDebugTint = vec3f(0.0);
+  if (directionalShadowParams.debugMode != 0u) {
+    let _tints = array<vec3f, 3>(
+      vec3f(1.0, 0.2, 0.2),
+      vec3f(0.2, 1.0, 0.2),
+      vec3f(0.2, 0.2, 1.0),
+    );
+    cascadeDebugTint = _tints[_cascadeIdx];
+  }

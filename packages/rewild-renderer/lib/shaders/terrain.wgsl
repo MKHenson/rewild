@@ -93,5 +93,9 @@ fn fs(
                   + shadowCastingSpotContrib * spotShadowFactor;
 
   // Combine the textures with lighting
-  return textureSample(myTexture, mySampler, fragUV) * vec4f(blendedColor, 1.0) * vec4f(shadedLight, 1.0);
+  var color = textureSample(myTexture, mySampler, fragUV) * vec4f(blendedColor, 1.0) * vec4f(shadedLight, 1.0);
+  if (directionalShadowParams.debugMode != 0u) {
+    color = vec4f(mix(color.rgb, cascadeDebugTint, 0.5), 1.0);
+  }
+  return color;
 }
