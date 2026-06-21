@@ -75,6 +75,9 @@ fn fs(
                   + shadowCastingSpotContrib * spotShadowFactor;
 
   var color = textureSample(myTexture, mySampler, fragUV) * vec4f(shadedLight, 1.0);
+  if (directionalShadowParams.debugMode != 0u) {
+    color = vec4f(mix(color.rgb, cascadeDebugTint, 0.5), 1.0);
+  }
 
   return applySelectionTint(color, 0.35f);
 }

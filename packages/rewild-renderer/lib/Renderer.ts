@@ -810,6 +810,9 @@ export class Renderer {
         guiPass.end();
         device.queue.submit([guiEncoder.finish()]);
       }
+
+      // Shadow debug atlas viewer — rendered on top of everything when active.
+      this.directionalShadowRenderer.debugRenderer.render(this);
     }
   }
 }

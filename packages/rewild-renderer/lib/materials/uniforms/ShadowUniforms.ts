@@ -26,8 +26,10 @@ export class ShadowUniforms implements ISharedUniformBuffer {
 
   // invViewMatrix (16) + worldSize, centerX, centerZ, shadowIntensity (4) = 20 floats
   private cloudData: Float32Array;
-  // 3 × lightMVPFromView (mat4x4f = 16 floats each) + cascadeSplits (vec4f = 4 floats) = 52 floats / 208 bytes
-  private directionalData: Float32Array;
+  // 3 × lightMVPFromView (192 bytes) + cascadeSplits (16 bytes) + debugMode u32 + 3× pad = 224 bytes
+  private directionalData: ArrayBuffer;
+  private directionalFloats: Float32Array;
+  private directionalInts: Uint32Array;
   // lightMVPFromView (mat4x4f = 16 floats) + lightIndex (u32) + hasSpotShadow (u32) + 2× pad = 80 bytes
   private spotData: ArrayBuffer;
   private spotFloats: Float32Array;
@@ -37,7 +39,9 @@ export class ShadowUniforms implements ISharedUniformBuffer {
     this.group = group;
     this.requiresBuild = true;
     this.cloudData = new Float32Array(20);
-    this.directionalData = new Float32Array(NUM_CASCADES * 16 + 4);
+    this.directionalData = new ArrayBuffer(224);
+    this.directionalFloats = new Float32Array(this.directionalData);
+    this.directionalInts = new Uint32Array(this.directionalData);
     this.spotData = new ArrayBuffer(80);
     this.spotFloats = new Float32Array(this.spotData);
     this.spotInts = new Uint32Array(this.spotData);
@@ -68,10 +72,10 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // Directional shadow params: 3 × lightMVPFromView (192 bytes) + cascadeSplits vec4f (16 bytes) = 208 bytes
+    // Directional shadow params: 3 × lightMVPFromView (192) + cascadeSplits (16) + debugMode + 3×pad = 224 bytes
     this.directionalBuffer = device.createBuffer({
       label: 'directional shadow params',
-      size: 208,
+      size: 224,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -129,10 +133,12 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       // Transforms a view-space position into cascade i's light clip space.
       for (let i = 0; i < NUM_CASCADES; i++) {
         _tempMat.multiplyMatrices(dirShadowRenderer.lightVPs[i], camera.transform.matrixWorld);
-        this.directionalData.set(_tempMat.elements, i * 16);
+        this.directionalFloats.set(_tempMat.elements, i * 16);
       }
-      this.directionalData.set(dirShadowRenderer.cascadeSplitDistances, NUM_CASCADES * 16);
-      device.queue.writeBuffer(this.directionalBuffer, 0, this.directionalData.buffer);
+      this.directionalFloats.set(dirShadowRenderer.cascadeSplitDistances, NUM_CASCADES * 16);
+      // debugMode is at byte offset 208 (float index 52 = u32 index 52).
+      this.directionalInts[52] = dirShadowRenderer.debugMode ? 1 : 0;
+      device.queue.writeBuffer(this.directionalBuffer, 0, this.directionalData);
     }
 
     // --- Spot light shadow ---
