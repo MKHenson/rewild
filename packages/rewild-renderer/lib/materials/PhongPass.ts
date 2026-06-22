@@ -1,26 +1,26 @@
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from './IMaterialPass';
-import shader from '../shaders/diffuse.wgsl';
+import shader from '../shaders/phong.wgsl';
 import { Renderer } from '..';
 import { ProjModelView } from './uniforms/ProjModelView';
 import { PerMeshTracker } from './PerMeshTracker';
 import { SharedUniformsTracker } from './SharedUniformsTracker';
 import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
-import { Diffuse } from './uniforms/Diffuse';
+import { PhongMaterial } from './uniforms/PhongMaterial';
 import { Lighting } from './uniforms/Lighting';
 import { ShadowUniforms } from './uniforms/ShadowUniforms';
 
-const sharedBindgroupIndex = 1;
+const materialGroupIndex = 1;
 const lightingGroupIndex = 2;
 const shadowGroupIndex = 3;
 
-export class DiffusePass implements IMaterialPass {
+export class PhongPass implements IMaterialPass {
   pipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
   sharedUniformsTracker: SharedUniformsTracker;
-  diffuse: Diffuse;
+  material: PhongMaterial;
   lightingUniforms: Lighting;
   shadowUniforms: ShadowUniforms;
   side: GPUFrontFace;
@@ -28,11 +28,11 @@ export class DiffusePass implements IMaterialPass {
   constructor() {
     this.side = 'ccw';
     this.requiresRebuild = true;
-    this.diffuse = new Diffuse(sharedBindgroupIndex);
+    this.material = new PhongMaterial(materialGroupIndex);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
     this.shadowUniforms = new ShadowUniforms(shadowGroupIndex);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
-      this.diffuse,
+      this.material,
       this.lightingUniforms,
       this.shadowUniforms,
     ]);
@@ -44,12 +44,10 @@ export class DiffusePass implements IMaterialPass {
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
     const { device, presentationFormat } = renderer;
-    const module = device.createShaderModule({
-      code: shader,
-    });
+    const module = device.createShaderModule({ code: shader });
 
     this.pipeline = device.createRenderPipeline({
-      label: 'Diffuse Pass',
+      label: 'Phong Pass',
       layout: 'auto',
       vertex: {
         entryPoint: 'vs',
@@ -57,36 +55,15 @@ export class DiffusePass implements IMaterialPass {
         buffers: [
           {
             arrayStride: 4 * 3,
-            attributes: [
-              {
-                // position
-                shaderLocation: 0,
-                offset: 0,
-                format: 'float32x3',
-              },
-            ],
+            attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
           },
           {
             arrayStride: 4 * 2,
-            attributes: [
-              {
-                // uv
-                shaderLocation: 1,
-                offset: 0,
-                format: 'float32x2',
-              },
-            ],
+            attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x2' }],
           },
           {
             arrayStride: 4 * 3,
-            attributes: [
-              {
-                // normal
-                shaderLocation: 2,
-                offset: 0,
-                format: 'float32x3',
-              },
-            ],
+            attributes: [{ shaderLocation: 2, offset: 0, format: 'float32x3' }],
           },
         ],
       },
@@ -111,20 +88,12 @@ export class DiffusePass implements IMaterialPass {
           },
         ],
       },
-      multisample: {
-        count: renderer.sampleCount,
-      },
+      multisample: { count: renderer.sampleCount },
       primitive: {
         topology: 'triangle-list',
-
-        // Backface culling since the cube is solid piece of geometry.
-        // Faces pointing away from the camera will be occluded by faces
-        // pointing toward the camera.
         cullMode: 'back',
         frontFace: this.side,
       },
-      // Enable depth testing so that the fragment closest to the camera
-      // is rendered in front.
       depthStencil: {
         depthWriteEnabled: true,
         depthCompare: 'less',
@@ -155,12 +124,7 @@ export class DiffusePass implements IMaterialPass {
     pass.setVertexBuffer(2, geometry.normalBuffer);
     pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
 
-    this.sharedUniformsTracker.prepareMeshUniforms(
-      renderer,
-      pass,
-      camera,
-      meshes
-    );
+    this.sharedUniformsTracker.prepareMeshUniforms(renderer, pass, camera, meshes);
 
     const tracker = this.perMeshTracker;
     const numIndices = geometry.indices!.length;

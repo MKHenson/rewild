@@ -1,49 +1,53 @@
 import { Geometry } from '../geometry/Geometry';
 import { IMaterialPass } from './IMaterialPass';
-import shader from '../shaders/diffuse-instanced.wgsl';
+import shader from '../shaders/lambert.wgsl';
 import { Renderer } from '..';
+import { ProjModelView } from './uniforms/ProjModelView';
+import { PerMeshTracker } from './PerMeshTracker';
 import { SharedUniformsTracker } from './SharedUniformsTracker';
 import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
-import { Diffuse } from './uniforms/Diffuse';
+import { LambertMaterial } from './uniforms/LambertMaterial';
 import { Lighting } from './uniforms/Lighting';
 import { ShadowUniforms } from './uniforms/ShadowUniforms';
-import { ProjectionAndInstances } from './uniforms/ProjectionAndInstances';
 
-const sharedBindgroupIndex = 0;
-const projectionAndInstancesGroup = 1;
-const lightingGroup = 2;
-const shadowGroup = 3;
+const materialGroupIndex = 1;
+const lightingGroupIndex = 2;
+const shadowGroupIndex = 3;
 
-export class DiffuseIntancedPass implements IMaterialPass {
+export class LambertPass implements IMaterialPass {
   pipeline: GPURenderPipeline;
-  perMeshTracker: SharedUniformsTracker;
+  perMeshTracker: PerMeshTracker;
   requiresRebuild: boolean = true;
-  diffuse: Diffuse;
+  sharedUniformsTracker: SharedUniformsTracker;
+  material: LambertMaterial;
+  lightingUniforms: Lighting;
+  shadowUniforms: ShadowUniforms;
   side: GPUFrontFace;
 
   constructor() {
     this.side = 'ccw';
     this.requiresRebuild = true;
-    this.diffuse = new Diffuse(sharedBindgroupIndex);
-
-    this.perMeshTracker = new SharedUniformsTracker(this, [
-      this.diffuse,
-      new ProjectionAndInstances(projectionAndInstancesGroup),
-      new Lighting(lightingGroup),
-      new ShadowUniforms(shadowGroup),
+    this.material = new LambertMaterial(materialGroupIndex);
+    this.lightingUniforms = new Lighting(lightingGroupIndex);
+    this.shadowUniforms = new ShadowUniforms(shadowGroupIndex);
+    this.sharedUniformsTracker = new SharedUniformsTracker(this, [
+      this.material,
+      this.lightingUniforms,
+      this.shadowUniforms,
+    ]);
+    this.perMeshTracker = new PerMeshTracker(this, () => [
+      new ProjModelView(0),
     ]);
   }
 
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
     const { device, presentationFormat } = renderer;
-    const module = device.createShaderModule({
-      code: shader,
-    });
+    const module = device.createShaderModule({ code: shader });
 
     this.pipeline = device.createRenderPipeline({
-      label: 'Diffuse Instanced Pass',
+      label: 'Lambert Pass',
       layout: 'auto',
       vertex: {
         entryPoint: 'vs',
@@ -51,36 +55,15 @@ export class DiffuseIntancedPass implements IMaterialPass {
         buffers: [
           {
             arrayStride: 4 * 3,
-            attributes: [
-              {
-                // position
-                shaderLocation: 0,
-                offset: 0,
-                format: 'float32x3',
-              },
-            ],
+            attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
           },
           {
             arrayStride: 4 * 2,
-            attributes: [
-              {
-                // uv
-                shaderLocation: 1,
-                offset: 0,
-                format: 'float32x2',
-              },
-            ],
+            attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x2' }],
           },
           {
             arrayStride: 4 * 3,
-            attributes: [
-              {
-                // normal
-                shaderLocation: 2,
-                offset: 0,
-                format: 'float32x3',
-              },
-            ],
+            attributes: [{ shaderLocation: 2, offset: 0, format: 'float32x3' }],
           },
         ],
       },
@@ -105,9 +88,7 @@ export class DiffuseIntancedPass implements IMaterialPass {
           },
         ],
       },
-      multisample: {
-        count: renderer.sampleCount,
-      },
+      multisample: { count: renderer.sampleCount },
       primitive: {
         topology: 'triangle-list',
         cullMode: 'back',
@@ -122,6 +103,7 @@ export class DiffuseIntancedPass implements IMaterialPass {
   }
 
   dispose(): void {
+    this.sharedUniformsTracker.dispose();
     this.perMeshTracker.dispose();
   }
 
@@ -142,8 +124,14 @@ export class DiffuseIntancedPass implements IMaterialPass {
     pass.setVertexBuffer(2, geometry.normalBuffer);
     pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
 
-    this.perMeshTracker.prepareMeshUniforms(renderer, pass, camera, meshes);
+    this.sharedUniformsTracker.prepareMeshUniforms(renderer, pass, camera, meshes);
+
+    const tracker = this.perMeshTracker;
     const numIndices = geometry.indices!.length;
-    pass.drawIndexed(numIndices, meshes.length);
+
+    for (const mesh of meshes) {
+      tracker.prepareMeshUniforms(mesh, renderer, pass, camera);
+      pass.drawIndexed(numIndices);
+    }
   }
 }

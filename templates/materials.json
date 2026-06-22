@@ -25,6 +25,10 @@
       "url": "crate-wooden.jpg"
     },
     {
+      "name": "crate-normal",
+      "url": "crate-wooden-normal.jpg"
+    },
+    {
       "name": "wardrobe",
       "url": "models/wardrobe/wardrobe.jpg"
     },
@@ -33,16 +37,32 @@
       "url": "basketball.png"
     },
     {
+      "name": "basketball-normal",
+      "url": "basketball-normal.png"
+    },
+    {
       "name": "earth",
       "url": "earth-day-2k.jpg"
+    },
+    {
+      "name": "earth-normal",
+      "url": "earth-day-2k-normal.jpg"
     },
     {
       "name": "rocky-mountain-texture-seamless",
       "url": "nature/landscapes/rocky-mountain-texture-seamless.png"
     },
     {
+      "name": "rocky-mountain-texture-seamless-normal",
+      "url": "nature/landscapes/rocky-mountain-texture-seamless-normal.png"
+    },
+    {
       "name": "ground-coastal-1",
       "url": "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png"
+    },
+    {
+      "name": "ground-coastal-1-normal",
+      "url": "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_normal.png"
     },
     {
       "name": "block-concrete-4",
@@ -80,23 +100,33 @@
   "materials": [
     {
       "name": "crate",
-      "type": "diffuse",
-      "diffuseMap": "crate"
+      "type": "phong",
+      "diffuseMap": "crate",
+      "normalMap": "crate-normal",
+      "ambientColor": [0.05, 0.05, 0.05],
+      "shininess": 8
     },
     {
       "name": "basketball",
-      "type": "diffuse",
-      "diffuseMap": "basketball"
+      "type": "phong",
+      "diffuseMap": "basketball",
+      "normalMap": "basketball-normal",
+      "ambientColor": [0.05, 0.05, 0.05],
+      "shininess": 32
     },
     {
       "name": "earth",
-      "type": "diffuse",
-      "diffuseMap": "earth"
+      "type": "phong",
+      "diffuseMap": "earth",
+      "normalMap": "earth-normal",
+      "ambientColor": [0.05, 0.05, 0.05],
+      "shininess": 48
     },
     {
       "name": "wardrobe",
-      "type": "diffuse",
-      "diffuseMap": "wardrobe"
+      "type": "lambert",
+      "diffuseMap": "wardrobe",
+      "ambientColor": [0.05, 0.05, 0.05]
     },
     {
       "name": "light-wireframe",

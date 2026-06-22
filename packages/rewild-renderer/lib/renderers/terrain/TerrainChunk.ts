@@ -264,6 +264,10 @@ export class LODMesh {
     terrainPass.terrainUniforms.albedoTexture = renderer.textureManager.get(
       'rocky-mountain-texture-seamless'
     ).gpuTexture;
+    terrainPass.terrainUniforms.normalMap = renderer.textureManager.get(
+      'rocky-mountain-texture-seamless-normal'
+    ).gpuTexture;
+    terrainPass.terrainUniforms.shininess = 5;
 
     this.mesh = new Mesh(geometry, terrainPass);
     this.chunk.transform.addChild(this.mesh.transform);

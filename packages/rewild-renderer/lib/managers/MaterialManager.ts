@@ -1,6 +1,7 @@
 import { Color } from 'rewild-common';
-import { DiffuseIntancedPass } from '../materials/DiffuseIntancedPass';
-import { DiffusePass } from '../materials/DiffusePass';
+import { LambertInstancedPass } from '../materials/LambertInstancedPass';
+import { LambertPass } from '../materials/LambertPass';
+import { PhongPass } from '../materials/PhongPass';
 import { GizmoPass } from '../materials/GizmoPass';
 import { IMaterialPass } from '../materials/IMaterialPass';
 import { SpritePass } from '../materials/SpritePass';
@@ -11,9 +12,17 @@ import { UIElementPass } from '../materials/UIElementPass';
 import { UIElementHealthPass } from '../materials/UIElementHealthPass';
 
 export interface IMaterial {
-  type: 'diffuse' | 'diffuse-instanced';
+  type: 'lambert' | 'lambert-instanced' | 'phong';
   id: string;
   diffuseMap?: string;
+  normalMap?: string;
+  specularMap?: string;
+  emissiveMap?: string;
+  specularColor?: [number, number, number];
+  shininess?: number;
+  emissiveColor?: [number, number, number];
+  emissiveIntensity?: number;
+  ambientColor?: [number, number, number];
 }
 
 export class MaterialManager {
@@ -37,68 +46,82 @@ export class MaterialManager {
     this.addMaterial('ui-material', new UIElementPass());
     this.addMaterial('ui-health-material', new UIElementHealthPass());
 
-    templates.materials.forEach((materialTemplate) => {
+    templates.materials.forEach((t) => {
       let materialPass: IMaterialPass;
 
-      switch (materialTemplate.type) {
-        case 'diffuse':
-          materialPass = new DiffusePass();
-          if (materialTemplate.diffuseMap)
-            (materialPass as DiffusePass).diffuse.texture =
-              renderer.textureManager.get(
-                materialTemplate.diffuseMap
-              ).gpuTexture;
+      switch (t.type) {
+        case 'lambert': {
+          const pass = new LambertPass();
+          if (t.diffuseMap)
+            pass.material.diffuseTexture = renderer.textureManager.get(t.diffuseMap).gpuTexture;
+          if (t.emissiveMap)
+            pass.material.emissiveTexture = renderer.textureManager.get(t.emissiveMap).gpuTexture;
+          if (t.emissiveColor) pass.material.emissiveColor = t.emissiveColor;
+          if (t.emissiveIntensity !== undefined) pass.material.emissiveIntensity = t.emissiveIntensity;
+          if (t.ambientColor) pass.material.ambientColor = t.ambientColor;
+          materialPass = pass;
           break;
+        }
+        case 'lambert-instanced': {
+          const pass = new LambertInstancedPass();
+          if (t.diffuseMap)
+            pass.diffuse.texture = renderer.textureManager.get(t.diffuseMap).gpuTexture;
+          materialPass = pass;
+          break;
+        }
+        case 'phong': {
+          const pass = new PhongPass();
+          if (t.diffuseMap)
+            pass.material.diffuseTexture = renderer.textureManager.get(t.diffuseMap).gpuTexture;
+          if (t.normalMap)
+            pass.material.normalTexture = renderer.textureManager.get(t.normalMap).gpuTexture;
+          if (t.specularMap)
+            pass.material.specularTexture = renderer.textureManager.get(t.specularMap).gpuTexture;
+          if (t.emissiveMap)
+            pass.material.emissiveTexture = renderer.textureManager.get(t.emissiveMap).gpuTexture;
+          if (t.specularColor) pass.material.specularColor = t.specularColor;
+          if (t.shininess !== undefined) pass.material.shininess = t.shininess;
+          if (t.emissiveColor) pass.material.emissiveColor = t.emissiveColor;
+          if (t.emissiveIntensity !== undefined) pass.material.emissiveIntensity = t.emissiveIntensity;
+          if (t.ambientColor) pass.material.ambientColor = t.ambientColor;
+          materialPass = pass;
+          break;
+        }
         case 'wireframe':
           materialPass = new WireframePass();
-          (materialPass as WireframePass).wireframeUniforms.color =
-            new Color().setRGB(
-              materialTemplate.color?.[0] ?? 1,
-              materialTemplate.color?.[1] ?? 1,
-              materialTemplate.color?.[2] ?? 1
-            );
-          (materialPass as WireframePass).wireframeUniforms.opacity =
-            materialTemplate.opacity || 1;
-          break;
-        case 'diffuse-instanced':
-          materialPass = new DiffuseIntancedPass();
-          if (materialTemplate.diffuseMap)
-            (materialPass as DiffuseIntancedPass).diffuse.texture =
-              renderer.textureManager.get(
-                materialTemplate.diffuseMap
-              ).gpuTexture;
+          (materialPass as WireframePass).wireframeUniforms.color = new Color().setRGB(
+            t.color?.[0] ?? 1,
+            t.color?.[1] ?? 1,
+            t.color?.[2] ?? 1
+          );
+          (materialPass as WireframePass).wireframeUniforms.opacity = t.opacity || 1;
           break;
         case 'gizmo':
           materialPass = new GizmoPass();
           (materialPass as GizmoPass).gizmoUniforms.color = new Color().setRGB(
-            materialTemplate.color?.[0] ?? 1,
-            materialTemplate.color?.[1] ?? 1,
-            materialTemplate.color?.[2] ?? 1
+            t.color?.[0] ?? 1,
+            t.color?.[1] ?? 1,
+            t.color?.[2] ?? 1
           );
-          (materialPass as GizmoPass).gizmoUniforms.opacity =
-            materialTemplate.opacity ?? 1;
+          (materialPass as GizmoPass).gizmoUniforms.opacity = t.opacity ?? 1;
           break;
         case 'sprite':
           materialPass = new SpritePass();
-          (materialPass as SpritePass).spriteUniforms.diffuseColor =
-            new Color().setRGB(
-              materialTemplate.color?.[0] ?? 1,
-              materialTemplate.color?.[1] ?? 1,
-              materialTemplate.color?.[2] ?? 1
-            );
-          (materialPass as SpritePass).spriteUniforms.diffuseAlpha =
-            materialTemplate.opacity ?? 1;
-          if (materialTemplate.diffuseMap)
+          (materialPass as SpritePass).spriteUniforms.diffuseColor = new Color().setRGB(
+            t.color?.[0] ?? 1,
+            t.color?.[1] ?? 1,
+            t.color?.[2] ?? 1
+          );
+          (materialPass as SpritePass).spriteUniforms.diffuseAlpha = t.opacity ?? 1;
+          if (t.diffuseMap)
             (materialPass as SpritePass).spriteUniforms.texture =
-              renderer.textureManager.get(
-                materialTemplate.diffuseMap
-              ).gpuTexture;
+              renderer.textureManager.get(t.diffuseMap).gpuTexture;
           break;
         default:
-          throw new Error(`Unknown material type: ${materialTemplate.type}`);
+          throw new Error(`Unknown material type: ${(t as { type: string }).type}`);
       }
 
-      this.addMaterial(materialTemplate.name, materialPass);
+      this.addMaterial(t.name, materialPass);
     });
 
     this.initialized = true;
