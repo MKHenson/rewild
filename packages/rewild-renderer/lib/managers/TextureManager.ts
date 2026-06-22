@@ -129,6 +129,25 @@ export class TextureManager {
         height
       )
     );
+
+    this.addTexture(
+      new DataTexture(
+        new TextureProperties('white-1x1', false),
+        new Uint8Array([255, 255, 255, 255]),
+        1,
+        1
+      )
+    );
+
+    // Flat normal: (0.5, 0.5, 1.0) in [0,1] = tangent-space (0,0,1)
+    this.addTexture(
+      new DataTexture(
+        new TextureProperties('flat-normal-1x1', false),
+        new Uint8Array([128, 128, 255, 255]),
+        1,
+        1
+      )
+    );
   }
 
   addTexture(texture: ITexture) {

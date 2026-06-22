@@ -1,5 +1,6 @@
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/tbn.frag.wgsl"
+#include "./shader-lib/selection-tint.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"
 #include "./shader-lib/directional-shadow.wgsl"
@@ -9,13 +10,16 @@ struct Uniforms {
   normalMatrix: mat3x3f,
   projMatrix : mat4x4f,
   modelViewMatrix : mat4x4<f32>,
+  selected: f32,
 }
 
-struct TerrainParams {
-  specularColor: vec3f,
-  shininess    : f32,
-  ambientColor : vec3f,
-  _pad         : f32,
+struct PhongParams {
+  specularColor    : vec3f,
+  shininess        : f32,
+  emissiveColor    : vec3f,
+  emissiveIntensity: f32,
+  ambientColor     : vec3f,
+  _pad             : f32,
 }
 
 struct VertexInput {
@@ -33,12 +37,11 @@ struct VertexOutput {
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
 @group(1) @binding(0) var mySampler: sampler;
-@group(1) @binding(1) var myTexture: texture_2d<f32>;
-@group(1) @binding(2) var albedoTexture: texture_2d<f32>;
-@group(1) @binding(3) var seamlessSampler: sampler;
-@group(1) @binding(4) var normalMapTexture: texture_2d<f32>;
-@group(1) @binding(5) var specularMapTexture: texture_2d<f32>;
-@group(1) @binding(6) var<uniform> phongParams: TerrainParams;
+@group(1) @binding(1) var diffuseMap: texture_2d<f32>;
+@group(1) @binding(2) var normalMap: texture_2d<f32>;
+@group(1) @binding(3) var specularMap: texture_2d<f32>;
+@group(1) @binding(4) var emissiveMap: texture_2d<f32>;
+@group(1) @binding(5) var<uniform> phongParams: PhongParams;
 @group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
@@ -66,37 +69,17 @@ fn fs(
   @location(1) normal: vec3f,
   @location(2) viewPosition: vec3f
 ) -> @location(0) vec4f {
-  let scaledUV = fragUV * 25.0;
 
-  // Procedural multi-scale blend: same offsets used for albedo, normal, and specular maps
-  let k = textureSample(albedoTexture, seamlessSampler, scaledUV * 0.005).x;
-  let index = k * 8.0;
-  let i = floor(index);
-  let f = fract(index);
-  let offa = sin(vec2f(3.0, 7.0) * (i + 0.0));
-  let offb = sin(vec2f(3.0, 7.0) * (i + 1.0));
-
-  let cola = textureSample(albedoTexture, seamlessSampler, scaledUV + offa).rgb;
-  let colb = textureSample(albedoTexture, seamlessSampler, scaledUV + offb).rgb;
-  let blendFactor = smoothstep(0.2, 0.8, f - 0.1 * dot(cola - colb, vec3f(1.0, 1.0, 1.0)));
-  let blendedColor = mix(cola, colb, blendFactor);
-
-  // Normal map: blended with same procedural offsets for consistency with albedo
   let geometricNormal = normalize(normal);
-  let normalA = textureSample(normalMapTexture, seamlessSampler, scaledUV + offa).rgb;
-  let normalB = textureSample(normalMapTexture, seamlessSampler, scaledUV + offb).rgb;
-  let blendedNormalSample = mix(normalA, normalB, blendFactor) * 2.0 - 1.0;
-  let normalizedNormal = perturbNormal(viewPosition, scaledUV, geometricNormal, blendedNormalSample);
-
-  // Specular map: blended scalar modulator (white-1x1 fallback = 1.0 = full specular)
-  let specA = textureSample(specularMapTexture, seamlessSampler, scaledUV + offa).r;
-  let specB = textureSample(specularMapTexture, seamlessSampler, scaledUV + offb).r;
-  let specFactor = mix(specA, specB, blendFactor);
+  let normalSample = textureSample(normalMap, mySampler, fragUV).rgb * 2.0 - 1.0;
+  let normalizedNormal = perturbNormal(viewPosition, fragUV, geometricNormal, normalSample);
 
   #include "./shader-lib/total-lighting-phong.frag.wgsl"
   #include "./shader-lib/cloud-shadow.frag.wgsl"
   #include "./shader-lib/directional-shadow.frag.wgsl"
   #include "./shader-lib/spot-light-shadow.frag.wgsl"
+
+  let specFactor = textureSample(specularMap, mySampler, fragUV).r;
 
   let diffuseShaded = directionalLight * cloudShadowFactor * directionalShadowFactor
                     + otherLight
@@ -107,9 +90,16 @@ fn fs(
 
   let shadedLight = diffuseShaded + specularShaded + phongParams.ambientColor;
 
-  var color = textureSample(myTexture, mySampler, fragUV) * vec4f(blendedColor, 1.0) * vec4f(shadedLight, 1.0);
+  let albedo = textureSample(diffuseMap, mySampler, fragUV);
+  let emissiveSample = textureSample(emissiveMap, mySampler, fragUV).rgb;
+  let emissive = emissiveSample * phongParams.emissiveColor * phongParams.emissiveIntensity;
+
+  var color = albedo * vec4f(shadedLight, 1.0) + vec4f(emissive, 0.0);
+  color.a = albedo.a;
+
   if (directionalShadowParams.debugMode != 0u) {
-    color = vec4f(mix(color.rgb, cascadeDebugTint, 0.5), 1.0);
+    color = vec4f(mix(color.rgb, cascadeDebugTint, 0.5), color.a);
   }
-  return color;
+
+  return applySelectionTint(color, 0.35f);
 }
