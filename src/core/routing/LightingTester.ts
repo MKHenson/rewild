@@ -54,6 +54,7 @@ export class LightingTester extends Node {
         light.radius = LIGHT_RADIUS;
         light.transform.position.set(x, RAYCAST_ORIGIN_Y, z);
         renderer.scene.addChild(light.transform);
+        light.enableSprite(renderer);
 
         this._lights[idx] = light;
         this._positioned[idx] = false;

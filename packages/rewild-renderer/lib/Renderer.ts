@@ -726,7 +726,7 @@ export class Renderer {
           depthStencilAttachment: {
             view: this.depthTexture.createView(),
             depthClearValue: 1.0,
-            depthLoadOp: 'clear',
+            depthLoadOp: 'load',
             depthStoreOp: 'store',
           },
         });
