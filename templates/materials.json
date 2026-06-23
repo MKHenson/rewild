@@ -112,7 +112,7 @@
       "diffuseMap": "basketball",
       "normalMap": "basketball-normal",
       "ambientColor": [0.05, 0.05, 0.05],
-      "shininess": 32
+      "shininess": 30
     },
     {
       "name": "earth",
