@@ -17,7 +17,7 @@ export class PhongMaterial implements ISharedUniformBuffer {
   bindGroup: GPUBindGroup;
   requiresBuild: boolean;
 
-  specularColor: [number, number, number] = [1, 1, 1];
+  specularColor: [number, number, number] = [0.04, 0.04, 0.04];
   shininess: number = 32;
   emissiveColor: [number, number, number] = [1, 1, 1];
   emissiveIntensity: number = 0;
