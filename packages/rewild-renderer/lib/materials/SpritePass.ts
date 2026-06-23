@@ -12,6 +12,8 @@ import { IVisualComponent } from '../../types/interfaces';
 const projectionIndex = 0;
 const sharedBindgroupIndex = 1;
 
+export type BlendMode = 'alpha' | 'additive' | 'multiply';
+
 export class SpritePass implements IMaterialPass {
   pipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;
@@ -19,6 +21,7 @@ export class SpritePass implements IMaterialPass {
   sharedUniformsTracker: SharedUniformsTracker;
   spriteUniforms: SpriteUniforms;
   side: GPUFrontFace;
+  private _blendMode: BlendMode = 'alpha';
 
   constructor() {
     this.side = 'ccw';
@@ -32,12 +35,39 @@ export class SpritePass implements IMaterialPass {
     ]);
   }
 
+  get blendMode(): BlendMode {
+    return this._blendMode;
+  }
+
+  set blendMode(mode: BlendMode) {
+    if (this._blendMode === mode) return;
+    this._blendMode = mode;
+    this.requiresRebuild = true;
+  }
+
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
     const { device, presentationFormat } = renderer;
     const module = device.createShaderModule({
       code: shader,
     });
+
+    type BlendComponent = GPUBlendComponent;
+
+    const blendConfigs: Record<BlendMode, { color: BlendComponent; alpha: BlendComponent }> = {
+      alpha: {
+        color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+        alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+      },
+      additive: {
+        color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
+        alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
+      },
+      multiply: {
+        color: { srcFactor: 'zero', dstFactor: 'src', operation: 'add' },
+        alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
+      },
+    };
 
     this.pipeline = device.createRenderPipeline({
       label: 'Sprite Pass',
@@ -76,18 +106,7 @@ export class SpritePass implements IMaterialPass {
         targets: [
           {
             format: presentationFormat,
-            blend: {
-              color: {
-                srcFactor: 'src-alpha',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add',
-              },
-              alpha: {
-                srcFactor: 'one',
-                dstFactor: 'one-minus-src-alpha',
-                operation: 'add',
-              },
-            },
+            blend: blendConfigs[this._blendMode],
           },
         ],
       },
@@ -100,7 +119,7 @@ export class SpritePass implements IMaterialPass {
         frontFace: this.side,
       },
       depthStencil: {
-        depthWriteEnabled: true,
+        depthWriteEnabled: false,
         depthCompare: 'less',
         format: 'depth24plus',
       },

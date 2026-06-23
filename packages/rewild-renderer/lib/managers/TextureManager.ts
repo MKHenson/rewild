@@ -148,6 +148,31 @@ export class TextureManager {
         1
       )
     );
+
+    const glowSize = 64;
+    const half = glowSize / 2;
+    const glowData = new Uint8Array(glowSize * glowSize * 4);
+    for (let y = 0; y < glowSize; y++) {
+      for (let x = 0; x < glowSize; x++) {
+        const dx = (x - half + 0.5) / half;
+        const dy = (y - half + 0.5) / half;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        const t = Math.max(0, 1 - d);
+        const i = (y * glowSize + x) * 4;
+        glowData[i] = 255;
+        glowData[i + 1] = 255;
+        glowData[i + 2] = 255;
+        glowData[i + 3] = Math.round(t * t * 255);
+      }
+    }
+    this.addTexture(
+      new DataTexture(
+        new TextureProperties('point-light-glow', false),
+        glowData,
+        glowSize,
+        glowSize
+      )
+    );
   }
 
   addTexture(texture: ITexture) {
