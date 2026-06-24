@@ -1,5 +1,6 @@
 import { Color, Vector3 } from 'rewild-common';
 import { Node } from 'rewild-routing';
+import { Mesh } from 'rewild-renderer';
 import { PointLight } from 'node_modules/rewild-renderer/lib/core/lights/PointLight';
 import {
   Raycaster,
@@ -13,7 +14,7 @@ const SPREAD = 250; // ±125 units in X and Z
 const LIGHT_HEIGHT_ABOVE_TERRAIN = 3.0;
 const RAYCAST_ORIGIN_Y = 500.0;
 const LIGHT_RADIUS = 20.0;
-const LIGHT_INTENSITY = 2.0;
+const LIGHT_INTENSITY = 5.0;
 
 // Pre-allocated for raycasting — no allocations inside onUpdate.
 const _origin = new Vector3();
@@ -22,6 +23,7 @@ const _intersects: Intersection[] = [];
 
 export class LightingTester extends Node {
   private _lights: PointLight[] = [];
+  private _plants: Mesh[] = [];
   private _positioned: boolean[] = new Array(LIGHT_COUNT).fill(false);
   private _allPositioned = false;
   private _raycaster = new Raycaster(
@@ -40,6 +42,8 @@ export class LightingTester extends Node {
 
     const stateData = this.stateMachine?.data as StateMachineData;
     const renderer = stateData.renderer;
+    const plantGeometry = renderer.geometryManager.get('alient-plant');
+    const plantMaterial = renderer.materialManager.get('alient-plant');
 
     // Create 100 point lights in a 10x10 grid.
     // Start at a default Y until BVH raycasting places them on the terrain.
@@ -56,7 +60,12 @@ export class LightingTester extends Node {
         renderer.scene.addChild(light.transform);
         light.enableSprite(renderer);
 
+        const plant = new Mesh(plantGeometry, plantMaterial);
+        plant.transform.position.set(x, RAYCAST_ORIGIN_Y, z);
+        plant.transform.rotation.y = Math.random() * Math.PI * 2;
+
         this._lights[idx] = light;
+        this._plants[idx] = plant;
         this._positioned[idx] = false;
         idx++;
       }
@@ -69,8 +78,12 @@ export class LightingTester extends Node {
     for (let i = 0; i < this._lights.length; i++) {
       this._lights[i].transform.removeFromParent();
     }
+    for (let i = 0; i < this._plants.length; i++) {
+      this._plants[i].transform.removeFromParent();
+    }
 
     this._lights.length = 0;
+    this._plants.length = 0;
     this._allPositioned = false;
   }
 
@@ -102,6 +115,9 @@ export class LightingTester extends Node {
           terrainY + LIGHT_HEIGHT_ABOVE_TERRAIN,
           lz
         );
+        const plant = this._plants[i];
+        plant.transform.position.y = terrainY;
+        stateData.renderer.scene.addChild(plant.transform);
         this._positioned[i] = true;
       } else {
         allDone = false;

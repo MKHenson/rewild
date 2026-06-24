@@ -76,6 +76,18 @@
       }
     },
     {
+      "name": "alient-plant",
+      "type": "asset",
+      "resource": {
+        "materialId": "alient-plant",
+        "geometryId": "alient-plant",
+        "physics": {
+          "bodyType": "fixed",
+          "shape": { "type": "box", "size": [3.92, 10, 2.83] }
+        }
+      }
+    },
+    {
       "name": "point-light",
       "type": "light",
       "resource": {

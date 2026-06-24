@@ -6,5 +6,9 @@
   "monkey": {
     "type": "gltf",
     "url": "models/monkey.glb"
+  },
+  "alient-plant": {
+    "type": "gltf",
+    "url": "models/alient-plant/alient-plant.glb"
   }
 }
