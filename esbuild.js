@@ -3,7 +3,6 @@ import * as http from 'http';
 import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { copy } from 'esbuild-plugin-copy';
 
 // Load .env into process.env (shell env vars take precedence)
 if (fs.existsSync('.env')) {
@@ -19,32 +18,66 @@ if (fs.existsSync('.env')) {
     });
 }
 
-const copyPluginDetails = {
-  // this is equal to process.cwd(), which means we use cwd path as base path to resolve `to` path
-  // if not specified, this plugin uses ESBuild.build outdir/outfile options as base path.
-  resolveFrom: 'cwd',
-  assets: [
-    {
-      from: ['style.css'],
-      to: ['./public/style.css'],
-      watch: true,
-    },
-    {
-      from: ['index.html'],
-      to: ['./public/index.html'],
-      watch: true,
-    },
-    {
-      from: ['./templates/**/*'], // Match all files and subfolders in the templates folder
-      to: ['./public/templates'], // Destination folder
-      watch: true,
-    },
-    {
-      from: ['./static/**/*'], // Match all files and subfolders in the static folder
-      to: ['./public'], // Destination folder
-      watch: true,
-    },
-  ],
+function copyDirRecursive(src, dest) {
+  if (!fs.existsSync(src)) return;
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirRecursive(srcPath, destPath);
+    } else {
+      fs.mkdirSync(path.dirname(destPath), { recursive: true });
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+// Replaces esbuild-plugin-copy, which crashes in watch mode on Windows because
+// chokidar returns absolute paths but the plugin splits by a relative startFragment.
+const copyPlugin = {
+  name: 'copy',
+  setup(build) {
+    let watchersStarted = false;
+
+    build.onStart(() => {
+      fs.mkdirSync('./public', { recursive: true });
+      if (fs.existsSync('./style.css')) fs.copyFileSync('./style.css', './public/style.css');
+      if (fs.existsSync('./index.html')) fs.copyFileSync('./index.html', './public/index.html');
+      copyDirRecursive('./templates', './public/templates');
+      copyDirRecursive('./static', './public');
+    });
+
+    build.onEnd(() => {
+      if (watchersStarted) return;
+      watchersStarted = true;
+
+      fs.watch('./style.css', () => {
+        if (fs.existsSync('./style.css')) fs.copyFileSync('./style.css', './public/style.css');
+      });
+      fs.watch('./index.html', () => {
+        if (fs.existsSync('./index.html')) fs.copyFileSync('./index.html', './public/index.html');
+      });
+      fs.watch('./templates', { recursive: true }, (_event, filename) => {
+        if (!filename) return;
+        const src = path.join('./templates', filename);
+        const dest = path.join('./public/templates', filename);
+        if (fs.existsSync(src)) {
+          fs.mkdirSync(path.dirname(dest), { recursive: true });
+          fs.copyFileSync(src, dest);
+        }
+      });
+      fs.watch('./static', { recursive: true }, (_event, filename) => {
+        if (!filename) return;
+        const src = path.join('./static', filename);
+        const dest = path.join('./public', filename);
+        if (fs.existsSync(src)) {
+          fs.mkdirSync(path.dirname(dest), { recursive: true });
+          fs.copyFileSync(src, dest);
+        }
+      });
+    });
+  },
 };
 
 const defines = {
@@ -143,7 +176,7 @@ function getConfig() {
     tsconfig: './src/tsconfig.json',
     outdir: './public',
     define: defines,
-    plugins: [logPlugin, wgslInlineIncludePlugin, copy(copyPluginDetails)],
+    plugins: [logPlugin, wgslInlineIncludePlugin, copyPlugin],
   };
 }
 
@@ -241,7 +274,6 @@ async function serve() {
 }
 
 async function build() {
-  copyPluginDetails.assets.forEach((asset) => (asset.watch = false));
   await esbuild.build(getConfig());
 }
 
