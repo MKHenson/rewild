@@ -193,6 +193,8 @@ export class EditorViewport extends Component<Props> {
       } else if (event.code === 'Minus' || event.code === 'NumpadSubtract') {
         this.gizmo?.decreaseSize();
         this.updateGizmoScale();
+      } else if (event.code === 'NumpadDecimal') {
+        this.focusCameraOnSelected();
       }
     };
 
@@ -213,10 +215,16 @@ export class EditorViewport extends Component<Props> {
         this.hasInitialized = true;
 
         await this.renderer.init(pane3D.canvas()!);
-        this.orbitController = new OrbitController(this.renderer.camera, pane3D.canvas()!);
+        this.orbitController = new OrbitController(
+          this.renderer.camera,
+          pane3D.canvas()!
+        );
         this.orbitController.minCameraY = 0.5;
         this.orbitController.getTerrainHeight = (x, z) => {
-          const hit = raycastToSurface(this.renderer, this._terrainRayPos.set(x, 0, z));
+          const hit = raycastToSurface(
+            this.renderer,
+            this._terrainRayPos.set(x, 0, z)
+          );
           return hit?.point.y ?? null;
         };
         await this.templateLoader.load();
@@ -458,6 +466,9 @@ export class EditorViewport extends Component<Props> {
   private _cameraWorldPos = new Vector3();
   private _terrainRayPos = new Vector3();
   private _updatingGizmoScale = false;
+  private _focusCenter = new Vector3();
+  private _focusDir = new Vector3();
+  private _focusSize = new Vector3();
 
   private updateGizmoScale(): void {
     if (this._updatingGizmoScale) return;
@@ -474,9 +485,7 @@ export class EditorViewport extends Component<Props> {
     this.cameraObserver = {
       worldMatrixUpdated: () => this.updateGizmoScale(),
     };
-    this.renderer.camera.camera.transform.observers.push(
-      this.cameraObserver
-    );
+    this.renderer.camera.camera.transform.observers.push(this.cameraObserver);
   }
 
   private removeCameraObserver(): void {
@@ -487,6 +496,38 @@ export class EditorViewport extends Component<Props> {
     this.cameraObserver = null;
   }
 
+  focusCameraOnSelected(): void {
+    if (!this.selectedTransform || !this.orbitController) return;
+
+    this.selectedTransform.getWorldPosition(this._focusCenter);
+
+    let boundingRadius = 1;
+    if (this.selectedTransform.component instanceof Mesh) {
+      this.selectedTransform.component.geometry.computeBoundingBox();
+      const bbox = this.selectedTransform.component.geometry.boundingBox;
+      if (bbox) {
+        bbox.getSize(this._focusSize);
+        boundingRadius =
+          Math.max(this._focusSize.x, this._focusSize.y, this._focusSize.z) *
+          0.5;
+      }
+    }
+
+    const desiredDistance = Math.max(boundingRadius * 2.5, 4.5);
+    const camPos = this.renderer.camera.camera.transform.position;
+
+    this._focusDir.copy(camPos).sub(this._focusCenter);
+    const currentDist = this._focusDir.length();
+    if (currentDist > 0.0001) {
+      this._focusDir.multiplyScalar(desiredDistance / currentDist);
+    } else {
+      this._focusDir.set(0, desiredDistance * 0.5, desiredDistance);
+    }
+
+    this.orbitController.target.copy(this._focusCenter);
+    camPos.copy(this._focusCenter).add(this._focusDir);
+    this.orbitController.update();
+  }
 
   dispose() {
     this.removeCameraObserver();
