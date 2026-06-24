@@ -42,6 +42,10 @@
           "templateId": "wardrobe"
         },
         {
+          "name": "Alien Plant",
+          "templateId": "alient-plant"
+        },
+        {
           "name": "Crate",
           "templateId": "crate"
         },

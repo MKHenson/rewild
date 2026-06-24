@@ -33,6 +33,14 @@
       "url": "models/wardrobe/wardrobe.jpg"
     },
     {
+      "name": "plant-skin-diffuse",
+      "url": "models/alient-plant/plant-skin-diffuse.png"
+    },
+    {
+      "name": "plant-skin-normal",
+      "url": "models/alient-plant/plant-skin-normal.png"
+    },
+    {
       "name": "basketball",
       "url": "basketball.png"
     },
@@ -103,7 +111,6 @@
       "type": "phong",
       "diffuseMap": "crate",
       "normalMap": "crate-normal",
-      "ambientColor": [0.05, 0.05, 0.05],
       "shininess": 8
     },
     {
@@ -111,15 +118,20 @@
       "type": "phong",
       "diffuseMap": "basketball",
       "normalMap": "basketball-normal",
-      "ambientColor": [0.05, 0.05, 0.05],
       "shininess": 30
+    },
+    {
+      "name": "alient-plant",
+      "type": "phong",
+      "diffuseMap": "plant-skin-diffuse",
+      "normalMap": "plant-skin-normal",
+      "shininess": 90
     },
     {
       "name": "earth",
       "type": "phong",
       "diffuseMap": "earth",
       "normalMap": "earth-normal",
-      "ambientColor": [0.05, 0.05, 0.05],
       "shininess": 48
     },
     {
