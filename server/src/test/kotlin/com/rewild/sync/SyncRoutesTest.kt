@@ -6,6 +6,7 @@ import com.rewild.levels.LevelService
 import com.rewild.makeTestJwtService
 import com.rewild.models.*
 import com.rewild.projects.ProjectService
+import com.rewild.projects.projectRoutes
 import com.rewild.startTestDatabase
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
 import io.ktor.client.request.*
@@ -98,7 +99,10 @@ class SyncRoutesTest {
     }
 
     private fun ApplicationTestBuilder.installTestApp() {
-        installTestAuth(jwtService) { syncRoutes(syncService) }
+        installTestAuth(jwtService) {
+            syncRoutes(syncService)
+            projectRoutes(projectService)
+        }
     }
 
     @Test
