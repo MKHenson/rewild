@@ -33,6 +33,8 @@ function copyDirRecursive(src, dest) {
   }
 }
 
+const isWatchMode = process.argv.join('').includes('serve') || process.argv.join('').includes('watch');
+
 // Replaces esbuild-plugin-copy, which crashes in watch mode on Windows because
 // chokidar returns absolute paths but the plugin splits by a relative startFragment.
 const copyPlugin = {
@@ -49,7 +51,7 @@ const copyPlugin = {
     });
 
     build.onEnd(() => {
-      if (watchersStarted) return;
+      if (!isWatchMode || watchersStarted) return;
       watchersStarted = true;
 
       fs.watch('./style.css', () => {
