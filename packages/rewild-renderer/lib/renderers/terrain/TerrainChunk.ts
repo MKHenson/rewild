@@ -33,7 +33,8 @@ export class TerrainChunk implements IComponent {
     coord: Vector2,
     size: i32,
     chunkSize: i32,
-    detailLevels: LODInfo[]
+    detailLevels: LODInfo[],
+    seed: number
   ) {
     this.id = `${coord.x},${coord.y}`;
     this.position = coord.multiplyScalar(size);
@@ -52,7 +53,8 @@ export class TerrainChunk implements IComponent {
         detailLevels[i].lod,
         this,
         this.position,
-        chunkSize
+        chunkSize,
+        seed
       );
     }
 
@@ -171,18 +173,21 @@ export class LODMesh {
   chunk: TerrainChunk;
   chunkSize: i32;
   heights: Float32Array;
+  seed: number;
 
   constructor(
     lod: i32,
     chunk: TerrainChunk,
     position: Vector2,
-    chunkSize: i32
+    chunkSize: i32,
+    seed: number
   ) {
     this.lod = lod;
     this.gpuState = 'none';
     this.chunk = chunk;
     this.chunkSize = chunkSize;
     this.position = position;
+    this.seed = seed;
   }
 
   requestMesh(renderer: Renderer, pool: TerrainWorkerPool) {
@@ -228,6 +233,7 @@ export class LODMesh {
       chunkSize,
       lod,
       position: this.position,
+      seed: this.seed,
     });
 
     const terrainTexture = renderer.textureManager.addTexture(

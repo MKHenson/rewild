@@ -43,6 +43,10 @@ export async function loadInitialLevels(
   skyRenderer.dayNightCycle = project.sceneGraph.atmosphere
     .dayNightCycle as boolean;
 
+  if (project.sceneGraph.terrain) {
+    renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
+  }
+
   const levelRouter = new InGameLevel(
     level.name,
     new Asset3D(renderer.scene),

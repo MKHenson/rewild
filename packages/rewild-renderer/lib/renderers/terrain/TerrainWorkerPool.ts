@@ -2,6 +2,7 @@ interface TerrainWorkerRequest {
   chunkSize: number;
   lod: number;
   position: { x: number; y: number };
+  seed: number;
 }
 
 export interface TerrainWorkerResponse {

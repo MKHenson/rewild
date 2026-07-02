@@ -56,6 +56,10 @@ export class ProjectStore {
           dayNightCycle: false,
         },
         containers: [],
+        terrain: {
+          version: 1,
+          seed: Math.floor(Math.random() * 2147483647),
+        },
       },
     };
   }
@@ -122,6 +126,7 @@ export class ProjectStore {
       atmosphere: {
         ...sceneGraphStore.buildObjectFromProperties('SKY')!,
       },
+      terrain: project.sceneGraph.terrain,
     };
 
     this.loading = true;

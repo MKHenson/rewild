@@ -895,6 +895,11 @@ export interface components {
         "com.rewild.models.Project": {
             /** Boolean */
             activeOnStartup: boolean;
+            /**
+             * Long
+             * Format: int64
+             */
+            deletedAt?: null | number;
             /** String */
             description: string;
             /** String */
@@ -926,6 +931,7 @@ export interface components {
             atmosphere: components["schemas"]["com.rewild.models.Atmosphere"];
             /** List<Container> */
             containers: components["schemas"]["com.rewild.models.Container"][];
+            terrain?: null | components["schemas"]["com.rewild.models.WorldGenConfig"];
         };
         /** Atmosphere */
         "com.rewild.models.Atmosphere": {
@@ -1030,12 +1036,30 @@ export interface components {
             /** List<Float> */
             rotation: number[];
         };
+        /** WorldGenConfig */
+        "com.rewild.models.WorldGenConfig": {
+            /**
+             * Int
+             * Format: int32
+             */
+            seed: number;
+            /**
+             * Int
+             * Format: int32
+             */
+            version: number;
+        };
         /** Level */
         "com.rewild.models.Level": {
             /** Boolean */
             activeOnStartup: boolean;
             /** List<Container> */
             containers: components["schemas"]["com.rewild.models.Container"][];
+            /**
+             * Long
+             * Format: int64
+             */
+            deletedAt?: null | number;
             /** Boolean */
             hasTerrain: boolean;
             /** String */

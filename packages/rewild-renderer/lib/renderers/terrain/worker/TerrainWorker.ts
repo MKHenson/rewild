@@ -10,13 +10,13 @@ const NOISE_LACUNARITY = 2.0;
 const HEIGHT_SCALE = 80;      // max terrain height in meters
 
 self.onmessage = async (event: MessageEvent) => {
-  const { chunkSize, lod, position } = event.data;
+  const { chunkSize, lod, position, seed } = event.data;
 
   const noise = generateNoiseMap(
     chunkSize,
     chunkSize,
     NOISE_SCALE,
-    undefined,
+    seed,
     NOISE_OCTAVES,
     NOISE_PERSISTENCE,
     NOISE_LACUNARITY,

@@ -7,6 +7,7 @@ import {
   theme,
 } from 'rewild-ui';
 import { Mesh, Renderer, Sprite3D, Transform } from 'rewild-renderer';
+import { TerrainEvent } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
 import { OrbitController } from 'rewild-renderer/lib/input/OrbitController';
 import { InteractionLayer } from 'src/core/InteractionLayer';
 import { Gizmo } from 'rewild-renderer/lib/helpers/Gizmo';
@@ -63,6 +64,26 @@ export class EditorViewport extends Component<Props> {
     };
 
     this.on(projectStore.dispatcher, onProjectEvent);
+
+    // After terrain (re)generates — a seed change or a map load — the surface
+    // under the camera may now sit above it. The orbit clamp that keeps the
+    // camera above ground only runs during interaction, so re-run it once the
+    // chunk beneath the camera becomes available to lift the camera clear.
+    const onTerrainEvent: Subscriber<TerrainEvent> = (event) => {
+      if (event.type !== 'chunk-loaded' || !this.orbitController) return;
+      const cam = this.renderer.camera.camera.transform.position;
+      const b = event.chunk.bounds;
+      if (
+        cam.x >= b.min.x &&
+        cam.x <= b.max.x &&
+        cam.z >= b.min.z &&
+        cam.z <= b.max.z
+      ) {
+        this.orbitController.update();
+      }
+    };
+
+    this.on(this.renderer.terrainRenderer.dispatcher, onTerrainEvent);
 
     const setTransformSelected = (transform: Transform, value: boolean) => {
       transform.selected = value;
