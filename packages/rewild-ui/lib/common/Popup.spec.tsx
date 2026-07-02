@@ -60,4 +60,80 @@ describe('Popup', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  describe('portal (top layer)', () => {
+    // jsdom has no Popover API, so mock it to exercise the top-layer path.
+    // Mocks must be installed before _createRenderer(), which runs init().
+    function mountPopup(
+      overrides: Partial<PopupProps> = {},
+      { popover = false } = {}
+    ) {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+
+      const popup = new Popup();
+      popup._props = { ...popup._props, open: true, ...overrides };
+
+      let popoverOpen = false;
+      const showPopover = jest.fn(() => {
+        popoverOpen = true;
+      });
+      const hidePopover = jest.fn(() => {
+        popoverOpen = false;
+      });
+      if (popover) {
+        (popup as any).showPopover = showPopover;
+        (popup as any).hidePopover = hidePopover;
+        const realMatches = popup.matches.bind(popup);
+        (popup as any).matches = (sel: string) =>
+          sel === ':popover-open' ? popoverOpen : realMatches(sel);
+      }
+
+      popup._createRenderer();
+      container.appendChild(popup); // triggers connectedCallback -> render
+
+      return { container, popup, showPopover, hidePopover };
+    }
+
+    afterEach(() => {
+      document.body.innerHTML = '';
+    });
+
+    it('does not relocate itself in the DOM', () => {
+      const { container, popup } = mountPopup({}, { popover: true });
+
+      expect(popup.parentNode).toBe(container);
+    });
+
+    it('promotes itself to the top layer when supported', () => {
+      const { popup, showPopover } = mountPopup({}, { popover: true });
+
+      expect(popup.getAttribute('popover')).toBe('manual');
+      expect(showPopover).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not use the top layer when portal is false', () => {
+      const { popup, showPopover } = mountPopup(
+        { portal: false },
+        { popover: true }
+      );
+
+      expect(popup.hasAttribute('popover')).toBe(false);
+      expect(showPopover).not.toHaveBeenCalled();
+    });
+
+    it('hides the popover when open becomes false', () => {
+      const { popup, hidePopover } = mountPopup({}, { popover: true });
+
+      popup.props = { ...popup.props, open: false }; // re-renders
+      expect(hidePopover).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to inline rendering when the Popover API is absent', () => {
+      const { container, popup } = mountPopup(); // no popover support
+
+      expect(popup.hasAttribute('popover')).toBe(false);
+      expect(popup.parentNode).toBe(container);
+    });
+  });
 });

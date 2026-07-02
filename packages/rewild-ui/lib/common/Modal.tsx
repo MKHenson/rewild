@@ -7,6 +7,11 @@ export interface ModalProps {
   title?: JSX.Element | string;
   open: boolean;
   withBackground?: boolean;
+  /**
+   * Promote the modal to the browser's top layer so it renders on top of
+   * everything regardless of ancestor stacking contexts. Defaults to true.
+   */
+  portal?: boolean;
   hideConfirmButtons?: boolean;
   okLabel?: string;
   cancelLabel?: string;
@@ -23,7 +28,7 @@ export interface ModalProps {
 @register('x-modal')
 export class Modal extends Component<ModalProps> {
   constructor() {
-    super({ props: { withBackground: true } });
+    super({ props: { withBackground: true, portal: true } });
   }
 
   init() {
@@ -41,7 +46,8 @@ export class Modal extends Component<ModalProps> {
       <Popup
         open={this.props.open}
         onClose={this.props.onClose}
-        withBackground={this.props.withBackground}>
+        withBackground={this.props.withBackground}
+        portal={this.props.portal}>
         {typeof this.props.title === 'string' ? (
           <Typography variant="h3">{this.props.title}</Typography>
         ) : (
