@@ -859,6 +859,14 @@
                         "type": "boolean",
                         "title": "Boolean"
                     },
+                    "deletedAt": {
+                        "type": [
+                            "null",
+                            "integer"
+                        ],
+                        "format": "int64",
+                        "title": "Long"
+                    },
                     "description": {
                         "type": "string",
                         "title": "String"
@@ -934,6 +942,16 @@
                             "$ref": "#/components/schemas/com.rewild.models.Container"
                         },
                         "title": "List<Container>"
+                    },
+                    "terrain": {
+                        "oneOf": [
+                            {
+                                "type": "null"
+                            },
+                            {
+                                "$ref": "#/components/schemas/com.rewild.models.WorldGenConfig"
+                            }
+                        ]
                     }
                 },
                 "required": [
@@ -1315,6 +1333,26 @@
                 ],
                 "title": "Asset3D"
             },
+            "com.rewild.models.WorldGenConfig": {
+                "type": "object",
+                "properties": {
+                    "seed": {
+                        "type": "integer",
+                        "format": "int32",
+                        "title": "Int"
+                    },
+                    "version": {
+                        "type": "integer",
+                        "format": "int32",
+                        "title": "Int"
+                    }
+                },
+                "required": [
+                    "seed",
+                    "version"
+                ],
+                "title": "WorldGenConfig"
+            },
             "com.rewild.models.Level": {
                 "type": "object",
                 "properties": {
@@ -1328,6 +1366,14 @@
                             "$ref": "#/components/schemas/com.rewild.models.Container"
                         },
                         "title": "List<Container>"
+                    },
+                    "deletedAt": {
+                        "type": [
+                            "null",
+                            "integer"
+                        ],
+                        "format": "int64",
+                        "title": "Long"
                     },
                     "hasTerrain": {
                         "type": "boolean",

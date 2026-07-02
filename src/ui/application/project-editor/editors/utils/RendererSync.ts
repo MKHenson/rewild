@@ -16,6 +16,10 @@ export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
       atmosphere.dayNightCycle as boolean;
   }
 
+  if (project.sceneGraph?.terrain) {
+    renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
+  }
+
   project.sceneGraph.containers.forEach((container) => {
     container.actors.forEach((actor) => {
       if (actor.type === 'actor') {

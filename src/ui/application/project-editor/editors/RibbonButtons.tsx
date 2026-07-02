@@ -8,6 +8,7 @@ import {
   Button,
 } from 'rewild-ui';
 import { projectStore } from '../../../stores/ProjectStore';
+import { TerrainSettingsDialog } from './TerrainSettingsDialog';
 
 interface Props {
   onHome: () => void;
@@ -19,6 +20,8 @@ export class RibbonButtons extends Component<Props> {
     this.on(projectStore.dispatcher, (event) => {
       if (event.kind === 'changed') this.render();
     });
+
+    const [terrainOpen, setTerrainOpen] = this.useState(false);
 
     return () => {
       const { loading, dirty } = projectStore;
@@ -35,16 +38,25 @@ export class RibbonButtons extends Component<Props> {
             <Button
               variant="text"
               disabled={!dirty || loading}
-              onClick={(e) => projectStore.updateProject()}>
+              onClick={() => projectStore.updateProject()}>
               <StyledMaterialIcon icon="save" size="s" />
             </Button>
             <Button
               variant="text"
               disabled={loading}
-              onClick={(e) => projectStore.publish()}>
+              onClick={() => projectStore.publish()}>
               <StyledMaterialIcon icon="file_upload" size="s" />
             </Button>
+            <Button
+              variant="text"
+              disabled={loading || !projectStore.project?.sceneGraph?.terrain}
+              onClick={() => setTerrainOpen(true)}>
+              <StyledMaterialIcon icon="landscape" size="s" />
+            </Button>
           </ButtonGroup>
+          {terrainOpen() && (
+            <TerrainSettingsDialog onClose={() => setTerrainOpen(false)} />
+          )}
         </Card>
       );
     };

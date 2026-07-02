@@ -84,6 +84,19 @@ export class LocalAssetStore extends LocalDataTable<IAsset> {
     await Promise.all(result.items.map((item) => this.hardRemove(item.id)));
   }
 
+  async removeChunksByLevel(levelId: string): Promise<void> {
+    try {
+      const root = await navigator.storage.getDirectory();
+      const levelsDir = await root.getDirectoryHandle('levels', { create: false });
+      const levelDir = await levelsDir.getDirectoryHandle(levelId, { create: false });
+      await levelDir.removeEntry('chunk', { recursive: true });
+    } catch {}
+
+    const result = await this.getMany({ where: [['levelId', '==', levelId]] });
+    const chunks = result.items.filter((i) => i.assetType === 'chunk');
+    await Promise.all(chunks.map((item) => this.hardRemove(item.id)));
+  }
+
   private async findMetadata(levelId: string, assetType: string, filename: string) {
     const result = await this.getMany({ where: [['levelId', '==', levelId]] });
     return result.items.find((i) => i.assetType === assetType && i.filename === filename) ?? null;

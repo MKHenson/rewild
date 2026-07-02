@@ -41,6 +41,8 @@ export class TerrainRenderer {
   readonly mapChunkSizeLod = 241;
   private _levelOfDetail: number = 0; // Must be any int from 0 to 6
 
+  seed: number = 100;
+
   constructor() {
     this.terrainChunks = new Map();
     this.viewerPosition = new Vector3();
@@ -136,7 +138,8 @@ export class TerrainRenderer {
             viewedChunkCoord,
             this.chunkSize,
             this.mapChunkSizeLod,
-            this.detailLevels
+            this.detailLevels,
+            this.seed
           );
 
           newChunk.dispatcher.add(this.onChunkLoadedDelegate);
@@ -210,15 +213,24 @@ export class TerrainRenderer {
 
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera) {}
 
+  reset(seed: number, renderer: Renderer) {
+    this.dispose();
+    this.init(renderer);
+    this.seed = seed;
+  }
+
   dispose() {
     const dispatcher = this.dispatcher;
     for (const chunk of this.terrainChunks.values()) {
       dispatcher.dispatch({ type: 'chunk-disposed', chunk });
       chunk.dispatcher.remove(this.onChunkLoadedDelegate);
       chunk.dispose();
+      chunk.transform.removeFromParent();
     }
     this.terrainChunks.clear();
     this.terrainChunksVisibleLastUpdate.length = 0;
+    this._hasInitiallyUpdatedTerrain = false;
+    this._needsVisibilityUpdate = false;
     this.workerPool.dispose();
   }
 }

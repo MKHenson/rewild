@@ -101,6 +101,11 @@ declare module 'models' {
     sort?: [keyof Query, 'asc' | 'desc'][];
   }
 
+  export interface WorldGenConfig {
+    version: number;
+    seed: number;
+  }
+
   export interface IProject {
     id?: string;
     levelId: string;
@@ -119,6 +124,7 @@ declare module 'models' {
         temperature: PropValue;
         dayNightCycle: PropValue;
       };
+      terrain?: WorldGenConfig;
     };
   }
 

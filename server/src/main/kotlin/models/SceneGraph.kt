@@ -60,7 +60,14 @@ data class Container(
 ) : Resource
 
 @Serializable
+data class WorldGenConfig(
+    val version: Int,
+    val seed: Int
+)
+
+@Serializable
 data class SceneGraph(
     val containers: List<Container>,
-    val atmosphere: Atmosphere
+    val atmosphere: Atmosphere,
+    val terrain: WorldGenConfig? = null
 )
