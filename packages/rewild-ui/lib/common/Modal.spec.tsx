@@ -174,4 +174,26 @@ describe('Modal', () => {
     const container = popup?.querySelector('.button-container');
     expect(container).not.toBeNull();
   });
+
+  describe('portal', () => {
+    // The Modal itself no longer moves; it forwards the portal flag to the inner
+    // Popup, which promotes itself to the top layer.
+    it('forwards portal=true to the inner popup by default', () => {
+      const modal = createModal({ open: true });
+
+      const popup = modal.shadow?.querySelector('x-popup') as HTMLElement & {
+        _props?: { portal?: boolean };
+      };
+      expect(popup._props?.portal).toBe(true);
+    });
+
+    it('forwards portal=false to the inner popup', () => {
+      const modal = createModal({ open: true, portal: false });
+
+      const popup = modal.shadow?.querySelector('x-popup') as HTMLElement & {
+        _props?: { portal?: boolean };
+      };
+      expect(popup._props?.portal).toBe(false);
+    });
+  });
 });
