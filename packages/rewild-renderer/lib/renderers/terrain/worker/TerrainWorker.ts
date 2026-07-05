@@ -1,38 +1,29 @@
 import './SetupWorkerUtils';
 import { generateTerrainMesh, MESH_STRIDE } from '../MeshGenerator';
-import { generateNoiseMap } from '../Noise';
+import { generateBiomeBlendedHeightMap } from '../Noise';
+import { DEFAULT_CLIMATE, MAX_WORLD_HEIGHT } from '../Biomes';
 import { Vector2 } from 'rewild-common';
-
-const NOISE_SCALE = 400;      // feature size in world-units (meters); large enough for mountains spanning multiple chunks
-const NOISE_OCTAVES = 6;
-const NOISE_PERSISTENCE = 0.5;
-const NOISE_LACUNARITY = 2.0;
-const HEIGHT_SCALE = 80;      // max terrain height in meters
 
 self.onmessage = async (event: MessageEvent) => {
   const { chunkSize, lod, position, seed } = event.data;
 
-  const noise = generateNoiseMap(
+  // Heights in absolute world meters. Which biome shapes each sample comes from
+  // the temperature × moisture climate model (biome table + axes in Biomes.ts);
+  // all generation parameters, including feature size, live in the biome table.
+  const heights = generateBiomeBlendedHeightMap(
     chunkSize,
     chunkSize,
-    NOISE_SCALE,
     seed,
-    NOISE_OCTAVES,
-    NOISE_PERSISTENCE,
-    NOISE_LACUNARITY,
-    new Vector2(position.x, position.y)
+    new Vector2(position.x, position.y),
+    DEFAULT_CLIMATE
   );
 
-  // Apply height curve: pushes mid-range values lower (more plains) while keeping
-  // peaks tall (mountains). Pow > 1 squishes towards 0; 1.5 is a mild but noticeable bias.
-  for (let i = 0; i < noise.length; i++) {
-    noise[i] = Math.pow(noise[i], 1.5);
-  }
-
-  // Terrain colour bands based on normalised height [0, 1]
+  // Terrain colour bands based on absolute world height normalised by the
+  // tallest biome, so plains keep lowland colours and rock/snow only appears
+  // on genuinely tall terrain. Placeholder until per-biome materials land.
   const textureValues = new Uint8Array(chunkSize * chunkSize * 4);
   for (let i = 0; i < chunkSize * chunkSize; i++) {
-    const h = noise[i];
+    const h = heights[i] / MAX_WORLD_HEIGHT;
     let r: number, g: number, b: number;
 
     if (h < 0.15) {
@@ -73,7 +64,8 @@ self.onmessage = async (event: MessageEvent) => {
     textureValues[i * 4 + 3] = 255;
   }
 
-  const meshData = generateTerrainMesh(noise, chunkSize, chunkSize, lod, HEIGHT_SCALE);
+  // Heights are already in meters, so no further vertical scaling.
+  const meshData = generateTerrainMesh(heights, chunkSize, chunkSize, lod, 1);
 
   const vertexCount = meshData.interleaved.length / MESH_STRIDE;
   const vertices = new Float32Array(vertexCount * 3);
