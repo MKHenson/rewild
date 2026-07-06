@@ -3,6 +3,7 @@ import { Camera } from '../../core/Camera';
 import { Dispatcher, Vector2, Vector3 } from 'rewild-common';
 import { LODMesh, TerrainChunk, TerrainChunkEvent } from './TerrainChunk';
 import { TerrainWorkerPool } from './TerrainWorkerPool';
+import { DEFAULT_CLIMATE_PRESET } from './Biomes';
 
 export class LODInfo {
   lod: i32;
@@ -42,6 +43,8 @@ export class TerrainRenderer {
   private _levelOfDetail: number = 0; // Must be any int from 0 to 6
 
   seed: number = 100;
+  climatePreset: string = DEFAULT_CLIMATE_PRESET;
+  private _enabled: boolean = true;
 
   constructor() {
     this.terrainChunks = new Map();
@@ -49,6 +52,18 @@ export class TerrainRenderer {
     this.terrainChunksVisibleLastUpdate = [];
     this.dispatcher = new Dispatcher<TerrainEvent>();
     this.onChunkLoadedDelegate = this.onChunkLoaded.bind(this);
+  }
+
+  get enabled() {
+    return this._enabled;
+  }
+
+  // Runtime terrain gate (driven by ILevel.hasTerrain in the game; the editor
+  // leaves it on). Disabling tears down any chunks already generated.
+  set enabled(value: boolean) {
+    if (this._enabled === value) return;
+    this._enabled = value;
+    if (!value) this.clearChunks();
   }
 
   get maxViewDst() {
@@ -139,7 +154,8 @@ export class TerrainRenderer {
             this.chunkSize,
             this.mapChunkSizeLod,
             this.detailLevels,
-            this.seed
+            this.seed,
+            this.climatePreset
           );
 
           newChunk.dispatcher.add(this.onChunkLoadedDelegate);
@@ -182,6 +198,8 @@ export class TerrainRenderer {
   }
 
   update(renderer: Renderer, camera: Camera) {
+    if (!this._enabled) return;
+
     this.viewerPosition.set(
       camera.transform.position.x,
       0,
@@ -219,7 +237,7 @@ export class TerrainRenderer {
     this.seed = seed;
   }
 
-  dispose() {
+  private clearChunks() {
     const dispatcher = this.dispatcher;
     for (const chunk of this.terrainChunks.values()) {
       dispatcher.dispatch({ type: 'chunk-disposed', chunk });
@@ -231,6 +249,10 @@ export class TerrainRenderer {
     this.terrainChunksVisibleLastUpdate.length = 0;
     this._hasInitiallyUpdatedTerrain = false;
     this._needsVisibilityUpdate = false;
+  }
+
+  dispose() {
+    this.clearChunks();
     this.workerPool.dispose();
   }
 }

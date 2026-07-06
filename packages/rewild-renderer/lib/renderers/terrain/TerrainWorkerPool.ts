@@ -3,6 +3,7 @@ interface TerrainWorkerRequest {
   lod: number;
   position: { x: number; y: number };
   seed: number;
+  climatePreset: string;
 }
 
 export interface TerrainWorkerResponse {

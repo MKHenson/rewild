@@ -1,21 +1,23 @@
 import './SetupWorkerUtils';
 import { generateTerrainMesh, MESH_STRIDE } from '../MeshGenerator';
 import { generateBiomeBlendedHeightMap } from '../Noise';
-import { DEFAULT_CLIMATE, MAX_WORLD_HEIGHT } from '../Biomes';
+import { getMaxWorldHeight, resolveClimatePreset } from '../Biomes';
 import { Vector2 } from 'rewild-common';
 
 self.onmessage = async (event: MessageEvent) => {
-  const { chunkSize, lod, position, seed } = event.data;
+  const { chunkSize, lod, position, seed, climatePreset } = event.data;
 
   // Heights in absolute world meters. Which biome shapes each sample comes from
-  // the temperature × moisture climate model (biome table + axes in Biomes.ts);
-  // all generation parameters, including feature size, live in the biome table.
+  // the temperature × moisture climate model of the world's climate preset —
+  // presets are code-defined game content (Biomes.ts); worlds carry only the id.
+  const climate = resolveClimatePreset(climatePreset);
+  const maxWorldHeight = getMaxWorldHeight(climate);
   const heights = generateBiomeBlendedHeightMap(
     chunkSize,
     chunkSize,
     seed,
     new Vector2(position.x, position.y),
-    DEFAULT_CLIMATE
+    climate
   );
 
   // Terrain colour bands based on absolute world height normalised by the
@@ -23,7 +25,7 @@ self.onmessage = async (event: MessageEvent) => {
   // on genuinely tall terrain. Placeholder until per-biome materials land.
   const textureValues = new Uint8Array(chunkSize * chunkSize * 4);
   for (let i = 0; i < chunkSize * chunkSize; i++) {
-    const h = heights[i] / MAX_WORLD_HEIGHT;
+    const h = heights[i] / maxWorldHeight;
     let r: number, g: number, b: number;
 
     if (h < 0.15) {

@@ -86,3 +86,20 @@ export function getMaxWorldHeight(climate: ClimateConfig): number {
 }
 
 export const MAX_WORLD_HEIGHT = getMaxWorldHeight(DEFAULT_CLIMATE);
+
+// Climate presets are game content: designed in code, never persisted. A world
+// stores only which preset it uses (WorldGenConfig.climatePreset). Later eras
+// ("worlds back in time") are additional entries here.
+export const DEFAULT_CLIMATE_PRESET = 'default';
+
+export const CLIMATE_PRESETS: Record<string, ClimateConfig> = {
+  [DEFAULT_CLIMATE_PRESET]: DEFAULT_CLIMATE,
+};
+
+// Unknown ids fall back to the default preset so a world saved against a
+// removed/renamed preset still loads.
+export function resolveClimatePreset(id: string | undefined): ClimateConfig {
+  if (id !== undefined && !CLIMATE_PRESETS[id])
+    console.warn(`Unknown climate preset '${id}' — falling back to '${DEFAULT_CLIMATE_PRESET}'.`);
+  return CLIMATE_PRESETS[id ?? DEFAULT_CLIMATE_PRESET] ?? DEFAULT_CLIMATE;
+}

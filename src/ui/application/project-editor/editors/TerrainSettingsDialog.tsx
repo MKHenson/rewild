@@ -3,6 +3,7 @@ import { projectStore } from '../../../stores/ProjectStore';
 import { confirmationStore } from '../../../stores/ConfirmationStore';
 import { db } from 'src/database/database';
 import { getActiveRenderer } from './utils/getActiveRenderer';
+import { DEFAULT_CLIMATE_PRESET } from 'rewild-renderer';
 
 interface Props {
   onClose: () => void;
@@ -26,7 +27,13 @@ export class TerrainSettingsDialog extends Component<Props> {
           const project = projectStore.project!;
           await db.assets.removeChunksByLevel(project.levelId);
 
-          project.sceneGraph.terrain = { version: 1, seed: parsed };
+          project.sceneGraph.terrain = {
+            version: 1,
+            seed: parsed,
+            climatePreset:
+              project.sceneGraph.terrain?.climatePreset ??
+              DEFAULT_CLIMATE_PRESET,
+          };
           projectStore.dirty = true;
           projectStore.dispatcher.dispatch({ kind: 'changed' });
 

@@ -1,5 +1,5 @@
 import { IProject, Vector3 } from 'models';
-import { PointLight, Renderer } from 'rewild-renderer';
+import { DEFAULT_CLIMATE_PRESET, PointLight, Renderer } from 'rewild-renderer';
 import { sceneGraphStore } from 'src/ui/stores/SceneGraphStore';
 
 export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
@@ -18,6 +18,8 @@ export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
 
   if (project.sceneGraph?.terrain) {
     renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
+    renderer.terrainRenderer.climatePreset =
+      project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
   }
 
   project.sceneGraph.containers.forEach((container) => {

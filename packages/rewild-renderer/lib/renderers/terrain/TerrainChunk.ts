@@ -34,7 +34,8 @@ export class TerrainChunk implements IComponent {
     size: i32,
     chunkSize: i32,
     detailLevels: LODInfo[],
-    seed: number
+    seed: number,
+    climatePreset: string
   ) {
     this.id = `${coord.x},${coord.y}`;
     this.position = coord.multiplyScalar(size);
@@ -54,7 +55,8 @@ export class TerrainChunk implements IComponent {
         this,
         this.position,
         chunkSize,
-        seed
+        seed,
+        climatePreset
       );
     }
 
@@ -174,13 +176,15 @@ export class LODMesh {
   chunkSize: i32;
   heights: Float32Array;
   seed: number;
+  climatePreset: string;
 
   constructor(
     lod: i32,
     chunk: TerrainChunk,
     position: Vector2,
     chunkSize: i32,
-    seed: number
+    seed: number,
+    climatePreset: string
   ) {
     this.lod = lod;
     this.gpuState = 'none';
@@ -188,6 +192,7 @@ export class LODMesh {
     this.chunkSize = chunkSize;
     this.position = position;
     this.seed = seed;
+    this.climatePreset = climatePreset;
   }
 
   requestMesh(renderer: Renderer, pool: TerrainWorkerPool) {
@@ -234,6 +239,7 @@ export class LODMesh {
       lod,
       position: this.position,
       seed: this.seed,
+      climatePreset: this.climatePreset,
     });
 
     const terrainTexture = renderer.textureManager.addTexture(
