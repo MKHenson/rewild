@@ -18,21 +18,25 @@ without re-architecting later — and then delivers the first hands-on payoff,
 **terrain sculpting** ([#175](https://github.com/MKHenson/rewild/issues/175)),
 proving the whole stack end to end.
 
-## Current state (what exists today)
+## Current state (updated after #170 + #171 landed)
 
-- **Generation:** `TerrainWorker.ts` defines generation as hardcoded globals
-  (`NOISE_SCALE=400`, `NOISE_OCTAVES=6`, `NOISE_PERSISTENCE=0.5`,
-  `NOISE_LACUNARITY=2.0`, `HEIGHT_SCALE=80`) plus a `pow(h, 1.5)` height curve.
-- **No per-world seed:** `generateNoiseMap` accepts a `seed` (`Noise.ts:17`,
-  default `100`), but `TerrainWorker.ts:19` passes `undefined`. Per-chunk
-  variation is purely positional `offset`, so every world is identical.
+- **Seeded worlds (#170):** a per-world seed is carried end-to-end
+  (recipe → worker → noise) with an editor seed dialog.
+- **Climate-driven generation (#171):** height comes from a **temperature ×
+  moisture climate model** (`ClimateConfig` in `Biomes.ts`) — two low-frequency
+  climate axes select a biome per world position from a band-cell grid, a
+  per-biome parameter table (`heightScale`, `noiseScale`, octaves, curve)
+  drives height, and heights are smoothstep-blended across band borders (at
+  most 4 biome evaluations in a corner, 1 outside transition bands). The config
+  is hardcoded as `DEFAULT_CLIMATE`; worlds don't yet reference it — that's
+  [#172](https://github.com/MKHenson/rewild/issues/172).
 - **Seamless boundaries:** normalisation uses a fixed theoretical max amplitude
-  (`Noise.ts:67–69`), not per-chunk min/max — this is what keeps chunk borders
-  seamless. **Any change to generation must preserve this.**
-- **"Biomes":** height-colour bands in `TerrainWorker.ts` (lines 32–74) —
-  cosmetic only, no spatial regions, no biome data.
+  per biome (`Noise.ts`), not per-chunk min/max — this is what keeps chunk
+  borders seamless. **Any change to generation must preserve this.**
+- **Colour:** still placeholder height-colour bands in `TerrainWorker.ts`, now
+  driven by absolute world height; real materials arrive with painting.
 - **Workers:** a 4-worker pool (`TerrainWorkerPool.ts`); the worker message is
-  `{ chunkSize, lod, position }` (`TerrainWorker.ts:13`).
+  `{ chunkSize, lod, position, seed }`.
 - **Editor:** terrain is **already on** in the editor — `raycastToSurface`
   (`WorldPlacement.ts`) feeds the orbit camera and drag-drop placement
   (`EditorViewport.tsx`). No editor-instantiation work is needed.
@@ -89,18 +93,31 @@ Chunk snapshots follow the same path as every other asset:
   coherently. Same seed + position ⇒ identical height, every load. This
   determinism is the contract persistence relies on.
 - **The recipe lives on the project, next to `atmosphere`.** `WorldGenConfig`
-  (seed + biome table) is stored on `IProject.sceneGraph.terrain`, mirroring how
-  the existing world-environment config (`atmosphere`) is modelled, and it flows to
-  both editor and game the same way. `hasTerrain` stays the Level-side runtime
-  gate; chunk snapshot blobs stay keyed by `levelId`.
+  (seed + climate preset reference) is stored on `IProject.sceneGraph.terrain`,
+  mirroring how the existing world-environment config (`atmosphere`) is
+  modelled, and it flows to both editor and game the same way. `hasTerrain`
+  stays the Level-side runtime gate; chunk snapshot blobs stay keyed by
+  `levelId`.
+- **Climate config is game content, not world data.** The climate/biome tables
+  are designed and tuned by the developer and live **in code** as named
+  presets (one for now; later eras — "worlds back in time" — are more presets).
+  A world persists only **which** preset it uses (`climatePreset` id) plus the
+  recipe `version`, not the tables themselves. Consequence (accepted): re-tuning
+  a preset in code reshapes existing worlds that use it, except sculpted chunk
+  snapshots, which stay frozen — the version field exists so a future load can
+  detect "generated under older rules".
 - **Changing the seed wipes saved chunks.** A new seed is a different world, so
   existing chunk snapshots (edits to the old terrain) no longer apply — applying a
   new seed prompts to confirm, then discards them and regenerates.
-- **Biomes vary _within_ a world, not _per_ world.** A low-frequency **biome
-  map** selects, per world-position, which biome is active; a **per-biome
+- **Biomes vary _within_ a world, not _per_ world.** A low-frequency
+  **temperature × moisture climate model** selects, per world-position, which
+  biome is active (band cuts on each axis + a cell lookup grid); a **per-biome
   parameter table** drives height; neighbouring biomes **blend across a
-  transition band** (mountain eases into plain). Ship with **two biomes — mountain and
-  plain**; more biomes are table rows, not new code.
+  transition band** (mountain eases into plain). Shipped with **two biomes —
+  mountain and plain** — split on temperature only; adding a biome is a table
+  row + an axis cut + cell entries, not new code. (Decided during #171: the
+  2-axis model landed immediately rather than the originally planned 1D biome
+  map, so more biomes never need a re-architecture.)
 - **Persistence = recipe + saved chunk snapshots.** Unedited chunks regenerate
   deterministically from the recipe and are never stored. An **edited** chunk is
   saved as a **full heightfield snapshot** on the asset path (`assetType='chunk'`),
@@ -126,9 +143,9 @@ Work top-to-bottom; arrows are hard dependencies.
 
 | GitHub                                                | Spec                                                                             | Depends on                                                                                                   | Summary                                                                                                                  |
 | ----------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| [#170](https://github.com/MKHenson/rewild/issues/170) | [01 — Seeded worlds (end-to-end)](issues/01-world-seed.md)                       | —                                                                                                            | Seed into the noise + `WorldGenConfig` on `sceneGraph.terrain` + persist/load + editor seed dialog.                      |
-| [#171](https://github.com/MKHenson/rewild/issues/171) | [02 — Biome map + blended generation](issues/02-biome-generation.md)             | [#170](https://github.com/MKHenson/rewild/issues/170)                                                        | Low-freq biome map + plain/mountain param table; blend heights across borders.                                           |
-| [#172](https://github.com/MKHenson/rewild/issues/172) | [03 — Recipe: biome table + terrain gating](issues/03-world-recipe.md)           | [#170](https://github.com/MKHenson/rewild/issues/170), [#171](https://github.com/MKHenson/rewild/issues/171) | Append the biome table to the recipe + feed it into generation; make `hasTerrain` gate terrain.                          |
+| [#170](https://github.com/MKHenson/rewild/issues/170) | [01 — Seeded worlds (end-to-end)](issues/01-world-seed.md)                       | —                                                                                                            | ✅ Done. Seed into the noise + `WorldGenConfig` on `sceneGraph.terrain` + persist/load + editor seed dialog.             |
+| [#171](https://github.com/MKHenson/rewild/issues/171) | [02 — Biome map + blended generation](issues/02-biome-generation.md)             | [#170](https://github.com/MKHenson/rewild/issues/170)                                                        | ✅ Done. Temperature × moisture climate model + plain/mountain param table; blend heights across borders.                |
+| [#172](https://github.com/MKHenson/rewild/issues/172) | [03 — Recipe: climate preset + terrain gating](issues/03-world-recipe.md)        | [#170](https://github.com/MKHenson/rewild/issues/170), [#171](https://github.com/MKHenson/rewild/issues/171) | Persist a climate-preset id on the recipe (presets hardcoded in code); make `hasTerrain` gate terrain.                   |
 | [#173](https://github.com/MKHenson/rewild/issues/173) | [04 — Chunk snapshot — read & mesh](issues/04-chunk-snapshot-read.md)            | [#172](https://github.com/MKHenson/rewild/issues/172)                                                        | Full-heightfield snapshot format + read from the blob path; saved chunks mesh from stored heights instead of generating. |
 | [#174](https://github.com/MKHenson/rewild/issues/174) | [05 — Chunk snapshot — write (dev/test hook)](issues/05-chunk-snapshot-write.md) | [#173](https://github.com/MKHenson/rewild/issues/173)                                                        | A dev/test writer that round-trips a snapshot: write → reload → fetch-and-mesh.                                          |
 | [#175](https://github.com/MKHenson/rewild/issues/175) | [06 — Terrain sculpting (editor brushes)](issues/06-terrain-sculpting.md)        | [#173](https://github.com/MKHenson/rewild/issues/173), [#174](https://github.com/MKHenson/rewild/issues/174) | Raise/lower/smooth/flatten brushes in the editor; affected chunks saved as snapshots.                                    |
@@ -137,9 +154,10 @@ Work top-to-bottom; arrows are hard dependencies.
 (seeded worlds: generation plumbing + the persisted `WorldGenConfig` recipe + load
 
 - editor seed dialog). [#171](https://github.com/MKHenson/rewild/issues/171) adds
-  biome-blended generation on top of the seed;
-  [#172](https://github.com/MKHenson/rewild/issues/172) folds #171's biome table into
-  the persisted recipe and gates `hasTerrain`.
+  climate-driven biome generation on top of the seed;
+  [#172](https://github.com/MKHenson/rewild/issues/172) adds the persisted
+  climate-preset reference (the tables themselves stay in code) and gates
+  `hasTerrain`.
   [#173](https://github.com/MKHenson/rewild/issues/173)/[#174](https://github.com/MKHenson/rewild/issues/174)
   add chunk-snapshot persistence (saved edits), and
   [#175](https://github.com/MKHenson/rewild/issues/175) is the first user-facing
@@ -157,5 +175,8 @@ Work top-to-bottom; arrows are hard dependencies.
 - Object scatter.
 - New surface materials / splat layers (biomes keep the existing height-band
   colouring for now; materials arrive with painting).
-- A third+ biome and a 2-axis (temperature × moisture) climate model — both are
-  additive on top of Strata's architecture.
+- A third+ biome — purely additive on the climate model from #171 (a table row
+  + an axis cut + cell entries). The 2-axis climate model itself landed early,
+  in #171.
+- More climate presets (eras / time-travel worlds) — additive once #172 gives
+  worlds a preset reference.
