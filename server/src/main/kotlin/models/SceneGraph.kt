@@ -62,7 +62,10 @@ data class Container(
 @Serializable
 data class WorldGenConfig(
     val version: Int,
-    val seed: Int
+    val seed: Int,
+    // Id of a code-defined climate preset; the preset's tables are game
+    // content and are never persisted. Defaulted so older records deserialize.
+    val climatePreset: String = "default"
 )
 
 @Serializable

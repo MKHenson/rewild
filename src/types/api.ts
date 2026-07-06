@@ -1038,6 +1038,8 @@ export interface components {
         };
         /** WorldGenConfig */
         "com.rewild.models.WorldGenConfig": {
+            /** String */
+            climatePreset: string;
             /**
              * Int
              * Format: int32

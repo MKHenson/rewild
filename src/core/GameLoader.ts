@@ -3,7 +3,7 @@ import { getProjects } from '../api/projects';
 import { StateMachine } from 'rewild-routing';
 import { InGameLevel } from './routing/InGameLevel';
 import { Asset3D } from './routing/Asset3D';
-import { Renderer } from 'rewild-renderer';
+import { DEFAULT_CLIMATE_PRESET, Renderer } from 'rewild-renderer';
 import { Player } from './routing/Player';
 import { TemplateLoader } from './TemplateLoader';
 import { ContainerWithState } from './routing/ContainerWithState';
@@ -45,7 +45,10 @@ export async function loadInitialLevels(
 
   if (project.sceneGraph.terrain) {
     renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
+    renderer.terrainRenderer.climatePreset =
+      project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
   }
+  renderer.terrainRenderer.enabled = level.hasTerrain;
 
   const levelRouter = new InGameLevel(
     level.name,

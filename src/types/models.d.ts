@@ -104,6 +104,10 @@ declare module 'models' {
   export interface WorldGenConfig {
     version: number;
     seed: number;
+    // Id of a code-defined climate preset (CLIMATE_PRESETS in rewild-renderer).
+    // The preset's tables are game content and are never persisted; older
+    // records without this field resolve to the default preset.
+    climatePreset?: string;
   }
 
   export interface IProject {

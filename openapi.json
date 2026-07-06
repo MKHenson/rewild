@@ -1336,6 +1336,10 @@
             "com.rewild.models.WorldGenConfig": {
                 "type": "object",
                 "properties": {
+                    "climatePreset": {
+                        "type": "string",
+                        "title": "String"
+                    },
                     "seed": {
                         "type": "integer",
                         "format": "int32",
@@ -1348,6 +1352,7 @@
                     }
                 },
                 "required": [
+                    "climatePreset",
                     "seed",
                     "version"
                 ],
