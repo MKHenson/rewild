@@ -42,8 +42,8 @@ export class TerrainRenderer {
   readonly mapChunkSizeLod = 241;
   private _levelOfDetail: number = 0; // Must be any int from 0 to 6
 
-  seed: number = 100;
-  climatePreset: string = DEFAULT_CLIMATE_PRESET;
+  private _seed: number = 100;
+  private _climatePreset: string = DEFAULT_CLIMATE_PRESET;
   private _enabled: boolean = true;
 
   constructor() {
@@ -52,6 +52,31 @@ export class TerrainRenderer {
     this.terrainChunksVisibleLastUpdate = [];
     this.dispatcher = new Dispatcher<TerrainEvent>();
     this.onChunkLoadedDelegate = this.onChunkLoaded.bind(this);
+  }
+
+  get seed() {
+    return this._seed;
+  }
+
+  // Chunks capture the seed when they are created, so changing it must throw
+  // away every existing chunk — otherwise chunks generated before a world's
+  // seed is applied (e.g. during project load) keep default-seed terrain and
+  // render disconnected from their later-generated neighbours.
+  set seed(value: number) {
+    if (this._seed === value) return;
+    this._seed = value;
+    this.clearChunks();
+  }
+
+  get climatePreset() {
+    return this._climatePreset;
+  }
+
+  // Same capture semantics as `seed` — a preset change invalidates all chunks.
+  set climatePreset(value: string) {
+    if (this._climatePreset === value) return;
+    this._climatePreset = value;
+    this.clearChunks();
   }
 
   get enabled() {
@@ -77,7 +102,12 @@ export class TerrainRenderer {
   init(renderer: Renderer) {
     const mapChunkSize = this.mapChunkSizeLod;
     this.chunkSize = mapChunkSize - 1;
-    this.chunksVisibleInViewDst = Math.round(this.maxViewDst / mapChunkSize);
+    // Chunks are culled by nearest-edge distance, so the creation square must
+    // cover every chunk whose edge can fall within maxViewDst: a chunk at grid
+    // offset k is at least (k-1)*chunkSize away from any viewer position
+    // inside the current chunk.
+    this.chunksVisibleInViewDst =
+      Math.floor(this.maxViewDst / this.chunkSize) + 1;
     this.workerPool = new TerrainWorkerPool();
   }
 
@@ -175,7 +205,9 @@ export class TerrainRenderer {
     const toFullEvict: string[] = [];
 
     for (const [key, chunk] of this.terrainChunks) {
-      const dist = chunk.transform.position.distanceTo(viewerPos);
+      // Same nearest-edge metric as chunk visibility/LOD selection — using
+      // center distance here would unload chunks that are still visible.
+      const dist = chunk.bounds.distanceToPoint(viewerPos);
       if (dist > evictDistance) {
         toFullEvict.push(key);
       } else if (dist > maxViewDst) {

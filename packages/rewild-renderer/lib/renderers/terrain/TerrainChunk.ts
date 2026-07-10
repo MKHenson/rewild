@@ -96,8 +96,7 @@ export class TerrainChunk implements IComponent {
     terrainRenderer: TerrainRenderer,
     renderer: Renderer
   ) {
-    const viewerDistFromNearestEdge =
-      this.transform.position.distanceTo(viewerPos);
+    const viewerDistFromNearestEdge = this.bounds.distanceToPoint(viewerPos);
     const isVisible = viewerDistFromNearestEdge <= terrainRenderer.maxViewDst;
     this.visible = isVisible;
 
