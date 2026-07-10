@@ -282,6 +282,12 @@ export class LODMesh {
 
     this.mesh = new Mesh(geometry, terrainPass);
     this.chunk.transform.addChild(this.mesh.transform);
+    // This mesh arrives mid-frame from a worker; until the next render pass
+    // its matrixWorld is identity, which would place the chunk's geometry at
+    // the world origin. A pointer-event raycast landing in that window (e.g.
+    // the orbit controller's terrain clamp) would hit phantom terrain, so
+    // compute the world matrix immediately.
+    this.mesh.transform.updateWorldMatrix(true, false);
     this.gpuState = 'ready';
     this.chunk.dispatcher.dispatch({
       type: 'mesh-loaded',
