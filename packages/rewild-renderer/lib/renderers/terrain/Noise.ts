@@ -147,6 +147,32 @@ function resolveAxis(value: number, axis: ClimateAxis, out: ResolvedAxis): void 
   }
 }
 
+// Merge a (biome, weight) pair into the active-cell scratch arrays, returning
+// the new active count. This is deliberately a top-level function taking the
+// count as a parameter rather than a closure over a mutable `activeCount`:
+// V8's Maglev optimizer (Chrome ~149) miscompiles that closure when it
+// OSR-compiles the sample loop mid-run, silently dropping every cell — the
+// first heightmap a worker generates then collapses to zeros partway through.
+// See issue notes: reproduced deterministically; a plain function is immune.
+function addCell(
+  activeBiomes: Int32Array,
+  activeWeights: Float64Array,
+  activeCount: number,
+  biomeIndex: number,
+  weight: number
+): number {
+  if (weight === 0) return activeCount;
+  for (let i = 0; i < activeCount; i++) {
+    if (activeBiomes[i] === biomeIndex) {
+      activeWeights[i] += weight;
+      return activeCount;
+    }
+  }
+  activeBiomes[activeCount] = biomeIndex;
+  activeWeights[activeCount] = weight;
+  return activeCount + 1;
+}
+
 function validateClimate(climate: ClimateConfig): void {
   for (const biome of climate.biomes) {
     if (biome.noiseScale <= 0)
@@ -237,19 +263,6 @@ export function generateBiomeBlendedHeightMap(
   const activeWeights = new Float64Array(4);
   let activeCount = 0;
 
-  const addCell = (biomeIndex: number, weight: number): void => {
-    if (weight === 0) return;
-    for (let i = 0; i < activeCount; i++) {
-      if (activeBiomes[i] === biomeIndex) {
-        activeWeights[i] += weight;
-        return;
-      }
-    }
-    activeBiomes[activeCount] = biomeIndex;
-    activeWeights[activeCount] = weight;
-    activeCount++;
-  };
-
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       if (sampleTemperature) {
@@ -275,12 +288,37 @@ export function generateBiomeBlendedHeightMap(
 
       // Bilinear weights over the (up to four) neighbouring cells; cells that
       // share a biome merge, so each biome is evaluated at most once.
-      activeCount = 0;
-      addCell(cells[t.bandA][m.bandA], (1 - t.weight) * (1 - m.weight));
-      if (m.bandB !== m.bandA) addCell(cells[t.bandA][m.bandB], (1 - t.weight) * m.weight);
+      activeCount = addCell(
+        activeBiomes,
+        activeWeights,
+        0,
+        cells[t.bandA][m.bandA],
+        (1 - t.weight) * (1 - m.weight)
+      );
+      if (m.bandB !== m.bandA)
+        activeCount = addCell(
+          activeBiomes,
+          activeWeights,
+          activeCount,
+          cells[t.bandA][m.bandB],
+          (1 - t.weight) * m.weight
+        );
       if (t.bandB !== t.bandA) {
-        addCell(cells[t.bandB][m.bandA], t.weight * (1 - m.weight));
-        if (m.bandB !== m.bandA) addCell(cells[t.bandB][m.bandB], t.weight * m.weight);
+        activeCount = addCell(
+          activeBiomes,
+          activeWeights,
+          activeCount,
+          cells[t.bandB][m.bandA],
+          t.weight * (1 - m.weight)
+        );
+        if (m.bandB !== m.bandA)
+          activeCount = addCell(
+            activeBiomes,
+            activeWeights,
+            activeCount,
+            cells[t.bandB][m.bandB],
+            t.weight * m.weight
+          );
       }
 
       let h = 0;
