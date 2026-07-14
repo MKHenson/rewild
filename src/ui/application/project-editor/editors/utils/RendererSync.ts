@@ -1,6 +1,8 @@
 import { IProject, Vector3 } from 'models';
 import { DEFAULT_CLIMATE_PRESET, PointLight, Renderer } from 'rewild-renderer';
 import { sceneGraphStore } from 'src/ui/stores/SceneGraphStore';
+import { createChunkSnapshotProvider } from 'src/database/chunk-snapshots';
+import { registerDebugCommands } from 'src/core/debug';
 
 export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
   const atmosphere = project.sceneGraph?.atmosphere;
@@ -21,6 +23,11 @@ export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
     renderer.terrainRenderer.climatePreset =
       project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
   }
+
+  renderer.terrainRenderer.snapshotProvider = project.levelId
+    ? createChunkSnapshotProvider(project.levelId)
+    : null;
+  registerDebugCommands(renderer, project);
 
   project.sceneGraph.containers.forEach((container) => {
     container.actors.forEach((actor) => {

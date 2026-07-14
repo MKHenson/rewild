@@ -9,7 +9,7 @@ import { TextureProperties } from '../../textures/Texture';
 import { Geometry } from '../../geometry/Geometry';
 import { Intersection } from '../../core/Raycaster';
 import { IComponent, IRaycaster } from '../../../types/interfaces';
-import { TerrainWorkerPool } from './TerrainWorkerPool';
+import { ChunkSnapshotProvider } from './ChunkSnapshot';
 
 const temp: Vector3 = new Vector3();
 
@@ -19,6 +19,7 @@ export type TerrainChunkEvent = {
   chunk: TerrainChunk;
 };
 export class TerrainChunk implements IComponent {
+  coord: Vector2;
   position: Vector2;
   _visible: boolean = false;
   bounds: Box3;
@@ -28,6 +29,8 @@ export class TerrainChunk implements IComponent {
   chunkSize: i32;
   dispatcher: Dispatcher<TerrainChunkEvent>;
   id: string;
+  // Cached snapshot lookup — one OPFS read per chunk, shared by all LODs.
+  private snapshotLookup: Promise<Float32Array | null> | null = null;
 
   constructor(
     coord: Vector2,
@@ -38,6 +41,7 @@ export class TerrainChunk implements IComponent {
     climatePreset: string
   ) {
     this.id = `${coord.x},${coord.y}`;
+    this.coord = new Vector2(coord.x, coord.y);
     this.position = coord.multiplyScalar(size);
     this.chunkSize = chunkSize;
     this.detailLevels = detailLevels;
@@ -65,6 +69,34 @@ export class TerrainChunk implements IComponent {
       this.transform.position,
       temp.set(size, 0, size)
     );
+  }
+
+  // Resolves this chunk's saved snapshot heights, or null when the chunk has
+  // no snapshot (or the provider fails / the blob is unusable) — the caller
+  // then falls back to generation. The lookup runs once and is shared.
+  fetchSnapshotHeights(
+    provider: ChunkSnapshotProvider | null
+  ): Promise<Float32Array | null> {
+    if (!provider) return Promise.resolve(null);
+    if (!this.snapshotLookup) {
+      const expected = this.chunkSize * this.chunkSize;
+      this.snapshotLookup = provider(this.coord.x, this.coord.y).then(
+        (heights) => {
+          if (heights && heights.length !== expected) {
+            console.warn(
+              `Chunk ${this.id} snapshot has ${heights.length} samples; expected ${expected} — regenerating instead.`
+            );
+            return null;
+          }
+          return heights;
+        },
+        (err) => {
+          console.warn(`Chunk ${this.id} snapshot read failed:`, err);
+          return null;
+        }
+      );
+    }
+    return this.snapshotLookup;
   }
 
   raycast(raycaster: IRaycaster, intersects: Intersection[]) {
@@ -121,7 +153,7 @@ export class TerrainChunk implements IComponent {
       const lodMesh = this.lodMesh[lodIndex];
 
       if (lodMesh.gpuState === 'none' || lodMesh.gpuState === 'unloaded') {
-        lodMesh.requestMesh(renderer, terrainRenderer.workerPool);
+        lodMesh.requestMesh(renderer);
       }
 
       if (lodMesh.gpuState === 'ready') {
@@ -194,14 +226,14 @@ export class LODMesh {
     this.climatePreset = climatePreset;
   }
 
-  requestMesh(renderer: Renderer, pool: TerrainWorkerPool) {
+  requestMesh(renderer: Renderer) {
     if (this.gpuState === 'unloaded') {
       this.reuploadGPU(renderer);
       return;
     }
     if (this.gpuState !== 'none') return;
     this.gpuState = 'requested';
-    this.load(this.chunkSize, this.lod, renderer, pool);
+    this.load(this.chunkSize, this.lod, renderer);
   }
 
   unloadGPU() {
@@ -227,19 +259,23 @@ export class LODMesh {
     });
   }
 
-  async load(
-    chunkSize: i32,
-    lod: i32,
-    renderer: Renderer,
-    pool: TerrainWorkerPool
-  ) {
-    const { texture, vertices, uvs, normals, indices } = await pool.enqueue({
-      chunkSize,
-      lod,
-      position: this.position,
-      seed: this.seed,
-      climatePreset: this.climatePreset,
-    });
+  async load(chunkSize: i32, lod: i32, renderer: Renderer) {
+    const terrainRenderer = renderer.terrainRenderer;
+
+    // Saved ⇒ mesh the stored heights, skipping generation; absent ⇒ the
+    // worker generates from the recipe as before.
+    const storedHeights = await this.chunk.fetchSnapshotHeights(
+      terrainRenderer.snapshotProvider
+    );
+    const { texture, vertices, uvs, normals, indices } =
+      await terrainRenderer.workerPool.enqueue({
+        chunkSize,
+        lod,
+        position: this.position,
+        seed: this.seed,
+        climatePreset: this.climatePreset,
+        heights: storedHeights ?? undefined,
+      });
 
     const terrainTexture = renderer.textureManager.addTexture(
       new DataTexture(
