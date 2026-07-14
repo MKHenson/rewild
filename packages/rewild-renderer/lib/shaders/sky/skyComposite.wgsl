@@ -88,24 +88,14 @@ var<private> sunDotUp: f32;
       return vec4f(occludedColor, 1.0);
     }
 
-    let startHeigh = -160.0;
-    let endHeight = mix(2.0, 50.0, object.foginess);
-    let startDistance = mix( 200.0, 0.0, object.foginess );
-    let endDistance = mix( 800.0, 300.0, object.foginess );
-
-    // Height based fog
-    let t = saturate( (worldPos.y - startHeigh) / (endHeight - startHeigh) );
-    let heightFogFactor = 1.0 - pow( t, 3.0 );
-
-    // Distance based fog
-    let distance = length(worldPos - object.cameraPosition);
-    let distanceFogFactor = saturate( (distance - startDistance) / (endDistance - startDistance) );
-
-    // Adjust blending based on fog factors
-    let fogFactor = saturate( distanceFogFactor + ( heightFogFactor * smoothstep( 0.0, 0.3, saturate( distance / endDistance ) ) ) );
-
     let dir: vec3f = normalize( worldPos - object.cameraPosition );
     let sunDirection: vec3f = normalize( object.sunPosition );
+
+    // Fog opacity from the exponential height-fog model (fog.wgsl), integrated
+    // along the camera→pixel ray. The layer is anchored to world height, so fog
+    // pools over low terrain instead of tracking the camera's eye level.
+    let distance = length(worldPos - object.cameraPosition);
+    let fogFactor = 1.0 - fogTransmittance(object.cameraPosition, dir, distance);
 
     sunDotUp = dot(sunDirection, vec3f(0.0, 1.0, 0.0));
 
@@ -123,27 +113,10 @@ var<private> sunDotUp: f32;
       fogShadowFactor = max(fogShadowFactor, 0.3);
     }
 
-    // getFogColor uses intersectSphere against the cloud-base sphere. When the
-    // camera is at or above that sphere, the forward intersection distance is
-    // near-zero (the camera just crossed the sphere surface). Because fog density
-    // is calibrated for tens-of-km scale, exp(-density * ~0) ≈ 1 and originalColor
-    // (which is 0 — sky is transparent over terrain pixels above the cloud layer)
-    // dominates the mix, producing solid-black terrain.
-    // Fix: above CLOUD_START, build the fog colour directly from time-of-day
-    // constants — the same values getFogColor would return at infinite fogDistance.
-    var rawFogColor: vec3f;
-    let cameraAlt = object.cameraPosition.y;
-    if (cameraAlt >= CLOUD_START) {
-        var fc = mix(FOG_COLOR_NIGHT, FOG_COLOR_EVENING, smoothstep(-0.1, 0.0, sunDotUp));
-        fc = mix(fc, FOG_COLOR_DAY, smoothstep(0.0, 0.3, sunDotUp));
-        let stormFactor = saturate((object.cloudiness - 0.8) / 0.2);
-        fc = mix(fc, FOG_COLOR_STORM, stormFactor);
-        let cloudOcc = mix(1.0, 0.05, pow(object.cloudiness, 2.0));
-        let brightness = mix(0.01, 1.0, smoothstep(-0.1, 0.1, sunDotUp) * cloudOcc);
-        rawFogColor = fc * brightness * 10.0;
-    } else {
-        rawFogColor = getFogColor( dir, object.cameraPosition, sunDirection, hdrBlend.rgb );
-    }
+    // Fully-saturated fog colour; fogFactor (the src-alpha of this pass) controls
+    // how much of it covers the terrain, so no distance fade is baked into the
+    // colour itself. Works at any camera altitude — no sphere intersection involved.
+    let rawFogColor = getFogScatterColor( dir, sunDirection );
 
     // Single ACES pass over the full HDR fog value — no separate exp curve.
     let fogTonemapped = tonemapACES(HDR_SCALE * rawFogColor * mix(1.0, fogShadowFactor, fogFactor));

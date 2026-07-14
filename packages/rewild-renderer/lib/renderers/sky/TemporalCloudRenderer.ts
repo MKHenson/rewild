@@ -35,6 +35,10 @@ const BLEND_FACTOR_MOVING = 0.6;
 /** Rotation rate (°/frame) at which the blend factor reaches BLEND_FACTOR_MOVING. */
 const MOVEMENT_RAMP_DEG = 3.0;
 
+/** Assumed typical distance to the clouds being reprojected, used to convert
+ *  camera translation into an equivalent angular (parallax) rate. */
+const CLOUD_PARALLAX_DISTANCE = 1500;
+
 /**
  * Camera jump thresholds that trigger history invalidation.
  * Position in world units, rotation in radians.
@@ -265,7 +269,20 @@ export class TemporalCloudRenderer {
       // quatDot = cos(θ/2) so 2·acos(quatDot) gives the full rotation angle in radians.
       const rotAngleDeg =
         (2.0 * Math.acos(Math.min(quatDot, 1.0)) * 180) / Math.PI;
-      const movementFactor = Math.min(rotAngleDeg / MOVEMENT_RAMP_DEG, 1.0);
+
+      // Translation causes real parallax on clouds (~1.5 km typical viewing
+      // distance) that the direction-based (infinite-distance) reprojection
+      // cannot represent, so stale history smears radially while the camera
+      // pans or zooms. Convert the per-frame translation into an equivalent
+      // angular rate so the blend also ramps up under fast translation —
+      // editor cameras translate hundreds of units per frame when zoomed out.
+      const translationDeg =
+        ((positionDelta / CLOUD_PARALLAX_DISTANCE) * 180) / Math.PI;
+
+      const movementFactor = Math.min(
+        (rotAngleDeg + translationDeg) / MOVEMENT_RAMP_DEG,
+        1.0
+      );
       this.currentBlendFactor =
         BLEND_FACTOR_STILL +
         movementFactor * (BLEND_FACTOR_MOVING - BLEND_FACTOR_STILL);

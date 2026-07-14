@@ -26,9 +26,12 @@ fn fbm2(p: vec3f) -> f32 {
 }
 
 fn cirrusDensityAt(position: vec3f) -> f32 {
+    // position is camera-relative (camera at XZ = 0); re-anchor the noise
+    // domain to world space so the cirrus pattern doesn't follow the camera.
+    let worldPos    = position + vec3f(object.cameraPosition.x, 0.0, object.cameraPosition.z);
     let windDirection = vec3f(1.0, 0.0, -1.0);
     let windOffset  = vec3f(object.iTime * 0.00035 * object.windiness, 0.0, 0.0) * windDirection;
-    let noisePos    = position * 0.0002 + windOffset;
+    let noisePos    = worldPos * 0.0002 + windOffset;
     // Strongly elongated along the wind axis — 3x vs 1x creates strand-like shapes
     let stretchPos  = vec3f(noisePos.x * 0.35, noisePos.y * 8.0, noisePos.z * 1.0);
 

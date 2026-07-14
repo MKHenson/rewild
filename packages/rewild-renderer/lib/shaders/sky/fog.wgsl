@@ -88,14 +88,66 @@ fn intersectSphereBoth(origin: vec3f, dir: vec3f, spherePos: vec3f, sphereRad: f
 }
 
 
-fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3f ) -> vec3f {
+// ─────────────────────────────────────────────────────────────────────────────
+// Exponential height fog
+//
+// Fog density falls off exponentially with world altitude:
+//   density(y) = baseDensity * exp(-(y - FOG_BASE_HEIGHT) / scaleHeight)
+// so the fog layer is anchored to the world — pooling over low terrain — instead
+// of following the camera. (A uniform-density layer's visual horizon always sits
+// at eye level, which made the fog line climb mountains as the camera rose.)
+// The transmittance integral along a ray has a closed form, evaluated below.
+//
+// A thin altitude-independent haze (HAZE_DENSITY) is kept on top of the layer
+// for aerial perspective, so distant terrain and horizon clouds still fade
+// even at foginess = 0.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FOG_BASE_HEIGHT: f32 = 0.0;   // world height of maximum fog density
+const HAZE_DENSITY: f32 = 0.00009;  // constant aerial-perspective haze
+
+fn heightFogOpticalDepth(org: vec3f, dir: vec3f, dist: f32) -> f32 {
+    let scaleHeight = mix(15.0, 50.0, object.foginess);
+    let baseDensity = 0.01 * object.foginess * object.foginess;
+    if (baseDensity <= 0.0) {
+        return 0.0;
+    }
+
+    // Density at the camera; below the base height the layer saturates
+    // (constant density) rather than growing without bound.
+    let relY = max(org.y - FOG_BASE_HEIGHT, 0.0);
+    let densityAtCam = baseDensity * exp(-relY / scaleHeight);
+
+    // ∫ density(org.y + dir.y·t) dt for t ∈ [0, dist]
+    //   = densityAtCam · dist · (1 - exp(-k)) / k,   k = dir.y · dist / scaleHeight
+    let k = dir.y * dist / scaleHeight;
+    if (abs(k) < 1e-3) {
+        // Near-horizontal ray: integrand is ~constant along the path
+        return densityAtCam * dist;
+    }
+    // Clamp the exponent to keep steep long rays finite; optical depth is
+    // capped in fogTransmittance anyway.
+    return densityAtCam * dist * (1.0 - exp(-clamp(k, -30.0, 30.0))) / k;
+}
+
+/** Fraction of background light surviving along the ray (0 = full fog, 1 = clear). */
+fn fogTransmittance(org: vec3f, dir: vec3f, dist: f32) -> f32 {
+    let d = max(dist, 0.0);
+    let opticalDepth = HAZE_DENSITY * d + heightFogOpticalDepth(org, dir, d);
+    return exp(-min(opticalDepth, 50.0));
+}
+
+/**
+ * Fully fog-saturated colour for a given view/sun direction: what an infinitely
+ * thick wall of fog looks like. Callers blend toward the background colour with
+ * fogTransmittance() — or use it directly as an alpha-blended overlay.
+ */
+fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     // Sun visibility: fades sun-driven scattering during dusk/dawn (sunDotUp ±0.1).
     // 0 = sun below horizon (no direct scatter), 1 = sun above horizon (full scatter)
     let sunVisibility = smoothstep(-0.1, 0.1, sunDotUp);
     let mu = dot(vSunDirection, dir) * sunVisibility;
 
-    let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + CLOUD_START);
-    let fogDistanceToEarth = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS);
     let foginess = object.foginess;
 
     // Cloud occlusion: clouds block sunlight from reaching the lower atmosphere.
@@ -121,8 +173,6 @@ fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3
     let overcastFactor_fog    = smoothstep(0.5, 0.9, object.cloudiness) * overcastDayFactor_fog;
     fogColor = mix(fogColor, vec3f(0.63, 0.63, 0.63), overcastFactor_fog);
 
-    let fogDensity = mix( 0.00002, 0.0008, foginess );
-
     // Fog brightness: scales with both sun elevation and cloud cover.
     // Overcast skies produce dimmer, flatter fog even during daylight.
     let fogBrightness = mix(0.01, 1.0, effectiveSunStrength);
@@ -133,12 +183,21 @@ fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3
     // sun beam that drives forward scattering in the fog layer.
     let sunScatter = effectiveSunStrength * fogPhase * 0.1 * LOW_SCATTER * SUN_POWER;
 
+    return sunScatter + 10.0 * fogColor;
+}
+
+fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3f ) -> vec3f {
+    let fogDistance = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS + CLOUD_START);
+    let fogDistanceToEarth = intersectSphere(org, dir, vec3f(0.0, -EARTH_RADIUS, 0.0), EARTH_RADIUS);
+
+    let scatterColor = getFogScatterColor(dir, vSunDirection);
+
     // Camera above clouds looking down at earth: render as solid fog layer.
     // Fires when fogDistance = -1 (no cloud-sphere exit ahead) and fogDistanceToEarth > 0.
     if ( fogDistanceToEarth - fogDistance > 0 ) {
-        return sunScatter + 10.0 * fogColor;
+        return scatterColor;
     }
-    return mix( sunScatter + 10.0 * fogColor, originalColor.xyz, exp(-fogDensity * fogDistance ));
+    return mix( scatterColor, originalColor.xyz, fogTransmittance(org, dir, fogDistance) );
 }
 
 fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec3f ) -> vec3f {

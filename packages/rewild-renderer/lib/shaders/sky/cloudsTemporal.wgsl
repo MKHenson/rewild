@@ -113,7 +113,7 @@ fn numericalMieFit(costh: f32) -> f32 {
 }
 
 fn clouds(position: vec3f) -> CloudDensityResult {
-    return cloudDensity(position, object.windiness, object.cloudiness, object.iTime, object.windDirection);
+    return cloudDensity(position, object.cameraPosition.xz, object.windiness, object.cloudiness, object.iTime, object.windDirection);
 }
 
 fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_direction: vec3f, cloudHeight2: f32) -> f32 {
@@ -266,9 +266,8 @@ fn drawCloudsHorizonFog(dir: vec3f, org: vec3f, vSunDirection: vec3f) -> vec4f {
         return color;
     }
 
-    let fogDensity = mix(0.00001, 0.00009, object.foginess);
     let fogDistance = intersectSphere(org, dir, earthCenter, ATM_START_DCS);
-    let cloudAlpha = min(exp(-fogDensity * fogDistance), color.a);
+    let cloudAlpha = min(fogTransmittance(org, dir, fogDistance), color.a);
     return vec4f(getFogColor(dir, org, vSunDirection, color.rgb), cloudAlpha);
 }
 
@@ -291,16 +290,25 @@ fn drawCloudsHorizonFogLowQuality(dir: vec3f, org: vec3f, vSunDirection: vec3f) 
 @fragment
 fn fs(
     @builtin(position) fragCoord: vec4<f32>,
-    @location(0) vWorldPosition: vec3<f32>,
+    @location(0) vRelPosition: vec3<f32>,
     @location(1) vSunDirection: vec3<f32>
 ) -> OutputStruct {
     sunDotUp = dot(vSunDirection, vec3f(0.0, 1.0, 0.0));
     currentFragCoord = fragCoord.xy;
 
-    let direction = normalize(vWorldPosition - object.cameraPosition);
+    // vRelPosition is camera-relative, so the camera is at its origin.
+    let direction = normalize(vRelPosition);
 
+    // Camera-relative origin (camera at XZ = 0): the spherical-earth model is
+    // evaluated with the sphere directly under the camera, making the sky
+    // translation-invariant. Using the absolute world position made the camera
+    // slowly climb the origin-centred sphere (~d²/2R — 200 m up at 50 km out)
+    // until it entered the cloud shell and the sky stretched and broke. World
+    // XZ is re-applied inside cloudDensity() for noise sampling only, so the
+    // cloud pattern stays anchored to the world.
+    let org = vec3f(0.0, object.cameraPosition.y, 0.0);
     let earthCenter = vec3f(0.0, -EARTH_RADIUS, 0.0);
-    let camHeight = length(object.cameraPosition - earthCenter);
+    let camHeight = length(org - earthCenter);
     let cloudResolution = vec2f(object.resolutionX * object.resolutionScale, object.resolutionY * object.resolutionScale);
     let currentUV = fragCoord.xy / cloudResolution;
 
@@ -329,13 +337,15 @@ fn fs(
 
     if (isThisPixelsTurn || temporal.historyValid == 0u) {
         // Fresh full-quality raymarch (always when history is invalid)
-        pixelColor = drawCloudsHorizonFog(direction, object.cameraPosition, vSunDirection);
+        pixelColor = drawCloudsHorizonFog(direction, org, vSunDirection);
     } else {
         // Direction-based reprojection:
-        // Project the current ray direction into the previous frame's screen space.
-        // Using a far point (100 km) so camera translation is negligible (~0.1% error).
-        let worldPoint = object.cameraPosition + direction * 100000.0;
-        let prevClip = temporal.prevViewProjMatrix * vec4f(worldPoint, 1.0);
+        // Project the current ray direction into the previous frame's screen
+        // space as a point at infinity (w = 0). Camera translation cancels
+        // exactly, so this stays precise at any distance from world origin —
+        // the previous camPos + dir·100km formulation jittered far from origin
+        // because the huge f32 coordinates lost sub-pixel precision.
+        let prevClip = temporal.prevViewProjMatrix * vec4f(direction, 0.0);
 
         var reprojectionValid = prevClip.w > 0.001;
         var prevUV: vec2f = vec2f(0.0);
@@ -356,7 +366,7 @@ fn fs(
             pixelColor = textureSampleLevel(historyTexture, historySampler, prevUV, 0.0);
         } else {
             // Off-screen or behind-camera — low-quality fallback
-            pixelColor = drawCloudsHorizonFogLowQuality(direction, object.cameraPosition, vSunDirection);
+            pixelColor = drawCloudsHorizonFogLowQuality(direction, org, vSunDirection);
         }
     }
 

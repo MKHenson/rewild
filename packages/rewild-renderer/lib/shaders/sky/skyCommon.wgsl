@@ -1,11 +1,20 @@
 
 struct VaryingsStruct {
-	@location( 0 ) vWorldPosition : vec3<f32>,
+	// Camera-RELATIVE far-plane position (the camera sits at the origin of
+	// this space). Ray direction = normalize(vRelPosition). Kept camera-relative
+	// so the interpolated values stay small — interpolating absolute world
+	// positions loses f32 precision far from world origin, which made the
+	// temporal reprojection resample history at slightly wrong sub-texel UVs
+	// and smear the clouds whenever the camera was still.
+	@location( 0 ) vRelPosition : vec3<f32>,
 	@location( 1 ) vSunDirection : vec3<f32>,
 	@builtin( position ) Vertex : vec4<f32>
 };
 
 struct ObjectStruct {
+	// Inverse of (projection × rotation-only view): reconstructs camera-RELATIVE
+	// positions from clip space. Deliberately excludes the camera translation —
+	// see VaryingsStruct.vRelPosition.
 	invViewProjectionMatrix : mat4x4<f32>,
 	cameraPosition : vec3<f32>,
     resolutionScale: f32,
@@ -51,8 +60,14 @@ fn hash3( p: vec3f ) -> vec3f {
 }
 
 fn noise3( x: vec3f ) -> f32 {
-    let p = floor(x);
-    var f = fract(x);
+    // noise3 is exactly 256-periodic in each axis (uv below shifts by a
+    // multiple of 256 when x does, and the texture sampler wraps). Wrap the
+    // input to [0, 256) first: uv multiplies p.z by 37, so a large world-space
+    // input (far from origin, long wind scroll) would otherwise be amplified
+    // past f32 sub-texel precision and the noise turns streaky/mushy.
+    let xw = x - 256.0 * floor(x / 256.0);
+    let p = floor(xw);
+    var f = fract(xw);
     f = f * f * ( 3.0 - 2.0 * f );
 	let uv = ( p.xy + vec2f( 37.0, 17.0 ) * p.z) + f.xy;
     let rg = textureSampleLevel( noiseTexture, noiseSampler, (uv + 0.5 ) / 256.0, 0.0).yx;
@@ -112,12 +127,13 @@ fn vs( @builtin(vertex_index) vertexIndex : u32 ) -> VaryingsStruct {
 
 	let xy = pos[vertexIndex];
 
-	// Reconstruct a far-plane world position from clip-space corner
+	// Reconstruct a far-plane position from the clip-space corner in
+	// camera-relative space (the matrix carries no camera translation).
 	let clipPos = vec4f(xy.x, xy.y, 1.0, 1.0);
-	let worldPosH = object.invViewProjectionMatrix * clipPos;
-	let worldPos = worldPosH.xyz / worldPosH.w;
+	let relPosH = object.invViewProjectionMatrix * clipPos;
+	let relPos = relPosH.xyz / relPosH.w;
 
-	varyings.vWorldPosition = worldPos;
+	varyings.vRelPosition = relPos;
 	varyings.Vertex = vec4f(xy, 0.0, 1.0);
 	varyings.vSunDirection = normalize( object.sunPosition );
 	return varyings;

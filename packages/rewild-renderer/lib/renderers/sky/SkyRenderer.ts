@@ -25,6 +25,16 @@ export class SkyRenderer {
   requiresRebuild: boolean = true;
   private invViewProjectionMatrix = new Matrix4();
 
+  /** Rotation-only copy of the camera's world-inverse (translation zeroed). */
+  private centeredViewMatrix = new Matrix4();
+
+  /** Inverse of (projection × rotation-only view). The sky shaders reconstruct
+   *  ray directions from this camera-CENTERED matrix: including the camera
+   *  translation makes the interpolated far-plane varying carry world-sized
+   *  magnitudes, and the resulting f32 direction error grows with distance
+   *  from world origin (visible as history smear in the temporal cloud pass). */
+  private invViewProjCentered = new Matrix4();
+
   /** Current frame's view-projection matrix — stored so it can be passed to the
    *  temporal renderer as prevViewProjMatrix on the next frame. */
   private viewProjMatrix = new Matrix4();
@@ -272,7 +282,17 @@ export class SkyRenderer {
     );
     this.invViewProjectionMatrix.copy(this.viewProjMatrix).invert();
 
-    uniformData.set(this.invViewProjectionMatrix.elements, 0); // invViewProjectionMatrix
+    // Camera-centered variant for sky ray reconstruction (see field docs).
+    this.centeredViewMatrix.copy(camera.matrixWorldInverse);
+    const cv = this.centeredViewMatrix.elements;
+    cv[12] = 0;
+    cv[13] = 0;
+    cv[14] = 0;
+    this.invViewProjCentered
+      .multiplyMatrices(camera.projectionMatrix, this.centeredViewMatrix)
+      .invert();
+
+    uniformData.set(this.invViewProjCentered.elements, 0); // invViewProjectionMatrix (camera-centered)
     uniformData.set(
       [
         camera.transform.position.x,
@@ -405,9 +425,11 @@ export class SkyRenderer {
       this.perfMonitor.getTimestampWrites('sky-god-rays')
     );
 
+    // Bilateral only uses the matrix to reconstruct ray directions, so it
+    // gets the camera-centered variant for position-independent precision.
     this.bilateralPass.render(
       renderer,
-      this.invViewProjectionMatrix.elements,
+      this.invViewProjCentered.elements,
       this.perfMonitor.getTimestampWrites('sky-bilateral')
     );
 
@@ -469,8 +491,17 @@ export class SkyRenderer {
   /** Called after the sky compositor is submitted — renders bolt then rain onto the canvas. */
   postRender(renderer: Renderer): void {
     if (this.pendingBoltStrike) {
-      // Match fog.wgsl: mix(0.00002, 0.0008, foginess)
-      const fogDensity = 0.00002 + 0.00078 * this.foginess;
+      // Match fog.wgsl's exponential height fog: constant aerial haze plus the
+      // ground-hugging layer's density at camera height. The bolt shader only
+      // takes a scalar density, and bolt rays climb out of the layer toward the
+      // cloud base, so the layer term is scaled down to an average along the path.
+      const scaleHeight = 15 + 35 * this.foginess;
+      const layerDensityAtCam =
+        0.01 *
+        this.foginess *
+        this.foginess *
+        Math.exp(-Math.max(this.lastCameraPos[1], 0) / scaleHeight);
+      const fogDensity = 0.00002 + layerDensityAtCam * 0.15;
       this.lightningBoltPass.render(
         renderer,
         this.pendingBoltStrike,
