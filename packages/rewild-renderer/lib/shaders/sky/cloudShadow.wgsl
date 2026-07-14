@@ -25,7 +25,7 @@ struct CloudShadowUniforms {
 
 struct VertexShaderOutput {
   @builtin(position) position: vec4f,
-  @location(0) worldXZ: vec2f,
+  @location(0) relativeXZ: vec2f,
 };
 
 @vertex fn vs(@builtin(vertex_index) vertexIndex: u32) -> VertexShaderOutput {
@@ -42,13 +42,15 @@ struct VertexShaderOutput {
   let xy = pos[vertexIndex];
   vsOutput.position = vec4f(xy, 0.0, 1.0);
 
-  // Map clip-space [-1,1] to world XZ centered on shadow.center
+  // Map clip-space [-1,1] to XZ relative to shadow.center (center-relative, so
+  // cloudDensity's curvature-height term stays precise far from world origin;
+  // the world anchoring is passed to cloudDensity separately as domainOffset).
   // Negate Y: clip Y=+1 is texture row 0 (UV.y=0), so we need to flip
   // so that UV.y=0 maps to worldZ = centerZ - halfSize (south)
   let halfSize = shadow.worldSize * 0.5;
-  vsOutput.worldXZ = vec2f(
-    shadow.centerX + xy.x * halfSize,
-    shadow.centerZ - xy.y * halfSize
+  vsOutput.relativeXZ = vec2f(
+    xy.x * halfSize,
+    -xy.y * halfSize
   );
 
   return vsOutput;
@@ -58,7 +60,7 @@ const NUM_SHADOW_SAMPLES: i32 = 32;
 
 @fragment fn fs(
   @builtin(position) fragCoord: vec4f,
-  @location(0) worldXZ: vec2f,
+  @location(0) relativeXZ: vec2f,
 ) -> @location(0) vec4f {
   // Sun direction (pointing toward the sun)
   let sunDir = normalize(vec3f(shadow.sunDirX, shadow.sunDirY, shadow.sunDirZ));
@@ -70,7 +72,7 @@ const NUM_SHADOW_SAMPLES: i32 = 32;
 
   // For this ground XZ position, trace a ray from ground level upward along the sun direction
   // through the cloud layer. The ray goes from this XZ at CLOUD_START upward.
-  // We need to find where the ray from (worldXZ, groundY) toward the sun passes through the
+  // We need to find where the ray from (relativeXZ, groundY) toward the sun passes through the
   // cloud layer [CLOUD_START, CLOUD_START + CLOUD_HEIGHT].
   //
   // Given a ground point, a ray toward the sun enters the cloud layer at CLOUD_START.
@@ -88,8 +90,8 @@ const NUM_SHADOW_SAMPLES: i32 = 32;
     let sampleY = CLOUD_START + h;
     // Offset XZ based on sun angle: at height h, light arrives from an XZ offset
     let xzOffset = sunDir.xz * (h * invSunY);
-    let samplePos = vec3f(worldXZ.x + xzOffset.x, sampleY, worldXZ.y + xzOffset.y);
-    let density = cloudDensity(samplePos, shadow.windiness, shadow.cloudiness, shadow.iTime, vec2f(1.0, 0.0)).density;
+    let samplePos = vec3f(relativeXZ.x + xzOffset.x, sampleY, relativeXZ.y + xzOffset.y);
+    let density = cloudDensity(samplePos, vec2f(shadow.centerX, shadow.centerZ), shadow.windiness, shadow.cloudiness, shadow.iTime, vec2f(1.0, 0.0)).density;
     totalDensity += density * stepSize;
   }
 

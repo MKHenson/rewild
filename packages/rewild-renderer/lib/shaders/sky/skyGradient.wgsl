@@ -42,19 +42,24 @@ fn sampleNightSky(direction: vec3f) -> vec3f {
 @fragment
 fn fs( 
     @builtin(position) fragCoord: vec4<f32>,
-	@location( 0 ) vWorldPosition : vec3<f32>,
+	@location( 0 ) vRelPosition : vec3<f32>,
 	@location( 1 ) vSunDirection : vec3<f32> ) -> OutputStruct {
 
     sunDotUp = dot(vSunDirection, vec3f(0.0, 1.0, 0.0));
 
-	let direction: vec3f = normalize( vWorldPosition - object.cameraPosition );
+	// vRelPosition is camera-relative, so the camera is at its origin.
+	let direction: vec3f = normalize( vRelPosition );
 
 	// Vertical component of view direction: 1.0 = looking straight up, -1.0 = straight down
     var viewVertical = dot( direction, vec3f(0.0, 1.0, 0.0) );
 
-    // Camera altitude relative to cloud layer
+    // Camera altitude relative to cloud layer.
+    // Camera-relative origin (camera at XZ = 0): keeps the spherical-earth
+    // model translation-invariant so the sky doesn't break far from world
+    // origin (see cloudsTemporal.wgsl for the full explanation).
+    let org = vec3f(0.0, object.cameraPosition.y, 0.0);
     let earthCenter = vec3f(0.0, -EARTH_RADIUS, 0.0);
-    let camHeight = length(object.cameraPosition - earthCenter);
+    let camHeight = length(org - earthCenter);
     const ATM_START_FS = EARTH_RADIUS + CLOUD_START;
 
      // Define uv based on fragCoord
@@ -76,7 +81,7 @@ fn fs(
         let downFade = smoothstep(-0.1, 0.1, viewVertical);
         let cloudinessFade = 1.0 - object.cloudiness;
         let adjustedNightSky = nightSky * downFade * cloudinessFade;
-        let atmosphereColor = drawSkyAndHorizonFog( direction, object.cameraPosition, vSunDirection, adjustedNightSky );
+        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, adjustedNightSky );
         output.color = vec4f( atmosphereColor, 1.0 );
         return output;
     }
@@ -99,7 +104,7 @@ fn fs(
     // Stars fade with cloud coverage.
     let horizonDir = normalize(vec3f(direction.x, max(0.001, direction.y), direction.z));
     let horizonNightSky = sampleNightSky(horizonDir) * starVisibility * (1.0 - object.cloudiness);
-    let horizonFog = drawSkyAndHorizonFog(horizonDir, object.cameraPosition, vSunDirection, horizonNightSky);
+    let horizonFog = drawSkyAndHorizonFog(horizonDir, org, vSunDirection, horizonNightSky);
 
     // Below clouds — original hemisphere masking
 	// Smooth transition: 0 = below horizon, 1 = above horizon
@@ -108,7 +113,7 @@ fn fs(
     // Horizon transition band: blend between below-horizon color and atmosphere above
     if ( hemisphereMask < 1 && hemisphereMask > 0.0 ) {
         let nightSky: vec3f = sampleNightSky(direction) * (1.0 - object.cloudiness);
-        let atmosphereColor = drawSkyAndHorizonFog( direction, object.cameraPosition, vSunDirection, nightSky );
+        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, nightSky );
         output.color = vec4f( mix( horizonFog, atmosphereColor, hemisphereMask), 1.0 );
         return output;
     }
@@ -120,7 +125,7 @@ fn fs(
     // Above horizon: full atmosphere
     else {
         let nightSky: vec3f = sampleNightSky(direction) * (1.0 - object.cloudiness);
-        let atmosphereColor = drawSkyAndHorizonFog( direction, object.cameraPosition, vSunDirection, nightSky );
+        let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, nightSky );
         output.color = vec4f( atmosphereColor, 1.0 );
         return output;
     } 
