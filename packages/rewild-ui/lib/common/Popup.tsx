@@ -106,6 +106,14 @@ const StyledPopup = cssStylesheet(css`
     height: 100%;
   }
 
+  /* The host spans the whole viewport (and sits in the top layer when acting
+     as a popover), so it must never hit-test itself — only the backdrop and
+     modal opt back in. Otherwise it swallows clicks meant for content below,
+     even with withBackground=false. */
+  :host {
+    pointer-events: none;
+  }
+
   :host > div {
     pointer-events: none;
     background: none;
