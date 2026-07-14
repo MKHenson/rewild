@@ -4,6 +4,7 @@ import { Dispatcher, Vector2, Vector3 } from 'rewild-common';
 import { LODMesh, TerrainChunk, TerrainChunkEvent } from './TerrainChunk';
 import { TerrainWorkerPool } from './TerrainWorkerPool';
 import { DEFAULT_CLIMATE_PRESET } from './Biomes';
+import { ChunkSnapshotProvider } from './ChunkSnapshot';
 
 export class LODInfo {
   lod: i32;
@@ -44,6 +45,9 @@ export class TerrainRenderer {
 
   private _seed: number = 100;
   private _climatePreset: string = DEFAULT_CLIMATE_PRESET;
+  // Injected by the host app (game/editor); looks up a chunk's saved snapshot
+  // heights on the asset path. Saved ⇒ meshed from storage, absent ⇒ generated.
+  snapshotProvider: ChunkSnapshotProvider | null = null;
   private _enabled: boolean = true;
 
   constructor() {

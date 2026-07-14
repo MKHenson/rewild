@@ -21,3 +21,4 @@ export * from './typeGuards';
 export * from './acceleration';
 export * from './core/Raycaster';
 export * from './renderers/terrain/Biomes';
+export * from './renderers/terrain/ChunkSnapshot';

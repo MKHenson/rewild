@@ -141,17 +141,6 @@ export class DirectionalShadowRenderer {
     });
 
     this.debugRenderer.init(renderer, this.shadowDepthTexture);
-
-    (window as any).startShadowDebug = () => {
-      this.debugMode = true;
-      this.debugRenderer.enabled = true;
-      console.log('Shadow debug ON — cascade tint: red=0 green=1 blue=2 | atlas viewer: bottom-left');
-    };
-    (window as any).stopShadowDebug = () => {
-      this.debugMode = false;
-      this.debugRenderer.enabled = false;
-      console.log('Shadow debug OFF');
-    };
   }
 
   render(

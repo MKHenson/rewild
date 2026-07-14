@@ -15,10 +15,14 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: rewild
-      MINIO_ROOT_PASSWORD: rewild
+      # MinIO requires >= 8 characters or the container exits at startup.
+      # Must match S3_SECRET_KEY in server/.env.
+      MINIO_ROOT_PASSWORD: rewild-dev
     ports:
       - "9000:9000"
-      - "9001:9001"
+      # Console on host 9090 — the web dev server owns 9001 (esbuild.js), and a
+      # collision there stops the whole minio container from starting.
+      - "9090:9001"
     volumes:
       - minio_data:/data
 

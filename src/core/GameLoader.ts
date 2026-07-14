@@ -10,6 +10,8 @@ import { ContainerWithState } from './routing/ContainerWithState';
 import { StateMachineData } from './routing/Types';
 import { GameManager } from './GameManager';
 import { LightingTester } from './routing/LightingTester';
+import { createChunkSnapshotProvider } from '../database/chunk-snapshots';
+import { registerDebugCommands } from './debug';
 
 /** Loads game files and assets and sends the created objects to wasm */
 
@@ -49,6 +51,10 @@ export async function loadInitialLevels(
       project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
   }
   renderer.terrainRenderer.enabled = level.hasTerrain;
+  renderer.terrainRenderer.snapshotProvider = level.id
+    ? createChunkSnapshotProvider(level.id)
+    : null;
+  registerDebugCommands(renderer, project);
 
   const levelRouter = new InGameLevel(
     level.name,

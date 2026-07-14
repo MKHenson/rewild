@@ -217,23 +217,6 @@ export class SkyRenderer {
       'sky-bilateral',
       'sky-bloom',
     ]);
-
-    (window as any).startSkyPerfCapture = () => {
-      this.perfMonitor.enabled = true;
-      console.log('Sky performance capture started');
-    };
-    (window as any).stopSkyPerfCapture = () => {
-      this.perfMonitor.enabled = false;
-      console.log('Sky performance capture stopped');
-    };
-
-    (window as any).toggleCloudShadowDebug = () => {
-      const config = this.cloudShadowRenderer.config;
-      console.log(
-        `Cloud Shadow Map: ${config.resolution}x${config.resolution}, ` +
-          `worldSize=${config.worldSize}m, updateFreq=every ${config.updateFrequency} frames`
-      );
-    };
   }
 
   addingCloudiness: boolean = false;

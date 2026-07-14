@@ -410,10 +410,10 @@ When a level is deleted, all its assets are removed with a single prefix delete 
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: rewild
-      MINIO_ROOT_PASSWORD: rewild
+      MINIO_ROOT_PASSWORD: rewild-dev # >= 8 chars or MinIO exits at startup
     ports:
       - "9000:9000"
-      - "9001:9001"
+      - "9090:9001" # console on 9090; the web dev server owns host 9001
 ```
 
 Additional local env vars:
@@ -422,7 +422,7 @@ BUCKET_BASE_URL=http://localhost:9000/rewild-assets
 BUCKET_NAME=rewild-assets
 S3_ENDPOINT=http://localhost:9000
 S3_ACCESS_KEY=rewild
-S3_SECRET_KEY=rewild
+S3_SECRET_KEY=rewild-dev
 ```
 
 ---
@@ -515,7 +515,7 @@ BUCKET_BASE_URL=http://localhost:9000/rewild-assets
 BUCKET_NAME=rewild-assets
 S3_ENDPOINT=http://localhost:9000
 S3_ACCESS_KEY=rewild
-S3_SECRET_KEY=rewild
+S3_SECRET_KEY=rewild-dev
 ```
 
 The client dev server (`npm run start`) proxies `/api/*` to `localhost:8080` via the esbuild dev config so no CORS issues during development.
