@@ -16,6 +16,8 @@ export interface TerrainWorkerResponse {
   uvs: Float32Array;
   normals: Float32Array;
   indices: Uint32Array;
+  // Full LOD-0 heightfield the mesh was built from (see BuildChunkMeshResult).
+  heights: Float32Array;
 }
 
 interface QueuedRequest {

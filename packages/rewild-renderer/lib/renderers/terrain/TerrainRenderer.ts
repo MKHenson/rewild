@@ -1,7 +1,8 @@
 import { Renderer } from '../../Renderer';
 import { Camera } from '../../core/Camera';
 import { Dispatcher, Vector2, Vector3 } from 'rewild-common';
-import { LODMesh, TerrainChunk, TerrainChunkEvent } from './TerrainChunk';
+import { TerrainChunk, TerrainChunkEvent } from './TerrainChunk';
+import { LODMesh } from './LODMesh';
 import { TerrainWorkerPool } from './TerrainWorkerPool';
 import { DEFAULT_CLIMATE_PRESET } from './Biomes';
 import { ChunkSnapshotProvider } from './ChunkSnapshot';
@@ -231,6 +232,32 @@ export class TerrainRenderer {
       renderer.scene.removeChild(chunk.transform);
       this.terrainChunks.delete(key);
     }
+  }
+
+  // Applies an edit: replaces a chunk's in-memory heightfield and rebuilds its
+  // meshes, without touching the rest of the terrain. Returns false if the
+  // chunk isn't loaded (a saved snapshot will supply the heights when it is).
+  applyChunkHeights(cx: number, cy: number, heights: Float32Array): boolean {
+    const chunk = this.terrainChunks.get(`${cx},${cy}`);
+    if (!chunk) return false;
+
+    chunk.setHeights(heights);
+    this.remeshChunk(cx, cy);
+    return true;
+  }
+
+  // Rebuilds one chunk's meshes from its current in-memory heights (after an
+  // edit / snapshot write) without touching the rest of the terrain. Dispatches
+  // chunk-unloaded so listeners (e.g. physics colliders) reset before the
+  // re-mesh raises chunk-loaded again. Returns false if the chunk isn't loaded.
+  remeshChunk(cx: number, cy: number): boolean {
+    const chunk = this.terrainChunks.get(`${cx},${cy}`);
+    if (!chunk) return false;
+
+    this.dispatcher.dispatch({ type: 'chunk-unloaded', chunk });
+    chunk.invalidateMeshes();
+    this._needsVisibilityUpdate = true;
+    return true;
   }
 
   update(renderer: Renderer, camera: Camera) {

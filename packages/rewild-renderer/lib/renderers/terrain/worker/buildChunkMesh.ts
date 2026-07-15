@@ -20,6 +20,10 @@ export interface BuildChunkMeshResult {
   uvs: Float32Array;
   normals: Float32Array;
   indices: Uint32Array;
+  // The full LOD-0 heightfield the mesh was built from (generated or provided).
+  // Returned so the main thread can keep the chunk's current heights in memory
+  // — the capture source for snapshot writes (#174) and sculpting (#175).
+  heights: Float32Array;
 }
 
 // Shared by the terrain worker and tests. Everything downstream of the height
@@ -113,5 +117,6 @@ export function buildChunkMesh(
     uvs,
     normals: meshData.normals,
     indices: meshData.triangles,
+    heights,
   };
 }

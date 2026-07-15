@@ -1,14 +1,15 @@
 import { IProject } from 'models';
-import { Renderer, resolveClimatePreset, serializeChunkSnapshot, chunkSnapshotFilename } from 'rewild-renderer';
+import { Renderer, resolveClimatePreset } from 'rewild-renderer';
 import { generateBiomeBlendedHeightMap } from 'rewild-renderer/lib/renderers/terrain/Noise';
 import { Vector2 } from 'rewild-common';
 import { db } from 'src/database/database';
+import { writeChunkSnapshot } from 'src/database/chunk-snapshots';
 
-// Dev/verification console commands for the chunk-snapshot read path (#173).
-// writeChunkSnapshotFixture stamps an obviously artificial plateau into an
-// otherwise-correct heightfield and saves it as a snapshot, so a reload of the
-// chunk visibly meshes from storage while its neighbours still generate. The
-// real writer (sculpting) lands with #174/#175.
+// Dev/verification console commands for the chunk-snapshot round-trip
+// (#173 read, #174 write). writeChunkSnapshotFixture simulates an edit the way
+// sculpting (#175) will: take the chunk's current in-memory LOD-0 heights,
+// modify them (an unmistakable plateau), persist via the asset path, and
+// re-mesh just that chunk in place — no reload, neighbours untouched.
 export function registerChunkSnapshotDevCommands(
   renderer: Renderer,
   project: IProject
@@ -25,17 +26,23 @@ export function registerChunkSnapshotDevCommands(
 
     const terrain = renderer.terrainRenderer;
     const size = terrain.mapChunkSizeLod; // LOD-0 samples per side (241)
-    const worldStep = size - 1; // chunk world size (240)
-    const heights = generateBiomeBlendedHeightMap(
-      size,
-      size,
-      terrain.seed,
-      new Vector2(cx * worldStep, cy * worldStep),
-      resolveClimatePreset(terrain.climatePreset)
-    );
+    const chunk = terrain.terrainChunks.get(`${cx},${cy}`);
 
-    // Stamp a smooth flat-topped plateau in the chunk centre — unmistakably
-    // hand-made, so "meshed from storage" is visible at a glance.
+    // Capture: the chunk's current in-memory heights (includes prior edits).
+    // A chunk that was never loaded has none — generate its unedited baseline,
+    // which is byte-identical to what the worker would produce for it.
+    const heights = chunk?.heights
+      ? new Float32Array(chunk.heights)
+      : generateBiomeBlendedHeightMap(
+          size,
+          size,
+          terrain.seed,
+          new Vector2(cx * (size - 1), cy * (size - 1)),
+          resolveClimatePreset(terrain.climatePreset)
+        );
+
+    // The "edit": a smooth flat-topped plateau in the chunk centre —
+    // unmistakably hand-made, so "meshed from storage" is visible at a glance.
     const centre = (size - 1) / 2;
     const radius = size * 0.35;
     const plateauHeight = 60;
@@ -49,13 +56,14 @@ export function registerChunkSnapshotDevCommands(
       }
     }
 
-    const blob = serializeChunkSnapshot(heights, size, size);
-    await db.assets.write(levelId, 'chunk', chunkSnapshotFilename(cx, cy), blob);
+    await writeChunkSnapshot(levelId, cx, cy, heights, size);
 
-    // Rebuild terrain so the chunk re-fetches and meshes the stored heights.
-    terrain.reset(terrain.seed, renderer);
+    // Show the change without a reload: apply the edited heights to the loaded
+    // chunk and rebuild only its meshes. If it isn't loaded, it will mesh from
+    // the snapshot whenever it comes into view.
+    const applied = terrain.applyChunkHeights(cx, cy, heights);
     console.log(
-      `Wrote fixture snapshot for chunk ${cx},${cy} (${chunkSnapshotFilename(cx, cy)}) — terrain reloading.`
+      `Wrote snapshot for chunk ${cx},${cy} — ${applied ? 're-meshing in place' : 'will mesh from storage when loaded'}. Sync uploads it on next save/publish or login.`
     );
   };
 

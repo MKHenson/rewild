@@ -17,3 +17,11 @@ export class Database {
 }
 
 export const db = new Database();
+
+// Sync is auth-gated and local-first: edits made while logged out sit dirty in
+// IndexedDB/OPFS. Flush them promptly once a user is authenticated (login,
+// register, or token refresh) instead of waiting for the next save/publish.
+authService.onAuthStateChanged.add((user) => {
+  if (user)
+    db.syncAll().catch((err) => console.warn('Post-login sync failed:', err));
+});

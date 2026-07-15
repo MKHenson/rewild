@@ -36,7 +36,25 @@ describe('buildChunkMesh', () => {
       expect(provided.normals).toEqual(generated.normals);
       expect(provided.indices).toEqual(generated.indices);
       expect(provided.texture).toEqual(generated.texture);
+      expect(provided.heights).toEqual(generated.heights);
     }
+  });
+
+  it('returns the LOD-0 heightfield the mesh was built from', () => {
+    const generated = buildChunkMesh({ ...baseRequest, lod: 2 });
+    expect(generated.heights).toEqual(
+      generateBiomeBlendedHeightMap(
+        CHUNK_SIZE,
+        CHUNK_SIZE,
+        SEED,
+        new Vector2(POSITION.x, POSITION.y),
+        resolveClimatePreset(DEFAULT_CLIMATE_PRESET)
+      )
+    );
+
+    const supplied = new Float32Array(CHUNK_SIZE * CHUNK_SIZE).fill(7);
+    const provided = buildChunkMesh({ ...baseRequest, lod: 2, heights: supplied });
+    expect(provided.heights).toEqual(supplied);
   });
 
   it('meshes provided heights without consulting the generator', () => {

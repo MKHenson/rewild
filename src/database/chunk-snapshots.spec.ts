@@ -2,7 +2,10 @@ import {
   CHUNK_SNAPSHOT_FLAG_COMPRESSED,
   serializeChunkSnapshot,
 } from 'rewild-renderer/lib/renderers/terrain/ChunkSnapshot';
-import { createChunkSnapshotProvider } from './chunk-snapshots';
+import {
+  createChunkSnapshotProvider,
+  writeChunkSnapshot,
+} from './chunk-snapshots';
 import { db } from './database';
 import { installOPFSMock } from './opfs-mock';
 import { clearDatabase } from './local-db';
@@ -68,5 +71,77 @@ describe('createChunkSnapshotProvider', () => {
     const provider = createChunkSnapshotProvider(LEVEL_ID);
     expect(await provider(0, 0)).toBeNull();
     expect(warnSpy).toHaveBeenCalled();
+  });
+
+  describe('level deletion', () => {
+    it('deleting a level removes its chunk snapshots (blob + metadata)', async () => {
+      const level = await db.levels.add({
+        name: 'doomed',
+        projectId: 'p1',
+        hasTerrain: true,
+      } as any);
+      await writeChunkSnapshot(level.id, 0, 0, fixtureHeights(), SIZE);
+
+      const provider = createChunkSnapshotProvider(level.id);
+      expect(await provider(0, 0)).not.toBeNull();
+
+      await db.levels.remove(level.id);
+
+      expect(await provider(0, 0)).toBeNull();
+      const dirty = await db.assets.getDirty();
+      expect(dirty.some((d) => d.levelId === level.id)).toBe(false);
+    });
+
+    it('deleting a level leaves another level\'s snapshots intact', async () => {
+      const doomed = await db.levels.add({ name: 'doomed', projectId: 'p1' } as any);
+      await writeChunkSnapshot(doomed.id, 0, 0, fixtureHeights(), SIZE);
+      const kept = fixtureHeights().map((h) => h * 2);
+      await writeChunkSnapshot('level-keep', 1, 1, kept, SIZE);
+
+      await db.levels.remove(doomed.id);
+
+      const provider = createChunkSnapshotProvider('level-keep');
+      expect(await provider(1, 1)).toEqual(kept);
+    });
+  });
+
+  describe('writeChunkSnapshot', () => {
+    it('round-trips: written heights come back through the provider', async () => {
+      const heights = fixtureHeights();
+      await writeChunkSnapshot(LEVEL_ID, 5, -3, heights, SIZE);
+
+      const provider = createChunkSnapshotProvider(LEVEL_ID);
+      expect(await provider(5, -3)).toEqual(heights);
+    });
+
+    it('writes are dirty so the next sync pushes them', async () => {
+      await writeChunkSnapshot(LEVEL_ID, 0, 0, fixtureHeights(), SIZE);
+
+      const dirty = await db.assets.getDirty();
+      expect(dirty).toHaveLength(1);
+      expect(dirty[0].assetType).toBe('chunk');
+      expect(dirty[0].filename).toBe('0_0.bin');
+    });
+
+    it('re-edits override: same asset row re-dirtied, latest heights win', async () => {
+      const first = fixtureHeights();
+      const id = await writeChunkSnapshot(LEVEL_ID, 0, 0, first, SIZE);
+
+      // Simulate a completed sync, then wait so the re-write's updatedAt advances.
+      const record = await db.assets.getOne(id);
+      await db.assets.markSynced(id, record!.updatedAt, null);
+      expect(await db.assets.getDirty()).toHaveLength(0);
+      await new Promise((r) => setTimeout(r, 5));
+
+      const second = fixtureHeights().map((h) => h + 10);
+      const secondId = await writeChunkSnapshot(LEVEL_ID, 0, 0, second, SIZE);
+
+      expect(secondId).toBe(id); // same metadata row, same storage key
+      const dirty = await db.assets.getDirty();
+      expect(dirty).toHaveLength(1);
+
+      const provider = createChunkSnapshotProvider(LEVEL_ID);
+      expect(await provider(0, 0)).toEqual(second);
+    });
   });
 });
