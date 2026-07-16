@@ -1,5 +1,6 @@
 package com.rewild.levels
 
+import com.rewild.assets.AssetCleanupService
 import com.rewild.common.DeleteResult
 import com.rewild.db.tables.LevelsTable
 import com.rewild.models.Container
@@ -14,7 +15,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 
 private val json = Json { ignoreUnknownKeys = true }
 
-class LevelService {
+class LevelService(private val cleanup: AssetCleanupService? = null) {
 
     fun getAll(userId: String): List<Level> = transaction {
         LevelsTable.selectAll()
@@ -78,16 +79,22 @@ class LevelService {
             .map { it.toLevel() }
     }
 
-    fun delete(userId: String, id: String): DeleteResult = transaction {
-        val existing = LevelsTable.selectAll()
-            .where { LevelsTable.id eq id }
-            .firstOrNull()
-            ?: return@transaction DeleteResult.NotFound
+    fun delete(userId: String, id: String): DeleteResult {
+        val result = transaction {
+            val existing = LevelsTable.selectAll()
+                .where { LevelsTable.id eq id }
+                .firstOrNull()
+                ?: return@transaction DeleteResult.NotFound
 
-        if (existing[LevelsTable.userId] != userId) return@transaction DeleteResult.Forbidden
+            if (existing[LevelsTable.userId] != userId) return@transaction DeleteResult.Forbidden
 
-        LevelsTable.deleteWhere { LevelsTable.id eq id }
-        DeleteResult.Success
+            LevelsTable.deleteWhere { LevelsTable.id eq id }
+            DeleteResult.Success
+        }
+
+        // Only once the row is committed gone — a rolled-back delete must not lose blobs.
+        if (result == DeleteResult.Success) cleanup?.cleanupLevel(id)
+        return result
     }
 
     private fun ResultRow.toLevel() = Level(
