@@ -238,12 +238,12 @@ export class LODMesh {
         terrainPass.terrainUniforms.sampler =
           renderer.samplerManager.get('linear-clamped');
         terrainPass.terrainUniforms.texture = this.chunk.texture!.gpuTexture;
-        terrainPass.terrainUniforms.albedoTexture = renderer.textureManager.get(
-          'rocky-mountain-texture-seamless'
-        ).gpuTexture;
-        terrainPass.terrainUniforms.normalMap = renderer.textureManager.get(
-          'rocky-mountain-texture-seamless-normal'
-        ).gpuTexture;
+        // One hardcoded material for the whole world — the placeholder #181
+        // replaces with the per-biome layer blend.
+        terrainPass.terrainUniforms.albedoTexture =
+          renderer.textureManager.get('rocks-ground-01').gpuTexture;
+        terrainPass.terrainUniforms.normalMap =
+          renderer.textureManager.get('rocks-ground-01-normal').gpuTexture;
         terrainPass.terrainUniforms.shininess = 5;
 
         const newMesh = new Mesh(geometry, terrainPass);
