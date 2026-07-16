@@ -6,6 +6,8 @@ import { Intersection } from '../../core/Raycaster';
 import { IComponent, IRaycaster } from '../../../types/interfaces';
 import { ChunkSnapshotProvider } from './ChunkSnapshot';
 import { LODMesh } from './LODMesh';
+import { DataTexture } from '../../textures/DataTexture';
+import { TextureProperties } from '../../textures/Texture';
 
 const temp: Vector3 = new Vector3();
 
@@ -37,6 +39,16 @@ export class TerrainChunk implements IComponent {
   // and to coalesce rebuilds while edits keep arriving.
   heightsVersion = 0;
   disposed = false;
+  // The chunk's surface texture, derived from `heights`. This is chunk state,
+  // not per-LOD state: the worker builds it at full resolution and never varies
+  // it by lod, so every LOD of a chunk wants the same texels. Owned here (all
+  // LODs merely bind it) and destroyed with the chunk.
+  //
+  // Deliberately NOT registered with the textureManager — its name-keyed map
+  // would have every chunk clobber the same entry while the GPU textures leak.
+  texture: DataTexture | null = null;
+  // The heightsVersion the texture's contents were built from.
+  private textureVersion = -1;
   // Cached snapshot lookup — one OPFS read per chunk, shared by all LODs.
   private snapshotLookup: Promise<Float32Array | null> | null = null;
 
@@ -147,6 +159,41 @@ export class TerrainChunk implements IComponent {
     this.heightsVersion++;
   }
 
+  // Adopts a worker-built texture for the heights at `version`. Creates the GPU
+  // texture on first call, then re-uploads in place for later edits: the
+  // GPUTexture object stays stable across a sculpt stroke, so LOD bind groups
+  // built against it stay valid and no per-stamp texture is allocated.
+  //
+  // Data older than what the texture already holds is ignored, so a slow LOD
+  // build that started before an edit cannot overwrite it with pre-edit texels.
+  // Equal versions are also ignored: sibling LODs of a chunk produce identical
+  // texels, so the first one there wins and the rest are redundant uploads.
+  populateTexture(renderer: Renderer, data: Uint8Array, version: number) {
+    if (this.texture && version <= this.textureVersion) return;
+    this.textureVersion = version;
+
+    if (!this.texture) {
+      this.texture = new DataTexture(
+        new TextureProperties(`terrain_${this.id}`, false),
+        data,
+        this.chunkSize,
+        this.chunkSize
+      );
+      // load() is declared async but assigns gpuTexture synchronously, so the
+      // texture is bindable as soon as this returns (as callers rely on).
+      this.texture.load(renderer);
+      return;
+    }
+
+    this.texture.data = data;
+    renderer.device.queue.writeTexture(
+      { texture: this.texture.gpuTexture },
+      data as BufferSource,
+      { bytesPerRow: this.chunkSize * 4 },
+      { width: this.chunkSize, height: this.chunkSize }
+    );
+  }
+
   // Rebuilds every built LOD mesh from the current in-memory heights, in the
   // background — each mesh keeps rendering until its replacement swaps in.
   refreshMeshes(renderer: Renderer) {
@@ -175,6 +222,9 @@ export class TerrainChunk implements IComponent {
     for (const lod of this.lodMesh) {
       lod.dispose();
     }
+    this.texture?.gpuTexture.destroy();
+    this.texture = null;
+    this.textureVersion = -1;
   }
 
   updateTerrainChunk(
