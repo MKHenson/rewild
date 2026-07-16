@@ -8,6 +8,7 @@ import { IMaterialPass } from './materials/IMaterialPass';
 import { IRenderGroup } from '../types/IRenderGroup';
 import { Sky } from './core/Sky';
 import { TerrainRenderer } from './renderers/terrain/TerrainRenderer';
+import { initTerrainTextureArrays } from './renderers/terrain/TerrainTextureArrays';
 import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
 import { RenderList } from './core/RenderList';
 import { RenderLayer } from './core/RenderLayer';
@@ -202,6 +203,7 @@ export class Renderer {
     await this.samplerManager.initialize(this);
     await this.fontManager.initialize(this);
     await this.textureManager.initialize(this, materialsTemplate);
+    await initTerrainTextureArrays(this);
     await this.geometryManager.initialize(this);
     await this.materialManager.initialize(this, materialsTemplate);
     await this.terrainRenderer.init(this);

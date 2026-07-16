@@ -3,6 +3,12 @@ import { TerrainPass } from '../../materials/TerrainPass';
 import { Mesh } from '../../core/Mesh';
 import { Renderer } from '../..';
 import { Geometry } from '../../geometry/Geometry';
+import { TextureArray } from '../../textures/TextureArray';
+import { getTerrainMaterialLayer } from './TerrainMaterials';
+import {
+  TERRAIN_ALBEDO_ARRAY,
+  TERRAIN_NORMAL_ARRAY,
+} from './TerrainTextureArrays';
 import type { TerrainChunk } from './TerrainChunk';
 
 export type LODMeshGPUState = 'none' | 'requested' | 'ready' | 'unloaded';
@@ -16,6 +22,10 @@ export type LODMeshGPUState = 'none' | 'requested' | 'ready' | 'unloaded';
 // of chunks a ray actually crosses.
 const TERRAIN_BVH_MAX_LOD = 1;
 const TERRAIN_BVH_LEAF_TRIANGLES = 32;
+
+// The single material every chunk is surfaced with until #181 blends the
+// per-biome layers from the splat map.
+const PLACEHOLDER_MATERIAL = 'rocks-ground-01';
 
 // One detail level of a terrain chunk: owns the worker request for its mesh
 // and the resulting GPU resources. The heights it meshes come from the chunk
@@ -239,11 +249,16 @@ export class LODMesh {
           renderer.samplerManager.get('linear-clamped');
         terrainPass.terrainUniforms.texture = this.chunk.texture!.gpuTexture;
         // One hardcoded material for the whole world — the placeholder #181
-        // replaces with the per-biome layer blend.
-        terrainPass.terrainUniforms.albedoTexture =
-          renderer.textureManager.get('rocks-ground-01').gpuTexture;
-        terrainPass.terrainUniforms.normalMap =
-          renderer.textureManager.get('rocks-ground-01-normal').gpuTexture;
+        // replaces with the per-biome layer blend. Until then the shader takes
+        // a plain texture_2d, so bind a single-layer view of the arrays rather
+        // than loading these two textures a second time standalone.
+        const rockLayer = getTerrainMaterialLayer(PLACEHOLDER_MATERIAL);
+        terrainPass.terrainUniforms.albedoView = (
+          renderer.textureManager.get(TERRAIN_ALBEDO_ARRAY) as TextureArray
+        ).createLayerView(rockLayer);
+        terrainPass.terrainUniforms.normalView = (
+          renderer.textureManager.get(TERRAIN_NORMAL_ARRAY) as TextureArray
+        ).createLayerView(rockLayer);
         terrainPass.terrainUniforms.shininess = 5;
 
         const newMesh = new Mesh(geometry, terrainPass);

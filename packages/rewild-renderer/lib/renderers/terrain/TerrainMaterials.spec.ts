@@ -5,7 +5,13 @@ import {
   getClimatePalette,
   validateClimateLayers,
 } from './Biomes';
-import { TERRAIN_MATERIALS, getTerrainMaterial } from './TerrainMaterials';
+import {
+  TERRAIN_MATERIALS,
+  getTerrainMaterial,
+  getTerrainMaterialLayer,
+  getTerrainMaterialOrder,
+  validateTerrainMaterials,
+} from './TerrainMaterials';
 
 // A minimal climate wrapper — these tests care only about the biome layers.
 function climateOf(biomes: ClimateConfig['biomes']): ClimateConfig {
@@ -52,19 +58,82 @@ describe('TERRAIN_MATERIALS', () => {
     }
   });
 
-  it('pairs every macroNormal with a macroUvScale', () => {
-    for (const material of Object.values(TERRAIN_MATERIALS)) {
-      expect(!!material.macroNormal).toBe(material.macroUvScale !== undefined);
+});
+
+describe('texture array layer order', () => {
+  it('covers the whole library, not just one climate palette', () => {
+    expect(getTerrainMaterialOrder()).toEqual(Object.keys(TERRAIN_MATERIALS));
+  });
+
+  it('gives every material a distinct layer', () => {
+    const order = getTerrainMaterialOrder();
+    expect(new Set(order).size).toBe(order.length);
+  });
+
+  it('maps a material to its layer index', () => {
+    const order = getTerrainMaterialOrder();
+    for (let i = 0; i < order.length; i++) {
+      expect(getTerrainMaterialLayer(order[i])).toBe(i);
     }
   });
 
-  // The macro normal only earns its samples if it is materially coarser than
-  // the detail normal — at the same scale it would just double the detail.
-  it('samples macro normals at a coarser scale than detail', () => {
-    for (const material of Object.values(TERRAIN_MATERIALS)) {
-      if (material.macroUvScale === undefined) continue;
-      expect(material.macroUvScale).toBeLessThan(material.uvScale);
-    }
+  it('reports -1 for a material outside the library', () => {
+    expect(getTerrainMaterialLayer('no-such-material')).toBe(-1);
+  });
+});
+
+describe('validateTerrainMaterials', () => {
+  const original = { ...TERRAIN_MATERIALS };
+
+  afterEach(() => {
+    for (const key of Object.keys(TERRAIN_MATERIALS))
+      delete TERRAIN_MATERIALS[key];
+    Object.assign(TERRAIN_MATERIALS, original);
+  });
+
+  it('accepts the shipped library', () => {
+    expect(() => validateTerrainMaterials()).not.toThrow();
+  });
+
+  it('rejects a macroNormalUrl without a macroUvScale', () => {
+    TERRAIN_MATERIALS['broken'] = {
+      name: 'broken',
+      albedoUrl: 'terrain/x/albedo.png',
+      normalUrl: 'terrain/x/normal.png',
+      uvScale: 25,
+      macroNormalUrl: 'terrain/x/normal.png',
+      specular: 0.1,
+    };
+    expect(() => validateTerrainMaterials()).toThrow(/together/);
+  });
+
+  it('rejects a macro normal that is not coarser than the detail normal', () => {
+    TERRAIN_MATERIALS['broken'] = {
+      name: 'broken',
+      albedoUrl: 'terrain/x/albedo.png',
+      normalUrl: 'terrain/x/normal.png',
+      uvScale: 25,
+      macroNormalUrl: 'terrain/x/normal.png',
+      macroUvScale: 25,
+      specular: 0.1,
+    };
+    expect(() => validateTerrainMaterials()).toThrow(/coarser/);
+  });
+
+  // Only albedo and normal arrays exist, so the macro normal is the material's
+  // own normal layer sampled at a coarser scale. A distinct macro map would
+  // silently render as the detail map instead.
+  it('rejects a macroNormalUrl that is a different texture to the normal', () => {
+    TERRAIN_MATERIALS['broken'] = {
+      name: 'broken',
+      albedoUrl: 'terrain/x/albedo.png',
+      normalUrl: 'terrain/x/normal.png',
+      uvScale: 25,
+      macroNormalUrl: 'terrain/x/some-other-normal.png',
+      macroUvScale: 2,
+      specular: 0.1,
+    };
+    expect(() => validateTerrainMaterials()).toThrow(/third texture array/);
   });
 });
 
@@ -128,8 +197,8 @@ describe('validateClimateLayers', () => {
   it('rejects a climate needing more materials than the splat map holds', () => {
     TERRAIN_MATERIALS['test-fifth'] = {
       name: 'test-fifth',
-      albedo: 'crate',
-      normal: 'crate-normal',
+      albedoUrl: 'terrain/test-fifth/albedo.png',
+      normalUrl: 'terrain/test-fifth/normal.png',
       uvScale: 25,
       specular: 0.1,
     };
