@@ -2,8 +2,6 @@ import { Vector2 } from 'rewild-common';
 import { TerrainPass } from '../../materials/TerrainPass';
 import { Mesh } from '../../core/Mesh';
 import { Renderer } from '../..';
-import { DataTexture } from '../../textures/DataTexture';
-import { TextureProperties } from '../../textures/Texture';
 import { Geometry } from '../../geometry/Geometry';
 import type { TerrainChunk } from './TerrainChunk';
 
@@ -39,11 +37,6 @@ export class LODMesh {
   // chunk.heightsVersion the current mesh was built from.
   private builtVersion = -1;
   private building = false;
-  // The colour texture backing the current mesh. Owned by this LOD (it is
-  // per-chunk data, not a shared managed asset) and must be destroyed with
-  // it — losing the reference leaks a GPUTexture, which under sculpting's
-  // rebuild-per-stamp cadence runs the GPU out of memory in seconds.
-  private texture: DataTexture | null = null;
 
   constructor(
     lod: i32,
@@ -83,14 +76,14 @@ export class LODMesh {
         return;
       case 'unloaded': {
         // Nothing on screen and the CPU geometry is now stale — throw it away
-        // and rebuild on demand instead of re-uploading stale data.
+        // and rebuild on demand instead of re-uploading stale data. The chunk's
+        // texture is left alone: it is shared with sibling LODs and refreshed
+        // by whichever build lands next.
         if (this.mesh) {
           this.mesh.material.dispose();
           this.mesh.transform.removeFromParent();
           this.mesh = undefined as never;
         }
-        this.texture?.gpuTexture.destroy();
-        this.texture = null;
         this.builtVersion = -1;
         this.gpuState = 'none';
         return;
@@ -111,16 +104,14 @@ export class LODMesh {
     this.gpuState = 'unloaded';
   }
 
-  // Full teardown (chunk eviction/reset): releases GPU geometry, uniform
-  // buffers and the owned colour texture.
+  // Full teardown (chunk eviction/reset): releases GPU geometry and uniform
+  // buffers
   dispose() {
     if (this.mesh) {
       if (this.gpuState === 'ready') this.mesh.geometry.dispose();
       this.mesh.material.dispose();
       this.mesh.transform.removeFromParent();
     }
-    this.texture?.gpuTexture.destroy();
-    this.texture = null;
   }
 
   private async reuploadGPU(renderer: Renderer) {
@@ -186,15 +177,9 @@ export class LODMesh {
           return;
         }
 
-        // Per-chunk texture, owned by this LOD — deliberately NOT registered
-        // with the textureManager (its name-keyed map would just have every
-        // chunk clobber the same entry while the GPU textures leak).
-        const terrainTexture = new DataTexture(
-          new TextureProperties(`terrain_${this.chunk.id}_${this.lod}`, false),
-          texture,
-          this.chunkSize,
-          this.chunkSize
-        );
+        // The texture is chunk state shared by every LOD — hand it over and let
+        // the chunk create or re-upload it as its version warrants.
+        this.chunk.populateTexture(renderer, texture, version);
 
         const oldMesh = swapping ? this.mesh : null;
 
@@ -221,7 +206,6 @@ export class LODMesh {
           geometry.bvh = oldBvh;
         }
 
-        terrainTexture.load(renderer);
         geometry.build(
           renderer.device,
           renderer.bvhConfig,
@@ -253,7 +237,7 @@ export class LODMesh {
         const terrainPass = new TerrainPass();
         terrainPass.terrainUniforms.sampler =
           renderer.samplerManager.get('linear-clamped');
-        terrainPass.terrainUniforms.texture = terrainTexture.gpuTexture;
+        terrainPass.terrainUniforms.texture = this.chunk.texture!.gpuTexture;
         terrainPass.terrainUniforms.albedoTexture = renderer.textureManager.get(
           'rocky-mountain-texture-seamless'
         ).gpuTexture;
@@ -263,9 +247,6 @@ export class LODMesh {
         terrainPass.terrainUniforms.shininess = 5;
 
         const newMesh = new Mesh(geometry, terrainPass);
-        const oldTexture = this.texture;
-
-        this.texture = terrainTexture;
         this.mesh = newMesh;
         this.chunk.transform.addChild(newMesh.transform);
         // This mesh arrives mid-frame from a worker; until the next render
@@ -284,7 +265,6 @@ export class LODMesh {
           oldMesh.material.dispose();
           oldMesh.transform.removeFromParent();
         }
-        oldTexture?.gpuTexture.destroy();
 
         this.builtVersion = version;
         this.gpuState = 'ready';
