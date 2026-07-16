@@ -25,6 +25,8 @@ export class SpotLightShadowRenderer {
 
   private pipeline: GPURenderPipeline;
   private meshUniforms: Map<IVisualComponent, MeshShadowUniforms>;
+  // Scratch set reused by the per-frame stale-entry sweep (no per-frame allocation).
+  private _liveMeshes = new Set<IVisualComponent>();
 
   private _lightViewWorld: Matrix4;
   private _lightView: Matrix4;
@@ -89,6 +91,11 @@ export class SpotLightShadowRenderer {
     _camera: PerspectiveCamera,
     renderer: Renderer
   ): void {
+    // Drop uniform entries for meshes no longer in the caster list — the map
+    // would otherwise pin every dead mesh's geometry forever (terrain
+    // sculpting replaces a chunk's mesh on every stamp).
+    this._sweepStaleMeshUniforms(renderList);
+
     const spotLight = this._findShadowCastingSpotLight(renderer);
     if (!spotLight) {
       this.hasSpotShadow = false;
@@ -199,6 +206,23 @@ export class SpotLightShadowRenderer {
     te[1]  = 0;  te[5]  = f;  te[9]  = 0;               te[13] = 0;
     te[2]  = 0;  te[6]  = 0;  te[10] = far * rangeInv;  te[14] = near * far * rangeInv;
     te[3]  = 0;  te[7]  = 0;  te[11] = -1;              te[15] = 0;
+  }
+
+  // The shadow render list is collected from the full scene (not camera-
+  // culled), so membership only changes when a mesh is actually added to or
+  // removed from the scene — entries never thrash with camera movement.
+  private _sweepStaleMeshUniforms(renderList: IRenderGroup[]): void {
+    const live = this._liveMeshes;
+    live.clear();
+    for (const item of renderList) {
+      for (const mesh of item.meshes) live.add(mesh);
+    }
+    for (const [mesh, uniforms] of this.meshUniforms) {
+      if (live.has(mesh)) continue;
+      uniforms.buffer.destroy();
+      this.meshUniforms.delete(mesh);
+    }
+    live.clear();
   }
 
   private _ensureMeshUniforms(device: GPUDevice, mesh: IVisualComponent): void {

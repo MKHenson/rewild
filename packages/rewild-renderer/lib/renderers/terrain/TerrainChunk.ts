@@ -32,6 +32,11 @@ export class TerrainChunk implements IComponent {
   // response (or a snapshot read) and kept for the chunk's lifetime; it is the
   // capture source for snapshot writes (#174) and sculpting (#175).
   heights: Float32Array | null = null;
+  // Bumped on every heights change (setHeights or an in-place edit via
+  // bumpHeightsVersion). LOD meshes compare against it to know they are stale
+  // and to coalesce rebuilds while edits keep arriving.
+  heightsVersion = 0;
+  disposed = false;
   // Cached snapshot lookup — one OPFS read per chunk, shared by all LODs.
   private snapshotLookup: Promise<Float32Array | null> | null = null;
 
@@ -106,36 +111,47 @@ export class TerrainChunk implements IComponent {
     return this.snapshotLookup;
   }
 
-  // Replaces the chunk's in-memory heightfield (an edit). Meshes are not
-  // touched — call TerrainRenderer.remeshChunk() to rebuild them from it.
+  // Fills in the chunk's heightfield for the first time, from a worker
+  // generation or a snapshot read. Deliberately does NOT bump heightsVersion:
+  // this is the baseline every LOD is already building against, not an edit.
+  // (Bumping it made a sibling LOD whose request was still in flight consider
+  // itself stale and re-mesh — which used to tear down the chunk's collider.)
+  // No-op once heights exist: the first writer wins, and all writers agree
+  // (generation is deterministic, and the snapshot lookup is shared).
+  populateHeights(heights: Float32Array) {
+    if (this.heights) return;
+    this.validateHeights(heights);
+    this.heights = heights;
+  }
+
+  // Replaces the chunk's in-memory heightfield (an edit) and marks meshes
+  // stale. Meshes are not touched — call TerrainRenderer.remeshChunk() /
+  // refreshMeshes() to rebuild them from it.
   setHeights(heights: Float32Array) {
+    this.validateHeights(heights);
+    this.heights = heights;
+    this.heightsVersion++;
+  }
+
+  private validateHeights(heights: Float32Array) {
     const expected = this.chunkSize * this.chunkSize;
     if (heights.length !== expected)
       throw new Error(
         `Chunk ${this.id} heights must have ${expected} samples, got ${heights.length}.`
       );
-    this.heights = heights;
   }
 
-  // Tears down all LOD meshes (keeping heights) so the next visibility update
-  // re-requests and re-meshes from the current in-memory heights.
-  invalidateMeshes() {
+  // Marks the heights stale after they were mutated in place (sculpting edits
+  // the chunk's array directly to avoid per-stamp copies).
+  bumpHeightsVersion() {
+    this.heightsVersion++;
+  }
+
+  // Rebuilds every built LOD mesh from the current in-memory heights, in the
+  // background — each mesh keeps rendering until its replacement swaps in.
+  refreshMeshes(renderer: Renderer) {
     for (const lod of this.lodMesh) {
-      if (lod.mesh) {
-        if (lod.gpuState === 'ready') lod.mesh.geometry.dispose();
-        lod.mesh.material.dispose();
-        lod.mesh.transform.removeFromParent();
-      }
-    }
-    for (let i = 0; i < this.detailLevels.length; i++) {
-      this.lodMesh[i] = new LODMesh(
-        this.detailLevels[i].lod,
-        this,
-        this.position,
-        this.chunkSize,
-        this.seed,
-        this.climatePreset
-      );
+      lod.refresh(renderer);
     }
   }
 
@@ -155,11 +171,9 @@ export class TerrainChunk implements IComponent {
   }
 
   dispose() {
+    this.disposed = true;
     for (const lod of this.lodMesh) {
-      if (lod.mesh) {
-        if (lod.gpuState === 'ready') lod.mesh.geometry.dispose();
-        lod.mesh.material.dispose();
-      }
+      lod.dispose();
     }
   }
 

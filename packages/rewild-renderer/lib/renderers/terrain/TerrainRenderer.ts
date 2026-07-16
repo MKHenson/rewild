@@ -39,6 +39,9 @@ export class TerrainRenderer {
   workerPool: TerrainWorkerPool;
   private onChunkLoadedDelegate: (event: TerrainChunkEvent) => void;
   private _needsVisibilityUpdate: boolean = false;
+  // Captured in init(); background mesh refreshes (edits) need it outside the
+  // update() call path.
+  private renderer: Renderer | null = null;
 
   _hasInitiallyUpdatedTerrain: boolean = false;
   readonly mapChunkSizeLod = 241;
@@ -105,6 +108,7 @@ export class TerrainRenderer {
   }
 
   init(renderer: Renderer) {
+    this.renderer = renderer;
     const mapChunkSize = this.mapChunkSizeLod;
     this.chunkSize = mapChunkSize - 1;
     // Chunks are culled by nearest-edge distance, so the creation square must
@@ -118,6 +122,14 @@ export class TerrainRenderer {
 
   private onChunkLoaded(event: TerrainChunkEvent) {
     this._needsVisibilityUpdate = true;
+    // Note: a re-mesh (edit) raises chunk-loaded again for that LOD without a
+    // preceding chunk-unloaded — the chunk never went away. Listeners holding
+    // per-chunk resources built from a mesh must release the old one when they
+    // (re)build on chunk-loaded, keyed by chunk id. Dispatching chunk-unloaded
+    // here instead would be wrong and was actively harmful: a replaced LOD-3
+    // mesh would tear down the LOD-0 physics collider, and the chunk-loaded
+    // that followed carried lod 3, so the collider was never rebuilt — solid
+    // looking terrain the player fell straight through.
     this.dispatcher.dispatch({
       type: 'chunk-loaded',
       chunk: event.chunk,
@@ -234,6 +246,40 @@ export class TerrainRenderer {
     }
   }
 
+  // Terrain height at world (x, z), bilinearly sampled from the owning
+  // chunk's in-memory LOD-0 heightfield; null when that chunk has no heights
+  // yet. Exact regardless of terrain altitude (unlike a bounded raycast) and
+  // reflects in-flight sculpt edits immediately — the mesh lags a rebuild
+  // behind. Used by the editor's orbit-camera ground clamp.
+  sampleHeight(x: number, z: number): number | null {
+    const span = this.chunkSize;
+    const size = this.mapChunkSizeLod;
+    if (!span) return null;
+
+    const cx = Math.round(x / span);
+    const cy = Math.round(z / span);
+    const heights = this.terrainChunks.get(`${cx},${cy}`)?.heights;
+    if (!heights) return null;
+
+    // Chunk-local sample coordinates (see MeshGenerator: +z is -sy).
+    const fx = Math.min(span, Math.max(0, x - cx * span + span / 2));
+    const fz = Math.min(span, Math.max(0, cy * span + span / 2 - z));
+    const x0 = Math.floor(fx);
+    const z0 = Math.floor(fz);
+    const x1 = Math.min(x0 + 1, span);
+    const z1 = Math.min(z0 + 1, span);
+    const tx = fx - x0;
+    const tz = fz - z0;
+
+    const h00 = heights[z0 * size + x0];
+    const h10 = heights[z0 * size + x1];
+    const h01 = heights[z1 * size + x0];
+    const h11 = heights[z1 * size + x1];
+    const top = h00 + (h10 - h00) * tx;
+    const bottom = h01 + (h11 - h01) * tx;
+    return top + (bottom - top) * tz;
+  }
+
   // Applies an edit: replaces a chunk's in-memory heightfield and rebuilds its
   // meshes, without touching the rest of the terrain. Returns false if the
   // chunk isn't loaded (a saved snapshot will supply the heights when it is).
@@ -242,21 +288,23 @@ export class TerrainRenderer {
     if (!chunk) return false;
 
     chunk.setHeights(heights);
-    this.remeshChunk(cx, cy);
+    if (this.renderer) chunk.refreshMeshes(this.renderer);
     return true;
   }
 
-  // Rebuilds one chunk's meshes from its current in-memory heights (after an
-  // edit / snapshot write) without touching the rest of the terrain. Dispatches
-  // chunk-unloaded so listeners (e.g. physics colliders) reset before the
-  // re-mesh raises chunk-loaded again. Returns false if the chunk isn't loaded.
+  // Rebuilds one chunk's meshes from its current in-memory heights after they
+  // were mutated in place (a sculpt stamp), without touching the rest of the
+  // terrain. Rebuilds run in the background and swap in when ready — the old
+  // mesh keeps rendering meanwhile, and listeners get chunk-unloaded /
+  // chunk-loaded around each swap (e.g. to rebuild physics colliders).
+  // Repeated calls while a rebuild is in flight coalesce. Returns false if
+  // the chunk isn't loaded.
   remeshChunk(cx: number, cy: number): boolean {
     const chunk = this.terrainChunks.get(`${cx},${cy}`);
-    if (!chunk) return false;
+    if (!chunk || !this.renderer) return false;
 
-    this.dispatcher.dispatch({ type: 'chunk-unloaded', chunk });
-    chunk.invalidateMeshes();
-    this._needsVisibilityUpdate = true;
+    chunk.bumpHeightsVersion();
+    chunk.refreshMeshes(this.renderer);
     return true;
   }
 

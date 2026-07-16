@@ -42,10 +42,19 @@ export function computeObjectHalfHeight(transform: Transform): number {
 export function raycastToSurface(
   renderer: Renderer,
   worldPosition: Vector3,
-  excludeTransforms?: Transform[]
+  excludeTransforms?: Transform[],
+  // The down-ray starts castFrom above worldPosition.y and travels range —
+  // callers scanning for surfaces far from their reference height (e.g. the
+  // orbit camera's ground probe) pass a wider window.
+  castFrom: number = 100,
+  range: number = 200
 ): Intersection | null {
-  _raycaster.far = 200;
-  _downRay.origin.set(worldPosition.x, worldPosition.y + 100, worldPosition.z);
+  _raycaster.far = range;
+  _downRay.origin.set(
+    worldPosition.x,
+    worldPosition.y + castFrom,
+    worldPosition.z
+  );
   _downRay.direction.copy(_downDir);
   _raycaster.ray.copy(_downRay);
 

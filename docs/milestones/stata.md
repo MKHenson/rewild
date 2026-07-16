@@ -176,7 +176,7 @@ Work top-to-bottom; arrows are hard dependencies.
 - New surface materials / splat layers (biomes keep the existing height-band
   colouring for now; materials arrive with painting).
 - A third+ biome — purely additive on the climate model from #171 (a table row
-  + an axis cut + cell entries). The 2-axis climate model itself landed early,
-  in #171.
+  - an axis cut + cell entries). The 2-axis climate model itself landed early,
+    in #171.
 - More climate presets (eras / time-travel worlds) — additive once #172 gives
   worlds a preset reference.

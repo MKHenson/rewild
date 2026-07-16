@@ -46,7 +46,7 @@ export class MaterialIcon extends Component<Props> {
   }
 }
 
-const StyledMaterialIconStylesheet = cssStylesheet(css`
+const iconCss = css`
   :host {
     display: inline-block;
     vertical-align: middle;
@@ -83,18 +83,23 @@ const StyledMaterialIconStylesheet = cssStylesheet(css`
   span.md-48 {
     font-size: 48px;
   }
-`);
+`;
+
+const StyledMaterialIconStylesheet = cssStylesheet(iconCss);
+
+// The muted default lives on :host, not on an inline style: an inline style is
+// unbeatable from the outside, so the icon could never take its container's
+// colour (a selected/hovered button changed its label but left the icon grey).
+// :host is the lowest-priority source, so any outer rule — including Button's
+// `color: inherit` for slotted icons — wins.
+const MutedMaterialIconStylesheet = cssStylesheet(
+  `${iconCss} :host { color: var(--on-surface-light); }`
+);
 
 @register("x-styled-material-icon")
 export class StyledMaterialIcon extends MaterialIcon {
-  constructor() {
-    super({
-      props: {
-        style: css`
-          color: var(--on-surface-light);
-        `,
-      },
-    });
+  getStyle() {
+    return MutedMaterialIconStylesheet;
   }
 }
 
