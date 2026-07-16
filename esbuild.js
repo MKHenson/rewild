@@ -161,6 +161,24 @@ const wgslInlineIncludePlugin = {
   },
 };
 
+/**
+ * @loaders.gl/worker-utils re-exports a Node-only ChildProcessProxy from its index
+ * barrel, so bundling @loaders.gl/core or /gltf drags in a `child_process` import
+ * that the browser field disables. The class is unreachable in a browser, so stub it.
+ */
+const loadersGlChildProcessStubPlugin = {
+  name: 'loaders-gl-child-process-stub',
+  setup(build) {
+    build.onLoad(
+      { filter: /worker-utils[\\/]dist[\\/]lib[\\/]process-utils[\\/]child-process-proxy\.js$/ },
+      () => ({
+        contents: 'export default class ChildProcessProxy {}',
+        loader: 'js',
+      })
+    );
+  },
+};
+
 function getConfig() {
   return {
     entryPoints: {
@@ -178,7 +196,12 @@ function getConfig() {
     tsconfig: './src/tsconfig.json',
     outdir: './public',
     define: defines,
-    plugins: [logPlugin, wgslInlineIncludePlugin, copyPlugin],
+    plugins: [
+      logPlugin,
+      wgslInlineIncludePlugin,
+      loadersGlChildProcessStubPlugin,
+      copyPlugin,
+    ],
   };
 }
 
