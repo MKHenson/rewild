@@ -1,5 +1,6 @@
 package com.rewild
 
+import com.rewild.assets.AssetCleanupService
 import com.rewild.assets.AssetService
 import com.rewild.assets.S3Client
 import com.rewild.assets.assetRoutes
@@ -77,10 +78,6 @@ private fun Application.configureAuth(jwtService: JwtService) {
 }
 
 private fun Application.configureApi(authService: AuthService, secureCookies: Boolean, protected: Boolean) {
-    val projectService = ProjectService()
-    val levelService = LevelService()
-    val syncService = SyncService(projectService, levelService)
-
     fun str(key: String) = environment.config.propertyOrNull(key)?.getString() ?: ""
     val s3Endpoint = str("storage.s3Endpoint")
     val s3 = if (s3Endpoint.isNotEmpty()) S3Client(
@@ -93,6 +90,11 @@ private fun Application.configureApi(authService: AuthService, secureCookies: Bo
         bucketName = str("storage.bucketName"),
         bucketBaseUrl = str("storage.bucketBaseUrl")
     )
+    val assetCleanupService = AssetCleanupService(s3 = s3, bucketName = str("storage.bucketName"))
+
+    val projectService = ProjectService()
+    val levelService = LevelService(assetCleanupService)
+    val syncService = SyncService(projectService, levelService, assetCleanupService)
 
     val corsOrigin = environment.config.propertyOrNull("cors.allowedOrigin")?.getString()
     install(CORS) {

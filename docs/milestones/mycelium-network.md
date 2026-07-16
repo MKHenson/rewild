@@ -398,7 +398,9 @@ The public URL is always `{BUCKET_BASE_URL}/{storage_key}`. `BUCKET_BASE_URL` is
 
 **Deletion**
 
-When a level is deleted, all its assets are removed with a single prefix delete on `levels/{levelId}/` — a native S3 batch operation that does not require iterating individual records. The `assets` DB rows are removed by cascading FK delete on `level_id`.
+When a level is deleted, all its assets are removed by deleting the `levels/{levelId}/` prefix. S3 has no native prefix delete, so this is a `ListObjectsV2` over the prefix followed by a `DeleteObjects` batch per page — 1000 keys per round-trip, driven entirely off the prefix and never off the DB records. The `assets` DB rows are removed by cascading FK delete on `level_id` when the level row is hard-deleted; a level tombstoned via sync keeps its row, so its asset rows are deleted explicitly.
+
+Deletion must never be blocked by object storage. A prefix whose delete fails is parked in `asset_cleanup_queue` and retried by `AssetCleanupService.retryPending()` — without it, a failed delete would be unreclaimable, since once the level id is gone nothing else knows the prefix exists. No reaper is scheduled yet; the queue is drained manually for now.
 
 **Local development**
 

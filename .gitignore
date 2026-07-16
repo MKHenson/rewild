@@ -13,7 +13,10 @@ public/
 
 node_modules/
 build/
-assets/
+# Anchored: this is the root art directory (large binaries, kept out of git).
+# Unanchored it also swallowed source packages named "assets" — e.g.
+# server/src/main/kotlin/assets and src/api/assets — silently dropping new files.
+/assets/
 
 **/node_modules/*
 **/.firebase

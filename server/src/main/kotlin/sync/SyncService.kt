@@ -1,5 +1,6 @@
 package com.rewild.sync
 
+import com.rewild.assets.AssetCleanupService
 import com.rewild.levels.LevelService
 import com.rewild.models.Level
 import com.rewild.models.Project
@@ -16,7 +17,8 @@ private val json = Json { ignoreUnknownKeys = true }
 
 class SyncService(
     private val projectService: ProjectService,
-    private val levelService: LevelService
+    private val levelService: LevelService,
+    private val cleanup: AssetCleanupService? = null
 ) {
     fun sync(userId: String, request: SyncRequest): SyncResponse {
         val now = System.currentTimeMillis()
@@ -48,10 +50,16 @@ class SyncService(
         }
 
         // Pass 2: upsert levels — projects exist now so project_id FK is satisfied.
+        // Levels are tombstoned rather than hard-deleted, so the assets FK never cascades
+        // and nothing else would ever reclaim their blobs: collect newly-arrived
+        // tombstones and clean them up once the push phase has committed.
+        val newlyTombstoned = mutableListOf<String>()
         for ((record, incoming) in levelRecords) {
             val existing = levelService.getById(userId, record.id)
             if (existing == null || record.updatedAt > existing.updatedAt) {
                 levelService.upsert(userId, incoming.copy(userId = userId, syncedAt = now, syncError = null))
+                // Only on the transition to deleted, so re-syncing a tombstone is a no-op.
+                if (incoming.deletedAt != null && existing?.deletedAt == null) newlyTombstoned.add(record.id)
             }
         }
 
@@ -61,6 +69,10 @@ class SyncService(
             if (incoming.deletedAt != null) continue
             projectService.upsert(userId, incoming.copy(userId = userId, syncedAt = now, syncError = null))
         }
+
+        // Reclaim blobs for levels this sync just tombstoned. Never throws, so a bucket
+        // outage can't fail the sync — failures are queued for a later retry.
+        for (levelId in newlyTombstoned) cleanup?.cleanupLevel(levelId)
 
         // Pull phase: return everything the client hasn't seen yet.
         // lastSyncedAt = 0 means first sync — return the full dataset.
