@@ -57,20 +57,36 @@
       "url": "earth-day-2k-normal.jpg"
     },
     {
-      "name": "rocky-mountain-texture-seamless",
-      "url": "nature/landscapes/rocky-mountain-texture-seamless.png"
+      "name": "forest-ground-01",
+      "url": "terrain/forest-ground-01/forrest_ground_01_diff_1k.jpg"
     },
     {
-      "name": "rocky-mountain-texture-seamless-normal",
-      "url": "nature/landscapes/rocky-mountain-texture-seamless-normal.png"
+      "name": "forest-ground-01-normal",
+      "url": "terrain/forest-ground-01/forrest_ground_01_norm_1k.png"
     },
     {
       "name": "ground-coastal-1",
-      "url": "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png"
+      "url": "terrain/ground-coastal-1/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png"
     },
     {
       "name": "ground-coastal-1-normal",
-      "url": "nature/dirt/TexturesCom_Ground_Coastal1_2x2_1K_normal.png"
+      "url": "terrain/ground-coastal-1/TexturesCom_Ground_Coastal1_2x2_1K_normal.png"
+    },
+    {
+      "name": "rocks-ground-01",
+      "url": "terrain/rocks-ground-01/rocks_ground_01_diff_1k.jpg"
+    },
+    {
+      "name": "rocks-ground-01-normal",
+      "url": "terrain/rocks-ground-01/rocks_ground_01_norm_1k.png"
+    },
+    {
+      "name": "snow-02",
+      "url": "terrain/snow-02/snow_02_diff_1k.jpg"
+    },
+    {
+      "name": "snow-02-normal",
+      "url": "terrain/snow-02/snow_02_norm_1k.png"
     },
     {
       "name": "block-concrete-4",
