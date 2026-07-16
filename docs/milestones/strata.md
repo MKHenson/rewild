@@ -34,7 +34,10 @@ proving the whole stack end to end.
   per biome (`Noise.ts`), not per-chunk min/max — this is what keeps chunk
   borders seamless. **Any change to generation must preserve this.**
 - **Colour:** still placeholder height-colour bands in `TerrainWorker.ts`, now
-  driven by absolute world height; real materials arrive with painting.
+  driven by absolute world height, and one hardcoded material for the whole
+  world. Real per-biome materials arrive in
+  [07](./strata-terrain-materials.md) — ahead of painting, which needs them
+  first.
 - **Workers:** a 4-worker pool (`TerrainWorkerPool.ts`); the worker message is
   `{ chunkSize, lod, position, seed }`.
 - **Editor:** terrain is **already on** in the editor — `raycastToSurface`
@@ -141,14 +144,15 @@ Chunk snapshots follow the same path as every other asset:
 
 Work top-to-bottom; arrows are hard dependencies.
 
-| GitHub                                                | Spec                                                                             | Depends on                                                                                                   | Summary                                                                                                                  |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| [#170](https://github.com/MKHenson/rewild/issues/170) | [01 — Seeded worlds (end-to-end)](issues/01-world-seed.md)                       | —                                                                                                            | ✅ Done. Seed into the noise + `WorldGenConfig` on `sceneGraph.terrain` + persist/load + editor seed dialog.             |
-| [#171](https://github.com/MKHenson/rewild/issues/171) | [02 — Biome map + blended generation](issues/02-biome-generation.md)             | [#170](https://github.com/MKHenson/rewild/issues/170)                                                        | ✅ Done. Temperature × moisture climate model + plain/mountain param table; blend heights across borders.                |
-| [#172](https://github.com/MKHenson/rewild/issues/172) | [03 — Recipe: climate preset + terrain gating](issues/03-world-recipe.md)        | [#170](https://github.com/MKHenson/rewild/issues/170), [#171](https://github.com/MKHenson/rewild/issues/171) | Persist a climate-preset id on the recipe (presets hardcoded in code); make `hasTerrain` gate terrain.                   |
-| [#173](https://github.com/MKHenson/rewild/issues/173) | [04 — Chunk snapshot — read & mesh](issues/04-chunk-snapshot-read.md)            | [#172](https://github.com/MKHenson/rewild/issues/172)                                                        | Full-heightfield snapshot format + read from the blob path; saved chunks mesh from stored heights instead of generating. |
-| [#174](https://github.com/MKHenson/rewild/issues/174) | [05 — Chunk snapshot — write (dev/test hook)](issues/05-chunk-snapshot-write.md) | [#173](https://github.com/MKHenson/rewild/issues/173)                                                        | A dev/test writer that round-trips a snapshot: write → reload → fetch-and-mesh.                                          |
-| [#175](https://github.com/MKHenson/rewild/issues/175) | [06 — Terrain sculpting (editor brushes)](issues/06-terrain-sculpting.md)        | [#173](https://github.com/MKHenson/rewild/issues/173), [#174](https://github.com/MKHenson/rewild/issues/174) | Raise/lower/smooth/flatten brushes in the editor; affected chunks saved as snapshots.                                    |
+| Issue                                                                                            | Depends on                                                                                                   | Summary                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [#170 — Seeded worlds (end-to-end)](https://github.com/MKHenson/rewild/issues/170)               | —                                                                                                            | ✅ Done. Seed into the noise + `WorldGenConfig` on `sceneGraph.terrain` + persist/load + editor seed dialog.                                                    |
+| [#171 — Biome map + blended generation](https://github.com/MKHenson/rewild/issues/171)           | [#170](https://github.com/MKHenson/rewild/issues/170)                                                        | ✅ Done. Temperature × moisture climate model + plain/mountain param table; blend heights across borders.                                                       |
+| [#172 — Recipe: climate preset + terrain gating](https://github.com/MKHenson/rewild/issues/172)  | [#170](https://github.com/MKHenson/rewild/issues/170), [#171](https://github.com/MKHenson/rewild/issues/171) | Persist a climate-preset id on the recipe (presets hardcoded in code); make `hasTerrain` gate terrain.                                                          |
+| [#173 — Chunk snapshot — read & mesh](https://github.com/MKHenson/rewild/issues/173)             | [#172](https://github.com/MKHenson/rewild/issues/172)                                                        | Full-heightfield snapshot format + read from the blob path; saved chunks mesh from stored heights instead of generating.                                        |
+| [#174 — Chunk snapshot — write (dev/test hook)](https://github.com/MKHenson/rewild/issues/174)   | [#173](https://github.com/MKHenson/rewild/issues/173)                                                        | A dev/test writer that round-trips a snapshot: write → reload → fetch-and-mesh.                                                                                 |
+| [#175 — Terrain sculpting (editor brushes)](https://github.com/MKHenson/rewild/issues/175)       | [#173](https://github.com/MKHenson/rewild/issues/173), [#174](https://github.com/MKHenson/rewild/issues/174) | Raise/lower/smooth/flatten brushes in the editor; affected chunks saved as snapshots.                                                                           |
+| [#177–#182 — Biome materials & distance normals](./strata-terrain-materials.md)                  | [#171](https://github.com/MKHenson/rewild/issues/171), [#175](https://github.com/MKHenson/rewild/issues/175) | Per-biome material layers on a splat map, blended across and within biomes; macro/detail normal crossfade by distance. Six issues — see the linked design for the build order. |
 
 [#170](https://github.com/MKHenson/rewild/issues/170) is a full vertical slice
 (seeded worlds: generation plumbing + the persisted `WorldGenConfig` recipe + load
@@ -167,16 +171,18 @@ Work top-to-bottom; arrows are hard dependencies.
 
 - Material/texture **painting** (painting what terrain looks like) and **undo/redo**
   history — height sculpting is in ([#175](https://github.com/MKHenson/rewild/issues/175)),
-  but painting needs multiple surface materials first and undo is a follow-up.
+  and [07](./strata-terrain-materials.md) supplies the surface materials painting
+  needs, but the painting UX itself and undo stay follow-ups. 07 is designed
+  against painting's constraints so it doesn't force a rewrite.
 - In-game (runtime) sculpting UX — [#175](https://github.com/MKHenson/rewild/issues/175)
   is the editor; the write path is shared so runtime can reuse it later.
 - Voxel terrain, caves, overhangs.
 - Water, sea level, oceans.
 - Object scatter.
-- New surface materials / splat layers (biomes keep the existing height-band
-  colouring for now; materials arrive with painting).
-- A third+ biome — purely additive on the climate model from #171 (a table row
+- A third+ biome — still additive on the climate model from #171 (a table row
   - an axis cut + cell entries). The 2-axis climate model itself landed early,
-    in #171.
+    in #171. Note [07](./strata-terrain-materials.md) adds a second cost: a new
+    biome also needs layer-table entries, and would overflow its four-layer
+    splat palette.
 - More climate presets (eras / time-travel worlds) — additive once #172 gives
   worlds a preset reference.
