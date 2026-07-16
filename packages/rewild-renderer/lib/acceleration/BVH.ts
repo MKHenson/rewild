@@ -150,6 +150,18 @@ export class BVH {
     this.refitNode(this.root);
   }
 
+  /**
+   * Points the BVH at a replacement vertex array with identical topology
+   * (same triangle count and ordering — only positions moved) and refits
+   * every node's bounds in place. Lets a rebuilt mesh (e.g. a sculpted
+   * terrain chunk) inherit its predecessor's tree instead of queueing a
+   * full rebuild in the BVH worker.
+   */
+  rebind(vertices: Float32Array): void {
+    this.vertices = vertices;
+    this.refit();
+  }
+
   private raycastNode(
     node: BVHNode,
     ray: Ray,

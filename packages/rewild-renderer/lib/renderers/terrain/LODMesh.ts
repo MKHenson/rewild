@@ -9,9 +9,24 @@ import type { TerrainChunk } from './TerrainChunk';
 
 export type LODMeshGPUState = 'none' | 'requested' | 'ready' | 'unloaded';
 
+// Terrain BVH policy. Trees exist only for raycasting (picking, sculpting,
+// the orbit ground clamp), which happens at close range — so only the two
+// nearest LODs get one, and with editor-picking leaf density rather than the
+// engine default of 8 tris/leaf. The default policy (every LOD, 8/leaf) put
+// ~2.7M BVH nodes (~4 heap objects each) on an idle scene. Far LODs raycast
+// brute-force; the bounding-sphere pre-check keeps that cheap for the couple
+// of chunks a ray actually crosses.
+const TERRAIN_BVH_MAX_LOD = 1;
+const TERRAIN_BVH_LEAF_TRIANGLES = 32;
+
 // One detail level of a terrain chunk: owns the worker request for its mesh
 // and the resulting GPU resources. The heights it meshes come from the chunk
 // (in-memory edits or a saved snapshot) or are generated in the worker.
+//
+// Edits (sculpting, snapshot writes) bump the chunk's heightsVersion; refresh()
+// then rebuilds this LOD *in the background* and swaps the new mesh in only
+// when it is ready, so the chunk never blinks out mid-stroke. Rebuild requests
+// arriving while one is in flight coalesce into a single follow-up build.
 export class LODMesh {
   mesh: Mesh;
   lod: i32;
@@ -19,9 +34,16 @@ export class LODMesh {
   gpuState: LODMeshGPUState;
   chunk: TerrainChunk;
   chunkSize: i32;
-  heights: Float32Array;
   seed: number;
   climatePreset: string;
+  // chunk.heightsVersion the current mesh was built from.
+  private builtVersion = -1;
+  private building = false;
+  // The colour texture backing the current mesh. Owned by this LOD (it is
+  // per-chunk data, not a shared managed asset) and must be destroyed with
+  // it — losing the reference leaks a GPUTexture, which under sculpting's
+  // rebuild-per-stamp cadence runs the GPU out of memory in seconds.
+  private texture: DataTexture | null = null;
 
   constructor(
     lod: i32,
@@ -47,14 +69,58 @@ export class LODMesh {
     }
     if (this.gpuState !== 'none') return;
     this.gpuState = 'requested';
-    this.load(this.chunkSize, this.lod, renderer);
+    this.build(renderer);
+  }
+
+  // The chunk's heights changed — make this LOD reflect them without a blink.
+  refresh(renderer: Renderer) {
+    switch (this.gpuState) {
+      case 'none':
+        // Nothing built yet; the next requestMesh() uses the current heights.
+        return;
+      case 'requested':
+        // The in-flight build notices the version bump and re-runs.
+        return;
+      case 'unloaded': {
+        // Nothing on screen and the CPU geometry is now stale — throw it away
+        // and rebuild on demand instead of re-uploading stale data.
+        if (this.mesh) {
+          this.mesh.material.dispose();
+          this.mesh.transform.removeFromParent();
+          this.mesh = undefined as never;
+        }
+        this.texture?.gpuTexture.destroy();
+        this.texture = null;
+        this.builtVersion = -1;
+        this.gpuState = 'none';
+        return;
+      }
+      case 'ready':
+        // Rebuild in the background; the old mesh stays visible until the
+        // replacement is committed.
+        this.build(renderer);
+    }
   }
 
   unloadGPU() {
     if (this.gpuState !== 'ready') return;
-    this.mesh.geometry.dispose();
+    // GPU buffers only — CPU data and the BVH stay so reuploadGPU() can
+    // bring this LOD back without rebuilding anything.
+    this.mesh.geometry.unloadBuffers();
     this.mesh.transform.visible = false;
     this.gpuState = 'unloaded';
+  }
+
+  // Full teardown (chunk eviction/reset): releases GPU geometry, uniform
+  // buffers and the owned colour texture.
+  dispose() {
+    if (this.mesh) {
+      if (this.gpuState === 'ready') this.mesh.geometry.dispose();
+      this.mesh.material.dispose();
+      this.mesh.transform.removeFromParent();
+    }
+    this.texture?.gpuTexture.destroy();
+    this.texture = null;
   }
 
   private async reuploadGPU(renderer: Renderer) {
@@ -71,83 +137,168 @@ export class LODMesh {
       mesh: this,
       chunk: this.chunk,
     });
+    // Heights may have changed while this LOD sat unloaded with its meshes
+    // still cached — catch up now that it is visible again.
+    if (this.builtVersion !== this.chunk.heightsVersion) this.build(renderer);
   }
 
-  async load(chunkSize: i32, lod: i32, renderer: Renderer) {
-    const terrainRenderer = renderer.terrainRenderer;
+  // Builds (or rebuilds) this LOD's mesh from the chunk's current heights and
+  // swaps it in atomically. Loops until the mesh matches the latest
+  // heightsVersion, so any number of edits during a build coalesce into at
+  // most one follow-up build.
+  private async build(renderer: Renderer) {
+    if (this.building) return;
+    this.building = true;
+    try {
+      do {
+        const swapping = this.gpuState === 'ready';
 
-    // Known heights (in-memory or saved snapshot) ⇒ the worker meshes them,
-    // skipping generation; absent ⇒ it generates from the recipe as before.
-    const knownHeights = await this.chunk.resolveHeights(
-      terrainRenderer.snapshotProvider
-    );
-    const { texture, vertices, uvs, normals, indices, heights } =
-      await terrainRenderer.workerPool.enqueue({
-        chunkSize,
-        lod,
-        position: this.position,
-        seed: this.seed,
-        climatePreset: this.climatePreset,
-        heights: knownHeights ?? undefined,
-      });
+        // Known heights (in-memory or saved snapshot) ⇒ the worker meshes
+        // them, skipping generation; absent ⇒ it generates from the recipe.
+        const knownHeights = await this.chunk.resolveHeights(
+          renderer.terrainRenderer.snapshotProvider
+        );
+        const version = this.chunk.heightsVersion;
 
-    // Cache the heightfield on the chunk so later LODs, snapshot writes, and
-    // sculpting all work from the same in-memory truth. Never clobber heights
-    // that appeared while this request was in flight (an edit wins).
-    if (!this.chunk.heights) this.chunk.setHeights(heights);
+        const { texture, vertices, uvs, normals, indices, heights } =
+          await renderer.terrainRenderer.workerPool.enqueue({
+            chunkSize: this.chunkSize,
+            lod: this.lod,
+            position: this.position,
+            seed: this.seed,
+            climatePreset: this.climatePreset,
+            heights: knownHeights ?? undefined,
+          });
 
-    const terrainTexture = renderer.textureManager.addTexture(
-      new DataTexture(
-        new TextureProperties('terrain1', false),
-        texture,
-        chunkSize,
-        chunkSize
-      )
-    );
+        // Cache the heightfield on the chunk so later LODs, snapshot writes,
+        // and sculpting all work from the same in-memory truth. A no-op if a
+        // sibling LOD got there first — its baseline is identical to ours, so
+        // this mesh still reflects `version`, and only a real edit (which
+        // bumps the version) makes us rebuild below.
+        this.chunk.populateHeights(heights);
 
-    const geometry = new Geometry();
-    geometry.vertices = vertices;
-    geometry.normals = normals; // pre-computed in worker using main-mesh triangles only
-    geometry.uvs = uvs;
-    geometry.indices = indices;
+        // The chunk was evicted/disposed while the worker ran — drop the
+        // result instead of resurrecting GPU state.
+        if (
+          this.chunk.disposed ||
+          this.gpuState !== (swapping ? 'ready' : 'requested')
+        ) {
+          return;
+        }
 
-    this.heights = new Float32Array(vertices.length / 3);
-    for (let i = 0, j = 0; i < vertices.length; i += 3, j++) {
-      this.heights[j] = vertices[i + 1];
+        // Per-chunk texture, owned by this LOD — deliberately NOT registered
+        // with the textureManager (its name-keyed map would just have every
+        // chunk clobber the same entry while the GPU textures leak).
+        const terrainTexture = new DataTexture(
+          new TextureProperties(`terrain_${this.chunk.id}_${this.lod}`, false),
+          texture,
+          this.chunkSize,
+          this.chunkSize
+        );
+
+        const oldMesh = swapping ? this.mesh : null;
+
+        const geometry = new Geometry();
+        geometry.vertices = vertices;
+        geometry.normals = normals; // pre-computed in worker using main-mesh triangles only
+        geometry.uvs = uvs;
+        geometry.indices = indices;
+        geometry.autoComputeBVH = false; // BVH policy is per-LOD, below
+
+        // A re-mesh preserves topology (same grid and skirt ordering — only
+        // heights moved), so the new geometry inherits the old mesh's BVH
+        // with a cheap in-place refit. Queueing a full worker rebuild per
+        // sculpt stamp instead floods the single BVH worker: the backlog
+        // retains every superseded geometry and materializes millions of
+        // BVH nodes, running the tab out of memory.
+        const oldBvh = oldMesh?.geometry.bvh;
+        if (
+          oldBvh?.isReady &&
+          oldMesh!.geometry.vertices.length === vertices.length &&
+          oldMesh!.geometry.indices?.length === indices.length
+        ) {
+          oldBvh.rebind(vertices);
+          geometry.bvh = oldBvh;
+        }
+
+        terrainTexture.load(renderer);
+        geometry.build(
+          renderer.device,
+          renderer.bvhConfig,
+          renderer.bvhWorkerManager ?? undefined
+        );
+
+        const bvhConfig = renderer.bvhConfig;
+        if (
+          !geometry.bvh &&
+          this.lod <= TERRAIN_BVH_MAX_LOD &&
+          bvhConfig?.autoComputeGeometryBVH
+        ) {
+          const bvhOptions = {
+            strategy: bvhConfig.geometryBVHStrategy,
+            maxDepth: bvhConfig.geometryBVHMaxDepth,
+            maxLeafTriangles: TERRAIN_BVH_LEAF_TRIANGLES,
+          };
+          if (renderer.bvhWorkerManager) {
+            geometry.computeBVHAsync(
+              renderer.bvhWorkerManager,
+              bvhOptions,
+              bvhConfig.asyncBuildThreshold
+            );
+          } else {
+            geometry.computeBVH(bvhOptions);
+          }
+        }
+
+        const terrainPass = new TerrainPass();
+        terrainPass.terrainUniforms.sampler =
+          renderer.samplerManager.get('linear-clamped');
+        terrainPass.terrainUniforms.texture = terrainTexture.gpuTexture;
+        terrainPass.terrainUniforms.albedoTexture = renderer.textureManager.get(
+          'rocky-mountain-texture-seamless'
+        ).gpuTexture;
+        terrainPass.terrainUniforms.normalMap = renderer.textureManager.get(
+          'rocky-mountain-texture-seamless-normal'
+        ).gpuTexture;
+        terrainPass.terrainUniforms.shininess = 5;
+
+        const newMesh = new Mesh(geometry, terrainPass);
+        const oldTexture = this.texture;
+
+        this.texture = terrainTexture;
+        this.mesh = newMesh;
+        this.chunk.transform.addChild(newMesh.transform);
+        // This mesh arrives mid-frame from a worker; until the next render
+        // pass its matrixWorld is identity, which would place the chunk's
+        // geometry at the world origin. A pointer-event raycast landing in
+        // that window (e.g. the orbit controller's terrain clamp) would hit
+        // phantom terrain, so compute the world matrix immediately.
+        newMesh.transform.updateWorldMatrix(true, false);
+
+        if (oldMesh) {
+          // Keep whatever visibility the old mesh had so the swap is
+          // invisible; the next visibility update re-evaluates it anyway.
+          newMesh.visible = oldMesh.visible;
+          newMesh.transform.visible = oldMesh.transform.visible;
+          oldMesh.geometry.dispose();
+          oldMesh.material.dispose();
+          oldMesh.transform.removeFromParent();
+        }
+        oldTexture?.gpuTexture.destroy();
+
+        this.builtVersion = version;
+        this.gpuState = 'ready';
+        this.chunk.dispatcher.dispatch({
+          type: 'mesh-loaded',
+          mesh: this,
+          chunk: this.chunk,
+        });
+      } while (
+        !this.chunk.disposed &&
+        this.builtVersion !== this.chunk.heightsVersion
+      );
+    } finally {
+      this.building = false;
     }
-
-    terrainTexture.load(renderer);
-    geometry.build(
-      renderer.device,
-      renderer.bvhConfig,
-      renderer.bvhWorkerManager ?? undefined
-    );
-
-    const terrainPass = new TerrainPass();
-    terrainPass.terrainUniforms.sampler =
-      renderer.samplerManager.get('linear-clamped');
-    terrainPass.terrainUniforms.texture = terrainTexture.gpuTexture;
-    terrainPass.terrainUniforms.albedoTexture = renderer.textureManager.get(
-      'rocky-mountain-texture-seamless'
-    ).gpuTexture;
-    terrainPass.terrainUniforms.normalMap = renderer.textureManager.get(
-      'rocky-mountain-texture-seamless-normal'
-    ).gpuTexture;
-    terrainPass.terrainUniforms.shininess = 5;
-
-    this.mesh = new Mesh(geometry, terrainPass);
-    this.chunk.transform.addChild(this.mesh.transform);
-    // This mesh arrives mid-frame from a worker; until the next render pass
-    // its matrixWorld is identity, which would place the chunk's geometry at
-    // the world origin. A pointer-event raycast landing in that window (e.g.
-    // the orbit controller's terrain clamp) would hit phantom terrain, so
-    // compute the world matrix immediately.
-    this.mesh.transform.updateWorldMatrix(true, false);
-    this.gpuState = 'ready';
-    this.chunk.dispatcher.dispatch({
-      type: 'mesh-loaded',
-      mesh: this,
-      chunk: this.chunk,
-    });
   }
 }

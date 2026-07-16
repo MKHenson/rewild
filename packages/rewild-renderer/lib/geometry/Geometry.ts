@@ -47,6 +47,17 @@ export class Geometry {
 
   bvh: BVH | null;
   bvhNeedsUpdate: boolean;
+  /**
+   * When false, build() never auto-computes a BVH for this geometry — the
+   * owner manages the BVH itself (or deliberately goes without one and
+   * relies on brute-force raycasting). Terrain uses this to keep trees off
+   * far LOD meshes.
+   */
+  autoComputeBVH = true;
+  // Set by dispose(); lets the async BVH path drop results that complete
+  // after the geometry was replaced (otherwise every superseded terrain
+  // re-mesh would materialize a full node tree on a dead geometry).
+  private isDisposed = false;
 
   constructor() {
     this.groups = [];
@@ -58,11 +69,24 @@ export class Geometry {
   }
 
   dispose() {
+    this.isDisposed = true;
+    this.unloadBuffers();
+    this.disposeBVH();
+  }
+
+  /**
+   * Releases the GPU buffers only, keeping CPU-side arrays and the BVH.
+   * For temporary unloads (e.g. terrain LOD caching) where the geometry
+   * will be re-uploaded unchanged — build() then skips BVH construction
+   * because the tree is still valid for the same vertices. Rebuilding it
+   * on every unload/re-upload cycle churns hundreds of thousands of BVH
+   * nodes just from the camera moving across LOD/view-distance rings.
+   */
+  unloadBuffers() {
     this.vertexBuffer?.destroy();
     this.normalBuffer?.destroy();
     this.uvBuffer?.destroy();
     this.indexBuffer?.destroy();
-    this.disposeBVH();
   }
 
   computeBVH(options?: Partial<BVHOptions>): void {
@@ -83,12 +107,16 @@ export class Geometry {
     options?: Partial<BVHOptions>,
     asyncThreshold: i32 = 10000
   ): Promise<void> {
-    this.bvh = await BVH.buildAsync(
+    const bvh = await BVH.buildAsync(
       this,
       workerManager,
       options,
       asyncThreshold
     );
+    // The geometry was disposed while the worker ran (e.g. its mesh was
+    // superseded by a sculpt re-mesh) — discard the stale tree.
+    if (this.isDisposed) return;
+    this.bvh = bvh;
     this.bvhNeedsUpdate = false;
   }
 
@@ -318,6 +346,9 @@ export class Geometry {
     bvhConfig?: BVHConfig,
     workerManager?: BVHWorkerManager
   ) {
+    // A geometry can be rebuilt after dispose (LOD re-upload) — it is live
+    // again from here on.
+    this.isDisposed = false;
     this.vertexBuffer = device.createBuffer({
       size: this.vertices.byteLength,
       usage: GPUBufferUsage.VERTEX,
@@ -373,7 +404,7 @@ export class Geometry {
     this.requiresBuild = false;
 
     // Auto-compute BVH if enabled and geometry exceeds threshold.
-    if (bvhConfig?.autoComputeGeometryBVH && !this.bvh) {
+    if (bvhConfig?.autoComputeGeometryBVH && this.autoComputeBVH && !this.bvh) {
       const triCount = this.getTriangleCount();
       if (triCount >= bvhConfig.autoComputeThreshold) {
         const options: Partial<BVHOptions> = {

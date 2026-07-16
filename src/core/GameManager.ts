@@ -70,6 +70,9 @@ export class GameManager {
         if (event.lod.lod === 0) {
           const mesh = event.lod.mesh;
           if (mesh?.geometry?.vertices && mesh?.geometry?.indices) {
+            // An edit re-mesh replaces the chunk's geometry; drop the collider
+            // built from the old mesh before creating the new one.
+            this.removeTerrainBody(event.chunk.id);
             const verts = new Float32Array(mesh.geometry.vertices);
             const inds = new Uint32Array(mesh.geometry.indices);
             const triDesc = this.RAPIER.ColliderDesc.trimesh(verts, inds);
@@ -93,18 +96,21 @@ export class GameManager {
         break;
       case 'chunk-unloaded':
       case 'chunk-disposed': {
-        const rb = this.terrainRapierBodyMap.get(event.chunk.id);
-        if (rb) {
-          const numColliders = rb.numColliders();
-          for (let i = 0; i < numColliders; i++) {
-            this.physicsWorld.removeCollider(rb.collider(i), false);
-          }
-          this.physicsWorld.removeRigidBody(rb);
-          this.terrainRapierBodyMap.delete(event.chunk.id);
-        }
+        this.removeTerrainBody(event.chunk.id);
         break;
       }
     }
+  }
+
+  private removeTerrainBody(chunkId: string) {
+    const rb = this.terrainRapierBodyMap.get(chunkId);
+    if (!rb) return;
+    const numColliders = rb.numColliders();
+    for (let i = 0; i < numColliders; i++) {
+      this.physicsWorld.removeCollider(rb.collider(i), false);
+    }
+    this.physicsWorld.removeRigidBody(rb);
+    this.terrainRapierBodyMap.delete(chunkId);
   }
 
   async initPhysics() {

@@ -64,6 +64,8 @@ export class DirectionalShadowRenderer {
 
   private pipeline: GPURenderPipeline;
   private meshUniforms: Map<IVisualComponent, MeshShadowUniforms>;
+  // Scratch set reused by the per-frame stale-entry sweep (no per-frame allocation).
+  private _liveMeshes = new Set<IVisualComponent>();
 
   // Pre-allocated per-frame math — never allocated inside render().
   private _lightViewWorld: Matrix4;
@@ -160,6 +162,12 @@ export class DirectionalShadowRenderer {
 
     const { device } = renderer;
 
+    // Meshes come and go (actor removal, chunk eviction, terrain sculpting
+    // replaces a chunk's mesh every stamp) — drop uniform entries for meshes
+    // no longer in the caster list, or the map pins every dead mesh's whole
+    // geometry forever and the tab runs out of memory.
+    this._sweepStaleMeshUniforms(renderList);
+
     if (sunAboveHorizon) {
       this._computeCascadeLightVPs(camera, sun.transform.position);
 
@@ -248,6 +256,23 @@ export class DirectionalShadowRenderer {
       for (const buf of buffers) buf.destroy();
     }
     this.meshUniforms.clear();
+  }
+
+  // The shadow render list is collected from the full scene (not camera-
+  // culled), so membership only changes when a mesh is actually added to or
+  // removed from the scene — entries never thrash with camera movement.
+  private _sweepStaleMeshUniforms(renderList: IRenderGroup[]): void {
+    const live = this._liveMeshes;
+    live.clear();
+    for (const item of renderList) {
+      for (const mesh of item.meshes) live.add(mesh);
+    }
+    for (const [mesh, uniforms] of this.meshUniforms) {
+      if (live.has(mesh)) continue;
+      for (const buf of uniforms.buffers) buf.destroy();
+      this.meshUniforms.delete(mesh);
+    }
+    live.clear();
   }
 
   private _ensureMeshUniforms(device: GPUDevice, mesh: IVisualComponent): void {

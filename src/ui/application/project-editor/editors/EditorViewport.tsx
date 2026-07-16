@@ -27,13 +27,20 @@ import { ITreeNodeAction } from 'models';
 import { TemplateLoader } from 'src/core/TemplateLoader';
 import { Asset3D } from 'src/core/routing/Asset3D';
 import { GizmoDragController } from './utils/GizmoDragController';
+import { TerrainSculptController } from './utils/TerrainSculptController';
 import {
   computeObjectHalfHeight,
   computeRotationFromNormal,
   raycastToSurface,
 } from './utils/WorldPlacement';
+import { sculptStore } from 'src/ui/stores/SculptStore';
+import { SculptToolbar } from './SculptToolbar';
 
 interface Props {}
+
+// How far above/below the terrain reference the orbit camera's ground probe
+// scans for placed objects — structures up to this tall are ridden over.
+const SURFACE_PROBE_CLEARANCE = 500;
 
 export interface ViewportEventDetails {
   renderer: Renderer | null;
@@ -48,6 +55,7 @@ export class EditorViewport extends Component<Props> {
   templateLoader: TemplateLoader;
   gizmo: Gizmo;
   dragController: GizmoDragController;
+  sculptController: TerrainSculptController | null = null;
   selectedTransform: Transform | null = null;
   private didDrag = false;
   private mouseDownPos = { x: 0, y: 0 };
@@ -84,6 +92,25 @@ export class EditorViewport extends Component<Props> {
     };
 
     this.on(this.renderer.terrainRenderer.dispatcher, onTerrainEvent);
+
+    // Sculpt mode toggling (ribbon button / Esc). Turning it off mid-stroke
+    // ends the stroke cleanly (saving touched chunks) and restores the orbit
+    // camera; re-render shows/hides the brush toolbar overlay.
+    this.on(sculptStore.dispatcher, () => {
+      if (!sculptStore.enabled) {
+        endSculptStroke();
+        this.sculptController?.hideCursor();
+      }
+      this.render();
+    });
+
+    const endSculptStroke = () => {
+      if (!this.sculptController?.isSculpting) return;
+      this.sculptController.endStroke().catch((err) => {
+        console.error('Failed to save sculpted chunks:', err);
+      });
+      if (this.orbitController) this.orbitController.enabled = true;
+    };
 
     const setTransformSelected = (transform: Transform, value: boolean) => {
       transform.selected = value;
@@ -208,7 +235,9 @@ export class EditorViewport extends Component<Props> {
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code === 'Equal' || event.code === 'NumpadAdd') {
+      if (event.code === 'Escape' && sculptStore.enabled) {
+        sculptStore.setEnabled(false);
+      } else if (event.code === 'Equal' || event.code === 'NumpadAdd') {
         this.gizmo?.increaseSize();
         this.updateGizmoScale();
       } else if (event.code === 'Minus' || event.code === 'NumpadSubtract') {
@@ -241,12 +270,26 @@ export class EditorViewport extends Component<Props> {
           pane3D.canvas()!
         );
         this.orbitController.minCameraY = 0.5;
+        // Ground clamp: the camera rides over everything in the world —
+        // terrain AND placed objects. Terrain height comes from the in-memory
+        // heightfield (exact at any altitude, tracks live sculpt edits before
+        // the re-mesh lands); a scene probe anchored to it catches whatever
+        // sits on top. The old fixed ray window (y ∈ [-100, 100]) let the
+        // camera fly through sculpted hills taller than 100m.
         this.orbitController.getTerrainHeight = (x, z) => {
+          const terrainH = this.renderer.terrainRenderer.sampleHeight(x, z);
+          const refY =
+            terrainH ?? this.renderer.camera.camera.transform.position.y;
           const hit = raycastToSurface(
             this.renderer,
-            this._terrainRayPos.set(x, 0, z)
+            this._surfaceProbePos.set(x, refY, z),
+            undefined,
+            SURFACE_PROBE_CLEARANCE,
+            SURFACE_PROBE_CLEARANCE * 2
           );
-          return hit?.point.y ?? null;
+          if (hit && terrainH !== null)
+            return Math.max(hit.point.y, terrainH);
+          return hit?.point.y ?? terrainH;
         };
         await this.templateLoader.load();
 
@@ -255,6 +298,7 @@ export class EditorViewport extends Component<Props> {
           this.renderer,
           this.gizmo
         );
+        this.sculptController = new TerrainSculptController(this.renderer);
 
         this.installCameraObserver();
 
@@ -268,6 +312,8 @@ export class EditorViewport extends Component<Props> {
     };
 
     const onClick = (event: MouseEvent) => {
+      // Sculpt mode owns the pointer — clicks never select/deselect.
+      if (sculptStore.enabled) return;
       if (this.didDrag) {
         this.didDrag = false;
         return;
@@ -296,6 +342,30 @@ export class EditorViewport extends Component<Props> {
 
     const onMouseDown = (event: MouseEvent) => {
       if (event.button !== 0) return;
+
+      if (sculptStore.enabled && this.sculptController) {
+        // Alt+drag is the camera escape hatch: the brush owns left-drag, which
+        // would otherwise leave orbit-rotate unreachable in sculpt mode (pan
+        // and zoom still have their own buttons). Bailing here leaves the
+        // orbit controller enabled, and its own pointer handler — which reads
+        // Alt as a plain rotate — takes the drag.
+        if (event.altKey) return;
+
+        const hit = this.sculptController.pickTerrain(
+          createRaycaster(event.clientX, event.clientY)
+        );
+        if (hit) {
+          // Suspend orbit for the stroke so the camera and the brush don't
+          // fight over left-drag; right-drag/wheel keep working on release.
+          this.orbitController?.cancelInteraction();
+          if (this.orbitController) this.orbitController.enabled = false;
+          this.sculptController.beginStroke(hit.point, event.shiftKey);
+          // The stroke must end even when the pointer is released off-canvas.
+          document.addEventListener('mouseup', onSculptDocumentMouseUp);
+        }
+        return;
+      }
+
       this.mouseDownPos.x = event.clientX;
       this.mouseDownPos.y = event.clientY;
       this.didDrag = false;
@@ -323,7 +393,40 @@ export class EditorViewport extends Component<Props> {
       }
     };
 
+    const onSculptDocumentMouseUp = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      document.removeEventListener('mouseup', onSculptDocumentMouseUp);
+      endSculptStroke();
+    };
+
     const onMouseMove = (event: MouseEvent) => {
+      if (sculptStore.enabled && this.sculptController) {
+        // Alt means the camera has the drag — the brush is inactive, so drop
+        // the ring rather than have it chase the cursor across a swinging
+        // view, and skip the picking/warm-up work behind it.
+        if (event.altKey && !this.sculptController.isSculpting) {
+          this.sculptController.hideCursor();
+          return;
+        }
+
+        const hit = this.sculptController.pickTerrain(
+          createRaycaster(event.clientX, event.clientY)
+        );
+        if (this.sculptController.isSculpting) {
+          if (hit) this.sculptController.moveStroke(hit.point);
+        } else if (hit) {
+          // Warm up chunks under the brush so they are editable the moment a
+          // stroke reaches them (snapshot lookup / baseline generation).
+          this.sculptController.prefetchHeights(
+            hit.point.x,
+            hit.point.z,
+            sculptStore.radius
+          );
+        }
+        this.sculptController.updateCursor(hit?.point ?? null);
+        return;
+      }
+
       if (event.buttons & 1 && !this.dragController.isDragging) {
         const dx = event.clientX - this.mouseDownPos.x;
         const dy = event.clientY - this.mouseDownPos.y;
@@ -350,6 +453,9 @@ export class EditorViewport extends Component<Props> {
 
     const onMouseUp = (event: MouseEvent) => {
       if (event.button !== 0) return;
+      // Sculpt strokes end via the document-level listener (which also fires
+      // for on-canvas releases), so nothing to do here for them.
+      if (this.sculptController?.isSculpting) return;
       if (!this.dragController.isDragging) return;
 
       if (this.orbitController) this.orbitController.enabled = true;
@@ -474,9 +580,21 @@ export class EditorViewport extends Component<Props> {
     pane3D.ondrop = onDrop;
     pane3D.onclick = onClick;
 
+    // Persistent wrapper so the canvas is never re-parented on re-render; the
+    // sculpt toolbar overlay is attached/detached as sculpt mode toggles.
+    const sculptToolbar = (<SculptToolbar />) as SculptToolbar;
+    const container = (
+      <div class="viewport-container">{pane3D}</div>
+    ) as HTMLDivElement;
+
     return () => {
       this.toggleAttribute('activated', !!sceneGraphStore.selectedContainerId);
-      return pane3D;
+      if (sculptStore.enabled) {
+        if (!sculptToolbar.parentElement) container.appendChild(sculptToolbar);
+      } else {
+        sculptToolbar.remove();
+      }
+      return container;
     };
   }
 
@@ -485,7 +603,7 @@ export class EditorViewport extends Component<Props> {
   }
 
   private _cameraWorldPos = new Vector3();
-  private _terrainRayPos = new Vector3();
+  private _surfaceProbePos = new Vector3();
   private _updatingGizmoScale = false;
   private _focusCenter = new Vector3();
   private _focusDir = new Vector3();
@@ -554,6 +672,7 @@ export class EditorViewport extends Component<Props> {
     this.removeCameraObserver();
     this.orbitController?.dispose();
     this.gizmo?.dispose();
+    this.sculptController?.dispose();
     this.renderer.dispose();
   }
 }
@@ -564,6 +683,12 @@ const StyledContainer = cssStylesheet(css`
     width: 100%;
     display: block;
     box-sizing: border-box;
+    position: relative;
+  }
+
+  .viewport-container {
+    height: 100%;
+    width: 100%;
     position: relative;
   }
 

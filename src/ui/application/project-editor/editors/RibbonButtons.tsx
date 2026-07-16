@@ -8,6 +8,7 @@ import {
   Button,
 } from 'rewild-ui';
 import { projectStore } from '../../../stores/ProjectStore';
+import { sculptStore } from '../../../stores/SculptStore';
 import { TerrainSettingsDialog } from './TerrainSettingsDialog';
 
 interface Props {
@@ -20,6 +21,7 @@ export class RibbonButtons extends Component<Props> {
     this.on(projectStore.dispatcher, (event) => {
       if (event.kind === 'changed') this.render();
     });
+    this.on(sculptStore.dispatcher, () => this.render());
 
     const [terrainOpen, setTerrainOpen] = this.useState(false);
 
@@ -53,6 +55,13 @@ export class RibbonButtons extends Component<Props> {
               onClick={() => setTerrainOpen(true)}>
               <StyledMaterialIcon icon="landscape" size="s" />
             </Button>
+            <Button
+              variant="text"
+              class={sculptStore.enabled ? 'sculpt-active' : ''}
+              disabled={loading || !projectStore.project?.sceneGraph?.terrain}
+              onClick={() => sculptStore.setEnabled(!sculptStore.enabled)}>
+              <StyledMaterialIcon icon="draw" size="s" />
+            </Button>
           </ButtonGroup>
           {terrainOpen() && (
             <TerrainSettingsDialog onClose={() => setTerrainOpen(false)} />
@@ -75,5 +84,9 @@ const StyledRibbonButtons = cssStylesheet(css`
   x-button {
     color: ${theme?.colors.onSubtle};
     padding: 0.5rem;
+  }
+
+  x-button.sculpt-active {
+    color: ${theme?.colors.primary400};
   }
 `);
