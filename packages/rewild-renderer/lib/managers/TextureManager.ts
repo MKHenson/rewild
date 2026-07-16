@@ -8,6 +8,13 @@ import { IMaterialsTemplate } from './types';
 
 const MEDIA_URL = process.env.SHARED_ASSETS_BASE_URL;
 
+// Resolves a materials.json `url` against the shared asset bucket. Exported so
+// loaders that build textures from the template outside this manager (the
+// terrain material arrays) resolve them the same way.
+export function resolveAssetUrl(url: string): string {
+  return MEDIA_URL + url;
+}
+
 export class TextureManager {
   textures: Map<string, ITexture>;
   initialized: boolean;

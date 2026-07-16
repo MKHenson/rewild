@@ -9,7 +9,17 @@ export class MipMapGenerator {
     this.pipelineByFormat = {};
   }
 
-  generateMips(device: GPUDevice, texture: GPUTexture) {
+  /**
+   * Fills mip levels 1..n of `texture` by successively half-scaling the level
+   * above, for the single array layer `baseArrayLayer` (0 for a plain 2D
+   * texture). Array textures need one call per layer.
+   *
+   * Every view is created with an explicit `dimension: '2d'` and a single
+   * layer: WebGPU defaults a layered texture's view to `2d-array`, which will
+   * not bind to the `texture_2d<f32>` this generator's shader declares. That
+   * default is why layered textures previously shipped without mips.
+   */
+  generateMips(device: GPUDevice, texture: GPUTexture, baseArrayLayer = 0) {
     const pipelines = this.pipelineByFormat;
 
     if (!this.module) {
@@ -59,7 +69,13 @@ export class MipMapGenerator {
           { binding: 0, resource: this.sampler },
           {
             binding: 1,
-            resource: texture.createView({ baseMipLevel, mipLevelCount: 1 }),
+            resource: texture.createView({
+              dimension: '2d',
+              baseMipLevel,
+              mipLevelCount: 1,
+              baseArrayLayer,
+              arrayLayerCount: 1,
+            }),
           },
         ],
       });
@@ -70,7 +86,13 @@ export class MipMapGenerator {
         label: 'our basic canvas renderPass',
         colorAttachments: [
           {
-            view: texture.createView({ baseMipLevel, mipLevelCount: 1 }),
+            view: texture.createView({
+              dimension: '2d',
+              baseMipLevel,
+              mipLevelCount: 1,
+              baseArrayLayer,
+              arrayLayerCount: 1,
+            }),
             loadOp: 'clear',
             storeOp: 'store',
           },

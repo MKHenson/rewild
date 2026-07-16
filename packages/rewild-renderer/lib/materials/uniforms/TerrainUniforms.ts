@@ -19,11 +19,14 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   shininess: number = 32;
   ambientColor: [number, number, number] = [0, 0, 0];
 
-  private _albedoTexture: GPUTexture;
+  // Albedo and normal are held as views, not textures: they are single-layer
+  // views into the terrain texture arrays, and a default view of an array
+  // texture is `2d-array`, which will not bind to the shader's `texture_2d`.
+  private _albedoView: GPUTextureView;
+  private _normalView: GPUTextureView;
   private _texture: GPUTexture;
   private _sampler: GPUSampler;
   private _seamlessSampler: GPUSampler;
-  private _normalMap: GPUTexture;
   private _specularMap: GPUTexture;
   private _paramsBuffer: GPUBuffer;
   private _paramsData: Float32Array = new Float32Array(PARAMS_SIZE / 4);
@@ -42,14 +45,17 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
     if (!this._texture)
       this._texture = renderer.textureManager.get('grid-data').gpuTexture;
-    if (!this._albedoTexture)
-      this._albedoTexture = renderer.textureManager.get('grid-data').gpuTexture;
+    if (!this._albedoView)
+      this._albedoView = renderer.textureManager
+        .get('grid-data')
+        .gpuTexture.createView();
     if (!this._sampler) this._sampler = renderer.samplerManager.get('linear');
     if (!this._seamlessSampler)
       this._seamlessSampler = renderer.samplerManager.get('linear');
-    if (!this._normalMap)
-      this._normalMap =
-        renderer.textureManager.get('flat-normal-1x1').gpuTexture;
+    if (!this._normalView)
+      this._normalView = renderer.textureManager
+        .get('flat-normal-1x1')
+        .gpuTexture.createView();
     if (!this._specularMap)
       this._specularMap = renderer.textureManager.get('white-1x1').gpuTexture;
 
@@ -66,9 +72,9 @@ export class TerrainUniforms implements ISharedUniformBuffer {
       entries: [
         { binding: 0, resource: this._sampler },
         { binding: 1, resource: this._texture.createView() },
-        { binding: 2, resource: this._albedoTexture.createView() },
+        { binding: 2, resource: this._albedoView },
         { binding: 3, resource: this._seamlessSampler },
-        { binding: 4, resource: this._normalMap.createView() },
+        { binding: 4, resource: this._normalView },
         { binding: 5, resource: this._specularMap.createView() },
         { binding: 6, resource: { buffer: this._paramsBuffer } },
       ],
@@ -102,13 +108,13 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     return this._texture;
   }
 
-  set albedoTexture(texture: GPUTexture) {
-    this._albedoTexture = texture;
+  set albedoView(view: GPUTextureView) {
+    this._albedoView = view;
     this.requiresBuild = true;
   }
 
-  get albedoTexture(): GPUTexture {
-    return this._albedoTexture;
+  get albedoView(): GPUTextureView {
+    return this._albedoView;
   }
 
   set sampler(sampler: GPUSampler) {
@@ -129,13 +135,13 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     this.requiresBuild = true;
   }
 
-  set normalMap(texture: GPUTexture) {
-    this._normalMap = texture;
+  set normalView(view: GPUTextureView) {
+    this._normalView = view;
     this.requiresBuild = true;
   }
 
-  get normalMap(): GPUTexture {
-    return this._normalMap;
+  get normalView(): GPUTextureView {
+    return this._normalView;
   }
 
   set specularMap(texture: GPUTexture) {
