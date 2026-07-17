@@ -137,6 +137,8 @@ export class TextureManager {
       )
     );
 
+    this.createSmoothNoiseTexture();
+
     this.addTexture(
       new DataTexture(
         new TextureProperties('white-1x1', false),
@@ -178,6 +180,76 @@ export class TextureManager {
         glowData,
         glowSize,
         glowSize
+      )
+    );
+  }
+
+  // Smooth, tileable, low-frequency value noise.
+  //
+  // Distinct from `data-rgba-noise-256`, which is *white* noise — every texel
+  // independently random. A stochastic no-tile blend (terrain.wgsl) indexes its
+  // offset regions from a field like this and needs it smooth: with white noise
+  // the region index changes every texel, chopping the surface into tiny
+  // patches sampled from unrelated parts of the texture. That reads as a
+  // warbling, swirling mess wherever the material is stretched enough to see
+  // the patch edges.
+  //
+  // Built by interpolating a coarse grid of random values with a smoothstep
+  // fade and wrapping at the edges, so the result tiles seamlessly. Seeded, so
+  // terrain looks the same every session rather than reshuffling on reload.
+  private createSmoothNoiseTexture() {
+    const size = 256;
+    const cells = 16; // Grid of random values; a feature every size/cells texels.
+
+    let seed = 1337;
+    const random = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
+
+    const grid = new Float32Array(cells * cells);
+    for (let i = 0; i < grid.length; i++) grid[i] = random();
+
+    const data = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const fx = (x / size) * cells;
+        const fy = (y / size) * cells;
+        const x0 = Math.floor(fx);
+        const y0 = Math.floor(fy);
+        // Wrap the far edge back to the first cell so the texture tiles.
+        const x1 = (x0 + 1) % cells;
+        const y1 = (y0 + 1) % cells;
+
+        // Smoothstep the interpolant: plain bilinear leaves visible diamond
+        // creases along the cell grid.
+        let tx = fx - x0;
+        let ty = fy - y0;
+        tx = tx * tx * (3 - 2 * tx);
+        ty = ty * ty * (3 - 2 * ty);
+
+        const top =
+          grid[y0 * cells + x0] +
+          (grid[y0 * cells + x1] - grid[y0 * cells + x0]) * tx;
+        const bottom =
+          grid[y1 * cells + x0] +
+          (grid[y1 * cells + x1] - grid[y1 * cells + x0]) * tx;
+        const value = Math.round((top + (bottom - top) * ty) * 255);
+
+        const i = (y * size + x) * 4;
+        data[i] = value;
+        data[i + 1] = value;
+        data[i + 2] = value;
+        data[i + 3] = 255;
+      }
+    }
+
+    this.addTexture(
+      new DataTexture(
+        new TextureProperties('smooth-noise-256'),
+        data,
+        size,
+        size
       )
     );
   }

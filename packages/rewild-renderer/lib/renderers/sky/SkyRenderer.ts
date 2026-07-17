@@ -110,7 +110,7 @@ export class SkyRenderer {
     this.windiness = 0.5;
     this.upDot = 0.0;
     this.sun = new DirectionLight();
-    this.sun.intensity = 2.0;
+    this.sun.intensity = 1.5;
     parent.addChild(this.sun.transform);
     this.requiresRebuild = true;
 

@@ -84,7 +84,7 @@ export const MOUNTAIN: BiomeParams = {
   heightCurveExp: 2.0,
   layers: [
     // Base: the low, flat ground between the faces.
-    { material: 'ground-coastal-1' },
+    { material: 'aerial_rocks_01' },
     // Rock takes the steep ground, whatever the altitude.
     { material: 'rocks-ground-01', slope: { from: 25, to: 45 } },
     // Snow settles high — but not on cliffs. The inverted slope band fades it
@@ -92,8 +92,8 @@ export const MOUNTAIN: BiomeParams = {
     // what stops peaks reading as dipped in white paint.
     {
       material: 'snow-02',
-      height: { from: 120, to: 170 },
-      slope: { from: 45, to: 30 },
+      height: { from: 100, to: 170 },
+      slope: { from: 55, to: 35 },
     },
   ],
 };
@@ -172,12 +172,15 @@ export function validateClimateLayers(climate: ClimateConfig): void {
   const palette = getClimatePalette(climate);
   if (palette.length > MAX_SPLAT_LAYERS)
     throw new Error(
-      `Climate needs ${palette.length} materials (${palette.join(', ')}) but the splat map holds ${MAX_SPLAT_LAYERS}.`
+      `Climate needs ${palette.length} materials (${palette.join(
+        ', '
+      )}) but the splat map holds ${MAX_SPLAT_LAYERS}.`
     );
 }
 
-// Tallest possible terrain across a climate's biomes — used to normalise
-// absolute world height (meters) back to [0,1], e.g. for the colour bands.
+// Tallest possible terrain across a climate's biomes. The height-colour bands
+// that used to normalise against this are gone — materials now come from the
+// splat map — but it still bounds what generation may produce.
 export function getMaxWorldHeight(climate: ClimateConfig): number {
   let max = 0;
   for (const biome of climate.biomes) {
@@ -185,8 +188,6 @@ export function getMaxWorldHeight(climate: ClimateConfig): number {
   }
   return max;
 }
-
-export const MAX_WORLD_HEIGHT = getMaxWorldHeight(DEFAULT_CLIMATE);
 
 // Climate presets are game content: designed in code, never persisted. A world
 // stores only which preset it uses (WorldGenConfig.climatePreset). Later eras
@@ -201,6 +202,8 @@ export const CLIMATE_PRESETS: Record<string, ClimateConfig> = {
 // removed/renamed preset still loads.
 export function resolveClimatePreset(id: string | undefined): ClimateConfig {
   if (id !== undefined && !CLIMATE_PRESETS[id])
-    console.warn(`Unknown climate preset '${id}' — falling back to '${DEFAULT_CLIMATE_PRESET}'.`);
+    console.warn(
+      `Unknown climate preset '${id}' — falling back to '${DEFAULT_CLIMATE_PRESET}'.`
+    );
   return CLIMATE_PRESETS[id ?? DEFAULT_CLIMATE_PRESET] ?? DEFAULT_CLIMATE;
 }

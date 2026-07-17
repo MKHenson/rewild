@@ -11,7 +11,9 @@ interface TerrainWorkerRequest {
 }
 
 export interface TerrainWorkerResponse {
-  texture: Uint8Array;
+  // RGBA8 splat map — per-texel weights over the climate's material palette
+  // (see BuildChunkMeshResult).
+  splat: Uint8Array;
   vertices: Float32Array;
   uvs: Float32Array;
   normals: Float32Array;

@@ -35,7 +35,7 @@ describe('buildChunkMesh', () => {
       expect(provided.uvs).toEqual(generated.uvs);
       expect(provided.normals).toEqual(generated.normals);
       expect(provided.indices).toEqual(generated.indices);
-      expect(provided.texture).toEqual(generated.texture);
+      expect(provided.splat).toEqual(generated.splat);
       expect(provided.heights).toEqual(generated.heights);
     }
   });

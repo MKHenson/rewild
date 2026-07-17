@@ -2,15 +2,15 @@ import './SetupWorkerUtils';
 import { buildChunkMesh } from './buildChunkMesh';
 
 self.onmessage = async (event: MessageEvent) => {
-  const { texture, vertices, uvs, normals, indices, heights } = buildChunkMesh(
+  const { splat, vertices, uvs, normals, indices, heights } = buildChunkMesh(
     event.data
   );
 
   self.postMessage(
-    { texture, vertices, uvs, normals, indices, heights },
+    { splat, vertices, uvs, normals, indices, heights },
     {
       transfer: [
-        texture.buffer,
+        splat.buffer,
         vertices.buffer,
         uvs.buffer,
         normals.buffer,
