@@ -103,8 +103,8 @@ fn intersectSphereBoth(origin: vec3f, dir: vec3f, spherePos: vec3f, sphereRad: f
 // even at foginess = 0.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FOG_BASE_HEIGHT: f32 = 0.0;   // world height of maximum fog density
-const HAZE_DENSITY: f32 = 0.00009;  // constant aerial-perspective haze
+const FOG_BASE_HEIGHT: f32 = 100.0;   // world height of maximum fog density
+const HAZE_DENSITY: f32 = 0.00002;  // constant aerial-perspective haze
 
 fn heightFogOpticalDepth(org: vec3f, dir: vec3f, dist: f32) -> f32 {
     let scaleHeight = mix(15.0, 50.0, object.foginess);

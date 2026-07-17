@@ -6,6 +6,16 @@ const DIRT = 0;
 const ROCK = 1;
 const SNOW = 2;
 
+// Read the selectors off the table rather than restating them: these tests are
+// about how layers compose, not about the values that happen to be tuned in.
+const SNOW_HEIGHT = MOUNTAIN.layers[SNOW].height!;
+const SNOW_SLOPE = MOUNTAIN.layers[SNOW].slope!;
+const ROCK_SLOPE = MOUNTAIN.layers[ROCK].slope!;
+
+// A slope gentle enough for snow to hold, and one too sheer for it.
+const GENTLE = SNOW_SLOPE.to - 10;
+const SHEER = SNOW_SLOPE.from + 15;
+
 function weightsFor(
   biome: BiomeParams,
   height: number,
@@ -53,12 +63,13 @@ describe('resolveLayerWeights', () => {
     });
 
     it('surfaces steep ground as rock, at any altitude', () => {
-      expect(weightsFor(MOUNTAIN, 10, 60)[ROCK]).toBe(1);
-      expect(weightsFor(MOUNTAIN, 190, 60)[ROCK]).toBe(1);
+      const steep = ROCK_SLOPE.to + 15;
+      expect(weightsFor(MOUNTAIN, SNOW_HEIGHT.from - 50, steep)[ROCK]).toBe(1);
+      expect(weightsFor(MOUNTAIN, SNOW_HEIGHT.to + 20, steep)[ROCK]).toBe(1);
     });
 
     it('surfaces high flat ground as snow', () => {
-      const w = weightsFor(MOUNTAIN, 190, 0);
+      const w = weightsFor(MOUNTAIN, SNOW_HEIGHT.to + 20, 0);
       expect(w[SNOW]).toBe(1);
       expect(w[ROCK]).toBe(0);
       expect(w[DIRT]).toBe(0);
@@ -67,15 +78,19 @@ describe('resolveLayerWeights', () => {
     // The reason snow carries an inverted slope band: a peak that is snow all
     // the way down its cliffs reads as dipped in paint.
     it('lets rock through on high cliffs instead of snowing over them', () => {
-      const cliff = weightsFor(MOUNTAIN, 190, 70);
+      const cliff = weightsFor(MOUNTAIN, SNOW_HEIGHT.to + 20, SHEER);
       expect(cliff[SNOW]).toBe(0);
       expect(cliff[ROCK]).toBe(1);
     });
 
     it('blends rather than snapping across the snow line', () => {
-      const below = weightsFor(MOUNTAIN, 110, 0)[SNOW];
-      const mid = weightsFor(MOUNTAIN, 145, 0)[SNOW];
-      const above = weightsFor(MOUNTAIN, 180, 0)[SNOW];
+      const below = weightsFor(MOUNTAIN, SNOW_HEIGHT.from - 10, GENTLE)[SNOW];
+      const mid = weightsFor(
+        MOUNTAIN,
+        (SNOW_HEIGHT.from + SNOW_HEIGHT.to) / 2,
+        GENTLE
+      )[SNOW];
+      const above = weightsFor(MOUNTAIN, SNOW_HEIGHT.to + 10, GENTLE)[SNOW];
 
       expect(below).toBe(0);
       expect(mid).toBeGreaterThan(0);
@@ -84,9 +99,14 @@ describe('resolveLayerWeights', () => {
     });
 
     it('blends rather than snapping across the rock slope band', () => {
-      const flat = weightsFor(MOUNTAIN, 10, 20)[ROCK];
-      const mid = weightsFor(MOUNTAIN, 10, 35)[ROCK];
-      const steep = weightsFor(MOUNTAIN, 10, 50)[ROCK];
+      const low = SNOW_HEIGHT.from - 50;
+      const flat = weightsFor(MOUNTAIN, low, ROCK_SLOPE.from - 5)[ROCK];
+      const mid = weightsFor(
+        MOUNTAIN,
+        low,
+        (ROCK_SLOPE.from + ROCK_SLOPE.to) / 2
+      )[ROCK];
+      const steep = weightsFor(MOUNTAIN, low, ROCK_SLOPE.to + 5)[ROCK];
 
       expect(flat).toBe(0);
       expect(mid).toBeGreaterThan(0);
@@ -97,7 +117,7 @@ describe('resolveLayerWeights', () => {
     // A partially-covering top layer must leave room for what is beneath it,
     // not scale everything down proportionally.
     it('lets a partial top layer reveal the layers under it', () => {
-      const w = weightsFor(MOUNTAIN, 145, 60);
+      const w = weightsFor(MOUNTAIN, SNOW_HEIGHT.to + 20, SHEER);
       expect(w[SNOW]).toBe(0); // too steep for snow
       expect(w[ROCK]).toBe(1); // ...so the rock beneath takes it all
     });

@@ -1,5 +1,6 @@
 import { Perlin, Vector2 } from 'rewild-common';
-import { BiomeParams, ClimateAxis, ClimateConfig } from './Biomes';
+import { BiomeParams, ClimateConfig } from './Biomes';
+import { createClimateField, resolveBiomeWeights } from './ClimateField';
 
 function seededRandom(seed: number): () => number {
   let value = seed % 2147483647;
@@ -113,66 +114,6 @@ function biomeHeight(
   return Math.pow(n, biome.heightCurveExp) * biome.heightScale;
 }
 
-// Which band an axis value falls in, plus the smoothstep blend into the next
-// band when the value sits inside a cut's transition zone. bandB === bandA
-// (with weight 0) outside transition zones.
-interface ResolvedAxis {
-  bandA: number;
-  bandB: number;
-  weight: number;
-}
-
-function resolveAxis(value: number, axis: ClimateAxis, out: ResolvedAxis): void {
-  const cuts = axis.cuts;
-  const half = axis.blendHalfWidth;
-
-  let band = 0;
-  while (band < cuts.length && value >= cuts[band]) band++;
-
-  out.bandA = band;
-  out.bandB = band;
-  out.weight = 0;
-
-  // Blending into the band above (value just below cuts[band])?
-  if (band < cuts.length && value > cuts[band] - half) {
-    const t = (value - (cuts[band] - half)) / (2 * half);
-    out.bandB = band + 1;
-    out.weight = t * t * (3 - 2 * t);
-  }
-  // Blending out of the band below (value just above cuts[band-1])?
-  else if (band > 0 && value < cuts[band - 1] + half) {
-    const t = (value - (cuts[band - 1] - half)) / (2 * half);
-    out.bandA = band - 1;
-    out.weight = t * t * (3 - 2 * t);
-  }
-}
-
-// Merge a (biome, weight) pair into the active-cell scratch arrays, returning
-// the new active count. This is deliberately a top-level function taking the
-// count as a parameter rather than a closure over a mutable `activeCount`:
-// V8's Maglev optimizer (Chrome ~149) miscompiles that closure when it
-// OSR-compiles the sample loop mid-run, silently dropping every cell — the
-// first heightmap a worker generates then collapses to zeros partway through.
-// See issue notes: reproduced deterministically; a plain function is immune.
-function addCell(
-  activeBiomes: Int32Array,
-  activeWeights: Float64Array,
-  activeCount: number,
-  biomeIndex: number,
-  weight: number
-): number {
-  if (weight === 0) return activeCount;
-  for (let i = 0; i < activeCount; i++) {
-    if (activeBiomes[i] === biomeIndex) {
-      activeWeights[i] += weight;
-      return activeCount;
-    }
-  }
-  activeBiomes[activeCount] = biomeIndex;
-  activeWeights[activeCount] = weight;
-  return activeCount + 1;
-}
-
 function validateClimate(climate: ClimateConfig): void {
   for (const biome of climate.biomes) {
     if (biome.noiseScale <= 0)
@@ -216,8 +157,11 @@ export function generateBiomeBlendedHeightMap(
 
   const perlin = new Perlin(seed);
   const biomes = climate.biomes;
-  const cells = climate.cells;
   const heights = new Float32Array(width * height);
+
+  // Climate resolution is shared with splat generation so the materials a chunk
+  // is surfaced with always agree with the biome that shaped it.
+  const field = createClimateField(width, height, seed, offset, climate);
 
   // All biomes share one set of octave offsets (same rng stream as
   // generateNoiseMap) so they sample the same underlying fields and blended
@@ -236,90 +180,24 @@ export function generateBiomeBlendedHeightMap(
   for (let i = 0; i < biomes.length; i++)
     maxAmplitudes[i] = theoreticalMaxAmplitude(biomes[i].persistence, biomes[i].octaves);
 
-  // Per-axis world offsets, salted so each axis is independent of the height
-  // noise and of the other axis while staying seed-deterministic. Offsets carry
-  // the chunk position with the same sign convention as the height noise, so
-  // climate values are world-continuous across chunk borders.
-  const tAxis = climate.temperature;
-  const mAxis = climate.moisture;
-  const tRng = seededRandom(seed + tAxis.seedSalt);
-  const tOffsetX = tRng() * 200000 - 100000 + offset.x;
-  const tOffsetY = tRng() * 200000 - 100000 + offset.y;
-  const mRng = seededRandom(seed + mAxis.seedSalt);
-  const mOffsetX = mRng() * 200000 - 100000 + offset.x;
-  const mOffsetY = mRng() * 200000 - 100000 + offset.y;
-
-  // An axis with no cuts has a single band — skip its noise entirely.
-  const sampleTemperature = tAxis.cuts.length > 0;
-  const sampleMoisture = mAxis.cuts.length > 0;
-
   const halfWidth = width / 2;
   const halfHeight = height / 2;
 
   // Scratch state reused across samples (no allocation in the sample loop).
-  const t: ResolvedAxis = { bandA: 0, bandB: 0, weight: 0 };
-  const m: ResolvedAxis = { bandA: 0, bandB: 0, weight: 0 };
   const activeBiomes = new Int32Array(4);
   const activeWeights = new Float64Array(4);
-  let activeCount = 0;
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      if (sampleTemperature) {
-        const tValue =
-          (perlin.simplex2(
-            (x - halfWidth + tOffsetX) / tAxis.scale,
-            (y - halfHeight - tOffsetY) / tAxis.scale
-          ) +
-            1) *
-          0.5;
-        resolveAxis(tValue, tAxis, t);
-      }
-      if (sampleMoisture) {
-        const mValue =
-          (perlin.simplex2(
-            (x - halfWidth + mOffsetX) / mAxis.scale,
-            (y - halfHeight - mOffsetY) / mAxis.scale
-          ) +
-            1) *
-          0.5;
-        resolveAxis(mValue, mAxis, m);
-      }
-
-      // Bilinear weights over the (up to four) neighbouring cells; cells that
-      // share a biome merge, so each biome is evaluated at most once.
-      activeCount = addCell(
+      // Bilinear weights over the (up to four) neighbouring climate cells;
+      // cells that share a biome merge, so each biome is evaluated at most once.
+      const activeCount = resolveBiomeWeights(
+        field,
+        x,
+        y,
         activeBiomes,
-        activeWeights,
-        0,
-        cells[t.bandA][m.bandA],
-        (1 - t.weight) * (1 - m.weight)
+        activeWeights
       );
-      if (m.bandB !== m.bandA)
-        activeCount = addCell(
-          activeBiomes,
-          activeWeights,
-          activeCount,
-          cells[t.bandA][m.bandB],
-          (1 - t.weight) * m.weight
-        );
-      if (t.bandB !== t.bandA) {
-        activeCount = addCell(
-          activeBiomes,
-          activeWeights,
-          activeCount,
-          cells[t.bandB][m.bandA],
-          t.weight * (1 - m.weight)
-        );
-        if (m.bandB !== m.bandA)
-          activeCount = addCell(
-            activeBiomes,
-            activeWeights,
-            activeCount,
-            cells[t.bandB][m.bandB],
-            t.weight * m.weight
-          );
-      }
 
       let h = 0;
       for (let i = 0; i < activeCount; i++) {

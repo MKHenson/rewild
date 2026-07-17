@@ -2,13 +2,36 @@ import { Renderer } from '../..';
 import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
+import { MAX_SPLAT_LAYERS } from '../../renderers/terrain/Biomes';
 
-// TerrainParams layout (32 bytes, std140-compatible):
-//   specularColor  vec3f  offset 0  (12 bytes)
-//   shininess      f32    offset 12 (4 bytes)
-//   ambientColor   vec3f  offset 16 (12 bytes)
-//   _pad           f32    offset 28 (4 bytes)
-const PARAMS_SIZE = 32;
+// TerrainParams layout (176 bytes, std140-compatible) — must match the struct
+// in terrain.wgsl:
+//   specularColor    vec3f          offset 0   (12 bytes)
+//   shininess        f32            offset 12  (4 bytes)
+//   ambientColor     vec3f          offset 16  (12 bytes)
+//   detailFadeStart  f32            offset 28  (4 bytes)
+//   detailFadeEnd    f32            offset 32  (4 bytes)
+//   noiseScale       f32            offset 36  (4 bytes)
+//   _pad             vec2f          offset 40  (8 bytes)
+//   layers           array<vec4f,8> offset 48  (128 bytes)
+//
+// `layers` starts at 48 because a uniform array of vec4f needs 16-byte
+// alignment; 40 + 8 padding is what gets it there. Two vec4f per splat channel:
+//   [slot*2    ] = (layerIndex, uvScale, macroUvScale, specular)
+//   [slot*2 + 1] = (normalYSign, 0, 0, 0)
+const PARAMS_SIZE = 176;
+const LAYERS_OFFSET_FLOATS = 48 / 4;
+const FLOATS_PER_LAYER = 8;
+
+export interface TerrainLayerParams {
+  layerIndex: number;
+  uvScale: number;
+  // 0 ⇒ no macro normal for this material.
+  macroUvScale: number;
+  specular: number;
+  // +1 for a DirectX-convention normal map, -1 for an OpenGL one.
+  normalYSign: number;
+}
 
 export class TerrainUniforms implements ISharedUniformBuffer {
   group: number;
@@ -17,17 +40,41 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
   specularColor: [number, number, number] = [0.04, 0.04, 0.04];
   shininess: number = 32;
-  ambientColor: [number, number, number] = [0, 0, 0];
 
-  // Albedo and normal are held as views, not textures: they are single-layer
-  // views into the terrain texture arrays, and a default view of an array
-  // texture is `2d-array`, which will not bind to the shader's `texture_2d`.
+  // Sky fill. Added outside the shadow terms, so it is what a surface facing
+  // away from the sun — or inside a shadow — still receives; at zero those
+  // areas render pure black, since nothing else lights them.
+  //
+  // Tinted blue because outdoors the fill *is* the sky. Kept modest because
+  // this is a flat add: a fully lit surface gets diffuse (up to 1.0) plus this
+  // on top, so raising it brightens the lit terrain as well as the shadows,
+  // and daylight terrain is already close to saturating.
+  ambientColor: [number, number, number] = [0.1, 0.11, 0.14];
+
+  // Where the detail normal starts and finishes fading out, in view-space
+  // metres. Past detailFadeEnd only the macro normal remains — which is the
+  // point: the detail's mips have averaged to flat by then anyway.
+  detailFadeStart: number = 150;
+  detailFadeEnd: number = 500;
+
+  // Size of the no-tile offset regions, as a fraction of each layer's own tile
+  // — it multiplies scaledUV, so it tracks the material's tiling rather than
+  // the world. Smaller ⇒ larger regions. Regions must stay large relative to
+  // one tile, or their offsets read as seams instead of hiding the repeat.
+  noiseScale: number = 0.005;
+
+  layers: TerrainLayerParams[] = [];
+
+  // Albedo and normal are held as views, not textures: they are views into the
+  // terrain texture arrays, and the shader declares texture_2d_array, so the
+  // view dimension has to be chosen explicitly by the caller.
   private _albedoView: GPUTextureView;
   private _normalView: GPUTextureView;
-  private _texture: GPUTexture;
-  private _sampler: GPUSampler;
+  private _roughnessView: GPUTextureView;
+  private _splatTexture: GPUTexture;
+  private _noiseTexture: GPUTexture;
+  private _splatSampler: GPUSampler;
   private _seamlessSampler: GPUSampler;
-  private _specularMap: GPUTexture;
   private _paramsBuffer: GPUBuffer;
   private _paramsData: Float32Array = new Float32Array(PARAMS_SIZE / 4);
 
@@ -43,21 +90,32 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   build(renderer: Renderer, pipelineLayout: GPUBindGroupLayout): void {
     const { device } = renderer;
 
-    if (!this._texture)
-      this._texture = renderer.textureManager.get('grid-data').gpuTexture;
+    if (!this._splatTexture)
+      this._splatTexture = renderer.textureManager.get('grid-data').gpuTexture;
+    // Must be the *smooth* field, not `data-rgba-noise-256`: that one is white
+    // noise, and the shader floors this into a region index.
+    if (!this._noiseTexture)
+      this._noiseTexture = renderer.textureManager.get(
+        'smooth-noise-256'
+      ).gpuTexture;
+    if (!this._splatSampler)
+      this._splatSampler = renderer.samplerManager.get('linear-clamped');
+    if (!this._seamlessSampler)
+      this._seamlessSampler = renderer.samplerManager.get('linear');
     if (!this._albedoView)
       this._albedoView = renderer.textureManager
         .get('grid-data')
-        .gpuTexture.createView();
-    if (!this._sampler) this._sampler = renderer.samplerManager.get('linear');
-    if (!this._seamlessSampler)
-      this._seamlessSampler = renderer.samplerManager.get('linear');
+        .gpuTexture.createView({ dimension: '2d-array' });
     if (!this._normalView)
       this._normalView = renderer.textureManager
         .get('flat-normal-1x1')
-        .gpuTexture.createView();
-    if (!this._specularMap)
-      this._specularMap = renderer.textureManager.get('white-1x1').gpuTexture;
+        .gpuTexture.createView({ dimension: '2d-array' });
+    // white-1x1 ⇒ roughness 1 ⇒ zero specular, the safe fallback before the
+    // real roughness array is bound.
+    if (!this._roughnessView)
+      this._roughnessView = renderer.textureManager
+        .get('white-1x1')
+        .gpuTexture.createView({ dimension: '2d-array' });
 
     if (this._paramsBuffer) this._paramsBuffer.destroy();
     this._paramsBuffer = device.createBuffer({
@@ -70,13 +128,14 @@ export class TerrainUniforms implements ISharedUniformBuffer {
       label: 'terrain textures',
       layout: pipelineLayout,
       entries: [
-        { binding: 0, resource: this._sampler },
-        { binding: 1, resource: this._texture.createView() },
+        { binding: 0, resource: this._splatSampler },
+        { binding: 1, resource: this._splatTexture.createView() },
         { binding: 2, resource: this._albedoView },
         { binding: 3, resource: this._seamlessSampler },
         { binding: 4, resource: this._normalView },
-        { binding: 5, resource: this._specularMap.createView() },
+        { binding: 5, resource: this._noiseTexture.createView() },
         { binding: 6, resource: { buffer: this._paramsBuffer } },
+        { binding: 7, resource: this._roughnessView },
       ],
     });
 
@@ -84,28 +143,50 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   }
 
   private _writeParams(device: GPUDevice): void {
-    this._paramsData[0] = this.specularColor[0];
-    this._paramsData[1] = this.specularColor[1];
-    this._paramsData[2] = this.specularColor[2];
-    this._paramsData[3] = this.shininess;
-    this._paramsData[4] = this.ambientColor[0];
-    this._paramsData[5] = this.ambientColor[1];
-    this._paramsData[6] = this.ambientColor[2];
-    this._paramsData[7] = 0;
+    const data = this._paramsData;
+    data[0] = this.specularColor[0];
+    data[1] = this.specularColor[1];
+    data[2] = this.specularColor[2];
+    data[3] = this.shininess;
+    data[4] = this.ambientColor[0];
+    data[5] = this.ambientColor[1];
+    data[6] = this.ambientColor[2];
+    data[7] = this.detailFadeStart;
+    data[8] = this.detailFadeEnd;
+    data[9] = this.noiseScale;
+    data[10] = 0; // _pad
+    data[11] = 0;
+
+    // Channels the palette does not use keep weight 0 in the splat, so the
+    // shader's epsilon skips them — but zero them anyway so a stale layer can
+    // never be read if a future palette grows.
+    for (let i = 0; i < MAX_SPLAT_LAYERS; i++) {
+      const layer = this.layers[i];
+      const base = LAYERS_OFFSET_FLOATS + i * FLOATS_PER_LAYER;
+      data[base] = layer ? layer.layerIndex : 0;
+      data[base + 1] = layer ? layer.uvScale : 1;
+      data[base + 2] = layer ? layer.macroUvScale : 0;
+      data[base + 3] = layer ? layer.specular : 0;
+      data[base + 4] = layer ? layer.normalYSign : 1;
+      data[base + 5] = 0;
+      data[base + 6] = 0;
+      data[base + 7] = 0;
+    }
+
     device.queue.writeBuffer(
       this._paramsBuffer,
       0,
-      this._paramsData as ArrayBufferView<ArrayBuffer>
+      data as ArrayBufferView<ArrayBuffer>
     );
   }
 
-  set texture(texture: GPUTexture) {
-    this._texture = texture;
+  set splatTexture(texture: GPUTexture) {
+    this._splatTexture = texture;
     this.requiresBuild = true;
   }
 
-  get texture(): GPUTexture {
-    return this._texture;
+  get splatTexture(): GPUTexture {
+    return this._splatTexture;
   }
 
   set albedoView(view: GPUTextureView) {
@@ -117,24 +198,6 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     return this._albedoView;
   }
 
-  set sampler(sampler: GPUSampler) {
-    this._sampler = sampler;
-    this.requiresBuild = true;
-  }
-
-  get sampler(): GPUSampler {
-    return this._sampler;
-  }
-
-  get seamlessSampler(): GPUSampler {
-    return this._seamlessSampler;
-  }
-
-  set seamlessSampler(sampler: GPUSampler) {
-    this._seamlessSampler = sampler;
-    this.requiresBuild = true;
-  }
-
   set normalView(view: GPUTextureView) {
     this._normalView = view;
     this.requiresBuild = true;
@@ -144,13 +207,31 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     return this._normalView;
   }
 
-  set specularMap(texture: GPUTexture) {
-    this._specularMap = texture;
+  set roughnessView(view: GPUTextureView) {
+    this._roughnessView = view;
     this.requiresBuild = true;
   }
 
-  get specularMap(): GPUTexture {
-    return this._specularMap;
+  get roughnessView(): GPUTextureView {
+    return this._roughnessView;
+  }
+
+  set splatSampler(sampler: GPUSampler) {
+    this._splatSampler = sampler;
+    this.requiresBuild = true;
+  }
+
+  get splatSampler(): GPUSampler {
+    return this._splatSampler;
+  }
+
+  get seamlessSampler(): GPUSampler {
+    return this._seamlessSampler;
+  }
+
+  set seamlessSampler(sampler: GPUSampler) {
+    this._seamlessSampler = sampler;
+    this.requiresBuild = true;
   }
 
   setNumInstances(numInstances: number): void {}

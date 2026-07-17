@@ -57,7 +57,6 @@ describe('TERRAIN_MATERIALS', () => {
       expect(material.name).toBe(key);
     }
   });
-
 });
 
 describe('texture array layer order', () => {
@@ -100,7 +99,9 @@ describe('validateTerrainMaterials', () => {
       name: 'broken',
       albedoUrl: 'terrain/x/albedo.png',
       normalUrl: 'terrain/x/normal.png',
+      roughnessUrl: 'terrain/x/rough.png',
       uvScale: 25,
+      normalConvention: 'opengl' as const,
       macroNormalUrl: 'terrain/x/normal.png',
       specular: 0.1,
     };
@@ -112,7 +113,9 @@ describe('validateTerrainMaterials', () => {
       name: 'broken',
       albedoUrl: 'terrain/x/albedo.png',
       normalUrl: 'terrain/x/normal.png',
+      roughnessUrl: 'terrain/x/rough.png',
       uvScale: 25,
+      normalConvention: 'opengl' as const,
       macroNormalUrl: 'terrain/x/normal.png',
       macroUvScale: 25,
       specular: 0.1,
@@ -120,15 +123,17 @@ describe('validateTerrainMaterials', () => {
     expect(() => validateTerrainMaterials()).toThrow(/coarser/);
   });
 
-  // Only albedo and normal arrays exist, so the macro normal is the material's
-  // own normal layer sampled at a coarser scale. A distinct macro map would
-  // silently render as the detail map instead.
+  // There is no separate macro-normal array, so the macro normal is the
+  // material's own normal layer sampled at a coarser scale. A distinct macro
+  // map would silently render as the detail map instead.
   it('rejects a macroNormalUrl that is a different texture to the normal', () => {
     TERRAIN_MATERIALS['broken'] = {
       name: 'broken',
       albedoUrl: 'terrain/x/albedo.png',
       normalUrl: 'terrain/x/normal.png',
+      roughnessUrl: 'terrain/x/rough.png',
       uvScale: 25,
+      normalConvention: 'opengl' as const,
       macroNormalUrl: 'terrain/x/some-other-normal.png',
       macroUvScale: 2,
       specular: 0.1,
@@ -141,7 +146,7 @@ describe('getClimatePalette', () => {
   it('lists the default climate materials, base-first per biome', () => {
     expect(getClimatePalette(DEFAULT_CLIMATE)).toEqual([
       'forest-ground-01',
-      'ground-coastal-1',
+      'aerial_rocks_01',
       'rocks-ground-01',
       'snow-02',
     ]);
@@ -192,32 +197,33 @@ describe('validateClimateLayers', () => {
   });
 
   // The library holds exactly MAX_SPLAT_LAYERS materials, so overflowing the
-  // palette needs a fifth registered for the duration of the test — otherwise
-  // this would throw on the unknown material and pass for the wrong reason.
+  // palette needs one more distinct material than the splat map holds. Built
+  // from the whole library plus an extra registered material, so it overflows
+  // whatever the library size is — the message just has to name a count over
+  // MAX_SPLAT_LAYERS, not a hardcoded number the table can drift past.
   it('rejects a climate needing more materials than the splat map holds', () => {
-    TERRAIN_MATERIALS['test-fifth'] = {
-      name: 'test-fifth',
-      albedoUrl: 'terrain/test-fifth/albedo.png',
-      normalUrl: 'terrain/test-fifth/normal.png',
+    TERRAIN_MATERIALS['test-extra'] = {
+      name: 'test-extra',
+      albedoUrl: 'terrain/test-extra/albedo.png',
+      normalUrl: 'terrain/test-extra/normal.png',
+      roughnessUrl: 'terrain/test-extra/rough.png',
       uvScale: 25,
+      normalConvention: 'opengl' as const,
       specular: 0.1,
     };
 
     try {
       const climate = climateOf([
-        biome('a', [
-          { material: 'snow-02' },
-          { material: 'rocks-ground-01' },
-          { material: 'ground-coastal-1' },
-          { material: 'forest-ground-01' },
-        ]),
-        biome('b', [{ material: 'test-fifth' }]),
+        biome(
+          'a',
+          Object.keys(TERRAIN_MATERIALS).map((material) => ({ material }))
+        ),
       ]);
       expect(() => validateClimateLayers(climate)).toThrow(
-        /needs 5 materials .* but the splat map holds 4/
+        /but the splat map holds 4/
       );
     } finally {
-      delete TERRAIN_MATERIALS['test-fifth'];
+      delete TERRAIN_MATERIALS['test-extra'];
     }
   });
 });

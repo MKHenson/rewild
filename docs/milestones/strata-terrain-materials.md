@@ -156,16 +156,22 @@ The problem is not that the rock texture isn't rocky enough — it is that
 the detail and returning a flat surface. High LODs compound it: fewer vertices
 means a smoother geometric normal too.
 
-The fix, per layer:
+The fix, per layer, is a **crossfade between two UV scales of the same map**:
 
-- A **macro normal** at a large `uvScale` — features stay many pixels wide at
-  distance, so mipping cannot erase them.
-- The **detail normal** at the current small scale, **faded out by view
-  distance**. `viewPosition` is already in the fragment shader, so
+- The **detail normal** at the current small scale, close up.
+- A **macro normal** at a large `uvScale`, taking over with distance — its
+  features stay many pixels wide, so mipping cannot erase them.
+- Driven by view distance. `viewPosition` is already in the fragment shader, so
   `length(viewPosition)` is free; fade via `smoothstep(near, far, d)` with the
   bounds in `TerrainParams`.
 
-Far → macro only → dramatic rock. Near → macro + detail.
+Far → macro only → dramatic rock. Near → **detail only**.
+
+**The macro must not be additive.** It *stands in for* the detail at range, so
+it has to be invisible up close, where the detail it replaces still resolves.
+An earlier revision of this doc said "near → macro + detail", and the shader
+built from it kept the macro at full strength at every distance — a 240m-wide
+bump visible from arm's length. Interpolate; don't add.
 
 **Rejected: scaling the UV by distance on a single map.** It swims as the camera
 moves and it shifts the no-tile offsets.

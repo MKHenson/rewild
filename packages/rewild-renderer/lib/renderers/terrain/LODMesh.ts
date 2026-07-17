@@ -3,11 +3,12 @@ import { TerrainPass } from '../../materials/TerrainPass';
 import { Mesh } from '../../core/Mesh';
 import { Renderer } from '../..';
 import { Geometry } from '../../geometry/Geometry';
-import { TextureArray } from '../../textures/TextureArray';
-import { getTerrainMaterialLayer } from './TerrainMaterials';
+import { resolveClimatePreset } from './Biomes';
 import {
   TERRAIN_ALBEDO_ARRAY,
   TERRAIN_NORMAL_ARRAY,
+  TERRAIN_ROUGHNESS_ARRAY,
+  getClimateLayerParams,
 } from './TerrainTextureArrays';
 import type { TerrainChunk } from './TerrainChunk';
 
@@ -22,10 +23,6 @@ export type LODMeshGPUState = 'none' | 'requested' | 'ready' | 'unloaded';
 // of chunks a ray actually crosses.
 const TERRAIN_BVH_MAX_LOD = 1;
 const TERRAIN_BVH_LEAF_TRIANGLES = 32;
-
-// The single material every chunk is surfaced with until #181 blends the
-// per-biome layers from the splat map.
-const PLACEHOLDER_MATERIAL = 'rocks-ground-01';
 
 // One detail level of a terrain chunk: owns the worker request for its mesh
 // and the resulting GPU resources. The heights it meshes come from the chunk
@@ -161,7 +158,7 @@ export class LODMesh {
         );
         const version = this.chunk.heightsVersion;
 
-        const { texture, vertices, uvs, normals, indices, heights } =
+        const { splat, vertices, uvs, normals, indices, heights } =
           await renderer.terrainRenderer.workerPool.enqueue({
             chunkSize: this.chunkSize,
             lod: this.lod,
@@ -187,9 +184,9 @@ export class LODMesh {
           return;
         }
 
-        // The texture is chunk state shared by every LOD — hand it over and let
-        // the chunk create or re-upload it as its version warrants.
-        this.chunk.populateTexture(renderer, texture, version);
+        // The splat map is chunk state shared by every LOD — hand it over and
+        // let the chunk create or re-upload it as its version warrants.
+        this.chunk.populateSplat(renderer, splat, version);
 
         const oldMesh = swapping ? this.mesh : null;
 
@@ -245,21 +242,23 @@ export class LODMesh {
         }
 
         const terrainPass = new TerrainPass();
-        terrainPass.terrainUniforms.sampler =
-          renderer.samplerManager.get('linear-clamped');
-        terrainPass.terrainUniforms.texture = this.chunk.texture!.gpuTexture;
-        // One hardcoded material for the whole world — the placeholder #181
-        // replaces with the per-biome layer blend. Until then the shader takes
-        // a plain texture_2d, so bind a single-layer view of the arrays rather
-        // than loading these two textures a second time standalone.
-        const rockLayer = getTerrainMaterialLayer(PLACEHOLDER_MATERIAL);
-        terrainPass.terrainUniforms.albedoView = (
-          renderer.textureManager.get(TERRAIN_ALBEDO_ARRAY) as TextureArray
-        ).createLayerView(rockLayer);
-        terrainPass.terrainUniforms.normalView = (
-          renderer.textureManager.get(TERRAIN_NORMAL_ARRAY) as TextureArray
-        ).createLayerView(rockLayer);
-        terrainPass.terrainUniforms.shininess = 5;
+        const uniforms = terrainPass.terrainUniforms;
+        uniforms.splatSampler = renderer.samplerManager.get('linear-clamped');
+        uniforms.splatTexture = this.chunk.splatTexture!.gpuTexture;
+        uniforms.albedoView = renderer.textureManager
+          .get(TERRAIN_ALBEDO_ARRAY)
+          .gpuTexture.createView({ dimension: '2d-array' });
+        uniforms.normalView = renderer.textureManager
+          .get(TERRAIN_NORMAL_ARRAY)
+          .gpuTexture.createView({ dimension: '2d-array' });
+        uniforms.roughnessView = renderer.textureManager
+          .get(TERRAIN_ROUGHNESS_ARRAY)
+          .gpuTexture.createView({ dimension: '2d-array' });
+        // Which material each splat channel means, and how to sample it.
+        uniforms.layers = getClimateLayerParams(
+          resolveClimatePreset(this.climatePreset)
+        );
+        uniforms.shininess = 5;
 
         const newMesh = new Mesh(geometry, terrainPass);
         this.mesh = newMesh;

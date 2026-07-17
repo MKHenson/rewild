@@ -22,6 +22,11 @@ export interface TerrainMaterial {
   // MiB of VRAM nothing binds. The table describes the material completely.
   albedoUrl: string;
   normalUrl: string;
+  // Linear grayscale roughness. Sampled per texel and folded into the specular
+  // highlight as gloss = 1 - roughness, so the highlight follows the surface
+  // (damp rock catches the sun, dry grass stays matte) instead of the whole
+  // layer glinting uniformly. Only the red channel is read.
+  roughnessUrl: string;
   // Detail tiling, in tiles per chunk UV unit.
   uvScale: number;
   // Large-scale normal for distant fragments, sampled at `macroUvScale`.
@@ -40,15 +45,26 @@ export interface TerrainMaterial {
   // is bound to `white-1x1` today, so it costs two texture samples per layer to
   // multiply by 1.0.
   specular: number;
+  // Which way the normal map's green channel points. Sources differ and there
+  // is no way to detect it from the file, so every material must say.
+  //
+  //   'opengl'  green = +Y, up the image   (Poly Haven, Blender, Substance-GL)
+  //   'directx' green = -Y, down the image (Unreal, 3ds Max, many stock sites)
+  //
+  // Terrain's tangent frame has Y following +V, and V runs *down* the image
+  // (WebGPU samples with the origin top-left), so a DirectX map binds directly
+  // and an OpenGL map needs its green inverted. Get this backwards and every
+  // bump on the material reads as a dent.
+  normalConvention: 'opengl' | 'directx';
 }
 
 // Matches the shader's current `fragUV * 25.0`, so the detail tiling of the
 // existing single-material terrain carries over unchanged.
-const DETAIL_UV_SCALE = 25;
+const DETAIL_UV_SCALE = 10;
 
 // Much coarser than the detail scale: features spanning metres rather than
 // centimetres, which is what survives mipping at distance.
-const MACRO_UV_SCALE = 2;
+const MACRO_UV_SCALE = 0.5;
 
 const ROCK_NORMAL_URL = 'terrain/rocks-ground-01/rocks_ground_01_norm_1k.png';
 
@@ -57,17 +73,29 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'forest-ground-01',
     albedoUrl: 'terrain/forest-ground-01/forrest_ground_01_diff_1k.jpg',
     normalUrl: 'terrain/forest-ground-01/forrest_ground_01_norm_1k.png',
+    roughnessUrl: 'terrain/forest-ground-01/forrest_ground_01_rough_1k.jpg',
+    macroNormalUrl: 'terrain/forest-ground-01/forrest_ground_01_norm_1k.png',
+    macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    specular: 0.12,
+    specular: 0.3,
+    normalConvention: 'opengl', // Poly Haven
   },
-  'ground-coastal-1': {
-    name: 'ground-coastal-1',
+  'ground-coastal-01': {
+    name: 'ground-coastal-01',
     albedoUrl:
-      'terrain/ground-coastal-1/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png',
+      'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png',
     normalUrl:
-      'terrain/ground-coastal-1/TexturesCom_Ground_Coastal1_2x2_1K_normal.png',
+      'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_normal.png',
+    roughnessUrl:
+      'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_roughness.png',
+    macroNormalUrl:
+      'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_normal.png',
     uvScale: DETAIL_UV_SCALE,
+    macroUvScale: MACRO_UV_SCALE,
     specular: 0.18,
+    // TexturesCom, not Poly Haven — this one is a guess. If coastal ground
+    // alone reads inset while the others look right, flip it to 'directx'.
+    normalConvention: 'opengl',
   },
   // The only material that reads at silhouette distance, so it is the one that
   // gets a macro normal — reusing its own detail normal at a much larger scale
@@ -77,17 +105,43 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'rocks-ground-01',
     albedoUrl: 'terrain/rocks-ground-01/rocks_ground_01_diff_1k.jpg',
     normalUrl: ROCK_NORMAL_URL,
+    roughnessUrl: 'terrain/rocks-ground-01/rocks_ground_01_rough_1k.jpg',
     uvScale: DETAIL_UV_SCALE,
     macroNormalUrl: ROCK_NORMAL_URL,
     macroUvScale: MACRO_UV_SCALE,
     specular: 0.3,
+    normalConvention: 'opengl', // Poly Haven
   },
   'snow-02': {
     name: 'snow-02',
     albedoUrl: 'terrain/snow-02/snow_02_diff_1k.jpg',
     normalUrl: 'terrain/snow-02/snow_02_norm_1k.png',
+    roughnessUrl: 'terrain/snow-02/snow_02_rough_1k.jpg',
     uvScale: DETAIL_UV_SCALE,
     specular: 0.55,
+    normalConvention: 'opengl', // Poly Haven
+  },
+  rocky_terrain: {
+    name: 'rocky_terrain',
+    albedoUrl: 'terrain/rocky-terrain/rocky_terrain_diff_1k.jpg',
+    normalUrl: 'terrain/rocky-terrain/rocky_terrain_norm_1k.png',
+    roughnessUrl: 'terrain/rocky-terrain/rocky_terrain_rough_1k.png',
+    macroNormalUrl: 'terrain/rocky-terrain/rocky_terrain_norm_1k.png',
+    macroUvScale: MACRO_UV_SCALE * 2,
+    uvScale: DETAIL_UV_SCALE,
+    specular: 0.3,
+    normalConvention: 'opengl', // Poly Haven
+  },
+  aerial_rocks_01: {
+    name: 'aerial_rocks_01',
+    albedoUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_diff_1k.jpg',
+    normalUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_norm_1k.png',
+    roughnessUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_rough_1k.jpg',
+    macroNormalUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_norm_1k.png',
+    macroUvScale: MACRO_UV_SCALE * 2,
+    uvScale: DETAIL_UV_SCALE,
+    specular: 0.3,
+    normalConvention: 'opengl', // Poly Haven
   },
 };
 
@@ -132,11 +186,14 @@ export function validateTerrainMaterials(): void {
         `Terrain material '${material.name}' has macroUvScale ${material.macroUvScale} >= uvScale ${material.uvScale} — a macro normal must be coarser than the detail normal or it buys nothing.`
       );
 
-    // Only albedo and normal arrays are built, so the macro normal is the
+    // There is no separate macro-normal array, so the macro normal is the
     // material's own normal array layer sampled at macroUvScale. A macro map
-    // that is a *different* texture would need a third array — deliberately not
-    // built for one material that currently reuses its own normal.
-    if (material.macroNormalUrl && material.macroNormalUrl !== material.normalUrl)
+    // that is a *different* texture would need its own array — deliberately not
+    // built for materials that currently reuse their own normal.
+    if (
+      material.macroNormalUrl &&
+      material.macroNormalUrl !== material.normalUrl
+    )
       throw new Error(
         `Terrain material '${material.name}' macroNormalUrl must be its own normalUrl — a distinct macro map needs a third texture array, which does not exist yet.`
       );

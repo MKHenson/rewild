@@ -1,6 +1,7 @@
 import { generateTerrainMesh, MESH_STRIDE } from '../MeshGenerator';
 import { generateBiomeBlendedHeightMap } from '../Noise';
-import { getMaxWorldHeight, resolveClimatePreset } from '../Biomes';
+import { resolveClimatePreset } from '../Biomes';
+import { generateSplatMap } from '../Splat';
 import { Vector2 } from 'rewild-common';
 
 export interface BuildChunkMeshRequest {
@@ -15,7 +16,9 @@ export interface BuildChunkMeshRequest {
 }
 
 export interface BuildChunkMeshResult {
-  texture: Uint8Array;
+  // RGBA8 splat map: channel i is the weight of the climate palette's i-th
+  // material. Chunk-wide and identical for every LOD.
+  splat: Uint8Array;
   vertices: Float32Array;
   uvs: Float32Array;
   normals: Float32Array;
@@ -39,62 +42,28 @@ export function buildChunkMesh(
   // the temperature × moisture climate model of the world's climate preset —
   // presets are code-defined game content (Biomes.ts); worlds carry only the id.
   const climate = resolveClimatePreset(climatePreset);
-  const maxWorldHeight = getMaxWorldHeight(climate);
+  const worldOffset = new Vector2(position.x, position.y);
   const heights =
     request.heights ??
     generateBiomeBlendedHeightMap(
       chunkSize,
       chunkSize,
       seed,
-      new Vector2(position.x, position.y),
+      worldOffset,
       climate
     );
 
-  // Terrain colour bands based on absolute world height normalised by the
-  // tallest biome, so plains keep lowland colours and rock/snow only appears
-  // on genuinely tall terrain. Placeholder until per-biome materials land.
-  const textureValues = new Uint8Array(chunkSize * chunkSize * 4);
-  for (let i = 0; i < chunkSize * chunkSize; i++) {
-    const h = heights[i] / maxWorldHeight;
-    let r: number, g: number, b: number;
-
-    if (h < 0.15) {
-      // Wet lowlands — dark green/moss
-      const t = h / 0.15;
-      r = Math.round(40 + t * 30);
-      g = Math.round(80 + t * 30);
-      b = Math.round(40 + t * 10);
-    } else if (h < 0.45) {
-      // Grasslands
-      const t = (h - 0.15) / 0.3;
-      r = Math.round(70 + t * 30);
-      g = Math.round(110 + t * 20);
-      b = Math.round(50 + t * 10);
-    } else if (h < 0.70) {
-      // Upland / shrub — earthy greens transitioning to brown
-      const t = (h - 0.45) / 0.25;
-      r = Math.round(100 + t * 50);
-      g = Math.round(130 - t * 30);
-      b = Math.round(60 - t * 20);
-    } else if (h < 0.88) {
-      // Rocky slopes
-      const t = (h - 0.70) / 0.18;
-      r = Math.round(150 + t * 40);
-      g = Math.round(100 + t * 30);
-      b = Math.round(40 + t * 30);
-    } else {
-      // Mountain peaks — grey / snow
-      const t = Math.min((h - 0.88) / 0.12, 1);
-      r = Math.round(190 + t * 65);
-      g = Math.round(130 + t * 110);
-      b = Math.round(70 + t * 180);
-    }
-
-    textureValues[i * 4]     = r;
-    textureValues[i * 4 + 1] = g;
-    textureValues[i * 4 + 2] = b;
-    textureValues[i * 4 + 3] = 255;
-  }
+  // Per-biome material weights, derived from the same climate model that shaped
+  // the heights plus each biome's slope/height layer rules. Derived rather than
+  // stored, so it is correct for generated and sculpted chunks alike.
+  const splat = generateSplatMap(
+    chunkSize,
+    chunkSize,
+    seed,
+    worldOffset,
+    climate,
+    heights
+  );
 
   // Heights are already in meters, so no further vertical scaling.
   const meshData = generateTerrainMesh(heights, chunkSize, chunkSize, lod, 1);
@@ -112,7 +81,7 @@ export function buildChunkMesh(
   }
 
   return {
-    texture: textureValues,
+    splat,
     vertices,
     uvs,
     normals: meshData.normals,
