@@ -150,8 +150,8 @@ export class PerformanceMonitor {
         totalMs += ms;
       }
 
-      this.latestResults.set('sky-total', totalMs);
-      table['sky-total (sum)'] = totalMs.toFixed(3) + ' ms';
+      this.latestResults.set('total', totalMs);
+      table['total (sum)'] = totalMs.toFixed(3) + ' ms';
       console.table(table);
     } catch {
       // Ignore read errors (buffer destroyed, device lost, etc.)
