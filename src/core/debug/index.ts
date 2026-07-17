@@ -3,6 +3,7 @@ import { Renderer } from 'rewild-renderer';
 import { registerChunkSnapshotDevCommands } from './ChunkSnapshotDevCommands';
 import { registerShadowDebugCommands } from './ShadowDebugCommands';
 import { registerSkyDebugCommands } from './SkyDebugCommands';
+import { registerTerrainPerfCommands } from './TerrainPerfCommands';
 
 // One-stop registration for the window console commands, called wherever a
 // renderer is bound to a loaded project (editor sync + game load). Commands
@@ -11,5 +12,6 @@ import { registerSkyDebugCommands } from './SkyDebugCommands';
 export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerSkyDebugCommands(renderer);
   registerShadowDebugCommands(renderer);
+  registerTerrainPerfCommands(renderer);
   registerChunkSnapshotDevCommands(renderer, project);
 }

@@ -14,6 +14,7 @@ import { RenderList } from './core/RenderList';
 import { RenderLayer } from './core/RenderLayer';
 import { Light } from './core/lights/Light';
 import { MipMapGenerator } from './textures/MipMapGenerator';
+import { PerformanceMonitor } from './utils/PerformanceMonitor';
 import { TextureManager } from './managers/TextureManager';
 import { SamplerManager } from './managers/SamplerManager';
 import { GeometryManager } from './managers/GeometryManager';
@@ -55,6 +56,14 @@ export class Renderer {
   guiManager: GuiManager;
   materialManager: MaterialManager;
   mipmapGenerator: MipMapGenerator;
+
+  // GPU-time profiling of the main scene pass (terrain + all opaque geometry).
+  // Terrain is not its own pass — its LOD meshes draw through renderGroupings in
+  // this pass — so 'scene' times the whole thing. On a terrain-filling view that
+  // is dominated by terrain's fragment cost, which is what #182 is watching. Set
+  // `scenePerfMonitor.enabled = true` (e.g. from the console) to log it; off by
+  // default at zero overhead.
+  scenePerfMonitor: PerformanceMonitor = new PerformanceMonitor();
 
   camera: PerspectiveCamera;
   scene: Transform;
@@ -188,6 +197,8 @@ export class Renderer {
     this.context = context;
     this.device = device;
 
+    this.scenePerfMonitor.init(device, ['scene']);
+
     this.textureManager = new TextureManager();
     this.samplerManager = new SamplerManager();
     this.fontManager = new FontManager();
@@ -285,6 +296,7 @@ export class Renderer {
     this.terrainRenderer.dispose();
     this.directionalShadowRenderer.dispose();
     this.spotLightShadowRenderer.dispose();
+    this.scenePerfMonitor.dispose();
     this.disposed = true;
     this.initialized = false;
     this.renderTarget?.destroy();
@@ -669,6 +681,7 @@ export class Renderer {
           depthLoadOp: 'clear',
           depthStoreOp: 'store',
         },
+        timestampWrites: this.scenePerfMonitor.getTimestampWrites('scene'),
       });
 
       const camera = this.camera;
@@ -678,6 +691,9 @@ export class Renderer {
       this.renderGroupings(renderList, pass, camera.camera);
       pass.end();
       device.queue.submit([encoder.finish()]);
+
+      // Resolve the 'scene' GPU timestamp (no-op unless profiling is enabled).
+      this.scenePerfMonitor.resolveAndLog();
 
       // Create a new encoder for the post-processing pass
       const postProcessingEncoder = device.createCommandEncoder({
