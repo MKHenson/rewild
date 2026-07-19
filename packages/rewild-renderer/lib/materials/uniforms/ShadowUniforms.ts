@@ -142,8 +142,15 @@ export class ShadowUniforms implements ISharedUniformBuffer {
     }
 
     // --- Spot light shadow ---
+    // Two independent systems must agree before the shader may use the spot
+    // shadow: the shadow renderer found a castShadow spot in the scene
+    // (hasSpotShadow), AND Lighting.prepare actually packed that light into
+    // this frame's light buffer (index >= 0). They can disagree — e.g. the
+    // light-budget once dropped the flashlight while its shadow map still
+    // rendered — and writing -1 into the u32 index then made the shader read a
+    // zeroed light slot. Treat "not packed" as "no spot shadow".
     const spotRenderer = renderer.spotLightShadowRenderer;
-    if (spotRenderer?.hasSpotShadow) {
+    if (spotRenderer?.hasSpotShadow && renderer.shadowCastingSpotLightIndex >= 0) {
       // lightMVPFromView = lightVP * camera.matrixWorld
       // Transforms a view-space position into spot light clip space.
       _tempMat.multiplyMatrices(spotRenderer.lightVP, camera.transform.matrixWorld);

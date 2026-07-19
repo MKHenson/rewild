@@ -164,9 +164,25 @@ export class Lighting implements ISharedUniformBuffer {
           (light as PointLight).setSpriteAlpha(t * t * t * t);
         }
 
+        // Beyond the fade-out distance the light contributes nothing — pass 2
+        // would skip it anyway. Rejecting it here too matters because pass 2's
+        // budget is sliced off the top of the sorted candidates *before* the
+        // fade check runs: a crowd of distant, invisible lights could otherwise
+        // consume every slot and push a nearby visible light off the end.
+        if (dist2 >= FADE_ZERO_DIST * FADE_ZERO_DIST) continue;
+
+        // The shadow-casting spot is the player's flashlight — an inch from the
+        // camera and always visible when lit. It must never lose its slot to a
+        // crowd of scenery lights, so it outranks every scored candidate.
+        // Directional lights already bypass scoring entirely in pass 1.
+        // (Infinity survives the Float32Array round-trip and sorts first.)
+        //
         // Score falls off as intensity/dist² inside range, intensity×range²/dist⁴ outside.
         const rangeWeight = Math.min(1.0, (range * range) / (dist2 + 1.0));
-        const score = (light.intensity * rangeWeight) / (dist2 + 1.0);
+        const score =
+          light instanceof SpotLight && (light as SpotLight).castShadow
+            ? Infinity
+            : (light.intensity * rangeWeight) / (dist2 + 1.0);
 
         this._candidateLights[numCandidates] = light;
         this._candidateScores[numCandidates] = score;
@@ -188,13 +204,16 @@ export class Lighting implements ISharedUniformBuffer {
       this._candidateScores[j + 1] = keyScore;
     }
 
-    const remainingSlots = MAX_LIGHTS - lightCount;
-    const toWrite = Math.min(numCandidates, remainingSlots);
-
     // Pass 2: write selected lights with a steep t⁴ distance-based fade factor.
     // The steep curve ensures lights near the budget boundary (~80–90 units) are
     // already at ~4% intensity, making budget swaps visually imperceptible.
-    for (let i = 0; i < toWrite && lightCount < MAX_LIGHTS; i++) {
+    //
+    // Deliberately iterates ALL candidates rather than slicing the top
+    // `MAX_LIGHTS - lightCount` off the sorted array: a candidate this loop
+    // skips (its fade factor reached zero) must yield its slot to the next
+    // candidate down, not waste it. The lightCount guard is what enforces the
+    // budget — it only advances on an actual write.
+    for (let i = 0; i < numCandidates && lightCount < MAX_LIGHTS; i++) {
       const light = this._candidateLights[i]!;
 
       if (light instanceof PointLight) {
