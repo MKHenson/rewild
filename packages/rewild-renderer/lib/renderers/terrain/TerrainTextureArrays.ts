@@ -18,6 +18,7 @@ import {
 export const TERRAIN_ALBEDO_ARRAY = 'terrain-albedo-array';
 export const TERRAIN_NORMAL_ARRAY = 'terrain-normal-array';
 export const TERRAIN_ROUGHNESS_ARRAY = 'terrain-roughness-array';
+export const TERRAIN_HEIGHT_ARRAY = 'terrain-height-array';
 
 /**
  * Builds the terrain albedo, normal and roughness texture arrays from the
@@ -51,16 +52,22 @@ export async function initTerrainTextureArrays(
     new TextureProperties(TERRAIN_ROUGHNESS_ARRAY),
     order.map((name) => resolveAssetUrl(TERRAIN_MATERIALS[name].roughnessUrl))
   );
+  const height = new TextureArray(
+    new TextureProperties(TERRAIN_HEIGHT_ARRAY),
+    order.map((name) => resolveAssetUrl(TERRAIN_MATERIALS[name].heightUrl))
+  );
 
   await Promise.all([
     albedo.load(renderer),
     normal.load(renderer),
     roughness.load(renderer),
+    height.load(renderer),
   ]);
 
   renderer.textureManager.addTexture(albedo);
   renderer.textureManager.addTexture(normal);
   renderer.textureManager.addTexture(roughness);
+  renderer.textureManager.addTexture(height);
 }
 
 /**
@@ -82,7 +89,9 @@ export function getClimateLayerParams(
       layerIndex: getTerrainMaterialLayer(name),
       uvScale: material.uvScale,
       macroUvScale: material.macroUvScale ?? 0,
+      heightScale: material.heightScale,
       specular: material.specular,
+      shininess: material.shininess,
       // Our tangent frame's Y runs down the image, matching DirectX; an OpenGL
       // map's green points the other way and has to be inverted.
       normalYSign: material.normalConvention === 'opengl' ? -1 : 1,

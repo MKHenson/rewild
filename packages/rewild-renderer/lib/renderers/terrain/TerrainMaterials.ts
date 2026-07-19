@@ -27,6 +27,18 @@ export interface TerrainMaterial {
   // (damp rock catches the sun, dry grass stays matte) instead of the whole
   // layer glinting uniformly. Only the red channel is read.
   roughnessUrl: string;
+  // Linear grayscale height/displacement: 0 the deepest crevice, 1 the highest
+  // peak of the surface relief. The terrain shader's parallax-occlusion march
+  // treats this as a depth volume carved below the surface — view rays march
+  // inward until they strike the heightfield, so texels sit at the apparent
+  // height their relief implies rather than flat on the geometry, and near
+  // relief occludes far relief. Only the red channel is read. It also drives
+  // the height-aware layer blend: taller texels win material transitions.
+  heightUrl: string;
+  // Depth of the parallax volume, in tile-UV units (one tile = 1.0), before
+  // the shader's distance fade. Bigger ⇒ deeper apparent relief; 0 disables
+  // parallax for this material. Expect to tune per material.
+  heightScale: number;
   // Detail tiling, in tiles per chunk UV unit.
   uvScale: number;
   // Large-scale normal for distant fragments, sampled at `macroUvScale`.
@@ -43,8 +55,15 @@ export interface TerrainMaterial {
   macroUvScale?: number;
   // Scalar specular modulator, replacing the per-texel specular map — that map
   // is bound to `white-1x1` today, so it costs two texture samples per layer to
-  // multiply by 1.0.
+  // multiply by 1.0. This is *how much* the surface glints.
   specular: number;
+  // Blinn-Phong specular exponent — *how tight* the glint is (its glossiness).
+  // Low (~8) is a broad, soft sheen; high (~64+) is a small, sharp sun-glint.
+  // Blended per-fragment across the active materials, so wet rock can hold a
+  // tight highlight in the same spot dry grass stays matte. The energy-
+  // conserving lighting brightens tighter lobes automatically, so raising this
+  // sharpens *and* intensifies the glint.
+  shininess: number;
   // Which way the normal map's green channel points. Sources differ and there
   // is no way to detect it from the file, so every material must say.
   //
@@ -66,6 +85,14 @@ const DETAIL_UV_SCALE = 10;
 // centimetres, which is what survives mipping at distance.
 const MACRO_UV_SCALE = 0.5;
 
+// Base parallax-occlusion depth, in tile-UV units. Rock reads deeper than
+// ground and snow via the per-material multipliers below.
+const HEIGHT_SCALE = 0.022;
+
+// Base specular exponent (gloss). Matte ground sits below it, hard/wet surfaces
+// (rock, marble, snow crust) above — see each material's shininess.
+const SHININESS = 32;
+
 const ROCK_NORMAL_URL = 'terrain/rocks-ground-01/rocks_ground_01_norm_1k.png';
 
 export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
@@ -74,10 +101,13 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     albedoUrl: 'terrain/forest-ground-01/forrest_ground_01_diff_1k.jpg',
     normalUrl: 'terrain/forest-ground-01/forrest_ground_01_norm_1k.png',
     roughnessUrl: 'terrain/forest-ground-01/forrest_ground_01_rough_1k.jpg',
+    heightUrl: 'terrain/forest-ground-01/forrest_ground_01_disp_1k.png',
+    heightScale: HEIGHT_SCALE,
     macroNormalUrl: 'terrain/forest-ground-01/forrest_ground_01_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
     specular: 0.3,
+    shininess: SHININESS * 0.5, // matte grass/soil
     normalConvention: 'opengl', // Poly Haven
   },
   'ground-coastal-01': {
@@ -88,11 +118,15 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
       'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_normal.png',
     roughnessUrl:
       'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_roughness.png',
+    heightUrl:
+      'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_height.png',
+    heightScale: HEIGHT_SCALE,
     macroNormalUrl:
       'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_normal.png',
     uvScale: DETAIL_UV_SCALE,
     macroUvScale: MACRO_UV_SCALE,
     specular: 0.18,
+    shininess: SHININESS * 0.75,
     // TexturesCom, not Poly Haven — this one is a guess. If coastal ground
     // alone reads inset while the others look right, flip it to 'directx'.
     normalConvention: 'opengl',
@@ -106,10 +140,13 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     albedoUrl: 'terrain/rocks-ground-01/rocks_ground_01_diff_1k.jpg',
     normalUrl: ROCK_NORMAL_URL,
     roughnessUrl: 'terrain/rocks-ground-01/rocks_ground_01_rough_1k.jpg',
+    heightUrl: 'terrain/rocks-ground-01/rocks_ground_01_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 1.8,
     uvScale: DETAIL_UV_SCALE,
     macroNormalUrl: ROCK_NORMAL_URL,
     macroUvScale: MACRO_UV_SCALE,
-    specular: 0.3,
+    specular: 0.4,
+    shininess: SHININESS * 1.5,
     normalConvention: 'opengl', // Poly Haven
   },
   'snow-02': {
@@ -117,8 +154,11 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     albedoUrl: 'terrain/snow-02/snow_02_diff_1k.jpg',
     normalUrl: 'terrain/snow-02/snow_02_norm_1k.png',
     roughnessUrl: 'terrain/snow-02/snow_02_rough_1k.jpg',
+    heightUrl: 'terrain/snow-02/snow_02_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 0.7,
     uvScale: DETAIL_UV_SCALE,
     specular: 0.55,
+    shininess: SHININESS * 2,
     normalConvention: 'opengl', // Poly Haven
   },
   rocky_terrain: {
@@ -126,10 +166,13 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     albedoUrl: 'terrain/rocky-terrain/rocky_terrain_diff_1k.jpg',
     normalUrl: 'terrain/rocky-terrain/rocky_terrain_norm_1k.png',
     roughnessUrl: 'terrain/rocky-terrain/rocky_terrain_rough_1k.png',
+    heightUrl: 'terrain/rocky-terrain/rocky_terrain_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 1.6,
     macroNormalUrl: 'terrain/rocky-terrain/rocky_terrain_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
     specular: 0.3,
+    shininess: SHININESS * 1.5,
     normalConvention: 'opengl', // Poly Haven
   },
   aerial_rocks_01: {
@@ -137,10 +180,27 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     albedoUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_diff_1k.jpg',
     normalUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_norm_1k.png',
     roughnessUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_rough_1k.jpg',
+    heightUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 1.6,
     macroNormalUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    specular: 0.3,
+    specular: 0.2,
+    shininess: SHININESS * 6,
+    normalConvention: 'opengl', // Poly Haven
+  },
+  marble_cliff_05: {
+    name: 'marble_cliff_05',
+    albedoUrl: 'terrain/marble-cliff-05/marble_cliff_05_diff_1k.jpg',
+    normalUrl: 'terrain/marble-cliff-05/marble_cliff_05_norm_1k.png',
+    roughnessUrl: 'terrain/marble-cliff-05/marble_cliff_05_rough_1k.png',
+    heightUrl: 'terrain/marble-cliff-05/marble_cliff_05_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 2,
+    macroNormalUrl: 'terrain/marble-cliff-05/marble_cliff_05_norm_1k.png',
+    macroUvScale: MACRO_UV_SCALE * 2,
+    uvScale: DETAIL_UV_SCALE,
+    specular: 0.2,
+    shininess: SHININESS * 4.5, // polished marble — tightest glint
     normalConvention: 'opengl', // Poly Haven
   },
 };
@@ -173,6 +233,14 @@ export function getTerrainMaterialLayer(name: string): number {
 // something subtly wrong.
 export function validateTerrainMaterials(): void {
   for (const material of Object.values(TERRAIN_MATERIALS)) {
+    // Zero is a legitimate off-switch — the shader documents heightScale 0 as
+    // "samples flat, no parallax" and skips the march entirely. A *negative*
+    // scale is always a sign slip that would carve relief away from the viewer.
+    if (material.heightScale < 0)
+      throw new Error(
+        `Terrain material '${material.name}' heightScale must not be negative (0 disables parallax).`
+      );
+
     if (!!material.macroNormalUrl !== (material.macroUvScale !== undefined))
       throw new Error(
         `Terrain material '${material.name}' must set macroNormalUrl and macroUvScale together.`

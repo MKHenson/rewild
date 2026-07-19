@@ -8,6 +8,7 @@ import {
   TERRAIN_ALBEDO_ARRAY,
   TERRAIN_NORMAL_ARRAY,
   TERRAIN_ROUGHNESS_ARRAY,
+  TERRAIN_HEIGHT_ARRAY,
   getClimateLayerParams,
 } from './TerrainTextureArrays';
 import type { TerrainChunk } from './TerrainChunk';
@@ -254,11 +255,14 @@ export class LODMesh {
         uniforms.roughnessView = renderer.textureManager
           .get(TERRAIN_ROUGHNESS_ARRAY)
           .gpuTexture.createView({ dimension: '2d-array' });
+        uniforms.heightView = renderer.textureManager
+          .get(TERRAIN_HEIGHT_ARRAY)
+          .gpuTexture.createView({ dimension: '2d-array' });
         // Which material each splat channel means, and how to sample it.
+        // (Gloss now rides in these per-layer params, not a global shininess.)
         uniforms.layers = getClimateLayerParams(
           resolveClimatePreset(this.climatePreset)
         );
-        uniforms.shininess = 5;
 
         const newMesh = new Mesh(geometry, terrainPass);
         this.mesh = newMesh;

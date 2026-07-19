@@ -86,7 +86,7 @@ export const MOUNTAIN: BiomeParams = {
     // Base: the low, flat ground between the faces.
     { material: 'aerial_rocks_01' },
     // Rock takes the steep ground, whatever the altitude.
-    { material: 'rocks-ground-01', slope: { from: 25, to: 45 } },
+    { material: 'marble_cliff_05', slope: { from: 25, to: 45 } },
     // Snow settles high — but not on cliffs. The inverted slope band fades it
     // out as the face steepens, letting the rock beneath show through, which is
     // what stops peaks reading as dipped in white paint.

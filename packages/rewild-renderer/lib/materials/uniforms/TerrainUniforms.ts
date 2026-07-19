@@ -12,13 +12,14 @@ import { MAX_SPLAT_LAYERS } from '../../renderers/terrain/Biomes';
 //   detailFadeStart  f32            offset 28  (4 bytes)
 //   detailFadeEnd    f32            offset 32  (4 bytes)
 //   noiseScale       f32            offset 36  (4 bytes)
-//   _pad             vec2f          offset 40  (8 bytes)
+//   heightBlendDepth f32            offset 40  (4 bytes)
+//   _pad             f32            offset 44  (4 bytes)
 //   layers           array<vec4f,8> offset 48  (128 bytes)
 //
 // `layers` starts at 48 because a uniform array of vec4f needs 16-byte
 // alignment; 40 + 8 padding is what gets it there. Two vec4f per splat channel:
 //   [slot*2    ] = (layerIndex, uvScale, macroUvScale, specular)
-//   [slot*2 + 1] = (normalYSign, 0, 0, 0)
+//   [slot*2 + 1] = (normalYSign, heightScale, shininess, 0)
 const PARAMS_SIZE = 176;
 const LAYERS_OFFSET_FLOATS = 48 / 4;
 const FLOATS_PER_LAYER = 8;
@@ -31,6 +32,10 @@ export interface TerrainLayerParams {
   specular: number;
   // +1 for a DirectX-convention normal map, -1 for an OpenGL one.
   normalYSign: number;
+  // Depth of the parallax-occlusion volume, in tile-UV units. 0 ⇒ no parallax.
+  heightScale: number;
+  // Blinn-Phong specular exponent (gloss). Higher ⇒ tighter, sharper highlight.
+  shininess: number;
 }
 
 export class TerrainUniforms implements ISharedUniformBuffer {
@@ -38,7 +43,14 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   bindGroup: GPUBindGroup;
   requiresBuild: boolean;
 
-  specularColor: [number, number, number] = [0.04, 0.04, 0.04];
+  // Master gain on the specular highlight (tints it slightly warm so sun-glints
+  // read golden). This multiplies every layer's own `specular`, so it is the
+  // overall ceiling: at 0.04 (a dielectric F0) no material can glint no matter
+  // its shininess — hence the higher value now that gloss is per-material.
+  specularColor: [number, number, number] = [0.5, 0.5, 0.45];
+  // Legacy global gloss. Terrain now blends shininess per-fragment from its
+  // materials (see getClimateLayerParams), so this is unused by terrain lighting
+  // and kept only for the uniform layout.
   shininess: number = 32;
 
   // Sky fill. Added outside the shadow terms, so it is what a surface facing
@@ -55,13 +67,20 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   // metres. Past detailFadeEnd only the macro normal remains — which is the
   // point: the detail's mips have averaged to flat by then anyway.
   detailFadeStart: number = 150;
-  detailFadeEnd: number = 500;
+  detailFadeEnd: number = 200;
 
   // Size of the no-tile offset regions, as a fraction of each layer's own tile
   // — it multiplies scaledUV, so it tracks the material's tiling rather than
   // the world. Smaller ⇒ larger regions. Regions must stay large relative to
   // one tile, or their offsets read as seams instead of hiding the repeat.
   noiseScale: number = 0.005;
+
+  // Transition width of the height-aware layer blend, in blend-score units
+  // (score = splat weight + centred surface height). Only layers within this of
+  // the winning score show: smaller ⇒ a harder, interlocking silhouette where
+  // the taller material (rock over grass) protrudes along its own edges; larger
+  // ⇒ softens back toward a plain splat crossfade.
+  heightBlendDepth: number = 0.2;
 
   layers: TerrainLayerParams[] = [];
 
@@ -71,6 +90,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   private _albedoView: GPUTextureView;
   private _normalView: GPUTextureView;
   private _roughnessView: GPUTextureView;
+  private _heightView: GPUTextureView;
   private _splatTexture: GPUTexture;
   private _noiseTexture: GPUTexture;
   private _splatSampler: GPUSampler;
@@ -95,9 +115,8 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     // Must be the *smooth* field, not `data-rgba-noise-256`: that one is white
     // noise, and the shader floors this into a region index.
     if (!this._noiseTexture)
-      this._noiseTexture = renderer.textureManager.get(
-        'smooth-noise-256'
-      ).gpuTexture;
+      this._noiseTexture =
+        renderer.textureManager.get('smooth-noise-256').gpuTexture;
     if (!this._splatSampler)
       this._splatSampler = renderer.samplerManager.get('linear-clamped');
     if (!this._seamlessSampler)
@@ -115,6 +134,12 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     if (!this._roughnessView)
       this._roughnessView = renderer.textureManager
         .get('white-1x1')
+        .gpuTexture.createView({ dimension: '2d-array' });
+    // flat-normal-1x1's red channel is 0.5 — the shader centres height on 0.5,
+    // so this reads as zero displacement until the real height array is bound.
+    if (!this._heightView)
+      this._heightView = renderer.textureManager
+        .get('flat-normal-1x1')
         .gpuTexture.createView({ dimension: '2d-array' });
 
     if (this._paramsBuffer) this._paramsBuffer.destroy();
@@ -136,6 +161,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
         { binding: 5, resource: this._noiseTexture.createView() },
         { binding: 6, resource: { buffer: this._paramsBuffer } },
         { binding: 7, resource: this._roughnessView },
+        { binding: 8, resource: this._heightView },
       ],
     });
 
@@ -154,8 +180,8 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     data[7] = this.detailFadeStart;
     data[8] = this.detailFadeEnd;
     data[9] = this.noiseScale;
-    data[10] = 0; // _pad
-    data[11] = 0;
+    data[10] = this.heightBlendDepth;
+    data[11] = 0; // _pad
 
     // Channels the palette does not use keep weight 0 in the splat, so the
     // shader's epsilon skips them — but zero them anyway so a stale layer can
@@ -168,8 +194,8 @@ export class TerrainUniforms implements ISharedUniformBuffer {
       data[base + 2] = layer ? layer.macroUvScale : 0;
       data[base + 3] = layer ? layer.specular : 0;
       data[base + 4] = layer ? layer.normalYSign : 1;
-      data[base + 5] = 0;
-      data[base + 6] = 0;
+      data[base + 5] = layer ? layer.heightScale : 0;
+      data[base + 6] = layer ? layer.shininess : 32;
       data[base + 7] = 0;
     }
 
@@ -214,6 +240,15 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
   get roughnessView(): GPUTextureView {
     return this._roughnessView;
+  }
+
+  set heightView(view: GPUTextureView) {
+    this._heightView = view;
+    this.requiresBuild = true;
+  }
+
+  get heightView(): GPUTextureView {
+    return this._heightView;
   }
 
   set splatSampler(sampler: GPUSampler) {
