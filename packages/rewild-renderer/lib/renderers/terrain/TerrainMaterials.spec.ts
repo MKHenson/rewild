@@ -100,10 +100,13 @@ describe('validateTerrainMaterials', () => {
       albedoUrl: 'terrain/x/albedo.png',
       normalUrl: 'terrain/x/normal.png',
       roughnessUrl: 'terrain/x/rough.png',
+      heightUrl: 'terrain/x/height.png',
+      heightScale: 0.03,
       uvScale: 25,
       normalConvention: 'opengl' as const,
       macroNormalUrl: 'terrain/x/normal.png',
       specular: 0.1,
+      shininess: 32,
     };
     expect(() => validateTerrainMaterials()).toThrow(/together/);
   });
@@ -114,11 +117,14 @@ describe('validateTerrainMaterials', () => {
       albedoUrl: 'terrain/x/albedo.png',
       normalUrl: 'terrain/x/normal.png',
       roughnessUrl: 'terrain/x/rough.png',
+      heightUrl: 'terrain/x/height.png',
+      heightScale: 0.03,
       uvScale: 25,
       normalConvention: 'opengl' as const,
       macroNormalUrl: 'terrain/x/normal.png',
       macroUvScale: 25,
       specular: 0.1,
+      shininess: 32,
     };
     expect(() => validateTerrainMaterials()).toThrow(/coarser/);
   });
@@ -132,11 +138,14 @@ describe('validateTerrainMaterials', () => {
       albedoUrl: 'terrain/x/albedo.png',
       normalUrl: 'terrain/x/normal.png',
       roughnessUrl: 'terrain/x/rough.png',
+      heightUrl: 'terrain/x/height.png',
+      heightScale: 0.03,
       uvScale: 25,
       normalConvention: 'opengl' as const,
       macroNormalUrl: 'terrain/x/some-other-normal.png',
       macroUvScale: 2,
       specular: 0.1,
+      shininess: 32,
     };
     expect(() => validateTerrainMaterials()).toThrow(/third texture array/);
   });
@@ -147,7 +156,7 @@ describe('getClimatePalette', () => {
     expect(getClimatePalette(DEFAULT_CLIMATE)).toEqual([
       'forest-ground-01',
       'aerial_rocks_01',
-      'rocks-ground-01',
+      'marble_cliff_05',
       'snow-02',
     ]);
   });
@@ -160,10 +169,10 @@ describe('getClimatePalette', () => {
     const palette = getClimatePalette(
       climateOf([
         biome('a', [{ material: 'snow-02' }]),
-        biome('b', [{ material: 'snow-02' }, { material: 'rocks-ground-01' }]),
+        biome('b', [{ material: 'snow-02' }, { material: 'marble_cliff_05' }]),
       ])
     );
-    expect(palette).toEqual(['snow-02', 'rocks-ground-01']);
+    expect(palette).toEqual(['snow-02', 'marble_cliff_05']);
   });
 });
 
@@ -190,7 +199,7 @@ describe('validateClimateLayers', () => {
     const climate = climateOf([
       biome('a', [
         { material: 'snow-02', slope: { from: 0, to: 10 } } as never,
-        { material: 'rocks-ground-01' },
+        { material: 'marble_cliff_05' },
       ]),
     ]);
     expect(() => validateClimateLayers(climate)).toThrow(/base layer/);
@@ -207,9 +216,12 @@ describe('validateClimateLayers', () => {
       albedoUrl: 'terrain/test-extra/albedo.png',
       normalUrl: 'terrain/test-extra/normal.png',
       roughnessUrl: 'terrain/test-extra/rough.png',
+      heightUrl: 'terrain/test-extra/height.png',
+      heightScale: 0.03,
       uvScale: 25,
       normalConvention: 'opengl' as const,
       specular: 0.1,
+      shininess: 32,
     };
 
     try {

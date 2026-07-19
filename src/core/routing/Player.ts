@@ -64,7 +64,7 @@ export class Player extends Node {
   private _flashlight: SpotLight | null = null;
   private _flashlightOn: boolean = false;
   private _crouching: boolean = false;
-  private static readonly _FLASHLIGHT_INTENSITY: f32 = 3.5;
+  private static readonly _FLASHLIGHT_INTENSITY: f32 = 1.5;
 
   private _onMouseMove: (e: MouseEvent) => void;
   private _onKeyDown: (e: KeyboardEvent) => void;
@@ -140,7 +140,11 @@ export class Player extends Node {
         new Color(1, 0.95, 0.85),
         Player._FLASHLIGHT_INTENSITY
       );
-      flash.range = 40.0;
+      // Beam throw. The shader holds a spot at full strength to 40% of range
+      // then fades — so this gives full brightness to ~24m and a graceful
+      // die-off by 60m, far enough that terrain the beam lands on down-slope
+      // still lights instead of silently exceeding the range.
+      flash.range = 60.0;
       flash.innerAngle = 10 * _DEG2RAD;
       flash.outerAngle = 25 * _DEG2RAD;
       flash.castShadow = true;

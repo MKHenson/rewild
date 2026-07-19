@@ -74,6 +74,8 @@ fn fs(
   let normalSample = textureSample(normalMap, mySampler, fragUV).rgb * 2.0 - 1.0;
   let normalizedNormal = perturbNormal(viewPosition, fragUV, geometricNormal, normalSample);
 
+  // Uniform material: one shininess for the whole surface.
+  let shadingShininess = phongParams.shininess;
   #include "./shader-lib/total-lighting-phong.frag.wgsl"
   #include "./shader-lib/cloud-shadow.frag.wgsl"
   #include "./shader-lib/directional-shadow.frag.wgsl"

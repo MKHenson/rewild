@@ -24,6 +24,11 @@ struct TerrainLayer {
   // +1 for a DirectX-convention normal map, -1 for an OpenGL one. See
   // decodeNormal.
   normalYSign : f32,
+  // Depth of the parallax-occlusion volume, in tile-UV units (one tile = 1.0).
+  // 0 ⇒ this material samples flat, no parallax.
+  heightScale : f32,
+  // Blinn-Phong specular exponent (gloss). Higher ⇒ tighter, sharper highlight.
+  shininess   : f32,
 }
 
 struct TerrainParams {
@@ -36,10 +41,14 @@ struct TerrainParams {
   // Size of the no-tile offset regions, as a fraction of a layer's own tile
   // (it multiplies scaledUV, not fragUV). Smaller ⇒ larger regions.
   noiseScale      : f32,
-  _pad            : vec2f,
+  // Height-blend transition width, in blend-score units. Only layers within this
+  // of the winning score contribute: small ⇒ a hard interlocking silhouette
+  // (just the tallest material shows), large ⇒ softens toward a plain crossfade.
+  heightBlendDepth: f32,
+  _pad            : f32,
   // Packed TerrainLayer, two vec4f per splat channel:
   //   [slot*2    ] = (layerIndex, uvScale, macroUvScale, specular)
-  //   [slot*2 + 1] = (normalYSign, unused, unused, unused)
+  //   [slot*2 + 1] = (normalYSign, heightScale, shininess, unused)
   // vec4f rather than array<TerrainLayer, N> because a uniform array's element
   // stride must be a multiple of 16 — a vec4f guarantees that, whereas a struct
   // depends on alignment rules that are easy to get subtly wrong. The spare
@@ -70,6 +79,7 @@ struct VertexOutput {
 @group(1) @binding(5) var noiseTexture: texture_2d<f32>;
 @group(1) @binding(6) var<uniform> phongParams: TerrainParams;
 @group(1) @binding(7) var roughnessArray: texture_2d_array<f32>;
+@group(1) @binding(8) var heightArray: texture_2d_array<f32>;
 @group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
@@ -83,10 +93,33 @@ struct VertexOutput {
 // six texture samples would buy nothing.
 const WEIGHT_EPSILON: f32 = 0.004;
 
+// Parallax-occlusion march step counts. The count scales with view angle:
+// MIN steps head-on (the ray barely moves across UV) up to MAX at grazing
+// (where it sweeps far and would stair-step through thin ridges without them).
+const POM_MIN_STEPS: f32 = 8.0;
+const POM_MAX_STEPS: f32 = 16.0;
+
+// Binary-search bisections that refine the bracketed crossing after the linear
+// march (relief mapping). Each halves the depth error, so 6 turns the coarsest
+// 8-step march into 8·2^6 = 512 effective depth levels — banding gone for six
+// extra taps, far cheaper than a linear march fine enough to match.
+const POM_REFINE_STEPS: i32 = 6;
+
+// Grazing floor for the view ray's z (= N·V). The march travel is
+// viewTS.xy / viewTS.z, which runs away as the surface turns edge-on: a screen
+// pixel then covers a huge texture swath and adjacent pixels march to unrelated
+// intersections — the grazing "heat-mirage" smear. Flooring z caps that travel
+// uniformly. It trades away literal-correct parallax at extreme grazing (which
+// smears anyway) for a stable, shallow offset there. Higher ⇒ less smear, but
+// the relief flattens sooner as you tilt toward the horizon. This is the right
+// lever for grazing smear: capping travel does not draw the N·V contour rings
+// that fading depth by orientation does.
+const POM_MIN_VIEW_Z: f32 = 0.6;
+
 fn getLayer(slot: u32) -> TerrainLayer {
   let a = phongParams.layers[slot * 2u];
   let b = phongParams.layers[slot * 2u + 1u];
-  return TerrainLayer(a.x, a.y, a.z, a.w, b.x);
+  return TerrainLayer(a.x, a.y, a.z, a.w, b.x, b.y, b.z);
 }
 
 // Decodes a normal map sample from [0,1] to [-1,1] and resolves its green-
@@ -100,6 +133,106 @@ fn getLayer(slot: u32) -> TerrainLayer {
 fn decodeNormal(sample: vec3f, ySign: f32) -> vec3f {
   let n = sample * 2.0 - 1.0;
   return vec3f(n.x, n.y * ySign, n.z);
+}
+
+// One tap of the layer's height, as *depth* into the volume: 1 at the top
+// surface (the polygon), 0 at the deepest crevice. POM references the top and
+// only ever carves inward — all a heightmap on a flat face can honestly show —
+// so the ray starts at depth 0 and marches down until the surface rises to meet
+// it. Grad-sampled so it stays valid in the weight-gated, non-uniform loop.
+fn sampleDepth(uv: vec2f, arrayIndex: i32, ddx: vec2f, ddy: vec2f) -> f32 {
+  return 1.0 - textureSampleGrad(
+    heightArray, seamlessSampler, uv, arrayIndex, ddx, ddy
+  ).r;
+}
+
+// Parallax occlusion mapping: march the view ray through the layer's height
+// volume and return the UV where it first crosses the surface. Unlike the
+// single-step offset it self-occludes — near relief hides far relief — which is
+// what lets it hold at the grazing angles that make single-step swim.
+//
+// `viewTS` is the tangent-space surface→eye direction; `amplitude` is the
+// volume's depth in this layer's tile UV (heightScale, already faded by
+// distance). Called once per no-tile tap, so the marched depth tracks the
+// texture region actually shown at this fragment.
+//
+// Returns vec3f: the displaced UV in .xy, and the surface *height* (1 = peak) at
+// the hit in .z — a free byproduct of the march that the height-aware layer
+// blend downstream needs, so it costs no extra tap.
+fn parallaxOcclusion(
+  startUV: vec2f,
+  arrayIndex: i32,
+  ddx: vec2f,
+  ddy: vec2f,
+  viewTS: vec3f,
+  amplitude: f32
+) -> vec3f {
+  // Distant fragments (detailFade → 0) carry no relief — skip the whole march,
+  // but still report the height at the undisplaced UV for the blend.
+  if (amplitude < 1e-4) {
+    let h = textureSampleGrad(
+      heightArray, seamlessSampler, startUV, arrayIndex, ddx, ddy
+    ).r;
+    return vec3f(startUV, h);
+  }
+
+  // Floor the view ray's z well above 0. The march travel is viewTS.xy/viewZ,
+  // which runs away as the surface turns edge-on; there a screen pixel covers a
+  // huge swath of texture and adjacent pixels march to unrelated intersections —
+  // the grazing "heat-mirage" smear. Flooring z caps that travel uniformly,
+  // which tames the smear *without* modulating depth by orientation (that draws
+  // N·V contour rings on curved grazing surfaces). The relief just eases toward
+  // a shallow offset as the surface goes edge-on, which is invisible anyway.
+  let viewZ = max(viewTS.z, POM_MIN_VIEW_Z);
+  let numLayers = mix(POM_MAX_STEPS, POM_MIN_STEPS, clamp(viewZ, 0.0, 1.0));
+  let layerDepth = 1.0 / numLayers;
+  // Total UV the ray sweeps across the full depth of the volume, and the step.
+  let deltaUV = (viewTS.xy / viewZ) * amplitude * layerDepth;
+
+  var currentUV = startUV;
+  var currentLayerDepth = 0.0;
+  var currentDepth = sampleDepth(currentUV, arrayIndex, ddx, ddy);
+
+  // Linear march down the ray until the sampled surface is above the ray depth.
+  // This only *brackets* the crossing — the true intersection lies in the last
+  // step, between prevUV (ray still above surface) and currentUV (ray now
+  // below). The fixed MAX bound is a safety cap; the break fires after
+  // `numLayers` steps, when currentLayerDepth reaches 1.0 ≥ any depth.
+  for (var s = 0; s < i32(POM_MAX_STEPS); s++) {
+    if (currentLayerDepth >= currentDepth) {
+      break;
+    }
+    currentUV -= deltaUV;
+    currentDepth = sampleDepth(currentUV, arrayIndex, ddx, ddy);
+    currentLayerDepth += layerDepth;
+  }
+
+  // Binary-search the bracketed step for the intersection (relief mapping,
+  // Policarpo 2005). Linear interpolation across the step assumes the surface is
+  // a straight ramp between the two samples, which terraces on curved or steep
+  // relief — the banding. Bisection instead re-samples the heightfield each
+  // halving, converging on the real surface: POM_REFINE_STEPS doublings turn
+  // numLayers depth bands into numLayers·2^REFINE, enough to erase them.
+  var uvAbove = currentUV + deltaUV;              // ray above surface
+  var uvBelow = currentUV;                        // ray below surface
+  var depthAbove = currentLayerDepth - layerDepth;
+  var depthBelow = currentLayerDepth;
+  for (var b = 0; b < POM_REFINE_STEPS; b++) {
+    let uvMid = 0.5 * (uvAbove + uvBelow);
+    let depthMid = 0.5 * (depthAbove + depthBelow);
+    if (depthMid >= sampleDepth(uvMid, arrayIndex, ddx, ddy)) {
+      uvBelow = uvMid;
+      depthBelow = depthMid;
+    } else {
+      uvAbove = uvMid;
+      depthAbove = depthMid;
+    }
+  }
+  // The bracket is tight after the bisections, so its midpoint is the hit UV and
+  // its mid-depth converts back to a height (1 - depth) with no further tap.
+  let uvHit = 0.5 * (uvAbove + uvBelow);
+  let heightHit = 1.0 - 0.5 * (depthAbove + depthBelow);
+  return vec3f(uvHit, heightHit);
 }
 
 @vertex
@@ -149,9 +282,59 @@ fn fs(
     viewDistance
   );
 
-  var blendedColor = vec3f(0.0);
-  var blendedTangentNormal = vec3f(0.0);
-  var specFactor = 0.0;
+  // Stable tangent frame for the parallax march. Unlike an arbitrary mesh, the
+  // terrain's UV is an affine map of world XZ — U runs along world +X, V along
+  // world -Z (see MeshGenerator) — so its tangent frame is *known*, not
+  // something to reconstruct from screen-space derivatives. Rebuilding it from
+  // dpdx/dpdy (as perturbNormal does for shading) yields a slightly different,
+  // non-orthonormal basis every frame; the march integrates that view-dependent
+  // wobble into an apparent depth that shifts as the camera turns — the ground
+  // undulating and swelling under rotation. Building it from the fixed UV axes
+  // instead gives an orthonormal frame that only *rotates* with the camera, so a
+  // point's relief stays put and rotation reads as honest motion parallax.
+  //
+  // viewTS is the surface→eye direction in that frame: the march walks its xy
+  // across UV per unit depth (viewTS.xy / viewTS.z), taking more steps as z
+  // shrinks toward grazing. detailFade fades the relief out with distance —
+  // mipped to nothing by then, and the march would only alias.
+  let parallaxN = normalize(normal);
+  // World +X (the +U axis) carried into view space, then Gram-Schmidt'd into the
+  // surface tangent plane so T ⟂ N. normalMatrix carries a direction correctly
+  // for the rigid, uniformly-scaled chunk transform (normalize absorbs scale).
+  let uAxisView = uniforms.normalMatrix * vec3f(1.0, 0.0, 0.0);
+  var tRaw = uAxisView - parallaxN * dot(parallaxN, uAxisView);
+  // Degenerate when the face points along world X (a chunk skirt): +X is then
+  // parallel to N and the projection vanishes. Fall back to the +Z axis, which
+  // cannot also be parallel to N. The frame is then rotated relative to UV, but
+  // these faces are hidden edge skirts — this only has to stay finite, not exact.
+  if (dot(tRaw, tRaw) < 1e-6) {
+    let zAxisView = uniforms.normalMatrix * vec3f(0.0, 0.0, 1.0);
+    tRaw = zAxisView - parallaxN * dot(parallaxN, zAxisView);
+  }
+  let parallaxT = normalize(tRaw);
+  // +V runs along world -Z; cross(N, T) yields that direction and is orthonormal.
+  let parallaxB = cross(parallaxN, parallaxT);
+  // View-space eye is the origin, so the surface→eye direction is -viewPosition.
+  // (Named distinctly from the lighting include's own `viewDir` below.)
+  let parallaxViewDir = -normalize(viewPosition);
+  let viewTS = vec3f(
+    dot(parallaxViewDir, parallaxT),
+    dot(parallaxViewDir, parallaxB),
+    dot(parallaxViewDir, parallaxN)
+  );
+
+  // Per-layer results, combined *after* the loop by a height-aware blend rather
+  // than a straight splat-weighted sum. Gathering first is what lets the blend
+  // compare every active layer's surface height at once, so the taller material
+  // wins locally — rock peaks poking through grass along their own silhouette —
+  // instead of the two crossfading uniformly across the transition.
+  var layerColors = array<vec3f, 4>();
+  var layerNormals = array<vec3f, 4>();
+  var layerSpecs = array<f32, 4>();
+  var layerShininess = array<f32, 4>();
+  // Blend score per active layer; -1 marks a slot the splat did not select.
+  var layerScores = array<f32, 4>(-1.0, -1.0, -1.0, -1.0);
+  var maxScore = -1.0;
 
   for (var layerSlot = 0u; layerSlot < 4u; layerSlot++) {
     let weight = weights[layerSlot];
@@ -191,15 +374,32 @@ fn fs(
     let offa = sin(vec2f(3.0, 7.0) * (i + 0.0));
     let offb = sin(vec2f(3.0, 7.0) * (i + 1.0));
 
+    // Parallax occlusion, applied *per no-tile tap*. The blend below relocates
+    // the visible texture by offa/offb, so the relief actually shown is the
+    // heightfield at those offset positions — marching a single ray at scaledUV
+    // would displace each tap by relief that isn't its own, which warbles. So
+    // each tap marches its own height volume; the blend then mixes two self-
+    // consistent parallax samples. detailFade fades the volume depth to zero at
+    // range, where the relief has mipped away and the march would only alias.
+    let amplitude = layer.heightScale * detailFade;
+    let resA = parallaxOcclusion(scaledUV + offa, arrayIndex, ddx, ddy, viewTS, amplitude);
+    let resB = parallaxOcclusion(scaledUV + offb, arrayIndex, ddx, ddy, viewTS, amplitude);
+    let sa = resA.xy;
+    let sb = resB.xy;
+
     // Two offset lookups mixed by the region's fraction — the stochastic
     // no-tile blend that hides the repeat of a 1K texture over a 240m chunk.
-    let cola = textureSampleGrad(albedoArray, seamlessSampler, scaledUV + offa, arrayIndex, ddx, ddy).rgb;
-    let colb = textureSampleGrad(albedoArray, seamlessSampler, scaledUV + offb, arrayIndex, ddx, ddy).rgb;
+    let cola = textureSampleGrad(albedoArray, seamlessSampler, sa, arrayIndex, ddx, ddy).rgb;
+    let colb = textureSampleGrad(albedoArray, seamlessSampler, sb, arrayIndex, ddx, ddy).rgb;
     let blendFactor = smoothstep(0.2, 0.8, f - 0.1 * dot(cola - colb, vec3f(1.0, 1.0, 1.0)));
-    blendedColor += weight * mix(cola, colb, blendFactor);
+    let layerColor = mix(cola, colb, blendFactor);
+    // The layer's surface height at this fragment, through the same no-tile blend
+    // as its albedo so the height that arbitrates the splat tracks the texture
+    // actually shown (the POM march returned it in .z for free).
+    let layerHeight = mix(resA.z, resB.z, blendFactor);
 
-    let nrmA = textureSampleGrad(normalArray, seamlessSampler, scaledUV + offa, arrayIndex, ddx, ddy).rgb;
-    let nrmB = textureSampleGrad(normalArray, seamlessSampler, scaledUV + offb, arrayIndex, ddx, ddy).rgb;
+    let nrmA = textureSampleGrad(normalArray, seamlessSampler, sa, arrayIndex, ddx, ddy).rgb;
+    let nrmB = textureSampleGrad(normalArray, seamlessSampler, sb, arrayIndex, ddx, ddy).rgb;
     let detailNormal = normalize(
       decodeNormal(mix(nrmA, nrmB, blendFactor), layer.normalYSign)
     );
@@ -241,8 +441,6 @@ fn fs(
       layerNormal = normalize(mix(macroNormal, detailNormal, detailFade));
     }
 
-    blendedTangentNormal += weight * layerNormal;
-
     // Roughness carves the specular highlight out of the material's surface,
     // instead of the whole layer glinting uniformly (the flat-scalar look:
     // wet plastic). This is a Phong hack, not PBR — roughness only scales the
@@ -251,16 +449,64 @@ fn fs(
     // stays as the material's ceiling; roughness detail lives under it. Sampled
     // through the same no-tile blend as albedo so the highlight tracks the
     // texture actually shown.
-    let rghA = textureSampleGrad(roughnessArray, seamlessSampler, scaledUV + offa, arrayIndex, ddx, ddy).r;
-    let rghB = textureSampleGrad(roughnessArray, seamlessSampler, scaledUV + offb, arrayIndex, ddx, ddy).r;
+    let rghA = textureSampleGrad(roughnessArray, seamlessSampler, sa, arrayIndex, ddx, ddy).r;
+    let rghB = textureSampleGrad(roughnessArray, seamlessSampler, sb, arrayIndex, ddx, ddy).r;
     let roughness = mix(rghA, rghB, blendFactor);
-    specFactor += weight * layer.specular * (1.0 - roughness);
+
+    layerColors[layerSlot] = layerColor;
+    layerNormals[layerSlot] = layerNormal;
+    layerSpecs[layerSlot] = layer.specular * (1.0 - roughness);
+    layerShininess[layerSlot] = layer.shininess;
+    // Height carves the boundary: a texel standing above its map's midpoint
+    // (a rock bump) lifts the score, below it (a crevice) drops it, so the
+    // taller layer shows through where it actually protrudes rather than by a
+    // flat crossfade. Centred on 0.5 so an average-height texel neither gains nor
+    // loses against its splat weight — the weight still sets where a material can
+    // appear at all (a slot below WEIGHT_EPSILON was skipped and never scores),
+    // and height only decides who wins in the overlap.
+    let score = weight + (layerHeight - 0.5);
+    layerScores[layerSlot] = score;
+    maxScore = max(maxScore, score);
   }
 
-  // Every layer fell below the epsilon (a degenerate splat) — normalizing a
-  // zero vector yields NaN, which propagates through the lighting and renders
-  // black. Fall back to the geometric normal.
-  if (dot(blendedTangentNormal, blendedTangentNormal) < 1e-8) {
+  // Height-aware combine (Mishkinis): only layers within heightBlendDepth of the
+  // winning score contribute, weighted by how far above the cutoff they stand.
+  // The top layer clears the cutoff by heightBlendDepth, so blendWeightSum is
+  // ≥ that whenever any layer is active — the guard below only catches the
+  // all-skipped degenerate splat (which then falls back to a flat geometric
+  // normal, exactly as the single-pass version did).
+  let cutoff = maxScore - phongParams.heightBlendDepth;
+  var blendedColor = vec3f(0.0);
+  var blendedTangentNormal = vec3f(0.0);
+  var specFactor = 0.0;
+  var blendedShininess = 0.0;
+  var blendWeightSum = 0.0;
+  for (var layerSlot = 0u; layerSlot < 4u; layerSlot++) {
+    let score = layerScores[layerSlot];
+    if (score < 0.0) {
+      continue;
+    }
+    let contribution = max(score - cutoff, 0.0);
+    blendWeightSum += contribution;
+    blendedColor += contribution * layerColors[layerSlot];
+    blendedTangentNormal += contribution * layerNormals[layerSlot];
+    specFactor += contribution * layerSpecs[layerSlot];
+    blendedShininess += contribution * layerShininess[layerSlot];
+  }
+
+  // Per-fragment gloss for the lighting include, blended across the active
+  // materials so damp rock can hold a tight highlight where dry grass stays
+  // matte. Fallback matches the old global default for the degenerate splat.
+  var shadingShininess = 32.0;
+  if (blendWeightSum > 1e-6) {
+    blendedColor /= blendWeightSum;
+    blendedTangentNormal /= blendWeightSum;
+    specFactor /= blendWeightSum;
+    shadingShininess = blendedShininess / blendWeightSum;
+  } else {
+    // Every layer fell below the epsilon (a degenerate splat) — normalizing a
+    // zero vector yields NaN, which propagates through the lighting and renders
+    // black. Fall back to the geometric normal.
     blendedTangentNormal = vec3f(0.0, 0.0, 1.0);
   }
 
@@ -268,9 +514,17 @@ fn fs(
   // derivatives, and that basis is invariant under uniform UV scaling (the
   // scale cancels through the normalize). So the layers' tangent-space normals
   // are blended first and the basis is applied once.
-  let geometricNormal = normalize(normal);
-  let normalizedNormal = perturbNormal(
-    viewPosition, fragUV, geometricNormal, normalize(blendedTangentNormal)
+  // Apply the blended tangent-space normal through the terrain's *stable*
+  // orthonormal frame (parallaxT/B/N, built from the UV→world mapping up top)
+  // rather than perturbNormal's screen-space derivative frame. That frame is
+  // non-orthonormal and rebuilt from the view every frame, so it skews the
+  // perturbed normal differently as the camera turns — invisible under the sun,
+  // but a head-mounted light (L ≈ V) rides exactly that axis, so the flashlight
+  // brightened and dimmed with heading. The UV frame is fixed to world XZ, so
+  // the shading normal is view-consistent. (Same fix as the parallax undulation.)
+  let ns = normalize(blendedTangentNormal);
+  let normalizedNormal = normalize(
+    parallaxT * ns.x + parallaxB * ns.y + parallaxN * ns.z
   );
 
   #include "./shader-lib/total-lighting-phong.frag.wgsl"
