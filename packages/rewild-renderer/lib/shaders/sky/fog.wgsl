@@ -170,8 +170,8 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
 
     // W1.3: shift horizon fog toward neutral gray under overcast (daytime only)
     let overcastDayFactor_fog = smoothstep(-0.05, 0.15, sunDotUp);
-    let overcastFactor_fog    = smoothstep(0.5, 0.9, object.cloudiness) * overcastDayFactor_fog;
-    fogColor = mix(fogColor, vec3f(0.63, 0.63, 0.63), overcastFactor_fog);
+    let overcastFactor_fog    = smoothstep(0.8, 0.9, object.cloudiness) * overcastDayFactor_fog;
+    fogColor = mix(fogColor, vec3f(0.73, 0.73, 0.73), overcastFactor_fog);
 
     // Fog brightness: scales with both sun elevation and cloud cover.
     // Overcast skies produce dimmer, flatter fog even during daylight.
@@ -239,7 +239,7 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     );
 
     // W1.2: shift sky toward pale overcast gray under heavy cloud cover
-    let overcastZenith = vec3f(0.92, 0.95, 0.90);
+    let overcastZenith = vec3f(1, 1, 1);
     let skyColor = mix(skyColorClear, overcastZenith, overcastFactor);
 
     // Sky brightness: dimmer at sunset, full brightness at noon.

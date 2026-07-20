@@ -99,27 +99,13 @@ var<private> sunDotUp: f32;
 
     sunDotUp = dot(sunDirection, vec3f(0.0, 1.0, 0.0));
 
-    // Sample cloud shadow to darken fog under clouds
-    let shadowUV = vec2f(
-      (worldPos.x - object.cameraPosition.x) / object.shadowWorldSize + 0.5,
-      (worldPos.z - object.cameraPosition.z) / object.shadowWorldSize + 0.5
-    );
-    var fogShadowFactor = 1.0;
-    if (shadowUV.x >= 0.0 && shadowUV.x <= 1.0 && shadowUV.y >= 0.0 && shadowUV.y <= 1.0) {
-      let edgeFade = smoothstep(0.0, 0.05, shadowUV.x) * smoothstep(1.0, 0.95, shadowUV.x)
-                   * smoothstep(0.0, 0.05, shadowUV.y) * smoothstep(1.0, 0.95, shadowUV.y);
-      let shadowDensity = textureSampleLevel(cloudShadowMap, cloudsSampler, shadowUV, 0.0).r;
-      fogShadowFactor = 1.0 - (shadowDensity * object.shadowIntensity * edgeFade);
-      fogShadowFactor = max(fogShadowFactor, 0.3);
-    }
-
     // Fully-saturated fog colour; fogFactor (the src-alpha of this pass) controls
     // how much of it covers the terrain, so no distance fade is baked into the
     // colour itself. Works at any camera altitude — no sphere intersection involved.
     let rawFogColor = getFogScatterColor( dir, sunDirection );
 
     // Single ACES pass over the full HDR fog value — no separate exp curve.
-    let fogTonemapped = tonemapACES(HDR_SCALE * rawFogColor * mix(1.0, fogShadowFactor, fogFactor));
+    let fogTonemapped = tonemapACES(HDR_SCALE * rawFogColor);
     let fogResult = vec4f(fogTonemapped, max(hdrBlend.a, fogFactor));
 
     // Partial cloud occlusion: blend terrain fog with cloud-occluded sky view
