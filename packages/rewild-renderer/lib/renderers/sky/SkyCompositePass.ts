@@ -169,7 +169,6 @@ export class SkyCompositePass implements IPostProcess {
         { binding: 1, resource: { buffer: this.uniformBuffer } },
         { binding: 2, resource: renderer.samplerManager.get('linear-clamped') },
         { binding: 3, resource: renderer.depthTexture.createView() },
-        { binding: 4, resource: this.cloudShadowMap!.createView() },
         { binding: 5, resource: this.godRaysTexture!.createView() },
         { binding: 6, resource: this.bloomTexture!.createView() },
       ],
