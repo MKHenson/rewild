@@ -79,11 +79,11 @@ export interface TerrainMaterial {
 
 // Matches the shader's current `fragUV * 25.0`, so the detail tiling of the
 // existing single-material terrain carries over unchanged.
-const DETAIL_UV_SCALE = 10;
+const DETAIL_UV_SCALE = 30;
 
 // Much coarser than the detail scale: features spanning metres rather than
 // centimetres, which is what survives mipping at distance.
-const MACRO_UV_SCALE = 0.5;
+const MACRO_UV_SCALE = 2;
 
 // Base parallax-occlusion depth, in tile-UV units. Rock reads deeper than
 // ground and snow via the per-material multipliers below.
@@ -155,7 +155,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     normalUrl: 'terrain/snow-02/snow_02_norm_1k.png',
     roughnessUrl: 'terrain/snow-02/snow_02_rough_1k.jpg',
     heightUrl: 'terrain/snow-02/snow_02_disp_1k.png',
-    heightScale: HEIGHT_SCALE * 0.7,
+    heightScale: HEIGHT_SCALE * 0.5,
     uvScale: DETAIL_UV_SCALE,
     specular: 0.55,
     shininess: SHININESS * 2,

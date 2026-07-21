@@ -42,6 +42,7 @@ function flatBiome(name: string, heightScale: number): BiomeParams {
     persistence: 0.5,
     lacunarity: 2.0,
     heightCurveExp: 0,
+    layers: [{ material: 'flat-ground-01' }],
   };
 }
 
@@ -149,8 +150,18 @@ describe('generateBiomeBlendedHeightMap', () => {
 
   it('supports a full 2×2 temperature × moisture grid without cliffs', () => {
     const climate: ClimateConfig = {
-      temperature: { scale: 1200, seedSalt: 7919, cuts: [0.5], blendHalfWidth: 0.05 },
-      moisture: { scale: 900, seedSalt: 104729, cuts: [0.5], blendHalfWidth: 0.05 },
+      temperature: {
+        scale: 1200,
+        seedSalt: 7919,
+        cuts: [0.5],
+        blendHalfWidth: 0.05,
+      },
+      moisture: {
+        scale: 900,
+        seedSalt: 104729,
+        cuts: [0.5],
+        blendHalfWidth: 0.05,
+      },
       biomes: [
         flatBiome('cold-dry', 0),
         flatBiome('cold-wet', 30),
@@ -176,8 +187,10 @@ describe('generateBiomeBlendedHeightMap', () => {
         const h = patch[y * size + x];
         min = Math.min(min, h);
         max = Math.max(max, h);
-        if (x > 0) maxStep = Math.max(maxStep, Math.abs(h - patch[y * size + x - 1]));
-        if (y > 0) maxStep = Math.max(maxStep, Math.abs(h - patch[(y - 1) * size + x]));
+        if (x > 0)
+          maxStep = Math.max(maxStep, Math.abs(h - patch[y * size + x - 1]));
+        if (y > 0)
+          maxStep = Math.max(maxStep, Math.abs(h - patch[(y - 1) * size + x]));
       }
     }
 

@@ -36,7 +36,10 @@ const TERRAIN_BVH_LEAF_TRIANGLES = 32;
 export class LODMesh {
   mesh: Mesh;
   lod: i32;
-  position: Vector2;
+  // Sample-space noise offset for this chunk (coord * (chunkSize-1)); handed to
+  // the worker to generate heights/splat. Not a world position — chunk
+  // placement is the TerrainChunk transform (see TerrainChunk.noiseOffset).
+  noiseOffset: Vector2;
   gpuState: LODMeshGPUState;
   chunk: TerrainChunk;
   chunkSize: i32;
@@ -49,7 +52,7 @@ export class LODMesh {
   constructor(
     lod: i32,
     chunk: TerrainChunk,
-    position: Vector2,
+    noiseOffset: Vector2,
     chunkSize: i32,
     seed: number,
     climatePreset: string
@@ -58,7 +61,7 @@ export class LODMesh {
     this.gpuState = 'none';
     this.chunk = chunk;
     this.chunkSize = chunkSize;
-    this.position = position;
+    this.noiseOffset = noiseOffset;
     this.seed = seed;
     this.climatePreset = climatePreset;
   }
@@ -159,14 +162,28 @@ export class LODMesh {
         );
         const version = this.chunk.heightsVersion;
 
+        // Edited surfaces diverge from the worker's noise apron ring, so build a
+        // real apron from the loaded neighbours' heights on the main thread and
+        // hand it over — the worker shades edges two-sided against it, matching
+        // the neighbour. It carries the inner heights too, so `heights` is
+        // omitted to avoid transferring the field twice. If the apron can't be
+        // built (no heights yet), `edited` makes the worker fall back to
+        // one-sided edges rather than the mismatched noise ring.
+        const apron =
+          this.chunk.heightsAreEdited && knownHeights
+            ? renderer.terrainRenderer.buildApron(knownHeights, this.chunk.coord)
+            : undefined;
+
         const { splat, vertices, uvs, normals, indices, heights } =
           await renderer.terrainRenderer.workerPool.enqueue({
             chunkSize: this.chunkSize,
             lod: this.lod,
-            position: this.position,
+            position: this.noiseOffset,
             seed: this.seed,
             climatePreset: this.climatePreset,
-            heights: knownHeights ?? undefined,
+            heights: apron ? undefined : knownHeights ?? undefined,
+            apron,
+            edited: this.chunk.heightsAreEdited,
           });
 
         // Cache the heightfield on the chunk so later LODs, snapshot writes,

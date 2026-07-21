@@ -18,7 +18,14 @@ export type TerrainChunkEvent = {
 };
 export class TerrainChunk implements IComponent {
   coord: Vector2;
+  // World-space position of the chunk centre (= coord * worldChunkSize). Drives
+  // the mesh transform, bounds and the physics collider translation.
   position: Vector2;
+  // Sample-space noise offset (= coord * (chunkSize - 1)), passed to the worker
+  // for height/splat generation. Deliberately NOT scaled by the world scale:
+  // keeping generation in sample space is what makes chunks byte-identical and
+  // seam-free at any TERRAIN_METERS_PER_SAMPLE (see MeshGenerator).
+  noiseOffset: Vector2;
   _visible: boolean = false;
   bounds: Box3;
   transform: Transform;
@@ -38,6 +45,14 @@ export class TerrainChunk implements IComponent {
   // bumpHeightsVersion). LOD meshes compare against it to know they are stale
   // and to coalesce rebuilds while edits keep arriving.
   heightsVersion = 0;
+  // True once the chunk's heights diverge from the deterministic generator —
+  // an in-memory edit or a loaded snapshot. It gates the seamless-normal apron:
+  // the worker's apron ring is the *noise* baseline, correct only for
+  // unedited chunks, so an edited chunk must fall back to one-sided edge normals
+  // rather than shade against a ring that no longer matches its surface (which
+  // showed as dark seams along sculpted chunk borders). Generated and
+  // cached-generated chunks stay false and keep the seamless two-sided apron.
+  heightsAreEdited = false;
   disposed = false;
   // The chunk's splat map — per-texel weights over the climate's material
   // palette, derived from the climate model and `heights`. This is chunk state,
@@ -63,6 +78,11 @@ export class TerrainChunk implements IComponent {
   ) {
     this.id = `${coord.x},${coord.y}`;
     this.coord = new Vector2(coord.x, coord.y);
+    // Sample-space offset before `coord` is mutated below into world position.
+    this.noiseOffset = new Vector2(
+      this.coord.x * (chunkSize - 1),
+      this.coord.y * (chunkSize - 1)
+    );
     this.position = coord.multiplyScalar(size);
     this.chunkSize = chunkSize;
     this.detailLevels = detailLevels;
@@ -80,7 +100,7 @@ export class TerrainChunk implements IComponent {
       this.lodMesh[i] = new LODMesh(
         detailLevels[i].lod,
         this,
-        this.position,
+        this.noiseOffset,
         chunkSize,
         seed,
         climatePreset
@@ -113,6 +133,8 @@ export class TerrainChunk implements IComponent {
             );
             return null;
           }
+          // A snapshot is a saved edit — its edges won't match the noise apron.
+          if (heights) this.heightsAreEdited = true;
           return heights;
         },
         (err) => {
@@ -144,6 +166,7 @@ export class TerrainChunk implements IComponent {
     this.validateHeights(heights);
     this.heights = heights;
     this.heightsVersion++;
+    this.heightsAreEdited = true;
   }
 
   private validateHeights(heights: Float32Array) {
@@ -158,6 +181,7 @@ export class TerrainChunk implements IComponent {
   // the chunk's array directly to avoid per-stamp copies).
   bumpHeightsVersion() {
     this.heightsVersion++;
+    this.heightsAreEdited = true;
   }
 
   // Adopts a worker-built splat map for the heights at `version`. Creates the

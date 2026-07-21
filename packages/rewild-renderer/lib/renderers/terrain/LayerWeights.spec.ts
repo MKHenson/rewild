@@ -12,9 +12,12 @@ const SNOW_HEIGHT = MOUNTAIN.layers[SNOW].height!;
 const SNOW_SLOPE = MOUNTAIN.layers[SNOW].slope!;
 const ROCK_SLOPE = MOUNTAIN.layers[ROCK].slope!;
 
-// A slope gentle enough for snow to hold, and one too sheer for it.
+// A slope gentle enough for snow to hold, and one too sheer for it — and past
+// the rock band's top, so rock has fully taken over (snow releases at
+// SNOW_SLOPE.from, rock saturates at ROCK_SLOPE.to; a "bare cliff" slope must
+// clear both).
 const GENTLE = SNOW_SLOPE.to - 10;
-const SHEER = SNOW_SLOPE.from + 15;
+const SHEER = Math.max(SNOW_SLOPE.from, ROCK_SLOPE.to) + 5;
 
 function weightsFor(
   biome: BiomeParams,

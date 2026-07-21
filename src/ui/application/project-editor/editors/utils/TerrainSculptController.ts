@@ -63,6 +63,9 @@ export class TerrainSculptController {
       get chunkSize() {
         return controller.renderer.terrainRenderer.mapChunkSizeLod;
       },
+      get metersPerSample() {
+        return controller.renderer.terrainRenderer.metersPerSample;
+      },
       getHeights: (cx: number, cy: number) => this.getChunkHeights(cx, cy),
     };
   }
@@ -245,7 +248,9 @@ export class TerrainSculptController {
    */
   prefetchHeights(centerX: number, centerZ: number, radius: number) {
     const terrain = this.renderer.terrainRenderer;
-    const span = terrain.mapChunkSizeLod - 1;
+    // World span of a chunk (already scaled by metersPerSample), so this maps
+    // the world-space brush footprint to chunk coords at any terrain scale.
+    const span = terrain.chunkSize;
     const half = span / 2;
     const cxMin = Math.ceil((centerX - radius - half) / span);
     const cxMax = Math.floor((centerX + radius + half) / span);

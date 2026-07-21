@@ -1,3 +1,4 @@
+import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { TERRAIN_MATERIALS } from './TerrainMaterials';
 
 // A smoothstep band over a per-sample value: `from` → 0, `to` → 1, ramping
@@ -63,7 +64,7 @@ export interface ClimateConfig {
 export const PLAIN: BiomeParams = {
   name: 'plain',
   heightScale: 20,
-  noiseScale: 400,
+  noiseScale: 200,
   octaves: 4,
   persistence: 0.5,
   lacunarity: 2.0,
@@ -76,24 +77,24 @@ export const PLAIN: BiomeParams = {
 // the region at moderate height so full-height peaks read as landmarks.
 export const MOUNTAIN: BiomeParams = {
   name: 'mountain',
-  heightScale: 200,
-  noiseScale: 800,
+  heightScale: 300,
+  noiseScale: 600,
   octaves: 6,
-  persistence: 0.5,
-  lacunarity: 2.0,
+  persistence: 0.35,
+  lacunarity: 2.6,
   heightCurveExp: 2.0,
   layers: [
     // Base: the low, flat ground between the faces.
     { material: 'aerial_rocks_01' },
     // Rock takes the steep ground, whatever the altitude.
-    { material: 'marble_cliff_05', slope: { from: 25, to: 45 } },
+    { material: 'marble_cliff_05', slope: { from: 35, to: 75 } },
     // Snow settles high — but not on cliffs. The inverted slope band fades it
     // out as the face steepens, letting the rock beneath show through, which is
     // what stops peaks reading as dipped in white paint.
     {
       material: 'snow-02',
       height: { from: 100, to: 170 },
-      slope: { from: 55, to: 35 },
+      slope: { from: 70, to: 55 },
     },
   ],
 };
@@ -103,16 +104,19 @@ export const MOUNTAIN: BiomeParams = {
 // row later is a moisture cut + new cell entries, no new code).
 export const DEFAULT_CLIMATE: ClimateConfig = {
   temperature: {
-    scale: 3000,
+    scale: 3000 / TERRAIN_METERS_PER_SAMPLE,
     seedSalt: 7919,
     cuts: [0.5],
-    blendHalfWidth: 0.05,
+    // Wider transition band: softens the biome border into a gradual blend
+    // rather than a hard line, and gives the ClimateField domain warp room to
+    // wander the border without compressing it into a height cliff.
+    blendHalfWidth: 0.1,
   },
   moisture: {
-    scale: 2400,
+    scale: 2400 / TERRAIN_METERS_PER_SAMPLE,
     seedSalt: 104729,
     cuts: [],
-    blendHalfWidth: 0.05,
+    blendHalfWidth: 0.1,
   },
   biomes: [PLAIN, MOUNTAIN],
   cells: [
