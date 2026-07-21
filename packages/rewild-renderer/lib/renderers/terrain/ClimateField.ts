@@ -24,6 +24,23 @@ function seededRandom(seed: number): () => number {
   };
 }
 
+// Domain warp for biome borders. The climate noise is deliberately very low
+// frequency (a band spans many chunks), so across a single view its iso-line —
+// the biome border — is nearly a straight gradient. Displacing the lookup
+// position by a higher-frequency noise makes that border meander organically
+// WITHOUT changing biome size: the value distribution is unchanged, only where
+// each sample reads from. The warp is a function of absolute sample position
+// (like the climate noise), so borders stay seam-free across chunks, and both
+// axes share one warp so their borders wander coherently.
+//
+// Tuning (both in sample units — multiply by metersPerSample for world units):
+//   WARP_SAMPLE_SCALE — wiggle wavelength; keep well below the biome `scale` so
+//                       wiggles are finer than the biomes but not noisy.
+//   WARP_AMPLITUDE    — how far the border wanders; ~0.2–0.4 × biome `scale`
+//                       reads as natural. Higher fragments biomes into islands.
+const WARP_SAMPLE_SCALE = 1000;
+const WARP_AMPLITUDE = 350;
+
 // Which band an axis value falls in, plus the smoothstep blend into the next
 // band when the value sits inside a cut's transition zone. bandB === bandA
 // (with weight 0) outside transition zones.
@@ -100,6 +117,9 @@ export interface ClimateField {
   tOffsetY: number;
   mOffsetX: number;
   mOffsetY: number;
+  // Decorrelated world offsets for the domain-warp noise field.
+  warpOffsetX: number;
+  warpOffsetY: number;
   // An axis with no cuts has a single band — skip its noise entirely.
   sampleTemperature: boolean;
   sampleMoisture: boolean;
@@ -129,6 +149,12 @@ export function createClimateField(
   const mOffsetX = mRng() * 200000 - 100000 + offset.x;
   const mOffsetY = mRng() * 200000 - 100000 + offset.y;
 
+  // Warp field salt: fixed, decorrelated from both climate axes and the height
+  // noise, kept seed-deterministic and carrying the chunk offset for continuity.
+  const wRng = seededRandom(seed + 5501);
+  const warpOffsetX = wRng() * 200000 - 100000 + offset.x;
+  const warpOffsetY = wRng() * 200000 - 100000 + offset.y;
+
   return {
     perlin: new Perlin(seed),
     climate,
@@ -138,6 +164,8 @@ export function createClimateField(
     tOffsetY,
     mOffsetX,
     mOffsetY,
+    warpOffsetX,
+    warpOffsetY,
     sampleTemperature: tAxis.cuts.length > 0,
     sampleMoisture: mAxis.cuts.length > 0,
     t: { bandA: 0, bandB: 0, weight: 0 },
@@ -164,12 +192,25 @@ export function resolveBiomeWeights(
   const { perlin, climate, halfWidth, halfHeight, t, m } = field;
   const cells = climate.cells;
 
+  // Domain-warp the lookup so biome borders meander instead of tracing the
+  // low-frequency climate gradient in a straight line. One warp vector, shared
+  // by both axes; the +137.13 / -91.7 constant shifts decorrelate its two
+  // components from the same noise field. No-op when there is nothing to split.
+  let sx = x;
+  let sy = y;
+  if (field.sampleTemperature || field.sampleMoisture) {
+    const wx = (x - halfWidth + field.warpOffsetX) / WARP_SAMPLE_SCALE;
+    const wy = (y - halfHeight - field.warpOffsetY) / WARP_SAMPLE_SCALE;
+    sx = x + perlin.simplex2(wx, wy) * WARP_AMPLITUDE;
+    sy = y + perlin.simplex2(wx + 137.13, wy - 91.7) * WARP_AMPLITUDE;
+  }
+
   if (field.sampleTemperature) {
     const tAxis = climate.temperature;
     const tValue =
       (perlin.simplex2(
-        (x - halfWidth + field.tOffsetX) / tAxis.scale,
-        (y - halfHeight - field.tOffsetY) / tAxis.scale
+        (sx - halfWidth + field.tOffsetX) / tAxis.scale,
+        (sy - halfHeight - field.tOffsetY) / tAxis.scale
       ) +
         1) *
       0.5;
@@ -179,8 +220,8 @@ export function resolveBiomeWeights(
     const mAxis = climate.moisture;
     const mValue =
       (perlin.simplex2(
-        (x - halfWidth + field.mOffsetX) / mAxis.scale,
-        (y - halfHeight - field.mOffsetY) / mAxis.scale
+        (sx - halfWidth + field.mOffsetX) / mAxis.scale,
+        (sy - halfHeight - field.mOffsetY) / mAxis.scale
       ) +
         1) *
       0.5;

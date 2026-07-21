@@ -53,6 +53,13 @@ export interface SculptStamp {
 export interface SculptHeightSource {
   /** LOD-0 samples per chunk side (e.g. 241). */
   chunkSize: number;
+  /**
+   * World units per sample step (TERRAIN_METERS_PER_SAMPLE). The stamp's world
+   * coordinates are divided by this so all the integer-sample math below runs
+   * in sample space, where a chunk spans exactly (chunkSize - 1). Defaults to 1
+   * (the legacy 1 unit/sample scale) when omitted.
+   */
+  metersPerSample?: number;
   getHeights(cx: number, cy: number): Float32Array | null;
 }
 
@@ -81,7 +88,15 @@ export function applySculptStamp(
   const chunkSize = source.chunkSize;
   const span = chunkSize - 1;
   const half = span / 2;
-  const { centerX, centerZ, radius, type } = stamp;
+  const { type } = stamp;
+
+  // Work in sample space: 1 unit == 1 sample, chunk span == chunkSize - 1,
+  // independent of world scale. World inputs (brush centre/radius) convert in;
+  // vertical amounts/targets are unaffected by horizontal scale.
+  const mps = source.metersPerSample ?? 1;
+  const centerX = stamp.centerX / mps;
+  const centerZ = stamp.centerZ / mps;
+  const radius = stamp.radius / mps;
 
   if (radius <= 0 || stamp.amount === 0) return [];
   if (type === 'flatten' && stamp.target === undefined) return [];

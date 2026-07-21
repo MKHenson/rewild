@@ -8,6 +8,14 @@ interface TerrainWorkerRequest {
   // generating. Structured-cloned (not transferred): the chunk keeps its copy
   // for the other LOD requests.
   heights?: Float32Array;
+  // Pre-assembled (chunkSize+2)² apron for an edited chunk — its heights plus a
+  // ring of the real neighbour heights, so edge normals are two-sided and match
+  // the neighbour. Supersedes `heights` (it carries them). See
+  // TerrainRenderer.buildApron and BuildChunkMeshRequest.
+  apron?: Float32Array;
+  // The heights are an edit/snapshot rather than generator output, so the
+  // worker's noise apron would not match them. See BuildChunkMeshRequest.
+  edited?: boolean;
 }
 
 export interface TerrainWorkerResponse {

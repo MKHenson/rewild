@@ -47,7 +47,12 @@ const PLAIN_ONLY = climateOfOneBiome(0);
 // are about layer selection, not about the values that happen to be tuned in.
 const SNOW_HEIGHT = MOUNTAIN.layers[2].height!;
 const SNOW_SLOPE = MOUNTAIN.layers[2].slope!;
+const ROCK_SLOPE = MOUNTAIN.layers[1].slope!;
 const DEG_TO_RAD = Math.PI / 180;
+
+// A slope past the top of the rock band (and past where snow releases), so rock
+// has fully taken over — a "bare cliff". Read off the table so it tracks tuning.
+const CLIFF_SLOPE = Math.max(SNOW_SLOPE.from, ROCK_SLOPE.to) + 5;
 
 function splatFor(
   heights: Float32Array,
@@ -142,10 +147,12 @@ describe('generateSplatMap', () => {
     });
 
     it('surfaces steep mountain ground as rock rather than the base', () => {
-      // A ramp climbing 45° along x: one unit of height per unit of distance.
+      // A ramp climbing along x past the top of the rock band, so rock has
+      // fully taken over from the base.
+      const rise = Math.tan(CLIFF_SLOPE * DEG_TO_RAD);
       const heights = new Float32Array(SIZE * SIZE);
       for (let y = 0; y < SIZE; y++)
-        for (let x = 0; x < SIZE; x++) heights[x + y * SIZE] = x;
+        for (let x = 0; x < SIZE; x++) heights[x + y * SIZE] = x * rise;
 
       const splat = splatFor(heights, MOUNTAIN_ONLY);
 
@@ -161,9 +168,10 @@ describe('generateSplatMap', () => {
     // The reason snow carries an inverted slope band. A high cliff must show
     // the rock beneath rather than reading as dipped in white paint.
     it('leaves high cliffs as rock rather than snowing over them', () => {
-      // Sheer enough that snow's slope band has let go entirely, and high
-      // enough that its height band would otherwise cover it completely.
-      const rise = Math.tan((SNOW_SLOPE.from + 15) * DEG_TO_RAD);
+      // Sheer enough that snow's slope band has let go entirely and rock has
+      // fully taken over, and high enough that snow's height band would
+      // otherwise cover it completely.
+      const rise = Math.tan(CLIFF_SLOPE * DEG_TO_RAD);
       const heights = new Float32Array(SIZE * SIZE);
       for (let y = 0; y < SIZE; y++)
         for (let x = 0; x < SIZE; x++)

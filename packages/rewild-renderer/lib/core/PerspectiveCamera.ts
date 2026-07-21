@@ -21,7 +21,7 @@ export class PerspectiveCamera implements ICameraController {
     fov: f32 = 50,
     aspect: f32 = 1,
     near: f32 = 0.1,
-    far: f32 = 2000
+    far: f32 = 4000
   ) {
     this.fov = fov;
     this.zoom = 1;
