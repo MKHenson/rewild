@@ -1,6 +1,6 @@
-// Two-pass separable Gaussian bloom.
+// Two-pass separable Gaussian bloom, coverage-weighted.
 //
-// Pass 1 (horizontal=1): reads bilateral HDR clouds, extracts pixels above
+// Pass 1 (horizontal=1): reads the HDR sky+cloud blend, extracts pixels above
 //   bloomThreshold (in exposure-adjusted luminance), applies horizontal
 //   Gaussian weights, writes to an intermediate rgba16float texture.
 //
@@ -11,6 +11,17 @@
 // The composite pass adds the renderTarget to the HDR cloud colour BEFORE
 // tonemapping, so the ACES shoulder naturally compresses bright+bloom into
 // a smooth glow with no LDR ring artefact.
+//
+// ── Coverage weighting ──
+// The cloud raymarch is depth-gated (cloudsTemporal.wgsl): when the camera is
+// below the cloud layer it writes vec4f(0) on terrain-occluded pixels rather
+// than paying for a march that will be hidden. Those pixels are not black sky,
+// they are *missing data*, and a plain Gaussian averaged them in — dividing by
+// a full-kernel weight while summing only a partial kernel. The result was a
+// systematically under-bloomed band tracing every terrain silhouette, ~sigma
+// wide. So each tap carries a validity flag, the kernel renormalises over valid
+// taps only, and alpha carries the coverage fraction forward so the separable
+// second pass can renormalise the same way.
 
 struct ObjectStruct {
     resolution:     vec2f,
@@ -18,11 +29,26 @@ struct ObjectStruct {
     bloomAmount:    f32,
     bloomThreshold: f32,
     horizontal:     f32,   // 1.0 = H extraction pass, 0.0 = V blur pass
+    cloudsGated:    f32,   // 1.0 when the cloud pass depth-gated this frame
 };
 
 @group(0) @binding(0) var ourSampler: sampler;
 @group(0) @binding(1) var ourTexture: texture_2d<f32>;
 @group(0) @binding(2) var<uniform> object: ObjectStruct;
+@group(0) @binding(3) var depthTexture: texture_depth_2d;
+
+// A source texel holds real cloud data unless the cloud pass skipped it. That
+// happens only where terrain occludes AND the camera is below the cloud layer;
+// above the layer clouds are marched full-screen and everything is valid.
+fn cloudCoverage(uv: vec2f) -> f32 {
+    if (object.cloudsGated < 0.5) {
+        return 1.0;
+    }
+    let dims  = vec2f(textureDimensions(depthTexture));
+    let coord = vec2i(clamp(uv, vec2f(0.0), vec2f(1.0)) * dims - 0.5);
+    let depth = textureLoad(depthTexture, clamp(coord, vec2i(0), vec2i(dims) - 1), 0);
+    return select(0.0, 1.0, depth >= 1.0);
+}
 
 @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
   let pos = array<vec2f, 6>(
@@ -44,34 +70,45 @@ struct ObjectStruct {
   let RADIUS   = 15;
 
   var bloomSum    = vec3f(0.0);
-  var totalWeight = 0.0;
+  var totalWeight = 0.0;   // sum of gaussW * validity — the renormalisation divisor
+  var kernelWeight = 0.0;  // sum of gaussW — the full kernel, for the coverage ratio
 
   for (var i: i32 = -RADIUS; i <= RADIUS; i++) {
     let sampleUV = uv + dir * f32(i);
     let s        = textureSampleLevel(ourTexture, ourSampler, sampleUV, 0.0);
     let gaussW   = gaussian(f32(i), SIGMA);
 
+    // H reads the blend buffer and must consult depth; V reads the H output,
+    // where alpha already carries that row's coverage.
+    let validity = select(s.a, cloudCoverage(sampleUV), isH);
+    let w        = gaussW * validity;
+
     if (isH) {
       // Horizontal pass: only accumulate pixels above the bloom threshold.
       let exposedLum = dot(EXPOSURE * s.rgb, vec3f(0.2126, 0.7152, 0.0722));
       let excess     = softKnee(exposedLum, object.bloomThreshold, KNEE);
-      bloomSum += s.rgb * excess * gaussW;
+      bloomSum += s.rgb * excess * w;
     } else {
       // Vertical pass: blur the H-extracted highlights, no re-thresholding.
-      bloomSum += s.rgb * gaussW;
+      bloomSum += s.rgb * w;
     }
 
-    totalWeight += gaussW;
+    totalWeight  += w;
+    kernelWeight += gaussW;
   }
 
+  // Divide by the weight actually accumulated, not the full kernel, so a
+  // partially-occluded neighbourhood yields the average of what it could see
+  // rather than a value biased toward zero.
   var result = vec3f(0.0);
   if (totalWeight > 0.0) {
     result = bloomSum / totalWeight;
   }
 
   // bloomAmount is applied once, on the final (vertical) pass only.
-  let scale = select(object.bloomAmount, 1.0, isH);
-  return vec4f(result * scale, 1.0);
+  let scale    = select(object.bloomAmount, 1.0, isH);
+  let coverage = select(1.0, totalWeight / kernelWeight, isH);
+  return vec4f(result * scale, coverage);
 }
 
 

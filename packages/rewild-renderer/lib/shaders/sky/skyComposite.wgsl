@@ -118,9 +118,12 @@ var<private> sunDotUp: f32;
     return vec4f(fogResult.rgb + godRays.rgb + flash, fogResult.a);
   }
 
-  // Sky pixel: single ACES over the full HDR composite (sky + clouds + bloom)
+  // Sky pixel: single ACES over the full HDR composite (sky + clouds + bloom).
+  // Alpha is 1 — nothing is behind the sky. (This used to read hdrBlend.a, which
+  // was 1 here only because the sky pass wrote alpha=1 on non-terrain pixels;
+  // that channel now carries cloud opacity, so the constant is stated directly.)
   let tonemapped = tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb));
-  return vec4f(tonemapped + godRays.rgb + flash, hdrBlend.a);
+  return vec4f(tonemapped + godRays.rgb + flash, 1.0);
 }
 
 fn worldFromScreenCoord( coord: vec2f, depthSample: f32 ) -> vec3f {

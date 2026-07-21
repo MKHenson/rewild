@@ -60,14 +60,8 @@ export class SkyGradientRenderer {
           binding: 1,
           resource: renderer.samplerManager.get('linear'),
         },
-        {
-          binding: 3,
-          resource: renderer.depthTexture.createView(),
-        },
-        {
-          binding: 4,
-          resource: renderer.samplerManager.get('depth-comparison'),
-        },
+        // Bindings 3/4 (depth texture + comparison sampler) are gone: the sky is
+        // evaluated full-screen now, so this pass no longer reads the z-buffer.
         {
           binding: 5,
           resource: nightSkyCubemap.createView({ dimension: 'cube' }),

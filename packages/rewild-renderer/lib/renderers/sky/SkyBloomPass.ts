@@ -4,8 +4,12 @@ import bloomShader from '../../shaders/sky/skyBloom.wgsl';
 import temporalShader from '../../shaders/sky/skyBloomTemporal.wgsl';
 import { PostProcessManager } from '../../post-processes/PostProcessManager';
 
-const UNIFORM_FLOATS = 6; // resolution(2) + iTime + bloomAmount + bloomThreshold + horizontal
+const UNIFORM_FLOATS = 7; // resolution(2) + iTime + bloomAmount + bloomThreshold + horizontal + cloudsGated
 const ALIGNED_SIZE = Math.ceil((UNIFORM_FLOATS * 4) / 256) * 256;
+
+/** Mirrors CLOUD_START in shaders/sky/skyConstants.wgsl. Below this altitude the
+ *  cloud raymarch depth-gates itself, leaving holes the bloom kernel must mask. */
+const CLOUD_START = 500.0;
 const TEMPORAL_ALIGNED_SIZE = Math.ceil((1 * 4) / 256) * 256; // blendFactor f32
 
 /** Bloom runs at this fraction of the canvas resolution. Half-res is sufficient
@@ -43,6 +47,11 @@ export class SkyBloomPass implements IPostProcess {
   /** History weight for temporal stabilization. Higher = smoother but slower
    *  to respond to new bright areas. Range 0–1; default 0.85. */
   temporalBlend: number = 0.7;
+
+  /** Camera world Y, set by SkyRenderer each frame. Below CLOUD_START the cloud
+   *  pass skips occluded pixels, so the extraction kernel must weight by coverage
+   *  instead of treating those holes as black sky. */
+  cameraAltitude: number = 0;
 
   private pipeline: GPURenderPipeline;
   private hBindGroup: GPUBindGroup;
@@ -119,6 +128,10 @@ export class SkyBloomPass implements IPostProcess {
     this.hUniforms = makeUniforms('sky bloom H uniforms');
     this.vUniforms = makeUniforms('sky bloom V uniforms');
 
+    // Both passes share one pipeline, so both bind groups must supply the depth
+    // texture even though only the H pass reads it (V gets coverage from alpha).
+    const depthView = renderer.depthTexture.createView();
+
     this.hBindGroup = device.createBindGroup({
       label: 'sky bloom H bind group',
       layout: this.pipeline.getBindGroupLayout(0),
@@ -126,6 +139,7 @@ export class SkyBloomPass implements IPostProcess {
         { binding: 0, resource: sampler },
         { binding: 1, resource: src.createView() },
         { binding: 2, resource: { buffer: this.hUniforms } },
+        { binding: 3, resource: depthView },
       ],
     });
 
@@ -136,6 +150,7 @@ export class SkyBloomPass implements IPostProcess {
         { binding: 0, resource: sampler },
         { binding: 1, resource: this.extractTarget.createView() },
         { binding: 2, resource: { buffer: this.vUniforms } },
+        { binding: 3, resource: depthView },
       ],
     });
 
@@ -216,13 +231,18 @@ export class SkyBloomPass implements IPostProcess {
     const { bw, bh } = this;
     const t = renderer.totalDeltaTime;
 
+    // Matches the gate in cloudsTemporal.wgsl: camHeight < EARTH_RADIUS +
+    // CLOUD_START reduces to cameraY < CLOUD_START.
+    const cloudsGated = this.cameraAltitude < CLOUD_START ? 1.0 : 0.0;
+
     // Write all uniform buffers before opening the command encoder.
     const hData = new Float32Array(ALIGNED_SIZE / 4);
-    hData.set([bw, bh, t, this.bloomAmount, this.bloomThreshold, 1.0]);
+    hData.set([bw, bh, t, this.bloomAmount, this.bloomThreshold, 1.0, cloudsGated]);
     device.queue.writeBuffer(this.hUniforms, 0, hData.buffer);
 
+    // V pass reads coverage from the H output's alpha — no depth lookup needed.
     const vData = new Float32Array(ALIGNED_SIZE / 4);
-    vData.set([bw, bh, t, this.bloomAmount, this.bloomThreshold, 0.0]);
+    vData.set([bw, bh, t, this.bloomAmount, this.bloomThreshold, 0.0, 0.0]);
     device.queue.writeBuffer(this.vUniforms, 0, vData.buffer);
 
     const temporalData = new Float32Array(TEMPORAL_ALIGNED_SIZE / 4);
