@@ -1,5 +1,5 @@
 const PI: f32 = 3.141592653589793238462643383279502884197169;
-const FOG_COLOR_DAY = vec3f( 0.8, 0.89, 1.0 );
+const FOG_COLOR_DAY = vec3f( 0.6, 0.63, 0.72 );
 const FOG_COLOR_NIGHT = vec3f( 0.03, 0.04, 0.08 );
 const FOG_COLOR_EVENING = vec3f( 0.32, 0.12, 0.0 ); //  vec3f( 0.75, 0.7, 0.5 );
 const FOG_COLOR_STORM = vec3f( 0.55, 0.57, 0.45 );
@@ -10,4 +10,4 @@ const EARTH_RADIUS: f32 = 6300e3;
 const CLOUD_START: f32 = 500.0;
 const CLOUD_HEIGHT: f32 = 600.0;
 const SUN_POWER: vec3f = vec3(1.0,0.9,0.6) * 1200.;
-const LOW_SCATTER: vec3f = vec3(1.0, 0.7, 0.5);
+const LOW_SCATTER: vec3f = vec3(1.0, 0.7, 0.5); 

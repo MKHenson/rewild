@@ -462,6 +462,7 @@ export class SkyRenderer {
     this.finalPass.azimuth = this.azimuth;
     this.finalPass.elevation = this.elevation;
     this.finalPass.cloudiness = this.cloudiness;
+    this.bloomPass.cameraAltitude = camera.transform.position.y;
     this.bloomPass.render(
       renderer,
       this.perfMonitor.getTimestampWrites('sky-bloom')

@@ -7,12 +7,6 @@ var noiseSampler: sampler;
 @group( 0 ) @binding( 2 )
 var noiseTexture: texture_2d<f32>;
 
-@group( 0 ) @binding( 3 )
-var depthTexture: texture_depth_2d;
-
-@group( 0 ) @binding( 4 )
-var depthSampler: sampler_comparison;
-
 @group( 0 ) @binding( 5 )
 var nightSkyCubemap: texture_cube<f32>;
 
@@ -62,33 +56,23 @@ fn fs(
     let camHeight = length(org - earthCenter);
     const ATM_START_FS = EARTH_RADIUS + CLOUD_START;
 
-     // Define uv based on fragCoord
-    let uv = fragCoord.xy / vec2(object.resolutionX, object.resolutionY);
-
-    // Depth test must be in uniform control flow — sample once before any branching.
-    let rawDepth = textureSampleCompare( depthTexture, depthSampler, uv, 1 );
+    // NOTE: this pass is deliberately NOT depth-gated. Writing vec4f(0) on
+    // terrain-occluded pixels used to punch black holes into the HDR blend
+    // buffer, and the bloom pass (±15 texel Gaussian) averaged those zeros in,
+    // producing a dark halo tracing every terrain silhouette. The gate saved
+    // little — this is an analytic evaluation, not a raymarch — so the sky is
+    // now evaluated full-screen and the composite pass discards it via its own
+    // depth test. Only the expensive cloud raymarch stays depth-gated; the
+    // bloom pass masks that one out by coverage weight instead.
 
     if (camHeight >= ATM_START_FS) {
-        // Inside or above clouds — still discard terrain pixels so the sky's
-        // alpha=1.0 blue doesn't bleed into the composite fog calculation.
-        // The composite pass's cloudOcclusion logic handles cloud-over-terrain.
-        if (rawDepth < 1.0) {
-            output.color = vec4f( 0.0, 0.0, 0.0, 0.0 );
-            return output;
-        }
-        // No terrain — render sky. Fade out stars when looking down and when clouds are thick.
+        // Above the cloud layer. Fade out stars when looking down and when clouds are thick.
         let nightSky: vec3f = sampleNightSky(direction);
         let downFade = smoothstep(-0.1, 0.1, viewVertical);
         let cloudinessFade = 1.0 - object.cloudiness;
         let adjustedNightSky = nightSky * downFade * cloudinessFade;
         let atmosphereColor = drawSkyAndHorizonFog( direction, org, vSunDirection, adjustedNightSky );
         output.color = vec4f( atmosphereColor, 1.0 );
-        return output;
-    }
-
-    // Below clouds: do not draw pixel if blocked by something in the z-buffer
-    if (rawDepth < 1.0) {
-         output.color = vec4f( 0.0, 0.0, 0.0, 0.0 );
         return output;
     }
 

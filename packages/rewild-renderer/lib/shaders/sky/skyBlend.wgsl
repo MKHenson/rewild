@@ -29,7 +29,14 @@ struct BlendUniformStruct {
     // peak white). A thin cloud (alpha=0.2) in front: 60*0.8 + cloud*0.2 ≈ 58 → ACES(2.61)
     // ≈ 0.954 (shows some cloud instead of pure white). Sun disk (no cloud) still appears
     // bright and visible even when capped.
-    let skyCapped = vec4f(min(sky.rgb, vec3f(60.0)), sky.a);
-    let preMultClouds = vec4f(clouds.rgb * clouds.a, clouds.a);
-    return skyCapped * (1.0 - preMultClouds.a) + preMultClouds;
+    let skyCapped = min(sky.rgb, vec3f(60.0));
+    let blended = skyCapped * (1.0 - clouds.a) + clouds.rgb * clouds.a;
+
+    // Alpha carries CLOUD opacity, not the composited alpha. The sky pass used to
+    // write alpha=0 on terrain-occluded pixels, which made the composited alpha
+    // happen to equal cloud alpha there — the composite's cloudOcclusion term
+    // relied on that. Now that the sky is evaluated full-screen (sky.a is 1
+    // everywhere) that coincidence is gone, so cloud opacity is passed through
+    // explicitly. The composite decides sky-vs-terrain from its own depth test.
+    return vec4f(blended, clouds.a);
 }
