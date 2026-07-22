@@ -1,7 +1,7 @@
 import { Renderer } from '../..';
 import { Transform } from '../../core/Transform';
 import { Camera } from '../../core/Camera';
-import { Color, degToRad, Matrix4, Vector2 } from 'rewild-common';
+import { Color, degToRad, Matrix4, smoothstep, Vector2 } from 'rewild-common';
 import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
 import { TemporalCloudRenderer } from './TemporalCloudRenderer';
 import { SkyBilateralPass } from './SkyBilateralPass';
@@ -61,6 +61,10 @@ export class SkyRenderer {
   upDot: f32;
   sun: DirectionLight;
 
+  /** Sun intensity at a neutral climate (temperature 0.5). The live
+   *  sun.intensity is derived from this each frame — hot climates scale it up. */
+  baseSunIntensity: f32 = 1.2;
+
   // God rays tunables (updatable at runtime without pipeline recreation)
   /** Master on/off switch. When false the god ray pass is skipped entirely each frame. */
   godRayEnabled: boolean = true;
@@ -108,7 +112,7 @@ export class SkyRenderer {
     this.windiness = 0.5;
     this.upDot = 0.0;
     this.sun = new DirectionLight();
-    this.sun.intensity = 1.5;
+    this.sun.intensity = this.baseSunIntensity;
     parent.addChild(this.sun.transform);
     this.requiresRebuild = true;
 
@@ -253,6 +257,23 @@ export class SkyRenderer {
     } else {
       this.sun.color.copy(this._dayColor);
     }
+
+    // Climate tint. temperature 0.5 is neutral; 1 = hot (warmer, yellower and a
+    // little brighter), 0 = cold (cooler, bluer, unchanged brightness). The same
+    // curve is applied to the fog in climateTint() in fog.wgsl — keep them in
+    // sync or the key light and the haze will disagree about the season.
+    const warm = Math.max(this.temperature - 0.5, 0.0) * 2.0;
+    const cool = Math.max(0.5 - this.temperature, 0.0) * 2.0;
+    this.sun.color.r *= 1.0 + 0.085 * warm - 0.04 * cool;
+    this.sun.color.g *= 1.0 + 0.035 * warm - 0.01 * cool;
+    this.sun.color.b *= 1.0 - 0.07 * warm + 0.1 * cool;
+
+    // Heavy-overcast dimming: in the 0.9→1.0 cloudiness bracket the sky is thick
+    // enough that direct sun should fall off toward a dull, sunless grey. Ramps
+    // the key light down to 40% by full cover, eased so it doesn't snap on at 0.9.
+    const overcastDim = 1.0 - 0.8 * smoothstep(this.cloudiness, 0.9, 1.0);
+    this.sun.intensity =
+      this.baseSunIntensity * (1.0 + 0.15 * warm) * overcastDim;
 
     // Compute view-projection matrix (forward) and its inverse for ray reconstruction.
     // The forward matrix is needed by the temporal renderer for reprojection.

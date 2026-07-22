@@ -15,6 +15,7 @@ struct FinalUniformStruct {
     cameraPosition: vec3f,
     padding0: f32,
     foginess: f32,
+    temperature: f32,
     lightningFlash: f32,
 };
 
