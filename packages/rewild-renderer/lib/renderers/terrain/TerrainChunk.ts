@@ -60,9 +60,15 @@ export class TerrainChunk implements IComponent {
   // it by lod, so every LOD of a chunk wants the same texels. Owned here (all
   // LODs merely bind it) and destroyed with the chunk.
   //
+  // Two textures because the palette holds eight materials and an RGBA8 texel
+  // holds four weights: `splatTexture` carries palette channels 0-3 and
+  // `splatTextureExt` channels 4-7. They are always written and destroyed
+  // together — the pair is one logical map, split only by texel format.
+  //
   // Deliberately NOT registered with the textureManager — its name-keyed map
   // would have every chunk clobber the same entry while the GPU textures leak.
   splatTexture: DataTexture | null = null;
+  splatTextureExt: DataTexture | null = null;
   // The heightsVersion the splat's contents were built from.
   private splatVersion = -1;
   // Cached snapshot lookup — one OPFS read per chunk, shared by all LODs.
@@ -197,25 +203,47 @@ export class TerrainChunk implements IComponent {
     if (this.splatTexture && version <= this.splatVersion) return;
     this.splatVersion = version;
 
+    // `data` holds the two RGBA8 planes back to back (see generateSplatMap).
+    // Subarrays view them in place rather than copying: a typed array carries
+    // its byteOffset, so writeTexture and DataTexture both upload from the
+    // right half of the same buffer.
+    const planeStride = this.chunkSize * this.chunkSize * 4;
+    const plane0 = data.subarray(0, planeStride);
+    const plane1 = data.subarray(planeStride, planeStride * 2);
+
     if (!this.splatTexture) {
+      // No mipmaps: the splat is sampled with the mesh UV, so a chunk covers
+      // it at roughly one texel per world unit at every LOD.
       this.splatTexture = new DataTexture(
-        // No mipmaps: the splat is sampled with the mesh UV, so a chunk covers
-        // it at roughly one texel per world unit at every LOD.
         new TextureProperties(`terrain_splat_${this.id}`, false),
-        data,
+        plane0,
+        this.chunkSize,
+        this.chunkSize
+      );
+      this.splatTextureExt = new DataTexture(
+        new TextureProperties(`terrain_splat_ext_${this.id}`, false),
+        plane1,
         this.chunkSize,
         this.chunkSize
       );
       // load() is declared async but assigns gpuTexture synchronously, so the
-      // texture is bindable as soon as this returns (as callers rely on).
+      // textures are bindable as soon as this returns (as callers rely on).
       this.splatTexture.load(renderer);
+      this.splatTextureExt.load(renderer);
       return;
     }
 
-    this.splatTexture.data = data;
+    this.splatTexture.data = plane0;
+    this.splatTextureExt!.data = plane1;
     renderer.device.queue.writeTexture(
       { texture: this.splatTexture.gpuTexture },
-      data as BufferSource,
+      plane0 as BufferSource,
+      { bytesPerRow: this.chunkSize * 4 },
+      { width: this.chunkSize, height: this.chunkSize }
+    );
+    renderer.device.queue.writeTexture(
+      { texture: this.splatTextureExt!.gpuTexture },
+      plane1 as BufferSource,
       { bytesPerRow: this.chunkSize * 4 },
       { width: this.chunkSize, height: this.chunkSize }
     );
@@ -250,7 +278,9 @@ export class TerrainChunk implements IComponent {
       lod.dispose();
     }
     this.splatTexture?.gpuTexture.destroy();
+    this.splatTextureExt?.gpuTexture.destroy();
     this.splatTexture = null;
+    this.splatTextureExt = null;
     this.splatVersion = -1;
   }
 

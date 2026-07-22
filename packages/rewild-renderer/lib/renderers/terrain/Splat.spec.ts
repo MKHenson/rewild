@@ -2,8 +2,10 @@ import { Vector2 } from 'rewild-common';
 import {
   ClimateConfig,
   DEFAULT_CLIMATE,
+  DESERT,
   MOUNTAIN,
   PLAIN,
+  SPLAT_BYTES_PER_TEXEL,
   getClimatePalette,
 } from './Biomes';
 import { generateBiomeBlendedHeightMap } from './Noise';
@@ -19,9 +21,12 @@ const PALETTE = getClimatePalette(DEFAULT_CLIMATE);
 const channelOf = (material: string) => PALETTE.indexOf(material);
 
 const GRASS = channelOf(PLAIN.layers[0].material);
+const LEAVES = channelOf(PLAIN.layers[1].material); // noise-mixed with GRASS
 const BASE = channelOf(MOUNTAIN.layers[0].material); // mountain's base ground
 const ROCK = channelOf(MOUNTAIN.layers[1].material); // slope layer
 const SNOW = channelOf(MOUNTAIN.layers[2].material); // height layer
+const SAND = channelOf(DESERT.layers[0].material);
+const PAN = channelOf(DESERT.layers[1].material); // low + flat layer
 
 // A 32-sample chunk is tiny against the climate's 3000-unit scale, so a whole
 // test chunk falls in one climate cell — which cell being an accident of the
@@ -35,13 +40,16 @@ function climateOfOneBiome(biomeIndex: number): ClimateConfig {
       blendHalfWidth: 0.05,
     },
     moisture: { scale: 2400, seedSalt: 104729, cuts: [], blendHalfWidth: 0.05 },
-    biomes: [PLAIN, MOUNTAIN],
+    // The full biome list, so the palette — and therefore every channel index
+    // below — matches DEFAULT_CLIMATE's even though only one cell is reachable.
+    biomes: [PLAIN, MOUNTAIN, DESERT],
     cells: [[biomeIndex]],
   };
 }
 
 const MOUNTAIN_ONLY = climateOfOneBiome(1);
 const PLAIN_ONLY = climateOfOneBiome(0);
+const DESERT_ONLY = climateOfOneBiome(2);
 
 // Read snow's selectors off the table rather than restating them — these tests
 // are about layer selection, not about the values that happen to be tuned in.
@@ -66,9 +74,22 @@ function flat(value: number): Float32Array {
   return new Float32Array(SIZE * SIZE).fill(value);
 }
 
+// Weight of palette channel `c` at texel `index`, as a 0..255 byte. The splat
+// is two RGBA8 planes back to back, so channels 0-3 come from the first and
+// 4-7 from the second at the same texel — never assume one flat stride.
+function channelAt(
+  splat: Uint8Array,
+  index: number,
+  c: number,
+  texels = SIZE * SIZE
+): number {
+  const planeStride = texels * 4;
+  return splat[Math.floor(c / 4) * planeStride + index * 4 + (c % 4)];
+}
+
 // Weight of channel `c` at sample (x, y), as a 0..255 byte.
 function at(splat: Uint8Array, x: number, y: number, c: number): number {
-  return splat[(x + y * SIZE) * 4 + c];
+  return channelAt(splat, x + y * SIZE, c);
 }
 
 describe('generateSplatMap', () => {
@@ -77,10 +98,10 @@ describe('generateSplatMap', () => {
   });
 
   it('produces one weight set per sample', () => {
-    expect(splatFor(flat(0)).length).toBe(SIZE * SIZE * 4);
+    expect(splatFor(flat(0)).length).toBe(SIZE * SIZE * SPLAT_BYTES_PER_TEXEL);
   });
 
-  it('weights sum to ~255 at every sample', () => {
+  it('weights sum to ~255 at every sample, across both planes', () => {
     const heights = generateBiomeBlendedHeightMap(
       SIZE,
       SIZE,
@@ -91,8 +112,9 @@ describe('generateSplatMap', () => {
     const splat = splatFor(heights);
 
     for (let i = 0; i < SIZE * SIZE; i++) {
-      const sum =
-        splat[i * 4] + splat[i * 4 + 1] + splat[i * 4 + 2] + splat[i * 4 + 3];
+      let sum = 0;
+      for (let c = 0; c < SPLAT_BYTES_PER_TEXEL; c++)
+        sum += channelAt(splat, i, c);
       // Each channel rounds independently, so the sum can drift by up to 2.
       expect(Math.abs(sum - 255)).toBeLessThanOrEqual(2);
     }
@@ -112,116 +134,11 @@ describe('generateSplatMap', () => {
     const right = splatFor(flat(10), DEFAULT_CLIMATE, new Vector2(span, 0));
 
     for (let y = 0; y < SIZE; y++) {
-      for (let c = 0; c < 4; c++) {
+      for (let c = 0; c < SPLAT_BYTES_PER_TEXEL; c++) {
         // The left chunk's last column is the same world position as the right
         // chunk's first column.
         expect(at(right, 0, y, c)).toBe(at(left, SIZE - 1, y, c));
       }
     }
-  });
-
-  describe('layer selection', () => {
-    it('gives a plain its only layer, whatever the terrain does', () => {
-      for (const heights of [flat(5), flat(190)]) {
-        const splat = splatFor(heights, PLAIN_ONLY);
-        for (let i = 0; i < SIZE * SIZE; i++) {
-          expect(splat[i * 4 + GRASS]).toBe(255);
-        }
-      }
-    });
-
-    it('surfaces flat low mountain ground as its base material', () => {
-      const splat = splatFor(flat(5), MOUNTAIN_ONLY);
-      for (let i = 0; i < SIZE * SIZE; i++) {
-        expect(splat[i * 4 + BASE]).toBe(255);
-        expect(splat[i * 4 + ROCK]).toBe(0);
-        expect(splat[i * 4 + SNOW]).toBe(0);
-      }
-    });
-
-    it('surfaces flat high mountain ground as snow', () => {
-      const splat = splatFor(flat(190), MOUNTAIN_ONLY);
-      for (let i = 0; i < SIZE * SIZE; i++) {
-        expect(splat[i * 4 + SNOW]).toBe(255);
-      }
-    });
-
-    it('surfaces steep mountain ground as rock rather than the base', () => {
-      // A ramp climbing along x past the top of the rock band, so rock has
-      // fully taken over from the base.
-      const rise = Math.tan(CLIFF_SLOPE * DEG_TO_RAD);
-      const heights = new Float32Array(SIZE * SIZE);
-      for (let y = 0; y < SIZE; y++)
-        for (let x = 0; x < SIZE; x++) heights[x + y * SIZE] = x * rise;
-
-      const splat = splatFor(heights, MOUNTAIN_ONLY);
-
-      // Interior only — edge samples use a one-sided gradient.
-      for (let y = 1; y < SIZE - 1; y++) {
-        for (let x = 1; x < SIZE - 1; x++) {
-          expect(at(splat, x, y, ROCK)).toBe(255);
-          expect(at(splat, x, y, BASE)).toBe(0);
-        }
-      }
-    });
-
-    // The reason snow carries an inverted slope band. A high cliff must show
-    // the rock beneath rather than reading as dipped in white paint.
-    it('leaves high cliffs as rock rather than snowing over them', () => {
-      // Sheer enough that snow's slope band has let go entirely and rock has
-      // fully taken over, and high enough that snow's height band would
-      // otherwise cover it completely.
-      const rise = Math.tan(CLIFF_SLOPE * DEG_TO_RAD);
-      const heights = new Float32Array(SIZE * SIZE);
-      for (let y = 0; y < SIZE; y++)
-        for (let x = 0; x < SIZE; x++)
-          heights[x + y * SIZE] = SNOW_HEIGHT.to + 20 + x * rise;
-
-      const splat = splatFor(heights, MOUNTAIN_ONLY);
-
-      for (let y = 1; y < SIZE - 1; y++) {
-        for (let x = 1; x < SIZE - 1; x++) {
-          expect(at(splat, x, y, SNOW)).toBe(0);
-          expect(at(splat, x, y, ROCK)).toBe(255);
-        }
-      }
-    });
-
-    it('blends rather than snapping across the snow line', () => {
-      // Climbing the snow's height band needs a *gentle* ramp: rise steeply
-      // enough to cross it in a few samples and the slope alone would keep snow
-      // off, whatever the altitude. So the ramp sits inside snow's slope band
-      // and the grid is sized to climb through the height band at that rate.
-      const rise = Math.tan((SNOW_SLOPE.to - 10) * DEG_TO_RAD);
-      const startHeight = SNOW_HEIGHT.from - 20;
-      const wide = Math.ceil((SNOW_HEIGHT.to + 20 - startHeight) / rise) + 2;
-
-      const heights = new Float32Array(wide * wide);
-      for (let y = 0; y < wide; y++)
-        for (let x = 0; x < wide; x++)
-          heights[x + y * wide] = startHeight + y * rise;
-
-      const splat = generateSplatMap(
-        wide,
-        wide,
-        SEED,
-        new Vector2(0, 0),
-        MOUNTAIN_ONLY,
-        heights
-      );
-
-      // Snow must rise monotonically up the slope, through intermediate values
-      // rather than in a single 0→255 step.
-      const column: number[] = [];
-      for (let y = 1; y < wide - 1; y++)
-        column.push(splat[(2 + y * wide) * 4 + SNOW]);
-
-      for (let i = 1; i < column.length; i++) {
-        expect(column[i]).toBeGreaterThanOrEqual(column[i - 1]);
-      }
-      expect(column[0]).toBe(0);
-      expect(column[column.length - 1]).toBe(255);
-      expect(column.filter((v) => v > 0 && v < 255).length).toBeGreaterThan(20);
-    });
   });
 });

@@ -126,7 +126,9 @@ describe('generateBiomeBlendedHeightMap', () => {
     // so the strip crosses band borders.
     const climate: ClimateConfig = {
       temperature: DEFAULT_CLIMATE.temperature,
-      moisture: DEFAULT_CLIMATE.moisture,
+      // Uncut, so this test is a pure temperature split whatever the default
+      // climate does with moisture. The 2×2 grid has its own test below.
+      moisture: { ...DEFAULT_CLIMATE.moisture, cuts: [] },
       biomes: [flatBiome('low', 0), flatBiome('high', 100)],
       cells: [[1], [0]],
     };
@@ -210,7 +212,11 @@ describe('generateBiomeBlendedHeightMap', () => {
     const blended = generate(0, 0, SEED, {
       ...DEFAULT_CLIMATE,
       biomes: [MOUNTAIN],
-      cells: [[0], [0]],
+      // Every cell of the default's full temperature × moisture grid.
+      cells: [
+        [0, 0],
+        [0, 0],
+      ],
     });
     expect(blended).toEqual(mountainOnly);
   });

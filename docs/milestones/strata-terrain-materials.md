@@ -190,6 +190,16 @@ detail), then call `perturbNormal` **once**.
 
 ### One global 4-material palette now; per-chunk palettes reserved
 
+> **Superseded — the palette is now eight materials, in two RGBA8 splat
+> textures.** The desert biome was the fifth material this section predicted,
+> and it took the escape hatch described below ("eight channels via a second
+> splat texture") rather than per-chunk palettes. `MAX_SPLAT_LAYERS` is 8, the
+> chunk owns a `splatTexture` / `splatTextureExt` pair carrying channels 0-3 and
+> 4-7, and the shader binds both. Everything below still describes the reasoning
+> accurately — only the number changed, and the seam analysis is the argument
+> for *why* widening beat evicting. Per-chunk palettes remain reserved, for a
+> library that outgrows eight simultaneously-visible materials.
+
 RGBA8 gives four channels, so four materials. Plain's grass plus mountain's rock,
 snow and dirt is exactly four — **the palette is full on day one**.
 

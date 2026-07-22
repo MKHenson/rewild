@@ -10,9 +10,32 @@ export interface SelectorBand {
   to: number;
 }
 
+// A selector over a noise field rather than over the terrain's shape.
+//
+// Slope and height ask what the ground is doing at a sample. This asks nothing:
+// it is a smooth random field, so it scatters a material in organic patches
+// wherever the layer's other selectors already allow it. That is what mixes two
+// materials "naturally" — a hard job for slope/height, which can only ever draw
+// the same patch on the same shape.
+//
+// Band values are against a 0..1 noise value, so `{ from: 0.45, to: 0.55 }` is
+// a roughly even mottle with soft edges, and `{ from: 0.7, to: 0.8 }` is
+// occasional patches. Inverting it (from > to) selects the *other* side of the
+// same field, which is how two layers can share one field and interlock.
+export interface NoiseSelector {
+  // Patch size in sample units. Divide metres by TERRAIN_METERS_PER_SAMPLE.
+  scale: number;
+  // Added to the world seed. Decorrelates this field from the height noise, the
+  // climate axes, and other layers' fields. Two layers given the same salt and
+  // scale see the *same* field, which is deliberate and useful.
+  seedSalt: number;
+  band: SelectorBand;
+}
+
 // One material a biome can surface with, and where it applies. A layer's
 // coverage is the product of its selectors; an omitted selector is 1, so a
-// layer with no selectors covers everywhere.
+// layer with no selectors covers everywhere — which above the base means it
+// buries every layer under it. validateClimateLayers rejects that.
 //
 // Layers composite base-first, like painting: each layer takes its coverage of
 // whatever the layers above it left uncovered, and layers[0] soaks up the
@@ -23,6 +46,7 @@ export interface BiomeLayer {
   material: string; // key into TERRAIN_MATERIALS
   slope?: SelectorBand; // degrees from horizontal
   height?: SelectorBand; // absolute world meters
+  noise?: NoiseSelector; // organic patches, independent of terrain shape
 }
 
 export interface BiomeParams {
@@ -69,12 +93,15 @@ export const PLAIN: BiomeParams = {
   persistence: 0.5,
   lacunarity: 2.0,
   heightCurveExp: 1.1,
-  layers: [{ material: 'forest-ground-01' }],
+  layers: [
+    { material: 'forest-ground-01' },
+    {
+      material: 'forest_leaves_02',
+      noise: { scale: 20, seedSalt: 11, band: { from: 0.35, to: 0.65 } },
+    },
+  ],
 };
 
-// 200m peaks need broad bases: noiseScale 800 keeps typical slopes in the
-// 35–55° range (400 would give spikes), and heightCurveExp 2.0 keeps most of
-// the region at moderate height so full-height peaks read as landmarks.
 export const MOUNTAIN: BiomeParams = {
   name: 'mountain',
   heightScale: 300,
@@ -84,13 +111,8 @@ export const MOUNTAIN: BiomeParams = {
   lacunarity: 2.6,
   heightCurveExp: 2.0,
   layers: [
-    // Base: the low, flat ground between the faces.
     { material: 'aerial_rocks_01' },
-    // Rock takes the steep ground, whatever the altitude.
     { material: 'marble_cliff_05', slope: { from: 35, to: 75 } },
-    // Snow settles high — but not on cliffs. The inverted slope band fades it
-    // out as the face steepens, letting the rock beneath show through, which is
-    // what stops peaks reading as dipped in white paint.
     {
       material: 'snow-02',
       height: { from: 100, to: 170 },
@@ -99,9 +121,27 @@ export const MOUNTAIN: BiomeParams = {
   ],
 };
 
-// Two biomes split across temperature only: cold → mountain, warm → plain.
-// The moisture axis is defined but uncut until a biome needs it (e.g. a desert
-// row later is a moisture cut + new cell entries, no new code).
+export const DESERT: BiomeParams = {
+  name: 'desert',
+  heightScale: 50,
+  noiseScale: 520,
+  octaves: 3,
+  persistence: 0.3,
+  lacunarity: 2.2,
+  heightCurveExp: 1.0,
+  layers: [
+    { material: 'sand_01' },
+    {
+      material: 'mud_cracked_dry_03',
+      noise: { scale: 20, seedSalt: 11, band: { from: 0.35, to: 0.65 } },
+    },
+  ],
+};
+
+// Three biomes over both climate axes. Temperature splits cold (mountain) from
+// warm; moisture then splits the warm half into dry (desert) and wet (plain).
+// Cold ignores moisture — a wet mountain and a dry mountain are the same
+// mountain — which is what sharing a biome across cells is for.
 export const DEFAULT_CLIMATE: ClimateConfig = {
   temperature: {
     scale: 3000 / TERRAIN_METERS_PER_SAMPLE,
@@ -115,25 +155,38 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
   moisture: {
     scale: 2400 / TERRAIN_METERS_PER_SAMPLE,
     seedSalt: 104729,
-    cuts: [],
+    cuts: [0.5],
     blendHalfWidth: 0.1,
   },
-  biomes: [PLAIN, MOUNTAIN],
+  biomes: [PLAIN, MOUNTAIN, DESERT],
   cells: [
-    [1], // cold → mountain
-    [0], // warm → plain
+    // dry, wet
+    [1, 1], // cold → mountain either way
+    [2, 0], // warm → desert when dry, plain when wet
   ],
 };
 
-// The splat map is a single RGBA8 texture, so it carries one weight per channel
-// — four materials for the whole climate. `getClimatePalette` is that mapping.
+// The splat map carries one weight per channel across *two* RGBA8 textures —
+// eight materials for the whole climate. `getClimatePalette` is that mapping.
 //
-// The palette is global and its identity mapping is all we need today: with two
-// biomes it is exactly full and cannot overflow. A fifth material (a third
-// biome, or painting wanting an arbitrary library) is what forces the move to
-// per-chunk palettes — see the design doc, which also covers why differing
-// palettes are *not* in themselves a seam risk, and why overflow is.
-export const MAX_SPLAT_LAYERS = 4;
+// Four (a single RGBA8) was exactly full at two biomes, so the desert was the
+// fifth material that forced the widening. The design doc offered two ways out:
+// per-chunk palettes, or eight channels via a second splat texture. This is the
+// second — it keeps the palette global, which means no eviction policy, no
+// per-chunk palette upload, and no chance of the overflow seam (a chunk
+// dropping a material its neighbour kept at a shared edge). Per-chunk palettes
+// remain the answer if the library ever outgrows eight *simultaneously visible*
+// materials; the shader's layerIndex indirection is still the hook for it.
+//
+// The cost is one extra byte-per-texel of splat per chunk and one extra texture
+// sample per fragment. The per-layer work is unchanged: the shader skips any
+// channel below its weight epsilon, so unused channels cost a compare.
+export const MAX_SPLAT_LAYERS = 8;
+
+// Bytes of splat per texel: two RGBA8 textures' worth, laid out as two
+// consecutive planes (all texels' channels 0-3, then all texels' 4-7) rather
+// than interleaved, so each plane uploads straight from the same buffer.
+export const SPLAT_BYTES_PER_TEXEL = MAX_SPLAT_LAYERS;
 
 // Every material any biome in this climate can surface with, in a stable order:
 // the splat map's channel i is palette[i]. Biome order then layer order, so
@@ -165,10 +218,24 @@ export function validateClimateLayers(climate: ClimateConfig): void {
         `Biome '${biome.name}' base layer '${base.material}' must not have selectors — it covers whatever the layers above it do not.`
       );
 
-    for (const layer of biome.layers) {
+    for (let i = 0; i < biome.layers.length; i++) {
+      const layer = biome.layers[i];
       if (!TERRAIN_MATERIALS[layer.material])
         throw new Error(
           `Biome '${biome.name}' references unknown terrain material '${layer.material}'.`
+        );
+
+      // A layer above the base with no selectors has coverage 1 everywhere, and
+      // layers composite top-down taking their coverage of what is left — so it
+      // takes *all* of it and every layer beneath it, base included, silently
+      // resolves to weight 0. The author who wrote two materials expecting to
+      // see both instead sees only the last one. Nothing downstream can detect
+      // this (a valid splat comes out, just an unintended one), so it is caught
+      // here. To mix materials without regard to terrain shape, give the layer
+      // a `noise` selector — that is what it is for.
+      if (i > 0 && !layer.slope && !layer.height && !layer.noise)
+        throw new Error(
+          `Biome '${biome.name}' layer ${i} ('${layer.material}') has no selectors, so it covers everything and buries the layers beneath it. Give it a slope, height or noise selector — or make it the base layer.`
         );
     }
   }

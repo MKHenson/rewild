@@ -64,6 +64,25 @@ export interface TerrainMaterial {
   // conserving lighting brightens tighter lobes automatically, so raising this
   // sharpens *and* intensifies the glint.
   shininess: number;
+  // How softly this material hands over to its neighbours, in blend-score units
+  // (score = splat weight + centred surface height). Only layers within this of
+  // the winning score contribute, so it is the *width of the transition*.
+  //
+  // The scale to judge it against is the spread of the height term. Two layers
+  // at equal splat weight differ in score by their surface-height difference
+  // alone, which for typical maps spans roughly ±0.4 — so:
+  //
+  //   ~0.2  every texel has one clear winner. A hard, interlocking edge that
+  //         follows the material's own relief: rock protruding through grass
+  //         along its own silhouette. Right for stone.
+  //   ~0.7  the height term rarely decides anything on its own, and the splat
+  //         weight carries the transition. A soft crossfade. Right for
+  //         litter, sand, and anything that should intermingle rather than meet.
+  //
+  // Applied from whichever layer is *winning* at a fragment, so a pair that
+  // should blend softly wants the soft value on both of its materials.
+  // Omitted ⇒ BLEND_DEPTH.
+  blendDepth?: number;
   // Which way the normal map's green channel points. Sources differ and there
   // is no way to detect it from the file, so every material must say.
   //
@@ -93,6 +112,17 @@ const HEIGHT_SCALE = 0.022;
 // (rock, marble, snow crust) above — see each material's shininess.
 const SHININESS = 32;
 
+// Default transition width — the hard, interlocking edge the height-aware blend
+// was built for, and what a material without its own `blendDepth` gets.
+// Materials that should intermingle override it upward; see
+// TerrainMaterial.blendDepth.
+export const BLEND_DEPTH = 0.2;
+
+// Transition width for materials that mix rather than meet: wide enough that
+// per-texel relief no longer decides the boundary on its own, leaving the splat
+// weight to carry a soft crossfade.
+const BLEND_DEPTH_SOFT = 0.7;
+
 const ROCK_NORMAL_URL = 'terrain/rocks-ground-01/rocks_ground_01_norm_1k.png';
 
 export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
@@ -108,6 +138,9 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     uvScale: DETAIL_UV_SCALE,
     specular: 0.3,
     shininess: SHININESS * 0.5, // matte grass/soil
+    // Pairs with forest_leaves_02 under a noise selector — litter scattered
+    // over soil, which should intermingle rather than meet along an edge.
+    blendDepth: BLEND_DEPTH_SOFT,
     normalConvention: 'opengl', // Poly Haven
   },
   'ground-coastal-01': {
@@ -203,6 +236,63 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     uvScale: DETAIL_UV_SCALE,
     specular: 0.2,
     shininess: SHININESS * 4.5, // polished marble — tightest glint
+    normalConvention: 'opengl', // Poly Haven
+  },
+  // The desert's crust, in the pans between dunes. Its relief is the deepest in
+  // the library relative to its scale — the cracks are narrow and steep, which
+  // is exactly the geometry parallax-occlusion sells best, and they flatten to
+  // a beige wash without it.
+  mud_cracked_dry_03: {
+    name: 'mud_cracked_dry_03',
+    albedoUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_diff_1k.jpg',
+    normalUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_norm_1k.png',
+    roughnessUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_rough_1k.png',
+    heightUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 1.5,
+    macroNormalUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_norm_1k.png',
+    macroUvScale: MACRO_UV_SCALE * 5,
+    uvScale: DETAIL_UV_SCALE,
+    specular: 0.4,
+    blendDepth: BLEND_DEPTH_SOFT,
+    shininess: SHININESS * 0.75, // dry and dusty — no glint to speak of
+    normalConvention: 'opengl', // Poly Haven
+  },
+  // The desert's dune bodies. Shallow relief on purpose: sand ripples are
+  // millimetres, and a deep parallax volume on a surface this smooth reads as
+  // the ground boiling as the camera moves.
+  sand_01: {
+    name: 'sand_01',
+    albedoUrl: 'terrain/sand-01/sand_01_diff_1k.jpg',
+    normalUrl: 'terrain/sand-01/sand_01_norm_1k.png',
+    roughnessUrl: 'terrain/sand-01/sand_01_rough_1k.jpg',
+    heightUrl: 'terrain/sand-01/sand_01_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 2,
+    macroNormalUrl: 'terrain/sand-01/sand_01_norm_1k.png',
+    // Coarser than the other macro normals: what a dune field should hold at
+    // range is the long swell, not the grain.
+    macroUvScale: MACRO_UV_SCALE,
+    uvScale: DETAIL_UV_SCALE,
+    // Dry sand is matte but not dead — a broad, low sheen down the sunlit flank
+    // is most of what makes a dune read as a dune.
+    specular: 0.35,
+    shininess: SHININESS * 0.5,
+    blendDepth: BLEND_DEPTH_SOFT,
+    normalConvention: 'opengl', // Poly Haven
+  },
+  forest_leaves_02: {
+    name: 'forest_leaves_02',
+    albedoUrl: 'terrain/forest-leaves-02/forest_leaves_02_diffuse_1k.jpg',
+    normalUrl: 'terrain/forest-leaves-02/forest_leaves_02_norm_1k.png',
+    roughnessUrl: 'terrain/forest-leaves-02/forest_leaves_02_rough_1k.jpg',
+    heightUrl: 'terrain/forest-leaves-02/forest_leaves_02_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 2,
+    macroNormalUrl: 'terrain/forest-leaves-02/forest_leaves_02_norm_1k.png',
+    macroUvScale: MACRO_UV_SCALE,
+    uvScale: DETAIL_UV_SCALE,
+    specular: 0.35,
+    shininess: SHININESS * 0.5,
+    // The soft half of the forest floor pair — see forest-ground-01.
+    blendDepth: BLEND_DEPTH_SOFT,
     normalConvention: 'opengl', // Poly Haven
   },
 };

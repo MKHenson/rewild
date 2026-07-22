@@ -173,6 +173,67 @@ export function createClimateField(
   };
 }
 
+// The lookup for one layer's noise selector, resolved once per generation call.
+// `scale` is copied from the selector; the offsets carry the layer's salt *and*
+// the chunk position, exactly as the climate axes do — which is what makes the
+// field world-continuous, so a noise-selected patch crosses a chunk border
+// without a seam.
+export interface LayerNoiseField {
+  offsetX: number;
+  offsetY: number;
+  scale: number;
+}
+
+/**
+ * Per-(biome, layer) noise lookups for every layer carrying a noise selector;
+ * `null` for layers without one. Indexed `[biomeIndex][layerIndex]`, built once
+ * per generation call so the sample loop only ever indexes.
+ */
+export function createLayerNoiseFields(
+  seed: number,
+  offset: Vector2,
+  climate: ClimateConfig
+): (LayerNoiseField | null)[][] {
+  return climate.biomes.map((biome) =>
+    biome.layers.map((layer) => {
+      if (!layer.noise) return null;
+      const rng = seededRandom(seed + layer.noise.seedSalt);
+      return {
+        offsetX: rng() * 200000 - 100000 + offset.x,
+        offsetY: rng() * 200000 - 100000 + offset.y,
+        scale: layer.noise.scale,
+      };
+    })
+  );
+}
+
+/**
+ * A layer's noise value in 0..1 at chunk-local sample (x, y).
+ *
+ * Takes primitives rather than the ClimateField so it allocates nothing and the
+ * caller can hoist the field lookup out of the inner loop.
+ */
+export function sampleLayerNoise(
+  perlin: Perlin,
+  field: LayerNoiseField,
+  halfWidth: number,
+  halfHeight: number,
+  x: number,
+  y: number
+): number {
+  // Same sign convention as the climate axes and the height noise — y enters
+  // negatively — so every field in the system agrees about where a world
+  // position is.
+  return (
+    (perlin.simplex2(
+      (x - halfWidth + field.offsetX) / field.scale,
+      (y - halfHeight - field.offsetY) / field.scale
+    ) +
+      1) *
+    0.5
+  );
+}
+
 /**
  * Resolves the biome(s) active at chunk-local sample (x, y) into `outBiomes` /
  * `outWeights`, returning how many are active. Weights sum to 1.

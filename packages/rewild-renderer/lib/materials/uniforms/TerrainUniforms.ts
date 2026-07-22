@@ -4,23 +4,24 @@ import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 import { MAX_SPLAT_LAYERS } from '../../renderers/terrain/Biomes';
 
-// TerrainParams layout (176 bytes, std140-compatible) — must match the struct
+// TerrainParams layout (304 bytes, std140-compatible) — must match the struct
 // in terrain.wgsl:
-//   specularColor    vec3f          offset 0   (12 bytes)
-//   shininess        f32            offset 12  (4 bytes)
-//   ambientColor     vec3f          offset 16  (12 bytes)
-//   detailFadeStart  f32            offset 28  (4 bytes)
-//   detailFadeEnd    f32            offset 32  (4 bytes)
-//   noiseScale       f32            offset 36  (4 bytes)
-//   heightBlendDepth f32            offset 40  (4 bytes)
-//   _pad             f32            offset 44  (4 bytes)
-//   layers           array<vec4f,8> offset 48  (128 bytes)
+//   specularColor    vec3f           offset 0   (12 bytes)
+//   shininess        f32             offset 12  (4 bytes)
+//   ambientColor     vec3f           offset 16  (12 bytes)
+//   detailFadeStart  f32             offset 28  (4 bytes)
+//   detailFadeEnd    f32             offset 32  (4 bytes)
+//   noiseScale       f32             offset 36  (4 bytes)
+//   heightBlendDepth f32             offset 40  (4 bytes)
+//   _pad             f32             offset 44  (4 bytes)
+//   layers           array<vec4f,16> offset 48  (256 bytes)
 //
 // `layers` starts at 48 because a uniform array of vec4f needs 16-byte
-// alignment; 40 + 8 padding is what gets it there. Two vec4f per splat channel:
+// alignment; 40 + 8 padding is what gets it there. Two vec4f per splat channel,
+// MAX_SPLAT_LAYERS channels:
 //   [slot*2    ] = (layerIndex, uvScale, macroUvScale, specular)
-//   [slot*2 + 1] = (normalYSign, heightScale, shininess, 0)
-const PARAMS_SIZE = 176;
+//   [slot*2 + 1] = (normalYSign, heightScale, shininess, blendDepth)
+const PARAMS_SIZE = 48 + MAX_SPLAT_LAYERS * 2 * 16;
 const LAYERS_OFFSET_FLOATS = 48 / 4;
 const FLOATS_PER_LAYER = 8;
 
@@ -36,6 +37,9 @@ export interface TerrainLayerParams {
   heightScale: number;
   // Blinn-Phong specular exponent (gloss). Higher ⇒ tighter, sharper highlight.
   shininess: number;
+  // Width of this material's transition to its neighbours, in blend-score
+  // units. Small ⇒ a hard interlocking edge; large ⇒ a soft crossfade.
+  blendDepth: number;
 }
 
 export class TerrainUniforms implements ISharedUniformBuffer {
@@ -75,11 +79,11 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   // one tile, or their offsets read as seams instead of hiding the repeat.
   noiseScale: number = 0.005;
 
-  // Transition width of the height-aware layer blend, in blend-score units
-  // (score = splat weight + centred surface height). Only layers within this of
-  // the winning score show: smaller ⇒ a harder, interlocking silhouette where
-  // the taller material (rock over grass) protrudes along its own edges; larger
-  // ⇒ softens back toward a plain splat crossfade.
+  // Fallback transition width for the height-aware layer blend. Terrain now
+  // takes this per-material from the winning layer (TerrainMaterial.blendDepth)
+  // so stone can interlock while litter and sand intermingle; this is only what
+  // an unpopulated layer slot is given, and the uniform layout's original home
+  // for the value.
   heightBlendDepth: number = 0.2;
 
   layers: TerrainLayerParams[] = [];
@@ -91,7 +95,10 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   private _normalView: GPUTextureView;
   private _roughnessView: GPUTextureView;
   private _heightView: GPUTextureView;
+  // Palette channels 0-3 and 4-7. Two RGBA8 textures rather than one, because
+  // that is all a texel holds; see MAX_SPLAT_LAYERS.
   private _splatTexture: GPUTexture;
+  private _splatTextureExt: GPUTexture;
   private _noiseTexture: GPUTexture;
   private _splatSampler: GPUSampler;
   private _seamlessSampler: GPUSampler;
@@ -112,6 +119,9 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
     if (!this._splatTexture)
       this._splatTexture = renderer.textureManager.get('grid-data').gpuTexture;
+    if (!this._splatTextureExt)
+      this._splatTextureExt =
+        renderer.textureManager.get('grid-data').gpuTexture;
     // Must be the *smooth* field, not `data-rgba-noise-256`: that one is white
     // noise, and the shader floors this into a region index.
     if (!this._noiseTexture)
@@ -162,6 +172,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
         { binding: 6, resource: { buffer: this._paramsBuffer } },
         { binding: 7, resource: this._roughnessView },
         { binding: 8, resource: this._heightView },
+        { binding: 9, resource: this._splatTextureExt.createView() },
       ],
     });
 
@@ -185,7 +196,8 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
     // Channels the palette does not use keep weight 0 in the splat, so the
     // shader's epsilon skips them — but zero them anyway so a stale layer can
-    // never be read if a future palette grows.
+    // never be read if a future palette grows. (Most climates use fewer than
+    // MAX_SPLAT_LAYERS materials, so this is the common case, not a corner.)
     for (let i = 0; i < MAX_SPLAT_LAYERS; i++) {
       const layer = this.layers[i];
       const base = LAYERS_OFFSET_FLOATS + i * FLOATS_PER_LAYER;
@@ -196,7 +208,10 @@ export class TerrainUniforms implements ISharedUniformBuffer {
       data[base + 4] = layer ? layer.normalYSign : 1;
       data[base + 5] = layer ? layer.heightScale : 0;
       data[base + 6] = layer ? layer.shininess : 32;
-      data[base + 7] = 0;
+      // Never 0 for an unused slot: the shader subtracts this from the winning
+      // score, and a 0 there would make an empty slot's cutoff exclude
+      // everything if it ever won.
+      data[base + 7] = layer ? layer.blendDepth : this.heightBlendDepth;
     }
 
     device.queue.writeBuffer(
@@ -213,6 +228,15 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
   get splatTexture(): GPUTexture {
     return this._splatTexture;
+  }
+
+  set splatTextureExt(texture: GPUTexture) {
+    this._splatTextureExt = texture;
+    this.requiresBuild = true;
+  }
+
+  get splatTextureExt(): GPUTexture {
+    return this._splatTextureExt;
   }
 
   set albedoView(view: GPUTextureView) {
