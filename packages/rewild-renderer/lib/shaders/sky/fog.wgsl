@@ -106,6 +106,10 @@ fn intersectSphereBoth(origin: vec3f, dir: vec3f, spherePos: vec3f, sphereRad: f
 const FOG_BASE_HEIGHT: f32 = 100.0;   // world height of maximum fog density
 const HAZE_DENSITY: f32 = 0.00009;  // constant aerial-perspective haze
 
+// Cloudiness at which the sky counts as fully overcast for lighting purposes.
+// Cover beyond this adds no further occlusion — see getFogScatterColor().
+const OVERCAST_FULL: f32 = 0.95;
+
 fn heightFogOpticalDepth(org: vec3f, dir: vec3f, dist: f32) -> f32 {
     let scaleHeight = mix(15.0, 50.0, object.foginess);
     let baseDensity = 0.01 * object.foginess * object.foginess;
@@ -138,6 +142,21 @@ fn fogTransmittance(org: vec3f, dir: vec3f, dist: f32) -> f32 {
 }
 
 /**
+ * Per-channel climate tint. temperature 0.5 is neutral, 1 = hot (warm yellow
+ * cast), 0 = cold (cool blue cast). Mirrored on the CPU in SkyRenderer.update()
+ * for the directional light — change both together.
+ */
+fn climateTint(temperature: f32) -> vec3f {
+    let warm = max(temperature - 0.5, 0.0) * 2.0;
+    let cool = max(0.5 - temperature, 0.0) * 2.0;
+    return vec3f(
+        1.0 + 0.35 * warm - 0.04 * cool,
+        1.0 + 0.085 * warm - 0.01 * cool,
+        1.0 - 0.2 * warm + 0.1 * cool
+    );
+}
+
+/**
  * Fully fog-saturated colour for a given view/sun direction: what an infinitely
  * thick wall of fog looks like. Callers blend toward the background colour with
  * fogTransmittance() — or use it directly as an alpha-blended overlay.
@@ -151,9 +170,15 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     let foginess = object.foginess;
 
     // Cloud occlusion: clouds block sunlight from reaching the lower atmosphere.
-    // At 0% cloudiness = full sun, at 100% = only ~5% of sunlight penetrates.
-    // Uses a squared curve so light clouds have modest effect, heavy clouds are dramatic.
-    let cloudOcclusion = mix(1.0, 0.05, pow(object.cloudiness, 2.0));
+    // At 0% cloudiness = full sun. Squared curve, so light clouds have a modest
+    // effect and heavy clouds are dramatic.
+    //
+    // The drive plateaus at OVERCAST_FULL. The squared curve is still steepening
+    // at the top, so without the clamp the last 10% of cloudiness dropped fog
+    // brightness ~4x (0.24 → 0.06) and full overcast went almost black. Real
+    // overcast reads flat and grey, not dark — so total cover lights the fog the
+    // same as heavy cover.
+    let cloudOcclusion = mix(1.0, 0.05, pow(min(object.cloudiness, OVERCAST_FULL), 2.0));
 
     // Combined sun strength: elevation + cloud cover
     let effectiveSunStrength = sunVisibility * cloudOcclusion;
@@ -173,6 +198,15 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     let overcastFactor_fog    = smoothstep(0.8, 0.9, object.cloudiness) * overcastDayFactor_fog;
     fogColor = mix(fogColor, vec3f(0.73, 0.73, 0.73), overcastFactor_fog);
 
+    // Extreme overcast (0.9→1.0): desaturate toward luminance so the storm tint's
+    // khaki cast reads as neutral grey. Unlike the W1.3 blend above this isn't
+    // gated by sun elevation — a maxed-out sky is colourless at any hour — and it
+    // preserves brightness (night stays dark, day stays bright) by pulling toward
+    // the fog's own luminance rather than a fixed grey.
+    let neutralSwing = smoothstep(0.9, 1.0, object.cloudiness);
+    let fogLuma = dot(fogColor, vec3f(0.2126, 0.7152, 0.0722));
+    fogColor = mix(fogColor, vec3f(fogLuma), neutralSwing);
+
     // Fog brightness: scales with both sun elevation and cloud cover.
     // Overcast skies produce dimmer, flatter fog even during daylight.
     let fogBrightness = mix(0.01, 1.0, effectiveSunStrength);
@@ -183,7 +217,12 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     // sun beam that drives forward scattering in the fog layer.
     let sunScatter = effectiveSunStrength * fogPhase * 0.1 * LOW_SCATTER * SUN_POWER;
 
-    return sunScatter + 10.0 * fogColor;
+    // Climate tint fades out under extreme overcast: a maxed-out sky is neutral
+    // grey regardless of season, so cancel the warm/cool cast over the same
+    // 0.9→1.0 bracket that desaturates fogColor above. Without this the tint
+    // re-applies the hue after the desaturation and heavy cover still looks warm.
+    let tint = mix(climateTint(object.temperature), vec3f(1.0), neutralSwing);
+    return (sunScatter + 10.0 * fogColor) * tint;
 }
 
 fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3f ) -> vec3f {
@@ -205,11 +244,18 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     // Dusk/dawn transition occurs at sunDotUp ±0.1 (~6° above/below horizon).
     let dayFactor = smoothstep(-0.1, 0.1, sunDotUp);
 
-    // Overcast factor: 0 at clear sky, ramps to 1 at heavy overcast.
-    // Gated by day so the night sky is completely unaffected.
-    // Greying begins at 50% cloudiness for more natural overcast appearance.
+    // Overcast has two independent effects, deliberately timed differently:
+    //   greyFactor — desaturates the sky toward flat overcast grey. Ramps in
+    //     early and is fully grey by 0.9, so a heavily-clouded-but-not-total sky
+    //     (~0.8) reads as bright natural overcast rather than a dark sky.
+    //   darkFactor — dims the sky. Held back to the 0.9→1.0 bracket so only a
+    //     near-total overcast actually goes dark. (Previously both shared one
+    //     0.7→0.95 ramp, so 0.8 was ~35% dimmed and looked unnaturally dark.)
+    // Both gated by day so the night sky is unaffected.
     let overcastDayFactor = smoothstep(-0.05, 0.15, sunDotUp);
-    let overcastFactor    = smoothstep(0.7, 0.95, object.cloudiness) * overcastDayFactor;
+    let greyFactor        = smoothstep(0.5, 0.9, object.cloudiness) * overcastDayFactor;
+    let darkFactor        = smoothstep(0.9, 1.0, object.cloudiness) * overcastDayFactor;
+    let overcastFactor    = greyFactor;
 
     // Sun proximity gradient: bright near the sun, dark away from it.
     // Soften the sun halo edge under cloud cover (sharp clear-sky halo → diffuse glow).
@@ -245,7 +291,7 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     // Sky brightness: dimmer at sunset, full brightness at noon.
     // W1.4: dim the sun contribution through clouds (0.15 at full overcast).
     let skyBrightness = mix(2.0, 6.0, smoothstep(0.0, 0.3, sunDotUp));
-    let sunDim = mix(1.0, 0.15, overcastFactor);
+    let sunDim = mix(1.0, 0.3, darkFactor);
 
     // Altitude-based atmosphere thinning:
     // As the camera rises above the cloud layer the atmosphere gradually thins toward

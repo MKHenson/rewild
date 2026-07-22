@@ -18,6 +18,7 @@ const finalUniformBufferSize =
   16 + // cameraPosition
   4 + // padding
   4 + // foginess
+  4 + // temperature
   4 + // lightningFlash
   0;
 
@@ -214,6 +215,7 @@ export class SkyCompositePass implements IPostProcess {
         camera.transform.position.z,
         0,
         renderer.sky.skyRenderer.foginess,
+        renderer.sky.skyRenderer.temperature,
         renderer.sky.skyRenderer.lightningFlash,
       ],
       32

@@ -111,6 +111,7 @@ const HEIGHT_SCALE = 0.022;
 // Base specular exponent (gloss). Matte ground sits below it, hard/wet surfaces
 // (rock, marble, snow crust) above — see each material's shininess.
 const SHININESS = 32;
+const SPECULAR = 1;
 
 // Default transition width — the hard, interlocking edge the height-aware blend
 // was built for, and what a material without its own `blendDepth` gets.
@@ -136,7 +137,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     macroNormalUrl: 'terrain/forest-ground-01/forrest_ground_01_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    specular: 0.3,
+    specular: SPECULAR * 0.3,
     shininess: SHININESS * 0.5, // matte grass/soil
     // Pairs with forest_leaves_02 under a noise selector — litter scattered
     // over soil, which should intermingle rather than meet along an edge.
@@ -158,7 +159,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
       'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_normal.png',
     uvScale: DETAIL_UV_SCALE,
     macroUvScale: MACRO_UV_SCALE,
-    specular: 0.18,
+    specular: SPECULAR * 0.18,
     shininess: SHININESS * 0.75,
     // TexturesCom, not Poly Haven — this one is a guess. If coastal ground
     // alone reads inset while the others look right, flip it to 'directx'.
@@ -178,7 +179,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     uvScale: DETAIL_UV_SCALE,
     macroNormalUrl: ROCK_NORMAL_URL,
     macroUvScale: MACRO_UV_SCALE,
-    specular: 0.4,
+    specular: SPECULAR * 0.4,
     shininess: SHININESS * 1.5,
     normalConvention: 'opengl', // Poly Haven
   },
@@ -192,7 +193,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     macroUvScale: MACRO_UV_SCALE,
     heightScale: HEIGHT_SCALE * 0.5,
     uvScale: DETAIL_UV_SCALE,
-    specular: 0.55,
+    specular: SPECULAR * 0.55,
     shininess: SHININESS * 2,
     normalConvention: 'opengl', // Poly Haven
   },
@@ -206,7 +207,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     macroNormalUrl: 'terrain/rocky-terrain/rocky_terrain_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    specular: 0.3,
+    specular: SPECULAR * 0.3,
     shininess: SHININESS * 1.5,
     normalConvention: 'opengl', // Poly Haven
   },
@@ -220,7 +221,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     macroNormalUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    specular: 0.2,
+    specular: SPECULAR * 0.2,
     shininess: SHININESS * 6,
     normalConvention: 'opengl', // Poly Haven
   },
@@ -234,7 +235,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     macroNormalUrl: 'terrain/marble-cliff-05/marble_cliff_05_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    specular: 0.2,
+    specular: SPECULAR * 0.2,
     shininess: SHININESS * 4.5, // polished marble — tightest glint
     normalConvention: 'opengl', // Poly Haven
   },
@@ -252,7 +253,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     macroNormalUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 5,
     uvScale: DETAIL_UV_SCALE,
-    specular: 0.4,
+    specular: SPECULAR * 0.4,
     blendDepth: BLEND_DEPTH_SOFT,
     shininess: SHININESS * 0.75, // dry and dusty — no glint to speak of
     normalConvention: 'opengl', // Poly Haven
@@ -274,7 +275,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     uvScale: DETAIL_UV_SCALE,
     // Dry sand is matte but not dead — a broad, low sheen down the sunlit flank
     // is most of what makes a dune read as a dune.
-    specular: 0.35,
+    specular: SPECULAR * 0.35,
     shininess: SHININESS * 0.5,
     blendDepth: BLEND_DEPTH_SOFT,
     normalConvention: 'opengl', // Poly Haven
@@ -289,7 +290,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     macroNormalUrl: 'terrain/forest-leaves-02/forest_leaves_02_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE,
     uvScale: DETAIL_UV_SCALE,
-    specular: 0.35,
+    specular: SPECULAR * 0.35,
     shininess: SHININESS * 0.5,
     // The soft half of the forest floor pair — see forest-ground-01.
     blendDepth: BLEND_DEPTH_SOFT,
