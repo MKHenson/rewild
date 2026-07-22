@@ -102,8 +102,14 @@ export class ShadowUniforms implements ISharedUniformBuffer {
         { binding: 1, resource: renderer.samplerManager.get('linear-clamped') },
         { binding: 2, resource: { buffer: this.cloudBuffer } },
         // Shadow atlas — directional cascades + spot quadrant (bindings 3–5)
-        { binding: 3, resource: shadowAtlas.createView({ aspect: 'depth-only' }) },
-        { binding: 4, resource: renderer.samplerManager.get('depth-comparison') },
+        {
+          binding: 3,
+          resource: shadowAtlas.createView({ aspect: 'depth-only' }),
+        },
+        {
+          binding: 4,
+          resource: renderer.samplerManager.get('depth-comparison'),
+        },
         { binding: 5, resource: { buffer: this.directionalBuffer } },
         // Spot light shadow params (binding 6)
         { binding: 6, resource: { buffer: this.spotBuffer } },
@@ -111,9 +117,19 @@ export class ShadowUniforms implements ISharedUniformBuffer {
     });
   }
 
-  prepare(renderer: Renderer, camera: Camera, _meshes: IVisualComponent[]): void {
+  prepare(
+    renderer: Renderer,
+    camera: Camera,
+    _meshes: IVisualComponent[]
+  ): void {
     const { device } = renderer;
-    if (!this.cloudBuffer || !this.directionalBuffer || !this.spotBuffer || !this.bindGroup) return;
+    if (
+      !this.cloudBuffer ||
+      !this.directionalBuffer ||
+      !this.spotBuffer ||
+      !this.bindGroup
+    )
+      return;
 
     // --- Cloud shadow ---
     const shadowRenderer = renderer.sky?.skyRenderer?.cloudShadowRenderer;
@@ -122,7 +138,7 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       this.cloudData[16] = shadowRenderer.config.worldSize;
       this.cloudData[17] = camera.transform.position.x;
       this.cloudData[18] = camera.transform.position.z;
-      this.cloudData[19] = renderer.sky.skyRenderer.fogIntensity;
+      this.cloudData[19] = renderer.sky.skyRenderer.cloudShadowIntensity;
       device.queue.writeBuffer(this.cloudBuffer, 0, this.cloudData.buffer);
     }
 
@@ -132,10 +148,16 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       // lightMVPFromView[i] = lightVPs[i] * camera.matrixWorld
       // Transforms a view-space position into cascade i's light clip space.
       for (let i = 0; i < NUM_CASCADES; i++) {
-        _tempMat.multiplyMatrices(dirShadowRenderer.lightVPs[i], camera.transform.matrixWorld);
+        _tempMat.multiplyMatrices(
+          dirShadowRenderer.lightVPs[i],
+          camera.transform.matrixWorld
+        );
         this.directionalFloats.set(_tempMat.elements, i * 16);
       }
-      this.directionalFloats.set(dirShadowRenderer.cascadeSplitDistances, NUM_CASCADES * 16);
+      this.directionalFloats.set(
+        dirShadowRenderer.cascadeSplitDistances,
+        NUM_CASCADES * 16
+      );
       // debugMode is at byte offset 208 (float index 52 = u32 index 52).
       this.directionalInts[52] = dirShadowRenderer.debugMode ? 1 : 0;
       device.queue.writeBuffer(this.directionalBuffer, 0, this.directionalData);
@@ -150,10 +172,16 @@ export class ShadowUniforms implements ISharedUniformBuffer {
     // rendered — and writing -1 into the u32 index then made the shader read a
     // zeroed light slot. Treat "not packed" as "no spot shadow".
     const spotRenderer = renderer.spotLightShadowRenderer;
-    if (spotRenderer?.hasSpotShadow && renderer.shadowCastingSpotLightIndex >= 0) {
+    if (
+      spotRenderer?.hasSpotShadow &&
+      renderer.shadowCastingSpotLightIndex >= 0
+    ) {
       // lightMVPFromView = lightVP * camera.matrixWorld
       // Transforms a view-space position into spot light clip space.
-      _tempMat.multiplyMatrices(spotRenderer.lightVP, camera.transform.matrixWorld);
+      _tempMat.multiplyMatrices(
+        spotRenderer.lightVP,
+        camera.transform.matrixWorld
+      );
       this.spotFloats.set(_tempMat.elements, 0);
       this.spotInts[16] = renderer.shadowCastingSpotLightIndex;
       this.spotInts[17] = 1; // hasSpotShadow = true

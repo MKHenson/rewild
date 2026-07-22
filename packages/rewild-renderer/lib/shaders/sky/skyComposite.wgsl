@@ -15,8 +15,6 @@ struct FinalUniformStruct {
     cameraPosition: vec3f,
     padding0: f32,
     foginess: f32,
-    shadowWorldSize: f32,
-    shadowIntensity: f32,
     lightningFlash: f32,
 };
 
@@ -33,12 +31,9 @@ var cloudsSampler: sampler;
 var depthTexture: texture_depth_2d;
 
 @group(0) @binding(4)
-var cloudShadowMap: texture_2d<f32>;
-
-@group(0) @binding(5)
 var godRaysTexture: texture_2d<f32>;
 
-@group(0) @binding(6)
+@group(0) @binding(5)
 var bloomHighlights: texture_2d<f32>;
 
 var<private> sunDotUp: f32;

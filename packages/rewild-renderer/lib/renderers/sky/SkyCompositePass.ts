@@ -18,8 +18,6 @@ const finalUniformBufferSize =
   16 + // cameraPosition
   4 + // padding
   4 + // foginess
-  4 + // shadowWorldSize
-  4 + // shadowIntensity
   4 + // lightningFlash
   0;
 
@@ -40,7 +38,6 @@ export class SkyCompositePass implements IPostProcess {
   scaleFactor: number;
   atmosphereTexture: GPUTexture | null;
   cloudsTexture: GPUTexture | null;
-  cloudShadowMap: GPUTexture | null;
   godRaysTexture: GPUTexture | null;
   bloomTexture: GPUTexture | null;
 
@@ -56,7 +53,6 @@ export class SkyCompositePass implements IPostProcess {
     this.scaleFactor = 1;
     this.atmosphereTexture = null;
     this.cloudsTexture = null;
-    this.cloudShadowMap = null;
     this.godRaysTexture = null;
     this.bloomTexture = null;
   }
@@ -169,8 +165,8 @@ export class SkyCompositePass implements IPostProcess {
         { binding: 1, resource: { buffer: this.uniformBuffer } },
         { binding: 2, resource: renderer.samplerManager.get('linear-clamped') },
         { binding: 3, resource: renderer.depthTexture.createView() },
-        { binding: 5, resource: this.godRaysTexture!.createView() },
-        { binding: 6, resource: this.bloomTexture!.createView() },
+        { binding: 4, resource: this.godRaysTexture!.createView() },
+        { binding: 5, resource: this.bloomTexture!.createView() },
       ],
     });
 
@@ -218,8 +214,6 @@ export class SkyCompositePass implements IPostProcess {
         camera.transform.position.z,
         0,
         renderer.sky.skyRenderer.foginess,
-        renderer.sky.skyRenderer.cloudShadowRenderer.config.worldSize,
-        renderer.sky.skyRenderer.fogShadowIntensity,
         renderer.sky.skyRenderer.lightningFlash,
       ],
       32
