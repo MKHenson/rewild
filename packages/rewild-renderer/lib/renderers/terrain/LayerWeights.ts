@@ -12,14 +12,19 @@ function bandCoverage(band: SelectorBand | undefined, value: number): number {
 }
 
 // A layer applies where all of its selectors do, so coverage is their product.
+// `noiseValue` is this layer's noise field at the sample, already resolved by
+// the caller (it needs a Perlin and world offsets this module has no business
+// knowing about); it is ignored unless the layer carries a noise selector.
 function layerCoverage(
   layer: BiomeLayer,
   height: number,
-  slopeDegrees: number
+  slopeDegrees: number,
+  noiseValue: number
 ): number {
   return (
     bandCoverage(layer.slope, slopeDegrees) *
-    bandCoverage(layer.height, height)
+    bandCoverage(layer.height, height) *
+    bandCoverage(layer.noise?.band, noiseValue)
   );
 }
 
@@ -33,6 +38,11 @@ function layerCoverage(
  * lets the layers beneath show through, and the base needs no selector of its
  * own — it is simply what is left.
  *
+ * `noiseValues[i]` is layer i's noise field at this sample, in 0..1 (see
+ * sampleLayerNoise); entries for layers without a noise selector are never
+ * read, so the caller need not fill them. Pass `null` when no layer in the
+ * biome uses one.
+ *
  * `out` is caller-owned and reused across samples (this runs once per texel);
  * it must be at least `biome.layers.length` long. Only indices
  * [0, layers.length) are written — the caller owns anything beyond that.
@@ -41,13 +51,20 @@ export function resolveLayerWeights(
   biome: BiomeParams,
   height: number,
   slopeDegrees: number,
+  noiseValues: Float64Array | null,
   out: Float64Array
 ): void {
   const layers = biome.layers;
   let remaining = 1;
 
   for (let i = layers.length - 1; i > 0; i--) {
-    const covered = layerCoverage(layers[i], height, slopeDegrees) * remaining;
+    const covered =
+      layerCoverage(
+        layers[i],
+        height,
+        slopeDegrees,
+        noiseValues ? noiseValues[i] : 0
+      ) * remaining;
     out[i] = covered;
     remaining -= covered;
   }

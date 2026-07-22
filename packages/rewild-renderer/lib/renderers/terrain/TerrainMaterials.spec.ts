@@ -1,4 +1,5 @@
 import {
+  BiomeLayer,
   ClimateConfig,
   DEFAULT_CLIMATE,
   MAX_SPLAT_LAYERS,
@@ -23,7 +24,7 @@ function climateOf(biomes: ClimateConfig['biomes']): ClimateConfig {
   };
 }
 
-function biome(name: string, layers: { material: string }[]) {
+function biome(name: string, layers: BiomeLayer[]) {
   return {
     name,
     heightScale: 10,
@@ -155,14 +156,19 @@ describe('getClimatePalette', () => {
   it('lists the default climate materials, base-first per biome', () => {
     expect(getClimatePalette(DEFAULT_CLIMATE)).toEqual([
       'forest-ground-01',
+      'forest_leaves_02',
       'aerial_rocks_01',
       'marble_cliff_05',
       'snow-02',
+      'sand_01',
+      'mud_cracked_dry_03',
     ]);
   });
 
-  it('fills the splat map exactly, with no room to spare', () => {
-    expect(getClimatePalette(DEFAULT_CLIMATE)).toHaveLength(MAX_SPLAT_LAYERS);
+  it('fits the splat map', () => {
+    expect(
+      getClimatePalette(DEFAULT_CLIMATE).length
+    ).toBeLessThanOrEqual(MAX_SPLAT_LAYERS);
   });
 
   it('gives a material shared by two biomes a single palette entry', () => {
@@ -205,11 +211,33 @@ describe('validateClimateLayers', () => {
     expect(() => validateClimateLayers(climate)).toThrow(/base layer/);
   });
 
-  // The library holds exactly MAX_SPLAT_LAYERS materials, so overflowing the
-  // palette needs one more distinct material than the splat map holds. Built
-  // from the whole library plus an extra registered material, so it overflows
-  // whatever the library size is — the message just has to name a count over
-  // MAX_SPLAT_LAYERS, not a hardcoded number the table can drift past.
+  // A selectorless layer above the base has coverage 1 everywhere, so it takes
+  // the entire remainder and every layer beneath it resolves to 0 — the author
+  // sees one material where they wrote two. A valid splat comes out, so nothing
+  // downstream can catch it.
+  it('rejects a selectorless layer above the base', () => {
+    const climate = climateOf([
+      biome('a', [{ material: 'snow-02' }, { material: 'marble_cliff_05' }]),
+    ]);
+    expect(() => validateClimateLayers(climate)).toThrow(/no selectors/);
+  });
+
+  it('accepts a layer selected by noise alone', () => {
+    const climate = climateOf([
+      biome('a', [
+        { material: 'snow-02' },
+        {
+          material: 'marble_cliff_05',
+          noise: { scale: 20, seedSalt: 1, band: { from: 0.4, to: 0.6 } },
+        },
+      ]),
+    ]);
+    expect(() => validateClimateLayers(climate)).not.toThrow();
+  });
+
+  // Built from the whole library plus an extra registered material, so it
+  // overflows whatever the library size is — the message just has to name the
+  // splat's capacity, not a material count the table can drift past.
   it('rejects a climate needing more materials than the splat map holds', () => {
     TERRAIN_MATERIALS['test-extra'] = {
       name: 'test-extra',
@@ -228,11 +256,15 @@ describe('validateClimateLayers', () => {
       const climate = climateOf([
         biome(
           'a',
-          Object.keys(TERRAIN_MATERIALS).map((material) => ({ material }))
+          // Every layer past the base needs a selector, or the selectorless
+          // check fires first and this stops testing overflow.
+          Object.keys(TERRAIN_MATERIALS).map((material, i) =>
+            i === 0 ? { material } : { material, slope: { from: 0, to: 10 } }
+          )
         ),
       ]);
       expect(() => validateClimateLayers(climate)).toThrow(
-        /but the splat map holds 4/
+        new RegExp(`but the splat map holds ${MAX_SPLAT_LAYERS}`)
       );
     } finally {
       delete TERRAIN_MATERIALS['test-extra'];

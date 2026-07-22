@@ -263,6 +263,7 @@ export class LODMesh {
         const uniforms = terrainPass.terrainUniforms;
         uniforms.splatSampler = renderer.samplerManager.get('linear-clamped');
         uniforms.splatTexture = this.chunk.splatTexture!.gpuTexture;
+        uniforms.splatTextureExt = this.chunk.splatTextureExt!.gpuTexture;
         uniforms.albedoView = renderer.textureManager
           .get(TERRAIN_ALBEDO_ARRAY)
           .gpuTexture.createView({ dimension: '2d-array' });

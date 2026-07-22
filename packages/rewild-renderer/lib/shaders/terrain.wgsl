@@ -29,6 +29,12 @@ struct TerrainLayer {
   heightScale : f32,
   // Blinn-Phong specular exponent (gloss). Higher ⇒ tighter, sharper highlight.
   shininess   : f32,
+  // Width of this material's transition to its neighbours, in blend-score
+  // units. Small ⇒ a hard interlocking edge where per-texel relief decides
+  // every fragment; large ⇒ the splat weight carries a soft crossfade. Read
+  // from the *winning* layer, so it is that material's own answer to "how do I
+  // meet my neighbours".
+  blendDepth  : f32,
 }
 
 struct TerrainParams {
@@ -46,15 +52,15 @@ struct TerrainParams {
   // (just the tallest material shows), large ⇒ softens toward a plain crossfade.
   heightBlendDepth: f32,
   _pad            : f32,
-  // Packed TerrainLayer, two vec4f per splat channel:
+  // Packed TerrainLayer, two vec4f per splat channel (SPLAT_SLOTS channels):
   //   [slot*2    ] = (layerIndex, uvScale, macroUvScale, specular)
-  //   [slot*2 + 1] = (normalYSign, heightScale, shininess, unused)
+  //   [slot*2 + 1] = (normalYSign, heightScale, shininess, blendDepth)
   // vec4f rather than array<TerrainLayer, N> because a uniform array's element
   // stride must be a multiple of 16 — a vec4f guarantees that, whereas a struct
   // depends on alignment rules that are easy to get subtly wrong. The spare
   // lanes in the second vec4 are where the next per-layer parameter goes.
   // Unpack through getLayer().
-  layers          : array<vec4f, 8>,
+  layers          : array<vec4f, 16>,
 }
 
 struct VertexInput {
@@ -80,6 +86,11 @@ struct VertexOutput {
 @group(1) @binding(6) var<uniform> phongParams: TerrainParams;
 @group(1) @binding(7) var roughnessArray: texture_2d_array<f32>;
 @group(1) @binding(8) var heightArray: texture_2d_array<f32>;
+// Palette channels 4-7. A second texture rather than more channels, because an
+// RGBA8 texel holds four weights and that is the format the splat is authored
+// and uploaded in; `splatMap` carries channels 0-3. Same dimensions, same
+// sampler, same UV — the pair is one logical map.
+@group(1) @binding(9) var splatMapExt: texture_2d<f32>;
 @group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
@@ -116,10 +127,16 @@ const POM_REFINE_STEPS: i32 = 6;
 // that fading depth by orientation does.
 const POM_MIN_VIEW_Z: f32 = 0.6;
 
+// Splat channels the palette can address, across the two splat textures. Must
+// match MAX_SPLAT_LAYERS (Biomes.ts) and the `layers` array above (2 vec4f
+// each). Raising it costs nothing per fragment beyond the extra weight compares:
+// every channel below WEIGHT_EPSILON skips its whole sample block.
+const SPLAT_SLOTS: u32 = 8u;
+
 fn getLayer(slot: u32) -> TerrainLayer {
   let a = phongParams.layers[slot * 2u];
   let b = phongParams.layers[slot * 2u + 1u];
-  return TerrainLayer(a.x, a.y, a.z, a.w, b.x, b.y, b.z);
+  return TerrainLayer(a.x, a.y, a.z, a.w, b.x, b.y, b.z, b.w);
 }
 
 // Decodes a normal map sample from [0,1] to [-1,1] and resolves its green-
@@ -265,13 +282,19 @@ fn fs(
   let duvdx = dpdx(fragUV);
   let duvdy = dpdy(fragUV);
 
-  let weightsRaw = textureSample(splatMap, splatSampler, fragUV);
+  // Channels 0-3 and 4-7 of the palette, from the two splat textures.
+  let weightsRawLo = textureSample(splatMap, splatSampler, fragUV);
+  let weightsRawHi = textureSample(splatMapExt, splatSampler, fragUV);
 
-  // Quantising to 8 bits costs up to 1/255 per channel, and the palette may use
-  // fewer than four materials. Renormalise so the blend is always a true
-  // weighted average. (Linear filtering preserves the sum, so this covers it.)
-  let weightSum = weightsRaw.r + weightsRaw.g + weightsRaw.b + weightsRaw.a;
-  let weights = weightsRaw / max(weightSum, 1e-4);
+  // Quantising to 8 bits costs up to 1/255 per channel, and the palette usually
+  // uses fewer than SPLAT_SLOTS materials. Renormalise so the blend is always a
+  // true weighted average. (Linear filtering preserves the sum, so this covers
+  // it.) Both textures share the sum — the weights are one distribution split
+  // across two texels, not two distributions.
+  let weightSum = dot(weightsRawLo, vec4f(1.0)) + dot(weightsRawHi, vec4f(1.0));
+  let invWeightSum = 1.0 / max(weightSum, 1e-4);
+  let weightsLo = weightsRawLo * invWeightSum;
+  let weightsHi = weightsRawHi * invWeightSum;
 
   // Detail is deleted by mipping at distance anyway — fade it out deliberately
   // so what remains is the macro normal rather than mip-averaged grey.
@@ -328,16 +351,25 @@ fn fs(
   // compare every active layer's surface height at once, so the taller material
   // wins locally — rock peaks poking through grass along their own silhouette —
   // instead of the two crossfading uniformly across the transition.
-  var layerColors = array<vec3f, 4>();
-  var layerNormals = array<vec3f, 4>();
-  var layerSpecs = array<f32, 4>();
-  var layerShininess = array<f32, 4>();
+  var layerColors = array<vec3f, 8>();
+  var layerNormals = array<vec3f, 8>();
+  var layerSpecs = array<f32, 8>();
+  var layerShininess = array<f32, 8>();
   // Blend score per active layer; -1 marks a slot the splat did not select.
-  var layerScores = array<f32, 4>(-1.0, -1.0, -1.0, -1.0);
+  var layerScores = array<f32, 8>(
+    -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0
+  );
   var maxScore = -1.0;
+  var maxScoreSlot = 0u;
 
-  for (var layerSlot = 0u; layerSlot < 4u; layerSlot++) {
-    let weight = weights[layerSlot];
+  for (var layerSlot = 0u; layerSlot < SPLAT_SLOTS; layerSlot++) {
+    // Slots 0-3 live in the first splat texture, 4-7 in the second.
+    var weight = 0.0;
+    if (layerSlot < 4u) {
+      weight = weightsLo[layerSlot];
+    } else {
+      weight = weightsHi[layerSlot - 4u];
+    }
     if (weight < WEIGHT_EPSILON) {
       continue;
     }
@@ -466,22 +498,37 @@ fn fs(
     // and height only decides who wins in the overlap.
     let score = weight + (layerHeight - 0.5);
     layerScores[layerSlot] = score;
-    maxScore = max(maxScore, score);
+    // Track *which* layer wins, not just the score: the transition width is a
+    // property of the winning material, so stone can keep its hard interlocking
+    // edge in the same frame that leaf litter fades softly into soil.
+    if (score > maxScore) {
+      maxScore = score;
+      maxScoreSlot = layerSlot;
+    }
   }
 
-  // Height-aware combine (Mishkinis): only layers within heightBlendDepth of the
-  // winning score contribute, weighted by how far above the cutoff they stand.
-  // The top layer clears the cutoff by heightBlendDepth, so blendWeightSum is
+  // Height-aware combine (Mishkinis): only layers within the winner's
+  // blendDepth of the winning score contribute, weighted by how far above the
+  // cutoff they stand.
+  //
+  // Taking the width from the winning material is what makes the same mechanism
+  // serve both jobs. The score gap between two equally-weighted layers is their
+  // surface-height difference, which spans roughly ±0.4 for typical maps — so a
+  // narrow depth (~0.2) lets relief pick a single winner per texel, cutting the
+  // hard interlocking silhouette rock wants, while a wide one (~0.7) leaves the
+  // splat weight in charge and crossfades, which is what litter and sand want.
+  //
+  // The top layer clears the cutoff by its own blendDepth, so blendWeightSum is
   // ≥ that whenever any layer is active — the guard below only catches the
   // all-skipped degenerate splat (which then falls back to a flat geometric
   // normal, exactly as the single-pass version did).
-  let cutoff = maxScore - phongParams.heightBlendDepth;
+  let cutoff = maxScore - getLayer(maxScoreSlot).blendDepth;
   var blendedColor = vec3f(0.0);
   var blendedTangentNormal = vec3f(0.0);
   var specFactor = 0.0;
   var blendedShininess = 0.0;
   var blendWeightSum = 0.0;
-  for (var layerSlot = 0u; layerSlot < 4u; layerSlot++) {
+  for (var layerSlot = 0u; layerSlot < SPLAT_SLOTS; layerSlot++) {
     let score = layerScores[layerSlot];
     if (score < 0.0) {
       continue;

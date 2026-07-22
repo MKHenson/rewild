@@ -19,13 +19,20 @@ const ROCK_SLOPE = MOUNTAIN.layers[ROCK].slope!;
 const GENTLE = SNOW_SLOPE.to - 10;
 const SHEER = Math.max(SNOW_SLOPE.from, ROCK_SLOPE.to) + 5;
 
+// `noise` is the value every noise-selecting layer sees; the tables under test
+// here select on slope and height, so it defaults to unused.
 function weightsFor(
   biome: BiomeParams,
   height: number,
-  slopeDegrees: number
+  slopeDegrees: number,
+  noise: number | null = null
 ): number[] {
   const out = new Float64Array(biome.layers.length);
-  resolveLayerWeights(biome, height, slopeDegrees, out);
+  const noiseValues =
+    noise === null
+      ? null
+      : new Float64Array(biome.layers.length).fill(noise);
+  resolveLayerWeights(biome, height, slopeDegrees, noiseValues, out);
   return Array.from(out);
 }
 
@@ -34,9 +41,13 @@ function sum(weights: number[]): number {
 }
 
 describe('resolveLayerWeights', () => {
+  // Its own biome rather than a table row: this is about the base case, and
+  // shipped biomes gain layers as they are tuned (PLAIN has leaf litter now).
+  const SOLO: BiomeParams = { ...PLAIN, layers: [{ material: 'only' }] };
+
   it('gives a single-layer biome all the weight', () => {
-    expect(weightsFor(PLAIN, 0, 0)).toEqual([1]);
-    expect(weightsFor(PLAIN, 500, 89)).toEqual([1]);
+    expect(weightsFor(SOLO, 0, 0)).toEqual([1]);
+    expect(weightsFor(SOLO, 500, 89)).toEqual([1]);
   });
 
   it('always sums to 1, across the whole height/slope domain', () => {
@@ -126,9 +137,87 @@ describe('resolveLayerWeights', () => {
     });
   });
 
+  // The reason validateClimateLayers rejects a selectorless layer above the
+  // base. This is what such a table actually resolves to: coverage 1 takes the
+  // whole remainder, so everything beneath it — base included — comes out 0.
+  // Pinned so the validator has a documented behaviour to be protecting against
+  // rather than an assertion nobody can check.
+  it('buries lower layers under a selectorless layer', () => {
+    const unconstrained = (materials: string[]): BiomeParams => ({
+      ...PLAIN,
+      layers: materials.map((material) => ({ material })),
+    });
+
+    expect(weightsFor(unconstrained(['a', 'b']), 50, 20)).toEqual([0, 1]);
+    expect(weightsFor(unconstrained(['a', 'b', 'c']), 50, 20)).toEqual([
+      0, 0, 1,
+    ]);
+  });
+
+  describe('noise selectors', () => {
+    const mottled = (band: { from: number; to: number }): BiomeParams => ({
+      ...PLAIN,
+      layers: [
+        { material: 'base' },
+        {
+          material: 'patch',
+          noise: { scale: 20, seedSalt: 11, band },
+        },
+      ],
+    });
+
+    it('splits two materials by the noise value alone', () => {
+      const biome = mottled({ from: 0.45, to: 0.55 });
+      // Below the band the base keeps everything; above it the patch takes all.
+      expect(weightsFor(biome, 50, 20, 0.2)).toEqual([1, 0]);
+      expect(weightsFor(biome, 50, 20, 0.8)).toEqual([0, 1]);
+    });
+
+    it('ramps smoothly through the band rather than snapping', () => {
+      const biome = mottled({ from: 0.45, to: 0.55 });
+      const mid = weightsFor(biome, 50, 20, 0.5)[1];
+      expect(mid).toBeGreaterThan(0);
+      expect(mid).toBeLessThan(1);
+      // Symmetric band, so the midpoint is an even mix.
+      expect(mid).toBeCloseTo(0.5, 5);
+    });
+
+    // Inverting the band selects the other side of the same field, which is how
+    // two layers share one noise field and interlock instead of overlapping.
+    it('inverts with the band, selecting the opposite side of the field', () => {
+      const normal = mottled({ from: 0.45, to: 0.55 });
+      const inverted = mottled({ from: 0.55, to: 0.45 });
+      expect(weightsFor(normal, 50, 20, 0.8)[1]).toBe(1);
+      expect(weightsFor(inverted, 50, 20, 0.8)[1]).toBe(0);
+      expect(weightsFor(inverted, 50, 20, 0.2)[1]).toBe(1);
+    });
+
+    // Selectors multiply, so a noise selector narrows a slope/height layer
+    // rather than replacing it — the patches only appear where both agree.
+    it('multiplies with the layer other selectors', () => {
+      const biome: BiomeParams = {
+        ...PLAIN,
+        layers: [
+          { material: 'base' },
+          {
+            material: 'patch',
+            slope: { from: 10, to: 20 },
+            noise: { scale: 20, seedSalt: 11, band: { from: 0.45, to: 0.55 } },
+          },
+        ],
+      };
+      // Noise says yes, slope says no.
+      expect(weightsFor(biome, 50, 0, 0.8)).toEqual([1, 0]);
+      // Slope says yes, noise says no.
+      expect(weightsFor(biome, 50, 30, 0.2)).toEqual([1, 0]);
+      // Both agree.
+      expect(weightsFor(biome, 50, 30, 0.8)).toEqual([0, 1]);
+    });
+  });
+
   it('leaves array entries beyond the biome layer count untouched', () => {
     const out = new Float64Array(4).fill(-1);
-    resolveLayerWeights(PLAIN, 0, 0, out);
+    resolveLayerWeights(SOLO, 0, 0, null, out);
     expect(out[0]).toBe(1);
     expect(out[1]).toBe(-1);
   });

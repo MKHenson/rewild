@@ -5,6 +5,7 @@ import { TextureProperties } from '../../textures/Texture';
 import { TerrainLayerParams } from '../../materials/uniforms/TerrainUniforms';
 import { ClimateConfig, getClimatePalette } from './Biomes';
 import {
+  BLEND_DEPTH,
   TERRAIN_MATERIALS,
   getTerrainMaterial,
   getTerrainMaterialLayer,
@@ -92,6 +93,7 @@ export function getClimateLayerParams(
       heightScale: material.heightScale,
       specular: material.specular,
       shininess: material.shininess,
+      blendDepth: material.blendDepth ?? BLEND_DEPTH,
       // Our tangent frame's Y runs down the image, matching DirectX; an OpenGL
       // map's green points the other way and has to be inverted.
       normalYSign: material.normalConvention === 'opengl' ? -1 : 1,
