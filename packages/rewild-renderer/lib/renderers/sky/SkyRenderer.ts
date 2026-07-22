@@ -56,8 +56,7 @@ export class SkyRenderer {
   azimuth: f32;
   cloudiness: f32;
   foginess: f32;
-  fogShadowIntensity: f32;
-  fogIntensity: f32;
+  cloudShadowIntensity: f32;
   windiness: f32;
   upDot: f32;
   sun: DirectionLight;
@@ -105,8 +104,7 @@ export class SkyRenderer {
     this.elevation = -0;
     this.cloudiness = 0.7;
     this.foginess = 0.3;
-    this.fogShadowIntensity = 0.31;
-    this.fogIntensity = 0.5;
+    this.cloudShadowIntensity = 0.4;
     this.windiness = 0.5;
     this.upDot = 0.0;
     this.sun = new DirectionLight();
@@ -199,7 +197,6 @@ export class SkyRenderer {
     // Bloom then sources from the full composite so stars and atmospheric glow contribute.
     this.finalPass.atmosphereTexture = this.atmospherePass.renderTarget;
     this.finalPass.cloudsTexture = this.bilateralPass.renderTarget;
-    this.finalPass.cloudShadowMap = this.cloudShadowRenderer.shadowMap;
     this.finalPass.godRaysTexture = this.godRaysPass.renderTarget;
     this.finalPass.initBlend(renderer);
 
