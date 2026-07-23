@@ -18,6 +18,33 @@
 const NUM_CLOUD_SAMPLES = 80;
 const NUM_LIGHT_SAMPLES = 25;
 
+// The view march stops once this little light is still getting through — a pure
+// perf cut-off, since the remaining contribution is negligible. It is *not* a
+// statement that the cloud is 5% transparent, so the final opacity is rescaled
+// against it (see the alpha computation in skyRay).
+const CLOUD_TRANSMITTANCE_FLOOR: f32 = 0.05;
+
+// How far the depth gate is pulled back from terrain silhouettes, in cloud texels.
+//
+// INVARIANT: this must exceed the filter radius of every consumer that reads this
+// texture without a validity test of its own, or that consumer averages in the
+// vec4f(0) the gate leaves behind and draws a dark outline along every ridge.
+// Current consumers, converted to cloud texels (clouds run at 0.7x canvas):
+//
+//   skyBilateral   +/-4   (9x9 at cloud resolution; effective sigma is ~2)
+//   skyBlend       +/-1   (bilinear footprint of the 0.7x -> 1.0x upsample)
+//   skyBloom       +/-21  (15 texels at BLOOM_SCALE 0.5) -- exceeds this margin, so
+//                         it carries its own coverage weighting and must keep it
+//   cloudsTemporal unbounded (reprojection drifts with camera rotation) -- likewise
+//                         validity-checked in sampleHistoryValid()
+//
+// Note the probes below are axis-aligned only, so erosion along a diagonal is
+// roughly this value over sqrt(2). Budget accordingly.
+//
+// Raising this is cheap insurance: it costs a thin band of extra marching along
+// silhouettes, which is far less than per-tap depth loads in a full-screen filter.
+const GATE_EROSION_TEXELS: f32 = 6.0;
+
 // ──────────────────────────────────────────────
 // Group 0: standard cloud shader bindings
 // (identical to clouds.wgsl so the same SkyRenderer uniform buffer is reused)
@@ -56,8 +83,10 @@ struct TemporalUniforms {
 @group(1) @binding(0)
 var historyTexture: texture_2d<f32>;
 
-@group(1) @binding(1)
-var historySampler: sampler;
+// Binding 1 was a linear sampler for the history texture. History is now fetched
+// with textureLoad through sampleHistoryValid(), which does its own filtering so it
+// can reject texels the previous frame depth-gated; a hardware linear fetch cannot
+// be told to skip them. The binding is left vacant rather than renumbered.
 
 @group(1) @binding(2)
 var<uniform> temporal: TemporalUniforms;
@@ -243,14 +272,14 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
             radiance *= density;
             color += transmittance * (radiance - radiance * exp(-density * stepS)) / density;
             transmittance *= exp(-density * stepS);
-            if (transmittance <= 0.05) { break; }
+            if (transmittance <= CLOUD_TRANSMITTANCE_FLOOR) { break; }
         }
 
         rayStartPosition += dir * stepS;
     }
 
     // Cirrus: blend high-altitude ice layer using remaining transmittance.
-    if (transmittance > 0.05 && object.cirrusOpacity > 0.0) {
+    if (transmittance > CLOUD_TRANSMITTANCE_FLOOR && object.cirrusOpacity > 0.0) {
         let cir = cirrusRaySample(cameraPos, dir, sun_direction);
         if (cir.a > 0.0) {
             color += transmittance * cir.rgb * cir.a;
@@ -273,7 +302,16 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     color += vec3f(sunDisc) * pow(transmittance, 2.0);
 
     let sunAlpha = smoothstep(alphaEdge, 1.0, mu) * sunExtinction;
-    let alpha = max(1.0 - transmittance, sunAlpha);
+
+    // Rescale against the march's cut-off so a fully-marched cloud reaches true
+    // opacity. Raw 1 - transmittance topped out at 0.95, leaving even solid overcast
+    // 5% transparent. That is invisible against sky, but stars run to hundreds of HDR
+    // and skyBlend caps the sky it composites at 60, so the leak was a fixed ~3 HDR —
+    // about three times a night cloud's own ambient radiance, which is why stars read
+    // as shining straight through the deck. Dividing keeps the ramp smooth rather
+    // than clamping at a hard edge.
+    let cloudOpacity = saturate((1.0 - transmittance) / (1.0 - CLOUD_TRANSMITTANCE_FLOOR));
+    let alpha = max(cloudOpacity, sunAlpha);
     return vec4f(color, alpha);
 }
 
@@ -290,7 +328,18 @@ fn drawCloudsHorizonFog(dir: vec3f, org: vec3f, vSunDirection: vec3f) -> vec4f {
     }
 
     let fogDistance = intersectSphere(org, dir, earthCenter, ATM_START_DCS);
-    let cloudAlpha = min(fogTransmittance(org, dir, fogDistance), color.a);
+
+    // Coverage is the cloud's own opacity. Fog between the camera and the cloud layer
+    // changes the cloud's *colour*, which getFogColor below already does — it must not
+    // reduce how much of the background the cloud hides.
+    //
+    // This used to be min(fogTransmittance, color.a), which mixes a transmittance
+    // (1 = clear air) with an opacity, so the two run in opposite directions. Near the
+    // horizon a ray only reaches the 500m cloud shell after ~79km of atmosphere, so
+    // even at foginess = 0 transmittance is ~0.21 — and cloud alpha was being clamped
+    // to 0.21 with it. The dark cloud colour still looked dark over a dark night sky,
+    // which hid the problem, but ~79% of the starfield came through solid overcast.
+    let cloudAlpha = color.a;
     return vec4f(getFogColor(dir, org, vSunDirection, color.rgb), cloudAlpha);
 }
 
@@ -304,6 +353,54 @@ fn drawCloudsHorizonFogLowQuality(dir: vec3f, org: vec3f, vSunDirection: vec3f) 
     let result = drawCloudsHorizonFog(dir, org, vSunDirection);
     currentFragCoord = savedFragCoord;
     return result;
+}
+
+struct HistorySample {
+    color: vec4f,
+    valid: bool,
+};
+
+// History holds vec4f(0) wherever the previous frame depth-gated, so a linear fetch
+// interpolates those zeros into neighbouring sky pixels — the same failure the
+// upsample in skyBlend.wgsl had, moved into the temporal domain. Because only one
+// checkerboard group reprojects per frame, the contamination lands on part of a
+// silhouette at a time and reads as a *dashed* outline rather than a solid one.
+// Gather the four texels and renormalise over the valid ones.
+//
+// Validity is tested against the current depth buffer rather than the previous
+// frame's, which is not kept. Silhouettes move slowly relative to frame rate so it
+// is a close stand-in, and erring toward rejection only costs a fresh march.
+fn sampleHistoryValid(uv: vec2f) -> HistorySample {
+    let dims  = vec2f(textureDimensions(historyTexture));
+    let coord = uv * dims - 0.5;
+    let base  = floor(coord);
+    let frac  = coord - base;
+    let maxT  = vec2i(dims) - 1;
+
+    var acc  = vec4f(0.0);
+    var wsum = 0.0;
+
+    for (var j = 0; j < 2; j++) {
+        for (var i = 0; i < 2; i++) {
+            let texel   = clamp(vec2i(base) + vec2i(i, j), vec2i(0), maxT);
+            let texelUV = (vec2f(texel) + 0.5) / dims;
+            let wx      = select(1.0 - frac.x, frac.x, i == 1);
+            let wy      = select(1.0 - frac.y, frac.y, j == 1);
+
+            // textureSampleCompareLevel, not textureSampleCompare: this runs under
+            // non-uniform control flow and must not need implicit derivatives.
+            let sky = textureSampleCompareLevel(depthTexture, depthSampler, texelUV, 1.0);
+            let w   = wx * wy * select(0.0, 1.0, sky >= 1.0);
+
+            acc  += w * textureLoad(historyTexture, texel, 0);
+            wsum += w;
+        }
+    }
+
+    var out: HistorySample;
+    out.valid = wsum > 0.0;
+    out.color = select(vec4f(0.0), acc / max(wsum, 1e-6), out.valid);
+    return out;
 }
 
 // ──────────────────────────────────────────────
@@ -338,8 +435,33 @@ fn fs(
     // ── Depth / hemisphere gates (same as standard clouds.wgsl) ──
 
     if (camHeight < (EARTH_RADIUS + CLOUD_START)) {
-        let rawDepth = textureSampleCompare(depthTexture, depthSampler, currentUV, 1);
-        if (rawDepth < 1.0) {
+        // Skip the march only where the surrounding neighbourhood is terrain too.
+        //
+        // This gate is a pure optimisation: the texels it skips sit behind terrain
+        // and skyComposite discards them via its own depth test. But it writes
+        // vec4f(0), and every consumer of this texture *filters* it — the bilateral,
+        // skyBlend's 0.7x upsample, bloom's Gaussian, the temporal reprojection —
+        // reading texels around the one being produced. textureSampleCompare is
+        // PCF-filtered, so gating on it alone also eats a texel or two of genuine sky
+        // past the silhouette. Between the two, pixels near a ridge had no valid
+        // cloud data within reach and resolved toward black: a dark outline tracing
+        // the terrain that no amount of validity-aware filtering downstream could
+        // repair, because the data was never marched in the first place.
+        //
+        // Taking the max means one fully-sky tap is enough to keep marching, so the
+        // dead zone erodes back from every silhouette by GATE_EROSION_TEXELS.
+        let gateOffset = GATE_EROSION_TEXELS / cloudResolution;
+        var neighbourhoodSky = textureSampleCompare(depthTexture, depthSampler, currentUV, 1);
+        neighbourhoodSky = max(neighbourhoodSky,
+            textureSampleCompare(depthTexture, depthSampler, currentUV + vec2f(gateOffset.x, 0.0), 1));
+        neighbourhoodSky = max(neighbourhoodSky,
+            textureSampleCompare(depthTexture, depthSampler, currentUV - vec2f(gateOffset.x, 0.0), 1));
+        neighbourhoodSky = max(neighbourhoodSky,
+            textureSampleCompare(depthTexture, depthSampler, currentUV + vec2f(0.0, gateOffset.y), 1));
+        neighbourhoodSky = max(neighbourhoodSky,
+            textureSampleCompare(depthTexture, depthSampler, currentUV - vec2f(0.0, gateOffset.y), 1));
+
+        if (neighbourhoodSky < 1.0) {
             output.color = vec4f(0.0, 0.0, 0.0, 0.0);
             return output;
         }
@@ -382,13 +504,17 @@ fn fs(
             }
         }
 
+        var reprojected: HistorySample;
+        reprojected.valid = false;
         if (reprojectionValid) {
-            // textureSampleLevel (not textureSample) is required here because
-            // control flow is non-uniform after the textureSampleCompare depth
-            // test above.  Mip level 0 is correct — history is single-mip.
-            pixelColor = textureSampleLevel(historyTexture, historySampler, prevUV, 0.0);
+            reprojected = sampleHistoryValid(prevUV);
+        }
+
+        if (reprojected.valid) {
+            pixelColor = reprojected.color;
         } else {
-            // Off-screen or behind-camera — low-quality fallback
+            // Off-screen, behind-camera, or reprojecting onto texels the previous
+            // frame gated away — nothing trustworthy to read, so march instead.
             pixelColor = drawCloudsHorizonFogLowQuality(direction, org, vSunDirection);
         }
     }
@@ -406,18 +532,20 @@ fn fs(
     //    history — use it directly.  Mixing it with stale currentUV history was
     //    the cause of the smearing artefact on camera movement.
 
-    // textureSampleLevel required (non-uniform control flow from depth test above).
-    let historyColor = textureSampleLevel(historyTexture, historySampler, currentUV, 0.0);
+    // Validity-aware, for the same reason as the reprojection above. blendFactor is
+    // low (~0.1-0.15), so history carries ~90% of the result here — a contaminated
+    // sample would drag an otherwise correct fresh march most of the way to black.
+    let historyColor = sampleHistoryValid(currentUV);
     var finalColor: vec4f;
 
-    if (temporal.historyValid == 0u) {
+    if (temporal.historyValid == 0u || !historyColor.valid) {
         finalColor = pixelColor;
     } else if (isThisPixelsTurn) {
         // Boost blend when clouds are animating so fresh raymarches converge faster,
         // preventing pixel-age differences from showing as static-camera smear.
         let windBoost = clamp(object.windiness * 2.0, 0.0, 0.4);
         let effectiveBlend = min(temporal.blendFactor + windBoost, 1.0);
-        finalColor = mix(historyColor, pixelColor, effectiveBlend);
+        finalColor = mix(historyColor.color, pixelColor, effectiveBlend);
     } else {
         finalColor = pixelColor;
     }

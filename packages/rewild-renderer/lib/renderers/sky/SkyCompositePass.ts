@@ -23,7 +23,14 @@ const finalUniformBufferSize =
   0;
 
 const alignedUniformBufferSize = Math.ceil(finalUniformBufferSize / 256) * 256;
-const BLEND_UNIFORM_SIZE = Math.ceil(8 / 256) * 256; // resolution vec2f
+const BLEND_UNIFORM_SIZE = Math.ceil(16 / 256) * 256; // resolution vec2f + cloudsGated + pad
+
+/** Mirrors CLOUD_START in shaders/sky/skyConstants.wgsl. Below this altitude the
+ *  cloud pass depth-gates, leaving vec4f(0) on terrain-occluded texels. */
+const CLOUD_START = 500.0;
+
+// Reused across frames — renderBlend runs every frame and must not allocate.
+const blendData = new Float32Array(BLEND_UNIFORM_SIZE / 4);
 
 const tempVec = new Vector3();
 const uniformData = new Float32Array(alignedUniformBufferSize / 4);
@@ -45,6 +52,10 @@ export class SkyCompositePass implements IPostProcess {
   cloudiness: number;
   elevation: number;
   azimuth: number;
+
+  /** Camera world Y, set by SkyRenderer each frame. Below CLOUD_START the cloud pass
+   *  depth-gates, and the blend must not interpolate across the texels it left empty. */
+  cameraAltitude: number = 0;
 
   private blendPipeline: GPURenderPipeline;
   private blendBindGroup: GPUBindGroup;
@@ -104,6 +115,7 @@ export class SkyCompositePass implements IPostProcess {
         { binding: 1, resource: this.cloudsTexture!.createView() },
         { binding: 2, resource: { buffer: this.blendUniformBuffer } },
         { binding: 3, resource: sampler },
+        { binding: 4, resource: renderer.depthTexture.createView() },
       ],
     });
   }
@@ -227,9 +239,11 @@ export class SkyCompositePass implements IPostProcess {
   renderBlend(renderer: Renderer): void {
     const { device, canvas } = renderer;
 
-    const blendData = new Float32Array(BLEND_UNIFORM_SIZE / 4);
     blendData[0] = canvas.width;
     blendData[1] = canvas.height;
+    // The cloud pass only depth-gates below the cloud layer; above it, clouds are
+    // marched full-screen and every texel is valid.
+    blendData[2] = this.cameraAltitude < CLOUD_START ? 1.0 : 0.0;
     device.queue.writeBuffer(this.blendUniformBuffer, 0, blendData.buffer);
 
     const encoder = device.createCommandEncoder();

@@ -43,6 +43,12 @@ const LUM_KNEE: f32 = 30.0;
 // rather than in 0..1 display space.
 const GOD_RAY_HDR_SCALE: f32 = 60.0;
 
+// How much sun still reaches a sample that lands on geometry. Zero gives the
+// strongest, crispest ridge shafts. Raise it toward ~0.25 if the half-resolution
+// depth mask ever shows as a hard edge along silhouettes; the compositor's
+// multi-tap fetch should make that unnecessary.
+const TERRAIN_TRANSMITTANCE: f32 = 0.0;
+
 const LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
 
 // Interleaved-gradient noise, rotated per frame. The previous static
@@ -89,9 +95,15 @@ fn fs(
         // Geometry occlusion. Depth is cleared to 1.0, so anything below that is
         // something the main pass drew — terrain, rocks, trees — and it blocks the
         // sun. This is what carves shafts out of a ridgeline at sunset.
+        //
+        // Occlusion is partial rather than binary, for two reasons. Physically, air
+        // *in front of* a ridge is still lit and still scatters toward the camera,
+        // and screen space cannot tell that from air behind it. Practically, a hard
+        // 0/1 step in this half-resolution buffer survives the compositor's bilinear
+        // upsample as a dark stroke tracing every silhouette.
         let texel = vec2<i32>(clamp(currentPos, vec2(0.0), vec2(1.0)) * depthDims);
         let sceneDepth = textureLoad(depthTexture, texel, 0);
-        let skyMask = select(0.0, 1.0, sceneDepth >= 1.0);
+        let skyMask = select(TERRAIN_TRANSMITTANCE, 1.0, sceneDepth >= 1.0);
 
         let c = textureSampleLevel(cloudTexture, linearSampler, currentPos, 0.0);
         let lum = dot(c.rgb, LUMA);

@@ -3,6 +3,12 @@ const FOG_COLOR_DAY = vec3f( 0.66, 0.66, 0.69 );
 const FOG_COLOR_NIGHT = vec3f( 0.03, 0.04, 0.08 );
 const FOG_COLOR_EVENING = vec3f( 0.32, 0.12, 0.0 ); //  vec3f( 0.75, 0.7, 0.5 );
 const FOG_COLOR_STORM = vec3f( 0.55, 0.57, 0.45 );
+
+// Sky-glow floor for fog with the sun below the horizon. Airglow, starlight and
+// scattered moonlight keep real night fog dark but never black — and the horizon has
+// to stay continuous with the night sky, which sits around 1 HDR here. Without this
+// the fog band quantised to pure black and read as a wall across the horizon.
+const FOG_NIGHT_AMBIENT = vec3f( 0.30, 0.38, 0.70 );
 // Ambient bounce onto clouds. EVENING is the golden-hour term: warm, because light
 // reaching a cloud at low sun has been reddened by a long atmospheric path. It used to
 // be all but identical to NIGHT — a cold blue-grey — which is why sunset decks read as

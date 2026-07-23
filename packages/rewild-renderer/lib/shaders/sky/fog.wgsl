@@ -239,7 +239,15 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     // grey regardless of season, so the cast is cancelled over the same 0.9→1.0
     // bracket that desaturates fogColor above. Without that the tint re-applies
     // the hue after the desaturation and heavy cover still looks warm.
-    return applyClimateTint(sunScatter + 10.0 * fogColor, object.temperature, neutralSwing);
+    // Night sky-glow. Added rather than folded into the fogBrightness floor on
+    // purpose: that floor is also what dims fog under daytime overcast (via
+    // cloudOcclusion in effectiveSunStrength), so raising it would have brightened
+    // overcast days by ~6x as a side effect. Gating on nightFactor keeps the change
+    // confined to the hours that are actually broken.
+    let nightFactor = 1.0 - sunVisibility;
+    let nightAmbient = FOG_NIGHT_AMBIENT * nightFactor;
+
+    return applyClimateTint(sunScatter + 10.0 * fogColor + nightAmbient, object.temperature, neutralSwing);
 }
 
 fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3f ) -> vec3f {
