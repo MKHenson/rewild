@@ -141,19 +141,37 @@ fn fogTransmittance(org: vec3f, dir: vec3f, dist: f32) -> f32 {
     return exp(-min(opticalDepth, 50.0));
 }
 
+/** How much brighter the fully-cold, fully-desaturated colour reads. 1.0 = plain
+ *  grey; above that it lifts toward a pale white-out. */
+const COLD_LIFT: f32 = 1.12;
+
 /**
- * Per-channel climate tint. temperature 0.5 is neutral, 1 = hot (warm yellow
- * cast), 0 = cold (cool blue cast). Mirrored on the CPU in SkyRenderer.update()
- * for the directional light — change both together.
+ * Applies the climate colour cast. temperature 0.5 is neutral.
+ *
+ *   hot  (→1) — multiplicative warm cast: red up, blue down.
+ *   cold (→0) — desaturates toward white rather than tinting blue.
+ *
+ * The two ends work differently on purpose. A per-channel multiply can only ever
+ * remove colour, so expressing "cold" as (1 - k·cool) on R/G and (1 + k·cool) on
+ * B just drives the result toward saturated blue as k grows — at k=1 red and
+ * green hit zero. Desaturating toward the colour's own luminance (and lifting it
+ * slightly) is what actually reads as a cold white-out.
+ *
+ * `neutralize` (0–1) fades the whole effect out — used under heavy overcast,
+ * where the sky should be colourless regardless of season.
+ *
+ * Mirrored on the CPU in SkyRenderer.update() for the directional light —
+ * change both together.
  */
-fn climateTint(temperature: f32) -> vec3f {
+fn applyClimateTint(color: vec3f, temperature: f32, neutralize: f32) -> vec3f {
     let warm = max(temperature - 0.5, 0.0) * 2.0;
     let cool = max(0.5 - temperature, 0.0) * 2.0;
-    return vec3f(
-        1.0 + 0.35 * warm - 0.04 * cool,
-        1.0 + 0.085 * warm - 0.01 * cool,
-        1.0 - 0.2 * warm + 0.1 * cool
-    );
+
+    let warmTint = vec3f(1.0 + 0.35 * warm, 1.0 + 0.085 * warm, 1.0 - 0.2 * warm);
+    var result = color * mix(warmTint, vec3f(1.0), neutralize);
+
+    let luma = dot(result, vec3f(0.2126, 0.7152, 0.0722));
+    return mix(result, vec3f(luma * COLD_LIFT), cool * (1.0 - neutralize));
 }
 
 /**
@@ -218,11 +236,10 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     let sunScatter = effectiveSunStrength * fogPhase * 0.1 * LOW_SCATTER * SUN_POWER;
 
     // Climate tint fades out under extreme overcast: a maxed-out sky is neutral
-    // grey regardless of season, so cancel the warm/cool cast over the same
-    // 0.9→1.0 bracket that desaturates fogColor above. Without this the tint
-    // re-applies the hue after the desaturation and heavy cover still looks warm.
-    let tint = mix(climateTint(object.temperature), vec3f(1.0), neutralSwing);
-    return (sunScatter + 10.0 * fogColor) * tint;
+    // grey regardless of season, so the cast is cancelled over the same 0.9→1.0
+    // bracket that desaturates fogColor above. Without that the tint re-applies
+    // the hue after the desaturation and heavy cover still looks warm.
+    return applyClimateTint(sunScatter + 10.0 * fogColor, object.temperature, neutralSwing);
 }
 
 fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3f ) -> vec3f {
