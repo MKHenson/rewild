@@ -5,7 +5,7 @@ struct GodRayUniforms {
     decay: f32,
     exposure: f32,
     numSamples: f32,
-    _pad: f32,
+    frameIndex: f32,
     sunColor: vec3<f32>,
     _pad2: f32,
     resolution: vec2<f32>,
@@ -21,85 +21,110 @@ var cloudTexture: texture_2d<f32>;
 @group(0) @binding(2)
 var linearSampler: sampler;
 
+// Full-resolution scene depth, written by the main pass before the sky compositor
+// runs. Any texel closer than the far plane is terrain/props occluding the sun.
+@group(0) @binding(3)
+var depthTexture: texture_depth_2d;
+
+// The cloud pass writes HDR radiance (rgba16float): clear sky lands near 7,
+// sunlit cloud tops near 40, and the sun disc between 1000 and 9000
+// (see the discBrightness ramp in sky/cloudsTemporal.wgsl). SUN_LUM_MIN sits
+// above the cloud range so only the disc and its immediate corona register as
+// the disc rather than as bright cloud.
+const SUN_LUM_MIN: f32 = 60.0;
+const SUN_LUM_MAX: f32 = 400.0;
+
+// Soft-compression knee for sky radiance. Turns unbounded HDR into a 0..1 emitter
+// that still ranks sky < cloud rim < sun without a hard clip.
+const LUM_KNEE: f32 = 30.0;
+
+// Output scale. The compositor adds this pass into the HDR sum *before* ACES, so
+// the result has to live in the same units as the sky (~7) and clouds (~40)
+// rather than in 0..1 display space.
+const GOD_RAY_HDR_SCALE: f32 = 60.0;
+
+const LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
+
+// Interleaved-gradient noise, rotated per frame. The previous static
+// sin/fract hash baked a fixed grain into the half-res upsample; advancing it
+// with the frame index lets the pattern average out over time instead.
+fn interleavedGradientNoise(pixel: vec2<f32>, frame: f32) -> f32 {
+    let p = pixel + 5.588238 * (frame % 64.0);
+    return fract(52.9829189 * fract(dot(p, vec2<f32>(0.06711056, 0.00583715))));
+}
+
 @fragment
 fn fs(
   @builtin(position) fragCoord: vec4<f32>,
 ) -> @location(0) vec4<f32> {
     let uv = fragCoord.xy / uniforms.resolution;
 
-    let toSun = uniforms.sunScreenPos - uv;
-    let dist = length(toSun);
-    let dir = toSun / max(dist, 0.001);
-
     let numSamples = i32(uniforms.numSamples);
-    let stepSize = uniforms.density / f32(numSamples);
 
-    // --- Sun visibility gate ---
-    // Sample the cloud texture in a ring AROUND the sun disc, not at the disc
-    // centre. At the centre, the cloud shader bakes sunAlpha=1 into the alpha
-    // channel even in clear sky (the sun disc itself), so a centre sample always
-    // looks like a blocked source. The ring sits just outside the disc and reads
-    // actual cloud coverage. If it is all cloud, rays should not appear.
-    let r = 0.05; // ring radius in UV space — outside the sun disc (~0.01-0.02 UV)
-    let ra = textureSample(cloudTexture, linearSampler, uniforms.sunScreenPos + vec2( r,  0.0)).a;
-    let rb = textureSample(cloudTexture, linearSampler, uniforms.sunScreenPos + vec2(-r,  0.0)).a;
-    let rc = textureSample(cloudTexture, linearSampler, uniforms.sunScreenPos + vec2( 0.0,  r)).a;
-    let rd = textureSample(cloudTexture, linearSampler, uniforms.sunScreenPos + vec2( 0.0, -r)).a;
-    let ringAlpha = (ra + rb + rc + rd) * 0.25;
+    // Step proportionally along the pixel -> sun vector, so the march always
+    // terminates near the sun and the streak length grows with distance from it.
+    // (A fixed-length step in UV, which is what this used to do, gives every pixel
+    // the same short smear — that produces a radial blur, never a converging shaft.)
+    let delta = (uniforms.sunScreenPos - uv) * (uniforms.density / f32(numSamples));
 
-    // Gate: rays are always visible unless the sun is heavily blocked by clouds.
-    // In clear sky the sun disc itself is the bright source — the march accumulates
-    // a uniform illumination that the distance falloff turns into a radial glow.
-    // In partial cloud the contrast between opaque cloud and clear gaps creates
-    // distinct shafts. Only heavy overcast (ringAlpha > ~0.7) kills the effect.
-    //
-    //  ringAlpha=0.00 (clear sky)  -> sunVisibility=1.0  (full glow from disc)
-    //  ringAlpha=0.35 (partial)    -> sunVisibility=1.0  (shafts through gaps)
-    //  ringAlpha=0.65 (heavy)      -> sunVisibility~0.6
-    //  ringAlpha=0.90 (overcast)   -> sunVisibility=0.0  (sun fully blocked)
-    let sunVisibility = 1.0 - smoothstep(0.55, 0.90, ringAlpha);
+    // Jitter the start by up to one step to break the banding the low sample
+    // count would otherwise produce.
+    let noise = interleavedGradientNoise(fragCoord.xy, uniforms.frameIndex);
 
-    // --- Radial blur march (pixel -> sun) ---
-    // Forward direction gives the correct radial shaft pattern: highest-weight
-    // samples are closest to the current pixel, fading toward the sun.
-    var currentPos = uv;
+    var currentPos = uv + delta * noise;
     var currentWeight = 1.0;
     var illumination = 0.0;
 
-    // Per-pixel dithering: offset starting position to break banding
-    let noise = fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);
-    currentPos += dir * stepSize * noise;
+    let depthDims = vec2<f32>(textureDimensions(depthTexture));
 
     for (var i = 0; i < numSamples; i++) {
-        currentPos += dir * stepSize;
+        currentPos += delta;
 
-        // Discard samples that have marched outside [0,1] UV bounds.
-        // When the sun is near or past a screen edge the march exits the cloud
-        // texture early. clamp-to-edge would return the same border texel for
-        // every remaining step, injecting a run of identical values that inflates
-        // the accumulated illumination. Zeroing them out prevents this.
+        // Zero out samples that leave the screen. The sampler is clamp-to-edge, so
+        // without this a march that exits early would keep re-reading the same
+        // border texel and inflate the sum with a run of identical values.
         let inBounds = step(vec2(0.0), currentPos) * step(currentPos, vec2(1.0));
         let boundsGate = inBounds.x * inBounds.y;
 
-        // Alpha = max(1 - cloudTransmittance, sunDisc). Clear sky = low alpha.
-        let cloudSample = textureSample(cloudTexture, linearSampler, currentPos);
-        let sampleT = pow(saturate(1.0 - cloudSample.a), 4.0) * boundsGate;
+        // Geometry occlusion. Depth is cleared to 1.0, so anything below that is
+        // something the main pass drew — terrain, rocks, trees — and it blocks the
+        // sun. This is what carves shafts out of a ridgeline at sunset.
+        let texel = vec2<i32>(clamp(currentPos, vec2(0.0), vec2(1.0)) * depthDims);
+        let sceneDepth = textureLoad(depthTexture, texel, 0);
+        let skyMask = select(0.0, 1.0, sceneDepth >= 1.0);
 
-        illumination += sampleT * currentWeight;
+        let c = textureSampleLevel(cloudTexture, linearSampler, currentPos, 0.0);
+        let lum = dot(c.rgb, LUMA);
+
+        // The emitter and the occluder have to be read from different channels.
+        // cloudsTemporal.wgsl writes alpha = max(1 - transmittance, sunAlpha), so
+        // alpha alone reports the sun disc — the brightest source in the scene — as
+        // fully opaque. Luminance identifies the disc; alpha supplies cloud opacity;
+        // sunMask exempts the disc from its own occlusion term.
+        let sunMask = smoothstep(SUN_LUM_MIN, SUN_LUM_MAX, lum);
+        let cloudTransmittance = max(pow(saturate(1.0 - c.a), 2.0), sunMask);
+
+        // Soft-compressed radiance: clear sky contributes a little, the near-sun
+        // corona more, the disc almost fully. Clouds are bright too, which is why
+        // the transmittance factor has to gate them back down to nearly nothing.
+        let skyBrightness = lum / (lum + LUM_KNEE);
+
+        let source = skyBrightness * cloudTransmittance * skyMask * boundsGate;
+
+        illumination += source * currentWeight;
         currentWeight *= uniforms.decay;
     }
 
-    // Normalize, apply exposure, and gate by whether the sun itself is visible.
     illumination /= f32(numSamples);
     illumination *= uniforms.exposure * uniforms.weight;
-    illumination *= sunVisibility;
 
-    // Distance falloff: stronger near sun, fades toward screen edges
-    let falloff = 1.0 - smoothstep(0.0, 1.2, dist);
-    illumination *= falloff;
+    // Gentle radial falloff, only to keep the far corners from picking up a flat
+    // pedestal. The old 1.2 cutoff killed everything past ~0.4 UV from the sun,
+    // which is exactly the range over which crepuscular rays are supposed to run.
+    let dist = length(uniforms.sunScreenPos - uv);
+    illumination *= 1.0 - smoothstep(0.6, 2.2, dist);
 
-    // Tint with sun color
-    let rayColor = uniforms.sunColor * illumination;
+    let rayColor = uniforms.sunColor * illumination * GOD_RAY_HDR_SCALE;
 
-    return vec4<f32>(rayColor, illumination);
+    return vec4<f32>(rayColor, 1.0);
 }

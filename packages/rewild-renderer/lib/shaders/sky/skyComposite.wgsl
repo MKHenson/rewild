@@ -46,8 +46,10 @@ var<private> sunDotUp: f32;
   // Define uv based on fragCoord
   let uv = fragCoord.xy / vec2(object.resolution);
 
-  // Sample god rays — additively blended into every output path
-  let godRays = textureSampleLevel(godRaysTexture, cloudsSampler, uv, 0);
+  // God rays carry HDR in-scattered radiance and are folded into the scene HDR
+  // *before* ACES, so the tone curve's shoulder rolls off bright shafts and they
+  // read as light rather than as a translucent overlay painted on the final image.
+  let godRays = textureSampleLevel(godRaysTexture, cloudsSampler, uv, 0).rgb;
 
   // Lightning screen flash: brightest at centre, dimmed at edges
   let flashVignette = 1.0 - smoothstep(0.3, 1.0, length(uv - vec2<f32>(0.5, 0.5)));
@@ -79,8 +81,9 @@ var<private> sunDotUp: f32;
     let cloudOcclusion = aboveCloudBlend * terrainBelowClouds * hdrBlend.a;
 
     if (cloudOcclusion > 0.99) {
-      // Terrain fully occluded by clouds — tonemap and use sky+cloud view directly
-      let occludedColor = tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb)) + godRays.rgb + flash;
+      // Terrain fully occluded by clouds — tonemap and use sky+cloud view directly.
+      // What is visible here is sky, so the shafts apply at full strength.
+      let occludedColor = tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb + godRays)) + flash;
       return vec4f(occludedColor, 1.0);
     }
 
@@ -100,26 +103,39 @@ var<private> sunDotUp: f32;
     // colour itself. Works at any camera altitude — no sphere intersection involved.
     let rawFogColor = getFogScatterColor( dir, sunDirection );
 
+    // In-scattering accumulates along the camera ray, so a rock a few metres away
+    // catches almost none of the shaft that fills the valley behind it. This uses its
+    // own distance ramp rather than fogFactor: fog density bottoms out near 2e-5/m,
+    // so on a clear day fogFactor is ~0.01 and would scale the shafts to nothing.
+    let rayDepthFade = 1.0 - exp(-distance * 0.0033);
+    let godRaysTerrain = godRays * rayDepthFade;
+
     // Single ACES pass over the full HDR fog value — no separate exp curve.
-    let fogTonemapped = tonemapACES(HDR_SCALE * rawFogColor);
-    let fogResult = vec4f(fogTonemapped, max(hdrBlend.a, fogFactor));
+    let fogTonemapped = tonemapACES(HDR_SCALE * (rawFogColor + godRaysTerrain));
+
+    // This pass composites over the already-shaded terrain with src-alpha, so colour
+    // added here is scaled by the coverage term on the way out. A shaft is medium
+    // radiance sitting in front of the terrain, so it has to raise coverage as well —
+    // otherwise the near-zero clear-air fogFactor multiplies it straight back out.
+    let rayCoverage = saturate(dot(godRaysTerrain, vec3f(0.2126, 0.7152, 0.0722)) * HDR_SCALE);
+    let fogResult = vec4f(fogTonemapped, max(max(hdrBlend.a, fogFactor), rayCoverage));
 
     // Partial cloud occlusion: blend terrain fog with cloud-occluded sky view
     if (cloudOcclusion > 0.0) {
-      let skyResult = vec4f(tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb)), 1.0);
+      let skyResult = vec4f(tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb + godRays)), 1.0);
       let blended = mix(fogResult, skyResult, cloudOcclusion);
-      return vec4f(blended.rgb + godRays.rgb + flash, blended.a);
+      return vec4f(blended.rgb + flash, blended.a);
     }
 
-    return vec4f(fogResult.rgb + godRays.rgb + flash, fogResult.a);
+    return vec4f(fogResult.rgb + flash, fogResult.a);
   }
 
   // Sky pixel: single ACES over the full HDR composite (sky + clouds + bloom).
   // Alpha is 1 — nothing is behind the sky. (This used to read hdrBlend.a, which
   // was 1 here only because the sky pass wrote alpha=1 on non-terrain pixels;
   // that channel now carries cloud opacity, so the constant is stated directly.)
-  let tonemapped = tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb));
-  return vec4f(tonemapped + godRays.rgb + flash, 1.0);
+  let tonemapped = tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb + godRays));
+  return vec4f(tonemapped + flash, 1.0);
 }
 
 fn worldFromScreenCoord( coord: vec2f, depthSample: f32 ) -> vec3f {
