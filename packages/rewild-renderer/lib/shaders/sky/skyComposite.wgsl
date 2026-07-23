@@ -49,11 +49,33 @@ var<private> sunDotUp: f32;
   // God rays carry HDR in-scattered radiance and are folded into the scene HDR
   // *before* ACES, so the tone curve's shoulder rolls off bright shafts and they
   // read as light rather than as a translucent overlay painted on the final image.
-  let godRays = textureSampleLevel(godRaysTexture, cloudsSampler, uv, 0).rgb;
+  //
+  // Sampled as a 5-tap cross at the god-ray buffer's own texel spacing. That buffer
+  // is half resolution and its depth mask changes abruptly at terrain silhouettes;
+  // a single bilinear tap turns that step into a 1-2 pixel dark stroke outlining
+  // every ridge. Spreading the fetch converts the stroke into a gradient wide
+  // enough to read as shading. The effect is low-frequency, so nothing is lost.
+  let grTexel = 1.0 / vec2f(textureDimensions(godRaysTexture));
+  let godRays = (
+      textureSampleLevel(godRaysTexture, cloudsSampler, uv, 0).rgb +
+      textureSampleLevel(godRaysTexture, cloudsSampler, uv + vec2f( grTexel.x, 0.0), 0).rgb +
+      textureSampleLevel(godRaysTexture, cloudsSampler, uv + vec2f(-grTexel.x, 0.0), 0).rgb +
+      textureSampleLevel(godRaysTexture, cloudsSampler, uv + vec2f(0.0,  grTexel.y), 0).rgb +
+      textureSampleLevel(godRaysTexture, cloudsSampler, uv + vec2f(0.0, -grTexel.y), 0).rgb
+    ) * 0.2;
 
   // Lightning screen flash: brightest at centre, dimmed at edges
   let flashVignette = 1.0 - smoothstep(0.3, 1.0, length(uv - vec2<f32>(0.5, 0.5)));
   let flash = object.lightningFlash * 0.7 * (0.6 + flashVignette * 0.4);
+
+  // Dither, applied to every output path below. This pass writes to an 8-bit
+  // swapchain, and ACES compresses a night sky into a handful of output levels — a
+  // smooth gradient then lands on so few steps that the boundaries read as contour
+  // bands. Half an LSB of triangular noise pushes each pixel across the rounding
+  // threshold at a rate proportional to where it sits between two levels, turning
+  // the steps into noise the eye integrates back into a gradient. Amplitude is
+  // deliberately sub-LSB: enough to break the contours, not enough to see as grain.
+  let dither = triangularDither(fragCoord.xy);
 
   // Convert uv to texture coordinates
   let texCoord = vec2<i32>(uv * vec2<f32>(textureDimensions(depthTexture)));
@@ -84,7 +106,7 @@ var<private> sunDotUp: f32;
       // Terrain fully occluded by clouds — tonemap and use sky+cloud view directly.
       // What is visible here is sky, so the shafts apply at full strength.
       let occludedColor = tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb + godRays)) + flash;
-      return vec4f(occludedColor, 1.0);
+      return vec4f(occludedColor + dither, 1.0);
     }
 
     let dir: vec3f = normalize( worldPos - object.cameraPosition );
@@ -118,16 +140,22 @@ var<private> sunDotUp: f32;
     // radiance sitting in front of the terrain, so it has to raise coverage as well —
     // otherwise the near-zero clear-air fogFactor multiplies it straight back out.
     let rayCoverage = saturate(dot(godRaysTerrain, vec3f(0.2126, 0.7152, 0.0722)) * HDR_SCALE);
-    let fogResult = vec4f(fogTonemapped, max(max(hdrBlend.a, fogFactor), rayCoverage));
+
+    // cloudOcclusion, not raw hdrBlend.a: cloud opacity only hides terrain when the
+    // camera is above the cloud layer, and cloudOcclusion already carries that test.
+    // Below the layer there is no cloud between the eye and the ground, so coverage
+    // comes from fog alone — which also keeps the eroded cloud gate (see
+    // cloudsTemporal.wgsl) from raising terrain coverage in a band along ridges.
+    let fogResult = vec4f(fogTonemapped, max(max(cloudOcclusion, fogFactor), rayCoverage));
 
     // Partial cloud occlusion: blend terrain fog with cloud-occluded sky view
     if (cloudOcclusion > 0.0) {
       let skyResult = vec4f(tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb + godRays)), 1.0);
       let blended = mix(fogResult, skyResult, cloudOcclusion);
-      return vec4f(blended.rgb + flash, blended.a);
+      return vec4f(blended.rgb + flash + dither, blended.a);
     }
 
-    return vec4f(fogResult.rgb + flash, fogResult.a);
+    return vec4f(fogResult.rgb + flash + dither, fogResult.a);
   }
 
   // Sky pixel: single ACES over the full HDR composite (sky + clouds + bloom).
@@ -135,7 +163,7 @@ var<private> sunDotUp: f32;
   // was 1 here only because the sky pass wrote alpha=1 on non-terrain pixels;
   // that channel now carries cloud opacity, so the constant is stated directly.)
   let tonemapped = tonemapACES(HDR_SCALE * (hdrBlend.rgb + bloom.rgb + godRays));
-  return vec4f(tonemapped + flash, 1.0);
+  return vec4f(tonemapped + flash + dither, 1.0);
 }
 
 fn worldFromScreenCoord( coord: vec2f, depthSample: f32 ) -> vec3f {
@@ -143,6 +171,17 @@ fn worldFromScreenCoord( coord: vec2f, depthSample: f32 ) -> vec3f {
   let posWordW = object.invViewProjectionMatrix * posClip;
   let posWorld = posWordW.xyz / posWordW.www;
   return posWorld;
+}
+
+// Triangular-PDF dither in units of one 8-bit level. Two independent uniform hashes
+// summed give a triangular distribution, which is the right shape for quantisation
+// noise: it decorrelates the error from the signal, so banding does not simply
+// become a lower-contrast band. Static per pixel — a time-varying pattern would
+// shimmer on a still camera, and the whole point here is a scene that barely moves.
+fn triangularDither(pixel: vec2f) -> f32 {
+    let n1 = fract(sin(dot(pixel, vec2f(12.9898, 78.233))) * 43758.5453);
+    let n2 = fract(sin(dot(pixel, vec2f(93.9898, 67.345))) * 24634.6345);
+    return (n1 + n2 - 1.0) / 255.0;
 }
 
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/

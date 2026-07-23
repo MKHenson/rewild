@@ -443,6 +443,7 @@ export class SkyRenderer {
 
     // Bilateral only uses the matrix to reconstruct ray directions, so it
     // gets the camera-centered variant for position-independent precision.
+    this.bilateralPass.cameraAltitude = camera.transform.position.y;
     this.bilateralPass.render(
       renderer,
       this.invViewProjCentered.elements,
@@ -451,6 +452,7 @@ export class SkyRenderer {
 
     // Blend sub-pass: sky HDR + bilateral HDR → intermediateTarget (no tonemap).
     // Must run before bloom so the full scene feeds the bloom threshold pass.
+    this.finalPass.cameraAltitude = camera.transform.position.y;
     this.finalPass.renderBlend(renderer);
 
     // Store bolt for postRender (renders before rain so it sits behind particles)

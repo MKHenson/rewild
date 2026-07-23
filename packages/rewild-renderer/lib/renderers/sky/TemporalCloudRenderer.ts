@@ -212,10 +212,9 @@ export class TemporalCloudRenderer {
       layout: this.pipeline.getBindGroupLayout(1),
       entries: [
         { binding: 0, resource: this.historyTexture.createView() },
-        {
-          binding: 1,
-          resource: renderer.samplerManager.get('linear-clamped'),
-        },
+        // No binding 1: the shader's history sampler is gone (see cloudsTemporal.wgsl).
+        // With layout:'auto' the derived layout omits it, so passing one here would
+        // fail bind group validation.
         { binding: 2, resource: { buffer: this.temporalUniformBuffer } },
       ],
     });

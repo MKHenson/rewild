@@ -6,12 +6,16 @@ import bilateralShader from '../../shaders/sky/skyBilateral.wgsl';
 //   sigmaSpatial      : f32          offset  8, size  4
 //   sigmaRange        : f32          offset 12, size  4
 //   sigmaFar          : f32          offset 16, size  4
-//   _pad0             : f32          offset 20, size  4
+//   cloudsGated       : f32          offset 20, size  4
 //   _pad1             : vec2<f32>    offset 24, size  8  → aligns mat4 to 32
 //   invViewProjMatrix : mat4x4<f32>  offset 32, size 64
 // Total: 96 bytes → aligned to 256
 const UNIFORM_BYTE_SIZE = 96;
 const ALIGNED_UNIFORM_SIZE = Math.ceil(UNIFORM_BYTE_SIZE / 256) * 256;
+
+/** Mirrors CLOUD_START in shaders/sky/skyConstants.wgsl. Below this altitude the
+ *  cloud pass depth-gates, leaving vec4f(0) on terrain-occluded texels. */
+const CLOUD_START = 500.0;
 
 /**
  * Single-pass bilateral filter for cloud edge-preserving softening.
@@ -58,6 +62,10 @@ export class SkyBilateralPass {
    * Default: 6.0
    */
   sigmaFar: number = 1.2;
+
+  /** Camera world Y, set by SkyRenderer each frame. Below CLOUD_START the cloud
+   *  pass depth-gates and this filter must skip the texels it left empty. */
+  cameraAltitude: number = 0;
 
   private pipeline: GPURenderPipeline;
   private bindGroup: GPUBindGroup;
@@ -111,6 +119,7 @@ export class SkyBilateralPass {
         { binding: 0, resource: src.createView() },
         { binding: 1, resource: sampler },
         { binding: 2, resource: { buffer: this.uniformBuffer } },
+        { binding: 3, resource: renderer.depthTexture.createView() },
       ],
     });
   }
@@ -130,7 +139,10 @@ export class SkyBilateralPass {
     uData[2] = this.sigmaSpatial;
     uData[3] = this.sigmaRange;
     uData[4] = this.sigmaFar;
-    // uData[5..7] = padding
+    // The cloud pass only depth-gates when the camera is below the cloud layer;
+    // above it, clouds are marched full-screen and every texel is valid.
+    uData[5] = this.cameraAltitude < CLOUD_START ? 1.0 : 0.0;
+    // uData[6..7] = padding
     uData.set(invViewProjMatrix, 8); // invViewProjMatrix at offset 32 bytes (index 8)
     device.queue.writeBuffer(this.uniformBuffer, 0, uData.buffer);
 
