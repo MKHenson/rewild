@@ -21,6 +21,11 @@ import { LightningController } from './LightningController';
 import { LightningBoltPass } from '../../post-processes/LightningBoltPass';
 import type { LightningStrike } from './LightningController';
 
+/** How much brighter the fully-cold, fully-desaturated colour reads. 1.0 = plain
+ *  grey; above that it lifts toward a pale white-out. Mirrors COLD_LIFT in
+ *  fog.wgsl — keep the two in sync. */
+const COLD_LIFT = 1.12;
+
 export class SkyRenderer {
   requiresRebuild: boolean = true;
   private invViewProjectionMatrix = new Matrix4();
@@ -258,15 +263,24 @@ export class SkyRenderer {
       this.sun.color.copy(this._dayColor);
     }
 
-    // Climate tint. temperature 0.5 is neutral; 1 = hot (warmer, yellower and a
-    // little brighter), 0 = cold (cooler, bluer, unchanged brightness). The same
-    // curve is applied to the fog in climateTint() in fog.wgsl — keep them in
-    // sync or the key light and the haze will disagree about the season.
+    // Climate tint. temperature 0.5 is neutral; 1 = hot (warmer, yellower), 0 =
+    // cold, which desaturates toward white rather than tinting blue — see
+    // applyClimateTint() in fog.wgsl for why the two ends work differently.
+    // Keep the two in sync or the key light and the haze disagree about season.
     const warm = Math.max(this.temperature - 0.5, 0.0) * 2.0;
     const cool = Math.max(0.5 - this.temperature, 0.0) * 2.0;
-    this.sun.color.r *= 1.0 + 0.085 * warm - 0.04 * cool;
-    this.sun.color.g *= 1.0 + 0.035 * warm - 0.01 * cool;
-    this.sun.color.b *= 1.0 - 0.07 * warm + 0.1 * cool;
+    this.sun.color.r *= 1.0 + 0.085 * warm;
+    this.sun.color.g *= 1.0 + 0.035 * warm;
+    this.sun.color.b *= 1.0 - 0.07 * warm;
+
+    const luma =
+      this.sun.color.r * 0.2126 +
+      this.sun.color.g * 0.7152 +
+      this.sun.color.b * 0.0722;
+    const cold = luma * COLD_LIFT;
+    this.sun.color.r += (cold - this.sun.color.r) * cool;
+    this.sun.color.g += (cold - this.sun.color.g) * cool;
+    this.sun.color.b += (cold - this.sun.color.b) * cool;
 
     // Heavy-overcast dimming: in the 0.9→1.0 cloudiness bracket the sky is thick
     // enough that direct sun should fall off toward a dull, sunless grey. Ramps

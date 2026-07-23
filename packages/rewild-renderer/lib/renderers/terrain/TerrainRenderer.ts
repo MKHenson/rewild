@@ -83,8 +83,8 @@ export class TerrainRenderer {
     { lod: 4, visibleDstThreshold: 1000 },
     { lod: 5, visibleDstThreshold: 1300 },
     { lod: 6, visibleDstThreshold: 1700 },
-    // { lod: 8, visibleDstThreshold: 2200 },
-    // { lod: 10, visibleDstThreshold: 2800 },
+    { lod: 8, visibleDstThreshold: 2200 },
+    { lod: 10, visibleDstThreshold: 2800 },
   ];
   dispatcher: Dispatcher<TerrainEvent>;
   workerPool: TerrainWorkerPool;
