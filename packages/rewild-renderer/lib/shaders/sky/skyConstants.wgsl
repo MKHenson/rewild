@@ -3,8 +3,12 @@ const FOG_COLOR_DAY = vec3f( 0.66, 0.66, 0.69 );
 const FOG_COLOR_NIGHT = vec3f( 0.03, 0.04, 0.08 );
 const FOG_COLOR_EVENING = vec3f( 0.32, 0.12, 0.0 ); //  vec3f( 0.75, 0.7, 0.5 );
 const FOG_COLOR_STORM = vec3f( 0.55, 0.57, 0.45 );
+// Ambient bounce onto clouds. EVENING is the golden-hour term: warm, because light
+// reaching a cloud at low sun has been reddened by a long atmospheric path. It used to
+// be all but identical to NIGHT — a cold blue-grey — which is why sunset decks read as
+// flat and dead however the direct term was tuned.
 const CLOUD_AMBIENT_DAY_COLOR = vec3f(0.5, 0.8, 1.0);
-const CLOUD_AMBIENT_EVENING_COLOR = vec3f( 0.11, 0.13, 0.17 );
+const CLOUD_AMBIENT_EVENING_COLOR = vec3f( 0.34, 0.17, 0.13 );
 const CLOUD_AMBIENT_NIGHT_COLOR = vec3f( 0.10, 0.12, 0.17);
 const EARTH_RADIUS: f32 = 6300e3;
 const CLOUD_START: f32 = 500.0;

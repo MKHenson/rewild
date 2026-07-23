@@ -130,7 +130,22 @@ fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_d
         lighRayDen += result.density;
     }
     let sunAngle = dot(sun_direction, vec3f(0.0, 1.0, 0.0));
-    let sunIntensityModifier = smoothstep(0.0, 0.1, sunAngle);
+
+    // The cloud deck sits at 500-1100m, so it stays in direct sunlight for roughly a
+    // degree *after* the sun has set for an observer on the ground — that geometry is
+    // exactly why a cloud base lights up at sunrise and sunset. Gating the direct term
+    // at sunAngle > 0 switched the sun off while it was still visibly on the horizon,
+    // and only restored it at ~5.7 degrees up, so the clouds were lit by ambient alone
+    // through the entire golden hour. The cutoff belongs just below zero, not above it.
+    let horizonGate = smoothstep(-0.05, -0.005, sunAngle);
+
+    // Grazing sunlight crosses far more atmosphere, so it should arrive dimmer and
+    // warmer rather than simply stopping. Normalised so that above ~10 degrees this is
+    // 1.0 and the daytime look is unchanged.
+    let airmass = 1.0 / max(sunAngle, 0.02);
+    let extinction = saturate(exp(-0.055 * (airmass - 5.75)));
+
+    let sunIntensityModifier = horizonGate * extinction;
     let scatterAmount: f32 = mix(0.008, 1.0, smoothstep(0.96, 0.0, mu));
     let beersLaw: f32 = exp(-stepL * lighRayDen) + 0.9 * scatterAmount * exp(-0.1 * stepL * lighRayDen) + scatterAmount * 0.5 * exp(-0.02 * stepL * lighRayDen);
     // Thin cloud absorption: caps forward-scattered sun brightness for low-density clouds.
@@ -203,7 +218,11 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
     let phaseFunction = numericalMieFit(mu);
     rayStartPosition += dir * stepS * hash1(dot(dir, vec3f(12.256, 2.646, 6.356)) + object.iTime * 0.00001);
 
-    let sunDotUp3 = pow(sunDotUp, 3.0);
+    // pow() is undefined for a negative base in WGSL (it evaluates as
+    // exp2(e2 * log2(e1))), and sunDotUp goes negative every night. Saturating first
+    // keeps a NaN from reaching the radiance accumulator, where it would survive even
+    // the multiply by a zeroed sun term.
+    let sunDotUp3 = pow(saturate(sunDotUp), 3.0);
 
     for (var i = 0; i < nbSample; i++) {
         var cloudHeight: f32;
@@ -213,8 +232,12 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
 
         if (density > 0.0) {
             let intensity = lightRay(rayStartPosition, phaseFunction, density, mu, sun_direction, cloudHeight);
-            var cloudAmbientColor = mix(CLOUD_AMBIENT_NIGHT_COLOR, CLOUD_AMBIENT_EVENING_COLOR, smoothstep(-0.2, 0.2, sunDotUp));
-            cloudAmbientColor = mix(cloudAmbientColor, CLOUD_AMBIENT_DAY_COLOR, smoothstep(0.2, 0.8, sunDotUp));
+            // The evening term now peaks at the horizon instead of ~11 degrees up, and
+            // day takes over from ~6 to ~37 degrees. Previously evening only arrived at
+            // the same elevation where day started displacing it, so the warm ambient
+            // never actually got a window of its own.
+            var cloudAmbientColor = mix(CLOUD_AMBIENT_NIGHT_COLOR, CLOUD_AMBIENT_EVENING_COLOR, smoothstep(-0.25, -0.02, sunDotUp));
+            cloudAmbientColor = mix(cloudAmbientColor, CLOUD_AMBIENT_DAY_COLOR, smoothstep(0.1, 0.6, sunDotUp));
             let ambient = (0.5 + 0.6 * cloudHeight) * cloudAmbientColor * 6.5 + vec3f(0.8) * max(0.0, 1.0 - 2.0 * cloudHeight);
             var radiance = ambient + (SUN_POWER * intensity * mix(vec3f(0.8, 0.5, 0.3), vec3f(1.0), clamp(sunDotUp3, 0.0, 1.0)));
             radiance *= density;
