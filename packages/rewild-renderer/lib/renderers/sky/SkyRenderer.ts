@@ -76,9 +76,10 @@ export class SkyRenderer {
   /** Master brightness multiplier (range 0–3). Scales the final ray intensity on top of the
    *  per-frame horizon fade. 0 = invisible, 1 = default, >1 = exaggerated shafts. */
   godRayIntensity: number = 2.0;
-  /** How far the radial blur rays extend from the sun toward the screen edges (range 0.1–1.0).
-   *  Low values (0.2) give short subtle rays; high values (0.8) give long dramatic shafts. */
-  godRayDensity: number = 0.8;
+  /** Fraction of the pixel→sun distance the march covers (range 0.1–1.0). At 1.0 the
+   *  march reaches the sun itself, which gives the longest, most sharply converging
+   *  shafts; lower values stop short and leave a softer glow near the sun. */
+  godRayDensity: number = 0.9;
   /** Per-step brightness falloff along each ray (range 0.8–0.99).
    *  Lower values (0.85) concentrate light near the sun; higher values (0.98) let rays
    *  reach further across the screen before fading out. */

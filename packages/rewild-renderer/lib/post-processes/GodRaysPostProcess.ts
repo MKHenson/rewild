@@ -13,7 +13,7 @@ import { Matrix4, Vector3 } from 'rewild-common';
 //   offset 16: decay (f32)
 //   offset 20: exposure (f32)
 //   offset 24: numSamples (f32)
-//   offset 28: _pad
+//   offset 28: frameIndex (f32)
 //   offset 32: sunColor (vec3<f32>)
 //   offset 44: _pad2
 //   offset 48: resolution (vec2<f32>)
@@ -47,15 +47,23 @@ export class GodRaysPostProcess implements IPostProcess {
 
   config: GodRayConfig;
 
+  /** Depth texture the bind group currently points at, so a resize can be detected. */
+  private boundDepthTexture: GPUTexture | null;
+  private frameIndex: number;
+
   constructor() {
     this.cloudTexture = null;
+    this.boundDepthTexture = null;
+    this.frameIndex = 0;
     this.intensityScale = 1.0;
+    // density is a fraction of the pixel->sun distance (not a UV length), so it
+    // wants to sit near 1.0 for the march to actually reach the sun.
     this.config = {
-      numSamples: 24,
-      density: 0.4,
-      weight: 0.3,
+      numSamples: 48,
+      density: 0.9,
+      weight: 0.5,
       decay: 0.96,
-      exposure: 0.6,
+      exposure: 1.0,
       enabled: true,
     };
   }
@@ -76,10 +84,14 @@ export class GodRaysPostProcess implements IPostProcess {
       code: vertexScreenQuadShader,
     });
 
+    // HDR, because the compositor folds this into the scene radiance before ACES
+    // rather than painting it over the tonemapped image. An 8-bit target would
+    // clip the shafts flat and hide them from the tone curve's shoulder.
+    this.renderTarget?.destroy();
     this.renderTarget = device.createTexture({
       label: 'god rays render target',
       size: [width, height, 1],
-      format: 'rgba8unorm',
+      format: 'rgba16float',
       usage:
         GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
@@ -94,27 +106,38 @@ export class GodRaysPostProcess implements IPostProcess {
       fragment: {
         entryPoint: 'fs',
         module,
-        targets: [{ format: 'rgba8unorm' }],
+        targets: [{ format: 'rgba16float' }],
       },
     });
 
+    this.uniformBuffer?.destroy();
     this.uniformBuffer = device.createBuffer({
       label: 'god rays uniforms',
       size: alignedUniformBufferSize,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    this.bindGroup = device.createBindGroup({
+    this.createBindGroup(renderer);
+
+    return this;
+  }
+
+  /**
+   * The depth texture is destroyed and recreated whenever the canvas resizes, so
+   * the bind group holding a view of it has to be rebuilt alongside it.
+   */
+  private createBindGroup(renderer: Renderer): void {
+    this.boundDepthTexture = renderer.depthTexture;
+    this.bindGroup = renderer.device.createBindGroup({
       label: 'god rays bind group',
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: { buffer: this.uniformBuffer } },
         { binding: 1, resource: this.cloudTexture!.createView() },
         { binding: 2, resource: renderer.samplerManager.get('linear-clamped') },
+        { binding: 3, resource: renderer.depthTexture.createView() },
       ],
     });
-
-    return this;
   }
 
   dispose(): void {
@@ -192,19 +215,25 @@ export class GodRaysPostProcess implements IPostProcess {
     const sunUVx = (clipX + 1.0) * 0.5;
     const sunUVy = (1.0 - clipY) * 0.5;
 
-    // Skip if sun is more than 30% outside screen bounds on any axis
-    const margin = 0.3;
-    if (
-      sunUVx < -margin || sunUVx > 1.0 + margin ||
-      sunUVy < -margin || sunUVy > 1.0 + margin
-    ) { this.clearRenderTarget(renderer); return; }
+    // Off-screen fade. This is a screen-space effect, so it has to die out as the
+    // sun leaves the frame — but as a ramp, not a cutoff. A hard threshold makes
+    // the whole effect pop off mid-pan.
+    const overshoot = Math.max(
+      0,
+      Math.max(-sunUVx, sunUVx - 1.0),
+      Math.max(-sunUVy, sunUVy - 1.0)
+    );
+    const margin = 0.35;
+    if (overshoot >= margin) { this.clearRenderTarget(renderer); return; }
+    const edgeFade = 1.0 - overshoot / margin;
 
     // --- Horizon fade ---
     const horizonFade = Math.max(
       0,
       Math.min(1, (sunDotUp + 0.05) / 0.15)  // smoothstep(-0.05, 0.1, sunDotUp)
     );
-    const effectiveWeight = config.weight * this.intensityScale * horizonFade;
+    const effectiveWeight =
+      config.weight * this.intensityScale * horizonFade * edgeFade;
     if (effectiveWeight <= 0) { this.clearRenderTarget(renderer); return; }
 
     // --- Sun color (warm at sunset, white at noon) ---
@@ -212,6 +241,13 @@ export class GodRaysPostProcess implements IPostProcess {
     const sunColorR = 1.0;
     const sunColorG = 0.4 + 0.6 * t;
     const sunColorB = 0.1 + 0.8 * t;
+
+    // Rebuild the bind group if the canvas resized out from under the depth texture.
+    if (this.boundDepthTexture !== renderer.depthTexture) {
+      this.createBindGroup(renderer);
+    }
+
+    this.frameIndex = (this.frameIndex + 1) % 64;
 
     // --- Upload uniforms ---
     const rt = this.renderTarget;
@@ -222,7 +258,7 @@ export class GodRaysPostProcess implements IPostProcess {
     uniformData[4] = config.decay;    // decay
     uniformData[5] = config.exposure; // exposure
     uniformData[6] = config.numSamples; // numSamples
-    uniformData[7] = 0;               // _pad
+    uniformData[7] = this.frameIndex;  // frameIndex (dither rotation)
     uniformData[8] = sunColorR;       // sunColor.r
     uniformData[9] = sunColorG;       // sunColor.g
     uniformData[10] = sunColorB;      // sunColor.b
