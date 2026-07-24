@@ -65,9 +65,21 @@ fn cloudCoverage(uv: vec2f) -> f32 {
   let dir        = select(vec2f(0.0, texelSize.y), vec2f(texelSize.x, 0.0), isH);
 
   let EXPOSURE = 0.001;
-  let SIGMA    = 8.0;
-  let KNEE     = 0.08; 
-  let RADIUS   = 15;
+
+  // The knee is the soft shoulder either side of the threshold, so it only makes
+  // sense as a fraction of it. It used to be a fixed 0.08 against a threshold of
+  // 0.05, which put the ramp's lower edge at -0.03: below black. softKnee could
+  // then never return zero, so every coloured pixel in the frame bloomed in
+  // proportion to its brightness and the threshold gated nothing at all. Scaling
+  // it keeps the shoulder proportionate wherever bloomThreshold is dialled to.
+  let KNEE     = object.bloomThreshold * 0.5;
+
+  // Supplied by the pipeline (SkyQuality.ts). RADIUS bounds the loop, and SIGMA
+  // moves with it: at the shipped ratio the kernel already truncates a
+  // non-trivial tail, so shrinking the radius on its own would hard-cut the
+  // bloom rather than narrow it.
+  let SIGMA    = ${ BLOOM_SIGMA };
+  let RADIUS   = ${ BLOOM_RADIUS };
 
   var bloomSum    = vec3f(0.0);
   var totalWeight = 0.0;   // sum of gaussW * validity — the renormalisation divisor
@@ -116,11 +128,22 @@ fn gaussian(x: f32, sigma: f32) -> f32 {
   return exp(-0.5 * x * x / (sigma * sigma));
 }
 
+// Excess above `threshold`, with a quadratic shoulder of half-width `knee` on
+// either side so highlights fade in smoothly instead of popping across the gate.
+// Continuous at both edges: 0 at threshold-knee, and knee at threshold+knee,
+// which is exactly what the linear branch gives there.
 fn softKnee(x: f32, threshold: f32, knee: f32) -> f32 {
-  let lower = threshold - knee;
-  let upper = threshold + knee;
+  // A knee wider than the threshold would put the ramp's lower edge below zero,
+  // where nothing can be rejected and the function stops being a gate. Callers
+  // should keep it well under; clamping means a bad value degrades to a hard
+  // cutoff rather than to no cutoff at all.
+  let k = min(knee, threshold);
+  if (k <= 0.0) { return max(x - threshold, 0.0); }
+
+  let lower = threshold - k;
+  let upper = threshold + k;
   if (x <= lower) { return 0.0; }
   if (x >= upper) { return x - threshold; }
-  let t = (x - lower) / (2.0 * knee);
-  return knee * t * t;
+  let t = (x - lower) / (2.0 * k);
+  return k * t * t;
 }

@@ -1,6 +1,6 @@
 // Bilateral filter for cloud edge-preserving softening.
 //
-// A 5×5 kernel weighted by both spatial Gaussian and luminance similarity.
+// A square kernel weighted by both spatial Gaussian and luminance similarity.
 // The range weight (sigmaRange) acts as an edge-stop: samples whose luminance
 // differs too much from the center pixel contribute near-zero weight, so
 // cloud-sky boundaries stay sharp while uniform cloud interiors are smoothed.
@@ -14,6 +14,10 @@
 //   0 – sourceTexture : texture_2d<f32>
 //   1 – sourceSampler : sampler
 //   2 – uniforms      : SkyBilateralUniforms
+
+// Kernel half-width in texels, supplied by the pipeline (SkyQuality.ts). It
+// bounds the sample loop, so it must be a const rather than a uniform.
+const BILATERAL_RADIUS: i32 = ${ BILATERAL_RADIUS };
 
 struct SkyBilateralUniforms {
     resolution        : vec2<f32>,   // width, height in pixels
@@ -95,9 +99,12 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
     var result      = vec4f(0.0);
     var totalWeight = 0.0;
 
-    // 9×9 kernel (±4 texels)
-    for (var y: i32 = -4; y <= 4; y++) {
-        for (var x: i32 = -4; x <= 4; x++) {
+    // (2R+1)² kernel, R supplied by the pipeline (SkyQuality.ts), which sizes it
+    // against the sigmas above — see the bilateralRadius comment there for the
+    // truncation figures. Weights are renormalised below, so a tighter kernel
+    // narrows the blur rather than darkening it.
+    for (var y: i32 = -BILATERAL_RADIUS; y <= BILATERAL_RADIUS; y++) {
+        for (var x: i32 = -BILATERAL_RADIUS; x <= BILATERAL_RADIUS; x++) {
             let offset   = vec2f(f32(x), f32(y));
             let sampleUV = uv + offset * texel;
             let s        = textureSampleLevel(sourceTexture, sourceSampler, sampleUV, 0.0);

@@ -35,6 +35,13 @@ export class ShadowUniforms implements ISharedUniformBuffer {
   private spotFloats: Float32Array;
   private spotInts: Uint32Array;
 
+  // Textures the current bind group samples, so a swap can be detected. A
+  // replaced texture is not an error the API reports — the old one stays alive
+  // and readable, it just stops being rendered into — so the only way to notice
+  // is to compare identity. Mirrors boundDepthTexture in GodRaysPostProcess.
+  private boundCloudShadowMap: GPUTexture | null = null;
+  private boundShadowAtlas: GPUTexture | null = null;
+
   constructor(group: number) {
     this.group = group;
     this.requiresBuild = true;
@@ -94,6 +101,9 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       return;
     }
 
+    this.boundCloudShadowMap = cloudShadowMap;
+    this.boundShadowAtlas = shadowAtlas;
+
     this.bindGroup = device.createBindGroup({
       layout: pipelineLayout,
       entries: [
@@ -130,6 +140,19 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       !this.bindGroup
     )
       return;
+
+    // Either source can replace its texture — the sky rebuilds the cloud shadow
+    // map if its resolution changes, and the shadow atlas is recreated with the
+    // cascade config. The bind group would go on sampling the old texture, which
+    // nothing renders into any more: shadows frozen mid-drift, no error. The
+    // tracker checks this flag before prepare() each frame, so flagging here
+    // costs one stale frame and then self-heals.
+    if (
+      this.boundCloudShadowMap !== renderer.cloudShadowMap ||
+      this.boundShadowAtlas !== renderer.shadowAtlas
+    ) {
+      this.requiresBuild = true;
+    }
 
     // --- Cloud shadow ---
     const shadowRenderer = renderer.sky?.skyRenderer?.cloudShadowRenderer;

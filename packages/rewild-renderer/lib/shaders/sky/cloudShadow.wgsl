@@ -56,7 +56,8 @@ struct VertexShaderOutput {
   return vsOutput;
 }
 
-const NUM_SHADOW_SAMPLES: i32 = 32;
+// Supplied by the pipeline (SkyQuality.ts); bounds the march loop below.
+const NUM_SHADOW_SAMPLES: i32 = ${ SHADOW_SAMPLES };
 
 @fragment fn fs(
   @builtin(position) fragCoord: vec4f,

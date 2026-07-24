@@ -18,6 +18,8 @@ export * from './core/GltfLoader';
 export * from './core/UIElement';
 export * from './core/UIPointerEvent';
 export * from './typeGuards';
+export * from './utils/RenderQuality';
+export * from './utils/shaderDefines';
 export * from './acceleration';
 export * from './core/Raycaster';
 export * from './renderers/terrain/Biomes';

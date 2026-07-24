@@ -3,6 +3,9 @@ import shader from '../../shaders/sky/cloudShadow.wgsl';
 import constantsFns from '../../shaders/sky/skyConstants.wgsl';
 import cloudNoiseFns from '../../shaders/sky/cloudNoise.wgsl';
 import cloudDensityFns from '../../shaders/sky/cloudDensity.wgsl';
+import { RenderQuality } from '../../utils/RenderQuality';
+import { composeShader } from '../../utils/shaderDefines';
+import { cloudShadowShaderDefines } from './SkyQuality';
 
 export interface CloudShadowConfig {
   resolution: number;
@@ -17,6 +20,10 @@ const DEFAULT_CONFIG: CloudShadowConfig = {
 };
 
 export class CloudShadowRenderer {
+  /** Quality tier, read when init() builds the shader module. Assigned by
+   *  SkyRenderer.init(); set `skyRenderer.quality` to change it. */
+  quality: RenderQuality = 'high';
+
   shadowMap: GPUTexture;
   pipeline: GPURenderPipeline;
   bindGroup: GPUBindGroup;
@@ -33,17 +40,36 @@ export class CloudShadowRenderer {
     const { device } = renderer;
     const { resolution } = this.config;
 
-    this.shadowMap = device.createTexture({
-      size: [resolution, resolution, 1],
-      format: 'r16float',
-      label: 'cloud shadow map',
-      usage:
-        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    });
+    // The shadow map is sized from config.resolution, not the canvas, so a
+    // re-init (window resize, quality change) does not need a new one — and
+    // creating one anyway is actively harmful. Terrain materials bake a view of
+    // this texture into their bind group once (ShadowUniforms.build), and
+    // nothing tells them it was replaced. The pass below would then render into
+    // the new texture while the terrain kept sampling the old one, which is
+    // still alive and so raises no validation error: the cloud shadows simply
+    // freeze mid-drift.
+    //
+    // The old texture is deliberately not destroyed on a genuine resolution
+    // change: a bind group may still reference it for another frame (see the
+    // identity check in ShadowUniforms.prepare, which rebuilds one frame later).
+    // Leaking a 2 MB texture on a config change nobody makes at runtime beats a
+    // use-after-destroy.
+    if (!this.shadowMap || this.shadowMap.width !== resolution) {
+      this.shadowMap = device.createTexture({
+        size: [resolution, resolution, 1],
+        format: 'r16float',
+        label: 'cloud shadow map',
+        usage:
+          GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      });
+    }
 
     const module = device.createShaderModule({
       label: 'cloud shadow shader',
-      code: shader + constantsFns + cloudNoiseFns + cloudDensityFns,
+      code: composeShader(
+        [shader, constantsFns, cloudNoiseFns, cloudDensityFns],
+        cloudShadowShaderDefines(this.quality)
+      ),
     });
 
     this.pipeline = device.createRenderPipeline({

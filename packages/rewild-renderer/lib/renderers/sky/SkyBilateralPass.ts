@@ -1,5 +1,8 @@
 import { Renderer } from '../../Renderer';
 import bilateralShader from '../../shaders/sky/skyBilateral.wgsl';
+import { RenderQuality } from '../../utils/RenderQuality';
+import { composeShader } from '../../utils/shaderDefines';
+import { bilateralShaderDefines } from './SkyQuality';
 
 // Uniform layout (matches SkyBilateralUniforms in skyBilateral.wgsl):
 //   resolution        : vec2<f32>    offset  0, size  8
@@ -33,6 +36,10 @@ const CLOUD_START = 500.0;
  * sigmaRange:   luminance edge-stop (default 0.05 — lower = sharper edges)
  */
 export class SkyBilateralPass {
+  /** Quality tier, read when init() builds the shader module. Assigned by
+   *  SkyRenderer.init(); set `skyRenderer.quality` to change it. */
+  quality: RenderQuality = 'high';
+
   renderTarget: GPUTexture;
   sourceTexture: GPUTexture | null;
 
@@ -83,7 +90,10 @@ export class SkyBilateralPass {
 
     const module = device.createShaderModule({
       label: 'sky bilateral shader',
-      code: bilateralShader,
+      code: composeShader(
+        [bilateralShader],
+        bilateralShaderDefines(this.quality)
+      ),
     });
 
     this.renderTarget = device.createTexture({
