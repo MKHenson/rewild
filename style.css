@@ -1,7 +1,7 @@
 :root {
-  --primary-400: #2861a3;
-  --primary-500: #1f4f86;
-  --primary-600: #194372;
+  --primary-400: #1664ad;
+  --primary-500: #1a5c8e;
+  --primary-600: #0f3e5c;
 
   --secondary-400: rgb(45, 143, 146);
   --secondary-500: rgb(17, 84, 87);
@@ -38,7 +38,12 @@
   --on-surface: #333;
   --on-subtle: #333;
   --on-surface-light: #666;
+  --on-surface-lighter: #999;
   --on-surface-border: #ccc;
+  /* Text the user typed or picked, inside a form field. Sits between the field
+     label (--on-surface) and its caption (--on-surface-light) so a form reads
+     label first, value second. */
+  --on-field: #555;
 
   --on-error-400: #fff;
   --on-error-500: #fff;

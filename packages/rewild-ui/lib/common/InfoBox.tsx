@@ -1,7 +1,7 @@
 import { Typography } from './Typography';
 import { Component, register } from '../Component';
 import { theme } from '../theme';
-import { IconType, MaterialIcon } from './MaterialIcon';
+import { IconType, Icon } from './Icon';
 
 interface Props {
   variant: 'info' | 'error' | 'warning';
@@ -20,13 +20,13 @@ export class InfoBox extends Component<Props> {
           case 'info':
             return 'info';
           case 'error':
-            return 'error';
+            return 'circle-alert';
           case 'warning':
-            return 'warning';
+            return 'triangle-alert';
         }
       };
 
-      const getMaterialIconColor = (): string => {
+      const getIconColor = (): string => {
         switch (variant) {
           case 'info':
             return theme.colors.onPrimary600;
@@ -40,10 +40,7 @@ export class InfoBox extends Component<Props> {
       return (
         <div class={variant}>
           <div class="icon">
-            <MaterialIcon
-              icon={getIcon()}
-              style={`color: ${getMaterialIconColor()};`}
-            />
+            <Icon icon={getIcon()} style={`color: ${getIconColor()};`} />
           </div>
           <div class="content">
             <Typography variant="label">{this.props.title}</Typography>

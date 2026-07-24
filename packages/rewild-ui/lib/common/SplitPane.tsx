@@ -149,7 +149,7 @@ const StyledPane3D = cssStylesheet(css`
   :host .horizontal .dragger {
     height: 4px;
     width: 100%;
-    background-color: #3b5db4;
+    background-color: var(--on-surface-lighter);
     cursor: pointer;
   }
 
@@ -157,7 +157,7 @@ const StyledPane3D = cssStylesheet(css`
   :host .vertical .dragger {
     width: 4px;
     height: 100%;
-    background-color: #3b5db4;
+    background-color: var(--on-surface-lighter);
     cursor: pointer;
   }
 

@@ -42,12 +42,16 @@ export class Modal extends Component<ModalProps> {
       this.props.onClose && this.props.onClose();
     };
 
+    // The css override is forwarded to the Popup as well as being applied to
+    // this component's own tree: `.wrapper`/`.modal` live in the Popup's shadow
+    // root, so callers styling the modal box can't reach them from here.
     return () => (
       <Popup
         open={this.props.open}
         onClose={this.props.onClose}
         withBackground={this.props.withBackground}
-        portal={this.props.portal}>
+        portal={this.props.portal}
+        css={this.props.css}>
         {typeof this.props.title === 'string' ? (
           <Typography variant="h3">{this.props.title}</Typography>
         ) : (

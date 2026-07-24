@@ -9,7 +9,7 @@ export const baseActorTemplate: ITreeNode = {
 
 export const containerFactory: () => ITreeNode<IResource> = () => ({
   ...baseActorTemplate,
-  icon: 'label',
+  icon: 'box',
   onDragOver(data, node) {
     if (data?.type === 'treenode' && (data as ITreeNodeAction).node)
       return false;

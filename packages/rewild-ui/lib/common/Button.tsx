@@ -63,33 +63,44 @@ export class Button extends Component<Props> {
 
 const StyledButtons = cssStylesheet(css`
   :host {
-    display: inline-block;
+    /* Flex, not inline-block: an icon and a label are then laid out and spaced
+       by the button itself, instead of each call site nudging them apart. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
     padding: 0.5rem 1rem;
-    border-radius: 5px;
-    border: none;
-    text-transform: uppercase;
-    font-weight: 500;
+    border-radius: 6px;
+    /* Transparent rather than none, so contained and outlined buttons are the
+       same size and sit level next to each other in a group. */
+    border: 1px solid transparent;
     font-family: var(--font-family);
-    font-weight: 400;
+    font-weight: 500;
     font-size: 14px;
-    display: inline-block;
+    line-height: 1.25;
+    letter-spacing: 0.01em;
     text-align: center;
     user-select: none;
     cursor: pointer;
-    transition: box-shadow 0.25s, background-color 0.25s;
+    /* Quick and eased — a button should read as responding, not animating.
+       transform is left out on purpose: the press must land instantly. */
+    transition: background-color 0.15s ease, box-shadow 0.15s ease,
+      color 0.15s ease, border-color 0.15s ease;
   }
   :host([fullwidth]) {
-    display: block;
+    display: flex;
   }
 
-  :host > * {
-    vertical-align: middle;
+  /* Every variant dips on press. Cheap, and it does most of the work of making
+     the control feel physical. */
+  :host(:active) {
+    transform: translateY(1px);
   }
 
   /* Icons take the button's colour, so they follow it through hover, selected
      and disabled instead of keeping their own muted default. */
-  ::slotted(x-material-icon),
-  ::slotted(x-styled-material-icon) {
+  ::slotted(x-icon),
+  ::slotted(x-styled-icon) {
     color: inherit;
   }
 
@@ -98,11 +109,18 @@ const StyledButtons = cssStylesheet(css`
     opacity: 0.65;
     pointer-events: none;
   }
+  /* Two soft layers offset straight down — a contact shadow plus a wider
+     ambient one. The old single 2px/2px offset shadow fell to the right, which
+     reads as a sticker rather than as height. */
   :host(.contained) {
-    box-shadow: 2px 2px 2px rgb(0 0 0 / 30%);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 12%), 0 1px 3px rgb(0 0 0 / 8%);
   }
   :host(.contained):hover {
-    box-shadow: 2px 2px 4px rgb(0 0 0 / 40%);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 14%), 0 4px 8px rgb(0 0 0 / 8%);
+  }
+  /* Pressed sits back down on the surface. */
+  :host(.contained):active {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 14%);
   }
   :host(.contained.primary) {
     background: ${theme?.colors.primary400};
@@ -144,14 +162,15 @@ const StyledButtons = cssStylesheet(css`
   :host(.text) {
     background: transparent;
   }
-  :host(.outlined:hover) {
-    background: rgba(0, 0, 0, 0.05);
-  }
-  :host(.outlined:active) {
-    background: rgba(0, 0, 0, 0.1);
-  }
+  /* Tinted with the button's own colour rather than a flat grey wash, so a
+     primary and an error button hover as themselves. */
+  :host(.outlined:hover),
   :host(.text:hover) {
-    font-weight: 500;
+    background: color-mix(in srgb, currentColor 8%, transparent);
+  }
+  :host(.outlined:active),
+  :host(.text:active) {
+    background: color-mix(in srgb, currentColor 14%, transparent);
   }
   :host(.outlined.primary) {
     color: ${theme?.colors.primary400};
@@ -180,12 +199,16 @@ const StyledButtons = cssStylesheet(css`
      buttons is more chrome than content. */
   :host(.ghost) {
     background: transparent;
-    border: none;
+    /* Keeps the base transparent border rather than dropping to none, so a
+       ghost button is the same size as the framed ones beside it. */
     color: ${theme?.colors.onSubtle};
   }
   :host(.ghost:hover) {
-    background: rgba(0, 0, 0, 0.05);
+    background: color-mix(in srgb, currentColor 8%, transparent);
     color: ${theme?.colors.onSurface};
+  }
+  :host(.ghost:active) {
+    background: color-mix(in srgb, currentColor 14%, transparent);
   }
 
   /* Selected (toggle) — last so it wins over the hover rules above at equal

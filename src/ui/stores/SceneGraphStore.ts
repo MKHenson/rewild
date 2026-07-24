@@ -71,7 +71,7 @@ export class SceneGraphStore {
         name: 'Containers',
         factoryKey: 'container',
         canSelect: true,
-        icon: 'group_work',
+        icon: 'boxes',
         id: 'CONTAINERS',
         template: containerFactory,
         children:
@@ -85,7 +85,7 @@ export class SceneGraphStore {
                   (actor) =>
                     ({
                       ...baseActorTemplate,
-                      icon: 'label_important',
+                      icon: 'box',
                       name: actor.name,
                       resource: actor,
                     } as ITreeNode)
@@ -98,7 +98,7 @@ export class SceneGraphStore {
         factoryKey: 'sky',
         canRename: false,
         canSelect: true,
-        icon: 'wb_sunny',
+        icon: 'sun',
         id: 'SKY',
         resource: {
           id: 'SKY',

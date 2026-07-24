@@ -15,7 +15,7 @@ describe('Avatar', () => {
 
     const root = avatar.shadow?.querySelector('div.avatar');
     expect(root).not.toBeNull();
-    expect(root?.querySelector('x-material-icon')).not.toBeNull();
+    expect(root?.querySelector('x-icon')).not.toBeNull();
     expect(root?.querySelector('img')).toBeNull();
   });
 

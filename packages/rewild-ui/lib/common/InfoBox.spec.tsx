@@ -3,7 +3,7 @@ import { InfoBox } from './InfoBox';
 
 type InfoBoxOptions = NonNullable<ConstructorParameters<typeof InfoBox>[0]>;
 type InfoBoxProps = InfoBoxOptions['props'];
-type MaterialIconElement = HTMLElement & {
+type IconElement = HTMLElement & {
   _props?: {
     icon?: string;
     style?: string;
@@ -48,9 +48,9 @@ describe('InfoBox', () => {
     infoBox.render();
 
     const icon = infoBox.shadow?.querySelector(
-      'x-material-icon'
-    ) as MaterialIconElement | null;
+      'x-icon'
+    ) as IconElement | null;
     expect(icon).not.toBeNull();
-    expect(icon?._props?.icon).toBe('warning');
+    expect(icon?._props?.icon).toBe('triangle-alert');
   });
 });

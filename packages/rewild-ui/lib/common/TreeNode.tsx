@@ -1,5 +1,5 @@
 import { Typography } from './Typography';
-import { MaterialIcon, StyledMaterialIcon } from './MaterialIcon';
+import { Icon, StyledIcon } from './Icon';
 import { Component, register } from '../Component';
 import { theme } from '../theme';
 import {
@@ -132,17 +132,17 @@ export class TreeNode extends Component<NodeProps> {
             }>
             {props.node.children && props.node.children.length ? (
               expanded() ? (
-                <MaterialIcon
+                <Icon
                   class="expand-icon"
                   onClick={handleExpandedClick}
-                  icon="arrow_drop_down"
+                  icon="chevron-down"
                   size="s"
                 />
               ) : (
-                <MaterialIcon
+                <Icon
                   class="expand-icon"
                   onClick={handleExpandedClick}
-                  icon="arrow_drop_up"
+                  icon="chevron-right"
                   size="s"
                 />
               )
@@ -160,7 +160,7 @@ export class TreeNode extends Component<NodeProps> {
               <Typography variant="body2">
                 {props.node.icon && (
                   <span class="node-icon">
-                    <StyledMaterialIcon
+                    <StyledIcon
                       icon={props.node.icon}
                       size={props.node.iconSize || 's'}
                     />

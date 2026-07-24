@@ -5,6 +5,7 @@ import { InGame } from './InGame';
 import { Auth } from './Auth';
 import { ConfirmationModal } from './ConfirmationModal';
 import { ResetPassword } from './ResetPassword';
+import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
 
 interface Props {}
 
@@ -24,6 +25,7 @@ export class Application extends Component<Props> {
     };
 
     const canvas = <div class="background" />;
+    canvas.style.backgroundImage = `url(${resolveAssetUrl('strata-bg.jpg')})`;
 
     return () => {
       return [
@@ -59,7 +61,6 @@ export class Application extends Component<Props> {
 
       .background {
         height: 100%;
-        background-image: url('/earth.jpg');
         background-size: cover;
         background-position: center;
       }

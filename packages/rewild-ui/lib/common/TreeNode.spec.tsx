@@ -65,7 +65,7 @@ describe('TreeNode', () => {
     tn._createRenderer();
     tn.render();
 
-    const expandIcon = tn.shadow?.querySelector('x-material-icon');
+    const expandIcon = tn.shadow?.querySelector('x-icon');
     expect(expandIcon).not.toBeNull();
   });
 
@@ -79,7 +79,7 @@ describe('TreeNode', () => {
     tn.render();
 
     const expandIcon = tn.shadow?.querySelector(
-      '.tree-content > x-material-icon'
+      '.tree-content > x-icon'
     );
     expect(expandIcon).toBeNull();
   });

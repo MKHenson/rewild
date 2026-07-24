@@ -29,6 +29,7 @@ export const theme = {
     onSubtle: 'var(--on-subtle)',
     onSurfaceLight: 'var(--on-surface-light)',
     onSurfaceBorder: 'var(--on-surface-border)',
+    onField: 'var(--on-field)',
     onError400: 'var(--on-error-400)',
     onError500: 'var(--on-error-500)',
     onError600: 'var(--on-error-600)',

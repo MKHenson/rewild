@@ -1,4 +1,4 @@
-import { MaterialIcon } from './MaterialIcon';
+import { Icon } from './Icon';
 import { Component, register } from '../Component';
 import { theme } from '../theme';
 
@@ -35,6 +35,10 @@ export class Select extends Component<Props> {
       const alreadyShown = !!options.parentElement;
       if (!alreadyShown) document.body.appendChild(options);
       positionOptions();
+      // Drives the open styling (accent border, flipped arrow). Set on the host
+      // directly because toggling the dropdown deliberately skips a re-render,
+      // so it cannot come from a class in the render function.
+      this.classList.add('open');
 
       if (!alreadyShown && usePopover) {
         try {
@@ -47,6 +51,7 @@ export class Select extends Component<Props> {
     };
 
     const hideOptions = () => {
+      this.classList.remove('open');
       if (options.parentElement) document.body.removeChild(options);
     };
 
@@ -122,7 +127,7 @@ export class Select extends Component<Props> {
                 ?.label
             }
           </div>
-          <MaterialIcon icon="arrow_drop_down" size="s" />
+          <Icon icon="chevron-down" size="s" />
         </div>
       );
     };
@@ -168,12 +173,16 @@ export class Options extends Component {
 }
 
 const StyledOption = cssStylesheet(css`
+  /* Padding and size track .select's so each label stays put as the list
+     opens over the control. */
   :host {
     display: block;
-    padding: 0.5rem;
+    padding: 0.6rem;
     font-weight: 400;
+    font-size: ${theme.colors.fontSizeMedium};
     background-color: ${theme.colors.surface};
-    color: ${theme.colors.onSurface};
+    color: ${theme.colors.onField};
+    transition: background-color 0.15s;
   }
 
   :host(:hover) {
@@ -198,11 +207,16 @@ const StyledOptions = cssStylesheet(css`
        document and the list would slide away from its select on scroll. */
     position: fixed;
     display: block;
-    border-radius: 5px;
-    overflow: hidden;
+    /* Matches the control it drops out of. */
+    border-radius: 4px;
     cursor: pointer;
     border: 1px solid ${theme.colors.onSurfaceBorder};
-    box-shadow: ${theme.colors.shadowShort1};
+    box-shadow: ${theme.colors.shadowShort2};
+    /* A long list scrolls rather than running off the viewport. x stays hidden
+       so the first and last options are clipped to the radius. */
+    max-height: 16rem;
+    overflow-x: hidden;
+    overflow-y: auto;
     /* Only relevant on the non-popover fallback path; in the top layer there is
        nothing left to stack against. */
     z-index: 10;
@@ -210,13 +224,13 @@ const StyledOptions = cssStylesheet(css`
 
   /* Top-layer popover: the UA centres popovers with inset:0 + margin:auto and
      adds its own box styling, all of which would override the position we set
-     inline. Strip it back so this stays an anchored dropdown. */
+     inline. Strip it back so this stays an anchored dropdown — but leave
+     overflow alone, or the scrolling set above is undone. */
   :host([popover]) {
     inset: auto;
     margin: 0;
     padding: 0;
     background: none;
-    overflow: hidden;
   }
 `);
 
@@ -224,20 +238,59 @@ const StyledSelect = cssStylesheet(css`
   :host {
     position: relative;
     display: block;
+    /* Keeps a caption below the field off its border. On the host rather than
+       on .select so it stays outside getBoundingClientRect — positionOptions
+       anchors the dropdown to rect.bottom, which must be the border edge. */
+    margin-bottom: 0.6rem;
   }
 
+  /* Deliberately mirrors Input's box: the two sit next to each other in forms,
+     so they share the padding, border, radius and text colour. */
   .select {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 0.5rem;
+    box-sizing: border-box;
+    padding: 0.6rem;
+    font-size: ${theme.colors.fontSizeMedium};
+    background: ${theme.colors.surface};
+    color: ${theme.colors.onField};
+    border: 1px solid ${theme.colors.onSurfaceBorder};
+    border-radius: 4px;
+    transition: all 0.25s;
     /* The whole row is a button, so it must not look like selectable text —
        a caret over the arrow reads as "this does nothing". */
     cursor: pointer;
     user-select: none;
   }
 
+  .select:hover {
+    border-color: ${theme.colors.onSurfaceLight};
+  }
+
+  /* Same treatment Input gives :focus — an open dropdown is the equivalent
+     "this control has the interaction" state. */
+  :host(.open) .select {
+    border-color: ${theme.colors.primary400};
+    color: ${theme.colors.primary500};
+  }
+
   .value {
-    padding: 2px;
     font-weight: 400;
+    /* A label longer than the control must not push the arrow off the row. */
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  x-icon {
+    flex-shrink: 0;
+    transition: transform 0.25s;
+  }
+
+  /* Points at the list while it is open. */
+  :host(.open) x-icon {
+    transform: rotate(180deg);
   }
 `);
