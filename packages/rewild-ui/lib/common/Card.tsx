@@ -48,6 +48,7 @@ const StyledCard = cssStylesheet(css`
 
   :host([button]) {
     cursor: pointer;
+    border-radius: 5px;
   }
 
   :host([disabled]) {
@@ -62,7 +63,6 @@ const StyledCard = cssStylesheet(css`
     box-shadow: ${theme?.colors.shadowShort2};
   }
   :host(.pushed.raised) {
-    box-shadow: ${theme?.colors.shadowShort1},
-      inset 0 0 0px 2px ${theme?.colors.primary400};
+    background: color-mix(in srgb, ${theme?.colors.primary400} 6%, transparent);
   }
 `);

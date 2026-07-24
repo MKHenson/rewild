@@ -1,4 +1,4 @@
-import type { IconType } from '../lib/common/MaterialIcon';
+import type { IconType } from '../lib/common/Icon';
 
 export interface IDragDropAction {
   type: 'cell-move' | 'treenode';

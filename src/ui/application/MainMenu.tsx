@@ -3,7 +3,7 @@ import {
   Modal,
   Button,
   Typography,
-  MaterialIcon,
+  Icon,
   Loading,
   Component,
   register,
@@ -30,6 +30,7 @@ export class MainMenu extends Component<Props> {
           hideConfirmButtons
           withBackground={false}
           open={props.open}
+          css={MainMenuOverrides}
           title={
             <Typography variant="h2" style={`text-align: center; margin: 0;`}>
               Rewild
@@ -61,7 +62,7 @@ export class MainMenu extends Component<Props> {
                 <span>Options</span>
               </Button>
               <Button onClick={props.onEditor} fullWidth>
-                <MaterialIcon size="s" icon="build_circle" />
+                <Icon size="s" icon="wrench" />
                 <span>Editor</span>
               </Button>
             </div>
@@ -77,7 +78,7 @@ export class MainMenu extends Component<Props> {
         margin: 1rem 0 0 0;
       }
 
-      x-material-icon {
+      x-icon {
         margin: 0 4px 0 0;
       }
 
@@ -93,3 +94,13 @@ export class MainMenu extends Component<Props> {
     `;
   }
 }
+
+const MainMenuOverrides = css`
+  :host .modal {
+    width: 800px;
+    top: 10%;
+    /* Popup centres the box vertically; anchor it to top instead. */
+    transform: translate(-50%, 0);
+    background-color: rgba(255, 255, 255, 0.9);
+  }
+`;

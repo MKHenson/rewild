@@ -1,4 +1,4 @@
-import { MaterialIcon } from "./MaterialIcon";
+import { Icon } from "./Icon";
 import { Component, register } from "../Component";
 import { theme } from "../theme";
 
@@ -29,7 +29,7 @@ export class Avatar extends Component<Props> {
         }
         return <div class="avatar">{img}</div>;
       }
-      return <div class="avatar"><MaterialIcon icon="person" /></div>;
+      return <div class="avatar"><Icon icon="user" /></div>;
     };
   }
 

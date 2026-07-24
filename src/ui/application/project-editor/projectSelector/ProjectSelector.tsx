@@ -7,7 +7,7 @@ import {
   register,
   Typography,
   Button,
-  StyledMaterialIcon,
+  StyledIcon,
 } from 'rewild-ui';
 import { NewProjectForm } from '../NewProjectForm';
 import { projectsStore } from '../../../stores/ProjectsStore';
@@ -79,7 +79,7 @@ export class ProjectSelector extends Component<Props> {
           <div class="container">
             <div class="nav-buttons">
               <Button variant="text" onClick={onBack}>
-                <StyledMaterialIcon icon="chevron_left" />
+                <StyledIcon icon="chevron-left" />
                 <span>Back</span>
               </Button>
             </div>
@@ -101,11 +101,14 @@ export class ProjectSelector extends Component<Props> {
               ) : (
                 <div class="projects-list">
                   <Card button raised disabled={loading} onClick={onNewProject}>
-                    <Typography variant="h4">
-                      <div>
-                        <StyledMaterialIcon icon="add_circle" />
-                      </div>
-                      Add New Project
+                    {/* Flexed on the Typography's own box rather than around it:
+                        the label wraps at this card width, and a row here keeps
+                        the icon centred against the whole wrapped block. */}
+                    <Typography
+                      variant="h4"
+                      style="display: flex; align-items: center; justify-content: center; gap: 5px">
+                      <StyledIcon icon="circle-plus" size="s" />
+                      <span>New Project</span>
                     </Typography>
                   </Card>
                   {loading || projectsStore.error ? (
@@ -179,7 +182,7 @@ export class ProjectSelector extends Component<Props> {
         display: grid;
         align-content: stretch;
         grid-template-columns: 2fr 1fr;
-        grid-template-rows: 40px 1fr 1fr;
+        grid-template-rows: 50px 1fr 1fr;
         width: 860px;
         height: 500px;
         min-height: 300px;
@@ -212,8 +215,12 @@ export class ProjectSelector extends Component<Props> {
         align-self: end;
       }
 
+      .actions x-button {
+        margin-top: 10px;
+      }
+
       .nav-buttons x-button {
-        padding: 0;
+        margin-bottom: 10px;
       }
     `;
   }

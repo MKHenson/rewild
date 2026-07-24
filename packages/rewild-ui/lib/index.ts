@@ -14,7 +14,7 @@ export * from './common/InfoBox';
 export * from './common/Input';
 export * from './common/NumberInput';
 export * from './common/Loading';
-export * from './common/MaterialIcon';
+export * from './common/Icon';
 export * from './common/Modal';
 export * from './common/Pane3D';
 export * from './common/SplitPane';

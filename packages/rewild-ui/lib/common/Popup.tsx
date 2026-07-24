@@ -95,6 +95,10 @@ const StyledPopup = cssStylesheet(css`
     border: 0;
     background: none;
     overflow: visible;
+    /* The UA sheet also sets color: CanvasText on [popover]. That beats the
+       inherited page color and cascades into every descendant's shadow tree,
+       so restore the theme colour here rather than in each child component. */
+    color: ${theme?.colors.onSurface};
   }
 
   :host,

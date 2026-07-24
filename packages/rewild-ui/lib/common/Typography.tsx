@@ -1,7 +1,21 @@
-import { Component, register } from "../Component";
+import { Component, register } from '../Component';
 
-export type TypographyVariant = "h1" | "h2" | "h3" | "h4" | "body1" | "body2" | "label" | "light";
-export type TypographyAlign = "center" | "inherit" | "justify" | "left" | "right";
+export type TypographyVariant =
+  | 'h1'
+  | 'h2'
+  | 'h3'
+  | 'h4'
+  | 'body1'
+  | 'body2'
+  | 'label'
+  | 'light'
+  | 'info';
+export type TypographyAlign =
+  | 'center'
+  | 'inherit'
+  | 'justify'
+  | 'left'
+  | 'right';
 
 interface Props {
   class?: string;
@@ -10,15 +24,14 @@ interface Props {
   onClick?: (e: MouseEvent) => void;
 }
 
-@register("x-typography")
+@register('x-typography')
 export class Typography extends Component<Props> {
   init() {
     return () => (
       <div
-        class={`typography ${this.props.variant} ${this.props.class || ""}`}
+        class={`typography ${this.props.variant} ${this.props.class || ''}`}
         onclick={this.props.onClick}
-        style={this.props.style}
-      >
+        style={this.props.style}>
         <slot></slot>
       </div>
     );
@@ -47,6 +60,13 @@ const StyledTypography = cssStylesheet(css`
     font-size: 0.875rem;
     line-height: 1.43;
     letter-spacing: 0.01071em;
+  }
+  .info {
+    font-weight: 300;
+    font-size: 0.75rem;
+    line-height: 1.33;
+    letter-spacing: 0.01071em;
+    color: var(--on-surface-light);
   }
   .h1 {
     font-weight: 300;

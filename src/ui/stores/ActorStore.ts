@@ -32,12 +32,12 @@ export class ActorStore {
           children: template.actors.map(
             (actor) =>
               ({
-                icon: 'label_important',
+                icon: 'box',
                 iconSize: 'xs',
                 name: actor.name,
                 template: () => ({
                   ...baseActorTemplate,
-                  icon: 'label_important',
+                  icon: 'box',
                   resource: {
                     ...actor,
                     id: createUUID(),

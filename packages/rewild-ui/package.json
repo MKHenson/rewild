@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.ts",
-  "devDependencies": {},
   "types": "./types",
   "scripts": {
     "clean": "rimraf build",
@@ -20,5 +19,8 @@
   "bugs": {
     "url": "https://github.com/Webinate/rewild/issues"
   },
-  "homepage": "https://github.com/Webinate/rewild#readme"
+  "homepage": "https://github.com/Webinate/rewild#readme",
+  "dependencies": {
+    "lucide": "^1.26.0"
+  }
 }

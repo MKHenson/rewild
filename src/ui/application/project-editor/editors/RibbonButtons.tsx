@@ -2,7 +2,7 @@ import {
   theme,
   Component,
   register,
-  StyledMaterialIcon,
+  StyledIcon,
   ButtonGroup,
   Card,
   Button,
@@ -35,32 +35,32 @@ export class RibbonButtons extends Component<Props> {
               variant="text"
               onClick={this.props.onHome}
               disabled={loading}>
-              <StyledMaterialIcon icon="home" size="s" />
+              <StyledIcon icon="house" size="s" />
             </Button>
             <Button
               variant="text"
               disabled={!dirty || loading}
               onClick={() => projectStore.updateProject()}>
-              <StyledMaterialIcon icon="save" size="s" />
+              <StyledIcon icon="save" size="s" />
             </Button>
             <Button
               variant="text"
               disabled={loading}
               onClick={() => projectStore.publish()}>
-              <StyledMaterialIcon icon="file_upload" size="s" />
+              <StyledIcon icon="upload" size="s" />
             </Button>
             <Button
               variant="text"
               disabled={loading || !projectStore.project?.sceneGraph?.terrain}
               onClick={() => setTerrainOpen(true)}>
-              <StyledMaterialIcon icon="landscape" size="s" />
+              <StyledIcon icon="mountain-snow" size="s" />
             </Button>
             <Button
               variant="text"
               class={sculptStore.enabled ? 'sculpt-active' : ''}
               disabled={loading || !projectStore.project?.sceneGraph?.terrain}
               onClick={() => sculptStore.setEnabled(!sculptStore.enabled)}>
-              <StyledMaterialIcon icon="draw" size="s" />
+              <StyledIcon icon="trending-up-down" size="s" />
             </Button>
           </ButtonGroup>
           {terrainOpen() && (
@@ -81,12 +81,22 @@ const StyledRibbonButtons = cssStylesheet(css`
     padding: 3px;
   }
 
+  /* These buttons hold nothing but an icon, so this colour IS the icon colour —
+     Button forwards its own colour to slotted icons. A rule here is in the
+     outer tree, so it also beats every :host() colour inside Button, hover
+     included; the hover state has to be restated rather than inherited. */
   x-button {
-    color: ${theme?.colors.onSubtle};
+    color: ${theme?.colors.onSurfaceLight};
     padding: 0.5rem;
+    border-radius: 5px;
   }
 
-  x-button.sculpt-active {
+  x-button:hover {
+    color: ${theme?.colors.onSurface};
+  }
+
+  x-button.sculpt-active,
+  x-button.sculpt-active:hover {
     color: ${theme?.colors.primary400};
   }
 `);

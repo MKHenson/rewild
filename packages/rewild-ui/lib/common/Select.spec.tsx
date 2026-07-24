@@ -34,7 +34,7 @@ describe('Select', () => {
     cmp._createRenderer();
     cmp.render();
 
-    const icon = cmp.shadow?.querySelector('x-material-icon');
+    const icon = cmp.shadow?.querySelector('x-icon');
     expect(icon).not.toBeNull();
   });
 

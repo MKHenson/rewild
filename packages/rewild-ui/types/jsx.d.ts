@@ -3,7 +3,9 @@ declare namespace JSX {
   type Element = HTMLElement;
 
   /** The child types we allow  */
-  export type ChildElement = JSX.Element | number | boolean | undefined | null | string;
+  // SVGElement is not an HTMLElement, but the factory creates SVG nodes via
+  // createElementNS and appends them like any other child, so it belongs here.
+  export type ChildElement = JSX.Element | SVGElement | number | boolean | undefined | null | string;
 
   export interface PropsWithChildren {
     children?: JSX.ChildElement | JSX.ChildElement[];
