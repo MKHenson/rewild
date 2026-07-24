@@ -82,7 +82,7 @@ export class SkyRenderer {
   godRayEnabled: boolean = true;
   /** Master brightness multiplier (range 0–3). Scales the final ray intensity on top of the
    *  per-frame horizon fade. 0 = invisible, 1 = default, >1 = exaggerated shafts. */
-  godRayIntensity: number = 3.0;
+  godRayIntensity: number = 2.0;
   /** Fraction of the pixel→sun distance the march covers (range 0.1–1.0). At 1.0 the
    *  march reaches the sun itself, which gives the longest, most sharply converging
    *  shafts; lower values stop short and leave a softer glow near the sun. */
