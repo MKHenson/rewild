@@ -167,7 +167,7 @@ fn applyClimateTint(color: vec3f, temperature: f32, neutralize: f32) -> vec3f {
     let warm = max(temperature - 0.5, 0.0) * 2.0;
     let cool = max(0.5 - temperature, 0.0) * 2.0;
 
-    let warmTint = vec3f(1.0 + 0.35 * warm, 1.0 + 0.085 * warm, 1.0 - 0.2 * warm);
+    let warmTint = vec3f(1.0 + 0.35 * warm, 1.0 + 0.085 * warm, 1.0 - 0.07 * warm);
     var result = color * mix(warmTint, vec3f(1.0), neutralize);
 
     let luma = dot(result, vec3f(0.2126, 0.7152, 0.0722));

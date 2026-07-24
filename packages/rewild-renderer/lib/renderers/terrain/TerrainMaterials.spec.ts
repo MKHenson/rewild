@@ -1,5 +1,6 @@
 import {
   BiomeLayer,
+  CLIMATE_PRESETS,
   ClimateConfig,
   DEFAULT_CLIMATE,
   MAX_SPLAT_LAYERS,
@@ -155,20 +156,23 @@ describe('validateTerrainMaterials', () => {
 describe('getClimatePalette', () => {
   it('lists the default climate materials, base-first per biome', () => {
     expect(getClimatePalette(DEFAULT_CLIMATE)).toEqual([
-      'forest-ground-01',
+      'grass_01_1k',
+      'grass_path_02_1k',
+      'forest_leaves_03_1k',
       'forest_leaves_02',
       'aerial_rocks_01',
       'marble_cliff_05',
       'snow-02',
-      'sand_01',
-      'mud_cracked_dry_03',
     ]);
   });
 
-  it('fits the splat map', () => {
-    expect(
-      getClimatePalette(DEFAULT_CLIMATE).length
-    ).toBeLessThanOrEqual(MAX_SPLAT_LAYERS);
+  // Over the registry rather than one preset: the splat map is a fixed eight
+  // channels, and a preset that overflows it renders materials the shader has
+  // no channel for. Every shipped preset has to fit, not just the default.
+  it.each(Object.keys(CLIMATE_PRESETS))('fits the splat map (%s)', (id) => {
+    expect(getClimatePalette(CLIMATE_PRESETS[id]).length).toBeLessThanOrEqual(
+      MAX_SPLAT_LAYERS
+    );
   });
 
   it('gives a material shared by two biomes a single palette entry', () => {
@@ -183,9 +187,15 @@ describe('getClimatePalette', () => {
 });
 
 describe('validateClimateLayers', () => {
-  it('accepts the shipped default climate', () => {
-    expect(() => validateClimateLayers(DEFAULT_CLIMATE)).not.toThrow();
-  });
+  // Every registered preset, not just the default — this is the only thing
+  // standing between a mis-authored preset and terrain that silently renders
+  // one material where its author wrote three.
+  it.each(Object.keys(CLIMATE_PRESETS))(
+    'accepts the shipped climate preset (%s)',
+    (id) => {
+      expect(() => validateClimateLayers(CLIMATE_PRESETS[id])).not.toThrow();
+    }
+  );
 
   it('rejects a biome with no layers', () => {
     expect(() => validateClimateLayers(climateOf([biome('bare', [])]))).toThrow(

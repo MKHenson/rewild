@@ -2,7 +2,7 @@ import { Vector2 } from 'rewild-common';
 import {
   ClimateConfig,
   DEFAULT_CLIMATE,
-  DESERT,
+  FOREST,
   MOUNTAIN,
   PLAIN,
   SPLAT_BYTES_PER_TEXEL,
@@ -21,12 +21,12 @@ const PALETTE = getClimatePalette(DEFAULT_CLIMATE);
 const channelOf = (material: string) => PALETTE.indexOf(material);
 
 const GRASS = channelOf(PLAIN.layers[0].material);
-const LEAVES = channelOf(PLAIN.layers[1].material); // noise-mixed with GRASS
+const PATH = channelOf(PLAIN.layers[1].material); // noise-mixed with GRASS
+const LITTER = channelOf(FOREST.layers[0].material); // the forest's leaf bed
+const LEAVES = channelOf(FOREST.layers[1].material); // noise-mixed with LITTER
 const BASE = channelOf(MOUNTAIN.layers[0].material); // mountain's base ground
 const ROCK = channelOf(MOUNTAIN.layers[1].material); // slope layer
 const SNOW = channelOf(MOUNTAIN.layers[2].material); // height layer
-const SAND = channelOf(DESERT.layers[0].material);
-const PAN = channelOf(DESERT.layers[1].material); // low + flat layer
 
 // A 32-sample chunk is tiny against the climate's 3000-unit scale, so a whole
 // test chunk falls in one climate cell — which cell being an accident of the
@@ -42,14 +42,14 @@ function climateOfOneBiome(biomeIndex: number): ClimateConfig {
     moisture: { scale: 2400, seedSalt: 104729, cuts: [], blendHalfWidth: 0.05 },
     // The full biome list, so the palette — and therefore every channel index
     // below — matches DEFAULT_CLIMATE's even though only one cell is reachable.
-    biomes: [PLAIN, MOUNTAIN, DESERT],
+    biomes: [PLAIN, FOREST, MOUNTAIN],
     cells: [[biomeIndex]],
   };
 }
 
-const MOUNTAIN_ONLY = climateOfOneBiome(1);
 const PLAIN_ONLY = climateOfOneBiome(0);
-const DESERT_ONLY = climateOfOneBiome(2);
+const FOREST_ONLY = climateOfOneBiome(1);
+const MOUNTAIN_ONLY = climateOfOneBiome(2);
 
 // Read snow's selectors off the table rather than restating them — these tests
 // are about layer selection, not about the values that happen to be tuned in.

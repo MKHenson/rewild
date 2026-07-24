@@ -296,6 +296,154 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     blendDepth: BLEND_DEPTH_SOFT,
     normalConvention: 'opengl', // Poly Haven
   },
+  // The dry, pale upper beach — wind-rippled and bleached almost grey. Shallow
+  // relief for the same reason as sand_01: the ripples are millimetres, and a
+  // deep parallax volume on a surface this smooth reads as boiling ground.
+  aerial_beach_01: {
+    name: 'aerial_beach_01',
+    albedoUrl: 'terrain/aerial-beach-01/aerial_beach_01_diff_1k.jpg',
+    normalUrl: 'terrain/aerial-beach-01/aerial_beach_01_norm_1k.png',
+    roughnessUrl: 'terrain/aerial-beach-01/aerial_beach_01_rough_1k.jpg',
+    heightUrl: 'terrain/aerial-beach-01/aerial_beach_01_disp_1k.png',
+    heightScale: HEIGHT_SCALE,
+    macroNormalUrl: 'terrain/aerial-beach-01/aerial_beach_01_norm_1k.png',
+    macroUvScale: MACRO_UV_SCALE,
+    uvScale: DETAIL_UV_SCALE,
+    specular: SPECULAR * 0.3,
+    shininess: SHININESS * 0.5, // dry sand — a broad, matte sheen
+    // Pairs with aerial_beach_02 across a height band; damp and dry sand should
+    // intermingle over a tide line, not meet along an edge.
+    blendDepth: BLEND_DEPTH_SOFT,
+    normalConvention: 'opengl', // Poly Haven
+  },
+  // The damp lower beach: darker, and carrying dune-scale forms rather than
+  // grain, which is what makes it read as the surface the tide last worked.
+  aerial_beach_02: {
+    name: 'aerial_beach_02',
+    albedoUrl: 'terrain/aerial-beach-02/aerial_beach_02_diff_1k.jpg',
+    normalUrl: 'terrain/aerial-beach-02/aerial_beach_02_norm_1k.png',
+    roughnessUrl: 'terrain/aerial-beach-02/aerial_beach_02_rough_1k.jpg',
+    heightUrl: 'terrain/aerial-beach-02/aerial_beach_02_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 1.5,
+    macroNormalUrl: 'terrain/aerial-beach-02/aerial_beach_02_norm_1k.png',
+    macroUvScale: MACRO_UV_SCALE,
+    uvScale: DETAIL_UV_SCALE,
+    // Damp sand is the one sand that genuinely glints — a tighter, stronger
+    // highlight than its dry counterpart is most of what sells it as wet.
+    specular: SPECULAR * 0.5,
+    shininess: SHININESS * 1.25,
+    blendDepth: BLEND_DEPTH_SOFT, // the soft half of the beach pair
+    // TexturesCom-style pack, not confirmed Poly Haven — this is a guess. If
+    // the beach alone reads inset while the others look right, flip to 'directx'.
+    normalConvention: 'opengl',
+  },
+  // Stratified sandstone: horizontal bedding with deep, hard-edged ledges. The
+  // deepest parallax volume in the library alongside marble_cliff_05 — the
+  // bedding *is* the material, and it flattens to a tan wash without it.
+  cliff_side_1k: {
+    name: 'cliff_side_1k',
+    albedoUrl: 'terrain/cliff-side-1k/cliff_side_diff_1k.jpg',
+    normalUrl: 'terrain/cliff-side-1k/cliff_side_norm_1k.png',
+    roughnessUrl: 'terrain/cliff-side-1k/cliff_side_rough_1k.png',
+    heightUrl: 'terrain/cliff-side-1k/cliff_side_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 4,
+    macroNormalUrl: 'terrain/cliff-side-1k/cliff_side_norm_1k.png',
+    // Coarse on purpose: the strata are what a mesa should still show in
+    // silhouette, and they are metres apart, not centimetres.
+    macroUvScale: MACRO_UV_SCALE * 2,
+    uvScale: DETAIL_UV_SCALE,
+    specular: SPECULAR * 0.2,
+    shininess: SHININESS * 1.5, // dry stone — present but not polished
+    // No blendDepth: the default hard edge is what this is for. Ledges should
+    // break through the rock beneath them along their own relief.
+    normalConvention: 'opengl',
+  },
+  // Coarse mottled granite in rust and near-black. The desert mountain's body
+  // rock — busy enough at detail scale that it does not need a companion
+  // material to stop reading as a flat colour.
+  tiger_rock_1k: {
+    name: 'tiger_rock_1k',
+    albedoUrl: 'terrain/tiger-rock-1k/tiger_rock_diff_1k.jpg',
+    normalUrl: 'terrain/tiger-rock-1k/tiger_rock_norm_1k.png',
+    roughnessUrl: 'terrain/tiger-rock-1k/tiger_rock_rough_1k.png',
+    heightUrl: 'terrain/tiger-rock-1k/tiger_rock_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 1.8,
+    macroNormalUrl: 'terrain/tiger-rock-1k/tiger_rock_norm_1k.png',
+    macroUvScale: MACRO_UV_SCALE * 2,
+    uvScale: DETAIL_UV_SCALE,
+    specular: SPECULAR * 0.25,
+    shininess: SHININESS * 2,
+    // No blendDepth: sand drifting against it should meet the rock along the
+    // rock's own crevices, which is exactly what the default hard edge does.
+    normalConvention: 'opengl',
+  },
+  // Dense green sward — the plain's body material. Its relief is blade-scale,
+  // so the parallax volume stays shallow: a deep one on a surface this fine
+  // reads as the ground swimming rather than as grass standing up.
+  grass_01_1k: {
+    name: 'grass_01_1k',
+    albedoUrl: 'terrain/grass-01-1k/grass_01.png',
+    normalUrl: 'terrain/grass-01-1k/grass_01_norm.png',
+    roughnessUrl: 'terrain/grass-01-1k/grass_01_roughness.png',
+    heightUrl: 'terrain/grass-01-1k/grass_01_disp.png',
+    heightScale: HEIGHT_SCALE * 0.5,
+    macroNormalUrl: 'terrain/grass-01-1k/grass_01_norm.png',
+    // Coarse: what a grassland should still carry at range is the swell of the
+    // sward, not the blades — those mip to a flat green wash regardless.
+    macroUvScale: MACRO_UV_SCALE,
+    uvScale: DETAIL_UV_SCALE,
+    specular: SPECULAR * 0.25,
+    shininess: SHININESS * 0.5, // matte — dry grass has no glint to speak of
+    // Pairs with grass_path_02_1k under a noise selector: worn ground bleeding
+    // into grass, which should intermingle rather than meet along an edge.
+    blendDepth: BLEND_DEPTH_SOFT,
+    // Not a Poly Haven pack (its maps are named _norm/_roughness/_disp with no
+    // resolution suffix), so the convention is a guess. If grass alone reads
+    // inset while the others look right, flip it to 'directx'.
+    normalConvention: 'opengl',
+  },
+  // Trodden ground: bare compacted earth with grass giving way at its margins.
+  // Deeper relief than the sward it scatters over — ruts and hoof-prints are
+  // centimetres, and they are the whole reason a path reads as walked on.
+  grass_path_02_1k: {
+    name: 'grass_path_02_1k',
+    albedoUrl: 'terrain/grass-path-02-1k/grass_path_02_diff_1k.jpg',
+    normalUrl: 'terrain/grass-path-02-1k/grass_path_02_norm_1k.png',
+    roughnessUrl: 'terrain/grass-path-02-1k/grass_path_02_rough_1k.jpg',
+    heightUrl: 'terrain/grass-path-02-1k/grass_path_02_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 2,
+    macroNormalUrl: 'terrain/grass-path-02-1k/grass_path_02_norm_1k.png',
+    macroUvScale: MACRO_UV_SCALE * 2,
+    uvScale: DETAIL_UV_SCALE,
+    specular: SPECULAR * 0.3,
+    shininess: SHININESS * 0.75, // bare earth — dusty, barely brighter than grass
+    blendDepth: BLEND_DEPTH_SOFT, // the soft half of the grassland pair
+    normalConvention: 'opengl', // Poly Haven
+  },
+  // Deep broadleaf litter — the forest's body material, in place of bare soil.
+  // A forest floor is the leaves that fell on it, not the dirt underneath, and
+  // this reads that way where forest-ground-01 read as a worn track.
+  //
+  // Deep parallax on purpose: stacked leaves are the one ground surface whose
+  // relief is genuinely centimetres, and the near-over-far occlusion the march
+  // gives is most of what stops litter looking like a printed pattern.
+  forest_leaves_03_1k: {
+    name: 'forest_leaves_03_1k',
+    albedoUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_diff_1k.jpg',
+    normalUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_norm_1k.png',
+    roughnessUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_rough_1k.png',
+    heightUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_disp_1k.png',
+    heightScale: HEIGHT_SCALE * 2,
+    macroNormalUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_norm_1k.png',
+    macroUvScale: MACRO_UV_SCALE,
+    uvScale: DETAIL_UV_SCALE,
+    specular: SPECULAR * 0.35,
+    shininess: SHININESS * 0.5, // dry leaves — matte, with a faint waxy sheen
+    // Pairs with forest_leaves_02 under a noise selector: two litters of the
+    // same floor, which should intermingle rather than meet along an edge.
+    blendDepth: BLEND_DEPTH_SOFT,
+    normalConvention: 'opengl', // Poly Haven
+  },
 };
 
 // Throws rather than falling back: unlike a climate preset id (which a saved

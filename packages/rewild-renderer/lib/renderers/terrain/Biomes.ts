@@ -78,6 +78,10 @@ export interface ClimateAxis {
 // cells[temperatureBand][moistureBand] is an index into `biomes`; multiple
 // cells may share a biome. Adding a biome = a table row + a cut + cell entries.
 export interface ClimateConfig {
+  // Human-readable name for the editor's preset picker. Lives here rather than
+  // in a parallel id→label table so a preset cannot be added without one.
+  // Omitted ⇒ callers fall back to the preset id (see getClimatePresets).
+  label?: string;
   temperature: ClimateAxis;
   moisture: ClimateAxis;
   biomes: BiomeParams[];
@@ -85,6 +89,12 @@ export interface ClimateConfig {
 }
 
 // Biome parameter table. Rows are data — adding a biome is a table edit.
+//
+// Open grassland: sward everywhere, with bare trodden ground worn through it in
+// patches. The path noise is coarser and narrower-banded than the forest's leaf
+// litter below — worn ground should read as occasional broad clearings rather
+// than an even mottle, which is what separates a plain from a forest floor when
+// both are green.
 export const PLAIN: BiomeParams = {
   name: 'plain',
   heightScale: 20,
@@ -94,10 +104,36 @@ export const PLAIN: BiomeParams = {
   lacunarity: 2.0,
   heightCurveExp: 1.1,
   layers: [
-    { material: 'forest-ground-01' },
+    { material: 'grass_01_1k' },
     {
-      material: 'forest_leaves_02',
-      noise: { scale: 20, seedSalt: 11, band: { from: 0.35, to: 0.65 } },
+      material: 'grass_path_02_1k',
+      noise: { scale: 80, seedSalt: 23, band: { from: 0.15, to: 0.92 } },
+    },
+  ],
+};
+
+// Wooded ground — the plain's wet counterpart. Taller and busier than PLAIN over
+// a tighter feature size, so the two temperate lowlands read as different
+// country rather than the same field in a different green.
+//
+// Two leaf litters rather than litter over soil: a forest floor is what fell on
+// it, so the deep broadleaf bed is the body material and the finer litter breaks
+// it up in patches. forest-ground-01 stays in the library, unused by any biome —
+// it reads as a worn track, which is not what a wood underfoot looks like.
+export const FOREST: BiomeParams = {
+  name: 'forest',
+  heightScale: 45,
+  noiseScale: 260,
+  octaves: 5,
+  persistence: 0.45,
+  lacunarity: 2.2,
+  heightCurveExp: 1.2,
+  layers: [
+    { material: 'forest_leaves_02' },
+    {
+      material: 'forest_leaves_03_1k',
+      height: { from: 10, to: 20 },
+      noise: { scale: 50, seedSalt: 11, band: { from: 0.15, to: 0.95 } },
     },
   ],
 };
@@ -121,28 +157,130 @@ export const MOUNTAIN: BiomeParams = {
   ],
 };
 
+// The arid answer to MOUNTAIN: different rock, and snow replaced by the thing
+// that actually accumulates in a desert — sand, which drifts *up* against the
+// feet of the massif rather than settling on its peaks. So its height band is
+// inverted where the snow band is not.
+//
+// It does NOT share MOUNTAIN's silhouette parameters, and the difference is the
+// point. Biome blending lerps *heights*, so a biome with no low ground of its
+// own cannot grow into its neighbour — it can only be faded in, which reads as
+// a massif springing out of flat desert. heightCurveExp 2.0 did exactly that:
+// squaring a noise field that clusters around 0.5 crushes the whole mid-range
+// flat, leaving peaks and nothing under them. At 1.45 the same field keeps its
+// mids, so the massif carries its own skirts and foothills down to meet DESERT's
+// dune crests, and the raised persistence puts shoulders and spurs on the body
+// instead of one smooth cone wearing fine noise.
+export const DESERT_MOUNTAIN: BiomeParams = {
+  name: 'desert-mountain',
+  heightScale: 300,
+  // Broader than MOUNTAIN: a wider massif spreads its rise over more ground, so
+  // the climb starts well before the climate border rather than at it.
+  noiseScale: 750,
+  octaves: 6,
+  persistence: 0.42,
+  lacunarity: 2.5,
+  heightCurveExp: 1.45,
+  layers: [
+    { material: 'tiger_rock_1k' },
+    // Drift sand: only low down, and only where the ground is flat enough to
+    // hold it. Both bands are inverted (from > to) — coverage rises as height
+    // and slope *fall*. The band reaches to DESERT's peak height on purpose, so
+    // sand crosses the biome border unbroken and the foothills read as buried
+    // in the dune field rather than planted beside it.
+    {
+      material: 'sand_01',
+      height: { from: 110, to: 30 },
+      slope: { from: 30, to: 12 },
+    },
+    // Last, so a steep face wins outright over the drift below it. Opens a
+    // little lower than MOUNTAIN's cliff band — the gentler height curve means
+    // fewer samples reach 35°, and bare strata on the flanks is most of what
+    // stops the new foothills reading as smooth mounds.
+    { material: 'cliff_side_1k', slope: { from: 30, to: 65 } },
+  ],
+};
+
+// Dune country: the arid world's *relief*, and the biome that carries the climb
+// from the coastal flats up to the mountain's feet.
+//
+// It used to be a 1 km swell 50 m tall with 72% of its amplitude in one octave —
+// which is neither flat enough to read as flats nor tall enough to read as
+// dunes, and near-identical to BEACH_SAND's parameters besides. The tighter
+// feature size plus the higher persistence is what makes a dune field: a ~600 m
+// primary swell with a ~290 m secondary crest riding it at nearly half the
+// amplitude, so the ground has a rhythm at the scale you actually cross it.
 export const DESERT: BiomeParams = {
   name: 'desert',
-  heightScale: 50,
-  noiseScale: 520,
-  octaves: 3,
-  persistence: 0.3,
-  lacunarity: 2.2,
-  heightCurveExp: 1.0,
+  heightScale: 110,
+  noiseScale: 300,
+  octaves: 4,
+  persistence: 0.45,
+  lacunarity: 2.1,
+  heightCurveExp: 1.25, // hollows the pans between crests without blunting them
   layers: [
     { material: 'sand_01' },
+    // Cracked crust belongs in the pans, not scattered evenly over the dunes —
+    // so the inverted height band puts it in the low ground and the noise field
+    // (now broad enough to read as pans rather than a mottle) breaks up its edge.
     {
       material: 'mud_cracked_dry_03',
-      noise: { scale: 20, seedSalt: 11, band: { from: 0.35, to: 0.65 } },
+      height: { from: 55, to: 22 },
+      noise: { scale: 60, seedSalt: 11, band: { from: 0.35, to: 0.65 } },
+    },
+  ],
+};
+
+// Low coastal flats — the arid world's floor, and the one biome that is allowed
+// to be flat. It reads as different country from DESERT by being flat where the
+// dunes have relief, which is a job it can only do if it commits: at 30 m over a
+// 1.4 km swell it was merely *smaller* than the dunes, and two sands differing
+// only in amplitude read as one biome with a soft spot in it.
+//
+// Flat in silhouette is not the same as featureless underfoot, and the octave
+// stack is what separates them. Six times shorter than DESERT, but with an
+// octave more over a higher lacunarity, so its finest detail is twice as fine as
+// the dunes' (~32 m against ~65 m): nothing here breaks 18 m while the ground
+// still hummocks at ~170 m and ripples at ~74 m — the scales you walk, not the
+// scale you see across.
+//
+// The two beach materials are the same sand at two states of wetness, so height
+// alone separates them: damp and dark in the hollows, bleached and dry on the
+// rises. The band spans most of the biome's range, which puts the tide line in
+// the terrain's own shape rather than on a contour ring.
+export const BEACH_SAND: BiomeParams = {
+  name: 'beach-sand',
+  heightScale: 30,
+  noiseScale: 450,
+  octaves: 5,
+  persistence: 0.42,
+  lacunarity: 2.3,
+  heightCurveExp: 1.3, // keeps the flats flat; only the rare rise gets height
+  layers: [
+    { material: 'aerial_beach_02' },
+    // Retuned to the shorter range — the old 3→20 band never resolved at all
+    // once nothing reached 20 m, leaving the whole beach permanently damp.
+    {
+      material: 'aerial_beach_01',
+      noise: { scale: 60, seedSalt: 11, band: { from: 0.15, to: 0.85 } },
+    },
+    {
+      material: 'sand_01',
+      noise: { scale: 90, seedSalt: 6, band: { from: 0.15, to: 0.85 } },
     },
   ],
 };
 
 // Three biomes over both climate axes. Temperature splits cold (mountain) from
-// warm; moisture then splits the warm half into dry (desert) and wet (plain).
+// warm; moisture then splits the warm half into dry (plain) and wet (forest).
 // Cold ignores moisture — a wet mountain and a dry mountain are the same
 // mountain — which is what sharing a biome across cells is for.
+//
+// This is the temperate world; the desert lives in ARID_CLIMATE, which is what
+// that preset exists for. Keeping the two apart is also what leaves the default
+// room inside the eight splat channels (it uses seven).
 export const DEFAULT_CLIMATE: ClimateConfig = {
+  label: 'Default',
   temperature: {
     scale: 3000 / TERRAIN_METERS_PER_SAMPLE,
     seedSalt: 7919,
@@ -158,11 +296,37 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
     cuts: [0.5],
     blendHalfWidth: 0.1,
   },
-  biomes: [PLAIN, MOUNTAIN, DESERT],
+  biomes: [PLAIN, FOREST, MOUNTAIN],
   cells: [
     // dry, wet
-    [1, 1], // cold → mountain either way
-    [2, 0], // warm → desert when dry, plain when wet
+    [2, 2], // cold → mountain either way
+    [0, 1], // warm → grassland when dry, forest when wet
+  ],
+};
+
+// A world with no wet half. The axes are the default's — same scales, same
+// salts, so the same seed lays the biome borders in the same places — but every
+// cell resolves to something arid. "Moisture" here only ever means *less dry*,
+// which is why the wet warm cell is coastal flats rather than grassland.
+export const ARID_CLIMATE: ClimateConfig = {
+  label: 'Arid',
+  temperature: {
+    scale: 3000 / TERRAIN_METERS_PER_SAMPLE,
+    seedSalt: 7919,
+    cuts: [0.5],
+    blendHalfWidth: 0.1,
+  },
+  moisture: {
+    scale: 2400 / TERRAIN_METERS_PER_SAMPLE,
+    seedSalt: 104729,
+    cuts: [0.5],
+    blendHalfWidth: 0.1,
+  },
+  biomes: [BEACH_SAND, DESERT, DESERT_MOUNTAIN],
+  cells: [
+    // dry, wet
+    [2, 2], // cold → desert mountain either way, mirroring DEFAULT's cold row
+    [1, 0], // warm → dunes when dry, coastal flats when wet
   ],
 };
 
@@ -264,10 +428,24 @@ export function getMaxWorldHeight(climate: ClimateConfig): number {
 // stores only which preset it uses (WorldGenConfig.climatePreset). Later eras
 // ("worlds back in time") are additional entries here.
 export const DEFAULT_CLIMATE_PRESET = 'default';
+export const ARID_CLIMATE_PRESET = 'arid';
 
+// Ids are persisted in saved worlds (WorldGenConfig.climatePreset), so renaming
+// a key here silently re-rolls every world that used it — resolveClimatePreset
+// falls back to the default rather than failing. Add, don't rename.
 export const CLIMATE_PRESETS: Record<string, ClimateConfig> = {
   [DEFAULT_CLIMATE_PRESET]: DEFAULT_CLIMATE,
+  [ARID_CLIMATE_PRESET]: ARID_CLIMATE,
 };
+
+// The preset picker's options, in declaration order. `label` is authored on the
+// config; the id is the fallback so a preset added without one still shows.
+export function getClimatePresets(): { id: string; label: string }[] {
+  return Object.entries(CLIMATE_PRESETS).map(([id, climate]) => ({
+    id,
+    label: climate.label ?? id,
+  }));
+}
 
 // Unknown ids fall back to the default preset so a world saved against a
 // removed/renamed preset still loads.
