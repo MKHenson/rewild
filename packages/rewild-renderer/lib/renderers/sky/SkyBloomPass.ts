@@ -3,6 +3,9 @@ import { Renderer } from '../../Renderer';
 import bloomShader from '../../shaders/sky/skyBloom.wgsl';
 import temporalShader from '../../shaders/sky/skyBloomTemporal.wgsl';
 import { PostProcessManager } from '../../post-processes/PostProcessManager';
+import { RenderQuality } from '../../utils/RenderQuality';
+import { composeShader } from '../../utils/shaderDefines';
+import { bloomScale, bloomShaderDefines } from './SkyQuality';
 
 const UNIFORM_FLOATS = 7; // resolution(2) + iTime + bloomAmount + bloomThreshold + horizontal + cloudsGated
 const ALIGNED_SIZE = Math.ceil((UNIFORM_FLOATS * 4) / 256) * 256;
@@ -11,10 +14,6 @@ const ALIGNED_SIZE = Math.ceil((UNIFORM_FLOATS * 4) / 256) * 256;
  *  cloud raymarch depth-gates itself, leaving holes the bloom kernel must mask. */
 const CLOUD_START = 500.0;
 const TEMPORAL_ALIGNED_SIZE = Math.ceil((1 * 4) / 256) * 256; // blendFactor f32
-
-/** Bloom runs at this fraction of the canvas resolution. Half-res is sufficient
- *  for a blurry highlight pass and halves texture memory + bandwidth. */
-const BLOOM_SCALE = 0.5;
 
 /**
  * Three-pass bloom: horizontal extraction → vertical blur → temporal stabilization.
@@ -31,6 +30,10 @@ const BLOOM_SCALE = 0.5;
  * for the next frame.
  */
 export class SkyBloomPass implements IPostProcess {
+  /** Quality tier, read when init() builds the shader module. Assigned by
+   *  SkyRenderer.init(); set `skyRenderer.quality` to change it. */
+  quality: RenderQuality = 'high';
+
   renderTarget: GPUTexture; // temporally stabilised HDR bloom (consumed by composite)
   manager: PostProcessManager;
   sourceTexture: GPUTexture | null; // set to bilateralPass.renderTarget before init()
@@ -39,10 +42,17 @@ export class SkyBloomPass implements IPostProcess {
    *  Range 0–3; default 1.2. Higher = brighter glow. */
   bloomAmount: number = 0.86;
 
-  /** Threshold in exposure-adjusted luminance (EXPOSURE * raw_luminance).
-   *  With EXPOSURE=0.05, threshold 0.25 ≈ HDR lum ~7 — daytime sky (~7 HDR, lum
-   *  ~0.245) stays just below; bright stars (8+ HDR) and cloud tops bloom. */
-  bloomThreshold: number = 0.05;
+  /**
+   * Threshold in exposure-adjusted luminance (EXPOSURE * raw_luminance, with
+   * EXPOSURE = 0.001 in skyBloom.wgsl), so this value times 1000 is the raw HDR
+   * luminance at which a pixel starts to bloom.
+   *
+   * skyBlend caps the sky at 60 HDR, i.e. 0.06 here, so the gate has to sit
+   * above that or the entire sky is a bloom source — which is what 0.05 was
+   * doing. At 0.10 the shoulder runs from 50 to 150 HDR: capped sky contributes
+   * essentially nothing, sunlit cloud tops and the sun disc still bloom fully.
+   */
+  bloomThreshold: number = 0.1;
 
   /** History weight for temporal stabilization. Higher = smoother but slower
    *  to respond to new bright areas. Range 0–1; default 0.85. */
@@ -82,12 +92,16 @@ export class SkyBloomPass implements IPostProcess {
     if (!src)
       throw new Error('SkyBloomPass: sourceTexture must be set before init()');
 
-    this.bw = Math.max(1, Math.floor(canvas.width * BLOOM_SCALE));
-    this.bh = Math.max(1, Math.floor(canvas.height * BLOOM_SCALE));
+    const scale = bloomScale(this.quality);
+    this.bw = Math.max(1, Math.floor(canvas.width * scale));
+    this.bh = Math.max(1, Math.floor(canvas.height * scale));
     const { bw, bh } = this;
 
     // --- Gaussian bloom pipeline (passes 1 & 2) ---
-    const bloomModule = device.createShaderModule({ code: bloomShader });
+    // Only the blur module takes defines; skyBloomTemporal.wgsl has no kernel.
+    const bloomModule = device.createShaderModule({
+      code: composeShader([bloomShader], bloomShaderDefines(this.quality)),
+    });
 
     this.pipeline = device.createRenderPipeline({
       label: 'sky bloom pipeline',

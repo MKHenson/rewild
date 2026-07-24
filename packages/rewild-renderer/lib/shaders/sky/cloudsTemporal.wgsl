@@ -15,8 +15,10 @@
 // SYNC NOTE: if skyRay() or drawCloudsHorizonFog() change in clouds.wgsl, mirror the
 // changes here.  The LOD system (calculateCloudLOD) must be kept identical.
 
-const NUM_CLOUD_SAMPLES = 80;
-const NUM_LIGHT_SAMPLES = 25;
+// Supplied by the pipeline (SkyQuality.ts). Both bound loops, so they have to be
+// WGSL consts rather than uniforms — changing tier recompiles the module.
+const NUM_CLOUD_SAMPLES = ${ CLOUD_SAMPLES };
+const NUM_LIGHT_SAMPLES = ${ CLOUD_LIGHT_SAMPLES };
 
 // The view march stops once this little light is still getting through — a pure
 // perf cut-off, since the remaining contribution is negligible. It is *not* a
@@ -43,7 +45,11 @@ const CLOUD_TRANSMITTANCE_FLOOR: f32 = 0.05;
 //
 // Raising this is cheap insurance: it costs a thin band of extra marching along
 // silhouettes, which is far less than per-tap depth loads in a full-screen filter.
-const GATE_EROSION_TEXELS: f32 = 6.0;
+//
+// Supplied by the pipeline as (bilateral radius + margin) so the invariant above
+// cannot be broken by tuning the bilateral alone — see GATE_MARGIN_TEXELS in
+// SkyQuality.ts.
+const GATE_EROSION_TEXELS: f32 = ${ GATE_EROSION_TEXELS };
 
 // ──────────────────────────────────────────────
 // Group 0: standard cloud shader bindings
@@ -237,7 +243,7 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
 
     // Dynamic LOD: scale sample count by screen position, ray distance, and view angle
     let lod = calculateCloudLOD(currentFragCoord, dir, rayLength);
-    nbSample = max(i32(mix(f32(nbSample), 40.0, lod)), 16);
+    nbSample = max(i32(mix(f32(nbSample), ${ CLOUD_LOD_SAMPLES }, lod)), ${ CLOUD_MIN_SAMPLES });
 
     var color = vec3f(0.0);
     let stepS = rayLength / f32(nbSample);

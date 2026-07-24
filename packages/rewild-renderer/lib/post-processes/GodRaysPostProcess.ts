@@ -45,6 +45,15 @@ export class GodRaysPostProcess implements IPostProcess {
   /** Master brightness multiplier, applied on top of config.weight. */
   intensityScale: number;
 
+  /**
+   * Render-target size as a fraction of the canvas, read by init().
+   *
+   * Safe to push well below 1: the shafts are radial and low-frequency, the
+   * march is jittered per pixel, and the output is additive HDR that the bloom
+   * pass smears anyway. SkyRenderer assigns this from the quality tier.
+   */
+  resolutionScale: number = 0.5;
+
   config: GodRayConfig;
 
   /** Depth texture the bind group currently points at, so a resize can be detected. */
@@ -71,8 +80,8 @@ export class GodRaysPostProcess implements IPostProcess {
   init(renderer: Renderer): IPostProcess {
     const { device, canvas } = renderer;
 
-    const width = Math.floor(canvas.width / 2);
-    const height = Math.floor(canvas.height / 2);
+    const width = Math.max(1, Math.floor(canvas.width * this.resolutionScale));
+    const height = Math.max(1, Math.floor(canvas.height * this.resolutionScale));
 
     const module = device.createShaderModule({
       label: 'god rays fragment shader',

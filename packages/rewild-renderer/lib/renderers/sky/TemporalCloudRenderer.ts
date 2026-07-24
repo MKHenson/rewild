@@ -7,6 +7,9 @@ import fogFns from '../../shaders/sky/fog.wgsl';
 import cloudDensityFns from '../../shaders/sky/cloudDensity.wgsl';
 import cirrusFns from '../../shaders/sky/cloudsCirrus.wgsl';
 import temporalShader from '../../shaders/sky/cloudsTemporal.wgsl';
+import { RenderQuality } from '../../utils/RenderQuality';
+import { composeShader } from '../../utils/shaderDefines';
+import { cloudShaderDefines } from './SkyQuality';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Temporal uniform layout (matches TemporalUniforms struct in cloudsTemporal.wgsl):
@@ -111,6 +114,16 @@ export class TemporalCloudRenderer {
   private uniformFloat32 = new Float32Array(this.uniformRawBuffer);
   private uniformUint32 = new Uint32Array(this.uniformRawBuffer);
 
+  /**
+   * Quality tier, read when init() builds the shader module.
+   *
+   * Assigned by SkyRenderer.init() rather than set directly: the tier is baked
+   * into WGSL as compile-time constants, so it only takes effect on a rebuild,
+   * and rebuilding this pass alone would leave the passes that read its render
+   * target bound to a dead texture. Set `skyRenderer.quality` instead.
+   */
+  quality: RenderQuality = 'high';
+
   constructor() {
     this.resolutionScale = 0.7;
   }
@@ -120,6 +133,12 @@ export class TemporalCloudRenderer {
   // ────────────────────────────────────────────
 
   init(renderer: Renderer, uniformBuffer: GPUBuffer): void {
+    // The history texture below is recreated empty, so anything accumulated by
+    // a previous init (a resize, or a quality change) no longer corresponds to
+    // it. Without this reset the first frames blend fresh marches against a
+    // zeroed history and the clouds darken briefly.
+    this.historyValid = false;
+
     const { device, canvas } = renderer;
     this.device = device;
     const w = Math.floor(canvas.width * this.resolutionScale);
@@ -128,13 +147,17 @@ export class TemporalCloudRenderer {
     // ── Shader module (self-contained: temporal shader + helpers) ──
     const module = device.createShaderModule({
       label: 'temporal clouds shader',
-      code:
-        temporalShader +
-        constantsFns +
-        fogFns +
-        cirrusFns +
-        commonShaderFns +
-        cloudDensityFns,
+      code: composeShader(
+        [
+          temporalShader,
+          constantsFns,
+          fogFns,
+          cirrusFns,
+          commonShaderFns,
+          cloudDensityFns,
+        ],
+        cloudShaderDefines(this.quality)
+      ),
     });
 
     // ── Render target (output — same format/size as CloudRenderer) ──

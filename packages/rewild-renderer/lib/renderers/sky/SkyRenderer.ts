@@ -3,6 +3,13 @@ import { Transform } from '../../core/Transform';
 import { Camera } from '../../core/Camera';
 import { Color, degToRad, Matrix4, smoothstep, Vector2 } from 'rewild-common';
 import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
+import { RenderQuality } from '../../utils/RenderQuality';
+import {
+  bilateralSigmas,
+  cloudResolutionScale,
+  godRaySamples,
+  godRayScale,
+} from './SkyQuality';
 import { TemporalCloudRenderer } from './TemporalCloudRenderer';
 import { SkyBilateralPass } from './SkyBilateralPass';
 import { SkyBloomPass } from './SkyBloomPass';
@@ -85,8 +92,11 @@ export class SkyRenderer {
    *  reach further across the screen before fading out. */
   godRayDecay: number = 0.98;
 
-  cirrusCoverage: number = 0.01;
-  cirrusOpacity: number = 0.25;
+  cirrusCoverage: number = 0.2;
+  cirrusOpacity: number = 0.2;
+
+  /** Backing field for `quality` — see the setter. */
+  private _quality: RenderQuality = 'high';
 
   windDirection: Vector2 = new Vector2(1, 0);
   precipitation: number = 0.0;
@@ -144,8 +154,55 @@ export class SkyRenderer {
     this.perfMonitor = new PerformanceMonitor();
   }
 
+  /** Quality tier for the sky. Passes map it onto their own knobs. */
+  get quality(): RenderQuality {
+    return this._quality;
+  }
+
+  /**
+   * Tiers are baked into WGSL as compile-time constants, so a change needs a
+   * shader rebuild rather than a uniform write. The flag is picked up in
+   * render(), which re-initialises the whole sky chain — see the note there.
+   */
+  set quality(value: RenderQuality) {
+    if (value === this._quality) return;
+    this._quality = value;
+    this.requiresRebuild = true;
+  }
+
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
+
+    // Push the tier into each pass before any of them builds a module. The
+    // passes hold it as a plain field rather than reacting to it themselves:
+    // rebuilding one in isolation would leave the passes downstream of it bound
+    // to a texture it had already replaced, so the rebuild is always this
+    // whole-chain init.
+    //
+    // God rays are the exception — that shader reads its sample count from a
+    // uniform, so the tier is just a number and costs no recompile.
+    this.cloudsPass.quality = this._quality;
+    this.cloudShadowRenderer.quality = this._quality;
+    this.bilateralPass.quality = this._quality;
+    this.bloomPass.quality = this._quality;
+    this.godRaysPass.config.numSamples = godRaySamples(this._quality);
+
+    // Render-target scales. These need no shader rebuild of their own, but they
+    // resize textures, so they belong on this same whole-chain path. The
+    // bilateral is absent on purpose: it sizes itself from the cloud target and
+    // so follows cloudResolutionScale for free.
+    this.cloudsPass.resolutionScale = cloudResolutionScale(this._quality);
+    this.godRaysPass.resolutionScale = godRayScale(this._quality);
+
+    // Bilateral sigmas are uniforms rather than defines, so they are assigned
+    // here alongside the scales. They go *up* as quality goes down — this pass
+    // is what hides the cloud target's resolution, so a cheaper tier needs more
+    // smoothing, not less.
+    const sigmas = bilateralSigmas(this._quality);
+    this.bilateralPass.sigmaSpatial = sigmas.spatial;
+    this.bilateralPass.sigmaFar = sigmas.far;
+    this.bilateralPass.sigmaRange = sigmas.range;
+
     const { canvas, device } = renderer;
     this.canvasSizeWatcher = new CanvasSizeWatcher(canvas);
 
@@ -376,7 +433,15 @@ export class SkyRenderer {
   }
 
   render(renderer: Renderer, pass: GPURenderPassEncoder, camera: Camera): void {
-    if (this.canvasSizeWatcher.hasResized()) this.init(renderer);
+    // The whole chain is re-initialised rather than just the pass that asked
+    // for it: cloudsPass.init() recreates its render target, and bilateralPass
+    // and godRaysPass hold references to that texture which have to be re-bound.
+    //
+    // requiresRebuild is tested first so the short-circuit covers the case where
+    // canvasSizeWatcher has not been created yet.
+    if (this.requiresRebuild || this.canvasSizeWatcher.hasResized()) {
+      this.init(renderer);
+    }
 
     const { canvas, device } = renderer;
 

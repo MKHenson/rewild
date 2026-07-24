@@ -1,9 +1,9 @@
 // Cirrus cloud helpers — included in cloudsTemporal.wgsl.
 //
-// Quality is a constant here, not a separate file: CIR_TAPS below is the only
-// meaningful cost/quality dial (3 = fallstreaks with depth, 1 = a flat sheet at
-// roughly a third of the cost). A future quality-switch should drive that and
-// CIR_DETAIL_* rather than swapping shaders.
+// Quality is driven by `${ }` defines rather than by swapping shader files —
+// CIR_TAPS (3 = fallstreaks with depth, 1 = a flat sheet at roughly a third of
+// the cost) and CIR_DETAIL_* are substituted in by TemporalCloudRenderer from
+// its CIRRUS_QUALITY table. Everything else here is tuning, not tiering.
 //
 // The construction, in order of how much each part matters visually:
 //
@@ -109,7 +109,12 @@ const CIR_GAIN:      f32 = 2.6;
 // grazing angles; a real cirrus deck is 1-2 km. Rather than re-tuning that shell
 // (and invalidating existing coverage/opacity settings), the taps are spread
 // over this depth around the midplane hit.
-const CIR_TAPS: i32 = 3;
+//
+// CIR_TAPS is supplied by the pipeline (CIRRUS_QUALITY in TemporalCloudRenderer)
+// rather than hardcoded here. It bounds a loop, so it has to be a WGSL `const`
+// and cannot come from a uniform — hence the `${ }` substitution, which means
+// changing the tier recompiles the module.
+const CIR_TAPS: i32 = ${ CIRRUS_TAPS };
 const CIR_DECK: f32 = 2400.0;
 
 // Lateral drift between the top and bottom of the deck. This is the fallstreak.
@@ -126,8 +131,11 @@ const CIR_EXTINCTION: f32 = 2.2;
 // pixel crawl and ghost. Fading the two finest octaves out with distance is both
 // cheaper and stabler than trying to filter them afterwards — without this the
 // extra detail is a net loss over a blobbier shader.
-const CIR_DETAIL_NEAR: f32 = 70000.0;
-const CIR_DETAIL_FAR:  f32 = 260000.0;
+//
+// Also pipeline-supplied: lower tiers pull these in so they do less work per tap
+// as well as fewer taps.
+const CIR_DETAIL_NEAR: f32 = ${ CIRRUS_DETAIL_NEAR };
+const CIR_DETAIL_FAR:  f32 = ${ CIRRUS_DETAIL_FAR };
 
 // 22-degree halo strength (hexagonal ice prisms). Set to 0.0 to disable.
 const CIR_HALO: f32 = 0.35;
