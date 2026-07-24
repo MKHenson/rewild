@@ -2,6 +2,7 @@ import { Vector2 } from 'rewild-common';
 import { generateBiomeBlendedHeightMap } from './Noise';
 import {
   BiomeParams,
+  CLIMATE_PRESETS,
   ClimateConfig,
   DEFAULT_CLIMATE,
   MOUNTAIN,
@@ -54,6 +55,18 @@ function singleBiomeClimate(biome: BiomeParams): ClimateConfig {
     cells: [[0]],
   };
 }
+
+// validateClimate is private to Noise.ts and only runs inside generation, so
+// generating is how a shipped preset's cells table gets checked — that it has a
+// row per temperature band, an entry per moisture band, and no biome index
+// pointing past the end of its own biomes array.
+describe('shipped climate presets', () => {
+  it.each(Object.keys(CLIMATE_PRESETS))('generates terrain (%s)', (id) => {
+    const map = generate(0, 0, SEED, CLIMATE_PRESETS[id]);
+    expect(map.length).toBe(CHUNK_SIZE * CHUNK_SIZE);
+    expect(map.every((h) => Number.isFinite(h))).toBe(true);
+  });
+});
 
 describe('generateBiomeBlendedHeightMap', () => {
   it('is deterministic for the same seed and position', () => {

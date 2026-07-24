@@ -3,7 +3,7 @@ import {
   register,
   theme,
   Typography,
-  StyledMaterialIcon,
+  StyledIcon,
   IconType,
   Slider,
   Button,
@@ -23,10 +23,10 @@ const BRUSHES: Array<{
   icon: IconType;
   label: string;
 }> = [
-  { type: 'raise', icon: 'arrow_upward', label: 'Raise' },
-  { type: 'lower', icon: 'arrow_downward', label: 'Lower' },
-  { type: 'smooth', icon: 'blur_on', label: 'Smooth' },
-  { type: 'flatten', icon: 'horizontal_rule', label: 'Flatten' },
+  { type: 'raise', icon: 'arrow-up', label: 'Raise' },
+  { type: 'lower', icon: 'arrow-down', label: 'Lower' },
+  { type: 'smooth', icon: 'waves-horizontal', label: 'Smooth' },
+  { type: 'flatten', icon: 'minus', label: 'Flatten' },
 ];
 
 // Floating brush controls shown over the viewport while sculpt mode is
@@ -47,7 +47,7 @@ export class SculptToolbar extends Component<Props> {
             variant="ghost"
             selected={sculptStore.brush === brush.type}
             onClick={() => sculptStore.setBrush(brush.type)}>
-            <StyledMaterialIcon icon={brush.icon} size="s" />
+            <StyledIcon icon={brush.icon} size="s" />
             <span>{brush.label}</span>
           </Button>
         ) as unknown as Button
