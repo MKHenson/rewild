@@ -1,7 +1,7 @@
 import { IResource, ITemplateTreeNode } from 'models';
 import {
   theme,
-  StyledMaterialIcon,
+  StyledIcon,
   ButtonGroup,
   Button,
   Tree,
@@ -121,7 +121,7 @@ export class SceneGraph extends Component<Props> {
     const goBackTreeNode: ITreeNode = {
       canRename: false,
       canSelect: false,
-      icon: 'chevron_left',
+      icon: 'chevron-left',
       name: '..',
     };
 
@@ -139,7 +139,7 @@ export class SceneGraph extends Component<Props> {
                 variant="text"
                 id="add-scene-node"
                 onClick={onAdd}>
-                <StyledMaterialIcon icon="add_circle" size="s" />
+                <StyledIcon icon="circle-plus" size="s" />
               </Button>
               <Button
                 disabled={
@@ -148,7 +148,7 @@ export class SceneGraph extends Component<Props> {
                 variant="text"
                 id="delete-scene-node"
                 onClick={onDelete}>
-                <StyledMaterialIcon icon="delete" size="s" />
+                <StyledIcon icon="trash-2" size="s" />
               </Button>
             </ButtonGroup>
           </div>
