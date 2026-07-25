@@ -324,9 +324,9 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     normalUrl: 'terrain/aerial-beach-02/aerial_beach_02_norm_1k.png',
     roughnessUrl: 'terrain/aerial-beach-02/aerial_beach_02_rough_1k.jpg',
     heightUrl: 'terrain/aerial-beach-02/aerial_beach_02_disp_1k.png',
-    heightScale: HEIGHT_SCALE * 1.5,
+    heightScale: HEIGHT_SCALE * 5,
     macroNormalUrl: 'terrain/aerial-beach-02/aerial_beach_02_norm_1k.png',
-    macroUvScale: MACRO_UV_SCALE,
+    macroUvScale: MACRO_UV_SCALE * 0.5,
     uvScale: DETAIL_UV_SCALE,
     // Damp sand is the one sand that genuinely glints — a tighter, stronger
     // highlight than its dry counterpart is most of what sells it as wet.

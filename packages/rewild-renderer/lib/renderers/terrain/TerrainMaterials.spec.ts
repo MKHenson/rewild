@@ -1,5 +1,6 @@
 import {
   BiomeLayer,
+  BiomeParams,
   CLIMATE_PRESETS,
   ClimateConfig,
   DEFAULT_CLIMATE,
@@ -25,15 +26,21 @@ function climateOf(biomes: ClimateConfig['biomes']): ClimateConfig {
   };
 }
 
-function biome(name: string, layers: BiomeLayer[]) {
+function biome(name: string, layers: BiomeLayer[]): BiomeParams {
   return {
     name,
-    heightScale: 10,
-    noiseScale: 100,
-    octaves: 1,
-    persistence: 0.5,
-    lacunarity: 2,
-    heightCurveExp: 1,
+    deformations: [
+      {
+        kind: 'fbm',
+        amplitude: 10,
+        noiseScale: 100,
+        octaves: 1,
+        persistence: 0.5,
+        lacunarity: 2,
+        curveExp: 1,
+        seedSalt: 0,
+      },
+    ],
     layers,
   };
 }

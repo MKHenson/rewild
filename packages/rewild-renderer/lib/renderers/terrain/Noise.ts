@@ -1,6 +1,8 @@
 import { Perlin, Vector2 } from 'rewild-common';
-import { BiomeParams, ClimateConfig } from './Biomes';
+import { ClimateConfig, Deformation } from './Biomes';
 import { createClimateField, resolveBiomeWeights } from './ClimateField';
+
+const DEG2RAD = Math.PI / 180;
 
 function seededRandom(seed: number): () => number {
   let value = seed % 2147483647;
@@ -79,45 +81,186 @@ function theoreticalMaxAmplitude(persistence: number, octaves: number): number {
   return (1 - Math.pow(persistence, octaves)) / (1 - persistence);
 }
 
-// Octave-summed height for one biome at one sample, normalised to [0,1] with the
-// biome's own fixed max amplitude (seam-free, see generateNoiseMap), curved by
-// heightCurveExp and scaled to meters.
-function biomeHeight(
+// Per-deformation constants computed once per chunk (before the sample loop) and
+// read-only inside it, so the loop itself allocates nothing. Which fields are
+// live depends on the deformation's kind: fbm fills the octave arrays and
+// maxAmplitude; dunes fill the orientation and warp offsets. The other kind's
+// fields are inert.
+interface PreparedDeformation {
+  // fbm: per-octave sample offsets (random decorrelation + this chunk's world
+  // offset folded in, so the field is continuous across chunk borders) and the
+  // octave stack's theoretical max, for the same seam-free normalisation the
+  // standalone generateNoiseMap uses.
+  offsetsX: Float64Array | null;
+  offsetsY: Float64Array | null;
+  maxAmplitude: number;
+  // dunes: wind bearing as a unit vector, and the warp field's own offset.
+  cos: number;
+  sin: number;
+  warpOffsetX: number;
+  warpOffsetY: number;
+}
+
+// Builds the per-chunk constants for one deformation. Fbm derives its octave
+// offsets from seed + seedSalt using the same rng stream as generateNoiseMap, so
+// two fbm deformations sharing a salt see the same field (and salt 0 reproduces
+// the pre-deformation shared-offset behaviour exactly). The chunk's world offset
+// is folded into every offset so neighbouring chunks stay seam-free.
+function prepareDeformation(
+  def: Deformation,
+  seed: number,
+  offset: Vector2
+): PreparedDeformation {
+  if (def.kind === 'fbm') {
+    const rng = seededRandom(seed + def.seedSalt);
+    const offsetsX = new Float64Array(def.octaves);
+    const offsetsY = new Float64Array(def.octaves);
+    for (let i = 0; i < def.octaves; i++) {
+      offsetsX[i] = rng() * 200000 - 100000 + offset.x;
+      offsetsY[i] = rng() * 200000 - 100000 + offset.y;
+    }
+    return {
+      offsetsX,
+      offsetsY,
+      maxAmplitude: theoreticalMaxAmplitude(def.persistence, def.octaves),
+      cos: 0,
+      sin: 0,
+      warpOffsetX: 0,
+      warpOffsetY: 0,
+    };
+  }
+
+  // dunes
+  const rng = seededRandom(seed + def.seedSalt);
+  const rad = def.angleDeg * DEG2RAD;
+  return {
+    offsetsX: null,
+    offsetsY: null,
+    maxAmplitude: 1,
+    cos: Math.cos(rad),
+    sin: Math.sin(rad),
+    warpOffsetX: rng() * 200000 - 100000,
+    warpOffsetY: rng() * 200000 - 100000,
+  };
+}
+
+// One deformation's height contribution in meters at one sample. A plain switch
+// on `kind` — no allocation, no dynamic dispatch — so the whole heightfield loop
+// stays cheap however many kinds exist. `offsetX/Y` are this chunk's world
+// offset; fbm has them folded into its octave offsets already and ignores them,
+// dunes need them for the continuous along-wind coordinate.
+function evalDeformation(
   perlin: Perlin,
+  def: Deformation,
+  prep: PreparedDeformation,
   x: number,
   y: number,
   halfWidth: number,
   halfHeight: number,
-  octaveOffsetsX: Float64Array,
-  octaveOffsetsY: Float64Array,
-  biome: BiomeParams,
-  maxAmplitude: number
+  offsetX: number,
+  offsetY: number
 ): number {
-  let amplitude = 1;
-  let frequency = 1;
-  let noiseValue = 0;
+  switch (def.kind) {
+    case 'fbm': {
+      const offsetsX = prep.offsetsX!;
+      const offsetsY = prep.offsetsY!;
+      let amplitude = 1;
+      let frequency = 1;
+      let noiseValue = 0;
 
-  for (let o = 0; o < biome.octaves; o++) {
-    const sampleX = ((x - halfWidth + octaveOffsetsX[o]) / biome.noiseScale) * frequency;
-    const sampleY = ((y - halfHeight - octaveOffsetsY[o]) / biome.noiseScale) * frequency;
+      for (let o = 0; o < def.octaves; o++) {
+        const sampleX = ((x - halfWidth + offsetsX[o]) / def.noiseScale) * frequency;
+        const sampleY = ((y - halfHeight - offsetsY[o]) / def.noiseScale) * frequency;
 
-    noiseValue += perlin.simplex2(sampleX, sampleY) * amplitude;
+        noiseValue += perlin.simplex2(sampleX, sampleY) * amplitude;
 
-    amplitude *= biome.persistence;
-    frequency *= biome.lacunarity;
+        amplitude *= def.persistence;
+        frequency *= def.lacunarity;
+      }
+
+      let n = (noiseValue / prep.maxAmplitude + 1) * 0.5;
+      if (n < 0) n = 0;
+      else if (n > 1) n = 1;
+
+      return Math.pow(n, def.curveExp) * def.amplitude;
+    }
+
+    case 'dunes': {
+      // World position, same continuous basis as the fbm field so dunes are
+      // seam-free too: +x folds in +offsetX, +y in −offsetY (the height noise's
+      // sign convention — see generateBiomeBlendedHeightMap's seam tests).
+      const wx = x - halfWidth + offsetX;
+      const wy = y - halfHeight - offsetY;
+
+      // Meander the crest lines: a low-frequency simplex value in [-1,1] that
+      // bends the otherwise-straight ridges into drifting waves.
+      const warpN = perlin.simplex2(
+        (wx + prep.warpOffsetX) / def.warpScale,
+        (wy + prep.warpOffsetY) / def.warpScale
+      );
+
+      // Distance along the wind bearing, in wavelengths, meandered — so crests
+      // (lines of constant phase) run across the wind at ~wavelength spacing.
+      const along = wx * prep.cos + wy * prep.sin;
+      const phase = along / def.wavelength + def.warp * warpN;
+
+      // One dune period as a skewed profile: gentle windward rise to a crest at
+      // fraction p, then a shorter, steeper leeward drop. sharpness pushes the
+      // crest toward the lee (p→1), which is the slip face steepening.
+      const u = phase - Math.floor(phase); // 0..1 within the period
+      const p = 0.5 + 0.45 * def.sharpness;
+      const tri = u < p ? u / p : (1 - u) / (1 - p);
+      const wave = tri * tri * (3 - 2 * tri); // smoothstep: soft swell, defined crest
+
+      return def.amplitude * wave;
+    }
   }
+}
 
-  let n = (noiseValue / maxAmplitude + 1) * 0.5;
-  if (n < 0) n = 0;
-  else if (n > 1) n = 1;
-
-  return Math.pow(n, biome.heightCurveExp) * biome.heightScale;
+// Summed height for one biome at one sample: its deformation stack evaluated
+// base-first and added. Seam-free and allocation-free (see evalDeformation).
+function biomeHeight(
+  perlin: Perlin,
+  deformations: Deformation[],
+  prepared: PreparedDeformation[],
+  x: number,
+  y: number,
+  halfWidth: number,
+  halfHeight: number,
+  offsetX: number,
+  offsetY: number
+): number {
+  let h = 0;
+  for (let d = 0; d < deformations.length; d++) {
+    h += evalDeformation(
+      perlin,
+      deformations[d],
+      prepared[d],
+      x,
+      y,
+      halfWidth,
+      halfHeight,
+      offsetX,
+      offsetY
+    );
+  }
+  return h;
 }
 
 function validateClimate(climate: ClimateConfig): void {
   for (const biome of climate.biomes) {
-    if (biome.noiseScale <= 0)
-      throw new Error(`Biome '${biome.name}' noiseScale must be a positive number.`);
+    if (!biome.deformations || biome.deformations.length === 0)
+      throw new Error(`Biome '${biome.name}' must have at least one deformation.`);
+    for (const def of biome.deformations) {
+      if (def.kind === 'fbm' && def.noiseScale <= 0)
+        throw new Error(
+          `Biome '${biome.name}' fbm deformation noiseScale must be a positive number.`
+        );
+      if (def.kind === 'dunes' && (def.wavelength <= 0 || def.warpScale <= 0))
+        throw new Error(
+          `Biome '${biome.name}' dune deformation wavelength and warpScale must be positive numbers.`
+        );
+    }
   }
   const tBands = climate.temperature.cuts.length + 1;
   const mBands = climate.moisture.cuts.length + 1;
@@ -163,22 +306,20 @@ export function generateBiomeBlendedHeightMap(
   // is surfaced with always agree with the biome that shaped it.
   const field = createClimateField(width, height, seed, offset, climate);
 
-  // All biomes share one set of octave offsets (same rng stream as
-  // generateNoiseMap) so they sample the same underlying fields and blended
-  // features stay spatially aligned across transition bands.
-  let maxOctaves = 1;
-  for (const biome of biomes) maxOctaves = Math.max(maxOctaves, biome.octaves);
-  const rng = seededRandom(seed);
-  const octaveOffsetsX = new Float64Array(maxOctaves);
-  const octaveOffsetsY = new Float64Array(maxOctaves);
-  for (let i = 0; i < maxOctaves; i++) {
-    octaveOffsetsX[i] = rng() * 200000 - 100000 + offset.x;
-    octaveOffsetsY[i] = rng() * 200000 - 100000 + offset.y;
+  // Precompute each biome's per-deformation constants (octave offsets and
+  // normalisation for fbm, orientation and warp offset for dunes) once, before
+  // the sample loop, so the loop reads them and allocates nothing. Fbm bases
+  // sharing seedSalt 0 all derive the same offsets, which keeps neighbouring
+  // biomes' large-scale relief aligned across transition bands — what the old
+  // single shared-offset stream did, now expressed per field.
+  const prepared: PreparedDeformation[][] = new Array(biomes.length);
+  for (let b = 0; b < biomes.length; b++) {
+    const defs = biomes[b].deformations;
+    const row: PreparedDeformation[] = new Array(defs.length);
+    for (let d = 0; d < defs.length; d++)
+      row[d] = prepareDeformation(defs[d], seed, offset);
+    prepared[b] = row;
   }
-
-  const maxAmplitudes = new Float64Array(biomes.length);
-  for (let i = 0; i < biomes.length; i++)
-    maxAmplitudes[i] = theoreticalMaxAmplitude(biomes[i].persistence, biomes[i].octaves);
 
   const halfWidth = width / 2;
   const halfHeight = height / 2;
@@ -206,14 +347,14 @@ export function generateBiomeBlendedHeightMap(
           activeWeights[i] *
           biomeHeight(
             perlin,
+            biomes[biomeIndex].deformations,
+            prepared[biomeIndex],
             x,
             y,
             halfWidth,
             halfHeight,
-            octaveOffsetsX,
-            octaveOffsetsY,
-            biomes[biomeIndex],
-            maxAmplitudes[biomeIndex]
+            offset.x,
+            offset.y
           );
       }
 

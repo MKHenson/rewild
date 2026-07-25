@@ -49,16 +49,67 @@ export interface BiomeLayer {
   noise?: NoiseSelector; // organic patches, independent of terrain shape
 }
 
-export interface BiomeParams {
-  name: string;
-  heightScale: number; // max height in meters this biome can reach
+// ── Deformations ─────────────────────────────────────────────────────────────
+// A biome's shape is a *stack* of deformations, each a pure function of world
+// position that returns a height contribution in meters. The stack is summed:
+// the first entry is conventionally an fBm 'base' (rolling hills), and later
+// entries — dunes, and whatever kinds get added here in future — layer relief on
+// top of it. Height and surfacing are separate concerns: this shapes the ground,
+// `layers` paints it, and neither reads the other.
+//
+// Every deformation is seam-free: it reads only the sample's world position, so
+// adjacent chunks agree on their shared edge with no cross-chunk state. And each
+// is evaluated by a plain switch on `kind` (see evalDeformation in Noise.ts),
+// never a per-sample method call or allocation — that switch is what keeps the
+// heightfield loop cheap. Adding a kind is a member here plus a case there.
+export type Deformation = FbmDeformation | DuneDeformation;
+
+// Fractional-Brownian-motion noise: octaves of simplex summed with falling
+// amplitude (persistence) and rising frequency (lacunarity), normalised to [0,1]
+// against the octave stack's own fixed maximum (continuous across chunks),
+// curved, and scaled to meters. The classic rolling-hills field — every biome
+// carried exactly one of these before deformations existed, which is why the
+// migration from the old flat fields is a straight rename.
+export interface FbmDeformation {
+  kind: 'fbm';
+  amplitude: number; // meters at full noise (the old heightScale)
   noiseScale: number; // horizontal feature size in world-units; bigger → broader, gentler forms
   octaves: number;
   persistence: number;
   lacunarity: number;
-  heightCurveExp: number; // exponent on normalised height; >1 flattens mids while keeping peaks
+  curveExp: number; // exponent on normalised height; >1 flattens mids, keeps peaks (old heightCurveExp)
+  // Added to the world seed to pick this field's octave offsets. Two fbm
+  // deformations given the same salt sample the *same* underlying field — which
+  // is how neighbouring biomes keep their large-scale relief aligned across a
+  // climate transition (salt 0 everywhere reproduces the old shared-offset
+  // behaviour). Give a field a different salt to decorrelate it.
+  seedSalt: number;
+}
+
+// Wind-blown dunes: a wavy transverse-ridge field that fBm cannot make, because
+// fBm is isotropic (no wind direction) and broadband (no crest rhythm). The
+// crest lines run across `angleDeg` at roughly `wavelength` spacing, meandered by
+// a low-frequency warp so they read as drifting dunes rather than a corrugated
+// roof. Its contribution is non-negative, so it adds swell onto the fBm beneath.
+export interface DuneDeformation {
+  kind: 'dunes';
+  amplitude: number; // meters, trough to crest
+  wavelength: number; // world-units between crests
+  angleDeg: number; // wind bearing; ridges run across it
+  warp: number; // how far the crest lines meander, in wavelengths
+  warpScale: number; // world-units feature size of that meander
+  sharpness: number; // 0 = smooth rolling swell → 1 = steep leeward slip face
+  seedSalt: number; // decorrelates the meander from every other field
+}
+
+export interface BiomeParams {
+  name: string;
+  // The stack that shapes this biome's surface, summed base-first (see
+  // Deformation). Separate from `layers` below, which surfaces the shape with
+  // materials and never touches height.
+  deformations: Deformation[];
   // The materials this biome surfaces with, base first. Climate picks the
-  // biome; these picks the material *within* it — height cannot do that job,
+  // biome; these pick the material *within* it — height cannot do that job,
   // since biome height ranges overlap and terrain is tall *because* it is a
   // mountain, not a mountain because it is tall.
   layers: BiomeLayer[];
@@ -97,12 +148,18 @@ export interface ClimateConfig {
 // both are green.
 export const PLAIN: BiomeParams = {
   name: 'plain',
-  heightScale: 20,
-  noiseScale: 200,
-  octaves: 4,
-  persistence: 0.5,
-  lacunarity: 2.0,
-  heightCurveExp: 1.1,
+  deformations: [
+    {
+      kind: 'fbm',
+      amplitude: 20,
+      noiseScale: 200,
+      octaves: 4,
+      persistence: 0.5,
+      lacunarity: 2.0,
+      curveExp: 1.1,
+      seedSalt: 0,
+    },
+  ],
   layers: [
     { material: 'grass_01_1k' },
     {
@@ -122,12 +179,18 @@ export const PLAIN: BiomeParams = {
 // it reads as a worn track, which is not what a wood underfoot looks like.
 export const FOREST: BiomeParams = {
   name: 'forest',
-  heightScale: 45,
-  noiseScale: 260,
-  octaves: 5,
-  persistence: 0.45,
-  lacunarity: 2.2,
-  heightCurveExp: 1.2,
+  deformations: [
+    {
+      kind: 'fbm',
+      amplitude: 45,
+      noiseScale: 260,
+      octaves: 5,
+      persistence: 0.45,
+      lacunarity: 2.2,
+      curveExp: 1.2,
+      seedSalt: 0,
+    },
+  ],
   layers: [
     { material: 'forest_leaves_02' },
     {
@@ -140,12 +203,18 @@ export const FOREST: BiomeParams = {
 
 export const MOUNTAIN: BiomeParams = {
   name: 'mountain',
-  heightScale: 300,
-  noiseScale: 600,
-  octaves: 6,
-  persistence: 0.35,
-  lacunarity: 2.6,
-  heightCurveExp: 2.0,
+  deformations: [
+    {
+      kind: 'fbm',
+      amplitude: 300,
+      noiseScale: 600,
+      octaves: 6,
+      persistence: 0.35,
+      lacunarity: 2.6,
+      curveExp: 2.0,
+      seedSalt: 0,
+    },
+  ],
   layers: [
     { material: 'aerial_rocks_01' },
     { material: 'marble_cliff_05', slope: { from: 35, to: 75 } },
@@ -173,14 +242,20 @@ export const MOUNTAIN: BiomeParams = {
 // instead of one smooth cone wearing fine noise.
 export const DESERT_MOUNTAIN: BiomeParams = {
   name: 'desert-mountain',
-  heightScale: 300,
-  // Broader than MOUNTAIN: a wider massif spreads its rise over more ground, so
-  // the climb starts well before the climate border rather than at it.
-  noiseScale: 750,
-  octaves: 6,
-  persistence: 0.42,
-  lacunarity: 2.5,
-  heightCurveExp: 1.45,
+  deformations: [
+    {
+      kind: 'fbm',
+      amplitude: 500,
+      // Broader than MOUNTAIN: a wider massif spreads its rise over more
+      // ground, so the climb starts well before the climate border, not at it.
+      noiseScale: 750,
+      octaves: 6,
+      persistence: 0.42,
+      lacunarity: 2.2,
+      curveExp: 1.45,
+      seedSalt: 0,
+    },
+  ],
   layers: [
     { material: 'tiger_rock_1k' },
     // Drift sand: only low down, and only where the ground is flat enough to
@@ -212,21 +287,26 @@ export const DESERT_MOUNTAIN: BiomeParams = {
 // amplitude, so the ground has a rhythm at the scale you actually cross it.
 export const DESERT: BiomeParams = {
   name: 'desert',
-  heightScale: 110,
-  noiseScale: 300,
-  octaves: 4,
-  persistence: 0.45,
-  lacunarity: 2.1,
-  heightCurveExp: 1.25, // hollows the pans between crests without blunting them
+  deformations: [
+    {
+      kind: 'fbm',
+      amplitude: 110,
+      noiseScale: 300,
+      octaves: 4,
+      persistence: 0.45,
+      lacunarity: 2.1,
+      curveExp: 1.25, // hollows the pans between crests without blunting them
+      seedSalt: 0,
+    },
+  ],
   layers: [
-    { material: 'sand_01' },
+    { material: 'mud_cracked_dry_03' },
     // Cracked crust belongs in the pans, not scattered evenly over the dunes —
     // so the inverted height band puts it in the low ground and the noise field
     // (now broad enough to read as pans rather than a mottle) breaks up its edge.
     {
-      material: 'mud_cracked_dry_03',
-      height: { from: 55, to: 22 },
-      noise: { scale: 60, seedSalt: 11, band: { from: 0.35, to: 0.65 } },
+      material: 'sand_01',
+      height: { from: 20, to: 61 },
     },
   ],
 };
@@ -250,23 +330,39 @@ export const DESERT: BiomeParams = {
 // the terrain's own shape rather than on a contour ring.
 export const BEACH_SAND: BiomeParams = {
   name: 'beach-sand',
-  heightScale: 30,
-  noiseScale: 450,
-  octaves: 5,
-  persistence: 0.42,
-  lacunarity: 2.3,
-  heightCurveExp: 1.3, // keeps the flats flat; only the rare rise gets height
+  deformations: [
+    {
+      kind: 'fbm',
+      amplitude: 100,
+      noiseScale: 550,
+      octaves: 3,
+      persistence: 0.42,
+      lacunarity: 2.3,
+      curveExp: 1.3, // keeps the flats flat; only the rare rise gets height
+      seedSalt: 0,
+    },
+    // Low coastal dunes: shorter wavelength and gentler slip face than DESERT's,
+    // so the flats ripple into wavy sand ridges without becoming dune country.
+    // Different salt/bearing from DESERT so the two sand fields don't line up
+    // where the biomes meet. First-pass numbers; tune to taste.
+    {
+      kind: 'dunes',
+      amplitude: 10,
+      wavelength: 100,
+      angleDeg: 55,
+      warp: 0.35,
+      warpScale: 200,
+      sharpness: 0.45,
+      seedSalt: 17,
+    },
+  ],
   layers: [
     { material: 'aerial_beach_02' },
     // Retuned to the shorter range — the old 3→20 band never resolved at all
     // once nothing reached 20 m, leaving the whole beach permanently damp.
     {
       material: 'aerial_beach_01',
-      noise: { scale: 60, seedSalt: 11, band: { from: 0.15, to: 0.85 } },
-    },
-    {
-      material: 'sand_01',
-      noise: { scale: 90, seedSalt: 6, band: { from: 0.15, to: 0.85 } },
+      height: { from: 0, to: 60 },
     },
   ],
 };
@@ -311,22 +407,22 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
 export const ARID_CLIMATE: ClimateConfig = {
   label: 'Arid',
   temperature: {
-    scale: 3000 / TERRAIN_METERS_PER_SAMPLE,
+    scale: 6000 / TERRAIN_METERS_PER_SAMPLE,
     seedSalt: 7919,
-    cuts: [0.5],
+    cuts: [0.4, 0.7],
     blendHalfWidth: 0.1,
-  },
+  }, // 3 bands
   moisture: {
-    scale: 2400 / TERRAIN_METERS_PER_SAMPLE,
+    scale: 4800 / TERRAIN_METERS_PER_SAMPLE,
     seedSalt: 104729,
-    cuts: [0.5],
+    cuts: [],
     blendHalfWidth: 0.1,
-  },
+  }, // 1 band
   biomes: [BEACH_SAND, DESERT, DESERT_MOUNTAIN],
   cells: [
-    // dry, wet
-    [2, 2], // cold → desert mountain either way, mirroring DEFAULT's cold row
-    [1, 0], // warm → dunes when dry, coastal flats when wet
+    [2], // cold → desert mountain
+    [1], // mid  → dunes
+    [0], // warm → coastal flats
   ],
 };
 
@@ -415,11 +511,16 @@ export function validateClimateLayers(climate: ClimateConfig): void {
 
 // Tallest possible terrain across a climate's biomes. The height-colour bands
 // that used to normalise against this are gone — materials now come from the
-// splat map — but it still bounds what generation may produce.
+// splat map — but it still bounds what generation may produce. A biome's ceiling
+// is the sum of its deformation amplitudes: every kind's contribution peaks at
+// its own `amplitude` and they stack, so the sum is a safe (if loose) upper
+// bound on the summed height.
 export function getMaxWorldHeight(climate: ClimateConfig): number {
   let max = 0;
   for (const biome of climate.biomes) {
-    if (biome.heightScale > max) max = biome.heightScale;
+    let ceiling = 0;
+    for (const def of biome.deformations) ceiling += def.amplitude;
+    if (ceiling > max) max = ceiling;
   }
   return max;
 }
