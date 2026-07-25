@@ -29,7 +29,7 @@ These are the designer-facing properties on `SkyRenderer`. All take effect withi
 | `windDirection` | `Vector2` | normalized | XZ direction clouds and precipitation move toward            |
 | `windiness`     | `number`  | 0–1        | Wind speed scale; drives gust strength quadratically         |
 | `precipitation` | `number`  | 0–1        | Precipitation density. Also gates lightning (requires > 0.8) |
-| `temperature`   | `number`  | 0–1        | 0 = snow, 1 = rain; blends particle behavior                 |
+| `temperature`   | `number`  | 0–1        | 0 = snow, 1 = rain; blends particle behavior. Also gates lightning (requires > 0.3) |
 
 **Read-only / triggering:**
 
@@ -75,7 +75,7 @@ Owns the strike state machine and bolt path generation. No GPU resources.
 IDLE → BOLT (150ms) → FLASH (80ms) → FADE (100ms) → IDLE
 ```
 
-Lightning only fires when `cloudiness > 0.85` and `precipitation > 0.8`. Strike frequency scales with `cloudiness × precipitation`. Chain strikes: up to 2 follow-up bolts at 40% chance each.
+Lightning only fires when `cloudiness > 0.85`, `precipitation > 0.8`, and `temperature > 0.3` (a thunderbolt in a snowstorm looks wrong). Strike frequency scales with `cloudiness × precipitation`. Chain strikes: up to 2 follow-up bolts at 40% chance each.
 
 The bolt path is generated via **fractal subdivision** (4 levels, 2–3 branches) using pre-allocated ping-pong buffers — zero per-frame allocation.
 

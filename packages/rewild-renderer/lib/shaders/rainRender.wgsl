@@ -60,7 +60,10 @@ fn vs(
     let lUV = QUAD_UV[vi];
     let p   = particles[ii];
 
-    let rainFactor = u.temperature;  // 0 = snow, 1 = rain
+    // Snow→rain transition is compressed into temperature 0–0.5; anything
+    // above 0.5 is pure rain. Raw u.temperature is left alone (sky/fog tint
+    // still reads the full 0–1 range).
+    let rainFactor = saturate(u.temperature * 2.0);  // 0 = snow, 1 = rain
 
     // ── Rain streak geometry ──────────────────────────────────────────────
     // Use the particle's stored velocity for streak direction so bounce arcs
@@ -121,17 +124,17 @@ fn vs(
 
 @fragment
 fn fs(in: VertexOutput) -> @location(0) vec4f {
-    let rainFactor = u.temperature;
+    let rainFactor = saturate(u.temperature * 2.0);
 
     // ── Rain streak: thin soft line ───────────────────────────────────────
     let rainEdge    = abs(in.uv.x - 0.5) * 2.0;               // 0 = center, 1 = edge
     let rainCapFade = smoothstep(0.0, 0.12, in.uv.y)           // fade at head
                     * smoothstep(1.0, 0.88, in.uv.y);          // fade at tail
-    let rainAlpha   = smoothstep(1.0, 0.0, rainEdge) * rainCapFade * 0.38;
+    let rainAlpha   = smoothstep(1.0, 0.0, rainEdge) * rainCapFade * 0.7;
 
     // ── Snow flake: soft circle ───────────────────────────────────────────
     let snowDist  = length(in.uv - vec2f(0.5)) * 2.0;          // 0=center, 1=edge
-    let snowAlpha = smoothstep(1.0, 0.2, snowDist) * 0.55;
+    let snowAlpha = smoothstep(1.0, 0.2, snowDist) * 0.9;
 
     // ── Blend, apply precipitation & near-fade ────────────────────────────
     let alpha = mix(snowAlpha, rainAlpha, rainFactor) * in.nearFade;

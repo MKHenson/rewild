@@ -414,6 +414,7 @@ export class SkyRenderer {
       renderer.delta,
       this.cloudiness,
       this.precipitation,
+      this.temperature,
       camera.transform.position,
       cfwdX,
       cfwdZ

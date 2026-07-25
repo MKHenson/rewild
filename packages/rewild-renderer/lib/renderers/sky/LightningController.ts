@@ -25,6 +25,9 @@ const FADE_MS = 100;
 const MIN_CLOUDINESS = 0.85;
 // Minimum precipitation (0–1) required for lightning to occur
 const MIN_PRECIPITATION = 0.8;
+// Minimum temperature (0–1) required for lightning — below this it's snowing,
+// and a thunderbolt in a snowstorm looks wrong.
+const MIN_TEMPERATURE = 0.3;
 // Y position (height) of the cloud base where lightning starts
 const CLOUD_BASE_Y = 520;
 // Number of fractal subdivision levels for bolt shape
@@ -87,6 +90,7 @@ export class LightningController {
    * @param deltaMs        - frame time in milliseconds
    * @param cloudiness     - 0–1
    * @param precipitation  - 0–1
+   * @param temperature    - 0–1 (below MIN_TEMPERATURE it's snowing, no lightning)
    * @param cameraPos      - world-space camera position
    * @param cameraFwdX     - normalised forward X in XZ plane
    * @param cameraFwdZ     - normalised forward Z in XZ plane
@@ -95,13 +99,16 @@ export class LightningController {
     deltaMs: number,
     cloudiness: number,
     precipitation: number,
+    temperature: number,
     cameraPos: Vector3,
     cameraFwdX: number,
     cameraFwdZ: number
   ): LightningStrike {
     const strike = this.currentStrike;
     const stormActive =
-      cloudiness > MIN_CLOUDINESS && precipitation > MIN_PRECIPITATION;
+      cloudiness > MIN_CLOUDINESS &&
+      precipitation > MIN_PRECIPITATION &&
+      temperature > MIN_TEMPERATURE;
 
     // Compute attenuation factor for flash based on distance to camera
     let flashAttenuation = 1;
