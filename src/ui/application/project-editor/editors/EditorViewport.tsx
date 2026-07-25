@@ -35,6 +35,7 @@ import {
 } from './utils/WorldPlacement';
 import { sculptStore } from 'src/ui/stores/SculptStore';
 import { SculptToolbar } from './SculptToolbar';
+import { loadCameraState, saveCameraState } from './utils/CameraPersistence';
 
 interface Props {}
 
@@ -60,6 +61,8 @@ export class EditorViewport extends Component<Props> {
   private didDrag = false;
   private mouseDownPos = { x: 0, y: 0 };
   private cameraObserver: ITransformObserver | null = null;
+  private cameraSaveHandle: number | null = null;
+  private viewportCanvas: HTMLCanvasElement | null = null;
 
   init() {
     this.renderer = new Renderer();
@@ -68,6 +71,10 @@ export class EditorViewport extends Component<Props> {
     const onProjectEvent: Subscriber<ProjectStoreEvents> = (event) => {
       if (event.kind === 'loading-completed') {
         SyncRendererFromProject(this.renderer, event.project);
+        // Reloading a scene should keep the last viewpoint rather than snap
+        // back to the default camera. The orbit controller may not exist yet
+        // on the very first load — onCanvasReady restores in that case.
+        this.restoreSavedCamera();
       }
     };
 
@@ -301,6 +308,22 @@ export class EditorViewport extends Component<Props> {
         this.sculptController = new TerrainSculptController(this.renderer);
 
         this.installCameraObserver();
+
+        // Persist the camera after any orbit/pan/zoom interaction so the next
+        // scene reload restores this viewpoint. Debounced so a burst of wheel
+        // ticks or a drag collapses into a single write.
+        this.viewportCanvas = pane3D.canvas()!;
+        this.viewportCanvas.addEventListener(
+          'pointerup',
+          this.scheduleCameraSave
+        );
+        this.viewportCanvas.addEventListener('wheel', this.scheduleCameraSave, {
+          passive: true,
+        });
+
+        // If the project loaded before the canvas was ready, the earlier
+        // loading-completed restore was a no-op — apply the saved camera now.
+        this.restoreSavedCamera();
 
         pane3D.onclick = onClick;
         pane3D.onmousedown = onMouseDown;
@@ -620,6 +643,44 @@ export class EditorViewport extends Component<Props> {
     this._updatingGizmoScale = false;
   }
 
+  private scheduleCameraSave = (): void => {
+    if (this.cameraSaveHandle !== null) {
+      window.clearTimeout(this.cameraSaveHandle);
+    }
+    this.cameraSaveHandle = window.setTimeout(() => {
+      this.cameraSaveHandle = null;
+      const projectId = projectStore.project?.id;
+      if (!projectId || !this.orbitController) return;
+      saveCameraState(
+        projectId,
+        this.renderer.camera.camera.transform.position,
+        this.orbitController.target
+      );
+    }, 400);
+  };
+
+  private restoreSavedCamera(): void {
+    const projectId = projectStore.project?.id;
+    if (!projectId || !this.orbitController) return;
+
+    const state = loadCameraState(projectId);
+    if (!state) return;
+
+    this.renderer.camera.camera.transform.position.set(
+      state.position[0],
+      state.position[1],
+      state.position[2]
+    );
+    this.orbitController.target.set(
+      state.target[0],
+      state.target[1],
+      state.target[2]
+    );
+    // Rebuild the camera's spherical state and orientation from the restored
+    // position/target so the next drag continues smoothly from here.
+    this.orbitController.update();
+  }
+
   private installCameraObserver(): void {
     this.cameraObserver = {
       worldMatrixUpdated: () => this.updateGizmoScale(),
@@ -669,6 +730,21 @@ export class EditorViewport extends Component<Props> {
   }
 
   dispose() {
+    if (this.cameraSaveHandle !== null) {
+      window.clearTimeout(this.cameraSaveHandle);
+      this.cameraSaveHandle = null;
+    }
+    if (this.viewportCanvas) {
+      this.viewportCanvas.removeEventListener(
+        'pointerup',
+        this.scheduleCameraSave
+      );
+      this.viewportCanvas.removeEventListener(
+        'wheel',
+        this.scheduleCameraSave
+      );
+      this.viewportCanvas = null;
+    }
     this.removeCameraObserver();
     this.orbitController?.dispose();
     this.gizmo?.dispose();
