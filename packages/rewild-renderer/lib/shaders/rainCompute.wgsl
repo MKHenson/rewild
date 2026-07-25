@@ -84,7 +84,9 @@ fn computeMain(@builtin(global_invocation_id) id: vec3<u32>) {
 
     var p = particles[i];
 
-    let rainFactor = u.temperature;
+    // Match rainRender.wgsl: snow→rain transition lives in temperature 0–0.5,
+    // above 0.5 is pure rain. Keep this remap identical in both shaders.
+    let rainFactor = saturate(u.temperature * 2.0);
     let fallSpeed  = mix(1.0, 9.5, rainFactor);
     let windFactor = mix(0.2, 1.0, rainFactor);
     let gustAmp    = sin(u.iTime * 0.41) * 0.5
