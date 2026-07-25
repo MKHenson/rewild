@@ -5,6 +5,8 @@ import {
   CLIMATE_PRESETS,
   ClimateConfig,
   DEFAULT_CLIMATE,
+  DuneDeformation,
+  FbmDeformation,
   MOUNTAIN,
   PLAIN,
   getMaxWorldHeight,
@@ -32,17 +34,23 @@ function generate(
   );
 }
 
-// A biome whose height is a constant `heightScale` everywhere (pow(n, 0) === 1),
-// so tests can isolate the climate blending from the octave noise.
-function flatBiome(name: string, heightScale: number): BiomeParams {
+// A biome whose height is a constant `amplitude` everywhere (curveExp 0 makes
+// pow(n, 0) === 1), so tests can isolate the climate blending from the noise.
+function flatBiome(name: string, amplitude: number): BiomeParams {
   return {
     name,
-    heightScale,
-    noiseScale: 400,
-    octaves: 1,
-    persistence: 0.5,
-    lacunarity: 2.0,
-    heightCurveExp: 0,
+    deformations: [
+      {
+        kind: 'fbm',
+        amplitude,
+        noiseScale: 400,
+        octaves: 1,
+        persistence: 0.5,
+        lacunarity: 2.0,
+        curveExp: 0,
+        seedSalt: 0,
+      },
+    ],
     layers: [{ material: 'flat-ground-01' }],
   };
 }
@@ -240,5 +248,104 @@ describe('generateBiomeBlendedHeightMap', () => {
       cells: [[0]], // temperature has 2 bands, only 1 row given
     };
     expect(() => generate(0, 0, SEED, bad)).toThrow();
+  });
+});
+
+describe('deformation stack', () => {
+  // A shared fbm base so tests that compare "with dunes" against "without" differ
+  // in exactly one deformation — any change in the output is the dune's alone.
+  const fbmBase: FbmDeformation = {
+    kind: 'fbm',
+    amplitude: 40,
+    noiseScale: 300,
+    octaves: 4,
+    persistence: 0.45,
+    lacunarity: 2.1,
+    curveExp: 1,
+    seedSalt: 0,
+  };
+  const dune: DuneDeformation = {
+    kind: 'dunes',
+    amplitude: 30,
+    wavelength: 100,
+    angleDeg: 0, // ridges run across +x, so a strip along x crosses many crests
+    warp: 0.2,
+    warpScale: 600,
+    sharpness: 0.5,
+    seedSalt: 31,
+  };
+  const biomeOf = (deformations: BiomeParams['deformations']): BiomeParams => ({
+    name: 'test',
+    deformations,
+    layers: [{ material: 'flat-ground-01' }],
+  });
+
+  it('adds only non-negative relief, bounded by the dune amplitude', () => {
+    // fbm+dunes must sit at or above fbm-only everywhere (the dune wave is ≥ 0)
+    // and never lift by more than the dune's amplitude.
+    const base = generate(0, 0, SEED, singleBiomeClimate(biomeOf([fbmBase])));
+    const duned = generate(0, 0, SEED, singleBiomeClimate(biomeOf([fbmBase, dune])));
+
+    let maxLift = 0;
+    for (let i = 0; i < base.length; i++) {
+      const lift = duned[i] - base[i];
+      expect(lift).toBeGreaterThanOrEqual(-1e-4);
+      expect(lift).toBeLessThanOrEqual(dune.amplitude + 1e-4);
+      if (lift > maxLift) maxLift = lift;
+    }
+    // …and the dunes must actually do something, not round to nothing.
+    expect(maxLift).toBeGreaterThan(5);
+  });
+
+  it('lays down a crest rhythm that plain fbm cannot', () => {
+    // A dunes-only strip along the wind axis: heights should oscillate at roughly
+    // one crest per wavelength — a periodicity fbm has no way to produce.
+    const W = 1600;
+    const strip = generate(0, 0, SEED, singleBiomeClimate(biomeOf([dune])), W, 1);
+
+    let min = Infinity;
+    let max = -Infinity;
+    let peaks = 0;
+    for (let i = 0; i < W; i++) {
+      if (strip[i] < min) min = strip[i];
+      if (strip[i] > max) max = strip[i];
+      if (i > 0 && i < W - 1 && strip[i] > strip[i - 1] && strip[i] >= strip[i + 1])
+        peaks++;
+    }
+
+    expect(min).toBeGreaterThanOrEqual(0);
+    expect(max).toBeLessThanOrEqual(dune.amplitude + 1e-4);
+    // ~W/wavelength ≈ 16 crests; wide bounds tolerate the meander merging some.
+    expect(peaks).toBeGreaterThan(6);
+    expect(peaks).toBeLessThan(40);
+  });
+
+  it('stays seam-free across chunk borders with a dune biome', () => {
+    const climate = singleBiomeClimate(biomeOf([fbmBase, dune]));
+
+    const left = generate(0, 0, SEED, climate);
+    const right = generate(CHUNK_SIZE - 1, 0, SEED, climate);
+    for (let y = 0; y < CHUNK_SIZE; y++)
+      expect(right[y * CHUNK_SIZE]).toBeCloseTo(
+        left[y * CHUNK_SIZE + (CHUNK_SIZE - 1)],
+        4
+      );
+
+    const top = generate(0, 0, SEED, climate);
+    const bottom = generate(0, CHUNK_SIZE - 1, SEED, climate);
+    for (let x = 0; x < CHUNK_SIZE; x++)
+      expect(bottom[(CHUNK_SIZE - 1) * CHUNK_SIZE + x]).toBeCloseTo(top[x], 4);
+  });
+
+  it('stays within getMaxWorldHeight, which sums the stack amplitudes', () => {
+    const climate = singleBiomeClimate(biomeOf([fbmBase, dune]));
+    const max = getMaxWorldHeight(climate);
+    expect(max).toBe(fbmBase.amplitude + dune.amplitude);
+
+    const heights = generate(0, 0, SEED, climate);
+    for (let i = 0; i < heights.length; i++) {
+      expect(heights[i]).toBeGreaterThanOrEqual(0);
+      expect(heights[i]).toBeLessThanOrEqual(max);
+    }
   });
 });
