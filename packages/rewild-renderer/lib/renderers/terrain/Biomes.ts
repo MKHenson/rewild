@@ -265,7 +265,7 @@ export const DESERT_MOUNTAIN: BiomeParams = {
     // in the dune field rather than planted beside it.
     {
       material: 'sand_01',
-      height: { from: 110, to: 30 },
+      height: { from: 310, to: 60 },
       slope: { from: 30, to: 12 },
     },
     // Last, so a steep face wins outright over the drift below it. Opens a
