@@ -12,8 +12,10 @@ import {
 import { TerrainChunk, TerrainChunkEvent } from './TerrainChunk';
 import { LODMesh } from './LODMesh';
 import { TerrainWorkerPool } from './TerrainWorkerPool';
-import { DEFAULT_CLIMATE_PRESET } from './Biomes';
+import { DEFAULT_CLIMATE_PRESET, resolveClimatePreset } from './Biomes';
 import { ChunkSnapshotProvider } from './ChunkSnapshot';
+import { PaintMaskProvider } from './PaintMask';
+import { generateSplatMap } from './Splat';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 
 export class LODInfo {
@@ -103,6 +105,9 @@ export class TerrainRenderer {
   // Injected by the host app (game/editor); looks up a chunk's saved snapshot
   // heights on the asset path. Saved ⇒ meshed from storage, absent ⇒ generated.
   snapshotProvider: ChunkSnapshotProvider | null = null;
+  // Same, for a chunk's saved biome paint mask. Absent ⇒ the chunk surfaces
+  // from pure climate.
+  biomeMaskProvider: PaintMaskProvider | null = null;
   private _enabled: boolean = true;
 
   constructor() {
@@ -490,6 +495,95 @@ export class TerrainRenderer {
     chunk.bumpHeightsVersion();
     chunk.refreshMeshes(this.renderer);
     return true;
+  }
+
+  /**
+   * Regenerates a chunk's splat map from its current heights and biome mask,
+   * and uploads it — the whole map, or just the LOD-0 sample window given.
+   *
+   * This is the paint brush's counterpart to remeshChunk, and the reason
+   * painting is cheap: a stroke changes no geometry, so nothing is re-meshed and
+   * no worker is involved. Only the disc under the brush is resolved and only
+   * that rectangle is uploaded, so the cost tracks the brush size rather than
+   * the chunk size.
+   *
+   * Returns false when the chunk isn't loaded or has no splat yet (its first
+   * worker build will pick the mask up on its own).
+   */
+  refreshChunkSplat(
+    cx: number,
+    cy: number,
+    window?: { x0: number; y0: number; x1: number; y1: number }
+  ): boolean {
+    const chunk = this.terrainChunks.get(`${cx},${cy}`);
+    const renderer = this.renderer;
+    if (!chunk || !renderer) return false;
+    // Nothing resident to patch — the pending/next build generates from the
+    // mask anyway, so there is nothing to do and nothing lost.
+    if (!chunk.splatData || !chunk.heights || !chunk.splatTexture) return false;
+
+    const size = this.mapChunkSizeLod;
+    generateSplatMap(
+      size,
+      size,
+      chunk.seed,
+      chunk.noiseOffset,
+      resolveClimatePreset(chunk.climatePreset),
+      chunk.heights,
+      {
+        biomeMask: chunk.biomeMask,
+        out: chunk.splatData,
+        region: window,
+      }
+    );
+
+    if (window) {
+      chunk.uploadSplatRegion(renderer, window.x0, window.y0, window.x1, window.y1);
+    } else {
+      chunk.uploadSplatRegion(renderer, 0, 0, size - 1, size - 1);
+    }
+    return true;
+  }
+
+  /**
+   * The LOD-0 sample window a world-space disc covers in chunk (cx, cy),
+   * padded by one sample so the splat's bilinear filtering has a correct ring
+   * around the edited texels. Returns null when the disc misses the chunk.
+   *
+   * Mirrors sampleHeight's world→sample mapping (+z is −sy), which is the same
+   * convention the mesh, the heightfield and the mask all use.
+   */
+  splatWindowForDisc(
+    cx: number,
+    cy: number,
+    centerX: number,
+    centerZ: number,
+    radius: number
+  ): { x0: number; y0: number; x1: number; y1: number } | null {
+    const span = this.chunkSize; // world units per chunk
+    const size = this.mapChunkSizeLod;
+    const mps = this.metersPerSample;
+    const max = size - 1;
+
+    // Chunk-local world offsets of the disc's bounding box, then to samples.
+    const localMinX = centerX - radius - cx * span + span / 2;
+    const localMaxX = centerX + radius - cx * span + span / 2;
+    // +z is −sy, so the far edge in z is the *small* sample row.
+    const localMinZ = cy * span + span / 2 - (centerZ + radius);
+    const localMaxZ = cy * span + span / 2 - (centerZ - radius);
+
+    const x0 = Math.floor(localMinX / mps) - 1;
+    const x1 = Math.ceil(localMaxX / mps) + 1;
+    const y0 = Math.floor(localMinZ / mps) - 1;
+    const y1 = Math.ceil(localMaxZ / mps) + 1;
+    if (x1 < 0 || y1 < 0 || x0 > max || y0 > max) return null;
+
+    return {
+      x0: Math.max(0, x0),
+      y0: Math.max(0, y0),
+      x1: Math.min(max, x1),
+      y1: Math.min(max, y1),
+    };
   }
 
   update(renderer: Renderer, camera: Camera) {

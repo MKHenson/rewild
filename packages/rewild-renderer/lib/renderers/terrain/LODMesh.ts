@@ -160,7 +160,15 @@ export class LODMesh {
         const knownHeights = await this.chunk.resolveHeights(
           renderer.terrainRenderer.snapshotProvider
         );
+        // The chunk's painted biome mask (loading it on first use, exactly like
+        // the height snapshot). Splat-only — it never reaches the height paths.
+        const climate = resolveClimatePreset(this.climatePreset);
+        const biomeMask = await this.chunk.resolveBiomeMask(
+          renderer.terrainRenderer.biomeMaskProvider,
+          climate.biomes.length
+        );
         const version = this.chunk.heightsVersion;
+        const maskVersion = this.chunk.maskVersion;
 
         // Edited surfaces diverge from the worker's noise apron ring, so build a
         // real apron from the loaded neighbours' heights on the main thread and
@@ -184,6 +192,7 @@ export class LODMesh {
             heights: apron ? undefined : knownHeights ?? undefined,
             apron,
             edited: this.chunk.heightsAreEdited,
+            biomeMask: biomeMask ?? undefined,
           });
 
         // Cache the heightfield on the chunk so later LODs, snapshot writes,
@@ -205,6 +214,17 @@ export class LODMesh {
         // The splat map is chunk state shared by every LOD — hand it over and
         // let the chunk create or re-upload it as its version warrants.
         this.chunk.populateSplat(renderer, splat, version);
+
+        // A paint stamp landed while this build was in the worker, so the splat
+        // it just produced is already one stroke stale. Painting bumps only
+        // maskVersion (no geometry changed), so the do-while below will not
+        // catch this — regenerate the splat alone, in place, right here.
+        if (this.chunk.maskVersion !== maskVersion) {
+          renderer.terrainRenderer.refreshChunkSplat(
+            this.chunk.coord.x,
+            this.chunk.coord.y
+          );
+        }
 
         const oldMesh = swapping ? this.mesh : null;
 

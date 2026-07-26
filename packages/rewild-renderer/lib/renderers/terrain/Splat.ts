@@ -13,12 +13,38 @@ import {
   sampleLayerNoise,
 } from './ClimateField';
 import { resolveLayerWeights } from './LayerWeights';
+import { PaintMask, samplePaintMask } from './PaintMask';
 
 // Samples are one world unit apart (241 samples spanning 240 units), so a
 // height difference between neighbours *is* the per-unit gradient.
 const SAMPLE_SPACING = 1;
 
 const RAD_TO_DEG = 180 / Math.PI;
+
+/** An inclusive texel window of a chunk's splat map. */
+export interface SplatRegion {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+export interface SplatOptions {
+  /**
+   * Author-painted biome weights for this chunk (channel i = climate biome i).
+   * Overrides the climate model in proportion to how hard each texel is
+   * painted; omitted or null ⇒ pure climate, the generated world.
+   */
+  biomeMask?: PaintMask | null;
+  /**
+   * Write into this buffer instead of allocating one. Required for `region` —
+   * a partial pass leaves every texel outside the window untouched, so it only
+   * makes sense against a buffer that already holds a full map.
+   */
+  out?: Uint8Array;
+  /** Only regenerate this window. Defaults to the whole chunk. */
+  region?: SplatRegion;
+}
 
 /**
  * Terrain slope in degrees from horizontal at sample (x, y), by central
@@ -75,6 +101,15 @@ function slopeDegreesAt(
  * chunk whose heights were generated and one whose heights came from a sculpt
  * snapshot — which is what lets a sculpted peak grow snow for free, and why no
  * snapshot format change was needed.
+ *
+ * A third answer overrides the first: `options.biomeMask`, the author's painted
+ * biome weights. It replaces climate's answer to "which biome" in proportion to
+ * how hard it was painted, and the climate model keeps the remainder — the same
+ * "take your coverage of what is left" compositing the layers already use. It
+ * deliberately does NOT feed height generation: heights are frozen the moment a
+ * chunk is sculpted or snapshotted, so a painted biome that moved the ground
+ * would either fight the sculpt or be silently ignored on saved chunks. Paint
+ * says what the ground is made of; sculpt says what shape it is.
  */
 export function generateSplatMap(
   width: number,
@@ -82,7 +117,8 @@ export function generateSplatMap(
   seed: number,
   offset: Vector2,
   climate: ClimateConfig,
-  heights: Float32Array
+  heights: Float32Array,
+  options?: SplatOptions
 ): Uint8Array {
   if (heights.length !== width * height)
     throw new Error(
@@ -90,11 +126,39 @@ export function generateSplatMap(
     );
   validateClimateLayers(climate);
 
+  const biomeMask = options?.biomeMask ?? null;
+  if (biomeMask && biomeMask.channels !== climate.biomes.length)
+    throw new Error(
+      `Biome mask has ${biomeMask.channels} channels but the climate has ${climate.biomes.length} biomes.`
+    );
+
   const palette = getClimatePalette(climate);
   const field = createClimateField(width, height, seed, offset, climate);
-  const splat = new Uint8Array(width * height * SPLAT_BYTES_PER_TEXEL);
+  const expectedBytes = width * height * SPLAT_BYTES_PER_TEXEL;
+  const out = options?.out;
+  if (out && out.length !== expectedBytes)
+    throw new Error(
+      `Splat output buffer is ${out.length} bytes; expected ${expectedBytes}.`
+    );
+  const splat = out ?? new Uint8Array(expectedBytes);
   // Where the second plane (channels 4-7) starts.
   const planeStride = width * height * 4;
+
+  // Texel window to (re)generate. A paint stroke only invalidates the disc under
+  // the brush, and regenerating 241² texels — each of which resolves several
+  // octaves of climate noise — per stamp is what would make painting stutter.
+  // Defaults to the whole chunk, which is what every generation path wants.
+  const region = options?.region;
+  // Without `out` a partial pass would return a freshly allocated map that is
+  // zero everywhere outside the window — a silently corrupt splat rather than a
+  // patched one. Fail instead of producing it.
+  if (region && !out)
+    throw new Error('Splat region requires an `out` buffer to patch into.');
+  const rx0 = region ? Math.max(0, region.x0) : 0;
+  const ry0 = region ? Math.max(0, region.y0) : 0;
+  const rx1 = region ? Math.min(width - 1, region.x1) : width - 1;
+  const ry1 = region ? Math.min(height - 1, region.y1) : height - 1;
+  if (rx1 < rx0 || ry1 < ry0) return splat;
 
   // Per-biome map from layer index → splat channel, resolved up front so the
   // sample loop never does a name lookup.
@@ -114,27 +178,70 @@ export function generateSplatMap(
   );
 
   // Scratch reused across samples — nothing is allocated in the loop.
-  const activeBiomes = new Int32Array(4);
-  const activeWeights = new Float64Array(4);
+  const biomeCount = climate.biomes.length;
+  const climateBiomes = new Int32Array(4);
+  const climateWeights = new Float64Array(4);
+  // Painted biomes merge with the (up to four) climate biomes, so the combined
+  // list can hold both — in practice they overlap heavily and it stays short.
+  const activeBiomes = new Int32Array(4 + biomeCount);
+  const activeWeights = new Float64Array(4 + biomeCount);
+  const paintWeights = new Float64Array(biomeCount);
   const layerWeights = new Float64Array(maxLayers);
   const layerNoise = new Float64Array(maxLayers);
   const channels = new Float64Array(MAX_SPLAT_LAYERS);
 
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
+  for (let y = ry0; y <= ry1; y++) {
+    for (let x = rx0; x <= rx1; x++) {
       const index = x + y * width;
       const worldHeight = heights[index];
       const slope = slopeDegreesAt(heights, width, height, x, y);
 
       channels.fill(0);
 
-      const activeCount = resolveBiomeWeights(
-        field,
-        x,
-        y,
-        activeBiomes,
-        activeWeights
-      );
+      // Painted biomes first: each takes its painted weight outright, and the
+      // climate model is scaled into whatever is left. Where paint saturates,
+      // `climateScale` is 0 and the climate noise is skipped entirely — a fully
+      // painted region costs no noise evaluations at all.
+      let activeCount = 0;
+      let painted = 0;
+      if (biomeMask) {
+        painted = samplePaintMask(biomeMask, x, y, paintWeights);
+        for (let c = 0; c < biomeCount; c++) {
+          if (paintWeights[c] <= 0) continue;
+          activeBiomes[activeCount] = c;
+          activeWeights[activeCount] = paintWeights[c];
+          activeCount++;
+        }
+      }
+
+      const climateScale = 1 - painted;
+      if (climateScale > 0) {
+        const climateCount = resolveBiomeWeights(
+          field,
+          x,
+          y,
+          climateBiomes,
+          climateWeights
+        );
+        for (let b = 0; b < climateCount; b++) {
+          const biomeIndex = climateBiomes[b];
+          const weight = climateWeights[b] * climateScale;
+          // A biome can be both painted and climate-native here; merging keeps
+          // it evaluated once, exactly as the climate cells already merge.
+          let merged = false;
+          for (let j = 0; j < activeCount; j++) {
+            if (activeBiomes[j] === biomeIndex) {
+              activeWeights[j] += weight;
+              merged = true;
+              break;
+            }
+          }
+          if (merged) continue;
+          activeBiomes[activeCount] = biomeIndex;
+          activeWeights[activeCount] = weight;
+          activeCount++;
+        }
+      }
 
       for (let b = 0; b < activeCount; b++) {
         const biomeIndex = activeBiomes[b];

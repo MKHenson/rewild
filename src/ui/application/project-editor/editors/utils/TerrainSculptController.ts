@@ -1,14 +1,6 @@
 import { Color, Vector2, Vector3 } from 'rewild-common';
-import {
-  Mesh,
-  Renderer,
-  Transform,
-  Geometry,
-  RenderLayer,
-  resolveClimatePreset,
-} from 'rewild-renderer';
-import { GizmoPass } from 'rewild-renderer/lib/materials/GizmoPass';
-import { InteractionLayer } from 'src/core/InteractionLayer';
+import { Renderer, Transform, resolveClimatePreset } from 'rewild-renderer';
+import { BrushCursor, pickTerrain } from './BrushCursor';
 import {
   applySculptStamp,
   SculptHeightSource,
@@ -55,10 +47,16 @@ export class TerrainSculptController {
   private pendingResolves = new Set<string>();
   private scratchIntersections: Intersection[] = [];
   private scratchTransforms: Transform[] = [];
+  private cursor: BrushCursor;
   private source: SculptHeightSource;
 
   constructor(private renderer: Renderer) {
     const controller = this;
+    this.cursor = new BrushCursor(
+      renderer,
+      new Color(1, 0.6, 0.1),
+      'SculptBrushCursor'
+    );
     this.source = {
       get chunkSize() {
         return controller.renderer.terrainRenderer.mapChunkSizeLod;
@@ -79,116 +77,24 @@ export class TerrainSculptController {
    * (scaled to the current brush radius), or hides it when point is null.
    */
   updateCursor(point: Vector3 | null) {
-    if (!point) {
-      this.hideCursor();
-      return;
-    }
-    if (!this.cursorRing) this.cursorRing = this.createCursorRing();
-    const ring = this.cursorRing;
-    if (!ring.transform.parent) {
-      this.renderer.scene.addChild(ring.transform);
-    }
-    ring.transform.visible = true;
-    ring.visible = true;
-    ring.transform.position.set(point.x, point.y + 0.3, point.z);
-    const r = sculptStore.radius;
-    ring.transform.scale.set(r, 1, r);
+    this.cursor.update(point, sculptStore.radius);
   }
 
   hideCursor() {
-    if (!this.cursorRing) return;
-    this.cursorRing.visible = false;
-    this.cursorRing.transform.visible = false;
+    this.cursor.hide();
   }
 
   dispose() {
-    if (this.cursorRing) {
-      this.cursorRing.transform.removeFromParent();
-      this.cursorRing.geometry.dispose();
-      this.cursorRing.material.dispose();
-      this.cursorRing = null;
-    }
+    this.cursor.dispose();
   }
 
-  private cursorRing: Mesh | null = null;
-
-  // A flat unit-radius annulus on the overlay layer, scaled per frame to the
-  // brush radius. Lives on the Helper interaction layer so terrain/placement
-  // raycasts pass straight through it.
-  private createCursorRing(): Mesh {
-    const segments = 64;
-    const inner = 0.94;
-    const vertices = new Float32Array(segments * 2 * 3);
-    const normals = new Float32Array(segments * 2 * 3);
-    const uvs = new Float32Array(segments * 2 * 2);
-    const indices = new Uint32Array(segments * 6);
-
-    for (let i = 0; i < segments; i++) {
-      const a = (i / segments) * Math.PI * 2;
-      const cos = Math.cos(a);
-      const sin = Math.sin(a);
-      const vi = i * 6;
-      vertices[vi] = cos * inner;
-      vertices[vi + 1] = 0;
-      vertices[vi + 2] = sin * inner;
-      vertices[vi + 3] = cos;
-      vertices[vi + 4] = 0;
-      vertices[vi + 5] = sin;
-      normals[vi + 1] = 1;
-      normals[vi + 4] = 1;
-      uvs[i * 4] = 0;
-      uvs[i * 4 + 1] = 0;
-      uvs[i * 4 + 2] = 1;
-      uvs[i * 4 + 3] = 0;
-
-      const i0 = i * 2;
-      const i1 = i * 2 + 1;
-      const j0 = ((i + 1) % segments) * 2;
-      const j1 = j0 + 1;
-      const ti = i * 6;
-      indices[ti] = i0;
-      indices[ti + 1] = j0;
-      indices[ti + 2] = i1;
-      indices[ti + 3] = i1;
-      indices[ti + 4] = j0;
-      indices[ti + 5] = j1;
-    }
-
-    const geometry = new Geometry();
-    geometry.vertices = vertices;
-    geometry.normals = normals;
-    geometry.uvs = uvs;
-    geometry.indices = indices;
-
-    const material = new GizmoPass();
-    material.gizmoUniforms.color = new Color(1, 0.6, 0.1);
-    material.gizmoUniforms.opacity = 0.75;
-
-    const mesh = new Mesh(geometry, material);
-    mesh.castShadow = false;
-    mesh.transform.name = 'SculptBrushCursor';
-    mesh.transform.renderLayer = RenderLayer.Overlay;
-    mesh.transform.layers.set(InteractionLayer.Helper);
-    mesh.transform.userData.isHelper = true;
-    return mesh;
-  }
-
-  /**
-   * Raycasts against terrain chunk meshes only (ignoring actors, gizmos and
-   * helpers) and returns the nearest hit, or null.
-   */
   pickTerrain(raycaster: Raycaster): Intersection | null {
-    const transforms = this.scratchTransforms;
-    const intersections = this.scratchIntersections;
-    transforms.length = 0;
-    intersections.length = 0;
-
-    for (const chunk of this.renderer.terrainRenderer.terrainChunks.values()) {
-      if (chunk.visible) transforms.push(chunk.transform);
-    }
-
-    const hits = raycaster.intersectObjects(transforms, true, intersections);
-    return hits.length > 0 ? hits[0] : null;
+    return pickTerrain(
+      this.renderer,
+      raycaster,
+      this.scratchTransforms,
+      this.scratchIntersections
+    );
   }
 
   beginStroke(point: Vector3, invert: boolean) {

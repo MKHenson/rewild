@@ -11,6 +11,7 @@ import { StateMachineData } from './routing/Types';
 import { GameManager } from './GameManager';
 import { LightingTester } from './routing/LightingTester';
 import { createChunkSnapshotProvider } from '../database/chunk-snapshots';
+import { createBiomeMaskProvider } from '../database/biome-masks';
 import { registerDebugCommands } from './debug';
 
 /** Loads game files and assets and sends the created objects to wasm */
@@ -53,6 +54,9 @@ export async function loadInitialLevels(
   renderer.terrainRenderer.enabled = level.hasTerrain;
   renderer.terrainRenderer.snapshotProvider = level.id
     ? createChunkSnapshotProvider(level.id)
+    : null;
+  renderer.terrainRenderer.biomeMaskProvider = level.id
+    ? createBiomeMaskProvider(level.id)
     : null;
   registerDebugCommands(renderer, project);
 
