@@ -86,10 +86,20 @@ export function getClimateLayerParams(
 ): TerrainLayerParams[] {
   return getClimatePalette(climate).map((name) => {
     const material = getTerrainMaterial(name);
+    // The macro normal is a layer in the same normal array, but not necessarily
+    // this material's: `macroNormalFrom` lets a material whose detail normal
+    // reads badly at metre scale borrow a coarser one. The convention travels
+    // with the *source*, since it describes that texture's green channel, not
+    // this material's.
+    const macroSource = material.macroNormalFrom
+      ? getTerrainMaterial(material.macroNormalFrom)
+      : material;
     return {
       layerIndex: getTerrainMaterialLayer(name),
       uvScale: material.uvScale,
       macroUvScale: material.macroUvScale ?? 0,
+      macroLayerIndex: getTerrainMaterialLayer(macroSource.name),
+      macroStrength: material.macroStrength ?? 1,
       heightScale: material.heightScale,
       specular: material.specular,
       shininess: material.shininess,
@@ -97,6 +107,7 @@ export function getClimateLayerParams(
       // Our tangent frame's Y runs down the image, matching DirectX; an OpenGL
       // map's green points the other way and has to be inverted.
       normalYSign: material.normalConvention === 'opengl' ? -1 : 1,
+      macroNormalYSign: macroSource.normalConvention === 'opengl' ? -1 : 1,
     };
   });
 }

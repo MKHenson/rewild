@@ -103,60 +103,69 @@ describe('validateTerrainMaterials', () => {
     expect(() => validateTerrainMaterials()).not.toThrow();
   });
 
-  it('rejects a macroNormalUrl without a macroUvScale', () => {
-    TERRAIN_MATERIALS['broken'] = {
-      name: 'broken',
-      albedoUrl: 'terrain/x/albedo.png',
-      normalUrl: 'terrain/x/normal.png',
-      roughnessUrl: 'terrain/x/rough.png',
-      heightUrl: 'terrain/x/height.png',
-      heightScale: 0.03,
-      uvScale: 25,
-      normalConvention: 'opengl' as const,
-      macroNormalUrl: 'terrain/x/normal.png',
-      specular: 0.1,
-      shininess: 32,
-    };
-    expect(() => validateTerrainMaterials()).toThrow(/together/);
-  });
+  // Every field below is spread over this, so a test only states the one thing
+  // it is breaking.
+  const VALID = {
+    name: 'broken',
+    albedoUrl: 'terrain/x/albedo.png',
+    normalUrl: 'terrain/x/normal.png',
+    roughnessUrl: 'terrain/x/rough.png',
+    heightUrl: 'terrain/x/height.png',
+    heightScale: 0.03,
+    uvScale: 25,
+    normalConvention: 'opengl' as const,
+    specular: 0.1,
+    shininess: 32,
+  };
 
   it('rejects a macro normal that is not coarser than the detail normal', () => {
-    TERRAIN_MATERIALS['broken'] = {
-      name: 'broken',
-      albedoUrl: 'terrain/x/albedo.png',
-      normalUrl: 'terrain/x/normal.png',
-      roughnessUrl: 'terrain/x/rough.png',
-      heightUrl: 'terrain/x/height.png',
-      heightScale: 0.03,
-      uvScale: 25,
-      normalConvention: 'opengl' as const,
-      macroNormalUrl: 'terrain/x/normal.png',
-      macroUvScale: 25,
-      specular: 0.1,
-      shininess: 32,
-    };
+    TERRAIN_MATERIALS['broken'] = { ...VALID, macroUvScale: 25 };
     expect(() => validateTerrainMaterials()).toThrow(/coarser/);
   });
 
-  // There is no separate macro-normal array, so the macro normal is the
-  // material's own normal layer sampled at a coarser scale. A distinct macro
-  // map would silently render as the detail map instead.
-  it('rejects a macroNormalUrl that is a different texture to the normal', () => {
+  // macroUvScale is the on-switch, so these would be settings that silently do
+  // nothing rather than settings that render wrong — which is worse to debug.
+  it('rejects a macroNormalFrom without a macroUvScale', () => {
     TERRAIN_MATERIALS['broken'] = {
-      name: 'broken',
-      albedoUrl: 'terrain/x/albedo.png',
-      normalUrl: 'terrain/x/normal.png',
-      roughnessUrl: 'terrain/x/rough.png',
-      heightUrl: 'terrain/x/height.png',
-      heightScale: 0.03,
-      uvScale: 25,
-      normalConvention: 'opengl' as const,
-      macroNormalUrl: 'terrain/x/some-other-normal.png',
-      macroUvScale: 2,
-      specular: 0.1,
-      shininess: 32,
+      ...VALID,
+      macroNormalFrom: 'rocks-ground-01',
     };
-    expect(() => validateTerrainMaterials()).toThrow(/third texture array/);
+    expect(() => validateTerrainMaterials()).toThrow(/without macroUvScale/);
+  });
+
+  it('rejects a macroStrength without a macroUvScale', () => {
+    TERRAIN_MATERIALS['broken'] = { ...VALID, macroStrength: 0.5 };
+    expect(() => validateTerrainMaterials()).toThrow(/without macroUvScale/);
+  });
+
+  // There is one normal array, so a borrowed macro normal has to be a material
+  // in the library — anything else resolves to layer -1.
+  it('rejects a macroNormalFrom that is not in the library', () => {
+    TERRAIN_MATERIALS['broken'] = {
+      ...VALID,
+      macroUvScale: 2,
+      macroNormalFrom: 'no-such-material',
+    };
+    expect(() => validateTerrainMaterials()).toThrow(/not in the library/);
+  });
+
+  it('accepts a macro normal borrowed from another material', () => {
+    TERRAIN_MATERIALS['broken'] = {
+      ...VALID,
+      macroUvScale: 2,
+      macroNormalFrom: 'rocks-ground-01',
+      macroStrength: 0.6,
+    };
+    expect(() => validateTerrainMaterials()).not.toThrow();
+  });
+
+  it('rejects a negative macroStrength', () => {
+    TERRAIN_MATERIALS['broken'] = {
+      ...VALID,
+      macroUvScale: 2,
+      macroStrength: -0.5,
+    };
+    expect(() => validateTerrainMaterials()).toThrow(/must not be negative/);
   });
 });
 
