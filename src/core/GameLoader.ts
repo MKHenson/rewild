@@ -1,4 +1,4 @@
-import { getLevel } from '../api/levels';
+import { findLevel } from '../api/levels';
 import { getProjects } from '../api/projects';
 import { StateMachine } from 'rewild-routing';
 import { InGameLevel } from './routing/InGameLevel';
@@ -24,44 +24,51 @@ export async function loadInitialLevels(
   const renderer: Renderer = gameManager.renderer;
   await templateLoader.load();
 
-  const project = (await getProjects(true)).at(0);
-  if (!project) return null;
+  // A fresh install — or a startup project that hasn't had a level authored
+  // yet — has nothing to load. Rather than refusing to start, fall back to a
+  // bare world: default sky, default-seed terrain, no actors. There is still
+  // somewhere to stand, and the Player places itself on the surface.
+  const project = (await getProjects(true)).at(0) ?? null;
+  const level = project ? await findLevel(project.id) : null;
 
-  const level = await getLevel(project.id);
   const stateMachine = new StateMachine<StateMachineData>({
     renderer,
     player,
     gameManager,
   });
 
-  // Load the sky properties
-  const skyRenderer = renderer.sky.skyRenderer;
-  skyRenderer.cloudiness = project.sceneGraph.atmosphere.cloudiness as f32;
-  skyRenderer.foginess = project.sceneGraph.atmosphere.foginess as f32;
-  skyRenderer.windiness = project.sceneGraph.atmosphere.windiness as f32;
-  skyRenderer.precipitation = project.sceneGraph.atmosphere
-    .precipitation as f32;
-  skyRenderer.temperature = project.sceneGraph.atmosphere.temperature as f32;
-  skyRenderer.elevation = project.sceneGraph.atmosphere.elevation as f32;
-  skyRenderer.dayNightCycle = project.sceneGraph.atmosphere
-    .dayNightCycle as boolean;
+  if (project) {
+    // Load the sky properties
+    const skyRenderer = renderer.sky.skyRenderer;
+    skyRenderer.cloudiness = project.sceneGraph.atmosphere.cloudiness as f32;
+    skyRenderer.foginess = project.sceneGraph.atmosphere.foginess as f32;
+    skyRenderer.windiness = project.sceneGraph.atmosphere.windiness as f32;
+    skyRenderer.precipitation = project.sceneGraph.atmosphere
+      .precipitation as f32;
+    skyRenderer.temperature = project.sceneGraph.atmosphere.temperature as f32;
+    skyRenderer.elevation = project.sceneGraph.atmosphere.elevation as f32;
+    skyRenderer.dayNightCycle = project.sceneGraph.atmosphere
+      .dayNightCycle as boolean;
 
-  if (project.sceneGraph.terrain) {
-    renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
-    renderer.terrainRenderer.climatePreset =
-      project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
+    if (project.sceneGraph.terrain) {
+      renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
+      renderer.terrainRenderer.climatePreset =
+        project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
+    }
+
+    registerDebugCommands(renderer, project);
   }
-  renderer.terrainRenderer.enabled = level.hasTerrain;
-  renderer.terrainRenderer.snapshotProvider = level.id
+
+  renderer.terrainRenderer.enabled = level ? level.hasTerrain : true;
+  renderer.terrainRenderer.snapshotProvider = level?.id
     ? createChunkSnapshotProvider(level.id)
     : null;
-  renderer.terrainRenderer.biomeMaskProvider = level.id
+  renderer.terrainRenderer.biomeMaskProvider = level?.id
     ? createBiomeMaskProvider(level.id)
     : null;
-  registerDebugCommands(renderer, project);
 
   const levelRouter = new InGameLevel(
-    level.name,
+    level?.name ?? 'Untitled Level',
     new Asset3D(renderer.scene),
     false,
     player
@@ -70,7 +77,7 @@ export async function loadInitialLevels(
   stateMachine.addNode(levelRouter, true);
   stateMachine.addNode(new LightingTester(), true);
 
-  for (const container of level.containers) {
+  for (const container of level?.containers ?? []) {
     const containerRouter = new ContainerWithState(
       container,
       levelRouter.parentObject3D
