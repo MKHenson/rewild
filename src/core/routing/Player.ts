@@ -33,6 +33,17 @@ const _CROUCH_EYE_HEIGHT: f32 = 0.9;
 // Flashlight hangs below the camera eye line (chest/hip level) to create natural shadow offset.
 const _FLASHLIGHT_BODY_DROP: f32 = 0.8;
 const _DEG2RAD = Math.PI / 180;
+// Distance from the capsule's centre to its base (0.9 half-height + 0.5 radius).
+const _CAPSULE_HALF_EXTENT: f32 = 1.4;
+// Where the capsule centre goes when spawning onto a known ground height: just
+// clear of the surface, so the character controller settles the last fraction
+// instead of starting interpenetrated.
+const _SPAWN_GROUND_CLEARANCE: f32 = _CAPSULE_HALF_EXTENT + 0.6;
+// Lowest the capsule centre may sit when no ground height is known — keeps its
+// base on y=0 rather than below it.
+const _MIN_CAPSULE_Y: f32 = _CAPSULE_HALF_EXTENT;
+// Reused so the per-frame update allocates nothing.
+const _spawnTranslation = { x: 0, y: 0, z: 0 };
 
 export class Player extends Node {
   cameraController: ICameraController;
@@ -46,7 +57,15 @@ export class Player extends Node {
   collider: Collider;
   verticalVelocity: f32 = 0.0;
   grounded: boolean = false;
+  // Set once the level's rigid bodies have been released — the world is as
+  // ready as it is going to get.
   terrainLoaded: boolean = false;
+  // Set once there is collidable ground beneath the player. Gravity stays off
+  // until then so nobody falls through terrain whose collider hasn't been built.
+  hasGround: boolean = false;
+  // Set once the player has been placed somewhere valid — by a PlayerStart, or
+  // by the terrain-surface fallback for levels that have no PlayerStart.
+  spawnResolved: boolean = false;
   uiHealthBar: UIElementHealthPass;
 
   // Pointer-lock / mouse-look state
@@ -128,6 +147,14 @@ export class Player extends Node {
     this.cameraController.camera.lookAt(0, 0, 0);
     this.syncLookFromCamera();
 
+    // A remount is a fresh game: re-run spawn placement and re-arm the ground
+    // gate rather than inheriting the previous session's state.
+    this.terrainLoaded = false;
+    this.hasGround = false;
+    this.spawnResolved = false;
+    this.grounded = false;
+    this.verticalVelocity = 0.0;
+
     this._canvas = stateData.renderer.canvas;
     document.addEventListener('mousemove', this._onMouseMove);
     document.addEventListener('pointerlockchange', this._onPointerlockChange);
@@ -156,11 +183,12 @@ export class Player extends Node {
     if (!this.characterController) {
       this.rapierWorld = stateData.gameManager.physicsWorld;
 
+      const camPos = this.cameraController.camera.transform.position;
       const rigidBodyDesc =
         RigidBodyDesc.kinematicPositionBased().setTranslation(
-          this.cameraController.camera.transform.position.x,
-          this.cameraController.camera.transform.position.y - 1.8,
-          this.cameraController.camera.transform.position.z
+          camPos.x,
+          Math.max(camPos.y - _STANDING_EYE_HEIGHT, _MIN_CAPSULE_Y),
+          camPos.z
         );
 
       this.capsuleBody = this.rapierWorld.createRigidBody(rigidBodyDesc);
@@ -216,7 +244,23 @@ export class Player extends Node {
       this._flashlight.transform.removeFromParent();
     }
 
-    this.rapierWorld.removeCharacterController(this.characterController);
+    if (this.rapierWorld && this.characterController) {
+      this.rapierWorld.removeCharacterController(this.characterController);
+    }
+  }
+
+  // The level's rigid bodies start disabled so props don't sink through
+  // terrain whose colliders haven't been built yet; this releases them once the
+  // world is settled (or once we know no terrain is coming).
+  private enableAssetBodies(): void {
+    this.stateMachine?.getAllAssets().forEach((asset) => {
+      const asset3D = asset as Asset3D;
+      asset3D.behaviours.forEach((behaviour) => {
+        if (behaviour.name !== 'rigid-body') return;
+        const rbBehaviour = behaviour as RigidBodyBehaviour;
+        rbBehaviour.rb.setEnabled(true);
+      });
+    });
   }
 
   onUpdate(delta: f32, total: u32): void {
@@ -229,9 +273,47 @@ export class Player extends Node {
 
     const stateData = this.stateMachine?.data as StateMachineData;
     const R = stateData?.gameManager?.RAPIER;
-    let gravityEnabled = true;
+    const terrainRenderer = stateData?.renderer?.terrainRenderer;
+    const hasTerrain = terrainRenderer ? terrainRenderer.enabled : false;
 
-    if (!this.terrainLoaded && R && this.rapierWorld && this.capsuleBody) {
+    // A level with no PlayerStart (or no level at all) leaves the player at the
+    // origin, which is buried anywhere the terrain rises above y=0. Drop them
+    // onto the surface instead. The height comes straight from the heightfield
+    // rather than the ground ray below, so it resolves at any altitude — the
+    // ray only reaches 100 units and finds nothing when spawning underground.
+    // Chunks stream in asynchronously, so this retries until one has heights.
+    if (!this.spawnResolved && hasTerrain && this.capsuleBody) {
+      const spawnPos = this.capsuleBody.translation();
+      const groundY = terrainRenderer!.sampleHeight(spawnPos.x, spawnPos.z);
+
+      if (groundY !== null) {
+        _spawnTranslation.x = spawnPos.x;
+        _spawnTranslation.y = groundY + _SPAWN_GROUND_CLEARANCE;
+        _spawnTranslation.z = spawnPos.z;
+        this.capsuleBody.setTranslation(_spawnTranslation, true);
+        this.spawnResolved = true;
+        this.verticalVelocity = 0.0;
+        this.grounded = false;
+      }
+    }
+
+    // Gravity is held off until there is ground to land on, so an early frame
+    // (or a terrain-less level) can't drop the player out of the world.
+    let gravityEnabled = this.hasGround;
+
+    if (!this.terrainLoaded && !hasTerrain) {
+      // No terrain means nothing to stand on and nothing to wait for. Release
+      // the level's rigid bodies so its props behave, and leave the player
+      // hovering where they are instead of falling forever.
+      this.terrainLoaded = true;
+      this.spawnResolved = true;
+      this.enableAssetBodies();
+    } else if (
+      !this.terrainLoaded &&
+      R &&
+      this.rapierWorld &&
+      this.capsuleBody
+    ) {
       const pos = this.capsuleBody.translation();
       const origin = { x: pos.x, y: pos.y + 2, z: pos.z };
       const dir = { x: 0, y: -1, z: 0 };
@@ -254,15 +336,8 @@ export class Player extends Node {
 
       if (hit) {
         this.terrainLoaded = true;
-
-        this.stateMachine?.getAllAssets().forEach((asset) => {
-          const asset3D = asset as Asset3D;
-          asset3D.behaviours.forEach((behaviour) => {
-            if (behaviour.name !== 'rigid-body') return;
-            const rbBehaviour = behaviour as RigidBodyBehaviour;
-            rbBehaviour.rb.setEnabled(true);
-          });
-        });
+        this.hasGround = true;
+        this.enableAssetBodies();
       }
 
       gravityEnabled = !!hit;

@@ -18,16 +18,18 @@ export class PlayerStart extends Asset3D {
 
     const sm = this.stateMachine as StateMachine<StateMachineData>;
     const player = sm.getNode('Player') as Player;
-    const lookAtPos = ((camPosProp?.value as PropValueObject)
-      .target as Vector3) || [0, 0, 0];
-    const startPos = ((camPosProp?.value as PropValueObject)
-      .position as Vector3) || [0, 0, -10];
-    const upPos = ((camPosProp?.value as PropValueObject).up as Vector3) || [
-      0, 1, 0,
-    ];
+    // The property is absent on a start point that was never positioned in the
+    // editor, so every field falls back rather than reading through undefined.
+    const camPos = camPosProp?.value as PropValueObject | undefined;
+    const lookAtPos = (camPos?.target as Vector3) || [0, 0, 0];
+    const startPos = (camPos?.position as Vector3) || [0, 0, -10];
+    const upPos = (camPos?.up as Vector3) || [0, 1, 0];
 
     // Ensure player physics objects exist before attempting to move them
     if (player?.capsuleBody) {
+      // Claim the spawn so the Player's terrain-surface fallback (used by
+      // levels that have no PlayerStart) leaves this position alone.
+      player.spawnResolved = true;
       player.grounded = false;
       player.verticalVelocity = 0.0;
 
@@ -45,9 +47,6 @@ export class PlayerStart extends Asset3D {
         },
         true
       );
-
-      const pos = player.capsuleBody.translation();
-      console.log(pos.x);
     }
 
     sm.data?.renderer.camera.camera.transform.position.fromArray(startPos);
