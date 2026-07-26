@@ -165,8 +165,8 @@ describe('getClimatePalette', () => {
     expect(getClimatePalette(DEFAULT_CLIMATE)).toEqual([
       'grass_01_1k',
       'grass_path_02_1k',
-      'forest_leaves_03_1k',
       'forest_leaves_02',
+      'forest_leaves_03_1k',
       'aerial_rocks_01',
       'marble_cliff_05',
       'snow-02',
