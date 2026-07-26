@@ -41,18 +41,37 @@ export interface TerrainMaterial {
   heightScale: number;
   // Detail tiling, in tiles per chunk UV unit.
   uvScale: number;
-  // Large-scale normal for distant fragments, sampled at `macroUvScale`.
+  // Detail tiling of the large-scale normal for distant fragments. Set ⇒ this
+  // material has a macro normal; omitted ⇒ it has none and simply fades toward
+  // its geometric normal.
   //
   // Distant terrain looks washed out because a normal map's mips average toward
   // flat (0,0,1) — the GPU deletes the detail. A macro normal's features stay
   // many pixels wide at range, so mipping cannot erase them, and the detail
-  // normal is faded out by view distance underneath it (#181). Omitted ⇒ this
-  // material has no macro normal and simply fades toward its geometric normal.
-  //
-  // Must currently be the material's own `normalUrl` — see
-  // validateTerrainMaterials for why.
-  macroNormalUrl?: string;
+  // normal is faded out by view distance underneath it (#181).
   macroUvScale?: number;
+  // Which material's normal map to use as this one's macro normal. Omitted ⇒ its
+  // own, which is the historical behaviour.
+  //
+  // There is still only one normal array, so a macro normal must be *some*
+  // material's normal layer — but it need not be this material's. Detail normals
+  // are authored at centimetre scale and many of them read badly stretched to
+  // metres: sand's grain becomes a rippled sheet, leaf litter becomes lumpy
+  // noise. Borrowing a coarser material's map (dune swell from `rocky_terrain`,
+  // strata from `cliff_side_1k`) costs nothing — the layer is already resident,
+  // and the shader samples exactly one macro texel either way.
+  //
+  // The borrowed map's green-channel convention comes from the material it
+  // belongs to, not from this one; see getClimateLayerParams.
+  macroNormalFrom?: string;
+  // How much of the macro normal to apply, 0 (flat) to 1 (the map's full tilt).
+  // Omitted ⇒ 1.
+  //
+  // Mostly for borrowed macro normals: a map authored for rock is usually too
+  // pronounced for the sand drifting against it, and this is the amplitude knob
+  // that avoids needing a second, gentler asset. Above 1 extrapolates past the
+  // source map's tilt, which is legal but rarely what you want.
+  macroStrength?: number;
   // Scalar specular modulator, replacing the per-texel specular map — that map
   // is bound to `white-1x1` today, so it costs two texture samples per layer to
   // multiply by 1.0. This is *how much* the surface glints.
@@ -124,8 +143,6 @@ export const BLEND_DEPTH = 0.2;
 // weight to carry a soft crossfade.
 const BLEND_DEPTH_SOFT = 0.7;
 
-const ROCK_NORMAL_URL = 'terrain/rocks-ground-01/rocks_ground_01_norm_1k.png';
-
 export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
   'forest-ground-01': {
     name: 'forest-ground-01',
@@ -134,7 +151,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughnessUrl: 'terrain/forest-ground-01/forrest_ground_01_rough_1k.jpg',
     heightUrl: 'terrain/forest-ground-01/forrest_ground_01_disp_1k.png',
     heightScale: HEIGHT_SCALE,
-    macroNormalUrl: 'terrain/forest-ground-01/forrest_ground_01_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
     specular: SPECULAR * 0.3,
@@ -155,8 +171,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightUrl:
       'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_height.png',
     heightScale: HEIGHT_SCALE,
-    macroNormalUrl:
-      'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_normal.png',
     uvScale: DETAIL_UV_SCALE,
     macroUvScale: MACRO_UV_SCALE,
     specular: SPECULAR * 0.18,
@@ -165,19 +179,14 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     // alone reads inset while the others look right, flip it to 'directx'.
     normalConvention: 'opengl',
   },
-  // The only material that reads at silhouette distance, so it is the one that
-  // gets a macro normal — reusing its own detail normal at a much larger scale
-  // rather than a purpose-authored macro map. Cheap, tunable, and enough to
-  // tell whether the technique earns a dedicated asset.
   'rocks-ground-01': {
     name: 'rocks-ground-01',
     albedoUrl: 'terrain/rocks-ground-01/rocks_ground_01_diff_1k.jpg',
-    normalUrl: ROCK_NORMAL_URL,
+    normalUrl: 'terrain/rocks-ground-01/rocks_ground_01_norm_1k.png',
     roughnessUrl: 'terrain/rocks-ground-01/rocks_ground_01_rough_1k.jpg',
     heightUrl: 'terrain/rocks-ground-01/rocks_ground_01_disp_1k.png',
     heightScale: HEIGHT_SCALE * 1.8,
     uvScale: DETAIL_UV_SCALE,
-    macroNormalUrl: ROCK_NORMAL_URL,
     macroUvScale: MACRO_UV_SCALE,
     specular: SPECULAR * 0.4,
     shininess: SHININESS * 1.5,
@@ -189,7 +198,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     normalUrl: 'terrain/snow-02/snow_02_norm_1k.png',
     roughnessUrl: 'terrain/snow-02/snow_02_rough_1k.jpg',
     heightUrl: 'terrain/snow-02/snow_02_disp_1k.png',
-    macroNormalUrl: 'terrain/snow-02/snow_02_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE,
     heightScale: HEIGHT_SCALE * 0.5,
     uvScale: DETAIL_UV_SCALE,
@@ -204,7 +212,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughnessUrl: 'terrain/rocky-terrain/rocky_terrain_rough_1k.png',
     heightUrl: 'terrain/rocky-terrain/rocky_terrain_disp_1k.png',
     heightScale: HEIGHT_SCALE * 1.6,
-    macroNormalUrl: 'terrain/rocky-terrain/rocky_terrain_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
     specular: SPECULAR * 0.3,
@@ -218,7 +225,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughnessUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_rough_1k.jpg',
     heightUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_disp_1k.png',
     heightScale: HEIGHT_SCALE * 1.6,
-    macroNormalUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
     specular: SPECULAR * 0.2,
@@ -232,7 +238,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughnessUrl: 'terrain/marble-cliff-05/marble_cliff_05_rough_1k.png',
     heightUrl: 'terrain/marble-cliff-05/marble_cliff_05_disp_1k.png',
     heightScale: HEIGHT_SCALE * 4,
-    macroNormalUrl: 'terrain/marble-cliff-05/marble_cliff_05_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
     specular: SPECULAR * 0.2,
@@ -250,7 +255,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughnessUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_rough_1k.png',
     heightUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_disp_1k.png',
     heightScale: HEIGHT_SCALE * 1.5,
-    macroNormalUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 5,
     uvScale: DETAIL_UV_SCALE,
     specular: SPECULAR * 0.4,
@@ -268,7 +272,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughnessUrl: 'terrain/sand-01/sand_01_rough_1k.jpg',
     heightUrl: 'terrain/sand-01/sand_01_disp_1k.png',
     heightScale: HEIGHT_SCALE * 2,
-    macroNormalUrl: 'terrain/sand-01/sand_01_norm_1k.png',
     // Coarser than the other macro normals: what a dune field should hold at
     // range is the long swell, not the grain.
     macroUvScale: MACRO_UV_SCALE,
@@ -287,7 +290,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughnessUrl: 'terrain/forest-leaves-02/forest_leaves_02_rough_1k.jpg',
     heightUrl: 'terrain/forest-leaves-02/forest_leaves_02_disp_1k.png',
     heightScale: HEIGHT_SCALE * 2,
-    macroNormalUrl: 'terrain/forest-leaves-02/forest_leaves_02_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE,
     uvScale: DETAIL_UV_SCALE,
     specular: SPECULAR * 0.35,
@@ -306,7 +308,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughnessUrl: 'terrain/aerial-beach-01/aerial_beach_01_rough_1k.jpg',
     heightUrl: 'terrain/aerial-beach-01/aerial_beach_01_disp_1k.png',
     heightScale: HEIGHT_SCALE,
-    macroNormalUrl: 'terrain/aerial-beach-01/aerial_beach_01_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE,
     uvScale: DETAIL_UV_SCALE,
     specular: SPECULAR * 0.3,
@@ -325,7 +326,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughnessUrl: 'terrain/aerial-beach-02/aerial_beach_02_rough_1k.jpg',
     heightUrl: 'terrain/aerial-beach-02/aerial_beach_02_disp_1k.png',
     heightScale: HEIGHT_SCALE * 5,
-    macroNormalUrl: 'terrain/aerial-beach-02/aerial_beach_02_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 0.5,
     uvScale: DETAIL_UV_SCALE,
     // Damp sand is the one sand that genuinely glints — a tighter, stronger
@@ -346,11 +346,11 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     normalUrl: 'terrain/cliff-side-1k/cliff_side_norm_1k.png',
     roughnessUrl: 'terrain/cliff-side-1k/cliff_side_rough_1k.png',
     heightUrl: 'terrain/cliff-side-1k/cliff_side_disp_1k.png',
+    macroNormalFrom: 'marble_cliff_05',
     heightScale: HEIGHT_SCALE * 4,
-    macroNormalUrl: 'terrain/cliff-side-1k/cliff_side_norm_1k.png',
     // Coarse on purpose: the strata are what a mesa should still show in
     // silhouette, and they are metres apart, not centimetres.
-    macroUvScale: MACRO_UV_SCALE * 2,
+    macroUvScale: MACRO_UV_SCALE * 0.75,
     uvScale: DETAIL_UV_SCALE,
     specular: SPECULAR * 0.2,
     shininess: SHININESS * 1.5, // dry stone — present but not polished
@@ -367,8 +367,8 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     normalUrl: 'terrain/tiger-rock-1k/tiger_rock_norm_1k.png',
     roughnessUrl: 'terrain/tiger-rock-1k/tiger_rock_rough_1k.png',
     heightUrl: 'terrain/tiger-rock-1k/tiger_rock_disp_1k.png',
+    macroNormalFrom: 'marble_cliff_05',
     heightScale: HEIGHT_SCALE * 1.8,
-    macroNormalUrl: 'terrain/tiger-rock-1k/tiger_rock_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
     specular: SPECULAR * 0.25,
@@ -387,7 +387,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughnessUrl: 'terrain/grass-01-1k/grass_01_roughness.png',
     heightUrl: 'terrain/grass-01-1k/grass_01_disp.png',
     heightScale: HEIGHT_SCALE * 0.5,
-    macroNormalUrl: 'terrain/grass-01-1k/grass_01_norm.png',
     // Coarse: what a grassland should still carry at range is the swell of the
     // sward, not the blades — those mip to a flat green wash regardless.
     macroUvScale: MACRO_UV_SCALE,
@@ -412,7 +411,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughnessUrl: 'terrain/grass-path-02-1k/grass_path_02_rough_1k.jpg',
     heightUrl: 'terrain/grass-path-02-1k/grass_path_02_disp_1k.png',
     heightScale: HEIGHT_SCALE * 2,
-    macroNormalUrl: 'terrain/grass-path-02-1k/grass_path_02_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
     specular: SPECULAR * 0.3,
@@ -434,7 +432,6 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughnessUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_rough_1k.png',
     heightUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_disp_1k.png',
     heightScale: HEIGHT_SCALE * 2,
-    macroNormalUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_norm_1k.png',
     macroUvScale: MACRO_UV_SCALE,
     uvScale: DETAIL_UV_SCALE,
     specular: SPECULAR * 0.35,
@@ -482,11 +479,6 @@ export function validateTerrainMaterials(): void {
         `Terrain material '${material.name}' heightScale must not be negative (0 disables parallax).`
       );
 
-    if (!!material.macroNormalUrl !== (material.macroUvScale !== undefined))
-      throw new Error(
-        `Terrain material '${material.name}' must set macroNormalUrl and macroUvScale together.`
-      );
-
     if (
       material.macroUvScale !== undefined &&
       material.macroUvScale >= material.uvScale
@@ -495,16 +487,35 @@ export function validateTerrainMaterials(): void {
         `Terrain material '${material.name}' has macroUvScale ${material.macroUvScale} >= uvScale ${material.uvScale} — a macro normal must be coarser than the detail normal or it buys nothing.`
       );
 
-    // There is no separate macro-normal array, so the macro normal is the
-    // material's own normal array layer sampled at macroUvScale. A macro map
-    // that is a *different* texture would need its own array — deliberately not
-    // built for materials that currently reuse their own normal.
+    // macroUvScale is what switches the macro normal on, so a source or a
+    // strength without one is a setting that silently does nothing.
+    if (material.macroUvScale === undefined) {
+      if (material.macroNormalFrom !== undefined)
+        throw new Error(
+          `Terrain material '${material.name}' sets macroNormalFrom without macroUvScale — it has no macro normal, so the source would be ignored.`
+        );
+      if (material.macroStrength !== undefined)
+        throw new Error(
+          `Terrain material '${material.name}' sets macroStrength without macroUvScale — it has no macro normal, so the strength would be ignored.`
+        );
+    }
+
+    // There is one normal array, so a borrowed macro normal has to be a layer
+    // in it — i.e. some material in this library. A name that isn't would
+    // resolve to layer -1 and sample out of bounds.
     if (
-      material.macroNormalUrl &&
-      material.macroNormalUrl !== material.normalUrl
+      material.macroNormalFrom !== undefined &&
+      !TERRAIN_MATERIALS[material.macroNormalFrom]
     )
       throw new Error(
-        `Terrain material '${material.name}' macroNormalUrl must be its own normalUrl — a distinct macro map needs a third texture array, which does not exist yet.`
+        `Terrain material '${material.name}' macroNormalFrom '${material.macroNormalFrom}' is not in the library — a macro normal must be some material's normal layer.`
+      );
+
+    // Negative would flip the macro relief inside out against the detail relief
+    // on the same fragment, which is never what an amplitude knob is for.
+    if (material.macroStrength !== undefined && material.macroStrength < 0)
+      throw new Error(
+        `Terrain material '${material.name}' macroStrength must not be negative (0 is flat).`
       );
   }
 }

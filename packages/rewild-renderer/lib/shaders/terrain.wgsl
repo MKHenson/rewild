@@ -35,6 +35,15 @@ struct TerrainLayer {
   // from the *winning* layer, so it is that material's own answer to "how do I
   // meet my neighbours".
   blendDepth  : f32,
+  // Normal-array layer the macro normal samples. Usually the same as
+  // layerIndex, but a material may borrow another material's normal map when
+  // its own reads badly at metre scale — so this is indexed separately.
+  macroLayerIndex : f32,
+  // Green-channel sign of the *macro* map. Belongs to whichever material the
+  // map came from, so it need not match normalYSign.
+  macroNormalYSign: f32,
+  // Macro-normal amplitude: 0 flat, 1 the source map's full tilt.
+  macroStrength   : f32,
 }
 
 struct TerrainParams {
@@ -52,15 +61,16 @@ struct TerrainParams {
   // (just the tallest material shows), large ⇒ softens toward a plain crossfade.
   heightBlendDepth: f32,
   _pad            : f32,
-  // Packed TerrainLayer, two vec4f per splat channel (SPLAT_SLOTS channels):
-  //   [slot*2    ] = (layerIndex, uvScale, macroUvScale, specular)
-  //   [slot*2 + 1] = (normalYSign, heightScale, shininess, blendDepth)
+  // Packed TerrainLayer, three vec4f per splat channel (SPLAT_SLOTS channels):
+  //   [slot*3    ] = (layerIndex, uvScale, macroUvScale, specular)
+  //   [slot*3 + 1] = (normalYSign, heightScale, shininess, blendDepth)
+  //   [slot*3 + 2] = (macroLayerIndex, macroNormalYSign, macroStrength, _pad)
   // vec4f rather than array<TerrainLayer, N> because a uniform array's element
   // stride must be a multiple of 16 — a vec4f guarantees that, whereas a struct
   // depends on alignment rules that are easy to get subtly wrong. The spare
-  // lanes in the second vec4 are where the next per-layer parameter goes.
+  // lane in the third vec4 is where the next per-layer parameter goes.
   // Unpack through getLayer().
-  layers          : array<vec4f, 16>,
+  layers          : array<vec4f, 24>,
 }
 
 struct VertexInput {
@@ -128,15 +138,16 @@ const POM_REFINE_STEPS: i32 = 6;
 const POM_MIN_VIEW_Z: f32 = 0.6;
 
 // Splat channels the palette can address, across the two splat textures. Must
-// match MAX_SPLAT_LAYERS (Biomes.ts) and the `layers` array above (2 vec4f
+// match MAX_SPLAT_LAYERS (Biomes.ts) and the `layers` array above (3 vec4f
 // each). Raising it costs nothing per fragment beyond the extra weight compares:
 // every channel below WEIGHT_EPSILON skips its whole sample block.
 const SPLAT_SLOTS: u32 = 8u;
 
 fn getLayer(slot: u32) -> TerrainLayer {
-  let a = phongParams.layers[slot * 2u];
-  let b = phongParams.layers[slot * 2u + 1u];
-  return TerrainLayer(a.x, a.y, a.z, a.w, b.x, b.y, b.z, b.w);
+  let a = phongParams.layers[slot * 3u];
+  let b = phongParams.layers[slot * 3u + 1u];
+  let c = phongParams.layers[slot * 3u + 2u];
+  return TerrainLayer(a.x, a.y, a.z, a.w, b.x, b.y, b.z, b.w, c.x, c.y, c.z);
 }
 
 // Decodes a normal map sample from [0,1] to [-1,1] and resolves its green-
@@ -445,19 +456,32 @@ fn fs(
     var layerNormal = detailNormal;
 
     if (layer.macroUvScale > 0.0) {
-      // The macro normal is this material's own normal map at a much coarser
-      // UV. Its features stay many pixels wide at range, so mipping cannot
-      // average them away — which is what keeps distant mountains from reading
-      // flat.
+      // The macro normal is a normal map from this array at a much coarser UV.
+      // Its features stay many pixels wide at range, so mipping cannot average
+      // them away — which is what keeps distant mountains from reading flat.
+      //
+      // Usually it is this material's own map (macroLayerIndex == arrayIndex),
+      // but a material whose detail normal reads badly stretched to metres can
+      // borrow a coarser material's — same array, same single sample, so the
+      // choice is free. Its ySign travels with the borrowed map, not this
+      // material, or the macro relief inverts against the detail relief.
+      let macroIndex = i32(layer.macroLayerIndex);
       let macroUV = fragUV * layer.macroUvScale;
       let macroDdx = duvdx * layer.macroUvScale;
       let macroDdy = duvdy * layer.macroUvScale;
-      let macroNormal = normalize(decodeNormal(
+      // Toward flat, before normalizing: macroStrength is an amplitude on the
+      // map's tilt, and scaling a decoded normal's xy while z holds is exactly
+      // that. Applied here so the crossfade below still interpolates a unit
+      // normal, which is what bounds the tilt.
+      let macroRaw = decodeNormal(
         textureSampleGrad(
-          normalArray, seamlessSampler, macroUV, arrayIndex, macroDdx, macroDdy
+          normalArray, seamlessSampler, macroUV, macroIndex, macroDdx, macroDdy
         ).rgb,
-        layer.normalYSign
-      ));
+        layer.macroNormalYSign
+      );
+      let macroNormal = normalize(
+        vec3f(macroRaw.xy * layer.macroStrength, macroRaw.z)
+      );
 
       // Crossfade, not a sum: the macro *stands in for* the detail at range, so
       // it must be invisible up close where the detail it replaces still
@@ -466,8 +490,8 @@ fn fs(
       //
       // Interpolating two *unit* normals also bounds the tilt to between the
       // two. A UDN blend (macro.xy + detail.xy, macro.z) must not be used here:
-      // both maps are the same full-strength rock texture, so their xy sums
-      // toward 2 while z stays put, tipping the normal into the tangent plane.
+      // both are full-strength rock-grade normal maps, so their xy sums toward
+      // 2 while z stays put, tipping the normal into the tangent plane.
       // perturbNormal then points it sideways — into the hillside on a sheer
       // face — and the face renders black. normalize() bounds length, not tilt.
       layerNormal = normalize(mix(macroNormal, detailNormal, detailFade));

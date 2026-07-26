@@ -4,7 +4,7 @@ import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 import { MAX_SPLAT_LAYERS } from '../../renderers/terrain/Biomes';
 
-// TerrainParams layout (304 bytes, std140-compatible) — must match the struct
+// TerrainParams layout (432 bytes, std140-compatible) — must match the struct
 // in terrain.wgsl:
 //   specularColor    vec3f           offset 0   (12 bytes)
 //   shininess        f32             offset 12  (4 bytes)
@@ -14,16 +14,17 @@ import { MAX_SPLAT_LAYERS } from '../../renderers/terrain/Biomes';
 //   noiseScale       f32             offset 36  (4 bytes)
 //   heightBlendDepth f32             offset 40  (4 bytes)
 //   _pad             f32             offset 44  (4 bytes)
-//   layers           array<vec4f,16> offset 48  (256 bytes)
+//   layers           array<vec4f,24> offset 48  (384 bytes)
 //
 // `layers` starts at 48 because a uniform array of vec4f needs 16-byte
-// alignment; 40 + 8 padding is what gets it there. Two vec4f per splat channel,
-// MAX_SPLAT_LAYERS channels:
-//   [slot*2    ] = (layerIndex, uvScale, macroUvScale, specular)
-//   [slot*2 + 1] = (normalYSign, heightScale, shininess, blendDepth)
-const PARAMS_SIZE = 48 + MAX_SPLAT_LAYERS * 2 * 16;
+// alignment; 40 + 8 padding is what gets it there. Three vec4f per splat
+// channel, MAX_SPLAT_LAYERS channels:
+//   [slot*3    ] = (layerIndex, uvScale, macroUvScale, specular)
+//   [slot*3 + 1] = (normalYSign, heightScale, shininess, blendDepth)
+//   [slot*3 + 2] = (macroLayerIndex, macroNormalYSign, macroStrength, _pad)
+const PARAMS_SIZE = 48 + MAX_SPLAT_LAYERS * 3 * 16;
 const LAYERS_OFFSET_FLOATS = 48 / 4;
-const FLOATS_PER_LAYER = 8;
+const FLOATS_PER_LAYER = 12;
 
 export interface TerrainLayerParams {
   layerIndex: number;
@@ -40,6 +41,15 @@ export interface TerrainLayerParams {
   // Width of this material's transition to its neighbours, in blend-score
   // units. Small ⇒ a hard interlocking edge; large ⇒ a soft crossfade.
   blendDepth: number;
+  // Normal-array layer the macro normal samples. Usually the same as
+  // layerIndex, but a material may borrow a coarser material's normal map
+  // (TerrainMaterial.macroNormalFrom) — hence a separate index.
+  macroLayerIndex: number;
+  // Green-channel sign of the *macro* map, which belongs to whichever material
+  // it came from and so need not match normalYSign.
+  macroNormalYSign: number;
+  // Macro-normal amplitude: 0 flat, 1 the source map's full tilt.
+  macroStrength: number;
 }
 
 export class TerrainUniforms implements ISharedUniformBuffer {
@@ -212,6 +222,10 @@ export class TerrainUniforms implements ISharedUniformBuffer {
       // score, and a 0 there would make an empty slot's cutoff exclude
       // everything if it ever won.
       data[base + 7] = layer ? layer.blendDepth : this.heightBlendDepth;
+      data[base + 8] = layer ? layer.macroLayerIndex : 0;
+      data[base + 9] = layer ? layer.macroNormalYSign : 1;
+      data[base + 10] = layer ? layer.macroStrength : 0;
+      data[base + 11] = 0; // _pad
     }
 
     device.queue.writeBuffer(
