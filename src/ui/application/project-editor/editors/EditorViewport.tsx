@@ -35,6 +35,9 @@ import {
 } from './utils/WorldPlacement';
 import { sculptStore } from 'src/ui/stores/SculptStore';
 import { SculptToolbar } from './SculptToolbar';
+import { biomePaintStore } from 'src/ui/stores/BiomePaintStore';
+import { BiomePaintToolbar } from './BiomePaintToolbar';
+import { TerrainBiomePaintController } from './utils/TerrainBiomePaintController';
 import { loadCameraState, saveCameraState } from './utils/CameraPersistence';
 
 interface Props {}
@@ -57,6 +60,7 @@ export class EditorViewport extends Component<Props> {
   gizmo: Gizmo;
   dragController: GizmoDragController;
   sculptController: TerrainSculptController | null = null;
+  biomePaintController: TerrainBiomePaintController | null = null;
   selectedTransform: Transform | null = null;
   private didDrag = false;
   private mouseDownPos = { x: 0, y: 0 };
@@ -111,10 +115,29 @@ export class EditorViewport extends Component<Props> {
       this.render();
     });
 
+    // Biome paint mode toggling — the same lifecycle as sculpt above. The two
+    // brushes are mutually exclusive (the ribbon disarms one when the other is
+    // armed), so they never both own the pointer.
+    this.on(biomePaintStore.dispatcher, () => {
+      if (!biomePaintStore.enabled) {
+        endPaintStroke();
+        this.biomePaintController?.hideCursor();
+      }
+      this.render();
+    });
+
     const endSculptStroke = () => {
       if (!this.sculptController?.isSculpting) return;
       this.sculptController.endStroke().catch((err) => {
         console.error('Failed to save sculpted chunks:', err);
+      });
+      if (this.orbitController) this.orbitController.enabled = true;
+    };
+
+    const endPaintStroke = () => {
+      if (!this.biomePaintController?.isPainting) return;
+      this.biomePaintController.endStroke().catch((err) => {
+        console.error('Failed to save painted biome masks:', err);
       });
       if (this.orbitController) this.orbitController.enabled = true;
     };
@@ -244,6 +267,8 @@ export class EditorViewport extends Component<Props> {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.code === 'Escape' && sculptStore.enabled) {
         sculptStore.setEnabled(false);
+      } else if (event.code === 'Escape' && biomePaintStore.enabled) {
+        biomePaintStore.setEnabled(false);
       } else if (event.code === 'Equal' || event.code === 'NumpadAdd') {
         this.gizmo?.increaseSize();
         this.updateGizmoScale();
@@ -306,6 +331,9 @@ export class EditorViewport extends Component<Props> {
           this.gizmo
         );
         this.sculptController = new TerrainSculptController(this.renderer);
+        this.biomePaintController = new TerrainBiomePaintController(
+          this.renderer
+        );
 
         this.installCameraObserver();
 
@@ -335,8 +363,8 @@ export class EditorViewport extends Component<Props> {
     };
 
     const onClick = (event: MouseEvent) => {
-      // Sculpt mode owns the pointer — clicks never select/deselect.
-      if (sculptStore.enabled) return;
+      // A terrain brush owns the pointer — clicks never select/deselect.
+      if (sculptStore.enabled || biomePaintStore.enabled) return;
       if (this.didDrag) {
         this.didDrag = false;
         return;
@@ -389,6 +417,23 @@ export class EditorViewport extends Component<Props> {
         return;
       }
 
+      if (biomePaintStore.enabled && this.biomePaintController) {
+        // Alt+drag is the camera escape hatch, exactly as in sculpt mode.
+        if (event.altKey) return;
+
+        const hit = this.biomePaintController.pickTerrain(
+          createRaycaster(event.clientX, event.clientY)
+        );
+        if (hit) {
+          this.orbitController?.cancelInteraction();
+          if (this.orbitController) this.orbitController.enabled = false;
+          // Shift erases, mirroring Shift-inverts on the sculpt brush.
+          this.biomePaintController.beginStroke(hit.point, event.shiftKey);
+          document.addEventListener('mouseup', onPaintDocumentMouseUp);
+        }
+        return;
+      }
+
       this.mouseDownPos.x = event.clientX;
       this.mouseDownPos.y = event.clientY;
       this.didDrag = false;
@@ -422,6 +467,12 @@ export class EditorViewport extends Component<Props> {
       endSculptStroke();
     };
 
+    const onPaintDocumentMouseUp = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      document.removeEventListener('mouseup', onPaintDocumentMouseUp);
+      endPaintStroke();
+    };
+
     const onMouseMove = (event: MouseEvent) => {
       if (sculptStore.enabled && this.sculptController) {
         // Alt means the camera has the drag — the brush is inactive, so drop
@@ -447,6 +498,30 @@ export class EditorViewport extends Component<Props> {
           );
         }
         this.sculptController.updateCursor(hit?.point ?? null);
+        return;
+      }
+
+      if (biomePaintStore.enabled && this.biomePaintController) {
+        if (event.altKey && !this.biomePaintController.isPainting) {
+          this.biomePaintController.hideCursor();
+          return;
+        }
+
+        const hit = this.biomePaintController.pickTerrain(
+          createRaycaster(event.clientX, event.clientY)
+        );
+        if (this.biomePaintController.isPainting) {
+          if (hit) this.biomePaintController.moveStroke(hit.point);
+        } else if (hit) {
+          // Warm up chunks under the brush so they are paintable the moment a
+          // stroke reaches them (saved-mask lookup).
+          this.biomePaintController.prefetchMasks(
+            hit.point.x,
+            hit.point.z,
+            biomePaintStore.radius
+          );
+        }
+        this.biomePaintController.updateCursor(hit?.point ?? null);
         return;
       }
 
@@ -476,9 +551,10 @@ export class EditorViewport extends Component<Props> {
 
     const onMouseUp = (event: MouseEvent) => {
       if (event.button !== 0) return;
-      // Sculpt strokes end via the document-level listener (which also fires
+      // Brush strokes end via their document-level listeners (which also fire
       // for on-canvas releases), so nothing to do here for them.
       if (this.sculptController?.isSculpting) return;
+      if (this.biomePaintController?.isPainting) return;
       if (!this.dragController.isDragging) return;
 
       if (this.orbitController) this.orbitController.enabled = true;
@@ -603,9 +679,11 @@ export class EditorViewport extends Component<Props> {
     pane3D.ondrop = onDrop;
     pane3D.onclick = onClick;
 
-    // Persistent wrapper so the canvas is never re-parented on re-render; the
-    // sculpt toolbar overlay is attached/detached as sculpt mode toggles.
+    // Persistent wrapper so the canvas is never re-parented on re-render; each
+    // brush toolbar overlay is attached/detached as its mode toggles. The two
+    // modes are mutually exclusive, so at most one is ever mounted.
     const sculptToolbar = (<SculptToolbar />) as SculptToolbar;
+    const biomePaintToolbar = (<BiomePaintToolbar />) as BiomePaintToolbar;
     const container = (
       <div class="viewport-container">{pane3D}</div>
     ) as HTMLDivElement;
@@ -616,6 +694,12 @@ export class EditorViewport extends Component<Props> {
         if (!sculptToolbar.parentElement) container.appendChild(sculptToolbar);
       } else {
         sculptToolbar.remove();
+      }
+      if (biomePaintStore.enabled) {
+        if (!biomePaintToolbar.parentElement)
+          container.appendChild(biomePaintToolbar);
+      } else {
+        biomePaintToolbar.remove();
       }
       return container;
     };
@@ -749,6 +833,7 @@ export class EditorViewport extends Component<Props> {
     this.orbitController?.dispose();
     this.gizmo?.dispose();
     this.sculptController?.dispose();
+    this.biomePaintController?.dispose();
     this.renderer.dispose();
   }
 }

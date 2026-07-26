@@ -241,6 +241,15 @@ restrictive, is eight channels via a second splat texture.
 
 ## Painting readiness
 
+> **Partly superseded — biome painting has since landed.** It stores the biome
+> _input_ (a per-chunk weight mask) rather than the material _output_, so the
+> splat stayed **derived**: there is no frozen splat blob, no "painted ⇒ not
+> derived", and no splat file header. Constraints 1, 2 and 4 below all held and
+> were load-bearing; constraint 3 and the closing tradeoff did not apply in the
+> end. See "Biome painting" in [strata.md](./strata.md). What remains genuinely
+> future is **direct-material** painting, which _would_ store output weights and
+> to which most of this section still applies.
+
 Painting is a **separate, future issue**. These are constraints this work must
 satisfy so painting doesn't force a rewrite — not work to do here.
 

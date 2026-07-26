@@ -6,6 +6,7 @@ import {
 import { generateBiomeBlendedHeightMap } from '../Noise';
 import { resolveClimatePreset } from '../Biomes';
 import { generateSplatMap } from '../Splat';
+import { PaintMask } from '../PaintMask';
 import { Vector2 } from 'rewild-common';
 
 export interface BuildChunkMeshRequest {
@@ -27,6 +28,10 @@ export interface BuildChunkMeshRequest {
   // ring for its edge normals — the ring no longer matches its surface — so it
   // shades edges one-sided instead. Only meaningful with `heights`/`apron`.
   edited?: boolean;
+  // The chunk's painted biome mask, if it has one. Feeds splat generation only:
+  // paint decides what the ground is made of, never its shape (see
+  // generateSplatMap), so it is absent from every height path above.
+  biomeMask?: PaintMask;
 }
 
 // One-sample apron ring so edge-vertex normals get a two-sided gradient that
@@ -145,15 +150,17 @@ export function buildChunkMesh(
   }
 
   // Per-biome material weights, derived from the same climate model that shaped
-  // the heights plus each biome's slope/height layer rules. Derived rather than
-  // stored, so it is correct for generated and sculpted chunks alike.
+  // the heights plus each biome's slope/height layer rules, with any painted
+  // biome mask displacing the climate's choice. Derived rather than stored, so
+  // it is correct for generated and sculpted chunks alike.
   const splat = generateSplatMap(
     chunkSize,
     chunkSize,
     seed,
     worldOffset,
     climate,
-    heights
+    heights,
+    { biomeMask: request.biomeMask ?? null }
   );
 
   // Heights are already in meters (no vertical scaling); the mesh is stretched

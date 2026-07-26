@@ -9,6 +9,7 @@ import {
 } from 'rewild-ui';
 import { projectStore } from '../../../stores/ProjectStore';
 import { sculptStore } from '../../../stores/SculptStore';
+import { biomePaintStore } from '../../../stores/BiomePaintStore';
 import { TerrainSettingsDialog } from './TerrainSettingsDialog';
 
 interface Props {
@@ -22,6 +23,7 @@ export class RibbonButtons extends Component<Props> {
       if (event.kind === 'changed') this.render();
     });
     this.on(sculptStore.dispatcher, () => this.render());
+    this.on(biomePaintStore.dispatcher, () => this.render());
 
     const [terrainOpen, setTerrainOpen] = this.useState(false);
 
@@ -59,8 +61,23 @@ export class RibbonButtons extends Component<Props> {
               variant="text"
               class={sculptStore.enabled ? 'sculpt-active' : ''}
               disabled={loading || !projectStore.project?.sceneGraph?.terrain}
-              onClick={() => sculptStore.setEnabled(!sculptStore.enabled)}>
+              onClick={() => {
+                // The two terrain brushes both own left-drag, so arming one
+                // must disarm the other.
+                if (!sculptStore.enabled) biomePaintStore.setEnabled(false);
+                sculptStore.setEnabled(!sculptStore.enabled);
+              }}>
               <StyledIcon icon="trending-up-down" size="s" />
+            </Button>
+            <Button
+              variant="text"
+              class={biomePaintStore.enabled ? 'sculpt-active' : ''}
+              disabled={loading || !projectStore.project?.sceneGraph?.terrain}
+              onClick={() => {
+                if (!biomePaintStore.enabled) sculptStore.setEnabled(false);
+                biomePaintStore.setEnabled(!biomePaintStore.enabled);
+              }}>
+              <StyledIcon icon="paintbrush" size="s" />
             </Button>
           </ButtonGroup>
           {terrainOpen() && (

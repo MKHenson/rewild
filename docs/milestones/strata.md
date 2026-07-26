@@ -140,19 +140,82 @@ Chunk snapshots follow the same path as every other asset:
   ([#175](https://github.com/MKHenson/rewild/issues/175)) then build on exactly that
   write path.
 
+## Biome painting (landed)
+
+The second hands-on payoff, and the answer to "painting" that
+[07](./strata-terrain-materials.md) was designed against. The shape it took
+differs from the one 07 anticipated — see the note at the end.
+
+- **Paint overrides the _biome_, not the splat.** `resolveBiomeWeights`
+  (`ClimateField.ts`) is the single choke point both height and splat generation
+  go through to ask "which biome is here". A painted mask displaces its answer at
+  splat-generation time; the splat itself stays **derived**. So "saved ⇒ not
+  generated" does _not_ gain the sibling "painted ⇒ not derived" — the splat is
+  still computed from heights + biome every time.
+- **Consequence, and the reason it was done this way:** a painted chunk that is
+  later sculpted still resolves its slope/height layer rules correctly. Raise a
+  peak inside a region painted as mountain and it still grows snow, because the
+  paint said _which country the ground belongs to_, not _which texture to draw_.
+  Freezing a splat blob (07's assumption) would have killed exactly that.
+- **Splat-only, deliberately. Paint never feeds height.** Heights freeze the
+  moment a chunk is sculpted or snapshotted, so a painted biome that moved the
+  ground would either fight the sculpt or be silently ignored on saved chunks.
+  **Paint says what the ground is made of; sculpt says what shape it is.**
+- **Paintable biomes are the active climate's biomes**, not a global biome list.
+  The splat palette is by construction exactly the materials of the climate's own
+  biomes, so painting _within_ that set adds **zero palette pressure** — which is
+  why this fit inside the eight-channel budget with no per-chunk-palette work.
+  Painting a biome from a _different_ preset would not; that is the constraint
+  that keeps the tool scoped to one climate.
+- **Weights, not an index.** The mask stores a per-biome weight and blends —
+  painted weight is taken outright, climate keeps the remainder. That is the same
+  "take your coverage of what is left" rule the material layers already
+  composite by. A hard biome index would have drawn cookie-cutter borders: climate
+  borders are kilometres across (axis `scale` 3000m) and a brush is tens of metres.
+- **The mask is quarter-resolution and interpolated** — 61² × biomes against the
+  splat's 241², ~1/16th the bytes. Biome is a low-frequency field by
+  construction, so bilinear interpolation is indistinguishable from per-sample.
+  The format stores `step` rather than assuming it, so a finer mask later is not a
+  format break.
+- **A separate blob with independent freeze** — `{cx}_{cy}.biome.bin` beside the
+  height snapshot on the same asset path, with the same local-first/dirty/sync
+  semantics. A chunk can be painted without ever being sculpted and vice versa,
+  and neither format grows a version for the other's sake. (This is 07's
+  constraint 2, honoured.)
+- **Painting costs brush size, not chunk size.** A stroke changes no geometry, so
+  nothing is re-meshed and no worker is involved: each stamp regenerates only the
+  splat texels under the brush and uploads only that rectangle. Where paint
+  saturates, the climate noise is skipped entirely.
+- **The mask container is generic** — N channels of `u8` weight at a stated
+  resolution, with nothing biome-specific in it. A future **direct-material**
+  painter (a pond bed, a worn clearing) reuses the same container, format and
+  brush at a finer `step`, with channels meaning palette slots; it composites on
+  the **output** side (an unselectored layer above everything) where biome paint
+  composites on the input side. That is the one hedge taken deliberately in
+  advance, and it cost only naming.
+
+**Divergence from 07's "Painting readiness".** That section assumed painting
+would store a **frozen splat** ("painted ⇒ not derived") and would therefore need
+a higher splat resolution and a splat file header. Neither happened: storing the
+biome _input_ instead of the material _output_ keeps the splat derived, keeps
+sculpting and painting independent, and needs 1/16th the bytes. 07's constraints
+1 (splat on the chunk), 2 (separate blobs, independent freeze) and 4 (palette
+indirection) all still hold and were all load-bearing.
+
 ## Issues (build order)
 
 Work top-to-bottom; arrows are hard dependencies.
 
-| Issue                                                                                            | Depends on                                                                                                   | Summary                                                                                                                                                        |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [#170 — Seeded worlds (end-to-end)](https://github.com/MKHenson/rewild/issues/170)               | —                                                                                                            | ✅ Done. Seed into the noise + `WorldGenConfig` on `sceneGraph.terrain` + persist/load + editor seed dialog.                                                    |
-| [#171 — Biome map + blended generation](https://github.com/MKHenson/rewild/issues/171)           | [#170](https://github.com/MKHenson/rewild/issues/170)                                                        | ✅ Done. Temperature × moisture climate model + plain/mountain param table; blend heights across borders.                                                       |
-| [#172 — Recipe: climate preset + terrain gating](https://github.com/MKHenson/rewild/issues/172)  | [#170](https://github.com/MKHenson/rewild/issues/170), [#171](https://github.com/MKHenson/rewild/issues/171) | Persist a climate-preset id on the recipe (presets hardcoded in code); make `hasTerrain` gate terrain.                                                          |
-| [#173 — Chunk snapshot — read & mesh](https://github.com/MKHenson/rewild/issues/173)             | [#172](https://github.com/MKHenson/rewild/issues/172)                                                        | Full-heightfield snapshot format + read from the blob path; saved chunks mesh from stored heights instead of generating.                                        |
-| [#174 — Chunk snapshot — write (dev/test hook)](https://github.com/MKHenson/rewild/issues/174)   | [#173](https://github.com/MKHenson/rewild/issues/173)                                                        | A dev/test writer that round-trips a snapshot: write → reload → fetch-and-mesh.                                                                                 |
-| [#175 — Terrain sculpting (editor brushes)](https://github.com/MKHenson/rewild/issues/175)       | [#173](https://github.com/MKHenson/rewild/issues/173), [#174](https://github.com/MKHenson/rewild/issues/174) | Raise/lower/smooth/flatten brushes in the editor; affected chunks saved as snapshots.                                                                           |
-| [#177–#182 — Biome materials & distance normals](./strata-terrain-materials.md)                  | [#171](https://github.com/MKHenson/rewild/issues/171), [#175](https://github.com/MKHenson/rewild/issues/175) | Per-biome material layers on a splat map, blended across and within biomes; macro/detail normal crossfade by distance. Six issues — see the linked design for the build order. |
+| Issue                                                                                           | Depends on                                                                                                   | Summary                                                                                                                                                                        |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [#170 — Seeded worlds (end-to-end)](https://github.com/MKHenson/rewild/issues/170)              | —                                                                                                            | ✅ Done. Seed into the noise + `WorldGenConfig` on `sceneGraph.terrain` + persist/load + editor seed dialog.                                                                   |
+| [#171 — Biome map + blended generation](https://github.com/MKHenson/rewild/issues/171)          | [#170](https://github.com/MKHenson/rewild/issues/170)                                                        | ✅ Done. Temperature × moisture climate model + plain/mountain param table; blend heights across borders.                                                                      |
+| [#172 — Recipe: climate preset + terrain gating](https://github.com/MKHenson/rewild/issues/172) | [#170](https://github.com/MKHenson/rewild/issues/170), [#171](https://github.com/MKHenson/rewild/issues/171) | Persist a climate-preset id on the recipe (presets hardcoded in code); make `hasTerrain` gate terrain.                                                                         |
+| [#173 — Chunk snapshot — read & mesh](https://github.com/MKHenson/rewild/issues/173)            | [#172](https://github.com/MKHenson/rewild/issues/172)                                                        | Full-heightfield snapshot format + read from the blob path; saved chunks mesh from stored heights instead of generating.                                                       |
+| [#174 — Chunk snapshot — write (dev/test hook)](https://github.com/MKHenson/rewild/issues/174)  | [#173](https://github.com/MKHenson/rewild/issues/173)                                                        | A dev/test writer that round-trips a snapshot: write → reload → fetch-and-mesh.                                                                                                |
+| [#175 — Terrain sculpting (editor brushes)](https://github.com/MKHenson/rewild/issues/175)      | [#173](https://github.com/MKHenson/rewild/issues/173), [#174](https://github.com/MKHenson/rewild/issues/174) | Raise/lower/smooth/flatten brushes in the editor; affected chunks saved as snapshots.                                                                                          |
+| [#177–#182 — Biome materials & distance normals](./strata-terrain-materials.md)                 | [#171](https://github.com/MKHenson/rewild/issues/171), [#175](https://github.com/MKHenson/rewild/issues/175) | Per-biome material layers on a splat map, blended across and within biomes; macro/detail normal crossfade by distance. Six issues — see the linked design for the build order. |
+| Biome painter (editor brush)                                                                    | [#175](https://github.com/MKHenson/rewild/issues/175), [#177–#182](./strata-terrain-materials.md)            | ✅ Done. Paint which biome the climate model resolves to, per chunk, as a stored weight mask; the splat stays derived. See "Biome painting" above.                             |
 
 [#170](https://github.com/MKHenson/rewild/issues/170) is a full vertical slice
 (seeded worlds: generation plumbing + the persisted `WorldGenConfig` recipe + load
@@ -169,11 +232,15 @@ Work top-to-bottom; arrows are hard dependencies.
 
 ## Out of scope (deferred to later milestones)
 
-- Material/texture **painting** (painting what terrain looks like) and **undo/redo**
-  history — height sculpting is in ([#175](https://github.com/MKHenson/rewild/issues/175)),
-  and [07](./strata-terrain-materials.md) supplies the surface materials painting
-  needs, but the painting UX itself and undo stay follow-ups. 07 is designed
-  against painting's constraints so it doesn't force a rewrite.
+- **Direct-material painting** — painting a single material (a pond bed, a worn
+  clearing) with no biome behind it. **Biome** painting has landed (above); this
+  is the other half, and it is the one that reintroduces the palette-budget
+  question, since a pond material is a channel no biome asked for. The mask
+  container, format and brush are already generic enough to carry it.
+- **Roads / linear features.** Not a painting problem at all — see the biome
+  painting notes above. A decal ribbon along a spline, in its own milestone.
+- **Undo/redo history** for either brush. Sculpting and painting both mutate
+  chunk state in place and persist on pointer-up; neither keeps a stroke stack.
 - In-game (runtime) sculpting UX — [#175](https://github.com/MKHenson/rewild/issues/175)
   is the editor; the write path is shared so runtime can reuse it later.
 - Voxel terrain, caves, overhangs.

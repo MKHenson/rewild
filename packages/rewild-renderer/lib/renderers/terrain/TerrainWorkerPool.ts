@@ -1,3 +1,5 @@
+import type { PaintMask } from './PaintMask';
+
 interface TerrainWorkerRequest {
   chunkSize: number;
   lod: number;
@@ -16,6 +18,9 @@ interface TerrainWorkerRequest {
   // The heights are an edit/snapshot rather than generator output, so the
   // worker's noise apron would not match them. See BuildChunkMeshRequest.
   edited?: boolean;
+  // The chunk's painted biome mask. Structured-cloned (not transferred) — the
+  // chunk keeps its copy for the other LOD requests and for the next stroke.
+  biomeMask?: PaintMask;
 }
 
 export interface TerrainWorkerResponse {
