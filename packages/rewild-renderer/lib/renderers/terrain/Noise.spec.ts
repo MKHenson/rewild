@@ -151,7 +151,10 @@ describe('generateBiomeBlendedHeightMap', () => {
       // climate does with moisture. The 2×2 grid has its own test below.
       moisture: { ...DEFAULT_CLIMATE.moisture, cuts: [] },
       biomes: [flatBiome('low', 0), flatBiome('high', 100)],
-      cells: [[1], [0]],
+      // One row per temperature band. Alternating rather than repeating the last
+      // one puts a border at *both* of the axis's cuts, so the strip is checked
+      // for cliffs across each of them rather than only the first.
+      cells: [[1], [0], [1]],
     };
     const strip = generate(0, 0, SEED, climate, 4097, 1);
 
@@ -233,11 +236,9 @@ describe('generateBiomeBlendedHeightMap', () => {
     const blended = generate(0, 0, SEED, {
       ...DEFAULT_CLIMATE,
       biomes: [MOUNTAIN],
-      // Every cell of the default's full temperature × moisture grid.
-      cells: [
-        [0, 0],
-        [0, 0],
-      ],
+      // Every cell of the default's full temperature × moisture grid — three
+      // temperature bands over an uncut moisture axis.
+      cells: [[0], [0], [0]],
     });
     expect(blended).toEqual(mountainOnly);
   });
