@@ -2,7 +2,12 @@
   // Returns 1.0 (fully lit) when no shadow-casting spot light exists or fragment is outside the cone.
   var spotShadowFactor = 1.0;
   if (spotLightShadowParams.hasSpotShadow != 0u) {
-    let _biasedPos = viewPosition + normalizedNormal * 0.3;
+    // Geometric normal, not the shaded one — see the same bias in
+    // directional-shadow.frag.wgsl. A normal-mapped (and on terrain, parallax-
+    // displaced) normal makes this 0.3m offset chase texture detail, which moves
+    // the shadow lookup as the camera moves.
+    let _spotShadowGeoNormal = normalize(normal);
+    let _biasedPos = viewPosition + _spotShadowGeoNormal * 0.3;
     let _lsp = spotLightShadowParams.lightMVPFromView * vec4f(_biasedPos, 1.0);
     let _pc = _lsp.xyz / _lsp.w;
     // NDC [-1,+1] → quadrant-local UV [0,1], Y flipped

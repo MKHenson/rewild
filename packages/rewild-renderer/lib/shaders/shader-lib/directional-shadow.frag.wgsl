@@ -20,8 +20,18 @@
   // This eliminates slope-dependent self-shadowing (acne) without needing the light direction.
   // Each cascade's offset scales with its approximate world-space texel size so that
   // near cascades stay sharp while far cascades (with coarser texels) get enough clearance.
+  //
+  // Along the *geometric* normal, deliberately — not the shaded one. The offset is
+  // in metres (up to 1.2), and its job is to clear the receiver's own surface
+  // plane. A normal-mapped shading normal points wherever the texture says, so
+  // biasing along it drags the shadow lookup up to half a metre sideways per
+  // texel. On terrain that normal is also parallax-displaced, hence view
+  // dependent: the lookup then moves as the camera moves and the received shadow
+  // visibly swims underfoot. It only looked right at a distance because
+  // detailFade hands the shading normal over to the smooth macro normal there.
+  let _dirShadowGeoNormal = normalize(normal);
   let _cascadeNormalOffsets = array<f32, 3>(0.5, 0.8, 1.2);
-  let _biasedViewPos = viewPosition + normalizedNormal * _cascadeNormalOffsets[_cascadeIdx];
+  let _biasedViewPos = viewPosition + _dirShadowGeoNormal * _cascadeNormalOffsets[_cascadeIdx];
 
   // Project view-space position into this cascade's light clip space.
   let _lightSpacePos = directionalShadowParams.lightMVPFromView[_cascadeIdx] * vec4f(_biasedViewPos, 1.0);
