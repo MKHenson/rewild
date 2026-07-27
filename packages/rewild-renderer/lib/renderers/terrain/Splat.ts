@@ -13,11 +13,21 @@ import {
   sampleLayerNoise,
 } from './ClimateField';
 import { resolveLayerWeights } from './LayerWeights';
+import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { PaintMask, samplePaintMask } from './PaintMask';
 
-// Samples are one world unit apart (241 samples spanning 240 units), so a
-// height difference between neighbours *is* the per-unit gradient.
-const SAMPLE_SPACING = 1;
+// World units between adjacent heightmap samples — the run that the rise between
+// neighbours is taken over, so the slope below comes out in real degrees.
+//
+// This was hardcoded to 1, with a comment claiming "241 samples spanning 240
+// units". That stopped being true when the terrain gained a world scale: a chunk
+// spans (chunkSize - 1) * TERRAIN_METERS_PER_SAMPLE, so the run is 2 m, not 1.
+// Dividing the rise by half the real run made every slope read about twice its
+// true steepness — atan(dh/1) where it should be atan(dh/2) — so a band written
+// as 35°-75° actually opened at a true 19°, and cliff materials spread across
+// ground that is merely rolling. Deriving it from the constant means it cannot
+// drift from the world scale again.
+const SAMPLE_SPACING = TERRAIN_METERS_PER_SAMPLE;
 
 const RAD_TO_DEG = 180 / Math.PI;
 

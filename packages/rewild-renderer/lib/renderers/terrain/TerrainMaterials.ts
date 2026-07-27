@@ -98,8 +98,14 @@ export interface TerrainMaterial {
   //         weight carries the transition. A soft crossfade. Right for
   //         litter, sand, and anything that should intermingle rather than meet.
   //
-  // Applied from whichever layer is *winning* at a fragment, so a pair that
-  // should blend softly wants the soft value on both of its materials.
+  // This is a *vote*, not a verdict: the shader averages the depths of every
+  // material present at a fragment, weighted by splat coverage. So a material
+  // gets exactly its own width wherever it stands alone, and a mismatched pair
+  // (mountain rock at 0.2 meeting forest litter at 0.7) meets at an intermediate
+  // width that slides smoothly with the splat. Taking it from the winning layer
+  // instead — which is what this used to do — made the width flip in a single
+  // fragment at the 50/50 contour and drew a visible line along the biome
+  // border, so setting a pair to match is no longer load-bearing.
   // Omitted ⇒ BLEND_DEPTH.
   blendDepth?: number;
   // Which way the normal map's green channel points. Sources differ and there
@@ -200,7 +206,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightUrl: 'terrain/snow-02/snow_02_disp_1k.png',
     macroUvScale: MACRO_UV_SCALE,
     heightScale: HEIGHT_SCALE * 0.5,
-    uvScale: DETAIL_UV_SCALE,
+    uvScale: DETAIL_UV_SCALE * 0.25,
     specular: SPECULAR * 0.55,
     shininess: SHININESS * 2,
     normalConvention: 'opengl', // Poly Haven
