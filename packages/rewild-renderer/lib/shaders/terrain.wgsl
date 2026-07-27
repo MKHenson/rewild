@@ -31,9 +31,9 @@ struct TerrainLayer {
   shininess   : f32,
   // Width of this material's transition to its neighbours, in blend-score
   // units. Small ⇒ a hard interlocking edge where per-texel relief decides
-  // every fragment; large ⇒ the splat weight carries a soft crossfade. Read
-  // from the *winning* layer, so it is that material's own answer to "how do I
-  // meet my neighbours".
+  // every fragment; large ⇒ the splat weight carries a soft crossfade. Averaged
+  // across the active layers by splat weight (see the combine), so it is this
+  // material's *vote* on how the transition reads, not a unilateral answer.
   blendDepth  : f32,
   // Normal-array layer the macro normal samples. Usually the same as
   // layerIndex, but a material may borrow another material's normal map when
@@ -110,9 +110,30 @@ struct VertexOutput {
 @group(3) @binding(5) var<uniform> directionalShadowParams: DirectionalShadowParams;
 @group(3) @binding(6) var<uniform> spotLightShadowParams: SpotLightShadowParams;
 
-// Below this a layer contributes less than one 8-bit quantisation step, so its
-// six texture samples would buy nothing.
+// Splat weight below which a layer is skipped outright, saving its whole block
+// of texture samples. One 8-bit quantisation step is 1/255 = 0.0039, so this is
+// the smallest weight the splat can even express.
 const WEIGHT_EPSILON: f32 = 0.004;
+
+// Weight at which a layer earns its full say in the blend; between the epsilon
+// and this it fades in.
+//
+// Without the fade the skip above is a *cliff*, and the height-aware combine
+// makes that cliff enormous. Contribution is not proportional to weight: once a
+// layer is active its score is weight + (height - 0.5), and the height term
+// spans ±0.5 — far more than a small weight. So a layer carrying 0.4% of the
+// splat still clears the cutoff wherever its relief is high and walks off with
+// 20-40% of the fragment, and because it also joins blendWeightSum it drags
+// every other layer's share down with it. Crossing 0.004 therefore jumped the
+// blend discontinuously, and the contour where a smooth weight field crosses
+// that threshold drew a hard-edged region across the terrain: a pale material
+// with almost no business being there, veiling the ground inside its own
+// iso-line. Fading from the epsilon means the faded-in and skipped cases meet at
+// exactly zero, so the seam closes.
+//
+// Raise it if materials still bleed in where the splat barely places them; lower
+// it if genuine transitions start to look thin.
+const WEIGHT_FADE_END: f32 = 0.05;
 
 // Parallax-occlusion march step counts. The count scales with view angle:
 // MIN steps head-on (the ray barely moves across UV) up to MAX at grazing
@@ -366,12 +387,21 @@ fn fs(
   var layerNormals = array<vec3f, 8>();
   var layerSpecs = array<f32, 8>();
   var layerShininess = array<f32, 8>();
-  // Blend score per active layer; -1 marks a slot the splat did not select.
-  var layerScores = array<f32, 8>(
-    -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0
-  );
-  var maxScore = -1.0;
-  var maxScoreSlot = 0u;
+  var layerScores = array<f32, 8>();
+  // 1 for a slot the splat selected, 0 otherwise. A separate flag rather than a
+  // negative sentinel in layerScores, because the score below is *legitimately*
+  // negative: it is weight + (height - 0.5), so a low-weight layer sitting in a
+  // crevice scores down to -0.5. Testing `score < 0` for "inactive" therefore
+  // culled real layers, and culled them abruptly along the score = 0 contour —
+  // an edge of its own, on top of the blendDepth one.
+  var layerActive = array<f32, 8>();
+  // Ramp from the skip threshold to full participation; see WEIGHT_FADE_END.
+  var layerWeightFade = array<f32, 8>();
+  // Running splat-weighted mean of the active layers' blendDepths. See the
+  // combine below for why the width cannot be taken from the winner alone.
+  var blendDepthSum = 0.0;
+  var blendDepthWeight = 0.0;
+  var maxScore = -1e9;
 
   for (var layerSlot = 0u; layerSlot < SPLAT_SLOTS; layerSlot++) {
     // Slots 0-3 live in the first splat texture, 4-7 in the second.
@@ -385,7 +415,16 @@ fn fs(
       continue;
     }
 
+    layerWeightFade[layerSlot] = smoothstep(WEIGHT_EPSILON, WEIGHT_FADE_END, weight);
+
     let layer = getLayer(layerSlot);
+    // Weighted by the splat rather than by the blend contribution: the
+    // contribution depends on the cutoff, which depends on this average, so
+    // that would be circular. The splat weight is also the honest measure of
+    // "how much of this material is here", and it varies smoothly (bilinear
+    // filtering), which is what keeps the resulting width free of creases.
+    blendDepthSum += weight * layer.blendDepth;
+    blendDepthWeight += weight;
     let arrayIndex = i32(layer.layerIndex);
     let scaledUV = fragUV * layer.uvScale;
     let ddx = duvdx * layer.uvScale;
@@ -435,6 +474,15 @@ fn fs(
     let cola = textureSampleGrad(albedoArray, seamlessSampler, sa, arrayIndex, ddx, ddy).rgb;
     let colb = textureSampleGrad(albedoArray, seamlessSampler, sb, arrayIndex, ddx, ddy).rgb;
     let blendFactor = smoothstep(0.2, 0.8, f - 0.1 * dot(cola - colb, vec3f(1.0, 1.0, 1.0)));
+
+    // A plain lerp, deliberately. Averaging two uncorrelated crops does lose
+    // variance (w0² + w1², so ~30% of the contrast at the 50/50 point), and
+    // rescaling the deviation from the material's mean is the textbook
+    // correction — but the correction factor is a smooth function of the region
+    // fraction, so applying it paints the no-tile region structure onto the
+    // ground as broad parallel bands. That trade is worse than the contrast it
+    // buys back. If this is revisited, the fix for the banding is to make the
+    // correction depend on something that is not the region field.
     let layerColor = mix(cola, colb, blendFactor);
     // The layer's surface height at this fragment, through the same no-tile blend
     // as its albedo so the height that arbitrates the splat tracks the texture
@@ -443,6 +491,10 @@ fn fs(
 
     let nrmA = textureSampleGrad(normalArray, seamlessSampler, sa, arrayIndex, ddx, ddy).rgb;
     let nrmB = textureSampleGrad(normalArray, seamlessSampler, sb, arrayIndex, ddx, ddy).rgb;
+    // Plain lerp for the same reason as the albedo above: rescaling the blended
+    // tilt to recover the variance the average costs makes the shading track the
+    // no-tile region field, which is far more visible than the slightly shallower
+    // relief it corrects.
     let detailNormal = normalize(
       decodeNormal(mix(nrmA, nrmB, blendFactor), layer.normalYSign)
     );
@@ -522,42 +574,55 @@ fn fs(
     // and height only decides who wins in the overlap.
     let score = weight + (layerHeight - 0.5);
     layerScores[layerSlot] = score;
-    // Track *which* layer wins, not just the score: the transition width is a
-    // property of the winning material, so stone can keep its hard interlocking
-    // edge in the same frame that leaf litter fades softly into soil.
-    if (score > maxScore) {
-      maxScore = score;
-      maxScoreSlot = layerSlot;
-    }
+    layerActive[layerSlot] = 1.0;
+    maxScore = max(maxScore, score);
   }
 
-  // Height-aware combine (Mishkinis): only layers within the winner's
-  // blendDepth of the winning score contribute, weighted by how far above the
-  // cutoff they stand.
+  // Height-aware combine (Mishkinis): only layers within blendDepth of the
+  // winning score contribute, weighted by how far above the cutoff they stand.
   //
-  // Taking the width from the winning material is what makes the same mechanism
-  // serve both jobs. The score gap between two equally-weighted layers is their
-  // surface-height difference, which spans roughly ±0.4 for typical maps — so a
-  // narrow depth (~0.2) lets relief pick a single winner per texel, cutting the
-  // hard interlocking silhouette rock wants, while a wide one (~0.7) leaves the
-  // splat weight in charge and crossfades, which is what litter and sand want.
+  // The score gap between two equally-weighted layers is their surface-height
+  // difference, which spans roughly ±0.4 for typical maps — so a narrow depth
+  // (~0.2) lets relief pick a single winner per texel, cutting the hard
+  // interlocking silhouette rock wants, while a wide one (~0.7) leaves the splat
+  // weight in charge and crossfades, which is what litter and sand want.
   //
-  // The top layer clears the cutoff by its own blendDepth, so blendWeightSum is
-  // ≥ that whenever any layer is active — the guard below only catches the
-  // all-skipped degenerate splat (which then falls back to a flat geometric
-  // normal, exactly as the single-pass version did).
-  let cutoff = maxScore - getLayer(maxScoreSlot).blendDepth;
+  // The width is the splat-weighted *mean* of the active layers' depths, not the
+  // winning layer's. Reading it from the winner alone looks equivalent — the
+  // blended colour is even continuous across the point where the winner changes,
+  // since equal scores give equal contributions whatever the depth — but its
+  // slope is not. Where a hard material meets a soft one (mountain rock at 0.2
+  // against forest litter at 0.7) the width flips in a single fragment and the
+  // ramp rate jumps 3.5×, which draws a Mach band along the 50/50 contour: a
+  // visible line following the biome border, with a washed-out four-material
+  // average on the soft side of it and a crisp cut on the hard side. Averaging
+  // makes the width vary as smoothly as the splat does, so a mismatched pair
+  // meets at an intermediate width instead of across a seam — and a material
+  // still gets its own answer wherever it is the only thing present.
+  //
+  // The ramp is smoothstepped rather than the raw linear `score - cutoff`. The
+  // linear version corners where a layer's contribution reaches zero, and a
+  // slope discontinuity in a colour ramp reads as a line for the same reason the
+  // one above did. Smoothstep is C1 at both ends, so layers ease in and out.
+  //
+  // The winner sits at t = 1, so blendWeightSum is ≥ 1 whenever any layer is
+  // active — the guard below only catches the all-skipped degenerate splat
+  // (which then falls back to a flat geometric normal).
+  let blendDepth = max(blendDepthSum / max(blendDepthWeight, 1e-4), 1e-4);
+  let cutoff = maxScore - blendDepth;
   var blendedColor = vec3f(0.0);
   var blendedTangentNormal = vec3f(0.0);
   var specFactor = 0.0;
   var blendedShininess = 0.0;
   var blendWeightSum = 0.0;
   for (var layerSlot = 0u; layerSlot < SPLAT_SLOTS; layerSlot++) {
-    let score = layerScores[layerSlot];
-    if (score < 0.0) {
+    if (layerActive[layerSlot] == 0.0) {
       continue;
     }
-    let contribution = max(score - cutoff, 0.0);
+    let t = clamp((layerScores[layerSlot] - cutoff) / blendDepth, 0.0, 1.0);
+    // The weight fade is what closes the seam at the skip threshold; see
+    // WEIGHT_FADE_END. It reaches 0 exactly where the skip begins.
+    let contribution = t * t * (3.0 - 2.0 * t) * layerWeightFade[layerSlot];
     blendWeightSum += contribution;
     blendedColor += contribution * layerColors[layerSlot];
     blendedTangentNormal += contribution * layerNormals[layerSlot];

@@ -85,9 +85,20 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
   // Size of the no-tile offset regions, as a fraction of each layer's own tile
   // — it multiplies scaledUV, so it tracks the material's tiling rather than
-  // the world. Smaller ⇒ larger regions. Regions must stay large relative to
-  // one tile, or their offsets read as seams instead of hiding the repeat.
-  noiseScale: number = 0.005;
+  // the world.
+  //
+  // The region size follows directly from the noise texture's own feature
+  // period: smooth-noise-256 is a 16-cell grid, so a feature spans 1/16 UV and
+  // one region covers (1/16) / noiseScale *tiles*. That ratio is the whole
+  // ballgame — inside one region the two offsets are fixed, so the texture
+  // repeats there untouched. At 0.005 a region was 12.5 tiles wide (200 m at
+  // uvScale 30) and the repeat was plainly visible within it. ~3 tiles is
+  // Inigo Quilez's figure for the technique and reads correctly here.
+  //
+  // Pushing much past this is the other failure mode: regions smaller than a
+  // tile turn the crossfade itself into the dominant pattern, so the offsets
+  // read as blotches rather than hiding the repeat.
+  noiseScale: number = 0.02;
 
   // Fallback transition width for the height-aware layer blend. Terrain now
   // takes this per-material from the winning layer (TerrainMaterial.blendDepth)
