@@ -67,10 +67,15 @@ export class GodRaysPostProcess implements IPostProcess {
     this.intensityScale = 1.0;
     // density is a fraction of the pixel->sun distance (not a UV length), so it
     // wants to sit near 1.0 for the march to actually reach the sun.
+    // weight is calibrated against the contrast curve in the shader (RAY_CONTRAST):
+    // that curve normalises by accumulated decay weight rather than by sample count
+    // and then crushes the low end, so 0.35 here (x2 from SkyRenderer.godRayIntensity)
+    // keeps a shaft above the point where ACES saturates while holding the flat
+    // clear-sky term near 0.3 HDR — it used to add ~7 HDR to a ~7 HDR sky.
     this.config = {
       numSamples: 48,
       density: 0.9,
-      weight: 0.5,
+      weight: 0.35,
       decay: 0.96,
       exposure: 1.0,
       enabled: true,

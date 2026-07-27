@@ -49,6 +49,19 @@ const GOD_RAY_HDR_SCALE: f32 = 60.0;
 // multi-tap fetch should make that unnecessary.
 const TERRAIN_TRANSMITTANCE: f32 = 0.0;
 
+// Contrast exponent applied to the normalised march result.
+//
+// A cloudless sky is a *uniform* emitter: every sample of every march reads the
+// same ~7 HDR blue, so the accumulation lands on the same value at every pixel
+// (~0.19) and the pass adds a flat pedestal to the whole frame — the sky simply
+// gets brighter, which reads as haze, not as shafts. A shaft is contrast rather
+// than level: a pixel whose march crosses the corona or a gap between clouds
+// accumulates several times the ambient value. A power curve on the normalised
+// mean collapses that low flat end (0.19^3 = 0.007) while leaving the peaks well
+// past where ACES saturates (0.74^3 = 0.40, ~17 HDR against a saturation point
+// near 16.7): the pedestal drops ~26x and the visible shafts do not move at all.
+const RAY_CONTRAST: f32 = 2.0;
+
 const LUMA: vec3<f32> = vec3<f32>(0.2126, 0.7152, 0.0722);
 
 // Interleaved-gradient noise, rotated per frame. The previous static
@@ -80,6 +93,7 @@ fn fs(
     var currentPos = uv + delta * noise;
     var currentWeight = 1.0;
     var illumination = 0.0;
+    var weightSum = 0.0;
 
     let depthDims = vec2<f32>(textureDimensions(depthTexture));
 
@@ -124,10 +138,16 @@ fn fs(
         let source = skyBrightness * cloudTransmittance * skyMask * boundsGate;
 
         illumination += source * currentWeight;
+        weightSum += currentWeight;
         currentWeight *= uniforms.decay;
     }
 
-    illumination /= f32(numSamples);
+    // Normalise by the weights actually accumulated, not by the sample count. That
+    // makes illumination the transmittance-weighted *mean* source radiance, a plain
+    // 0..1 quantity, so the contrast curve below has a fixed meaning and neither it
+    // nor the calibration below shifts when decay or numSamples is retuned.
+    // (Dividing by numSamples folded Σdecay^i ≈ 21.5/48 into the brightness.)
+    illumination = pow(illumination / max(weightSum, 1e-5), RAY_CONTRAST);
     illumination *= uniforms.exposure * uniforms.weight;
 
     // Gentle radial falloff, only to keep the far corners from picking up a flat
