@@ -164,7 +164,7 @@ export const PLAIN: BiomeParams = {
     { material: 'grass_01_1k' },
     {
       material: 'grass_path_02_1k',
-      noise: { scale: 80, seedSalt: 23, band: { from: 0.15, to: 0.92 } },
+      noise: { scale: 160, seedSalt: 23, band: { from: 0.15, to: 0.92 } },
     },
   ],
 };
@@ -196,7 +196,7 @@ export const FOREST: BiomeParams = {
     {
       material: 'forest_leaves_03_1k',
       height: { from: 10, to: 20 },
-      noise: { scale: 50, seedSalt: 11, band: { from: 0.15, to: 0.95 } },
+      noise: { scale: 200, seedSalt: 11, band: { from: 0.15, to: 0.95 } },
     },
   ],
 };
@@ -217,7 +217,7 @@ export const MOUNTAIN: BiomeParams = {
   ],
   layers: [
     { material: 'aerial_rocks_01' },
-    { material: 'marble_cliff_05', slope: { from: 35, to: 75 } },
+    { material: 'marble_cliff_05', slope: { from: 15, to: 75 } },
     {
       material: 'snow-02',
       height: { from: 100, to: 170 },
@@ -380,7 +380,7 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
   temperature: {
     scale: 3000 / TERRAIN_METERS_PER_SAMPLE,
     seedSalt: 7919,
-    cuts: [0.5],
+    cuts: [0.4, 0.7],
     // Wider transition band: softens the biome border into a gradual blend
     // rather than a hard line, and gives the ClimateField domain warp room to
     // wander the border without compressing it into a height cliff.
@@ -389,14 +389,14 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
   moisture: {
     scale: 2400 / TERRAIN_METERS_PER_SAMPLE,
     seedSalt: 104729,
-    cuts: [0.5],
+    cuts: [],
     blendHalfWidth: 0.1,
   },
   biomes: [PLAIN, FOREST, MOUNTAIN],
   cells: [
-    // dry, wet
-    [2, 2], // cold → mountain either way
-    [0, 1], // warm → grassland when dry, forest when wet
+    [2], // cold → mountain
+    [1], // mid  → FOREST
+    [0], // warm → PLAIN
   ],
 };
 
