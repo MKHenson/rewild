@@ -20,6 +20,28 @@ const SHADOW_CASCADE_FAR = 500;
 // Higher values pull cascade 0 much tighter (better near-shadow texel density).
 const CSM_LAMBDA = 0.85;
 
+// How far each cascade's ortho box is pushed *toward the light*, beyond the
+// receivers it covers, so that casters standing outside the slice are still
+// drawn into its depth map.
+//
+// A cascade's box is fitted to the ground it shades, but the thing casting onto
+// that ground is up-light of it and usually outside the slice entirely. Anything
+// not inside the box is never rendered, so the receivers find no occluder and
+// come out fully lit. This bit the near cascade alone: cascade 0 is pulled tight
+// by CSM_LAMBDA, so its box spans only tens of metres, while cascades 1 and 2 are
+// large enough to swallow the caster by accident. The near ground rendered
+// unshadowed under a dune that plainly shadows everything behind it, and the
+// unshadowed patch tracked cascade 0's footprint — so it slid around as the
+// camera turned, while nothing in the world had moved.
+//
+// Sized from the shallowest sun that still casts: the shader fades shadows out
+// below ~17° elevation (see _sunElevationFade), and at that angle a 100m dune
+// throws its shadow a bit over 300m, putting the caster ~300 units up-light of
+// the receiver. 500 clears that with room spare. Raise it if shadows go missing
+// on the near ground under tall casters at low sun; the only cost is depth range
+// (harmless at depth32float) and slightly coarser effective bias.
+const CASTER_EXTENSION_TOWARD_LIGHT = 500;
+
 // Atlas pixel offset [x, y] for each cascade.
 // Layout: cascade 0 = top-left, cascade 1 = top-right, cascade 2 = bottom-left.
 // Bottom-right quadrant (1024, 1024) is reserved for the spot light shadow map.
@@ -406,31 +428,75 @@ export class DirectionalShadowRenderer {
     );
     this._lightView.copy(this._lightViewWorld).invert();
 
-    // Fit ortho bounds tightly to the cascade sub-frustum corners in light space
-    let minX = Infinity,
-      maxX = -Infinity;
-    let minY = Infinity,
-      maxY = -Infinity;
-    let minZ = Infinity,
-      maxZ = -Infinity;
-
-    const lve = this._lightView.elements;
+    // Fit the ortho box to the sub-frustum's bounding SPHERE, not to a tight AABB
+    // of its corners, and then snap that box to whole shadow-map texels. Both
+    // halves are needed, and skipping them is what made near shadows crawl.
+    //
+    // A tight AABB is rotation-dependent: turning the camera on the spot sweeps
+    // the 8 corners around, so the fitted bounds — and the centroid the light
+    // looks at — change every frame. The cascade re-renders from a different
+    // projection each time and the shadow slides across the ground while nothing
+    // in the world has moved. A sphere's radius depends only on the sub-frustum's
+    // *shape* (FOV, aspect, split distances), so it is invariant under rotation
+    // and translation; the box then stays a fixed size and only ever moves.
+    //
+    // Even a fixed-size box shimmers if it can move by fractions of a texel, so
+    // the centre is snapped to texel increments in light space. That locks the
+    // texel grid to the world: the box advances in whole-texel steps and each
+    // texel keeps covering the same ground from frame to frame.
+    //
+    // This is why the artefact was confined to the near field. Cascade 0 is
+    // pulled tight by CSM_LAMBDA, so its 1024 texels cover tens of metres — a
+    // couple of centimetres each — and sub-texel drift is a large fraction of
+    // one. Cascade 2 spreads the same 1024 texels over SHADOW_CASCADE_FAR, where
+    // the identical drift is invisible.
+    //
+    // The cost is resolution: a sphere circumscribes the frustum, so the box is
+    // larger than a tight fit and texel density drops. That is the standard trade
+    // for stable cascades — a slightly softer shadow that stays put beats a
+    // sharper one that swims.
+    let radius = 0;
     for (let i = 0; i < 8; i++) {
       const w = this._cascadeCorners[i];
-      const lx = lve[0] * w.x + lve[4] * w.y + lve[8] * w.z + lve[12];
-      const ly = lve[1] * w.x + lve[5] * w.y + lve[9] * w.z + lve[13];
-      const lz = lve[2] * w.x + lve[6] * w.y + lve[10] * w.z + lve[14];
-      if (lx < minX) minX = lx;
-      if (lx > maxX) maxX = lx;
-      if (ly < minY) minY = ly;
-      if (ly > maxY) maxY = ly;
-      if (lz < minZ) minZ = lz;
-      if (lz > maxZ) maxZ = lz;
+      const dx = w.x - this._frustumCenter.x;
+      const dy = w.y - this._frustumCenter.y;
+      const dz = w.z - this._frustumCenter.z;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (d > radius) radius = d;
     }
+    // Quantise so float noise in the corner maths cannot jitter the extent (and
+    // with it the texel size) frame to frame.
+    radius = Math.ceil(radius * 16) / 16;
 
-    // Extend Z to catch shadow casters just outside the sub-frustum slice
-    minZ -= 50;
-    maxZ += 50;
+    // Sub-frustum centre in light space. The light view's rotation is fixed by
+    // the sun direction, so only this translation varies — which is exactly what
+    // makes snapping in this space meaningful.
+    const lve = this._lightView.elements;
+    const c = this._frustumCenter;
+    const cx = lve[0] * c.x + lve[4] * c.y + lve[8] * c.z + lve[12];
+    const cy = lve[1] * c.x + lve[5] * c.y + lve[9] * c.z + lve[13];
+    const cz = lve[2] * c.x + lve[6] * c.y + lve[10] * c.z + lve[14];
+
+    const texelSize = (2 * radius) / CASCADE_SIZE;
+    const snappedX = Math.floor(cx / texelSize) * texelSize;
+    const snappedY = Math.floor(cy / texelSize) * texelSize;
+
+    const minX = snappedX - radius;
+    const maxX = snappedX + radius;
+    const minY = snappedY - radius;
+    const maxY = snappedY + radius;
+
+    // Z from the same sphere so the depth range is stable too — a near/far that
+    // moved each frame would shift every stored depth and flicker the PCF
+    // comparison.
+    //
+    // Light space looks down -Z, so the receivers sit at cz ≈ -orbitDist and
+    // anything nearer the light has a *larger* z. Growing maxZ is therefore what
+    // takes in casters; see CASTER_EXTENSION_TOWARD_LIGHT. The small margin on
+    // minZ is the other end — it only keeps receivers a little outside the sphere
+    // from falling through the far plane and failing the shader's depth test.
+    const minZ = cz - radius - 50;
+    const maxZ = cz + radius + CASTER_EXTENSION_TOWARD_LIGHT;
 
     const nearDist = Math.max(0.1, -maxZ);
     const farDist = Math.max(nearDist + 1, -minZ);
