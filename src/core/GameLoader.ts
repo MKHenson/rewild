@@ -9,7 +9,6 @@ import { TemplateLoader } from './TemplateLoader';
 import { ContainerWithState } from './routing/ContainerWithState';
 import { StateMachineData } from './routing/Types';
 import { GameManager } from './GameManager';
-import { LightingTester } from './routing/LightingTester';
 import { createChunkSnapshotProvider } from '../database/chunk-snapshots';
 import { createBiomeMaskProvider } from '../database/biome-masks';
 import { registerDebugCommands } from './debug';
@@ -75,7 +74,6 @@ export async function loadInitialLevels(
   );
   stateMachine.addNode(player, true);
   stateMachine.addNode(levelRouter, true);
-  stateMachine.addNode(new LightingTester(), true);
 
   for (const container of level?.containers ?? []) {
     const containerRouter = new ContainerWithState(
