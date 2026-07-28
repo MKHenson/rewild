@@ -1,255 +1,264 @@
-# Milestone: Strata — terrain foundation
+![Terrain](../images/strata.png)
 
-**Codename:** Strata
-**Theme:** the data-model foundation the rest of the terrain roadmap sits on.
+# Terrain (Strata)
 
-## Why this milestone
+Rewild's terrain is a **procedural, endless, heightmap world** that you can seed,
+shape, paint and save. This document explains what the terrain system does,
+feature by feature, and broadly how to use each part from the editor.
 
-Terrain today is **pure procedural, heightmap-based, endless + chunked**, and
-**stateless** — nothing is persisted, and there is no per-world seed, so _every
-"random" world is byte-for-byte identical_. The five "biomes" are hardcoded
-height-colour bands, not a real biome concept. Generation parameters are
-hardcoded globals.
+> **Where the name comes from.** _Strata_ was the milestone that built this
+> system — the data-model "spine" the rest of the terrain roadmap sits on. That
+> work has landed; this page is now the plain-English guide to what it delivers.
 
-Almost everything we want next — painting, biomes, water, object scatter, saved
-games — needs a place to store data and a way to vary worlds, neither of which
-exists. **Strata builds that spine** so the visual features can land on top
-without re-architecting later — and then delivers the first hands-on payoff,
-**terrain sculpting** ([#175](https://github.com/MKHenson/rewild/issues/175)),
-proving the whole stack end to end.
+---
 
-## Current state (updated after #170 + #171 landed)
+## The short version
 
-- **Seeded worlds (#170):** a per-world seed is carried end-to-end
-  (recipe → worker → noise) with an editor seed dialog.
-- **Climate-driven generation (#171):** height comes from a **temperature ×
-  moisture climate model** (`ClimateConfig` in `Biomes.ts`) — two low-frequency
-  climate axes select a biome per world position from a band-cell grid, a
-  per-biome parameter table (`heightScale`, `noiseScale`, octaves, curve)
-  drives height, and heights are smoothstep-blended across band borders (at
-  most 4 biome evaluations in a corner, 1 outside transition bands). The config
-  is hardcoded as `DEFAULT_CLIMATE`; worlds don't yet reference it — that's
-  [#172](https://github.com/MKHenson/rewild/issues/172).
-- **Seamless boundaries:** normalisation uses a fixed theoretical max amplitude
-  per biome (`Noise.ts`), not per-chunk min/max — this is what keeps chunk
-  borders seamless. **Any change to generation must preserve this.**
-- **Colour:** still placeholder height-colour bands in `TerrainWorker.ts`, now
-  driven by absolute world height, and one hardcoded material for the whole
-  world. Real per-biome materials arrive in
-  [07](./strata-terrain-materials.md) — ahead of painting, which needs them
-  first.
-- **Workers:** a 4-worker pool (`TerrainWorkerPool.ts`); the worker message is
-  `{ chunkSize, lod, position, seed }`.
-- **Editor:** terrain is **already on** in the editor — `raycastToSurface`
-  (`WorldPlacement.ts`) feeds the orbit camera and drag-drop placement
-  (`EditorViewport.tsx`). No editor-instantiation work is needed.
-- **Persistence:** none for terrain. `ILevel` has an unused `hasTerrain: boolean`
-  (`src/types/models.d.ts`, mirrored in `server/.../models/Level.kt`).
+- Every world has a **seed**, so each world is genuinely different — and always
+  regenerates identically.
+- Terrain shape is driven by **climate**: a temperature × moisture model decides
+  which **biome** (plain, mountain, desert…) you're standing in, and biomes blend
+  smoothly into one another.
+- You can **sculpt** the ground (raise / lower / smooth / flatten) and **paint**
+  which biome a patch of ground belongs to, directly in the editor.
+- Biomes are drawn with **real per-biome materials** (grass, rock, snow, sand…)
+  that blend by slope and height, with sharpened detail on distant hills.
+- Anything you edit is **saved automatically** — local-first, and synced to the
+  cloud once you're logged in. Anything you don't touch costs nothing to store.
 
-## Infrastructure we build on
+---
 
-- **A binary blob path already exists**, separate from the IndexedDB record sync:
-  - Client cache: `src/database/local-asset-store.ts` stores blobs in **OPFS**
-    keyed `levels/{levelId}/{assetType}/{filename}` (`write()`/`read()`/`sync()`).
-  - Server: presigned-URL flow — `POST /api/assets/upload-url`,
-    `POST /api/assets/confirm`, `GET /api/assets`
-    (`server/.../assets/{AssetRoutes,AssetService,S3Client}.kt`), backed by
-    **MinIO** in Docker (`server/docker-compose.yml`).
-  - **A test fixture already anticipates terrain chunks** on this path:
-    `assetType: 'chunk'`, `filename: 'terrain.bin'`
-    (`src/database/local-asset-store.spec.ts`). This is the path chunk snapshots use.
-  - Local dev with **no S3** still works: OPFS read/write functions; server sync
-    is skipped when no upload URL is returned (`requestUploadUrl()` → `null`).
+## Seeded, endless worlds
 
-## Storage flow (local-first → auth-gated sync)
+Terrain has no edges — it generates forever as you move, in chunks, at several
+levels of detail. Each world carries a single **seed** (an integer) that shifts
+the entire world coherently. Two consequences:
 
-Chunk snapshots follow the same path as every other asset:
+- **Different seeds give different worlds.** Before, every "random" world was
+  byte-for-byte identical; now a new seed is a genuinely new landscape.
+- **The same seed always rebuilds the same world.** Move away and come back,
+  reload the page, reopen tomorrow — the hills are exactly where you left them.
+  This determinism is what makes saving edits possible (see
+  [Saving & sync](#saving--sync)).
 
-1. **Write is local-first (OPFS, no server).** Editing a chunk calls
-   `LocalAssetStore.write()` → bytes go to **OPFS**
-   (`levels/{levelId}/chunk/{cx}_{cy}.bin`) and an IndexedDB metadata row is
-   upserted and marked **dirty** (`updatedAt > syncedAt`). This works **offline /
-   logged out** — no server or local API is involved.
-2. **Sync is auth-gated and pushes to the bucket.** `db.syncAll()` →
-   `assets.sync()` returns immediately if there's no auth token. When
-   authenticated it **pushes** each dirty asset and **pulls** any server assets
-   missing from OPFS. The push is a **presigned-URL** flow: request a PUT URL,
-   `PUT` the bytes **directly to MinIO/S3** (the app server never proxies the
-   data), `confirmUpload()`, then `markSynced()` clears the dirty flag.
-3. **Re-edits override and re-upload.** A chunk can be overridden any number of
-   times. Re-editing **overwrites** its OPFS file and `write()` `patch()`es the
-   existing metadata row, bumping `updatedAt` so it becomes **dirty again**. The
-   next sync re-uploads it, overwriting the **same bucket object** (same storage
-   key) — latest edit wins.
-4. **Trigger.** Sync currently fires in the background from `ProjectStore` (on
-   save/publish) and no-ops without a token, so the _effect_ is "uploads once
-   authenticated." To flush pending edits **promptly on login**, `syncAll()`
-   should also be invoked from `authService.onAuthStateChanged` (work item in
-   [#174](https://github.com/MKHenson/rewild/issues/174)).
+**How to use it.** When you create or edit a world, the editor's **seed dialog**
+lets you set or change the seed. Changing the seed makes a different world, so
+it will ask you to confirm — and any edits you'd saved to the old terrain are
+discarded, because they no longer belong to the new ground.
 
-## Design overview & key decisions (agreed)
+---
 
-- **Stay heightmap.** Sculpting ([#175](https://github.com/MKHenson/rewild/issues/175)) is raise/lower/smooth/flatten. No
-  caves/overhangs/arches — those need a voxel rewrite and are explicitly deferred.
-- **Per-world seed.** A single integer carried on the recipe, fed into both the
-  Perlin permutation and the octave-offset RNG so the whole world shifts
-  coherently. Same seed + position ⇒ identical height, every load. This
-  determinism is the contract persistence relies on.
-- **The recipe lives on the project, next to `atmosphere`.** `WorldGenConfig`
-  (seed + climate preset reference) is stored on `IProject.sceneGraph.terrain`,
-  mirroring how the existing world-environment config (`atmosphere`) is
-  modelled, and it flows to both editor and game the same way. `hasTerrain`
-  stays the Level-side runtime gate; chunk snapshot blobs stay keyed by
-  `levelId`.
-- **Climate config is game content, not world data.** The climate/biome tables
-  are designed and tuned by the developer and live **in code** as named
-  presets (one for now; later eras — "worlds back in time" — are more presets).
-  A world persists only **which** preset it uses (`climatePreset` id) plus the
-  recipe `version`, not the tables themselves. Consequence (accepted): re-tuning
-  a preset in code reshapes existing worlds that use it, except sculpted chunk
-  snapshots, which stay frozen — the version field exists so a future load can
-  detect "generated under older rules".
-- **Changing the seed wipes saved chunks.** A new seed is a different world, so
-  existing chunk snapshots (edits to the old terrain) no longer apply — applying a
-  new seed prompts to confirm, then discards them and regenerates.
-- **Biomes vary _within_ a world, not _per_ world.** A low-frequency
-  **temperature × moisture climate model** selects, per world-position, which
-  biome is active (band cuts on each axis + a cell lookup grid); a **per-biome
-  parameter table** drives height; neighbouring biomes **blend across a
-  transition band** (mountain eases into plain). Shipped with **two biomes —
-  mountain and plain** — split on temperature only; adding a biome is a table
-  row + an axis cut + cell entries, not new code. (Decided during #171: the
-  2-axis model landed immediately rather than the originally planned 1D biome
-  map, so more biomes never need a re-architecture.)
-- **Persistence = recipe + saved chunk snapshots.** Unedited chunks regenerate
-  deterministically from the recipe and are never stored. An **edited** chunk is
-  saved as a **full heightfield snapshot** on the asset path (`assetType='chunk'`),
-  and once saved it is **fetched-and-meshed instead of regenerated** ("saved ⇒ not
-  generated"). Storage is O(edited chunks).
-- **A snapshot is a whole, frozen chunk** — internally consistent and immune to
-  later changes in the generation algorithm or biome tuning (you sculpted it; it
-  stays). Simpler than merging sparse edits onto a regenerated base, and more
-  robust. The **recipe is versioned**, and snapshots carry a format version too;
-  raw `f32` heights now, with a reserved flag for optional compression later.
-- **Worlds are endless.** Storage is O(edited chunks), so world size costs
-  nothing. (Float-precision jitter at extreme coordinates — floating-origin — is
-  a pre-existing endless-terrain concern, out of scope here.)
-- **Prove the format before the UX.** The first _writer_ of snapshots is a dev/test
-  hook ([#174](https://github.com/MKHenson/rewild/issues/174)) that locks the
-  save/load contract in isolation; the real **sculpt brushes**
-  ([#175](https://github.com/MKHenson/rewild/issues/175)) then build on exactly that
-  write path.
+## Climate & biomes
 
-## Biome painting (landed)
+Terrain shape is not painted by hand — it's driven by a **climate model**. Two
+slow-moving, large-scale fields, **temperature** and **moisture**, vary across
+the world. Together they decide, for any point, which **biome** is active there:
 
-The second hands-on payoff, and the answer to "painting" that
-[07](./strata-terrain-materials.md) was designed against. The shape it took
-differs from the one 07 anticipated — see the note at the end.
+- **Plain** — low, gentle, grassy.
+- **Mountain** — tall, steep, snow-capped.
+- **Desert** — dunes and sand.
 
-- **Paint overrides the _biome_, not the splat.** `resolveBiomeWeights`
-  (`ClimateField.ts`) is the single choke point both height and splat generation
-  go through to ask "which biome is here". A painted mask displaces its answer at
-  splat-generation time; the splat itself stays **derived**. So "saved ⇒ not
-  generated" does _not_ gain the sibling "painted ⇒ not derived" — the splat is
-  still computed from heights + biome every time.
-- **Consequence, and the reason it was done this way:** a painted chunk that is
-  later sculpted still resolves its slope/height layer rules correctly. Raise a
-  peak inside a region painted as mountain and it still grows snow, because the
-  paint said _which country the ground belongs to_, not _which texture to draw_.
-  Freezing a splat blob (07's assumption) would have killed exactly that.
-- **Splat-only, deliberately. Paint never feeds height.** Heights freeze the
-  moment a chunk is sculpted or snapshotted, so a painted biome that moved the
-  ground would either fight the sculpt or be silently ignored on saved chunks.
-  **Paint says what the ground is made of; sculpt says what shape it is.**
-- **Paintable biomes are the active climate's biomes**, not a global biome list.
-  The splat palette is by construction exactly the materials of the climate's own
-  biomes, so painting _within_ that set adds **zero palette pressure** — which is
-  why this fit inside the eight-channel budget with no per-chunk-palette work.
-  Painting a biome from a _different_ preset would not; that is the constraint
-  that keeps the tool scoped to one climate.
-- **Weights, not an index.** The mask stores a per-biome weight and blends —
-  painted weight is taken outright, climate keeps the remainder. That is the same
-  "take your coverage of what is left" rule the material layers already
-  composite by. A hard biome index would have drawn cookie-cutter borders: climate
-  borders are kilometres across (axis `scale` 3000m) and a brush is tens of metres.
-- **The mask is quarter-resolution and interpolated** — 61² × biomes against the
-  splat's 241², ~1/16th the bytes. Biome is a low-frequency field by
-  construction, so bilinear interpolation is indistinguishable from per-sample.
-  The format stores `step` rather than assuming it, so a finer mask later is not a
-  format break.
-- **A separate blob with independent freeze** — `{cx}_{cy}.biome.bin` beside the
-  height snapshot on the same asset path, with the same local-first/dirty/sync
-  semantics. A chunk can be painted without ever being sculpted and vice versa,
-  and neither format grows a version for the other's sake. (This is 07's
-  constraint 2, honoured.)
-- **Painting costs brush size, not chunk size.** A stroke changes no geometry, so
-  nothing is re-meshed and no worker is involved: each stamp regenerates only the
-  splat texels under the brush and uploads only that rectangle. Where paint
-  saturates, the climate noise is skipped entirely.
-- **The mask container is generic** — N channels of `u8` weight at a stated
-  resolution, with nothing biome-specific in it. A future **direct-material**
-  painter (a pond bed, a worn clearing) reuses the same container, format and
-  brush at a finer `step`, with channels meaning palette slots; it composites on
-  the **output** side (an unselectored layer above everything) where biome paint
-  composites on the input side. That is the one hedge taken deliberately in
-  advance, and it cost only naming.
+Each biome has its own shaping settings (how tall, how rough, how the curve
+bends), so a mountain region is dramatic and a plain is calm. Where two biomes
+meet they **blend across a transition band** — a mountain eases down into a
+plain rather than stopping at a hard line. Because climate varies over
+kilometres and blends are smooth, you get large, believable regions rather than
+patchwork.
 
-**Divergence from 07's "Painting readiness".** That section assumed painting
-would store a **frozen splat** ("painted ⇒ not derived") and would therefore need
-a higher splat resolution and a splat file header. Neither happened: storing the
-biome _input_ instead of the material _output_ keeps the splat derived, keeps
-sculpting and painting independent, and needs 1/16th the bytes. 07's constraints
-1 (splat on the chunk), 2 (separate blobs, independent freeze) and 4 (palette
-indirection) all still hold and were all load-bearing.
+Adding a new biome is a **table entry**, not new code — which is why plain,
+mountain and desert could arrive one after another without re-architecting.
 
-## Issues (build order)
+---
 
-Work top-to-bottom; arrows are hard dependencies.
+## Climate presets
 
-| Issue                                                                                           | Depends on                                                                                                   | Summary                                                                                                                                                                        |
-| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [#170 — Seeded worlds (end-to-end)](https://github.com/MKHenson/rewild/issues/170)              | —                                                                                                            | ✅ Done. Seed into the noise + `WorldGenConfig` on `sceneGraph.terrain` + persist/load + editor seed dialog.                                                                   |
-| [#171 — Biome map + blended generation](https://github.com/MKHenson/rewild/issues/171)          | [#170](https://github.com/MKHenson/rewild/issues/170)                                                        | ✅ Done. Temperature × moisture climate model + plain/mountain param table; blend heights across borders.                                                                      |
-| [#172 — Recipe: climate preset + terrain gating](https://github.com/MKHenson/rewild/issues/172) | [#170](https://github.com/MKHenson/rewild/issues/170), [#171](https://github.com/MKHenson/rewild/issues/171) | Persist a climate-preset id on the recipe (presets hardcoded in code); make `hasTerrain` gate terrain.                                                                         |
-| [#173 — Chunk snapshot — read & mesh](https://github.com/MKHenson/rewild/issues/173)            | [#172](https://github.com/MKHenson/rewild/issues/172)                                                        | Full-heightfield snapshot format + read from the blob path; saved chunks mesh from stored heights instead of generating.                                                       |
-| [#174 — Chunk snapshot — write (dev/test hook)](https://github.com/MKHenson/rewild/issues/174)  | [#173](https://github.com/MKHenson/rewild/issues/173)                                                        | A dev/test writer that round-trips a snapshot: write → reload → fetch-and-mesh.                                                                                                |
-| [#175 — Terrain sculpting (editor brushes)](https://github.com/MKHenson/rewild/issues/175)      | [#173](https://github.com/MKHenson/rewild/issues/173), [#174](https://github.com/MKHenson/rewild/issues/174) | Raise/lower/smooth/flatten brushes in the editor; affected chunks saved as snapshots.                                                                                          |
-| [#177–#182 — Biome materials & distance normals](./strata-terrain-materials.md)                 | [#171](https://github.com/MKHenson/rewild/issues/171), [#175](https://github.com/MKHenson/rewild/issues/175) | Per-biome material layers on a splat map, blended across and within biomes; macro/detail normal crossfade by distance. Six issues — see the linked design for the build order. |
-| Biome painter (editor brush)                                                                    | [#175](https://github.com/MKHenson/rewild/issues/175), [#177–#182](./strata-terrain-materials.md)            | ✅ Done. Paint which biome the climate model resolves to, per chunk, as a stored weight mask; the splat stays derived. See "Biome painting" above.                             |
+The climate/biome tables are **game content, tuned in code**, not per-world data.
+They're bundled as named **presets**. A world stores only *which* preset it uses,
+not a copy of the tables.
 
-[#170](https://github.com/MKHenson/rewild/issues/170) is a full vertical slice
-(seeded worlds: generation plumbing + the persisted `WorldGenConfig` recipe + load
+- Today there's a default preset; future presets are the door to "worlds back in
+  time" — different eras with different climates.
+- Because a world only references a preset, **re-tuning a preset in code reshapes
+  every world that uses it** — except ground you've already sculpted, which stays
+  frozen (see below).
 
-- editor seed dialog). [#171](https://github.com/MKHenson/rewild/issues/171) adds
-  climate-driven biome generation on top of the seed;
-  [#172](https://github.com/MKHenson/rewild/issues/172) adds the persisted
-  climate-preset reference (the tables themselves stay in code) and gates
-  `hasTerrain`.
-  [#173](https://github.com/MKHenson/rewild/issues/173)/[#174](https://github.com/MKHenson/rewild/issues/174)
-  add chunk-snapshot persistence (saved edits), and
-  [#175](https://github.com/MKHenson/rewild/issues/175) is the first user-facing
-  payoff — sculpting — on top of the full round-trip (#173 + #174).
+**How to use it.** The editor lets you choose the climate model for a world. The
+`hasTerrain` flag on a level gates whether terrain is generated at all, so a
+scene can opt out of terrain entirely.
 
-## Out of scope (deferred to later milestones)
+---
 
-- **Direct-material painting** — painting a single material (a pond bed, a worn
-  clearing) with no biome behind it. **Biome** painting has landed (above); this
-  is the other half, and it is the one that reintroduces the palette-budget
-  question, since a pond material is a channel no biome asked for. The mask
-  container, format and brush are already generic enough to carry it.
-- **Roads / linear features.** Not a painting problem at all — see the biome
-  painting notes above. A decal ribbon along a spline, in its own milestone.
-- **Undo/redo history** for either brush. Sculpting and painting both mutate
-  chunk state in place and persist on pointer-up; neither keeps a stroke stack.
-- In-game (runtime) sculpting UX — [#175](https://github.com/MKHenson/rewild/issues/175)
-  is the editor; the write path is shared so runtime can reuse it later.
-- Voxel terrain, caves, overhangs.
-- Water, sea level, oceans.
-- Object scatter.
-- A third+ biome — still additive on the climate model from #171 (a table row
-  - an axis cut + cell entries). The 2-axis climate model itself landed early,
-    in #171. Note [07](./strata-terrain-materials.md) adds a second cost: a new
-    biome also needs layer-table entries, and would overflow its four-layer
-    splat palette.
-- More climate presets (eras / time-travel worlds) — additive once #172 gives
-  worlds a preset reference.
+## Terrain sculpting
+
+Once a world exists you can reshape the ground by hand in the editor with
+**brush tools**:
+
+- **Raise / Lower** — push ground up or pull it down under the brush.
+- **Smooth** — average out bumps and jaggies.
+- **Flatten** — level ground toward a target height.
+
+Sculpting works on the **heightmap** — you're moving the surface up and down, not
+carving caves or overhangs (those would need a very different, voxel-based
+engine and are deliberately out of scope). Brushes affect a circular area sized
+by the brush, and strokes that cross a chunk boundary correctly edit both
+chunks so there's no seam.
+
+**What happens when you sculpt.** The chunks you touch are saved as **snapshots**
+(see [Saving & sync](#saving--sync)) and, from then on, that ground is loaded
+from your saved edit instead of being regenerated. Your sculpt is permanent and
+immune to later changes in the generation rules.
+
+---
+
+## Biome painting
+
+Alongside sculpting you can **paint which biome a patch of ground belongs to**.
+The key idea — and the reason it behaves so well — is that you're painting the
+biome *input*, not the final texture:
+
+- Paint a hillside as "mountain" and it isn't just given a rock texture — it
+  adopts mountain's whole rulebook. **Raise a peak inside that painted region and
+  it grows snow on its own**, because you told the ground *what it is*, not *what
+  to draw*.
+- Paint is **splat-only — it never changes the shape of the ground.** Sculpting
+  says what shape the terrain is; painting says what it's made of. The two are
+  independent: you can paint without sculpting and vice-versa.
+- Painting blends. A brush stroke takes its share and lets the natural climate
+  keep the rest, so painted regions ease into their surroundings rather than
+  drawing hard cookie-cutter borders.
+
+**What you can paint.** The palette is exactly the biomes of the world's current
+climate preset — painting *within* that set is free. (Painting a biome from a
+different preset isn't supported; it's the one thing that keeps the tool scoped.)
+
+**Cost.** Painting is cheap: no geometry moves, so nothing is re-meshed — a
+stroke just re-computes the surface texture under the brush.
+
+---
+
+## Materials & surfaces
+
+Biomes don't just drive shape — they drive **surface**. Each biome has its own
+set of **material layers** (for example mountain uses rock, snow and dirt), and
+the terrain shader picks between them by **slope and height**:
+
+- Snow gathers near summits, rock shows on steep faces, dirt and grass settle in
+  the valleys.
+- Layers blend smoothly across biome borders and within a biome, so there are no
+  hard texture lines.
+
+Two extra touches keep it looking good at all distances:
+
+- **Distance-sharpened normals.** Far-off hills used to flatten out as the GPU
+  averaged their surface detail away. A larger-scale "macro" version of each
+  surface now takes over with distance, so distant mountains stay dramatic and
+  rocky instead of going smooth.
+- **Parallax mapping** gives close-up surfaces real depth, so rock and sand read
+  as bumpy rather than painted-on flat.
+
+This is all **derived automatically** from the terrain — you don't author it
+per-chunk. Materials themselves are game content, defined in code: the material
+library and each biome's layer rules are the main levers a developer tunes — see
+[Core API & tuning levers](#core-api--tuning-levers) below.
+
+---
+
+## Saving & sync
+
+Terrain edits are saved **local-first**, then synced to the cloud when you log in.
+The model is simple:
+
+- **Unedited ground is never stored.** It regenerates deterministically from the
+  seed + climate preset, so an endless world costs nothing until you touch it.
+- **Editing a chunk saves a snapshot.** Sculpting saves the chunk's heights;
+  painting saves a separate biome mask. Each is a small blob keyed to the level.
+  Heights and paint freeze **independently** — sculpting a painted chunk keeps
+  the paint, and painting a sculpted chunk keeps the shape.
+- **Local-first, works offline / logged out.** Edits go straight to the browser's
+  local storage (OPFS) immediately, with no server involved.
+- **Sync is automatic once you're authenticated.** On save/publish (and on login)
+  pending edits upload directly to cloud storage; anything on the server that's
+  missing locally is pulled down. Re-editing a chunk overwrites the same stored
+  object — latest edit wins.
+- **Deleting a level cleans up its terrain**, so removed worlds don't leave
+  orphaned chunk data behind.
+
+A saved chunk is a **whole, frozen snapshot** — internally consistent and immune
+to later changes in the generation algorithm or biome tuning. You sculpted it;
+it stays.
+
+---
+
+## Core API & tuning levers
+
+Terrain content — climates, biomes and materials — is **defined in code**, not in
+per-world data. These are the tables a developer edits to change how terrain looks
+and behaves. All live in `packages/rewild-renderer/lib/renderers/terrain/`.
+
+**Materials** — `TerrainMaterials.ts` (`TERRAIN_MATERIALS`). Each named material is
+a set of textures (albedo, normal, roughness, height) plus tuning knobs:
+
+| Lever | What it does |
+| --- | --- |
+| `uvScale` | Detail tiling — how many times the texture repeats per chunk. |
+| `heightScale` | Parallax-occlusion depth. Bigger ⇒ deeper apparent relief; `0` turns parallax off. |
+| `macroUvScale` / `macroNormalFrom` / `macroStrength` | The **distance-sharpening** knobs — a coarse "macro" normal that keeps distant surfaces from flattening out. `macroNormalFrom` can borrow another material's normal. |
+| `specular` / `shininess` | How strong and how tight the sun-glint is (wet rock vs. matte grass). |
+| `blendDepth` | Transition width to neighbouring materials — low (~0.2) = a hard interlocking edge, high (~0.7) = a soft crossfade. |
+| `normalConvention` | `'opengl'` or `'directx'` — **the common gotcha:** get it wrong and every bump reads as a dent. If one material looks "inset" while others look right, flip this. |
+
+**Biomes** — `Biomes.ts` (`PLAIN`, `MOUNTAIN`, `DESERT`, …). A biome is a
+**deformation stack** (what shapes its ground — amplitude, curve) plus a list of
+**layers**. Each layer names a material and the rule that selects it:
+
+- `slope` — degrees from horizontal (rock on steep faces).
+- `height` — absolute world metres (snow near summits).
+- `noise` — organic patches independent of the terrain's shape (litter over soil).
+
+The first layer is the biome's base and covers everything the others don't.
+**Adding a material to a biome, or a whole new biome, is a table edit here** — no
+new code.
+
+**Climate presets & world settings** — a climate preset bundles the biomes and the
+temperature/moisture model; a world stores only *which* preset it uses plus its
+`seed`, both set from the editor. The palette ceiling is `MAX_SPLAT_LAYERS = 8`
+simultaneously-visible materials.
+
+## Debugger / console functions
+
+Available from the browser DevTools console while the app is running (registered in
+`src/core/debug/`). Terrain-relevant ones:
+
+| Function | What it does |
+| --- | --- |
+| `startScenePerfCapture()` / `stopScenePerfCapture()` | Log GPU time for the main scene pass. On a terrain-filling view this is dominated by terrain's fragment cost — the sample-budget measurement. |
+| `writeChunkSnapshotFixture(cx?, cy?)` | Write a test snapshot (an unmistakable plateau) for a chunk and re-mesh it in place — exercises the save/load round-trip without the sculpt UI. |
+| `clearChunkSnapshots()` | Remove all saved chunk edits for the current level and reload the terrain. |
+| `startShadowDebug()` / `stopShadowDebug()` | Tint the terrain by shadow cascade + show the shadow atlas — useful when shadows on terrain look wrong. |
+
+Sky/atmosphere over the terrain has its own console tools (`startSkyPerfCapture()`,
+`setSkyQuality()`, `setBloom()`, `toggleCloudShadowDebug()`) — see
+[Sky Rendering](../sky-rendering.md).
+
+---
+
+## What's not here (yet)
+
+- **Caves, overhangs, arches** — the terrain is a heightmap by design; these need
+  a voxel engine.
+- **Water, sea level, oceans.**
+- **Object scatter** (trees, rocks placed by the generator).
+- **Direct-material painting** — painting a bare material (a pond bed, a worn
+  path) with no biome behind it. Biome painting has landed; this is the other
+  half, and the tools are already built to grow into it.
+- **Roads / linear features**, and **undo/redo history** for the brushes.
+- **More climate presets** (eras / time-travel worlds) — additive on top of the
+  preset system.
+
+---
+
+## Related docs
+
+- [Sky Rendering](../sky-rendering.md) and [Weather System](../weather.md) — the
+  atmosphere the terrain sits under.
+- [Lighting (Foxfire)](./foxfire-lighting.md) — how the world is lit and shadowed.
