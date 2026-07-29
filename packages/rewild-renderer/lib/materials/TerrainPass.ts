@@ -48,7 +48,7 @@ export class TerrainPass implements IMaterialPass {
 
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
-    const { device, presentationFormat } = renderer;
+    const { device, sceneColorFormat } = renderer;
     const module = device.createShaderModule({
       code: shader,
     });
@@ -100,7 +100,7 @@ export class TerrainPass implements IMaterialPass {
         module,
         targets: [
           {
-            format: presentationFormat,
+            format: sceneColorFormat,
           },
         ],
       },

@@ -30,6 +30,7 @@ import { BVHConfig, DEFAULT_BVH_CONFIG } from './acceleration/BVHConfig';
 import { BVHWorkerManager } from './acceleration/BVHWorkerManager';
 import { DirectionalShadowRenderer } from './renderers/shadow/DirectionalShadowRenderer';
 import { SpotLightShadowRenderer } from './renderers/shadow/SpotLightShadowRenderer';
+import { SceneOutputPass } from './post-processes/SceneOutputPass';
 
 const _projScreenMatrix = new Matrix4();
 const _frustum = new Frustum();
@@ -37,13 +38,28 @@ const _frustum = new Frustum();
 export class Renderer {
   device: GPUDevice;
   presentationFormat: GPUTextureFormat;
+
+  /**
+   * Colour format of the main scene pass. HDR, so shaded values above 1.0
+   * survive to the end of the frame rather than being clipped as they are
+   * written — physical light units and IBL both depend on that headroom.
+   *
+   * Only the scene pass renders at this format. The sky composite, overlay,
+   * GUI and precipitation passes all draw straight to the swapchain and stay
+   * at `presentationFormat`, so any material used in those passes must too.
+   */
+  sceneColorFormat: GPUTextureFormat = 'rgba16float';
+
   canvas: HTMLCanvasElement;
   sampleCount = 1;
 
   private context: GPUCanvasContext;
   disposed: boolean;
-  private renderTargetView: GPUTextureView | undefined;
-  private renderTarget: GPUTexture | undefined;
+  /** HDR colour target the scene pass renders into. */
+  private sceneColorTexture: GPUTexture | undefined;
+  private sceneColorView: GPUTextureView | undefined;
+  /** Transfers `sceneColorTexture` to the swapchain. */
+  private sceneOutputPass: SceneOutputPass;
   private initialized: boolean;
   private autoFrame: boolean;
 
@@ -132,6 +148,7 @@ export class Renderer {
     this.terrainRenderer = new TerrainRenderer();
     this.directionalShadowRenderer = new DirectionalShadowRenderer();
     this.spotLightShadowRenderer = new SpotLightShadowRenderer();
+    this.sceneOutputPass = new SceneOutputPass();
     this.renderGroups = [];
     this.overlayRenderGroups = [];
 
@@ -220,6 +237,9 @@ export class Renderer {
     await this.terrainRenderer.init(this);
     this.directionalShadowRenderer.init(this);
     this.spotLightShadowRenderer.init(this);
+    // Must be initialised before resizeRenderTargets(), which binds the scene
+    // colour target to it.
+    this.sceneOutputPass.init(this);
 
     this.guiManager.initialize(this);
 
@@ -297,9 +317,10 @@ export class Renderer {
     this.directionalShadowRenderer.dispose();
     this.spotLightShadowRenderer.dispose();
     this.scenePerfMonitor.dispose();
+    this.sceneOutputPass.dispose();
     this.disposed = true;
     this.initialized = false;
-    this.renderTarget?.destroy();
+    this.sceneColorTexture?.destroy();
     this.depthTexture?.destroy();
     this.device.destroy();
     this.renderGroups.length = 0; // Clear the render groups
@@ -336,30 +357,35 @@ export class Renderer {
   resizeRenderTargets() {
     const device = this.device;
     const canvas = this.canvas;
-    let renderTargetView = this.renderTargetView;
-    let renderTarget = this.renderTarget;
 
     // If the canvas size changing we need to reallocate the render target.
     // We also need to set the physical size of the canvas to match the computed size.
-    // if (!renderTargetView) {
     const currentWidth = canvas.width || 1;
     const currentHeight = canvas.height || 1;
 
-    if (renderTarget !== undefined) {
+    if (this.sceneColorTexture !== undefined) {
       // Destroy the previous render target
-      renderTarget.destroy();
+      this.sceneColorTexture.destroy();
     }
 
     this.camera.aspect = currentWidth / currentHeight;
     this.camera.updateProjectionMatrix();
 
-    // Resize the multisampled render target to match the new canvas size.
-    renderTarget = device.createTexture({
+    // HDR colour target for the scene pass, sized to the canvas. TEXTURE_BINDING
+    // is required so the output pass can read it back when transferring to the
+    // swapchain.
+    const sceneColorTexture = device.createTexture({
+      label: 'scene-color-hdr',
       size: [currentWidth, currentHeight],
       sampleCount: this.sampleCount,
-      format: this.presentationFormat,
-      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+      format: this.sceneColorFormat,
+      usage:
+        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     });
+
+    this.sceneColorTexture = sceneColorTexture;
+    this.sceneColorView = sceneColorTexture.createView();
+    this.sceneOutputPass.setSceneTexture(this, this.sceneColorView);
 
     if (this.depthTexture) this.depthTexture.destroy();
 
@@ -373,10 +399,6 @@ export class Renderer {
         GPUTextureUsage.RENDER_ATTACHMENT |
         GPUTextureUsage.TEXTURE_BINDING,
     });
-
-    renderTargetView = renderTarget.createView();
-    this.renderTarget = renderTarget;
-    this.renderTargetView = renderTargetView;
   }
 
   // TODO: Will come back later to flesh this out
@@ -635,9 +657,9 @@ export class Renderer {
 
     const device = this.device;
     const context = this.context;
-    let renderTargetView = this.renderTargetView;
+    const sceneColorView = this.sceneColorView;
 
-    if (renderTargetView) {
+    if (sceneColorView) {
       const encoder = device.createCommandEncoder({
         label: 'main pass encoder',
       });
@@ -664,12 +686,14 @@ export class Renderer {
         this
       );
 
+      // The scene pass renders to the HDR target rather than the swapchain, so
+      // shaded values above 1.0 are preserved instead of clipped on write.
+      // SceneOutputPass transfers the result below.
       const pass = encoder.beginRenderPass({
+        label: 'scene pass',
         colorAttachments: [
           {
-            // view: renderTargetView,
-            // resolveTarget: context.getCurrentTexture().createView(),
-            view: context.getCurrentTexture().createView(),
+            view: sceneColorView,
             clearValue: [0.0, 0.0, 0.0, 1.0],
             loadOp: 'clear',
             storeOp: 'store',
@@ -700,11 +724,20 @@ export class Renderer {
         label: 'post-processing encoder',
       });
 
+      // Transfer the HDR scene colour to the swapchain. This has to happen
+      // before the sky composite, which blends over whatever the swapchain
+      // already holds. Currently a 1:1 copy clamped by the unorm target — the
+      // same clipping the scene pass used to do itself — so the image is
+      // unchanged. Whole-frame tonemapping lands here later.
+      this.sceneOutputPass.render(
+        postProcessingEncoder,
+        context.getCurrentTexture().createView()
+      );
+
       const postProcessingPass = postProcessingEncoder.beginRenderPass({
+        label: 'sky composite pass',
         colorAttachments: [
           {
-            // view: renderTargetView,
-            // resolveTarget: context.getCurrentTexture().createView(),
             view: context.getCurrentTexture().createView(),
             loadOp: 'load',
             storeOp: 'store',
