@@ -37,7 +37,7 @@ export class LambertInstancedPass implements IMaterialPass {
 
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
-    const { device, presentationFormat } = renderer;
+    const { device, sceneColorFormat } = renderer;
     const module = device.createShaderModule({ code: shader });
 
     this.pipeline = device.createRenderPipeline({
@@ -66,7 +66,7 @@ export class LambertInstancedPass implements IMaterialPass {
         module,
         targets: [
           {
-            format: presentationFormat,
+            format: sceneColorFormat,
             blend: {
               color: {
                 srcFactor: 'src-alpha',
