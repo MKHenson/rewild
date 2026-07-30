@@ -1,24 +1,22 @@
-import { IPostProcess } from '../../../types/IPostProcess';
-import { Renderer } from '../../Renderer';
-import bloomShader from '../../shaders/sky/skyBloom.wgsl';
-import temporalShader from '../../shaders/sky/skyBloomTemporal.wgsl';
-import { PostProcessManager } from '../../post-processes/PostProcessManager';
-import { RenderQuality } from '../../utils/RenderQuality';
-import { composeShader } from '../../utils/shaderDefines';
-import { bloomScale, bloomShaderDefines } from './SkyQuality';
+import { IPostProcess } from '../../types/IPostProcess';
+import { Renderer } from '../Renderer';
+import bloomShader from '../shaders/frame-compositing/bloom.wgsl';
+import temporalShader from '../shaders/frame-compositing/bloom-temporal.wgsl';
+import { PostProcessManager } from './PostProcessManager';
+import { RenderQuality } from '../utils/RenderQuality';
+import { composeShader } from '../utils/shaderDefines';
+import { bloomScale, bloomShaderDefines } from './BloomQuality';
 
 const UNIFORM_FLOATS = 7; // resolution(2) + iTime + bloomAmount + bloomThreshold + horizontal + cloudsGated
 const ALIGNED_SIZE = Math.ceil((UNIFORM_FLOATS * 4) / 256) * 256;
 
-/** Mirrors CLOUD_START in shaders/sky/skyConstants.wgsl. Below this altitude the
- *  cloud raymarch depth-gates itself, leaving holes the bloom kernel must mask. */
-const CLOUD_START = 500.0;
 const TEMPORAL_ALIGNED_SIZE = Math.ceil((1 * 4) / 256) * 256; // blendFactor f32
 
 /**
  * Three-pass bloom: horizontal extraction → vertical blur → temporal stabilization.
  *
- * Pass 1 reads the bilateral HDR cloud texture, extracts pixels above
+ * Pass 1 reads the composited HDR frame — scene, sky, clouds and shafts —
+ * extracts pixels above
  * bloomThreshold (exposure-adjusted luminance with a soft knee), and applies
  * a horizontal Gaussian blur → extractTarget.
  *
@@ -29,14 +27,14 @@ const TEMPORAL_ALIGNED_SIZE = Math.ceil((1 * 4) / 256) * 256; // blendFactor f32
  * the threshold → renderTarget. renderTarget is then copied to historyTexture
  * for the next frame.
  */
-export class SkyBloomPass implements IPostProcess {
+export class BloomPass implements IPostProcess {
   /** Quality tier, read when init() builds the shader module. Assigned by
    *  SkyRenderer.init(); set `skyRenderer.quality` to change it. */
   quality: RenderQuality = 'high';
 
   renderTarget: GPUTexture; // temporally stabilised HDR bloom (consumed by composite)
   manager: PostProcessManager;
-  sourceTexture: GPUTexture | null; // set to bilateralPass.renderTarget before init()
+  sourceTexture: GPUTexture | null; // set to renderer.sceneColorTarget before init()
 
   /** Scales the HDR highlight added to clouds before tonemapping.
    *  Range 0–3; default 1.2. Higher = brighter glow. */
@@ -44,7 +42,7 @@ export class SkyBloomPass implements IPostProcess {
 
   /**
    * Threshold in exposure-adjusted luminance (EXPOSURE * raw_luminance, with
-   * EXPOSURE = 0.001 in skyBloom.wgsl), so this value times 1000 is the raw HDR
+   * EXPOSURE = 0.001 in bloom.wgsl), so this value times 1000 is the raw HDR
    * luminance at which a pixel starts to bloom.
    *
    * skyBlend caps the sky at 60 HDR, i.e. 0.06 here, so the gate has to sit
@@ -57,11 +55,6 @@ export class SkyBloomPass implements IPostProcess {
   /** History weight for temporal stabilization. Higher = smoother but slower
    *  to respond to new bright areas. Range 0–1; default 0.85. */
   temporalBlend: number = 0.7;
-
-  /** Camera world Y, set by SkyRenderer each frame. Below CLOUD_START the cloud
-   *  pass skips occluded pixels, so the extraction kernel must weight by coverage
-   *  instead of treating those holes as black sky. */
-  cameraAltitude: number = 0;
 
   private pipeline: GPURenderPipeline;
   private hBindGroup: GPUBindGroup;
@@ -90,7 +83,7 @@ export class SkyBloomPass implements IPostProcess {
 
     const src = this.sourceTexture;
     if (!src)
-      throw new Error('SkyBloomPass: sourceTexture must be set before init()');
+      throw new Error('BloomPass: sourceTexture must be set before init()');
 
     const scale = bloomScale(this.quality);
     this.bw = Math.max(1, Math.floor(canvas.width * scale));
@@ -98,13 +91,13 @@ export class SkyBloomPass implements IPostProcess {
     const { bw, bh } = this;
 
     // --- Gaussian bloom pipeline (passes 1 & 2) ---
-    // Only the blur module takes defines; skyBloomTemporal.wgsl has no kernel.
+    // Only the blur module takes defines; bloom-temporal.wgsl has no kernel.
     const bloomModule = device.createShaderModule({
       code: composeShader([bloomShader], bloomShaderDefines(this.quality)),
     });
 
     this.pipeline = device.createRenderPipeline({
-      label: 'sky bloom pipeline',
+      label: 'bloom pipeline',
       layout: 'auto',
       vertex: { entryPoint: 'vs', module: bloomModule },
       fragment: {
@@ -118,7 +111,7 @@ export class SkyBloomPass implements IPostProcess {
 
     this.extractTarget = device.createTexture({
       size: [bw, bh, 1],
-      label: 'sky bloom H-pass intermediate',
+      label: 'bloom H-pass intermediate',
       format: 'rgba16float',
       usage:
         GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
@@ -126,7 +119,7 @@ export class SkyBloomPass implements IPostProcess {
 
     this.vPassTarget = device.createTexture({
       size: [bw, bh, 1],
-      label: 'sky bloom V-pass intermediate',
+      label: 'bloom V-pass intermediate',
       format: 'rgba16float',
       usage:
         GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
@@ -139,15 +132,15 @@ export class SkyBloomPass implements IPostProcess {
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
 
-    this.hUniforms = makeUniforms('sky bloom H uniforms');
-    this.vUniforms = makeUniforms('sky bloom V uniforms');
+    this.hUniforms = makeUniforms('bloom H uniforms');
+    this.vUniforms = makeUniforms('bloom V uniforms');
 
     // Both passes share one pipeline, so both bind groups must supply the depth
     // texture even though only the H pass reads it (V gets coverage from alpha).
     const depthView = renderer.depthTexture.createView();
 
     this.hBindGroup = device.createBindGroup({
-      label: 'sky bloom H bind group',
+      label: 'bloom H bind group',
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: sampler },
@@ -158,7 +151,7 @@ export class SkyBloomPass implements IPostProcess {
     });
 
     this.vBindGroup = device.createBindGroup({
-      label: 'sky bloom V bind group',
+      label: 'bloom V bind group',
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: sampler },
@@ -172,7 +165,7 @@ export class SkyBloomPass implements IPostProcess {
     const temporalModule = device.createShaderModule({ code: temporalShader });
 
     this.temporalPipeline = device.createRenderPipeline({
-      label: 'sky bloom temporal pipeline',
+      label: 'bloom temporal pipeline',
       layout: 'auto',
       vertex: { entryPoint: 'vs', module: temporalModule },
       fragment: {
@@ -186,7 +179,7 @@ export class SkyBloomPass implements IPostProcess {
     // Needs COPY_SRC so we can copy it into historyTexture after each frame.
     this.renderTarget = device.createTexture({
       size: [bw, bh, 1],
-      label: 'sky bloom stabilized highlights',
+      label: 'bloom stabilized highlights',
       format: 'rgba16float',
       usage:
         GPUTextureUsage.RENDER_ATTACHMENT |
@@ -198,19 +191,19 @@ export class SkyBloomPass implements IPostProcess {
     // Needs COPY_DST so renderTarget can be copied into it each frame.
     this.historyTexture = device.createTexture({
       size: [bw, bh, 1],
-      label: 'sky bloom history',
+      label: 'bloom history',
       format: 'rgba16float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
 
     this.temporalUniforms = device.createBuffer({
-      label: 'sky bloom temporal uniforms',
+      label: 'bloom temporal uniforms',
       size: TEMPORAL_ALIGNED_SIZE,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
     this.temporalBindGroup = device.createBindGroup({
-      label: 'sky bloom temporal bind group',
+      label: 'bloom temporal bind group',
       layout: this.temporalPipeline.getBindGroupLayout(0),
       entries: [
         { binding: 0, resource: sampler },
@@ -245,13 +238,25 @@ export class SkyBloomPass implements IPostProcess {
     const { bw, bh } = this;
     const t = renderer.totalDeltaTime;
 
-    // Matches the gate in cloudsTemporal.wgsl: camHeight < EARTH_RADIUS +
-    // CLOUD_START reduces to cameraY < CLOUD_START.
-    const cloudsGated = this.cameraAltitude < CLOUD_START ? 1.0 : 0.0;
+    // Coverage weighting is off. It existed because bloom used to source the
+    // sky+cloud blend, where the depth-gated cloud march leaves vec4f(0) on
+    // terrain pixels — missing data a plain Gaussian would average in, producing
+    // an under-bloomed band along every ridge. The source is now the fully
+    // composited HDR frame, where those pixels hold real scene radiance, so
+    // every texel is valid and the kernel is a straight Gaussian.
+    const cloudsGated = 0.0;
 
     // Write all uniform buffers before opening the command encoder.
     const hData = new Float32Array(ALIGNED_SIZE / 4);
-    hData.set([bw, bh, t, this.bloomAmount, this.bloomThreshold, 1.0, cloudsGated]);
+    hData.set([
+      bw,
+      bh,
+      t,
+      this.bloomAmount,
+      this.bloomThreshold,
+      1.0,
+      cloudsGated,
+    ]);
     device.queue.writeBuffer(this.hUniforms, 0, hData.buffer);
 
     // V pass reads coverage from the H output's alpha — no depth lookup needed.

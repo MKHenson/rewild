@@ -35,7 +35,7 @@ const CLOUD_TRANSMITTANCE_FLOOR: f32 = 0.05;
 //
 //   skyBilateral   +/-4   (9x9 at cloud resolution; effective sigma is ~2)
 //   skyBlend       +/-1   (bilinear footprint of the 0.7x -> 1.0x upsample)
-//   skyBloom       +/-21  (15 texels at BLOOM_SCALE 0.5) -- exceeds this margin, so
+//   bloom          +/-21  (15 texels at BLOOM_SCALE 0.5) -- exceeds this margin, so
 //                         it carries its own coverage weighting and must keep it
 //   cloudsTemporal unbounded (reprojection drifts with camera rotation) -- likewise
 //                         validity-checked in sampleHistoryValid()

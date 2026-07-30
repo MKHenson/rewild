@@ -30,7 +30,8 @@ import { BVHConfig, DEFAULT_BVH_CONFIG } from './acceleration/BVHConfig';
 import { BVHWorkerManager } from './acceleration/BVHWorkerManager';
 import { DirectionalShadowRenderer } from './renderers/shadow/DirectionalShadowRenderer';
 import { SpotLightShadowRenderer } from './renderers/shadow/SpotLightShadowRenderer';
-import { SceneOutputPass } from './post-processes/SceneOutputPass';
+import { FrameCompositor } from './post-processes/FrameCompositor';
+import { QualitySettings } from './utils/QualitySettings';
 
 const _projScreenMatrix = new Matrix4();
 const _frustum = new Frustum();
@@ -50,6 +51,13 @@ export class Renderer {
    */
   sceneColorFormat: GPUTextureFormat = 'rgba16float';
 
+  /**
+   * App-wide render quality. Every subsystem that scales with quality — sky,
+   * clouds, bloom, and materials in future — reads its tier from here. Set
+   * `renderer.quality.level` and each one rebuilds on its next frame.
+   */
+  quality: QualitySettings = new QualitySettings();
+
   canvas: HTMLCanvasElement;
   sampleCount = 1;
 
@@ -58,8 +66,8 @@ export class Renderer {
   /** HDR colour target the scene pass renders into. */
   private sceneColorTexture: GPUTexture | undefined;
   private sceneColorView: GPUTextureView | undefined;
-  /** Transfers `sceneColorTexture` to the swapchain. */
-  private sceneOutputPass: SceneOutputPass;
+  /** Bloom + whole-frame tone curve; turns the HDR frame into the displayed image. */
+  frameCompositor: FrameCompositor;
   private initialized: boolean;
   private autoFrame: boolean;
 
@@ -137,6 +145,15 @@ export class Renderer {
     return this.directionalShadowRenderer?.shadowDepthTexture ?? null;
   }
 
+  /**
+   * The HDR target the scene, sky, fog and god rays are all composited into.
+   * Read by the bloom pass and by the whole-frame tonemap. Recreated on resize,
+   * so anything binding it must rebind then.
+   */
+  get sceneColorTarget(): GPUTexture {
+    return this.sceneColorTexture!;
+  }
+
   constructor() {
     this.autoFrame = true;
     this.onFrameHandler = this.onFrame.bind(this);
@@ -148,7 +165,7 @@ export class Renderer {
     this.terrainRenderer = new TerrainRenderer();
     this.directionalShadowRenderer = new DirectionalShadowRenderer();
     this.spotLightShadowRenderer = new SpotLightShadowRenderer();
-    this.sceneOutputPass = new SceneOutputPass();
+    this.frameCompositor = new FrameCompositor();
     this.renderGroups = [];
     this.overlayRenderGroups = [];
 
@@ -237,9 +254,7 @@ export class Renderer {
     await this.terrainRenderer.init(this);
     this.directionalShadowRenderer.init(this);
     this.spotLightShadowRenderer.init(this);
-    // Must be initialised before resizeRenderTargets(), which binds the scene
-    // colour target to it.
-    this.sceneOutputPass.init(this);
+    this.frameCompositor.initToneMap(this);
 
     this.guiManager.initialize(this);
 
@@ -317,7 +332,7 @@ export class Renderer {
     this.directionalShadowRenderer.dispose();
     this.spotLightShadowRenderer.dispose();
     this.scenePerfMonitor.dispose();
-    this.sceneOutputPass.dispose();
+    this.frameCompositor.dispose();
     this.disposed = true;
     this.initialized = false;
     this.sceneColorTexture?.destroy();
@@ -385,7 +400,6 @@ export class Renderer {
 
     this.sceneColorTexture = sceneColorTexture;
     this.sceneColorView = sceneColorTexture.createView();
-    this.sceneOutputPass.setSceneTexture(this, this.sceneColorView);
 
     if (this.depthTexture) this.depthTexture.destroy();
 
@@ -399,6 +413,11 @@ export class Renderer {
         GPUTextureUsage.RENDER_ATTACHMENT |
         GPUTextureUsage.TEXTURE_BINDING,
     });
+
+    // Bloom derives its target sizes from the canvas and reads the scene target,
+    // so it is rebuilt here rather than once at startup. The tone map pipeline is
+    // resolution-independent and rebinds itself when it sees a new texture.
+    this.frameCompositor.init(this);
   }
 
   // TODO: Will come back later to flesh this out
@@ -688,7 +707,7 @@ export class Renderer {
 
       // The scene pass renders to the HDR target rather than the swapchain, so
       // shaded values above 1.0 are preserved instead of clipped on write.
-      // SceneOutputPass transfers the result below.
+      // The frame compositor tonemaps it to the swapchain at the end of the frame.
       const pass = encoder.beginRenderPass({
         label: 'scene pass',
         colorAttachments: [
@@ -724,21 +743,16 @@ export class Renderer {
         label: 'post-processing encoder',
       });
 
-      // Transfer the HDR scene colour to the swapchain. This has to happen
-      // before the sky composite, which blends over whatever the swapchain
-      // already holds. Currently a 1:1 copy clamped by the unorm target — the
-      // same clipping the scene pass used to do itself — so the image is
-      // unchanged. Whole-frame tonemapping lands here later.
-      this.sceneOutputPass.render(
-        postProcessingEncoder,
-        context.getCurrentTexture().createView()
-      );
-
+      // The atmosphere composite blends sky, clouds, fog and god rays over the
+      // scene *in HDR*, loading what the scene pass already wrote. Both sides of
+      // its src-alpha blend are now radiance on the same scale, so the result is
+      // a single unified HDR frame rather than tonemapped sky over untonemapped
+      // terrain.
       const postProcessingPass = postProcessingEncoder.beginRenderPass({
-        label: 'sky composite pass',
+        label: 'atmosphere composite pass',
         colorAttachments: [
           {
-            view: context.getCurrentTexture().createView(),
+            view: sceneColorView,
             loadOp: 'load',
             storeOp: 'store',
           },
@@ -756,7 +770,15 @@ export class Renderer {
 
       device.queue.submit([postProcessingEncoder.finish()]);
 
-      // Render precipitation directly onto the canvas after the sky compositor so
+      // Bloom + whole-frame tonemap. Runs after the composite has been submitted
+      // because bloom reads the target that pass writes. This is the only place
+      // HDR radiance becomes displayable colour.
+      this.frameCompositor.render(
+        this,
+        context.getCurrentTexture().createView()
+      );
+
+      // Render precipitation directly onto the canvas after the tonemap so
       // particles are visible against both terrain and sky (not gated through fog alpha).
       this.sky.postRender(this);
 

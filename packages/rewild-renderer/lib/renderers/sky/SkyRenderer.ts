@@ -3,7 +3,6 @@ import { Transform } from '../../core/Transform';
 import { Camera } from '../../core/Camera';
 import { Color, degToRad, Matrix4, smoothstep, Vector2 } from 'rewild-common';
 import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
-import { RenderQuality } from '../../utils/RenderQuality';
 import {
   bilateralSigmas,
   cloudResolutionScale,
@@ -12,7 +11,6 @@ import {
 } from './SkyQuality';
 import { TemporalCloudRenderer } from './TemporalCloudRenderer';
 import { SkyBilateralPass } from './SkyBilateralPass';
-import { SkyBloomPass } from './SkyBloomPass';
 import { SkyCompositePass } from './SkyCompositePass';
 import { SkyGradientRenderer } from './SkyGradientRenderer';
 import { DirectionLight } from '../../core/lights/DirectionLight';
@@ -54,7 +52,6 @@ export class SkyRenderer {
   cloudsPass: TemporalCloudRenderer;
   atmospherePass: SkyGradientRenderer;
   bilateralPass: SkyBilateralPass;
-  bloomPass: SkyBloomPass;
   finalPass: SkyCompositePass;
   godRaysPass: GodRaysPostProcess;
   rainPass: RainParticlePass;
@@ -95,8 +92,8 @@ export class SkyRenderer {
   cirrusCoverage: number = 0.2;
   cirrusOpacity: number = 0.2;
 
-  /** Backing field for `quality` — see the setter. */
-  private _quality: RenderQuality = 'high';
+  /** Quality revision this chain was last built against; -1 until first build. */
+  private builtQualityRevision: number = -1;
 
   windDirection: Vector2 = new Vector2(1, 0);
   precipitation: number = 0.0;
@@ -139,7 +136,6 @@ export class SkyRenderer {
     this.cloudsPass = new TemporalCloudRenderer();
     this.atmospherePass = new SkyGradientRenderer();
     this.bilateralPass = new SkyBilateralPass();
-    this.bloomPass = new SkyBloomPass();
     this.godRaysPass = new GodRaysPostProcess();
     this.rainPass = new RainParticlePass();
     this.lightning = new LightningController();
@@ -154,24 +150,15 @@ export class SkyRenderer {
     this.perfMonitor = new PerformanceMonitor();
   }
 
-  /** Quality tier for the sky. Passes map it onto their own knobs. */
-  get quality(): RenderQuality {
-    return this._quality;
-  }
-
-  /**
-   * Tiers are baked into WGSL as compile-time constants, so a change needs a
-   * shader rebuild rather than a uniform write. The flag is picked up in
-   * render(), which re-initialises the whole sky chain — see the note there.
-   */
-  set quality(value: RenderQuality) {
-    if (value === this._quality) return;
-    this._quality = value;
-    this.requiresRebuild = true;
-  }
-
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
+
+    // The tier comes from the app-wide setting rather than a copy held here.
+    // Tiers are baked into WGSL as compile-time constants, so a change needs a
+    // shader rebuild rather than a uniform write — render() compares the
+    // revision and re-enters init when it moves.
+    const quality = renderer.quality.level;
+    this.builtQualityRevision = renderer.quality.revision;
 
     // Push the tier into each pass before any of them builds a module. The
     // passes hold it as a plain field rather than reacting to it themselves:
@@ -181,24 +168,23 @@ export class SkyRenderer {
     //
     // God rays are the exception — that shader reads its sample count from a
     // uniform, so the tier is just a number and costs no recompile.
-    this.cloudsPass.quality = this._quality;
-    this.cloudShadowRenderer.quality = this._quality;
-    this.bilateralPass.quality = this._quality;
-    this.bloomPass.quality = this._quality;
-    this.godRaysPass.config.numSamples = godRaySamples(this._quality);
+    this.cloudsPass.quality = quality;
+    this.cloudShadowRenderer.quality = quality;
+    this.bilateralPass.quality = quality;
+    this.godRaysPass.config.numSamples = godRaySamples(quality);
 
     // Render-target scales. These need no shader rebuild of their own, but they
     // resize textures, so they belong on this same whole-chain path. The
     // bilateral is absent on purpose: it sizes itself from the cloud target and
     // so follows cloudResolutionScale for free.
-    this.cloudsPass.resolutionScale = cloudResolutionScale(this._quality);
-    this.godRaysPass.resolutionScale = godRayScale(this._quality);
+    this.cloudsPass.resolutionScale = cloudResolutionScale(quality);
+    this.godRaysPass.resolutionScale = godRayScale(quality);
 
     // Bilateral sigmas are uniforms rather than defines, so they are assigned
     // here alongside the scales. They go *up* as quality goes down — this pass
     // is what hides the cloud target's resolution, so a cheaper tier needs more
     // smoothing, not less.
-    const sigmas = bilateralSigmas(this._quality);
+    const sigmas = bilateralSigmas(quality);
     this.bilateralPass.sigmaSpatial = sigmas.spatial;
     this.bilateralPass.sigmaFar = sigmas.far;
     this.bilateralPass.sigmaRange = sigmas.range;
@@ -260,17 +246,12 @@ export class SkyRenderer {
     this.rainPass.init(renderer);
     this.lightningBoltPass.init(renderer);
 
-    // Blend sub-pass creates intermediateTarget (sky HDR + clouds HDR, no tonemap).
-    // Bloom then sources from the full composite so stars and atmospheric glow contribute.
+    // Blend sub-pass creates intermediateTarget (sky HDR + clouds HDR, no tonemap),
+    // which the composite then blends over the HDR scene target.
     this.finalPass.atmosphereTexture = this.atmospherePass.renderTarget;
     this.finalPass.cloudsTexture = this.bilateralPass.renderTarget;
     this.finalPass.godRaysTexture = this.godRaysPass.renderTarget;
     this.finalPass.initBlend(renderer);
-
-    this.bloomPass.sourceTexture = this.finalPass.intermediateTarget;
-    this.bloomPass.init(renderer);
-
-    this.finalPass.bloomTexture = this.bloomPass.renderTarget;
     this.finalPass.initFinal(renderer);
 
     this.perfMonitor.init(device, [
@@ -279,7 +260,6 @@ export class SkyRenderer {
       'sky-atmosphere',
       'sky-god-rays',
       'sky-bilateral',
-      'sky-bloom',
     ]);
   }
 
@@ -440,7 +420,11 @@ export class SkyRenderer {
     //
     // requiresRebuild is tested first so the short-circuit covers the case where
     // canvasSizeWatcher has not been created yet.
-    if (this.requiresRebuild || this.canvasSizeWatcher.hasResized()) {
+    if (
+      this.requiresRebuild ||
+      this.canvasSizeWatcher.hasResized() ||
+      renderer.quality.hasChangedSince(this.builtQualityRevision)
+    ) {
       this.init(renderer);
     }
 
@@ -516,8 +500,8 @@ export class SkyRenderer {
       this.perfMonitor.getTimestampWrites('sky-bilateral')
     );
 
-    // Blend sub-pass: sky HDR + bilateral HDR → intermediateTarget (no tonemap).
-    // Must run before bloom so the full scene feeds the bloom threshold pass.
+    // Blend sub-pass: sky HDR + bilateral HDR → intermediateTarget (no tonemap),
+    // which the atmosphere composite then blends over the HDR scene target.
     this.finalPass.cameraAltitude = camera.transform.position.y;
     this.finalPass.renderBlend(renderer);
 
@@ -563,11 +547,6 @@ export class SkyRenderer {
     this.finalPass.azimuth = this.azimuth;
     this.finalPass.elevation = this.elevation;
     this.finalPass.cloudiness = this.cloudiness;
-    this.bloomPass.cameraAltitude = camera.transform.position.y;
-    this.bloomPass.render(
-      renderer,
-      this.perfMonitor.getTimestampWrites('sky-bloom')
-    );
     this.finalPass.render(renderer, pass, camera);
 
     this.perfMonitor.resolveAndLog();
@@ -620,7 +599,6 @@ export class SkyRenderer {
     this.starfieldRenderer.dispose();
     this.cloudShadowRenderer.dispose();
     this.bilateralPass.dispose();
-    this.bloomPass.dispose();
     this.godRaysPass.dispose();
     this.rainPass.dispose();
     this.lightningBoltPass.dispose();

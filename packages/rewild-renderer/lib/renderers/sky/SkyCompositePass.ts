@@ -47,7 +47,6 @@ export class SkyCompositePass implements IPostProcess {
   atmosphereTexture: GPUTexture | null;
   cloudsTexture: GPUTexture | null;
   godRaysTexture: GPUTexture | null;
-  bloomTexture: GPUTexture | null;
 
   cloudiness: number;
   elevation: number;
@@ -66,7 +65,6 @@ export class SkyCompositePass implements IPostProcess {
     this.atmosphereTexture = null;
     this.cloudsTexture = null;
     this.godRaysTexture = null;
-    this.bloomTexture = null;
   }
 
   /**
@@ -121,12 +119,13 @@ export class SkyCompositePass implements IPostProcess {
   }
 
   /**
-   * Phase 2: creates the final tonemap pipeline that reads intermediateTarget +
-   * bloom and outputs to the swapchain. Call this after the bloom pass is
-   * initialised so that bloomTexture is available.
+   * Phase 2: creates the atmosphere composite pipeline. Reads intermediateTarget
+   * and blends sky, clouds, fog and god rays over the HDR scene target with
+   * src-alpha coverage. Outputs HDR — the whole-frame tonemap happens later, in
+   * the frame compositor's tonemap pass.
    */
   initFinal(renderer: Renderer): IPostProcess {
-    const { device, presentationFormat } = renderer;
+    const { device, sceneColorFormat } = renderer;
 
     const module = device.createShaderModule({
       code: constantsFn + commonShaderFns + shader,
@@ -148,7 +147,8 @@ export class SkyCompositePass implements IPostProcess {
         module: module,
         targets: [
           {
-            format: presentationFormat,
+            // Composites into the HDR scene target, not the swapchain.
+            format: sceneColorFormat,
             blend: {
               color: {
                 srcFactor: 'src-alpha',
@@ -179,14 +179,13 @@ export class SkyCompositePass implements IPostProcess {
         { binding: 2, resource: renderer.samplerManager.get('linear-clamped') },
         { binding: 3, resource: renderer.depthTexture.createView() },
         { binding: 4, resource: this.godRaysTexture!.createView() },
-        { binding: 5, resource: this.bloomTexture!.createView() },
       ],
     });
 
     return this;
   }
 
-  /** Legacy single-call init: calls initBlend then initFinal (requires bloomTexture set). */
+  /** Legacy single-call init: calls initBlend then initFinal. */
   init(renderer: Renderer): IPostProcess {
     this.initBlend(renderer);
     return this.initFinal(renderer);

@@ -1,6 +1,7 @@
 import { IProject } from 'models';
 import { Renderer } from 'rewild-renderer';
 import { registerChunkSnapshotDevCommands } from './ChunkSnapshotDevCommands';
+import { registerRenderQualityCommands } from './RenderQualityCommands';
 import { registerShadowDebugCommands } from './ShadowDebugCommands';
 import { registerSkyDebugCommands } from './SkyDebugCommands';
 import { registerTerrainPerfCommands } from './TerrainPerfCommands';
@@ -10,6 +11,7 @@ import { registerTerrainPerfCommands } from './TerrainPerfCommands';
 // close over the given renderer/project, so re-registering on a later load
 // simply repoints them.
 export function registerDebugCommands(renderer: Renderer, project: IProject) {
+  registerRenderQualityCommands(renderer);
   registerSkyDebugCommands(renderer);
   registerShadowDebugCommands(renderer);
   registerTerrainPerfCommands(renderer);

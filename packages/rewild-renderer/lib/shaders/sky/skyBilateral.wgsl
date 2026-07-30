@@ -37,7 +37,7 @@ struct SkyBilateralUniforms {
 // A source texel holds real cloud data unless the cloud pass skipped it, which it
 // does on terrain-occluded pixels when the camera is below the cloud layer (see the
 // depth gate in cloudsTemporal.wgsl). Those texels are vec4f(0) — missing data, not
-// black cloud. Identical to the coverage test in skyBloom.wgsl.
+// black cloud. Identical to the coverage test in bloom.wgsl.
 fn cloudCoverage(uv: vec2f) -> f32 {
     if (uniforms.cloudsGated < 0.5) {
         return 1.0;
