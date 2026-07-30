@@ -1,7 +1,7 @@
 import { Renderer } from '..';
 import { ImageLoader } from './ImageLoader';
 import { ITexture } from './ITexture';
-import { getNumMipmaps, TextureProperties } from './Texture';
+import { getNumMipmaps, rgba8FormatFor, TextureProperties } from './Texture';
 
 /**
  * A stack of same-sized images in one `texture_2d_array`, so a shader can pick
@@ -54,7 +54,7 @@ export class TextureArray implements ITexture {
         height: maxHeight,
         depthOrArrayLayers: images.length,
       },
-      format: 'rgba8unorm',
+      format: rgba8FormatFor(this.properties.colorSpace),
       dimension: '2d',
       mipLevelCount: this.properties.generateMipmaps
         ? getNumMipmaps(maxWidth, maxHeight)

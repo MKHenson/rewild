@@ -1,7 +1,7 @@
 import { Renderer } from '..';
 import { ImageLoader } from './ImageLoader';
 import { ITexture } from './ITexture';
-import { TextureProperties } from './Texture';
+import { rgba8FormatFor, TextureProperties } from './Texture';
 
 export class BitmapCubeTexture implements ITexture {
   src: string[];
@@ -23,7 +23,7 @@ export class BitmapCubeTexture implements ITexture {
         height: loader.maxHeight,
         depthOrArrayLayers: this.src.length,
       },
-      format: 'rgba8unorm',
+      format: rgba8FormatFor(this.properties.colorSpace),
       dimension: '2d',
       mipLevelCount: 1, // TODO: Not sure what to do here yet
       usage:

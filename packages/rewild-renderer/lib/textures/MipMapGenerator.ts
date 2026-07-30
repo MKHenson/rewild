@@ -18,6 +18,14 @@ export class MipMapGenerator {
    * layer: WebGPU defaults a layered texture's view to `2d-array`, which will
    * not bind to the `texture_2d<f32>` this generator's shader declares. That
    * default is why layered textures previously shipped without mips.
+   *
+   * Averaging happens in linear space for free, and only because the source
+   * and destination views share the texture's own format: for an `-srgb`
+   * texture the sampler decodes before the hardware blends the four texels,
+   * and the colour attachment re-encodes on write. Nothing here needs to know
+   * which space it is in — but a caller that reformatted either view (via
+   * `viewFormats`) to strip the `-srgb` suffix would silently be back to
+   * averaging the encoding.
    */
   generateMips(device: GPUDevice, texture: GPUTexture, baseArrayLayer = 0) {
     const pipelines = this.pipelineByFormat;

@@ -35,14 +35,24 @@ export class TextureManager {
 
     template.textures.forEach((textureTemplate) => {
       let texture: ITexture;
+      const { colorSpace } = textureTemplate;
+
+      // Deliberately not defaulted: see IMaterialsTemplate. A texture decoded
+      // in the wrong space still renders, just wrongly, so the omission has to
+      // be loud.
+      if (colorSpace !== 'srgb' && colorSpace !== 'linear')
+        throw new Error(
+          `Texture template ${textureTemplate.name} needs a colorSpace of 'srgb' or 'linear'`
+        );
+
       if (textureTemplate.type === 'cubemap' && textureTemplate.urls) {
         texture = new BitmapCubeTexture(
-          new TextureProperties(textureTemplate.name),
+          new TextureProperties(textureTemplate.name, true, colorSpace),
           textureTemplate.urls.map((url) => MEDIA_URL + url)
         );
       } else if (textureTemplate.url) {
         texture = new BitmapTexture(
-          new TextureProperties(textureTemplate.name),
+          new TextureProperties(textureTemplate.name, true, colorSpace),
           MEDIA_URL + textureTemplate.url
         );
       } else {

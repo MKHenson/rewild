@@ -41,20 +41,23 @@ export async function initTerrainTextureArrays(
 
   const order = getTerrainMaterialOrder();
 
+  // Albedo is the only one of the four that is sRGB-encoded colour; normal,
+  // roughness and height are data maps whose bytes are already the value the
+  // shader wants.
   const albedo = new TextureArray(
-    new TextureProperties(TERRAIN_ALBEDO_ARRAY),
+    new TextureProperties(TERRAIN_ALBEDO_ARRAY, true, 'srgb'),
     order.map((name) => resolveAssetUrl(TERRAIN_MATERIALS[name].albedoUrl))
   );
   const normal = new TextureArray(
-    new TextureProperties(TERRAIN_NORMAL_ARRAY),
+    new TextureProperties(TERRAIN_NORMAL_ARRAY, true, 'linear'),
     order.map((name) => resolveAssetUrl(TERRAIN_MATERIALS[name].normalUrl))
   );
   const roughness = new TextureArray(
-    new TextureProperties(TERRAIN_ROUGHNESS_ARRAY),
+    new TextureProperties(TERRAIN_ROUGHNESS_ARRAY, true, 'linear'),
     order.map((name) => resolveAssetUrl(TERRAIN_MATERIALS[name].roughnessUrl))
   );
   const height = new TextureArray(
-    new TextureProperties(TERRAIN_HEIGHT_ARRAY),
+    new TextureProperties(TERRAIN_HEIGHT_ARRAY, true, 'linear'),
     order.map((name) => resolveAssetUrl(TERRAIN_MATERIALS[name].heightUrl))
   );
 

@@ -1,7 +1,7 @@
 import { Renderer } from '..';
 import { ITexture } from './ITexture';
 import { MipMapGenerator } from './MipMapGenerator';
-import { TextureProperties, getNumMipmaps } from './Texture';
+import { TextureProperties, getNumMipmaps, rgba8FormatFor } from './Texture';
 
 export class DataTexture implements ITexture {
   data: Uint8Array | Uint8ClampedArray;
@@ -31,7 +31,7 @@ export class DataTexture implements ITexture {
     const { device } = renderer;
     this.gpuTexture = device.createTexture({
       size: [this.width, this.height],
-      format: 'rgba8unorm',
+      format: rgba8FormatFor(this.properties.colorSpace),
       dimension: '2d',
       usage:
         GPUTextureUsage.TEXTURE_BINDING |
