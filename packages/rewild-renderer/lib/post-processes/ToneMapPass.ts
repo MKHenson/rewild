@@ -1,7 +1,7 @@
 import { Renderer } from '..';
 import toneMapShader from '../shaders/frame-compositing/tonemap.wgsl';
 
-const UNIFORM_BYTES = 16; // lightningFlash + 3 floats of padding
+const UNIFORM_BYTES = 16; // lightningFlash + exposure + 2 floats of padding
 const uniformData = new Float32Array(4);
 
 /**
@@ -102,6 +102,10 @@ export class ToneMapPass {
     if (!this.bindGroup) return;
 
     uniformData[0] = renderer.sky?.skyRenderer?.lightningFlash ?? 0;
+    // Read every frame rather than on change: it is one float in a buffer that
+    // is already written each frame, so tracking dirtiness would cost more than
+    // it saves and would be one more thing to get wrong.
+    uniformData[1] = renderer.camera.camera.exposure;
     renderer.device.queue.writeBuffer(
       this.uniformBuffer,
       0,

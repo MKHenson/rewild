@@ -80,10 +80,14 @@ fn sampleCloudsValid(uv: vec2f) -> vec4f {
     let clouds = sampleCloudsValid(uv);
 
     // Cap sky at 60 HDR to prevent thin clouds from appearing opaque-white when in front of
-    // the bright sun. With HDR_SCALE=0.045: cap at 60 → ACES(2.7) ≈ 0.957 (bright but not
-    // peak white). A thin cloud (alpha=0.2) in front: 60*0.8 + cloud*0.2 ≈ 58 → ACES(2.61)
-    // ≈ 0.954 (shows some cloud instead of pure white). Sun disk (no cloud) still appears
-    // bright and visible even when capped.
+    // the bright sun: capped sky and thin-cloud-over-sky then land on different display
+    // values instead of both clipping to white.
+    //
+    // The cap was tuned when exposure was 0.045, where it bought a visible margin —
+    // ACES(60*0.045) ≈ 0.945 against ACES(58*0.045) ≈ 0.941. At the current 0.06 default
+    // (Camera.exposure) the same pair is 0.967 vs 0.965, well under one 8-bit level, so
+    // the cap is doing far less than it was designed to. Worth revisiting if thin cloud
+    // in front of the sun starts reading as solid white again.
     let skyCapped = min(sky.rgb, vec3f(60.0));
     let blended = skyCapped * (1.0 - clouds.a) + clouds.rgb * clouds.a;
 

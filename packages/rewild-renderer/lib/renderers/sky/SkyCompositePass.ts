@@ -10,16 +10,18 @@ import { Camera } from '../../core/Camera';
 import { degToRad, Matrix4, Vector3 } from 'rewild-common';
 
 const finalUniformBufferSize =
-  64 + // invProjectionMatrix
+  64 + // invViewProjectionMatrix
+  64 + // invViewMatrix
   8 + // resolutionXY
   4 + // iTime
   4 + // cloudiness
-  16 + // sunPosition
-  16 + // cameraPosition
-  4 + // padding
+  16 + // sunPosition (vec3f, padded to its 16-byte alignment)
+  16 + // cameraPosition (vec3f, padded)
+  4 + // padding0
   4 + // foginess
   4 + // temperature
   4 + // lightningFlash
+  4 + // exposure
   0;
 
 const alignedUniformBufferSize = Math.ceil(finalUniformBufferSize / 256) * 256;
@@ -228,6 +230,9 @@ export class SkyCompositePass implements IPostProcess {
         renderer.sky.skyRenderer.foginess,
         renderer.sky.skyRenderer.temperature,
         renderer.sky.skyRenderer.lightningFlash,
+        // The rayCoverage heuristic predicts how bright a shaft will read after
+        // the tonemap, so it has to use the exposure that tonemap will apply.
+        camera.exposure,
       ],
       32
     );

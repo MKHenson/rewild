@@ -1,8 +1,11 @@
 import { Renderer, RENDER_QUALITIES, RenderQuality } from 'rewild-renderer';
 
+// Whole-frame image controls: the render quality tier, exposure and bloom. All
+// three cut across the sky/scene split, which is why they live here rather than
+// alongside the sky commands.
+//
 // App-wide render quality tier. Sky, clouds, god rays and bloom all follow it,
-// and future consumers (materials) will too — which is why this lives on its own
-// rather than alongside the sky commands.
+// and future consumers (materials) will too.
 //
 // The tiers are WGSL compile-time constants (loop bounds and kernel radii, which
 // cannot come from a uniform), so setting this schedules a shader rebuild rather
@@ -35,6 +38,31 @@ export function registerRenderQualityCommands(renderer: Renderer) {
     console.log(
       `Render quality → ${quality}; affected shaders rebuild on the next frame.`
     );
+  };
+
+  // Whole-frame exposure — the linear scale applied to HDR radiance just before
+  // the ACES curve. Deliberately not EV stops: the atmosphere's radiance scale
+  // was hand-tuned in absolute terms against this multiplier, so the number that
+  // is useful to type here is the multiplier itself.
+  //
+  // Turning this is the quickest check that HDR values are surviving the
+  // pipeline: if raising it brightens the sky but leaves geometry black, the
+  // scene pass is clipping rather than the tonemap.
+  (window as any).setExposure = (exposure?: number) => {
+    const camera = renderer.camera.camera;
+
+    if (exposure === undefined) {
+      console.log(`Exposure: ${camera.exposure} — call setExposure(scale)`);
+      return;
+    }
+
+    if (!Number.isFinite(exposure) || exposure <= 0) {
+      console.warn(`Exposure must be a number > 0, got ${exposure}`);
+      return;
+    }
+
+    camera.exposure = exposure;
+    console.log(`Exposure → ${camera.exposure}`);
   };
 
   // Bloom tuning. Both of these are uniforms, so unlike setRenderQuality they
