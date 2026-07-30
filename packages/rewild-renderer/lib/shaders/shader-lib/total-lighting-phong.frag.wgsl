@@ -44,7 +44,7 @@
           let H = normalize(L + viewDir);
           specular = specNorm * pow(max(dot(normalizedNormal, H), 0.0), shadingShininess);
         }
-        attenuation = max(0.0, 1.0 - dist / light.range);
+        attenuation = lightDistanceAttenuation(dist, light.range);
       } else {
         attenuation = 0.0;
       }
@@ -69,16 +69,23 @@
           let H = normalize(L + viewDir);
           specular = specNorm * pow(max(dot(normalizedNormal, H), 0.0), shadingShininess);
         }
-        // Plateau falloff: full strength through the first 40% of range, then a
-        // smooth fade to zero. The linear 1 - d/range it replaces made beam
-        // brightness track the hit distance directly — a camera-mounted
-        // flashlight brightened and dimmed dramatically with wherever the beam
-        // happened to land (near up-slope vs far down-valley) as the player
-        // turned. A flashlight's throw should read consistent at typical
-        // distances and only die gracefully at its limit. Spot-only: point
-        // lights keep their linear falloff below.
-        let distAttenuation =
-          1.0 - smoothstep(light.range * 0.4, light.range, dist);
+        // Inverse-square, the same curve the point light above uses.
+        //
+        // This replaces a plateau — full strength through the first 40% of
+        // range, then a smooth fade — that existed because a camera-mounted
+        // flashlight brightened and dimmed dramatically as the beam swung
+        // between a near up-slope and a far down-valley. Worth being clear that
+        // inverse-square makes that swing *larger*, not smaller: across a 3m to
+        // 10m throw on a 15m light it is about 17x, where the plateau held it
+        // under 2x.
+        //
+        // The swing is kept anyway because it is what light actually does, and
+        // because the pipeline now has somewhere better to absorb it — a single
+        // whole-frame ACES curve with a camera exposure (#189/#192), which
+        // compresses a hot near-field instead of flattening the falloff that
+        // produced it. If a specific light still reads badly, the fix belongs
+        // in that light's range and intensity, not in the shading model.
+        let distAttenuation = lightDistanceAttenuation(dist, light.range);
         let angle = acos(clamp(dot(-L, light.direction), 0.0, 1.0));
         let coneAttenuation = 1.0 - smoothstep(light.innerAngle, light.outerAngle, angle);
         attenuation = distAttenuation * coneAttenuation;
