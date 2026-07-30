@@ -101,8 +101,13 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
     label: 'Target',
     valueType: 'vec3',
   },
+  // Falloff is inverse-square, so for a point or spot light this number is the
+  // brightness delivered one unit away rather than a flat 0-to-max dial. The
+  // label says so because the useful values are now range-dependent and much
+  // larger than the ones it replaced — a radius-10 light that read well at 3.1
+  // reads the same at ~44.
   intensity: {
-    label: 'Intensity',
+    label: 'Intensity (at 1m)',
     valueType: 'float',
   },
   radius: {
