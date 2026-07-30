@@ -16,7 +16,7 @@ struct BlendUniformStruct {
 
 // A cloud texel holds real data unless the cloud pass skipped it. It depth-gates
 // terrain-occluded pixels when the camera is below the cloud layer, leaving vec4f(0)
-// behind — missing data, not transparent sky. Same test as skyBloom.wgsl and
+// behind — missing data, not transparent sky. Same test as bloom.wgsl and
 // skyBilateral.wgsl.
 fn cloudTexelValid(texel: vec2i, cloudDims: vec2f) -> f32 {
     if (object.cloudsGated < 0.5) {

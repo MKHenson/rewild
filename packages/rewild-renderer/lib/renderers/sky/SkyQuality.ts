@@ -82,18 +82,6 @@ interface SkyQualityTier {
   bilateralEdgeRelax: number;
 
   /**
-   * Bloom render-target scale. The safest thing in the chain to downscale — the
-   * output is a wide Gaussian, so it has no high frequencies to lose.
-   *
-   * The kernel radius is *derived* from this (see bloomShaderDefines) rather
-   * than listed per tier, because what should stay constant across tiers is the
-   * bloom's width on screen. Two independent numbers would let the glow silently
-   * change size with quality. Downscaling therefore saves twice over: fewer
-   * pixels, and fewer taps to cover the same screen distance.
-   */
-  bloomScale: number;
-
-  /**
    * God-ray render-target scale. Also safe to downscale: the shafts are radial
    * and low-frequency, the march is already jittered with interleaved gradient
    * noise, and the result is additive HDR that gets bloomed afterwards.
@@ -116,20 +104,6 @@ const BASE_CLOUD_SCALE = 0.7;
  */
 const CIRRUS_DETAIL_NEAR_BASE = 70000;
 const CIRRUS_DETAIL_FAR_BASE = 260000;
-
-/**
- * How far the bloom reaches across the screen, in full-resolution pixels. This
- * is the artistic constant; radius and sigma per tier fall out of it and
- * bloomScale. Changing it changes the look at every tier, which is the point.
- */
-const BLOOM_SCREEN_EXTENT_PX = 30;
-
-/**
- * Kernel half-width divided by sigma. At ~1.9 the Gaussian still has a
- * non-trivial tail at the cut, so radius and sigma must move together or the
- * bloom gets hard-edged rather than narrower.
- */
-const BLOOM_RADIUS_OVER_SIGMA = 1.875;
 
 /**
  * Bilateral sigmas at bilateralBlurBoost = 1, in cloud texels. Spatial applies
@@ -184,7 +158,6 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cloudShadowSamples: 32,
     bilateralBlurBoost: 1.0,
     bilateralEdgeRelax: 1.0,
-    bloomScale: 0.5,
     godRayScale: 0.5,
     godRaySamples: 48,
   },
@@ -199,7 +172,6 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cloudShadowSamples: 24,
     bilateralBlurBoost: 1.3,
     bilateralEdgeRelax: 1.2,
-    bloomScale: 0.4,
     godRayScale: 0.4,
     godRaySamples: 32,
   },
@@ -214,7 +186,6 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cloudShadowSamples: 16,
     bilateralBlurBoost: 1.7,
     bilateralEdgeRelax: 1.45,
-    bloomScale: 0.3,
     godRayScale: 0.3,
     godRaySamples: 20,
   },
@@ -297,31 +268,6 @@ export function bilateralSigmas(quality: RenderQuality): {
   range: number;
 } {
   return bilateralSigmasFor(TIERS[quality]);
-}
-
-export function bloomShaderDefines(quality: RenderQuality): ShaderDefines {
-  const tier = TIERS[quality];
-
-  // Radius is in texels of the bloom target, so covering a fixed screen distance
-  // takes proportionally fewer of them as the target shrinks. Deriving it here
-  // is what makes downscaling save twice — fewer pixels and fewer taps — while
-  // the glow stays the same size on screen.
-  const radius = Math.max(
-    2,
-    Math.round(BLOOM_SCREEN_EXTENT_PX * tier.bloomScale)
-  );
-
-  return {
-    BLOOM_RADIUS: wgslI32(radius),
-    BLOOM_SIGMA: wgslF32(
-      Math.round((radius / BLOOM_RADIUS_OVER_SIGMA) * 100) / 100
-    ),
-  };
-}
-
-/** Bloom render-target scale, as a fraction of canvas. */
-export function bloomScale(quality: RenderQuality): number {
-  return TIERS[quality].bloomScale;
 }
 
 /** God-ray render-target scale, as a fraction of canvas. */

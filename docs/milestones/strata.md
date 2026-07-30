@@ -237,8 +237,9 @@ Available from the browser DevTools console while the app is running (registered
 | `startShadowDebug()` / `stopShadowDebug()` | Tint the terrain by shadow cascade + show the shadow atlas — useful when shadows on terrain look wrong. |
 
 Sky/atmosphere over the terrain has its own console tools (`startSkyPerfCapture()`,
-`setSkyQuality()`, `setBloom()`, `toggleCloudShadowDebug()`) — see
-[Sky Rendering](../sky-rendering.md).
+`setBloom()`, `toggleCloudShadowDebug()`) — see
+[Sky Rendering](../sky-rendering.md). Render quality is app-wide rather than
+sky-specific: `setRenderQuality('low' | 'medium' | 'high')`.
 
 ---
 
