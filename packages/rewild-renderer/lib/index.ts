@@ -12,6 +12,7 @@ export * from './materials/IMaterialPass';
 export * from './materials/LambertPass';
 export * from './materials/LambertInstancedPass';
 export * from './materials/PhongPass';
+export * from './materials/StandardPass';
 export * from './materials/SpritePass';
 export * from './input';
 export * from './core/GltfLoader';
