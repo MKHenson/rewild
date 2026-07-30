@@ -1,6 +1,6 @@
 import { Renderer } from '..';
 import { ITexture } from './ITexture';
-import { TextureProperties } from './Texture';
+import { rgba8FormatFor, TextureProperties } from './Texture';
 
 export class CanvasTexture implements ITexture {
   canvas: HTMLCanvasElement;
@@ -19,7 +19,7 @@ export class CanvasTexture implements ITexture {
         height: this.canvas.height,
         depthOrArrayLayers: 1,
       },
-      format: 'rgba8unorm',
+      format: rgba8FormatFor(this.properties.colorSpace),
       dimension: '2d',
       mipLevelCount: 1, // TODO: why doesnt this work? getNumMipmaps(loader.maxWidth, loader.maxHeight),
       usage:

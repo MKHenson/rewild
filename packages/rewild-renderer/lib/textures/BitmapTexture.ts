@@ -1,6 +1,6 @@
 import { ImageLoader } from './ImageLoader';
 import { ITexture } from './ITexture';
-import { getNumMipmaps, TextureProperties } from './Texture';
+import { getNumMipmaps, rgba8FormatFor, TextureProperties } from './Texture';
 
 import { Renderer } from '..';
 
@@ -24,7 +24,7 @@ export class BitmapTexture implements ITexture {
         height: loader.maxHeight,
         depthOrArrayLayers: 1,
       },
-      format: 'rgba8unorm',
+      format: rgba8FormatFor(this.properties.colorSpace),
       dimension: '2d',
       mipLevelCount: this.properties.generateMipmaps
         ? getNumMipmaps(loader.maxWidth, loader.maxHeight)

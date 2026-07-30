@@ -2,67 +2,83 @@
   "textures": [
     {
       "name": "grid",
-      "url": "uv-grid.jpg"
+      "url": "uv-grid.jpg",
+      "colorSpace": "srgb"
     },
     {
       "name": "f-texture",
-      "url": "utils/f-texture.png"
+      "url": "utils/f-texture.png",
+      "colorSpace": "srgb"
     },
     {
       "name": "bw-noise-64",
-      "url": "utils/bw-noise-64.png"
+      "url": "utils/bw-noise-64.png",
+      "colorSpace": "linear"
     },
     {
       "name": "pebbles-512",
-      "url": "utils/pebbles-512.png"
+      "url": "utils/pebbles-512.png",
+      "colorSpace": "linear"
     },
     {
       "name": "rgba-noise-256",
-      "url": "utils/rgba-noise-256.png"
+      "url": "utils/rgba-noise-256.png",
+      "colorSpace": "linear"
     },
     {
       "name": "crate",
-      "url": "crate-wooden.jpg"
+      "url": "crate-wooden.jpg",
+      "colorSpace": "srgb"
     },
     {
       "name": "crate-normal",
-      "url": "crate-wooden-normal.jpg"
+      "url": "crate-wooden-normal.jpg",
+      "colorSpace": "linear"
     },
     {
       "name": "wardrobe",
-      "url": "models/wardrobe/wardrobe.jpg"
+      "url": "models/wardrobe/wardrobe.jpg",
+      "colorSpace": "srgb"
     },
     {
       "name": "plant-skin-diffuse",
-      "url": "models/alient-plant/plant-skin-diffuse.png"
+      "url": "models/alient-plant/plant-skin-diffuse.png",
+      "colorSpace": "srgb"
     },
     {
       "name": "plant-skin-normal",
-      "url": "models/alient-plant/plant-skin-normal.png"
+      "url": "models/alient-plant/plant-skin-normal.png",
+      "colorSpace": "linear"
     },
     {
       "name": "basketball",
-      "url": "basketball.png"
+      "url": "basketball.png",
+      "colorSpace": "srgb"
     },
     {
       "name": "basketball-normal",
-      "url": "basketball-normal.png"
+      "url": "basketball-normal.png",
+      "colorSpace": "linear"
     },
     {
       "name": "earth",
-      "url": "earth-day-2k.jpg"
+      "url": "earth-day-2k.jpg",
+      "colorSpace": "srgb"
     },
     {
       "name": "earth-normal",
-      "url": "earth-day-2k-normal.jpg"
+      "url": "earth-day-2k-normal.jpg",
+      "colorSpace": "linear"
     },
     {
       "name": "block-concrete-4",
-      "url": "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png"
+      "url": "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_albedo.png",
+      "colorSpace": "srgb"
     },
     {
       "name": "light-32",
-      "url": "icons/editor/light-32.png"
+      "url": "icons/editor/light-32.png",
+      "colorSpace": "linear"
     },
     {
       "name": "desert-sky",
@@ -74,7 +90,8 @@
         "skyboxes/desert/ny.jpg",
         "skyboxes/desert/pz.jpg",
         "skyboxes/desert/nz.jpg"
-      ]
+      ],
+      "colorSpace": "srgb"
     },
     {
       "name": "starry-sky",
@@ -86,7 +103,8 @@
         "skyboxes/stars/bottom.png",
         "skyboxes/stars/front.png",
         "skyboxes/stars/back.png"
-      ]
+      ],
+      "colorSpace": "srgb"
     }
   ],
   "materials": [
