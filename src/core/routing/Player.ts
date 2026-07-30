@@ -83,7 +83,12 @@ export class Player extends Node {
   private _flashlight: SpotLight | null = null;
   private _flashlightOn: boolean = false;
   private _crouching: boolean = false;
-  private static readonly _FLASHLIGHT_INTENSITY: f32 = 1.5;
+  // Was 1.5 against the plateau falloff, which sat at ~0.93 at the beam's 30m
+  // mid-range rather than the linear ramp's 0.5 — so this is converted against
+  // that, not against the generic ramp factor in Light.intensity. It preserves
+  // how bright the beam reads at 30m; near the player it is now much brighter
+  // and past ~40m much dimmer, because inverse-square says so.
+  private static readonly _FLASHLIGHT_INTENSITY: f32 = 1422.2;
 
   private _onMouseMove: (e: MouseEvent) => void;
   private _onKeyDown: (e: KeyboardEvent) => void;
@@ -167,10 +172,11 @@ export class Player extends Node {
         new Color(1, 0.95, 0.85),
         Player._FLASHLIGHT_INTENSITY
       );
-      // Beam throw. The shader holds a spot at full strength to 40% of range
-      // then fades — so this gives full brightness to ~24m and a graceful
-      // die-off by 60m, far enough that terrain the beam lands on down-slope
-      // still lights instead of silently exceeding the range.
+      // Beam throw. Falloff is inverse-square with a window that reaches zero
+      // at range, so brightness now drops continuously rather than holding a
+      // plateau — but the range still needs to be generous enough that terrain
+      // the beam lands on down-slope lights at all instead of silently falling
+      // outside it.
       flash.range = 60.0;
       flash.innerAngle = 10 * _DEG2RAD;
       flash.outerAngle = 25 * _DEG2RAD;

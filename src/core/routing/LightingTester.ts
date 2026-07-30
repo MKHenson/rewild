@@ -14,7 +14,10 @@ const SPREAD = 250; // ±125 units in X and Z
 const LIGHT_HEIGHT_ABOVE_TERRAIN = 3.0;
 const RAYCAST_ORIGIN_Y = 500.0;
 const LIGHT_RADIUS = 20.0;
-const LIGHT_INTENSITY = 2.0;
+// Was 2.0 against the old `1 - dist/range` ramp. Converted by
+// `0.1422 * LIGHT_RADIUS^2` so the lights still read the same at 10m, their
+// mid-range reference distance — see Light.intensity.
+const LIGHT_INTENSITY = 113.78;
 
 // Pre-allocated for raycasting — no allocations inside onUpdate.
 const _origin = new Vector3();
