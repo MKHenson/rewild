@@ -21,7 +21,7 @@
         if (dist < light.range) {
           let lightDir = normalize(lightVec);
           diffuse = max(dot(normalizedNormal, lightDir), 0.0);
-          attenuation = max(0.0, 1.0 - dist / light.range);
+          attenuation = lightDistanceAttenuation(dist, light.range);
         } else {
           attenuation = 0.0;
         }
@@ -33,7 +33,7 @@
         if (dist < light.range) {
           let lightDir = normalize(lightVec);
           diffuse = max(dot(normalizedNormal, lightDir), 0.0);
-          let distAttenuation = max(0.0, 1.0 - dist / light.range);
+          let distAttenuation = lightDistanceAttenuation(dist, light.range);
           let angle = acos(clamp(dot(-lightDir, light.direction), 0.0, 1.0));
           let coneAttenuation = 1.0 - smoothstep(light.innerAngle, light.outerAngle, angle);
           attenuation = distAttenuation * coneAttenuation;
