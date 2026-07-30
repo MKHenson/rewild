@@ -6,22 +6,20 @@
 // This pass applies exposure, folds in bloom, runs one ACES curve over the
 // whole image, and writes the 8-bit swapchain.
 //
-// Note: the scene and sky are still on radiance scales that differ by ~100x,
-// because scene shading has no physical units yet. Geometry therefore reads far
-// too dark through this curve. That is expected here and is corrected when
-// lights move to inverse-square falloff on the sky's scale.
-
-// Maps HDR radiance into the ACES curve's useful range. Blue sky ~7 HDR,
-// clouds ~40, sun corona ~290. Becomes a camera exposure property later; the
-// ray-coverage heuristic in skyComposite.wgsl mirrors this value and must move
-// with it.
-const EXPOSURE: f32 = 0.06;
+// Note: the scene and sky are still on radiance scales that differ by ~100x, so
+// geometry reads far too dark through this curve. Falloff is now inverse-square
+// on the sky's scale, but the light intensities feeding it are still the values
+// authored against the old linear ramp; converting them is what closes the gap.
 
 struct OutputUniforms {
   lightningFlash: f32,
+  // Maps HDR radiance into the ACES curve's useful range; `Camera.exposure`,
+  // which is where the documentation for it lives. The ray-coverage heuristic
+  // in skyComposite.wgsl reasons about post-exposure brightness and reads the
+  // same camera value.
+  exposure: f32,
   _pad0: f32,
   _pad1: f32,
-  _pad2: f32,
 };
 
 struct VSOut {
@@ -59,7 +57,7 @@ struct VSOut {
   let uv = (vec2f(in.position.xy)) / dims;
   let bloom = textureSampleLevel(bloomTexture, bloomSampler, uv, 0.0).rgb;
 
-  var color = tonemapACES(EXPOSURE * (sceneHDR + bloom));
+  var color = tonemapACES(uniforms.exposure * (sceneHDR + bloom));
 
   // Lightning screen flash: brightest at centre, dimmed at edges. Applied after
   // the curve, as it did when it lived in the sky composite — it represents the

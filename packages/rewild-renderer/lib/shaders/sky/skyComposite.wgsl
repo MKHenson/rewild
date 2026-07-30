@@ -6,10 +6,10 @@
 // is atmospheric coverage: `dst = fog * a + scene * (1 - a)`.
 //
 // Exposure only survives here as the scale for the ray-coverage heuristic below,
-// which reasons about how bright a shaft will read after exposure. It must match
-// EXPOSURE in tonemap.wgsl; both move to the camera when exposure becomes a
-// camera property.
-const HDR_SCALE: f32 = 0.06;
+// which reasons about how bright a shaft will read *after* exposure. It comes in
+// as `object.exposure` — the same `Camera.exposure` the tonemap uses, rather
+// than a constant mirrored between the two, so turning the exposure knob cannot
+// silently desync god-ray coverage from the image it is predicting.
 
 struct FinalUniformStruct {
     invViewProjectionMatrix: mat4x4<f32>,
@@ -23,6 +23,7 @@ struct FinalUniformStruct {
     foginess: f32,
     temperature: f32,
     lightningFlash: f32,
+    exposure: f32,
 };
 
 @group(0) @binding(0)
@@ -129,7 +130,7 @@ var<private> sunDotUp: f32;
     // added here is scaled by the coverage term on the way out. A shaft is medium
     // radiance sitting in front of the terrain, so it has to raise coverage as well —
     // otherwise the near-zero clear-air fogFactor multiplies it straight back out.
-    let rayCoverage = saturate(dot(godRaysTerrain, vec3f(0.2126, 0.7152, 0.0722)) * HDR_SCALE);
+    let rayCoverage = saturate(dot(godRaysTerrain, vec3f(0.2126, 0.7152, 0.0722)) * object.exposure);
 
     // cloudOcclusion, not raw hdrBlend.a: cloud opacity only hides terrain when the
     // camera is above the cloud layer, and cloudOcclusion already carries that test.
