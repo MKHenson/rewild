@@ -53,7 +53,13 @@ async function loadTexture(
   device: GPUDevice
 ): Promise<GPUTexture> {
   const response = await fetch(url);
-  const imageBitmap = await createImageBitmap(await response.blob());
+  // An MSDF atlas is the least colour-like texture in the engine — its three
+  // channels are signed distances that the shader takes a median of. Colour
+  // management would bend that curve and soften every glyph edge. Same reason
+  // ImageLoader opts out; see BITMAP_OPTIONS there.
+  const imageBitmap = await createImageBitmap(await response.blob(), {
+    colorSpaceConversion: 'none',
+  });
 
   const texture = device.createTexture({
     label: `MSDF font texture ${url}`,

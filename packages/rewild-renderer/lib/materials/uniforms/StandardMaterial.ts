@@ -3,27 +3,30 @@ import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 
-// StandardParams layout (48 bytes, std140-compatible):
+// StandardParams layout (64 bytes, std140-compatible):
 //   baseColorFactor   vec3f  offset 0  (12 bytes)
 //   metallic          f32    offset 12 (4 bytes)
 //   emissiveColor     vec3f  offset 16 (12 bytes)
 //   roughness         f32    offset 28 (4 bytes)
 //   ambientColor      vec3f  offset 32 (12 bytes)
 //   emissiveIntensity f32    offset 44 (4 bytes)
+//   occlusionStrength f32    offset 48 (4 bytes)
+//   normalScale       f32    offset 52 (4 bytes)
+//   _pad0.._pad1      f32    offset 56 (8 bytes)
 //
-// The two scalars are tucked into the vec3 padding slots rather than given rows
-// of their own — a vec3f is aligned to 16 bytes either way, so this costs
-// nothing and keeps the block at three rows.
-const PARAMS_SIZE = 48;
+// The scalars are tucked into the vec3 padding slots rather than given rows of
+// their own — a vec3f is aligned to 16 bytes either way, so this costs nothing.
+// The trailing pad is a whole row spare; #196 wants alphaCutoff in it.
+const PARAMS_SIZE = 64;
 
 /**
- * Uniforms for the metallic-roughness standard material.
+ * Uniforms for the metallic-roughness standard material — glTF's full texture
+ * set: base colour, metallic-roughness, normal, occlusion and emissive.
  *
- * Deliberately the scalar half of glTF's material model only: baseColorFactor,
- * metallic and roughness are per-material constants here, and the maps that
- * make them vary across a surface — metallicRoughness and occlusion, including
- * ORM channel packing — arrive with #195. Base colour, normal and emissive maps
- * are wired up now because the pipeline already carries them.
+ * Metallic-roughness and occlusion are separate slots that may point at the
+ * same texture, which is exactly what an ORM atlas is (occlusion R, roughness
+ * G, metallic B). That is glTF's own model, and it means an ORM texture, a
+ * separate AO map, or neither all work without a packing mode to set.
  */
 export class StandardMaterial implements ISharedUniformBuffer {
   group: number;
@@ -32,17 +35,30 @@ export class StandardMaterial implements ISharedUniformBuffer {
 
   baseColorFactor: [number, number, number] = [1, 1, 1];
   /** 0 = dielectric, 1 = metal. Values between are only meaningful for a
-   *  surface that is genuinely partly both, e.g. paint worn through to metal. */
+   *  surface that is genuinely partly both, e.g. paint worn through to metal.
+   *  Multiplied by the B channel of metallicRoughnessTexture. */
   metallic: number = 0;
-  /** Perceptual roughness, as glTF authors it — the shader squares it. */
+  /** Perceptual roughness, as glTF authors it — the shader squares it.
+   *  Multiplied by the G channel of metallicRoughnessTexture. */
   roughness: number = 0.5;
   emissiveColor: [number, number, number] = [1, 1, 1];
   emissiveIntensity: number = 0;
   /** Placeholder for IBL; #201 replaces this with the sky-captured ambient. */
   ambientColor: [number, number, number] = [0, 0, 0];
+  /** How far the occlusion map is allowed to darken indirect light: 0 ignores
+   *  the map entirely, 1 applies it in full. glTF's occlusionTexture.strength.
+   *  Note occlusion only affects the indirect term, so it is invisible while
+   *  ambientColor is black. */
+  occlusionStrength: number = 1;
+  /** How far the normal map is allowed to tilt the shading normal: 0 flattens
+   *  it to the geometric normal, 1 is the map as authored, above 1 exaggerates.
+   *  glTF's normalTexture.scale. */
+  normalScale: number = 1;
 
   private _baseColorTexture: GPUTexture;
   private _normalTexture: GPUTexture;
+  private _metallicRoughnessTexture: GPUTexture;
+  private _occlusionTexture: GPUTexture;
   private _emissiveTexture: GPUTexture;
   private _sampler: GPUSampler;
   private _paramsBuffer: GPUBuffer;
@@ -70,6 +86,15 @@ export class StandardMaterial implements ISharedUniformBuffer {
     if (!this._normalTexture)
       this._normalTexture =
         renderer.textureManager.get('flat-normal-1x1').gpuTexture;
+    // White in both slots is glTF's default and a genuine no-op: roughness and
+    // metallic fall through to their factors, and occlusion of 1.0 is "nothing
+    // is occluded".
+    if (!this._metallicRoughnessTexture)
+      this._metallicRoughnessTexture =
+        renderer.textureManager.get('white-1x1').gpuTexture;
+    if (!this._occlusionTexture)
+      this._occlusionTexture =
+        renderer.textureManager.get('white-1x1').gpuTexture;
     if (!this._emissiveTexture)
       this._emissiveTexture =
         renderer.textureManager.get('white-1x1').gpuTexture;
@@ -90,8 +115,10 @@ export class StandardMaterial implements ISharedUniformBuffer {
         { binding: 0, resource: this._sampler },
         { binding: 1, resource: this._baseColorTexture.createView() },
         { binding: 2, resource: this._normalTexture.createView() },
-        { binding: 3, resource: this._emissiveTexture.createView() },
-        { binding: 4, resource: { buffer: this._paramsBuffer } },
+        { binding: 3, resource: this._metallicRoughnessTexture.createView() },
+        { binding: 4, resource: this._occlusionTexture.createView() },
+        { binding: 5, resource: this._emissiveTexture.createView() },
+        { binding: 6, resource: { buffer: this._paramsBuffer } },
       ],
     });
 
@@ -111,6 +138,8 @@ export class StandardMaterial implements ISharedUniformBuffer {
     this._paramsData[9] = this.ambientColor[1];
     this._paramsData[10] = this.ambientColor[2];
     this._paramsData[11] = this.emissiveIntensity;
+    this._paramsData[12] = this.occlusionStrength;
+    this._paramsData[13] = this.normalScale;
     device.queue.writeBuffer(
       this._paramsBuffer,
       0,
@@ -134,6 +163,27 @@ export class StandardMaterial implements ISharedUniformBuffer {
 
   get normalTexture(): GPUTexture {
     return this._normalTexture;
+  }
+
+  /** Roughness in G, metallic in B. Point this and occlusionTexture at the same
+   *  texture to use a packed ORM atlas. */
+  set metallicRoughnessTexture(texture: GPUTexture) {
+    this._metallicRoughnessTexture = texture;
+    this.requiresBuild = true;
+  }
+
+  get metallicRoughnessTexture(): GPUTexture {
+    return this._metallicRoughnessTexture;
+  }
+
+  /** Occlusion in R. */
+  set occlusionTexture(texture: GPUTexture) {
+    this._occlusionTexture = texture;
+    this.requiresBuild = true;
+  }
+
+  get occlusionTexture(): GPUTexture {
+    return this._occlusionTexture;
   }
 
   set emissiveTexture(texture: GPUTexture) {

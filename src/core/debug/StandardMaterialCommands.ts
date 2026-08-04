@@ -21,12 +21,26 @@ export function registerStandardMaterialCommands(renderer: Renderer) {
   (window as any).useStandardMaterial = (
     materialId?: string,
     metallic: number = 0,
-    roughness: number = 0.5
+    roughness: number = 0.5,
+    maps?: {
+      baseColor?: string;
+      normal?: string;
+      metallicRoughness?: string;
+      occlusion?: string;
+      emissive?: string;
+      ambient?: number;
+    }
   ) => {
     if (materialId === undefined) {
       console.log(
-        'useStandardMaterial(materialId, metallic = 0, roughness = 0.5) — ' +
-          'rebinds every mesh using materialId onto a StandardPass'
+        'useStandardMaterial(materialId, metallic = 0, roughness = 0.5, maps?) — ' +
+          'rebinds every mesh using materialId onto a StandardPass.\n' +
+          'maps: { baseColor, normal, metallicRoughness, occlusion, emissive } are ' +
+          'textureManager names; ambient is a grey level for the placeholder ' +
+          'ambient term.\n' +
+          "e.g. useStandardMaterial('crate', 0, 1, { " +
+          "metallicRoughness: 'block-concrete-4-roughness', " +
+          "occlusion: 'block-concrete-4-ao', ambient: 0.3 })"
       );
       return;
     }
@@ -63,6 +77,37 @@ export function registerStandardMaterialCommands(renderer: Renderer) {
     }
     if (source instanceof PhongPass && source.material.normalTexture) {
       pass.material.normalTexture = source.material.normalTexture;
+    }
+
+    // Explicit maps win over whatever came off the source pass. There is no
+    // material in the bucket carrying a metallic-roughness or occlusion map of
+    // its own yet, so this is the only way to exercise those two slots.
+    const named = (name?: string) =>
+      name === undefined ? undefined : renderer.textureManager.get(name).gpuTexture;
+
+    try {
+      const baseColor = named(maps?.baseColor);
+      const normal = named(maps?.normal);
+      const metallicRoughness = named(maps?.metallicRoughness);
+      const occlusion = named(maps?.occlusion);
+      const emissive = named(maps?.emissive);
+
+      if (baseColor) pass.material.baseColorTexture = baseColor;
+      if (normal) pass.material.normalTexture = normal;
+      if (metallicRoughness)
+        pass.material.metallicRoughnessTexture = metallicRoughness;
+      if (occlusion) pass.material.occlusionTexture = occlusion;
+      if (emissive) pass.material.emissiveTexture = emissive;
+    } catch (err) {
+      console.warn(`${(err as Error).message} — no meshes were changed.`);
+      return;
+    }
+
+    // Occlusion only affects indirect light, so without an ambient term an
+    // occlusion map does nothing at all. Offering the knob here is what makes
+    // that slot observable before #201's IBL provides a real indirect term.
+    if (maps?.ambient !== undefined) {
+      pass.material.ambientColor = [maps.ambient, maps.ambient, maps.ambient];
     }
 
     // The renderer calls init() lazily on any pass whose requiresRebuild is

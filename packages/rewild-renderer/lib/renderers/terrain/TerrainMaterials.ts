@@ -22,11 +22,24 @@ export interface TerrainMaterial {
   // MiB of VRAM nothing binds. The table describes the material completely.
   albedoUrl: string;
   normalUrl: string;
-  // Linear grayscale roughness. Sampled per texel and folded into the specular
+  // Packed ARM map, linear: ambient occlusion in R, roughness in G, metallic in
+  // B. The pack convention, and the same channel layout glTF's ORM uses, so a
+  // terrain material and an imported model material read alike.
+  //
+  // Roughness (G) is what the shader reads today: folded into the specular
   // highlight as gloss = 1 - roughness, so the highlight follows the surface
-  // (damp rock catches the sun, dry grass stays matte) instead of the whole
-  // layer glinting uniformly. Only the red channel is read.
-  roughnessUrl: string;
+  // (damp rock catches the sun, dry grass stays matte) rather than the whole
+  // layer glinting uniformly.
+  //
+  // R and B are banked, not yet sampled. Occlusion needs an indirect term to
+  // attenuate and gets one with the sky IBL (#201); metallic is 0 across every
+  // natural material here and is only carried so the channel layout matches.
+  //
+  // Replaces a separate grayscale roughness map per material. Nothing was lost
+  // — the roughness data is the same — and it drops a whole 17-layer 1K texture
+  // array, about 91 MiB of VRAM with mips, that held one channel of what this
+  // one already carries.
+  armUrl: string;
   // Linear grayscale height/displacement: 0 the deepest crevice, 1 the highest
   // peak of the surface relief. The terrain shader's parallax-occlusion march
   // treats this as a depth volume carved below the surface — view rays march
@@ -154,7 +167,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'forest-ground-01',
     albedoUrl: 'terrain/forest-ground-01/forrest_ground_01_diff_1k.jpg',
     normalUrl: 'terrain/forest-ground-01/forrest_ground_01_norm_1k.png',
-    roughnessUrl: 'terrain/forest-ground-01/forrest_ground_01_rough_1k.jpg',
+    armUrl: 'terrain/forest-ground-01/forrest_ground_01_arm_1k.jpg',
     heightUrl: 'terrain/forest-ground-01/forrest_ground_01_disp_1k.png',
     heightScale: HEIGHT_SCALE,
     macroUvScale: MACRO_UV_SCALE * 2,
@@ -172,8 +185,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
       'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png',
     normalUrl:
       'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_normal.png',
-    roughnessUrl:
-      'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_roughness.png',
+    armUrl: 'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_arm.jpg',
     heightUrl:
       'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_height.png',
     heightScale: HEIGHT_SCALE,
@@ -189,7 +201,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'rocks-ground-01',
     albedoUrl: 'terrain/rocks-ground-01/rocks_ground_01_diff_1k.jpg',
     normalUrl: 'terrain/rocks-ground-01/rocks_ground_01_norm_1k.png',
-    roughnessUrl: 'terrain/rocks-ground-01/rocks_ground_01_rough_1k.jpg',
+    armUrl: 'terrain/rocks-ground-01/rocks_ground_01_arm_1k.jpg',
     heightUrl: 'terrain/rocks-ground-01/rocks_ground_01_disp_1k.png',
     heightScale: HEIGHT_SCALE * 1.8,
     uvScale: DETAIL_UV_SCALE,
@@ -202,7 +214,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'snow-02',
     albedoUrl: 'terrain/snow-02/snow_02_diff_1k.jpg',
     normalUrl: 'terrain/snow-02/snow_02_norm_1k.png',
-    roughnessUrl: 'terrain/snow-02/snow_02_rough_1k.jpg',
+    armUrl: 'terrain/snow-02/snow_02_arm_1k.jpg',
     heightUrl: 'terrain/snow-02/snow_02_disp_1k.png',
     macroUvScale: MACRO_UV_SCALE,
     heightScale: HEIGHT_SCALE * 0.5,
@@ -215,7 +227,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'rocky_terrain',
     albedoUrl: 'terrain/rocky-terrain/rocky_terrain_diff_1k.jpg',
     normalUrl: 'terrain/rocky-terrain/rocky_terrain_norm_1k.png',
-    roughnessUrl: 'terrain/rocky-terrain/rocky_terrain_rough_1k.png',
+    armUrl: 'terrain/rocky-terrain/rocky_terrain_arm_1k.jpg',
     heightUrl: 'terrain/rocky-terrain/rocky_terrain_disp_1k.png',
     heightScale: HEIGHT_SCALE * 1.6,
     macroUvScale: MACRO_UV_SCALE * 2,
@@ -228,7 +240,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'aerial_rocks_01',
     albedoUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_diff_1k.jpg',
     normalUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_norm_1k.png',
-    roughnessUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_rough_1k.jpg',
+    armUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_arm_1k.jpg',
     heightUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_disp_1k.png',
     heightScale: HEIGHT_SCALE * 1.6,
     macroUvScale: MACRO_UV_SCALE * 2,
@@ -241,7 +253,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'marble_cliff_05',
     albedoUrl: 'terrain/marble-cliff-05/marble_cliff_05_diff_1k.jpg',
     normalUrl: 'terrain/marble-cliff-05/marble_cliff_05_norm_1k.png',
-    roughnessUrl: 'terrain/marble-cliff-05/marble_cliff_05_rough_1k.png',
+    armUrl: 'terrain/marble-cliff-05/marble_cliff_05_arm_1k.jpg',
     heightUrl: 'terrain/marble-cliff-05/marble_cliff_05_disp_1k.png',
     heightScale: HEIGHT_SCALE * 4,
     macroUvScale: MACRO_UV_SCALE * 2,
@@ -258,7 +270,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'mud_cracked_dry_03',
     albedoUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_diff_1k.jpg',
     normalUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_norm_1k.png',
-    roughnessUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_rough_1k.png',
+    armUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_arm_1k.jpg',
     heightUrl: 'terrain/mud-cracked-dry-03/mud_cracked_dry_03_disp_1k.png',
     heightScale: HEIGHT_SCALE * 1.5,
     macroUvScale: MACRO_UV_SCALE * 5,
@@ -275,7 +287,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'sand_01',
     albedoUrl: 'terrain/sand-01/sand_01_diff_1k.jpg',
     normalUrl: 'terrain/sand-01/sand_01_norm_1k.png',
-    roughnessUrl: 'terrain/sand-01/sand_01_rough_1k.jpg',
+    armUrl: 'terrain/sand-01/sand_01_arm_1k.jpg',
     heightUrl: 'terrain/sand-01/sand_01_disp_1k.png',
     heightScale: HEIGHT_SCALE * 2,
     // Coarser than the other macro normals: what a dune field should hold at
@@ -293,7 +305,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'forest_leaves_02',
     albedoUrl: 'terrain/forest-leaves-02/forest_leaves_02_diffuse_1k.jpg',
     normalUrl: 'terrain/forest-leaves-02/forest_leaves_02_norm_1k.png',
-    roughnessUrl: 'terrain/forest-leaves-02/forest_leaves_02_rough_1k.jpg',
+    armUrl: 'terrain/forest-leaves-02/forest_leaves_02_arm_1k.jpg',
     heightUrl: 'terrain/forest-leaves-02/forest_leaves_02_disp_1k.png',
     heightScale: HEIGHT_SCALE * 2,
     macroUvScale: MACRO_UV_SCALE,
@@ -311,7 +323,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'aerial_beach_01',
     albedoUrl: 'terrain/aerial-beach-01/aerial_beach_01_diff_1k.jpg',
     normalUrl: 'terrain/aerial-beach-01/aerial_beach_01_norm_1k.png',
-    roughnessUrl: 'terrain/aerial-beach-01/aerial_beach_01_rough_1k.jpg',
+    armUrl: 'terrain/aerial-beach-01/aerial_beach_01_arm_1k.jpg',
     heightUrl: 'terrain/aerial-beach-01/aerial_beach_01_disp_1k.png',
     heightScale: HEIGHT_SCALE,
     macroUvScale: MACRO_UV_SCALE,
@@ -329,7 +341,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'aerial_beach_02',
     albedoUrl: 'terrain/aerial-beach-02/aerial_beach_02_diff_1k.jpg',
     normalUrl: 'terrain/aerial-beach-02/aerial_beach_02_norm_1k.png',
-    roughnessUrl: 'terrain/aerial-beach-02/aerial_beach_02_rough_1k.jpg',
+    armUrl: 'terrain/aerial-beach-02/aerial_beach_02_arm_1k.jpg',
     heightUrl: 'terrain/aerial-beach-02/aerial_beach_02_disp_1k.png',
     heightScale: HEIGHT_SCALE * 5,
     macroUvScale: MACRO_UV_SCALE * 0.5,
@@ -350,7 +362,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'cliff_side_1k',
     albedoUrl: 'terrain/cliff-side-1k/cliff_side_diff_1k.jpg',
     normalUrl: 'terrain/cliff-side-1k/cliff_side_norm_1k.png',
-    roughnessUrl: 'terrain/cliff-side-1k/cliff_side_rough_1k.png',
+    armUrl: 'terrain/cliff-side-1k/cliff_side_arm_1k.jpg',
     heightUrl: 'terrain/cliff-side-1k/cliff_side_disp_1k.png',
     macroNormalFrom: 'marble_cliff_05',
     heightScale: HEIGHT_SCALE * 4,
@@ -371,7 +383,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'tiger_rock_1k',
     albedoUrl: 'terrain/tiger-rock-1k/tiger_rock_diff_1k.jpg',
     normalUrl: 'terrain/tiger-rock-1k/tiger_rock_norm_1k.png',
-    roughnessUrl: 'terrain/tiger-rock-1k/tiger_rock_rough_1k.png',
+    armUrl: 'terrain/tiger-rock-1k/tiger_rock_arm_1k.jpg',
     heightUrl: 'terrain/tiger-rock-1k/tiger_rock_disp_1k.png',
     macroNormalFrom: 'marble_cliff_05',
     heightScale: HEIGHT_SCALE * 1.8,
@@ -390,7 +402,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'grass_01_1k',
     albedoUrl: 'terrain/grass-01-1k/grass_01.png',
     normalUrl: 'terrain/grass-01-1k/grass_01_norm.png',
-    roughnessUrl: 'terrain/grass-01-1k/grass_01_roughness.png',
+    armUrl: 'terrain/grass-01-1k/grass_01_arm.jpg',
     heightUrl: 'terrain/grass-01-1k/grass_01_disp.png',
     heightScale: HEIGHT_SCALE * 0.5,
     // Coarse: what a grassland should still carry at range is the swell of the
@@ -414,7 +426,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'grass_path_02_1k',
     albedoUrl: 'terrain/grass-path-02-1k/grass_path_02_diff_1k.jpg',
     normalUrl: 'terrain/grass-path-02-1k/grass_path_02_norm_1k.png',
-    roughnessUrl: 'terrain/grass-path-02-1k/grass_path_02_rough_1k.jpg',
+    armUrl: 'terrain/grass-path-02-1k/grass_path_2_arm_1k.jpg',
     heightUrl: 'terrain/grass-path-02-1k/grass_path_02_disp_1k.png',
     heightScale: HEIGHT_SCALE * 2,
     macroUvScale: MACRO_UV_SCALE * 2,
@@ -435,7 +447,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     name: 'forest_leaves_03_1k',
     albedoUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_diff_1k.jpg',
     normalUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_norm_1k.png',
-    roughnessUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_rough_1k.png',
+    armUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_arm_1k.jpg',
     heightUrl: 'terrain/forest-leaves-03-1k/forest_leaves_03_disp_1k.png',
     heightScale: HEIGHT_SCALE * 2,
     macroUvScale: MACRO_UV_SCALE,
