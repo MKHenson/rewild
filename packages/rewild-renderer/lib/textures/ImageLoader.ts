@@ -1,3 +1,10 @@
+const BITMAP_OPTIONS: ImageBitmapOptions = { colorSpaceConversion: 'none' };
+
+/**
+ * Decodes image files to `ImageBitmap`s for upload as GPU textures.
+ *
+ * Decoding is deliberately *not* colour-managed — see `BITMAP_OPTIONS`.
+ */
 export class ImageLoader {
   images: ImageBitmap[];
   maxWidth: number;
@@ -12,7 +19,7 @@ export class ImageLoader {
         img.crossOrigin = 'Anonymous';
         img.src = src;
         img.onload = () => {
-          createImageBitmap(img)
+          createImageBitmap(img, BITMAP_OPTIONS)
             .then((data) => {
               resolve(data);
             })

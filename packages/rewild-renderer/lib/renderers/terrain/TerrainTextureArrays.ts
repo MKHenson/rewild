@@ -15,14 +15,15 @@ import {
 
 // textureManager keys for the arrays every terrain layer samples from. Layer i
 // of each is getTerrainMaterialOrder()[i] — the arrays share one layer order,
-// so a material's albedo, normal and roughness are always the same array_index.
+// so a material's albedo, normal and ARM are always the same array_index.
 export const TERRAIN_ALBEDO_ARRAY = 'terrain-albedo-array';
 export const TERRAIN_NORMAL_ARRAY = 'terrain-normal-array';
-export const TERRAIN_ROUGHNESS_ARRAY = 'terrain-roughness-array';
+// Packed ARM: occlusion R, roughness G, metallic B.
+export const TERRAIN_ARM_ARRAY = 'terrain-arm-array';
 export const TERRAIN_HEIGHT_ARRAY = 'terrain-height-array';
 
 /**
- * Builds the terrain albedo, normal and roughness texture arrays from the
+ * Builds the terrain albedo, normal, ARM and height texture arrays from the
  * material library and registers them with the texture manager.
  *
  * One `texture_2d_array` binding per map replaces a binding per material, so a
@@ -41,9 +42,10 @@ export async function initTerrainTextureArrays(
 
   const order = getTerrainMaterialOrder();
 
-  // Albedo is the only one of the four that is sRGB-encoded colour; normal,
-  // roughness and height are data maps whose bytes are already the value the
-  // shader wants.
+  // Albedo is the only one of the four that is sRGB-encoded colour; normal, ARM
+  // and height are data maps whose bytes are already the value the shader
+  // wants. ARM especially — decoding it would bend the roughness curve and
+  // silently change every highlight.
   const albedo = new TextureArray(
     new TextureProperties(TERRAIN_ALBEDO_ARRAY, true, 'srgb'),
     order.map((name) => resolveAssetUrl(TERRAIN_MATERIALS[name].albedoUrl))
@@ -52,9 +54,9 @@ export async function initTerrainTextureArrays(
     new TextureProperties(TERRAIN_NORMAL_ARRAY, true, 'linear'),
     order.map((name) => resolveAssetUrl(TERRAIN_MATERIALS[name].normalUrl))
   );
-  const roughness = new TextureArray(
-    new TextureProperties(TERRAIN_ROUGHNESS_ARRAY, true, 'linear'),
-    order.map((name) => resolveAssetUrl(TERRAIN_MATERIALS[name].roughnessUrl))
+  const arm = new TextureArray(
+    new TextureProperties(TERRAIN_ARM_ARRAY, true, 'linear'),
+    order.map((name) => resolveAssetUrl(TERRAIN_MATERIALS[name].armUrl))
   );
   const height = new TextureArray(
     new TextureProperties(TERRAIN_HEIGHT_ARRAY, true, 'linear'),
@@ -64,13 +66,13 @@ export async function initTerrainTextureArrays(
   await Promise.all([
     albedo.load(renderer),
     normal.load(renderer),
-    roughness.load(renderer),
+    arm.load(renderer),
     height.load(renderer),
   ]);
 
   renderer.textureManager.addTexture(albedo);
   renderer.textureManager.addTexture(normal);
-  renderer.textureManager.addTexture(roughness);
+  renderer.textureManager.addTexture(arm);
   renderer.textureManager.addTexture(height);
 }
 

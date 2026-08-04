@@ -76,6 +76,21 @@
       "colorSpace": "srgb"
     },
     {
+      "name": "block-concrete-4-normal",
+      "url": "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_normal.png",
+      "colorSpace": "linear"
+    },
+    {
+      "name": "block-concrete-4-roughness",
+      "url": "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_roughness.png",
+      "colorSpace": "linear"
+    },
+    {
+      "name": "block-concrete-4-ao",
+      "url": "construction/walls/TexturesCom_Wall_BlockConcrete4_2x2_B_1K_ao.png",
+      "colorSpace": "linear"
+    },
+    {
       "name": "light-32",
       "url": "icons/editor/light-32.png",
       "colorSpace": "linear"

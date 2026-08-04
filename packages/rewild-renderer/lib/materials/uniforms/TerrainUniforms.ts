@@ -114,7 +114,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   // view dimension has to be chosen explicitly by the caller.
   private _albedoView: GPUTextureView;
   private _normalView: GPUTextureView;
-  private _roughnessView: GPUTextureView;
+  private _armView: GPUTextureView;
   private _heightView: GPUTextureView;
   // Palette channels 0-3 and 4-7. Two RGBA8 textures rather than one, because
   // that is all a texel holds; see MAX_SPLAT_LAYERS.
@@ -160,10 +160,10 @@ export class TerrainUniforms implements ISharedUniformBuffer {
       this._normalView = renderer.textureManager
         .get('flat-normal-1x1')
         .gpuTexture.createView({ dimension: '2d-array' });
-    // white-1x1 ⇒ roughness 1 ⇒ zero specular, the safe fallback before the
-    // real roughness array is bound.
-    if (!this._roughnessView)
-      this._roughnessView = renderer.textureManager
+    // white-1x1 ⇒ the ARM green channel reads 1 ⇒ roughness 1 ⇒ zero specular,
+    // the safe fallback before the real ARM array is bound.
+    if (!this._armView)
+      this._armView = renderer.textureManager
         .get('white-1x1')
         .gpuTexture.createView({ dimension: '2d-array' });
     // flat-normal-1x1's red channel is 0.5 — the shader centres height on 0.5,
@@ -191,7 +191,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
         { binding: 4, resource: this._normalView },
         { binding: 5, resource: this._noiseTexture.createView() },
         { binding: 6, resource: { buffer: this._paramsBuffer } },
-        { binding: 7, resource: this._roughnessView },
+        { binding: 7, resource: this._armView },
         { binding: 8, resource: this._heightView },
         { binding: 9, resource: this._splatTextureExt.createView() },
       ],
@@ -282,13 +282,13 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     return this._normalView;
   }
 
-  set roughnessView(view: GPUTextureView) {
-    this._roughnessView = view;
+  set armView(view: GPUTextureView) {
+    this._armView = view;
     this.requiresBuild = true;
   }
 
-  get roughnessView(): GPUTextureView {
-    return this._roughnessView;
+  get armView(): GPUTextureView {
+    return this._armView;
   }
 
   set heightView(view: GPUTextureView) {

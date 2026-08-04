@@ -7,7 +7,7 @@ import { resolveClimatePreset } from './Biomes';
 import {
   TERRAIN_ALBEDO_ARRAY,
   TERRAIN_NORMAL_ARRAY,
-  TERRAIN_ROUGHNESS_ARRAY,
+  TERRAIN_ARM_ARRAY,
   TERRAIN_HEIGHT_ARRAY,
   getClimateLayerParams,
 } from './TerrainTextureArrays';
@@ -290,8 +290,8 @@ export class LODMesh {
         uniforms.normalView = renderer.textureManager
           .get(TERRAIN_NORMAL_ARRAY)
           .gpuTexture.createView({ dimension: '2d-array' });
-        uniforms.roughnessView = renderer.textureManager
-          .get(TERRAIN_ROUGHNESS_ARRAY)
+        uniforms.armView = renderer.textureManager
+          .get(TERRAIN_ARM_ARRAY)
           .gpuTexture.createView({ dimension: '2d-array' });
         uniforms.heightView = renderer.textureManager
           .get(TERRAIN_HEIGHT_ARRAY)

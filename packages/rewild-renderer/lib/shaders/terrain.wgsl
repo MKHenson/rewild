@@ -94,7 +94,7 @@ struct VertexOutput {
 @group(1) @binding(4) var normalArray: texture_2d_array<f32>;
 @group(1) @binding(5) var noiseTexture: texture_2d<f32>;
 @group(1) @binding(6) var<uniform> phongParams: TerrainParams;
-@group(1) @binding(7) var roughnessArray: texture_2d_array<f32>;
+@group(1) @binding(7) var armArray: texture_2d_array<f32>;
 @group(1) @binding(8) var heightArray: texture_2d_array<f32>;
 // Palette channels 4-7. A second texture rather than more channels, because an
 // RGBA8 texel holds four weights and that is the format the splat is authored
@@ -557,8 +557,12 @@ fn fs(
     // stays as the material's ceiling; roughness detail lives under it. Sampled
     // through the same no-tile blend as albedo so the highlight tracks the
     // texture actually shown.
-    let rghA = textureSampleGrad(roughnessArray, seamlessSampler, sa, arrayIndex, ddx, ddy).r;
-    let rghB = textureSampleGrad(roughnessArray, seamlessSampler, sb, arrayIndex, ddx, ddy).r;
+    //
+    // .g, not .r: this is a packed ARM map — occlusion R, roughness G, metallic
+    // B. R and B are carried but not yet read; occlusion needs an indirect term
+    // to attenuate (#201) and every natural material here is a dielectric.
+    let rghA = textureSampleGrad(armArray, seamlessSampler, sa, arrayIndex, ddx, ddy).g;
+    let rghB = textureSampleGrad(armArray, seamlessSampler, sb, arrayIndex, ddx, ddy).g;
     let roughness = mix(rghA, rghB, blendFactor);
 
     layerColors[layerSlot] = layerColor;
