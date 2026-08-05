@@ -162,6 +162,17 @@
       "type": "wireframe",
       "color": [1.0, 1.0, 1.0],
       "opacity": 0.1
+    },
+    {
+      "name": "block-concrete",
+      "type": "standard",
+      "baseColorMap": "block-concrete-4",
+      "normalMap": "block-concrete-4-normal",
+      "metallicRoughnessMap": "block-concrete-4-roughness",
+      "occlusionMap": "block-concrete-4-ao",
+      "metallic": 0,
+      "roughness": 1,
+      "ambientColor": [0.3, 0.3, 0.3]
     }
   ]
 }

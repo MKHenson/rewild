@@ -16,6 +16,21 @@
       }
     },
     {
+      "name": "concrete-block",
+      "type": "asset",
+      "resource": {
+        "materialId": "block-concrete",
+        "geometryId": "box",
+        "physics": {
+          "bodyType": "dynamic",
+          "mass": 6.0,
+          "shape": { "type": "box", "size": [1, 1, 1] },
+          "friction": 0.9,
+          "restitution": 0.05
+        }
+      }
+    },
+    {
       "name": "basketball",
       "type": "asset",
       "resource": {
