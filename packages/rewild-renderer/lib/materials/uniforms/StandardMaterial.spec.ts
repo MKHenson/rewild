@@ -2,8 +2,10 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { ALPHA_MODES, StandardMaterial } from './StandardMaterial';
 
+// The struct and the alpha modes live in the include both standard.wgsl and
+// standard-instanced.wgsl pull in, so pinning it here pins both passes.
 const SHADER = readFileSync(
-  join(__dirname, '../../shaders/standard.wgsl'),
+  join(__dirname, '../../shaders/shader-lib/standard-material.wgsl'),
   'utf8'
 );
 
@@ -95,7 +97,7 @@ describe('StandardParams packing', () => {
   });
 });
 
-describe('standard.wgsl agreement', () => {
+describe('standard-material.wgsl agreement', () => {
   const struct = SHADER.match(/struct StandardParams \{([^}]*)\}/)![1];
   // Trimmed before the comment strip so a checkout with CRLF endings does not
   // leave a \r the `.` in the pattern refuses to cross.

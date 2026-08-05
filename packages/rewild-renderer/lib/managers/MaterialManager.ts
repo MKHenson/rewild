@@ -11,6 +11,7 @@ import { IMaterialsTemplate, IStandardMaterialTemplate } from './types';
 import { UIElementPass } from '../materials/UIElementPass';
 import { UIElementHealthPass } from '../materials/UIElementHealthPass';
 import { StandardPass } from '../materials/StandardPass';
+import { StandardInstancedPass } from '../materials/StandardInstancedPass';
 import { ALPHA_MODES } from '../materials/uniforms/StandardMaterial';
 
 export class MaterialManager {
@@ -92,6 +93,7 @@ export class MaterialManager {
           break;
         }
         case 'standard':
+        case 'standard-instanced':
           materialPass = createStandardPass(renderer, t);
           break;
         case 'wireframe':
@@ -162,12 +164,19 @@ export class MaterialManager {
  * Every field is optional and every default lives on StandardMaterial, so a
  * `{ name, type }` entry is glTF's default material: white, dielectric, half
  * rough. Only what the template names is written.
+ *
+ * One function for both the per-mesh and instanced passes, because the template
+ * is the same in both cases — the choice between them is about how the meshes
+ * are drawn, not about what the material is.
  */
 function createStandardPass(
   renderer: Renderer,
   t: IStandardMaterialTemplate
-): StandardPass {
-  const pass = new StandardPass();
+): StandardPass | StandardInstancedPass {
+  const pass =
+    t.type === 'standard-instanced'
+      ? new StandardInstancedPass()
+      : new StandardPass();
   const { material } = pass;
   const texture = (name?: string) =>
     name === undefined

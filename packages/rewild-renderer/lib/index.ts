@@ -13,6 +13,7 @@ export * from './materials/LambertPass';
 export * from './materials/LambertInstancedPass';
 export * from './materials/PhongPass';
 export * from './materials/StandardPass';
+export * from './materials/StandardInstancedPass';
 export * from './materials/uniforms/StandardMaterial';
 export * from './materials/SpritePass';
 export * from './input';
