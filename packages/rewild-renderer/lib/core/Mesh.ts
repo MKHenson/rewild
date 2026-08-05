@@ -132,7 +132,15 @@ export class Mesh implements IComponent, IVisualComponent {
         // BVH works in local space so pass 0/Infinity for near/far;
         // world-space distance filtering happens after the transform below.
         const bvhHits: Intersection[] = [];
-        geometry.bvh.raycast(_ray, material.side, 0, Infinity, bvhHits);
+        // 'none' is BVH.raycast's double-sided case — anything that is neither
+        // 'cw' nor 'ccw' skips the backface test.
+        geometry.bvh.raycast(
+          _ray,
+          material.doubleSided ? 'none' : material.side,
+          0,
+          Infinity,
+          bvhHits
+        );
 
         // Transform hit points from local to world space and apply near/far
         for (let i = 0, l = bvhHits.length; i < l; i++) {
@@ -342,14 +350,18 @@ function checkIntersection(
 ) {
   let intersect: Vector3 | null;
 
+  // A double-sided material rasterizes back faces, so culling them here would
+  // make a surface that is visible from behind un-pickable from behind.
+  const cullBackFaces = material.doubleSided !== true;
+
   if (material.side === 'cw') {
-    intersect = ray.intersectTriangle(pC, pB, pA, true, point);
+    intersect = ray.intersectTriangle(pC, pB, pA, cullBackFaces, point);
   } else {
     intersect = ray.intersectTriangle(
       pA,
       pB,
       pC,
-      material.side === 'ccw',
+      cullBackFaces && material.side === 'ccw',
       point
     );
   }
