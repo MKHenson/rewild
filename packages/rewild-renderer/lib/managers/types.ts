@@ -1,4 +1,66 @@
+import { AlphaMode } from '../materials/uniforms/StandardMaterial';
 import { TextureColorSpace } from '../textures/Texture';
+
+export type TemplateColor = [number, number, number];
+
+export interface IStandardMaterialTemplate {
+  name: string;
+  type: 'standard';
+  baseColorMap?: string;
+  normalMap?: string;
+  /** Roughness in G, metallic in B. */
+  metallicRoughnessMap?: string;
+  /** Occlusion in R. Name the same texture as metallicRoughnessMap to use a
+   *  packed ORM atlas — glTF models it as two slots precisely so that works. */
+  occlusionMap?: string;
+  emissiveMap?: string;
+  /** RGB only. glTF's fourth component is `opacity` below, because that is
+   *  already this schema's word for alpha. */
+  baseColorFactor?: TemplateColor;
+  opacity?: number;
+  metallic?: number;
+  roughness?: number;
+  /** glTF's emissiveFactor. */
+  emissiveColor?: TemplateColor;
+  /** KHR_materials_emissive_strength — may exceed 1. */
+  emissiveStrength?: number;
+  occlusionStrength?: number;
+  normalScale?: number;
+  /** Placeholder flat ambient; #201's IBL replaces it. */
+  ambientColor?: TemplateColor;
+  alphaMode?: AlphaMode;
+  alphaCutoff?: number;
+  doubleSided?: boolean;
+  /** Requires the geometry to carry COLOR_0 — a mesh without it cannot be
+   *  assigned this material at all. */
+  vertexColors?: boolean;
+}
+
+export interface IClassicMaterialTemplate {
+  name: string;
+  type:
+    | 'lambert'
+    | 'lambert-instanced'
+    | 'phong'
+    | 'wireframe'
+    | 'gizmo'
+    | 'sprite';
+  diffuseMap?: string;
+  normalMap?: string;
+  specularMap?: string;
+  emissiveMap?: string;
+  color?: TemplateColor;
+  opacity?: number;
+  specularColor?: TemplateColor;
+  shininess?: number;
+  emissiveColor?: TemplateColor;
+  emissiveIntensity?: number;
+  ambientColor?: TemplateColor;
+}
+
+export type IMaterialTemplate =
+  | IStandardMaterialTemplate
+  | IClassicMaterialTemplate;
 
 export interface IMaterialsTemplate {
   textures: {
@@ -21,21 +83,7 @@ export interface IMaterialsTemplate {
      */
     colorSpace: TextureColorSpace;
   }[];
-  materials: {
-    name: string;
-    type: 'lambert' | 'lambert-instanced' | 'phong' | 'wireframe' | 'gizmo' | 'sprite';
-    diffuseMap?: string;
-    normalMap?: string;
-    specularMap?: string;
-    emissiveMap?: string;
-    color?: [number, number, number];
-    opacity?: number;
-    specularColor?: [number, number, number];
-    shininess?: number;
-    emissiveColor?: [number, number, number];
-    emissiveIntensity?: number;
-    ambientColor?: [number, number, number];
-  }[];
+  materials: IMaterialTemplate[];
 }
 
 export interface IGeometryTemplates {

@@ -7,23 +7,11 @@ import { IMaterialPass } from '../materials/IMaterialPass';
 import { SpritePass } from '../materials/SpritePass';
 import { WireframePass } from '../materials/WireframePass';
 import { Renderer } from '../Renderer';
-import { IMaterialsTemplate } from './types';
+import { IMaterialsTemplate, IStandardMaterialTemplate } from './types';
 import { UIElementPass } from '../materials/UIElementPass';
 import { UIElementHealthPass } from '../materials/UIElementHealthPass';
-
-export interface IMaterial {
-  type: 'lambert' | 'lambert-instanced' | 'phong';
-  id: string;
-  diffuseMap?: string;
-  normalMap?: string;
-  specularMap?: string;
-  emissiveMap?: string;
-  specularColor?: [number, number, number];
-  shininess?: number;
-  emissiveColor?: [number, number, number];
-  emissiveIntensity?: number;
-  ambientColor?: [number, number, number];
-}
+import { StandardPass } from '../materials/StandardPass';
+import { ALPHA_MODES } from '../materials/uniforms/StandardMaterial';
 
 export class MaterialManager {
   materials: Map<string, IMaterialPass>;
@@ -53,11 +41,16 @@ export class MaterialManager {
         case 'lambert': {
           const pass = new LambertPass();
           if (t.diffuseMap)
-            pass.material.diffuseTexture = renderer.textureManager.get(t.diffuseMap).gpuTexture;
+            pass.material.diffuseTexture = renderer.textureManager.get(
+              t.diffuseMap
+            ).gpuTexture;
           if (t.emissiveMap)
-            pass.material.emissiveTexture = renderer.textureManager.get(t.emissiveMap).gpuTexture;
+            pass.material.emissiveTexture = renderer.textureManager.get(
+              t.emissiveMap
+            ).gpuTexture;
           if (t.emissiveColor) pass.material.emissiveColor = t.emissiveColor;
-          if (t.emissiveIntensity !== undefined) pass.material.emissiveIntensity = t.emissiveIntensity;
+          if (t.emissiveIntensity !== undefined)
+            pass.material.emissiveIntensity = t.emissiveIntensity;
           if (t.ambientColor) pass.material.ambientColor = t.ambientColor;
           materialPass = pass;
           break;
@@ -65,36 +58,52 @@ export class MaterialManager {
         case 'lambert-instanced': {
           const pass = new LambertInstancedPass();
           if (t.diffuseMap)
-            pass.diffuse.texture = renderer.textureManager.get(t.diffuseMap).gpuTexture;
+            pass.diffuse.texture = renderer.textureManager.get(
+              t.diffuseMap
+            ).gpuTexture;
           materialPass = pass;
           break;
         }
         case 'phong': {
           const pass = new PhongPass();
           if (t.diffuseMap)
-            pass.material.diffuseTexture = renderer.textureManager.get(t.diffuseMap).gpuTexture;
+            pass.material.diffuseTexture = renderer.textureManager.get(
+              t.diffuseMap
+            ).gpuTexture;
           if (t.normalMap)
-            pass.material.normalTexture = renderer.textureManager.get(t.normalMap).gpuTexture;
+            pass.material.normalTexture = renderer.textureManager.get(
+              t.normalMap
+            ).gpuTexture;
           if (t.specularMap)
-            pass.material.specularTexture = renderer.textureManager.get(t.specularMap).gpuTexture;
+            pass.material.specularTexture = renderer.textureManager.get(
+              t.specularMap
+            ).gpuTexture;
           if (t.emissiveMap)
-            pass.material.emissiveTexture = renderer.textureManager.get(t.emissiveMap).gpuTexture;
+            pass.material.emissiveTexture = renderer.textureManager.get(
+              t.emissiveMap
+            ).gpuTexture;
           if (t.specularColor) pass.material.specularColor = t.specularColor;
           if (t.shininess !== undefined) pass.material.shininess = t.shininess;
           if (t.emissiveColor) pass.material.emissiveColor = t.emissiveColor;
-          if (t.emissiveIntensity !== undefined) pass.material.emissiveIntensity = t.emissiveIntensity;
+          if (t.emissiveIntensity !== undefined)
+            pass.material.emissiveIntensity = t.emissiveIntensity;
           if (t.ambientColor) pass.material.ambientColor = t.ambientColor;
           materialPass = pass;
           break;
         }
+        case 'standard':
+          materialPass = createStandardPass(renderer, t);
+          break;
         case 'wireframe':
           materialPass = new WireframePass();
-          (materialPass as WireframePass).wireframeUniforms.color = new Color().setRGB(
-            t.color?.[0] ?? 1,
-            t.color?.[1] ?? 1,
-            t.color?.[2] ?? 1
-          );
-          (materialPass as WireframePass).wireframeUniforms.opacity = t.opacity || 1;
+          (materialPass as WireframePass).wireframeUniforms.color =
+            new Color().setRGB(
+              t.color?.[0] ?? 1,
+              t.color?.[1] ?? 1,
+              t.color?.[2] ?? 1
+            );
+          (materialPass as WireframePass).wireframeUniforms.opacity =
+            t.opacity || 1;
           break;
         case 'gizmo':
           materialPass = new GizmoPass();
@@ -107,18 +116,22 @@ export class MaterialManager {
           break;
         case 'sprite':
           materialPass = new SpritePass();
-          (materialPass as SpritePass).spriteUniforms.diffuseColor = new Color().setRGB(
-            t.color?.[0] ?? 1,
-            t.color?.[1] ?? 1,
-            t.color?.[2] ?? 1
-          );
-          (materialPass as SpritePass).spriteUniforms.diffuseAlpha = t.opacity ?? 1;
+          (materialPass as SpritePass).spriteUniforms.diffuseColor =
+            new Color().setRGB(
+              t.color?.[0] ?? 1,
+              t.color?.[1] ?? 1,
+              t.color?.[2] ?? 1
+            );
+          (materialPass as SpritePass).spriteUniforms.diffuseAlpha =
+            t.opacity ?? 1;
           if (t.diffuseMap)
             (materialPass as SpritePass).spriteUniforms.texture =
               renderer.textureManager.get(t.diffuseMap).gpuTexture;
           break;
         default:
-          throw new Error(`Unknown material type: ${(t as { type: string }).type}`);
+          throw new Error(
+            `Unknown material type: ${(t as { type: string }).type}`
+          );
       }
 
       this.addMaterial(t.name, materialPass);
@@ -140,4 +153,72 @@ export class MaterialManager {
     this.materials.set(id, material);
     return material;
   }
+}
+
+/**
+ * A standard material is enough parameters that inlining it in the switch
+ * would bury the other five types, so it gets a function.
+ *
+ * Every field is optional and every default lives on StandardMaterial, so a
+ * `{ name, type }` entry is glTF's default material: white, dielectric, half
+ * rough. Only what the template names is written.
+ */
+function createStandardPass(
+  renderer: Renderer,
+  t: IStandardMaterialTemplate
+): StandardPass {
+  const pass = new StandardPass();
+  const { material } = pass;
+  const texture = (name?: string) =>
+    name === undefined
+      ? undefined
+      : renderer.textureManager.get(name).gpuTexture;
+
+  const baseColor = texture(t.baseColorMap);
+  const normal = texture(t.normalMap);
+  const metallicRoughness = texture(t.metallicRoughnessMap);
+  const occlusion = texture(t.occlusionMap);
+  const emissive = texture(t.emissiveMap);
+
+  if (baseColor) material.baseColorTexture = baseColor;
+  if (normal) material.normalTexture = normal;
+  if (metallicRoughness) material.metallicRoughnessTexture = metallicRoughness;
+  if (occlusion) material.occlusionTexture = occlusion;
+  if (emissive) material.emissiveTexture = emissive;
+
+  // glTF carries opacity as baseColorFactor's fourth component; this schema
+  // splits it out under the name the other material types already use.
+  if (t.baseColorFactor || t.opacity !== undefined) {
+    const rgb = t.baseColorFactor ?? [1, 1, 1];
+    material.baseColorFactor = [rgb[0], rgb[1], rgb[2], t.opacity ?? 1];
+  }
+
+  if (t.metallic !== undefined) material.metallic = t.metallic;
+  if (t.roughness !== undefined) material.roughness = t.roughness;
+  if (t.emissiveColor) material.emissiveColor = t.emissiveColor;
+  if (t.emissiveStrength !== undefined)
+    material.emissiveStrength = t.emissiveStrength;
+  if (t.occlusionStrength !== undefined)
+    material.occlusionStrength = t.occlusionStrength;
+  if (t.normalScale !== undefined) material.normalScale = t.normalScale;
+  if (t.ambientColor) material.ambientColor = t.ambientColor;
+  if (t.alphaCutoff !== undefined) material.alphaCutoff = t.alphaCutoff;
+
+  if (t.alphaMode !== undefined) {
+    // The template is cast, never validated, so a typo would otherwise pack an
+    // out-of-range mode the shader reads as OPAQUE — a material that silently
+    // loses its cutout. Same stance as the texture colour space: throw at load.
+    if (!ALPHA_MODES.includes(t.alphaMode))
+      throw new Error(
+        `Material "${t.name}": alphaMode must be one of ${ALPHA_MODES.join(
+          ', '
+        )}, got "${t.alphaMode}"`
+      );
+    pass.alphaMode = t.alphaMode;
+  }
+
+  if (t.doubleSided !== undefined) pass.doubleSided = t.doubleSided;
+  if (t.vertexColors !== undefined) pass.vertexColors = t.vertexColors;
+
+  return pass;
 }

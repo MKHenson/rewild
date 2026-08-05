@@ -8,17 +8,16 @@ import {
   LambertPass,
 } from 'rewild-renderer';
 
-// A way to actually look at StandardPass before anything else can reach it.
+// A way to look at StandardPass on an object that is already in the scene.
 //
-// The pass is deliberately not wired into materials.json yet — that schema work
-// is #197, and the metallic x roughness reference grid is #203. Without one of
-// those, nothing in the app ever constructs a StandardPass, so esbuild strips
-// it from the bundle and its shader is never even compiled. This command is the
-// stopgap: it rebinds meshes that are already in the scene, so a familiar
-// object can be compared against its Phong version directly.
+// Since #197 a `standard` material can simply be named in materials.json, so
+// this is no longer how the pass reaches the bundle. What it still does that a
+// template cannot is *rebind an existing mesh*: the same crate under Phong and
+// under PBR, one command apart, which is the only honest way to judge the
+// shading models against each other. It also reaches parameters no material in
+// the template sets, so a slot can be exercised before an asset uses it.
 //
-// Expected to be deleted once #197 lands and a `standard` material can simply
-// be named in the template.
+// #203's metallic x roughness grid supersedes the comparison half of this.
 export function registerStandardMaterialCommands(renderer: Renderer) {
   (window as any).useStandardMaterial = (
     materialId?: string,

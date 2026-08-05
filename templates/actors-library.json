@@ -50,6 +50,10 @@
           "templateId": "crate"
         },
         {
+          "name": "Concrete Block",
+          "templateId": "concrete-block"
+        },
+        {
           "name": "Pill",
           "templateId": "pill"
         },
