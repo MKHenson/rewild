@@ -5,7 +5,7 @@ export type TemplateColor = [number, number, number];
 
 export interface IStandardMaterialTemplate {
   name: string;
-  type: 'standard';
+  type: 'standard' | 'standard-instanced';
   baseColorMap?: string;
   normalMap?: string;
   /** Roughness in G, metallic in B. */
