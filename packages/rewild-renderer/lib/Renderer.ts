@@ -36,6 +36,9 @@ import { QualitySettings } from './utils/QualitySettings';
 const _projScreenMatrix = new Matrix4();
 const _frustum = new Frustum();
 
+const sortOpaqueFirst = (a: IRenderGroup, b: IRenderGroup) =>
+  (a.pass.transparent ? 1 : 0) - (b.pass.transparent ? 1 : 0);
+
 export class Renderer {
   device: GPUDevice;
   presentationFormat: GPUTextureFormat;
@@ -540,6 +543,7 @@ export class Renderer {
       }
     }
 
+    target.sort(sortOpaqueFirst);
     return target;
   }
 

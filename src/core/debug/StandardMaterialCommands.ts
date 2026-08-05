@@ -1,4 +1,6 @@
 import {
+  ALPHA_MODES,
+  AlphaMode,
   Mesh,
   PhongPass,
   Renderer,
@@ -29,18 +31,29 @@ export function registerStandardMaterialCommands(renderer: Renderer) {
       occlusion?: string;
       emissive?: string;
       ambient?: number;
+      alphaMode?: AlphaMode;
+      alphaCutoff?: number;
+      opacity?: number;
+      doubleSided?: boolean;
+      emissiveColor?: [number, number, number];
+      emissiveStrength?: number;
     }
   ) => {
     if (materialId === undefined) {
       console.log(
-        'useStandardMaterial(materialId, metallic = 0, roughness = 0.5, maps?) — ' +
+        'useStandardMaterial(materialId, metallic = 0, roughness = 0.5, opts?) — ' +
           'rebinds every mesh using materialId onto a StandardPass.\n' +
-          'maps: { baseColor, normal, metallicRoughness, occlusion, emissive } are ' +
+          'opts: { baseColor, normal, metallicRoughness, occlusion, emissive } are ' +
           'textureManager names; ambient is a grey level for the placeholder ' +
           'ambient term.\n' +
+          "glTF material semantics: alphaMode ('OPAQUE' | 'MASK' | 'BLEND'), " +
+          'alphaCutoff, opacity (baseColorFactor alpha), doubleSided, ' +
+          'emissiveColor, emissiveStrength.\n' +
           "e.g. useStandardMaterial('crate', 0, 1, { " +
           "metallicRoughness: 'block-concrete-4-roughness', " +
-          "occlusion: 'block-concrete-4-ao', ambient: 0.3 })"
+          "occlusion: 'block-concrete-4-ao', ambient: 0.3 })\n" +
+          "e.g. useStandardMaterial('alient-plant', 0, 0.8, { " +
+          "alphaMode: 'MASK', alphaCutoff: 0.5, doubleSided: true })"
       );
       return;
     }
@@ -109,6 +122,27 @@ export function registerStandardMaterialCommands(renderer: Renderer) {
     if (maps?.ambient !== undefined) {
       pass.material.ambientColor = [maps.ambient, maps.ambient, maps.ambient];
     }
+
+    if (maps?.alphaMode !== undefined) {
+      if (!ALPHA_MODES.includes(maps.alphaMode)) {
+        console.warn(
+          `alphaMode must be one of ${ALPHA_MODES.join(', ')}, got ${maps.alphaMode}`
+        );
+        return;
+      }
+      pass.alphaMode = maps.alphaMode;
+    }
+    if (maps?.alphaCutoff !== undefined)
+      pass.material.alphaCutoff = maps.alphaCutoff;
+    // Opacity is baseColorFactor's fourth component, and it only reaches the
+    // frame in BLEND — in OPAQUE or MASK the shader writes 1.0 whatever it says.
+    if (maps?.opacity !== undefined)
+      pass.material.baseColorFactor = [1, 1, 1, maps.opacity];
+    if (maps?.doubleSided !== undefined) pass.doubleSided = maps.doubleSided;
+    if (maps?.emissiveColor !== undefined)
+      pass.material.emissiveColor = maps.emissiveColor;
+    if (maps?.emissiveStrength !== undefined)
+      pass.material.emissiveStrength = maps.emissiveStrength;
 
     // The renderer calls init() lazily on any pass whose requiresRebuild is
     // set, so there is nothing to build here.

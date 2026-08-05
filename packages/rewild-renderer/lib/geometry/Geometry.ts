@@ -31,6 +31,7 @@ export class Geometry {
   normals?: Float32Array;
   uvs?: Float32Array;
   uvs1?: Float32Array;
+  colors?: Float32Array;
   groups: GeometryGroup[];
 
   _todoTangents: Float32Array;
@@ -39,6 +40,7 @@ export class Geometry {
   normalBuffer: GPUBuffer;
   uvBuffer: GPUBuffer;
   uv1Buffer: GPUBuffer;
+  colorBuffer: GPUBuffer;
   indexBuffer: GPUBuffer;
 
   boundingBox: Box3 | null;
@@ -86,6 +88,7 @@ export class Geometry {
     this.vertexBuffer?.destroy();
     this.normalBuffer?.destroy();
     this.uvBuffer?.destroy();
+    this.colorBuffer?.destroy();
     this.indexBuffer?.destroy();
   }
 
@@ -388,6 +391,17 @@ export class Geometry {
       });
       new Float32Array(this.uvBuffer.getMappedRange()).set(this.uvs1);
       this.uvBuffer.unmap();
+    }
+
+    if (this.colors) {
+      this.colorBuffer = device.createBuffer({
+        label: 'color buffer data',
+        size: this.colors.byteLength,
+        usage: GPUBufferUsage.VERTEX,
+        mappedAtCreation: true,
+      });
+      new Float32Array(this.colorBuffer.getMappedRange()).set(this.colors);
+      this.colorBuffer.unmap();
     }
 
     if (this.indices) {

@@ -23,11 +23,7 @@ const channelOf = (material: string) => PALETTE.indexOf(material);
 
 const GRASS = channelOf(PLAIN.layers[0].material);
 const PATH = channelOf(PLAIN.layers[1].material); // noise-mixed with GRASS
-const LITTER = channelOf(FOREST.layers[0].material); // the forest's leaf bed
-const LEAVES = channelOf(FOREST.layers[1].material); // noise-mixed with LITTER
 const BASE = channelOf(MOUNTAIN.layers[0].material); // mountain's base ground
-const ROCK = channelOf(MOUNTAIN.layers[1].material); // slope layer
-const SNOW = channelOf(MOUNTAIN.layers[2].material); // height layer
 
 // A 32-sample chunk is tiny against the climate's 3000-unit scale, so a whole
 // test chunk falls in one climate cell — which cell being an accident of the
@@ -49,19 +45,6 @@ function climateOfOneBiome(biomeIndex: number): ClimateConfig {
 }
 
 const PLAIN_ONLY = climateOfOneBiome(0);
-const FOREST_ONLY = climateOfOneBiome(1);
-const MOUNTAIN_ONLY = climateOfOneBiome(2);
-
-// Read snow's selectors off the table rather than restating them — these tests
-// are about layer selection, not about the values that happen to be tuned in.
-const SNOW_HEIGHT = MOUNTAIN.layers[2].height!;
-const SNOW_SLOPE = MOUNTAIN.layers[2].slope!;
-const ROCK_SLOPE = MOUNTAIN.layers[1].slope!;
-const DEG_TO_RAD = Math.PI / 180;
-
-// A slope past the top of the rock band (and past where snow releases), so rock
-// has fully taken over — a "bare cliff". Read off the table so it tracks tuning.
-const CLIFF_SLOPE = Math.max(SNOW_SLOPE.from, ROCK_SLOPE.to) + 5;
 
 function splatFor(
   heights: Float32Array,
