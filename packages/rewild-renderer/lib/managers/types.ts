@@ -26,8 +26,6 @@ export interface IStandardMaterialTemplate {
   emissiveStrength?: number;
   occlusionStrength?: number;
   normalScale?: number;
-  /** Placeholder flat ambient; #201's IBL replaces it. */
-  ambientColor?: TemplateColor;
   alphaMode?: AlphaMode;
   alphaCutoff?: number;
   doubleSided?: boolean;
@@ -55,6 +53,9 @@ export interface IClassicMaterialTemplate {
   shininess?: number;
   emissiveColor?: TemplateColor;
   emissiveIntensity?: number;
+  /** Flat ambient. Retained only for Lambert and Phong — the standard material
+   *  gets its ambient from the sky IBL instead (#201), and these two shading
+   *  models are what Lichen is replacing rather than upgrading. */
   ambientColor?: TemplateColor;
 }
 

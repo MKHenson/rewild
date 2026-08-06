@@ -59,9 +59,28 @@ export function registerSkyDebugCommands(renderer: Renderer) {
     );
   };
 
+  // Shading-side toggle: it zeroes the ambient every lit surface receives, which
+  // is what separates a direct-lighting bug from an ambient one. Distinct from
+  // setIblPrefilterEnabled below, which freezes the cubes but leaves whatever
+  // they last held still lighting the scene.
   (window as any).setIblEnabled = (enabled: boolean) => {
+    renderer.iblIntensity = enabled ? 1 : 0;
+    console.log(`Sky IBL ambient ${enabled ? 'enabled' : 'disabled'}`);
+  };
+
+  (window as any).setIblIntensity = (intensity: number) => {
+    renderer.iblIntensity = intensity;
+    console.log(`Sky IBL ambient intensity ${intensity} (1 = physical)`);
+  };
+
+  (window as any).setIblPrefilterEnabled = (enabled: boolean) => {
     renderer.sky.skyRenderer.iblPrefilter.enabled = enabled;
-    console.log(`IBL prefilter ${enabled ? 'enabled' : 'disabled'}`);
+    console.log(
+      `IBL prefilter ${
+        enabled ? 'enabled' : 'frozen'
+      } — the cubes keep lighting ` +
+        'the scene either way; use setIblEnabled(false) to remove ambient.'
+    );
   };
 
   (window as any).skyCaptureStats = () => {

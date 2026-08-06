@@ -48,7 +48,6 @@ describe("MaterialManager type: 'standard'", () => {
       emissiveStrength: 4,
       occlusionStrength: 0.8,
       normalScale: 1.5,
-      ambientColor: [0.1, 0.1, 0.1],
       alphaMode: 'BLEND',
       alphaCutoff: 0.25,
       doubleSided: true,
@@ -70,7 +69,6 @@ describe("MaterialManager type: 'standard'", () => {
     expect(material.emissiveStrength).toBe(4);
     expect(material.occlusionStrength).toBe(0.8);
     expect(material.normalScale).toBe(1.5);
-    expect(material.ambientColor).toEqual([0.1, 0.1, 0.1]);
     expect(material.alphaCutoff).toBe(0.25);
 
     // alphaMode has to reach both halves: the pass picks blend and depth-write

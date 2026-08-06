@@ -3,22 +3,23 @@ import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 
-// StandardParams layout (80 bytes, std140-compatible):
+// StandardParams layout (64 bytes, std140-compatible):
 //   baseColorFactor   vec4f  offset 0  (16 bytes)
 //   emissiveColor     vec3f  offset 16 (12 bytes)
 //   roughness         f32    offset 28 (4 bytes)
-//   ambientColor      vec3f  offset 32 (12 bytes)
-//   emissiveStrength  f32    offset 44 (4 bytes)
-//   metallic          f32    offset 48 (4 bytes)
-//   occlusionStrength f32    offset 52 (4 bytes)
-//   normalScale       f32    offset 56 (4 bytes)
-//   alphaCutoff       f32    offset 60 (4 bytes)
-//   alphaMode         u32    offset 64 (4 bytes)
-//   _pad0.._pad2      f32    offset 68 (12 bytes)
+//   emissiveStrength  f32    offset 32 (4 bytes)
+//   metallic          f32    offset 36 (4 bytes)
+//   occlusionStrength f32    offset 40 (4 bytes)
+//   normalScale       f32    offset 44 (4 bytes)
+//   alphaCutoff       f32    offset 48 (4 bytes)
+//   alphaMode         u32    offset 52 (4 bytes)
+//   _pad0.._pad1      f32    offset 56 (8 bytes)
 //
-// The scalars are tucked into the vec3 padding slots rather than given rows of
-// their own — a vec3f is aligned to 16 bytes either way, so this costs nothing.
-const PARAMS_SIZE = 80;
+// roughness is tucked into emissiveColor's padding slot rather than given a row
+// of its own — a vec3f is aligned to 16 bytes either way, so this costs nothing.
+//
+// #201 removed ambientColor from offset 32; the scalars below it moved up a row.
+const PARAMS_SIZE = 64;
 
 /** glTF's alphaMode. The shader compares against these, so the numbering is
  *  shared with ALPHA_MODE_* in standard.wgsl. */
@@ -61,12 +62,10 @@ export class StandardMaterial implements ISharedUniformBuffer {
    *  Kept separate from emissiveColor rather than folded into it because glTF
    *  clamps the factor to [0,1] and puts all the range here. */
   emissiveStrength: number = 1;
-  /** Placeholder for IBL; #201 replaces this with the sky-captured ambient. */
-  ambientColor: [number, number, number] = [0, 0, 0];
   /** How far the occlusion map is allowed to darken indirect light: 0 ignores
    *  the map entirely, 1 applies it in full. glTF's occlusionTexture.strength.
-   *  Note occlusion only affects the indirect term, so it is invisible while
-   *  ambientColor is black. */
+   *  Occlusion is scoped to indirect light
+   */
   occlusionStrength: number = 1;
   /** How far the normal map is allowed to tilt the shading normal: 0 flattens
    *  it to the geometric normal, 1 is the map as authored, above 1 exaggerates.
@@ -167,15 +166,12 @@ export class StandardMaterial implements ISharedUniformBuffer {
     this._paramsData[5] = this.emissiveColor[1];
     this._paramsData[6] = this.emissiveColor[2];
     this._paramsData[7] = this.roughness;
-    this._paramsData[8] = this.ambientColor[0];
-    this._paramsData[9] = this.ambientColor[1];
-    this._paramsData[10] = this.ambientColor[2];
-    this._paramsData[11] = this.emissiveStrength;
-    this._paramsData[12] = this.metallic;
-    this._paramsData[13] = this.occlusionStrength;
-    this._paramsData[14] = this.normalScale;
-    this._paramsData[15] = this.alphaCutoff;
-    this._paramsDataU32[16] = ALPHA_MODES.indexOf(this.alphaMode);
+    this._paramsData[8] = this.emissiveStrength;
+    this._paramsData[9] = this.metallic;
+    this._paramsData[10] = this.occlusionStrength;
+    this._paramsData[11] = this.normalScale;
+    this._paramsData[12] = this.alphaCutoff;
+    this._paramsDataU32[13] = ALPHA_MODES.indexOf(this.alphaMode);
     device.queue.writeBuffer(
       this._paramsBuffer,
       0,

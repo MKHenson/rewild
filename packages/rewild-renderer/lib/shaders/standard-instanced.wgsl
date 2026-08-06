@@ -15,6 +15,7 @@
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
 #include "./shader-lib/tbn.frag.wgsl"
+#include "./shader-lib/ibl.wgsl"
 #include "./shader-lib/standard-material.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"
@@ -77,6 +78,13 @@ struct VertexOutput {
 @group(3) @binding(4) var shadowSampler: sampler_comparison;
 @group(3) @binding(5) var<uniform> directionalShadowParams: DirectionalShadowParams;
 @group(3) @binding(6) var<uniform> spotLightShadowParams: SpotLightShadowParams;
+// Sky IBL — same bindings as standard.wgsl, since both run the same fragment
+// code out of shader-lib. See that file for why they share group 3.
+@group(3) @binding(7) var iblIrradianceMap: texture_cube<f32>;
+@group(3) @binding(8) var iblSpecularMap: texture_cube<f32>;
+@group(3) @binding(9) var iblBrdfLut: texture_2d<f32>;
+@group(3) @binding(10) var iblSampler: sampler;
+@group(3) @binding(11) var<uniform> iblParams: IblParams;
 
 fn transformVertex(
   instanceIndex: u32,

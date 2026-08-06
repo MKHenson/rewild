@@ -43,6 +43,13 @@ split-sum BRDF map. Specular mip 0 is a straight copy of the capture: roughness 
 the GGX estimator degenerates there. Each sample picks a source mip from its pdf, which is what
 stops a 64-sample estimate over a sky containing point-like stars from producing fireflies.
 
+Consumed by `shader-lib/ibl.wgsl`, which the standard material calls in place of the flat
+`ambientColor` constant it used to add (#201). Diffuse is `irradiance × diffuseColor`; specular is
+`prefiltered × (F0 × lut.r + lut.g)`; both are scaled by the occlusion map, since glTF scopes that
+to indirect light and this is now the only indirect term. The cubes are world-space and the
+material passes shade in view space, so directions are rotated out through the camera's world
+matrix, supplied per frame in the IBL params block.
+
 Amortised a **level per frame** — nine steps, so a full pass trails the sky by ~150ms at 60fps.
 A pass always runs to completion before the next starts: restarting whenever the capture touched a
 face would mean a drifting sun restarts it every frame and it never reaches the end. A
@@ -70,8 +77,16 @@ setIblSpecularMip(3); // Which roughness level the specular row shows (0-7)
 setIblCubeExposureBias(8); // Open up a night capture; 1 matches the frame
 skyCaptureStats(); // Capture + prefilter schedule state
 setSkyCaptureEnabled(false); // Stop capturing entirely
-setIblEnabled(false); // Stop prefiltering entirely
+
+setIblEnabled(false); // Remove sky ambient from shading — isolates direct-light bugs
+setIblIntensity(2); // Scale it instead of removing it; 1 is physical
+setIblPrefilterEnabled(false); // Freeze the cubes; they keep lighting the scene
 ```
+
+`setIblEnabled` and `setIblPrefilterEnabled` are different knobs. The first zeroes the ambient
+every lit surface receives, which is what separates a direct-lighting bug from an ambient one. The
+second stops the cubes being **updated** and leaves whatever they last held still lighting the
+scene — useful for checking whether something is moving because the sky moved.
 
 Reading the viewer: the irradiance row should be a smooth gradient with no visible structure at
 all, and the specular row **at mip 0 should be identical to the capture row** — it is a straight

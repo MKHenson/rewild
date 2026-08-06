@@ -13,7 +13,8 @@
 // and binding its own layout puts them:
 //   - mySampler, baseColorMap, normalMap, metallicRoughnessMap, occlusionMap,
 //     emissiveMap, and the standardParams uniform block
-//   - brdf.wgsl, pbr-lighting.wgsl and tbn.frag.wgsl, which this calls into
+//   - brdf.wgsl, pbr-lighting.wgsl, tbn.frag.wgsl and ibl.wgsl, which this
+//     calls into, plus the IBL bindings that last one names
 //   - the `lighting` storage binding those two need, and spotLightShadowParams,
 //     which says which light in it the spot atlas belongs to
 
@@ -29,10 +30,6 @@ struct StandardParams {
   baseColorFactor  : vec4f,
   emissiveColor    : vec3f,
   roughness        : f32,
-  // Flat ambient, and temporary: #201 replaces it with sky-captured IBL and
-  // deletes it. It is here because without any ambient term a face turned away
-  // from every light is pure black, which makes the BRDF impossible to judge.
-  ambientColor     : vec3f,
   emissiveStrength : f32,
   metallic         : f32,
   occlusionStrength: f32,
@@ -41,7 +38,6 @@ struct StandardParams {
   alphaMode        : u32,
   _pad0            : f32,
   _pad1            : f32,
-  _pad2            : f32,
 }
 
 // `sunShadow` is the cloud and cascade shadow product; `spotShadow` is the one
@@ -111,17 +107,17 @@ fn shadeStandardSurface(
   // which is a statement about *indirect* light — direct lighting already
   // answers the question with N·L and the shadow maps, and multiplying it again
   // here would double-darken every crevice that faces away from the sun. So
-  // glTF scopes it to indirect, and today the only indirect term is the flat
-  // ambient below. #201's IBL takes that term's place and inherits the multiply.
-  //
-  // Consequence worth knowing: with ambientColor at its default black, an
-  // occlusion map has no visible effect at all.
+  // glTF scopes it to indirect, IBL below and
+  // nothing else.
   let occlusionSample = textureSample(occlusionMap, mySampler, fragUV).r;
   let occlusion = 1.0 + standardParams.occlusionStrength * (occlusionSample - 1.0);
 
-  // Ambient lands on the diffuse colour only, so a metal stays black under it
-  // rather than picking up a grey wash no reflection would produce.
-  color += surface.diffuseColor * standardParams.ambientColor * occlusion;
+  // Ambient, from the prefiltered sky rather than an authored constant. Both
+  // lobes: a metal has no diffuse to catch a flat ambient with and used to go
+  // black in shadow, and it is the specular half — a real reflection of a real
+  // sky — that fixes that. Perceptual roughness rather than surface.alpha,
+  // because that is what the prefiltered chain and the BRDF map are indexed by.
+  color += evaluateIbl(surface, roughness) * occlusion;
 
   let emissiveSample = textureSample(emissiveMap, mySampler, fragUV).rgb;
   color += emissiveSample * standardParams.emissiveColor * standardParams.emissiveStrength;
