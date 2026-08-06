@@ -73,7 +73,7 @@ mountain and desert could arrive one after another without re-architecting.
 ## Climate presets
 
 The climate/biome tables are **game content, tuned in code**, not per-world data.
-They're bundled as named **presets**. A world stores only *which* preset it uses,
+They're bundled as named **presets**. A world stores only _which_ preset it uses,
 not a copy of the tables.
 
 - Today there's a default preset; future presets are the door to "worlds back in
@@ -114,12 +114,12 @@ immune to later changes in the generation rules.
 
 Alongside sculpting you can **paint which biome a patch of ground belongs to**.
 The key idea — and the reason it behaves so well — is that you're painting the
-biome *input*, not the final texture:
+biome _input_, not the final texture:
 
 - Paint a hillside as "mountain" and it isn't just given a rock texture — it
   adopts mountain's whole rulebook. **Raise a peak inside that painted region and
-  it grows snow on its own**, because you told the ground *what it is*, not *what
-  to draw*.
+  it grows snow on its own**, because you told the ground _what it is_, not _what
+  to draw_.
 - Paint is **splat-only — it never changes the shape of the ground.** Sculpting
   says what shape the terrain is; painting says what it's made of. The two are
   independent: you can paint without sculpting and vice-versa.
@@ -128,7 +128,7 @@ biome *input*, not the final texture:
   drawing hard cookie-cutter borders.
 
 **What you can paint.** The palette is exactly the biomes of the world's current
-climate preset — painting *within* that set is free. (Painting a biome from a
+climate preset — painting _within_ that set is free. (Painting a biome from a
 different preset isn't supported; it's the one thing that keeps the tool scoped.)
 
 **Cost.** Painting is cheap: no geometry moves, so nothing is re-meshed — a
@@ -198,14 +198,14 @@ and behaves. All live in `packages/rewild-renderer/lib/renderers/terrain/`.
 **Materials** — `TerrainMaterials.ts` (`TERRAIN_MATERIALS`). Each named material is
 a set of textures (albedo, normal, roughness, height) plus tuning knobs:
 
-| Lever | What it does |
-| --- | --- |
-| `uvScale` | Detail tiling — how many times the texture repeats per chunk. |
-| `heightScale` | Parallax-occlusion depth. Bigger ⇒ deeper apparent relief; `0` turns parallax off. |
-| `macroUvScale` / `macroNormalFrom` / `macroStrength` | The **distance-sharpening** knobs — a coarse "macro" normal that keeps distant surfaces from flattening out. `macroNormalFrom` can borrow another material's normal. |
-| `specular` / `shininess` | How strong and how tight the sun-glint is (wet rock vs. matte grass). |
-| `blendDepth` | Transition width to neighbouring materials — low (~0.2) = a hard interlocking edge, high (~0.7) = a soft crossfade. |
-| `normalConvention` | `'opengl'` or `'directx'` — **the common gotcha:** get it wrong and every bump reads as a dent. If one material looks "inset" while others look right, flip this. |
+| Lever                                                | What it does                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `uvScale`                                            | Detail tiling — how many times the texture repeats per chunk.                                                                                                                                                                                                                |
+| `heightScale`                                        | Parallax-occlusion depth. Bigger ⇒ deeper apparent relief; `0` turns parallax off.                                                                                                                                                                                           |
+| `macroUvScale` / `macroNormalFrom` / `macroStrength` | The **distance-sharpening** knobs — a coarse "macro" normal that keeps distant surfaces from flattening out. `macroNormalFrom` can borrow another material's normal.                                                                                                         |
+| `roughness` / `occlusionStrength`                    | Multipliers on the ARM map's roughness and occlusion channels, as glTF's `roughnessFactor` and `occlusionTexture.strength`. Roughness sets how tight the sun-glint is (wet rock vs. matte grass). Replaced `specular` / `shininess` when terrain adopted PBR in Lichen #202. |
+| `blendDepth`                                         | Transition width to neighbouring materials — low (~0.2) = a hard interlocking edge, high (~0.7) = a soft crossfade.                                                                                                                                                          |
+| `normalConvention`                                   | `'opengl'` or `'directx'` — **the common gotcha:** get it wrong and every bump reads as a dent. If one material looks "inset" while others look right, flip this.                                                                                                            |
 
 **Biomes** — `Biomes.ts` (`PLAIN`, `MOUNTAIN`, `DESERT`, …). A biome is a
 **deformation stack** (what shapes its ground — amplitude, curve) plus a list of
@@ -220,7 +220,7 @@ The first layer is the biome's base and covers everything the others don't.
 new code.
 
 **Climate presets & world settings** — a climate preset bundles the biomes and the
-temperature/moisture model; a world stores only *which* preset it uses plus its
+temperature/moisture model; a world stores only _which_ preset it uses plus its
 `seed`, both set from the editor. The palette ceiling is `MAX_SPLAT_LAYERS = 8`
 simultaneously-visible materials.
 
@@ -229,12 +229,12 @@ simultaneously-visible materials.
 Available from the browser DevTools console while the app is running (registered in
 `src/core/debug/`). Terrain-relevant ones:
 
-| Function | What it does |
-| --- | --- |
-| `startScenePerfCapture()` / `stopScenePerfCapture()` | Log GPU time for the main scene pass. On a terrain-filling view this is dominated by terrain's fragment cost — the sample-budget measurement. |
-| `writeChunkSnapshotFixture(cx?, cy?)` | Write a test snapshot (an unmistakable plateau) for a chunk and re-mesh it in place — exercises the save/load round-trip without the sculpt UI. |
-| `clearChunkSnapshots()` | Remove all saved chunk edits for the current level and reload the terrain. |
-| `startShadowDebug()` / `stopShadowDebug()` | Tint the terrain by shadow cascade + show the shadow atlas — useful when shadows on terrain look wrong. |
+| Function                                             | What it does                                                                                                                                    |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `startScenePerfCapture()` / `stopScenePerfCapture()` | Log GPU time for the main scene pass. On a terrain-filling view this is dominated by terrain's fragment cost — the sample-budget measurement.   |
+| `writeChunkSnapshotFixture(cx?, cy?)`                | Write a test snapshot (an unmistakable plateau) for a chunk and re-mesh it in place — exercises the save/load round-trip without the sculpt UI. |
+| `clearChunkSnapshots()`                              | Remove all saved chunk edits for the current level and reload the terrain.                                                                      |
+| `startShadowDebug()` / `stopShadowDebug()`           | Tint the terrain by shadow cascade + show the shadow atlas — useful when shadows on terrain look wrong.                                         |
 
 Sky/atmosphere over the terrain has its own console tools (`startSkyPerfCapture()`,
 `setBloom()`, `toggleCloudShadowDebug()`) — see

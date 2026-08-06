@@ -44,7 +44,8 @@ the GGX estimator degenerates there. Each sample picks a source mip from its pdf
 stops a 64-sample estimate over a sky containing point-like stars from producing fireflies.
 
 Consumed by `shader-lib/ibl.wgsl`, which the standard material calls in place of the flat
-`ambientColor` constant it used to add (#201). Diffuse is `irradiance × diffuseColor`; specular is
+`ambientColor` constant it used to add (#201), and which terrain calls too since it adopted the
+same PBR include (#202). Diffuse is `irradiance × diffuseColor`; specular is
 `prefiltered × (F0 × lut.r + lut.g)`; both are scaled by the occlusion map, since glTF scopes that
 to indirect light and this is now the only indirect term. The cubes are world-space and the
 material passes shade in view space, so directions are rotated out through the camera's world

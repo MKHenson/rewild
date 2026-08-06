@@ -1,4 +1,7 @@
 #include "./shader-lib/total-lighting.wgsl"
+#include "./shader-lib/brdf.wgsl"
+#include "./shader-lib/pbr-lighting.wgsl"
+#include "./shader-lib/ibl.wgsl"
 #include "./shader-lib/tbn.frag.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"
@@ -20,15 +23,16 @@ struct TerrainLayer {
   uvScale     : f32,
   // 0 ⇒ this material has no macro normal.
   macroUvScale: f32,
-  specular    : f32,
+  // Multiplies the ARM map's roughness (G), as glTF's roughnessFactor does.
+  // 1 ⇒ trust the map; below 1 polishes the material, above 1 dulls it.
+  roughnessFactor : f32,
   // +1 for a DirectX-convention normal map, -1 for an OpenGL one. See
   // decodeNormal.
   normalYSign : f32,
   // Depth of the parallax-occlusion volume, in tile-UV units (one tile = 1.0).
   // 0 ⇒ this material samples flat, no parallax.
-  heightScale : f32,
-  // Blinn-Phong specular exponent (gloss). Higher ⇒ tighter, sharper highlight.
-  shininess   : f32,
+  heightScale : f32, 
+  occlusionStrength : f32,
   // Width of this material's transition to its neighbours, in blend-score
   // units. Small ⇒ a hard interlocking edge where per-texel relief decides
   // every fragment; large ⇒ the splat weight carries a soft crossfade. Averaged
@@ -47,9 +51,6 @@ struct TerrainLayer {
 }
 
 struct TerrainParams {
-  specularColor   : vec3f,
-  shininess       : f32,
-  ambientColor    : vec3f,
   // View distance over which the detail normal fades toward flat.
   detailFadeStart : f32,
   detailFadeEnd   : f32,
@@ -60,10 +61,9 @@ struct TerrainParams {
   // of the winning score contribute: small ⇒ a hard interlocking silhouette
   // (just the tallest material shows), large ⇒ softens toward a plain crossfade.
   heightBlendDepth: f32,
-  _pad            : f32,
   // Packed TerrainLayer, three vec4f per splat channel (SPLAT_SLOTS channels):
-  //   [slot*3    ] = (layerIndex, uvScale, macroUvScale, specular)
-  //   [slot*3 + 1] = (normalYSign, heightScale, shininess, blendDepth)
+  //   [slot*3    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
+  //   [slot*3 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
   //   [slot*3 + 2] = (macroLayerIndex, macroNormalYSign, macroStrength, _pad)
   // vec4f rather than array<TerrainLayer, N> because a uniform array's element
   // stride must be a multiple of 16 — a vec4f guarantees that, whereas a struct
@@ -93,7 +93,7 @@ struct VertexOutput {
 @group(1) @binding(3) var seamlessSampler: sampler;
 @group(1) @binding(4) var normalArray: texture_2d_array<f32>;
 @group(1) @binding(5) var noiseTexture: texture_2d<f32>;
-@group(1) @binding(6) var<uniform> phongParams: TerrainParams;
+@group(1) @binding(6) var<uniform> terrainParams: TerrainParams;
 @group(1) @binding(7) var armArray: texture_2d_array<f32>;
 @group(1) @binding(8) var heightArray: texture_2d_array<f32>;
 // Palette channels 4-7. A second texture rather than more channels, because an
@@ -109,6 +109,13 @@ struct VertexOutput {
 @group(3) @binding(4) var shadowSampler: sampler_comparison;
 @group(3) @binding(5) var<uniform> directionalShadowParams: DirectionalShadowParams;
 @group(3) @binding(6) var<uniform> spotLightShadowParams: SpotLightShadowParams;
+// Sky IBL — the same bindings standard.wgsl declares, since terrain now runs
+// the same shading. TerrainPass opts its ShadowUniforms into populating them.
+@group(3) @binding(7) var iblIrradianceMap: texture_cube<f32>;
+@group(3) @binding(8) var iblSpecularMap: texture_cube<f32>;
+@group(3) @binding(9) var iblBrdfLut: texture_2d<f32>;
+@group(3) @binding(10) var iblSampler: sampler;
+@group(3) @binding(11) var<uniform> iblParams: IblParams;
 
 // Splat weight below which a layer is skipped outright, saving its whole block
 // of texture samples. One 8-bit quantisation step is 1/255 = 0.0039, so this is
@@ -165,9 +172,9 @@ const POM_MIN_VIEW_Z: f32 = 0.6;
 const SPLAT_SLOTS: u32 = 8u;
 
 fn getLayer(slot: u32) -> TerrainLayer {
-  let a = phongParams.layers[slot * 3u];
-  let b = phongParams.layers[slot * 3u + 1u];
-  let c = phongParams.layers[slot * 3u + 2u];
+  let a = terrainParams.layers[slot * 3u];
+  let b = terrainParams.layers[slot * 3u + 1u];
+  let c = terrainParams.layers[slot * 3u + 2u];
   return TerrainLayer(a.x, a.y, a.z, a.w, b.x, b.y, b.z, b.w, c.x, c.y, c.z);
 }
 
@@ -332,8 +339,8 @@ fn fs(
   // so what remains is the macro normal rather than mip-averaged grey.
   let viewDistance = length(viewPosition);
   let detailFade = 1.0 - smoothstep(
-    phongParams.detailFadeStart,
-    phongParams.detailFadeEnd,
+    terrainParams.detailFadeStart,
+    terrainParams.detailFadeEnd,
     viewDistance
   );
 
@@ -385,8 +392,8 @@ fn fs(
   // instead of the two crossfading uniformly across the transition.
   var layerColors = array<vec3f, 8>();
   var layerNormals = array<vec3f, 8>();
-  var layerSpecs = array<f32, 8>();
-  var layerShininess = array<f32, 8>();
+  var layerRoughness = array<f32, 8>();
+  var layerOcclusion = array<f32, 8>();
   var layerScores = array<f32, 8>();
   // 1 for a slot the splat selected, 0 otherwise. A separate flag rather than a
   // negative sentinel in layerScores, because the score below is *legitimately*
@@ -444,9 +451,9 @@ fn fs(
     // of them is a visible seam. Scaling with the tile keeps the technique
     // correct from uvScale 1 to 25, and quietly turns it off (one region per
     // chunk) when the texture is so stretched there is no repeat to hide.
-    let noiseUV = scaledUV * phongParams.noiseScale;
-    let noiseDdx = ddx * phongParams.noiseScale;
-    let noiseDdy = ddy * phongParams.noiseScale;
+    let noiseUV = scaledUV * terrainParams.noiseScale;
+    let noiseDdx = ddx * terrainParams.noiseScale;
+    let noiseDdy = ddy * terrainParams.noiseScale;
     let k = textureSampleGrad(
       noiseTexture, seamlessSampler, noiseUV, noiseDdx, noiseDdy
     ).x;
@@ -549,26 +556,31 @@ fn fs(
       layerNormal = normalize(mix(macroNormal, detailNormal, detailFade));
     }
 
-    // Roughness carves the specular highlight out of the material's surface,
-    // instead of the whole layer glinting uniformly (the flat-scalar look:
-    // wet plastic). This is a Phong hack, not PBR — roughness only scales the
-    // highlight's *strength*, not the lobe width — but gloss = 1 - roughness is
-    // enough to make dry grass matte and damp rock catch the sun. layer.specular
-    // stays as the material's ceiling; roughness detail lives under it. Sampled
-    // through the same no-tile blend as albedo so the highlight tracks the
-    // texture actually shown.
+    // The ARM map, sampled through the same no-tile blend as albedo so the
+    // shading tracks the texture actually shown: occlusion in R, roughness in
+    // G, metallic in B.
     //
-    // .g, not .r: this is a packed ARM map — occlusion R, roughness G, metallic
-    // B. R and B are carried but not yet read; occlusion needs an indirect term
-    // to attenuate (#201) and every natural material here is a dielectric.
-    let rghA = textureSampleGrad(armArray, seamlessSampler, sa, arrayIndex, ddx, ddy).g;
-    let rghB = textureSampleGrad(armArray, seamlessSampler, sb, arrayIndex, ddx, ddy).g;
-    let roughness = mix(rghA, rghB, blendFactor);
+    // Both channels finally mean what they say. Under Phong (before #202)
+    // roughness could only scale the highlight's *strength*, not its lobe
+    // width, and occlusion had no indirect term to attenuate at all — the map
+    // carried both and the shader could use neither properly.
+    //
+    // B is still not read. Every natural material in the palette is a
+    // dielectric, so metallic is pinned at 0 below rather than trusted from a
+    // channel that is unauthored in most of these textures.
+    let armA = textureSampleGrad(armArray, seamlessSampler, sa, arrayIndex, ddx, ddy);
+    let armB = textureSampleGrad(armArray, seamlessSampler, sb, arrayIndex, ddx, ddy);
+    let arm = mix(armA, armB, blendFactor);
 
     layerColors[layerSlot] = layerColor;
     layerNormals[layerSlot] = layerNormal;
-    layerSpecs[layerSlot] = layer.specular * (1.0 - roughness);
-    layerShininess[layerSlot] = layer.shininess;
+    // glTF's roughnessFactor: the map is the detail, the material scalar is its
+    // overall character. Clamped because a factor above 1 can push a already-
+    // rough texel past the valid range.
+    layerRoughness[layerSlot] = clamp(arm.g * layer.roughnessFactor, 0.0, 1.0);
+    // glTF's occlusionTexture.strength, which lerps the map toward "unoccluded"
+    // rather than scaling it — 0 ignores the map, 1 applies it in full.
+    layerOcclusion[layerSlot] = 1.0 + layer.occlusionStrength * (arm.r - 1.0);
     // Height carves the boundary: a texel standing above its map's midpoint
     // (a rock bump) lifts the score, below it (a crevice) drops it, so the
     // taller layer shows through where it actually protrudes rather than by a
@@ -616,8 +628,8 @@ fn fs(
   let cutoff = maxScore - blendDepth;
   var blendedColor = vec3f(0.0);
   var blendedTangentNormal = vec3f(0.0);
-  var specFactor = 0.0;
-  var blendedShininess = 0.0;
+  var blendedRoughness = 0.0;
+  var blendedOcclusion = 0.0;
   var blendWeightSum = 0.0;
   for (var layerSlot = 0u; layerSlot < SPLAT_SLOTS; layerSlot++) {
     if (layerActive[layerSlot] == 0.0) {
@@ -630,19 +642,24 @@ fn fs(
     blendWeightSum += contribution;
     blendedColor += contribution * layerColors[layerSlot];
     blendedTangentNormal += contribution * layerNormals[layerSlot];
-    specFactor += contribution * layerSpecs[layerSlot];
-    blendedShininess += contribution * layerShininess[layerSlot];
+    blendedRoughness += contribution * layerRoughness[layerSlot];
+    blendedOcclusion += contribution * layerOcclusion[layerSlot];
   }
 
-  // Per-fragment gloss for the lighting include, blended across the active
-  // materials so damp rock can hold a tight highlight where dry grass stays
-  // matte. Fallback matches the old global default for the degenerate splat.
-  var shadingShininess = 32.0;
+  // Per-fragment roughness and occlusion, blended across the active materials
+  // so damp rock can hold a tight highlight in the same fragment dry grass
+  // stays matte. Roughness rather than a Phong exponent means the lobe actually
+  // narrows now, instead of a fixed-width highlight merely brightening.
+  //
+  // Fallbacks are for the degenerate splat below: fully rough and unoccluded,
+  // which reads as plain diffuse rather than as anything eye-catching.
+  var shadingRoughness = 1.0;
+  var shadingOcclusion = 1.0;
   if (blendWeightSum > 1e-6) {
     blendedColor /= blendWeightSum;
     blendedTangentNormal /= blendWeightSum;
-    specFactor /= blendWeightSum;
-    shadingShininess = blendedShininess / blendWeightSum;
+    shadingRoughness = blendedRoughness / blendWeightSum;
+    shadingOcclusion = blendedOcclusion / blendWeightSum;
   } else {
     // Every layer fell below the epsilon (a degenerate splat) — normalizing a
     // zero vector yields NaN, which propagates through the lighting and renders
@@ -667,21 +684,49 @@ fn fs(
     parallaxT * ns.x + parallaxB * ns.y + parallaxN * ns.z
   );
 
-  #include "./shader-lib/total-lighting-phong.frag.wgsl"
+  // Shadow factors are statement fragments, so they splice into the entry point
+  // rather than being called. The shading itself is a function call now: the
+  // Blinn-Phong include this replaced wrote six named locals into scope and
+  // relied on them being assembled correctly below, whereas accumulatePbrLighting
+  // takes a surface and returns its buckets.
   #include "./shader-lib/cloud-shadow.frag.wgsl"
   #include "./shader-lib/directional-shadow.frag.wgsl"
   #include "./shader-lib/spot-light-shadow.frag.wgsl"
 
-  let diffuseShaded = directionalLight * cloudShadowFactor * directionalShadowFactor
-                    + otherLight
-                    + shadowCastingSpotContrib * spotShadowFactor;
-  let specularShaded = (directionalSpecular * cloudShadowFactor * directionalShadowFactor
-                    + otherSpecular
-                    + shadowCastingSpotSpecular * spotShadowFactor) * specFactor;
+  var surface: PbrSurface;
+  surface.normal = normalizedNormal;
+  surface.viewPosition = viewPosition;
+  // Metallic is pinned at 0: every material in the palette is a dielectric, so
+  // the diffuse colour is the albedo and F0 is glTF's fixed 4%. If a metallic
+  // terrain material ever exists, this is where the ARM map's B channel goes.
+  surface.diffuseColor = diffuseColorFromBaseColor(blendedColor, 0.0);
+  surface.f0 = f0FromBaseColor(blendedColor, 0.0);
+  surface.alpha = perceptualRoughnessToAlpha(shadingRoughness);
 
-  let shadedLight = diffuseShaded + specularShaded + phongParams.ambientColor;
+  let lit = accumulatePbrLighting(
+    surface,
+    spotLightShadowParams.hasSpotShadow,
+    spotLightShadowParams.lightIndex
+  );
 
-  var color = vec4f(blendedColor, 1.0) * vec4f(shadedLight, 1.0);
+  // Shadows attenuate diffuse and specular together — a blocked light delivers
+  // neither. Same assembly as shadeStandardSurface, and deliberately so: the
+  // two paths shade the same way or the objects standing on the terrain do not
+  // look like they belong on it.
+  let sunShadow = cloudShadowFactor * directionalShadowFactor;
+  var shaded = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow
+             + lit.punctualDiffuse + lit.punctualSpecular
+             + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadowFactor;
+
+  // Sky IBL in place of the flat ambient constant. Occlusion applies to this and
+  // only this: direct light already answers the question with N·L and the shadow
+  // maps, so multiplying it there would double-darken every crevice.
+  shaded += evaluateIbl(surface, shadingRoughness) * shadingOcclusion;
+
+  // No multiply by albedo here, unlike the Phong path this replaced. The BRDF
+  // already carries it — diffuseColor went into the surface, and specular is
+  // tinted by F0 rather than by base colour.
+  var color = vec4f(shaded, 1.0);
   if (directionalShadowParams.debugMode != 0u) {
     color = vec4f(mix(color.rgb, cascadeDebugTint, 0.5), 1.0);
   }
