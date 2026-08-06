@@ -7,7 +7,9 @@ import { RenderQuality } from '../utils/RenderQuality';
 import { composeShader } from '../utils/shaderDefines';
 import { bloomScale, bloomShaderDefines } from './BloomQuality';
 
-const UNIFORM_FLOATS = 7; // resolution(2) + iTime + bloomAmount + bloomThreshold + horizontal + cloudsGated
+// resolution(2) + iTime + bloomAmount + bloomThreshold + horizontal +
+// cloudsGated + maxSourceLuminance
+const UNIFORM_FLOATS = 8;
 const ALIGNED_SIZE = Math.ceil((UNIFORM_FLOATS * 4) / 256) * 256;
 
 const TEMPORAL_ALIGNED_SIZE = Math.ceil((1 * 4) / 256) * 256; // blendFactor f32
@@ -38,7 +40,7 @@ export class BloomPass implements IPostProcess {
 
   /** Scales the HDR highlight added to clouds before tonemapping.
    *  Range 0–3; default 1.2. Higher = brighter glow. */
-  bloomAmount: number = 0.86;
+  bloomAmount: number = 0.3;
 
   /**
    * Threshold in exposure-adjusted luminance (EXPOSURE * raw_luminance, with
@@ -51,6 +53,25 @@ export class BloomPass implements IPostProcess {
    * essentially nothing, sunlit cloud tops and the sun disc still bloom fully.
    */
   bloomThreshold: number = 0.1;
+
+  /**
+   * Ceiling on what a single source pixel may contribute, in the same
+   * exposure-adjusted luminance units as bloomThreshold.
+   *
+   * Extraction weights radiance by its excess above the threshold, so bloom
+   * grows with the square of brightness. Bounded sources make that a feature —
+   * it is what separates a sunlit cloud top from the disc behind it. A punctual
+   * light on a near-mirror surface is not bounded: GGX at the roughness floor
+   * peaks around 78,000x, so a metal sphere's highlight arrived four orders of
+   * magnitude above the sun and bloomed as a hard-edged white rectangle — the
+   * kernel's bounding box, saturated corner to corner.
+   *
+   * 9.0 is the sun disc's own ceiling (9000 HDR at the horizon, see
+   * cloudsTemporal.wgsl), which makes the rule "nothing outblooms the sun".
+   * Sky (capped at 60 HDR), cloud tops (~40) and the disc itself all sit at or
+   * under it, so the existing sky tuning is unaffected.
+   */
+  bloomMaxSourceLuminance: number = 9.0;
 
   /** History weight for temporal stabilization. Higher = smoother but slower
    *  to respond to new bright areas. Range 0–1; default 0.85. */
@@ -256,12 +277,23 @@ export class BloomPass implements IPostProcess {
       this.bloomThreshold,
       1.0,
       cloudsGated,
+      this.bloomMaxSourceLuminance,
     ]);
     device.queue.writeBuffer(this.hUniforms, 0, hData.buffer);
 
-    // V pass reads coverage from the H output's alpha — no depth lookup needed.
+    // V pass reads coverage from the H output's alpha — no depth lookup needed,
+    // and no clamp: extraction already happened, so maxSourceLuminance is unread.
     const vData = new Float32Array(ALIGNED_SIZE / 4);
-    vData.set([bw, bh, t, this.bloomAmount, this.bloomThreshold, 0.0, 0.0]);
+    vData.set([
+      bw,
+      bh,
+      t,
+      this.bloomAmount,
+      this.bloomThreshold,
+      0.0,
+      0.0,
+      0.0,
+    ]);
     device.queue.writeBuffer(this.vUniforms, 0, vData.buffer);
 
     const temporalData = new Float32Array(TEMPORAL_ALIGNED_SIZE / 4);

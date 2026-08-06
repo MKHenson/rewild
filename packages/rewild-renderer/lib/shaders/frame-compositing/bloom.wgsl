@@ -30,7 +30,10 @@ struct ObjectStruct {
     bloomThreshold: f32,
     horizontal:     f32,   // 1.0 = H extraction pass, 0.0 = V blur pass
     cloudsGated:    f32,   // 1.0 when the cloud pass depth-gated this frame
+    maxSourceLum:   f32,   // firefly clamp, in exposure-adjusted luminance
 };
+
+const LUMA: vec3f = vec3f(0.2126, 0.7152, 0.0722);
 
 @group(0) @binding(0) var ourSampler: sampler;
 @group(0) @binding(1) var ourTexture: texture_2d<f32>;
@@ -85,10 +88,20 @@ fn cloudCoverage(uv: vec2f) -> f32 {
   var totalWeight = 0.0;   // sum of gaussW * validity — the renormalisation divisor
   var kernelWeight = 0.0;  // sum of gaussW — the full kernel, for the coverage ratio
 
+  // The Gaussian is truncated at 1.875 sigma, where it still carries ~17% of its
+  // peak. Left as-is, the outermost tap is a step from 0.17 to nothing, so any
+  // source bright enough to saturate the core after normalisation saturates the
+  // whole footprint too — and the footprint of two separable passes is a
+  // rectangle. That is what the hard white blocks around a mirror highlight are:
+  // the kernel's own bounding box, not a glow. Subtracting the value at the cut
+  // lands the kernel on exactly zero there, so the boundary is invisible however
+  // bright the source. RADIUS + 1 rather than RADIUS keeps the last tap alive.
+  let TAIL = gaussian(f32(RADIUS + 1), SIGMA);
+
   for (var i: i32 = -RADIUS; i <= RADIUS; i++) {
     let sampleUV = uv + dir * f32(i);
     let s        = textureSampleLevel(ourTexture, ourSampler, sampleUV, 0.0);
-    let gaussW   = gaussian(f32(i), SIGMA);
+    let gaussW   = max(gaussian(f32(i), SIGMA) - TAIL, 0.0);
 
     // H reads the blend buffer and must consult depth; V reads the H output,
     // where alpha already carries that row's coverage.
@@ -97,9 +110,24 @@ fn cloudCoverage(uv: vec2f) -> f32 {
 
     if (isH) {
       // Horizontal pass: only accumulate pixels above the bloom threshold.
-      let exposedLum = dot(EXPOSURE * s.rgb, vec3f(0.2126, 0.7152, 0.0722));
+      //
+      // Firefly clamp. The extracted value is radiance × excess-above-threshold,
+      // so bloom grows with the *square* of source brightness: a pixel 100x over
+      // the gate blooms 10,000x harder. That is survivable while the brightest
+      // thing on screen is the sun disc (9000 HDR, see cloudsTemporal.wgsl), but
+      // a punctual light on a near-mirror surface is a delta function — GGX at
+      // the roughness floor peaks around 78,000x, which put a metal sphere's
+      // highlight four orders of magnitude past the sun. Capping the source at
+      // the disc's own ceiling states the rule directly: nothing in the frame
+      // blooms harder than the sun does. Everything already below it — sky
+      // (capped at 60), cloud tops (~40), the disc itself — is untouched.
+      let rawLum     = dot(EXPOSURE * s.rgb, LUMA);
+      // Scaled by luminance rather than clamped per channel, so a clipped
+      // highlight keeps its hue instead of desaturating toward white.
+      let clamped    = s.rgb * min(1.0, object.maxSourceLum / max(rawLum, 1e-6));
+      let exposedLum = min(rawLum, object.maxSourceLum);
       let excess     = softKnee(exposedLum, object.bloomThreshold, KNEE);
-      bloomSum += s.rgb * excess * w;
+      bloomSum += clamped * excess * w;
     } else {
       // Vertical pass: blur the H-extracted highlights, no re-thresholding.
       bloomSum += s.rgb * w;

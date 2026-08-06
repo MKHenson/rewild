@@ -16,6 +16,7 @@
 #include "./shader-lib/pbr-lighting.wgsl"
 #include "./shader-lib/tbn.frag.wgsl"
 #include "./shader-lib/ibl.wgsl"
+#include "./shader-lib/material-debug.wgsl"
 #include "./shader-lib/standard-material.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"

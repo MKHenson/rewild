@@ -84,6 +84,15 @@ fn fresnelSchlickRoughness(f0: vec3f, NoV: f32, perceptualRoughness: f32) -> vec
   return f0 + (ceiling - f0) * f;
 }
 
+/**
+ * Horizon occlusion (Frostbite / Filament) — attenuates specular reflected into
+ * directions the geometry cannot actually see.
+ */
+fn horizonOcclusion(reflectDir: vec3f, geometricNormal: vec3f) -> f32 {
+  let horizon = clamp(1.0 + dot(reflectDir, geometricNormal), 0.0, 1.0);
+  return horizon * horizon;
+}
+
 fn diffuseLambert(diffuseColor: vec3f) -> vec3f {
   return diffuseColor / BRDF_PI;
 }

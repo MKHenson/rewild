@@ -143,7 +143,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     macroUvScale: MACRO_UV_SCALE,
     heightScale: HEIGHT_SCALE * 0.5,
     uvScale: DETAIL_UV_SCALE * 0.25,
-    roughness: ROUGHNESS * 0.85,
+    roughness: ROUGHNESS * 0.75,
     normalConvention: 'opengl', // Poly Haven
   },
   rocky_terrain: {
@@ -167,7 +167,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE * 1.6,
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    roughness: ROUGHNESS * 0.65,
+    roughness: ROUGHNESS * 1.55,
     normalConvention: 'opengl', // Poly Haven
   },
   marble_cliff_05: {
@@ -179,7 +179,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE * 4,
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    roughness: ROUGHNESS * 0.69, // polished marble — tightest glint
+    roughness: ROUGHNESS * 0.8, // polished marble — tightest glint
     normalConvention: 'opengl', // Poly Haven
   },
   // The desert's crust, in the pans between dunes. Its relief is the deepest in

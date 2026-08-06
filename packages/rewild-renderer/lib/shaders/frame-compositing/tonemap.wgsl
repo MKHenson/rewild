@@ -18,7 +18,8 @@ struct OutputUniforms {
   // in skyComposite.wgsl reasons about post-exposure brightness and reads the
   // same camera value.
   exposure: f32,
-  _pad0: f32,
+  // 1 normally, 0 while a material debug channel is up — see ToneMapPass.
+  bloomScale: f32,
   _pad1: f32,
 };
 
@@ -57,7 +58,7 @@ struct VSOut {
   let uv = (vec2f(in.position.xy)) / dims;
   let bloom = textureSampleLevel(bloomTexture, bloomSampler, uv, 0.0).rgb;
 
-  var color = tonemapACES(uniforms.exposure * (sceneHDR + bloom));
+  var color = tonemapACES(uniforms.exposure * (sceneHDR + bloom * uniforms.bloomScale));
 
   // Lightning screen flash: brightest at centre, dimmed at edges. Applied after
   // the curve, as it did when it lived in the sky composite — it represents the

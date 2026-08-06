@@ -86,6 +86,9 @@ fn shadeStandardSurface(
 
   var surface: PbrSurface;
   surface.normal = perturbNormal(viewPosition, fragUV, geometricNormal, normalSample);
+  // Pre-perturbation, so horizon occlusion can tell how far the normal map has
+  // tilted the shading normal off the triangle.
+  surface.geometricNormal = geometricNormal;
   surface.viewPosition = viewPosition;
   surface.diffuseColor = diffuseColorFromBaseColor(baseColor, metallic);
   surface.f0 = f0FromBaseColor(baseColor, metallic);
@@ -99,9 +102,10 @@ fn shadeStandardSurface(
 
   // Shadows attenuate diffuse and specular together — a blocked light delivers
   // neither.
-  var color = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow
-            + lit.punctualDiffuse + lit.punctualSpecular
-            + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadow;
+  let direct = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow
+             + lit.punctualDiffuse + lit.punctualSpecular
+             + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadow;
+  var color = direct;
 
   // Occlusion describes light that never reached the pocket in the first place,
   // which is a statement about *indirect* light — direct lighting already
@@ -117,10 +121,23 @@ fn shadeStandardSurface(
   // black in shadow, and it is the specular half — a real reflection of a real
   // sky — that fixes that. Perceptual roughness rather than surface.alpha,
   // because that is what the prefiltered chain and the BRDF map are indexed by.
-  color += evaluateIbl(surface, roughness) * occlusion;
+  let indirect = evaluateIbl(surface, roughness) * occlusion;
+  color += indirect;
 
   let emissiveSample = textureSample(emissiveMap, mySampler, fragUV).rgb;
-  color += emissiveSample * standardParams.emissiveColor * standardParams.emissiveStrength;
+  let emissive = emissiveSample * standardParams.emissiveColor * standardParams.emissiveStrength;
+  color += emissive;
+
+  // Channel visualisation short-circuits here rather than earlier so the
+  // debug views are of the *shaded* surface's own inputs — the same normal the
+  // BRDF used, the same roughness, and for the two output channels the same
+  // direct and indirect terms that would have been summed above.
+  if (iblParams.debugChannel != DEBUG_CHANNEL_OFF) {
+    return materialDebugColor(
+      baseColor, metallic, roughness, surface.normal, occlusion, emissive,
+      direct, indirect
+    );
+  }
 
   // OPAQUE ignores alpha entirely, and MASK has already resolved it to a yes or
   // no — both write 1.0, per glTF. Only BLEND lets it through, and only that

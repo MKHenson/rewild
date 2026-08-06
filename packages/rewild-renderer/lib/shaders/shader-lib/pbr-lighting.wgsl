@@ -24,6 +24,13 @@
 struct PbrSurface {
   // View space, normalized, after normal mapping.
   normal: vec3f,
+  /**
+   * View space, normalized, *before* normal mapping — the surface the geometry
+   * actually has. Only used for horizon occlusion (see horizonOcclusion), which
+   * is the one thing that needs to know how far the shading normal has been
+   * tilted away from what the triangle can support.
+   */
+  geometricNormal: vec3f,
   // View-space fragment position. The eye is at the origin in view space, which
   // is what makes the view vector just `normalize(-viewPosition)`.
   viewPosition: vec3f,
@@ -58,6 +65,10 @@ fn accumulatePbrLighting(
   let N = surface.normal;
   let V = normalize(-surface.viewPosition);
 
+  // The reflection vector depends only on N and V, not on any light, so the
+  // horizon term is computed once and applied to every light's specular.
+  let specularHorizon = horizonOcclusion(reflect(-V, N), surface.geometricNormal);
+
   for (var i: u32 = 0; i < lighting.numLights; i++) {
     let light = lighting.lights[i];
     let radiance = light.color * light.intensity;
@@ -70,7 +81,7 @@ fn accumulatePbrLighting(
         surface.diffuseColor, surface.f0, surface.alpha
       );
       accum.directionalDiffuse += brdf.diffuse * radiance;
-      accum.directionalSpecular += brdf.specular * radiance;
+      accum.directionalSpecular += brdf.specular * radiance * specularHorizon;
       continue;
     }
 
@@ -95,7 +106,7 @@ fn accumulatePbrLighting(
       N, V, L, surface.diffuseColor, surface.f0, surface.alpha
     );
     let diffuse = brdf.diffuse * radiance * attenuation;
-    let specular = brdf.specular * radiance * attenuation;
+    let specular = brdf.specular * radiance * attenuation * specularHorizon;
 
     if (isSpot && hasShadowSpot != 0u && i == shadowSpotIndex) {
       accum.spotShadowDiffuse += diffuse;

@@ -69,19 +69,33 @@ export function registerRenderQualityCommands(renderer: Renderer) {
   // take effect on the very next frame with no rebuild — which is what makes them
   // usable for eyeballing a value.
   //
-  // threshold is in exposure-adjusted luminance: multiply by 1000 for the raw
-  // HDR luminance at which a pixel starts to glow. skyBlend caps the sky at 60
-  // HDR, so anything at or below 0.06 makes the whole sky a bloom source.
-  (window as any).setBloom = (amount?: number, threshold?: number) => {
+  // threshold and maxSource are both in exposure-adjusted luminance: multiply by
+  // 1000 for raw HDR. skyBlend caps the sky at 60 HDR, so a threshold at or below
+  // 0.06 makes the whole sky a bloom source. maxSource caps what one pixel may
+  // contribute — see BloomPass.bloomMaxSourceLuminance for why a specular
+  // highlight needs one at all.
+  (window as any).setBloom = (
+    amount?: number,
+    threshold?: number,
+    maxSource?: number
+  ) => {
     const bloom = renderer.frameCompositor.bloom;
 
-    if (amount === undefined && threshold === undefined) {
+    if (
+      amount === undefined &&
+      threshold === undefined &&
+      maxSource === undefined
+    ) {
       console.log(
         `Bloom: amount=${bloom.bloomAmount}, threshold=${bloom.bloomThreshold} ` +
           `(glows above ~${Math.round(
             bloom.bloomThreshold * 1000
-          )} HDR luminance) — ` +
-          `call setBloom(amount, threshold)`
+          )} HDR luminance), ` +
+          `maxSource=${bloom.bloomMaxSourceLuminance} ` +
+          `(one pixel contributes at most ~${Math.round(
+            bloom.bloomMaxSourceLuminance * 1000
+          )} HDR) — ` +
+          `call setBloom(amount, threshold, maxSource)`
       );
       return;
     }
@@ -102,11 +116,24 @@ export function registerRenderQualityCommands(renderer: Renderer) {
       bloom.bloomThreshold = threshold;
     }
 
+    if (maxSource !== undefined) {
+      // Must clear the threshold or the clamp swallows the gate: softKnee would
+      // see a luminance that can never exceed it and nothing would ever bloom.
+      if (!Number.isFinite(maxSource) || maxSource <= bloom.bloomThreshold) {
+        console.warn(
+          `Bloom maxSource must be a number > threshold ` +
+            `(${bloom.bloomThreshold}), got ${maxSource}`
+        );
+        return;
+      }
+      bloom.bloomMaxSourceLuminance = maxSource;
+    }
+
     console.log(
       `Bloom → amount=${bloom.bloomAmount}, threshold=${bloom.bloomThreshold} ` +
         `(glows above ~${Math.round(
           bloom.bloomThreshold * 1000
-        )} HDR luminance)`
+        )} HDR luminance), maxSource=${bloom.bloomMaxSourceLuminance}`
     );
   };
 }
