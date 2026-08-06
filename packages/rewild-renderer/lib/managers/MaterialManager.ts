@@ -210,7 +210,6 @@ function createStandardPass(
   if (t.occlusionStrength !== undefined)
     material.occlusionStrength = t.occlusionStrength;
   if (t.normalScale !== undefined) material.normalScale = t.normalScale;
-  if (t.ambientColor) material.ambientColor = t.ambientColor;
   if (t.alphaCutoff !== undefined) material.alphaCutoff = t.alphaCutoff;
 
   if (t.alphaMode !== undefined) {

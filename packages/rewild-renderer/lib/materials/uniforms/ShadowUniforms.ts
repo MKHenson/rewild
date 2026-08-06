@@ -4,20 +4,30 @@ import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { IVisualComponent } from '../../../types/interfaces';
 import { NUM_CASCADES } from '../../renderers/shadow/DirectionalShadowRenderer';
+import { SKY_CUBE_MIP_COUNT } from '../../renderers/sky/SkyCubeCapture';
 
 const _tempMat = new Matrix4();
 
 /**
- * Manages bind group 3 — all shadow resources for a material pass.
+ * Manages bind group 3 — the scene-wide resources a material pass shades with.
  *
- * Bindings 0–2: cloud shadow (transmittance map, linear sampler, params buffer)
- * Bindings 3–5: shadow atlas (depth texture, comparison sampler, directional params buffer)
- * Binding  6:   spot light shadow params buffer
+ * Bindings 0–2:  cloud shadow (transmittance map, linear sampler, params buffer)
+ * Bindings 3–5:  shadow atlas (depth texture, comparison sampler, directional params buffer)
+ * Binding  6:    spot light shadow params buffer
+ * Bindings 7–11: sky IBL (irradiance cube, specular cube, BRDF map, sampler, params) — opt-in
  *
  * All packed into a single bind group because WebGPU limits bind groups to 4 (0–3).
+ *
+ * The IBL bindings are opt-in because this group is shared with the Lambert,
+ * Phong and terrain passes, whose shaders do not declare them. Their pipelines
+ * use `layout: 'auto'`, so a layout is derived from what a shader actually
+ * uses — and a bind group carrying entries the layout has no slot for fails
+ * validation. Terrain flips this on in #202.
  */
 export class ShadowUniforms implements ISharedUniformBuffer {
   group: number;
+  /** Whether bindings 7–11 are populated. See the class comment. */
+  private includeIbl: boolean;
   cloudBuffer: GPUBuffer;
   directionalBuffer: GPUBuffer;
   spotBuffer: GPUBuffer;
@@ -41,9 +51,15 @@ export class ShadowUniforms implements ISharedUniformBuffer {
   // is to compare identity. Mirrors boundDepthTexture in GodRaysPostProcess.
   private boundCloudShadowMap: GPUTexture | null = null;
   private boundShadowAtlas: GPUTexture | null = null;
+  private boundIrradianceMap: GPUTexture | null = null;
 
-  constructor(group: number) {
+  /** viewToWorld (16) + intensity + maxSpecularMip + 2 pad = 20 floats. */
+  private iblData: Float32Array;
+  iblBuffer: GPUBuffer;
+
+  constructor(group: number, includeIbl: boolean = false) {
     this.group = group;
+    this.includeIbl = includeIbl;
     this.requiresBuild = true;
     this.cloudData = new Float32Array(20);
     this.directionalData = new ArrayBuffer(224);
@@ -52,6 +68,7 @@ export class ShadowUniforms implements ISharedUniformBuffer {
     this.spotData = new ArrayBuffer(80);
     this.spotFloats = new Float32Array(this.spotData);
     this.spotInts = new Uint32Array(this.spotData);
+    this.iblData = new Float32Array(20);
   }
 
   get buffer(): GPUBuffer {
@@ -62,6 +79,7 @@ export class ShadowUniforms implements ISharedUniformBuffer {
     this.cloudBuffer?.destroy();
     this.directionalBuffer?.destroy();
     this.spotBuffer?.destroy();
+    this.iblBuffer?.destroy();
   }
 
   setNumInstances(_numInstances: number): void {}
@@ -95,35 +113,76 @@ export class ShadowUniforms implements ISharedUniformBuffer {
 
     const cloudShadowMap = renderer.cloudShadowMap;
     const shadowAtlas = renderer.shadowAtlas;
+    const irradianceMap = renderer.iblIrradianceMap;
+    const specularMap = renderer.iblSpecularMap;
+    const brdfLut = renderer.iblBrdfLut;
 
+    // Every one of these belongs to a subsystem that initialises lazily, and the
+    // scene pass runs before the sky each frame — so on the first frame some are
+    // still null. Deferring is the established answer: requiresBuild is checked
+    // again next frame and this self-heals.
     if (!cloudShadowMap || !shadowAtlas) {
+      this.requiresBuild = true;
+      return;
+    }
+    if (this.includeIbl && (!irradianceMap || !specularMap || !brdfLut)) {
       this.requiresBuild = true;
       return;
     }
 
     this.boundCloudShadowMap = cloudShadowMap;
     this.boundShadowAtlas = shadowAtlas;
+    this.boundIrradianceMap = irradianceMap;
+
+    const entries: GPUBindGroupEntry[] = [
+      // Cloud shadow (bindings 0–2)
+      { binding: 0, resource: cloudShadowMap.createView() },
+      { binding: 1, resource: renderer.samplerManager.get('linear-clamped') },
+      { binding: 2, resource: { buffer: this.cloudBuffer } },
+      // Shadow atlas — directional cascades + spot quadrant (bindings 3–5)
+      {
+        binding: 3,
+        resource: shadowAtlas.createView({ aspect: 'depth-only' }),
+      },
+      {
+        binding: 4,
+        resource: renderer.samplerManager.get('depth-comparison'),
+      },
+      { binding: 5, resource: { buffer: this.directionalBuffer } },
+      // Spot light shadow params (binding 6)
+      { binding: 6, resource: { buffer: this.spotBuffer } },
+    ];
+
+    if (this.includeIbl) {
+      this.iblBuffer = device.createBuffer({
+        label: 'ibl params',
+        size: 80,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+
+      entries.push(
+        {
+          binding: 7,
+          resource: irradianceMap!.createView({ dimension: 'cube' }),
+        },
+        {
+          binding: 8,
+          resource: specularMap!.createView({ dimension: 'cube' }),
+        },
+        { binding: 9, resource: brdfLut!.createView() },
+        // linear-clamped, so the roughness chain interpolates between levels
+        // rather than snapping, and the BRDF map does not wrap at its edges.
+        {
+          binding: 10,
+          resource: renderer.samplerManager.get('linear-clamped'),
+        },
+        { binding: 11, resource: { buffer: this.iblBuffer } }
+      );
+    }
 
     this.bindGroup = device.createBindGroup({
       layout: pipelineLayout,
-      entries: [
-        // Cloud shadow (bindings 0–2)
-        { binding: 0, resource: cloudShadowMap.createView() },
-        { binding: 1, resource: renderer.samplerManager.get('linear-clamped') },
-        { binding: 2, resource: { buffer: this.cloudBuffer } },
-        // Shadow atlas — directional cascades + spot quadrant (bindings 3–5)
-        {
-          binding: 3,
-          resource: shadowAtlas.createView({ aspect: 'depth-only' }),
-        },
-        {
-          binding: 4,
-          resource: renderer.samplerManager.get('depth-comparison'),
-        },
-        { binding: 5, resource: { buffer: this.directionalBuffer } },
-        // Spot light shadow params (binding 6)
-        { binding: 6, resource: { buffer: this.spotBuffer } },
-      ],
+      entries,
     });
   }
 
@@ -149,9 +208,22 @@ export class ShadowUniforms implements ISharedUniformBuffer {
     // costs one stale frame and then self-heals.
     if (
       this.boundCloudShadowMap !== renderer.cloudShadowMap ||
-      this.boundShadowAtlas !== renderer.shadowAtlas
+      this.boundShadowAtlas !== renderer.shadowAtlas ||
+      (this.includeIbl && this.boundIrradianceMap !== renderer.iblIrradianceMap)
     ) {
       this.requiresBuild = true;
+    }
+
+    // --- Sky IBL ---
+    // The cubes themselves are written by the prefilter, so nothing per-frame is
+    // needed for them. What is needed is the rotation that takes a view-space
+    // direction into the world space they are indexed in, which changes as soon
+    // as the camera turns.
+    if (this.includeIbl && this.iblBuffer) {
+      this.iblData.set(camera.transform.matrixWorld.elements, 0);
+      this.iblData[16] = renderer.iblIntensity;
+      this.iblData[17] = SKY_CUBE_MIP_COUNT - 1;
+      device.queue.writeBuffer(this.iblBuffer, 0, this.iblData.buffer);
     }
 
     // --- Cloud shadow ---

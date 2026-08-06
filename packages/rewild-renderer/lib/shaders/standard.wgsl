@@ -14,6 +14,7 @@
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
 #include "./shader-lib/tbn.frag.wgsl"
+#include "./shader-lib/ibl.wgsl"
 #include "./shader-lib/standard-material.wgsl"
 #include "./shader-lib/selection-tint.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
@@ -76,6 +77,15 @@ struct VertexOutput {
 @group(3) @binding(4) var shadowSampler: sampler_comparison;
 @group(3) @binding(5) var<uniform> directionalShadowParams: DirectionalShadowParams;
 @group(3) @binding(6) var<uniform> spotLightShadowParams: SpotLightShadowParams;
+// Sky IBL. These share group 3 with the shadow resources because WebGPU only
+// guarantees four bind groups and 0–2 are taken by the object, the material and
+// the light buffer. ShadowUniforms populates them, and only for the passes
+// whose shader declares them — see its class comment.
+@group(3) @binding(7) var iblIrradianceMap: texture_cube<f32>;
+@group(3) @binding(8) var iblSpecularMap: texture_cube<f32>;
+@group(3) @binding(9) var iblBrdfLut: texture_2d<f32>;
+@group(3) @binding(10) var iblSampler: sampler;
+@group(3) @binding(11) var<uniform> iblParams: IblParams;
 
 fn transformVertex(position: vec3f, uv: vec2f, normal: vec3f, color: vec4f) -> VertexOutput {
   var output : VertexOutput;

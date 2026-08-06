@@ -70,6 +70,20 @@ fn fresnelSchlick(f0: vec3f, VoH: f32) -> vec3f {
   return f0 + (vec3f(1.0) - f0) * f;
 }
 
+// Fresnel for an environment rather than a single light.
+//
+// A punctual light has one half-vector, so plain Schlick is exact. Ambient
+// arrives from the whole hemisphere at once, and applying Schlick to the view
+// angle alone puts a bright rim on every silhouette regardless of how rough the
+// surface is — a sanded surface would ring like chrome. Ceiling the reflectance
+// at (1 - roughness) removes that: rough surfaces stop gaining anything at
+// grazing angles, smooth ones are unaffected. Sébastien Lagarde's fit.
+fn fresnelSchlickRoughness(f0: vec3f, NoV: f32, perceptualRoughness: f32) -> vec3f {
+  let f = pow(clamp(1.0 - NoV, 0.0, 1.0), 5.0);
+  let ceiling = max(vec3f(1.0 - perceptualRoughness), f0);
+  return f0 + (ceiling - f0) * f;
+}
+
 fn diffuseLambert(diffuseColor: vec3f) -> vec3f {
   return diffuseColor / BRDF_PI;
 }

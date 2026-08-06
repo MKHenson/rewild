@@ -20,7 +20,11 @@ describe('StandardParams packing', () => {
     let written: Float32Array | undefined;
     const device = {
       queue: {
-        writeBuffer: (_buffer: unknown, _offset: number, data: Float32Array) => {
+        writeBuffer: (
+          _buffer: unknown,
+          _offset: number,
+          data: Float32Array
+        ) => {
           written = new Float32Array(data);
         },
       },
@@ -39,7 +43,6 @@ describe('StandardParams packing', () => {
     material.baseColorFactor = [0.1, 0.2, 0.3, 0.4];
     material.emissiveColor = [0.5, 0.6, 0.7];
     material.roughness = 0.8;
-    material.ambientColor = [0.9, 0.11, 0.12];
     material.emissiveStrength = 3;
     material.metallic = 0.13;
     material.occlusionStrength = 0.14;
@@ -62,16 +65,15 @@ describe('StandardParams packing', () => {
       Math.fround(0.7),
     ]);
     expect(packed[7]).toBeCloseTo(0.8);
-    expect(Array.from(packed.slice(8, 11))).toEqual([
-      Math.fround(0.9),
-      Math.fround(0.11),
-      Math.fround(0.12),
-    ]);
-    expect(packed[11]).toBe(3);
-    expect(packed[12]).toBeCloseTo(0.13);
-    expect(packed[13]).toBeCloseTo(0.14);
-    expect(packed[14]).toBeCloseTo(0.15);
-    expect(packed[15]).toBeCloseTo(0.16);
+    expect(packed[8]).toBe(3);
+    expect(packed[9]).toBeCloseTo(0.13);
+    expect(packed[10]).toBeCloseTo(0.14);
+    expect(packed[11]).toBeCloseTo(0.15);
+    expect(packed[12]).toBeCloseTo(0.16);
+  });
+
+  it('is the size the layout table claims', () => {
+    expect(packOf(new StandardMaterial(1)).byteLength).toBe(64);
   });
 
   // The one integer in the block. Written through a Uint32Array view, so a
@@ -81,7 +83,7 @@ describe('StandardParams packing', () => {
     material.alphaMode = 'BLEND';
 
     const asU32 = new Uint32Array(packOf(material).buffer);
-    expect(asU32[16]).toBe(ALPHA_MODES.indexOf('BLEND'));
+    expect(asU32[13]).toBe(ALPHA_MODES.indexOf('BLEND'));
   });
 
   it('defaults to the glTF defaults', () => {
@@ -103,7 +105,12 @@ describe('standard-material.wgsl agreement', () => {
   // leave a \r the `.` in the pattern refuses to cross.
   const fields = struct
     .split('\n')
-    .map((line) => line.trim().replace(/\/\/.*/, '').trim())
+    .map((line) =>
+      line
+        .trim()
+        .replace(/\/\/.*/, '')
+        .trim()
+    )
     .filter((line) => line.length > 0)
     .map((line) => line.split(':')[0].trim());
 
@@ -112,7 +119,6 @@ describe('standard-material.wgsl agreement', () => {
       'baseColorFactor',
       'emissiveColor',
       'roughness',
-      'ambientColor',
       'emissiveStrength',
       'metallic',
       'occlusionStrength',
@@ -121,7 +127,6 @@ describe('standard-material.wgsl agreement', () => {
       'alphaMode',
       '_pad0',
       '_pad1',
-      '_pad2',
     ]);
   });
 

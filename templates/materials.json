@@ -171,8 +171,7 @@
       "metallicRoughnessMap": "block-concrete-4-roughness",
       "occlusionMap": "block-concrete-4-ao",
       "metallic": 0,
-      "roughness": 1,
-      "ambientColor": [0.3, 0.3, 0.3]
+      "roughness": 1
     }
   ]
 }

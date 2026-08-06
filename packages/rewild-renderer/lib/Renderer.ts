@@ -175,6 +175,16 @@ export class Renderer {
     return this.sky?.skyRenderer?.iblPrefilter?.brdfLut ?? null;
   }
 
+  /**
+   * Global multiplier on the sky's ambient contribution. 1 is the physical
+   * answer. 0 removes ambient entirely, which is what separates a
+   * direct-lighting bug from an ambient one — `setIblEnabled(false)`.
+   *
+   * Distinct from `SkyIblPrefilter.enabled`, which stops the cubes being
+   * *updated* and leaves whatever they last held still lighting the scene.
+   */
+  iblIntensity: number = 1;
+
   /** Returns the shared shadow atlas (directional cascades + spot light quadrant), or null if not yet initialized. */
   get shadowAtlas(): GPUTexture | null {
     return this.directionalShadowRenderer?.shadowDepthTexture ?? null;

@@ -49,7 +49,7 @@ export class StandardInstancedPass extends StandardPassBase {
       projectionAndInstancesGroup
     );
     this.lightingUniforms = new Lighting(lightingGroup);
-    this.shadowUniforms = new ShadowUniforms(shadowGroup);
+    this.shadowUniforms = new ShadowUniforms(shadowGroup, true);
 
     this.perMeshTracker = new SharedUniformsTracker(this, [
       this.material,
