@@ -88,7 +88,38 @@ fn fs(
     // Stars fade with cloud coverage.
     let horizonDir = normalize(vec3f(direction.x, max(0.001, direction.y), direction.z));
     let horizonNightSky = sampleNightSky(horizonDir) * starVisibility * (1.0 - object.cloudiness);
-    let horizonFog = drawSkyAndHorizonFog(horizonDir, org, vSunDirection, horizonNightSky);
+    var horizonFog = drawSkyAndHorizonFog(horizonDir, org, vSunDirection, horizonNightSky);
+
+    // Azimuth is undefined looking straight down — every azimuth converges on
+    // that single direction — so painting the lower hemisphere with a
+    // per-azimuth horizon colour compresses the whole 360-degree ring into a
+    // singularity at the nadir. On screen this never mattered: you rarely look
+    // straight down at fog, and terrain covers it when you do. The IBL capture
+    // is what made it visible, because there the down face is a sixth of the
+    // ambient and the pinch put a bright fan through the middle of it.
+    //
+    // Fade the azimuthal signal out over the last ~45 degrees, toward one
+    // azimuth-independent colour. The stand-in direction is horizontal and
+    // perpendicular to the sun, so its mu is exactly zero — a fair proxy for
+    // the ring mean given how forward-peaked the fog phase function is, and
+    // free of the degeneracy that interpolating the *direction* would hit on
+    // the opposite azimuth. Colours are mixed rather than directions for the
+    // same reason.
+    let nadirFade = smoothstep(-0.7, -1.0, viewVertical);
+    if (nadirFade > 0.0) {
+        // cross() collapses with the sun overhead. Any horizontal direction is
+        // correct there, since mu is zero for all of them.
+        var sunPerp = vec3f(1.0, 0.0, 0.0);
+        let perpAxis = cross(vSunDirection, vec3f(0.0, 1.0, 0.0));
+        let perpLen = length(perpAxis);
+        if (perpLen > 1e-3) {
+            sunPerp = perpAxis / perpLen;
+        }
+
+        let nadirNightSky = sampleNightSky(sunPerp) * starVisibility * (1.0 - object.cloudiness);
+        let nadirFog = drawSkyAndHorizonFog(sunPerp, org, vSunDirection, nadirNightSky);
+        horizonFog = mix(horizonFog, nadirFog, nadirFade);
+    }
 
     // Below clouds — original hemisphere masking
 	// Smooth transition: 0 = below horizon, 1 = above horizon

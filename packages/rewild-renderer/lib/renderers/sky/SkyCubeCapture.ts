@@ -18,6 +18,18 @@ import { CUBE_FACE_COUNT, SkyCaptureScheduler } from './SkyCaptureScheduler';
  */
 export const SKY_CUBE_SIZE = 128;
 
+/**
+ * Mips on the captured cube: 128, 64, ... 1.
+ *
+ * The capture pass only ever writes mip 0. The rest are box-filtered by the IBL
+ * prefilter, which needs them for two things — picking a source level from the
+ * sample pdf when importance-sampling the specular chain, and giving the
+ * irradiance convolution a pre-averaged level to integrate. Both amount to the
+ * same thing: they are what stops a handful of samples over a sky containing
+ * point-like stars from turning into fireflies.
+ */
+export const SKY_CUBE_MIP_COUNT = 8;
+
 // Basis vectors per cube face: [A | B | C], where the world-space ray direction
 // for a fragment at NDC (x, y) is A*x + B*y + C.
 //
@@ -147,8 +159,14 @@ export class SkyCubeCapture {
         size: [SKY_CUBE_SIZE, SKY_CUBE_SIZE, CUBE_FACE_COUNT],
         format: 'rgba16float',
         label: 'sky environment cubemap',
+        mipLevelCount: SKY_CUBE_MIP_COUNT,
         usage:
-          GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+          GPUTextureUsage.RENDER_ATTACHMENT |
+          GPUTextureUsage.TEXTURE_BINDING |
+          // The prefilter copies mip 0 straight across as the specular cube's
+          // roughness-0 level rather than re-deriving a mirror through an
+          // estimator that degenerates there.
+          GPUTextureUsage.COPY_SRC,
       });
     }
 
@@ -201,8 +219,12 @@ export class SkyCubeCapture {
         label: `sky cube capture pass ${face}`,
         colorAttachments: [
           {
+            // mipLevelCount is mandatory now the texture has a chain: a render
+            // attachment view must resolve to exactly one mip level.
             view: this.cubemap.createView({
               dimension: '2d',
+              baseMipLevel: 0,
+              mipLevelCount: 1,
               baseArrayLayer: face,
               arrayLayerCount: 1,
             }),
@@ -233,6 +255,10 @@ export class SkyCubeCapture {
    * `timestampWrites` times the first face only. Every face costs the same, so
    * one measurement times them all — and attaching the query to each of them in
    * turn would need a query slot per face for a number that never differs.
+   *
+   * @returns how many faces were redrawn. The IBL prefilter reads this to know
+   *          the source moved, and reads a full six as the discontinuity signal
+   *          that it should catch up in one frame rather than amortise.
    */
   render(
     device: GPUDevice,
@@ -246,8 +272,8 @@ export class SkyCubeCapture {
     temperature: number,
     cameraAltitude: number,
     timestampWrites?: GPURenderPassTimestampWrites
-  ): void {
-    if (!this.enabled || !this.pipeline) return;
+  ): number {
+    if (!this.enabled || !this.pipeline) return 0;
 
     const count = this.scheduler.plan(
       sunX,
@@ -258,7 +284,7 @@ export class SkyCubeCapture {
       temperature,
       cameraAltitude
     );
-    if (count === 0) return;
+    if (count === 0) return 0;
 
     const faceData = this.faceData;
 
@@ -286,6 +312,8 @@ export class SkyCubeCapture {
       pass.draw(6);
       pass.end();
     }
+
+    return count;
   }
 
   dispose(): void {
