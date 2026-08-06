@@ -19,4 +19,43 @@ export function registerSkyDebugCommands(renderer: Renderer) {
         `worldSize=${config.worldSize}m, updateFreq=every ${config.updateFrequency} frames`
     );
   };
+
+  // Sky-driven IBL (Lichen phase 4). Only the captured cube exists so far —
+  // #200 adds the irradiance and prefiltered-specular rows to the same viewer.
+  (window as any).showIblCubes = () => {
+    renderer.sky.skyRenderer.cubeDebugRenderer.enabled = true;
+    console.log(
+      'IBL cube viewer ON — captured sky faces along the bottom, ' +
+        'left to right: +X -X +Y -Y +Z -Z. Exposed and tonemapped exactly as ' +
+        'the frame is, so a tile should read like the sky above it. ' +
+        'Use setIblCubeExposureBias() to open up a night capture.'
+    );
+  };
+  (window as any).hideIblCubes = () => {
+    renderer.sky.skyRenderer.cubeDebugRenderer.enabled = false;
+    console.log('IBL cube viewer OFF');
+  };
+
+  (window as any).setIblCubeExposureBias = (bias: number) => {
+    renderer.sky.skyRenderer.cubeDebugRenderer.exposureBias = bias;
+    console.log(
+      `IBL cube viewer exposure bias ${bias}x ` +
+        `(effective ${(renderer.camera.camera.exposure * bias).toFixed(4)})`
+    );
+  };
+
+  (window as any).setSkyCaptureEnabled = (enabled: boolean) => {
+    renderer.sky.skyRenderer.cubeCapture.enabled = enabled;
+    console.log(`Sky cubemap capture ${enabled ? 'enabled' : 'disabled'}`);
+  };
+
+  (window as any).skyCaptureStats = () => {
+    const capture = renderer.sky.skyRenderer.cubeCapture;
+    console.log(
+      `Sky capture: ${capture.enabled ? 'on' : 'off'}, ` +
+        `${capture.scheduler.facesPerFrame} face(s)/frame, ` +
+        `${capture.scheduler.facesPending} pending, ` +
+        `next face ${capture.scheduler.nextFaceIndex}`
+    );
+  };
 }
