@@ -20,15 +20,17 @@ export function registerSkyDebugCommands(renderer: Renderer) {
     );
   };
 
-  // Sky-driven IBL (Lichen phase 4). Only the captured cube exists so far —
-  // #200 adds the irradiance and prefiltered-specular rows to the same viewer.
+  // Sky-driven IBL (Lichen phase 4).
   (window as any).showIblCubes = () => {
     renderer.sky.skyRenderer.cubeDebugRenderer.enabled = true;
     console.log(
-      'IBL cube viewer ON — captured sky faces along the bottom, ' +
-        'left to right: +X -X +Y -Y +Z -Z. Exposed and tonemapped exactly as ' +
-        'the frame is, so a tile should read like the sky above it. ' +
-        'Use setIblCubeExposureBias() to open up a night capture.'
+      'IBL viewer ON. Rows bottom-up: captured sky, diffuse irradiance, ' +
+        'prefiltered specular; BRDF map at the right of the top row. ' +
+        'Faces left to right: +X -X +Y -Y +Z -Z.\n' +
+        'Row 0 is exposed and tonemapped exactly as the frame is, so a tile ' +
+        'should read like the sky above it. Row 1 should be smooth with no ' +
+        'visible structure. Step setIblSpecularMip() through the chain to ' +
+        'check row 2 blurs monotonically.'
     );
   };
   (window as any).hideIblCubes = () => {
@@ -49,13 +51,32 @@ export function registerSkyDebugCommands(renderer: Renderer) {
     console.log(`Sky cubemap capture ${enabled ? 'enabled' : 'disabled'}`);
   };
 
+  (window as any).setIblSpecularMip = (mip: number) => {
+    renderer.sky.skyRenderer.cubeDebugRenderer.specularMip = mip;
+    console.log(
+      `IBL viewer showing specular mip ${mip} ` +
+        `(roughness ~${(mip / 7).toFixed(2)})`
+    );
+  };
+
+  (window as any).setIblEnabled = (enabled: boolean) => {
+    renderer.sky.skyRenderer.iblPrefilter.enabled = enabled;
+    console.log(`IBL prefilter ${enabled ? 'enabled' : 'disabled'}`);
+  };
+
   (window as any).skyCaptureStats = () => {
-    const capture = renderer.sky.skyRenderer.cubeCapture;
+    const sky = renderer.sky.skyRenderer;
+    const capture = sky.cubeCapture;
+    const prefilter = sky.iblPrefilter;
     console.log(
       `Sky capture: ${capture.enabled ? 'on' : 'off'}, ` +
         `${capture.scheduler.facesPerFrame} face(s)/frame, ` +
         `${capture.scheduler.facesPending} pending, ` +
-        `next face ${capture.scheduler.nextFaceIndex}`
+        `next face ${capture.scheduler.nextFaceIndex}\n` +
+        `IBL prefilter: ${prefilter.enabled ? 'on' : 'off'}, ` +
+        `${prefilter.schedule.stepsPerFrame} step(s)/frame, ` +
+        `${prefilter.schedule.isRunning ? 'running' : 'idle'}, ` +
+        `next step ${prefilter.schedule.nextStep}`
     );
   };
 }

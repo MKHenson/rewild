@@ -1,14 +1,15 @@
 import type { Renderer } from '../../Renderer';
 import shader from '../../shaders/sky/skyCubeDebug.wgsl';
 import { CUBE_FACE_COUNT } from './SkyCaptureScheduler';
+import { SKY_CUBE_MIP_COUNT } from './SkyCubeCapture';
+
+/** Three rows of six faces, plus one quad for the BRDF map. */
+const TILE_COUNT = CUBE_FACE_COUNT * 3 + 1;
 
 /**
- * Draws the captured sky cubemap's six faces as a strip along the bottom of the
- * screen. Follows ShadowDebugRenderer: its own encoder, straight onto the
- * swapchain after everything else, and completely inert until `enabled`.
- *
- * #200 extends this with rows for the irradiance and prefiltered-specular
- * cubes, which is why the console command is already named showIblCubes().
+ * Draws the whole IBL chain as tiled cube faces along the bottom of the screen:
+ * the captured sky, the diffuse irradiance cube, the prefiltered specular cube
+ * at a selectable roughness level, and the BRDF integration map.
  */
 export class SkyCubeDebugRenderer {
   enabled: boolean = false;
@@ -21,12 +22,25 @@ export class SkyCubeDebugRenderer {
    */
   exposureBias: number = 1;
 
+  /**
+   * Which specular mip the third row shows — i.e. which roughness. Stepping it
+   * through the chain is how you check the prefilter blurs monotonically
+   * rather than, say, sampling the wrong source level at one end.
+   */
+  specularMip: number = 0;
+
   private pipeline: GPURenderPipeline | null = null;
   private bindGroup: GPUBindGroup | null = null;
   private uniformBuffer: GPUBuffer | null = null;
   private uniformData = new Float32Array(4);
 
-  init(renderer: Renderer, cubemap: GPUTexture): void {
+  init(
+    renderer: Renderer,
+    capturedCube: GPUTexture,
+    irradianceCube: GPUTexture,
+    specularCube: GPUTexture,
+    brdfLut: GPUTexture
+  ): void {
     const { device, presentationFormat } = renderer;
 
     if (!this.pipeline) {
@@ -54,13 +68,27 @@ export class SkyCubeDebugRenderer {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
+    const sampler = renderer.samplerManager.get('linear-clamped');
+
     this.bindGroup = device.createBindGroup({
       label: 'sky cube debug bind group',
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: cubemap.createView({ dimension: 'cube' }) },
-        { binding: 1, resource: renderer.samplerManager.get('linear-clamped') },
+        {
+          binding: 0,
+          resource: capturedCube.createView({ dimension: 'cube' }),
+        },
+        { binding: 1, resource: sampler },
         { binding: 2, resource: { buffer: this.uniformBuffer } },
+        {
+          binding: 3,
+          resource: irradianceCube.createView({ dimension: 'cube' }),
+        },
+        {
+          binding: 4,
+          resource: specularCube.createView({ dimension: 'cube' }),
+        },
+        { binding: 5, resource: brdfLut.createView() },
       ],
     });
   }
@@ -71,6 +99,10 @@ export class SkyCubeDebugRenderer {
     // Read live rather than cached: setExposure() from the console is exactly
     // the kind of thing you would be doing while this viewer is up.
     this.uniformData[0] = renderer.camera.camera.exposure * this.exposureBias;
+    this.uniformData[1] = Math.max(
+      0,
+      Math.min(SKY_CUBE_MIP_COUNT - 1, this.specularMip)
+    );
     renderer.device.queue.writeBuffer(
       this.uniformBuffer!,
       0,
@@ -91,7 +123,7 @@ export class SkyCubeDebugRenderer {
     });
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.bindGroup);
-    pass.draw(6 * CUBE_FACE_COUNT);
+    pass.draw(6 * TILE_COUNT);
     pass.end();
     renderer.device.queue.submit([encoder.finish()]);
   }

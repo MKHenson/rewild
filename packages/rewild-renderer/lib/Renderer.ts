@@ -151,6 +151,30 @@ export class Renderer {
     return this.sky?.skyRenderer?.cubeCapture?.cubemap ?? null;
   }
 
+  /**
+   * Diffuse ambient from the sky, as irradiance/pi — multiply straight by
+   * albedo. Null before the sky has initialised.
+   */
+  get iblIrradianceMap(): GPUTexture | null {
+    return this.sky?.skyRenderer?.iblPrefilter?.irradianceCube ?? null;
+  }
+
+  /**
+   * Specular ambient from the sky, prefiltered per roughness: mip m holds
+   * roughness m / (mipLevelCount - 1). Sample with an explicit level.
+   */
+  get iblSpecularMap(): GPUTexture | null {
+    return this.sky?.skyRenderer?.iblPrefilter?.specularCube ?? null;
+  }
+
+  /**
+   * Split-sum scale/bias for F0, indexed (NdotV, roughness). Constant for the
+   * lifetime of the device — generated once, never updated.
+   */
+  get iblBrdfLut(): GPUTexture | null {
+    return this.sky?.skyRenderer?.iblPrefilter?.brdfLut ?? null;
+  }
+
   /** Returns the shared shadow atlas (directional cascades + spot light quadrant), or null if not yet initialized. */
   get shadowAtlas(): GPUTexture | null {
     return this.directionalShadowRenderer?.shadowDepthTexture ?? null;

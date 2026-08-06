@@ -19,6 +19,7 @@ import { StarfieldRenderer } from './StarfieldRenderer';
 import { CloudShadowRenderer } from './CloudShadowRenderer';
 import { SkyCubeCapture } from './SkyCubeCapture';
 import { SkyCubeDebugRenderer } from './SkyCubeDebugRenderer';
+import { SkyIblPrefilter } from './SkyIblPrefilter';
 import { GodRaysPostProcess } from '../../post-processes/GodRaysPostProcess';
 import {
   RainParticlePass,
@@ -64,6 +65,8 @@ export class SkyRenderer {
 
   /** Atmosphere captured to a cubemap — the source for Lichen's sky-driven IBL. */
   cubeCapture: SkyCubeCapture;
+  /** Turns that capture into irradiance, prefiltered specular and the BRDF map. */
+  iblPrefilter: SkyIblPrefilter;
   /** On-screen viewer for the captured faces; off unless a console command turns it on. */
   cubeDebugRenderer: SkyCubeDebugRenderer;
 
@@ -155,6 +158,7 @@ export class SkyRenderer {
       updateFrequency: 2,
     });
     this.cubeCapture = new SkyCubeCapture();
+    this.iblPrefilter = new SkyIblPrefilter();
     this.cubeDebugRenderer = new SkyCubeDebugRenderer();
     this.perfMonitor = new PerformanceMonitor();
   }
@@ -254,7 +258,14 @@ export class SkyRenderer {
       this.atmospherePass.pipeline,
       this.starfieldRenderer.cubemap
     );
-    this.cubeDebugRenderer.init(renderer, this.cubeCapture.cubemap);
+    this.iblPrefilter.init(renderer, this.cubeCapture.cubemap);
+    this.cubeDebugRenderer.init(
+      renderer,
+      this.cubeCapture.cubemap,
+      this.iblPrefilter.irradianceCube,
+      this.iblPrefilter.specularCube,
+      this.iblPrefilter.brdfLut
+    );
 
     // Bilateral reads HDR clouds directly — edge-preserving smoothing, no ghosting.
     this.bilateralPass.sourceTexture = this.cloudsPass.renderTarget;
@@ -280,9 +291,8 @@ export class SkyRenderer {
       'sky-atmosphere',
       'sky-god-rays',
       'sky-bilateral',
-      // Times one captured face. Multiply by SkyCaptureScheduler.facesPerFrame
-      // for the frame cost; it reads 0 on the frames where nothing changed.
       'sky-cube-capture',
+      'sky-ibl-prefilter',
     ]);
   }
 
@@ -498,10 +508,7 @@ export class SkyRenderer {
       this.perfMonitor.getTimestampWrites('sky-atmosphere')
     );
 
-    // IBL capture, on the same encoder as the passes above. It runs after the
-    // atmosphere pass only because it shares that pipeline; the two write
-    // different targets and neither reads the other.
-    this.cubeCapture.render(
+    const facesCaptured = this.cubeCapture.render(
       device,
       commandEncoder,
       uniformData,
@@ -513,6 +520,13 @@ export class SkyRenderer {
       this.temperature,
       camera.transform.position.y,
       this.perfMonitor.getTimestampWrites('sky-cube-capture')
+    );
+
+    this.iblPrefilter.render(
+      device,
+      commandEncoder,
+      facesCaptured,
+      this.perfMonitor.getTimestampWrites('sky-ibl-prefilter')
     );
 
     const commandBuffer = commandEncoder.finish();
@@ -636,6 +650,7 @@ export class SkyRenderer {
 
   dispose() {
     this.perfMonitor.dispose();
+    this.iblPrefilter.dispose();
     this.cubeCapture.dispose();
     this.starfieldRenderer.dispose();
     this.cloudShadowRenderer.dispose();
