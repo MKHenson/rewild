@@ -143,6 +143,14 @@ export class Renderer {
     );
   }
 
+  /**
+   * The atmosphere captured to a cubemap, or null before the sky has
+   * initialised. Source texture for the IBL prefilter — see SkyCubeCapture.
+   */
+  get skyEnvironmentMap(): GPUTexture | null {
+    return this.sky?.skyRenderer?.cubeCapture?.cubemap ?? null;
+  }
+
   /** Returns the shared shadow atlas (directional cascades + spot light quadrant), or null if not yet initialized. */
   get shadowAtlas(): GPUTexture | null {
     return this.directionalShadowRenderer?.shadowDepthTexture ?? null;
@@ -906,6 +914,9 @@ export class Renderer {
 
       // Shadow debug atlas viewer — rendered on top of everything when active.
       this.directionalShadowRenderer.debugRenderer.render(this);
+
+      // Captured sky cubemap viewer — likewise inert unless switched on.
+      this.sky.skyRenderer.cubeDebugRenderer.render(this);
     }
   }
 }
