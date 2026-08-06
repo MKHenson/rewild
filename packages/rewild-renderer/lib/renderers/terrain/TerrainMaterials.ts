@@ -14,88 +14,22 @@
 
 export interface TerrainMaterial {
   name: string;
-  // Bucket-relative texture URLs, resolved against SHARED_ASSETS_BASE_URL.
-  //
-  // Deliberately URLs rather than materials.json keys: these textures are only
-  // ever sampled through the terrain arrays, so routing them via the shared
-  // template would load each one a second time as a standalone texture — ~43
-  // MiB of VRAM nothing binds. The table describes the material completely.
   albedoUrl: string;
   normalUrl: string;
-  // Packed ARM map, linear: ambient occlusion in R, roughness in G, metallic in
-  // B. The pack convention, and the same channel layout glTF's ORM uses, so a
-  // terrain material and an imported model material read alike.
-  //
-  // Roughness (G) is what the shader reads today: folded into the specular
-  // highlight as gloss = 1 - roughness, so the highlight follows the surface
-  // (damp rock catches the sun, dry grass stays matte) rather than the whole
-  // layer glinting uniformly.
-  //
-  // R and B are banked, not yet sampled. Occlusion needs an indirect term to
-  // attenuate and gets one with the sky IBL (#201); metallic is 0 across every
-  // natural material here and is only carried so the channel layout matches.
-  //
-  // Replaces a separate grayscale roughness map per material. Nothing was lost
-  // — the roughness data is the same — and it drops a whole 17-layer 1K texture
-  // array, about 91 MiB of VRAM with mips, that held one channel of what this
-  // one already carries.
+  // Roughness (G), metallic (B) and occlusion (R)
   armUrl: string;
-  // Linear grayscale height/displacement: 0 the deepest crevice, 1 the highest
-  // peak of the surface relief. The terrain shader's parallax-occlusion march
-  // treats this as a depth volume carved below the surface — view rays march
-  // inward until they strike the heightfield, so texels sit at the apparent
-  // height their relief implies rather than flat on the geometry, and near
-  // relief occludes far relief. Only the red channel is read. It also drives
-  // the height-aware layer blend: taller texels win material transitions.
   heightUrl: string;
-  // Depth of the parallax volume, in tile-UV units (one tile = 1.0), before
-  // the shader's distance fade. Bigger ⇒ deeper apparent relief; 0 disables
-  // parallax for this material. Expect to tune per material.
   heightScale: number;
-  // Detail tiling, in tiles per chunk UV unit.
   uvScale: number;
-  // Detail tiling of the large-scale normal for distant fragments. Set ⇒ this
-  // material has a macro normal; omitted ⇒ it has none and simply fades toward
-  // its geometric normal.
-  //
-  // Distant terrain looks washed out because a normal map's mips average toward
-  // flat (0,0,1) — the GPU deletes the detail. A macro normal's features stay
-  // many pixels wide at range, so mipping cannot erase them, and the detail
-  // normal is faded out by view distance underneath it (#181).
   macroUvScale?: number;
   // Which material's normal map to use as this one's macro normal. Omitted ⇒ its
   // own, which is the historical behaviour.
-  //
-  // There is still only one normal array, so a macro normal must be *some*
-  // material's normal layer — but it need not be this material's. Detail normals
-  // are authored at centimetre scale and many of them read badly stretched to
-  // metres: sand's grain becomes a rippled sheet, leaf litter becomes lumpy
-  // noise. Borrowing a coarser material's map (dune swell from `rocky_terrain`,
-  // strata from `cliff_side_1k`) costs nothing — the layer is already resident,
-  // and the shader samples exactly one macro texel either way.
-  //
-  // The borrowed map's green-channel convention comes from the material it
-  // belongs to, not from this one; see getClimateLayerParams.
   macroNormalFrom?: string;
   // How much of the macro normal to apply, 0 (flat) to 1 (the map's full tilt).
   // Omitted ⇒ 1.
-  //
-  // Mostly for borrowed macro normals: a map authored for rock is usually too
-  // pronounced for the sand drifting against it, and this is the amplitude knob
-  // that avoids needing a second, gentler asset. Above 1 extrapolates past the
-  // source map's tilt, which is legal but rarely what you want.
   macroStrength?: number;
-  // Scalar specular modulator, replacing the per-texel specular map — that map
-  // is bound to `white-1x1` today, so it costs two texture samples per layer to
-  // multiply by 1.0. This is *how much* the surface glints.
-  specular: number;
-  // Blinn-Phong specular exponent — *how tight* the glint is (its glossiness).
-  // Low (~8) is a broad, soft sheen; high (~64+) is a small, sharp sun-glint.
-  // Blended per-fragment across the active materials, so wet rock can hold a
-  // tight highlight in the same spot dry grass stays matte. The energy-
-  // conserving lighting brightens tighter lobes automatically, so raising this
-  // sharpens *and* intensifies the glint.
-  shininess: number;
+  roughness: number;
+  occlusionStrength?: number;
   // How softly this material hands over to its neighbours, in blend-score units
   // (score = splat weight + centred surface height). Only layers within this of
   // the winning score contribute, so it is the *width of the transition*.
@@ -110,16 +44,6 @@ export interface TerrainMaterial {
   //   ~0.7  the height term rarely decides anything on its own, and the splat
   //         weight carries the transition. A soft crossfade. Right for
   //         litter, sand, and anything that should intermingle rather than meet.
-  //
-  // This is a *vote*, not a verdict: the shader averages the depths of every
-  // material present at a fragment, weighted by splat coverage. So a material
-  // gets exactly its own width wherever it stands alone, and a mismatched pair
-  // (mountain rock at 0.2 meeting forest litter at 0.7) meets at an intermediate
-  // width that slides smoothly with the splat. Taking it from the winning layer
-  // instead — which is what this used to do — made the width flip in a single
-  // fragment at the 50/50 contour and drew a visible line along the biome
-  // border, so setting a pair to match is no longer load-bearing.
-  // Omitted ⇒ BLEND_DEPTH.
   blendDepth?: number;
   // Which way the normal map's green channel points. Sources differ and there
   // is no way to detect it from the file, so every material must say.
@@ -146,10 +70,12 @@ const MACRO_UV_SCALE = 2;
 // ground and snow via the per-material multipliers below.
 const HEIGHT_SCALE = 0.022;
 
-// Base specular exponent (gloss). Matte ground sits below it, hard/wet surfaces
-// (rock, marble, snow crust) above — see each material's shininess.
-const SHININESS = 32;
-const SPECULAR = 1;
+/**
+ * Base roughness factor: 1 means "the ARM map is right as authored", which is
+ * where a material with no particular character should sit. Matte ground goes
+ * above it, hard or wet surfaces (rock, marble, snow crust) below.
+ */
+const ROUGHNESS = 1;
 
 // Default transition width — the hard, interlocking edge the height-aware blend
 // was built for, and what a material without its own `blendDepth` gets.
@@ -172,8 +98,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE,
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    specular: SPECULAR * 0.3,
-    shininess: SHININESS * 0.5, // matte grass/soil
+    roughness: ROUGHNESS * 1.17,
     // Pairs with forest_leaves_02 under a noise selector — litter scattered
     // over soil, which should intermingle rather than meet along an edge.
     blendDepth: BLEND_DEPTH_SOFT,
@@ -185,14 +110,14 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
       'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_albedo.png',
     normalUrl:
       'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_normal.png',
-    armUrl: 'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_arm.jpg',
+    armUrl:
+      'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_arm.jpg',
     heightUrl:
       'terrain/ground-coastal-01/TexturesCom_Ground_Coastal1_2x2_1K_height.png',
     heightScale: HEIGHT_SCALE,
     uvScale: DETAIL_UV_SCALE,
     macroUvScale: MACRO_UV_SCALE,
-    specular: SPECULAR * 0.18,
-    shininess: SHININESS * 0.75,
+    roughness: ROUGHNESS * 1.07,
     // TexturesCom, not Poly Haven — this one is a guess. If coastal ground
     // alone reads inset while the others look right, flip it to 'directx'.
     normalConvention: 'opengl',
@@ -206,8 +131,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE * 1.8,
     uvScale: DETAIL_UV_SCALE,
     macroUvScale: MACRO_UV_SCALE,
-    specular: SPECULAR * 0.4,
-    shininess: SHININESS * 1.5,
+    roughness: ROUGHNESS * 0.91,
     normalConvention: 'opengl', // Poly Haven
   },
   'snow-02': {
@@ -219,8 +143,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     macroUvScale: MACRO_UV_SCALE,
     heightScale: HEIGHT_SCALE * 0.5,
     uvScale: DETAIL_UV_SCALE * 0.25,
-    specular: SPECULAR * 0.55,
-    shininess: SHININESS * 2,
+    roughness: ROUGHNESS * 0.85,
     normalConvention: 'opengl', // Poly Haven
   },
   rocky_terrain: {
@@ -232,8 +155,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE * 1.6,
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    specular: SPECULAR * 0.3,
-    shininess: SHININESS * 1.5,
+    roughness: ROUGHNESS * 0.91,
     normalConvention: 'opengl', // Poly Haven
   },
   aerial_rocks_01: {
@@ -245,8 +167,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE * 1.6,
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    specular: SPECULAR * 0.2,
-    shininess: SHININESS * 6,
+    roughness: ROUGHNESS * 0.65,
     normalConvention: 'opengl', // Poly Haven
   },
   marble_cliff_05: {
@@ -258,8 +179,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE * 4,
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    specular: SPECULAR * 0.2,
-    shininess: SHININESS * 4.5, // polished marble — tightest glint
+    roughness: ROUGHNESS * 0.69, // polished marble — tightest glint
     normalConvention: 'opengl', // Poly Haven
   },
   // The desert's crust, in the pans between dunes. Its relief is the deepest in
@@ -275,9 +195,8 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE * 1.5,
     macroUvScale: MACRO_UV_SCALE * 5,
     uvScale: DETAIL_UV_SCALE,
-    specular: SPECULAR * 0.4,
     blendDepth: BLEND_DEPTH_SOFT,
-    shininess: SHININESS * 0.75, // dry and dusty — no glint to speak of
+    roughness: ROUGHNESS * 1.07, // dry and dusty — no glint to speak of
     normalConvention: 'opengl', // Poly Haven
   },
   // The desert's dune bodies. Shallow relief on purpose: sand ripples are
@@ -296,8 +215,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     uvScale: DETAIL_UV_SCALE,
     // Dry sand is matte but not dead — a broad, low sheen down the sunlit flank
     // is most of what makes a dune read as a dune.
-    specular: SPECULAR * 0.35,
-    shininess: SHININESS * 0.5,
+    roughness: ROUGHNESS * 1.17,
     blendDepth: BLEND_DEPTH_SOFT,
     normalConvention: 'opengl', // Poly Haven
   },
@@ -310,8 +228,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE * 2,
     macroUvScale: MACRO_UV_SCALE,
     uvScale: DETAIL_UV_SCALE,
-    specular: SPECULAR * 0.35,
-    shininess: SHININESS * 0.5,
+    roughness: ROUGHNESS * 1.17,
     // The soft half of the forest floor pair — see forest-ground-01.
     blendDepth: BLEND_DEPTH_SOFT,
     normalConvention: 'opengl', // Poly Haven
@@ -328,8 +245,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE,
     macroUvScale: MACRO_UV_SCALE,
     uvScale: DETAIL_UV_SCALE,
-    specular: SPECULAR * 0.3,
-    shininess: SHININESS * 0.5, // dry sand — a broad, matte sheen
+    roughness: ROUGHNESS * 1.17, // dry sand — a broad, matte sheen
     // Pairs with aerial_beach_02 across a height band; damp and dry sand should
     // intermingle over a tide line, not meet along an edge.
     blendDepth: BLEND_DEPTH_SOFT,
@@ -348,8 +264,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     uvScale: DETAIL_UV_SCALE,
     // Damp sand is the one sand that genuinely glints — a tighter, stronger
     // highlight than its dry counterpart is most of what sells it as wet.
-    specular: SPECULAR * 0.5,
-    shininess: SHININESS * 1.25,
+    roughness: ROUGHNESS * 0.95,
     blendDepth: BLEND_DEPTH_SOFT, // the soft half of the beach pair
     // TexturesCom-style pack, not confirmed Poly Haven — this is a guess. If
     // the beach alone reads inset while the others look right, flip to 'directx'.
@@ -370,8 +285,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     // silhouette, and they are metres apart, not centimetres.
     macroUvScale: MACRO_UV_SCALE * 0.75,
     uvScale: DETAIL_UV_SCALE,
-    specular: SPECULAR * 0.2,
-    shininess: SHININESS * 1.5, // dry stone — present but not polished
+    roughness: ROUGHNESS * 0.91, // dry stone — present but not polished
     // No blendDepth: the default hard edge is what this is for. Ledges should
     // break through the rock beneath them along their own relief.
     normalConvention: 'opengl',
@@ -389,8 +303,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE * 1.8,
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    specular: SPECULAR * 0.25,
-    shininess: SHININESS * 2,
+    roughness: ROUGHNESS * 0.85,
     // No blendDepth: sand drifting against it should meet the rock along the
     // rock's own crevices, which is exactly what the default hard edge does.
     normalConvention: 'opengl',
@@ -409,8 +322,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     // sward, not the blades — those mip to a flat green wash regardless.
     macroUvScale: MACRO_UV_SCALE,
     uvScale: DETAIL_UV_SCALE,
-    specular: SPECULAR * 0.25,
-    shininess: SHININESS * 0.5, // matte — dry grass has no glint to speak of
+    roughness: ROUGHNESS * 1.17, // matte — dry grass has no glint to speak of
     // Pairs with grass_path_02_1k under a noise selector: worn ground bleeding
     // into grass, which should intermingle rather than meet along an edge.
     blendDepth: BLEND_DEPTH_SOFT,
@@ -431,8 +343,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE * 2,
     macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
-    specular: SPECULAR * 0.3,
-    shininess: SHININESS * 0.75, // bare earth — dusty, barely brighter than grass
+    roughness: ROUGHNESS * 1.07, // bare earth — dusty, barely glossier than grass
     blendDepth: BLEND_DEPTH_SOFT, // the soft half of the grassland pair
     normalConvention: 'opengl', // Poly Haven
   },
@@ -452,8 +363,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE * 2,
     macroUvScale: MACRO_UV_SCALE,
     uvScale: DETAIL_UV_SCALE,
-    specular: SPECULAR * 0.35,
-    shininess: SHININESS * 0.5, // dry leaves — matte, with a faint waxy sheen
+    roughness: ROUGHNESS * 1.17,
     // Pairs with forest_leaves_02 under a noise selector: two litters of the
     // same floor, which should intermingle rather than meet along an edge.
     blendDepth: BLEND_DEPTH_SOFT,

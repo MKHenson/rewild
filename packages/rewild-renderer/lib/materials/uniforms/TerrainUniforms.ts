@@ -4,26 +4,22 @@ import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 import { MAX_SPLAT_LAYERS } from '../../renderers/terrain/Biomes';
 
-// TerrainParams layout (432 bytes, std140-compatible) — must match the struct
+// TerrainParams layout (400 bytes, std140-compatible) — must match the struct
 // in terrain.wgsl:
-//   specularColor    vec3f           offset 0   (12 bytes)
-//   shininess        f32             offset 12  (4 bytes)
-//   ambientColor     vec3f           offset 16  (12 bytes)
-//   detailFadeStart  f32             offset 28  (4 bytes)
-//   detailFadeEnd    f32             offset 32  (4 bytes)
-//   noiseScale       f32             offset 36  (4 bytes)
-//   heightBlendDepth f32             offset 40  (4 bytes)
-//   _pad             f32             offset 44  (4 bytes)
-//   layers           array<vec4f,24> offset 48  (384 bytes)
+//   detailFadeStart  f32             offset 0   (4 bytes)
+//   detailFadeEnd    f32             offset 4   (4 bytes)
+//   noiseScale       f32             offset 8   (4 bytes)
+//   heightBlendDepth f32             offset 12  (4 bytes)
+//   layers           array<vec4f,24> offset 16  (384 bytes)
 //
-// `layers` starts at 48 because a uniform array of vec4f needs 16-byte
-// alignment; 40 + 8 padding is what gets it there. Three vec4f per splat
-// channel, MAX_SPLAT_LAYERS channels:
-//   [slot*3    ] = (layerIndex, uvScale, macroUvScale, specular)
-//   [slot*3 + 1] = (normalYSign, heightScale, shininess, blendDepth)
+// `layers` starts at 16 because a uniform array of vec4f needs 16-byte
+// alignment, and the four scalars above fill exactly one row. Three vec4f per
+// splat channel, MAX_SPLAT_LAYERS channels:
+//   [slot*3    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
+//   [slot*3 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
 //   [slot*3 + 2] = (macroLayerIndex, macroNormalYSign, macroStrength, _pad)
-const PARAMS_SIZE = 48 + MAX_SPLAT_LAYERS * 3 * 16;
-const LAYERS_OFFSET_FLOATS = 48 / 4;
+const PARAMS_SIZE = 16 + MAX_SPLAT_LAYERS * 3 * 16;
+const LAYERS_OFFSET_FLOATS = 16 / 4;
 const FLOATS_PER_LAYER = 12;
 
 export interface TerrainLayerParams {
@@ -31,13 +27,12 @@ export interface TerrainLayerParams {
   uvScale: number;
   // 0 ⇒ no macro normal for this material.
   macroUvScale: number;
-  specular: number;
+  roughnessFactor: number;
   // +1 for a DirectX-convention normal map, -1 for an OpenGL one.
   normalYSign: number;
   // Depth of the parallax-occlusion volume, in tile-UV units. 0 ⇒ no parallax.
   heightScale: number;
-  // Blinn-Phong specular exponent (gloss). Higher ⇒ tighter, sharper highlight.
-  shininess: number;
+  occlusionStrength: number;
   // Width of this material's transition to its neighbours, in blend-score
   // units. Small ⇒ a hard interlocking edge; large ⇒ a soft crossfade.
   blendDepth: number;
@@ -56,26 +51,6 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   group: number;
   bindGroup: GPUBindGroup;
   requiresBuild: boolean;
-
-  // Master gain on the specular highlight (tints it slightly warm so sun-glints
-  // read golden). This multiplies every layer's own `specular`, so it is the
-  // overall ceiling: at 0.04 (a dielectric F0) no material can glint no matter
-  // its shininess — hence the higher value now that gloss is per-material.
-  specularColor: [number, number, number] = [0.5, 0.5, 0.45];
-  // Legacy global gloss. Terrain now blends shininess per-fragment from its
-  // materials (see getClimateLayerParams), so this is unused by terrain lighting
-  // and kept only for the uniform layout.
-  shininess: number = 32;
-
-  // Sky fill. Added outside the shadow terms, so it is what a surface facing
-  // away from the sun — or inside a shadow — still receives; at zero those
-  // areas render pure black, since nothing else lights them.
-  //
-  // Tinted blue because outdoors the fill *is* the sky. Kept modest because
-  // this is a flat add: a fully lit surface gets diffuse (up to 1.0) plus this
-  // on top, so raising it brightens the lit terrain as well as the shadows,
-  // and daylight terrain is already close to saturating.
-  ambientColor: [number, number, number] = [0.1, 0.11, 0.14];
 
   // Where the detail normal starts and finishes fading out, in view-space
   // metres. Past detailFadeEnd only the macro normal remains — which is the
@@ -202,18 +177,10 @@ export class TerrainUniforms implements ISharedUniformBuffer {
 
   private _writeParams(device: GPUDevice): void {
     const data = this._paramsData;
-    data[0] = this.specularColor[0];
-    data[1] = this.specularColor[1];
-    data[2] = this.specularColor[2];
-    data[3] = this.shininess;
-    data[4] = this.ambientColor[0];
-    data[5] = this.ambientColor[1];
-    data[6] = this.ambientColor[2];
-    data[7] = this.detailFadeStart;
-    data[8] = this.detailFadeEnd;
-    data[9] = this.noiseScale;
-    data[10] = this.heightBlendDepth;
-    data[11] = 0; // _pad
+    data[0] = this.detailFadeStart;
+    data[1] = this.detailFadeEnd;
+    data[2] = this.noiseScale;
+    data[3] = this.heightBlendDepth;
 
     // Channels the palette does not use keep weight 0 in the splat, so the
     // shader's epsilon skips them — but zero them anyway so a stale layer can
@@ -225,10 +192,12 @@ export class TerrainUniforms implements ISharedUniformBuffer {
       data[base] = layer ? layer.layerIndex : 0;
       data[base + 1] = layer ? layer.uvScale : 1;
       data[base + 2] = layer ? layer.macroUvScale : 0;
-      data[base + 3] = layer ? layer.specular : 0;
+      // 1 for an unused slot, not 0: these multiply the ARM map, so 1 means
+      // "trust it" while 0 would claim a mirror-smooth, fully-occluded surface.
+      data[base + 3] = layer ? layer.roughnessFactor : 1;
       data[base + 4] = layer ? layer.normalYSign : 1;
       data[base + 5] = layer ? layer.heightScale : 0;
-      data[base + 6] = layer ? layer.shininess : 32;
+      data[base + 6] = layer ? layer.occlusionStrength : 1;
       // Never 0 for an unused slot: the shader subtracts this from the winning
       // score, and a 0 there would make an empty slot's cutoff exclude
       // everything if it ever won.

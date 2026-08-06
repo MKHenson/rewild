@@ -106,8 +106,8 @@ export function getClimateLayerParams(
       macroLayerIndex: getTerrainMaterialLayer(macroSource.name),
       macroStrength: material.macroStrength ?? 1,
       heightScale: material.heightScale,
-      specular: material.specular,
-      shininess: material.shininess,
+      roughnessFactor: material.roughness,
+      occlusionStrength: material.occlusionStrength ?? 1,
       blendDepth: material.blendDepth ?? BLEND_DEPTH,
       // Our tangent frame's Y runs down the image, matching DirectX; an OpenGL
       // map's green points the other way and has to be inverted.
