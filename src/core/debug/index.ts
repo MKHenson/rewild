@@ -4,6 +4,7 @@ import { registerChunkSnapshotDevCommands } from './ChunkSnapshotDevCommands';
 import { registerRenderQualityCommands } from './RenderQualityCommands';
 import { registerShadowDebugCommands } from './ShadowDebugCommands';
 import { registerSkyDebugCommands } from './SkyDebugCommands';
+import { registerPbrHarnessCommands } from './PbrHarnessCommands';
 import { registerStandardMaterialCommands } from './StandardMaterialCommands';
 import { registerTerrainPerfCommands } from './TerrainPerfCommands';
 
@@ -17,5 +18,6 @@ export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerShadowDebugCommands(renderer);
   registerTerrainPerfCommands(renderer);
   registerStandardMaterialCommands(renderer);
+  registerPbrHarnessCommands(renderer);
   registerChunkSnapshotDevCommands(renderer, project);
 }

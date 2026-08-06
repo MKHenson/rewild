@@ -1,7 +1,7 @@
 import { Renderer } from '..';
 import toneMapShader from '../shaders/frame-compositing/tonemap.wgsl';
 
-const UNIFORM_BYTES = 16; // lightningFlash + exposure + 2 floats of padding
+const UNIFORM_BYTES = 16; // lightningFlash + exposure + bloomScale + 1 pad
 const uniformData = new Float32Array(4);
 
 /**
@@ -106,6 +106,12 @@ export class ToneMapPass {
     // is already written each frame, so tracking dirtiness would cost more than
     // it saves and would be one more thing to get wrong.
     uniformData[1] = renderer.camera.camera.exposure;
+    // Bloom is suppressed while a material debug channel is up. A debug
+    // channel is scaled by 1/exposure so the tone curve sees its raw 0..1
+    // value — which puts it at an exposure-adjusted luminance of up to 1.0,
+    // ten times BloomPass.bloomThreshold. Left on, every channel blooms into a
+    // featureless wash and the view that exists to be *measured* cannot be.
+    uniformData[2] = renderer.materialDebugChannel === 0 ? 1 : 0;
     renderer.device.queue.writeBuffer(
       this.uniformBuffer,
       0,

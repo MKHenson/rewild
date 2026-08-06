@@ -35,8 +35,17 @@ struct IblParams {
    * one place — SkyCubeCapture's SKY_CUBE_MIP_COUNT.
    */
   maxSpecularMip: f32,
-  _iblPad0: f32,
-  _iblPad1: f32,
+  /**
+   * Material debug channel 0 shades normally; anything else short-
+   * circuits the material to one of its inputs. See material-debug.wgsl.
+   */
+  debugChannel: u32,
+  /**
+   * Reciprocal of the camera exposure. A debug channel is a 0..1 quantity, and
+   * the frame tonemap multiplies by exposure before ACES — so scaling by this
+   * first makes the curve see the raw value rather than crushing it to black.
+   */
+  debugScale: f32,
 }
 
 /**
@@ -69,8 +78,6 @@ fn evaluateIbl(surface: PbrSurface, perceptualRoughness: f32) -> vec3f {
   // diffuse colour directly — no further division, and no cosine, both having
   // been folded in by the cosine-weighted convolution that produced it.
   let irradiance = textureSampleLevel(iblIrradianceMap, iblSampler, worldN, 0.0).rgb;
-  let diffuse = irradiance * surface.diffuseColor;
-
   // Roughness maps linearly onto the chain, matching how the prefilter assigned
   // roughness to each level (mip m holds m / maxSpecularMip). Sampled with an
   // explicit level so the hardware's own derivative-based choice, which would
@@ -84,13 +91,30 @@ fn evaluateIbl(surface: PbrSurface, perceptualRoughness: f32) -> vec3f {
   let ab = textureSampleLevel(
     iblBrdfLut, iblSampler, vec2f(NoV, clamp(perceptualRoughness, 0.0, 1.0)), 0.0
   ).rg;
-  let specular = prefiltered * (surface.f0 * ab.x + ab.y);
+  // Horizon occlusion, for the same reason the direct path applies it: the
+  // reflection vector can point below the geometry once a normal map has tilted
+  // N, and the prefiltered cube will happily return sky from down there.
+  let horizon = horizonOcclusion(reflect(-V, N), surface.geometricNormal);
 
-  // Energy split, as in the direct path: what reflects off the surface cannot
-  // also refract into it. surface.diffuseColor is already scaled by
-  // (1 - metallic), so a metal contributes no diffuse here and must not be
-  // scaled by it twice.
-  let kD = vec3f(1.0) - fresnelSchlickRoughness(surface.f0, NoV, perceptualRoughness);
+  // Single-scattering reflectance: the fraction of incoming light that leaves
+  // after exactly one bounce off a microfacet.
+  let kS = fresnelSchlickRoughness(surface.f0, NoV, perceptualRoughness);
+  let FssEss = kS * ab.x + ab.y;
 
-  return (kD * diffuse + specular) * iblParams.intensity;
+  // Multiple scattering (Fdez-Agüera 2019).
+  let Ems = 1.0 - (ab.x + ab.y);
+  let Favg = surface.f0 + (1.0 - surface.f0) / 21.0;
+  // The denominator reaches zero for a perfect mirror (F0 = 1) that loses all
+  // its energy — physically unreachable, numerically one division away.
+  let FmsEms = Ems * FssEss * Favg / max(vec3f(1.0) - Favg * Ems, vec3f(1e-4));
+
+  // What is left for the diffuse lobe once both scattering terms have taken
+  // their share. surface.diffuseColor is already scaled by (1 - metallic), so a
+  // metal contributes nothing here and must not be scaled by it twice.
+  let kD = surface.diffuseColor * (1.0 - FssEss + FmsEms);
+
+  let specular = prefiltered * FssEss * horizon;
+  let diffuse = (FmsEms + kD) * irradiance;
+
+  return (diffuse + specular) * iblParams.intensity;
 }

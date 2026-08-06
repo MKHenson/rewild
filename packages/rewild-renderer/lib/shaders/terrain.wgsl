@@ -2,6 +2,7 @@
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
 #include "./shader-lib/ibl.wgsl"
+#include "./shader-lib/material-debug.wgsl"
 #include "./shader-lib/tbn.frag.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"
@@ -695,6 +696,9 @@ fn fs(
 
   var surface: PbrSurface;
   surface.normal = normalizedNormal;
+  // parallaxN is the mesh normal before any map tilts it — the surface the
+  // triangle actually has, which is what horizon occlusion needs.
+  surface.geometricNormal = parallaxN;
   surface.viewPosition = viewPosition;
   // Metallic is pinned at 0: every material in the palette is a dielectric, so
   // the diffuse colour is the albedo and F0 is glTF's fixed 4%. If a metallic
@@ -714,14 +718,32 @@ fn fs(
   // two paths shade the same way or the objects standing on the terrain do not
   // look like they belong on it.
   let sunShadow = cloudShadowFactor * directionalShadowFactor;
-  var shaded = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow
+  let direct = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow
              + lit.punctualDiffuse + lit.punctualSpecular
              + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadowFactor;
+  var shaded = direct;
 
   // Sky IBL in place of the flat ambient constant. Occlusion applies to this and
   // only this: direct light already answers the question with N·L and the shadow
   // maps, so multiplying it there would double-darken every crevice.
-  shaded += evaluateIbl(surface, shadingRoughness) * shadingOcclusion;
+  let indirect = evaluateIbl(surface, shadingRoughness) * shadingOcclusion;
+  shaded += indirect;
+
+  // Channel visualisation
+  if (iblParams.debugChannel != DEBUG_CHANNEL_OFF) {
+    return materialDebugColor(
+      blendedColor,
+      // Pinned at 0 by this shader, so the channel reports the constant rather
+      // than the ARM map's unauthored B.
+      0.0,
+      shadingRoughness,
+      normalizedNormal,
+      shadingOcclusion,
+      vec3f(0.0), // terrain has no emissive slot
+      direct,
+      indirect
+    );
+  }
 
   // No multiply by albedo here, unlike the Phong path this replaced. The BRDF
   // already carries it — diffuseColor went into the surface, and specular is

@@ -131,7 +131,7 @@ export class SkyRenderer {
     this.elevation = -0;
     this.cloudiness = 0.7;
     this.foginess = 0.3;
-    this.cloudShadowIntensity = 0.8;
+    this.cloudShadowIntensity = 0.45;
     this.windiness = 0.5;
     this.upDot = 0.0;
     this.sun = new DirectionLight();

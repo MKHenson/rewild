@@ -88,7 +88,7 @@ export class Player extends Node {
   // that, not against the generic ramp factor in Light.intensity. It preserves
   // how bright the beam reads at 30m; near the player it is now much brighter
   // and past ~40m much dimmer, because inverse-square says so.
-  private static readonly _FLASHLIGHT_INTENSITY: f32 = 1422.2;
+  private static readonly _FLASHLIGHT_INTENSITY: f32 = 2422.2;
 
   private _onMouseMove: (e: MouseEvent) => void;
   private _onKeyDown: (e: KeyboardEvent) => void;

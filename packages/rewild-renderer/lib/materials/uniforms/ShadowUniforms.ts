@@ -53,8 +53,10 @@ export class ShadowUniforms implements ISharedUniformBuffer {
   private boundShadowAtlas: GPUTexture | null = null;
   private boundIrradianceMap: GPUTexture | null = null;
 
-  /** viewToWorld (16) + intensity + maxSpecularMip + 2 pad = 20 floats. */
+  /** viewToWorld (16) + intensity + maxSpecularMip + debugChannel + debugScale. */
   private iblData: Float32Array;
+  /** Aliases iblData so debugChannel can be written as the u32 the shader reads. */
+  private iblInts: Uint32Array;
   iblBuffer: GPUBuffer;
 
   constructor(group: number, includeIbl: boolean = false) {
@@ -69,6 +71,7 @@ export class ShadowUniforms implements ISharedUniformBuffer {
     this.spotFloats = new Float32Array(this.spotData);
     this.spotInts = new Uint32Array(this.spotData);
     this.iblData = new Float32Array(20);
+    this.iblInts = new Uint32Array(this.iblData.buffer);
   }
 
   get buffer(): GPUBuffer {
@@ -223,6 +226,9 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       this.iblData.set(camera.transform.matrixWorld.elements, 0);
       this.iblData[16] = renderer.iblIntensity;
       this.iblData[17] = SKY_CUBE_MIP_COUNT - 1;
+      this.iblInts[18] = renderer.materialDebugChannel;
+      const exposure = camera.exposure;
+      this.iblData[19] = exposure > 1e-6 ? 1 / exposure : 1;
       device.queue.writeBuffer(this.iblBuffer, 0, this.iblData.buffer);
     }
 

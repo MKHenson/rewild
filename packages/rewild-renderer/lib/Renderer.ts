@@ -185,6 +185,16 @@ export class Renderer {
    */
   iblIntensity: number = 1;
 
+  /**
+   * Material channel to visualise scene-wide instead of shading (#203). 0 is
+   * off; the rest mirror DEBUG_CHANNEL_* in shader-lib/material-debug.wgsl.
+   *
+   * Read by every pass that declares the IBL bindings — the standard material,
+   * its instanced variant, and terrain — so one setting covers the whole frame
+   * and the same channel can be compared across all three.
+   */
+  materialDebugChannel: number = 0;
+
   /** Returns the shared shadow atlas (directional cascades + spot light quadrant), or null if not yet initialized. */
   get shadowAtlas(): GPUTexture | null {
     return this.directionalShadowRenderer?.shadowDepthTexture ?? null;
