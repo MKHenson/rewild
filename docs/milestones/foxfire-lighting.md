@@ -83,4 +83,5 @@ shadow casters ──▶ ShadowPass (depth-only)                                
 
 ## Debugger
 
-- You can turn the cascade shadow map debugger on and off in the console with the functions startShadowDebug() & stopShadowDebug()
+Cascade tinting, the shadow atlas viewer and the spot-shadow bypass are console
+commands — see [Debugger & Console Commands](../debug-commands.md#shadows).

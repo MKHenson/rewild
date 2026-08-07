@@ -1,287 +1,205 @@
 ![Lichen](../images/lichen.jpg)
 
-# Lichen — Physically Based Materials & Shading
+# Materials & Shading (Lichen)
 
-> Successor to **Foxfire**. Where Foxfire decided how the world is _lit_, _Lichen_ — the
-> fungus-and-alga symbiosis that colonises bare rock and gives a dead surface its first
-> character — decides what the light actually _lands on_.
+Rewild shades the world with a single **physically based material model** —
+metallic-roughness, the same one glTF and Blender speak. This document explains
+what that gives you, how to author a material, and the console tools for when
+something looks wrong.
 
-## Overview
-
-Rewild currently has two shading models, both non-physical: **Lambert** diffuse
-(`shader-lib/total-lighting.frag.wgsl`) and **Phong** specular
-(`shader-lib/total-lighting-phong.frag.wgsl`), with a **flat constant ambient term** added at the
-end (`lambertParams.ambientColor`, `phongParams.ambientColor`). Light `intensity` is a unitless
-`f32` (`core/lights/Light.ts`) and point/spot attenuation is a linear `1 - dist/range` ramp.
-
-More consequentially, the renderer is **split across two different colour pipelines**:
-
-- The **sky, cloud, fog, bloom and god-ray path is fully HDR** — `rgba16float` throughout, with
-  ACES tonemapping and pre-tonemap bloom in `shaders/sky/skyComposite.wgsl`.
-- The **main scene pass is LDR** — terrain and meshes render directly into
-  `presentationFormat` (an 8-bit `bgra8unorm` swapchain; see `Renderer.ts`).
-- They meet at the composite, where the sky tonemaps **only its own contribution** and
-  src-alpha blends over already-shaded terrain. **Terrain is never tonemapped.**
-
-Separately, all textures load as `rgba8unorm` and never `rgba8unorm-srgb`
-(`textures/BitmapTexture.ts`), so sRGB-encoded albedo is sampled as though it were linear — and
-mipmaps are averaged in that same wrong space by `shaders/mipmap-generator.wgsl`.
-
-Lichen replaces both shading models with a single **metallic-roughness PBR** model, moves the
-scene pass into HDR so physical light values survive to the tonemapper, and replaces the flat
-ambient constant with **image-based lighting captured from the sky system we already have**.
-
-**Why this milestone comes before objects.** The material system sits _below_ objects in the
-dependency stack. Building Understory's instancing, LOD and scatter against Lambert would mean
-rewriting all of it when PBR lands. And glTF's material model _is_ metallic-roughness — importing
-models into a Lambert pipeline discards everything the artist authored.
+> **Where the name comes from.** _Lichen_ was the milestone that replaced the
+> engine's two ad-hoc shading models with one physical one. Where
+> [Foxfire](./foxfire-lighting.md) decided how the world is _lit_, Lichen decided
+> what the light actually _lands on_. That work has landed; this page is the
+> plain-English guide to what it delivers.
 
 ---
 
-## Goals
+## The short version
 
-- **One HDR scene pipeline.** Scene pass renders `rgba16float`; a single whole-frame ACES
-  tonemap replaces the sky pass's isolated tonemapping. Terrain gets tonemapped for the first time.
-- **Colour-space correctness.** sRGB textures declared as sRGB, data maps (normal, roughness,
-  metallic, AO) declared linear, mip generation in linear space.
-- **Meaningful light units** — inverse-square falloff with a smooth range window, anchored to the
-  sky's existing radiance scale, plus a single camera **exposure** scalar.
-- **A `StandardPass` metallic-roughness material** — GGX specular, Smith visibility, Schlick
-  Fresnel — matching the glTF material spec so imported materials render as authored.
-- **Sky-driven IBL.** Capture the existing atmosphere to a cubemap, prefilter it, and use it for
-  diffuse and specular ambient. Ambient then tracks time of day and weather **for free**.
-- **Terrain adopts PBR** by swapping its shader include — the whole world benefits, not just
-  future objects.
-- A **PBR reference harness** (metallic × roughness sphere grid) so correctness is measured
-  rather than eyeballed.
-
-## Non-goals (deferred)
-
-- **The glTF mesh loader** — node hierarchy, multi-primitive, tangents. That's **Understory**.
-  Lichen defines the material model _to glTF's spec_ and proves it with hand-authored
-  `materials.json` entries plus a few Blender-exported test meshes; Understory wires the importer
-  up to create those materials automatically. See [Scope boundary](#scope-boundary-with-understory).
-- **Local / dynamic reflection probes.** Sky IBL covers an outdoor natural world. Probes are an
-  interiors-and-cities feature; revisit when there are interiors.
-- **Screen-space reflections**, and **global illumination** of any kind (lightmaps, GI probes,
-  irradiance volumes).
-- **Advanced glTF material extensions** — clearcoat, sheen, transmission, anisotropy, iridescence,
-  subsurface scattering. Core metallic-roughness only.
-- **Area lights.** Punctual lights only, as in Foxfire.
-- **Texture compression codecs** — KTX2/basisu, Draco, meshopt. Models are Blender-authored with
-  export settings we control, so these buy nothing yet.
-- **Skinned/animated materials.** That's **Sinew**, two milestones out.
+- **One material model.** A surface is described by base colour, **metallic** and
+  **roughness** — not by hand-tuned specular exponents. Values authored in
+  Blender or exported to glTF render as authored.
+- **One HDR frame.** Everything — terrain, objects, sky, clouds, god rays —
+  renders in high dynamic range and passes through **one exposure and one ACES
+  curve** at the end. Before, only the sky was tonemapped.
+- **Lights fall off physically** (inverse-square), with a smooth window that
+  still takes them to zero at their `range`.
+- **Ambient comes from the sky.** There is no flat ambient constant any more. The
+  atmosphere is captured to a cubemap and used as image-based lighting, so
+  ambient tracks time of day and weather **for free**.
+- **Terrain uses the same shading path** as everything else, so surfaces match
+  wherever they meet.
+- **Textures declare their colour space**, and a `npm run textures:audit` tool
+  catches the ones that lie about it.
 
 ---
 
-## Key technical decisions
+## Authoring a material
 
-| Decision            | Choice                                                             | Why                                                                                                                                                                                                                           |
-| ------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shading model       | **Metallic-roughness** (not specular-glossiness)                   | It's what glTF authors, what Blender exports, and one fewer texture than spec-gloss.                                                                                                                                          |
-| Specular BRDF       | **GGX + Smith height-correlated + Schlick Fresnel**                | The industry-standard combination; a handful of extra ALU over Phong.                                                                                                                                                         |
-| Diffuse BRDF        | **Lambert**                                                        | Burley/Oren-Nayar is a marginal gain at real cost. Keep it cheap; revisit never.                                                                                                                                              |
-| Scene colour target | **`rgba16float`**                                                  | Physical light values exceed 1.0. 8-bit clips them at source, so specular and IBL white out.                                                                                                                                  |
-| Tonemapping         | **Single whole-frame ACES**, moved out of the sky composite        | One curve over the whole image. Two tonemapping regimes meeting at a blend cannot be made consistent.                                                                                                                         |
-| Light units         | **Sky-anchored relative**, with inverse-square + range window      | Full photometric units (lux/candela) would mean re-deriving the sky's already hand-tuned absolute scale to match. Anchoring to the sky instead costs nothing and still gets correct falloff. See [Light units](#light-units). |
-| Exposure            | **One scalar**, promoted from the sky's existing `HDR_SCALE`       | A single knob rather than an aperture/shutter/ISO triple. Nothing to tune that isn't already tuned.                                                                                                                           |
-| Ambient             | **Sky-captured IBL**, no flat constant                             | The atmosphere model is already physically based — capturing it is far cheaper than authoring ambient, and it tracks weather automatically.                                                                                   |
-| IBL capture         | **Amortised** — a face or mip per frame, plus on sun/weather delta | The sky changes slowly. A full cubemap re-prefilter every frame would be pure waste.                                                                                                                                          |
-| Specular IBL        | **Prefiltered roughness mip chain + split-sum BRDF LUT**           | The standard approach; reuses the existing `mipmap-generator.wgsl` machinery as a starting point.                                                                                                                             |
-| Diffuse IBL         | **Irradiance cubemap** (small, e.g. 16²)                           | Simpler to reason about than SH and trivially cheap at that resolution.                                                                                                                                                       |
-| Terrain integration | **Swap the shader include**                                        | `terrain.wgsl` already composes shading via `#include`; PBR slots into the same seam.                                                                                                                                         |
-| Per-frame compute   | **None added**                                                     | Consistent with Foxfire. IBL prefilter is amortised, not per-frame.                                                                                                                                                           |
+Materials are declared in `templates/materials.json`. A PBR material is
+`type: 'standard'` (or `'standard-instanced'` for instanced draws):
 
----
-
-## Architecture sketch
-
-```
-                     ┌─ baseColor (sRGB) ─┐
-glTF / materials.json ├─ metallicRough ────┤
-                     ├─ normal ───────────┼─▶ StandardPass ──┐
-                     ├─ occlusion ────────┤                  │
-                     └─ emissive (sRGB) ──┘                  │
-                                                             ▼
-lights (physical units) ──▶ Lighting storage buffer ──▶  pbr.frag.wgsl  ──▶ HDR scene
-                                                        (GGX + Smith         (rgba16float)
-shadow atlas ──▶ PCF ──────────────────────────────▶     + Fresnel)              │
-                                                             ▲                   │
-SkyRenderer ──▶ cube capture ──▶ irradiance cube ────────────┤                   │
-                     │           (diffuse IBL)                │                   │
-                     └────────▶ prefiltered spec mips ───────┘                   │
-                                 + BRDF LUT                                      │
-                                                                                 ▼
-sky / clouds / fog / god rays (HDR, already) ──────────▶ composite ──▶ ACES ──▶ swapchain
-                                                          (blend only,   (single
-                                                           no tonemap)    whole-frame)
+```json
+{
+  "name": "block-concrete",
+  "type": "standard",
+  "baseColorMap": "block-concrete-4",
+  "normalMap": "block-concrete-4-normal",
+  "metallicRoughnessMap": "block-concrete-4-roughness",
+  "occlusionMap": "block-concrete-4-ao",
+  "metallic": 0,
+  "roughness": 1
+}
 ```
 
-The change in shape: today the ACES box sits _inside_ the sky composite and only the sky's own
-contribution passes through it. Lichen moves it to the end, after everything has been blended in
-HDR, so terrain and objects go through the same curve as the sky.
+Every field is optional except `name` and `type` — a material with nothing but a
+`baseColorFactor` is valid and will shade correctly.
+
+| Field                                                | What it does                                                                                                                                      |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baseColorMap` / `baseColorFactor` / `opacity`       | The surface colour, and a tint multiplied over it. `opacity` is glTF's fourth base-colour component.                                              |
+| `metallic` / `roughness`                             | 0–1. Metal or not; mirror-smooth to fully rough. Multiplied over `metallicRoughnessMap` if one is set.                                            |
+| `metallicRoughnessMap`                               | Roughness in **G**, metallic in **B** — glTF's packing.                                                                                           |
+| `occlusionMap` / `occlusionStrength`                 | Occlusion in **R**. Name the _same_ texture as `metallicRoughnessMap` to use a packed **ORM** atlas. Applies to ambient only, as glTF specifies.  |
+| `normalMap` / `normalScale`                          | Tangent-space normals. Must be **linear** on disk — see [Colour spaces](#colour-spaces--the-texture-audit) below, this is the classic silent bug. |
+| `emissiveMap` / `emissiveColor` / `emissiveStrength` | Light the surface emits. `emissiveStrength` may exceed 1 (`KHR_materials_emissive_strength`), which is how something glows into bloom.            |
+| `alphaMode` / `alphaCutoff`                          | `OPAQUE`, `MASK` (cutout — what foliage needs) or `BLEND`.                                                                                        |
+| `doubleSided`                                        | Disables back-face culling. Usually paired with `MASK` for leaves and cards.                                                                      |
+| `vertexColors`                                       | Requires the geometry to carry `COLOR_0`; a mesh without it cannot use the material at all.                                                       |
+
+The full schema, with the reasoning behind each choice, lives in
+`packages/rewild-renderer/lib/managers/types.ts`.
+
+**The classic shading models are still there.** `lambert`, `phong`, `wireframe`,
+`gizmo` and `sprite` still work and still take a flat `ambientColor` — but they
+are what Lichen replaces, not what it upgrades. New work should use `standard`.
 
 ---
 
-## Phases & issues
+## Colour spaces & the texture audit
 
-This section is the **running order** for the milestone. Phases run in sequence; within a phase,
-anything without a listed dependency can be picked up in parallel. Phase 1 is the unblocker —
-nothing after it is meaningful until light values above 1.0 survive to the end of the frame.
+Every texture in `materials.json` must declare a `colorSpace`, with no default:
 
-The tables below are the authoritative running order — the
-[milestone board](https://github.com/MKHenson/rewild/milestone/5) itself is unordered, though each
-issue names its own prerequisites.
+- `srgb` — anything the eye reads as colour: base colour, emissive.
+- `linear` — data maps whose channels are numbers: normal, roughness, metallic,
+  occlusion, height.
 
-### Phase 1 — HDR scene pass & unified tonemapping
+There is no guessing, because guessing wrong is invisible in the source and only
+shows up as shading that's slightly off. (Sprite, gizmo and UI textures are the
+one surprising case — they're `linear` even when they're colour, because those
+passes draw straight to the swapchain with no encode on the way out.)
 
-| #                                                     | Issue                                                                                                                                                       | Depends on |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| [#188](https://github.com/MKHenson/rewild/issues/188) | Render the scene pass to `rgba16float` instead of `presentationFormat`                                                                                      | —          |
-| [#189](https://github.com/MKHenson/rewild/issues/189) | Move ACES tonemapping to a single whole-frame step; the sky composite blends in HDR and stops tonemapping its own contribution, keeping the existing dither | #188       |
-| [#190](https://github.com/MKHenson/rewild/issues/190) | Declare texture colour spaces correctly — `rgba8unorm-srgb` for albedo/emissive, linear for normal/roughness/metallic/AO, mips in linear space              | —          |
+The other half of the problem is files that are **encoded wrongly on disk**. A
+gamma-encoded normal map still loads, still mips, and still looks like a normal
+map in an image viewer — it just decodes to a constant tilt on every texel. That
+cost a full day of chasing a "the spotlight dims when I turn" bug that turned out
+to be sixteen terrain normal maps. So:
 
-### Phase 2 — Light units & exposure
+```sh
+npm run textures:audit          # report on assets/shared
+npm run textures:audit:strict   # treat warnings as failures too
+npm run textures:fix            # convert gamma-encoded data maps to linear
+npm run textures:shrink         # requantise 16-bit maps to 8-bit
+```
 
-| #                                                     | Issue                                                                                                | Depends on |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------- |
-| [#191](https://github.com/MKHenson/rewild/issues/191) | Inverse-square falloff with a smooth range window, replacing the linear `1 - dist/range` ramp        | #188       |
-| [#192](https://github.com/MKHenson/rewild/issues/192) | Promote the sky's `HDR_SCALE` to a camera exposure property, applied at the tonemap step             | #189       |
-| [#193](https://github.com/MKHenson/rewild/issues/193) | Convert existing lights using the reference-distance formula; relabel the editor's intensity control | #191       |
-
-### Phase 3 — Standard material
-
-| #                                                     | Issue                                                                                                                                                                                        | Depends on |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| [#194](https://github.com/MKHenson/rewild/issues/194) | `StandardPass` + `pbr.frag.wgsl` — GGX/Smith/Schlick through the existing `shader-lib` include pattern                                                                                       | #189       |
-| [#195](https://github.com/MKHenson/rewild/issues/195) | Full metallic-roughness texture set, including ORM channel packing                                                                                                                           | #194, #190 |
-| [#196](https://github.com/MKHenson/rewild/issues/196) | glTF material semantics — `alphaMode` OPAQUE/MASK/BLEND, `alphaCutoff`, `doubleSided`, `emissiveStrength`, vertex colours. _MASK + double-sided is what foliage cutouts need in Understory._ | #194       |
-| [#197](https://github.com/MKHenson/rewild/issues/197) | `materials.json` schema + `MaterialManager` support for `type: 'standard'`                                                                                                                   | #194       |
-| [#198](https://github.com/MKHenson/rewild/issues/198) | Instanced variant (`StandardInstancedPass`), so Understory's scatter has a target                                                                                                            | #197       |
-
-### Phase 4 — Sky-driven IBL
-
-| #                                                     | Issue                                                                              | Depends on |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------- |
-| [#199](https://github.com/MKHenson/rewild/issues/199) | Render the atmosphere to a cubemap from `SkyRenderer`, with amortised face updates | #188       |
-| [#200](https://github.com/MKHenson/rewild/issues/200) | Prefilter it — irradiance cube, roughness-mipped specular cube, BRDF LUT           | #199       |
-| [#201](https://github.com/MKHenson/rewild/issues/201) | Wire IBL into `pbr.frag.wgsl` and delete the flat `ambientColor` term              | #200, #194 |
-
-### Phase 5 — Adoption, tooling & parity
-
-| #                                                     | Issue                                                                                                                                | Depends on       |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------- |
-| [#202](https://github.com/MKHenson/rewild/issues/202) | Terrain adopts the PBR include; per-material `specular`/`shininess` re-tuned to roughness (see [Migration & risk](#migration--risk)) | #201             |
-| [#203](https://github.com/MKHenson/rewild/issues/203) | PBR reference harness — metallic × roughness sphere grid, reference model, and the material/IBL debug views                          | #194             |
-| [#204](https://github.com/MKHenson/rewild/issues/204) | Editor material inspector for metallic/roughness/emissive                                                                            | #197, #103, #104 |
-
-**Worth pulling forward:** [#203](https://github.com/MKHenson/rewild/issues/203) is listed in Phase 5
-but is most valuable the moment [#194](https://github.com/MKHenson/rewild/issues/194) lands — the
-sphere grid is what turns "does this look right?" into a measurement, and both the terrain re-tune
-(#202) and the colour-space work (#190) are much easier to verify against it.
+The check works because a tangent-space normal map is **self-verifying** — every
+texel must be a unit vector — so it settles the question without trusting the
+filename or the file's own colour chunks. It also flags data maps saved as JPEG,
+whose chroma subsampling decimates the roughness and metallic channels before the
+shader ever sees them. `npm run assets:push` runs the audit and refuses to
+publish if it fails. See `scripts/audit-textures.js`.
 
 ---
 
-## Light units
+## Exposure & light intensity
 
-PBR needs light values that mean something, but there are two ways to get there and only one of
-them is cheap here.
+The whole frame passes through one exposure multiplier and one ACES curve, both
+applied at the end. Exposure is a property of the camera (`Camera.exposure`,
+default `0.06`) — a plain linear multiplier, not an EV/aperture/ISO triple,
+because the atmosphere's radiance scale was already hand-tuned against exactly
+this number.
 
-**Full photometric units** — sun in lux, lamps in candela, camera exposure derived from aperture,
-shutter and ISO — is the textbook answer. It is the wrong answer for Rewild, because the
-atmosphere model **already defines an absolute radiance scale**, and that scale has been tuned by
-hand against ACES and `HDR_SCALE` until the sky looked right. Adopting photometric units means
-re-deriving all of that to land on the same picture. That is a large amount of tuning to arrive
-back where we started.
+**Light intensity is radiance on the sky's scale**, not a photometric unit. Point
+and spot lights divide it by distance squared, so it reads as _"the brightness
+this light delivers one metre away"_ — which is why values look large compared to
+the ones that came before. The unit system is deliberately anchored to the sky
+rather than to lux and candela: the atmosphere model already defines an absolute
+scale that has been tuned by hand, and adopting real-world units would mean
+re-deriving all of it to arrive back at the same picture. The tradeoff is that
+intensities aren't portable to or from real-world reference values.
 
-So instead: **the sky defines the unit system, and everything else is expressed relative to it.**
-
-- **The sun doesn't change.** Its radiance keeps coming from the atmosphere model exactly as it
-  does today.
-- **Point and spot lights** switch to inverse-square with a smooth window that takes intensity to
-  zero at `range` — physically correct near-field falloff, and the hard cutoff Foxfire's culling
-  budget relies on is preserved.
-- **Exposure is one scalar**, which is the sky's existing `HDR_SCALE` promoted to a camera property
-  and moved to the tonemap step. No new tuning surface.
-
-The practical payoff is the migration. Because the sun is untouched and the reference brightness is
-unchanged, converting an existing light is mechanical: solve for the intensity that preserves its
-current apparent brightness at a reference distance (its mid-range), and levels come out looking
-close to how they went in. Compare that to a photometric switch, which would require relighting
-every level by hand.
-
-The tradeoff accepted: intensities aren't portable to or from real-world reference values. For an
-engine whose dominant light is a sky it already owns, that's worth very little.
+Converting a light authored against the old linear ramp is mechanical — the
+formula and its derivation are on `Light.intensity` in
+`packages/rewild-renderer/lib/core/lights/Light.ts`.
 
 ---
 
-## Scope boundary with Understory
+## Ambient from the sky
 
-The line is drawn at **who creates the material**:
+There is no ambient constant to author. The atmosphere is rendered to a small
+cubemap and prefiltered into the three things a PBR shader needs — a diffuse
+irradiance cube, a roughness-mipped specular cube, and a BRDF map. Every lit
+surface reads its ambient from those.
 
-- **Lichen** owns the material _model_ — the BRDF, the texture semantics, the `standard` type in
-  `materials.json`, and proving it renders correctly. Test assets are a handful of meshes exported
-  from Blender, loaded through the existing single-primitive stub in `core/GltfLoader.ts`.
-- **Understory** owns the _importer_ — walking the glTF node hierarchy, handling multi-primitive
-  meshes and tangents, and auto-creating `standard` materials from glTF material definitions.
+The practical consequences:
 
-This keeps two moving variables apart. When a model looks wrong in Understory, the material model
-will already have been validated against the reference harness.
+- **Ambient follows the sky.** Dusk, overcast, a storm rolling in — the ambient
+  colour and intensity change with it, with nothing to author.
+- **Metals reflect the sky**, which is what makes them read as metal at all.
+- **It costs close to nothing per frame.** The capture is amortised at one cube
+  face per frame and the prefilter at one level per frame, both idling at zero
+  when the sky isn't moving. No per-frame compute passes were added.
 
----
+Clouds are excluded from the capture — raymarching six more views was the one
+cost that couldn't be absorbed — but cloudiness still greys and dims it, because
+the gradient and fog shaders take it as an input directly.
 
-## Performance notes (web budget)
-
-- **PBR fragment cost over Phong is small** — GGX plus Smith plus Fresnel is a modest ALU
-  increase, and it is dwarfed by what terrain already spends on parallax occlusion mapping and
-  splat blending.
-- **The real cost is bandwidth.** An `rgba16float` scene colour attachment doubles write bandwidth
-  on the main pass. Worth noting that the entire sky pipeline already pays exactly this cost, so
-  the budget is a known quantity rather than a guess.
-- **IBL is amortised, not per-frame** — a face or mip per frame plus an event-driven refresh on
-  sun/weather change. The sky changes over seconds, not frames.
-- **No new per-frame compute passes**, consistent with Foxfire's decision to avoid them.
-- **Shadow cost is unchanged** — Lichen does not touch the shadow atlas or cascade setup.
+How the capture and prefilter actually work, and how to read the debug viewer, is
+in [Sky Rendering](../sky-rendering.md).
 
 ---
 
-## Migration & risk
+## Terrain
 
-This milestone changes how **everything already in the engine** looks. That is the point, but it
-needs to be planned for rather than discovered.
-
-| Risk                                            | Impact                                                                                                                                                                   | Mitigation                                                                                                                                                                              |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Moving tonemapping out of the sky composite** | Highest-risk single edit in the milestone. `skyComposite.wgsl` interleaves fog, god rays, cloud occlusion, lightning flash and dither, with several hand-tuned branches. | Do it first, in isolation, with before/after captures at several times of day and weather states. Nothing else lands until it is stable.                                                |
-| **The sRGB fix changes every existing texture** | Correctly-decoded albedo will read darker and more saturated. Terrain material colours are currently tuned _against_ the wrong decode.                                   | Expect a terrain re-tune as part of Phase 5, not a bug. Budget for it.                                                                                                                  |
-| **New light falloff changes existing levels**   | Inverse-square is not a rescale of `1 - d/range` — near-field gets brighter, far-field dimmer.                                                                           | Mechanical conversion preserving apparent brightness at each light's mid-range. Because units stay sky-anchored the sun is untouched, so this is a per-light fix rather than a relight. |
-| **Terrain specular/shininess → roughness**      | Per-material values in `TerrainMaterials.ts` are hand-tuned Phong exponents. There is no mechanical conversion that preserves appearance.                                | Treat as a deliberate re-tune with the reference harness available for calibration.                                                                                                     |
-| **Judging correctness by eye**                  | Easy to "fix" a BRDF bug by compensating elsewhere, then have it resurface in Understory under different lighting.                                                       | Land the reference harness early — the metallic × roughness grid makes energy-conservation and Fresnel errors obvious rather than arguable.                                             |
+Terrain shades through the same PBR path as everything else, so a rock face and a
+rock-textured mesh standing on it match. Per-material `specular`/`shininess` were
+replaced by `roughness` and `occlusionStrength` in `TerrainMaterials.ts` — see
+[Terrain (Strata)](./strata.md#core-api--tuning-levers) for the tuning levers.
 
 ---
 
-## Debugger / console functions
+## Render quality
 
-Following the existing conventions in `src/core/debug/`:
+Quality is **app-wide**, not per-subsystem: `renderer.quality` is the single
+authority and every pass that scales with quality reads its level from there. Set
+it with `setRenderQuality('low' | 'medium' | 'high')`.
 
-| Function                                                                                         | What it does                                                                                                                         |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `setExposure(ev100)`                                                                             | Override camera exposure to check that HDR values survive the pipeline.                                                              |
-| `showPbrReferenceGrid()` / `hidePbrReferenceGrid()`                                              | Spawn the metallic × roughness sphere grid in front of the camera.                                                                   |
-| `setMaterialChannel('basecolor' \| 'metallic' \| 'roughness' \| 'normal' \| 'ao' \| 'emissive')` | Visualise one PBR channel across the whole scene — the fastest way to spot a mis-declared colour space or a wrong normal convention. |
-| `showIblCubes()`                                                                                 | Display the captured, irradiance and prefiltered-specular cubemaps on screen.                                                        |
-| `setIblEnabled(bool)`                                                                            | Toggle IBL to separate direct-lighting bugs from ambient ones.                                                                       |
+---
+
+## When something looks wrong
+
+Shading has too many places to hide a mistake — a mis-declared colour space, a
+flipped normal-map green channel and a roughness map that never loaded all present
+as "it looks a bit off". So there is a reference harness rather than an eyeball
+test: a grid of spheres stepping metallic and roughness, a switch to render any one
+PBR input scene-wide, and a viewer for the IBL cubes.
+
+All of it is console commands, documented in
+[Debugger & Console Commands](../debug-commands.md#materials--shading) along with
+what _correct_ looks like in each view.
 
 ---
 
 ## Related docs
 
-- [Lighting (Foxfire)](./foxfire-lighting.md) — the light types, storage buffer and shadow atlas
-  this milestone shades with.
-- [Terrain (Strata)](./strata.md) — the material library and biome layer rules that adopt PBR in
-  Phase 5.
-- [Sky Rendering](../sky-rendering.md) — the HDR pipeline Lichen extends, and the atmosphere the
-  IBL is captured from.
-- [Weather System](../weather.md) — why sky-captured IBL is worth the trouble: ambient follows the
-  weather with no extra authoring.
+- [Debugger & Console Commands](../debug-commands.md) — the reference grid, the
+  material channels and the IBL viewer, and how to read each one.
 - [Renderer](../renderer.md) — pass structure and the WGSL `#include` mechanism.
+- [Sky Rendering](../sky-rendering.md) — the HDR pipeline, and how the IBL capture
+  and prefilter actually work.
+- [Lighting (Foxfire)](./foxfire-lighting.md) — the light types, storage buffer
+  and shadow atlas this shades with.
+- [Terrain (Strata)](./strata.md) — the material library and biome layer rules.
+- [Weather System](../weather.md) — why sky-captured ambient is worth the
+  trouble.

@@ -76,30 +76,6 @@ export function registerPbrHarnessCommands(renderer: Renderer) {
     );
   };
 
-  /**
-   * Exposure is a plain multiplier here rather than an EV100 stop, following
-   * #192's decision: the atmosphere's radiance scale is already hand-tuned in
-   * absolute terms, and this is the number it was tuned against. Converting to
-   * stops would add a unit nothing else in the engine speaks.
-   */
-  (window as any).setExposure = (exposure?: number) => {
-    const camera = renderer.camera.camera;
-    if (exposure === undefined) {
-      console.log(
-        `setExposure(value) — linear multiplier applied to HDR radiance before ` +
-          `the ACES curve. Not EV stops; see Camera.exposure.\n` +
-          `Currently: ${camera.exposure}`
-      );
-      return;
-    }
-    if (!Number.isFinite(exposure) || exposure <= 0) {
-      console.warn(`exposure must be a positive number, got ${exposure}`);
-      return;
-    }
-    camera.exposure = exposure;
-    console.log(`Camera exposure ${exposure}`);
-  };
-
   (window as any).showPbrReferenceGrid = () => {
     if (gridRoot) {
       console.log('Reference grid is already up.');
