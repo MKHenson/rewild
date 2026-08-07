@@ -226,20 +226,11 @@ simultaneously-visible materials.
 
 ## Debugger / console functions
 
-Available from the browser DevTools console while the app is running (registered in
-`src/core/debug/`). Terrain-relevant ones:
-
-| Function                                             | What it does                                                                                                                                    |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `startScenePerfCapture()` / `stopScenePerfCapture()` | Log GPU time for the main scene pass. On a terrain-filling view this is dominated by terrain's fragment cost — the sample-budget measurement.   |
-| `writeChunkSnapshotFixture(cx?, cy?)`                | Write a test snapshot (an unmistakable plateau) for a chunk and re-mesh it in place — exercises the save/load round-trip without the sculpt UI. |
-| `clearChunkSnapshots()`                              | Remove all saved chunk edits for the current level and reload the terrain.                                                                      |
-| `startShadowDebug()` / `stopShadowDebug()`           | Tint the terrain by shadow cascade + show the shadow atlas — useful when shadows on terrain look wrong.                                         |
-
-Sky/atmosphere over the terrain has its own console tools (`startSkyPerfCapture()`,
-`setBloom()`, `toggleCloudShadowDebug()`) — see
-[Sky Rendering](../sky-rendering.md). Render quality is app-wide rather than
-sky-specific: `setRenderQuality('low' | 'medium' | 'high')`.
+Scene-pass GPU timing and the chunk-snapshot round-trip tools are console commands
+— see [Debugger & Console Commands](../debug-commands.md#terrain). The shadow,
+sky and material tools on that page all apply to terrain too, since terrain draws
+through the main scene pass and shades through the same PBR path as everything
+else.
 
 ---
 

@@ -5,7 +5,6 @@ import { registerRenderQualityCommands } from './RenderQualityCommands';
 import { registerShadowDebugCommands } from './ShadowDebugCommands';
 import { registerSkyDebugCommands } from './SkyDebugCommands';
 import { registerPbrHarnessCommands } from './PbrHarnessCommands';
-import { registerStandardMaterialCommands } from './StandardMaterialCommands';
 import { registerTerrainPerfCommands } from './TerrainPerfCommands';
 
 // One-stop registration for the window console commands, called wherever a
@@ -17,7 +16,6 @@ export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerSkyDebugCommands(renderer);
   registerShadowDebugCommands(renderer);
   registerTerrainPerfCommands(renderer);
-  registerStandardMaterialCommands(renderer);
   registerPbrHarnessCommands(renderer);
   registerChunkSnapshotDevCommands(renderer, project);
 }

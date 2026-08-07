@@ -15,7 +15,12 @@ Checkout the 🦕[Demo](https://rewild-client.s3-website.fr-par.scw.cloud)🦖 (
 
 - [Server & Sync Architecture](./docs/milestones/mycelium-network.md)
 - [Lighting](./docs/milestones/foxfire-lighting.md)
+- [Materials & Shading](./docs/milestones/lichen.md)
 - [Terrain](./docs/milestones/strata.md)
+
+## Debugging
+
+- [Debugger & Console Commands](./docs/debug-commands.md) — every console command the engine registers, and how to read what each one shows you
 
 ## Deployment
 
