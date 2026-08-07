@@ -82,7 +82,7 @@ export class SkyRenderer {
 
   /** Sun intensity at a neutral climate (temperature 0.5). The live
    *  sun.intensity is derived from this each frame — hot climates scale it up. */
-  baseSunIntensity: f32 = 90;
+  baseSunIntensity: f32 = 110;
 
   // God rays tunables (updatable at runtime without pipeline recreation)
   /** Master on/off switch. When false the god ray pass is skipped entirely each frame. */
@@ -131,7 +131,7 @@ export class SkyRenderer {
     this.elevation = -0;
     this.cloudiness = 0.7;
     this.foginess = 0.3;
-    this.cloudShadowIntensity = 0.45;
+    this.cloudShadowIntensity = 0.6;
     this.windiness = 0.5;
     this.upDot = 0.0;
     this.sun = new DirectionLight();
