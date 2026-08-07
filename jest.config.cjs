@@ -8,13 +8,16 @@ module.exports = {
   coverageProvider: 'v8',
   setupFiles: ['./jest.setup.js'],
   testEnvironment: 'jsdom',
-  testMatch: ['<rootDir>/src/**/*+(spec|test).[jt]s?(x)'],
+  testMatch: [
+    '<rootDir>/src/**/*+(spec|test).[jt]s?(x)',
+    '<rootDir>/scripts/**/*+(spec|test).[jt]s?(x)',
+  ],
   // Mirrors the baseUrl resolution in src/tsconfig.json, which lets modules
   // import each other as 'src/...'.
   moduleNameMapper: {
     '^src/(.*)$': '<rootDir>/src/$1',
   },
-      transform: {
-        '^.+\\.[jt]sx?$': '<rootDir>/jest.transform.cjs',
-      },
+  transform: {
+    '^.+\\.[jt]sx?$': '<rootDir>/jest.transform.cjs',
+  },
 };

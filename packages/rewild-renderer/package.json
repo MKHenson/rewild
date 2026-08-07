@@ -10,7 +10,8 @@
     "clean": "rimraf build",
     "build-all": "npm run clean && tsc",
     "build": "npm run build-all",
-    "test": "jest --passWithNoTests"
+    "test": "jest --passWithNoTests",
+    "ts-check": "tsc --noEmit -p tsconfig.json"
   },
   "repository": {
     "type": "git",

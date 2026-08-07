@@ -2,7 +2,10 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./build",
-    "types": ["node", "@webgpu/types", "jest"],
+    // rewild-common/types/types carries the f32/i32 aliases its math classes are
+    // written in. Without it, type-checking this package fails on rewild-common's
+    // sources rather than on anything here — the renderer already lists it.
+    "types": ["node", "rewild-common/types/types", "@webgpu/types", "jest"],
     "paths": {
       "*": ["/build/types.d.ts"]
     }

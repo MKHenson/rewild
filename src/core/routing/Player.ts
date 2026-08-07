@@ -88,7 +88,7 @@ export class Player extends Node {
   // that, not against the generic ramp factor in Light.intensity. It preserves
   // how bright the beam reads at 30m; near the player it is now much brighter
   // and past ~40m much dimmer, because inverse-square says so.
-  private static readonly _FLASHLIGHT_INTENSITY: f32 = 2422.2;
+  private static readonly _FLASHLIGHT_INTENSITY: f32 = 5000;
 
   private _onMouseMove: (e: MouseEvent) => void;
   private _onKeyDown: (e: KeyboardEvent) => void;
@@ -177,7 +177,7 @@ export class Player extends Node {
       // plateau — but the range still needs to be generous enough that terrain
       // the beam lands on down-slope lights at all instead of silently falling
       // outside it.
-      flash.range = 60.0;
+      flash.range = 6000.0;
       flash.innerAngle = 10 * _DEG2RAD;
       flash.outerAngle = 25 * _DEG2RAD;
       flash.castShadow = true;

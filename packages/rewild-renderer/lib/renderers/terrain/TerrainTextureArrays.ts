@@ -50,6 +50,9 @@ export async function initTerrainTextureArrays(
     new TextureProperties(TERRAIN_ALBEDO_ARRAY, true, 'srgb'),
     order.map((name) => resolveAssetUrl(TERRAIN_MATERIALS[name].albedoUrl))
   );
+  // Normal, ARM and height are linear
+  // If not exported properly they can cause issues with lighting.
+  // Use the npm textures checkers to audit them if need be
   const normal = new TextureArray(
     new TextureProperties(TERRAIN_NORMAL_ARRAY, true, 'linear'),
     order.map((name) => resolveAssetUrl(TERRAIN_MATERIALS[name].normalUrl))

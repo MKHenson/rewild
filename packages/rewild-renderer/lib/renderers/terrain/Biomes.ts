@@ -161,7 +161,7 @@ export const PLAIN: BiomeParams = {
     },
   ],
   layers: [
-    { material: 'grass_01_1k' },
+    { material: 'aerial_grass_rock' },
     {
       material: 'grass_path_02_1k',
       noise: { scale: 160, seedSalt: 23, band: { from: 0.15, to: 0.92 } },
