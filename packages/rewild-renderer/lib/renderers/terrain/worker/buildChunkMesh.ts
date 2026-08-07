@@ -64,7 +64,10 @@ function overlayInner(
   size: number
 ): void {
   for (let y = 0; y < size; y++) {
-    apron.set(inner.subarray(y * size, y * size + size), (y + APRON) * apronSize + APRON);
+    apron.set(
+      inner.subarray(y * size, y * size + size),
+      (y + APRON) * apronSize + APRON
+    );
   }
 }
 
@@ -184,10 +187,10 @@ export function buildChunkMesh(
   const uvs = new Float32Array(vertexCount * 2);
   for (let i = 0; i < vertexCount; i++) {
     const base = i * MESH_STRIDE;
-    vertices[i * 3]     = meshData.interleaved[base];
+    vertices[i * 3] = meshData.interleaved[base];
     vertices[i * 3 + 1] = meshData.interleaved[base + 1];
     vertices[i * 3 + 2] = meshData.interleaved[base + 2];
-    uvs[i * 2]     = meshData.interleaved[base + 3];
+    uvs[i * 2] = meshData.interleaved[base + 3];
     uvs[i * 2 + 1] = meshData.interleaved[base + 4];
   }
 

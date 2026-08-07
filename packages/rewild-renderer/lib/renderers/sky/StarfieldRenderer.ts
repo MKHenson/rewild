@@ -3,6 +3,9 @@ import nightSkyShader from '../../shaders/sky/starfield.wgsl';
 
 const CUBEMAP_SIZE = 1024;
 
+/** 1024, 512, ... 1. */
+const CUBEMAP_MIP_COUNT = Math.log2(CUBEMAP_SIZE) + 1;
+
 export class StarfieldRenderer {
   cubemap: GPUTexture;
   private initialized = false;
@@ -13,10 +16,21 @@ export class StarfieldRenderer {
 
     const { device } = renderer;
 
-    // Create cubemap texture (512x512x6 faces, half-float for HDR star values)
+    // Create cubemap texture (1024x1024x6 faces, half-float for HDR star values)
+    //
+    // The mip chain is not for the screen pass, which always reads level 0 and
+    // wants every star it can get. It exists for SkyCubeCapture, which resamples
+    // this cube onto a 128-a-side face — a 3-level reduction. Without a chain
+    // the only level it could read is 0, and a single bilinear tap across 64
+    // source texels is a point sample of a field whose features (noise at
+    // `500.0 * dir`, so ~0.115 degrees) are already at texel scale. That
+    // discards ~63 of every 64 stars and makes which ones survive a function of
+    // sub-texel sampling phase, so the slow star rotation makes them flare and
+    // pop rather than drift. See starCaptureLod() in SkyCubeCapture.
     this.cubemap = device.createTexture({
       size: [CUBEMAP_SIZE, CUBEMAP_SIZE, 6],
       format: 'rgba16float',
+      mipLevelCount: CUBEMAP_MIP_COUNT,
       usage:
         GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
       label: 'night sky cubemap',
@@ -64,8 +78,12 @@ export class StarfieldRenderer {
       const pass = encoder.beginRenderPass({
         colorAttachments: [
           {
+            // mipLevelCount is mandatory now the texture has a chain: a render
+            // attachment view must resolve to exactly one mip level.
             view: this.cubemap.createView({
               dimension: '2d',
+              baseMipLevel: 0,
+              mipLevelCount: 1,
               baseArrayLayer: face,
               arrayLayerCount: 1,
             }),
@@ -83,6 +101,20 @@ export class StarfieldRenderer {
     }
 
     device.queue.submit([encoder.finish()]);
+
+    // One call per face: generateMips binds a single-layer `2d` view, because a
+    // layered texture's default view is `2d-array` and will not bind to the
+    // generator's `texture_2d<f32>`. Submitted after the faces above, and the
+    // queue is ordered, so every level reads finished content.
+    //
+    // The chain is box-filtered per face rather than across the cube, so a mip
+    // texel within one texel of a face edge averages clamped neighbours instead
+    // of wrapping onto the adjacent face. At the level the capture reads that is
+    // a handful of texels on a seam of a term that is itself convolved into
+    // ambient afterwards.
+    for (let face = 0; face < 6; face++) {
+      renderer.mipmapGenerator.generateMips(device, this.cubemap, face);
+    }
   }
 
   dispose(): void {

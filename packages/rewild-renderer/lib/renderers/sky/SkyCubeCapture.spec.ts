@@ -1,5 +1,9 @@
 import { CUBE_FACE_COUNT, SkyCaptureScheduler } from './SkyCaptureScheduler';
-import { SKY_CUBE_FACE_MATRICES } from './SkyCubeCapture';
+import {
+  SKY_CUBE_FACE_MATRICES,
+  SKY_CUBE_SIZE,
+  starCaptureLod,
+} from './SkyCubeCapture';
 
 /**
  * What the sky vertex shader does with the matrix: reconstruct a ray direction
@@ -128,6 +132,33 @@ describe('sky cube face matrices', () => {
         }
       }
     }
+  });
+});
+
+describe('starCaptureLod', () => {
+  // The shipping pair: a 1024 star cube resampled onto 128-a-side faces.
+  it('picks the level whose texels match a captured face', () => {
+    expect(starCaptureLod(1024, 11)).toBe(3);
+  });
+
+  // The whole point of the level. Reading 0 here is the bug it exists to stop:
+  // one bilinear tap standing in for 64 source texels.
+  it('never resolves to mip 0 while the star cube is finer than a face', () => {
+    expect(starCaptureLod(SKY_CUBE_SIZE * 2, 11)).toBeGreaterThan(0);
+  });
+
+  // A level past the end of the chain is not an error in WebGPU — it clamps to
+  // the last one — so an under-mipped source would over-blur silently.
+  it('clamps to the levels the source actually has', () => {
+    expect(starCaptureLod(1024, 1)).toBe(0);
+    expect(starCaptureLod(1024, 3)).toBe(2);
+  });
+
+  // A star cube at or below face resolution needs no reduction, and a negative
+  // level is not a level.
+  it('never goes below zero when the source is no finer than a face', () => {
+    expect(starCaptureLod(SKY_CUBE_SIZE, 11)).toBe(0);
+    expect(starCaptureLod(SKY_CUBE_SIZE / 4, 11)).toBe(0);
   });
 });
 

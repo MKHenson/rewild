@@ -27,7 +27,11 @@ fn sampleNightSky(direction: vec3f) -> vec3f {
     );
 
     let rotatedDir = rotationMatrix * direction;
-    return textureSampleLevel(nightSkyCubemap, noiseSampler, rotatedDir, 0.0).rgb;
+    // Explicit level rather than the hardware's derivative-based choice, which
+    // is meaningless for a direction vector. object.starLod is what band-limits
+    // the star field to the resolution of whoever is sampling it: 0 for the
+    // screen, higher for the IBL capture
+    return textureSampleLevel(nightSkyCubemap, noiseSampler, rotatedDir, object.starLod).rgb;
 }
 
 @fragment
