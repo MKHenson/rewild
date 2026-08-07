@@ -31,7 +31,12 @@ struct ObjectStruct {
     cameraAltitude: f32,
     cirrusCoverage: f32,
     cirrusOpacity: f32,
-    _skyPad0: f32,           // padding: aligns windDirection to 8-byte boundary (byte 152)
+    // Mip level sampleNightSky() reads from the star cubemap. 0 on screen, where
+    // a fragment is far finer than a star; log2(1024 / SKY_CUBE_SIZE) in the IBL
+    // capture, where one texel spans dozens of them and has to average rather
+    // than pick one. Written per-face by SkyCubeCapture. Was _skyPad0, and still
+    // does that job: it aligns windDirection to an 8-byte boundary (byte 152).
+    starLod: f32,
     windDirection: vec2<f32>, // byte 152
     precipitation: f32,       // byte 160
     temperature: f32,         // byte 164

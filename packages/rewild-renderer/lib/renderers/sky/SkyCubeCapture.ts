@@ -55,6 +55,38 @@ const FACE_BASIS: number[][] = [
 ];
 
 /**
+ * The star cube's mip level whose texels match a captured face's.
+ *
+ * Derived from the source texture rather than from StarfieldRenderer's own
+ * constant so resizing either cube keeps the two matched without a second edit.
+ *
+ * Clamped at both ends. A star cube smaller than a face gives a negative level,
+ * which is not a level; one whose chain is shorter than the reduction gives a
+ * level past the end, which WebGPU resolves to the last one — so it would
+ * silently over-blur rather than error, and the clamp makes that explicit.
+ */
+export function starCaptureLod(
+  sourceSize: number,
+  sourceMipCount: number,
+  faceSize: number = SKY_CUBE_SIZE
+): number {
+  return Math.min(
+    sourceMipCount - 1,
+    Math.max(0, Math.log2(sourceSize / faceSize))
+  );
+}
+
+/**
+ * Float index of `ObjectStruct.starLod` in the sky's uniform block.
+ *
+ * The other override below is a whole `Float32Array.set` at offset 0, so it
+ * needs no index; this one is a single scalar and does. Kept next to the matrix
+ * it travels with, because the two are the only fields the capture rewrites and
+ * both are pinned to skyCommon.wgsl's field order.
+ */
+const STAR_LOD_INDEX = 37;
+
+/**
  * Per-face replacements for `ObjectStruct.invViewProjectionMatrix`.
  *
  * The sky vertex shader already reconstructs its ray direction as
@@ -80,12 +112,6 @@ export const SKY_CUBE_FACE_MATRICES: Float32Array[] = FACE_BASIS.map(
 
 /**
  * Renders the atmosphere into a cubemap so it can light the scene.
- *
- * This is the source texture for Lichen's image-based lighting: #200 prefilters
- * it into an irradiance cube and a roughness-mipped specular cube, and #201
- * samples those in place of the flat ambient constant. Because the atmosphere
- * model already responds to cloudiness, foginess and temperature, capturing it
- * is what makes ambient track time of day and weather without any authoring.
  *
  * Only the analytic sky gradient is captured; the volumetric clouds are not.
  * Raymarching them six more times is the one cost in the sky pipeline that
@@ -123,6 +149,7 @@ export class SkyCubeCapture {
   private passDescriptors: GPURenderPassDescriptor[] = [];
   private faceData: Float32Array;
   private stride: number = 0;
+  private starLod: number = 0;
 
   /**
    * @param skyUniformData  The sky's live uniform block. Its length fixes the
@@ -147,6 +174,16 @@ export class SkyCubeCapture {
     this.pipeline = gradientPipeline;
     this.stride = skyUniformData.byteLength;
     this.faceData = new Float32Array(skyUniformData.length);
+
+    // Without this the capture point-sampled 1024 into 128: a bilinear tap over
+    // 64 source texels, keeping one star in 64 and choosing which by sub-texel
+    // phase. That phase drifts with the star rotation in sampleNightSky, so
+    // every re-capture reshuffled the stars — invisible until something shiny
+    // reflected the result. See the comment on StarfieldRenderer's mip chain.
+    this.starLod = starCaptureLod(
+      nightSkyCubemap.width,
+      nightSkyCubemap.mipLevelCount
+    );
 
     // The cubemap is sized from a constant, not the canvas, so a re-init on
     // resize or a quality change must not replace it — the IBL prefilter and
@@ -291,10 +328,11 @@ export class SkyCubeCapture {
     for (let i = 0; i < count; i++) {
       const face = this.scheduler.nextFace();
 
-      // Take the sky's live state verbatim, then swap only the matrix that
-      // decides which way the rays point.
+      // Take the sky's live state verbatim, then swap the matrix that decides
+      // which way the rays point and the level the star cube is read at.
       faceData.set(skyUniformData);
       faceData.set(SKY_CUBE_FACE_MATRICES[face], 0);
+      faceData[STAR_LOD_INDEX] = this.starLod;
       device.queue.writeBuffer(
         this.uniformBuffer,
         face * this.stride,

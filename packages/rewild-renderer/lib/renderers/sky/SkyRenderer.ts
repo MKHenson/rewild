@@ -221,7 +221,7 @@ export class SkyRenderer {
         4 + // cameraAltitude
         4 + // cirrusCoverage
         4 + // cirrusOpacity
-        4 + // _skyPad0 (aligns windDirection)
+        4 + // starLod (aligns windDirection)
         2 * 4 + // windDirection (vec2)
         4 + // precipitation
         4 + // temperature
@@ -404,7 +404,10 @@ export class SkyRenderer {
       ],
       28
     );
-    // Float index 37 = _skyPad0 (left as 0)
+    // Float index 37 = starLod. Zero is the screen answer — a fragment subtends
+    // far less than a star — and SkyCubeCapture overwrites it in its own copy
+    // of this block, so the live buffer never needs anything else.
+    uniformData[37] = 0;
     // Normalize windDirection before writing
     const wdLen = Math.sqrt(
       this.windDirection.x * this.windDirection.x +
