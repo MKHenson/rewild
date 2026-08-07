@@ -114,8 +114,7 @@ describe('validateTerrainMaterials', () => {
     heightScale: 0.03,
     uvScale: 25,
     normalConvention: 'opengl' as const,
-    specular: 0.1,
-    shininess: 32,
+    roughness: 1,
   };
 
   it('rejects a macro normal that is not coarser than the detail normal', () => {
@@ -172,7 +171,7 @@ describe('validateTerrainMaterials', () => {
 describe('getClimatePalette', () => {
   it('lists the default climate materials, base-first per biome', () => {
     expect(getClimatePalette(DEFAULT_CLIMATE)).toEqual([
-      'grass_01_1k',
+      'aerial_grass_rock',
       'grass_path_02_1k',
       'forest_leaves_02',
       'forest_leaves_03_1k',
@@ -274,8 +273,7 @@ describe('validateClimateLayers', () => {
       heightScale: 0.03,
       uvScale: 25,
       normalConvention: 'opengl' as const,
-      specular: 0.1,
-      shininess: 32,
+      roughness: 1,
     };
 
     try {

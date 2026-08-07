@@ -20,6 +20,7 @@ interface MeshShadowUniforms {
 export class SpotLightShadowRenderer {
   /** True when a shadow-casting spot light was found this frame. */
   hasSpotShadow: boolean = false;
+  enabled: boolean = true;
   /** Light VP matrix (world-space) — read by ShadowUniforms.prepare() to form lightMVPFromView. */
   lightVP: Matrix4;
 
@@ -96,7 +97,9 @@ export class SpotLightShadowRenderer {
     // sculpting replaces a chunk's mesh on every stamp).
     this._sweepStaleMeshUniforms(renderList);
 
-    const spotLight = this._findShadowCastingSpotLight(renderer);
+    const spotLight = this.enabled
+      ? this._findShadowCastingSpotLight(renderer)
+      : null;
     if (!spotLight) {
       this.hasSpotShadow = false;
       return;
@@ -122,7 +125,10 @@ export class SpotLightShadowRenderer {
       for (const mesh of item.meshes) {
         const uniforms = this.meshUniforms.get(mesh);
         if (!uniforms) continue;
-        this._shadowMVP.multiplyMatrices(this.lightVP, mesh.transform.matrixWorld);
+        this._shadowMVP.multiplyMatrices(
+          this.lightVP,
+          mesh.transform.matrixWorld
+        );
         this._matData.set(this._shadowMVP.elements);
         device.queue.writeBuffer(uniforms.buffer, 0, this._matData.buffer);
       }
@@ -140,7 +146,14 @@ export class SpotLightShadowRenderer {
     });
 
     pass.setPipeline(this.pipeline);
-    pass.setViewport(SPOT_VIEWPORT_X, SPOT_VIEWPORT_Y, SPOT_SIZE, SPOT_SIZE, 0, 1);
+    pass.setViewport(
+      SPOT_VIEWPORT_X,
+      SPOT_VIEWPORT_Y,
+      SPOT_SIZE,
+      SPOT_SIZE,
+      0,
+      1
+    );
 
     for (const item of renderList) {
       if (item.geometry.requiresBuild) continue;
@@ -188,8 +201,16 @@ export class SpotLightShadowRenderer {
       this._lightUp.set(0, 1, 0);
     }
 
-    this._lightViewWorld.lookAt(this._lightPos, this._lightTarget, this._lightUp);
-    this._lightViewWorld.setPosition(this._lightPos.x, this._lightPos.y, this._lightPos.z);
+    this._lightViewWorld.lookAt(
+      this._lightPos,
+      this._lightTarget,
+      this._lightUp
+    );
+    this._lightViewWorld.setPosition(
+      this._lightPos.x,
+      this._lightPos.y,
+      this._lightPos.z
+    );
     this._lightView.copy(this._lightViewWorld).invert();
 
     this._makePerspectiveWebGPU(light.outerAngle * 2, 0.1, light.range);
@@ -197,15 +218,31 @@ export class SpotLightShadowRenderer {
   }
 
   /** Perspective matrix using WebGPU depth convention [0, 1], aspect ratio 1:1. */
-  private _makePerspectiveWebGPU(fovY: number, near: number, far: number): void {
+  private _makePerspectiveWebGPU(
+    fovY: number,
+    near: number,
+    far: number
+  ): void {
     const f = 1.0 / Math.tan(fovY * 0.5);
     const rangeInv = 1.0 / (near - far);
     const te = this._lightProj.elements;
 
-    te[0]  = f;  te[4]  = 0;  te[8]  = 0;               te[12] = 0;
-    te[1]  = 0;  te[5]  = f;  te[9]  = 0;               te[13] = 0;
-    te[2]  = 0;  te[6]  = 0;  te[10] = far * rangeInv;  te[14] = near * far * rangeInv;
-    te[3]  = 0;  te[7]  = 0;  te[11] = -1;              te[15] = 0;
+    te[0] = f;
+    te[4] = 0;
+    te[8] = 0;
+    te[12] = 0;
+    te[1] = 0;
+    te[5] = f;
+    te[9] = 0;
+    te[13] = 0;
+    te[2] = 0;
+    te[6] = 0;
+    te[10] = far * rangeInv;
+    te[14] = near * far * rangeInv;
+    te[3] = 0;
+    te[7] = 0;
+    te[11] = -1;
+    te[15] = 0;
   }
 
   // The shadow render list is collected from the full scene (not camera-

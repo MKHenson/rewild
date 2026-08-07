@@ -12,7 +12,8 @@
     "clean": "rimraf build",
     "test": "jest",
     "build-all": "npm run clean && tsc",
-    "build": "npm run build-all"
+    "build": "npm run build-all",
+    "ts-check": "tsc --noEmit -p tsconfig.json"
   },
   "repository": {
     "type": "git",
