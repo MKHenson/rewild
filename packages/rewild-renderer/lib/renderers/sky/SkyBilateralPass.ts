@@ -78,6 +78,10 @@ export class SkyBilateralPass {
   private bindGroup: GPUBindGroup;
   private uniformBuffer: GPUBuffer;
 
+  /** Staging copy of the uniform block. A field rather than a per-frame array so
+   *  the every-frame render() allocates nothing. Fully rewritten before upload. */
+  private uniformData = new Float32Array(ALIGNED_UNIFORM_SIZE / 4);
+
   constructor() {
     this.sourceTexture = null;
   }
@@ -143,7 +147,7 @@ export class SkyBilateralPass {
     const w = this.renderTarget.width;
     const h = this.renderTarget.height;
 
-    const uData = new Float32Array(ALIGNED_UNIFORM_SIZE / 4);
+    const uData = this.uniformData;
     uData[0] = w;
     uData[1] = h;
     uData[2] = this.sigmaSpatial;

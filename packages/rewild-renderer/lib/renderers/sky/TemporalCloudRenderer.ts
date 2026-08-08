@@ -19,10 +19,14 @@ import { cloudShaderDefines } from './SkyQuality';
 //  offset 68  – historyValid       : u32           (4 bytes)
 //  offset 72  – blendFactor        : f32           (4 bytes)
 //  offset 76  – _padding           : f32           (4 bytes)
-//  total: 80 bytes → rounded up to 256
+//  offset 80  – jitter             : vec2<f32>     (8 bytes)
+//  total: 88 bytes → 96 with the struct's 16-byte alignment → rounded up to 256
+//
+// jitter sits at 80 rather than reusing _padding at 76 because a vec2<f32> needs
+// an 8-byte-aligned offset; 76 is not one.
 // ──────────────────────────────────────────────────────────────────────────────
 
-const TEMPORAL_UNIFORM_BYTE_SIZE = 80;
+const TEMPORAL_UNIFORM_BYTE_SIZE = 96;
 const ALIGNED_TEMPORAL_UNIFORM_SIZE =
   Math.ceil(TEMPORAL_UNIFORM_BYTE_SIZE / 256) * 256;
 
@@ -35,8 +39,14 @@ const ALIGNED_TEMPORAL_UNIFORM_SIZE =
 const BLEND_FACTOR_STILL = 0.1;
 const BLEND_FACTOR_MOVING = 0.6;
 
-/** Rotation rate (°/frame) at which the blend factor reaches BLEND_FACTOR_MOVING. */
-const MOVEMENT_RAMP_DEG = 3.0;
+/**
+ * Rotation rate (°/frame) at which the blend factor reaches BLEND_FACTOR_MOVING.
+ * This is the pass's motion-aware defence against ghosting, so it must sit at a
+ * rate a first-person camera actually turns at — 1.0 is 60°/s at 60fps. Raise it
+ * and ordinary mouse-look never reaches BLEND_FACTOR_MOVING; lower it and a
+ * near-still camera loses the accumulation depth the jitter needs.
+ */
+const MOVEMENT_RAMP_DEG = 1.0;
 
 /** Assumed typical distance to the clouds being reprojected, used to convert
  *  camera translation into an equivalent angular (parallax) rate. */
@@ -50,6 +60,51 @@ const TELEPORT_POSITION_THRESHOLD = 100;
 const TELEPORT_ROTATION_THRESHOLD = Math.PI / 8;
 
 /**
+ * Length of the sub-pixel jitter sequence.
+ *
+ * Must be coprime with the 4-frame checkerboard period, or a pixel — which
+ * marches only every 4th frame — sees a fixed subset of the offsets forever and
+ * converges on a biased sample position instead of the texel average.
+ */
+const JITTER_SEQUENCE_LENGTH = 9;
+
+/** Radical inverse of `index` in `base` — the Halton sequence. */
+function halton(index: number, base: number): number {
+  let result = 0;
+  let f = 1;
+  let i = index;
+  while (i > 0) {
+    f /= base;
+    result += f * (i % base);
+    i = Math.floor(i / base);
+  }
+  return result;
+}
+
+/**
+ * Halton(2,3) sub-texel offsets in [-0.5, 0.5], flattened as x,y pairs. Halton
+ * rather than a hash so the handful of offsets in an averaging window stratify
+ * the texel instead of clustering. Index starts at 1; Halton(0) is the centre.
+ */
+const JITTER_OFFSETS = (() => {
+  const offsets = new Float32Array(JITTER_SEQUENCE_LENGTH * 2);
+  for (let i = 0; i < JITTER_SEQUENCE_LENGTH; i++) {
+    offsets[i * 2] = halton(i + 1, 2) - 0.5;
+    offsets[i * 2 + 1] = halton(i + 1, 3) - 0.5;
+  }
+  return offsets;
+})();
+
+/**
+ * Jitter amplitude in cloud texels, interpolated by the same movementFactor as
+ * the blend. Jitter only antialiases once several offsets have averaged, so a
+ * moving camera — few effective samples — gets less of it or the residual reads
+ * as a wobbling edge. Non-zero at MOVING so the edge doesn't snap on stopping.
+ */
+const JITTER_SCALE_STILL = 1.0;
+const JITTER_SCALE_MOVING = 0.25;
+
+/**
  * TemporalCloudRenderer replaces CloudRenderer in SkyRenderer.
  *
  * Each frame only 1/4 of pixels are raymarched (2×2 checkerboard pattern).
@@ -57,6 +112,10 @@ const TELEPORT_ROTATION_THRESHOLD = Math.PI / 8;
  * accumulated history via direction-based reprojection.  An adaptive EMA
  * blend (BLEND_FACTOR_STILL..BLEND_FACTOR_MOVING) smooths convergence and
  * the checkerboard seam as the pattern cycles through all 4 groups.
+ *
+ * Each march is offset by a per-frame sub-texel jitter (JITTER_OFFSETS), so the
+ * EMA accumulates a spread of sample positions within the texel. That is what
+ * antialiases the cloud silhouette.
  *
  * History is invalidated (full re-render) on first frame, after a camera
  * teleport, or after a resolution change.
@@ -108,6 +167,12 @@ export class TemporalCloudRenderer {
 
   /** Adaptive EMA weight for freshly-raymarched pixels, updated each frame. */
   private currentBlendFactor = BLEND_FACTOR_STILL;
+
+  /** Cursor into JITTER_OFFSETS, advanced once per rendered frame. */
+  private jitterIndex = 0;
+
+  /** Jitter amplitude for this frame, interpolated with camera movement. */
+  private currentJitterScale = JITTER_SCALE_STILL;
 
   /** Shared ArrayBuffer backing both float32 and uint32 typed-array views. */
   private uniformRawBuffer = new ArrayBuffer(ALIGNED_TEMPORAL_UNIFORM_SIZE);
@@ -308,6 +373,12 @@ export class TemporalCloudRenderer {
       this.currentBlendFactor =
         BLEND_FACTOR_STILL +
         movementFactor * (BLEND_FACTOR_MOVING - BLEND_FACTOR_STILL);
+
+      // Same ramp: both depend on how many frames will average together, and
+      // movement is what shortens that window.
+      this.currentJitterScale =
+        JITTER_SCALE_STILL +
+        movementFactor * (JITTER_SCALE_MOVING - JITTER_SCALE_STILL);
     }
 
     // ── Store current frame's data in the "last" slot for next frame ──
@@ -366,8 +437,8 @@ export class TemporalCloudRenderer {
     // ── Advance temporal state ──
     // Mark history valid after the first frame has been written
     this.historyValid = true;
-    // this.currentFrame = (this.currentFrame + 1) % 4;
     this.currentFrame = (this.currentFrame + 1) % 4;
+    this.jitterIndex = (this.jitterIndex + 1) % JITTER_SEQUENCE_LENGTH;
   }
 
   // ────────────────────────────────────────────
@@ -392,6 +463,11 @@ export class TemporalCloudRenderer {
 
     // _padding at byte offset 76 → float32 index 19
     f32[19] = 0.0;
+
+    // jitter at byte offset 80 → float32 indices 20-21
+    const offset = this.jitterIndex * 2;
+    f32[20] = JITTER_OFFSETS[offset] * this.currentJitterScale;
+    f32[21] = JITTER_OFFSETS[offset + 1] * this.currentJitterScale;
 
     // Both u32 and f32 views share the same ArrayBuffer so setting one does
     // not corrupt the other as long as byte offsets don't overlap.

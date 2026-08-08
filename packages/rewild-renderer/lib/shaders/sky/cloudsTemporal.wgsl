@@ -51,6 +51,24 @@ const CLOUD_TRANSMITTANCE_FLOOR: f32 = 0.05;
 // SkyQuality.ts.
 const GATE_EROSION_TEXELS: f32 = ${ GATE_EROSION_TEXELS };
 
+// Standard deviations of its 3x3 neighbourhood a reprojected sample may sit from
+// that neighbourhood's mean before it is clamped in. See historyNeighbourhood().
+//
+// The main dial on the clamp: lower pins reprojected texels harder to their
+// surroundings, trading texel-scale cloud detail for fewer stale outliers. Above
+// the textbook 1.0 because a 9-tap sigma is itself noisy, and under-estimating
+// sigma clamps valid detail.
+const NEIGHBOURHOOD_CLAMP_GAMMA: f32 = 1.25;
+
+// Below this many valid taps the mean and sigma are not worth trusting, so the
+// clamp is skipped rather than applied to a one- or two-sample estimate.
+const NEIGHBOURHOOD_MIN_TAPS: f32 = 3.0;
+
+// Ceiling on how much cloud animation may raise the EMA blend for a freshly
+// marched pixel. Effective sample count is 1 / (blendFactor + this), so raising it
+// cuts how much the sub-texel jitter can average — raise only if wind visibly lags.
+const WIND_BLEND_BOOST_MAX: f32 = 0.12;
+
 // ──────────────────────────────────────────────
 // Group 0: standard cloud shader bindings
 // (identical to clouds.wgsl so the same SkyRenderer uniform buffer is reused)
@@ -84,6 +102,7 @@ struct TemporalUniforms {
     historyValid: u32,                 // 0 = history empty (first frame / after teleport)
     blendFactor: f32,                  // EMA weight for reprojected pixels (e.g. 0.15)
     _padding: f32,
+    jitter: vec2<f32>,                 // sub-texel march offset, in cloud texels, [-0.5, 0.5]
 };
 
 @group(1) @binding(0)
@@ -376,36 +395,166 @@ struct HistorySample {
 // Validity is tested against the current depth buffer rather than the previous
 // frame's, which is not kept. Silhouettes move slowly relative to frame rate so it
 // is a close stand-in, and erring toward rejection only costs a fresh march.
+//
+// Reconstruction is Catmull-Rom, not bilinear, which is what keeps clouds from
+// dissolving while the camera turns. A turning camera reprojects exactly (w = 0
+// drops the translation column, leaving only rotation) but refetches history at a
+// new sub-texel offset every frame. A bilinear is an average, so iterating it walks
+// the signal toward its local mean and the deck goes soft within a second of
+// turning. Catmull-Rom's negative lobes do not converge that way.
+//
+// Raising the blend factor is not the fix for that smear — it discards history to
+// hide a filter problem, and takes the jitter's accumulation depth with it.
+// Catmull-Rom (B=0, C=0.5) weights for taps at offsets -1, 0, 1, 2 from `t`'s cell.
+fn catmullRomWeights(t: f32) -> vec4f {
+    let t2 = t * t;
+    let t3 = t2 * t;
+    return vec4f(
+        -0.5 * t3 +       t2 - 0.5 * t,
+         1.5 * t3 - 2.5 * t2       + 1.0,
+        -1.5 * t3 + 2.0 * t2 + 0.5 * t,
+         0.5 * t3 - 0.5 * t2
+    );
+}
+
 fn sampleHistoryValid(uv: vec2f) -> HistorySample {
     let dims  = vec2f(textureDimensions(historyTexture));
     let coord = uv * dims - 0.5;
     let base  = floor(coord);
     let frac  = coord - base;
     let maxT  = vec2i(dims) - 1;
+    let dDims = vec2f(textureDimensions(depthTexture));
+    let maxD  = vec2i(dDims) - 1;
 
-    var acc  = vec4f(0.0);
-    var wsum = 0.0;
+    // var rather than let: indexed by the loop counter below, and a memory
+    // location is indexable with a runtime value on every backend.
+    var crX = catmullRomWeights(frac.x);
+    var crY = catmullRomWeights(frac.y);
 
-    for (var j = 0; j < 2; j++) {
-        for (var i = 0; i < 2; i++) {
-            let texel   = clamp(vec2i(base) + vec2i(i, j), vec2i(0), maxT);
+    var crAcc    = vec4f(0.0);
+    var allValid = true;
+
+    var biAcc  = vec4f(0.0);
+    var biWsum = 0.0;
+
+    var lo = vec4f( 1e30);
+    var hi = vec4f(-1e30);
+
+    for (var j = 0; j < 4; j++) {
+        for (var i = 0; i < 4; i++) {
+            let texel   = clamp(vec2i(base) + vec2i(i - 1, j - 1), vec2i(0), maxT);
             let texelUV = (vec2f(texel) + 0.5) / dims;
-            let wx      = select(1.0 - frac.x, frac.x, i == 1);
-            let wy      = select(1.0 - frac.y, frac.y, j == 1);
+            let dCoord  = vec2i(texelUV * dDims - 0.5);
 
-            // textureSampleCompareLevel, not textureSampleCompare: this runs under
-            // non-uniform control flow and must not need implicit derivatives.
-            let sky = textureSampleCompareLevel(depthTexture, depthSampler, texelUV, 1.0);
-            let w   = wx * wy * select(0.0, 1.0, sky >= 1.0);
+            if (textureLoad(depthTexture, clamp(dCoord, vec2i(0), maxD), 0) < 1.0) {
+                allValid = false;
+                continue;
+            }
 
-            acc  += w * textureLoad(historyTexture, texel, 0);
-            wsum += w;
+            let c = textureLoad(historyTexture, texel, 0);
+            crAcc += crX[i] * crY[j] * c;
+
+            // Inner 2x2: the bilinear fallback, and the range the Catmull-Rom
+            // result is confined to.
+            if (i >= 1 && i <= 2 && j >= 1 && j <= 2) {
+                let wx = select(1.0 - frac.x, frac.x, i == 2);
+                let wy = select(1.0 - frac.y, frac.y, j == 2);
+                biAcc  += wx * wy * c;
+                biWsum += wx * wy;
+                lo = min(lo, c);
+                hi = max(hi, c);
+            }
         }
     }
 
     var out: HistorySample;
-    out.valid = wsum > 0.0;
-    out.color = select(vec4f(0.0), acc / max(wsum, 1e-6), out.valid);
+
+    if (allValid) {
+        // Confined to the inner 2x2's range: the negative lobes overshoot at a
+        // step edge, which against HDR reads as a dark or blown ring. Costs
+        // nothing of the point — a cubic still places the value within that range
+        // rather than averaging toward the middle.
+        out.valid = true;
+        out.color = clamp(crAcc, lo, hi);
+    } else {
+        // A tap in the 4x4 was depth-gated. Catmull-Rom weights sum to 1 but
+        // individual ones are negative, so dropping taps and renormalising is
+        // unstable — the remainder can sum to near zero. The bilinear's weights
+        // are non-negative and renormalise safely. Only reached along terrain
+        // silhouettes, where the gate applies.
+        out.valid = biWsum > 0.0;
+        out.color = select(vec4f(0.0), biAcc / max(biWsum, 1e-6), out.valid);
+    }
+
+    return out;
+}
+
+struct Neighbourhood {
+    mean: vec4f,
+    stddev: vec4f,
+    valid: bool,
+};
+
+// Mean and standard deviation of the 3x3 history neighbourhood around `uv`, over
+// the taps the depth gate left valid. Used to bound reprojected texels.
+//
+// Only one checkerboard group marches per frame, so neighbouring texels hold values
+// up to 3 frames apart in age. With the clouds animating those differ in value, and
+// since the groups tile 2x2 the disagreement lands as 2x2 blocks that skyBlend's
+// upsample magnifies into stair-stepping along cloud silhouettes. A 3x3 window
+// spans all four groups, so the statistics cover every age present.
+//
+// `uv` MUST be the reprojected coordinate, not the fragment's own — the question is
+// whether a texel disagrees with its own surroundings in history. Centring on the
+// fragment instead clamps a correctly-reprojected sample toward whatever sky was at
+// that screen position before the camera turned, smearing three quarters of the
+// screen under rotation.
+//
+// These are history statistics, one frame stale, where textbook TAA uses the
+// current frame's fresh render. There is none here: the march is inline in this
+// pass and covers a quarter of the pixels.
+fn historyNeighbourhood(uv: vec2f) -> Neighbourhood {
+    let dims   = vec2f(textureDimensions(historyTexture));
+    let centre = vec2i(uv * dims);
+    let maxT   = vec2i(dims) - 1;
+    let dDims = vec2f(textureDimensions(depthTexture));
+    let maxD  = vec2i(dDims) - 1;
+
+    // Running sum and sum of squares, for a one-pass mean/variance.
+    var sum   = vec4f(0.0);
+    var sumSq = vec4f(0.0);
+    var taps  = 0.0;
+
+    for (var j = -1; j <= 1; j++) {
+        for (var i = -1; i <= 1; i++) {
+            let texel = clamp(centre + vec2i(i, j), vec2i(0), maxT);
+
+            // Gated texels are vec4f(0) — missing data, not black cloud. Folding
+            // them in would drag the mean toward zero and inflate sigma, giving
+            // every ridge a band of wrongly-clamped sky. textureLoad rather than
+            // the comparison sampler: this wants occupancy, not PCF.
+            let texelUV = (vec2f(texel) + 0.5) / dims;
+            let dCoord  = vec2i(texelUV * dDims - 0.5);
+            let depth   = textureLoad(depthTexture, clamp(dCoord, vec2i(0), maxD), 0);
+            if (depth < 1.0) {
+                continue;
+            }
+
+            let c = textureLoad(historyTexture, texel, 0);
+            sum   += c;
+            sumSq += c * c;
+            taps  += 1.0;
+        }
+    }
+
+    var out: Neighbourhood;
+    out.valid = taps >= NEIGHBOURHOOD_MIN_TAPS;
+
+    let inv = 1.0 / max(taps, 1.0);
+    out.mean = sum * inv;
+    // max() against zero: E[x^2] - E[x]^2 lands a hair below it in f32 on a
+    // near-uniform neighbourhood, and sqrt of that is NaN.
+    out.stddev = sqrt(max(sumSq * inv - out.mean * out.mean, vec4f(0.0)));
     return out;
 }
 
@@ -479,6 +628,30 @@ fn fs(
         }
     }
 
+    // ── Sub-texel jitter for the march ray ──
+    //
+    // Offsetting the ray by a different sub-texel amount each frame turns the EMA
+    // below into supersampling of the cloud silhouette. Marching every frame from
+    // the texel centre instead only averages the along-ray dither, leaving the
+    // silhouette a binary edge quantised to the cloud grid, which skyBlend's
+    // upsample then magnifies into stair-stepping.
+    //
+    // Reconstructed from fragCoord rather than offsetting vRelPosition, which
+    // carries no derivative to offset along. Exact, not an approximation: the
+    // far-plane point is affine in NDC under a perspective projection, so this
+    // matches the rasteriser and jitter = 0 reproduces vRelPosition.
+    //
+    // Only the march is jittered. `direction` stays on the texel centre for the
+    // depth gate, the reprojection and the history read — a still camera must
+    // reproject onto the exact texel it came from, or resampling history at a
+    // half-texel offset every frame blurs the accumulation away.
+    let jitteredNDC = vec2f(
+        ((fragCoord.x + temporal.jitter.x) / cloudResolution.x) * 2.0 - 1.0,
+        1.0 - ((fragCoord.y + temporal.jitter.y) / cloudResolution.y) * 2.0
+    );
+    let jitteredRel = object.invViewProjectionMatrix * vec4f(jitteredNDC, 1.0, 1.0);
+    let marchDirection = normalize(jitteredRel.xyz / jitteredRel.w);
+
     // ── 4×4 checkerboard temporal group ──
 
     let pixelGroup = (i32(fragCoord.x) % 2) + (i32(fragCoord.y) % 2) * 2;
@@ -488,7 +661,7 @@ fn fs(
 
     if (isThisPixelsTurn || temporal.historyValid == 0u) {
         // Fresh full-quality raymarch (always when history is invalid)
-        pixelColor = drawCloudsHorizonFog(direction, org, vSunDirection);
+        pixelColor = drawCloudsHorizonFog(marchDirection, org, vSunDirection);
     } else {
         // Direction-based reprojection:
         // Project the current ray direction into the previous frame's screen
@@ -517,11 +690,32 @@ fn fs(
         }
 
         if (reprojected.valid) {
-            pixelColor = reprojected.color;
+            // Bound it to what its surroundings support. Two things put a
+            // reprojected sample out of step with its neighbours: up to 3 frames
+            // of staleness, and reprojection treating the clouds as infinitely
+            // distant, so translation drags in a sample with the wrong parallax
+            // for a ~1.5km deck. Both read as a texel that disagrees with
+            // everything around it.
+            //
+            // Per-channel against the AABB rather than clipping along the ray to
+            // the mean: the ray form only pays off on saturated colour, which
+            // clouds have little of. Alpha is clamped too — coverage disagreement
+            // at a silhouette is most of the stair-stepping.
+            let nb = historyNeighbourhood(prevUV);
+            if (nb.valid) {
+                let spread = NEIGHBOURHOOD_CLAMP_GAMMA * nb.stddev;
+                pixelColor = clamp(
+                    reprojected.color,
+                    nb.mean - spread,
+                    nb.mean + spread
+                );
+            } else {
+                pixelColor = reprojected.color;
+            }
         } else {
             // Off-screen, behind-camera, or reprojecting onto texels the previous
             // frame gated away — nothing trustworthy to read, so march instead.
-            pixelColor = drawCloudsHorizonFogLowQuality(direction, org, vSunDirection);
+            pixelColor = drawCloudsHorizonFogLowQuality(marchDirection, org, vSunDirection);
         }
     }
 
@@ -538,20 +732,34 @@ fn fs(
     //    history — use it directly.  Mixing it with stale currentUV history was
     //    the cause of the smearing artefact on camera movement.
 
+    var finalColor: vec4f;
+
+    // history is fetched inside the fresh branch, not ahead of the chain: a
+    // reprojected pixel takes pixelColor whether or not its co-located history is
+    // valid, so on three quarters of the screen the gather cannot affect the output.
+    //
     // Validity-aware, for the same reason as the reprojection above. blendFactor is
     // low (~0.1-0.15), so history carries ~90% of the result here — a contaminated
     // sample would drag an otherwise correct fresh march most of the way to black.
-    let historyColor = sampleHistoryValid(currentUV);
-    var finalColor: vec4f;
-
-    if (temporal.historyValid == 0u || !historyColor.valid) {
+    if (temporal.historyValid == 0u) {
         finalColor = pixelColor;
     } else if (isThisPixelsTurn) {
-        // Boost blend when clouds are animating so fresh raymarches converge faster,
-        // preventing pixel-age differences from showing as static-camera smear.
-        let windBoost = clamp(object.windiness * 2.0, 0.0, 0.4);
-        let effectiveBlend = min(temporal.blendFactor + windBoost, 1.0);
-        finalColor = mix(historyColor.color, pixelColor, effectiveBlend);
+        let historyColor = sampleHistoryValid(currentUV);
+        if (!historyColor.valid) {
+            finalColor = pixelColor;
+        } else {
+            // Boost the blend when the clouds are animating, so a fresh march is
+            // not held back by history describing where the cloud used to be.
+            //
+            // This covers cloud animation only. Pixel-age disagreement is handled
+            // by the neighbourhood clamp on the reprojected branch, and history
+            // lagging a turning camera by MOVEMENT_RAMP_DEG — folding those into
+            // this constant costs accumulation depth on a still camera, which is
+            // what the sub-texel jitter needs to antialias with.
+            let windBoost = clamp(object.windiness * 2.0, 0.0, WIND_BLEND_BOOST_MAX);
+            let effectiveBlend = min(temporal.blendFactor + windBoost, 1.0);
+            finalColor = mix(historyColor.color, pixelColor, effectiveBlend);
+        }
     } else {
         finalColor = pixelColor;
     }
