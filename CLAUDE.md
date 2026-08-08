@@ -4,4 +4,8 @@
 - **Custom UI framework** instead of React/Vue — lightweight web components with signals-like reactivity. Please see ./docs/ui.md for more if you need to work with the UI
 - **WebGPU** — modern GPU API with WGSL shaders and `#include` preprocessing. See more in ./docs/renderer.md for more info
 - **esbuild** instead of webpack — fast builds with custom WGSL/WASM loaders. See more in in ./docs/monorepo-structure.md on how to build/test
-- **Dual database** — (online database not decided yet) + IndexedDB (offline) with shared interface
+- **Dual database** - [Server & Sync Architecture](./docs/milestones/mycelium-network.md)
+
+# Some key points for an LLM
+
+- Comments _must_ be to the point and only about the code. Do _NOT_ reference issues, chats or documents. The comment should be clear, concise and the focus is on what its for & how to use it. DO NOT BE VERBOSE
