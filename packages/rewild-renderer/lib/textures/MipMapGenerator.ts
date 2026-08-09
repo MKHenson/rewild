@@ -1,12 +1,16 @@
 import mipmapShader from '../shaders/mipmap-generator.wgsl';
 
 export class MipMapGenerator {
-  module: GPUShaderModule;
+  module: GPUShaderModule | null;
   pipelineByFormat: Partial<{ [key in GPUTextureFormat]: GPURenderPipeline }>;
-  sampler: GPUSampler;
+  sampler: GPUSampler | null;
+  private device: GPUDevice | null;
 
   constructor() {
+    this.module = null;
+    this.sampler = null;
     this.pipelineByFormat = {};
+    this.device = null;
   }
 
   /**
@@ -28,6 +32,15 @@ export class MipMapGenerator {
    * averaging the encoding.
    */
   generateMips(device: GPUDevice, texture: GPUTexture, baseArrayLayer = 0) {
+    // The module, sampler and pipelines all belong to the device that created
+    // them, so a new device invalidates every cached object.
+    if (this.device !== device) {
+      this.device = device;
+      this.module = null;
+      this.sampler = null;
+      this.pipelineByFormat = {};
+    }
+
     const pipelines = this.pipelineByFormat;
 
     if (!this.module) {
@@ -46,11 +59,11 @@ export class MipMapGenerator {
         label: 'mip level generator pipeline',
         layout: 'auto',
         vertex: {
-          module: this.module,
+          module: this.module!,
           entryPoint: 'vs',
         },
         fragment: {
-          module: this.module,
+          module: this.module!,
           entryPoint: 'fs',
           targets: [{ format: texture.format }],
         },
@@ -74,7 +87,7 @@ export class MipMapGenerator {
       const bindGroup = device.createBindGroup({
         layout: pipeline.getBindGroupLayout(0),
         entries: [
-          { binding: 0, resource: this.sampler },
+          { binding: 0, resource: this.sampler! },
           {
             binding: 1,
             resource: texture.createView({
