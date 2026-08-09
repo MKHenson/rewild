@@ -9,3 +9,4 @@
 # Some key points for an LLM
 
 - Comments _must_ be to the point and only about the code. Do _NOT_ reference issues, chats or documents. The comment should be clear, concise and the focus is on what its for & how to use it. DO NOT BE VERBOSE
+- **Do not launch, serve or browser-automate the app to verify changes.** The user runs it in the browser themselves. Verify with `npm run ts-check`, `npx jest` and `node ./esbuild.js`, then hand over for visual checking.
