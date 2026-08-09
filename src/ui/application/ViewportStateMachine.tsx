@@ -1,4 +1,4 @@
-import { Component, Pane3D, register } from 'rewild-ui';
+import { Component, Loading, Pane3D, register } from 'rewild-ui';
 import { Renderer } from 'rewild-renderer';
 import { Player } from 'src/core/routing/Player';
 import { InGameUI } from './InGameUI';
@@ -17,6 +17,9 @@ export class ViewportStateMachine extends Component<Props> {
     this.player = new Player('Player');
     this.gameManager = new GameManager(this.player, this.props.onUnlock);
 
+    // Covers physics init, renderer setup and the initial level load.
+    const [loading, setLoading] = this.useState(true);
+
     const onFrame = () => {
       inGame.update();
       this.gameManager.onUpdate();
@@ -28,6 +31,9 @@ export class ViewportStateMachine extends Component<Props> {
     const onCanvasReady = async (pane3D: Pane3D) => {
       const initialized = await this.gameManager.init(pane3D);
       this.gameManager.onUnlock = this.props.onUnlock;
+      // init() swallows its own errors, so drop the overlay either way rather
+      // than leaving the player staring at a shell that will never clear.
+      setLoading(false);
       if (initialized) window.requestAnimationFrame(onFrame);
     };
 
@@ -51,14 +57,22 @@ export class ViewportStateMachine extends Component<Props> {
 
     const canvas = (<Pane3D onCanvasReady={onCanvasReady} />) as Pane3D;
     const inGame = (<InGameUI player={this.player} />) as InGameUI;
+    const loadingOverlay = (<Loading overlay label="Loading" />) as Loading;
     const toReturn = (
       <div class="container">
         {canvas}
         {inGame}
       </div>
-    );
+    ) as HTMLDivElement;
 
-    return () => toReturn;
+    return () => {
+      if (loading()) {
+        if (!loadingOverlay.parentElement) toReturn.appendChild(loadingOverlay);
+      } else {
+        loadingOverlay.remove();
+      }
+      return toReturn;
+    };
   }
 
   getStyle() {
@@ -80,5 +94,6 @@ const StyledInGame = cssStylesheet(css`
   .container {
     width: 100%;
     height: 100%;
+    position: relative;
   }
 `);

@@ -1,6 +1,7 @@
 export * from './Component';
 export * from './theme';
 export * from './utils/createUUID';
+export * from './utils/nautilus';
 export * from './utils/dragDrop';
 export * from './common/Avatar';
 export * from './common/Button';

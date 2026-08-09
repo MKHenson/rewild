@@ -5,6 +5,7 @@ import {
   curDragAction,
   compelteDragDrop,
   theme,
+  Loading,
 } from 'rewild-ui';
 import { Mesh, Renderer, Sprite3D, Transform } from 'rewild-renderer';
 import { TerrainEvent } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
@@ -46,6 +47,9 @@ interface Props {}
 // scans for placed objects — structures up to this tall are ridden over.
 const SURFACE_PROBE_CLEARANCE = 500;
 
+// Longest the loading overlay is held waiting for terrain before giving up.
+const LOAD_TIMEOUT_MS = 20000;
+
 export interface ViewportEventDetails {
   renderer: Renderer | null;
   orbitController: OrbitController | null;
@@ -66,13 +70,38 @@ export class EditorViewport extends Component<Props> {
   private mouseDownPos = { x: 0, y: 0 };
   private cameraObserver: ITransformObserver | null = null;
   private cameraSaveHandle: number | null = null;
+  private loadingTimeout: number | null = null;
   private viewportCanvas: HTMLCanvasElement | null = null;
 
   init() {
     this.renderer = new Renderer();
     this.templateLoader = new TemplateLoader();
 
+    // The scene is only really "open" once terrain is on screen, which lands
+    // well after the project record does — so the overlay is held until the
+    // first chunk arrives rather than until the store finishes fetching.
+    const [levelLoading, setLevelLoading] = this.useState(true);
+
+    const beginLevelLoad = () => {
+      setLevelLoading(true);
+      if (this.loadingTimeout !== null) {
+        window.clearTimeout(this.loadingTimeout);
+      }
+      // Terrain generation can fail outright; never trap the editor behind it.
+      this.loadingTimeout = window.setTimeout(endLevelLoad, LOAD_TIMEOUT_MS);
+    };
+
+    const endLevelLoad = () => {
+      if (this.loadingTimeout !== null) {
+        window.clearTimeout(this.loadingTimeout);
+        this.loadingTimeout = null;
+      }
+      setLevelLoading(false);
+    };
+
     const onProjectEvent: Subscriber<ProjectStoreEvents> = (event) => {
+      if (event.kind === 'loading-initiated') beginLevelLoad();
+
       if (event.kind === 'loading-completed') {
         SyncRendererFromProject(this.renderer, event.project);
         // Reloading a scene should keep the last viewpoint rather than snap
@@ -89,6 +118,9 @@ export class EditorViewport extends Component<Props> {
     // camera above ground only runs during interaction, so re-run it once the
     // chunk beneath the camera becomes available to lift the camera clear.
     const onTerrainEvent: Subscriber<TerrainEvent> = (event) => {
+      // First chunk on screen is the earliest point the scene is worth showing.
+      if (event.type === 'chunk-loaded') endLevelLoad();
+
       if (event.type !== 'chunk-loaded' || !this.orbitController) return;
       const cam = this.renderer.camera.camera.transform.position;
       const b = event.chunk.bounds;
@@ -283,11 +315,16 @@ export class EditorViewport extends Component<Props> {
     this.onMount = () => {
       document.addEventListener('request-renderer', onRequestRendererEvent);
       document.addEventListener('keydown', onKeyDown);
+      beginLevelLoad();
     };
 
     this.onCleanup = () => {
       document.removeEventListener('request-renderer', onRequestRendererEvent);
       document.removeEventListener('keydown', onKeyDown);
+      if (this.loadingTimeout !== null) {
+        window.clearTimeout(this.loadingTimeout);
+        this.loadingTimeout = null;
+      }
       this.removeCameraObserver();
     };
 
@@ -684,12 +721,21 @@ export class EditorViewport extends Component<Props> {
     // modes are mutually exclusive, so at most one is ever mounted.
     const sculptToolbar = (<SculptToolbar />) as SculptToolbar;
     const biomePaintToolbar = (<BiomePaintToolbar />) as BiomePaintToolbar;
+    const loadingOverlay = (
+      <Loading overlay label="Loading level" />
+    ) as Loading;
     const container = (
       <div class="viewport-container">{pane3D}</div>
     ) as HTMLDivElement;
 
     return () => {
       this.toggleAttribute('activated', !!sceneGraphStore.selectedContainerId);
+      if (levelLoading()) {
+        if (!loadingOverlay.parentElement)
+          container.appendChild(loadingOverlay);
+      } else {
+        loadingOverlay.remove();
+      }
       if (sculptStore.enabled) {
         if (!sculptToolbar.parentElement) container.appendChild(sculptToolbar);
       } else {
@@ -817,6 +863,10 @@ export class EditorViewport extends Component<Props> {
     if (this.cameraSaveHandle !== null) {
       window.clearTimeout(this.cameraSaveHandle);
       this.cameraSaveHandle = null;
+    }
+    if (this.loadingTimeout !== null) {
+      window.clearTimeout(this.loadingTimeout);
+      this.loadingTimeout = null;
     }
     if (this.viewportCanvas) {
       this.viewportCanvas.removeEventListener(
