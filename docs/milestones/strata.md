@@ -234,21 +234,6 @@ else.
 
 ---
 
-## What's not here (yet)
-
-- **Caves, overhangs, arches** — the terrain is a heightmap by design; these need
-  a voxel engine.
-- **Water, sea level, oceans.**
-- **Object scatter** (trees, rocks placed by the generator).
-- **Direct-material painting** — painting a bare material (a pond bed, a worn
-  path) with no biome behind it. Biome painting has landed; this is the other
-  half, and the tools are already built to grow into it.
-- **Roads / linear features**, and **undo/redo history** for the brushes.
-- **More climate presets** (eras / time-travel worlds) — additive on top of the
-  preset system.
-
----
-
 ## Related docs
 
 - [Sky Rendering](../sky-rendering.md) and [Weather System](../weather.md) — the
