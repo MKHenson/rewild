@@ -219,7 +219,7 @@ export const MOUNTAIN: BiomeParams = {
     { material: 'aerial_rocks_01' },
     { material: 'marble_cliff_05', slope: { from: 15, to: 75 } },
     {
-      material: 'snow-02',
+      material: 'snow_field_aerial',
       height: { from: 100, to: 170 },
       slope: { from: 70, to: 55 },
     },

@@ -60,15 +60,15 @@ export interface TerrainMaterial {
 
 // Matches the shader's current `fragUV * 25.0`, so the detail tiling of the
 // existing single-material terrain carries over unchanged.
-const DETAIL_UV_SCALE = 30;
+const DETAIL_UV_SCALE = 60;
 
 // Much coarser than the detail scale: features spanning metres rather than
 // centimetres, which is what survives mipping at distance.
-const MACRO_UV_SCALE = 2;
+const MACRO_UV_SCALE = 3;
 
 // Base parallax-occlusion depth, in tile-UV units. Rock reads deeper than
 // ground and snow via the per-material multipliers below.
-const HEIGHT_SCALE = 0.022;
+const HEIGHT_SCALE = 0.032;
 
 /**
  * Base roughness factor: 1 means "the ARM map is right as authored", which is
@@ -138,6 +138,18 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughness: ROUGHNESS * 0.55,
     normalConvention: 'opengl',
   },
+  snow_field_aerial: {
+    name: 'snow_field_aerial',
+    albedoUrl: 'terrain/snow-field-aerial/snow_field_aerial_col_1k.jpg',
+    normalUrl: 'terrain/snow-field-aerial/snow_field_aerial_nor_gl_1k.webp',
+    armUrl: 'terrain/snow-field-aerial/snow_field_aerial_arm_1k.webp',
+    heightUrl: 'terrain/snow-field-aerial/snow_field_aerial_height_1k.webp',
+    heightScale: HEIGHT_SCALE * 0.5,
+    macroUvScale: MACRO_UV_SCALE,
+    uvScale: DETAIL_UV_SCALE,
+    roughness: ROUGHNESS * 0.25,
+    normalConvention: 'opengl',
+  },
   rocky_terrain: {
     name: 'rocky_terrain',
     albedoUrl: 'terrain/rocky-terrain/rocky_terrain_diff_1k.jpg',
@@ -168,9 +180,9 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     normalUrl: 'terrain/marble-cliff-05/marble_cliff_05_nor_gl_1k.webp',
     armUrl: 'terrain/marble-cliff-05/marble_cliff_05_arm_1k.webp',
     heightUrl: 'terrain/marble-cliff-05/marble_cliff_05_disp_1k.webp',
-    heightScale: HEIGHT_SCALE * 4,
+    heightScale: HEIGHT_SCALE * 2,
     macroUvScale: MACRO_UV_SCALE * 2,
-    uvScale: DETAIL_UV_SCALE,
+    uvScale: DETAIL_UV_SCALE * 0.5,
     roughness: ROUGHNESS * 0.8,
     normalConvention: 'opengl',
   },
