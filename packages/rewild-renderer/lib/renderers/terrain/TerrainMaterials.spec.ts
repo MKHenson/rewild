@@ -47,7 +47,7 @@ function biome(name: string, layers: BiomeLayer[]): BiomeParams {
 
 describe('getTerrainMaterial', () => {
   it('resolves a known material', () => {
-    expect(getTerrainMaterial('snow-02')).toBe(TERRAIN_MATERIALS['snow-02']);
+    expect(getTerrainMaterial('snow_02')).toBe(TERRAIN_MATERIALS['snow_02']);
   });
 
   // Unlike a climate preset id (which a saved world can carry from a renamed
@@ -127,7 +127,7 @@ describe('validateTerrainMaterials', () => {
   it('rejects a macroNormalFrom without a macroUvScale', () => {
     TERRAIN_MATERIALS['broken'] = {
       ...VALID,
-      macroNormalFrom: 'rocks-ground-01',
+      macroNormalFrom: 'rocks_ground_01',
     };
     expect(() => validateTerrainMaterials()).toThrow(/without macroUvScale/);
   });
@@ -152,7 +152,7 @@ describe('validateTerrainMaterials', () => {
     TERRAIN_MATERIALS['broken'] = {
       ...VALID,
       macroUvScale: 2,
-      macroNormalFrom: 'rocks-ground-01',
+      macroNormalFrom: 'rocks_ground_01',
       macroStrength: 0.6,
     };
     expect(() => validateTerrainMaterials()).not.toThrow();
@@ -177,7 +177,7 @@ describe('getClimatePalette', () => {
       'forest_leaves_03_1k',
       'aerial_rocks_01',
       'marble_cliff_05',
-      'snow-02',
+      'snow_field_aerial',
     ]);
   });
 
@@ -193,11 +193,11 @@ describe('getClimatePalette', () => {
   it('gives a material shared by two biomes a single palette entry', () => {
     const palette = getClimatePalette(
       climateOf([
-        biome('a', [{ material: 'snow-02' }]),
-        biome('b', [{ material: 'snow-02' }, { material: 'marble_cliff_05' }]),
+        biome('a', [{ material: 'snow_02' }]),
+        biome('b', [{ material: 'snow_02' }, { material: 'marble_cliff_05' }]),
       ])
     );
-    expect(palette).toEqual(['snow-02', 'marble_cliff_05']);
+    expect(palette).toEqual(['snow_02', 'marble_cliff_05']);
   });
 });
 
@@ -229,7 +229,7 @@ describe('validateClimateLayers', () => {
   it('rejects a selector on the base layer', () => {
     const climate = climateOf([
       biome('a', [
-        { material: 'snow-02', slope: { from: 0, to: 10 } } as never,
+        { material: 'snow_02', slope: { from: 0, to: 10 } } as never,
         { material: 'marble_cliff_05' },
       ]),
     ]);
@@ -242,7 +242,7 @@ describe('validateClimateLayers', () => {
   // downstream can catch it.
   it('rejects a selectorless layer above the base', () => {
     const climate = climateOf([
-      biome('a', [{ material: 'snow-02' }, { material: 'marble_cliff_05' }]),
+      biome('a', [{ material: 'snow_02' }, { material: 'marble_cliff_05' }]),
     ]);
     expect(() => validateClimateLayers(climate)).toThrow(/no selectors/);
   });
@@ -250,7 +250,7 @@ describe('validateClimateLayers', () => {
   it('accepts a layer selected by noise alone', () => {
     const climate = climateOf([
       biome('a', [
-        { material: 'snow-02' },
+        { material: 'snow_02' },
         {
           material: 'marble_cliff_05',
           noise: { scale: 20, seedSalt: 1, band: { from: 0.4, to: 0.6 } },

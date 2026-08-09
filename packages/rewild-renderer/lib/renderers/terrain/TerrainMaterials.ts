@@ -89,8 +89,8 @@ export const BLEND_DEPTH = 0.2;
 const BLEND_DEPTH_SOFT = 0.7;
 
 export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
-  'forest-ground-01': {
-    name: 'forest-ground-01',
+  forest_ground_01: {
+    name: 'forest_ground_01',
     albedoUrl: 'terrain/forest-ground-01/forrest_ground_01_diff_1k.jpg',
     normalUrl: 'terrain/forest-ground-01/forrest_ground_01_nor_gl_1k.webp',
     armUrl: 'terrain/forest-ground-01/forrest_ground_01_arm_1k.webp',
@@ -114,8 +114,8 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughness: ROUGHNESS * 1.07,
     normalConvention: 'opengl',
   },
-  'rocks-ground-01': {
-    name: 'rocks-ground-01',
+  rocks_ground_01: {
+    name: 'rocks_ground_01',
     albedoUrl: 'terrain/rocks-ground-01/rocks_ground_01_diff_1k.jpg',
     normalUrl: 'terrain/rocks-ground-01/rocks_ground_01_nor_gl_1k.webp',
     armUrl: 'terrain/rocks-ground-01/rocks_ground_01_arm_1k.webp',
@@ -126,8 +126,8 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughness: ROUGHNESS * 0.91,
     normalConvention: 'opengl',
   },
-  'snow-02': {
-    name: 'snow-02',
+  snow_02: {
+    name: 'snow_02',
     albedoUrl: 'terrain/snow-02/snow_02_diff_1k.jpg',
     normalUrl: 'terrain/snow-02/snow_02_nor_gl_1k.webp',
     armUrl: 'terrain/snow-02/snow_02_arm_1k.webp',
@@ -147,7 +147,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightScale: HEIGHT_SCALE * 0.5,
     macroUvScale: MACRO_UV_SCALE,
     uvScale: DETAIL_UV_SCALE,
-    roughness: ROUGHNESS * 0.25,
+    roughness: ROUGHNESS * 0.55,
     normalConvention: 'opengl',
   },
   rocky_terrain: {

@@ -175,7 +175,7 @@ export const PLAIN: BiomeParams = {
 //
 // Two leaf litters rather than litter over soil: a forest floor is what fell on
 // it, so the deep broadleaf bed is the body material and the finer litter breaks
-// it up in patches. forest-ground-01 stays in the library, unused by any biome —
+// it up in patches. forest_ground_01 stays in the library, unused by any biome —
 // it reads as a worn track, which is not what a wood underfoot looks like.
 export const FOREST: BiomeParams = {
   name: 'forest',
