@@ -13,6 +13,7 @@ import {
 type Props = {
   open: boolean;
   onStart: () => void;
+  onOptions: () => void;
   onEditor: () => void;
 };
 
@@ -20,7 +21,6 @@ type Props = {
 export class MainMenu extends Component<Props> {
   init() {
     this.on(authStore.dispatcher);
-    const onOptionsClick = () => {};
 
     return () => {
       const props = this.props;
@@ -58,7 +58,8 @@ export class MainMenu extends Component<Props> {
               <Button onClick={props.onStart} fullWidth>
                 <span>New Game (WIP)</span>
               </Button>
-              <Button onClick={onOptionsClick} fullWidth disabled>
+              <Button onClick={props.onOptions} fullWidth>
+                <Icon size="s" icon="settings" />
                 <span>Options</span>
               </Button>
               <Button onClick={props.onEditor} fullWidth>

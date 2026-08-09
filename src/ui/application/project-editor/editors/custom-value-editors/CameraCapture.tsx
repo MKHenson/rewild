@@ -1,6 +1,6 @@
 import { PropValueObject, Vector3 } from 'models';
 import { Button, Component, register } from 'rewild-ui';
-import { getActiveRenderer } from '../utils/getActiveRenderer';
+import { getActiveRenderer } from 'src/ui/utils/getActiveRenderer';
 import { OrbitController } from 'rewild-renderer';
 import { ViewportEventDetails } from '../EditorViewport';
 

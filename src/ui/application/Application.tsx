@@ -5,6 +5,7 @@ import { InGame } from './InGame';
 import { Auth } from './Auth';
 import { ConfirmationModal } from './ConfirmationModal';
 import { ResetPassword } from './ResetPassword';
+import { SettingsPanel } from './SettingsPanel';
 import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
 
 interface Props {}
@@ -18,6 +19,10 @@ export class Application extends Component<Props> {
 
     const onEditor = () => {
       navigate('/editor');
+    };
+
+    const onOptions = () => {
+      navigate('/settings');
     };
 
     const onQuit = () => {
@@ -34,8 +39,17 @@ export class Application extends Component<Props> {
           <Route
             path="/"
             onRender={(params) => (
-              <MainMenu open onStart={onStart} onEditor={onEditor} />
+              <MainMenu
+                open
+                onStart={onStart}
+                onOptions={onOptions}
+                onEditor={onEditor}
+              />
             )}
+          />
+          <Route
+            path="/settings"
+            onRender={() => <SettingsPanel onClose={onQuit} />}
           />
           <Route path="/game" onRender={() => <InGame onQuit={onQuit} />} />
           <Route

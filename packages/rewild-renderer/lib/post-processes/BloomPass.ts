@@ -40,7 +40,7 @@ export class BloomPass implements IPostProcess {
 
   /** Scales the HDR highlight added to clouds before tonemapping.
    *  Range 0–3; default 1.2. Higher = brighter glow. */
-  bloomAmount: number = 0.15;
+  bloomAmount: number = 0.02;
 
   /**
    * Threshold in exposure-adjusted luminance (EXPOSURE * raw_luminance, with
@@ -52,7 +52,7 @@ export class BloomPass implements IPostProcess {
    * doing. At 0.10 the shoulder runs from 50 to 150 HDR: capped sky contributes
    * essentially nothing, sunlit cloud tops and the sun disc still bloom fully.
    */
-  bloomThreshold: number = 0.1;
+  bloomThreshold: number = 2.0;
 
   /**
    * Ceiling on what a single source pixel may contribute, in the same

@@ -1,8 +1,9 @@
-import { Modal, Button, Component, register } from 'rewild-ui';
+import { Modal, Button, Component, Icon, register } from 'rewild-ui';
 
 type Props = {
   open: boolean;
   onResumeClick: () => void;
+  onSettingsClick: () => void;
   onQuitClick: () => void;
 };
 
@@ -14,6 +15,10 @@ export class InGameMenu extends Component<Props> {
         <div>
           <Button onClick={this.props.onResumeClick} fullWidth>
             Resume
+          </Button>
+          <Button onClick={this.props.onSettingsClick} fullWidth>
+            <Icon size="s" icon="settings" />
+            <span>Settings</span>
           </Button>
           <Button onClick={this.props.onQuitClick} fullWidth>
             Quit
@@ -31,5 +36,9 @@ export class InGameMenu extends Component<Props> {
 const StyledButtons = cssStylesheet(css`
   x-button {
     margin: 1rem 0 0 0;
+  }
+
+  x-button span {
+    vertical-align: middle;
   }
 `);

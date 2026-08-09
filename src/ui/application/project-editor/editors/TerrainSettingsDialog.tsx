@@ -9,7 +9,7 @@ import {
 import { projectStore } from '../../../stores/ProjectStore';
 import { confirmationStore } from '../../../stores/ConfirmationStore';
 import { db } from 'src/database/database';
-import { getActiveRenderer } from './utils/getActiveRenderer';
+import { getActiveRenderer } from 'src/ui/utils/getActiveRenderer';
 import { DEFAULT_CLIMATE_PRESET, getClimatePresets } from 'rewild-renderer';
 
 interface Props {

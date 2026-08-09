@@ -30,3 +30,28 @@ export function isRenderQuality(value: unknown): value is RenderQuality {
     (RENDER_QUALITIES as readonly string[]).includes(value)
   );
 }
+
+/**
+ * A subsystem that can be pinned to its own tier, independently of the app-wide
+ * one
+ */
+export type QualityAspect = 'clouds' | 'cloudShadows' | 'godRays' | 'bloom';
+
+/** Every aspect. Useful for iterating a settings form or a stored override map. */
+export const QUALITY_ASPECTS: readonly QualityAspect[] = [
+  'clouds',
+  'cloudShadows',
+  'godRays',
+  'bloom',
+];
+
+/** Narrows an untrusted key — stored settings — to an aspect. */
+export function isQualityAspect(value: unknown): value is QualityAspect {
+  return (
+    typeof value === 'string' &&
+    (QUALITY_ASPECTS as readonly string[]).includes(value)
+  );
+}
+
+/** Per-aspect tiers. An absent entry means "follow the app-wide level". */
+export type QualityOverrides = Partial<Record<QualityAspect, RenderQuality>>;

@@ -1,23 +1,27 @@
 import { InGameMenu } from './InGameMenu';
 import { GameOverMenu } from './GameOverMenu';
+import { SettingsPanel } from './SettingsPanel';
 import { Component, register } from 'rewild-ui';
 import { ViewportStateMachine } from './ViewportStateMachine';
 
 interface Props {
   onQuit: () => void;
 }
-type ActiveMenu = 'ingameMenu' | 'gameOverMenu';
+type ActiveMenu = 'ingameMenu' | 'gameOverMenu' | 'settings';
 
 @register('x-in-game')
 export class InGame extends Component<Props> {
   init() {
     const [modalOpen, setModalOpen] = this.useState(false);
-    const [activeMenu] = this.useState<ActiveMenu>('ingameMenu');
+    const [activeMenu, setActiveMenu] = this.useState<ActiveMenu>('ingameMenu');
 
     const onResume = () => {
       setModalOpen(false);
       (viewport as ViewportStateMachine).gameManager.lock();
     };
+
+    const onSettings = () => setActiveMenu('settings');
+    const onSettingsClose = () => setActiveMenu('ingameMenu');
 
     const onQuit = () => {
       this.props.onQuit();
@@ -28,15 +32,37 @@ export class InGame extends Component<Props> {
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!modalOpen() && event.key === 'Escape') {
+      if (event.key !== 'Escape') return;
+
+      if (!modalOpen()) {
         setModalOpen(true);
-      } else if (event.key === 'Escape') {
+      } else if (activeMenu() === 'settings') {
+        setActiveMenu('ingameMenu');
+      } else {
         setModalOpen(false);
       }
     };
 
     const onUnlock = () => {
       setModalOpen(true);
+    };
+
+    /** The one panel the overlay is showing, if any. */
+    const renderMenu = () => {
+      if (activeMenu() === 'gameOverMenu')
+        return <GameOverMenu onQuitClick={onQuit} open />;
+
+      if (activeMenu() === 'settings')
+        return <SettingsPanel onClose={onSettingsClose} />;
+
+      return (
+        <InGameMenu
+          open={modalOpen()}
+          onResumeClick={onResume}
+          onSettingsClick={onSettings}
+          onQuitClick={onQuit}
+        />
+      );
     };
 
     this.onCleanup = () => {
@@ -50,15 +76,7 @@ export class InGame extends Component<Props> {
     return () => (
       <div>
         {viewport}
-        {activeMenu() === 'ingameMenu' ? (
-          <InGameMenu
-            open={modalOpen()}
-            onResumeClick={onResume}
-            onQuitClick={onQuit}
-          />
-        ) : (
-          <GameOverMenu onQuitClick={onQuit} open />
-        )}
+        {renderMenu()}
         {fpsDiv}
       </div>
     );

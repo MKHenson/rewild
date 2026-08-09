@@ -61,7 +61,7 @@ Registered in `RenderQualityCommands.ts`.
 ```js
 setExposure(0.06); // linear multiplier, not EV stops — see Camera.exposure
 setBloom(amount, threshold, maxSource); // uniforms: effective next frame, no rebuild
-setRenderQuality('low' | 'medium' | 'high' | 'ultra'); // app-wide, not per-subsystem
+setRenderQuality('low' | 'medium' | 'high' | 'ultra'); // app-wide tier
 ```
 
 Exposure is a plain multiplier rather than an aperture/shutter/ISO triple — the
@@ -72,6 +72,25 @@ scale with quality, so unlike the bloom knobs it isn't instant.
 The tier persists to `localStorage` under `rewild.render.quality` and is restored
 on the next load. Default is `high`; `ultra` renders the clouds at full canvas
 resolution rather than 0.7x, which is roughly twice the cloud pixels.
+
+### Per-subsystem overrides
+
+Individual subsystems can sit on their own tier — `clouds` (which covers the
+bilateral that cleans them up), `cloudShadows`, `godRays` and `bloom`. They are
+read through `renderer.quality.aspect('clouds')` rather than `.level`, and stored
+separately under `rewild.render.quality.overrides`.
+
+`setRenderQuality` — like the Render Quality dropdown in the settings menu —
+clears them all, since the app-wide tier is the coarse control. To set one
+without going through the UI:
+
+```js
+renderer.quality.setAspect('clouds', 'low');
+```
+
+Players reach the same settings from Options on the main menu and Settings in the
+in-game menu, which write through `QualitySettings.apply()` so a whole form's
+worth of changes costs one rebuild.
 
 ---
 

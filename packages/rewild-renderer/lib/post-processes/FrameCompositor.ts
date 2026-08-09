@@ -52,7 +52,7 @@ export class FrameCompositor {
    * derived from the canvas size.
    */
   init(renderer: Renderer): void {
-    this.bloom.quality = renderer.quality.level;
+    this.bloom.quality = renderer.quality.aspect('bloom');
     this.builtQualityRevision = renderer.quality.revision;
     this.bloom.sourceTexture = renderer.sceneColorTarget;
     this.bloom.init(renderer);

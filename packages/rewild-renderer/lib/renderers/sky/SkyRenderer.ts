@@ -166,11 +166,15 @@ export class SkyRenderer {
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
 
-    // The tier comes from the app-wide setting rather than a copy held here.
-    // Tiers are baked into WGSL as compile-time constants, so a change needs a
-    // shader rebuild rather than a uniform write — render() compares the
-    // revision and re-enters init when it moves.
-    const quality = renderer.quality.level;
+    // Tiers come from the app-wide setting rather than a copy held here, and are
+    // read per aspect so a user who has pinned one subsystem gets that tier.
+    //
+    // cloudsQuality drives the bilateral as well as the cloud march: the cloud
+    // shader's depth-gate erosion is sized from the bilateral's kernel radius,
+    // so on two different tiers the gate would stop covering the filter and
+    // terrain ridges would pick up a dark outline. See QualityAspect.
+    const cloudsQuality = renderer.quality.aspect('clouds');
+    const godRaysQuality = renderer.quality.aspect('godRays');
     this.builtQualityRevision = renderer.quality.revision;
 
     // Push the tier into each pass before any of them builds a module. The
@@ -181,23 +185,23 @@ export class SkyRenderer {
     //
     // God rays are the exception — that shader reads its sample count from a
     // uniform, so the tier is just a number and costs no recompile.
-    this.cloudsPass.quality = quality;
-    this.cloudShadowRenderer.quality = quality;
-    this.bilateralPass.quality = quality;
-    this.godRaysPass.config.numSamples = godRaySamples(quality);
+    this.cloudsPass.quality = cloudsQuality;
+    this.cloudShadowRenderer.quality = renderer.quality.aspect('cloudShadows');
+    this.bilateralPass.quality = cloudsQuality;
+    this.godRaysPass.config.numSamples = godRaySamples(godRaysQuality);
 
     // Render-target scales. These need no shader rebuild of their own, but they
     // resize textures, so they belong on this same whole-chain path. The
     // bilateral is absent on purpose: it sizes itself from the cloud target and
     // so follows cloudResolutionScale for free.
-    this.cloudsPass.resolutionScale = cloudResolutionScale(quality);
-    this.godRaysPass.resolutionScale = godRayScale(quality);
+    this.cloudsPass.resolutionScale = cloudResolutionScale(cloudsQuality);
+    this.godRaysPass.resolutionScale = godRayScale(godRaysQuality);
 
     // Bilateral sigmas are uniforms rather than defines, so they are assigned
     // here alongside the scales. They go *up* as quality goes down — this pass
     // is what hides the cloud target's resolution, so a cheaper tier needs more
     // smoothing, not less.
-    const sigmas = bilateralSigmas(quality);
+    const sigmas = bilateralSigmas(cloudsQuality);
     this.bilateralPass.sigmaSpatial = sigmas.spatial;
     this.bilateralPass.sigmaFar = sigmas.far;
     this.bilateralPass.sigmaRange = sigmas.range;
