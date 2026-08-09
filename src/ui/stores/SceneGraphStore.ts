@@ -46,22 +46,29 @@ export class SceneGraphStore {
   }
 
   setActiveContainer(id: string | null) {
-    const currentContainerId = this.selectedContainerId;
+    const previousId = this.selectedContainerId;
+    if (previousId === id) return;
 
     this.selectedContainerId = id;
-    if (id) {
-      const node = this.findNodeById(id)!;
-      this.dispatcher.dispatch({
-        kind: 'container-activated',
-        container: node,
-      });
-    } else if (currentContainerId) {
-      const node = this.findNodeById(currentContainerId)!;
 
-      this.dispatcher.dispatch({
-        kind: 'container-deactivated',
-        container: node,
-      });
+    // Switching straight from one container to another must unload the previous
+    // one first, or its assets stay in the scene alongside the new container's.
+    if (previousId) {
+      const previous = this.findNodeById(previousId);
+      if (previous)
+        this.dispatcher.dispatch({
+          kind: 'container-deactivated',
+          container: previous,
+        });
+    }
+
+    if (id) {
+      const node = this.findNodeById(id);
+      if (node)
+        this.dispatcher.dispatch({
+          kind: 'container-activated',
+          container: node,
+        });
     }
   }
 
@@ -223,6 +230,7 @@ export class SceneGraphStore {
 
   createChildNode(selectedNode: ITemplateTreeNode) {
     const newNode = selectedNode.template();
+    newNode.parent = selectedNode;
     selectedNode.children = (selectedNode.children || []).concat(newNode);
     this.dispatcher.dispatch({ kind: 'nodes-updated', nodes: this.nodes });
   }

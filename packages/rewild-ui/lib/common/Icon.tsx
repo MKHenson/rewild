@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ChevronUp,
   CircleAlert,
+  CircleDot,
   CirclePlus,
   House,
   Info,
@@ -27,7 +28,8 @@ import {
   User,
   WavesHorizontal,
   Wrench,
-  Box, 
+  X,
+  Box,
   MountainSnow,
   TrendingUpDown,
   type IconNode,
@@ -46,6 +48,7 @@ const icons = {
   'chevron-right': ChevronRight,
   'chevron-up': ChevronUp,
   'circle-alert': CircleAlert,
+  'circle-dot': CircleDot,
   'circle-plus': CirclePlus,
   house: House,
   info: Info,
@@ -66,6 +69,7 @@ const icons = {
   'waves-horizontal': WavesHorizontal,
   'trending-up-down': TrendingUpDown,
   wrench: Wrench,
+  x: X,
   box: Box,
 } satisfies Record<string, IconNode>;
 

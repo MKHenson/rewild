@@ -16,6 +16,10 @@ import {
 interface NodeProps {
   node: ITreeNode;
   selectedNodes?: ITreeNode[];
+  /** Marked as the current/live node with an accent and a dot marker. */
+  activeNode?: ITreeNode | null;
+  /** Rendered muted. */
+  dimmedNodes?: ITreeNode[];
   onSelectionChanged?: (nodes: ITreeNode[]) => void;
   onNodeDblClick?: (node: ITreeNode) => void;
   onDrop?: (node: ITreeNode) => void;
@@ -62,7 +66,9 @@ export class TreeNode extends Component<NodeProps> {
   init() {
     this.selected =
       this.props.selectedNodes?.includes(this.props.node) || false;
-    const [expanded, setExpanded] = this.useState(true);
+    const [expanded, setExpanded] = this.useState(
+      this.props.node.expanded ?? true
+    );
 
     const onDragStart = (e: DragEvent) => {
       const props = this.props;
@@ -71,8 +77,12 @@ export class TreeNode extends Component<NodeProps> {
       startDragDrop<IDragDropAction>(e, action);
     };
 
+    // Written back to the node: this component is rebuilt whenever the owning
+    // tree re-renders, so local state alone would be lost on the next click.
     const handleExpandedClick = () => {
-      setExpanded(!expanded());
+      const next = !expanded();
+      this.props.node.expanded = next;
+      setExpanded(next);
     };
 
     const handleNodeClick = (e: MouseEvent) => {
@@ -123,12 +133,17 @@ export class TreeNode extends Component<NodeProps> {
     return () => {
       const props = this.props;
       this.selected = props.selectedNodes?.includes(props.node) || false;
+      const active = !!props.activeNode && props.activeNode === props.node;
+      const dimmed = props.dimmedNodes?.includes(props.node) || false;
 
       return (
         <div class="treenode">
           <div
             class={
-              'tree-content' + (this.selected ? ' selected-treenode' : '')
+              'tree-content' +
+              (this.selected ? ' selected-treenode' : '') +
+              (active ? ' active-treenode' : '') +
+              (dimmed ? ' dimmed-treenode' : '')
             }>
             {props.node.children && props.node.children.length ? (
               expanded() ? (
@@ -158,6 +173,11 @@ export class TreeNode extends Component<NodeProps> {
               ondragend={onDragEndEvent}
               ondrop={props.node.onDrop ? onDrop : undefined}>
               <Typography variant="body2">
+                {active && (
+                  <span class="active-marker">
+                    <Icon icon="circle-dot" size="xs" />
+                  </span>
+                )}
                 {props.node.icon && (
                   <span class="node-icon">
                     <StyledIcon
@@ -177,6 +197,8 @@ export class TreeNode extends Component<NodeProps> {
               {props.node.children.map((node) => (
                 <TreeNode
                   selectedNodes={props.selectedNodes}
+                  activeNode={props.activeNode}
+                  dimmedNodes={props.dimmedNodes}
                   onSelectionChanged={props.onSelectionChanged}
                   onNodeDblClick={props.onNodeDblClick}
                   node={node}
@@ -247,6 +269,22 @@ const StyledTreeNode = cssStylesheet(css`
   .tree-content.selected-treenode x-typography {
     color: ${theme?.colors.primary400};
     font-weight: 500;
+  }
+  .tree-content.active-treenode .treenode-drop-area {
+    background: ${theme?.colors.subtle500};
+    border-radius: 3px;
+    padding: 0 6px 0 4px;
+  }
+  .tree-content.active-treenode x-typography {
+    font-weight: 600;
+  }
+  .tree-content.active-treenode .active-marker {
+    color: ${theme?.colors.secondary400};
+    vertical-align: middle;
+    margin: 0 4px 0 0;
+  }
+  .tree-content.dimmed-treenode {
+    opacity: 0.5;
   }
   .tree-content .expand-icon {
     vertical-align: middle;

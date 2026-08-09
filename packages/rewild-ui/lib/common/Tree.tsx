@@ -5,6 +5,10 @@ import { TreeNode } from './TreeNode';
 interface TreeProps {
   rootNodes: ITreeNode[];
   selectedNodes?: ITreeNode[];
+  /** Marked as the current/live node with an accent and a dot marker. */
+  activeNode?: ITreeNode | null;
+  /** Rendered muted. */
+  dimmedNodes?: ITreeNode[];
   onSelectionChanged?: (nodes: ITreeNode[]) => void;
   onNodeDblClick?: (node: ITreeNode) => void;
   onDrop?: (node: ITreeNode) => void;
@@ -42,6 +46,8 @@ export class Tree extends Component<TreeProps> {
           {props.rootNodes.map((node) => (
             <TreeNode
               selectedNodes={props.selectedNodes}
+              activeNode={props.activeNode}
+              dimmedNodes={props.dimmedNodes}
               onSelectionChanged={props.onSelectionChanged}
               node={node}
               onNodeDblClick={props.onNodeDblClick}
