@@ -147,6 +147,30 @@ function bilateralRadiusFor(tier: SkyQualityTier): number {
 }
 
 const TIERS: Record<RenderQuality, SkyQualityTier> = {
+  // cloudResolutionScale 1.0 is what this tier is for: the clouds stop being the
+  // one buffer in the frame that gets magnified, so skyBlend's upsample becomes a
+  // 1:1 fetch and silhouettes are no longer quantised to a coarser grid than the
+  // geometry beside them. Roughly twice the cloud pixels of `high`, and it
+  // multiplies with the sample counts.
+  //
+  // The two bilateral fields go *below* high's 1.0 rather than above, breaking the
+  // pattern of the tiers under it. That pass exists to hide the cloud target's
+  // resolution; at full resolution there is none to hide, and leaving the blur at
+  // high's setting would spend the extra pixels and then smooth them away.
+  ultra: {
+    cloudSamples: 112,
+    cloudLightSamples: 32,
+    cloudLodSamples: 64,
+    cloudMinSamples: 24,
+    cloudResolutionScale: 1.0,
+    cirrusTaps: 4,
+    cirrusDetailBias: 1.0,
+    cloudShadowSamples: 48,
+    bilateralBlurBoost: 0.7,
+    bilateralEdgeRelax: 0.85,
+    godRayScale: 0.7,
+    godRaySamples: 64,
+  },
   high: {
     cloudSamples: 80,
     cloudLightSamples: 25,
@@ -170,7 +194,7 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cirrusTaps: 2,
     cirrusDetailBias: 0.8,
     cloudShadowSamples: 24,
-    bilateralBlurBoost: 1.3,
+    bilateralBlurBoost: 1.1,
     bilateralEdgeRelax: 1.2,
     godRayScale: 0.4,
     godRaySamples: 32,
@@ -184,7 +208,7 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cirrusTaps: 1,
     cirrusDetailBias: 0.6,
     cloudShadowSamples: 16,
-    bilateralBlurBoost: 1.7,
+    bilateralBlurBoost: 1.3,
     bilateralEdgeRelax: 1.45,
     godRayScale: 0.3,
     godRaySamples: 20,

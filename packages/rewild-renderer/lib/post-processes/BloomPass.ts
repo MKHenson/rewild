@@ -40,7 +40,7 @@ export class BloomPass implements IPostProcess {
 
   /** Scales the HDR highlight added to clouds before tonemapping.
    *  Range 0–3; default 1.2. Higher = brighter glow. */
-  bloomAmount: number = 0.3;
+  bloomAmount: number = 0.15;
 
   /**
    * Threshold in exposure-adjusted luminance (EXPOSURE * raw_luminance, with

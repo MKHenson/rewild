@@ -61,13 +61,17 @@ Registered in `RenderQualityCommands.ts`.
 ```js
 setExposure(0.06); // linear multiplier, not EV stops — see Camera.exposure
 setBloom(amount, threshold, maxSource); // uniforms: effective next frame, no rebuild
-setRenderQuality('low' | 'medium' | 'high'); // app-wide, not per-subsystem
+setRenderQuality('low' | 'medium' | 'high' | 'ultra'); // app-wide, not per-subsystem
 ```
 
 Exposure is a plain multiplier rather than an aperture/shutter/ISO triple — the
 atmosphere's radiance scale is already hand-tuned in absolute terms, and this is
 the number it was tuned against. `setRenderQuality` rebuilds the pipelines that
 scale with quality, so unlike the bloom knobs it isn't instant.
+
+The tier persists to `localStorage` under `rewild.render.quality` and is restored
+on the next load. Default is `high`; `ultra` renders the clouds at full canvas
+resolution rather than 0.7x, which is roughly twice the cloud pixels.
 
 ---
 

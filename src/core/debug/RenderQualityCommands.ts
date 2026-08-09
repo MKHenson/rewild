@@ -1,4 +1,4 @@
-import { Renderer, RENDER_QUALITIES, RenderQuality } from 'rewild-renderer';
+import { Renderer, RENDER_QUALITIES, isRenderQuality } from 'rewild-renderer';
 
 // Whole-frame image controls: the render quality tier, exposure and bloom. All
 // three cut across the sky/scene split, which is why they live here rather than
@@ -11,6 +11,8 @@ import { Renderer, RENDER_QUALITIES, RenderQuality } from 'rewild-renderer';
 // cannot come from a uniform), so setting this schedules a shader rebuild rather
 // than taking effect immediately — expect one hitched frame. Pair it with
 // startSkyPerfCapture to measure the difference.
+//
+// The chosen tier persists to localStorage; QualitySettings restores it on load.
 export function registerRenderQualityCommands(renderer: Renderer) {
   (window as any).setRenderQuality = (quality?: string) => {
     if (quality === undefined) {
@@ -22,10 +24,9 @@ export function registerRenderQualityCommands(renderer: Renderer) {
       return;
     }
 
-    // Compare as plain strings: the argument comes from a console, so it has not
-    // been through any type checking and must not be asserted into the union
-    // before it is validated.
-    if (!(RENDER_QUALITIES as readonly string[]).includes(quality)) {
+    // The argument comes from a console, so it has not been through any type
+    // checking and must not be asserted into the union before it is validated.
+    if (!isRenderQuality(quality)) {
       console.warn(
         `Unknown render quality "${quality}". Expected one of: ${RENDER_QUALITIES.join(
           ', '
@@ -34,7 +35,7 @@ export function registerRenderQualityCommands(renderer: Renderer) {
       return;
     }
 
-    renderer.quality.level = quality as RenderQuality;
+    renderer.quality.level = quality;
     console.log(
       `Render quality → ${quality}; affected shaders rebuild on the next frame.`
     );

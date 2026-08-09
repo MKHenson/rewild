@@ -1,4 +1,11 @@
-import { RenderQuality } from './RenderQuality';
+import {
+  DEFAULT_RENDER_QUALITY,
+  isRenderQuality,
+  RenderQuality,
+} from './RenderQuality';
+
+/** localStorage key holding the chosen tier. */
+const STORAGE_KEY = 'rewild.render.quality';
 
 /**
  * The app-wide render-quality setting.
@@ -7,13 +14,16 @@ import { RenderQuality } from './RenderQuality';
  * Renderer as `renderer.quality`. Every subsystem that scales with quality —
  * all sub systems reads the level from here rather
  * than holding its own copy.
+ *
+ * The level persists to localStorage on every change and is restored on
+ * construction, so a reload keeps the chosen tier.
  */
 export class QualitySettings {
   private _level: RenderQuality;
   private _revision: number;
 
-  constructor(level: RenderQuality = 'high') {
-    this._level = level;
+  constructor(fallback: RenderQuality = DEFAULT_RENDER_QUALITY) {
+    this._level = readStoredQuality() ?? fallback;
     this._revision = 0;
   }
 
@@ -26,6 +36,7 @@ export class QualitySettings {
     if (value === this._level) return;
     this._level = value;
     this._revision++;
+    writeStoredQuality(value);
   }
 
   /**
@@ -43,5 +54,27 @@ export class QualitySettings {
    */
   hasChangedSince(builtRevision: number): boolean {
     return builtRevision !== this._revision;
+  }
+}
+
+/** Stored tier, or null when absent, unreadable or no longer a valid tier. */
+function readStoredQuality(): RenderQuality | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    // isRenderQuality also rejects a tier written by an older build that has
+    // since been renamed or removed, which would otherwise index a tier table
+    // with a key it has no row for.
+    return isRenderQuality(stored) ? stored : null;
+  } catch {
+    // Storage blocked (private mode) or unavailable — fall back to the default.
+    return null;
+  }
+}
+
+function writeStoredQuality(level: RenderQuality): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, level);
+  } catch {
+    // Storage full or blocked — the level still applies for this session.
   }
 }

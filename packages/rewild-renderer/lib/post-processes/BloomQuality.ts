@@ -39,6 +39,7 @@ const BLOOM_SCREEN_EXTENT_PX = 30;
 const BLOOM_RADIUS_OVER_SIGMA = 1.875;
 
 const TIERS: Record<RenderQuality, BloomQualityTier> = {
+  ultra: { bloomScale: 0.6 },
   high: { bloomScale: 0.5 },
   medium: { bloomScale: 0.4 },
   low: { bloomScale: 0.3 },
