@@ -68,28 +68,6 @@
       "icon": "lightbulb",
       "actors": [
         {
-          "name": "Directional",
-          "properties": [
-            {
-              "type": "intensity",
-              "value": 3.1
-            },
-            {
-              "type": "color",
-              "value": [1, 1, 1]
-            },
-            {
-              "type": "position",
-              "value": [0, 0, 0]
-            },
-            {
-              "type": "target",
-              "value": [0, -1, 0]
-            }
-          ],
-          "templateId": "directional-light"
-        },
-        {
           "name": "Point",
           "properties": [
             {
@@ -106,20 +84,6 @@
             }
           ],
           "templateId": "point-light"
-        },
-        {
-          "name": "Ambient",
-          "properties": [
-            {
-              "type": "intensity",
-              "value": 1
-            },
-            {
-              "type": "color",
-              "value": [1, 1, 1]
-            }
-          ],
-          "templateId": "ambient-light"
         }
       ]
     }
