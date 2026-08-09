@@ -23,6 +23,7 @@ export * from './common/Route';
 export * from './common/RouterProvider';
 export * from './common/RouterSwitch';
 export * from './common/Switch';
+export * from './common/Tabs';
 export * from './common/Tree';
 export * from './common/TreeNode';
 export * from './common/Typography';
