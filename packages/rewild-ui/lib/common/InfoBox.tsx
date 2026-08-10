@@ -64,6 +64,10 @@ const StyledInfoBox = cssStylesheet(css`
   :host {
     width: 100%;
     display: block;
+    /* Slotted content is often a raw error string — a URL or a stack frame with
+       no spaces to break on. Inherited, so it reaches the slotted text through
+       Typography's shadow root. */
+    overflow-wrap: anywhere;
   }
 
   .info {
@@ -93,5 +97,9 @@ const StyledInfoBox = cssStylesheet(css`
 
   .content {
     flex: 1;
+    /* A flex item's automatic minimum size is its content's intrinsic width, so
+       without this a long unbreakable string widens the item past the box and
+       spills out rather than wrapping inside it. */
+    min-width: 0;
   }
 `);

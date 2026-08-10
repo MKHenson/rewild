@@ -3,6 +3,18 @@ import { auditTextures, reportAudit } from './audit-textures.js';
 
 const ASSET_ROOT = './assets/shared';
 
+// Served without this, the browser only heuristically caches, so every page load
+// re-fetches the whole ~95MB texture library. That is slow enough on its own to
+// time requests out.
+//
+// Deliberately *not* `immutable`, unlike the client bundle: these keys are
+// stable paths rather than content-hashed, and `textures:fix` rewrites files in
+// place, so a republished texture has to be able to win. Without `immutable` a
+// hard reload still bypasses the cache, and once the window lapses the ETag
+// makes revalidation a 304 rather than a re-download. Worth revisiting if asset
+// URLs ever carry a content hash.
+const CACHE_CONTROL = 'public, max-age=604800';
+
 const endpoint = process.env.SHARED_S3_ENDPOINT;
 const bucket = process.env.SHARED_BUCKET_NAME;
 const accessKey = process.env.SHARED_S3_ACCESS_KEY;
@@ -45,16 +57,32 @@ if (!process.argv.includes('--skip-audit')) {
   );
 }
 
-console.log(`Pushing assets to s3://${bucket} ...`);
+// `sync` uploads only what changed, which means it also skips stamping metadata
+// onto objects that are already up to date — so a cache-header change alone
+// would be a no-op for the entire existing library. `--reupload` swaps in a
+// plain recursive copy to push every file regardless, which is what applies new
+// headers across the board. Costs a full upload, so it is opt-in.
+const reupload = process.argv.includes('--reupload');
+
+console.log(
+  `Pushing assets to s3://${bucket}${reupload ? ' (re-uploading everything)' : ''} ...`
+);
 
 // *.orig is what `npm run textures:fix` leaves behind when it rewrites a
 // texture in place — a local undo, since assets/shared is not in version
 // control. Uploading those would republish the very files the fix removed.
-execSync(`aws s3 sync ./assets/shared s3://${bucket} --endpoint-url ${endpoint} --acl public-read --exclude "*.orig"`, {
-  stdio: 'inherit',
-  env: {
-    ...process.env,
-    AWS_ACCESS_KEY_ID: accessKey,
-    AWS_SECRET_ACCESS_KEY: secretKey,
-  },
-});
+const command = reupload
+  ? `aws s3 cp ./assets/shared s3://${bucket} --recursive`
+  : `aws s3 sync ./assets/shared s3://${bucket}`;
+
+execSync(
+  `${command} --endpoint-url ${endpoint} --acl public-read --cache-control "${CACHE_CONTROL}" --exclude "*.orig"`,
+  {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      AWS_ACCESS_KEY_ID: accessKey,
+      AWS_SECRET_ACCESS_KEY: secretKey,
+    },
+  }
+);

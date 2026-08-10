@@ -6,6 +6,7 @@ import {
   compelteDragDrop,
   theme,
   Loading,
+  InfoBox,
 } from 'rewild-ui';
 import { Mesh, Renderer, Sprite3D, Transform } from 'rewild-renderer';
 import { TerrainEvent } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
@@ -48,7 +49,12 @@ interface Props {}
 const SURFACE_PROBE_CLEARANCE = 500;
 
 // Longest the loading overlay is held waiting for terrain before giving up.
-const LOAD_TIMEOUT_MS = 20000;
+//
+// Armed only once the renderer has finished initializing, not on mount: renderer
+// init pulls the whole texture library (~95MB cold) and legitimately outruns any
+// terrain-shaped budget. Timing that too would dismiss the overlay mid-download,
+// which looks exactly like a broken editor.
+const TERRAIN_TIMEOUT_MS = 20000;
 
 export interface ViewportEventDetails {
   renderer: Renderer | null;
@@ -60,6 +66,9 @@ export class EditorViewport extends Component<Props> {
   renderer: Renderer;
   orbitController: OrbitController | null = null;
   hasInitialized = false;
+  // hasInitialized is set when init *starts*, to keep it from running twice.
+  // This one means init finished, which is what gates the terrain timeout.
+  rendererReady = false;
   templateLoader: TemplateLoader;
   gizmo: Gizmo;
   dragController: GizmoDragController;
@@ -81,14 +90,30 @@ export class EditorViewport extends Component<Props> {
     // well after the project record does — so the overlay is held until the
     // first chunk arrives rather than until the store finishes fetching.
     const [levelLoading, setLevelLoading] = this.useState(true);
+    const [loadError, setLoadError] = this.useState<string | null>(null);
 
     const beginLevelLoad = () => {
+      setLoadError(null);
       setLevelLoading(true);
       if (this.loadingTimeout !== null) {
         window.clearTimeout(this.loadingTimeout);
+        this.loadingTimeout = null;
       }
-      // Terrain generation can fail outright; never trap the editor behind it.
-      this.loadingTimeout = window.setTimeout(endLevelLoad, LOAD_TIMEOUT_MS);
+      // No timeout armed here. Until the renderer is up there is nothing to time
+      // out *of* — the wait is asset downloads, whose length is the user's
+      // bandwidth, not a fault. armTerrainTimeout takes over once init lands.
+      if (this.rendererReady) armTerrainTimeout();
+    };
+
+    // Terrain generation can fail outright; never trap the editor behind it.
+    const armTerrainTimeout = () => {
+      if (this.loadingTimeout !== null) {
+        window.clearTimeout(this.loadingTimeout);
+      }
+      this.loadingTimeout = window.setTimeout(
+        endLevelLoad,
+        TERRAIN_TIMEOUT_MS
+      );
     };
 
     const endLevelLoad = () => {
@@ -97,6 +122,15 @@ export class EditorViewport extends Component<Props> {
         this.loadingTimeout = null;
       }
       setLevelLoading(false);
+    };
+
+    // A dead renderer never raises chunk-loaded, so nothing else would ever
+    // clear the overlay. Say what happened rather than dropping the user into an
+    // editor that looks fine and cannot draw.
+    const failLevelLoad = (err: unknown) => {
+      console.error(err);
+      setLoadError(err instanceof Error ? err.message : String(err));
+      endLevelLoad();
     };
 
     const onProjectEvent: Subscriber<ProjectStoreEvents> = (event) => {
@@ -362,6 +396,13 @@ export class EditorViewport extends Component<Props> {
         };
         await this.templateLoader.load();
 
+        // Everything above — GPU device, ~95MB of textures, geometry, templates —
+        // is what the overlay is really covering on a cold load. Only now does a
+        // terrain chunk become possible, so only now is a terrain timeout
+        // meaningful.
+        this.rendererReady = true;
+        if (levelLoading()) armTerrainTimeout();
+
         this.gizmo = new Gizmo();
         this.dragController = new GizmoDragController(
           this.renderer,
@@ -395,7 +436,7 @@ export class EditorViewport extends Component<Props> {
         pane3D.onmousemove = onMouseMove;
         pane3D.onmouseup = onMouseUp;
       } catch (err: unknown) {
-        console.error(err);
+        failLevelLoad(err);
       }
     };
 
@@ -724,6 +765,9 @@ export class EditorViewport extends Component<Props> {
     const loadingOverlay = (
       <Loading overlay label="Loading level" />
     ) as Loading;
+    const errorBox = (
+      <InfoBox variant="error" title="Could not open the level" />
+    ) as InfoBox;
     const container = (
       <div class="viewport-container">{pane3D}</div>
     ) as HTMLDivElement;
@@ -735,6 +779,13 @@ export class EditorViewport extends Component<Props> {
           container.appendChild(loadingOverlay);
       } else {
         loadingOverlay.remove();
+      }
+      const error = loadError();
+      if (error) {
+        errorBox.textContent = error;
+        if (!errorBox.parentElement) container.appendChild(errorBox);
+      } else {
+        errorBox.remove();
       }
       if (sculptStore.enabled) {
         if (!sculptToolbar.parentElement) container.appendChild(sculptToolbar);
@@ -901,6 +952,15 @@ const StyledContainer = cssStylesheet(css`
     height: 100%;
     width: 100%;
     position: relative;
+  }
+
+  x-info-box {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: min(32rem, 80%);
+    z-index: 10;
   }
 
   :host([activated])::after {

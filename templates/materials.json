@@ -94,32 +94,6 @@
       "name": "light-32",
       "url": "icons/editor/light-32.png",
       "colorSpace": "linear"
-    },
-    {
-      "name": "desert-sky",
-      "type": "cubemap",
-      "urls": [
-        "skyboxes/desert/px.jpg",
-        "skyboxes/desert/nx.jpg",
-        "skyboxes/desert/py.jpg",
-        "skyboxes/desert/ny.jpg",
-        "skyboxes/desert/pz.jpg",
-        "skyboxes/desert/nz.jpg"
-      ],
-      "colorSpace": "srgb"
-    },
-    {
-      "name": "starry-sky",
-      "type": "cubemap",
-      "urls": [
-        "skyboxes/stars/left.png",
-        "skyboxes/stars/right.png",
-        "skyboxes/stars/top.png",
-        "skyboxes/stars/bottom.png",
-        "skyboxes/stars/front.png",
-        "skyboxes/stars/back.png"
-      ],
-      "colorSpace": "srgb"
     }
   ],
   "materials": [

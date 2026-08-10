@@ -71,3 +71,15 @@ npm run assets:push
 ```
 
 Only changed files are transferred. The running application never needs S3 credentials — it only reads public asset URLs.
+
+Uploads are stamped with `Cache-Control: public, max-age=604800`, so a returning
+player does not re-download the texture library. Because only changed files are
+transferred, a change to that header does not reach objects already in the
+bucket — re-upload everything to apply it:
+
+```bash
+npm run assets:push -- --reupload
+```
+
+A republished texture can take up to a week to reach clients that already cached
+the old one. Hard-reload (Ctrl/Cmd+Shift+R) to bypass it while iterating.
