@@ -1,4 +1,4 @@
-import { Ray, Vector3 } from 'rewild-common';
+import { Box3, Matrix4, Ray, Vector3 } from 'rewild-common';
 import { Mesh, Renderer, Transform } from 'rewild-renderer';
 import { Raycaster, Intersection } from 'rewild-renderer/lib/core/Raycaster';
 
@@ -7,7 +7,10 @@ const _downRay = new Ray();
 const _downDir = new Vector3(0, -1, 0);
 const _up = new Vector3(0, 1, 0);
 const _axis = new Vector3();
-const _size = new Vector3();
+const _bounds = new Box3();
+const _meshBounds = new Box3();
+const _inverseRoot = new Matrix4();
+const _toRoot = new Matrix4();
 
 export function computeRotationFromNormal(
   normal: Vector3
@@ -27,16 +30,39 @@ export function computeRotationFromNormal(
   }
 }
 
-export function computeObjectHalfHeight(transform: Transform): number {
-  if (transform.component instanceof Mesh) {
-    transform.component.geometry.computeBoundingBox();
-    const bbox = transform.component.geometry.boundingBox;
-    if (bbox) {
-      bbox.getSize(_size);
-      return _size.y / 2;
+/** Unions every descendant mesh's bounds into `_bounds`, in root-local space. */
+function expandBoundsFromMeshes(transform: Transform): void {
+  const component = transform.component;
+
+  if (component instanceof Mesh) {
+    const geometry = component.geometry;
+    if (!geometry.boundingBox) geometry.computeBoundingBox();
+
+    if (geometry.boundingBox) {
+      _meshBounds.copy(geometry.boundingBox);
+      _toRoot.multiplyMatrices(_inverseRoot, transform.matrixWorld);
+      _meshBounds.applyMatrix4(_toRoot);
+      _bounds.union(_meshBounds);
     }
   }
-  return 0;
+
+  for (const child of transform.children) expandBoundsFromMeshes(child);
+}
+
+/**
+ * How far above a surface an object's origin must sit for the object to rest on
+ * it — the drop from the origin down to its lowest point.
+ */
+export function computeGroundOffset(transform: Transform): number {
+  // Bounds are gathered in the root's own space, so an object still outside the
+  // scene measures the same as one already parented into it.
+  transform.updateMatrixWorld(true);
+  _inverseRoot.copy(transform.matrixWorld).invert();
+  _bounds.makeEmpty();
+
+  expandBoundsFromMeshes(transform);
+
+  return _bounds.isEmpty() ? 0 : -_bounds.min.y;
 }
 
 export function raycastToSurface(
@@ -75,14 +101,14 @@ export function raycastToSurface(
 export function placeOnSurface(
   renderer: Renderer,
   position: Vector3,
-  halfHeight: number,
+  groundOffset: number,
   excludeTransforms?: Transform[]
 ): { y: number; rotation: [number, number, number, number] } | null {
   const hit = raycastToSurface(renderer, position, excludeTransforms);
   if (!hit || !hit.face) return null;
 
   return {
-    y: hit.point.y + halfHeight,
+    y: hit.point.y + groundOffset,
     rotation: computeRotationFromNormal(hit.face.normal),
   };
 }

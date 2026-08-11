@@ -31,7 +31,7 @@ import { Asset3D } from 'src/core/routing/Asset3D';
 import { GizmoDragController } from './utils/GizmoDragController';
 import { TerrainSculptController } from './utils/TerrainSculptController';
 import {
-  computeObjectHalfHeight,
+  computeGroundOffset,
   computeRotationFromNormal,
   raycastToSurface,
 } from './utils/WorldPlacement';
@@ -723,8 +723,7 @@ export class EditorViewport extends Component<Props> {
           this.renderer
         )) as Asset3D;
 
-        const halfHeight = computeObjectHalfHeight(createdResource.transform);
-        point.y += halfHeight;
+        point.y += computeGroundOffset(createdResource.transform);
 
         const normal = intersection!.face!.normal;
         const rotation = computeRotationFromNormal(normal);
