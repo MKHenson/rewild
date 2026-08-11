@@ -10,7 +10,7 @@ import {
   dragModeInvolvesY,
 } from './GizmoDragTypes';
 import {
-  computeObjectHalfHeight,
+  computeGroundOffset,
   placeOnSurface,
   raycastMouseToWorld,
   computeRotationFromNormal,
@@ -31,7 +31,7 @@ export class GizmoDragController {
   private startObjectPosition = new Vector3();
   private startObjectRotation: [number, number, number, number] = [0, 0, 0, 1];
   private dragStartPointOnPlane = new Vector3();
-  private objectHalfHeight = 0;
+  private objectGroundOffset = 0;
   private transform: Transform | null = null;
   private lastRotation: [number, number, number, number] = [0, 0, 0, 1];
 
@@ -68,7 +68,7 @@ export class GizmoDragController {
     const q = objectTransform.quaternion;
     this.startObjectRotation = [q.x, q.y, q.z, q.w];
     this.lastRotation = [...this.startObjectRotation];
-    this.objectHalfHeight = computeObjectHalfHeight(objectTransform);
+    this.objectGroundOffset = computeGroundOffset(objectTransform);
 
     this.buildConstraintPlane(cameraTransform);
 
@@ -96,7 +96,7 @@ export class GizmoDragController {
           // Place exactly where the mouse points on the world
           _newPosition.set(
             worldHit.point.x,
-            worldHit.point.y + this.objectHalfHeight,
+            worldHit.point.y + this.objectGroundOffset,
             worldHit.point.z
           );
         } else {
@@ -110,7 +110,7 @@ export class GizmoDragController {
           const surfaceResult = placeOnSurface(
             this.renderer,
             _newPosition,
-            this.objectHalfHeight,
+            this.objectGroundOffset,
             excludes
           );
           if (surfaceResult) {
@@ -223,6 +223,6 @@ export class GizmoDragController {
     this._isDragging = false;
     this.mode = GizmoDragMode.None;
     this.transform = null;
-    this.objectHalfHeight = 0;
+    this.objectGroundOffset = 0;
   }
 }
