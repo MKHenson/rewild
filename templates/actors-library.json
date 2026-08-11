@@ -64,6 +64,16 @@
       ]
     },
     {
+      "name": "Nature",
+      "icon": "park",
+      "actors": [
+        {
+          "name": "Granite Rock",
+          "templateId": "granite-rock"
+        }
+      ]
+    },
+    {
       "name": "Lights",
       "icon": "lightbulb",
       "actors": [

@@ -16,6 +16,10 @@ module.exports = {
   // import each other as 'src/...'.
   moduleNameMapper: {
     '^src/(.*)$': '<rootDir>/src/$1',
+    // Importing anything from the rewild-renderer barrel pulls in Renderer and
+    // with it the shader files, which are esbuild-loaded in the app but plain
+    // text to jest. Same mock the renderer package's own config uses.
+    '\\.wgsl$': '<rootDir>/packages/rewild-renderer/lib/__mocks__/wgslMock.js',
   },
   transform: {
     '^.+\\.[jt]sx?$': '<rootDir>/jest.transform.cjs',

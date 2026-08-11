@@ -91,6 +91,21 @@
       "colorSpace": "linear"
     },
     {
+      "name": "granite-rock-diffuse",
+      "url": "nature/granite-rocks/rock_granite_diff.webp",
+      "colorSpace": "srgb"
+    },
+    {
+      "name": "granite-rock-normal",
+      "url": "nature/granite-rocks/rock_granite_norm_gl.webp",
+      "colorSpace": "linear"
+    },
+    {
+      "name": "granite-rock-arm",
+      "url": "nature/granite-rocks/rock_granite_arm_gl.webp",
+      "colorSpace": "linear"
+    },
+    {
       "name": "light-32",
       "url": "icons/editor/light-32.png",
       "colorSpace": "linear"
@@ -146,6 +161,20 @@
       "occlusionMap": "block-concrete-4-ao",
       "metallic": 0,
       "roughness": 1
+    },
+    {
+      "name": "granite-rock",
+      "type": "standard",
+      "baseColorMap": "granite-rock-diffuse",
+      "normalMap": "granite-rock-normal",
+      "metallicRoughnessMap": "granite-rock-arm",
+      "occlusionMap": "granite-rock-arm",
+      "metallic": 1,
+      "roughness": 1.3,
+      "occlusionStrength": 0.1,
+      "normalScale": 1,
+      "emissiveColor": [0, 0, 0],
+      "emissiveStrength": 0.0
     }
   ]
 }
