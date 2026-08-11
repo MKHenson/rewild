@@ -1,6 +1,67 @@
+import { Matrix4, Quaternion, Vector3 } from 'rewild-common';
 import { Geometry } from '../geometry/Geometry';
+import { IMaterialPass } from '../materials/IMaterialPass';
+import { Mesh } from './Mesh';
+import { Transform } from './Transform';
 import { load } from '@loaders.gl/core';
 import { GLTFLoader, postProcessGLTF } from '@loaders.gl/gltf';
+import type {
+  GLTFMeshPrimitivePostprocessed,
+  GLTFNodePostprocessed,
+  GLTFPostprocessed,
+} from '@loaders.gl/gltf';
+
+// glTF's TRIANGLES mode. Points, lines and strips load fine but none of the
+// engine's pipelines rasterize them, so they are skipped rather than uploaded
+// as triangles — which would draw the primitive as garbage.
+const GLTF_MODE_TRIANGLES = 4;
+
+/**
+ * One drawable piece of a node's mesh. glTF splits a mesh into primitives
+ * precisely because each one takes a single material, so a primitive is the
+ * finest unit that can become a Mesh.
+ *
+ * `materialName` names the glTF material rather than resolving it: creating
+ * engine materials from glTF definitions is a separate concern, and until that
+ * exists a caller's resolver is free to ignore the name entirely.
+ */
+export interface GltfPrimitive {
+  geometry: Geometry;
+  materialName: string | null;
+}
+
+/**
+ * A node in the imported hierarchy, carrying its transform relative to its
+ * parent.
+ *
+ * The transform stays on the node instead of being baked into the vertices so
+ * the hierarchy survives import — a wheel keeps its own origin to spin about,
+ * and two nodes referencing one mesh keep sharing a single geometry.
+ */
+export interface GltfNode {
+  name: string;
+  /** Node-local TRS. glTF lets a node carry either a matrix or TRS; a matrix is
+   *  decomposed at parse time so instantiation has one form to handle. */
+  translation: [number, number, number];
+  /** Quaternion, xyzw — glTF's own order. */
+  rotation: [number, number, number, number];
+  scale: [number, number, number];
+  primitives: GltfPrimitive[];
+  children: GltfNode[];
+}
+
+export interface GltfModel {
+  /** Root nodes of the default scene. */
+  roots: GltfNode[];
+}
+
+/** Resolves a glTF material name to a pass. Called once per primitive. */
+export type MaterialResolver = (materialName: string | null) => IMaterialPass;
+
+const _matrix = new Matrix4();
+const _position = new Vector3();
+const _quaternion = new Quaternion();
+const _scale = new Vector3();
 
 /**
  * glTF writes COLOR_0 as vec3 or vec4, in floats or normalized u8/u16 — six
@@ -20,8 +81,8 @@ function toFloatRgba(
     value instanceof Uint8Array
       ? 1 / 255
       : value instanceof Uint16Array
-        ? 1 / 65535
-        : 1;
+      ? 1 / 65535
+      : 1;
 
   const count = (value.length / components) | 0;
   const out = new Float32Array(count * 4);
@@ -38,38 +99,185 @@ function toFloatRgba(
   return out;
 }
 
-export async function loadGLTF(url: string, geometry: Geometry): Promise<void> {
-  const gltfData = await load(url, GLTFLoader);
+/** Returns null for anything the engine cannot draw, so the caller can skip it. */
+function toGeometry(
+  primitive: GLTFMeshPrimitivePostprocessed
+): Geometry | null {
+  if ((primitive.mode ?? GLTF_MODE_TRIANGLES) !== GLTF_MODE_TRIANGLES)
+    return null;
 
-  // Use postProcessGLTF to resolve buffers into typed arrays
-  const processedGltf = postProcessGLTF(gltfData);
+  const attributes = primitive.attributes;
+  const position = attributes.POSITION;
+  if (!position) return null;
 
-  // Example traversal (assuming a single mesh/primitive for simplicity):
-  const mesh = processedGltf.meshes[0];
-  if (mesh && mesh.primitives[0]) {
-    const attributes = mesh.primitives[0].attributes;
+  const geometry = new Geometry();
+  geometry.vertices = position.value as Float32Array;
+  geometry.normals = attributes.NORMAL?.value as Float32Array;
+  geometry.uvs = attributes.TEXCOORD_0?.value as Float32Array;
 
-    geometry.vertices = attributes.POSITION.value as Float32Array;
-    geometry.normals = attributes.NORMAL?.value as Float32Array;
-    geometry.uvs = attributes.TEXCOORD_0?.value as Float32Array;
-    geometry.indices = new Uint32Array(
-      mesh.primitives[0].indices?.value as Uint16Array | Uint32Array
-    );
+  // Widened to u32 whatever the accessor used, because Geometry uploads one
+  // index format. A non-indexed primitive leaves this undefined, which build()
+  // already reads as "draw the vertices in order".
+  if (primitive.indices)
+    geometry.indices = new Uint32Array(primitive.indices.value);
 
-    // Only the standard material reads this, and only with vertexColors set —
-    // carrying it costs a buffer that nothing else binds.
-    const color = attributes.COLOR_0;
-    if (color) {
-      geometry.colors = toFloatRgba(color.value, color.components);
-    }
+  // Only the standard material reads this, and only with vertexColors set —
+  // carrying it costs a buffer that nothing else binds.
+  const color = attributes.COLOR_0;
+  if (color) geometry.colors = toFloatRgba(color.value, color.components);
 
-    // If normals were not provided, compute simple vertex normals
-    if (!attributes.NORMAL) geometry.computeNormals();
-  }
+  // If normals were not provided, compute simple vertex normals
+  if (!attributes.NORMAL) geometry.computeNormals();
 
   // Compute bounds for culling/picking
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
 
   geometry.requiresBuild = true;
+  return geometry;
+}
+
+/** Loads a glTF/GLB from a url and parses it. */
+export async function loadGltfModel(url: string): Promise<GltfModel> {
+  return parseGltf(postProcessGLTF(await load(url, GLTFLoader)));
+}
+
+function readTransform(
+  node: GLTFNodePostprocessed
+): Pick<GltfNode, 'translation' | 'rotation' | 'scale'> {
+  if (node.matrix) {
+    _matrix.fromArray(new Float32Array(node.matrix));
+    _matrix.decompose(_position, _quaternion, _scale);
+
+    return {
+      translation: [_position.x, _position.y, _position.z],
+      rotation: [_quaternion.x, _quaternion.y, _quaternion.z, _quaternion.w],
+      scale: [_scale.x, _scale.y, _scale.z],
+    };
+  }
+
+  return {
+    translation: (node.translation as [number, number, number]) ?? [0, 0, 0],
+    rotation: (node.rotation as [number, number, number, number]) ?? [
+      0, 0, 0, 1,
+    ],
+    scale: (node.scale as [number, number, number]) ?? [1, 1, 1],
+  };
+}
+
+function parseNode(node: GLTFNodePostprocessed): GltfNode {
+  const primitives: GltfPrimitive[] = [];
+
+  for (const primitive of node.mesh?.primitives ?? []) {
+    const geometry = toGeometry(primitive);
+    if (!geometry) continue;
+
+    primitives.push({
+      geometry,
+      materialName: primitive.material?.name ?? primitive.material?.id ?? null,
+    });
+  }
+
+  return {
+    name: node.name ?? node.id,
+    ...readTransform(node),
+    primitives,
+    children: (node.children ?? []).map(parseNode),
+  };
+}
+
+function sceneRoots(gltf: GLTFPostprocessed): GLTFNodePostprocessed[] {
+  const scene = gltf.scene ?? gltf.scenes?.[0];
+  if (scene?.nodes) return scene.nodes;
+
+  // A glTF need not declare a scene. Walking the flat node list would re-add
+  // every child as a root, so take only the nodes nothing else parents.
+  const children = new Set<GLTFNodePostprocessed>();
+  for (const node of gltf.nodes ?? [])
+    for (const child of node.children ?? []) children.add(child);
+
+  return (gltf.nodes ?? []).filter((node) => !children.has(node));
+}
+
+/**
+ * Turns a post-processed glTF into geometries and the hierarchy that positions
+ * them. Split from the fetch so the walk can be exercised against a structure
+ * rather than a file.
+ */
+export function parseGltf(gltf: GLTFPostprocessed): GltfModel {
+  return { roots: sceneRoots(gltf).map(parseNode) };
+}
+
+/** Every geometry the model owns, for buffer upload and disposal. */
+export function collectGeometries(model: GltfModel): Geometry[] {
+  const geometries: Geometry[] = [];
+
+  const visit = (node: GltfNode) => {
+    for (const primitive of node.primitives)
+      geometries.push(primitive.geometry);
+    for (const child of node.children) visit(child);
+  };
+
+  for (const root of model.roots) visit(root);
+  return geometries;
+}
+
+function instantiateNode(
+  node: GltfNode,
+  resolveMaterial: MaterialResolver
+): Transform {
+  // A single-primitive node puts its mesh on the node's own transform rather
+  // than under a child, so the common case imports at the same depth it was
+  // authored. Only a multi-material node needs a level per primitive, because a
+  // transform carries one component.
+  const transform =
+    node.primitives.length === 1
+      ? new Mesh(
+          node.primitives[0].geometry,
+          resolveMaterial(node.primitives[0].materialName)
+        ).transform
+      : new Transform();
+
+  transform.name = node.name;
+  transform.position.set(...node.translation);
+  transform.quaternion.set(...node.rotation);
+  transform.scale.set(...node.scale);
+
+  if (node.primitives.length > 1) {
+    for (let i = 0; i < node.primitives.length; i++) {
+      const primitive = node.primitives[i];
+      const mesh = new Mesh(
+        primitive.geometry,
+        resolveMaterial(primitive.materialName)
+      );
+      mesh.transform.name = `${node.name}[${i}]`;
+      transform.addChild(mesh.transform);
+    }
+  }
+
+  for (const child of node.children)
+    transform.addChild(instantiateNode(child, resolveMaterial));
+
+  return transform;
+}
+
+/**
+ * Builds a transform tree of meshes from a parsed model. Geometries are shared
+ * with the model rather than copied, so instantiating twice costs two transform
+ * trees and no extra vertex data.
+ */
+export function instantiateGltfModel(
+  model: GltfModel,
+  resolveMaterial: MaterialResolver
+): Transform {
+  // A single-root model becomes that root, so the usual one-mesh import gains
+  // no wrapper. Several roots need one to hang from.
+  if (model.roots.length === 1)
+    return instantiateNode(model.roots[0], resolveMaterial);
+
+  const root = new Transform();
+  for (const node of model.roots)
+    root.addChild(instantiateNode(node, resolveMaterial));
+
+  return root;
 }

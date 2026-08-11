@@ -1,4 +1,8 @@
-import { loadGLTF } from '../core/GltfLoader';
+import {
+  GltfModel,
+  collectGeometries,
+  loadGltfModel,
+} from '../core/GltfLoader';
 import { BoxGeometryFactory } from '../geometry/BoxGeometryFactory';
 import { CapsuleGeometryFactory } from '../geometry/CapsuleGeometryFactory';
 import { ConeGeometryFactory } from '../geometry/ConeGeometryFactory';
@@ -12,16 +16,35 @@ import { IGeometryTemplates } from './types';
 
 export class GeometryManager {
   geometries: Map<string, Geometry>;
+  /**
+   * Imported models, keyed the same way as geometries. A glTF entry lands here
+   * and not in `geometries`, because a model is a hierarchy of meshes and
+   * collapsing it to one geometry would discard every node transform and every
+   * material but the first. Instantiate it with `instantiateGltfModel`.
+   */
+  models: Map<string, GltfModel>;
   initialized: boolean;
 
   constructor() {
     this.geometries = new Map();
+    this.models = new Map();
     this.initialized = false;
   }
 
   get(id: string) {
     const toRet = this.geometries.get(id);
-    if (!toRet) throw new Error(`Could not find geometry with id ${id}`);
+    if (!toRet)
+      throw new Error(
+        this.models.has(id)
+          ? `Geometry id ${id} is an imported model — use getModel(${id}) instead`
+          : `Could not find geometry with id ${id}`
+      );
+    return toRet;
+  }
+
+  getModel(id: string) {
+    const toRet = this.models.get(id);
+    if (!toRet) throw new Error(`Could not find model with id ${id}`);
     return toRet;
   }
 
@@ -45,14 +68,17 @@ export class GeometryManager {
     for (const key in geometriesToLoad) {
       const geometryTemplate = geometriesToLoad[key];
       if (geometryTemplate.type === 'gltf') {
-        const geometry = new Geometry();
-        await loadGLTF(process.env.SHARED_ASSETS_BASE_URL + geometryTemplate.url, geometry);
-        this.addGeometry(key, geometry);
+        this.models.set(
+          key,
+          await loadGltfModel(
+            process.env.SHARED_ASSETS_BASE_URL + geometryTemplate.url
+          )
+        );
       }
     }
 
     await Promise.all(
-      Array.from(this.geometries.values()).map((geometry) => {
+      this.allGeometries().map((geometry) => {
         return geometry.build(
           device,
           renderer.bvhConfig,
@@ -65,12 +91,22 @@ export class GeometryManager {
   }
 
   dispose() {
-    Array.from(this.geometries.values()).forEach((geometry) => {
+    this.allGeometries().forEach((geometry) => {
       geometry.dispose();
     });
 
     this.geometries.clear();
+    this.models.clear();
     this.initialized = false;
+  }
+
+  /** Standalone geometries plus every geometry owned by an imported model. */
+  private allGeometries(): Geometry[] {
+    const geometries = Array.from(this.geometries.values());
+    for (const model of this.models.values())
+      geometries.push(...collectGeometries(model));
+
+    return geometries;
   }
 
   addGeometry(id: string, geometry: Geometry): Geometry {

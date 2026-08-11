@@ -10,5 +10,9 @@
   "alient-plant": {
     "type": "gltf",
     "url": "models/alient-plant/alient-plant.glb"
+  },
+  "granite-rock": {
+    "type": "gltf",
+    "url": "nature/granite-rocks/rock_granite_01.glb"
   }
 }

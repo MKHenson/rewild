@@ -103,6 +103,18 @@
       }
     },
     {
+      "name": "granite-rock",
+      "type": "asset",
+      "resource": {
+        "materialId": "granite-rock",
+        "geometryId": "granite-rock",
+        "physics": {
+          "bodyType": "fixed",
+          "shape": { "type": "box", "size": [2.23, 1.12, 1.25] }
+        }
+      }
+    },
+    {
       "name": "point-light",
       "type": "light",
       "resource": {

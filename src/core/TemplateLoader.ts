@@ -1,6 +1,11 @@
 import { IResource, ITemplateItems } from 'models';
 import { IAsset } from 'rewild-routing/lib/IAsset';
-import { Mesh, PointLight, Renderer } from 'rewild-renderer';
+import {
+  Mesh,
+  PointLight,
+  Renderer,
+  instantiateGltfModel,
+} from 'rewild-renderer';
 import { Asset3D } from './routing/Asset3D';
 import { behaviourManager } from './routing/BehaviourManager';
 import { PlayerStart } from './routing/PlayerStart';
@@ -41,12 +46,23 @@ export class TemplateLoader {
         if (!gameManager) toReturn.addVisualHelper(renderer);
       }
     } else if (template?.type === 'asset') {
-      if (template.resource.geometryId && template.resource.materialId) {
-        const mesh = new Mesh(
-          renderer.geometryManager.get(template.resource.geometryId),
-          renderer.materialManager.get(template.resource.materialId)
-        );
-        toReturn = new Asset3D(mesh.transform);
+      const { geometryId, materialId } = template.resource;
+
+      if (geometryId && materialId) {
+        const material = renderer.materialManager.get(materialId);
+
+        // An imported model brings its own hierarchy; a built-in geometry is a
+        // single mesh. Every primitive takes the template's material for now,
+        // since glTF material definitions are not yet turned into passes.
+        const transform = renderer.geometryManager.models.has(geometryId)
+          ? instantiateGltfModel(
+              renderer.geometryManager.getModel(geometryId),
+              () => material
+            )
+          : new Mesh(renderer.geometryManager.get(geometryId), material)
+              .transform;
+
+        toReturn = new Asset3D(transform);
       } else
         throw new Error(
           `Template ${template.name} is missing geometry or material ID.`
@@ -73,7 +89,9 @@ export class TemplateLoader {
 
         // Create the rigid body
         const rb = gameManager.physicsWorld.createRigidBody(rbDesc);
-        (toReturn as Asset3D).addBehavior(new RigidBodyBehaviour(rb, gameManager.renderer.sceneBVH));
+        (toReturn as Asset3D).addBehavior(
+          new RigidBodyBehaviour(rb, gameManager.renderer.sceneBVH)
+        );
 
         rb.setEnabled(false); // Start disabled until mounted
 

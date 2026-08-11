@@ -1,6 +1,6 @@
 import { Color, Vector3 } from 'rewild-common';
 import { Node } from 'rewild-routing';
-import { Mesh } from 'rewild-renderer';
+import { Transform, instantiateGltfModel } from 'rewild-renderer';
 import { PointLight } from 'node_modules/rewild-renderer/lib/core/lights/PointLight';
 import {
   Raycaster,
@@ -26,7 +26,7 @@ const _intersects: Intersection[] = [];
 
 export class LightingTester extends Node {
   private _lights: PointLight[] = [];
-  private _plants: Mesh[] = [];
+  private _plants: Transform[] = [];
   private _positioned: boolean[] = new Array(LIGHT_COUNT).fill(false);
   private _allPositioned = false;
   private _raycaster = new Raycaster(
@@ -45,7 +45,7 @@ export class LightingTester extends Node {
 
     const stateData = this.stateMachine?.data as StateMachineData;
     const renderer = stateData.renderer;
-    const plantGeometry = renderer.geometryManager.get('alient-plant');
+    const plantModel = renderer.geometryManager.getModel('alient-plant');
     const plantMaterial = renderer.materialManager.get('alient-plant');
 
     // Create 100 point lights in a 10x10 grid.
@@ -63,9 +63,11 @@ export class LightingTester extends Node {
         renderer.scene.addChild(light.transform);
         light.enableSprite(renderer);
 
-        const plant = new Mesh(plantGeometry, plantMaterial);
-        plant.transform.position.set(x, RAYCAST_ORIGIN_Y, z);
-        plant.transform.rotation.y = Math.random() * Math.PI * 2;
+        // Each plant is its own transform tree over the model's shared
+        // geometries, so a hundred of them cost a hundred transforms.
+        const plant = instantiateGltfModel(plantModel, () => plantMaterial);
+        plant.position.set(x, RAYCAST_ORIGIN_Y, z);
+        plant.rotation.y = Math.random() * Math.PI * 2;
 
         this._lights[idx] = light;
         this._plants[idx] = plant;
@@ -82,7 +84,7 @@ export class LightingTester extends Node {
       this._lights[i].transform.removeFromParent();
     }
     for (let i = 0; i < this._plants.length; i++) {
-      this._plants[i].transform.removeFromParent();
+      this._plants[i].removeFromParent();
     }
 
     this._lights.length = 0;
@@ -119,8 +121,8 @@ export class LightingTester extends Node {
           lz
         );
         const plant = this._plants[i];
-        plant.transform.position.y = terrainY;
-        stateData.renderer.scene.addChild(plant.transform);
+        plant.position.y = terrainY;
+        stateData.renderer.scene.addChild(plant);
         this._positioned[i] = true;
       } else {
         allDone = false;
