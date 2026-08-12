@@ -10,6 +10,11 @@ import type {
   GLTFNodePostprocessed,
   GLTFPostprocessed,
 } from '@loaders.gl/gltf';
+import {
+  GltfMaterialTextures,
+  GltfTextureRequest,
+  collectGltfTextures,
+} from './GltfTextures';
 
 // glTF's TRIANGLES mode. Points, lines and strips load fine but none of the
 // engine's pipelines rasterize them, so they are skipped rather than uploaded
@@ -53,6 +58,10 @@ export interface GltfNode {
 export interface GltfModel {
   /** Root nodes of the default scene. */
   roots: GltfNode[];
+  /** Every image the file's materials bind, for the texture manager to load. */
+  textures: GltfTextureRequest[];
+  /** What each glTF material binds, by texture-manager key. */
+  materials: GltfMaterialTextures[];
 }
 
 /** Resolves a glTF material name to a pass. Called once per primitive. */
@@ -180,7 +189,11 @@ function toGeometry(
 
 /** Loads a glTF/GLB from a url and parses it. */
 export async function loadGltfModel(url: string): Promise<GltfModel> {
-  return parseGltf(postProcessGLTF(await load(url, GLTFLoader)));
+  // Images are left encoded: the engine decodes them itself so that embedded
+  // and file-backed textures take the same path, and so an embedded image can
+  // be identified by its bytes. See collectGltfTextures.
+  const gltf = await load(url, GLTFLoader, { gltf: { loadImages: false } });
+  return parseGltf(postProcessGLTF(gltf), url);
 }
 
 function readTransform(
@@ -241,12 +254,21 @@ function sceneRoots(gltf: GLTFPostprocessed): GLTFNodePostprocessed[] {
 }
 
 /**
- * Turns a post-processed glTF into geometries and the hierarchy that positions
- * them. Split from the fetch so the walk can be exercised against a structure
- * rather than a file.
+ * Turns a post-processed glTF into geometries, the hierarchy that positions
+ * them, and the textures its materials ask for. Split from the fetch so the
+ * walk can be exercised against a structure rather than a file.
+ *
+ * `baseUrl` is the model's own url, needed only to resolve image URIs that are
+ * relative to it.
  */
-export function parseGltf(gltf: GLTFPostprocessed): GltfModel {
-  return { roots: sceneRoots(gltf).map(parseNode) };
+export function parseGltf(
+  gltf: GLTFPostprocessed,
+  baseUrl?: string
+): GltfModel {
+  return {
+    roots: sceneRoots(gltf).map(parseNode),
+    ...collectGltfTextures(gltf, baseUrl),
+  };
 }
 
 /** Every geometry the model owns, for buffer upload and disposal. */

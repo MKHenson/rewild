@@ -68,12 +68,18 @@ export class GeometryManager {
     for (const key in geometriesToLoad) {
       const geometryTemplate = geometriesToLoad[key];
       if (geometryTemplate.type === 'gltf') {
-        this.models.set(
-          key,
-          await loadGltfModel(
-            process.env.SHARED_ASSETS_BASE_URL + geometryTemplate.url
-          )
+        const model = await loadGltfModel(
+          process.env.SHARED_ASSETS_BASE_URL + geometryTemplate.url
         );
+
+        // Here rather than in the loader so the loader stays a pure parse. The
+        // manager already runs after the texture library and before materials
+        // are built, which is exactly the window an imported texture needs.
+        await renderer.textureManager.loadGltfTextures(
+          renderer,
+          model.textures
+        );
+        this.models.set(key, model);
       }
     }
 

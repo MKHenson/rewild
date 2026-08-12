@@ -14,5 +14,9 @@
   "granite-rock": {
     "type": "gltf",
     "url": "nature/granite-rocks/rock_granite_01.glb"
+  },
+  "damaged-helmet": {
+    "type": "gltf",
+    "url": "items/damaged_helmet.glb"
   }
 }

@@ -85,6 +85,25 @@ async function loadOne(src: string): Promise<ImageBitmap> {
 }
 
 /**
+ * Decodes already-fetched image bytes — a GLB-embedded texture, or a data URI.
+ *
+ * No concurrency gate: that exists for network requests, and these bytes have
+ * already arrived inside the model. The decode itself still goes through
+ * `BITMAP_OPTIONS`, so an embedded texture and a file-backed one are decoded
+ * identically.
+ */
+export function decodeImageBytes(
+  bytes: Uint8Array,
+  mimeType?: string
+): Promise<ImageBitmap> {
+  const blob = new Blob(
+    [bytes as BlobPart],
+    mimeType ? { type: mimeType } : {}
+  );
+  return createImageBitmap(blob, BITMAP_OPTIONS);
+}
+
+/**
  * Decodes image files to `ImageBitmap`s for upload as GPU textures.
  *
  * Fetches are gated at `MAX_CONCURRENT_LOADS` process-wide and retried up to
