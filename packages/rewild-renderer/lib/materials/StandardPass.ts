@@ -10,6 +10,7 @@ import { StandardMaterial } from './uniforms/StandardMaterial';
 import { Lighting } from './uniforms/Lighting';
 import { ShadowUniforms } from './uniforms/ShadowUniforms';
 import { StandardPassBase } from './StandardPassBase';
+import { composeShader } from '../utils/shaderDefines';
 
 const materialGroupIndex = 1;
 const lightingGroupIndex = 2;
@@ -80,7 +81,7 @@ export class StandardPass extends StandardPassBase {
     const { device, sceneColorFormat } = renderer;
     const module = device.createShaderModule({
       label: 'standard shader',
-      code: shader,
+      code: composeShader([shader], this.shaderDefines()),
     });
 
     this.pipeline = device.createRenderPipeline({
@@ -115,11 +116,7 @@ export class StandardPass extends StandardPassBase {
     geometry: Geometry
   ): void {
     pass.setPipeline(this.pipeline);
-    pass.setVertexBuffer(0, geometry.vertexBuffer);
-    pass.setVertexBuffer(1, geometry.uvBuffer);
-    pass.setVertexBuffer(2, geometry.normalBuffer);
-    if (this.vertexColors) pass.setVertexBuffer(3, geometry.colorBuffer);
-    pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
+    this.setVertexBuffers(pass, geometry);
 
     // With depth writes off, transparent meshes only compose correctly if they
     // arrive far-to-near. The renderer orders transparent *groups* after opaque

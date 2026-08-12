@@ -32,15 +32,21 @@ export class Geometry {
   uvs?: Float32Array;
   uvs1?: Float32Array;
   colors?: Float32Array;
+  /**
+   * glTF's TANGENT: four floats per vertex — a unit tangent in xyz and a
+   * handedness of +1 or -1 in w, which says which way the bitangent runs and so
+   * survives mirrored UVs. Only a normal-mapped material reads it, and only
+   * with `vertexTangents` set on the pass.
+   */
+  tangents?: Float32Array;
   groups: GeometryGroup[];
-
-  _todoTangents: Float32Array;
 
   vertexBuffer: GPUBuffer;
   normalBuffer: GPUBuffer;
   uvBuffer: GPUBuffer;
   uv1Buffer: GPUBuffer;
   colorBuffer: GPUBuffer;
+  tangentBuffer: GPUBuffer;
   indexBuffer: GPUBuffer;
 
   boundingBox: Box3 | null;
@@ -89,6 +95,7 @@ export class Geometry {
     this.normalBuffer?.destroy();
     this.uvBuffer?.destroy();
     this.colorBuffer?.destroy();
+    this.tangentBuffer?.destroy();
     this.indexBuffer?.destroy();
   }
 
@@ -130,7 +137,7 @@ export class Geometry {
   applyMatrix4(matrix: Matrix4): Geometry {
     const verts = this.vertices;
     const normals = this.normals;
-    const tangents = this._todoTangents;
+    const tangents = this.tangents;
 
     for (let i = 0, l = verts.length; i < l; i += 3) {
       _vector.x = verts[i];
@@ -159,7 +166,14 @@ export class Geometry {
     }
 
     if (tangents) {
-      for (let i = 0, l = verts.length; i < l; i += 3) {
+      // A mirroring matrix swaps which way round the bitangent runs, and the
+      // bitangent is not stored — w is. So the handedness flips with the
+      // determinant's sign, and nothing else in the frame has to change.
+      const handedness: f32 = matrix.determinant() < 0 ? -1 : 1;
+
+      // Four floats per vertex, not three: the loop walks tangents rather than
+      // verts because the two arrays have different strides.
+      for (let i = 0, l = tangents.length; i < l; i += 4) {
         _vector.x = tangents[i];
         _vector.y = tangents[i + 1];
         _vector.z = tangents[i + 2];
@@ -168,6 +182,7 @@ export class Geometry {
         tangents[i] = _vector.x;
         tangents[i + 1] = _vector.y;
         tangents[i + 2] = _vector.z;
+        tangents[i + 3] *= handedness;
       }
     }
 
@@ -404,6 +419,17 @@ export class Geometry {
       this.colorBuffer.unmap();
     }
 
+    if (this.tangents) {
+      this.tangentBuffer = device.createBuffer({
+        label: 'tangent buffer data',
+        size: this.tangents.byteLength,
+        usage: GPUBufferUsage.VERTEX,
+        mappedAtCreation: true,
+      });
+      new Float32Array(this.tangentBuffer.getMappedRange()).set(this.tangents);
+      this.tangentBuffer.unmap();
+    }
+
     if (this.indices) {
       this.indexBuffer = device.createBuffer({
         label: 'index buffer data',
@@ -557,6 +583,142 @@ export class Geometry {
     }
 
     this.normalizeNormals();
+    this.requiresBuild = true;
+  }
+
+  /**
+   * Derives a tangent frame from the UV parameterization, for geometry whose
+   * source did not ship one. A normal map is authored in tangent space, so
+   * without a tangent the only frame a shader can reconstruct is one from
+   * screen-space derivatives — which is an approximation of *this*, and gets
+   * mirrored UVs and hard UV seams wrong.
+   *
+   * Per triangle, the UV gradient gives the direction in object space that U
+   * increases along; accumulating that at each vertex and orthogonalizing
+   * against the normal yields the same frame a baker used, to within the
+   * smoothing that averaging introduces. Handedness comes from whether the V
+   * gradient agrees with N × T — negative wherever the UVs are mirrored.
+   *
+   * Requires normals and UVs. Call it after computeNormals(), and again if the
+   * normals change: the frame is orthogonalized against them.
+   */
+  computeTangents(): void {
+    const { vertices, uvs, normals, indices } = this;
+
+    if (!vertices || !uvs || !normals) {
+      console.error(
+        'Geometry.computeTangents(): requires vertices, uvs and normals.'
+      );
+      return;
+    }
+
+    const vertexCount = (vertices.length / 3) | 0;
+
+    if (!this.tangents || this.tangents.length !== vertexCount * 4)
+      this.tangents = new Float32Array(vertexCount * 4);
+
+    // U and V gradients, accumulated per vertex over every triangle using it.
+    // Scalar arrays rather than Vector3s: this runs over every triangle of
+    // every imported model, and the whole loop below allocates nothing.
+    const uDir = new Float32Array(vertexCount * 3);
+    const vDir = new Float32Array(vertexCount * 3);
+    const triangleCount = ((indices ? indices.length : vertexCount) / 3) | 0;
+
+    for (let t = 0; t < triangleCount; t++) {
+      const a = indices ? indices[t * 3] : t * 3;
+      const b = indices ? indices[t * 3 + 1] : t * 3 + 1;
+      const c = indices ? indices[t * 3 + 2] : t * 3 + 2;
+
+      const x1 = vertices[b * 3] - vertices[a * 3];
+      const y1 = vertices[b * 3 + 1] - vertices[a * 3 + 1];
+      const z1 = vertices[b * 3 + 2] - vertices[a * 3 + 2];
+      const x2 = vertices[c * 3] - vertices[a * 3];
+      const y2 = vertices[c * 3 + 1] - vertices[a * 3 + 1];
+      const z2 = vertices[c * 3 + 2] - vertices[a * 3 + 2];
+
+      const s1 = uvs[b * 2] - uvs[a * 2];
+      const t1 = uvs[b * 2 + 1] - uvs[a * 2 + 1];
+      const s2 = uvs[c * 2] - uvs[a * 2];
+      const t2 = uvs[c * 2 + 1] - uvs[a * 2 + 1];
+
+      // Zero area in UV space — the triangle carries no information about which
+      // way U runs, so it contributes nothing rather than a division by zero.
+      const det = s1 * t2 - s2 * t1;
+      if (det === 0) continue;
+      const r = 1 / det;
+
+      const udx = (t2 * x1 - t1 * x2) * r;
+      const udy = (t2 * y1 - t1 * y2) * r;
+      const udz = (t2 * z1 - t1 * z2) * r;
+      const vdx = (s1 * x2 - s2 * x1) * r;
+      const vdy = (s1 * y2 - s2 * y1) * r;
+      const vdz = (s1 * z2 - s2 * z1) * r;
+
+      for (let k = 0; k < 3; k++) {
+        const v = k === 0 ? a : k === 1 ? b : c;
+        uDir[v * 3] += udx;
+        uDir[v * 3 + 1] += udy;
+        uDir[v * 3 + 2] += udz;
+        vDir[v * 3] += vdx;
+        vDir[v * 3 + 1] += vdy;
+        vDir[v * 3 + 2] += vdz;
+      }
+    }
+
+    const tangents = this.tangents;
+
+    for (let v = 0; v < vertexCount; v++) {
+      const nx = normals[v * 3];
+      const ny = normals[v * 3 + 1];
+      const nz = normals[v * 3 + 2];
+      const ux = uDir[v * 3];
+      const uy = uDir[v * 3 + 1];
+      const uz = uDir[v * 3 + 2];
+
+      // Gram-Schmidt: the accumulated gradient is only perpendicular to the
+      // normal on a flat, evenly mapped surface, and the shader's frame has to
+      // be orthonormal to invert.
+      const dot = nx * ux + ny * uy + nz * uz;
+      let tx = ux - nx * dot;
+      let ty = uy - ny * dot;
+      let tz = uz - nz * dot;
+      const length = Math.sqrt(tx * tx + ty * ty + tz * tz);
+
+      if (length > 1e-8) {
+        tx /= length;
+        ty /= length;
+        tz /= length;
+      } else {
+        // No usable gradient — a vertex only degenerate triangles touch, or one
+        // whose gradient came out parallel to its normal. Any perpendicular
+        // will do: the normal map will be read in an arbitrarily rotated frame,
+        // which is wrong but bounded, where a zero tangent is a NaN normal and
+        // a black hole in the shading.
+        const ax = Math.abs(nx) < 0.9 ? 1 : 0;
+        const ay = ax === 1 ? 0 : 1;
+        tx = ny * 0 - nz * ay;
+        ty = nz * ax - nx * 0;
+        tz = nx * ay - ny * ax;
+        const fallbackLength = Math.sqrt(tx * tx + ty * ty + tz * tz);
+        tx /= fallbackLength;
+        ty /= fallbackLength;
+        tz /= fallbackLength;
+      }
+
+      // (N × T) is where the bitangent should point for right-handed UVs;
+      // disagreeing with the actual V gradient means they are mirrored.
+      const bx = ny * tz - nz * ty;
+      const by = nz * tx - nx * tz;
+      const bz = nx * ty - ny * tx;
+      const agrees =
+        bx * vDir[v * 3] + by * vDir[v * 3 + 1] + bz * vDir[v * 3 + 2];
+
+      tangents[v * 4] = tx;
+      tangents[v * 4 + 1] = ty;
+      tangents[v * 4 + 2] = tz;
+      tangents[v * 4 + 3] = agrees < 0 ? -1 : 1;
+    }
+
     this.requiresBuild = true;
   }
 }

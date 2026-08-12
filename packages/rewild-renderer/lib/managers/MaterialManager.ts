@@ -227,6 +227,7 @@ function createStandardPass(
 
   if (t.doubleSided !== undefined) pass.doubleSided = t.doubleSided;
   if (t.vertexColors !== undefined) pass.vertexColors = t.vertexColors;
+  if (t.vertexTangents !== undefined) pass.vertexTangents = t.vertexTangents;
 
   return pass;
 }

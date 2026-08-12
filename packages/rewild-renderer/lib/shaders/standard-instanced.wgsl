@@ -11,6 +11,9 @@
 //   - no selection tint: `uniforms.selected` is per mesh, and an instanced draw
 //     has no per-instance equivalent to drive it. A scatter of a thousand ferns
 //     is not something the editor selects one blade of.
+
+const HAS_VERTEX_TANGENTS: bool = ${ HAS_VERTEX_TANGENTS };
+
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
@@ -47,13 +50,35 @@ struct VertexColorInput {
     @builtin(instance_index) instanceIndex: u32
 };
 
+struct VertexTangentInput {
+    @location(0) position : vec4<f32>,
+    @location(1) uv : vec2<f32>,
+    @location(2) normal : vec3<f32>,
+    @location(4) tangent : vec4<f32>,
+    @builtin(instance_index) instanceIndex: u32
+};
+
+struct VertexColorTangentInput {
+    @location(0) position : vec4<f32>,
+    @location(1) uv : vec2<f32>,
+    @location(2) normal : vec3<f32>,
+    @location(3) color : vec4<f32>,
+    @location(4) tangent : vec4<f32>,
+    @builtin(instance_index) instanceIndex: u32
+};
+
 struct VertexOutput {
   @builtin(position) Position : vec4f,
   @location(0) fragUV : vec2f,
   @location(1) normal : vec3f,
   @location(2) viewPosition : vec3f,
   @location(3) color : vec4f,
+  @location(4) tangent : vec4f,
 }
+
+// The placeholder the entry points without the attribute pass along; never read,
+// because the fragment stage only reads a tangent where HAS_VERTEX_TANGENTS.
+const NO_TANGENT = vec4f(1.0, 0.0, 0.0, 0.0);
 
 // The material sits at group 0 here, where standard.wgsl has its per-mesh
 // matrices — an instanced pass has no per-mesh group, and the shared shading
@@ -92,7 +117,8 @@ fn transformVertex(
   position: vec3f,
   uv: vec2f,
   normal: vec3f,
-  color: vec4f
+  color: vec4f,
+  tangent: vec4f
 ) -> VertexOutput {
   var output : VertexOutput;
 
@@ -105,20 +131,47 @@ fn transformVertex(
   output.fragUV = uv;
   output.normal = transform.normalMatrix * normal;
   output.color = color;
+  // Through the instance's model-view matrix rather than its normal matrix — a
+  // tangent transforms like a direction along the surface, not like a covector.
+  // Same reasoning as standard.wgsl, which spells it out.
+  let modelView3 = mat3x3f(
+    transform.modelViewMatrix[0].xyz,
+    transform.modelViewMatrix[1].xyz,
+    transform.modelViewMatrix[2].xyz
+  );
+  output.tangent = vec4f(modelView3 * tangent.xyz, tangent.w);
   return output;
 }
 
 @vertex
 fn vs(input: VertexInput) -> VertexOutput {
   return transformVertex(
-    input.instanceIndex, input.position.xyz, input.uv, input.normal, vec4f(1.0)
+    input.instanceIndex, input.position.xyz, input.uv, input.normal, vec4f(1.0),
+    NO_TANGENT
   );
 }
 
 @vertex
 fn vsVertexColors(input: VertexColorInput) -> VertexOutput {
   return transformVertex(
-    input.instanceIndex, input.position.xyz, input.uv, input.normal, input.color
+    input.instanceIndex, input.position.xyz, input.uv, input.normal, input.color,
+    NO_TANGENT
+  );
+}
+
+@vertex
+fn vsTangents(input: VertexTangentInput) -> VertexOutput {
+  return transformVertex(
+    input.instanceIndex, input.position.xyz, input.uv, input.normal, vec4f(1.0),
+    input.tangent
+  );
+}
+
+@vertex
+fn vsVertexColorsTangents(input: VertexColorTangentInput) -> VertexOutput {
+  return transformVertex(
+    input.instanceIndex, input.position.xyz, input.uv, input.normal, input.color,
+    input.tangent
   );
 }
 
@@ -128,6 +181,7 @@ fn fs(
   @location(1) normal: vec3f,
   @location(2) viewPosition: vec3f,
   @location(3) vertexColor: vec4f,
+  @location(4) tangent: vec4f,
   @builtin(front_facing) isFrontFacing: bool
 ) -> @location(0) vec4f {
 
@@ -138,6 +192,7 @@ fn fs(
   var outColor = shadeStandardSurface(
     fragUV,
     normal,
+    tangent,
     viewPosition,
     vertexColor,
     isFrontFacing,
