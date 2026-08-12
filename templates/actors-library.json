@@ -60,6 +60,10 @@
         {
           "name": "Basketball",
           "templateId": "basketball"
+        },
+        {
+          "name": "Damaged Helmet",
+          "templateId": "damaged-helmet"
         }
       ]
     },

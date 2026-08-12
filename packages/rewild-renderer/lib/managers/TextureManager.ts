@@ -4,6 +4,8 @@ import { Renderer } from '../Renderer';
 import { ITexture } from '../textures/ITexture';
 import { TextureProperties } from '../textures/Texture';
 import { DataTexture } from '../textures/DataTexture';
+import { EncodedTexture } from '../textures/EncodedTexture';
+import { GltfTextureRequest } from '../core/GltfTextures';
 import { IMaterialsTemplate } from './types';
 
 const MEDIA_URL = process.env.SHARED_ASSETS_BASE_URL;
@@ -72,6 +74,40 @@ export class TextureManager {
     );
 
     this.initialized = true;
+  }
+
+  /**
+   * Adds an imported model's textures and loads the ones not already here.
+   *
+   * A request whose key is present is skipped outright, which is the whole
+   * dedup mechanism: the key is the image's identity — its URL for a sibling
+   * file, a hash of its bytes when embedded — so a texture shared by five
+   * models is fetched, decoded and uploaded once, however many files reference
+   * it. See `collectGltfTextures`.
+   *
+   * Runs after `initialize`, since models load after the texture library.
+   */
+  async loadGltfTextures(renderer: Renderer, requests: GltfTextureRequest[]) {
+    const loading: Promise<ITexture>[] = [];
+
+    for (const request of requests) {
+      if (this.textures.has(request.key)) continue;
+
+      const properties = new TextureProperties(
+        request.key,
+        true,
+        request.colorSpace
+      );
+
+      const texture = request.url
+        ? new BitmapTexture(properties, request.url)
+        : new EncodedTexture(properties, request.bytes!, request.mimeType);
+
+      this.addTexture(texture);
+      loading.push(texture.load(renderer));
+    }
+
+    await Promise.all(loading);
   }
 
   createDataTextures() {

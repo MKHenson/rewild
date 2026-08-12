@@ -115,6 +115,18 @@
       }
     },
     {
+      "name": "damaged-helmet",
+      "type": "asset",
+      "resource": {
+        "materialId": "imported-default",
+        "geometryId": "damaged-helmet",
+        "physics": {
+          "bodyType": "fixed",
+          "shape": { "type": "box", "size": [1.89, 1.8, 2.0] }
+        }
+      }
+    },
+    {
       "name": "point-light",
       "type": "light",
       "resource": {

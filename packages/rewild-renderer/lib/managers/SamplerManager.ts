@@ -9,12 +9,34 @@ export type SamplerType =
   | 'msdf-sampler'
   | 'depth-comparison';
 
+/**
+ * Canonical string for a descriptor, so two requests for the same sampling
+ * state share one GPUSampler. Also usable as part of a material's identity —
+ * two materials that sample differently are not the same material.
+ */
+export function samplerKey(descriptor: GPUSamplerDescriptor): string {
+  return [
+    descriptor.magFilter ?? 'linear',
+    descriptor.minFilter ?? 'linear',
+    descriptor.mipmapFilter ?? 'linear',
+    descriptor.addressModeU ?? 'clamp-to-edge',
+    descriptor.addressModeV ?? 'clamp-to-edge',
+  ].join('|');
+}
+
 export class SamplerManager {
   samplers: Map<SamplerType, GPUSampler>;
+  /**
+   * Samplers described rather than named. The named set above covers what the
+   * engine's own passes need; an imported model states its sampling in glTF's
+   * terms and can land on any combination of them.
+   */
+  private describedSamplers: Map<string, GPUSampler>;
   initialized: boolean;
 
   constructor() {
     this.samplers = new Map();
+    this.describedSamplers = new Map();
     this.initialized = false;
   }
 
@@ -22,6 +44,19 @@ export class SamplerManager {
     const toRet = this.samplers.get(name);
     if (!toRet) throw new Error(`Could not find asset with name ${name}`);
     return toRet;
+  }
+
+  /** Returns the sampler for this state, creating it on first request. */
+  getOrCreate(device: GPUDevice, descriptor: GPUSamplerDescriptor): GPUSampler {
+    const key = samplerKey(descriptor);
+    let sampler = this.describedSamplers.get(key);
+
+    if (!sampler) {
+      sampler = device.createSampler({ label: key, ...descriptor });
+      this.describedSamplers.set(key, sampler);
+    }
+
+    return sampler;
   }
 
   async initialize(renderer: Renderer) {
@@ -120,6 +155,7 @@ export class SamplerManager {
 
   dispose() {
     this.samplers.clear();
+    this.describedSamplers.clear();
     this.initialized = false;
   }
 

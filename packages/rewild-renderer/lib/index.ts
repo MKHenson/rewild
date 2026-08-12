@@ -18,6 +18,7 @@ export * from './materials/uniforms/StandardMaterial';
 export * from './materials/SpritePass';
 export * from './input';
 export * from './core/GltfLoader';
+export * from './core/GltfTextures';
 export * from './core/UIElement';
 export * from './core/UIPointerEvent';
 export * from './typeGuards';

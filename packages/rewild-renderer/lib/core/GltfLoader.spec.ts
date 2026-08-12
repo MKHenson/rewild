@@ -438,6 +438,8 @@ describe('instantiateGltfModel', () => {
   it('wraps several roots in one transform', () => {
     const model: GltfModel = {
       roots: [...modelWith('left', 1).roots, ...modelWith('right', 1).roots],
+      textures: [],
+      materials: [],
     };
 
     const root = instantiateGltfModel(model, () => fakeMaterial());
