@@ -32,6 +32,11 @@ export interface IStandardMaterialTemplate {
   /** Requires the geometry to carry COLOR_0 — a mesh without it cannot be
    *  assigned this material at all. */
   vertexColors?: boolean;
+  /** Shade the normal map through the geometry's TANGENT frame rather than a
+   *  screen-space reconstruction of it. Worth setting alongside any normalMap on
+   *  an imported model; requires the geometry to carry tangents, which the glTF
+   *  importer supplies and the procedural geometry factories do not. */
+  vertexTangents?: boolean;
 }
 
 export interface IClassicMaterialTemplate {

@@ -7,9 +7,18 @@
 // body, which is what lets standard-instanced.wgsl reuse it verbatim — and what
 // will let terrain reuse it later with per-fragment material parameters.
 //
-// Two vertex entry points, one fragment: `vs` for geometry without COLOR_0 and
-// `vsVertexColors` for geometry with it. StandardPass picks one when it builds
-// its pipeline.
+// Four vertex entry points, one fragment: COLOR_0 and TANGENT are both optional
+// vertex attributes, and a pipeline may only declare attributes its buffers
+// supply — so every combination of the two is an entry point over one shared
+// body. StandardPass picks one when it builds its pipeline.
+
+// Whether this pipeline's geometry supplies TANGENT, baked in by
+// StandardPassBase.shaderDefines(). Declared before the includes because the
+// shared shading below reads it to pick a tangent frame, and it has to be a
+// constant rather than a uniform because one side of that branch takes
+// derivatives — see standard-material.wgsl.
+const HAS_VERTEX_TANGENTS: bool = ${ HAS_VERTEX_TANGENTS };
+
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
@@ -36,16 +45,26 @@ struct VertexInput {
     @location(2) normal : vec3<f32>,
 };
 
-// The vertex-coloured variant. glTF's COLOR_0 is optional, and a pipeline may
-// only declare attributes its vertex buffers actually supply — so the two cases
-// are two entry points over one shared body rather than one entry point reading
-// a flag. The fragment stage is common to both: `vs` writes white, which is
-// glTF's default COLOR_0 and a no-op through the same multiply.
 struct VertexColorInput {
     @location(0) position : vec4<f32>,
     @location(1) uv : vec2<f32>,
     @location(2) normal : vec3<f32>,
     @location(3) color : vec4<f32>,
+};
+
+struct VertexTangentInput {
+    @location(0) position : vec4<f32>,
+    @location(1) uv : vec2<f32>,
+    @location(2) normal : vec3<f32>,
+    @location(4) tangent : vec4<f32>,
+};
+
+struct VertexColorTangentInput {
+    @location(0) position : vec4<f32>,
+    @location(1) uv : vec2<f32>,
+    @location(2) normal : vec3<f32>,
+    @location(3) color : vec4<f32>,
+    @location(4) tangent : vec4<f32>,
 };
 
 struct VertexOutput {
@@ -54,7 +73,15 @@ struct VertexOutput {
   @location(1) normal : vec3f,
   @location(2) viewPosition : vec3f,
   @location(3) color : vec4f,
+  @location(4) tangent : vec4f,
 }
+
+// What the entry points without a TANGENT attribute pass along. Never read:
+// the fragment stage only looks at the tangent when HAS_VERTEX_TANGENTS, which
+// is set only for the pipelines whose layout carries the attribute. A unit
+// vector rather than zero so that a future reader of it gets a usable frame
+// rather than a NaN.
+const NO_TANGENT = vec4f(1.0, 0.0, 0.0, 0.0);
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
 @group(1) @binding(0) var mySampler: sampler;
@@ -88,7 +115,7 @@ struct VertexOutput {
 @group(3) @binding(10) var iblSampler: sampler;
 @group(3) @binding(11) var<uniform> iblParams: IblParams;
 
-fn transformVertex(position: vec3f, uv: vec2f, normal: vec3f, color: vec4f) -> VertexOutput {
+fn transformVertex(position: vec3f, uv: vec2f, normal: vec3f, color: vec4f, tangent: vec4f) -> VertexOutput {
   var output : VertexOutput;
   var mvPosition = vec4<f32>(position, 1.0);
   mvPosition = uniforms.modelViewMatrix * mvPosition;
@@ -97,17 +124,39 @@ fn transformVertex(position: vec3f, uv: vec2f, normal: vec3f, color: vec4f) -> V
   output.fragUV = uv;
   output.normal = uniforms.normalMatrix * normal;
   output.color = color;
+  // The model-view matrix, not the normal matrix: a tangent lies *along* the
+  // surface, so it transforms like a difference of positions, where a normal is
+  // a covector and needs the inverse transpose. The two agree under rotation
+  // and uniform scale and diverge under a non-uniform one — glTF is explicit
+  // that TANGENT follows the model matrix. The fragment stage re-orthogonalizes
+  // the pair afterwards. Handedness is unitless and passes through.
+  let modelView3 = mat3x3f(
+    uniforms.modelViewMatrix[0].xyz,
+    uniforms.modelViewMatrix[1].xyz,
+    uniforms.modelViewMatrix[2].xyz
+  );
+  output.tangent = vec4f(modelView3 * tangent.xyz, tangent.w);
   return output;
 }
 
 @vertex
 fn vs(input: VertexInput) -> VertexOutput {
-  return transformVertex(input.position.xyz, input.uv, input.normal, vec4f(1.0));
+  return transformVertex(input.position.xyz, input.uv, input.normal, vec4f(1.0), NO_TANGENT);
 }
 
 @vertex
 fn vsVertexColors(input: VertexColorInput) -> VertexOutput {
-  return transformVertex(input.position.xyz, input.uv, input.normal, input.color);
+  return transformVertex(input.position.xyz, input.uv, input.normal, input.color, NO_TANGENT);
+}
+
+@vertex
+fn vsTangents(input: VertexTangentInput) -> VertexOutput {
+  return transformVertex(input.position.xyz, input.uv, input.normal, vec4f(1.0), input.tangent);
+}
+
+@vertex
+fn vsVertexColorsTangents(input: VertexColorTangentInput) -> VertexOutput {
+  return transformVertex(input.position.xyz, input.uv, input.normal, input.color, input.tangent);
 }
 
 @fragment
@@ -116,6 +165,7 @@ fn fs(
   @location(1) normal: vec3f,
   @location(2) viewPosition: vec3f,
   @location(3) vertexColor: vec4f,
+  @location(4) tangent: vec4f,
   @builtin(front_facing) isFrontFacing: bool
 ) -> @location(0) vec4f {
 
@@ -129,6 +179,7 @@ fn fs(
   var outColor = shadeStandardSurface(
     fragUV,
     normal,
+    tangent,
     viewPosition,
     vertexColor,
     isFrontFacing,

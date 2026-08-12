@@ -17,6 +17,8 @@
 //     calls into, plus the IBL bindings that last one names
 //   - the `lighting` storage binding those two need, and spotLightShadowParams,
 //     which says which light in it the spot atlas belongs to
+//   - HAS_VERTEX_TANGENTS, a module-scope bool const the host bakes in from
+//     StandardPassBase.shaderDefines()
 
 // glTF alphaMode. Shared numbering with ALPHA_MODES in StandardMaterial.ts.
 const ALPHA_MODE_OPAQUE: u32 = 0u;
@@ -46,6 +48,10 @@ struct StandardParams {
 fn shadeStandardSurface(
   fragUV: vec2f,
   normal: vec3f,
+  // glTF's TANGENT in view space, xyz plus handedness. Read only where
+  // HAS_VERTEX_TANGENTS says the pipeline supplies one; the hosts pass a
+  // placeholder otherwise, since a parameter cannot be conditionally absent.
+  tangent: vec4f,
   viewPosition: vec3f,
   vertexColor: vec4f,
   isFrontFacing: bool,
@@ -85,7 +91,12 @@ fn shadeStandardSurface(
   let metallic = standardParams.metallic * metallicRoughnessSample.b;
 
   var surface: PbrSurface;
-  surface.normal = perturbNormal(viewPosition, fragUV, geometricNormal, normalSample);
+
+  if (HAS_VERTEX_TANGENTS) {
+    surface.normal = perturbNormalTangent(geometricNormal, tangent, normalSample);
+  } else {
+    surface.normal = perturbNormal(viewPosition, fragUV, geometricNormal, normalSample);
+  }
   // Pre-perturbation, so horizon occlusion can tell how far the normal map has
   // tilted the shading normal off the triangle.
   surface.geometricNormal = geometricNormal;

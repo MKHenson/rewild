@@ -99,6 +99,32 @@ function toFloatRgba(
   return out;
 }
 
+/**
+ * glTF writes TANGENT as vec4 floats — xyz plus a handedness w of +1 or -1 —
+ * and that is what Geometry stores. An exporter that wrote vec3 (a few do, and
+ * the spec does not allow it) is taken at its word and given the right-handed
+ * default, which is what its bitangent would have been anyway.
+ */
+function toFloatTangent(
+  value: ArrayLike<number>,
+  components: number
+): Float32Array {
+  if (components === 4)
+    return value instanceof Float32Array ? value : new Float32Array(value);
+
+  const count = (value.length / components) | 0;
+  const out = new Float32Array(count * 4);
+
+  for (let i = 0; i < count; i++) {
+    out[i * 4] = value[i * components];
+    out[i * 4 + 1] = value[i * components + 1];
+    out[i * 4 + 2] = value[i * components + 2];
+    out[i * 4 + 3] = 1;
+  }
+
+  return out;
+}
+
 /** Returns null for anything the engine cannot draw, so the caller can skip it. */
 function toGeometry(
   primitive: GLTFMeshPrimitivePostprocessed
@@ -128,6 +154,21 @@ function toGeometry(
 
   // If normals were not provided, compute simple vertex normals
   if (!attributes.NORMAL) geometry.computeNormals();
+
+  // A normal map is authored against a tangent frame, so a model without one
+  // can only be shaded through a screen-space approximation of it — which is
+  // what mirrored UVs and hard seams show up wrong in.
+  //
+  // glTF asks for tangents to be derived only where the *material* has a normal
+  // texture. That test is not available here: this engine binds materials by
+  // name after import, and #212's auto-created ones do not exist yet, so a
+  // primitive whose glTF material is bare may still end up normal-mapped. The
+  // test is therefore "could this ever need one" — UVs and normals — at a cost
+  // of one pass over the triangles at load and 16 bytes a vertex.
+  const tangents = attributes.TANGENT;
+  if (tangents)
+    geometry.tangents = toFloatTangent(tangents.value, tangents.components);
+  else if (geometry.uvs && geometry.normals) geometry.computeTangents();
 
   // Compute bounds for culling/picking
   geometry.computeBoundingBox();

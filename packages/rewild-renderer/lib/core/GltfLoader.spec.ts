@@ -20,6 +20,8 @@ function primitive(
   options: {
     indices?: number[];
     normals?: number[];
+    uvs?: number[];
+    tangents?: { value: ArrayLike<number>; components: number };
     colors?: { value: ArrayLike<number>; components: number };
     material?: { name?: string; id?: string };
     mode?: number;
@@ -30,6 +32,13 @@ function primitive(
   };
   if (options.normals)
     attributes.NORMAL = accessor(new Float32Array(options.normals));
+  if (options.uvs)
+    attributes.TEXCOORD_0 = accessor(new Float32Array(options.uvs), 2);
+  if (options.tangents)
+    attributes.TANGENT = accessor(
+      options.tangents.value,
+      options.tangents.components
+    );
   if (options.colors)
     attributes.COLOR_0 = accessor(
       options.colors.value,
@@ -250,6 +259,98 @@ describe('parseGltf', () => {
     expect(colors).toBeInstanceOf(Float32Array);
     // A vec3 accessor gains alpha 1, which is what the spec says it means.
     expect(Array.from(colors.slice(0, 4))).toEqual([1, 0, 0, 1]);
+  });
+
+  // The triangle every fixture uses lies in XY with its normal on +Z, so a
+  // straight U-along-X mapping has to come back as +X, right-handed.
+  const flatUvs = [0, 0, 1, 0, 0, 1];
+
+  it('imports TANGENT as the vec4 the spec defines', () => {
+    const model = parseGltf(
+      gltf(
+        node({
+          mesh: {
+            primitives: [
+              primitive({
+                uvs: flatUvs,
+                tangents: {
+                  value: new Float32Array([
+                    0, 0, 1, -1, 0, 0, 1, -1, 0, 0, 1, -1,
+                  ]),
+                  components: 4,
+                },
+              }),
+            ],
+          },
+        })
+      )
+    );
+    const tangents = model.roots[0].primitives[0].geometry.tangents!;
+
+    // Taken as authored rather than recomputed — the file's own frame is the
+    // one its normal map was baked against.
+    expect(Array.from(tangents.slice(0, 4))).toEqual([0, 0, 1, -1]);
+  });
+
+  it('gives a vec3 TANGENT the right-handed default it left out', () => {
+    const model = parseGltf(
+      gltf(
+        node({
+          mesh: {
+            primitives: [
+              primitive({
+                uvs: flatUvs,
+                tangents: {
+                  value: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+                  components: 3,
+                },
+              }),
+            ],
+          },
+        })
+      )
+    );
+    const tangents = model.roots[0].primitives[0].geometry.tangents!;
+
+    expect(tangents).toHaveLength(12);
+    expect(Array.from(tangents.slice(0, 4))).toEqual([0, 0, 1, 1]);
+  });
+
+  it('derives a tangent frame from the UVs when the file omits one', () => {
+    const model = parseGltf(
+      gltf(node({ mesh: { primitives: [primitive({ uvs: flatUvs })] } }))
+    );
+    const tangents = model.roots[0].primitives[0].geometry.tangents!;
+
+    expect(tangents).toHaveLength(12);
+    expect(Array.from(tangents.slice(0, 4))).toEqual([1, 0, 0, 1]);
+  });
+
+  it('derives negative handedness where the UVs are mirrored', () => {
+    const model = parseGltf(
+      gltf(
+        node({
+          mesh: {
+            primitives: [primitive({ uvs: [0, 0, -1, 0, 0, 1] })],
+          },
+        })
+      )
+    );
+    const tangents = model.roots[0].primitives[0].geometry.tangents!;
+
+    // Mirroring is the case a screen-space reconstruction gets wrong and this
+    // gets right, so it is the one worth asserting.
+    expect(Array.from(tangents.slice(0, 4))).toEqual([-1, 0, 0, -1]);
+  });
+
+  // Without UVs there is no tangent space to speak of, and no normal map can be
+  // sampled either — deriving one would be 16 bytes a vertex of nothing.
+  it('leaves a primitive with no UVs untangented', () => {
+    const model = parseGltf(
+      gltf(node({ mesh: { primitives: [primitive({})] } }))
+    );
+
+    expect(model.roots[0].primitives[0].geometry.tangents).toBeUndefined();
   });
 
   it('computes bounds so the mesh can be culled and picked', () => {

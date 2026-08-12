@@ -12,3 +12,16 @@ fn perturbNormal(viewPos: vec3f, uv: vec2f, geometricNormal: vec3f, normalSample
   let B = normalize((-duv_dy.x * dpos_dx + duv_dx.x * dpos_dy) / denom);
   return normalize(mat3x3f(T, B, geometricNormal) * normalSample);
 }
+
+// The same perturbation through the geometry's own tangent frame — glTF's
+// TANGENT, in the same space the normal has already been transformed into, with
+// handedness in w. Preferred over perturbNormal wherever the geometry carries
+// one: it is the frame the normal map was baked against, so mirrored UVs and
+// hard seams come out right rather than approximately right, and it needs no
+// derivatives. Fragment-only only because its inputs are interpolated.
+fn perturbNormalTangent(geometricNormal: vec3f, tangent: vec4f, normalSample: vec3f) -> vec3f {
+  let T = normalize(tangent.xyz - geometricNormal * dot(geometricNormal, tangent.xyz));
+  // w is +1 or -1, and carries every bit of the mirroring a baked map needs
+  let B = cross(geometricNormal, T) * tangent.w;
+  return normalize(mat3x3f(T, B, geometricNormal) * normalSample);
+}

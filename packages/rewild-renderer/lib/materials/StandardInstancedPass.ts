@@ -9,6 +9,7 @@ import { Lighting } from './uniforms/Lighting';
 import { ShadowUniforms } from './uniforms/ShadowUniforms';
 import { ProjectionAndInstances } from './uniforms/ProjectionAndInstances';
 import { StandardPassBase } from './StandardPassBase';
+import { composeShader } from '../utils/shaderDefines';
 
 const materialGroupIndex = 0;
 const projectionAndInstancesGroup = 1;
@@ -70,7 +71,7 @@ export class StandardInstancedPass extends StandardPassBase {
     const { device, sceneColorFormat } = renderer;
     const module = device.createShaderModule({
       label: 'standard instanced shader',
-      code: shader,
+      code: composeShader([shader], this.shaderDefines()),
     });
 
     this.pipeline = device.createRenderPipeline({
@@ -104,11 +105,7 @@ export class StandardInstancedPass extends StandardPassBase {
     geometry: Geometry
   ): void {
     pass.setPipeline(this.pipeline);
-    pass.setVertexBuffer(0, geometry.vertexBuffer);
-    pass.setVertexBuffer(1, geometry.uvBuffer);
-    pass.setVertexBuffer(2, geometry.normalBuffer);
-    if (this.vertexColors) pass.setVertexBuffer(3, geometry.colorBuffer);
-    pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
+    this.setVertexBuffers(pass, geometry);
 
     // No back-to-front sort for a BLEND material here, unlike StandardPass:
     // one draw covers every instance, so the order is the instance buffer's and
