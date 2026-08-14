@@ -8,5 +8,6 @@
 
 # Some key points for an LLM
 
+- Do not add conversational filler, preambles, or redundant code comments. Write clean code with zero comments unless explicitly requested.
 - Comments _must_ be to the point and only about the code. Do _NOT_ reference issues, chats or documents. The comment should be clear, concise and the focus is on what its for & how to use it. DO NOT BE VERBOSE
 - **Do not launch, serve or browser-automate the app to verify changes.** The user runs it in the browser themselves. Verify with `npm run ts-check`, `npx jest` and `node ./esbuild.js`, then hand over for visual checking.

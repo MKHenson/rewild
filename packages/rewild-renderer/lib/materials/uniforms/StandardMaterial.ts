@@ -227,6 +227,17 @@ export class StandardMaterial implements ISharedUniformBuffer {
     return this._emissiveTexture;
   }
 
+  /** Shared by all five slots — glTF states filtering and wrapping per texture,
+   *  but one bind group entry serves them here. Defaults to trilinear repeat. */
+  set sampler(sampler: GPUSampler) {
+    this._sampler = sampler;
+    this.requiresBuild = true;
+  }
+
+  get sampler(): GPUSampler {
+    return this._sampler;
+  }
+
   setNumInstances(numInstances: number): void {}
   prepare(renderer: Renderer, camera: Camera, meshes: Mesh[]): void {}
 }

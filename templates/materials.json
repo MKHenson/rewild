@@ -163,13 +163,6 @@
       "roughness": 1
     },
     {
-      "name": "imported-default",
-      "type": "standard",
-      "metallic": 0,
-      "roughness": 0.6,
-      "vertexTangents": true
-    },
-    {
       "name": "granite-rock",
       "type": "standard",
       "baseColorMap": "granite-rock-diffuse",

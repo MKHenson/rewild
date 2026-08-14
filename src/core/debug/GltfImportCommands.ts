@@ -1,10 +1,10 @@
 import { Renderer } from 'rewild-renderer';
 
-// Imported-model inspection (#211).
+// Imported-model inspection.
 //
-// A glTF's textures are pulled in behind the scenes — nothing in the editor
-// lists them, and a wrong colour space or a texture uploaded twice looks
-// exactly like a texture uploaded once until something shades wrong. This turns
+// A glTF's textures and materials are pulled in behind the scenes — nothing in
+// the editor lists them, and a wrong colour space or a texture uploaded twice
+// looks exactly like one uploaded once until something shades wrong. This turns
 // both into a table.
 
 export function registerGltfImportCommands(renderer: Renderer) {
@@ -42,18 +42,24 @@ export function registerGltfImportCommands(renderer: Renderer) {
       for (const material of model.materials)
         rows.push({
           model: id,
-          material: material.name ?? material.id,
+          authored: material.gltfName ?? material.gltfId,
+          key: material.name,
           baseColor: material.baseColorMap ?? '—',
           normal: material.normalMap ?? '—',
           metallicRoughness: material.metallicRoughnessMap ?? '—',
           occlusion: material.occlusionMap ?? '—',
           emissive: material.emissiveMap ?? '—',
+          metallic: material.metallic,
+          roughness: material.roughness,
+          alphaMode: material.alphaMode,
+          doubleSided: material.doubleSided,
         });
 
     console.log(
-      `showImportedMaterials() — what each imported material binds, by ` +
-        `texture key. Two models showing the same keys are candidates for one ` +
-        `shared material.`
+      `showImportedMaterials() — the materials the glTF importer created.\n` +
+        `'key' is a hash of what the material draws, so two rows sharing one ` +
+        `key are one pass however their authors named them. Look them up with ` +
+        `renderer.materialManager.get(key).`
     );
     console.table(rows);
   };

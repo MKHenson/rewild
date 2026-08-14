@@ -118,7 +118,6 @@
       "name": "damaged-helmet",
       "type": "asset",
       "resource": {
-        "materialId": "imported-default",
         "geometryId": "damaged-helmet",
         "physics": {
           "bodyType": "fixed",
