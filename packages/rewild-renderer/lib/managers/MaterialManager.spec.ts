@@ -18,6 +18,7 @@ function fakeRenderer(): Renderer {
         return { gpuTexture: { label: name } };
       },
     },
+    geometryManager: { models: new Map() },
   } as unknown as Renderer;
 }
 

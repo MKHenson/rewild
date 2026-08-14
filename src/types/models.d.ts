@@ -199,7 +199,9 @@ declare module 'models' {
   }
 
   export interface IResource3D {
-    materialId: string;
+    /** Omit on an imported model to use the materials its glTF defines; set it
+     *  to override them. Required for a built-in geometry, which has none. */
+    materialId?: string;
     geometryId: string;
     physics?: {
       mass?: number;

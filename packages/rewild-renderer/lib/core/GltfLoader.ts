@@ -10,11 +10,13 @@ import type {
   GLTFNodePostprocessed,
   GLTFPostprocessed,
 } from '@loaders.gl/gltf';
+import { GltfTextureRequest, collectGltfTextures } from './GltfTextures';
 import {
-  GltfMaterialTextures,
-  GltfTextureRequest,
-  collectGltfTextures,
-} from './GltfTextures';
+  DEFAULT_MATERIAL_ID,
+  GltfMaterialTemplate,
+  materialKeysById,
+  toMaterialTemplates,
+} from './GltfMaterials';
 
 // glTF's TRIANGLES mode. Points, lines and strips load fine but none of the
 // engine's pipelines rasterize them, so they are skipped rather than uploaded
@@ -25,14 +27,11 @@ const GLTF_MODE_TRIANGLES = 4;
  * One drawable piece of a node's mesh. glTF splits a mesh into primitives
  * precisely because each one takes a single material, so a primitive is the
  * finest unit that can become a Mesh.
- *
- * `materialName` names the glTF material rather than resolving it: creating
- * engine materials from glTF definitions is a separate concern, and until that
- * exists a caller's resolver is free to ignore the name entirely.
  */
 export interface GltfPrimitive {
   geometry: Geometry;
   materialName: string | null;
+  materialKey: string;
 }
 
 /**
@@ -60,12 +59,11 @@ export interface GltfModel {
   roots: GltfNode[];
   /** Every image the file's materials bind, for the texture manager to load. */
   textures: GltfTextureRequest[];
-  /** What each glTF material binds, by texture-manager key. */
-  materials: GltfMaterialTextures[];
+  materials: GltfMaterialTemplate[];
 }
 
-/** Resolves a glTF material name to a pass. Called once per primitive. */
-export type MaterialResolver = (materialName: string | null) => IMaterialPass;
+/** Resolves a primitive to the pass that draws it. Called once per primitive. */
+export type MaterialResolver = (primitive: GltfPrimitive) => IMaterialPass;
 
 const _matrix = new Matrix4();
 const _position = new Vector3();
@@ -169,11 +167,10 @@ function toGeometry(
   // what mirrored UVs and hard seams show up wrong in.
   //
   // glTF asks for tangents to be derived only where the *material* has a normal
-  // texture. That test is not available here: this engine binds materials by
-  // name after import, and #212's auto-created ones do not exist yet, so a
-  // primitive whose glTF material is bare may still end up normal-mapped. The
-  // test is therefore "could this ever need one" — UVs and normals — at a cost
-  // of one pass over the triangles at load and 16 bytes a vertex.
+  // texture. That test is not enough here, because a template may override an
+  // imported material with a normal-mapped one of its own. The test is
+  // therefore "could this ever need one" — UVs and normals — at a cost of one
+  // pass over the triangles at load and 16 bytes a vertex.
   const tangents = attributes.TANGENT;
   if (tangents)
     geometry.tangents = toFloatTangent(tangents.value, tangents.components);
@@ -219,7 +216,10 @@ function readTransform(
   };
 }
 
-function parseNode(node: GLTFNodePostprocessed): GltfNode {
+function parseNode(
+  node: GLTFNodePostprocessed,
+  materialKeys: Map<string, string>
+): GltfNode {
   const primitives: GltfPrimitive[] = [];
 
   for (const primitive of node.mesh?.primitives ?? []) {
@@ -229,6 +229,9 @@ function parseNode(node: GLTFNodePostprocessed): GltfNode {
     primitives.push({
       geometry,
       materialName: primitive.material?.name ?? primitive.material?.id ?? null,
+      materialKey:
+        (primitive.material && materialKeys.get(primitive.material.id)) ??
+        materialKeys.get(DEFAULT_MATERIAL_ID)!,
     });
   }
 
@@ -236,7 +239,9 @@ function parseNode(node: GLTFNodePostprocessed): GltfNode {
     name: node.name ?? node.id,
     ...readTransform(node),
     primitives,
-    children: (node.children ?? []).map(parseNode),
+    children: (node.children ?? []).map((child) =>
+      parseNode(child, materialKeys)
+    ),
   };
 }
 
@@ -255,8 +260,8 @@ function sceneRoots(gltf: GLTFPostprocessed): GLTFNodePostprocessed[] {
 
 /**
  * Turns a post-processed glTF into geometries, the hierarchy that positions
- * them, and the textures its materials ask for. Split from the fetch so the
- * walk can be exercised against a structure rather than a file.
+ * them, and the materials and textures they are drawn with. Split from the
+ * fetch so the walk can be exercised against a structure rather than a file.
  *
  * `baseUrl` is the model's own url, needed only to resolve image URIs that are
  * relative to it.
@@ -265,9 +270,17 @@ export function parseGltf(
   gltf: GLTFPostprocessed,
   baseUrl?: string
 ): GltfModel {
+  const { textures, materials: materialTextures } = collectGltfTextures(
+    gltf,
+    baseUrl
+  );
+  const materials = toMaterialTemplates(gltf, materialTextures);
+  const materialKeys = materialKeysById(materials);
+
   return {
-    roots: sceneRoots(gltf).map(parseNode),
-    ...collectGltfTextures(gltf, baseUrl),
+    roots: sceneRoots(gltf).map((node) => parseNode(node, materialKeys)),
+    textures,
+    materials,
   };
 }
 
@@ -297,7 +310,7 @@ function instantiateNode(
     node.primitives.length === 1
       ? new Mesh(
           node.primitives[0].geometry,
-          resolveMaterial(node.primitives[0].materialName)
+          resolveMaterial(node.primitives[0])
         ).transform
       : new Transform();
 
@@ -309,10 +322,7 @@ function instantiateNode(
   if (node.primitives.length > 1) {
     for (let i = 0; i < node.primitives.length; i++) {
       const primitive = node.primitives[i];
-      const mesh = new Mesh(
-        primitive.geometry,
-        resolveMaterial(primitive.materialName)
-      );
+      const mesh = new Mesh(primitive.geometry, resolveMaterial(primitive));
       mesh.transform.name = `${node.name}[${i}]`;
       transform.addChild(mesh.transform);
     }

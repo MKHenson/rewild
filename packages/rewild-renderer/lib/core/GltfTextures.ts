@@ -4,6 +4,7 @@ import type {
   GLTFTexturePostprocessed,
 } from '@loaders.gl/gltf';
 import { TextureColorSpace } from '../textures/Texture';
+import { hashBytes } from '../utils/hash';
 
 // The postprocessed sampler type is not exported from the package's barrel.
 type GltfSampler = NonNullable<GLTFTexturePostprocessed['sampler']>;
@@ -20,7 +21,7 @@ const GL_CLAMP_TO_EDGE = 33071;
 const GL_MIRRORED_REPEAT = 33648;
 
 /** glTF's own default: repeat, and "let the implementation choose" filtering. */
-const DEFAULT_SAMPLER: GPUSamplerDescriptor = {
+export const DEFAULT_SAMPLER: GPUSamplerDescriptor = {
   magFilter: 'linear',
   minFilter: 'linear',
   mipmapFilter: 'linear',
@@ -75,32 +76,6 @@ export interface GltfTextureSet {
  * space with no default, and glTF's slot semantics are that declaration.
  */
 const SRGB_SLOTS: readonly string[] = ['baseColorMap', 'emissiveMap'];
-
-/**
- * FNV-1a over the encoded bytes, run in two lanes with different multipliers so
- * the 32-bit variant's collision odds are squared rather than trusted. A
- * collision would bind the wrong image, which is worth eight extra characters.
- *
- * This is what lets separate exports share one material: Blender's GLB export
- * embeds a copy of every image in every file, so five rock models carry five
- * copies of one texture. Hashing the bytes collapses them to a single upload.
- * It cannot collapse the *download* — for that the images have to be sibling
- * files, which key on their URL instead.
- */
-function hashBytes(bytes: Uint8Array): string {
-  let low = 0x811c9dc5;
-  let high = 0x01000193;
-
-  for (let i = 0; i < bytes.length; i++) {
-    const byte = bytes[i];
-    low = Math.imul(low ^ byte, 0x01000193);
-    high = Math.imul(high ^ byte, 0x85ebca6b);
-  }
-
-  return `${(low >>> 0).toString(16).padStart(8, '0')}${(high >>> 0)
-    .toString(16)
-    .padStart(8, '0')}${bytes.length.toString(16)}`;
-}
 
 /**
  * Two references name the same texture when they resolve to the same bytes

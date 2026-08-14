@@ -13,6 +13,7 @@ import { UIElementHealthPass } from '../materials/UIElementHealthPass';
 import { StandardPass } from '../materials/StandardPass';
 import { StandardInstancedPass } from '../materials/StandardInstancedPass';
 import { ALPHA_MODES } from '../materials/uniforms/StandardMaterial';
+import { GltfMaterialTemplate } from '../core/GltfMaterials';
 
 export class MaterialManager {
   materials: Map<string, IMaterialPass>;
@@ -139,7 +140,27 @@ export class MaterialManager {
       this.addMaterial(t.name, materialPass);
     });
 
+    for (const model of renderer.geometryManager.models.values())
+      this.addGltfMaterials(renderer, model.materials);
+
     this.initialized = true;
+  }
+
+  /**
+   * Registers the materials an imported model brought with it
+   */
+  addGltfMaterials(renderer: Renderer, templates: GltfMaterialTemplate[]) {
+    for (const template of templates) {
+      if (this.materials.has(template.name)) continue;
+
+      const pass = createStandardPass(renderer, template);
+      pass.material.sampler = renderer.samplerManager.getOrCreate(
+        renderer.device,
+        template.sampler
+      );
+
+      this.addMaterial(template.name, pass);
+    }
   }
 
   dispose() {

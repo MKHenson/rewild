@@ -464,12 +464,12 @@ describe('instantiateGltfModel', () => {
     expect(Array.from(geometry.vertices)).toEqual(verticesBefore);
   });
 
-  it('resolves a material per primitive, by glTF material name', () => {
+  it('resolves a material per primitive', () => {
     const seen: (string | null)[] = [];
 
-    instantiateGltfModel(modelWith('two-tone', 2), (name) => {
-      seen.push(name);
-      return fakeMaterial(name ?? 'default');
+    instantiateGltfModel(modelWith('two-tone', 2), (primitive) => {
+      seen.push(primitive.materialName);
+      return fakeMaterial(primitive.materialKey);
     });
 
     expect(seen).toEqual(['material-0', 'material-1']);

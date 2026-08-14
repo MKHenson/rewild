@@ -13,12 +13,15 @@ export type SamplerType =
  * Canonical string for a descriptor, so two requests for the same sampling
  * state share one GPUSampler. Also usable as part of a material's identity —
  * two materials that sample differently are not the same material.
+ *
+ * The fallbacks are WebGPU's own, so the key describes the sampler that would
+ * actually be created rather than what the caller might have meant.
  */
 export function samplerKey(descriptor: GPUSamplerDescriptor): string {
   return [
-    descriptor.magFilter ?? 'linear',
-    descriptor.minFilter ?? 'linear',
-    descriptor.mipmapFilter ?? 'linear',
+    descriptor.magFilter ?? 'nearest',
+    descriptor.minFilter ?? 'nearest',
+    descriptor.mipmapFilter ?? 'nearest',
     descriptor.addressModeU ?? 'clamp-to-edge',
     descriptor.addressModeV ?? 'clamp-to-edge',
   ].join('|');

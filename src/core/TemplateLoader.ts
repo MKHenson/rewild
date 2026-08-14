@@ -48,25 +48,33 @@ export class TemplateLoader {
     } else if (template?.type === 'asset') {
       const { geometryId, materialId } = template.resource;
 
-      if (geometryId && materialId) {
-        const material = renderer.materialManager.get(materialId);
+      const isModel =
+        !!geometryId && renderer.geometryManager.models.has(geometryId);
 
-        // An imported model brings its own hierarchy; a built-in geometry is a
-        // single mesh. Every primitive takes the template's material for now,
-        // since glTF material definitions are not yet turned into passes.
-        const transform = renderer.geometryManager.models.has(geometryId)
-          ? instantiateGltfModel(
-              renderer.geometryManager.getModel(geometryId),
-              () => material
-            )
-          : new Mesh(renderer.geometryManager.get(geometryId), material)
-              .transform;
-
-        toReturn = new Asset3D(transform);
-      } else
+      // A model carries its own materials, so `materialId` is optional for one
+      // and an override when given. Anything else is a bare geometry with
+      // nothing to shade it.
+      if (!geometryId || (!materialId && !isModel))
         throw new Error(
           `Template ${template.name} is missing geometry or material ID.`
         );
+
+      const override = materialId
+        ? renderer.materialManager.get(materialId)
+        : null;
+
+      // An imported model brings its own hierarchy; a built-in geometry is a
+      // single mesh.
+      const transform = isModel
+        ? instantiateGltfModel(
+            renderer.geometryManager.getModel(geometryId),
+            (primitive) =>
+              override ?? renderer.materialManager.get(primitive.materialKey)
+          )
+        : new Mesh(renderer.geometryManager.get(geometryId), override!)
+            .transform;
+
+      toReturn = new Asset3D(transform);
 
       if (gameManager && template.resource.physics) {
         const R = gameManager.RAPIER;
