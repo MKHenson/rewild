@@ -209,12 +209,14 @@ function createStandardPass(
   const metallicRoughness = texture(t.metallicRoughnessMap);
   const occlusion = texture(t.occlusionMap);
   const emissive = texture(t.emissiveMap);
+  const height = texture(t.heightMap);
 
   if (baseColor) material.baseColorTexture = baseColor;
   if (normal) material.normalTexture = normal;
   if (metallicRoughness) material.metallicRoughnessTexture = metallicRoughness;
   if (occlusion) material.occlusionTexture = occlusion;
   if (emissive) material.emissiveTexture = emissive;
+  if (height) material.heightTexture = height;
 
   // glTF carries opacity as baseColorFactor's fourth component; this schema
   // splits it out under the name the other material types already use.
@@ -232,6 +234,11 @@ function createStandardPass(
     material.occlusionStrength = t.occlusionStrength;
   if (t.normalScale !== undefined) material.normalScale = t.normalScale;
   if (t.alphaCutoff !== undefined) material.alphaCutoff = t.alphaCutoff;
+  if (t.heightScale !== undefined) material.heightScale = t.heightScale;
+  if (t.parallaxFadeStart !== undefined)
+    material.parallaxFadeStart = t.parallaxFadeStart;
+  if (t.parallaxFadeEnd !== undefined)
+    material.parallaxFadeEnd = t.parallaxFadeEnd;
 
   if (t.alphaMode !== undefined) {
     // The template is cast, never validated, so a typo would otherwise pack an
@@ -249,6 +256,7 @@ function createStandardPass(
   if (t.doubleSided !== undefined) pass.doubleSided = t.doubleSided;
   if (t.vertexColors !== undefined) pass.vertexColors = t.vertexColors;
   if (t.vertexTangents !== undefined) pass.vertexTangents = t.vertexTangents;
+  if (t.parallax !== undefined) pass.parallax = t.parallax;
 
   return pass;
 }

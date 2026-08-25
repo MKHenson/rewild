@@ -13,11 +13,13 @@
 //     is not something the editor selects one blade of.
 
 const HAS_VERTEX_TANGENTS: bool = ${ HAS_VERTEX_TANGENTS };
+const HAS_PARALLAX: bool = ${ HAS_PARALLAX };
 
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
 #include "./shader-lib/tbn.frag.wgsl"
+#include "./shader-lib/parallax.frag.wgsl"
 #include "./shader-lib/ibl.wgsl"
 #include "./shader-lib/material-debug.wgsl"
 #include "./shader-lib/standard-material.wgsl"
@@ -91,6 +93,7 @@ const NO_TANGENT = vec4f(1.0, 0.0, 0.0, 0.0);
 @group(0) @binding(4) var occlusionMap: texture_2d<f32>;
 @group(0) @binding(5) var emissiveMap: texture_2d<f32>;
 @group(0) @binding(6) var<uniform> standardParams: StandardParams;
+@group(0) @binding(7) var heightMap: texture_2d<f32>;
 
 @group(1) @binding(0) var<uniform> uniforms : Uniforms;
 @group(1) @binding(1) var<storage, read> transforms : array<Transform>;

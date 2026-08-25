@@ -19,10 +19,17 @@
 // derivatives — see standard-material.wgsl.
 const HAS_VERTEX_TANGENTS: bool = ${ HAS_VERTEX_TANGENTS };
 
+// Whether the parallax-occlusion march is compiled in, also from
+// StandardPassBase.shaderDefines(). A const rather than a uniform because the
+// march is a dozen dependent texture taps that a material without a height map
+// should not pay for at all — and because it brackets a dpdx.
+const HAS_PARALLAX: bool = ${ HAS_PARALLAX };
+
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
 #include "./shader-lib/tbn.frag.wgsl"
+#include "./shader-lib/parallax.frag.wgsl"
 #include "./shader-lib/ibl.wgsl"
 #include "./shader-lib/material-debug.wgsl"
 #include "./shader-lib/standard-material.wgsl"
@@ -97,6 +104,11 @@ const NO_TANGENT = vec4f(1.0, 0.0, 0.0, 0.0);
 @group(1) @binding(4) var occlusionMap: texture_2d<f32>;
 @group(1) @binding(5) var emissiveMap: texture_2d<f32>;
 @group(1) @binding(6) var<uniform> standardParams: StandardParams;
+// Height in R, for the parallax march. Bound whether or not HAS_PARALLAX is
+// set — the shared shading names it either way, so it stays in the derived bind
+// group layout, and StandardMaterial defaults it to white, which is a flat
+// surface at zero depth.
+@group(1) @binding(7) var heightMap: texture_2d<f32>;
 @group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;

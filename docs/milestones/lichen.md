@@ -67,6 +67,9 @@ Every field is optional except `name` and `type` — a material with nothing but
 | `alphaMode` / `alphaCutoff`                          | `OPAQUE`, `MASK` (cutout — what foliage needs) or `BLEND`.                                                                                        |
 | `doubleSided`                                        | Disables back-face culling. Usually paired with `MASK` for leaves and cards.                                                                      |
 | `vertexColors`                                       | Requires the geometry to carry `COLOR_0`; a mesh without it cannot use the material at all.                                                       |
+| `vertexTangents`                                     | Shade the normal map through the geometry's own `TANGENT` frame rather than a screen-space reconstruction. Requires the geometry to carry it.     |
+| `parallax` / `heightMap` / `heightScale`             | Parallax-occlusion mapping — the terrain's march over one mesh's UVs. Height in **R**, `heightScale` in UV units (0.02–0.05), 0 samples flat.     |
+| `parallaxFadeStart` / `parallaxFadeEnd`              | View-space distance where the relief starts fading and where it is gone. Defaults 20 and 40 — past that the march only aliases.                   |
 
 The full schema, with the reasoning behind each choice, lives in
 `packages/rewild-renderer/lib/managers/types.ts`.
