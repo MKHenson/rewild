@@ -99,7 +99,7 @@ export class SkyRenderer {
    *  reach further across the screen before fading out. */
   godRayDecay: number = 0.98;
 
-  cirrusCoverage: number = 0.2;
+  cirrusCoverage: number = 0.1;
   cirrusOpacity: number = 0.2;
 
   /** Quality revision this chain was last built against; -1 until first build. */
@@ -122,7 +122,6 @@ export class SkyRenderer {
 
   _dayColor: Color;
   _eveColor: Color;
-  _nightColor: Color;
 
   perfMonitor: PerformanceMonitor;
 
@@ -141,7 +140,6 @@ export class SkyRenderer {
 
     this._dayColor = new Color(1, 1, 1);
     this._eveColor = new Color(0.32, 0.12, 0.0);
-    this._nightColor = new Color(0.05, 0.05, 0.2);
 
     this.cloudsPass = new TemporalCloudRenderer();
     this.atmospherePass = new SkyGradientRenderer();
@@ -321,16 +319,20 @@ export class SkyRenderer {
     const sunDotUp = sunPosition.y / sunOrbitDistance;
     this.upDot = sunDotUp;
 
-    // Directional light color — transitions aligned with shader dusk/dawn at ±10%:
-    //   sunDotUp < -0.1  → full night (dark blue moonlight)
-    //   -0.1  to  0.0    → night → evening (warm orange)
-    //    0.0  to  0.3    → evening → day (orange fades to white sunlight)
-    //   sunDotUp > 0.3   → full daylight (white)
-    if (sunDotUp < -0.1) {
-      this.sun.color.copy(this._nightColor);
-    } else if (sunDotUp < 0.0) {
-      const t = (sunDotUp + 0.1) / 0.1;
-      this.sun.color.lerpColors(this._nightColor, this._eveColor, t);
+    // Directional light color:
+    //   sunDotUp < 0.0  → evening (warm orange), held while nightFade dims it out
+    //    0.0  to  0.3   → evening → day (orange fades to white sunlight)
+    //   sunDotUp > 0.3  → full daylight (white)
+    //
+    // There is no night colour. This used to ramp toward a dark blue below the
+    // horizon, standing in for moonlight, which a PBR pipeline reads as the sun
+    // literally shining blue from underneath the terrain — normals on the wrong
+    // side of the surface get lit and specular picks up a key light that is not
+    // in the sky. Direct sunlight only ever gets redder and dimmer as it sets;
+    // it never turns blue. Ambient at night now comes from the sky IBL, which
+    // already carries the starlight and airglow.
+    if (sunDotUp < 0.0) {
+      this.sun.color.copy(this._eveColor);
     } else if (sunDotUp < 0.3) {
       const t = sunDotUp / 0.3;
       this.sun.color.lerpColors(this._eveColor, this._dayColor, t);
@@ -361,8 +363,16 @@ export class SkyRenderer {
     // enough that direct sun should fall off toward a dull, sunless grey. Ramps
     // the key light down to 40% by full cover, eased so it doesn't snap on at 0.9.
     const overcastDim = 1.0 - 0.8 * smoothstep(this.cloudiness, 0.9, 1.0);
+
+    // The key light switches off below the horizon — there is no direct sunlight
+    // at night, and leaving one on is what made the old blue night light read as
+    // wrong once shading went physically based. Same window the sun disc uses for
+    // sunExtinction in cloudsTemporal.wgsl, so the light dies exactly as the disc
+    // it represents does rather than out of step with it.
+    const nightFade = smoothstep(sunDotUp, -0.12, 0.0);
+
     this.sun.intensity =
-      this.baseSunIntensity * (1.0 + 0.15 * warm) * overcastDim;
+      this.baseSunIntensity * (1.0 + 0.15 * warm) * overcastDim * nightFade;
 
     // Compute view-projection matrix (forward) and its inverse for ray reconstruction.
     // The forward matrix is needed by the temporal renderer for reprojection.

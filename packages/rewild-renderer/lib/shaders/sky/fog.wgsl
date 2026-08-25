@@ -204,8 +204,18 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     // Henyey-Greenstein forward scattering (g=0.76 base, reduced in stormy/foggy conditions)
     let fogPhase = mix(0.4, 0.2, foginess * object.cloudiness) * HenyeyGreenstein(mu, mix( 0.76, 0.68, foginess * object.cloudiness ) );
 
-    // Fog color transitions: night → evening (at horizon) → day
-    var fogColor = mix(FOG_COLOR_NIGHT, FOG_COLOR_EVENING, smoothstep(-0.1, 0.0, sunDotUp));
+    // Evening haze, split by azimuth. Uses the raw view-sun angle rather than the
+    // sunVisibility-scaled `mu` above: the gold-to-violet split across the ring is
+    // a property of where the sun is, and fades out through the evening window
+    // below rather than collapsing to the perpendicular colour as the sun sets.
+    let wedge = saturate(0.5 + 0.5 * dot(vSunDirection, dir));
+    let sunWedge = wedge * wedge;
+    let eveningColor = mix(FOG_COLOR_EVENING_AWAY, FOG_COLOR_EVENING_SUN, sunWedge);
+
+    // Fog color transitions: night → evening (at horizon) → day. The evening
+    // window reaches down to -9 degrees so the warm band outlives the sunset,
+    // roughly tracking the sky's own NIGHT_FADE ramp.
+    var fogColor = mix(FOG_COLOR_NIGHT, eveningColor, smoothstep(-0.16, 0.0, sunDotUp));
     fogColor = mix(fogColor, FOG_COLOR_DAY, smoothstep(0.0, 0.3, sunDotUp));
 
     let stormFactor = saturate( (object.cloudiness - 0.8) / 0.2 );
@@ -267,7 +277,10 @@ fn getFogColor(dir: vec3f, org: vec3f, vSunDirection: vec3f, originalColor: vec3
 fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec3f ) -> vec3f {
     // Day-night blend factor: 0 = full night, 1 = full day.
     // Dusk/dawn transition occurs at sunDotUp ±0.1 (~6° above/below horizon).
+    // Drives the horizon haze and the twilight glow only — the night sky itself
+    // runs on the much longer NIGHT_FADE_* ramp below.
     let dayFactor = smoothstep(-0.1, 0.1, sunDotUp);
+    let nightDayFactor = smoothstep(NIGHT_FADE_END, NIGHT_FADE_START, sunDotUp);
 
     // Overcast has two independent effects, deliberately timed differently:
     //   greyFactor — desaturates the sky toward flat overcast grey. Ramps in
@@ -287,26 +300,41 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     let sunSharpness  = mix(15.0, 3.0, overcastFactor);
     let sunProximity = pow(max(0.0, 0.5 + 0.5 * mu), sunSharpness);
 
+    // Broad sun-facing wedge, for the twilight palette only. sunProximity is a
+    // ~30 degree halo — right for the daytime whitening around the sun, far too
+    // tight for the sunset arc, which spreads across most of a hemisphere.
+    // 1 at the sun, 0.25 at 90 degrees, 0 opposite.
+    let sunWedge = pow(max(0.0, 0.5 + 0.5 * mu), mix(2.0, 4.0, overcastFactor));
+
     // During twilight only, sun proximity extends a subtle warm glow toward the sun.
     // Fades to zero once the sun is fully below the horizon.
     let twilightGlow = sunProximity * smoothstep(-0.1, 0.05, sunDotUp) * (1.0 - dayFactor);
-    let dayNightRatio = clamp(dayFactor + twilightGlow * 0.5, 0.0, 1.0);
+    let dayNightRatio = clamp(nightDayFactor + twilightGlow * 0.5, 0.0, 1.0);
 
     // Sun elevation blend for sky color palette:
     // 0 = sunset/sunrise warm colors, 1 = daytime cool colors
     let sunElevationBlend = smoothstep(-0.05, 0.15, sunDotUp);
 
-    // Sky color palette
-    let deepBlue = vec3f(0.4, 0.62, 1.0);       // Away from sun, daytime
-    let paleBlue = vec3f(0.8, 0.95, 1.0);        // Toward sun, daytime
-    let sunsetRed = vec3f(0.9, 0.3, 0.55);        // Away from sun, sunset — rose-pink
-    let sunsetOrange = vec3f(1.0, 0.55, 0.3);    // Toward sun, sunset — warm peach
+    // Vertical structure of the twilight sky. Two nested weights rather than one
+    // ramp: the warm band is squeezed into the last few degrees above the horizon
+    // (wHorizon is already down to 0.11 at 10 degrees) while the violet mid-band
+    // it sits under runs up to roughly 45 degrees.
+    // Base clamped away from zero: pow() is exp2(e * log2(base)) in WGSL, which
+    // can NaN on a zero base on some drivers rather than returning 0.
+    let down = max(1.0 - saturate(dir.y), 1e-4);
+    let wHorizon = pow(down, 12.0);
+    let wLow     = pow(down, 3.0);
 
-    // Blend sky colors by sun elevation and viewing angle relative to sun
+    let duskAway = mix(mix(SKY_DUSK_ZENITH, SKY_DUSK_MID, wLow), SKY_DUSK_HORIZON, wHorizon);
+    let duskSun  = mix(mix(SKY_DUSK_SUN_ZENITH, SKY_DUSK_SUN_MID, wLow), SKY_DUSK_SUN_HORIZON, wHorizon);
+
+    // Blend sky colors by sun elevation and viewing angle relative to sun. The
+    // daytime sky gets its own vertical gradient from horizonHaze below, so it
+    // only needs the sun-proximity axis here.
     let skyColorClear = mix(
-        mix(sunsetRed, deepBlue, sunElevationBlend),
-        mix(sunsetOrange, paleBlue, sunElevationBlend),
-        sunProximity
+        mix(duskAway, duskSun, sunWedge),
+        mix(SKY_DAY_DEEP_BLUE, SKY_DAY_PALE_BLUE, sunProximity),
+        sunElevationBlend
     );
 
     // W1.2: shift sky toward pale overcast gray under heavy cloud cover
@@ -315,7 +343,12 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
 
     // Sky brightness: dimmer at sunset, full brightness at noon.
     // W1.4: dim the sun contribution through clouds (0.15 at full overcast).
-    let skyBrightness = mix(2.0, 6.0, smoothstep(0.0, 0.3, sunDotUp));
+    //
+    // Below the horizon this used to floor at 2.0, which was fine while the night
+    // blend cut in at -0.1 but holds a bright sunset palette across the longer fade.
+    // twilightDim is exactly 1.0 at and above the horizon, so daylight is untouched.
+    let twilightDim = mix(TWILIGHT_DIM_FLOOR, 1.0, smoothstep(NIGHT_FADE_END, 0.0, sunDotUp));
+    let skyBrightness = mix(2.0, 6.0, smoothstep(0.0, 0.3, sunDotUp)) * twilightDim;
     let sunDim = mix(1.0, 0.3, darkFactor);
 
     // Altitude-based atmosphere thinning:
@@ -330,8 +363,19 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     // Fades with altitude (thinner air) and scales with daylight (minimal at night).
     let horizonHaze = mix(0.3, 3.5, dayFactor) * max(0.0, 1.0 - 2.3 * dir.y) * atmosphereDensity;
 
+    // Neutral white by day, but at dusk it carries the same warm/cool split as
+    // the palette. As a plain white additive it is the single largest term in the
+    // bottom 25 degrees at sunset, so leaving it achromatic desaturates the arc
+    // back to grey no matter what the palette does. Overcast pulls it back to
+    // white, where a colourless sky is what we want anyway.
+    let hazeTint = mix(
+        mix(SKY_DUSK_HAZE_AWAY, SKY_DUSK_HAZE_SUN, sunWedge),
+        vec3f(1.0),
+        max(sunElevationBlend, overcastFactor)
+    );
+
     // Sky colour scales with atmospheric density; at high altitude the sky dims toward black
-    var dayTimeColor = skyBrightness * skyColor * atmosphereDensity * sunDim + vec3f(horizonHaze);
+    var dayTimeColor = skyBrightness * skyColor * atmosphereDensity * sunDim + horizonHaze * hazeTint;
 
     // At high altitude the daytime atmosphere fades, letting the night sky (stars/space)
     // show through — even during the day, which is physically correct for near-space.

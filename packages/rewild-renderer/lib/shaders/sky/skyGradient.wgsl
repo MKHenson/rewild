@@ -80,7 +80,7 @@ fn fs(
     // Star visibility below horizon: only during twilight/night and near ground.
     // nightFactor: 1 = night/twilight, 0 = daytime
     // groundFactor: 1 = near ground, 0 = high altitude
-    let nightFactor = smoothstep(0.1, -0.1, sunDotUp);
+    let nightFactor = 1.0 - smoothstep(NIGHT_FADE_END, NIGHT_FADE_START, sunDotUp);
     let groundFactor = 1.0 - smoothstep(0.0, 300.0, object.cameraPosition.y);
     let starVisibility = nightFactor * groundFactor;
 
