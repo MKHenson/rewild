@@ -43,6 +43,7 @@ export abstract class StandardPassBase implements IMaterialPass {
   private _doubleSided: boolean = false;
   private _vertexColors: boolean = false;
   private _vertexTangents: boolean = false;
+  private _parallax: boolean = false;
 
   /**
    * glTF's alphaMode:
@@ -103,6 +104,21 @@ export abstract class StandardPassBase implements IMaterialPass {
   set vertexTangents(value: boolean) {
     if (value === this._vertexTangents) return;
     this._vertexTangents = value;
+    this.invalidatePipeline();
+  }
+
+  /**
+   * Compile the parallax-occlusion march into the fragment shader, so the
+   * material's height map displaces where every other map is read — the same
+   * technique the terrain uses, over a single mesh's UVs.
+   */
+  get parallax(): boolean {
+    return this._parallax;
+  }
+
+  set parallax(value: boolean) {
+    if (value === this._parallax) return;
+    this._parallax = value;
     this.invalidatePipeline();
   }
 
@@ -179,7 +195,10 @@ export abstract class StandardPassBase implements IMaterialPass {
    * What the two shader hosts substitute before compiling.
    */
   protected shaderDefines(): ShaderDefines {
-    return { HAS_VERTEX_TANGENTS: this._vertexTangents };
+    return {
+      HAS_VERTEX_TANGENTS: this._vertexTangents,
+      HAS_PARALLAX: this._parallax,
+    };
   }
 
   /**

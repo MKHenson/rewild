@@ -48,6 +48,9 @@ describe('StandardParams packing', () => {
     material.occlusionStrength = 0.14;
     material.normalScale = 0.15;
     material.alphaCutoff = 0.16;
+    material.heightScale = 0.17;
+    material.parallaxFadeStart = 18;
+    material.parallaxFadeEnd = 19;
 
     const packed = packOf(material);
 
@@ -70,10 +73,14 @@ describe('StandardParams packing', () => {
     expect(packed[10]).toBeCloseTo(0.14);
     expect(packed[11]).toBeCloseTo(0.15);
     expect(packed[12]).toBeCloseTo(0.16);
+    // 13 is alphaMode, the one u32 — checked through the integer view below.
+    expect(packed[14]).toBeCloseTo(0.17);
+    expect(packed[15]).toBe(18);
+    expect(packed[16]).toBe(19);
   });
 
   it('is the size the layout table claims', () => {
-    expect(packOf(new StandardMaterial(1)).byteLength).toBe(64);
+    expect(packOf(new StandardMaterial(1)).byteLength).toBe(80);
   });
 
   // The one integer in the block. Written through a Uint32Array view, so a
@@ -96,6 +103,8 @@ describe('StandardParams packing', () => {
     // white-with-zero-strength pairing, but the pairing glTF specifies.
     expect(material.emissiveColor).toEqual([0, 0, 0]);
     expect(material.emissiveStrength).toBe(1);
+    // glTF has no height map, so a material that says nothing is flat.
+    expect(material.heightScale).toBe(0);
   });
 });
 
@@ -125,8 +134,12 @@ describe('standard-material.wgsl agreement', () => {
       'normalScale',
       'alphaCutoff',
       'alphaMode',
+      'heightScale',
+      'parallaxFadeStart',
+      'parallaxFadeEnd',
       '_pad0',
       '_pad1',
+      '_pad2',
     ]);
   });
 

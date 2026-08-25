@@ -14,6 +14,9 @@ export interface IStandardMaterialTemplate {
    *  packed ORM atlas — glTF models it as two slots precisely so that works. */
   occlusionMap?: string;
   emissiveMap?: string;
+  /** Height in R, 1 at the surface and 0 at the deepest crevice — Poly Haven's
+   *  `_disp` maps. Only read when `parallax` is on and `heightScale` non-zero. */
+  heightMap?: string;
   /** RGB only. glTF's fourth component is `opacity` below, because that is
    *  already this schema's word for alpha. */
   baseColorFactor?: TemplateColor;
@@ -37,6 +40,18 @@ export interface IStandardMaterialTemplate {
    *  an imported model; requires the geometry to carry tangents, which the glTF
    *  importer supplies and the procedural geometry factories do not. */
   vertexTangents?: boolean;
+  /** Compile the parallax-occlusion march in, so `heightMap` displaces where
+   *  every map is read. Costs a dozen dependent taps per fragment, so it is
+   *  opt-in per material; pair it with `vertexTangents` where the geometry has
+   *  them, or the relief drifts as the camera turns. */
+  parallax?: boolean;
+  /** Depth of the parallax volume in UV units — 0.02–0.05 for a mesh whose UVs
+   *  cover it once. 0 (the default) samples flat. */
+  heightScale?: number;
+  /** View-space distance where the relief starts fading out, and where it is
+   *  gone. Defaults to 20 and 40. */
+  parallaxFadeStart?: number;
+  parallaxFadeEnd?: number;
 }
 
 export interface IClassicMaterialTemplate {

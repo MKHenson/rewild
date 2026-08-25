@@ -3,7 +3,7 @@ import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 
-// StandardParams layout (64 bytes, std140-compatible):
+// StandardParams layout (80 bytes, std140-compatible):
 //   baseColorFactor   vec4f  offset 0  (16 bytes)
 //   emissiveColor     vec3f  offset 16 (12 bytes)
 //   roughness         f32    offset 28 (4 bytes)
@@ -13,13 +13,16 @@ import { Mesh } from '../../core/Mesh';
 //   normalScale       f32    offset 44 (4 bytes)
 //   alphaCutoff       f32    offset 48 (4 bytes)
 //   alphaMode         u32    offset 52 (4 bytes)
-//   _pad0.._pad1      f32    offset 56 (8 bytes)
+//   heightScale       f32    offset 56 (4 bytes)
+//   parallaxFadeStart f32    offset 60 (4 bytes)
+//   parallaxFadeEnd   f32    offset 64 (4 bytes)
+//   _pad0.._pad2      f32    offset 68 (12 bytes)
 //
 // roughness is tucked into emissiveColor's padding slot rather than given a row
 // of its own — a vec3f is aligned to 16 bytes either way, so this costs nothing.
 //
 // #201 removed ambientColor from offset 32; the scalars below it moved up a row.
-const PARAMS_SIZE = 64;
+const PARAMS_SIZE = 80;
 
 /** glTF's alphaMode. The shader compares against these, so the numbering is
  *  shared with ALPHA_MODE_* in standard.wgsl. */
@@ -81,12 +84,21 @@ export class StandardMaterial implements ISharedUniformBuffer {
    * the pipeline alone cannot force alpha to 1 for OPAQUE or discard for MASK.
    */
   alphaMode: AlphaMode = 'OPAQUE';
+  /**
+   * Depth of the parallax volume
+   */
+  heightScale: number = 0;
+  /** View-space distance at which the parallax volume starts fading, and where
+   *  it reaches zero */
+  parallaxFadeStart: number = 20;
+  parallaxFadeEnd: number = 40;
 
   private _baseColorTexture: GPUTexture;
   private _normalTexture: GPUTexture;
   private _metallicRoughnessTexture: GPUTexture;
   private _occlusionTexture: GPUTexture;
   private _emissiveTexture: GPUTexture;
+  private _heightTexture: GPUTexture;
   private _sampler: GPUSampler;
   private _paramsBuffer: GPUBuffer;
   private _paramsData: Float32Array = new Float32Array(PARAMS_SIZE / 4);
@@ -130,6 +142,12 @@ export class StandardMaterial implements ISharedUniformBuffer {
     if (!this._emissiveTexture)
       this._emissiveTexture =
         renderer.textureManager.get('white-1x1').gpuTexture;
+    // White is height 1 everywhere — the polygon surface itself, so the march
+    // finds no volume to displace into. Bound even when the pass compiled
+    // parallax out, because the shader names heightMap either way and the
+    // derived bind group layout therefore keeps a slot for it.
+    if (!this._heightTexture)
+      this._heightTexture = renderer.textureManager.get('white-1x1').gpuTexture;
     if (!this._sampler) this._sampler = renderer.samplerManager.get('linear');
 
     if (this._paramsBuffer) this._paramsBuffer.destroy();
@@ -151,6 +169,7 @@ export class StandardMaterial implements ISharedUniformBuffer {
         { binding: 4, resource: this._occlusionTexture.createView() },
         { binding: 5, resource: this._emissiveTexture.createView() },
         { binding: 6, resource: { buffer: this._paramsBuffer } },
+        { binding: 7, resource: this._heightTexture.createView() },
       ],
     });
 
@@ -172,6 +191,9 @@ export class StandardMaterial implements ISharedUniformBuffer {
     this._paramsData[11] = this.normalScale;
     this._paramsData[12] = this.alphaCutoff;
     this._paramsDataU32[13] = ALPHA_MODES.indexOf(this.alphaMode);
+    this._paramsData[14] = this.heightScale;
+    this._paramsData[15] = this.parallaxFadeStart;
+    this._paramsData[16] = this.parallaxFadeEnd;
     device.queue.writeBuffer(
       this._paramsBuffer,
       0,
@@ -227,7 +249,16 @@ export class StandardMaterial implements ISharedUniformBuffer {
     return this._emissiveTexture;
   }
 
-  /** Shared by all five slots — glTF states filtering and wrapping per texture,
+  set heightTexture(texture: GPUTexture) {
+    this._heightTexture = texture;
+    this.requiresBuild = true;
+  }
+
+  get heightTexture(): GPUTexture {
+    return this._heightTexture;
+  }
+
+  /** Shared by every slot — glTF states filtering and wrapping per texture,
    *  but one bind group entry serves them here. Defaults to trilinear repeat. */
   set sampler(sampler: GPUSampler) {
     this._sampler = sampler;

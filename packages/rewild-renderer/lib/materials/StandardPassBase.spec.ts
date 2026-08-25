@@ -68,6 +68,7 @@ describe.each([
     expect(pass.doubleSided).toBe(false);
     expect(pass.vertexColors).toBe(false);
     expect(pass.vertexTangents).toBe(false);
+    expect(pass.parallax).toBe(false);
     expect(pass.transparent).toBe(false);
   });
 
@@ -99,6 +100,7 @@ describe.each([
     'doubleSided',
     'vertexColors',
     'vertexTangents',
+    'parallax',
   ] as const)(
     'rebuilds the pipeline and its bind groups when %s changes',
     (property) => {
@@ -122,6 +124,7 @@ describe.each([
     pass.doubleSided = false;
     pass.vertexColors = false;
     pass.vertexTangents = false;
+    pass.parallax = false;
 
     expect(pass.requiresRebuild).toBe(false);
   });
@@ -193,6 +196,23 @@ describe.each([
     }
   );
 
+  // Same bargain as the tangent frame: the march is compiled in or out, so the
+  // define and the host's placeholder have to agree.
+  it.each([false, true])(
+    'compiles the shader with parallax = %s baked in',
+    (parallax) => {
+      const pass = create();
+      pass.parallax = parallax;
+      const defines = (
+        pass as unknown as { shaderDefines(): ShaderDefines }
+      ).shaderDefines();
+
+      const source = composeShader([shaderSource(shaderName)], defines);
+
+      expect(source).toContain(`const HAS_PARALLAX: bool = ${parallax};`);
+    }
+  );
+
   it('names a vertex entry point for every attribute combination', () => {
     const pass = create();
     const internals = pass as unknown as { vertexEntryPoint(): string };
@@ -244,6 +264,7 @@ describe('standard shader hosts', () => {
         'metallicRoughnessMap',
         'occlusionMap',
         'emissiveMap',
+        'heightMap',
         'standardParams',
         'spotLightShadowParams',
       ]) {
@@ -282,13 +303,25 @@ describe('standard shader hosts', () => {
     }
   );
 
-  it('branches on the host-supplied define in the shared shading', () => {
+  it('branches on the host-supplied defines in the shared shading', () => {
     const source = shaderSource('shader-lib/standard-material.wgsl');
 
     expect(source).toContain('if (HAS_VERTEX_TANGENTS)');
-    expect(source).toContain('perturbNormalTangent(');
+    expect(source).toContain('tbnFromTangent(');
     // The fallback stays: geometry without tangents is still the common case,
     // and every procedural geometry factory produces it.
-    expect(source).toContain('perturbNormal(');
+    expect(source).toContain('tbnFromDerivatives(');
+    expect(source).toContain('if (!HAS_PARALLAX)');
+  });
+
+  // heightMap has to be named in the shared shading whether or not the march is
+  // compiled in: `layout: 'auto'` derives the bind group layout from the
+  // resources the source names, and StandardMaterial binds its slot either way.
+  // Guarding the call site with `#include`-style omission instead would drop the
+  // binding from the layout and fail validation on the first draw.
+  it('names heightMap unconditionally, so the binding survives the define', () => {
+    const source = shaderSource('shader-lib/parallax.frag.wgsl');
+    expect(source).toContain('heightMap');
+    expect(source).not.toContain('HAS_PARALLAX');
   });
 });
