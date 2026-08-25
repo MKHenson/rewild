@@ -12,6 +12,12 @@ export function registerSkyDebugCommands(renderer: Renderer) {
     console.log('Sky performance capture stopped');
   };
 
+  (window as any).triggerLightning = (pos: [number, number, number]) => {
+    renderer.sky.skyRenderer.triggerLightning(pos);
+  };
+
+  
+
   (window as any).toggleCloudShadowDebug = () => {
     const config = renderer.sky.skyRenderer.cloudShadowRenderer.config;
     console.log(
