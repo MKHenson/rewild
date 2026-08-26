@@ -35,6 +35,24 @@ export class RigidBodyBehaviour implements IBehaviour {
     }
   }
 
+  // Pushes an externally changed transform back into the body. Only meaningful
+  // for a fixed body — a dynamic one owns its own transform once it is running,
+  // and moving it under the solver would fight it.
+  applyTransform(asset: IAsset): void {
+    if (!this.isFixed || !(asset instanceof Asset3D)) return;
+
+    const rotation = asset.transform.quaternion;
+    this.rb.setRotation(
+      new RapierQuat(rotation.x, rotation.y, rotation.z, rotation.w),
+      false
+    );
+    const position = asset.transform.position;
+    this.rb.setTranslation(
+      new RapierVec3(position.x, position.y, position.z),
+      true
+    );
+  }
+
   onMount(asset: IAsset): void {
     if (asset instanceof Asset3D) {
       this.rb.setRotation(

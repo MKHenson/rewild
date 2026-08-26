@@ -469,6 +469,16 @@ export class TerrainRenderer {
     return top + (bottom - top) * tz;
   }
 
+  // The chunk that owns world (x, z) — the same world→chunk mapping
+  // sampleHeight uses to pick a heightfield, exposed so a listener can tell
+  // which placements a given chunk's heights are responsible for. Null before
+  // init(), when chunkSize is still zero.
+  chunkIdAt(x: number, z: number): string | null {
+    const span = this.chunkSize;
+    if (!span) return null;
+    return `${Math.round(x / span)},${Math.round(z / span)}`;
+  }
+
   // Surface normal at world (x, z), from a central difference of sampleHeight
   // one sample step either side; false (and out untouched) when the owning
   // chunk has no heights. A probe that lands in an unloaded neighbour falls

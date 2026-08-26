@@ -42,3 +42,20 @@ describe('sampleNormal', () => {
     expect(new TerrainRenderer().sampleNormal(0, 0, normal)).toBe(false);
   });
 });
+
+describe('chunkIdAt', () => {
+  it('matches the chunk sampleHeight reads from', () => {
+    const terrain = rampedRenderer(0);
+    const span = terrain.chunkSize;
+
+    // Chunks are centred on their coordinate, so the origin is mid-chunk 0,0.
+    expect(terrain.chunkIdAt(0, 0)).toBe('0,0');
+    expect(terrain.chunkIdAt(span * 0.49, 0)).toBe('0,0');
+    expect(terrain.chunkIdAt(span, 0)).toBe('1,0');
+    expect(terrain.chunkIdAt(0, -span)).toBe('0,-1');
+  });
+
+  it('reports null before init has sized the chunks', () => {
+    expect(new TerrainRenderer().chunkIdAt(0, 0)).toBeNull();
+  });
+});
