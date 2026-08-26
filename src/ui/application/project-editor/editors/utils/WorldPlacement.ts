@@ -2,6 +2,7 @@ import { Box3, Matrix4, Quaternion, Ray, Vector3 } from 'rewild-common';
 import { Mesh, Renderer, Transform } from 'rewild-renderer';
 import { Raycaster, Intersection } from 'rewild-renderer/lib/core/Raycaster';
 import { quaternionFromUpToNormal } from 'src/core/placement/ConformedPlacement';
+import { TerrainChunk } from 'rewild-renderer/lib/renderers/terrain/TerrainChunk';
 
 const _raycaster = new Raycaster();
 const _downRay = new Ray();
@@ -87,18 +88,36 @@ export function raycastToSurface(
   return null;
 }
 
+/**
+ * Whether a raycast hit landed on terrain. The hit reports the LOD mesh, whose
+ * owner is the chunk, so the walk up the parents is what identifies it.
+ */
+export function isTerrainTransform(transform: Transform | null): boolean {
+  let current = transform;
+  while (current) {
+    if (current.component instanceof TerrainChunk) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
 export function placeOnSurface(
   renderer: Renderer,
   position: Vector3,
   groundOffset: number,
   excludeTransforms?: Transform[]
-): { y: number; rotation: [number, number, number, number] } | null {
+): {
+  y: number;
+  rotation: [number, number, number, number];
+  onTerrain: boolean;
+} | null {
   const hit = raycastToSurface(renderer, position, excludeTransforms);
   if (!hit || !hit.face) return null;
 
   return {
     y: hit.point.y + groundOffset,
     rotation: computeRotationFromNormal(hit.face.normal),
+    onTerrain: isTerrainTransform(hit.object),
   };
 }
 

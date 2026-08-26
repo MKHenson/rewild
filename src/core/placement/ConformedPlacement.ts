@@ -108,3 +108,24 @@ export function writeBackPlacement(
 
   placement.rotation = [_stored.x, _stored.y, _stored.z, _stored.w];
 }
+
+// Dropping on a slope has always tilted an object onto it, and conforming keeps
+// that true through a sculpt rather than freezing the tilt at drop time.
+const TERRAIN_ALIGN_TO_NORMAL = 1;
+
+/**
+ * Sets the conform fields from what a placement was just dropped or dragged
+ * onto. Terrain conforms; anything else — another object, or empty space —
+ * stores an absolute Y, because only the heightfield re-samples itself on
+ * every path that moves it.
+ *
+ * Call before `writeBackPlacement`, which reads these to decide what to store.
+ */
+export function applyConformPolicy(
+  placement: IAssetPlacement,
+  onTerrain: boolean
+): void {
+  placement.conform = onTerrain;
+  placement.alignToNormal = onTerrain ? TERRAIN_ALIGN_TO_NORMAL : 0;
+  if (!onTerrain) placement.yOffset = 0;
+}

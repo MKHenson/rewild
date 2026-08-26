@@ -14,6 +14,7 @@ import {
   placeOnSurface,
   raycastMouseToWorld,
   computeRotationFromNormal,
+  isTerrainTransform,
 } from './WorldPlacement';
 
 const _planeHit = new Vector3();
@@ -40,6 +41,9 @@ export class GizmoDragController {
   private objectGroundOffset = 0;
   private transform: Transform | null = null;
   private lastRotation: [number, number, number, number] = [0, 0, 0, 1];
+  // What the object was last placed on: terrain, something else, or null when
+  // the drag never resolved a surface (a click with no movement)
+  private lastOnTerrain: boolean | null = null;
 
   private renderer: Renderer;
   private gizmo: Gizmo;
@@ -74,6 +78,7 @@ export class GizmoDragController {
     const q = objectTransform.quaternion;
     this.startObjectRotation = [q.x, q.y, q.z, q.w];
     this.lastRotation = [...this.startObjectRotation];
+    this.lastOnTerrain = null;
     this.objectGroundOffset = computeGroundOffset(objectTransform);
 
     this.buildConstraintPlane(cameraTransform);
@@ -105,6 +110,7 @@ export class GizmoDragController {
             worldHit.point.y + this.objectGroundOffset,
             worldHit.point.z
           );
+          this.lastOnTerrain = isTerrainTransform(worldHit.object);
         } else {
           // Axis constraint: take only the constrained axis from the world hit
           const axisDir = AXIS_DIRECTIONS[this.mode];
@@ -122,6 +128,9 @@ export class GizmoDragController {
           if (surfaceResult) {
             _newPosition.y = surfaceResult.y;
           }
+          // The down-ray, not the mouse ray, is what the object ends up
+          // standing on once its x/z are constrained.
+          this.lastOnTerrain = surfaceResult ? surfaceResult.onTerrain : false;
         }
 
         // Apply rotation from surface normal
@@ -158,6 +167,9 @@ export class GizmoDragController {
 
     _newPosition.copy(this.startObjectPosition).add(_delta);
 
+    // Nothing under it — a free move through space, so Y is the author's.
+    this.lastOnTerrain = false;
+
     this.transform.position.copy(_newPosition);
     this.gizmo.transform.position.copy(_newPosition);
     this.renderer.sceneBVH?.markObjectMoved(this.transform);
@@ -166,6 +178,7 @@ export class GizmoDragController {
   endDrag(): {
     position: [number, number, number];
     rotation: [number, number, number, number];
+    onTerrain: boolean | null;
   } | null {
     if (!this._isDragging || !this.transform) {
       this.reset();
@@ -176,6 +189,7 @@ export class GizmoDragController {
     const result = {
       position: [pos.x, pos.y, pos.z] as [number, number, number],
       rotation: [...this.lastRotation] as [number, number, number, number],
+      onTerrain: this.lastOnTerrain,
     };
 
     this.reset();
@@ -233,5 +247,6 @@ export class GizmoDragController {
     this.mode = GizmoDragMode.None;
     this.transform = null;
     this.objectGroundOffset = 0;
+    this.lastOnTerrain = null;
   }
 }

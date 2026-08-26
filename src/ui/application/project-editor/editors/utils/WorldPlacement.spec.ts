@@ -1,7 +1,9 @@
 import { Geometry } from 'rewild-renderer/lib/geometry/Geometry';
 import { Mesh, Transform } from 'rewild-renderer';
 import { IMaterialPass } from 'rewild-renderer/lib/materials/IMaterialPass';
-import { computeGroundOffset } from './WorldPlacement';
+import { Vector2 } from 'rewild-common';
+import { TerrainChunk } from 'rewild-renderer/lib/renderers/terrain/TerrainChunk';
+import { computeGroundOffset, isTerrainTransform } from './WorldPlacement';
 
 function fakeMaterial(): IMaterialPass {
   return { isGeometryCompatible: () => true } as unknown as IMaterialPass;
@@ -90,5 +92,42 @@ describe('computeGroundOffset', () => {
 
   it('returns zero for a transform carrying no meshes at all', () => {
     expect(computeGroundOffset(new Transform())).toBe(0);
+  });
+});
+
+describe('isTerrainTransform', () => {
+  function terrainChunk(): TerrainChunk {
+    return new TerrainChunk(
+      new Vector2(0, 0),
+      241,
+      240,
+      [{ lod: 0, visibleDstThreshold: 200 }],
+      1,
+      'default'
+    );
+  }
+
+  it('recognises the chunk transform itself', () => {
+    expect(isTerrainTransform(terrainChunk().transform)).toBe(true);
+  });
+
+  it('recognises a LOD mesh parented under a chunk', () => {
+    // What a raycast actually reports is the LOD mesh, never the chunk.
+    const lodMesh = new Transform();
+    terrainChunk().transform.addChild(lodMesh);
+
+    expect(isTerrainTransform(lodMesh)).toBe(true);
+  });
+
+  it('rejects an ordinary scene object', () => {
+    const platform = new Transform();
+    const crate = new Transform();
+    platform.addChild(crate);
+
+    expect(isTerrainTransform(crate)).toBe(false);
+  });
+
+  it('rejects null', () => {
+    expect(isTerrainTransform(null)).toBe(false);
   });
 });
