@@ -1,12 +1,12 @@
-import { Box3, Matrix4, Ray, Vector3 } from 'rewild-common';
+import { Box3, Matrix4, Quaternion, Ray, Vector3 } from 'rewild-common';
 import { Mesh, Renderer, Transform } from 'rewild-renderer';
 import { Raycaster, Intersection } from 'rewild-renderer/lib/core/Raycaster';
+import { quaternionFromUpToNormal } from 'src/core/placement/ConformedPlacement';
 
 const _raycaster = new Raycaster();
 const _downRay = new Ray();
 const _downDir = new Vector3(0, -1, 0);
-const _up = new Vector3(0, 1, 0);
-const _axis = new Vector3();
+const _rotation = new Quaternion();
 const _bounds = new Box3();
 const _meshBounds = new Box3();
 const _inverseRoot = new Matrix4();
@@ -15,19 +15,8 @@ const _toRoot = new Matrix4();
 export function computeRotationFromNormal(
   normal: Vector3
 ): [number, number, number, number] {
-  const dot = _up.dot(normal);
-
-  if (dot < -0.9999) {
-    return [0, 0, 1, 0];
-  } else if (dot > 0.9999) {
-    return [0, 0, 0, 1];
-  } else {
-    _axis.copy(_up).cross(normal).normalize();
-    const angle = Math.acos(dot);
-    const halfAngle = angle / 2;
-    const s = Math.sin(halfAngle);
-    return [_axis.x * s, _axis.y * s, _axis.z * s, Math.cos(halfAngle)];
-  }
+  quaternionFromUpToNormal(normal, _rotation);
+  return [_rotation.x, _rotation.y, _rotation.z, _rotation.w];
 }
 
 /** Unions every descendant mesh's bounds into `_bounds`, in root-local space. */
@@ -117,7 +106,11 @@ export function raycastMouseToWorld(
   mouseRay: Ray,
   renderer: Renderer,
   excludeTransforms?: Transform[],
-  maxDistance: number = 500
+  // Defaults to the camera's far plane: anything the author can see is
+  // something they can drop onto. A fixed reach shorter than the draw
+  // distance silently stops finding terrain part-way to the horizon, and the
+  // caller's fallback then places the object somewhere else entirely.
+  maxDistance: number = renderer.camera.far
 ): Intersection | null {
   _raycaster.far = maxDistance;
   _raycaster.ray.copy(mouseRay);

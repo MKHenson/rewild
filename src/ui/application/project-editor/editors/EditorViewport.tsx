@@ -41,6 +41,10 @@ import { biomePaintStore } from 'src/ui/stores/BiomePaintStore';
 import { BiomePaintToolbar } from './BiomePaintToolbar';
 import { TerrainBiomePaintController } from './utils/TerrainBiomePaintController';
 import { loadCameraState, saveCameraState } from './utils/CameraPersistence';
+import {
+  resolvePlacement,
+  writeBackPlacement,
+} from 'src/core/placement/ConformedPlacement';
 
 interface Props {}
 
@@ -265,21 +269,15 @@ export class EditorViewport extends Component<Props> {
             ].asset3D.find((asset) => asset.id === childNode.resource!.id);
 
             if (assetPodData) {
-              createdResource.transform.position.set(
-                assetPodData.position[0],
-                assetPodData.position[1],
-                assetPodData.position[2]
+              resolvePlacement(
+                assetPodData,
+                this.renderer.terrainRenderer,
+                createdResource.transform.position,
+                this._placementRotation
               );
-              if (assetPodData.rotation) {
-                createdResource.transform.rotation.setFromQuaternion(
-                  new Quaternion(
-                    assetPodData.rotation[0],
-                    assetPodData.rotation[1],
-                    assetPodData.rotation[2],
-                    assetPodData.rotation[3]
-                  )
-                );
-              }
+              createdResource.transform.rotation.setFromQuaternion(
+                this._placementRotation
+              );
 
               this.renderer.scene.addChild(createdResource.transform);
               syncFromEditorResource(createdResource.id, this.renderer);
@@ -645,8 +643,14 @@ export class EditorViewport extends Component<Props> {
             (a) => a.id === this.selectedTransform!.id
           );
           if (asset) {
-            asset.position = result.position;
-            asset.rotation = result.rotation;
+            // Conformed assets store the drag as an offset above the ground,
+            // so the move survives the next sculpt instead of being overwritten.
+            writeBackPlacement(
+              asset,
+              this.renderer.terrainRenderer,
+              this._placementPosition.fromArray(result.position),
+              result.rotation
+            );
           }
         }
         projectStore.dirty = true;
@@ -807,6 +811,8 @@ export class EditorViewport extends Component<Props> {
 
   private _cameraWorldPos = new Vector3();
   private _surfaceProbePos = new Vector3();
+  private _placementRotation = new Quaternion();
+  private _placementPosition = new Vector3();
   private _updatingGizmoScale = false;
   private _focusCenter = new Vector3();
   private _focusDir = new Vector3();

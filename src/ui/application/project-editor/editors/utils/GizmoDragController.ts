@@ -25,6 +25,12 @@ const _planeNormal = new Vector3();
 const _normalCopy = new Vector3();
 const _tempQuat = new Quaternion();
 
+// Minimum |cos| between the mouse ray and the constraint plane's normal for the
+// plane solution to mean anything. At grazing incidence the intersection runs
+// away towards the horizon — a pixel of mouse movement becomes hundreds of
+// units — so below this the drag holds position instead of launching the object.
+const MIN_PLANE_INCIDENCE = 0.08;
+
 export class GizmoDragController {
   private _isDragging = false;
   private mode: GizmoDragMode = GizmoDragMode.None;
@@ -136,6 +142,9 @@ export class GizmoDragController {
     }
 
     // Constraint-plane math: used for Y-involved modes, alt-held, or world-raycast miss
+    const incidence = _constraintPlane.normal.dot(mouseRay.direction);
+    if (Math.abs(incidence) < MIN_PLANE_INCIDENCE) return;
+
     const hit = mouseRay.intersectPlane(_constraintPlane, _planeHit);
     if (!hit) return;
 

@@ -469,6 +469,26 @@ export class TerrainRenderer {
     return top + (bottom - top) * tz;
   }
 
+  // Surface normal at world (x, z), from a central difference of sampleHeight
+  // one sample step either side; false (and out untouched) when the owning
+  // chunk has no heights. A probe that lands in an unloaded neighbour falls
+  // back to the centre height, so the slope goes one-sided at the seam rather
+  // than failing.
+  sampleNormal(x: number, z: number, out: Vector3): boolean {
+    const h = this.sampleHeight(x, z);
+    if (h === null) return false;
+
+    const step = this.metersPerSample;
+    const hx0 = this.sampleHeight(x - step, z) ?? h;
+    const hx1 = this.sampleHeight(x + step, z) ?? h;
+    const hz0 = this.sampleHeight(x, z - step) ?? h;
+    const hz1 = this.sampleHeight(x, z + step) ?? h;
+
+    // For a heightfield y = h(x, z) the normal is (-dh/dx, 1, -dh/dz).
+    out.set((hx0 - hx1) / (2 * step), 1, (hz0 - hz1) / (2 * step)).normalize();
+    return true;
+  }
+
   // Applies an edit: replaces a chunk's in-memory heightfield and rebuilds its
   // meshes, without touching the rest of the terrain. Returns false if the
   // chunk isn't loaded (a saved snapshot will supply the heights when it is).

@@ -1029,12 +1029,24 @@ export interface components {
         };
         /** Asset3D */
         "com.rewild.models.Asset3D": {
+            /**
+             * Float
+             * Format: float
+             */
+            alignToNormal: number;
+            /** Boolean */
+            conform: boolean;
             /** String */
             id: string;
             /** List<Float> */
             position: number[];
             /** List<Float> */
             rotation: number[];
+            /**
+             * Float
+             * Format: float
+             */
+            yOffset: number;
         };
         /** WorldGenConfig */
         "com.rewild.models.WorldGenConfig": {
