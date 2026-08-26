@@ -1,6 +1,7 @@
 import { IAssetPlacement } from 'models';
 import { Quaternion, Vector3 } from 'rewild-common';
 import {
+  applyConformPolicy,
   IHeightfieldSampler,
   resolvePlacement,
   writeBackPlacement,
@@ -193,5 +194,62 @@ describe('writeBackPlacement', () => {
 
     expect(target.yOffset).toBe(4);
     expect(target.position).toEqual([1, 2, 3]);
+  });
+});
+
+describe('applyConformPolicy', () => {
+  it('conforms and aligns what lands on terrain', () => {
+    const target = placement();
+    applyConformPolicy(target, true);
+
+    expect(target.conform).toBe(true);
+    expect(target.alignToNormal).toBe(1);
+  });
+
+  it('keeps an absolute Y for anything not on terrain', () => {
+    // A crate on a platform: conforming would mean tracking a dependency on
+    // geometry that can be moved or deleted, which nothing re-derives.
+    const target = placement({ conform: true, yOffset: 3, alignToNormal: 1 });
+    applyConformPolicy(target, false);
+
+    expect(target.conform).toBe(false);
+    expect(target.yOffset).toBe(0);
+    expect(target.alignToNormal).toBe(0);
+  });
+
+  it('drives what writeBackPlacement then stores', () => {
+    const terrain = ramp(0, 40);
+    const onTerrain = placement();
+    const offTerrain = placement();
+
+    applyConformPolicy(onTerrain, true);
+    applyConformPolicy(offTerrain, false);
+    for (const target of [onTerrain, offTerrain])
+      writeBackPlacement(target, terrain, new Vector3(0, 42, 0), [0, 0, 0, 1]);
+
+    expect(onTerrain.yOffset).toBeCloseTo(2);
+    expect(offTerrain.yOffset).toBe(0);
+    expect(offTerrain.position[1]).toBe(42);
+  });
+
+  it('round-trips a drop onto terrain back to the drop point', () => {
+    // The whole contract in one pass: place, store, reload.
+    const terrain = ramp(0.5, 10);
+    const dropped = placement();
+    const position = new Vector3();
+    const rotation = new Quaternion();
+
+    applyConformPolicy(dropped, true);
+    writeBackPlacement(
+      dropped,
+      terrain,
+      new Vector3(6, 14.5, -2),
+      [0, 0, 0, 1]
+    );
+    resolvePlacement(dropped, terrain, position, rotation);
+
+    expect(position.x).toBe(6);
+    expect(position.y).toBeCloseTo(14.5);
+    expect(position.z).toBe(-2);
   });
 });

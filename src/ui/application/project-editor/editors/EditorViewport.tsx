@@ -25,13 +25,14 @@ import {
   SceneGraphEvents,
   sceneGraphStore,
 } from 'src/ui/stores/SceneGraphStore';
-import { ITreeNodeAction } from 'models';
+import { IAssetPlacement, ITreeNodeAction } from 'models';
 import { TemplateLoader } from 'src/core/TemplateLoader';
 import { Asset3D } from 'src/core/routing/Asset3D';
 import { GizmoDragController } from './utils/GizmoDragController';
 import { TerrainSculptController } from './utils/TerrainSculptController';
 import {
   computeGroundOffset,
+  isTerrainTransform,
   computeRotationFromNormal,
   raycastToSurface,
 } from './utils/WorldPlacement';
@@ -42,6 +43,7 @@ import { BiomePaintToolbar } from './BiomePaintToolbar';
 import { TerrainBiomePaintController } from './utils/TerrainBiomePaintController';
 import { loadCameraState, saveCameraState } from './utils/CameraPersistence';
 import {
+  applyConformPolicy,
   resolvePlacement,
   writeBackPlacement,
 } from 'src/core/placement/ConformedPlacement';
@@ -643,6 +645,10 @@ export class EditorViewport extends Component<Props> {
             (a) => a.id === this.selectedTransform!.id
           );
           if (asset) {
+            // A drag re-decides what the object stands on. A click that never
+            // moved it resolves no surface, and leaves the flag as authored.
+            if (result.onTerrain !== null)
+              applyConformPolicy(asset, result.onTerrain);
             // Conformed assets store the drag as an offset above the ground,
             // so the move survives the next sculpt instead of being overwritten.
             writeBackPlacement(
@@ -731,12 +737,21 @@ export class EditorViewport extends Component<Props> {
 
         const normal = intersection!.face!.normal;
         const rotation = computeRotationFromNormal(normal);
-
-        projectStore.containerPods[activeContainerId].asset3D.push({
+        const placement: IAssetPlacement = {
           id: json.node.resource.id,
           position: [point.x, point.y, point.z],
           rotation,
-        });
+        };
+
+        applyConformPolicy(placement, isTerrainTransform(intersection!.object));
+        writeBackPlacement(
+          placement,
+          this.renderer.terrainRenderer,
+          this._placementPosition.set(point.x, point.y, point.z),
+          rotation
+        );
+
+        projectStore.containerPods[activeContainerId].asset3D.push(placement);
 
         const newNode = sceneGraphStore.addNode(
           json.node,
@@ -745,9 +760,16 @@ export class EditorViewport extends Component<Props> {
 
         sceneGraphStore.setSelectedNode(newNode || null);
 
-        createdResource.transform.position.set(point.x, point.y, point.z);
+        // Resolve rather than reuse the drop point, so what appears now is
+        // exactly what a reload will rebuild from the stored placement.
+        resolvePlacement(
+          placement,
+          this.renderer.terrainRenderer,
+          createdResource.transform.position,
+          this._placementRotation
+        );
         createdResource.transform.rotation.setFromQuaternion(
-          new Quaternion(rotation[0], rotation[1], rotation[2], rotation[3])
+          this._placementRotation
         );
         this.renderer.scene.addChild(createdResource.transform);
       }
