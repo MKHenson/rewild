@@ -161,12 +161,26 @@ declare module 'models' {
     type: 'actor';
   }
 
+  /**
+   * Where a placed object sits. With `conform` set, Y is derived from the
+   * terrain heightfield rather than read from `position[1]`, so sculpting the
+   * ground moves whatever stands on it and there is no stale number to correct.
+   */
+  export interface IAssetPlacement {
+    id: string;
+    /** x and z are authoritative; y is only used when `conform` is off. */
+    position: Vector3;
+    rotation: Vector4;
+    /** Derive Y from the heightfield. Absent or false keeps `position[1]`. */
+    conform?: boolean;
+    /** Metres above the sampled surface. Ignored unless `conform` is set. */
+    yOffset?: number;
+    /** 0 keeps the stored orientation upright, 1 lays it onto the slope. */
+    alignToNormal?: number;
+  }
+
   export interface IContainerPod {
-    asset3D: {
-      id: string;
-      position: Vector3;
-      rotation: Vector4;
-    }[];
+    asset3D: IAssetPlacement[];
   }
 
   export interface IContainer extends IResource {

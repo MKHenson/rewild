@@ -22,7 +22,11 @@ data class Atmosphere(
 data class Asset3D(
     val id: String,
     val position: Vector3,
-    val rotation: Vector4
+    val rotation: Vector4,
+    // Terrain-relative placement
+    val conform: Boolean = false,
+    val yOffset: Float = 0f,
+    val alignToNormal: Float = 0f
 )
 
 @Serializable

@@ -1303,6 +1303,15 @@
             "com.rewild.models.Asset3D": {
                 "type": "object",
                 "properties": {
+                    "alignToNormal": {
+                        "type": "number",
+                        "format": "float",
+                        "title": "Float"
+                    },
+                    "conform": {
+                        "type": "boolean",
+                        "title": "Boolean"
+                    },
                     "id": {
                         "type": "string",
                         "title": "String"
@@ -1324,12 +1333,20 @@
                             "title": "Float"
                         },
                         "title": "List<Float>"
+                    },
+                    "yOffset": {
+                        "type": "number",
+                        "format": "float",
+                        "title": "Float"
                     }
                 },
                 "required": [
+                    "alignToNormal",
+                    "conform",
                     "id",
                     "position",
-                    "rotation"
+                    "rotation",
+                    "yOffset"
                 ],
                 "title": "Asset3D"
             },
