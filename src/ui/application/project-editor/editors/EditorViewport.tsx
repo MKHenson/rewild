@@ -47,6 +47,7 @@ import {
   resolvePlacement,
   writeBackPlacement,
 } from 'src/core/placement/ConformedPlacement';
+import { ConformedPlacementSync } from 'src/core/placement/ConformedPlacementSync';
 
 interface Props {}
 
@@ -79,6 +80,7 @@ export class EditorViewport extends Component<Props> {
   gizmo: Gizmo;
   dragController: GizmoDragController;
   sculptController: TerrainSculptController | null = null;
+  placementSync: ConformedPlacementSync | null = null;
   biomePaintController: TerrainBiomePaintController | null = null;
   selectedTransform: Transform | null = null;
   private didDrag = false;
@@ -409,6 +411,12 @@ export class EditorViewport extends Component<Props> {
           this.gizmo
         );
         this.sculptController = new TerrainSculptController(this.renderer);
+        // Sculpt, snapshot load, seed change and preset re-tune all end in a
+        // chunk rebuild, so this one listener covers every way the ground moves.
+        this.placementSync = new ConformedPlacementSync(this.renderer, (visit) =>
+          this.visitConformTargets(visit)
+        );
+        this.placementSync.start();
         this.biomePaintController = new TerrainBiomePaintController(
           this.renderer
         );
@@ -840,6 +848,27 @@ export class EditorViewport extends Component<Props> {
   private _focusDir = new Vector3();
   private _focusSize = new Vector3();
 
+  // The active container's pod is the source of truth for placement, so the
+  // sync reads it directly rather than tracking a second list that could drift.
+  private visitConformTargets(
+    visit: (placement: IAssetPlacement, transform: Transform) => boolean
+  ): void {
+    const containerId = sceneGraphStore.selectedContainerId;
+    const pod = containerId ? projectStore.containerPods[containerId] : null;
+    if (!pod) return;
+
+    for (const placement of pod.asset3D) {
+      const transform = this.renderer.scene.findObjectById(placement.id);
+      if (!transform) continue;
+
+      // The gizmo is parked on the selection, so it has to ride along or it
+      // detaches from the object it is manipulating.
+      if (visit(placement, transform) && transform === this.selectedTransform) {
+        this.gizmo?.transform.position.copy(transform.position);
+      }
+    }
+  }
+
   private updateGizmoScale(): void {
     if (this._updatingGizmoScale) return;
     if (!this.gizmo || !this.gizmo.transform.parent) return;
@@ -958,6 +987,7 @@ export class EditorViewport extends Component<Props> {
       this.viewportCanvas = null;
     }
     this.removeCameraObserver();
+    this.placementSync?.stop();
     this.orbitController?.dispose();
     this.gizmo?.dispose();
     this.sculptController?.dispose();
