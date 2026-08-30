@@ -7,14 +7,15 @@ import {
   validateClimateLayers,
 } from './Biomes';
 import {
+  createBiomeResolver,
   createClimateField,
   createLayerNoiseFields,
-  resolveBiomeWeights,
+  resolveActiveBiomes,
   sampleLayerNoise,
 } from './ClimateField';
 import { resolveLayerWeights } from './LayerWeights';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
-import { PaintMask, samplePaintMask } from './PaintMask';
+import { PaintMask } from './PaintMask';
 
 // World units between adjacent heightmap samples — the run that the rise between
 // neighbours is taken over, so the slope below comes out in real degrees.
@@ -57,8 +58,8 @@ export interface SplatOptions {
 }
 
 /**
- * Terrain slope in degrees from horizontal at sample (x, y), by central
- * difference on the heightfield.
+ * The heightfield's central-difference gradient at sample (x, y), written into
+ * `out` as [dh/dx, dh/dy] — the shared basis for slope and surface normal.
  *
  * Edge samples fall back to a one-sided difference, which disagrees very
  * slightly with the same world position computed from the neighbouring chunk
@@ -67,25 +68,39 @@ export interface SplatOptions {
  * stays far below one quantisation step — but it is the reason a visible seam,
  * if one ever appears in the splat, would appear at chunk borders first.
  */
-function slopeDegreesAt(
+export function heightGradientAt(
+  heights: Float32Array,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  out: Float64Array
+): void {
+  const x0 = x > 0 ? x - 1 : x;
+  const x1 = x < width - 1 ? x + 1 : x;
+  const y0 = y > 0 ? y - 1 : y;
+  const y1 = y < height - 1 ? y + 1 : y;
+
+  out[0] =
+    (heights[y * width + x1] - heights[y * width + x0]) /
+    ((x1 - x0) * SAMPLE_SPACING);
+  out[1] =
+    (heights[y1 * width + x] - heights[y0 * width + x]) /
+    ((y1 - y0) * SAMPLE_SPACING);
+}
+
+const _gradient = new Float64Array(2);
+
+export function slopeDegreesAt(
   heights: Float32Array,
   width: number,
   height: number,
   x: number,
   y: number
 ): number {
-  const x0 = x > 0 ? x - 1 : x;
-  const x1 = x < width - 1 ? x + 1 : x;
-  const y0 = y > 0 ? y - 1 : y;
-  const y1 = y < height - 1 ? y + 1 : y;
-
-  const dhdx =
-    (heights[y * width + x1] - heights[y * width + x0]) /
-    ((x1 - x0) * SAMPLE_SPACING);
-  const dhdy =
-    (heights[y1 * width + x] - heights[y0 * width + x]) /
-    ((y1 - y0) * SAMPLE_SPACING);
-
+  heightGradientAt(heights, width, height, x, y, _gradient);
+  const dhdx = _gradient[0];
+  const dhdy = _gradient[1];
   return Math.atan(Math.sqrt(dhdx * dhdx + dhdy * dhdy)) * RAD_TO_DEG;
 }
 
@@ -173,7 +188,9 @@ export function generateSplatMap(
   // Per-biome map from layer index → splat channel, resolved up front so the
   // sample loop never does a name lookup.
   const biomeChannels: Int32Array[] = climate.biomes.map((biome) =>
-    Int32Array.from(biome.layers.map((layer) => palette.indexOf(layer.material)))
+    Int32Array.from(
+      biome.layers.map((layer) => palette.indexOf(layer.material))
+    )
   );
 
   let maxLayers = 1;
@@ -188,14 +205,9 @@ export function generateSplatMap(
   );
 
   // Scratch reused across samples — nothing is allocated in the loop.
-  const biomeCount = climate.biomes.length;
-  const climateBiomes = new Int32Array(4);
-  const climateWeights = new Float64Array(4);
-  // Painted biomes merge with the (up to four) climate biomes, so the combined
-  // list can hold both — in practice they overlap heavily and it stays short.
-  const activeBiomes = new Int32Array(4 + biomeCount);
-  const activeWeights = new Float64Array(4 + biomeCount);
-  const paintWeights = new Float64Array(biomeCount);
+  const resolver = createBiomeResolver(field, biomeMask);
+  const activeBiomes = resolver.biomes;
+  const activeWeights = resolver.weights;
   const layerWeights = new Float64Array(maxLayers);
   const layerNoise = new Float64Array(maxLayers);
   const channels = new Float64Array(MAX_SPLAT_LAYERS);
@@ -208,50 +220,7 @@ export function generateSplatMap(
 
       channels.fill(0);
 
-      // Painted biomes first: each takes its painted weight outright, and the
-      // climate model is scaled into whatever is left. Where paint saturates,
-      // `climateScale` is 0 and the climate noise is skipped entirely — a fully
-      // painted region costs no noise evaluations at all.
-      let activeCount = 0;
-      let painted = 0;
-      if (biomeMask) {
-        painted = samplePaintMask(biomeMask, x, y, paintWeights);
-        for (let c = 0; c < biomeCount; c++) {
-          if (paintWeights[c] <= 0) continue;
-          activeBiomes[activeCount] = c;
-          activeWeights[activeCount] = paintWeights[c];
-          activeCount++;
-        }
-      }
-
-      const climateScale = 1 - painted;
-      if (climateScale > 0) {
-        const climateCount = resolveBiomeWeights(
-          field,
-          x,
-          y,
-          climateBiomes,
-          climateWeights
-        );
-        for (let b = 0; b < climateCount; b++) {
-          const biomeIndex = climateBiomes[b];
-          const weight = climateWeights[b] * climateScale;
-          // A biome can be both painted and climate-native here; merging keeps
-          // it evaluated once, exactly as the climate cells already merge.
-          let merged = false;
-          for (let j = 0; j < activeCount; j++) {
-            if (activeBiomes[j] === biomeIndex) {
-              activeWeights[j] += weight;
-              merged = true;
-              break;
-            }
-          }
-          if (merged) continue;
-          activeBiomes[activeCount] = biomeIndex;
-          activeWeights[activeCount] = weight;
-          activeCount++;
-        }
-      }
+      const activeCount = resolveActiveBiomes(resolver, x, y);
 
       for (let b = 0; b < activeCount; b++) {
         const biomeIndex = activeBiomes[b];
