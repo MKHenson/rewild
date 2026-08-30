@@ -653,16 +653,22 @@ export class EditorViewport extends Component<Props> {
             (a) => a.id === this.selectedTransform!.id
           );
           if (asset) {
+            const dragged = this._placementPosition.fromArray(result.position);
             // A drag re-decides what the object stands on. A click that never
             // moved it resolves no surface, and leaves the flag as authored.
             if (result.onTerrain !== null)
-              applyConformPolicy(asset, result.onTerrain);
-            // Conformed assets store the drag as an offset above the ground,
-            // so the move survives the next sculpt instead of being overwritten.
+              applyConformPolicy(
+                asset,
+                this.renderer.terrainRenderer,
+                dragged,
+                result.onTerrain
+              );
+            // Stored as an offset above the ground, so the move survives the
+            // next sculpt instead of being overwritten by it.
             writeBackPlacement(
               asset,
               this.renderer.terrainRenderer,
-              this._placementPosition.fromArray(result.position),
+              dragged,
               result.rotation
             );
           }
@@ -751,11 +757,21 @@ export class EditorViewport extends Component<Props> {
           rotation,
         };
 
-        applyConformPolicy(placement, isTerrainTransform(intersection!.object));
+        const dropPosition = this._placementPosition.set(
+          point.x,
+          point.y,
+          point.z
+        );
+        applyConformPolicy(
+          placement,
+          this.renderer.terrainRenderer,
+          dropPosition,
+          isTerrainTransform(intersection!.object)
+        );
         writeBackPlacement(
           placement,
           this.renderer.terrainRenderer,
-          this._placementPosition.set(point.x, point.y, point.z),
+          dropPosition,
           rotation
         );
 
