@@ -7,6 +7,7 @@ import { generateBiomeBlendedHeightMap } from '../Noise';
 import { resolveClimatePreset } from '../Biomes';
 import { generateSplatMap } from '../Splat';
 import { PaintMask } from '../PaintMask';
+import { ScatterInstances, scatterChunk } from '../Scatter';
 import { Vector2 } from 'rewild-common';
 
 export interface BuildChunkMeshRequest {
@@ -32,6 +33,8 @@ export interface BuildChunkMeshRequest {
   // paint decides what the ground is made of, never its shape (see
   // generateSplatMap), so it is absent from every height path above.
   biomeMask?: PaintMask;
+  // Generate scatter instances alongside the mesh
+  scatter?: boolean;
 }
 
 // One-sample apron ring so edge-vertex normals get a two-sided gradient that
@@ -83,6 +86,8 @@ export interface BuildChunkMeshResult {
   // Returned so the main thread can keep the chunk's current heights in memory
   // — the capture source for snapshot writes (#174) and sculpting (#175).
   heights: Float32Array;
+  // Per-layer instance lists; empty unless the request asked for scatter.
+  scatter: ScatterInstances[];
 }
 
 // Shared by the terrain worker and tests. Everything downstream of the height
@@ -194,6 +199,14 @@ export function buildChunkMesh(
     uvs[i * 2 + 1] = meshData.interleaved[base + 4];
   }
 
+  // Derived from the same heights and climate the splat was, so an instance
+  // stands on the material its own rules selected for.
+  const scatter = request.scatter
+    ? scatterChunk(chunkSize, seed, worldOffset, climate, heights, {
+        biomeMask: request.biomeMask ?? null,
+      })
+    : [];
+
   return {
     splat,
     vertices,
@@ -201,5 +214,6 @@ export function buildChunkMesh(
     normals: meshData.normals,
     indices: meshData.triangles,
     heights,
+    scatter,
   };
 }

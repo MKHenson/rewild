@@ -1,5 +1,6 @@
 import { Perlin, Vector2 } from 'rewild-common';
 import { ClimateAxis, ClimateConfig, NoiseSelector } from './Biomes';
+import { PaintMask, samplePaintMask } from './PaintMask';
 
 // Per-sample climate resolution: which biome(s) a world position is in, and in
 // what proportion.
@@ -345,4 +346,101 @@ export function resolveBiomeWeights(
   }
 
   return activeCount;
+}
+
+// Painted biomes merged with the climate's own, so splat and scatter cannot
+// disagree about which biome is where. Holds every scratch buffer the merge
+// needs, built once per generation call.
+export interface BiomeResolver {
+  field: ClimateField;
+  biomeMask: PaintMask | null;
+  /** Merged result of the last resolveActiveBiomes call. */
+  biomes: Int32Array;
+  weights: Float64Array;
+  paintWeights: Float64Array;
+  climateBiomes: Int32Array;
+  climateWeights: Float64Array;
+}
+
+export function createBiomeResolver(
+  field: ClimateField,
+  biomeMask: PaintMask | null
+): BiomeResolver {
+  const biomeCount = field.climate.biomes.length;
+  return {
+    field,
+    biomeMask,
+    // Painted biomes merge with the (up to four) climate biomes, so the list
+    // can hold both — in practice they overlap heavily and it stays short.
+    biomes: new Int32Array(4 + biomeCount),
+    weights: new Float64Array(4 + biomeCount),
+    paintWeights: new Float64Array(biomeCount),
+    climateBiomes: new Int32Array(4),
+    climateWeights: new Float64Array(4),
+  };
+}
+
+/**
+ * The biomes active at sample (x, y), written into `resolver.biomes` /
+ * `resolver.weights`; returns how many. Weights sum to 1.
+ *
+ * Paint goes first, taking its weight outright, and the climate model is scaled
+ * into what is left — the same "take your coverage of the remainder"
+ * compositing the layers use. Where paint saturates the climate noise is
+ * skipped entirely, so a fully painted region costs no noise evaluations.
+ */
+export function resolveActiveBiomes(
+  resolver: BiomeResolver,
+  x: number,
+  y: number
+): number {
+  const { biomeMask, paintWeights, biomes, weights } = resolver;
+  let count = 0;
+  let painted = 0;
+
+  if (biomeMask) {
+    painted = samplePaintMask(biomeMask, x, y, paintWeights);
+    for (let c = 0; c < paintWeights.length; c++) {
+      if (paintWeights[c] <= 0) continue;
+      biomes[count] = c;
+      weights[count] = paintWeights[c];
+      count++;
+    }
+  }
+
+  const climateScale = 1 - painted;
+  if (climateScale <= 0) return count;
+
+  const climateBiomes = resolver.climateBiomes;
+  const climateWeights = resolver.climateWeights;
+  const climateCount = resolveBiomeWeights(
+    resolver.field,
+    x,
+    y,
+    climateBiomes,
+    climateWeights
+  );
+
+  for (let b = 0; b < climateCount; b++) {
+    const biomeIndex = climateBiomes[b];
+    const weight = climateWeights[b] * climateScale;
+
+    // A biome can be both painted and climate-native here; merging keeps it
+    // evaluated once, exactly as the climate cells already merge.
+    let merged = false;
+    for (let j = 0; j < count; j++) {
+      if (biomes[j] === biomeIndex) {
+        weights[j] += weight;
+        merged = true;
+        break;
+      }
+    }
+    if (merged) continue;
+
+    biomes[count] = biomeIndex;
+    weights[count] = weight;
+    count++;
+  }
+
+  return count;
 }

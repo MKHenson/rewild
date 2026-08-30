@@ -2,6 +2,8 @@ import { Vector2 } from 'rewild-common';
 import { buildChunkMesh } from './buildChunkMesh';
 import { generateBiomeBlendedHeightMap } from '../Noise';
 import { DEFAULT_CLIMATE_PRESET, resolveClimatePreset } from '../Biomes';
+import { SCATTER_INSTANCE_STRIDE } from '../Scatter';
+import { getScatterLayer } from '../ScatterLayers';
 
 // Small chunk keeps the test fast; width-1 (24) is divisible by every LOD
 // increment (lod*2), mirroring the 241-sample production layout.
@@ -53,7 +55,11 @@ describe('buildChunkMesh', () => {
     );
 
     const supplied = new Float32Array(CHUNK_SIZE * CHUNK_SIZE).fill(7);
-    const provided = buildChunkMesh({ ...baseRequest, lod: 2, heights: supplied });
+    const provided = buildChunkMesh({
+      ...baseRequest,
+      lod: 2,
+      heights: supplied,
+    });
     expect(provided.heights).toEqual(supplied);
   });
 
@@ -80,7 +86,11 @@ describe('buildChunkMesh', () => {
     // identical normals — the seam this apron exists to remove. Checked at a
     // coarse LOD too, where the pre-apron facet normals diverged most.
     for (const lod of [0, 2]) {
-      const left = buildChunkMesh({ ...baseRequest, lod, position: { x: 0, y: 0 } });
+      const left = buildChunkMesh({
+        ...baseRequest,
+        lod,
+        position: { x: 0, y: 0 },
+      });
       const right = buildChunkMesh({
         ...baseRequest,
         lod,
@@ -139,7 +149,12 @@ describe('buildChunkMesh', () => {
     for (let y = 0; y < a; y++)
       for (let x = 0; x < a; x++) apron[y * a + x] = x; // ramp along x
 
-    const result = buildChunkMesh({ ...baseRequest, lod: 0, apron, edited: true });
+    const result = buildChunkMesh({
+      ...baseRequest,
+      lod: 0,
+      apron,
+      edited: true,
+    });
 
     const vpl = CHUNK_SIZE; // LOD 0
     const cornerN = (0 * vpl + 0) * 3; // an edge (corner) vertex
@@ -165,5 +180,43 @@ describe('buildChunkMesh', () => {
     expect(lod2.vertices.length).toBeLessThan(lod0.vertices.length);
     // Corner sample (first vertex) is shared by every LOD.
     expect(lod2.vertices[1]).toBe(lod0.vertices[1]);
+  });
+});
+
+describe('buildChunkMesh scatter', () => {
+  it('generates nothing unless asked', () => {
+    expect(buildChunkMesh({ ...baseRequest, lod: 0 }).scatter).toEqual([]);
+  });
+
+  it('generates per-layer instances from the same heights as the mesh', () => {
+    const built = buildChunkMesh({ ...baseRequest, lod: 0, scatter: true });
+
+    expect(built.scatter.length).toBeGreaterThan(0);
+    for (const layer of built.scatter) {
+      expect(layer.count).toBeGreaterThan(0);
+      expect(layer.data.length).toBeGreaterThanOrEqual(
+        layer.count * SCATTER_INSTANCE_STRIDE
+      );
+    }
+  });
+
+  // Scatter rides the provided heights, so a sculpted chunk re-places rather
+  // than re-deriving from the noise the sculpt diverged from.
+  it('follows provided heights rather than the generator', () => {
+    const raised = new Float32Array(CHUNK_SIZE * CHUNK_SIZE).fill(40);
+    const built = buildChunkMesh({
+      ...baseRequest,
+      lod: 0,
+      heights: raised,
+      edited: true,
+      scatter: true,
+    });
+
+    for (const layer of built.scatter)
+      for (let i = 0; i < layer.count; i++)
+        expect(layer.data[i * SCATTER_INSTANCE_STRIDE + 1]).toBeCloseTo(
+          40 + (getScatterLayer(layer.layer).yOffset ?? 0),
+          4
+        );
   });
 });
