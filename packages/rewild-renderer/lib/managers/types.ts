@@ -111,5 +111,7 @@ export interface IGeometryTemplates {
   [name: string]: {
     type: string;
     url: string;
+    /** Coarser stand-ins for the same model, nearest first. Array of URLs */
+    lods?: string[];
   };
 }
