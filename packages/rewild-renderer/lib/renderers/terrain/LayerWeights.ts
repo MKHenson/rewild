@@ -1,4 +1,4 @@
-import { BiomeLayer, BiomeParams, SelectorBand } from './Biomes';
+import { BiomeLayer, BiomeParams, BiomeScatter, SelectorBand } from './Biomes';
 
 // Smoothstep across a selector band. `from` > `to` inverts the ramp — the same
 // function covers "fades in as the value rises" and "fades out as it rises".
@@ -70,4 +70,27 @@ export function resolveLayerWeights(
   }
 
   out[0] = remaining;
+}
+
+/**
+ * A scatter rule's density at a single sample, in 0..1 of what the layer's
+ * footprint allows.
+ *
+ * Unlike layer weights these do not composite — a rule is its own field — so
+ * this is just the rule's density scaled by the product of its selectors.
+ * `noiseValue` is the rule's noise field at the sample (see sampleLayerNoise),
+ * ignored unless the rule carries a noise selector.
+ */
+export function resolveScatterDensity(
+  rule: BiomeScatter,
+  height: number,
+  slopeDegrees: number,
+  noiseValue: number
+): number {
+  return (
+    rule.density *
+    bandCoverage(rule.slope, slopeDegrees) *
+    bandCoverage(rule.height, height) *
+    bandCoverage(rule.noise?.band, noiseValue)
+  );
 }

@@ -1,5 +1,5 @@
 import { Perlin, Vector2 } from 'rewild-common';
-import { ClimateAxis, ClimateConfig } from './Biomes';
+import { ClimateAxis, ClimateConfig, NoiseSelector } from './Biomes';
 
 // Per-sample climate resolution: which biome(s) a world position is in, and in
 // what proportion.
@@ -195,16 +195,38 @@ export function createLayerNoiseFields(
   climate: ClimateConfig
 ): (LayerNoiseField | null)[][] {
   return climate.biomes.map((biome) =>
-    biome.layers.map((layer) => {
-      if (!layer.noise) return null;
-      const rng = seededRandom(seed + layer.noise.seedSalt);
-      return {
-        offsetX: rng() * 200000 - 100000 + offset.x,
-        offsetY: rng() * 200000 - 100000 + offset.y,
-        scale: layer.noise.scale,
-      };
-    })
+    biome.layers.map((layer) => createNoiseField(seed, offset, layer.noise))
   );
+}
+
+/**
+ * The same, per (biome, scatter rule). Scatter rules carry the same noise
+ * selector as layers do, so they get the same world-continuous field.
+ */
+export function createScatterNoiseFields(
+  seed: number,
+  offset: Vector2,
+  climate: ClimateConfig
+): (LayerNoiseField | null)[][] {
+  return climate.biomes.map((biome) =>
+    (biome.scatter ?? []).map((rule) =>
+      createNoiseField(seed, offset, rule.noise)
+    )
+  );
+}
+
+function createNoiseField(
+  seed: number,
+  offset: Vector2,
+  selector: NoiseSelector | undefined
+): LayerNoiseField | null {
+  if (!selector) return null;
+  const rng = seededRandom(seed + selector.seedSalt);
+  return {
+    offsetX: rng() * 200000 - 100000 + offset.x,
+    offsetY: rng() * 200000 - 100000 + offset.y,
+    scale: selector.scale,
+  };
 }
 
 /**

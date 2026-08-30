@@ -1,5 +1,5 @@
-import { BiomeParams, MOUNTAIN, PLAIN } from './Biomes';
-import { resolveLayerWeights } from './LayerWeights';
+import { BiomeParams, BiomeScatter, MOUNTAIN, PLAIN } from './Biomes';
+import { resolveLayerWeights, resolveScatterDensity } from './LayerWeights';
 
 // Layer indices in MOUNTAIN.layers.
 const DIRT = 0;
@@ -29,9 +29,7 @@ function weightsFor(
 ): number[] {
   const out = new Float64Array(biome.layers.length);
   const noiseValues =
-    noise === null
-      ? null
-      : new Float64Array(biome.layers.length).fill(noise);
+    noise === null ? null : new Float64Array(biome.layers.length).fill(noise);
   resolveLayerWeights(biome, height, slopeDegrees, noiseValues, out);
   return Array.from(out);
 }
@@ -220,5 +218,39 @@ describe('resolveLayerWeights', () => {
     resolveLayerWeights(SOLO, 0, 0, null, out);
     expect(out[0]).toBe(1);
     expect(out[1]).toBe(-1);
+  });
+});
+
+describe('resolveScatterDensity', () => {
+  const rule: BiomeScatter = {
+    layer: 'granite_pebble',
+    density: 0.4,
+    slope: { from: 40, to: 10 },
+    height: { from: 0, to: 50 },
+  };
+
+  it('is the density scaled by the product of its selectors', () => {
+    expect(resolveScatterDensity(rule, 100, 0, 0)).toBeCloseTo(0.4);
+  });
+
+  it('is zero outside any one selector', () => {
+    expect(resolveScatterDensity(rule, 100, 60, 0)).toBe(0);
+    expect(resolveScatterDensity(rule, -10, 0, 0)).toBe(0);
+  });
+
+  // Rules are independent fields, so nothing here caps at the biome level.
+  it('ignores the noise value when the rule has no noise selector', () => {
+    expect(resolveScatterDensity(rule, 100, 0, 0)).toBe(
+      resolveScatterDensity(rule, 100, 0, 1)
+    );
+  });
+
+  it('applies a noise selector when the rule carries one', () => {
+    const noisy: BiomeScatter = {
+      ...rule,
+      noise: { scale: 100, seedSalt: 1, band: { from: 0.4, to: 0.6 } },
+    };
+    expect(resolveScatterDensity(noisy, 100, 0, 0.2)).toBe(0);
+    expect(resolveScatterDensity(noisy, 100, 0, 0.8)).toBeCloseTo(0.4);
   });
 });
