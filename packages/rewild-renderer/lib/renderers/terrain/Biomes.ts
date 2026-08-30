@@ -1,47 +1,30 @@
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
+import { SCATTER_LAYERS } from './ScatterLayers';
 import { TERRAIN_MATERIALS } from './TerrainMaterials';
 
-// A smoothstep band over a per-sample value: `from` → 0, `to` → 1, ramping
-// smoothly between. `from` > `to` is allowed and inverts the ramp, so the same
-// band expresses both "fades in as the value rises" and "fades out" — which is
-// how snow lets go of a steepening face.
+// A smoothstep band over a per-sample value: `from` → 0, `to` → 1. `from` > `to`
+// inverts the ramp, so one band expresses both "fades in" and "fades out".
 export interface SelectorBand {
   from: number;
   to: number;
 }
 
-// A selector over a noise field rather than over the terrain's shape.
-//
-// Slope and height ask what the ground is doing at a sample. This asks nothing:
-// it is a smooth random field, so it scatters a material in organic patches
-// wherever the layer's other selectors already allow it. That is what mixes two
-// materials "naturally" — a hard job for slope/height, which can only ever draw
-// the same patch on the same shape.
-//
-// Band values are against a 0..1 noise value, so `{ from: 0.45, to: 0.55 }` is
-// a roughly even mottle with soft edges, and `{ from: 0.7, to: 0.8 }` is
-// occasional patches. Inverting it (from > to) selects the *other* side of the
-// same field, which is how two layers can share one field and interlock.
+// Organic patches, independent of the terrain's shape — what slope and height
+// cannot do, since they can only ever draw the same patch on the same shape.
+// The band is against a 0..1 noise value.
 export interface NoiseSelector {
   // Patch size in sample units. Divide metres by TERRAIN_METERS_PER_SAMPLE.
   scale: number;
-  // Added to the world seed. Decorrelates this field from the height noise, the
-  // climate axes, and other layers' fields. Two layers given the same salt and
-  // scale see the *same* field, which is deliberate and useful.
+  // Added to the world seed. Same salt and scale ⇒ the same field, which is how
+  // two layers interlock across one field.
   seedSalt: number;
   band: SelectorBand;
 }
 
-// One material a biome can surface with, and where it applies. A layer's
-// coverage is the product of its selectors; an omitted selector is 1, so a
-// layer with no selectors covers everywhere — which above the base means it
-// buries every layer under it. validateClimateLayers rejects that.
-//
-// Layers composite base-first, like painting: each layer takes its coverage of
-// whatever the layers above it left uncovered, and layers[0] soaks up the
-// remainder. So layers[0] is the biome's base material and must be
-// unconstrained, and no layer needs an explicit "everywhere the others aren't"
-// rule. See resolveLayerWeights (LayerWeights.ts).
+// One material a biome surfaces with. Coverage is the product of its selectors;
+// an omitted selector is 1. Layers composite base-first — each takes its
+// coverage of what the layers above left uncovered — so layers[0] is the base
+// and must be unconstrained. See resolveLayerWeights.
 export interface BiomeLayer {
   material: string; // key into TERRAIN_MATERIALS
   slope?: SelectorBand; // degrees from horizontal
@@ -49,48 +32,45 @@ export interface BiomeLayer {
   noise?: NoiseSelector; // organic patches, independent of terrain shape
 }
 
+// One scatter layer a biome grows. Same selectors as BiomeLayer, but rules do
+// not composite — each is an independent density field, so none is "the base"
+// and a biome may name a layer at most once.
+export interface BiomeScatter {
+  layer: string; // key into SCATTER_LAYERS
+  // Fraction of what the layer's `footprint` allows: 1 is as tightly packed as
+  // the instances fit. Relative rather than per-square-metre so it composes
+  // with a paint mask's 0..1 weight.
+  density: number;
+  slope?: SelectorBand; // degrees from horizontal
+  height?: SelectorBand; // absolute world meters
+  noise?: NoiseSelector; // organic patches, independent of terrain shape
+}
+
 // ── Deformations ─────────────────────────────────────────────────────────────
-// A biome's shape is a *stack* of deformations, each a pure function of world
-// position that returns a height contribution in meters. The stack is summed:
-// the first entry is conventionally an fBm 'base' (rolling hills), and later
-// entries — dunes, and whatever kinds get added here in future — layer relief on
-// top of it. Height and surfacing are separate concerns: this shapes the ground,
-// `layers` paints it, and neither reads the other.
-//
-// Every deformation is seam-free: it reads only the sample's world position, so
-// adjacent chunks agree on their shared edge with no cross-chunk state. And each
-// is evaluated by a plain switch on `kind` (see evalDeformation in Noise.ts),
-// never a per-sample method call or allocation — that switch is what keeps the
-// heightfield loop cheap. Adding a kind is a member here plus a case there.
+// A biome's shape is a summed stack of these, each a pure function of world
+// position returning metres. Reading only world position is what keeps them
+// seam-free across chunks. Evaluated by a switch on `kind` (evalDeformation in
+// Noise.ts), never a method call — adding a kind is a member here plus a case
+// there.
 export type Deformation = FbmDeformation | DuneDeformation;
 
-// Fractional-Brownian-motion noise: octaves of simplex summed with falling
-// amplitude (persistence) and rising frequency (lacunarity), normalised to [0,1]
-// against the octave stack's own fixed maximum (continuous across chunks),
-// curved, and scaled to meters. The classic rolling-hills field — every biome
-// carried exactly one of these before deformations existed, which is why the
-// migration from the old flat fields is a straight rename.
+// Octaves of simplex summed with falling amplitude and rising frequency — the
+// rolling-hills field every biome is built on.
 export interface FbmDeformation {
   kind: 'fbm';
-  amplitude: number; // meters at full noise (the old heightScale)
-  noiseScale: number; // horizontal feature size in world-units; bigger → broader, gentler forms
+  amplitude: number; // meters at full noise
+  noiseScale: number; // horizontal feature size in world-units
   octaves: number;
   persistence: number;
   lacunarity: number;
-  curveExp: number; // exponent on normalised height; >1 flattens mids, keeps peaks (old heightCurveExp)
-  // Added to the world seed to pick this field's octave offsets. Two fbm
-  // deformations given the same salt sample the *same* underlying field — which
-  // is how neighbouring biomes keep their large-scale relief aligned across a
-  // climate transition (salt 0 everywhere reproduces the old shared-offset
-  // behaviour). Give a field a different salt to decorrelate it.
+  curveExp: number; // >1 flattens mids, keeps peaks
+  // Same salt ⇒ the same underlying field, which is how neighbouring biomes
+  // keep their relief aligned across a climate transition.
   seedSalt: number;
 }
 
-// Wind-blown dunes: a wavy transverse-ridge field that fBm cannot make, because
-// fBm is isotropic (no wind direction) and broadband (no crest rhythm). The
-// crest lines run across `angleDeg` at roughly `wavelength` spacing, meandered by
-// a low-frequency warp so they read as drifting dunes rather than a corrugated
-// roof. Its contribution is non-negative, so it adds swell onto the fBm beneath.
+// Wind-blown dunes — a transverse-ridge field fBm cannot make, being isotropic
+// and broadband. Non-negative, so it adds swell onto the fBm beneath.
 export interface DuneDeformation {
   kind: 'dunes';
   amplitude: number; // meters, trough to crest
@@ -104,15 +84,12 @@ export interface DuneDeformation {
 
 export interface BiomeParams {
   name: string;
-  // The stack that shapes this biome's surface, summed base-first (see
-  // Deformation). Separate from `layers` below, which surfaces the shape with
-  // materials and never touches height.
+  /** Shapes the ground. Never reads `layers`, and vice versa. */
   deformations: Deformation[];
-  // The materials this biome surfaces with, base first. Climate picks the
-  // biome; these pick the material *within* it — height cannot do that job,
-  // since biome height ranges overlap and terrain is tall *because* it is a
-  // mountain, not a mountain because it is tall.
+  /** Surfaces the shape, base first. */
   layers: BiomeLayer[];
+  // What grows on the shape. Omitted ⇒ bare ground.
+  scatter?: BiomeScatter[];
 }
 
 // One climate dimension (temperature or moisture): a low-frequency noise field
@@ -129,9 +106,7 @@ export interface ClimateAxis {
 // cells[temperatureBand][moistureBand] is an index into `biomes`; multiple
 // cells may share a biome. Adding a biome = a table row + a cut + cell entries.
 export interface ClimateConfig {
-  // Human-readable name for the editor's preset picker. Lives here rather than
-  // in a parallel id→label table so a preset cannot be added without one.
-  // Omitted ⇒ callers fall back to the preset id (see getClimatePresets).
+  /** For the editor's preset picker. Omitted ⇒ callers fall back to the id. */
   label?: string;
   temperature: ClimateAxis;
   moisture: ClimateAxis;
@@ -141,11 +116,8 @@ export interface ClimateConfig {
 
 // Biome parameter table. Rows are data — adding a biome is a table edit.
 //
-// Open grassland: sward everywhere, with bare trodden ground worn through it in
-// patches. The path noise is coarser and narrower-banded than the forest's leaf
-// litter below — worn ground should read as occasional broad clearings rather
-// than an even mottle, which is what separates a plain from a forest floor when
-// both are green.
+// Open grassland: sward everywhere, worn through to bare ground in broad
+// clearings.
 export const PLAIN: BiomeParams = {
   name: 'plain',
   deformations: [
@@ -167,16 +139,24 @@ export const PLAIN: BiomeParams = {
       noise: { scale: 160, seedSalt: 23, band: { from: 0.15, to: 0.92 } },
     },
   ],
+  // Stones in the sward, and the odd erratic standing in it.
+  scatter: [
+    {
+      layer: 'granite_pebble',
+      density: 0.22,
+      slope: { from: 24, to: 6 },
+    },
+    {
+      layer: 'granite_boulder',
+      density: 0.07,
+      noise: { scale: 220, seedSalt: 41, band: { from: 0.55, to: 0.78 } },
+    },
+  ],
 };
 
-// Wooded ground — the plain's wet counterpart. Taller and busier than PLAIN over
-// a tighter feature size, so the two temperate lowlands read as different
-// country rather than the same field in a different green.
-//
-// Two leaf litters rather than litter over soil: a forest floor is what fell on
-// it, so the deep broadleaf bed is the body material and the finer litter breaks
-// it up in patches. forest_ground_01 stays in the library, unused by any biome —
-// it reads as a worn track, which is not what a wood underfoot looks like.
+// Wooded ground — the plain's wet counterpart, taller and busier over a tighter
+// feature size. Two leaf litters rather than litter over soil: a forest floor
+// is what fell on it.
 export const FOREST: BiomeParams = {
   name: 'forest',
   deformations: [
@@ -198,6 +178,16 @@ export const FOREST: BiomeParams = {
       height: { from: 10, to: 20 },
       noise: { scale: 200, seedSalt: 11, band: { from: 0.15, to: 0.95 } },
     },
+  ],
+  // Thins on anything steep; the noise band breaks the stand into glades.
+  scatter: [
+    {
+      layer: 'alien_plant',
+      density: 0.55,
+      slope: { from: 32, to: 10 },
+      noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
+    },
+    { layer: 'granite_pebble', density: 0.18, slope: { from: 30, to: 8 } },
   ],
 };
 
@@ -224,22 +214,26 @@ export const MOUNTAIN: BiomeParams = {
       slope: { from: 70, to: 55 },
     },
   ],
+  // Scree and erratics on the flanks. Both fade out *under* the snow line, so
+  // the stones thin into the white rather than stopping on a contour.
+  scatter: [
+    { layer: 'granite_pebble', density: 0.45, slope: { from: 55, to: 30 } },
+    {
+      layer: 'granite_boulder',
+      density: 0.3,
+      height: { from: 165, to: 105 },
+      slope: { from: 48, to: 22 },
+    },
+  ],
 };
 
-// The arid answer to MOUNTAIN: different rock, and snow replaced by the thing
-// that actually accumulates in a desert — sand, which drifts *up* against the
-// feet of the massif rather than settling on its peaks. So its height band is
-// inverted where the snow band is not.
+// The arid answer to MOUNTAIN: different rock, and sand drifting *up* against
+// the massif's feet where snow settles on peaks — hence the inverted band.
 //
-// It does NOT share MOUNTAIN's silhouette parameters, and the difference is the
-// point. Biome blending lerps *heights*, so a biome with no low ground of its
-// own cannot grow into its neighbour — it can only be faded in, which reads as
-// a massif springing out of flat desert. heightCurveExp 2.0 did exactly that:
-// squaring a noise field that clusters around 0.5 crushes the whole mid-range
-// flat, leaving peaks and nothing under them. At 1.45 the same field keeps its
-// mids, so the massif carries its own skirts and foothills down to meet DESERT's
-// dune crests, and the raised persistence puts shoulders and spurs on the body
-// instead of one smooth cone wearing fine noise.
+// Its silhouette deliberately differs from MOUNTAIN's. Biome blending lerps
+// heights, so a biome with no low ground of its own can only be faded in, which
+// reads as a massif springing out of flat desert; the gentler curveExp keeps
+// the mids that carry its skirts down to meet DESERT.
 export const DESERT_MOUNTAIN: BiomeParams = {
   name: 'desert-mountain',
   deformations: [
@@ -258,33 +252,32 @@ export const DESERT_MOUNTAIN: BiomeParams = {
   ],
   layers: [
     { material: 'tiger_rock_1k' },
-    // Drift sand: only low down, and only where the ground is flat enough to
-    // hold it. Both bands are inverted (from > to) — coverage rises as height
-    // and slope *fall*. The band reaches to DESERT's peak height on purpose, so
-    // sand crosses the biome border unbroken and the foothills read as buried
-    // in the dune field rather than planted beside it.
+    // Drift sand: low down, and flat enough to hold it — both bands inverted.
+    // Reaches DESERT's peak height so sand crosses the border unbroken.
     {
       material: 'sand_01',
       height: { from: 310, to: 60 },
       slope: { from: 30, to: 12 },
     },
-    // Last, so a steep face wins outright over the drift below it. Opens a
-    // little lower than MOUNTAIN's cliff band — the gentler height curve means
-    // fewer samples reach 35°, and bare strata on the flanks is most of what
-    // stops the new foothills reading as smooth mounds.
+    // Last, so a steep face wins outright over the drift below it.
     { material: 'cliff_side_1k', slope: { from: 30, to: 65 } },
+  ],
+  // Weathered blocks, collecting on the flanks and skirts rather than the crest.
+  scatter: [
+    {
+      layer: 'granite_boulder',
+      density: 0.26,
+      height: { from: 420, to: 90 },
+      slope: { from: 45, to: 18 },
+    },
+    { layer: 'granite_pebble', density: 0.34, slope: { from: 50, to: 20 } },
   ],
 };
 
-// Dune country: the arid world's *relief*, and the biome that carries the climb
-// from the coastal flats up to the mountain's feet.
-//
-// It used to be a 1 km swell 50 m tall with 72% of its amplitude in one octave —
-// which is neither flat enough to read as flats nor tall enough to read as
-// dunes, and near-identical to BEACH_SAND's parameters besides. The tighter
-// feature size plus the higher persistence is what makes a dune field: a ~600 m
-// primary swell with a ~290 m secondary crest riding it at nearly half the
-// amplitude, so the ground has a rhythm at the scale you actually cross it.
+// Dune country: the arid world's relief, carrying the climb from the coastal
+// flats up to the mountain's feet. A ~600 m primary swell with a ~290 m
+// secondary crest riding it, so the ground has a rhythm at the scale you cross
+// it.
 export const DESERT: BiomeParams = {
   name: 'desert',
   deformations: [
@@ -301,33 +294,31 @@ export const DESERT: BiomeParams = {
   ],
   layers: [
     { material: 'mud_cracked_dry_03' },
-    // Cracked crust belongs in the pans, not scattered evenly over the dunes —
-    // so the inverted height band puts it in the low ground and the noise field
-    // (now broad enough to read as pans rather than a mottle) breaks up its edge.
+    // Cracked crust belongs in the pans, so the band puts it in the low ground.
     {
       material: 'sand_01',
       height: { from: 20, to: 61 },
     },
   ],
+  // Almost bare: a dune crest is moving sand, so the inverted height band puts
+  // what little there is down in the pans.
+  scatter: [
+    {
+      layer: 'granite_boulder',
+      density: 0.05,
+      height: { from: 55, to: 12 },
+      noise: { scale: 340, seedSalt: 67, band: { from: 0.62, to: 0.85 } },
+    },
+  ],
 };
 
-// Low coastal flats — the arid world's floor, and the one biome that is allowed
-// to be flat. It reads as different country from DESERT by being flat where the
-// dunes have relief, which is a job it can only do if it commits: at 30 m over a
-// 1.4 km swell it was merely *smaller* than the dunes, and two sands differing
-// only in amplitude read as one biome with a soft spot in it.
+// Low coastal flats — the arid world's floor, and the one biome allowed to be
+// flat. Flat in silhouette is not featureless underfoot: the octave stack keeps
+// detail at the scales you walk (~170 m hummocks, ~74 m ripples) while nothing
+// breaks 18 m.
 //
-// Flat in silhouette is not the same as featureless underfoot, and the octave
-// stack is what separates them. Six times shorter than DESERT, but with an
-// octave more over a higher lacunarity, so its finest detail is twice as fine as
-// the dunes' (~32 m against ~65 m): nothing here breaks 18 m while the ground
-// still hummocks at ~170 m and ripples at ~74 m — the scales you walk, not the
-// scale you see across.
-//
-// The two beach materials are the same sand at two states of wetness, so height
-// alone separates them: damp and dark in the hollows, bleached and dry on the
-// rises. The band spans most of the biome's range, which puts the tide line in
-// the terrain's own shape rather than on a contour ring.
+// The two beach materials are one sand at two wetnesses, so height alone splits
+// them — which puts the tide line in the terrain's own shape, not on a contour.
 export const BEACH_SAND: BiomeParams = {
   name: 'beach-sand',
   deformations: [
@@ -341,10 +332,9 @@ export const BEACH_SAND: BiomeParams = {
       curveExp: 1.3, // keeps the flats flat; only the rare rise gets height
       seedSalt: 0,
     },
-    // Low coastal dunes: shorter wavelength and gentler slip face than DESERT's,
-    // so the flats ripple into wavy sand ridges without becoming dune country.
-    // Different salt/bearing from DESERT so the two sand fields don't line up
-    // where the biomes meet. First-pass numbers; tune to taste.
+    // Low coastal dunes: shorter wavelength and gentler slip face than DESERT's.
+    // Different salt and bearing so the two sand fields don't line up at the
+    // border.
     {
       kind: 'dunes',
       amplitude: 10,
@@ -358,32 +348,33 @@ export const BEACH_SAND: BiomeParams = {
   ],
   layers: [
     { material: 'aerial_beach_02' },
-    // Retuned to the shorter range — the old 3→20 band never resolved at all
-    // once nothing reached 20 m, leaving the whole beach permanently damp.
     {
       material: 'aerial_beach_01',
       height: { from: 0, to: 60 },
     },
   ],
+  // Shingle in the damp hollows, on the same height split the two sands use.
+  scatter: [
+    {
+      layer: 'granite_pebble',
+      density: 0.12,
+      height: { from: 40, to: 4 },
+      noise: { scale: 180, seedSalt: 79, band: { from: 0.48, to: 0.72 } },
+    },
+  ],
 };
 
-// Three biomes over both climate axes. Temperature splits cold (mountain) from
-// warm; moisture then splits the warm half into dry (plain) and wet (forest).
-// Cold ignores moisture — a wet mountain and a dry mountain are the same
-// mountain — which is what sharing a biome across cells is for.
-//
-// This is the temperate world; the desert lives in ARID_CLIMATE, which is what
-// that preset exists for. Keeping the two apart is also what leaves the default
-// room inside the eight splat channels (it uses seven).
+// Temperature splits cold (mountain) from warm; moisture splits the warm half
+// into dry (plain) and wet (forest). Cold ignores moisture, which is what
+// sharing a biome across cells is for. Uses seven of the eight splat channels.
 export const DEFAULT_CLIMATE: ClimateConfig = {
   label: 'Default',
   temperature: {
     scale: 3000 / TERRAIN_METERS_PER_SAMPLE,
     seedSalt: 7919,
     cuts: [0.4, 0.7],
-    // Wider transition band: softens the biome border into a gradual blend
-    // rather than a hard line, and gives the ClimateField domain warp room to
-    // wander the border without compressing it into a height cliff.
+    // Wide enough that the ClimateField domain warp can wander the border
+    // without compressing it into a height cliff.
     blendHalfWidth: 0.1,
   },
   moisture: {
@@ -400,10 +391,8 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
   ],
 };
 
-// A world with no wet half. The axes are the default's — same scales, same
-// salts, so the same seed lays the biome borders in the same places — but every
-// cell resolves to something arid. "Moisture" here only ever means *less dry*,
-// which is why the wet warm cell is coastal flats rather than grassland.
+// A world with no wet half. Same salts as the default, so the same seed lays
+// the borders in the same places; "moisture" here only means less dry.
 export const ARID_CLIMATE: ClimateConfig = {
   label: 'Arid',
   temperature: {
@@ -426,32 +415,19 @@ export const ARID_CLIMATE: ClimateConfig = {
   ],
 };
 
-// The splat map carries one weight per channel across *two* RGBA8 textures —
-// eight materials for the whole climate. `getClimatePalette` is that mapping.
-//
-// Four (a single RGBA8) was exactly full at two biomes, so the desert was the
-// fifth material that forced the widening. The design doc offered two ways out:
-// per-chunk palettes, or eight channels via a second splat texture. This is the
-// second — it keeps the palette global, which means no eviction policy, no
-// per-chunk palette upload, and no chance of the overflow seam (a chunk
-// dropping a material its neighbour kept at a shared edge). Per-chunk palettes
-// remain the answer if the library ever outgrows eight *simultaneously visible*
-// materials; the shader's layerIndex indirection is still the hook for it.
-//
-// The cost is one extra byte-per-texel of splat per chunk and one extra texture
-// sample per fragment. The per-layer work is unchanged: the shader skips any
-// channel below its weight epsilon, so unused channels cost a compare.
+// Materials per climate, across two RGBA8 splat textures. The palette is global
+// rather than per-chunk, so there is no eviction policy and no overflow seam at
+// a shared edge. Per-chunk palettes are the answer if the library ever outgrows
+// eight simultaneously visible materials; the shader's layerIndex indirection
+// is the hook for it.
 export const MAX_SPLAT_LAYERS = 8;
 
-// Bytes of splat per texel: two RGBA8 textures' worth, laid out as two
-// consecutive planes (all texels' channels 0-3, then all texels' 4-7) rather
-// than interleaved, so each plane uploads straight from the same buffer.
+// Two consecutive planes (channels 0-3, then 4-7) rather than interleaved, so
+// each plane uploads straight from the same buffer.
 export const SPLAT_BYTES_PER_TEXEL = MAX_SPLAT_LAYERS;
 
-// Every material any biome in this climate can surface with, in a stable order:
-// the splat map's channel i is palette[i]. Biome order then layer order, so
-// adding a layer to an existing biome shifts later channels — which only
-// matters once splat maps are persisted (painting), not while they are derived.
+// The splat map's channel i. Biome order then layer order, so adding a layer
+// shifts later channels — which only matters once splat maps are persisted.
 export function getClimatePalette(climate: ClimateConfig): string[] {
   const palette: string[] = [];
   for (const biome of climate.biomes) {
@@ -462,6 +438,46 @@ export function getClimatePalette(climate: ClimateConfig): string[] {
   return palette;
 }
 
+// Every scatter layer this climate grows, in library slot order rather than
+// biome order — a paint mask's channels are library slots, so it stays readable
+// when a biome's rules change. The splat channel budget is what forces
+// getClimatePalette into the opposite trade.
+export function getClimateScatterLayers(climate: ClimateConfig): string[] {
+  const used = new Set<string>();
+  for (const biome of climate.biomes)
+    for (const rule of biome.scatter ?? []) used.add(rule.layer);
+
+  return Object.keys(SCATTER_LAYERS).filter((name) => used.has(name));
+}
+
+// Run by validateClimateLayers, so a bad rule surfaces at world load rather
+// than at the first scattered chunk.
+export function validateBiomeScatter(climate: ClimateConfig): void {
+  for (const biome of climate.biomes) {
+    const seen = new Set<string>();
+
+    for (const rule of biome.scatter ?? []) {
+      if (!SCATTER_LAYERS[rule.layer])
+        throw new Error(
+          `Biome '${biome.name}' references unknown scatter layer '${rule.layer}'.`
+        );
+
+      // Rules do not composite, so a repeat silently doubles the density.
+      if (seen.has(rule.layer))
+        throw new Error(
+          `Biome '${biome.name}' names scatter layer '${rule.layer}' twice — a biome carries one rule per layer.`
+        );
+      seen.add(rule.layer);
+
+      // Zero places nothing, which reads as broken; drop the rule instead.
+      if (rule.density <= 0 || rule.density > 1)
+        throw new Error(
+          `Biome '${biome.name}' scatter layer '${rule.layer}' density ${rule.density} must be within (0, 1] — it is a fraction of what the layer's footprint allows.`
+        );
+    }
+  }
+}
+
 // Fails loudly on a mis-authored table rather than rendering something subtly
 // wrong. Called wherever a climate is first resolved for splat generation.
 export function validateClimateLayers(climate: ClimateConfig): void {
@@ -469,9 +485,8 @@ export function validateClimateLayers(climate: ClimateConfig): void {
     if (!biome.layers || biome.layers.length === 0)
       throw new Error(`Biome '${biome.name}' must have at least one layer.`);
 
-    // layers[0] takes whatever the layers above it leave uncovered, so a
-    // selector on it would be silently ignored — and its author would be
-    // expecting it to apply.
+    // The base takes whatever the layers above leave uncovered, so a selector
+    // on it would be silently ignored.
     const base = biome.layers[0];
     if (base.slope || base.height)
       throw new Error(
@@ -485,14 +500,9 @@ export function validateClimateLayers(climate: ClimateConfig): void {
           `Biome '${biome.name}' references unknown terrain material '${layer.material}'.`
         );
 
-      // A layer above the base with no selectors has coverage 1 everywhere, and
-      // layers composite top-down taking their coverage of what is left — so it
-      // takes *all* of it and every layer beneath it, base included, silently
-      // resolves to weight 0. The author who wrote two materials expecting to
-      // see both instead sees only the last one. Nothing downstream can detect
-      // this (a valid splat comes out, just an unintended one), so it is caught
-      // here. To mix materials without regard to terrain shape, give the layer
-      // a `noise` selector — that is what it is for.
+      // Coverage 1 everywhere buries every layer beneath at weight 0. A valid
+      // splat comes out, just an unintended one, so nothing downstream can
+      // catch it.
       if (i > 0 && !layer.slope && !layer.height && !layer.noise)
         throw new Error(
           `Biome '${biome.name}' layer ${i} ('${layer.material}') has no selectors, so it covers everything and buries the layers beneath it. Give it a slope, height or noise selector — or make it the base layer.`
@@ -507,14 +517,12 @@ export function validateClimateLayers(climate: ClimateConfig): void {
         ', '
       )}) but the splat map holds ${MAX_SPLAT_LAYERS}.`
     );
+
+  validateBiomeScatter(climate);
 }
 
-// Tallest possible terrain across a climate's biomes. The height-colour bands
-// that used to normalise against this are gone — materials now come from the
-// splat map — but it still bounds what generation may produce. A biome's ceiling
-// is the sum of its deformation amplitudes: every kind's contribution peaks at
-// its own `amplitude` and they stack, so the sum is a safe (if loose) upper
-// bound on the summed height.
+// A loose upper bound on what generation may produce: every deformation peaks
+// at its own amplitude and they stack, so a biome's ceiling is their sum.
 export function getMaxWorldHeight(climate: ClimateConfig): number {
   let max = 0;
   for (const biome of climate.biomes) {
@@ -525,22 +533,19 @@ export function getMaxWorldHeight(climate: ClimateConfig): number {
   return max;
 }
 
-// Climate presets are game content: designed in code, never persisted. A world
-// stores only which preset it uses (WorldGenConfig.climatePreset). Later eras
-// ("worlds back in time") are additional entries here.
+// Game content: designed in code, never persisted. A world stores only which
+// preset it uses (WorldGenConfig.climatePreset).
 export const DEFAULT_CLIMATE_PRESET = 'default';
 export const ARID_CLIMATE_PRESET = 'arid';
 
-// Ids are persisted in saved worlds (WorldGenConfig.climatePreset), so renaming
-// a key here silently re-rolls every world that used it — resolveClimatePreset
-// falls back to the default rather than failing. Add, don't rename.
+// Ids are persisted, so renaming a key silently re-rolls every world that used
+// it. Add, don't rename.
 export const CLIMATE_PRESETS: Record<string, ClimateConfig> = {
   [DEFAULT_CLIMATE_PRESET]: DEFAULT_CLIMATE,
   [ARID_CLIMATE_PRESET]: ARID_CLIMATE,
 };
 
-// The preset picker's options, in declaration order. `label` is authored on the
-// config; the id is the fallback so a preset added without one still shows.
+// The preset picker's options, in declaration order.
 export function getClimatePresets(): { id: string; label: string }[] {
   return Object.entries(CLIMATE_PRESETS).map(([id, climate]) => ({
     id,
@@ -548,8 +553,7 @@ export function getClimatePresets(): { id: string; label: string }[] {
   }));
 }
 
-// Unknown ids fall back to the default preset so a world saved against a
-// removed/renamed preset still loads.
+// Falls back to the default so a world saved against a removed preset loads.
 export function resolveClimatePreset(id: string | undefined): ClimateConfig {
   if (id !== undefined && !CLIMATE_PRESETS[id])
     console.warn(

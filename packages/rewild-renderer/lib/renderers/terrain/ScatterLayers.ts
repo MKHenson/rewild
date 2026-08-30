@@ -6,7 +6,7 @@
 // LOD meshes. The layer owns only where the tiers hand over, since the same
 // model scattered at two scales drops tier at two different distances.
 
-import { SelectorBand } from './Biomes';
+import type { SelectorBand } from './Biomes';
 
 // The far tier: a billboard sampled from an octahedral atlas baked off the
 // layer's own mesh. Baked rather than authored, so nothing here names an asset.
