@@ -233,9 +233,9 @@ same mechanism covers snapshot loads, seed changes and preset re-tunes without a
 
 Two escape hatches the doc commits to:
 
-- **`conform: false`** for anything deliberately off the ground — a platform in the air, a crate
-  stacked on another crate, a lamp on a rooftop. Absolute placement stays available; it stops being
-  the default.
+- **`conform: false`** for anything that must stay world-locked regardless of the ground. Absolute
+  placement stays available; the editor does not choose it, because an object left behind by rising
+  ground is a bug far more often than an intent.
 - **Dynamic rigid bodies conform at spawn only.** After that Rapier owns the transform —
   `RigidBodyBehaviour.onUpdate` already writes it every frame — and re-deriving Y under a body would
   fight the solver. Fixed and static bodies conform normally.
@@ -253,21 +253,38 @@ exclusion list. Drag a crate onto a platform and the drop lands it on the platfo
 the right Y, exactly as it does today. That convenience is unconditional and applies to every
 object, conformed or not.
 
-What differs is what gets **stored**. A crate dropped on a platform stores `conform: false` and an
-absolute vec3, because conforming to arbitrary geometry would mean tracking a dependency the engine
-cannot maintain: if the platform is moved, re-scaled or deleted, nothing re-derives the crate.
-Terrain conform is safe precisely because the heightfield is re-sampled at chunk build, which is a
-trigger that already exists and fires on every path that changes the ground. Arbitrary scene
-geometry has no equivalent, and inventing one — a dependency graph between placed objects — is a
-much larger feature than this milestone wants.
+What differs is what gets **stored**.
+
+A crate dropped on a platform stores `conform: true`, with its `yOffset` measured **against the
+terrain, not against the platform**. The platform is anchored to the terrain too, so raising the
+ground lifts both by the same amount and the crate stays sitting on it. Nothing has to know the
+platform exists.
+
+That indirection is what makes it safe. Conforming *to* arbitrary geometry would mean tracking a
+dependency the engine cannot maintain: if the platform is moved, re-scaled or deleted, nothing
+re-derives the crate. Re-anchoring both ends to the heightfield needs no dependency at all, because
+the heightfield is re-sampled at chunk build — a trigger that already exists and fires on every path
+that changes the ground. Arbitrary scene geometry has no equivalent, and inventing one — a
+dependency graph between placed objects — is a much larger feature than this milestone wants.
+
+It is an approximation, and holds while the ground moves by the same amount under both, which is the
+ordinary case for a brush wider than the object. A sculpt gradient running across the gap between
+them pulls them apart, and neither follows a platform dragged by hand.
+
+Alignment keys off the surface rather than the heightfield: only terrain drops tilt to the slope, so
+a crate keeps its platform's orientation rather than tipping to match ground it is not touching.
+
+`conform: false` covers a placement made where no heights are resident. With nothing to measure an
+offset against, claiming one would resolve to `yOffset` 0 and drop the object to the ground the
+moment its chunk arrived.
 
 So:
 
-| Dropped on        | Y at placement time     | Stored as                     |
-| ----------------- | ----------------------- | ----------------------------- |
-| Terrain           | Raycast hit             | `conform: true` + `yOffset`   |
-| Another object    | Raycast hit             | `conform: false` + absolute Y |
-| Nothing (mid-air) | Camera-relative default | `conform: false` + absolute Y |
+| Dropped on     | Y at placement time | Stored as                                     |
+| -------------- | ------------------- | --------------------------------------------- |
+| Terrain        | Raycast hit         | `conform: true` + `yOffset`, aligned to slope |
+| Another object | Raycast hit         | `conform: true` + `yOffset`, no tilt          |
+| No heights yet | Raycast hit         | `conform: false` + absolute Y                 |
 
 The Properties panel keeps its numeric vec3 throughout, so an absolute object can be nudged by hand
 to whatever the artistic intent requires. `conform` is a checkbox beside it, not a mode the author

@@ -114,18 +114,20 @@ export function writeBackPlacement(
 const TERRAIN_ALIGN_TO_NORMAL = 1;
 
 /**
- * Sets the conform fields from what a placement was just dropped or dragged
- * onto. Terrain conforms; anything else — another object, or empty space —
- * stores an absolute Y, because only the heightfield re-samples itself on
- * every path that moves it.
+ * Sets the conform fields from what a `placement` was just dropped or dragged
+ * onto. Everything conforms; what it landed on only decides whether it tilts.
  *
  * Call before `writeBackPlacement`, which reads these to decide what to store.
  */
 export function applyConformPolicy(
   placement: IAssetPlacement,
+  terrain: IHeightfieldSampler | null,
+  position: Vector3,
   onTerrain: boolean
 ): void {
-  placement.conform = onTerrain;
+  const height = terrain ? terrain.sampleHeight(position.x, position.z) : null;
+
+  placement.conform = height !== null;
   placement.alignToNormal = onTerrain ? TERRAIN_ALIGN_TO_NORMAL : 0;
-  if (!onTerrain) placement.yOffset = 0;
+  if (height === null) placement.yOffset = 0;
 }

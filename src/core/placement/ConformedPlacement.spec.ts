@@ -198,23 +198,51 @@ describe('writeBackPlacement', () => {
 });
 
 describe('applyConformPolicy', () => {
+  const origin = new Vector3(0, 0, 0);
+
   it('conforms and aligns what lands on terrain', () => {
     const target = placement();
-    applyConformPolicy(target, true);
+    applyConformPolicy(target, ramp(0, 40), origin, true);
 
     expect(target.conform).toBe(true);
     expect(target.alignToNormal).toBe(1);
   });
 
-  it('keeps an absolute Y for anything not on terrain', () => {
-    // A crate on a platform: conforming would mean tracking a dependency on
-    // geometry that can be moved or deleted, which nothing re-derives.
-    const target = placement({ conform: true, yOffset: 3, alignToNormal: 1 });
-    applyConformPolicy(target, false);
+  it('conforms what lands on another object, but does not tilt it', () => {
+    // A crate on a platform rides the terrain with the platform, so raising
+    // the ground lifts both. It keeps the platform's orientation rather than
+    // tipping to match ground it is not touching.
+    const target = placement();
+    applyConformPolicy(target, ramp(1, 40), origin, false);
+
+    expect(target.conform).toBe(true);
+    expect(target.alignToNormal).toBe(0);
+  });
+
+  it('stays absolute where there are no heights to measure against', () => {
+    // Claiming conform here would resolve to yOffset 0 and drop the object to
+    // the ground the moment its chunk arrived.
+    const target = placement({ yOffset: 7 });
+    applyConformPolicy(target, emptyTerrain, origin, false);
 
     expect(target.conform).toBe(false);
     expect(target.yOffset).toBe(0);
-    expect(target.alignToNormal).toBe(0);
+  });
+
+  it('keeps a stacked object the same distance above the moving ground', () => {
+    // The whole point: a crate resting on a platform 4m up, over ground that
+    // then rises by 30. Both are anchored to the terrain, so both rise by 30
+    // and the crate is still resting on the platform.
+    const crate = placement();
+    const position = new Vector3();
+    const rotation = new Quaternion();
+
+    applyConformPolicy(crate, ramp(0, 10), new Vector3(0, 14, 0), false);
+    writeBackPlacement(crate, ramp(0, 10), new Vector3(0, 14, 0), [0, 0, 0, 1]);
+    expect(crate.yOffset).toBeCloseTo(4);
+
+    resolvePlacement(crate, ramp(0, 40), position, rotation);
+    expect(position.y).toBeCloseTo(44);
   });
 
   it('drives what writeBackPlacement then stores', () => {
@@ -222,8 +250,8 @@ describe('applyConformPolicy', () => {
     const onTerrain = placement();
     const offTerrain = placement();
 
-    applyConformPolicy(onTerrain, true);
-    applyConformPolicy(offTerrain, false);
+    applyConformPolicy(onTerrain, terrain, origin, true);
+    applyConformPolicy(offTerrain, emptyTerrain, origin, false);
     for (const target of [onTerrain, offTerrain])
       writeBackPlacement(target, terrain, new Vector3(0, 42, 0), [0, 0, 0, 1]);
 
@@ -238,14 +266,10 @@ describe('applyConformPolicy', () => {
     const dropped = placement();
     const position = new Vector3();
     const rotation = new Quaternion();
+    const dropPoint = new Vector3(6, 14.5, -2);
 
-    applyConformPolicy(dropped, true);
-    writeBackPlacement(
-      dropped,
-      terrain,
-      new Vector3(6, 14.5, -2),
-      [0, 0, 0, 1]
-    );
+    applyConformPolicy(dropped, terrain, dropPoint, true);
+    writeBackPlacement(dropped, terrain, dropPoint, [0, 0, 0, 1]);
     resolvePlacement(dropped, terrain, position, rotation);
 
     expect(position.x).toBe(6);
