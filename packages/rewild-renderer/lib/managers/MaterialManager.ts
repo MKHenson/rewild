@@ -140,7 +140,7 @@ export class MaterialManager {
       this.addMaterial(t.name, materialPass);
     });
 
-    for (const model of renderer.geometryManager.models.values())
+    for (const model of renderer.geometryManager.allModels())
       this.addGltfMaterials(renderer, model.materials);
 
     this.initialized = true;
