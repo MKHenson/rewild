@@ -13,9 +13,15 @@ import {
 } from './PaintMask';
 import { LODMesh } from './LODMesh';
 import { DataTexture } from '../../textures/DataTexture';
+import { ChunkScatter } from './ChunkScatter';
+import { ScatterModels } from './ScatterModels';
+import { ScatterInstances } from './Scatter';
+import { getScatterGenerationDistance } from './ScatterLayers';
 import { TextureProperties } from '../../textures/Texture';
 
 const temp: Vector3 = new Vector3();
+// Kept apart from `temp`, which the constructor and the LOD walk also use.
+const _groundPoint: Vector3 = new Vector3();
 
 export type TerrainChunkEvent = {
   type: 'mesh-loaded';
@@ -60,6 +66,27 @@ export class TerrainChunk implements IComponent {
   // cached-generated chunks stay false and keep the seamless two-sided apron.
   heightsAreEdited = false;
   disposed = false;
+  // Built from the first worker response that carried instances. Scatter is
+  // chunk state like the splat map — the same instances serve every LOD.
+  scatter: ChunkScatter | null = null;
+  // heightsVersion the resident scatter was placed against, and whether a
+  // request for it is already out. Together they stop every LOD of a new chunk
+  // paying for the same placement.
+  scatterVersion = -1;
+  private scatterRequested = false;
+  // Latches once the chunk comes within range of any layer. Separate from the
+  // distance itself because a chunk meshes at the LOD threshold it crosses —
+  // 200m for LOD 0 — which is further out than anything scatters, so a build
+  // gated on the scatter range alone would never carry one.
+  private scatterWanted = false;
+  // Horizontal distance from the viewer to this chunk's footprint, from the
+  // last visibility update. Horizontal because `bounds` is flat at y = 0, so a
+  // 3D distance would fold the camera's height in and stop a chunk underneath a
+  // high camera ever generating scatter.
+  private viewerGroundDistance = Infinity;
+  // Last known viewer position, so scatter arriving from the worker is culled
+  // on arrival rather than drawing everywhere until the player next moves.
+  private viewerPosition = new Vector3();
   // The chunk's splat map — per-texel weights over the climate's material
   // palette, derived from the climate model and `heights`. This is chunk state,
   // not per-LOD state: the worker builds it at full resolution and never varies
@@ -404,6 +431,40 @@ export class TerrainChunk implements IComponent {
 
   // Rebuilds every built LOD mesh from the current in-memory heights, in the
   // background — each mesh keeps rendering until its replacement swaps in.
+  // True while this chunk still needs instances placed against `version`. The
+  // flag is what keeps four concurrent LOD builds from each generating them.
+  // Chunks stream to the terrain's view distance, many times further than
+  // anything scatters, so instances are only generated once a chunk is close
+  // enough for some layer to draw them.
+  needsScatter(version: number): boolean {
+    if (!this.scatterWanted) return false;
+    if (this.scatterRequested || this.scatterVersion === version) return false;
+    this.scatterRequested = true;
+    return true;
+  }
+
+  // The build that asked for scatter bailed (the chunk was evicted, or its LOD
+  // moved on). Without this the request would stay latched and the chunk would
+  // never try again.
+  cancelScatterRequest(): void {
+    this.scatterRequested = false;
+  }
+
+  populateScatter(
+    renderer: Renderer,
+    models: ScatterModels,
+    instances: ScatterInstances[],
+    version: number
+  ) {
+    this.scatterRequested = false;
+    if (this.disposed) return;
+
+    this.scatter ??= new ChunkScatter(this.transform);
+    this.scatter.build(renderer, models, instances);
+    this.scatter.updateVisibility(this.viewerPosition);
+    this.scatterVersion = version;
+  }
+
   refreshMeshes(renderer: Renderer) {
     for (const lod of this.lodMesh) {
       lod.refresh(renderer);
@@ -436,6 +497,9 @@ export class TerrainChunk implements IComponent {
     this.splatTextureExt = null;
     this.splatData = null;
     this.splatVersion = -1;
+    this.scatter?.dispose();
+    this.scatter = null;
+    this.scatterVersion = -1;
   }
 
   updateTerrainChunk(
@@ -446,6 +510,17 @@ export class TerrainChunk implements IComponent {
     const viewerDistFromNearestEdge = this.bounds.distanceToPoint(viewerPos);
     const isVisible = viewerDistFromNearestEdge <= terrainRenderer.maxViewDst;
     this.visible = isVisible;
+    _groundPoint.set(viewerPos.x, 0, viewerPos.z);
+    this.viewerGroundDistance = this.bounds.distanceToPoint(_groundPoint);
+    this.viewerPosition.copy(viewerPos);
+    this.scatter?.updateVisibility(viewerPos);
+
+    // A chunk that meshed before it came into range has no build left to carry
+    // scatter, so it needs one asking for. Latching means that happens once.
+    const inScatterRange =
+      this.viewerGroundDistance <= getScatterGenerationDistance();
+    const justEnteredRange = inScatterRange && !this.scatterWanted;
+    if (inScatterRange) this.scatterWanted = true;
 
     for (const lod of this.lodMesh) {
       if (lod.mesh) {
@@ -469,6 +544,8 @@ export class TerrainChunk implements IComponent {
 
       if (lodMesh.gpuState === 'none' || lodMesh.gpuState === 'unloaded') {
         lodMesh.requestMesh(renderer);
+      } else if (justEnteredRange && this.scatterVersion === -1) {
+        lodMesh.refresh(renderer);
       }
 
       if (lodMesh.gpuState === 'ready') {
@@ -510,4 +587,3 @@ export class TerrainChunk implements IComponent {
     return this._visible;
   }
 }
-

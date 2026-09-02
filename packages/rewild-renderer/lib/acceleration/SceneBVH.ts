@@ -227,10 +227,14 @@ export class SceneBVH {
       const component = transform.component as unknown as IVisualComponent;
       const geometry = component.geometry;
 
-      if (geometry.boundingBox === null) geometry.computeBoundingBox();
+      // A component that draws its geometry away from its own transform states
+      // its own bounds; everything else is bounded by the geometry it draws.
+      const local = component.localBounds;
+      if (!local && geometry.boundingBox === null)
+        geometry.computeBoundingBox();
 
       const box = new Box3();
-      box.copy(geometry.boundingBox!);
+      box.copy(local ?? geometry.boundingBox!);
       box.applyMatrix4(transform.matrixWorld);
       worldBoxes[i] = box;
     }

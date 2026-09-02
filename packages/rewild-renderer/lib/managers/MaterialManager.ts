@@ -12,15 +12,28 @@ import { UIElementPass } from '../materials/UIElementPass';
 import { UIElementHealthPass } from '../materials/UIElementHealthPass';
 import { StandardPass } from '../materials/StandardPass';
 import { StandardInstancedPass } from '../materials/StandardInstancedPass';
+import { ScatterInstancedPass } from '../materials/ScatterInstancedPass';
 import { ALPHA_MODES } from '../materials/uniforms/StandardMaterial';
 import { GltfMaterialTemplate } from '../core/GltfMaterials';
 
+/** Which standard pass a template is built into. The template is identical in
+ *  all three; only the draw differs. */
+export type StandardPassKind =
+  | 'standard'
+  | 'standard-instanced'
+  | 'standard-scatter';
+
 export class MaterialManager {
   materials: Map<string, IMaterialPass>;
+  // Every standard template a pass was built from — materials.json entries and
+  // imported glTF materials alike — kept so a second pass kind (scatter) can be
+  // built from the same definition rather than from a pass it cannot reuse.
+  standardTemplates: Map<string, IStandardMaterialTemplate>;
   initialized: boolean;
 
   constructor() {
     this.materials = new Map();
+    this.standardTemplates = new Map();
     this.initialized = false;
   }
 
@@ -95,6 +108,7 @@ export class MaterialManager {
         }
         case 'standard':
         case 'standard-instanced':
+          this.standardTemplates.set(t.name, t);
           materialPass = createStandardPass(renderer, t);
           break;
         case 'wireframe':
@@ -149,8 +163,13 @@ export class MaterialManager {
   /**
    * Registers the materials an imported model brought with it
    */
+  standardTemplate(name: string): IStandardMaterialTemplate | undefined {
+    return this.standardTemplates.get(name);
+  }
+
   addGltfMaterials(renderer: Renderer, templates: GltfMaterialTemplate[]) {
     for (const template of templates) {
+      this.standardTemplates.set(template.name, template);
       if (this.materials.has(template.name)) continue;
 
       const pass = createStandardPass(renderer, template);
@@ -169,6 +188,7 @@ export class MaterialManager {
     });
 
     this.materials.clear();
+    this.standardTemplates.clear();
     this.initialized = false;
   }
 
@@ -186,16 +206,21 @@ export class MaterialManager {
  * `{ name, type }` entry is glTF's default material: white, dielectric, half
  * rough. Only what the template names is written.
  *
- * One function for both the per-mesh and instanced passes, because the template
- * is the same in both cases — the choice between them is about how the meshes
- * are drawn, not about what the material is.
+ * One function for every standard pass, because the template is the same in all
+ * of them — the choice between them is about how the meshes are drawn, not
+ * about what the material is.
  */
-function createStandardPass(
+export function createStandardPass(
   renderer: Renderer,
-  t: IStandardMaterialTemplate
-): StandardPass | StandardInstancedPass {
+  t: IStandardMaterialTemplate,
+  kind: StandardPassKind = t.type === 'standard-instanced'
+    ? 'standard-instanced'
+    : 'standard'
+): StandardPass | StandardInstancedPass | ScatterInstancedPass {
   const pass =
-    t.type === 'standard-instanced'
+    kind === 'standard-scatter'
+      ? new ScatterInstancedPass()
+      : kind === 'standard-instanced'
       ? new StandardInstancedPass()
       : new StandardPass();
   const { material } = pass;

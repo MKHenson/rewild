@@ -63,6 +63,10 @@ export interface ScatterLayer {
   name: string;
   /** Key into templates/geometries.json — the model, and LOD tier 0. */
   geometryId: string;
+  /** Overrides the model's own glTF materials with this one from
+   *  templates/materials.json, the same way a template-library asset does. A
+   *  model whose glTF material is a bare placeholder needs it. */
+  materialId?: string;
   /** Metres at which each of the geometry's LOD tiers takes over, ascending.
    *  Shorter than the chain leaves the remaining tiers unused. */
   lodDistances?: number[];
@@ -82,7 +86,10 @@ export interface ScatterLayer {
   wind?: ScatterWind;
 }
 
-const MESH_CULL_DISTANCE = 400;
+// Culling is per chunk and a chunk spans 480m, so a range much beyond a chunk
+// draws several whole chunks of instances for the few near the viewer. Keep
+// these tight until the per-instance cull in #223.
+const MESH_CULL_DISTANCE = 160;
 const FULL_TURN: SelectorBand = { from: 0, to: 360 };
 
 // Rows are data — adding something the world can grow is a table edit here plus
@@ -92,13 +99,14 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
   granite_boulder: {
     name: 'granite_boulder',
     geometryId: 'granite-rock',
+    materialId: 'granite-rock',
     cullDistance: MESH_CULL_DISTANCE,
-    impostor: { fromDistance: 220, views: 8, tileSize: 128 },
+    impostor: { fromDistance: 100, views: 8, tileSize: 128 },
     jitter: { scale: { from: 0.8, to: 2.2 }, yaw: FULL_TURN, tilt: 6 },
     // Sunk so a boulder beds in rather than balancing on one sampled vertex.
     yOffset: -0.15,
     alignToNormal: 1,
-    footprint: 3.5,
+    footprint: 6,
     collider: { type: 'box', size: [2.23, 1.12, 1.25] },
   },
   // The same rock as ground clutter. No collider: a pebble that stops the
@@ -106,11 +114,15 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
   granite_pebble: {
     name: 'granite_pebble',
     geometryId: 'granite-rock',
-    cullDistance: 120,
+    materialId: 'granite-rock',
+    cullDistance: 60,
     jitter: { scale: { from: 0.12, to: 0.35 }, yaw: FULL_TURN, tilt: 25 },
     yOffset: -0.05,
     alignToNormal: 1,
-    footprint: 0.8,
+    // Cell size is twice this, so halving it quadruples the instance count.
+    // At 0.8 a single chunk resolved ~90k candidates against the splat map's
+    // 58k texels.
+    footprint: 2.5,
   },
   // The foliage template. Nothing flags a layer as foliage — cutout leaves come
   // from the model's own glTF material. What differs is upright placement, a
@@ -118,11 +130,11 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
   alien_plant: {
     name: 'alien_plant',
     geometryId: 'alient-plant',
-    cullDistance: 260,
-    impostor: { fromDistance: 140, views: 8, tileSize: 128 },
+    cullDistance: 130,
+    impostor: { fromDistance: 80, views: 8, tileSize: 128 },
     jitter: { scale: { from: 0.7, to: 1.3 }, yaw: FULL_TURN, tilt: 4 },
     alignToNormal: 0,
-    footprint: 2.5,
+    footprint: 5,
     collider: { type: 'capsule', radius: 0.45, height: 7.5 },
     wind: { amplitude: 0.35, frequency: 0.55, flutter: 0.4 },
   },
@@ -141,6 +153,28 @@ export function getScatterLayer(name: string): ScatterLayer {
 // the change. Add, don't reorder.
 export function getScatterLayerOrder(): string[] {
   return Object.keys(SCATTER_LAYERS);
+}
+
+// The furthest any layer draws.
+export function getMaxScatterCullDistance(): number {
+  let max = 0;
+  for (const key in SCATTER_LAYERS)
+    max = Math.max(max, SCATTER_LAYERS[key].cullDistance);
+  return max;
+}
+
+// How far ahead of the draw range a chunk starts generating. Placement is a
+// worker round trip, so generating only once a layer is already in range makes
+// instances appear later than they vanish — the same crossing reads as two
+// different distances depending on which way you walk it. Wide enough to cover
+// the round trip plus the movement threshold that batches visibility updates.
+const SCATTER_PREFETCH = 150;
+
+// The range a chunk generates instances over, out beyond where any layer draws
+// so they are resident before they are needed. Still far short of the terrain's
+// view distance, which is what keeps distant chunks free.
+export function getScatterGenerationDistance(): number {
+  return getMaxScatterCullDistance() + SCATTER_PREFETCH;
 }
 
 /** The slot a layer occupies, or -1 if it isn't in the library. */

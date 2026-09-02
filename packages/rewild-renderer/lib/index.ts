@@ -33,3 +33,4 @@ export * from './renderers/terrain/Sculpt';
 export * from './renderers/terrain/PaintMask';
 export * from './renderers/terrain/ScatterLayers';
 export * from './renderers/terrain/Scatter';
+export * from './materials/ScatterInstancedPass';

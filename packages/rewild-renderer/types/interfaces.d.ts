@@ -6,6 +6,7 @@ import {
   Transform,
 } from '../lib';
 import { Camera } from '../lib/core/Camera';
+import { Box3 } from 'rewild-common';
 
 export interface IVisualComponent {
   readonly [IS_VISUAL_COMPONENT]: true;
@@ -14,6 +15,30 @@ export interface IVisualComponent {
   material: IMaterialPass;
   visible: boolean;
   castShadow?: boolean;
+  /**
+   * Local-space bounds to cull against instead of the geometry's own. Only a
+   * component that draws its geometry somewhere other than its transform needs
+   * this — an instanced group spreads one geometry over a whole chunk, so
+   * culling it by the geometry alone tests a single point.
+   */
+  localBounds?: Box3 | null;
+}
+
+// A chunk's instances of one scatter layer, drawn in a single call. Owns its
+// own GPU buffers because a pass is shared by every chunk growing the layer.
+export interface IScatterInstanceGroup extends IVisualComponent {
+  instanceCount: number;
+  /** Uploads on first use and returns the group-1 bind group, or null while the
+   *  data is not ready. */
+  prepareInstances(
+    renderer: Renderer,
+    pass: { instanceBindGroupLayout(): GPUBindGroupLayout }
+  ): GPUBindGroup | null;
+  writeFrameUniforms(
+    renderer: Renderer,
+    projection: Float32Array,
+    modelView: Float32Array
+  ): void;
 }
 
 export interface IRaycaster {

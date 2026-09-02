@@ -4,6 +4,8 @@ import {
   getScatterLayer,
   getScatterLayerOrder,
   getScatterLayerSlot,
+  getMaxScatterCullDistance,
+  getScatterGenerationDistance,
   validateScatterLayers,
 } from './ScatterLayers';
 
@@ -230,6 +232,26 @@ describe('validateScatterLayers', () => {
     expectInvalid(
       { wind: { amplitude: 1, frequency: 1, flutter: -0.1 } },
       /wind flutter must not be negative/
+    );
+  });
+});
+
+describe('getMaxScatterCullDistance', () => {
+  it('is the furthest any layer draws', () => {
+    expect(getMaxScatterCullDistance()).toBe(
+      Math.max(
+        ...Object.values(SCATTER_LAYERS).map((layer) => layer.cullDistance)
+      )
+    );
+  });
+});
+
+describe('getScatterGenerationDistance', () => {
+  // Generation is a worker round trip, so it has to start before the draw
+  // range — otherwise a layer appears later than it disappears.
+  it('reaches beyond the furthest layer draws', () => {
+    expect(getScatterGenerationDistance()).toBeGreaterThan(
+      getMaxScatterCullDistance()
     );
   });
 });
