@@ -1,4 +1,5 @@
 import type { PaintMask } from './PaintMask';
+import type { ScatterInstances } from './Scatter';
 
 interface TerrainWorkerRequest {
   chunkSize: number;
@@ -21,6 +22,9 @@ interface TerrainWorkerRequest {
   // The chunk's painted biome mask. Structured-cloned (not transferred) — the
   // chunk keeps its copy for the other LOD requests and for the next stroke.
   biomeMask?: PaintMask;
+  // Generate scatter instances alongside the mesh. Requested once per chunk —
+  // scatter is chunk state, not per-LOD state.
+  scatter?: boolean;
 }
 
 export interface TerrainWorkerResponse {
@@ -33,6 +37,8 @@ export interface TerrainWorkerResponse {
   indices: Uint32Array;
   // Full LOD-0 heightfield the mesh was built from (see BuildChunkMeshResult).
   heights: Float32Array;
+  // Per-layer instance lists; empty unless the request asked for scatter.
+  scatter: ScatterInstances[];
 }
 
 interface QueuedRequest {

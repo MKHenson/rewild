@@ -179,10 +179,17 @@ export class LODMesh {
         // one-sided edges rather than the mismatched noise ring.
         const apron =
           this.chunk.heightsAreEdited && knownHeights
-            ? renderer.terrainRenderer.buildApron(knownHeights, this.chunk.coord)
+            ? renderer.terrainRenderer.buildApron(
+                knownHeights,
+                this.chunk.coord
+              )
             : undefined;
 
-        const { splat, vertices, uvs, normals, indices, heights } =
+        // Scatter rides whichever LOD build gets there first — the instances
+        // are chunk state, identical for every LOD, so only one build pays.
+        const wantsScatter = this.chunk.needsScatter(version);
+
+        const { splat, vertices, uvs, normals, indices, heights, scatter } =
           await renderer.terrainRenderer.workerPool.enqueue({
             chunkSize: this.chunkSize,
             lod: this.lod,
@@ -193,6 +200,7 @@ export class LODMesh {
             apron,
             edited: this.chunk.heightsAreEdited,
             biomeMask: biomeMask ?? undefined,
+            scatter: wantsScatter,
           });
 
         // Cache the heightfield on the chunk so later LODs, snapshot writes,
@@ -208,12 +216,21 @@ export class LODMesh {
           this.chunk.disposed ||
           this.gpuState !== (swapping ? 'ready' : 'requested')
         ) {
+          if (wantsScatter) this.chunk.cancelScatterRequest();
           return;
         }
 
         // The splat map is chunk state shared by every LOD — hand it over and
         // let the chunk create or re-upload it as its version warrants.
         this.chunk.populateSplat(renderer, splat, version);
+
+        if (wantsScatter)
+          this.chunk.populateScatter(
+            renderer,
+            renderer.terrainRenderer.scatterModels,
+            scatter,
+            version
+          );
 
         // A paint stamp landed while this build was in the worker, so the splat
         // it just produced is already one stroke stale. Painting bumps only

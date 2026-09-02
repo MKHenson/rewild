@@ -17,6 +17,7 @@ import { ChunkSnapshotProvider } from './ChunkSnapshot';
 import { PaintMaskProvider } from './PaintMask';
 import { generateSplatMap } from './Splat';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
+import { ScatterModels } from './ScatterModels';
 
 export class LODInfo {
   lod: i32;
@@ -90,6 +91,9 @@ export class TerrainRenderer {
   ];
   dispatcher: Dispatcher<TerrainEvent>;
   workerPool: TerrainWorkerPool;
+  // Geometry, passes and node transforms per scatter layer, shared by every
+  // chunk that grows one.
+  scatterModels: ScatterModels;
   private onChunkLoadedDelegate: (event: TerrainChunkEvent) => void;
   private _needsVisibilityUpdate: boolean = false;
   // Captured in init(); background mesh refreshes (edits) need it outside the
@@ -257,6 +261,7 @@ export class TerrainRenderer {
     this.chunksVisibleInViewDst =
       Math.floor(this.maxViewDst / this.chunkSize) + 1;
     this.workerPool = new TerrainWorkerPool();
+    this.scatterModels = new ScatterModels();
   }
 
   private onChunkLoaded(event: TerrainChunkEvent) {
@@ -568,7 +573,13 @@ export class TerrainRenderer {
     );
 
     if (window) {
-      chunk.uploadSplatRegion(renderer, window.x0, window.y0, window.x1, window.y1);
+      chunk.uploadSplatRegion(
+        renderer,
+        window.x0,
+        window.y0,
+        window.x1,
+        window.y1
+      );
     } else {
       chunk.uploadSplatRegion(renderer, 0, 0, size - 1, size - 1);
     }
@@ -694,6 +705,7 @@ export class TerrainRenderer {
 
   dispose() {
     this.clearChunks();
+    this.scatterModels.dispose();
     this.workerPool.dispose();
   }
 }
