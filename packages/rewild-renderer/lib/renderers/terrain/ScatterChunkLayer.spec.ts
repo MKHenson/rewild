@@ -163,3 +163,83 @@ describe('instance bounds', () => {
     expect(layer.localBounds.isEmpty()).toBe(true);
   });
 });
+
+describe('instanceStorageBuffer', () => {
+  function fakeRenderer() {
+    const buffers: { label?: string }[] = [];
+    const uploads: unknown[][] = [];
+
+    const renderer = {
+      device: {
+        createBuffer(desc: { label?: string }) {
+          buffers.push(desc);
+          return { ...desc, destroy() {} };
+        },
+        createBindGroup(desc: unknown) {
+          return desc;
+        },
+        queue: {
+          writeBuffer(...args: unknown[]) {
+            uploads.push(args);
+          },
+        },
+      },
+    };
+
+    return { renderer: renderer as never, buffers, uploads };
+  }
+
+  function layerOf(instances: number[][]): ScatterChunkLayer {
+    const geometry = new Geometry();
+    geometry.vertices = new Float32Array([-1, -1, -1, 1, 1, 1]);
+    return new ScatterChunkLayer(
+      new Transform(),
+      geometry,
+      { instanceBindGroupLayout: () => null } as never,
+      identityMatrix(),
+      instancesOf(instances),
+      60
+    );
+  }
+
+  beforeAll(() => {
+    (globalThis as Record<string, unknown>).GPUBufferUsage = {
+      STORAGE: 0x80,
+      UNIFORM: 0x40,
+      COPY_DST: 0x08,
+    };
+  });
+
+  // The shadow pass runs before the scene pass, so both ask for this buffer and
+  // whichever is first uploads it — a second copy per chunk would double the
+  // instance memory of the whole world.
+  it('uploads once however many callers ask', () => {
+    const { renderer, uploads } = fakeRenderer();
+    const layer = layerOf([[1, 2, 3, 0, 0, 0, 1, 1, 0]]);
+
+    const first = layer.instanceStorageBuffer(renderer);
+    const second = layer.instanceStorageBuffer(renderer);
+
+    expect(first).toBe(second);
+    expect(uploads.length).toBe(1);
+  });
+
+  it('shares the uploaded buffer with the scene bind group', () => {
+    const { renderer } = fakeRenderer();
+    const layer = layerOf([[1, 2, 3, 0, 0, 0, 1, 1, 0]]);
+
+    const instances = layer.instanceStorageBuffer(renderer);
+    const bindGroup = layer.prepareInstances(renderer, {
+      instanceBindGroupLayout: () => null,
+    } as never) as unknown as { entries: { resource: { buffer: unknown } }[] };
+
+    expect(bindGroup.entries[1].resource.buffer).toBe(instances);
+  });
+
+  // Nothing to bind means nothing to draw: the shadow renderer leaves an empty
+  // group out of its uniform map entirely rather than drawing zero instances.
+  it('is null for a layer with no instances', () => {
+    const { renderer } = fakeRenderer();
+    expect(layerOf([]).instanceStorageBuffer(renderer)).toBeNull();
+  });
+});

@@ -45,7 +45,7 @@ because there is no stored Y to fix up.
   `SelectorBand` / `NoiseSelector` vocabulary the material layers already use. Adding vegetation to
   a biome is a table edit.
 - **One draw per layer per chunk**, through `StandardInstancedPass` — including in the shadow pass,
-  which has no instanced path today.
+  which draws the same instance buffer through its own depth-only vertex stage.
 - **Distance LOD with impostors**, so a forest reaches the horizon instead of ending at 200m.
 - **A scatter brush** in the editor whose palette is the _whole_ layer library, so an author can
   paint a pine grove into a desert.

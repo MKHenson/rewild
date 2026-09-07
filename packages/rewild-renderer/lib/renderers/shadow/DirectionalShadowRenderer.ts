@@ -2,9 +2,14 @@ import { Matrix4, Vector3 } from 'rewild-common';
 import { Renderer } from '../../Renderer';
 import { PerspectiveCamera } from '../../core/PerspectiveCamera';
 import { IRenderGroup } from '../../../types/IRenderGroup';
-import { IVisualComponent } from '../../../types/interfaces';
+import {
+  IScatterInstanceGroup,
+  IVisualComponent,
+} from '../../../types/interfaces';
 import shader from '../../shaders/shadow-depth.wgsl';
+import instancedShader from '../../shaders/shadow-depth-instanced.wgsl';
 import { ShadowDebugRenderer } from './ShadowDebugRenderer';
+import { isScatterInstanceGroup } from '../../typeGuards';
 
 export const SHADOW_MAP_SIZE = 2048;
 export const NUM_CASCADES = 3;
@@ -63,9 +68,16 @@ const NDC_CORNERS: [number, number, number][] = [
   [-1, 1, NDC_FAR_Z],
 ];
 
+// shadowMVP + nodeMatrix + viewer/cull, matching Uniforms in
+// shadow-depth-instanced.wgsl.
+const INSTANCED_UNIFORM_BYTES = 64 * 2 + 16;
+
 interface MeshShadowUniforms {
   buffers: [GPUBuffer, GPUBuffer, GPUBuffer];
   bindGroups: [GPUBindGroup, GPUBindGroup, GPUBindGroup];
+  // Which pipeline these bind groups were built for. A group's entries differ
+  // between the two, so the flag decides both the write and the draw.
+  instanced: boolean;
 }
 
 export class DirectionalShadowRenderer {
@@ -85,6 +97,7 @@ export class DirectionalShadowRenderer {
   cascadeSplitDistances: Float32Array;
 
   private pipeline: GPURenderPipeline;
+  private instancedPipeline: GPURenderPipeline;
   private meshUniforms: Map<IVisualComponent, MeshShadowUniforms>;
   // Scratch set reused by the per-frame stale-entry sweep (no per-frame allocation).
   private _liveMeshes = new Set<IVisualComponent>();
@@ -101,6 +114,9 @@ export class DirectionalShadowRenderer {
   private _lightDir: Vector3;
   private _lightUp: Vector3;
   private _matData: Float32Array;
+  private _instancedData: Float32Array;
+  private _chunkInverse: Matrix4;
+  private _viewerLocal: Vector3;
 
   constructor() {
     this.debugRenderer = new ShadowDebugRenderer();
@@ -118,6 +134,9 @@ export class DirectionalShadowRenderer {
     this._lightDir = new Vector3();
     this._lightUp = new Vector3();
     this._matData = new Float32Array(16);
+    this._instancedData = new Float32Array(INSTANCED_UNIFORM_BYTES / 4);
+    this._chunkInverse = new Matrix4();
+    this._viewerLocal = new Vector3();
   }
 
   init(renderer: Renderer): void {
@@ -164,6 +183,39 @@ export class DirectionalShadowRenderer {
       },
     });
 
+    const instancedModule = device.createShaderModule({
+      label: 'instanced shadow depth shader',
+      code: instancedShader,
+    });
+
+    // Same depth state as the per-mesh pipeline, bias included: a caster
+    // stored at a different depth offset from the terrain it stands on would
+    // acne against it at the contact.
+    this.instancedPipeline = device.createRenderPipeline({
+      label: 'directional shadow instanced pipeline',
+      layout: 'auto',
+      vertex: {
+        entryPoint: 'vs',
+        module: instancedModule,
+        buffers: [
+          {
+            arrayStride: 4 * 3,
+            attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
+          },
+        ],
+      },
+      primitive: {
+        topology: 'triangle-list',
+        cullMode: 'none',
+      },
+      depthStencil: {
+        depthWriteEnabled: true,
+        depthCompare: 'less',
+        format: 'depth32float',
+        depthBiasSlopeScale: 2.0,
+      },
+    });
+
     this.debugRenderer.init(renderer, this.shadowDepthTexture);
   }
 
@@ -197,7 +249,7 @@ export class DirectionalShadowRenderer {
       for (const item of renderList) {
         if (item.geometry.requiresBuild) continue;
         for (const mesh of item.meshes) {
-          this._ensureMeshUniforms(device, mesh);
+          this._ensureMeshUniforms(renderer, mesh);
         }
       }
 
@@ -208,6 +260,17 @@ export class DirectionalShadowRenderer {
         for (const mesh of item.meshes) {
           const uniforms = this.meshUniforms.get(mesh);
           if (!uniforms) continue;
+
+          if (uniforms.instanced) {
+            this._writeInstancedUniforms(
+              device,
+              uniforms,
+              mesh as IScatterInstanceGroup,
+              camera
+            );
+            continue;
+          }
+
           for (let c = 0; c < NUM_CASCADES; c++) {
             this._shadowMVP.multiplyMatrices(
               this.lightVPs[c],
@@ -237,8 +300,6 @@ export class DirectionalShadowRenderer {
     });
 
     if (sunAboveHorizon) {
-      pass.setPipeline(this.pipeline);
-
       // Render all 3 cascades in a single pass — setViewport routes each into its atlas quadrant.
       for (let c = 0; c < NUM_CASCADES; c++) {
         pass.setViewport(
@@ -249,6 +310,11 @@ export class DirectionalShadowRenderer {
           0,
           1
         );
+
+        // organizeVisuals groups by geometry and pass, so a group is entirely
+        // instanced or entirely not; the pipeline only changes where the render
+        // list crosses from one kind to the other.
+        let currentPipeline: GPURenderPipeline | null = null;
 
         for (const item of renderList) {
           if (item.geometry.requiresBuild) continue;
@@ -262,8 +328,21 @@ export class DirectionalShadowRenderer {
             const uniforms = this.meshUniforms.get(mesh);
             if (!uniforms) continue;
 
+            const wanted = uniforms.instanced
+              ? this.instancedPipeline
+              : this.pipeline;
+            if (wanted !== currentPipeline) {
+              pass.setPipeline(wanted);
+              currentPipeline = wanted;
+            }
+
             pass.setBindGroup(0, uniforms.bindGroups[c]);
-            pass.drawIndexed(numIndices);
+            pass.drawIndexed(
+              numIndices,
+              uniforms.instanced
+                ? (mesh as IScatterInstanceGroup).instanceCount
+                : 1
+            );
           }
         }
       }
@@ -297,8 +376,44 @@ export class DirectionalShadowRenderer {
     live.clear();
   }
 
-  private _ensureMeshUniforms(device: GPUDevice, mesh: IVisualComponent): void {
+  private _ensureMeshUniforms(
+    renderer: Renderer,
+    mesh: IVisualComponent
+  ): void {
     if (this.meshUniforms.has(mesh)) return;
+
+    const { device } = renderer;
+
+    if (isScatterInstanceGroup(mesh)) {
+      // The scene pass would upload this on its first draw, but the shadow pass
+      // runs first in the frame, so it is as likely to be the one that does.
+      const instanceBuffer = mesh.instanceStorageBuffer(renderer);
+      // An empty group has no buffer to bind; leaving it out of the map also
+      // keeps it out of the draw loop.
+      if (!instanceBuffer) return;
+
+      const buffers = [0, 1, 2].map(() =>
+        device.createBuffer({
+          label: 'shadow instanced uniforms',
+          size: INSTANCED_UNIFORM_BYTES,
+          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        })
+      ) as [GPUBuffer, GPUBuffer, GPUBuffer];
+
+      const bindGroups = buffers.map((buffer) =>
+        device.createBindGroup({
+          label: 'shadow instanced bind group',
+          layout: this.instancedPipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: { buffer } },
+            { binding: 1, resource: { buffer: instanceBuffer } },
+          ],
+        })
+      ) as [GPUBindGroup, GPUBindGroup, GPUBindGroup];
+
+      this.meshUniforms.set(mesh, { buffers, bindGroups, instanced: true });
+      return;
+    }
 
     const buffers = [0, 1, 2].map(() =>
       device.createBuffer({
@@ -316,7 +431,47 @@ export class DirectionalShadowRenderer {
       })
     ) as [GPUBindGroup, GPUBindGroup, GPUBindGroup];
 
-    this.meshUniforms.set(mesh, { buffers, bindGroups });
+    this.meshUniforms.set(mesh, { buffers, bindGroups, instanced: false });
+  }
+
+  /**
+   * One instanced group's three cascade uniforms.
+   *
+   * Only the MVP differs between cascades, but each buffer is written whole —
+   * one 144-byte write beats tracking which half went stale.
+   *
+   * The viewer is put in chunk-local space so the shader's per-instance cull
+   * matches the scene pass's without carrying a second matrix. The chunk's
+   * model-view cannot stand in for it: shadow casters come from the whole
+   * scene, so a chunk outside the camera frustum still holds the model-view
+   * from whenever it was last visible.
+   */
+  private _writeInstancedUniforms(
+    device: GPUDevice,
+    uniforms: MeshShadowUniforms,
+    group: IScatterInstanceGroup,
+    camera: PerspectiveCamera
+  ): void {
+    const world = group.transform.matrixWorld;
+    const cameraWorld = camera.camera.transform.matrixWorld.elements;
+
+    this._chunkInverse.copy(world).invert();
+    this._viewerLocal
+      .set(cameraWorld[12], cameraWorld[13], cameraWorld[14])
+      .applyMatrix4(this._chunkInverse);
+
+    const data = this._instancedData;
+    data.set(group.nodeMatrix, 16);
+    data[32] = this._viewerLocal.x;
+    data[33] = this._viewerLocal.y;
+    data[34] = this._viewerLocal.z;
+    data[35] = group.cullDistance;
+
+    for (let c = 0; c < NUM_CASCADES; c++) {
+      this._shadowMVP.multiplyMatrices(this.lightVPs[c], world);
+      data.set(this._shadowMVP.elements, 0);
+      device.queue.writeBuffer(uniforms.buffers[c], 0, data.buffer);
+    }
   }
 
   private _computeCascadeLightVPs(
