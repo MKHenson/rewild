@@ -2,7 +2,10 @@ import { Box3, Matrix4, Quaternion, Vector3 } from 'rewild-common';
 import { Renderer } from '../..';
 import { Transform } from '../../core/Transform';
 import { Geometry } from '../../geometry/Geometry';
-import { IS_VISUAL_COMPONENT } from '../../typeGuards';
+import {
+  IS_SCATTER_INSTANCE_GROUP,
+  IS_VISUAL_COMPONENT,
+} from '../../typeGuards';
 import {
   SCATTER_GPU_STRIDE,
   SCATTER_UNIFORM_BYTES,
@@ -28,15 +31,13 @@ const _point = new Vector3();
  */
 export class ScatterChunkLayer implements IScatterInstanceGroup {
   readonly [IS_VISUAL_COMPONENT] = true as const;
+  readonly [IS_SCATTER_INSTANCE_GROUP] = true as const;
 
   transform: Transform;
   geometry: Geometry;
   material: ScatterInstancedPass;
   visible = true;
-  // Off until the shadow pass gains an instanced path (#220). The per-mesh path
-  // draws one copy per caster, which for a chunk of instances would be a single
-  // stray shadow at the chunk origin rather than a forest.
-  castShadow = false;
+  castShadow = true;
   instanceCount: number;
   /** The layer's draw range in metres, measured to the chunk's nearest edge. */
   cullDistance: number;
@@ -47,15 +48,15 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
    * frustum edge.
    */
   localBounds: Box3;
+  /** The primitive's place within its glTF model, applied before the instance
+   *  transform. Held as a matrix rather than baked into the geometry so two
+   *  layers can share one model's buffers. */
+  readonly nodeMatrix: Float32Array<ArrayBuffer>;
 
   // The renderer walks transforms and asks their component to raycast. Scatter
   // is not pickable — the editor selects a layer's density, never one instance.
   raycast(): void {}
 
-  /** The primitive's place within its glTF model, applied before the instance
-   *  transform. Held as a matrix rather than baked into the geometry so two
-   *  layers can share one model's buffers. */
-  private nodeMatrix: Float32Array<ArrayBuffer>;
   private instanceData: Float32Array<ArrayBuffer>;
   private instanceBuffer: GPUBuffer | null = null;
   private uniformBuffer: GPUBuffer | null = null;
@@ -82,21 +83,38 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     this.localBounds = computeInstanceBounds(geometry, nodeMatrix, instances);
   }
 
-  prepareInstances(
-    renderer: Renderer,
-    pass: ScatterInstancedPass
-  ): GPUBindGroup | null {
-    if (this.bindGroup) return this.bindGroup;
+  /**
+   * The instance transforms, uploaded on first use.
+   *
+   * Separate from prepareInstances because the shadow pass binds the same
+   * buffer under its own layout, and runs before the scene pass in the frame —
+   * whichever asks first is the one that uploads.
+   */
+  instanceStorageBuffer(renderer: Renderer): GPUBuffer | null {
     if (this.instanceCount === 0) return null;
+    if (this.instanceBuffer) return this.instanceBuffer;
 
     const { device } = renderer;
-
     this.instanceBuffer = device.createBuffer({
       label: 'scatter instances',
       size: this.instanceData.byteLength,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
     device.queue.writeBuffer(this.instanceBuffer, 0, this.instanceData);
+
+    return this.instanceBuffer;
+  }
+
+  prepareInstances(
+    renderer: Renderer,
+    pass: ScatterInstancedPass
+  ): GPUBindGroup | null {
+    if (this.bindGroup) return this.bindGroup;
+
+    const instanceBuffer = this.instanceStorageBuffer(renderer);
+    if (!instanceBuffer) return null;
+
+    const { device } = renderer;
 
     this.uniformBuffer = device.createBuffer({
       label: 'scatter chunk uniforms',
@@ -109,7 +127,7 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
       label: 'scatter chunk instances',
       entries: [
         { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: { buffer: this.instanceBuffer } },
+        { binding: 1, resource: { buffer: instanceBuffer } },
       ],
     });
 

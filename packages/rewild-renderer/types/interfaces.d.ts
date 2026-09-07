@@ -1,6 +1,7 @@
 import {
   Geometry,
   IMaterialPass,
+  IS_SCATTER_INSTANCE_GROUP,
   IS_VISUAL_COMPONENT,
   Renderer,
   Transform,
@@ -27,7 +28,17 @@ export interface IVisualComponent {
 // A chunk's instances of one scatter layer, drawn in a single call. Owns its
 // own GPU buffers because a pass is shared by every chunk growing the layer.
 export interface IScatterInstanceGroup extends IVisualComponent {
+  readonly [IS_SCATTER_INSTANCE_GROUP]: true;
   instanceCount: number;
+  /** The primitive's transform within its model, applied before the instance
+   *  transform. */
+  readonly nodeMatrix: Float32Array;
+  /** Metres beyond which instances are not drawn. */
+  readonly cullDistance: number;
+  /** The per-instance transform buffer, uploaded on first use, or null when the
+   *  group holds nothing. The shadow pass binds the same buffer under its own
+   *  layout. */
+  instanceStorageBuffer(renderer: Renderer): GPUBuffer | null;
   /** Uploads on first use and returns the group-1 bind group, or null while the
    *  data is not ready. */
   prepareInstances(
