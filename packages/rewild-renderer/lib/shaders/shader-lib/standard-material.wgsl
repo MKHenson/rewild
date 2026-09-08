@@ -17,8 +17,8 @@
 //     ibl.wgsl, which this calls into, plus the IBL bindings that last one names
 //   - the `lighting` storage binding those two need, and spotLightShadowParams,
 //     which says which light in it the spot atlas belongs to
-//   - HAS_VERTEX_TANGENTS and HAS_PARALLAX, module-scope bool consts the host
-//     bakes in from StandardPassBase.shaderDefines()
+//   - HAS_VERTEX_TANGENTS, HAS_PARALLAX and HAS_AUTHORED_NORMALS, module-scope
+//     bool consts the host bakes in from StandardPassBase.shaderDefines()
 
 // glTF alphaMode. Shared numbering with ALPHA_MODES in StandardMaterial.ts.
 const ALPHA_MODE_OPAQUE: u32 = 0u;
@@ -115,7 +115,13 @@ fn shadeStandardSurface(
   // and every open shell is black from behind. Single-sided materials cull
   // their back faces, so this is a no-op for them rather than a branch worth
   // gating on doubleSided.
-  let facing = select(-1.0, 1.0, isFrontFacing);
+  //
+  // HAS_AUTHORED_NORMALS opts out, for geometry whose normals describe a shape
+  // the triangles do not have: a canopy's cards carry the crown's outward
+  // normal, which is not the card's own and so must not follow its winding.
+  // Mirroring one turns it inward and the card goes black — on whichever half
+  // of them faces away, which changes as the camera moves.
+  let facing = select(-1.0, 1.0, isFrontFacing || HAS_AUTHORED_NORMALS);
   let geometricNormal = normalize(normal) * facing;
 
   // One frame for both jobs that need one: the normal map is applied through it,

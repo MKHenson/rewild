@@ -87,7 +87,8 @@ function drawPrimitive(
   canvas: Canvas,
   cutout: boolean,
   cutoff: number,
-  doubleSided: boolean
+  doubleSided: boolean,
+  mirrorBackFaces: boolean
 ): void {
   const { indices, uvs, normals } = attributes;
   const atlas = canvas.size;
@@ -142,7 +143,11 @@ function drawPrimitive(
         let nx = w0 * normals[ia] + w1 * normals[ib] + w2 * normals[ic];
         let ny = w0 * normals[ia + 1] + w1 * normals[ib + 1] + w2 * normals[ic + 1];
         let nz = w0 * normals[ia + 2] + w1 * normals[ib + 2] + w2 * normals[ic + 2];
-        const length = Math.hypot(nx, ny, nz) || 1;
+
+        // The engine mirrors a back face's normal, and a preview that does not
+        // hides every fault in a normal authored to ignore its own winding —
+        // which is the one class of fault only a render can catch.
+        const length = (Math.hypot(nx, ny, nz) || 1) * (mirrorBackFaces && area > 0 ? -1 : 1);
         nx /= length;
         ny /= length;
         nz /= length;
@@ -178,8 +183,13 @@ export function renderPreview(params: Params, mesh: TreeMesh, canvas: Canvas, si
   const project = createProjector(views, size, Math.round(size * 0.06));
 
   // One depth buffer across both, so a leaf behind a branch is hidden by it.
-  drawPrimitive(target, depth, size, mesh.bark, project(views[0]), canvas, false, 0, false);
-  drawPrimitive(target, depth, size, mesh.leaves, project(views[1]), canvas, true, params.leafAlphaCutoff, true);
+  // `card` is the one leaf mode whose normals are the cards' own, so it is the
+  // one the engine's back-face mirror is right for. The others set
+  // authoredNormals on the layer, which turns the mirror off there too.
+  const mirrorLeaves = params.leafNormalMode === 'card';
+
+  drawPrimitive(target, depth, size, mesh.bark, project(views[0]), canvas, false, 0, false, true);
+  drawPrimitive(target, depth, size, mesh.leaves, project(views[1]), canvas, true, params.leafAlphaCutoff, true, mirrorLeaves);
 
   return target;
 }

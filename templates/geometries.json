@@ -18,5 +18,9 @@
   "damaged-helmet": {
     "type": "gltf",
     "url": "items/damaged_helmet.glb"
+  },
+  "oak-01": {
+    "type": "gltf",
+    "url": "nature/trees/oak/oak-01.glb"
   }
 }

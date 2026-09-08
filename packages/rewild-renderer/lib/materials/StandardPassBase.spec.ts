@@ -213,6 +213,23 @@ describe.each([
     }
   );
 
+  // The mirror is a compile-time branch for the same reason the others are, and
+  // a host that forgot the placeholder would fail on first draw rather than here.
+  it.each([false, true])(
+    'compiles the shader with authoredNormals = %s baked in',
+    (authored) => {
+      const pass = create();
+      pass.authoredNormals = authored;
+      const defines = (
+        pass as unknown as { shaderDefines(): ShaderDefines }
+      ).shaderDefines();
+
+      const source = composeShader([shaderSource(shaderName)], defines);
+
+      expect(source).toContain(`const HAS_AUTHORED_NORMALS: bool = ${authored};`);
+    }
+  );
+
   it('names a vertex entry point for every attribute combination', () => {
     const pass = create();
     const internals = pass as unknown as { vertexEntryPoint(): string };
@@ -312,6 +329,12 @@ describe('standard shader hosts', () => {
     // and every procedural geometry factory produces it.
     expect(source).toContain('tbnFromDerivatives(');
     expect(source).toContain('if (!HAS_PARALLAX)');
+    // Normals authored for a shape the triangles do not have must survive a
+    // back face. Without the second term every leaf card turned away from the
+    // camera shades from the inside of its own canopy.
+    expect(source).toContain(
+      'select(-1.0, 1.0, isFrontFacing || HAS_AUTHORED_NORMALS)'
+    );
   });
 
   // heightMap has to be named in the shared shading whether or not the march is

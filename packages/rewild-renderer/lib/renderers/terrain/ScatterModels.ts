@@ -38,6 +38,7 @@ export class ScatterModels {
         renderer,
         layerName,
         layer.materialId,
+        !!layer.authoredNormals,
         root,
         null,
         built
@@ -46,6 +47,17 @@ export class ScatterModels {
     if (built.length === 0)
       throw new Error(
         `Scatter layer '${layerName}' model '${layer.geometryId}' has no drawable primitives.`
+      );
+
+    // The flag names the cutout piece, so a model with none of one has quietly
+    // ignored it. The symptom is half a canopy going black, a long way from
+    // whatever was actually changed.
+    if (
+      layer.authoredNormals &&
+      !built.some((piece) => piece.pass.authoredNormals)
+    )
+      throw new Error(
+        `Scatter layer '${layerName}' sets authoredNormals, but model '${layer.geometryId}' has no alpha-masked primitive for it to apply to.`
       );
 
     this.primitives.set(layerName, built);
@@ -63,6 +75,7 @@ function collectPrimitives(
   renderer: Renderer,
   layerName: string,
   materialId: string | undefined,
+  authoredNormals: boolean,
   node: GltfNode,
   parent: Float32Array<ArrayBuffer> | null,
   out: ScatterPrimitive[]
@@ -102,9 +115,21 @@ function collectPrimitives(
         sampler
       );
 
+    // The cutout piece only. A tree ships bark and leaves as two materials and
+    // the flag describes the leaves; a trunk's normals are its own.
+    if (authoredNormals && pass.alphaMode === 'MASK') pass.authoredNormals = true;
+
     out.push({ geometry: primitive.geometry, pass, nodeMatrix });
   }
 
   for (const child of node.children)
-    collectPrimitives(renderer, layerName, materialId, child, nodeMatrix, out);
+    collectPrimitives(
+      renderer,
+      layerName,
+      materialId,
+      authoredNormals,
+      child,
+      nodeMatrix,
+      out
+    );
 }

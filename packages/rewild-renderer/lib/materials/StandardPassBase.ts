@@ -44,6 +44,7 @@ export abstract class StandardPassBase implements IMaterialPass {
   private _vertexColors: boolean = false;
   private _vertexTangents: boolean = false;
   private _parallax: boolean = false;
+  private _authoredNormals: boolean = false;
 
   /**
    * glTF's alphaMode:
@@ -119,6 +120,26 @@ export abstract class StandardPassBase implements IMaterialPass {
   set parallax(value: boolean) {
     if (value === this._parallax) return;
     this._parallax = value;
+    this.invalidatePipeline();
+  }
+
+  /**
+   * Shade back faces with the normal as authored, instead of mirroring it.
+   *
+   * For geometry whose normals describe a shape its triangles do not have. A
+   * tree's leaf cards carry the crown's outward normal so the canopy shades as
+   * one rounded mass; that normal is not the card's own, so following the
+   * card's winding turns it inward and the card goes black. Leave it off for
+   * anything whose normals are its own — mirroring is what keeps the back of a
+   * sheet lit.
+   */
+  get authoredNormals(): boolean {
+    return this._authoredNormals;
+  }
+
+  set authoredNormals(value: boolean) {
+    if (value === this._authoredNormals) return;
+    this._authoredNormals = value;
     this.invalidatePipeline();
   }
 
@@ -198,6 +219,7 @@ export abstract class StandardPassBase implements IMaterialPass {
     return {
       HAS_VERTEX_TANGENTS: this._vertexTangents,
       HAS_PARALLAX: this._parallax,
+      HAS_AUTHORED_NORMALS: this._authoredNormals,
     };
   }
 

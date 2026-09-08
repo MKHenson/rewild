@@ -147,7 +147,7 @@ into the emitted scatter layer.
 | `--droop`           | Degrees the deepest branches bend toward the ground. **Negative bends them back upright**, which is how a crown is kept compact. |
 | `--segments`        | Rings along each branch. Deeper branches use fewer.                           |
 | `--radial-segments` | Sides of the trunk tube. Deeper branches use fewer.                           |
-| `--bark-tile`       | Metres of branch per bark texture repeat. A **mesh** setting: it writes the model's UVs and leaves the texture files untouched. Scale it with the tree. |
+| `--bark-tile`       | Metres of trunk per bark texture repeat. Thinner branches repeat proportionally faster, so bark stays the same shape all the way out. A **mesh** setting: it writes the model's UVs and leaves the texture files untouched. Scale it with the tree. |
 
 **The foliage**
 
@@ -159,7 +159,7 @@ into the emitted scatter layer.
 | `--leaf-aspect`      | Card width over card height.                                                 |
 | `--leaf-droop`       | Degrees a card hangs below its branch direction.                             |
 | `--leaf-from`        | Fraction along a branch that leaves start at.                                |
-| `--leaf-normal-mode` | `canopy` shades the crown as a rounded mass, `card` uses the true card normal, `up` faces every card at the sky. |
+| `--leaf-normal-mode` | `canopy` shades the crown as a rounded mass — outward from the crown's centre with the vertical lifted, so the underside faces out rather than down. `card` uses the true card normal, `up` faces every card at the sky. One normal per card in every mode. |
 | `--leaf-alpha-cutoff`| glTF `alphaCutoff` on the leaf material.                                     |
 
 **The texture template**
@@ -225,6 +225,14 @@ should collide against, and how it moves in wind.
 
 Paste the printed row into the `SCATTER_LAYERS` table. The generator has already filled in the wind
 block, the trunk capsule, the spacing and the impostor distance, measured off the tree it just built.
+
+`authoredNormals: true` is in that row for every `--leaf-normal-mode` but `card`. The engine
+mirrors a back face's shading normal, which is right for a normal that belongs to the face it sits
+on and wrong for `canopy` and `up`, whose normals describe the crown rather than the card. Mirrored,
+they point into the tree, and whichever half of the cards faces away from the camera shades black —
+a half that changes as the camera moves. The flag turns the mirror off, and only for the model's
+alpha-masked piece, so the trunk keeps it. Drop the line and the canopy goes patchy in the engine
+while the preview still looks right.
 
 Two names appear in that row and they differ on purpose:
 
@@ -305,9 +313,13 @@ completely. What travels in the file is `COLOR_0`, which the wind vertex stage r
 
 1024x1024 by default, bark over leaves:
 
-- **Top half** is bark. Length runs along `u` and tiles under a REPEAT sampler at `--bark-tile`
-  metres per repeat. The ring maps once across `v`, and the field is periodic across that band, so
-  the trunk closes with no seam.
+- **Top half** is bark. Length runs along `u` and tiles under a REPEAT sampler. The ring maps once
+  across `v`, and the field is periodic across that band, so the trunk closes with no seam.
+- Mapping the ring once across `v` fixes the texture's height to the branch's girth, so `u` is
+  advanced at `trunkRadius / radius` per `--bark-tile` metres to match. Without that a twig a
+  fiftieth of the trunk's girth carries the trunk's along-length scale and its bark is squashed by
+  that same fiftieth. With it every branch is a scaled copy of the trunk, which is also what a real
+  one is: fine bark on a twig, broad plates at the base.
 - **Bottom half** is a 4x2 grid of leaf-cluster cells on alpha. A card picks its cell by hash.
 - Leaf colour is **dilated** under the transparent texels, or the mip chain averages background into
   every leaf edge and the silhouette gains a dark fringe with distance.
