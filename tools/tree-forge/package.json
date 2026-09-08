@@ -1,0 +1,22 @@
+{
+  "name": "@rewild/tree-forge",
+  "version": "0.1.0",
+  "description": "Procedural tree generator producing Understory-ready glTF models and template textures",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "tree-forge": "./cli.ts"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "scripts": {
+    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --config jest.config.cjs",
+    "test:fast": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --config jest.config.cjs --testPathIgnorePatterns textures.spec",
+    "test:textures": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --config jest.config.cjs textures.spec",
+    "ts-check": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.3"
+  }
+}

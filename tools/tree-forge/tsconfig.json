@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // Importing a type out of the renderer pulls its whole source into the
+    // program, so this tool needs the globals that source expects: rewild-common
+    // annotates with AssemblyScript's numeric aliases, and the renderer with
+    // WebGPU's and its own .wgsl module declarations.
+    "types": [
+      "node",
+      "rewild-common/types/types",
+      "@webgpu/types",
+      "rewild-renderer/types/wgsl",
+      "jest"
+    ],
+    // Node resolves a sibling module by the extension written here, and it does
+    // not rewrite .js to .ts. Safe because nothing is ever emitted.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["**/*.ts"]
+}
