@@ -4,7 +4,7 @@
   "description": "Game about exploring earth's history",
   "type": "module",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.18.0"
   },
   "scripts": {
     "test": "jest && npm run test --workspaces --if-present",
@@ -57,6 +57,7 @@
     "packages/rewild-ui",
     "packages/rewild-routing",
     "packages/rewild-common",
-    "packages/rewild-renderer"
+    "packages/rewild-renderer",
+    "tools/tree-forge"
   ]
 }
