@@ -22,14 +22,14 @@ import {
   resolveParams,
   sameTexture,
   toConfig,
-  type Params,
+  type Params, 
   type RawArgs,
 } from './lib/params.ts';
 import { buildSkeleton, type Skeleton } from './lib/skeleton.ts';
 import {
   geometryEntry,
   materialEntries,
-  scatterLayer,
+  scatterLayer, 
   scatterLayerSource,
   writeTemplateFiles,
 } from './lib/templates.ts';

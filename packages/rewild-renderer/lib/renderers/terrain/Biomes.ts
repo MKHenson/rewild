@@ -182,7 +182,7 @@ export const FOREST: BiomeParams = {
   // Thins on anything steep; the noise band breaks the stand into glades.
   scatter: [
     {
-      layer: 'alien_plant',
+      layer: 'oak_01',
       density: 0.55,
       slope: { from: 32, to: 10 },
       noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
