@@ -92,6 +92,9 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
       frequency: params.windFrequency,
       flutter: params.windFlutter,
     },
+    // `card` is the one mode whose normals are the cards' own, and so the one
+    // mode a back face may mirror.
+    authoredNormals: params.leafNormalMode !== 'card',
   };
 }
 
@@ -118,6 +121,7 @@ export function scatterLayerSource(layer: ScatterLayer): string {
     `    footprint: ${layer.footprint},`,
     `    collider: { type: '${collider.type}', radius: ${collider.radius}, height: ${collider.height}, offset: [${collider.offset.join(', ')}] },`,
     `    wind: { amplitude: ${wind.amplitude}, frequency: ${wind.frequency}, flutter: ${wind.flutter} },`,
+    ...(layer.authoredNormals ? ['    authoredNormals: true,'] : []),
     '  },',
   ].join('\n');
 }

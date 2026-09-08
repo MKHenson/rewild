@@ -4,7 +4,7 @@ import { buildMesh } from './lib/mesh.ts';
 import { argsFromConfig, parseArgs, resolveParams, sameTexture, toConfig } from './lib/params.ts';
 import { fbm, gradientNoise, signedFbm, valueNoise, warp, worley } from './lib/noise.ts';
 import { buildSkeleton } from './lib/skeleton.ts';
-import { colliderFor, scatterLayer } from './lib/templates.ts';
+import { colliderFor, scatterLayer, scatterLayerSource } from './lib/templates.ts';
 
 const TEXTURES: GlbTextures = { baseColor: 'a_diff.webp', normal: 'a_nor.webp', arm: 'a_arm.webp' };
 
@@ -225,6 +225,134 @@ describe('winding', () => {
   });
 });
 
+describe('leaf normals', () => {
+  function leafNormals(mode: string) {
+    const { skeleton, mesh } = buildAll(['--leaf-normal-mode', mode]);
+    const { normals, positions, vertexCount } = mesh.leaves;
+    const at = (i: number, a: Float32Array): [number, number, number] => [a[i * 3], a[i * 3 + 1], a[i * 3 + 2]];
+    return { skeleton, normals, positions, vertexCount, at };
+  }
+
+  it('never points a canopy normal at the ground', () => {
+    // A crown hangs well below its own centre, so a plain outward normal sends
+    // half the cards face down. Those take bounce light only and the lower
+    // canopy reads as a hole rather than as the underside of a mass.
+    const { normals, vertexCount } = leafNormals('canopy');
+    for (let i = 0; i < vertexCount; i++) expect(normals[i * 3 + 1]).toBeGreaterThan(0);
+  });
+
+  it('still turns a canopy normal away from the crown centre', () => {
+    // The lift is vertical only, so the horizontal half has to survive it or
+    // the crown shades as a flat disc.
+    const { skeleton, normals, positions, vertexCount, at } = leafNormals('canopy');
+    const centre = skeleton.canopy.centre;
+    let agree = 0;
+    let total = 0;
+
+    // Measured from the card's own middle, which is what the normal is taken
+    // from. A corner of a card straddling the centre sits on the far side of it.
+    for (let card = 0; card < vertexCount / 4; card++) {
+      let outX = 0;
+      let outZ = 0;
+      for (let k = 0; k < 4; k++) {
+        const [px, , pz] = at(card * 4 + k, positions);
+        outX += (px - centre[0]) / 4;
+        outZ += (pz - centre[2]) / 4;
+      }
+
+      if (Math.hypot(outX, outZ) < 0.5) continue;
+      const [nx, , nz] = at(card * 4, normals);
+      total++;
+      if (nx * outX + nz * outZ > 0) agree++;
+    }
+
+    expect(agree / total).toBe(1);
+  });
+
+  it('gives every card one normal', () => {
+    // Per corner instead swings the direction across a single card wherever
+    // one sits near the crown centre, which shades as a crease.
+    for (const mode of ['canopy', 'card', 'up']) {
+      const { normals, vertexCount, at } = leafNormals(mode);
+      for (let card = 0; card < vertexCount / 4; card++) {
+        const first = at(card * 4, normals);
+        for (let k = 1; k < 4; k++)
+          for (let axis = 0; axis < 3; axis++)
+            expect(at(card * 4 + k, normals)[axis]).toBeCloseTo(first[axis], 6);
+      }
+    }
+  });
+});
+
+describe('bark uvs', () => {
+  /** Texels per metre along the branch over texels per metre around it, per ring segment. */
+  function uvAspects(params: ReturnType<typeof paramsFor>, skeleton: ReturnType<typeof buildSkeleton>): number[] {
+    const { positions, uvs } = buildMesh(params, skeleton).bark;
+    const bark = atlasRegions(params.textureSize).bark;
+    const aspects: number[] = [];
+    let cursor = 0;
+
+    for (const branch of skeleton.branches) {
+      const radial = Math.max(3, params.radialSegments - branch.level);
+      // One degenerate ring is appended to cap the tip, and the seam vertex is
+      // duplicated so the ring can close.
+      const rings = branch.points.length + 1;
+      const stride = radial + 1;
+
+      // Ring centre, mean radius and u, read back off the built mesh.
+      const read = (ring: number) => {
+        const base = cursor + ring * stride;
+        const centre = [0, 0, 0];
+        for (let j = 0; j < radial; j++)
+          for (let axis = 0; axis < 3; axis++) centre[axis] += positions[(base + j) * 3 + axis] / radial;
+
+        let radius = 0;
+        for (let j = 0; j < radial; j++)
+          radius +=
+            Math.hypot(
+              positions[(base + j) * 3] - centre[0],
+              positions[(base + j) * 3 + 1] - centre[1],
+              positions[(base + j) * 3 + 2] - centre[2]
+            ) / radial;
+
+        return { centre, radius, u: uvs[base * 2] };
+      };
+
+      for (let ring = 0; ring < rings - 1; ring++) {
+        const a = read(ring);
+        const b = read(ring + 1);
+        const span = Math.hypot(b.centre[0] - a.centre[0], b.centre[1] - a.centre[1], b.centre[2] - a.centre[2]);
+        const circumference = Math.PI * (a.radius + b.radius);
+        aspects.push(((b.u - a.u) / span) / ((bark.v1 - bark.v0) / circumference));
+      }
+
+      cursor += rings * stride;
+    }
+
+    return aspects;
+  }
+
+  it('scales bark with the branch instead of squashing it', () => {
+    // v maps once around whatever the branch's girth, so a fixed
+    // metres-per-repeat u leaves a thin branch several times denser around
+    // than along and the bark reads as squashed. The two densities have to
+    // hold one ratio from the trunk base to the last twig.
+    const { params, skeleton } = buildAll();
+    const aspects = uvAspects(params, skeleton);
+
+    expect(Math.min(...aspects)).toBeGreaterThan(0);
+    expect(Math.max(...aspects) / Math.min(...aspects)).toBeLessThan(1.1);
+  });
+
+  it('still scales the whole tree by --bark-tile', () => {
+    const tight = buildAll(['--bark-tile', '1.1']).mesh.bark.uvs;
+    const loose = buildAll(['--bark-tile', '2.2']).mesh.bark.uvs;
+
+    expect(tight[0]).toBe(0);
+    for (let i = 0; i < tight.length; i += 2) expect(tight[i]).toBeCloseTo(loose[i] * 2, 4);
+  });
+});
+
 describe('atlas', () => {
   it('keeps the bark clear of every leaf cell', () => {
     const regions = atlasRegions(1024);
@@ -371,6 +499,23 @@ describe('scatter layer', () => {
     expect(collider.offset[1] - collider.height / 2 - collider.radius).toBeCloseTo(0, 2);
     expect(top).toBeCloseTo(skeleton.trunk.splitHeight, 1);
     expect(collider.radius).toBeGreaterThan(params.trunkRadius);
+  });
+
+  it('declares authored leaf normals for every mode but card', () => {
+    // The engine mirrors a back face's normal. That is right only where the
+    // normal is the card's own, so canopy and up have to switch it off or half
+    // the cards shade from inside the crown.
+    for (const [mode, expected] of [
+      ['canopy', true],
+      ['up', true],
+      ['card', false],
+    ] as const) {
+      const { params, skeleton } = buildAll(['--leaf-normal-mode', mode]);
+      const layer = scatterLayer(params, skeleton);
+
+      expect(layer.authoredNormals).toBe(expected);
+      expect(scatterLayerSource(layer).includes('authoredNormals: true,')).toBe(expected);
+    }
   });
 
   it('emits a layer name the library can key on', () => {

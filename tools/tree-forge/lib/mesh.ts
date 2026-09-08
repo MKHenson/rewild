@@ -89,17 +89,31 @@ function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
     let heading = rings[0].dir;
     const ringStart: number[] = [];
 
+    // Length runs along u, the ring around v. v maps once into the bark band
+    // on every branch, because that is what closes the ring seamlessly, so a
+    // thin branch already wraps the whole texture round a fraction of the
+    // trunk's girth. u has to shrink with it or the bark comes out squashed:
+    // advancing by trunkRadius / radius makes a branch a scaled copy of the
+    // trunk, and leaves the trunk base at --bark-tile metres per repeat.
+    let u = rings[0].dist / params.barkTile;
+    let previous: BranchPoint | null = null;
+
     for (const ring of rings) {
       normal = normalize(transport(normal, heading, ring.dir));
       heading = ring.dir;
       const binormal = cross(ring.dir, normal);
 
       const bend = bendWeight(params, skeleton, ring.dist);
-      // Length runs along u and the ring around v. u spans the atlas edge to
-      // edge, so REPEAT tiles it for free at any branch length; v maps once
-      // into the bark band, which is authored periodic across itself so the
-      // ring closes with no seam.
-      const u = ring.dist / params.barkTile;
+
+      if (previous) {
+        // Integrated per segment: scaling the whole path distance by the
+        // local radius would let a taper rescale the length behind it too. The
+        // segment's mean radius, so the degenerate cap ring stays bounded —
+        // it shortens by the same factor it thins by.
+        const radius = Math.max(1e-9, (previous.radius + ring.radius) * 0.5);
+        u += ((ring.dist - previous.dist) * params.trunkRadius) / (radius * params.barkTile);
+      }
+      previous = ring;
 
       ringStart.push(out.positions.length / 3);
 
@@ -138,12 +152,18 @@ function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
   return finish(out);
 }
 
-function leafNormal(mode: string, corner: Vec3, cardNormal: Vec3, canopyCentre: Vec3): Vec3 {
+function leafNormal(mode: string, cardCentre: Vec3, cardNormal: Vec3, canopyCentre: Vec3): Vec3 {
   if (mode === 'up') return [0, 1, 0];
   if (mode === 'card') return cardNormal;
+
   // canopy: shade the crown as the rounded mass it reads as from a distance,
-  // rather than as a pile of sideways-facing walls.
-  return normalize(sub(corner, canopyCentre));
+  // rather than as a pile of sideways-facing walls. A dome and not a full
+  // sphere — half a crown hangs below its own centre, and a normal pointing
+  // at the ground there takes bounce light only and reads as a hole. Lifting
+  // the vertical half a turn leaves the rim facing out and the top facing up,
+  // so the mass rounds off without an unlit underside.
+  const outward = normalize(sub(cardCentre, canopyCentre));
+  return normalize([outward[0], outward[1] * 0.5 + 0.5, outward[2]]);
 }
 
 function buildLeaves(params: Params, skeleton: Skeleton): MeshAttributes {
@@ -177,13 +197,23 @@ function buildLeaves(params: Params, skeleton: Skeleton): MeshAttributes {
         [0, 1],
       ];
 
+      // One normal for the whole card. A card stands in for a cluster, not for
+      // a curved surface, and taking the canopy direction per corner instead
+      // swings it right across a card near the crown's centre.
+      const normal = leafNormal(
+        params.leafNormalMode,
+        add(stem, scale(leafDir, height * 0.5)),
+        cardNormal,
+        skeleton.canopy.centre
+      );
+
       for (const [uu, vv] of corners) {
         const corner = add(add(stem, scale(right, (uu - 0.5) * width)), scale(leafDir, vv * height));
 
         pushVertex(
           out,
           corner,
-          leafNormal(params.leafNormalMode, corner, cardNormal, skeleton.canopy.centre),
+          normal,
           [cell.u0 + uu * (cell.u1 - cell.u0), cell.v1 - vv * (cell.v1 - cell.v0)],
           // Flutter is the leaf's own high-frequency motion, so it starts at
           // zero where the card is pinned to the branch.

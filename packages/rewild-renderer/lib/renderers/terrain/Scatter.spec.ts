@@ -251,9 +251,7 @@ describe('scatterChunk', () => {
     for (let y = 0; y < CHUNK; y++)
       for (let x = 0; x < CHUNK; x++) heights[y * CHUNK + x] = x * 3;
 
-    const climate = climateOf(
-      flatBiome([{ layer: 'alien_plant', density: 1 }])
-    );
+    const climate = climateOf(flatBiome([{ layer: 'oak_01', density: 1 }]));
     const instances = scatterChunk(
       CHUNK,
       SEED,
@@ -262,7 +260,7 @@ describe('scatterChunk', () => {
       heights
     )[0];
 
-    // alien_plant carries a small tilt jitter, so allow for it rather than
+    // oak_01 carries a small tilt jitter, so allow for it rather than
     // demanding an exact yaw-only quaternion.
     for (let i = 0; i < instances.count; i++) {
       const base = i * SCATTER_INSTANCE_STRIDE;

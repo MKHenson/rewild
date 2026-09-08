@@ -84,6 +84,12 @@ export interface ScatterLayer {
   footprint: number;
   collider?: ScatterCollider;
   wind?: ScatterWind;
+  /** Shade the model's cutout piece with its normals as authored, rather than
+   *  mirroring them on back faces. For foliage whose cards carry the whole
+   *  canopy's outward normal instead of each card's own — mirroring one turns
+   *  it inward and blacks out whichever half of the cards faces away. Applies
+   *  only to the model's alpha-masked primitives, so a trunk is untouched. */
+  authoredNormals?: boolean;
 }
 
 // Culling is per chunk and a chunk spans 480m, so a range much beyond a chunk
@@ -137,6 +143,24 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     footprint: 5,
     collider: { type: 'capsule', radius: 0.45, height: 7.5 },
     wind: { amplitude: 0.35, frequency: 0.55, flutter: 0.4 },
+  },
+  oak_01: {
+    name: 'oak_01',
+    geometryId: 'oak-01',
+    cullDistance: 160,
+    impostor: { fromDistance: 96, views: 8, tileSize: 128 },
+    jitter: { scale: { from: 0.8, to: 1.25 }, yaw: FULL_TURN, tilt: 3 },
+    alignToNormal: 0,
+    footprint: 6.2,
+    collider: {
+      type: 'capsule',
+      radius: 0.34,
+      height: 2.65,
+      offset: [0, 1.67, 0],
+    },
+    wind: { amplitude: 0.4, frequency: 0.45, flutter: 0.35 },
+    // Leaf cards are shaded from the crown's outward normal, not their own.
+    authoredNormals: true,
   },
 };
 

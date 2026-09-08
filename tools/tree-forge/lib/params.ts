@@ -45,7 +45,7 @@ export const PARAM_SPEC = {
   leafNormalMode: { type: 'string', default: 'canopy', help: 'card | canopy | up. How leaf normals are authored.' },
   leafAlphaCutoff: { type: 'number', default: 0.45, help: 'glTF alphaCutoff on the leaf material.' },
 
-  barkTile: { type: 'number', default: 2.2, help: "Metres of branch per bark texture repeat. Writes the model's UVs, not the texture." },
+  barkTile: { type: 'number', default: 2.2, help: "Metres of trunk per bark texture repeat, scaled down on thinner branches. Writes the model's UVs, not the texture." },
   bendCurve: { type: 'number', default: 1.6, help: 'Exponent shaping COLOR_0.r. Higher keeps the trunk base rigid for longer.' },
 
   windAmplitude: { type: 'number', default: 0.4, help: 'ScatterWind amplitude for the emitted layer.' },
