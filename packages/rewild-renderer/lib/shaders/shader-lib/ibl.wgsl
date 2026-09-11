@@ -62,17 +62,20 @@ struct IblParams {
 fn evaluateIbl(surface: PbrSurface, perceptualRoughness: f32) -> vec3f {
   let viewToWorld = iblParams.viewToWorld;
 
+  // Irradiance is gathered along the shading normal and the reflection is
+  // taken along the specular one; see PbrSurface for when they differ.
   let N = surface.normal;
+  let Ns = surface.specularNormal;
   let V = normalize(-surface.viewPosition);
   // abs() for the same reason evaluateBRDF uses it: normal mapping pushes N
   // past the silhouette, and a NoV pinned at zero there makes the Fresnel
   // ceiling snap to white on exactly the fragments that show it most.
-  let NoV = clamp(abs(dot(N, V)), 1e-4, 1.0);
+  let NoV = clamp(abs(dot(Ns, V)), 1e-4, 1.0);
 
   let worldN = normalize((viewToWorld * vec4f(N, 0.0)).xyz);
   // Reflecting in view space and rotating the result costs one transform rather
   // than two, and is identical for a rotation.
-  let worldR = normalize((viewToWorld * vec4f(reflect(-V, N), 0.0)).xyz);
+  let worldR = normalize((viewToWorld * vec4f(reflect(-V, Ns), 0.0)).xyz);
 
   // The irradiance cube already holds irradiance/pi, so it multiplies the
   // diffuse colour directly — no further division, and no cosine, both having
@@ -94,7 +97,7 @@ fn evaluateIbl(surface: PbrSurface, perceptualRoughness: f32) -> vec3f {
   // Horizon occlusion, for the same reason the direct path applies it: the
   // reflection vector can point below the geometry once a normal map has tilted
   // N, and the prefiltered cube will happily return sky from down there.
-  let horizon = horizonOcclusion(reflect(-V, N), surface.geometricNormal);
+  let horizon = horizonOcclusion(reflect(-V, Ns), surface.geometricNormal);
 
   // Single-scattering reflectance: the fraction of incoming light that leaves
   // after exactly one bounce off a microfacet.

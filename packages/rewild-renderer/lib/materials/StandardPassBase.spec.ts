@@ -230,6 +230,23 @@ describe.each([
     }
   );
 
+  it.each([false, true])(
+    'compiles the shader with faceNormalSpecular and specularOcclusion = %s baked in',
+    (on) => {
+      const pass = create();
+      pass.faceNormalSpecular = on;
+      pass.specularOcclusion = on;
+      const defines = (
+        pass as unknown as { shaderDefines(): ShaderDefines }
+      ).shaderDefines();
+
+      const source = composeShader([shaderSource(shaderName)], defines);
+
+      expect(source).toContain(`const HAS_FACE_NORMAL_SPECULAR: bool = ${on};`);
+      expect(source).toContain(`const HAS_SPECULAR_OCCLUSION: bool = ${on};`);
+    }
+  );
+
   it('names a vertex entry point for every attribute combination', () => {
     const pass = create();
     const internals = pass as unknown as { vertexEntryPoint(): string };

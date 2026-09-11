@@ -17,8 +17,9 @@
 //     ibl.wgsl, which this calls into, plus the IBL bindings that last one names
 //   - the `lighting` storage binding those two need, and spotLightShadowParams,
 //     which says which light in it the spot atlas belongs to
-//   - HAS_VERTEX_TANGENTS, HAS_PARALLAX and HAS_AUTHORED_NORMALS, module-scope
-//     bool consts the host bakes in from StandardPassBase.shaderDefines()
+//   - HAS_VERTEX_TANGENTS, HAS_PARALLAX, HAS_AUTHORED_NORMALS,
+//     HAS_FACE_NORMAL_SPECULAR and HAS_SPECULAR_OCCLUSION, module-scope bool
+//     consts the host bakes in from StandardPassBase.shaderDefines()
 
 // glTF alphaMode. Shared numbering with ALPHA_MODES in StandardMaterial.ts.
 const ALPHA_MODE_OPAQUE: u32 = 0u;
@@ -124,6 +125,15 @@ fn shadeStandardSurface(
   let facing = select(-1.0, 1.0, isFrontFacing || HAS_AUTHORED_NORMALS);
   let geometricNormal = normalize(normal) * facing;
 
+  // The triangle's own normal, from the position derivatives, turned to face
+  // the eye so a back face reflects like the front of a sheet rather than
+  // through it. Only read under HAS_FACE_NORMAL_SPECULAR, for geometry whose
+  // vertex normals describe a different shape: those say how much light the
+  // surface gathers, and this says where it reflects. Taken here, before the
+  // discard below, for the same reason the frame's derivatives are.
+  let faceNormalRaw = normalize(cross(dpdx(viewPosition), dpdy(viewPosition)));
+  let faceNormal = faceNormalRaw * select(-1.0, 1.0, dot(faceNormalRaw, viewPosition) <= 0.0);
+
   // One frame for both jobs that need one: the normal map is applied through it,
   // and parallax marches the view ray across UV in it. The branch is on a
   // module-scope const rather than a uniform because one side takes derivatives.
@@ -168,9 +178,20 @@ fn shadeStandardSurface(
   var surface: PbrSurface;
 
   surface.normal = normalize(tbn * normalSample);
-  // Pre-perturbation, so horizon occlusion can tell how far the normal map has
-  // tilted the shading normal off the triangle.
-  surface.geometricNormal = geometricNormal;
+  // The specular lobes reflect off the triangle where the shading normal was
+  // authored for a shape the triangles do not have — a canopy's cards carry
+  // the crown's normal, and reflecting off that lights the crown as one
+  // polished sphere. Horizon occlusion follows the same surface, since it asks
+  // what the reflection can see past.
+  if (HAS_FACE_NORMAL_SPECULAR) {
+    surface.specularNormal = faceNormal;
+    surface.geometricNormal = faceNormal;
+  } else {
+    surface.specularNormal = surface.normal;
+    // Pre-perturbation, so horizon occlusion can tell how far the normal map
+    // has tilted the shading normal off the triangle.
+    surface.geometricNormal = geometricNormal;
+  }
   surface.viewPosition = viewPosition;
   surface.diffuseColor = diffuseColorFromBaseColor(baseColor, metallic);
   surface.f0 = f0FromBaseColor(baseColor, metallic);
@@ -182,21 +203,26 @@ fn shadeStandardSurface(
     spotLightShadowParams.lightIndex
   );
 
-  // Shadows attenuate diffuse and specular together — a blocked light delivers
-  // neither.
-  let direct = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow
-             + lit.punctualDiffuse + lit.punctualSpecular
-             + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadow;
-  var color = direct;
-
   // Occlusion describes light that never reached the pocket in the first place,
   // which is a statement about *indirect* light — direct lighting already
   // answers the question with N·L and the shadow maps, and multiplying it again
   // here would double-darken every crevice that faces away from the sun. So
-  // glTF scopes it to indirect, IBL below and
-  // nothing else.
+  // glTF scopes it to indirect, the IBL below, and nothing else.
+  //
+  // HAS_SPECULAR_OCCLUSION extends it to direct specular, for surfaces whose
+  // authored occlusion stands in for geometry the mesh does not carry: a card
+  // of leaves is occluded by the leaves in front of it, which no shadow map
+  // sees, and a highlight in that pocket reads as a leaf that is not there.
   let occlusionSample = textureSample(occlusionMap, mySampler, uv).r;
   let occlusion = 1.0 + standardParams.occlusionStrength * (occlusionSample - 1.0);
+  let specularOcclusion = select(1.0, occlusion, HAS_SPECULAR_OCCLUSION);
+
+  // Shadows attenuate diffuse and specular together — a blocked light delivers
+  // neither.
+  let direct = (lit.directionalDiffuse + lit.directionalSpecular * specularOcclusion) * sunShadow
+             + lit.punctualDiffuse + lit.punctualSpecular * specularOcclusion
+             + (lit.spotShadowDiffuse + lit.spotShadowSpecular * specularOcclusion) * spotShadow;
+  var color = direct;
 
   // Ambient, from the prefiltered sky rather than an authored constant. Both
   // lobes: a metal has no diffuse to catch a flat ambient with and used to go

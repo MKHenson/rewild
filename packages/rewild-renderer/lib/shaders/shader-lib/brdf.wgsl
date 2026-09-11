@@ -99,13 +99,21 @@ fn diffuseLambert(diffuseColor: vec3f) -> vec3f {
 
 // One light's contribution, for a unit-radiance light arriving along `L`.
 //
-// Both terms come back already weighted by N·L, so a caller multiplies by
-// (light colour × intensity × attenuation) and adds. Returns zero for a light
-// below the horizon rather than clamping, so back-facing lights cost nothing.
+// Both terms come back already weighted by their own N·L, so a caller
+// multiplies by (light colour × intensity × attenuation) and adds. Returns zero
+// for a light below both horizons rather than clamping, so back-facing lights
+// cost nothing.
 //
-// N, V and L must be normalized. V points from the surface toward the eye.
+// The diffuse lobe is evaluated against `N` and the specular lobe against
+// `Ns`. They are the same vector for an ordinary surface; they differ where the
+// shading normal was authored for a shape the triangles do not have, which is
+// right for how much light a surface gathers and wrong for where it reflects
+// it (see HAS_FACE_NORMAL_SPECULAR).
+//
+// N, Ns, V and L must be normalized. V points from the surface toward the eye.
 fn evaluateBRDF(
   N: vec3f,
+  Ns: vec3f,
   V: vec3f,
   L: vec3f,
   diffuseColor: vec3f,
@@ -117,7 +125,8 @@ fn evaluateBRDF(
   result.specular = vec3f(0.0);
 
   let NoL = clamp(dot(N, L), 0.0, 1.0);
-  if (NoL <= 0.0) {
+  let NsoL = clamp(dot(Ns, L), 0.0, 1.0);
+  if (NoL <= 0.0 && NsoL <= 0.0) {
     return result;
   }
 
@@ -125,12 +134,12 @@ fn evaluateBRDF(
   // abs() rather than max(_, 0): normal mapping and vertex interpolation both
   // push N past the silhouette, and a NoV pinned to zero there makes the
   // visibility term blow up instead of merely grazing.
-  let NoV = clamp(abs(dot(N, V)), 1e-4, 1.0);
-  let NoH = clamp(dot(N, H), 0.0, 1.0);
+  let NsoV = clamp(abs(dot(Ns, V)), 1e-4, 1.0);
+  let NsoH = clamp(dot(Ns, H), 0.0, 1.0);
   let VoH = clamp(dot(V, H), 0.0, 1.0);
 
-  let D = distributionGGX(NoH, alpha);
-  let Vis = visibilitySmithGGXCorrelated(NoV, NoL, alpha);
+  let D = distributionGGX(NsoH, alpha);
+  let Vis = visibilitySmithGGXCorrelated(NsoV, NsoL, alpha);
   let F = fresnelSchlick(f0, VoH);
 
   // Energy split: light Fresnel reflects off the surface cannot also refract
@@ -139,6 +148,6 @@ fn evaluateBRDF(
   let kD = vec3f(1.0) - F;
 
   result.diffuse = kD * diffuseLambert(diffuseColor) * NoL;
-  result.specular = F * (D * Vis) * NoL;
+  result.specular = F * (D * Vis) * NsoL;
   return result;
 }

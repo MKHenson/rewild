@@ -696,6 +696,7 @@ fn fs(
 
   var surface: PbrSurface;
   surface.normal = normalizedNormal;
+  surface.specularNormal = normalizedNormal;
   // parallaxN is the mesh normal before any map tilts it — the surface the
   // triangle actually has, which is what horizon occlusion needs.
   surface.geometricNormal = parallaxN;
