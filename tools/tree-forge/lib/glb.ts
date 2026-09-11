@@ -87,18 +87,24 @@ interface Gltf {
   buffers: { byteLength: number }[];
 }
 
-/** The sibling image files a model references, by role. */
+/** The sibling image files one material references, by role. */
 export interface GlbTextures {
   baseColor: string;
   normal: string;
   arm: string;
 }
 
+/** A tree's two materials draw from two images — see the header of atlas.ts. */
+export interface GlbTextureSet {
+  bark: GlbTextures;
+  leaves: GlbTextures;
+}
+
 export interface GlbRequest {
   name: string;
   bark: MeshAttributes;
   leaves: MeshAttributes;
-  textures: GlbTextures;
+  textures: GlbTextureSet;
   alphaCutoff: number;
 }
 
@@ -210,37 +216,43 @@ export function writeGlb({ name, bark, leaves, textures, alphaCutoff }: GlbReque
     buffers: [],
   };
 
-  for (const uri of [textures.baseColor, textures.normal, textures.arm]) {
-    gltf.images.push({ uri });
-    gltf.textures.push({ sampler: 0, source: gltf.images.length - 1 });
+  /** Registers one material's three images and returns the slots it draws from. */
+  function bind(set: GlbTextures) {
+    const slot = (uri: string): number => {
+      gltf.images.push({ uri });
+      gltf.textures.push({ sampler: 0, source: gltf.images.length - 1 });
+      return gltf.textures.length - 1;
+    };
+
+    const baseColor = slot(set.baseColor);
+    const normal = slot(set.normal);
+    const arm = slot(set.arm);
+
+    return {
+      pbrMetallicRoughness: {
+        baseColorTexture: { index: baseColor },
+        // Roughness in G and metallic in B, the same packed ARM map the
+        // occlusion slot reads R from. glTF models these as two slots precisely
+        // so one image can serve both.
+        metallicRoughnessTexture: { index: arm },
+        metallicFactor: 1,
+        roughnessFactor: 1,
+      },
+      normalTexture: { index: normal },
+      occlusionTexture: { index: arm },
+    };
   }
-
-  const [baseColor, normal, arm] = [0, 1, 2];
-
-  const shared = {
-    pbrMetallicRoughness: {
-      baseColorTexture: { index: baseColor },
-      // Roughness in G and metallic in B, the same packed ARM map the
-      // occlusion slot reads R from. glTF models these as two slots precisely
-      // so one atlas can serve both.
-      metallicRoughnessTexture: { index: arm },
-      metallicFactor: 1,
-      roughnessFactor: 1,
-    },
-    normalTexture: { index: normal },
-    occlusionTexture: { index: arm },
-  };
 
   gltf.materials.push({
     name: `${name}-bark`,
-    ...structuredClone(shared),
+    ...bind(textures.bark),
     alphaMode: 'OPAQUE',
     doubleSided: false,
   });
 
   gltf.materials.push({
     name: `${name}-leaves`,
-    ...structuredClone(shared),
+    ...bind(textures.leaves),
     // Cutout, never blend: an alpha-tested fragment either writes depth or does
     // not exist, so leaves sort against each other with no per-instance sort.
     alphaMode: 'MASK',

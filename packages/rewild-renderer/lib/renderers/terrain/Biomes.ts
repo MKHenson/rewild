@@ -187,6 +187,12 @@ export const FOREST: BiomeParams = {
       slope: { from: 32, to: 10 },
       noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
     },
+    {
+      layer: 'poplar_01',
+      density: 0.55,
+      slope: { from: 32, to: 10 },
+      noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
+    },
     { layer: 'granite_pebble', density: 0.18, slope: { from: 30, to: 8 } },
   ],
 };

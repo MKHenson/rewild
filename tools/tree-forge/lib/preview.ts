@@ -4,7 +4,7 @@
 
 import type { MeshAttributes, TreeMesh } from './mesh.ts';
 import type { Params } from './params.ts';
-import type { Canvas } from './textures.ts';
+import type { Canvas, Canvases } from './textures.ts';
 import type { Vec3 } from './vec.ts';
 
 const LIGHT: Vec3 = [-0.42, 0.76, 0.5];
@@ -134,8 +134,11 @@ function drawPrimitive(
         const u = w0 * uvs[indices[t] * 2] + w1 * uvs[indices[t + 1] * 2] + w2 * uvs[indices[t + 2] * 2];
         const v = w0 * uvs[indices[t] * 2 + 1] + w1 * uvs[indices[t + 1] * 2 + 1] + w2 * uvs[indices[t + 2] * 2 + 1];
 
+        // Wrapped on both axes, because both of bark's are: length repeats down
+        // the image however long the branch is, and the ring closes across it.
+        // Clamping either one smears its last row or column up the whole trunk.
         const tx = ((Math.floor(u * atlas) % atlas) + atlas) % atlas;
-        const ty = Math.min(atlas - 1, Math.max(0, Math.floor(v * atlas)));
+        const ty = ((Math.floor(v * atlas) % atlas) + atlas) % atlas;
         const texel = ty * atlas + tx;
 
         if (cutout && canvas.alpha[texel] < cutoff) continue;
@@ -168,7 +171,7 @@ function drawPrimitive(
 }
 
 /** RGB bytes of a `size` square preview. */
-export function renderPreview(params: Params, mesh: TreeMesh, canvas: Canvas, size: number): Buffer {
+export function renderPreview(params: Params, mesh: TreeMesh, canvases: Canvases, size: number): Buffer {
   const target = Buffer.alloc(size * size * 3);
   const depth = new Float32Array(size * size).fill(-Infinity);
 
@@ -188,8 +191,8 @@ export function renderPreview(params: Params, mesh: TreeMesh, canvas: Canvas, si
   // authoredNormals on the layer, which turns the mirror off there too.
   const mirrorLeaves = params.leafNormalMode === 'card';
 
-  drawPrimitive(target, depth, size, mesh.bark, project(views[0]), canvas, false, 0, false, true);
-  drawPrimitive(target, depth, size, mesh.leaves, project(views[1]), canvas, true, params.leafAlphaCutoff, true, mirrorLeaves);
+  drawPrimitive(target, depth, size, mesh.bark, project(views[0]), canvases.bark, false, 0, false, true);
+  drawPrimitive(target, depth, size, mesh.leaves, project(views[1]), canvases.leaves, true, params.leafAlphaCutoff, true, mirrorLeaves);
 
   return target;
 }

@@ -1,16 +1,21 @@
-// The texture template's layout, shared by the UV writer and the image writer
-// so the two cannot drift.
+// The two textures' layouts, shared by the UV writer and the image writer so
+// the two cannot drift.
 //
-// Top half is bark. Bottom half is a 4x2 grid of leaf-cluster cells on alpha,
-// which is what makes the cells square at any power-of-two size.
+// Bark and leaves are separate images because they are already separate
+// materials: a tree ships as two primitives and the scatter path builds a pass
+// per primitive, so a second image costs one decode at load and nothing per
+// frame. One shared atlas cost a gutter around the bark, a mip chain that
+// averaged bark into leaf alpha, and half the texels each.
+//
+// Bark owns its whole image and wraps on both axes, so it has no regions and
+// needs no gutter. Leaves are a square grid of cluster cells on alpha, `grid`
+// cells along each edge. The count is decided by whoever paints the cells —
+// see leafGrid in sources.ts — and the mesh has to be handed the same number,
+// or its cards address cells that were never drawn.
 
-export const LEAF_COLS = 4;
-export const LEAF_ROWS = 2;
-export const LEAF_VARIANTS = LEAF_COLS * LEAF_ROWS;
-
-// Texels kept clear at every region edge. Bilinear filtering reaches half a
-// texel past a UV and the mip chain reaches much further, so without this the
-// bark bleeds into the leaf alpha the moment the tree is a few metres away.
+// Texels kept clear at every cell edge. Bilinear filtering reaches half a texel
+// past a UV and the mip chain reaches much further, so without this a cell
+// bleeds into the one beside it.
 const GUTTER_TEXELS = 8;
 
 export function gutterFor(size: number): number {
@@ -25,31 +30,6 @@ export interface UvRect {
   v1: number;
 }
 
-export interface AtlasRegions {
-  gutter: number;
-  bark: UvRect;
-  leaves: UvRect[];
-}
-
-export function atlasRegions(size: number): AtlasRegions {
-  const g = gutterFor(size) / size;
-
-  const leaves: UvRect[] = [];
-  for (let cy = 0; cy < LEAF_ROWS; cy++)
-    for (let cx = 0; cx < LEAF_COLS; cx++)
-      leaves.push({
-        u0: cx / LEAF_COLS + g,
-        u1: (cx + 1) / LEAF_COLS - g,
-        v0: 0.5 + (cy / LEAF_ROWS) * 0.5 + g,
-        v1: 0.5 + ((cy + 1) / LEAF_ROWS) * 0.5 - g,
-      });
-
-  // Bark spans the full width so length tiles under a REPEAT sampler with no
-  // seam. The band is inset in v only, and is authored periodic across itself
-  // so the ring closes without one either.
-  return { gutter: g, bark: { u0: 0, u1: 1, v0: g, v1: 0.5 - g }, leaves };
-}
-
 /** A rectangle in texels. */
 export interface PixelRect {
   x: number;
@@ -58,20 +38,36 @@ export interface PixelRect {
   height: number;
 }
 
-export interface AtlasPixels {
-  bark: PixelRect;
-  leaves: PixelRect[];
+/** The leaf cells in UV space, inset by the gutter. */
+export function leafCells(size: number, grid: number): UvRect[] {
+  const g = gutterFor(size) / size;
+  const cells: UvRect[] = [];
+
+  for (let cy = 0; cy < grid; cy++)
+    for (let cx = 0; cx < grid; cx++)
+      cells.push({
+        u0: cx / grid + g,
+        u1: (cx + 1) / grid - g,
+        v0: cy / grid + g,
+        v1: (cy + 1) / grid - g,
+      });
+
+  return cells;
 }
 
-/** Pixel bounds of the same regions, for the image writer. */
-export function atlasPixels(size: number): AtlasPixels {
-  const width = size / LEAF_COLS;
-  const height = size / 2 / LEAF_ROWS;
+/** The same cells in texels, for the image writer. */
+export function leafCellPixels(size: number, grid: number): PixelRect[] {
+  const edge = size / grid;
+  const cells: PixelRect[] = [];
 
-  const leaves: PixelRect[] = [];
-  for (let cy = 0; cy < LEAF_ROWS; cy++)
-    for (let cx = 0; cx < LEAF_COLS; cx++)
-      leaves.push({ x: cx * width, y: size / 2 + cy * height, width, height });
+  for (let cy = 0; cy < grid; cy++)
+    for (let cx = 0; cx < grid; cx++)
+      cells.push({ x: cx * edge, y: cy * edge, width: edge, height: edge });
 
-  return { bark: { x: 0, y: 0, width: size, height: size / 2 }, leaves };
+  return cells;
+}
+
+/** A cell with its gutter taken off: the part a card's UVs actually address. */
+export function insetRect(rect: PixelRect, gutter: number): PixelRect {
+  return { x: rect.x + gutter, y: rect.y + gutter, width: rect.width - 2 * gutter, height: rect.height - 2 * gutter };
 }

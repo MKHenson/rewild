@@ -201,9 +201,9 @@ function finalise(params: Params, branches: Branch[]): Skeleton {
     for (const point of branch.points) grownHeight = Math.max(grownHeight, point.p[1]);
 
   // The trunk carries on past its first fork, so the grown height is not the
-  // trunk length. Normalising here is what makes --height mean the height of
+  // trunk length. Normalising here is what makes height mean the height of
   // the tree rather than of one branch, and it leaves the radii alone so
-  // --trunk-radius keeps meaning what it says.
+  // trunkRadius keeps meaning what it says.
   const factor = grownHeight > 1e-6 ? params.height / grownHeight : 1;
 
   let maxPathDist = 0;
@@ -254,7 +254,7 @@ function finalise(params: Params, branches: Branch[]): Skeleton {
   };
 }
 
-/** COLOR_0.r: 0 at the rigid base, 1 at a free tip, shaped by --bend-curve. */
+/** COLOR_0.r: 0 at the rigid base, 1 at a free tip, shaped by bendCurve. */
 export function bendWeight(params: Params, skeleton: Skeleton, distance: number): number {
   const t = Math.min(1, distance / skeleton.maxPathDist);
   return t ** params.bendCurve;

@@ -174,6 +174,25 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     faceNormalSpecular: true,
     specularOcclusion: true,
   },
+  poplar_01: {
+    name: 'poplar_01',
+    geometryId: 'poplar-01',
+    cullDistance: 160,
+    impostor: { fromDistance: 96, views: 8, tileSize: 128 },
+    jitter: { scale: { from: 0.8, to: 1.25 }, yaw: FULL_TURN, tilt: 3 },
+    alignToNormal: 0,
+    footprint: 6.4,
+    collider: {
+      type: 'capsule',
+      radius: 0.27,
+      height: 0.56,
+      offset: [0, 0.55, 0],
+    },
+    wind: { amplitude: 0.4, frequency: 0.45, flutter: 0.35 },
+    authoredNormals: true,
+    faceNormalSpecular: true,
+    specularOcclusion: true,
+  },
 };
 
 // Throws rather than falling back: a layer name only comes from this table, so

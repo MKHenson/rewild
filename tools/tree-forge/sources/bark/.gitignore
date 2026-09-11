@@ -1,0 +1,10 @@
+# Hand-authored bark sources: one folder per source, each holding a diffuse
+# (sRGB), an arm and a 16-bit disp map. Tileable on both axes, authored with the
+# trunk running up the image. No normal map — tree-forge derives it from the
+# composited height. See ../../../../docs/tree-forge.md.
+#
+# Large binaries, kept out of git the way /assets/ is. With no source here the
+# forge generates its bark instead, so a fresh clone still builds. This rule
+# keeps the file itself tracked so the folder survives that clone.
+*
+!.gitignore
