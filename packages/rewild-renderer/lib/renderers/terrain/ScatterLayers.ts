@@ -90,6 +90,16 @@ export interface ScatterLayer {
    *  it inward and blacks out whichever half of the cards faces away. Applies
    *  only to the model's alpha-masked primitives, so a trunk is untouched. */
   authoredNormals?: boolean;
+  /** Reflect off each triangle rather than off the shading normal on the
+   *  model's cutout piece. For cards whose normals describe a shape the
+   *  triangles do not have: the normal decides how much light a card gathers,
+   *  its face decides where it reflects. Without it a canopy reflects the sun
+   *  as one polished sphere across every card. */
+  faceNormalSpecular?: boolean;
+  /** Let the cutout piece's occlusion map attenuate direct specular too, not
+   *  only ambient. Its occlusion stands in for the leaves in front of a card,
+   *  which no shadow map sees. */
+  specularOcclusion?: boolean;
 }
 
 // Culling is per chunk and a chunk spans 480m, so a range much beyond a chunk
@@ -161,6 +171,8 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     wind: { amplitude: 0.4, frequency: 0.45, flutter: 0.35 },
     // Leaf cards are shaded from the crown's outward normal, not their own.
     authoredNormals: true,
+    faceNormalSpecular: true,
+    specularOcclusion: true,
   },
 };
 

@@ -32,13 +32,19 @@ export class ScatterModels {
     const layer = getScatterLayer(layerName);
     const model = renderer.geometryManager.getModel(layer.geometryId);
 
+    const cutout: CutoutShading = {
+      authoredNormals: !!layer.authoredNormals,
+      faceNormalSpecular: !!layer.faceNormalSpecular,
+      specularOcclusion: !!layer.specularOcclusion,
+    };
+
     const built: ScatterPrimitive[] = [];
     for (const root of model.roots)
       collectPrimitives(
         renderer,
         layerName,
         layer.materialId,
-        !!layer.authoredNormals,
+        cutout,
         root,
         null,
         built
@@ -49,15 +55,17 @@ export class ScatterModels {
         `Scatter layer '${layerName}' model '${layer.geometryId}' has no drawable primitives.`
       );
 
-    // The flag names the cutout piece, so a model with none of one has quietly
-    // ignored it. The symptom is half a canopy going black, a long way from
-    // whatever was actually changed.
-    if (
-      layer.authoredNormals &&
-      !built.some((piece) => piece.pass.authoredNormals)
-    )
+    // These flags name the cutout piece, so a model with none of one has
+    // quietly ignored them. The symptom is half a canopy going black, a long
+    // way from whatever was actually changed.
+    const asked = (Object.keys(cutout) as (keyof CutoutShading)[]).filter(
+      (key) => cutout[key]
+    );
+    if (asked.length && !built.some((piece) => piece.pass.alphaMode === 'MASK'))
       throw new Error(
-        `Scatter layer '${layerName}' sets authoredNormals, but model '${layer.geometryId}' has no alpha-masked primitive for it to apply to.`
+        `Scatter layer '${layerName}' sets ${asked.join(', ')}, but model '${
+          layer.geometryId
+        }' has no alpha-masked primitive for it to apply to.`
       );
 
     this.primitives.set(layerName, built);
@@ -71,11 +79,18 @@ export class ScatterModels {
   }
 }
 
+/** The layer flags that apply to a model's alpha-masked primitives. */
+interface CutoutShading {
+  authoredNormals: boolean;
+  faceNormalSpecular: boolean;
+  specularOcclusion: boolean;
+}
+
 function collectPrimitives(
   renderer: Renderer,
   layerName: string,
   materialId: string | undefined,
-  authoredNormals: boolean,
+  cutout: CutoutShading,
   node: GltfNode,
   parent: Float32Array<ArrayBuffer> | null,
   out: ScatterPrimitive[]
@@ -116,8 +131,12 @@ function collectPrimitives(
       );
 
     // The cutout piece only. A tree ships bark and leaves as two materials and
-    // the flag describes the leaves; a trunk's normals are its own.
-    if (authoredNormals && pass.alphaMode === 'MASK') pass.authoredNormals = true;
+    // these flags describe the leaves; a trunk's normals are its own.
+    if (pass.alphaMode === 'MASK') {
+      if (cutout.authoredNormals) pass.authoredNormals = true;
+      if (cutout.faceNormalSpecular) pass.faceNormalSpecular = true;
+      if (cutout.specularOcclusion) pass.specularOcclusion = true;
+    }
 
     out.push({ geometry: primitive.geometry, pass, nodeMatrix });
   }
@@ -127,7 +146,7 @@ function collectPrimitives(
       renderer,
       layerName,
       materialId,
-      authoredNormals,
+      cutout,
       child,
       nodeMatrix,
       out

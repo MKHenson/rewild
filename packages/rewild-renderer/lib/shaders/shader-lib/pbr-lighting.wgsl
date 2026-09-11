@@ -22,8 +22,16 @@
 // spot-light-shadow.wgsl having been included.
 
 struct PbrSurface {
-  // View space, normalized, after normal mapping.
+  // View space, normalized, after normal mapping. What the diffuse lobes use.
   normal: vec3f,
+  /**
+   * View space, normalized. What the specular lobes use — the GGX distribution,
+   * Fresnel and the reflection vector, direct and image-based alike. The same
+   * as `normal` for an ordinary surface. Differs where the shading normal is
+   * authored for a shape the triangles do not have: that normal says how much
+   * light the surface gathers, and the triangle's own says where it reflects.
+   */
+  specularNormal: vec3f,
   /**
    * View space, normalized, *before* normal mapping — the surface the geometry
    * actually has. Only used for horizon occlusion (see horizonOcclusion), which
@@ -63,11 +71,12 @@ fn accumulatePbrLighting(
   accum.spotShadowSpecular = vec3f(0.0);
 
   let N = surface.normal;
+  let Ns = surface.specularNormal;
   let V = normalize(-surface.viewPosition);
 
-  // The reflection vector depends only on N and V, not on any light, so the
+  // The reflection vector depends only on Ns and V, not on any light, so the
   // horizon term is computed once and applied to every light's specular.
-  let specularHorizon = horizonOcclusion(reflect(-V, N), surface.geometricNormal);
+  let specularHorizon = horizonOcclusion(reflect(-V, Ns), surface.geometricNormal);
 
   for (var i: u32 = 0; i < lighting.numLights; i++) {
     let light = lighting.lights[i];
@@ -77,7 +86,7 @@ fn accumulatePbrLighting(
       // Directional. positionOrDirection is the direction the light travels, so
       // the vector *toward* the light is its negation.
       let brdf = evaluateBRDF(
-        N, V, -light.positionOrDirection,
+        N, Ns, V, -light.positionOrDirection,
         surface.diffuseColor, surface.f0, surface.alpha
       );
       accum.directionalDiffuse += brdf.diffuse * radiance;
@@ -103,7 +112,7 @@ fn accumulatePbrLighting(
     }
 
     let brdf = evaluateBRDF(
-      N, V, L, surface.diffuseColor, surface.f0, surface.alpha
+      N, Ns, V, L, surface.diffuseColor, surface.f0, surface.alpha
     );
     let diffuse = brdf.diffuse * radiance * attenuation;
     let specular = brdf.specular * radiance * attenuation * specularHorizon;
