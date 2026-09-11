@@ -182,22 +182,64 @@ export function warp(
   return [x + dx * strength, y + dy * strength];
 }
 
+/**
+ * `warp` into a pair the caller owns.
+ *
+ * For callers that warp several times per texel — a layer measuring its own
+ * deformation needs three — where a returned tuple each time is an allocation
+ * per texel of a half-million-texel band.
+ */
+export function warpInto(
+  into: number[],
+  x: number,
+  y: number,
+  periodX: number,
+  periodY: number,
+  seed: number,
+  strength: number,
+  octaves = 2
+): void {
+  const dx = fbm(x, y, periodX, periodY, octaves, seed ^ 0x1f83d9ab) * 2 - 1;
+  const dy = fbm(x, y, periodX, periodY, octaves, seed ^ 0x5be0cd19) * 2 - 1;
+  into[0] = x + dx * strength;
+  into[1] = y + dy * strength;
+}
+
 export interface WorleyResult {
   /** Distance to the nearest feature point, in cells. */
   f1: number;
   /** Distance to the second nearest. `f2 - f1` is the cell border. */
   f2: number;
+  /**
+   * The winning cell's own random value, 0..1. Constant across a cell and
+   * discontinuous at its border, so read it only for something a feature at
+   * that border hides — a per-plate height, where the border is the fissure.
+   */
+  id: number;
+  /**
+   * Vector from the nearest feature point to the second nearest, in cells. It
+   * is the normal of the border the two share, so its direction says which way
+   * that border runs, which is how a field can treat an along-trunk fissure
+   * differently from a cross one without being two fields.
+   */
+  nx: number;
+  ny: number;
 }
 
 /**
- * Cellular (Worley) noise, wrapping at the same periods.
+ * Cellular (Worley) noise, wrapping at the same periods, written into a result
+ * the caller owns.
  *
  * Neither value nor gradient noise can produce a plate-and-fissure structure,
  * because both are sums of smooth bumps and bark is a partition. `f1` gives the
  * plates and `f2 - f1` the cracks between them, which is the shape the eye
  * actually reads as bark rather than as wood grain.
+ *
+ * The band is half a million texels and the bark stack reads several of these
+ * at each, so this fills a struct rather than returning one.
  */
-export function worley(
+export function worleyInto(
+  into: WorleyResult,
   x: number,
   y: number,
   periodX: number,
@@ -210,6 +252,11 @@ export function worley(
 
   let f1 = Infinity;
   let f2 = Infinity;
+  let id = 0;
+  let firstX = 0;
+  let firstY = 0;
+  let secondX = 0;
+  let secondY = 0;
 
   for (let oy = -1; oy <= 1; oy++) {
     for (let ox = -1; ox <= 1; ox++) {
@@ -226,12 +273,36 @@ export function worley(
       const distance = Math.hypot(px - x, py - y);
       if (distance < f1) {
         f2 = f1;
+        secondX = firstX;
+        secondY = firstY;
         f1 = distance;
+        firstX = px;
+        firstY = py;
+        id = hash(wx, wy, seed ^ 0x51ed270b);
       } else if (distance < f2) {
         f2 = distance;
+        secondX = px;
+        secondY = py;
       }
     }
   }
 
-  return { f1, f2 };
+  into.f1 = f1;
+  into.f2 = f2;
+  into.id = id;
+  into.nx = secondX - firstX;
+  into.ny = secondY - firstY;
+  return into;
+}
+
+/** `worleyInto` into a fresh result. */
+export function worley(
+  x: number,
+  y: number,
+  periodX: number,
+  periodY: number,
+  seed: number,
+  jitter = 1
+): WorleyResult {
+  return worleyInto({ f1: 0, f2: 0, id: 0, nx: 0, ny: 0 }, x, y, periodX, periodY, seed, jitter);
 }
