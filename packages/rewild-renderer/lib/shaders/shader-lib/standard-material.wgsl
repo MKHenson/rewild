@@ -181,10 +181,18 @@ fn shadeStandardSurface(
   // The specular lobes reflect off the triangle where the shading normal was
   // authored for a shape the triangles do not have — a canopy's cards carry
   // the crown's normal, and reflecting off that lights the crown as one
-  // polished sphere. Horizon occlusion follows the same surface, since it asks
+  // polished sphere. The normal map still applies, through a frame built on
+  // the face instead, so relief tilts the reflection the face decides the
+  // direction of. Horizon occlusion follows the same surface, since it asks
   // what the reflection can see past.
   if (HAS_FACE_NORMAL_SPECULAR) {
-    surface.specularNormal = faceNormal;
+    var faceTbn: mat3x3f;
+    if (HAS_VERTEX_TANGENTS) {
+      faceTbn = tbnFromTangent(faceNormal, tangent);
+    } else {
+      faceTbn = tbnFromDerivatives(viewPosition, fragUV, faceNormal);
+    }
+    surface.specularNormal = normalize(faceTbn * normalSample);
     surface.geometricNormal = faceNormal;
   } else {
     surface.specularNormal = surface.normal;
