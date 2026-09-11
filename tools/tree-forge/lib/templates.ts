@@ -27,25 +27,32 @@ export function geometryEntry(params: Params, modelUrl: string): IGeometryTempla
   return { [params.name]: { type: 'gltf', url: modelUrl } };
 }
 
-export function materialEntries(params: Params, textureUrls: TextureNames): IMaterialsTemplate {
+export interface TextureSetUrls {
+  bark: TextureNames;
+  leaves: TextureNames;
+}
+
+export function materialEntries(params: Params, textureUrls: TextureSetUrls): IMaterialsTemplate {
   const set = params.textureSet;
 
+  const maps = (piece: string, urls: TextureNames) => [
+    { name: `${set}-${piece}-diffuse`, url: urls.baseColor, colorSpace: 'srgb' as const },
+    { name: `${set}-${piece}-normal`, url: urls.normal, colorSpace: 'linear' as const },
+    { name: `${set}-${piece}-arm`, url: urls.arm, colorSpace: 'linear' as const },
+    { name: `${set}-${piece}-disp`, url: urls.height, colorSpace: 'linear' as const },
+  ];
+
   return {
-    textures: [
-      { name: `${set}-diffuse`, url: textureUrls.baseColor, colorSpace: 'srgb' },
-      { name: `${set}-normal`, url: textureUrls.normal, colorSpace: 'linear' },
-      { name: `${set}-arm`, url: textureUrls.arm, colorSpace: 'linear' },
-      { name: `${set}-disp`, url: textureUrls.height, colorSpace: 'linear' },
-    ],
+    textures: [...maps('bark', textureUrls.bark), ...maps('leaf', textureUrls.leaves)],
     materials: [
       {
         name: `${set}-bark`,
         type: 'standard',
-        baseColorMap: `${set}-diffuse`,
-        normalMap: `${set}-normal`,
-        metallicRoughnessMap: `${set}-arm`,
-        occlusionMap: `${set}-arm`,
-        heightMap: `${set}-disp`,
+        baseColorMap: `${set}-bark-diffuse`,
+        normalMap: `${set}-bark-normal`,
+        metallicRoughnessMap: `${set}-bark-arm`,
+        occlusionMap: `${set}-bark-arm`,
+        heightMap: `${set}-bark-disp`,
         parallax: false,
         heightScale: 0.04,
         metallic: 1,
@@ -95,6 +102,10 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
     // `card` is the one mode whose normals are the cards' own, and so the one
     // mode a back face may mirror.
     authoredNormals: params.leafNormalMode !== 'card',
+    // A card stands in for a cluster of leaves whatever its normal says, so it
+    // reflects off its own face and its occlusion shades its highlights too.
+    faceNormalSpecular: true,
+    specularOcclusion: true,
   };
 }
 
@@ -122,6 +133,8 @@ export function scatterLayerSource(layer: ScatterLayer): string {
     `    collider: { type: '${collider.type}', radius: ${collider.radius}, height: ${collider.height}, offset: [${collider.offset.join(', ')}] },`,
     `    wind: { amplitude: ${wind.amplitude}, frequency: ${wind.frequency}, flutter: ${wind.flutter} },`,
     ...(layer.authoredNormals ? ['    authoredNormals: true,'] : []),
+    ...(layer.faceNormalSpecular ? ['    faceNormalSpecular: true,'] : []),
+    ...(layer.specularOcclusion ? ['    specularOcclusion: true,'] : []),
     '  },',
   ].join('\n');
 }

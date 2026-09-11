@@ -1,0 +1,11 @@
+# Hand-authored leaf stamps: one folder per source, each holding a diffuse
+# (sRGB, alpha carries the cutout), an arm and a 16-bit disp map. One leaf per
+# stamp, pivot at bottom-middle and tip at top-middle, which is what lets the
+# forge arrange them into a cluster without per-source metadata. No normal map —
+# tree-forge derives it after rotation. See ../../../../docs/tree-forge.md.
+#
+# Large binaries, kept out of git the way /assets/ is. With no source here the
+# forge generates its leaves instead, so a fresh clone still builds. This rule
+# keeps the file itself tracked so the folder survives that clone.
+*
+!.gitignore

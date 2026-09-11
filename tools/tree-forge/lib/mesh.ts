@@ -3,7 +3,7 @@
 // sided, leaves are alpha-tested and double sided, and those are per-material
 // flags. One material would alpha-test the trunk for nothing.
 
-import { atlasRegions, LEAF_VARIANTS } from './atlas.ts';
+import { leafCells } from './atlas.ts';
 import type { Params } from './params.ts';
 import { createRng, hash2 } from './rng.ts';
 import { bendWeight, clusterPhase, sampleBranch, type BranchPoint, type Skeleton } from './skeleton.ts';
@@ -38,6 +38,7 @@ export type Rgba = [number, number, number, number];
 
 const DEG = Math.PI / 180;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const TWO_PI = Math.PI * 2;
 
 function createBuilder(): Builder {
   return { positions: [], normals: [], uvs: [], colors: [], indices: [] };
@@ -70,7 +71,6 @@ function finish(out: Builder): MeshAttributes {
 }
 
 function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
-  const regions = atlasRegions(params.textureSize);
   const out = createBuilder();
 
   for (const branch of skeleton.branches) {
@@ -89,13 +89,17 @@ function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
     let heading = rings[0].dir;
     const ringStart: number[] = [];
 
-    // Length runs along u, the ring around v. v maps once into the bark band
-    // on every branch, because that is what closes the ring seamlessly, so a
-    // thin branch already wraps the whole texture round a fraction of the
-    // trunk's girth. u has to shrink with it or the bark comes out squashed:
-    // advancing by trunkRadius / radius makes a branch a scaled copy of the
-    // trunk, and leaves the trunk base at --bark-tile metres per repeat.
-    let u = rings[0].dist / params.barkTile;
+    // Length runs down the image and the ring across it, matching the way bark
+    // is authored. Both axes wrap, so length tiles for free at any branch
+    // length and the ring closes on itself.
+    //
+    // The ring maps once across the image whatever the branch, because that is
+    // what closes it seamlessly — so the image width always covers exactly one
+    // circumference. Advancing length by the same circumference makes the
+    // texture square in world space on every branch, at every radius, with no
+    // reference length to author and nothing to drift out of step. It is also
+    // what keeps a twig a scaled copy of the trunk rather than a squashed one.
+    let along = rings[0].dist / (TWO_PI * params.trunkRadius);
     let previous: BranchPoint | null = null;
 
     for (const ring of rings) {
@@ -106,12 +110,12 @@ function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
       const bend = bendWeight(params, skeleton, ring.dist);
 
       if (previous) {
-        // Integrated per segment: scaling the whole path distance by the
-        // local radius would let a taper rescale the length behind it too. The
-        // segment's mean radius, so the degenerate cap ring stays bounded —
-        // it shortens by the same factor it thins by.
+        // Integrated per segment: dividing the whole path distance by the local
+        // radius would let a taper rescale the length behind it too. The
+        // segment's mean radius, so the degenerate cap ring stays bounded — it
+        // shortens by the same factor it thins by.
         const radius = Math.max(1e-9, (previous.radius + ring.radius) * 0.5);
-        u += ((ring.dist - previous.dist) * params.trunkRadius) / (radius * params.barkTile);
+        along += (ring.dist - previous.dist) / (TWO_PI * radius);
       }
       previous = ring;
 
@@ -131,7 +135,7 @@ function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
           out,
           add(ring.p, scale(offset, ring.radius)),
           normalize(offset),
-          [u, regions.bark.v0 + (j / radial) * (regions.bark.v1 - regions.bark.v0)],
+          [j / radial, along],
           [bend, phase, 0, 1]
         );
       }
@@ -166,8 +170,9 @@ function leafNormal(mode: string, cardCentre: Vec3, cardNormal: Vec3, canopyCent
   return normalize([outward[0], outward[1] * 0.5 + 0.5, outward[2]]);
 }
 
-function buildLeaves(params: Params, skeleton: Skeleton): MeshAttributes {
-  const regions = atlasRegions(params.textureSize);
+function buildLeaves(params: Params, skeleton: Skeleton, leafGrid: number): MeshAttributes {
+  const cells = leafCells(params.textureSize, leafGrid);
+  const variants = cells.length;
   const rng = createRng(params.seed ^ 0x1b873593);
   const out = createBuilder();
 
@@ -186,7 +191,7 @@ function buildLeaves(params: Params, skeleton: Skeleton): MeshAttributes {
       const height = params.leafSize * rng.range(0.75, 1.25);
       const width = height * params.leafAspect;
       const stem = add(at.p, scale(right, at.radius));
-      const cell = regions.leaves[Math.floor(hash2(params.seed, branch.id * 977 + k) * LEAF_VARIANTS) % LEAF_VARIANTS];
+      const cell = cells[Math.floor(hash2(params.seed, branch.id * 977 + k) * variants) % variants];
 
       const base = out.positions.length / 3;
 
@@ -228,8 +233,10 @@ function buildLeaves(params: Params, skeleton: Skeleton): MeshAttributes {
   return finish(out);
 }
 
-export function buildMesh(params: Params, skeleton: Skeleton): TreeMesh {
-  return { bark: buildBark(params, skeleton), leaves: buildLeaves(params, skeleton) };
+/** `leafGrid` is the cell count the leaf image was painted with, from
+ *  leafGrid in sources.ts, so a card never addresses a cell nothing drew. */
+export function buildMesh(params: Params, skeleton: Skeleton, leafGrid: number): TreeMesh {
+  return { bark: buildBark(params, skeleton), leaves: buildLeaves(params, skeleton, leafGrid) };
 }
 
 export function boundsOf(positions: Float32Array): { min: Vec3; max: Vec3 } {
