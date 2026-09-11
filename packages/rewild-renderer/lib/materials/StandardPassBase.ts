@@ -45,6 +45,8 @@ export abstract class StandardPassBase implements IMaterialPass {
   private _vertexTangents: boolean = false;
   private _parallax: boolean = false;
   private _authoredNormals: boolean = false;
+  private _faceNormalSpecular: boolean = false;
+  private _specularOcclusion: boolean = false;
 
   /**
    * glTF's alphaMode:
@@ -143,6 +145,45 @@ export abstract class StandardPassBase implements IMaterialPass {
     this.invalidatePipeline();
   }
 
+  /**
+   * Reflect off the triangle rather than off the shading normal.
+   *
+   * Diffuse keeps the vertex normal and the normal map; the specular lobes —
+   * GGX, Fresnel, the reflection into the sky — take the face's own normal
+   * instead. For geometry whose vertex normals describe a shape the triangles
+   * do not have: those normals say how much light a surface gathers, which is
+   * right, and where it reflects, which is not. A canopy shaded from the
+   * crown's normal gathers light as a rounded mass and would otherwise reflect
+   * the sun as one polished sphere across hundreds of cards.
+   */
+  get faceNormalSpecular(): boolean {
+    return this._faceNormalSpecular;
+  }
+
+  set faceNormalSpecular(value: boolean) {
+    if (value === this._faceNormalSpecular) return;
+    this._faceNormalSpecular = value;
+    this.invalidatePipeline();
+  }
+
+  /**
+   * Let the occlusion map attenuate direct specular as well as ambient.
+   *
+   * glTF scopes occlusion to indirect light, and by default so does this. On
+   * a surface whose occlusion stands in for geometry the mesh does not carry —
+   * the leaves in front of a leaf card, the depth of a crevice baked flat —
+   * a highlight in an occluded pocket reads as a surface that is not there.
+   */
+  get specularOcclusion(): boolean {
+    return this._specularOcclusion;
+  }
+
+  set specularOcclusion(value: boolean) {
+    if (value === this._specularOcclusion) return;
+    this._specularOcclusion = value;
+    this.invalidatePipeline();
+  }
+
   /** Read by the renderer to draw transparent groups after opaque ones. */
   get transparent(): boolean {
     return this._alphaMode === 'BLEND';
@@ -220,6 +261,8 @@ export abstract class StandardPassBase implements IMaterialPass {
       HAS_VERTEX_TANGENTS: this._vertexTangents,
       HAS_PARALLAX: this._parallax,
       HAS_AUTHORED_NORMALS: this._authoredNormals,
+      HAS_FACE_NORMAL_SPECULAR: this._faceNormalSpecular,
+      HAS_SPECULAR_OCCLUSION: this._specularOcclusion,
     };
   }
 
