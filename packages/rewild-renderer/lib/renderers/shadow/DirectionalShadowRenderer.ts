@@ -68,9 +68,9 @@ const NDC_CORNERS: [number, number, number][] = [
   [-1, 1, NDC_FAR_Z],
 ];
 
-// shadowMVP + nodeMatrix + viewer/cull, matching Uniforms in
+// shadowMVP + nodeMatrix + viewer + range, matching Uniforms in
 // shadow-depth-instanced.wgsl.
-const INSTANCED_UNIFORM_BYTES = 64 * 2 + 16;
+const INSTANCED_UNIFORM_BYTES = 64 * 2 + 32;
 
 interface MeshShadowUniforms {
   buffers: [GPUBuffer, GPUBuffer, GPUBuffer];
@@ -297,6 +297,7 @@ export class DirectionalShadowRenderer {
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
       },
+      timestampWrites: renderer.scenePerfMonitor.getTimestampWrites('shadow'),
     });
 
     if (sunAboveHorizon) {
@@ -336,13 +337,23 @@ export class DirectionalShadowRenderer {
               currentPipeline = wanted;
             }
 
+            if (!uniforms.instanced) {
+              pass.setBindGroup(0, uniforms.bindGroups[c]);
+              pass.drawIndexed(numIndices, 1);
+              continue;
+            }
+
+            const group = mesh as IScatterInstanceGroup;
+            if (group.rangeCount === 0) continue;
             pass.setBindGroup(0, uniforms.bindGroups[c]);
-            pass.drawIndexed(
-              numIndices,
-              uniforms.instanced
-                ? (mesh as IScatterInstanceGroup).instanceCount
-                : 1
-            );
+            for (let r = 0; r < group.rangeCount; r++)
+              pass.drawIndexed(
+                numIndices,
+                group.rangeCounts[r],
+                0,
+                0,
+                group.rangeStarts[r]
+              );
           }
         }
       }
@@ -438,7 +449,7 @@ export class DirectionalShadowRenderer {
    * One instanced group's three cascade uniforms.
    *
    * Only the MVP differs between cascades, but each buffer is written whole —
-   * one 144-byte write beats tracking which half went stale.
+   * one 160-byte write beats tracking which half went stale.
    *
    * The viewer is put in chunk-local space so the shader's per-instance cull
    * matches the scene pass's without carrying a second matrix. The chunk's
@@ -460,12 +471,17 @@ export class DirectionalShadowRenderer {
       .set(cameraWorld[12], cameraWorld[13], cameraWorld[14])
       .applyMatrix4(this._chunkInverse);
 
+    // The same viewer decides which cells the band can reach, so the caster
+    // set is the drawn set down to the run.
+    group.selectInstances(this._viewerLocal);
+
     const data = this._instancedData;
     data.set(group.nodeMatrix, 16);
     data[32] = this._viewerLocal.x;
     data[33] = this._viewerLocal.y;
     data[34] = this._viewerLocal.z;
-    data[35] = group.cullDistance;
+    data[36] = group.nearDistance;
+    data[37] = group.cullDistance;
 
     for (let c = 0; c < NUM_CASCADES; c++) {
       this._shadowMVP.multiplyMatrices(this.lightVPs[c], world);

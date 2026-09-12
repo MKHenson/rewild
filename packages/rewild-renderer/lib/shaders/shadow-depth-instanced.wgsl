@@ -13,8 +13,11 @@ struct Uniforms {
   shadowMVP : mat4x4f,
   // The primitive's transform within its model, applied before the instance.
   nodeMatrix : mat4x4f,
-  // xyz = viewer in chunk-local space, w = the layer's cull distance.
+  // xyz = viewer in chunk-local space. w unused.
   viewer : vec4f,
+  // x = metres at which this LOD tier takes over, y = metres at which it hands
+  // over.
+  range : vec4f,
 }
 
 struct ScatterInstance {
@@ -45,11 +48,12 @@ fn vs(
     instance.posScale.xyz +
     rotateByQuat(instance.rotation, nodePosition * instance.posScale.w);
 
-  // The same viewer-distance test the scene pass applies, so the caster set and
-  // the drawn set are one set. Skipping it would shadow the ground from trees
-  // that are not there, and draw a whole 480m chunk three times over for the
-  // handful of instances actually in range.
-  if (distance(chunkPosition, uniforms.viewer.xyz) > uniforms.viewer.w) {
+  // The same viewer-distance band the scene pass applies, so the caster set and
+  // the drawn set are one set, tier for tier. Skipping it would shadow the
+  // ground from trees that are not there, and draw a whole 480m chunk three
+  // times over for the handful of instances actually in range.
+  let viewDistance = distance(chunkPosition, uniforms.viewer.xyz);
+  if (viewDistance < uniforms.range.x || viewDistance >= uniforms.range.y) {
     return CULLED_POSITION;
   }
 

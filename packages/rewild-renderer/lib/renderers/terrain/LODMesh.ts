@@ -227,7 +227,7 @@ export class LODMesh {
         if (wantsScatter)
           this.chunk.populateScatter(
             renderer,
-            renderer.terrainRenderer.scatterModels,
+            renderer.terrainRenderer,
             scatter,
             version
           );

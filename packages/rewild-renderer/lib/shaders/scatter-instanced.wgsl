@@ -42,9 +42,18 @@ struct Uniforms {
   // The primitive's transform within its model, so a multi-part model keeps its
   // parts in place without a transformed copy of the geometry.
   nodeMatrix : mat4x4f,
-  // x = the layer's cull distance in metres. y/z/w unused.
+  // x = metres at which this LOD tier hands over, y = metres at which it takes
+  // over, z = the tier index, w = 1 to tint by tier for the LOD debug view.
   params : vec4f,
 }
+
+// One distinct colour per LOD tier for the debug tint, the far tiers warmest.
+const TIER_TINTS = array<vec3f, 4>(
+  vec3f(0.2, 1.0, 0.2),
+  vec3f(1.0, 1.0, 0.2),
+  vec3f(1.0, 0.5, 0.1),
+  vec3f(1.0, 0.1, 0.1)
+);
 
 // Far enough outside the clip volume that every vertex of the triangle is
 // discarded — z > w is behind the far plane.
@@ -166,9 +175,11 @@ fn transformVertex(
 
   // Per instance, not per chunk. The chunk-level cull can only drop a whole
   // chunk at once, and a chunk is 480m across — so standing in one draws every
-  // instance in it, out to the horizon. Collapsing the far ones here costs a
-  // compare and makes the draw range a circle around the camera.
-  if (length(mvPosition.xyz) > uniforms.params.x) {
+  // instance in it, out to the horizon. Collapsing the ones outside this
+  // tier's band costs two compares and is also the whole of LOD selection:
+  // every tier draws the same instances, and exactly one keeps each.
+  let viewDistance = length(mvPosition.xyz);
+  if (viewDistance < uniforms.params.y || viewDistance >= uniforms.params.x) {
     output.Position = CULLED_POSITION;
     return output;
   }
@@ -254,6 +265,14 @@ fn fs(
 
   if (directionalShadowParams.debugMode != 0u) {
     outColor = vec4f(mix(outColor.rgb, cascadeDebugTint, 0.5), outColor.a);
+  }
+
+  // Flat tier colour, lit only enough to keep the silhouette readable. A blend
+  // over the shaded surface disappears under tone mapping.
+  if (uniforms.params.w > 0.5) {
+    let tier = min(u32(uniforms.params.z), 3u);
+    let luma = dot(outColor.rgb, vec3f(0.299, 0.587, 0.114));
+    outColor = vec4f(TIER_TINTS[tier] * (0.35 + 0.65 * min(luma, 1.0)), outColor.a);
   }
 
   return outColor;

@@ -10,6 +10,9 @@ import { ShadowUniforms } from './uniforms/ShadowUniforms';
 import { StandardPassBase } from './StandardPassBase';
 import { composeShader } from '../utils/shaderDefines';
 import { IScatterInstanceGroup } from '../../types/interfaces';
+import { Vector3 } from 'rewild-common';
+
+const _viewerLocal = new Vector3();
 
 const materialGroupIndex = 0;
 const instanceGroupIndex = 1;
@@ -111,16 +114,28 @@ export class ScatterInstancedPass extends StandardPassBase {
 
     const numIndices = geometry.indices!.length;
     const projection = camera.projectionMatrix.elements;
+    const cameraWorld = camera.transform.matrixWorld.elements;
 
     for (let i = 0; i < meshes.length; i++) {
       const group = meshes[i] as unknown as IScatterInstanceGroup;
       if (group.instanceCount === 0) continue;
 
+      // Chunk transforms only translate, so the viewer lands in chunk-local
+      // space by subtraction rather than an inverse per group.
+      const world = group.transform.matrixWorld.elements;
+      _viewerLocal.set(
+        cameraWorld[12] - world[12],
+        cameraWorld[13] - world[13],
+        cameraWorld[14] - world[14]
+      );
+      group.selectInstances(_viewerLocal);
+      if (group.rangeCount === 0) continue;
+
       const bindGroup = group.prepareInstances(renderer, this);
       if (!bindGroup) continue;
 
       // Only the model-view changes per frame; the projection, node matrix and
-      // cull distance ride along because one small write beats several.
+      // LOD band ride along because one small write beats several.
       group.writeFrameUniforms(
         renderer,
         projection,
@@ -128,7 +143,14 @@ export class ScatterInstancedPass extends StandardPassBase {
       );
 
       pass.setBindGroup(instanceGroupIndex, bindGroup);
-      pass.drawIndexed(numIndices, group.instanceCount);
+      for (let r = 0; r < group.rangeCount; r++)
+        pass.drawIndexed(
+          numIndices,
+          group.rangeCounts[r],
+          0,
+          0,
+          group.rangeStarts[r]
+        );
     }
   }
 }

@@ -102,10 +102,14 @@ export interface ScatterLayer {
   specularOcclusion?: boolean;
 }
 
-// Culling is per chunk and a chunk spans 480m, so a range much beyond a chunk
-// draws several whole chunks of instances for the few near the viewer. Keep
-// these tight until the per-instance cull in #223.
+// A draw submits only the 60m cells its LOD band can reach, so a range is paid
+// for in what it actually draws rather than in whole chunks. What it still
+// costs is generation: every chunk within the range plus the prefetch places
+// its instances in the worker.
 const MESH_CULL_DISTANCE = 160;
+// Trees carry the view: a treeline that ends at 160m reads as a clearing. The
+// coarse tier is what makes the extra 160m affordable.
+const TREE_CULL_DISTANCE = 320;
 const FULL_TURN: SelectorBand = { from: 0, to: 360 };
 
 // Rows are data — adding something the world can grow is a table edit here plus
@@ -157,8 +161,9 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
   oak_01: {
     name: 'oak_01',
     geometryId: 'oak-01',
-    cullDistance: 160,
-    impostor: { fromDistance: 96, views: 8, tileSize: 128 },
+    lodDistances: [60],
+    cullDistance: TREE_CULL_DISTANCE,
+    impostor: { fromDistance: 192, views: 8, tileSize: 128 },
     jitter: { scale: { from: 0.8, to: 1.25 }, yaw: FULL_TURN, tilt: 3 },
     alignToNormal: 0,
     footprint: 6.2,
@@ -177,8 +182,9 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
   poplar_01: {
     name: 'poplar_01',
     geometryId: 'poplar-01',
-    cullDistance: 160,
-    impostor: { fromDistance: 96, views: 8, tileSize: 128 },
+    lodDistances: [60],
+    cullDistance: TREE_CULL_DISTANCE,
+    impostor: { fromDistance: 192, views: 8, tileSize: 128 },
     jitter: { scale: { from: 0.8, to: 1.25 }, yaw: FULL_TURN, tilt: 3 },
     alignToNormal: 0,
     footprint: 6.4,
@@ -235,6 +241,66 @@ export function getScatterGenerationDistance(): number {
 /** The slot a layer occupies, or -1 if it isn't in the library. */
 export function getScatterLayerSlot(name: string): number {
   return getScatterLayerOrder().indexOf(name);
+}
+
+/** Mesh tiers a layer draws: the model plus one per LOD distance. A geometry
+ *  carrying more tiers than the layer names distances for leaves them unused. */
+export function lodTierCount(layer: ScatterLayer): number {
+  return (layer.lodDistances?.length ?? 0) + 1;
+}
+
+// The bands a tier draws once the bias has shifted the chain. An instance in
+// band k draws at tier clamp(k + bias, 0, last), so the end tiers absorb
+// whatever the shift pushes past them: a bias that outruns the chain leaves
+// the whole range on the model, or on its coarsest tier. `high < low` when the
+// shift leaves the tier nothing.
+function lowestSourceBand(tier: number, tierCount: number, bias: number) {
+  if (tier === 0) return 0;
+  return tier === tierCount - 1 ? Math.max(tier - bias, 0) : tier - bias;
+}
+
+function highestSourceBand(tier: number, tierCount: number, bias: number) {
+  const last = tierCount - 1;
+  if (tier === last) return last;
+  return tier === 0 ? Math.min(tier - bias, last) : tier - bias;
+}
+
+function drawsNothing(tier: number, tierCount: number, bias: number) {
+  const low = lowestSourceBand(tier, tierCount, bias);
+  const high = highestSourceBand(tier, tierCount, bias);
+  return low > high || low < 0 || high > tierCount - 1;
+}
+
+/** Metres at which a tier starts drawing; 0 for whichever tier is nearest. */
+export function lodTierNear(
+  layer: ScatterLayer,
+  tier: number,
+  bias = 0
+): number {
+  const tierCount = lodTierCount(layer);
+  if (drawsNothing(tier, tierCount, bias)) return 0;
+  const band = lowestSourceBand(tier, tierCount, bias);
+  return band === 0 ? 0 : layer.lodDistances![band - 1];
+}
+
+/**
+ * Metres at which a tier hands over — to the next tier, or to nothing at the
+ * cull distance for the last. Never past the cull distance, so pulling that in
+ * at runtime truncates the chain rather than leaving a tier drawing beyond it.
+ * No greater than the tier's near when it has nothing to draw, so `near < far`
+ * is the test for a tier that draws.
+ */
+export function lodTierFar(
+  layer: ScatterLayer,
+  tier: number,
+  bias = 0
+): number {
+  const tierCount = lodTierCount(layer);
+  if (drawsNothing(tier, tierCount, bias)) return 0;
+  const band = highestSourceBand(tier, tierCount, bias);
+  return band === tierCount - 1
+    ? layer.cullDistance
+    : Math.min(layer.lodDistances![band], layer.cullDistance);
 }
 
 function validateBand(layer: string, field: string, band: SelectorBand): void {

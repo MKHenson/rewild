@@ -14,7 +14,6 @@ import {
 import { LODMesh } from './LODMesh';
 import { DataTexture } from '../../textures/DataTexture';
 import { ChunkScatter } from './ChunkScatter';
-import { ScatterModels } from './ScatterModels';
 import { ScatterInstances } from './Scatter';
 import { getScatterGenerationDistance } from './ScatterLayers';
 import { TextureProperties } from '../../textures/Texture';
@@ -452,7 +451,7 @@ export class TerrainChunk implements IComponent {
 
   populateScatter(
     renderer: Renderer,
-    models: ScatterModels,
+    terrainRenderer: TerrainRenderer,
     instances: ScatterInstances[],
     version: number
   ) {
@@ -460,8 +459,16 @@ export class TerrainChunk implements IComponent {
     if (this.disposed) return;
 
     this.scatter ??= new ChunkScatter(this.transform);
-    this.scatter.build(renderer, models, instances);
-    this.scatter.updateVisibility(this.viewerPosition);
+    this.scatter.build(
+      renderer,
+      terrainRenderer.scatterModels,
+      instances,
+      terrainRenderer.scatterLodBias
+    );
+    this.scatter.updateVisibility(
+      this.viewerPosition,
+      terrainRenderer.scatterLodBias
+    );
     this.scatterVersion = version;
   }
 
@@ -513,7 +520,7 @@ export class TerrainChunk implements IComponent {
     _groundPoint.set(viewerPos.x, 0, viewerPos.z);
     this.viewerGroundDistance = this.bounds.distanceToPoint(_groundPoint);
     this.viewerPosition.copy(viewerPos);
-    this.scatter?.updateVisibility(viewerPos);
+    this.scatter?.updateVisibility(viewerPos, terrainRenderer.scatterLodBias);
 
     // A chunk that meshed before it came into range has no build left to carry
     // scatter, so it needs one asking for. Latching means that happens once.

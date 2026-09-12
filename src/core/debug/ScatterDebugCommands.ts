@@ -6,16 +6,16 @@ import {
 
 // Scatter inspection.
 //
-// Whether a rock is on screen depends on three separate things — the chunk
-// generated instances, the layer is within its cull distance, and the scene BVH
-// kept it — and all three failing look identical from the camera. These print
-// them apart.
+// Whether a rock is on screen depends on four separate things — the chunk
+// generated instances, the layer is within its cull distance, some LOD tier's
+// band covers it, and the scene BVH kept it — and all four failing look
+// identical from the camera. These print them apart.
 
 export function registerScatterDebugCommands(renderer: Renderer) {
   (window as any).showScatterStats = () => {
     const chunks = renderer.terrainRenderer.terrainChunks;
     const rows: Record<string, unknown>[] = [];
-    const totals = new Map<string, { drawn: number; held: number }>();
+    const totals = new Map<string, { draws: number; held: number }>();
 
     let withScatter = 0;
     for (const [id, chunk] of chunks) {
@@ -24,34 +24,38 @@ export function registerScatterDebugCommands(renderer: Renderer) {
       withScatter++;
 
       for (const layer of scatter.describe()) {
-        const total = totals.get(layer.layer) ?? { drawn: 0, held: 0 };
+        const key = `${layer.layer} LOD ${layer.tier}`;
+        const total = totals.get(key) ?? { draws: 0, held: 0 };
         total.held += layer.instances;
-        if (layer.visible) total.drawn += layer.instances;
-        totals.set(layer.layer, total);
+        if (layer.visible) total.draws++;
+        totals.set(key, total);
 
         rows.push({
           chunk: id,
           layer: layer.layer,
+          tier: layer.tier,
           instances: layer.instances,
           drawn: layer.visible,
           distance: Math.round(layer.distance),
-          cullDistance: layer.cullDistance,
+          band: `${layer.nearDistance}..${layer.cullDistance}`,
         });
       }
     }
 
     console.log(
       `showScatterStats() — ${withScatter} of ${chunks.size} resident chunks ` +
-        `hold instances.\n` +
+        `hold instances; LOD bias ${renderer.terrainRenderer.scatterLodBias}.\n` +
+        `Every tier of a layer draws the same instances and keeps only those ` +
+        `inside its band, so a chunk's instances count once per tier. ` +
         `'distance' is what the cull measured at the last visibility update, ` +
         `against the layer's own instance bounds. drawn=false with distance ` +
-        `under cullDistance means the cull is stale; a chunk missing entirely ` +
-        `means it never generated.`
+        `under the band's end means the cull is stale; a chunk missing ` +
+        `entirely means it never generated.`
     );
     console.table(
       Array.from(totals, ([layer, total]) => ({
         layer,
-        instancesDrawn: total.drawn,
+        chunkDraws: total.draws,
         instancesHeld: total.held,
       }))
     );
@@ -103,6 +107,30 @@ export function registerScatterDebugCommands(renderer: Renderer) {
     console.log(
       `setScatterLayerEnabled('${name}', ${enabled}) — takes effect on the ` +
         `next visibility update, so move a little to see it.`
+    );
+  };
+
+  (window as any).setScatterLodBias = (bias: number) => {
+    const terrain = renderer.terrainRenderer;
+    terrain.scatterLodBias = Math.round(bias);
+    terrain.requestVisibilityUpdate();
+
+    console.log(
+      `setScatterLodBias(${terrain.scatterLodBias}) — every layer shifted ` +
+        `${Math.abs(terrain.scatterLodBias)} tier(s) ${
+          terrain.scatterLodBias >= 0 ? 'coarser' : 'finer'
+        }. Past a layer's last tier nothing draws; 0 restores the table.`
+    );
+  };
+
+  (window as any).showScatterLodTiers = (enabled = true) => {
+    renderer.terrainRenderer.scatterLodTint = enabled;
+    console.log(
+      `showScatterLodTiers(${enabled}) — ${
+        enabled
+          ? 'tinting instances by LOD tier: green 0, yellow 1, orange 2, red 3+.'
+          : 'tint off.'
+      }`
     );
   };
 }

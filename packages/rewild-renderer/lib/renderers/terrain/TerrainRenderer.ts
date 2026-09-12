@@ -94,6 +94,12 @@ export class TerrainRenderer {
   // Geometry, passes and node transforms per scatter layer, shared by every
   // chunk that grows one.
   scatterModels: ScatterModels;
+  // Whole tiers every scatter instance is pushed along its layer's LOD chain:
+  // positive coarser, negative finer. Debug lever; 0 draws as authored.
+  scatterLodBias = 0;
+  // Tint scatter by LOD tier so handover distances can be seen rather than
+  // argued about.
+  scatterLodTint = false;
   private onChunkLoadedDelegate: (event: TerrainChunkEvent) => void;
   private _needsVisibilityUpdate: boolean = false;
   // Captured in init(); background mesh refreshes (edits) need it outside the
@@ -262,6 +268,12 @@ export class TerrainRenderer {
       Math.floor(this.maxViewDst / this.chunkSize) + 1;
     this.workerPool = new TerrainWorkerPool();
     this.scatterModels = new ScatterModels();
+  }
+
+  /** Re-runs chunk and scatter visibility on the next update, without waiting
+   *  for the camera to move. */
+  requestVisibilityUpdate(): void {
+    this._needsVisibilityUpdate = true;
   }
 
   private onChunkLoaded(event: TerrainChunkEvent) {

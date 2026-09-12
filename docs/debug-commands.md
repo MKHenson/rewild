@@ -168,7 +168,7 @@ See [Lighting (Foxfire)](./milestones/foxfire-lighting.md).
 Registered in `TerrainPerfCommands.ts` and `ChunkSnapshotDevCommands.ts`.
 
 ```js
-startScenePerfCapture(); // GPU time for the main scene pass
+startScenePerfCapture(); // GPU time per second for the shadow pass and the main scene pass
 stopScenePerfCapture();
 
 writeChunkSnapshotFixture(cx, cy); // Save an unmistakable plateau and re-mesh in place
@@ -178,7 +178,8 @@ clearChunkSnapshots(); // Remove every saved edit for this level and reload
 Terrain is not its own render pass — its LOD meshes draw through the main scene
 pass alongside all opaque geometry — so `startScenePerfCapture` times that whole
 pass. Point the camera at terrain and the `scene` row is dominated by terrain's
-fragment cost, which is what the sample-budget measurement watches.
+fragment cost, which is what the sample-budget measurement watches. The `shadow`
+row is the directional shadow pass, all three cascades; scatter draws into both.
 
 `writeChunkSnapshotFixture` exercises the save/load round-trip without the sculpt
 UI: it takes the chunk's current heights, presses a smooth plateau into the middle,
@@ -187,6 +188,38 @@ reload, neighbours untouched. **`clearChunkSnapshots` deletes real edits** for t
 current level, so it is not a command to try casually on a world you care about.
 
 See [Terrain (Strata)](./milestones/strata.md).
+
+---
+
+## Scatter
+
+Registered in `ScatterDebugCommands.ts`.
+
+```js
+showScatterStats(); // Table of every scatter draw: chunk, layer, LOD tier, instance count, whether it drew
+showScatterChunks(); // Which resident chunks have generated scatter, and against which heights version
+setScatterLayerEnabled('oak_01', false); // Hide one layer everywhere; true brings it back
+setScatterLodBias(1); // Force every layer one LOD tier coarser; -1 finer; 0 back to normal
+showScatterLodTiers(); // Paint each LOD tier a flat colour: green 0, yellow 1, orange 2, red 3+. showScatterLodTiers(false) turns it off
+```
+
+A layer's LOD chain is a list of handover distances (`lodDistances` in
+`ScatterLayers.ts`): the model draws out to the first, the next mesh from there
+to the second, and the last mesh out to `cullDistance`. `showScatterLodTiers`
+shows where those handovers land on screen. `setScatterLodBias(2)` brings the
+coarsest mesh right up to the camera so its quality can be judged;
+`setScatterLodBias(-2)` draws the full model to the cull distance for a
+before/after on frame time.
+
+`showScatterStats` is for "why is that tree not there". Each row is one draw:
+one chunk, one layer, one tier. `drawn` is whether the draw was issued;
+`band` is the distance range that tier keeps; `distance` is how far the
+viewer was from that chunk's instances when the cull last ran. A chunk with no
+rows never generated scatter (see `showScatterChunks`); a row with `drawn:
+false` and a `distance` inside its `band` means the cull has not re-run since
+the camera moved.
+
+See [Understory](./milestones/understory.md).
 
 ---
 

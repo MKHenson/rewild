@@ -1,9 +1,9 @@
 import { Renderer } from '../..';
-import { GltfNode } from '../../core/GltfLoader';
+import { GltfModel, GltfNode } from '../../core/GltfLoader';
 import { Geometry } from '../../geometry/Geometry';
 import { ScatterInstancedPass } from '../../materials/ScatterInstancedPass';
 import { createStandardPass } from '../../managers/MaterialManager';
-import { getScatterLayer } from './ScatterLayers';
+import { ScatterLayer, getScatterLayer, lodTierCount } from './ScatterLayers';
 import { composeNodeMatrix } from './ScatterChunkLayer';
 
 /** One drawable piece of a scatter layer's model: a geometry, the pass that
@@ -15,68 +15,88 @@ export interface ScatterPrimitive {
 }
 
 /**
- * The primitives a scatter layer draws, built once and shared by every chunk
- * that grows the layer.
+ * The primitives a scatter layer draws, one list per mesh LOD tier, built once
+ * and shared by every chunk that grows the layer.
  *
- * A pass is per (layer, primitive material) rather than per chunk, which is what
- * makes the renderer's existing grouping collapse every chunk of a layer into
- * one group and therefore one pipeline bind for the lot.
+ * A pass is per (layer, tier, primitive material) rather than per chunk, which
+ * is what makes the renderer's existing grouping collapse every chunk of a tier
+ * into one group and therefore one pipeline bind for the lot.
  */
 export class ScatterModels {
-  private primitives = new Map<string, ScatterPrimitive[]>();
+  private tiersByLayer = new Map<string, ScatterPrimitive[][]>();
 
-  get(renderer: Renderer, layerName: string): ScatterPrimitive[] {
-    const existing = this.primitives.get(layerName);
+  /** Tier 0 is the model itself; the rest are its coarser stand-ins, nearest
+   *  first, as many as the layer names handover distances for. */
+  tiers(renderer: Renderer, layerName: string): ScatterPrimitive[][] {
+    const existing = this.tiersByLayer.get(layerName);
     if (existing) return existing;
 
     const layer = getScatterLayer(layerName);
-    const model = renderer.geometryManager.getModel(layer.geometryId);
+    const { geometryManager } = renderer;
+    const models = [
+      geometryManager.getModel(layer.geometryId),
+      ...geometryManager.getModelLods(layer.geometryId),
+    ].slice(0, lodTierCount(layer));
 
-    const cutout: CutoutShading = {
-      authoredNormals: !!layer.authoredNormals,
-      faceNormalSpecular: !!layer.faceNormalSpecular,
-      specularOcclusion: !!layer.specularOcclusion,
-    };
-
-    const built: ScatterPrimitive[] = [];
-    for (const root of model.roots)
-      collectPrimitives(
-        renderer,
-        layerName,
-        layer.materialId,
-        cutout,
-        root,
-        null,
-        built
-      );
-
-    if (built.length === 0)
-      throw new Error(
-        `Scatter layer '${layerName}' model '${layer.geometryId}' has no drawable primitives.`
-      );
-
-    // These flags name the cutout piece, so a model with none of one has
-    // quietly ignored them. The symptom is half a canopy going black, a long
-    // way from whatever was actually changed.
-    const asked = (Object.keys(cutout) as (keyof CutoutShading)[]).filter(
-      (key) => cutout[key]
+    const built = models.map((model, tier) =>
+      buildTier(renderer, layer, model, tier)
     );
-    if (asked.length && !built.some((piece) => piece.pass.alphaMode === 'MASK'))
-      throw new Error(
-        `Scatter layer '${layerName}' sets ${asked.join(', ')}, but model '${
-          layer.geometryId
-        }' has no alpha-masked primitive for it to apply to.`
-      );
 
-    this.primitives.set(layerName, built);
+    this.tiersByLayer.set(layerName, built);
     return built;
   }
 
   dispose(): void {
-    for (const primitives of this.primitives.values())
-      for (const primitive of primitives) primitive.pass.dispose();
-    this.primitives.clear();
+    for (const tiers of this.tiersByLayer.values())
+      for (const primitives of tiers)
+        for (const primitive of primitives) primitive.pass.dispose();
+    this.tiersByLayer.clear();
   }
+}
+
+function buildTier(
+  renderer: Renderer,
+  layer: ScatterLayer,
+  model: GltfModel,
+  tier: number
+): ScatterPrimitive[] {
+  const cutout: CutoutShading = {
+    authoredNormals: !!layer.authoredNormals,
+    faceNormalSpecular: !!layer.faceNormalSpecular,
+    specularOcclusion: !!layer.specularOcclusion,
+  };
+
+  const built: ScatterPrimitive[] = [];
+  for (const root of model.roots)
+    collectPrimitives(
+      renderer,
+      layer.name,
+      layer.materialId,
+      cutout,
+      root,
+      null,
+      built
+    );
+
+  if (built.length === 0)
+    throw new Error(
+      `Scatter layer '${layer.name}' model '${layer.geometryId}' LOD ${tier} has no drawable primitives.`
+    );
+
+  // These flags name the cutout piece, so a model with none of one has
+  // quietly ignored them. The symptom is half a canopy going black, a long
+  // way from whatever was actually changed.
+  const asked = (Object.keys(cutout) as (keyof CutoutShading)[]).filter(
+    (key) => cutout[key]
+  );
+  if (asked.length && !built.some((piece) => piece.pass.alphaMode === 'MASK'))
+    throw new Error(
+      `Scatter layer '${layer.name}' sets ${asked.join(', ')}, but model '${
+        layer.geometryId
+      }' LOD ${tier} has no alpha-masked primitive for it to apply to.`
+    );
+
+  return built;
 }
 
 /** The layer flags that apply to a model's alpha-masked primitives. */
