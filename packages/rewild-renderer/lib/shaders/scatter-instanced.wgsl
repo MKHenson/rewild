@@ -45,7 +45,8 @@ struct Uniforms {
   nodeMatrix : mat4x4f,
   // The tier's distance band: fades in over [x, y] and out over [z, w].
   band : vec4f,
-  // x = the tier index, y = 1 to tint by tier for the LOD debug view.
+  // x = the tier index, y = 1 to tint by tier for the LOD debug view, z = the
+  // reciprocal of the camera exposure, so the tint lands in scene units.
   debug : vec4f,
 }
 
@@ -181,7 +182,13 @@ fn transformVertex(
   // instance in it, out to the horizon. Collapsing the ones outside this
   // tier's band costs two compares and is also the whole of LOD selection:
   // every tier draws the same instances, and exactly one keeps each.
-  let viewDistance = length(mvPosition.xyz);
+  //
+  // Measured to the instance origin, not the vertex, so a whole tree changes
+  // tier at once. Per vertex, a crown straddling the handover is half one
+  // mesh and half the other, and every triangle across the line is lost.
+  let viewDistance = length(
+    (uniforms.modelViewMatrix * vec4f(instance.posScale.xyz, 1.0)).xyz
+  );
   if (viewDistance < uniforms.band.x || viewDistance >= uniforms.band.w) {
     output.Position = CULLED_POSITION;
     return output;
@@ -278,10 +285,12 @@ fn fs(
 
   // Flat tier colour, lit only enough to keep the silhouette readable. A blend
   // over the shaded surface disappears under tone mapping.
+  // A floor of a third of the exposed range plus the surface's own light, so
+  // the colour reads in shadow and the shading still shows through.
   if (uniforms.debug.y > 0.5) {
     let tier = min(u32(uniforms.debug.x), 3u);
     let luma = dot(outColor.rgb, vec3f(0.299, 0.587, 0.114));
-    outColor = vec4f(TIER_TINTS[tier] * (0.35 + 0.65 * min(luma, 1.0)), outColor.a);
+    outColor = vec4f(TIER_TINTS[tier] * (0.35 * uniforms.debug.z + luma), outColor.a);
   }
 
   return outColor;

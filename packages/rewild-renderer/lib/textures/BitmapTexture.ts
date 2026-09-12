@@ -1,6 +1,7 @@
 import { ImageLoader } from './ImageLoader';
 import { ITexture } from './ITexture';
 import { getNumMipmaps, rgba8FormatFor, TextureProperties } from './Texture';
+import { imageAlphaHistograms } from './AlphaCoverage';
 
 import { Renderer } from '..';
 
@@ -8,6 +9,7 @@ export class BitmapTexture implements ITexture {
   properties: TextureProperties;
   src: string;
   gpuTexture: GPUTexture;
+  alphaHistograms: Uint32Array[] | null = null;
 
   constructor(name: TextureProperties, src: string) {
     this.src = src;
@@ -44,6 +46,10 @@ export class BitmapTexture implements ITexture {
     if (this.gpuTexture.mipLevelCount > 1) {
       renderer.mipmapGenerator.generateMips(device, this.gpuTexture);
     }
+
+    // JPEG has no alpha to histogram.
+    if (!/\.jpe?g$/i.test(this.src))
+      this.alphaHistograms = imageAlphaHistograms(loader.images[0]);
 
     return this;
   }

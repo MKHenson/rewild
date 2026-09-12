@@ -2,6 +2,10 @@ import { Renderer } from '../..';
 import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
+import {
+  ALPHA_MIP_SCALE_COUNT,
+  alphaMipScales,
+} from '../../textures/AlphaCoverage';
 
 // StandardParams layout (80 bytes, std140-compatible):
 //   baseColorFactor   vec4f  offset 0  (16 bytes)
@@ -17,12 +21,14 @@ import { Mesh } from '../../core/Mesh';
 //   parallaxFadeStart f32    offset 60 (4 bytes)
 //   parallaxFadeEnd   f32    offset 64 (4 bytes)
 //   _pad0.._pad2      f32    offset 68 (12 bytes)
+//   alphaMipScale     vec4f×4 offset 80 (64 bytes) — one f32 per mip
 //
 // roughness is tucked into emissiveColor's padding slot rather than given a row
 // of its own — a vec3f is aligned to 16 bytes either way, so this costs nothing.
 //
 // #201 removed ambientColor from offset 32; the scalars below it moved up a row.
-const PARAMS_SIZE = 80;
+const PARAMS_SIZE = 144;
+const ALPHA_MIP_SCALE_OFFSET = 20;
 
 /** glTF's alphaMode. The shader compares against these, so the numbering is
  *  shared with ALPHA_MODE_* in standard.wgsl. */
@@ -78,6 +84,11 @@ export class StandardMaterial implements ISharedUniformBuffer {
    *  at or above it the fragment is fully opaque. Never a partial value — that
    *  is what separates MASK from BLEND. */
   alphaCutoff: number = 0.5;
+  /** The base colour map's alpha histograms per mip, from its ITexture. With
+   *  them a MASK material scales its cutoff per mip so a leaf keeps the
+   *  coverage it has at the base level instead of thinning away with
+   *  distance. Null leaves every mip tested against the cutoff as is. */
+  baseColorAlphaHistograms: Uint32Array[] | null = null;
   /**
    * Set through StandardPass, not here — it also selects the pipeline's blend
    * and depth-write state, and the two must agree. The shader needs it because
@@ -194,6 +205,12 @@ export class StandardMaterial implements ISharedUniformBuffer {
     this._paramsData[14] = this.heightScale;
     this._paramsData[15] = this.parallaxFadeStart;
     this._paramsData[16] = this.parallaxFadeEnd;
+    const scales =
+      this.alphaMode === 'MASK' && this.baseColorAlphaHistograms
+        ? alphaMipScales(this.baseColorAlphaHistograms, this.alphaCutoff)
+        : null;
+    for (let m = 0; m < ALPHA_MIP_SCALE_COUNT; m++)
+      this._paramsData[ALPHA_MIP_SCALE_OFFSET + m] = scales ? scales[m] : 1;
     device.queue.writeBuffer(
       this._paramsBuffer,
       0,

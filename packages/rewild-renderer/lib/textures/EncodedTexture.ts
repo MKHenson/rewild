@@ -2,6 +2,7 @@ import { Renderer } from '..';
 import { decodeImageBytes } from './ImageLoader';
 import { ITexture } from './ITexture';
 import { getNumMipmaps, rgba8FormatFor, TextureProperties } from './Texture';
+import { imageAlphaHistograms } from './AlphaCoverage';
 
 /**
  * A texture built from encoded image bytes rather than a URL — what a GLB
@@ -16,6 +17,7 @@ export class EncodedTexture implements ITexture {
   bytes: Uint8Array;
   mimeType?: string;
   gpuTexture: GPUTexture;
+  alphaHistograms: Uint32Array[] | null = null;
 
   constructor(
     properties: TextureProperties,
@@ -57,6 +59,9 @@ export class EncodedTexture implements ITexture {
 
     if (this.gpuTexture.mipLevelCount > 1)
       renderer.mipmapGenerator.generateMips(device, this.gpuTexture);
+
+    if (this.mimeType !== 'image/jpeg')
+      this.alphaHistograms = imageAlphaHistograms(bitmap);
 
     // The copy is complete by the time the queue call returns, and a decoded
     // 4K bitmap is 64MB of pixels the GC has no reason to hurry over.

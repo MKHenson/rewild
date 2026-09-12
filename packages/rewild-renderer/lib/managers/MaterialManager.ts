@@ -236,7 +236,11 @@ export function createStandardPass(
   const emissive = texture(t.emissiveMap);
   const height = texture(t.heightMap);
 
-  if (baseColor) material.baseColorTexture = baseColor;
+  if (baseColor) {
+    material.baseColorTexture = baseColor;
+    material.baseColorAlphaHistograms =
+      renderer.textureManager.get(t.baseColorMap!).alphaHistograms ?? null;
+  }
   if (normal) material.normalTexture = normal;
   if (metallicRoughness) material.metallicRoughnessTexture = metallicRoughness;
   if (occlusion) material.occlusionTexture = occlusion;

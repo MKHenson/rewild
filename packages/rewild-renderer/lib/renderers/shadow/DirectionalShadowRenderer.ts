@@ -10,6 +10,7 @@ import shader from '../../shaders/shadow-depth.wgsl';
 import instancedShader from '../../shaders/shadow-depth-instanced.wgsl';
 import impostorShader from '../../shaders/shadow-depth-impostor.wgsl';
 import { ScatterImpostorPass } from '../../materials/ScatterImpostorPass';
+import { ScatterInstancedPass } from '../../materials/ScatterInstancedPass';
 import { ShadowDebugRenderer } from './ShadowDebugRenderer';
 import {
   isScatterImpostorPass,
@@ -88,6 +89,8 @@ interface MeshShadowUniforms {
   buffers: [GPUBuffer, GPUBuffer, GPUBuffer];
   bindGroups: [GPUBindGroup, GPUBindGroup, GPUBindGroup];
   kind: ShadowCasterKind;
+  // Whether an instanced caster is a cutout the shadow shader has to test.
+  cutout: boolean;
 }
 
 export class DirectionalShadowRenderer {
@@ -203,7 +206,8 @@ export class DirectionalShadowRenderer {
 
     // Same depth state as the per-mesh pipeline, bias included: a caster
     // stored at a different depth offset from the terrain it stands on would
-    // acne against it at the contact.
+    // acne against it at the contact. The fragment stage has no targets; it
+    // only cuts leaf cards out of the depth they would otherwise write whole.
     this.instancedPipeline = device.createRenderPipeline({
       label: 'directional shadow instanced pipeline',
       layout: 'auto',
@@ -215,8 +219,13 @@ export class DirectionalShadowRenderer {
             arrayStride: 4 * 3,
             attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
           },
+          {
+            arrayStride: 4 * 2,
+            attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x2' }],
+          },
         ],
       },
+      fragment: { entryPoint: 'fs', module: instancedModule, targets: [] },
       primitive: {
         topology: 'triangle-list',
         cullMode: 'none',
@@ -398,9 +407,8 @@ export class DirectionalShadowRenderer {
 
             const group = mesh as IScatterInstanceGroup;
             if (group.rangeCount === 0) continue;
-            // The billboard is the one caster with a uv, for its cutout.
-            if (uniforms.kind === 'impostor')
-              pass.setVertexBuffer(1, geo.uvBuffer);
+            // Both scatter casters carry a uv, for their cutouts.
+            pass.setVertexBuffer(1, geo.uvBuffer);
             pass.setBindGroup(0, uniforms.bindGroups[c]);
             for (let r = 0; r < group.rangeCount; r++)
               pass.drawIndexed(
@@ -463,6 +471,11 @@ export class DirectionalShadowRenderer {
         ? (mesh.material as ScatterImpostorPass)
         : null;
       const kind: ShadowCasterKind = impostor ? 'impostor' : 'instanced';
+      // The scene pass would bind the material's defaults at its build, which
+      // may not have run yet for a group the shadow pass meets first.
+      const material = impostor
+        ? null
+        : (mesh.material as ScatterInstancedPass).material;
 
       const buffers = [0, 1, 2].map(() =>
         device.createBuffer({
@@ -488,12 +501,33 @@ export class DirectionalShadowRenderer {
                   { binding: 3, resource: impostor.atlas.albedo.createView() },
                   { binding: 4, resource: { buffer: impostor.atlas.params } },
                 ]
-              : []),
+              : [
+                  {
+                    binding: 2,
+                    resource:
+                      material!.sampler ||
+                      renderer.samplerManager.get('linear'),
+                  },
+                  {
+                    binding: 3,
+                    resource: (
+                      material!.baseColorTexture ||
+                      renderer.textureManager.get('white-1x1').gpuTexture
+                    ).createView(),
+                  },
+                ]),
           ],
         })
       ) as [GPUBindGroup, GPUBindGroup, GPUBindGroup];
 
-      this.meshUniforms.set(mesh, { buffers, bindGroups, kind });
+      const pass = mesh.material as ScatterInstancedPass;
+      const cutout = !impostor && pass.alphaMode === 'MASK';
+      this.meshUniforms.set(mesh, {
+        buffers,
+        bindGroups,
+        kind,
+        cutout,
+      });
       return;
     }
 
@@ -513,7 +547,12 @@ export class DirectionalShadowRenderer {
       })
     ) as [GPUBindGroup, GPUBindGroup, GPUBindGroup];
 
-    this.meshUniforms.set(mesh, { buffers, bindGroups, kind: 'mesh' });
+    this.meshUniforms.set(mesh, {
+      buffers,
+      bindGroups,
+      kind: 'mesh',
+      cutout: false,
+    });
   }
 
   /**
@@ -568,6 +607,7 @@ export class DirectionalShadowRenderer {
       data[34] = viewer.z;
       data[36] = group.nearDistance;
       data[37] = group.cullDistance;
+      data[38] = uniforms.cutout ? 1 : 0;
     }
 
     for (let c = 0; c < NUM_CASCADES; c++) {
