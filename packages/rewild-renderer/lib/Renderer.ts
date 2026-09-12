@@ -286,7 +286,7 @@ export class Renderer {
     this.context = context;
     this.device = device;
 
-    this.scenePerfMonitor.init(device, ['scene']);
+    this.scenePerfMonitor.init(device, ['shadow', 'scene']);
 
     this.textureManager = new TextureManager();
     this.samplerManager = new SamplerManager();

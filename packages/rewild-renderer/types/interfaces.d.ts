@@ -7,7 +7,7 @@ import {
   Transform,
 } from '../lib';
 import { Camera } from '../lib/core/Camera';
-import { Box3 } from 'rewild-common';
+import { Box3, Vector3 } from 'rewild-common';
 
 export interface IVisualComponent {
   readonly [IS_VISUAL_COMPONENT]: true;
@@ -33,8 +33,18 @@ export interface IScatterInstanceGroup extends IVisualComponent {
   /** The primitive's transform within its model, applied before the instance
    *  transform. */
   readonly nodeMatrix: Float32Array;
+  /** Metres from the viewer before which instances are not drawn — a LOD
+   *  tier's handover from the tier before it. 0 for the nearest tier. */
+  readonly nearDistance: number;
   /** Metres beyond which instances are not drawn. */
   readonly cullDistance: number;
+  /** Narrows the draw to the contiguous instance runs whose cells the band can
+   *  reach from a viewer in the group's local space. Fills `rangeCount` runs of
+   *  `rangeStarts[i]` + `rangeCounts[i]`. */
+  selectInstances(viewer: Vector3): void;
+  readonly rangeStarts: Int32Array;
+  readonly rangeCounts: Int32Array;
+  readonly rangeCount: number;
   /** The per-instance transform buffer, uploaded on first use, or null when the
    *  group holds nothing. The shadow pass binds the same buffer under its own
    *  layout. */

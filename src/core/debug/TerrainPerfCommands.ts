@@ -11,8 +11,9 @@ export function registerTerrainPerfCommands(renderer: Renderer) {
   (window as any).startScenePerfCapture = () => {
     renderer.scenePerfMonitor.enabled = true;
     console.log(
-      'Scene performance capture started — the "scene" row is the main pass ' +
-        '(terrain + opaque geometry). Point the camera at terrain to read its cost.'
+      'Scene performance capture started — "shadow" is the directional shadow ' +
+        'pass (all three cascades), "scene" is the main pass (terrain + opaque ' +
+        'geometry + scatter). Point the camera at terrain to read its cost.'
     );
   };
   (window as any).stopScenePerfCapture = () => {

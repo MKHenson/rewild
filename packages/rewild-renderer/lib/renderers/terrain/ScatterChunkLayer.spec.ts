@@ -1,12 +1,18 @@
 import { SCATTER_GPU_STRIDE } from '../../materials/ScatterInstancedPass';
 import { SCATTER_INSTANCE_STRIDE, ScatterInstances } from './Scatter';
 import {
+  SCATTER_CELL_GRID,
   ScatterChunkLayer,
+  bucketInstances,
   composeNodeMatrix,
   packInstances,
 } from './ScatterChunkLayer';
+import { Vector3 } from 'rewild-common';
 import { Geometry } from '../../geometry/Geometry';
 import { Transform } from '../../core/Transform';
+import { ScatterLayer } from './ScatterLayers';
+
+const testLayer = { cullDistance: 60 } as ScatterLayer;
 
 function identityMatrix(): Float32Array<ArrayBuffer> {
   const m = new Float32Array(16);
@@ -120,7 +126,9 @@ describe('instance bounds', () => {
         [-100, 5, -100, 0, 0, 0, 1, 1, 0],
         [100, 20, 100, 0, 0, 0, 1, 2, 0],
       ]),
-      60
+      testLayer,
+      0,
+      0
     );
 
     expect(layer.localBounds.min.x).toBeLessThanOrEqual(-101);
@@ -140,7 +148,9 @@ describe('instance bounds', () => {
       {} as never,
       identityMatrix(),
       instancesOf([[0, 0, 0, 0, 0, 0, 1, 3, 0]]),
-      60
+      testLayer,
+      0,
+      0
     );
 
     // Corner radius of a 2-unit half-extent box is sqrt(12) ≈ 3.46, tripled.
@@ -157,7 +167,9 @@ describe('instance bounds', () => {
       {} as never,
       identityMatrix(),
       instancesOf([]),
-      60
+      testLayer,
+      0,
+      0
     );
 
     expect(layer.localBounds.isEmpty()).toBe(true);
@@ -198,7 +210,9 @@ describe('instanceStorageBuffer', () => {
       { instanceBindGroupLayout: () => null } as never,
       identityMatrix(),
       instancesOf(instances),
-      60
+      testLayer,
+      0,
+      0
     );
   }
 
@@ -241,5 +255,123 @@ describe('instanceStorageBuffer', () => {
   it('is null for a layer with no instances', () => {
     const { renderer } = fakeRenderer();
     expect(layerOf([]).instanceStorageBuffer(renderer)).toBeNull();
+  });
+});
+
+describe('bucketInstances', () => {
+  // A cell's instances have to be one contiguous run of the packed buffer, or
+  // a draw could not address a cell with a first-instance offset.
+  it('groups each cell into one contiguous run, row-major in z then x', () => {
+    const cells = bucketInstances(
+      instancesOf([
+        [470, 0, 470, 0, 0, 0, 1, 1, 0],
+        [0, 0, 0, 0, 0, 0, 1, 1, 0],
+        [470, 0, 0, 0, 0, 0, 1, 1, 0],
+        [5, 0, 5, 0, 0, 0, 1, 1, 0],
+      ]),
+      1
+    );
+
+    const last = SCATTER_CELL_GRID * SCATTER_CELL_GRID - 1;
+    expect(Array.from(cells.order)).toEqual([1, 3, 2, 0]);
+    expect(cells.starts[0]).toBe(0);
+    expect(cells.starts[1]).toBe(2);
+    expect(cells.starts[SCATTER_CELL_GRID - 1]).toBe(2);
+    expect(cells.starts[SCATTER_CELL_GRID]).toBe(3);
+    expect(cells.starts[last]).toBe(3);
+    expect(cells.starts[last + 1]).toBe(4);
+  });
+
+  it('bounds each cell by its instances out to the model reach at their scale', () => {
+    const cells = bucketInstances(
+      instancesOf([
+        [10, 4, 10, 0, 0, 0, 1, 2, 0],
+        [400, 0, 400, 0, 0, 0, 1, 1, 0],
+      ]),
+      1.5
+    );
+
+    expect(Array.from(cells.bounds.subarray(0, 6))).toEqual([
+      7, 1, 7, 13, 7, 13,
+    ]);
+  });
+
+  it('packs in cell order', () => {
+    const instances = instancesOf([
+      [470, 0, 470, 0, 0, 0, 1, 1, 0],
+      [0, 0, 0, 0, 0, 0, 1, 1, 0],
+    ]);
+    const packed = packInstances(
+      instances,
+      bucketInstances(instances, 1).order
+    );
+    expect(packed[0]).toBe(0);
+    expect(packed[SCATTER_GPU_STRIDE]).toBe(470);
+  });
+});
+
+describe('selectInstances', () => {
+  function layerWith(band: [number, number], instances: number[][]) {
+    const geometry = new Geometry();
+    geometry.vertices = new Float32Array([-1, -1, -1, 1, 1, 1]);
+    const layer = new ScatterChunkLayer(
+      new Transform(),
+      geometry,
+      {} as never,
+      identityMatrix(),
+      instancesOf(instances),
+      { cullDistance: band[1], lodDistances: [band[0]] } as ScatterLayer,
+      1,
+      0
+    );
+    return layer;
+  }
+
+  const spread = [
+    [0, 0, 0, 0, 0, 0, 1, 1, 0],
+    [240, 0, 0, 0, 0, 0, 1, 1, 0],
+    [470, 0, 0, 0, 0, 0, 1, 1, 0],
+    [0, 0, 470, 0, 0, 0, 1, 1, 0],
+    [470, 0, 470, 0, 0, 0, 1, 1, 0],
+  ];
+
+  it('keeps only the cells the band can reach', () => {
+    const layer = layerWith([0, 60], spread);
+    layer.applyLodBias(0);
+    layer.selectInstances(new Vector3(0, 0, 0));
+
+    expect(layer.rangeCount).toBe(1);
+    expect(layer.rangeStarts[0]).toBe(0);
+    expect(layer.rangeCounts[0]).toBe(1);
+  });
+
+  it('drops the cells nearer than the band', () => {
+    const layer = layerWith([100, 300], spread);
+    layer.selectInstances(new Vector3(0, 0, 0));
+
+    const drawn = new Set<number>();
+    for (let r = 0; r < layer.rangeCount; r++)
+      for (let i = 0; i < layer.rangeCounts[r]; i++)
+        drawn.add(layer.rangeStarts[r] + i);
+
+    // The instance at the viewer is inside the band's near edge; the one at
+    // 240m is in; the corners at 470m and 665m are beyond its far edge.
+    expect(drawn).toEqual(new Set([1]));
+  });
+
+  it('merges neighbouring cells in a row into one run', () => {
+    const layer = layerWith([0, 1000], spread);
+    layer.selectInstances(new Vector3(0, 0, 0));
+
+    // Everything drawn, and the row-major order makes it a single run.
+    expect(layer.rangeCount).toBe(1);
+    expect(layer.rangeCounts[0]).toBe(5);
+  });
+
+  it('draws nothing when the bias has shifted the chain off the tier', () => {
+    const layer = layerWith([0, 60], spread);
+    layer.applyLodBias(-3);
+    layer.selectInstances(new Vector3(0, 0, 0));
+    expect(layer.rangeCount).toBe(0);
   });
 });
