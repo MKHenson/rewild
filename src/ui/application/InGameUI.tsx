@@ -33,15 +33,17 @@ export class InGameUI extends Component<Props> {
   update() {
     const player = this.props.player;
 
-    this.playerHealthElm!.props = {
-      ...this.playerHealthElm!.props,
-      value: player.health,
-    };
+    if (this.playerHealthElm?.props.value !== player.health)
+      this.playerHealthElm!.props = {
+        ...this.playerHealthElm!.props,
+        value: player.health,
+      };
 
-    this.playerHungerElm!.props = {
-      ...this.playerHungerElm!.props,
-      value: player.hunger,
-    };
+    if (this.playerHungerElm?.props.value !== player.hunger)
+      this.playerHungerElm!.props = {
+        ...this.playerHungerElm!.props,
+        value: player.hunger,
+      };
   }
 
   getStyle() {
