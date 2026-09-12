@@ -7,13 +7,29 @@ import { LOOK, retiredKeys } from './look.ts';
 import { hashString } from './rng.ts';
 
 interface ParamSpec {
-  readonly type: 'string' | 'number' | 'int' | 'flag' | 'list';
-  readonly default: string | number | boolean | readonly string[] | null;
+  readonly type: 'string' | 'number' | 'int' | 'flag' | 'list' | 'tiers';
+  readonly default: string | number | boolean | readonly string[] | readonly LodTier[] | null;
   readonly help: string;
   /** Changing this changes the texture files. Everything else only moves the
    *  mesh, which costs a thousandth as much to rebuild. */
   readonly texture?: boolean;
 }
+
+/**
+ * One coarser mesh tier. The skeleton is the model's own, so the silhouette
+ * holds across the chain; only what is hung on it gets cheaper.
+ */
+export interface LodTier {
+  /** Metres at which this tier takes over from the one before it. */
+  distance: number;
+  radialSegments?: number;
+  barkLevels?: number;
+  leavesPerBranch?: number;
+  leafScale?: number;
+}
+
+/** The keys a tier may override, all of them mesh-only. */
+export const LOD_OVERRIDES = ['radialSegments', 'barkLevels', 'leavesPerBranch', 'leafScale'] as const;
 
 export const PARAM_SPEC = {
   name: { type: 'string', default: null, help: 'Model id. Names the .glb and the geometry template.' },
@@ -38,10 +54,12 @@ export const PARAM_SPEC = {
   droop: { type: 'number', default: 16, help: 'Degrees the deepest branches bend toward the ground. Negative bends them back upright.' },
   segments: { type: 'int', default: 5, help: 'Rings along each branch.' },
   radialSegments: { type: 'int', default: 8, help: 'Sides of the trunk tube. Deeper branches use fewer.' },
+  barkLevels: { type: 'int', default: 6, help: 'Deepest branch generation that gets a bark tube. Twigs beyond it carry leaves only.' },
 
   leavesPerBranch: { type: 'int', default: 18, help: 'Leaf cards on each leaf-bearing branch.' },
   leafLevels: { type: 'int', default: 2, help: 'How many of the deepest branch generations carry leaves.' },
   leafSize: { type: 'number', default: 1, help: 'Leaf card height in metres. Decides how many authored leaves fill a card.', texture: true },
+  leafScale: { type: 'number', default: 1, help: 'Card size multiplier that leaves the texture fit alone. Fewer, larger cards for a LOD tier.' },
   leafAspect: { type: 'number', default: 0.85, help: 'Leaf card width as a fraction of its height.' },
   leafDroop: { type: 'number', default: 55, help: 'Degrees a leaf card hangs below its branch direction.' },
   leafFrom: { type: 'number', default: 0.15, help: 'Fraction along a tip branch that leaves start at.' },
@@ -49,6 +67,8 @@ export const PARAM_SPEC = {
   leafAlphaCutoff: { type: 'number', default: 0.45, help: 'glTF alphaCutoff on the leaf material.' },
 
   bendCurve: { type: 'number', default: 1.6, help: 'Exponent shaping COLOR_0.r. Higher keeps the trunk base rigid for longer.' },
+
+  lods: { type: 'tiers', default: [], help: 'Coarser tiers, nearest first: [{ distance, radialSegments?, barkLevels?, leavesPerBranch?, leafScale? }].' },
 
   windAmplitude: { type: 'number', default: 0.4, help: 'ScatterWind amplitude for the emitted layer.' },
   windFrequency: { type: 'number', default: 0.45, help: 'ScatterWind frequency for the emitted layer.' },
@@ -81,6 +101,8 @@ type Options = {
     ? string
     : (typeof PARAM_SPEC)[K]['type'] extends 'list'
     ? string[]
+    : (typeof PARAM_SPEC)[K]['type'] extends 'tiers'
+    ? LodTier[]
     : number;
 };
 
@@ -92,7 +114,7 @@ type Options = {
 export type Params = Options & { -readonly [K in keyof typeof LOOK]: (typeof LOOK)[K] extends string ? string : number };
 
 /** What a tree.json holds, before defaults and validation. */
-export type RawConfig = Partial<Record<keyof typeof PARAM_SPEC, string | number | boolean | string[]>>;
+export type RawConfig = Partial<Record<keyof typeof PARAM_SPEC, string | number | boolean | string[] | LodTier[]>>;
 
 function isParamKey(key: string): key is keyof typeof PARAM_SPEC {
   return key in PARAM_SPEC;
@@ -120,6 +142,12 @@ export function parseConfig(config: unknown, source: string): RawConfig {
 
     if (!isParamKey(key)) throw new Error(`${source} has an unknown option '${key}'.`);
 
+    if (PARAM_SPEC[key].type === 'tiers') {
+      if (!Array.isArray(value)) throw new Error(`${source} option '${key}' must be a list of tiers.`);
+      out[key] = value.map((entry, index) => parseTier(entry, `${source} option '${key}' tier ${index}`));
+      continue;
+    }
+
     if (Array.isArray(value)) {
       if (!value.every((entry) => typeof entry === 'string'))
         throw new Error(`${source} option '${key}' must be a list of strings.`);
@@ -136,6 +164,25 @@ export function parseConfig(config: unknown, source: string): RawConfig {
   return out;
 }
 
+function parseTier(entry: unknown, source: string): LodTier {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+    throw new Error(`${source} must be an object with a distance.`);
+
+  const tier: LodTier = { distance: NaN };
+  for (const [key, value] of Object.entries(entry)) {
+    if (key !== 'distance' && !(LOD_OVERRIDES as readonly string[]).includes(key))
+      throw new Error(`${source} has an unknown key '${key}'. A tier takes distance, ${LOD_OVERRIDES.join(', ')}.`);
+
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) throw new Error(`${source} key '${key}' must be a number, got '${value}'.`);
+    const spec = isParamKey(key) ? PARAM_SPEC[key] : null;
+    tier[key as keyof LodTier] = spec?.type === 'int' ? Math.round(parsed) : parsed;
+  }
+
+  if (!Number.isFinite(tier.distance)) throw new Error(`${source} needs a distance.`);
+  return tier;
+}
+
 /** The parameters as they are written beside the model, ready to be edited. */
 export function toConfig(params: Params): Record<string, unknown> {
   const saved: Record<string, unknown> = { ...params };
@@ -149,7 +196,7 @@ export function toConfig(params: Params): Record<string, unknown> {
 export function resolveParams(raw: RawConfig): Params {
   // Built dynamically because the loop walks the table, then asserted once. The
   // mapped type above is what every reader is checked against.
-  const params: Record<string, string | number | boolean | string[] | null> = {};
+  const params: Record<string, string | number | boolean | string[] | LodTier[] | null> = {};
 
   for (const [key, spec] of Object.entries(PARAM_SPEC) as [
     keyof typeof PARAM_SPEC,
@@ -158,13 +205,21 @@ export function resolveParams(raw: RawConfig): Params {
     const value = raw[key];
 
     if (value === undefined || value === null) {
-      params[key] = spec.type === 'list' ? [...(spec.default as readonly string[])] : (spec.default as string | number | boolean | null);
+      params[key] = Array.isArray(spec.default)
+        ? ([...spec.default] as string[] | LodTier[])
+        : (spec.default as string | number | boolean | null);
+      continue;
+    }
+
+    if (spec.type === 'tiers') {
+      if (!Array.isArray(value)) throw new Error(`Option '${key}' must be a list of tiers.`);
+      params[key] = value.map((entry) => parseTier(entry, `Option '${key}'`));
       continue;
     }
 
     if (spec.type === 'list') {
       if (!Array.isArray(value)) throw new Error(`Option '${key}' must be a list of source names.`);
-      params[key] = [...value];
+      params[key] = [...value] as string[];
       continue;
     }
 
@@ -197,7 +252,37 @@ export function resolveParams(raw: RawConfig): Params {
 
   const resolved = { ...params, ...LOOK } as Params;
   validate(resolved);
+  validateTiers(resolved);
   return resolved;
+}
+
+/** A tier's full parameter set: the model's, with the tier's overrides on top. */
+export function tierParams(params: Params, tier: LodTier): Params {
+  const overrides: Partial<Params> = {};
+  for (const key of LOD_OVERRIDES) if (tier[key] !== undefined) overrides[key] = tier[key];
+  return { ...params, ...overrides };
+}
+
+// The scatter layer's impostor is emitted at this fraction of the cull
+// distance, and the engine refuses a mesh tier that starts beyond it.
+export const IMPOSTOR_FRACTION = 0.6;
+
+function validateTiers(params: Params): void {
+  let previous = 0;
+  const impostorAt = Math.round(params.cullDistance * IMPOSTOR_FRACTION);
+
+  params.lods.forEach((tier, index) => {
+    if (tier.distance <= previous)
+      throw new Error(`lods must ascend: tier ${index} at ${tier.distance}m does not follow ${previous}m.`);
+    if (tier.distance >= impostorAt)
+      throw new Error(
+        `lods tier ${index} at ${tier.distance}m starts beyond the impostor at ${impostorAt}m (${IMPOSTOR_FRACTION} of cullDistance).`
+      );
+    previous = tier.distance;
+
+    // The same bounds the model itself is held to.
+    validate(tierParams(params, tier));
+  });
 }
 
 function validate(params: Params): void {
@@ -235,6 +320,13 @@ function validate(params: Params): void {
 
   if (params.segments < 2 || params.segments > 32)
     throw new Error('segments must be within 2..32.');
+
+  if (params.barkLevels < 0 || params.barkLevels > 6)
+    throw new Error('barkLevels must be within 0..6.');
+
+  if (!(params.leafScale > 0)) throw new Error(`leafScale must be positive, got ${params.leafScale}.`);
+
+  if (params.leavesPerBranch < 0) throw new Error('leavesPerBranch must not be negative.');
 
   if (params.scaleMax < params.scaleMin)
     throw new Error('scaleMax must not be below scaleMin.');

@@ -1,12 +1,12 @@
 import { leafCellPixels, leafCells } from './lib/atlas.ts';
 import { writeGlb, type GlbTextureSet } from './lib/glb.ts';
 import { buildMesh } from './lib/mesh.ts';
-import { parseConfig, resolveParams, sameTexture, toConfig, type Params, type RawConfig } from './lib/params.ts';
+import { parseConfig, resolveParams, sameTexture, tierParams, toConfig, type Params, type RawConfig } from './lib/params.ts';
 import { fbm, gradientNoise, signedFbm, valueNoise, warp, worley } from './lib/noise.ts';
 import { buildSkeleton } from './lib/skeleton.ts';
 import { LOOK } from './lib/look.ts';
 import { LEAF_GRID_GENERATED } from './lib/sources.ts';
-import { colliderFor, scatterLayer, scatterLayerSource } from './lib/templates.ts';
+import { colliderFor, geometryEntry, scatterLayer, scatterLayerSource } from './lib/templates.ts';
 
 const TEXTURES: GlbTextureSet = {
   bark: { baseColor: 'a_bark_diff.webp', normal: 'a_bark_nor.webp', arm: 'a_bark_arm.webp' },
@@ -127,7 +127,7 @@ describe('config', () => {
 
 describe('texture reuse', () => {
   it('reuses the texture across a mesh edit and rebuilds it across a texture edit', () => {
-    const base = paramsFor([]);
+    const base = paramsFor();
 
     expect(sameTexture(base, paramsFor({ height: '20' }))).toBe(true);
     expect(sameTexture(base, paramsFor({ splits: '5' }))).toBe(true);
@@ -614,5 +614,87 @@ describe('scatter layer', () => {
     expect(layer.impostor?.fromDistance).toBeDefined();
     expect(layer.impostor!.fromDistance).toBeLessThan(layer.cullDistance);
     expect(layer.footprint).toBeGreaterThan(0);
+  });
+});
+
+describe('LOD tiers', () => {
+  const chain: RawConfig = {
+    cullDistance: 160,
+    lods: [
+      { distance: 40, barkLevels: 2, leavesPerBranch: 9, leafScale: 1.4 },
+      { distance: 80, radialSegments: 4, barkLevels: 1, leavesPerBranch: 4, leafScale: 2 },
+    ],
+  };
+
+  it('reads tiers out of a saved tree and writes them back', () => {
+    const params = resolveParams(parseConfig({ name: 'tiered', ...chain }, 'test.json'));
+    expect(params.lods.map((tier) => tier.distance)).toEqual([40, 80]);
+
+    const round = resolveParams(parseConfig(toConfig(params), 'test.json'));
+    expect(round.lods).toEqual(params.lods);
+  });
+
+  it('rejects a tier key that is not a mesh override', () => {
+    expect(() => parseConfig({ name: 't', lods: [{ distance: 40, seed: 3 }] }, 'test.json')).toThrow(/unknown key 'seed'/);
+    expect(() => parseConfig({ name: 't', lods: [{ barkLevels: 1 }] }, 'test.json')).toThrow(/needs a distance/);
+  });
+
+  it('holds tiers to ascending distances short of the impostor', () => {
+    expect(() => paramsFor({ lods: [{ distance: 80 }, { distance: 40 }] })).toThrow(/must ascend/);
+    expect(() => paramsFor({ cullDistance: '100', lods: [{ distance: 60 }] })).toThrow(/beyond the impostor at 60m/);
+  });
+
+  it('holds a tier to the same bounds as the model', () => {
+    expect(() => paramsFor({ lods: [{ distance: 40, radialSegments: 1 }] })).toThrow(/radialSegments/);
+  });
+
+  // The chain is what makes a forest affordable, so a tier that is not
+  // cheaper than the one before it is a mistake worth catching here.
+  it('builds each tier cheaper than the last on the same skeleton', () => {
+    const { params, skeleton, mesh } = buildAll(chain);
+    const tiers = params.lods.map((tier) => buildMesh(tierParams(params, tier), skeleton, LEAF_GRID_GENERATED));
+
+    let previous = mesh.bark.triangleCount + mesh.leaves.triangleCount;
+    for (const tier of tiers) {
+      const count = tier.bark.triangleCount + tier.leaves.triangleCount;
+      expect(count).toBeLessThan(previous);
+      previous = count;
+    }
+  });
+
+  it('drops bark from the twigs beyond barkLevels and keeps their leaves', () => {
+    const full = buildAll({ branchLevels: '3', leafLevels: '1' });
+    const bare = buildAll({ branchLevels: '3', leafLevels: '1', barkLevels: '1' });
+
+    expect(bare.mesh.bark.triangleCount).toBeLessThan(full.mesh.bark.triangleCount);
+    expect(bare.mesh.leaves.triangleCount).toBe(full.mesh.leaves.triangleCount);
+  });
+
+  it('scales leaf cards by leafScale without touching the texture fit', () => {
+    const base = paramsFor();
+    const scaled = paramsFor({ leafScale: '2' });
+    expect(sameTexture(base, scaled)).toBe(true);
+
+    const cardHeight = (params: Params) => {
+      const skeleton = buildSkeleton(params);
+      const leaves = buildMesh(params, skeleton, LEAF_GRID_GENERATED).leaves;
+      const p = leaves.positions;
+      // Corners 0 and 3 of the first card are its stem and its tip.
+      return Math.hypot(p[9] - p[0], p[10] - p[1], p[11] - p[2]);
+    };
+
+    expect(cardHeight(scaled)).toBeCloseTo(cardHeight(base) * 2, 5);
+  });
+
+  it('declares the chain to the geometry registry and the scatter layer', () => {
+    const { params, skeleton } = buildAll(chain);
+    const entry = geometryEntry(params, 'trees/t/t.glb', ['trees/t/t.lod1.glb', 'trees/t/t.lod2.glb']);
+    expect(entry['test-tree'].lods).toEqual(['trees/t/t.lod1.glb', 'trees/t/t.lod2.glb']);
+    expect(geometryEntry(paramsFor(), 'trees/t/t.glb')['test-tree'].lods).toBeUndefined();
+
+    const layer = scatterLayer(params, skeleton);
+    expect(layer.lodDistances).toEqual([40, 80]);
+    expect(scatterLayerSource(layer)).toContain('lodDistances: [40, 80],');
+    expect(scatterLayer(paramsFor(), skeleton).lodDistances).toBeUndefined();
   });
 });

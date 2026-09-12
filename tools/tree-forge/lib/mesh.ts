@@ -74,6 +74,10 @@ function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
   const out = createBuilder();
 
   for (const branch of skeleton.branches) {
+    // A twig under the canopy is never seen from the distance a coarse tier
+    // draws at, and twigs are most of the bark.
+    if (branch.level > params.barkLevels) continue;
+
     const radial = Math.max(3, params.radialSegments - branch.level);
     const phase = clusterPhase(params, branch.clusterId);
 
@@ -188,7 +192,7 @@ function buildLeaves(params: Params, skeleton: Skeleton, leafGrid: number): Mesh
       const leafDir = normalize(rotateAbout(at.dir, right, (params.leafDroop + (rng() - 0.5) * 20) * DEG));
       const cardNormal = normalize(cross(right, leafDir));
 
-      const height = params.leafSize * rng.range(0.75, 1.25);
+      const height = params.leafSize * params.leafScale * rng.range(0.75, 1.25);
       const width = height * params.leafAspect;
       const stem = add(at.p, scale(right, at.radius));
       const cell = cells[Math.floor(hash2(params.seed, branch.id * 977 + k) * variants) % variants];
