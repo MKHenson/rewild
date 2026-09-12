@@ -2,11 +2,14 @@ import { Box3, Vector3 } from 'rewild-common';
 import { Renderer } from '../..';
 import { Transform } from '../../core/Transform';
 import { ScatterInstances } from './Scatter';
-import { ScatterChunkLayer } from './ScatterChunkLayer';
+import { ScatterChunkLayer, modelRadius } from './ScatterChunkLayer';
 import { ScatterModels } from './ScatterModels';
 import { getScatterLayer } from './ScatterLayers';
 
 const _bounds = new Box3();
+const IDENTITY = new Float32Array([
+  1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+]);
 
 /**
  * A chunk's scatter: one ScatterChunkLayer per (layer, LOD tier, model
@@ -47,25 +50,47 @@ export class ChunkScatter {
 
       for (let tier = 0; tier < tiers.length; tier++) {
         for (const primitive of tiers[tier]) {
-          const transform = new Transform();
-          transform.name = `${layerInstances.layer}`;
-          this.root.addChild(transform);
-
           this.layers.push(
             new ScatterChunkLayer(
-              transform,
+              this.attach(layerInstances.layer),
               primitive.geometry,
               primitive.pass,
               primitive.nodeMatrix,
               layerInstances,
               layer,
               tier,
-              lodBias
+              lodBias,
+              modelRadius(primitive.geometry, primitive.nodeMatrix)
             )
           );
         }
       }
+
+      // The impostor is the tier after the last mesh: one billboard per
+      // instance, framed by the shader rather than placed by a node matrix.
+      const impostor = models.impostor(renderer, layerInstances.layer);
+      if (impostor)
+        this.layers.push(
+          new ScatterChunkLayer(
+            this.attach(layerInstances.layer),
+            impostor.geometry,
+            impostor.pass,
+            IDENTITY,
+            layerInstances,
+            layer,
+            tiers.length,
+            lodBias,
+            impostor.reach
+          )
+        );
     }
+  }
+
+  private attach(name: string): Transform {
+    const transform = new Transform();
+    transform.name = name;
+    this.root.addChild(transform);
+    return transform;
   }
 
   /**

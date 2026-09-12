@@ -3,8 +3,10 @@ import { GltfModel, GltfNode } from '../../core/GltfLoader';
 import { Geometry } from '../../geometry/Geometry';
 import { ScatterInstancedPass } from '../../materials/ScatterInstancedPass';
 import { createStandardPass } from '../../managers/MaterialManager';
-import { ScatterLayer, getScatterLayer, lodTierCount } from './ScatterLayers';
+import { ScatterLayer, getScatterLayer, meshTierCount } from './ScatterLayers';
 import { composeNodeMatrix } from './ScatterChunkLayer';
+import { ScatterImpostorPass } from '../../materials/ScatterImpostorPass';
+import { ScatterImpostorBaker } from './ScatterImpostorBake';
 
 /** One drawable piece of a scatter layer's model: a geometry, the pass that
  *  shades it, and where the piece sits within the model. */
@@ -12,6 +14,15 @@ export interface ScatterPrimitive {
   geometry: Geometry;
   pass: ScatterInstancedPass;
   nodeMatrix: Float32Array<ArrayBuffer>;
+}
+
+/** The far tier's draw: the shared billboard quad and the pass holding the
+ *  layer's baked atlas. */
+export interface ScatterImpostorDraw {
+  geometry: Geometry;
+  pass: ScatterImpostorPass;
+  /** Furthest the billboard reaches from the instance origin at scale 1. */
+  reach: number;
 }
 
 /**
@@ -24,6 +35,8 @@ export interface ScatterPrimitive {
  */
 export class ScatterModels {
   private tiersByLayer = new Map<string, ScatterPrimitive[][]>();
+  private impostorsByLayer = new Map<string, ScatterImpostorDraw | null>();
+  private baker = new ScatterImpostorBaker();
 
   /** Tier 0 is the model itself; the rest are its coarser stand-ins, nearest
    *  first, as many as the layer names handover distances for. */
@@ -36,7 +49,7 @@ export class ScatterModels {
     const models = [
       geometryManager.getModel(layer.geometryId),
       ...geometryManager.getModelLods(layer.geometryId),
-    ].slice(0, lodTierCount(layer));
+    ].slice(0, meshTierCount(layer));
 
     const built = models.map((model, tier) =>
       buildTier(renderer, layer, model, tier)
@@ -46,11 +59,41 @@ export class ScatterModels {
     return built;
   }
 
+  /** The layer's impostor, baked off its model on first use; null for a
+   *  layer without one. */
+  impostor(renderer: Renderer, layerName: string): ScatterImpostorDraw | null {
+    const existing = this.impostorsByLayer.get(layerName);
+    if (existing !== undefined) return existing;
+
+    const layer = getScatterLayer(layerName);
+    let built: ScatterImpostorDraw | null = null;
+    if (layer.impostor) {
+      const atlas = this.baker.bake(
+        renderer,
+        layer,
+        layer.impostor,
+        this.tiers(renderer, layerName)[0]
+      );
+      built = {
+        geometry: this.baker.billboard(),
+        pass: new ScatterImpostorPass(atlas),
+        reach: atlas.reach,
+      };
+    }
+
+    this.impostorsByLayer.set(layerName, built);
+    return built;
+  }
+
   dispose(): void {
     for (const tiers of this.tiersByLayer.values())
       for (const primitives of tiers)
         for (const primitive of primitives) primitive.pass.dispose();
     this.tiersByLayer.clear();
+    for (const impostor of this.impostorsByLayer.values())
+      impostor?.pass.dispose();
+    this.impostorsByLayer.clear();
+    this.baker.dispose();
   }
 }
 

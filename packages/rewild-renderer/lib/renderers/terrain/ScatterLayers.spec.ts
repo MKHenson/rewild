@@ -337,6 +337,20 @@ describe('LOD tier bands', () => {
       );
   });
 
+  // The impostor is one more tier on the end of the chain: the last mesh
+  // hands over to it at fromDistance and it runs to the cull distance.
+  it('puts the impostor after the last mesh tier', () => {
+    const far = layer({
+      lodDistances: [40],
+      impostor: { fromDistance: 90, views: 8, tileSize: 128 },
+      cullDistance: 200,
+    });
+    expect(lodTierCount(far)).toBe(3);
+    expect([lodTierNear(far, 1), lodTierFar(far, 1)]).toEqual([40, 90]);
+    expect([lodTierNear(far, 2), lodTierFar(far, 2)]).toEqual([90, 200]);
+    expect([lodTierNear(far, 2, 2), lodTierFar(far, 2, 2)]).toEqual([0, 200]);
+  });
+
   it('keeps a chainless layer whole under any bias', () => {
     expect(lodTierFar(layer(), 0, -2)).toBe(200);
     expect(lodTierFar(layer(), 0, 2)).toBe(200);

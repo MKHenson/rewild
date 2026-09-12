@@ -45,7 +45,7 @@
   "windAmplitude": 0.4,
   "windFrequency": 0.45,
   "windFlutter": 0.35,
-  "cullDistance": 320,
+  "cullDistance": 800,
   "footprint": 0,
   "scaleMin": 0.8,
   "scaleMax": 1.25,

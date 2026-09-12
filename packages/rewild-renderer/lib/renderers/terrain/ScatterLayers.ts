@@ -107,9 +107,10 @@ export interface ScatterLayer {
 // costs is generation: every chunk within the range plus the prefetch places
 // its instances in the worker.
 const MESH_CULL_DISTANCE = 160;
-// Trees carry the view: a treeline that ends at 160m reads as a clearing. The
-// coarse tier is what makes the extra 160m affordable.
-const TREE_CULL_DISTANCE = 320;
+// Trees carry the view: a treeline that ends a few hundred metres out reads as
+// a clearing. The impostor is what makes the range affordable — beyond its
+// handover an instance is two triangles.
+const TREE_CULL_DISTANCE = 800;
 const FULL_TURN: SelectorBand = { from: 0, to: 360 };
 
 // Rows are data — adding something the world can grow is a table edit here plus
@@ -245,8 +246,21 @@ export function getScatterLayerSlot(name: string): number {
 
 /** Mesh tiers a layer draws: the model plus one per LOD distance. A geometry
  *  carrying more tiers than the layer names distances for leaves them unused. */
-export function lodTierCount(layer: ScatterLayer): number {
+export function meshTierCount(layer: ScatterLayer): number {
   return (layer.lodDistances?.length ?? 0) + 1;
+}
+
+/** Every tier a layer draws: its mesh tiers, then the impostor when it has
+ *  one. The impostor is always the last, so its index is this minus one. */
+export function lodTierCount(layer: ScatterLayer): number {
+  return meshTierCount(layer) + (layer.impostor ? 1 : 0);
+}
+
+/** Metres at which tier k + 1 takes over from tier k: the LOD distances, then
+ *  the impostor's. */
+function lodHandover(layer: ScatterLayer, k: number): number {
+  const lods = layer.lodDistances ?? [];
+  return k < lods.length ? lods[k] : layer.impostor!.fromDistance;
 }
 
 // The bands a tier draws once the bias has shifted the chain. An instance in
@@ -280,7 +294,7 @@ export function lodTierNear(
   const tierCount = lodTierCount(layer);
   if (drawsNothing(tier, tierCount, bias)) return 0;
   const band = lowestSourceBand(tier, tierCount, bias);
-  return band === 0 ? 0 : layer.lodDistances![band - 1];
+  return band === 0 ? 0 : lodHandover(layer, band - 1);
 }
 
 /**
@@ -300,7 +314,7 @@ export function lodTierFar(
   const band = highestSourceBand(tier, tierCount, bias);
   return band === tierCount - 1
     ? layer.cullDistance
-    : Math.min(layer.lodDistances![band], layer.cullDistance);
+    : Math.min(lodHandover(layer, band), layer.cullDistance);
 }
 
 function validateBand(layer: string, field: string, band: SelectorBand): void {
