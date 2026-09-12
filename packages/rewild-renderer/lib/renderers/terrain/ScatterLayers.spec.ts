@@ -8,6 +8,7 @@ import {
   getScatterLayerSlot,
   getMaxScatterCullDistance,
   getScatterGenerationDistance,
+  lodFadeHalfWidth,
   lodTierCount,
   lodTierFar,
   lodTierNear,
@@ -355,5 +356,13 @@ describe('LOD tier bands', () => {
     expect(lodTierFar(layer(), 0, -2)).toBe(200);
     expect(lodTierFar(layer(), 0, 2)).toBe(200);
     expect(lodTierNear(layer(), 0, 2)).toBe(0);
+  });
+});
+
+describe('lodFadeHalfWidth', () => {
+  it('grows with the handover distance between its clamps', () => {
+    expect(lodFadeHalfWidth(10)).toBe(3);
+    expect(lodFadeHalfWidth(200)).toBeCloseTo(12);
+    expect(lodFadeHalfWidth(5000)).toBe(40);
   });
 });

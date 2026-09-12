@@ -544,7 +544,7 @@ export class DirectionalShadowRenderer {
 
     // The same viewer decides which cells the band can reach, so the caster
     // set is the drawn set down to the run.
-    group.selectInstances(this._viewerLocal);
+    group.selectInstances(this._viewerLocal, null);
 
     const viewer = this._viewerLocal;
     let data: Float32Array;

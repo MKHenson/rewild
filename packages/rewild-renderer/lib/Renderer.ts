@@ -34,7 +34,6 @@ import { FrameCompositor } from './post-processes/FrameCompositor';
 import { QualitySettings } from './utils/QualitySettings';
 
 const _projScreenMatrix = new Matrix4();
-const _frustum = new Frustum();
 
 const sortOpaqueFirst = (a: IRenderGroup, b: IRenderGroup) =>
   (a.pass.transparent ? 1 : 0) - (b.pass.transparent ? 1 : 0);
@@ -109,6 +108,11 @@ export class Renderer {
   private uiVisibleElements: UIElement[] = [];
   private uiElementsByMaterial = new Map<IMaterialPass, UIElement[]>();
   private uiInstanceCounters = new Map<IMaterialPass, number>();
+
+  /** The camera's view frustum for the frame being rendered, in world
+   *  space. Refreshed before anything is culled, whether or not the scene BVH
+   *  is doing the culling. */
+  frustum = new Frustum();
 
   /** Optional scene-level BVH for spatial acceleration (frustum culling, raycasting). */
   sceneBVH: SceneBVH | null = null;
@@ -662,21 +666,21 @@ export class Renderer {
     // Clear the render list before projecting objects
     this.currentRenderList.reset();
 
+    _projScreenMatrix.multiplyMatrices(
+      pCamera.camera.projectionMatrix,
+      pCamera.camera.matrixWorldInverse
+    );
+    this.frustum.setFromProjectionMatrix(
+      _projScreenMatrix,
+      WebGPUCoordinateSystem
+    );
+
     // Project objects in the scene. Collect those that are to be rendered.
     // When a scene BVH is available, use frustum culling to avoid
     // visiting the entire scene graph.
     if (this.sceneBVH) {
-      _projScreenMatrix.multiplyMatrices(
-        pCamera.camera.projectionMatrix,
-        pCamera.camera.matrixWorldInverse
-      );
-      _frustum.setFromProjectionMatrix(
-        _projScreenMatrix,
-        WebGPUCoordinateSystem
-      );
-
       // BVH frustum cull returns only visible visual-component transforms.
-      this.sceneBVH.frustumCull(_frustum, this.currentRenderList.solids);
+      this.sceneBVH.frustumCull(this.frustum, this.currentRenderList.solids);
 
       // Lights and overlays are not tracked by the scene BVH, so collect
       // them with the traditional traversal.

@@ -1,4 +1,4 @@
-import { Box3, Matrix4, Quaternion, Vector3 } from 'rewild-common';
+import { Box3, Frustum, Matrix4, Quaternion, Vector3 } from 'rewild-common';
 import { Renderer } from '../..';
 import { Transform } from '../../core/Transform';
 import { Geometry } from '../../geometry/Geometry';
@@ -13,13 +13,19 @@ import {
 import { IMaterialPass } from '../../materials/IMaterialPass';
 import { IScatterInstanceGroup } from '../../../types/interfaces';
 import { SCATTER_INSTANCE_STRIDE, ScatterInstances } from './Scatter';
-import { ScatterLayer, lodTierFar, lodTierNear } from './ScatterLayers';
+import {
+  ScatterLayer,
+  lodFadeHalfWidth,
+  lodTierFar,
+  lodTierNear,
+} from './ScatterLayers';
 
 const _matrix = new Matrix4();
 const _position = new Vector3();
 const _rotation = new Quaternion();
 const _scale = new Vector3();
 const _corner = new Vector3();
+const _cellBox = new Box3();
 
 /** Cells per side a chunk's instances are bucketed into; 60m at a 480m chunk. */
 export const SCATTER_CELL_GRID = 8;
@@ -78,6 +84,13 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
   /** Metres at which this tier hands over, or the layer's cull distance for
    *  the last. Equal to `nearDistance` while the tier has nothing to draw. */
   cullDistance = 0;
+  /**
+   * The band the scene pass draws, wider than the hard one: the tier fades in
+   * over [0] to [1] and out over [2] to [3], sharing each handover's metres
+   * with its neighbour so the two cross-fade. The shadow pass keeps the hard
+   * band — a filtered shadow map hides a swap the eye would catch.
+   */
+  readonly fadeBand = new Float32Array(4);
   /**
    * Chunk-local bounds over every instance. Without it the scene BVH would cull
    * a whole chunk of scatter by the bounds of the single model at the chunk
@@ -140,18 +153,24 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
 
   /**
    * Picks the cells whose instances can fall inside the band from a viewer in
-   * chunk-local space, merged into contiguous runs for the draw. Conservative:
-   * the shader still tests each instance, this only spares it the ones that
-   * cannot pass. Called by each pass every frame — cheap enough that sharing
-   * the answer would cost more than recomputing it.
+   * chunk-local space — and inside the frustum, when one is given — merged
+   * into contiguous runs for the draw. Conservative: the shader still tests
+   * each instance, this only spares it the ones that cannot pass. Called by
+   * each pass every frame — cheap enough that sharing the answer would cost
+   * more than recomputing it.
+   *
+   * The scene pass selects over the faded band and its frustum; the shadow
+   * pass over the hard band and no frustum, since a caster off screen still
+   * shadows what is on it.
    */
-  selectInstances(viewer: Vector3): void {
+  selectInstances(viewer: Vector3, frustum: Frustum | null): void {
     this.rangeCount = 0;
-    const near = this.nearDistance;
-    const far = this.cullDistance;
+    const near = frustum ? this.fadeBand[0] : this.nearDistance;
+    const far = frustum ? this.fadeBand[3] : this.cullDistance;
     if (near >= far) return;
 
     const { starts, bounds } = this.cells;
+    const world = this.transform.matrixWorld.elements;
     let runStart = -1;
     let runEnd = 0;
 
@@ -170,7 +189,24 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
       const nearest = Math.sqrt(nx * nx + ny * ny + nz * nz);
       const farthest = Math.sqrt(fx * fx + fy * fy + fz * fz);
 
-      if (nearest >= far || farthest < near) {
+      let keep = nearest < far && farthest >= near;
+      if (keep && frustum) {
+        // Chunk transforms only translate, so the cell's world box is its
+        // local one moved by the chunk's position.
+        _cellBox.min.set(
+          bounds[b] + world[12],
+          bounds[b + 1] + world[13],
+          bounds[b + 2] + world[14]
+        );
+        _cellBox.max.set(
+          bounds[b + 3] + world[12],
+          bounds[b + 4] + world[13],
+          bounds[b + 5] + world[14]
+        );
+        keep = frustum.intersectsBox(_cellBox);
+      }
+
+      if (!keep) {
         if (runStart >= 0) this.pushRange(runStart, runEnd);
         runStart = -1;
         continue;
@@ -193,8 +229,31 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
    *  Picked up by the next frame's uniform write, so a bias set at runtime
    *  lands without touching the instance buffer. */
   applyLodBias(lodBias: number): void {
-    this.nearDistance = lodTierNear(this.layer, this.tier, lodBias);
-    this.cullDistance = lodTierFar(this.layer, this.tier, lodBias);
+    const near = lodTierNear(this.layer, this.tier, lodBias);
+    const far = lodTierFar(this.layer, this.tier, lodBias);
+    this.nearDistance = near;
+    this.cullDistance = far;
+
+    const fade = this.fadeBand;
+    if (near >= far) {
+      fade.fill(0);
+      return;
+    }
+
+    // A near edge at the viewer has nothing to fade from. A far edge at the
+    // cull distance fades to nothing, so its blend sits wholly inside the
+    // band rather than reaching past it.
+    const nearHalf = near > 0 ? lodFadeHalfWidth(near) : 0;
+    fade[0] = near - nearHalf;
+    fade[1] = near + nearHalf;
+    if (far >= this.layer.cullDistance) {
+      fade[2] = far - 2 * lodFadeHalfWidth(far);
+      fade[3] = far;
+    } else {
+      const farHalf = lodFadeHalfWidth(far);
+      fade[2] = far - farHalf;
+      fade[3] = far + farHalf;
+    }
   }
 
   /** Whether the band has any width — a bias can shift the chain off a tier. */
@@ -267,10 +326,9 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
       uniforms.set(this.nodeMatrix, 32);
       this.nodeMatrixWritten = true;
     }
-    uniforms[48] = this.cullDistance;
-    uniforms[49] = this.nearDistance;
-    uniforms[50] = this.tier;
-    uniforms[51] = renderer.terrainRenderer.scatterLodTint ? 1 : 0;
+    uniforms.set(this.fadeBand, 48);
+    uniforms[52] = this.tier;
+    uniforms[53] = renderer.terrainRenderer.scatterLodTint ? 1 : 0;
 
     renderer.device.queue.writeBuffer(this.uniformBuffer, 0, uniforms);
   }
