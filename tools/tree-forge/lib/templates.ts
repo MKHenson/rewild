@@ -17,14 +17,14 @@ import type {
   ScatterCollider,
   ScatterLayer,
 } from 'rewild-renderer/lib/renderers/terrain/ScatterLayers';
-import type { Params } from './params.ts';
+import { IMPOSTOR_FRACTION, type Params } from './params.ts';
 import type { Skeleton } from './skeleton.ts';
 import type { TextureNames } from './textures.ts';
 
 const round = (value: number, places = 2): number => Number(value.toFixed(places));
 
-export function geometryEntry(params: Params, modelUrl: string): IGeometryTemplates {
-  return { [params.name]: { type: 'gltf', url: modelUrl } };
+export function geometryEntry(params: Params, modelUrl: string, lodUrls: string[] = []): IGeometryTemplates {
+  return { [params.name]: { type: 'gltf', url: modelUrl, ...(lodUrls.length ? { lods: lodUrls } : {}) } };
 }
 
 export interface TextureSetUrls {
@@ -86,8 +86,9 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
   return {
     name: params.name.replace(/-/g, '_'),
     geometryId: params.name,
+    ...(params.lods.length ? { lodDistances: params.lods.map((tier) => tier.distance) } : {}),
     cullDistance: params.cullDistance,
-    impostor: { fromDistance: round(params.cullDistance * 0.6, 0), views: 8, tileSize: 128 },
+    impostor: { fromDistance: round(params.cullDistance * IMPOSTOR_FRACTION, 0), views: 8, tileSize: 128 },
     jitter: { scale: { from: params.scaleMin, to: params.scaleMax }, yaw: { from: 0, to: 360 }, tilt: 3 },
     // Trees stand up whatever the slope does. A tilted trunk reads as damage,
     // not as terrain.
@@ -125,6 +126,7 @@ export function scatterLayerSource(layer: ScatterLayer): string {
     `  ${layer.name}: {`,
     `    name: '${layer.name}',`,
     `    geometryId: '${layer.geometryId}',`,
+    ...(layer.lodDistances ? [`    lodDistances: [${layer.lodDistances.join(', ')}],`] : []),
     `    cullDistance: ${layer.cullDistance},`,
     `    impostor: { fromDistance: ${impostor.fromDistance}, views: ${impostor.views}, tileSize: ${impostor.tileSize} },`,
     `    jitter: { scale: { from: ${jitter.scale.from}, to: ${jitter.scale.to} }, yaw: ${yaw}, tilt: ${jitter.tilt} },`,

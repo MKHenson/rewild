@@ -22,6 +22,7 @@ import {
   parseConfig,
   resolveParams,
   sameTexture,
+  tierParams,
   toConfig,
   type Params,
 } from './lib/params.ts';
@@ -51,6 +52,8 @@ interface Built {
   skeleton: Skeleton;
   mesh: TreeMesh;
   modelPath: string;
+  /** One coarser mesh per `lods` entry, nearest first, beside their files. */
+  lods: { mesh: TreeMesh; path: string }[];
   directory: string;
   textures: TextureSetNames;
   geometry: IGeometryTemplates;
@@ -168,6 +171,25 @@ async function generate(params: Params, previous?: Built): Promise<Built> {
     })
   );
 
+  // Every tier is hung on the one skeleton, so the chain shares a silhouette
+  // and the handover moves nothing but detail.
+  const lods: Built['lods'] = [];
+  for (const [index, tier] of params.lods.entries()) {
+    const lodMesh = buildMesh(tierParams(params, tier), skeleton, grid);
+    const path = join(directory, `${params.name}.lod${index + 1}.glb`);
+    await writeFile(
+      path,
+      writeGlb({
+        name: `${params.name}-lod${index + 1}`,
+        bark: lodMesh.bark,
+        leaves: lodMesh.leaves,
+        textures,
+        alphaCutoff: params.leafAlphaCutoff,
+      })
+    );
+    lods.push({ mesh: lodMesh, path });
+  }
+
   // The parameters travel with the model so a variant can be re-cut or nudged
   // without anyone having to remember the command that made it.
   const configPath = join(directory, `${params.name}.tree.json`);
@@ -176,7 +198,11 @@ async function generate(params: Params, previous?: Built): Promise<Built> {
 
   const previewPath = canvases && params.preview ? await writePreview(params, mesh, canvases, directory) : null;
 
-  const geometry = geometryEntry(params, assetUrl(params.assetsRoot, modelPath));
+  const geometry = geometryEntry(
+    params,
+    assetUrl(params.assetsRoot, modelPath),
+    lods.map((lod) => assetUrl(params.assetsRoot, lod.path))
+  );
   const urls = (names: TextureNames): TextureNames => ({
     baseColor: assetUrl(params.assetsRoot, join(directory, names.baseColor)),
     normal: assetUrl(params.assetsRoot, join(directory, names.normal)),
@@ -199,6 +225,7 @@ async function generate(params: Params, previous?: Built): Promise<Built> {
     barkSource,
     leafSource,
     modelPath,
+    lods,
     directory,
     textures,
     geometry,
@@ -239,6 +266,7 @@ function report({
   barkSource,
   leafSource,
   modelPath,
+  lods,
   directory,
   textures,
   geometry,
@@ -258,6 +286,11 @@ function report({
       `z ${bounds.min[2].toFixed(2)}..${bounds.max[2].toFixed(2)}`,
     '',
     `  model    ${modelPath}`,
+    ...lods.map(
+      ({ mesh: lod, path }, index) =>
+        `  lod ${index + 1}    ${path} — ${lod.bark.triangleCount + lod.leaves.triangleCount} triangles ` +
+        `(${lod.bark.triangleCount} bark, ${lod.leaves.triangleCount} leaf) from ${params.lods[index].distance}m`
+    ),
     `  params   ${configPath}`,
     `  bark     ${
       barkSource

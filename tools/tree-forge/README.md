@@ -129,6 +129,7 @@ into the emitted scatter layer.
 | `droop`           | Degrees the deepest branches bend toward the ground. **Negative bends them back upright**, which is how a crown is kept compact. |
 | `segments`        | Rings along each branch. Deeper branches use fewer.                           |
 | `radialSegments` | Sides of the trunk tube. Deeper branches use fewer.                           |
+| `barkLevels`     | Deepest generation that gets a bark tube. Twigs beyond it carry leaves only. Default 6, every level. |
 
 **The foliage**
 
@@ -137,6 +138,7 @@ into the emitted scatter layer.
 | `leafLevels`      | How many of the deepest generations carry leaves. 1 is tips only, which goes bare on any tree with few tips. |
 | `leavesPerBranch`| Cards on each leaf-bearing branch.                                           |
 | `leafSize`        | Card height in metres. Absolute, so it has to come down with a small tree.   |
+| `leafScale`       | Card size multiplier that leaves the texture fit alone. 1 for the model; a LOD tier trades cards for size with it. |
 | `leafAspect`      | Card width over card height.                                                 |
 | `leafDroop`       | Degrees a card hangs below its branch direction.                             |
 | `leafFrom`        | Fraction along a branch that leaves start at.                                |
@@ -151,6 +153,30 @@ into the emitted scatter layer.
 | `leaves`       | Folders under `sources/leaves/` whose stamps fill the leaf image. Empty generates it. See [Authored leaves](#authored-leaves). |
 | `barkProfile`  | Which layer stack a *generated* bark is built from. See [Bark profiles](#bark-profiles). |
 | `textureSize`  | Edge of each square image. Power of two, at least 128.                            |
+
+**The LOD chain**
+
+`lods` is a list of coarser tiers, nearest first. Each names the distance it takes over at and the
+mesh keys it overrides — any of `radialSegments`, `barkLevels`, `leavesPerBranch` and `leafScale`:
+
+```json
+"lods": [
+  { "distance": 60, "radialSegments": 4, "barkLevels": 1, "leavesPerBranch": 1, "leafScale": 2 }
+]
+```
+
+Every tier is hung on the model's own skeleton, so the branching, the canopy and the height are
+identical across the chain and a handover moves nothing but detail. The bark is where the triangles
+are — the oak's twigs are three quarters of it — so `barkLevels` is the lever that matters, and
+`leafScale` keeps the crown as dense as it was while `leavesPerBranch` cuts the cards. That one row
+takes the oak from 39,844 triangles to 2,828, and it reads well enough from 60m that the shipped
+trees carry no tier between. A handover is visible up close whatever the tier; the cross-fade is a
+separate piece of engine work, and a middle tier only adds a second place to see it.
+
+A tier's distance has to stay below the impostor handover the layer is emitted with, at 60% of
+`cullDistance`; the engine refuses a chain that reaches past it. The tiers are written as
+`<name>.lod1.glb`, `<name>.lod2.glb` beside the model, and the printed `geometries.json` entry and
+`ScatterLayers.ts` row carry the chain.
 
 Everything else about how the bark and leaves **look** — the tints, the plates, the fissures, the
 knots, the lichen, the colour and roughness drift — is settled in [`lib/look.ts`](./lib/look.ts) and
@@ -194,10 +220,15 @@ about it. The tool prints every block it needs at the end of a run, ready to pas
 The registry of every model the engine can load. It maps a short id to a file:
 
 ```json
-"oak-01": { "type": "gltf", "url": "nature/trees/oak/oak-01.glb" }
+"oak-01": {
+  "type": "gltf",
+  "url": "nature/trees/oak/oak-01.glb",
+  "lods": ["nature/trees/oak/oak-01.lod1.glb"]
+}
 ```
 
 That id is how everything else names the model. Nothing can reference the tree until it is here.
+`lods` is the chain the tree was built with, nearest first, and is left out for a tree without one.
 
 ### 2. `ScatterLayers.ts` — required
 
@@ -207,7 +238,8 @@ how far away to stop drawing it, how much to vary each one's size and rotation, 
 should collide against, and how it moves in wind.
 
 Paste the printed row into the `SCATTER_LAYERS` table. The generator has already filled in the wind
-block, the trunk capsule, the spacing and the impostor distance, measured off the tree it just built.
+block, the trunk capsule, the spacing, the LOD handover distances and the impostor distance, measured
+off the tree it just built.
 
 `authoredNormals: true` is in that row for every `leafNormalMode` but `card`. The engine
 mirrors a back face's shading normal, which is right for a normal that belongs to the face it sits
@@ -641,12 +673,6 @@ map is written and registered, but reaching it needs a `materials.json` material
 `materialId` — which collapses the two materials into one. Leave `parallax` off for foliage
 regardless: it costs a dozen dependent taps per fragment, on the geometry that already covers the
 most pixels.
-
-### LOD tiers
-
-`geometries.json` takes a `lods` array and the generator does not fill it yet. Re-running with lower
-`branchLevels` and `leavesPerBranch` produces a tier from the same seed and the same silhouette,
-so the chain is a loop away.
 
 ### Conifer whorls
 
