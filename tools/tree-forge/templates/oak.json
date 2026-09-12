@@ -33,10 +33,19 @@
   "leafNormalMode": "canopy",
   "leafAlphaCutoff": 0.45,
   "bendCurve": 1.6,
+  "lods": [
+    {
+      "distance": 60,
+      "radialSegments": 4,
+      "barkLevels": 1,
+      "leavesPerBranch": 1,
+      "leafScale": 2
+    }
+  ],
   "windAmplitude": 0.4,
   "windFrequency": 0.45,
   "windFlutter": 0.35,
-  "cullDistance": 160,
+  "cullDistance": 320,
   "footprint": 0,
   "scaleMin": 0.8,
   "scaleMax": 1.25,
