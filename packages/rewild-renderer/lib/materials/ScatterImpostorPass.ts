@@ -151,7 +151,7 @@ export class ScatterImpostorPass implements IMaterialPass {
         cameraWorld[13] - world[13],
         cameraWorld[14] - world[14]
       );
-      group.selectInstances(_viewerLocal);
+      group.selectInstances(_viewerLocal, renderer.frustum);
       if (group.rangeCount === 0) continue;
 
       const bindGroup = group.prepareInstances(renderer, this);

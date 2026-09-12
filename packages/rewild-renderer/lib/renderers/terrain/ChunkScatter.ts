@@ -123,7 +123,7 @@ export class ChunkScatter {
       // component whose own `visible` is false, which is the culling this wants.
       layer.visible =
         layer.draws &&
-        _bounds.distanceToPoint(viewerPosition) <= layer.cullDistance;
+        _bounds.distanceToPoint(viewerPosition) <= layer.fadeBand[3];
     }
   }
 

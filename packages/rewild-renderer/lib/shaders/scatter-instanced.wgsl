@@ -34,6 +34,7 @@ const HAS_SPECULAR_OCCLUSION: bool = ${ HAS_SPECULAR_OCCLUSION };
 #include "./shader-lib/pcf.wgsl"
 #include "./shader-lib/directional-shadow.wgsl"
 #include "./shader-lib/spot-light-shadow.wgsl"
+#include "./shader-lib/lod-fade.wgsl"
 
 struct Uniforms {
   projMatrix : mat4x4f,
@@ -42,9 +43,10 @@ struct Uniforms {
   // The primitive's transform within its model, so a multi-part model keeps its
   // parts in place without a transformed copy of the geometry.
   nodeMatrix : mat4x4f,
-  // x = metres at which this LOD tier hands over, y = metres at which it takes
-  // over, z = the tier index, w = 1 to tint by tier for the LOD debug view.
-  params : vec4f,
+  // The tier's distance band: fades in over [x, y] and out over [z, w].
+  band : vec4f,
+  // x = the tier index, y = 1 to tint by tier for the LOD debug view.
+  debug : vec4f,
 }
 
 // One distinct colour per LOD tier for the debug tint, the far tiers warmest.
@@ -109,6 +111,7 @@ struct VertexOutput {
   @location(2) viewPosition : vec3f,
   @location(3) color : vec4f,
   @location(4) tangent : vec4f,
+  @location(5) fade : vec2f,
 }
 
 const NO_TANGENT = vec4f(1.0, 0.0, 0.0, 0.0);
@@ -179,7 +182,7 @@ fn transformVertex(
   // tier's band costs two compares and is also the whole of LOD selection:
   // every tier draws the same instances, and exactly one keeps each.
   let viewDistance = length(mvPosition.xyz);
-  if (viewDistance < uniforms.params.y || viewDistance >= uniforms.params.x) {
+  if (viewDistance < uniforms.band.x || viewDistance >= uniforms.band.w) {
     output.Position = CULLED_POSITION;
     return output;
   }
@@ -188,6 +191,7 @@ fn transformVertex(
   output.viewPosition = mvPosition.xyz;
   output.fragUV = uv;
   output.color = color;
+  output.fade = lodFadeWeights(viewDistance, uniforms.band);
 
   // The instance scale is uniform and the model-view is rigid, so both drop out
   // of the normal under a normalize — no inverse-transpose is needed, which is
@@ -245,8 +249,13 @@ fn fs(
   @location(2) viewPosition: vec3f,
   @location(3) vertexColor: vec4f,
   @location(4) tangent: vec4f,
-  @builtin(front_facing) isFrontFacing: bool
+  @location(5) fade: vec2f,
+  @builtin(front_facing) isFrontFacing: bool,
+  @builtin(position) fragCoord: vec4f
 ) -> @location(0) vec4f {
+  if (!lodFadeKeeps(fragCoord.xy, fade)) {
+    discard;
+  }
 
   #include "./shader-lib/cloud-shadow.frag.wgsl"
   #include "./shader-lib/directional-shadow.frag.wgsl"
@@ -269,8 +278,8 @@ fn fs(
 
   // Flat tier colour, lit only enough to keep the silhouette readable. A blend
   // over the shaded surface disappears under tone mapping.
-  if (uniforms.params.w > 0.5) {
-    let tier = min(u32(uniforms.params.z), 3u);
+  if (uniforms.debug.y > 0.5) {
+    let tier = min(u32(uniforms.debug.x), 3u);
     let luma = dot(outColor.rgb, vec3f(0.299, 0.587, 0.114));
     outColor = vec4f(TIER_TINTS[tier] * (0.35 + 0.65 * min(luma, 1.0)), outColor.a);
   }

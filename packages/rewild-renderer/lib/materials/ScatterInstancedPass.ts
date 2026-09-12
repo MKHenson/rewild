@@ -19,8 +19,8 @@ const instanceGroupIndex = 1;
 const lightingGroup = 2;
 const shadowGroup = 3;
 
-// projMatrix + modelViewMatrix + nodeMatrix + params.
-export const SCATTER_UNIFORM_BYTES = 64 * 3 + 16;
+// projMatrix + modelViewMatrix + nodeMatrix + band + debug.
+export const SCATTER_UNIFORM_BYTES = 64 * 3 + 32;
 
 // posScale + rotation + params, matching ScatterInstance in the shader.
 export const SCATTER_GPU_STRIDE = 12;
@@ -128,7 +128,7 @@ export class ScatterInstancedPass extends StandardPassBase {
         cameraWorld[13] - world[13],
         cameraWorld[14] - world[14]
       );
-      group.selectInstances(_viewerLocal);
+      group.selectInstances(_viewerLocal, renderer.frustum);
       if (group.rangeCount === 0) continue;
 
       const bindGroup = group.prepareInstances(renderer, this);

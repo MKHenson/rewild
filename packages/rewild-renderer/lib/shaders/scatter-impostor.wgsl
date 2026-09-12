@@ -21,6 +21,7 @@
 #include "./shader-lib/directional-shadow.wgsl"
 #include "./shader-lib/spot-light-shadow.wgsl"
 #include "./shader-lib/scatter-impostor.wgsl"
+#include "./shader-lib/lod-fade.wgsl"
 
 struct Uniforms {
   projMatrix : mat4x4f,
@@ -28,9 +29,10 @@ struct Uniforms {
   // Unused here: the billboard has no place within a model. Kept so the
   // group's one uniform buffer serves both passes.
   nodeMatrix : mat4x4f,
-  // x = metres at which this tier hands over, y = metres at which it takes
-  // over, z = the tier index, w = 1 to tint by tier for the LOD debug view.
-  params : vec4f,
+  // The tier's distance band: fades in over [x, y] and out over [z, w].
+  band : vec4f,
+  // x = the tier index, y = 1 to tint by tier for the LOD debug view.
+  debug : vec4f,
 }
 
 const TIER_TINTS = array<vec3f, 4>(
@@ -55,6 +57,7 @@ struct VertexOutput {
   // The hemisphere direction the tiles are picked by, model space.
   @location(2) @interpolate(flat) octDir : vec3f,
   @location(3) @interpolate(flat) rotation : vec4f,
+  @location(4) fade : vec2f,
 }
 
 @group(0) @binding(0) var atlasSampler : sampler;
@@ -112,10 +115,11 @@ fn vs(
   // Measured to the instance origin like every mesh tier, so the handover
   // between them is one distance and no instance draws twice or not at all.
   let viewDistance = distance(cameraLocal, instance.posScale.xyz);
-  if (viewDistance < uniforms.params.y || viewDistance >= uniforms.params.x) {
+  if (viewDistance < uniforms.band.x || viewDistance >= uniforms.band.w) {
     output.Position = CULLED_POSITION;
     return output;
   }
+  output.fade = lodFadeWeights(viewDistance, uniforms.band);
 
   // Into model space, where the atlas was captured, then framed there and
   // turned back — so the quad follows the instance's yaw as the model would.
@@ -166,8 +170,14 @@ fn fs(
   @location(0) uv : vec2f,
   @location(1) viewPosition : vec3f,
   @location(2) @interpolate(flat) octDir : vec3f,
-  @location(3) @interpolate(flat) rotation : vec4f
+  @location(3) @interpolate(flat) rotation : vec4f,
+  @location(4) fade : vec2f,
+  @builtin(position) fragCoord : vec4f
 ) -> @location(0) vec4f {
+  if (!lodFadeKeeps(fragCoord.xy, fade)) {
+    discard;
+  }
+
   // Tile centres sit at the corners of a (views - 1)² grid over the octahedral
   // square. The three tiles of the triangle the direction lands in share the
   // blend by barycentric weight.
@@ -237,8 +247,8 @@ fn fs(
     outColor = vec4f(mix(outColor.rgb, cascadeDebugTint, 0.5), outColor.a);
   }
 
-  if (uniforms.params.w > 0.5) {
-    let tier = min(u32(uniforms.params.z), 3u);
+  if (uniforms.debug.y > 0.5) {
+    let tier = min(u32(uniforms.debug.x), 3u);
     let luma = dot(outColor.rgb, vec3f(0.299, 0.587, 0.114));
     outColor = vec4f(TIER_TINTS[tier] * (0.35 + 0.65 * min(luma, 1.0)), outColor.a);
   }

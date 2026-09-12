@@ -8,7 +8,12 @@ import {
   modelRadius,
   packInstances,
 } from './ScatterChunkLayer';
-import { Vector3 } from 'rewild-common';
+import {
+  Frustum,
+  Matrix4,
+  Vector3,
+  WebGPUCoordinateSystem,
+} from 'rewild-common';
 import { Geometry } from '../../geometry/Geometry';
 import { Transform } from '../../core/Transform';
 import { ScatterLayer } from './ScatterLayers';
@@ -344,7 +349,7 @@ describe('selectInstances', () => {
   it('keeps only the cells the band can reach', () => {
     const layer = layerWith([0, 60], spread);
     layer.applyLodBias(0);
-    layer.selectInstances(new Vector3(0, 0, 0));
+    layer.selectInstances(new Vector3(0, 0, 0), null);
 
     expect(layer.rangeCount).toBe(1);
     expect(layer.rangeStarts[0]).toBe(0);
@@ -353,7 +358,7 @@ describe('selectInstances', () => {
 
   it('drops the cells nearer than the band', () => {
     const layer = layerWith([100, 300], spread);
-    layer.selectInstances(new Vector3(0, 0, 0));
+    layer.selectInstances(new Vector3(0, 0, 0), null);
 
     const drawn = new Set<number>();
     for (let r = 0; r < layer.rangeCount; r++)
@@ -367,7 +372,7 @@ describe('selectInstances', () => {
 
   it('merges neighbouring cells in a row into one run', () => {
     const layer = layerWith([0, 1000], spread);
-    layer.selectInstances(new Vector3(0, 0, 0));
+    layer.selectInstances(new Vector3(0, 0, 0), null);
 
     // Everything drawn, and the row-major order makes it a single run.
     expect(layer.rangeCount).toBe(1);
@@ -377,7 +382,99 @@ describe('selectInstances', () => {
   it('draws nothing when the bias has shifted the chain off the tier', () => {
     const layer = layerWith([0, 60], spread);
     layer.applyLodBias(-3);
-    layer.selectInstances(new Vector3(0, 0, 0));
+    layer.selectInstances(new Vector3(0, 0, 0), null);
     expect(layer.rangeCount).toBe(0);
+  });
+});
+
+describe('LOD fade band', () => {
+  function tier(band: [number, number], tierIndex: number, lods: number[]) {
+    const geometry = new Geometry();
+    geometry.vertices = new Float32Array([-1, -1, -1, 1, 1, 1]);
+    return new ScatterChunkLayer(
+      new Transform(),
+      geometry,
+      {} as never,
+      identityMatrix(),
+      instancesOf([[0, 0, 0, 0, 0, 0, 1, 1, 0]]),
+      { cullDistance: band[1], lodDistances: lods } as ScatterLayer,
+      tierIndex,
+      0,
+      1
+    );
+  }
+
+  // The outgoing tier's fade-out and the incoming tier's fade-in have to be
+  // the same metres, or the blend has a gap or a double-draw in it.
+  it('shares each handover between the tiers either side of it', () => {
+    const near = tier([0, 200], 0, [100]);
+    const far = tier([0, 200], 1, [100]);
+
+    expect(near.fadeBand[0]).toBe(0);
+    expect(near.fadeBand[1]).toBe(0);
+    expect(near.fadeBand[2]).toBeLessThan(100);
+    expect(near.fadeBand[3]).toBeGreaterThan(100);
+    expect(far.fadeBand[0]).toBe(near.fadeBand[2]);
+    expect(far.fadeBand[1]).toBe(near.fadeBand[3]);
+  });
+
+  it('fades the last tier out inside the cull distance', () => {
+    const last = tier([0, 200], 1, [100]);
+    expect(last.fadeBand[2]).toBeLessThan(200);
+    expect(last.fadeBand[3]).toBe(200);
+  });
+
+  it('has no band once the bias shifts the chain off the tier', () => {
+    const last = tier([0, 200], 1, [100]);
+    last.applyLodBias(-2);
+    expect(Array.from(last.fadeBand)).toEqual([0, 0, 0, 0]);
+  });
+});
+
+describe('frustum selection', () => {
+  function layerAt(instances: number[][]) {
+    const geometry = new Geometry();
+    geometry.vertices = new Float32Array([-1, -1, -1, 1, 1, 1]);
+    const transform = new Transform();
+    transform.updateMatrixWorld();
+    return new ScatterChunkLayer(
+      transform,
+      geometry,
+      {} as never,
+      identityMatrix(),
+      instancesOf(instances),
+      { cullDistance: 1000 } as ScatterLayer,
+      0,
+      0,
+      1
+    );
+  }
+
+  // A camera at the origin looking down -z: a frustum with a 90° field of
+  // view, so cells behind the camera are outside it.
+  function lookingDownNegativeZ(): Frustum {
+    const projection = new Matrix4().makePerspective(-1, 1, 1, -1, 1, 2000);
+    return new Frustum().setFromProjectionMatrix(
+      projection,
+      WebGPUCoordinateSystem
+    );
+  }
+
+  it('drops the cells the frustum cannot see and keeps the rest', () => {
+    const layer = layerAt([
+      [0, 0, -300, 0, 0, 0, 1, 1, 0],
+      [0, 0, 300, 0, 0, 0, 1, 1, 0],
+      [470, 0, 300, 0, 0, 0, 1, 1, 0],
+    ]);
+    layer.selectInstances(new Vector3(0, 0, 0), lookingDownNegativeZ());
+
+    const drawn = new Set<number>();
+    for (let r = 0; r < layer.rangeCount; r++)
+      for (let i = 0; i < layer.rangeCounts[r]; i++)
+        drawn.add(layer.rangeStarts[r] + i);
+    expect(drawn.size).toBe(1);
+
+    layer.selectInstances(new Vector3(0, 0, 0), null);
+    expect(layer.rangeCounts[0]).toBe(3);
   });
 });

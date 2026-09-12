@@ -207,8 +207,10 @@ A layer's LOD chain is a list of handover distances (`lodDistances` in
 `ScatterLayers.ts`): the model draws out to the first, the next mesh from there
 to the second, and the last mesh out to the impostor's `fromDistance`, where a
 billboard baked off the model takes over to `cullDistance`. The impostor is
-always the last tier. `showScatterLodTiers` shows where those handovers land on
-screen. `setScatterLodBias(2)` brings the impostor right up to the camera so
+always the last tier. Each handover is a cross-fade a few metres wide — the two
+tiers either side draw complementary screen-door patterns across it — and the
+last tier fades out short of `cullDistance`. `showScatterLodTiers` shows where
+those handovers land on screen; the fade shows as a band of mixed tints. `setScatterLodBias(2)` brings the impostor right up to the camera so
 its quality can be judged; `setScatterLodBias(-2)` draws the full model to the
 cull distance for a before/after on frame time.
 

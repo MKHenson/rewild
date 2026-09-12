@@ -285,6 +285,21 @@ function drawsNothing(tier: number, tierCount: number, bias: number) {
   return low > high || low < 0 || high > tierCount - 1;
 }
 
+// The cross-fade at a handover, as a fraction of its distance: a near handover
+// is crossed quickly and can afford a short blend, a far one has room for a
+// long one. Clamped so a very near handover still blends over a few strides.
+const LOD_FADE_FRACTION = 0.06;
+const LOD_FADE_MIN = 3;
+const LOD_FADE_MAX = 40;
+
+/** Half the width in metres of the cross-fade centred on a handover. */
+export function lodFadeHalfWidth(handover: number): number {
+  return Math.min(
+    LOD_FADE_MAX,
+    Math.max(LOD_FADE_MIN, handover * LOD_FADE_FRACTION)
+  );
+}
+
 /** Metres at which a tier starts drawing; 0 for whichever tier is nearest. */
 export function lodTierNear(
   layer: ScatterLayer,

@@ -7,7 +7,7 @@ import {
   Transform,
 } from '../lib';
 import { Camera } from '../lib/core/Camera';
-import { Box3, Vector3 } from 'rewild-common';
+import { Box3, Frustum, Vector3 } from 'rewild-common';
 
 export interface IVisualComponent {
   readonly [IS_VISUAL_COMPONENT]: true;
@@ -39,9 +39,10 @@ export interface IScatterInstanceGroup extends IVisualComponent {
   /** Metres beyond which instances are not drawn. */
   readonly cullDistance: number;
   /** Narrows the draw to the contiguous instance runs whose cells the band can
-   *  reach from a viewer in the group's local space. Fills `rangeCount` runs of
-   *  `rangeStarts[i]` + `rangeCounts[i]`. */
-  selectInstances(viewer: Vector3): void;
+   *  reach from a viewer in the group's local space, and that the frustum can
+   *  see when one is given. Fills `rangeCount` runs of `rangeStarts[i]` +
+   *  `rangeCounts[i]`. */
+  selectInstances(viewer: Vector3, frustum: Frustum | null): void;
   readonly rangeStarts: Int32Array;
   readonly rangeCounts: Int32Array;
   readonly rangeCount: number;
