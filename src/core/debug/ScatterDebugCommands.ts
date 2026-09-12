@@ -128,7 +128,7 @@ export function registerScatterDebugCommands(renderer: Renderer) {
     console.log(
       `showScatterLodTiers(${enabled}) — ${
         enabled
-          ? 'tinting instances by LOD tier: green 0, yellow 1, orange 2, red 3+.'
+          ? 'tinting instances by LOD tier: green 0, yellow 1, orange 2, red 3+. The impostor is the last tier.'
           : 'tint off.'
       }`
     );

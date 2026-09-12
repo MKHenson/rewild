@@ -5,6 +5,7 @@ import {
   ScatterChunkLayer,
   bucketInstances,
   composeNodeMatrix,
+  modelRadius,
   packInstances,
 } from './ScatterChunkLayer';
 import { Vector3 } from 'rewild-common';
@@ -128,7 +129,8 @@ describe('instance bounds', () => {
       ]),
       testLayer,
       0,
-      0
+      0,
+      modelRadius(geometry, identityMatrix())
     );
 
     expect(layer.localBounds.min.x).toBeLessThanOrEqual(-101);
@@ -150,7 +152,8 @@ describe('instance bounds', () => {
       instancesOf([[0, 0, 0, 0, 0, 0, 1, 3, 0]]),
       testLayer,
       0,
-      0
+      0,
+      modelRadius(geometry, identityMatrix())
     );
 
     // Corner radius of a 2-unit half-extent box is sqrt(12) ≈ 3.46, tripled.
@@ -169,7 +172,8 @@ describe('instance bounds', () => {
       instancesOf([]),
       testLayer,
       0,
-      0
+      0,
+      modelRadius(geometry, identityMatrix())
     );
 
     expect(layer.localBounds.isEmpty()).toBe(true);
@@ -212,7 +216,8 @@ describe('instanceStorageBuffer', () => {
       instancesOf(instances),
       testLayer,
       0,
-      0
+      0,
+      modelRadius(geometry, identityMatrix())
     );
   }
 
@@ -322,7 +327,8 @@ describe('selectInstances', () => {
       instancesOf(instances),
       { cullDistance: band[1], lodDistances: [band[0]] } as ScatterLayer,
       1,
-      0
+      0,
+      modelRadius(geometry, identityMatrix())
     );
     return layer;
   }

@@ -9,8 +9,8 @@ import {
 import {
   SCATTER_GPU_STRIDE,
   SCATTER_UNIFORM_BYTES,
-  ScatterInstancedPass,
 } from '../../materials/ScatterInstancedPass';
+import { IMaterialPass } from '../../materials/IMaterialPass';
 import { IScatterInstanceGroup } from '../../../types/interfaces';
 import { SCATTER_INSTANCE_STRIDE, ScatterInstances } from './Scatter';
 import { ScatterLayer, lodTierFar, lodTierNear } from './ScatterLayers';
@@ -31,6 +31,12 @@ export interface ScatterCells {
   order: Int32Array;
   starts: Int32Array;
   bounds: Float32Array;
+}
+
+/** A pass that draws from a group's own instance buffer — the mesh tiers'
+ *  pass and the impostor's both. */
+export interface IScatterInstancePass extends IMaterialPass {
+  instanceBindGroupLayout(): GPUBindGroupLayout;
 }
 
 /**
@@ -58,7 +64,7 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
 
   transform: Transform;
   geometry: Geometry;
-  material: ScatterInstancedPass;
+  material: IScatterInstancePass;
   visible = true;
   castShadow = true;
   instanceCount: number;
@@ -102,15 +108,21 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
   private frameUniforms = new Float32Array(SCATTER_UNIFORM_BYTES / 4);
   private nodeMatrixWritten = false;
 
+  /**
+   * `reach` is how far the drawn thing extends from an instance's origin at
+   * scale 1 — the model's bounding radius for a mesh tier, the billboard's for
+   * the impostor — and is what the cell and chunk bounds are grown by.
+   */
   constructor(
     transform: Transform,
     geometry: Geometry,
-    material: ScatterInstancedPass,
+    material: IScatterInstancePass,
     nodeMatrix: Float32Array<ArrayBuffer>,
     instances: ScatterInstances,
     layer: ScatterLayer,
     tier: number,
-    lodBias: number
+    lodBias: number,
+    reach: number
   ) {
     this.transform = transform;
     this.transform.component = this;
@@ -121,7 +133,7 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     this.layer = layer;
     this.tier = tier;
     this.applyLodBias(lodBias);
-    this.cells = bucketInstances(instances, modelRadius(geometry, nodeMatrix));
+    this.cells = bucketInstances(instances, reach);
     this.instanceData = packInstances(instances, this.cells.order);
     this.localBounds = cellsBounds(this.cells);
   }
@@ -214,7 +226,7 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
 
   prepareInstances(
     renderer: Renderer,
-    pass: ScatterInstancedPass
+    pass: IScatterInstancePass
   ): GPUBindGroup | null {
     if (this.bindGroup) return this.bindGroup;
 
@@ -369,7 +381,10 @@ function multiplyMatrices(
  * slope tilt, so the sphere is both cheaper and the only form that stays
  * correct under rotation.
  */
-function modelRadius(geometry: Geometry, nodeMatrix: Float32Array): number {
+export function modelRadius(
+  geometry: Geometry,
+  nodeMatrix: Float32Array
+): number {
   if (geometry.boundingBox === null) geometry.computeBoundingBox();
   const box = geometry.boundingBox!;
 

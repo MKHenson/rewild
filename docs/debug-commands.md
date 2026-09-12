@@ -205,11 +205,12 @@ showScatterLodTiers(); // Paint each LOD tier a flat colour: green 0, yellow 1, 
 
 A layer's LOD chain is a list of handover distances (`lodDistances` in
 `ScatterLayers.ts`): the model draws out to the first, the next mesh from there
-to the second, and the last mesh out to `cullDistance`. `showScatterLodTiers`
-shows where those handovers land on screen. `setScatterLodBias(2)` brings the
-coarsest mesh right up to the camera so its quality can be judged;
-`setScatterLodBias(-2)` draws the full model to the cull distance for a
-before/after on frame time.
+to the second, and the last mesh out to the impostor's `fromDistance`, where a
+billboard baked off the model takes over to `cullDistance`. The impostor is
+always the last tier. `showScatterLodTiers` shows where those handovers land on
+screen. `setScatterLodBias(2)` brings the impostor right up to the camera so
+its quality can be judged; `setScatterLodBias(-2)` draws the full model to the
+cull distance for a before/after on frame time.
 
 `showScatterStats` is for "why is that tree not there". Each row is one draw:
 one chunk, one layer, one tier. `drawn` is whether the draw was issued;

@@ -8,8 +8,13 @@ import {
 } from '../../../types/interfaces';
 import shader from '../../shaders/shadow-depth.wgsl';
 import instancedShader from '../../shaders/shadow-depth-instanced.wgsl';
+import impostorShader from '../../shaders/shadow-depth-impostor.wgsl';
+import { ScatterImpostorPass } from '../../materials/ScatterImpostorPass';
 import { ShadowDebugRenderer } from './ShadowDebugRenderer';
-import { isScatterInstanceGroup } from '../../typeGuards';
+import {
+  isScatterImpostorPass,
+  isScatterInstanceGroup,
+} from '../../typeGuards';
 
 export const SHADOW_MAP_SIZE = 2048;
 export const NUM_CASCADES = 3;
@@ -71,13 +76,18 @@ const NDC_CORNERS: [number, number, number][] = [
 // shadowMVP + nodeMatrix + viewer + range, matching Uniforms in
 // shadow-depth-instanced.wgsl.
 const INSTANCED_UNIFORM_BYTES = 64 * 2 + 32;
+// shadowMVP + viewer + range + lightDir, matching Uniforms in
+// shadow-depth-impostor.wgsl.
+const IMPOSTOR_UNIFORM_BYTES = 64 + 16 * 3;
+
+// Which pipeline a caster draws through. A group's bind group entries differ
+// between the three, so the kind decides both the write and the draw.
+type ShadowCasterKind = 'mesh' | 'instanced' | 'impostor';
 
 interface MeshShadowUniforms {
   buffers: [GPUBuffer, GPUBuffer, GPUBuffer];
   bindGroups: [GPUBindGroup, GPUBindGroup, GPUBindGroup];
-  // Which pipeline these bind groups were built for. A group's entries differ
-  // between the two, so the flag decides both the write and the draw.
-  instanced: boolean;
+  kind: ShadowCasterKind;
 }
 
 export class DirectionalShadowRenderer {
@@ -98,6 +108,7 @@ export class DirectionalShadowRenderer {
 
   private pipeline: GPURenderPipeline;
   private instancedPipeline: GPURenderPipeline;
+  private impostorPipeline: GPURenderPipeline;
   private meshUniforms: Map<IVisualComponent, MeshShadowUniforms>;
   // Scratch set reused by the per-frame stale-entry sweep (no per-frame allocation).
   private _liveMeshes = new Set<IVisualComponent>();
@@ -115,6 +126,7 @@ export class DirectionalShadowRenderer {
   private _lightUp: Vector3;
   private _matData: Float32Array;
   private _instancedData: Float32Array;
+  private _impostorData: Float32Array;
   private _chunkInverse: Matrix4;
   private _viewerLocal: Vector3;
 
@@ -135,6 +147,7 @@ export class DirectionalShadowRenderer {
     this._lightUp = new Vector3();
     this._matData = new Float32Array(16);
     this._instancedData = new Float32Array(INSTANCED_UNIFORM_BYTES / 4);
+    this._impostorData = new Float32Array(IMPOSTOR_UNIFORM_BYTES / 4);
     this._chunkInverse = new Matrix4();
     this._viewerLocal = new Vector3();
   }
@@ -216,6 +229,43 @@ export class DirectionalShadowRenderer {
       },
     });
 
+    const impostorModule = device.createShaderModule({
+      label: 'impostor shadow depth shader',
+      code: impostorShader,
+    });
+
+    // A fragment stage with no targets: the billboard is a cutout, so the
+    // atlas alpha has to decide which texels write depth.
+    this.impostorPipeline = device.createRenderPipeline({
+      label: 'directional shadow impostor pipeline',
+      layout: 'auto',
+      vertex: {
+        entryPoint: 'vs',
+        module: impostorModule,
+        buffers: [
+          {
+            arrayStride: 4 * 3,
+            attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
+          },
+          {
+            arrayStride: 4 * 2,
+            attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x2' }],
+          },
+        ],
+      },
+      fragment: { entryPoint: 'fs', module: impostorModule, targets: [] },
+      primitive: {
+        topology: 'triangle-list',
+        cullMode: 'none',
+      },
+      depthStencil: {
+        depthWriteEnabled: true,
+        depthCompare: 'less',
+        format: 'depth32float',
+        depthBiasSlopeScale: 2.0,
+      },
+    });
+
     this.debugRenderer.init(renderer, this.shadowDepthTexture);
   }
 
@@ -261,7 +311,7 @@ export class DirectionalShadowRenderer {
           const uniforms = this.meshUniforms.get(mesh);
           if (!uniforms) continue;
 
-          if (uniforms.instanced) {
+          if (uniforms.kind !== 'mesh') {
             this._writeInstancedUniforms(
               device,
               uniforms,
@@ -313,8 +363,8 @@ export class DirectionalShadowRenderer {
         );
 
         // organizeVisuals groups by geometry and pass, so a group is entirely
-        // instanced or entirely not; the pipeline only changes where the render
-        // list crosses from one kind to the other.
+        // of one kind; the pipeline only changes where the render list crosses
+        // from one kind to the next.
         let currentPipeline: GPURenderPipeline | null = null;
 
         for (const item of renderList) {
@@ -329,15 +379,18 @@ export class DirectionalShadowRenderer {
             const uniforms = this.meshUniforms.get(mesh);
             if (!uniforms) continue;
 
-            const wanted = uniforms.instanced
-              ? this.instancedPipeline
-              : this.pipeline;
+            const wanted =
+              uniforms.kind === 'impostor'
+                ? this.impostorPipeline
+                : uniforms.kind === 'instanced'
+                ? this.instancedPipeline
+                : this.pipeline;
             if (wanted !== currentPipeline) {
               pass.setPipeline(wanted);
               currentPipeline = wanted;
             }
 
-            if (!uniforms.instanced) {
+            if (uniforms.kind === 'mesh') {
               pass.setBindGroup(0, uniforms.bindGroups[c]);
               pass.drawIndexed(numIndices, 1);
               continue;
@@ -345,6 +398,9 @@ export class DirectionalShadowRenderer {
 
             const group = mesh as IScatterInstanceGroup;
             if (group.rangeCount === 0) continue;
+            // The billboard is the one caster with a uv, for its cutout.
+            if (uniforms.kind === 'impostor')
+              pass.setVertexBuffer(1, geo.uvBuffer);
             pass.setBindGroup(0, uniforms.bindGroups[c]);
             for (let r = 0; r < group.rangeCount; r++)
               pass.drawIndexed(
@@ -403,26 +459,41 @@ export class DirectionalShadowRenderer {
       // keeps it out of the draw loop.
       if (!instanceBuffer) return;
 
+      const impostor = isScatterImpostorPass(mesh.material)
+        ? (mesh.material as ScatterImpostorPass)
+        : null;
+      const kind: ShadowCasterKind = impostor ? 'impostor' : 'instanced';
+
       const buffers = [0, 1, 2].map(() =>
         device.createBuffer({
-          label: 'shadow instanced uniforms',
-          size: INSTANCED_UNIFORM_BYTES,
+          label: `shadow ${kind} uniforms`,
+          size: impostor ? IMPOSTOR_UNIFORM_BYTES : INSTANCED_UNIFORM_BYTES,
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
       ) as [GPUBuffer, GPUBuffer, GPUBuffer];
 
       const bindGroups = buffers.map((buffer) =>
         device.createBindGroup({
-          label: 'shadow instanced bind group',
-          layout: this.instancedPipeline.getBindGroupLayout(0),
+          label: `shadow ${kind} bind group`,
+          layout: (impostor
+            ? this.impostorPipeline
+            : this.instancedPipeline
+          ).getBindGroupLayout(0),
           entries: [
             { binding: 0, resource: { buffer } },
             { binding: 1, resource: { buffer: instanceBuffer } },
+            ...(impostor
+              ? [
+                  { binding: 2, resource: impostor.atlas.sampler },
+                  { binding: 3, resource: impostor.atlas.albedo.createView() },
+                  { binding: 4, resource: { buffer: impostor.atlas.params } },
+                ]
+              : []),
           ],
         })
       ) as [GPUBindGroup, GPUBindGroup, GPUBindGroup];
 
-      this.meshUniforms.set(mesh, { buffers, bindGroups, instanced: true });
+      this.meshUniforms.set(mesh, { buffers, bindGroups, kind });
       return;
     }
 
@@ -442,14 +513,14 @@ export class DirectionalShadowRenderer {
       })
     ) as [GPUBindGroup, GPUBindGroup, GPUBindGroup];
 
-    this.meshUniforms.set(mesh, { buffers, bindGroups, instanced: false });
+    this.meshUniforms.set(mesh, { buffers, bindGroups, kind: 'mesh' });
   }
 
   /**
-   * One instanced group's three cascade uniforms.
+   * One instanced or impostor group's three cascade uniforms.
    *
    * Only the MVP differs between cascades, but each buffer is written whole —
-   * one 160-byte write beats tracking which half went stale.
+   * one small write beats tracking which half went stale.
    *
    * The viewer is put in chunk-local space so the shader's per-instance cull
    * matches the scene pass's without carrying a second matrix. The chunk's
@@ -475,13 +546,29 @@ export class DirectionalShadowRenderer {
     // set is the drawn set down to the run.
     group.selectInstances(this._viewerLocal);
 
-    const data = this._instancedData;
-    data.set(group.nodeMatrix, 16);
-    data[32] = this._viewerLocal.x;
-    data[33] = this._viewerLocal.y;
-    data[34] = this._viewerLocal.z;
-    data[36] = group.nearDistance;
-    data[37] = group.cullDistance;
+    const viewer = this._viewerLocal;
+    let data: Float32Array;
+    if (uniforms.kind === 'impostor') {
+      data = this._impostorData;
+      data[16] = viewer.x;
+      data[17] = viewer.y;
+      data[18] = viewer.z;
+      data[20] = group.nearDistance;
+      data[21] = group.cullDistance;
+      // Chunk transforms only translate, so the light's direction is the same
+      // in chunk-local space as in the world.
+      data[24] = this._lightDir.x;
+      data[25] = this._lightDir.y;
+      data[26] = this._lightDir.z;
+    } else {
+      data = this._instancedData;
+      data.set(group.nodeMatrix, 16);
+      data[32] = viewer.x;
+      data[33] = viewer.y;
+      data[34] = viewer.z;
+      data[36] = group.nearDistance;
+      data[37] = group.cullDistance;
+    }
 
     for (let c = 0; c < NUM_CASCADES; c++) {
       this._shadowMVP.multiplyMatrices(this.lightVPs[c], world);

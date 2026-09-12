@@ -80,7 +80,12 @@ export class MipMapGenerator {
     let height = texture.height;
     let baseMipLevel = 0;
 
-    while (width > 1 || height > 1) {
+    // Stops at the chain the texture was created with, which may be shorter
+    // than a full one.
+    while (
+      (width > 1 || height > 1) &&
+      baseMipLevel + 1 < texture.mipLevelCount
+    ) {
       width = Math.max(1, (width / 2) | 0);
       height = Math.max(1, (height / 2) | 0);
 
