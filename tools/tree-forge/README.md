@@ -683,5 +683,7 @@ as close as the current model gets.
 
 ### Mip alpha erosion
 
-Distant leaves thin out until [#230](https://github.com/MKHenson/rewild/issues/230) lands. Nothing
-here works around it; `leafAlphaCutoff` is the lever in the meantime.
+Handled by the engine: every alpha-tested material scales its cutoff per mip so a card keeps the
+coverage it has at the base level however far away it is (`AlphaCoverage.ts`). Nothing here has
+to compensate for it, so `leafAlphaCutoff` is only about how much of a cluster reads as leaf up
+close.

@@ -80,7 +80,38 @@ describe('StandardParams packing', () => {
   });
 
   it('is the size the layout table claims', () => {
-    expect(packOf(new StandardMaterial(1)).byteLength).toBe(80);
+    expect(packOf(new StandardMaterial(1)).byteLength).toBe(144);
+  });
+
+  it('leaves every mip scale at 1 without histograms or a mask', () => {
+    const material = new StandardMaterial(1);
+    material.alphaMode = 'MASK';
+    expect(Array.from(packOf(material).slice(20, 36))).toEqual(
+      new Array(16).fill(1)
+    );
+  });
+
+  // A texture that is opaque at the base level and half-covered one mip down
+  // needs that mip's alpha doubled to keep every texel passing.
+  it('scales each mip so it keeps the base coverage under the mask cutoff', () => {
+    const material = new StandardMaterial(1);
+    material.alphaMode = 'MASK';
+    material.alphaCutoff = 0.5;
+    const base = new Uint32Array(256);
+    base[255] = 100;
+    const half = new Uint32Array(256);
+    half[128] = 100;
+    material.baseColorAlphaHistograms = [base, half];
+
+    const scales = Array.from(packOf(material).slice(20, 36));
+    expect(scales[0]).toBe(1);
+    expect(scales[1]).toBeCloseTo(1);
+    // Cutoff 0.5 lands on 128, so scale 1 already keeps the mip; a higher
+    // cutoff needs the alpha lifted to reach it.
+    material.alphaCutoff = 0.8;
+    const lifted = Array.from(packOf(material).slice(20, 36));
+    expect(lifted[1]).toBeCloseTo(204 / 128, 2);
+    expect(lifted[15]).toBeCloseTo(204 / 128, 2);
   });
 
   // The one integer in the block. Written through a Uint32Array view, so a
@@ -140,6 +171,7 @@ describe('standard-material.wgsl agreement', () => {
       '_pad0',
       '_pad1',
       '_pad2',
+      'alphaMipScale',
     ]);
   });
 

@@ -51,6 +51,26 @@ struct StandardParams {
   _pad0            : f32,
   _pad1            : f32,
   _pad2            : f32,
+  // Per mip, what alpha is multiplied by before the MASK cutoff, so a mip
+  // keeps the coverage the base level has instead of the average its texels
+  // sank to. All 1 for a material with nothing to preserve.
+  alphaMipScale    : array<vec4f, 4>,
+}
+
+fn alphaMipScaleAt(level : u32) -> f32 {
+  return standardParams.alphaMipScale[level / 4u][level % 4u];
+}
+
+// The scale for the mip the base colour is about to be read at, from the
+// screen-space footprint of the texture — the same level the sampler picks.
+// Takes derivatives, so it runs before any discard.
+fn alphaCoverageScale(fragUV : vec2f) -> f32 {
+  let texels = fragUV * vec2f(textureDimensions(baseColorMap));
+  let dx = dpdx(texels);
+  let dy = dpdy(texels);
+  let lod = clamp(0.5 * log2(max(dot(dx, dx), dot(dy, dy))), 0.0, 15.0);
+  let lo = u32(floor(lod));
+  return mix(alphaMipScaleAt(lo), alphaMipScaleAt(min(lo + 1u, 15u)), fract(lod));
 }
 
 // The UV every map is sampled at: fragUV displaced along the view ray through
@@ -159,8 +179,14 @@ fn shadeStandardSurface(
   // Alpha is decided before any shading, so a masked-out fragment costs a
   // texture fetch rather than a light loop. `discard` demotes the invocation to
   // a helper, so the derivatives taken above are still defined across the quad.
-  if (standardParams.alphaMode == ALPHA_MODE_MASK && baseColorSample.a < standardParams.alphaCutoff) {
-    discard;
+  // The alpha is rescaled for the mip it came from — see alphaMipScale — so a
+  // leaf holds its coverage down the chain instead of thinning to nothing.
+  // The branch is on a uniform, so the derivatives inside stay in uniform
+  // control flow and an opaque material pays nothing for them.
+  if (standardParams.alphaMode == ALPHA_MODE_MASK) {
+    if (baseColorSample.a * alphaCoverageScale(fragUV) < standardParams.alphaCutoff) {
+      discard;
+    }
   }
 
   // glTF's normalTexture.scale, which tilts X and Y while leaving Z alone —

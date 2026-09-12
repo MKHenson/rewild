@@ -31,7 +31,8 @@ struct Uniforms {
   nodeMatrix : mat4x4f,
   // The tier's distance band: fades in over [x, y] and out over [z, w].
   band : vec4f,
-  // x = the tier index, y = 1 to tint by tier for the LOD debug view.
+  // x = the tier index, y = 1 to tint by tier for the LOD debug view, z = the
+  // reciprocal of the camera exposure, so the tint lands in scene units.
   debug : vec4f,
 }
 
@@ -58,6 +59,8 @@ struct VertexOutput {
   @location(2) @interpolate(flat) octDir : vec3f,
   @location(3) @interpolate(flat) rotation : vec4f,
   @location(4) fade : vec2f,
+  // The billboard's half-edge in metres, for the shadow receiver offset.
+  @location(5) @interpolate(flat) reach : f32,
 }
 
 @group(0) @binding(0) var atlasSampler : sampler;
@@ -137,7 +140,18 @@ fn vs(
   output.uv = uv;
   output.octDir = octDir;
   output.rotation = q;
+  output.reach = radius;
   return output;
+}
+
+// The direction toward the sun in view space, or zero without one.
+fn sunDirection() -> vec3f {
+  for (var i : u32 = 0u; i < lighting.numLights; i++) {
+    if (lighting.lights[i].lightType == 1.0) {
+      return -lighting.lights[i].positionOrDirection;
+    }
+  }
+  return vec3f(0.0);
 }
 
 // Both atlases are premultiplied by coverage, so a tile's colour and normal
@@ -168,10 +182,11 @@ fn tileMipLevel(uv : vec2f) -> f32 {
 @fragment
 fn fs(
   @location(0) uv : vec2f,
-  @location(1) viewPosition : vec3f,
+  @location(1) surfaceViewPosition : vec3f,
   @location(2) @interpolate(flat) octDir : vec3f,
   @location(3) @interpolate(flat) rotation : vec4f,
   @location(4) fade : vec2f,
+  @location(5) @interpolate(flat) reach : f32,
   @builtin(position) fragCoord : vec4f
 ) -> @location(0) vec4f {
   if (!lodFadeKeeps(fragCoord.xy, fade)) {
@@ -216,6 +231,13 @@ fn fs(
   );
   let normal = normalize(mv3 * rotateByQuat(rotation, normalize(modelNormal)));
 
+  // Shadows are received a diameter toward the sun from the texel. The
+  // billboard faces the camera while its caster faces the sun, so half of it
+  // lies behind its own caster in light space and would shadow itself along
+  // the line where the two planes cross. Pushed clear of the sphere it is
+  // still under whatever hill or neighbour shades the tree.
+  let viewPosition = surfaceViewPosition + sunDirection() * (2.0 * reach);
+
   #include "./shader-lib/cloud-shadow.frag.wgsl"
   #include "./shader-lib/directional-shadow.frag.wgsl"
   #include "./shader-lib/spot-light-shadow.frag.wgsl"
@@ -225,7 +247,7 @@ fn fs(
   surface.normal = normal;
   surface.specularNormal = normal;
   surface.geometricNormal = normal;
-  surface.viewPosition = viewPosition;
+  surface.viewPosition = surfaceViewPosition;
   surface.diffuseColor = diffuseColorFromBaseColor(baseColor, 0.0);
   surface.f0 = f0FromBaseColor(baseColor, 0.0);
   surface.alpha = perceptualRoughnessToAlpha(1.0);
@@ -247,10 +269,12 @@ fn fs(
     outColor = vec4f(mix(outColor.rgb, cascadeDebugTint, 0.5), outColor.a);
   }
 
+  // A floor of a third of the exposed range plus the surface's own light, so
+  // the colour reads in shadow and the shading still shows through.
   if (uniforms.debug.y > 0.5) {
     let tier = min(u32(uniforms.debug.x), 3u);
     let luma = dot(outColor.rgb, vec3f(0.299, 0.587, 0.114));
-    outColor = vec4f(TIER_TINTS[tier] * (0.35 + 0.65 * min(luma, 1.0)), outColor.a);
+    outColor = vec4f(TIER_TINTS[tier] * (0.35 * uniforms.debug.z + luma), outColor.a);
   }
 
   return outColor;

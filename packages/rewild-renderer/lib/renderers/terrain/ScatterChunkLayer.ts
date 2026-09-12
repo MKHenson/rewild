@@ -329,6 +329,7 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     uniforms.set(this.fadeBand, 48);
     uniforms[52] = this.tier;
     uniforms[53] = renderer.terrainRenderer.scatterLodTint ? 1 : 0;
+    uniforms[54] = 1 / renderer.camera.camera.exposure;
 
     renderer.device.queue.writeBuffer(this.uniformBuffer, 0, uniforms);
   }
