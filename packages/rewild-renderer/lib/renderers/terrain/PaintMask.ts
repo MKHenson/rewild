@@ -307,6 +307,18 @@ export interface PaintStamp {
   type: PaintBrushType;
   /** Channel to paint. Ignored by `erase`, which lifts every channel. */
   channel: number;
+  /**
+   * A channel this stroke lifts back toward zero as it paints, at the same
+   * rate. Ignored by `erase` (which already lifts everything) and when it names
+   * the painted channel itself.
+   *
+   * For masks where one channel negates the others: scatter's exclusion channel
+   * suppresses every layer, so without this, painting into a cleared area does
+   * nothing and the author has to erase first with a different tool. Asymmetric
+   * on purpose — painting the exclusion channel does *not* lift the layers, so
+   * clearing a site and later lifting the clearing brings back what was there.
+   */
+  release?: number;
   /** Brush centre in world coordinates. */
   centerX: number;
   centerZ: number;
@@ -430,6 +442,8 @@ export function applyPaintStamp(
   const channels = source.channels;
   const ch = stamp.channel;
   if (!erasing && (ch < 0 || ch >= channels)) return [];
+  const release =
+    stamp.release !== undefined && stamp.release !== ch ? stamp.release : -1;
 
   // The texel's new weights, computed once per texel and then written to every
   // owning chunk. Hoisted so the texel loop allocates nothing.
@@ -505,9 +519,11 @@ export function applyPaintStamp(
             continue;
           }
           const w = first.weights[c * firstPlane + firstTexel];
-          const scaled = scale === 1 ? w : Math.round(w * scale);
-          next[c] = scaled;
-          if (scaled !== w) changed = true;
+          let value = scale === 1 ? w : Math.round(w * scale);
+          if (c === release && value !== 0)
+            value = quantise(value, (value / 255) * (1 - d));
+          next[c] = value;
+          if (value !== w) changed = true;
         }
       }
 

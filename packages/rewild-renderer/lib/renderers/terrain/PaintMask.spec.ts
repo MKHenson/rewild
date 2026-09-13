@@ -264,6 +264,45 @@ describe('applyPaintStamp', () => {
     expect(source.at(0, 0, 0, 0, 1)).toBe(255);
   });
 
+  // Without this, a scatter layer painted into an excluded area stays
+  // suppressed and the author has to switch tools to erase first.
+  it('lifts the release channel while painting its own', () => {
+    const source = new FakeSource([[0, 0]]);
+    source.independentChannels = true;
+
+    // Channel 2 stands in for the exclusion channel: cleared to full, then
+    // planted over with channel 0.
+    applyPaintStamp(source, stamp({ channel: 2, amount: 1 }));
+    expect(source.at(0, 0, 0, 0, 2)).toBe(255);
+
+    for (let i = 0; i < 200; i++) {
+      applyPaintStamp(source, stamp({ channel: 0, release: 2, amount: 0.05 }));
+    }
+    expect(source.at(0, 0, 0, 0, 0)).toBe(255);
+    expect(source.at(0, 0, 0, 0, 2)).toBe(0);
+  });
+
+  it('leaves channels other than the released one alone', () => {
+    const source = new FakeSource([[0, 0]]);
+    source.independentChannels = true;
+
+    applyPaintStamp(source, stamp({ channel: 1, amount: 1 }));
+    applyPaintStamp(source, stamp({ channel: 2, amount: 1 }));
+    applyPaintStamp(source, stamp({ channel: 0, release: 2, amount: 1 }));
+
+    expect(source.at(0, 0, 0, 0, 1)).toBe(255);
+  });
+
+  // Painting the exclusion channel must not wipe the density under it, so
+  // lifting a clearing later brings back what was there.
+  it('ignores a release naming the painted channel itself', () => {
+    const source = new FakeSource([[0, 0]]);
+    source.independentChannels = true;
+
+    applyPaintStamp(source, stamp({ channel: 0, release: 0, amount: 1 }));
+    expect(source.at(0, 0, 0, 0, 0)).toBe(255);
+  });
+
   it('erase lifts every channel back toward the generator', () => {
     const source = new FakeSource([[0, 0]]);
     applyPaintStamp(source, stamp({ channel: 0, amount: 1 }));

@@ -41,6 +41,9 @@ import { SculptToolbar } from './SculptToolbar';
 import { biomePaintStore } from 'src/ui/stores/BiomePaintStore';
 import { BiomePaintToolbar } from './BiomePaintToolbar';
 import { TerrainBiomePaintController } from './utils/TerrainBiomePaintController';
+import { scatterPaintStore } from 'src/ui/stores/ScatterPaintStore';
+import { ScatterPaintToolbar } from './ScatterPaintToolbar';
+import { TerrainScatterPaintController } from './utils/TerrainScatterPaintController';
 import { loadCameraState, saveCameraState } from './utils/CameraPersistence';
 import {
   applyConformPolicy,
@@ -82,6 +85,7 @@ export class EditorViewport extends Component<Props> {
   sculptController: TerrainSculptController | null = null;
   placementSync: ConformedPlacementSync | null = null;
   biomePaintController: TerrainBiomePaintController | null = null;
+  scatterPaintController: TerrainScatterPaintController | null = null;
   selectedTransform: Transform | null = null;
   private didDrag = false;
   private mouseDownPos = { x: 0, y: 0 };
@@ -118,10 +122,7 @@ export class EditorViewport extends Component<Props> {
       if (this.loadingTimeout !== null) {
         window.clearTimeout(this.loadingTimeout);
       }
-      this.loadingTimeout = window.setTimeout(
-        endLevelLoad,
-        TERRAIN_TIMEOUT_MS
-      );
+      this.loadingTimeout = window.setTimeout(endLevelLoad, TERRAIN_TIMEOUT_MS);
     };
 
     const endLevelLoad = () => {
@@ -189,13 +190,21 @@ export class EditorViewport extends Component<Props> {
       this.render();
     });
 
-    // Biome paint mode toggling — the same lifecycle as sculpt above. The two
-    // brushes are mutually exclusive (the ribbon disarms one when the other is
+    // Biome paint mode toggling — the same lifecycle as sculpt above. The
+    // brushes are mutually exclusive (the ribbon disarms the others when one is
     // armed), so they never both own the pointer.
     this.on(biomePaintStore.dispatcher, () => {
       if (!biomePaintStore.enabled) {
         endPaintStroke();
         this.biomePaintController?.hideCursor();
+      }
+      this.render();
+    });
+
+    this.on(scatterPaintStore.dispatcher, () => {
+      if (!scatterPaintStore.enabled) {
+        endScatterStroke();
+        this.scatterPaintController?.hideCursor();
       }
       this.render();
     });
@@ -212,6 +221,14 @@ export class EditorViewport extends Component<Props> {
       if (!this.biomePaintController?.isPainting) return;
       this.biomePaintController.endStroke().catch((err) => {
         console.error('Failed to save painted biome masks:', err);
+      });
+      if (this.orbitController) this.orbitController.enabled = true;
+    };
+
+    const endScatterStroke = () => {
+      if (!this.scatterPaintController?.isPainting) return;
+      this.scatterPaintController.endStroke().catch((err) => {
+        console.error('Failed to save painted scatter density:', err);
       });
       if (this.orbitController) this.orbitController.enabled = true;
     };
@@ -337,6 +354,8 @@ export class EditorViewport extends Component<Props> {
         sculptStore.setEnabled(false);
       } else if (event.code === 'Escape' && biomePaintStore.enabled) {
         biomePaintStore.setEnabled(false);
+      } else if (event.code === 'Escape' && scatterPaintStore.enabled) {
+        scatterPaintStore.setEnabled(false);
       } else if (event.code === 'Equal' || event.code === 'NumpadAdd') {
         this.gizmo?.increaseSize();
         this.updateGizmoScale();
@@ -392,8 +411,7 @@ export class EditorViewport extends Component<Props> {
             SURFACE_PROBE_CLEARANCE,
             SURFACE_PROBE_CLEARANCE * 2
           );
-          if (hit && terrainH !== null)
-            return Math.max(hit.point.y, terrainH);
+          if (hit && terrainH !== null) return Math.max(hit.point.y, terrainH);
           return hit?.point.y ?? terrainH;
         };
         await this.templateLoader.load();
@@ -413,11 +431,15 @@ export class EditorViewport extends Component<Props> {
         this.sculptController = new TerrainSculptController(this.renderer);
         // Sculpt, snapshot load, seed change and preset re-tune all end in a
         // chunk rebuild, so this one listener covers every way the ground moves.
-        this.placementSync = new ConformedPlacementSync(this.renderer, (visit) =>
-          this.visitConformTargets(visit)
+        this.placementSync = new ConformedPlacementSync(
+          this.renderer,
+          (visit) => this.visitConformTargets(visit)
         );
         this.placementSync.start();
         this.biomePaintController = new TerrainBiomePaintController(
+          this.renderer
+        );
+        this.scatterPaintController = new TerrainScatterPaintController(
           this.renderer
         );
 
@@ -450,7 +472,12 @@ export class EditorViewport extends Component<Props> {
 
     const onClick = (event: MouseEvent) => {
       // A terrain brush owns the pointer — clicks never select/deselect.
-      if (sculptStore.enabled || biomePaintStore.enabled) return;
+      if (
+        sculptStore.enabled ||
+        biomePaintStore.enabled ||
+        scatterPaintStore.enabled
+      )
+        return;
       if (this.didDrag) {
         this.didDrag = false;
         return;
@@ -520,6 +547,21 @@ export class EditorViewport extends Component<Props> {
         return;
       }
 
+      if (scatterPaintStore.enabled && this.scatterPaintController) {
+        if (event.altKey) return;
+
+        const hit = this.scatterPaintController.pickTerrain(
+          createRaycaster(event.clientX, event.clientY)
+        );
+        if (hit) {
+          this.orbitController?.cancelInteraction();
+          if (this.orbitController) this.orbitController.enabled = false;
+          this.scatterPaintController.beginStroke(hit.point, event.shiftKey);
+          document.addEventListener('mouseup', onScatterDocumentMouseUp);
+        }
+        return;
+      }
+
       this.mouseDownPos.x = event.clientX;
       this.mouseDownPos.y = event.clientY;
       this.didDrag = false;
@@ -557,6 +599,12 @@ export class EditorViewport extends Component<Props> {
       if (event.button !== 0) return;
       document.removeEventListener('mouseup', onPaintDocumentMouseUp);
       endPaintStroke();
+    };
+
+    const onScatterDocumentMouseUp = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      document.removeEventListener('mouseup', onScatterDocumentMouseUp);
+      endScatterStroke();
     };
 
     const onMouseMove = (event: MouseEvent) => {
@@ -608,6 +656,28 @@ export class EditorViewport extends Component<Props> {
           );
         }
         this.biomePaintController.updateCursor(hit?.point ?? null);
+        return;
+      }
+
+      if (scatterPaintStore.enabled && this.scatterPaintController) {
+        if (event.altKey && !this.scatterPaintController.isPainting) {
+          this.scatterPaintController.hideCursor();
+          return;
+        }
+
+        const hit = this.scatterPaintController.pickTerrain(
+          createRaycaster(event.clientX, event.clientY)
+        );
+        if (this.scatterPaintController.isPainting) {
+          if (hit) this.scatterPaintController.moveStroke(hit.point);
+        } else if (hit) {
+          this.scatterPaintController.prefetchMasks(
+            hit.point.x,
+            hit.point.z,
+            scatterPaintStore.radius
+          );
+        }
+        this.scatterPaintController.updateCursor(hit?.point ?? null);
         return;
       }
 
@@ -811,6 +881,9 @@ export class EditorViewport extends Component<Props> {
     // modes are mutually exclusive, so at most one is ever mounted.
     const sculptToolbar = (<SculptToolbar />) as SculptToolbar;
     const biomePaintToolbar = (<BiomePaintToolbar />) as BiomePaintToolbar;
+    const scatterPaintToolbar = (
+      <ScatterPaintToolbar />
+    ) as ScatterPaintToolbar;
     const loadingOverlay = (
       <Loading overlay label="Loading level" />
     ) as Loading;
@@ -846,6 +919,12 @@ export class EditorViewport extends Component<Props> {
           container.appendChild(biomePaintToolbar);
       } else {
         biomePaintToolbar.remove();
+      }
+      if (scatterPaintStore.enabled) {
+        if (!scatterPaintToolbar.parentElement)
+          container.appendChild(scatterPaintToolbar);
+      } else {
+        scatterPaintToolbar.remove();
       }
       return container;
     };
@@ -996,10 +1075,7 @@ export class EditorViewport extends Component<Props> {
         'pointerup',
         this.scheduleCameraSave
       );
-      this.viewportCanvas.removeEventListener(
-        'wheel',
-        this.scheduleCameraSave
-      );
+      this.viewportCanvas.removeEventListener('wheel', this.scheduleCameraSave);
       this.viewportCanvas = null;
     }
     this.removeCameraObserver();
@@ -1008,6 +1084,7 @@ export class EditorViewport extends Component<Props> {
     this.gizmo?.dispose();
     this.sculptController?.dispose();
     this.biomePaintController?.dispose();
+    this.scatterPaintController?.dispose();
     this.renderer.dispose();
   }
 }
