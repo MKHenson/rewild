@@ -12,6 +12,19 @@ interface Props {
 
 @register('x-select')
 export class Select extends Component<Props> {
+  get value(): string | undefined {
+    return this._props?.value;
+  }
+
+  /** Mirrors Slider's accessor, for panels that build their DOM once and mutate
+   *  it — returning a fresh tree instead would swap this element out and take
+   *  an open dropdown with it. */
+  set value(value: string | undefined) {
+    if (!this._props || this._props.value === value) return;
+    this._props.value = value;
+    this.render?.();
+  }
+
   init() {
     const [showDropDown, setShowDropDown] = this.useState(false);
 

@@ -608,11 +608,16 @@ export class TerrainRenderer {
    * placement is a worker pass over the whole chunk and an instance is a thing,
    * not a texel. Returns false when the chunk isn't loaded — its first
    * placement reads the saved mask anyway.
+   *
+   * The visibility pass is what acts on the staleness, and it normally only
+   * runs when the camera moves — a brush is the one thing that changes the
+   * world while the view holds still, so it has to ask for one.
    */
   refreshChunkScatter(cx: number, cy: number): boolean {
     const chunk = this.terrainChunks.get(`${cx},${cy}`);
     if (!chunk) return false;
     chunk.bumpScatterMaskVersion();
+    this._needsVisibilityUpdate = true;
     return true;
   }
 

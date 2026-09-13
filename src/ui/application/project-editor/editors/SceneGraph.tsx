@@ -20,6 +20,7 @@ import {
 import { projectStore } from '../../../stores/ProjectStore';
 import { sculptStore } from '../../../stores/SculptStore';
 import { biomePaintStore } from '../../../stores/BiomePaintStore';
+import { scatterPaintStore } from '../../../stores/ScatterPaintStore';
 import { Subscriber } from 'rewild-common';
 
 interface Props {}
@@ -59,13 +60,14 @@ export class SceneGraph extends Component<Props> {
     this.on(sceneGraphStore.dispatcher, onSceneGraphEvent);
 
     this.keyUpDelegate = async (e: KeyboardEvent) => {
-      // Escape is already claimed by the sculpt and biome brushes, so it only
+      // Escape is already claimed by the terrain brushes, so it only
       // deactivates the container once no brush mode is running.
       if (
         e.key === 'Escape' &&
         sceneGraphStore.selectedContainerId &&
         !sculptStore.enabled &&
-        !biomePaintStore.enabled
+        !biomePaintStore.enabled &&
+        !scatterPaintStore.enabled
       ) {
         sceneGraphStore.setActiveContainer(null);
         return;

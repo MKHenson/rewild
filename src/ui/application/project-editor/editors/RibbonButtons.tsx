@@ -10,6 +10,7 @@ import {
 import { projectStore } from '../../../stores/ProjectStore';
 import { sculptStore } from '../../../stores/SculptStore';
 import { biomePaintStore } from '../../../stores/BiomePaintStore';
+import { scatterPaintStore } from '../../../stores/ScatterPaintStore';
 import { TerrainSettingsDialog } from './TerrainSettingsDialog';
 
 interface Props {
@@ -24,6 +25,7 @@ export class RibbonButtons extends Component<Props> {
     });
     this.on(sculptStore.dispatcher, () => this.render());
     this.on(biomePaintStore.dispatcher, () => this.render());
+    this.on(scatterPaintStore.dispatcher, () => this.render());
 
     const [terrainOpen, setTerrainOpen] = this.useState(false);
 
@@ -62,9 +64,12 @@ export class RibbonButtons extends Component<Props> {
               class={sculptStore.enabled ? 'sculpt-active' : ''}
               disabled={loading || !projectStore.project?.sceneGraph?.terrain}
               onClick={() => {
-                // The two terrain brushes both own left-drag, so arming one
-                // must disarm the other.
-                if (!sculptStore.enabled) biomePaintStore.setEnabled(false);
+                // The terrain brushes all own left-drag, so arming one must
+                // disarm the others.
+                if (!sculptStore.enabled) {
+                  biomePaintStore.setEnabled(false);
+                  scatterPaintStore.setEnabled(false);
+                }
                 sculptStore.setEnabled(!sculptStore.enabled);
               }}>
               <StyledIcon icon="trending-up-down" size="s" />
@@ -74,10 +79,26 @@ export class RibbonButtons extends Component<Props> {
               class={biomePaintStore.enabled ? 'sculpt-active' : ''}
               disabled={loading || !projectStore.project?.sceneGraph?.terrain}
               onClick={() => {
-                if (!biomePaintStore.enabled) sculptStore.setEnabled(false);
+                if (!biomePaintStore.enabled) {
+                  sculptStore.setEnabled(false);
+                  scatterPaintStore.setEnabled(false);
+                }
                 biomePaintStore.setEnabled(!biomePaintStore.enabled);
               }}>
               <StyledIcon icon="paintbrush" size="s" />
+            </Button>
+            <Button
+              variant="text"
+              class={scatterPaintStore.enabled ? 'sculpt-active' : ''}
+              disabled={loading || !projectStore.project?.sceneGraph?.terrain}
+              onClick={() => {
+                if (!scatterPaintStore.enabled) {
+                  sculptStore.setEnabled(false);
+                  biomePaintStore.setEnabled(false);
+                }
+                scatterPaintStore.setEnabled(!scatterPaintStore.enabled);
+              }}>
+              <StyledIcon icon="trees" size="s" />
             </Button>
           </ButtonGroup>
           {terrainOpen() && (
