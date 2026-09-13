@@ -9,8 +9,18 @@ import {
 } from './ClimateField';
 import { resolveScatterDensity } from './LayerWeights';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
-import { PaintMask } from './PaintMask';
-import { getScatterLayer, getScatterLayerSlot } from './ScatterLayers';
+import {
+  PaintMask,
+  isPaintMaskChannelEmpty,
+  samplePaintMaskChannel,
+} from './PaintMask';
+import {
+  getScatterLayer,
+  getScatterLayerOrder,
+  getScatterLayerSlot,
+  scatterExcludeChannel,
+  scatterMaskChannels,
+} from './ScatterLayers';
 import { heightGradientAt, slopeDegreesAt } from './Splat';
 
 // Per-chunk scatter placement: which instances of which layer stand where.
@@ -51,6 +61,23 @@ export interface ScatterChunkOptions {
   /** Painted biome weights, as generateSplatMap takes them — a painted biome
    *  grows its own scatter. */
   biomeMask?: PaintMask | null;
+  /** Painted scatter density: one channel per layer slot plus the exclusion
+   *  channel (see scatterMaskChannels). Overrides the *input* to placement —
+   *  the density a candidate is accepted against — so painted instances are
+   *  derived like every other one and track a sculpt, a re-tuned jitter range
+   *  and a seed change for free. */
+  scatterMask?: PaintMask | null;
+}
+
+/**
+ * The density a candidate is accepted against, from the two sources composited.
+ */
+function compositeDensity(
+  biome: number,
+  painted: number,
+  exclude: number
+): number {
+  return (biome + painted * (1 - biome)) * (1 - exclude);
 }
 
 function mix(h: number): number {
@@ -232,7 +259,23 @@ export function scatterChunk(
       `Scatter needs ${chunkSize * chunkSize} heights, got ${heights.length}.`
     );
 
-  const layerNames = getClimateScatterLayers(climate);
+  const climateLayers = new Set(getClimateScatterLayers(climate));
+
+  // Every layer in the library is paintable anywhere, so the set to place is
+  // what the climate grows plus whatever has been painted here — a layer the
+  // local biome never emits is the ordinary case with a biome density of zero.
+  const mask =
+    options?.scatterMask &&
+    options.scatterMask.channels === scatterMaskChannels()
+      ? options.scatterMask
+      : null;
+  const excludeChannel = scatterExcludeChannel();
+  const layerNames = mask
+    ? getScatterLayerOrder().filter(
+        (name, slot) =>
+          climateLayers.has(name) || !isPaintMaskChannelEmpty(mask, slot)
+      )
+    : [...climateLayers];
   if (layerNames.length === 0) return [];
 
   const field = createClimateField(chunkSize, chunkSize, seed, offset, climate);
@@ -263,12 +306,18 @@ export function scatterChunk(
     const cellSize = (2 * layer.footprint) / TERRAIN_METERS_PER_SAMPLE;
 
     // Which of each biome's rules grows this layer, resolved up front so the
-    // candidate loop never searches. -1 where a biome does not grow it.
+    // candidate loop never searches. -1 where a biome does not grow it, and
+    // `hasRule` false for a purely painted layer — which skips the biome
+    // resolve per candidate, since every rule would miss anyway.
     const ruleIndex = new Int32Array(climate.biomes.length).fill(-1);
+    let hasRule = false;
     for (let b = 0; b < climate.biomes.length; b++) {
       const rules = climate.biomes[b].scatter ?? [];
       for (let r = 0; r < rules.length; r++)
-        if (rules[r].layer === name) ruleIndex[b] = r;
+        if (rules[r].layer === name) {
+          ruleIndex[b] = r;
+          hasRule = true;
+        }
     }
 
     let data = new Float32Array(INITIAL_CAPACITY * SCATTER_INSTANCE_STRIDE);
@@ -303,7 +352,7 @@ export function scatterChunk(
         // Density is the biome-weighted sum of whatever rules grow this layer
         // here, so a climate transition fades scatter in rather than switching
         // it on at the border.
-        const activeCount = resolveActiveBiomes(resolver, sx, sy);
+        const activeCount = hasRule ? resolveActiveBiomes(resolver, sx, sy) : 0;
         let density = 0;
         for (let b = 0; b < activeCount; b++) {
           const biomeIndex = resolver.biomes[b];
@@ -331,6 +380,13 @@ export function scatterChunk(
               noiseValue
             );
         }
+
+        if (mask)
+          density = compositeDensity(
+            density,
+            samplePaintMaskChannel(mask, slot, sx, sy),
+            samplePaintMaskChannel(mask, excludeChannel, sx, sy)
+          );
 
         if (density <= 0 || hash01(hash, 2) >= density) continue;
 

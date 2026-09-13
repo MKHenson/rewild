@@ -25,6 +25,9 @@ interface TerrainWorkerRequest {
   // Generate scatter instances alongside the mesh. Requested once per chunk —
   // scatter is chunk state, not per-LOD state.
   scatter?: boolean;
+  // The chunk's painted scatter density mask. Structured-cloned on the same
+  // terms as biomeMask.
+  scatterMask?: PaintMask;
 }
 
 export interface TerrainWorkerResponse {

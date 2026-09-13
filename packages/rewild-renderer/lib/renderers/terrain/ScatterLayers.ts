@@ -244,6 +244,24 @@ export function getScatterLayerSlot(name: string): number {
   return getScatterLayerOrder().indexOf(name);
 }
 
+/**
+ * The scatter density mask's channel layout: one channel per layer slot, then
+ * one exclusion channel past the end.
+ *
+ * Exclusion is a channel rather than the absence of paint because zero already
+ * means "say nothing, let the biome decide". Clearings, building sites and
+ * paths need the opposite — "nothing grows here, whatever the biome wants" —
+ * and that is a weight of its own. It is one channel, not one per layer: an
+ * author clearing a building site is clearing it of everything.
+ */
+export function scatterExcludeChannel(): number {
+  return getScatterLayerOrder().length;
+}
+
+export function scatterMaskChannels(): number {
+  return getScatterLayerOrder().length + 1;
+}
+
 /** Mesh tiers a layer draws: the model plus one per LOD distance. A geometry
  *  carrying more tiers than the layer names distances for leaves them unused. */
 export function meshTierCount(layer: ScatterLayer): number {

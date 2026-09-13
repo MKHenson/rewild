@@ -170,6 +170,18 @@ export class LODMesh {
         const version = this.chunk.heightsVersion;
         const maskVersion = this.chunk.maskVersion;
 
+        // Scatter rides whichever LOD build gets there first — the instances
+        // are chunk state, identical for every LOD, so only one build pays.
+        const wantsScatter = this.chunk.needsScatter(version);
+        // Only a build that will place instances pays for the density mask's
+        // lookup, so a chunk far outside scatter range never reads one.
+        const scatterMask = wantsScatter
+          ? await this.chunk.resolveScatterMask(
+              renderer.terrainRenderer.scatterMaskProvider
+            )
+          : null;
+        const scatterMaskVersion = this.chunk.scatterMaskVersion;
+
         // Edited surfaces diverge from the worker's noise apron ring, so build a
         // real apron from the loaded neighbours' heights on the main thread and
         // hand it over — the worker shades edges two-sided against it, matching
@@ -185,10 +197,6 @@ export class LODMesh {
               )
             : undefined;
 
-        // Scatter rides whichever LOD build gets there first — the instances
-        // are chunk state, identical for every LOD, so only one build pays.
-        const wantsScatter = this.chunk.needsScatter(version);
-
         const { splat, vertices, uvs, normals, indices, heights, scatter } =
           await renderer.terrainRenderer.workerPool.enqueue({
             chunkSize: this.chunkSize,
@@ -201,6 +209,7 @@ export class LODMesh {
             edited: this.chunk.heightsAreEdited,
             biomeMask: biomeMask ?? undefined,
             scatter: wantsScatter,
+            scatterMask: scatterMask ?? undefined,
           });
 
         // Cache the heightfield on the chunk so later LODs, snapshot writes,
@@ -229,7 +238,8 @@ export class LODMesh {
             renderer,
             renderer.terrainRenderer,
             scatter,
-            version
+            version,
+            scatterMaskVersion
           );
 
         // A paint stamp landed while this build was in the worker, so the splat

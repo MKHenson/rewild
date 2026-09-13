@@ -3,6 +3,7 @@ import { DEFAULT_CLIMATE_PRESET, PointLight, Renderer } from 'rewild-renderer';
 import { sceneGraphStore } from 'src/ui/stores/SceneGraphStore';
 import { createChunkSnapshotProvider } from 'src/database/chunk-snapshots';
 import { createBiomeMaskProvider } from 'src/database/biome-masks';
+import { createScatterMaskProvider } from 'src/database/scatter-masks';
 import { registerDebugCommands } from 'src/core/debug';
 
 export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
@@ -30,6 +31,9 @@ export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
     : null;
   renderer.terrainRenderer.biomeMaskProvider = project.levelId
     ? createBiomeMaskProvider(project.levelId)
+    : null;
+  renderer.terrainRenderer.scatterMaskProvider = project.levelId
+    ? createScatterMaskProvider(project.levelId)
     : null;
   registerDebugCommands(renderer, project);
 

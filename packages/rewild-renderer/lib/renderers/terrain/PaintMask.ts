@@ -8,8 +8,11 @@
 // *input* to splat generation (which biome is here). The same container is what
 // a future direct-material painter (a pond bed, a worn clearing) would use, at a
 // finer `step` and with channels meaning palette slots instead — that one
-// overrides the *output* side, compositing over the resolved layers. Keeping one
-// container means one format, one sampler and one brush for both.
+// overrides the *output* side, compositing over the resolved layers. The scatter
+// density painter is the second user of the input side: channels are scatter
+// layer slots at a coarser `step`, and its weights do not compete (see
+// `independentChannels`). Keeping one container means one format, one sampler
+// and one brush for all of them.
 //
 // Coordinate model — mask texels sit ON LOD-0 samples, every `step` samples:
 //   texel (mx, my) is LOD-0 sample (mx * step, my * step)
@@ -30,6 +33,12 @@ export const PAINT_MASK_FLAG_COMPRESSED = 1;
 
 // LOD-0 samples per biome-mask texel. With chunkSize 241 this gives a 61² mask.
 export const BIOME_MASK_STEP = 4;
+
+// LOD-0 samples per scatter-density texel — a 31² mask at chunkSize 241.
+// Coarser than the biome mask because scatter density is a coarser field still:
+// the brush paints where a stand of trees is, and the placer's own jittered grid
+// supplies everything finer than that.
+export const SCATTER_MASK_STEP = 8;
 
 export interface PaintMask {
   /** Texels per side. */
@@ -81,6 +90,65 @@ export function isPaintMaskEmpty(mask: PaintMask): boolean {
   const weights = mask.weights;
   for (let i = 0; i < weights.length; i++) if (weights[i] !== 0) return false;
   return true;
+}
+
+/**
+ * True when `channel` has never been painted. Lets a caller skip a layer slot
+ * whose plane is entirely zero without walking it again per sample.
+ */
+export function isPaintMaskChannelEmpty(
+  mask: PaintMask,
+  channel: number
+): boolean {
+  if (channel < 0 || channel >= mask.channels) return true;
+  const plane = mask.size * mask.size;
+  const base = channel * plane;
+  for (let i = 0; i < plane; i++)
+    if (mask.weights[base + i] !== 0) return false;
+  return true;
+}
+
+/**
+ * Bilinearly samples one channel at LOD-0 sample (x, y) as a 0..1 weight.
+ *
+ * The counterpart to samplePaintMask for masks whose channels are independent
+ * quantities rather than a budget shared between them — a scatter layer's
+ * density says nothing about its neighbour slot's, so there is nothing to
+ * renormalise and no reason to read the other planes.
+ */
+export function samplePaintMaskChannel(
+  mask: PaintMask,
+  channel: number,
+  x: number,
+  y: number
+): number {
+  if (channel < 0 || channel >= mask.channels) return 0;
+
+  const { size, step, weights } = mask;
+  const max = size - 1;
+
+  const fx = x / step;
+  const fy = y / step;
+  let x0 = Math.floor(fx);
+  let y0 = Math.floor(fy);
+  if (x0 < 0) x0 = 0;
+  else if (x0 > max) x0 = max;
+  if (y0 < 0) y0 = 0;
+  else if (y0 > max) y0 = max;
+  const x1 = x0 < max ? x0 + 1 : x0;
+  const y1 = y0 < max ? y0 + 1 : y0;
+  const tx = fx - x0;
+  const ty = fy - y0;
+
+  const base = channel * size * size;
+  const w00 = weights[base + y0 * size + x0];
+  const w10 = weights[base + y0 * size + x1];
+  const w01 = weights[base + y1 * size + x0];
+  const w11 = weights[base + y1 * size + x1];
+
+  const top = w00 + (w10 - w00) * tx;
+  const bottom = w01 + (w11 - w01) * tx;
+  return (top + (bottom - top) * ty) / 255;
 }
 
 /**
@@ -269,6 +337,15 @@ export interface PaintMaskSource {
   step: number;
   /** Weight planes per mask; every mask this source returns carries them all. */
   channels: number;
+  /**
+   * The channels are unrelated quantities, so painting one leaves the rest
+   * alone. Biome channels are the opposite — a texel is a choice between
+   * biomes, and painting one has to squeeze the others into the budget it
+   * leaves so the generator keeps a well-defined remainder — which is the
+   * default. A scatter mask sets this: two layer slots at full density means
+   * grass under trees, not a contradiction.
+   */
+  independentChannels?: boolean;
   getMask(cx: number, cy: number): PaintMask | null;
 }
 
@@ -349,6 +426,7 @@ export function applyPaintStamp(
   const touched = new Map<string, TouchedMaskChunk>();
   const radiusSq = radius * radius;
   const erasing = stamp.type === 'erase';
+  const independent = source.independentChannels === true;
   const channels = source.channels;
   const ch = stamp.channel;
   if (!erasing && (ch < 0 || ch >= channels)) return [];
@@ -411,11 +489,14 @@ export function applyPaintStamp(
 
         // Squeeze the other channels into whatever budget the painted channel
         // leaves, so the stored weights never out-sum 1 and the generator
-        // always keeps a well-defined remainder.
+        // always keeps a well-defined remainder. Independent channels have no
+        // shared budget to keep, so they are carried through untouched.
         const rest = 255 - painted;
         let otherSum = 0;
-        for (let c = 0; c < channels; c++)
-          if (c !== ch) otherSum += first.weights[c * firstPlane + firstTexel];
+        if (!independent)
+          for (let c = 0; c < channels; c++)
+            if (c !== ch)
+              otherSum += first.weights[c * firstPlane + firstTexel];
         const scale = otherSum > rest ? rest / otherSum : 1;
 
         for (let c = 0; c < channels; c++) {
