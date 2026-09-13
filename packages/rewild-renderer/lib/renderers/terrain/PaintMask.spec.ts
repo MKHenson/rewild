@@ -2,12 +2,14 @@ import {
   applyPaintStamp,
   createPaintMask,
   deserializePaintMask,
+  isPaintMaskChannelEmpty,
   isPaintMaskEmpty,
   PaintMask,
   PaintMaskSource,
   PaintStamp,
   paintMaskSize,
   samplePaintMask,
+  samplePaintMaskChannel,
   serializePaintMask,
 } from './PaintMask';
 
@@ -30,6 +32,7 @@ class FakeSource implements PaintMaskSource {
   metersPerSample = METERS_PER_SAMPLE;
   step = STEP;
   channels = CHANNELS;
+  independentChannels = false;
   masks = new Map<string, PaintMask>();
   missing = new Set<string>();
 
@@ -126,7 +129,48 @@ describe('samplePaintMask', () => {
     const out = new Float64Array(CHANNELS);
 
     // Sample 8 is the last LOD-0 sample, exactly on the last texel.
-    expect(samplePaintMask(mask, CHUNK_SIZE - 1, CHUNK_SIZE - 1, out)).toBeCloseTo(1);
+    expect(
+      samplePaintMask(mask, CHUNK_SIZE - 1, CHUNK_SIZE - 1, out)
+    ).toBeCloseTo(1);
+  });
+});
+
+describe('samplePaintMaskChannel', () => {
+  it('bilinearly interpolates one channel', () => {
+    const mask = createPaintMask(CHUNK_SIZE, CHANNELS, STEP);
+    mask.weights[SIZE * SIZE] = 255; // texel (0,0) of channel 1
+
+    expect(samplePaintMaskChannel(mask, 1, 0, 0)).toBeCloseTo(1);
+    expect(samplePaintMaskChannel(mask, 1, 1, 0)).toBeCloseTo(0.5);
+    expect(samplePaintMaskChannel(mask, 0, 0, 0)).toBe(0);
+  });
+
+  // The point of the single-channel read: scatter densities are independent
+  // quantities, so two full channels are two full channels.
+  it('does not renormalise channels that out-sum 1', () => {
+    const mask = createPaintMask(CHUNK_SIZE, CHANNELS, STEP);
+    mask.weights[0] = 255;
+    mask.weights[SIZE * SIZE] = 255;
+
+    expect(samplePaintMaskChannel(mask, 0, 0, 0)).toBeCloseTo(1);
+    expect(samplePaintMaskChannel(mask, 1, 0, 0)).toBeCloseTo(1);
+  });
+
+  it('reads 0 for a channel the mask does not carry', () => {
+    const mask = createPaintMask(CHUNK_SIZE, CHANNELS, STEP);
+    expect(samplePaintMaskChannel(mask, CHANNELS, 0, 0)).toBe(0);
+    expect(samplePaintMaskChannel(mask, -1, 0, 0)).toBe(0);
+  });
+});
+
+describe('isPaintMaskChannelEmpty', () => {
+  it('reports each channel independently', () => {
+    const mask = createPaintMask(CHUNK_SIZE, CHANNELS, STEP);
+    mask.weights[SIZE * SIZE + 2] = 1;
+
+    expect(isPaintMaskChannelEmpty(mask, 0)).toBe(true);
+    expect(isPaintMaskChannelEmpty(mask, 1)).toBe(false);
+    expect(isPaintMaskChannelEmpty(mask, CHANNELS)).toBe(true);
   });
 });
 
@@ -144,14 +188,18 @@ describe('paint mask serialization', () => {
   });
 
   it('rejects a truncated blob rather than misreading it', () => {
-    const buffer = serializePaintMask(createPaintMask(CHUNK_SIZE, CHANNELS, STEP));
+    const buffer = serializePaintMask(
+      createPaintMask(CHUNK_SIZE, CHANNELS, STEP)
+    );
     expect(() => deserializePaintMask(buffer.slice(0, 30))).toThrow(
       /body is .* expected/
     );
   });
 
   it('rejects an unknown version', () => {
-    const buffer = serializePaintMask(createPaintMask(CHUNK_SIZE, CHANNELS, STEP));
+    const buffer = serializePaintMask(
+      createPaintMask(CHUNK_SIZE, CHANNELS, STEP)
+    );
     new DataView(buffer).setUint32(0, 99, true);
     expect(() => deserializePaintMask(buffer)).toThrow(/version 99/);
   });
@@ -201,6 +249,19 @@ describe('applyPaintStamp', () => {
         expect(total).toBeLessThanOrEqual(255);
       }
     }
+  });
+
+  it('leaves the other channels alone when they are independent', () => {
+    const source = new FakeSource([[0, 0]]);
+    source.independentChannels = true;
+
+    applyPaintStamp(source, stamp({ channel: 0, amount: 1 }));
+    applyPaintStamp(source, stamp({ channel: 1, amount: 1 }));
+
+    // Grass under trees: two scatter slots at full density is not a
+    // contradiction, so neither squeezes the other.
+    expect(source.at(0, 0, 0, 0, 0)).toBe(255);
+    expect(source.at(0, 0, 0, 0, 1)).toBe(255);
   });
 
   it('erase lifts every channel back toward the generator', () => {

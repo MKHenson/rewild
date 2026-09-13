@@ -35,6 +35,9 @@ export interface BuildChunkMeshRequest {
   biomeMask?: PaintMask;
   // Generate scatter instances alongside the mesh
   scatter?: boolean;
+  // The chunk's painted scatter density mask, if it has one. Placement only —
+  // it decides how much grows where, never the shape of the ground.
+  scatterMask?: PaintMask;
 }
 
 // One-sample apron ring so edge-vertex normals get a two-sided gradient that
@@ -204,6 +207,7 @@ export function buildChunkMesh(
   const scatter = request.scatter
     ? scatterChunk(chunkSize, seed, worldOffset, climate, heights, {
         biomeMask: request.biomeMask ?? null,
+        scatterMask: request.scatterMask ?? null,
       })
     : [];
 

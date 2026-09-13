@@ -118,6 +118,8 @@ export class TerrainRenderer {
   // Same, for a chunk's saved biome paint mask. Absent ⇒ the chunk surfaces
   // from pure climate.
   biomeMaskProvider: PaintMaskProvider | null = null;
+  // Saved scatter density masks, looked up per chunk on first placement.
+  scatterMaskProvider: PaintMaskProvider | null = null;
   private _enabled: boolean = true;
 
   constructor() {
@@ -595,6 +597,22 @@ export class TerrainRenderer {
     } else {
       chunk.uploadSplatRegion(renderer, 0, 0, size - 1, size - 1);
     }
+    return true;
+  }
+
+  /**
+   * Marks a chunk's scatter instances stale after its density mask was edited,
+   * so the next visibility update re-places them.
+   *
+   * Unlike refreshChunkSplat this cannot patch the window under the brush:
+   * placement is a worker pass over the whole chunk and an instance is a thing,
+   * not a texel. Returns false when the chunk isn't loaded — its first
+   * placement reads the saved mask anyway.
+   */
+  refreshChunkScatter(cx: number, cy: number): boolean {
+    const chunk = this.terrainChunks.get(`${cx},${cy}`);
+    if (!chunk) return false;
+    chunk.bumpScatterMaskVersion();
     return true;
   }
 

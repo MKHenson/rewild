@@ -5,8 +5,14 @@ import {
   ScatterInstances,
   scatterChunk,
 } from './Scatter';
-import { SCATTER_LAYERS } from './ScatterLayers';
+import {
+  SCATTER_LAYERS,
+  getScatterLayerSlot,
+  scatterExcludeChannel,
+  scatterMaskChannels,
+} from './ScatterLayers';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
+import { PaintMask, SCATTER_MASK_STEP, createPaintMask } from './PaintMask';
 
 const CHUNK = 33;
 const SEED = 1234;
@@ -41,6 +47,22 @@ function positions(instances: ScatterInstances): [number, number, number][] {
     ]);
   }
   return out;
+}
+
+// A density mask over the whole chunk, every texel of `channel` at `weight`.
+function scatterMask(channel: number, weight: number, size = CHUNK): PaintMask {
+  const mask = createPaintMask(size, scatterMaskChannels(), SCATTER_MASK_STEP);
+  const plane = mask.size * mask.size;
+  mask.weights.fill(
+    Math.round(weight * 255),
+    channel * plane,
+    (channel + 1) * plane
+  );
+  return mask;
+}
+
+function countOf(results: ScatterInstances[], layer: string): number {
+  return results.find((r) => r.layer === layer)?.count ?? 0;
 }
 
 describe('scatterChunk', () => {
@@ -302,6 +324,131 @@ describe('scatterChunk', () => {
     };
 
     expect(tiltOf(sloped)).toBeGreaterThan(tiltOf(flat));
+  });
+
+  describe('painted density', () => {
+    const bare = climateOf(flatBiome(undefined));
+    const heights = flatHeights(CHUNK);
+    const halfDense = climateOf(
+      flatBiome([{ layer: 'granite_pebble', density: 0.4 }])
+    );
+
+    // The palette is the whole library: painting a layer the local biome never
+    // emits is the ordinary case with a biome density of zero.
+    it('grows a layer no biome in the climate grows', () => {
+      const slot = getScatterLayerSlot('alien_plant');
+      const results = scatterChunk(
+        CHUNK,
+        SEED,
+        new Vector2(0, 0),
+        bare,
+        heights,
+        {
+          scatterMask: scatterMask(slot, 1),
+        }
+      );
+
+      expect(countOf(results, 'alien_plant')).toBeGreaterThan(0);
+      expect(results.every((r) => r.layer === 'alien_plant')).toBe(true);
+    });
+
+    it('composites over the biome density rather than replacing it', () => {
+      const slot = getScatterLayerSlot('granite_pebble');
+      const biomeOnly = scatterChunk(
+        CHUNK,
+        SEED,
+        new Vector2(0, 0),
+        halfDense,
+        heights
+      );
+      const painted = scatterChunk(
+        CHUNK,
+        SEED,
+        new Vector2(0, 0),
+        halfDense,
+        heights,
+        { scatterMask: scatterMask(slot, 0.5) }
+      );
+
+      expect(countOf(painted, 'granite_pebble')).toBeGreaterThan(
+        countOf(biomeOnly, 'granite_pebble')
+      );
+    });
+
+    it('leaves the biome alone where nothing is painted', () => {
+      const plain = scatterChunk(
+        CHUNK,
+        SEED,
+        new Vector2(0, 0),
+        dense,
+        heights
+      );
+      const withMask = scatterChunk(
+        CHUNK,
+        SEED,
+        new Vector2(0, 0),
+        dense,
+        heights,
+        { scatterMask: scatterMask(getScatterLayerSlot('alien_plant'), 0) }
+      );
+
+      expect(countOf(withMask, 'granite_pebble')).toBe(
+        countOf(plain, 'granite_pebble')
+      );
+    });
+
+    // What a clearing, a building site or a path needs: zero is "say nothing",
+    // so removing biome-grown scatter takes a weight of its own.
+    it('clears biome-grown scatter through the exclusion channel', () => {
+      const results = scatterChunk(
+        CHUNK,
+        SEED,
+        new Vector2(0, 0),
+        dense,
+        heights,
+        { scatterMask: scatterMask(scatterExcludeChannel(), 1) }
+      );
+
+      expect(countOf(results, 'granite_pebble')).toBe(0);
+    });
+
+    it('exclusion beats paint', () => {
+      const mask = scatterMask(getScatterLayerSlot('granite_pebble'), 1);
+      const plane = mask.size * mask.size;
+      const exclude = scatterExcludeChannel();
+      mask.weights.fill(255, exclude * plane, (exclude + 1) * plane);
+
+      expect(
+        countOf(
+          scatterChunk(CHUNK, SEED, new Vector2(0, 0), dense, heights, {
+            scatterMask: mask,
+          }),
+          'granite_pebble'
+        )
+      ).toBe(0);
+    });
+
+    // A mask written against a library with a different number of slots would
+    // point every channel at the wrong layer; ignoring it scatters from the
+    // biome rules alone, which is what an unpainted chunk does.
+    it('ignores a mask whose channel count does not match the library', () => {
+      const stale = createPaintMask(CHUNK, 1, SCATTER_MASK_STEP);
+      stale.weights.fill(255);
+
+      expect(
+        countOf(
+          scatterChunk(CHUNK, SEED, new Vector2(0, 0), dense, heights, {
+            scatterMask: stale,
+          }),
+          'granite_pebble'
+        )
+      ).toBe(
+        countOf(
+          scatterChunk(CHUNK, SEED, new Vector2(0, 0), dense, heights),
+          'granite_pebble'
+        )
+      );
+    });
   });
 
   it('grows past its initial capacity without dropping instances', () => {

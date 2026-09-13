@@ -15,7 +15,10 @@ import { LODMesh } from './LODMesh';
 import { DataTexture } from '../../textures/DataTexture';
 import { ChunkScatter } from './ChunkScatter';
 import { ScatterInstances } from './Scatter';
-import { getScatterGenerationDistance } from './ScatterLayers';
+import {
+  getScatterGenerationDistance,
+  scatterMaskChannels,
+} from './ScatterLayers';
 import { TextureProperties } from '../../textures/Texture';
 
 const temp: Vector3 = new Vector3();
@@ -72,6 +75,9 @@ export class TerrainChunk implements IComponent {
   // request for it is already out. Together they stop every LOD of a new chunk
   // paying for the same placement.
   scatterVersion = -1;
+  // scatterMaskVersion the resident scatter was placed against, so a density
+  // stroke makes the instances stale exactly as a sculpt does.
+  private scatterMaskBuilt = -1;
   private scatterRequested = false;
   // Latches once the chunk comes within range of any layer. Separate from the
   // distance itself because a chunk meshes at the LOD threshold it crosses —
@@ -117,6 +123,13 @@ export class TerrainChunk implements IComponent {
   // regeneration alone, and lets an in-flight worker build notice that its
   // splat is already out of date by the time it lands.
   maskVersion = 0;
+  // The chunk's painted scatter density mask, or null when nothing has been
+  // painted here. Feeds placement only — density says how much grows, sculpt
+  // says what shape the ground is (see scatterChunk).
+  scatterMask: PaintMask | null = null;
+  // Bumped on every density edit. Unlike maskVersion this makes the *instances*
+  // stale, not the splat — scatter is the only thing the density mask feeds.
+  scatterMaskVersion = 0;
   // Cached snapshot lookup — one OPFS read per chunk, shared by all LODs.
   private snapshotLookup: Promise<Float32Array | null> | null = null;
   // Cached mask lookup, same one-read-per-chunk contract as the snapshot.
@@ -124,6 +137,9 @@ export class TerrainChunk implements IComponent {
   // True once the saved-mask lookup has settled (found one, found none, or
   // failed). Gates creating a blank mask for editing — see editableBiomeMask.
   private maskResolved = false;
+  // The scatter density mask's lookup and resolved flag, same contract again.
+  private scatterMaskLookup: Promise<PaintMask | null> | null = null;
+  private scatterMaskResolved = false;
 
   constructor(
     coord: Vector2,
@@ -315,6 +331,71 @@ export class TerrainChunk implements IComponent {
     this.maskVersion++;
   }
 
+  /**
+   * Resolves this chunk's saved scatter density mask, or null when it has never
+   * been painted. Same one-lookup-per-chunk contract as resolveBiomeMask; a
+   * mask written at a different resolution, or against a library with a
+   * different number of layer slots, is discarded rather than misapplied — the
+   * chunk then scatters from the biome rules alone.
+   */
+  resolveScatterMask(
+    provider: PaintMaskProvider | null
+  ): Promise<PaintMask | null> {
+    if (this.scatterMask) return Promise.resolve(this.scatterMask);
+    if (!provider) {
+      this.scatterMaskResolved = true;
+      return Promise.resolve(null);
+    }
+    if (!this.scatterMaskLookup) {
+      const channels = scatterMaskChannels();
+      this.scatterMaskLookup = provider(this.coord.x, this.coord.y).then(
+        (mask) => {
+          this.scatterMaskResolved = true;
+          if (!mask) return null;
+          const expectedSize = paintMaskSize(this.chunkSize, mask.step);
+          if (mask.size !== expectedSize || mask.channels !== channels) {
+            console.warn(
+              `Chunk ${this.id} scatter mask is ${mask.size}² × ${mask.channels}; expected ${expectedSize}² × ${channels} — ignoring it.`
+            );
+            return null;
+          }
+          this.scatterMask = mask;
+          return mask;
+        },
+        (err) => {
+          this.scatterMaskResolved = true;
+          console.warn(`Chunk ${this.id} scatter mask read failed:`, err);
+          return null;
+        }
+      );
+    }
+    return this.scatterMaskLookup;
+  }
+
+  /** The density mask a brush should edit — same create-on-demand and
+   *  skip-until-resolved rules as editableBiomeMask. */
+  editableScatterMask(step: number): PaintMask | null {
+    if (this.scatterMask) return this.scatterMask;
+    if (!this.scatterMaskResolved) return null;
+    this.scatterMask = createPaintMask(
+      this.chunkSize,
+      scatterMaskChannels(),
+      step
+    );
+    return this.scatterMask;
+  }
+
+  setScatterMask(mask: PaintMask) {
+    this.scatterMask = mask;
+    this.scatterMaskLookup = Promise.resolve(mask);
+    this.scatterMaskVersion++;
+  }
+
+  // Marks the instances stale after the density mask was mutated in place.
+  bumpScatterMaskVersion() {
+    this.scatterMaskVersion++;
+  }
+
   // Adopts a worker-built splat map for the heights at `version`. Creates the
   // GPU texture on first call, then re-uploads in place for later edits: the
   // GPUTexture object stays stable across a sculpt stroke, so LOD bind groups
@@ -436,10 +517,21 @@ export class TerrainChunk implements IComponent {
   // anything scatters, so instances are only generated once a chunk is close
   // enough for some layer to draw them.
   needsScatter(version: number): boolean {
-    if (!this.scatterWanted) return false;
-    if (this.scatterRequested || this.scatterVersion === version) return false;
+    if (!this.scatterIsStale(version)) return false;
     this.scatterRequested = true;
     return true;
+  }
+
+  // The resident instances no longer match the heights or the density mask they
+  // were placed against, and nothing is already on its way to fix that.
+  // Read-only, so the frame loop can ask for a rebuild without latching the
+  // request flag out from under the build that will service it.
+  scatterIsStale(version: number): boolean {
+    if (!this.scatterWanted || this.scatterRequested) return false;
+    return (
+      this.scatterVersion !== version ||
+      this.scatterMaskBuilt !== this.scatterMaskVersion
+    );
   }
 
   // The build that asked for scatter bailed (the chunk was evicted, or its LOD
@@ -453,7 +545,8 @@ export class TerrainChunk implements IComponent {
     renderer: Renderer,
     terrainRenderer: TerrainRenderer,
     instances: ScatterInstances[],
-    version: number
+    version: number,
+    maskVersion: number
   ) {
     this.scatterRequested = false;
     if (this.disposed) return;
@@ -470,6 +563,7 @@ export class TerrainChunk implements IComponent {
       terrainRenderer.scatterLodBias
     );
     this.scatterVersion = version;
+    this.scatterMaskBuilt = maskVersion;
   }
 
   refreshMeshes(renderer: Renderer) {
@@ -507,6 +601,7 @@ export class TerrainChunk implements IComponent {
     this.scatter?.dispose();
     this.scatter = null;
     this.scatterVersion = -1;
+    this.scatterMaskBuilt = -1;
   }
 
   updateTerrainChunk(
@@ -523,11 +618,10 @@ export class TerrainChunk implements IComponent {
     this.scatter?.updateVisibility(viewerPos, terrainRenderer.scatterLodBias);
 
     // A chunk that meshed before it came into range has no build left to carry
-    // scatter, so it needs one asking for. Latching means that happens once.
-    const inScatterRange =
-      this.viewerGroundDistance <= getScatterGenerationDistance();
-    const justEnteredRange = inScatterRange && !this.scatterWanted;
-    if (inScatterRange) this.scatterWanted = true;
+    // scatter. Latching is what lets a chunk still generate instances after
+    // crossing the LOD threshold that meshed it, which is much further out.
+    if (this.viewerGroundDistance <= getScatterGenerationDistance())
+      this.scatterWanted = true;
 
     for (const lod of this.lodMesh) {
       if (lod.mesh) {
@@ -551,7 +645,11 @@ export class TerrainChunk implements IComponent {
 
       if (lodMesh.gpuState === 'none' || lodMesh.gpuState === 'unloaded') {
         lodMesh.requestMesh(renderer);
-      } else if (justEnteredRange && this.scatterVersion === -1) {
+      } else if (this.scatterIsStale(this.heightsVersion)) {
+        // A chunk whose mesh is already current has no build left to carry
+        // instances — coming into range, or a density stroke, needs one asking
+        // for. refresh() no-ops while one is in flight, so asking every frame
+        // until the instances land costs nothing and is self-healing.
         lodMesh.refresh(renderer);
       }
 
