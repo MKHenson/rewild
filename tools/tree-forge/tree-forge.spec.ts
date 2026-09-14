@@ -1,7 +1,7 @@
 import { leafCellPixels, leafCells } from './lib/atlas.ts';
 import { writeGlb, type GlbTextureSet } from './lib/glb.ts';
 import { buildMesh, type TreeMesh } from './lib/mesh.ts';
-import { parseConfig, resolveParams, sameTexture, tierParams, toConfig, type Params, type RawConfig } from './lib/params.ts';
+import { impostorDistance, parseConfig, resolveParams, sameTexture, tierParams, toConfig, type Params, type RawConfig } from './lib/params.ts';
 import { fbm, gradientNoise, signedFbm, valueNoise, warp, worley } from './lib/noise.ts';
 import { randomSeed } from './lib/rng.ts';
 import { renderComparison, renderPreview } from './lib/preview.ts';
@@ -573,6 +573,30 @@ describe('glb', () => {
   });
 });
 
+describe('impostor', () => {
+  it('derives the handover from cullDistance until the file names one', () => {
+    expect(impostorDistance(paramsFor({ cullDistance: '800' }))).toBe(480);
+    expect(impostorDistance(paramsFor({ cullDistance: '800', impostorFrom: '192' }))).toBe(192);
+  });
+
+  it('carries the tuned handover into the emitted layer', () => {
+    const params = paramsFor({ cullDistance: '800', impostorFrom: '192', impostorViews: '12', impostorTile: '256' });
+    const layer = scatterLayer(params, buildSkeleton(params));
+
+    expect(layer.impostor).toEqual({ fromDistance: 192, views: 12, tileSize: 256 });
+  });
+
+  // The same bounds validateImpostor holds a layer to, so a printed row is one
+  // the engine will accept rather than one it refuses on paste.
+  it('refuses an impostor the engine would reject', () => {
+    expect(() => paramsFor({ cullDistance: '160', impostorFrom: '160' })).toThrow(/never draw/);
+    expect(() => paramsFor({ cullDistance: '160', impostorFrom: '200' })).toThrow(/never draw/);
+    expect(() => paramsFor({ impostorViews: '1' })).toThrow(/at least 2/);
+    expect(() => paramsFor({ impostorTile: '0' })).toThrow(/positive number of pixels/);
+    expect(() => paramsFor({ impostorFrom: '-5' })).toThrow(/not be negative/);
+  });
+});
+
 describe('scatter layer', () => {
   it('measures the trunk capsule off the trunk it stands in', () => {
     const { params, skeleton } = buildAll();
@@ -750,6 +774,11 @@ describe('LOD tiers', () => {
   it('holds tiers to ascending distances short of the impostor', () => {
     expect(() => paramsFor({ lods: [{ distance: 80 }, { distance: 40 }] })).toThrow(/must ascend/);
     expect(() => paramsFor({ cullDistance: '100', lods: [{ distance: 60 }] })).toThrow(/beyond the impostor at 60m/);
+
+    // The tier ceiling has to follow impostorFrom, or a chain validated against
+    // one distance would ship against another.
+    expect(() => paramsFor({ impostorFrom: '50', lods: [{ distance: 60 }] })).toThrow(/beyond the impostor at 50m/);
+    expect(() => paramsFor({ impostorFrom: '90', lods: [{ distance: 60 }] })).not.toThrow();
   });
 
   it('holds a tier to the same bounds as the model', () => {

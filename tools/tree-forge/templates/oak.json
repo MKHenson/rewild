@@ -38,6 +38,7 @@
   "windFrequency": 0.45,
   "windFlutter": 0.35,
   "cullDistance": 800,
+  "impostorFrom": 192,
   "footprint": 0,
   "scaleMin": 0.8,
   "scaleMax": 1.25,
