@@ -7,6 +7,7 @@ declare module 'models' {
     | 'actors'
     | 'viewport';
   import type { IDragDropAction, ITreeNode, IconType } from 'rewild-ui';
+  import type { PhysicsShape } from 'rewild-renderer';
 
   export type FactoryKey = 'actor' | 'container' | 'sky';
 
@@ -222,16 +223,9 @@ declare module 'models' {
       friction?: number;
       restitution?: number;
       bodyType?: 'dynamic' | 'fixed' | 'kinematic';
-      shape?:
-        | {
-            type: 'box';
-            // Full extents (width, height, depth). Will be converted to half-extents for Rapier.
-            size: [number, number, number];
-          }
-        | {
-            type: 'sphere';
-            radius: number;
-          };
+      /** Authored in the model's local space; scatter layers author the same
+       *  block as their collider proxy. */
+      shape?: PhysicsShape;
     };
   }
 

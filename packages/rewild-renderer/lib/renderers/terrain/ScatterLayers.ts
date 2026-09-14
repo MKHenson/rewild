@@ -6,6 +6,7 @@
 // LOD meshes. The layer owns only where the tiers hand over, since the same
 // model scattered at two scales drops tier at two different distances.
 
+import { PhysicsShape, physicsShapeError } from '../../core/PhysicsShape';
 import type { SelectorBand } from './Biomes';
 
 // The far tier: a billboard sampled from an octahedral atlas baked off the
@@ -18,24 +19,6 @@ export interface ScatterImpostor {
   // Pixels per atlas tile; the atlas is `views * tileSize` square.
   tileSize: number;
 }
-
-// The shape physics collides against, in un-jittered local space with the origin
-// on the ground. A trunk capsule, not a trimesh of the render mesh.
-export type ScatterCollider =
-  | {
-      type: 'box';
-      /** Full extents; halved for Rapier at registration. */
-      size: [number, number, number];
-      offset?: [number, number, number];
-    }
-  | { type: 'sphere'; radius: number; offset?: [number, number, number] }
-  | {
-      type: 'capsule';
-      radius: number;
-      /** Cylindrical section only, excluding the caps — Rapier's halfHeight * 2. */
-      height: number;
-      offset?: [number, number, number];
-    };
 
 // Per-instance randomisation, derived by the placer from the instance hash.
 export interface ScatterJitter {
@@ -82,7 +65,11 @@ export interface ScatterLayer {
   /** Radius in metres the placer keeps clear around an instance — what turns a
    *  biome density into a count. */
   footprint: number;
-  collider?: ScatterCollider;
+  /** The proxy physics collides against, in un-jittered local space with the
+   *  origin on the ground — the same block a template-library asset authors
+   *  under `physics.shape`. The instance's scale, rotation and position pose it
+   *  at registration. Omit it to walk through the layer. */
+  collider?: PhysicsShape;
   wind?: ScatterWind;
   /** Shade the model's cutout piece with its normals as authored, rather than
    *  mirroring them on back faces. For foliage whose cards carry the whole
@@ -382,21 +369,9 @@ function validateImpostor(
     );
 }
 
-function validateCollider(
-  layer: ScatterLayer,
-  collider: ScatterCollider
-): void {
-  const invalid =
-    collider.type === 'box'
-      ? collider.size.some((extent) => extent <= 0)
-      : collider.type === 'sphere'
-      ? collider.radius <= 0
-      : collider.radius <= 0 || collider.height <= 0;
-
-  if (invalid)
-    throw new Error(
-      `Scatter layer '${layer.name}' ${collider.type} collider must have positive dimensions.`
-    );
+function validateCollider(layer: ScatterLayer, collider: PhysicsShape): void {
+  const error = physicsShapeError(collider);
+  if (error) throw new Error(`Scatter layer '${layer.name}' ${error}.`);
 }
 
 function validateWind(layer: ScatterLayer, wind: ScatterWind): void {

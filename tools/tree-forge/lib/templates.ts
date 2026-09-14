@@ -13,10 +13,8 @@ import type {
   IGeometryTemplates,
   IMaterialsTemplate,
 } from 'rewild-renderer/lib/managers/types';
-import type {
-  ScatterCollider,
-  ScatterLayer,
-} from 'rewild-renderer/lib/renderers/terrain/ScatterLayers';
+import type { PhysicsShape } from 'rewild-renderer/lib/core/PhysicsShape';
+import type { ScatterLayer } from 'rewild-renderer/lib/renderers/terrain/ScatterLayers';
 import { impostorDistance, type Params } from './params.ts';
 import type { Skeleton } from './skeleton.ts';
 import type { TextureNames } from './textures.ts';
@@ -65,10 +63,10 @@ export function materialEntries(params: Params, textureUrls: TextureSetUrls): IM
 }
 
 /** The collider proxy, measured off the trunk rather than guessed. */
-export function colliderFor(params: Params, skeleton: Skeleton): ScatterCollider {
+export function colliderFor(params: Params, skeleton: Skeleton): PhysicsShape {
   const radius = round(params.trunkRadius * 1.05);
   const span = Math.max(skeleton.trunk.splitHeight, radius * 2.2);
-  // ScatterCollider's height is the cylindrical section, so the caps have to
+  // PhysicsShape's capsule height is the cylindrical section, so the caps have to
   // come out of the span or the capsule stands two radii too tall.
   const height = round(Math.max(0.1, span - radius * 2));
 

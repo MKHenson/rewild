@@ -602,7 +602,7 @@ describe('scatter layer', () => {
     const { params, skeleton } = buildAll();
     const collider = colliderFor(params, skeleton);
 
-    // ScatterCollider is a union and most of its members are optional, so the
+    // PhysicsShape is a union and most of its members are optional, so the
     // shape is asserted before the measurements are.
     expect(collider.type).toBe('capsule');
     if (collider.type !== 'capsule' || !collider.offset) throw new Error('expected a capsule with an offset');
