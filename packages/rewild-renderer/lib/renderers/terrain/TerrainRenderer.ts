@@ -16,7 +16,7 @@ import { DEFAULT_CLIMATE_PRESET, resolveClimatePreset } from './Biomes';
 import { ChunkSnapshotProvider } from './ChunkSnapshot';
 import { PaintMaskProvider } from './PaintMask';
 import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
-import { ScatterPick, pickScatterInstance } from './Scatter';
+import { ScatterInstances, ScatterPick, pickScatterInstance } from './Scatter';
 import { generateSplatMap } from './Splat';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { ScatterModels } from './ScatterModels';
@@ -28,6 +28,11 @@ export class LODInfo {
 
 export type TerrainEvent =
   | { type: 'chunk-loaded'; chunk: TerrainChunk; lod: LODMesh }
+  | {
+      type: 'scatter-loaded';
+      chunk: TerrainChunk;
+      instances: ScatterInstances[];
+    }
   | { type: 'chunk-unloaded'; chunk: TerrainChunk }
   | { type: 'chunk-disposed'; chunk: TerrainChunk };
 
