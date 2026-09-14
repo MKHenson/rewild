@@ -38,7 +38,7 @@ export const PARAM_SPEC = {
   leaves: { type: 'list', default: [], help: 'Folders under sources/leaves whose stamps fill the leaf image. Empty generates it.', texture: true },
   out: { type: 'string', default: 'assets/shared/nature/trees', help: 'Directory the model and textures are written to.' },
   assetsRoot: { type: 'string', default: 'assets/shared', help: 'Root the template urls are made relative to.' },
-  seed: { type: 'int', default: null, help: 'Placement seed. Defaults to a hash of name.', texture: true },
+  seed: { type: 'int', default: null, help: 'Every random choice. Omit it and the CLI rolls a new tree each run.', texture: true },
 
   height: { type: 'number', default: 12, help: 'Total tree height in metres. The skeleton is normalised to it.' },
   trunkRadius: { type: 'number', default: 0.32, help: 'Trunk radius at the base, in metres.' },
