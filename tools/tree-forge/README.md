@@ -5,8 +5,8 @@ command writes a two-material glTF, a four-map texture template, and the registr
 has to be declared through.
 
 It exists because a forest needs variants, and hand-authoring a hundred of them is not affordable.
-Every output is a pure function of the parameters plus a seed, so a variant regenerates identically
-and a family of them costs one loop.
+Every output is a pure function of the parameters plus a seed, so a recorded seed regenerates a tree
+identically and a family of them costs one loop.
 
 ## Running it
 
@@ -31,9 +31,13 @@ point of the TypeScript: `lib/templates.ts` types its output as the engine's own
 `IGeometryTemplates` and `IMaterialsTemplate`, so a field added to any of them fails here rather
 than producing a row that no longer compiles once you have pasted it in.
 
-`name` is the only required key. Everything else has a default. Only `name` changes what a tree
-looks like by itself, because the seed defaults to a hash of it; set `seed` to draw a different tree
-from the same shape.
+`name` is the only required key. Everything else has a default.
+
+**A config with no `seed` draws a new tree on every run.** The keys set the species, and the seed
+picks one individual out of it, so two runs of one file give two trees of the same kind. The run
+prints the seed it rolled and writes it into the sidecar, so a tree you liked is kept by copying
+that number back. Pin `seed` in the file and the tree stops moving, which is what the four templates
+do.
 
 Files land in `<out>/<textureSet>/`, which is `assets/shared/nature/trees/<set>/` by default:
 
@@ -42,6 +46,7 @@ Files land in `<out>/<textureSet>/`, which is `assets/shared/nature/trees/<set>/
 | `<name>.glb`           | The model. Two primitives, bark and leaves, on one node at the origin. |
 | `<name>.tree.json`     | Every key that made it, so it can be re-cut or nudged.                |
 | `<name>.preview.png`   | A shaded three-quarter render. Only with `preview` set.               |
+| `<name>.lods.preview.png` | The model beside every tier at one scale. Only with `preview` and `lods`. |
 | `<set>_bark_*.webp`    | The bark image, four maps. See [The texture template](#the-texture-template). |
 | `<set>_leaf_*.webp`    | The leaf image, four maps. Same four roles.                           |
 | `<set>.textures.json`  | What the leaf image was painted for, read back by variants that reuse it. |
@@ -59,7 +64,7 @@ node tools/tree-forge/cli.ts assets/shared/nature/trees/oak/oak-01.tree.json
 
 So the loop is: **edit the JSON, save, look at the preview PNG**. With `--watch` the middle step
 happens on every save. The file holds every key including `preview`, `out` and the seed, so nothing
-has to be repeated.
+has to be repeated. A seed the CLI rolled is held for the whole watch, so only what you edit moves.
 
 The sidecar is rewritten every run with whatever was actually built. A template is never rewritten —
 see below — so a preset stays a preset and the sidecar is the record of the build.
@@ -107,52 +112,82 @@ however many variants it has. See [Sharing one texture set](#sharing-one-texture
 `templatesDir` inside these files is unrelated: it names the engine's `templates/` at the repo root,
 where `writeTemplates` patches `geometries.json` and `materials.json`.
 
-## The shape parameters
+## The parameters
 
-Everything else in `--help` is either an output path, a texture setting, or a value copied straight
-into the emitted scatter layer.
+Every key of the `tree.json`, grouped by what it touches. `--help` prints the same list with its
+defaults. A value outside a stated range stops the run with the range in the message, so tuning by
+feel is safe.
 
 **The skeleton**
 
-| Key                 | Does                                                                          |
-| ------------------- | ----------------------------------------------------------------------------- |
-| `height`          | Total tree height in metres. The whole skeleton is normalised to it, so this is the height of the tree and not of the trunk. |
-| `trunkRadius`    | Radius at the base. Not scaled by `height`, so the two are independent.      |
-| `trunkTaper`     | Radius at the top of the trunk as a fraction of the base.                     |
-| `splits`          | Children per split. The single biggest lever on triangle count.               |
-| `splitAngle`     | Degrees a child leaves its parent by. Low is columnar, high is spreading.     |
-| `splitSpread`    | How far back along the parent the children are spread from its tip. Near 0 is a fan at the end, near 1 puts branches along the whole length. |
-| `branchLevels`   | Generations below the trunk.                                                  |
-| `lengthRatio`    | Child length over parent length.                                              |
-| `radiusRatio`    | Child radius over parent radius at the attach point.                          |
-| `curve`           | Total degrees a branch bends along its own length.                            |
-| `droop`           | Degrees the deepest branches bend toward the ground. **Negative bends them back upright**, which is how a crown is kept compact. |
-| `segments`        | Rings along each branch. Deeper branches use fewer.                           |
-| `radialSegments` | Sides of the trunk tube. Deeper branches use fewer.                           |
-| `barkLevels`     | Deepest generation that gets a bark tube. Twigs beyond it carry leaves only. Default 6, every level. |
+The last column reads low to high. Values named after a template are the ones that template ships.
+
+| Key | Default | Does | What the values mean |
+| --- | --- | --- | --- |
+| `height` | 12 | Finished height in metres, to the topmost point. The skeleton grows first, then scales to land on this, so it sizes the tree and not the trunk. | `2.2` shrub · `12` default · `16` birch · `18` oak and poplar |
+| `trunkRadius` | 0.32 | Radius at the ground, in metres. `height` never scales it, so a slender tree and a stout one of the same height differ only here. | `0.07` shrub · `0.16` birch, a whip at 16m · `0.62` oak, stout at 18m. The oak is `height / 29`, the birch `height / 100` |
+| `trunkTaper` | 0.22 | Trunk radius at the top as a fraction of the base. Branches always taper to 0.28 of their own base, which this does not touch. | `0.22` birch and poplar, down to a thin leader · `0.42` oak, carries weight high · `0.9` a near-parallel pole. Within 0..1 |
+| `splits` | 3 | Children grown at each fork. The largest lever on triangle count and build time. | `2` birch, a Y at every node · `3` default · `6` oak · `8` poplar, a full whorl. Branch count is `splits ^ branchLevels`, so the birch has 64 tips and the oak 1,296. Within 1..12, capped at 4096 branches |
+| `splitAngle` | 38 | Degrees a child turns away from its parent. | `30` birch, narrow and upright · `38` oak · `55` shrub · `72` poplar, almost square to its parent. The trunk's first child uses a quarter of this, so the trunk carries on past its fork |
+| `splitVariance` | 12 | Degrees of randomness added to each split angle, plus or minus. | `0` every fork identical and machine-made · `12` every template · `25` loose and wild |
+| `splitSpread` | 0.35 | How far back from the parent's tip its children attach, as a fraction of the parent's length. | `0` every child at the tip, an umbrella · `0.35` oak, children near the ends · `0.8` birch, down most of the branch · `0.95` shrub, the whole length. High values carry foliage close to the ground |
+| `branchLevels` | 4 | Generations grown below the trunk. Each one multiplies branch count by `splits`. | `3` shrub and poplar · `4` oak · `6` birch. Cheap at `splits` 2, ruinous at `splits` 8. Within 0..6 |
+| `lengthRatio` | 0.62 | Child length as a fraction of its parent's. | `0.45` poplar, children far shorter, a tight dense crown · `0.62` oak · `0.72` shrub, open and sprawling · `0.85` children rival their parent and the shape falls apart |
+| `radiusRatio` | 0.6 | Child radius as a fraction of the parent's radius where it attaches. | `0.4` whippy twigs off a heavy limb · `0.6` every template · `0.85` limbs nearly as thick as what carries them |
+| `curve` | 14 | Total degrees a branch bends over its length. The axis is fixed per branch, so it reads as a bend and not a wobble. | `0` dead straight sticks · `8` poplar, barely bent · `14` oak and birch · `40` strongly arced. Past about 20 raise `segments` too, or the curve shows its corners |
+| `droop` | 16 | Degrees the deepest branches turn toward the ground over their own length. Scaled by depth, so limbs hold their line and twigs hang. | `-30` birch, pulled hard back upright · `-20` shrub · `0` straight out · `16` oak · `22` poplar · `45` weeping. **Negative is the only way to stop a deep tree fanning into a disc** |
+| `segments` | 5 | Rings along a branch's centre line, which sets how smoothly it can curve. | `2` the floor, visible corners · `5` every template · `10` for a high `curve`. The trunk gets `segments + 2`, level 1 gets `segments`, each level below loses one. Within 2..32 |
+| `radialSegments` | 8 | Sides of the tube around a branch, which sets how round it looks against the sky. | `4` a LOD tier, faceted up close · `8` every template, round at any real distance · `16` a hero asset. Each level down uses one fewer, floor of 3. It adds sides to every branch at once, so cutting it saves less than it looks. Within 3..24 |
+| `barkLevels` | 6 | Deepest generation that gets a bark tube. Branches past it carry leaf cards and no geometry. | `1` the oak's LOD tier, 236 bark triangles · `6` the default, every level, 29,476 on the oak. Twigs are most of the bark, so this is the strongest triangle lever a tier has. Within 0..6 |
+| `bendCurve` | 1.6 | Exponent shaping the wind bend written into `COLOR_0.r`. See [Wind](#wind). | `1` sways evenly along its whole length · `1.6` every template · `3` base locked rigid, motion only in the tips |
 
 **The foliage**
 
-| Key                  | Does                                                                         |
-| -------------------- | ---------------------------------------------------------------------------- |
-| `leafLevels`      | How many of the deepest generations carry leaves. 1 is tips only, which goes bare on any tree with few tips. |
-| `leavesPerBranch`| Cards on each leaf-bearing branch.                                           |
-| `leafSize`        | Card height in metres. Absolute, so it has to come down with a small tree.   |
-| `leafScale`       | Card size multiplier that leaves the texture fit alone. 1 for the model; a LOD tier trades cards for size with it. |
-| `leafAspect`      | Card width over card height.                                                 |
-| `leafDroop`       | Degrees a card hangs below its branch direction.                             |
-| `leafFrom`        | Fraction along a branch that leaves start at.                                |
-| `leafNormalMode` | `canopy` shades the crown as a rounded mass — outward from the crown's centre with the vertical lifted, so the underside faces out rather than down. `card` uses the true card normal, `up` faces every card at the sky. One normal per card in every mode. |
-| `leafAlphaCutoff`| glTF `alphaCutoff` on the leaf material.                                     |
+Leaves are flat rectangles, two triangles each, with a leaf shape cut out by the alpha test. One card
+stands in for a sprig, never for a single leaf.
+
+| Key | Default | Does | What the values mean |
+| --- | --- | --- | --- |
+| `leafLevels` | 2 | How many generations carry cards, counted **inward from the outermost**, never out from the trunk. | `1` oak, the tips alone · `2` poplar · `3` birch and shrub. What it buys depends on `splits`. The oak's tips are 83% of its branches, so 1 to 2 adds only 17% more cards and mostly pulls foliage back along the limbs. The birch has 64 tips and cannot fill a crown from them, so 1 to 3 takes it from 768 leaf triangles to 1,344. Within 1 to `branchLevels + 1`, where the top hangs leaves off the trunk |
+| `leavesPerBranch` | 18 | Cards spaced evenly along each leaf-bearing branch, from `leafFrom` to the tip. | `1` the oak's LOD tier · `4` oak and poplar · `6` birch · `10` shrub · `18` default. Total cards is this times the leaf-bearing branches, at two triangles each. A tier cuts it and raises `leafScale` to hold the crown's density |
+| `leafSize` | 1 | Height of one card in metres, before `leafScale`. It also decides how many authored leaves fit a cell, see [What one division decides](#what-one-division-decides). | `0.3` shrub at 2.2m tall · `1` every tree at 16m and up. Absolute, so a small tree needs it brought down or its leaves swallow it |
+| `leafScale` | 1 | Multiplies card size and leaves the texture fit alone. | `1` every model · `2` the oak's LOD tier, paired with `leavesPerBranch` 1. That pair trades 4 small cards for 1 large one at about the same coverage |
+| `leafAspect` | 0.85 | Card width as a fraction of its height. The image cell is always square, so this squashes it. | `0.85` every template, narrowing the painted sprig by 15% so a cluster reads upright · `1` the art undistorted · `1.4` a wide frond |
+| `leafDroop` | 55 | Degrees a card hangs below its branch direction, plus or minus 10 of randomness. | `0` laid flat along the branch · `55` oak, birch and shrub · `80` poplar, hanging steeply · `90` straight down |
+| `leafFrom` | 0.15 | Fraction along a branch where the cards start. They fill from there to the tip. | `0.1` poplar, leaves almost back to the fork · `0.15` birch and shrub · `0.45` oak, inner limbs left bare and visible through the canopy |
+| `leafNormalMode` | `canopy` | Which way cards face for lighting. One normal per card in every mode. | `canopy` shades the crown as a rounded mass, pointing out from its centre with the vertical lifted, so the underside faces outward and not down · `card` uses the card's true normal, which makes the crown read as a pile of flat walls · `up` faces every card at the sky |
+| `leafAlphaCutoff` | 0.45 | Alpha below which a leaf pixel is thrown away. | `0.2` keeps the soft edge and shows more of the rectangle behind it · `0.45` every template · `0.7` bites into the leaf shape and thins the canopy |
 
 **The images**
 
-| Key            | Does                                                                              |
-| -------------- | --------------------------------------------------------------------------------- |
-| `bark`         | Folders under `sources/bark/` the bark is assembled from. Empty generates it. See [Authored bark](#authored-bark). |
-| `leaves`       | Folders under `sources/leaves/` whose stamps fill the leaf image. Empty generates it. See [Authored leaves](#authored-leaves). |
-| `barkProfile`  | Which layer stack a *generated* bark is built from. See [Bark profiles](#bark-profiles). |
-| `textureSize`  | Edge of each square image. Power of two, at least 128.                            |
+| Key | Default | Does | What the values mean |
+| --- | --- | --- | --- |
+| `bark` | `[]` | Folders under `sources/bark/` the bark image is assembled from. See [Authored bark](#authored-bark). | `[]` generates the bark instead · `["oak"]` builds it from that folder. A folder that is listed and missing stops the run rather than falling back |
+| `leaves` | `[]` | Folders under `sources/leaves/` whose stamps fill the leaf image. See [Authored leaves](#authored-leaves). | Same rule. `[]` generates them, a named folder is an error when it is absent |
+| `barkProfile` | `oak` | Which layer stack a *generated* bark is built from. Ignored once `bark` names a source. See [Bark profiles](#bark-profiles). | `oak` deep fissures and flat crusty plates, for oak, ash and elm · `smooth` barely parted plates and almost no crust |
+| `textureSize` | 1024 | Edge of each square map, in pixels. A power of two, at least 128. | `128` tests only, a cell holds 32 texels · `512` the floor for anything shipping · `1024` every template |
+
+**The files and the emitted layer**
+
+These name the outputs, or are copied into the printed `ScatterLayers.ts` row without touching the mesh.
+
+| Key | Default | Does | What the values mean |
+| --- | --- | --- | --- |
+| `name` | required | The variant. Names the `.glb`, the preview and the geometry id. | `oak-01`, `oak-02` for two cuts of one species |
+| `textureSet` | `name` | The texture family. Names the images and the folder every output lands in. | Give `oak-01`, `oak-02` and `oak-03` the set `oak` and the species costs two fetches however many variants exist. See [Sharing one texture set](#sharing-one-texture-set-across-a-family) |
+| `seed` | rolled per run | Seeds every random choice. Absent, the CLI rolls one and the tree is new each run. | Omit it while cutting variants, then copy the rolled number out of the sidecar to keep one · set it to hold a tree still, as every template does. The same seed and keys always give a byte-identical file. Under `--watch` a rolled seed is held for the session, or every save would reshape the tree under the key being tuned |
+| `out` | `assets/shared/nature/trees` | Directory the set's folder is written under. | |
+| `assetsRoot` | `assets/shared` | Root the printed template urls are made relative to. | |
+| `preview` | 0 | Edge of each shaded preview panel, in pixels. | `0` writes none · `1024` a quick check · `2056` every template. It costs a second or two, so drop it when cutting a family. With `lods` set it also writes the comparison strip, which is this wide per panel |
+| `skipTextures` | `false` | Reuse the set's existing images instead of writing them. | `false` writes the set · `true` takes a variant to about a tenth of a second. The set has to exist already |
+| `writeTemplates` | `false` | Patch `geometries.json` and `materials.json` in place instead of only printing them. | |
+| `templatesDir` | `templates` | Where those two files live. The engine's `templates/` at the repo root, not this tool's. | |
+| `cullDistance` | 160 | Metres past which the layer draws nothing. | `90` shrub · `160` default · `800` oak and poplar. The impostor takes over at 60% of it, `480` on the oak, and every `lods` distance has to stay below that |
+| `footprint` | 0 | Metres of clearance the placer keeps around a tree. | `0` derives it from the canopy spread, which is what you want unless two species have to interleave |
+| `scaleMin`, `scaleMax` | 0.8, 1.25 | Bounds of the random per-instance scale. | `0.8` and `1.25` every template, a forest of mixed ages off one model · `1` and `1` identical copies |
+| `windAmplitude` | 0.4 | How far the tree sways, copied into the layer's `ScatterWind`. | `0` still · `0.4` every template |
+| `windFrequency` | 0.45 | How fast it sways. | `0.45` every template. Higher reads as a lighter, faster wind |
+| `windFlutter` | 0.35 | High-frequency motion on the leaf cards only, on top of the sway. | `0` the crown moves as one mass · `0.35` every template |
 
 **The LOD chain**
 
@@ -172,6 +207,17 @@ are — the oak's twigs are three quarters of it — so `barkLevels` is the leve
 takes the oak from 39,844 triangles to 2,828, and it reads well enough from 60m that the shipped
 trees carry no tier between. A handover is visible up close whatever the tier; the cross-fade is a
 separate piece of engine work, and a middle tier only adds a second place to see it.
+
+**Judging a tier.** With `preview` set, the run writes `<name>.lods.preview.png`: the model and every
+tier side by side, labelled with their triangle counts. Every panel is fitted by one projection built
+from all of them, so the trees land on the same pixels at the same scale. A per-panel fit would
+redraw a tier that shed its outermost twigs slightly larger, and that scale change would read as the
+handover moving a silhouette which never moved.
+
+Read it for silhouette, not for detail. A tier is doing its job when the outline and the mass of the
+crown survive and only the detail goes. The oak's tier is a fair example of the trade: `leafScale` 2
+holds the crown's density on a quarter of the cards, but the larger cards spill past the model's own
+outline, so the crown reads wider at 60m than it does up close.
 
 A tier's distance has to stay below the impostor handover the layer is emitted with, at 60% of
 `cullDistance`; the engine refuses a chain that reaches past it. The tiers are written as

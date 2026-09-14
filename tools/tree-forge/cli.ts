@@ -26,6 +26,7 @@ import {
   toConfig,
   type Params,
 } from './lib/params.ts';
+import { randomSeed } from './lib/rng.ts';
 import { buildSkeleton, type Skeleton } from './lib/skeleton.ts';
 import { fitLeaves, leafGrid, loadBarkSource, loadLeafSource, type BarkSource, type LeafSource } from './lib/sources.ts';
 import {
@@ -45,7 +46,7 @@ import {
   type TextureNames,
   type TextureSetNames,
 } from './lib/textures.ts';
-import { renderPreview } from './lib/preview.ts';
+import { renderComparison, renderPreview, type Panel } from './lib/preview.ts';
 
 interface Built {
   params: Params;
@@ -59,6 +60,8 @@ interface Built {
   geometry: IGeometryTemplates;
   materials: IMaterialsTemplate;
   previewPath: string | null;
+  /** The model beside its tiers in one image. Only with `lods` and `preview`. */
+  lodPreviewPath: string | null;
   configPath: string;
   /** Exactly what was written back to the config, so the watcher can tell its
    *  own write apart from an edit that landed while it was building. */
@@ -98,11 +101,66 @@ async function writePreview(
   return path;
 }
 
-/** The file, resolved, plus its text for the watcher to compare against. */
-async function readParams(configPath: string): Promise<{ params: Params; configText: string }> {
+/** Triangles as a label reads them: `LOD1 2828 TRIS 7%`. */
+function panelLabel(name: string, mesh: TreeMesh, base: number | null): string {
+  const total = mesh.bark.triangleCount + mesh.leaves.triangleCount;
+  const share = base && base > 0 ? ` ${Math.max(1, Math.round((total / base) * 100))}%` : '';
+  return `${name} ${total} TRIS${share}`;
+}
+
+/**
+ * The model beside every tier, at one scale, so a handover can be judged.
+ *
+ * The chain is the whole point of the image, so it is only written when there
+ * is one. A single panel would be the model's own preview a second time.
+ */
+async function writeLodPreview(
+  params: Params,
+  mesh: TreeMesh,
+  lods: Built['lods'],
+  canvases: Canvases,
+  directory: string
+): Promise<string> {
+  const { default: sharp } = await import('sharp');
+  const path = join(directory, `${params.name}.lods.preview.png`);
+  const base = mesh.bark.triangleCount + mesh.leaves.triangleCount;
+
+  const panels: Panel[] = [
+    { label: panelLabel('BASE', mesh, null), mesh },
+    ...lods.map((lod, index) => ({ label: panelLabel(`LOD${index + 1}`, lod.mesh, base), mesh: lod.mesh })),
+  ];
+
+  const { data, width, height } = renderComparison(params, panels, canvases, params.preview);
+
+  await sharp(data, { raw: { width, height, channels: 3 } })
+    .png()
+    .toFile(path);
+
+  return path;
+}
+
+/**
+ * The file, resolved, plus its text for the watcher to compare against.
+ *
+ * A config with no `seed` gets a fresh one, so an unseeded run cuts a new tree
+ * every time. The build writes it into the sidecar, which is what makes a roll
+ * you liked keepable.
+ *
+ * `sessionSeed` holds that roll steady for the life of a watch. Rolling again
+ * on every save would reshape the tree under the key being tuned, and the
+ * change you were looking at would be lost in the noise. A `seed` added to the
+ * file mid-watch still wins, because this only fills an absent one.
+ */
+async function readParams(
+  configPath: string,
+  sessionSeed?: number
+): Promise<{ params: Params; configText: string; rolled: boolean }> {
   const configText = await readFile(configPath, 'utf8');
-  const file = JSON.parse(configText) as unknown;
-  return { params: resolveParams(parseConfig(file, configPath)), configText };
+  const raw = parseConfig(JSON.parse(configText) as unknown, configPath);
+  const rolled = raw.seed === undefined;
+  if (rolled) raw.seed = sessionSeed ?? randomSeed();
+
+  return { params: resolveParams(raw), configText, rolled };
 }
 
 async function main(argv: string[]): Promise<void> {
@@ -117,11 +175,11 @@ async function main(argv: string[]): Promise<void> {
     throw new Error(`Expected one tree.json and optionally --watch, got '${argv.join(' ')}'. Every other option is a key of the file.`);
 
   const [configPath] = rest;
-  const { params, configText } = await readParams(configPath);
+  const { params, configText, rolled } = await readParams(configPath);
   const built = await generate(params);
 
-  report(built);
-  if (watch) await watchConfig(configPath, built, configText);
+  report(built, rolled);
+  if (watch) await watchConfig(configPath, built, configText, rolled ? params.seed : undefined);
 }
 
 async function generate(params: Params, previous?: Built): Promise<Built> {
@@ -197,6 +255,10 @@ async function generate(params: Params, previous?: Built): Promise<Built> {
   await writeFile(configPath, configText);
 
   const previewPath = canvases && params.preview ? await writePreview(params, mesh, canvases, directory) : null;
+  const lodPreviewPath =
+    canvases && params.preview && lods.length
+      ? await writeLodPreview(params, mesh, lods, canvases, directory)
+      : null;
 
   const geometry = geometryEntry(
     params,
@@ -231,6 +293,7 @@ async function generate(params: Params, previous?: Built): Promise<Built> {
     geometry,
     materials,
     previewPath,
+    lodPreviewPath,
     configPath,
     configText,
     rebuiltTextures: !reusable && !params.skipTextures,
@@ -259,26 +322,40 @@ function describeLeaves(params: Params, source: LeafSource | null): string[] {
   return lines;
 }
 
-function report({
-  params,
-  skeleton,
-  mesh,
-  barkSource,
-  leafSource,
-  modelPath,
-  lods,
-  directory,
-  textures,
-  geometry,
-  materials,
-  previewPath,
-  configPath,
-}: Built): void {
+/** A tier's cost against the base mesh, as a percentage and a factor. */
+function share(tier: number, base: number): string {
+  if (base === 0) return 'n/a';
+  const percent = (tier / base) * 100;
+  const cost = percent < 10 ? percent.toFixed(1) : String(Math.round(percent));
+  return tier === 0 ? '0% of the base mesh' : `${cost}% of the base mesh, ${(base / tier).toFixed(1)}x lighter`;
+}
+
+function report(
+  {
+    params,
+    skeleton,
+    mesh,
+    barkSource,
+    leafSource,
+    modelPath,
+    lods,
+    directory,
+    textures,
+    geometry,
+    materials,
+    previewPath,
+    lodPreviewPath,
+    configPath,
+  }: Built,
+  rolledSeed: boolean
+): void {
   const bounds = boundsOf(mesh.bark.positions);
+  const baseTriangles = mesh.bark.triangleCount + mesh.leaves.triangleCount;
   const lines = [
     '',
-    `${params.name} — ${mesh.bark.triangleCount + mesh.leaves.triangleCount} triangles ` +
-      `(${mesh.bark.triangleCount} bark, ${mesh.leaves.triangleCount} leaf), seed ${params.seed}`,
+    `${params.name} — ${baseTriangles} triangles ` +
+      `(${mesh.bark.triangleCount} bark, ${mesh.leaves.triangleCount} leaf), ` +
+      `seed ${params.seed}${rolledSeed ? ' (rolled, and saved to the params below)' : ''}`,
     `  height ${skeleton.trunk.height.toFixed(2)}m, first fork ${skeleton.trunk.splitHeight.toFixed(2)}m, ` +
       `canopy spread ${skeleton.canopy.spread.toFixed(2)}m`,
     `  bounds x ${bounds.min[0].toFixed(2)}..${bounds.max[0].toFixed(2)}, ` +
@@ -286,11 +363,14 @@ function report({
       `z ${bounds.min[2].toFixed(2)}..${bounds.max[2].toFixed(2)}`,
     '',
     `  model    ${modelPath}`,
-    ...lods.map(
-      ({ mesh: lod, path }, index) =>
-        `  lod ${index + 1}    ${path} — ${lod.bark.triangleCount + lod.leaves.triangleCount} triangles ` +
-        `(${lod.bark.triangleCount} bark, ${lod.leaves.triangleCount} leaf) from ${params.lods[index].distance}m`
-    ),
+    ...lods.map(({ mesh: lod, path }, index) => {
+      const total = lod.bark.triangleCount + lod.leaves.triangleCount;
+      return (
+        `  lod ${index + 1}    ${path} — ${total} triangles ` +
+        `(${lod.bark.triangleCount} bark, ${lod.leaves.triangleCount} leaf) from ${params.lods[index].distance}m, ` +
+        `${share(total, baseTriangles)}`
+      );
+    }),
     `  params   ${configPath}`,
     `  bark     ${
       barkSource
@@ -304,6 +384,7 @@ function report({
           .map((file) => join(directory, file))
           .join('\n           ')}`,
     ...(previewPath ? [`  preview  ${previewPath}`] : []),
+    ...(lodPreviewPath ? [`  lods     ${lodPreviewPath} — the model and every tier at one scale`] : []),
     '',
     'Edit that file and re-run to see the change. It carries every option, preview included.',
     `  node ${shellPath(fileURLToPath(import.meta.url))} ${shellPath(configPath)}`,
@@ -352,7 +433,12 @@ const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
  * it just read would otherwise trigger itself forever. When it is a template,
  * nothing writes it and there is no loop to break.
  */
-async function watchConfig(configPath: string, first: Built, read: string): Promise<void> {
+async function watchConfig(
+  configPath: string,
+  first: Built,
+  read: string,
+  sessionSeed?: number
+): Promise<void> {
   let previous = first;
   let written = settled(configPath, first, read);
 
@@ -377,7 +463,7 @@ Watching ${shellPath(configPath)}. Save it to rebuild, ctrl-c to stop.
     const started = Date.now();
 
     try {
-      const next = await readParams(configPath);
+      const next = await readParams(configPath, sessionSeed);
       previous = await generate(next.params, previous);
       written = settled(configPath, previous, next.configText);
 

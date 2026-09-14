@@ -10,6 +10,12 @@ export function hashString(value: string): number {
   return hash >>> 0;
 }
 
+/** A fresh seed, in the range hashString returns. The one unseeded draw in the
+ *  tool: everything downstream of it is reproducible from the number it gives. */
+export function randomSeed(): number {
+  return (Math.random() * 4294967296) >>> 0;
+}
+
 /** A seeded stream, plus the two draws the generator actually makes from it. */
 export interface Rng {
   (): number;
