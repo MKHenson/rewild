@@ -163,3 +163,27 @@ export function registerScatterColliderCommands(
     console.table(stats.layers);
   };
 }
+
+// Registered with the renderer commands: wind is renderer state, so it can be
+// forced in the editor as well as the game.
+export function registerWindDebugCommands(renderer: Renderer) {
+  (window as any).setWindOverride = (strength?: number, bearingDeg = 0) => {
+    const wind = renderer.sky.skyRenderer.wind;
+    if (strength === undefined || strength === null) {
+      wind.override = null;
+      console.log(
+        `setWindOverride() — foliage follows the weather again. ` +
+          `setWindOverride(strength, bearingDeg) forces it: strength 0..1, ` +
+          `bearing in degrees the air moves toward, 0 = +x, 90 = +z.`
+      );
+      return;
+    }
+
+    wind.override = { strength, bearing: bearingDeg };
+    console.log(
+      `setWindOverride(${strength}, ${bearingDeg}) — foliage bends at ` +
+        `strength ${strength} toward bearing ${bearingDeg}° regardless of the ` +
+        `weather. setWindOverride() with no arguments releases it.`
+    );
+  };
+}

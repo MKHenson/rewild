@@ -189,8 +189,17 @@ export abstract class StandardPassBase implements IMaterialPass {
     return this._alphaMode === 'BLEND';
   }
 
+  /**
+   * Whether the vertex layout carries COLOR_0. Tinting is one reason; a
+   * subclass that reads the attribute as something else overrides this so the
+   * layout, the entry point and the compatibility check all agree.
+   */
+  protected bindsVertexColors(): boolean {
+    return this._vertexColors;
+  }
+
   isGeometryCompatible(geometry: Geometry): boolean {
-    if (this._vertexColors && !geometry.colors) return false;
+    if (this.bindsVertexColors() && !geometry.colors) return false;
     if (this._vertexTangents && !geometry.tangents) return false;
     return !!(geometry.vertices && geometry.uvs && geometry.normals);
   }
@@ -216,7 +225,7 @@ export abstract class StandardPassBase implements IMaterialPass {
       },
     ];
 
-    if (this._vertexColors) {
+    if (this.bindsVertexColors()) {
       buffers.push({
         arrayStride: 4 * 4,
         attributes: [{ shaderLocation: 3, offset: 0, format: 'float32x4' }],
@@ -246,7 +255,8 @@ export abstract class StandardPassBase implements IMaterialPass {
     pass.setVertexBuffer(2, geometry.normalBuffer);
 
     let slot = 3;
-    if (this._vertexColors) pass.setVertexBuffer(slot++, geometry.colorBuffer);
+    if (this.bindsVertexColors())
+      pass.setVertexBuffer(slot++, geometry.colorBuffer);
     if (this._vertexTangents)
       pass.setVertexBuffer(slot++, geometry.tangentBuffer);
 
@@ -272,7 +282,7 @@ export abstract class StandardPassBase implements IMaterialPass {
    * over one shared body rather than flags read at runtime.
    */
   protected vertexEntryPoint(): string {
-    if (this._vertexColors)
+    if (this.bindsVertexColors())
       return this._vertexTangents ? 'vsVertexColorsTangents' : 'vsVertexColors';
     return this._vertexTangents ? 'vsTangents' : 'vs';
   }

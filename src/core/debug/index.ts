@@ -7,7 +7,10 @@ import { registerSkyDebugCommands } from './SkyDebugCommands';
 import { registerPbrHarnessCommands } from './PbrHarnessCommands';
 import { registerTerrainPerfCommands } from './TerrainPerfCommands';
 import { registerGltfImportCommands } from './GltfImportCommands';
-import { registerScatterDebugCommands } from './ScatterDebugCommands';
+import {
+  registerScatterDebugCommands,
+  registerWindDebugCommands,
+} from './ScatterDebugCommands';
 
 // One-stop registration for the window console commands, called wherever a
 // renderer is bound to a loaded project (editor sync + game load). Commands
@@ -21,5 +24,6 @@ export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerPbrHarnessCommands(renderer);
   registerGltfImportCommands(renderer);
   registerScatterDebugCommands(renderer);
+  registerWindDebugCommands(renderer);
   registerChunkSnapshotDevCommands(renderer, project);
 }

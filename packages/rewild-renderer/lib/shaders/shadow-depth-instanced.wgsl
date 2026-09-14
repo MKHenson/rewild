@@ -30,7 +30,14 @@ struct Uniforms {
   // x = metres at which this LOD tier takes over, y = metres at which it hands
   // over, z = 1 for a cutout material, 0 for one that casts whole.
   range : vec4f,
+  // The same wind the scene pass displaces by — see scatter-wind.wgsl — so
+  // the shadow sways with the leaves rather than staying rigid under them.
+  wind : vec4f,
+  windParams : vec4f,
+  windOrigin : vec4f,
 }
+
+#include "./shader-lib/scatter-wind.wgsl"
 
 struct ScatterInstance {
   posScale : vec4f,
@@ -68,20 +75,33 @@ fn rotateByQuat(q: vec4f, v: vec3f) -> vec3f {
   return v + q.w * t + cross(q.xyz, t);
 }
 
-@vertex
-fn vs(
-  @location(0) position : vec3f,
-  @location(1) uv : vec2f,
-  @builtin(instance_index) instanceIndex : u32
+fn transformVertex(
+  instanceIndex : u32,
+  position : vec3f,
+  uv : vec2f,
+  weights : vec4f,
+  windy : bool
 ) -> VertexOutput {
   var output : VertexOutput;
   output.uv = uv;
   let instance = instances[instanceIndex];
 
   let nodePosition = (uniforms.nodeMatrix * vec4f(position, 1.0)).xyz;
-  let chunkPosition =
+  var chunkPosition =
     instance.posScale.xyz +
     rotateByQuat(instance.rotation, nodePosition * instance.posScale.w);
+
+  if (windy) {
+    chunkPosition += scatterWindOffset(
+      uniforms.wind,
+      uniforms.windParams,
+      uniforms.windOrigin.xy,
+      weights,
+      instance.params.x,
+      instance.posScale.w,
+      chunkPosition
+    );
+  }
 
   // The same viewer-distance band the scene pass applies, so the caster set and
   // the drawn set are one set, tier for tier. Skipping it would shadow the
@@ -96,6 +116,27 @@ fn vs(
   output.Position = uniforms.shadowMVP * vec4f(chunkPosition, 1.0);
   output.local = chunkPosition;
   return output;
+}
+
+@vertex
+fn vs(
+  @location(0) position : vec3f,
+  @location(1) uv : vec2f,
+  @builtin(instance_index) instanceIndex : u32
+) -> VertexOutput {
+  return transformVertex(instanceIndex, position, uv, vec4f(0.0), false);
+}
+
+// The wind variant, for a pipeline that also binds COLOR_0. A separate entry
+// point because a pipeline may only declare the attributes its buffers supply.
+@vertex
+fn vsWind(
+  @location(0) position : vec3f,
+  @location(1) uv : vec2f,
+  @location(2) weights : vec4f,
+  @builtin(instance_index) instanceIndex : u32
+) -> VertexOutput {
+  return transformVertex(instanceIndex, position, uv, weights, true);
 }
 
 @fragment

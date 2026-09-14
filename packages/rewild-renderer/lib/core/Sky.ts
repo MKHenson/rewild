@@ -14,8 +14,16 @@ export class Sky {
     this.skyRenderer = new SkyRenderer(this.transform);
   }
 
+  // Runs at the top of the frame, before the shadow and scene passes read the
+  // wind; the sky itself renders as a fullscreen quad and needs nothing here.
   update(renderer: Renderer, camera: Camera) {
-    // No longer needs to follow camera — sky is rendered as a fullscreen quad
+    const sky = this.skyRenderer;
+    sky.wind.update(
+      sky.windDirection.x,
+      sky.windDirection.y,
+      sky.windiness,
+      renderer.delta / 1000
+    );
   }
 
   dispose() {

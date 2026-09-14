@@ -21,6 +21,10 @@ const HAS_PARALLAX: bool = ${ HAS_PARALLAX };
 const HAS_AUTHORED_NORMALS: bool = ${ HAS_AUTHORED_NORMALS };
 const HAS_FACE_NORMAL_SPECULAR: bool = ${ HAS_FACE_NORMAL_SPECULAR };
 const HAS_SPECULAR_OCCLUSION: bool = ${ HAS_SPECULAR_OCCLUSION };
+// The wind variant: COLOR_0 is a bend weight rather than a tint, and the vertex
+// is displaced by it before projection. Set for a layer with a wind block whose
+// model carries COLOR_0.
+const HAS_WIND: bool = ${ HAS_WIND };
 
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/brdf.wgsl"
@@ -35,6 +39,7 @@ const HAS_SPECULAR_OCCLUSION: bool = ${ HAS_SPECULAR_OCCLUSION };
 #include "./shader-lib/directional-shadow.wgsl"
 #include "./shader-lib/spot-light-shadow.wgsl"
 #include "./shader-lib/lod-fade.wgsl"
+#include "./shader-lib/scatter-wind.wgsl"
 
 struct Uniforms {
   projMatrix : mat4x4f,
@@ -48,6 +53,13 @@ struct Uniforms {
   // x = the tier index, y = 1 to tint by tier for the LOD debug view, z = the
   // reciprocal of the camera exposure, so the tint lands in scene units.
   debug : vec4f,
+  // The weather: xy = world-space direction the air moves, z = strength,
+  // w = seconds. See scatter-wind.wgsl.
+  wind : vec4f,
+  // The layer's wind block: x = amplitude, y = frequency, z = flutter.
+  windParams : vec4f,
+  // xy = the chunk's world origin, so the wind field is read in world space.
+  windOrigin : vec4f,
 }
 
 // One distinct colour per LOD tier for the debug tint, the far tiers warmest.
@@ -62,8 +74,8 @@ const TIER_TINTS = array<vec3f, 4>(
 // discarded — z > w is behind the far plane.
 const CULLED_POSITION = vec4f(0.0, 0.0, 2.0, 1.0);
 
-// 48 bytes: two vec4s plus a params slot the wind variant (#229) reads its
-// phase out of.
+// 48 bytes: two vec4s plus a params slot the wind variant reads its phase out
+// of.
 struct ScatterInstance {
   // xyz chunk-local position, w uniform scale.
   posScale : vec4f,
@@ -171,9 +183,24 @@ fn transformVertex(
   );
 
   let nodePosition = (uniforms.nodeMatrix * vec4f(position, 1.0)).xyz;
-  let chunkPosition =
+  var chunkPosition =
     instance.posScale.xyz +
     rotateByQuat(instance.rotation, nodePosition * instance.posScale.w);
+
+  // After the instance transform, so the wind blows in world space whatever
+  // way the plant faces. Chunk transforms only translate, so chunk space and
+  // world space agree on direction.
+  if (HAS_WIND) {
+    chunkPosition += scatterWindOffset(
+      uniforms.wind,
+      uniforms.windParams,
+      uniforms.windOrigin.xy,
+      color,
+      instance.params.x,
+      instance.posScale.w,
+      chunkPosition
+    );
+  }
 
   let mvPosition = uniforms.modelViewMatrix * vec4f(chunkPosition, 1.0);
 
@@ -197,7 +224,9 @@ fn transformVertex(
   output.Position = uniforms.projMatrix * mvPosition;
   output.viewPosition = mvPosition.xyz;
   output.fragUV = uv;
-  output.color = color;
+  // COLOR_0 is a bend weight or a tint, never both: under wind it has been
+  // spent on the displacement and the surface shades untinted.
+  output.color = select(color, vec4f(1.0), HAS_WIND);
   output.fade = lodFadeWeights(viewDistance, uniforms.band);
 
   // The instance scale is uniform and the model-view is rigid, so both drop out
