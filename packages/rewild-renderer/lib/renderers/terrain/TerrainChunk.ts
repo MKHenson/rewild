@@ -19,6 +19,7 @@ import {
   getScatterGenerationDistance,
   scatterMaskChannels,
 } from './ScatterLayers';
+import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
 import { TextureProperties } from '../../textures/Texture';
 
 const temp: Vector3 = new Vector3();
@@ -75,9 +76,9 @@ export class TerrainChunk implements IComponent {
   // request for it is already out. Together they stop every LOD of a new chunk
   // paying for the same placement.
   scatterVersion = -1;
-  // scatterMaskVersion the resident scatter was placed against, so a density
-  // stroke makes the instances stale exactly as a sculpt does.
-  private scatterMaskBuilt = -1;
+  // scatterInputVersion the resident scatter was placed against, so a density
+  // stroke or a pluck makes the instances stale exactly as a sculpt does.
+  private scatterInputBuilt = -1;
   private scatterRequested = false;
   // Latches once the chunk comes within range of any layer. Separate from the
   // distance itself because a chunk meshes at the LOD threshold it crosses —
@@ -127,9 +128,12 @@ export class TerrainChunk implements IComponent {
   // painted here. Feeds placement only — density says how much grows, sculpt
   // says what shape the ground is (see scatterChunk).
   scatterMask: PaintMask | null = null;
-  // Bumped on every density edit. Unlike maskVersion this makes the *instances*
-  // stale, not the splat — scatter is the only thing the density mask feeds.
-  scatterMaskVersion = 0;
+  // The instances plucked here, or null when nothing has been. Sparse and
+  // usually absent; see ScatterKillSet.
+  scatterKills: ScatterKillSet | null = null;
+  // Bumped whenever an input to placement changes — a density stroke or a
+  // pluck. Unlike maskVersion this makes the *instances* stale, not the splat.
+  scatterInputVersion = 0;
   // Cached snapshot lookup — one OPFS read per chunk, shared by all LODs.
   private snapshotLookup: Promise<Float32Array | null> | null = null;
   // Cached mask lookup, same one-read-per-chunk contract as the snapshot.
@@ -140,6 +144,9 @@ export class TerrainChunk implements IComponent {
   // The scatter density mask's lookup and resolved flag, same contract again.
   private scatterMaskLookup: Promise<PaintMask | null> | null = null;
   private scatterMaskResolved = false;
+  // The kill set's lookup and resolved flag, same contract again.
+  private scatterKillsLookup: Promise<ScatterKillSet | null> | null = null;
+  private scatterKillsResolved = false;
 
   constructor(
     coord: Vector2,
@@ -388,12 +395,56 @@ export class TerrainChunk implements IComponent {
   setScatterMask(mask: PaintMask) {
     this.scatterMask = mask;
     this.scatterMaskLookup = Promise.resolve(mask);
-    this.scatterMaskVersion++;
+    this.scatterInputVersion++;
   }
 
-  // Marks the instances stale after the density mask was mutated in place.
-  bumpScatterMaskVersion() {
-    this.scatterMaskVersion++;
+  // Marks the instances stale after a placement input was mutated in place —
+  // the density mask, or the kill set.
+  bumpScatterInputVersion() {
+    this.scatterInputVersion++;
+  }
+
+  /**
+   * Resolves this chunk's saved kill set, or null when nothing has been plucked
+   * here. Same one-lookup-per-chunk contract as resolveScatterMask.
+   */
+  resolveScatterKills(
+    provider: ScatterKillSetProvider | null
+  ): Promise<ScatterKillSet | null> {
+    if (this.scatterKills) return Promise.resolve(this.scatterKills);
+    if (!provider) {
+      this.scatterKillsResolved = true;
+      return Promise.resolve(null);
+    }
+    if (!this.scatterKillsLookup) {
+      this.scatterKillsLookup = provider(this.coord.x, this.coord.y).then(
+        (kills) => {
+          this.scatterKillsResolved = true;
+          if (!kills) return null;
+          this.scatterKills = kills;
+          return kills;
+        },
+        (err) => {
+          this.scatterKillsResolved = true;
+          console.warn(`Chunk ${this.id} scatter kill set read failed:`, err);
+          return null;
+        }
+      );
+    }
+    return this.scatterKillsLookup;
+  }
+
+  /**
+   * The kill set a pluck should add to, creating an empty one the first time
+   * something is removed here. Null while the saved lookup is still in flight —
+   * creating one then would drop saved kills the moment the read landed, the
+   * same rule editableScatterMask follows.
+   */
+  editableScatterKills(): ScatterKillSet | null {
+    if (this.scatterKills) return this.scatterKills;
+    if (!this.scatterKillsResolved) return null;
+    this.scatterKills = new Set<number>();
+    return this.scatterKills;
   }
 
   // Adopts a worker-built splat map for the heights at `version`. Creates the
@@ -530,7 +581,7 @@ export class TerrainChunk implements IComponent {
     if (!this.scatterWanted || this.scatterRequested) return false;
     return (
       this.scatterVersion !== version ||
-      this.scatterMaskBuilt !== this.scatterMaskVersion
+      this.scatterInputBuilt !== this.scatterInputVersion
     );
   }
 
@@ -546,7 +597,7 @@ export class TerrainChunk implements IComponent {
     terrainRenderer: TerrainRenderer,
     instances: ScatterInstances[],
     version: number,
-    maskVersion: number
+    inputVersion: number
   ) {
     this.scatterRequested = false;
     if (this.disposed) return;
@@ -563,7 +614,7 @@ export class TerrainChunk implements IComponent {
       terrainRenderer.scatterLodBias
     );
     this.scatterVersion = version;
-    this.scatterMaskBuilt = maskVersion;
+    this.scatterInputBuilt = inputVersion;
   }
 
   refreshMeshes(renderer: Renderer) {
@@ -601,7 +652,7 @@ export class TerrainChunk implements IComponent {
     this.scatter?.dispose();
     this.scatter = null;
     this.scatterVersion = -1;
-    this.scatterMaskBuilt = -1;
+    this.scatterInputBuilt = -1;
   }
 
   updateTerrainChunk(

@@ -1,4 +1,5 @@
 import type { PaintMask } from './PaintMask';
+import type { ScatterKillSet } from './ScatterKillSet';
 import type { ScatterInstances } from './Scatter';
 
 interface TerrainWorkerRequest {
@@ -28,6 +29,9 @@ interface TerrainWorkerRequest {
   // The chunk's painted scatter density mask. Structured-cloned on the same
   // terms as biomeMask.
   scatterMask?: PaintMask;
+  // Instances plucked here. A Set survives structured cloning, so it crosses
+  // as the membership test placement wants rather than a list to rebuild.
+  scatterKills?: ScatterKillSet;
 }
 
 export interface TerrainWorkerResponse {

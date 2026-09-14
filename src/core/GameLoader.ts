@@ -12,6 +12,7 @@ import { GameManager } from './GameManager';
 import { createChunkSnapshotProvider } from '../database/chunk-snapshots';
 import { createBiomeMaskProvider } from '../database/biome-masks';
 import { createScatterMaskProvider } from '../database/scatter-masks';
+import { createScatterKillProvider } from '../database/scatter-kills';
 import { registerDebugCommands } from './debug';
 
 /** Loads game files and assets and sends the created objects to wasm */
@@ -68,6 +69,9 @@ export async function loadInitialLevels(
     : null;
   renderer.terrainRenderer.scatterMaskProvider = level?.id
     ? createScatterMaskProvider(level.id)
+    : null;
+  renderer.terrainRenderer.scatterKillProvider = level?.id
+    ? createScatterKillProvider(level.id)
     : null;
 
   const levelRouter = new InGameLevel(

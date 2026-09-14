@@ -15,6 +15,8 @@ import { TerrainWorkerPool } from './TerrainWorkerPool';
 import { DEFAULT_CLIMATE_PRESET, resolveClimatePreset } from './Biomes';
 import { ChunkSnapshotProvider } from './ChunkSnapshot';
 import { PaintMaskProvider } from './PaintMask';
+import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
+import { ScatterPick, pickScatterInstance } from './Scatter';
 import { generateSplatMap } from './Splat';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { ScatterModels } from './ScatterModels';
@@ -120,6 +122,8 @@ export class TerrainRenderer {
   biomeMaskProvider: PaintMaskProvider | null = null;
   // Saved scatter density masks, looked up per chunk on first placement.
   scatterMaskProvider: PaintMaskProvider | null = null;
+  // Saved kill sets, looked up alongside the density mask.
+  scatterKillProvider: ScatterKillSetProvider | null = null;
   private _enabled: boolean = true;
 
   constructor() {
@@ -616,9 +620,107 @@ export class TerrainRenderer {
   refreshChunkScatter(cx: number, cy: number): boolean {
     const chunk = this.terrainChunks.get(`${cx},${cy}`);
     if (!chunk) return false;
-    chunk.bumpScatterMaskVersion();
+    chunk.bumpScatterInputVersion();
     this._needsVisibilityUpdate = true;
     return true;
+  }
+
+  /**
+   * The scatter instance nearest a world-space point, within `radius` metres
+   * horizontally, or null when there is none.
+   *
+   * Re-derives the few cells around the point rather than searching what is
+   * drawn — see pickScatterInstance. Chunks whose heights are not in memory yet
+   * are skipped: placement reads those heights, so there is nothing to pick
+   * against until they land.
+   *
+   * `includeKilled` ignores the kill sets, so the pick can find an instance
+   * that has been plucked — which is how a restore names the key to take back
+   * out, since a removed instance is not drawn and has nothing else to point at.
+   */
+  pickScatter(
+    x: number,
+    z: number,
+    radius: number,
+    includeKilled = false
+  ): { cx: number; cy: number; pick: ScatterPick } | null {
+    const span = this.chunkSize;
+    const half = span / 2;
+    const cxMin = Math.ceil((x - radius - half) / span);
+    const cxMax = Math.floor((x + radius + half) / span);
+    const cyMin = Math.ceil((z - radius - half) / span);
+    const cyMax = Math.floor((z + radius + half) / span);
+
+    let best: { cx: number; cy: number; pick: ScatterPick } | null = null;
+
+    for (let cy = cyMin; cy <= cyMax; cy++) {
+      for (let cx = cxMin; cx <= cxMax; cx++) {
+        const chunk = this.terrainChunks.get(`${cx},${cy}`);
+        if (!chunk?.heights) continue;
+
+        const pick = pickScatterInstance(
+          this.mapChunkSizeLod,
+          chunk.seed,
+          chunk.noiseOffset,
+          resolveClimatePreset(chunk.climatePreset),
+          chunk.heights,
+          x - cx * span,
+          z - cy * span,
+          radius,
+          {
+            biomeMask: chunk.biomeMask,
+            scatterMask: chunk.scatterMask,
+            killSet: includeKilled ? null : chunk.scatterKills,
+          }
+        );
+
+        if (pick && (!best || pick.distance < best.pick.distance))
+          best = { cx, cy, pick };
+      }
+    }
+
+    return best;
+  }
+
+  /**
+   * Plucks one instance: adds its key to the chunk's kill set and marks the
+   * chunk's instances stale so the next visibility update re-places without it.
+   *
+   * Returns the chunk's kill set so the caller can persist it, or null when the
+   * chunk isn't loaded or its saved set is still being read — a pluck then does
+   * nothing rather than starting a fresh set that the read would overwrite.
+   */
+  pluckScatter(cx: number, cy: number, key: number): ScatterKillSet | null {
+    const chunk = this.terrainChunks.get(`${cx},${cy}`);
+    if (!chunk) return null;
+
+    const kills = chunk.editableScatterKills();
+    if (!kills) {
+      // Warm the lookup so the next click lands.
+      chunk.resolveScatterKills(this.scatterKillProvider);
+      return null;
+    }
+
+    kills.add(key);
+    chunk.bumpScatterInputVersion();
+    this._needsVisibilityUpdate = true;
+    return kills;
+  }
+
+  /**
+   * Puts a plucked instance back. Returns the chunk's kill set so the caller can
+   * persist it, or null when there was nothing to undo — the chunk isn't
+   * loaded, its saved set is still being read, or that instance was never
+   * plucked.
+   */
+  restoreScatter(cx: number, cy: number, key: number): ScatterKillSet | null {
+    const chunk = this.terrainChunks.get(`${cx},${cy}`);
+    const kills = chunk?.scatterKills;
+    if (!chunk || !kills || !kills.delete(key)) return null;
+
+    chunk.bumpScatterInputVersion();
+    this._needsVisibilityUpdate = true;
+    return kills;
   }
 
   /**

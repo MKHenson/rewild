@@ -8,21 +8,34 @@ interface Props {
   value?: string;
   options: OptionType[];
   onChange?: (value: string) => void;
+  disabled?: boolean;
 }
 
 @register('x-select')
 export class Select extends Component<Props> {
+  private applyValue?: (value: string | undefined) => void;
+  private applyDisabled?: (disabled: boolean) => void;
+
   get value(): string | undefined {
     return this._props?.value;
   }
 
-  /** Mirrors Slider's accessor, for panels that build their DOM once and mutate
-   *  it — returning a fresh tree instead would swap this element out and take
-   *  an open dropdown with it. */
+  /** For panels that build their DOM once and mutate it. Before init() there
+   *  is nothing to paint, but props feed the first render. */
   set value(value: string | undefined) {
     if (!this._props || this._props.value === value) return;
     this._props.value = value;
-    this.render?.();
+    this.applyValue?.(value);
+  }
+
+  get disabled(): boolean {
+    return this._props?.disabled === true;
+  }
+
+  set disabled(value: boolean) {
+    if (!this._props || (this._props.disabled === true) === value) return;
+    this._props.disabled = value;
+    this.applyDisabled?.(value);
   }
 
   init() {
@@ -69,6 +82,7 @@ export class Select extends Component<Props> {
     };
 
     const handleShowOptions = () => {
+      if (this.props.disabled) return;
       setShowDropDown(!showDropDown(), false);
 
       if (showDropDown()) {
@@ -128,21 +142,40 @@ export class Select extends Component<Props> {
       cleanup();
     };
 
+    // Built once. render() and the public setters all paint onto these rather
+    // than returning a fresh tree, so a value or disabled change never swaps
+    // the trigger out from under the pointer.
+    const valueLabel = (<div class="value" />) as HTMLDivElement;
+    const trigger = (
+      <div class="select" onmouseup={handleShowOptions}>
+        {valueLabel}
+        <Icon icon="chevron-down" size="s" />
+      </div>
+    ) as HTMLDivElement;
+
+    this.applyValue = (value: string | undefined) => {
+      valueLabel.textContent =
+        this.props.options.find((o) => o.value === value)?.label ?? '';
+    };
+
+    this.applyDisabled = (disabled: boolean) => {
+      trigger.classList.toggle('disabled', disabled);
+      trigger.setAttribute('aria-disabled', disabled.toString());
+      // Disabling while open closes the list: a dropdown the control no longer
+      // answers to must not be left hanging over the page.
+      if (disabled && showDropDown()) {
+        setShowDropDown(false, false);
+        cleanup();
+        hideOptions();
+      }
+    };
+
     return () => {
+      this.applyValue!(this.props.value);
+      this.applyDisabled!(this.props.disabled === true);
       if (!showDropDown()) hideOptions();
       else positionOptions();
-
-      return (
-        <div class="select" onmouseup={handleShowOptions}>
-          <div class="value">
-            {
-              this.props.options.find((o) => o.value === this.props.value)
-                ?.label
-            }
-          </div>
-          <Icon icon="chevron-down" size="s" />
-        </div>
-      );
+      return trigger;
     };
   }
 
@@ -280,6 +313,15 @@ const StyledSelect = cssStylesheet(css`
 
   .select:hover {
     border-color: ${theme.colors.onSurfaceLight};
+  }
+
+  /* Same look Slider gives its disabled state. Hover is restated because the
+     rule above would otherwise still light the border. */
+  .select.disabled,
+  .select.disabled:hover {
+    cursor: default;
+    opacity: 0.5;
+    border-color: ${theme.colors.onSurfaceBorder};
   }
 
   /* Same treatment Input gives :focus — an open dropdown is the equivalent

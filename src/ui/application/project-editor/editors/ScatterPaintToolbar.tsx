@@ -30,7 +30,13 @@ const BRUSHES: Array<{
   { type: 'paint', icon: 'paintbrush', label: 'Paint' },
   { type: 'erase', icon: 'eraser', label: 'Erase' },
   { type: 'exclude', icon: 'ban', label: 'Exclude' },
+  { type: 'pluck', icon: 'scissors', label: 'Pluck' },
 ];
+
+// Brushes that edit the density field, and so are steered by the layer picker
+// and the sliders. Exclude paints its own channel and pluck works on instances.
+const USES_LAYER: ScatterBrushType[] = ['paint', 'erase'];
+const USES_SLIDERS: ScatterBrushType[] = ['paint', 'erase', 'exclude'];
 
 // A layer's id as a label: the table stores snake ids ('granite_boulder').
 function labelForLayer(name: string): string {
@@ -101,6 +107,10 @@ export class ScatterPaintToolbar extends Component<Props> {
 
     const radiusValue = (<span class="value" />) as HTMLSpanElement;
     const strengthValue = (<span class="value" />) as HTMLSpanElement;
+    // The class goes on the host: Typography puts its own on an element inside
+    // its shadow root, where the panel cannot reach it.
+    const hint = (<Typography variant="light" />) as unknown as HTMLElement;
+    hint.classList.add('hint');
     const layerRow = (
       <div class="field">
         <Typography variant="label">Layer</Typography>
@@ -108,37 +118,55 @@ export class ScatterPaintToolbar extends Component<Props> {
       </div>
     ) as HTMLDivElement;
 
+    const sliderRows = (<div class="sliders" />) as HTMLDivElement;
+
     const elm = (
       <div class="panel">
         {layerRow}
         <ButtonGroup class="brushes" fullWidth>
           {brushButtons}
         </ButtonGroup>
+        {sliderRows}
+        {hint}
+      </div>
+    );
+
+    sliderRows.append(
+      (
         <div class="slider-row">
           <Typography variant="label">Radius</Typography>
           {radiusSlider}
           {radiusValue}
         </div>
+      ) as HTMLElement,
+      (
         <div class="slider-row">
           <Typography variant="label">Strength</Typography>
           {strengthSlider}
           {strengthValue}
         </div>
-        <Typography variant="light">
-          Drag to plant · Shift erases · Exclude clears biome-grown scatter ·
-          Alt-drag or right-drag moves the camera · Esc exits
-        </Typography>
-      </div>
+      ) as HTMLElement
     );
 
     return () => {
-      // The exclusion brush paints its own channel and ignores the layer, so
-      // the picker is dimmed rather than left looking like it still applies.
-      layerRow.classList.toggle(
-        'inactive',
-        scatterPaintStore.brush === 'exclude'
-      );
+      // A control the current brush ignores is disabled rather than left
+      // looking like it still applies: exclude paints its own channel, and
+      // pluck takes one instance at a fixed reach with no field to blend. The
+      // row class dims the label to match the control.
+      const brush = scatterPaintStore.brush;
+      const layerOff = !USES_LAYER.includes(brush);
+      const slidersOff = !USES_SLIDERS.includes(brush);
+      layerRow.classList.toggle('inactive', layerOff);
+      sliderRows.classList.toggle('inactive', slidersOff);
+      layerSelect.disabled = layerOff;
+      radiusSlider.disabled = slidersOff;
+      strengthSlider.disabled = slidersOff;
       layerSelect.value = layers[scatterPaintStore.layer];
+
+      hint.textContent =
+        brush === 'pluck'
+          ? 'Click or drag to remove one instance · Shift puts one back · Alt-drag or right-drag moves the camera · Esc exits'
+          : 'Drag to plant · Shift erases · Exclude clears biome-grown scatter · Alt-drag or right-drag moves the camera · Esc exits';
 
       for (let i = 0, l = brushButtons.length; i < l; i++) {
         brushButtons[i].selected = scatterPaintStore.brush === BRUSHES[i].type;
@@ -199,9 +227,12 @@ const StyledScatterPaintToolbar = cssStylesheet(css`
     min-width: 0;
   }
 
-  /* Exclude ignores the layer, so the picker says so rather than going away —
-     a row that disappears makes the panel jump. */
-  .field.inactive {
+  /* A control the brush ignores says so rather than going away — a row that
+     disappears makes the panel jump between brushes. Only the labels dim here;
+     the controls carry their own disabled look. */
+  .field.inactive x-typography,
+  .sliders.inactive x-typography,
+  .sliders.inactive .value {
     opacity: 0.4;
   }
 

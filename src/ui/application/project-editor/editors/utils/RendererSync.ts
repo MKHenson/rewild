@@ -4,6 +4,7 @@ import { sceneGraphStore } from 'src/ui/stores/SceneGraphStore';
 import { createChunkSnapshotProvider } from 'src/database/chunk-snapshots';
 import { createBiomeMaskProvider } from 'src/database/biome-masks';
 import { createScatterMaskProvider } from 'src/database/scatter-masks';
+import { createScatterKillProvider } from 'src/database/scatter-kills';
 import { registerDebugCommands } from 'src/core/debug';
 
 export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
@@ -34,6 +35,9 @@ export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
     : null;
   renderer.terrainRenderer.scatterMaskProvider = project.levelId
     ? createScatterMaskProvider(project.levelId)
+    : null;
+  renderer.terrainRenderer.scatterKillProvider = project.levelId
+    ? createScatterKillProvider(project.levelId)
     : null;
   registerDebugCommands(renderer, project);
 
