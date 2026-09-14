@@ -17,7 +17,7 @@ import type {
   ScatterCollider,
   ScatterLayer,
 } from 'rewild-renderer/lib/renderers/terrain/ScatterLayers';
-import { IMPOSTOR_FRACTION, type Params } from './params.ts';
+import { impostorDistance, type Params } from './params.ts';
 import type { Skeleton } from './skeleton.ts';
 import type { TextureNames } from './textures.ts';
 
@@ -88,7 +88,11 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
     geometryId: params.name,
     ...(params.lods.length ? { lodDistances: params.lods.map((tier) => tier.distance) } : {}),
     cullDistance: params.cullDistance,
-    impostor: { fromDistance: round(params.cullDistance * IMPOSTOR_FRACTION, 0), views: 8, tileSize: 128 },
+    impostor: {
+      fromDistance: impostorDistance(params),
+      views: params.impostorViews,
+      tileSize: params.impostorTile,
+    },
     jitter: { scale: { from: params.scaleMin, to: params.scaleMax }, yaw: { from: 0, to: 360 }, tilt: 3 },
     // Trees stand up whatever the slope does. A tilted trunk reads as damage,
     // not as terrain.

@@ -74,6 +74,9 @@ export const PARAM_SPEC = {
   windFrequency: { type: 'number', default: 0.45, help: 'ScatterWind frequency for the emitted layer.' },
   windFlutter: { type: 'number', default: 0.35, help: 'ScatterWind flutter for the emitted layer.' },
   cullDistance: { type: 'number', default: 160, help: 'ScatterLayer cullDistance for the emitted layer.' },
+  impostorFrom: { type: 'number', default: 0, help: `Metres the impostor takes over at. 0 derives it from cullDistance.` },
+  impostorViews: { type: 'int', default: 8, help: 'Impostor views baked per axis. At least 2.' },
+  impostorTile: { type: 'int', default: 128, help: 'Impostor tile edge in pixels.' },
   footprint: { type: 'number', default: 0, help: 'ScatterLayer footprint. 0 derives it from the canopy radius.' },
   scaleMin: { type: 'number', default: 0.8, help: 'Lower bound of the emitted scale jitter.' },
   scaleMax: { type: 'number', default: 1.25, help: 'Upper bound of the emitted scale jitter.' },
@@ -263,20 +266,40 @@ export function tierParams(params: Params, tier: LodTier): Params {
   return { ...params, ...overrides };
 }
 
-// The scatter layer's impostor is emitted at this fraction of the cull
-// distance, and the engine refuses a mesh tier that starts beyond it.
+// Where the impostor takes over when `impostorFrom` does not say, as a
+// fraction of the cull distance.
+//
+// It is only a fallback. The right handover is decided by the impostor's own
+// resolution: a tile stops being enough the moment the tree covers more pixels
+// than the tile has, and that distance depends on the tree's height and the
+// tile size rather than on how far the layer happens to draw. Trees tuned in
+// the engine sit well inside this, which is why the value is overridable.
 export const IMPOSTOR_FRACTION = 0.6;
+
+/**
+ * Metres the impostor takes over at: what the file says, else the fraction of
+ * the cull distance above.
+ *
+ * Read by the emitted layer and by the tier ceiling both, so a chain can never
+ * be validated against one distance and shipped against another.
+ */
+export function impostorDistance(params: Params): number {
+  return params.impostorFrom > 0
+    ? params.impostorFrom
+    : Math.round(params.cullDistance * IMPOSTOR_FRACTION);
+}
 
 function validateTiers(params: Params): void {
   let previous = 0;
-  const impostorAt = Math.round(params.cullDistance * IMPOSTOR_FRACTION);
+  const impostorAt = impostorDistance(params);
 
   params.lods.forEach((tier, index) => {
     if (tier.distance <= previous)
       throw new Error(`lods must ascend: tier ${index} at ${tier.distance}m does not follow ${previous}m.`);
     if (tier.distance >= impostorAt)
       throw new Error(
-        `lods tier ${index} at ${tier.distance}m starts beyond the impostor at ${impostorAt}m (${IMPOSTOR_FRACTION} of cullDistance).`
+        `lods tier ${index} at ${tier.distance}m starts beyond the impostor at ${impostorAt}m. ` +
+          `Move the tier in, or set impostorFrom past it.`
       );
     previous = tier.distance;
 
@@ -337,6 +360,23 @@ function validate(params: Params): void {
     throw new Error(
       `leafLevels must be within 1..${params.branchLevels + 1} at branchLevels ${params.branchLevels}.`
     );
+
+  // Mirrors validateImpostor in the engine's ScatterLayers.ts, so a layer this
+  // prints is one the engine will accept.
+  const impostorAt = impostorDistance(params);
+
+  if (params.impostorFrom < 0) throw new Error(`impostorFrom must not be negative, got ${params.impostorFrom}.`);
+
+  if (impostorAt >= params.cullDistance)
+    throw new Error(
+      `The impostor at ${impostorAt}m is not inside cullDistance ${params.cullDistance}m, so it would never draw.`
+    );
+
+  if (params.impostorViews < 2)
+    throw new Error(`impostorViews must be at least 2, got ${params.impostorViews}.`);
+
+  if (params.impostorTile <= 0)
+    throw new Error(`impostorTile must be a positive number of pixels, got ${params.impostorTile}.`);
 
   if (!profileNames().includes(params.barkProfile))
     throw new Error(

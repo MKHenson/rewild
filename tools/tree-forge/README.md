@@ -182,7 +182,10 @@ These name the outputs, or are copied into the printed `ScatterLayers.ts` row wi
 | `skipTextures` | `false` | Reuse the set's existing images instead of writing them. | `false` writes the set · `true` takes a variant to about a tenth of a second. The set has to exist already |
 | `writeTemplates` | `false` | Patch `geometries.json` and `materials.json` in place instead of only printing them. | |
 | `templatesDir` | `templates` | Where those two files live. The engine's `templates/` at the repo root, not this tool's. | |
-| `cullDistance` | 160 | Metres past which the layer draws nothing. | `90` shrub · `160` default · `800` oak and poplar. The impostor takes over at 60% of it, `480` on the oak, and every `lods` distance has to stay below that |
+| `cullDistance` | 160 | Metres past which the layer draws nothing. | `90` shrub · `160` default · `800` oak and poplar |
+| `impostorFrom` | 0 | Metres the billboard tier takes over at. Every `lods` distance has to stay below it. | `0` derives 60% of `cullDistance` · `192` oak and poplar, which is where the trees are tuned. **Lower is cheaper**: it hands more of the world to billboards instead of meshes. Pick it from the tile rather than from the cull distance, below |
+| `impostorViews` | 8 | Views baked around the tree. At least 2. | `8` every template. More views means a smoother turn and a bigger bake |
+| `impostorTile` | 128 | Edge of one baked view, in pixels. | `128` every template. This is what decides the handover distance |
 | `footprint` | 0 | Metres of clearance the placer keeps around a tree. | `0` derives it from the canopy spread, which is what you want unless two species have to interleave |
 | `scaleMin`, `scaleMax` | 0.8, 1.25 | Bounds of the random per-instance scale. | `0.8` and `1.25` every template, a forest of mixed ages off one model · `1` and `1` identical copies |
 | `windAmplitude` | 0.4 | How far the tree sways, copied into the layer's `ScatterWind`. | `0` still · `0.4` every template |
@@ -219,8 +222,24 @@ crown survive and only the detail goes. The oak's tier is a fair example of the 
 holds the crown's density on a quarter of the cards, but the larger cards spill past the model's own
 outline, so the crown reads wider at 60m than it does up close.
 
-A tier's distance has to stay below the impostor handover the layer is emitted with, at 60% of
-`cullDistance`; the engine refuses a chain that reaches past it. The tiers are written as
+**Where the impostor should take over.** `impostorFrom` decides it, and the useful rule is the
+tile, not the cull distance. A billboard stops being enough the moment the tree covers more pixels
+than `impostorTile` has, so the handover belongs at roughly:
+
+```
+impostorFrom  =  screenHeightPx / impostorTile  x  height / (2 x tan(vFov / 2))
+```
+
+At 1080p and a 50 degree vertical field of view, that is about `145 x height / impostorTile` metres.
+An 18m oak on a 128px tile comes out near 160m, which is why the shipped trees hand over at 192m and
+not at the 480m that 60% of their cull distance would give. Left at `0` the tool falls back to that
+fraction, which suits a low bush and is far too generous for a tree.
+
+Lower is cheaper. The mesh band is a ring, so its area grows with the square of the handover: moving
+an oak from 192m out to 480m is about 6.8x the ground, and roughly 2.7M more triangles in view.
+
+A tier's distance has to stay below the handover, whichever way it is set; the engine refuses a
+chain that reaches past it. The tiers are written as
 `<name>.lod1.glb`, `<name>.lod2.glb` beside the model, and the printed `geometries.json` entry and
 `ScatterLayers.ts` row carry the chain.
 
