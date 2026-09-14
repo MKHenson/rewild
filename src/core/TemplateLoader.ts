@@ -12,6 +12,7 @@ import { PlayerStart } from './routing/PlayerStart';
 import { GameManager } from './GameManager';
 import { RigidBodyBehaviour } from './routing/behaviours/RigidBodyBehaviour';
 import { LightAsset } from './routing/LightAsset';
+import { createColliderDesc } from './physics/ColliderShapes';
 
 export class TemplateLoader {
   templateLibrary: ITemplateItems;
@@ -103,32 +104,17 @@ export class TemplateLoader {
 
         rb.setEnabled(false); // Start disabled until mounted
 
-        // Create collider based on shape definition
         if (phys.shape) {
-          let colliderDesc:
-            | import('@dimforge/rapier3d-compat').ColliderDesc
-            | null = null;
-          if (phys.shape.type === 'box') {
-            const [w, h, d] = phys.shape.size;
-            // Rapier cuboid takes half-extents
-            colliderDesc = R.ColliderDesc.cuboid(w / 2, h / 2, d / 2);
-          } else if (phys.shape.type === 'sphere') {
-            colliderDesc = R.ColliderDesc.ball(phys.shape.radius);
-          }
+          const collider = gameManager.physicsWorld.createCollider(
+            createColliderDesc(R, phys.shape),
+            rb
+          );
 
-          if (colliderDesc) {
-            const collider = gameManager.physicsWorld.createCollider(
-              colliderDesc,
-              rb
-            );
-
-            if (typeof phys.mass === 'number') collider.setMass(phys.mass);
-            // Optional friction/restitution overrides
-            if (typeof phys.friction === 'number')
-              collider.setFriction(phys.friction);
-            if (typeof phys.restitution === 'number')
-              collider.setRestitution(phys.restitution);
-          }
+          if (typeof phys.mass === 'number') collider.setMass(phys.mass);
+          if (typeof phys.friction === 'number')
+            collider.setFriction(phys.friction);
+          if (typeof phys.restitution === 'number')
+            collider.setRestitution(phys.restitution);
         }
       }
 

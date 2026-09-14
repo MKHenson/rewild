@@ -27,6 +27,7 @@ export * from './utils/QualitySettings';
 export * from './utils/shaderDefines';
 export * from './acceleration';
 export * from './core/Raycaster';
+export * from './core/PhysicsShape';
 export * from './renderers/terrain/Biomes';
 export * from './renderers/terrain/ChunkSnapshot';
 export * from './renderers/terrain/Sculpt';
