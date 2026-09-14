@@ -6,6 +6,8 @@ import { Clock } from './Clock';
 import { loadInitialLevels } from './GameLoader';
 import { RigidBody, World } from '@dimforge/rapier3d-compat';
 import { TerrainEvent } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
+import { ScatterColliderStreamer } from './physics/ScatterColliderStreamer';
+import { registerScatterColliderCommands } from './debug/ScatterDebugCommands';
 
 export class GameManager {
   renderer: Renderer;
@@ -19,6 +21,7 @@ export class GameManager {
   private _onPointerlockChange: () => void;
   TerrainEventDelegate: (event: TerrainEvent) => void;
   terrainRapierBodyMap: Map<string, RigidBody>;
+  scatterColliders: ScatterColliderStreamer;
 
   constructor(player: Player, onUnlock: () => void) {
     this.hasInitialized = false;
@@ -94,11 +97,24 @@ export class GameManager {
           }
         }
         break;
+      case 'scatter-loaded':
+        this.scatterColliders.setChunk(
+          event.chunk.id,
+          event.chunk.position.x,
+          event.chunk.position.y,
+          this.renderer.terrainRenderer.chunkSize / 2,
+          event.instances
+        );
+        break;
       case 'chunk-unloaded':
-      case 'chunk-disposed': {
         this.removeTerrainBody(event.chunk.id);
         break;
-      }
+      // Scatter stays resident through a GPU unload — the chunk is far past
+      // the band by then — and goes only when the chunk does.
+      case 'chunk-disposed':
+        this.removeTerrainBody(event.chunk.id);
+        this.scatterColliders.removeChunk(event.chunk.id);
+        break;
     }
   }
 
@@ -119,6 +135,11 @@ export class GameManager {
 
     let gravity = { x: 0.0, y: -9.81, z: 0.0 };
     this.physicsWorld = new this.RAPIER.World(gravity);
+    this.scatterColliders = new ScatterColliderStreamer(
+      this.RAPIER,
+      this.physicsWorld
+    );
+    registerScatterColliderCommands(this.scatterColliders);
   }
 
   private _handlePointerlockChange() {
@@ -132,6 +153,8 @@ export class GameManager {
     const delta = clock.getDelta();
     const total = clock.getElapsedTime();
 
+    const viewer = this.renderer.camera.camera.transform.position;
+    this.scatterColliders.update(viewer.x, viewer.y, viewer.z);
     this.physicsWorld.step();
 
     this.stateMachine?.OnLoop(delta, total);
@@ -140,6 +163,7 @@ export class GameManager {
 
   dispose() {
     this.stateMachine?.dispose();
+    this.scatterColliders?.dispose();
     this.renderer.dispose();
     document.removeEventListener('pointerlockchange', this._onPointerlockChange);
     this.renderer.terrainRenderer.dispatcher.remove(this.TerrainEventDelegate);

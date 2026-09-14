@@ -201,6 +201,7 @@ showScatterChunks(); // Which resident chunks have generated scatter, and agains
 setScatterLayerEnabled('oak_01', false); // Hide one layer everywhere; true brings it back
 setScatterLodBias(1); // Force every layer one LOD tier coarser; -1 finer; 0 back to normal
 showScatterLodTiers(); // Paint each LOD tier a flat colour: green 0, yellow 1, orange 2, red 3+. showScatterLodTiers(false) turns it off
+showColliderBands(); // How many scatter instances hold a physics collider, per layer, against the band radii and the budget. Game only
 ```
 
 A layer's LOD chain is a list of handover distances (`lodDistances` in
@@ -221,6 +222,15 @@ viewer was from that chunk's instances when the cull last ran. A chunk with no
 rows never generated scatter (see `showScatterChunks`); a row with `drawn:
 false` and a `distance` inside its `band` means the cull has not re-run since
 the camera moved.
+
+`showColliderBands` reads the physics side. A scatter instance holds a Rapier
+collider only while the player is near: it gains one inside the activate
+radius, keeps it out to the deactivate radius, and never more than the budget
+are resident at once — nearer instances win, and a held collider gets the
+band width of grace before a newcomer takes its slot. `active` well under
+`candidates` is the point; `active` pinned at `budget` means the forest is
+denser than the budget and the furthest colliders are unregistered. Only
+layers with a `collider` proxy in `ScatterLayers.ts` count as candidates.
 
 See [Understory](./milestones/understory.md).
 

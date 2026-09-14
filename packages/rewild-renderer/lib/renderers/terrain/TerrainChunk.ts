@@ -615,6 +615,11 @@ export class TerrainChunk implements IComponent {
     );
     this.scatterVersion = version;
     this.scatterInputBuilt = inputVersion;
+    terrainRenderer.dispatcher.dispatch({
+      type: 'scatter-loaded',
+      chunk: this,
+      instances,
+    });
   }
 
   refreshMeshes(renderer: Renderer) {

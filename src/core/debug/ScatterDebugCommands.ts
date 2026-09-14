@@ -3,6 +3,7 @@ import {
   SCATTER_LAYERS,
   getScatterLayerOrder,
 } from 'rewild-renderer';
+import { ScatterColliderStreamer } from '../physics/ScatterColliderStreamer';
 
 // Scatter inspection.
 //
@@ -143,3 +144,22 @@ const SCATTER_CULL_DISTANCES = new Map(
     layer.cullDistance,
   ])
 );
+
+// Game-side only: the streamer exists where there is a physics world, so this
+// is registered from the GameManager rather than with the renderer commands.
+export function registerScatterColliderCommands(
+  streamer: ScatterColliderStreamer
+) {
+  (window as any).showColliderBands = () => {
+    const stats = streamer.stats();
+    console.log(
+      `showColliderBands() — ${stats.active} of ${stats.candidates} ` +
+        `collider-carrying instances across ${stats.chunks} chunks hold a ` +
+        `collider; budget ${stats.budget}. An instance gains one inside ` +
+        `${stats.activateDistance}m and keeps it out to ` +
+        `${stats.deactivateDistance}m. active at the budget means the ` +
+        `nearest won and further ones are unregistered.`
+    );
+    console.table(stats.layers);
+  };
+}
