@@ -1,12 +1,8 @@
 {
   "name": "poplar-01",
   "textureSet": "poplar",
-  "bark": [
-    "poplar"
-  ],
-  "leaves": [
-    "poplar"
-  ],
+  "bark": ["poplar"],
+  "leaves": ["poplar"],
   "out": "assets/shared/nature/trees",
   "assetsRoot": "assets/shared",
   "seed": 42,
@@ -14,6 +10,7 @@
   "trunkRadius": 0.44,
   "trunkTaper": 0.22,
   "splits": 8,
+  "barkLevels": 2,
   "splitAngle": 72,
   "splitVariance": 12,
   "splitSpread": 0.75,
