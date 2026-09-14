@@ -11,9 +11,11 @@ import {
   scatterExcludeChannel,
   scatterMaskChannels,
 } from 'rewild-renderer/lib/renderers/terrain/ScatterLayers';
+import { ScatterKillSet } from 'rewild-renderer/lib/renderers/terrain/ScatterKillSet';
 import { TerrainChunk } from 'rewild-renderer/lib/renderers/terrain/TerrainChunk';
 import { Raycaster, Intersection } from 'rewild-renderer/lib/core/Raycaster';
 import { writeScatterMask } from 'src/database/scatter-masks';
+import { writeScatterKills } from 'src/database/scatter-kills';
 import { projectStore } from 'src/ui/stores/ProjectStore';
 import { scatterPaintStore } from 'src/ui/stores/ScatterPaintStore';
 import { BrushCursor, pickTerrain } from './BrushCursor';
@@ -22,8 +24,16 @@ import { BrushCursor, pickTerrain } from './BrushCursor';
 const MAX_STAMP_DT = 0.1; // seconds
 const PAINT_RATE = 2.5;
 
+// How far the pluck brush reaches, in metres. Fixed rather than taken from the
+// radius slider: pluck removes the *nearest* instance, so a wide reach would
+// take a tree the author was not pointing at. Roughly the spacing of the
+// coarsest layer, so pointing at a trunk finds it.
+const PLUCK_RADIUS = 6;
+
 interface StrokeState {
   touched: Map<string, { cx: number; cy: number; mask: PaintMask }>;
+  // Chunks whose kill set changed, with the set each will be saved from.
+  killed: Map<string, { cx: number; cy: number; kills: ScatterKillSet }>;
   erase: boolean;
   lastStampTime: number;
 }
@@ -84,7 +94,7 @@ export class TerrainScatterPaintController {
   }
 
   updateCursor(point: Vector3 | null) {
-    this.cursor.update(point, scatterPaintStore.radius);
+    this.cursor.update(point, this.radius);
   }
 
   hideCursor() {
@@ -104,9 +114,17 @@ export class TerrainScatterPaintController {
     );
   }
 
+  /** Metres the brush reaches - the slider, except for pluck's fixed bite. */
+  get radius(): number {
+    return scatterPaintStore.brush === 'pluck'
+      ? PLUCK_RADIUS
+      : scatterPaintStore.radius;
+  }
+
   beginStroke(point: Vector3, erase: boolean) {
     this.stroke = {
       touched: new Map(),
+      killed: new Map(),
       erase,
       lastStampTime: performance.now(),
     };
@@ -132,21 +150,25 @@ export class TerrainScatterPaintController {
   async endStroke(): Promise<void> {
     const stroke = this.stroke;
     this.stroke = null;
-    if (!stroke || stroke.touched.size === 0) return;
+    if (!stroke || (stroke.touched.size === 0 && stroke.killed.size === 0))
+      return;
 
     const levelId = projectStore.project?.levelId;
     if (!levelId) {
       console.warn(
-        'No levelId on the current project — scatter density not saved.'
+        'No levelId on the current project — scatter edits not saved.'
       );
       return;
     }
 
-    await Promise.all(
-      [...stroke.touched.values()].map((t) =>
+    await Promise.all([
+      ...[...stroke.touched.values()].map((t) =>
         writeScatterMask(levelId, t.cx, t.cy, t.mask)
-      )
-    );
+      ),
+      ...[...stroke.killed.values()].map((k) =>
+        writeScatterKills(levelId, k.cx, k.cy, k.kills)
+      ),
+    ]);
 
     projectStore.dirty = true;
     projectStore.dispatcher.dispatch({ kind: 'changed' });
@@ -168,7 +190,7 @@ export class TerrainScatterPaintController {
     for (let cy = cyMin; cy <= cyMax; cy++) {
       for (let cx = cxMin; cx <= cxMax; cx++) {
         const chunk = terrain.terrainChunks.get(`${cx},${cy}`);
-        if (chunk && !chunk.scatterMask) this.ensureMask(chunk);
+        if (chunk) this.ensureMask(chunk);
       }
     }
   }
@@ -176,6 +198,11 @@ export class TerrainScatterPaintController {
   private stamp(point: Vector3, dt: number) {
     const stroke = this.stroke;
     if (!stroke) return;
+
+    if (scatterPaintStore.brush === 'pluck') {
+      this.pluck(point, stroke.erase);
+      return;
+    }
 
     // Shift erases whichever brush is selected, so a held Shift is always the
     // way back to what the biome grows.
@@ -204,6 +231,30 @@ export class TerrainScatterPaintController {
     }
   }
 
+  /**
+   * Removes the instance nearest the cursor, or - with Shift - puts back one
+   * that was removed.
+   */
+  private pluck(point: Vector3, restore: boolean) {
+    const stroke = this.stroke;
+    const terrain = this.renderer.terrainRenderer;
+    if (!stroke) return;
+
+    const hit = terrain.pickScatter(point.x, point.z, PLUCK_RADIUS, restore);
+    if (!hit) return;
+
+    const kills = restore
+      ? terrain.restoreScatter(hit.cx, hit.cy, hit.pick.key)
+      : terrain.pluckScatter(hit.cx, hit.cy, hit.pick.key);
+    if (!kills) return;
+
+    stroke.killed.set(`${hit.cx},${hit.cy}`, {
+      cx: hit.cx,
+      cy: hit.cy,
+      kills,
+    });
+  }
+
   // Resolves a chunk's editable mask for the current stamp, or null to skip it
   // this stamp (applyPaintStamp then also skips any texel the chunk co-owns, so
   // a not-yet-ready neighbour can never cause a seam).
@@ -218,16 +269,19 @@ export class TerrainScatterPaintController {
     return null;
   }
 
-  // Kicks off a chunk's saved-mask lookup so it becomes paintable. Runs once
-  // per chunk; by the next pointer event the chunk is editable.
+  // Kicks off a chunk's saved density-mask and kill-set lookups so it becomes
+  // editable. Runs once per chunk; by the next pointer event both have landed.
   private ensureMask(chunk: TerrainChunk) {
-    if (chunk.scatterMask || this.pendingResolves.has(chunk.id)) return;
+    if (this.pendingResolves.has(chunk.id)) return;
+    if (chunk.scatterMask && chunk.scatterKills) return;
     this.pendingResolves.add(chunk.id);
 
-    chunk
-      .resolveScatterMask(this.renderer.terrainRenderer.scatterMaskProvider)
-      .finally(() => {
-        this.pendingResolves.delete(chunk.id);
-      });
+    const terrain = this.renderer.terrainRenderer;
+    Promise.all([
+      chunk.resolveScatterMask(terrain.scatterMaskProvider),
+      chunk.resolveScatterKills(terrain.scatterKillProvider),
+    ]).finally(() => {
+      this.pendingResolves.delete(chunk.id);
+    });
   }
 }

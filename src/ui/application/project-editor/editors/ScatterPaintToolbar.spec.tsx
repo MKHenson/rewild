@@ -56,13 +56,14 @@ describe('ScatterPaintToolbar', () => {
     expect(scatterPaintStore.layer).toBe(2);
   });
 
-  it('offers paint, erase and exclude', () => {
+  it('offers paint, erase, exclude and pluck', () => {
     const comp = createToolbar();
     const labels = getBrushButtons(comp).map((b) => b.textContent);
-    expect(labels.length).toBe(3);
+    expect(labels.length).toBe(4);
     expect(labels.some((l) => l?.includes('Paint'))).toBe(true);
     expect(labels.some((l) => l?.includes('Erase'))).toBe(true);
     expect(labels.some((l) => l?.includes('Exclude'))).toBe(true);
+    expect(labels.some((l) => l?.includes('Pluck'))).toBe(true);
   });
 
   it('marks the active brush as the selected brush button', () => {
@@ -76,17 +77,36 @@ describe('ScatterPaintToolbar', () => {
     expect(active[0].textContent).toContain('Erase');
   });
 
-  // Exclude paints its own channel, so a picker that still looked live would
-  // suggest it does something the stroke ignores.
-  it('dims the layer picker while the exclusion brush is armed', () => {
+  // A control the brush ignores must be disabled, not merely dimmed: exclude
+  // paints its own channel, and pluck takes one instance at a fixed reach with
+  // no field to blend.
+  it('disables the controls each brush ignores', () => {
     const comp = createToolbar();
-    const row = () => comp.shadow?.querySelector('.field');
-
-    scatterPaintStore.setBrush('exclude');
-    expect(row()?.classList.contains('inactive')).toBe(true);
+    const select = () => getLayerSelect(comp).disabled;
+    const sliders = () => getSliders(comp).map((s) => s.disabled);
 
     scatterPaintStore.setBrush('paint');
-    expect(row()?.classList.contains('inactive')).toBe(false);
+    expect(select()).toBe(false);
+    expect(sliders()).toEqual([false, false]);
+
+    scatterPaintStore.setBrush('exclude');
+    expect(select()).toBe(true);
+    expect(sliders()).toEqual([false, false]);
+
+    scatterPaintStore.setBrush('pluck');
+    expect(select()).toBe(true);
+    expect(sliders()).toEqual([true, true]);
+  });
+
+  it('tells the author what Shift does for the armed brush', () => {
+    const comp = createToolbar();
+    const hint = () => comp.shadow?.querySelector('.hint');
+
+    scatterPaintStore.setBrush('paint');
+    expect(hint()?.textContent).toContain('Shift erases');
+
+    scatterPaintStore.setBrush('pluck');
+    expect(hint()?.textContent).toContain('Shift puts one back');
   });
 
   it('renders a slider for radius and strength', () => {

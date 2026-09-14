@@ -180,7 +180,12 @@ export class LODMesh {
               renderer.terrainRenderer.scatterMaskProvider
             )
           : null;
-        const scatterMaskVersion = this.chunk.scatterMaskVersion;
+        const scatterKills = wantsScatter
+          ? await this.chunk.resolveScatterKills(
+              renderer.terrainRenderer.scatterKillProvider
+            )
+          : null;
+        const scatterInputVersion = this.chunk.scatterInputVersion;
 
         // Edited surfaces diverge from the worker's noise apron ring, so build a
         // real apron from the loaded neighbours' heights on the main thread and
@@ -210,6 +215,7 @@ export class LODMesh {
             biomeMask: biomeMask ?? undefined,
             scatter: wantsScatter,
             scatterMask: scatterMask ?? undefined,
+            scatterKills: scatterKills ?? undefined,
           });
 
         // Cache the heightfield on the chunk so later LODs, snapshot writes,
@@ -239,7 +245,7 @@ export class LODMesh {
             renderer.terrainRenderer,
             scatter,
             version,
-            scatterMaskVersion
+            scatterInputVersion
           );
 
         // A paint stamp landed while this build was in the worker, so the splat

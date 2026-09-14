@@ -49,6 +49,18 @@ export class Slider extends Component<Props> {
     else if (this._props) this._props.value = value;
   }
 
+  get disabled(): boolean {
+    return this._props?.disabled === true;
+  }
+
+  /** For build-once panels, like `value`; unlike it this does re-render, since
+   *  the disabled look and the pointer guard both read props. */
+  set disabled(value: boolean) {
+    if (!this._props || (this._props.disabled === true) === value) return;
+    this._props.disabled = value;
+    this.render?.();
+  }
+
   init() {
     const min = () => this.props.min ?? DEFAULT_MIN;
     const max = () => this.props.max ?? DEFAULT_MAX;

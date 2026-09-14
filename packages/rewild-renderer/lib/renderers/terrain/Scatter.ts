@@ -21,6 +21,11 @@ import {
   scatterExcludeChannel,
   scatterMaskChannels,
 } from './ScatterLayers';
+import {
+  SCATTER_KILL_CELL_LIMIT,
+  ScatterKillSet,
+  scatterKillKey,
+} from './ScatterKillSet';
 import { heightGradientAt, slopeDegreesAt } from './Splat';
 
 // Per-chunk scatter placement: which instances of which layer stand where.
@@ -55,6 +60,13 @@ export interface ScatterInstances {
   count: number;
   /** `count * SCATTER_INSTANCE_STRIDE` floats; may be longer than that. */
   data: Float32Array;
+  /**
+   * Each instance's kill key (see ScatterKillSet), present only when the caller
+   * asked for it. Off by default: the draw path never needs an identity, and
+   * every chunk would otherwise post four more bytes per instance across the
+   * worker boundary for nobody.
+   */
+  ids?: Uint32Array;
 }
 
 export interface ScatterChunkOptions {
@@ -67,6 +79,17 @@ export interface ScatterChunkOptions {
    *  derived like every other one and track a sculpt, a re-tuned jitter range
    *  and a seed change for free. */
   scatterMask?: PaintMask | null;
+  /** Instances the author has plucked, skipped wherever they would be placed. */
+  killSet?: ScatterKillSet | null;
+  /**
+   * Restricts placement to the cells overlapping this chunk-local sample-space
+   * box, instead of the whole chunk. For the editor's pick, which needs the
+   * handful of candidates around a click rather than the thousands a chunk
+   * grows; the instances it returns are identical to the full run's.
+   */
+  region?: { x0: number; y0: number; x1: number; y1: number } | null;
+  /** Fill `ScatterInstances.ids`. */
+  withIds?: boolean;
 }
 
 /**
@@ -270,6 +293,9 @@ export function scatterChunk(
       ? options.scatterMask
       : null;
   const excludeChannel = scatterExcludeChannel();
+  const killSet = options?.killSet ?? null;
+  const region = options?.region ?? null;
+  const withIds = options?.withIds === true;
   const layerNames = mask
     ? getScatterLayerOrder().filter(
         (name, slot) =>
@@ -305,6 +331,15 @@ export function scatterChunk(
     // Cell size in sample units, from a footprint authored in metres.
     const cellSize = (2 * layer.footprint) / TERRAIN_METERS_PER_SAMPLE;
 
+    // A kill key addresses a cell within its chunk, so a footprint fine enough
+    // to out-count that would leave instances no author could pluck. Checked
+    // here because the bound depends on the chunk size, which the layer table
+    // does not know.
+    if ((chunkSize - 1) / cellSize >= SCATTER_KILL_CELL_LIMIT)
+      throw new Error(
+        `Scatter layer '${name}' footprint ${layer.footprint}m puts more than ${SCATTER_KILL_CELL_LIMIT} cells across a ${chunkSize}-sample chunk.`
+      );
+
     // Which of each biome's rules grows this layer, resolved up front so the
     // candidate loop never searches. -1 where a biome does not grow it, and
     // `hasRule` false for a purely painted layer — which skips the biome
@@ -321,15 +356,41 @@ export function scatterChunk(
     }
 
     let data = new Float32Array(INITIAL_CAPACITY * SCATTER_INSTANCE_STRIDE);
+    let ids = withIds ? new Uint32Array(INITIAL_CAPACITY) : null;
     let count = 0;
 
+    // The chunk's own cell origin. Kill keys are relative to it, so a chunk's
+    // blob says the same thing wherever in the world the chunk sits.
     const cellX0 = Math.floor(spanStart / cellSize);
     const cellX1 = Math.floor(spanEndX / cellSize);
     const cellY0 = Math.floor(spanStartY / cellSize);
     const cellY1 = Math.floor(spanEndY / cellSize);
 
-    for (let cellY = cellY0; cellY <= cellY1; cellY++) {
-      for (let cellX = cellX0; cellX <= cellX1; cellX++) {
+    // A region clips the sweep to the cells that can reach it; the cells
+    // themselves are unchanged, so a clipped run places exactly what the full
+    // run would have inside the box.
+    const fromY = region
+      ? Math.max(cellY0, Math.floor((spanStartY + region.y0) / cellSize))
+      : cellY0;
+    const toY = region
+      ? Math.min(cellY1, Math.floor((spanStartY + region.y1) / cellSize))
+      : cellY1;
+    const fromX = region
+      ? Math.max(cellX0, Math.floor((spanStart + region.x0) / cellSize))
+      : cellX0;
+    const toX = region
+      ? Math.min(cellX1, Math.floor((spanStart + region.x1) / cellSize))
+      : cellX1;
+
+    for (let cellY = fromY; cellY <= toY; cellY++) {
+      for (let cellX = fromX; cellX <= toX; cellX++) {
+        // Plucked instances are dropped before any of the work below: the cell
+        // still exists, it just grows nothing.
+        const killKey = killSet
+          ? scatterKillKey(slot, cellX - cellX0, cellY - cellY0)
+          : -1;
+        if (killKey >= 0 && killSet!.has(killKey)) continue;
+
         const hash = cellHash(cellX, cellY, slot, seed);
 
         const globalX = (cellX + hash01(hash, 0)) * cellSize;
@@ -423,6 +484,13 @@ export function scatterChunk(
 
         const needed = (count + 1) * SCATTER_INSTANCE_STRIDE;
         if (needed > data.length) data = grow(data, needed);
+        if (ids && count >= ids.length) {
+          const grown = new Uint32Array(ids.length * 2);
+          grown.set(ids);
+          ids = grown;
+        }
+        if (ids)
+          ids[count] = scatterKillKey(slot, cellX - cellX0, cellY - cellY0);
 
         const base = count * SCATTER_INSTANCE_STRIDE;
         data[base] = (sx - half) * TERRAIN_METERS_PER_SAMPLE;
@@ -438,8 +506,108 @@ export function scatterChunk(
       }
     }
 
-    if (count > 0) results.push({ layer: name, slot, count, data });
+    if (count > 0)
+      results.push({
+        layer: name,
+        slot,
+        count,
+        data,
+        ids: ids ?? undefined,
+      });
   }
 
   return results;
+}
+
+export interface ScatterPick {
+  layer: string;
+  slot: number;
+  /** The kill key to add to the chunk's set to remove this instance. */
+  key: number;
+  /** Chunk-local metres, the same space the instance is drawn in. */
+  x: number;
+  y: number;
+  z: number;
+  /** Horizontal metres from the query point. */
+  distance: number;
+}
+
+/**
+ * The scatter instance nearest a chunk-local point, within `radius` metres
+ * horizontally, or null when there is none.
+ *
+ * Derived rather than looked up: it re-places the handful of cells around the
+ * point through scatterChunk itself, so the answer is by construction the same
+ * instance that is drawn — no index to keep in step, and no per-instance table
+ * held in memory for a tool that is used a few times a session. A dense layer
+ * puts tens of thousands of instances in a chunk, and keeping even their
+ * positions resident for every loaded chunk would cost more than the whole
+ * kill-set feature saves.
+ *
+ * Horizontal distance because the author is pointing at the ground: the ray
+ * hits the terrain, and the instance standing on it is what they mean.
+ */
+export function pickScatterInstance(
+  chunkSize: number,
+  seed: number,
+  offset: Vector2,
+  climate: ClimateConfig,
+  heights: Float32Array,
+  localX: number,
+  localZ: number,
+  radius: number,
+  options?: ScatterChunkOptions
+): ScatterPick | null {
+  const half = ((chunkSize - 1) / 2) * TERRAIN_METERS_PER_SAMPLE;
+  // Chunk-local metres to sample space, the box clipped to the chunk. +z is
+  // -sy, the same convention the mesh and the heightfield use.
+  const toSampleX = (metres: number) =>
+    (metres + half) / TERRAIN_METERS_PER_SAMPLE;
+  const toSampleY = (metres: number) =>
+    (half - metres) / TERRAIN_METERS_PER_SAMPLE;
+
+  const max = chunkSize - 1;
+  const clamp = (v: number) => (v < 0 ? 0 : v > max ? max : v);
+  const region = {
+    x0: clamp(toSampleX(localX - radius)),
+    x1: clamp(toSampleX(localX + radius)),
+    // The z flip swaps which edge is the low row.
+    y0: clamp(toSampleY(localZ + radius)),
+    y1: clamp(toSampleY(localZ - radius)),
+  };
+
+  const results = scatterChunk(chunkSize, seed, offset, climate, heights, {
+    ...options,
+    region,
+    withIds: true,
+  });
+
+  let best: ScatterPick | null = null;
+  let bestDistSq = radius * radius;
+
+  for (const instances of results) {
+    const { data, ids, count } = instances;
+    if (!ids) continue;
+
+    for (let i = 0; i < count; i++) {
+      const base = i * SCATTER_INSTANCE_STRIDE;
+      const dx = data[base] - localX;
+      const dz = data[base + 2] - localZ;
+      const distSq = dx * dx + dz * dz;
+      if (distSq > bestDistSq) continue;
+
+      bestDistSq = distSq;
+      best = {
+        layer: instances.layer,
+        slot: instances.slot,
+        key: ids[i],
+        x: data[base],
+        y: data[base + 1],
+        z: data[base + 2],
+        distance: Math.sqrt(distSq),
+      };
+    }
+  }
+
+  return best;
 }

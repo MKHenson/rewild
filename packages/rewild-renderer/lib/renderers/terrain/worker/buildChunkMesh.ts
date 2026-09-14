@@ -7,6 +7,7 @@ import { generateBiomeBlendedHeightMap } from '../Noise';
 import { resolveClimatePreset } from '../Biomes';
 import { generateSplatMap } from '../Splat';
 import { PaintMask } from '../PaintMask';
+import { ScatterKillSet } from '../ScatterKillSet';
 import { ScatterInstances, scatterChunk } from '../Scatter';
 import { Vector2 } from 'rewild-common';
 
@@ -38,6 +39,8 @@ export interface BuildChunkMeshRequest {
   // The chunk's painted scatter density mask, if it has one. Placement only —
   // it decides how much grows where, never the shape of the ground.
   scatterMask?: PaintMask;
+  // Instances the author has plucked here, skipped by placement.
+  scatterKills?: ScatterKillSet;
 }
 
 // One-sample apron ring so edge-vertex normals get a two-sided gradient that
@@ -208,6 +211,7 @@ export function buildChunkMesh(
     ? scatterChunk(chunkSize, seed, worldOffset, climate, heights, {
         biomeMask: request.biomeMask ?? null,
         scatterMask: request.scatterMask ?? null,
+        killSet: request.scatterKills ?? null,
       })
     : [];
 

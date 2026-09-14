@@ -3,11 +3,9 @@ import { Dispatcher } from 'rewild-common';
 export type ScatterPaintStoreEvents = { kind: 'changed' };
 
 // Paint raises a layer's density, erase lifts the paint back off (revealing
-// whatever the biome grows), exclude suppresses every layer. Exclude is its own
-// brush rather than "paint at zero" because zero already means "say nothing":
-// clearing a building site of biome-grown trees takes a weight of its own (see
-// scatterExcludeChannel).
-export type ScatterBrushType = 'paint' | 'erase' | 'exclude';
+// whatever the biome grows), exclude suppresses every layer, and pluck removes
+// one instance.
+export type ScatterBrushType = 'paint' | 'erase' | 'exclude' | 'pluck';
 
 export const SCATTER_PAINT_RADIUS_MIN = 10;
 export const SCATTER_PAINT_RADIUS_MAX = 250;
