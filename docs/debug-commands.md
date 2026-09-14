@@ -202,6 +202,7 @@ setScatterLayerEnabled('oak_01', false); // Hide one layer everywhere; true brin
 setScatterLodBias(1); // Force every layer one LOD tier coarser; -1 finer; 0 back to normal
 showScatterLodTiers(); // Paint each LOD tier a flat colour: green 0, yellow 1, orange 2, red 3+. showScatterLodTiers(false) turns it off
 showColliderBands(); // How many scatter instances hold a physics collider, per layer, against the band radii and the budget. Game only
+setWindOverride(1, 90); // Force foliage wind: strength 0..1, bearing in degrees the air moves toward (0 = +x, 90 = +z). setWindOverride() follows the weather again
 ```
 
 A layer's LOD chain is a list of handover distances (`lodDistances` in
@@ -231,6 +232,20 @@ band width of grace before a newcomer takes its slot. `active` well under
 `candidates` is the point; `active` pinned at `budget` means the forest is
 denser than the budget and the furthest colliders are unregistered. Only
 layers with a `collider` proxy in `ScatterLayers.ts` count as candidates.
+
+`setWindOverride` is for tuning a layer's wind block and a model's bend
+weights without waiting for a storm. Foliage sways by `COLOR_0` — R bend, G
+phase, B flutter — along the direction clouds and rain drift. A layer's
+`wind` block is tuned for windiness 1; the weather scales all three fields
+down from there, and the wind clock runs at the windiness, so a calm day
+sways slower as well as less. Gusts are a smooth noise field over world
+position blown downwind at the wind's speed and read per vertex, so
+neighbours lean together and a crown's upwind side leads its lee — trees
+moving independently means the field has lost its world position. A model
+without `COLOR_0` stays rigid whatever the layer says; a primitive that
+carries it sways in the scene pass and the shadow pass alike, so a shadow
+that stays still under moving leaves means the shadow pipeline missed the
+variant.
 
 See [Understory](./milestones/understory.md).
 

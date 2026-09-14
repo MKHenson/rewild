@@ -39,9 +39,9 @@
       "leafScale": 2
     }
   ],
-  "windAmplitude": 0.4,
-  "windFrequency": 0.45,
-  "windFlutter": 0.35,
+  "windAmplitude": 8,
+  "windFrequency": 0.55,
+  "windFlutter": 0.6,
   "cullDistance": 800,
   "impostorFrom": 192,
   "footprint": 0,

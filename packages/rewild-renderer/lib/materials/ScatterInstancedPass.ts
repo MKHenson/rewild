@@ -11,6 +11,8 @@ import { StandardPassBase } from './StandardPassBase';
 import { composeShader } from '../utils/shaderDefines';
 import { IScatterInstanceGroup } from '../../types/interfaces';
 import { Vector3 } from 'rewild-common';
+import { ShaderDefines } from '../utils/shaderDefines';
+import type { ScatterWind } from '../renderers/terrain/ScatterLayers';
 
 const _viewerLocal = new Vector3();
 
@@ -19,8 +21,9 @@ const instanceGroupIndex = 1;
 const lightingGroup = 2;
 const shadowGroup = 3;
 
-// projMatrix + modelViewMatrix + nodeMatrix + band + debug.
-export const SCATTER_UNIFORM_BYTES = 64 * 3 + 32;
+// projMatrix + modelViewMatrix + nodeMatrix + band + debug + wind + windParams
+// + windOrigin.
+export const SCATTER_UNIFORM_BYTES = 64 * 3 + 80;
 
 // posScale + rotation + params, matching ScatterInstance in the shader.
 export const SCATTER_GPU_STRIDE = 12;
@@ -56,6 +59,33 @@ export class ScatterInstancedPass extends StandardPassBase {
       this.lightingUniforms,
       this.shadowUniforms,
     ]);
+  }
+
+  private _wind: ScatterWind | null = null;
+
+  /**
+   * The layer's wind block, or null to draw rigid. Compiles the wind variant:
+   * COLOR_0 is bound and read as bend weights — R bend, G phase, B flutter —
+   * and never as a tint, so `vertexColors` has no effect while this is set.
+   * Only for geometry that carries COLOR_0; a model without it has no weights
+   * to bend by and draws rigid whatever the layer says.
+   */
+  get wind(): ScatterWind | null {
+    return this._wind;
+  }
+
+  set wind(value: ScatterWind | null) {
+    if (value === this._wind) return;
+    this._wind = value;
+    this.invalidatePipeline();
+  }
+
+  protected bindsVertexColors(): boolean {
+    return this._wind !== null || super.bindsVertexColors();
+  }
+
+  protected shaderDefines(): ShaderDefines {
+    return { ...super.shaderDefines(), HAS_WIND: this._wind !== null };
   }
 
   protected invalidatePipeline(): void {

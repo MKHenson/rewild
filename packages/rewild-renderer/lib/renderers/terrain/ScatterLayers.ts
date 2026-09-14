@@ -32,14 +32,40 @@ export interface ScatterJitter {
 
 // Vertex-stage foliage motion driven by the weather's wind. Per-vertex weights
 // come from the model's COLOR_0 — R bend, G phase, B flutter — so a mesh with no
-// COLOR_0 reads as rigid and the block does nothing.
+// COLOR_0 reads as rigid and the block does nothing. Every field is what the
+// layer does in full wind; the weather's windiness scales all three down from
+// there, so a block is tuned once at 1 and a calm day takes care of itself.
 export interface ScatterWind {
   /** Metres of sway at bend weight 1 in full wind. */
   amplitude: number;
-  /** Sway cycles per second. */
+  /** Sway cycles per second in full wind. */
   frequency: number;
-  /** Per-leaf flutter as a fraction of `amplitude`, gated by COLOR_0.b. */
+  /** Per-leaf flutter as a fraction of `amplitude` in full wind, gated by
+   *  COLOR_0.b. */
   flutter: number;
+}
+
+/**
+ * A layer's wind block as the scatter shaders' `windParams` vec4 — zeros for a
+ * rigid layer, which the wind pipeline is never compiled for anyway — followed
+ * by `windOrigin`, the drawing chunk's world xz, so the wind field is read in
+ * world space and crosses chunk borders without a seam.
+ */
+export function writeScatterWindParams(
+  wind: ScatterWind | null | undefined,
+  originX: number,
+  originZ: number,
+  out: Float32Array,
+  offset: number
+): void {
+  out[offset] = wind ? wind.amplitude : 0;
+  out[offset + 1] = wind ? wind.frequency : 0;
+  out[offset + 2] = wind ? wind.flutter : 0;
+  out[offset + 3] = 0;
+  out[offset + 4] = originX;
+  out[offset + 5] = originZ;
+  out[offset + 6] = 0;
+  out[offset + 7] = 0;
 }
 
 export interface ScatterLayer {
@@ -161,7 +187,7 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
       height: 3.37,
       offset: [0, 2.33, 0],
     },
-    wind: { amplitude: 0.4, frequency: 0.45, flutter: 0.35 },
+    wind: { amplitude: 8, frequency: 0.55, flutter: 0.6 },
     authoredNormals: true,
     faceNormalSpecular: true,
     specularOcclusion: true,
@@ -181,7 +207,7 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
       height: 1.8,
       offset: [0, 1.36, 0],
     },
-    wind: { amplitude: 0.4, frequency: 0.45, flutter: 0.35 },
+    wind: { amplitude: 8, frequency: 0.55, flutter: 0.6 },
     authoredNormals: true,
     faceNormalSpecular: true,
     specularOcclusion: true,

@@ -10,6 +10,7 @@ import {
   godRayScale,
 } from './SkyQuality';
 import { TemporalCloudRenderer } from './TemporalCloudRenderer';
+import { WindState } from './WindState';
 import { SkyBilateralPass } from './SkyBilateralPass';
 import { SkyCompositePass } from './SkyCompositePass';
 import { SkyGradientRenderer } from './SkyGradientRenderer';
@@ -106,6 +107,9 @@ export class SkyRenderer {
   private builtQualityRevision: number = -1;
 
   windDirection: Vector2 = new Vector2(1, 0);
+  /** The wind as foliage reads it, resolved from windiness and windDirection
+   *  at the top of every frame — see Sky.update. */
+  readonly wind = new WindState();
   precipitation: number = 0.0;
   temperature: number = 0.5;
   lightningFlash: number = 0.0;

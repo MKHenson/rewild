@@ -11,6 +11,7 @@ import instancedShader from '../../shaders/shadow-depth-instanced.wgsl';
 import impostorShader from '../../shaders/shadow-depth-impostor.wgsl';
 import { ScatterImpostorPass } from '../../materials/ScatterImpostorPass';
 import { ScatterInstancedPass } from '../../materials/ScatterInstancedPass';
+import { writeScatterWindParams } from '../terrain/ScatterLayers';
 import { ShadowDebugRenderer } from './ShadowDebugRenderer';
 import {
   isScatterImpostorPass,
@@ -74,9 +75,9 @@ const NDC_CORNERS: [number, number, number][] = [
   [-1, 1, NDC_FAR_Z],
 ];
 
-// shadowMVP + nodeMatrix + viewer + range, matching Uniforms in
-// shadow-depth-instanced.wgsl.
-const INSTANCED_UNIFORM_BYTES = 64 * 2 + 32;
+// shadowMVP + nodeMatrix + viewer + range + wind + windParams + windOrigin,
+// matching Uniforms in shadow-depth-instanced.wgsl.
+const INSTANCED_UNIFORM_BYTES = 64 * 2 + 80;
 // shadowMVP + viewer + range + lightDir, matching Uniforms in
 // shadow-depth-impostor.wgsl.
 const IMPOSTOR_UNIFORM_BYTES = 64 + 16 * 3;
@@ -91,6 +92,9 @@ interface MeshShadowUniforms {
   kind: ShadowCasterKind;
   // Whether an instanced caster is a cutout the shadow shader has to test.
   cutout: boolean;
+  // Whether an instanced caster sways: it binds COLOR_0 and draws through the
+  // wind pipeline, so its shadow bends with it.
+  wind: boolean;
 }
 
 export class DirectionalShadowRenderer {
@@ -111,6 +115,7 @@ export class DirectionalShadowRenderer {
 
   private pipeline: GPURenderPipeline;
   private instancedPipeline: GPURenderPipeline;
+  private instancedWindPipeline: GPURenderPipeline;
   private impostorPipeline: GPURenderPipeline;
   private meshUniforms: Map<IVisualComponent, MeshShadowUniforms>;
   // Scratch set reused by the per-frame stale-entry sweep (no per-frame allocation).
@@ -208,35 +213,56 @@ export class DirectionalShadowRenderer {
     // stored at a different depth offset from the terrain it stands on would
     // acne against it at the contact. The fragment stage has no targets; it
     // only cuts leaf cards out of the depth they would otherwise write whole.
-    this.instancedPipeline = device.createRenderPipeline({
-      label: 'directional shadow instanced pipeline',
-      layout: 'auto',
-      vertex: {
-        entryPoint: 'vs',
-        module: instancedModule,
-        buffers: [
-          {
-            arrayStride: 4 * 3,
-            attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
-          },
-          {
-            arrayStride: 4 * 2,
-            attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x2' }],
-          },
-        ],
+    const instancedBuffers: GPUVertexBufferLayout[] = [
+      {
+        arrayStride: 4 * 3,
+        attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }],
       },
-      fragment: { entryPoint: 'fs', module: instancedModule, targets: [] },
-      primitive: {
-        topology: 'triangle-list',
-        cullMode: 'none',
+      {
+        arrayStride: 4 * 2,
+        attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x2' }],
       },
-      depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: 'less',
-        format: 'depth32float',
-        depthBiasSlopeScale: 2.0,
-      },
-    });
+    ];
+    const instancedPipeline = (
+      label: string,
+      entryPoint: string,
+      buffers: GPUVertexBufferLayout[]
+    ): GPURenderPipeline =>
+      device.createRenderPipeline({
+        label,
+        layout: 'auto',
+        vertex: { entryPoint, module: instancedModule, buffers },
+        fragment: { entryPoint: 'fs', module: instancedModule, targets: [] },
+        primitive: {
+          topology: 'triangle-list',
+          cullMode: 'none',
+        },
+        depthStencil: {
+          depthWriteEnabled: true,
+          depthCompare: 'less',
+          format: 'depth32float',
+          depthBiasSlopeScale: 2.0,
+        },
+      });
+
+    this.instancedPipeline = instancedPipeline(
+      'directional shadow instanced pipeline',
+      'vs',
+      instancedBuffers
+    );
+    // The wind variant also binds COLOR_0, the bend weights the scene pass
+    // displaces by.
+    this.instancedWindPipeline = instancedPipeline(
+      'directional shadow instanced wind pipeline',
+      'vsWind',
+      [
+        ...instancedBuffers,
+        {
+          arrayStride: 4 * 4,
+          attributes: [{ shaderLocation: 2, offset: 0, format: 'float32x4' }],
+        },
+      ]
+    );
 
     const impostorModule = device.createShaderModule({
       label: 'impostor shadow depth shader',
@@ -322,7 +348,7 @@ export class DirectionalShadowRenderer {
 
           if (uniforms.kind !== 'mesh') {
             this._writeInstancedUniforms(
-              device,
+              renderer,
               uniforms,
               mesh as IScatterInstanceGroup,
               camera
@@ -392,7 +418,9 @@ export class DirectionalShadowRenderer {
               uniforms.kind === 'impostor'
                 ? this.impostorPipeline
                 : uniforms.kind === 'instanced'
-                ? this.instancedPipeline
+                ? uniforms.wind
+                  ? this.instancedWindPipeline
+                  : this.instancedPipeline
                 : this.pipeline;
             if (wanted !== currentPipeline) {
               pass.setPipeline(wanted);
@@ -409,6 +437,7 @@ export class DirectionalShadowRenderer {
             if (group.rangeCount === 0) continue;
             // Both scatter casters carry a uv, for their cutouts.
             pass.setVertexBuffer(1, geo.uvBuffer);
+            if (uniforms.wind) pass.setVertexBuffer(2, geo.colorBuffer);
             pass.setBindGroup(0, uniforms.bindGroups[c]);
             for (let r = 0; r < group.rangeCount; r++)
               pass.drawIndexed(
@@ -471,11 +500,11 @@ export class DirectionalShadowRenderer {
         ? (mesh.material as ScatterImpostorPass)
         : null;
       const kind: ShadowCasterKind = impostor ? 'impostor' : 'instanced';
+      const pass = impostor ? null : (mesh.material as ScatterInstancedPass);
+      const wind = pass?.wind != null;
       // The scene pass would bind the material's defaults at its build, which
       // may not have run yet for a group the shadow pass meets first.
-      const material = impostor
-        ? null
-        : (mesh.material as ScatterInstancedPass).material;
+      const material = pass ? pass.material : null;
 
       const buffers = [0, 1, 2].map(() =>
         device.createBuffer({
@@ -490,6 +519,8 @@ export class DirectionalShadowRenderer {
           label: `shadow ${kind} bind group`,
           layout: (impostor
             ? this.impostorPipeline
+            : wind
+            ? this.instancedWindPipeline
             : this.instancedPipeline
           ).getBindGroupLayout(0),
           entries: [
@@ -520,13 +551,13 @@ export class DirectionalShadowRenderer {
         })
       ) as [GPUBindGroup, GPUBindGroup, GPUBindGroup];
 
-      const pass = mesh.material as ScatterInstancedPass;
-      const cutout = !impostor && pass.alphaMode === 'MASK';
+      const cutout = pass?.alphaMode === 'MASK';
       this.meshUniforms.set(mesh, {
         buffers,
         bindGroups,
         kind,
         cutout,
+        wind,
       });
       return;
     }
@@ -552,6 +583,7 @@ export class DirectionalShadowRenderer {
       bindGroups,
       kind: 'mesh',
       cutout: false,
+      wind: false,
     });
   }
 
@@ -568,11 +600,12 @@ export class DirectionalShadowRenderer {
    * from whenever it was last visible.
    */
   private _writeInstancedUniforms(
-    device: GPUDevice,
+    renderer: Renderer,
     uniforms: MeshShadowUniforms,
     group: IScatterInstanceGroup,
     camera: PerspectiveCamera
   ): void {
+    const { device } = renderer;
     const world = group.transform.matrixWorld;
     const cameraWorld = camera.camera.transform.matrixWorld.elements;
 
@@ -608,6 +641,16 @@ export class DirectionalShadowRenderer {
       data[36] = group.nearDistance;
       data[37] = group.cullDistance;
       data[38] = uniforms.cutout ? 1 : 0;
+      // The same wind the scene pass reads this frame, so the shadow of a
+      // leaf lands where the leaf is.
+      data.set(renderer.sky.skyRenderer.wind.vec, 40);
+      writeScatterWindParams(
+        (group.material as ScatterInstancedPass).wind,
+        world.elements[12],
+        world.elements[14],
+        data,
+        44
+      );
     }
 
     for (let c = 0; c < NUM_CASCADES; c++) {

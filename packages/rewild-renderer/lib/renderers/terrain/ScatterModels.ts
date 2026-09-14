@@ -3,7 +3,12 @@ import { GltfModel, GltfNode } from '../../core/GltfLoader';
 import { Geometry } from '../../geometry/Geometry';
 import { ScatterInstancedPass } from '../../materials/ScatterInstancedPass';
 import { createStandardPass } from '../../managers/MaterialManager';
-import { ScatterLayer, getScatterLayer, meshTierCount } from './ScatterLayers';
+import {
+  ScatterLayer,
+  ScatterWind,
+  getScatterLayer,
+  meshTierCount,
+} from './ScatterLayers';
 import { composeNodeMatrix } from './ScatterChunkLayer';
 import { ScatterImpostorPass } from '../../materials/ScatterImpostorPass';
 import { ScatterImpostorBaker } from './ScatterImpostorBake';
@@ -116,6 +121,7 @@ function buildTier(
       layer.name,
       layer.materialId,
       cutout,
+      layer.wind ?? null,
       root,
       null,
       built
@@ -154,6 +160,7 @@ function collectPrimitives(
   layerName: string,
   materialId: string | undefined,
   cutout: CutoutShading,
+  wind: ScatterWind | null,
   node: GltfNode,
   parent: Float32Array<ArrayBuffer> | null,
   out: ScatterPrimitive[]
@@ -201,6 +208,10 @@ function collectPrimitives(
       if (cutout.specularOcclusion) pass.specularOcclusion = true;
     }
 
+    // Per primitive, because the weights are: a model whose trunk ships
+    // without COLOR_0 keeps the trunk rigid and sways only what was painted.
+    if (wind && primitive.geometry.colors) pass.wind = wind;
+
     out.push({ geometry: primitive.geometry, pass, nodeMatrix });
   }
 
@@ -210,6 +221,7 @@ function collectPrimitives(
       layerName,
       materialId,
       cutout,
+      wind,
       child,
       nodeMatrix,
       out
