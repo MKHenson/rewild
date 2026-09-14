@@ -1,8 +1,11 @@
 import { leafCellPixels, leafCells } from './lib/atlas.ts';
 import { writeGlb, type GlbTextureSet } from './lib/glb.ts';
-import { buildMesh } from './lib/mesh.ts';
+import { buildMesh, type TreeMesh } from './lib/mesh.ts';
 import { parseConfig, resolveParams, sameTexture, tierParams, toConfig, type Params, type RawConfig } from './lib/params.ts';
 import { fbm, gradientNoise, signedFbm, valueNoise, warp, worley } from './lib/noise.ts';
+import { randomSeed } from './lib/rng.ts';
+import { renderComparison, renderPreview } from './lib/preview.ts';
+import type { Canvas } from './lib/textures.ts';
 import { buildSkeleton } from './lib/skeleton.ts';
 import { LOOK } from './lib/look.ts';
 import { LEAF_GRID_GENERATED } from './lib/sources.ts';
@@ -35,9 +38,24 @@ function readGltf(buffer: Buffer) {
 }
 
 describe('params', () => {
+  // The CLI rolls a seed for a config that has none, so this fallback is what
+  // the library keeps. Without it every seedless test would draw its own tree.
   it('derives a seed from the name so a name alone reproduces a tree', () => {
     expect(paramsFor().seed).toBe(paramsFor().seed);
     expect(resolveParams({ name: 'other-tree' }).seed).not.toBe(paramsFor().seed);
+  });
+
+  it('rolls seeds in the range a seed is read as', () => {
+    const seeds = Array.from({ length: 64 }, randomSeed);
+
+    for (const seed of seeds) {
+      expect(Number.isInteger(seed)).toBe(true);
+      expect(seed).toBeGreaterThanOrEqual(0);
+      expect(seed).toBeLessThan(4294967296);
+    }
+
+    // A roll that repeated would hand every unseeded run the same tree.
+    expect(new Set(seeds).size).toBeGreaterThan(60);
   });
 
   it('rejects a name that cannot be a filename or a template key', () => {
@@ -614,6 +632,96 @@ describe('scatter layer', () => {
     expect(layer.impostor?.fromDistance).toBeDefined();
     expect(layer.impostor!.fromDistance).toBeLessThan(layer.cullDistance);
     expect(layer.footprint).toBeGreaterThan(0);
+  });
+});
+
+describe('preview', () => {
+  /** A flat two-texel canvas. The comparison sheet is about geometry, and a
+   *  generated atlas would make this the slowest test in the file. */
+  function stubCanvas(): Canvas {
+    const texels = 4;
+    return {
+      size: 2,
+      bumpStrength: 1,
+      albedo: new Float32Array(texels * 3).fill(0.5),
+      alpha: new Float32Array(texels).fill(1),
+      height: new Float32Array(texels),
+      ao: new Float32Array(texels).fill(1),
+      roughness: new Float32Array(texels).fill(0.5),
+      metallic: new Float32Array(texels),
+    };
+  }
+
+  const canvases = { bark: stubCanvas(), leaves: stubCanvas() };
+  const SIZE = 64;
+  const panels = 2;
+
+  it('lays the model and every tier out in one strip', () => {
+    const { params, skeleton, mesh } = buildAll({ lods: [{ distance: 40, barkLevels: 1, leavesPerBranch: 1 }] });
+    const tier = buildMesh(tierParams(params, params.lods[0]), skeleton, LEAF_GRID_GENERATED);
+
+    const sheet = renderComparison(
+      params,
+      [
+        { label: 'BASE', mesh },
+        { label: 'LOD1', mesh: tier },
+      ],
+      canvases,
+      SIZE
+    );
+
+    expect(sheet.width).toBe(SIZE * 2);
+    expect(sheet.height).toBe(SIZE);
+    expect(sheet.data.length).toBe(SIZE * SIZE * 2 * 3);
+  });
+
+  /**
+   * The point of the sheet. A projection fitted per panel would redraw a tier
+   * that shed geometry larger, and the scale change would read as the handover
+   * moving a silhouette that never moved.
+   *
+   * A leafless tier sits wholly inside the model's bounds, so the shared fit is
+   * the model's own. That makes the model's panel identical to its solo render,
+   * and the tier's panel necessarily different from its own, because it is
+   * drawn at the model's scale rather than at one fitted to it. Fitting per
+   * panel is exactly what would make that second render match.
+   */
+  it('fits every panel through one projection, so a tier cannot drift in scale', () => {
+    const { params, skeleton, mesh } = buildAll({ seed: '7', lods: [{ distance: 40, leavesPerBranch: 0 }] });
+    const tier = buildMesh(tierParams(params, params.lods[0]), skeleton, LEAF_GRID_GENERATED);
+
+    const sheet = renderComparison(
+      params,
+      [
+        { label: 'A', mesh },
+        { label: 'B', mesh: tier },
+      ],
+      canvases,
+      SIZE
+    );
+
+    // Below the labels and clear of the divider, so only the render is compared.
+    const panel = (index: number): number[] => {
+      const bytes: number[] = [];
+      for (let y = Math.round(SIZE * 0.4); y < SIZE; y++)
+        for (let x = 2; x < SIZE; x++)
+          for (let channel = 0; channel < 3; channel++)
+            bytes.push(sheet.data[(y * SIZE * panels + index * SIZE + x) * 3 + channel]);
+      return bytes;
+    };
+
+    const solo = (target: TreeMesh): number[] => {
+      const render = renderPreview(params, target, canvases, SIZE);
+      const bytes: number[] = [];
+      for (let y = Math.round(SIZE * 0.4); y < SIZE; y++)
+        for (let x = 2; x < SIZE; x++)
+          for (let channel = 0; channel < 3; channel++)
+            bytes.push(render[(y * SIZE + x) * 3 + channel]);
+      return bytes;
+    };
+
+    expect(panel(0)).toEqual(solo(mesh));
+    expect(panel(1)).not.toEqual(solo(tier));
   });
 });
 

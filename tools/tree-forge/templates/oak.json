@@ -1,15 +1,7 @@
 {
   "name": "oak-01",
-  "textureSet": "oak",
-  "bark": [
-    "oak"
-  ],
-  "leaves": [
-    "oak"
-  ],
   "out": "assets/shared/nature/trees",
   "assetsRoot": "assets/shared",
-  "seed": 173219970,
   "height": 18,
   "trunkRadius": 0.62,
   "trunkTaper": 0.42,

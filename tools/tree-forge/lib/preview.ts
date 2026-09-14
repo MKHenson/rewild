@@ -170,8 +170,24 @@ function drawPrimitive(
   }
 }
 
-/** RGB bytes of a `size` square preview. */
-export function renderPreview(params: Params, mesh: TreeMesh, canvases: Canvases, size: number): Buffer {
+/** The two primitives' positions in view space, before they are fitted. */
+function viewsOf(mesh: TreeMesh): Float32Array[] {
+  return [toView(mesh.bark.positions), toView(mesh.leaves.positions)];
+}
+
+function marginFor(size: number): number {
+  return Math.round(size * 0.06);
+}
+
+/** One panel, drawn through a projection the caller owns. */
+function paint(
+  params: Params,
+  mesh: TreeMesh,
+  canvases: Canvases,
+  size: number,
+  views: Float32Array[],
+  project: (view: Float32Array) => Float32Array
+): Buffer {
   const target = Buffer.alloc(size * size * 3);
   const depth = new Float32Array(size * size).fill(-Infinity);
 
@@ -181,9 +197,6 @@ export function renderPreview(params: Params, mesh: TreeMesh, canvases: Canvases
     target[i * 3 + 1] = Math.round(mix(30, 48, t));
     target[i * 3 + 2] = Math.round(mix(36, 52, t));
   }
-
-  const views = [toView(mesh.bark.positions), toView(mesh.leaves.positions)];
-  const project = createProjector(views, size, Math.round(size * 0.06));
 
   // One depth buffer across both, so a leaf behind a branch is hidden by it.
   // `card` is the one leaf mode whose normals are the cards' own, so it is the
@@ -195,6 +208,121 @@ export function renderPreview(params: Params, mesh: TreeMesh, canvases: Canvases
   drawPrimitive(target, depth, size, mesh.leaves, project(views[1]), canvases.leaves, true, params.leafAlphaCutoff, true, mirrorLeaves);
 
   return target;
+}
+
+/** RGB bytes of a `size` square preview. */
+export function renderPreview(params: Params, mesh: TreeMesh, canvases: Canvases, size: number): Buffer {
+  const views = viewsOf(mesh);
+  return paint(params, mesh, canvases, size, views, createProjector(views, size, marginFor(size)));
+}
+
+/** One tier of the comparison strip. */
+export interface Panel {
+  label: string;
+  mesh: TreeMesh;
+}
+
+/**
+ * The model and its tiers side by side, nearest first, in one image.
+ *
+ * Every panel is fitted by a single projection built from all of them, so the
+ * trees land on the same pixels at the same scale. Fitting each panel to its
+ * own bounds would redraw a tier that dropped its outermost twigs slightly
+ * larger, and the scale change would read as the handover moving the
+ * silhouette when it had not.
+ */
+export function renderComparison(
+  params: Params,
+  panels: Panel[],
+  canvases: Canvases,
+  size: number
+): { data: Buffer; width: number; height: number } {
+  const views = panels.map((panel) => viewsOf(panel.mesh));
+  const project = createProjector(views.flat(), size, marginFor(size));
+
+  const width = size * panels.length;
+  const strip = Buffer.alloc(width * size * 3);
+
+  panels.forEach((panel, index) => {
+    const tile = paint(params, panel.mesh, canvases, size, views[index], project);
+
+    for (let y = 0; y < size; y++)
+      tile.copy(strip, (y * width + index * size) * 3, y * size * 3, (y + 1) * size * 3);
+  });
+
+  // Drawn after the blit so a label is never clipped by the panel it names.
+  panels.forEach((panel, index) => {
+    drawLabel(strip, width, panel.label, index * size + marginFor(size), marginFor(size), size);
+    if (index > 0) drawDivider(strip, width, size, index * size);
+  });
+
+  return { data: strip, width, height: size };
+}
+
+// A 3x5 bitmap per character, scaled up to suit the panel. A real font would
+// mean a dependency and an asset, for four words that only have to be read.
+const GLYPHS: Record<string, string> = {
+  '0': '111101101101111', '1': '010110010010111', '2': '111001111100111', '3': '111001111001111',
+  '4': '101101111001001', '5': '111100111001111', '6': '111100111101111', '7': '111001010010010',
+  '8': '111101111101111', '9': '111101111001111', A: '111101111101101', B: '110101110101110',
+  D: '110101101101110', E: '111100111100111', I: '111010010010111', L: '100100100100111',
+  O: '111101101101111', R: '110101110101101', S: '111100111001111', T: '111010010010010',
+  '%': '101001010100101', ' ': '000000000000000',
+};
+
+const GLYPH_WIDTH = 3;
+const GLYPH_HEIGHT = 5;
+
+function drawLabel(
+  target: Buffer,
+  width: number,
+  label: string,
+  left: number,
+  top: number,
+  size: number
+): void {
+  const pixel = Math.max(2, Math.round(size / 220));
+  const advance = (GLYPH_WIDTH + 1) * pixel;
+
+  // A panel is dark at the top, so the label is drawn light and given a dark
+  // pad. Bark behind it is the one thing bright enough to swallow it.
+  for (let y = -pixel; y < GLYPH_HEIGHT * pixel + pixel; y++)
+    for (let x = -pixel; x < label.length * advance; x++) {
+      const at = ((top + y) * width + left + x) * 3;
+      if (at < 0 || at + 2 >= target.length) continue;
+      target[at] = Math.round(target[at] * 0.25);
+      target[at + 1] = Math.round(target[at + 1] * 0.25);
+      target[at + 2] = Math.round(target[at + 2] * 0.25);
+    }
+
+  [...label].forEach((character, index) => {
+    const glyph = GLYPHS[character] ?? GLYPHS[' '];
+
+    for (let row = 0; row < GLYPH_HEIGHT; row++)
+      for (let column = 0; column < GLYPH_WIDTH; column++) {
+        if (glyph[row * GLYPH_WIDTH + column] !== '1') continue;
+
+        for (let y = 0; y < pixel; y++)
+          for (let x = 0; x < pixel; x++) {
+            const px = left + index * advance + column * pixel + x;
+            const py = top + row * pixel + y;
+            const at = (py * width + px) * 3;
+            if (at < 0 || at + 2 >= target.length) continue;
+            target[at] = 236;
+            target[at + 1] = 240;
+            target[at + 2] = 244;
+          }
+      }
+  });
+}
+
+function drawDivider(target: Buffer, width: number, size: number, x: number): void {
+  for (let y = 0; y < size; y++) {
+    const at = (y * width + x) * 3;
+    target[at] = 90;
+    target[at + 1] = 96;
+    target[at + 2] = 104;
+  }
 }
 
 function mix(a: number, b: number, t: number): number {
