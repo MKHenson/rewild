@@ -14,6 +14,16 @@ export const LOOK = {
   barkTint: '#6b5541',
   /** Base leaf colour, six digit hex. */
   leafTint: '#4e7c33',
+  /**
+   * Base blade colour for a generated clump, six digit hex.
+   *
+   * Its own value rather than the leaf's, and lighter and more olive than it.
+   * A tuft is read against the ground it stands on rather than against the sky,
+   * so a canopy green reads as a dark blob on dry terrain while the same green
+   * high in a crown reads as foliage. This sits close enough to a dry sward
+   * that the gaps between tufts stop registering as holes.
+   */
+  bladeTint: '#7d8f4a',
   /** Bark plates around the tube. Fewer means broader slabs. */
   barkPlates: 18,
   /** How far bark plates sit above and below each other. */

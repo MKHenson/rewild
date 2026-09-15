@@ -58,6 +58,6 @@
     "packages/rewild-routing",
     "packages/rewild-common",
     "packages/rewild-renderer",
-    "tools/tree-forge"
+    "tools/scatter-forge"
   ]
 }

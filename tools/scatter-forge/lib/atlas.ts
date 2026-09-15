@@ -38,18 +38,33 @@ export interface PixelRect {
   height: number;
 }
 
+/**
+ * Where cell `k` starts, in texels.
+ *
+ * Whole texels, because a grid need not divide the image. A leaf grid is 1, 2
+ * or 4 and always did, but a clump's is the smallest square holding its stamps,
+ * so 3 and 5 are ordinary — and `2048 / 3` lands a rect on a fractional index,
+ * where every write to the canvas is silently dropped.
+ *
+ * Both the UVs and the image writer are derived from this one function, so a
+ * rounded boundary cannot move one without moving the other.
+ */
+function edgeAt(size: number, grid: number, k: number): number {
+  return Math.round((k * size) / grid);
+}
+
 /** The leaf cells in UV space, inset by the gutter. */
 export function leafCells(size: number, grid: number): UvRect[] {
-  const g = gutterFor(size) / size;
+  const g = gutterFor(size);
   const cells: UvRect[] = [];
 
   for (let cy = 0; cy < grid; cy++)
     for (let cx = 0; cx < grid; cx++)
       cells.push({
-        u0: cx / grid + g,
-        u1: (cx + 1) / grid - g,
-        v0: cy / grid + g,
-        v1: (cy + 1) / grid - g,
+        u0: (edgeAt(size, grid, cx) + g) / size,
+        u1: (edgeAt(size, grid, cx + 1) - g) / size,
+        v0: (edgeAt(size, grid, cy) + g) / size,
+        v1: (edgeAt(size, grid, cy + 1) - g) / size,
       });
 
   return cells;
@@ -57,12 +72,19 @@ export function leafCells(size: number, grid: number): UvRect[] {
 
 /** The same cells in texels, for the image writer. */
 export function leafCellPixels(size: number, grid: number): PixelRect[] {
-  const edge = size / grid;
   const cells: PixelRect[] = [];
 
   for (let cy = 0; cy < grid; cy++)
-    for (let cx = 0; cx < grid; cx++)
-      cells.push({ x: cx * edge, y: cy * edge, width: edge, height: edge });
+    for (let cx = 0; cx < grid; cx++) {
+      const x = edgeAt(size, grid, cx);
+      const y = edgeAt(size, grid, cy);
+      cells.push({
+        x,
+        y,
+        width: edgeAt(size, grid, cx + 1) - x,
+        height: edgeAt(size, grid, cy + 1) - y,
+      });
+    }
 
   return cells;
 }

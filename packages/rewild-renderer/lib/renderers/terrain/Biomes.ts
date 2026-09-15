@@ -147,6 +147,19 @@ export const PLAIN: BiomeParams = {
       slope: { from: 24, to: 6 },
     },
     {
+      layer: 'meadow_01',
+      density: 0.5,
+      slope: { from: 55, to: 25 },
+      noise: { scale: 160, seedSalt: 23, band: { from: 0.95, to: 0.6 } },
+    },
+    {
+      layer: 'meadow_02',
+      density: 0.5,
+      slope: { from: 55, to: 25 },
+      noise: { scale: 160, seedSalt: 23, band: { from: 0.95, to: 0.6 } },
+    },
+
+    {
       layer: 'granite_boulder',
       density: 0.07,
       noise: { scale: 220, seedSalt: 41, band: { from: 0.55, to: 0.78 } },
@@ -192,6 +205,20 @@ export const FOREST: BiomeParams = {
       density: 0.55,
       slope: { from: 32, to: 10 },
       noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
+    },
+    {
+      layer: 'meadow_01',
+      density: 0.5,
+      slope: { from: 55, to: 25 },
+      // The stand's own field, inverted. Grass fills the glades.
+      noise: { scale: 260, seedSalt: 53, band: { from: 0.8, to: 0.45 } },
+    },
+    {
+      layer: 'meadow_02',
+      density: 0.5,
+      slope: { from: 55, to: 25 },
+      // The stand's own field, inverted. Grass fills the glades.
+      noise: { scale: 260, seedSalt: 53, band: { from: 0.8, to: 0.45 } },
     },
     { layer: 'granite_pebble', density: 0.18, slope: { from: 30, to: 8 } },
   ],

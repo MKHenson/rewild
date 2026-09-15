@@ -2,6 +2,11 @@
 // primitives because they want different materials: bark is opaque and single
 // sided, leaves are alpha-tested and double sided, and those are per-material
 // flags. One material would alpha-test the trunk for nothing.
+//
+// A model is a list of pieces rather than a fixed bark-and-leaves pair, because
+// a piece is what everything downstream is keyed on: one texture set, one glTF
+// material, one draw. A tree ships two, a clump ships one, and a rock will ship
+// one. The shared builder below is what every type writes its vertices through.
 
 import { leafCells } from './atlas.ts';
 import type { Params } from './params.ts';
@@ -20,13 +25,43 @@ export interface MeshAttributes {
   triangleCount: number;
 }
 
-export interface TreeMesh {
-  bark: MeshAttributes;
-  leaves: MeshAttributes;
+/**
+ * One primitive of a model: its vertices, and how they are drawn.
+ *
+ * `key` is the single name the piece is known by end to end — its texture
+ * files (`<set>_<key>_diff.webp`), its glTF material, its materials.json
+ * block and its preview panel. Nothing maps one spelling to another.
+ */
+export interface Piece {
+  key: string;
+  attributes: MeshAttributes;
+  /**
+   * Alpha tested and double sided. Cutout foliage is both: the test cuts the
+   * leaf shape out of a rectangle, and you see a leaf from underneath. Bark is
+   * neither, and a trunk seen from inside is a bug.
+   */
+  cutout: boolean;
+}
+
+/** A finished model: everything a glTF, a preview and a triangle count need. */
+export interface ForgeMesh {
+  pieces: Piece[];
+}
+
+/** One piece by key. Throws rather than returning undefined, because a caller
+ *  asking for a piece a type does not ship is a mistake, not a branch. */
+export function pieceOf(mesh: ForgeMesh, key: string): MeshAttributes {
+  const piece = mesh.pieces.find((entry) => entry.key === key);
+  if (!piece) throw new Error(`This model has no '${key}' piece. It ships ${mesh.pieces.map((p) => p.key).join(', ')}.`);
+  return piece.attributes;
+}
+
+export function totalTriangles(mesh: ForgeMesh): number {
+  return mesh.pieces.reduce((sum, piece) => sum + piece.attributes.triangleCount, 0);
 }
 
 /** Attributes while they are still growing, before they are frozen. */
-interface Builder {
+export interface Builder {
   positions: number[];
   normals: number[];
   uvs: number[];
@@ -40,11 +75,11 @@ const DEG = Math.PI / 180;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const TWO_PI = Math.PI * 2;
 
-function createBuilder(): Builder {
+export function createBuilder(): Builder {
   return { positions: [], normals: [], uvs: [], colors: [], indices: [] };
 }
 
-function pushVertex(
+export function pushVertex(
   out: Builder,
   position: Vec3,
   normal: Vec3,
@@ -58,7 +93,7 @@ function pushVertex(
   return out.positions.length / 3 - 1;
 }
 
-function finish(out: Builder): MeshAttributes {
+export function finish(out: Builder): MeshAttributes {
   return {
     positions: new Float32Array(out.positions),
     normals: new Float32Array(out.normals),
@@ -239,8 +274,13 @@ function buildLeaves(params: Params, skeleton: Skeleton, leafGrid: number): Mesh
 
 /** `leafGrid` is the cell count the leaf image was painted with, from
  *  leafGrid in sources.ts, so a card never addresses a cell nothing drew. */
-export function buildMesh(params: Params, skeleton: Skeleton, leafGrid: number): TreeMesh {
-  return { bark: buildBark(params, skeleton), leaves: buildLeaves(params, skeleton, leafGrid) };
+export function buildMesh(params: Params, skeleton: Skeleton, leafGrid: number): ForgeMesh {
+  return {
+    pieces: [
+      { key: 'bark', attributes: buildBark(params, skeleton), cutout: false },
+      { key: 'leaf', attributes: buildLeaves(params, skeleton, leafGrid), cutout: true },
+    ],
+  };
 }
 
 export function boundsOf(positions: Float32Array): { min: Vec3; max: Vec3 } {
