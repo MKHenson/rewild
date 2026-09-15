@@ -128,6 +128,9 @@ export function clumpLayer(params: Params, metrics: ClumpMetrics): ScatterLayer 
     authoredNormals: true,
     faceNormalSpecular: true,
     specularOcclusion: true,
+    // A tuft's shadow is a flicker of blade-sized texels under itself, and the
+    // shadow pass would draw every card of every patch to get it.
+    castShadow: false,
   };
 }
 
@@ -248,6 +251,7 @@ export function scatterLayerSource(layer: ScatterLayer): string {
     ...(layer.authoredNormals ? ['    authoredNormals: true,'] : []),
     ...(layer.faceNormalSpecular ? ['    faceNormalSpecular: true,'] : []),
     ...(layer.specularOcclusion ? ['    specularOcclusion: true,'] : []),
+    ...(layer.castShadow === false ? ['    castShadow: false,'] : []),
     '  },',
   ].join('\n');
 }

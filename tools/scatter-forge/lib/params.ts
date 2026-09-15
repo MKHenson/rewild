@@ -106,6 +106,7 @@ export const PARAM_SPEC = {
   cardCurve: { type: 'number', default: 26, help: 'Degrees a card bows over its own length, on top of the lean.', types: CLUMP },
   cardSpread: { type: 'number', default: 0.22, help: 'How far card bases sit from the tuft centre, as a fraction of height.', types: CLUMP },
   cardAspect: { type: 'number', default: 1, help: 'Card width as a fraction of its height.', types: CLUMP },
+  normalLean: { type: 'number', default: 0.45, help: 'How far every normal leans outward from straight up. 0 faces the whole tuft at the sky.', types: CLUMP },
 
   bendCurve: {
     type: 'number',
@@ -459,6 +460,8 @@ function validateClump(params: Params): void {
   if (!(params.cardAspect > 0)) throw new Error(`cardAspect must be positive, got ${params.cardAspect}.`);
 
   if (params.cardSpread < 0) throw new Error(`cardSpread must not be negative, got ${params.cardSpread}.`);
+
+  if (params.normalLean < 0) throw new Error(`normalLean must not be negative, got ${params.normalLean}.`);
 
   if (params.footprint > 0 && params.footprint < CLUMP_MIN_FOOTPRINT)
     throw new Error(

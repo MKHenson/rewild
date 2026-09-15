@@ -56,16 +56,15 @@ function heightFactor(params: Params): number {
 }
 
 /**
- * The tuft's shading normal at a point: mostly up, leaned outward.
+ * The tuft's shading normal at a point: up, leaned outward by `normalLean`.
  *
- * Mostly up is what keeps the tuft out of the wall-shading that makes grass
- * read as dark cardboard. The outward part is what stops the whole tuft
- * shading as one flat disc, and it is small on purpose.
+ * Up is what keeps the tuft out of the wall-shading that makes grass read as
+ * dark cardboard. The outward part is what stops the whole tuft shading as one
+ * flat disc, and it costs contrast between the cards facing the sun and the
+ * ones facing away — most under a low sun, so a lawn wants it at 0.
  */
-const OUTWARD_WEIGHT = 0.45;
-
-function tuftNormal(outward: Vec3): Vec3 {
-  return normalize(add(scale(outward, OUTWARD_WEIGHT), UP));
+function tuftNormal(params: Params, outward: Vec3): Vec3 {
+  return normalize(add(scale(outward, params.normalLean), UP));
 }
 
 /**
@@ -168,7 +167,7 @@ function buildTuft(
         point = add(point, scale(direction, cardLength / params.cardSegments));
       }
 
-      const normal = tuftNormal(outward);
+      const normal = tuftNormal(params, outward);
       const bend = t ** params.bendCurve;
       rowStart.push(out.positions.length / 3);
 

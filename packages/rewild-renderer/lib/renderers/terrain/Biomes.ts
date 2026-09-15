@@ -147,14 +147,14 @@ export const PLAIN: BiomeParams = {
       slope: { from: 24, to: 6 },
     },
     {
-      layer: 'meadow_01',
-      density: 0.5,
+      layer: 'plains_01',
+      density: 0.3,
       slope: { from: 55, to: 25 },
       noise: { scale: 160, seedSalt: 23, band: { from: 0.95, to: 0.6 } },
     },
     {
-      layer: 'meadow_02',
-      density: 0.5,
+      layer: 'plains_02',
+      density: 0.3,
       slope: { from: 55, to: 25 },
       noise: { scale: 160, seedSalt: 23, band: { from: 0.95, to: 0.6 } },
     },
@@ -207,15 +207,15 @@ export const FOREST: BiomeParams = {
       noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
     },
     {
-      layer: 'meadow_01',
-      density: 0.5,
+      layer: 'plains_01',
+      density: 0.3,
       slope: { from: 55, to: 25 },
       // The stand's own field, inverted. Grass fills the glades.
       noise: { scale: 260, seedSalt: 53, band: { from: 0.8, to: 0.45 } },
     },
     {
-      layer: 'meadow_02',
-      density: 0.5,
+      layer: 'plains_02',
+      density: 0.3,
       slope: { from: 55, to: 25 },
       // The stand's own field, inverted. Grass fills the glades.
       noise: { scale: 260, seedSalt: 53, band: { from: 0.8, to: 0.45 } },

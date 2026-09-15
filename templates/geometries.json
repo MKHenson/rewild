@@ -29,12 +29,12 @@
     "url": "nature/trees/poplar/poplar-01.glb",
     "lods": ["nature/trees/poplar/poplar-01.lod1.glb"]
   },
-  "meadow-01": {
+  "plains-01": {
     "type": "gltf",
-    "url": "nature/clumps/meadow/meadow-01.glb"
+    "url": "nature/clumps/plains/plains-01.glb"
   },
-  "meadow-02": {
+  "plains-02": {
     "type": "gltf",
-    "url": "nature/clumps/meadow/meadow-02.glb"
+    "url": "nature/clumps/plains/plains-02.glb"
   }
 }

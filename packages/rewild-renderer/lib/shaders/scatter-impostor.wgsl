@@ -11,6 +11,11 @@
 // Shading is the mesh tier's: the atlas holds base colour and the model-space
 // normal, and the fragment builds a rough dielectric surface from them and
 // runs it through the same BRDF, IBL and shadow taps.
+//
+// So is the wind: the quad's top edge sways through the same field the mesh
+// tier's crown does, with a bend weight ramping from the quad's foot to its
+// head, so the handover crossfades between two copies moving together and a
+// gust keeps rolling through the wood past the last mesh.
 
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/brdf.wgsl"
@@ -22,6 +27,7 @@
 #include "./shader-lib/spot-light-shadow.wgsl"
 #include "./shader-lib/scatter-impostor.wgsl"
 #include "./shader-lib/lod-fade.wgsl"
+#include "./shader-lib/scatter-wind.wgsl"
 
 struct Uniforms {
   projMatrix : mat4x4f,
@@ -34,6 +40,13 @@ struct Uniforms {
   // x = the tier index, y = 1 to tint by tier for the LOD debug view, z = the
   // reciprocal of the camera exposure, so the tint lands in scene units.
   debug : vec4f,
+  // The weather: xy = world-space direction the air moves, z = strength,
+  // w = seconds. See scatter-wind.wgsl.
+  wind : vec4f,
+  // The layer's wind block: x = amplitude, y = frequency, z = flutter.
+  windParams : vec4f,
+  // xy = the chunk's world origin, so the wind field is read in world space.
+  windOrigin : vec4f,
 }
 
 const TIER_TINTS = array<vec3f, 4>(
@@ -44,6 +57,8 @@ const TIER_TINTS = array<vec3f, 4>(
 );
 
 const CULLED_POSITION = vec4f(0.0, 0.0, 2.0, 1.0);
+// How much further the billboard's head travels than the mesh crown's tips.
+const IMPOSTOR_SWAY_GAIN = 2.5;
 
 struct ScatterInstance {
   posScale : vec4f,
@@ -132,7 +147,24 @@ fn vs(
   let up = impostorUp(octDir, right);
   let radius = impostor.centre.w * scale;
   let corner = (right * position.x + up * position.y) * radius;
-  let chunkPosition = centre + rotateByQuat(q, corner);
+  var chunkPosition = centre + rotateByQuat(q, corner);
+
+  // The quad's foot is the model's, so it stays planted like a trunk, and the
+  // lean grows linearly to the head: the weight is square-rooted because the
+  // wind squares it, and a quadratic ramp would leave most of the crown still.
+  // Then gained up. A mesh crown reads as moving through its leaves shifting
+  // against each other; a flat sheet has only its shear, and the same metres
+  // are a pixel at this range. No flutter: a leaf's own motion is under one.
+  let bend = sqrt((position.y + 1.0) * 0.5);
+  chunkPosition += scatterWindOffset(
+    uniforms.wind,
+    uniforms.windParams,
+    uniforms.windOrigin.xy,
+    vec4f(bend, 0.0, 0.0, 1.0),
+    instance.params.x,
+    scale,
+    chunkPosition
+  ) * IMPOSTOR_SWAY_GAIN;
 
   let mvPosition = uniforms.modelViewMatrix * vec4f(chunkPosition, 1.0);
   output.Position = uniforms.projMatrix * mvPosition;

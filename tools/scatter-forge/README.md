@@ -221,6 +221,7 @@ all of it.
 | `cardCurve` | 26 | Degrees a card bows over its length, on top of the lean. Quadratic, so it holds straight low down and bends near the tip. | `0` dead straight blades · `26` the default · `30` the template · `70` a weeping arc |
 | `cardSpread` | 0.22 | How far card bases sit from the tuft centre, as a fraction of `height`. | `0` every card on one point, which reads as pinched · `0.22` the default · `0.5` a ring rather than a tuft |
 | `cardAspect` | 1 | Card width as a fraction of its own height. | `1` the default, matching the square cell · `0.6` a narrower card for a tall stamp |
+| `normalLean` | 0.45 | How far every normal leans outward from straight up, as a weight against a unit up vector. | `0` the whole tuft faces the sky and every card shades the same, which is what a lawn or a plain under a low sun wants · `0.45` the default, about 24° out, which keeps a tuft from shading as one flat disc · `1` 45° out, a rosette lit from the side |
 | `blades` | `[]` | Folders under `sources/clump/` whose stamps fill the atlas. See [Authored clumps](#authored-clumps). | `[]` generates nine tufts instead · `["meadow", "clover"]` builds the atlas from both. A folder that is listed and missing stops the run rather than falling back |
 
 **The files and the emitted layer**
@@ -328,10 +329,17 @@ defaults to 3, which is what lets a blade bend as a curve. This is the whole rea
 six quads.
 
 **Normals lifted toward up.** A blade's own normal faces sideways, so it shades as a wall and the
-tuft goes dark. Every vertex here takes the tuft's normal instead — mostly up, leaned outward — and
-the emitted layer sets `authoredNormals: true` so the engine's back-face mirror does not turn it
-inward again. That is the same trick `leafNormalMode: canopy` uses on a tree, and it closes the
-"dark blades" problem in the asset rather than in a shader.
+tuft goes dark. Every vertex here takes the tuft's normal instead — up, leaned outward by
+`normalLean` — and the emitted layer sets `authoredNormals: true` so the engine's back-face mirror
+does not turn it inward again. That is the same trick `leafNormalMode: canopy` uses on a tree, and
+it closes the "dark blades" problem in the asset rather than in a shader.
+
+The lean is a trade. It is what stops a tuft shading as one flat disc, and it is also the whole
+difference between the card facing the sun and the card facing away: at the default 0.45 and a sun
+30° up, the two gather light at 0.8 and 0.1, and a patch reads as a scatter of bright and dark
+cards rather than as grass. Overhead the same lean costs almost nothing. Ground cover that has to
+hold together at every hour of the day wants `normalLean: 0`, where every card shades the same and
+the stamp alone carries the variety.
 
 **No shader work, and none needed.** Wind is already vertex-stage and reads `COLOR_0`, which this
 writes. `authoredNormals`, `faceNormalSpecular` and `specularOcclusion` already exist as layer flags,
@@ -343,6 +351,7 @@ and a clump sets all three for the reasons a tree's canopy does.
 | --- | --- |
 | **No impostor** | A billboard is only worth baking while the model covers more pixels than the tile has. A 0.38m tuft is under a 128px tile at every distance it is still drawn at, so it culls instead. `granite_pebble` does the same. |
 | **No collider** | A tuft that stops the player is worse than one they walk through. |
+| **No shadow** | The emitted row sets `castShadow: false`. A tuft's shadow is a flicker of blade-sized texels under itself, and casting it means the shadow pass draws every card of every patch in range. |
 | **No LOD chain** | A tier would save 18 triangles. Culling at 50m is the whole budget. |
 | **No `_disp` map** | Displacement is not wired at all — see [Displacement](#displacement) — and a blade's relief is under a millimetre. A `-disp` **input** is still required, because the normal is derived from it. |
 | **No ground tint** | `COLOR_0` is spent on wind, and it cannot also be a tint. Blending the terrain's colour into the blade base would need a second vertex colour. Named here rather than discovered as a bug. |
