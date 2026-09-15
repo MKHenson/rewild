@@ -119,7 +119,7 @@ export interface ScatterLayer {
 // for in what it actually draws rather than in whole chunks. What it still
 // costs is generation: every chunk within the range plus the prefetch places
 // its instances in the worker.
-const MESH_CULL_DISTANCE = 160;
+const MESH_CULL_DISTANCE = 400;
 // Trees carry the view: a treeline that ends a few hundred metres out reads as
 // a clearing. The impostor is what makes the range affordable — beyond its
 // handover an instance is two triangles.
@@ -135,7 +135,7 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     geometryId: 'granite-rock',
     materialId: 'granite-rock',
     cullDistance: MESH_CULL_DISTANCE,
-    impostor: { fromDistance: 100, views: 8, tileSize: 128 },
+    impostor: { fromDistance: 50, views: 8, tileSize: 128 },
     jitter: { scale: { from: 0.8, to: 2.2 }, yaw: FULL_TURN, tilt: 6 },
     // Sunk so a boulder beds in rather than balancing on one sampled vertex.
     yOffset: -0.15,
