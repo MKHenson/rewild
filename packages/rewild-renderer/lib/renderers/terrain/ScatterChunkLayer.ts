@@ -73,7 +73,7 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
   geometry: Geometry;
   material: IScatterInstancePass;
   visible = true;
-  castShadow = true;
+  castShadow: boolean;
   instanceCount: number;
   /** The library row this draws for, which owns the LOD chain's distances. */
   readonly layer: ScatterLayer;
@@ -146,6 +146,7 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     this.instanceCount = instances.count;
     this.layer = layer;
     this.tier = tier;
+    this.castShadow = layer.castShadow !== false;
     this.applyLodBias(lodBias);
     this.cells = bucketInstances(instances, reach);
     this.instanceData = packInstances(instances, this.cells.order);

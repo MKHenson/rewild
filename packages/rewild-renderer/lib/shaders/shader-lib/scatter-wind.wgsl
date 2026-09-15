@@ -23,6 +23,8 @@ const WIND_TAU = 6.28318530718;
 // second — the 10 m/s the rain leans by at strength 1.
 const GUST_LENGTH = 60.0;
 const GUST_SPEED = 10.0;
+// Fraction of the gust speed the finest octave is blown at.
+const EDDY_DRIFT = 0.55;
 
 fn windHash(p: vec2f) -> f32 {
   return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.5453);
@@ -66,11 +68,18 @@ fn scatterWindOffset(
   let t = wind.w;
 
   // The field, blown downwind: the point a vertex reads moves upwind through
-  // it over time, so its features come toward the viewer with the wind. Two
-  // octaves for shape; the second is offset so it never lines up with the
-  // first.
-  let p = (chunkPosition.xz + origin - wind.xy * (t * GUST_SPEED)) / GUST_LENGTH;
-  let field = 0.65 * windNoise(p) + 0.35 * windNoise(p * 2.7 + vec2f(37.0, 91.0));
+  // it over time, so its features come toward the viewer with the wind. Three
+  // octaves, each offset so none lines up with another. The finest is blown
+  // slower than the gusts it rides in, so it drifts through them instead of
+  // travelling in lockstep — one field moving as a block reads as a wave
+  // train, and this is what breaks it into eddies.
+  let drift = wind.xy * (t * GUST_SPEED);
+  let p = (chunkPosition.xz + origin - drift) / GUST_LENGTH;
+  let e = (chunkPosition.xz + origin - drift * EDDY_DRIFT) / GUST_LENGTH;
+  let field =
+    0.5 * windNoise(p) +
+    0.3 * windNoise(p * 2.7 + vec2f(37.0, 91.0)) +
+    0.2 * windNoise(e * 6.3 + vec2f(-71.0, 23.0));
   // A plant under wind keeps a lean; the gust adds to it.
   let gust = 0.3 + 0.7 * field;
   // A second read of the same field, off to one side, steers the lean a
@@ -78,9 +87,10 @@ fn scatterWindOffset(
   let veer = windNoise(p * 1.9 + vec2f(-53.0, 17.0)) - 0.5;
 
   // The plant's own sway at the layer's frequency, gated by the gust. Phase
-  // spread is small — a tenth of a cycle per plant, a little per limb — so a
-  // wood moves together and its limbs do not.
-  let phase = (0.1 * instancePhase + 0.08 * weights.g) * WIND_TAU;
+  // spread is a quarter of a cycle per plant and a little per limb: enough
+  // that neighbours are not in step, not so much that a wood stops moving
+  // together.
+  let phase = (0.25 * instancePhase + 0.08 * weights.g) * WIND_TAU;
   let sway = 0.8 + 0.2 * sin(t * params.y * WIND_TAU + phase);
   let lean = amplitude * bend * gust * sway;
   var offset = along * lean + across * (lean * 0.35 * veer);

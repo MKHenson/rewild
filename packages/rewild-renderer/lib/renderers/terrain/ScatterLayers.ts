@@ -113,6 +113,9 @@ export interface ScatterLayer {
    *  only ambient. Its occlusion stands in for the leaves in front of a card,
    *  which no shadow map sees. */
   specularOcclusion?: boolean;
+  /** Draw the layer into the shadow maps. Defaults to true. Off for ground
+   *  cover whose shadow is a flicker of blade-sized texels under itself. */
+  castShadow?: boolean;
 }
 
 // A draw submits only the 60m cells its LOD band can reach, so a range is paid
@@ -141,7 +144,7 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     yOffset: -0.15,
     alignToNormal: 1,
     footprint: 6,
-    collider: { type: 'box', size: [2.23, 1.12, 1.25] },
+    collider: { type: 'box', size: [2.23, 2.12, 1.25] },
   },
   // The same rock as ground clutter. No collider: a pebble that stops the
   // player is worse than one they walk through.
@@ -150,7 +153,7 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     geometryId: 'granite-rock',
     materialId: 'granite-rock',
     cullDistance: 60,
-    jitter: { scale: { from: 0.12, to: 0.35 }, yaw: FULL_TURN, tilt: 25 },
+    jitter: { scale: { from: 0.22, to: 0.45 }, yaw: FULL_TURN, tilt: 25 },
     yOffset: -0.05,
     alignToNormal: 1,
     // Cell size is twice this, so halving it quadruples the instance count.
@@ -178,7 +181,7 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     lodDistances: [60],
     cullDistance: TREE_CULL_DISTANCE,
     impostor: { fromDistance: 192, views: 8, tileSize: 128 },
-    jitter: { scale: { from: 0.8, to: 1.25 }, yaw: FULL_TURN, tilt: 3 },
+    jitter: { scale: { from: 0.9, to: 1.6 }, yaw: FULL_TURN, tilt: 3 },
     alignToNormal: 0,
     footprint: 9.8,
     collider: {
@@ -198,7 +201,7 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     lodDistances: [60],
     cullDistance: TREE_CULL_DISTANCE,
     impostor: { fromDistance: 192, views: 8, tileSize: 128 },
-    jitter: { scale: { from: 0.8, to: 1.25 }, yaw: FULL_TURN, tilt: 3 },
+    jitter: { scale: { from: 0.5, to: 1.25 }, yaw: FULL_TURN, tilt: 3 },
     alignToNormal: 0,
     footprint: 6.4,
     collider: {
@@ -212,31 +215,33 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     faceNormalSpecular: true,
     specularOcclusion: true,
   },
-  meadow_01: {
-    name: 'meadow_01',
-    geometryId: 'meadow-01',
-    cullDistance: 50,
-    jitter: { scale: { from: 0.8, to: 1.8 }, yaw: FULL_TURN, tilt: 3 },
+  plains_01: {
+    name: 'plains_01',
+    geometryId: 'plains-01',
+    cullDistance: 120,
+    jitter: { scale: { from: 0.8, to: 1.3 }, yaw: FULL_TURN, tilt: 3 },
     yOffset: -0.084,
     alignToNormal: 0.6,
     footprint: 1.6,
-    wind: { amplitude: 1.18, frequency: 1.1, flutter: 0.7 },
+    wind: { amplitude: 4.18, frequency: 0.8, flutter: 0.7 },
     authoredNormals: true,
     faceNormalSpecular: true,
     specularOcclusion: true,
+    castShadow: false,
   },
-  meadow_02: {
-    name: 'meadow_02',
-    geometryId: 'meadow-02',
-    cullDistance: 50,
-    jitter: { scale: { from: 0.8, to: 1.8 }, yaw: FULL_TURN, tilt: 3 },
+  plains_02: {
+    name: 'plains_02',
+    geometryId: 'plains-02',
+    cullDistance: 120,
+    jitter: { scale: { from: 0.8, to: 1.3 }, yaw: FULL_TURN, tilt: 2 },
     yOffset: -0.09,
     alignToNormal: 0.6,
     footprint: 1.6,
-    wind: { amplitude: 1.18, frequency: 1.1, flutter: 0.7 },
+    wind: { amplitude: 4.18, frequency: 0.8, flutter: 0.7 },
     authoredNormals: true,
     faceNormalSpecular: true,
     specularOcclusion: true,
+    castShadow: false,
   },
 };
 

@@ -900,6 +900,15 @@ describe('clump', () => {
     for (let i = 0; i < vertexCount; i++) expect(normals[i * 3 + 1]).toBeGreaterThan(0.5);
   });
 
+  it('faces every normal straight at the sky at normalLean 0', () => {
+    const { normals, vertexCount } = build({ normalLean: 0 }).mesh.pieces[0].attributes;
+    for (let i = 0; i < vertexCount; i++) expect(normals[i * 3 + 1]).toBeCloseTo(1, 6);
+  });
+
+  it('rejects a negative normalLean', () => {
+    expect(() => build({ normalLean: -0.1 })).toThrow(/normalLean/);
+  });
+
   it('writes COLOR_0 rigid at the base and free at the tip', () => {
     const { positions, colors, vertexCount } = build({ bendCurve: 1 }).mesh.pieces[0].attributes;
     let lowest = Infinity;
