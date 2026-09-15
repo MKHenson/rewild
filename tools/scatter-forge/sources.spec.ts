@@ -137,7 +137,7 @@ describe('bark sources', () => {
   let root: string;
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), 'tree-forge-sources-'));
+    root = await mkdtemp(join(tmpdir(), 'scatter-forge-sources-'));
   });
 
   afterAll(async () => {
@@ -203,7 +203,7 @@ describe('leaf sources', () => {
   let root: string;
 
   beforeAll(async () => {
-    root = await mkdtemp(join(tmpdir(), 'tree-forge-leaves-'));
+    root = await mkdtemp(join(tmpdir(), 'scatter-forge-leaves-'));
   });
 
   afterAll(async () => {

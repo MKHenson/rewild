@@ -1,19 +1,21 @@
 import { leafCellPixels, leafCells } from './lib/atlas.ts';
 import { writeGlb, type GlbTextureSet } from './lib/glb.ts';
-import { buildMesh, type TreeMesh } from './lib/mesh.ts';
-import { impostorDistance, parseConfig, resolveParams, sameTexture, tierParams, toConfig, type Params, type RawConfig } from './lib/params.ts';
+import { buildMesh, pieceOf, totalTriangles, type ForgeMesh, type MeshAttributes } from './lib/mesh.ts';
+import { CLUMP_MAX_PATCH_RADIUS, impostorDistance, parseConfig, resolveParams, sameTexture, tierParams, toConfig, type Params, type RawConfig } from './lib/params.ts';
 import { fbm, gradientNoise, signedFbm, valueNoise, warp, worley } from './lib/noise.ts';
 import { randomSeed } from './lib/rng.ts';
 import { renderComparison, renderPreview } from './lib/preview.ts';
 import type { Canvas } from './lib/textures.ts';
 import { buildSkeleton } from './lib/skeleton.ts';
 import { LOOK } from './lib/look.ts';
-import { LEAF_GRID_GENERATED } from './lib/sources.ts';
-import { colliderFor, geometryEntry, scatterLayer, scatterLayerSource } from './lib/templates.ts';
+import { clumpAtlas, CLUMP_CELLS_GENERATED, LEAF_GRID_GENERATED } from './lib/sources.ts';
+import { clumpLayer, colliderFor, geometryEntry, scatterLayer, scatterLayerSource } from './lib/templates.ts';
+import { buildClump, patchRadiusOf } from './lib/clump.ts';
+import { heightPieces, materialPieces } from './lib/pieces.ts';
 
 const TEXTURES: GlbTextureSet = {
   bark: { baseColor: 'a_bark_diff.webp', normal: 'a_bark_nor.webp', arm: 'a_bark_arm.webp' },
-  leaves: { baseColor: 'a_leaf_diff.webp', normal: 'a_leaf_nor.webp', arm: 'a_leaf_arm.webp' },
+  leaf: { baseColor: 'a_leaf_diff.webp', normal: 'a_leaf_nor.webp', arm: 'a_leaf_arm.webp' },
 };
 
 /**
@@ -217,8 +219,8 @@ describe('skeleton', () => {
 describe('COLOR_0', () => {
   it('runs bend from rigid at the base to free at the tips', () => {
     const { mesh } = buildAll();
-    const bark = [...mesh.bark.colors].filter((_, i) => i % 4 === 0);
-    const leaves = [...mesh.leaves.colors].filter((_, i) => i % 4 === 0);
+    const bark = [...pieceOf(mesh, 'bark').colors].filter((_, i) => i % 4 === 0);
+    const leaves = [...pieceOf(mesh, 'leaf').colors].filter((_, i) => i % 4 === 0);
 
     expect(Math.min(...bark)).toBeCloseTo(0, 3);
     expect(Math.max(...leaves)).toBeGreaterThan(Math.max(...bark));
@@ -227,8 +229,8 @@ describe('COLOR_0', () => {
 
   it('flutters leaves only, and never the bark', () => {
     const { mesh } = buildAll();
-    const barkFlutter = [...mesh.bark.colors].filter((_, i) => i % 4 === 2);
-    const leafFlutter = [...mesh.leaves.colors].filter((_, i) => i % 4 === 2);
+    const barkFlutter = [...pieceOf(mesh, 'bark').colors].filter((_, i) => i % 4 === 2);
+    const leafFlutter = [...pieceOf(mesh, 'leaf').colors].filter((_, i) => i % 4 === 2);
 
     expect(Math.max(...barkFlutter)).toBe(0);
     expect(Math.min(...leafFlutter)).toBe(0);
@@ -237,7 +239,7 @@ describe('COLOR_0', () => {
 
   it('gives each limb its own phase, constant across that limb', () => {
     const { mesh, skeleton } = buildAll();
-    const phases = new Set([...mesh.bark.colors].filter((_, i) => i % 4 === 1));
+    const phases = new Set([...pieceOf(mesh, 'bark').colors].filter((_, i) => i % 4 === 1));
     const limbs = new Set(skeleton.branches.map((branch) => branch.clusterId));
 
     expect(phases.size).toBe(limbs.size);
@@ -246,7 +248,7 @@ describe('COLOR_0', () => {
 
 describe('winding', () => {
   /** Share of triangles whose index order agrees with their vertex normals. */
-  function facingAgreement(attributes: ReturnType<typeof buildMesh>['bark']): number {
+  function facingAgreement(attributes: MeshAttributes): number {
     const { positions, normals, indices } = attributes;
     const at = (i: number, a: Float32Array): [number, number, number] => [a[i * 3], a[i * 3 + 1], a[i * 3 + 2]];
     let agree = 0;
@@ -277,20 +279,20 @@ describe('winding', () => {
     // The bark material is single sided, so a reversed winding culls the near
     // wall of the tube and draws its far inside. That reads as a dark, hollow
     // trunk, and nothing else in the pipeline checks it.
-    expect(facingAgreement(buildAll().mesh.bark)).toBe(1);
+    expect(facingAgreement(pieceOf(buildAll().mesh, 'bark'))).toBe(1);
   });
 
   it('winds leaf cards to face the way their card points', () => {
     // Measured against the card normal, because the default canopy normals
     // deliberately do not follow the card.
-    expect(facingAgreement(buildAll({ leafNormalMode: 'card' }).mesh.leaves)).toBe(1);
+    expect(facingAgreement(pieceOf(buildAll({ leafNormalMode: 'card' }).mesh, 'leaf'))).toBe(1);
   });
 });
 
 describe('leaf normals', () => {
   function leafNormals(mode: string) {
     const { skeleton, mesh } = buildAll({ leafNormalMode: mode });
-    const { normals, positions, vertexCount } = mesh.leaves;
+    const { normals, positions, vertexCount } = pieceOf(mesh, 'leaf');
     const at = (i: number, a: Float32Array): [number, number, number] => [a[i * 3], a[i * 3 + 1], a[i * 3 + 2]];
     return { skeleton, normals, positions, vertexCount, at };
   }
@@ -349,7 +351,7 @@ describe('leaf normals', () => {
 describe('bark uvs', () => {
   /** Texels per metre along the branch over texels per metre around it, per ring segment. */
   function uvAspects(params: ReturnType<typeof paramsFor>, skeleton: ReturnType<typeof buildSkeleton>): number[] {
-    const { positions, uvs } = buildMesh(params, skeleton, LEAF_GRID_GENERATED).bark;
+    const { positions, uvs } = pieceOf(buildMesh(params, skeleton, LEAF_GRID_GENERATED), 'bark');
     const aspects: number[] = [];
     let cursor = 0;
 
@@ -414,7 +416,7 @@ describe('bark uvs', () => {
     const { params, skeleton, mesh } = buildAll();
     const trunk = skeleton.branches[0];
     const stride = Math.max(3, params.radialSegments - trunk.level) + 1;
-    const along = (ring: number) => mesh.bark.uvs[ring * stride * 2 + 1];
+    const along = (ring: number) => pieceOf(mesh, 'bark').uvs[ring * stride * 2 + 1];
 
     for (let ring = 1; ring < trunk.points.length; ring++) {
       const span = trunk.points[ring].dist - trunk.points[ring - 1].dist;
@@ -528,7 +530,7 @@ describe('atlas', () => {
 describe('glb', () => {
   it('writes a container whose chunks match their declared lengths', () => {
     const { params, mesh } = buildAll();
-    const buffer = writeGlb({ name: params.name, ...mesh, textures: TEXTURES, alphaCutoff: 0.45 });
+    const buffer = writeGlb({ name: params.name, mesh, textures: TEXTURES, alphaCutoff: 0.45 });
 
     expect(buffer.readUInt32LE(0)).toBe(0x46546c67);
     expect(buffer.readUInt32LE(8)).toBe(buffer.byteLength);
@@ -540,7 +542,7 @@ describe('glb', () => {
 
   it('splits opaque bark from cutout leaves', () => {
     const { params, mesh } = buildAll();
-    const gltf = readGltf(writeGlb({ name: params.name, ...mesh, textures: TEXTURES, alphaCutoff: 0.4 }));
+    const gltf = readGltf(writeGlb({ name: params.name, mesh, textures: TEXTURES, alphaCutoff: 0.4 }));
     const [bark, leaves] = gltf.materials;
 
     expect(gltf.meshes[0].primitives).toHaveLength(2);
@@ -553,7 +555,7 @@ describe('glb', () => {
 
   it('carries COLOR_0 on both primitives and no tangents', () => {
     const { params, mesh } = buildAll();
-    const gltf = readGltf(writeGlb({ name: params.name, ...mesh, textures: TEXTURES, alphaCutoff: 0.45 }));
+    const gltf = readGltf(writeGlb({ name: params.name, mesh, textures: TEXTURES, alphaCutoff: 0.45 }));
 
     for (const primitive of gltf.meshes[0].primitives) {
       expect(primitive.attributes.COLOR_0).toBeDefined();
@@ -565,7 +567,7 @@ describe('glb', () => {
   it('reproduces a tree byte for byte from the same seed', () => {
     const build = (extra: RawConfig) => {
       const { params, mesh } = buildAll(extra);
-      return writeGlb({ name: params.name, ...mesh, textures: TEXTURES, alphaCutoff: 0.45 });
+      return writeGlb({ name: params.name, mesh, textures: TEXTURES, alphaCutoff: 0.45 });
     };
 
     expect(build({ seed: '7' }).equals(build({ seed: '7' }))).toBe(true);
@@ -676,7 +678,7 @@ describe('preview', () => {
     };
   }
 
-  const canvases = { bark: stubCanvas(), leaves: stubCanvas() };
+  const canvases = { bark: stubCanvas(), leaf: stubCanvas() };
   const SIZE = 64;
   const panels = 2;
 
@@ -734,7 +736,7 @@ describe('preview', () => {
       return bytes;
     };
 
-    const solo = (target: TreeMesh): number[] => {
+    const solo = (target: ForgeMesh): number[] => {
       const render = renderPreview(params, target, canvases, SIZE);
       const bytes: number[] = [];
       for (let y = Math.round(SIZE * 0.4); y < SIZE; y++)
@@ -791,9 +793,9 @@ describe('LOD tiers', () => {
     const { params, skeleton, mesh } = buildAll(chain);
     const tiers = params.lods.map((tier) => buildMesh(tierParams(params, tier), skeleton, LEAF_GRID_GENERATED));
 
-    let previous = mesh.bark.triangleCount + mesh.leaves.triangleCount;
+    let previous = totalTriangles(mesh);
     for (const tier of tiers) {
-      const count = tier.bark.triangleCount + tier.leaves.triangleCount;
+      const count = totalTriangles(tier);
       expect(count).toBeLessThan(previous);
       previous = count;
     }
@@ -803,8 +805,8 @@ describe('LOD tiers', () => {
     const full = buildAll({ branchLevels: '3', leafLevels: '1' });
     const bare = buildAll({ branchLevels: '3', leafLevels: '1', barkLevels: '1' });
 
-    expect(bare.mesh.bark.triangleCount).toBeLessThan(full.mesh.bark.triangleCount);
-    expect(bare.mesh.leaves.triangleCount).toBe(full.mesh.leaves.triangleCount);
+    expect(pieceOf(bare.mesh, 'bark').triangleCount).toBeLessThan(pieceOf(full.mesh, 'bark').triangleCount);
+    expect(pieceOf(bare.mesh, 'leaf').triangleCount).toBe(pieceOf(full.mesh, 'leaf').triangleCount);
   });
 
   it('scales leaf cards by leafScale without touching the texture fit', () => {
@@ -814,7 +816,7 @@ describe('LOD tiers', () => {
 
     const cardHeight = (params: Params) => {
       const skeleton = buildSkeleton(params);
-      const leaves = buildMesh(params, skeleton, LEAF_GRID_GENERATED).leaves;
+      const leaves = pieceOf(buildMesh(params, skeleton, LEAF_GRID_GENERATED), 'leaf');
       const p = leaves.positions;
       // Corners 0 and 3 of the first card are its stem and its tip.
       return Math.hypot(p[9] - p[0], p[10] - p[1], p[11] - p[2]);
@@ -833,5 +835,256 @@ describe('LOD tiers', () => {
     expect(layer.lodDistances).toEqual([40, 80]);
     expect(scatterLayerSource(layer)).toContain('lodDistances: [40, 80],');
     expect(scatterLayer(paramsFor(), skeleton).lodDistances).toBeUndefined();
+  });
+});
+
+describe('clump', () => {
+  const clumpParams = (extra: RawConfig = {}): Params =>
+    resolveParams({ type: 'clump', name: 'test-clump', ...extra });
+
+  const build = (extra: RawConfig = {}, cells = CLUMP_CELLS_GENERATED) =>
+    buildClump(clumpParams(extra), cells);
+
+  it('rejects a key that belongs to another type, and names the type that takes it', () => {
+    expect(() => parseConfig({ type: 'clump', name: 'a', splits: 4 }, 'test.json')).toThrow(
+      /'splits' applies to tree, not to type 'clump'/
+    );
+    expect(() => parseConfig({ name: 'a', cardsPerTuft: 4 }, 'test.json')).toThrow(
+      /'cardsPerTuft' applies to clump, not to type 'tree'/
+    );
+    expect(() => parseConfig({ type: 'bush', name: 'a' }, 'test.json')).toThrow(/must be one of tree, clump/);
+  });
+
+  // The sidecar is written from resolved params, which carry a default for
+  // every key including the ones this type does not use. Writing those would
+  // produce a file the next run refuses to open.
+  it('writes a sidecar that reopens', () => {
+    for (const type of ['tree', 'clump'] as const) {
+      const saved = toConfig(resolveParams({ type, name: 'a' }));
+      expect(() => resolveParams(parseConfig(saved, 'sidecar'))).not.toThrow();
+    }
+  });
+
+  it('takes its defaults from the type rather than from the tree', () => {
+    const clump = clumpParams();
+    expect(clump.out).toBe('assets/shared/nature/clumps');
+    expect(clump.cullDistance).toBe(50);
+    expect(clump.textureSize).toBe(2048);
+    // A blade bends along its whole length. The tree's 1.6 holds a trunk rigid.
+    expect(clump.bendCurve).toBe(1);
+    expect(resolveParams({ name: 'a' }).cullDistance).toBe(160);
+  });
+
+  it('ships one cutout piece of two triangles per card segment', () => {
+    const { mesh } = build({ cardsPerTuft: 4, cardSegments: 3 });
+    expect(mesh.pieces).toHaveLength(1);
+    expect(mesh.pieces[0].key).toBe('blade');
+    expect(mesh.pieces[0].cutout).toBe(true);
+    expect(totalTriangles(mesh)).toBe(4 * 3 * 2);
+  });
+
+  // Lean and curve bend a card over, so its tip lands below its own length.
+  // Without the normalise, raising cardCurve would quietly shrink the tuft.
+  it('lands on the height it was asked for whatever the curve does', () => {
+    for (const cardCurve of [0, 30, 70]) {
+      const { metrics } = build({ height: 0.4, cardCurve });
+      expect(metrics.height).toBeCloseTo(0.4, 5);
+    }
+  });
+
+  // The engine's open "dark blades" problem, solved in the asset: a card's own
+  // normal faces sideways and shades as a wall. The layer sets authoredNormals
+  // so nothing mirrors these back inward.
+  it('points every normal up rather than along the card', () => {
+    const { normals, vertexCount } = build().mesh.pieces[0].attributes;
+    for (let i = 0; i < vertexCount; i++) expect(normals[i * 3 + 1]).toBeGreaterThan(0.5);
+  });
+
+  it('writes COLOR_0 rigid at the base and free at the tip', () => {
+    const { positions, colors, vertexCount } = build({ bendCurve: 1 }).mesh.pieces[0].attributes;
+    let lowest = Infinity;
+    let highest = -Infinity;
+
+    for (let i = 0; i < vertexCount; i++) {
+      if (positions[i * 3 + 1] < lowest) lowest = positions[i * 3 + 1];
+      if (positions[i * 3 + 1] > highest) highest = positions[i * 3 + 1];
+      // Flutter is the blade's own motion, so it starts at zero where the card
+      // meets the ground.
+      expect(colors[i * 4 + 2]).toBeGreaterThanOrEqual(0);
+    }
+
+    expect(lowest).toBeCloseTo(0, 5);
+    const bends = [...colors].filter((_, i) => i % 4 === 0);
+    expect(Math.min(...bends)).toBe(0);
+    expect(Math.max(...bends)).toBe(1);
+
+    // One phase per card, not one for the whole tuft: blades in lockstep read
+    // as a single stiff object.
+    const phases = new Set([...colors].filter((_, i) => i % 4 === 1));
+    expect(phases.size).toBe(clumpParams().cardsPerTuft);
+  });
+
+  it('never addresses a cell nothing painted', () => {
+    // Ten stamps land in a 4x4, which leaves six cells blank.
+    const cells = 10;
+    expect(clumpAtlas({ stamps: new Array(cells) } as never)).toEqual({ grid: 4, cells });
+
+    const { uvs, vertexCount } = build({ cardsPerTuft: 12 }, cells).mesh.pieces[0].attributes;
+    const painted = leafCells(clumpParams().textureSize, 4).slice(0, cells);
+
+    for (let i = 0; i < vertexCount; i++) {
+      const u = uvs[i * 2];
+      const v = uvs[i * 2 + 1];
+      expect(
+        painted.some((cell) => u >= cell.u0 - 1e-6 && u <= cell.u1 + 1e-6 && v >= cell.v0 - 1e-6 && v <= cell.v1 + 1e-6)
+      ).toBe(true);
+    }
+  });
+
+  it('emits a layer with no impostor and no collider', () => {
+    const { metrics } = build();
+    const layer = clumpLayer(clumpParams(), metrics);
+
+    // A billboard of a half-metre tuft is fewer pixels than the tile has, and a
+    // tuft that stops the player is worse than one they walk through.
+    expect(layer.impostor).toBeUndefined();
+    expect(layer.collider).toBeUndefined();
+    // Grass leans with the ground it grows out of. A tree does not.
+    expect(layer.alignToNormal).toBeGreaterThan(0);
+    expect(layer.authoredNormals).toBe(true);
+
+    const source = scatterLayerSource(layer);
+    expect(source).not.toContain('impostor');
+    expect(source).not.toContain('collider');
+    expect(source).toContain('authoredNormals: true');
+    expect(source).toContain('yOffset:');
+  });
+
+  it('writes no _disp map and so no materials.json material', () => {
+    expect(heightPieces('clump')).toEqual([]);
+    expect(heightPieces('tree')).toEqual(['bark', 'leaf']);
+    // Binding a material through materialId replaces every material in the
+    // model, so only a piece a displacement path might reach gets one.
+    expect(materialPieces('tree')).toEqual(['bark']);
+    expect(materialPieces('clump')).toEqual([]);
+  });
+});
+
+// A leaf grid is 1, 2 or 4 and always divided the image. A clump's is the
+// smallest square holding its stamps, so 3 and 5 are ordinary — and a
+// fractional rect lands on a non-integer index, where every canvas write is
+// silently dropped.
+describe('atlas cells on a grid that does not divide the image', () => {
+  it('lands every cell on whole texels and leaves no gap between them', () => {
+    for (const grid of [3, 5, 7]) {
+      const cells = leafCellPixels(2048, grid);
+      expect(cells).toHaveLength(grid * grid);
+
+      for (const cell of cells)
+        for (const value of [cell.x, cell.y, cell.width, cell.height])
+          expect(Number.isInteger(value)).toBe(true);
+
+      // The last cell of a row ends exactly on the edge, so nothing is left
+      // unpainted and nothing runs past the image.
+      const row = cells.slice(0, grid);
+      expect(row[0].x).toBe(0);
+      expect(row[grid - 1].x + row[grid - 1].width).toBe(2048);
+      for (let i = 1; i < grid; i++) expect(row[i].x).toBe(row[i - 1].x + row[i - 1].width);
+    }
+  });
+
+  it('keeps the uvs inside the texels that were painted', () => {
+    const size = 2048;
+    const grid = 3;
+    const pixels = leafCellPixels(size, grid);
+    const uv = leafCells(size, grid);
+
+    uv.forEach((cell, index) => {
+      expect(cell.u0 * size).toBeGreaterThanOrEqual(pixels[index].x);
+      expect(cell.u1 * size).toBeLessThanOrEqual(pixels[index].x + pixels[index].width);
+      expect(cell.v0 * size).toBeGreaterThanOrEqual(pixels[index].y);
+      expect(cell.v1 * size).toBeLessThanOrEqual(pixels[index].y + pixels[index].height);
+    });
+  });
+});
+
+// One candidate per instance buys every tuft in it: the placer samples a
+// height, a slope, a biome and a noise field per cell of every chunk, and a
+// patch pays that once for all of them.
+describe('clump patches', () => {
+  const patchParams = (extra: RawConfig = {}): Params =>
+    resolveParams({ type: 'clump', name: 'test-patch', tuftsPerModel: 9, patchRadius: 1.4, ...extra });
+
+  const build = (extra: RawConfig = {}) => buildClump(patchParams(extra), CLUMP_CELLS_GENERATED);
+
+  it('grows one tuft per model by default, so an existing clump is unchanged', () => {
+    const single = resolveParams({ type: 'clump', name: 'a' });
+    expect(single.tuftsPerModel).toBe(1);
+    expect(patchRadiusOf(single)).toBe(0);
+    expect(buildClump(single, CLUMP_CELLS_GENERATED).metrics.patchRadius).toBe(0);
+  });
+
+  it('multiplies the tufts without multiplying the instances', () => {
+    const one = buildClump(patchParams({ tuftsPerModel: 1 }), CLUMP_CELLS_GENERATED);
+    const nine = build();
+    const cards = patchParams().cardsPerTuft * patchParams().cardSegments * 2;
+
+    expect(totalTriangles(one.mesh)).toBe(cards);
+    expect(totalTriangles(nine.mesh)).toBe(cards * 9);
+  });
+
+  // The model is cut to land on `height` rather than grown and scaled onto it.
+  // Scaling would rescale the patch sideways too, so `patchRadius` would stop
+  // meaning metres the moment `cardCurve` moved.
+  it('lands on its height without rescaling the patch', () => {
+    for (const cardCurve of [0, 30, 70]) {
+      const { metrics } = build({ height: 0.4, cardCurve });
+      expect(metrics.height).toBeCloseTo(0.4, 5);
+      expect(metrics.patchRadius).toBe(1.4);
+    }
+  });
+
+  it('keeps every tuft inside the patch it was given', () => {
+    const radius = 1.4;
+    const { mesh, metrics } = build({ patchRadius: radius });
+    const { positions, vertexCount } = mesh.pieces[0].attributes;
+
+    // Blades reach past the bases they grow from, but only by one tuft's own
+    // width. A patch that sprawled further would not tile the cell its
+    // footprint claims.
+    for (let i = 0; i < vertexCount; i++)
+      expect(Math.hypot(positions[i * 3], positions[i * 3 + 2])).toBeLessThan(radius * 1.5);
+
+    expect(metrics.spread).toBeGreaterThan(radius);
+  });
+
+  // A patch whose tufts share phases sways as one rigid slab, which is far more
+  // obvious at three metres across than a single stiff tuft ever was.
+  it('phases every tuft separately, not just every card', () => {
+    const { colors } = build().mesh.pieces[0].attributes;
+    const phases = new Set([...colors].filter((_, i) => i % 4 === 1));
+    expect(phases.size).toBe(9 * patchParams().cardsPerTuft);
+  });
+
+  it('refuses a patch wider than the terrain resolves', () => {
+    expect(() => patchParams({ patchRadius: CLUMP_MAX_PATCH_RADIUS + 0.1 })).toThrow(/past the .* the terrain resolves/);
+    expect(() => patchParams({ tuftsPerModel: 0 })).toThrow(/tuftsPerModel must be within 1\.\.64/);
+  });
+
+  it('tiles a patch but spaces a lone tuft, and sinks the patch deeper', () => {
+    const single = buildClump(resolveParams({ type: 'clump', name: 'a', footprint: 0 }), CLUMP_CELLS_GENERATED);
+    const patch = buildClump(patchParams({ footprint: 0 }), CLUMP_CELLS_GENERATED);
+
+    const soloLayer = clumpLayer(resolveParams({ type: 'clump', name: 'a', footprint: 0 }), single.metrics);
+    const patchLayer = clumpLayer(patchParams({ footprint: 0 }), patch.metrics);
+
+    // A patch already carries its own density, so its cells tile it. Tiling a
+    // lone tuft would be right for the look and ruinous for the count.
+    expect(soloLayer.footprint).toBeCloseTo(single.metrics.spread * 2, 1);
+    expect(patchLayer.footprint).toBeCloseTo(patch.metrics.spread * 0.9, 1);
+
+    // Sunk further, because a patch is posed off one height sample and a buried
+    // tuft reads better than a floating one.
+    expect(patchLayer.yOffset!).toBeLessThan(soloLayer.yOffset!);
   });
 });

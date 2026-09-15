@@ -212,6 +212,32 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     faceNormalSpecular: true,
     specularOcclusion: true,
   },
+  meadow_01: {
+    name: 'meadow_01',
+    geometryId: 'meadow-01',
+    cullDistance: 50,
+    jitter: { scale: { from: 0.8, to: 1.8 }, yaw: FULL_TURN, tilt: 3 },
+    yOffset: -0.084,
+    alignToNormal: 0.6,
+    footprint: 1.6,
+    wind: { amplitude: 1.18, frequency: 1.1, flutter: 0.7 },
+    authoredNormals: true,
+    faceNormalSpecular: true,
+    specularOcclusion: true,
+  },
+  meadow_02: {
+    name: 'meadow_02',
+    geometryId: 'meadow-02',
+    cullDistance: 50,
+    jitter: { scale: { from: 0.8, to: 1.8 }, yaw: FULL_TURN, tilt: 3 },
+    yOffset: -0.09,
+    alignToNormal: 0.6,
+    footprint: 1.6,
+    wind: { amplitude: 1.18, frequency: 1.1, flutter: 0.7 },
+    authoredNormals: true,
+    faceNormalSpecular: true,
+    specularOcclusion: true,
+  },
 };
 
 // Throws rather than falling back: a layer name only comes from this table, so

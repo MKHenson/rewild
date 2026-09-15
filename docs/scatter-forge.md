@@ -1,6 +1,6 @@
-# tree-forge — authored texture sources
+# scatter-forge — authored texture sources
 
-Working notes for moving [tree-forge](../tools/tree-forge/README.md) from generating its bark and
+Working notes for moving [scatter-forge](../tools/scatter-forge/README.md) from generating its bark and
 leaves to assembling them from hand-authored art. Spans more than one sitting, so the decisions are
 written down rather than rediscovered. Delete it once the work has landed and the tool's own README
 carries the result.
@@ -15,7 +15,7 @@ bakes offline**. Height-based blending, stochastic tiling, multi-scale detail �
 stop tiled bark reading as tiled — are normally too expensive per fragment. Baked into an atlas they
 cost nothing at runtime. This moves the work to where it is free.
 
-The layer stack in [`lib/bark.ts`](../tools/tree-forge/lib/bark.ts) is not thrown away. `BarkSample`
+The layer stack in [`lib/bark.ts`](../tools/scatter-forge/lib/bark.ts) is not thrown away. `BarkSample`
 carries a `u,v` that layers displace, and `knotLayer` works by shoving that coordinate so the pattern
 flows past a knot. Point the displaced lookup at a bitmap instead of `plateLayer` and knots still
 work — authored bark sampled at a warped coordinate is the same trick. This replaces the field, not
@@ -59,7 +59,7 @@ tool's own README carries the authoring end of it.
 
 
 ```
-tools/tree-forge/sources/
+tools/scatter-forge/sources/
   bark/<name>/
   leaves/<name>/
 ```
@@ -122,7 +122,7 @@ offline and once, so give it the best source there is and let it throw away what
 ### Why disp is required and normals are not
 
 `encodeNormal(canvas, params.bumpStrength)` at
-[`textures.ts:710`](../tools/tree-forge/lib/textures.ts#L710) already derives every normal from
+[`textures.ts:710`](../tools/scatter-forge/lib/textures.ts#L710) already derives every normal from
 height, so this is the existing behaviour rather than a new risk. Three reasons it is also the more
 correct choice:
 
@@ -213,13 +213,13 @@ Mip alpha erosion ([#230](https://github.com/MKHenson/rewild/issues/230)) is una
 
 ## 4. Parameters — done
 
-The twenty look values are settled in [`lib/look.ts`](../tools/tree-forge/lib/look.ts) and are no
+The twenty look values are settled in [`lib/look.ts`](../tools/scatter-forge/lib/look.ts) and are no
 longer keys. They are still fields on `Params`, so `textures.ts` and `bark.ts` did not change and a
 test still varies one by overriding it on the object. A `tree.json` still carrying them opens and
 drops them on the next save, so nothing on disk was stranded.
 
 The command line went with them. Every option is a key of the `tree.json`; the CLI takes the file
-and, optionally, `--watch`. Presets live in `tools/tree-forge/templates/`, and a run never writes
+and, optionally, `--watch`. Presets live in `tools/scatter-forge/templates/`, and a run never writes
 back to one — the sidecar beside the model is the record of the build.
 
 `barkProfile`, `textureSize`, `seed`, `leafSize` and the two source lists are what is left that
@@ -232,9 +232,9 @@ The run states which path each image took, because a fresh clone would otherwise
 art silently:
 
 ```
-bark     from tools/tree-forge/sources/bark/oak (1024px tile, 1m across)
+bark     from tools/scatter-forge/sources/bark/oak (1024px tile, 1m across)
 bark     generated — no sources listed
-leaves   from tools/tree-forge/sources/leaves/oak (2 stamps, up to 0.25m long): 4.0 per 1m card, 4x4 grid
+leaves   from tools/scatter-forge/sources/leaves/oak (2 stamps, up to 0.25m long): 4.0 per 1m card, 4x4 grid
 leaves   generated — no sources listed
 ```
 

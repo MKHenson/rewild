@@ -18,7 +18,7 @@ import { gutterFor } from './atlas.ts';
 import { srgbToLinear } from './colour.ts';
 
 /**
- * `tools/tree-forge/sources`, resolved off this file rather than the cwd.
+ * `tools/scatter-forge/sources`, resolved off this file rather than the cwd.
  *
  * Called rather than computed at import, because `import.meta.url` is not
  * defined under the test runner's transform and a module that cannot be
@@ -324,9 +324,21 @@ async function loadStamp(name: string, lengthMetres: number, paths: MapSet, dire
  * together fill a card with both. Null is the signal to generate instead.
  * Anything else throws.
  */
-export async function loadLeafSource(
+/**
+ * Stamps off disk, from folders under one slot of `sources/`.
+ *
+ * Leaves and clumps load identically because a stamp is the same thing to
+ * both: three maps, a cutout on the alpha, and an anchor at the bottom-middle.
+ * What differs is the word the folder declares its size with, and what the
+ * assembler does with the stamp afterwards. A leaf is rotated about its anchor
+ * into a sprig; a clump stamp is the cell.
+ */
+async function loadStampSource(
   names: string[],
-  root: string = sourceRoot()
+  root: string,
+  slot: string,
+  sizeField: string,
+  kind: string
 ): Promise<LeafSource | null> {
   if (names.length === 0) return null;
 
@@ -336,22 +348,44 @@ export async function loadLeafSource(
   let depthMetres: number | null = null;
 
   for (const name of names) {
-    const directory = join(root, 'leaves', name);
-    await requireDirectory(directory, 'leaf', name);
+    const directory = join(root, slot, name);
+    await requireDirectory(directory, kind, name);
     directories.push(directory);
 
     const sets = await mapSets(directory);
-    const metadata = await readMetadata(directory, ['lengthMetres'], ['depthMetres']);
-    lengthMetres = Math.max(lengthMetres, metadata.lengthMetres);
+    const metadata = await readMetadata(directory, [sizeField], ['depthMetres']);
+    const declared = metadata[sizeField];
+    lengthMetres = Math.max(lengthMetres, declared);
     if (metadata.depthMetres !== undefined) depthMetres = Math.max(depthMetres ?? 0, metadata.depthMetres);
 
     // Sorted so a stamp's index, and with it every cell that picks it, is the
     // same on every machine whatever order the directory lists in.
     for (const [prefix, paths] of [...sets].sort(([a], [b]) => a.localeCompare(b)))
-      stamps.push(await loadStamp(`${name}/${prefix}`, metadata.lengthMetres, paths, directory));
+      stamps.push(await loadStamp(`${name}/${prefix}`, declared, paths, directory));
   }
 
   return { names, directories, lengthMetres, depthMetres, stamps };
+}
+
+export async function loadLeafSource(
+  names: string[],
+  root: string = sourceRoot()
+): Promise<LeafSource | null> {
+  return loadStampSource(names, root, 'leaves', 'lengthMetres', 'leaf');
+}
+
+/**
+ * Clump stamps: whole tufts, each one a cell of the atlas.
+ *
+ * `heightMetres` rather than `lengthMetres`, because the stamp is never
+ * rotated about its anchor the way a leaf is. It stands the way it was drawn,
+ * and the number says how tall it stands.
+ */
+export async function loadClumpSource(
+  names: string[],
+  root: string = sourceRoot()
+): Promise<LeafSource | null> {
+  return loadStampSource(names, root, 'clump', 'heightMetres', 'clump');
 }
 
 /**
@@ -384,6 +418,55 @@ export function normalStrength(source: BarkSource, repeats: number, size: number
 
 /** The leaf grid the generator draws, and the most a source is spread over. */
 export const LEAF_GRID_GENERATED = 4;
+
+/** Cells a generated clump atlas draws, where no source names its own count. */
+export const CLUMP_CELLS_GENERATED = 9;
+
+/**
+ * What a clump atlas holds: one whole stamp per cell, and a grid big enough
+ * for them.
+ *
+ * Nothing is divided here, unlike a leaf grid. A leaf cell is *composed* from
+ * many stamps, so its cell count follows from how many fit. A clump stamp *is*
+ * the cell, so the count follows from how many there are, and the grid is the
+ * smallest square that holds them.
+ *
+ * `cells` is reported separately from `grid` because the two part company the
+ * moment the stamp count is not a square: ten stamps land in a 4x4 with six
+ * cells left blank, and a card hashing into one of those would draw nothing.
+ */
+export function clumpAtlas(source: LeafSource | null): { grid: number; cells: number } {
+  const cells = source ? source.stamps.length : CLUMP_CELLS_GENERATED;
+  return { grid: Math.ceil(Math.sqrt(cells)), cells };
+}
+
+/**
+ * Texels one clump cell gets, and whether a stamp had to be stretched to fill
+ * it.
+ *
+ * The one number worth watching on a clump: the atlas holds every stamp, so
+ * adding a ninth to a 2x2 set takes every cell from half the atlas edge to a
+ * third of it, and nothing says so unless it is measured.
+ */
+export function fitClump(
+  source: LeafSource,
+  textureSize: number
+): { grid: number; cells: number; cellPx: number; placedPx: number; sourcePx: number } {
+  const { grid, cells } = clumpAtlas(source);
+  const inner = textureSize / grid - 2 * gutterFor(textureSize);
+
+  let placedPx = 0;
+  let sourcePx = 1;
+  for (const stamp of source.stamps) {
+    const placed = inner * (stamp.lengthMetres / source.lengthMetres);
+    if (placed / stampLengthPx(stamp) > placedPx / sourcePx) {
+      placedPx = placed;
+      sourcePx = stampLengthPx(stamp);
+    }
+  }
+
+  return { grid, cells, cellPx: Math.round(inner), placedPx, sourcePx };
+}
 
 /**
  * Leaves along a card's height: `leafSize` over the declared length.

@@ -2,7 +2,7 @@
 // samples in the engine. The point is triage: at a hundred variants the only
 // affordable review is a folder of thumbnails.
 
-import type { MeshAttributes, TreeMesh } from './mesh.ts';
+import type { ForgeMesh, MeshAttributes } from './mesh.ts';
 import type { Params } from './params.ts';
 import type { Canvas, Canvases } from './textures.ts';
 import type { Vec3 } from './vec.ts';
@@ -170,9 +170,9 @@ function drawPrimitive(
   }
 }
 
-/** The two primitives' positions in view space, before they are fitted. */
-function viewsOf(mesh: TreeMesh): Float32Array[] {
-  return [toView(mesh.bark.positions), toView(mesh.leaves.positions)];
+/** Every piece's positions in view space, before they are fitted. */
+function viewsOf(mesh: ForgeMesh): Float32Array[] {
+  return mesh.pieces.map((piece) => toView(piece.attributes.positions));
 }
 
 function marginFor(size: number): number {
@@ -182,7 +182,7 @@ function marginFor(size: number): number {
 /** One panel, drawn through a projection the caller owns. */
 function paint(
   params: Params,
-  mesh: TreeMesh,
+  mesh: ForgeMesh,
   canvases: Canvases,
   size: number,
   views: Float32Array[],
@@ -198,20 +198,35 @@ function paint(
     target[i * 3 + 2] = Math.round(mix(36, 52, t));
   }
 
-  // One depth buffer across both, so a leaf behind a branch is hidden by it.
-  // `card` is the one leaf mode whose normals are the cards' own, so it is the
-  // one the engine's back-face mirror is right for. The others set
+  // One depth buffer across every piece, so a leaf behind a branch is hidden
+  // by it. `card` is the one leaf mode whose normals are the cards' own, so it
+  // is the one the engine's back-face mirror is right for. The others set
   // authoredNormals on the layer, which turns the mirror off there too.
-  const mirrorLeaves = params.leafNormalMode === 'card';
+  const mirrorCutout = params.leafNormalMode === 'card';
 
-  drawPrimitive(target, depth, size, mesh.bark, project(views[0]), canvases.bark, false, 0, false, true);
-  drawPrimitive(target, depth, size, mesh.leaves, project(views[1]), canvases.leaves, true, params.leafAlphaCutoff, true, mirrorLeaves);
+  mesh.pieces.forEach((piece, index) => {
+    const canvas = canvases[piece.key];
+    if (!canvas) throw new Error(`No canvas for piece '${piece.key}'.`);
+
+    drawPrimitive(
+      target,
+      depth,
+      size,
+      piece.attributes,
+      project(views[index]),
+      canvas,
+      piece.cutout,
+      piece.cutout ? params.leafAlphaCutoff : 0,
+      piece.cutout,
+      piece.cutout ? mirrorCutout : true
+    );
+  });
 
   return target;
 }
 
 /** RGB bytes of a `size` square preview. */
-export function renderPreview(params: Params, mesh: TreeMesh, canvases: Canvases, size: number): Buffer {
+export function renderPreview(params: Params, mesh: ForgeMesh, canvases: Canvases, size: number): Buffer {
   const views = viewsOf(mesh);
   return paint(params, mesh, canvases, size, views, createProjector(views, size, marginFor(size)));
 }
@@ -219,7 +234,7 @@ export function renderPreview(params: Params, mesh: TreeMesh, canvases: Canvases
 /** One tier of the comparison strip. */
 export interface Panel {
   label: string;
-  mesh: TreeMesh;
+  mesh: ForgeMesh;
 }
 
 /**

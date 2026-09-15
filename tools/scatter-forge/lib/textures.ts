@@ -11,7 +11,10 @@ import { join } from 'path';
 import sharp from 'sharp';
 import { gutterFor, insetRect, leafCellPixels, type PixelRect } from './atlas.ts';
 import {
+  clumpAtlas,
+  fitClump,
   fitLeaves,
+  gradientGain,
   LEAF_GRID_GENERATED,
   normalStrength,
   tileRepeats,
@@ -48,18 +51,12 @@ export interface TextureNames {
   height: string;
 }
 
-/** Both images a tree references. Separate because they are separate
- *  materials — see the header of atlas.ts. */
-export interface TextureSetNames {
-  bark: TextureNames;
-  leaves: TextureNames;
-}
+/** One image set per piece, keyed by the piece's own key. Separate because
+ *  pieces are separate materials — see the header of atlas.ts. */
+export type TextureSetNames = Record<string, TextureNames>;
 
-/** Both images as float channels. */
-export interface Canvases {
-  bark: Canvas;
-  leaves: Canvas;
-}
+/** The same sets as float channels, before anything is quantised. */
+export type Canvases = Record<string, Canvas>;
 
 type Rgb = [number, number, number];
 
@@ -75,6 +72,8 @@ interface Leaflet {
 // The bounds a 4-octave sum of this noise actually spans, measured rather than
 // assumed. Thresholds outside them are the difference between a flag that does
 // nothing and one that covers the whole trunk.
+const DEG = Math.PI / 180;
+
 const LICHEN_CLEAR = 0.78;
 const LICHEN_DENSE = 0.3;
 
@@ -397,12 +396,45 @@ function leafVeins(along: number, across: number, width: number): number {
   return clamp01(Math.max(midrib, secondary * 0.5));
 }
 
-function paintLeafCell(canvas: Canvas, params: Params, rect: PixelRect, variant: number): void {
+/**
+ * What a generated cell draws: the shapes in it, and how wide each one is
+ * along its own length.
+ *
+ * The pixel loop below is the same whichever it is, because a leaflet and a
+ * blade differ only in where they sit and how they taper. Veins are the one
+ * feature a blade does without: a grass blade has a fold, not a network, and
+ * the ridge field reads as a leaf the moment it forks.
+ */
+interface CellStyle {
+  shapes: Leaflet[];
+  width: (shape: Leaflet, along: number) => number;
+  veins: boolean;
+  /** Base colour, six digit hex. A blade's is not a leaf's — see look.ts. */
+  tint: string;
+}
+
+function leafStyle(params: Params, rng: Rng, cell: number, variant: number): CellStyle {
+  return {
+    shapes: leafletsFor(rng, cell, variant),
+    width: (shape, along) => leafletWidth(shape, along, params, variant),
+    veins: true,
+    tint: params.leafTint,
+  };
+}
+
+function paintFoliageCell(
+  canvas: Canvas,
+  params: Params,
+  rect: PixelRect,
+  variant: number,
+  makeStyle: (params: Params, rng: Rng, cell: number, variant: number) => CellStyle
+): void {
   const { size } = canvas;
   const cell = Math.min(rect.width, rect.height);
   const rng = createRng((params.seed ^ 0x2f6b1e3d) + variant * 7919);
-  const tint = parseHex(params.leafTint, 'leaf-tint');
-  const leaflets = leafletsFor(rng, cell, variant);
+  const style = makeStyle(params, rng, cell, variant);
+  const tint = parseHex(style.tint, 'tint');
+  const leaflets = style.shapes;
 
   // Softens the cutout by roughly a texel. Any wider and the alphaCutoff walks
   // the silhouette as the mip level changes.
@@ -421,7 +453,7 @@ function paintLeafCell(canvas: Canvas, params: Params, rect: PixelRect, variant:
         if (along < -0.1 || along > 1.1) continue;
 
         const across = dx * -leaflet.direction[1] + dy * leaflet.direction[0];
-        const width = leafletWidth(leaflet, along, params, variant);
+        const width = style.width(leaflet, along);
 
         const value =
           clamp01((width - Math.abs(across)) / EDGE) *
@@ -444,7 +476,7 @@ function paintLeafCell(canvas: Canvas, params: Params, rect: PixelRect, variant:
 
       const lateral = Math.abs(across) / Math.max(width, 0.001);
       const dome = Math.sqrt(Math.max(0, 1 - lateral * lateral));
-      const veins = leafVeins(along, across, width);
+      const veins = style.veins ? leafVeins(along, across, width) : 0;
 
       // Warped, so the blotching runs with the blade instead of sitting on it
       // as even speckle.
@@ -703,8 +735,8 @@ function namesFor(textureSet: string, piece: string): TextureNames {
   };
 }
 
-export function textureFileNames(textureSet: string): TextureSetNames {
-  return { bark: namesFor(textureSet, 'bark'), leaves: namesFor(textureSet, 'leaf') };
+export function textureFileNames(textureSet: string, pieces: readonly string[]): TextureSetNames {
+  return Object.fromEntries(pieces.map((piece) => [piece, namesFor(textureSet, piece)]));
 }
 
 /**
@@ -811,7 +843,7 @@ export function buildLeafCanvas(params: Params, source?: LeafSource | null): Can
   const cells = leafCellPixels(size, LEAF_GRID_GENERATED);
   const canvas = createCanvas(size, params.bumpStrength);
 
-  cells.forEach((rect, index) => paintLeafCell(canvas, params, rect, index));
+  cells.forEach((rect, index) => paintFoliageCell(canvas, params, rect, index, leafStyle));
 
   // Before the dilation, so the colour pushed out under the alpha is the colour
   // the leaf edge actually ends up with.
@@ -823,33 +855,164 @@ export function buildLeafCanvas(params: Params, source?: LeafSource | null): Can
   return canvas;
 }
 
-export function buildCanvases(params: Params, bark?: BarkSource | null, leaves?: LeafSource | null): Canvases {
-  return { bark: buildBarkCanvas(params, bark), leaves: buildLeafCanvas(params, leaves) };
+/**
+ * A generated tuft: blades fanning from the bottom-middle of the cell.
+ *
+ * They fan rather than sitting on a rachis, because that is the difference
+ * between grass and a leaf. Every blade starts at the same anchor, leans by its
+ * own angle and arcs over, and the ones leaning furthest are shortest, which is
+ * what stops a fan reading as a paper doily.
+ */
+function bladesFor(rng: Rng, cell: number, variant: number): Leaflet[] {
+  const count = [11, 13, 16, 12, 15, 10, 17, 13][variant % 8];
+  const blades: Leaflet[] = [];
+
+  for (let i = 0; i < count; i++) {
+    // Spread evenly and then jittered, rather than drawn at random: a random
+    // fan clumps on one side often enough to be noticed across sixteen cells.
+    const spread = count > 1 ? (i / (count - 1)) * 2 - 1 : 0;
+    // A narrower fan than looks right in the atlas. The card already leans out
+    // by `cardLean` and its base is already offset by `cardSpread`, so the
+    // three compound: a 50 degree fan on top of those reads as a splayed
+    // starburst rather than as a tuft standing up out of the ground.
+    const lean = (spread * 33 + rng.range(-8, 8)) * DEG;
+
+    // A blade leaning hard is a blade seen from the side, so it is shorter and
+    // narrower. Without this the fan comes out as a half disc of equal spokes.
+    const foreshorten = mix(1, 0.62, Math.abs(spread));
+
+    blades.push({
+      // Jittered along the bottom edge rather than all on one point. Blades
+      // converging exactly reads as a pinch, and a tuft leaves the ground over
+      // a few millimetres.
+      base: [cell * (0.5 + spread * 0.06 + rng.range(-0.02, 0.02)), cell * 0.995],
+      // -y is up in image space.
+      direction: [Math.sin(lean), -Math.cos(lean)],
+      length: cell * 0.9 * foreshorten * rng.range(0.82, 1.06),
+      // Wide enough to survive the mip chain. A blade a fortieth of the cell
+      // across is under a texel by the second mip, and the alpha test then eats
+      // what is left — so the tuft thins to nothing a few metres out while the
+      // atlas still looks correct.
+      halfWidth: cell * 0.055 * foreshorten * rng.range(0.8, 1.25),
+      hue: rng.range(-0.07, 0.07),
+      tone: rng.range(0.78, 1.18),
+    });
+  }
+
+  return blades;
 }
 
-function encodeOne(directory: string, names: TextureNames, canvas: Canvas): Promise<void>[] {
+/**
+ * A blade's half width along its length: full at the base, tapering to a point.
+ *
+ * A leaflet's `sin` profile is wrong here. It narrows at the base as well as
+ * the tip, and a blade of grass is widest where it leaves the ground. The
+ * exponent keeps most of the width for most of the length, so the taper reads
+ * at the tip rather than along the whole blade.
+ */
+function bladeWidth(shape: Leaflet, along: number): number {
+  const t = clamp01(along);
+  return shape.halfWidth * (1 - t ** 2.4) * smoothstep(0, 0.05, t);
+}
+
+function bladeStyle(params: Params, rng: Rng, cell: number, variant: number): CellStyle {
+  return { shapes: bladesFor(rng, cell, variant), width: bladeWidth, veins: false, tint: params.bladeTint };
+}
+
+/**
+ * The clump atlas: one whole stamp per cell, or generated tufts where none are
+ * listed.
+ *
+ * Only `cells` of the grid are painted. The mesh is handed the same number, so
+ * a card never addresses a cell nothing drew.
+ */
+export function buildBladeCanvas(params: Params, source?: LeafSource | null): Canvas {
+  const size = params.textureSize;
+  const gutter = gutterFor(size);
+  const { grid, cells } = clumpAtlas(source ?? null);
+  const rects = leafCellPixels(size, grid).slice(0, cells);
+
+  if (source) {
+    const fit = fitClump(source, size);
+    const canvas = createCanvas(size, gradientGainFor(source, params, fit.cellPx));
+
+    rects.forEach((rect, index) => {
+      const inner = insetRect(rect, gutter);
+      const rng = createRng((params.seed ^ 0x51a7e3c9) + index * 7919);
+      // One stamp per cell, pinned at the bottom-middle and fitted to the cell.
+      // `clusterFor` already does exactly that below two stamps per cell, which
+      // is the case a clump always is.
+      compositeCluster(canvas, inner, source, clusterFor(rng, inner, source, 1, index));
+    });
+
+    // No curvature pass, for the same reason the sourced bark skips it.
+    for (const rect of rects) dilate(canvas, rect, gutter * 3);
+    return canvas;
+  }
+
+  const canvas = createCanvas(size, params.bumpStrength);
+
+  // Painted into the *inset* rect, unlike a leaf cell. A tuft is anchored on the
+  // bottom edge of its cell, and the card samples the cell inset by the gutter,
+  // so painting the full rect slices the bases off every blade and leaves the
+  // tips floating. A leaf cluster sits in the middle of its cell and never
+  // noticed.
+  rects.forEach((rect, index) => paintFoliageCell(canvas, params, insetRect(rect, gutter), index, bladeStyle));
+  applyCurvature(canvas, params.curvature, false);
+  for (const rect of rects) dilate(canvas, rect, gutter * 3);
+
+  return canvas;
+}
+
+/** The gain a clump's composited height needs, where its folders declare one. */
+function gradientGainFor(source: LeafSource, params: Params, cellPx: number): number {
+  return source.depthMetres === null
+    ? params.bumpStrength
+    : gradientGain(source.depthMetres, source.lengthMetres / Math.max(1, cellPx));
+}
+
+export function buildClumpCanvases(params: Params, blades?: LeafSource | null): Canvases {
+  return { blade: buildBladeCanvas(params, blades) };
+}
+
+export function buildTreeCanvases(params: Params, bark?: BarkSource | null, leaves?: LeafSource | null): Canvases {
+  return { bark: buildBarkCanvas(params, bark), leaf: buildLeafCanvas(params, leaves) };
+}
+
+/**
+ * One piece's maps.
+ *
+ * `_disp` is written only where the piece asks for it. glTF has no
+ * displacement slot and the engine builds no heightMap from a file, so the map
+ * is dead weight wherever the relief it records is under a millimetre. A
+ * blade's is. Bark's is kept because bark is the one surface a displacement
+ * path would ever be wired for.
+ */
+function encodeOne(directory: string, names: TextureNames, canvas: Canvas, withHeight: boolean): Promise<void>[] {
   const size = canvas.size;
 
   return [
     encode(join(directory, names.baseColor), encodeRgba(canvas), size, 4),
     encode(join(directory, names.normal), encodeNormal(canvas, canvas.bumpStrength), size, 3),
     encode(join(directory, names.arm), encodeArm(canvas), size, 3),
-    encode(join(directory, names.height), encodeHeight(canvas), size, 3),
+    ...(withHeight ? [encode(join(directory, names.height), encodeHeight(canvas), size, 3)] : []),
   ];
 }
 
 export async function writeTextureSet(
   params: Params,
   directory: string,
-  canvases: Canvases = buildCanvases(params)
+  canvases: Canvases,
+  heightPieces: readonly string[]
 ): Promise<TextureSetNames> {
   await mkdir(directory, { recursive: true });
-  const names = textureFileNames(params.textureSet);
+  const names = textureFileNames(params.textureSet, Object.keys(canvases));
 
-  await Promise.all([
-    ...encodeOne(directory, names.bark, canvases.bark),
-    ...encodeOne(directory, names.leaves, canvases.leaves),
-  ]);
+  await Promise.all(
+    Object.entries(canvases).flatMap(([piece, canvas]) =>
+      encodeOne(directory, names[piece], canvas, heightPieces.includes(piece))
+    )
+  );
 
   return names;
 }
@@ -863,6 +1026,14 @@ export async function writeTextureSet(
 export interface SetManifest {
   leafGrid: number;
   leafSize: number;
+  /**
+   * Cells the atlas actually painted, where that is fewer than `leafGrid`
+   * squared. A clump atlas sizes its grid to hold its stamps, so ten stamps
+   * land in a 4x4 with six cells left blank, and a card hashing into one of
+   * those would draw nothing. Absent on a set written before clumps, which is
+   * a tree, whose grid is always full.
+   */
+  cells?: number;
 }
 
 function manifestPath(directory: string, textureSet: string): string {
@@ -886,5 +1057,9 @@ export async function readSetManifest(directory: string, textureSet: string): Pr
   const parsed = JSON.parse(text) as Partial<SetManifest>;
   if (typeof parsed.leafGrid !== 'number' || typeof parsed.leafSize !== 'number')
     throw new Error(`${manifestPath(directory, textureSet)} does not name a leafGrid and a leafSize.`);
-  return { leafGrid: parsed.leafGrid, leafSize: parsed.leafSize };
+  return {
+    leafGrid: parsed.leafGrid,
+    leafSize: parsed.leafSize,
+    cells: typeof parsed.cells === 'number' ? parsed.cells : parsed.leafGrid * parsed.leafGrid,
+  };
 }

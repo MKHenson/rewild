@@ -7,7 +7,7 @@
 // primitive carrying UVs and normals, so shipping them costs 16 bytes a vertex
 // for a value the importer would compute anyway.
 
-import type { MeshAttributes } from './mesh.ts';
+import type { ForgeMesh, MeshAttributes } from './mesh.ts';
 
 const MAGIC = 0x46546c67;
 const JSON_CHUNK = 0x4e4f534a;
@@ -94,17 +94,15 @@ export interface GlbTextures {
   arm: string;
 }
 
-/** A tree's two materials draw from two images — see the header of atlas.ts. */
-export interface GlbTextureSet {
-  bark: GlbTextures;
-  leaves: GlbTextures;
-}
+/** One image set per piece, keyed by the piece's own key — see the header of
+ *  atlas.ts for why pieces do not share an image. */
+export type GlbTextureSet = Record<string, GlbTextures>;
 
 export interface GlbRequest {
   name: string;
-  bark: MeshAttributes;
-  leaves: MeshAttributes;
+  mesh: ForgeMesh;
   textures: GlbTextureSet;
+  /** Applied to every cutout piece. An opaque piece has no cutoff. */
   alphaCutoff: number;
 }
 
@@ -198,11 +196,11 @@ function addPrimitive(
  * one fetch, one decode and one GPU texture — the importer keys an external
  * image by its absolute url.
  */
-export function writeGlb({ name, bark, leaves, textures, alphaCutoff }: GlbRequest): Buffer {
+export function writeGlb({ name, mesh, textures, alphaCutoff }: GlbRequest): Buffer {
   const buffers = new BufferBuilder();
 
   const gltf: Gltf = {
-    asset: { version: '2.0', generator: 'tree-forge' },
+    asset: { version: '2.0', generator: 'scatter-forge' },
     scene: 0,
     scenes: [{ nodes: [0] }],
     nodes: [{ name, mesh: 0 }],
@@ -243,26 +241,28 @@ export function writeGlb({ name, bark, leaves, textures, alphaCutoff }: GlbReque
     };
   }
 
-  gltf.materials.push({
-    name: `${name}-bark`,
-    ...bind(textures.bark),
-    alphaMode: 'OPAQUE',
-    doubleSided: false,
-  });
-
-  gltf.materials.push({
-    name: `${name}-leaves`,
-    ...bind(textures.leaves),
-    // Cutout, never blend: an alpha-tested fragment either writes depth or does
-    // not exist, so leaves sort against each other with no per-instance sort.
-    alphaMode: 'MASK',
-    alphaCutoff,
-    doubleSided: true,
-  });
-
   const primitives = gltf.meshes[0].primitives;
-  if (bark.vertexCount) primitives.push(addPrimitive(gltf, buffers, bark, 0));
-  if (leaves.vertexCount) primitives.push(addPrimitive(gltf, buffers, leaves, 1));
+
+  for (const piece of mesh.pieces) {
+    const set = textures[piece.key];
+    if (!set) throw new Error(`No texture set for piece '${piece.key}'.`);
+
+    gltf.materials.push({
+      name: `${name}-${piece.key}`,
+      ...bind(set),
+      // Cutout, never blend: an alpha-tested fragment either writes depth or
+      // does not exist, so foliage sorts against itself with no per-instance
+      // sort. Both sides draw because you see a leaf from underneath.
+      ...(piece.cutout
+        ? { alphaMode: 'MASK' as const, alphaCutoff, doubleSided: true }
+        : { alphaMode: 'OPAQUE' as const, doubleSided: false }),
+    });
+
+    // A piece a tier stripped to nothing keeps its material slot, so the
+    // remaining pieces do not renumber between tiers of one model.
+    if (piece.attributes.vertexCount)
+      primitives.push(addPrimitive(gltf, buffers, piece.attributes, gltf.materials.length - 1));
+  }
 
   const bin = buffers.concat();
   gltf.bufferViews = buffers.views;

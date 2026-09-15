@@ -1,11 +1,11 @@
 {
-  "name": "@rewild/tree-forge",
+  "name": "@rewild/scatter-forge",
   "version": "0.1.0",
-  "description": "Procedural tree generator producing Understory-ready glTF models and template textures",
+  "description": "Procedural scatter assets for the Understory scatter system: trees, clumps and the registry entries they are declared through",
   "private": true,
   "type": "module",
   "bin": {
-    "tree-forge": "./cli.ts"
+    "scatter-forge": "./cli.ts"
   },
   "engines": {
     "node": ">=22.18.0"
