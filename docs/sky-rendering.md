@@ -20,7 +20,7 @@ Atmospheric rendering system for the Rewild engine supporting realistic sky/clou
 
 **Night Sky**: Baked to 1024×1024×6 rgba16float cubemap at init
 
-**Cloud Shadows**: Cascaded shadow map approach — 1024×1024 density map, orthographic projection from sun, updates every few frames
+**Cloud Shadows**: Cascaded shadow map approach — density map over a fixed 5000 m ground extent, orthographic projection from sun. Edge and update period both come from the quality tier: 1024² every 2 frames on `ultra` down to 256² every 6 on `low`. Measurement puts this pass at roughly four fifths of the sky's GPU time on `ultra`, so it is the first thing to turn down.
 
 **Altitude Handling**: Three cases (below/inside/above clouds) with adaptive sample counts — fewer samples when inside clouds (30% reduction)
 

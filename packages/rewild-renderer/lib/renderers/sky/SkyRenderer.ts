@@ -6,6 +6,7 @@ import { CanvasSizeWatcher } from '../../utils/CanvasSizeWatcher';
 import {
   bilateralSigmas,
   cloudResolutionScale,
+  cloudShadowConfig,
   godRaySamples,
   godRayScale,
 } from './SkyQuality';
@@ -154,11 +155,7 @@ export class SkyRenderer {
     this.lightningBoltPass = new LightningBoltPass();
     this.finalPass = new SkyCompositePass();
     this.starfieldRenderer = new StarfieldRenderer();
-    this.cloudShadowRenderer = new CloudShadowRenderer({
-      resolution: 1024,
-      worldSize: 5000,
-      updateFrequency: 2,
-    });
+    this.cloudShadowRenderer = new CloudShadowRenderer({ worldSize: 5000 });
     this.cubeCapture = new SkyCubeCapture();
     this.iblPrefilter = new SkyIblPrefilter();
     this.cubeDebugRenderer = new SkyCubeDebugRenderer();
@@ -177,6 +174,7 @@ export class SkyRenderer {
     // terrain ridges would pick up a dark outline. See QualityAspect.
     const cloudsQuality = renderer.quality.aspect('clouds');
     const godRaysQuality = renderer.quality.aspect('godRays');
+    const cloudShadowsQuality = renderer.quality.aspect('cloudShadows');
     this.builtQualityRevision = renderer.quality.revision;
 
     // Push the tier into each pass before any of them builds a module. The
@@ -188,7 +186,7 @@ export class SkyRenderer {
     // God rays are the exception — that shader reads its sample count from a
     // uniform, so the tier is just a number and costs no recompile.
     this.cloudsPass.quality = cloudsQuality;
-    this.cloudShadowRenderer.quality = renderer.quality.aspect('cloudShadows');
+    this.cloudShadowRenderer.quality = cloudShadowsQuality;
     this.bilateralPass.quality = cloudsQuality;
     this.godRaysPass.config.numSamples = godRaySamples(godRaysQuality);
 
@@ -198,6 +196,16 @@ export class SkyRenderer {
     // so follows cloudResolutionScale for free.
     this.cloudsPass.resolutionScale = cloudResolutionScale(cloudsQuality);
     this.godRaysPass.resolutionScale = godRayScale(godRaysQuality);
+
+    // The cloud shadow map is sized in texels rather than as a fraction of the
+    // canvas, because it covers a fixed worldSize on the ground and not the
+    // view. Its update period comes down the same path: both are plain config
+    // fields, and cloudShadowRenderer.init() below reads the edge to decide
+    // whether to swap the texture, so they have to be assigned before it runs.
+    const cloudShadows = cloudShadowConfig(cloudShadowsQuality);
+    this.cloudShadowRenderer.config.resolution = cloudShadows.resolution;
+    this.cloudShadowRenderer.config.updateFrequency =
+      cloudShadows.updateFrequency;
 
     // Bilateral sigmas are uniforms rather than defines, so they are assigned
     // here alongside the scales. They go *up* as quality goes down — this pass

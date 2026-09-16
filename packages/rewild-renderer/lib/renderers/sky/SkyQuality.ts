@@ -54,6 +54,19 @@ interface SkyQualityTier {
   cloudShadowSamples: number;
 
   /**
+   * Cloud shadow map edge, in texels. The map covers worldSize metres of ground,
+   * so 1024 over the default 5000 m gives 4.9 m per texel. Halve it to quarter
+   * the cost of the pass.
+   */
+  cloudShadowResolution: number;
+
+  /**
+   * Frames between shadow map rebuilds. 2 redraws the map every other frame. 6
+   * redraws it every sixth and costs a third as much.
+   */
+  cloudShadowUpdateFrequency: number;
+
+  /**
    * Multiplier on the bilateral's spatial sigmas — how hard the cloud buffer is
    * smoothed, in cloud texels.
    *
@@ -166,6 +179,8 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cirrusTaps: 4,
     cirrusDetailBias: 1.0,
     cloudShadowSamples: 48,
+    cloudShadowResolution: 1024,
+    cloudShadowUpdateFrequency: 2,
     bilateralBlurBoost: 0.7,
     bilateralEdgeRelax: 0.85,
     godRayScale: 0.7,
@@ -180,6 +195,8 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cirrusTaps: 3,
     cirrusDetailBias: 1.0,
     cloudShadowSamples: 32,
+    cloudShadowResolution: 768,
+    cloudShadowUpdateFrequency: 3,
     bilateralBlurBoost: 1.0,
     bilateralEdgeRelax: 1.0,
     godRayScale: 0.5,
@@ -194,6 +211,8 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cirrusTaps: 2,
     cirrusDetailBias: 0.8,
     cloudShadowSamples: 24,
+    cloudShadowResolution: 512,
+    cloudShadowUpdateFrequency: 4,
     bilateralBlurBoost: 1.1,
     bilateralEdgeRelax: 1.2,
     godRayScale: 0.4,
@@ -208,6 +227,8 @@ const TIERS: Record<RenderQuality, SkyQualityTier> = {
     cirrusTaps: 1,
     cirrusDetailBias: 0.6,
     cloudShadowSamples: 16,
+    cloudShadowResolution: 256,
+    cloudShadowUpdateFrequency: 6,
     bilateralBlurBoost: 1.3,
     bilateralEdgeRelax: 1.45,
     godRayScale: 0.3,
@@ -266,6 +287,27 @@ export function cloudShaderDefines(quality: RenderQuality): ShaderDefines {
 /** Cloud render-target scale, as a fraction of canvas. */
 export function cloudResolutionScale(quality: RenderQuality): number {
   return TIERS[quality].cloudResolutionScale;
+}
+
+/**
+ * Cloud shadow map edge and rebuild period for a tier.
+ *
+ *     const { resolution, updateFrequency } = cloudShadowConfig('medium');
+ *     cloudShadowRenderer.config.resolution = resolution; // 512
+ *     cloudShadowRenderer.config.updateFrequency = updateFrequency; // 4
+ *
+ * Assign both before calling `cloudShadowRenderer.init()`, which reads the edge
+ * to decide whether to swap the texture.
+ */
+export function cloudShadowConfig(quality: RenderQuality): {
+  resolution: number;
+  updateFrequency: number;
+} {
+  const tier = TIERS[quality];
+  return {
+    resolution: tier.cloudShadowResolution,
+    updateFrequency: tier.cloudShadowUpdateFrequency,
+  };
 }
 
 export function cloudShadowShaderDefines(
