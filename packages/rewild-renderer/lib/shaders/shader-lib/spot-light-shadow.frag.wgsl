@@ -1,7 +1,7 @@
   // Spot light shadow — samples the bottom-right quadrant (0.5,0.5)→(1.0,1.0) of the shadow atlas.
   // Returns 1.0 (fully lit) when no shadow-casting spot light exists or fragment is outside the cone.
   var spotShadowFactor = 1.0;
-  if (spotLightShadowParams.hasSpotShadow != 0u) {
+  if (spotLightShadowParams.hasSpotShadow != 0u && !HAS_FOLIAGE_SHADING) {
     // Geometric normal, not the shaded one — see the same bias in
     // directional-shadow.frag.wgsl. A normal-mapped (and on terrain, parallax-
     // displaced) normal makes this 0.3m offset chase texture detail, which moves

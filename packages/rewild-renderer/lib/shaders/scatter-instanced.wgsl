@@ -19,8 +19,7 @@
 const HAS_VERTEX_TANGENTS: bool = ${ HAS_VERTEX_TANGENTS };
 const HAS_PARALLAX: bool = ${ HAS_PARALLAX };
 const HAS_AUTHORED_NORMALS: bool = ${ HAS_AUTHORED_NORMALS };
-const HAS_FACE_NORMAL_SPECULAR: bool = ${ HAS_FACE_NORMAL_SPECULAR };
-const HAS_SPECULAR_OCCLUSION: bool = ${ HAS_SPECULAR_OCCLUSION };
+const HAS_FOLIAGE_SHADING: bool = ${ HAS_FOLIAGE_SHADING };
 // The wind variant: COLOR_0 is a bend weight rather than a tint, and the vertex
 // is displaced by it before projection. Set for a layer with a wind block whose
 // model carries COLOR_0.

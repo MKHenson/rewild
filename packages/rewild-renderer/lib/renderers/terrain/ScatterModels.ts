@@ -110,8 +110,7 @@ function buildTier(
 ): ScatterPrimitive[] {
   const cutout: CutoutShading = {
     authoredNormals: !!layer.authoredNormals,
-    faceNormalSpecular: !!layer.faceNormalSpecular,
-    specularOcclusion: !!layer.specularOcclusion,
+    foliage: !!layer.foliage,
   };
 
   const built: ScatterPrimitive[] = [];
@@ -151,8 +150,7 @@ function buildTier(
 /** The layer flags that apply to a model's alpha-masked primitives. */
 interface CutoutShading {
   authoredNormals: boolean;
-  faceNormalSpecular: boolean;
-  specularOcclusion: boolean;
+  foliage: boolean;
 }
 
 function collectPrimitives(
@@ -204,8 +202,7 @@ function collectPrimitives(
     // these flags describe the leaves; a trunk's normals are its own.
     if (pass.alphaMode === 'MASK') {
       if (cutout.authoredNormals) pass.authoredNormals = true;
-      if (cutout.faceNormalSpecular) pass.faceNormalSpecular = true;
-      if (cutout.specularOcclusion) pass.specularOcclusion = true;
+      if (cutout.foliage) pass.foliage = true;
     }
 
     // Per primitive, because the weights are: a model whose trunk ships

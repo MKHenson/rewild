@@ -108,7 +108,7 @@ fn diffuseLambert(diffuseColor: vec3f) -> vec3f {
 // `Ns`. They are the same vector for an ordinary surface; they differ where the
 // shading normal was authored for a shape the triangles do not have, which is
 // right for how much light a surface gathers and wrong for where it reflects
-// it (see HAS_FACE_NORMAL_SPECULAR).
+// it.
 //
 // N, Ns, V and L must be normalized. V points from the surface toward the eye.
 fn evaluateBRDF(

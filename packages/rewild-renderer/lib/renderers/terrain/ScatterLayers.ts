@@ -103,16 +103,17 @@ export interface ScatterLayer {
    *  it inward and blacks out whichever half of the cards faces away. Applies
    *  only to the model's alpha-masked primitives, so a trunk is untouched. */
   authoredNormals?: boolean;
-  /** Reflect off each triangle rather than off the shading normal on the
-   *  model's cutout piece. For cards whose normals describe a shape the
-   *  triangles do not have: the normal decides how much light a card gathers,
-   *  its face decides where it reflects. Without it a canopy reflects the sun
-   *  as one polished sphere across every card. */
-  faceNormalSpecular?: boolean;
-  /** Let the cutout piece's occlusion map attenuate direct specular too, not
-   *  only ambient. Its occlusion stands in for the leaves in front of a card,
-   *  which no shadow map sees. */
-  specularOcclusion?: boolean;
+  /**
+   * Shade the layer's cutout piece as foliage rather than as a
+   * metallic-roughness surface.
+   *
+   * Drops the specular chain and three of the five texture fetches the standard
+   * model takes per fragment, and adds the transmission that makes a backlit
+   * blade read as a blade. Applies to the alpha-masked primitives only, so a
+   * tree's trunk keeps the standard model while its canopy does not.
+   */
+  foliage?: boolean;
+
   /** Draw the layer into the shadow maps. Defaults to true. Off for ground
    *  cover whose shadow is a flicker of blade-sized texels under itself. */
   castShadow?: boolean;
@@ -192,8 +193,7 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     },
     wind: { amplitude: 8, frequency: 0.55, flutter: 0.6 },
     authoredNormals: true,
-    faceNormalSpecular: true,
-    specularOcclusion: true,
+    foliage: true,
   },
   poplar_01: {
     name: 'poplar_01',
@@ -212,8 +212,7 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     },
     wind: { amplitude: 8, frequency: 0.55, flutter: 0.6 },
     authoredNormals: true,
-    faceNormalSpecular: true,
-    specularOcclusion: true,
+    foliage: true,
   },
   plains_01: {
     name: 'plains_01',
@@ -225,8 +224,7 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     footprint: 1.6,
     wind: { amplitude: 4.18, frequency: 0.8, flutter: 0.7 },
     authoredNormals: true,
-    faceNormalSpecular: true,
-    specularOcclusion: true,
+    foliage: true,
     castShadow: false,
   },
   plains_02: {
@@ -239,8 +237,7 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
     footprint: 1.6,
     wind: { amplitude: 4.18, frequency: 0.8, flutter: 0.7 },
     authoredNormals: true,
-    faceNormalSpecular: true,
-    specularOcclusion: true,
+    foliage: true,
     castShadow: false,
   },
 };

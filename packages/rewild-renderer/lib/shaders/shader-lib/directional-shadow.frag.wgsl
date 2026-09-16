@@ -42,7 +42,15 @@
   let _shadowUV = _cascadeUV * 0.5 + _uvOffset;
   let _shadowDepth = _projCoords.z; // already [0,1] from WebGPU-correct ortho matrix
   let _bias = 0.0002;
-  let _shadowSample = pcfSample3x3(shadowAtlas, shadowSampler, _shadowUV, _shadowDepth - _bias);
+  // Nine taps on a receiver a few texels across, drawn several layers deep, is
+  // filtering that lands on noise. HAS_FOLIAGE_SHADING is declared by every
+  // host that includes this, as a literal false where it cannot be foliage.
+  var _shadowSample = 0.0;
+  if (HAS_FOLIAGE_SHADING) {
+    _shadowSample = pcfSample1(shadowAtlas, shadowSampler, _shadowUV, _shadowDepth - _bias);
+  } else {
+    _shadowSample = pcfSample3x3(shadowAtlas, shadowSampler, _shadowUV, _shadowDepth - _bias);
+  }
 
   // Apply shadow only when the fragment falls within the cascade's local UV coverage.
   let _inShadowBounds = (_cascadeUV.x > 0.001 && _cascadeUV.x < 0.999 &&
