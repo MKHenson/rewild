@@ -1,4 +1,4 @@
-import { Stat } from './Stat';
+import { TimedWindow } from './TimedWindow';
 
 export type MetricKind = 'duration' | 'count';
 
@@ -11,6 +11,15 @@ export interface MetricOptions {
   kind?: MetricKind;
   /** Order within the group. Lower sorts first. Defaults to registration order. */
   order?: number;
+  /**
+   * Duty comes from `markActive` rather than from how often a value arrives.
+   *
+   * Set this when the cost is sampled on a different cadence than the work
+   * happens. GPU passes are the case that matters: a readback lands a few
+   * frames late and not on every frame, so counting values would measure the
+   * readback rate. Encode time knows the truth and reports it every frame.
+   */
+  activityTracked?: boolean;
 }
 
 /** One metric as the panel reads it. */
@@ -19,23 +28,25 @@ export interface MetricView {
   label: string;
   group: string;
   kind: MetricKind;
-  /** Average of the samples actually taken. For a periodic pass this is its
-   *  cost on the frames it runs, not its cost per frame. */
+  /** Mean of the samples taken. For a periodic pass this is its cost on the
+   *  frames it runs, not its cost per frame. */
   perRun: number;
   /** Highest single sample in the window. The spike a mean hides. */
   max: number;
-  /** Fraction of ticks that produced a sample. 1 means every frame. */
+  /** How often the work happened, per frame, over the window. A pass rebuilding
+   *  one frame in six reads 0.167. Anything running every frame reads 1. */
   duty: number;
-  /** perRun scaled by duty: what this actually costs the average frame. */
+  /** perRun scaled by duty: what this costs the average frame. */
   perFrame: number;
   order: number;
 }
 
 class Metric {
-  readonly samples: Stat;
-  /** 1 on a tick that produced a sample, 0 on a tick that skipped. Its mean is
-   *  the duty cycle, which is how a 1-in-N pass gets amortised honestly. */
-  readonly duty: Stat;
+  /** Costs. For a GPU pass these arrive late and not every frame. */
+  readonly samples: TimedWindow;
+  /** One mark per frame the work actually happened. Only used when
+   *  `activityTracked`, where it is the sole source of duty. */
+  readonly active: TimedWindow;
 
   constructor(
     readonly key: string,
@@ -43,12 +54,16 @@ class Metric {
     readonly group: string,
     readonly kind: MetricKind,
     readonly order: number,
-    capacity: number
+    readonly activityTracked: boolean,
+    windowMs: number
   ) {
-    this.samples = new Stat(capacity);
-    this.duty = new Stat(capacity);
+    this.samples = new TimedWindow(windowMs);
+    this.active = new TimedWindow(windowMs);
   }
 }
+
+/** Frames ignored after a reset, while pipelines rebuild and caches warm. */
+const WARMUP_FRAMES = 30;
 
 /**
  * One place every performance number is published to, and the only place the
@@ -63,17 +78,57 @@ class Metric {
  *
  * Every method returns immediately while `enabled` is false, so a closed panel
  * costs nothing but the branch.
+ *
+ * Duty is derived rather than declared: a metric's samples are counted against
+ * the frames in the same window, so a pass that publishes on one frame in six
+ * reads 0.167 without anyone having to say so. That only holds while publishers
+ * report every frame they run, which is why GpuPassTimer reads back on a ring
+ * of buffers rather than skipping frames.
  */
 export class MetricsRegistry {
   /** Nothing is recorded while this is false. The panel sets it on open. */
   enabled = false;
 
-  /** Samples held per metric. 120 is about two seconds at 60 fps. */
-  windowSize = 120;
+  /** How far back every window reaches. */
+  windowMs = 2000;
 
   private metrics = new Map<string, Metric>();
   private openSpans = new Map<string, number>();
+  private frames = new TimedWindow(this.windowMs);
   private registrationCount = 0;
+  private warmupRemaining = WARMUP_FRAMES;
+
+  /**
+   * True while the first frames after a reset are being discarded.
+   *
+   * A quality change recompiles pipelines, and the frame after one can cost a
+   * hundred milliseconds on the GPU. Left in, that single sample dominates the
+   * mean for the whole window and makes a pass look several times its real
+   * cost.
+   */
+  get settling(): boolean {
+    return this.warmupRemaining > 0;
+  }
+
+  /**
+   * Frames in the current window. Small numbers mean a thin sample: at one
+   * frame per second a two second window holds two of them, and every mean in
+   * the panel is really a reading of those two frames.
+   */
+  get frameCount(): number {
+    this.frames.prune(performance.now());
+    return this.frames.count;
+  }
+
+  /** Call once per frame, before anything is recorded. */
+  beginFrame(): void {
+    if (!this.enabled) return;
+    if (this.warmupRemaining > 0) {
+      this.warmupRemaining--;
+      return;
+    }
+    this.frames.push(1, performance.now());
+  }
 
   declare(key: string, options: MetricOptions): void {
     if (this.metrics.has(key)) return;
@@ -85,7 +140,8 @@ export class MetricsRegistry {
         options.group,
         options.kind ?? 'duration',
         options.order ?? this.registrationCount++,
-        this.windowSize
+        options.activityTracked ?? false,
+        this.windowMs
       )
     );
   }
@@ -93,23 +149,25 @@ export class MetricsRegistry {
   /** Publish one sample. Declares the metric first if it is new. */
   record(key: string, value: number, options?: MetricOptions): void {
     if (!this.enabled) return;
+    // Declared before the warm-up guard, not after. A metric that only carries
+    // its options on the first record would otherwise never be declared at all
+    // when that first call lands during warm-up.
     if (options) this.declare(key, options);
-    const metric = this.metrics.get(key);
-    if (!metric) return;
-    metric.samples.push(value);
-    metric.duty.push(1);
+    if (this.warmupRemaining > 0) return;
+    this.metrics.get(key)?.samples.push(value, performance.now());
   }
 
   /**
-   * Mark that a metric had nothing to report this tick.
+   * Note that the work behind a metric happened this frame.
    *
-   * This is what separates "ran and cost nothing" from "did not run". Without
-   * it a pass that rebuilds one frame in six looks six times more expensive
-   * than it is.
+   * Only for `activityTracked` metrics, and it must be called on every frame
+   * the work happens, whether or not a cost lands for it. This is what keeps a
+   * pass that runs every frame at duty 1 even though its timings arrive on two
+   * frames in three.
    */
-  skip(key: string): void {
-    if (!this.enabled) return;
-    this.metrics.get(key)?.duty.push(0);
+  markActive(key: string): void {
+    if (!this.enabled || this.warmupRemaining > 0) return;
+    this.metrics.get(key)?.active.push(1, performance.now());
   }
 
   /** Open a CPU span. Pairs with `end`. */
@@ -129,11 +187,25 @@ export class MetricsRegistry {
 
   /** Everything the panel needs, sorted by group then declared order. */
   snapshot(): MetricView[] {
+    const now = performance.now();
+    this.frames.prune(now);
+    const frameCount = this.frames.count;
+
     const views: MetricView[] = [];
     for (const metric of this.metrics.values()) {
+      metric.samples.prune(now);
+      metric.active.prune(now);
       if (metric.samples.count === 0) continue;
+
       const perRun = metric.samples.avg;
-      const duty = metric.duty.avg;
+      // Activity where it is tracked, value arrivals otherwise. Capped at 1: a
+      // metric reporting more than once a frame is not running more often than
+      // the frame does, and a duty above 1 would inflate its share of it.
+      const occurrences = metric.activityTracked
+        ? metric.active.count
+        : metric.samples.count;
+      const duty = frameCount > 0 ? Math.min(occurrences / frameCount, 1) : 0;
+
       views.push({
         key: metric.key,
         label: metric.label,
@@ -152,12 +224,19 @@ export class MetricsRegistry {
     return views;
   }
 
-  /** Drop every sample but keep the declarations. */
+  /**
+   * Drop every sample and re-arm the warm-up. Declarations are kept.
+   *
+   * Called whenever something invalidates the numbers rather than merely
+   * changes them: a pipeline rebuild, a resize, the panel opening.
+   */
   reset(): void {
     for (const metric of this.metrics.values()) {
       metric.samples.reset();
-      metric.duty.reset();
+      metric.active.reset();
     }
+    this.frames.reset();
     this.openSpans.clear();
+    this.warmupRemaining = WARMUP_FRAMES;
   }
 }

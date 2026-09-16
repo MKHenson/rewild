@@ -1,3 +1,4 @@
+import { SceneCategory } from './IMaterialPass';
 import { Geometry } from '../geometry/Geometry';
 import shader from '../shaders/scatter-instanced.wgsl';
 import { Renderer } from '..';
@@ -42,6 +43,8 @@ export const SCATTER_GPU_STRIDE = 12;
  * the layer and each of those owns its own buffer.
  */
 export class ScatterInstancedPass extends StandardPassBase {
+  profileCategory: SceneCategory = 'scatter';
+
   pipeline: GPURenderPipeline;
   perMeshTracker: SharedUniformsTracker;
   material: StandardMaterial;

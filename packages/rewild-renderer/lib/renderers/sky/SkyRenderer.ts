@@ -164,6 +164,11 @@ export class SkyRenderer {
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
 
+    // A rebuild recompiles pipelines, and the frame after one can cost a
+    // hundred milliseconds on the GPU. Left in the window that single sample
+    // dominates every mean, so the numbers start again from here.
+    renderer.metrics.reset();
+
     // Tiers come from the app-wide setting rather than a copy held here, and are
     // read per aspect so a user who has pinned one subsystem gets that tier.
     //
@@ -523,7 +528,7 @@ export class SkyRenderer {
       sunPosition.x / sunDir,
       sunPosition.y / sunDir,
       sunPosition.z / sunDir,
-      this.gpuTimer.writes('sky-cloud-shadow')
+      () => this.gpuTimer.writes('sky-cloud-shadow')
     );
 
     // Update temporal state: teleport detection + store prev view-proj for next frame's reprojection
@@ -546,13 +551,10 @@ export class SkyRenderer {
       this.foginess,
       this.temperature,
       camera.transform.position.y,
-      this.gpuTimer.writes('sky-cube-capture')
+      () => this.gpuTimer.writes('sky-cube-capture')
     );
 
-    this.iblPrefilter.render(
-      device,
-      commandEncoder,
-      facesCaptured,
+    this.iblPrefilter.render(device, commandEncoder, facesCaptured, () =>
       this.gpuTimer.writes('sky-ibl-prefilter')
     );
 
@@ -564,11 +566,7 @@ export class SkyRenderer {
     this.godRaysPass.config.density = this.godRayDensity;
     this.godRaysPass.config.decay = this.godRayDecay;
     this.godRaysPass.intensityScale = this.godRayIntensity;
-    this.godRaysPass.render(
-      renderer,
-      sunPosition,
-      camera,
-      this.upDot,
+    this.godRaysPass.render(renderer, sunPosition, camera, this.upDot, () =>
       this.gpuTimer.writes('sky-god-rays')
     );
 

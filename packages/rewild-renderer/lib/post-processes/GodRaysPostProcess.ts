@@ -1,3 +1,4 @@
+import { TimestampWritesFn } from '../metrics/GpuPassTimer';
 import { IPostProcess } from '../../types/IPostProcess';
 import { Renderer } from '../Renderer';
 import godRaysShader from '../shaders/godRays.wgsl';
@@ -86,7 +87,10 @@ export class GodRaysPostProcess implements IPostProcess {
     const { device, canvas } = renderer;
 
     const width = Math.max(1, Math.floor(canvas.width * this.resolutionScale));
-    const height = Math.max(1, Math.floor(canvas.height * this.resolutionScale));
+    const height = Math.max(
+      1,
+      Math.floor(canvas.height * this.resolutionScale)
+    );
 
     const module = device.createShaderModule({
       label: 'god rays fragment shader',
@@ -194,18 +198,26 @@ export class GodRaysPostProcess implements IPostProcess {
     sunWorldPos: Vector3,
     camera: Camera,
     sunDotUp: number,
-    timestampWrites?: GPURenderPassTimestampWrites
+    timestampWrites?: TimestampWritesFn
   ): void {
     const config = this.config;
 
-    if (!config.enabled) { this.clearRenderTarget(renderer); return; }
+    if (!config.enabled) {
+      this.clearRenderTarget(renderer);
+      return;
+    }
 
     // --- Auto-disable: sun below horizon ---
-    if (sunDotUp < -0.05) { this.clearRenderTarget(renderer); return; }
+    if (sunDotUp < -0.05) {
+      this.clearRenderTarget(renderer);
+      return;
+    }
 
     // --- Project sun to screen UV ---
-    _vpMatrix
-      .multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    _vpMatrix.multiplyMatrices(
+      camera.projectionMatrix,
+      camera.matrixWorldInverse
+    );
 
     const e = _vpMatrix.elements;
     // Treat the sun as a direction (w=0), not a world-space point (w=1).
@@ -221,7 +233,10 @@ export class GodRaysPostProcess implements IPostProcess {
 
     // Clip-space W for a direction (w=0) — if <= 0 the sun is behind the camera
     const clipW = e[3] * sx + e[7] * sy + e[11] * sz;
-    if (clipW <= 0) { this.clearRenderTarget(renderer); return; }
+    if (clipW <= 0) {
+      this.clearRenderTarget(renderer);
+      return;
+    }
 
     const clipX = (e[0] * sx + e[4] * sy + e[8] * sz) / clipW;
     const clipY = (e[1] * sx + e[5] * sy + e[9] * sz) / clipW;
@@ -238,17 +253,23 @@ export class GodRaysPostProcess implements IPostProcess {
       Math.max(-sunUVy, sunUVy - 1.0)
     );
     const margin = 0.35;
-    if (overshoot >= margin) { this.clearRenderTarget(renderer); return; }
+    if (overshoot >= margin) {
+      this.clearRenderTarget(renderer);
+      return;
+    }
     const edgeFade = 1.0 - overshoot / margin;
 
     // --- Horizon fade ---
     const horizonFade = Math.max(
       0,
-      Math.min(1, (sunDotUp + 0.05) / 0.15)  // smoothstep(-0.05, 0.1, sunDotUp)
+      Math.min(1, (sunDotUp + 0.05) / 0.15) // smoothstep(-0.05, 0.1, sunDotUp)
     );
     const effectiveWeight =
       config.weight * this.intensityScale * horizonFade * edgeFade;
-    if (effectiveWeight <= 0) { this.clearRenderTarget(renderer); return; }
+    if (effectiveWeight <= 0) {
+      this.clearRenderTarget(renderer);
+      return;
+    }
 
     // --- Sun color (warm at sunset, white at noon) ---
     const t = Math.max(0, sunDotUp / (Math.PI / 2));
@@ -265,24 +286,28 @@ export class GodRaysPostProcess implements IPostProcess {
 
     // --- Upload uniforms ---
     const rt = this.renderTarget;
-    uniformData[0] = sunUVx;          // sunScreenPos.x
-    uniformData[1] = sunUVy;          // sunScreenPos.y
-    uniformData[2] = config.density;  // density
+    uniformData[0] = sunUVx; // sunScreenPos.x
+    uniformData[1] = sunUVy; // sunScreenPos.y
+    uniformData[2] = config.density; // density
     uniformData[3] = effectiveWeight; // weight
-    uniformData[4] = config.decay;    // decay
+    uniformData[4] = config.decay; // decay
     uniformData[5] = config.exposure; // exposure
     uniformData[6] = config.numSamples; // numSamples
-    uniformData[7] = this.frameIndex;  // frameIndex (dither rotation)
-    uniformData[8] = sunColorR;       // sunColor.r
-    uniformData[9] = sunColorG;       // sunColor.g
-    uniformData[10] = sunColorB;      // sunColor.b
-    uniformData[11] = 0;              // _pad2
-    uniformData[12] = rt.width;       // resolution.x
-    uniformData[13] = rt.height;      // resolution.y
-    uniformData[14] = 0;              // _pad3.x
-    uniformData[15] = 0;              // _pad3.y
+    uniformData[7] = this.frameIndex; // frameIndex (dither rotation)
+    uniformData[8] = sunColorR; // sunColor.r
+    uniformData[9] = sunColorG; // sunColor.g
+    uniformData[10] = sunColorB; // sunColor.b
+    uniformData[11] = 0; // _pad2
+    uniformData[12] = rt.width; // resolution.x
+    uniformData[13] = rt.height; // resolution.y
+    uniformData[14] = 0; // _pad3.x
+    uniformData[15] = 0; // _pad3.y
 
-    renderer.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData.buffer);
+    renderer.device.queue.writeBuffer(
+      this.uniformBuffer,
+      0,
+      uniformData.buffer
+    );
 
     // --- Render pass ---
     const commandEncoder = renderer.device.createCommandEncoder();
@@ -295,7 +320,7 @@ export class GodRaysPostProcess implements IPostProcess {
           storeOp: 'store',
         },
       ],
-      timestampWrites,
+      timestampWrites: timestampWrites?.(),
     });
 
     pass.setPipeline(this.pipeline);

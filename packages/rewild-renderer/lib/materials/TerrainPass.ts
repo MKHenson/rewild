@@ -1,5 +1,5 @@
 import { Geometry } from '../geometry/Geometry';
-import { IMaterialPass } from './IMaterialPass';
+import { IMaterialPass, SceneCategory } from './IMaterialPass';
 import shader from '../shaders/terrain.wgsl';
 import { Renderer } from '..';
 import { ProjModelView } from './uniforms/ProjModelView';
@@ -16,6 +16,8 @@ const lightingGroupIndex = 2;
 const shadowGroupIndex = 3;
 
 export class TerrainPass implements IMaterialPass {
+  profileCategory: SceneCategory = 'terrain';
+
   side: GPUFrontFace;
   pipeline: GPURenderPipeline;
   perMeshTracker: PerMeshTracker;

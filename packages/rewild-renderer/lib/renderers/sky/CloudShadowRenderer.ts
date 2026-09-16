@@ -1,3 +1,4 @@
+import { TimestampWritesFn } from '../../metrics/GpuPassTimer';
 import { Renderer } from '../../Renderer';
 import shader from '../../shaders/sky/cloudShadow.wgsl';
 import constantsFns from '../../shaders/sky/skyConstants.wgsl';
@@ -148,7 +149,7 @@ export class CloudShadowRenderer {
     sunDirX: number,
     sunDirY: number,
     sunDirZ: number,
-    timestampWrites?: GPURenderPassTimestampWrites
+    timestampWrites?: TimestampWritesFn
   ): void {
     if (!this.shouldUpdate()) return;
 
@@ -174,7 +175,7 @@ export class CloudShadowRenderer {
           storeOp: 'store',
         },
       ],
-      timestampWrites,
+      timestampWrites: timestampWrites?.(),
     });
 
     pass.setPipeline(this.pipeline);

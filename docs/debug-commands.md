@@ -302,7 +302,38 @@ mip 1**, the largest unit of prefilter work there is, since every later level
 quarters in size.
 
 `no gpu timings` on the verdict line means the adapter has no `timestamp-query`.
-CPU rows and counts still work.
+CPU rows and counts still work. `settling` means the first 30 frames after a
+pipeline rebuild are being discarded, which takes about half a second.
+
+**Sanity check every capture against the frame row.** GPU work is sequential, so
+the sum of the GPU subtotals cannot exceed the frame time. If it does, something
+is being double counted and the rest of the reading is not safe to act on.
+
+### Attributing the scene pass
+
+Terrain, scatter and everything else all draw through one `renderGroupings` call
+inside a single render pass, and a GPU timestamp can only bracket a whole pass.
+There is no `terrain` row and there cannot be one without splitting that pass,
+which on a tile-based GPU would add a tile store and reload per split and so
+change the thing being measured.
+
+Attribution is by ablation instead. Hide a category and read how far the `scene`
+row falls:
+
+```js
+setSceneCategoryEnabled('scatter', false); // Also drops its shadow cost
+setSceneCategoryEnabled('scatter', true);
+showAllSceneCategories();
+```
+
+Categories are `terrain`, `scatter` and `opaque`, set by `profileCategory` on the
+material pass. Hiding one holds it back from **every** pass including shadows,
+which is what you want: it answers "what would removing this buy me". Each call
+clears the metrics window, so wait for `settling` to clear before reading.
+
+The `counts` section says which category is worth ablating first. A scene with
+ten thousand scatter meshes and two hundred of everything else has an obvious
+first suspect.
 
 ### Why the GPU numbers are not raw durations
 
@@ -367,9 +398,24 @@ encoder.beginRenderPass({ ..., timestampWrites: this.gpuTimer.writes('clouds') }
 this.gpuTimer.resolve(); // once per frame, after the submits
 ```
 
-A pass that is skipped on some frames needs nothing extra. The timer notices its
-begin timestamp has not moved and reports a skip, which is what makes the
-amortised number honest.
+**Calling `writes(label)` counts as encoding that pass**, and that, not the
+timings, is where duty comes from. A readback lands a few frames late and only
+on about two frames in three, so counting arrivals would report a pass that runs
+every frame as running on two in three, and under-report its cost by a third.
+
+So a pass that only runs on some frames must not have its descriptor built on
+the frames it sits out. Take a `TimestampWritesFn` and call it inside your own
+guard:
+
+```ts
+render(encoder: GPUCommandEncoder, timestampWrites?: TimestampWritesFn) {
+  if (!this.shouldUpdate()) return; // Before the call, not after.
+  encoder.beginRenderPass({ ..., timestampWrites: timestampWrites?.() });
+}
+```
+
+Evaluating `writes(label)` into the argument list of a method that might return
+early is the one way to get this wrong, and it is silent.
 
 Add the group to `GROUP_ORDER` and `GROUP_LABELS` in `PerfPanel.tsx` if it is a
 new one. Anything else is picked up automatically.

@@ -25,6 +25,16 @@ const GROUP_LABELS: Record<string, string> = {
 
 const ms = (value: number) => value.toFixed(2);
 
+/** Below this many frames in the window, every mean is a reading of a handful
+ *  of frames and the panel says so rather than pretending otherwise. */
+const MIN_FRAMES = 10;
+
+/** Slowest refresh interval worth calling a vsync cap: 30Hz plus slack. */
+const SLOWEST_VSYNC_MS = 36;
+
+/** Frame time past which unaccounted time is a stall, not a cap. */
+const STALL_MS = 50;
+
 /**
  * Performance overlay, toggled with the backquote key.
  *
@@ -128,6 +138,13 @@ export class PerfPanel extends Component<Props> {
       }
 
       renderer.metrics.enabled = true;
+
+      if (renderer.metrics.settling) {
+        verdictElm.textContent = 'settling — discarding rebuild frames';
+        verdictElm.className = 'verdict idle';
+        return;
+      }
+
       const views = renderer.metrics.snapshot();
 
       lastViews = views;
@@ -185,10 +202,15 @@ export class PerfPanel extends Component<Props> {
         if (group.startsWith('gpu/')) gpuTotal += subtotal;
       }
 
-      paintVerdict(wall, cpu, gpuTotal);
+      paintVerdict(wall, cpu, gpuTotal, renderer.metrics.frameCount);
     };
 
-    const paintVerdict = (wall: number, cpu: number, gpu: number) => {
+    const paintVerdict = (
+      wall: number,
+      cpu: number,
+      gpu: number,
+      frames: number
+    ) => {
       if (wall <= 0) {
         verdictElm.textContent = 'waiting for frames';
         verdictElm.className = 'verdict idle';
@@ -196,13 +218,27 @@ export class PerfPanel extends Component<Props> {
       }
 
       const fps = 1000 / wall;
+      // CPU and GPU overlap, so the larger of the two is the floor the frame
+      // could reach. Anything beyond it is time neither of them accounts for.
+      const accounted = Math.max(cpu, gpu);
+      const unaccounted = wall - accounted;
+
       let reading: string;
       let tone: string;
 
-      if (gpu <= 0) {
+      if (frames < MIN_FRAMES) {
+        reading = `only ${frames} frames in the window, too few to read`;
+        tone = 'idle';
+      } else if (gpu <= 0) {
         reading = 'no gpu timings (timestamp-query unavailable)';
         tone = 'idle';
-      } else if (wall >= 16 && Math.max(cpu, gpu) < wall * 0.8) {
+      } else if (wall > STALL_MS && unaccounted > wall * 0.5) {
+        // Neither side is busy and the frame is far too long for a refresh
+        // interval. Something outside the render path is blocking: a shader
+        // compile, an asset or impostor bake, a long GC.
+        reading = 'stalled outside the render path';
+        tone = 'warn';
+      } else if (wall <= SLOWEST_VSYNC_MS && accounted < wall * 0.8) {
         reading = 'vsync capped, headroom on both';
         tone = 'good';
       } else if (gpu > cpu * 1.2) {
@@ -245,6 +281,10 @@ export class PerfPanel extends Component<Props> {
             `quality ${quality.level}${pins ? ` (${pins})` : ''}`
         );
       }
+      const hidden = renderer ? [...renderer.hiddenSceneCategories] : [];
+      if (hidden.length > 0) {
+        lines.push(`ABLATED: ${hidden.join(', ')} hidden from every pass`);
+      }
       lines.push(`verdict: ${lastVerdict || 'none'}`);
 
       for (const group of GROUP_ORDER) {
@@ -278,9 +318,10 @@ export class PerfPanel extends Component<Props> {
 
       lines.push('');
       lines.push(
-        'note: values are averages over a 2s window. a row marked "on 1 frame ' +
-          'in N" runs periodically, and the stated per-run cost is what it ' +
-          'costs on the frames it does run.'
+        'note: values are means over the last 2 seconds. a row marked "on 1 ' +
+          'frame in N" runs periodically, and the stated per-run cost is what ' +
+          'it costs on the frames it does run. the first 30 frames after a ' +
+          'pipeline rebuild are discarded.'
       );
       return lines.join('\n');
     };
@@ -328,6 +369,7 @@ export class PerfPanel extends Component<Props> {
       root.hidden = !open;
 
       if (open) {
+        getActiveRenderer()?.metrics.reset();
         tick();
         return;
       }

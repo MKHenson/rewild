@@ -3,6 +3,7 @@ import { Renderer } from 'rewild-renderer';
 import { registerChunkSnapshotDevCommands } from './ChunkSnapshotDevCommands';
 import { registerRenderQualityCommands } from './RenderQualityCommands';
 import { registerShadowDebugCommands } from './ShadowDebugCommands';
+import { registerSceneDebugCommands } from './SceneDebugCommands';
 import { registerSkyDebugCommands } from './SkyDebugCommands';
 import { registerPbrHarnessCommands } from './PbrHarnessCommands';
 import { registerGltfImportCommands } from './GltfImportCommands';
@@ -17,6 +18,7 @@ import {
 // simply repoints them.
 export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerRenderQualityCommands(renderer);
+  registerSceneDebugCommands(renderer);
   registerSkyDebugCommands(renderer);
   registerShadowDebugCommands(renderer);
   registerPbrHarnessCommands(renderer);

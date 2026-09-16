@@ -1,3 +1,4 @@
+import { TimestampWritesFn } from '../../metrics/GpuPassTimer';
 import type { Renderer } from '../../Renderer';
 import { CUBE_FACE_COUNT, SkyCaptureScheduler } from './SkyCaptureScheduler';
 
@@ -308,7 +309,7 @@ export class SkyCubeCapture {
     foginess: number,
     temperature: number,
     cameraAltitude: number,
-    timestampWrites?: GPURenderPassTimestampWrites
+    timestampWrites?: TimestampWritesFn
   ): number {
     if (!this.enabled || !this.pipeline) return 0;
 
@@ -342,7 +343,7 @@ export class SkyCubeCapture {
       );
 
       const descriptor = this.passDescriptors[face];
-      descriptor.timestampWrites = i === 0 ? timestampWrites : undefined;
+      descriptor.timestampWrites = i === 0 ? timestampWrites?.() : undefined;
 
       const pass = encoder.beginRenderPass(descriptor);
       pass.setPipeline(this.pipeline);
