@@ -52,6 +52,12 @@ const ASPECTS: Record<QualityAspect, { label: string; description: string }> = {
     label: 'Bloom',
     description: 'The glow that spreads out of the brightest parts of a frame.',
   },
+  terrain: {
+    label: 'Terrain detail',
+    description:
+      'Surface relief on the ground and how far out it carries. The heaviest ' +
+      'setting here on most views, because terrain fills the screen.',
+  },
 };
 
 /**

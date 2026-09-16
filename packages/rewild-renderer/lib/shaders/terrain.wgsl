@@ -3,6 +3,19 @@
 // materials have no foliage mode to plumb.
 const HAS_FOLIAGE_SHADING: bool = false;
 
+// Compile the parallax march in at all. The tier that turns it off keeps the
+// height sample the blend needs and drops the loop around it — see
+// TerrainQuality.
+const HAS_TERRAIN_PARALLAX: bool = ${ HAS_TERRAIN_PARALLAX };
+
+// Take the second no-tile tap. Half of the per-layer texture reads live behind
+// this; turning it off lets the texture repeat show. See TerrainQuality.
+const HAS_TERRAIN_NO_TILE: bool = ${ HAS_TERRAIN_NO_TILE };
+
+// Sample each layer's detail normal map. When false the macro normal stands in,
+// but only where the layer has one — see the fallback below.
+const HAS_TERRAIN_DETAIL_NORMAL: bool = ${ HAS_TERRAIN_DETAIL_NORMAL };
+
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
@@ -151,14 +164,14 @@ const WEIGHT_FADE_END: f32 = 0.05;
 // Parallax-occlusion march step counts. The count scales with view angle:
 // MIN steps head-on (the ray barely moves across UV) up to MAX at grazing
 // (where it sweeps far and would stair-step through thin ridges without them).
-const POM_MIN_STEPS: f32 = 8.0;
-const POM_MAX_STEPS: f32 = 16.0;
+const POM_MIN_STEPS: f32 = ${ POM_MIN_STEPS };
+const POM_MAX_STEPS: f32 = ${ POM_MAX_STEPS };
 
 // Binary-search bisections that refine the bracketed crossing after the linear
 // march (relief mapping). Each halves the depth error, so 6 turns the coarsest
 // 8-step march into 8·2^6 = 512 effective depth levels — banding gone for six
 // extra taps, far cheaper than a linear march fine enough to match.
-const POM_REFINE_STEPS: i32 = 6;
+const POM_REFINE_STEPS: i32 = ${ POM_REFINE_STEPS };
 
 // Grazing floor for the view ray's z (= N·V). The march travel is
 // viewTS.xy / viewTS.z, which runs away as the surface turns edge-on: a screen
@@ -230,8 +243,10 @@ fn parallaxOcclusion(
   amplitude: f32
 ) -> vec3f {
   // Distant fragments (detailFade → 0) carry no relief — skip the whole march,
-  // but still report the height at the undisplaced UV for the blend.
-  if (amplitude < 1e-4) {
+  // but still report the height at the undisplaced UV for the blend. The tier
+  // that compiles parallax out takes the same exit for every fragment, which is
+  // why the height sample sits on this side of it.
+  if (!HAS_TERRAIN_PARALLAX || amplitude < 1e-4) {
     let h = textureSampleGrad(
       heightArray, seamlessSampler, startUV, arrayIndex, ddx, ddy
     ).r;
@@ -478,15 +493,30 @@ fn fs(
     // range, where the relief has mipped away and the march would only alias.
     let amplitude = layer.heightScale * detailFade;
     let resA = parallaxOcclusion(scaledUV + offa, arrayIndex, ddx, ddy, viewTS, amplitude);
-    let resB = parallaxOcclusion(scaledUV + offb, arrayIndex, ddx, ddy, viewTS, amplitude);
     let sa = resA.xy;
-    let sb = resB.xy;
+    // Seeded from A so a single tap makes every mix below a no-op, whatever
+    // blendFactor is.
+    var layerHeightB = resA.z;
 
     // Two offset lookups mixed by the region's fraction — the stochastic
     // no-tile blend that hides the repeat of a 1K texture over a 240m chunk.
+    //
+    // The second tap is half the texture reads in this loop, across up to eight
+    // active layers, so the cheaper tiers drop it and take the repeat. With one
+    // tap the blend collapses: blendFactor stays 0 and every mix below returns
+    // its A operand.
     let cola = textureSampleGrad(albedoArray, seamlessSampler, sa, arrayIndex, ddx, ddy).rgb;
-    let colb = textureSampleGrad(albedoArray, seamlessSampler, sb, arrayIndex, ddx, ddy).rgb;
-    let blendFactor = smoothstep(0.2, 0.8, f - 0.1 * dot(cola - colb, vec3f(1.0, 1.0, 1.0)));
+
+    var sb = sa;
+    var colb = cola;
+    var blendFactor = 0.0;
+    if (HAS_TERRAIN_NO_TILE) {
+      let resB = parallaxOcclusion(scaledUV + offb, arrayIndex, ddx, ddy, viewTS, amplitude);
+      sb = resB.xy;
+      colb = textureSampleGrad(albedoArray, seamlessSampler, sb, arrayIndex, ddx, ddy).rgb;
+      blendFactor = smoothstep(0.2, 0.8, f - 0.1 * dot(cola - colb, vec3f(1.0, 1.0, 1.0)));
+      layerHeightB = resB.z;
+    }
 
     // A plain lerp, deliberately. Averaging two uncorrelated crops does lose
     // variance (w0² + w1², so ~30% of the contrast at the 50/50 point), and
@@ -500,17 +530,29 @@ fn fs(
     // The layer's surface height at this fragment, through the same no-tile blend
     // as its albedo so the height that arbitrates the splat tracks the texture
     // actually shown (the POM march returned it in .z for free).
-    let layerHeight = mix(resA.z, resB.z, blendFactor);
+    let layerHeight = mix(resA.z, layerHeightB, blendFactor);
 
-    let nrmA = textureSampleGrad(normalArray, seamlessSampler, sa, arrayIndex, ddx, ddy).rgb;
-    let nrmB = textureSampleGrad(normalArray, seamlessSampler, sb, arrayIndex, ddx, ddy).rgb;
-    // Plain lerp for the same reason as the albedo above: rescaling the blended
-    // tilt to recover the variance the average costs makes the shading track the
-    // no-tile region field, which is far more visible than the slightly shallower
-    // relief it corrects.
-    let detailNormal = normalize(
-      decodeNormal(mix(nrmA, nrmB, blendFactor), layer.normalYSign)
-    );
+    // A layer with no macro normal keeps its detail map whatever the tier says.
+    // The fallback is a flat tangent normal, and that is uniform full diffuse —
+    // a featureless wash, which is far worse than the samples it saves. See the
+    // macro crossfade below for why the fade exists at all.
+    let wantsDetailNormal = HAS_TERRAIN_DETAIL_NORMAL || layer.macroUvScale <= 0.0;
+
+    var detailNormal = vec3f(0.0, 0.0, 1.0);
+    if (wantsDetailNormal) {
+      let nrmA = textureSampleGrad(normalArray, seamlessSampler, sa, arrayIndex, ddx, ddy).rgb;
+      var nrmB = nrmA;
+      if (HAS_TERRAIN_NO_TILE) {
+        nrmB = textureSampleGrad(normalArray, seamlessSampler, sb, arrayIndex, ddx, ddy).rgb;
+      }
+      // Plain lerp for the same reason as the albedo above: rescaling the blended
+      // tilt to recover the variance the average costs makes the shading track the
+      // no-tile region field, which is far more visible than the slightly shallower
+      // relief it corrects.
+      detailNormal = normalize(
+        decodeNormal(mix(nrmA, nrmB, blendFactor), layer.normalYSign)
+      );
+    }
 
     // Materials with no macro normal keep their detail normal at every
     // distance, and let mipping LOD it. Fading them toward flat instead throws
@@ -559,7 +601,11 @@ fn fs(
       // 2 while z stays put, tipping the normal into the tangent plane.
       // perturbNormal then points it sideways — into the hillside on a sheer
       // face — and the face renders black. normalize() bounds length, not tilt.
-      layerNormal = normalize(mix(macroNormal, detailNormal, detailFade));
+      layerNormal = select(
+        macroNormal,
+        normalize(mix(macroNormal, detailNormal, detailFade)),
+        wantsDetailNormal
+      );
     }
 
     // The ARM map, sampled through the same no-tile blend as albedo so the
@@ -575,7 +621,10 @@ fn fs(
     // dielectric, so metallic is pinned at 0 below rather than trusted from a
     // channel that is unauthored in most of these textures.
     let armA = textureSampleGrad(armArray, seamlessSampler, sa, arrayIndex, ddx, ddy);
-    let armB = textureSampleGrad(armArray, seamlessSampler, sb, arrayIndex, ddx, ddy);
+    var armB = armA;
+    if (HAS_TERRAIN_NO_TILE) {
+      armB = textureSampleGrad(armArray, seamlessSampler, sb, arrayIndex, ddx, ddy);
+    }
     let arm = mix(armA, armB, blendFactor);
 
     layerColors[layerSlot] = layerColor;
