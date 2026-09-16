@@ -7,7 +7,7 @@
     _cascadeIdx = 1u;
   }
 
-  // Atlas UV offsets: each cascade occupies a 1024×1024 quadrant in the 2048×2048 atlas.
+  // Atlas UV offsets: each cascade occupies one quadrant of the atlas.
   // Cascade 0 = top-left (0, 0), cascade 1 = top-right (0.5, 0), cascade 2 = bottom-left (0, 0.5).
   var _uvOffset = vec2f(0.0, 0.5); // default: cascade 2
   if (_cascadeIdx == 0u) {
@@ -20,6 +20,8 @@
   // This eliminates slope-dependent self-shadowing (acne) without needing the light direction.
   // Each cascade's offset scales with its approximate world-space texel size so that
   // near cascades stay sharp while far cascades (with coarser texels) get enough clearance.
+  // The metres below are tuned at a 1024 cascade; normalOffsetScale rescales them for
+  // the atlas the quality tier actually chose.
   //
   // Along the *geometric* normal, deliberately — not the shaded one. The offset is
   // in metres (up to 1.2), and its job is to clear the receiver's own surface
@@ -31,7 +33,8 @@
   // detailFade hands the shading normal over to the smooth macro normal there.
   let _dirShadowGeoNormal = normalize(normal);
   let _cascadeNormalOffsets = array<f32, 3>(0.5, 0.8, 1.2);
-  let _biasedViewPos = viewPosition + _dirShadowGeoNormal * _cascadeNormalOffsets[_cascadeIdx];
+  let _normalOffset = _cascadeNormalOffsets[_cascadeIdx] * directionalShadowParams.normalOffsetScale;
+  let _biasedViewPos = viewPosition + _dirShadowGeoNormal * _normalOffset;
 
   // Project view-space position into this cascade's light clip space.
   let _lightSpacePos = directionalShadowParams.lightMVPFromView[_cascadeIdx] * vec4f(_biasedViewPos, 1.0);

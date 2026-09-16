@@ -1,7 +1,7 @@
 // PCF soft-shadow helper — shared by directional and spot-light shadow sampling.
 // Increase PCF_SPREAD to soften edges (1.0 = one shadow-atlas texel per tap step).
+// The atlas edge is read from the texture: it is sized by the shadows quality tier.
 const PCF_SPREAD: f32 = 1.0;
-const PCF_ATLAS_SIZE: f32 = 2048.0;
 
 fn pcfSample3x3(
   shadowMap: texture_depth_2d,
@@ -9,7 +9,7 @@ fn pcfSample3x3(
   uv: vec2f,
   depth: f32
 ) -> f32 {
-  let _ts = PCF_SPREAD / PCF_ATLAS_SIZE;
+  let _ts = PCF_SPREAD / f32(textureDimensions(shadowMap).x);
   var _sum = 0.0;
   _sum += textureSampleCompare(shadowMap, shadowSampler, uv + vec2f(-_ts, -_ts), depth);
   _sum += textureSampleCompare(shadowMap, shadowSampler, uv + vec2f( 0.0, -_ts), depth);

@@ -125,7 +125,7 @@ describe('QualitySettings', () => {
     it('drops stored entries that are not a known aspect or tier', () => {
       localStorage.setItem(
         OVERRIDES_STORAGE_KEY,
-        JSON.stringify({ clouds: 'extreme', shadows: 'low', bloom: 'low' })
+        JSON.stringify({ clouds: 'extreme', water: 'low', bloom: 'low' })
       );
 
       const quality = new QualitySettings('high');

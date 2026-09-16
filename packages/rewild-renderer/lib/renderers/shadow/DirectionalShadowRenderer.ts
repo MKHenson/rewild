@@ -17,20 +17,17 @@ import {
   isScatterImpostorPass,
   isScatterInstanceGroup,
 } from '../../typeGuards';
+import { shadowConfig } from './ShadowQuality';
 
-export const SHADOW_MAP_SIZE = 2048;
 export const NUM_CASCADES = 3;
 
-// Each cascade occupies one 1024×1024 quadrant of the 2048×2048 atlas.
-const CASCADE_SIZE = SHADOW_MAP_SIZE / 2;
-
-// Maximum view-space distance (world units) that receives shadows.
-// Keeps the far cascade resolution acceptable despite the camera's 2000-unit far plane.
-const SHADOW_CASCADE_FAR = 500;
+// Cascade edge the shader's per-cascade normal offsets are tuned at, in texels.
+// See normalOffsetScale.
+const NORMAL_OFFSET_REFERENCE_CASCADE_SIZE = 1024;
 
 // Practical-split blend factor λ: 0 = uniform spacing, 1 = logarithmic spacing.
 // Higher values pull cascade 0 much tighter (better near-shadow texel density).
-const CSM_LAMBDA = 0.85;
+const CSM_LAMBDA = 0.7;
 
 // How far each cascade's ortho box is pushed *toward the light*, beyond the
 // receivers it covers, so that casters standing outside the slice are still
@@ -54,11 +51,11 @@ const CSM_LAMBDA = 0.85;
 // (harmless at depth32float) and slightly coarser effective bias.
 const CASTER_EXTENSION_TOWARD_LIGHT = 500;
 
-// Atlas pixel offset [x, y] for each cascade.
+// Atlas quadrant [x, y] for each cascade, in units of cascadeSize.
 // Layout: cascade 0 = top-left, cascade 1 = top-right, cascade 2 = bottom-left.
-// Bottom-right quadrant (1024, 1024) is reserved for the spot light shadow map.
-const CASCADE_VIEWPORT_X = [0, CASCADE_SIZE, 0];
-const CASCADE_VIEWPORT_Y = [0, 0, CASCADE_SIZE];
+// The bottom-right quadrant is reserved for the spot light shadow map.
+const CASCADE_QUADRANT_X = [0, 1, 0];
+const CASCADE_QUADRANT_Y = [0, 0, 1];
 
 // NDC corners used to reconstruct the view frustum in world space.
 // Camera projection uses OpenGL convention: near → NDC Z = -1, far → NDC Z = +1.
@@ -108,12 +105,31 @@ export class DirectionalShadowRenderer {
    * View-space depth at which each cascade ends, plus sun elevation in [3].
    *   [0] = end of cascade 0  (cascadeSplits.x in shader)
    *   [1] = end of cascade 1  (cascadeSplits.y in shader)
-   *   [2] = SHADOW_CASCADE_FAR (cascadeSplits.z in shader)
+   *   [2] = shadowFar (cascadeSplits.z in shader)
    *   [3] = normalized sun direction Y (cascadeSplits.w) — used by shader to fade shadows near horizon
    */
   cascadeSplitDistances: Float32Array;
+  /**
+   * Edge of one cascade's atlas quadrant, in texels; the atlas is twice this.
+   * Read by the spot pass to place its own quadrant. Set from the shadows
+   * quality tier.
+   */
+  cascadeSize: number = 0;
+  /** View-space distance past which nothing receives a directional shadow. */
+  shadowFar: number = 0;
+  /**
+   * Multiplier on the shader's per-cascade normal-offset bias — read by
+   * ShadowUniforms.prepare(). The offsets are tuned in metres at a
+   * NORMAL_OFFSET_REFERENCE_CASCADE_SIZE cascade and only need to clear a
+   * texel or so, so they shrink as the cascade grows and its texels get finer.
+   */
+  normalOffsetScale: number = 1;
 
   private pipeline: GPURenderPipeline;
+  private builtQualityRevision: number = -1;
+  // The atlas the previous frame sampled. ShadowUniforms rebinds one frame
+  // after the swap, so the old texture must outlive the frame that swapped it.
+  private retiredAtlas: GPUTexture | null = null;
   private instancedPipeline: GPURenderPipeline;
   private instancedWindPipeline: GPURenderPipeline;
   private impostorPipeline: GPURenderPipeline;
@@ -128,7 +144,7 @@ export class DirectionalShadowRenderer {
   private _shadowMVP: Matrix4;
   private _frustumCorners: Vector3[]; // 8 full-frustum corners (near + far planes)
   private _cascadeCorners: Vector3[]; // 8 sub-frustum corners for the current cascade
-  private _lightPos: Vector3;
+  private _origin: Vector3;
   private _frustumCenter: Vector3;
   private _lightDir: Vector3;
   private _lightUp: Vector3;
@@ -149,7 +165,7 @@ export class DirectionalShadowRenderer {
     this._shadowMVP = new Matrix4();
     this._frustumCorners = Array.from({ length: 8 }, () => new Vector3());
     this._cascadeCorners = Array.from({ length: 8 }, () => new Vector3());
-    this._lightPos = new Vector3();
+    this._origin = new Vector3();
     this._frustumCenter = new Vector3();
     this._lightDir = new Vector3();
     this._lightUp = new Vector3();
@@ -162,16 +178,6 @@ export class DirectionalShadowRenderer {
 
   init(renderer: Renderer): void {
     const { device } = renderer;
-
-    // 2048×2048 atlas split into four 1024×1024 quadrants.
-    // Cascades 0/1/2 use top-left / top-right / bottom-left; bottom-right is reserved.
-    this.shadowDepthTexture = device.createTexture({
-      label: 'directional shadow depth',
-      size: [SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 1],
-      format: 'depth32float',
-      usage:
-        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    });
 
     const module = device.createShaderModule({
       label: 'shadow depth shader',
@@ -301,7 +307,40 @@ export class DirectionalShadowRenderer {
       },
     });
 
-    this.debugRenderer.init(renderer, this.shadowDepthTexture);
+    this.debugRenderer.init(renderer);
+    this._buildAtlas(renderer);
+  }
+
+  /**
+   * Sizes the atlas from the shadows quality tier: four cascadeSize quadrants,
+   * cascades 0/1/2 top-left / top-right / bottom-left, bottom-right reserved
+   * for the spot light. Called again whenever the tier moves; the pipelines do
+   * not depend on the size, so only the texture is replaced.
+   */
+  private _buildAtlas(renderer: Renderer): void {
+    const { device, quality } = renderer;
+    const tier = shadowConfig(quality.aspect('shadows'));
+    this.builtQualityRevision = quality.revision;
+
+    this.shadowFar = tier.shadowFar;
+    if (this.cascadeSize === tier.cascadeSize) return;
+
+    this.cascadeSize = tier.cascadeSize;
+    this.normalOffsetScale =
+      NORMAL_OFFSET_REFERENCE_CASCADE_SIZE / tier.cascadeSize;
+
+    this.retiredAtlas?.destroy();
+    this.retiredAtlas = this.shadowDepthTexture ?? null;
+
+    const atlasSize = tier.cascadeSize * 2;
+    this.shadowDepthTexture = device.createTexture({
+      label: 'directional shadow depth',
+      size: [atlasSize, atlasSize, 1],
+      format: 'depth32float',
+      usage:
+        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+    this.debugRenderer.bindAtlas(device, this.shadowDepthTexture);
   }
 
   render(
@@ -320,6 +359,16 @@ export class DirectionalShadowRenderer {
     const sunAboveHorizon = sun.transform.position.y > 0;
 
     const { device } = renderer;
+
+    // The frame that swapped the atlas has been submitted by now, so the old
+    // one has no reader left.
+    if (this.retiredAtlas) {
+      this.retiredAtlas.destroy();
+      this.retiredAtlas = null;
+    }
+    if (renderer.quality.hasChangedSince(this.builtQualityRevision)) {
+      this._buildAtlas(renderer);
+    }
 
     // Meshes come and go (actor removal, chunk eviction, terrain sculpting
     // replaces a chunk's mesh every stamp) — drop uniform entries for meshes
@@ -387,12 +436,13 @@ export class DirectionalShadowRenderer {
 
     if (sunAboveHorizon) {
       // Render all 3 cascades in a single pass — setViewport routes each into its atlas quadrant.
+      const size = this.cascadeSize;
       for (let c = 0; c < NUM_CASCADES; c++) {
         pass.setViewport(
-          CASCADE_VIEWPORT_X[c],
-          CASCADE_VIEWPORT_Y[c],
-          CASCADE_SIZE,
-          CASCADE_SIZE,
+          CASCADE_QUADRANT_X[c] * size,
+          CASCADE_QUADRANT_Y[c] * size,
+          size,
+          size,
           0,
           1
         );
@@ -456,6 +506,8 @@ export class DirectionalShadowRenderer {
   }
 
   dispose(): void {
+    this.retiredAtlas?.destroy();
+    this.retiredAtlas = null;
     this.shadowDepthTexture?.destroy();
     for (const { buffers } of this.meshUniforms.values()) {
       for (const buf of buffers) buf.destroy();
@@ -695,9 +747,17 @@ export class DirectionalShadowRenderer {
       this._lightUp.set(0, 1, 0);
     }
 
+    // Rotation-only light view anchored at the world origin, shared by every
+    // cascade. It depends on the sun alone, so a point's light-space position is
+    // absolute and snapping it to texels locks the grid to the world. A view
+    // that followed the cascade centre would put that centre at (0, 0) every
+    // frame and leave the snap nothing to bite on.
+    this._lightViewWorld.lookAt(this._lightDir, this._origin, this._lightUp);
+    this._lightView.copy(this._lightViewWorld).invert();
+
     // --- Practical-split cascade distances ---
     // cascadeSplitDistances[i] is the VIEW-SPACE depth where cascade i ends.
-    const shadowFar = Math.min(camFar, SHADOW_CASCADE_FAR);
+    const shadowFar = Math.min(camFar, this.shadowFar);
     for (let i = 1; i <= NUM_CASCADES; i++) {
       const cLog = camNear * Math.pow(shadowFar / camNear, i / NUM_CASCADES);
       const cUni = camNear + (shadowFar - camNear) * (i / NUM_CASCADES);
@@ -750,25 +810,6 @@ export class DirectionalShadowRenderer {
     this._frustumCenter.y /= 8;
     this._frustumCenter.z /= 8;
 
-    const orbitDist = 2000;
-    this._lightPos.set(
-      this._frustumCenter.x + this._lightDir.x * orbitDist,
-      this._frustumCenter.y + this._lightDir.y * orbitDist,
-      this._frustumCenter.z + this._lightDir.z * orbitDist
-    );
-
-    this._lightViewWorld.lookAt(
-      this._lightPos,
-      this._frustumCenter,
-      this._lightUp
-    );
-    this._lightViewWorld.setPosition(
-      this._lightPos.x,
-      this._lightPos.y,
-      this._lightPos.z
-    );
-    this._lightView.copy(this._lightViewWorld).invert();
-
     // Fit the ortho box to the sub-frustum's bounding SPHERE, not to a tight AABB
     // of its corners, and then snap that box to whole shadow-map texels. Both
     // halves are needed, and skipping them is what made near shadows crawl.
@@ -787,10 +828,10 @@ export class DirectionalShadowRenderer {
     // texel keeps covering the same ground from frame to frame.
     //
     // This is why the artefact was confined to the near field. Cascade 0 is
-    // pulled tight by CSM_LAMBDA, so its 1024 texels cover tens of metres — a
-    // couple of centimetres each — and sub-texel drift is a large fraction of
-    // one. Cascade 2 spreads the same 1024 texels over SHADOW_CASCADE_FAR, where
-    // the identical drift is invisible.
+    // pulled tight by CSM_LAMBDA, so its texels cover tens of metres — a couple
+    // of centimetres each — and sub-texel drift is a large fraction of one.
+    // Cascade 2 spreads the same texels over shadowFar, where the identical
+    // drift is invisible.
     //
     // The cost is resolution: a sphere circumscribes the frustum, so the box is
     // larger than a tight fit and texel density drops. That is the standard trade
@@ -809,16 +850,14 @@ export class DirectionalShadowRenderer {
     // with it the texel size) frame to frame.
     radius = Math.ceil(radius * 16) / 16;
 
-    // Sub-frustum centre in light space. The light view's rotation is fixed by
-    // the sun direction, so only this translation varies — which is exactly what
-    // makes snapping in this space meaningful.
+    // Sub-frustum centre in the shared, origin-anchored light space.
     const lve = this._lightView.elements;
     const c = this._frustumCenter;
     const cx = lve[0] * c.x + lve[4] * c.y + lve[8] * c.z + lve[12];
     const cy = lve[1] * c.x + lve[5] * c.y + lve[9] * c.z + lve[13];
     const cz = lve[2] * c.x + lve[6] * c.y + lve[10] * c.z + lve[14];
 
-    const texelSize = (2 * radius) / CASCADE_SIZE;
+    const texelSize = (2 * radius) / this.cascadeSize;
     const snappedX = Math.floor(cx / texelSize) * texelSize;
     const snappedY = Math.floor(cy / texelSize) * texelSize;
 
@@ -831,18 +870,17 @@ export class DirectionalShadowRenderer {
     // moved each frame would shift every stored depth and flicker the PCF
     // comparison.
     //
-    // Light space looks down -Z, so the receivers sit at cz ≈ -orbitDist and
-    // anything nearer the light has a *larger* z. Growing maxZ is therefore what
-    // takes in casters; see CASTER_EXTENSION_TOWARD_LIGHT. The small margin on
-    // minZ is the other end — it only keeps receivers a little outside the sphere
-    // from falling through the far plane and failing the shader's depth test.
+    // Light space looks down -Z, so anything nearer the light than the receivers
+    // has a *larger* z. Growing maxZ is therefore what takes in casters; see
+    // CASTER_EXTENSION_TOWARD_LIGHT. The small margin on minZ is the other end —
+    // it only keeps receivers a little outside the sphere from falling through
+    // the far plane and failing the shader's depth test. The view is anchored at
+    // the world origin, so near may come out negative; an ortho projection only
+    // needs near < far.
     const minZ = cz - radius - 50;
     const maxZ = cz + radius + CASTER_EXTENSION_TOWARD_LIGHT;
 
-    const nearDist = Math.max(0.1, -maxZ);
-    const farDist = Math.max(nearDist + 1, -minZ);
-
-    this._makeOrthoWebGPU(minX, maxX, maxY, minY, nearDist, farDist);
+    this._makeOrthoWebGPU(minX, maxX, maxY, minY, -maxZ, -minZ);
     this.lightVPs[cascadeIndex].multiplyMatrices(
       this._lightProj,
       this._lightView

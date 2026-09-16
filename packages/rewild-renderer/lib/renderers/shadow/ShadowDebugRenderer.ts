@@ -6,7 +6,7 @@ export class ShadowDebugRenderer {
   private pipeline: GPURenderPipeline | null = null;
   private bindGroup: GPUBindGroup | null = null;
 
-  init(renderer: Renderer, shadowAtlas: GPUTexture): void {
+  init(renderer: Renderer): void {
     const { device, presentationFormat } = renderer;
 
     const module = device.createShaderModule({
@@ -25,7 +25,11 @@ export class ShadowDebugRenderer {
       },
       primitive: { topology: 'triangle-list' },
     });
+  }
 
+  /** Points the viewer at an atlas; called again whenever the atlas is replaced. */
+  bindAtlas(device: GPUDevice, shadowAtlas: GPUTexture): void {
+    if (!this.pipeline) return;
     this.bindGroup = device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [

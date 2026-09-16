@@ -42,6 +42,12 @@ const ASPECTS: Record<QualityAspect, { label: string; description: string }> = {
     description:
       'How finely the shadows clouds cast across the landscape are traced.',
   },
+  shadows: {
+    label: 'Shadows',
+    description:
+      'Sharpness of the shadows cast by the sun, and how far out they reach. ' +
+      'Ultra doubles the shadow map and costs four times the fill of High.',
+  },
   godRays: {
     label: 'God Rays',
     description:
