@@ -12,14 +12,13 @@ describe('TerrainQuality', () => {
       POM_REFINE_STEPS: '6',
       HAS_TERRAIN_PARALLAX: true,
       HAS_TERRAIN_NO_TILE: true,
-      HAS_TERRAIN_DETAIL_NORMAL: true,
     });
     expect(terrainDetailFade('high')).toEqual({ start: 150, end: 200 });
   });
 
   it('names a value for every tier', () => {
     for (const quality of RENDER_QUALITIES) {
-      expect(Object.keys(terrainShaderDefines(quality))).toHaveLength(6);
+      expect(Object.keys(terrainShaderDefines(quality))).toHaveLength(5);
       expect(terrainDetailFade(quality).end).toBeGreaterThan(0);
     }
   });
@@ -64,11 +63,13 @@ describe('TerrainQuality', () => {
     expect(terrainShaderDefines('low').HAS_TERRAIN_NO_TILE).toBe(false);
   });
 
-  it('keeps detail normals everywhere but the cheapest tier', () => {
-    expect(terrainShaderDefines('low').HAS_TERRAIN_DETAIL_NORMAL).toBe(false);
-    for (const quality of ['ultra', 'high', 'medium'] as const) {
-      expect(terrainShaderDefines(quality).HAS_TERRAIN_DETAIL_NORMAL).toBe(
-        true
+  it('never trades away detail normals by tier', () => {
+    // They are gated by the fade distance at runtime instead, so near fragments
+    // keep them at every tier. A define here would take them at arm's length
+    // too, where the macro normal cannot stand in for them.
+    for (const quality of RENDER_QUALITIES) {
+      expect(terrainShaderDefines(quality)).not.toHaveProperty(
+        'HAS_TERRAIN_DETAIL_NORMAL'
       );
     }
   });

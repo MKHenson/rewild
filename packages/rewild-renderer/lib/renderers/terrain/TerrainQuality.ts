@@ -50,21 +50,13 @@ interface TerrainQualityTier {
    */
   noTileBlend: boolean;
   /**
-   * Sample each layer's detail normal map.
-   *
-   * When false the macro normal stands in for it — but only where the material
-   * has one. A layer with no macro normal keeps its detail map whatever this
-   * says, because the fallback there is a flat tangent normal, which is uniform
-   * full diffuse and washes the surface out completely.
-   */
-  detailNormal: boolean;
-  /**
    * Metres at which surface relief starts fading out, and where it is gone.
    *
-   * The strongest lever here. Past the end distance a fragment skips the march
-   * on the existing amplitude test and keeps only the macro normal, and screen
-   * area grows with the square of distance, so pulling these in takes the march
-   * off most of the screen.
+   * The strongest lever here. Past the end distance a fragment skips both the
+   * march and the per-layer detail normal sample, on runtime tests the shader
+   * already has, and keeps only the macro normal. Screen area grows with the
+   * square of distance, so pulling these in takes that work off most of the
+   * screen.
    *
    * Uniforms rather than defines, so they cost no recompile.
    */
@@ -75,7 +67,6 @@ interface TerrainQualityTier {
 const TIERS: Record<RenderQuality, TerrainQualityTier> = {
   ultra: {
     noTileBlend: true,
-    detailNormal: true,
     pomMinSteps: 12,
     pomMaxSteps: 24,
     pomRefineSteps: 6,
@@ -85,7 +76,6 @@ const TIERS: Record<RenderQuality, TerrainQualityTier> = {
   },
   high: {
     noTileBlend: true,
-    detailNormal: true,
     pomMinSteps: 8,
     pomMaxSteps: 16,
     pomRefineSteps: 6,
@@ -94,11 +84,10 @@ const TIERS: Record<RenderQuality, TerrainQualityTier> = {
     detailFadeEnd: 200,
   },
   medium: {
-    // Measured at 0.14ms against `high`, because the splat loop skips any layer
-    // under WEIGHT_EPSILON and most fragments have only one or two above it.
-    // Visible tiling was not worth a seventh of a millisecond here.
+    // Worth 0.14ms here, because the splat loop skips any layer under
+    // WEIGHT_EPSILON and most fragments have only one or two above it. Visible
+    // tiling is not worth a seventh of a millisecond.
     noTileBlend: true,
-    detailNormal: true,
     pomMinSteps: 6,
     pomMaxSteps: 12,
     pomRefineSteps: 4,
@@ -108,7 +97,6 @@ const TIERS: Record<RenderQuality, TerrainQualityTier> = {
   },
   low: {
     noTileBlend: false,
-    detailNormal: false,
     pomMinSteps: 4,
     pomMaxSteps: 8,
     pomRefineSteps: 3,
@@ -136,7 +124,6 @@ export function terrainShaderDefines(quality: RenderQuality): ShaderDefines {
     POM_REFINE_STEPS: wgslI32(tier.pomRefineSteps),
     HAS_TERRAIN_PARALLAX: tier.parallax,
     HAS_TERRAIN_NO_TILE: tier.noTileBlend,
-    HAS_TERRAIN_DETAIL_NORMAL: tier.detailNormal,
   };
 }
 

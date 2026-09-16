@@ -12,10 +12,6 @@ const HAS_TERRAIN_PARALLAX: bool = ${ HAS_TERRAIN_PARALLAX };
 // this; turning it off lets the texture repeat show. See TerrainQuality.
 const HAS_TERRAIN_NO_TILE: bool = ${ HAS_TERRAIN_NO_TILE };
 
-// Sample each layer's detail normal map. When false the macro normal stands in,
-// but only where the layer has one — see the fallback below.
-const HAS_TERRAIN_DETAIL_NORMAL: bool = ${ HAS_TERRAIN_DETAIL_NORMAL };
-
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
@@ -532,11 +528,11 @@ fn fs(
     // actually shown (the POM march returned it in .z for free).
     let layerHeight = mix(resA.z, layerHeightB, blendFactor);
 
-    // A layer with no macro normal keeps its detail map whatever the tier says.
-    // The fallback is a flat tangent normal, and that is uniform full diffuse —
-    // a featureless wash, which is far worse than the samples it saves. See the
-    // macro crossfade below for why the fade exists at all.
-    let wantsDetailNormal = HAS_TERRAIN_DETAIL_NORMAL || layer.macroUvScale <= 0.0;
+    // Skipped only where the crossfade below would discard it anyway: past the
+    // fade, detailFade is 0 and the macro normal stands alone. A layer with no
+    // macro normal has no stand-in — its fallback is a flat tangent normal,
+    // uniform full diffuse — so it keeps its detail map at every distance.
+    let wantsDetailNormal = detailFade > 0.0 || layer.macroUvScale <= 0.0;
 
     var detailNormal = vec3f(0.0, 0.0, 1.0);
     if (wantsDetailNormal) {
