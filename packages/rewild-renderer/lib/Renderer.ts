@@ -14,7 +14,8 @@ import { RenderList } from './core/RenderList';
 import { RenderLayer } from './core/RenderLayer';
 import { Light } from './core/lights/Light';
 import { MipMapGenerator } from './textures/MipMapGenerator';
-import { PerformanceMonitor } from './utils/PerformanceMonitor';
+import { MetricsRegistry } from './metrics/MetricsRegistry';
+import { GpuPassTimer } from './metrics/GpuPassTimer';
 import { TextureManager } from './managers/TextureManager';
 import { SamplerManager } from './managers/SamplerManager';
 import { GeometryManager } from './managers/GeometryManager';
@@ -83,13 +84,15 @@ export class Renderer {
   materialManager: MaterialManager;
   mipmapGenerator: MipMapGenerator;
 
-  // GPU-time profiling of the main scene pass (terrain + all opaque geometry).
-  // Terrain is not its own pass — its LOD meshes draw through renderGroupings in
-  // this pass — so 'scene' times the whole thing. On a terrain-filling view that
-  // is dominated by terrain's fragment cost, which is what #182 is watching. Set
-  // `scenePerfMonitor.enabled = true` (e.g. from the console) to log it; off by
-  // default at zero overhead.
-  scenePerfMonitor: PerformanceMonitor = new PerformanceMonitor();
+  // Every performance number the engine publishes, and the only thing the perf
+  // panel reads. Disabled until the panel opens, at which point it costs one
+  // branch per record call. See MetricsRegistry.
+  metrics: MetricsRegistry = new MetricsRegistry();
+
+  // GPU time for the shadow and main scene passes. Terrain is not its own pass —
+  // its LOD meshes draw through renderGroupings in the main one — so 'scene'
+  // covers the lot.
+  sceneGpuTimer: GpuPassTimer = new GpuPassTimer(this.metrics, 'gpu/scene');
 
   camera: PerspectiveCamera;
   scene: Transform;
@@ -290,7 +293,8 @@ export class Renderer {
     this.context = context;
     this.device = device;
 
-    this.scenePerfMonitor.init(device, ['shadow', 'scene']);
+    this.sceneGpuTimer.init(device, ['shadow', 'scene']);
+    this.declareMetrics();
 
     this.textureManager = new TextureManager();
     this.samplerManager = new SamplerManager();
@@ -390,7 +394,7 @@ export class Renderer {
     this.terrainRenderer.dispose();
     this.directionalShadowRenderer.dispose();
     this.spotLightShadowRenderer.dispose();
-    this.scenePerfMonitor.dispose();
+    this.sceneGpuTimer.dispose();
     this.frameCompositor.dispose();
     this.disposed = true;
     this.initialized = false;
@@ -621,6 +625,61 @@ export class Renderer {
     }
   }
 
+  /**
+   * Names and labels for everything render() publishes.
+   *
+   * Declared up front rather than on first use so the panel shows a stable row
+   * order from the first frame, instead of rows appearing as each phase first
+   * runs.
+   */
+  private declareMetrics(): void {
+    const m = this.metrics;
+    m.declare('frame.wall', { label: 'frame', group: 'frame', order: 0 });
+    m.declare('frame.cpu', { label: 'cpu (render)', group: 'frame', order: 1 });
+
+    m.declare('cpu.scenegraph', {
+      label: 'scene graph',
+      group: 'cpu',
+      order: 0,
+    });
+    m.declare('cpu.cull', { label: 'cull + collect', group: 'cpu', order: 1 });
+    m.declare('cpu.organize', {
+      label: 'organize visuals',
+      group: 'cpu',
+      order: 2,
+    });
+    m.declare('cpu.encode', {
+      label: 'encode + submit',
+      group: 'cpu',
+      order: 3,
+    });
+    m.declare('cpu.shadowcast', {
+      label: 'shadow casters (in encode)',
+      group: 'cpu',
+      order: 4,
+    });
+
+    const count = 'count' as const;
+    m.declare('counts.drawgroups', {
+      label: 'draw groups',
+      group: 'counts',
+      kind: count,
+      order: 0,
+    });
+    m.declare('counts.solids', {
+      label: 'visible solids',
+      group: 'counts',
+      kind: count,
+      order: 1,
+    });
+    m.declare('counts.shadowcasters', {
+      label: 'shadow casters',
+      group: 'counts',
+      kind: count,
+      order: 2,
+    });
+  }
+
   getCurrentTextureView(): GPUTextureView {
     return this.context.getCurrentTexture().createView();
   }
@@ -639,6 +698,11 @@ export class Renderer {
     this.delta = deltaTime;
     this.totalDeltaTime += deltaTime;
     this.lastTime = currentTime;
+
+    const metrics = this.metrics;
+    metrics.record('frame.wall', deltaTime);
+    metrics.begin('frame.cpu');
+    metrics.begin('cpu.scenegraph');
 
     const pCamera = this.camera;
 
@@ -662,6 +726,9 @@ export class Renderer {
     if (this.bvhConfig.autoRefitGeometryBVH) {
       this.refitDirtyGeometryBVHs();
     }
+
+    metrics.end('cpu.scenegraph');
+    metrics.begin('cpu.cull');
 
     // Clear the render list before projecting objects
     this.currentRenderList.reset();
@@ -690,6 +757,9 @@ export class Renderer {
     }
 
     this.collectUIElements(this.ui);
+
+    metrics.end('cpu.cull');
+    metrics.begin('cpu.organize');
 
     let transform: Transform | null;
     const solids = this.currentRenderList.solids;
@@ -729,6 +799,14 @@ export class Renderer {
       this.overlayRenderGroups
     );
 
+    metrics.end('cpu.organize');
+    metrics.record('counts.solids', solids.length);
+    metrics.record(
+      'counts.drawgroups',
+      renderList.length + overlayRenderList.length
+    );
+    metrics.begin('cpu.encode');
+
     // Gets the device render targets ready. Checks for things like canvas resize
     if (this.canvasSizeWatcher.hasResized()) {
       this.resizeRenderTargets();
@@ -746,12 +824,15 @@ export class Renderer {
       // Directional shadow pass — depth-only, runs before the main color pass.
       // Shadow casters are collected from the full scene, not the camera-culled renderList,
       // so objects outside the camera frustum still cast visible shadows.
+      metrics.begin('cpu.shadowcast');
       this._shadowCasters.length = 0;
       this.collectShadowCasters(this.scene, this._shadowCasters);
       const shadowRenderList = this.organizeVisuals(
         this._shadowCasters,
         this._shadowGroups
       );
+      metrics.end('cpu.shadowcast');
+      metrics.record('counts.shadowcasters', this._shadowCasters.length);
       this.directionalShadowRenderer.render(
         encoder,
         shadowRenderList,
@@ -784,7 +865,7 @@ export class Renderer {
           depthLoadOp: 'clear',
           depthStoreOp: 'store',
         },
-        timestampWrites: this.scenePerfMonitor.getTimestampWrites('scene'),
+        timestampWrites: this.sceneGpuTimer.writes('scene'),
       });
 
       const camera = this.camera;
@@ -795,8 +876,8 @@ export class Renderer {
       pass.end();
       device.queue.submit([encoder.finish()]);
 
-      // Resolve the 'scene' GPU timestamp (no-op unless profiling is enabled).
-      this.scenePerfMonitor.resolveAndLog();
+      // Resolve the scene-pass GPU timestamps (no-op unless the panel is open).
+      this.sceneGpuTimer.resolve();
 
       // Create a new encoder for the post-processing pass
       const postProcessingEncoder = device.createCommandEncoder({
@@ -966,5 +1047,8 @@ export class Renderer {
       // Captured sky cubemap viewer — likewise inert unless switched on.
       this.sky.skyRenderer.cubeDebugRenderer.render(this);
     }
+
+    metrics.end('cpu.encode');
+    metrics.end('frame.cpu');
   }
 }

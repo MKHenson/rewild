@@ -382,7 +382,7 @@ export class DirectionalShadowRenderer {
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
       },
-      timestampWrites: renderer.scenePerfMonitor.getTimestampWrites('shadow'),
+      timestampWrites: renderer.sceneGpuTimer.writes('shadow'),
     });
 
     if (sunAboveHorizon) {

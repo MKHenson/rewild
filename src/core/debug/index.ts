@@ -5,7 +5,6 @@ import { registerRenderQualityCommands } from './RenderQualityCommands';
 import { registerShadowDebugCommands } from './ShadowDebugCommands';
 import { registerSkyDebugCommands } from './SkyDebugCommands';
 import { registerPbrHarnessCommands } from './PbrHarnessCommands';
-import { registerTerrainPerfCommands } from './TerrainPerfCommands';
 import { registerGltfImportCommands } from './GltfImportCommands';
 import {
   registerScatterDebugCommands,
@@ -20,7 +19,6 @@ export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerRenderQualityCommands(renderer);
   registerSkyDebugCommands(renderer);
   registerShadowDebugCommands(renderer);
-  registerTerrainPerfCommands(renderer);
   registerPbrHarnessCommands(renderer);
   registerGltfImportCommands(renderer);
   registerScatterDebugCommands(renderer);

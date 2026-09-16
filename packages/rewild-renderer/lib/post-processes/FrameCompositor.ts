@@ -1,5 +1,5 @@
 import { Renderer } from '..';
-import { PerformanceMonitor } from '../utils/PerformanceMonitor';
+import { GpuPassTimer } from '../metrics/GpuPassTimer';
 import { BloomPass } from './BloomPass';
 import { ToneMapPass } from './ToneMapPass';
 
@@ -26,7 +26,7 @@ export class FrameCompositor {
   readonly bloom: BloomPass;
   readonly toneMap: ToneMapPass;
 
-  perfMonitor: PerformanceMonitor = new PerformanceMonitor();
+  gpuTimer: GpuPassTimer;
 
   private initialized = false;
   /** Quality revision bloom was last built against; -1 until first build. */
@@ -43,7 +43,9 @@ export class FrameCompositor {
    */
   initToneMap(renderer: Renderer): void {
     this.toneMap.init(renderer);
-    this.perfMonitor.init(renderer.device, ['bloom']);
+    if (!this.gpuTimer)
+      this.gpuTimer = new GpuPassTimer(renderer.metrics, 'gpu/post');
+    this.gpuTimer.init(renderer.device, ['bloom']);
   }
 
   /**
@@ -72,7 +74,7 @@ export class FrameCompositor {
       this.init(renderer);
     }
 
-    this.bloom.render(renderer, this.perfMonitor.getTimestampWrites('bloom'));
+    this.bloom.render(renderer, this.gpuTimer.writes('bloom'));
 
     const encoder = renderer.device.createCommandEncoder({
       label: 'frame compositor encoder',
@@ -80,13 +82,13 @@ export class FrameCompositor {
     this.toneMap.render(renderer, encoder, targetView, this.bloom.renderTarget);
     renderer.device.queue.submit([encoder.finish()]);
 
-    this.perfMonitor.resolveAndLog();
+    this.gpuTimer.resolve();
   }
 
   dispose(): void {
     this.bloom.dispose();
     this.toneMap.dispose();
-    this.perfMonitor.dispose();
+    this.gpuTimer?.dispose();
     this.initialized = false;
   }
 }

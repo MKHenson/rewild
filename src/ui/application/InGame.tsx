@@ -70,14 +70,12 @@ export class InGame extends Component<Props> {
       (viewport as ViewportStateMachine).dispose();
     };
 
-    const fpsDiv = <div class="fps-counter">0</div>;
     const viewport = <ViewportStateMachine onUnlock={onUnlock} />;
 
     return () => (
       <div>
         {viewport}
         {renderMenu()}
-        {fpsDiv}
       </div>
     );
   }
@@ -101,18 +99,5 @@ const StyledInGame = cssStylesheet(css`
     width: 100%;
     height: 100%;
     margin: 0;
-  }
-
-  .fps-counter {
-    width: 100px;
-    color: white;
-    font-size: 14px;
-    height: 25px;
-    padding: 5px;
-    text-align: center;
-    position: absolute;
-    top: 0;
-    left: 0;
-    background: #255fa1;
   }
 `);
