@@ -126,8 +126,7 @@ export function clumpLayer(params: Params, metrics: ClumpMetrics): ScatterLayer 
     // Every card's normal describes the tuft, not the card, so none of them may
     // be mirrored on a back face. Same reason a tree's canopy mode sets it.
     authoredNormals: true,
-    faceNormalSpecular: true,
-    specularOcclusion: true,
+    foliage: true,
     // A tuft's shadow is a flicker of blade-sized texels under itself, and the
     // shadow pass would draw every card of every patch to get it.
     castShadow: false,
@@ -212,8 +211,7 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
     authoredNormals: params.leafNormalMode !== 'card',
     // A card stands in for a cluster of leaves whatever its normal says, so it
     // reflects off its own face and its occlusion shades its highlights too.
-    faceNormalSpecular: true,
-    specularOcclusion: true,
+    foliage: true,
   };
 }
 
@@ -249,8 +247,7 @@ export function scatterLayerSource(layer: ScatterLayer): string {
       : []),
     `    wind: { amplitude: ${wind.amplitude}, frequency: ${wind.frequency}, flutter: ${wind.flutter} },`,
     ...(layer.authoredNormals ? ['    authoredNormals: true,'] : []),
-    ...(layer.faceNormalSpecular ? ['    faceNormalSpecular: true,'] : []),
-    ...(layer.specularOcclusion ? ['    specularOcclusion: true,'] : []),
+    ...(layer.foliage ? ['    foliage: true,'] : []),
     ...(layer.castShadow === false ? ['    castShadow: false,'] : []),
     '  },',
   ].join('\n');

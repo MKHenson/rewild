@@ -342,8 +342,8 @@ hold together at every hour of the day wants `normalLean: 0`, where every card s
 the stamp alone carries the variety.
 
 **No shader work, and none needed.** Wind is already vertex-stage and reads `COLOR_0`, which this
-writes. `authoredNormals`, `faceNormalSpecular` and `specularOcclusion` already exist as layer flags,
-and a clump sets all three for the reasons a tree's canopy does.
+writes. `authoredNormals` and `foliage` already exist as layer flags, and a clump sets both for the
+reasons a tree's canopy does.
 
 ### What a clump does not get
 
@@ -619,12 +619,14 @@ a half that changes as the camera moves. The flag turns the mirror off, and only
 alpha-masked piece, so the trunk keeps it. Drop the line and the canopy goes patchy in the engine
 while the preview still looks right.
 
-`faceNormalSpecular: true` and `specularOcclusion: true` are in the row in every mode, for the same
-piece. A card stands in for a cluster of leaves whatever its normal says: the normal decides how
-much light the card gathers, but reflections have to come off the card itself, or the sun reflects
-off the canopy as one polished sphere across hundreds of cards. And the leaf image's occlusion
-stands in for the leaves in front of a card, which no shadow map sees, so it is allowed to shade
-the highlights too. Both are generic material options in `StandardPassBase`, not foliage ones.
+`foliage: true` is in the row in every mode, for the same piece. A card stands in for a cluster of
+leaves whatever its normal says, and the foliage shading model is built for exactly that: it drops
+the metallic-roughness specular chain, which had nothing real to describe on a leaf and reflected
+the sun off a canopy as one polished sphere, and adds the transmission that makes a backlit card
+read as foliage. It replaced the `faceNormalSpecular` and `specularOcclusion` flags, which existed
+only to make that specular chain behave here. It also takes a single shadow tap instead of a
+3x3 kernel: a blade is a few atlas texels across and drawn several layers deep, so the filtering
+lands on noise.
 
 Two names appear in that row and they differ on purpose:
 

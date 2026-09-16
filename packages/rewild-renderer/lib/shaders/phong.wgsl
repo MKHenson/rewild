@@ -1,3 +1,8 @@
+// Never foliage, but the shared shadow include branches on this to take a
+// cheaper tap for grass and leaves. A literal rather than a define: these
+// materials have no foliage mode to plumb.
+const HAS_FOLIAGE_SHADING: bool = false;
+
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/tbn.frag.wgsl"
 #include "./shader-lib/selection-tint.wgsl"

@@ -226,24 +226,24 @@ describe.each([
 
       const source = composeShader([shaderSource(shaderName)], defines);
 
-      expect(source).toContain(`const HAS_AUTHORED_NORMALS: bool = ${authored};`);
+      expect(source).toContain(
+        `const HAS_AUTHORED_NORMALS: bool = ${authored};`
+      );
     }
   );
 
   it.each([false, true])(
-    'compiles the shader with faceNormalSpecular and specularOcclusion = %s baked in',
+    'compiles the shader with foliage = %s baked in',
     (on) => {
       const pass = create();
-      pass.faceNormalSpecular = on;
-      pass.specularOcclusion = on;
+      pass.foliage = on;
       const defines = (
         pass as unknown as { shaderDefines(): ShaderDefines }
       ).shaderDefines();
 
       const source = composeShader([shaderSource(shaderName)], defines);
 
-      expect(source).toContain(`const HAS_FACE_NORMAL_SPECULAR: bool = ${on};`);
-      expect(source).toContain(`const HAS_SPECULAR_OCCLUSION: bool = ${on};`);
+      expect(source).toContain(`const HAS_FOLIAGE_SHADING: bool = ${on};`);
     }
   );
 

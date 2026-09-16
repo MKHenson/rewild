@@ -45,8 +45,7 @@ export abstract class StandardPassBase implements IMaterialPass {
   private _vertexTangents: boolean = false;
   private _parallax: boolean = false;
   private _authoredNormals: boolean = false;
-  private _faceNormalSpecular: boolean = false;
-  private _specularOcclusion: boolean = false;
+  private _foliage: boolean = false;
 
   /**
    * glTF's alphaMode:
@@ -146,41 +145,28 @@ export abstract class StandardPassBase implements IMaterialPass {
   }
 
   /**
-   * Reflect off the triangle rather than off the shading normal.
+   * Shade as foliage rather than as a metallic-roughness surface.
    *
-   * Diffuse keeps the vertex normal and the normal map; the specular lobes —
-   * GGX, Fresnel, the reflection into the sky — take the face's own normal
-   * instead. For geometry whose vertex normals describe a shape the triangles
-   * do not have: those normals say how much light a surface gathers, which is
-   * right, and where it reflects, which is not. A canopy shaded from the
-   * crown's normal gathers light as a rounded mass and would otherwise reflect
-   * the sun as one polished sphere across hundreds of cards.
-   */
-  get faceNormalSpecular(): boolean {
-    return this._faceNormalSpecular;
-  }
-
-  set faceNormalSpecular(value: boolean) {
-    if (value === this._faceNormalSpecular) return;
-    this._faceNormalSpecular = value;
-    this.invalidatePipeline();
-  }
-
-  /**
-   * Let the occlusion map attenuate direct specular as well as ambient.
+   * A different model, not a cheaper one. It drops the whole specular chain
+   * and the normal, metallic-roughness, occlusion and emissive fetches with it,
+   * because a leaf is a matte cutout and none of that was describing anything.
+   * In their place it wraps the sun past the terminator and adds transmission,
+   * which is the light through a blade that the metallic-roughness model has no
+   * term for at all.
    *
-   * glTF scopes occlusion to indirect light, and by default so does this. On
-   * a surface whose occlusion stands in for geometry the mesh does not carry —
-   * the leaves in front of a leaf card, the depth of a crevice baked flat —
-   * a highlight in an occluded pocket reads as a surface that is not there.
+   * It replaced `faceNormalSpecular` and `specularOcclusion`, both of which
+   * existed only to make the specular chain behave on leaf cards. There is no
+   * specular chain here to correct.
+   *
+   * Parallax is not available alongside it, and neither is a normal map.
    */
-  get specularOcclusion(): boolean {
-    return this._specularOcclusion;
+  get foliage(): boolean {
+    return this._foliage;
   }
 
-  set specularOcclusion(value: boolean) {
-    if (value === this._specularOcclusion) return;
-    this._specularOcclusion = value;
+  set foliage(value: boolean) {
+    if (value === this._foliage) return;
+    this._foliage = value;
     this.invalidatePipeline();
   }
 
@@ -271,8 +257,7 @@ export abstract class StandardPassBase implements IMaterialPass {
       HAS_VERTEX_TANGENTS: this._vertexTangents,
       HAS_PARALLAX: this._parallax,
       HAS_AUTHORED_NORMALS: this._authoredNormals,
-      HAS_FACE_NORMAL_SPECULAR: this._faceNormalSpecular,
-      HAS_SPECULAR_OCCLUSION: this._specularOcclusion,
+      HAS_FOLIAGE_SHADING: this._foliage,
     };
   }
 

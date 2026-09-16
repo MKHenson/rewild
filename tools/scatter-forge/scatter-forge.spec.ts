@@ -633,18 +633,16 @@ describe('scatter layer', () => {
     }
   });
 
-  it('reflects off the card and occludes its highlights in every mode', () => {
-    // A card is a cluster of leaves whichever way its normal was authored, so
-    // the sun must not reflect off the canopy as one sphere in any of them.
+  it('shades as foliage in every leaf normal mode', () => {
+    // A card is a cluster of leaves whichever way its normal was authored, and
+    // none of those ways wants a metallic-roughness specular lobe over it.
     for (const mode of ['canopy', 'up', 'card']) {
       const { params, skeleton } = buildAll({ leafNormalMode: mode });
       const layer = scatterLayer(params, skeleton);
       const source = scatterLayerSource(layer);
 
-      expect(layer.faceNormalSpecular).toBe(true);
-      expect(layer.specularOcclusion).toBe(true);
-      expect(source).toContain('faceNormalSpecular: true,');
-      expect(source).toContain('specularOcclusion: true,');
+      expect(layer.foliage).toBe(true);
+      expect(source).toContain('foliage: true,');
     }
   });
 
