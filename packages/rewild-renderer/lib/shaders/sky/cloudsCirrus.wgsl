@@ -67,6 +67,9 @@ const CIR_SCALE: f32 = 0.0002;
 // fixed value and sits inside this range.
 const CIR_SQUASH_ALONG_MIN: f32 = 0.26;   // long ribbons
 const CIR_SQUASH_ALONG_MAX: f32 = 0.58;   // chunky, granular
+// Fixed squash applied to the wind scroll, so advection speed does not follow
+// the regime drift. Mid-range, so strands move at 0.7-1.6x the warp fields.
+const CIR_SQUASH_ALONG_SCROLL: f32 = 0.42;
 const CIR_SQUASH_ACROSS: f32 = 1.0;
 const CIR_SQUASH_UP:     f32 = 0.6;
 
@@ -307,6 +310,13 @@ fn cirrusBasis() -> CirBasis {
     return b;
 }
 
+// Downwind advection of the whole sheet, in sheet units. Unbounded — it grows
+// for as long as the app runs — so it must only ever be added to a coordinate,
+// never multiplied by anything that varies (see cirrusDensityAt).
+fn cirScroll() -> f32 {
+    return object.iTime * 0.00035 * object.windiness;
+}
+
 // Raw sheet coordinates for a camera-relative position: x downwind, y up,
 // z across. Unsquashed and unwarped — every warp field is built from these, and
 // only the final density lookup works in the squashed space.
@@ -315,9 +325,8 @@ fn cirrusBasis() -> CirBasis {
 // rather than riding along with the camera.
 fn cirSheet(position: vec3f, b: CirBasis) -> vec3f {
     let worldPos = position + vec3f(object.cameraPosition.x, 0.0, object.cameraPosition.z);
-    let scroll   = object.iTime * 0.00035 * object.windiness;
     return vec3f(
-        dot(worldPos, b.along) * CIR_SCALE + scroll,
+        dot(worldPos, b.along) * CIR_SCALE + cirScroll(),
         worldPos.y * CIR_SCALE * CIR_SQUASH_UP,
         dot(worldPos, b.across) * CIR_SCALE
     );
@@ -444,12 +453,19 @@ fn cirrusDensityAt(sheet: vec3f, swirl: vec2f, deckFrac: f32, fine: f32, reg: Ci
         cirSigned(sheet * CIR_WARP_MED_FREQ + vec3f(-5.6, 4.2, 12.8))
     ) * reg.warpMed;
 
-    let uw = sheet.x + swirl.x + med.x;
+    // The scroll is taken out before the squash and put back after it at a
+    // fixed squash. Squashing the scrolled coordinate would multiply the
+    // unbounded scroll by squashAlong, which drifts in time and varies per
+    // patch: strands then slide and stretch by scroll * d(squashAlong), which
+    // grows without limit the longer the app runs. Only the world-anchored
+    // part, bounded by view distance, is allowed to breathe with the regime.
+    let scroll = cirScroll();
+    let uw = sheet.x - scroll + swirl.x + med.x;
     let vw = sheet.z + swirl.y + med.y;
 
     // Into strand space: squash along the wind, then shear for the fallstreak.
     var q = vec3f(
-        uw * reg.squashAlong   + deckFrac * reg.shearAlong,
+        uw * reg.squashAlong + scroll * CIR_SQUASH_ALONG_SCROLL + deckFrac * reg.shearAlong,
         sheet.y,
         vw * CIR_SQUASH_ACROSS + deckFrac * reg.shearAcross
     );
