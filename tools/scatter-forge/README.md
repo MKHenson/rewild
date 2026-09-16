@@ -708,7 +708,8 @@ completely. What travels in the file is `COLOR_0`, which the wind vertex stage r
 | ------- | ----------------------------------------------------------------------- |
 | **R**   | Bend. Path distance from the root over the longest path, to `bendCurve`. 0 at the trunk base, 1 at a leaf tip. |
 | **G**   | Phase. One value per limb, constant across that limb and its leaves.    |
-| **B**   | Flutter. 0 everywhere on the bark, 0 at a leaf stem rising to 1 at its tip. |
+| **B**   | Flutter. 0 everywhere on the bark, 0 at a leaf stem rising toward 1 at its tip, jittered per tip corner so a card twists rather than rocks. |
+| **A**   | Leaf phase. One random value per leaf card, so cards on one limb flutter out of step. 1 on the bark. |
 
 `COLOR_0` cannot also be a tint. Leave `vertexColors` off on any material a tree is drawn with.
 

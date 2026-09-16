@@ -234,7 +234,24 @@ describe('COLOR_0', () => {
 
     expect(Math.max(...barkFlutter)).toBe(0);
     expect(Math.min(...leafFlutter)).toBe(0);
-    expect(Math.max(...leafFlutter)).toBe(1);
+    expect(Math.max(...leafFlutter)).toBeGreaterThan(0.6);
+    expect(Math.max(...leafFlutter)).toBeLessThanOrEqual(1);
+  });
+
+  it('gives each leaf card its own phase in A, and the bark none', () => {
+    const { mesh } = buildAll();
+    const barkPhase = new Set([...pieceOf(mesh, 'bark').colors].filter((_, i) => i % 4 === 3));
+    const leafColors = pieceOf(mesh, 'leaf').colors;
+    const cardPhases = new Set<number>();
+
+    for (let v = 0; v < leafColors.length; v += 16) {
+      for (let corner = 1; corner < 4; corner++)
+        expect(leafColors[v + corner * 4 + 3]).toBe(leafColors[v + 3]);
+      cardPhases.add(leafColors[v + 3]);
+    }
+
+    expect([...barkPhase]).toEqual([1]);
+    expect(cardPhases.size).toBeGreaterThan(leafColors.length / 16 / 2);
   });
 
   it('gives each limb its own phase, constant across that limb', () => {

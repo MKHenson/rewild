@@ -3,9 +3,11 @@
 // caster sways exactly with its lit copy.
 //
 // Weights ride in COLOR_0 — R bend (0 rigid, 1 free), G one phase per limb so
-// a branch moves as one, B how far up its leaf card a vertex sits. A mesh with
-// no COLOR_0 never reaches here. Normals are not bent: nobody has noticed a
-// leaf's normal lagging its position.
+// a branch moves as one, B how far up its leaf card a vertex sits, A the
+// leaf's own flutter phase so cards on one limb are not in step (1 on
+// anything that has no leaf of its own, which is a full turn and so no
+// offset). A mesh with no COLOR_0 never reaches here. Normals are not bent:
+// nobody has noticed a leaf's normal lagging its position.
 //
 // The wind is a field, not a clock: a smooth noise over world position,
 // blown downwind at the wind's speed, sampled where each vertex stands. Two
@@ -95,11 +97,11 @@ fn scatterWindOffset(
   let lean = amplitude * bend * gust * sway;
   var offset = along * lean + across * (lean * 0.35 * veer);
 
-  // Leaf tips only: fast, small, in step along a limb, growing toward the
-  // top of each card.
+  // Leaf tips only: fast, small, offset per leaf, growing toward the top of
+  // each card.
   let flutter = params.z * wind.z * amplitude * bend * gust * weights.b;
   if (flutter > 0.0) {
-    let ft = t * params.y * WIND_TAU * 3.1 + weights.g * WIND_TAU + phase;
+    let ft = t * params.y * WIND_TAU * 3.1 + (weights.g + weights.a) * WIND_TAU + phase;
     offset += along * (flutter * 0.6 * sin(ft)) + vec3f(0.0, flutter * 0.4 * cos(ft * 1.37), 0.0);
   }
 
