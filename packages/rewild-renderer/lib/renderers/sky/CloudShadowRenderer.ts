@@ -8,11 +8,19 @@ import { composeShader } from '../../utils/shaderDefines';
 import { cloudShadowShaderDefines } from './SkyQuality';
 
 export interface CloudShadowConfig {
+  /** Map edge in texels. Assigned from the quality tier by SkyRenderer.init(). */
   resolution: number;
+  /** Ground extent the map covers, in metres. Not tier-driven: it sets coverage
+   *  rather than quality, and the shader reads it to build the sample UV. */
   worldSize: number;
+  /** Frames between rebuilds. Assigned from the quality tier by
+   *  SkyRenderer.init(). */
   updateFrequency: number;
 }
 
+/** Only worldSize survives a SkyRenderer init. The other two are overwritten
+ *  from the tier every time, so these are the values a bare construction gets
+ *  before the first init and nothing more. */
 const DEFAULT_CONFIG: CloudShadowConfig = {
   resolution: 1024,
   worldSize: 5000,
@@ -62,6 +70,11 @@ export class CloudShadowRenderer {
         usage:
           GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
       });
+
+      // A new texture reads zero everywhere, which shades as full sun. Make the
+      // next frame the due one, so a tier change shows one unshadowed frame
+      // instead of a whole update period of them.
+      this.frameCounter = this.config.updateFrequency - 1;
     }
 
     const module = device.createShaderModule({
