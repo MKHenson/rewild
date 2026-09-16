@@ -85,7 +85,26 @@ fn alphaCoverageScale(fragUV : vec2f) -> f32 {
 // How far the sun wraps past the terminator on a leaf, as a fraction of the
 // lobe. A blade is thin enough to be lit from well behind its own horizon, and
 // a hard Lambert terminator is what makes foliage read as stamped cardboard.
-const FOLIAGE_WRAP: f32 = 0.6;
+//
+// It costs contrast, though: the wrap is a floor under every blade whatever way
+// it points, and too much of one flattens a field into a single tone. This is
+// the knob to reach for if foliage reads as posterised.
+const FOLIAGE_WRAP: f32 = 0.4;
+
+// Energy normalisation for the lobe above: (1+w)^2, not (1+w). Averaged over
+// blades pointing every way, (N·L + w)/(1+w) integrates to 1.6x Lambert at
+// w = 0.6 — foliage lit by the same sun as the ground it stands in, and coming
+// out brighter. Squaring puts the average back on Lambert exactly, at the cost
+// of a sun-facing blade peaking at 1/(1+w) rather than 1.
+const FOLIAGE_WRAP_NORM: f32 = (1.0 + FOLIAGE_WRAP) * (1.0 + FOLIAGE_WRAP);
+
+// The sky a blade actually sees. The standard path multiplies its irradiance by
+// an occlusion map; this model has neither that fetch nor vertex AO (COLOR_0 is
+// spent on wind bend weights), so every blade would otherwise be lit as though
+// it stood alone in the open. A flat factor is the crude stand-in — it is a
+// constant added to every fragment, so it flattens contrast as much as it
+// brightens. Baked per-vertex AO in the scatter meshes is the real answer.
+const FOLIAGE_AMBIENT: f32 = 0.6;
 
 // Strength and tightness of light coming *through* a blade. Peaks looking into
 // the sun, which is the whole character of a backlit field.
@@ -166,7 +185,7 @@ fn shadeFoliage(
     }
 
     direct += radiance
-            * max(0.0, (dot(N, L) + FOLIAGE_WRAP) / (1.0 + FOLIAGE_WRAP));
+            * max(0.0, (dot(N, L) + FOLIAGE_WRAP) / FOLIAGE_WRAP_NORM);
     transmitted += radiance
                  * pow(max(0.0, dot(V, -L)), FOLIAGE_TRANSMIT_POWER)
                  * FOLIAGE_TRANSMIT;
@@ -178,7 +197,8 @@ fn shadeFoliage(
   // No 1/pi here: the irradiance cube already holds irradiance/pi, which is
   // why evaluateIbl multiplies the diffuse colour by it directly.
   let worldN = normalize((iblParams.viewToWorld * vec4f(N, 0.0)).xyz);
-  let ambient = textureSampleLevel(iblIrradianceMap, iblSampler, worldN, 0.0).rgb;
+  let ambient = textureSampleLevel(iblIrradianceMap, iblSampler, worldN, 0.0).rgb
+              * FOLIAGE_AMBIENT;
 
   // Transmitted light is tinted by the blade it came through, so it takes the
   // albedo like the rest.
