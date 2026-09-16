@@ -1,5 +1,6 @@
 import 'rewild-ui/compiler/jsx';
 import { QualitySettings } from 'rewild-renderer/lib/utils/QualitySettings';
+import { QUALITY_ASPECTS } from 'rewild-renderer/lib/utils/RenderQuality';
 import { Select, Tab } from 'rewild-ui';
 import { flushMicrotasks } from 'rewild-ui/lib/test-utils';
 import { SettingsPanel } from './SettingsPanel';
@@ -52,8 +53,9 @@ describe('SettingsPanel', () => {
   it('renders a select for the overall tier and one per aspect', () => {
     const { panel } = createPanel();
 
-    // clouds, cloudShadows, godRays and bloom, plus the overall tier.
-    expect(selectsOf(panel).length).toBe(5);
+    // One per aspect, plus the overall tier. Derived, so adding an aspect does
+    // not fail a test that has nothing to say about it.
+    expect(selectsOf(panel).length).toBe(QUALITY_ASPECTS.length + 1);
   });
 
   it('seeds the draft from the stored settings', () => {
@@ -70,13 +72,9 @@ describe('SettingsPanel', () => {
     stored().level = 'low';
     const { panel } = createPanel();
 
-    expect(selectsOf(panel).map((s) => s.props.value)).toEqual([
-      'low',
-      'low',
-      'low',
-      'low',
-      'low',
-    ]);
+    expect(selectsOf(panel).map((s) => s.props.value)).toEqual(
+      new Array(QUALITY_ASPECTS.length + 1).fill('low')
+    );
   });
 
   describe('editing', () => {
@@ -115,13 +113,9 @@ describe('SettingsPanel', () => {
       await change(selectsOf(panel)[1], 'low');
       await change(selectsOf(panel)[0], 'ultra');
 
-      expect(selectsOf(panel).map((s) => s.props.value)).toEqual([
-        'ultra',
-        'ultra',
-        'ultra',
-        'ultra',
-        'ultra',
-      ]);
+      expect(selectsOf(panel).map((s) => s.props.value)).toEqual(
+        new Array(QUALITY_ASPECTS.length + 1).fill('ultra')
+      );
     });
 
     it('drops a pin set back to the overall tier', async () => {

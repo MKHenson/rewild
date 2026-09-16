@@ -76,9 +76,35 @@ resolution rather than 0.7x, which is roughly twice the cloud pixels.
 ### Per-subsystem overrides
 
 Individual subsystems can sit on their own tier — `clouds` (which covers the
-bilateral that cleans them up), `cloudShadows`, `godRays` and `bloom`. They are
-read through `renderer.quality.aspect('clouds')` rather than `.level`, and stored
-separately under `rewild.render.quality.overrides`.
+bilateral that cleans them up), `cloudShadows`, `godRays`, `bloom` and
+`terrain`. They are read through `renderer.quality.aspect('clouds')` rather than
+`.level`, and stored separately under `rewild.render.quality.overrides`.
+
+`terrain` is the one that moves the frame most on an open view, because terrain
+fills the screen and draws through the main scene pass. Its cost is texture
+reads, not maths: each active splat layer samples albedo, normal and ARM at two
+offset UVs, and up to eight layers can be active, so a fragment can take around
+fifty texture-array reads.
+
+Its tier controls, in rough order of what they are worth:
+
+- **The parallax march**: step and refinement counts, and the distance relief
+  fades out over. About 0.6ms between `high` and `low`.
+- **The second no-tile tap** (`low` only). Two offset crops mixed together hide
+  the repeat of a 1K texture across a 240m chunk, and are half the texture reads
+  per layer. `low` takes the repeat instead.
+- **Per-layer detail normals** (`low` only). The macro normal stands in — but
+  only where the layer has one, because the fallback otherwise is a flat tangent
+  normal, which is uniform full diffuse and washes the surface out entirely.
+
+The last two measured at 0.14ms combined, far less than the sample count
+suggests, because the splat loop skips any layer under `WEIGHT_EPSILON` and most
+fragments have only one or two above it. Eight active layers is the worst case,
+not the usual one. They stay on `low` alone for that reason: the image cost is
+real and the saving is not.
+
+See `TerrainQuality.ts`. `high` reproduces exactly what was hardcoded before the
+table existed.
 
 `cloudShadows` is the one worth reaching for first on a GPU-bound frame. It sets
 the shadow map edge and how many frames apart the rebuilds are, 1024² every 2

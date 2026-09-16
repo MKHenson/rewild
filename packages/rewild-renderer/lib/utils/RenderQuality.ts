@@ -35,7 +35,12 @@ export function isRenderQuality(value: unknown): value is RenderQuality {
  * A subsystem that can be pinned to its own tier, independently of the app-wide
  * one
  */
-export type QualityAspect = 'clouds' | 'cloudShadows' | 'godRays' | 'bloom';
+export type QualityAspect =
+  | 'clouds'
+  | 'cloudShadows'
+  | 'godRays'
+  | 'bloom'
+  | 'terrain';
 
 /** Every aspect. Useful for iterating a settings form or a stored override map. */
 export const QUALITY_ASPECTS: readonly QualityAspect[] = [
@@ -43,6 +48,7 @@ export const QUALITY_ASPECTS: readonly QualityAspect[] = [
   'cloudShadows',
   'godRays',
   'bloom',
+  'terrain',
 ];
 
 /** Narrows an untrusted key — stored settings — to an aspect. */
