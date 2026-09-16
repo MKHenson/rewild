@@ -161,6 +161,9 @@ export class Player extends Node {
     this.verticalVelocity = 0.0;
 
     this._canvas = stateData.renderer.canvas;
+    // The lock may already be held: GameManager requests it before the first
+    // OnLoop mounts this node, so the change event has fired without us.
+    this._isLocked = !!document.pointerLockElement;
     document.addEventListener('mousemove', this._onMouseMove);
     document.addEventListener('pointerlockchange', this._onPointerlockChange);
     document.addEventListener('keydown', this._onKeyDown);
