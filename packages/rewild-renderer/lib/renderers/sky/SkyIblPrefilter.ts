@@ -1,3 +1,4 @@
+import { TimestampWritesFn } from '../../metrics/GpuPassTimer';
 import type { Renderer } from '../../Renderer';
 import downsampleShader from '../../shaders/sky/iblDownsample.wgsl';
 import specularShader from '../../shaders/sky/iblSpecular.wgsl';
@@ -485,7 +486,7 @@ export class SkyIblPrefilter {
     device: GPUDevice,
     encoder: GPUCommandEncoder,
     facesCaptured: number,
-    timestampWrites?: GPURenderPassTimestampWrites
+    timestampWrites?: TimestampWritesFn
   ): void {
     if (!this.enabled || !this.specularPipeline) return;
 
@@ -536,7 +537,7 @@ export class SkyIblPrefilter {
     device: GPUDevice,
     encoder: GPUCommandEncoder,
     mip: number,
-    timestampWrites?: GPURenderPassTimestampWrites
+    timestampWrites?: TimestampWritesFn
   ): void {
     // Perceptual roughness spread evenly over the chain, so mip 0 is a mirror
     // and the last mip is fully rough. #201 inverts this to pick a level.
@@ -560,7 +561,7 @@ export class SkyIblPrefilter {
       );
 
       const descriptor = descriptors[face];
-      descriptor.timestampWrites = face === 0 ? timestampWrites : undefined;
+      descriptor.timestampWrites = face === 0 ? timestampWrites?.() : undefined;
 
       const pass = encoder.beginRenderPass(descriptor);
       pass.setPipeline(this.specularPipeline!);

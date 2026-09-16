@@ -14,6 +14,7 @@ import { RenderList } from './core/RenderList';
 import { RenderLayer } from './core/RenderLayer';
 import { Light } from './core/lights/Light';
 import { MipMapGenerator } from './textures/MipMapGenerator';
+import { SceneCategory } from './materials/IMaterialPass';
 import { MetricsRegistry } from './metrics/MetricsRegistry';
 import { GpuPassTimer } from './metrics/GpuPassTimer';
 import { TextureManager } from './managers/TextureManager';
@@ -93,6 +94,11 @@ export class Renderer {
   // its LOD meshes draw through renderGroupings in the main one — so 'scene'
   // covers the lot.
   sceneGpuTimer: GpuPassTimer = new GpuPassTimer(this.metrics, 'gpu/scene');
+
+  // Scene categories held back from every pass, shadows included. Attribution
+  // by ablation: hide one and the `scene` row falls by what it was costing.
+  // See setSceneCategoryEnabled and IMaterialPass.profileCategory.
+  hiddenSceneCategories = new Set<SceneCategory>();
 
   camera: PerspectiveCamera;
   scene: Transform;
@@ -612,7 +618,11 @@ export class Renderer {
     pass: GPURenderPassEncoder,
     camera: Camera
   ) {
+    const hidden = this.hiddenSceneCategories;
     for (const item of renderGroup) {
+      if (hidden.size > 0 && hidden.has(item.pass.profileCategory ?? 'opaque'))
+        continue;
+
       if (item.geometry.requiresBuild)
         item.geometry.build(
           this.device,
@@ -666,6 +676,24 @@ export class Renderer {
       kind: count,
       order: 0,
     });
+    m.declare('counts.terrain', {
+      label: 'terrain meshes',
+      group: 'counts',
+      kind: count,
+      order: 3,
+    });
+    m.declare('counts.scatter', {
+      label: 'scatter meshes',
+      group: 'counts',
+      kind: count,
+      order: 4,
+    });
+    m.declare('counts.opaque', {
+      label: 'other meshes',
+      group: 'counts',
+      kind: count,
+      order: 5,
+    });
     m.declare('counts.solids', {
       label: 'visible solids',
       group: 'counts',
@@ -678,6 +706,30 @@ export class Renderer {
       kind: count,
       order: 2,
     });
+  }
+
+  /**
+   * Mesh count per scene category, so the panel shows what the scene pass is
+   * made of. The pass cannot be timed per category, only ablated, and these
+   * counts say which category is worth ablating first.
+   */
+  private recordCategoryCounts(renderList: IRenderGroup[]): void {
+    let terrain = 0;
+    let scatter = 0;
+    let opaque = 0;
+
+    for (const item of renderList) {
+      const meshes = item.meshes.length;
+      const category = item.pass.profileCategory ?? 'opaque';
+      if (category === 'terrain') terrain += meshes;
+      else if (category === 'scatter') scatter += meshes;
+      else opaque += meshes;
+    }
+
+    const m = this.metrics;
+    m.record('counts.terrain', terrain);
+    m.record('counts.scatter', scatter);
+    m.record('counts.opaque', opaque);
   }
 
   getCurrentTextureView(): GPUTextureView {
@@ -700,6 +752,7 @@ export class Renderer {
     this.lastTime = currentTime;
 
     const metrics = this.metrics;
+    metrics.beginFrame();
     metrics.record('frame.wall', deltaTime);
     metrics.begin('frame.cpu');
     metrics.begin('cpu.scenegraph');
@@ -800,6 +853,7 @@ export class Renderer {
     );
 
     metrics.end('cpu.organize');
+    if (metrics.enabled) this.recordCategoryCounts(renderList);
     metrics.record('counts.solids', solids.length);
     metrics.record(
       'counts.drawgroups',

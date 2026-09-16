@@ -1,5 +1,14 @@
 import { MetricsRegistry } from './MetricsRegistry';
 
+/**
+ * Deferred `timestampWrites`, for a pass that only runs on some frames.
+ *
+ * Call it at the point the pass is genuinely begun. Evaluating it into an
+ * argument list would count the frames the pass sat out. See
+ * `GpuPassTimer.writes`.
+ */
+export type TimestampWritesFn = () => GPURenderPassTimestampWrites | undefined;
+
 interface Slot {
   label: string;
   beginIndex: number;
@@ -68,17 +77,29 @@ export function derivePassCosts(fresh: PassReading[]): Map<string, number> {
  * Labels must be given in the order the passes are encoded. See `publish` for
  * why that matters.
  */
+/**
+ * Readbacks kept in flight.
+ *
+ * One buffer means `resolve` has to sit out every frame until the previous
+ * `mapAsync` lands, which on a 27ms frame is three or four frames. Duty is
+ * samples per frame, so a publisher that reports every fourth frame makes a
+ * pass that runs every sixth frame look like it runs every one and a half.
+ * Three buffers is enough to publish on every frame at any frame rate this
+ * engine reaches.
+ */
+const READBACK_RING = 3;
+
 export class GpuPassTimer {
   private device: GPUDevice | null = null;
   private querySet: GPUQuerySet | null = null;
   private resolveBuffer: GPUBuffer | null = null;
-  private readBuffer: GPUBuffer | null = null;
+  private readBuffers: GPUBuffer[] = [];
+  private busy: boolean[] = [];
   private slots: Slot[] = [];
   private byLabel = new Map<string, Slot>();
   private queryCount = 0;
   private supported = false;
-  private pendingRead = false;
-  private previousBegins = new Map<string, bigint>();
+  private latestBegins = new Map<string, bigint>();
 
   constructor(
     private readonly registry: MetricsRegistry,
@@ -91,6 +112,7 @@ export class GpuPassTimer {
   }
 
   init(device: GPUDevice, labels: string[]): void {
+    this.dispose();
     this.device = device;
     this.supported = device.features.has('timestamp-query');
     if (!this.supported) return;
@@ -109,6 +131,7 @@ export class GpuPassTimer {
         label: this.slots[i].label,
         group: this.group,
         order: i,
+        activityTracked: true,
       });
     }
 
@@ -121,21 +144,39 @@ export class GpuPassTimer {
       size: this.queryCount * 8,
       usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
     });
-    this.readBuffer = device.createBuffer({
-      label: `${this.group} readback`,
-      size: this.queryCount * 8,
-      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    });
+    for (let i = 0; i < READBACK_RING; i++) {
+      this.readBuffers.push(
+        device.createBuffer({
+          label: `${this.group} readback ${i}`,
+          size: this.queryCount * 8,
+          usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+        })
+      );
+      this.busy.push(false);
+    }
   }
 
   /**
    * `timestampWrites` for a pass, or undefined when profiling is off, which
    * `beginRenderPass` ignores.
+   *
+   * **Calling this counts as encoding the pass.** It is what duty is measured
+   * from, so it must be called once per frame the pass actually runs and never
+   * on a frame it is skipped. A pass that only runs sometimes therefore has to
+   * take a `TimestampWritesFn` and call it inside its own guard, rather than
+   * having the descriptor evaluated into its arguments.
+   *
+   * Duty cannot come from the timings themselves. A readback lands a few frames
+   * late and only on about two frames in three, so counting arrivals measures
+   * the readback rate and would report a pass that runs every frame as running
+   * on two in three.
    */
   writes(label: string): GPURenderPassTimestampWrites | undefined {
     if (!this.registry.enabled || !this.querySet) return undefined;
     const slot = this.byLabel.get(label);
     if (!slot) return undefined;
+
+    this.registry.markActive(this.key(label));
 
     // The installed @webgpu/types (0.1.21) describe the older iterable form of
     // this descriptor. Browsers take the object form.
@@ -148,15 +189,11 @@ export class GpuPassTimer {
 
   /** Call once per frame, after the passes this timer covers are submitted. */
   resolve(): void {
-    if (
-      !this.registry.enabled ||
-      !this.supported ||
-      !this.device ||
-      this.pendingRead
-    ) {
-      return;
-    }
-    this.pendingRead = true;
+    if (!this.registry.enabled || !this.supported || !this.device) return;
+
+    const index = this.busy.indexOf(false);
+    if (index === -1) return; // Every buffer still in flight. Skip this frame.
+    this.busy[index] = true;
 
     const encoder = this.device.createCommandEncoder({
       label: `${this.group} resolve`,
@@ -168,54 +205,62 @@ export class GpuPassTimer {
       this.resolveBuffer!,
       0
     );
+    // Safe to share one resolve buffer across readbacks in flight: GPU commands
+    // run in submission order, so each copy completes before the next resolve
+    // overwrites it.
     encoder.copyBufferToBuffer(
       this.resolveBuffer!,
       0,
-      this.readBuffer!,
+      this.readBuffers[index],
       0,
       this.queryCount * 8
     );
     this.device.queue.submit([encoder.finish()]);
-    this.read();
+    void this.read(index);
   }
 
   dispose(): void {
     this.querySet?.destroy();
     this.resolveBuffer?.destroy();
-    this.readBuffer?.destroy();
+    for (const buffer of this.readBuffers) buffer.destroy();
     this.querySet = null;
     this.resolveBuffer = null;
-    this.readBuffer = null;
+    this.readBuffers = [];
+    this.busy = [];
     this.device = null;
     this.supported = false;
-    this.previousBegins.clear();
+    this.latestBegins.clear();
   }
 
   private key(label: string): string {
     return `${this.group}.${label}`;
   }
 
-  private async read(): Promise<void> {
+  private async read(index: number): Promise<void> {
+    const buffer = this.readBuffers[index];
     try {
-      await this.readBuffer!.mapAsync(GPUMapMode.READ);
-      const data = new BigUint64Array(
-        this.readBuffer!.getMappedRange().slice(0)
-      );
-      this.readBuffer!.unmap();
+      await buffer.mapAsync(GPUMapMode.READ);
+      const data = new BigUint64Array(buffer.getMappedRange().slice(0));
+      buffer.unmap();
       this.publish(data);
     } catch {
       // Buffer destroyed or device lost. Nothing to publish.
     }
-    this.pendingRead = false;
+    // Guarded because dispose() may have emptied the ring while this was in
+    // flight, in which case the slot no longer exists.
+    if (index < this.busy.length) this.busy[index] = false;
   }
 
   /**
    * Turn one readback into per-pass costs and publish them.
    *
-   * Staleness is decided here: a pass that was not encoded this frame keeps the
-   * timestamps from the last frame it was, so its begin does not move. Those
-   * are reported as a skip, which is what lets the registry amortise a 1-in-N
-   * pass instead of charging its full cost to every frame.
+   * A pass that was not encoded this frame keeps the timestamps from the last
+   * frame it was, so its begin does not move and it is left out. Nothing is
+   * published for it, and the registry counts that absence against the frames
+   * in the window, which is what amortises a periodic pass correctly.
+   *
+   * The comparison is strictly greater rather than not-equal so a readback that
+   * lands out of order is discarded instead of being read as a fresh run.
    *
    * The costs themselves come from derivePassCosts.
    */
@@ -225,17 +270,12 @@ export class GpuPassTimer {
     for (const slot of this.slots) {
       const begin = data[slot.beginIndex];
       const end = data[slot.endIndex];
-      const key = this.key(slot.label);
+      if (begin === 0n && end === 0n) continue;
 
-      if (begin === 0n && end === 0n) {
-        this.registry.skip(key);
-        continue;
-      }
-      if (this.previousBegins.get(slot.label) === begin) {
-        this.registry.skip(key);
-        continue;
-      }
-      this.previousBegins.set(slot.label, begin);
+      const latest = this.latestBegins.get(slot.label);
+      if (latest !== undefined && begin <= latest) continue;
+
+      this.latestBegins.set(slot.label, begin);
       fresh.push({ label: slot.label, begin, end });
     }
 

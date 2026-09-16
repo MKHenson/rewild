@@ -105,9 +105,14 @@ export function registerScatterDebugCommands(renderer: Renderer) {
       ? SCATTER_CULL_DISTANCES.get(name) ?? layer.cullDistance
       : 0;
 
+    // The window still holds frames drawn the other way, and reading the new
+    // number is the point of the toggle.
+    renderer.metrics.reset();
+
     console.log(
       `setScatterLayerEnabled('${name}', ${enabled}) — takes effect on the ` +
-        `next visibility update, so move a little to see it.`
+        `next visibility update, so move a little to see it. Metrics window ` +
+        `cleared.`
     );
   };
 
@@ -115,12 +120,15 @@ export function registerScatterDebugCommands(renderer: Renderer) {
     const terrain = renderer.terrainRenderer;
     terrain.scatterLodBias = Math.round(bias);
     terrain.requestVisibilityUpdate();
+    renderer.metrics.reset();
 
     console.log(
       `setScatterLodBias(${terrain.scatterLodBias}) — every layer shifted ` +
         `${Math.abs(terrain.scatterLodBias)} tier(s) ${
           terrain.scatterLodBias >= 0 ? 'coarser' : 'finer'
-        }. Past a layer's last tier nothing draws; 0 restores the table.`
+        }. Past a layer's last tier nothing draws; 0 restores the table. ` +
+        `Metrics window cleared, and a first move to an impostor tier bakes ` +
+        `it, which stalls for seconds. Read the panel after that settles.`
     );
   };
 

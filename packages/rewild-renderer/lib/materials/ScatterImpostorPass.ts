@@ -7,7 +7,7 @@ import { Geometry } from '../geometry/Geometry';
 import { ScatterImpostorAtlas } from '../renderers/terrain/ScatterImpostorBake';
 import shader from '../shaders/scatter-impostor.wgsl';
 import { IS_SCATTER_IMPOSTOR_PASS } from '../typeGuards';
-import { IMaterialPass } from './IMaterialPass';
+import { IMaterialPass, SceneCategory } from './IMaterialPass';
 import { SharedUniformsTracker } from './SharedUniformsTracker';
 import { Lighting } from './uniforms/Lighting';
 import { ShadowUniforms } from './uniforms/ShadowUniforms';
@@ -29,6 +29,8 @@ const _viewerLocal = new Vector3();
  * differs is group 0: the atlas instead of a material.
  */
 export class ScatterImpostorPass implements IMaterialPass {
+  profileCategory: SceneCategory = 'scatter';
+
   readonly [IS_SCATTER_IMPOSTOR_PASS] = true as const;
 
   pipeline: GPURenderPipeline;
