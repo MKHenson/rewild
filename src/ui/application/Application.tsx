@@ -6,6 +6,7 @@ import { Auth } from './Auth';
 import { ConfirmationModal } from './ConfirmationModal';
 import { ResetPassword } from './ResetPassword';
 import { SettingsPanel } from './SettingsPanel';
+import { PerfPanel } from './PerfPanel';
 import { resolveAssetUrl } from 'rewild-renderer/lib/managers/TextureManager';
 
 interface Props {}
@@ -29,12 +30,17 @@ export class Application extends Component<Props> {
       navigate('/');
     };
 
+    // App level rather than inside a route, so backquote opens it over the game
+    // and the editor alike. It finds whichever renderer is mounted.
+    const perfPanel = <PerfPanel />;
+
     const canvas = <div class="background" />;
     canvas.style.backgroundImage = `url(${resolveAssetUrl('strata-bg.jpg')})`;
 
     return () => {
       return [
         canvas,
+        perfPanel,
         <RouterSwitch>
           <Route
             path="/"

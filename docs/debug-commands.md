@@ -1,7 +1,7 @@
 # Debugger & Console Commands
 
-Every debug tool in the engine is a function on `window`, callable from the browser
-DevTools console while the app is running. They're registered in `src/core/debug/`
+Every debug tool in the engine except the [perf panel](#perf-panel) is a function
+on `window`, callable from the browser DevTools console while the app is running. They're registered in `src/core/debug/`
 by `registerDebugCommands()`, which runs wherever a renderer and project are
 available — so they repoint at the current scene on every load rather than going
 stale.
@@ -79,6 +79,13 @@ Individual subsystems can sit on their own tier — `clouds` (which covers the
 bilateral that cleans them up), `cloudShadows`, `godRays` and `bloom`. They are
 read through `renderer.quality.aspect('clouds')` rather than `.level`, and stored
 separately under `rewild.render.quality.overrides`.
+
+`cloudShadows` is the one worth reaching for first on a GPU-bound frame. It sets
+the shadow map edge and how many frames apart the rebuilds are, 1024² every 2
+frames on `ultra` down to 256² every 6 on `low`, and that pass measures as most
+of the sky's GPU cost. Pinning it low while the rest of the sky stays high costs
+very little on screen, because the map covers a fixed 5000 m of ground and cloud
+shadows are soft at any resolution.
 
 `setRenderQuality` — like the Render Quality dropdown in the settings menu —
 clears them all, since the app-wide tier is the coarse control. To set one
@@ -165,21 +172,17 @@ See [Lighting (Foxfire)](./milestones/foxfire-lighting.md).
 
 ## Terrain
 
-Registered in `TerrainPerfCommands.ts` and `ChunkSnapshotDevCommands.ts`.
+Registered in `ChunkSnapshotDevCommands.ts`.
 
 ```js
-startScenePerfCapture(); // GPU time per second for the shadow pass and the main scene pass
-stopScenePerfCapture();
-
 writeChunkSnapshotFixture(cx, cy); // Save an unmistakable plateau and re-mesh in place
 clearChunkSnapshots(); // Remove every saved edit for this level and reload
 ```
 
-Terrain is not its own render pass — its LOD meshes draw through the main scene
-pass alongside all opaque geometry — so `startScenePerfCapture` times that whole
-pass. Point the camera at terrain and the `scene` row is dominated by terrain's
-fragment cost, which is what the sample-budget measurement watches. The `shadow`
-row is the directional shadow pass, all three cascades; scatter draws into both.
+Terrain has no timing command of its own. It is not a separate render pass —
+its LOD meshes draw through the main scene pass alongside all opaque geometry —
+so its cost shows up in the `scene` row of the [perf panel](#perf-panel). Point
+the camera at terrain and that row is dominated by terrain's fragment cost.
 
 `writeChunkSnapshotFixture` exercises the save/load round-trip without the sculpt
 UI: it takes the chunk's current heights, presses a smooth plateau into the middle,
@@ -251,20 +254,76 @@ See [Understory](./milestones/understory.md).
 
 ---
 
-## Sky performance
+## Perf panel
 
-Registered in `SkyDebugCommands.ts`. GPU timestamp queries, zero overhead when off.
+Press the backquote key (`` ` ``) in the game or the editor. Press it again to
+close. There are no performance console commands: everything they used to print
+is a row here.
 
-```js
-startSkyPerfCapture(); // Logs a console.table of label → ms once per interval
-stopSkyPerfCapture();
-```
+**Copy** puts the whole panel on the clipboard as plain text, ready to paste into
+a bug report or at an LLM. The button works anywhere the cursor does, and `c`
+does the same while the panel is open, which is the one that works in game where
+pointer lock swallows clicks. The text carries the canvas size, the quality tier
+and any per-aspect pins, so a paste says what it was measured on. It also carries
+a note explaining the amortised rows, since a reader who does not know that a
+periodic pass is averaged will misread it.
 
-Two rows need a caveat. `sky-cube-capture` times **one** face, so multiply by the
-faces drawn that frame, and it reads zero on frames where the sky did not move.
-`sky-ibl-prefilter` times **one face of specular mip 1** — the largest unit of
-prefilter work there is, since every later level quarters in size — and likewise
-reads zero on frames with no prefilter step scheduled.
+The panel is the only reader of `MetricsRegistry`, which every subsystem
+publishes into. Adding a number means publishing it from the renderer, not
+editing the panel. While the panel is closed the registry is disabled and
+records nothing.
+
+**The top line is the verdict.** Frame time, fps, CPU milliseconds spent inside
+`Renderer.render()`, GPU milliseconds across every timed pass, and which of the
+two is the limit. `vsync capped` means neither is: both have headroom and the
+frame is waiting on the display. Shrink the window or find a heavier view before
+reading anything into the rest.
+
+**Sections.** `frame` is the wall clock and the CPU total. `gpu · scene`,
+`gpu · sky` and `gpu · post` are the render passes, each with its own subtotal.
+`cpu · render()` splits the JavaScript side into scene graph, cull, organize and
+encode. `counts` holds draw groups, visible solids and shadow casters.
+
+**Every row carries a second number.** Normally it is `max`, the highest single
+sample in the two-second window. Read it. A mean hides exactly the spike you are
+chasing: a pass costing 9 ms on one frame in two averages to 4.6 and looks
+unremarkable.
+
+**Rows that do not run every frame read differently.** Where a pass is periodic
+the right-hand number becomes `9.18 @ 1/2`, meaning it cost 9.18 ms on the frames
+it ran and runs on one frame in two. The main value stays the amortised cost, so
+it is comparable with every other row, and the spike stays visible beside it.
+`sky-cloud-shadow` is the one to watch. The cube capture and IBL prefilter run on
+their own schedule too.
+
+Two rows still need a caveat. `sky-cube-capture` times **one** face, so multiply
+by the faces drawn that frame. `sky-ibl-prefilter` times **one face of specular
+mip 1**, the largest unit of prefilter work there is, since every later level
+quarters in size.
+
+`no gpu timings` on the verdict line means the adapter has no `timestamp-query`.
+CPU rows and counts still work.
+
+### Why the GPU numbers are not raw durations
+
+`GpuPassTimer` does not report `end - begin` blindly, and the correction matters
+enough to know about.
+
+A duration is a pass cost only when the pass has a begin timestamp of its own.
+Some backends resolve a pass-boundary write to the start of the whole command
+buffer, so several passes in one encoder claim the same start and every
+`end - begin` comes out as a running total from that point. Ends stay monotonic
+and correct, so when begins repeat the timer takes each cost from the gap to the
+previous end instead. This is why `GpuPassTimer.init` must be given its labels in
+encode order.
+
+The collapse is usually partial. In `SkyRenderer.render` the first pass keeps its
+own begin and the three after it share one. Where begins genuinely are all
+distinct the measured durations are used unchanged, and they may sum past the
+buffer's wall time, because passes do overlap.
+
+`derivePassCosts` is a pure function and is covered by
+`GpuPassTimer.spec.ts` against both real captures.
 
 ---
 
@@ -279,3 +338,38 @@ and call it from `index.ts`. Two conventions worth keeping:
   type checking at all.
 
 Then add it here.
+
+Performance numbers are the exception: they do not get a command. Add them to the
+panel instead.
+
+## Adding a metric
+
+Publish it from wherever it is measured. The panel picks it up with no change of
+its own.
+
+```ts
+// A CPU span. Declare it in Renderer.declareMetrics so the row order is stable.
+metrics.begin('cpu.cull');
+// ...work...
+metrics.end('cpu.cull');
+
+// A count.
+metrics.record('counts.solids', solids.length);
+```
+
+For a GPU pass, hand `GpuPassTimer` its labels **in encode order** and pass
+`writes(label)` into `beginRenderPass`:
+
+```ts
+this.gpuTimer = new GpuPassTimer(renderer.metrics, 'gpu/sky');
+this.gpuTimer.init(device, ['clouds', 'atmosphere']);
+encoder.beginRenderPass({ ..., timestampWrites: this.gpuTimer.writes('clouds') });
+this.gpuTimer.resolve(); // once per frame, after the submits
+```
+
+A pass that is skipped on some frames needs nothing extra. The timer notices its
+begin timestamp has not moved and reports a skip, which is what makes the
+amortised number honest.
+
+Add the group to `GROUP_ORDER` and `GROUP_LABELS` in `PerfPanel.tsx` if it is a
+new one. Anything else is picked up automatically.

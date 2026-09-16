@@ -8,4 +8,4 @@ The renderer lives in `packages/rewild-renderer`. WGSL shader files support `#in
 - Sky rendering: Multi-pass rendering of sky, atmosphere and weather. Please read [sky-rendering.md](./sky-rendering.md)
 - Weather system: Dynamic weather including precipitation, lightning and overcast sky response. See [weather.md](./weather.md)
 - Materials & shading: The PBR material model, colour spaces, exposure and sky-driven ambient. See [lichen.md](./milestones/lichen.md)
-- Debugging: Every console command the engine registers — material channels, the PBR reference grid, IBL viewer, shadow and perf capture. See [debug-commands.md](./debug-commands.md)
+- Debugging: The perf panel (backquote), and every console command the engine registers — material channels, the PBR reference grid, IBL viewer, shadows. See [debug-commands.md](./debug-commands.md)

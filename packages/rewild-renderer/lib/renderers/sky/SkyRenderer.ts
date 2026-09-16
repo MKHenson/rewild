@@ -16,7 +16,7 @@ import { SkyBilateralPass } from './SkyBilateralPass';
 import { SkyCompositePass } from './SkyCompositePass';
 import { SkyGradientRenderer } from './SkyGradientRenderer';
 import { DirectionLight } from '../../core/lights/DirectionLight';
-import { PerformanceMonitor } from '../../utils/PerformanceMonitor';
+import { GpuPassTimer } from '../../metrics/GpuPassTimer';
 import { StarfieldRenderer } from './StarfieldRenderer';
 import { CloudShadowRenderer } from './CloudShadowRenderer';
 import { SkyCubeCapture } from './SkyCubeCapture';
@@ -128,7 +128,7 @@ export class SkyRenderer {
   _dayColor: Color;
   _eveColor: Color;
 
-  perfMonitor: PerformanceMonitor;
+  gpuTimer: GpuPassTimer;
 
   constructor(parent: Transform) {
     this.azimuth = 180;
@@ -159,7 +159,6 @@ export class SkyRenderer {
     this.cubeCapture = new SkyCubeCapture();
     this.iblPrefilter = new SkyIblPrefilter();
     this.cubeDebugRenderer = new SkyCubeDebugRenderer();
-    this.perfMonitor = new PerformanceMonitor();
   }
 
   init(renderer: Renderer): void {
@@ -299,7 +298,9 @@ export class SkyRenderer {
     this.finalPass.initBlend(renderer);
     this.finalPass.initFinal(renderer);
 
-    this.perfMonitor.init(device, [
+    if (!this.gpuTimer)
+      this.gpuTimer = new GpuPassTimer(renderer.metrics, 'gpu/sky');
+    this.gpuTimer.init(device, [
       'sky-cloud-shadow',
       'sky-clouds',
       'sky-atmosphere',
@@ -522,19 +523,16 @@ export class SkyRenderer {
       sunPosition.x / sunDir,
       sunPosition.y / sunDir,
       sunPosition.z / sunDir,
-      this.perfMonitor.getTimestampWrites('sky-cloud-shadow')
+      this.gpuTimer.writes('sky-cloud-shadow')
     );
 
     // Update temporal state: teleport detection + store prev view-proj for next frame's reprojection
     this.cloudsPass.updateTemporalState(camera, this.viewProjMatrix);
 
-    this.cloudsPass.render(
-      commandEncoder,
-      this.perfMonitor.getTimestampWrites('sky-clouds')
-    );
+    this.cloudsPass.render(commandEncoder, this.gpuTimer.writes('sky-clouds'));
     this.atmospherePass.render(
       commandEncoder,
-      this.perfMonitor.getTimestampWrites('sky-atmosphere')
+      this.gpuTimer.writes('sky-atmosphere')
     );
 
     const facesCaptured = this.cubeCapture.render(
@@ -548,14 +546,14 @@ export class SkyRenderer {
       this.foginess,
       this.temperature,
       camera.transform.position.y,
-      this.perfMonitor.getTimestampWrites('sky-cube-capture')
+      this.gpuTimer.writes('sky-cube-capture')
     );
 
     this.iblPrefilter.render(
       device,
       commandEncoder,
       facesCaptured,
-      this.perfMonitor.getTimestampWrites('sky-ibl-prefilter')
+      this.gpuTimer.writes('sky-ibl-prefilter')
     );
 
     const commandBuffer = commandEncoder.finish();
@@ -571,7 +569,7 @@ export class SkyRenderer {
       sunPosition,
       camera,
       this.upDot,
-      this.perfMonitor.getTimestampWrites('sky-god-rays')
+      this.gpuTimer.writes('sky-god-rays')
     );
 
     // Bilateral only uses the matrix to reconstruct ray directions, so it
@@ -580,7 +578,7 @@ export class SkyRenderer {
     this.bilateralPass.render(
       renderer,
       this.invViewProjCentered.elements,
-      this.perfMonitor.getTimestampWrites('sky-bilateral')
+      this.gpuTimer.writes('sky-bilateral')
     );
 
     // Blend sub-pass: sky HDR + bilateral HDR → intermediateTarget (no tonemap),
@@ -632,7 +630,7 @@ export class SkyRenderer {
     this.finalPass.cloudiness = this.cloudiness;
     this.finalPass.render(renderer, pass, camera);
 
-    this.perfMonitor.resolveAndLog();
+    this.gpuTimer.resolve();
   }
 
   /** Called after the sky compositor is submitted — renders bolt then rain onto the canvas. */
@@ -678,11 +676,11 @@ export class SkyRenderer {
   }
 
   dispose() {
-    this.perfMonitor.dispose();
     this.iblPrefilter.dispose();
     this.cubeCapture.dispose();
     this.starfieldRenderer.dispose();
     this.cloudShadowRenderer.dispose();
+    this.gpuTimer?.dispose();
     this.bilateralPass.dispose();
     this.godRaysPass.dispose();
     this.rainPass.dispose();
