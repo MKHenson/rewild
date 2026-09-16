@@ -93,3 +93,24 @@ export function leafCellPixels(size: number, grid: number): PixelRect[] {
 export function insetRect(rect: PixelRect, gutter: number): PixelRect {
   return { x: rect.x + gutter, y: rect.y + gutter, width: rect.width - 2 * gutter, height: rect.height - 2 * gutter };
 }
+
+/**
+ * The centred column of a cell that a card of `aspect` samples: as wide as
+ * the cell is tall, times the aspect, and never wider than the cell.
+ *
+ * A frond is three times longer than it is wide, and a square cell that held
+ * it stretched would give it three times the texels across that it has along.
+ * The card samples this column instead, so a stamp lands at its own aspect and
+ * a generated frond is painted at the same. The rest of the cell is blank.
+ */
+export function columnOf(rect: UvRect, aspect: number): UvRect {
+  const width = Math.min(rect.u1 - rect.u0, (rect.v1 - rect.v0) * aspect);
+  const centre = (rect.u0 + rect.u1) / 2;
+  return { u0: centre - width / 2, u1: centre + width / 2, v0: rect.v0, v1: rect.v1 };
+}
+
+/** The same column in texels, for the image writer. */
+export function columnPixels(rect: PixelRect, aspect: number): PixelRect {
+  const width = Math.min(rect.width, Math.round(rect.height * aspect));
+  return { x: rect.x + Math.floor((rect.width - width) / 2), y: rect.y, width, height: rect.height };
+}

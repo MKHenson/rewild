@@ -8,11 +8,11 @@
 
 import { resolveParams, type Params, type RawConfig } from './lib/params.ts';
 import { barkStack, createSample, sampleBark } from './lib/bark.ts';
-import { gutterFor, insetRect, leafCellPixels } from './lib/atlas.ts';
+import { columnPixels, gutterFor, insetRect, leafCellPixels } from './lib/atlas.ts';
 import { compositeCluster } from './lib/cluster.ts';
 import { srgbToLinear } from './lib/colour.ts';
-import type { LeafSource, LeafStamp } from './lib/sources.ts';
-import { buildBarkCanvas, buildLeafCanvas, type Canvas } from './lib/textures.ts';
+import { CROWN_CELLS_GENERATED, type LeafSource, type LeafStamp } from './lib/sources.ts';
+import { buildBarkCanvas, buildCrownCanvases, buildFrondCanvas, buildLeafCanvas, type Canvas } from './lib/textures.ts';
 
 const SIZE = '128';
 
@@ -585,3 +585,38 @@ describe('leaf assembly', () => {
   });
 });
 
+
+describe('frond atlas', () => {
+  const params = paramsFor({ type: 'crown', name: 'test-crown', cardAspect: 0.3 });
+  const canvas = buildFrondCanvas(params);
+
+  // The card samples a centred column of its cell, `cardAspect` of the cell's
+  // height wide. A frond painted outside it would never be seen, and a column
+  // left blank would leave the card empty.
+  it('paints every frond inside the column its card samples, and nothing outside it', () => {
+    const rects = leafCellPixels(canvas.size, 2).slice(0, CROWN_CELLS_GENERATED);
+    const gutter = gutterFor(canvas.size);
+
+    for (const rect of rects) {
+      const inner = insetRect(rect, gutter);
+      const column = columnPixels(inner, params.cardAspect);
+      let inside = 0;
+      let outside = 0;
+
+      for (let y = inner.y; y < inner.y + inner.height; y++)
+        for (let x = inner.x; x < inner.x + inner.width; x++) {
+          if (canvas.alpha[y * canvas.size + x] <= 0) continue;
+          if (x >= column.x && x < column.x + column.width) inside++;
+          else outside++;
+        }
+
+      expect(inside).toBeGreaterThan(column.width * column.height * 0.2);
+      expect(outside).toBe(0);
+    }
+  });
+
+  it('ships bark only with a stem', () => {
+    expect(Object.keys(buildCrownCanvases(params, true))).toEqual(['bark', 'frond']);
+    expect(Object.keys(buildCrownCanvases(params, false))).toEqual(['frond']);
+  });
+});

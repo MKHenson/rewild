@@ -333,6 +333,25 @@ async function loadStamp(name: string, lengthMetres: number, paths: MapSet, dire
  * assembler does with the stamp afterwards. A leaf is rotated about its anchor
  * into a sprig; a clump stamp is the cell.
  */
+/**
+ * A source entry split into its folder and the stamps it takes from it.
+ *
+ * `oak` is every set in the folder. `oak/green-*` is the sets whose prefix
+ * matches, which is how one folder of authored art serves two species: a
+ * palm's dead fronds are right on a palm and wrong on a fern, and the fern
+ * lists `palm/green-*` rather than a second copy of the folder.
+ */
+export function splitSourceName(name: string): { folder: string; pattern: string | null } {
+  const slash = name.indexOf('/');
+  return slash === -1 ? { folder: name, pattern: null } : { folder: name.slice(0, slash), pattern: name.slice(slash + 1) };
+}
+
+/** Whether a stamp prefix matches a `*`/`?` glob, whole. */
+export function matchesPattern(prefix: string, pattern: string): boolean {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp(`^${escaped}$`).test(prefix);
+}
+
 async function loadStampSource(
   names: string[],
   root: string,
@@ -348,20 +367,31 @@ async function loadStampSource(
   let depthMetres: number | null = null;
 
   for (const name of names) {
-    const directory = join(root, slot, name);
-    await requireDirectory(directory, kind, name);
-    directories.push(directory);
+    const { folder, pattern } = splitSourceName(name);
+    const directory = join(root, slot, folder);
+    await requireDirectory(directory, kind, folder);
+    // The pattern rides along so the report shows which stamps were taken.
+    directories.push(pattern ? join(directory, pattern) : directory);
 
     const sets = await mapSets(directory);
     const metadata = await readMetadata(directory, [sizeField], ['depthMetres']);
     const declared = metadata[sizeField];
+
+    // A pattern that takes nothing is an error for the reason a missing folder
+    // is: art that quietly fell back to generation looks like art doing nothing.
+    const taken = [...sets].filter(([prefix]) => !pattern || matchesPattern(prefix, pattern));
+    if (!taken.length)
+      throw new Error(
+        `Source '${name}' matches none of the stamps in ${directory}: ${[...sets.keys()].sort().join(', ')}.`
+      );
+
     lengthMetres = Math.max(lengthMetres, declared);
     if (metadata.depthMetres !== undefined) depthMetres = Math.max(depthMetres ?? 0, metadata.depthMetres);
 
     // Sorted so a stamp's index, and with it every cell that picks it, is the
     // same on every machine whatever order the directory lists in.
-    for (const [prefix, paths] of [...sets].sort(([a], [b]) => a.localeCompare(b)))
-      stamps.push(await loadStamp(`${name}/${prefix}`, declared, paths, directory));
+    for (const [prefix, paths] of taken.sort(([a], [b]) => a.localeCompare(b)))
+      stamps.push(await loadStamp(`${folder}/${prefix}`, declared, paths, directory));
   }
 
   return { names, directories, lengthMetres, depthMetres, stamps };
@@ -386,6 +416,18 @@ export async function loadClumpSource(
   root: string = sourceRoot()
 ): Promise<LeafSource | null> {
   return loadStampSource(names, root, 'clump', 'heightMetres', 'clump');
+}
+
+/**
+ * Frond stamps: one whole frond per cell, base at the bottom-middle and tip at
+ * the top, the way a clump stamp stands. `lengthMetres` because that is what
+ * a frond has, and it decides how stamps of different lengths share an atlas.
+ */
+export async function loadFrondSource(
+  names: string[],
+  root: string = sourceRoot()
+): Promise<LeafSource | null> {
+  return loadStampSource(names, root, 'fronds', 'lengthMetres', 'frond');
 }
 
 /**
@@ -423,36 +465,58 @@ export const LEAF_GRID_GENERATED = 4;
 export const CLUMP_CELLS_GENERATED = 9;
 
 /**
- * What a clump atlas holds: one whole stamp per cell, and a grid big enough
+ * Cells a generated frond atlas draws. Fewer than a clump's, because a frond
+ * is long and a card samples only `cardAspect` of its cell's width, so every
+ * texel of cell edge counts twice over.
+ */
+export const CROWN_CELLS_GENERATED = 4;
+
+export interface StampAtlas {
+  grid: number;
+  cells: number;
+}
+
+/**
+ * What a whole-stamp atlas holds: one stamp per cell, and a grid big enough
  * for them.
  *
  * Nothing is divided here, unlike a leaf grid. A leaf cell is *composed* from
- * many stamps, so its cell count follows from how many fit. A clump stamp *is*
- * the cell, so the count follows from how many there are, and the grid is the
- * smallest square that holds them.
+ * many stamps, so its cell count follows from how many fit. A clump or frond
+ * stamp *is* the cell, so the count follows from how many there are, and the
+ * grid is the smallest square that holds them.
  *
  * `cells` is reported separately from `grid` because the two part company the
  * moment the stamp count is not a square: ten stamps land in a 4x4 with six
  * cells left blank, and a card hashing into one of those would draw nothing.
  */
-export function clumpAtlas(source: LeafSource | null): { grid: number; cells: number } {
-  const cells = source ? source.stamps.length : CLUMP_CELLS_GENERATED;
+function stampAtlas(source: LeafSource | null, generated: number): StampAtlas {
+  const cells = source ? source.stamps.length : generated;
   return { grid: Math.ceil(Math.sqrt(cells)), cells };
 }
 
+export function clumpAtlas(source: LeafSource | null): StampAtlas {
+  return stampAtlas(source, CLUMP_CELLS_GENERATED);
+}
+
+export function crownAtlas(source: LeafSource | null): StampAtlas {
+  return stampAtlas(source, CROWN_CELLS_GENERATED);
+}
+
+export interface StampFit extends StampAtlas {
+  cellPx: number;
+  placedPx: number;
+  sourcePx: number;
+}
+
 /**
- * Texels one clump cell gets, and whether a stamp had to be stretched to fill
- * it.
+ * Texels one whole-stamp cell gets, and whether a stamp had to be stretched
+ * to fill it.
  *
  * The one number worth watching on a clump: the atlas holds every stamp, so
  * adding a ninth to a 2x2 set takes every cell from half the atlas edge to a
  * third of it, and nothing says so unless it is measured.
  */
-export function fitClump(
-  source: LeafSource,
-  textureSize: number
-): { grid: number; cells: number; cellPx: number; placedPx: number; sourcePx: number } {
-  const { grid, cells } = clumpAtlas(source);
+function fitStamps(source: LeafSource, textureSize: number, { grid, cells }: StampAtlas): StampFit {
   const inner = textureSize / grid - 2 * gutterFor(textureSize);
 
   let placedPx = 0;
@@ -466,6 +530,25 @@ export function fitClump(
   }
 
   return { grid, cells, cellPx: Math.round(inner), placedPx, sourcePx };
+}
+
+export function fitClump(source: LeafSource, textureSize: number): StampFit {
+  return fitStamps(source, textureSize, clumpAtlas(source));
+}
+
+export function fitCrown(source: LeafSource, textureSize: number): StampFit {
+  return fitStamps(source, textureSize, crownAtlas(source));
+}
+
+/**
+ * The widest stamp's width over its length. A crown card samples `cardAspect`
+ * of its cell, so a stamp wider than that is clipped at the card's edge, and
+ * the run says so.
+ */
+export function widestAspect(source: LeafSource): number {
+  return Math.max(
+    ...source.stamps.map((stamp) => (stamp.extent.right - stamp.extent.left + 1) / stampLengthPx(stamp))
+  );
 }
 
 /**

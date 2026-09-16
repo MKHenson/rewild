@@ -13,7 +13,7 @@
 // Deliberately free of imports, so the parameter table can reach it without a
 // cycle.
 
-export const FORGE_TYPES = ['tree', 'clump'] as const;
+export const FORGE_TYPES = ['tree', 'clump', 'crown'] as const;
 
 export type ForgeType = (typeof FORGE_TYPES)[number];
 
@@ -43,6 +43,11 @@ export interface PieceSpec {
    * model with it. See "Leave materialId alone" in the README.
    */
   material: boolean;
+  /**
+   * Shipped only while the model has a stem. A fern's rosette sits on the
+   * ground, and a bark material nothing draws would still load its images.
+   */
+  needsStem?: boolean;
 }
 
 export const PIECES: Record<ForgeType, readonly PieceSpec[]> = {
@@ -51,20 +56,33 @@ export const PIECES: Record<ForgeType, readonly PieceSpec[]> = {
     { key: 'leaf', cutout: true, height: true, material: false },
   ],
   clump: [{ key: 'blade', cutout: true, height: false, material: false }],
+  crown: [
+    { key: 'bark', cutout: false, height: true, material: true, needsStem: true },
+    { key: 'frond', cutout: true, height: false, material: false },
+  ],
 };
 
-export function pieceKeys(type: ForgeType): string[] {
-  return PIECES[type].map((piece) => piece.key);
+/** The pieces a model ships. `hasStem` drops the ones a stemless crown has no use for. */
+export function piecesOf(type: ForgeType, hasStem = true): readonly PieceSpec[] {
+  return PIECES[type].filter((piece) => !piece.needsStem || hasStem);
+}
+
+export function pieceKeys(type: ForgeType, hasStem = true): string[] {
+  return piecesOf(type, hasStem).map((piece) => piece.key);
 }
 
 /** Pieces whose `_disp` map is written. */
-export function heightPieces(type: ForgeType): string[] {
-  return PIECES[type].filter((piece) => piece.height).map((piece) => piece.key);
+export function heightPieces(type: ForgeType, hasStem = true): string[] {
+  return piecesOf(type, hasStem)
+    .filter((piece) => piece.height)
+    .map((piece) => piece.key);
 }
 
 /** Pieces that get a materials.json material. */
-export function materialPieces(type: ForgeType): string[] {
-  return PIECES[type].filter((piece) => piece.material).map((piece) => piece.key);
+export function materialPieces(type: ForgeType, hasStem = true): string[] {
+  return piecesOf(type, hasStem)
+    .filter((piece) => piece.material)
+    .map((piece) => piece.key);
 }
 
 export function isForgeType(value: string): value is ForgeType {

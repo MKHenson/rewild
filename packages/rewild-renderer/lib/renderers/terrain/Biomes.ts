@@ -337,11 +337,44 @@ export const DESERT: BiomeParams = {
   // what little there is down in the pans.
   scatter: [
     {
+      layer: 'palm_01',
+      density: 0.35,
+      slope: { from: 32, to: 10 },
+      noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
+    },
+    {
+      layer: 'date_palm_01',
+      density: 0.25,
+      slope: { from: 32, to: 10 },
+      noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
+    },
+    {
+      layer: 'palm_02',
+      density: 0.35,
+      slope: { from: 32, to: 10 },
+      noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
+    },
+    {
+      layer: 'desert_plains_01',
+      density: 0.3,
+      slope: { from: 55, to: 25 },
+      // The stand's own field, inverted. Grass fills the glades.
+      noise: { scale: 260, seedSalt: 53, band: { from: 0.8, to: 0.45 } },
+    },
+    {
+      layer: 'fern_01',
+      density: 0.3,
+      slope: { from: 55, to: 25 },
+      // The stand's own field, inverted. Grass fills the glades.
+      noise: { scale: 260, seedSalt: 53, band: { from: 0.8, to: 0.45 } },
+    },
+    {
       layer: 'granite_boulder',
       density: 0.05,
       height: { from: 55, to: 12 },
       noise: { scale: 340, seedSalt: 67, band: { from: 0.62, to: 0.85 } },
     },
+    { layer: 'granite_pebble', density: 0.18, slope: { from: 30, to: 8 } },
   ],
 };
 
