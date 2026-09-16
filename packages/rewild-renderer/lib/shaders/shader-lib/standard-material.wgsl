@@ -120,19 +120,50 @@ fn shadeFoliage(
   var direct = vec3f(0.0);
   var transmitted = vec3f(0.0);
 
-  // Directional lights only. A blade is lit by the sun and the sky; a point
-  // lamp near enough to matter to one blade is not a case worth the loop.
+  // Every light type, through the same two lobes. A lamp aimed at a field is
+  // the case the wrap and transmit terms exist for, so restricting this to the
+  // sun would put grass in a spot's cone lit only by the sky.
+  //
+  // Punctual lights reuse the standard model's falloff and cone, so a blade and
+  // the ground it stands in take the same light. What foliage does not take is
+  // the spot *shadow*: the atlas tap is 3x3 PCF and the overdraw here does not
+  // carry it, so foliage inside a cone is lit whether or not something blocks
+  // it. Only sunShadow, which the caller already has, reaches this model.
   for (var i: u32 = 0u; i < lighting.numLights; i = i + 1u) {
     let light = lighting.lights[i];
-    if (light.lightType != 1.0) {
-      continue;
-    }
-
-    let L = normalize(-light.positionOrDirection);
     // Both lobes are Lambertian, so both carry the 1/pi the standard model
     // applies through diffuseLambert. Without it foliage comes out pi times
     // brighter than everything around it.
-    let radiance = light.color * light.intensity * sunShadow / BRDF_PI;
+    var radiance = light.color * light.intensity / BRDF_PI;
+    var L: vec3f;
+
+    if (light.lightType == 1.0) {
+      // positionOrDirection is the direction the light travels, so the vector
+      // toward it is its negation.
+      L = normalize(-light.positionOrDirection);
+      radiance *= sunShadow;
+    } else {
+      // Rejected on the square, so a light that does not reach this fragment
+      // costs a dot and a compare rather than a sqrt. Every punctual light in
+      // the buffer pays this much per foliage fragment, at foliage overdraw.
+      let lightVec = light.positionOrDirection - viewPosition;
+      let d2 = dot(lightVec, lightVec);
+      if (d2 >= light.range * light.range) {
+        continue;
+      }
+      let dist = sqrt(d2);
+      L = lightVec / max(dist, 1e-4);
+
+      var attenuation = lightDistanceAttenuation(dist, light.range);
+      if (light.lightType == 2.0) {
+        let angle = acos(clamp(dot(-L, light.direction), 0.0, 1.0));
+        attenuation *= 1.0 - smoothstep(light.innerAngle, light.outerAngle, angle);
+      }
+      if (attenuation <= 0.0) {
+        continue;
+      }
+      radiance *= attenuation;
+    }
 
     direct += radiance
             * max(0.0, (dot(N, L) + FOLIAGE_WRAP) / (1.0 + FOLIAGE_WRAP));

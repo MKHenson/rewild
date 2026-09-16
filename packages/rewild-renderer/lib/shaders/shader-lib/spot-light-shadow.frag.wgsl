@@ -1,5 +1,7 @@
   // Spot light shadow — samples the bottom-right quadrant (0.5,0.5)→(1.0,1.0) of the shadow atlas.
   // Returns 1.0 (fully lit) when no shadow-casting spot light exists or fragment is outside the cone.
+  // Foliage is lit by a spot but never shadowed by one: 3x3 PCF is not
+  // affordable at the overdraw it draws at. See shadeFoliage.
   var spotShadowFactor = 1.0;
   if (spotLightShadowParams.hasSpotShadow != 0u && !HAS_FOLIAGE_SHADING) {
     // Geometric normal, not the shaded one — see the same bias in
