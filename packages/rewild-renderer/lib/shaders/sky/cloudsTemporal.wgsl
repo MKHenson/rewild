@@ -108,20 +108,28 @@ struct TemporalUniforms {
 @group(1) @binding(0)
 var historyTexture: texture_2d<f32>;
 
-// Binding 1 was a linear sampler for the history texture. History is now fetched
-// with textureLoad through sampleHistoryValid(), which does its own filtering so it
-// can reject texels the previous frame depth-gated; a hardware linear fetch cannot
-// be told to skip them. The binding is left vacant rather than renumbered.
+// Previous frame's validity mask: 1 where historyTexture holds cloud data, 0 where
+// that frame gated the texel. History is fetched with textureLoad through
+// sampleHistoryValid(), which filters over this mask; a hardware linear fetch
+// cannot be told to skip gated texels.
+@group(1) @binding(1)
+var historyValidity: texture_2d<f32>;
 
 @group(1) @binding(2)
 var<uniform> temporal: TemporalUniforms;
+
+// Second target is the validity mask read back next frame as historyValidity.
+struct TemporalOutput {
+    @location(0) color: vec4<f32>,
+    @location(1) valid: f32,
+};
 
 // ──────────────────────────────────────────────
 // Module-level private state (mirrors clouds.wgsl)
 // ──────────────────────────────────────────────
 
 var<private> varyings: VaryingsStruct;
-var<private> output: OutputStruct;
+var<private> output: TemporalOutput;
 var<private> sunDotUp: f32;
 var<private> currentFragCoord: vec2<f32>;
 
@@ -392,9 +400,10 @@ struct HistorySample {
 // silhouette at a time and reads as a *dashed* outline rather than a solid one.
 // Gather the four texels and renormalise over the valid ones.
 //
-// Validity is tested against the current depth buffer rather than the previous
-// frame's, which is not kept. Silhouettes move slowly relative to frame rate so it
-// is a close stand-in, and erring toward rejection only costs a fresh march.
+// Validity comes from the previous frame's own mask, not the current depth buffer.
+// Foliage writes depth and moves every frame (wind, parallax under translation),
+// so a texel gated last frame is often sky now; testing current depth accepted
+// its zeroed history and the foliage silhouette ghosted across the clouds.
 //
 // Reconstruction is Catmull-Rom, not bilinear, which is what keeps clouds from
 // dissolving while the camera turns. A turning camera reprojects exactly (w = 0
@@ -423,8 +432,6 @@ fn sampleHistoryValid(uv: vec2f) -> HistorySample {
     let base  = floor(coord);
     let frac  = coord - base;
     let maxT  = vec2i(dims) - 1;
-    let dDims = vec2f(textureDimensions(depthTexture));
-    let maxD  = vec2i(dDims) - 1;
 
     // var rather than let: indexed by the loop counter below, and a memory
     // location is indexable with a runtime value on every backend.
@@ -442,11 +449,9 @@ fn sampleHistoryValid(uv: vec2f) -> HistorySample {
 
     for (var j = 0; j < 4; j++) {
         for (var i = 0; i < 4; i++) {
-            let texel   = clamp(vec2i(base) + vec2i(i - 1, j - 1), vec2i(0), maxT);
-            let texelUV = (vec2f(texel) + 0.5) / dims;
-            let dCoord  = vec2i(texelUV * dDims - 0.5);
+            let texel = clamp(vec2i(base) + vec2i(i - 1, j - 1), vec2i(0), maxT);
 
-            if (textureLoad(depthTexture, clamp(dCoord, vec2i(0), maxD), 0) < 1.0) {
+            if (textureLoad(historyValidity, texel, 0).r < 0.5) {
                 allValid = false;
                 continue;
             }
@@ -477,7 +482,7 @@ fn sampleHistoryValid(uv: vec2f) -> HistorySample {
         out.valid = true;
         out.color = clamp(crAcc, lo, hi);
     } else {
-        // A tap in the 4x4 was depth-gated. Catmull-Rom weights sum to 1 but
+        // A tap in the 4x4 was gated. Catmull-Rom weights sum to 1 but
         // individual ones are negative, so dropping taps and renormalising is
         // unstable — the remainder can sum to near zero. The bilinear's weights
         // are non-negative and renormalise safely. Only reached along terrain
@@ -517,8 +522,6 @@ fn historyNeighbourhood(uv: vec2f) -> Neighbourhood {
     let dims   = vec2f(textureDimensions(historyTexture));
     let centre = vec2i(uv * dims);
     let maxT   = vec2i(dims) - 1;
-    let dDims = vec2f(textureDimensions(depthTexture));
-    let maxD  = vec2i(dDims) - 1;
 
     // Running sum and sum of squares, for a one-pass mean/variance.
     var sum   = vec4f(0.0);
@@ -531,12 +534,8 @@ fn historyNeighbourhood(uv: vec2f) -> Neighbourhood {
 
             // Gated texels are vec4f(0) — missing data, not black cloud. Folding
             // them in would drag the mean toward zero and inflate sigma, giving
-            // every ridge a band of wrongly-clamped sky. textureLoad rather than
-            // the comparison sampler: this wants occupancy, not PCF.
-            let texelUV = (vec2f(texel) + 0.5) / dims;
-            let dCoord  = vec2i(texelUV * dDims - 0.5);
-            let depth   = textureLoad(depthTexture, clamp(dCoord, vec2i(0), maxD), 0);
-            if (depth < 1.0) {
+            // every ridge a band of wrongly-clamped sky.
+            if (textureLoad(historyValidity, texel, 0).r < 0.5) {
                 continue;
             }
 
@@ -567,9 +566,10 @@ fn fs(
     @builtin(position) fragCoord: vec4<f32>,
     @location(0) vRelPosition: vec3<f32>,
     @location(1) vSunDirection: vec3<f32>
-) -> OutputStruct {
+) -> TemporalOutput {
     sunDotUp = dot(vSunDirection, vec3f(0.0, 1.0, 0.0));
     currentFragCoord = fragCoord.xy;
+    output.valid = 1.0;
 
     // vRelPosition is camera-relative, so the camera is at its origin.
     let direction = normalize(vRelPosition);
@@ -618,12 +618,14 @@ fn fs(
 
         if (neighbourhoodSky < 1.0) {
             output.color = vec4f(0.0, 0.0, 0.0, 0.0);
+            output.valid = 0.0;
             return output;
         }
         let cosTheta = dot(direction, vec3f(0.0, 1.0, 0.0));
         let hemisphereMask = smoothstep(0.0, 0.1, cosTheta);
         if (hemisphereMask <= 0.0) {
             output.color = vec4f(0.0, 0.0, 0.0, 0.0);
+            output.valid = 0.0;
             return output;
         }
     }
@@ -714,7 +716,8 @@ fn fs(
             }
         } else {
             // Off-screen, behind-camera, or reprojecting onto texels the previous
-            // frame gated away — nothing trustworthy to read, so march instead.
+            // frame gated away (foliage that has since moved) — nothing
+            // trustworthy to read, so march instead.
             pixelColor = drawCloudsHorizonFogLowQuality(marchDirection, org, vSunDirection);
         }
     }

@@ -130,6 +130,12 @@ export class TemporalCloudRenderer {
   /** Accumulated history from previous frames (ping-ponged each frame). */
   historyTexture: GPUTexture;
 
+  /** Per-texel mask of what this frame gated (r8: 1 = cloud data, 0 = gated). */
+  validityTarget: GPUTexture;
+
+  /** Previous frame's validityTarget; the shader tests history against it. */
+  historyValidity: GPUTexture;
+
   pipeline: GPURenderPipeline;
   bindGroup0: GPUBindGroup;
   bindGroup1: GPUBindGroup;
@@ -245,6 +251,24 @@ export class TemporalCloudRenderer {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
 
+    // ── Validity mask (which texels the pass gated) and its previous-frame copy ──
+    // History validity has to come from the frame that wrote the history: foliage
+    // writes depth and moves every frame, so the current depth buffer says nothing
+    // about which history texels hold cloud data.
+    this.validityTarget = device.createTexture({
+      size: [w, h, 1],
+      label: 'temporal clouds validity',
+      format: 'r8unorm',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+    });
+
+    this.historyValidity = device.createTexture({
+      size: [w, h, 1],
+      label: 'temporal clouds history validity',
+      format: 'r8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+
     // ── Pipeline ──
     this.pipeline = device.createRenderPipeline({
       label: 'Temporal Clouds Pipeline',
@@ -256,7 +280,7 @@ export class TemporalCloudRenderer {
       fragment: {
         module,
         entryPoint: 'fs',
-        targets: [{ format: 'rgba16float' }],
+        targets: [{ format: 'rgba16float' }, { format: 'r8unorm' }],
       },
     });
 
@@ -300,9 +324,7 @@ export class TemporalCloudRenderer {
       layout: this.pipeline.getBindGroupLayout(1),
       entries: [
         { binding: 0, resource: this.historyTexture.createView() },
-        // No binding 1: the shader's history sampler is gone (see cloudsTemporal.wgsl).
-        // With layout:'auto' the derived layout omits it, so passing one here would
-        // fail bind group validation.
+        { binding: 1, resource: this.historyValidity.createView() },
         { binding: 2, resource: { buffer: this.temporalUniformBuffer } },
       ],
     });
@@ -416,6 +438,12 @@ export class TemporalCloudRenderer {
           loadOp: 'clear',
           storeOp: 'store',
         },
+        {
+          view: this.validityTarget.createView(),
+          clearValue: [0.0, 0.0, 0.0, 0.0],
+          loadOp: 'clear',
+          storeOp: 'store',
+        },
       ],
       timestampWrites,
     });
@@ -432,6 +460,11 @@ export class TemporalCloudRenderer {
       { texture: this.renderTarget },
       { texture: this.historyTexture },
       [this.renderTarget.width, this.renderTarget.height, 1]
+    );
+    encoder.copyTextureToTexture(
+      { texture: this.validityTarget },
+      { texture: this.historyValidity },
+      [this.validityTarget.width, this.validityTarget.height, 1]
     );
 
     // ── Advance temporal state ──
@@ -476,6 +509,8 @@ export class TemporalCloudRenderer {
   dispose(): void {
     this.renderTarget?.destroy();
     this.historyTexture?.destroy();
+    this.validityTarget?.destroy();
+    this.historyValidity?.destroy();
     this.temporalUniformBuffer?.destroy();
   }
 }
