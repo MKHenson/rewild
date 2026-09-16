@@ -92,19 +92,18 @@ Its tier controls, in rough order of what they are worth:
   fades out over. About 0.6ms between `high` and `low`.
 - **The second no-tile tap** (`low` only). Two offset crops mixed together hide
   the repeat of a 1K texture across a 240m chunk, and are half the texture reads
-  per layer. `low` takes the repeat instead.
-- **Per-layer detail normals** (`low` only). The macro normal stands in — but
-  only where the layer has one, because the fallback otherwise is a flat tangent
-  normal, which is uniform full diffuse and washes the surface out entirely.
+  per layer. `low` takes the repeat instead. Worth 0.14ms — far less than the
+  sample count suggests, because the splat loop skips any layer under
+  `WEIGHT_EPSILON` and most fragments have only one or two above it. Eight
+  active layers is the worst case, not the usual one.
 
-The last two measured at 0.14ms combined, far less than the sample count
-suggests, because the splat loop skips any layer under `WEIGHT_EPSILON` and most
-fragments have only one or two above it. Eight active layers is the worst case,
-not the usual one. They stay on `low` alone for that reason: the image cost is
-real and the saving is not.
+Per-layer detail normals are not on that list. They are gated on the fade
+distance at runtime, so pulling the fade in already takes them off the distant
+part of the screen, where the macro normal stands in for them. No tier drops
+them outright: the macro normal is a 240m-scale map, and standing it in at
+arm's length lights near ground with far-range relief.
 
-See `TerrainQuality.ts`. `high` reproduces exactly what was hardcoded before the
-table existed.
+See `TerrainQuality.ts`.
 
 `cloudShadows` is the one worth reaching for first on a GPU-bound frame. It sets
 the shadow map edge and how many frames apart the rebuilds are, 1024² every 2
