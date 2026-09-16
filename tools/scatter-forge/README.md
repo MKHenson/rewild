@@ -18,9 +18,10 @@ shape of thing entirely:
 | ------ | -- | ------ |
 | `tree` | Recursive branching. Tapered tubes with cards hung on the outermost generations. | Oak, birch, poplar, and a shrub, which is the same generator at two metres |
 | `clump` | Cards radiating from one point on the ground. No stem. | Grass, wildflowers, clover, reeds |
+| `crown` | One undivided stem with a rosette of long curved cards at its top. The stem may be 0m. | Palm, tree fern, cycad, and a fern, which is the same rosette on the ground |
 
-`tree` is the default, so a config written before types existed still opens unchanged. Two more are
-planned and neither is written — see [Where this is going](#where-this-is-going).
+`tree` is the default, so a config written before types existed still opens unchanged. One more is
+planned and not written — see [Where this is going](#where-this-is-going).
 
 Each type takes its own keys, and setting one that belongs to another is an error naming the type
 that does take it. That is the same rule an unknown key gets, for the same reason: an option that
@@ -125,6 +126,9 @@ be tuned live too.
 | `shrub.json`  | Undergrowth. The same generator at two metres, on its own `shrub` set, generated art. |
 | `meadow.json` | **A clump, not a tree.** A nine-tuft patch 2.8m across, off a nine-cell generated atlas. The type's worked example, and the thing to copy for grass, clover or wildflowers. |
 | `meadow-02.json` | The second patch off the **same** `meadow` set, with `skipTextures`. Twelve tufts and a different constellation, which is what stops six hundred copies of one patch reading as a pattern. Run `meadow.json` first. |
+| `palm.json`   | **A crown.** A seven metre stem leaning twelve degrees under sixteen fronds of 3.2m, on its own `palm` set, generated art. The type's worked example for anything with a trunk. |
+| `fern.json`   | **A crown with no stem.** Eleven fronds of 0.9m standing up from the ground and arching over, on its own `fern` set. Emits a clump's layer, because at half a metre it is ground cover. |
+| `date-palm.json` | **The heavy crown, with a tier.** Thirty-six fronds of 4m attaching down the top half of a stout stem — `frondSpan` — so the old ones hang below the young. 792 triangles, and the one crown template that carries a `lods` tier, at 70m. |
 
 What they cost:
 
@@ -134,13 +138,16 @@ What they cost:
 | `poplar-01` | 24,864    | 2,880      | 18m    | 8.0m          |
 | `birch-01`  | 3,436     | 672        | 16m    | 4.8m          |
 | `shrub-01`  | 2,344     | 390        | 2.2m   | 1.2m          |
-| `meadow-01` | 540       | 90         | 0.38m  | 1.68m         |
-| `meadow-02` | 720       | 120        | 0.32m  | 1.67m         |
+| `plains-01` | 540       | 90         | 0.38m  | 1.68m         |
+| `plains-02` | 720       | 120        | 0.32m  | 1.67m         |
+| `palm-01`   | 360       | 16         | 8.7m   | 3.6m          |
+| `fern-01`   | 88        | 11         | 0.53m  | 0.75m         |
+| `date-palm-01` | 792  | 36         | 7.7m   | 4.1m          |
 
 The tool prints the triangle count on every run. Watch it: branch count is `splits` to the power of
 `branchLevels`, and leaf cards multiply that again by `leavesPerBranch`.
 
-**Run `oak.json` before `birch.json`, and `meadow.json` before `meadow-02.json`.** Each of the
+**Run `oak.json` before `birch.json`, and `plains-01.json` before `meadow-02.json`.** Each of the
 second ones carries `skipTextures: true` and names the first one's set, so the images have to exist
 before it does. Sharing one set is what makes a species cost two fetches
 however many variants it has. See [Sharing one texture set](#sharing-one-texture-set-across-a-family).
@@ -154,19 +161,19 @@ Every key of the config, grouped by what it touches. `--help` prints the same li
 defaults. A value outside a stated range stops the run with the range in the message, so tuning by
 feel is safe.
 
-Keys marked **tree** or **clump** below belong to that type alone. Everything else is shared, and a
-few of the shared ones default differently per type — `cullDistance` is 160 for a tree and 50 for a
-clump, and neither is a sensible fallback for the other.
+Keys marked **tree**, **clump** or **crown** below belong to those types alone. Everything else is
+shared, and a few of the shared ones default differently per type — `cullDistance` is 160 for a tree
+and 50 for a clump, and neither is a sensible fallback for the other.
 
-**The skeleton** — `tree`
+**The skeleton** — `tree`, with the tube keys shared by `crown`
 
 The last column reads low to high. Values named after a template are the ones that template ships.
 
 | Key | Default | Does | What the values mean |
 | --- | --- | --- | --- |
-| `height` | 12 | Finished height in metres, to the topmost point. The skeleton grows first, then scales to land on this, so it sizes the tree and not the trunk. | `2.2` shrub · `12` default · `16` birch · `18` oak and poplar |
-| `trunkRadius` | 0.32 | Radius at the ground, in metres. `height` never scales it, so a slender tree and a stout one of the same height differ only here. | `0.07` shrub · `0.16` birch, a whip at 16m · `0.62` oak, stout at 18m. The oak is `height / 29`, the birch `height / 100` |
-| `trunkTaper` | 0.22 | Trunk radius at the top as a fraction of the base. Branches always taper to 0.28 of their own base, which this does not touch. | `0.22` birch and poplar, down to a thin leader · `0.42` oak, carries weight high · `0.9` a near-parallel pole. Within 0..1 |
+| `height` — `tree`, `clump` | 12 | Finished height in metres, to the topmost point. The skeleton grows first, then scales to land on this, so it sizes the tree and not the trunk. A crown has no `height`: it is a stem plus a frond, each in metres. | `2.2` shrub · `12` default · `16` birch · `18` oak and poplar |
+| `trunkRadius` — `tree`, `crown` | 0.32 | Radius at the ground, in metres. `height` never scales it, so a slender tree and a stout one of the same height differ only here. | `0.07` shrub · `0.16` birch, a whip at 16m · `0.22` the crown default and the palm · `0.62` oak, stout at 18m. The oak is `height / 29`, the birch `height / 100` |
+| `trunkTaper` — `tree`, `crown` | 0.22 | Trunk radius at the top as a fraction of the base. Branches always taper to 0.28 of their own base, which this does not touch. | `0.22` birch and poplar, down to a thin leader · `0.42` oak, carries weight high · `0.8` the crown default, a palm barely thins · `0.9` a near-parallel pole. Within 0..1 |
 | `splits` | 3 | Children grown at each fork. The largest lever on triangle count and build time. | `2` birch, a Y at every node · `3` default · `6` oak · `8` poplar, a full whorl. Branch count is `splits ^ branchLevels`, so the birch has 64 tips and the oak 1,296. Within 1..12, capped at 4096 branches |
 | `splitAngle` | 38 | Degrees a child turns away from its parent. | `30` birch, narrow and upright · `38` oak · `55` shrub · `72` poplar, almost square to its parent. The trunk's first child uses a quarter of this, so the trunk carries on past its fork |
 | `splitVariance` | 12 | Degrees of randomness added to each split angle, plus or minus. | `0` every fork identical and machine-made · `12` every template · `25` loose and wild |
@@ -176,8 +183,8 @@ The last column reads low to high. Values named after a template are the ones th
 | `radiusRatio` | 0.6 | Child radius as a fraction of the parent's radius where it attaches. | `0.4` whippy twigs off a heavy limb · `0.6` every template · `0.85` limbs nearly as thick as what carries them |
 | `curve` | 14 | Total degrees a branch bends over its length. The axis is fixed per branch, so it reads as a bend and not a wobble. | `0` dead straight sticks · `8` poplar, barely bent · `14` oak and birch · `40` strongly arced. Past about 20 raise `segments` too, or the curve shows its corners |
 | `droop` | 16 | Degrees the deepest branches turn toward the ground over their own length. Scaled by depth, so limbs hold their line and twigs hang. | `-30` birch, pulled hard back upright · `-20` shrub · `0` straight out · `16` oak · `22` poplar · `45` weeping. **Negative is the only way to stop a deep tree fanning into a disc** |
-| `segments` | 5 | Rings along a branch's centre line, which sets how smoothly it can curve. | `2` the floor, visible corners · `5` every template · `10` for a high `curve`. The trunk gets `segments + 2`, level 1 gets `segments`, each level below loses one. Within 2..32 |
-| `radialSegments` | 8 | Sides of the tube around a branch, which sets how round it looks against the sky. | `4` a LOD tier, faceted up close · `8` every template, round at any real distance · `16` a hero asset. Each level down uses one fewer, floor of 3. It adds sides to every branch at once, so cutting it saves less than it looks. Within 3..24 |
+| `segments` — `tree`, `crown` | 5 | Rings along a branch's centre line, which sets how smoothly it can curve. | `2` the floor, visible corners · `5` every tree template · `8` the crown default · `10` for a high `curve`. The trunk gets `segments + 2`, level 1 gets `segments`, each level below loses one. Within 2..32 |
+| `radialSegments` — `tree`, `crown` | 8 | Sides of the tube around a branch, which sets how round it looks against the sky. | `4` a LOD tier, faceted up close · `8` every tree template, round at any real distance · `10` the crown default, because a bare stem is all silhouette · `16` a hero asset. Each level down uses one fewer, floor of 3. It adds sides to every branch at once, so cutting it saves less than it looks. Within 3..24 |
 | `barkLevels` | 6 | Deepest generation that gets a bark tube. Branches past it carry leaf cards and no geometry. | `1` the oak's LOD tier, 236 bark triangles · `6` the default, every level, 29,476 on the oak. Twigs are most of the bark, so this is the strongest triangle lever a tier has. Within 0..6 |
 
 **The foliage** — `tree`
@@ -200,12 +207,12 @@ stands in for a sprig, never for a single leaf.
 
 | Key | Default | Does | What the values mean |
 | --- | --- | --- | --- |
-| `bark` | `[]` | Folders under `sources/bark/` the bark image is assembled from. See [Authored bark](#authored-bark). | `[]` generates the bark instead · `["oak"]` builds it from that folder. A folder that is listed and missing stops the run rather than falling back |
-| `leaves` | `[]` | Folders under `sources/leaves/` whose stamps fill the leaf image. See [Authored leaves](#authored-leaves). | Same rule. `[]` generates them, a named folder is an error when it is absent |
-| `barkProfile` | `oak` | Which layer stack a *generated* bark is built from. Ignored once `bark` names a source. See [Bark profiles](#bark-profiles). | `oak` deep fissures and flat crusty plates, for oak, ash and elm · `smooth` barely parted plates and almost no crust |
+| `bark` — `tree`, `crown` | `[]` | Folders under `sources/bark/` the bark image is assembled from. See [Authored bark](#authored-bark). | `[]` generates the bark instead · `["oak"]` builds it from that folder. A folder that is listed and missing stops the run rather than falling back |
+| `leaves` | `[]` | Folders under `sources/leaves/` whose stamps fill the leaf image. See [Authored leaves](#authored-leaves). | Same rule. `[]` generates them, a named folder is an error when it is absent · `["palm/green-*"]` takes only the stamps whose prefix matches. See [Picking stamps](#picking-stamps-out-of-a-folder) |
+| `barkProfile` — `tree`, `crown` | `oak` | Which layer stack a *generated* bark is built from. Ignored once `bark` names a source. See [Bark profiles](#bark-profiles). | `oak` deep fissures and flat crusty plates, for oak, ash and elm · `smooth` barely parted plates and almost no crust, the crown default |
 | `textureSize` | 1024 | Edge of each square map, in pixels. A power of two, at least 128. | `128` tests only, a cell holds 32 texels · `512` the floor for anything shipping · `1024` every tree template · `2048` the clump default, because a clump atlas holds every stamp at once. See [The clump atlas](#the-clump-atlas) |
 
-**The tuft** — `clump`
+**The tuft** — `clump`, with the card keys shared by `crown`
 
 A clump has no skeleton. What it has instead is an arrangement of cards on one point, and these are
 all of it.
@@ -216,13 +223,35 @@ all of it.
 | `tuftsPerModel` | 1 | Tufts grown into one model. Above 1 the model is a **patch**, and the placer resolves one candidate for all of them. **The cheapest density there is.** | `1` a single tuft · `9` the `meadow` template · `12` the `meadow-02` variant · `64` the ceiling. See [Patches](#patches) |
 | `patchRadius` | 0 | Metres the tuft bases are spread over. Ignored at `tuftsPerModel` 1. | `0` derives it from the count and the height · `1.4` the template · `2.2` the ceiling, because a patch is posed off one terrain sample and samples are 2m apart |
 | `cardsPerTuft` | 5 | Cards radiating from the tuft's centre, spread by the golden angle. **Reach for this before `footprint`.** | `1` a single plane, which shows its zero thickness the moment you walk round it · `5` the default · `6` the template · `12` a dense tussock. Two triangles per card per segment |
-| `cardSegments` | 3 | Divisions up a card. | `1` the card pivots about its base as a rigid plank, because wind has weight at two corners only · `3` bends as a curve · `6` for a tall reed. The whole reason a blade is not one quad |
+| `cardSegments` — `clump`, `crown` | 3 | Divisions up a card. | `1` the card pivots about its base as a rigid plank, because wind has weight at two corners only · `3` bends as a curve · `5` the crown default · `6` for a tall reed. The whole reason a blade is not one quad |
 | `cardLean` | 18 | Degrees a card turns outward from upright over its own length. Linear in the distance along, so it opens the tuft evenly. | `0` a sheaf standing straight up · `18` the default · `45` splayed flat |
-| `cardCurve` | 26 | Degrees a card bows over its length, on top of the lean. Quadratic, so it holds straight low down and bends near the tip. | `0` dead straight blades · `26` the default · `30` the template · `70` a weeping arc |
+| `cardCurve` — `clump`, `crown` | 26 | Degrees a card bows over its length, on top of the lean. Quadratic, so it holds straight low down and bends near the tip. | `0` dead straight blades · `26` the default · `30` the template · `70` a weeping arc · `80` the crown default, a frond that leaves at `frondAngle` and hangs by its tip |
 | `cardSpread` | 0.22 | How far card bases sit from the tuft centre, as a fraction of `height`. | `0` every card on one point, which reads as pinched · `0.22` the default · `0.5` a ring rather than a tuft |
-| `cardAspect` | 1 | Card width as a fraction of its own height. | `1` the default, matching the square cell · `0.6` a narrower card for a tall stamp |
-| `normalLean` | 0.45 | How far every normal leans outward from straight up, as a weight against a unit up vector. | `0` the whole tuft faces the sky and every card shades the same, which is what a lawn or a plain under a low sun wants · `0.45` the default, about 24° out, which keeps a tuft from shading as one flat disc · `1` 45° out, a rosette lit from the side |
-| `blades` | `[]` | Folders under `sources/clump/` whose stamps fill the atlas. See [Authored clumps](#authored-clumps). | `[]` generates nine tufts instead · `["meadow", "clover"]` builds the atlas from both. A folder that is listed and missing stops the run rather than falling back |
+| `cardAspect` — `clump`, `crown` | 1 | Card width as a fraction of its own height. | `1` the default, matching the square cell · `0.6` a narrower card for a tall stamp · `0.3` the crown default. A crown card samples only this fraction of its cell, so a frond is never stretched — see [The frond atlas](#the-frond-atlas) |
+| `normalLean` — `clump`, `crown` | 0.45 | How far every normal leans outward from straight up, as a weight against a unit up vector. | `0` the whole tuft faces the sky and every card shades the same, which is what a lawn or a plain under a low sun wants · `0.45` the default, about 24° out, which keeps a tuft from shading as one flat disc · `0.6` the crown default, a rosette read as a dome · `1` 45° out, lit from the side |
+| `blades` | `[]` | Folders under `sources/clump/` whose stamps fill the atlas. See [Authored clumps](#authored-clumps). | `[]` generates nine tufts instead · `["meadow", "clover"]` builds the atlas from both. A folder that is listed and missing stops the run rather than falling back · `["meadow/tall-?"]` takes a subset of one, by pattern |
+
+**The rosette** — `crown`
+
+A crown is a stem and a rosette, and each is sized in metres on its own. There is no `height`: the
+model's height is the stem plus however far the fronds rise, and the run prints it.
+
+| Key | Default | Does | What the values mean |
+| --- | --- | --- | --- |
+| `stemHeight` | 6 | Metres of stem below the rosette. | `0` no stem at all — the `fern` template, which ships no bark piece and emits a clump's layer · `7` the palm · `15` a tall coconut palm |
+| `stemLean` | 10 | Degrees the stem has turned from vertical by its top. It eases in as the square of the height, so the lower trunk stands straight and the bend gathers under the crown. | `0` a pole · `12` the palm · `30` a beach palm leaning out over the water |
+| `stemFlare` | 0.25 | How far the foot swells past `trunkRadius`, as a fraction of it, gone by a quarter of the way up. | `0` a plain tube · `0.2` the date palm · `0.3` the palm · `0.6` a buttressed foot |
+| `crownBulge` | 0.2 | How far the stem swells under the rosette, as a fraction of `trunkRadius`. It peaks just under the fronds and comes back in by half at the very top, so it reads as a crownshaft and not a wider tube. | `0` no crownshaft · `0.2` the date palm · `0.25` the palm · `0.5` a bottle palm |
+| `frondCount` | 14 | Frond cards in the rosette, spread by the golden angle. | `9` a sparse cycad · `11` the fern · `16` the palm · `24` a dense crown. Two triangles per frond per `cardSegments`. Within 1..48 |
+| `frondLength` | 3 | Metres from the rosette to a frond's tip, along its curve. Frond 0 is exactly this and the rest fall short of it, so the rim is ragged. | `0.9` the fern · `3.2` the palm · `5` a royal palm |
+| `frondAngle` | 45 | Degrees above horizontal a frond leaves the rosette at, before `cardCurve` bends it down. | `15` old fronds hanging almost flat · `40` the palm · `68` the fern, a vase · `85` a shuttlecock. Within -90..90 |
+| `frondVariance` | 20 | Random degrees added to each frond's angle, plus or minus. This is the difference between the young fronds standing up and the old ones hanging. Down a `frondSpan` it is ordered by depth instead of random, with a quarter left to chance. | `0` a machined rosette · `14` the fern · `25` the palm · `45` the date palm, from 69° standing to 1° hanging |
+| `frondSpan` | 0 | Fraction of the stem, down from its top, that the fronds attach along. A palm grows from its tip, so the lowest fronds are the oldest and hang most. Needs a stem. | `0` every frond at the top, the palm · `0.55` the date palm, a crown two thirds as deep as it is wide · `1` fronds from the ground up, a cycad or a young palm |
+| `fronds` | `[]` | Folders under `sources/fronds/` whose stamps fill the frond atlas. See [Authored fronds](#authored-fronds). | `[]` generates four fronds instead · `["palm"]` builds the atlas from every stamp in that folder · `["palm/palm-01", "palm/palm-02"]` from those two alone, see [Picking stamps](#picking-stamps-out-of-a-folder). A folder that is listed and missing stops the run rather than falling back |
+
+The stem takes `trunkRadius`, `trunkTaper`, `segments`, `radialSegments`, `bark` and `barkProfile`
+from the tree's tables above, and the fronds take `cardSegments`, `cardCurve`, `cardAspect` and
+`normalLean` from the clump's. Without a stem, the tube keys are accepted and unread.
 
 **The files and the emitted layer**
 
@@ -240,9 +269,9 @@ These name the outputs, or are copied into the printed `ScatterLayers.ts` row wi
 | `writeTemplates` | `false` | Patch `geometries.json` and `materials.json` in place instead of only printing them. | |
 | `templatesDir` | `templates` | Where those two files live. The engine's `templates/` at the repo root, not this tool's. | |
 | `cullDistance` | 160 | Metres past which the layer draws nothing. | `50` the clump default · `90` shrub · `160` the tree default · `800` oak and poplar |
-| `impostorFrom` — `tree` | 0 | Metres the billboard tier takes over at. Every `lods` distance has to stay below it. | `0` derives 60% of `cullDistance` · `192` oak and poplar, which is where the trees are tuned. **Lower is cheaper**: it hands more of the world to billboards instead of meshes. Pick it from the tile rather than from the cull distance, below |
-| `impostorViews` — `tree` | 8 | Views baked around the tree. At least 2. | `8` every template. More views means a smoother turn and a bigger bake |
-| `impostorTile` — `tree` | 128 | Edge of one baked view, in pixels. | `128` every template. This is what decides the handover distance |
+| `impostorFrom` — `tree`, `crown` | 0 | Metres the billboard tier takes over at. Every `lods` distance has to stay below it. | `0` derives 60% of `cullDistance` · `192` oak and poplar, which is where the trees are tuned. A crown takes these only while it has a stem; a fern culls instead. **Lower is cheaper**: it hands more of the world to billboards instead of meshes. Pick it from the tile rather than from the cull distance, below |
+| `impostorViews` — `tree`, `crown` | 8 | Views baked around the tree. At least 2. | `8` every template. More views means a smoother turn and a bigger bake |
+| `impostorTile` — `tree`, `crown` | 128 | Edge of one baked view, in pixels. | `128` every template. This is what decides the handover distance |
 | `footprint` | 0 | Metres of clearance the placer keeps around an instance. **The most expensive number in the file.** | `0` derives it from the model's own spread · `0.7` the clump default · `9.8` the oak's. Read [Density](#density) before lowering it: candidate cost goes as one over its square |
 | `scaleMin`, `scaleMax` | 0.8, 1.25 | Bounds of the random per-instance scale. | `0.8` and `1.25` every tree template, a forest of mixed ages off one model · `0.75` and `1.3` the clump default · `1` and `1` identical copies |
 | `windAmplitude` | 0.4 | How far it sways, copied into the layer's `ScatterWind`. | `0` still · `0.18` the clump default · `0.4` the tree default · `8` what the shipped oak and poplar rows are actually tuned to |
@@ -251,10 +280,12 @@ These name the outputs, or are copied into the printed `ScatterLayers.ts` row wi
 | `bendCurve` | 1.6 | Exponent shaping the wind bend written into `COLOR_0.r`. See [Wind](#wind). | `1` sways evenly along its whole length, which is the clump default because a blade does · `1.6` every tree template · `3` base locked rigid, motion only in the tips |
 | `leafAlphaCutoff` | 0.45 | Alpha below which a cutout pixel is thrown away. Applies to every cutout piece. | `0.2` keeps the soft edge and shows more of the rectangle behind it · `0.4` the clump default · `0.45` every tree template · `0.7` bites into the leaf shape and thins the canopy |
 
-**The LOD chain** — `tree`
+**The LOD chain** — `tree`, `crown`
 
 `lods` is a list of coarser tiers, nearest first. Each names the distance it takes over at and the
-mesh keys it overrides — any of `radialSegments`, `barkLevels`, `leavesPerBranch` and `leafScale`:
+mesh keys it overrides — any of `radialSegments`, `barkLevels`, `leavesPerBranch` and `leafScale` for a
+tree, `radialSegments` and `cardSegments` for a crown. An override its type never reads is an error,
+as a stray key is:
 
 ```json
 "lods": [
@@ -262,13 +293,19 @@ mesh keys it overrides — any of `radialSegments`, `barkLevels`, `leavesPerBran
 ]
 ```
 
-Every tier is hung on the model's own skeleton, so the branching, the canopy and the height are
-identical across the chain and a handover moves nothing but detail. The bark is where the triangles
-are — the oak's twigs are three quarters of it — so `barkLevels` is the lever that matters, and
-`leafScale` keeps the crown as dense as it was while `leavesPerBranch` cuts the cards. That one row
+Every tier is hung on the model's own skeleton — a crown regrows its stem from the same seed — so
+the branching, the canopy and the height are identical across the chain and a handover moves nothing
+but detail. The bark is where the triangles are — the oak's twigs are three quarters of it — so
+`barkLevels` is the lever that matters, and `leafScale` keeps the crown as dense as it was while
+`leavesPerBranch` cuts the cards. That one row
 takes the oak from 39,844 triangles to 2,828, and it reads well enough from 60m that the shipped
 trees carry no tier between. A handover is visible up close whatever the tier; the cross-fade is a
 separate piece of engine work, and a middle tier only adds a second place to see it.
+
+A crown's chain is a matter of judgement rather than budget: the `date-palm` template is 792
+triangles and its tier takes it to 360, where an oak's tier is 2,828. The impostor is the LOD that
+matters for a palm, and pulling `impostorFrom` in is the cheaper lever. A stemless crown takes no
+tiers, for the reason a clump does not.
 
 **Judging a tier.** With `preview` set, the run writes `<name>.lods.preview.png`: the model and every
 tier side by side, labelled with their triangle counts. Every panel is fitted by one projection built
@@ -493,7 +530,9 @@ tools/scatter-forge/sources/clump/meadow/
   source.json
 ```
 
-Every stamp in every listed folder becomes one cell. Two grass tufts and one carrying a flower are
+Every stamp in every listed folder becomes one cell — or every stamp a `/pattern` picks out of it,
+as `"blades": ["meadow/tall-*"]`, see [Picking stamps](#picking-stamps-out-of-a-folder). Two grass
+tufts and one carrying a flower are
 three cells, and a card picks among them by hash.
 
 ```json
@@ -511,6 +550,91 @@ The stamp's base goes on the **bottom edge, middle**, which is the same anchor a
 
 A random rectangle over a combined image slices through tufts and drags background between them.
 The grid is what stops that: every card gets one whole stamp, never half of two.
+
+## Crowns
+
+A crown is one undivided stem carrying a rosette of long curved cards. A palm is the stem case; a
+fern is the same rosette at 0.6 metres with no stem at all. They share a type because they are one
+structure, and the tree and the clump are not it: a palm never forks, so `branchLevels: 0` gets a
+bare pole with nothing to hang fronds on, and a clump's cards are short, straight and
+interchangeable where a frond is long, curved and individually placed.
+
+**The stem is one branch on a skeleton of its own.** It goes through the tree's bark builder, its
+collider and its impostor unchanged, which is why the tube keys are the tree's. Two things it does
+that a branch does not. It leans by the square of its height — `stemLean` — so the trunk stands
+straight low down and the bend gathers under the crown, the way a palm's does. And its radius is a
+profile rather than a taper: `trunkRadius` flared at the foot by `stemFlare`, thinning to
+`trunkTaper`, then swelling under the rosette by `crownBulge` — the crownshaft, which is fatter than
+the stem below it and is where the fronds leave from. The collider is still the plain `trunkRadius`
+capsule. At `stemHeight: 0` there is no branch, no bark piece and no bark texture: a fern with a
+bark material would still load four images nothing draws.
+
+**A frond is a clump's card, placed at one height.** The same segmented strip, walked so that its
+length is its arc length, with the same `cardSegments` and `cardCurve`. What differs is where it
+starts: at the rosette, leaving at `frondAngle` above horizontal, on the stem's own axis rather than
+the world's so a leaning palm carries its crown with it. Frond 0 is always `frondLength` and the
+rest fall short of it, so the rim is ragged and the number means what it says.
+
+**A deep crown is the same rosette spread down the stem.** `frondSpan` is how far down, as a
+fraction of the stem, and the fronds attach along it by index — first at the top, last at the
+bottom — while the golden angle still decides their azimuth, so height and direction stay
+uncorrelated. Depth is age: a palm grows from its tip, so the lowest fronds are the oldest, and on a
+span `frondVariance` is spent by depth rather than at random, the top fronds standing and the bottom
+ones hanging. At `frondSpan: 1` the fronds leave from the ground up, which is a cycad or a young
+palm. A skirt of dead fronds hanging flat against the trunk is a different thing and is not
+written.
+
+**Every frond sways with the stem.** Its `COLOR_0.g` phase is the stem's, or the rosette would
+drift off the stem top it is pinned to in wind. Bend runs on from the stem top to the frond tips
+without a step, because both are measured along one path. Each frond has its own flutter phase in
+`A`, which is its motion of its own.
+
+**Normals are the clump's**, up and leaned outward by `normalLean`, so the rosette shades as a dome
+rather than as a ring of walls. The emitted layer sets `authoredNormals` for the reason a tuft's
+does.
+
+### Which layer a crown emits
+
+The stem decides. With one, the layer is a tree's: upright whatever the slope, a capsule collider up
+to the rosette, an impostor from `impostorFrom`, shadows, and any `lods` tiers it names. Without one it is a clump's — no
+impostor at half a metre tall, no collider, no shadow, laid partly onto the slope — for every
+reason listed under [What a clump does not get](#what-a-clump-does-not-get).
+
+### The frond atlas
+
+A frond atlas is a clump atlas: **one whole stamp per cell**, the grid the smallest square that
+holds them, and only the painted cells addressed. See [The clump atlas](#the-clump-atlas). The
+generated set is four cells rather than nine, because a frond needs the texels more than it needs
+the variety.
+
+The one difference is aspect. A frond is three or four times longer than it is wide, and a square
+cell that held it stretched would give it three times the texels across that it has along, then
+squash them back on the card. So a crown card samples only the **centred column** of its cell that
+is `cardAspect` of the cell's height wide, and a generated frond is painted into that column. The
+rest of the cell is blank. That costs texels, and it is what keeps a stamp at the proportion it was
+drawn at — the [non-square cells](#smaller-things-worth-keeping) that would recover them are a
+packer, not a grid.
+
+A sourced stamp stands in the cell at its own aspect, pinned at the bottom-middle. Where it is wider
+than the column, the card's edge clips it, and the run says so:
+
+```
+fronds   from tools/scatter-forge/sources/fronds/palm (2 stamps, up to 3m long): 2x2 grid, 1008px a cell
+         clipped: the widest stamp is 0.38 of its length and the card samples 0.3. Raise cardAspect to 0.38 or crop the stamp.
+```
+
+`textureSize` defaults to 2048 for a crown as it does for a clump, and that size is the bark's as
+well, since one key sizes every map in the set. Drop it to 1024 for anything the camera never
+stands under.
+
+## Authored fronds
+
+A frond source is a clump source under `sources/fronds/`: a folder of `<prefix>-diff`, `-arm` and
+`-disp` maps, one whole frond per set, base at the bottom-middle and tip at the top, standing the
+way it is drawn. `source.json` declares `lengthMetres`, base to tip, and optionally `depthMetres`.
+Every rule under [Authored clumps](#authored-clumps) applies, and the same errors stop the run. So
+does [picking stamps](#picking-stamps-out-of-a-folder) by `/pattern`, which is what lets a fern list
+`"fronds": ["palm/palm-01", "palm/palm-02"]` and leave the palm's dead fronds where they are.
 
 ## Sharing one texture set across a family
 
@@ -816,6 +940,24 @@ being told where the stem is. How much of the image the leaf fills is read off t
 can carry margin. A stamp need not be square. Put several sets in one folder — `oak-a-diff.webp`,
 `oak-b-diff.webp` and so on — and each becomes a stamp the cells draw from.
 
+### Picking stamps out of a folder
+
+A source entry is a folder, and a folder is the wrong unit the moment one species' art serves
+another: a palm's dead fronds are right on a palm and wrong on a fern. So an entry may add
+`/pattern` and take only the stamps whose prefix matches it, whole, with `*` for any run of
+characters and `?` for one:
+
+```json
+"fronds": ["palm/palm-01", "palm/palm-02", "palm/green-*"]
+```
+
+Each entry is its own selection, so the same folder can be listed twice with different patterns,
+and a folder listed bare still takes everything. Order within the set is still by prefix, so the
+cells pick the same stamp on every machine. A pattern that matches nothing stops the run and lists
+the prefixes it could have matched — for the reason a missing folder does, that art which quietly
+fell back to generation looks like art doing nothing. This applies to `leaves`, `blades` and
+`fronds` alike; `bark` is one tile and takes no pattern.
+
 ### `source.json`
 
 ```json
@@ -1049,44 +1191,20 @@ passes on the output, which is what lets `assets:push` publish it.
 
 ## Where this is going
 
-Two types are written. Two more are planned, and this section exists so the reasoning behind them
+Three types are written. One more is planned, and this section exists so the reasoning behind it
 does not have to be rediscovered.
 
 The axis is **structure**, not plant category. Species that one generator can already reach are
 parameters and a template file, not types. That is why oak, birch, poplar and a shrub are four
-configs and one generator, and why the list below is short.
+configs and one generator, a palm and a fern two configs and another, and why the list below is
+short.
 
 | `type` | State | Is | Covers |
 | ------ | ----- | -- | ------ |
 | `tree` | Written | Recursive branching, tubes plus cards | Oak, birch, poplar, shrub, most broadleaf |
 | `clump` | Written | Cards radiating from one ground point | Grass, wildflowers, clover, reeds |
-| `crown` | Planned | One undivided stem, a rosette of long curved cards at the top | Palm, fern, tree fern, cycad |
+| `crown` | Written | One undivided stem, a rosette of long curved cards at the top | Palm, fern, tree fern, cycad |
 | `rock` | Planned | A deformed solid. No cards, no alpha, one material | Boulder, pebble, scree |
-
-### `crown` — palms and ferns are the same problem
-
-A palm is not a species of tree. It breaks the branch model outright: one straight undivided stem,
-no forks at all, and a rosette of fronds at the top. `branchLevels: 0` gets a bare pole, and there
-is nothing to hang the fronds on.
-
-**A fern is a palm at 0.6 metres.** Same rosette of long curved cards from one point, no stem to
-speak of. It is not a clump, because a clump's cards are short, straight and interchangeable, and a
-frond is long, curved and individually placed. Putting both in one type is the whole reason `crown`
-is worth having rather than adding a palm mode to `tree` and a fern mode to `clump`.
-
-What it needs that does not exist yet:
-
-- **A stem that does not fork.** Closer to one branch of the existing skeleton than to a whole tree.
-  A curved tapered tube with a bend that increases toward the top, so a palm leans.
-- **Frond cards with their own curve.** A long card, segmented like a clump's, drooping over its
-  length — `cardCurve` and `cardSegments` already mean the right things. The difference from a clump
-  is placement: a rosette at one height, not a fan from the ground.
-- **Nothing new in the texture path.** `stampsPerCell` already returns 1 when the stamp's declared
-  length matches the card, which is the `Palm | 3m | 3m | 1 | the frond | 1x1` row in
-  [What one division decides](#what-one-division-decides). A frond atlas is a clump atlas: one
-  whole stamp per cell.
-
-Pieces would be `bark` plus `frond`, so it reuses the tree's bark generator unchanged.
 
 ### Conifers stay inside `tree`
 

@@ -105,7 +105,9 @@ export function finish(out: Builder): MeshAttributes {
   };
 }
 
-function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
+/** The bark tubes of every branch up to `barkLevels`. A crown's stem is one
+ *  branch on a skeleton of its own, and goes through here unchanged. */
+export function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
   const out = createBuilder();
 
   for (const branch of skeleton.branches) {

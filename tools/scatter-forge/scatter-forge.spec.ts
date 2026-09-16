@@ -1,21 +1,39 @@
-import { leafCellPixels, leafCells } from './lib/atlas.ts';
+import { columnOf, leafCellPixels, leafCells } from './lib/atlas.ts';
 import { writeGlb, type GlbTextureSet } from './lib/glb.ts';
 import { buildMesh, pieceOf, totalTriangles, type ForgeMesh, type MeshAttributes } from './lib/mesh.ts';
-import { CLUMP_MAX_PATCH_RADIUS, impostorDistance, parseConfig, resolveParams, sameTexture, tierParams, toConfig, type Params, type RawConfig } from './lib/params.ts';
+import {
+  CLUMP_MAX_PATCH_RADIUS,
+  hasImpostor,
+  hasStem,
+  impostorDistance,
+  parseConfig,
+  resolveParams,
+  sameTexture,
+  tierParams,
+  toConfig,
+  type Params,
+  type RawConfig,
+} from './lib/params.ts';
 import { fbm, gradientNoise, signedFbm, valueNoise, warp, worley } from './lib/noise.ts';
 import { randomSeed } from './lib/rng.ts';
 import { renderComparison, renderPreview } from './lib/preview.ts';
 import type { Canvas } from './lib/textures.ts';
 import { buildSkeleton } from './lib/skeleton.ts';
 import { LOOK } from './lib/look.ts';
-import { clumpAtlas, CLUMP_CELLS_GENERATED, LEAF_GRID_GENERATED } from './lib/sources.ts';
-import { clumpLayer, colliderFor, geometryEntry, scatterLayer, scatterLayerSource } from './lib/templates.ts';
+import { clumpAtlas, CLUMP_CELLS_GENERATED, crownAtlas, CROWN_CELLS_GENERATED, LEAF_GRID_GENERATED } from './lib/sources.ts';
+import { clumpLayer, colliderFor, crownLayer, geometryEntry, scatterLayer, scatterLayerSource } from './lib/templates.ts';
 import { buildClump, patchRadiusOf } from './lib/clump.ts';
+import { buildCrown } from './lib/crown.ts';
 import { heightPieces, materialPieces } from './lib/pieces.ts';
 
 const TEXTURES: GlbTextureSet = {
   bark: { baseColor: 'a_bark_diff.webp', normal: 'a_bark_nor.webp', arm: 'a_bark_arm.webp' },
   leaf: { baseColor: 'a_leaf_diff.webp', normal: 'a_leaf_nor.webp', arm: 'a_leaf_arm.webp' },
+};
+
+const CROWN_TEXTURES: GlbTextureSet = {
+  bark: TEXTURES.bark,
+  frond: { baseColor: 'a_frond_diff.webp', normal: 'a_frond_nor.webp', arm: 'a_frond_arm.webp' },
 };
 
 /**
@@ -116,6 +134,12 @@ describe('config', () => {
     expect(() => paramsFor({ leaves: 'oak' })).toThrow(/list of source names/);
     expect(() => parseConfig({ name: 'a', leaves: [1] }, 'test.json')).toThrow(/list of strings/);
     expect(() => paramsFor({ bark: ['Oak Bark'] })).toThrow(/lowercase/);
+
+    // A stamp source may pick its stamps by pattern. Bark is one tile and may not.
+    expect(paramsFor({ leaves: ['palm/green-*', 'oak/leaf-?'] }).leaves).toEqual(['palm/green-*', 'oak/leaf-?']);
+    expect(() => paramsFor({ leaves: ['palm/'] })).toThrow(/followed by \/pattern/);
+    expect(() => paramsFor({ leaves: ['palm/a/b'] })).toThrow(/followed by \/pattern/);
+    expect(() => paramsFor({ bark: ['oak/*'] })).toThrow(/lowercase, digits and hyphens/);
   });
 
   it('rejects an unknown option rather than dropping it', () => {
@@ -788,6 +812,48 @@ describe('LOD tiers', () => {
     expect(() => parseConfig({ name: 't', lods: [{ barkLevels: 1 }] }, 'test.json')).toThrow(/needs a distance/);
   });
 
+  // An override a type never reads is the same silent no-op a stray key is.
+  it('rejects a tier override that belongs to another type', () => {
+    expect(() => parseConfig({ name: 't', lods: [{ distance: 40, cardSegments: 2 }] }, 'test.json')).toThrow(
+      /'cardSegments' applies to clump, crown, not to a tree's tier/
+    );
+    expect(() =>
+      parseConfig({ type: 'crown', name: 'c', lods: [{ distance: 40, leavesPerBranch: 2 }] }, 'test.json')
+    ).toThrow(/'leavesPerBranch' applies to tree, not to a crown's tier/);
+    expect(() => parseConfig({ type: 'clump', name: 'c', lods: [{ distance: 40 }] }, 'test.json')).toThrow(
+      /'lods' applies to tree, crown/
+    );
+  });
+
+  it('coarsens a crown on the same stem and refuses a chain without one', () => {
+    const params = resolveParams({
+      type: 'crown',
+      name: 'palm',
+      stemHeight: 6,
+      frondCount: 12,
+      cardSegments: 6,
+      radialSegments: 12,
+      cullDistance: 300,
+      lods: [{ distance: 60, radialSegments: 6, cardSegments: 2 }],
+    });
+    const base = buildCrown(params, CROWN_CELLS_GENERATED);
+    const tier = buildCrown(tierParams(params, params.lods[0]), CROWN_CELLS_GENERATED);
+
+    expect(pieceOf(tier.mesh, 'frond').triangleCount).toBe(12 * 2 * 2);
+    expect(pieceOf(base.mesh, 'frond').triangleCount).toBe(12 * 6 * 2);
+    expect(totalTriangles(tier.mesh)).toBeLessThan(totalTriangles(base.mesh) / 2);
+
+    // The stem is seeded, so the tier stands on the same centre line.
+    const stem = (crown: ReturnType<typeof buildCrown>) => crown.skeleton!.branches[0].points.map((p) => p.p);
+    expect(stem(tier)).toEqual(stem(base));
+
+    expect(crownLayer(params, base).lodDistances).toEqual([60]);
+
+    expect(() => resolveParams({ type: 'crown', name: 'f', stemHeight: 0, lods: [{ distance: 20 }] })).toThrow(
+      /lods need a stem/
+    );
+  });
+
   it('holds tiers to ascending distances short of the impostor', () => {
     expect(() => paramsFor({ lods: [{ distance: 80 }, { distance: 40 }] })).toThrow(/must ascend/);
     expect(() => paramsFor({ cullDistance: '100', lods: [{ distance: 60 }] })).toThrow(/beyond the impostor at 60m/);
@@ -874,7 +940,7 @@ describe('clump', () => {
   // every key including the ones this type does not use. Writing those would
   // produce a file the next run refuses to open.
   it('writes a sidecar that reopens', () => {
-    for (const type of ['tree', 'clump'] as const) {
+    for (const type of ['tree', 'clump', 'crown'] as const) {
       const saved = toConfig(resolveParams({ type, name: 'a' }));
       expect(() => resolveParams(parseConfig(saved, 'sidecar'))).not.toThrow();
     }
@@ -991,6 +1057,233 @@ describe('clump', () => {
     // model, so only a piece a displacement path might reach gets one.
     expect(materialPieces('tree')).toEqual(['bark']);
     expect(materialPieces('clump')).toEqual([]);
+  });
+});
+
+describe('crown', () => {
+  const crownParams = (extra: RawConfig = {}): Params =>
+    resolveParams({ type: 'crown', name: 'test-crown', ...extra });
+
+  const build = (extra: RawConfig = {}, cells = CROWN_CELLS_GENERATED) => buildCrown(crownParams(extra), cells);
+
+  it('takes the tube keys from the tree and the card keys from the clump', () => {
+    const crown = crownParams();
+    expect(crown.out).toBe('assets/shared/nature/crowns');
+    expect(crown.barkProfile).toBe('smooth');
+    expect(crown.cardCurve).toBe(80);
+    expect(crown.textureSize).toBe(2048);
+
+    // A crown is two lengths, not one height, so `height` is not its key.
+    expect(() => parseConfig({ type: 'crown', name: 'a', height: 8 }, 'test.json')).toThrow(
+      /'height' applies to tree, clump, not to type 'crown'/
+    );
+    expect(() => parseConfig({ type: 'crown', name: 'a', splits: 4 }, 'test.json')).toThrow(/applies to tree/);
+    expect(() => parseConfig({ name: 'a', stemHeight: 4 }, 'test.json')).toThrow(
+      /'stemHeight' applies to crown, not to type 'tree'/
+    );
+  });
+
+  it('grows a bark stem and a frond rosette, and drops the stem at 0', () => {
+    const palm = build({ stemHeight: 6, frondCount: 10, cardSegments: 4 });
+    expect(palm.mesh.pieces.map((piece) => piece.key)).toEqual(['bark', 'frond']);
+    expect(palm.skeleton).not.toBeNull();
+    expect(pieceOf(palm.mesh, 'frond').triangleCount).toBe(10 * 4 * 2);
+    expect(hasStem(crownParams({ stemHeight: 6 }))).toBe(true);
+
+    const fern = build({ stemHeight: 0 });
+    expect(fern.mesh.pieces.map((piece) => piece.key)).toEqual(['frond']);
+    expect(fern.skeleton).toBeNull();
+    expect(hasStem(crownParams({ stemHeight: 0 }))).toBe(false);
+  });
+
+  // The bark material would still load its four images for a piece nothing
+  // draws, so a stemless crown ships neither the piece nor its files.
+  it('ships bark files and a material only while it has a stem', () => {
+    expect(heightPieces('crown', true)).toEqual(['bark']);
+    expect(materialPieces('crown', true)).toEqual(['bark']);
+    expect(heightPieces('crown', false)).toEqual([]);
+    expect(materialPieces('crown', false)).toEqual([]);
+  });
+
+  it('puts the rosette on top of the stem and reports the frond length it was asked for', () => {
+    const { metrics, mesh } = build({ stemHeight: 5, frondLength: 2, frondAngle: 45, cardCurve: 0 });
+    expect(metrics.stemHeight).toBe(5);
+    expect(metrics.frondLength).toBe(2);
+
+    // Straight fronds at 45 degrees rise by a known amount above the stem top.
+    const { positions, vertexCount } = pieceOf(mesh, 'frond');
+    let lowest = Infinity;
+    for (let i = 0; i < vertexCount; i++) lowest = Math.min(lowest, positions[i * 3 + 1]);
+    expect(lowest).toBeGreaterThan(4.5);
+    expect(metrics.height).toBeGreaterThan(5 + 2 * Math.SQRT1_2 * 0.9);
+    expect(metrics.height).toBeLessThan(5 + 2 * Math.SQRT1_2 * 1.1 + 0.3);
+  });
+
+  it('flares the stem at the foot and swells it under the crown', () => {
+    const rings = build({ stemHeight: 10, segments: 18, trunkRadius: 1, trunkTaper: 0.8, stemFlare: 0.3, crownBulge: 0.2 })
+      .skeleton!.branches[0].points;
+    const radius = (t: number): number => rings[Math.round(t * (rings.length - 1))].radius;
+
+    // The foot is trunkRadius plus the flare, and the flare is gone by a quarter of the way up.
+    expect(radius(0)).toBeCloseTo(1.3, 5);
+    expect(radius(0.3)).toBeLessThan(1.02);
+    // The waist is the plain taper, and the crownshaft rises above it.
+    expect(radius(0.55)).toBeLessThan(radius(0.3));
+    expect(radius(0.9)).toBeGreaterThan(radius(0.55) + 0.1);
+    // And comes back in at the very top, so it reads as a bulge and not a wider tube.
+    expect(radius(1)).toBeLessThan(radius(0.9));
+    expect(radius(1)).toBeGreaterThan(0.8);
+
+    // Both off, the stem is the trunk's own taper.
+    const plain = build({ stemHeight: 10, segments: 18, trunkRadius: 1, trunkTaper: 0.8, stemFlare: 0, crownBulge: 0 })
+      .skeleton!.branches[0].points;
+    expect(plain[0].radius).toBeCloseTo(1, 5);
+    expect(plain[plain.length - 1].radius).toBeCloseTo(0.8, 5);
+    for (let i = 1; i < plain.length; i++) expect(plain[i].radius).toBeLessThanOrEqual(plain[i - 1].radius);
+
+    expect(() => crownParams({ stemFlare: -0.1 })).toThrow(/stemFlare/);
+    expect(() => crownParams({ crownBulge: -0.1 })).toThrow(/crownBulge/);
+  });
+
+  it('leans the stem from its upper half rather than evenly', () => {
+    const { skeleton } = build({ stemHeight: 10, stemLean: 30, segments: 10 });
+    const points = skeleton!.branches[0].points;
+    const lean = (index: number): number => Math.hypot(points[index].p[0], points[index].p[2]);
+    const half = Math.floor(points.length / 2);
+    // An even lean would put half the offset at the halfway ring. Eased in, far less lands there.
+    expect(lean(half)).toBeLessThan(lean(points.length - 1) * 0.35);
+    expect(lean(points.length - 1)).toBeGreaterThan(1);
+  });
+
+  it('phases every frond with the stem so the rosette rides its sway', () => {
+    const { mesh } = build({ stemHeight: 6 });
+    const bark = pieceOf(mesh, 'bark');
+    const frond = pieceOf(mesh, 'frond');
+    const stemPhase = bark.colors[1];
+
+    for (let i = 0; i < bark.vertexCount; i++) expect(bark.colors[i * 4 + 1]).toBe(stemPhase);
+    for (let i = 0; i < frond.vertexCount; i++) expect(frond.colors[i * 4 + 1]).toBe(stemPhase);
+
+    // The frond's own motion is flutter, phased per frond in A.
+    const frondPhases = new Set([...frond.colors].filter((_, i) => i % 4 === 3));
+    expect(frondPhases.size).toBe(crownParams().frondCount);
+  });
+
+  it('carries the bend on from the stem top to the frond tips', () => {
+    const { mesh } = build({ stemHeight: 6, frondLength: 3, bendCurve: 1 });
+    const bark = pieceOf(mesh, 'bark');
+    const frond = pieceOf(mesh, 'frond');
+
+    const bends = (piece: MeshAttributes) => [...piece.colors].filter((_, i) => i % 4 === 0);
+    expect(Math.min(...bends(bark))).toBe(0);
+    // The stem top is six ninths of the path, and the tube's cap ring sits just past it.
+    expect(Math.max(...bends(bark))).toBeCloseTo(6 / 9, 1);
+    expect(Math.max(...bends(frond))).toBe(1);
+    expect(Math.min(...bends(frond))).toBeCloseTo(6 / 9, 5);
+  });
+
+  it('samples only the column of its cell that the card is wide', () => {
+    const params = crownParams({ cardAspect: 0.25 });
+    const { uvs, vertexCount } = pieceOf(build({ cardAspect: 0.25 }).mesh, 'frond');
+    const cells = leafCells(params.textureSize, 2);
+
+    for (let i = 0; i < vertexCount; i++) {
+      const u = uvs[i * 2];
+      const v = uvs[i * 2 + 1];
+      const cell = cells.find((c) => v >= c.v0 - 1e-6 && v <= c.v1 + 1e-6 && u >= c.u0 && u <= c.u1);
+      expect(cell).toBeDefined();
+      const column = columnOf(cell!, 0.25);
+      expect(u).toBeGreaterThanOrEqual(column.u0 - 1e-6);
+      expect(u).toBeLessThanOrEqual(column.u1 + 1e-6);
+      expect(column.u1 - column.u0).toBeCloseTo((cell!.v1 - cell!.v0) * 0.25, 6);
+    }
+  });
+
+  it('never addresses a cell nothing painted', () => {
+    const cells = 3;
+    expect(crownAtlas({ stamps: new Array(cells) } as never)).toEqual({ grid: 2, cells });
+    expect(crownAtlas(null)).toEqual({ grid: 2, cells: CROWN_CELLS_GENERATED });
+
+    const { uvs, vertexCount } = pieceOf(build({ frondCount: 20 }, cells).mesh, 'frond');
+    const painted = leafCells(crownParams().textureSize, 2).slice(0, cells);
+
+    for (let i = 0; i < vertexCount; i++) {
+      const u = uvs[i * 2];
+      const v = uvs[i * 2 + 1];
+      expect(
+        painted.some((cell) => u >= cell.u0 - 1e-6 && u <= cell.u1 + 1e-6 && v >= cell.v0 - 1e-6 && v <= cell.v1 + 1e-6)
+      ).toBe(true);
+    }
+  });
+
+  it('emits a tree layer with a stem and a clump layer without one', () => {
+    const palmParams = crownParams({ stemHeight: 6, cullDistance: 300 });
+    const palm = crownLayer(palmParams, buildCrown(palmParams, CROWN_CELLS_GENERATED));
+    expect(palm.impostor).toEqual({ fromDistance: 180, views: 8, tileSize: 128 });
+    expect(palm.collider).toMatchObject({ type: 'capsule', radius: 0.23 });
+    expect(palm.alignToNormal).toBe(0);
+    expect(palm.authoredNormals).toBe(true);
+    expect(palm.castShadow).toBeUndefined();
+    expect(hasImpostor(palmParams)).toBe(true);
+
+    const fernParams = crownParams({ stemHeight: 0 });
+    const fern = crownLayer(fernParams, buildCrown(fernParams, CROWN_CELLS_GENERATED));
+    expect(fern.impostor).toBeUndefined();
+    expect(fern.collider).toBeUndefined();
+    expect(fern.alignToNormal).toBeGreaterThan(0);
+    expect(fern.castShadow).toBe(false);
+    expect(hasImpostor(fernParams)).toBe(false);
+
+    expect(() => scatterLayerSource(palm)).not.toThrow();
+    expect(() => scatterLayerSource(fern)).not.toThrow();
+  });
+
+  it('holds a stem to the trunk bounds and skips them without one', () => {
+    expect(() => crownParams({ stemHeight: 6, trunkTaper: 1.5 })).toThrow(/trunkTaper/);
+    expect(() => crownParams({ stemHeight: 6, impostorFrom: 500 })).toThrow(/impostor/);
+    expect(() => crownParams({ stemHeight: 0, trunkTaper: 1.5 })).not.toThrow();
+    expect(() => crownParams({ stemHeight: -1 })).toThrow(/stemHeight/);
+    expect(() => crownParams({ frondCount: 0 })).toThrow(/frondCount/);
+    expect(() => crownParams({ frondAngle: 100 })).toThrow(/frondAngle/);
+  });
+
+  it('attaches fronds down the stem by frondSpan, with the lowest hanging most', () => {
+    const top = build({ stemHeight: 10, frondCount: 20, frondSpan: 0, stemLean: 0 });
+    const deep = build({ stemHeight: 10, frondCount: 20, frondSpan: 0.6, frondVariance: 40, stemLean: 0 });
+
+    // Row 0 of each frond is its base; a frond has (cardSegments + 1) rows of two vertices.
+    const baseHeights = (crown: ReturnType<typeof build>, segments: number): number[] => {
+      const { positions } = pieceOf(crown.mesh, 'frond');
+      const perFrond = (segments + 1) * 2;
+      return Array.from({ length: 20 }, (_, i) => positions[i * perFrond * 3 + 1]);
+    };
+    const tipHeights = (crown: ReturnType<typeof build>, segments: number): number[] => {
+      const { positions } = pieceOf(crown.mesh, 'frond');
+      const perFrond = (segments + 1) * 2;
+      return Array.from({ length: 20 }, (_, i) => positions[(i * perFrond + segments * 2) * 3 + 1]);
+    };
+
+    for (const y of baseHeights(top, 5)) expect(y).toBeCloseTo(10, 0);
+
+    const bases = baseHeights(deep, 5);
+    expect(Math.max(...bases)).toBeCloseTo(10, 0);
+    expect(Math.min(...bases)).toBeCloseTo(4, 0);
+    // Ordered by index: the first frond is at the top, the last at the bottom.
+    expect(bases[0]).toBeGreaterThan(bases[19]);
+
+    // The lowest frond leaves nearer horizontal than the highest, so its tip
+    // drops further below its own base.
+    const tips = tipHeights(deep, 5);
+    expect(tips[19] - bases[19]).toBeLessThan(tips[0] - bases[0]);
+  });
+
+  it('reproduces a crown byte for byte from the same seed', () => {
+    const a = writeGlb({ name: 'p', mesh: build({ seed: 5 }).mesh, textures: CROWN_TEXTURES, alphaCutoff: 0.45 });
+    const b = writeGlb({ name: 'p', mesh: build({ seed: 5 }).mesh, textures: CROWN_TEXTURES, alphaCutoff: 0.45 });
+    expect(a.equals(b)).toBe(true);
+
+    const gltf = readGltf(a);
+    expect(gltf.materials.map((material: { alphaMode: string }) => material.alphaMode)).toEqual(['OPAQUE', 'MASK']);
   });
 });
 

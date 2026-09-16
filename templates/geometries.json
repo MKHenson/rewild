@@ -36,5 +36,22 @@
   "plains-02": {
     "type": "gltf",
     "url": "nature/clumps/plains/plains-02.glb"
+  },
+  "palm-01": {
+    "type": "gltf",
+    "url": "nature/crowns/palm/palm-01.glb"
+  },
+  "palm-02": {
+    "type": "gltf",
+    "url": "nature/crowns/palm/palm-02.glb"
+  },
+  "fern-01": {
+    "type": "gltf",
+    "url": "nature/crowns/fern/fern-01.glb"
+  },
+  "date-palm-01": {
+    "type": "gltf",
+    "url": "nature/crowns/date-palm/date-palm-01.glb",
+    "lods": ["nature/crowns/date-palm/date-palm-01.lod1.glb"]
   }
 }

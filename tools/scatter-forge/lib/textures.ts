@@ -9,10 +9,12 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import sharp from 'sharp';
-import { gutterFor, insetRect, leafCellPixels, type PixelRect } from './atlas.ts';
+import { columnPixels, gutterFor, insetRect, leafCellPixels, type PixelRect } from './atlas.ts';
 import {
   clumpAtlas,
+  crownAtlas,
   fitClump,
+  fitCrown,
   fitLeaves,
   gradientGain,
   LEAF_GRID_GENERATED,
@@ -67,6 +69,8 @@ interface Leaflet {
   halfWidth: number;
   hue: number;
   tone: number;
+  /** A frond's rachis: the one shape in its cell that keeps its width. */
+  kind?: 'rachis';
 }
 
 // The bounds a 4-octave sum of this noise actually spans, measured rather than
@@ -413,26 +417,24 @@ interface CellStyle {
   tint: string;
 }
 
-function leafStyle(params: Params, rng: Rng, cell: number, variant: number): CellStyle {
-  return {
-    shapes: leafletsFor(rng, cell, variant),
-    width: (shape, along) => leafletWidth(shape, along, params, variant),
-    veins: true,
-    tint: params.leafTint,
-  };
-}
+/** Builds a cell's style. `rect` is the cell in texels, origin at its own corner. */
+type StyleFor = (params: Params, rng: Rng, rect: PixelRect, variant: number) => CellStyle;
 
-function paintFoliageCell(
-  canvas: Canvas,
-  params: Params,
-  rect: PixelRect,
-  variant: number,
-  makeStyle: (params: Params, rng: Rng, cell: number, variant: number) => CellStyle
-): void {
+/** The edge a square cell's shapes are scaled by. */
+const cellEdge = (rect: PixelRect): number => Math.min(rect.width, rect.height);
+
+const leafStyle: StyleFor = (params, rng, rect, variant) => ({
+  shapes: leafletsFor(rng, cellEdge(rect), variant),
+  width: (shape, along) => leafletWidth(shape, along, params, variant),
+  veins: true,
+  tint: params.leafTint,
+});
+
+function paintFoliageCell(canvas: Canvas, params: Params, rect: PixelRect, variant: number, makeStyle: StyleFor): void {
   const { size } = canvas;
-  const cell = Math.min(rect.width, rect.height);
+  const cell = cellEdge(rect);
   const rng = createRng((params.seed ^ 0x2f6b1e3d) + variant * 7919);
-  const style = makeStyle(params, rng, cell, variant);
+  const style = makeStyle(params, rng, rect, variant);
   const tint = parseHex(style.tint, 'tint');
   const leaflets = style.shapes;
 
@@ -915,9 +917,12 @@ function bladeWidth(shape: Leaflet, along: number): number {
   return shape.halfWidth * (1 - t ** 2.4) * smoothstep(0, 0.05, t);
 }
 
-function bladeStyle(params: Params, rng: Rng, cell: number, variant: number): CellStyle {
-  return { shapes: bladesFor(rng, cell, variant), width: bladeWidth, veins: false, tint: params.bladeTint };
-}
+const bladeStyle: StyleFor = (params, rng, rect, variant) => ({
+  shapes: bladesFor(rng, cellEdge(rect), variant),
+  width: bladeWidth,
+  veins: false,
+  tint: params.bladeTint,
+});
 
 /**
  * The clump atlas: one whole stamp per cell, or generated tufts where none are
@@ -971,12 +976,149 @@ function gradientGainFor(source: LeafSource, params: Params, cellPx: number): nu
     : gradientGain(source.depthMetres, source.lengthMetres / Math.max(1, cellPx));
 }
 
+/**
+ * A generated frond: a rachis up the column with leaflets pinned along it.
+ *
+ * Pinnate, like the leaf cell's cluster, but at a frond's proportions: many
+ * narrow leaflets rather than a few broad ones, angled forward toward the tip,
+ * and reaching the column's edge through the middle of the frond so the card
+ * is filled. They shorten toward both ends, which is what makes the silhouette
+ * a frond and not a bottle brush.
+ */
+function frondsFor(rng: Rng, rect: PixelRect, variant: number): Leaflet[] {
+  const pairs = [18, 22, 20, 24][variant % 4];
+  const width = rect.width;
+  const height = rect.height;
+  const base: [number, number] = [width * 0.5, height * 0.99];
+  const tip: [number, number] = [width * (0.5 + rng.range(-0.06, 0.06)), height * 0.03];
+  const rachisLength = Math.hypot(tip[0] - base[0], tip[1] - base[1]);
+  const rachisDir: [number, number] = [(tip[0] - base[0]) / rachisLength, (tip[1] - base[1]) / rachisLength];
+  const shapes: Leaflet[] = [];
+
+  for (let i = 0; i < pairs; i++) {
+    const t = 0.06 + (0.9 * i) / Math.max(1, pairs - 1);
+    const angle = (48 + rng.range(-10, 10)) * DEG;
+
+    // Full reach through the middle, short at the base and shorter at the tip.
+    const envelope = smoothstep(0, 0.22, t) * (1 - 0.6 * smoothstep(0.55, 1, t));
+    const reach = (width / 2 / Math.sin(angle)) * envelope * rng.range(0.9, 1.02);
+
+    for (const side of [-1, 1]) {
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle) * side;
+      const along = t + side * 0.012;
+
+      shapes.push({
+        base: [mix(base[0], tip[0], along), mix(base[1], tip[1], along)],
+        // Rotated off the rachis toward the tip, so the leaflet climbs.
+        direction: [rachisDir[0] * cos - rachisDir[1] * sin, rachisDir[0] * sin + rachisDir[1] * cos],
+        length: reach,
+        // Wide enough to survive the mip chain, as a blade is.
+        halfWidth: Math.max(1.5, width * 0.032) * rng.range(0.85, 1.15),
+        hue: rng.range(-0.06, 0.06),
+        tone: rng.range(0.82, 1.14),
+      });
+    }
+  }
+
+  shapes.push({
+    base: [mix(base[0], tip[0], 0.9), mix(base[1], tip[1], 0.9)],
+    direction: rachisDir,
+    length: rachisLength * 0.1,
+    halfWidth: Math.max(1.5, width * 0.03),
+    hue: rng.range(-0.04, 0.04),
+    tone: rng.range(0.9, 1.1),
+  });
+
+  // Drawn last so it sits on top of the leaflet bases.
+  shapes.push({
+    base,
+    direction: rachisDir,
+    length: rachisLength * 0.94,
+    halfWidth: Math.max(1.2, width * 0.018),
+    hue: -0.12,
+    tone: 0.86,
+    kind: 'rachis',
+  });
+
+  return shapes;
+}
+
+/** A leaflet tapers to a point like a blade; the rachis only thins toward the tip. */
+function frondWidth(shape: Leaflet, along: number): number {
+  const t = clamp01(along);
+  if (shape.kind === 'rachis') return shape.halfWidth * mix(1, 0.4, t);
+  return shape.halfWidth * (1 - t ** 2.2) * smoothstep(0, 0.06, t);
+}
+
+const frondStyle: StyleFor = (params, rng, rect, variant) => ({
+  shapes: frondsFor(rng, rect, variant),
+  width: frondWidth,
+  veins: true,
+  tint: params.frondTint,
+});
+
+/**
+ * The frond atlas: one whole frond per cell, or generated fronds where none
+ * are listed.
+ *
+ * Each frond is painted into the centred column of its cell that a card of
+ * `cardAspect` samples, so it lands on the card at the proportion it was
+ * drawn at. A sourced stamp stands at its own aspect and is clipped by the
+ * card's edge where it is wider — the run reports that.
+ */
+export function buildFrondCanvas(params: Params, source?: LeafSource | null): Canvas {
+  const size = params.textureSize;
+  const gutter = gutterFor(size);
+  const { grid, cells } = crownAtlas(source ?? null);
+  const rects = leafCellPixels(size, grid).slice(0, cells);
+
+  if (source) {
+    const fit = fitCrown(source, size);
+    const canvas = createCanvas(size, gradientGainFor(source, params, fit.cellPx));
+
+    rects.forEach((rect, index) => {
+      const inner = insetRect(rect, gutter);
+      const rng = createRng((params.seed ^ 0x51a7e3c9) + index * 7919);
+      compositeCluster(canvas, inner, source, clusterFor(rng, inner, source, 1, index));
+    });
+
+    for (const rect of rects) dilate(canvas, rect, gutter * 3);
+    return canvas;
+  }
+
+  const canvas = createCanvas(size, params.bumpStrength);
+
+  // Painted into the column the card samples, inset like a blade's cell so the
+  // base is not sliced off at the gutter.
+  rects.forEach((rect, index) =>
+    paintFoliageCell(canvas, params, columnPixels(insetRect(rect, gutter), params.cardAspect), index, frondStyle)
+  );
+  applyCurvature(canvas, params.curvature, false);
+  for (const rect of rects) dilate(canvas, rect, gutter * 3);
+
+  return canvas;
+}
+
 export function buildClumpCanvases(params: Params, blades?: LeafSource | null): Canvases {
   return { blade: buildBladeCanvas(params, blades) };
 }
 
 export function buildTreeCanvases(params: Params, bark?: BarkSource | null, leaves?: LeafSource | null): Canvases {
   return { bark: buildBarkCanvas(params, bark), leaf: buildLeafCanvas(params, leaves) };
+}
+
+/** A crown's images: the frond atlas, and bark only while there is a stem to wear it. */
+export function buildCrownCanvases(
+  params: Params,
+  hasStem: boolean,
+  bark?: BarkSource | null,
+  fronds?: LeafSource | null
+): Canvases {
+  return {
+    ...(hasStem ? { bark: buildBarkCanvas(params, bark) } : {}),
+    frond: buildFrondCanvas(params, fronds),
+  };
 }
 
 /**

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// scatter-forge — procedural trees for the Understory scatter system.
+// scatter-forge — procedural scatter assets for the Understory scatter system.
 //
-// Reads one tree.json and writes a two-material glTF whose COLOR_0 carries the
-// bend, phase and flutter weights the wind vertex stage reads, alongside two
-// four-map images, and prints the registry entries the model has to be
-// declared through. The file is the whole interface: the only switch on the
-// command line is --watch.
+// Reads one config and writes a glTF with one material per piece, whose
+// COLOR_0 carries the bend, phase and flutter weights the wind vertex stage
+// reads, alongside a four-map image per piece, and prints the registry entries
+// the model has to be declared through. The file is the whole interface: the
+// only switch on the command line is --watch.
 
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join, relative, resolve, sep } from 'path';
@@ -14,11 +14,14 @@ import type {
   IGeometryTemplates,
   IMaterialsTemplate,
 } from 'rewild-renderer/lib/managers/types';
+import type { ScatterLayer } from 'rewild-renderer/lib/renderers/terrain/ScatterLayers';
 import { writeGlb } from './lib/glb.ts';
 import { buildClump, type ClumpMetrics } from './lib/clump.ts';
+import { buildCrown, type CrownMetrics } from './lib/crown.ts';
 import { boundsOf, buildMesh, totalTriangles, type ForgeMesh } from './lib/mesh.ts';
 import { heightPieces, materialPieces, pieceKeys } from './lib/pieces.ts';
 import {
+  hasStem,
   helpText,
   PARAM_SPEC,
   parseConfig,
@@ -32,17 +35,23 @@ import { randomSeed } from './lib/rng.ts';
 import { buildSkeleton, type Skeleton } from './lib/skeleton.ts';
 import {
   clumpAtlas,
+  crownAtlas,
   fitClump,
+  fitCrown,
   fitLeaves,
   leafGrid,
   loadBarkSource,
   loadClumpSource,
+  loadFrondSource,
   loadLeafSource,
+  widestAspect,
   type BarkSource,
   type LeafSource,
+  type StampFit,
 } from './lib/sources.ts';
 import {
   clumpLayer,
+  crownLayer,
   geometryEntry,
   materialEntries,
   scatterLayer,
@@ -51,6 +60,7 @@ import {
 } from './lib/templates.ts';
 import {
   buildClumpCanvases,
+  buildCrownCanvases,
   buildTreeCanvases,
   readSetManifest,
   textureFileNames,
@@ -62,13 +72,20 @@ import {
 } from './lib/textures.ts';
 import { renderComparison, renderPreview, type Panel } from './lib/preview.ts';
 
-interface Built {
-  params: Params;
-  /** A tree's branch skeleton. Null for a type that does not branch. */
+/** The model grown from its parameters, before anything is written. */
+interface Grown {
+  mesh: ForgeMesh;
+  /** A tree's branch skeleton, or a crown's stem. Null for a type with neither. */
   skeleton: Skeleton | null;
   /** What a clump's layer is measured off, in place of a skeleton. */
   metrics: ClumpMetrics | null;
-  mesh: ForgeMesh;
+  /** What a crown's report is measured off. */
+  crown: CrownMetrics | null;
+  layer: ScatterLayer;
+}
+
+interface Built extends Grown {
+  params: Params;
   modelPath: string;
   /** One coarser mesh per `lods` entry, nearest first, beside their files. */
   lods: { mesh: ForgeMesh; path: string }[];
@@ -199,32 +216,89 @@ async function main(argv: string[]): Promise<void> {
   if (watch) await watchConfig(configPath, built, configText, rolled ? params.seed : undefined);
 }
 
-async function generate(params: Params, previous?: Built): Promise<Built> {
-  const clump = params.type === 'clump';
-  const directory = join(params.out, params.textureSet);
-  const pieces = pieceKeys(params.type);
-  const withHeight = heightPieces(params.type);
+/**
+ * The sources a type names: bark for anything with a tube to wrap, and one
+ * set of stamps for its cutout.
+ *
+ * None listed, the generator runs instead. Listed and missing or broken, these
+ * throw rather than falling back, because art that quietly did nothing is
+ * worse than a stopped run.
+ */
+async function loadSources(params: Params): Promise<{ barkSource: BarkSource | null; leafSource: LeafSource | null }> {
+  switch (params.type) {
+    case 'clump':
+      return { barkSource: null, leafSource: await loadClumpSource(params.blades) };
+    case 'crown':
+      return {
+        barkSource: hasStem(params) ? await loadBarkSource(params.bark) : null,
+        leafSource: await loadFrondSource(params.fronds),
+      };
+    default:
+      return { barkSource: await loadBarkSource(params.bark), leafSource: await loadLeafSource(params.leaves) };
+  }
+}
 
-  // None listed, the generator runs instead. Listed and missing or broken,
-  // these throw rather than falling back, because art that quietly did nothing
-  // is worse than a stopped run.
-  const barkSource = clump ? null : await loadBarkSource(params.bark);
-  const leafSource = clump ? await loadClumpSource(params.blades) : await loadLeafSource(params.leaves);
+/**
+ * The cells a set being written will paint, derived from the sources: how
+ * many stamps there are for a whole-stamp atlas, how many leaf lengths fit a
+ * card for a tree.
+ */
+function atlasFor(params: Params, leafSource: LeafSource | null): { grid: number; cells: number } {
+  if (params.type === 'clump') return clumpAtlas(leafSource);
+  if (params.type === 'crown') return crownAtlas(leafSource);
+  const grid = leafGrid(leafSource, params.leafSize);
+  return { grid, cells: grid * grid };
+}
+
+/** The model, and the layer it is declared through. */
+function grow(params: Params, grid: number, cells: number): Grown {
+  if (params.type === 'clump') {
+    const { mesh, metrics } = buildClump(params, cells);
+    return { mesh, skeleton: null, metrics, crown: null, layer: clumpLayer(params, metrics) };
+  }
+
+  if (params.type === 'crown') {
+    const crown = buildCrown(params, cells);
+    return { mesh: crown.mesh, skeleton: crown.skeleton, metrics: null, crown: crown.metrics, layer: crownLayer(params, crown) };
+  }
+
+  const skeleton = buildSkeleton(params);
+  return { mesh: buildMesh(params, skeleton, grid), skeleton, metrics: null, crown: null, layer: scatterLayer(params, skeleton) };
+}
+
+/**
+ * One coarser tier. A tree hangs it on the base skeleton; a crown regrows from
+ * the same seed, which lands the same stem and rosette with fewer segments.
+ */
+function growTier(params: Params, skeleton: Skeleton, grid: number, cells: number): ForgeMesh {
+  return params.type === 'crown' ? buildCrown(params, cells).mesh : buildMesh(params, skeleton, grid);
+}
+
+function paint(params: Params, barkSource: BarkSource | null, leafSource: LeafSource | null): Canvases {
+  if (params.type === 'clump') return buildClumpCanvases(params, leafSource);
+  if (params.type === 'crown') return buildCrownCanvases(params, hasStem(params), barkSource, leafSource);
+  return buildTreeCanvases(params, barkSource, leafSource);
+}
+
+async function generate(params: Params, previous?: Built): Promise<Built> {
+  const directory = join(params.out, params.textureSet);
+  const pieces = pieceKeys(params.type, hasStem(params));
+  const withHeight = heightPieces(params.type, hasStem(params));
+
+  const { barkSource, leafSource } = await loadSources(params);
 
   await mkdir(directory, { recursive: true });
 
   // The cell count the cards address has to be the one the images were painted
   // with. A reused set says so in its manifest; a set being written derives it
-  // from the sources — from how many stamps there are for a clump, and from how
-  // many leaf lengths fit a card for a tree.
+  // from the sources.
   const painted = params.skipTextures ? await readSetManifest(directory, params.textureSet) : null;
-  const atlas = clumpAtlas(leafSource);
-  const grid = painted ? painted.leafGrid : clump ? atlas.grid : leafGrid(leafSource, params.leafSize);
-  const cells = painted ? (painted.cells ?? grid * grid) : clump ? atlas.cells : grid * grid;
+  const atlas = atlasFor(params, leafSource);
+  const grid = painted ? painted.leafGrid : atlas.grid;
+  const cells = painted ? (painted.cells ?? grid * grid) : atlas.cells;
 
-  const skeleton = clump ? null : buildSkeleton(params);
-  const built = clump ? buildClump(params, cells) : null;
-  const mesh = built ? built.mesh : buildMesh(params, skeleton!, grid);
+  const grown = grow(params, grid, cells);
+  const { mesh, skeleton } = grown;
 
   // Built even when the files are being reused, because the preview shades
   // against these pixels rather than against a stand-in palette. Carried over
@@ -232,12 +306,7 @@ async function generate(params: Params, previous?: Built): Promise<Built> {
   // makes a mesh edit rebuild in milliseconds rather than seconds.
   const reusable = previous?.canvases && sameTexture(previous.params, params) ? previous.canvases : undefined;
   const canvases =
-    reusable ??
-    (params.skipTextures && !params.preview
-      ? undefined
-      : clump
-      ? buildClumpCanvases(params, leafSource)
-      : buildTreeCanvases(params, barkSource, leafSource));
+    reusable ?? (params.skipTextures && !params.preview ? undefined : paint(params, barkSource, leafSource));
 
   let textures = textureFileNames(params.textureSet, pieces);
   if (!params.skipTextures && !reusable) {
@@ -255,12 +324,12 @@ async function generate(params: Params, previous?: Built): Promise<Built> {
     writeGlb({ name: params.name, mesh, textures, alphaCutoff: params.leafAlphaCutoff })
   );
 
-  // Every tier is hung on the one skeleton, so the chain shares a silhouette
-  // and the handover moves nothing but detail. Only a tree has tiers: a clump
-  // culls rather than coarsening, so there is nothing to hand over to.
+  // Every tier shares the base's skeleton, so the chain shares a silhouette
+  // and the handover moves nothing but detail. A clump has no tiers: it culls
+  // rather than coarsening, so there is nothing to hand over to.
   const lods: Built['lods'] = [];
   for (const [index, tier] of params.lods.entries()) {
-    const lodMesh = buildMesh(tierParams(params, tier), skeleton!, grid);
+    const lodMesh = growTier(tierParams(params, tier), skeleton!, grid, cells);
     const path = join(directory, `${params.name}.lod${index + 1}.glb`);
     await writeFile(
       path,
@@ -301,16 +370,14 @@ async function generate(params: Params, previous?: Built): Promise<Built> {
   const materials = materialEntries(
     params,
     Object.fromEntries(pieces.map((piece) => [piece, urls(textures[piece])])),
-    materialPieces(params.type)
+    materialPieces(params.type, hasStem(params))
   );
 
   if (params.writeTemplates) await writeTemplateFiles(params.templatesDir, geometry, materials);
 
   return {
+    ...grown,
     params,
-    skeleton,
-    metrics: built ? built.metrics : null,
-    mesh,
     canvases,
     barkSource,
     leafSource,
@@ -357,13 +424,10 @@ function describeLeaves(params: Params, source: LeafSource | null): string[] {
  * stamp, so a ninth one takes every cell from half the atlas edge to a third of
  * it, and nothing else says so.
  */
-function describeBlades(params: Params, source: LeafSource | null): string[] {
-  if (!source) return ['  blades   generated — no sources listed'];
-
-  const fit = fitClump(source, params.textureSize);
+function describeStamps(label: string, source: LeafSource, fit: StampFit, size: string): string[] {
   const stamps = `${source.stamps.length} stamp${source.stamps.length === 1 ? '' : 's'}`;
   const lines = [
-    `  blades   from ${source.directories.map(shellPath).join(', ')} (${stamps}, up to ${source.lengthMetres}m tall): ` +
+    `  ${label.padEnd(8)} from ${source.directories.map(shellPath).join(', ')} (${stamps}, up to ${source.lengthMetres}m ${size}): ` +
       `${fit.grid}x${fit.grid} grid, ${fit.cellPx}px a cell`,
   ];
 
@@ -376,6 +440,72 @@ function describeBlades(params: Params, source: LeafSource | null): string[] {
   return lines;
 }
 
+function describeBlades(params: Params, source: LeafSource | null): string[] {
+  if (!source) return ['  blades   generated — no sources listed'];
+  return describeStamps('blades', source, fitClump(source, params.textureSize), 'tall');
+}
+
+/**
+ * The fronds line. A frond card samples `cardAspect` of its cell, so a stamp
+ * wider than that loses its edges at the card's, and only this says so.
+ */
+function describeFronds(params: Params, source: LeafSource | null): string[] {
+  if (!source) return ['  fronds   generated — no sources listed'];
+
+  const lines = describeStamps('fronds', source, fitCrown(source, params.textureSize), 'long');
+  const widest = widestAspect(source);
+  if (widest > params.cardAspect + 1e-3)
+    lines.push(
+      `           clipped: the widest stamp is ${widest.toFixed(2)} of its length and the card samples ` +
+        `${params.cardAspect}. Raise cardAspect to ${widest.toFixed(2)} or crop the stamp.`
+    );
+
+  return lines;
+}
+
+function describeBark(source: BarkSource | null): string {
+  return `  bark     ${
+    source
+      ? `from ${shellPath(source.directory)} (${source.size}px tile, ${source.widthMetres}m across)`
+      : 'generated — no sources listed'
+  }`;
+}
+
+/** Where the model's sources came from, by type. */
+function describeSources(params: Params, barkSource: BarkSource | null, leafSource: LeafSource | null): string[] {
+  switch (params.type) {
+    case 'clump':
+      return describeBlades(params, leafSource);
+    case 'crown':
+      return [...(hasStem(params) ? [describeBark(barkSource)] : []), ...describeFronds(params, leafSource)];
+    default:
+      return [describeBark(barkSource), ...describeLeaves(params, leafSource)];
+  }
+}
+
+/** The second line of the report: what the model measures, by type. */
+function describeShape({ params, skeleton, metrics, crown }: Built): string {
+  if (crown)
+    return (
+      `  height ${crown.height.toFixed(2)}m, ` +
+      (skeleton ? `stem ${crown.stemHeight.toFixed(2)}m, ` : 'no stem, ') +
+      `${crown.fronds} fronds of up to ${crown.frondLength.toFixed(2)}m at ${params.cardSegments} segments, ` +
+      `spread ${crown.spread.toFixed(2)}m`
+    );
+
+  if (skeleton)
+    return (
+      `  height ${skeleton.trunk.height.toFixed(2)}m, first fork ${skeleton.trunk.splitHeight.toFixed(2)}m, ` +
+      `canopy spread ${skeleton.canopy.spread.toFixed(2)}m`
+    );
+
+  return (
+    `  height ${metrics!.height.toFixed(2)}m, spread ${metrics!.spread.toFixed(2)}m, ` +
+    (metrics!.tufts > 1 ? `${metrics!.tufts} tufts over a ${(metrics!.patchRadius * 2).toFixed(1)}m patch, ` : '') +
+    `${params.cardsPerTuft} cards at ${params.cardSegments} segments`
+  );
+}
+
 /** A tier's cost against the base mesh, as a percentage and a factor. */
 function share(tier: number, base: number): string {
   if (base === 0) return 'n/a';
@@ -384,11 +514,9 @@ function share(tier: number, base: number): string {
   return tier === 0 ? '0% of the base mesh' : `${cost}% of the base mesh, ${(base / tier).toFixed(1)}x lighter`;
 }
 
-function report(
-  {
+function report(built: Built, rolledSeed: boolean): void {
+  const {
     params,
-    skeleton,
-    metrics,
     mesh,
     barkSource,
     leafSource,
@@ -398,12 +526,11 @@ function report(
     textures,
     geometry,
     materials,
+    layer,
     previewPath,
     lodPreviewPath,
     configPath,
-  }: Built,
-  rolledSeed: boolean
-): void {
+  } = built;
   const bounds = boundsOf(mesh.pieces[0].attributes.positions);
   const baseTriangles = totalTriangles(mesh);
   const breakdown = (target: ForgeMesh): string =>
@@ -413,14 +540,7 @@ function report(
     '',
     `${params.name} — ${params.type}, ${baseTriangles} triangles (${breakdown(mesh)}), ` +
       `seed ${params.seed}${rolledSeed ? ' (rolled, and saved to the params below)' : ''}`,
-    skeleton
-      ? `  height ${skeleton.trunk.height.toFixed(2)}m, first fork ${skeleton.trunk.splitHeight.toFixed(2)}m, ` +
-        `canopy spread ${skeleton.canopy.spread.toFixed(2)}m`
-      : `  height ${metrics!.height.toFixed(2)}m, spread ${metrics!.spread.toFixed(2)}m, ` +
-        (metrics!.tufts > 1
-          ? `${metrics!.tufts} tufts over a ${(metrics!.patchRadius * 2).toFixed(1)}m patch, `
-          : '') +
-        `${params.cardsPerTuft} cards at ${params.cardSegments} segments`,
+    describeShape(built),
     `  bounds x ${bounds.min[0].toFixed(2)}..${bounds.max[0].toFixed(2)}, ` +
       `y ${bounds.min[1].toFixed(2)}..${bounds.max[1].toFixed(2)}, ` +
       `z ${bounds.min[2].toFixed(2)}..${bounds.max[2].toFixed(2)}`,
@@ -435,16 +555,7 @@ function report(
       );
     }),
     `  params   ${configPath}`,
-    ...(params.type === 'tree'
-      ? [
-          `  bark     ${
-            barkSource
-              ? `from ${shellPath(barkSource.directory)} (${barkSource.size}px tile, ${barkSource.widthMetres}m across)`
-              : 'generated \u2014 no sources listed'
-          }`,
-          ...describeLeaves(params, leafSource),
-        ]
-      : describeBlades(params, leafSource)),
+    ...describeSources(params, barkSource, leafSource),
     params.skipTextures
       ? `  textures reused from ${directory}`
       : `  textures ${Object.entries(textures)
@@ -452,7 +563,7 @@ function report(
             // Only the maps that were written. A type that skips `_disp`
             // listing it here would send someone looking for a file that is
             // not there.
-            heightPieces(params.type).includes(piece)
+            heightPieces(params.type, hasStem(params)).includes(piece)
               ? Object.values(names)
               : [names.baseColor, names.normal, names.arm]
           )
@@ -471,7 +582,7 @@ function report(
       .join('\n'),
     '',
     'ScatterLayers.ts — add to SCATTER_LAYERS',
-    scatterLayerSource(skeleton ? scatterLayer(params, skeleton) : clumpLayer(params, metrics!)),
+    scatterLayerSource(layer),
     '',
     ...(materials.materials?.length
       ? [

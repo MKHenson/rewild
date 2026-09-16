@@ -24,6 +24,12 @@ export const LOOK = {
    * that the gaps between tufts stop registering as holes.
    */
   bladeTint: '#7d8f4a',
+  /**
+   * Base frond colour for a generated crown, six digit hex. Between the two
+   * above: a rosette is read against the sky like a canopy, but a frond is
+   * one leaf and lighter than a cluster's shadowed mass.
+   */
+  frondTint: '#5c8a3c',
   /** Bark plates around the tube. Fewer means broader slabs. */
   barkPlates: 18,
   /** How far bark plates sit above and below each other. */

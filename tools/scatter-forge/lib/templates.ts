@@ -16,6 +16,7 @@ import type {
 import type { PhysicsShape } from 'rewild-renderer/lib/core/PhysicsShape';
 import type { ScatterLayer } from 'rewild-renderer/lib/renderers/terrain/ScatterLayers';
 import type { ClumpMetrics } from './clump.ts';
+import type { Crown } from './crown.ts';
 import { impostorDistance, type Params } from './params.ts';
 import type { Skeleton } from './skeleton.ts';
 import type { TextureNames } from './textures.ts';
@@ -213,6 +214,19 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
     // reflects off its own face and its occlusion shades its highlights too.
     foliage: true,
   };
+}
+
+/**
+ * A crown's layer is decided by its stem.
+ *
+ * With one it is a tree: it stands upright, stops the player at the stem and
+ * hands over to a billboard. Without one it is ground cover, and takes
+ * everything a clump's layer decides for the same reasons — no impostor at a
+ * metre tall, no collider, and laid partly onto the slope it grows from.
+ */
+export function crownLayer(params: Params, crown: Crown): ScatterLayer {
+  if (crown.skeleton) return scatterLayer(params, crown.skeleton);
+  return clumpLayer(params, { height: crown.metrics.height, spread: crown.metrics.spread, patchRadius: 0, tufts: 1 });
 }
 
 /** The layer as source, formatted the way SCATTER_LAYERS is already written. */

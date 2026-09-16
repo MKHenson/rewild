@@ -17,12 +17,16 @@ import {
   fitLeaves,
   leafGrid,
   loadBarkSource,
+  loadClumpSource,
+  loadFrondSource,
   loadLeafSource,
   normalStrength,
   stampsPerCell,
   tileRepeats,
   type BarkSource,
   type LeafSource,
+  matchesPattern,
+  splitSourceName,
 } from './lib/sources.ts';
 
 const SIZE = 8;
@@ -105,9 +109,9 @@ async function writeSource(
 async function writeStamp(
   root: string,
   name: string,
-  options: { prefix?: string; metadata?: unknown; alpha?: boolean; extra?: string } = {}
+  options: { prefix?: string; metadata?: unknown; alpha?: boolean; extra?: string; slot?: string } = {}
 ): Promise<string> {
-  const directory = join(root, 'leaves', name);
+  const directory = join(root, options.slot ?? 'leaves', name);
   await mkdir(directory, { recursive: true });
   const prefix = options.prefix ?? name;
   const alpha = options.alpha ?? true;
@@ -247,6 +251,55 @@ describe('leaf sources', () => {
     await writeStamp(root, 'many', { prefix: 'a' });
     const source = await loadLeafSource(['many'], root);
     expect(source!.stamps.map((stamp) => stamp.name)).toEqual(['many/a', 'many/b']);
+  });
+
+  // One folder of art serves two species: the fern lists the palm's green
+  // fronds and leaves its dead ones behind.
+  it('takes only the stamps a /pattern names, and refuses one that names none', async () => {
+    await writeStamp(root, 'mixed', { prefix: 'green-a' });
+    await writeStamp(root, 'mixed', { prefix: 'green-b' });
+    await writeStamp(root, 'mixed', { prefix: 'dead-a' });
+
+    const all = await loadLeafSource(['mixed'], root);
+    expect(all!.stamps.map((stamp) => stamp.name)).toEqual(['mixed/dead-a', 'mixed/green-a', 'mixed/green-b']);
+
+    const green = await loadLeafSource(['mixed/green-*'], root);
+    expect(green!.stamps.map((stamp) => stamp.name)).toEqual(['mixed/green-a', 'mixed/green-b']);
+    expect(green!.directories[0]).toContain('green-*');
+
+    const one = await loadLeafSource(['mixed/green-b', 'mixed/dead-?'], root);
+    expect(one!.stamps.map((stamp) => stamp.name)).toEqual(['mixed/green-b', 'mixed/dead-a']);
+
+    await expect(loadLeafSource(['mixed/brown-*'], root)).rejects.toThrow(
+      /'mixed\/brown-\*' matches none of the stamps in .*: dead-a, green-a, green-b/
+    );
+  });
+
+  // One loader serves every stamp slot, so a pattern picks the same way on each.
+  it('picks by pattern for clump and frond sources too', async () => {
+    for (const [slot, load, metadata] of [
+      ['clump', loadClumpSource, { heightMetres: 0.4 }],
+      ['fronds', loadFrondSource, { lengthMetres: 2 }],
+    ] as const) {
+      await writeStamp(root, 'set', { prefix: 'keep-a', slot, metadata });
+      await writeStamp(root, 'set', { prefix: 'keep-b', slot, metadata });
+      await writeStamp(root, 'set', { prefix: 'drop-a', slot, metadata });
+
+      expect((await load(['set'], root))!.stamps).toHaveLength(3);
+      expect((await load(['set/keep-*'], root))!.stamps.map((stamp) => stamp.name)).toEqual(['set/keep-a', 'set/keep-b']);
+      await expect(load(['set/none-*'], root)).rejects.toThrow(/matches none of the stamps/);
+    }
+  });
+
+  it('splits a name at its slash and matches a glob whole', () => {
+    expect(splitSourceName('oak')).toEqual({ folder: 'oak', pattern: null });
+    expect(splitSourceName('oak/green-*')).toEqual({ folder: 'oak', pattern: 'green-*' });
+    expect(matchesPattern('green-a', 'green-*')).toBe(true);
+    expect(matchesPattern('green-a', 'green')).toBe(false);
+    expect(matchesPattern('green-a', 'green-?')).toBe(true);
+    expect(matchesPattern('green-ab', 'green-?')).toBe(false);
+    expect(matchesPattern('a.b', 'a.b')).toBe(true);
+    expect(matchesPattern('axb', 'a.b')).toBe(false);
   });
 
   it('merges several folders into one set, each stamp keeping its own length', async () => {

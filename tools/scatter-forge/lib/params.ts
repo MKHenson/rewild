@@ -34,6 +34,13 @@ interface ParamSpec {
 
 const TREE = ['tree'] as const;
 const CLUMP = ['clump'] as const;
+const CROWN = ['crown'] as const;
+/** The types that grow a bark tube. */
+const WOODY = ['tree', 'crown'] as const;
+/** The types whose cutout is a segmented card. */
+const CARDED = ['clump', 'crown'] as const;
+/** The types whose `height` is a finished height. A crown is two lengths instead. */
+const SIZED = ['tree', 'clump'] as const;
 
 /**
  * One coarser mesh tier. The skeleton is the model's own, so the silhouette
@@ -46,21 +53,23 @@ export interface LodTier {
   barkLevels?: number;
   leavesPerBranch?: number;
   leafScale?: number;
+  cardSegments?: number;
 }
 
-/** The keys a tier may override, all of them mesh-only. */
-export const LOD_OVERRIDES = ['radialSegments', 'barkLevels', 'leavesPerBranch', 'leafScale'] as const;
+/** The keys a tier may override, all of them mesh-only. A tier takes only
+ *  those its own type reads, checked the way any other key is. */
+export const LOD_OVERRIDES = ['radialSegments', 'barkLevels', 'leavesPerBranch', 'leafScale', 'cardSegments'] as const;
 
 export const PARAM_SPEC = {
   type: { type: 'string', default: 'tree', help: `Structure to grow: ${FORGE_TYPES.join(' | ')}. Picks the generator, not the species.` },
   name: { type: 'string', default: null, help: 'Model id. Names the .glb and the geometry template.' },
   textureSet: { type: 'string', default: null, help: 'Texture set to write or reference. Defaults to name. Share one across variants.' },
-  bark: { type: 'list', default: [], help: 'Folders under sources/bark the bark image is assembled from. Empty generates it.', texture: true, types: TREE },
+  bark: { type: 'list', default: [], help: 'Folders under sources/bark the bark image is assembled from. Empty generates it.', texture: true, types: WOODY },
   leaves: { type: 'list', default: [], help: 'Folders under sources/leaves whose stamps fill the leaf image. Empty generates it.', texture: true, types: TREE },
   out: {
     type: 'string',
     default: 'assets/shared/nature/trees',
-    byType: { clump: 'assets/shared/nature/clumps' },
+    byType: { clump: 'assets/shared/nature/clumps', crown: 'assets/shared/nature/crowns' },
     help: 'Directory the model and textures are written to.',
   },
   assetsRoot: { type: 'string', default: 'assets/shared', help: 'Root the template urls are made relative to.' },
@@ -71,9 +80,10 @@ export const PARAM_SPEC = {
     default: 12,
     byType: { clump: 0.35 },
     help: 'Finished height in metres. A tree normalises its skeleton to it; a clump sizes its cards to reach it.',
+    types: SIZED,
   },
-  trunkRadius: { type: 'number', default: 0.32, help: 'Trunk radius at the base, in metres.', types: TREE },
-  trunkTaper: { type: 'number', default: 0.22, help: 'Trunk radius at the top as a fraction of the base.', types: TREE },
+  trunkRadius: { type: 'number', default: 0.32, byType: { crown: 0.22 }, help: 'Trunk radius at the base, in metres.', types: WOODY },
+  trunkTaper: { type: 'number', default: 0.22, byType: { crown: 0.8 }, help: 'Trunk radius at the top as a fraction of the base.', types: WOODY },
   splits: { type: 'int', default: 3, help: 'Child branches per split.', types: TREE },
   splitAngle: { type: 'number', default: 38, help: 'Degrees a child leaves its parent by.', types: TREE },
   splitVariance: { type: 'number', default: 12, help: 'Random degrees added to each split angle.', types: TREE },
@@ -83,8 +93,8 @@ export const PARAM_SPEC = {
   radiusRatio: { type: 'number', default: 0.6, help: 'Child radius as a fraction of its parent at the attach point.', types: TREE },
   curve: { type: 'number', default: 14, help: 'Total degrees a branch bends along its own length.', types: TREE },
   droop: { type: 'number', default: 16, help: 'Degrees the deepest branches bend toward the ground. Negative bends them back upright.', types: TREE },
-  segments: { type: 'int', default: 5, help: 'Rings along each branch.', types: TREE },
-  radialSegments: { type: 'int', default: 8, help: 'Sides of the trunk tube. Deeper branches use fewer.', types: TREE },
+  segments: { type: 'int', default: 5, byType: { crown: 8 }, help: 'Rings along each branch.', types: WOODY },
+  radialSegments: { type: 'int', default: 8, byType: { crown: 10 }, help: 'Sides of the trunk tube. Deeper branches use fewer.', types: WOODY },
   barkLevels: { type: 'int', default: 6, help: 'Deepest branch generation that gets a bark tube. Twigs beyond it carry leaves only.', types: TREE },
 
   leavesPerBranch: { type: 'int', default: 18, help: 'Leaf cards on each leaf-bearing branch.', types: TREE },
@@ -101,12 +111,23 @@ export const PARAM_SPEC = {
   tuftsPerModel: { type: 'int', default: 1, help: 'Tufts grown into one model. Above 1 the model is a patch, and the placer resolves one candidate for all of them.', types: CLUMP },
   patchRadius: { type: 'number', default: 0, help: 'Metres the tuft bases are spread over. 0 derives it from the tuft count and height. Ignored at tuftsPerModel 1.', types: CLUMP },
   cardsPerTuft: { type: 'int', default: 5, help: 'Cards radiating from one tuft. The knob to reach for before footprint.', types: CLUMP },
-  cardSegments: { type: 'int', default: 3, help: 'Divisions up a card. Wind bends it as a curve rather than tipping it as a plank.', types: CLUMP },
+  cardSegments: { type: 'int', default: 3, byType: { crown: 5 }, help: 'Divisions up a card. Wind bends it as a curve rather than tipping it as a plank.', types: CARDED },
   cardLean: { type: 'number', default: 18, help: 'Degrees a card leans outward from upright over its length.', types: CLUMP },
-  cardCurve: { type: 'number', default: 26, help: 'Degrees a card bows over its own length, on top of the lean.', types: CLUMP },
+  cardCurve: { type: 'number', default: 26, byType: { crown: 80 }, help: 'Degrees a card bows over its own length, on top of the lean.', types: CARDED },
   cardSpread: { type: 'number', default: 0.22, help: 'How far card bases sit from the tuft centre, as a fraction of height.', types: CLUMP },
-  cardAspect: { type: 'number', default: 1, help: 'Card width as a fraction of its height.', types: CLUMP },
-  normalLean: { type: 'number', default: 0.45, help: 'How far every normal leans outward from straight up. 0 faces the whole tuft at the sky.', types: CLUMP },
+  cardAspect: { type: 'number', default: 1, byType: { crown: 0.3 }, help: 'Card width as a fraction of its height. A crown card samples that fraction of its cell.', types: CARDED },
+  normalLean: { type: 'number', default: 0.45, byType: { crown: 0.6 }, help: 'How far every normal leans outward from straight up. 0 faces the whole tuft at the sky.', types: CARDED },
+
+  fronds: { type: 'list', default: [], help: 'Folders under sources/fronds whose stamps fill the frond atlas. Empty generates them.', texture: true, types: CROWN },
+  stemHeight: { type: 'number', default: 6, help: 'Metres of stem below the rosette. 0 grows none, which is a fern.', types: CROWN },
+  stemLean: { type: 'number', default: 10, help: 'Degrees the stem has bent over by its top. Eases in, so a palm leans from its upper half.', types: CROWN },
+  stemFlare: { type: 'number', default: 0.25, help: 'How far the foot swells past trunkRadius, as a fraction of it. Gone by a quarter of the way up.', types: CROWN },
+  crownBulge: { type: 'number', default: 0.2, help: 'How far the stem swells under the rosette, as a fraction of trunkRadius. A palm\'s crownshaft.', types: CROWN },
+  frondCount: { type: 'int', default: 14, help: 'Frond cards in the rosette.', types: CROWN },
+  frondLength: { type: 'number', default: 3, help: 'Frond length in metres, base to tip along its curve. Frond 0 is full length and the rest fall short of it.', types: CROWN },
+  frondAngle: { type: 'number', default: 45, help: 'Degrees above horizontal a frond leaves the rosette at, before cardCurve bends it down.', types: CROWN },
+  frondVariance: { type: 'number', default: 20, help: 'Random degrees added to each frond angle: the spread between young fronds standing up and old ones hanging.', types: CROWN },
+  frondSpan: { type: 'number', default: 0, help: 'Fraction of the stem, down from its top, the fronds attach along. 0 puts every frond at the top; the lowest hang most.', types: CROWN },
 
   bendCurve: {
     type: 'number',
@@ -115,21 +136,21 @@ export const PARAM_SPEC = {
     help: 'Exponent shaping COLOR_0.r. Higher keeps the base rigid for longer. A blade bends along its whole length, so a clump wants 1.',
   },
 
-  lods: { type: 'tiers', default: [], help: 'Coarser tiers, nearest first: [{ distance, radialSegments?, barkLevels?, leavesPerBranch?, leafScale? }].', types: TREE },
+  lods: { type: 'tiers', default: [], help: 'Coarser tiers, nearest first: [{ distance, radialSegments?, barkLevels?, leavesPerBranch?, leafScale?, cardSegments? }]. Each override must be a key of the type.', types: WOODY },
 
   windAmplitude: { type: 'number', default: 0.4, help: 'ScatterWind amplitude for the emitted layer.', byType: { clump: 0.18 } },
   windFrequency: { type: 'number', default: 0.45, help: 'ScatterWind frequency for the emitted layer.', byType: { clump: 1.1 } },
   windFlutter: { type: 'number', default: 0.35, help: 'ScatterWind flutter for the emitted layer.', byType: { clump: 0.7 } },
   cullDistance: { type: 'number', default: 160, help: 'ScatterLayer cullDistance for the emitted layer.', byType: { clump: 50 } },
-  impostorFrom: { type: 'number', default: 0, help: `Metres the impostor takes over at. 0 derives it from cullDistance.`, types: TREE },
-  impostorViews: { type: 'int', default: 8, help: 'Impostor views baked per axis. At least 2.', types: TREE },
-  impostorTile: { type: 'int', default: 128, help: 'Impostor tile edge in pixels.', types: TREE },
+  impostorFrom: { type: 'number', default: 0, help: `Metres the impostor takes over at. 0 derives it from cullDistance.`, types: WOODY },
+  impostorViews: { type: 'int', default: 8, help: 'Impostor views baked per axis. At least 2.', types: WOODY },
+  impostorTile: { type: 'int', default: 128, help: 'Impostor tile edge in pixels.', types: WOODY },
   footprint: { type: 'number', default: 0, help: 'ScatterLayer footprint in metres. 0 derives it from the model. The most expensive number here: candidates go as 1/footprint squared.', byType: { clump: 0.7 } },
   scaleMin: { type: 'number', default: 0.8, byType: { clump: 0.75 }, help: 'Lower bound of the emitted scale jitter.' },
   scaleMax: { type: 'number', default: 1.25, help: 'Upper bound of the emitted scale jitter.', byType: { clump: 1.3 } },
 
-  barkProfile: { type: 'string', default: 'oak', help: 'Which bark layer stack to build. oak | smooth.', texture: true, types: TREE },
-  textureSize: { type: 'int', default: 1024, byType: { clump: 2048 }, help: 'Edge of the square texture template. A clump atlas holds every stamp, so it starts larger.', texture: true },
+  barkProfile: { type: 'string', default: 'oak', byType: { crown: 'smooth' }, help: 'Which bark layer stack to build. oak | smooth.', texture: true, types: WOODY },
+  textureSize: { type: 'int', default: 1024, byType: { clump: 2048, crown: 2048 }, help: 'Edge of the square texture template. A clump or frond atlas holds every stamp, so it starts larger.', texture: true },
   preview: { type: 'int', default: 0, help: 'Write a shaded preview PNG at this pixel size. 0 writes none.' },
   skipTextures: { type: 'flag', default: false, help: 'Reuse an existing texture set rather than writing one.' },
   writeTemplates: { type: 'flag', default: false, help: 'Patch geometries.json and materials.json in place.' },
@@ -214,7 +235,7 @@ export function parseConfig(config: unknown, source: string): RawConfig {
 
     if (PARAM_SPEC[key].type === 'tiers') {
       if (!Array.isArray(value)) throw new Error(`${source} option '${key}' must be a list of tiers.`);
-      out[key] = value.map((entry, index) => parseTier(entry, `${source} option '${key}' tier ${index}`));
+      out[key] = value.map((entry, index) => parseTier(entry, `${source} option '${key}' tier ${index}`, modelType));
       continue;
     }
 
@@ -234,7 +255,7 @@ export function parseConfig(config: unknown, source: string): RawConfig {
   return out;
 }
 
-function parseTier(entry: unknown, source: string): LodTier {
+function parseTier(entry: unknown, source: string, modelType: ForgeType): LodTier {
   if (!entry || typeof entry !== 'object' || Array.isArray(entry))
     throw new Error(`${source} must be an object with a distance.`);
 
@@ -242,6 +263,12 @@ function parseTier(entry: unknown, source: string): LodTier {
   for (const [key, value] of Object.entries(entry)) {
     if (key !== 'distance' && !(LOD_OVERRIDES as readonly string[]).includes(key))
       throw new Error(`${source} has an unknown key '${key}'. A tier takes distance, ${LOD_OVERRIDES.join(', ')}.`);
+
+    // An override of a key this type never reads is the same silent no-op a
+    // stray top-level key would be.
+    const owners = isParamKey(key) ? (PARAM_SPEC[key] as ParamSpec).types : undefined;
+    if (owners && !owners.includes(modelType))
+      throw new Error(`${source} key '${key}' applies to ${owners.join(', ')}, not to a ${modelType}'s tier.`);
 
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) throw new Error(`${source} key '${key}' must be a number, got '${value}'.`);
@@ -298,7 +325,7 @@ export function resolveParams(raw: RawConfig): Params {
 
     if (spec.type === 'tiers') {
       if (!Array.isArray(value)) throw new Error(`Option '${key}' must be a list of tiers.`);
-      params[key] = value.map((entry) => parseTier(entry, `Option '${key}'`));
+      params[key] = value.map((entry) => parseTier(entry, `Option '${key}'`, modelType));
       continue;
     }
 
@@ -328,16 +355,25 @@ export function resolveParams(raw: RawConfig): Params {
     throw new Error(`textureSet '${params.textureSet}' must be lowercase, digits and hyphens.`);
 
   // Source names are folder names, held to the same alphabet as the outputs.
-  for (const key of ['bark', 'leaves', 'blades'] as const)
+  // A stamp source may add `/pattern` to take only the stamps whose prefix
+  // matches it; bark is one tile and takes no pattern.
+  for (const entry of params.bark as string[])
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(entry))
+      throw new Error(`bark source '${entry}' must be lowercase, digits and hyphens.`);
+
+  for (const key of ['leaves', 'blades', 'fronds'] as const)
     for (const entry of params[key] as string[])
-      if (!/^[a-z0-9][a-z0-9-]*$/.test(entry))
-        throw new Error(`${key} source '${entry}' must be lowercase, digits and hyphens.`);
+      if (!/^[a-z0-9][a-z0-9-]*(\/[A-Za-z0-9_*?-]+)?$/.test(entry))
+        throw new Error(
+          `${key} source '${entry}' must be a folder of lowercase, digits and hyphens, ` +
+            `optionally followed by /pattern to pick its stamps, as in 'palm/green-*'.`
+        );
 
   params.seed ??= hashString(name);
 
   const resolved = { ...params, ...LOOK } as Params;
   validate(resolved);
-  if (resolved.type === 'tree') validateTiers(resolved);
+  if (resolved.lods.length) validateTiers(resolved);
   return resolved;
 }
 
@@ -372,20 +408,33 @@ export function impostorDistance(params: Params): number {
 }
 
 /**
+ * Whether a crown grows a stem, which is the line between a palm and a fern.
+ * Everything a stem brings — the bark piece, the collider, the impostor —
+ * follows from this one test.
+ */
+export function hasStem(params: Params): boolean {
+  return params.type === 'crown' && params.stemHeight > 0;
+}
+
+/**
  * Whether the emitted layer carries a billboard tier.
  *
  * A clump never does. A billboard stops being worth it the moment the model
  * covers fewer pixels than the tile has, and a 0.35m tuft is under that at any
  * distance it is still drawn at. It culls instead, the way `granite_pebble`
- * does.
+ * does. A stemless crown is ground cover and culls for the same reason.
  */
 export function hasImpostor(params: Params): boolean {
-  return params.type === 'tree';
+  return params.type === 'tree' || hasStem(params);
 }
 
 function validateTiers(params: Params): void {
   let previous = 0;
   const impostorAt = impostorDistance(params);
+
+  // A stemless crown culls rather than coarsening, the way a clump does.
+  if (params.type === 'crown' && !hasStem(params))
+    throw new Error('lods need a stem: a stemless crown is ground cover and culls instead of coarsening.');
 
   params.lods.forEach((tier, index) => {
     if (tier.distance <= previous)
@@ -423,7 +472,84 @@ function validate(params: Params): void {
     throw new Error('textureSize must be a power of two of at least 128.');
 
   if (params.type === 'clump') validateClump(params);
+  else if (params.type === 'crown') validateCrown(params);
   else validateTree(params);
+}
+
+/** A stem is one branch, so it is held to the trunk's bounds; the rosette to a card's. */
+function validateCrown(params: Params): void {
+  if (params.stemHeight < 0) throw new Error(`stemHeight must not be negative, got ${params.stemHeight}.`);
+
+  if (hasStem(params)) {
+    validateTube(params);
+    validateImpostor(params);
+  }
+
+  if (params.stemFlare < 0) throw new Error(`stemFlare must not be negative, got ${params.stemFlare}.`);
+  if (params.crownBulge < 0) throw new Error(`crownBulge must not be negative, got ${params.crownBulge}.`);
+
+  if (params.frondCount < 1 || params.frondCount > 48)
+    throw new Error(`frondCount must be within 1..48, got ${params.frondCount}.`);
+
+  if (!(params.frondLength > 0)) throw new Error(`frondLength must be positive, got ${params.frondLength}.`);
+
+  if (params.frondAngle < -90 || params.frondAngle > 90)
+    throw new Error(`frondAngle must be within -90..90, got ${params.frondAngle}.`);
+
+  if (params.frondVariance < 0) throw new Error(`frondVariance must not be negative, got ${params.frondVariance}.`);
+
+  if (params.frondSpan < 0 || params.frondSpan > 1)
+    throw new Error(`frondSpan must be within 0..1, got ${params.frondSpan}.`);
+
+  validateCards(params);
+}
+
+/** The bounds a card shares between a clump and a crown. */
+function validateCards(params: Params): void {
+  if (params.cardSegments < 1 || params.cardSegments > 12)
+    throw new Error(`cardSegments must be within 1..12, got ${params.cardSegments}.`);
+
+  if (!(params.cardAspect > 0)) throw new Error(`cardAspect must be positive, got ${params.cardAspect}.`);
+
+  if (params.normalLean < 0) throw new Error(`normalLean must not be negative, got ${params.normalLean}.`);
+}
+
+/** The bounds a bark tube shares between a trunk and a stem. */
+function validateTube(params: Params): void {
+  if (!(params.trunkRadius > 0)) throw new Error(`trunkRadius must be positive, got ${params.trunkRadius}.`);
+
+  if (params.trunkTaper <= 0 || params.trunkTaper > 1)
+    throw new Error('trunkTaper must be within 0..1.');
+
+  if (params.radialSegments < 3 || params.radialSegments > 24)
+    throw new Error('radialSegments must be within 3..24.');
+
+  if (params.segments < 2 || params.segments > 32)
+    throw new Error('segments must be within 2..32.');
+
+  if (!profileNames().includes(params.barkProfile))
+    throw new Error(
+      `barkProfile must be one of ${profileNames().join(', ')}, got '${params.barkProfile}'.`
+    );
+}
+
+/** Mirrors validateImpostor in the engine's ScatterLayers.ts, so a layer this
+ *  prints is one the engine will accept. */
+function validateImpostor(params: Params): void {
+  const impostorAt = impostorDistance(params);
+
+  if (params.impostorFrom < 0) throw new Error(`impostorFrom must not be negative, got ${params.impostorFrom}.`);
+
+  if (impostorAt >= params.cullDistance)
+    throw new Error(
+      `The impostor at ${impostorAt}m is not inside cullDistance ${params.cullDistance}m, so it would never draw.`
+    );
+
+  if (params.impostorViews < 2)
+    throw new Error(`impostorViews must be at least 2, got ${params.impostorViews}.`);
+
+  if (params.impostorTile <= 0)
+    throw new Error(`impostorTile must be a positive number of pixels, got ${params.impostorTile}.`);
 }
 
 /**
@@ -454,14 +580,9 @@ function validateClump(params: Params): void {
   if (params.cardsPerTuft < 1 || params.cardsPerTuft > 24)
     throw new Error(`cardsPerTuft must be within 1..24, got ${params.cardsPerTuft}.`);
 
-  if (params.cardSegments < 1 || params.cardSegments > 12)
-    throw new Error(`cardSegments must be within 1..12, got ${params.cardSegments}.`);
-
-  if (!(params.cardAspect > 0)) throw new Error(`cardAspect must be positive, got ${params.cardAspect}.`);
+  validateCards(params);
 
   if (params.cardSpread < 0) throw new Error(`cardSpread must not be negative, got ${params.cardSpread}.`);
-
-  if (params.normalLean < 0) throw new Error(`normalLean must not be negative, got ${params.normalLean}.`);
 
   if (params.footprint > 0 && params.footprint < CLUMP_MIN_FOOTPRINT)
     throw new Error(
@@ -484,13 +605,12 @@ export const CLUMP_MIN_FOOTPRINT = 0.06;
 export const CLUMP_MAX_PATCH_RADIUS = 2.2;
 
 function validateTree(params: Params): void {
-  const positive = ['trunkRadius', 'lengthRatio', 'radiusRatio', 'leafSize'] as const;
+  const positive = ['lengthRatio', 'radiusRatio', 'leafSize'] as const;
 
   for (const key of positive)
     if (!(params[key] > 0)) throw new Error(`${key} must be positive, got ${params[key]}.`);
 
-  if (params.trunkTaper <= 0 || params.trunkTaper > 1)
-    throw new Error('trunkTaper must be within 0..1.');
+  validateTube(params);
 
   if (params.splits < 1 || params.splits > 12)
     throw new Error('splits must be within 1..12.');
@@ -504,12 +624,6 @@ function validateTree(params: Params): void {
     throw new Error(
       `splits ${params.splits} at branchLevels ${params.branchLevels} is ${params.splits ** params.branchLevels} branches. Lower one of them.`
     );
-
-  if (params.radialSegments < 3 || params.radialSegments > 24)
-    throw new Error('radialSegments must be within 3..24.');
-
-  if (params.segments < 2 || params.segments > 32)
-    throw new Error('segments must be within 2..32.');
 
   if (params.barkLevels < 0 || params.barkLevels > 6)
     throw new Error('barkLevels must be within 0..6.');
@@ -525,27 +639,7 @@ function validateTree(params: Params): void {
       `leafLevels must be within 1..${params.branchLevels + 1} at branchLevels ${params.branchLevels}.`
     );
 
-  // Mirrors validateImpostor in the engine's ScatterLayers.ts, so a layer this
-  // prints is one the engine will accept.
-  const impostorAt = impostorDistance(params);
-
-  if (params.impostorFrom < 0) throw new Error(`impostorFrom must not be negative, got ${params.impostorFrom}.`);
-
-  if (impostorAt >= params.cullDistance)
-    throw new Error(
-      `The impostor at ${impostorAt}m is not inside cullDistance ${params.cullDistance}m, so it would never draw.`
-    );
-
-  if (params.impostorViews < 2)
-    throw new Error(`impostorViews must be at least 2, got ${params.impostorViews}.`);
-
-  if (params.impostorTile <= 0)
-    throw new Error(`impostorTile must be a positive number of pixels, got ${params.impostorTile}.`);
-
-  if (!profileNames().includes(params.barkProfile))
-    throw new Error(
-      `barkProfile must be one of ${profileNames().join(', ')}, got '${params.barkProfile}'.`
-    );
+  validateImpostor(params);
 
   if (!['card', 'canopy', 'up'].includes(params.leafNormalMode))
     throw new Error(`leafNormalMode must be card, canopy or up, got '${params.leafNormalMode}'.`);
