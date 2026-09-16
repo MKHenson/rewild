@@ -279,7 +279,7 @@ export const SCATTER_LAYERS: Record<string, ScatterLayer> = {
   date_palm_01: {
     name: 'date_palm_01',
     geometryId: 'date-palm-01',
-    lodDistances: [70],
+    lodDistances: [120],
     cullDistance: 420,
     impostor: { fromDistance: 200, views: 8, tileSize: 128 },
     jitter: { scale: { from: 0.8, to: 1.25 }, yaw: FULL_TURN, tilt: 3 },
