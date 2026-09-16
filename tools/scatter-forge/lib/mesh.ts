@@ -231,6 +231,7 @@ function buildLeaves(params: Params, skeleton: Skeleton, leafGrid: number): Mesh
       const width = height * params.leafAspect;
       const stem = add(at.p, scale(right, at.radius));
       const cell = cells[Math.floor(hash2(params.seed, branch.id * 977 + k) * variants) % variants];
+      const leafPhase = hash2(params.seed ^ 0x2545f491, branch.id * 977 + k);
 
       const base = out.positions.length / 3;
 
@@ -260,8 +261,16 @@ function buildLeaves(params: Params, skeleton: Skeleton, leafGrid: number): Mesh
           normal,
           [cell.u0 + uu * (cell.u1 - cell.u0), cell.v1 - vv * (cell.v1 - cell.v0)],
           // Flutter is the leaf's own high-frequency motion, so it starts at
-          // zero where the card is pinned to the branch.
-          [bendWeight(params, skeleton, at.dist + vv * height), phase, vv, 1]
+          // zero where the card is pinned to the branch. The tip corners are
+          // jittered apart so a card twists rather than rocking as a rigid
+          // hinge, and the leaf's own phase in A stops every card on a limb
+          // fluttering in step.
+          [
+            bendWeight(params, skeleton, at.dist + vv * height),
+            phase,
+            vv * rng.range(0.6, 1),
+            leafPhase,
+          ]
         );
       }
 
