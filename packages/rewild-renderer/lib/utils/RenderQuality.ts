@@ -38,6 +38,7 @@ export function isRenderQuality(value: unknown): value is RenderQuality {
 export type QualityAspect =
   | 'clouds'
   | 'cloudShadows'
+  | 'shadows'
   | 'godRays'
   | 'bloom'
   | 'terrain';
@@ -46,6 +47,7 @@ export type QualityAspect =
 export const QUALITY_ASPECTS: readonly QualityAspect[] = [
   'clouds',
   'cloudShadows',
+  'shadows',
   'godRays',
   'bloom',
   'terrain',

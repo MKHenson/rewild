@@ -5,7 +5,8 @@ struct DirectionalShadowParams {
   cascadeSplits: vec4f,
   // Non-zero when shadow cascade debug tint is active.
   debugMode: u32,
-  _p0: u32,
+  // Scales the per-cascade normal-offset bias with the atlas texel size.
+  normalOffsetScale: f32,
   _p1: u32,
   _p2: u32,
 };

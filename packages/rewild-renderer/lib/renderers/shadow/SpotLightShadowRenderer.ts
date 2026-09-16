@@ -5,13 +5,7 @@ import { IRenderGroup } from '../../../types/IRenderGroup';
 import { IVisualComponent } from '../../../types/interfaces';
 import { SpotLight } from '../../core/lights/SpotLight';
 import shader from '../../shaders/shadow-depth.wgsl';
-import { SHADOW_MAP_SIZE } from './DirectionalShadowRenderer';
 import { isScatterInstanceGroup } from '../../typeGuards';
-
-// Spot light shadow occupies the bottom-right quadrant of the 2048×2048 atlas.
-const SPOT_SIZE = SHADOW_MAP_SIZE / 2; // 1024
-const SPOT_VIEWPORT_X = SPOT_SIZE;
-const SPOT_VIEWPORT_Y = SPOT_SIZE;
 
 interface MeshShadowUniforms {
   buffer: GPUBuffer;
@@ -146,15 +140,10 @@ export class SpotLightShadowRenderer {
       },
     });
 
+    // The spot map is the atlas's bottom-right quadrant, one cascade in size.
+    const size = renderer.directionalShadowRenderer.cascadeSize;
     pass.setPipeline(this.pipeline);
-    pass.setViewport(
-      SPOT_VIEWPORT_X,
-      SPOT_VIEWPORT_Y,
-      SPOT_SIZE,
-      SPOT_SIZE,
-      0,
-      1
-    );
+    pass.setViewport(size, size, size, size, 0, 1);
 
     for (const item of renderList) {
       if (item.geometry.requiresBuild) continue;
