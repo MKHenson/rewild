@@ -234,7 +234,7 @@ setWindOverride(1, 90); // Force foliage wind: strength 0..1, bearing in degrees
 ```
 
 A layer's LOD chain is a list of handover distances (`lodDistances` in
-`ScatterLayers.ts`): the model draws out to the first, the next mesh from there
+`templates/scatter-layers.json`): the model draws out to the first, the next mesh from there
 to the second, and the last mesh out to the impostor's `fromDistance`, where a
 billboard baked off the model takes over to `cullDistance`. The impostor is
 always the last tier. Each handover is a cross-fade a few metres wide — the two
@@ -259,7 +259,7 @@ are resident at once — nearer instances win, and a held collider gets the
 band width of grace before a newcomer takes its slot. `active` well under
 `candidates` is the point; `active` pinned at `budget` means the forest is
 denser than the budget and the furthest colliders are unregistered. Only
-layers with a `collider` proxy in `ScatterLayers.ts` count as candidates.
+layers with a `collider` proxy in `templates/scatter-layers.json` count as candidates.
 
 `setWindOverride` is for tuning a layer's wind block and a model's bend
 weights without waiting for a storm. Foliage sways by `COLOR_0` — R bend, G

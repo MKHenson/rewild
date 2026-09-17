@@ -14,6 +14,7 @@ import sharp from 'sharp';
 // cannot exit. Nothing here reads a file twice, so the cache buys nothing.
 sharp.cache(false);
 import {
+  fitBark,
   fitLeaves,
   leafGrid,
   loadBarkSource,
@@ -72,10 +73,11 @@ function png16(samples: number[], width: number, height = width): Buffer {
 
 async function writeSource(
   root: string,
-  name: string,
-  options: { metadata?: unknown; dispDepth?: 8 | 16; heights?: number[]; rows?: number } = {}
+  folder: string,
+  options: { name?: string; metadata?: unknown; dispDepth?: 8 | 16; heights?: number[]; rows?: number } = {}
 ): Promise<string> {
-  const directory = join(root, 'bark', name);
+  const directory = join(root, 'bark', folder);
+  const name = options.name ?? folder;
   await mkdir(directory, { recursive: true });
 
   // A bark tile may be any shape, and a photograph of bark usually is taller
@@ -167,6 +169,43 @@ describe('bark sources', () => {
 
   it('takes one bark for now', async () => {
     await expect(loadBarkSource(['a', 'b'], root)).rejects.toThrow(/more than one bark/);
+  });
+
+  it('picks one tile out of a folder that holds several', async () => {
+    // A folder is one bark until a second set lands in it. Then a bare name
+    // is ambiguous and says so, and folder/set picks — but only ever one.
+    await writeSource(root, 'many', { name: 'many-01', rows: 8 });
+    await writeSource(root, 'many', { name: 'many-02', rows: 16 });
+
+    await expect(loadBarkSource(['many'], root)).rejects.toThrow(/2 map sets.*many-01, many-02.*'many\/<set>'/);
+    await expect(loadBarkSource(['many/many-*'], root)).rejects.toThrow(/2 map sets/);
+    await expect(loadBarkSource(['many/none'], root)).rejects.toThrow(/matches none.*many-01, many-02/);
+
+    const source = await loadBarkSource(['many/many-02'], root);
+    expect(source?.height).toBe(16);
+    expect(source?.directory).toBe(join(root, 'bark', 'many', 'many-02'));
+  });
+
+  it('reduces a tile to textureSize on its long edge, keeping its shape', async () => {
+    // SIZE wide by 2*SIZE tall. Under a cap of SIZE the long edge halves and
+    // so does the short one; under a cap it already fits, nothing moves.
+    await writeSource(root, 'tall-tile', { rows: SIZE * 2 });
+    const source = (await loadBarkSource(['tall-tile'], root))!;
+
+    expect(fitBark(source, SIZE * 2)).toBe(source);
+    expect(fitBark(source, SIZE * 4)).toBe(source);
+
+    const fitted = fitBark(source, SIZE);
+    expect([fitted.width, fitted.height]).toEqual([SIZE / 2, SIZE]);
+    expect(fitted.aspect).toBe(2);
+    expect(fitted.widthMetres).toBe(source.widthMetres);
+    expect(fitted.albedo.length).toBe((SIZE / 2) * SIZE * 3);
+
+    // A box filter: the first output texel is the mean of its 2x2 footprint.
+    const box = [0, 1, source.width, source.width + 1].map((i) => source.relief[i]);
+    expect(fitted.relief[0]).toBeCloseTo(box.reduce((a, b) => a + b) / 4, 6);
+    // Twice the metres per texel is half the gradient gain.
+    expect(normalStrength(fitted)).toBeCloseTo(normalStrength(source) / 2, 6);
   });
 
   it('carries a 16-bit height through at full precision', async () => {

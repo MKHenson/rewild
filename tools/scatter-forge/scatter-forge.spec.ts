@@ -1,3 +1,6 @@
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { columnOf, leafCellPixels, leafCells } from './lib/atlas.ts';
 import { writeGlb, type GlbTextureSet } from './lib/glb.ts';
 import {
@@ -9,6 +12,7 @@ import {
   type MeshAttributes,
 } from './lib/mesh.ts';
 import {
+  barkCanvasSize,
   CLUMP_MAX_PATCH_RADIUS,
   hasImpostor,
   hasStem,
@@ -28,7 +32,16 @@ import type { Canvas } from './lib/textures.ts';
 import { buildSkeleton } from './lib/skeleton.ts';
 import { LOOK } from './lib/look.ts';
 import { clumpAtlas, CLUMP_CELLS_GENERATED, crownAtlas, CROWN_CELLS_GENERATED, LEAF_GRID_GENERATED } from './lib/sources.ts';
-import { clumpLayer, colliderFor, crownLayer, geometryEntry, scatterLayer, scatterLayerSource } from './lib/templates.ts';
+import {
+  clumpLayer,
+  colliderFor,
+  crownLayer,
+  geometryEntry,
+  scatterLayer,
+  scatterLayerEntry,
+  scatterLayerKey,
+  writeScatterLayer,
+} from './lib/templates.ts';
 import { buildClump, patchRadiusOf } from './lib/clump.ts';
 import { buildCrown } from './lib/crown.ts';
 import { heightPieces, materialPieces } from './lib/pieces.ts';
@@ -137,11 +150,20 @@ describe('config', () => {
     expect(() => parseConfig({ name: 'a', leaves: [1] }, 'test.json')).toThrow(/list of strings/);
     expect(() => paramsFor({ bark: ['Oak Bark'] })).toThrow(/lowercase/);
 
-    // A stamp source may pick its stamps by pattern. Bark is one tile and may not.
+    // Any source may pick its sets by pattern; the loader is what holds bark
+    // to one.
     expect(paramsFor({ leaves: ['palm/green-*', 'oak/leaf-?'] }).leaves).toEqual(['palm/green-*', 'oak/leaf-?']);
+    expect(paramsFor({ bark: ['oak/oak-01'] }).bark).toEqual(['oak/oak-01']);
     expect(() => paramsFor({ leaves: ['palm/'] })).toThrow(/followed by \/pattern/);
     expect(() => paramsFor({ leaves: ['palm/a/b'] })).toThrow(/followed by \/pattern/);
-    expect(() => paramsFor({ bark: ['oak/*'] })).toThrow(/lowercase, digits and hyphens/);
+    expect(() => paramsFor({ bark: ['oak/a/b'] })).toThrow(/followed by \/pattern/);
+  });
+
+  it('sizes the bark map on its own key, following textureSize at 0', () => {
+    expect(barkCanvasSize(paramsFor({ textureSize: 512 }))).toEqual({ width: 256, height: 512 });
+    expect(barkCanvasSize(paramsFor({ textureSize: 512, barkTextureSize: 2048 }))).toEqual({ width: 1024, height: 2048 });
+    expect(() => paramsFor({ barkTextureSize: 300 })).toThrow(/barkTextureSize must be a power of two/);
+    expect(() => paramsFor({ barkTextureSize: 128, barkAspect: 4 })).toThrow(/barkTextureSize 128 at barkAspect 4/);
   });
 
   it('rejects an unknown option rather than dropping it', () => {
@@ -1029,7 +1051,7 @@ describe('scatter layer', () => {
       const layer = scatterLayer(params, skeleton);
 
       expect(layer.authoredNormals).toBe(expected);
-      expect(scatterLayerSource(layer).includes('authoredNormals: true,')).toBe(expected);
+      expect(scatterLayerEntry(layer).includes('"authoredNormals": true')).toBe(expected);
     }
   });
 
@@ -1039,10 +1061,10 @@ describe('scatter layer', () => {
     for (const mode of ['canopy', 'up', 'card']) {
       const { params, skeleton } = buildAll({ leafNormalMode: mode });
       const layer = scatterLayer(params, skeleton);
-      const source = scatterLayerSource(layer);
+      const entry = scatterLayerEntry(layer);
 
       expect(layer.foliage).toBe(true);
-      expect(source).toContain('foliage: true,');
+      expect(entry).toContain('"foliage": true');
     }
   });
 
@@ -1056,6 +1078,79 @@ describe('scatter layer', () => {
     expect(layer.impostor?.fromDistance).toBeDefined();
     expect(layer.impostor!.fromDistance).toBeLessThan(layer.cullDistance);
     expect(layer.footprint).toBeGreaterThan(0);
+  });
+
+  it('prints the entry as scatter-layers.json holds it', () => {
+    const { params, skeleton } = buildAll();
+    const layer = scatterLayer(params, skeleton);
+
+    expect(JSON.parse(`{${scatterLayerEntry(layer)}}`)).toEqual({ test_tree: layer });
+  });
+
+  it('finds an entry by its key or by the name it carries', () => {
+    const { params, skeleton } = buildAll();
+    const layer = scatterLayer(params, skeleton);
+
+    expect(scatterLayerKey({ test_tree: layer }, 'test_tree')).toBe('test_tree');
+    expect(scatterLayerKey({ old_key: layer }, 'test_tree')).toBe('old_key');
+    expect(scatterLayerKey({ other: { ...layer, name: 'other' } }, 'test_tree')).toBeUndefined();
+  });
+
+  describe('writing scatter-layers.json', () => {
+    let root: string;
+    let path: string;
+
+    beforeEach(async () => {
+      root = await mkdtemp(join(tmpdir(), 'scatter-forge-layers-'));
+      path = join(root, 'scatter-layers.json');
+    });
+
+    afterEach(async () => {
+      await rm(root, { recursive: true, force: true });
+    });
+
+    const contentsOf = async (): Promise<Record<string, unknown>> =>
+      JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+
+    it('replaces the entry that carries its name and keeps its slot', async () => {
+      const { params, skeleton } = buildAll();
+      const layer = scatterLayer(params, skeleton);
+      const stale = { ...layer, footprint: 99, materialId: 'gone' };
+      const other = { ...layer, name: 'other' };
+      await writeFile(path, JSON.stringify({ first: other, test_tree: stale, last: other }, null, 2));
+
+      await writeScatterLayer(path, layer);
+
+      const contents = await contentsOf();
+      expect(Object.keys(contents)).toEqual(['first', 'test_tree', 'last']);
+      expect(contents.test_tree).toEqual(layer);
+      expect(contents.first).toEqual(other);
+    });
+
+    it('appends an entry the file does not have', async () => {
+      const { params, skeleton } = buildAll();
+      const layer = scatterLayer(params, skeleton);
+      const other = { ...layer, name: 'other' };
+      await writeFile(path, JSON.stringify({ other }, null, 2));
+
+      await writeScatterLayer(path, layer);
+
+      const contents = await contentsOf();
+      expect(Object.keys(contents)).toEqual(['other', 'test_tree']);
+      expect(contents.test_tree).toEqual(layer);
+    });
+
+    it('rewrites the same file on a second run', async () => {
+      const { params, skeleton } = buildAll();
+      const layer = scatterLayer(params, skeleton);
+      await writeFile(path, '{}');
+
+      await writeScatterLayer(path, layer);
+      const once = await readFile(path, 'utf8');
+      await writeScatterLayer(path, layer);
+
+      expect(await readFile(path, 'utf8')).toBe(once);
+    });
   });
 });
 
@@ -1274,7 +1369,7 @@ describe('LOD tiers', () => {
 
     const layer = scatterLayer(params, skeleton);
     expect(layer.lodDistances).toEqual([40, 80]);
-    expect(scatterLayerSource(layer)).toContain('lodDistances: [40, 80],');
+    expect(JSON.parse(`{${scatterLayerEntry(layer)}}`).test_tree.lodDistances).toEqual([40, 80]);
     expect(scatterLayer(paramsFor(), skeleton).lodDistances).toBeUndefined();
   });
 });
@@ -1403,11 +1498,11 @@ describe('clump', () => {
     expect(layer.alignToNormal).toBeGreaterThan(0);
     expect(layer.authoredNormals).toBe(true);
 
-    const source = scatterLayerSource(layer);
-    expect(source).not.toContain('impostor');
-    expect(source).not.toContain('collider');
-    expect(source).toContain('authoredNormals: true');
-    expect(source).toContain('yOffset:');
+    const entry = scatterLayerEntry(layer);
+    expect(entry).not.toContain('impostor');
+    expect(entry).not.toContain('collider');
+    expect(entry).toContain('"authoredNormals": true');
+    expect(entry).toContain('"yOffset":');
   });
 
   it('writes no _disp map and so no materials.json material', () => {
@@ -1594,8 +1689,8 @@ describe('crown', () => {
     expect(fern.castShadow).toBe(false);
     expect(hasImpostor(fernParams)).toBe(false);
 
-    expect(() => scatterLayerSource(palm)).not.toThrow();
-    expect(() => scatterLayerSource(fern)).not.toThrow();
+    expect(() => scatterLayerEntry(palm)).not.toThrow();
+    expect(() => scatterLayerEntry(fern)).not.toThrow();
   });
 
   it('holds a stem to the trunk bounds and skips them without one', () => {

@@ -1,6 +1,6 @@
 // The three places a generated tree has to be declared before the world can
-// grow it: the geometry registry, the material registry, and the scatter layer
-// library.
+// grow it: the geometry registry, the scatter layer library, and the material
+// registry.
 //
 // glTF carries no slot for a displacement map and the importer builds no
 // heightMap from a file, so the materials.json block is the only route to the
@@ -229,42 +229,21 @@ export function crownLayer(params: Params, crown: Crown): ScatterLayer {
   return clumpLayer(params, { height: crown.metrics.height, spread: crown.metrics.spread, patchRadius: 0, tufts: 1 });
 }
 
-/** The layer as source, formatted the way SCATTER_LAYERS is already written. */
-export function scatterLayerSource(layer: ScatterLayer): string {
-  // Wind and a yaw range are the two blocks every type fills in, so a gap in
-  // either is a generator bug rather than an authoring choice. An impostor and
-  // a collider are not: a clump has neither, on purpose.
-  const { jitter, impostor, collider, wind } = layer;
+/**
+ * The layer as its scatter-layers.json entry, ready to paste.
+ *
+ * Wind and a yaw range are the two blocks every type fills in, so a gap in
+ * either is a generator bug rather than an authoring choice. An impostor and
+ * a collider are not: a clump has neither, on purpose.
+ */
+export function scatterLayerEntry(layer: ScatterLayer): string {
+  const { jitter, collider, wind } = layer;
   if (!wind || !jitter.yaw)
     throw new Error(`Scatter layer '${layer.name}' is missing a block the generator always fills in.`);
   if (collider && (collider.type !== 'capsule' || !collider.offset))
     throw new Error(`Scatter layer '${layer.name}' collider must be a capsule with an offset, got a ${collider.type}.`);
-  const yaw = jitter.yaw.from === 0 && jitter.yaw.to === 360 ? 'FULL_TURN' : `{ from: ${jitter.yaw.from}, to: ${jitter.yaw.to} }`;
 
-  return [
-    `  ${layer.name}: {`,
-    `    name: '${layer.name}',`,
-    `    geometryId: '${layer.geometryId}',`,
-    ...(layer.lodDistances ? [`    lodDistances: [${layer.lodDistances.join(', ')}],`] : []),
-    `    cullDistance: ${layer.cullDistance},`,
-    ...(impostor
-      ? [`    impostor: { fromDistance: ${impostor.fromDistance}, views: ${impostor.views}, tileSize: ${impostor.tileSize} },`]
-      : []),
-    `    jitter: { scale: { from: ${jitter.scale.from}, to: ${jitter.scale.to} }, yaw: ${yaw}, tilt: ${jitter.tilt} },`,
-    ...(layer.yOffset !== undefined ? [`    yOffset: ${layer.yOffset},`] : []),
-    `    alignToNormal: ${layer.alignToNormal},`,
-    `    footprint: ${layer.footprint},`,
-    ...(collider && collider.type === 'capsule' && collider.offset
-      ? [
-          `    collider: { type: '${collider.type}', radius: ${collider.radius}, height: ${collider.height}, offset: [${collider.offset.join(', ')}] },`,
-        ]
-      : []),
-    `    wind: { amplitude: ${wind.amplitude}, frequency: ${wind.frequency}, flutter: ${wind.flutter} },`,
-    ...(layer.authoredNormals ? ['    authoredNormals: true,'] : []),
-    ...(layer.foliage ? ['    foliage: true,'] : []),
-    ...(layer.castShadow === false ? ['    castShadow: false,'] : []),
-    '  },',
-  ].join('\n');
+  return JSON.stringify({ [layer.name]: layer }, null, 2).split('\n').slice(1, -1).join('\n');
 }
 
 async function patchJson<T>(path: string, mutate: (contents: T) => void): Promise<void> {
@@ -273,15 +252,13 @@ async function patchJson<T>(path: string, mutate: (contents: T) => void): Promis
   await writeFile(path, `${JSON.stringify(contents, null, 2)}\n`);
 }
 
-export async function writeTemplateFiles(
-  directory: string,
-  geometry: IGeometryTemplates,
-  materials: IMaterialsTemplate
-): Promise<void> {
+export async function writeGeometryTemplate(directory: string, geometry: IGeometryTemplates): Promise<void> {
   await patchJson<IGeometryTemplates>(join(directory, 'geometries.json'), (contents) =>
     Object.assign(contents, geometry)
   );
+}
 
+export async function writeMaterialTemplate(directory: string, materials: IMaterialsTemplate): Promise<void> {
   await patchJson<IMaterialsTemplate>(join(directory, 'materials.json'), (contents) => {
     for (const texture of materials.textures) {
       const index = contents.textures.findIndex((entry) => entry.name === texture.name);
@@ -294,5 +271,34 @@ export async function writeTemplateFiles(
       if (index === -1) contents.materials.push(material);
       else contents.materials[index] = material;
     }
+  });
+}
+
+export async function writeTemplateFiles(
+  directory: string,
+  geometry: IGeometryTemplates,
+  materials: IMaterialsTemplate
+): Promise<void> {
+  await writeGeometryTemplate(directory, geometry);
+  await writeMaterialTemplate(directory, materials);
+}
+
+/**
+ * The key an entry for this layer already sits under: the layer's name, or a
+ * key whose entry names it. Undefined when the file has none.
+ */
+export function scatterLayerKey(contents: Record<string, ScatterLayer>, name: string): string | undefined {
+  if (name in contents) return name;
+  return Object.keys(contents).find((key) => contents[key].name === name);
+}
+
+/**
+ * Patches the layer into a scatter-layers.json: replaced whole where an entry
+ * carries its name, appended where none does. Never reordered, because the
+ * key order is the paint mask's slot order.
+ */
+export async function writeScatterLayer(path: string, layer: ScatterLayer): Promise<void> {
+  await patchJson<Record<string, ScatterLayer>>(path, (contents) => {
+    contents[scatterLayerKey(contents, layer.name) ?? layer.name] = layer;
   });
 }

@@ -65,7 +65,7 @@ because there is no stored Y to fix up.
 | Where scatter runs      | **In the terrain worker**, beside mesh generation                          | The heightfield and resolved layer weights are already there. Doing it on the main thread would mean shipping both back.                                                                                                        |
 | Painted scatter storage | **A `PaintMask` with layer-slot channels**, not stored instance transforms | `PaintMask` is already "N channels of u8 weight" and its header anticipates a third user. A mask is ~3.7KB/channel/chunk and keeps instances derived; transforms would be ~8 bytes each and break that.                         |
 | Paint palette           | **The whole scatter-layer library**, not the biome's subset                | Deliberately wider than Strata's biome painter. Painting a layer the biome never emits _is_ the answer to non-biome mass placement — no special case.                                                                           |
-| Scatter layer content   | **A code table** (`ScatterLayers.ts`), like `TERRAIN_MATERIALS`            | A layer is a model _plus_ LOD chain, impostor, collider proxy, jitter ranges and wind params. That is authored content, not a raw template.                                                                                     |
+| Scatter layer content   | **A bundled table** (`templates/scatter-layers.json`, typed by `ScatterLayers.ts`) | A layer is a model _plus_ LOD chain, impostor, collider proxy, jitter ranges and wind params. That is authored content, not a raw template, and scatter-forge writes it.                                                        |
 | Instanced draw          | **Per chunk, per layer**                                                   | Gives frustum culling a chunk-sized granularity for free and keeps instance buffers aligned to the streaming unit that already exists.                                                                                          |
 | Far LOD                 | **Octahedral impostors**                                                   | The single biggest range lever. Mesh LODs alone cannot carry a forest to the horizon at web budgets.                                                                                                                            |
 | Collider shapes         | **Authored proxies on the layer**                                          | A trunk capsule, not a trimesh of a 40k-triangle tree. The `physics.shape` block in `template-library.json` is already the right shape for this.                                                                                |
@@ -84,7 +84,7 @@ templates/ ──▶ GltfImporter ──┬─▶ Geometry (+ tangents, COLOR_0 
                               └─▶ standard materials (auto-created, Lichen schema)
                                         │
                                         ▼
-                              ScatterLayers.ts ──── model + LOD chain + impostor
+                              scatter-layers.json ──── model + LOD chain + impostor
                                         │             + collider proxy + wind params
                     ┌───────────────────┤
                     │                   │
@@ -327,7 +327,7 @@ per-chunk blob that already syncs through [Mycelium](./mycelium-network.md).
 
 **The palette is the whole library, not the biome's subset.** Strata constrains biome painting to
 the current preset's biomes, because a biome is a whole rulebook and painting one from another
-preset is meaningless. Scatter deliberately goes the other way: every layer in `ScatterLayers.ts` is
+preset is meaningless. Scatter deliberately goes the other way: every layer in `scatter-layers.json` is
 paintable anywhere. Painting a layer the local biome never emits is not a special case in the code —
 it is the ordinary case with a biome density of zero.
 

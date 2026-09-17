@@ -233,13 +233,22 @@ export async function loadBarkSource(
     throw new Error(`bark lists ${names.length} sources. Assembling more than one bark is not supported yet.`);
 
   const [name] = names;
-  const directory = join(root, 'bark', name);
-  await requireDirectory(directory, 'bark', name);
+  const { folder, pattern } = splitSourceName(name);
+  const directory = join(root, 'bark', folder);
+  await requireDirectory(directory, 'bark', folder);
 
+  // A bark is one tile, so a folder holding several sets needs the pattern to
+  // pick one, and a pattern must land on exactly one.
   const sets = await mapSets(directory);
-  if (sets.size > 1)
-    throw new Error(`Source '${directory}' holds ${sets.size} map sets. A bark source is one tile.`);
-  const paths = [...sets.values()][0];
+  const taken = [...sets].filter(([prefix]) => !pattern || matchesPattern(prefix, pattern));
+  const available = [...sets.keys()].sort().join(', ');
+  if (!taken.length)
+    throw new Error(`Source '${name}' matches none of the sets in ${directory}: ${available}.`);
+  if (taken.length > 1)
+    throw new Error(
+      `Source '${name}' takes ${taken.length} map sets from ${directory}: ${available}. A bark source is one tile — name it as '${folder}/<set>'.`
+    );
+  const [prefix, paths] = taken[0];
   const { widthMetres, depthMetres } = await readMetadata(directory, ['widthMetres', 'depthMetres']);
 
   const diff = await readRaw(paths.diff);
@@ -265,7 +274,8 @@ export async function loadBarkSource(
 
   return {
     name,
-    directory,
+    // The set rides along so the report shows which tile was taken.
+    directory: pattern ? join(directory, prefix) : directory,
     widthMetres,
     depthMetres,
     width,
@@ -473,6 +483,66 @@ export function gradientGain(depthMetres: number, metresPerTexel: number): numbe
 
 export function normalStrength(source: BarkSource): number {
   return gradientGain(source.depthMetres, source.widthMetres / source.width);
+}
+
+/** The size an authored bark is written at: its own shape, with the long edge
+ *  capped at `textureSize`. Never upsampled, which would invent nothing. */
+export function barkOutputSize(source: BarkSource, textureSize: number): { width: number; height: number } {
+  const long = Math.max(source.width, source.height);
+  if (long <= textureSize) return { width: source.width, height: source.height };
+  const scale = textureSize / long;
+  return {
+    width: Math.max(1, Math.round(source.width * scale)),
+    height: Math.max(1, Math.round(source.height * scale)),
+  };
+}
+
+/**
+ * The bark at the size it is written at. A box filter over each output
+ * texel's footprint: the tile repeats, so nothing here needs an edge policy,
+ * and the metres a texel covers grow with the step, which `normalStrength`
+ * reads off the result.
+ */
+export function fitBark(source: BarkSource, textureSize: number): BarkSource {
+  const { width, height } = barkOutputSize(source, textureSize);
+  if (width === source.width && height === source.height) return source;
+
+  const boxes = (out: number, size: number): [number, number][] =>
+    Array.from({ length: out }, (_, i) => {
+      const from = Math.floor((i * size) / out);
+      return [from, Math.max(from + 1, Math.floor(((i + 1) * size) / out))];
+    });
+  const columns = boxes(width, source.width);
+  const rows = boxes(height, source.height);
+
+  const average = (input: Float32Array, channels: number): Float32Array => {
+    const output = new Float32Array(width * height * channels);
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const [x0, x1] = columns[x];
+        const [y0, y1] = rows[y];
+        const count = (x1 - x0) * (y1 - y0);
+        for (let c = 0; c < channels; c++) {
+          let sum = 0;
+          for (let sy = y0; sy < y1; sy++)
+            for (let sx = x0; sx < x1; sx++) sum += input[(sy * source.width + sx) * channels + c];
+          output[(y * width + x) * channels + c] = sum / count;
+        }
+      }
+    return output;
+  };
+
+  return {
+    ...source,
+    width,
+    height,
+    aspect: height / width,
+    albedo: average(source.albedo, 3),
+    ao: average(source.ao, 1),
+    roughness: average(source.roughness, 1),
+    metallic: average(source.metallic, 1),
+    relief: average(source.relief, 1),
+  };
 }
 
 /** The leaf grid the generator draws, and the most a source is spread over. */

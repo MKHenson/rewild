@@ -13,6 +13,7 @@ import { columnPixels, gutterFor, insetRect, leafCellPixels, type PixelRect } fr
 import {
   clumpAtlas,
   crownAtlas,
+  fitBark,
   fitClump,
   fitCrown,
   fitLeaves,
@@ -26,7 +27,7 @@ import { woodAt } from './wood.ts';
 import { clusterFor, compositeCluster } from './cluster.ts';
 import { fbm, signedFbm, warp } from './noise.ts';
 import { createRng, type Rng } from './rng.ts';
-import { barkCanvasSize, type Params } from './params.ts';
+import { barkCanvasSize, barkTextureSize, type Params } from './params.ts';
 
 /** The atlas as float channels, before any of it is quantised or encoded. */
 export interface Canvas {
@@ -643,12 +644,12 @@ export function textureFileNames(textureSet: string, pieces: readonly string[]):
 
 /** The bark image as float channels. Split from encoding so the preview can
  *  shade against the same pixels the model will sample. */
-export function buildBarkCanvas(params: Params, source?: BarkSource | null): Canvas {
-  if (source) {
-    // Written out at the source's own size and shape, texel for texel. It used
-    // to be resampled into `textureSize`, which at a barkAspect of 2 took a
-    // 1024 tile down to 512 around the ring and threw away half of what was
-    // authored. The repeating is the mesh's job now: see `barkTileOf`.
+export function buildBarkCanvas(params: Params, authored?: BarkSource | null): Canvas {
+  if (authored) {
+    // Written out in the source's own shape, only ever reduced, so that
+    // `textureSize` caps a tile without cropping it or squeezing it into
+    // `barkAspect`. The repeating is the mesh's job: see `barkTileOf`.
+    const source = fitBark(authored, barkTextureSize(params));
     const canvas = createCanvas(source.width, source.height, normalStrength(source));
 
     canvas.albedo.set(source.albedo);

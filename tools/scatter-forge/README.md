@@ -30,14 +30,16 @@ silently did nothing is a change that appears not to have worked.
 ## Running it
 
 ```
-node tools/scatter-forge/cli.ts tools/scatter-forge/templates/oak.json
-node tools/scatter-forge/cli.ts tools/scatter-forge/templates/meadow.json
-node tools/scatter-forge/cli.ts tools/scatter-forge/templates/oak.json --watch
+node tools/scatter-forge/cli.ts tools/scatter-forge/templates/oak-01.json
+node tools/scatter-forge/cli.ts tools/scatter-forge/templates/plains-01.json
+node tools/scatter-forge/cli.ts tools/scatter-forge/templates/oak-01.json --watch
+node tools/scatter-forge/cli.ts tools/scatter-forge/templates/oak-01.json --write-template
 node tools/scatter-forge/cli.ts --help
 ```
 
 One file in, one model out. The config is the whole interface: every option is a key of it, and
-the only thing the command line adds is `--watch`. Start from a preset in
+the command line adds only `--watch` and `--write-template`, which say when to build and where to
+declare the result rather than what to build. Start from a preset in
 [`templates/`](./templates/) — see [Templates](#templates) — and `--help` lists every key with its
 default and the types it applies to.
 
@@ -111,7 +113,7 @@ what lets the file it writes be a file it can reopen.
 the model it describes, and the file is what to copy and tweak for a new one:
 
 ```
-node tools/scatter-forge/cli.ts tools/scatter-forge/templates/oak.json
+node tools/scatter-forge/cli.ts tools/scatter-forge/templates/oak-01.json
 ```
 
 A run never writes back to a template. The sidecar it rewrites is the one beside the model, under
@@ -120,27 +122,27 @@ be tuned live too.
 
 | Template      | Is                                                                                  |
 | ------------- | ----------------------------------------------------------------------------------- |
-| `oak.json`    | Broad deciduous. A heavy trunk that forks low into a wide crown. Oak bark, oak leaves; writes the `oak` set. |
-| `poplar.json` | Tall and dense. Eight short branches per split spread over 90% of their parent, so foliage starts near the ground and carries all the way up. **Poplar bark with oak leaves**, on its own `poplar` set — the mix-and-match case. |
-| `birch.json`  | Slender and columnar. Two-way splits climbing six generations, with a **negative** `droop` pulling every branch back toward vertical — split angles compound with depth, so without it a deep tree fans out into a disc. Reuses the `oak` set. |
-| `shrub.json`  | Undergrowth. The same generator at two metres, on its own `shrub` set, generated art. |
-| `spruce.json` | **A conifer.** Eighteen whorls of five limbs climbing 88% of a 24m trunk, each whorl a sixth of the length of the lowest. The `whorl` model's worked example, and the thing to copy for a fir or a pine. See [Conifers](#conifers). |
-| `redwood.json` | **The tall conifer, and the shaped trunk.** A 42m trunk bare for half its height, under a narrow crown at `whorlTaper` 0.45. Its trunk is fluted, flared and wandering on 24 sides, which is the worked example for [The trunk](#the-trunk). Hands over to its billboard at 320m. |
-| `larch.json`  | **The open conifer.** Limbs at 85 degrees off a 26m trunk, with steeply hanging foliage. The airy one: 9,672 triangles for a 26m tree, against the oak's 39,844 at 18m. |
-| `juniper.json` | **The scrubby conifer.** Five and a half metres, eight loose whorls, `splitVariance` 22 and an upswept `droop`, which breaks the rings up into something irregular. |
-| `cypress.json` | **The columnar conifer.** An Italian cypress: 24 whorls of short limbs at 24 degrees off the trunk, so they hug it, at `whorlTaper` 0.9 so the column barely narrows. 18m tall and 3.7m wide. |
+| `oak-01.json`    | Broad deciduous. A heavy trunk that forks low into a wide crown. Oak bark, oak leaves; writes the `oak` set. |
+| `poplar-01.json` | Tall and dense. Eight short branches per split spread over 90% of their parent, so foliage starts near the ground and carries all the way up. **Poplar bark with oak leaves**, on its own `poplar` set — the mix-and-match case. |
+| `birch-01.json`  | Slender and columnar. Two-way splits climbing six generations, with a **negative** `droop` pulling every branch back toward vertical — split angles compound with depth, so without it a deep tree fans out into a disc. Reuses the `oak` set. |
+| `shrub-01.json`  | Undergrowth. The same generator at two metres, on its own `shrub` set, generated art. |
+| `spruce-01.json` | **A conifer.** Eighteen whorls of five limbs climbing 88% of a 24m trunk, each whorl a sixth of the length of the lowest. The `whorl` model's worked example, and the thing to copy for a fir or a pine. See [Conifers](#conifers). |
+| `redwood-01.json` | **The tall conifer, and the shaped trunk.** A 42m trunk bare for half its height, under a narrow crown at `whorlTaper` 0.45. Its trunk is fluted, flared and wandering on 24 sides, which is the worked example for [The trunk](#the-trunk). Hands over to its billboard at 320m. |
+| `larch-01.json`  | **The open conifer.** Limbs at 85 degrees off a 26m trunk, with steeply hanging foliage. The airy one: 9,672 triangles for a 26m tree, against the oak's 39,844 at 18m. |
+| `juniper-01.json` | **The scrubby conifer.** Five and a half metres, eight loose whorls, `splitVariance` 22 and an upswept `droop`, which breaks the rings up into something irregular. |
+| `cypress-01.json` | **The columnar conifer.** An Italian cypress: 24 whorls of short limbs at 24 degrees off the trunk, so they hug it, at `whorlTaper` 0.9 so the column barely narrows. 18m tall and 3.7m wide. |
 | `plains-01.json` | **A clump, not a tree.** A nine-tuft patch 2.8m across, off a nine-cell generated atlas. The type's worked example, and the thing to copy for grass, clover or wildflowers. |
 | `plains-02.json` | The second patch off the **same** `plains` set, with `skipTextures`. Twelve tufts and a different constellation, which is what stops six hundred copies of one patch reading as a pattern. Run `plains-01.json` first. |
 | `palm-01.json`   | **A crown.** A seven metre stem leaning twelve degrees under sixteen fronds of 3.2m, on its own `palm` set, generated art. The type's worked example for anything with a trunk. |
 | `fern.json`   | **A crown with no stem.** Eleven fronds of 0.9m standing up from the ground and arching over, on its own `fern` set. Emits a clump's layer, because at half a metre it is ground cover. |
-| `date-palm.json` | **The heavy crown, with a tier.** Thirty-six fronds of 4m attaching down the top half of a stout stem — `frondSpan` — so the old ones hang below the young. 792 triangles, and the one crown template that carries a `lods` tier, at 70m. |
+| `palm-03.json` | **The heavy crown, with a tier.** Thirty-six fronds of 4m attaching down the top half of a stout stem — `frondSpan` — so the old ones hang below the young. 792 triangles, and the one crown template that carries a `lods` tier, at 70m. |
 
 
 The tool prints the triangle count on every run. Watch it: branch count is `splits` to the power of
 `branchLevels`, times `whorls` under the whorl model, and leaf cards multiply that again by
 `leavesPerBranch`.
 
-**Run `oak.json` before `birch.json`, and `plains-01.json` before `meadow-02.json`.** Each of the
+**Run `oak-01.json` before `birch-01.json`, and `plains-01.json` before `plains-02.json`.** Each of the
 second ones carries `skipTextures: true` and names the first one's set, so the images have to exist
 before it does. Sharing one set is what makes a species cost two fetches
 however many variants it has. See [Sharing one texture set](#sharing-one-texture-set-across-a-family).
@@ -208,9 +210,10 @@ stands in for a sprig, never for a single leaf.
 
 | Key | Default | Does | What the values mean |
 | --- | --- | --- | --- |
-| `bark` — `tree`, `crown` | `[]` | Folders under `sources/bark/` the bark image is assembled from. See [Authored bark](#authored-bark). | `[]` generates the bark instead · `["oak"]` builds it from that folder. A folder that is listed and missing stops the run rather than falling back |
+| `bark` — `tree`, `crown` | `[]` | Folder under `sources/bark/` the bark tile comes from. See [Authored bark](#authored-bark). | `[]` generates the bark instead · `["oak"]` builds it from that folder · `["oak/oak-01"]` picks one set out of a folder that holds several. A folder that is listed and missing stops the run rather than falling back |
 | `leaves` | `[]` | Folders under `sources/leaves/` whose stamps fill the leaf image. See [Authored leaves](#authored-leaves). | Same rule. `[]` generates them, a named folder is an error when it is absent · `["palm/green-*"]` takes only the stamps whose prefix matches. See [Picking stamps](#picking-stamps-out-of-a-folder) |
-| `textureSize` | 1024 | Edge of each square map, and the **long** edge of the bark map, in pixels. A power of two, at least 128. | `128` tests only, a cell holds 32 texels · `512` the floor for anything shipping · `1024` every tree template · `2048` the clump default, because a clump atlas holds every stamp at once. See [The clump atlas](#the-clump-atlas) |
+| `textureSize` | 1024 | Edge of each square map — the leaf, blade or frond atlas — and, unless `barkTextureSize` says otherwise, the **long** edge of the bark map, in pixels. A power of two, at least 128. | `128` tests only, a cell holds 32 texels · `512` the floor for anything shipping · `1024` every tree template · `2048` the clump default, because a clump atlas holds every stamp at once. See [The clump atlas](#the-clump-atlas) |
+| `barkTextureSize` — `tree`, `crown` | 0 | The bark map's **long** edge on its own, so it can differ from the atlas. `0` follows `textureSize`. An authored bark keeps its own shape and is reduced so its long edge fits; it is never enlarged. | `0` one size for the set · `1024` bark with `textureSize: 512` gives a 512x1024 bark beside a 512 leaf atlas, which is the usual way round: one tile wraps every trunk, sixteen cards share the atlas |
 | `barkAspect` — `tree`, `crown` | 2 | How many times taller than wide the **generated** bark map is, and how many circumferences of branch one tile covers. Ignored once `bark` names a source, which brings its own shape. **The lever on visible tiling.** | `1` a square map, one circumference per tile · `2` the default: a 1024 `textureSize` gives a 512x1024 map covering two circumferences. The two axes are not alike — x wraps once around the ring and never repeats, y runs along the branch and repeats every tile — so the texels go where the repeat is. A redwood's trunk shows the same plate 12.9 times at `1` and 6.5 at `2` |
 
 **The tuft** — `clump`, with the card keys shared by `crown`
@@ -257,7 +260,7 @@ take `cardSegments`, `cardCurve`, `cardAspect` and `normalLean` from the clump's
 
 **The files and the emitted layer**
 
-These name the outputs, or are copied into the printed `ScatterLayers.ts` row without touching the mesh.
+These name the outputs, or are copied into the printed `scatter-layers.json` entry without touching the mesh.
 
 | Key | Default | Does | What the values mean |
 | --- | --- | --- | --- |
@@ -340,7 +343,7 @@ an oak from 192m out to 480m is about 6.8x the ground, and roughly 2.7M more tri
 A tier's distance has to stay below the handover, whichever way it is set; the engine refuses a
 chain that reaches past it. The tiers are written as
 `<name>.lod1.glb`, `<name>.lod2.glb` beside the model, and the printed `geometries.json` entry and
-`ScatterLayers.ts` row carry the chain.
+`scatter-layers.json` entry carry the chain.
 
 Everything else about how the bark and leaves **look** — the tints, the plates, the fissures, the
 the tint it is ramped from, the colour and roughness drift — is settled in [`lib/look.ts`](./lib/look.ts) and
@@ -751,8 +754,8 @@ fronds   from tools/scatter-forge/sources/fronds/palm (2 stamps, up to 3m long):
 ```
 
 `textureSize` defaults to 2048 for a crown as it does for a clump, and that size is the bark's as
-well, since one key sizes every map in the set. Drop it to 1024 for anything the camera never
-stands under.
+well unless `barkTextureSize` sets its own. Drop it to 1024 for anything the camera never stands
+under.
 
 ## Authored fronds
 
@@ -834,7 +837,19 @@ than a smaller footprint here.
 
 Nothing scans the assets folder. A model stays invisible to the engine until the files below know
 about it. The tool prints every block it needs at the end of a run, ready to paste, and
-`writeTemplates: true` writes the two JSON ones for you.
+`--write-template` writes the two required ones for you:
+
+```
+node tools/scatter-forge/cli.ts tools/scatter-forge/templates/oak-01.json --write-template
+```
+
+That patches the layer into `scatter-layers.json` under the config's `templatesDir` — `templates/`
+unless the config says otherwise — and the geometry into the `geometries.json` beside it, on every
+build, so it works under `--watch` too. `--write-template=<path>` names a different file. An entry whose key or `name` matches the layer's
+is replaced whole; a layer the file has never seen is appended, and never anywhere else, because
+the key order is the paint mask's slot order. The optional materials block is left as a paste.
+`writeTemplates: true` in the config is the older switch and still patches `geometries.json` and
+`materials.json` under `templatesDir`.
 
 ### 1. `templates/geometries.json` — required
 
@@ -851,18 +866,19 @@ The registry of every model the engine can load. It maps a short id to a file:
 That id is how everything else names the model. Nothing can reference the tree until it is here.
 `lods` is the chain the tree was built with, nearest first, and is left out for a tree without one.
 
-### 2. `ScatterLayers.ts` — required
+### 2. `templates/scatter-layers.json` — required
 
 A **scatter layer** is one kind of thing the world grows: a boulder, a fern, this tree. The layer is
 not the model. It is the model *plus* everything the engine needs in order to plant thousands of it:
 how far away to stop drawing it, how much to vary each one's size and rotation, what shape physics
 should collide against, and how it moves in wind.
 
-Paste the printed row into the `SCATTER_LAYERS` table. The generator has already filled in the wind
-block, the trunk capsule, the spacing, the LOD handover distances and the impostor distance, measured
-off the tree it just built.
+Paste the printed entry into the file, or let `--write-template` do it. The engine bundles the file
+at build time into `SCATTER_LAYERS`, typed as `ScatterLayer`, and `validateScatterLayers` checks
+every entry on startup. The generator has already filled in the wind block, the trunk capsule, the
+spacing, the LOD handover distances and the impostor distance, measured off the tree it just built.
 
-`authoredNormals: true` is in that row for every `leafNormalMode` but `card`. The engine
+`"authoredNormals": true` is in that entry for every `leafNormalMode` but `card`. The engine
 mirrors a back face's shading normal, which is right for a normal that belongs to the face it sits
 on and wrong for `canopy` and `up`, whose normals describe the crown rather than the card. Mirrored,
 they point into the tree, and whichever half of the cards faces away from the camera shades black —
@@ -870,7 +886,7 @@ a half that changes as the camera moves. The flag turns the mirror off, and only
 alpha-masked piece, so the trunk keeps it. Drop the line and the canopy goes patchy in the engine
 while the preview still looks right.
 
-`foliage: true` is in the row in every mode, for the same piece. A card stands in for a cluster of
+`"foliage": true` is in the entry in every mode, for the same piece. A card stands in for a cluster of
 leaves whatever its normal says, and the foliage shading model is built for exactly that: it drops
 the metallic-roughness specular chain, which had nothing real to describe on a leaf and reflected
 the sun off a canopy as one polished sphere, and adds the transmission that makes a backlit card
@@ -879,11 +895,11 @@ only to make that specular chain behave here. It also takes a single shadow tap 
 3x3 kernel: a blade is a few atlas texels across and drawn several layers deep, so the filtering
 lands on noise.
 
-Two names appear in that row and they differ on purpose:
+Two names appear in that entry and they differ on purpose:
 
-- `geometryId: 'oak-01'` — hyphens. This is the key from `geometries.json` above.
-- `name: 'oak_01'` — underscores. This is the layer's own name, and it must match the key it sits
-  under in the table. `validateScatterLayers` throws if the two disagree.
+- `"geometryId": "oak-01"` — hyphens. This is the key from `geometries.json` above.
+- `"name": "oak_01"` — underscores. This is the layer's own name, and it must match the key it sits
+  under in the file. `validateScatterLayers` throws if the two disagree.
 
 ### 3. A biome rule — required before anything appears
 
@@ -952,7 +968,7 @@ visible solid rectangles, or the trunk pays the alpha test for nothing and turns
 
 ## Wind
 
-`ScatterWind` is a code table row, not model metadata — the importer ignores glTF `extras`
+`ScatterWind` is a block of the layer's entry, not model metadata — the importer ignores glTF `extras`
 completely. What travels in the file is `COLOR_0`, which the wind vertex stage reads directly:
 
 | Channel | Written as                                                              |
@@ -979,6 +995,17 @@ A source is a folder under `sources/bark/`, and a tree names it in its `bark` li
 One name for now. Combining two barks is a height-based blend rather than a lerp, and that is its
 own piece of work; listing two is an error that says so.
 
+A folder can hold more than one set, keyed on the prefix before `-diff`, `-arm` and `-disp`. Then
+the bare folder name is ambiguous and the run stops listing the sets it found; name the one you
+want as `folder/set`:
+
+```json
+"bark": ["oak/oak-01"]
+```
+
+The pattern is the same `*` and `?` form the stamp sources take, but it has to land on exactly one
+set, because a bark is one tile.
+
 ```
 tools/scatter-forge/sources/bark/oak/
   oak-diff.webp    lossless, sRGB
@@ -990,12 +1017,15 @@ tools/scatter-forge/sources/bark/oak/
 The maps are matched on their `-diff` / `-arm` / `-disp` suffix rather than on the folder's name, so
 renaming a source does not mean renaming everything in it. It must tile on both axes.
 
-**Any size, any shape.** A tile of 512x1024 is used at 512x1024: the maps are written out texel for
-texel and the mesh's UVs do the repeating, so `textureSize` and `barkAspect` do not apply to an
-authored bark at all and nothing is resampled on the way in. A bark photograph is usually taller
-than it is wide, and that shape is read from the art rather than declared — the tile covers
-`widthMetres` around the branch by `widthMetres x aspect` along it. Powers of two still mip more
-cleanly, but nothing rejects other sizes.
+**Any shape, capped by `textureSize`.** A tile of 512x1024 is written at 512x1024: the mesh's UVs
+do the repeating, so `barkAspect` does not apply to an authored bark and nothing is cropped or
+squeezed. `textureSize` — or `barkTextureSize`, where it is set — is a cap on the long edge: a
+1024x2048 tile under `textureSize: 1024` is box-filtered down to 512x1024, keeping its shape, and
+the run's `bark` line says so. A tile already
+within the cap is used texel for texel — nothing is ever enlarged, which would invent nothing. A
+bark photograph is usually taller than it is wide, and that shape is read from the art rather than
+declared — the tile covers `widthMetres` around the branch by `widthMetres x aspect` along it.
+Powers of two still mip more cleanly, but nothing rejects other sizes.
 
 **The height map has to be 16-bit**, and a PNG, because WebP cannot carry sixteen bits at all. The
 normal is derived from the height rather than authored beside it, and a height differentiated from
@@ -1091,7 +1121,8 @@ and a folder listed bare still takes everything. Order within the set is still b
 cells pick the same stamp on every machine. A pattern that matches nothing stops the run and lists
 the prefixes it could have matched — for the reason a missing folder does, that art which quietly
 fell back to generation looks like art doing nothing. This applies to `leaves`, `blades` and
-`fronds` alike; `bark` is one tile and takes no pattern.
+`fronds` alike. `bark` takes the same form, but a bark is one tile, so its pattern has to land on
+exactly one set — see [Authored bark](#authored-bark).
 
 ### `source.json`
 

@@ -94,7 +94,7 @@ export const PARAM_SPEC = {
   type: { type: 'string', default: 'tree', help: `Structure to grow: ${FORGE_TYPES.join(' | ')}. Picks the generator, not the species.` },
   name: { type: 'string', default: null, help: 'Model id. Names the .glb and the geometry template.' },
   textureSet: { type: 'string', default: null, help: 'Texture set to write or reference. Defaults to name. Share one across variants.' },
-  bark: { type: 'list', default: [], help: 'Folders under sources/bark the bark image is assembled from. Empty generates it.', texture: true, types: WOODY },
+  bark: { type: 'list', default: [], help: 'Folder under sources/bark the bark tile comes from, as folder or folder/set. Empty generates it.', texture: true, types: WOODY },
   leaves: { type: 'list', default: [], help: 'Folders under sources/leaves whose stamps fill the leaf image. Empty generates it.', texture: true, types: TREE },
   out: {
     type: 'string',
@@ -197,12 +197,13 @@ export const PARAM_SPEC = {
   scaleMin: { type: 'number', default: 0.8, byType: { clump: 0.75 }, help: 'Lower bound of the emitted scale jitter.' },
   scaleMax: { type: 'number', default: 1.25, help: 'Upper bound of the emitted scale jitter.', byType: { clump: 1.3 } },
 
-  textureSize: { type: 'int', default: 1024, byType: { clump: 2048, crown: 2048 }, help: 'Edge of the square texture template, and the long edge of the bark one. A clump or frond atlas holds every stamp, so it starts larger.', texture: true },
+  textureSize: { type: 'int', default: 1024, byType: { clump: 2048, crown: 2048 }, help: 'Edge of the square texture template, and the long edge of the bark one; an authored bark keeps its shape and is reduced to fit. A clump or frond atlas holds every stamp, so it starts larger.', texture: true },
+  barkTextureSize: { type: 'int', default: 0, help: 'Long edge of the bark map in pixels, so the bark and the leaf atlas can differ. 0 follows textureSize.', texture: true, types: WOODY },
   barkAspect: { type: 'int', default: 2, help: 'How many times taller than wide the bark map is, and how many circumferences of branch one tile covers. 1 is square.', texture: true, types: WOODY },
   preview: { type: 'int', default: 0, help: 'Write a shaded preview PNG at this pixel size. 0 writes none.' },
   skipTextures: { type: 'flag', default: false, help: 'Reuse an existing texture set rather than writing one.' },
   writeTemplates: { type: 'flag', default: false, help: 'Patch geometries.json and materials.json in place.' },
-  templatesDir: { type: 'string', default: 'templates', help: 'Directory holding geometries.json and materials.json.' },
+  templatesDir: { type: 'string', default: 'templates', help: 'Directory holding geometries.json, materials.json and scatter-layers.json.' },
 } as const satisfies Record<string, ParamSpec>;
 
 /**
@@ -408,18 +409,15 @@ export function resolveParams(raw: RawConfig): Params {
     throw new Error(`textureSet '${params.textureSet}' must be lowercase, digits and hyphens.`);
 
   // Source names are folder names, held to the same alphabet as the outputs.
-  // A stamp source may add `/pattern` to take only the stamps whose prefix
-  // matches it; bark is one tile and takes no pattern.
-  for (const entry of params.bark as string[])
-    if (!/^[a-z0-9][a-z0-9-]*$/.test(entry))
-      throw new Error(`bark source '${entry}' must be lowercase, digits and hyphens.`);
-
-  for (const key of ['leaves', 'blades', 'fronds'] as const)
+  // A source may add `/pattern` to take only the sets whose prefix matches it:
+  // a subset of a stamp folder's stamps, or the one tile of a bark folder that
+  // holds several.
+  for (const key of ['bark', 'leaves', 'blades', 'fronds'] as const)
     for (const entry of params[key] as string[])
       if (!/^[a-z0-9][a-z0-9-]*(\/[A-Za-z0-9_*?-]+)?$/.test(entry))
         throw new Error(
           `${key} source '${entry}' must be a folder of lowercase, digits and hyphens, ` +
-            `optionally followed by /pattern to pick its stamps, as in 'palm/green-*'.`
+            `optionally followed by /pattern to pick its sets, as in 'palm/green-*'.`
         );
 
   params.seed ??= hashString(name);
@@ -527,7 +525,11 @@ function validate(params: Params): void {
   if (params.textureSize < 128 || (params.textureSize & (params.textureSize - 1)) !== 0)
     throw new Error('textureSize must be a power of two of at least 128.');
 
-  if (params.type !== 'clump') validateBarkShape(params);
+  if (params.type !== 'clump') {
+    if (params.barkTextureSize !== 0 && (params.barkTextureSize < 128 || (params.barkTextureSize & (params.barkTextureSize - 1)) !== 0))
+      throw new Error('barkTextureSize must be a power of two of at least 128, or 0 to follow textureSize.');
+    validateBarkShape(params);
+  }
 
   if (params.type === 'clump') validateClump(params);
   else if (params.type === 'crown') validateCrown(params);
@@ -550,16 +552,23 @@ function validateBarkShape(params: Params): void {
   // and 128 is a test size rather than a shipping one. What this catches is an
   // aspect so tall that the ring has no texels left: at 64 a plate is under
   // four of them and the fissures merge into a smear.
-  if (params.textureSize / params.barkAspect < 64)
+  const size = barkTextureSize(params);
+  if (size / params.barkAspect < 64)
     throw new Error(
-      `textureSize ${params.textureSize} at barkAspect ${params.barkAspect} leaves the bark map ` +
-        `${params.textureSize / params.barkAspect}px around the ring. Raise textureSize or lower barkAspect.`
+      `${params.barkTextureSize ? 'barkTextureSize' : 'textureSize'} ${size} at barkAspect ${params.barkAspect} leaves the bark map ` +
+        `${size / params.barkAspect}px around the ring. Raise it or lower barkAspect.`
     );
 }
 
-/** The bark map in texels: `barkAspect` times taller than it is wide. */
+/** The bark map's long edge: its own key, or the set's size where that is 0. */
+export function barkTextureSize(params: Params): number {
+  return params.barkTextureSize || params.textureSize;
+}
+
+/** The generated bark map in texels: `barkAspect` times taller than it is wide. */
 export function barkCanvasSize(params: Params): { width: number; height: number } {
-  return { width: params.textureSize / params.barkAspect, height: params.textureSize };
+  const size = barkTextureSize(params);
+  return { width: size / params.barkAspect, height: size };
 }
 
 /** A stem is one branch, so it is held to the trunk's bounds; the rosette to a card's. */
@@ -847,10 +856,12 @@ export function helpText(): string {
   return [
     'scatter-forge — procedural scatter assets for the Understory scatter system',
     '',
-    'Usage: node tools/scatter-forge/cli.ts <config.json> [--watch]',
+    'Usage: node tools/scatter-forge/cli.ts <config.json> [--watch] [--write-template[=<path>]]',
     '',
     'Every option is a key of the file. Start from a preset in tools/scatter-forge/templates/.',
     '--watch rebuilds whenever the file is saved.',
+    '--write-template patches the layer into templatesDir/scatter-layers.json and the',
+    'geometry into geometries.json beside it, on every build. =<path> names another file.',
     '',
     `Types: ${FORGE_TYPES.join(', ')}. A key marked [type] belongs to that type alone,`,
     'and setting it on another is an error naming the type that takes it.',

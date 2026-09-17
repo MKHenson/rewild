@@ -5,10 +5,11 @@
 // COLOR_0 carries the bend, phase and flutter weights the wind vertex stage
 // reads, alongside a four-map image per piece, and prints the registry entries
 // the model has to be declared through. The file is the whole interface: the
-// only switch on the command line is --watch.
+// command line only adds --watch, and --write-template to patch the layer
+// into scatter-layers.json.
 
 import { mkdir, readFile, writeFile } from 'fs/promises';
-import { join, relative, resolve, sep } from 'path';
+import { dirname, join, relative, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
 import type {
   IGeometryTemplates,
@@ -21,6 +22,7 @@ import { buildCrown, type CrownMetrics } from './lib/crown.ts';
 import { boundsOf, buildMesh, totalTriangles, type BarkTile, type ForgeMesh } from './lib/mesh.ts';
 import { heightPieces, materialPieces, pieceKeys } from './lib/pieces.ts';
 import {
+  barkTextureSize,
   hasStem,
   helpText,
   PARAM_SPEC,
@@ -40,6 +42,7 @@ import {
   fitCrown,
   fitLeaves,
   leafGrid,
+  barkOutputSize,
   barkTileOf,
   loadBarkSource,
   loadClumpSource,
@@ -56,7 +59,9 @@ import {
   geometryEntry,
   materialEntries,
   scatterLayer,
-  scatterLayerSource,
+  scatterLayerEntry,
+  writeGeometryTemplate,
+  writeScatterLayer,
   writeTemplateFiles,
 } from './lib/templates.ts';
 import {
@@ -87,6 +92,8 @@ interface Grown {
 
 interface Built extends Grown {
   params: Params;
+  /** The scatter-layers.json the layer was patched into, when one was named. */
+  writeTemplate: string | null;
   modelPath: string;
   /** One coarser mesh per `lods` entry, nearest first, beside their files. */
   lods: { mesh: ForgeMesh; path: string }[];
@@ -205,16 +212,32 @@ async function main(argv: string[]): Promise<void> {
   }
 
   const watch = argv.includes('--watch');
-  const rest = argv.filter((arg) => arg !== '--watch');
+  const rest = argv.filter((arg) => arg !== '--watch' && !arg.startsWith(WRITE_TEMPLATE));
   if (rest.length !== 1 || rest[0].startsWith('--'))
-    throw new Error(`Expected one tree.json and optionally --watch, got '${argv.join(' ')}'. Every other option is a key of the file.`);
+    throw new Error(
+      `Expected one tree.json and optionally --watch or ${WRITE_TEMPLATE}[=<path>], got '${argv.join(' ')}'. Every other option is a key of the file.`
+    );
 
   const [configPath] = rest;
   const { params, configText, rolled } = await readParams(configPath);
-  const built = await generate(params);
+  const built = await generate(params, writeTemplateArg(argv, params.templatesDir));
 
   report(built, rolled);
   if (watch) await watchConfig(configPath, built, configText, rolled ? params.seed : undefined);
+}
+
+const WRITE_TEMPLATE = '--write-template';
+
+/**
+ * The scatter-layers.json to patch, or null when the flag is absent. Bare, the
+ * flag means the one under the config's templatesDir; `=<path>` names another.
+ */
+function writeTemplateArg(argv: string[], templatesDir: string): string | null {
+  const arg = argv.find((candidate) => candidate === WRITE_TEMPLATE || candidate.startsWith(`${WRITE_TEMPLATE}=`));
+  if (arg === undefined) return null;
+
+  const path = arg.slice(WRITE_TEMPLATE.length + 1);
+  return resolve(path || join(templatesDir, 'scatter-layers.json'));
 }
 
 /**
@@ -295,7 +318,7 @@ function paint(params: Params, barkSource: BarkSource | null, leafSource: LeafSo
   return buildTreeCanvases(params, barkSource, leafSource);
 }
 
-async function generate(params: Params, previous?: Built): Promise<Built> {
+async function generate(params: Params, writeTemplate: string | null, previous?: Built): Promise<Built> {
   const directory = join(params.out, params.textureSet);
   const pieces = pieceKeys(params.type, hasStem(params));
   const withHeight = heightPieces(params.type, hasStem(params));
@@ -390,9 +413,17 @@ async function generate(params: Params, previous?: Built): Promise<Built> {
 
   if (params.writeTemplates) await writeTemplateFiles(params.templatesDir, geometry, materials);
 
+  // The layer names the geometry, so the two are declared together. The
+  // materials block is optional and stays a paste.
+  if (writeTemplate) {
+    await writeGeometryTemplate(dirname(writeTemplate), geometry);
+    await writeScatterLayer(writeTemplate, grown.layer);
+  }
+
   return {
     ...grown,
     params,
+    writeTemplate,
     canvases,
     barkSource,
     leafSource,
@@ -478,13 +509,15 @@ function describeFronds(params: Params, source: LeafSource | null): string[] {
   return lines;
 }
 
-function describeBark(source: BarkSource | null): string {
-  return `  bark     ${
-    source
-      ? `from ${shellPath(source.directory)} (${source.width}x${source.height} tile, ` +
-        `${source.widthMetres}m around by ${(source.widthMetres * source.aspect).toFixed(2)}m along)`
-      : 'generated — no sources listed'
-  }`;
+function describeBark(params: Params, source: BarkSource | null): string {
+  if (!source) return '  bark     generated — no sources listed';
+
+  const written = barkOutputSize(source, barkTextureSize(params));
+  const reduced = written.width !== source.width ? `, written at ${written.width}x${written.height}` : '';
+  return (
+    `  bark     from ${shellPath(source.directory)} (${source.width}x${source.height} tile${reduced}, ` +
+    `${source.widthMetres}m around by ${(source.widthMetres * source.aspect).toFixed(2)}m along)`
+  );
 }
 
 /** Where the model's sources came from, by type. */
@@ -493,9 +526,9 @@ function describeSources(params: Params, barkSource: BarkSource | null, leafSour
     case 'clump':
       return describeBlades(params, leafSource);
     case 'crown':
-      return [...(hasStem(params) ? [describeBark(barkSource)] : []), ...describeFronds(params, leafSource)];
+      return [...(hasStem(params) ? [describeBark(params, barkSource)] : []), ...describeFronds(params, leafSource)];
     default:
-      return [describeBark(barkSource), ...describeLeaves(params, leafSource)];
+      return [describeBark(params, barkSource), ...describeLeaves(params, leafSource)];
   }
 }
 
@@ -557,6 +590,7 @@ function report(built: Built, rolledSeed: boolean): void {
     previewPath,
     lodPreviewPath,
     configPath,
+    writeTemplate,
   } = built;
   const bounds = boundsOf(mesh.pieces[0].attributes.positions);
   const baseTriangles = totalTriangles(mesh);
@@ -608,8 +642,8 @@ function report(built: Built, rolledSeed: boolean): void {
       .slice(1, -1)
       .join('\n'),
     '',
-    'ScatterLayers.ts — add to SCATTER_LAYERS',
-    scatterLayerSource(layer),
+    'templates/scatter-layers.json',
+    scatterLayerEntry(layer),
     '',
     ...(materials.materials?.length
       ? [
@@ -624,7 +658,10 @@ function report(built: Built, rolledSeed: boolean): void {
       : ['templates/materials.json — textures only. This type writes no _disp map, so it needs no material here.']),
     JSON.stringify(materials, null, 2),
     '',
-    params.writeTemplates ? 'templates/ patched in place.' : 'Re-run with --write-templates to patch templates/ in place.',
+    ...(writeTemplate
+      ? [`${shellPath(writeTemplate)} and the geometries.json beside it patched in place.`]
+      : [`Re-run with ${WRITE_TEMPLATE} to patch the layer and its geometry into ${params.templatesDir}/ in place.`]),
+    ...(params.writeTemplates ? [`${params.templatesDir}/geometries.json and materials.json patched in place.`] : []),
     '',
   ];
 
@@ -682,7 +719,7 @@ Watching ${shellPath(configPath)}. Save it to rebuild, ctrl-c to stop.
 
     try {
       const next = await readParams(configPath, sessionSeed);
-      previous = await generate(next.params, previous);
+      previous = await generate(next.params, previous.writeTemplate, previous);
       written = settled(configPath, previous, next.configText);
 
       const what = previous.rebuiltTextures ? 'model and textures' : 'model only, textures reused';
