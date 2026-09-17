@@ -32,11 +32,20 @@ export function sourceRoot(): string {
 export interface BarkSource {
   name: string;
   directory: string;
-  /** Metres of trunk one tile of this bark covers. */
+  /** Metres of trunk one tile of this bark covers, around the branch. */
   widthMetres: number;
   /** How far its height spans, in metres. */
   depthMetres: number;
-  size: number;
+  width: number;
+  height: number;
+  /**
+   * Its own shape, height over width.
+   *
+   * Taken from the art rather than declared, and it decides how much trunk the
+   * tile covers along the branch: `widthMetres` around by `widthMetres * aspect`
+   * along. Nothing requires it to be a whole number.
+   */
+  aspect: number;
   /** Three floats a texel, in display space — the same space the generator
    *  writes and the encoder reads. */
   albedo: Float32Array;
@@ -44,7 +53,7 @@ export interface BarkSource {
   roughness: Float32Array;
   metallic: Float32Array;
   /** 0..1, off the 16-bit map. */
-  height: Float32Array;
+  relief: Float32Array;
 }
 
 /**
@@ -235,12 +244,13 @@ export async function loadBarkSource(
 
   const diff = await readRaw(paths.diff);
   const arm = await readRaw(paths.arm);
-  if (diff.width !== diff.height)
-    throw new Error(`${paths.diff} is ${diff.width}x${diff.height}. A bark tile must be square.`);
   sameSize(diff, arm, directory);
 
-  const size = diff.width;
-  const texels = size * size;
+  // Any shape. A bark photograph is usually taller than it is wide, and that
+  // shape is the art's to state: it is written out at its own size and the UVs
+  // repeat it, so nothing here resamples and nothing is lost.
+  const { width, height } = diff;
+  const texels = width * height;
   const albedo = new Float32Array(texels * 3);
   const ao = new Float32Array(texels);
   const roughness = new Float32Array(texels);
@@ -258,12 +268,14 @@ export async function loadBarkSource(
     directory,
     widthMetres,
     depthMetres,
-    size,
+    width,
+    height,
+    aspect: height / width,
     albedo,
     ao,
     roughness,
     metallic,
-    height: await readHeight(paths.disp, size, size),
+    relief: await readHeight(paths.disp, width, height),
   };
 }
 
@@ -439,8 +451,13 @@ export async function loadFrondSource(
  * length advances by one circumference per image too — which is what lands the
  * tile square rather than stretched.
  */
-export function tileRepeats(source: BarkSource, trunkRadius: number): number {
-  return Math.max(1, Math.round((2 * Math.PI * trunkRadius) / source.widthMetres));
+/** What a mesh needs of an authored tile: how much branch it covers. */
+export function barkTileOf(source: BarkSource | null): { metresAround: number; aspect: number } | null {
+  return source ? { metresAround: source.widthMetres, aspect: source.aspect } : null;
+}
+
+export function tileRepeats(source: BarkSource, radius: number): number {
+  return Math.max(1, Math.round((2 * Math.PI * radius) / source.widthMetres));
 }
 
 /**
@@ -454,8 +471,8 @@ export function gradientGain(depthMetres: number, metresPerTexel: number): numbe
   return depthMetres / (8 * metresPerTexel);
 }
 
-export function normalStrength(source: BarkSource, repeats: number, size: number): number {
-  return gradientGain(source.depthMetres, (repeats * source.widthMetres) / size);
+export function normalStrength(source: BarkSource): number {
+  return gradientGain(source.depthMetres, source.widthMetres / source.width);
 }
 
 /** The leaf grid the generator draws, and the most a source is spread over. */

@@ -9,10 +9,26 @@
 // ground, and phased with the stem so the rosette rides its sway.
 
 import { columnOf, leafCells } from './atlas.ts';
-import { buildBark, createBuilder, finish, pushVertex, type ForgeMesh, type MeshAttributes } from './mesh.ts';
-import { hasStem, type Params } from './params.ts';
+import {
+  buildBark,
+  createBuilder,
+  finish,
+  pushVertex,
+  type BarkTile,
+  type ForgeMesh,
+  type MeshAttributes,
+} from './mesh.ts';
+import { hasStem, trunkRingsOf, type Params } from './params.ts';
 import { createRng, hash2, type Rng } from './rng.ts';
-import { bendWeight, clusterPhase, sampleBranch, type Branch, type BranchPoint, type Skeleton } from './skeleton.ts';
+import {
+  bendWeight,
+  clusterPhase,
+  sampleBranch,
+  wanderCentreLine,
+  type Branch,
+  type BranchPoint,
+  type Skeleton,
+} from './skeleton.ts';
 import { add, cross, normalize, perpendicular, rotateAbout, scale, type Vec3 } from './vec.ts';
 
 const DEG = Math.PI / 180;
@@ -55,14 +71,18 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
  * The stem's radius at `t` up its length: the trunk's taper, flared at the
  * foot and swollen under the crown.
  *
- * The flare is gone by a quarter of the way up. The bulge rises over the top
+ * The foot takes `trunkFlare`, the same key a trunk does, and defaults to 0.25
+ * here where a trunk defaults to none: a bare pole is what a tree's trunk
+ * mostly is and what a palm's stem never is. It is gone by a quarter of the way
+ * up, against a fifth on a trunk, because a stem is seven metres and a trunk is
+ * forty. The bulge rises over the top
  * third to peak just under the rosette, then comes back in by half, so it
  * reads as a swelling rather than as a wider tube — a palm's crownshaft is
  * fatter than the stem below it and the fronds leave from its shoulder.
  */
 function stemRadiusAt(params: Params, t: number): number {
   const taper = params.trunkTaper + (1 - params.trunkTaper) * (1 - t) ** 1.3;
-  const flare = params.stemFlare * (1 - smoothstep(0, 0.25, t));
+  const flare = params.trunkFlare * (1 - smoothstep(0, 0.25, t));
   const bulge = params.crownBulge * smoothstep(0.6, 0.88, t) * (1 - 0.5 * smoothstep(0.88, 1, t));
   return params.trunkRadius * (taper + flare + bulge);
 }
@@ -78,7 +98,7 @@ function stemRadiusAt(params: Params, t: number): number {
  * straight and reads as a wobble.
  */
 function growStem(params: Params, rng: Rng): Branch {
-  const rings = params.segments + 2;
+  const rings = trunkRingsOf(params);
   const step = params.stemHeight / (rings - 1);
   const tipRadius = stemRadiusAt(params, 1);
   const leanAxis = rotateAbout(perpendicular(UP), UP, rng() * TWO_PI);
@@ -100,7 +120,7 @@ function growStem(params: Params, rng: Rng): Branch {
     distance += step;
   }
 
-  return {
+  const stem: Branch = {
     id: 0,
     level: 0,
     clusterId: 0,
@@ -110,6 +130,13 @@ function growStem(params: Params, rng: Rng): Branch {
     tipRadius,
     children: [],
   };
+
+  // The same stray a trunk takes. `stemLean` bends the stem one way over its
+  // whole height, which is the palm's arc; this is the unevenness on top of it.
+  // The rosette rides the stem's top point, so it follows without being told.
+  if (params.trunkWander > 0) wanderCentreLine(params, stem);
+
+  return stem;
 }
 
 /**
@@ -264,13 +291,14 @@ function stemSkeleton(params: Params, rng: Rng): { skeleton: Skeleton; rosette: 
  * `cells` is how many of the frond atlas's cells were painted, from
  * `crownAtlas` or the set's manifest, so a card never addresses past it.
  */
-export function buildCrown(params: Params, cells: number): Crown {
+export function buildCrown(params: Params, cells: number, bark: BarkTile | null = null): Crown {
   const rng = createRng(params.seed ^ 0x2d51f39b);
   const { skeleton, rosette } = stemSkeleton(params, rng);
   const fronds = buildFronds(params, skeleton, rosette, Math.max(1, cells));
 
   const pieces: ForgeMesh['pieces'] = [];
-  if (skeleton.branches.length) pieces.push({ key: 'bark', attributes: buildBark(params, skeleton), cutout: false });
+  if (skeleton.branches.length)
+    pieces.push({ key: 'bark', attributes: buildBark(params, skeleton, bark), cutout: false });
   pieces.push({ key: 'frond', attributes: fronds, cutout: true });
 
   let height = 0;

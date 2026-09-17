@@ -2,7 +2,6 @@
 // set is written next to the model as its sidecar, so a variant can be
 // regenerated or nudged from the file that made it.
 
-import { profileNames } from './bark.ts';
 import { LOOK, retiredKeys } from './look.ts';
 import { FORGE_TYPES, isForgeType, type ForgeType } from './pieces.ts';
 import { hashString } from './rng.ts';
@@ -30,6 +29,13 @@ interface ParamSpec {
    * is a sensible fallback for the other.
    */
   readonly byType?: Partial<Record<ForgeType, Default>>;
+  /**
+   * For a type this key does not apply to, the key that type takes instead.
+   *
+   * Named in the error, because "this belongs to another type" leaves the
+   * reader to go and find what their own type calls it.
+   */
+  readonly insteadFor?: Partial<Record<ForgeType, string>>;
 }
 
 const TREE = ['tree'] as const;
@@ -50,6 +56,7 @@ export interface LodTier {
   /** Metres at which this tier takes over from the one before it. */
   distance: number;
   radialSegments?: number;
+  trunkSides?: number;
   barkLevels?: number;
   leavesPerBranch?: number;
   leafScale?: number;
@@ -58,7 +65,30 @@ export interface LodTier {
 
 /** The keys a tier may override, all of them mesh-only. A tier takes only
  *  those its own type reads, checked the way any other key is. */
-export const LOD_OVERRIDES = ['radialSegments', 'barkLevels', 'leavesPerBranch', 'leafScale', 'cardSegments'] as const;
+export const LOD_OVERRIDES = [
+  'radialSegments',
+  'trunkSides',
+  'barkLevels',
+  'leavesPerBranch',
+  'leafScale',
+  'cardSegments',
+] as const;
+
+/**
+ * How a tree places the children of its trunk.
+ *
+ * `fork` divides: the trunk's first child is a leader that carries it on, and
+ * every generation below splits again. That is an oak, a birch or a poplar.
+ *
+ * `whorl` does not divide. The trunk runs unbroken to the tip and carries rings
+ * of near-horizontal limbs up it, each ring shorter than the one below. That is
+ * a conifer, and it is the one difference between a spruce and a poplar. The
+ * limbs themselves fork the ordinary way, so a whorl is a placement rule on the
+ * trunk and nothing else about the type changes.
+ */
+export const BRANCH_MODELS = ['fork', 'whorl'] as const;
+
+export type BranchModel = (typeof BRANCH_MODELS)[number];
 
 export const PARAM_SPEC = {
   type: { type: 'string', default: 'tree', help: `Structure to grow: ${FORGE_TYPES.join(' | ')}. Picks the generator, not the species.` },
@@ -84,17 +114,36 @@ export const PARAM_SPEC = {
   },
   trunkRadius: { type: 'number', default: 0.32, byType: { crown: 0.22 }, help: 'Trunk radius at the base, in metres.', types: WOODY },
   trunkTaper: { type: 'number', default: 0.22, byType: { crown: 0.8 }, help: 'Trunk radius at the top as a fraction of the base.', types: WOODY },
-  splits: { type: 'int', default: 3, help: 'Child branches per split.', types: TREE },
-  splitAngle: { type: 'number', default: 38, help: 'Degrees a child leaves its parent by.', types: TREE },
+  trunkFlare: {
+    type: 'number',
+    default: 0,
+    byType: { crown: 0.25 },
+    help: 'How far the foot swells past trunkRadius, as a fraction of it. Gone by a fifth of the way up a trunk, a quarter of the way up a stem.',
+    types: WOODY,
+  },
+  trunkFlute: { type: 'number', default: 0, help: 'Depth of the grooves cut up the trunk or stem, as a fraction of its radius. 0 is a turned pole.', types: WOODY },
+  trunkWander: { type: 'number', default: 0, help: 'Metres the centre line strays from a straight climb.', types: WOODY },
+  branchModel: {
+    type: 'string',
+    default: 'fork',
+    help: `How the trunk carries its children: ${BRANCH_MODELS.join(' | ')}. whorl grows a conifer: rings of limbs up an undivided trunk.`,
+    types: TREE,
+  },
+  splits: { type: 'int', default: 3, help: 'Child branches per split, and per whorl at branchModel whorl.', types: TREE },
+  splitAngle: { type: 'number', default: 38, help: 'Degrees a child leaves its parent by. Near 80 at branchModel whorl, where a limb leaves the trunk almost square.', types: TREE },
   splitVariance: { type: 'number', default: 12, help: 'Random degrees added to each split angle.', types: TREE },
-  splitSpread: { type: 'number', default: 0.35, help: 'Fraction of the parent the splits are spread back along from its tip.', types: TREE },
+  splitSpread: { type: 'number', default: 0.35, help: 'Fraction of the parent the splits are spread back along from its tip. At branchModel whorl it is the fraction of the trunk the whorls climb, down from the top.', types: TREE },
   branchLevels: { type: 'int', default: 4, help: 'Branch generations below the trunk.', types: TREE },
+  whorls: { type: 'int', default: 7, help: 'Rings of limbs up the trunk. Read at branchModel whorl alone.', types: TREE },
+  whorlTaper: { type: 'number', default: 0.3, help: 'Length of the top whorl as a fraction of the lowest, which is what makes the cone. Read at branchModel whorl alone.', types: TREE },
   lengthRatio: { type: 'number', default: 0.62, help: 'Child length as a fraction of its parent.', types: TREE },
   radiusRatio: { type: 'number', default: 0.6, help: 'Child radius as a fraction of its parent at the attach point.', types: TREE },
   curve: { type: 'number', default: 14, help: 'Total degrees a branch bends along its own length.', types: TREE },
   droop: { type: 'number', default: 16, help: 'Degrees the deepest branches bend toward the ground. Negative bends them back upright.', types: TREE },
   segments: { type: 'int', default: 5, byType: { crown: 8 }, help: 'Rings along each branch.', types: WOODY },
-  radialSegments: { type: 'int', default: 8, byType: { crown: 10 }, help: 'Sides of the trunk tube. Deeper branches use fewer.', types: WOODY },
+  radialSegments: { type: 'int', default: 8, byType: { crown: 10 }, help: 'Sides of a branch tube. Deeper branches use fewer.', types: WOODY },
+  trunkSides: { type: 'int', default: 0, help: 'Sides of the trunk or stem tube alone. 0 takes radialSegments. It is one branch of hundreds, so detail here is cheap.', types: WOODY },
+  trunkSegments: { type: 'int', default: 0, help: 'Rings up the trunk or stem alone. 0 takes segments + 2.', types: WOODY },
   barkLevels: { type: 'int', default: 6, help: 'Deepest branch generation that gets a bark tube. Twigs beyond it carry leaves only.', types: TREE },
 
   leavesPerBranch: { type: 'int', default: 18, help: 'Leaf cards on each leaf-bearing branch.', types: TREE },
@@ -121,7 +170,6 @@ export const PARAM_SPEC = {
   fronds: { type: 'list', default: [], help: 'Folders under sources/fronds whose stamps fill the frond atlas. Empty generates them.', texture: true, types: CROWN },
   stemHeight: { type: 'number', default: 6, help: 'Metres of stem below the rosette. 0 grows none, which is a fern.', types: CROWN },
   stemLean: { type: 'number', default: 10, help: 'Degrees the stem has bent over by its top. Eases in, so a palm leans from its upper half.', types: CROWN },
-  stemFlare: { type: 'number', default: 0.25, help: 'How far the foot swells past trunkRadius, as a fraction of it. Gone by a quarter of the way up.', types: CROWN },
   crownBulge: { type: 'number', default: 0.2, help: 'How far the stem swells under the rosette, as a fraction of trunkRadius. A palm\'s crownshaft.', types: CROWN },
   frondCount: { type: 'int', default: 14, help: 'Frond cards in the rosette.', types: CROWN },
   frondLength: { type: 'number', default: 3, help: 'Frond length in metres, base to tip along its curve. Frond 0 is full length and the rest fall short of it.', types: CROWN },
@@ -149,8 +197,8 @@ export const PARAM_SPEC = {
   scaleMin: { type: 'number', default: 0.8, byType: { clump: 0.75 }, help: 'Lower bound of the emitted scale jitter.' },
   scaleMax: { type: 'number', default: 1.25, help: 'Upper bound of the emitted scale jitter.', byType: { clump: 1.3 } },
 
-  barkProfile: { type: 'string', default: 'oak', byType: { crown: 'smooth' }, help: 'Which bark layer stack to build. oak | smooth.', texture: true, types: WOODY },
-  textureSize: { type: 'int', default: 1024, byType: { clump: 2048, crown: 2048 }, help: 'Edge of the square texture template. A clump or frond atlas holds every stamp, so it starts larger.', texture: true },
+  textureSize: { type: 'int', default: 1024, byType: { clump: 2048, crown: 2048 }, help: 'Edge of the square texture template, and the long edge of the bark one. A clump or frond atlas holds every stamp, so it starts larger.', texture: true },
+  barkAspect: { type: 'int', default: 2, help: 'How many times taller than wide the bark map is, and how many circumferences of branch one tile covers. 1 is square.', texture: true, types: WOODY },
   preview: { type: 'int', default: 0, help: 'Write a shaded preview PNG at this pixel size. 0 writes none.' },
   skipTextures: { type: 'flag', default: false, help: 'Reuse an existing texture set rather than writing one.' },
   writeTemplates: { type: 'flag', default: false, help: 'Patch geometries.json and materials.json in place.' },
@@ -230,8 +278,13 @@ export function parseConfig(config: unknown, source: string): RawConfig {
     // like it did not work. The message names the type that does take it, so
     // the fix is obvious.
     const owners = (PARAM_SPEC[key] as ParamSpec).types;
-    if (owners && !owners.includes(modelType))
-      throw new Error(`${source} option '${key}' applies to ${owners.join(', ')}, not to type '${modelType}'.`);
+    if (owners && !owners.includes(modelType)) {
+      const instead = (PARAM_SPEC[key] as ParamSpec).insteadFor?.[modelType];
+      throw new Error(
+        `${source} option '${key}' applies to ${owners.join(', ')}, not to type '${modelType}'.` +
+          (instead ? ` A ${modelType} takes '${instead}' instead.` : '')
+      );
+    }
 
     if (PARAM_SPEC[key].type === 'tiers') {
       if (!Array.isArray(value)) throw new Error(`${source} option '${key}' must be a list of tiers.`);
@@ -373,6 +426,9 @@ export function resolveParams(raw: RawConfig): Params {
 
   const resolved = { ...params, ...LOOK } as Params;
   validate(resolved);
+  // A stemless crown takes the tube keys and reads none of them, so there is
+  // nothing for a flute to be cut into and nothing to hold it to.
+  if (resolved.type === 'tree' || hasStem(resolved)) validateTrunkDetail(resolved);
   if (resolved.lods.length) validateTiers(resolved);
   return resolved;
 }
@@ -471,9 +527,39 @@ function validate(params: Params): void {
   if (params.textureSize < 128 || (params.textureSize & (params.textureSize - 1)) !== 0)
     throw new Error('textureSize must be a power of two of at least 128.');
 
+  if (params.type !== 'clump') validateBarkShape(params);
+
   if (params.type === 'clump') validateClump(params);
   else if (params.type === 'crown') validateCrown(params);
   else validateTree(params);
+}
+
+/**
+ * The bark map's shape.
+ *
+ * Its width is the long edge divided by the aspect, so raising the aspect buys
+ * length rather than texels: the two axes of a bark map are not alike. x wraps
+ * once around the ring and never repeats; y runs along the branch and repeats
+ * every tile, which is the repetition you see on a trunk.
+ */
+function validateBarkShape(params: Params): void {
+  if (params.barkAspect < 1 || (params.barkAspect & (params.barkAspect - 1)) !== 0)
+    throw new Error(`barkAspect must be a power of two of at least 1, got ${params.barkAspect}.`);
+
+  // Half the floor on the long edge, because that edge is already held to 128
+  // and 128 is a test size rather than a shipping one. What this catches is an
+  // aspect so tall that the ring has no texels left: at 64 a plate is under
+  // four of them and the fissures merge into a smear.
+  if (params.textureSize / params.barkAspect < 64)
+    throw new Error(
+      `textureSize ${params.textureSize} at barkAspect ${params.barkAspect} leaves the bark map ` +
+        `${params.textureSize / params.barkAspect}px around the ring. Raise textureSize or lower barkAspect.`
+    );
+}
+
+/** The bark map in texels: `barkAspect` times taller than it is wide. */
+export function barkCanvasSize(params: Params): { width: number; height: number } {
+  return { width: params.textureSize / params.barkAspect, height: params.textureSize };
 }
 
 /** A stem is one branch, so it is held to the trunk's bounds; the rosette to a card's. */
@@ -485,7 +571,6 @@ function validateCrown(params: Params): void {
     validateImpostor(params);
   }
 
-  if (params.stemFlare < 0) throw new Error(`stemFlare must not be negative, got ${params.stemFlare}.`);
   if (params.crownBulge < 0) throw new Error(`crownBulge must not be negative, got ${params.crownBulge}.`);
 
   if (params.frondCount < 1 || params.frondCount > 48)
@@ -516,6 +601,8 @@ function validateCards(params: Params): void {
 
 /** The bounds a bark tube shares between a trunk and a stem. */
 function validateTube(params: Params): void {
+  validateTrunk(params);
+
   if (!(params.trunkRadius > 0)) throw new Error(`trunkRadius must be positive, got ${params.trunkRadius}.`);
 
   if (params.trunkTaper <= 0 || params.trunkTaper > 1)
@@ -526,11 +613,6 @@ function validateTube(params: Params): void {
 
   if (params.segments < 2 || params.segments > 32)
     throw new Error('segments must be within 2..32.');
-
-  if (!profileNames().includes(params.barkProfile))
-    throw new Error(
-      `barkProfile must be one of ${profileNames().join(', ')}, got '${params.barkProfile}'.`
-    );
 }
 
 /** Mirrors validateImpostor in the engine's ScatterLayers.ts, so a layer this
@@ -604,6 +686,72 @@ export const CLUMP_MIN_FOOTPRINT = 0.06;
  */
 export const CLUMP_MAX_PATCH_RADIUS = 2.2;
 
+/**
+ * The bounds on a trunk's or a stem's own relief and its own detail.
+ *
+ * Every one of these is off at 0, and 0 is the default, so a tree that does not
+ * ask for a shaped trunk is the plain tube it always was.
+ */
+function validateTrunk(params: Params): void {
+  // Past half the radius the grooves of one side meet those of the other.
+  if (params.trunkFlute < 0 || params.trunkFlute > 0.5)
+    throw new Error(`trunkFlute must be within 0..0.5, got ${params.trunkFlute}.`);
+
+  if (params.trunkFlare < 0) throw new Error(`trunkFlare must not be negative, got ${params.trunkFlare}.`);
+
+  if (params.trunkWander < 0) throw new Error(`trunkWander must not be negative, got ${params.trunkWander}.`);
+
+  // The same bounds the branch tube is held to, plus 0 for "take the branch's".
+  if (params.trunkSides !== 0 && (params.trunkSides < 3 || params.trunkSides > 48))
+    throw new Error(`trunkSides must be 0, or within 3..48, got ${params.trunkSides}.`);
+
+  if (params.trunkSegments !== 0 && (params.trunkSegments < 2 || params.trunkSegments > 64))
+    throw new Error(`trunkSegments must be 0, or within 2..64, got ${params.trunkSegments}.`);
+
+}
+
+/**
+ * A flute is a fold in the ring, and a ring of 8 has no room to fold, so asking
+ * for one on a tube that coarse is a key that silently does nothing.
+ *
+ * The model is held to this and its tiers are not. A tier that drops its sides
+ * is coarsening on purpose, and a flute that goes blocky at 90m is the trade it
+ * was asking for.
+ */
+function validateTrunkDetail(params: Params): void {
+  if (params.trunkFlute > 0 && trunkSidesOf(params) < TRUNK_FLUTE_SIDES)
+    throw new Error(
+      `trunkFlute ${params.trunkFlute} needs a rounder trunk than ${trunkSidesOf(params)} sides to cut into. ` +
+        `Set trunkSides to ${TRUNK_FLUTE_SIDES} or more.`
+    );
+}
+
+/** Sides below which a groove has nothing to be a groove in. */
+export const TRUNK_FLUTE_SIDES = 12;
+
+/** Sides of the trunk tube: its own, else the branch tube's. */
+export function trunkSidesOf(params: Params): number {
+  return params.trunkSides > 0 ? params.trunkSides : Math.max(3, params.radialSegments);
+}
+
+/** Rings up the trunk: its own, else two more than a branch gets. */
+export function trunkRingsOf(params: Params): number {
+  return params.trunkSegments > 0 ? params.trunkSegments : params.segments + 2;
+}
+
+/**
+ * Branches in the deepest generation, which is what the branch cap is read
+ * against.
+ *
+ * A fork tree reaches `splits ^ branchLevels`. A whorl tree starts from
+ * `whorls x splits` limbs rather than from `splits`, so every generation below
+ * is that many times wider and the cap has to see the whorl count.
+ */
+export function deepestGeneration(params: Params): number {
+  const forked = params.splits ** params.branchLevels;
+  return params.branchModel === 'whorl' && params.branchLevels > 0 ? forked * params.whorls : forked;
+}
+
 function validateTree(params: Params): void {
   const positive = ['lengthRatio', 'radiusRatio', 'leafSize'] as const;
 
@@ -620,9 +768,30 @@ function validateTree(params: Params): void {
   if (params.branchLevels < 0 || params.branchLevels > 6)
     throw new Error('branchLevels must be within 0..6.');
 
-  if (params.splits ** params.branchLevels > 4096)
+  validateTrunk(params);
+
+  if (!(BRANCH_MODELS as readonly string[]).includes(params.branchModel))
+    throw new Error(`branchModel must be one of ${BRANCH_MODELS.join(', ')}, got '${params.branchModel}'.`);
+
+  if (params.branchModel === 'whorl') {
+    // One whorl is a single ring of limbs, which is a shape the fork model
+    // already reaches. The ceiling is the branch cap below, reached through
+    // the limb count rather than stated twice.
+    if (params.whorls < 1 || params.whorls > 24)
+      throw new Error(`whorls must be within 1..24, got ${params.whorls}.`);
+
+    // At 0 the top whorl has no length and the spire ends in nothing. Past 1
+    // the tree widens as it climbs, which is an inverted cone and not a
+    // conifer: use the fork model for that.
+    if (!(params.whorlTaper > 0) || params.whorlTaper > 1)
+      throw new Error(`whorlTaper must be within 0..1, got ${params.whorlTaper}.`);
+  }
+
+  if (deepestGeneration(params) > 4096)
     throw new Error(
-      `splits ${params.splits} at branchLevels ${params.branchLevels} is ${params.splits ** params.branchLevels} branches. Lower one of them.`
+      `splits ${params.splits} at branchLevels ${params.branchLevels}` +
+        (params.branchModel === 'whorl' ? ` over ${params.whorls} whorls` : '') +
+        ` is ${deepestGeneration(params)} branches. Lower one of them.`
     );
 
   if (params.barkLevels < 0 || params.barkLevels > 6)

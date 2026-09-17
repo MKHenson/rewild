@@ -7,7 +7,6 @@
 // asserts anything a larger atlas would say differently.
 
 import { resolveParams, type Params, type RawConfig } from './lib/params.ts';
-import { barkStack, createSample, sampleBark } from './lib/bark.ts';
 import { columnPixels, gutterFor, insetRect, leafCellPixels } from './lib/atlas.ts';
 import { compositeCluster } from './lib/cluster.ts';
 import { srgbToLinear } from './lib/colour.ts';
@@ -45,12 +44,12 @@ describe('texture template', () => {
   const leaves = buildLeafCanvas(paramsFor());
 
   it('leaves the bark opaque everywhere', () => {
-    const bark = canvas.size * canvas.size;
+    const bark = canvas.width * canvas.height;
     for (let i = 0; i < bark; i++) expect(canvas.alpha[i]).toBe(1);
   });
 
   it('cuts the leaf cells out rather than filling them', () => {
-    const texels = leaves.size * leaves.size;
+    const texels = leaves.width * leaves.height;
     let clear = 0;
     for (let i = 0; i < texels; i++) if (leaves.alpha[i] === 0) clear++;
 
@@ -60,7 +59,7 @@ describe('texture template', () => {
 
   it('dilates colour under the transparent texels', () => {
     // Left black, the mip chain averages the background into every leaf edge.
-    const texels = leaves.size * leaves.size;
+    const texels = leaves.width * leaves.height;
     let litAndClear = 0;
     for (let i = 0; i < texels; i++)
       if (leaves.alpha[i] === 0 && leaves.albedo[i * 3 + 1] > 0) litAndClear++;
@@ -68,165 +67,41 @@ describe('texture template', () => {
     expect(litAndClear).toBeGreaterThan(0);
   });
 
-  /** Degrees between the warmest and coolest eighth of the bark half. */
-  function patchHueRange(target: Canvas): number {
-    const blockWidth = target.size / 4;
-    const blockHeight = target.size / 4;
-    const means: number[] = [];
 
-    for (let by = 0; by < 2; by++)
-      for (let bx = 0; bx < 4; bx++) {
-        let sumX = 0;
-        let sumY = 0;
 
-        for (let y = by * blockHeight; y < (by + 1) * blockHeight; y++)
-          for (let x = bx * blockWidth; x < (bx + 1) * blockWidth; x++) {
-            const i = y * target.size + x;
-            const [r, g, b] = [target.albedo[i * 3], target.albedo[i * 3 + 1], target.albedo[i * 3 + 2]];
-            const max = Math.max(r, g, b);
-            const min = Math.min(r, g, b);
-            if (max - min < 0.05 || max < 0.15) continue;
-
-            const raw =
-              max === r ? (g - b) / (max - min) : max === g ? (b - r) / (max - min) + 2 : (r - g) / (max - min) + 4;
-            const hue = ((((raw * 60) % 360) + 360) % 360) * (Math.PI / 180);
-            sumX += Math.cos(hue);
-            sumY += Math.sin(hue);
-          }
-
-        means.push((Math.atan2(sumY, sumX) * 180) / Math.PI);
-      }
-
-    return Math.max(...means) - Math.min(...means);
-  }
-
-  /** Share of the bark half the lichen has taken, by its green cast. */
-  function lichenShare(target: Canvas): number {
-    const bark = target.size * target.size;
-    let covered = 0;
-    for (let i = 0; i < bark; i++) if (target.albedo[i * 3 + 1] >= target.albedo[i * 3]) covered++;
-    return covered / bark;
-  }
-
-  it('drifts colour in hue, not only in brightness', () => {
-    // Measured patch to patch rather than over the whole half. A global spread
-    // is dominated by the near-black fissures, whose hue is meaningless, and
-    // stays flat however far the colour actually moves.
-    const flat = buildBarkCanvas(paramsFor({}, { colourVariation: 0, lichen: 0 }));
-    const varied = buildBarkCanvas(paramsFor({}, { colourVariation: 0.35, lichen: 0 }));
-
-    expect(patchHueRange(varied)).toBeGreaterThan(patchHueRange(flat) * 1.5);
-  });
-
-  it('makes --lichen mean coverage across its whole range', () => {
-    // An octave sum clusters around its mean and reaches neither bound, so a
-    // threshold picked by eye lands outside the distribution and the flag
-    // silently does nothing. It did exactly that once.
-    const none = buildBarkCanvas(paramsFor({}, { lichen: 0 }));
-    const some = buildBarkCanvas(paramsFor({}, { lichen: 0.3 }));
-    const lots = buildBarkCanvas(paramsFor({}, { lichen: 1 }));
-
-    expect(lichenShare(none)).toBe(0);
-    expect(lichenShare(some)).toBeGreaterThan(0.001);
-    expect(lichenShare(lots)).toBeGreaterThan(lichenShare(some) * 3);
-  });
-
-  it('breaks roughness away from being a pure function of depth', () => {
-    // Lichen off in both: it writes its own roughness, which would break the
-    // "pure function of depth" the flat case is asserting.
-    const flat = buildBarkCanvas(paramsFor({}, { roughnessVariation: 0, lichen: 0 }));
-    const varied = buildBarkCanvas(paramsFor({}, { lichen: 0 }));
-
-    /** How completely roughness is predicted by height, 0 to 1. */
-    const dependence = (target: Canvas): number => {
-      const bark = target.size * target.size;
-      let sx = 0;
-      let sy = 0;
-      let sxx = 0;
-      let syy = 0;
-      let sxy = 0;
-      let n = 0;
-
-      for (let i = 0; i < bark; i += 5) {
-        const x = target.height[i];
-        const y = target.roughness[i];
-        sx += x;
-        sy += y;
-        sxx += x * x;
-        syy += y * y;
-        sxy += x * y;
-        n++;
-      }
-
-      const cov = sxy / n - (sx / n) * (sy / n);
-      const sdx = Math.sqrt(sxx / n - (sx / n) ** 2);
-      const sdy = Math.sqrt(syy / n - (sy / n) ** 2);
-      return Math.abs(cov / (sdx * sdy));
-    };
-
-    // Without variation the two are the same number scaled, so the whole
-    // surface catches light identically as the viewer moves across it.
-    expect(dependence(flat)).toBeCloseTo(1, 5);
-    expect(dependence(varied)).toBeLessThan(0.5);
-  });
-
-  it('tunes the grooves in depth and in darkness separately', () => {
-    const bark = (target: Canvas) => target.size * target.size;
-    const floorOf = (target: Canvas): number => {
-      let lowest = 1;
-      for (let i = 0; i < bark(target); i++) lowest = Math.min(lowest, target.height[i]);
-      return lowest;
-    };
-    const darkestOf = (target: Canvas): number => {
-      let darkest = 1;
-      for (let i = 0; i < bark(target); i++) darkest = Math.min(darkest, target.albedo[i * 3]);
-      return darkest;
-    };
-
-    const joined = buildBarkCanvas(paramsFor({}, { grooveDepth: 0, lichen: 0 }));
-    const cut = buildBarkCanvas(paramsFor({}, { grooveDepth: 0.4, lichen: 0 }));
-    const pale = buildBarkCanvas(
-      paramsFor({}, { grooveDepth: 0.4, grooveShade: 0.85, lichen: 0 })
-    );
-
-    expect(floorOf(cut)).toBeLessThan(floorOf(joined));
-
-    // Depth and darkness are separable on purpose: a groove can be deep enough
-    // to catch a shadow without bottoming out as a black line.
-    expect(darkestOf(pale)).toBeGreaterThan(darkestOf(cut));
-    expect(floorOf(pale)).toBeCloseTo(floorOf(cut), 5);
-  });
-
-  /** Mean height step across one wrap, over the mean step just inside it. */
+  /**
+   * Mean relief step across one wrap, over the mean step just inside it.
+   *
+   * A tileable field meets itself, so the step across the seam is the step
+   * anywhere else. A field that does not puts a hard line down every trunk in
+   * the world, and nothing else in the suite would catch it.
+   */
   function seamStep(target: Canvas, axis: 'ring' | 'length'): number {
-    const size = target.size;
+    const { width, height } = target;
+    const at = (x: number, y: number) => target.relief[y * width + x];
+    // Walked along whichever edge the wrap is on: the ring closes across the
+    // image and the length repeats down it, and the two are no longer the same
+    // length in texels.
+    const steps = axis === 'ring' ? height : width;
     let seam = 0;
     let inner = 0;
-    let n = 0;
 
-    for (let k = 0; k < size; k++) {
-      const at = (a: number, b: number) => target.height[b * size + a];
+    for (let k = 0; k < steps; k++) {
       if (axis === 'ring') {
-        seam += Math.abs(at(size - 1, k) - at(0, k));
+        seam += Math.abs(at(width - 1, k) - at(0, k));
         inner += Math.abs(at(1, k) - at(2, k));
       } else {
-        seam += Math.abs(at(k, size - 1) - at(k, 0));
+        seam += Math.abs(at(k, height - 1) - at(k, 0));
         inner += Math.abs(at(k, 1) - at(k, 2));
       }
-      n++;
     }
 
-    return seam / n / Math.max(inner / n, 1e-9);
+    return seam / Math.max(1e-9, inner);
   }
 
-  it('closes the bark ring at every colour patch scale', () => {
-    // The ring maps once across the image, so its two edges are the same place
-    // on the tube. The lattice wraps on whole cells, so a fractional period
-    // would put a seam down every trunk in the world.
-    for (const patches of ['2', '5', '13']) {
-      const target = buildBarkCanvas(paramsFor({}, { colourPatches: Number(patches) }));
-      expect(seamStep(target, 'ring')).toBeLessThan(3);
-    }
+  it('closes the bark ring where it wraps', () => {
+    // x is one turn of the tube, so its two edges are the same line of trunk.
+    expect(seamStep(buildBarkCanvas(paramsFor()), 'ring')).toBeLessThan(3);
   });
 
   it('tiles the bark along the branch', () => {
@@ -235,228 +110,51 @@ describe('texture template', () => {
     expect(seamStep(buildBarkCanvas(paramsFor()), 'length')).toBeLessThan(3);
   });
 
-  it('scales the colour patches with --colour-patches', () => {
-    // Measured as how fast colour changes across the band. Broad blotches vary
-    // slowly, fine mottling varies quickly.
-    const churn = (target: Canvas): number => {
-      let total = 0;
-      let n = 0;
-      for (let y = 4; y < target.size - 4; y += 3)
-        for (let x = 0; x < target.size - 1; x += 3) {
-          const a = (y * target.size + x) * 3;
-          const b = (y * target.size + x + 1) * 3;
-          total += Math.abs(target.albedo[a] - target.albedo[b]) + Math.abs(target.albedo[a + 2] - target.albedo[b + 2]);
-          n++;
-        }
-      return total / n;
-    };
+  it('cuts the bark map taller than it is wide, and only the bark map', () => {
+    // The two axes of a bark map are not alike. x wraps once around the ring
+    // and never repeats; y runs along the branch and repeats every tile, which
+    // is the repetition seen on a trunk. So the texels go where the repeat is.
+    const shaped = buildBarkCanvas(paramsFor({ textureSize: 1024, barkAspect: 2 }));
+    expect([shaped.width, shaped.height]).toEqual([512, 1024]);
 
-    const broad = buildBarkCanvas(paramsFor({}, { colourPatches: 2, colourVariation: 0.4 }));
-    const fine = buildBarkCanvas(paramsFor({}, { colourPatches: 20, colourVariation: 0.4 }));
+    const square = buildBarkCanvas(paramsFor({ textureSize: 1024, barkAspect: 1 }));
+    expect([square.width, square.height]).toEqual([1024, 1024]);
 
-    expect(churn(fine)).toBeGreaterThan(churn(broad));
+    // A leaf atlas stays square: its cells are square and a rectangle would
+    // only waste half of each one.
+    const leaf = buildLeafCanvas(paramsFor({ textureSize: 1024, barkAspect: 2 }));
+    expect([leaf.width, leaf.height]).toEqual([1024, 1024]);
   });
 
-  it('grows knots without tearing the bark around them', () => {
-    const smooth = buildBarkCanvas(paramsFor({}, { knots: 0 }));
-    const knotted = buildBarkCanvas(paramsFor({}, { knots: 1 }));
-
-    /** The largest step between two side by side texels of the bark. */
-    const worstStep = (target: Canvas): number => {
-      let worst = 0;
-      for (let y = 2; y < target.size / 2 - 2; y++)
-        for (let x = 0; x < target.size; x++) {
-          const a = target.height[y * target.size + x];
-          const b = target.height[y * target.size + ((x + 1) % target.size)];
-          worst = Math.max(worst, Math.abs(a - b));
-        }
-      return worst;
-    };
-
-    expect(identical(knotted.height, smooth.height)).toBe(false);
-
-    // A knot displaces the coordinate every other bark lookup reads at. Taking
-    // that displacement from the nearest knot makes it jump wherever the winner
-    // changes, and the jump draws a hard straight line clean across the trunk —
-    // far more obvious than the knots themselves. Accumulating every knot in
-    // range is what keeps it continuous. The floor is the fissures, which are
-    // meant to be sharp.
-    expect(worstStep(knotted)).toBeLessThan(worstStep(smooth) * 1.5);
-  });
-
-  it('closes the bark ring with knots at full density', () => {
-    expect(seamStep(buildBarkCanvas(paramsFor({}, { knots: 1 })), 'ring')).toBeLessThan(3);
-  });
-
-  it('runs the oak fissures along the trunk rather than around it', () => {
+  it('runs the fissures along the trunk rather than around it', () => {
     // Length runs down the image and the ring across it, so a bark whose
     // fissures run up the trunk changes height far faster from column to column
     // than from row to row. This is the one assertion that would catch the
     // plate field losing its direction, which no test of depth or width can see.
-    const target = buildBarkCanvas(paramsFor({}, { knots: 0, lichen: 0 }));
-    const size = target.size;
+    const target = buildBarkCanvas(paramsFor());
+    const { width, height } = target;
     let alongStep = 0;
     let aroundStep = 0;
     let n = 0;
 
-    for (let y = 0; y < size; y++)
-      for (let x = 0; x < size; x++) {
-        const i = y * size + x;
-        alongStep += Math.abs(target.height[i] - target.height[((y + 1) % size) * size + x]);
-        aroundStep += Math.abs(target.height[i] - target.height[y * size + ((x + 1) % size)]);
+    // One texel is the same distance of trunk either way, whatever the map's
+    // shape: its width covers one circumference and its height covers
+    // barkAspect of them, so the two axes carry equal texels per metre.
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const i = y * width + x;
+        alongStep += Math.abs(target.relief[i] - target.relief[((y + 1) % height) * width + x]);
+        aroundStep += Math.abs(target.relief[i] - target.relief[y * width + ((x + 1) % width)]);
         n++;
       }
 
     expect(aroundStep / n).toBeGreaterThan((alongStep / n) * 1.5);
   });
 
-  it('cuts every fissure to one width, whichever way it runs', () => {
-    // The complaint this answers is that some cuts read as a line and others as
-    // a smudge. Both come from measuring a width in the cell lattice: the cells
-    // are several times wider than they are tall, and the warp stretches them
-    // further and unevenly, so one authored width lands as a different width
-    // everywhere. Depth is what is allowed to vary between cuts. Width is not.
-    // Larger than the rest of the file runs at: at 128 a cut is under a texel
-    // across, so every width would measure 1 and the assertion would hold
-    // whatever the field did.
-    const params = paramsFor({ textureSize: '512' }, { knots: 0, lichen: 0 });
-    const size = params.textureSize;
-
-    const stack = barkStack(params, params.seed);
-    const sample = createSample();
-    const cavity = new Float32Array(size * size);
-
-    // Length runs down the image, the ring across it.
-    for (let y = 0; y < size; y++)
-      for (let x = 0; x < size; x++) {
-        sampleBark(stack, sample, y / size, x / size);
-        cavity[y * size + x] = sample.cavity;
-      }
-
-    // Scanned across the ring, which crosses the along-trunk fissures square
-    // on. Each descent into a cut and back out is measured at half its own
-    // depth, so a shallow cut and a deep one are compared on the same terms.
-    const widths: number[] = [];
-    for (let y = 0; y < size; y++) {
-      let start = -1;
-      for (let x = 0; x < size; x++) {
-        const inside = cavity[y * size + x] > 0.02;
-        if (inside && start < 0) start = x;
-        if (inside || start < 0) continue;
-
-        let peak = 0;
-        for (let k = start; k < x; k++) peak = Math.max(peak, cavity[y * size + k]);
-        let width = 0;
-        for (let k = start; k < x; k++) if (cavity[y * size + k] > peak * 0.5) width++;
-        if (peak > 0.05) widths.push(width);
-        start = -1;
-      }
-    }
-
-    widths.sort((a, b) => a - b);
-    const at = (p: number) => widths[Math.floor(p * (widths.length - 1))];
-
-    expect(widths.length).toBeGreaterThan(100);
-    // Measured in whole texels, so the floor of the spread is the quantisation
-    // rather than the field. Before the band's own metric was used this ran to
-    // 8x, with a tail of single cuts spread over hundreds of texels.
-    expect(at(0.9) / at(0.1)).toBeLessThanOrEqual(2);
-    expect(at(0.99)).toBeLessThan(at(0.5) * 4);
-  });
-
-  it('bottoms a fissure in a crease rather than a plateau', () => {
-    // A curve that arrives flat at the bottom leaves the deepest part of the
-    // cut a flat floor a few texels across, which reads as a blurred line
-    // however deep it is. The profile has to be steepest exactly where it is
-    // deepest, which is what draws the line down the middle of the cut.
-    const params = paramsFor({}, { knots: 0, lichen: 0 });
-    const stack = barkStack(params, params.seed);
-    const sample = createSample();
-
-    // Walk across the deepest cut found on one column and compare the step
-    // taken either side of its floor against the step out at the shoulder.
-    let steepestNearFloor = 0;
-    let shoulder = 0;
-
-    for (let i = 0; i < 4000; i++) {
-      const u = i / 4000;
-      const v = 0.5;
-      const step = 1 / params.textureSize;
-      const here = sampleBark(stack, sample, u, v).cavity;
-      if (here < 0.6) continue;
-
-      const below = sampleBark(stack, sample, u, v - step).cavity;
-      const above = sampleBark(stack, sample, u, v + step).cavity;
-      steepestNearFloor = Math.max(steepestNearFloor, Math.abs(above - below) / 2);
-      shoulder = Math.max(shoulder, here);
-    }
-
-    // A plateau would leave the two samples either side of the floor equal.
-    expect(shoulder).toBeGreaterThan(0.6);
-    expect(steepestNearFloor).toBeGreaterThan(0);
-  });
-
-  it('builds a different surface per --bark-profile', () => {
-    const oak = buildBarkCanvas(paramsFor({ barkProfile: 'oak' }));
-    const smooth = buildBarkCanvas(paramsFor({ barkProfile: 'smooth' }));
-
-    expect(identical(oak.height, smooth.height)).toBe(false);
-
-    /** Mean absolute height step between neighbouring texels, on both axes.
-     *  One axis alone does not separate the profiles: they differ in how many
-     *  cells run along the branch, and --bark-plates gives them the same number
-     *  around it, so a scan across the ring crosses the same borders in each. */
-    const relief = (target: Canvas): number => {
-      const size = target.size;
-      let total = 0;
-      let n = 0;
-
-      for (let y = 0; y < size; y++)
-        for (let x = 0; x < size; x++) {
-          const i = y * size + x;
-          total += Math.abs(target.height[i] - target.height[y * size + ((x + 1) % size)]);
-          total += Math.abs(target.height[i] - target.height[((y + 1) % size) * size + x]);
-          n += 2;
-        }
-
-      return total / n;
-    };
-
-    // The profile is what decides how broken the surface is, so this is the
-    // difference between the two that has to hold whatever else is tuned.
-    expect(relief(oak)).toBeGreaterThan(relief(smooth));
-    expect(() => paramsFor({ barkProfile: 'chestnut' })).toThrow(/barkProfile/);
-  });
-
-  it('sits plate tops at their own levels under --bark-step', () => {
-    // A plate is a shelf, not a dome, and this is what makes two of them
-    // neighbours at different heights rather than one continuous surface.
-    const spread = (target: Canvas): number => {
-      const bark = target.size * target.size;
-      let sum = 0;
-      let sumSq = 0;
-      // Faces only. The fissures dominate any measure taken over everything,
-      // and they are not what --bark-step moves.
-      let n = 0;
-      for (let i = 0; i < bark; i++)
-        if (target.height[i] > 0.55) {
-          sum += target.height[i];
-          sumSq += target.height[i] * target.height[i];
-          n++;
-        }
-      return Math.sqrt(sumSq / n - (sum / n) ** 2);
-    };
-
-    const level = buildBarkCanvas(paramsFor({}, { barkStep: 0, knots: 0, barkCrust: 0 }));
-    const stepped = buildBarkCanvas(paramsFor({}, { barkStep: 0.3, knots: 0, barkCrust: 0 }));
-
-    expect(spread(stepped)).toBeGreaterThan(spread(level) * 1.5);
-  });
-
   it('shades curvature without moving the height it read', () => {
     const flat = buildBarkCanvas(paramsFor({}, { curvature: 0 }));
 
-    expect(identical(canvas.height, flat.height)).toBe(true);
+    expect(identical(canvas.relief, flat.relief)).toBe(true);
     expect(identical(canvas.albedo, flat.albedo)).toBe(false);
   });
 });
@@ -565,7 +263,7 @@ describe('leaf assembly', () => {
     const source = sourceOf(1, stampOf(16, 32, 6));
     const canvas = buildLeafCanvas(params, null);
     canvas.alpha.fill(0);
-    canvas.height.fill(0);
+    canvas.relief.fill(0);
     const inner = { x: 0, y: 0, width: size, height: size };
 
     // Laid on its side, tip pointing +x, so the stem-to-tip ramp in the
@@ -575,7 +273,7 @@ describe('leaf assembly', () => {
       { stamp: 0, x: 8, y, dirX: 1, dirY: 0, length: 64, mirror: false, shade: 1 },
     ]);
 
-    const at = (x: number) => canvas.height[y * size + x];
+    const at = (x: number) => canvas.relief[y * size + x];
     expect(canvas.alpha[y * size + 40]).toBeGreaterThan(0.9);
     expect(at(20)).toBeLessThan(at(40));
     expect(at(40)).toBeLessThan(at(60));
@@ -594,8 +292,8 @@ describe('frond atlas', () => {
   // height wide. A frond painted outside it would never be seen, and a column
   // left blank would leave the card empty.
   it('paints every frond inside the column its card samples, and nothing outside it', () => {
-    const rects = leafCellPixels(canvas.size, 2).slice(0, CROWN_CELLS_GENERATED);
-    const gutter = gutterFor(canvas.size);
+    const rects = leafCellPixels(canvas.width, 2).slice(0, CROWN_CELLS_GENERATED);
+    const gutter = gutterFor(canvas.width);
 
     for (const rect of rects) {
       const inner = insetRect(rect, gutter);
@@ -605,7 +303,7 @@ describe('frond atlas', () => {
 
       for (let y = inner.y; y < inner.y + inner.height; y++)
         for (let x = inner.x; x < inner.x + inner.width; x++) {
-          if (canvas.alpha[y * canvas.size + x] <= 0) continue;
+          if (canvas.alpha[y * canvas.width + x] <= 0) continue;
           if (x >= column.x && x < column.x + column.width) inside++;
           else outside++;
         }

@@ -9,7 +9,8 @@
 // one. The shared builder below is what every type writes its vertices through.
 
 import { leafCells } from './atlas.ts';
-import type { Params } from './params.ts';
+import { signedFbm, smoothstep } from './noise.ts';
+import { trunkSidesOf, type Params } from './params.ts';
 import { createRng, hash2 } from './rng.ts';
 import { bendWeight, clusterPhase, sampleBranch, type BranchPoint, type Skeleton } from './skeleton.ts';
 import { add, cross, normalize, perpendicular, rotateAbout, scale, sub, transport, type Vec3 } from './vec.ts';
@@ -75,6 +76,103 @@ const DEG = Math.PI / 180;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const TWO_PI = Math.PI * 2;
 
+/** Flutes cut around the trunk. A whole number, or the last one fails to meet
+ *  the first and there is a seam up the trunk. Five is four sides of a
+ *  20-sided ring per flute, which is the coarsest that still reads as a fold
+ *  rather than as a facet. */
+export const TRUNK_FLUTES = 5;
+
+/** Cells of the sway field up the trunk. Low, so a flute runs with the grain
+ *  and wanders over the whole height instead of knotting every metre. */
+const TRUNK_FLUTE_RISE = 2;
+
+/**
+ * The trunk's surface radius at one angle and one height, as a multiple of the
+ * radius the skeleton carries there. Exactly 1 on a tree that sets neither key,
+ * which is what keeps a plain trunk the tube it always was.
+ *
+ * Two layers over the taper. `trunkFlare` swells the foot and is gone by a
+ * quarter of the way up, on the curve `lib/crown.ts` already gives a palm's
+ * stem. `trunkFlute` cuts the grooves: narrow creases at the zero crossings of
+ * a field that varies fast around the trunk and slowly up it, so they run
+ * vertically and wander as they climb. They fade out under the crown, where a
+ * trunk is one season's growth and smooth.
+ *
+ * It cuts in rather than swelling out, so a fluted trunk still measures
+ * `trunkRadius` across its faces and the tree does not quietly get fatter.
+ */
+function trunkProfile(params: Params, angle: number, height: number): number {
+  // Gone by a fifth of the way up. A palm's stem uses a quarter of its own
+  // height for this and a stem is seven metres; a trunk is forty, and a quarter
+  // of that is a cone rather than a foot.
+  //
+  // A crown's stem carries its foot in its own radius, on its own curve, so the
+  // flare belongs to the trunk here and a stem takes the flutes alone. Adding
+  // it twice squares the swelling.
+  const flare = params.type === 'crown' ? 0 : params.trunkFlare * (1 - smoothstep(0, 0.2, height));
+  if (params.trunkFlute <= 0) return 1 + flare;
+
+  const turn = angle / TWO_PI;
+
+  // A cosine of the angle, not a noise field read straight. A flute has to be
+  // there at every height and at its full depth, and one ring is a slice
+  // through a field that reaches its extremes only here and there: sampled
+  // that way `trunkFlute` 0.16 cut 6% and the trunk came out round.
+  //
+  // So the count is exact and the noise only sways it, which also makes the key
+  // mean what it says. Both terms stay periodic around the trunk: the phase
+  // advances by a whole number of flutes per turn and the sway wraps with it,
+  // so the last flute meets the first.
+  const sway = signedFbm(turn * 2, height * TRUNK_FLUTE_RISE, 2, TRUNK_FLUTE_RISE, 2, params.seed ^ 0x2f9c1b7d) * 0.4;
+  const ripple = Math.cos((turn * TRUNK_FLUTES + sway) * TWO_PI);
+
+  // The broad hollow, plus the groove line at the bottom of it. The hollow
+  // alone reads as melted wax, and the groove alone falls between the sides.
+  const hollow = 0.5 - 0.5 * ripple;
+  const groove = smoothstep(-0.55, -1, ripple);
+
+  // No two flutes the same depth. Constant up the trunk, because how deep a
+  // flute is belongs to the flute; read mid-cell of a 2-period axis, because a
+  // period of 1 makes the lattice's two rows the same row and the field
+  // collapses to its mean.
+  const depth =
+    0.55 + 0.45 * (0.5 + 0.5 * signedFbm(turn * TRUNK_FLUTES, 0.5, TRUNK_FLUTES, 2, 1, params.seed ^ 0x45d9f3b3));
+
+  const fade = 1 - smoothstep(0.45, 0.95, height);
+  return 1 + flare - params.trunkFlute * depth * (0.72 * hollow + 0.28 * groove) * fade;
+}
+
+/**
+ * The normal of that surface, from the derivatives of the profile rather than
+ * from the radial direction.
+ *
+ * A shaped trunk is no longer a cylinder, so its normal is no longer the way
+ * the vertex points. Leaving it radial lights every groove wall as if it faced
+ * outward, and a groove that does not shade is a groove you cannot see: the
+ * silhouette gains flutes and the lit face stays a smooth pole.
+ */
+function trunkNormal(
+  params: Params,
+  angle: number,
+  height: number,
+  frame: { radial: Vec3; tangential: Vec3; axis: Vec3 },
+  radius: number,
+  axisLength: number
+): Vec3 {
+  const step = 1e-3;
+  const dAngle =
+    ((trunkProfile(params, angle + step, height) - trunkProfile(params, angle - step, height)) / (2 * step)) * radius;
+  const dHeight =
+    ((trunkProfile(params, angle, height + step) - trunkProfile(params, angle, height - step)) / (2 * step)) * radius;
+
+  // dP/dangle and dP/dheight in the ring's own frame. Crossed in that order
+  // they point outward, because (radial, tangential, axis) is right handed.
+  const around = add(scale(frame.radial, dAngle), scale(frame.tangential, radius));
+  const along = add(scale(frame.axis, axisLength), scale(frame.radial, dHeight));
+
+  return normalize(cross(around, along));
+}
+
 export function createBuilder(): Builder {
   return { positions: [], normals: [], uvs: [], colors: [], indices: [] };
 }
@@ -105,9 +203,23 @@ export function finish(out: Builder): MeshAttributes {
   };
 }
 
+/**
+ * An authored bark tile's size in the world, which is what the UVs repeat it by.
+ *
+ * Null where the bark is generated: that pattern has no size of its own, so it
+ * wraps exactly once around every branch whatever the branch measures, and a
+ * twig comes out a scaled copy of the trunk.
+ */
+export interface BarkTile {
+  /** Metres of branch one tile covers around the ring. */
+  metresAround: number;
+  /** Its shape, height over width. One tile is `metresAround * aspect` long. */
+  aspect: number;
+}
+
 /** The bark tubes of every branch up to `barkLevels`. A crown's stem is one
  *  branch on a skeleton of its own, and goes through here unchanged. */
-export function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
+export function buildBark(params: Params, skeleton: Skeleton, bark: BarkTile | null = null): MeshAttributes {
   const out = createBuilder();
 
   for (const branch of skeleton.branches) {
@@ -115,8 +227,17 @@ export function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
     // draws at, and twigs are most of the bark.
     if (branch.level > params.barkLevels) continue;
 
-    const radial = Math.max(3, params.radialSegments - branch.level);
+    // The trunk is one branch of hundreds and most of what a tree is seen by,
+    // so it takes its own side count. Everything below it thins with depth.
+    const radial =
+      branch.level === 0 ? trunkSidesOf(params) : Math.max(3, params.radialSegments - branch.level);
     const phase = clusterPhase(params, branch.clusterId);
+
+    // Whether this branch's rings are shaped rather than round. The trunk
+    // alone, and only when it was asked for: a tree that sets neither key
+    // builds exactly the tube it built before these existed.
+    const shaped =
+      branch.level === 0 && (params.trunkFlute > 0 || (params.type !== 'crown' && params.trunkFlare > 0));
 
     // A degenerate ring at the tip closes the tube. Without it every branch
     // ends in a hole that reads as a black speck through the canopy.
@@ -129,6 +250,20 @@ export function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
     let normal = perpendicular(rings[0].dir);
     let heading = rings[0].dir;
     const ringStart: number[] = [];
+    // Rings per unit of the height the profile is read against, which is what
+    // turns its slope into a real one along the trunk.
+    const lastPoint = branch.points.length - 1;
+
+    // How many times the image wraps this branch.
+    //
+    // An authored tile knows how much trunk it covers, so a thick branch shows
+    // several of it and a twig shows one — its bark keeps the size it was
+    // photographed at. A generated one has no such size and always wraps once.
+    // Whole turns either way, or the seam where the ring closes would land
+    // mid-image.
+    const circumference = TWO_PI * branch.baseRadius;
+    const turns = bark ? Math.max(1, Math.round(circumference / bark.metresAround)) : 1;
+    const aspect = bark ? bark.aspect : params.barkAspect;
 
     // Length runs down the image and the ring across it, matching the way bark
     // is authored. Both axes wrap, so length tiles for free at any branch
@@ -140,10 +275,21 @@ export function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
     // texture square in world space on every branch, at every radius, with no
     // reference length to author and nothing to drift out of step. It is also
     // what keeps a twig a scaled copy of the trunk rather than a squashed one.
-    let along = rings[0].dist / (TWO_PI * params.trunkRadius);
+    // Metres of branch one tile covers along it. The image is `aspect` times
+    // taller than the strip of ring it wraps, so it is that many times longer
+    // than the strip is wide — which is what turns texels into distance before
+    // the same bark comes round again.
+    const tileAlong = (circumference / turns) * aspect;
+    let along = rings[0].dist / tileAlong;
     let previous: BranchPoint | null = null;
 
-    for (const ring of rings) {
+    for (let i = 0; i < rings.length; i++) {
+      const ring = rings[i];
+      // The degenerate cap ring is past the top of the profile and has no
+      // radius left to shape, so it stays round.
+      const shapedRing = shaped && i <= lastPoint;
+      const height = lastPoint > 0 ? Math.min(1, i / lastPoint) : 0;
+
       normal = normalize(transport(normal, heading, ring.dir));
       heading = ring.dir;
       const binormal = cross(ring.dir, normal);
@@ -156,7 +302,10 @@ export function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
         // segment's mean radius, so the degenerate cap ring stays bounded — it
         // shortens by the same factor it thins by.
         const radius = Math.max(1e-9, (previous.radius + ring.radius) * 0.5);
-        along += (ring.dist - previous.dist) / (TWO_PI * radius);
+        // Integrated against the local radius so a taper cannot rescale the
+        // length behind it, and against this branch's own turn count so the
+        // tile stays undistorted at any thickness.
+        along += ((ring.dist - previous.dist) * turns) / (TWO_PI * radius * aspect);
       }
       previous = ring;
 
@@ -164,6 +313,7 @@ export function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
 
       for (let j = 0; j <= radial; j++) {
         const angle = (j / radial) * Math.PI * 2;
+        const u = (j / radial) * turns;
         const cos = Math.cos(angle);
         const sin = Math.sin(angle);
         const offset: Vec3 = [
@@ -172,11 +322,30 @@ export function buildBark(params: Params, skeleton: Skeleton): MeshAttributes {
           normal[2] * cos + binormal[2] * sin,
         ];
 
+        const radius = shapedRing ? ring.radius * trunkProfile(params, angle, height) : ring.radius;
+
         pushVertex(
           out,
-          add(ring.p, scale(offset, ring.radius)),
-          normalize(offset),
-          [j / radial, along],
+          add(ring.p, scale(offset, radius)),
+          shapedRing
+            ? trunkNormal(
+                params,
+                angle,
+                height,
+                {
+                  radial: offset,
+                  tangential: [
+                    normal[0] * -sin + binormal[0] * cos,
+                    normal[1] * -sin + binormal[1] * cos,
+                    normal[2] * -sin + binormal[2] * cos,
+                  ],
+                  axis: ring.dir,
+                },
+                ring.radius,
+                branch.length
+              )
+            : normalize(offset),
+          [u, along],
           [bend, phase, 0, 1]
         );
       }
@@ -285,10 +454,15 @@ function buildLeaves(params: Params, skeleton: Skeleton, leafGrid: number): Mesh
 
 /** `leafGrid` is the cell count the leaf image was painted with, from
  *  leafGrid in sources.ts, so a card never addresses a cell nothing drew. */
-export function buildMesh(params: Params, skeleton: Skeleton, leafGrid: number): ForgeMesh {
+export function buildMesh(
+  params: Params,
+  skeleton: Skeleton,
+  leafGrid: number,
+  bark: BarkTile | null = null
+): ForgeMesh {
   return {
     pieces: [
-      { key: 'bark', attributes: buildBark(params, skeleton), cutout: false },
+      { key: 'bark', attributes: buildBark(params, skeleton, bark), cutout: false },
       { key: 'leaf', attributes: buildLeaves(params, skeleton, leafGrid), cutout: true },
     ],
   };

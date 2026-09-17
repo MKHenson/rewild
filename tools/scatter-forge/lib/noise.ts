@@ -87,6 +87,13 @@ export const gradientNoise: NoiseBasis = (x, y, periodX, periodY, seed) => {
   return (top + (bottom - top) * v) * 0.7071 + 0.5;
 };
 
+/** Hermite ease between two edges, clamped. Flat at both ends, which is what
+ *  makes it the right shape for a field that has to start from nothing. */
+export function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
 export interface FbmOptions {
   gain?: number;
   basis?: NoiseBasis;

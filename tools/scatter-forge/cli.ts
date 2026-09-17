@@ -18,7 +18,7 @@ import type { ScatterLayer } from 'rewild-renderer/lib/renderers/terrain/Scatter
 import { writeGlb } from './lib/glb.ts';
 import { buildClump, type ClumpMetrics } from './lib/clump.ts';
 import { buildCrown, type CrownMetrics } from './lib/crown.ts';
-import { boundsOf, buildMesh, totalTriangles, type ForgeMesh } from './lib/mesh.ts';
+import { boundsOf, buildMesh, totalTriangles, type BarkTile, type ForgeMesh } from './lib/mesh.ts';
 import { heightPieces, materialPieces, pieceKeys } from './lib/pieces.ts';
 import {
   hasStem,
@@ -40,6 +40,7 @@ import {
   fitCrown,
   fitLeaves,
   leafGrid,
+  barkTileOf,
   loadBarkSource,
   loadClumpSource,
   loadFrondSource,
@@ -251,27 +252,41 @@ function atlasFor(params: Params, leafSource: LeafSource | null): { grid: number
 }
 
 /** The model, and the layer it is declared through. */
-function grow(params: Params, grid: number, cells: number): Grown {
+function grow(params: Params, grid: number, cells: number, bark: BarkTile | null): Grown {
   if (params.type === 'clump') {
     const { mesh, metrics } = buildClump(params, cells);
     return { mesh, skeleton: null, metrics, crown: null, layer: clumpLayer(params, metrics) };
   }
 
   if (params.type === 'crown') {
-    const crown = buildCrown(params, cells);
+    const crown = buildCrown(params, cells, bark);
     return { mesh: crown.mesh, skeleton: crown.skeleton, metrics: null, crown: crown.metrics, layer: crownLayer(params, crown) };
   }
 
   const skeleton = buildSkeleton(params);
-  return { mesh: buildMesh(params, skeleton, grid), skeleton, metrics: null, crown: null, layer: scatterLayer(params, skeleton) };
+  return {
+    mesh: buildMesh(params, skeleton, grid, bark),
+    skeleton,
+    metrics: null,
+    crown: null,
+    layer: scatterLayer(params, skeleton),
+  };
 }
 
 /**
  * One coarser tier. A tree hangs it on the base skeleton; a crown regrows from
  * the same seed, which lands the same stem and rosette with fewer segments.
  */
-function growTier(params: Params, skeleton: Skeleton, grid: number, cells: number): ForgeMesh {
-  return params.type === 'crown' ? buildCrown(params, cells).mesh : buildMesh(params, skeleton, grid);
+function growTier(
+  params: Params,
+  skeleton: Skeleton,
+  grid: number,
+  cells: number,
+  bark: BarkTile | null
+): ForgeMesh {
+  return params.type === 'crown'
+    ? buildCrown(params, cells, bark).mesh
+    : buildMesh(params, skeleton, grid, bark);
 }
 
 function paint(params: Params, barkSource: BarkSource | null, leafSource: LeafSource | null): Canvases {
@@ -297,7 +312,7 @@ async function generate(params: Params, previous?: Built): Promise<Built> {
   const grid = painted ? painted.leafGrid : atlas.grid;
   const cells = painted ? (painted.cells ?? grid * grid) : atlas.cells;
 
-  const grown = grow(params, grid, cells);
+  const grown = grow(params, grid, cells, barkTileOf(barkSource));
   const { mesh, skeleton } = grown;
 
   // Built even when the files are being reused, because the preview shades
@@ -329,7 +344,7 @@ async function generate(params: Params, previous?: Built): Promise<Built> {
   // rather than coarsening, so there is nothing to hand over to.
   const lods: Built['lods'] = [];
   for (const [index, tier] of params.lods.entries()) {
-    const lodMesh = growTier(tierParams(params, tier), skeleton!, grid, cells);
+    const lodMesh = growTier(tierParams(params, tier), skeleton!, grid, cells, barkTileOf(barkSource));
     const path = join(directory, `${params.name}.lod${index + 1}.glb`);
     await writeFile(
       path,
@@ -466,7 +481,8 @@ function describeFronds(params: Params, source: LeafSource | null): string[] {
 function describeBark(source: BarkSource | null): string {
   return `  bark     ${
     source
-      ? `from ${shellPath(source.directory)} (${source.size}px tile, ${source.widthMetres}m across)`
+      ? `from ${shellPath(source.directory)} (${source.width}x${source.height} tile, ` +
+        `${source.widthMetres}m around by ${(source.widthMetres * source.aspect).toFixed(2)}m along)`
       : 'generated — no sources listed'
   }`;
 }
@@ -483,6 +499,12 @@ function describeSources(params: Params, barkSource: BarkSource | null, leafSour
   }
 }
 
+/** Height of the lowest limb, which is where a whorled trunk stops being bare. */
+function lowestLimb(skeleton: Skeleton): number {
+  const limbs = skeleton.branches.filter((branch) => branch.level === 1);
+  return limbs.length ? Math.min(...limbs.map((branch) => branch.points[0].p[1])) : skeleton.trunk.height;
+}
+
 /** The second line of the report: what the model measures, by type. */
 function describeShape({ params, skeleton, metrics, crown }: Built): string {
   if (crown)
@@ -495,7 +517,12 @@ function describeShape({ params, skeleton, metrics, crown }: Built): string {
 
   if (skeleton)
     return (
-      `  height ${skeleton.trunk.height.toFixed(2)}m, first fork ${skeleton.trunk.splitHeight.toFixed(2)}m, ` +
+      `  height ${skeleton.trunk.height.toFixed(2)}m, ` +
+      // A whorled trunk has no fork to report. What it has instead is the foot
+      // left bare below its lowest ring of limbs.
+      (params.branchModel === 'whorl'
+        ? `${params.whorls} whorls from ${lowestLimb(skeleton).toFixed(2)}m, `
+        : `first fork ${skeleton.trunk.splitHeight.toFixed(2)}m, `) +
       `canopy spread ${skeleton.canopy.spread.toFixed(2)}m`
     );
 

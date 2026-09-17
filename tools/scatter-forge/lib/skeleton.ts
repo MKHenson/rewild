@@ -2,7 +2,8 @@
 // that COLOR_0's bend weight is derived from. Purely geometric, so it can be
 // asserted against without building a mesh.
 
-import type { Params } from './params.ts';
+import { signedFbm, smoothstep } from './noise.ts';
+import { trunkRingsOf, type Params } from './params.ts';
 import { createRng, hash2, type Rng } from './rng.ts';
 import { cross, length, normalize, perpendicular, rotateAbout, scale, sub, type Vec3 } from './vec.ts';
 
@@ -47,16 +48,21 @@ interface GrowSpec {
 }
 
 const DEG = Math.PI / 180;
+const TWO_PI = Math.PI * 2;
 const UP: Vec3 = [0, 1, 0];
 
 // Phyllotaxis. Spacing children by an even fraction of a turn ties azimuth to
-// attach height, because both are indexed by the same child number — a whorl
+// attach height, because both are indexed by the same child number — a ring
 // spread along its parent then winds up one side as a helix. The golden angle
 // spreads them evenly and leaves the two uncorrelated.
+//
+// A whorl wants the opposite and takes the even fraction instead: its children
+// share one height, so there is no attach height for the azimuth to correlate
+// with, and a ring of limbs at even angles is what a conifer has.
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 function ringsFor(params: Params, level: number): number {
-  return level === 0 ? params.segments + 2 : Math.max(2, params.segments - level + 1);
+  return level === 0 ? trunkRingsOf(params) : Math.max(2, params.segments - level + 1);
 }
 
 function radiusAt(base: number, tip: number, t: number): number {
@@ -126,6 +132,119 @@ export function sampleBranch(branch: Branch, t: number): BranchPoint {
   };
 }
 
+/**
+ * Where one child attaches to its parent and how it leaves it. The two branch
+ * models differ in this and in nothing else: both hand the same four numbers
+ * to the same `growBranch`.
+ */
+interface Placement {
+  /** Fraction along the parent the child attaches at. */
+  attach: number;
+  /** Turn about the parent's own axis, in radians. */
+  azimuth: number;
+  /** Degrees the child turns away from the parent's heading. */
+  angle: number;
+  /** Multiplies the child's length. What makes a whorled trunk a cone. */
+  lengthScale: number;
+}
+
+/**
+ * The dividing model: children spread back from the parent's tip along
+ * `splitSpread` and turned by the golden angle.
+ */
+function forkPlacement(params: Params, rng: Rng, index: number, ringPhase: number, onTrunk: boolean): Placement {
+  const spread = params.splits > 1 ? index / (params.splits - 1) : 0;
+
+  // Child 0 off the trunk is the leader: a real trunk carries on past its
+  // first fork rather than ending in a symmetric fan.
+  const leader = onTrunk && index === 0;
+  const angle = (leader ? params.splitAngle * 0.25 : params.splitAngle) + (rng() - 0.5) * 2 * params.splitVariance;
+
+  return {
+    attach: 1 - params.splitSpread * spread,
+    azimuth: ringPhase + index * GOLDEN_ANGLE + (rng() - 0.5) * 0.6,
+    angle,
+    lengthScale: leader ? 1.15 : 1,
+  };
+}
+
+/**
+ * The conifer model: rings of limbs up an undivided trunk.
+ *
+ * The whorls climb the top `splitSpread` of the trunk at one fixed interval,
+ * which leaves a bare foot below the lowest and a bare leader of one interval
+ * above the top: the leading shoot a conifer carries above its last whorl.
+ * Length falls from the lowest ring to `whorlTaper` at the top, and that fall
+ * is the cone.
+ */
+function whorlPlacement(params: Params, rng: Rng, index: number): Placement {
+  const ring = Math.floor(index / params.splits);
+  const step = params.splitSpread / params.whorls;
+  // 0 at the lowest ring, 1 at the top. A single whorl is the lowest one.
+  const rise = params.whorls > 1 ? ring / (params.whorls - 1) : 0;
+
+  const angle = params.splitAngle + (rng() - 0.5) * 2 * params.splitVariance;
+
+  // Each ring is turned by a phase of its own, or every whorl stacks its limbs
+  // into the same vertical planes and the tree reads as a mast with battens.
+  const azimuth =
+    hash2(params.seed ^ 0x27d4eb2f, ring) * TWO_PI +
+    ((index % params.splits) / params.splits) * TWO_PI +
+    (rng() - 0.5) * 0.35;
+
+  return {
+    attach: 1 - params.splitSpread + ring * step,
+    azimuth,
+    angle,
+    lengthScale: 1 + (params.whorlTaper - 1) * rise,
+  };
+}
+
+/**
+ * Strays a trunk's or a stem's centre line off a straight climb.
+ *
+ * `curve` turns a branch about one fixed axis, which reads as a clean arc. A
+ * real trunk leans one way and then back, so this is a smooth two-axis field
+ * rather than more curve. It is held at zero at the foot, so the tree still
+ * stands where it was planted, and the headings are rebuilt from the moved
+ * points afterwards: the limbs sample the trunk, and the bark rings take their
+ * frame from it, so both follow the stray for free.
+ *
+ * The field is hashed from the seed rather than drawn from the rng. A key that
+ * is off by default must not shift the sequence every other branch reads from.
+ */
+export function wanderCentreLine(params: Params, trunk: Branch): void {
+  const points = trunk.points;
+  const last = points.length - 1;
+
+  for (let i = 1; i <= last; i++) {
+    const t = i / last;
+
+    // Read up the y axis over two cells of three: one lean and a partial
+    // second, which is what a trunk does. More cells read as a snake.
+    //
+    // Both periods are 2 or more and the x coordinate sits mid-cell on purpose.
+    // A period of 1 makes the lattice's two rows the same row, so that axis
+    // cancels and the field returns its mean everywhere; the first cut of this
+    // read a 1-period axis and `trunkWander` moved nothing at all.
+    const x = signedFbm(0.5, t * 2, 2, 3, 2, params.seed ^ 0x6d2b79f5);
+    const z = signedFbm(1.5, t * 2, 2, 3, 2, params.seed ^ 0x1b56c4e9);
+    // Eased in, and eased in with a flat start rather than a linear one. A ramp
+    // that opens at full slope tilts the first ring by that slope, and a ring
+    // tilted at the foot puts the low side of the trunk under the ground.
+    const ramp = smoothstep(0, 0.3, t);
+    const stray = params.trunkWander * ramp;
+
+    points[i].p = [points[i].p[0] + x * stray, points[i].p[1], points[i].p[2] + z * stray];
+  }
+
+  for (let i = 0; i <= last; i++) {
+    const before = points[Math.max(0, i - 1)].p;
+    const after = points[Math.min(last, i + 1)].p;
+    if (before !== after) points[i].dir = normalize(sub(after, before));
+  }
+}
+
 export function buildSkeleton(params: Params): Skeleton {
   const rng = createRng(params.seed);
   const branches: Branch[] = [];
@@ -141,6 +260,7 @@ export function buildSkeleton(params: Params): Skeleton {
     baseRadius: params.trunkRadius,
     baseDist: 0,
   });
+  if (params.trunkWander > 0) wanderCentreLine(params, trunk);
   branches.push(trunk);
 
   const queue = [trunk];
@@ -151,23 +271,25 @@ export function buildSkeleton(params: Params): Skeleton {
     const parent = queue[head];
     if (parent.level >= params.branchLevels) continue;
 
-    // Each whorl starts at its own angle, so successive levels do not stack
+    // Each ring starts at its own angle, so successive levels do not stack
     // their branches into the same vertical planes.
-    const whorlPhase = hash2(params.seed, parent.id) * Math.PI * 2;
+    const ringPhase = hash2(params.seed, parent.id) * TWO_PI;
 
-    for (let i = 0; i < params.splits; i++) {
-      const spread = params.splits > 1 ? i / (params.splits - 1) : 0;
-      const attach = 1 - params.splitSpread * spread;
-      const at = sampleBranch(parent, attach);
+    // The whorl model governs the trunk alone. A conifer's limbs divide the
+    // ordinary way once they have left it, so everything below level 0 forks
+    // whatever the model says.
+    const whorled = params.branchModel === 'whorl' && parent.level === 0;
+    const children = whorled ? params.whorls * params.splits : params.splits;
 
-      // Child 0 off the trunk is the leader: a real trunk carries on past its
-      // first fork rather than ending in a symmetric fan.
-      const leader = parent.level === 0 && i === 0;
-      const angle = (leader ? params.splitAngle * 0.25 : params.splitAngle) + (rng() - 0.5) * 2 * params.splitVariance;
+    for (let i = 0; i < children; i++) {
+      const placement = whorled
+        ? whorlPlacement(params, rng, i)
+        : forkPlacement(params, rng, i, ringPhase, parent.level === 0);
 
-      const azimuth = whorlPhase + i * GOLDEN_ANGLE + (rng() - 0.5) * 0.6;
-      const axis = rotateAbout(perpendicular(at.dir), at.dir, azimuth);
-      const direction = normalize(rotateAbout(at.dir, normalize(axis), angle * DEG));
+      const at = sampleBranch(parent, placement.attach);
+
+      const axis = rotateAbout(perpendicular(at.dir), at.dir, placement.azimuth);
+      const direction = normalize(rotateAbout(at.dir, normalize(axis), placement.angle * DEG));
 
       const child = growBranch(params, rng, {
         id: nextId++,
@@ -175,7 +297,7 @@ export function buildSkeleton(params: Params): Skeleton {
         clusterId: parent.level === 0 ? nextId : parent.clusterId,
         origin: at.p,
         direction,
-        branchLength: parent.length * params.lengthRatio * (leader ? 1.15 : 1) * rng.range(0.85, 1.15),
+        branchLength: parent.length * params.lengthRatio * placement.lengthScale * rng.range(0.85, 1.15),
         baseRadius: at.radius * params.radiusRatio,
         baseDist: at.dist,
       });
@@ -213,7 +335,12 @@ function finalise(params: Params, branches: Branch[]): Skeleton {
   // Where the trunk first forks. The collider proxy stops here: a straight
   // capsule cannot follow a curving trunk, and above the fork there is nothing
   // solid enough to be worth the mismatch.
-  const trunkChildren = branches.filter((branch) => branch.level === 1);
+  //
+  // A whorled trunk never forks. It runs unbroken to the tip, so there is a
+  // solid column the whole way up and the proxy follows it there. Stopping at
+  // the lowest whorl would leave a spruce with a stub of a collider and a
+  // player walking through its trunk.
+  const trunkChildren = params.branchModel === 'whorl' ? [] : branches.filter((branch) => branch.level === 1);
 
   for (const branch of branches) {
     branch.length *= factor;
