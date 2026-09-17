@@ -39,7 +39,7 @@ const SIZE = 8;
  * scaled by 257. A test for 16-bit precision cannot be built out of a writer
  * that does not have any.
  */
-function png16(samples: number[], size: number): Buffer {
+function png16(samples: number[], width: number, height = width): Buffer {
   const chunk = (type: string, body: Buffer): Buffer => {
     const head = Buffer.alloc(8);
     head.writeUInt32BE(body.length, 0);
@@ -50,16 +50,16 @@ function png16(samples: number[], size: number): Buffer {
   };
 
   const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0);
-  ihdr.writeUInt32BE(size, 4);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 16; // bit depth
   ihdr[9] = 0; // greyscale
 
   // One filter byte per row, then big-endian samples.
-  const raw = Buffer.alloc(size * (1 + size * 2));
-  for (let y = 0; y < size; y++) {
-    const row = y * (1 + size * 2);
-    for (let x = 0; x < size; x++) raw.writeUInt16BE(samples[y * size + x], row + 1 + x * 2);
+  const raw = Buffer.alloc(height * (1 + width * 2));
+  for (let y = 0; y < height; y++) {
+    const row = y * (1 + width * 2);
+    for (let x = 0; x < width; x++) raw.writeUInt16BE(samples[y * width + x], row + 1 + x * 2);
   }
 
   return Buffer.concat([
@@ -73,24 +73,27 @@ function png16(samples: number[], size: number): Buffer {
 async function writeSource(
   root: string,
   name: string,
-  options: { metadata?: unknown; dispDepth?: 8 | 16; heights?: number[] } = {}
+  options: { metadata?: unknown; dispDepth?: 8 | 16; heights?: number[]; rows?: number } = {}
 ): Promise<string> {
   const directory = join(root, 'bark', name);
   await mkdir(directory, { recursive: true });
 
-  const rgb = Buffer.alloc(SIZE * SIZE * 3, 128);
-  const raw = { raw: { width: SIZE, height: SIZE, channels: 3 as const } };
+  // A bark tile may be any shape, and a photograph of bark usually is taller
+  // than it is wide.
+  const rows = options.rows ?? SIZE;
+  const rgb = Buffer.alloc(SIZE * rows * 3, 128);
+  const raw = { raw: { width: SIZE, height: rows, channels: 3 as const } };
   await sharp(rgb, raw).webp({ lossless: true }).toFile(join(directory, `${name}-diff.webp`));
   await sharp(rgb, raw).webp({ lossless: true }).toFile(join(directory, `${name}-arm.webp`));
 
   const depth = options.dispDepth ?? 16;
   if (depth === 16) {
     const samples: number[] = [];
-    for (let i = 0; i < SIZE * SIZE; i++)
+    for (let i = 0; i < SIZE * rows; i++)
       samples.push(options.heights ? options.heights[i % options.heights.length] : i * 37);
-    await writeFile(join(directory, `${name}-disp.png`), png16(samples, SIZE));
+    await writeFile(join(directory, `${name}-disp.png`), png16(samples, SIZE, rows));
   } else {
-    await sharp(Buffer.alloc(SIZE * SIZE, 200), { raw: { width: SIZE, height: SIZE, channels: 1 } })
+    await sharp(Buffer.alloc(SIZE * rows, 200), { raw: { width: SIZE, height: rows, channels: 1 } })
       .png()
       .toFile(join(directory, `${name}-disp.png`));
   }
@@ -176,7 +179,7 @@ describe('bark sources', () => {
     const source = await loadBarkSource(['precise'], root);
     expect(source).not.toBeNull();
 
-    const seen = new Set(Array.from(source!.height, (v) => Math.round(v * 65535)));
+    const seen = new Set(Array.from(source!.relief, (v) => Math.round(v * 65535)));
     for (const h of heights) expect(seen.has(h)).toBe(true);
     // Adjacent values a byte apart would collapse into each other at 8 bits.
     expect(seen.has(40000) && seen.has(40001) && seen.has(40002)).toBe(true);
@@ -379,8 +382,29 @@ describe('leaf fit', () => {
   });
 });
 
+describe('a bark tile of any shape', () => {
+  it('takes its aspect from the art rather than being held to a square', async () => {
+    // A bark photograph is taller than it is wide, and that shape is what says
+    // how much trunk one tile covers along the branch.
+    const root = await mkdtemp(join(tmpdir(), 'forge-rect-'));
+    await writeSource(root, 'tall', { rows: SIZE * 2, metadata: { widthMetres: 0.8, depthMetres: 0.03 } });
+
+    const source = await loadBarkSource(['tall'], root);
+
+    expect(source!.width).toBe(SIZE);
+    expect(source!.height).toBe(SIZE * 2);
+    expect(source!.aspect).toBe(2);
+    // 0.8m around by 1.6m along.
+    expect(source!.widthMetres * source!.aspect).toBeCloseTo(1.6, 6);
+    expect(source!.albedo).toHaveLength(SIZE * SIZE * 2 * 3);
+    expect(source!.relief).toHaveLength(SIZE * SIZE * 2);
+
+    await rm(root, { recursive: true, force: true });
+  });
+});
+
 describe('bark scale', () => {
-  const source = { widthMetres: 1, depthMetres: 0.04, size: 1024 } as BarkSource;
+  const source = { widthMetres: 1, depthMetres: 0.04, width: 1024, height: 1024, aspect: 1 } as BarkSource;
 
   it('fits a whole number of tiles around the trunk', () => {
     // A fraction of a tile would leave the ring's seam meeting a different part
@@ -400,13 +424,13 @@ describe('bark scale', () => {
 
   it('scales the normal gain with the texels a tile is given', () => {
     // Same depth over twice the texels is half the slope per texel, so the gain
-    // has to halve with it or the bump doubles when the atlas grows.
-    const one = normalStrength(source, 2, 1024);
-    const wider = normalStrength(source, 2, 2048);
+    // has to halve with it or the bump doubles when the art is authored larger.
+    const one = normalStrength(source);
+    const wider = normalStrength({ ...source, width: 2048 } as BarkSource);
     expect(wider).toBeCloseTo(one * 2, 6);
 
     // Deeper bark, stronger normal, in proportion.
-    const deeper = normalStrength({ ...source, depthMetres: 0.08 } as BarkSource, 2, 1024);
+    const deeper = normalStrength({ ...source, depthMetres: 0.08 } as BarkSource);
     expect(deeper).toBeCloseTo(one * 2, 6);
   });
 });

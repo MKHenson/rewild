@@ -19,19 +19,28 @@ import {
   gradientGain,
   LEAF_GRID_GENERATED,
   normalStrength,
-  tileRepeats,
   type BarkSource,
   type LeafSource,
 } from './sources.ts';
-import { barkStack, createSample, sampleBark } from './bark.ts';
+import { woodAt } from './wood.ts';
 import { clusterFor, compositeCluster } from './cluster.ts';
 import { fbm, signedFbm, warp } from './noise.ts';
 import { createRng, type Rng } from './rng.ts';
-import type { Params } from './params.ts';
+import { barkCanvasSize, type Params } from './params.ts';
 
 /** The atlas as float channels, before any of it is quantised or encoded. */
 export interface Canvas {
-  size: number;
+  /**
+   * Texels across the image and down it.
+   *
+   * Square for every piece but bark. Bark's is `barkAspect` times taller than
+   * it is wide, because its two axes are not alike: x wraps once around the
+   * ring and never repeats, and y runs along the branch and repeats every
+   * tile. Texels spent on x buy sharpness; texels spent on y buy the distance
+   * before the eye sees the same plate again.
+   */
+  width: number;
+  height: number;
   /** The gradient gain this canvas's own height needs to become a normal. A
    *  sourced image derives it from the depth the source declares; a generated
    *  one takes the settled value. */
@@ -39,7 +48,9 @@ export interface Canvas {
   /** Three floats a texel, in display space. */
   albedo: Float32Array;
   alpha: Float32Array;
-  height: Float32Array;
+  /** The surface, 0..1. Named for what it is rather than `height`, which on a
+   *  canvas is a dimension. */
+  relief: Float32Array;
   ao: Float32Array;
   roughness: Float32Array;
   metallic: Float32Array;
@@ -78,9 +89,6 @@ interface Leaflet {
 // nothing and one that covers the whole trunk.
 const DEG = Math.PI / 180;
 
-const LICHEN_CLEAR = 0.78;
-const LICHEN_DENSE = 0.3;
-
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 const mix = (a: number, b: number, t: number): number => a + (b - a) * t;
 
@@ -92,34 +100,6 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 const mixRgb = (a: Rgb, b: Rgb, t: number): Rgb => [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
 const scaleRgb = (c: Rgb, s: number): Rgb => [c[0] * s, c[1] * s, c[2] * s];
 
-function desaturate(c: Rgb, amount: number): Rgb {
-  const grey = luminance(c);
-  return mixRgb(c, [grey, grey, grey], amount);
-}
-
-/** Blends across an ordered palette by a single 0..1 position. */
-function paletteAt(entries: Rgb[], t: number): Rgb {
-  const scaled = clamp01(t) * (entries.length - 1);
-  const index = Math.min(entries.length - 2, Math.floor(scaled));
-  return mixRgb(entries[index], entries[index + 1], scaled - index);
-}
-
-/**
- * Bark is never one colour. A trunk is warm brown where it is fresh, grey where
- * it has weathered, and greener where damp, in patches metres across. Ramping a
- * single tint by depth varies brightness alone, which is the most reliable tell
- * that a texture was generated.
- */
-function barkPalette(tint: Rgb): Rgb[] {
-  // Kept close together on purpose. These are weathering states of one bark,
-  // not three different materials, and a wide palette reads as a stain rather
-  // than as a trunk.
-  return [
-    [Math.min(1, tint[0] * 1.08), tint[1] * 0.98, tint[2] * 0.92],
-    scaleRgb(desaturate(tint, 0.3), 1.05),
-    scaleRgb(desaturate([tint[0] * 0.94, tint[1] * 1, tint[2] * 0.98], 0.12), 0.88),
-  ];
-}
 
 // Weathering runs along one axis, from fresh warm tissue to grey-blue exposure.
 // Blending toward these keeps the drift inside colours bark and leaves actually
@@ -184,135 +164,53 @@ function parseHex(value: string | undefined, field: string): Rgb {
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
 
-function createCanvas(size: number, bumpStrength: number): Canvas {
-  const texels = size * size;
+function createCanvas(width: number, height: number, bumpStrength: number): Canvas {
+  const texels = width * height;
   return {
-    size,
+    width,
+    height,
     bumpStrength,
     albedo: new Float32Array(texels * 3),
     alpha: new Float32Array(texels),
-    height: new Float32Array(texels),
+    relief: new Float32Array(texels),
     ao: new Float32Array(texels).fill(1),
     roughness: new Float32Array(texels).fill(0.8),
     metallic: new Float32Array(texels),
   };
 }
 
+/**
+ * The generated bark: the wood pattern, tinted and shaded from its own relief.
+ *
+ * Three stops rather than two, which is most of what makes a wood texture read
+ * as rich rather than as a tinted heightfield: crevice, mid, and the exposed
+ * face that catches the light.
+ */
 function paintBark(canvas: Canvas, params: Params): void {
-  const { size } = canvas;
-  const seed = params.seed | 0;
-  const palette = barkPalette(parseHex(params.barkTint, 'bark-tint'));
-  const lichenColour = parseHex(params.lichenTint, 'lichen-tint');
+  const { width, height } = canvas;
+  const face = parseHex(params.barkTint, 'bark-tint');
+  const crevice = scaleRgb(face, 0.24);
 
-  // Colour patches run along the branch, so they are broader in u than in v,
-  // the same way the plates are. Both periods stay integers because the lattice
-  // wraps on whole cells.
-  const PATCH_Y = params.colourPatches;
-  const PATCH_X = Math.max(1, Math.round(params.colourPatches * 0.4));
+  for (let y = 0; y < height; y++) {
+    // y runs along the branch and x around the ring, which is the way bark is
+    // authored and the way the tube samples it.
+    const along = y / height;
 
-  // Built once and run per texel. One sample, reused: the band is half a
-  // million texels and a stack touches it several times at each.
-  const stack = barkStack(params, seed);
-  const sample = createSample();
+    for (let x = 0; x < width; x++) {
+      const relief = woodAt(params, x / width, along);
+      const i = y * width + x;
 
-  // Length runs down the image and the ring across it, which is the way bark
-  // sources are authored and so the way the assembler will want to write them.
-  // Both axes span the whole image and both wrap, so there is no gutter and no
-  // edge: the ring closes across x and the tile repeats down y.
-  for (let y = 0; y < size; y++) {
-    const fu = y / size;
+      // Ramped straight from crevice to face. A three-stop ramp with a mid
+      // point crushes the lower half into near-black, which is what the first
+      // cut of this did: the bands between the grain read as holes.
+      for (let c = 0; c < 3; c++)
+        canvas.albedo[i * 3 + c] = clamp01(mix(crevice[c], face[c], relief));
 
-    for (let x = 0; x < size; x++) {
-      const fv = x / size;
-
-      sampleBark(stack, sample, fu, fv);
-      let h = sample.height;
-      const { cavity, grain, plate, wear: knotCore } = sample;
-
-      // Which colour this patch of trunk is. Deliberately low frequency: the
-      // eye reads patches of a different hue, and fine colour noise only fights
-      // the normal map and then averages away in the mip chain anyway.
-      const [rx, ry] = warp(fu * 2, fv * 3, 2, 3, seed + 71, 0.6);
-      // Plate to plate on top of that. Weathering is per plate because a plate
-      // is what is exposed as a unit, and it is the cue that says these are
-      // separate pieces of bark rather than one dented surface.
-      const base = paletteAt(palette, clamp01(fbm(rx, ry, 2, 3, 3, seed + 71) + (plate - 0.5) * 0.5));
-
-      // Depth alone decides how dark a fissure goes, because colour is ramped
-      // by height. This lifts the floor independently, so a groove can be deep
-      // without being a black line.
-      const crevice = scaleRgb(base, params.grooveShade);
-      const ridge: Rgb = [
-        Math.min(1, base[0] * 1.38 + 0.06),
-        Math.min(1, base[1] * 1.38 + 0.06),
-        Math.min(1, base[2] * 1.38 + 0.06),
-      ];
-
-      const i = y * size + x;
-      // Keyed on cavity rather than on height. Height only says how deep a
-      // texel is, and a plate sitting low is not a crevice — shading from it
-      // alone is what leaves a generated map looking like a tinted heightfield.
-      const shade = clamp01(1 - cavity) ** 0.75;
-      const tone = mix(0.88, 1.12, plate) * mix(0.88, 1.12, grain);
-
-      const graded = driftColour(
-        [
-          mix(crevice[0], ridge[0], shade) * tone,
-          mix(crevice[1], ridge[1], shade) * tone,
-          mix(crevice[2], ridge[2], shade) * tone,
-        ],
-        fu * PATCH_X,
-        fv * PATCH_Y,
-        PATCH_X,
-        PATCH_Y,
-        seed,
-        params.colourVariation
-      );
-
-      let [red, green, blue] = graded;
-
-      // Dead heartwood in the middle of a healed knot, darker than the bark
-      // that grew over it.
-      if (knotCore > 0) {
-        const stain = knotCore * params.knotDepth * 0.9;
-        red = mix(red, red * 0.34, stain);
-        green = mix(green, green * 0.28, stain);
-        blue = mix(blue, blue * 0.26, stain);
-      }
-
-      let roughness = 0.94 - 0.18 * h;
-      // Occlusion is what a fissure does to the light reaching its floor, so it
-      // follows how enclosed a texel is and not how low it sits.
-      let occlusion = clamp01(1 - 0.72 * cavity);
-
-      if (params.lichen > 0) {
-        // Grows on the outer face rather than down in the fissures, and holds
-        // its own roughness: lichen is matt where the bark under it is not.
-        const [lx, ly] = warp(fu * 3, fv * 6, 3, 6, seed + 97, 0.85);
-
-        // An octave sum clusters hard around its mean and reaches neither 0 nor
-        // 1, so a threshold picked by eye either covers everything or nothing.
-        // The band below sits inside the distribution this actually produces,
-        // and lichen slides it, which is what makes the flag mean coverage.
-        const start = mix(LICHEN_CLEAR, LICHEN_DENSE, clamp01(params.lichen));
-        const patch = smoothstep(start, start + 0.09, fbm(lx, ly, 3, 6, 4, seed + 97));
-        const cover = patch * (1 - smoothstep(0.15, 0.6, cavity)) * 0.85;
-
-        red = mix(red, lichenColour[0] * mix(0.75, 1.15, grain), cover);
-        green = mix(green, lichenColour[1] * mix(0.75, 1.15, grain), cover);
-        blue = mix(blue, lichenColour[2] * mix(0.75, 1.15, grain), cover);
-        roughness = mix(roughness, 0.97, cover);
-        occlusion = mix(occlusion, occlusion * 0.94, cover);
-        h = clamp01(h + cover * 0.04);
-      }
-
-      canvas.albedo[i * 3] = clamp01(red);
-      canvas.albedo[i * 3 + 1] = clamp01(green);
-      canvas.albedo[i * 3 + 2] = clamp01(blue);
       canvas.alpha[i] = 1;
-      canvas.height[i] = h;
-      canvas.ao[i] = occlusion;
-      canvas.roughness[i] = clamp01(roughness + roughnessDrift(fu * 2, fv * 5, 2, 5, seed, params.roughnessVariation));
+      canvas.relief[i] = relief;
+      // A crevice holds shadow and dust; a face is worn smoother and lighter.
+      canvas.ao[i] = 0.55 + 0.45 * relief;
+      canvas.roughness[i] = clamp01(0.94 - 0.18 * relief);
       canvas.metallic[i] = 0;
     }
   }
@@ -431,7 +329,7 @@ const leafStyle: StyleFor = (params, rng, rect, variant) => ({
 });
 
 function paintFoliageCell(canvas: Canvas, params: Params, rect: PixelRect, variant: number, makeStyle: StyleFor): void {
-  const { size } = canvas;
+  const { width } = canvas;
   const cell = cellEdge(rect);
   const rng = createRng((params.seed ^ 0x2f6b1e3d) + variant * 7919);
   const style = makeStyle(params, rng, rect, variant);
@@ -472,13 +370,13 @@ function paintFoliageCell(canvas: Canvas, params: Params, rect: PixelRect, varia
 
       if (!best) continue;
 
-      const i = (rect.y + ly) * size + (rect.x + lx);
-      const { leaflet, across, width } = best;
+      const i = (rect.y + ly) * width + (rect.x + lx);
+      const { leaflet, across, width: leafletWidth } = best;
       const along = best.along;
 
-      const lateral = Math.abs(across) / Math.max(width, 0.001);
+      const lateral = Math.abs(across) / Math.max(leafletWidth, 0.001);
       const dome = Math.sqrt(Math.max(0, 1 - lateral * lateral));
-      const veins = style.veins ? leafVeins(along, across, width) : 0;
+      const veins = style.veins ? leafVeins(along, across, leafletWidth) : 0;
 
       // Warped, so the blotching runs with the blade instead of sitting on it
       // as even speckle.
@@ -519,7 +417,7 @@ function paintFoliageCell(canvas: Canvas, params: Params, rect: PixelRect, varia
       // Veins stand proud of the blade, but only just. A leaf is a millimetre
       // thick, and relief past that reads as corrugated plastic once the
       // curvature pass gets hold of it.
-      canvas.height[i] = clamp01(0.34 + 0.38 * dome + 0.1 * veins);
+      canvas.relief[i] = clamp01(0.34 + 0.38 * dome + 0.1 * veins);
       // Overlapping leaflets sit in each other's shadow, which is the only
       // occlusion a flat card can carry.
       canvas.ao[i] = clamp01((0.78 + 0.22 * dome) * (overlaps > 1 ? 0.86 : 1));
@@ -544,8 +442,8 @@ function paintFoliageCell(canvas: Canvas, params: Params, rect: PixelRect, varia
 function applyCurvature(canvas: Canvas, strength: number, tiles: boolean): void {
   if (strength <= 0) return;
 
-  const { size, alpha } = canvas;
-  const height = canvas.height;
+  const { width, height, alpha } = canvas;
+  const relief = canvas.relief;
 
   // A texel with no coverage has no height to compare against, so it lends the
   // centre's own value. Reading its zero instead would ring a bright rim around
@@ -554,21 +452,21 @@ function applyCurvature(canvas: Canvas, strength: number, tiles: boolean): void 
     // Bark wraps on both axes now that it owns its image, so its curvature has
     // to read across the seam or every tile gains a rim. A leaf cell must not:
     // the neighbour across the edge is a different leaf.
-    if (!tiles && (y < 0 || y >= size)) return centre;
-    const j = (((y % size) + size) % size) * size + (((x % size) + size) % size);
-    return alpha[j] > 0 ? height[j] : centre;
+    if (!tiles && (y < 0 || y >= height)) return centre;
+    const j = (((y % height) + height) % height) * width + (((x % width) + width) % width);
+    return alpha[j] > 0 ? relief[j] : centre;
   };
 
   // Neighbouring texels differ by very little, so the Laplacian needs lifting
   // into a usable range before it is clamped.
   const GAIN = 16;
 
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const i = y * size + x;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
       if (alpha[i] <= 0) continue;
 
-      const centre = height[i];
+      const centre = relief[i];
       const laplacian =
         4 * centre - (at(x - 1, y, centre) + at(x + 1, y, centre) + at(x, y - 1, centre) + at(x, y + 1, centre));
 
@@ -589,12 +487,12 @@ function applyCurvature(canvas: Canvas, strength: number, tiles: boolean): void 
  * silhouette gains a dark fringe that gets worse with distance.
  */
 function dilate(canvas: Canvas, rect: PixelRect, passes: number): void {
-  const { size } = canvas;
+  const { width: stride } = canvas;
   const filled = new Uint8Array(rect.width * rect.height);
 
   for (let ly = 0; ly < rect.height; ly++)
     for (let lx = 0; lx < rect.width; lx++)
-      filled[ly * rect.width + lx] = canvas.alpha[(rect.y + ly) * size + (rect.x + lx)] > 0 ? 1 : 0;
+      filled[ly * rect.width + lx] = canvas.alpha[(rect.y + ly) * stride + (rect.x + lx)] > 0 ? 1 : 0;
 
   for (let pass = 0; pass < passes; pass++) {
     const next = filled.slice();
@@ -620,7 +518,7 @@ function dilate(canvas: Canvas, rect: PixelRect, passes: number): void {
           if (nx < 0 || ny < 0 || nx >= rect.width || ny >= rect.height) continue;
           if (!filled[ny * rect.width + nx]) continue;
 
-          const j = (rect.y + ny) * size + (rect.x + nx);
+          const j = (rect.y + ny) * stride + (rect.x + nx);
           sum[0] += canvas.albedo[j * 3];
           sum[1] += canvas.albedo[j * 3 + 1];
           sum[2] += canvas.albedo[j * 3 + 2];
@@ -629,7 +527,7 @@ function dilate(canvas: Canvas, rect: PixelRect, passes: number): void {
 
         if (!count) continue;
 
-        const i = (rect.y + ly) * size + (rect.x + lx);
+        const i = (rect.y + ly) * stride + (rect.x + lx);
         canvas.albedo[i * 3] = sum[0] / count;
         canvas.albedo[i * 3 + 1] = sum[1] / count;
         canvas.albedo[i * 3 + 2] = sum[2] / count;
@@ -648,12 +546,14 @@ function dilate(canvas: Canvas, rect: PixelRect, passes: number): void {
  * clamped, and every clamped row falls inside a gutter no UV addresses.
  */
 function encodeNormal(canvas: Canvas, strength: number): Buffer {
-  const { size, height } = canvas;
-  const out = Buffer.alloc(size * size * 3);
-  const at = (x: number, y: number): number => height[Math.min(size - 1, Math.max(0, y)) * size + ((x % size) + size) % size];
+  const { width, height: rows, relief } = canvas;
+  const out = Buffer.alloc(width * rows * 3);
+  // Clamped down the image and wrapped across it, the way the tube samples it.
+  const at = (x: number, y: number): number =>
+    relief[Math.min(rows - 1, Math.max(0, y)) * width + ((((x % width) + width) % width))];
 
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < width; x++) {
       const dx =
         at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1) -
         (at(x - 1, y - 1) + 2 * at(x - 1, y) + at(x - 1, y + 1));
@@ -668,7 +568,7 @@ function encodeNormal(canvas: Canvas, strength: number): Buffer {
       ny /= length;
       const nz = 1 / length;
 
-      const i = (y * size + x) * 3;
+      const i = (y * width + x) * 3;
       out[i] = Math.round((nx * 0.5 + 0.5) * 255);
       out[i + 1] = Math.round((ny * 0.5 + 0.5) * 255);
       out[i + 2] = Math.round((nz * 0.5 + 0.5) * 255);
@@ -679,10 +579,10 @@ function encodeNormal(canvas: Canvas, strength: number): Buffer {
 }
 
 function encodeRgba(canvas: Canvas): Buffer {
-  const { size } = canvas;
-  const out = Buffer.alloc(size * size * 4);
+  const texels = canvas.width * canvas.height;
+  const out = Buffer.alloc(texels * 4);
 
-  for (let i = 0; i < size * size; i++) {
+  for (let i = 0; i < texels; i++) {
     out[i * 4] = Math.round(clamp01(canvas.albedo[i * 3]) * 255);
     out[i * 4 + 1] = Math.round(clamp01(canvas.albedo[i * 3 + 1]) * 255);
     out[i * 4 + 2] = Math.round(clamp01(canvas.albedo[i * 3 + 2]) * 255);
@@ -693,10 +593,10 @@ function encodeRgba(canvas: Canvas): Buffer {
 }
 
 function encodeArm(canvas: Canvas): Buffer {
-  const { size } = canvas;
-  const out = Buffer.alloc(size * size * 3);
+  const texels = canvas.width * canvas.height;
+  const out = Buffer.alloc(texels * 3);
 
-  for (let i = 0; i < size * size; i++) {
+  for (let i = 0; i < texels; i++) {
     out[i * 3] = Math.round(clamp01(canvas.ao[i]) * 255);
     out[i * 3 + 1] = Math.round(clamp01(canvas.roughness[i]) * 255);
     out[i * 3 + 2] = Math.round(clamp01(canvas.metallic[i]) * 255);
@@ -706,11 +606,11 @@ function encodeArm(canvas: Canvas): Buffer {
 }
 
 function encodeHeight(canvas: Canvas): Buffer {
-  const { size } = canvas;
-  const out = Buffer.alloc(size * size * 3);
+  const texels = canvas.width * canvas.height;
+  const out = Buffer.alloc(texels * 3);
 
-  for (let i = 0; i < size * size; i++) {
-    const value = Math.round(clamp01(canvas.height[i]) * 255);
+  for (let i = 0; i < texels; i++) {
+    const value = Math.round(clamp01(canvas.relief[i]) * 255);
     out[i * 3] = value;
     out[i * 3 + 1] = value;
     out[i * 3 + 2] = value;
@@ -719,11 +619,11 @@ function encodeHeight(canvas: Canvas): Buffer {
   return out;
 }
 
-async function encode(path: string, data: Buffer, size: number, channels: 3 | 4): Promise<void> {
+async function encode(path: string, data: Buffer, width: number, height: number, channels: 3 | 4): Promise<void> {
   // Lossless throughout. The audit refuses lossy data maps because chroma
   // subsampling averages roughness and metallic across 2x2 blocks, and the
   // base colour's alpha is a cutout mask that must not be smeared either.
-  await sharp(data, { raw: { width: size, height: size, channels } })
+  await sharp(data, { raw: { width, height, channels } })
     .webp({ lossless: true, effort: 4, alphaQuality: 100 })
     .toFile(path);
 }
@@ -741,73 +641,31 @@ export function textureFileNames(textureSet: string, pieces: readonly string[]):
   return Object.fromEntries(pieces.map((piece) => [piece, namesFor(textureSet, piece)]));
 }
 
-/**
- * Lays a source tile across the bark image, repeated to its declared size.
- *
- * Bilinear and wrapped, so the repeat count does not have to divide the image
- * evenly and the tile's own edges keep meeting.
- */
-function paintBarkFromSource(canvas: Canvas, source: BarkSource, repeats: number): void {
-  const { size } = canvas;
-  const n = source.size;
-
-  for (let y = 0; y < size; y++) {
-    const sy = (y / size) * repeats * n;
-    const y0 = Math.floor(sy);
-    const fy = sy - y0;
-    const ay = ((y0 % n) + n) % n;
-    const by = (ay + 1) % n;
-
-    for (let x = 0; x < size; x++) {
-      const sx = (x / size) * repeats * n;
-      const x0 = Math.floor(sx);
-      const fx = sx - x0;
-      const ax = ((x0 % n) + n) % n;
-      const bx = (ax + 1) % n;
-
-      const i00 = ay * n + ax;
-      const i10 = ay * n + bx;
-      const i01 = by * n + ax;
-      const i11 = by * n + bx;
-      const w00 = (1 - fx) * (1 - fy);
-      const w10 = fx * (1 - fy);
-      const w01 = (1 - fx) * fy;
-      const w11 = fx * fy;
-
-      const blend = (channel: Float32Array): number =>
-        channel[i00] * w00 + channel[i10] * w10 + channel[i01] * w01 + channel[i11] * w11;
-
-      const i = y * size + x;
-      for (let c = 0; c < 3; c++)
-        canvas.albedo[i * 3 + c] =
-          source.albedo[i00 * 3 + c] * w00 +
-          source.albedo[i10 * 3 + c] * w10 +
-          source.albedo[i01 * 3 + c] * w01 +
-          source.albedo[i11 * 3 + c] * w11;
-
-      canvas.alpha[i] = 1;
-      canvas.ao[i] = blend(source.ao);
-      canvas.roughness[i] = blend(source.roughness);
-      canvas.metallic[i] = blend(source.metallic);
-      canvas.height[i] = blend(source.height);
-    }
-  }
-}
-
 /** The bark image as float channels. Split from encoding so the preview can
  *  shade against the same pixels the model will sample. */
 export function buildBarkCanvas(params: Params, source?: BarkSource | null): Canvas {
   if (source) {
-    const repeats = tileRepeats(source, params.trunkRadius);
-    const canvas = createCanvas(params.textureSize, normalStrength(source, repeats, params.textureSize));
-    paintBarkFromSource(canvas, source, repeats);
+    // Written out at the source's own size and shape, texel for texel. It used
+    // to be resampled into `textureSize`, which at a barkAspect of 2 took a
+    // 1024 tile down to 512 around the ring and threw away half of what was
+    // authored. The repeating is the mesh's job now: see `barkTileOf`.
+    const canvas = createCanvas(source.width, source.height, normalStrength(source));
+
+    canvas.albedo.set(source.albedo);
+    canvas.alpha.fill(1);
+    canvas.relief.set(source.relief);
+    canvas.ao.set(source.ao);
+    canvas.roughness.set(source.roughness);
+    canvas.metallic.set(source.metallic);
+
     // No curvature pass. It exists to stop a generated map reading as a tinted
     // heightfield; authored art already carries where its own light falls, and
     // running it again would darken every crevice twice.
     return canvas;
   }
 
-  const canvas = createCanvas(params.textureSize, params.bumpStrength);
+  const { width, height } = barkCanvasSize(params);
+  const canvas = createCanvas(width, height, params.bumpStrength);
 
   paintBark(canvas, params);
   applyCurvature(canvas, params.curvature, true);
@@ -829,7 +687,7 @@ export function buildLeafCanvas(params: Params, source?: LeafSource | null): Can
   if (source) {
     const fit = fitLeaves(source, params.leafSize, size);
     const cells = leafCellPixels(size, fit.grid);
-    const canvas = createCanvas(size, fit.bumpStrength ?? params.bumpStrength);
+    const canvas = createCanvas(size, size, fit.bumpStrength ?? params.bumpStrength);
 
     cells.forEach((rect, index) => {
       const inner = insetRect(rect, gutter);
@@ -843,7 +701,7 @@ export function buildLeafCanvas(params: Params, source?: LeafSource | null): Can
   }
 
   const cells = leafCellPixels(size, LEAF_GRID_GENERATED);
-  const canvas = createCanvas(size, params.bumpStrength);
+  const canvas = createCanvas(size, size, params.bumpStrength);
 
   cells.forEach((rect, index) => paintFoliageCell(canvas, params, rect, index, leafStyle));
 
@@ -939,7 +797,7 @@ export function buildBladeCanvas(params: Params, source?: LeafSource | null): Ca
 
   if (source) {
     const fit = fitClump(source, size);
-    const canvas = createCanvas(size, gradientGainFor(source, params, fit.cellPx));
+    const canvas = createCanvas(size, size, gradientGainFor(source, params, fit.cellPx));
 
     rects.forEach((rect, index) => {
       const inner = insetRect(rect, gutter);
@@ -955,7 +813,7 @@ export function buildBladeCanvas(params: Params, source?: LeafSource | null): Ca
     return canvas;
   }
 
-  const canvas = createCanvas(size, params.bumpStrength);
+  const canvas = createCanvas(size, size, params.bumpStrength);
 
   // Painted into the *inset* rect, unlike a leaf cell. A tuft is anchored on the
   // bottom edge of its cell, and the card samples the cell inset by the gutter,
@@ -1075,7 +933,7 @@ export function buildFrondCanvas(params: Params, source?: LeafSource | null): Ca
 
   if (source) {
     const fit = fitCrown(source, size);
-    const canvas = createCanvas(size, gradientGainFor(source, params, fit.cellPx));
+    const canvas = createCanvas(size, size, gradientGainFor(source, params, fit.cellPx));
 
     rects.forEach((rect, index) => {
       const inner = insetRect(rect, gutter);
@@ -1087,7 +945,7 @@ export function buildFrondCanvas(params: Params, source?: LeafSource | null): Ca
     return canvas;
   }
 
-  const canvas = createCanvas(size, params.bumpStrength);
+  const canvas = createCanvas(size, size, params.bumpStrength);
 
   // Painted into the column the card samples, inset like a blade's cell so the
   // base is not sliced off at the gutter.
@@ -1131,13 +989,13 @@ export function buildCrownCanvases(
  * path would ever be wired for.
  */
 function encodeOne(directory: string, names: TextureNames, canvas: Canvas, withHeight: boolean): Promise<void>[] {
-  const size = canvas.size;
+  const { width, height } = canvas;
 
   return [
-    encode(join(directory, names.baseColor), encodeRgba(canvas), size, 4),
-    encode(join(directory, names.normal), encodeNormal(canvas, canvas.bumpStrength), size, 3),
-    encode(join(directory, names.arm), encodeArm(canvas), size, 3),
-    ...(withHeight ? [encode(join(directory, names.height), encodeHeight(canvas), size, 3)] : []),
+    encode(join(directory, names.baseColor), encodeRgba(canvas), width, height, 4),
+    encode(join(directory, names.normal), encodeNormal(canvas, canvas.bumpStrength), width, height, 3),
+    encode(join(directory, names.arm), encodeArm(canvas), width, height, 3),
+    ...(withHeight ? [encode(join(directory, names.height), encodeHeight(canvas), width, height, 3)] : []),
   ];
 }
 

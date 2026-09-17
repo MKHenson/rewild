@@ -16,7 +16,7 @@ shape of thing entirely:
 
 | `type` | Is | Covers |
 | ------ | -- | ------ |
-| `tree` | Recursive branching. Tapered tubes with cards hung on the outermost generations. | Oak, birch, poplar, and a shrub, which is the same generator at two metres |
+| `tree` | Recursive branching. Tapered tubes with cards hung on the outermost generations, placed by one of two **branch models**. | Oak, birch, poplar and a shrub, which is the same generator at two metres. Also every conifer, which is that generator under `branchModel: whorl`. See [Conifers](#conifers) |
 | `clump` | Cards radiating from one point on the ground. No stem. | Grass, wildflowers, clover, reeds |
 | `crown` | One undivided stem with a rosette of long curved cards at its top. The stem may be 0m. | Palm, tree fern, cycad, and a fern, which is the same rosette on the ground |
 
@@ -124,28 +124,21 @@ be tuned live too.
 | `poplar.json` | Tall and dense. Eight short branches per split spread over 90% of their parent, so foliage starts near the ground and carries all the way up. **Poplar bark with oak leaves**, on its own `poplar` set — the mix-and-match case. |
 | `birch.json`  | Slender and columnar. Two-way splits climbing six generations, with a **negative** `droop` pulling every branch back toward vertical — split angles compound with depth, so without it a deep tree fans out into a disc. Reuses the `oak` set. |
 | `shrub.json`  | Undergrowth. The same generator at two metres, on its own `shrub` set, generated art. |
-| `meadow.json` | **A clump, not a tree.** A nine-tuft patch 2.8m across, off a nine-cell generated atlas. The type's worked example, and the thing to copy for grass, clover or wildflowers. |
-| `meadow-02.json` | The second patch off the **same** `meadow` set, with `skipTextures`. Twelve tufts and a different constellation, which is what stops six hundred copies of one patch reading as a pattern. Run `meadow.json` first. |
-| `palm.json`   | **A crown.** A seven metre stem leaning twelve degrees under sixteen fronds of 3.2m, on its own `palm` set, generated art. The type's worked example for anything with a trunk. |
+| `spruce.json` | **A conifer.** Eighteen whorls of five limbs climbing 88% of a 24m trunk, each whorl a sixth of the length of the lowest. The `whorl` model's worked example, and the thing to copy for a fir or a pine. See [Conifers](#conifers). |
+| `redwood.json` | **The tall conifer, and the shaped trunk.** A 42m trunk bare for half its height, under a narrow crown at `whorlTaper` 0.45. Its trunk is fluted, flared and wandering on 24 sides, which is the worked example for [The trunk](#the-trunk). Hands over to its billboard at 320m. |
+| `larch.json`  | **The open conifer.** Limbs at 85 degrees off a 26m trunk, with steeply hanging foliage. The airy one: 9,672 triangles for a 26m tree, against the oak's 39,844 at 18m. |
+| `juniper.json` | **The scrubby conifer.** Five and a half metres, eight loose whorls, `splitVariance` 22 and an upswept `droop`, which breaks the rings up into something irregular. |
+| `cypress.json` | **The columnar conifer.** An Italian cypress: 24 whorls of short limbs at 24 degrees off the trunk, so they hug it, at `whorlTaper` 0.9 so the column barely narrows. 18m tall and 3.7m wide. |
+| `plains-01.json` | **A clump, not a tree.** A nine-tuft patch 2.8m across, off a nine-cell generated atlas. The type's worked example, and the thing to copy for grass, clover or wildflowers. |
+| `plains-02.json` | The second patch off the **same** `plains` set, with `skipTextures`. Twelve tufts and a different constellation, which is what stops six hundred copies of one patch reading as a pattern. Run `plains-01.json` first. |
+| `palm-01.json`   | **A crown.** A seven metre stem leaning twelve degrees under sixteen fronds of 3.2m, on its own `palm` set, generated art. The type's worked example for anything with a trunk. |
 | `fern.json`   | **A crown with no stem.** Eleven fronds of 0.9m standing up from the ground and arching over, on its own `fern` set. Emits a clump's layer, because at half a metre it is ground cover. |
 | `date-palm.json` | **The heavy crown, with a tier.** Thirty-six fronds of 4m attaching down the top half of a stout stem — `frondSpan` — so the old ones hang below the young. 792 triangles, and the one crown template that carries a `lods` tier, at 70m. |
 
-What they cost:
-
-| Tree        | Triangles | Leaf cards | Height | Canopy spread |
-| ----------- | --------- | ---------- | ------ | ------------- |
-| `oak-01`    | 39,844    | 5,184      | 18m    | 12.2m         |
-| `poplar-01` | 24,864    | 2,880      | 18m    | 8.0m          |
-| `birch-01`  | 3,436     | 672        | 16m    | 4.8m          |
-| `shrub-01`  | 2,344     | 390        | 2.2m   | 1.2m          |
-| `plains-01` | 540       | 90         | 0.38m  | 1.68m         |
-| `plains-02` | 720       | 120        | 0.32m  | 1.67m         |
-| `palm-01`   | 360       | 16         | 8.7m   | 3.6m          |
-| `fern-01`   | 88        | 11         | 0.53m  | 0.75m         |
-| `date-palm-01` | 792  | 36         | 7.7m   | 4.1m          |
 
 The tool prints the triangle count on every run. Watch it: branch count is `splits` to the power of
-`branchLevels`, and leaf cards multiply that again by `leavesPerBranch`.
+`branchLevels`, times `whorls` under the whorl model, and leaf cards multiply that again by
+`leavesPerBranch`.
 
 **Run `oak.json` before `birch.json`, and `plains-01.json` before `meadow-02.json`.** Each of the
 second ones carries `skipTextures: true` and names the first one's set, so the images have to exist
@@ -174,17 +167,25 @@ The last column reads low to high. Values named after a template are the ones th
 | `height` — `tree`, `clump` | 12 | Finished height in metres, to the topmost point. The skeleton grows first, then scales to land on this, so it sizes the tree and not the trunk. A crown has no `height`: it is a stem plus a frond, each in metres. | `2.2` shrub · `12` default · `16` birch · `18` oak and poplar |
 | `trunkRadius` — `tree`, `crown` | 0.32 | Radius at the ground, in metres. `height` never scales it, so a slender tree and a stout one of the same height differ only here. | `0.07` shrub · `0.16` birch, a whip at 16m · `0.22` the crown default and the palm · `0.62` oak, stout at 18m. The oak is `height / 29`, the birch `height / 100` |
 | `trunkTaper` — `tree`, `crown` | 0.22 | Trunk radius at the top as a fraction of the base. Branches always taper to 0.28 of their own base, which this does not touch. | `0.22` birch and poplar, down to a thin leader · `0.42` oak, carries weight high · `0.8` the crown default, a palm barely thins · `0.9` a near-parallel pole. Within 0..1 |
-| `splits` | 3 | Children grown at each fork. The largest lever on triangle count and build time. | `2` birch, a Y at every node · `3` default · `6` oak · `8` poplar, a full whorl. Branch count is `splits ^ branchLevels`, so the birch has 64 tips and the oak 1,296. Within 1..12, capped at 4096 branches |
-| `splitAngle` | 38 | Degrees a child turns away from its parent. | `30` birch, narrow and upright · `38` oak · `55` shrub · `72` poplar, almost square to its parent. The trunk's first child uses a quarter of this, so the trunk carries on past its fork |
-| `splitVariance` | 12 | Degrees of randomness added to each split angle, plus or minus. | `0` every fork identical and machine-made · `12` every template · `25` loose and wild |
-| `splitSpread` | 0.35 | How far back from the parent's tip its children attach, as a fraction of the parent's length. | `0` every child at the tip, an umbrella · `0.35` oak, children near the ends · `0.8` birch, down most of the branch · `0.95` shrub, the whole length. High values carry foliage close to the ground |
-| `branchLevels` | 4 | Generations grown below the trunk. Each one multiplies branch count by `splits`. | `3` shrub and poplar · `4` oak · `6` birch. Cheap at `splits` 2, ruinous at `splits` 8. Within 0..6 |
+| `branchModel` | `fork` | How the **trunk** carries its children. Nothing below the trunk changes: a limb always forks. See [Conifers](#conifers). | `fork` divides: the trunk's first child is a leader that carries it on, and every generation splits again · `whorl` does not divide: the trunk runs unbroken to the tip and carries rings of near-horizontal limbs up it, which is a conifer |
+| `trunkFlare` — `tree`, `crown` | 0, and 0.25 for a crown | How far the foot swells past `trunkRadius`, as a fraction of it. Gone by a fifth of the way up a trunk and a quarter of the way up a stem, because a stem is seven metres and a trunk is forty. A trunk is mostly a bare pole and defaults to none; a palm's stem never is. | `0` a tube meeting the ground at a right angle · `0.2` the date palm · `0.3` the palm · `0.5` the redwood, a buttressed foot · `1` a fig |
+| `trunkFlute` — `tree`, `crown` | 0 | Depth of the grooves cut up the trunk or stem, as a fraction of its radius. **The one that stops a trunk reading as a turned pole.** See [The trunk](#the-trunk). | `0` a plain tube · `0.22` the redwood · `0.5` the ceiling, where the grooves of one side meet those of the other. Needs `trunkSides` of 12 or more, and the run says so rather than quietly doing nothing |
+| `trunkWander` — `tree`, `crown` | 0 | Metres the centre line strays from a straight climb. `curve` turns a branch about one fixed axis and reads as a clean arc; this leans one way and then back. On a crown it is the unevenness on top of `stemLean`. | **Metres, so it does not scale with the tree**: `0.6` is 1.4% of the redwood's height and 8.6% of a palm stem, which is the difference between a lean and a drunken S. `0` dead straight · `0.6` the redwood · `0.12` the same look on a 7m palm. The foot never moves, and the limbs, the bark and a crown's rosette follow the stray |
+| `splits` | 3 | Children grown at each fork, and limbs grown in each whorl. The largest lever on triangle count and build time. | `2` birch, a Y at every node · `3` default · `4` larch and juniper, per whorl · `5` spruce, per whorl · `6` oak · `8` poplar, a full ring. Branch count is `splits ^ branchLevels`, times `whorls` under the whorl model, so the birch has 64 tips and the oak 1,296. Within 1..12, capped at 4096 branches |
+| `splitAngle` | 38 | Degrees a child turns away from its parent. | `30` birch, narrow and upright · `38` oak · `55` shrub · `72` poplar, almost square to its parent · `78` spruce and `85` larch, a limb leaving the trunk near horizontal. The trunk's first child uses a quarter of this, so the trunk carries on past its fork. A whorled trunk has no such child, and every limb takes the full angle |
+| `splitVariance` | 12 | Degrees of randomness added to each split angle, plus or minus. | `0` every fork identical and machine-made · `7` spruce, a regular conifer · `12` every broadleaf template · `22` juniper, scrubby and irregular · `25` loose and wild |
+| `splitSpread` | 0.35 | How far back from the parent's tip its children attach, as a fraction of the parent's length. Under `whorl` it is instead the fraction of the **trunk** the whorls climb, down from the top. | `0` every child at the tip, an umbrella · `0.35` oak, children near the ends · `0.8` birch, down most of the branch · `0.95` shrub, the whole length. High values carry foliage close to the ground. Whorled: `0.5` redwood, bare for half its height · `0.88` spruce, limbs almost to the ground |
+| `branchLevels` | 4 | Generations grown below the trunk. Each one multiplies branch count by `splits`. | `2` spruce, larch and redwood, which spend their branches on whorls instead · `3` shrub, poplar and juniper · `4` oak · `6` birch. Cheap at `splits` 2, ruinous at `splits` 8. Within 0..6 |
+| `whorls` — `whorl` only | 7 | Rings of limbs up the trunk. With `splitSpread` it sets the interval they step up by, and the trunk keeps one interval of bare leader above the top ring. | `8` juniper · `15` larch · `18` spruce and redwood, tight rings on a tall trunk. Within 1..24, and it multiplies the branch count, so it is read into the 4096 cap |
+| `whorlTaper` — `whorl` only | 0.3 | Length of the top whorl as a fraction of the lowest. **This is the cone.** | `0.16` spruce, a sharp spire · `0.3` larch · `0.45` redwood and juniper, a crown that barely narrows. Within 0..1; past 1 a tree widens as it climbs, which is an inverted cone and not a conifer |
 | `lengthRatio` | 0.62 | Child length as a fraction of its parent's. | `0.45` poplar, children far shorter, a tight dense crown · `0.62` oak · `0.72` shrub, open and sprawling · `0.85` children rival their parent and the shape falls apart |
 | `radiusRatio` | 0.6 | Child radius as a fraction of the parent's radius where it attaches. | `0.4` whippy twigs off a heavy limb · `0.6` every template · `0.85` limbs nearly as thick as what carries them |
 | `curve` | 14 | Total degrees a branch bends over its length. The axis is fixed per branch, so it reads as a bend and not a wobble. | `0` dead straight sticks · `8` poplar, barely bent · `14` oak and birch · `40` strongly arced. Past about 20 raise `segments` too, or the curve shows its corners |
 | `droop` | 16 | Degrees the deepest branches turn toward the ground over their own length. Scaled by depth, so limbs hold their line and twigs hang. | `-30` birch, pulled hard back upright · `-20` shrub · `0` straight out · `16` oak · `22` poplar · `45` weeping. **Negative is the only way to stop a deep tree fanning into a disc** |
 | `segments` — `tree`, `crown` | 5 | Rings along a branch's centre line, which sets how smoothly it can curve. | `2` the floor, visible corners · `5` every tree template · `8` the crown default · `10` for a high `curve`. The trunk gets `segments + 2`, level 1 gets `segments`, each level below loses one. Within 2..32 |
 | `radialSegments` — `tree`, `crown` | 8 | Sides of the tube around a branch, which sets how round it looks against the sky. | `4` a LOD tier, faceted up close · `8` every tree template, round at any real distance · `10` the crown default, because a bare stem is all silhouette · `16` a hero asset. Each level down uses one fewer, floor of 3. It adds sides to every branch at once, so cutting it saves less than it looks. Within 3..24 |
+| `trunkSides` — `tree`, `crown` | 0 | Sides of the **trunk or stem** tube alone. 0 takes `radialSegments`. | `0` the trunk is as round as a twig · `20` enough to hold a flute · `24` the redwood. The trunk is one branch of hundreds: the redwood's went from 96 triangles to 960 and the model grew by 6% |
+| `trunkSegments` — `tree`, `crown` | 0 | Rings up the **trunk or stem** alone. 0 takes `segments + 2`. | `0` six rings on a 42m trunk · `20` the redwood, which is what gives `trunkWander` somewhere to wander |
 | `barkLevels` | 6 | Deepest generation that gets a bark tube. Branches past it carry leaf cards and no geometry. | `1` the oak's LOD tier, 236 bark triangles · `6` the default, every level, 29,476 on the oak. Twigs are most of the bark, so this is the strongest triangle lever a tier has. Within 0..6 |
 
 **The foliage** — `tree`
@@ -209,8 +210,8 @@ stands in for a sprig, never for a single leaf.
 | --- | --- | --- | --- |
 | `bark` — `tree`, `crown` | `[]` | Folders under `sources/bark/` the bark image is assembled from. See [Authored bark](#authored-bark). | `[]` generates the bark instead · `["oak"]` builds it from that folder. A folder that is listed and missing stops the run rather than falling back |
 | `leaves` | `[]` | Folders under `sources/leaves/` whose stamps fill the leaf image. See [Authored leaves](#authored-leaves). | Same rule. `[]` generates them, a named folder is an error when it is absent · `["palm/green-*"]` takes only the stamps whose prefix matches. See [Picking stamps](#picking-stamps-out-of-a-folder) |
-| `barkProfile` — `tree`, `crown` | `oak` | Which layer stack a *generated* bark is built from. Ignored once `bark` names a source. See [Bark profiles](#bark-profiles). | `oak` deep fissures and flat crusty plates, for oak, ash and elm · `smooth` barely parted plates and almost no crust, the crown default |
-| `textureSize` | 1024 | Edge of each square map, in pixels. A power of two, at least 128. | `128` tests only, a cell holds 32 texels · `512` the floor for anything shipping · `1024` every tree template · `2048` the clump default, because a clump atlas holds every stamp at once. See [The clump atlas](#the-clump-atlas) |
+| `textureSize` | 1024 | Edge of each square map, and the **long** edge of the bark map, in pixels. A power of two, at least 128. | `128` tests only, a cell holds 32 texels · `512` the floor for anything shipping · `1024` every tree template · `2048` the clump default, because a clump atlas holds every stamp at once. See [The clump atlas](#the-clump-atlas) |
+| `barkAspect` — `tree`, `crown` | 2 | How many times taller than wide the **generated** bark map is, and how many circumferences of branch one tile covers. Ignored once `bark` names a source, which brings its own shape. **The lever on visible tiling.** | `1` a square map, one circumference per tile · `2` the default: a 1024 `textureSize` gives a 512x1024 map covering two circumferences. The two axes are not alike — x wraps once around the ring and never repeats, y runs along the branch and repeats every tile — so the texels go where the repeat is. A redwood's trunk shows the same plate 12.9 times at `1` and 6.5 at `2` |
 
 **The tuft** — `clump`, with the card keys shared by `crown`
 
@@ -240,7 +241,6 @@ model's height is the stem plus however far the fronds rise, and the run prints 
 | --- | --- | --- | --- |
 | `stemHeight` | 6 | Metres of stem below the rosette. | `0` no stem at all — the `fern` template, which ships no bark piece and emits a clump's layer · `7` the palm · `15` a tall coconut palm |
 | `stemLean` | 10 | Degrees the stem has turned from vertical by its top. It eases in as the square of the height, so the lower trunk stands straight and the bend gathers under the crown. | `0` a pole · `12` the palm · `30` a beach palm leaning out over the water |
-| `stemFlare` | 0.25 | How far the foot swells past `trunkRadius`, as a fraction of it, gone by a quarter of the way up. | `0` a plain tube · `0.2` the date palm · `0.3` the palm · `0.6` a buttressed foot |
 | `crownBulge` | 0.2 | How far the stem swells under the rosette, as a fraction of `trunkRadius`. It peaks just under the fronds and comes back in by half at the very top, so it reads as a crownshaft and not a wider tube. | `0` no crownshaft · `0.2` the date palm · `0.25` the palm · `0.5` a bottle palm |
 | `frondCount` | 14 | Frond cards in the rosette, spread by the golden angle. | `9` a sparse cycad · `11` the fern · `16` the palm · `24` a dense crown. Two triangles per frond per `cardSegments`. Within 1..48 |
 | `frondLength` | 3 | Metres from the rosette to a frond's tip, along its curve. Frond 0 is exactly this and the rest fall short of it, so the rim is ragged. | `0.9` the fern · `3.2` the palm · `5` a royal palm |
@@ -249,9 +249,11 @@ model's height is the stem plus however far the fronds rise, and the run prints 
 | `frondSpan` | 0 | Fraction of the stem, down from its top, that the fronds attach along. A palm grows from its tip, so the lowest fronds are the oldest and hang most. Needs a stem. | `0` every frond at the top, the palm · `0.55` the date palm, a crown two thirds as deep as it is wide · `1` fronds from the ground up, a cycad or a young palm |
 | `fronds` | `[]` | Folders under `sources/fronds/` whose stamps fill the frond atlas. See [Authored fronds](#authored-fronds). | `[]` generates four fronds instead · `["palm"]` builds the atlas from every stamp in that folder · `["palm/palm-01", "palm/palm-02"]` from those two alone, see [Picking stamps](#picking-stamps-out-of-a-folder). A folder that is listed and missing stops the run rather than falling back |
 
-The stem takes `trunkRadius`, `trunkTaper`, `segments`, `radialSegments`, `bark` and `barkProfile`
-from the tree's tables above, and the fronds take `cardSegments`, `cardCurve`, `cardAspect` and
-`normalLean` from the clump's. Without a stem, the tube keys are accepted and unread.
+The stem takes `trunkRadius`, `trunkTaper`, `segments`, `radialSegments` and `bark`
+from the tree's tables above, along with the whole of [The trunk](#the-trunk) — `trunkFlute`,
+`trunkWander`, `trunkSides` and `trunkSegments` shape a stem exactly as they shape a trunk, because
+the stem is one branch on a skeleton of its own and goes through the same bark builder. The fronds
+take `cardSegments`, `cardCurve`, `cardAspect` and `normalLean` from the clump's. Without a stem, the tube keys are accepted and unread.
 
 **The files and the emitted layer**
 
@@ -283,8 +285,9 @@ These name the outputs, or are copied into the printed `ScatterLayers.ts` row wi
 **The LOD chain** — `tree`, `crown`
 
 `lods` is a list of coarser tiers, nearest first. Each names the distance it takes over at and the
-mesh keys it overrides — any of `radialSegments`, `barkLevels`, `leavesPerBranch` and `leafScale` for a
-tree, `radialSegments` and `cardSegments` for a crown. An override its type never reads is an error,
+mesh keys it overrides — any of `radialSegments`, `trunkSides`, `barkLevels`, `leavesPerBranch` and
+`leafScale` for a tree, `radialSegments` and `cardSegments` for a crown. `trunkSegments` and
+`trunkWander` are not among them: they shape the skeleton, and every tier hangs on the model's own. An override its type never reads is an error,
 as a stray key is:
 
 ```json
@@ -340,7 +343,7 @@ chain that reaches past it. The tiers are written as
 `ScatterLayers.ts` row carry the chain.
 
 Everything else about how the bark and leaves **look** — the tints, the plates, the fissures, the
-knots, the lichen, the colour and roughness drift — is settled in [`lib/look.ts`](./lib/look.ts) and
+the tint it is ramped from, the colour and roughness drift — is settled in [`lib/look.ts`](./lib/look.ts) and
 is not a key. Those values are tuned; a run that varies them per tree produces a family that does
 not look like one species, and twenty rows of `--help` for something nobody should be reaching for.
 Edit that file to change them, which changes every tree at once.
@@ -348,6 +351,130 @@ Edit that file to change them, which changes every tree at once.
 They are still fields on `Params`, so nothing downstream reads them differently and a test can
 override one directly to prove what it does. A `tree.json` written before they were settled still
 opens; it just loses them on the next save.
+
+## The trunk
+
+Everything here applies to a **crown's stem** as well, which is one branch on a skeleton of its own
+and goes through the same bark builder. Only the defaults differ: a stem flares by 0.25 where a
+trunk flares by none.
+
+A trunk built from the keys above is a lathe-turned pole: a circular tube of `radialSegments` sides,
+climbing a centre line that `curve` bends on one fixed axis. On a redwood that pole is **96
+triangles of 14,208**, 0.7% of the model, and most of what you see when you stand under it.
+
+Three keys shape it, and two more pay for the detail to show. All five are 0 by default, which is
+the tube that was there before, so no tree changes until it asks to.
+
+```json
+"trunkSides": 24, "trunkSegments": 20,
+"trunkFlare": 0.5, "trunkFlute": 0.22, "trunkWander": 0.6
+```
+
+**Why geometry and not a texture.** The bark's `_disp` map is written and registered and never
+reaches the GPU: glTF has no displacement slot, and parallax on a trunk is a dozen dependent taps on
+the geometry that covers the most pixels. See [Displacement](#displacement). Relief on a trunk has
+to be in the mesh, and the mesh is where the trunk is cheapest.
+
+**What each does.**
+
+- **`trunkFlute`** cuts vertical grooves. Five of them, wandering as they climb, fading out under the
+  crown where a trunk is one season's growth. It cuts **in** rather than swelling out, so a fluted
+  trunk still measures `trunkRadius` across its faces.
+- **`trunkFlare`** swells the foot, on the curve `lib/crown.ts` already gives a palm's stem, gone by
+  a fifth of the height rather than a quarter — a stem is 7m and a trunk is 40.
+- **`trunkWander`** strays the centre line. The foot stays where it was planted, and the headings are
+  rebuilt from the moved points, so the limbs and the bark rings follow it for free.
+
+**`trunkSides` is what makes a flute visible, and it is nearly free.** A flute is a fold in the ring,
+and a ring of 8 has nowhere to fold: setting `trunkFlute` under 12 sides is an error rather than a
+key that quietly does nothing. Sides on the trunk cost one branch of hundreds — the redwood's 24
+sides and 20 rings took its trunk from 96 triangles to 960, which is 6% of the model. A tier may
+drop them back with `trunkSides`, and a blocky flute at 90m is the trade it asked for.
+
+**Two traps worth knowing**, both found by building this:
+
+- **A flute cannot be sampled straight out of a noise field.** One ring is a slice through that
+  field, and a slice reaches the field's extremes only here and there, so `trunkFlute` 0.16 cut 6%
+  and the trunk came out round. The flute count is a cosine of the angle instead, and the noise only
+  sways it. That is also what makes the key mean what it says.
+- **A ramp that opens at full slope tilts the first ring by that slope.** `trunkWander` eased in
+  linearly to begin with, which stood the foot ring at 8 degrees and put the low side of a palm 11cm
+  under the ground. The ease is a smoothstep now, flat where it starts.
+- **A noise axis of period 1 returns its mean at every point.** The lattice's two rows are the same
+  row, so that axis cancels. The first `trunkWander` read such an axis and moved the trunk nothing at
+  all, silently. Keep both periods at 2 or more, and sample mid-cell. See also
+  [How the bark is built](#how-the-bark-is-built), where the whole-number rule comes from.
+
+## Conifers
+
+A spruce is not a `crown`. It has a straight undivided trunk *and* real branches, in **whorls** of
+near-horizontal limbs at intervals up it, each whorl shorter than the one below. So a conifer is a
+second **branch model** inside `tree`, and not a type of its own:
+
+```json
+{ "branchModel": "whorl", "whorls": 18, "splits": 5, "whorlTaper": 0.16, "splitSpread": 0.88 }
+```
+
+`whorl` changes where the trunk puts its children, and nothing else. The bark, the leaf cards, the
+LOD chain, the impostor and the emitted layer are the tree's own, which is the whole argument for
+keeping conifers inside the type.
+
+**The model governs the trunk alone.** A limb forks the ordinary way once it has left, by
+`splitAngle`, `splitSpread` and the golden angle. So a conifer is one whorled generation with fork
+generations hanging off it, and `branchLevels` counts them all as usual.
+
+**What the trunk does instead of forking.** It runs unbroken to the tip. `whorls` rings of `splits`
+limbs each climb the top `splitSpread` of it at one fixed interval, and each ring is turned by a
+phase of its own so the rings do not stack their limbs into the same vertical planes. The limbs of
+one ring share a height and are spread evenly around the trunk, where a fork spreads its children
+along the parent and turns them by the golden angle. Length falls from the lowest ring to
+`whorlTaper` at the top, and that fall is the cone.
+
+Three things follow from an undivided trunk, and all three are what a conifer wants:
+
+- **A bare foot.** `splitSpread` is what the whorls climb, so `1 - splitSpread` of the trunk carries
+  nothing. At `0.5` a redwood is bare for half its height.
+- **A leading shoot.** The top ring sits one interval below the tip, so the trunk always stands
+  proud of its own crown.
+- **A full-height collider.** The capsule stops at the first fork, and there is none. It follows the
+  trunk the whole way up rather than ending in a stub at the lowest whorl.
+
+### The five presets
+
+Every conifer below is the same generator. What separates them is five numbers:
+
+| Template | `whorls` | `splits` | `whorlTaper` | `splitSpread` | `splitAngle` | Reads as |
+| -------- | -------- | -------- | ------------ | ------------- | ------------ | -------- |
+| `spruce.json` | 18 | 5 | 0.16 | 0.88 | 78 | A 24m spire. Tight rings from near the ground, each a sixth of the one below |
+| `redwood.json` | 18 | 4 | 0.45 | 0.5 | 70 | A 42m column. Bare for 21m, then a narrow crown that hardly narrows further |
+| `larch.json` | 15 | 4 | 0.3 | 0.78 | 85 | Open and airy at 26m. Limbs almost square to the trunk, with the foliage hanging off them |
+| `juniper.json` | 8 | 4 | 0.45 | 0.92 | 58 | Scrubby at 5.5m. A wide `splitVariance` and an upswept `droop` break the rings up |
+| `cypress.json` | 24 | 4 | 0.9 | 0.95 | 24 | An Italian cypress. A dense 18m column 3.7m wide, foliage to a metre off the ground |
+
+**Reach for `whorlTaper` first.** It is the silhouette. `splitSpread` decides how much trunk shows
+below the crown, and the two together are most of what separates a spruce from a redwood.
+
+**Then `splitAngle`.** It decides whether the limbs stand out from the trunk or hug it, and it is the
+whole difference between the spruce at 78 degrees and the cypress at 24. A low angle also stacks the
+limbs of one ring into the rings above, which is what fills a column in.
+
+**Spend the branch budget on whorls, not on levels.** The deepest generation is
+`splits ^ branchLevels` times `whorls`, and the 4096 cap counts it. Every template above grows two
+or three levels and puts the rest into rings, which is also what a conifer looks like.
+
+**Set `barkLevels` to 1.** The limbs carry tubes and the shoots carry cards alone. That is three
+quarters of the triangles on a tree of this shape, and the needle mass hides the shoots anyway.
+
+**Keep `curve` low and `trunkTaper` near 0.1.** The trunk is the one thing a conifer reads by. A
+spruce at `curve` 5 and `trunkTaper` 0.06 stands as a spire; the same tree at the oak's 14 and 0.22
+reads as a bent broadleaf with rings glued on. A straight trunk is not a smooth one, though: what
+keeps it from reading as a turned pole is [The trunk](#the-trunk), and the redwood is the one of
+these four that spends anything on it.
+
+What is **not** done is the art. The leaf cards are still the broadleaf sprig every tree generates,
+and the bark is the one generated wood pattern. Bark that has to look like a particular conifer is
+an authored `bark` source, not another generator. See
+[How the bark is built](#how-the-bark-is-built).
 
 ## Clumps
 
@@ -563,7 +690,7 @@ interchangeable where a frond is long, curved and individually placed.
 collider and its impostor unchanged, which is why the tube keys are the tree's. Two things it does
 that a branch does not. It leans by the square of its height — `stemLean` — so the trunk stands
 straight low down and the bend gathers under the crown, the way a palm's does. And its radius is a
-profile rather than a taper: `trunkRadius` flared at the foot by `stemFlare`, thinning to
+profile rather than a taper: `trunkRadius` flared at the foot by `trunkFlare`, thinning to
 `trunkTaper`, then swelling under the rosette by `crownBulge` — the crownshaft, which is fatter than
 the stem below it and is where the fronds leave from. The collider is still the plain `trunkRadius`
 capsule. At `stemHeight: 0` there is no branch, no bark piece and no bark texture: a fern with a
@@ -861,8 +988,14 @@ tools/scatter-forge/sources/bark/oak/
 ```
 
 The maps are matched on their `-diff` / `-arm` / `-disp` suffix rather than on the folder's name, so
-renaming a source does not mean renaming everything in it. The tile must be square and it must tile
-on both axes.
+renaming a source does not mean renaming everything in it. It must tile on both axes.
+
+**Any size, any shape.** A tile of 512x1024 is used at 512x1024: the maps are written out texel for
+texel and the mesh's UVs do the repeating, so `textureSize` and `barkAspect` do not apply to an
+authored bark at all and nothing is resampled on the way in. A bark photograph is usually taller
+than it is wide, and that shape is read from the art rather than declared — the tile covers
+`widthMetres` around the branch by `widthMetres x aspect` along it. Powers of two still mip more
+cleanly, but nothing rejects other sizes.
 
 **The height map has to be 16-bit**, and a PNG, because WebP cannot carry sixteen bits at all. The
 normal is derived from the height rather than authored beside it, and a height differentiated from
@@ -884,10 +1017,12 @@ The one thing a bitmap cannot say about itself:
 `widthMetres` is how much trunk one tile covers, and `depthMetres` is how far its height actually
 cuts. Both are required, because both are computed from rather than guessed at:
 
-- The ring maps once across the image, so the image width is **one circumference**. The tile repeats
-  `round(circumference / widthMetres)` times across it — a whole number, or the seam the ring closes
-  on would meet a different part of the image than it left. The same count runs down the length,
-  which is what lands the tile square rather than stretched.
+- `widthMetres` is what keeps the bark the size it was photographed at. Each branch wraps
+  `round(circumference / widthMetres)` tiles around itself — a whole number, or the seam the ring
+  closes on would meet a different part of the image than it left, and never less than one, so a
+  twig shows one tile rather than a fraction of one. A 2.6m redwood trunk takes seven of a 1.1m
+  tile; a twig takes one. The length advances at the matching rate, `aspect` times the width of the
+  strip the tile wraps, which is what lands it undistorted rather than stretched.
 - `depthMetres` over the real width of a texel is the gradient the normal needs, so the bump comes
   out at the strength the bark really has instead of a number somebody liked the look of.
 
@@ -897,11 +1032,11 @@ An **empty list** is not an error — that is the fallback working, and the run 
 
 ```
 bark     generated — no sources listed
-bark     from tools/scatter-forge/sources/bark/oak (1024px tile, 1m across)
+bark     from tools/scatter-forge/sources/bark/oak (512x1024 tile, 1.1m around by 2.20m along)
 ```
 
 A **listed** source that is missing, or that exists and is wrong, stops the run and names the
-problem: no such folder, a missing map, an 8-bit height, a non-square tile, maps at different sizes,
+problem: no such folder, a missing map, an 8-bit height, maps at different sizes,
 a `source.json` that does not declare both fields. None of those fall back to generating, because
 art the tree asked for and did not get should look like a mistake, not like the art having no
 effect.
@@ -1052,119 +1187,43 @@ layout, the UVs and the two materials are the same either way.
 Both images come out of `lib/noise.ts`, whose every basis wraps on a stated period so an octave sum,
 a domain warp and a cellular field can be combined and still tile.
 
-**Bark** is a stack of layers, one per file in `lib/bark.ts`, and is described under
-[Bark profiles](#bark-profiles) below.
+**Bark** is one pattern in [`lib/wood.ts`](./lib/wood.ts): a domain-warped ridged fractal, five
+octaves, tinted from `barkTint` between a crevice shade and the face that catches the light. That is
+all of it, and it is deliberate. What it replaced was a stack of layers — plates, crust, knots,
+grain, lift — that modelled bark as a *structure*, with a `barkProfile` naming which stack to run.
+It cost **5.7 seconds a map** against 214ms now, and the thing it was competing with is an authored
+photograph, which is always going to win. So the generator is a fallback that has to be plausible
+and cheap, and art that matters is a `bark` source.
 
-**Knots** are scattered on a jittered wrapped grid, and what sells them is not the knot but the way
-the plates and fissures **bend around** it. Every later layer reads at a coordinate displaced
-radially away from any knot in range, so the whole pattern flows past rather than running through.
-On top of that goes a raised collar where the bark healed over the stub, a sunken dead middle, and
-the branch's rings showing through — added as a **signed offset**, not as a height blended over the
-bark. Blending replaces the plates and fissures with a smooth bullseye, and a bullseye is what a
-generated knot always looks like.
+Two properties are worth keeping if you change it:
 
-One rule if you extend this: **never read a per-knot value from the nearest knot.** Any such value
-jumps wherever the nearest one changes, and the jump draws a hard straight line clean across the
-trunk that is far more obvious than the knots are. Accumulate over every knot in range instead, with
-a falloff that reaches exactly zero at the cutoff, and zero again at the centre where the outward
-direction is undefined.
+- **It tiles on both axes**, because x wraps around the ring and y repeats along the branch. Every
+  field is sampled on the periodic lattice, and the octave lacunarity is 2: a fractional one lands
+  the wrap mid-cell and puts a seam down every trunk in the world.
+- **The grain runs along the branch**, from two cell counts — many around the ring, few along it.
+  This is the one property no test of depth or contrast would catch, so
+  [`textures.spec.ts`](./textures.spec.ts) asserts it directly.
 
-That is the opposite of what the plate layer does with a cell's own value, and the difference is
-where the discontinuity lands. A plate's step lands on a cell border, which is exactly where the
-fissure is, so it is never seen. A knot's would land in open bark.
-
-Depth and darkness are separate values, because they are not the same thing. Depth decides how far
-a fissure cuts, and colour follows how enclosed a texel is, so a deep groove goes dark on its own.
-Shade lifts the floor that colour ramps down to, so a groove can be deep enough to catch a shadow
-without bottoming out as a black line. Width is separate again.
+The lift and stretch that put the pattern on 0..1 are **measured percentiles**, not eyeballed. The
+first cut used numbers that looked reasonable and produced a median of 0.27, which reads as black
+with veins in it. See the same trap under [An fbm does not fill 0..1](#how-the-bark-is-built) below.
 
 **Leaves** get an irregular margin from a noise field perturbing the width profile, tapered at both
 ends so the narrow base and tip do not gain a bite out of them. Veins are a ridge field: a midrib
-plus secondaries whose chevrons come from shearing the along-coordinate by the across one. The
-mottling is warped the same way the bark fibre is.
+plus secondaries whose chevrons come from shearing the along-coordinate by the across one.
 
-**Both** carry **colour variation**, because a surface that only varies in brightness is the most
-reliable tell that a texture was generated. How far it drifts and how large the blotches are are separate values, and worth separating:
-broad sweeps read as weathering, fine mottling reads as dirt. The drift runs along a single warm-to-cool axis rather
-than three independent channels: independent channels wander into magenta and cyan, which no bark
-has ever been. Roughness gets the same treatment, and is worth as much — it changes how the surface
-catches light as you move, not just how it looks in a still.
-
-**Bark** also grows **lichen**: a warped low-frequency patch field with its own colour, its own
-higher roughness and a little lift in height. Coverage is settled in `look.ts`.
+**Leaves** carry **colour variation**, because a surface that only varies in brightness is the most
+reliable tell that a texture was generated. How far it drifts and how large the blotches are are
+separate values, and worth separating: broad sweeps read as weathering, fine mottling reads as dirt.
+The drift runs along a single warm-to-cool axis rather than three independent channels: independent
+channels wander into magenta and cyan, which no leaf has ever been. Roughness gets the same
+treatment, and is worth as much — it changes how the surface catches light as you move, not just how
+it looks in a still.
 
 **Both** then go through a **curvature** pass, which darkens where the height template curves in and
 bleaches where it curves out. Height alone only says how deep a texel is. Dirt in a crevice and wear
 on a ridge track curvature, not depth, and this is the cheapest thing that stops a generated map
 looking like a tinted heightfield. Settled in `look.ts`.
-
-### Bark profiles
-
-No single field is bark. An oak is flat plates at differing levels, split by deep fissures that run
-along the trunk and shallow ones that interrupt them, with a crust of flakes over the exposed faces.
-A birch is none of that. So `lib/bark.ts` holds a **vocabulary of layers**, `barkProfile` names an
-ordered stack of them, and a species is a table row rather than a rewrite of the file.
-
-Each layer writes the fields it owns into one `BarkSample`, and the colour pass reads those fields
-rather than re-deriving anything:
-
-| Field    | Is                                                                                |
-| -------- | --------------------------------------------------------------------------------- |
-| `u`, `v` | The lookup coordinate. A layer that deforms the bark displaces it, and every later layer flows with it. |
-| `height` | The surface, 0..1.                                                                |
-| `cavity` | 0 on an exposed face, 1 at the bottom of a fissure.                               |
-| `plate`  | Per-plate random, constant across one plate.                                      |
-| `grain`  | Fine tone at texel scale.                                                         |
-| `wear`   | Dead tissue. Knot cores.                                                          |
-| `lift`   | A signed offset staged by an early layer and settled after the layers it deforms. |
-
-**`cavity` is the one worth understanding.** Height alone only says how deep a texel is, and a plate
-sitting low is not a crevice. Shading, occluding and growing lichen from depth is what leaves a
-generated map looking like a tinted heightfield, and it is why a bark that is *correct* in relief can
-still read as plastic. `cavity` says how enclosed a texel is instead, which is the thing dirt, shadow
-and wear actually track.
-
-The layers that exist:
-
-| Layer   | Does                                                                                 |
-| ------- | ------------------------------------------------------------------------------------ |
-| `knot`  | Displaces the lookup away from every knot in range and stages the collar as a `lift`. |
-| `plate` | The structure: a partition into plates, cut apart by fissures.                       |
-| `crust` | Flaking on the exposed faces.                                                        |
-| `grain` | Texel-scale tone and the last of the relief.                                         |
-| `lift`  | Settles whatever an earlier layer staged.                                            |
-
-And the profiles they are composed into:
-
-| Profile  | Is                                                                     |
-| -------- | ---------------------------------------------------------------------- |
-| `oak`    | Long deep fissures up the trunk, shallow interruptions across it, flat crusty plates between. Oak, ash, elm. |
-| `smooth` | Barely parted plates and almost no crust.                              |
-
-Two ideas carry the `plate` layer, and both are worth keeping if you extend it.
-
-**A plate is a shelf at its own level, not a dome.** Its height comes from the cell's own random
-value, constant across the plate. A dome per cell is the obvious thing to write and it is what makes
-generated bark read as melted wax. The step between two plates is faded out by the fissure wall, so
-they meet at the bottom of the crack rather than stepping against each other over one texel.
-
-**Fissure depth follows the direction of the border**, taken from the vector between the two feature
-points that own it — which is what `worleyInto` returns `nx`/`ny` for. An oak's long fissures run up
-the trunk and its cross cracks only interrupt them, and that is *one* field asked which way it
-points. Laying a second cellular network across the first is the obvious alternative and it produces
-a fishnet: two sets of cracks of equal weight, crossing at every intersection.
-
-Two smaller things that each cost one line and are each visible:
-
-- The fissures wander by a **shear** — v displaced by a field that varies mostly along the trunk —
-  and not by a symmetric warp. A warp squashes the lattice, and where it squashes, neighbouring
-  borders merge into a broad dark smudge.
-- The crust is **elongated along the branch and patchy**. Square chips read as crocodile skin, and
-  spread evenly they read as a material rather than as wear.
-
-Still to write: rings and lenticels for birch, peeling strips for cedar, and the overlapping scales
-of a mature pine. Each is a layer plus a profile row. See
-[Where this is going](#where-this-is-going).
 
 Two things to know before adding to this file.
 
@@ -1201,28 +1260,26 @@ short.
 
 | `type` | State | Is | Covers |
 | ------ | ----- | -- | ------ |
-| `tree` | Written | Recursive branching, tubes plus cards | Oak, birch, poplar, shrub, most broadleaf |
+| `tree` | Written | Recursive branching, tubes plus cards, under either branch model | Oak, birch, poplar, shrub, most broadleaf, and every conifer |
 | `clump` | Written | Cards radiating from one ground point | Grass, wildflowers, clover, reeds |
 | `crown` | Written | One undivided stem, a rosette of long curved cards at the top | Palm, fern, tree fern, cycad |
 | `rock` | Planned | A deformed solid. No cards, no alpha, one material | Boulder, pebble, scree |
 
-### Conifers stay inside `tree`
+### Conifers stayed inside `tree`
 
-A spruce is not a `crown`. It has a straight undivided trunk *and* real branches, in **whorls** of
-near-horizontal limbs at intervals up it, each whorl shorter than the one below.
+**Written.** `branchModel: fork | whorl` is the second branch model, and it is one placement
+function and three keys. Everything either side of it, the bark, the leaf cards, the LOD chain and
+the impostor, is the tree's own. See [Conifers](#conifers) and the four templates it ships.
 
-There is one branch model today: children leave their parent at `splitAngle`, spread back along it
-by `splitSpread`, and are placed around it by the golden angle. `poplar-01` is as close as it gets.
+It is worth keeping why. A spruce reads as a different plant, but the only thing it does
+differently is where the trunk puts its children, and a type split there would have duplicated the
+whole generator to change one function. The rule the split follows is **structure**: a type earns
+itself at the mesh and the texture painter, not at the silhouette.
 
-The fix is a second **branch model** inside `tree`, not a new type. Something like
-`branchModel: fork | whorl`, where `whorl` places N children at one height around the trunk, steps
-up by a fixed interval, and scales each whorl by its height. That is one placement function and one
-key. Everything else — the bark, the leaf cards, the LOD chain, the impostor — is unchanged, which
-is exactly the argument for keeping it inside the type.
-
-`barkProfile` would want `scale` alongside `oak` and `smooth` for a mature pine, plus `rings` and
-`lenticels` for birch and `peel` for cedar. Each is a layer in
-[`lib/bark.ts`](./lib/bark.ts) plus a profile row — see [Bark profiles](#bark-profiles).
+What a conifer still borrows is the art. The leaf cards are the broadleaf sprig every tree
+generates, and the bark is the one generated wood pattern. Both are fallbacks: a conifer that has to
+read as its own species takes an authored `bark` source and a `leaves` folder, which is the path the
+generator exists to be replaced by. See [How the bark is built](#how-the-bark-is-built).
 
 ### `rock` — the type that shares the least
 
@@ -1256,7 +1313,8 @@ bottom so it beds in, and a tiling stone texture. The engine already has `granit
 
 glTF has no displacement slot, and `GltfMaterials` builds no `heightMap` from a file. A tree's
 `_disp` map is written and registered, but reaching it needs a `materials.json` material bound
-through `materialId` — which collapses the model's two materials into one. Leave `parallax` off for
+through `materialId` — which collapses the model's two materials into one. Where relief actually
+matters, which is the trunk, it is cut into the mesh instead: see [The trunk](#the-trunk). Leave `parallax` off for
 foliage regardless: it costs a dozen dependent taps per fragment, on the geometry that already
 covers the most pixels.
 

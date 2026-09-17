@@ -91,7 +91,7 @@ function drawPrimitive(
   mirrorBackFaces: boolean
 ): void {
   const { indices, uvs, normals } = attributes;
-  const atlas = canvas.size;
+  const { width: atlasWidth, height: atlasHeight } = canvas;
 
   for (let t = 0; t < indices.length; t += 3) {
     const ia = indices[t] * 3;
@@ -137,9 +137,9 @@ function drawPrimitive(
         // Wrapped on both axes, because both of bark's are: length repeats down
         // the image however long the branch is, and the ring closes across it.
         // Clamping either one smears its last row or column up the whole trunk.
-        const tx = ((Math.floor(u * atlas) % atlas) + atlas) % atlas;
-        const ty = ((Math.floor(v * atlas) % atlas) + atlas) % atlas;
-        const texel = ty * atlas + tx;
+        const tx = ((Math.floor(u * atlasWidth) % atlasWidth) + atlasWidth) % atlasWidth;
+        const ty = ((Math.floor(v * atlasHeight) % atlasHeight) + atlasHeight) % atlasHeight;
+        const texel = ty * atlasWidth + tx;
 
         if (cutout && canvas.alpha[texel] < cutoff) continue;
 

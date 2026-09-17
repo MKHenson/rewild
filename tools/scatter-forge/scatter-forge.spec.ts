@@ -1,6 +1,13 @@
 import { columnOf, leafCellPixels, leafCells } from './lib/atlas.ts';
 import { writeGlb, type GlbTextureSet } from './lib/glb.ts';
-import { buildMesh, pieceOf, totalTriangles, type ForgeMesh, type MeshAttributes } from './lib/mesh.ts';
+import {
+  buildMesh,
+  pieceOf,
+  totalTriangles,
+  type BarkTile,
+  type ForgeMesh,
+  type MeshAttributes,
+} from './lib/mesh.ts';
 import {
   CLUMP_MAX_PATCH_RADIUS,
   hasImpostor,
@@ -46,10 +53,10 @@ function paramsFor(extra: RawConfig = {}, look: Partial<Params> = {}): Params {
   return { ...resolveParams({ name: 'test-tree', ...extra }), ...look };
 }
 
-function buildAll(extra: RawConfig = {}, look: Partial<Params> = {}) {
+function buildAll(extra: RawConfig = {}, look: Partial<Params> = {}, bark: BarkTile | null = null) {
   const params = paramsFor(extra, look);
   const skeleton = buildSkeleton(params);
-  return { params, skeleton, mesh: buildMesh(params, skeleton, LEAF_GRID_GENERATED) };
+  return { params, skeleton, mesh: buildMesh(params, skeleton, LEAF_GRID_GENERATED, bark) };
 }
 
 function readGltf(buffer: Buffer) {
@@ -107,14 +114,9 @@ describe('config', () => {
     // carrying them has to load and ignore them. Erroring the way an unknown
     // key does would strand every tree.json already on disk.
     const params = resolveParams(
-      parseConfig(
-        { name: 'saved-tree', knots: 0, grooveDepth: 0.9, barkTint: '#ffffff', barkTile: 9 },
-        'test.json'
-      )
+      parseConfig({ name: 'saved-tree', barkTint: '#ffffff', barkTile: 9 }, 'test.json')
     );
 
-    expect(params.knots).toBe(LOOK.knots);
-    expect(params.grooveDepth).toBe(LOOK.grooveDepth);
     expect(params.barkTint).toBe(LOOK.barkTint);
     expect(params).not.toHaveProperty('barkTile');
   });
@@ -177,7 +179,7 @@ describe('texture reuse', () => {
     expect(sameTexture(base, paramsFor({ splits: '5' }))).toBe(true);
     // Four things left that change an image, now that the look is settled.
     expect(sameTexture(base, paramsFor({ seed: '42' }))).toBe(false);
-    expect(sameTexture(base, paramsFor({ barkProfile: 'smooth' }))).toBe(false);
+    expect(sameTexture(base, paramsFor({ barkAspect: '1' }))).toBe(false);
     expect(sameTexture(base, paramsFor({ textureSize: '512' }))).toBe(false);
     // An authored leaf is fitted to the card, so the card's size is in the image.
     expect(sameTexture(base, paramsFor({ leafSize: '2' }))).toBe(false);
@@ -237,6 +239,315 @@ describe('skeleton', () => {
     const { skeleton } = buildAll();
     expect(skeleton.trunk.splitHeight).toBeGreaterThan(0);
     expect(skeleton.trunk.splitHeight).toBeLessThan(skeleton.canopy.centre[1]);
+  });
+});
+
+describe('whorls', () => {
+  // A conifer, held still: no curve, no droop and no split variance, so the
+  // placement itself is what the numbers below measure.
+  const WHORLED: RawConfig = {
+    branchModel: 'whorl',
+    whorls: 6,
+    splits: 4,
+    whorlTaper: 0.25,
+    splitSpread: 0.9,
+    splitAngle: 80,
+    splitVariance: 0,
+    branchLevels: 1,
+    leafLevels: 1,
+    lengthRatio: 0.2,
+    curve: 0,
+    droop: 0,
+    height: 20,
+  };
+
+  /** The limbs in creation order, which is whorl by whorl from the ground up. */
+  function limbsOf(extra: RawConfig = {}) {
+    return buildAll({ ...WHORLED, ...extra }).skeleton.branches.filter((branch) => branch.level === 1);
+  }
+
+  it('hangs every limb off a trunk that never forks', () => {
+    const { skeleton } = buildAll(WHORLED);
+
+    expect(skeleton.branches[0].children).toHaveLength(6 * 4);
+
+    // A fork tree's first child is a leader leaving at a quarter of splitAngle,
+    // which is what carries the trunk on past the fork. A whorl has none: every
+    // limb leaves at splitAngle, so none of them is near vertical.
+    for (const limb of skeleton.branches.filter((branch) => branch.level === 1))
+      expect(limb.points[0].dir[1]).toBeLessThan(Math.cos(70 * (Math.PI / 180)));
+  });
+
+  it('places one whorl at one height, evenly around the trunk', () => {
+    const ring = limbsOf().slice(0, 4);
+
+    for (const limb of ring) expect(limb.points[0].p[1]).toBeCloseTo(ring[0].points[0].p[1], 5);
+
+    const azimuths = ring.map((limb) => {
+      const start = limb.points[0].p;
+      const next = limb.points[1].p;
+      return (Math.atan2(next[2] - start[2], next[0] - start[0]) * 180) / Math.PI;
+    });
+
+    // A quarter turn apart at four per whorl, give or take the jitter, measured
+    // as the shorter arc because the trunk's turn and the world's are opposite
+    // hands. The golden angle a fork uses would leave 137 degrees between them.
+    for (let i = 1; i < azimuths.length; i++) {
+      const turn = (((azimuths[i] - azimuths[i - 1]) % 360) + 360) % 360;
+      const gap = Math.min(turn, 360 - turn);
+      expect(gap).toBeGreaterThan(65);
+      expect(gap).toBeLessThan(115);
+    }
+  });
+
+  it('climbs the trunk at one interval, leaving a bare foot and a leader', () => {
+    const bases = limbsOf().map((limb) => limb.points[0].p[1]);
+    const step = (20 * 0.9) / 6;
+
+    // splitSpread is the fraction of the trunk the whorls climb, so what is
+    // left below the lowest is the rest of it.
+    expect(Math.min(...bases)).toBeCloseTo(20 * (1 - 0.9), 3);
+    // And the leading shoot above the top whorl is one interval of trunk.
+    expect(20 - Math.max(...bases)).toBeCloseTo(step, 3);
+  });
+
+  it('shortens each whorl as it climbs, which is the cone', () => {
+    const limbs = limbsOf();
+    const mean = (ring: number) =>
+      limbs.slice(ring * 4, ring * 4 + 4).reduce((sum, limb) => sum + limb.length, 0) / 4;
+
+    // Lengths carry a 15% jitter each, so this reads the ring means rather
+    // than two limbs.
+    expect(mean(5) / mean(0)).toBeGreaterThan(0.15);
+    expect(mean(5) / mean(0)).toBeLessThan(0.35);
+    expect(buildAll({ ...WHORLED, whorlTaper: 0.9 }).skeleton.canopy.spread).toBeGreaterThan(
+      buildAll(WHORLED).skeleton.canopy.spread
+    );
+  });
+
+  it('carries the collider the whole way up an undivided trunk', () => {
+    // The proxy stops at the first fork, and there is none: stopping at the
+    // lowest whorl instead would leave a spruce with a stub of a collider.
+    expect(buildAll(WHORLED).skeleton.trunk.splitHeight).toBeCloseTo(20, 5);
+  });
+
+  it('leaves a fork tree alone, whatever the whorl keys say', () => {
+    expect(buildAll({ whorls: 12, whorlTaper: 0.4 }).skeleton).toEqual(buildAll().skeleton);
+  });
+
+  it('counts the whorls into the branch cap', () => {
+    // 6^4 is 1,296 branches as a fork and 15,552 over twelve whorls.
+    expect(() => paramsFor({ splits: 6, branchLevels: 4 })).not.toThrow();
+    expect(() =>
+      paramsFor({ branchModel: 'whorl', whorls: 12, splits: 6, branchLevels: 4 })
+    ).toThrow(/12 whorls is 15552 branches/);
+  });
+
+  it('holds the model and its numbers to what the placer can grow', () => {
+    expect(() => paramsFor({ branchModel: 'spiral' })).toThrow(/branchModel must be one of fork, whorl/);
+    expect(() => paramsFor({ branchModel: 'whorl', whorls: 0 })).toThrow(/whorls must be within 1..24/);
+    // At 0 the spire ends in nothing; past 1 the tree widens as it climbs.
+    expect(() => paramsFor({ branchModel: 'whorl', whorlTaper: 0 })).toThrow(/whorlTaper/);
+    expect(() => paramsFor({ branchModel: 'whorl', whorlTaper: 1.2 })).toThrow(/whorlTaper/);
+  });
+
+  it('belongs to a tree alone', () => {
+    expect(() => parseConfig({ name: 'a', type: 'clump', branchModel: 'whorl' }, 'test.json')).toThrow(
+      /applies to tree, not to type 'clump'/
+    );
+  });
+});
+
+describe('trunk relief', () => {
+  // Bark for the trunk alone, so the piece is the trunk and its rings can be
+  // read straight out of the buffer.
+  const TRUNK: RawConfig = { barkLevels: 0, trunkSides: 24, trunkSegments: 10, trunkRadius: 1, trunkTaper: 0.5 };
+
+  /** Ring `index` of the trunk: its centre, and each vertex's offset from it.
+   *
+   *  Measured in three dimensions about the ring's own centre rather than about
+   *  the world axis in plan. A trunk curves and may wander, so its rings are
+   *  neither horizontal nor centred on the origin, and a radius read off the
+   *  x/z plane carries the tilt as a wobble that is not there. */
+  function ringOf(mesh: ForgeMesh, sides: number, index: number) {
+    const positions = pieceOf(mesh, 'bark').positions;
+    const base = index * (sides + 1) * 3;
+    const vertex = (j: number): [number, number, number] => [
+      positions[base + j * 3],
+      positions[base + j * 3 + 1],
+      positions[base + j * 3 + 2],
+    ];
+
+    const centre: [number, number, number] = [0, 0, 0];
+    for (let j = 0; j < sides; j++)
+      for (let axis = 0; axis < 3; axis++) centre[axis] += vertex(j)[axis] / sides;
+
+    const spokes = Array.from({ length: sides }, (_, j) => {
+      const point = vertex(j);
+      return [point[0] - centre[0], point[1] - centre[1], point[2] - centre[2]] as [number, number, number];
+    });
+
+    return { centre, spokes, radii: spokes.map((spoke) => Math.hypot(...spoke)) };
+  }
+
+  const ringRadii = (mesh: ForgeMesh, sides: number, index: number) => ringOf(mesh, sides, index).radii;
+
+  it('builds a plain tube when neither key is set', () => {
+    const radii = ringRadii(buildAll(TRUNK).mesh, 24, 2);
+    for (const radius of radii) expect(radius).toBeCloseTo(radii[0], 6);
+  });
+
+  it('spends its polygons on the trunk alone', () => {
+    // Rings are trunkSegments plus the degenerate cap, each of trunkSides + 1
+    // vertices, and the branches carry none of the cost.
+    expect(pieceOf(buildAll(TRUNK).mesh, 'bark').vertexCount).toBe(11 * 25);
+    expect(pieceOf(buildAll({ ...TRUNK, trunkSides: 8, trunkSegments: 4 }).mesh, 'bark').vertexCount).toBe(5 * 9);
+    // 0 is what the tree built before these keys existed: the branch tube's.
+    expect(pieceOf(buildAll({ ...TRUNK, trunkSides: 0, trunkSegments: 0, radialSegments: 8, segments: 5 }).mesh, 'bark').vertexCount).toBe(8 * 9);
+  });
+
+  it('cuts the flutes in rather than swelling them out', () => {
+    const plain = ringRadii(buildAll(TRUNK).mesh, 24, 2);
+    const fluted = ringRadii(buildAll({ ...TRUNK, trunkFlute: 0.2 }).mesh, 24, 2);
+
+    const swing = (Math.max(...fluted) - Math.min(...fluted)) / plain[0];
+    expect(swing).toBeGreaterThan(0.08);
+    // Never deeper than the key says, which is what makes it mean something.
+    expect(swing).toBeLessThanOrEqual(0.2 + 1e-6);
+    // A fluted trunk still measures its own radius across the faces, so a tree
+    // does not quietly get fatter when it is given relief.
+    expect(Math.max(...fluted)).toBeLessThanOrEqual(plain[0] + 1e-6);
+  });
+
+  it('shades the flutes, rather than lighting them as a round pole', () => {
+    // A groove whose walls keep the radial normal is a groove you cannot see.
+    const tilt = (extra: RawConfig) => {
+      const mesh = buildAll({ ...TRUNK, ...extra }).mesh;
+      const normals = pieceOf(mesh, 'bark').normals;
+      const { spokes, radii } = ringOf(mesh, 24, 2);
+      let worst = 0;
+
+      for (let j = 0; j < 24; j++) {
+        const at = (2 * 25 + j) * 3;
+        const dot =
+          (spokes[j][0] / radii[j]) * normals[at] +
+          (spokes[j][1] / radii[j]) * normals[at + 1] +
+          (spokes[j][2] / radii[j]) * normals[at + 2];
+        worst = Math.max(worst, Math.acos(Math.min(1, Math.max(-1, dot))));
+      }
+
+      return (worst * 180) / Math.PI;
+    };
+
+    expect(tilt({ trunkFlute: 0.2 })).toBeGreaterThan(10);
+    expect(tilt({})).toBeLessThan(1);
+  });
+
+  it('swells the foot and is done with it by a fifth of the way up', () => {
+    const flared = buildAll({ ...TRUNK, trunkFlare: 0.5 }).mesh;
+
+    expect(ringRadii(flared, 24, 0)[0]).toBeCloseTo(1.5, 5);
+    // Ring 3 of 10 is above the flare, and stands where an unflared trunk does.
+    expect(ringRadii(flared, 24, 3)[0]).toBeCloseTo(ringRadii(buildAll(TRUNK).mesh, 24, 3)[0], 5);
+  });
+
+  it('strays the centre line, and the limbs follow it', () => {
+    // No curve, so the straight climb it strays from is actually straight.
+    const straight: RawConfig = { height: 20, curve: 0 };
+    const { skeleton } = buildAll({ ...straight, trunkWander: 1 });
+    const trunk = skeleton.branches[0];
+    const top = trunk.points[trunk.points.length - 1].p;
+    const plainTop = buildAll(straight).skeleton.branches[0].points.at(-1)!.p;
+
+    expect(Math.hypot(top[0], top[2])).toBeGreaterThan(0.3);
+    expect(Math.hypot(plainTop[0], plainTop[2])).toBeCloseTo(0, 6);
+    // Planted where it was planted.
+    expect(Math.hypot(trunk.points[0].p[0], trunk.points[0].p[2])).toBeCloseTo(0, 6);
+
+    // A limb whose base sat on the old axis would hang in the air beside the
+    // trunk. Every one of them is still inside the wood it grows from.
+    for (const limb of skeleton.branches.filter((branch) => branch.level === 1)) {
+      const base = limb.points[0].p;
+      const nearest = Math.min(
+        ...trunk.points.map((point) => Math.hypot(point.p[0] - base[0], point.p[1] - base[1], point.p[2] - base[2]))
+      );
+      expect(nearest).toBeLessThan(trunk.baseRadius);
+    }
+  });
+
+  it('holds the keys to what the mesh can actually show', () => {
+    expect(() => paramsFor({ trunkFlute: 0.6 })).toThrow(/trunkFlute must be within 0..0.5/);
+    expect(() => paramsFor({ trunkFlare: -1 })).toThrow(/trunkFlare/);
+    expect(() => paramsFor({ trunkWander: -1 })).toThrow(/trunkWander/);
+    expect(() => paramsFor({ trunkSides: 2 })).toThrow(/trunkSides must be 0, or within 3..48/);
+    expect(() => paramsFor({ trunkSegments: 1 })).toThrow(/trunkSegments must be 0, or within 2..64/);
+
+    // A flute needs a ring round enough to fold. Asking for one on an 8-sided
+    // trunk is a key that would silently do nothing.
+    expect(() => paramsFor({ trunkFlute: 0.2 })).toThrow(/needs a rounder trunk than 8 sides/);
+    expect(() => paramsFor({ trunkFlute: 0.2, trunkSides: 16 })).not.toThrow();
+  });
+
+  it("shapes a crown's stem with the same keys", () => {
+    // The stem is one branch on a skeleton of its own and goes through the
+    // tree's own bark builder, so the trunk keys reach it unchanged.
+    const stem = (extra: RawConfig = {}) =>
+      buildCrown(
+        resolveParams({ type: 'crown', name: 'test-palm', stemHeight: 8, trunkRadius: 0.5, trunkSides: 20, trunkSegments: 12, ...extra }),
+        CROWN_CELLS_GENERATED
+      ).mesh;
+
+    expect(pieceOf(stem(), 'bark').vertexCount).toBe(13 * 21);
+
+    const plain = ringRadii(stem(), 20, 2);
+    const fluted = ringRadii(stem({ trunkFlute: 0.2 }), 20, 2);
+    expect((Math.max(...fluted) - Math.min(...fluted)) / plain[0]).toBeGreaterThan(0.08);
+
+    // And the wander, which the rosette follows because it rides the stem top.
+    const straight = pieceOf(stem(), 'bark').positions;
+    const strayed = pieceOf(stem({ trunkWander: 0.8 }), 'bark').positions;
+    expect(Math.hypot(strayed.at(-3)! - straight.at(-3)!, strayed.at(-1)! - straight.at(-1)!)).toBeGreaterThan(0.1);
+  });
+
+  it('swells a stem under the same key, from a default of its own', () => {
+    const foot = (extra: RawConfig) =>
+      ringRadii(
+        buildCrown(
+          resolveParams({ type: 'crown', name: 'test-palm', stemHeight: 8, trunkRadius: 0.5, trunkSides: 20, ...extra }),
+          CROWN_CELLS_GENERATED
+        ).mesh,
+        20,
+        0
+      )[0];
+
+    // A trunk is mostly a bare pole and defaults to no flare; a stem never is.
+    expect(resolveParams({ type: 'crown', name: 'a' }).trunkFlare).toBe(0.25);
+    expect(resolveParams({ name: 'a' }).trunkFlare).toBe(0);
+    expect(foot({ trunkFlare: 0.6 })).toBeCloseTo(0.5 * 1.6, 5);
+    expect(foot({ trunkFlare: 0 })).toBeCloseTo(0.5, 5);
+  });
+
+  it('leaves a stemless crown out of it', () => {
+    // A fern takes the tube keys and reads none of them. There is nothing for a
+    // flute to cut into, so the sides check does not hold it either.
+    const fern = buildCrown(
+      resolveParams({ type: 'crown', name: 'test-fern', stemHeight: 0, trunkFlute: 0.3, trunkWander: 1 }),
+      CROWN_CELLS_GENERATED
+    );
+
+    expect(fern.mesh.pieces.map((piece) => piece.key)).toEqual(['frond']);
+  });
+
+  it('lets a tier drop the sides the model paid for', () => {
+    // The tier is coarsening on purpose, so the flute check does not hold it:
+    // a blocky flute at 90m is the trade it asked for.
+    expect(() =>
+      paramsFor({ trunkFlute: 0.2, trunkSides: 24, lods: [{ distance: 60, trunkSides: 8 }] })
+    ).not.toThrow();
+
+    expect(() => parseConfig({ name: 'a', type: 'clump', trunkSides: 8 }, 'test.json')).toThrow(
+      /applies to tree, crown, not to type 'clump'/
+    );
   });
 });
 
@@ -450,20 +761,68 @@ describe('bark uvs', () => {
     expect(Math.max(...aspects) / Math.min(...aspects)).toBeLessThan(1.1);
   });
 
-  it('advances length by one circumference per image', () => {
+  it('advances length by barkAspect circumferences per image', () => {
     // Nothing authors the bark's scale any more. The ring maps once across the
-    // image, so the image width is one circumference, and length has to advance
-    // by the same circumference or the texture is not square on the trunk.
-    const { params, skeleton, mesh } = buildAll();
+    // image, so the image's width is one circumference; its height is that many
+    // circumferences again, and length has to advance by all of them or the
+    // texture is not square on the trunk.
+    //
+    // This is the whole mechanism by which a taller map is less repetitive
+    // rather than merely sharper, so it is asserted at both shapes.
+    for (const barkAspect of [1, 2, 4]) {
+      const { params, skeleton, mesh } = buildAll({ barkAspect });
+      const trunk = skeleton.branches[0];
+      const stride = Math.max(3, params.radialSegments - trunk.level) + 1;
+      const along = (ring: number) => pieceOf(mesh, 'bark').uvs[ring * stride * 2 + 1];
+
+      for (let ring = 1; ring < trunk.points.length; ring++) {
+        const span = trunk.points[ring].dist - trunk.points[ring - 1].dist;
+        const radius = (trunk.points[ring].radius + trunk.points[ring - 1].radius) / 2;
+        expect(along(ring) - along(ring - 1)).toBeCloseTo(span / (barkAspect * 2 * Math.PI * radius), 5);
+      }
+    }
+  });
+
+  it('repeats an authored tile by its own size in metres', () => {
+    // A generated pattern has no size, so it wraps once around anything. An
+    // authored one was photographed at a stated width, and keeping that width
+    // is the whole point of declaring it: a thick branch shows several tiles,
+    // a twig shows one.
+    const tile = { metresAround: 1, aspect: 2 };
+    const { params, skeleton, mesh } = buildAll({ height: 20, trunkRadius: 1.2, barkLevels: 0 }, {}, tile);
+    const stride = Math.max(3, params.radialSegments) + 1;
+    const uvs = pieceOf(mesh, 'bark').uvs;
+
+    // 2 x pi x 1.2 is 7.54m of circumference, so eight tiles of 1m fit best.
+    const turns = uvs[(stride - 1) * 2];
+    expect(turns).toBe(8);
+
+    // And the tile stays undistorted: eight of them around means the length of
+    // one is a whole tile's height, 7.54 / 8 x 2 metres of trunk.
     const trunk = skeleton.branches[0];
-    const stride = Math.max(3, params.radialSegments - trunk.level) + 1;
-    const along = (ring: number) => pieceOf(mesh, 'bark').uvs[ring * stride * 2 + 1];
+    const along = (ring: number) => uvs[ring * stride * 2 + 1];
+    const tileAlong = ((2 * Math.PI * 1.2) / 8) * 2;
 
     for (let ring = 1; ring < trunk.points.length; ring++) {
       const span = trunk.points[ring].dist - trunk.points[ring - 1].dist;
       const radius = (trunk.points[ring].radius + trunk.points[ring - 1].radius) / 2;
-      expect(along(ring) - along(ring - 1)).toBeCloseTo(span / (2 * Math.PI * radius), 5);
+      expect(along(ring) - along(ring - 1)).toBeCloseTo((span * (1.2 / radius)) / tileAlong, 5);
     }
+  });
+
+  it('halves the repeat up a trunk for every doubling of barkAspect', () => {
+    // The symptom the key exists for: the same plate coming round again up a
+    // trunk. Measured as the largest v the trunk's own rings reach.
+    const repeats = (barkAspect: number) => {
+      const { params, skeleton, mesh } = buildAll({ barkAspect, height: 42, trunkRadius: 1.3 });
+      const stride = Math.max(3, params.radialSegments - 0) + 1;
+      const uvs = pieceOf(mesh, 'bark').uvs;
+      const rings = skeleton.branches[0].points.length;
+      return uvs[(rings - 1) * stride * 2 + 1];
+    };
+
+    expect(repeats(2)).toBeCloseTo(repeats(1) / 2, 5);
+    expect(repeats(4)).toBeCloseTo(repeats(1) / 4, 5);
   });
 });
 
@@ -706,11 +1065,12 @@ describe('preview', () => {
   function stubCanvas(): Canvas {
     const texels = 4;
     return {
-      size: 2,
+      width: 2,
+      height: 2,
       bumpStrength: 1,
       albedo: new Float32Array(texels * 3).fill(0.5),
       alpha: new Float32Array(texels).fill(1),
-      height: new Float32Array(texels),
+      relief: new Float32Array(texels),
       ao: new Float32Array(texels).fill(1),
       roughness: new Float32Array(texels).fill(0.5),
       metallic: new Float32Array(texels),
@@ -1069,7 +1429,7 @@ describe('crown', () => {
   it('takes the tube keys from the tree and the card keys from the clump', () => {
     const crown = crownParams();
     expect(crown.out).toBe('assets/shared/nature/crowns');
-    expect(crown.barkProfile).toBe('smooth');
+    expect(crown.trunkFlare).toBe(0.25);
     expect(crown.cardCurve).toBe(80);
     expect(crown.textureSize).toBe(2048);
 
@@ -1120,7 +1480,7 @@ describe('crown', () => {
   });
 
   it('flares the stem at the foot and swells it under the crown', () => {
-    const rings = build({ stemHeight: 10, segments: 18, trunkRadius: 1, trunkTaper: 0.8, stemFlare: 0.3, crownBulge: 0.2 })
+    const rings = build({ stemHeight: 10, segments: 18, trunkRadius: 1, trunkTaper: 0.8, trunkFlare: 0.3, crownBulge: 0.2 })
       .skeleton!.branches[0].points;
     const radius = (t: number): number => rings[Math.round(t * (rings.length - 1))].radius;
 
@@ -1135,13 +1495,13 @@ describe('crown', () => {
     expect(radius(1)).toBeGreaterThan(0.8);
 
     // Both off, the stem is the trunk's own taper.
-    const plain = build({ stemHeight: 10, segments: 18, trunkRadius: 1, trunkTaper: 0.8, stemFlare: 0, crownBulge: 0 })
+    const plain = build({ stemHeight: 10, segments: 18, trunkRadius: 1, trunkTaper: 0.8, trunkFlare: 0, crownBulge: 0 })
       .skeleton!.branches[0].points;
     expect(plain[0].radius).toBeCloseTo(1, 5);
     expect(plain[plain.length - 1].radius).toBeCloseTo(0.8, 5);
     for (let i = 1; i < plain.length; i++) expect(plain[i].radius).toBeLessThanOrEqual(plain[i - 1].radius);
 
-    expect(() => crownParams({ stemFlare: -0.1 })).toThrow(/stemFlare/);
+    expect(() => crownParams({ trunkFlare: -0.1 })).toThrow(/trunkFlare/);
     expect(() => crownParams({ crownBulge: -0.1 })).toThrow(/crownBulge/);
   });
 

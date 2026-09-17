@@ -10,7 +10,8 @@
 // still vary one directly to prove what it does.
 
 export const LOOK = {
-  /** Base bark colour, six digit hex. */
+  /** Base bark colour, six digit hex. The generated wood is three shades of
+   *  it: the crevice, the mid tone and the face that catches the light. */
   barkTint: '#6b5541',
   /** Base leaf colour, six digit hex. */
   leafTint: '#4e7c33',
@@ -30,36 +31,12 @@ export const LOOK = {
    * one leaf and lighter than a cluster's shadowed mass.
    */
   frondTint: '#5c8a3c',
-  /** Bark plates around the tube. Fewer means broader slabs. */
-  barkPlates: 18,
-  /** How far bark plates sit above and below each other. */
-  barkStep: 0.13,
-  /** Flaking on the exposed faces. */
-  barkCrust: 0.13,
-  /** How far a fissure wanders sideways, scaling what the profile sets. */
-  grooveWander: 1,
-  /** How often a knot appears, 0..1, over a fixed grid of bark cells. */
-  knots: 0.12,
-  /** Knot radius as a fraction of a bark cell. */
-  knotSize: 0.26,
-  /** How strongly a knot deforms the bark around it, 0..1. */
-  knotDepth: 0.75,
-  /** Half-width of a fissure, as a fraction of a cell's height. */
-  grooveWidth: 0.26,
-  /** How far a fissure cuts where it runs along the trunk. */
-  grooveDepth: 0.72,
-  /** Colour at the bottom of a fissure, as a fraction of the plate colour. */
-  grooveShade: 0.32,
   /** Colour patches around the tube. Fewer means broader blotches. */
   colourPatches: 5,
   /** How far colour drifts along the warm-to-cool axis. */
   colourVariation: 0.18,
   /** Low frequency variation in the roughness channel. */
   roughnessVariation: 0.13,
-  /** Lichen coverage on the bark, 0..1. */
-  lichen: 0.3,
-  /** Lichen colour, six digit hex. */
-  lichenTint: '#93a17a',
   /** How much curvature darkens crevices and bleaches ridges. */
   curvature: 0.55,
   /** How far a leaflet edge is eaten into lobes. */

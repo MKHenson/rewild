@@ -288,7 +288,7 @@ function stampInto(canvas: Canvas, inner: PixelRect, source: LeafSource, p: Plac
 
   const ss = Math.max(1, Math.min(6, Math.ceil(1 / scale)));
   const samples = ss * ss;
-  const { size } = canvas;
+  const { width: stride } = canvas;
 
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) {
@@ -307,7 +307,7 @@ function stampInto(canvas: Canvas, inner: PixelRect, source: LeafSource, p: Plac
       const a = acc[A] / samples;
       if (a <= 1e-4) continue;
 
-      const t = y * size + x;
+      const t = y * stride + x;
       const dst = canvas.alpha[t];
       const out = a + dst * (1 - a);
       const ws = a / out;
@@ -320,7 +320,7 @@ function stampInto(canvas: Canvas, inner: PixelRect, source: LeafSource, p: Plac
       }
 
       canvas.alpha[t] = out;
-      canvas.height[t] = (acc[H] / acc[A]) * ws + canvas.height[t] * wd;
+      canvas.relief[t] = (acc[H] / acc[A]) * ws + canvas.relief[t] * wd;
       canvas.ao[t] = (acc[O] / acc[A]) * p.shade * ws + canvas.ao[t] * wd;
       canvas.roughness[t] = (acc[RO] / acc[A]) * ws + canvas.roughness[t] * wd;
       canvas.metallic[t] = (acc[M] / acc[A]) * ws + canvas.metallic[t] * wd;
