@@ -1,0 +1,415 @@
+{
+  "granite_boulder": {
+    "name": "granite_boulder",
+    "geometryId": "granite-rock",
+    "materialId": "granite-rock",
+    "cullDistance": 400,
+    "impostor": {
+      "fromDistance": 50,
+      "views": 8,
+      "tileSize": 128
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.8,
+        "to": 2.2
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 6
+    },
+    "yOffset": -0.15,
+    "alignToNormal": 1,
+    "footprint": 6,
+    "collider": {
+      "type": "box",
+      "size": [
+        2.23,
+        2.12,
+        1.25
+      ]
+    }
+  },
+  "granite_pebble": {
+    "name": "granite_pebble",
+    "geometryId": "granite-rock",
+    "materialId": "granite-rock",
+    "cullDistance": 60,
+    "jitter": {
+      "scale": {
+        "from": 0.22,
+        "to": 0.45
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 25
+    },
+    "yOffset": -0.05,
+    "alignToNormal": 1,
+    "footprint": 2.5
+  },
+  "alien_plant": {
+    "name": "alien_plant",
+    "geometryId": "alient-plant",
+    "cullDistance": 130,
+    "impostor": {
+      "fromDistance": 80,
+      "views": 8,
+      "tileSize": 128
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.7,
+        "to": 1.3
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 4
+    },
+    "alignToNormal": 0,
+    "footprint": 5,
+    "collider": {
+      "type": "capsule",
+      "radius": 0.45,
+      "height": 7.5
+    },
+    "wind": {
+      "amplitude": 0.35,
+      "frequency": 0.55,
+      "flutter": 0.4
+    }
+  },
+  "oak_01": {
+    "name": "oak_01",
+    "geometryId": "oak-01",
+    "lodDistances": [
+      60
+    ],
+    "cullDistance": 800,
+    "impostor": {
+      "fromDistance": 192,
+      "views": 8,
+      "tileSize": 128
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.9,
+        "to": 1.6
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 3
+    },
+    "alignToNormal": 0,
+    "footprint": 9.5,
+    "collider": {
+      "type": "capsule",
+      "radius": 0.65,
+      "height": 3.39,
+      "offset": [
+        0,
+        2.35,
+        0
+      ]
+    },
+    "wind": {
+      "amplitude": 8,
+      "frequency": 0.55,
+      "flutter": 0.6
+    },
+    "authoredNormals": true,
+    "foliage": true
+  },
+  "poplar_01": {
+    "name": "poplar_01",
+    "geometryId": "poplar-01",
+    "lodDistances": [
+      60
+    ],
+    "cullDistance": 800,
+    "impostor": {
+      "fromDistance": 192,
+      "views": 8,
+      "tileSize": 128
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.5,
+        "to": 1.25
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 3
+    },
+    "alignToNormal": 0,
+    "footprint": 6.4,
+    "collider": {
+      "type": "capsule",
+      "radius": 0.46,
+      "height": 1.8,
+      "offset": [
+        0,
+        1.36,
+        0
+      ]
+    },
+    "wind": {
+      "amplitude": 8,
+      "frequency": 0.55,
+      "flutter": 0.6
+    },
+    "authoredNormals": true,
+    "foliage": true
+  },
+  "plains_01": {
+    "name": "plains_01",
+    "geometryId": "plains-01",
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 0.8,
+        "to": 1.3
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 3
+    },
+    "yOffset": -0.084,
+    "alignToNormal": 0.6,
+    "footprint": 1.6,
+    "wind": {
+      "amplitude": 4.18,
+      "frequency": 0.8,
+      "flutter": 0.7
+    },
+    "authoredNormals": true,
+    "foliage": true,
+    "castShadow": false
+  },
+  "plains_02": {
+    "name": "plains_02",
+    "geometryId": "plains-02",
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 0.8,
+        "to": 1.3
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 2
+    },
+    "yOffset": -0.09,
+    "alignToNormal": 0.6,
+    "footprint": 1.6,
+    "wind": {
+      "amplitude": 4.18,
+      "frequency": 0.8,
+      "flutter": 0.7
+    },
+    "authoredNormals": true,
+    "foliage": true,
+    "castShadow": false
+  },
+  "palm_01": {
+    "name": "palm_01",
+    "geometryId": "palm-01",
+    "cullDistance": 420,
+    "impostor": {
+      "fromDistance": 180,
+      "views": 8,
+      "tileSize": 128
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.8,
+        "to": 1.25
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 3
+    },
+    "alignToNormal": 0,
+    "footprint": 2.6,
+    "collider": {
+      "type": "capsule",
+      "radius": 0.23,
+      "height": 6.54,
+      "offset": [
+        0,
+        3.5,
+        0
+      ]
+    },
+    "wind": {
+      "amplitude": 4.6,
+      "frequency": 0.4,
+      "flutter": 0.5
+    },
+    "authoredNormals": true,
+    "foliage": true
+  },
+  "palm_02": {
+    "name": "palm_02",
+    "geometryId": "palm-02",
+    "cullDistance": 420,
+    "impostor": {
+      "fromDistance": 180,
+      "views": 8,
+      "tileSize": 128
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.8,
+        "to": 1.25
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 3
+    },
+    "alignToNormal": 0,
+    "footprint": 3.9,
+    "collider": {
+      "type": "capsule",
+      "radius": 0.23,
+      "height": 6.54,
+      "offset": [
+        0,
+        3.5,
+        0
+      ]
+    },
+    "wind": {
+      "amplitude": 4.6,
+      "frequency": 0.4,
+      "flutter": 0.5
+    },
+    "authoredNormals": true,
+    "foliage": true
+  },
+  "date_palm_01": {
+    "name": "date_palm_01",
+    "geometryId": "date-palm-01",
+    "lodDistances": [
+      120
+    ],
+    "cullDistance": 420,
+    "impostor": {
+      "fromDistance": 200,
+      "views": 8,
+      "tileSize": 128
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.8,
+        "to": 1.25
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 3
+    },
+    "alignToNormal": 0,
+    "footprint": 4.7,
+    "collider": {
+      "type": "capsule",
+      "radius": 0.71,
+      "height": 8.08,
+      "offset": [
+        0,
+        4.75,
+        0
+      ]
+    },
+    "wind": {
+      "amplitude": 4.5,
+      "frequency": 0.4,
+      "flutter": 0.5
+    },
+    "authoredNormals": true,
+    "foliage": true
+  },
+  "fern_01": {
+    "name": "fern_01",
+    "geometryId": "fern-01",
+    "cullDistance": 420,
+    "impostor": {
+      "fromDistance": 120,
+      "views": 2,
+      "tileSize": 32
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.7,
+        "to": 1.3
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 6
+    },
+    "yOffset": -0.027,
+    "alignToNormal": 0.6,
+    "footprint": 1.58,
+    "wind": {
+      "amplitude": 2.15,
+      "frequency": 0.9,
+      "flutter": 0.6
+    },
+    "authoredNormals": true,
+    "foliage": true,
+    "castShadow": false
+  },
+  "desert_plains_01": {
+    "name": "desert_plains_01",
+    "geometryId": "plains-01",
+    "cullDistance": 420,
+    "impostor": {
+      "fromDistance": 120,
+      "views": 2,
+      "tileSize": 32
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.8,
+        "to": 1.3
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 3
+    },
+    "yOffset": -0.084,
+    "alignToNormal": 0.6,
+    "footprint": 1.6,
+    "wind": {
+      "amplitude": 4.18,
+      "frequency": 0.8,
+      "flutter": 0.7
+    },
+    "authoredNormals": true,
+    "foliage": true,
+    "castShadow": false
+  }
+}

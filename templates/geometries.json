@@ -22,12 +22,16 @@
   "oak-01": {
     "type": "gltf",
     "url": "nature/trees/oak/oak-01.glb",
-    "lods": ["nature/trees/oak/oak-01.lod1.glb"]
+    "lods": [
+      "nature/trees/oak/oak-01.lod1.glb"
+    ]
   },
   "poplar-01": {
     "type": "gltf",
     "url": "nature/trees/poplar/poplar-01.glb",
-    "lods": ["nature/trees/poplar/poplar-01.lod1.glb"]
+    "lods": [
+      "nature/trees/poplar/poplar-01.lod1.glb"
+    ]
   },
   "plains-01": {
     "type": "gltf",
@@ -52,6 +56,8 @@
   "date-palm-01": {
     "type": "gltf",
     "url": "nature/crowns/date-palm/date-palm-01.glb",
-    "lods": ["nature/crowns/date-palm/date-palm-01.lod1.glb"]
+    "lods": [
+      "nature/crowns/date-palm/date-palm-01.lod1.glb"
+    ]
   }
 }
