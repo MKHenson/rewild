@@ -1,5 +1,9 @@
 import { Vector3 } from 'rewild-common';
-import { billboardFrame, hemiOctDecode } from './ScatterImpostorBake';
+import {
+  billboardFrame,
+  hemiOctDecode,
+  impostorBakeSizeError,
+} from './ScatterImpostorBake';
 
 // The shader's encode, so the two directions of the mapping can be checked
 // against each other: impostorOctUv in shader-lib/scatter-impostor.wgsl.
@@ -75,5 +79,18 @@ describe('billboardFrame', () => {
     expect(right.length()).toBeCloseTo(1);
     expect(up.length()).toBeCloseTo(1);
     expect(right.dot(up)).toBeCloseTo(0);
+  });
+});
+
+describe('impostorBakeSizeError', () => {
+  it('accepts a bake whose supersampled row fits the device', () => {
+    expect(impostorBakeSizeError('oak', 8, 256, 8192)).toBeNull();
+  });
+
+  it('rejects a row wider than the device limit and names the largest tile', () => {
+    const error = impostorBakeSizeError('oak', 8, 1024, 8192);
+    expect(error).toContain("'oak'");
+    expect(error).toContain('32768px');
+    expect(error).toContain('tileSize can be at most 256');
   });
 });

@@ -40,6 +40,29 @@ export interface ScatterImpostorAtlas {
 }
 
 /**
+ * Why a layer's impostor cannot be baked on a device with the given
+ * `maxTextureDimension2D`, or null when it fits. The bake renders a row of
+ * tiles at SUPERSAMPLE times the atlas width, so that row is the widest
+ * texture it creates.
+ */
+export function impostorBakeSizeError(
+  layer: string,
+  views: number,
+  tileSize: number,
+  maxDimension: number
+): string | null {
+  const rowWidth = views * tileSize * SUPERSAMPLE;
+  if (rowWidth <= maxDimension) return null;
+  const maxTile = Math.floor(maxDimension / (views * SUPERSAMPLE));
+  return (
+    `Scatter layer '${layer}' impostor bakes a ${rowWidth}px wide row ` +
+    `(views ${views} × tileSize ${tileSize} × ${SUPERSAMPLE} supersample), ` +
+    `over this device's ${maxDimension}px texture limit. ` +
+    `At ${views} views the tileSize can be at most ${maxTile}.`
+  );
+}
+
+/**
  * Hemi-octahedral decode: a point on the unit square back to the upper
  * hemisphere direction it stands for. The pole is the centre of the square
  * and the horizon runs round its edge. Inverse of impostorOctUv in the shader.
@@ -107,6 +130,13 @@ export class ScatterImpostorBaker {
 
     const { centre, radius } = boundingSphere(primitives);
     const { views, tileSize } = impostor;
+    const sizeError = impostorBakeSizeError(
+      layer.name,
+      views,
+      tileSize,
+      device.limits.maxTextureDimension2D
+    );
+    if (sizeError) throw new Error(sizeError);
     const size = views * tileSize;
     const mipLevelCount = Math.floor(Math.log2(size)) + 1;
 
