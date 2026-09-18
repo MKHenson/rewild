@@ -204,10 +204,11 @@ arithmetic.
 **So the grid is derived.** Sixteen variants of a frond are worth nothing and a frond needs every
 texel it can get, so a species whose leaf fills its own card gets fewer, larger cells. `leafGrid` in
 `sources.ts`: four or more per card is 4x4, two to four is 2x2, under two is 1x1 — or 2x2 when the
-set has several stamps to show. `fitLeaves` compares the texels a stamp lands with against the
+set has several stamps to show. A config's `leafGrid` names one outright where the derived grid is
+not the trade wanted, texels per cluster against variants across the canopy. `fitLeaves` compares the texels a stamp lands with against the
 texels it has, and the run reports an upscale rather than leaving it to be noticed in-game. Because
 the card size is in the image, `leafSize` is a texture key and changing it rebuilds the images, as
-are the `bark` and `leaves` lists.
+are `leafGrid` and the `bark` and `leaves` lists.
 
 Mip alpha erosion ([#230](https://github.com/MKHenson/rewild/issues/230)) is unaffected either way.
 

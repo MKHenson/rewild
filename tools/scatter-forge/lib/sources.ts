@@ -650,7 +650,8 @@ export function stampsPerCell(source: LeafSource, leafSize: number): number {
 }
 
 /**
- * Cells along each edge of the leaf image.
+ * Cells along each edge of the leaf image, or `override` when the config
+ * names one.
  *
  * Derived rather than fixed, because a cell's variety comes from how its
  * leaves are arranged, and a cell holding one leaf has no arrangement to vary.
@@ -658,7 +659,8 @@ export function stampsPerCell(source: LeafSource, leafSize: number): number {
  * it can get, so a species whose leaf fills its card gets fewer, larger cells.
  * A set with several stamps still gets a second row so each can be seen.
  */
-export function leafGrid(source: LeafSource | null, leafSize: number): number {
+export function leafGrid(source: LeafSource | null, leafSize: number, override = 0): number {
+  if (override) return override;
   if (!source) return LEAF_GRID_GENERATED;
   const perCell = stampsPerCell(source, leafSize);
   if (perCell >= 4) return LEAF_GRID_GENERATED;
@@ -679,8 +681,8 @@ export interface LeafFit {
   bumpStrength: number | null;
 }
 
-export function fitLeaves(source: LeafSource, leafSize: number, textureSize: number): LeafFit {
-  const grid = leafGrid(source, leafSize);
+export function fitLeaves(source: LeafSource, leafSize: number, textureSize: number, override = 0): LeafFit {
+  const grid = leafGrid(source, leafSize, override);
   const perCell = stampsPerCell(source, leafSize);
   const inner = textureSize / grid - 2 * gutterFor(textureSize);
 

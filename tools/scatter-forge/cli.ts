@@ -270,7 +270,7 @@ async function loadSources(params: Params): Promise<{ barkSource: BarkSource | n
 function atlasFor(params: Params, leafSource: LeafSource | null): { grid: number; cells: number } {
   if (params.type === 'clump') return clumpAtlas(leafSource);
   if (params.type === 'crown') return crownAtlas(leafSource);
-  const grid = leafGrid(leafSource, params.leafSize);
+  const grid = leafGrid(leafSource, params.leafSize, params.leafGrid);
   return { grid, cells: grid * grid };
 }
 
@@ -445,7 +445,7 @@ async function generate(params: Params, writeTemplate: string | null, previous?:
 function describeLeaves(params: Params, source: LeafSource | null): string[] {
   if (!source) return ['  leaves   generated — no sources listed'];
 
-  const fit = fitLeaves(source, params.leafSize, params.textureSize);
+  const fit = fitLeaves(source, params.leafSize, params.textureSize, params.leafGrid);
   const stamps = `${source.stamps.length} stamp${source.stamps.length === 1 ? '' : 's'}`;
   const lines = [
     `  leaves   from ${source.directories.map(shellPath).join(', ')} (${stamps}, up to ${source.lengthMetres}m long): ` +

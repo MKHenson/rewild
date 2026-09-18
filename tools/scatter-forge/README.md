@@ -200,6 +200,7 @@ stands in for a sprig, never for a single leaf.
 | `leafLevels` | 2 | How many generations carry cards, counted **inward from the outermost**, never out from the trunk. | `1` oak, the tips alone · `2` poplar · `3` birch and shrub. What it buys depends on `splits`. The oak's tips are 83% of its branches, so 1 to 2 adds only 17% more cards and mostly pulls foliage back along the limbs. The birch has 64 tips and cannot fill a crown from them, so 1 to 3 takes it from 768 leaf triangles to 1,344. Within 1 to `branchLevels + 1`, where the top hangs leaves off the trunk |
 | `leavesPerBranch` | 18 | Cards spaced evenly along each leaf-bearing branch, from `leafFrom` to the tip. | `1` the oak's LOD tier · `4` oak and poplar · `6` birch · `10` shrub · `18` default. Total cards is this times the leaf-bearing branches, at two triangles each. A tier cuts it and raises `leafScale` to hold the crown's density |
 | `leafSize` | 1 | Height of one card in metres, before `leafScale`. It also decides how many authored leaves fit a cell, see [What one division decides](#what-one-division-decides). | `0.3` shrub at 2.2m tall · `1` every tree at 16m and up. Absolute, so a small tree needs it brought down or its leaves swallow it |
+| `leafGrid` | 0 | Cells along each edge of the leaf image, overriding the derived grid. Texture key. | `0` derive it from `leafSize` over the source's leaf length, see [What one division decides](#what-one-division-decides) · `2` four larger cells, each cluster at twice the texels of a 4x4's, at the cost of fewer variants across the canopy · `1` or `4` likewise |
 | `leafScale` | 1 | Multiplies card size and leaves the texture fit alone. | `1` every model · `2` the oak's LOD tier, paired with `leavesPerBranch` 1. That pair trades 4 small cards for 1 large one at about the same coverage |
 | `leafAspect` | 0.85 | Card width as a fraction of its height. The image cell is always square, so this squashes it. | `0.85` every template, narrowing the painted sprig by 15% so a cluster reads upright · `1` the art undistorted · `1.4` a wide frond |
 | `leafDroop` | 55 | Degrees a card hangs below its branch direction, plus or minus 10 of randomness. | `0` laid flat along the branch · `55` oak, birch and shrub · `80` poplar, hanging steeply · `90` straight down |
@@ -1153,9 +1154,11 @@ the only depth a flat card can carry. One leaf per card is the leaf itself, pinn
 The grid follows: a cell's variety comes from how its leaves are arranged, and a cell holding one
 leaf has no arrangement to vary, so it gets the texels instead. Four or more per card is 4x4, two to
 four is 2x2, under two is 1x1 — or 2x2 when the set has several stamps to show. The mesh is handed
-the same number, so a card never addresses a cell nothing drew. Because the card size is in the
-image, `leafSize` counts as a texture key and changing it rebuilds the images — as does changing
-which sources are listed.
+the same number, so a card never addresses a cell nothing drew. `leafGrid` names a grid outright
+where the derived one is not the trade wanted: a 2x2 gives each cluster four times the texels of a
+4x4 and the canopy four arrangements instead of sixteen. Because the card size is in the image,
+`leafSize` counts as a texture key and changing it rebuilds the images — as does changing which
+sources are listed, or `leafGrid`.
 
 A stamp's pixel size never decides anything but quality. The forge shrinks a stamp to its place on
 the card, averaging the source texels each canvas texel covers, so a 128px and a 512px leaf lay out

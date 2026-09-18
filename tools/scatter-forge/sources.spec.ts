@@ -394,6 +394,12 @@ describe('leaf fit', () => {
     expect(leafGrid(null, 1)).toBe(4);
   });
 
+  it('takes a named grid over the derived one', () => {
+    expect(leafGrid(oak, 1, 2)).toBe(2);
+    expect(leafGrid(null, 1, 1)).toBe(1);
+    expect(leafGrid(oak, 1, 0)).toBe(4);
+  });
+
   it('still gives a frond a second row when there are several to show', () => {
     const set = { ...palm, stamps: [stampOf(3), stampOf(3)] } as unknown as LeafSource;
     expect(leafGrid(set, 3)).toBe(2);

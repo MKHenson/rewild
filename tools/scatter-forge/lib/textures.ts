@@ -679,14 +679,14 @@ export function buildBarkCanvas(params: Params, authored?: BarkSource | null): C
  *
  * With a source the grid is derived from how many leaves fit a card, and each
  * cell is stamps composited on a spray of sprigs; without one it is the
- * generator's 4x4 of drawn clusters.
+ * generator's 4x4 of drawn clusters. A config's `leafGrid` overrides either.
  */
 export function buildLeafCanvas(params: Params, source?: LeafSource | null): Canvas {
   const size = params.textureSize;
   const gutter = gutterFor(size);
 
   if (source) {
-    const fit = fitLeaves(source, params.leafSize, size);
+    const fit = fitLeaves(source, params.leafSize, size, params.leafGrid);
     const cells = leafCellPixels(size, fit.grid);
     const canvas = createCanvas(size, size, fit.bumpStrength ?? params.bumpStrength);
 
@@ -701,7 +701,7 @@ export function buildLeafCanvas(params: Params, source?: LeafSource | null): Can
     return canvas;
   }
 
-  const cells = leafCellPixels(size, LEAF_GRID_GENERATED);
+  const cells = leafCellPixels(size, params.leafGrid || LEAF_GRID_GENERATED);
   const canvas = createCanvas(size, size, params.bumpStrength);
 
   cells.forEach((rect, index) => paintFoliageCell(canvas, params, rect, index, leafStyle));
