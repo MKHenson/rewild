@@ -149,6 +149,7 @@ export const PARAM_SPEC = {
   leavesPerBranch: { type: 'int', default: 18, help: 'Leaf cards on each leaf-bearing branch.', types: TREE },
   leafLevels: { type: 'int', default: 2, help: 'How many of the deepest branch generations carry leaves.', types: TREE },
   leafSize: { type: 'number', default: 1, help: 'Leaf card height in metres. Decides how many authored leaves fill a card.', texture: true, types: TREE },
+  leafGrid: { type: 'int', default: 0, help: 'Cells along each edge of the leaf image: 1, 2 or 4. Fewer cells give each cluster more texels; more give the canopy more variants. 0 derives it from how many leaves fit a card.', texture: true, types: TREE },
   leafScale: { type: 'number', default: 1, help: 'Card size multiplier that leaves the texture fit alone. Fewer, larger cards for a LOD tier.', types: TREE },
   leafAspect: { type: 'number', default: 0.85, help: 'Leaf card width as a fraction of its height.', types: TREE },
   leafDroop: { type: 'number', default: 55, help: 'Degrees a leaf card hangs below its branch direction.', types: TREE },
@@ -807,6 +808,9 @@ function validateTree(params: Params): void {
     throw new Error('barkLevels must be within 0..6.');
 
   if (!(params.leafScale > 0)) throw new Error(`leafScale must be positive, got ${params.leafScale}.`);
+
+  if (![0, 1, 2, 4].includes(params.leafGrid))
+    throw new Error(`leafGrid must be 1, 2 or 4, or 0 to derive it, got ${params.leafGrid}.`);
 
   if (params.leavesPerBranch < 0) throw new Error('leavesPerBranch must not be negative.');
 
