@@ -275,9 +275,11 @@ These name the outputs, or are copied into the printed `scatter-layers.json` ent
 | `writeTemplates` | `false` | Patch `geometries.json` and `materials.json` in place instead of only printing them. | |
 | `templatesDir` | `templates` | Where those two files live. The engine's `templates/` at the repo root, not this tool's. | |
 | `cullDistance` | 160 | Metres past which the layer draws nothing. | `50` the clump default · `90` shrub · `160` the tree default · `800` oak and poplar |
-| `impostorFrom` — `tree`, `crown` | 0 | Metres the billboard tier takes over at. Every `lods` distance has to stay below it. | `0` derives 60% of `cullDistance` · `192` oak and poplar, which is where the trees are tuned. A crown takes these only while it has a stem; a fern culls instead. **Lower is cheaper**: it hands more of the world to billboards instead of meshes. Pick it from the tile rather than from the cull distance, below |
-| `impostorViews` — `tree`, `crown` | 8 | Views baked around the tree. At least 2. | `8` every template. More views means a smoother turn and a bigger bake |
-| `impostorTile` — `tree`, `crown` | 128 | Edge of one baked view, in pixels. | `128` every template. This is what decides the handover distance |
+| `castShadow` | by type | Whether the layer draws into the shadow maps. | `true` a tree, and a crown with a stem · `false` a clump, and a stemless crown: ground cover's shadow is a flicker of blade-sized texels under itself, and casting it draws every card of every patch in the shadow pass. Every template sets it |
+| `impostor` | `{ fromDistance: 0, views: 8, tileSize: 128 }` | The layer's billboard block, keyed exactly as `scatter-layers.json` carries it. Any key left out takes its default. | A tree and a stemmed crown always carry one. A clump or a stemless crown carries one only if the file sets it: `{ fromDistance: 160, views: 2, tileSize: 64 }` the plains, a patch metres wide · omitted, a fern or a lone tuft culls instead |
+| `impostor.fromDistance` | 0 | Metres the billboard tier takes over at. Every `lods` distance has to stay below it. | `0` derives 60% of `cullDistance` · `192` oak and poplar, which is where the trees are tuned. **Lower is cheaper**: it hands more of the world to billboards instead of meshes. Pick it from the tile rather than from the cull distance, below |
+| `impostor.views` | 8 | Views baked around the tree. At least 2. | `8` every template. More views means a smoother turn and a bigger bake |
+| `impostor.tileSize` | 128 | Edge of one baked view, in pixels. | `128` every template. This is what decides the handover distance |
 | `footprint` | 0 | Metres of clearance the placer keeps around an instance. **The most expensive number in the file.** | `0` derives it from the model's own spread · `0.7` the clump default · `9.8` the oak's. Read [Density](#density) before lowering it: candidate cost goes as one over its square |
 | `scaleMin`, `scaleMax` | 0.8, 1.25 | Bounds of the random per-instance scale. | `0.8` and `1.25` every tree template, a forest of mixed ages off one model · `0.75` and `1.3` the clump default · `1` and `1` identical copies |
 | `windAmplitude` | 0.4 | How far it sways, copied into the layer's `ScatterWind`. | `0` still · `0.18` the clump default · `0.4` the tree default · `8` what the shipped oak and poplar rows are actually tuned to |
@@ -311,7 +313,7 @@ separate piece of engine work, and a middle tier only adds a second place to see
 
 A crown's chain is a matter of judgement rather than budget: the `date-palm` template is 792
 triangles and its tier takes it to 360, where an oak's tier is 2,828. The impostor is the LOD that
-matters for a palm, and pulling `impostorFrom` in is the cheaper lever. A stemless crown takes no
+matters for a palm, and pulling `impostor.fromDistance` in is the cheaper lever. A stemless crown takes no
 tiers, for the reason a clump does not.
 
 **Judging a tier.** With `preview` set, the run writes `<name>.lods.preview.png`: the model and every
@@ -325,15 +327,15 @@ crown survive and only the detail goes. The oak's tier is a fair example of the 
 holds the crown's density on a quarter of the cards, but the larger cards spill past the model's own
 outline, so the crown reads wider at 60m than it does up close.
 
-**Where the impostor should take over.** `impostorFrom` decides it, and the useful rule is the
-tile, not the cull distance. A billboard stops being enough the moment the tree covers more pixels
-than `impostorTile` has, so the handover belongs at roughly:
+**Where the impostor should take over.** `impostor.fromDistance` decides it, and the useful rule is
+the tile, not the cull distance. A billboard stops being enough the moment the tree covers more
+pixels than `impostor.tileSize` has, so the handover belongs at roughly:
 
 ```
-impostorFrom  =  screenHeightPx / impostorTile  x  height / (2 x tan(vFov / 2))
+fromDistance  =  screenHeightPx / tileSize  x  height / (2 x tan(vFov / 2))
 ```
 
-At 1080p and a 50 degree vertical field of view, that is about `145 x height / impostorTile` metres.
+At 1080p and a 50 degree vertical field of view, that is about `145 x height / tileSize` metres.
 An 18m oak on a 128px tile comes out near 160m, which is why the shipped trees hand over at 192m and
 not at the 480m that 60% of their cull distance would give. Left at `0` the tool falls back to that
 fraction, which suits a low bush and is far too generous for a tree.
@@ -517,9 +519,9 @@ reasons a tree's canopy does.
 
 | | Why |
 | --- | --- |
-| **No impostor** | A billboard is only worth baking while the model covers more pixels than the tile has. A 0.38m tuft is under a 128px tile at every distance it is still drawn at, so it culls instead. `granite_pebble` does the same. |
+| **No impostor, unless it sets one** | A billboard is only worth baking while the model covers more pixels than the tile has. A 0.38m tuft is under a 128px tile at every distance it is still drawn at, so it culls instead. `granite_pebble` does the same. A metres-wide patch is worth one: the plains set `impostor` and get it. |
 | **No collider** | A tuft that stops the player is worse than one they walk through. |
-| **No shadow** | The emitted row sets `castShadow: false`. A tuft's shadow is a flicker of blade-sized texels under itself, and casting it means the shadow pass draws every card of every patch in range. |
+| **No shadow** | `castShadow` defaults to `false`. A tuft's shadow is a flicker of blade-sized texels under itself, and casting it means the shadow pass draws every card of every patch in range. |
 | **No LOD chain** | A tier would save 18 triangles. Culling at 50m is the whole budget. |
 | **No `_disp` map** | Displacement is not wired at all — see [Displacement](#displacement) — and a blade's relief is under a millimetre. A `-disp` **input** is still required, because the normal is derived from it. |
 | **No ground tint** | `COLOR_0` is spent on wind, and it cannot also be a tint. Blending the terrain's colour into the blade base would need a second vertex colour. Named here rather than discovered as a bug. |
@@ -727,9 +729,9 @@ does.
 ### Which layer a crown emits
 
 The stem decides. With one, the layer is a tree's: upright whatever the slope, a capsule collider up
-to the rosette, an impostor from `impostorFrom`, shadows, and any `lods` tiers it names. Without one it is a clump's — no
-impostor at half a metre tall, no collider, no shadow, laid partly onto the slope — for every
-reason listed under [What a clump does not get](#what-a-clump-does-not-get).
+to the rosette, an impostor from `impostor.fromDistance`, shadows, and any `lods` tiers it names. Without one it is a clump's — no
+impostor at half a metre tall unless the file sets one, no collider, no shadow, laid partly onto the slope — for
+every reason listed under [What a clump does not get](#what-a-clump-does-not-get).
 
 ### The frond atlas
 

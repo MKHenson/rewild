@@ -36,7 +36,8 @@
   "leafDroop": 25,
   "leafFrom": 0.1,
   "cullDistance": 450,
-  "impostorFrom": 320,
+  "castShadow": true,
+  "impostor": { "fromDistance": 320 },
   "lods": [
     {
       "distance": 90,

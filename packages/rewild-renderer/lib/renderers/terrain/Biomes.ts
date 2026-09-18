@@ -9,6 +9,11 @@ export interface SelectorBand {
   to: number;
 }
 
+// A selector over a per-sample value: one band, or several whose coverages
+// multiply. A pair is a plateau — one band fading in and one fading out — which
+// is what a treeline is: present above the foothills and gone under the snow.
+export type Selector = SelectorBand | SelectorBand[];
+
 // Organic patches, independent of the terrain's shape — what slope and height
 // cannot do, since they can only ever draw the same patch on the same shape.
 // The band is against a 0..1 noise value.
@@ -27,8 +32,8 @@ export interface NoiseSelector {
 // and must be unconstrained. See resolveLayerWeights.
 export interface BiomeLayer {
   material: string; // key into TERRAIN_MATERIALS
-  slope?: SelectorBand; // degrees from horizontal
-  height?: SelectorBand; // absolute world meters
+  slope?: Selector; // degrees from horizontal
+  height?: Selector; // absolute world meters
   noise?: NoiseSelector; // organic patches, independent of terrain shape
 }
 
@@ -41,8 +46,8 @@ export interface BiomeScatter {
   // the instances fit. Relative rather than per-square-metre so it composes
   // with a paint mask's 0..1 weight.
   density: number;
-  slope?: SelectorBand; // degrees from horizontal
-  height?: SelectorBand; // absolute world meters
+  slope?: Selector; // degrees from horizontal
+  height?: Selector; // absolute world meters
   noise?: NoiseSelector; // organic patches, independent of terrain shape
 }
 
@@ -220,6 +225,15 @@ export const FOREST: BiomeParams = {
       // The stand's own field, inverted. Grass fills the glades.
       noise: { scale: 260, seedSalt: 53, band: { from: 0.8, to: 0.45 } },
     },
+    {
+      layer: 'cypress_01',
+      density: 0.1,
+      height: [
+        { from: 20, to: 100 },
+        { from: 150, to: 110 },
+      ],
+      slope: { from: 42, to: 20 },
+    },
     { layer: 'granite_pebble', density: 0.18, slope: { from: 30, to: 8 } },
   ],
 };
@@ -256,6 +270,28 @@ export const MOUNTAIN: BiomeParams = {
       density: 0.3,
       height: { from: 165, to: 105 },
       slope: { from: 48, to: 22 },
+    },
+    // The treeline: conifers climb in from the foothills, stand thickest
+    // where the snow begins, and are gone before it closes over. They hold
+    // steeper ground than a broadleaf would, and the noise band breaks the
+    // line into stands rather than a contour of trees.
+    {
+      layer: 'cypress_01',
+      density: 0.01,
+      height: [
+        { from: 0, to: 100 },
+        { from: 150, to: 110 },
+      ],
+      slope: { from: 42, to: 20 },
+    },
+    {
+      layer: 'poplar_01',
+      density: 0.01,
+      height: [
+        { from: 0, to: 100 },
+        { from: 150, to: 110 },
+      ],
+      slope: { from: 42, to: 20 },
     },
   ],
 };
@@ -343,7 +379,7 @@ export const DESERT: BiomeParams = {
       noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
     },
     {
-      layer: 'date_palm_01',
+      layer: 'palm_03',
       density: 0.25,
       slope: { from: 32, to: 10 },
       noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },

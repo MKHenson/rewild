@@ -34,6 +34,7 @@ const HAS_FOLIAGE_SHADING: bool = ${ HAS_FOLIAGE_SHADING };
 #include "./shader-lib/parallax.frag.wgsl"
 #include "./shader-lib/ibl.wgsl"
 #include "./shader-lib/material-debug.wgsl"
+#include "./shader-lib/foliage-lighting.wgsl"
 #include "./shader-lib/standard-material.wgsl"
 #include "./shader-lib/selection-tint.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"

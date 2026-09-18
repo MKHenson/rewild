@@ -17,7 +17,7 @@ import type { PhysicsShape } from 'rewild-renderer/lib/core/PhysicsShape';
 import type { ScatterLayer } from 'rewild-renderer/lib/renderers/terrain/ScatterLayers';
 import type { ClumpMetrics } from './clump.ts';
 import type { Crown } from './crown.ts';
-import { impostorDistance, type Params } from './params.ts';
+import { IMPOSTOR_DEFAULT, impostorDistance, type Params } from './params.ts';
 import type { Skeleton } from './skeleton.ts';
 import type { TextureNames } from './textures.ts';
 
@@ -92,15 +92,21 @@ export function colliderFor(params: Params, skeleton: Skeleton): PhysicsShape {
  * has been pasted in.
  */
 /**
- * A clump's layer: no impostor, no collider, and laid partly onto the slope.
+ * A clump's layer: no collider, laid partly onto the slope, and an impostor
+ * only when the file sets one.
  *
- * **No impostor.** A billboard is only worth baking while the model covers
- * more pixels than the tile has, and a tuft at half a metre is under a 128px
- * tile at every distance it is still drawn at. It culls instead, which is what
- * `granite_pebble` does for the same reason.
+ * **No impostor, unless asked.** A billboard is only worth baking while the
+ * model covers more pixels than the tile has, and a tuft at half a metre is
+ * under a 128px tile at every distance it is still drawn at. It culls instead,
+ * which is what `granite_pebble` does for the same reason. A metres-wide patch
+ * of plains grass is worth one, and sets it.
  *
  * **No collider.** A tuft of grass that stops the player is worse than one they
  * walk through.
+ *
+ * **No shadow, unless asked.** A tuft's shadow is a flicker of blade-sized
+ * texels under itself, and the shadow pass would draw every card of every
+ * patch to get it.
  *
  * **Laid partly onto the slope.** A tree stands upright whatever the ground
  * does. Grass does not: it grows from the surface, so it leans with it, but
@@ -111,6 +117,7 @@ export function clumpLayer(params: Params, metrics: ClumpMetrics): ScatterLayer 
     name: params.name.replace(/-/g, '_'),
     geometryId: params.name,
     cullDistance: params.cullDistance,
+    ...(params.impostor ? { impostor: { ...params.impostor, fromDistance: impostorDistance(params) } } : {}),
     jitter: {
       scale: { from: params.scaleMin, to: params.scaleMax },
       yaw: { from: 0, to: 360 },
@@ -128,9 +135,7 @@ export function clumpLayer(params: Params, metrics: ClumpMetrics): ScatterLayer 
     // be mirrored on a back face. Same reason a tree's canopy mode sets it.
     authoredNormals: true,
     foliage: true,
-    // A tuft's shadow is a flicker of blade-sized texels under itself, and the
-    // shadow pass would draw every card of every patch to get it.
-    castShadow: false,
+    castShadow: params.castShadow,
   };
 }
 
@@ -191,11 +196,7 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
     geometryId: params.name,
     ...(params.lods.length ? { lodDistances: params.lods.map((tier) => tier.distance) } : {}),
     cullDistance: params.cullDistance,
-    impostor: {
-      fromDistance: impostorDistance(params),
-      views: params.impostorViews,
-      tileSize: params.impostorTile,
-    },
+    impostor: { ...(params.impostor ?? IMPOSTOR_DEFAULT), fromDistance: impostorDistance(params) },
     jitter: { scale: { from: params.scaleMin, to: params.scaleMax }, yaw: { from: 0, to: 360 }, tilt: 3 },
     // Trees stand up whatever the slope does. A tilted trunk reads as damage,
     // not as terrain.
@@ -213,6 +214,7 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
     // A card stands in for a cluster of leaves whatever its normal says, so it
     // reflects off its own face and its occlusion shades its highlights too.
     foliage: true,
+    castShadow: params.castShadow,
   };
 }
 

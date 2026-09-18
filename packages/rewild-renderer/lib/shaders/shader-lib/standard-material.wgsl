@@ -13,8 +13,9 @@
 // and binding its own layout puts them:
 //   - mySampler, baseColorMap, normalMap, metallicRoughnessMap, occlusionMap,
 //     emissiveMap, heightMap, and the standardParams uniform block
-//   - brdf.wgsl, pbr-lighting.wgsl, tbn.frag.wgsl, parallax.frag.wgsl and
-//     ibl.wgsl, which this calls into, plus the IBL bindings that last one names
+//   - brdf.wgsl, pbr-lighting.wgsl, tbn.frag.wgsl, parallax.frag.wgsl,
+//     ibl.wgsl and foliage-lighting.wgsl, which this calls into, plus the IBL
+//     bindings ibl.wgsl names
 //   - the `lighting` storage binding those two need, and spotLightShadowParams,
 //     which says which light in it the spot atlas belongs to
 //   - HAS_VERTEX_TANGENTS, HAS_PARALLAX, HAS_AUTHORED_NORMALS and
@@ -82,129 +83,6 @@ fn alphaCoverageScale(fragUV : vec2f) -> f32 {
 // was baked against; without vertex tangents that frame comes from screen-space
 // derivatives and is rebuilt every frame, so relief can swim slightly as the
 // camera turns. Prefer vertexTangents on anything parallax-mapped.
-// How far the sun wraps past the terminator on a leaf, as a fraction of the
-// lobe. A blade is thin enough to be lit from well behind its own horizon, and
-// a hard Lambert terminator is what makes foliage read as stamped cardboard.
-//
-// It costs contrast, though: the wrap is a floor under every blade whatever way
-// it points, and too much of one flattens a field into a single tone. This is
-// the knob to reach for if foliage reads as posterised.
-const FOLIAGE_WRAP: f32 = 0.4;
-
-// Energy normalisation for the lobe above: (1+w)^2, not (1+w). Averaged over
-// blades pointing every way, (N·L + w)/(1+w) integrates to 1.6x Lambert at
-// w = 0.6 — foliage lit by the same sun as the ground it stands in, and coming
-// out brighter. Squaring puts the average back on Lambert exactly, at the cost
-// of a sun-facing blade peaking at 1/(1+w) rather than 1.
-const FOLIAGE_WRAP_NORM: f32 = (1.0 + FOLIAGE_WRAP) * (1.0 + FOLIAGE_WRAP);
-
-// The sky a blade actually sees. The standard path multiplies its irradiance by
-// an occlusion map; this model has neither that fetch nor vertex AO (COLOR_0 is
-// spent on wind bend weights), so every blade would otherwise be lit as though
-// it stood alone in the open. A flat factor is the crude stand-in — it is a
-// constant added to every fragment, so it flattens contrast as much as it
-// brightens. Baked per-vertex AO in the scatter meshes is the real answer.
-const FOLIAGE_AMBIENT: f32 = 0.6;
-
-// Strength and tightness of light coming *through* a blade. Peaks looking into
-// the sun, which is the whole character of a backlit field.
-const FOLIAGE_TRANSMIT: f32 = 0.55;
-const FOLIAGE_TRANSMIT_POWER: f32 = 3.0;
-
-/**
- * Shading model for foliage: grass clumps and canopy cards.
- *
- * Not a cheaper standard material, a different one. It drops the entire
- * specular chain — no metallic-roughness, no GGX, no prefiltered probe, no
- * normal map, no tangent frame — because a leaf is a matte cutout and none of
- * it was describing anything. That also drops three of the five texture
- * fetches the standard path takes on every fragment, which is what makes it
- * affordable at the overdraw foliage draws at.
- *
- * What it adds is transmission, which the standard material has no term for and
- * which is the one thing that makes grass look like grass.
- *
- * `sunShadow` arrives with the cloud shadow already folded in, so an overcast
- * sweep still crosses a field shaded this way.
- */
-fn shadeFoliage(
-  albedo: vec3f,
-  normal: vec3f,
-  viewPosition: vec3f,
-  sunShadow: f32
-) -> vec4f {
-  let N = normalize(normal);
-  let V = normalize(-viewPosition);
-
-  var direct = vec3f(0.0);
-  var transmitted = vec3f(0.0);
-
-  // Every light type, through the same two lobes. A lamp aimed at a field is
-  // the case the wrap and transmit terms exist for, so restricting this to the
-  // sun would put grass in a spot's cone lit only by the sky.
-  //
-  // Punctual lights reuse the standard model's falloff and cone, so a blade and
-  // the ground it stands in take the same light. What foliage does not take is
-  // the spot *shadow*: the atlas tap is 3x3 PCF and the overdraw here does not
-  // carry it, so foliage inside a cone is lit whether or not something blocks
-  // it. Only sunShadow, which the caller already has, reaches this model.
-  for (var i: u32 = 0u; i < lighting.numLights; i = i + 1u) {
-    let light = lighting.lights[i];
-    // Both lobes are Lambertian, so both carry the 1/pi the standard model
-    // applies through diffuseLambert. Without it foliage comes out pi times
-    // brighter than everything around it.
-    var radiance = light.color * light.intensity / BRDF_PI;
-    var L: vec3f;
-
-    if (light.lightType == 1.0) {
-      // positionOrDirection is the direction the light travels, so the vector
-      // toward it is its negation.
-      L = normalize(-light.positionOrDirection);
-      radiance *= sunShadow;
-    } else {
-      // Rejected on the square, so a light that does not reach this fragment
-      // costs a dot and a compare rather than a sqrt. Every punctual light in
-      // the buffer pays this much per foliage fragment, at foliage overdraw.
-      let lightVec = light.positionOrDirection - viewPosition;
-      let d2 = dot(lightVec, lightVec);
-      if (d2 >= light.range * light.range) {
-        continue;
-      }
-      let dist = sqrt(d2);
-      L = lightVec / max(dist, 1e-4);
-
-      var attenuation = lightDistanceAttenuation(dist, light.range);
-      if (light.lightType == 2.0) {
-        let angle = acos(clamp(dot(-L, light.direction), 0.0, 1.0));
-        attenuation *= 1.0 - smoothstep(light.innerAngle, light.outerAngle, angle);
-      }
-      if (attenuation <= 0.0) {
-        continue;
-      }
-      radiance *= attenuation;
-    }
-
-    direct += radiance
-            * max(0.0, (dot(N, L) + FOLIAGE_WRAP) / FOLIAGE_WRAP_NORM);
-    transmitted += radiance
-                 * pow(max(0.0, dot(V, -L)), FOLIAGE_TRANSMIT_POWER)
-                 * FOLIAGE_TRANSMIT;
-  }
-
-  // Diffuse irradiance only. The specular probe and the BRDF lookup are the
-  // expensive half of evaluateIbl and a blade has nothing to reflect with.
-  //
-  // No 1/pi here: the irradiance cube already holds irradiance/pi, which is
-  // why evaluateIbl multiplies the diffuse colour by it directly.
-  let worldN = normalize((iblParams.viewToWorld * vec4f(N, 0.0)).xyz);
-  let ambient = textureSampleLevel(iblIrradianceMap, iblSampler, worldN, 0.0).rgb
-              * FOLIAGE_AMBIENT;
-
-  // Transmitted light is tinted by the blade it came through, so it takes the
-  // albedo like the rest.
-  return vec4f(albedo * (direct + ambient + transmitted), 1.0);
-}
-
 fn parallaxUV(fragUV: vec2f, viewPosition: vec3f, tbn: mat3x3f) -> vec2f {
   // Const-folded away where parallax is off — but heightMap is still named
   // below, which is what keeps it in the `layout: 'auto'` bind group layout the

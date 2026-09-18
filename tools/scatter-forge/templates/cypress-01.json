@@ -1,8 +1,8 @@
 {
   "name": "cypress-01",
   "textureSet": "cypress",
-  "bark": [],
-  "leaves": [],
+  "bark": ["oak/oak-01"],
+  "leaves": ["pine"],
   "out": "assets/shared/nature/trees",
   "assetsRoot": "assets/shared",
   "seed": 1509,
@@ -32,21 +32,22 @@
   "leafFrom": 0.05,
   "leafNormalMode": "canopy",
   "leafAlphaCutoff": 0.45,
-  "bendCurve": 2.4,
+  "bendCurve": 1.01,
   "lods": [
     {
       "distance": 60,
-      "radialSegments": 4,
+      "radialSegments": 3,
       "barkLevels": 1,
-      "leavesPerBranch": 3,
-      "leafScale": 1.8
+      "leavesPerBranch": 2,
+      "leafScale": 2.2
     }
   ],
-  "windAmplitude": 3,
+  "windAmplitude": 12,
   "windFrequency": 0.45,
-  "windFlutter": 0.25,
-  "cullDistance": 700,
-  "impostorFrom": 160,
+  "windFlutter": 0.15,
+  "cullDistance": 1800,
+  "castShadow": true,
+  "impostor": { "fromDistance": 400 },
   "footprint": 0,
   "scaleMin": 0.8,
   "scaleMax": 1.25,

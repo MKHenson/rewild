@@ -1045,11 +1045,20 @@ describe('glb', () => {
 describe('impostor', () => {
   it('derives the handover from cullDistance until the file names one', () => {
     expect(impostorDistance(paramsFor({ cullDistance: '800' }))).toBe(480);
-    expect(impostorDistance(paramsFor({ cullDistance: '800', impostorFrom: '192' }))).toBe(192);
+    expect(impostorDistance(paramsFor({ cullDistance: '800', impostor: { fromDistance: 192 } }))).toBe(192);
+  });
+
+  it('takes the block keyed as the layer keys it, and fills what the file leaves out', () => {
+    expect(paramsFor({ impostor: { views: 12 } }).impostor).toEqual({ fromDistance: 0, views: 12, tileSize: 128 });
+    expect(paramsFor({}).impostor).toEqual({ fromDistance: 0, views: 8, tileSize: 128 });
+    expect(() => parseConfig({ name: 'a', impostor: { tile: 128 } }, 'test.json')).toThrow(/unknown key 'tile'/);
+    expect(() => parseConfig({ name: 'a', impostor: 128 }, 'test.json')).toThrow(/must be an object/);
+    expect(() => parseConfig({ name: 'a', impostorFrom: 192 }, 'test.json')).toThrow(/now 'impostor.fromDistance'/);
+    expect(() => parseConfig({ name: 'a', impostorTile: 128 }, 'test.json')).toThrow(/now 'impostor.tileSize'/);
   });
 
   it('carries the tuned handover into the emitted layer', () => {
-    const params = paramsFor({ cullDistance: '800', impostorFrom: '192', impostorViews: '12', impostorTile: '256' });
+    const params = paramsFor({ cullDistance: '800', impostor: { fromDistance: 192, views: 12, tileSize: 256 } });
     const layer = scatterLayer(params, buildSkeleton(params));
 
     expect(layer.impostor).toEqual({ fromDistance: 192, views: 12, tileSize: 256 });
@@ -1058,11 +1067,11 @@ describe('impostor', () => {
   // The same bounds validateImpostor holds a layer to, so a printed row is one
   // the engine will accept rather than one it refuses on paste.
   it('refuses an impostor the engine would reject', () => {
-    expect(() => paramsFor({ cullDistance: '160', impostorFrom: '160' })).toThrow(/never draw/);
-    expect(() => paramsFor({ cullDistance: '160', impostorFrom: '200' })).toThrow(/never draw/);
-    expect(() => paramsFor({ impostorViews: '1' })).toThrow(/at least 2/);
-    expect(() => paramsFor({ impostorTile: '0' })).toThrow(/positive number of pixels/);
-    expect(() => paramsFor({ impostorFrom: '-5' })).toThrow(/not be negative/);
+    expect(() => paramsFor({ cullDistance: '160', impostor: { fromDistance: 160 } })).toThrow(/never draw/);
+    expect(() => paramsFor({ cullDistance: '160', impostor: { fromDistance: 200 } })).toThrow(/never draw/);
+    expect(() => paramsFor({ impostor: { views: 1 } })).toThrow(/at least 2/);
+    expect(() => paramsFor({ impostor: { tileSize: 0 } })).toThrow(/positive number of pixels/);
+    expect(() => paramsFor({ impostor: { fromDistance: -5 } })).toThrow(/not be negative/);
   });
 });
 
@@ -1358,10 +1367,12 @@ describe('LOD tiers', () => {
     expect(() => paramsFor({ lods: [{ distance: 80 }, { distance: 40 }] })).toThrow(/must ascend/);
     expect(() => paramsFor({ cullDistance: '100', lods: [{ distance: 60 }] })).toThrow(/beyond the impostor at 60m/);
 
-    // The tier ceiling has to follow impostorFrom, or a chain validated against
-    // one distance would ship against another.
-    expect(() => paramsFor({ impostorFrom: '50', lods: [{ distance: 60 }] })).toThrow(/beyond the impostor at 50m/);
-    expect(() => paramsFor({ impostorFrom: '90', lods: [{ distance: 60 }] })).not.toThrow();
+    // The tier ceiling has to follow impostor.fromDistance, or a chain validated
+    // against one distance would ship against another.
+    expect(() => paramsFor({ impostor: { fromDistance: 50 }, lods: [{ distance: 60 }] })).toThrow(
+      /beyond the impostor at 50m/
+    );
+    expect(() => paramsFor({ impostor: { fromDistance: 90 }, lods: [{ distance: 60 }] })).not.toThrow();
   });
 
   it('holds a tier to the same bounds as the model', () => {
@@ -1548,6 +1559,18 @@ describe('clump', () => {
     expect(entry).not.toContain('collider');
     expect(entry).toContain('"authoredNormals": true');
     expect(entry).toContain('"yOffset":');
+
+    // A patch metres wide is worth a billboard, and gets one only by asking.
+    const patch = clumpParams({ cullDistance: 420, impostor: { fromDistance: 160, views: 2, tileSize: 64 } });
+    expect(hasImpostor(patch)).toBe(true);
+    expect(clumpLayer(patch, metrics).impostor).toEqual({ fromDistance: 160, views: 2, tileSize: 64 });
+    expect(clumpLayer(clumpParams({ impostor: { views: 2 } }), metrics).impostor).toEqual({
+      fromDistance: 30,
+      views: 2,
+      tileSize: 128,
+    });
+    expect(() => clumpParams({ impostor: { fromDistance: 60 } })).toThrow(/never draw/);
+    expect(hasImpostor(clumpParams())).toBe(false);
   });
 
   it('writes no _disp map and so no materials.json material', () => {
@@ -1723,7 +1746,7 @@ describe('crown', () => {
     expect(palm.collider).toMatchObject({ type: 'capsule', radius: 0.23 });
     expect(palm.alignToNormal).toBe(0);
     expect(palm.authoredNormals).toBe(true);
-    expect(palm.castShadow).toBeUndefined();
+    expect(palm.castShadow).toBe(true);
     expect(hasImpostor(palmParams)).toBe(true);
 
     const fernParams = crownParams({ stemHeight: 0 });
@@ -1736,11 +1759,19 @@ describe('crown', () => {
 
     expect(() => scatterLayerEntry(palm)).not.toThrow();
     expect(() => scatterLayerEntry(fern)).not.toThrow();
+
+    // The key overrides the stem's decision either way.
+    const shadyFern = crownParams({ stemHeight: 0, castShadow: true });
+    expect(crownLayer(shadyFern, buildCrown(shadyFern, CROWN_CELLS_GENERATED)).castShadow).toBe(true);
+    const dimPalm = crownParams({ stemHeight: 6, castShadow: false });
+    expect(crownLayer(dimPalm, buildCrown(dimPalm, CROWN_CELLS_GENERATED)).castShadow).toBe(false);
+    expect(resolveParams({ name: 'a' }).castShadow).toBe(true);
+    expect(resolveParams({ name: 'a', type: 'clump' }).castShadow).toBe(false);
   });
 
   it('holds a stem to the trunk bounds and skips them without one', () => {
     expect(() => crownParams({ stemHeight: 6, trunkTaper: 1.5 })).toThrow(/trunkTaper/);
-    expect(() => crownParams({ stemHeight: 6, impostorFrom: 500 })).toThrow(/impostor/);
+    expect(() => crownParams({ stemHeight: 6, impostor: { fromDistance: 500 } })).toThrow(/impostor/);
     expect(() => crownParams({ stemHeight: 0, trunkTaper: 1.5 })).not.toThrow();
     expect(() => crownParams({ stemHeight: -1 })).toThrow(/stemHeight/);
     expect(() => crownParams({ frondCount: 0 })).toThrow(/frondCount/);

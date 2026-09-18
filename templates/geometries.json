@@ -43,21 +43,41 @@
   },
   "palm-01": {
     "type": "gltf",
-    "url": "nature/crowns/palm/palm-01.glb"
+    "url": "nature/trees/palm/palm-01.glb",
+    "lods": [
+      "nature/trees/palm/palm-01.lod1.glb"
+    ]
   },
   "palm-02": {
     "type": "gltf",
-    "url": "nature/crowns/palm/palm-02.glb"
+    "url": "nature/trees/palm/palm-02.glb",
+    "lods": [
+      "nature/trees/palm/palm-02.lod1.glb"
+    ]
   },
   "fern-01": {
     "type": "gltf",
-    "url": "nature/crowns/fern/fern-01.glb"
+    "url": "nature/trees/fern/fern-01.glb"
   },
   "date-palm-01": {
     "type": "gltf",
     "url": "nature/crowns/date-palm/date-palm-01.glb",
     "lods": [
       "nature/crowns/date-palm/date-palm-01.lod1.glb"
+    ]
+  },
+  "palm-03": {
+    "type": "gltf",
+    "url": "nature/trees/palm/palm-03.glb",
+    "lods": [
+      "nature/trees/palm/palm-03.lod1.glb"
+    ]
+  },
+  "cypress-01": {
+    "type": "gltf",
+    "url": "nature/trees/cypress/cypress-01.glb",
+    "lods": [
+      "nature/trees/cypress/cypress-01.lod1.glb"
     ]
   }
 }

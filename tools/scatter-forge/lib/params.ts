@@ -2,14 +2,15 @@
 // set is written next to the model as its sidecar, so a variant can be
 // regenerated or nudged from the file that made it.
 
+import type { ScatterImpostor } from 'rewild-renderer/lib/renderers/terrain/ScatterLayers';
 import { LOOK, retiredKeys } from './look.ts';
 import { FORGE_TYPES, isForgeType, type ForgeType } from './pieces.ts';
 import { hashString } from './rng.ts';
 
-type Default = string | number | boolean | readonly string[] | readonly LodTier[] | null;
+type Default = string | number | boolean | readonly string[] | readonly LodTier[] | ScatterImpostor | null;
 
 interface ParamSpec {
-  readonly type: 'string' | 'number' | 'int' | 'flag' | 'list' | 'tiers';
+  readonly type: 'string' | 'number' | 'int' | 'flag' | 'list' | 'tiers' | 'impostor';
   readonly default: Default;
   readonly help: string;
   /** Changing this changes the texture files. Everything else only moves the
@@ -89,6 +90,17 @@ export const LOD_OVERRIDES = [
 export const BRANCH_MODELS = ['fork', 'whorl'] as const;
 
 export type BranchModel = (typeof BRANCH_MODELS)[number];
+
+/** The impostor block as the layer carries it. Every key may be left out. */
+export const IMPOSTOR_DEFAULT: ScatterImpostor = { fromDistance: 0, views: 8, tileSize: 128 };
+
+/** Keys that moved into `impostor`, and where each went. Named in the error,
+ *  because a sidecar from before the move must not silently lose its handover. */
+const MOVED_INTO_IMPOSTOR: Record<string, keyof ScatterImpostor> = {
+  impostorFrom: 'fromDistance',
+  impostorViews: 'views',
+  impostorTile: 'tileSize',
+};
 
 export const PARAM_SPEC = {
   type: { type: 'string', default: 'tree', help: `Structure to grow: ${FORGE_TYPES.join(' | ')}. Picks the generator, not the species.` },
@@ -191,9 +203,8 @@ export const PARAM_SPEC = {
   windFrequency: { type: 'number', default: 0.45, help: 'ScatterWind frequency for the emitted layer.', byType: { clump: 1.1 } },
   windFlutter: { type: 'number', default: 0.35, help: 'ScatterWind flutter for the emitted layer.', byType: { clump: 0.7 } },
   cullDistance: { type: 'number', default: 160, help: 'ScatterLayer cullDistance for the emitted layer.', byType: { clump: 50 } },
-  impostorFrom: { type: 'number', default: 0, help: `Metres the impostor takes over at. 0 derives it from cullDistance.`, types: WOODY },
-  impostorViews: { type: 'int', default: 8, help: 'Impostor views baked per axis. At least 2.', types: WOODY },
-  impostorTile: { type: 'int', default: 128, help: 'Impostor tile edge in pixels.', types: WOODY },
+  castShadow: { type: 'flag', default: true, byType: { clump: false, crown: null }, help: 'Draw the emitted layer into the shadow maps. A clump defaults off; a crown casts while it has a stem.' },
+  impostor: { type: 'impostor', default: IMPOSTOR_DEFAULT, byType: { clump: null, crown: null }, help: "The layer's impostor block, keyed as the layer keys it: { fromDistance, views, tileSize }. fromDistance 0 derives it from cullDistance; views is per axis, at least 2; tileSize is in pixels. A clump or a stemless crown bakes one only if the file sets it." },
   footprint: { type: 'number', default: 0, help: 'ScatterLayer footprint in metres. 0 derives it from the model. The most expensive number here: candidates go as 1/footprint squared.', byType: { clump: 0.7 } },
   scaleMin: { type: 'number', default: 0.8, byType: { clump: 0.75 }, help: 'Lower bound of the emitted scale jitter.' },
   scaleMax: { type: 'number', default: 1.25, help: 'Upper bound of the emitted scale jitter.', byType: { clump: 1.3 } },
@@ -224,6 +235,8 @@ type Options = {
     ? string[]
     : (typeof PARAM_SPEC)[K]['type'] extends 'tiers'
     ? LodTier[]
+    : (typeof PARAM_SPEC)[K]['type'] extends 'impostor'
+    ? ScatterImpostor | null
     : number;
 };
 
@@ -237,7 +250,9 @@ export type Params = Omit<Options, 'type'> & { type: ForgeType } & {
 };
 
 /** What a tree.json holds, before defaults and validation. */
-export type RawConfig = Partial<Record<keyof typeof PARAM_SPEC, string | number | boolean | string[] | LodTier[]>>;
+export type RawConfig = Partial<
+  Record<keyof typeof PARAM_SPEC, string | number | boolean | string[] | LodTier[] | Partial<ScatterImpostor>>
+>;
 
 function isParamKey(key: string): key is keyof typeof PARAM_SPEC {
   return key in PARAM_SPEC;
@@ -273,6 +288,9 @@ export function parseConfig(config: unknown, source: string): RawConfig {
     // value doing anything. Erroring would strand every tree.json on disk.
     if (retiredKeys().includes(key)) continue;
 
+    if (key in MOVED_INTO_IMPOSTOR)
+      throw new Error(`${source} option '${key}' is now 'impostor.${MOVED_INTO_IMPOSTOR[key]}'.`);
+
     if (!isParamKey(key)) throw new Error(`${source} has an unknown option '${key}'.`);
 
     // A key that exists but belongs to another structure is rejected for the
@@ -291,6 +309,11 @@ export function parseConfig(config: unknown, source: string): RawConfig {
     if (PARAM_SPEC[key].type === 'tiers') {
       if (!Array.isArray(value)) throw new Error(`${source} option '${key}' must be a list of tiers.`);
       out[key] = value.map((entry, index) => parseTier(entry, `${source} option '${key}' tier ${index}`, modelType));
+      continue;
+    }
+
+    if (PARAM_SPEC[key].type === 'impostor') {
+      out[key] = parseImpostor(value, `${source} option '${key}'`);
       continue;
     }
 
@@ -335,6 +358,22 @@ function parseTier(entry: unknown, source: string, modelType: ForgeType): LodTie
   return tier;
 }
 
+/** A partial impostor block: what the file sets, the defaults filling the rest. */
+function parseImpostor(entry: unknown, source: string): Partial<ScatterImpostor> {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+    throw new Error(`${source} must be an object: { fromDistance, views, tileSize }.`);
+
+  const block: Partial<ScatterImpostor> = {};
+  for (const [key, value] of Object.entries(entry)) {
+    if (!(key in IMPOSTOR_DEFAULT))
+      throw new Error(`${source} has an unknown key '${key}'. It takes ${Object.keys(IMPOSTOR_DEFAULT).join(', ')}.`);
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) throw new Error(`${source} key '${key}' must be a number, got '${value}'.`);
+    block[key as keyof ScatterImpostor] = key === 'fromDistance' ? parsed : Math.round(parsed);
+  }
+  return block;
+}
+
 /** The parameters as they are written beside the model, ready to be edited. */
 export function toConfig(params: Params): Record<string, unknown> {
   const saved: Record<string, unknown> = { ...params };
@@ -358,7 +397,7 @@ export function resolveParams(raw: RawConfig): Params {
 
   // Built dynamically because the loop walks the table, then asserted once. The
   // mapped type above is what every reader is checked against.
-  const params: Record<string, string | number | boolean | string[] | LodTier[] | null> = {};
+  const params: Record<string, string | number | boolean | string[] | LodTier[] | ScatterImpostor | null> = {};
 
   for (const [key, spec] of Object.entries(PARAM_SPEC) as [
     keyof typeof PARAM_SPEC,
@@ -371,9 +410,11 @@ export function resolveParams(raw: RawConfig): Params {
     // was rejected; keeping the object complete here is what lets the mapped
     // type above stay free of optionals.
     if (value === undefined || value === null) {
-      const fallback = spec.byType?.[modelType] ?? spec.default;
+      const fallback = spec.byType && modelType in spec.byType ? spec.byType[modelType] : spec.default;
       params[key] = Array.isArray(fallback)
         ? ([...fallback] as string[] | LodTier[])
+        : fallback && typeof fallback === 'object'
+        ? { ...(fallback as ScatterImpostor) }
         : (fallback as string | number | boolean | null);
       continue;
     }
@@ -381,6 +422,11 @@ export function resolveParams(raw: RawConfig): Params {
     if (spec.type === 'tiers') {
       if (!Array.isArray(value)) throw new Error(`Option '${key}' must be a list of tiers.`);
       params[key] = value.map((entry) => parseTier(entry, `Option '${key}'`, modelType));
+      continue;
+    }
+
+    if (spec.type === 'impostor') {
+      params[key] = { ...IMPOSTOR_DEFAULT, ...parseImpostor(value, `Option '${key}'`) };
       continue;
     }
 
@@ -423,6 +469,13 @@ export function resolveParams(raw: RawConfig): Params {
 
   params.seed ??= hashString(name);
 
+  // A crown decides both by its stem: a palm throws a shadow and hands over to
+  // a billboard, and a fern is ground cover whose shadow is a flicker under
+  // itself and which culls instead.
+  const stemmed = modelType === 'crown' && Number(params.stemHeight) > 0;
+  params.castShadow ??= stemmed;
+  if (stemmed) params.impostor ??= { ...IMPOSTOR_DEFAULT };
+
   const resolved = { ...params, ...LOOK } as Params;
   validate(resolved);
   // A stemless crown takes the tube keys and reads none of them, so there is
@@ -439,7 +492,7 @@ export function tierParams(params: Params, tier: LodTier): Params {
   return { ...params, ...overrides };
 }
 
-// Where the impostor takes over when `impostorFrom` does not say, as a
+// Where the impostor takes over when `impostor.fromDistance` does not say, as a
 // fraction of the cull distance.
 //
 // It is only a fallback. The right handover is decided by the impostor's own
@@ -457,9 +510,8 @@ export const IMPOSTOR_FRACTION = 0.6;
  * be validated against one distance and shipped against another.
  */
 export function impostorDistance(params: Params): number {
-  return params.impostorFrom > 0
-    ? params.impostorFrom
-    : Math.round(params.cullDistance * IMPOSTOR_FRACTION);
+  const from = params.impostor?.fromDistance ?? 0;
+  return from > 0 ? from : Math.round(params.cullDistance * IMPOSTOR_FRACTION);
 }
 
 /**
@@ -474,13 +526,14 @@ export function hasStem(params: Params): boolean {
 /**
  * Whether the emitted layer carries a billboard tier.
  *
- * A clump never does. A billboard stops being worth it the moment the model
- * covers fewer pixels than the tile has, and a 0.35m tuft is under that at any
- * distance it is still drawn at. It culls instead, the way `granite_pebble`
- * does. A stemless crown is ground cover and culls for the same reason.
+ * A tree and a stemmed crown always do. Ground cover does only when the file
+ * asks: a billboard stops being worth it the moment the model covers fewer
+ * pixels than the tile has, and a 0.35m tuft is under that at any distance it
+ * is still drawn at, so it culls instead, the way `granite_pebble` does. A
+ * three metre patch of plains grass is another matter, and sets one.
  */
 export function hasImpostor(params: Params): boolean {
-  return params.type === 'tree' || hasStem(params);
+  return params.impostor !== null;
 }
 
 function validateTiers(params: Params): void {
@@ -497,7 +550,7 @@ function validateTiers(params: Params): void {
     if (tier.distance >= impostorAt)
       throw new Error(
         `lods tier ${index} at ${tier.distance}m starts beyond the impostor at ${impostorAt}m. ` +
-          `Move the tier in, or set impostorFrom past it.`
+          `Move the tier in, or set impostor.fromDistance past it.`
       );
     previous = tier.distance;
 
@@ -535,6 +588,8 @@ function validate(params: Params): void {
   if (params.type === 'clump') validateClump(params);
   else if (params.type === 'crown') validateCrown(params);
   else validateTree(params);
+
+  if (params.impostor) validateImpostor(params.impostor, params.cullDistance);
 }
 
 /**
@@ -576,10 +631,7 @@ export function barkCanvasSize(params: Params): { width: number; height: number 
 function validateCrown(params: Params): void {
   if (params.stemHeight < 0) throw new Error(`stemHeight must not be negative, got ${params.stemHeight}.`);
 
-  if (hasStem(params)) {
-    validateTube(params);
-    validateImpostor(params);
-  }
+  if (hasStem(params)) validateTube(params);
 
   if (params.crownBulge < 0) throw new Error(`crownBulge must not be negative, got ${params.crownBulge}.`);
 
@@ -627,21 +679,18 @@ function validateTube(params: Params): void {
 
 /** Mirrors validateImpostor in the engine's ScatterLayers.ts, so a layer this
  *  prints is one the engine will accept. */
-function validateImpostor(params: Params): void {
-  const impostorAt = impostorDistance(params);
+function validateImpostor(impostor: ScatterImpostor, cullDistance: number): void {
+  if (impostor.fromDistance < 0)
+    throw new Error(`impostor.fromDistance must not be negative, got ${impostor.fromDistance}.`);
 
-  if (params.impostorFrom < 0) throw new Error(`impostorFrom must not be negative, got ${params.impostorFrom}.`);
+  const impostorAt = impostor.fromDistance > 0 ? impostor.fromDistance : Math.round(cullDistance * IMPOSTOR_FRACTION);
+  if (impostorAt >= cullDistance)
+    throw new Error(`The impostor at ${impostorAt}m is not inside cullDistance ${cullDistance}m, so it would never draw.`);
 
-  if (impostorAt >= params.cullDistance)
-    throw new Error(
-      `The impostor at ${impostorAt}m is not inside cullDistance ${params.cullDistance}m, so it would never draw.`
-    );
+  if (impostor.views < 2) throw new Error(`impostor.views must be at least 2, got ${impostor.views}.`);
 
-  if (params.impostorViews < 2)
-    throw new Error(`impostorViews must be at least 2, got ${params.impostorViews}.`);
-
-  if (params.impostorTile <= 0)
-    throw new Error(`impostorTile must be a positive number of pixels, got ${params.impostorTile}.`);
+  if (impostor.tileSize <= 0)
+    throw new Error(`impostor.tileSize must be a positive number of pixels, got ${impostor.tileSize}.`);
 }
 
 /**
@@ -820,8 +869,6 @@ function validateTree(params: Params): void {
     throw new Error(
       `leafLevels must be within 1..${params.branchLevels + 1} at branchLevels ${params.branchLevels}.`
     );
-
-  validateImpostor(params);
 
   if (!['card', 'canopy', 'up'].includes(params.leafNormalMode))
     throw new Error(`leafNormalMode must be card, canopy or up, got '${params.leafNormalMode}'.`);

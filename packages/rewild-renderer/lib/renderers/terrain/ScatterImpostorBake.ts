@@ -333,7 +333,7 @@ export class ScatterImpostorBaker {
         radius,
         views,
         IMPOSTOR_CUTOFF,
-        0,
+        layer.foliage ? 1 : 0,
         0,
       ])
     );
