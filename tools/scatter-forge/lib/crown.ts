@@ -54,10 +54,9 @@ export interface Crown {
   metrics: CrownMetrics;
 }
 
-/** Where the rosette sits, and which way it points. */
+/** Where the rosette sits. */
 interface Rosette {
   p: Vec3;
-  dir: Vec3;
   radius: number;
   dist: number;
 }
@@ -102,6 +101,7 @@ function growStem(params: Params, rng: Rng): Branch {
   const step = params.stemHeight / (rings - 1);
   const tipRadius = stemRadiusAt(params, 1);
   const leanAxis = rotateAbout(perpendicular(UP), UP, rng() * TWO_PI);
+  const headingAt = (t: number) => normalize(rotateAbout(UP, leanAxis, params.stemLean * DEG * t * t));
 
   const points: BranchPoint[] = [];
   let position: Vec3 = [0, 0, 0];
@@ -109,14 +109,12 @@ function growStem(params: Params, rng: Rng): Branch {
 
   for (let i = 0; i < rings; i++) {
     const t = i / (rings - 1);
-    const heading = normalize(rotateAbout(UP, leanAxis, params.stemLean * DEG * t * t));
-    points.push({ p: position, radius: stemRadiusAt(params, t), dist: distance, dir: heading });
+    points.push({ p: position, radius: stemRadiusAt(params, t), dist: distance, dir: headingAt(t) });
     if (i === rings - 1) break;
 
     // Stepped along the heading at the next ring, so the stem's length is its
     // arc length and a leaning palm does not come out short.
-    const next = normalize(rotateAbout(UP, leanAxis, params.stemLean * DEG * ((i + 1) / (rings - 1)) ** 2));
-    position = add(position, scale(next, step));
+    position = add(position, scale(headingAt((i + 1) / (rings - 1)), step));
     distance += step;
   }
 
@@ -170,16 +168,28 @@ function depthOf(params: Params, stem: Branch | null, index: number): number {
 /**
  * Degrees above horizontal a frond leaves at.
  *
- * On one point the variance is random: which fronds stand and which hang is
- * not visible in where they attach. Down a span it is ordered by depth, with a
- * little left random, because on a deep crown the hanging fronds are visibly
- * the low ones and a random spread puts a young frond under an old one.
+ * On one point the variance is dealt out by index, one frond per equal slice
+ * of it and each placed at random within its slice. Independent draws clump:
+ * thirty of them leave a gap through the middle of the fan as often as not,
+ * and no setting of the keys closes it. Index and azimuth stay uncorrelated
+ * for the reason a tree's children do, because azimuth turns by the golden
+ * angle. Down a span it is ordered by depth instead, with a little left
+ * random, because on a deep crown the hanging fronds are visibly the low
+ * ones and a random spread puts a young frond under an old one.
  */
-function pitchOf(params: Params, rng: Rng, depth: number, spanned: boolean): number {
-  const spread = spanned ? (1 - 2 * depth) * 0.75 + rng.range(-0.25, 0.25) : rng.range(-1, 1);
+function pitchOf(params: Params, rng: Rng, index: number, depth: number, spanned: boolean): number {
+  const spread = spanned
+    ? (1 - 2 * depth) * 0.75 + rng.range(-0.25, 0.25)
+    : 1 - (2 * (index + rng())) / params.frondCount;
   return params.frondAngle + params.frondVariance * spread;
 }
 
+/**
+ * The fronds fan about the vertical, wherever the stem top has got to. A
+ * leaning palm's crown re-curves toward upright, and the stem's own heading
+ * at the top is the last ring-to-ring segment once it has wandered, which a
+ * small stray throws well off the stem's line.
+ */
 function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, cells: number): MeshAttributes {
   const grid = Math.ceil(Math.sqrt(cells));
   const uvCells = leafCells(params.textureSize, grid).slice(0, cells);
@@ -202,10 +212,10 @@ function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, cells
     // Spread by the golden angle and jittered, for the reason a tuft's cards
     // are: an even fraction of a turn reads as a machined rosette.
     const yaw = rosettePhase + GOLDEN_ANGLE * frond + rng.range(-0.3, 0.3);
-    const outward = normalize(rotateAbout(perpendicular(at.dir), at.dir, yaw));
-    const side = normalize(cross(at.dir, outward));
+    const outward = normalize(rotateAbout(perpendicular(UP), UP, yaw));
+    const side = normalize(cross(UP, outward));
 
-    const pitch = pitchOf(params, rng, depth, spanned);
+    const pitch = pitchOf(params, rng, frond, depth, spanned);
 
     // Frond 0 is always full length, so frondLength means what it says. The
     // rest fall short, or the rosette comes to a machined rim.
@@ -229,7 +239,7 @@ function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, cells
       const t = k / params.cardSegments;
 
       if (k > 0) {
-        const direction = normalize(rotateAbout(at.dir, side, tiltAt(params, pitch, t)));
+        const direction = normalize(rotateAbout(UP, side, tiltAt(params, pitch, t)));
         point = add(point, scale(direction, frondLength / params.cardSegments));
       }
 
@@ -269,9 +279,7 @@ function stemSkeleton(params: Params, rng: Rng): { skeleton: Skeleton; rosette: 
   const stem = hasStem(params) ? growStem(params, rng) : null;
   const top = stem ? stem.points[stem.points.length - 1] : null;
 
-  const rosette: Rosette = top
-    ? { p: top.p, dir: top.dir, radius: top.radius, dist: top.dist }
-    : { p: [0, 0, 0], dir: UP, radius: 0, dist: 0 };
+  const rosette: Rosette = top ? { p: top.p, radius: top.radius, dist: top.dist } : { p: [0, 0, 0], radius: 0, dist: 0 };
 
   // The frond tip must not resolve to bend 1 before it has anywhere to go.
   const maxPathDist = params.stemHeight + params.frondLength;

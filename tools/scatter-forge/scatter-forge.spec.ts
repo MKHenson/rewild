@@ -529,6 +529,51 @@ describe('trunk relief', () => {
     const straight = pieceOf(stem(), 'bark').positions;
     const strayed = pieceOf(stem({ trunkWander: 0.8 }), 'bark').positions;
     expect(Math.hypot(strayed.at(-3)! - straight.at(-3)!, strayed.at(-1)! - straight.at(-1)!)).toBeGreaterThan(0.1);
+
+    // The rosette moves with the stem top but stays upright: the fronds fan
+    // about the vertical, not the lean or the last wandered segment.
+    const tilt = (extra: RawConfig) => {
+      const frond = pieceOf(stem({ stemLean: 0, frondCount: 1, frondAngle: 90, frondVariance: 0, cardCurve: 0, cardSegments: 1, ...extra }), 'frond');
+      const p = frond.positions;
+      const base = [(p[0] + p[3]) / 2, (p[1] + p[4]) / 2, (p[2] + p[5]) / 2];
+      const tip = [(p[6] + p[9]) / 2, (p[7] + p[10]) / 2, (p[8] + p[11]) / 2];
+      const d = [tip[0] - base[0], tip[1] - base[1], tip[2] - base[2]];
+      return Math.acos(d[1] / Math.hypot(d[0], d[1], d[2]));
+    };
+    expect(tilt({})).toBeCloseTo(0, 5);
+    expect(tilt({ trunkWander: 0.8 })).toBeCloseTo(0, 5);
+    expect(tilt({ stemLean: 20 })).toBeCloseTo(0, 5);
+    expect(tilt({ stemLean: 20, trunkWander: 0.8 })).toBeCloseTo(0, 5);
+  });
+
+  it('deals the frond variance out evenly rather than drawing it', () => {
+    // Twelve fronds over 120 degrees: one lands in every 10 degree slice, on
+    // any seed. Independent draws would leave a slice empty as often as not.
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const params = resolveParams({
+        type: 'crown',
+        name: 'test-palm',
+        seed,
+        stemHeight: 8,
+        stemLean: 0,
+        frondCount: 12,
+        frondAngle: 15,
+        frondVariance: 60,
+        cardCurve: 0,
+        cardSegments: 1,
+      });
+      const p = pieceOf(buildCrown(params, CROWN_CELLS_GENERATED).mesh, 'frond').positions;
+      const slices = new Set<number>();
+      for (let frond = 0; frond < 12; frond++) {
+        const o = frond * 12;
+        const dx = (p[o + 6] + p[o + 9] - p[o] - p[o + 3]) / 2;
+        const dy = (p[o + 7] + p[o + 10] - p[o + 1] - p[o + 4]) / 2;
+        const dz = (p[o + 8] + p[o + 11] - p[o + 2] - p[o + 5]) / 2;
+        const elevation = (Math.atan2(dy, Math.hypot(dx, dz)) * 180) / Math.PI;
+        slices.add(Math.floor((elevation + 45) / 10));
+      }
+      expect([...slices].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    }
   });
 
   it('swells a stem under the same key, from a default of its own', () => {
