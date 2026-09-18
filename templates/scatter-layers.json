@@ -3,7 +3,7 @@
     "name": "granite_boulder",
     "geometryId": "granite-rock",
     "materialId": "granite-rock",
-    "cullDistance": 400,
+    "cullDistance": 1800,
     "impostor": {
       "fromDistance": 50,
       "views": 8,
@@ -91,9 +91,9 @@
     "lodDistances": [
       60
     ],
-    "cullDistance": 800,
+    "cullDistance": 1600,
     "impostor": {
-      "fromDistance": 192,
+      "fromDistance": 400,
       "views": 8,
       "tileSize": 128
     },
@@ -134,15 +134,15 @@
     "lodDistances": [
       60
     ],
-    "cullDistance": 800,
+    "cullDistance": 1600,
     "impostor": {
-      "fromDistance": 192,
+      "fromDistance": 400,
       "views": 8,
       "tileSize": 128
     },
     "jitter": {
       "scale": {
-        "from": 0.5,
+        "from": 0.8,
         "to": 1.25
       },
       "yaw": {
@@ -156,15 +156,15 @@
     "collider": {
       "type": "capsule",
       "radius": 0.46,
-      "height": 1.8,
+      "height": 1.79,
       "offset": [
         0,
-        1.36,
+        1.35,
         0
       ]
     },
     "wind": {
-      "amplitude": 8,
+      "amplitude": 10,
       "frequency": 0.55,
       "flutter": 0.6
     },
@@ -174,7 +174,6 @@
   "plains_01": {
     "name": "plains_01",
     "geometryId": "plains-01",
-    "cullDistance": 120,
     "jitter": {
       "scale": {
         "from": 0.8,
@@ -186,11 +185,17 @@
       },
       "tilt": 3
     },
+    "cullDistance": 420,
+    "impostor": {
+      "fromDistance": 160,
+      "views": 2,
+      "tileSize": 64
+    },
     "yOffset": -0.084,
     "alignToNormal": 0.6,
     "footprint": 1.6,
     "wind": {
-      "amplitude": 4.18,
+      "amplitude": 5.18,
       "frequency": 0.8,
       "flutter": 0.7
     },
@@ -201,7 +206,12 @@
   "plains_02": {
     "name": "plains_02",
     "geometryId": "plains-02",
-    "cullDistance": 120,
+    "cullDistance": 420,
+    "impostor": {
+      "fromDistance": 160,
+      "views": 2,
+      "tileSize": 64
+    },
     "jitter": {
       "scale": {
         "from": 0.8,
@@ -217,7 +227,7 @@
     "alignToNormal": 0.6,
     "footprint": 1.6,
     "wind": {
-      "amplitude": 4.18,
+      "amplitude": 5.18,
       "frequency": 0.8,
       "flutter": 0.7
     },
@@ -228,11 +238,14 @@
   "palm_01": {
     "name": "palm_01",
     "geometryId": "palm-01",
-    "cullDistance": 420,
+    "lodDistances": [
+      70
+    ],
+    "cullDistance": 1800,
     "impostor": {
-      "fromDistance": 180,
+      "fromDistance": 800,
       "views": 8,
-      "tileSize": 128
+      "tileSize": 64
     },
     "jitter": {
       "scale": {
@@ -246,14 +259,14 @@
       "tilt": 3
     },
     "alignToNormal": 0,
-    "footprint": 2.6,
+    "footprint": 4.8,
     "collider": {
       "type": "capsule",
-      "radius": 0.23,
-      "height": 6.54,
+      "radius": 0.34,
+      "height": 11.32,
       "offset": [
         0,
-        3.5,
+        6,
         0
       ]
     },
@@ -268,11 +281,14 @@
   "palm_02": {
     "name": "palm_02",
     "geometryId": "palm-02",
-    "cullDistance": 420,
+    "lodDistances": [
+      70
+    ],
+    "cullDistance": 1800,
     "impostor": {
-      "fromDistance": 180,
+      "fromDistance": 800,
       "views": 8,
-      "tileSize": 128
+      "tileSize": 64
     },
     "jitter": {
       "scale": {
@@ -286,14 +302,14 @@
       "tilt": 3
     },
     "alignToNormal": 0,
-    "footprint": 3.9,
+    "footprint": 7,
     "collider": {
       "type": "capsule",
-      "radius": 0.23,
-      "height": 6.54,
+      "radius": 0.55,
+      "height": 8.9,
       "offset": [
         0,
-        3.5,
+        5,
         0
       ]
     },
@@ -305,15 +321,15 @@
     "authoredNormals": true,
     "foliage": true
   },
-  "date_palm_01": {
-    "name": "date_palm_01",
-    "geometryId": "date-palm-01",
+  "palm_03": {
+    "name": "palm_03",
+    "geometryId": "palm-03",
     "lodDistances": [
-      120
+      70
     ],
-    "cullDistance": 420,
+    "cullDistance": 1800,
     "impostor": {
-      "fromDistance": 200,
+      "fromDistance": 600,
       "views": 8,
       "tileSize": 128
     },
@@ -329,14 +345,14 @@
       "tilt": 3
     },
     "alignToNormal": 0,
-    "footprint": 4.7,
+    "footprint": 6.8,
     "collider": {
       "type": "capsule",
-      "radius": 0.71,
-      "height": 8.08,
+      "radius": 0.92,
+      "height": 18.66,
       "offset": [
         0,
-        4.75,
+        10.25,
         0
       ]
     },
@@ -351,11 +367,11 @@
   "fern_01": {
     "name": "fern_01",
     "geometryId": "fern-01",
-    "cullDistance": 420,
+    "cullDistance": 220,
     "impostor": {
       "fromDistance": 120,
-      "views": 2,
-      "tileSize": 32
+      "views": 4,
+      "tileSize": 64
     },
     "jitter": {
       "scale": {
@@ -366,11 +382,20 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 6
+      "tilt": 3
     },
-    "yOffset": -0.027,
-    "alignToNormal": 0.6,
-    "footprint": 1.58,
+    "alignToNormal": 0,
+    "footprint": 2.3,
+    "collider": {
+      "type": "capsule",
+      "radius": 0.23,
+      "height": 0.54,
+      "offset": [
+        0,
+        0.5,
+        0
+      ]
+    },
     "wind": {
       "amplitude": 2.15,
       "frequency": 0.9,
@@ -378,14 +403,14 @@
     },
     "authoredNormals": true,
     "foliage": true,
-    "castShadow": false
+    "castShadow": true
   },
   "desert_plains_01": {
     "name": "desert_plains_01",
     "geometryId": "plains-01",
-    "cullDistance": 420,
+    "cullDistance": 520,
     "impostor": {
-      "fromDistance": 120,
+      "fromDistance": 220,
       "views": 2,
       "tileSize": 32
     },
@@ -411,5 +436,49 @@
     "authoredNormals": true,
     "foliage": true,
     "castShadow": false
+  },
+  "cypress_01": {
+    "name": "cypress_01",
+    "geometryId": "cypress-01",
+    "lodDistances": [
+      60
+    ],
+    "cullDistance": 1800,
+    "impostor": {
+      "fromDistance": 400,
+      "views": 8,
+      "tileSize": 128
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.8,
+        "to": 1.25
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 3
+    },
+    "alignToNormal": 0,
+    "footprint": 1.5,
+    "collider": {
+      "type": "capsule",
+      "radius": 0.23,
+      "height": 17.54,
+      "offset": [
+        0,
+        9,
+        0
+      ]
+    },
+    "wind": {
+      "amplitude": 12,
+      "frequency": 0.45,
+      "flutter": 0.15
+    },
+    "authoredNormals": true,
+    "foliage": true,
+    "castShadow": true
   }
 }

@@ -9,23 +9,25 @@
 // between captures instead of snapping.
 //
 // Shading is the mesh tier's: the atlas holds base colour and the model-space
-// normal, and the fragment builds a rough dielectric surface from them and
-// runs it through the same BRDF, IBL and shadow taps.
+// normal, and the fragment shades them through the same shadow taps and the
+// same model the layer's cutout piece uses — the foliage lobes for a foliage
+// layer, a rough dielectric through the BRDF and IBL for anything else.
 //
 // So is the wind: the quad's top edge sways through the same field the mesh
 // tier's crown does, with a bend weight ramping from the quad's foot to its
 // head, so the handover crossfades between two copies moving together and a
 // gust keeps rolling through the wood past the last mesh.
 
-// Never foliage, but the shared shadow include branches on this to take a
-// cheaper tap for grass and leaves. A literal rather than a define: these
-// materials have no foliage mode to plumb.
+// Only the shared shadow include reads this, to pick a cheaper tap for grass
+// and leaves. A billboard is one layer of overdraw whatever it shows, so it
+// keeps the full tap; whether it shades as foliage is impostor.atlas.z.
 const HAS_FOLIAGE_SHADING: bool = false;
 
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
 #include "./shader-lib/ibl.wgsl"
+#include "./shader-lib/foliage-lighting.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"
 #include "./shader-lib/directional-shadow.wgsl"
@@ -279,28 +281,37 @@ fn fs(
   #include "./shader-lib/directional-shadow.frag.wgsl"
   #include "./shader-lib/spot-light-shadow.frag.wgsl"
 
-  // A rough dielectric: foliage and bark alike at the distance this draws.
-  var surface : PbrSurface;
-  surface.normal = normal;
-  surface.specularNormal = normal;
-  surface.geometricNormal = normal;
-  surface.viewPosition = surfaceViewPosition;
-  surface.diffuseColor = diffuseColorFromBaseColor(baseColor, 0.0);
-  surface.f0 = f0FromBaseColor(baseColor, 0.0);
-  surface.alpha = perceptualRoughnessToAlpha(1.0);
-
-  let lit = accumulatePbrLighting(
-    surface,
-    spotLightShadowParams.hasSpotShadow,
-    spotLightShadowParams.lightIndex
-  );
   let sunShadow = cloudShadowFactor * directionalShadowFactor;
-  var color = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow
-            + lit.punctualDiffuse + lit.punctualSpecular
-            + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadowFactor;
-  color += evaluateIbl(surface, 1.0);
+  var outColor : vec4f;
 
-  var outColor = vec4f(color, 1.0);
+  // A foliage layer's crown is most of what the atlas holds, so the whole
+  // billboard takes the foliage lobes; the trunk's share is too few texels at
+  // this range to shade apart. A uniform branch, so the samples inside stay in
+  // uniform control flow.
+  if (impostor.atlas.z > 0.5) {
+    outColor = shadeFoliage(baseColor, normal, surfaceViewPosition, sunShadow);
+  } else {
+    // A rough dielectric: bark and rock alike at the distance this draws.
+    var surface : PbrSurface;
+    surface.normal = normal;
+    surface.specularNormal = normal;
+    surface.geometricNormal = normal;
+    surface.viewPosition = surfaceViewPosition;
+    surface.diffuseColor = diffuseColorFromBaseColor(baseColor, 0.0);
+    surface.f0 = f0FromBaseColor(baseColor, 0.0);
+    surface.alpha = perceptualRoughnessToAlpha(1.0);
+
+    let lit = accumulatePbrLighting(
+      surface,
+      spotLightShadowParams.hasSpotShadow,
+      spotLightShadowParams.lightIndex
+    );
+    var color = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow
+              + lit.punctualDiffuse + lit.punctualSpecular
+              + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadowFactor;
+    color += evaluateIbl(surface, 1.0);
+    outColor = vec4f(color, 1.0);
+  }
 
   if (directionalShadowParams.debugMode != 0u) {
     outColor = vec4f(mix(outColor.rgb, cascadeDebugTint, 0.5), outColor.a);

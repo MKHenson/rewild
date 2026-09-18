@@ -9,7 +9,8 @@ struct ImpostorParams {
   // Model-space centre of the model's bounding sphere, w = its radius. The
   // billboard is this square, and every tile was captured through it.
   centre : vec4f,
-  // x = tiles per atlas axis, y = alpha cutoff, z/w unused.
+  // x = tiles per atlas axis, y = alpha cutoff, z = 1 to shade as foliage,
+  // w unused.
   atlas : vec4f,
 }
 

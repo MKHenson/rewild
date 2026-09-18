@@ -1,4 +1,4 @@
-import { BiomeParams, BiomeScatter, MOUNTAIN, PLAIN } from './Biomes';
+import { BiomeParams, BiomeScatter, MOUNTAIN, PLAIN, SelectorBand } from './Biomes';
 import { resolveLayerWeights, resolveScatterDensity } from './LayerWeights';
 
 // Layer indices in MOUNTAIN.layers.
@@ -8,9 +8,9 @@ const SNOW = 2;
 
 // Read the selectors off the table rather than restating them: these tests are
 // about how layers compose, not about the values that happen to be tuned in.
-const SNOW_HEIGHT = MOUNTAIN.layers[SNOW].height!;
-const SNOW_SLOPE = MOUNTAIN.layers[SNOW].slope!;
-const ROCK_SLOPE = MOUNTAIN.layers[ROCK].slope!;
+const SNOW_HEIGHT = MOUNTAIN.layers[SNOW].height as SelectorBand;
+const SNOW_SLOPE = MOUNTAIN.layers[SNOW].slope as SelectorBand;
+const ROCK_SLOPE = MOUNTAIN.layers[ROCK].slope as SelectorBand;
 
 // A slope gentle enough for snow to hold, and one too sheer for it — and past
 // the rock band's top, so rock has fully taken over (snow releases at
@@ -252,5 +252,22 @@ describe('resolveScatterDensity', () => {
     };
     expect(resolveScatterDensity(noisy, 100, 0, 0.2)).toBe(0);
     expect(resolveScatterDensity(noisy, 100, 0, 0.8)).toBeCloseTo(0.4);
+  });
+
+  // A treeline fades in above the foothills and out again under the snow,
+  // which one ramp cannot say. A pair of bands multiplies into a plateau.
+  it('multiplies a pair of bands into a plateau', () => {
+    const treeline: BiomeScatter = {
+      ...rule,
+      height: [
+        { from: 40, to: 100 },
+        { from: 150, to: 110 },
+      ],
+    };
+    expect(resolveScatterDensity(treeline, 20, 0, 0)).toBe(0);
+    expect(resolveScatterDensity(treeline, 70, 0, 0)).toBeCloseTo(0.2);
+    expect(resolveScatterDensity(treeline, 105, 0, 0)).toBeCloseTo(0.4);
+    expect(resolveScatterDensity(treeline, 130, 0, 0)).toBeCloseTo(0.2);
+    expect(resolveScatterDensity(treeline, 160, 0, 0)).toBe(0);
   });
 });

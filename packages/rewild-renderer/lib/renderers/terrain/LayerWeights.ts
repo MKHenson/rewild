@@ -1,14 +1,22 @@
-import { BiomeLayer, BiomeParams, BiomeScatter, SelectorBand } from './Biomes';
+import { BiomeLayer, BiomeParams, BiomeScatter, Selector, SelectorBand } from './Biomes';
 
 // Smoothstep across a selector band. `from` > `to` inverts the ramp — the same
 // function covers "fades in as the value rises" and "fades out as it rises".
-// An absent band is unconstrained (1).
-function bandCoverage(band: SelectorBand | undefined, value: number): number {
-  if (!band) return 1;
+function rampCoverage(band: SelectorBand, value: number): number {
   const t = (value - band.from) / (band.to - band.from);
   if (t <= 0) return 0;
   if (t >= 1) return 1;
   return t * t * (3 - 2 * t);
+}
+
+// Coverage of a selector: one band's ramp, or the product of several. An
+// absent selector is unconstrained (1).
+function bandCoverage(selector: Selector | undefined, value: number): number {
+  if (!selector) return 1;
+  if (!Array.isArray(selector)) return rampCoverage(selector, value);
+  let coverage = 1;
+  for (let i = 0; i < selector.length; i++) coverage *= rampCoverage(selector[i], value);
+  return coverage;
 }
 
 // A layer applies where all of its selectors do, so coverage is their product.
