@@ -1,6 +1,6 @@
 # Hand-authored leaf stamps: one folder per source, each holding a diffuse
-# (sRGB, alpha carries the cutout), an arm and a 16-bit disp map. One leaf per
-# stamp, pivot at bottom-middle and tip at top-middle, which is what lets the
+# (sRGB, alpha carries the cutout) and, optionally, an arm and a 16-bit disp
+# map — either one absent is derived from the diffuse. One leaf per stamp, pivot at bottom-middle and tip at top-middle, which is what lets the
 # forge arrange them into a cluster without per-source metadata. No normal map —
 # scatter-forge derives it after rotation. See ../../../../docs/scatter-forge.md.
 #

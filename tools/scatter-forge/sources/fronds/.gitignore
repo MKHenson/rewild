@@ -1,7 +1,8 @@
 # Hand-authored frond stamps: one folder per source, each holding a diffuse
-# (sRGB, alpha carries the cutout), an arm and a 16-bit disp map. One whole
-# frond per stamp, base on the bottom edge and tip at the top, standing the way
-# it is drawn — like a clump stamp, nothing here is ever rotated. `source.json`
+# (sRGB, alpha carries the cutout) and, optionally, an arm and a 16-bit disp
+# map — either one absent is derived from the diffuse. One whole frond per
+# stamp, base on the bottom edge and tip at the top, standing the way it is
+# drawn — like a clump stamp, nothing here is ever rotated. `source.json`
 # declares lengthMetres. No normal map — scatter-forge derives it from the
 # height. See ../../README.md, "Authored fronds".
 #

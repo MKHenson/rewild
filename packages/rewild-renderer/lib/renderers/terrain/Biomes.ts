@@ -163,7 +163,18 @@ export const PLAIN: BiomeParams = {
       slope: { from: 55, to: 25 },
       noise: { scale: 160, seedSalt: 23, band: { from: 0.95, to: 0.6 } },
     },
-
+    {
+      layer: 'cardinal_flower_01',
+      density: 0.01,
+      slope: { from: 55, to: 25 },
+      noise: { scale: 160, seedSalt: 23, band: { from: 0.95, to: 0.6 } },
+    },
+    {
+      layer: 'thistle_01',
+      density: 0.03,
+      slope: { from: 55, to: 25 },
+      noise: { scale: 160, seedSalt: 23, band: { from: 0.95, to: 0.6 } },
+    },
     {
       layer: 'granite_boulder',
       density: 0.07,
@@ -219,11 +230,16 @@ export const FOREST: BiomeParams = {
       noise: { scale: 260, seedSalt: 53, band: { from: 0.8, to: 0.45 } },
     },
     {
-      layer: 'plains_02',
-      density: 0.3,
-      slope: { from: 55, to: 25 },
-      // The stand's own field, inverted. Grass fills the glades.
-      noise: { scale: 260, seedSalt: 53, band: { from: 0.8, to: 0.45 } },
+      layer: 'fern_01',
+      density: 0.85,
+      slope: { from: 32, to: 10 },
+      noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
+    },
+    {
+      layer: 'fern_02',
+      density: 0.85,
+      slope: { from: 32, to: 10 },
+      noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
     },
     {
       layer: 'cypress_01',
@@ -398,7 +414,7 @@ export const DESERT: BiomeParams = {
       noise: { scale: 260, seedSalt: 53, band: { from: 0.8, to: 0.45 } },
     },
     {
-      layer: 'fern_01',
+      layer: 'palm_04',
       density: 0.3,
       slope: { from: 55, to: 25 },
       // The stand's own field, inverted. Grass fills the glades.

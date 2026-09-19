@@ -55,9 +55,9 @@
       "nature/trees/palm/palm-02.lod1.glb"
     ]
   },
-  "fern-01": {
+  "palm-04": {
     "type": "gltf",
-    "url": "nature/trees/fern/fern-01.glb"
+    "url": "nature/trees/palm/palm-04.glb"
   },
   "date-palm-01": {
     "type": "gltf",
@@ -79,5 +79,21 @@
     "lods": [
       "nature/trees/cypress/cypress-01.lod1.glb"
     ]
+  },
+  "cardinal-flower-01": {
+    "type": "gltf",
+    "url": "nature/trees/cardinal-flower/cardinal-flower-01.glb"
+  },
+  "fern-01": {
+    "type": "gltf",
+    "url": "nature/trees/fern/fern-01.glb"
+  },
+  "fern-02": {
+    "type": "gltf",
+    "url": "nature/trees/fern/fern-02.glb"
+  },
+  "thistle-01": {
+    "type": "gltf",
+    "url": "nature/clumps/thistle/thistle-01.glb"
   }
 }
