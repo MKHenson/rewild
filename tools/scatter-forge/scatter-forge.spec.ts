@@ -1769,6 +1769,14 @@ describe('crown', () => {
     expect(resolveParams({ name: 'a', type: 'clump' }).castShadow).toBe(false);
   });
 
+  it('shades the cutout as foliage unless the key turns it off', () => {
+    expect(resolveParams({ name: 'a' }).foliage).toBe(true);
+    const fern = crownParams({ stemHeight: 0 });
+    expect(crownLayer(fern, buildCrown(fern, CROWN_CELLS_GENERATED)).foliage).toBe(true);
+    const flower = crownParams({ stemHeight: 0, foliage: false });
+    expect(crownLayer(flower, buildCrown(flower, CROWN_CELLS_GENERATED)).foliage).toBe(false);
+  });
+
   it('holds a stem to the trunk bounds and skips them without one', () => {
     expect(() => crownParams({ stemHeight: 6, trunkTaper: 1.5 })).toThrow(/trunkTaper/);
     expect(() => crownParams({ stemHeight: 6, impostor: { fromDistance: 500 } })).toThrow(/impostor/);

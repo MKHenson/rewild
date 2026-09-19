@@ -234,7 +234,7 @@ describe('bark sources', () => {
     await expect(loadBarkSource(['sizeless'], root)).rejects.toThrow(/depthMetres/);
   });
 
-  it('names the map a half-built source is missing', async () => {
+  it('refuses a folder with no diffuse in it', async () => {
     const directory = join(root, 'bark', 'partial');
     await mkdir(directory, { recursive: true });
     await writeFile(join(directory, 'source.json'), JSON.stringify({ widthMetres: 1, depthMetres: 0.1 }));
@@ -242,6 +242,52 @@ describe('bark sources', () => {
     // Not null. A folder that exists and is wrong must stop the run, or the art
     // silently does nothing and the generator's output looks like a bug.
     await expect(loadBarkSource(['partial'], root)).rejects.toThrow(/-diff map/);
+
+    // An arm with nothing to go under it is the same mistake, named.
+    await sharp(Buffer.alloc(SIZE * SIZE * 3, 200), { raw: { width: SIZE, height: SIZE, channels: 3 } })
+      .webp({ lossless: true })
+      .toFile(join(directory, 'partial-arm.webp'));
+    await expect(loadBarkSource(['partial'], root)).rejects.toThrow(/no partial-diff map/);
+  });
+
+  it('derives the arm and height off a diffuse that comes alone', async () => {
+    // A vertical ramp, dark at the top, with the rest of the set absent. The
+    // luma is stretched to its own 2nd..98th percentile, so the top row lands
+    // at 0 and the bottom at 1 whatever exposure the photograph had.
+    const directory = join(root, 'bark', 'alone');
+    await mkdir(directory, { recursive: true });
+    const rgb = Buffer.alloc(SIZE * SIZE * 3);
+    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) rgb.fill(40 + y * 20, (y * SIZE + x) * 3, (y * SIZE + x) * 3 + 3);
+    await sharp(rgb, { raw: { width: SIZE, height: SIZE, channels: 3 } })
+      .webp({ lossless: true })
+      .toFile(join(directory, 'alone-diff.webp'));
+    await writeFile(join(directory, 'source.json'), JSON.stringify({ widthMetres: 1, depthMetres: 0.1 }));
+
+    const source = (await loadBarkSource(['alone'], root))!;
+    expect(source.derived).toEqual(['arm', 'disp']);
+
+    const top = 0;
+    const bottom = (SIZE - 1) * SIZE;
+    expect(source.relief[top]).toBeCloseTo(0, 2);
+    expect(source.relief[bottom]).toBeCloseTo(1, 2);
+    // Crevice: occluded and rough. Plate: open and smoother. Never metal.
+    expect(source.ao[top]).toBeCloseTo(0.5, 2);
+    expect(source.ao[bottom]).toBeCloseTo(1, 2);
+    expect(source.roughness[top]).toBeGreaterThan(source.roughness[bottom]);
+    expect(Math.max(...source.metallic)).toBe(0);
+    // Monotonic down the ramp, so the detail survives the stretch.
+    for (let y = 1; y < SIZE; y++) expect(source.relief[y * SIZE]).toBeGreaterThan(source.relief[(y - 1) * SIZE]);
+  });
+
+  it('takes the maps that are there and derives only the rest', async () => {
+    await writeSource(root, 'half');
+    await rm(join(root, 'bark', 'half', 'half-disp.png'));
+
+    const source = (await loadBarkSource(['half'], root))!;
+    expect(source.derived).toEqual(['disp']);
+    // The arm on disk is flat 128; a derived one off a flat diffuse would be
+    // the look's floor.
+    expect(source.ao[0]).toBeCloseTo(128 / 255, 3);
   });
 });
 
@@ -368,15 +414,24 @@ describe('leaf sources', () => {
     await expect(loadLeafSource(['sizeless'], root)).rejects.toThrow(/lengthMetres/);
   });
 
-  it('names the map a half-built stamp is missing', async () => {
-    const directory = join(root, 'leaves', 'partial');
-    await mkdir(directory, { recursive: true });
-    await writeFile(join(directory, 'source.json'), JSON.stringify({ lengthMetres: 0.1 }));
-    await sharp(Buffer.alloc(SIZE * SIZE * 4, 255), { raw: { width: SIZE, height: SIZE, channels: 4 } })
-      .webp({ lossless: true })
-      .toFile(join(directory, 'partial-diff.webp'));
+  it("derives a stamp's arm and height off its diffuse alone, levelled on the cutout", async () => {
+    // The bar is one flat green over a black margin. Only the bar counts
+    // toward the stretch, and a flat cutout has no levels to stretch, so it
+    // lands mid-range — not at 1 above a margin that should not count.
+    const directory = await writeStamp(root, 'alone');
+    await rm(join(directory, 'alone-arm.webp'));
+    await rm(join(directory, 'alone-disp.png'));
 
-    await expect(loadLeafSource(['partial'], root)).rejects.toThrow(/partial-arm map/);
+    const source = (await loadLeafSource(['alone'], root))!;
+    const [stamp] = source.stamps;
+    expect(stamp.derived).toEqual(['arm', 'disp']);
+    expect(stamp.extent).toEqual({ left: 3, right: 4, top: 1, bottom: 6 });
+
+    const onBar = 3 * SIZE + 3;
+    expect(stamp.height[onBar]).toBe(0.5);
+    expect(stamp.ao[onBar]).toBeCloseTo(0.825, 3);
+    expect(stamp.roughness[onBar]).toBeCloseTo(0.55, 3);
+    expect(stamp.metallic[onBar]).toBe(0);
   });
 });
 

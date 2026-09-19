@@ -32,6 +32,8 @@ export function sourceRoot(): string {
 export interface BarkSource {
   name: string;
   directory: string;
+  /** Maps the folder did not hold and the diffuse stood in for. */
+  derived: DerivedMap[];
   /** Metres of trunk one tile of this bark covers, around the branch. */
   widthMetres: number;
   /** How far its height spans, in metres. */
@@ -62,8 +64,10 @@ export interface BarkSource {
  * being told where the stem is.
  */
 export interface LeafStamp {
-  /** The folder and the file prefix the three maps share. */
+  /** The folder and the file prefix the maps share. */
   name: string;
+  /** Maps the folder did not hold and the diffuse stood in for. */
+  derived: DerivedMap[];
   /** Stem to tip, in metres, as the stamp's own folder declares it. Stamps
    *  from several folders keep their own sizes when they share a card. */
   lengthMetres: number;
@@ -103,7 +107,17 @@ export function stampLengthPx(stamp: LeafStamp): number {
 
 const ROLES = ['diff', 'arm', 'disp'] as const;
 type Role = (typeof ROLES)[number];
-type MapSet = Record<Role, string>;
+
+/** A set's maps on disk. Only the diffuse is required; the others are derived
+ *  from it where the folder holds none. */
+interface MapSet {
+  diff: string;
+  arm?: string;
+  disp?: string;
+}
+
+/** Which of a set's maps were derived rather than read. */
+export type DerivedMap = 'arm' | 'disp';
 
 /**
  * The map sets in a folder, keyed on the prefix before `-diff`, `-arm` and
@@ -128,18 +142,103 @@ async function mapSets(directory: string): Promise<Map<string, MapSet>> {
     partial.set(match[1], set);
   }
 
-  if (!partial.size)
-    throw new Error(`Source '${directory}' has no *-diff map. It needs all of: ${ROLES.join(', ')}.`);
+  if (!partial.size) throw new Error(`Source '${directory}' has no *-diff map.`);
 
   const sets = new Map<string, MapSet>();
   for (const [prefix, set] of partial) {
-    for (const role of ROLES)
-      if (!set[role])
-        throw new Error(`Source '${directory}' has no ${prefix}-${role} map. Every set needs all of: ${ROLES.join(', ')}.`);
+    if (!set.diff)
+      throw new Error(`Source '${directory}' has ${prefix}-arm or -disp but no ${prefix}-diff map. The diffuse is the one map a set cannot do without.`);
     sets.set(prefix, set as MapSet);
   }
 
   return sets;
+}
+
+function missingMaps(paths: MapSet): DerivedMap[] {
+  const missing: DerivedMap[] = [];
+  if (!paths.arm) missing.push('arm');
+  if (!paths.disp) missing.push('disp');
+  return missing;
+}
+
+/**
+ * Where a diffuse-derived channel lands, as the value at the darkest texel and
+ * at the brightest. Per slot, because a bark's crevices occlude and roughen far
+ * more than a leaf's veins do.
+ */
+interface DerivedLook {
+  ao: [number, number];
+  roughness: [number, number];
+}
+
+const BARK_LOOK: DerivedLook = { ao: [0.5, 1], roughness: [0.85, 0.6] };
+const STAMP_LOOK: DerivedLook = { ao: [0.65, 1], roughness: [0.7, 0.4] };
+
+/** Fraction of texels clipped at each end when a map is stretched to full range. */
+const LEVELS_CLIP = 0.02;
+
+/** What a diffuse stands in for, as float channels at its own size. */
+interface DerivedMaps {
+  ao: Float32Array;
+  roughness: Float32Array;
+  metallic: Float32Array;
+  height: Float32Array;
+}
+
+/**
+ * The ARM and height maps a diffuse implies, where the folder holds none.
+ *
+ * Everything comes off one greyscale of the diffuse: BT.709 luma of the encoded
+ * values, the same grey an image editor's desaturate gives. It is stretched so
+ * its 2nd..98th percentile spans 0..1 before anything is read off it, which is
+ * what makes a dark photograph and a bright one of the same bark come out the
+ * same — and what lets `depthMetres` mean the full span of the height. Then
+ * the dark end is the crevice and the bright end the plate: occluded and rough
+ * at one, open and smoother at the other, and nothing is metal.
+ *
+ * Only the texels under `mask` — a stamp's cutout — count toward the stretch,
+ * so the margin around a leaf does not set its levels.
+ */
+function deriveMaps(diff: Raw, look: DerivedLook, mask: Float32Array | null): DerivedMaps {
+  const texels = diff.width * diff.height;
+  const luma = new Float32Array(texels);
+  for (let i = 0; i < texels; i++) {
+    const p = i * diff.channels;
+    luma[i] = (0.2126 * diff.data[p] + 0.7152 * diff.data[p + 1] + 0.0722 * diff.data[p + 2]) / 255;
+  }
+
+  const bins = new Uint32Array(1024);
+  let counted = 0;
+  for (let i = 0; i < texels; i++) {
+    if (mask && mask[i] < 0.5) continue;
+    bins[Math.min(1023, Math.floor(luma[i] * 1023))]++;
+    counted++;
+  }
+  const percentile = (fraction: number): number => {
+    let seen = 0;
+    for (let b = 0; b < bins.length; b++) {
+      seen += bins[b];
+      if (seen >= fraction * counted) return b / 1023;
+    }
+    return 1;
+  };
+  const low = percentile(LEVELS_CLIP);
+  const high = percentile(1 - LEVELS_CLIP);
+  // A flat diffuse has no levels to stretch; it lands mid-range rather than on
+  // bin noise.
+  const flat = high <= low;
+
+  const ao = new Float32Array(texels);
+  const roughness = new Float32Array(texels);
+  const height = new Float32Array(texels);
+  for (let i = 0; i < texels; i++) {
+    const n = flat ? 0.5 : Math.min(1, Math.max(0, (luma[i] - low) / (high - low)));
+    height[i] = n;
+    ao[i] = look.ao[0] + (look.ao[1] - look.ao[0]) * n;
+    roughness[i] = look.roughness[0] + (look.roughness[1] - look.roughness[0]) * n;
+  }
+
+  return { ao, roughness, metallic: new Float32Array(texels), height };
 }
 
 async function readMetadata(
@@ -252,8 +351,8 @@ export async function loadBarkSource(
   const { widthMetres, depthMetres } = await readMetadata(directory, ['widthMetres', 'depthMetres']);
 
   const diff = await readRaw(paths.diff);
-  const arm = await readRaw(paths.arm);
-  sameSize(diff, arm, directory);
+  const derived = missingMaps(paths);
+  const maps = derived.length ? deriveMaps(diff, BARK_LOOK, null) : null;
 
   // Any shape. A bark photograph is usually taller than it is wide, and that
   // shape is the art's to state: it is written out at its own size and the UVs
@@ -261,56 +360,59 @@ export async function loadBarkSource(
   const { width, height } = diff;
   const texels = width * height;
   const albedo = new Float32Array(texels * 3);
-  const ao = new Float32Array(texels);
-  const roughness = new Float32Array(texels);
-  const metallic = new Float32Array(texels);
-
-  for (let i = 0; i < texels; i++) {
+  for (let i = 0; i < texels; i++)
     for (let c = 0; c < 3; c++) albedo[i * 3 + c] = diff.data[i * diff.channels + c] / 255;
-    ao[i] = arm.data[i * arm.channels] / 255;
-    roughness[i] = arm.data[i * arm.channels + 1] / 255;
-    metallic[i] = arm.data[i * arm.channels + 2] / 255;
-  }
 
   return {
     name,
     // The set rides along so the report shows which tile was taken.
     directory: pattern ? join(directory, prefix) : directory,
+    derived,
     widthMetres,
     depthMetres,
     width,
     height,
     aspect: height / width,
     albedo,
-    ao,
-    roughness,
-    metallic,
-    relief: await readHeight(paths.disp, width, height),
+    ...(paths.arm ? await readArm(paths.arm, diff, directory) : { ao: maps!.ao, roughness: maps!.roughness, metallic: maps!.metallic }),
+    relief: paths.disp ? await readHeight(paths.disp, width, height) : maps!.height,
   };
+}
+
+/** The three channels of an ARM map, checked against the diffuse's size. */
+async function readArm(
+  path: string,
+  diff: Raw,
+  directory: string
+): Promise<{ ao: Float32Array; roughness: Float32Array; metallic: Float32Array }> {
+  const arm = await readRaw(path);
+  sameSize(diff, arm, directory);
+  const texels = arm.width * arm.height;
+  const ao = new Float32Array(texels);
+  const roughness = new Float32Array(texels);
+  const metallic = new Float32Array(texels);
+  for (let i = 0; i < texels; i++) {
+    ao[i] = arm.data[i * arm.channels] / 255;
+    roughness[i] = arm.data[i * arm.channels + 1] / 255;
+    metallic[i] = arm.data[i * arm.channels + 2] / 255;
+  }
+  return { ao, roughness, metallic };
 }
 
 async function loadStamp(name: string, lengthMetres: number, paths: MapSet, directory: string): Promise<LeafStamp> {
   const diff = await readRaw(paths.diff);
   if (diff.channels !== 4)
     throw new Error(`${paths.diff} has no alpha channel. A leaf stamp's cutout is its alpha.`);
-  const arm = await readRaw(paths.arm);
-  sameSize(diff, arm, directory);
 
   const { width: columns, height: rows } = diff;
   const texels = columns * rows;
   const albedo = new Float32Array(texels * 3);
   const alpha = new Float32Array(texels);
-  const ao = new Float32Array(texels);
-  const roughness = new Float32Array(texels);
-  const metallic = new Float32Array(texels);
   const extent = { left: columns, right: -1, top: rows, bottom: -1 };
 
   for (let i = 0; i < texels; i++) {
     for (let c = 0; c < 3; c++) albedo[i * 3 + c] = srgbToLinear(diff.data[i * 4 + c] / 255);
     alpha[i] = diff.data[i * 4 + 3] / 255;
-    ao[i] = arm.data[i * arm.channels] / 255;
-    roughness[i] = arm.data[i * arm.channels + 1] / 255;
-    metallic[i] = arm.data[i * arm.channels + 2] / 255;
 
     if (alpha[i] > 0) {
       const x = i % columns;
@@ -324,17 +426,19 @@ async function loadStamp(name: string, lengthMetres: number, paths: MapSet, dire
 
   if (extent.right < 0) throw new Error(`${paths.diff} is transparent everywhere. There is no leaf in it.`);
 
+  const derived = missingMaps(paths);
+  const maps = derived.length ? deriveMaps(diff, STAMP_LOOK, alpha) : null;
+
   return {
     name,
+    derived,
     lengthMetres,
     columns,
     rows,
     albedo,
     alpha,
-    ao,
-    roughness,
-    metallic,
-    height: await readHeight(paths.disp, columns, rows),
+    ...(paths.arm ? await readArm(paths.arm, diff, directory) : { ao: maps!.ao, roughness: maps!.roughness, metallic: maps!.metallic }),
+    height: paths.disp ? await readHeight(paths.disp, columns, rows) : maps!.height,
     extent,
   };
 }

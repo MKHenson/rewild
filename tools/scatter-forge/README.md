@@ -135,6 +135,7 @@ be tuned live too.
 | `plains-02.json` | The second patch off the **same** `plains` set, with `skipTextures`. Twelve tufts and a different constellation, which is what stops six hundred copies of one patch reading as a pattern. Run `plains-01.json` first. |
 | `palm-01.json`   | **A crown.** A seven metre stem leaning twelve degrees under sixteen fronds of 3.2m, on its own `palm` set, generated art. The type's worked example for anything with a trunk. |
 | `fern.json`   | **A crown with no stem.** Eleven fronds of 0.9m standing up from the ground and arching over, on its own `fern` set. Emits a clump's layer, because at half a metre it is ground cover. |
+| `cardinal-flower-01.json` | **A stemless crown off diffuse-only art.** Five upright stalks of 0.9m from a `fronds` folder holding nothing but three `-diff` maps: the arm and height are [derived from the diffuse](#maps-derived-from-the-diffuse). The thing to copy for any wildflower that comes as a cutout photograph. |
 | `palm-03.json` | **The heavy crown, with a tier.** Thirty-six fronds of 4m attaching down the top half of a stout stem — `frondSpan` — so the old ones hang below the young. 792 triangles, and the one crown template that carries a `lods` tier, at 70m. |
 
 
@@ -275,6 +276,7 @@ These name the outputs, or are copied into the printed `scatter-layers.json` ent
 | `writeTemplates` | `false` | Patch `geometries.json` and `materials.json` in place instead of only printing them. | |
 | `templatesDir` | `templates` | Where those two files live. The engine's `templates/` at the repo root, not this tool's. | |
 | `cullDistance` | 160 | Metres past which the layer draws nothing. | `50` the clump default · `90` shrub · `160` the tree default · `800` oak and poplar |
+| `foliage` | `true` | Whether the layer's cutout piece is shaded as foliage — `HAS_FOLIAGE_SHADING` in the renderer: no specular chain, fewer fetches, and the transmission that makes a backlit leaf glow. | `true` every leaf, blade and frond · `false` shades the cards as a standard metallic-roughness surface, for a cutout that is not a leaf: a flower spike, a stalk, a stone. The trunk piece is never affected |
 | `castShadow` | by type | Whether the layer draws into the shadow maps. | `true` a tree, and a crown with a stem · `false` a clump, and a stemless crown: ground cover's shadow is a flicker of blade-sized texels under itself, and casting it draws every card of every patch in the shadow pass. Every template sets it |
 | `impostor` | `{ fromDistance: 0, views: 8, tileSize: 128 }` | The layer's billboard block, keyed exactly as `scatter-layers.json` carries it. Any key left out takes its default. | A tree and a stemmed crown always carry one. A clump or a stemless crown carries one only if the file sets it: `{ fromDistance: 160, views: 2, tileSize: 64 }` the plains, a patch metres wide · omitted, a fern or a lone tuft culls instead |
 | `impostor.fromDistance` | 0 | Metres the billboard tier takes over at. Every `lods` distance has to stay below it. | `0` derives 60% of `cullDistance` · `192` oak and poplar, which is where the trees are tuned. **Lower is cheaper**: it hands more of the world to billboards instead of meshes. Pick it from the tile rather than from the cull distance, below |
@@ -523,7 +525,7 @@ reasons a tree's canopy does.
 | **No collider** | A tuft that stops the player is worse than one they walk through. |
 | **No shadow** | `castShadow` defaults to `false`. A tuft's shadow is a flicker of blade-sized texels under itself, and casting it means the shadow pass draws every card of every patch in range. |
 | **No LOD chain** | A tier would save 18 triangles. Culling at 50m is the whole budget. |
-| **No `_disp` map** | Displacement is not wired at all — see [Displacement](#displacement) — and a blade's relief is under a millimetre. A `-disp` **input** is still required, because the normal is derived from it. |
+| **No `_disp` map** | Displacement is not wired at all — see [Displacement](#displacement) — and a blade's relief is under a millimetre. The normal is derived from the height — from a `-disp` input where the folder holds one, and from the diffuse where it does not. See [Maps derived from the diffuse](#maps-derived-from-the-diffuse). |
 | **No ground tint** | `COLOR_0` is spent on wind, and it cannot also be a tint. Blending the terrain's colour into the blade base would need a second vertex colour. Named here rather than discovered as a bug. |
 
 `alignToNormal` is 0.6 rather than a tree's 0. Grass grows out of the surface so it leans with it,
@@ -656,8 +658,8 @@ wrong.
 ```
 tools/scatter-forge/sources/clump/meadow/
   meadow-a-diff.webp    lossless, sRGB, alpha is the cutout
-  meadow-a-arm.webp     lossless, linear
-  meadow-a-disp.png     16-bit greyscale, linear
+  meadow-a-arm.webp     optional. lossless, linear
+  meadow-a-disp.png     optional. 16-bit greyscale, linear
   meadow-b-diff.webp    a second stamp, a second cell
   ...
   source.json
@@ -762,9 +764,9 @@ under.
 
 ## Authored fronds
 
-A frond source is a clump source under `sources/fronds/`: a folder of `<prefix>-diff`, `-arm` and
-`-disp` maps, one whole frond per set, base at the bottom-middle and tip at the top, standing the
-way it is drawn. `source.json` declares `lengthMetres`, base to tip, and optionally `depthMetres`.
+A frond source is a clump source under `sources/fronds/`: a folder of `<prefix>-diff` maps, each
+with a `-arm` and `-disp` beside it or [derived from it](#maps-derived-from-the-diffuse), one whole
+frond per set, base at the bottom-middle and tip at the top, standing the way it is drawn. `source.json` declares `lengthMetres`, base to tip, and optionally `depthMetres`.
 Every rule under [Authored clumps](#authored-clumps) applies, and the same errors stop the run. So
 does [picking stamps](#picking-stamps-out-of-a-folder) by `/pattern`, which is what lets a fern list
 `"fronds": ["palm/palm-01", "palm/palm-02"]` and leave the palm's dead fronds where they are.
@@ -1012,13 +1014,15 @@ set, because a bark is one tile.
 ```
 tools/scatter-forge/sources/bark/oak/
   oak-diff.webp    lossless, sRGB
-  oak-arm.webp     lossless, linear. Occlusion, roughness, metallic.
-  oak-disp.png     16-bit greyscale, linear
+  oak-arm.webp     optional. lossless, linear. Occlusion, roughness, metallic.
+  oak-disp.png     optional. 16-bit greyscale, linear
   source.json
 ```
 
 The maps are matched on their `-diff` / `-arm` / `-disp` suffix rather than on the folder's name, so
-renaming a source does not mean renaming everything in it. It must tile on both axes.
+renaming a source does not mean renaming everything in it. It must tile on both axes. Only the
+diffuse is required: a set that has no `-arm` or no `-disp` gets that map derived from its diffuse,
+see [Maps derived from the diffuse](#maps-derived-from-the-diffuse).
 
 **Any shape, capped by `textureSize`.** A tile of 512x1024 is written at 512x1024: the mesh's UVs
 do the repeating, so `barkAspect` does not apply to an authored bark and nothing is cropped or
@@ -1030,10 +1034,10 @@ bark photograph is usually taller than it is wide, and that shape is read from t
 declared — the tile covers `widthMetres` around the branch by `widthMetres x aspect` along it.
 Powers of two still mip more cleanly, but nothing rejects other sizes.
 
-**The height map has to be 16-bit**, and a PNG, because WebP cannot carry sixteen bits at all. The
-normal is derived from the height rather than authored beside it, and a height differentiated from
-eight bits terraces on every gentle slope. A source whose disp is 8-bit is refused rather than
-quietly used.
+**An authored height map has to be 16-bit**, and a PNG, because WebP cannot carry sixteen bits at
+all. The normal is derived from the height rather than authored beside it, and a height
+differentiated from eight bits terraces on every gentle slope. A source whose disp is 8-bit is
+refused rather than quietly used.
 
 Deriving the normal is also the more correct choice: blending two authored normals where two heights
 meet gives a surface that does not match its own silhouette, and a normal that is derived after a
@@ -1069,7 +1073,7 @@ bark     from tools/scatter-forge/sources/bark/oak (512x1024 tile, 1.1m around b
 ```
 
 A **listed** source that is missing, or that exists and is wrong, stops the run and names the
-problem: no such folder, a missing map, an 8-bit height, maps at different sizes,
+problem: no such folder, no diffuse, an 8-bit height, maps at different sizes,
 a `source.json` that does not declare both fields. None of those fall back to generating, because
 art the tree asked for and did not get should look like a mistake, not like the art having no
 effect.
@@ -1077,6 +1081,36 @@ effect.
 Note that a sourced image skips the curvature pass. That pass exists to stop a *generated* map
 reading as a tinted heightfield; a photograph already carries where its own light fell, and running
 it again would darken every crevice twice.
+
+### Maps derived from the diffuse
+
+A folder that holds only a `-diff` is a complete source. The forge derives the maps it does not
+find, per set, and the run's source line says which:
+
+```
+fronds   from tools/scatter-forge/sources/fronds/cardinal-flower (3 stamps, up to 0.9m long): 2x2 grid, 496px a cell
+         arm and disp derived from the diffuse on every stamp
+bark     from tools/scatter-forge/sources/bark/oak (1024x2048 tile, 1.1m around by 2.20m along, disp derived from the diffuse)
+```
+
+Everything comes off one greyscale of the diffuse — BT.709 luma of the encoded values, the grey an
+image editor's desaturate gives — stretched so its 2nd..98th percentile spans 0..1. The stretch is
+what makes a dark photograph and a bright one of the same bark come out the same, and it is what
+lets `depthMetres` mean the full span of the height. On a stamp only the texels under the alpha
+count toward it, so a leaf's margin does not set its levels. Then the dark end is the crevice and
+the bright end the plate:
+
+| Map | Bark | Leaf, clump, frond |
+| --- | --- | --- |
+| Height | `0..1`, the stretched luma | the same |
+| Occlusion | `0.5` in the crevice to `1` on the plate | `0.65` to `1` — a leaf's veins occlude less than bark's fissures |
+| Roughness | `0.85` in the crevice to `0.6` on the plate | `0.7` to `0.4` — a leaf is the smoother surface, and its bright texels are its sheen |
+| Metallic | `0` | `0` |
+
+Luma is a stand-in for depth, not a measurement of it: a dark texel is read as a hollow, and a dark
+marking on a flat surface will be read the same way. That is what an authored map is for. Any map
+that is present is used as given, and only the absent ones are derived, so a set can ship an
+authored `-arm` and leave its `-disp` to the forge or the other way round.
 
 ## Authored leaves
 
@@ -1097,8 +1131,8 @@ oak leaves.
 ```
 tools/scatter-forge/sources/leaves/oak/
   oak-diff.webp    lossless, sRGB, alpha is the cutout
-  oak-arm.webp     lossless, linear
-  oak-disp.png     16-bit greyscale, linear
+  oak-arm.webp     optional. lossless, linear
+  oak-disp.png     optional. 16-bit greyscale, linear
   source.json
 ```
 

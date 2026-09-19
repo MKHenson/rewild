@@ -204,6 +204,7 @@ export const PARAM_SPEC = {
   windFlutter: { type: 'number', default: 0.35, help: 'ScatterWind flutter for the emitted layer.', byType: { clump: 0.7 } },
   cullDistance: { type: 'number', default: 160, help: 'ScatterLayer cullDistance for the emitted layer.', byType: { clump: 50 } },
   castShadow: { type: 'flag', default: true, byType: { clump: false, crown: null }, help: 'Draw the emitted layer into the shadow maps. A clump defaults off; a crown casts while it has a stem.' },
+  foliage: { type: 'flag', default: true, help: 'Shade the cutout piece as foliage: no specular, with transmission. Off shades it as a standard metallic-roughness surface.' },
   impostor: { type: 'impostor', default: IMPOSTOR_DEFAULT, byType: { clump: null, crown: null }, help: "The layer's impostor block, keyed as the layer keys it: { fromDistance, views, tileSize }. fromDistance 0 derives it from cullDistance; views is per axis, at least 2; tileSize is in pixels. A clump or a stemless crown bakes one only if the file sets it." },
   footprint: { type: 'number', default: 0, help: 'ScatterLayer footprint in metres. 0 derives it from the model. The most expensive number here: candidates go as 1/footprint squared.', byType: { clump: 0.7 } },
   scaleMin: { type: 'number', default: 0.8, byType: { clump: 0.75 }, help: 'Lower bound of the emitted scale jitter.' },
