@@ -1,6 +1,7 @@
 # Hand-authored bark sources: one folder per source, each holding a diffuse
-# (sRGB), an arm and a 16-bit disp map. Tileable on both axes, authored with the
-# trunk running up the image. No normal map — scatter-forge derives it from the
+# (sRGB) and, optionally, an arm and a 16-bit disp map — either one absent is
+# derived from the diffuse. Tileable on both axes, authored with the trunk
+# running up the image. No normal map — scatter-forge derives it from the
 # composited height. See ../../../../docs/scatter-forge.md.
 #
 # Large binaries, kept out of git the way /assets/ is. With no source here the

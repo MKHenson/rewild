@@ -364,9 +364,9 @@
     "authoredNormals": true,
     "foliage": true
   },
-  "fern_01": {
-    "name": "fern_01",
-    "geometryId": "fern-01",
+  "palm_04": {
+    "name": "palm_04",
+    "geometryId": "palm-04",
     "cullDistance": 220,
     "impostor": {
       "fromDistance": 120,
@@ -382,20 +382,11 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 3
+      "tilt": 2
     },
-    "alignToNormal": 0,
-    "footprint": 2.3,
-    "collider": {
-      "type": "capsule",
-      "radius": 0.23,
-      "height": 0.54,
-      "offset": [
-        0,
-        0.5,
-        0
-      ]
-    },
+    "alignToNormal": 0.6,
+    "yOffset": -0.083,
+    "footprint": 6.24,
     "wind": {
       "amplitude": 2.15,
       "frequency": 0.9,
@@ -480,5 +471,133 @@
     "authoredNormals": true,
     "foliage": true,
     "castShadow": true
+  },
+  "cardinal_flower_01": {
+    "name": "cardinal_flower_01",
+    "geometryId": "cardinal-flower-01",
+    "cullDistance": 220,
+    "impostor": {
+      "fromDistance": 120,
+      "views": 4,
+      "tileSize": 32
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.8,
+        "to": 1.2
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 4
+    },
+    "alignToNormal": 0.6,
+    "yOffset": -0.122,
+    "footprint": 2.53,
+    "wind": {
+      "amplitude": 1.2,
+      "frequency": 1.1,
+      "flutter": 0.4
+    },
+    "authoredNormals": true,
+    "foliage": true,
+    "castShadow": false
+  },
+  "fern_01": {
+    "name": "fern_01",
+    "geometryId": "fern-01",
+    "cullDistance": 220,
+    "impostor": {
+      "fromDistance": 120,
+      "views": 4,
+      "tileSize": 64
+    },
+    "jitter": {
+      "scale": {
+        "from": 1,
+        "to": 1.5
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 2
+    },
+    "alignToNormal": 0.6,
+    "yOffset": -0.061,
+    "footprint": 4.58,
+    "wind": {
+      "amplitude": 2.15,
+      "frequency": 0.9,
+      "flutter": 0.6
+    },
+    "authoredNormals": true,
+    "foliage": true,
+    "castShadow": false
+  },
+  "fern_02": {
+    "name": "fern_02",
+    "geometryId": "fern-02",
+    "cullDistance": 220,
+    "impostor": {
+      "fromDistance": 120,
+      "views": 4,
+      "tileSize": 64
+    },
+    "jitter": {
+      "scale": {
+        "from": 1,
+        "to": 1.6
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 3
+    },
+    "alignToNormal": 0.6,
+    "yOffset": -0.064,
+    "footprint": 3.14,
+    "wind": {
+      "amplitude": 2.15,
+      "frequency": 0.9,
+      "flutter": 0.6
+    },
+    "authoredNormals": true,
+    "foliage": true,
+    "castShadow": false
+  },
+  "thistle_01": {
+    "name": "thistle_01",
+    "geometryId": "thistle-01",
+    "cullDistance": 420,
+    "impostor": {
+      "fromDistance": 110,
+      "views": 2,
+      "tileSize": 32
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.9,
+        "to": 1.1
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 2
+    },
+    "alignToNormal": 0.6,
+    "yOffset": -0.16,
+    "footprint": 1.6,
+    "wind": {
+      "amplitude": 2.18,
+      "frequency": 0.8,
+      "flutter": 0.7
+    },
+    "authoredNormals": true,
+    "foliage": true,
+    "castShadow": false
   }
 }
