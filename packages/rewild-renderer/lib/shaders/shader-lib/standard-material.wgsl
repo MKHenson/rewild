@@ -180,8 +180,15 @@ fn shadeStandardSurface(
   // leaf holds its coverage down the chain instead of thinning to nothing.
   // The branch is on a uniform, so the derivatives inside stay in uniform
   // control flow and an opaque material pays nothing for them.
+  //
+  // Foliage also erodes its cutout as the card turns edge on to the camera,
+  // so a card is never seen as the line it really is. See foliageEdgeFade.
   if (standardParams.alphaMode == ALPHA_MODE_MASK) {
-    if (baseColorSample.a * alphaCoverageScale(fragUV) < standardParams.alphaCutoff) {
+    var coverage = baseColorSample.a * alphaCoverageScale(fragUV);
+    if (HAS_FOLIAGE_SHADING) {
+      coverage = coverage * foliageEdgeFade(viewPosition);
+    }
+    if (coverage < standardParams.alphaCutoff) {
       discard;
     }
   }

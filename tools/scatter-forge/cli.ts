@@ -51,6 +51,7 @@ import {
   widestAspect,
   type BarkSource,
   type LeafSource,
+  type LeafStamp,
   type StampFit,
 } from './lib/sources.ts';
 import {
@@ -460,7 +461,16 @@ function describeLeaves(params: Params, source: LeafSource | null): string[] {
         `${Math.round(fit.placedPx)}px of card. Give it a larger source.`
     );
 
-  return lines;
+  return [...lines, ...describeDerived(source.stamps)];
+}
+
+/** Which maps came off the diffuse rather than the folder, per stamp set. */
+function describeDerived(stamps: LeafStamp[]): string[] {
+  const derived = stamps.filter((stamp) => stamp.derived.length);
+  if (!derived.length) return [];
+  const maps = [...new Set(derived.flatMap((stamp) => stamp.derived))].sort().join(' and ');
+  const which = derived.length === stamps.length ? 'every stamp' : derived.map((stamp) => stamp.name).join(', ');
+  return [`           ${maps} derived from the diffuse on ${which}`];
 }
 
 /**
@@ -483,7 +493,7 @@ function describeStamps(label: string, source: LeafSource, fit: StampFit, size: 
         `${Math.round(fit.placedPx)}px of cell. Give it a larger source, or a larger textureSize.`
     );
 
-  return lines;
+  return [...lines, ...describeDerived(source.stamps)];
 }
 
 function describeBlades(params: Params, source: LeafSource | null): string[] {
@@ -514,9 +524,10 @@ function describeBark(params: Params, source: BarkSource | null): string {
 
   const written = barkOutputSize(source, barkTextureSize(params));
   const reduced = written.width !== source.width ? `, written at ${written.width}x${written.height}` : '';
+  const derived = source.derived.length ? `, ${source.derived.join(' and ')} derived from the diffuse` : '';
   return (
     `  bark     from ${shellPath(source.directory)} (${source.width}x${source.height} tile${reduced}, ` +
-    `${source.widthMetres}m around by ${(source.widthMetres * source.aspect).toFixed(2)}m along)`
+    `${source.widthMetres}m around by ${(source.widthMetres * source.aspect).toFixed(2)}m along${derived})`
   );
 }
 

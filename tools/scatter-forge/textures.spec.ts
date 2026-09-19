@@ -169,6 +169,7 @@ function stampOf(columns: number, rows: number, width: number): LeafStamp {
   const texels = columns * rows;
   const stamp: LeafStamp = {
     name: 'bar',
+    derived: [],
     lengthMetres: 1,
     columns,
     rows,
