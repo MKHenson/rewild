@@ -53,6 +53,47 @@ function edgeAt(size: number, grid: number, k: number): number {
   return Math.round((k * size) / grid);
 }
 
+/** One accent's run of cells in the atlas. */
+export interface CellRange {
+  offset: number;
+  count: number;
+}
+
+/**
+ * How a cutout image is divided: the host's own cells first, then each
+ * accent's, on one square grid.
+ *
+ * The host's cells are the leaf grid, the clump's stamps or the crown's
+ * fronds, addressed from 0. An accent's stamps follow, one whole stamp per
+ * cell, in the order the config lists the accents. The grid is the smallest
+ * square holding all of it, so a tree at `leafGrid` 2 with one accent stamp
+ * paints a 3x3 image with four cells left blank — and every leaf cell drops
+ * from a half of the edge to a third. That cost is reported, not hidden.
+ */
+export interface AtlasLayout {
+  grid: number;
+  /** The host's cells, from 0. */
+  cells: number;
+  /** Each accent's cells, in the config's order. */
+  accents: CellRange[];
+}
+
+export function layoutAtlas(cells: number, accentCells: number[]): AtlasLayout {
+  const accents: CellRange[] = [];
+  let offset = cells;
+  for (const count of accentCells) {
+    accents.push({ offset, count });
+    offset += count;
+  }
+  return { grid: Math.max(1, Math.ceil(Math.sqrt(offset))), cells, accents };
+}
+
+/** The cells one accent's cards address. */
+export function accentCells(size: number, layout: AtlasLayout, index: number): UvRect[] {
+  const range = layout.accents[index];
+  return leafCells(size, layout.grid).slice(range.offset, range.offset + range.count);
+}
+
 /** The leaf cells in UV space, inset by the gutter. */
 export function leafCells(size: number, grid: number): UvRect[] {
   const g = gutterFor(size);

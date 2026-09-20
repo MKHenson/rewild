@@ -8,7 +8,8 @@
 // clump's segmented cards, placed at one height instead of fanned from the
 // ground, and phased with the stem so the rosette rides its sway.
 
-import { columnOf, leafCells } from './atlas.ts';
+import { accentRng, buildAccent, cardsAt, type AccentSite } from './accents.ts';
+import { accentCells, columnOf, leafCells, type AtlasLayout } from './atlas.ts';
 import {
   buildBark,
   createBuilder,
@@ -18,7 +19,7 @@ import {
   type ForgeMesh,
   type MeshAttributes,
 } from './mesh.ts';
-import { hasStem, trunkRingsOf, type Params } from './params.ts';
+import { hasStem, trunkRingsOf, type AccentSpec, type Params } from './params.ts';
 import { createRng, hash2, type Rng } from './rng.ts';
 import {
   bendWeight,
@@ -185,14 +186,38 @@ function pitchOf(params: Params, rng: Rng, index: number, depth: number, spanned
 }
 
 /**
+ * Where a crown's accent leaves from: the rosette, or a band of the stem below
+ * it. `depth` is that band as fractions of the stem down from its top, and
+ * defaults to the fronds' own span, so a spire on a fern leaves from the
+ * centre and a skirt on a palm can be told to hang below the living fronds.
+ * Sites are dealt down the band by index, the way fronds are.
+ */
+function crownSites(params: Params, stem: Branch | null, rosette: Rosette, spec: AccentSpec, rng: Rng): AccentSite[] {
+  const cards = cardsAt(spec.count, rng);
+  const [from, to] = spec.depth ?? [0, params.frondSpan];
+  const phase = clusterPhase(params, 0);
+  const sites: AccentSite[] = [];
+
+  for (let i = 0; i < cards; i++) {
+    const depth = cards > 1 ? from + ((to - from) * i) / (cards - 1) : from;
+    const at: Rosette = stem && depth > 0 ? sampleBranch(stem, 1 - depth) : rosette;
+    // Off the stem's surface, or a few centimetres off a fern's centre, as a
+    // frond is.
+    sites.push({ p: at.p, radius: Math.max(at.radius, spec.length * 0.02), dist: at.dist, phase, key: i });
+  }
+
+  return sites;
+}
+
+/**
  * The fronds fan about the vertical, wherever the stem top has got to. A
  * leaning palm's crown re-curves toward upright, and the stem's own heading
  * at the top is the last ring-to-ring segment once it has wandered, which a
  * small stray throws well off the stem's line.
  */
-function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, cells: number): MeshAttributes {
-  const grid = Math.ceil(Math.sqrt(cells));
-  const uvCells = leafCells(params.textureSize, grid).slice(0, cells);
+function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, atlas: AtlasLayout): MeshAttributes {
+  const cells = atlas.cells;
+  const uvCells = leafCells(params.textureSize, atlas.grid).slice(0, cells);
   const rng = createRng(params.seed ^ 0x6c3f9a17);
   const out = createBuilder();
   const stem = skeleton.branches[0] ?? null;
@@ -265,6 +290,13 @@ function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, cells
     }
   }
 
+  params.accents.forEach((spec, index) =>
+    buildAccent(out, params, index, spec, crownSites(params, stem, rosette, spec, accentRng(params, index)), accentCells(params.textureSize, atlas, index), {
+      bend: (site, along) => bendWeight(params, skeleton, site.dist + along),
+      normal: (_site, outward) => rosetteNormal(params, outward),
+    })
+  );
+
   return finish(out);
 }
 
@@ -296,13 +328,14 @@ function stemSkeleton(params: Params, rng: Rng): { skeleton: Skeleton; rosette: 
 }
 
 /**
- * `cells` is how many of the frond atlas's cells were painted, from
- * `crownAtlas` or the set's manifest, so a card never addresses past it.
+ * `atlas` is how the frond image was cut — which cells hold fronds and which
+ * an accent — from `crownAtlas` or the set's manifest, so a card never
+ * addresses past what was painted.
  */
-export function buildCrown(params: Params, cells: number, bark: BarkTile | null = null): Crown {
+export function buildCrown(params: Params, atlas: AtlasLayout, bark: BarkTile | null = null): Crown {
   const rng = createRng(params.seed ^ 0x2d51f39b);
   const { skeleton, rosette } = stemSkeleton(params, rng);
-  const fronds = buildFronds(params, skeleton, rosette, Math.max(1, cells));
+  const fronds = buildFronds(params, skeleton, rosette, { ...atlas, cells: Math.max(1, atlas.cells) });
 
   const pieces: ForgeMesh['pieces'] = [];
   if (skeleton.branches.length)

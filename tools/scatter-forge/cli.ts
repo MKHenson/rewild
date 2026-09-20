@@ -35,15 +35,16 @@ import {
 } from './lib/params.ts';
 import { randomSeed } from './lib/rng.ts';
 import { buildSkeleton, type Skeleton } from './lib/skeleton.ts';
+import type { AtlasLayout } from './lib/atlas.ts';
 import {
-  clumpAtlas,
-  crownAtlas,
+  atlasLayoutFor,
+  fitAccent,
   fitClump,
   fitCrown,
   fitLeaves,
-  leafGrid,
   barkOutputSize,
   barkTileOf,
+  loadAccentSource,
   loadBarkSource,
   loadClumpSource,
   loadFrondSource,
@@ -74,6 +75,7 @@ import {
   writeSetManifest,
   writeTextureSet,
   type Canvases,
+  type SetManifest,
   type TextureNames,
   type TextureSetNames,
 } from './lib/textures.ts';
@@ -112,7 +114,18 @@ interface Built extends Grown {
   canvases: Canvases | undefined;
   barkSource: BarkSource | null;
   leafSource: LeafSource | null;
+  /** One stamp set per accent, in the config's order. */
+  accentSources: LeafSource[];
+  /** How the cutout image is cut: the host's cells, then each accent's. */
+  layout: AtlasLayout;
   rebuiltTextures: boolean;
+}
+
+/** What a type loads: its bark, its own stamps, and one stamp set per accent. */
+interface Sources {
+  barkSource: BarkSource | null;
+  leafSource: LeafSource | null;
+  accentSources: LeafSource[];
 }
 
 /** A path relative to the shell, unless that climbs out of it. */
@@ -249,47 +262,60 @@ function writeTemplateArg(argv: string[], templatesDir: string): string | null {
  * throw rather than falling back, because art that quietly did nothing is
  * worse than a stopped run.
  */
-async function loadSources(params: Params): Promise<{ barkSource: BarkSource | null; leafSource: LeafSource | null }> {
+async function loadSources(params: Params): Promise<Sources> {
+  // An accent always names its stamps, so none of these is ever null.
+  const accentSources = (await Promise.all(params.accents.map((accent) => loadAccentSource(accent.stamps)))) as LeafSource[];
+
   switch (params.type) {
     case 'clump':
-      return { barkSource: null, leafSource: await loadClumpSource(params.blades) };
+      return { barkSource: null, leafSource: await loadClumpSource(params.blades), accentSources };
     case 'crown':
       return {
         barkSource: hasStem(params) ? await loadBarkSource(params.bark) : null,
         leafSource: await loadFrondSource(params.fronds),
+        accentSources,
       };
     default:
-      return { barkSource: await loadBarkSource(params.bark), leafSource: await loadLeafSource(params.leaves) };
+      return { barkSource: await loadBarkSource(params.bark), leafSource: await loadLeafSource(params.leaves), accentSources };
   }
 }
 
 /**
- * The cells a set being written will paint, derived from the sources: how
- * many stamps there are for a whole-stamp atlas, how many leaf lengths fit a
- * card for a tree.
+ * The layout a reused set was painted with, with this config's accents found
+ * in it by their stamps. A variant may list the set's accents in any order or
+ * leave some out; one the set never painted has no cells to address, and the
+ * set has to be rewritten with it.
  */
-function atlasFor(params: Params, leafSource: LeafSource | null): { grid: number; cells: number } {
-  if (params.type === 'clump') return clumpAtlas(leafSource);
-  if (params.type === 'crown') return crownAtlas(leafSource);
-  const grid = leafGrid(leafSource, params.leafSize, params.leafGrid);
-  return { grid, cells: grid * grid };
+function layoutFromManifest(params: Params, painted: SetManifest, directory: string): AtlasLayout {
+  const byStamps = (stamps: string[]): string => [...stamps].sort().join(',');
+  const accents = params.accents.map((spec) => {
+    const match = (painted.accents ?? []).find((entry) => byStamps(entry.stamps) === byStamps(spec.stamps));
+    if (!match)
+      throw new Error(
+        `Texture set '${params.textureSet}' in ${directory} was written without the accent stamps [${spec.stamps.join(', ')}]. ` +
+          `Re-run the config that writes the set with this accent listed — at count 0 it paints the cells and hangs nothing.`
+      );
+    return { offset: match.offset, count: match.cells };
+  });
+
+  return { grid: painted.leafGrid, cells: painted.cells ?? painted.leafGrid * painted.leafGrid, accents };
 }
 
 /** The model, and the layer it is declared through. */
-function grow(params: Params, grid: number, cells: number, bark: BarkTile | null): Grown {
+function grow(params: Params, layout: AtlasLayout, bark: BarkTile | null): Grown {
   if (params.type === 'clump') {
-    const { mesh, metrics } = buildClump(params, cells);
+    const { mesh, metrics } = buildClump(params, layout);
     return { mesh, skeleton: null, metrics, crown: null, layer: clumpLayer(params, metrics) };
   }
 
   if (params.type === 'crown') {
-    const crown = buildCrown(params, cells, bark);
+    const crown = buildCrown(params, layout, bark);
     return { mesh: crown.mesh, skeleton: crown.skeleton, metrics: null, crown: crown.metrics, layer: crownLayer(params, crown) };
   }
 
   const skeleton = buildSkeleton(params);
   return {
-    mesh: buildMesh(params, skeleton, grid, bark),
+    mesh: buildMesh(params, skeleton, layout, bark),
     skeleton,
     metrics: null,
     crown: null,
@@ -301,22 +327,14 @@ function grow(params: Params, grid: number, cells: number, bark: BarkTile | null
  * One coarser tier. A tree hangs it on the base skeleton; a crown regrows from
  * the same seed, which lands the same stem and rosette with fewer segments.
  */
-function growTier(
-  params: Params,
-  skeleton: Skeleton,
-  grid: number,
-  cells: number,
-  bark: BarkTile | null
-): ForgeMesh {
-  return params.type === 'crown'
-    ? buildCrown(params, cells, bark).mesh
-    : buildMesh(params, skeleton, grid, bark);
+function growTier(params: Params, skeleton: Skeleton, layout: AtlasLayout, bark: BarkTile | null): ForgeMesh {
+  return params.type === 'crown' ? buildCrown(params, layout, bark).mesh : buildMesh(params, skeleton, layout, bark);
 }
 
-function paint(params: Params, barkSource: BarkSource | null, leafSource: LeafSource | null): Canvases {
-  if (params.type === 'clump') return buildClumpCanvases(params, leafSource);
-  if (params.type === 'crown') return buildCrownCanvases(params, hasStem(params), barkSource, leafSource);
-  return buildTreeCanvases(params, barkSource, leafSource);
+function paint(params: Params, { barkSource, leafSource, accentSources }: Sources): Canvases {
+  if (params.type === 'clump') return buildClumpCanvases(params, leafSource, accentSources);
+  if (params.type === 'crown') return buildCrownCanvases(params, hasStem(params), barkSource, leafSource, accentSources);
+  return buildTreeCanvases(params, barkSource, leafSource, accentSources);
 }
 
 async function generate(params: Params, writeTemplate: string | null, previous?: Built): Promise<Built> {
@@ -324,19 +342,20 @@ async function generate(params: Params, writeTemplate: string | null, previous?:
   const pieces = pieceKeys(params.type, hasStem(params));
   const withHeight = heightPieces(params.type, hasStem(params));
 
-  const { barkSource, leafSource } = await loadSources(params);
+  const sources = await loadSources(params);
+  const { barkSource, leafSource, accentSources } = sources;
 
   await mkdir(directory, { recursive: true });
 
-  // The cell count the cards address has to be the one the images were painted
-  // with. A reused set says so in its manifest; a set being written derives it
-  // from the sources.
+  // The cells the cards address have to be the ones the images were painted
+  // with. A reused set says so in its manifest; a set being written derives
+  // them from the sources.
   const painted = params.skipTextures ? await readSetManifest(directory, params.textureSet) : null;
-  const atlas = atlasFor(params, leafSource);
-  const grid = painted ? painted.leafGrid : atlas.grid;
-  const cells = painted ? (painted.cells ?? grid * grid) : atlas.cells;
+  const layout = painted
+    ? layoutFromManifest(params, painted, directory)
+    : atlasLayoutFor(params, leafSource, accentSources);
 
-  const grown = grow(params, grid, cells, barkTileOf(barkSource));
+  const grown = grow(params, layout, barkTileOf(barkSource));
   const { mesh, skeleton } = grown;
 
   // Built even when the files are being reused, because the preview shades
@@ -345,15 +364,20 @@ async function generate(params: Params, writeTemplate: string | null, previous?:
   // makes a mesh edit rebuild in milliseconds rather than seconds.
   const reusable = previous?.canvases && sameTexture(previous.params, params) ? previous.canvases : undefined;
   const canvases =
-    reusable ?? (params.skipTextures && !params.preview ? undefined : paint(params, barkSource, leafSource));
+    reusable ?? (params.skipTextures && !params.preview ? undefined : paint(params, sources));
 
   let textures = textureFileNames(params.textureSet, pieces);
   if (!params.skipTextures && !reusable) {
     textures = await writeTextureSet(params, directory, canvases!, withHeight);
     await writeSetManifest(directory, params.textureSet, {
-      leafGrid: grid,
+      leafGrid: layout.grid,
       leafSize: params.leafSize,
-      cells,
+      cells: layout.cells,
+      accents: layout.accents.map((range, index) => ({
+        stamps: params.accents[index].stamps,
+        offset: range.offset,
+        cells: range.count,
+      })),
     });
   }
 
@@ -368,7 +392,7 @@ async function generate(params: Params, writeTemplate: string | null, previous?:
   // rather than coarsening, so there is nothing to hand over to.
   const lods: Built['lods'] = [];
   for (const [index, tier] of params.lods.entries()) {
-    const lodMesh = growTier(tierParams(params, tier), skeleton!, grid, cells, barkTileOf(barkSource));
+    const lodMesh = growTier(tierParams(params, tier), skeleton!, layout, barkTileOf(barkSource));
     const path = join(directory, `${params.name}.lod${index + 1}.glb`);
     await writeFile(
       path,
@@ -428,6 +452,8 @@ async function generate(params: Params, writeTemplate: string | null, previous?:
     canvases,
     barkSource,
     leafSource,
+    accentSources,
+    layout,
     modelPath,
     lods,
     directory,
@@ -443,14 +469,14 @@ async function generate(params: Params, writeTemplate: string | null, previous?:
 }
 
 /** The leaves line of the report: where they came from and how they fit. */
-function describeLeaves(params: Params, source: LeafSource | null): string[] {
-  if (!source) return ['  leaves   generated — no sources listed'];
+function describeLeaves(params: Params, source: LeafSource | null, layout: AtlasLayout): string[] {
+  if (!source) return [`  leaves   generated — no sources listed${onImage(layout)}`];
 
-  const fit = fitLeaves(source, params.leafSize, params.textureSize, params.leafGrid);
+  const fit = fitLeaves(source, params.leafSize, params.textureSize, params.leafGrid, layout.grid);
   const stamps = `${source.stamps.length} stamp${source.stamps.length === 1 ? '' : 's'}`;
   const lines = [
     `  leaves   from ${source.directories.map(shellPath).join(', ')} (${stamps}, up to ${source.lengthMetres}m long): ` +
-      `${fit.stampsPerCell.toFixed(1)} per ${params.leafSize}m card, ${fit.grid}x${fit.grid} grid`,
+      `${fit.stampsPerCell.toFixed(1)} per ${params.leafSize}m card, ${fit.grid}x${fit.grid} grid${onImage(layout)}`,
   ];
 
   // A stamp that lands on the card larger than it was drawn has nothing to
@@ -462,6 +488,47 @@ function describeLeaves(params: Params, source: LeafSource | null): string[] {
     );
 
   return [...lines, ...describeDerived(source.stamps)];
+}
+
+/**
+ * The cost of the accents, where they have pushed the image past the grid the
+ * host alone would take: every host cell is smaller for it, and only this
+ * says so.
+ */
+function onImage(layout: AtlasLayout): string {
+  const taken = layout.accents.reduce((sum, range) => sum + range.count, 0);
+  if (!taken) return '';
+  return ` on a ${layout.grid}x${layout.grid} image, ${taken} cell${taken === 1 ? '' : 's'} of it accents`;
+}
+
+/** One line per accent: its stamps, its cells, and how the card treats them. */
+function describeAccents(params: Params, sources: LeafSource[], layout: AtlasLayout): string[] {
+  return sources.flatMap((source, index) => {
+    const spec = params.accents[index];
+    const range = layout.accents[index];
+    const fit = fitAccent(source, params.textureSize, layout.grid);
+    const stamps = `${source.stamps.length} stamp${source.stamps.length === 1 ? '' : 's'}`;
+    const cells = range.count === 1 ? `cell ${range.offset}` : `cells ${range.offset}..${range.offset + range.count - 1}`;
+    const lines = [
+      `  accent ${index} from ${source.directories.map(shellPath).join(', ')} (${stamps}, up to ${source.lengthMetres}m long): ` +
+        `${cells}, ${fit.cellPx}px a cell, ${spec.count} per site at pitch ${spec.pitch}, ${spec.length}m cards`,
+    ];
+
+    if (fit.placedPx > fit.sourcePx)
+      lines.push(
+        `           upscaled ${(fit.placedPx / fit.sourcePx).toFixed(1)}x: a ${fit.sourcePx}px stamp for ` +
+          `${Math.round(fit.placedPx)}px of cell. Give it a larger source, or a larger textureSize.`
+      );
+
+    const widest = widestAspect(source);
+    if (widest > spec.aspect + 1e-3)
+      lines.push(
+        `           clipped: the widest stamp is ${widest.toFixed(2)} of its length and the card samples ` +
+          `${spec.aspect}. Raise the accent's aspect to ${widest.toFixed(2)} or crop the stamp.`
+      );
+
+    return [...lines, ...describeDerived(source.stamps)];
+  });
 }
 
 /** Which maps came off the diffuse rather than the folder, per stamp set. */
@@ -480,11 +547,11 @@ function describeDerived(stamps: LeafStamp[]): string[] {
  * stamp, so a ninth one takes every cell from half the atlas edge to a third of
  * it, and nothing else says so.
  */
-function describeStamps(label: string, source: LeafSource, fit: StampFit, size: string): string[] {
+function describeStamps(label: string, source: LeafSource, fit: StampFit, size: string, layout: AtlasLayout): string[] {
   const stamps = `${source.stamps.length} stamp${source.stamps.length === 1 ? '' : 's'}`;
   const lines = [
     `  ${label.padEnd(8)} from ${source.directories.map(shellPath).join(', ')} (${stamps}, up to ${source.lengthMetres}m ${size}): ` +
-      `${fit.grid}x${fit.grid} grid, ${fit.cellPx}px a cell`,
+      `${fit.grid}x${fit.grid} grid${onImage(layout)}, ${fit.cellPx}px a cell`,
   ];
 
   if (fit.placedPx > fit.sourcePx)
@@ -496,19 +563,19 @@ function describeStamps(label: string, source: LeafSource, fit: StampFit, size: 
   return [...lines, ...describeDerived(source.stamps)];
 }
 
-function describeBlades(params: Params, source: LeafSource | null): string[] {
-  if (!source) return ['  blades   generated — no sources listed'];
-  return describeStamps('blades', source, fitClump(source, params.textureSize), 'tall');
+function describeBlades(params: Params, source: LeafSource | null, layout: AtlasLayout): string[] {
+  if (!source) return [`  blades   generated — no sources listed${onImage(layout)}`];
+  return describeStamps('blades', source, fitClump(source, params.textureSize, layout.grid), 'tall', layout);
 }
 
 /**
  * The fronds line. A frond card samples `cardAspect` of its cell, so a stamp
  * wider than that loses its edges at the card's, and only this says so.
  */
-function describeFronds(params: Params, source: LeafSource | null): string[] {
-  if (!source) return ['  fronds   generated — no sources listed'];
+function describeFronds(params: Params, source: LeafSource | null, layout: AtlasLayout): string[] {
+  if (!source) return [`  fronds   generated — no sources listed${onImage(layout)}`];
 
-  const lines = describeStamps('fronds', source, fitCrown(source, params.textureSize), 'long');
+  const lines = describeStamps('fronds', source, fitCrown(source, params.textureSize, layout.grid), 'long', layout);
   const widest = widestAspect(source);
   if (widest > params.cardAspect + 1e-3)
     lines.push(
@@ -531,15 +598,20 @@ function describeBark(params: Params, source: BarkSource | null): string {
   );
 }
 
-/** Where the model's sources came from, by type. */
-function describeSources(params: Params, barkSource: BarkSource | null, leafSource: LeafSource | null): string[] {
+/** Where the model's sources came from, by type, and the accents after them. */
+function describeSources({ params, barkSource, leafSource, accentSources, layout }: Built): string[] {
+  const accents = describeAccents(params, accentSources, layout);
   switch (params.type) {
     case 'clump':
-      return describeBlades(params, leafSource);
+      return [...describeBlades(params, leafSource, layout), ...accents];
     case 'crown':
-      return [...(hasStem(params) ? [describeBark(params, barkSource)] : []), ...describeFronds(params, leafSource)];
+      return [
+        ...(hasStem(params) ? [describeBark(params, barkSource)] : []),
+        ...describeFronds(params, leafSource, layout),
+        ...accents,
+      ];
     default:
-      return [describeBark(params, barkSource), ...describeLeaves(params, leafSource)];
+      return [describeBark(params, barkSource), ...describeLeaves(params, leafSource, layout), ...accents];
   }
 }
 
@@ -589,8 +661,6 @@ function report(built: Built, rolledSeed: boolean): void {
   const {
     params,
     mesh,
-    barkSource,
-    leafSource,
     modelPath,
     lods,
     directory,
@@ -627,7 +697,7 @@ function report(built: Built, rolledSeed: boolean): void {
       );
     }),
     `  params   ${configPath}`,
-    ...describeSources(params, barkSource, leafSource),
+    ...describeSources(built),
     params.skipTextures
       ? `  textures reused from ${directory}`
       : `  textures ${Object.entries(textures)

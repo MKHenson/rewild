@@ -418,7 +418,7 @@ export const DESERT: BiomeParams = {
       density: 0.3,
       slope: { from: 55, to: 25 },
       // The stand's own field, inverted. Grass fills the glades.
-      noise: { scale: 260, seedSalt: 53, band: { from: 0.8, to: 0.45 } },
+      noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
     },
     {
       layer: 'granite_boulder',

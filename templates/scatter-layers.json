@@ -169,7 +169,8 @@
       "flutter": 0.6
     },
     "authoredNormals": true,
-    "foliage": true
+    "foliage": true,
+    "castShadow": true
   },
   "plains_01": {
     "name": "plains_01",
@@ -276,7 +277,8 @@
       "flutter": 0.5
     },
     "authoredNormals": true,
-    "foliage": true
+    "foliage": true,
+    "castShadow": true
   },
   "palm_02": {
     "name": "palm_02",
@@ -319,7 +321,8 @@
       "flutter": 0.5
     },
     "authoredNormals": true,
-    "foliage": true
+    "foliage": true,
+    "castShadow": true
   },
   "palm_03": {
     "name": "palm_03",
@@ -362,7 +365,8 @@
       "flutter": 0.5
     },
     "authoredNormals": true,
-    "foliage": true
+    "foliage": true,
+    "castShadow": true
   },
   "palm_04": {
     "name": "palm_04",
@@ -382,11 +386,20 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 2
+      "tilt": 3
     },
-    "alignToNormal": 0.6,
-    "yOffset": -0.083,
-    "footprint": 6.24,
+    "alignToNormal": 0,
+    "footprint": 2.3,
+    "collider": {
+      "type": "capsule",
+      "radius": 0.23,
+      "height": 0.54,
+      "offset": [
+        0,
+        0.5,
+        0
+      ]
+    },
     "wind": {
       "amplitude": 2.15,
       "frequency": 0.9,
@@ -557,8 +570,8 @@
       "tilt": 3
     },
     "alignToNormal": 0.6,
-    "yOffset": -0.064,
-    "footprint": 3.14,
+    "yOffset": -0.071,
+    "footprint": 3.35,
     "wind": {
       "amplitude": 2.15,
       "frequency": 0.9,

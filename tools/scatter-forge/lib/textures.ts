@@ -9,16 +9,14 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import sharp from 'sharp';
-import { columnPixels, gutterFor, insetRect, leafCellPixels, type PixelRect } from './atlas.ts';
+import { columnPixels, gutterFor, insetRect, leafCellPixels, type AtlasLayout, type PixelRect } from './atlas.ts';
 import {
-  clumpAtlas,
-  crownAtlas,
+  atlasLayoutFor,
   fitBark,
   fitClump,
   fitCrown,
   fitLeaves,
   gradientGain,
-  LEAF_GRID_GENERATED,
   normalStrength,
   type BarkSource,
   type LeafSource,
@@ -681,13 +679,38 @@ export function buildBarkCanvas(params: Params, authored?: BarkSource | null): C
  * cell is stamps composited on a spray of sprigs; without one it is the
  * generator's 4x4 of drawn clusters. A config's `leafGrid` overrides either.
  */
-export function buildLeafCanvas(params: Params, source?: LeafSource | null): Canvas {
+/**
+ * An accent's stamps, one whole stamp per cell, into the cells the layout set
+ * aside past the host's. Pinned at the bottom-middle and fitted to the cell
+ * the way a frond is, and never through the curvature pass, which is for the
+ * generated art alone.
+ */
+function paintAccents(canvas: Canvas, params: Params, layout: AtlasLayout, accents: LeafSource[]): void {
   const size = params.textureSize;
   const gutter = gutterFor(size);
+  const rects = leafCellPixels(size, layout.grid);
+
+  accents.forEach((source, index) => {
+    const { offset, count } = layout.accents[index];
+    for (let k = 0; k < count; k++) {
+      const rect = rects[offset + k];
+      const inner = insetRect(rect, gutter);
+      const rng = createRng((params.seed ^ 0x2c7b91e5) + (offset + k) * 7919);
+      compositeCluster(canvas, inner, source, clusterFor(rng, inner, source, 1, k));
+      dilate(canvas, rect, gutter * 3);
+    }
+  });
+}
+
+/** `accents` are the stamps of each accent the config lists, in its order. */
+export function buildLeafCanvas(params: Params, source: LeafSource | null = null, accents: LeafSource[] = []): Canvas {
+  const size = params.textureSize;
+  const gutter = gutterFor(size);
+  const layout = atlasLayoutFor(params, source, accents);
 
   if (source) {
-    const fit = fitLeaves(source, params.leafSize, size, params.leafGrid);
-    const cells = leafCellPixels(size, fit.grid);
+    const fit = fitLeaves(source, params.leafSize, size, params.leafGrid, layout.grid);
+    const cells = leafCellPixels(size, layout.grid).slice(0, layout.cells);
     const canvas = createCanvas(size, size, fit.bumpStrength ?? params.bumpStrength);
 
     cells.forEach((rect, index) => {
@@ -698,10 +721,11 @@ export function buildLeafCanvas(params: Params, source?: LeafSource | null): Can
 
     // No curvature pass, for the same reason the sourced bark skips it.
     for (const rect of cells) dilate(canvas, rect, gutter * 3);
+    paintAccents(canvas, params, layout, accents);
     return canvas;
   }
 
-  const cells = leafCellPixels(size, params.leafGrid || LEAF_GRID_GENERATED);
+  const cells = leafCellPixels(size, layout.grid).slice(0, layout.cells);
   const canvas = createCanvas(size, size, params.bumpStrength);
 
   cells.forEach((rect, index) => paintFoliageCell(canvas, params, rect, index, leafStyle));
@@ -712,6 +736,7 @@ export function buildLeafCanvas(params: Params, source?: LeafSource | null): Can
 
   // Reaches past the gutter, so the dilated colour survives several mip levels.
   for (const rect of cells) dilate(canvas, rect, gutter * 3);
+  paintAccents(canvas, params, layout, accents);
 
   return canvas;
 }
@@ -790,14 +815,14 @@ const bladeStyle: StyleFor = (params, rng, rect, variant) => ({
  * Only `cells` of the grid are painted. The mesh is handed the same number, so
  * a card never addresses a cell nothing drew.
  */
-export function buildBladeCanvas(params: Params, source?: LeafSource | null): Canvas {
+export function buildBladeCanvas(params: Params, source: LeafSource | null = null, accents: LeafSource[] = []): Canvas {
   const size = params.textureSize;
   const gutter = gutterFor(size);
-  const { grid, cells } = clumpAtlas(source ?? null);
-  const rects = leafCellPixels(size, grid).slice(0, cells);
+  const layout = atlasLayoutFor(params, source, accents);
+  const rects = leafCellPixels(size, layout.grid).slice(0, layout.cells);
 
   if (source) {
-    const fit = fitClump(source, size);
+    const fit = fitClump(source, size, layout.grid);
     const canvas = createCanvas(size, size, gradientGainFor(source, params, fit.cellPx));
 
     rects.forEach((rect, index) => {
@@ -811,6 +836,7 @@ export function buildBladeCanvas(params: Params, source?: LeafSource | null): Ca
 
     // No curvature pass, for the same reason the sourced bark skips it.
     for (const rect of rects) dilate(canvas, rect, gutter * 3);
+    paintAccents(canvas, params, layout, accents);
     return canvas;
   }
 
@@ -824,6 +850,7 @@ export function buildBladeCanvas(params: Params, source?: LeafSource | null): Ca
   rects.forEach((rect, index) => paintFoliageCell(canvas, params, insetRect(rect, gutter), index, bladeStyle));
   applyCurvature(canvas, params.curvature, false);
   for (const rect of rects) dilate(canvas, rect, gutter * 3);
+  paintAccents(canvas, params, layout, accents);
 
   return canvas;
 }
@@ -926,14 +953,14 @@ const frondStyle: StyleFor = (params, rng, rect, variant) => ({
  * drawn at. A sourced stamp stands at its own aspect and is clipped by the
  * card's edge where it is wider — the run reports that.
  */
-export function buildFrondCanvas(params: Params, source?: LeafSource | null): Canvas {
+export function buildFrondCanvas(params: Params, source: LeafSource | null = null, accents: LeafSource[] = []): Canvas {
   const size = params.textureSize;
   const gutter = gutterFor(size);
-  const { grid, cells } = crownAtlas(source ?? null);
-  const rects = leafCellPixels(size, grid).slice(0, cells);
+  const layout = atlasLayoutFor(params, source, accents);
+  const rects = leafCellPixels(size, layout.grid).slice(0, layout.cells);
 
   if (source) {
-    const fit = fitCrown(source, size);
+    const fit = fitCrown(source, size, layout.grid);
     const canvas = createCanvas(size, size, gradientGainFor(source, params, fit.cellPx));
 
     rects.forEach((rect, index) => {
@@ -943,6 +970,7 @@ export function buildFrondCanvas(params: Params, source?: LeafSource | null): Ca
     });
 
     for (const rect of rects) dilate(canvas, rect, gutter * 3);
+    paintAccents(canvas, params, layout, accents);
     return canvas;
   }
 
@@ -955,16 +983,22 @@ export function buildFrondCanvas(params: Params, source?: LeafSource | null): Ca
   );
   applyCurvature(canvas, params.curvature, false);
   for (const rect of rects) dilate(canvas, rect, gutter * 3);
+  paintAccents(canvas, params, layout, accents);
 
   return canvas;
 }
 
-export function buildClumpCanvases(params: Params, blades?: LeafSource | null): Canvases {
-  return { blade: buildBladeCanvas(params, blades) };
+export function buildClumpCanvases(params: Params, blades?: LeafSource | null, accents: LeafSource[] = []): Canvases {
+  return { blade: buildBladeCanvas(params, blades, accents) };
 }
 
-export function buildTreeCanvases(params: Params, bark?: BarkSource | null, leaves?: LeafSource | null): Canvases {
-  return { bark: buildBarkCanvas(params, bark), leaf: buildLeafCanvas(params, leaves) };
+export function buildTreeCanvases(
+  params: Params,
+  bark?: BarkSource | null,
+  leaves?: LeafSource | null,
+  accents: LeafSource[] = []
+): Canvases {
+  return { bark: buildBarkCanvas(params, bark), leaf: buildLeafCanvas(params, leaves, accents) };
 }
 
 /** A crown's images: the frond atlas, and bark only while there is a stem to wear it. */
@@ -972,11 +1006,12 @@ export function buildCrownCanvases(
   params: Params,
   hasStem: boolean,
   bark?: BarkSource | null,
-  fronds?: LeafSource | null
+  fronds?: LeafSource | null,
+  accents: LeafSource[] = []
 ): Canvases {
   return {
     ...(hasStem ? { bark: buildBarkCanvas(params, bark) } : {}),
-    frond: buildFrondCanvas(params, fronds),
+    frond: buildFrondCanvas(params, fronds, accents),
   };
 }
 
@@ -1024,7 +1059,15 @@ export async function writeTextureSet(
  * will address: the grid follows leafSize, and a card cut for a different
  * grid samples cells nothing drew.
  */
+/** One accent's stamps and where in the image they landed. */
+export interface ManifestAccent {
+  stamps: string[];
+  offset: number;
+  cells: number;
+}
+
 export interface SetManifest {
+  /** Cells along each edge of the whole image. */
   leafGrid: number;
   leafSize: number;
   /**
@@ -1035,6 +1078,12 @@ export interface SetManifest {
    * a tree, whose grid is always full.
    */
   cells?: number;
+  /**
+   * The accents the set was painted with, by their stamp lists, so a variant
+   * that reuses the set can find the cells for the accents it names — and be
+   * told when the set was written without them.
+   */
+  accents?: ManifestAccent[];
 }
 
 function manifestPath(directory: string, textureSet: string): string {
@@ -1058,9 +1107,15 @@ export async function readSetManifest(directory: string, textureSet: string): Pr
   const parsed = JSON.parse(text) as Partial<SetManifest>;
   if (typeof parsed.leafGrid !== 'number' || typeof parsed.leafSize !== 'number')
     throw new Error(`${manifestPath(directory, textureSet)} does not name a leafGrid and a leafSize.`);
+  const accents = Array.isArray(parsed.accents) ? parsed.accents : [];
+  for (const accent of accents)
+    if (!Array.isArray(accent.stamps) || typeof accent.offset !== 'number' || typeof accent.cells !== 'number')
+      throw new Error(`${manifestPath(directory, textureSet)} has an accent without stamps, offset and cells.`);
+
   return {
     leafGrid: parsed.leafGrid,
     leafSize: parsed.leafSize,
     cells: typeof parsed.cells === 'number' ? parsed.cells : parsed.leafGrid * parsed.leafGrid,
+    accents,
   };
 }

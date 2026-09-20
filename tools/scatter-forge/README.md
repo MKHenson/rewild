@@ -123,7 +123,7 @@ be tuned live too.
 | Template      | Is                                                                                  |
 | ------------- | ----------------------------------------------------------------------------------- |
 | `oak-01.json`    | Broad deciduous. A heavy trunk that forks low into a wide crown. Oak bark, oak leaves; writes the `oak` set. |
-| `poplar-01.json` | Tall and dense. Eight short branches per split spread over 90% of their parent, so foliage starts near the ground and carries all the way up. **Poplar bark with oak leaves**, on its own `poplar` set — the mix-and-match case. |
+| `poplar-01.json` | Tall and dense, **with catkins**: 0.35 seed clumps per leaf twig from `accents/poplar`, hanging at `pitch` 175. Eight short branches per split spread over 90% of their parent, so foliage starts near the ground and carries all the way up. **Poplar bark with oak leaves**, on its own `poplar` set — the mix-and-match case. |
 | `birch-01.json`  | Slender and columnar. Two-way splits climbing six generations, with a **negative** `droop` pulling every branch back toward vertical — split angles compound with depth, so without it a deep tree fans out into a disc. Reuses the `oak` set. |
 | `shrub-01.json`  | Undergrowth. The same generator at two metres, on its own `shrub` set, generated art. |
 | `spruce-01.json` | **A conifer.** Eighteen whorls of five limbs climbing 88% of a 24m trunk, each whorl a sixth of the length of the lowest. The `whorl` model's worked example, and the thing to copy for a fir or a pine. See [Conifers](#conifers). |
@@ -136,7 +136,8 @@ be tuned live too.
 | `palm-01.json`   | **A crown.** A seven metre stem leaning twelve degrees under sixteen fronds of 3.2m, on its own `palm` set, generated art. The type's worked example for anything with a trunk. |
 | `fern.json`   | **A crown with no stem.** Eleven fronds of 0.9m standing up from the ground and arching over, on its own `fern` set. Emits a clump's layer, because at half a metre it is ground cover. |
 | `cardinal-flower-01.json` | **A stemless crown off diffuse-only art.** Five upright stalks of 0.9m from a `fronds` folder holding nothing but three `-diff` maps: the arm and height are [derived from the diffuse](#maps-derived-from-the-diffuse). The thing to copy for any wildflower that comes as a cutout photograph. |
-| `palm-03.json` | **The heavy crown, with a tier.** Thirty-six fronds of 4m attaching down the top half of a stout stem — `frondSpan` — so the old ones hang below the young. 792 triangles, and the one crown template that carries a `lods` tier, at 70m. |
+| `palm-03.json` | **The heavy crown, with a tier.** Thirty-six fronds of 4m attaching down the top half of a stout stem — `frondSpan` — so the old ones hang below the young. 792 triangles, and the one crown template that carries a `lods` tier, at 70m. Also **the skirt**: fourteen dead fronds from `accents/palm` hanging at `pitch` 155 down the band of stem just under the living ones — see [Accents](#accents). `palm-01.json` and `palm-04.json` write the set, so each carries the same accent at `count` 0. |
+| `fern-02.json` | **The fern with spires.** Five fronds arching over and three fertile spires from `accents/fern` standing up out of the centre at `pitch` 8, arching outward by `curve` 25. `fern-01.json` writes the `fern` set and carries the accent at `count` 0. |
 
 
 The tool prints the triangle count on every run. Watch it: branch count is `splits` to the power of
@@ -201,7 +202,7 @@ stands in for a sprig, never for a single leaf.
 | `leafLevels` | 2 | How many generations carry cards, counted **inward from the outermost**, never out from the trunk. | `1` oak, the tips alone · `2` poplar · `3` birch and shrub. What it buys depends on `splits`. The oak's tips are 83% of its branches, so 1 to 2 adds only 17% more cards and mostly pulls foliage back along the limbs. The birch has 64 tips and cannot fill a crown from them, so 1 to 3 takes it from 768 leaf triangles to 1,344. Within 1 to `branchLevels + 1`, where the top hangs leaves off the trunk |
 | `leavesPerBranch` | 18 | Cards spaced evenly along each leaf-bearing branch, from `leafFrom` to the tip. | `1` the oak's LOD tier · `4` oak and poplar · `6` birch · `10` shrub · `18` default. Total cards is this times the leaf-bearing branches, at two triangles each. A tier cuts it and raises `leafScale` to hold the crown's density |
 | `leafSize` | 1 | Height of one card in metres, before `leafScale`. It also decides how many authored leaves fit a cell, see [What one division decides](#what-one-division-decides). | `0.3` shrub at 2.2m tall · `1` every tree at 16m and up. Absolute, so a small tree needs it brought down or its leaves swallow it |
-| `leafGrid` | 0 | Cells along each edge of the leaf image, overriding the derived grid. Texture key. | `0` derive it from `leafSize` over the source's leaf length, see [What one division decides](#what-one-division-decides) · `2` four larger cells, each cluster at twice the texels of a 4x4's, at the cost of fewer variants across the canopy · `1` or `4` likewise |
+| `leafGrid` | 0 | Cells along each edge the **leaves** get, overriding the derived grid. Texture key. With [accents](#accents) the image is cut on a larger grid that holds their cells too. | `0` derive it from `leafSize` over the source's leaf length, see [What one division decides](#what-one-division-decides) · `2` four larger cells, each cluster at twice the texels of a 4x4's, at the cost of fewer variants across the canopy · `1` or `4` likewise |
 | `leafScale` | 1 | Multiplies card size and leaves the texture fit alone. | `1` every model · `2` the oak's LOD tier, paired with `leavesPerBranch` 1. That pair trades 4 small cards for 1 large one at about the same coverage |
 | `leafAspect` | 0.85 | Card width as a fraction of its height. The image cell is always square, so this squashes it. | `0.85` every template, narrowing the painted sprig by 15% so a cluster reads upright · `1` the art undistorted · `1.4` a wide frond |
 | `leafDroop` | 55 | Degrees a card hangs below its branch direction, plus or minus 10 of randomness. | `0` laid flat along the branch · `55` oak, birch and shrub · `80` poplar, hanging steeply · `90` straight down |
@@ -259,6 +260,26 @@ from the tree's tables above, along with the whole of [The trunk](#the-trunk) �
 `trunkWander`, `trunkSides` and `trunkSegments` shape a stem exactly as they shape a trunk, because
 the stem is one branch on a skeleton of its own and goes through the same bark builder. The fronds
 take `cardSegments`, `cardCurve`, `cardAspect` and `normalLean` from the clump's. Without a stem, the tube keys are accepted and unread.
+
+**The accents** — every type
+
+One key, `accents`, holding a list. Each entry is a population of cards hung plumb off the model
+from its own stamps — a spire, fruit, a skirt — and the keys below are the entry's. See
+[Accents](#accents) for what they do and what they cost.
+
+| Key | Default | Does | What the values mean |
+| --- | --- | --- | --- |
+| `stamps` | required | Folders under `sources/accents/`, as folder or `folder/pattern`. Texture key: the one thing in an entry that reaches the image. | `["poplar"]` the catkins · `["fern/fern-01"]` the fertile spire alone |
+| `count` | required | Cards **per site**, and a fraction is a chance. A tree's sites are its leaf twigs or its forks, a crown's is its rosette, a patch's are its tufts. | `0.35` the poplar, a catkin bunch on a third of its twigs · `3` the fern, three spires · `14` the palm's skirt · `0` paints the cells and hangs nothing, which is how a set writer carries an accent for its variants |
+| `pitch` | required | Degrees from **world up**, whatever the card hangs from is doing. | `0` stands · `8` the fern's spires, near enough upright to lean · `155` the palm's skirt, leaving the stem at a slant and draping · `175` the poplar's catkins · `180` plumb |
+| `variance` | 10 | Degrees of randomness on the pitch, plus or minus. | `0` machined · `8`–`12` the templates |
+| `length` | required | Card height in metres. | `0.45` catkins · `1.2` a spire · `5.5` a dead palm frond |
+| `aspect` | 0.5 | Card width over height. The card samples the centred column of its cell that wide, as a frond does, and a stamp wider than it is clipped — the run says so and names the number. | `0.46` the poplar stamp · `0.78` the palm's |
+| `segments` | 1 | Divisions up the card. | `1` a rigid quad, fruit · `4` a spire that arches or a frond that drapes |
+| `curve` | 0 | Degrees the card bows on toward the ground over its length, quadratic like `cardCurve`. | `0` fruit · `25` the fern's spires arching outward, and the palm's skirt draping from a slant to plumb |
+| `flutter` | 0.25 | Scale on the card's flutter weight in `COLOR_0.b`. | `0.15` a heavy dead frond · `0.3` catkins that swing |
+| `attach` — `tree` | `twigs` | Where a tree hangs them. | `twigs` along the leaf-bearing branches, over the same stretch the leaves fill — catkins, acorns · `forks` at the points children leave their parents, on every generation, off the parent's radius — heavy fruit |
+| `depth` — `crown` | `[0, frondSpan]` | The band of stem the cards attach over, as two fractions down from the top, dealt out by index the way fronds are. | `[0, 0]` the rosette, a fern's spire · `[0.3, 0.42]` the palm's skirt, the band just below its living fronds |
 
 **The files and the emitted layer**
 
@@ -769,7 +790,75 @@ with a `-arm` and `-disp` beside it or [derived from it](#maps-derived-from-the-
 frond per set, base at the bottom-middle and tip at the top, standing the way it is drawn. `source.json` declares `lengthMetres`, base to tip, and optionally `depthMetres`.
 Every rule under [Authored clumps](#authored-clumps) applies, and the same errors stop the run. So
 does [picking stamps](#picking-stamps-out-of-a-folder) by `/pattern`, which is what lets a fern list
-`"fronds": ["palm/palm-01", "palm/palm-02"]` and leave the palm's dead fronds where they are.
+`"fronds": ["palm/palm-01", "palm/palm-02"]` and leave the rest of a folder where it is. A palm's dead
+fronds belong under `sources/accents/` and hang as an [accent](#accents).
+
+## Accents
+
+An accent is a second population of cards on a model, off stamps of its own: a fern's fertile
+spire, a poplar's catkins, a palm's skirt of dead fronds. They are one thing because what makes
+them not a leaf is the same in every case — **they hang off gravity, not off their host.** A leaf
+card follows its twig by `leafDroop` and a frond leaves the rosette at `frondAngle`; an accent
+is pitched from world up, and `pitch` is the whole difference between a spire and a fruit.
+
+**The type supplies the sites, the accent builder makes the cards.** A tree offers its leaf twigs,
+sampled over the stretch its leaves fill, or under `attach: forks` the points its branches leave
+their parents. A crown offers its rosette, or under `depth` a band of the stem below it, with the
+cards dealt down the band by index the way fronds are. A patch offers each tuft's centre. Each
+site gets `count` cards, and a fraction is a chance — fruit is sparse, and 0.35 of a card per
+twig is the number that says so. At every site the card leaves the host's surface, turns `pitch`
+from up about a horizontal axis and bows on toward the ground by `curve`, walked in `segments`
+so its length is its arc length. Its base offset is the host's radius there, so a skirt hangs
+against the trunk and a spire leaves a fern's centre by a couple of centimetres.
+
+**They ride what they hang from.** A card takes its site's sway phase — the limb's on a tree, the
+stem's on a crown — and its bend weight runs on from the site's path distance, so fruit swings
+with its branch rather than drifting off it. Flutter is the card's own and scaled by `flutter`,
+because a dead frond is heavier than a leaf. Its shading normal is the host's rule — canopy,
+rosette or tuft — so it shades into the mass instead of as its own object.
+
+### What they cost, and where they live
+
+An accent adds no piece. Its cards are written into the host's cutout primitive and its stamps
+into the host's image, so it costs no draw per instance and no image per set. What it costs is
+**cells**. The image is cut on the smallest square grid holding the host's cells and every
+accent's, one whole stamp per cell after the host's own, in the order the config lists them:
+
+```
+leaves   from tools/scatter-forge/sources/leaves/poplar (1 stamp, up to 0.2m long): 5.0 per 1m card, 2x2 grid on a 3x3 image, 1 cell of it accents
+accent 0 from tools/scatter-forge/sources/accents/poplar (1 stamp, up to 0.25m long): cell 4, 325px a cell, 0.35 per site at pitch 175, 0.45m cards
+```
+
+The poplar's four leaf cells were each half the image's edge and are now a third of it. On a
+clump or crown atlas, whose grid already has blank cells more often than not, an accent frequently
+costs nothing; on a tree it takes the leaf grid up a step, and `textureSize` is the answer where
+that shows. The stamp's declared `lengthMetres` sizes nothing on the card — `length` does — and
+matters only for the upscaling check and for stamps of different lengths sharing a folder.
+
+**The set writer decides the atlas.** A variant that reuses a set with `skipTextures` finds its
+accents' cells in the manifest by their `stamps`, in any order and any subset, and a set written
+without them stops the run naming the stamps. So the config that writes the set lists every accent
+its family will use, at `count: 0` where it wants none of the cards itself: `palm-01.json` and
+`palm-04.json` carry the skirt that only `palm-03.json` hangs.
+
+**A LOD tier keeps its model's accents.** `accents` is not a tier key, so a tier's cards are
+the base's; at the counts an accent runs to, that is a few dozen triangles.
+
+### Authored accents
+
+There is no generated accent. An accent is the art it names, and a berry the forge invented would
+help nobody, so `stamps` is required and a folder that is missing or broken stops the run the way
+any source does. A folder under `sources/accents/` is a frond folder: `<prefix>-diff` maps,
+each with a `-arm` and `-disp` beside it or [derived from it](#maps-derived-from-the-diffuse),
+one whole card per set, and a `source.json` declaring `lengthMetres`. `/pattern` picks out of
+it as anywhere.
+
+**The pivot is the attachment, and the image's up is the card's away-from-attachment direction.**
+A stamp stands in its cell at its own aspect, pinned at the bottom-middle, whichever way the card
+will point. So a spire is drawn standing, and a bunch of catkins that will hang is drawn with its
+twig at the **bottom** and the catkins pointing up the image — the card turns it over. A stamp
+drawn the way it hangs, twig at the top, hangs by its tips. The extent is read off the alpha, so a
+few stray texels far above the stamp stretch it to reach them and shrink what matters: crop them.
 
 ## Sharing one texture set across a family
 
