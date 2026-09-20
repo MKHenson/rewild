@@ -14,7 +14,8 @@ import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { gutterFor } from './atlas.ts';
+import { gutterFor, layoutAtlas, type AtlasLayout } from './atlas.ts';
+import type { Params } from './params.ts';
 import { srgbToLinear } from './colour.ts';
 
 /**
@@ -557,6 +558,19 @@ export async function loadFrondSource(
 }
 
 /**
+ * Accent stamps: one whole card per set, pinned at the bottom-middle the way a
+ * frond is. The pivot is the attachment, and the image's up is the card's
+ * away-from-attachment direction — so a spire is drawn standing and a bunch
+ * of catkins is drawn with its twig at the bottom, however it will hang.
+ */
+export async function loadAccentSource(
+  names: string[],
+  root: string = sourceRoot()
+): Promise<LeafSource | null> {
+  return loadStampSource(names, root, 'accents', 'lengthMetres', 'accent');
+}
+
+/**
  * How many times a tile repeats across the bark image.
  *
  * The ring maps once across the width, so the width is one circumference, and
@@ -707,8 +721,8 @@ export interface StampFit extends StampAtlas {
  * adding a ninth to a 2x2 set takes every cell from half the atlas edge to a
  * third of it, and nothing says so unless it is measured.
  */
-function fitStamps(source: LeafSource, textureSize: number, { grid, cells }: StampAtlas): StampFit {
-  const inner = textureSize / grid - 2 * gutterFor(textureSize);
+function fitStamps(source: LeafSource, textureSize: number, { grid, cells }: StampAtlas, imageGrid = grid): StampFit {
+  const inner = textureSize / imageGrid - 2 * gutterFor(textureSize);
 
   let placedPx = 0;
   let sourcePx = 1;
@@ -723,12 +737,36 @@ function fitStamps(source: LeafSource, textureSize: number, { grid, cells }: Sta
   return { grid, cells, cellPx: Math.round(inner), placedPx, sourcePx };
 }
 
-export function fitClump(source: LeafSource, textureSize: number): StampFit {
-  return fitStamps(source, textureSize, clumpAtlas(source));
+/** `imageGrid` is the grid the image is actually cut on, where accents have
+ *  pushed it past the one the stamps alone would take. */
+export function fitClump(source: LeafSource, textureSize: number, imageGrid?: number): StampFit {
+  return fitStamps(source, textureSize, clumpAtlas(source), imageGrid);
 }
 
-export function fitCrown(source: LeafSource, textureSize: number): StampFit {
-  return fitStamps(source, textureSize, crownAtlas(source));
+export function fitCrown(source: LeafSource, textureSize: number, imageGrid?: number): StampFit {
+  return fitStamps(source, textureSize, crownAtlas(source), imageGrid);
+}
+
+/** An accent's stamps on the host's grid: one cell each, at the host's cell size. */
+export function fitAccent(source: LeafSource, textureSize: number, imageGrid: number): StampFit {
+  return fitStamps(source, textureSize, { grid: imageGrid, cells: source.stamps.length });
+}
+
+/**
+ * The cutout image's layout for a set being written: the host's cells from
+ * its own sources, then each accent's stamps.
+ */
+export function atlasLayoutFor(params: Params, host: LeafSource | null, accents: LeafSource[]): AtlasLayout {
+  const cells =
+    params.type === 'clump'
+      ? clumpAtlas(host).cells
+      : params.type === 'crown'
+      ? crownAtlas(host).cells
+      : leafGrid(host, params.leafSize, params.leafGrid) ** 2;
+  return layoutAtlas(
+    cells,
+    accents.map((source) => source.stamps.length)
+  );
 }
 
 /**
@@ -785,10 +823,16 @@ export interface LeafFit {
   bumpStrength: number | null;
 }
 
-export function fitLeaves(source: LeafSource, leafSize: number, textureSize: number, override = 0): LeafFit {
+export function fitLeaves(
+  source: LeafSource,
+  leafSize: number,
+  textureSize: number,
+  override = 0,
+  imageGrid?: number
+): LeafFit {
   const grid = leafGrid(source, leafSize, override);
   const perCell = stampsPerCell(source, leafSize);
-  const inner = textureSize / grid - 2 * gutterFor(textureSize);
+  const inner = textureSize / (imageGrid ?? grid) - 2 * gutterFor(textureSize);
 
   // Each stamp lands at its own declared length; the one stretched furthest
   // past its texels is the one worth reporting.

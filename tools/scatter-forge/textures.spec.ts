@@ -7,7 +7,7 @@
 // asserts anything a larger atlas would say differently.
 
 import { resolveParams, type Params, type RawConfig } from './lib/params.ts';
-import { columnPixels, gutterFor, insetRect, leafCellPixels } from './lib/atlas.ts';
+import { columnPixels, gutterFor, insetRect, leafCellPixels, type PixelRect } from './lib/atlas.ts';
 import { compositeCluster } from './lib/cluster.ts';
 import { srgbToLinear } from './lib/colour.ts';
 import { CROWN_CELLS_GENERATED, type LeafSource, type LeafStamp } from './lib/sources.ts';
@@ -317,5 +317,40 @@ describe('frond atlas', () => {
   it('ships bark only with a stem', () => {
     expect(Object.keys(buildCrownCanvases(params, true))).toEqual(['bark', 'frond']);
     expect(Object.keys(buildCrownCanvases(params, false))).toEqual(['frond']);
+  });
+});
+
+describe('accent cells', () => {
+  // One leaf per card is the one-cell leaf case, so with two accent stamps the
+  // image is cut 2x2: the leaf in cell 0, the accents in 1 and 2, cell 3 blank.
+  const params = paramsFor({ accents: [{ stamps: ['x'], count: 1, pitch: 180, length: 0.2 }] as never });
+  const accent = sourceOf(0.2, stampOf(16, 32, 6), stampOf(16, 32, 4));
+  const canvas = buildLeafCanvas(params, sourceOf(1, stampOf(16, 32, 6)), [accent]);
+  const size = params.textureSize;
+  const gutter = gutterFor(size);
+  const rects = leafCellPixels(size, 2);
+
+  const covered = (rect: PixelRect): number => {
+    let count = 0;
+    for (let y = rect.y; y < rect.y + rect.height; y++)
+      for (let x = rect.x; x < rect.x + rect.width; x++) if (canvas.alpha[y * size + x] > 0) count++;
+    return count;
+  };
+
+  it('paints one accent stamp per cell after the host, pinned at the bottom-middle, and leaves the rest blank', () => {
+    expect(covered(rects[0])).toBeGreaterThan(0);
+    expect(covered(rects[1])).toBeGreaterThan(0);
+    expect(covered(rects[2])).toBeGreaterThan(0);
+    expect(covered(rects[3])).toBe(0);
+
+    for (const rect of rects.slice(1, 3)) {
+      const inner = insetRect(rect, gutter);
+      const stemX = Math.floor(inner.x + inner.width / 2);
+      expect(canvas.alpha[(inner.y + inner.height - 2) * size + stemX]).toBeGreaterThan(0);
+      expect(canvas.alpha[(inner.y + 1) * size + stemX]).toBeGreaterThan(0);
+    }
+
+    // The two stamps land in their own cells, narrow one second.
+    expect(covered(rects[1])).toBeGreaterThan(covered(rects[2]));
   });
 });

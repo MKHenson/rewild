@@ -3,6 +3,17 @@
   "textureSet": "poplar",
   "bark": ["poplar/poplar-02"],
   "leaves": ["poplar"],
+  "accents": [
+    {
+      "stamps": ["poplar"],
+      "count": 0.35,
+      "pitch": 175,
+      "variance": 8,
+      "length": 0.45,
+      "aspect": 0.46,
+      "flutter": 0.3
+    }
+  ],
   "out": "assets/shared/nature/trees",
   "assetsRoot": "assets/shared",
   "seed": 42,
@@ -29,7 +40,7 @@
   "leavesPerBranch": 4,
   "leafLevels": 2,
   "leafSize": 1,
-  "leafGrid": 2,
+  "leafGrid": 1,
   "leafAspect": 0.85,
   "leafDroop": 80,
   "leafFrom": 0.1,
@@ -55,7 +66,7 @@
   "scaleMin": 0.8,
   "scaleMax": 1.25,
   "barkTextureSize": 1024,
-  "textureSize": 512,
+  "textureSize": 1024,
   "preview": 2056,
   "skipTextures": false,
   "writeTemplates": false,

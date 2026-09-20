@@ -8,23 +8,16 @@
 // material, one draw. A tree ships two, a clump ships one, and a rock will ship
 // one. The shared builder below is what every type writes its vertices through.
 
-import { leafCells } from './atlas.ts';
+import { accentRng, buildAccent, cardsAt, type AccentSite } from './accents.ts';
+import { accentCells, leafCells, type AtlasLayout } from './atlas.ts';
+import { createBuilder, finish, pushVertex, type Builder, type MeshAttributes, type Rgba } from './builder.ts';
 import { signedFbm, smoothstep } from './noise.ts';
-import { trunkSidesOf, type Params } from './params.ts';
-import { createRng, hash2 } from './rng.ts';
+import { trunkSidesOf, type AccentSpec, type Params } from './params.ts';
+import { createRng, hash2, type Rng } from './rng.ts';
 import { bendWeight, clusterPhase, sampleBranch, type BranchPoint, type Skeleton } from './skeleton.ts';
 import { add, cross, normalize, perpendicular, rotateAbout, scale, sub, transport, type Vec3 } from './vec.ts';
 
-/** One primitive's vertex data, in the layout the glTF writer consumes. */
-export interface MeshAttributes {
-  positions: Float32Array;
-  normals: Float32Array;
-  uvs: Float32Array;
-  colors: Float32Array;
-  indices: Uint32Array;
-  vertexCount: number;
-  triangleCount: number;
-}
+export { createBuilder, finish, pushVertex, type Builder, type MeshAttributes, type Rgba };
 
 /**
  * One primitive of a model: its vertices, and how they are drawn.
@@ -60,17 +53,6 @@ export function pieceOf(mesh: ForgeMesh, key: string): MeshAttributes {
 export function totalTriangles(mesh: ForgeMesh): number {
   return mesh.pieces.reduce((sum, piece) => sum + piece.attributes.triangleCount, 0);
 }
-
-/** Attributes while they are still growing, before they are frozen. */
-export interface Builder {
-  positions: number[];
-  normals: number[];
-  uvs: number[];
-  colors: number[];
-  indices: number[];
-}
-
-export type Rgba = [number, number, number, number];
 
 const DEG = Math.PI / 180;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
@@ -171,36 +153,6 @@ function trunkNormal(
   const along = add(scale(frame.axis, axisLength), scale(frame.radial, dHeight));
 
   return normalize(cross(around, along));
-}
-
-export function createBuilder(): Builder {
-  return { positions: [], normals: [], uvs: [], colors: [], indices: [] };
-}
-
-export function pushVertex(
-  out: Builder,
-  position: Vec3,
-  normal: Vec3,
-  uv: [number, number],
-  color: Rgba
-): number {
-  out.positions.push(position[0], position[1], position[2]);
-  out.normals.push(normal[0], normal[1], normal[2]);
-  out.uvs.push(uv[0], uv[1]);
-  out.colors.push(color[0], color[1], color[2], color[3]);
-  return out.positions.length / 3 - 1;
-}
-
-export function finish(out: Builder): MeshAttributes {
-  return {
-    positions: new Float32Array(out.positions),
-    normals: new Float32Array(out.normals),
-    uvs: new Float32Array(out.uvs),
-    colors: new Float32Array(out.colors),
-    indices: new Uint32Array(out.indices),
-    vertexCount: out.positions.length / 3,
-    triangleCount: out.indices.length / 3,
-  };
 }
 
 /**
@@ -380,8 +332,48 @@ function leafNormal(mode: string, cardCentre: Vec3, cardNormal: Vec3, canopyCent
   return normalize([outward[0], outward[1] * 0.5 + 0.5, outward[2]]);
 }
 
-function buildLeaves(params: Params, skeleton: Skeleton, leafGrid: number): MeshAttributes {
-  const cells = leafCells(params.textureSize, leafGrid);
+/**
+ * Where a tree's accent may hang. Twigs are the leaf-bearing branches, sampled
+ * over the same stretch the leaves fill, so fruit and leaves share their
+ * shoots. Forks are the points children leave their parents, on every
+ * generation, with the parent's radius there — where heavy fruit hangs.
+ *
+ * The phase is the limb's, so a card swings with what it hangs from.
+ */
+function treeSites(params: Params, skeleton: Skeleton, spec: AccentSpec, rng: Rng): AccentSite[] {
+  const sites: AccentSite[] = [];
+
+  if (spec.attach === 'forks') {
+    for (const parent of skeleton.branches)
+      for (const childId of parent.children) {
+        const child = skeleton.branches[childId];
+        const at = child.points[0];
+        const cards = cardsAt(spec.count, rng);
+        for (let n = 0; n < cards; n++)
+          sites.push({
+            p: at.p,
+            radius: at.radius / params.radiusRatio,
+            dist: at.dist,
+            phase: clusterPhase(params, parent.clusterId),
+            key: child.id * 64 + n,
+          });
+      }
+    return sites;
+  }
+
+  for (const branch of skeleton.branches) {
+    if (!branch.bearsLeaves) continue;
+    const cards = cardsAt(spec.count, rng);
+    for (let n = 0; n < cards; n++) {
+      const at = sampleBranch(branch, params.leafFrom + (1 - params.leafFrom) * rng());
+      sites.push({ p: at.p, radius: at.radius, dist: at.dist, phase: clusterPhase(params, branch.clusterId), key: branch.id * 64 + n });
+    }
+  }
+  return sites;
+}
+
+function buildLeaves(params: Params, skeleton: Skeleton, atlas: AtlasLayout): MeshAttributes {
+  const cells = leafCells(params.textureSize, atlas.grid).slice(0, atlas.cells);
   const variants = cells.length;
   const rng = createRng(params.seed ^ 0x1b873593);
   const out = createBuilder();
@@ -449,21 +441,30 @@ function buildLeaves(params: Params, skeleton: Skeleton, leafGrid: number): Mesh
     }
   }
 
+  // Into the same piece, after the leaves: an accent is more cutout on the
+  // leaf material, addressing the cells set aside past the leaf grid.
+  params.accents.forEach((spec, index) =>
+    buildAccent(out, params, index, spec, treeSites(params, skeleton, spec, accentRng(params, index)), accentCells(params.textureSize, atlas, index), {
+      bend: (site, along) => bendWeight(params, skeleton, site.dist + along),
+      normal: (site, _outward, face) => leafNormal(params.leafNormalMode, site.p, face, skeleton.canopy.centre),
+    })
+  );
+
   return finish(out);
 }
 
-/** `leafGrid` is the cell count the leaf image was painted with, from
- *  leafGrid in sources.ts, so a card never addresses a cell nothing drew. */
+/** `atlas` is how the leaf image was cut, from the sources or the set's
+ *  manifest, so a card never addresses a cell nothing drew. */
 export function buildMesh(
   params: Params,
   skeleton: Skeleton,
-  leafGrid: number,
+  atlas: AtlasLayout,
   bark: BarkTile | null = null
 ): ForgeMesh {
   return {
     pieces: [
       { key: 'bark', attributes: buildBark(params, skeleton, bark), cutout: false },
-      { key: 'leaf', attributes: buildLeaves(params, skeleton, leafGrid), cutout: true },
+      { key: 'leaf', attributes: buildLeaves(params, skeleton, atlas), cutout: true },
     ],
   };
 }

@@ -7,10 +7,10 @@ import { LOOK, retiredKeys } from './look.ts';
 import { FORGE_TYPES, isForgeType, type ForgeType } from './pieces.ts';
 import { hashString } from './rng.ts';
 
-type Default = string | number | boolean | readonly string[] | readonly LodTier[] | ScatterImpostor | null;
+type Default = string | number | boolean | readonly string[] | readonly LodTier[] | readonly AccentSpec[] | ScatterImpostor | null;
 
 interface ParamSpec {
-  readonly type: 'string' | 'number' | 'int' | 'flag' | 'list' | 'tiers' | 'impostor';
+  readonly type: 'string' | 'number' | 'int' | 'flag' | 'list' | 'tiers' | 'impostor' | 'accents';
   readonly default: Default;
   readonly help: string;
   /** Changing this changes the texture files. Everything else only moves the
@@ -74,6 +74,50 @@ export const LOD_OVERRIDES = [
   'leafScale',
   'cardSegments',
 ] as const;
+
+/** Where a tree hangs an accent: along its leaf twigs, or at the points its branches fork. */
+export const ACCENT_ATTACH = ['twigs', 'forks'] as const;
+
+export type AccentAttach = (typeof ACCENT_ATTACH)[number];
+
+/**
+ * One accent: a population of cards hung plumb off the model, sourced from
+ * their own stamps and sharing the cutout's atlas. A fern's spire, a poplar's
+ * catkins and a palm's skirt of dead fronds are one of these each, and the
+ * only thing that tells them apart is `pitch`.
+ */
+export interface AccentSpec {
+  /** Folders under sources/accents, as folder or folder/pattern. */
+  stamps: string[];
+  /** Cards per site. A fraction is a chance: 0.3 hangs one off three twigs in ten. */
+  count: number;
+  /** Degrees from world up. 0 stands, 180 hangs. */
+  pitch: number;
+  /** Degrees of randomness on the pitch, plus or minus. */
+  variance: number;
+  /** Card height in metres. */
+  length: number;
+  /** Card width as a fraction of its height. */
+  aspect: number;
+  /** Divisions up the card. 1 is a rigid quad. */
+  segments: number;
+  /** Degrees the card bows toward the ground over its length. */
+  curve: number;
+  /** Scale on the card's flutter weight. Fruit is heavy and a spear frond is stiff. */
+  flutter: number;
+  /** tree: where the cards attach. */
+  attach: AccentAttach;
+  /** crown: the band of stem the cards attach over, as fractions down from the
+   *  top. Null follows the fronds, 0..frondSpan. */
+  depth: [number, number] | null;
+}
+
+const ACCENT_DEFAULTS = { variance: 10, aspect: 0.5, segments: 1, curve: 0, flutter: 0.25, attach: 'twigs', depth: null } as const;
+
+const ACCENT_KEYS = ['stamps', 'count', 'pitch', 'length', ...Object.keys(ACCENT_DEFAULTS)] as const;
+
+/** A source name: a folder, optionally followed by /pattern to pick its sets. */
+const SOURCE_NAME = /^[a-z0-9][a-z0-9-]*(\/[A-Za-z0-9_*?-]+)?$/;
 
 /**
  * How a tree places the children of its trunk.
@@ -197,6 +241,7 @@ export const PARAM_SPEC = {
     help: 'Exponent shaping COLOR_0.r. Higher keeps the base rigid for longer. A blade bends along its whole length, so a clump wants 1.',
   },
 
+  accents: { type: 'accents', default: [], help: 'Cards hung plumb off the model, off their own stamps under sources/accents: [{ stamps, count, pitch, length, variance?, aspect?, segments?, curve?, flutter?, attach?, depth? }]. Spires at pitch 0, fruit and skirts at 180.', texture: true },
   lods: { type: 'tiers', default: [], help: 'Coarser tiers, nearest first: [{ distance, radialSegments?, barkLevels?, leavesPerBranch?, leafScale?, cardSegments? }]. Each override must be a key of the type.', types: WOODY },
 
   windAmplitude: { type: 'number', default: 0.4, help: 'ScatterWind amplitude for the emitted layer.', byType: { clump: 0.18 } },
@@ -238,6 +283,8 @@ type Options = {
     ? LodTier[]
     : (typeof PARAM_SPEC)[K]['type'] extends 'impostor'
     ? ScatterImpostor | null
+    : (typeof PARAM_SPEC)[K]['type'] extends 'accents'
+    ? AccentSpec[]
     : number;
 };
 
@@ -252,7 +299,7 @@ export type Params = Omit<Options, 'type'> & { type: ForgeType } & {
 
 /** What a tree.json holds, before defaults and validation. */
 export type RawConfig = Partial<
-  Record<keyof typeof PARAM_SPEC, string | number | boolean | string[] | LodTier[] | Partial<ScatterImpostor>>
+  Record<keyof typeof PARAM_SPEC, string | number | boolean | string[] | LodTier[] | Partial<AccentSpec>[] | Partial<ScatterImpostor>>
 >;
 
 function isParamKey(key: string): key is keyof typeof PARAM_SPEC {
@@ -318,6 +365,15 @@ export function parseConfig(config: unknown, source: string): RawConfig {
       continue;
     }
 
+    // Checked here so the error names the file, and kept raw so resolveParams
+    // can parse it under the same rules: a parsed entry carries the other
+    // types' defaults, which the check would reject on the second pass.
+    if (PARAM_SPEC[key].type === 'accents') {
+      parseAccents(value, `${source} option '${key}'`, modelType);
+      out[key] = value as Partial<AccentSpec>[];
+      continue;
+    }
+
     if (Array.isArray(value)) {
       if (!value.every((entry) => typeof entry === 'string'))
         throw new Error(`${source} option '${key}' must be a list of strings.`);
@@ -359,6 +415,80 @@ function parseTier(entry: unknown, source: string, modelType: ForgeType): LodTie
   return tier;
 }
 
+function parseAccents(value: unknown, source: string, modelType: ForgeType): AccentSpec[] {
+  if (!Array.isArray(value)) throw new Error(`${source} must be a list of accents.`);
+  return value.map((entry, index) => parseAccent(entry, `${source} entry ${index}`, modelType));
+}
+
+/**
+ * One accent, defaults filled and every value held to its range here rather
+ * than at build time, so a bad entry stops the run naming which one.
+ */
+function parseAccent(entry: unknown, source: string, modelType: ForgeType): AccentSpec {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+    throw new Error(`${source} must be an object: { stamps, count, pitch, length, ... }.`);
+
+  const raw = entry as Record<string, unknown>;
+  for (const key of Object.keys(raw))
+    if (!(ACCENT_KEYS as readonly string[]).includes(key))
+      throw new Error(`${source} has an unknown key '${key}'. An accent takes ${ACCENT_KEYS.join(', ')}.`);
+
+  for (const key of ['stamps', 'count', 'pitch', 'length'] as const)
+    if (raw[key] === undefined || raw[key] === null) throw new Error(`${source} needs '${key}'.`);
+
+  if ('attach' in raw && modelType !== 'tree') throw new Error(`${source} key 'attach' applies to tree, not to a ${modelType}.`);
+  if ('depth' in raw && modelType !== 'crown') throw new Error(`${source} key 'depth' applies to crown, not to a ${modelType}.`);
+
+  const stamps = raw.stamps;
+  if (!Array.isArray(stamps) || !stamps.length || !stamps.every((name) => typeof name === 'string'))
+    throw new Error(`${source} 'stamps' must be a non-empty list of folders under sources/accents.`);
+  for (const name of stamps as string[])
+    if (!SOURCE_NAME.test(name))
+      throw new Error(
+        `${source} stamp source '${name}' must be a folder of lowercase, digits and hyphens, optionally followed by /pattern.`
+      );
+
+  const number = (key: string, low: number, high: number, fallback?: number): number => {
+    const value = raw[key] === undefined ? fallback : Number(raw[key]);
+    if (value === undefined || !Number.isFinite(value)) throw new Error(`${source} key '${key}' must be a number, got '${raw[key]}'.`);
+    if (value < low || value > high) throw new Error(`${source} key '${key}' must be within ${low}..${high}, got ${value}.`);
+    return value;
+  };
+
+  const length = number('length', 0, Infinity);
+  if (length === 0) throw new Error(`${source} key 'length' must be positive.`);
+  const aspect = number('aspect', 0, Infinity, ACCENT_DEFAULTS.aspect);
+  if (aspect === 0) throw new Error(`${source} key 'aspect' must be positive.`);
+
+  const attach = raw.attach === undefined ? ACCENT_DEFAULTS.attach : raw.attach;
+  if (typeof attach !== 'string' || !(ACCENT_ATTACH as readonly string[]).includes(attach))
+    throw new Error(`${source} key 'attach' must be one of ${ACCENT_ATTACH.join(', ')}, got '${String(raw.attach)}'.`);
+
+  let depth: [number, number] | null = null;
+  if (raw.depth !== undefined && raw.depth !== null) {
+    const pair = raw.depth;
+    if (!Array.isArray(pair) || pair.length !== 2 || !pair.every((v) => Number.isFinite(Number(v))))
+      throw new Error(`${source} key 'depth' must be two fractions of the stem down from its top, [from, to].`);
+    depth = [Number(pair[0]), Number(pair[1])];
+    if (depth[0] < 0 || depth[1] > 1 || depth[0] > depth[1])
+      throw new Error(`${source} key 'depth' must satisfy 0 <= from <= to <= 1, got [${depth.join(', ')}].`);
+  }
+
+  return {
+    stamps: [...(stamps as string[])],
+    count: number('count', 0, Infinity),
+    pitch: number('pitch', 0, 180),
+    variance: number('variance', 0, 180, ACCENT_DEFAULTS.variance),
+    length,
+    aspect,
+    segments: Math.round(number('segments', 1, 12, ACCENT_DEFAULTS.segments)),
+    curve: number('curve', -180, 180, ACCENT_DEFAULTS.curve),
+    flutter: number('flutter', 0, 1, ACCENT_DEFAULTS.flutter),
+    attach: attach as AccentAttach,
+    depth,
+  };
+}
+
 /** A partial impostor block: what the file sets, the defaults filling the rest. */
 function parseImpostor(entry: unknown, source: string): Partial<ScatterImpostor> {
   if (!entry || typeof entry !== 'object' || Array.isArray(entry))
@@ -390,6 +520,14 @@ export function toConfig(params: Params): Record<string, unknown> {
   for (const [key, spec] of Object.entries(PARAM_SPEC) as [string, ParamSpec][])
     if (spec.types && !spec.types.includes(params.type)) delete saved[key];
 
+  // An accent's per-type keys go the same way: a crown's sidecar carrying a
+  // tree's default `attach` would be rejected on the way back in.
+  saved.accents = params.accents.map(({ attach, depth, ...rest }) => ({
+    ...rest,
+    ...(params.type === 'tree' ? { attach } : {}),
+    ...(params.type === 'crown' && depth ? { depth } : {}),
+  }));
+
   return saved;
 }
 
@@ -398,7 +536,7 @@ export function resolveParams(raw: RawConfig): Params {
 
   // Built dynamically because the loop walks the table, then asserted once. The
   // mapped type above is what every reader is checked against.
-  const params: Record<string, string | number | boolean | string[] | LodTier[] | ScatterImpostor | null> = {};
+  const params: Record<string, string | number | boolean | string[] | LodTier[] | AccentSpec[] | ScatterImpostor | null> = {};
 
   for (const [key, spec] of Object.entries(PARAM_SPEC) as [
     keyof typeof PARAM_SPEC,
@@ -413,7 +551,7 @@ export function resolveParams(raw: RawConfig): Params {
     if (value === undefined || value === null) {
       const fallback = spec.byType && modelType in spec.byType ? spec.byType[modelType] : spec.default;
       params[key] = Array.isArray(fallback)
-        ? ([...fallback] as string[] | LodTier[])
+        ? ([...fallback] as string[] | LodTier[] | AccentSpec[])
         : fallback && typeof fallback === 'object'
         ? { ...(fallback as ScatterImpostor) }
         : (fallback as string | number | boolean | null);
@@ -428,6 +566,11 @@ export function resolveParams(raw: RawConfig): Params {
 
     if (spec.type === 'impostor') {
       params[key] = { ...IMPOSTOR_DEFAULT, ...parseImpostor(value, `Option '${key}'`) };
+      continue;
+    }
+
+    if (spec.type === 'accents') {
+      params[key] = parseAccents(value, `Option '${key}'`, modelType);
       continue;
     }
 
@@ -462,7 +605,7 @@ export function resolveParams(raw: RawConfig): Params {
   // holds several.
   for (const key of ['bark', 'leaves', 'blades', 'fronds'] as const)
     for (const entry of params[key] as string[])
-      if (!/^[a-z0-9][a-z0-9-]*(\/[A-Za-z0-9_*?-]+)?$/.test(entry))
+      if (!SOURCE_NAME.test(entry))
         throw new Error(
           `${key} source '${entry}' must be a folder of lowercase, digits and hyphens, ` +
             `optionally followed by /pattern to pick its sets, as in 'palm/green-*'.`
@@ -888,9 +1031,12 @@ export function textureKeys(): (keyof typeof PARAM_SPEC)[] {
     .map(([key]) => key);
 }
 
-/** Whether two parameter sets would produce the same texture files. */
+/** Whether two parameter sets would produce the same texture files. Of an
+ *  accent only its stamps reach the image; the rest moves cards. */
 export function sameTexture(a: Params, b: Params): boolean {
-  return textureKeys().every((key) => JSON.stringify(a[key]) === JSON.stringify(b[key]));
+  const seen = (params: Params, key: keyof typeof PARAM_SPEC): unknown =>
+    key === 'accents' ? params.accents.map((accent) => accent.stamps) : params[key];
+  return textureKeys().every((key) => JSON.stringify(seen(a, key)) === JSON.stringify(seen(b, key)));
 }
 
 export function helpText(): string {

@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { columnOf, leafCellPixels, leafCells } from './lib/atlas.ts';
+import { columnOf, layoutAtlas, leafCellPixels, leafCells } from './lib/atlas.ts';
 import { writeGlb, type GlbTextureSet } from './lib/glb.ts';
 import {
   buildMesh,
@@ -51,6 +51,11 @@ const TEXTURES: GlbTextureSet = {
   leaf: { baseColor: 'a_leaf_diff.webp', normal: 'a_leaf_nor.webp', arm: 'a_leaf_arm.webp' },
 };
 
+/** The layouts a set with no accents is cut on, as the CLI would derive them. */
+const TREE_ATLAS = layoutAtlas(LEAF_GRID_GENERATED * LEAF_GRID_GENERATED, []);
+const CLUMP_ATLAS = layoutAtlas(CLUMP_CELLS_GENERATED, []);
+const CROWN_ATLAS = layoutAtlas(CROWN_CELLS_GENERATED, []);
+
 const CROWN_TEXTURES: GlbTextureSet = {
   bark: TEXTURES.bark,
   frond: { baseColor: 'a_frond_diff.webp', normal: 'a_frond_nor.webp', arm: 'a_frond_arm.webp' },
@@ -69,7 +74,7 @@ function paramsFor(extra: RawConfig = {}, look: Partial<Params> = {}): Params {
 function buildAll(extra: RawConfig = {}, look: Partial<Params> = {}, bark: BarkTile | null = null) {
   const params = paramsFor(extra, look);
   const skeleton = buildSkeleton(params);
-  return { params, skeleton, mesh: buildMesh(params, skeleton, LEAF_GRID_GENERATED, bark) };
+  return { params, skeleton, mesh: buildMesh(params, skeleton, TREE_ATLAS, bark) };
 }
 
 function readGltf(buffer: Buffer) {
@@ -516,7 +521,7 @@ describe('trunk relief', () => {
     const stem = (extra: RawConfig = {}) =>
       buildCrown(
         resolveParams({ type: 'crown', name: 'test-palm', stemHeight: 8, trunkRadius: 0.5, trunkSides: 20, trunkSegments: 12, ...extra }),
-        CROWN_CELLS_GENERATED
+        CROWN_ATLAS
       ).mesh;
 
     expect(pieceOf(stem(), 'bark').vertexCount).toBe(13 * 21);
@@ -562,7 +567,7 @@ describe('trunk relief', () => {
         cardCurve: 0,
         cardSegments: 1,
       });
-      const p = pieceOf(buildCrown(params, CROWN_CELLS_GENERATED).mesh, 'frond').positions;
+      const p = pieceOf(buildCrown(params, CROWN_ATLAS).mesh, 'frond').positions;
       const slices = new Set<number>();
       for (let frond = 0; frond < 12; frond++) {
         const o = frond * 12;
@@ -581,7 +586,7 @@ describe('trunk relief', () => {
       ringRadii(
         buildCrown(
           resolveParams({ type: 'crown', name: 'test-palm', stemHeight: 8, trunkRadius: 0.5, trunkSides: 20, ...extra }),
-          CROWN_CELLS_GENERATED
+          CROWN_ATLAS
         ).mesh,
         20,
         0
@@ -599,7 +604,7 @@ describe('trunk relief', () => {
     // flute to cut into, so the sides check does not hold it either.
     const fern = buildCrown(
       resolveParams({ type: 'crown', name: 'test-fern', stemHeight: 0, trunkFlute: 0.3, trunkWander: 1 }),
-      CROWN_CELLS_GENERATED
+      CROWN_ATLAS
     );
 
     expect(fern.mesh.pieces.map((piece) => piece.key)).toEqual(['frond']);
@@ -770,7 +775,7 @@ describe('leaf normals', () => {
 describe('bark uvs', () => {
   /** Texels per metre along the branch over texels per metre around it, per ring segment. */
   function uvAspects(params: ReturnType<typeof paramsFor>, skeleton: ReturnType<typeof buildSkeleton>): number[] {
-    const { positions, uvs } = pieceOf(buildMesh(params, skeleton, LEAF_GRID_GENERATED), 'bark');
+    const { positions, uvs } = pieceOf(buildMesh(params, skeleton, TREE_ATLAS), 'bark');
     const aspects: number[] = [];
     let cursor = 0;
 
@@ -1232,7 +1237,7 @@ describe('preview', () => {
 
   it('lays the model and every tier out in one strip', () => {
     const { params, skeleton, mesh } = buildAll({ lods: [{ distance: 40, barkLevels: 1, leavesPerBranch: 1 }] });
-    const tier = buildMesh(tierParams(params, params.lods[0]), skeleton, LEAF_GRID_GENERATED);
+    const tier = buildMesh(tierParams(params, params.lods[0]), skeleton, TREE_ATLAS);
 
     const sheet = renderComparison(
       params,
@@ -1262,7 +1267,7 @@ describe('preview', () => {
    */
   it('fits every panel through one projection, so a tier cannot drift in scale', () => {
     const { params, skeleton, mesh } = buildAll({ seed: '7', lods: [{ distance: 40, leavesPerBranch: 0 }] });
-    const tier = buildMesh(tierParams(params, params.lods[0]), skeleton, LEAF_GRID_GENERATED);
+    const tier = buildMesh(tierParams(params, params.lods[0]), skeleton, TREE_ATLAS);
 
     const sheet = renderComparison(
       params,
@@ -1345,8 +1350,8 @@ describe('LOD tiers', () => {
       cullDistance: 300,
       lods: [{ distance: 60, radialSegments: 6, cardSegments: 2 }],
     });
-    const base = buildCrown(params, CROWN_CELLS_GENERATED);
-    const tier = buildCrown(tierParams(params, params.lods[0]), CROWN_CELLS_GENERATED);
+    const base = buildCrown(params, CROWN_ATLAS);
+    const tier = buildCrown(tierParams(params, params.lods[0]), CROWN_ATLAS);
 
     expect(pieceOf(tier.mesh, 'frond').triangleCount).toBe(12 * 2 * 2);
     expect(pieceOf(base.mesh, 'frond').triangleCount).toBe(12 * 6 * 2);
@@ -1383,7 +1388,7 @@ describe('LOD tiers', () => {
   // cheaper than the one before it is a mistake worth catching here.
   it('builds each tier cheaper than the last on the same skeleton', () => {
     const { params, skeleton, mesh } = buildAll(chain);
-    const tiers = params.lods.map((tier) => buildMesh(tierParams(params, tier), skeleton, LEAF_GRID_GENERATED));
+    const tiers = params.lods.map((tier) => buildMesh(tierParams(params, tier), skeleton, TREE_ATLAS));
 
     let previous = totalTriangles(mesh);
     for (const tier of tiers) {
@@ -1408,7 +1413,7 @@ describe('LOD tiers', () => {
 
     const cardHeight = (params: Params) => {
       const skeleton = buildSkeleton(params);
-      const leaves = pieceOf(buildMesh(params, skeleton, LEAF_GRID_GENERATED), 'leaf');
+      const leaves = pieceOf(buildMesh(params, skeleton, TREE_ATLAS), 'leaf');
       const p = leaves.positions;
       // Corners 0 and 3 of the first card are its stem and its tip.
       return Math.hypot(p[9] - p[0], p[10] - p[1], p[11] - p[2]);
@@ -1435,7 +1440,7 @@ describe('clump', () => {
     resolveParams({ type: 'clump', name: 'test-clump', ...extra });
 
   const build = (extra: RawConfig = {}, cells = CLUMP_CELLS_GENERATED) =>
-    buildClump(clumpParams(extra), cells);
+    buildClump(clumpParams(extra), layoutAtlas(cells, []));
 
   it('rejects a key that belongs to another type, and names the type that takes it', () => {
     expect(() => parseConfig({ type: 'clump', name: 'a', splits: 4 }, 'test.json')).toThrow(
@@ -1587,7 +1592,7 @@ describe('crown', () => {
   const crownParams = (extra: RawConfig = {}): Params =>
     resolveParams({ type: 'crown', name: 'test-crown', ...extra });
 
-  const build = (extra: RawConfig = {}, cells = CROWN_CELLS_GENERATED) => buildCrown(crownParams(extra), cells);
+  const build = (extra: RawConfig = {}, cells = CROWN_CELLS_GENERATED) => buildCrown(crownParams(extra), layoutAtlas(cells, []));
 
   it('takes the tube keys from the tree and the card keys from the clump', () => {
     const crown = crownParams();
@@ -1741,7 +1746,7 @@ describe('crown', () => {
 
   it('emits a tree layer with a stem and a clump layer without one', () => {
     const palmParams = crownParams({ stemHeight: 6, cullDistance: 300 });
-    const palm = crownLayer(palmParams, buildCrown(palmParams, CROWN_CELLS_GENERATED));
+    const palm = crownLayer(palmParams, buildCrown(palmParams, CROWN_ATLAS));
     expect(palm.impostor).toEqual({ fromDistance: 180, views: 8, tileSize: 128 });
     expect(palm.collider).toMatchObject({ type: 'capsule', radius: 0.23 });
     expect(palm.alignToNormal).toBe(0);
@@ -1750,7 +1755,7 @@ describe('crown', () => {
     expect(hasImpostor(palmParams)).toBe(true);
 
     const fernParams = crownParams({ stemHeight: 0 });
-    const fern = crownLayer(fernParams, buildCrown(fernParams, CROWN_CELLS_GENERATED));
+    const fern = crownLayer(fernParams, buildCrown(fernParams, CROWN_ATLAS));
     expect(fern.impostor).toBeUndefined();
     expect(fern.collider).toBeUndefined();
     expect(fern.alignToNormal).toBeGreaterThan(0);
@@ -1762,9 +1767,9 @@ describe('crown', () => {
 
     // The key overrides the stem's decision either way.
     const shadyFern = crownParams({ stemHeight: 0, castShadow: true });
-    expect(crownLayer(shadyFern, buildCrown(shadyFern, CROWN_CELLS_GENERATED)).castShadow).toBe(true);
+    expect(crownLayer(shadyFern, buildCrown(shadyFern, CROWN_ATLAS)).castShadow).toBe(true);
     const dimPalm = crownParams({ stemHeight: 6, castShadow: false });
-    expect(crownLayer(dimPalm, buildCrown(dimPalm, CROWN_CELLS_GENERATED)).castShadow).toBe(false);
+    expect(crownLayer(dimPalm, buildCrown(dimPalm, CROWN_ATLAS)).castShadow).toBe(false);
     expect(resolveParams({ name: 'a' }).castShadow).toBe(true);
     expect(resolveParams({ name: 'a', type: 'clump' }).castShadow).toBe(false);
   });
@@ -1772,9 +1777,9 @@ describe('crown', () => {
   it('shades the cutout as foliage unless the key turns it off', () => {
     expect(resolveParams({ name: 'a' }).foliage).toBe(true);
     const fern = crownParams({ stemHeight: 0 });
-    expect(crownLayer(fern, buildCrown(fern, CROWN_CELLS_GENERATED)).foliage).toBe(true);
+    expect(crownLayer(fern, buildCrown(fern, CROWN_ATLAS)).foliage).toBe(true);
     const flower = crownParams({ stemHeight: 0, foliage: false });
-    expect(crownLayer(flower, buildCrown(flower, CROWN_CELLS_GENERATED)).foliage).toBe(false);
+    expect(crownLayer(flower, buildCrown(flower, CROWN_ATLAS)).foliage).toBe(false);
   });
 
   it('holds a stem to the trunk bounds and skips them without one', () => {
@@ -1871,17 +1876,17 @@ describe('clump patches', () => {
   const patchParams = (extra: RawConfig = {}): Params =>
     resolveParams({ type: 'clump', name: 'test-patch', tuftsPerModel: 9, patchRadius: 1.4, ...extra });
 
-  const build = (extra: RawConfig = {}) => buildClump(patchParams(extra), CLUMP_CELLS_GENERATED);
+  const build = (extra: RawConfig = {}) => buildClump(patchParams(extra), CLUMP_ATLAS);
 
   it('grows one tuft per model by default, so an existing clump is unchanged', () => {
     const single = resolveParams({ type: 'clump', name: 'a' });
     expect(single.tuftsPerModel).toBe(1);
     expect(patchRadiusOf(single)).toBe(0);
-    expect(buildClump(single, CLUMP_CELLS_GENERATED).metrics.patchRadius).toBe(0);
+    expect(buildClump(single, CLUMP_ATLAS).metrics.patchRadius).toBe(0);
   });
 
   it('multiplies the tufts without multiplying the instances', () => {
-    const one = buildClump(patchParams({ tuftsPerModel: 1 }), CLUMP_CELLS_GENERATED);
+    const one = buildClump(patchParams({ tuftsPerModel: 1 }), CLUMP_ATLAS);
     const nine = build();
     const cards = patchParams().cardsPerTuft * patchParams().cardSegments * 2;
 
@@ -1928,8 +1933,8 @@ describe('clump patches', () => {
   });
 
   it('tiles a patch but spaces a lone tuft, and sinks the patch deeper', () => {
-    const single = buildClump(resolveParams({ type: 'clump', name: 'a', footprint: 0 }), CLUMP_CELLS_GENERATED);
-    const patch = buildClump(patchParams({ footprint: 0 }), CLUMP_CELLS_GENERATED);
+    const single = buildClump(resolveParams({ type: 'clump', name: 'a', footprint: 0 }), CLUMP_ATLAS);
+    const patch = buildClump(patchParams({ footprint: 0 }), CLUMP_ATLAS);
 
     const soloLayer = clumpLayer(resolveParams({ type: 'clump', name: 'a', footprint: 0 }), single.metrics);
     const patchLayer = clumpLayer(patchParams({ footprint: 0 }), patch.metrics);
@@ -1942,5 +1947,197 @@ describe('clump patches', () => {
     // Sunk further, because a patch is posed off one height sample and a buried
     // tuft reads better than a floating one.
     expect(patchLayer.yOffset!).toBeLessThan(soloLayer.yOffset!);
+  });
+});
+
+describe('accents', () => {
+  const spire = { stamps: ['fern-spire'], count: 1, pitch: 0, length: 0.5 };
+  const fruit = { stamps: ['acorn'], count: 1, pitch: 180, length: 0.2 };
+
+  /** The cards past the host's own, as rows of [x, y, z] per vertex. */
+  const cardsAfter = (attributes: MeshAttributes, hostVertices: number, segments = 1) => {
+    const perCard = (segments + 1) * 2;
+    const cards: number[][][] = [];
+    for (let v = hostVertices; v < attributes.vertexCount; v += perCard)
+      cards.push(
+        Array.from({ length: perCard }, (_, k) => Array.from(attributes.positions.subarray((v + k) * 3, (v + k) * 3 + 3)))
+      );
+    return cards;
+  };
+
+  it('parses an accent with its defaults, and refuses what it cannot use', () => {
+    const [accent] = resolveParams({ name: 'a', accents: [fruit] }).accents;
+    expect(accent).toEqual({ ...fruit, variance: 10, aspect: 0.5, segments: 1, curve: 0, flutter: 0.25, attach: 'twigs', depth: null });
+
+    expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, size: 2 }] }, 't.json')).toThrow(/unknown key 'size'/);
+    expect(() => parseConfig({ name: 'a', accents: [{ count: 1, pitch: 0, length: 1 }] }, 't.json')).toThrow(/needs 'stamps'/);
+    expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, stamps: [] }] }, 't.json')).toThrow(/non-empty list/);
+    expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, pitch: 200 }] }, 't.json')).toThrow(/'pitch' must be within 0..180/);
+    expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, segments: 0 }] }, 't.json')).toThrow(/'segments' must be within 1..12/);
+    expect(() => parseConfig({ name: 'a', accents: fruit }, 't.json')).toThrow(/must be a list of accents/);
+  });
+
+  it('holds the per-type keys to their type, on the way in and on the way out', () => {
+    expect(() => parseConfig({ type: 'crown', name: 'a', accents: [{ ...spire, attach: 'forks' }] }, 't.json')).toThrow(
+      /'attach' applies to tree, not to a crown/
+    );
+    expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, depth: [0, 0.5] }] }, 't.json')).toThrow(
+      /'depth' applies to crown, not to a tree/
+    );
+    expect(() => parseConfig({ type: 'crown', name: 'a', accents: [{ ...spire, depth: [0.5, 0.2] }] }, 't.json')).toThrow(
+      /0 <= from <= to <= 1/
+    );
+
+    // A crown's sidecar must not carry the tree's default `attach`, or it is
+    // rejected by the check above when it is opened again.
+    for (const raw of [
+      { type: 'crown', name: 'a', accents: [{ ...spire, depth: [0.2, 0.4] }] },
+      { name: 'a', accents: [{ ...fruit, attach: 'forks' }] },
+      { type: 'clump', name: 'a', accents: [spire] },
+    ] as RawConfig[]) {
+      const params = resolveParams(raw);
+      const saved = toConfig(params);
+      expect(resolveParams(parseConfig(JSON.parse(JSON.stringify(saved)), 't.json'))).toEqual(params);
+    }
+    const crownSaved = (toConfig(resolveParams({ type: 'crown', name: 'a', accents: [spire] })).accents as object[])[0];
+    expect(crownSaved).not.toHaveProperty('attach');
+    expect(crownSaved).not.toHaveProperty('depth');
+  });
+
+  it('rebuilds the texture for new stamps and not for a moved card', () => {
+    const base = resolveParams({ name: 'a', accents: [fruit] });
+    expect(sameTexture(base, resolveParams({ name: 'a', accents: [{ ...fruit, count: 3, pitch: 90 }] }))).toBe(true);
+    expect(sameTexture(base, resolveParams({ name: 'a', accents: [{ ...fruit, stamps: ['berry'] }] }))).toBe(false);
+    expect(sameTexture(base, resolveParams({ name: 'a' }))).toBe(false);
+  });
+
+  it('appends accent cells after the host on the smallest square that holds them', () => {
+    expect(layoutAtlas(4, [])).toEqual({ grid: 2, cells: 4, accents: [] });
+    expect(layoutAtlas(4, [1, 2])).toEqual({
+      grid: 3,
+      cells: 4,
+      accents: [
+        { offset: 4, count: 1 },
+        { offset: 5, count: 2 },
+      ],
+    });
+    expect(layoutAtlas(3, [1]).grid).toBe(2);
+  });
+
+  it('hangs one card per leaf twig, or per fork, and none where the count says none', () => {
+    const shape: RawConfig = { splits: 3, branchLevels: 3, leafLevels: 1, leavesPerBranch: 2 };
+    const skeleton = buildSkeleton(paramsFor(shape));
+    const twigs = skeleton.branches.filter((branch) => branch.bearsLeaves).length;
+    const forks = skeleton.branches.reduce((sum, branch) => sum + branch.children.length, 0);
+    const leafVertices = twigs * 2 * 4;
+    const atlas = layoutAtlas(LEAF_GRID_GENERATED ** 2, [1]);
+
+    const build = (accents: object[]) => pieceOf(buildMesh(paramsFor({ ...shape, accents: accents as never }), skeleton, atlas), 'leaf');
+
+    expect(build([]).vertexCount).toBe(leafVertices);
+    expect(cardsAfter(build([fruit]), leafVertices)).toHaveLength(twigs);
+    expect(cardsAfter(build([{ ...fruit, attach: 'forks' }]), leafVertices)).toHaveLength(forks);
+    expect(cardsAfter(build([{ ...fruit, count: 0 }]), leafVertices)).toHaveLength(0);
+
+    const some = cardsAfter(build([{ ...fruit, count: 0.5 }]), leafVertices).length;
+    expect(some).toBeGreaterThan(0);
+    expect(some).toBeLessThan(twigs);
+  });
+
+  it('pitches a card from the sky, not from its branch: 180 hangs, 0 stands', () => {
+    const shape: RawConfig = { leafLevels: 1, leavesPerBranch: 1, leafDroop: 0 };
+    const skeleton = buildSkeleton(paramsFor(shape));
+    const leafVertices = skeleton.branches.filter((branch) => branch.bearsLeaves).length * 4;
+    const atlas = layoutAtlas(LEAF_GRID_GENERATED ** 2, [1]);
+    const build = (pitch: number) =>
+      cardsAfter(pieceOf(buildMesh(paramsFor({ ...shape, accents: [{ ...fruit, pitch, variance: 0 }] as never }), skeleton, atlas), 'leaf'), leafVertices);
+
+    const hanging = build(180);
+    expect(hanging.length).toBeGreaterThan(0);
+    for (const [a, b, c, d] of hanging) {
+      // The base row is at the twig and the tip row a card length straight
+      // below it, whichever way the twig points.
+      expect(a[1] - c[1]).toBeGreaterThan(0.2 * 0.8 - 1e-6);
+      expect(a[1] - c[1]).toBeLessThanOrEqual(0.2 + 1e-6);
+      expect(Math.hypot(c[0] - a[0], c[2] - a[2])).toBeLessThan(1e-6);
+      expect(Math.hypot(d[0] - b[0], d[2] - b[2])).toBeLessThan(1e-6);
+    }
+
+    for (const [a, , c] of build(0)) expect(c[1] - a[1]).toBeGreaterThan(0.2 * 0.8 - 1e-6);
+  });
+
+  it('raises a spire from a stemless crown and hangs a skirt down a stemmed one', () => {
+    const fern = resolveParams({
+      type: 'crown',
+      name: 'fern',
+      stemHeight: 0,
+      frondCount: 4,
+      cardSegments: 2,
+      accents: [{ ...spire, count: 3, segments: 3, variance: 0 }],
+    });
+    const frondVertices = 4 * 3 * 2;
+    const spires = cardsAfter(pieceOf(buildCrown(fern, layoutAtlas(CROWN_CELLS_GENERATED, [1])).mesh, 'frond'), frondVertices, 3);
+    expect(spires).toHaveLength(3);
+    for (const rows of spires) {
+      // Its base a couple of centimetres off the centre, its tip well up.
+      const base = [(rows[0][0] + rows[1][0]) / 2, (rows[0][2] + rows[1][2]) / 2];
+      expect(Math.hypot(base[0], base[1])).toBeLessThan(0.05);
+      expect(rows[0][1]).toBeCloseTo(0, 5);
+      expect(rows[6][1]).toBeGreaterThan(0.35);
+    }
+
+    const palm = resolveParams({
+      type: 'crown',
+      name: 'palm',
+      stemHeight: 10,
+      stemLean: 0,
+      trunkWander: 0,
+      frondCount: 4,
+      cardSegments: 2,
+      accents: [{ ...fruit, count: 4, length: 2, depth: [0.2, 0.4] }],
+    });
+    const skirt = cardsAfter(pieceOf(buildCrown(palm, layoutAtlas(CROWN_CELLS_GENERATED, [1])).mesh, 'frond'), frondVertices);
+    expect(skirt).toHaveLength(4);
+    for (const [base, , tip] of skirt) expect(tip[1]).toBeLessThan(base[1] - 1);
+    // Dealt down the band the config named, top first.
+    expect(skirt[0][0][1]).toBeCloseTo(8, 5);
+    expect(skirt[3][0][1]).toBeCloseTo(6, 5);
+  });
+
+  it('stands a spire in every tuft of a patch, or in the share of them the count names', () => {
+    const shape: RawConfig = { type: 'clump', name: 'grass', tuftsPerModel: 9, cardsPerTuft: 3, cardSegments: 1 };
+    const patch = (count: number) => resolveParams({ ...shape, accents: [{ ...spire, count }] });
+    const tuftVertices = 9 * 3 * 4;
+    const atlas = layoutAtlas(CLUMP_CELLS_GENERATED, [1]);
+
+    const every = cardsAfter(buildClump(patch(1), atlas).mesh.pieces[0].attributes, tuftVertices);
+    expect(every).toHaveLength(9);
+    for (const [base] of every) expect(base[1]).toBeCloseTo(0, 5);
+
+    const some = cardsAfter(buildClump(patch(0.4), atlas).mesh.pieces[0].attributes, tuftVertices).length;
+    expect(some).toBeGreaterThan(0);
+    expect(some).toBeLessThan(9);
+
+    // A patch with no accents is the patch it always was.
+    expect(buildClump(patch(0), atlas).mesh.pieces[0].attributes.positions).toEqual(
+      buildClump(resolveParams(shape), CLUMP_ATLAS).mesh.pieces[0].attributes.positions
+    );
+  });
+
+  it('addresses only the cells set aside for it, and flutters no more than it is told', () => {
+    const params = paramsFor({ leafLevels: 1, leavesPerBranch: 1, accents: [{ ...fruit, flutter: 0.1, count: 2 }] as never });
+    const skeleton = buildSkeleton(params);
+    const leafVertices = skeleton.branches.filter((branch) => branch.bearsLeaves).length * 4;
+    const atlas = layoutAtlas(LEAF_GRID_GENERATED ** 2, [2]);
+    const { uvs, colors, vertexCount } = pieceOf(buildMesh(params, skeleton, atlas), 'leaf');
+    const own = leafCells(params.textureSize, atlas.grid).slice(16, 18);
+
+    expect(vertexCount).toBeGreaterThan(leafVertices);
+    for (let v = leafVertices; v < vertexCount; v++) {
+      const u = uvs[v * 2];
+      const t = uvs[v * 2 + 1];
+      expect(own.some((cell) => u >= cell.u0 - 1e-6 && u <= cell.u1 + 1e-6 && t >= cell.v0 - 1e-6 && t <= cell.v1 + 1e-6)).toBe(true);
+      expect(colors[v * 4 + 2]).toBeLessThanOrEqual(0.1 + 1e-6);
+    }
   });
 });

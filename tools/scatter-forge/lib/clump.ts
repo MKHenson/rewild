@@ -1,4 +1,5 @@
-import { leafCells } from './atlas.ts';
+import { accentRng, buildAccent, cardsAt, type AccentSite } from './accents.ts';
+import { accentCells, leafCells, type AtlasLayout } from './atlas.ts';
 import { createBuilder, finish, pushVertex, type ForgeMesh, type MeshAttributes } from './mesh.ts';
 import type { Params } from './params.ts';
 import { createRng, hash2, type Rng } from './rng.ts';
@@ -195,11 +196,17 @@ function buildTuft(
   }
 }
 
-function buildBlades(params: Params, cells: number): MeshAttributes {
-  const uvCells = leafCells(params.textureSize, gridFor(cells)).slice(0, cells);
+function buildBlades(params: Params, atlas: AtlasLayout): MeshAttributes {
+  const cells = atlas.cells;
+  const uvCells = leafCells(params.textureSize, atlas.grid).slice(0, cells);
   const rng = createRng(params.seed ^ 0x2d51f39b);
   const out = createBuilder();
   const origins = patchOrigins(params, rng);
+
+  // Dealt with rngs of their own, so an accent added to a patch moves none of
+  // its tufts.
+  const accentRngs = params.accents.map((_, index) => accentRng(params, index));
+  const accentSites: AccentSite[][] = params.accents.map(() => []);
 
   origins.forEach((origin, tuft) => {
     // Tuft 0 is full height and the rest stay under it, so `height` keeps
@@ -207,23 +214,39 @@ function buildBlades(params: Params, cells: number): MeshAttributes {
     // or a patch reads as a row of clones whatever their yaw does.
     const tuftHeight = params.height * (tuft === 0 ? 1 : rng.range(0.62, 0.98));
     buildTuft(params, out, rng, cells, uvCells, tuft, origin, rng() * TWO_PI, tuftHeight);
+
+    // An accent leaves the tuft's centre, inside the ring its cards leave from.
+    // A patch phases per tuft here for the reason its blades phase per card.
+    params.accents.forEach((spec, index) => {
+      const cards = cardsAt(spec.count, accentRngs[index]);
+      for (let n = 0; n < cards; n++)
+        accentSites[index].push({
+          p: origin,
+          radius: params.cardSpread * tuftHeight * 0.5,
+          dist: 0,
+          phase: hash2(params.seed ^ 0x6b1a9d37, tuft * 131 + n),
+          key: tuft * 64 + n,
+        });
+    });
   });
+
+  params.accents.forEach((spec, index) =>
+    buildAccent(out, params, index, spec, accentSites[index], accentCells(params.textureSize, atlas, index), {
+      bend: (_site, _along, t) => t ** params.bendCurve,
+      normal: (_site, outward) => tuftNormal(params, outward),
+    })
+  );
 
   return finish(out);
 }
 
-/** The grid a cell count is laid out on. Mirrors clumpAtlas in sources.ts. */
-function gridFor(cells: number): number {
-  return Math.ceil(Math.sqrt(cells));
-}
-
 /**
- * `cells` is how many of the atlas's cells were actually painted, from
- * `clumpAtlas` or the set's manifest. A card never addresses past it, because
- * a grid sized to hold ten stamps has six cells nothing drew.
+ * `atlas` is how the image was cut, from `clumpAtlas` or the set's manifest.
+ * A card never addresses past the cells that were painted, because a grid
+ * sized to hold ten stamps has six cells nothing drew.
  */
-export function buildClump(params: Params, cells: number): Clump {
-  const attributes = buildBlades(params, Math.max(1, cells));
+export function buildClump(params: Params, atlas: AtlasLayout): Clump {
+  const attributes = buildBlades(params, { ...atlas, cells: Math.max(1, atlas.cells) });
   const positions = attributes.positions;
 
   let height = 0;

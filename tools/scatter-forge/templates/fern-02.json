@@ -4,6 +4,19 @@
   "textureSet": "fern",
   "bark": [],
   "fronds": ["fern/fern-01", "fern/fern-02"],
+  "accents": [
+    {
+      "stamps": ["fern"],
+      "count": 3,
+      "pitch": 0,
+      "variance": 0,
+      "length": 1.5,
+      "aspect": 0.52,
+      "segments": 4,
+      "curve": 25,
+      "flutter": 0.2
+    }
+  ],
   "out": "assets/shared/nature/trees",
   "assetsRoot": "assets/shared",
   "seed": 4,
@@ -11,7 +24,7 @@
   "stemLean": 0,
   "frondCount": 5,
   "frondLength": 1.8,
-  "frondAngle": 90,
+  "frondAngle": 60,
   "frondVariance": 20,
   "cardCurve": 110,
   "cardSegments": 5,

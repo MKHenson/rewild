@@ -1,0 +1,13 @@
+# Hand-authored accent stamps: one folder per source, each holding a diffuse
+# (sRGB, alpha carries the cutout) and, optionally, an arm and a 16-bit disp
+# map — either one absent is derived from the diffuse. One whole card per
+# stamp, pinned at the bottom-middle: the pivot is where the card attaches and
+# the image's up is the card's away-from-attachment direction, so a spire is
+# drawn standing and a bunch of catkins is drawn twig-down, however it hangs.
+# `source.json` declares lengthMetres. See ../../README.md, "Accents".
+#
+# Large binaries, kept out of git the way /assets/ is. An accent has no
+# generated fallback, so a config that names one needs its art present.
+# This rule keeps the file itself tracked so the folder survives a clone.
+*
+!.gitignore

@@ -3,7 +3,21 @@
   "name": "palm-01",
   "textureSet": "palm",
   "bark": ["palm/palm-01"],
-  "fronds": ["palm/palm-01", "palm/palm-02", "palm/palm-03", "palm/palm-04"],
+  "fronds": ["palm/palm-01", "palm/palm-02", "palm/palm-04"],
+  "accents": [
+    {
+      "stamps": ["palm"],
+      "count": 3,
+      "pitch": 155,
+      "variance": 10,
+      "length": 5.5,
+      "aspect": 0.78,
+      "segments": 4,
+      "curve": 25,
+      "flutter": 0.15,
+      "depth": [0.0, 0.1]
+    }
+  ],
   "out": "assets/shared/nature/trees",
   "assetsRoot": "assets/shared",
   "seed": 14,
