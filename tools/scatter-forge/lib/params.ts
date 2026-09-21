@@ -267,8 +267,11 @@ export const PARAM_SPEC = {
   weathering: { type: 'number', default: 0.6, help: 'How far exposure goes, 0..1: lichen, dirt in the hollows, drip stains and soil up the base.', texture: true, types: ROCK },
   patina: { type: 'number', default: 0.5, help: 'The dark crust old stone grows where water sits or runs, 0..1: on the tops, in the hollows, beside the cracks, under the drip lines and around the lichen, never on a worn edge.', texture: true, types: ROCK },
   edgeWear: { type: 'number', default: 0.5, help: 'How far the convex edges are weathered, 0..1: bleached toward edgeTint, smoother, and kept clear of stain, patina and lichen.', texture: true, types: ROCK },
-  streaks: { type: 'number', default: 0, help: 'Opacity of the run-off streaks down the sides, 0..1: droplet trails from a splat, thinning and fading as they fall, branching into the cracks. Colour and finish only, never height.', texture: true, types: ROCK },
+  streaks: { type: 'number', default: 0, help: 'Opacity of the run-off streaks down the sides, 0..1: droplet trails from a splat, full colour at the head and thinning and fading as they fall, branching into the cracks. Colour and finish only, never height.', texture: true, types: ROCK },
+  streakCount: { type: 'int', default: 12, help: 'Streaks around the rock, 0..100, spaced unevenly, each at its own height, run and fade.', texture: true, types: ROCK },
   snow: { type: 'number', default: 0, help: 'Snow on the faces that look up, 0..1. 0 is none; 0.5 the tops; 1 everything but the sides and the edges.', texture: true, types: ROCK },
+  topWash: { type: 'number', default: 0, help: 'How far down the faces that look up the topTint wash reaches, 0..1, on the same scale as snow. 0 is none.', texture: true, types: ROCK },
+  topOpacity: { type: 'number', default: 1, help: 'How strongly the wash multiplies the stone it reaches, 0..1. Part of the base colour: the glint, the veins, the stain and the growth are never tinted by it.', texture: true, types: ROCK },
   stain: { type: 'number', default: 0.5, help: 'How strongly iron staining is drawn, 0..1: rust seeping from the cracks and in bands down the bedding.', texture: true, types: ROCK },
   veins: { type: 'number', default: 0.15, help: 'How much of the stone the quartz veins run through, 0..1. 0 draws none.', texture: true, types: ROCK },
   stoneTint: { type: 'string', default: '#7f827c', help: 'The mid tone of the stone, six digit hex.', texture: true, types: ROCK },
@@ -278,6 +281,7 @@ export const PARAM_SPEC = {
   soilTint: { type: 'string', default: '#4f4a36', help: 'Dirt in the hollows and soil up the base, six digit hex.', texture: true, types: ROCK },
   stainTint: { type: 'string', default: '#8a5a2e', help: 'The iron staining, six digit hex.', texture: true, types: ROCK },
   streakTint: { type: 'string', default: '#2a2d28', help: 'What the run-off leaves, six digit hex. Near black is mould and algae; white is bird droppings.', texture: true, types: ROCK },
+  topTint: { type: 'string', default: '#808080', help: 'What the faces that look up are multiplied by, six digit hex read with #808080 as no change: lighter lifts them, darker shades them, and a hue warms or cools them.', texture: true, types: ROCK },
   edgeTint: { type: 'string', default: '#c6c3ba', help: 'The bleached colour a worn edge weathers to, six digit hex.', texture: true, types: ROCK },
   toneSize: { type: 'number', default: 0.25, help: 'Metres across the largest patch of the tone mottling, the octave stack the colour is ramped from.', texture: true, types: ROCK },
   toneOctaves: { type: 'int', default: 5, help: 'Octaves of tone mottling under toneSize.', texture: true, types: ROCK },
@@ -976,8 +980,11 @@ function validateRock(params: Params): void {
   for (const key of ['plateBevel', 'plateLean', 'bedding', 'plateShare', 'plateTint'] as const)
     if (params[key] < 0 || params[key] > 1) throw new Error(`${key} must be within 0..1, got ${params[key]}.`);
 
-  for (const key of ['smoothing', 'stain', 'veins', 'edgeWear', 'snow', 'streaks', 'patina', 'undulation', 'roughness', 'metallic', 'glint'] as const)
+  for (const key of ['smoothing', 'stain', 'veins', 'edgeWear', 'snow', 'topWash', 'topOpacity', 'streaks', 'patina', 'undulation', 'roughness', 'metallic', 'glint'] as const)
     if (params[key] < 0 || params[key] > 1) throw new Error(`${key} must be within 0..1, got ${params[key]}.`);
+
+  if (params.streakCount < 0 || params.streakCount > 100)
+    throw new Error(`streakCount must be within 0..100, got ${params.streakCount}.`);
 
   if (params.cracks < 0) throw new Error(`cracks must not be negative, got ${params.cracks}.`);
 
@@ -995,7 +1002,7 @@ function validateRock(params: Params): void {
 
   if (params.bump < 0 || params.bump > 4) throw new Error(`bump must be within 0..4, got ${params.bump}.`);
 
-  for (const key of ['stoneTint', 'stoneDark', 'stoneLight', 'lichenTint', 'soilTint', 'stainTint', 'edgeTint', 'streakTint', 'glintTint'] as const)
+  for (const key of ['stoneTint', 'stoneDark', 'stoneLight', 'lichenTint', 'soilTint', 'stainTint', 'edgeTint', 'streakTint', 'topTint', 'glintTint'] as const)
     if (!/^#?[0-9a-f]{6}$/i.test(params[key]))
       throw new Error(`${key} must be a six digit hex colour, got '${params[key]}'.`);
 
