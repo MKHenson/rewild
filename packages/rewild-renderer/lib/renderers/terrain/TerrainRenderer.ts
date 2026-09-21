@@ -64,7 +64,13 @@ export class TerrainRenderer {
   // viewDirDotThresholdForChunkUpdate re-runs selection even without movement,
   // since which chunks are in the frustum depends on facing.
   viewDirOld: Vector3;
+  // The camera on the ground plane. Chunk streaming, LOD and eviction measure
+  // against flat chunk footprints, so the camera's height must not count.
   viewerPosition: Vector3;
+  // The camera itself, for what has real 3D bounds: the scatter tier cull,
+  // which would otherwise read every layer on a mountain as a hundred metres
+  // off and never reach its near tiers.
+  viewerEye: Vector3;
   chunkSize: i32;
   chunksVisibleInViewDst: i32;
   terrainChunks: Map<string, TerrainChunk>;
@@ -134,6 +140,7 @@ export class TerrainRenderer {
   constructor() {
     this.terrainChunks = new Map();
     this.viewerPosition = new Vector3();
+    this.viewerEye = new Vector3();
     this.terrainChunksVisibleLastUpdate = [];
     this.dispatcher = new Dispatcher<TerrainEvent>();
     this.onChunkLoadedDelegate = this.onChunkLoaded.bind(this);
@@ -377,7 +384,12 @@ export class TerrainRenderer {
         // camera turned away and back. The frustum only decides what to
         // *generate* (the creation branch below), never what stays on screen.
         if (existing) {
-          existing.updateTerrainChunk(this.viewerPosition, this, renderer);
+          existing.updateTerrainChunk(
+            this.viewerPosition,
+            this.viewerEye,
+            this,
+            renderer
+          );
 
           if (existing.visible) {
             this.terrainChunksVisibleLastUpdate.push(existing);
@@ -419,7 +431,12 @@ export class TerrainRenderer {
         newChunk.visible = false;
         renderer.scene.addChild(newChunk.transform);
         this.terrainChunks.set(mapId, newChunk);
-        newChunk.updateTerrainChunk(this.viewerPosition, this, renderer);
+        newChunk.updateTerrainChunk(
+          this.viewerPosition,
+          this.viewerEye,
+          this,
+          renderer
+        );
       }
     }
 
@@ -782,6 +799,7 @@ export class TerrainRenderer {
       0,
       camera.transform.position.z
     );
+    this.viewerEye.copy(camera.transform.position);
 
     // View frustum for this pass; chunk selection uses it to skip generating
     // terrain the player cannot see. One frame stale at worst, which coarse

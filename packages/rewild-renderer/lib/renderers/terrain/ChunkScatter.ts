@@ -136,8 +136,13 @@ export class ChunkScatter {
     nearDistance: number;
     cullDistance: number;
     distance: number;
+    /** Milliseconds since the scene pass last selected from this layer, or
+     *  -1 if it never has. */
+    selectedAgo: number;
+    selected: number;
   }[] {
     const origin = this.root.parent?.position;
+    const now = performance.now();
 
     return this.layers.map((layer) => {
       _bounds.copy(layer.localBounds);
@@ -151,6 +156,8 @@ export class ChunkScatter {
         nearDistance: layer.nearDistance,
         cullDistance: layer.cullDistance,
         distance: _bounds.distanceToPoint(this.lastViewerPosition),
+        selectedAgo: layer.lastSelected ? Math.round(now - layer.lastSelected) : -1,
+        selected: layer.selectedCount,
       };
     });
   }

@@ -39,6 +39,8 @@ export function registerScatterDebugCommands(renderer: Renderer) {
           drawn: layer.visible,
           distance: Math.round(layer.distance),
           band: `${layer.nearDistance}..${layer.cullDistance}`,
+          selectedAgo: layer.selectedAgo,
+          selected: layer.selected,
         });
       }
     }
@@ -51,7 +53,11 @@ export function registerScatterDebugCommands(renderer: Renderer) {
         `'distance' is what the cull measured at the last visibility update, ` +
         `against the layer's own instance bounds. drawn=false with distance ` +
         `under the band's end means the cull is stale; a chunk missing ` +
-        `entirely means it never generated.`
+        `entirely means it never generated. 'selectedAgo' is ms since the ` +
+        `scene pass last asked this layer for instances (-1 never): large ` +
+        `while drawn=true means the scene BVH is culling its transform. ` +
+        `'selected' is how many instances that selection kept: 0 means ` +
+        `every cell failed the band or frustum test.`
     );
     console.table(
       Array.from(totals, ([layer, total]) => ({
