@@ -1,0 +1,36 @@
+{
+  "type": "rock",
+  "name": "granite-01",
+  "seed": 703396634,
+  "height": 1.4,
+  "roundness": 0.45,
+  "cleaves": 3,
+  "facetRelief": 0.5,
+  "relief": 0.29,
+  "reliefSize": 0.6,
+  "reliefOctaves": 5,
+  "plates": 2,
+  "plateLayers": 2,
+  "plateBevel": 0.3,
+  "plateLean": 0.4,
+  "bedding": 0.6,
+  "plateShare": 0.7,
+  "plateTint": 0.25,
+  "cracks": 1.2,
+  "crackStrength": 0.4,
+  "grooveDepth": 0.03,
+  "grooveWidth": 0.11,
+  "weathering": 0.4,
+  "subdivisions": 48,
+  "lods": [
+    {
+      "distance": 40,
+      "subdivisions": 16
+    },
+    {
+      "distance": 90,
+      "subdivisions": 6
+    }
+  ],
+  "preview": 512
+}

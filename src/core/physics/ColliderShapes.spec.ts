@@ -65,6 +65,28 @@ describe('createColliderDesc', () => {
     expect(shape.radius).toBe(1);
     expect(desc.translation).toEqual({ x: 0, y: 4, z: 0 });
   });
+
+  it('scales every hull point by the instance scale', () => {
+    const hull: PhysicsShape = {
+      type: 'hull',
+      points: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+    };
+    const shape = createColliderDesc(R, hull, 2).shape as R.ConvexPolyhedron;
+    expect(Array.from(shape.vertices)).toEqual([
+      0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2,
+    ]);
+  });
+
+  it('reuses one scaled buffer per hull shape', () => {
+    const hull: PhysicsShape = {
+      type: 'hull',
+      points: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+    };
+    const a = createColliderDesc(R, hull, 1).shape as R.ConvexPolyhedron;
+    const b = createColliderDesc(R, hull, 3).shape as R.ConvexPolyhedron;
+    expect(b.vertices).toBe(a.vertices);
+    expect(b.vertices[3]).toBe(3);
+  });
 });
 
 describe('createScatterColliderDesc', () => {

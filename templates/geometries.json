@@ -95,5 +95,13 @@
   "thistle-01": {
     "type": "gltf",
     "url": "nature/clumps/thistle/thistle-01.glb"
+  },
+  "granite-01": {
+    "type": "gltf",
+    "url": "nature/rocks/granite-01/granite-01.glb",
+    "lods": [
+      "nature/rocks/granite-01/granite-01.lod1.glb",
+      "nature/rocks/granite-01/granite-01.lod2.glb"
+    ]
   }
 }

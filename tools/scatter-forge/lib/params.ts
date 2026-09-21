@@ -13,9 +13,10 @@ interface ParamSpec {
   readonly type: 'string' | 'number' | 'int' | 'flag' | 'list' | 'tiers' | 'impostor' | 'accents';
   readonly default: Default;
   readonly help: string;
-  /** Changing this changes the texture files. Everything else only moves the
-   *  mesh, which costs a thousandth as much to rebuild. */
-  readonly texture?: boolean;
+  /** Changing this changes the texture files, for every type or for the ones
+   *  listed. Everything else only moves the mesh, which costs a thousandth as
+   *  much to rebuild. */
+  readonly texture?: boolean | readonly ForgeType[];
   /**
    * The model types this key applies to. Absent means every type.
    *
@@ -42,12 +43,17 @@ interface ParamSpec {
 const TREE = ['tree'] as const;
 const CLUMP = ['clump'] as const;
 const CROWN = ['crown'] as const;
+const ROCK = ['rock'] as const;
 /** The types that grow a bark tube. */
 const WOODY = ['tree', 'crown'] as const;
 /** The types whose cutout is a segmented card. */
 const CARDED = ['clump', 'crown'] as const;
 /** The types whose `height` is a finished height. A crown is two lengths instead. */
-const SIZED = ['tree', 'clump'] as const;
+const SIZED = ['tree', 'clump', 'rock'] as const;
+/** The types that ship a cutout piece, and so read the wind and the foliage keys. */
+const LEAFY = ['tree', 'clump', 'crown'] as const;
+/** The types that coarsen with distance rather than culling. */
+const TIERED = ['tree', 'crown', 'rock'] as const;
 
 /**
  * One coarser mesh tier. The skeleton is the model's own, so the silhouette
@@ -62,6 +68,7 @@ export interface LodTier {
   leavesPerBranch?: number;
   leafScale?: number;
   cardSegments?: number;
+  subdivisions?: number;
 }
 
 /** The keys a tier may override, all of them mesh-only. A tier takes only
@@ -73,6 +80,7 @@ export const LOD_OVERRIDES = [
   'leavesPerBranch',
   'leafScale',
   'cardSegments',
+  'subdivisions',
 ] as const;
 
 /** Where a tree hangs an accent: along its leaf twigs, or at the points its branches fork. */
@@ -155,7 +163,7 @@ export const PARAM_SPEC = {
   out: {
     type: 'string',
     default: 'assets/shared/nature/trees',
-    byType: { clump: 'assets/shared/nature/clumps', crown: 'assets/shared/nature/crowns' },
+    byType: { clump: 'assets/shared/nature/clumps', crown: 'assets/shared/nature/crowns', rock: 'assets/shared/nature/rocks' },
     help: 'Directory the model and textures are written to.',
   },
   assetsRoot: { type: 'string', default: 'assets/shared', help: 'Root the template urls are made relative to.' },
@@ -164,8 +172,10 @@ export const PARAM_SPEC = {
   height: {
     type: 'number',
     default: 12,
-    byType: { clump: 0.35 },
-    help: 'Finished height in metres. A tree normalises its skeleton to it; a clump sizes its cards to reach it.',
+    byType: { clump: 0.35, rock: 1.2 },
+    help: 'Finished height in metres. A tree normalises its skeleton to it; a clump sizes its cards to reach it; a rock is this tall before its relief.',
+    // A rock's image is baked off its surface, so its size is in the image.
+    texture: ROCK,
     types: SIZED,
   },
   trunkRadius: { type: 'number', default: 0.32, byType: { crown: 0.22 }, help: 'Trunk radius at the base, in metres.', types: WOODY },
@@ -211,7 +221,7 @@ export const PARAM_SPEC = {
   leafDroop: { type: 'number', default: 55, help: 'Degrees a leaf card hangs below its branch direction.', types: TREE },
   leafFrom: { type: 'number', default: 0.15, help: 'Fraction along a tip branch that leaves start at.', types: TREE },
   leafNormalMode: { type: 'string', default: 'canopy', help: 'card | canopy | up. How leaf normals are authored.', types: TREE },
-  leafAlphaCutoff: { type: 'number', default: 0.45, byType: { clump: 0.4 }, help: 'glTF alphaCutoff on every cutout piece.' },
+  leafAlphaCutoff: { type: 'number', default: 0.45, byType: { clump: 0.4 }, help: 'glTF alphaCutoff on every cutout piece.', types: LEAFY },
 
   blades: { type: 'list', default: [], help: 'Folders under sources/clump whose stamps fill the blade atlas. Empty generates them.', texture: true, types: CLUMP },
   tuftsPerModel: { type: 'int', default: 1, help: 'Tufts grown into one model. Above 1 the model is a patch, and the placer resolves one candidate for all of them.', types: CLUMP },
@@ -234,28 +244,63 @@ export const PARAM_SPEC = {
   frondVariance: { type: 'number', default: 20, help: 'Random degrees added to each frond angle: the spread between young fronds standing up and old ones hanging.', types: CROWN },
   frondSpan: { type: 'number', default: 0, help: 'Fraction of the stem, down from its top, the fronds attach along. 0 puts every frond at the top; the lowest hang most.', types: CROWN },
 
+  width: { type: 'number', default: 0, help: 'Metres across the rock along x, before its relief. 0 derives it from height.', texture: true, types: ROCK },
+  depth: { type: 'number', default: 0, help: 'Metres across the rock along z, before its relief. 0 derives it from height.', texture: true, types: ROCK },
+  roundness: { type: 'number', default: 0.45, help: 'How far the rock is pushed from a cube toward a sphere, 0..1. A pebble is 1; a block is near 0.', texture: true, types: ROCK },
+  cleaves: { type: 'int', default: 3, help: 'Planes the rock is cleaved by. Each cuts a flat facet where it meets the surface.', texture: true, types: ROCK },
+  relief: { type: 'number', default: 0.1, help: 'Depth of the surface noise as a fraction of the radius.', texture: true, types: ROCK },
+  reliefSize: { type: 'number', default: 0.9, help: 'Metres across the largest lump of the surface noise. Each octave above it is half the size.', texture: true, types: ROCK },
+  reliefOctaves: { type: 'int', default: 5, help: 'Octaves of surface noise under reliefSize. More is finer detail at lower amplitude.', texture: true, types: ROCK },
+  plates: { type: 'number', default: 2, help: 'Slab cells per metre in the pile the relief is built from. 0 builds it from noise alone.', texture: true, types: ROCK },
+  plateLayers: { type: 'int', default: 2, help: 'Layers of slabs, each 1.7x finer than the last, chipping the ones below.', texture: true, types: ROCK },
+  plateBevel: { type: 'number', default: 0.35, help: 'Fraction of a slab that slopes to its edge, 0..1. Low is flat-topped and sharp; 1 is a pyramid.', texture: true, types: ROCK },
+  plateLean: { type: 'number', default: 0.3, help: 'How far a slab drops across its own width, 0..1 of its height.', texture: true, types: ROCK },
+  bedding: { type: 'number', default: 0.6, help: 'How far the slabs are flattened and aligned into strata, 0..1. 0 is a random rubble of blocks.', texture: true, types: ROCK },
+  plateShare: { type: 'number', default: 0.7, help: 'Share of the relief the slabs take, 0..1. The noise has the rest.', texture: true, types: ROCK },
+  plateTint: { type: 'number', default: 0.25, help: 'How far each slab shifts the tone by its own value, 0..1.', texture: true, types: ROCK },
+  facetRelief: { type: 'number', default: 0.3, help: 'Share of the relief a cleaved facet keeps, 0..1. 0 is a plane; grooves cut a facet in full regardless.', texture: true, types: ROCK },
+  cracks: { type: 'number', default: 1.2, help: 'Crack cells per metre. 0 draws none.', texture: true, types: ROCK },
+  crackStrength: { type: 'number', default: 1, help: 'How strongly the texture draws the cracks, 0..1. 0 draws none and keeps the grooves; cracks 0 removes both.', texture: true, types: ROCK },
+  grooveDepth: { type: 'number', default: 0.05, help: 'How deep the coarse cracks cut into the mesh, as a fraction of the radius.', texture: true, types: ROCK },
+  grooveWidth: { type: 'number', default: 0.15, help: 'Width of that groove as a fraction of a crack cell. The texture crack sits at its bottom.', texture: true, types: ROCK },
+  weathering: { type: 'number', default: 0.6, help: 'How far exposure, dirt and staining go, 0..1.', texture: true, types: ROCK },
+  stoneTint: { type: 'string', default: '#8a857d', help: 'The mid tone of the stone, six digit hex.', texture: true, types: ROCK },
+  stoneDark: { type: 'string', default: '#4a4642', help: 'The dark end of the stone and its dark flecks, six digit hex.', texture: true, types: ROCK },
+  stoneLight: { type: 'string', default: '#b9b1a5', help: 'The light end of the stone and its light flecks, six digit hex.', texture: true, types: ROCK },
+  lichenTint: { type: 'string', default: '#7c8a55', help: 'Lichen on the faces that look up, six digit hex.', texture: true, types: ROCK },
+  soilTint: { type: 'string', default: '#4f4a36', help: 'Dirt in the hollows and soil up the base, six digit hex.', texture: true, types: ROCK },
+  toneSize: { type: 'number', default: 0.2, help: 'Metres across the largest patch of the tone mottling, the octave stack the colour is ramped from.', texture: true, types: ROCK },
+  toneOctaves: { type: 'int', default: 5, help: 'Octaves of tone mottling under toneSize.', texture: true, types: ROCK },
+  toneContrast: { type: 'number', default: 0.7, help: 'How far the tone reaches from stoneTint toward stoneDark and stoneLight, 0..1.', texture: true, types: ROCK },
+  grainScale: { type: 'number', default: 45, help: 'Speckle cells per metre: the size of the mineral flecks.', texture: true, types: ROCK },
+  speckle: { type: 'number', default: 0.6, help: 'How strongly the flecks are drawn, 0..1. 0 draws none.', texture: true, types: ROCK },
+  crackWidth: { type: 'number', default: 0.05, help: 'Width of the crack line in the texture as a fraction of a crack cell.', texture: true, types: ROCK },
+  crackDepth: { type: 'number', default: 0.6, help: 'How deep the crack line cuts into the texture height, 0..1.', texture: true, types: ROCK },
+  subdivisions: { type: 'int', default: 24, help: 'Quads along each edge of the cube the rock is grown from. Six faces of this squared, doubled, is the triangle count.', types: ROCK },
+
   bendCurve: {
     type: 'number',
     default: 1.6,
     byType: { clump: 1 },
     help: 'Exponent shaping COLOR_0.r. Higher keeps the base rigid for longer. A blade bends along its whole length, so a clump wants 1.',
+    types: LEAFY,
   },
 
-  accents: { type: 'accents', default: [], help: 'Cards hung plumb off the model, off their own stamps under sources/accents: [{ stamps, count, pitch, length, variance?, aspect?, segments?, curve?, flutter?, attach?, depth? }]. Spires at pitch 0, fruit and skirts at 180.', texture: true },
-  lods: { type: 'tiers', default: [], help: 'Coarser tiers, nearest first: [{ distance, radialSegments?, barkLevels?, leavesPerBranch?, leafScale?, cardSegments? }]. Each override must be a key of the type.', types: WOODY },
+  accents: { type: 'accents', default: [], help: 'Cards hung plumb off the model, off their own stamps under sources/accents: [{ stamps, count, pitch, length, variance?, aspect?, segments?, curve?, flutter?, attach?, depth? }]. Spires at pitch 0, fruit and skirts at 180.', texture: true, types: LEAFY },
+  lods: { type: 'tiers', default: [], help: 'Coarser tiers, nearest first: [{ distance, radialSegments?, barkLevels?, leavesPerBranch?, leafScale?, cardSegments?, subdivisions? }]. Each override must be a key of the type.', types: TIERED },
 
-  windAmplitude: { type: 'number', default: 0.4, help: 'ScatterWind amplitude for the emitted layer.', byType: { clump: 0.18 } },
-  windFrequency: { type: 'number', default: 0.45, help: 'ScatterWind frequency for the emitted layer.', byType: { clump: 1.1 } },
-  windFlutter: { type: 'number', default: 0.35, help: 'ScatterWind flutter for the emitted layer.', byType: { clump: 0.7 } },
-  cullDistance: { type: 'number', default: 160, help: 'ScatterLayer cullDistance for the emitted layer.', byType: { clump: 50 } },
+  windAmplitude: { type: 'number', default: 0.4, help: 'ScatterWind amplitude for the emitted layer.', byType: { clump: 0.18 }, types: LEAFY },
+  windFrequency: { type: 'number', default: 0.45, help: 'ScatterWind frequency for the emitted layer.', byType: { clump: 1.1 }, types: LEAFY },
+  windFlutter: { type: 'number', default: 0.35, help: 'ScatterWind flutter for the emitted layer.', byType: { clump: 0.7 }, types: LEAFY },
+  cullDistance: { type: 'number', default: 160, help: 'ScatterLayer cullDistance for the emitted layer.', byType: { clump: 50, rock: 800 } },
   castShadow: { type: 'flag', default: true, byType: { clump: false, crown: null }, help: 'Draw the emitted layer into the shadow maps. A clump defaults off; a crown casts while it has a stem.' },
-  foliage: { type: 'flag', default: true, help: 'Shade the cutout piece as foliage: no specular, with transmission. Off shades it as a standard metallic-roughness surface.' },
-  impostor: { type: 'impostor', default: IMPOSTOR_DEFAULT, byType: { clump: null, crown: null }, help: "The layer's impostor block, keyed as the layer keys it: { fromDistance, views, tileSize }. fromDistance 0 derives it from cullDistance; views is per axis, at least 2; tileSize is in pixels. A clump or a stemless crown bakes one only if the file sets it." },
+  foliage: { type: 'flag', default: true, help: 'Shade the cutout piece as foliage: no specular, with transmission. Off shades it as a standard metallic-roughness surface.', types: LEAFY },
+  impostor: { type: 'impostor', default: IMPOSTOR_DEFAULT, byType: { clump: null, crown: null, rock: { fromDistance: 120, views: 8, tileSize: 128 } }, help: "The layer's impostor block, keyed as the layer keys it: { fromDistance, views, tileSize }. fromDistance 0 derives it from cullDistance; views is per axis, at least 2; tileSize is in pixels. A clump or a stemless crown bakes one only if the file sets it." },
   footprint: { type: 'number', default: 0, help: 'ScatterLayer footprint in metres. 0 derives it from the model. The most expensive number here: candidates go as 1/footprint squared.', byType: { clump: 0.7 } },
-  scaleMin: { type: 'number', default: 0.8, byType: { clump: 0.75 }, help: 'Lower bound of the emitted scale jitter.' },
-  scaleMax: { type: 'number', default: 1.25, help: 'Upper bound of the emitted scale jitter.', byType: { clump: 1.3 } },
+  scaleMin: { type: 'number', default: 0.8, byType: { clump: 0.75, rock: 0.6 }, help: 'Lower bound of the emitted scale jitter.' },
+  scaleMax: { type: 'number', default: 1.25, help: 'Upper bound of the emitted scale jitter.', byType: { clump: 1.3, rock: 1.6 } },
 
-  textureSize: { type: 'int', default: 1024, byType: { clump: 2048, crown: 2048 }, help: 'Edge of the square texture template, and the long edge of the bark one; an authored bark keeps its shape and is reduced to fit. A clump or frond atlas holds every stamp, so it starts larger.', texture: true },
+  textureSize: { type: 'int', default: 1024, byType: { clump: 2048, crown: 2048 }, help: "Edge of the square texture template, and the long edge of the bark one; an authored bark keeps its shape and is reduced to fit. A clump or frond atlas holds every stamp, so it starts larger. A rock's image is six charts of half this edge.", texture: true },
   barkTextureSize: { type: 'int', default: 0, help: 'Long edge of the bark map in pixels, so the bark and the leaf atlas can differ. 0 follows textureSize.', texture: true, types: WOODY },
   barkAspect: { type: 'int', default: 2, help: 'How many times taller than wide the bark map is, and how many circumferences of branch one tile covers. 1 is square.', texture: true, types: WOODY },
   preview: { type: 'int', default: 0, help: 'Write a shaded preview PNG at this pixel size. 0 writes none.' },
@@ -522,11 +567,12 @@ export function toConfig(params: Params): Record<string, unknown> {
 
   // An accent's per-type keys go the same way: a crown's sidecar carrying a
   // tree's default `attach` would be rejected on the way back in.
-  saved.accents = params.accents.map(({ attach, depth, ...rest }) => ({
-    ...rest,
-    ...(params.type === 'tree' ? { attach } : {}),
-    ...(params.type === 'crown' && depth ? { depth } : {}),
-  }));
+  if ('accents' in saved)
+    saved.accents = params.accents.map(({ attach, depth, ...rest }) => ({
+      ...rest,
+      ...(params.type === 'tree' ? { attach } : {}),
+      ...(params.type === 'crown' && depth ? { depth } : {}),
+    }));
 
   return saved;
 }
@@ -723,7 +769,7 @@ function validate(params: Params): void {
   if (params.textureSize < 128 || (params.textureSize & (params.textureSize - 1)) !== 0)
     throw new Error('textureSize must be a power of two of at least 128.');
 
-  if (params.type !== 'clump') {
+  if (params.type === 'tree' || params.type === 'crown') {
     if (params.barkTextureSize !== 0 && (params.barkTextureSize < 128 || (params.barkTextureSize & (params.barkTextureSize - 1)) !== 0))
       throw new Error('barkTextureSize must be a power of two of at least 128, or 0 to follow textureSize.');
     validateBarkShape(params);
@@ -731,6 +777,7 @@ function validate(params: Params): void {
 
   if (params.type === 'clump') validateClump(params);
   else if (params.type === 'crown') validateCrown(params);
+  else if (params.type === 'rock') validateRock(params);
   else validateTree(params);
 
   if (params.impostor) validateImpostor(params.impostor, params.cullDistance);
@@ -875,6 +922,76 @@ function validateClump(params: Params): void {
         `Raise cardsPerTuft for a denser clump instead: candidate cost goes as 1 / footprint squared, card cost goes linearly.`
     );
 }
+
+/**
+ * A rock's bounds. The subdivision ceiling is a triangle budget: 128 a side is
+ * 196k triangles for one boulder.
+ */
+function validateRock(params: Params): void {
+  if (params.width < 0) throw new Error(`width must not be negative, got ${params.width}.`);
+  if (params.depth < 0) throw new Error(`depth must not be negative, got ${params.depth}.`);
+
+  if (params.roundness < 0 || params.roundness > 1)
+    throw new Error(`roundness must be within 0..1, got ${params.roundness}.`);
+
+  if (params.cleaves < 0 || params.cleaves > 12)
+    throw new Error(`cleaves must be within 0..12, got ${params.cleaves}.`);
+
+  // Past half the radius the noise folds the surface through the centre and
+  // the rock stops being star-shaped, which is what the bake relies on.
+  if (params.relief < 0 || params.relief > 0.5)
+    throw new Error(`relief must be within 0..0.5, got ${params.relief}.`);
+
+  if (!(params.reliefSize > 0)) throw new Error(`reliefSize must be positive, got ${params.reliefSize}.`);
+
+  if (params.reliefOctaves < 1 || params.reliefOctaves > 8)
+    throw new Error(`reliefOctaves must be within 1..8, got ${params.reliefOctaves}.`);
+
+  if (params.plates < 0) throw new Error(`plates must not be negative, got ${params.plates}.`);
+
+  if (params.plateLayers < 1 || params.plateLayers > 4)
+    throw new Error(`plateLayers must be within 1..4, got ${params.plateLayers}.`);
+
+  for (const key of ['plateBevel', 'plateLean', 'bedding', 'plateShare', 'plateTint'] as const)
+    if (params[key] < 0 || params[key] > 1) throw new Error(`${key} must be within 0..1, got ${params[key]}.`);
+
+  if (params.facetRelief < 0 || params.facetRelief > 1)
+    throw new Error(`facetRelief must be within 0..1, got ${params.facetRelief}.`);
+
+  if (params.cracks < 0) throw new Error(`cracks must not be negative, got ${params.cracks}.`);
+
+  if (params.crackStrength < 0 || params.crackStrength > 1)
+    throw new Error(`crackStrength must be within 0..1, got ${params.crackStrength}.`);
+
+  if (params.grooveDepth < 0 || params.grooveDepth > 0.5)
+    throw new Error(`grooveDepth must be within 0..0.5, got ${params.grooveDepth}.`);
+
+  if (params.grooveWidth < 0 || params.grooveWidth > 1)
+    throw new Error(`grooveWidth must be within 0..1, got ${params.grooveWidth}.`);
+
+  if (params.weathering < 0 || params.weathering > 1)
+    throw new Error(`weathering must be within 0..1, got ${params.weathering}.`);
+
+  for (const key of ['stoneTint', 'stoneDark', 'stoneLight', 'lichenTint', 'soilTint'] as const)
+    if (!/^#?[0-9a-f]{6}$/i.test(params[key]))
+      throw new Error(`${key} must be a six digit hex colour, got '${params[key]}'.`);
+
+  if (!(params.toneSize > 0)) throw new Error(`toneSize must be positive, got ${params.toneSize}.`);
+
+  if (params.toneOctaves < 1 || params.toneOctaves > 8)
+    throw new Error(`toneOctaves must be within 1..8, got ${params.toneOctaves}.`);
+
+  for (const key of ['toneContrast', 'speckle', 'crackDepth', 'crackWidth'] as const)
+    if (params[key] < 0 || params[key] > 1) throw new Error(`${key} must be within 0..1, got ${params[key]}.`);
+
+  if (!(params.grainScale > 0)) throw new Error(`grainScale must be positive, got ${params.grainScale}.`);
+
+  if (params.subdivisions < ROCK_MIN_SUBDIVISIONS || params.subdivisions > 128)
+    throw new Error(`subdivisions must be within ${ROCK_MIN_SUBDIVISIONS}..128, got ${params.subdivisions}.`);
+}
+
+/** Fewer than two quads a side leaves a cube with no vertex to displace. */
+export const ROCK_MIN_SUBDIVISIONS = 2;
 
 /** Below this the engine's kill-set runs out of cell bits. See validateClump. */
 export const CLUMP_MIN_FOOTPRINT = 0.06;
@@ -1025,9 +1142,9 @@ function validateTree(params: Params): void {
  * and the card size an authored leaf is fitted to, which is why a mesh edit
  * almost always reuses the images it built last time.
  */
-export function textureKeys(): (keyof typeof PARAM_SPEC)[] {
+export function textureKeys(type: ForgeType): (keyof typeof PARAM_SPEC)[] {
   return (Object.entries(PARAM_SPEC) as [keyof typeof PARAM_SPEC, ParamSpec][])
-    .filter(([, spec]) => spec.texture)
+    .filter(([, spec]) => spec.texture === true || (Array.isArray(spec.texture) && spec.texture.includes(type)))
     .map(([key]) => key);
 }
 
@@ -1036,7 +1153,7 @@ export function textureKeys(): (keyof typeof PARAM_SPEC)[] {
 export function sameTexture(a: Params, b: Params): boolean {
   const seen = (params: Params, key: keyof typeof PARAM_SPEC): unknown =>
     key === 'accents' ? params.accents.map((accent) => accent.stamps) : params[key];
-  return textureKeys().every((key) => JSON.stringify(seen(a, key)) === JSON.stringify(seen(b, key)));
+  return a.type === b.type && textureKeys(a.type).every((key) => JSON.stringify(seen(a, key)) === JSON.stringify(seen(b, key)));
 }
 
 export function helpText(): string {

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { columnOf, layoutAtlas, leafCellPixels, leafCells } from './lib/atlas.ts';
 import { writeGlb, type GlbTextureSet } from './lib/glb.ts';
 import {
+  boundsOf,
   buildMesh,
   pieceOf,
   totalTriangles,
@@ -25,7 +26,7 @@ import {
   type Params,
   type RawConfig,
 } from './lib/params.ts';
-import { fbm, gradientNoise, signedFbm, valueNoise, warp, worley } from './lib/noise.ts';
+import { fbm, gradientNoise, gradientNoise3, signedFbm, valueNoise, warp, worley, worley3 } from './lib/noise.ts';
 import { randomSeed } from './lib/rng.ts';
 import { renderComparison, renderPreview } from './lib/preview.ts';
 import type { Canvas } from './lib/textures.ts';
@@ -37,6 +38,7 @@ import {
   colliderFor,
   crownLayer,
   geometryEntry,
+  rockLayer,
   scatterLayer,
   scatterLayerEntry,
   scatterLayerKey,
@@ -44,6 +46,9 @@ import {
 } from './lib/templates.ts';
 import { buildClump, patchRadiusOf } from './lib/clump.ts';
 import { buildCrown } from './lib/crown.ts';
+import { buildRock, chartUv, crackMask, cubePoint, FACES, ROCK_CHART_COLUMNS, ROCK_CHART_ROWS, ROCK_GUTTER, rockChartPx, surfaceAt } from './lib/rock.ts';
+import { buildStoneCanvas } from './lib/stone.ts';
+import { platesInto } from './lib/plates.ts';
 import { heightPieces, materialPieces } from './lib/pieces.ts';
 
 const TEXTURES: GlbTextureSet = {
@@ -1456,7 +1461,7 @@ describe('clump', () => {
   // every key including the ones this type does not use. Writing those would
   // produce a file the next run refuses to open.
   it('writes a sidecar that reopens', () => {
-    for (const type of ['tree', 'clump', 'crown'] as const) {
+    for (const type of ['tree', 'clump', 'crown', 'rock'] as const) {
       const saved = toConfig(resolveParams({ type, name: 'a' }));
       expect(() => resolveParams(parseConfig(saved, 'sidecar'))).not.toThrow();
     }
@@ -1603,7 +1608,7 @@ describe('crown', () => {
 
     // A crown is two lengths, not one height, so `height` is not its key.
     expect(() => parseConfig({ type: 'crown', name: 'a', height: 8 }, 'test.json')).toThrow(
-      /'height' applies to tree, clump, not to type 'crown'/
+      /'height' applies to tree, clump, rock, not to type 'crown'/
     );
     expect(() => parseConfig({ type: 'crown', name: 'a', splits: 4 }, 'test.json')).toThrow(/applies to tree/);
     expect(() => parseConfig({ name: 'a', stemHeight: 4 }, 'test.json')).toThrow(
@@ -2138,6 +2143,393 @@ describe('accents', () => {
       const t = uvs[v * 2 + 1];
       expect(own.some((cell) => u >= cell.u0 - 1e-6 && u <= cell.u1 + 1e-6 && t >= cell.v0 - 1e-6 && t <= cell.v1 + 1e-6)).toBe(true);
       expect(colors[v * 4 + 2]).toBeLessThanOrEqual(0.1 + 1e-6);
+    }
+  });
+});
+
+xdescribe('rock', () => {
+  const rockParams = (extra: RawConfig = {}): Params =>
+    resolveParams({ type: 'rock', name: 'test-rock', seed: 7, ...extra });
+
+  const build = (extra: RawConfig = {}) => buildRock(rockParams(extra));
+
+  const STONE_TEXTURES: GlbTextureSet = {
+    stone: { baseColor: 'a_stone_diff.webp', normal: 'a_stone_nor.webp', arm: 'a_stone_arm.webp' },
+  };
+
+  it("rejects another type's keys, and its own on another type", () => {
+    expect(() => parseConfig({ type: 'rock', name: 'a', splits: 4 }, 'test.json')).toThrow(
+      /'splits' applies to tree, not to type 'rock'/
+    );
+    expect(() => parseConfig({ type: 'rock', name: 'a', windAmplitude: 1 }, 'test.json')).toThrow(
+      /'windAmplitude' applies to tree, clump, crown, not to type 'rock'/
+    );
+    expect(() => parseConfig({ name: 'a', roundness: 1 }, 'test.json')).toThrow(
+      /'roundness' applies to rock, not to type 'tree'/
+    );
+  });
+
+  it('takes its defaults from the type', () => {
+    const rock = rockParams();
+    expect(rock.out).toBe('assets/shared/nature/rocks');
+    expect(rock.cullDistance).toBe(800);
+    expect(impostorDistance(rock)).toBe(120);
+    expect(rock.height).toBe(1.2);
+  });
+
+  it('holds its keys to their ranges', () => {
+    expect(() => rockParams({ roundness: 1.5 })).toThrow(/roundness must be within 0..1/);
+    expect(() => rockParams({ relief: 0.6 })).toThrow(/relief must be within 0..0.5/);
+    expect(() => rockParams({ cleaves: 13 })).toThrow(/cleaves must be within 0..12/);
+    expect(() => rockParams({ subdivisions: 1 })).toThrow(/subdivisions must be within 2..128/);
+    expect(() => rockParams({ weathering: -1 })).toThrow(/weathering must be within 0..1/);
+    expect(() => rockParams({ reliefSize: 0 })).toThrow(/reliefSize must be positive/);
+    expect(() => rockParams({ grooveDepth: 1 })).toThrow(/grooveDepth must be within 0..0.5/);
+  });
+
+  it('cuts a groove under a coarse crack that reaches the silhouette', () => {
+    const grooved = build({ relief: 0, cleaves: 0, cracks: 2, grooveDepth: 0.1, grooveWidth: 0.2 });
+    const plain = build({ relief: 0, cleaves: 0, cracks: 0 });
+    const a = grooved.mesh.pieces[0].attributes.positions;
+    const b = plain.mesh.pieces[0].attributes.positions;
+    let deepest = 0;
+    for (let i = 0; i < a.length; i += 3) {
+      const ra = Math.hypot(a[i], a[i + 1] + grooved.field.base, a[i + 2]);
+      const rb = Math.hypot(b[i], b[i + 1] + plain.field.base, b[i + 2]);
+      deepest = Math.max(deepest, rb - ra);
+    }
+    expect(deepest).toBeGreaterThan(grooved.metrics.radius * 0.08);
+  });
+
+  it('ships one opaque piece of six faces of quads', () => {
+    const { mesh } = build({ subdivisions: 6 });
+    expect(mesh.pieces).toHaveLength(1);
+    expect(mesh.pieces[0].key).toBe('stone');
+    expect(mesh.pieces[0].cutout).toBe(false);
+    expect(totalTriangles(mesh)).toBe(6 * 6 * 6 * 2);
+  });
+
+  // Every surface point is visible from the centre, so every triangle faces
+  // away from it. A face wound the other way would be culled by the engine
+  // and show as a hole.
+  it('winds every triangle outward from the centre', () => {
+    const { mesh, field } = build({ subdivisions: 8, cleaves: 4, relief: 0.3 });
+    const { positions, indices } = mesh.pieces[0].attributes;
+    const centre = [0, -field.base, 0];
+    let inward = 0;
+
+    for (let t = 0; t < indices.length; t += 3) {
+      const a = indices[t] * 3;
+      const b = indices[t + 1] * 3;
+      const c = indices[t + 2] * 3;
+      const abx = positions[b] - positions[a];
+      const aby = positions[b + 1] - positions[a + 1];
+      const abz = positions[b + 2] - positions[a + 2];
+      const acx = positions[c] - positions[a];
+      const acy = positions[c + 1] - positions[a + 1];
+      const acz = positions[c + 2] - positions[a + 2];
+      const nx = aby * acz - abz * acy;
+      const ny = abz * acx - abx * acz;
+      const nz = abx * acy - aby * acx;
+      const ox = (positions[a] + positions[b] + positions[c]) / 3 - centre[0];
+      const oy = (positions[a + 1] + positions[b + 1] + positions[c + 1]) / 3 - centre[1];
+      const oz = (positions[a + 2] + positions[b + 2] + positions[c + 2]) / 3 - centre[2];
+      if (nx * ox + ny * oy + nz * oz <= 0) inward++;
+    }
+
+    expect(inward).toBe(0);
+  });
+
+  it('stands on its lowest point and spans the size it was asked for', () => {
+    const { mesh, metrics } = build({ height: 2, width: 3, depth: 1.5, relief: 0, cleaves: 0, cracks: 0 });
+    const { positions } = mesh.pieces[0].attributes;
+    let lowest = Infinity;
+    for (let i = 1; i < positions.length; i += 3) lowest = Math.min(lowest, positions[i]);
+
+    expect(lowest).toBeCloseTo(0, 5);
+    expect(metrics.height).toBeCloseTo(2, 5);
+    expect(metrics.width).toBeCloseTo(3, 5);
+    expect(metrics.depth).toBeCloseTo(1.5, 5);
+  });
+
+  it('clips a cleave to a flat facet', () => {
+    const { mesh, field } = build({ cleaves: 1, relief: 0, cracks: 0 });
+    const [cleave] = field.cleaves;
+    const { positions } = mesh.pieces[0].attributes;
+    let past = 0;
+    let onFacet = 0;
+
+    for (let i = 0; i < positions.length; i += 3) {
+      const h =
+        positions[i] * cleave.normal[0] + (positions[i + 1] + field.base) * cleave.normal[1] + positions[i + 2] * cleave.normal[2];
+      if (h > cleave.distance + 1e-5) past++;
+      if (Math.abs(h - cleave.distance) < 1e-5) onFacet++;
+    }
+
+    expect(past).toBe(0);
+    expect(onFacet).toBeGreaterThan(0);
+  });
+
+  it('builds its relief from a slab pile unless plates is 0', () => {
+    expect(build({ plates: 0 }).field.plates).toBeNull();
+    const { field } = build({ plates: 2 });
+    expect(field.plates).not.toBeNull();
+
+    const sample = { height: 0, id: 0 };
+    let tops = 0;
+    let gaps = 0;
+    for (let i = 0; i < 400; i++) {
+      const x = ((i * 0.37) % 1.4) - 0.7;
+      const y = ((i * 0.71) % 1.4) - 0.7;
+      const z = ((i * 0.53) % 1.4) - 0.7;
+      platesInto(sample, field.plates!, x, y, z);
+      expect(sample.height).toBeGreaterThanOrEqual(0);
+      expect(sample.height).toBeLessThanOrEqual(1);
+      expect(sample.id).toBeGreaterThanOrEqual(0);
+      expect(sample.id).toBeLessThanOrEqual(1);
+      if (sample.height > 0.6) tops++;
+      if (sample.height < 0.5) gaps++;
+    }
+    // Slabs overlap, so most of the surface is on a slab and little is gap.
+    expect(tops).toBeGreaterThan(250);
+    expect(gaps).toBeLessThan(60);
+
+    expect(() => rockParams({ bedding: 2 })).toThrow(/bedding must be within 0..1/);
+    expect(() => rockParams({ plateLayers: 5 })).toThrow(/plateLayers must be within 1..4/);
+  });
+
+  it('keeps a share of the relief on a facet, and none at facetRelief 0', () => {
+    const facetSpan = (facetRelief: number): number => {
+      const { mesh, field } = build({ cleaves: 1, relief: 0.3, cracks: 0, facetRelief });
+      const [cleave] = field.cleaves;
+      const { positions } = mesh.pieces[0].attributes;
+      let low = Infinity;
+      let high = -Infinity;
+      for (let i = 0; i < positions.length; i += 3) {
+        const h =
+          positions[i] * cleave.normal[0] + (positions[i + 1] + field.base) * cleave.normal[1] + positions[i + 2] * cleave.normal[2];
+        if (h > cleave.distance - 1e-3 * field.relief) {
+          low = Math.min(low, h);
+          high = Math.max(high, h);
+        }
+      }
+      return high - low;
+    };
+    expect(facetSpan(0)).toBeLessThan(1e-4);
+    expect(facetSpan(0.5)).toBeGreaterThan(0.01);
+  });
+
+  it('lays every face inside its own chart, gutter excluded', () => {
+    const params = rockParams({ subdivisions: 4 });
+    const { uvs, vertexCount } = buildRock(params).mesh.pieces[0].attributes;
+    const chartPx = rockChartPx(params);
+    const perFace = vertexCount / 6;
+    const width = chartPx * ROCK_CHART_COLUMNS;
+    const height = chartPx * ROCK_CHART_ROWS;
+
+    for (let i = 0; i < vertexCount; i++) {
+      const face = Math.floor(i / perFace);
+      const column = face % ROCK_CHART_COLUMNS;
+      const row = Math.floor(face / ROCK_CHART_COLUMNS);
+      const x = uvs[i * 2] * width;
+      const y = uvs[i * 2 + 1] * height;
+      expect(x).toBeGreaterThanOrEqual(column * chartPx + ROCK_GUTTER - 1e-3);
+      expect(x).toBeLessThanOrEqual((column + 1) * chartPx - ROCK_GUTTER + 1e-3);
+      expect(y).toBeGreaterThanOrEqual(row * chartPx + ROCK_GUTTER - 1e-3);
+      expect(y).toBeLessThanOrEqual((row + 1) * chartPx - ROCK_GUTTER + 1e-3);
+    }
+  });
+
+  // A tier is the same cube at fewer quads a side, so its vertices are a
+  // subset of the base's, positions and uvs alike: the chain shares one image.
+  it('shares its uvs and surface across tiers', () => {
+    const coarse = build({ subdivisions: 4 }).mesh.pieces[0].attributes;
+    const fine = build({ subdivisions: 8 }).mesh.pieces[0].attributes;
+
+    for (let face = 0; face < 6; face++)
+      for (let j = 0; j <= 4; j++)
+        for (let i = 0; i <= 4; i++) {
+          const c = face * 25 + j * 5 + i;
+          const f = face * 81 + j * 2 * 9 + i * 2;
+          for (let k = 0; k < 3; k++) expect(fine.positions[f * 3 + k]).toBeCloseTo(coarse.positions[c * 3 + k], 6);
+          for (let k = 0; k < 2; k++) expect(fine.uvs[f * 2 + k]).toBeCloseTo(coarse.uvs[c * 2 + k], 6);
+        }
+  });
+
+  it("takes subdivisions as a tier override and nothing of a tree's", () => {
+    const params = rockParams({ lods: [{ distance: 40, subdivisions: 6 }] });
+    expect(tierParams(params, params.lods[0]).subdivisions).toBe(6);
+    expect(() => rockParams({ lods: [{ distance: 40, radialSegments: 6 }] })).toThrow(
+      /'radialSegments' applies to tree, crown, not to a rock's tier/
+    );
+  });
+
+  it('rebuilds its image for a key that moves the surface, not for one that only tessellates it', () => {
+    const base = rockParams();
+    expect(sameTexture(base, rockParams({ subdivisions: 12 }))).toBe(true);
+    expect(sameTexture(base, rockParams({ roundness: 0.9 }))).toBe(false);
+    expect(sameTexture(base, rockParams({ cleaves: 0 }))).toBe(false);
+    expect(sameTexture(base, rockParams({ height: 3 }))).toBe(false);
+  });
+
+  it('supports the hull at 26 mesh vertices that reach the mesh bounds', () => {
+    const { mesh, metrics } = build();
+    const { positions } = mesh.pieces[0].attributes;
+    expect(metrics.hull).toHaveLength(26 * 3);
+
+    const bounds = boundsOf(positions);
+    const hull = boundsOf(new Float32Array(metrics.hull));
+    for (let axis = 0; axis < 3; axis++) {
+      expect(hull.min[axis]).toBeCloseTo(bounds.min[axis], 2);
+      expect(hull.max[axis]).toBeCloseTo(bounds.max[axis], 2);
+    }
+  });
+
+  it('emits a layer laid onto the slope with a hull and no wind', () => {
+    const params = rockParams({ lods: [{ distance: 40, subdivisions: 6 }] });
+    const rock = buildRock(params);
+    const layer = rockLayer(params, rock);
+
+    expect(layer.collider).toEqual({ type: 'hull', points: rock.metrics.hull });
+    expect(layer.alignToNormal).toBe(1);
+    expect(layer.yOffset).toBeLessThan(0);
+    expect(layer.wind).toBeUndefined();
+    expect(layer.foliage).toBeUndefined();
+    expect(layer.impostor?.fromDistance).toBe(120);
+    expect(layer.lodDistances).toEqual([40]);
+    expect(() => scatterLayerEntry(layer)).not.toThrow();
+  });
+
+  it('writes one opaque material', () => {
+    const params = rockParams({ subdivisions: 3 });
+    const gltf = readGltf(writeGlb({ name: params.name, mesh: buildRock(params).mesh, textures: STONE_TEXTURES, alphaCutoff: 0 }));
+    expect(gltf.materials).toHaveLength(1);
+    expect(gltf.materials[0].alphaMode).toBe('OPAQUE');
+    expect(gltf.meshes[0].primitives).toHaveLength(1);
+  });
+
+  it('ships a stone piece with a height map and a material', () => {
+    expect(heightPieces('rock')).toEqual(['stone']);
+    expect(materialPieces('rock')).toEqual(['stone']);
+  });
+
+  // The two sides of a chart seam are two mappings of one field, so what the
+  // field says at the shared edge cannot depend on which chart asked.
+  it('reads one field from either side of a face edge', () => {
+    const { field } = build();
+    const a: [number, number, number] = [0, 0, 0];
+    const b: [number, number, number] = [0, 0, 0];
+    const c: [number, number, number] = [0, 0, 0];
+
+    for (let t = 0; t <= 1; t += 0.125) {
+      // +x face's top edge is +y face's +x edge, traversed the same way.
+      surfaceAt(a, field, cubePoint(c, FACES[0], t, 1));
+      surfaceAt(b, field, cubePoint(c, FACES[2], 1, t));
+      for (let k = 0; k < 3; k++) expect(a[k]).toBeCloseTo(b[k], 10);
+      expect(crackMask(field, a[0], a[1], a[2], 0.05)).toBeCloseTo(crackMask(field, b[0], b[1], b[2], 0.05), 10);
+    }
+  });
+
+  // A chart's gutter is the neighbouring face's surface continued past the
+  // edge, so the first gutter texel of one chart lies on the same surface as
+  // the last inner texel of the chart that shares the edge, and a crack that
+  // crosses the edge is painted alike in both. Two controls: the same texels
+  // matched the wrong way round, and two adjacent texels within one chart.
+  // The pair across the seam has to be closer than either.
+  it('paints a face edge alike in both charts that share it', () => {
+    const params = rockParams({ textureSize: 256, cracks: 3 });
+    const { field } = buildRock(params);
+    const canvas = buildStoneCanvas(params, field);
+    const chartPx = rockChartPx(params);
+    const inner = chartPx - ROCK_GUTTER * 2;
+    const half = 0.5 / inner;
+    const uv: [number, number] = [0, 0];
+    const texelAt = (face: number, a: number, b: number): number => {
+      chartUv(uv, face, a, b, chartPx);
+      return Math.floor(uv[1] * canvas.height) * canvas.width + Math.floor(uv[0] * canvas.width);
+    };
+    const gap = (a: number, b: number): number => {
+      let sum = 0;
+      for (let k = 0; k < 3; k++) sum += Math.abs(canvas.albedo[a * 3 + k] - canvas.albedo[b * 3 + k]);
+      return sum / 3;
+    };
+
+    let matched = 0;
+    let reversed = 0;
+    let adjacent = 0;
+    for (let i = 0; i < inner; i++) {
+      const t = (i + 0.5) / inner;
+      // +x's last inner row against +y's first gutter column past its +x edge.
+      const innerX = texelAt(0, t, 1 - half);
+      matched += gap(innerX, texelAt(2, 1 + half, t));
+      reversed += gap(innerX, texelAt(2, 1 + half, 1 - t));
+      adjacent += gap(innerX, texelAt(0, t, 1 - 3 * half));
+    }
+
+    expect(matched).toBeLessThan(reversed / 2);
+    expect(matched).toBeLessThan(adjacent);
+  });
+
+  it('fills every texel of the image, gutters included', () => {
+    const params = rockParams({ textureSize: 128 });
+    const canvas = buildStoneCanvas(params, buildRock(params).field);
+    expect(canvas.width).toBe(64 * 3);
+    expect(canvas.height).toBe(64 * 2);
+    for (let i = 0; i < canvas.width * canvas.height; i++) expect(canvas.alpha[i]).toBe(1);
+  });
+
+  it('reproduces a rock byte for byte from the same seed', () => {
+    const build = (seed: number) => {
+      const params = rockParams({ seed, subdivisions: 4 });
+      return writeGlb({ name: params.name, mesh: buildRock(params).mesh, textures: STONE_TEXTURES, alphaCutoff: 0 });
+    };
+    expect(build(3).equals(build(3))).toBe(true);
+    expect(build(3).equals(build(4))).toBe(false);
+  });
+
+  it('renders a preview with no hole', () => {
+    const params = rockParams({ textureSize: 128, subdivisions: 6 });
+    const rock = buildRock(params);
+    const canvases = { stone: buildStoneCanvas(params, rock.field) };
+    const size = 64;
+    const pixels = renderPreview(params, rock.mesh, canvases, size);
+
+    // The centre of the image is the middle of the rock. A hole there is the
+    // background gradient showing through a face wound inside out.
+    const centre = (size / 2) * size + size / 2;
+    const backgroundBlue = pixels[centre * 3 + 2] > pixels[centre * 3] + 6;
+    expect(backgroundBlue).toBe(false);
+  });
+});
+
+describe('noise in three dimensions', () => {
+  it('keeps gradient noise inside 0..1 and about its middle', () => {
+    let min = Infinity;
+    let max = -Infinity;
+    let sum = 0;
+    const samples = 4000;
+    for (let i = 0; i < samples; i++) {
+      const value = gradientNoise3((i * 0.37) % 9, (i * 0.71) % 7, (i * 0.53) % 5, 3);
+      min = Math.min(min, value);
+      max = Math.max(max, value);
+      sum += value;
+    }
+    expect(min).toBeGreaterThanOrEqual(0);
+    expect(max).toBeLessThanOrEqual(1);
+    expect(sum / samples).toBeCloseTo(0.5, 1);
+  });
+
+  it('is the same field for the same seed and a different one otherwise', () => {
+    expect(gradientNoise3(1.3, 2.7, 0.4, 5)).toBe(gradientNoise3(1.3, 2.7, 0.4, 5));
+    expect(gradientNoise3(1.3, 2.7, 0.4, 5)).not.toBe(gradientNoise3(1.3, 2.7, 0.4, 6));
+  });
+
+  it('orders the two nearest feature points', () => {
+    for (let i = 0; i < 200; i++) {
+      const { f1, f2 } = worley3(i * 0.31, i * 0.17, i * 0.23, 9);
+      expect(f1).toBeGreaterThanOrEqual(0);
+      expect(f2).toBeGreaterThanOrEqual(f1);
+      expect(f2).toBeLessThan(2);
     }
   });
 });
