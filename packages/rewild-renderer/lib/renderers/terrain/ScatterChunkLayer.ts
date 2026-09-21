@@ -113,6 +113,12 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
   readonly rangeStarts = new Int32Array(CELL_COUNT);
   readonly rangeCounts = new Int32Array(CELL_COUNT);
   rangeCount = 0;
+  /** `performance.now()` of the last scene-pass selection, so the debug
+   *  commands can tell a layer the frustum dropped from one that selected
+   *  nothing. */
+  lastSelected = 0;
+  /** Instances the last selection kept, over every run. */
+  selectedCount = 0;
 
   private cells: ScatterCells;
   private instanceData: Float32Array<ArrayBuffer>;
@@ -167,6 +173,10 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
    */
   selectInstances(viewer: Vector3, frustum: Frustum | null): void {
     this.rangeCount = 0;
+    if (frustum) {
+      this.lastSelected = performance.now();
+      this.selectedCount = 0;
+    }
     const near = frustum ? this.fadeBand[0] : this.nearDistance;
     const far = frustum ? this.fadeBand[3] : this.cullDistance;
     if (near >= far) return;
@@ -225,6 +235,7 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     this.rangeStarts[this.rangeCount] = start;
     this.rangeCounts[this.rangeCount] = end - start;
     this.rangeCount++;
+    this.selectedCount += end - start;
   }
 
   /** Re-reads the tier's distance band from the layer table under a bias.

@@ -90,8 +90,11 @@ export class TerrainChunk implements IComponent {
   // 3D distance would fold the camera's height in and stop a chunk underneath a
   // high camera ever generating scatter.
   private viewerGroundDistance = Infinity;
-  // Last known viewer position, so scatter arriving from the worker is culled
-  // on arrival rather than drawing everywhere until the player next moves.
+  // Last known camera position, height included, so scatter arriving from the
+  // worker is culled on arrival rather than drawing everywhere until the
+  // player next moves. The scatter cull measures against each layer's real
+  // bounds, and the shader that picks a tier per instance measures from the
+  // camera too, so the two must agree.
   private viewerPosition = new Vector3();
   // The chunk's splat map — per-texel weights over the climate's material
   // palette, derived from the climate model and `heights`. This is chunk state,
@@ -662,6 +665,7 @@ export class TerrainChunk implements IComponent {
 
   updateTerrainChunk(
     viewerPos: Vector3,
+    eye: Vector3,
     terrainRenderer: TerrainRenderer,
     renderer: Renderer
   ) {
@@ -670,8 +674,8 @@ export class TerrainChunk implements IComponent {
     this.visible = isVisible;
     _groundPoint.set(viewerPos.x, 0, viewerPos.z);
     this.viewerGroundDistance = this.bounds.distanceToPoint(_groundPoint);
-    this.viewerPosition.copy(viewerPos);
-    this.scatter?.updateVisibility(viewerPos, terrainRenderer.scatterLodBias);
+    this.viewerPosition.copy(eye);
+    this.scatter?.updateVisibility(eye, terrainRenderer.scatterLodBias);
 
     // A chunk that meshed before it came into range has no build left to carry
     // scatter. Latching is what lets a chunk still generate instances after
