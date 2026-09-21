@@ -34,7 +34,9 @@ import {
   type Params,
 } from './lib/params.ts';
 import { randomSeed } from './lib/rng.ts';
+import { buildRock, type Rock } from './lib/rock.ts';
 import { buildSkeleton, type Skeleton } from './lib/skeleton.ts';
+import { buildRockCanvases } from './lib/stone.ts';
 import type { AtlasLayout } from './lib/atlas.ts';
 import {
   atlasLayoutFor,
@@ -60,6 +62,7 @@ import {
   crownLayer,
   geometryEntry,
   materialEntries,
+  rockLayer,
   scatterLayer,
   scatterLayerEntry,
   writeGeometryTemplate,
@@ -90,6 +93,8 @@ interface Grown {
   metrics: ClumpMetrics | null;
   /** What a crown's report is measured off. */
   crown: CrownMetrics | null;
+  /** The field a rock was grown from, which its bake reads too. */
+  rock: Rock | null;
   layer: ScatterLayer;
 }
 
@@ -269,6 +274,8 @@ async function loadSources(params: Params): Promise<Sources> {
   switch (params.type) {
     case 'clump':
       return { barkSource: null, leafSource: await loadClumpSource(params.blades), accentSources };
+    case 'rock':
+      return { barkSource: null, leafSource: null, accentSources };
     case 'crown':
       return {
         barkSource: hasStem(params) ? await loadBarkSource(params.bark) : null,
@@ -305,12 +312,17 @@ function layoutFromManifest(params: Params, painted: SetManifest, directory: str
 function grow(params: Params, layout: AtlasLayout, bark: BarkTile | null): Grown {
   if (params.type === 'clump') {
     const { mesh, metrics } = buildClump(params, layout);
-    return { mesh, skeleton: null, metrics, crown: null, layer: clumpLayer(params, metrics) };
+    return { mesh, skeleton: null, metrics, crown: null, rock: null, layer: clumpLayer(params, metrics) };
   }
 
   if (params.type === 'crown') {
     const crown = buildCrown(params, layout, bark);
-    return { mesh: crown.mesh, skeleton: crown.skeleton, metrics: null, crown: crown.metrics, layer: crownLayer(params, crown) };
+    return { mesh: crown.mesh, skeleton: crown.skeleton, metrics: null, crown: crown.metrics, rock: null, layer: crownLayer(params, crown) };
+  }
+
+  if (params.type === 'rock') {
+    const rock = buildRock(params);
+    return { mesh: rock.mesh, skeleton: null, metrics: null, crown: null, rock, layer: rockLayer(params, rock) };
   }
 
   const skeleton = buildSkeleton(params);
@@ -319,21 +331,26 @@ function grow(params: Params, layout: AtlasLayout, bark: BarkTile | null): Grown
     skeleton,
     metrics: null,
     crown: null,
+    rock: null,
     layer: scatterLayer(params, skeleton),
   };
 }
 
 /**
  * One coarser tier. A tree hangs it on the base skeleton; a crown regrows from
- * the same seed, which lands the same stem and rosette with fewer segments.
+ * the same seed, which lands the same stem and rosette with fewer segments; a
+ * rock regrows its field at fewer subdivisions, under the same charts.
  */
-function growTier(params: Params, skeleton: Skeleton, layout: AtlasLayout, bark: BarkTile | null): ForgeMesh {
-  return params.type === 'crown' ? buildCrown(params, layout, bark).mesh : buildMesh(params, skeleton, layout, bark);
+function growTier(params: Params, skeleton: Skeleton | null, layout: AtlasLayout, bark: BarkTile | null): ForgeMesh {
+  if (params.type === 'crown') return buildCrown(params, layout, bark).mesh;
+  if (params.type === 'rock') return buildRock(params).mesh;
+  return buildMesh(params, skeleton!, layout, bark);
 }
 
-function paint(params: Params, { barkSource, leafSource, accentSources }: Sources): Canvases {
+function paint(params: Params, { barkSource, leafSource, accentSources }: Sources, rock: Rock | null): Canvases {
   if (params.type === 'clump') return buildClumpCanvases(params, leafSource, accentSources);
   if (params.type === 'crown') return buildCrownCanvases(params, hasStem(params), barkSource, leafSource, accentSources);
+  if (params.type === 'rock') return buildRockCanvases(params, rock!.field);
   return buildTreeCanvases(params, barkSource, leafSource, accentSources);
 }
 
@@ -364,7 +381,7 @@ async function generate(params: Params, writeTemplate: string | null, previous?:
   // makes a mesh edit rebuild in milliseconds rather than seconds.
   const reusable = previous?.canvases && sameTexture(previous.params, params) ? previous.canvases : undefined;
   const canvases =
-    reusable ?? (params.skipTextures && !params.preview ? undefined : paint(params, sources));
+    reusable ?? (params.skipTextures && !params.preview ? undefined : paint(params, sources, grown.rock));
 
   let textures = textureFileNames(params.textureSet, pieces);
   if (!params.skipTextures && !reusable) {
@@ -392,7 +409,7 @@ async function generate(params: Params, writeTemplate: string | null, previous?:
   // rather than coarsening, so there is nothing to hand over to.
   const lods: Built['lods'] = [];
   for (const [index, tier] of params.lods.entries()) {
-    const lodMesh = growTier(tierParams(params, tier), skeleton!, layout, barkTileOf(barkSource));
+    const lodMesh = growTier(tierParams(params, tier), skeleton, layout, barkTileOf(barkSource));
     const path = join(directory, `${params.name}.lod${index + 1}.glb`);
     await writeFile(
       path,
@@ -604,6 +621,8 @@ function describeSources({ params, barkSource, leafSource, accentSources, layout
   switch (params.type) {
     case 'clump':
       return [...describeBlades(params, leafSource, layout), ...accents];
+    case 'rock':
+      return ['  stone    generated from the field'];
     case 'crown':
       return [
         ...(hasStem(params) ? [describeBark(params, barkSource)] : []),
@@ -622,7 +641,14 @@ function lowestLimb(skeleton: Skeleton): number {
 }
 
 /** The second line of the report: what the model measures, by type. */
-function describeShape({ params, skeleton, metrics, crown }: Built): string {
+function describeShape({ params, skeleton, metrics, crown, rock }: Built): string {
+  if (rock)
+    return (
+      `  height ${rock.metrics.height.toFixed(2)}m, ${rock.metrics.width.toFixed(2)}m by ${rock.metrics.depth.toFixed(2)}m, ` +
+      `${rock.field.cleaves.length} cleaves, ${params.subdivisions} subdivisions a side, ` +
+      `hull of ${rock.metrics.hull.length / 3} points`
+    );
+
   if (crown)
     return (
       `  height ${crown.height.toFixed(2)}m, ` +

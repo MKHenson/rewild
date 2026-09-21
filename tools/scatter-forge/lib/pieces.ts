@@ -13,7 +13,7 @@
 // Deliberately free of imports, so the parameter table can reach it without a
 // cycle.
 
-export const FORGE_TYPES = ['tree', 'clump', 'crown'] as const;
+export const FORGE_TYPES = ['tree', 'clump', 'crown', 'rock'] as const;
 
 export type ForgeType = (typeof FORGE_TYPES)[number];
 
@@ -60,6 +60,7 @@ export const PIECES: Record<ForgeType, readonly PieceSpec[]> = {
     { key: 'bark', cutout: false, height: true, material: true, needsStem: true },
     { key: 'frond', cutout: true, height: false, material: false },
   ],
+  rock: [{ key: 'stone', cutout: false, height: true, material: true }],
 };
 
 /** The pieces a model ships. `hasStem` drops the ones a stemless crown has no use for. */

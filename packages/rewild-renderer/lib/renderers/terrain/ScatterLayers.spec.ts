@@ -237,6 +237,21 @@ describe('validateScatterLayers', () => {
     );
   });
 
+  it('rejects a hull that cannot span a volume', () => {
+    expectInvalid(
+      { collider: { type: 'hull', points: [0, 0, 0, 1, 0, 0, 0, 1, 0] } },
+      /hull collider needs at least 4 xyz points/
+    );
+    expectInvalid(
+      { collider: { type: 'hull', points: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0] } },
+      /hull collider needs at least 4 xyz points/
+    );
+    expectInvalid(
+      { collider: { type: 'hull', points: [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, NaN] } },
+      /hull collider points must be finite/
+    );
+  });
+
   it('rejects wind that cannot move anything', () => {
     expectInvalid(
       { wind: { amplitude: 0, frequency: 1, flutter: 0 } },

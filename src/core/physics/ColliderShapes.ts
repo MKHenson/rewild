@@ -7,6 +7,20 @@ import {
 
 type Rapier = typeof import('@dimforge/rapier3d-compat');
 
+// One scaled copy per hull shape, reused across every instance that shares
+// it: Rapier copies the points on registration, so nothing holds the buffer.
+const _hullPoints = new WeakMap<PhysicsShape, Float32Array>();
+
+function hullPoints(shape: PhysicsShape & { type: 'hull' }, scale: number): Float32Array {
+  let scaled = _hullPoints.get(shape);
+  if (!scaled) {
+    scaled = new Float32Array(shape.points.length);
+    _hullPoints.set(shape, scaled);
+  }
+  for (let i = 0; i < scaled.length; i++) scaled[i] = shape.points[i] * scale;
+  return scaled;
+}
+
 // Shapes are authored as full extents; Rapier takes half-extents and a
 // capsule's half-height. The halving happens here and nowhere else.
 function shapeDesc(
@@ -28,6 +42,11 @@ function shapeDesc(
         (shape.height * scale) / 2,
         shape.radius * scale
       );
+    case 'hull': {
+      const desc = R.ColliderDesc.convexHull(hullPoints(shape, scale));
+      if (!desc) throw new Error('Hull collider points are degenerate.');
+      return desc;
+    }
   }
 }
 
