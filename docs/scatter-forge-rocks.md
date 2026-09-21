@@ -11,8 +11,8 @@ Following the tool's rule that a type earns itself at the mesh and the texture p
 
 | `type`    | Mesh                                   | Texture                                | Collider          | Clusters |
 | --------- | -------------------------------------- | -------------------------------------- | ----------------- | -------- |
-| `pebble`  | Cube-sphere, rounded, light noise      | Grain and colour only, shared atlas    | None              | Yes      |
-| `rock`    | Cube-sphere, cleaved, field grooves    | Unique bake: grain, cracks, weathering | One convex hull   | No       |
+| `pebble`  | Scooped sphere, shallow, light noise   | Grain and colour only, shared atlas    | None              | Yes      |
+| `rock`    | Scooped sphere, field grooves          | Unique bake: grain, cracks, weathering | One convex hull   | No       |
 | `outcrop` | A stack of convex slabs                | Tiled stone; the cracks are geometry   | One hull per slab | No       |
 
 `pebble` and `rock` share the mesh generator and differ at the painter and in what the layer emits.
@@ -26,12 +26,13 @@ A crack must not stop at a UV seam, and the geometry should carry the same featu
 does. Both follow from one decision: the rock is a function of 3D position, and the mesh and the
 textures are evaluated from that same function.
 
-- **`shape(d)`** — the surface distance along direction `d` from the rock's centre. A 3D pile of
+- **`shape(d)`** — the surface distance along direction `d` from the rock's centre. A sphere with
+  larger **spheres scooped out** of it for the concave faces and ridges of broken, worn stone (each
+  placed so its silhouette from the centre lies outside the rock, so none overhangs), a 3D pile of
   bevelled, bedded slabs for the planes rock breaks along, low-frequency 3D fbm and ridged noise for
-  what is left, a few random **cleave planes** (half-space clips kept further than ~0.3r from the
-  centre) for the fractured-block look, and the lowest octave of the crack field as grooves. The result is star-shaped in the geometric sense: every point on
-  the surface is visible from the centre, so a ray from the centre meets the surface exactly once
-  and `shape(d)` has one value.
+  what is left, and the lowest octave of the crack field as grooves. The result is star-shaped in
+  the geometric sense: every point on the surface is visible from the centre, so a ray from the
+  centre meets the surface exactly once and `shape(d)` has one value.
 - **`detail(p, n)`** — evaluated at a surface point and its normal: grain, cracks, weathering. Yields
   height, albedo, roughness and occlusion.
 
@@ -43,12 +44,13 @@ texture because they come from the same octaves.
 `noise.ts` is a periodic 2D lattice. This needs a 3D gradient basis and a 3D Worley, neither of
 which wraps.
 
-## The base mesh is a cube-sphere
+## The base mesh is a subdivided cube
 
-A subdivided cube whose vertices are pushed toward a sphere. `roundness` (0..1) lerps between the
-two, `aspect` scales the axes, `cleaves` sets how many planes clip it, and the noise keys set the
-octaves and amplitude. A pebble is roundness 1 at low amplitude; an angular boulder is roundness
-0.3, ridged noise and three to five cleaves; a slab is roundness 0.5 with a squashed aspect.
+A subdivided cube whose vertices are directions, each pushed out to `shape(d)`. The cube is the
+parameterisation, not the shape: the shape is the scooped sphere above, scaled by the extents.
+`scoops`, `scoopSize` and `scoopDepth` set the faces, and the noise keys set the octaves and
+amplitude. A pebble is a few shallow scoops at low amplitude; a fractured boulder a dozen deep
+ones; a slab a squashed aspect.
 
 There is no flattened base. A rock beds in through the layer's `yOffset` and `alignToNormal: 1`,
 which is what `granite_boulder` already does, and an underside that is as shaped as the top gives a
@@ -74,22 +76,30 @@ Six charts in a 3×2 atlas. One piece: `{ key: 'stone', cutout: false, height: t
 
 Everything below is a function of `p` and `n`. Nothing reads a UV.
 
-**Grain.** Five or six octaves of 3D fbm at high frequency, thresholded into two or three mineral
-colours with a roughness per mineral. Or an authored tiling stone set under `sources/rock/<name>`
+**Grain.** A 3D cellular field at crystal scale, each cell one of three minerals at its own colour,
+roughness and height, over a texel-scale grit. Or an authored tiling stone set under `sources/rock/<name>`
 sampled triplanar in the bake — three taps weighted by `|n|`, free offline. Same contract as bark:
 `diffuse`, `arm`, 16-bit `disp`, and a `source.json` with `widthMetres` and `depthMetres`.
 
-**Cracks.** 3D Worley `F2 − F1` gives cell edges; a threshold on it gives a line of a width. Two or
-three octaves with shrinking cells and shrinking widths give the branching. The cell coordinates are
-domain-warped so lines wander. A crack writes depth into the height, darkens the albedo, raises
-roughness and lowers occlusion. Its lowest octave also displaces the mesh.
+**Cracks.** 3D Worley `F2 − F1` gives cell edges; a threshold on it gives a line of a width. Two
+octaves with shrinking cells and shrinking widths give the branching. The cells are flattened along
+the bedding normal so the borders run with the bedding, and the cell coordinates are domain-warped
+so lines wander. A slow noise along the network gates which borders are cracks and how wide each is.
+A crack writes depth into the height, darkens the albedo, raises roughness and lowers occlusion, and
+iron seeps from it. Its lowest octave alone also displaces the mesh: the fine one is under a quad
+and reads as dimples.
 
 **Weathering.** Each is a mask:
 
 | Mask           | From                                                             | Writes                                  |
 | -------------- | ---------------------------------------------------------------- | --------------------------------------- |
-| Exposure       | `dot(n, up)`, biased to one arbitrary side per rock              | Lichen and moss on tops                 |
-| Edge wear      | Curvature of `shape`                                             | Convex edges lighter and smoother       |
+| Exposure       | `dot(n, up)`, and a colony noise                                 | Lichen discs on tops                    |
+| Patina         | Moisture: up, hollows, crack seep, drip lines, colonies; not edges | Dark crust, brown margin, glossier heart |
+| Stain          | Crack proximity, and patches banded along the bedding            | Iron tint                               |
+| Veins          | Zero crossings of a stretched noise                              | Light, glassy, raised lines             |
+| Edge wear      | Curvature of `shape` at four reaches, summed and feathered        | Convex edges bleached, smoother, clear of stain and growth |
+| Run-off        | Droplet trails on a cylinder about up, on steep faces           | Tint, roughness, occlusion; no height   |
+| Snow           | `dot(n, up)`, less on edges, more in hollows, drifted           | Mottled white, blue in shadow, last     |
 | Cavity dirt    | Low local height                                                 | Dirt colour, rough                      |
 | Drip stains    | March a short way up `+up` sampling the crack field              | Darkening below a crack                 |
 | Ground contact | Height above the lowest point                                    | Soil and moss tint                      |
@@ -122,8 +132,8 @@ clump's reason.
 
 **A rock is one convex hull.** `PhysicsShape` gains `{ type: 'hull', points: number[] }`. The forge
 decimates the rock to at most 32 points and writes them into the layer entry beside where a tree's
-capsule goes. The hull of a cleaved cube-sphere is a close fit, because the cleave planes are hull
-faces. Engine side, `shapeDesc` in
+capsule goes. The hull of a scooped sphere is a close fit: the ridges between scoops are where it
+touches, and the faces sag inside it by the scoop depth. Engine side, `shapeDesc` in
 [`ColliderShapes.ts`](../src/core/physics/ColliderShapes.ts) scales the points into a scratch
 `Float32Array` held per shape and calls `ColliderDesc.convexHull`.
 

@@ -56,6 +56,11 @@ export const RETIRED: Record<string, string> = {
     Object.keys(LOOK).map((key) => [key, 'how the bark and leaves look is settled in lib/look.ts'])
   ),
   barkTile: 'bark is scaled by the branch it is on, so there is nothing left to set',
+  roundness: 'the rock is a scooped sphere now, not a cube pushed toward one',
+  cleaves: 'scoops cut the faces of a rock now, and a broad scoop is as flat as a plane',
+  facetRelief: 'a scooped face keeps the relief like the rest of the surface',
+  bulge: 'scoops of different depths take the symmetry out of a rock',
+  pitting: 'its dimples read as hammered metal; `undulation` is the soft version, and `bump` steepens what the height already holds',
   config: 'the file is the config; there is no option that names another one',
   watch: 'a command line switch, not a property of the tree',
 };

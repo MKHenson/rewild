@@ -4,17 +4,19 @@
 // solid is star-shaped: every surface point is visible from the centre, which
 // is what lets a texel be mapped to a surface point with no rasterising.
 //
-// The base is a cube pushed toward a sphere. Its six faces are the six charts
-// of the texture, and a chart's gutter is baked with the surface that really
-// continues past the face edge, so the mip chain never averages one face into
-// a foreign colour.
+// The base is a sphere with larger spheres scooped out of it, which is what
+// gives a rock its concave faces meeting at rounded ridges. The six faces of a
+// cube are still the six charts of the texture: a chart is a bundle of
+// directions, not a piece of the shape, and a chart's gutter is baked with the
+// surface that really continues past the face edge, so the mip chain never
+// averages one face into a foreign colour.
 
 import { createBuilder, finish, pushVertex, type ForgeMesh, type MeshAttributes } from './mesh.ts';
-import { fbm3, ridged3, smoothstep, worley3Into, type Worley3Result } from './noise.ts';
+import { fbm3r, ridged3r, smin, smoothstep, worley3Into, type Worley3Result } from './noise.ts';
 import type { Params } from './params.ts';
 import { beddingFrame, platesInto, type PlateField, type PlateSample } from './plates.ts';
 import { createRng } from './rng.ts';
-import { cross, dot, normalize, type Vec3 } from './vec.ts';
+import { cross, normalize, type Vec3 } from './vec.ts';
 
 /** Texels of real surface baked past each face's edge. */
 export const ROCK_GUTTER = 8;
@@ -23,16 +25,25 @@ export const ROCK_GUTTER = 8;
 export const ROCK_CHART_COLUMNS = 3;
 export const ROCK_CHART_ROWS = 2;
 
-/** Half-space the rock is clipped to: keep `dot(p, normal) <= distance`. */
-export interface Cleave {
-  normal: Vec3;
-  distance: number;
+/**
+ * A sphere scooped out of the unit sphere, in unit-sphere space. It never
+ * contains the centre, and its silhouette as seen from the centre lies
+ * outside the rock, so a ray from the centre enters it once and the scooped
+ * solid stays star-shaped.
+ */
+export interface Scoop {
+  centre: Vec3;
+  /** `|centre|²`, kept for the ray test. */
+  distance2: number;
+  radius: number;
 }
 
 export interface RockField {
   /** Half extents in metres along x, y and z, before relief. */
   extents: Vec3;
-  roundness: number;
+  scoops: Scoop[];
+  /** `crease` in unit-sphere space, for the ridges between scoops. */
+  creaseUnit: number;
   /** Metres the noise displaces the surface by. */
   relief: number;
   /** Metres across the largest lump of that noise. */
@@ -42,15 +53,20 @@ export interface RockField {
   groove: number;
   /** Width of a groove as a fraction of a crack cell. */
   grooveWidth: number;
-  /** Share of the relief a cleaved facet keeps, 0..1. Grooves cut it in full. */
-  facetRelief: number;
   /** The slab pile the relief is mostly made of, or null for noise alone. */
   plates: PlateField | null;
   /** Share of the relief the plates take; the noise has the rest. */
   plateShare: number;
   /** Crack cells per metre. 0 draws none. */
   cracks: number;
-  cleaves: Cleave[];
+  /** Row-major rotation taking world space into the bedding frame, bedding normal along y. */
+  frame: number[];
+  /** How far the cracks are flattened into the bedding, 0..1. */
+  bedding: number;
+  /** A second frame, for the veins, which cut across the bedding. */
+  veinFrame: number[];
+  /** Band the creases of the ridged noise are rounded over, in its own units. */
+  ridgeSoften: number;
   seed: number;
   /** Metres from the rock's centre to its lowest point, so the origin sits there. */
   base: number;
@@ -119,27 +135,92 @@ function centred(sum: number, octaves: number): number {
 const _worley: Worley3Result = { f1: 0, f2: 0, id: 0 };
 const _plate: PlateSample = { height: 0, id: 0 };
 
+/** How much thinner crack cells are across the bedding at full bedding. */
+const CRACK_FLATTEN = 1.6;
+/** The fine octave's cells per coarse cell. */
+const CRACK_FINE = 2.7;
+
+/** The coarse crack network at a point. */
+export interface CrackSample {
+  /** Distance to the nearest cell border, in cells. 0 on the crack line. */
+  edge: number;
+  /** How much of a crack that border carries here, 0..1. Not every border is one. */
+  presence: number;
+  /** How wide the crack is here as a multiple of the nominal width: hairline to open. */
+  width: number;
+}
+
+const _q: Vec3 = [0, 0, 0];
+
 /**
- * The crack mask at a point: 1 in a crack, 0 clear of one. Two octaves, the
- * second finer and fainter. `width` is a fraction of a cell.
+ * The crack domain: the point taken into the bedding frame and squeezed
+ * along the bedding normal, so the cells flatten and their borders run with
+ * the bedding the way joints do, then warped so the borders wander rather
+ * than run straight between points.
+ */
+function crackDomain(field: RockField, x: number, y: number, z: number): Vec3 {
+  const f = field.frame;
+  const qx = f[0] * x + f[1] * y + f[2] * z;
+  const qy = (f[3] * x + f[4] * y + f[5] * z) * (1 + field.bedding * CRACK_FLATTEN);
+  const qz = f[6] * x + f[7] * y + f[8] * z;
+
+  const wobble = 0.3 / field.cracks;
+  const s = field.cracks * 1.7;
+  _q[0] = qx + (fbm3r(qx * s, qy * s, qz * s, 2, field.seed ^ 0x1f83d9ab) - 0.5) * wobble;
+  _q[1] = qy + (fbm3r(qx * s, qy * s, qz * s, 2, field.seed ^ 0x5be0cd19) - 0.5) * wobble;
+  _q[2] = qz + (fbm3r(qx * s, qy * s, qz * s, 2, field.seed ^ 0x3c6ef372) - 0.5) * wobble;
+  return _q;
+}
+
+/**
+ * The coarse crack network at a point, written into `into`. A crack is a
+ * cell border, but not every border is drawn and no crack is one width: both
+ * come off one slow noise along the network, so a crack opens where it is
+ * strong and thins to nothing where it is not.
+ */
+export function crackCoarse(into: CrackSample, field: RockField, x: number, y: number, z: number): CrackSample {
+  if (field.cracks <= 0) {
+    into.edge = Infinity;
+    into.presence = 0;
+    into.width = 1;
+    return into;
+  }
+
+  const q = crackDomain(field, x, y, z);
+  const c = field.cracks;
+  const w = worley3Into(_worley, q[0] * c, q[1] * c, q[2] * c, field.seed ^ 0x2545f491);
+  into.edge = w.f2 - w.f1;
+
+  const g = fbm3r(q[0] * c * 0.9, q[1] * c * 0.9, q[2] * c * 0.9, 2, field.seed ^ 0x7a1b3c5d);
+  into.presence = smoothstep(0.4, 0.52, g);
+  into.width = 0.45 + 1.1 * smoothstep(0.45, 0.7, g);
+  return into;
+}
+
+/**
+ * The fine crack octave, 1 on a line and 0 clear of one, for the texture
+ * alone: at this scale a line is under a mesh quad, and cut into the mesh it
+ * reads as dimples rather than cracks.
+ */
+export function crackFine(field: RockField, x: number, y: number, z: number, width: number): number {
+  if (field.cracks <= 0) return 0;
+  const q = crackDomain(field, x, y, z);
+  const c = field.cracks * CRACK_FINE;
+  const w = worley3Into(_worley, q[0] * c, q[1] * c, q[2] * c, field.seed ^ 0x27d4eb2d);
+  const g = fbm3r(q[0] * c * 0.7, q[1] * c * 0.7, q[2] * c * 0.7, 2, field.seed ^ 0x3b9ac9ff);
+  return (1 - smoothstep(0, width, w.f2 - w.f1)) * smoothstep(0.42, 0.55, g);
+}
+
+const _crack: CrackSample = { edge: 0, presence: 0, width: 1 };
+
+/**
+ * The coarse crack mask at a point: 1 in a crack, 0 clear of one, with a
+ * rounded floor. `width` is a fraction of a cell. This is what the mesh cuts.
  */
 export function crackMask(field: RockField, x: number, y: number, z: number, width: number): number {
   if (field.cracks <= 0) return 0;
-
-  // Warped so the cell borders wander rather than run straight between points.
-  const wobble = 0.35 / field.cracks;
-  const wx = x + (fbm3(x * 2, y * 2, z * 2, 2, field.seed ^ 0x1f83d9ab) - 0.5) * wobble;
-  const wy = y + (fbm3(x * 2, y * 2, z * 2, 2, field.seed ^ 0x5be0cd19) - 0.5) * wobble;
-  const wz = z + (fbm3(x * 2, y * 2, z * 2, 2, field.seed ^ 0x3c6ef372) - 0.5) * wobble;
-
-  const coarse = worley3Into(_worley, wx * field.cracks, wy * field.cracks, wz * field.cracks, field.seed ^ 0x2545f491);
-  let mask = 1 - smoothstep(0, width, coarse.f2 - coarse.f1);
-
-  const fineScale = field.cracks * 2.7;
-  const fine = worley3Into(_worley, wx * fineScale, wy * fineScale, wz * fineScale, field.seed ^ 0x27d4eb2d);
-  mask = Math.max(mask, (1 - smoothstep(0, width * 0.7, fine.f2 - fine.f1)) * 0.55);
-
-  return mask;
+  crackCoarse(_crack, field, x, y, z);
+  return (1 - smoothstep(0, width * _crack.width, _crack.edge)) * _crack.presence;
 }
 
 /**
@@ -149,25 +230,29 @@ export function crackMask(field: RockField, x: number, y: number, z: number, wid
  * point along its own ray — so the result stays star-shaped whatever the keys.
  */
 export function shape(into: Vec3, field: RockField, d: Vec3): Vec3 {
-  const ax = Math.abs(d[0]);
-  const ay = Math.abs(d[1]);
-  const az = Math.abs(d[2]);
-  const largest = Math.max(ax, ay, az);
+  // The unit sphere, with every scoop the ray enters cutting it back to where
+  // the ray enters, the nearer taken smoothly so the ridge between two scoops
+  // is rounded. Then the extents stretch it.
+  let unit = 1;
+  for (const scoop of field.scoops) {
+    const b = d[0] * scoop.centre[0] + d[1] * scoop.centre[1] + d[2] * scoop.centre[2];
+    // Behind the centre both roots are negative: the scoop is on the far side.
+    if (b <= 0) continue;
+    const disc = b * b - scoop.distance2 + scoop.radius * scoop.radius;
+    if (disc <= 0) continue;
+    unit = smin(unit, b - Math.sqrt(disc), field.creaseUnit);
+  }
 
-  // The cube's surface in this direction is at 1 / largest; the sphere's at 1.
-  const cube = 1 / largest;
-  let r = cube + (1 - cube) * field.roundness;
-
-  const px = d[0] * r * field.extents[0];
-  const py = d[1] * r * field.extents[1];
-  const pz = d[2] * r * field.extents[2];
+  const px = d[0] * unit * field.extents[0];
+  const py = d[1] * unit * field.extents[1];
+  const pz = d[2] * unit * field.extents[2];
 
   // The lump frequency is one over the lump size; every octave above it halves
   // the size and the amplitude, the way a terrain heightmap is built.
   const lumpScale = 1 / field.reliefSize;
   const ridgeScale = lumpScale * RIDGE_SCALE;
-  const lumps = centred(fbm3(px * lumpScale, py * lumpScale, pz * lumpScale, field.reliefOctaves, field.seed), field.reliefOctaves);
-  const ridges = ridged3(px * ridgeScale, py * ridgeScale, pz * ridgeScale, RIDGE_OCTAVES, field.seed ^ 0x9e3779b9) * 2 - 1;
+  const lumps = centred(fbm3r(px * lumpScale, py * lumpScale, pz * lumpScale, field.reliefOctaves, field.seed), field.reliefOctaves);
+  const ridges = ridged3r(px * ridgeScale, py * ridgeScale, pz * ridgeScale, RIDGE_OCTAVES, field.seed ^ 0x9e3779b9, 0.5, field.ridgeSoften) * 2 - 1;
   const noise = lumps * (1 - RIDGE_SHARE) + ridges * RIDGE_SHARE;
   // Slab tops stand at the full relief and the gaps between them sit at its
   // negative, so a step from gap to top is the whole range.
@@ -175,37 +260,13 @@ export function shape(into: Vec3, field: RockField, d: Vec3): Vec3 {
   const displaced = (noise * (1 - field.plateShare) + slabs * field.plateShare) * field.relief;
   const groove = field.groove > 0 ? crackMask(field, px, py, pz, field.grooveWidth) * field.groove : 0;
 
-  // Applied as a fraction of the radial distance, so an anisotropic rock keeps
-  // its relief in proportion on every side.
+  // Applied along the ray, so an anisotropic rock keeps its relief in
+  // proportion on every side.
   const along = Math.hypot(px, py, pz);
   const factor = along > 1e-6 ? (along + displaced - groove) / along : 1;
-
   into[0] = px * factor;
   into[1] = py * factor;
   into[2] = pz * factor;
-
-  let clipped = false;
-  for (const cleave of field.cleaves) {
-    const h = dot(into, cleave.normal);
-    if (h > cleave.distance) {
-      const t = cleave.distance / h;
-      into[0] *= t;
-      into[1] *= t;
-      into[2] *= t;
-      clipped = true;
-    }
-  }
-
-  // The clip lands the point on the plane, which loses the surface it had. A
-  // facet keeps a share of it and every groove, still along its own ray.
-  if (clipped) {
-    const onFacet = Math.hypot(into[0], into[1], into[2]);
-    const keep = onFacet > 1e-6 ? (onFacet + displaced * field.facetRelief - groove) / onFacet : 1;
-    into[0] *= keep;
-    into[1] *= keep;
-    into[2] *= keep;
-  }
-
   return into;
 }
 
@@ -249,9 +310,39 @@ export function normalAt(into: Vec3, field: RockField, face: Face, a: number, b:
 /** Radians the bedding may tilt from horizontal. */
 const BEDDING_TILT = 0.5;
 
-/** Fraction of the base radius a cleave sits at: 0.6 cuts a broad facet, 0.9 a nick. */
-const CLEAVE_NEAR = 0.6;
-const CLEAVE_FAR = 0.9;
+// Band the ridge between two scoops rounds over at smoothing 1, as a fraction
+// of the radius. A polynomial smooth minimum moves the surface by at most a
+// quarter of its band, so 0.06 — the first cut — could round a ridge by 1.5%
+// of the radius, which on a metre of rock is under a centimetre and under a
+// mesh quad. The band has to be a quarter of the rock to read as rounding.
+const CREASE_ROUND = 0.3;
+
+/** Band the creases of the ridged noise round over at smoothing 1. */
+const RIDGE_SOFTEN = 0.5;
+
+/**
+ * How far past the surface a scoop's silhouette, as seen from the centre, has
+ * to lie. At exactly the surface the scoop would carve an overhang, which a
+ * ray from the centre cannot represent.
+ */
+const SCOOP_CLEARANCE = 1.08;
+
+/**
+ * A scoop of the unit sphere: a sphere of `size` times its own distance from
+ * the centre, sitting along `direction`, whose nearest point reaches `depth`
+ * of the way in. `size` near 1 is a broad shallow face like a plane's; near
+ * 0.5 a tight bite. The depth is held back where the geometry would overhang.
+ */
+export function scoopOf(direction: Vec3, size: number, depth: number): Scoop {
+  const clearance = (SCOOP_CLEARANCE * (1 - size)) / Math.sqrt(1 - size * size);
+  const reach = Math.max(1 - depth, clearance);
+  const distance = reach / (1 - size);
+  return {
+    centre: [direction[0] * distance, direction[1] * distance, direction[2] * distance],
+    distance2: distance * distance,
+    radius: size * distance,
+  };
+}
 
 /**
  * The field a config describes. Every random choice comes off the seed, so the
@@ -264,16 +355,18 @@ export function rockField(params: Params): RockField {
   const depth = params.depth > 0 ? params.depth : height;
   const extents: Vec3 = [width / 2, height / 2, depth / 2];
   const radius = (extents[0] + extents[1] + extents[2]) / 3;
+  const frame = beddingFrame(rng, BEDDING_TILT);
+  const veinFrame = beddingFrame(rng, Math.PI / 2);
 
   const field: RockField = {
     extents,
-    roundness: params.roundness,
+    scoops: [],
+    creaseUnit: params.smoothing * CREASE_ROUND,
     relief: params.relief * radius,
     reliefSize: params.reliefSize,
     reliefOctaves: params.reliefOctaves,
     groove: params.cracks > 0 ? params.grooveDepth * radius : 0,
     grooveWidth: params.grooveWidth,
-    facetRelief: params.facetRelief,
     plates:
       params.plates > 0
         ? {
@@ -282,32 +375,38 @@ export function rockField(params: Params): RockField {
             bevel: params.plateBevel,
             lean: params.plateLean,
             bedding: params.bedding,
-            frame: beddingFrame(rng, BEDDING_TILT),
+            frame,
+            smoothing: params.smoothing,
             seed: params.seed ^ 0x706c6174,
           }
         : null,
     plateShare: params.plates > 0 ? params.plateShare : 0,
     cracks: params.cracks,
-    cleaves: [],
+    frame,
+    bedding: params.bedding,
+    veinFrame,
+    ridgeSoften: params.smoothing * RIDGE_SOFTEN,
     seed: params.seed,
     base: 0,
   };
 
-  // Each plane sits a fraction of the way out along its own normal, measured
-  // against the uncleaved surface there, so a facet is the same size on a slab
-  // as on a sphere.
-  const probe: Vec3 = [0, 0, 0];
-  for (let i = 0; i < params.cleaves; i++) {
+  // Each scoop sits along its own random direction, at its own size and
+  // depth about the keys, so no two faces of the rock are alike.
+  for (let i = 0; i < params.scoops; i++) {
     const u = rng.range(-1, 1);
     const phi = rng.range(0, Math.PI * 2);
     const ring = Math.sqrt(1 - u * u);
-    const normal: Vec3 = [Math.cos(phi) * ring, u, Math.sin(phi) * ring];
-    const reach = dot(shape(probe, field, normal), normal);
-    field.cleaves.push({ normal, distance: reach * rng.range(CLEAVE_NEAR, CLEAVE_FAR) });
+    const direction: Vec3 = [Math.cos(phi) * ring, u, Math.sin(phi) * ring];
+    const size = Math.min(SCOOP_SIZE_MAX, Math.max(SCOOP_SIZE_MIN, params.scoopSize * rng.range(0.85, 1.08)));
+    field.scoops.push(scoopOf(direction, size, params.scoopDepth * rng.range(0.35, 1)));
   }
 
   return field;
 }
+
+/** The sizes a scoop is held to: under the floor it is a pit, over the ceiling a plane. */
+const SCOOP_SIZE_MIN = 0.3;
+const SCOOP_SIZE_MAX = 0.97;
 
 /** Where a face point lands in the image, 0..1 on both axes. */
 export function chartUv(into: [number, number], faceIndex: number, a: number, b: number, chartPx: number): [number, number] {
@@ -360,12 +459,18 @@ export function supportPoints(positions: Float32Array): number[] {
 
 const round = (value: number): number => Number(value.toFixed(3));
 
-/** Finite difference step for a vertex normal, in face units. */
-const NORMAL_STEP = 1e-3;
+/**
+ * Finite difference step for a vertex normal, as a fraction of a quad. At the
+ * mesh's own scale, so the normal is that of the surface the triangles carry:
+ * a step far finer than a quad reads every crease of the field, and a mesh
+ * too coarse to hold that crease shades it as a hard triangle edge.
+ */
+const NORMAL_STEP = 0.35;
 
 function buildStone(params: Params, field: RockField): MeshAttributes {
   const out = createBuilder();
   const n = params.subdivisions;
+  const step = NORMAL_STEP / n;
   const chartPx = rockChartPx(params);
   const c: Vec3 = [0, 0, 0];
   const p: Vec3 = [0, 0, 0];
@@ -380,7 +485,7 @@ function buildStone(params: Params, field: RockField): MeshAttributes {
         const a = i / n;
         const b = j / n;
         surfaceAt(p, field, cubePoint(c, face, a, b));
-        normalAt(normal, field, face, a, b, NORMAL_STEP);
+        normalAt(normal, field, face, a, b, step);
         chartUv(uv, faceIndex, a, b, chartPx);
         pushVertex(out, [p[0], p[1] - field.base, p[2]], [normal[0], normal[1], normal[2]], [uv[0], uv[1]], [0, 0, 0, 1]);
       }

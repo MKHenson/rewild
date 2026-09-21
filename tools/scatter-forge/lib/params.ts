@@ -246,8 +246,9 @@ export const PARAM_SPEC = {
 
   width: { type: 'number', default: 0, help: 'Metres across the rock along x, before its relief. 0 derives it from height.', texture: true, types: ROCK },
   depth: { type: 'number', default: 0, help: 'Metres across the rock along z, before its relief. 0 derives it from height.', texture: true, types: ROCK },
-  roundness: { type: 'number', default: 0.45, help: 'How far the rock is pushed from a cube toward a sphere, 0..1. A pebble is 1; a block is near 0.', texture: true, types: ROCK },
-  cleaves: { type: 'int', default: 3, help: 'Planes the rock is cleaved by. Each cuts a flat facet where it meets the surface.', texture: true, types: ROCK },
+  scoops: { type: 'int', default: 9, help: 'Spheres scooped out of the rock. Each cuts a concave face, and the faces meet at rounded ridges. 0 is an egg.', texture: true, types: ROCK },
+  scoopSize: { type: 'number', default: 0.8, help: 'How broad a scoop is, 0.3..0.97, as its radius over its distance from the centre. Near 1 is a broad shallow face like a plane; near 0.5 a tight bite.', texture: true, types: ROCK },
+  scoopDepth: { type: 'number', default: 0.35, help: 'How deep the deepest scoop reaches in, as a fraction of the radius, 0..0.6. Each scoop takes 0.35..1 of it.', texture: true, types: ROCK },
   relief: { type: 'number', default: 0.1, help: 'Depth of the surface noise as a fraction of the radius.', texture: true, types: ROCK },
   reliefSize: { type: 'number', default: 0.9, help: 'Metres across the largest lump of the surface noise. Each octave above it is half the size.', texture: true, types: ROCK },
   reliefOctaves: { type: 'int', default: 5, help: 'Octaves of surface noise under reliefSize. More is finer detail at lower amplitude.', texture: true, types: ROCK },
@@ -258,23 +259,40 @@ export const PARAM_SPEC = {
   bedding: { type: 'number', default: 0.6, help: 'How far the slabs are flattened and aligned into strata, 0..1. 0 is a random rubble of blocks.', texture: true, types: ROCK },
   plateShare: { type: 'number', default: 0.7, help: 'Share of the relief the slabs take, 0..1. The noise has the rest.', texture: true, types: ROCK },
   plateTint: { type: 'number', default: 0.25, help: 'How far each slab shifts the tone by its own value, 0..1.', texture: true, types: ROCK },
-  facetRelief: { type: 'number', default: 0.3, help: 'Share of the relief a cleaved facet keeps, 0..1. 0 is a plane; grooves cut a facet in full regardless.', texture: true, types: ROCK },
+  smoothing: { type: 'number', default: 0.5, help: 'How far the creases of the field are rounded, 0..1: the ridges between scoops, the slab edges and joins, the creases of the ridged noise. 0 is knife-edged; 1 is about a tenth smaller, because rounding only pulls the surface in.', texture: true, types: ROCK },
   cracks: { type: 'number', default: 1.2, help: 'Crack cells per metre. 0 draws none.', texture: true, types: ROCK },
   crackStrength: { type: 'number', default: 1, help: 'How strongly the texture draws the cracks, 0..1. 0 draws none and keeps the grooves; cracks 0 removes both.', texture: true, types: ROCK },
   grooveDepth: { type: 'number', default: 0.05, help: 'How deep the coarse cracks cut into the mesh, as a fraction of the radius.', texture: true, types: ROCK },
   grooveWidth: { type: 'number', default: 0.15, help: 'Width of that groove as a fraction of a crack cell. The texture crack sits at its bottom.', texture: true, types: ROCK },
-  weathering: { type: 'number', default: 0.6, help: 'How far exposure, dirt and staining go, 0..1.', texture: true, types: ROCK },
-  stoneTint: { type: 'string', default: '#8a857d', help: 'The mid tone of the stone, six digit hex.', texture: true, types: ROCK },
-  stoneDark: { type: 'string', default: '#4a4642', help: 'The dark end of the stone and its dark flecks, six digit hex.', texture: true, types: ROCK },
-  stoneLight: { type: 'string', default: '#b9b1a5', help: 'The light end of the stone and its light flecks, six digit hex.', texture: true, types: ROCK },
-  lichenTint: { type: 'string', default: '#7c8a55', help: 'Lichen on the faces that look up, six digit hex.', texture: true, types: ROCK },
+  weathering: { type: 'number', default: 0.6, help: 'How far exposure goes, 0..1: lichen, dirt in the hollows, drip stains and soil up the base.', texture: true, types: ROCK },
+  patina: { type: 'number', default: 0.5, help: 'The dark crust old stone grows where water sits or runs, 0..1: on the tops, in the hollows, beside the cracks, under the drip lines and around the lichen, never on a worn edge.', texture: true, types: ROCK },
+  edgeWear: { type: 'number', default: 0.5, help: 'How far the convex edges are weathered, 0..1: bleached toward edgeTint, smoother, and kept clear of stain, patina and lichen.', texture: true, types: ROCK },
+  streaks: { type: 'number', default: 0, help: 'Opacity of the run-off streaks down the sides, 0..1: droplet trails from a splat, thinning and fading as they fall, branching into the cracks. Colour and finish only, never height.', texture: true, types: ROCK },
+  snow: { type: 'number', default: 0, help: 'Snow on the faces that look up, 0..1. 0 is none; 0.5 the tops; 1 everything but the sides and the edges.', texture: true, types: ROCK },
+  stain: { type: 'number', default: 0.5, help: 'How strongly iron staining is drawn, 0..1: rust seeping from the cracks and in bands down the bedding.', texture: true, types: ROCK },
+  veins: { type: 'number', default: 0.15, help: 'How much of the stone the quartz veins run through, 0..1. 0 draws none.', texture: true, types: ROCK },
+  stoneTint: { type: 'string', default: '#7f827c', help: 'The mid tone of the stone, six digit hex.', texture: true, types: ROCK },
+  stoneDark: { type: 'string', default: '#3e403e', help: 'The dark end of the stone and its dark minerals, six digit hex.', texture: true, types: ROCK },
+  stoneLight: { type: 'string', default: '#b3b5ae', help: 'The light end of the stone, its light minerals and its veins, six digit hex.', texture: true, types: ROCK },
+  lichenTint: { type: 'string', default: '#a7b094', help: 'The crustose lichen discs on the exposed faces, six digit hex.', texture: true, types: ROCK },
   soilTint: { type: 'string', default: '#4f4a36', help: 'Dirt in the hollows and soil up the base, six digit hex.', texture: true, types: ROCK },
-  toneSize: { type: 'number', default: 0.2, help: 'Metres across the largest patch of the tone mottling, the octave stack the colour is ramped from.', texture: true, types: ROCK },
+  stainTint: { type: 'string', default: '#8a5a2e', help: 'The iron staining, six digit hex.', texture: true, types: ROCK },
+  streakTint: { type: 'string', default: '#2a2d28', help: 'What the run-off leaves, six digit hex. Near black is mould and algae; white is bird droppings.', texture: true, types: ROCK },
+  edgeTint: { type: 'string', default: '#c6c3ba', help: 'The bleached colour a worn edge weathers to, six digit hex.', texture: true, types: ROCK },
+  toneSize: { type: 'number', default: 0.25, help: 'Metres across the largest patch of the tone mottling, the octave stack the colour is ramped from.', texture: true, types: ROCK },
   toneOctaves: { type: 'int', default: 5, help: 'Octaves of tone mottling under toneSize.', texture: true, types: ROCK },
-  toneContrast: { type: 'number', default: 0.7, help: 'How far the tone reaches from stoneTint toward stoneDark and stoneLight, 0..1.', texture: true, types: ROCK },
-  grainScale: { type: 'number', default: 45, help: 'Speckle cells per metre: the size of the mineral flecks.', texture: true, types: ROCK },
-  speckle: { type: 'number', default: 0.6, help: 'How strongly the flecks are drawn, 0..1. 0 draws none.', texture: true, types: ROCK },
-  crackWidth: { type: 'number', default: 0.05, help: 'Width of the crack line in the texture as a fraction of a crack cell.', texture: true, types: ROCK },
+  toneContrast: { type: 'number', default: 0.45, help: 'How far the tone reaches from stoneTint toward stoneDark and stoneLight, 0..1.', texture: true, types: ROCK },
+  grainScale: { type: 'number', default: 110, help: 'Mineral crystals per metre: the size of the grain.', texture: true, types: ROCK },
+  speckle: { type: 'number', default: 0.6, help: 'How strongly the mineral grain is drawn, 0..1. 0 draws none.', texture: true, types: ROCK },
+  bump: { type: 'number', default: 1, help: 'Gain of the normal map derived from the texture height, as a multiple of the settled value. 2 is twice as steep; 0.5 half.', texture: true, types: ROCK },
+  undulation: { type: 'number', default: 0.5, help: 'Soft, irregular unevenness in the texture height, 0..1: the slow waviness of a weathered face, between what the mesh carries and the grain. Height alone.', texture: true, types: ROCK },
+  undulationSize: { type: 'number', default: 0.09, help: 'Metres across the largest swell of that unevenness. Two finer octaves ride under it.', texture: true, types: ROCK },
+  roughness: { type: 'number', default: 0.82, help: 'Base roughness of the stone, 0..1, before the grain, the wear and the growth move it. 0.9 is dry sandstone; 0.55 wet or polished rock.', texture: true, types: ROCK },
+  metallic: { type: 'number', default: 0, help: 'Base metalness of the stone, 0..1. 0 is stone; 0.3 an ore-bearing rock; 1 a lump of metal.', texture: true, types: ROCK },
+  glint: { type: 'number', default: 0.25, help: 'How much of the stone holds metallic flakes, 0..1: angular mica and pyrite shards, glossy and fully metallic, set into the surface.', texture: true, types: ROCK },
+  glintScale: { type: 'number', default: 30, help: 'Metallic flakes per metre: the size of a shard. 30 is about 3cm, 120 a speck.', texture: true, types: ROCK },
+  glintTint: { type: 'string', default: '#d8c9a4', help: 'The colour of those flakes, six digit hex. Pale brass is pyrite; a light grey is mica.', texture: true, types: ROCK },
+  crackWidth: { type: 'number', default: 0.035, help: 'Width of the crack line in the texture as a fraction of a crack cell.', texture: true, types: ROCK },
   crackDepth: { type: 'number', default: 0.6, help: 'How deep the crack line cuts into the texture height, 0..1.', texture: true, types: ROCK },
   subdivisions: { type: 'int', default: 24, help: 'Quads along each edge of the cube the rock is grown from. Six faces of this squared, doubled, is the triangle count.', types: ROCK },
 
@@ -931,16 +949,19 @@ function validateRock(params: Params): void {
   if (params.width < 0) throw new Error(`width must not be negative, got ${params.width}.`);
   if (params.depth < 0) throw new Error(`depth must not be negative, got ${params.depth}.`);
 
-  if (params.roundness < 0 || params.roundness > 1)
-    throw new Error(`roundness must be within 0..1, got ${params.roundness}.`);
+  if (params.scoops < 0 || params.scoops > 24) throw new Error(`scoops must be within 0..24, got ${params.scoops}.`);
 
-  if (params.cleaves < 0 || params.cleaves > 12)
-    throw new Error(`cleaves must be within 0..12, got ${params.cleaves}.`);
+  if (params.scoopSize < 0.3 || params.scoopSize > 0.97)
+    throw new Error(`scoopSize must be within 0.3..0.97, got ${params.scoopSize}.`);
+
+  if (params.scoopDepth < 0 || params.scoopDepth > 0.6)
+    throw new Error(`scoopDepth must be within 0..0.6, got ${params.scoopDepth}.`);
 
   // Past half the radius the noise folds the surface through the centre and
   // the rock stops being star-shaped, which is what the bake relies on.
   if (params.relief < 0 || params.relief > 0.5)
     throw new Error(`relief must be within 0..0.5, got ${params.relief}.`);
+
 
   if (!(params.reliefSize > 0)) throw new Error(`reliefSize must be positive, got ${params.reliefSize}.`);
 
@@ -955,8 +976,8 @@ function validateRock(params: Params): void {
   for (const key of ['plateBevel', 'plateLean', 'bedding', 'plateShare', 'plateTint'] as const)
     if (params[key] < 0 || params[key] > 1) throw new Error(`${key} must be within 0..1, got ${params[key]}.`);
 
-  if (params.facetRelief < 0 || params.facetRelief > 1)
-    throw new Error(`facetRelief must be within 0..1, got ${params.facetRelief}.`);
+  for (const key of ['smoothing', 'stain', 'veins', 'edgeWear', 'snow', 'streaks', 'patina', 'undulation', 'roughness', 'metallic', 'glint'] as const)
+    if (params[key] < 0 || params[key] > 1) throw new Error(`${key} must be within 0..1, got ${params[key]}.`);
 
   if (params.cracks < 0) throw new Error(`cracks must not be negative, got ${params.cracks}.`);
 
@@ -972,7 +993,9 @@ function validateRock(params: Params): void {
   if (params.weathering < 0 || params.weathering > 1)
     throw new Error(`weathering must be within 0..1, got ${params.weathering}.`);
 
-  for (const key of ['stoneTint', 'stoneDark', 'stoneLight', 'lichenTint', 'soilTint'] as const)
+  if (params.bump < 0 || params.bump > 4) throw new Error(`bump must be within 0..4, got ${params.bump}.`);
+
+  for (const key of ['stoneTint', 'stoneDark', 'stoneLight', 'lichenTint', 'soilTint', 'stainTint', 'edgeTint', 'streakTint', 'glintTint'] as const)
     if (!/^#?[0-9a-f]{6}$/i.test(params[key]))
       throw new Error(`${key} must be a six digit hex colour, got '${params[key]}'.`);
 
@@ -985,6 +1008,11 @@ function validateRock(params: Params): void {
     if (params[key] < 0 || params[key] > 1) throw new Error(`${key} must be within 0..1, got ${params[key]}.`);
 
   if (!(params.grainScale > 0)) throw new Error(`grainScale must be positive, got ${params.grainScale}.`);
+
+  if (!(params.glintScale > 0)) throw new Error(`glintScale must be positive, got ${params.glintScale}.`);
+
+  if (!(params.undulationSize > 0))
+    throw new Error(`undulationSize must be positive, got ${params.undulationSize}.`);
 
   if (params.subdivisions < ROCK_MIN_SUBDIVISIONS || params.subdivisions > 128)
     throw new Error(`subdivisions must be within ${ROCK_MIN_SUBDIVISIONS}..128, got ${params.subdivisions}.`);
