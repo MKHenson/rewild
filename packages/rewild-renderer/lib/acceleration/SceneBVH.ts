@@ -369,10 +369,12 @@ export class SceneBVH {
 
       const component = transform.component as unknown as IVisualComponent;
       const geometry = component.geometry;
-      if (geometry.boundingBox === null) geometry.computeBoundingBox();
+      const local = component.localBounds;
+      if (!local && geometry.boundingBox === null)
+        geometry.computeBoundingBox();
 
       const box = this.worldBoxes[idx];
-      box.copy(geometry.boundingBox!);
+      box.copy(local ?? geometry.boundingBox!);
       box.applyMatrix4(transform.matrixWorld);
     }
 
