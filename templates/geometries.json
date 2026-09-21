@@ -100,16 +100,42 @@
     "type": "gltf",
     "url": "nature/rocks/granite-01/granite-01.glb",
     "lods": [
-      "nature/rocks/granite-01/granite-01.lod1.glb",
-      "nature/rocks/granite-01/granite-01.lod2.glb"
+      "nature/rocks/granite-01/granite-01.lod1.glb"
     ]
   },
   "sandstone-01": {
     "type": "gltf",
     "url": "nature/rocks/sandstone-01/sandstone-01.glb",
     "lods": [
-      "nature/rocks/sandstone-01/sandstone-01.lod1.glb",
-      "nature/rocks/sandstone-01/sandstone-01.lod2.glb"
+      "nature/rocks/sandstone-01/sandstone-01.lod1.glb"
+    ]
+  },
+  "granite-02": {
+    "type": "gltf",
+    "url": "nature/rocks/granite-02/granite-02.glb",
+    "lods": [
+      "nature/rocks/granite-02/granite-02.lod1.glb"
+    ]
+  },
+  "granite-03": {
+    "type": "gltf",
+    "url": "nature/rocks/granite-03/granite-03.glb",
+    "lods": [
+      "nature/rocks/granite-03/granite-03.lod1.glb"
+    ]
+  },
+  "sandstone-02": {
+    "type": "gltf",
+    "url": "nature/rocks/sandstone-02/sandstone-02.glb",
+    "lods": [
+      "nature/rocks/sandstone-02/sandstone-02.lod1.glb"
+    ]
+  },
+  "sandstone-03": {
+    "type": "gltf",
+    "url": "nature/rocks/sandstone-03/sandstone-03.glb",
+    "lods": [
+      "nature/rocks/sandstone-03/sandstone-03.lod1.glb"
     ]
   }
 }

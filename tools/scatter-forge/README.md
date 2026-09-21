@@ -292,8 +292,12 @@ in the image too. See [Rocks](#rocks).
 | `weathering` | 0.6 | How far the dirt, the lichen, the drip stains and the ground contact go. | `0` fresh-cut stone · `0.55` the granite template · `1` lichen over every top, soil up its base |
 | `patina` | 0.5 | The dark crust old stone grows where water sits or runs: on the tops, in the hollows, beside the cracks, under the drip lines and around the lichen, never on a worn edge. Thin and brown at its margin, dark and a little glossy at its heart. | `0` none · `0.5` the default, an old rock · `1` a crust over most of what is damp. Within 0..1 |
 | `edgeWear` | 0.5 | How far the convex edges weather: bleached toward `edgeTint`, smoother, and clear of stain, patina and lichen. Read off the surface's curvature at four reaches and feathered, so slab lips and scoop ridges both count. | `0` edges the colour of the faces · `0.5` the default · `1` a rock outlined in pale stone. Within 0..1 |
-| `streaks` | 0 | Opacity of the run-off down the sides: droplet trails from a splat, thickest at the head, thinning and fading down, half of them branching, broken into rivulets and gathering in the cracks. Colour, roughness and occlusion; never height. | `0` none · `0.5` a weathered rock · `1` every trail at full colour. Within 0..1 |
+| `streaks` | 0 | Opacity of the run-off down the sides: droplet trails from a splat, full colour at the head and shedding their load as they fall, half of them branching, broken into rivulets and gathering in the cracks. Colour, roughness and occlusion; never height. | `0` none · `0.5` a weathered rock · `1` every head at full colour. Within 0..1 |
+| `streakCount` | 12 | Streaks around the rock, spaced unevenly, each at its own height up the side with its own run, splat and fade. | `0` none · `12` the default · `30` a rock under a roost. Within 0..100 |
 | `snow` | 0 | Snow on the faces that look up, deeper in hollows, off the edges, drifted at its margin, mottled and blue in its shadow. Painted last, over everything. | `0` none · `0.5` the tops · `1` all but the sides and the edges. Within 0..1 |
+| `topWash` | 0 | How far down the faces that look up the `topTint` wash reaches, on the same scale as `snow`, drifted at its margin. A multiply on the base stone, under the glint, the veins, the stain and the growth, so none of them take it. | `0` none · `0.5` the tops · `1` all but the sides. Within 0..1 |
+| `topOpacity` | 1 | How strongly the wash multiplies the stone it reaches. | `0.3` a hint · `1` the full tint. Within 0..1 |
+| `topTint` | `#808080` | What the wash multiplies by, read with mid grey as no change. | `#9a9488` a warm lift, the top caught by the light · `#6c7076` a cool shade · `#808080` nothing |
 | `stain` | 0.5 | How strongly iron staining is drawn: rust seeping from the cracks, and patches banded along the bedding, as a tint that keeps the grain under it. | `0` unstained · `0.5` the default · `1` rust down every crack. Within 0..1 |
 | `veins` | 0.15 | How much of the rock the quartz veins run through: faint pale lines along the zero crossings of a stretched noise, a little glassier and higher than the stone. | `0` none · `0.15` the default, a few faint ones · `1` most of the surface, and it reads as marble. Within 0..1 |
 | `stoneTint`, `stoneDark`, `stoneLight` | `#7f827c`, `#3e403e`, `#b3b5ae` | The stone's mid tone and the two ends the tone ramps to, six digit hex each. The dark and light are also the mineral colours, and the light lifted toward white is the veins'. | Granite grey by default · `#9c8f7a`, `#5a4a38`, `#c9bda6` sandstone · `#5e6066`, `#2e3034`, `#8d9096` basalt |
@@ -1163,23 +1167,34 @@ pale stone.
 *Affected by*: `smoothing` rounds the ridges, which spreads the wear wider and fainter; more scoops
 and sharper `relief` give it more edges to find.
 
-**The run-off** — `streaks`, `streakTint`
+**The run-off** — `streaks`, `streakCount`, `streakTint`
 
 Droplet stains down the sides. A streak starts at a splat where the drop landed, runs straight
-down under gravity with a little wander, is thickest at its head and tapers to a hairline a sixth
-as wide at its tail, fading as it goes, and about half of them throw a thinner branch part way down, the way water finds a crack.
-Within a streak the film is broken into rivulets, and it gathers where it crosses a crack. It sits
-on the colour, the roughness and the occlusion and never on the height: it is a film on the
-stone, not the stone. The streaks live on a cylinder about the rock's up axis, one possible source
-every 16cm around it, so a rock's girth sets how many it has and the seed which.
+down under gravity with a little wander, is full colour at its head and sheds its load as it goes,
+so it thins to a hairline a sixth as wide and fades together, whole at the head and broken into
+rivulets as it thins, and about half of them throw a thinner branch part way down, the way water
+finds a crack. It gathers where it crosses a crack. It sits on the colour, the roughness and the
+occlusion and never on the height: it is a film on the stone, not the stone. The streaks live on
+a cylinder about the rock's up axis, one per azimuth, spaced unevenly, and each has its own height
+up the side, its own run, its own splat and its own rate of fade, so no two are one streak.
 
-`streaks` is the opacity: `0` none, `0.5` a weathered rock, `1` every trail at full colour.
-`streakTint` is what the drop left: near black is mould and algae under a drip line, white is
-bird droppings, a warm brown is iron run-off.
+`streaks` is the opacity: `0` none, `0.5` a weathered rock, `1` every head at full colour.
+`streakCount` is how many there are around the rock. `streakTint` is what the drop left: near
+black is mould and algae under a drip line, white is bird droppings, a warm brown is iron run-off.
 
 *Affected by*: a trail only runs where the face is steep, so a broad top carries the splats and
 its sides the trails; the underside carries neither, because a drop lets go there. Snow is painted
 over it.
+
+**The wash** — `topWash`, `topOpacity`, `topTint`
+
+One tint over the stone that looks up, as a multiply rather than a coat: the top of the rock
+caught by the light, or held in a cool shade. It is part of the base colour, painted on the tone
+and the grain before the glint, the veins, the cracks, the stain and the growth, so none of those
+take it: a lichen disc or a mica flake on the top is the same colour as one on the side. `topWash`
+is how far down the faces it reaches, on the snow's scale, with its margin drifted by a slow noise
+so the line is never a contour. `topOpacity` is how strongly it multiplies. `topTint` is read with
+`#808080` as no change: lighter lifts the top, darker shades it, a hue warms or cools it.
 
 **The snow** — `snow`
 

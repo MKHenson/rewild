@@ -283,9 +283,21 @@ export const MOUNTAIN: BiomeParams = {
     { layer: 'granite_pebble', density: 0.45, slope: { from: 55, to: 30 } },
     {
       layer: 'granite_01',
-      density: 0.3,
+      density: 0.1,
       height: { from: 165, to: 105 },
       slope: { from: 48, to: 22 },
+    },
+    {
+      layer: 'granite_02',
+      density: 0.1,
+      height: { from: 165, to: 105 },
+      slope: { from: 48, to: 22 },
+    },
+    {
+      layer: 'granite_03',
+      density: 0.2,
+      height: { from: 130, to: 170 },
+      slope: { from: 70, to: 55 },
     },
     // The treeline: conifers climb in from the foothills, stand thickest
     // where the snow begins, and are gone before it closes over. They hold
@@ -303,6 +315,24 @@ export const MOUNTAIN: BiomeParams = {
     {
       layer: 'poplar_01',
       density: 0.01,
+      height: [
+        { from: 0, to: 100 },
+        { from: 150, to: 110 },
+      ],
+      slope: { from: 42, to: 20 },
+    },
+    {
+      layer: 'thistle_01',
+      density: 0.09,
+      height: [
+        { from: 0, to: 100 },
+        { from: 150, to: 110 },
+      ],
+      slope: { from: 42, to: 20 },
+    },
+    {
+      layer: 'plains_01',
+      density: 0.1,
       height: [
         { from: 0, to: 100 },
         { from: 150, to: 110 },
@@ -350,10 +380,22 @@ export const DESERT_MOUNTAIN: BiomeParams = {
   // Weathered blocks, collecting on the flanks and skirts rather than the crest.
   scatter: [
     {
-      layer: 'granite_01',
-      density: 0.26,
-      height: { from: 420, to: 90 },
+      layer: 'sandstone_01',
+      density: 0.2,
+      height: { from: 420, to: 0 },
       slope: { from: 45, to: 18 },
+    },
+    {
+      layer: 'sandstone_02',
+      density: 0.2,
+      height: { from: 420, to: 0 },
+      slope: { from: 45, to: 18 },
+    },
+    {
+      layer: 'sandstone_03',
+      density: 0.2,
+      height: { from: 420, to: 0 },
+      slope: { from: 0, to: 18 },
     },
     { layer: 'granite_pebble', density: 0.34, slope: { from: 50, to: 20 } },
   ],
@@ -421,7 +463,7 @@ export const DESERT: BiomeParams = {
       noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
     },
     {
-      layer: 'granite_01',
+      layer: 'sandstone_01',
       density: 0.05,
       height: { from: 55, to: 12 },
       noise: { scale: 340, seedSalt: 67, band: { from: 0.62, to: 0.85 } },

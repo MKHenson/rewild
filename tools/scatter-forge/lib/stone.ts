@@ -76,6 +76,8 @@ interface Palette {
   /** What the run-off leaves behind, and how dark it is. */
   streak: Rgb;
   streakLum: number;
+  /** What the faces that look up are multiplied by: topTint read with mid grey as one. */
+  wash: Rgb;
   /** The metallic flakes in the grain. */
   glint: Rgb;
 }
@@ -110,6 +112,7 @@ function paletteOf(params: Params): Palette {
     snowShadow: [0.72, 0.79, 0.9],
     streak: parseHex(params.streakTint, 'streakTint'),
     streakLum: luminance(parseHex(params.streakTint, 'streakTint')),
+    wash: mulRgb(parseHex(params.topTint, 'topTint'), [2, 2, 2]),
     glint: parseHex(params.glintTint, 'glintTint'),
   };
 }
@@ -253,6 +256,8 @@ const COLONY_SCALE = 1.2;
 /** Cycles per metre of the patchiness in the edge wear, and of the drifts in the snow. */
 const WEAR_SCALE = 3;
 const SNOW_SCALE = 5;
+/** Cycles per metre of the drift in the wash's margin. */
+const WASH_SCALE = 2;
 /** Cycles per metre of the snow's mottling, and of the lumps it drifts into. */
 const SNOW_MOTTLE = 18;
 const SNOW_LUMPS = 7;
@@ -359,79 +364,120 @@ function flakeAt(into: FlakeSample, x: number, y: number, z: number, cells: numb
   return into;
 }
 
-/** Metres around the rock per possible streak, and the share of those places that have one. */
-const STREAK_SPACING = 0.16;
-const STREAK_DENSITY = 0.6;
-/** Half width of a streak at its head, in metres, from this to twice it. The tail is a sixth of it. */
+/** Half width of a trail at its head, in metres, from this to twice it. The tail is a sixth of it. */
 const STREAK_WIDTH = 0.018;
-/** How far a streak wanders sideways over its length, in metres. */
+/** How far a trail wanders sideways over its length, in metres. */
 const STREAK_WANDER = 0.06;
-/** How far a branch leaves its streak by the end, in metres. */
+/** How far a branch leaves its trail by the end, in metres. */
 const STREAK_BRANCH = 0.07;
-/** Cycles per metre of the rivulets within a streak, around the rock and down it. */
+/** How fast a trail sheds its load, from this to twice it: the film at t down its run is (1 - t) to this. */
+const STREAK_DECAY = 1.1;
+/** Cycles per metre of the rivulets within a trail, around the rock and down it. */
 const RIVULET_AROUND = 30;
 const RIVULET_DOWN = 3;
+/** Floats per streak in a source table: azimuth, head height, run length, head half width, splat reach, splat opacity, decay, branch side (0, -1 or 1). */
+const STREAK_STRIDE = 8;
 
 const TWO_PI = Math.PI * 2;
 
 /**
- * The run-off at a point: 0 clear of it, 1 in the head of a streak. Streaks
- * live on a cylinder about the rock's up axis, one possible source per cell
- * around it, so each runs straight down under gravity. A streak is a splat
- * where the drop landed, a trail that wanders a little, thins and fades as
- * it goes, and sometimes a thinner branch that leaves it part way down.
+ * Where each streak starts and how it runs. One azimuth per streak, jittered
+ * so the spacing is uneven, a head at its own height up the side, and a run,
+ * a width, a splat and a decay of its own, so no two trails are one trail.
+ * Rolled once, so every chart reads the same table.
  */
-function streakAt(field: RockField, theta: number, y: number, lateral: number, cells: number, height: number, steep: number): number {
-  const cellWidth = TWO_PI / cells;
-  const k0 = Math.floor(theta / cellWidth);
+function streakSources(field: RockField, count: number, height: number): Float32Array {
   const seed = field.seed ^ 0x73747265;
-  let best = 0;
+  const sources = new Float32Array(count * STREAK_STRIDE);
 
-  for (let dk = -1; dk <= 1; dk++) {
-    const k = (((k0 + dk) % cells) + cells) % cells;
-    if (hash3(k, 1, 0, seed) > STREAK_DENSITY) continue;
+  for (let k = 0; k < count; k++) {
+    const o = k * STREAK_STRIDE;
+    sources[o] = ((k + hash3(k, 2, 0, seed)) * TWO_PI) / count;
+    sources[o + 1] = field.base + height * (0.4 + 0.6 * hash3(k, 3, 0, seed));
+    sources[o + 2] = height * (0.15 + 0.85 * hash3(k, 4, 0, seed));
+    sources[o + 3] = STREAK_WIDTH * (1 + hash3(k, 5, 0, seed));
+    sources[o + 4] = 0.8 + 0.6 * hash3(k, 8, 0, seed);
+    sources[o + 5] = 0.45 + 0.35 * hash3(k, 9, 0, seed);
+    sources[o + 6] = STREAK_DECAY * (1 + hash3(k, 10, 0, seed));
+    sources[o + 7] = hash3(k, 6, 0, seed) < 0.6 ? (hash3(k, 7, 0, seed) < 0.5 ? -1 : 1) : 0;
+  }
 
-    const sourceTheta = (k0 + dk + hash3(k, 2, 0, seed)) * cellWidth;
-    const top = field.base + height * (0.4 + 0.6 * hash3(k, 3, 0, seed));
-    const length = height * (0.3 + 0.6 * hash3(k, 4, 0, seed));
-    const headWidth = STREAK_WIDTH * (1 + hash3(k, 5, 0, seed));
-    let dTheta = theta - sourceTheta;
+  return sources;
+}
+
+interface StreakSample {
+  /** The run-off film: 0 clear of every streak, 1 at a head. */
+  film: number;
+  /** How far down its run the strongest trail here is, 0 at the head. */
+  t: number;
+}
+
+const _run: StreakSample = { film: 0, t: 0 };
+
+/**
+ * The run-off at a point. Streaks live on a cylinder about the rock's up
+ * axis, so each runs straight down under gravity. A streak is a splat where
+ * the drop landed, a trail that wanders a little and is full at its head
+ * and sheds its load as it goes, so it thins and fades together, and
+ * sometimes a thinner branch that leaves it part way down.
+ */
+function streakAt(into: StreakSample, sources: Float32Array, field: RockField, theta: number, y: number, lateral: number, steep: number): StreakSample {
+  const seed = field.seed ^ 0x73747265;
+  into.film = 0;
+  into.t = 0;
+
+  for (let o = 0; o < sources.length; o += STREAK_STRIDE) {
+    let dTheta = theta - sources[o];
     dTheta -= Math.round(dTheta / TWO_PI) * TWO_PI;
     // Sideways distance in metres at this height, so a streak is one width
     // whatever the rock's girth is here.
     const across = dTheta * lateral;
+    const headWidth = sources[o + 3];
+    if (Math.abs(across) > headWidth * 4 + STREAK_WANDER + STREAK_BRANCH) continue;
 
     // The splat, a little wider than it is tall, and fainter than the trail's head.
-    const splat = (1 - smoothstep(headWidth * 1.2, headWidth * 3, Math.hypot(across, (y - top) * 1.4))) * 0.7;
-    best = Math.max(best, splat);
+    const top = sources[o + 1];
+    const reach = headWidth * sources[o + 4];
+    const splat = (1 - smoothstep(reach * 1.2, reach * 3, Math.hypot(across, (y - top) * 1.4))) * sources[o + 5];
+    if (splat > into.film) {
+      into.film = splat;
+      into.t = 0;
+    }
 
     // A drop only runs where the face is steep enough to run down; on a
     // face that looks up it lies where it landed.
     const below = top - y;
+    const length = sources[o + 2];
     if (steep <= 0 || below < 0 || below > length) continue;
     const t = below / length;
-    const wander = (fbm3r(below * 4, k * 7.3, 0.5, 2, seed) - 0.5) * STREAK_WANDER * Math.sqrt(t);
+    const wander = (fbm3r(below * 4, (o / STREAK_STRIDE) * 7.3, 0.5, 2, seed) - 0.5) * STREAK_WANDER * Math.sqrt(t);
     // Thick at the head, a hairline at the tail: the width and the edge's
     // softness both taper, or the blur alone sets the width the eye reads.
     const halfWidth = headWidth * (1 - 0.85 * t);
-    const fade = Math.pow(1 - t, 1.1) * (0.7 + 0.3 * smoothstep(0, 0.15, t));
+    const fade = Math.pow(1 - t, sources[o + 6]);
     const trail = (1 - smoothstep(halfWidth * 0.5, halfWidth * 1.3, Math.abs(across - wander))) * fade * steep;
-    best = Math.max(best, trail);
+    if (trail > into.film) {
+      into.film = trail;
+      into.t = t;
+    }
 
-    if (t > 0.35 && hash3(k, 6, 0, seed) < 0.6) {
-      const side = hash3(k, 7, 0, seed) < 0.5 ? -1 : 1;
+    const side = sources[o + 7];
+    if (side !== 0 && t > 0.35) {
       const offset = side * STREAK_BRANCH * ((t - 0.35) / 0.65);
       const branch = (1 - smoothstep(halfWidth * 0.3, halfWidth * 0.9, Math.abs(across - wander - offset))) * fade * 0.7 * steep;
-      best = Math.max(best, branch);
+      if (branch > into.film) {
+        into.film = branch;
+        into.t = t;
+      }
     }
   }
 
-  return best;
+  return into;
 }
 
 const DRIP_STEPS = 5;
 
-function paintChart(canvas: Canvas, params: Params, field: RockField, palette: Palette, faceIndex: number): void {
+function paintChart(canvas: Canvas, params: Params, field: RockField, palette: Palette, sources: Float32Array, faceIndex: number): void {
   const chartPx = rockChartPx(params);
   const surface = sampleSurface(field, faceIndex, chartPx);
   const column = faceIndex % ROCK_CHART_COLUMNS;
@@ -448,6 +494,8 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
   const crackStrength = params.crackStrength;
   const edgeWear = params.edgeWear;
   const snow = params.snow;
+  const wash = params.topWash;
+  const washOpacity = params.topOpacity;
   const streaks = params.streaks;
   const patinaStrength = params.patina;
   const undulation = params.undulation;
@@ -456,9 +504,6 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
   const glintScale = params.glintScale;
   const baseRoughness = params.roughness;
   const lateralRadius = (field.extents[0] + field.extents[2]) / 2;
-  // One lattice around the whole rock, sized off its girth, so a streak is
-  // the same streak at every height it passes.
-  const streakCells = Math.max(6, Math.round((TWO_PI * lateralRadius) / STREAK_SPACING));
   const radius = (field.extents[0] + field.extents[1] + field.extents[2]) / 3;
   const height = field.extents[1] * 2;
   const dripStep = radius * 0.04;
@@ -546,6 +591,20 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
         b = mix(b, mineral[2], amount) * crystal;
         roughness = mix(roughness, mineralRough, speckle * 0.6);
         relief += speckle * (fract(id * 53.17) - 0.5) * 0.07 * boundary;
+      }
+
+      // The wash: the stone that looks up, multiplied by one tint. Part of
+      // the base colour, before the glint, the veins, the stain and the
+      // growth, so none of them take it, and drifted at its margin like the
+      // snow so the line is never a contour.
+      if (wash > 0) {
+        const drift = (fbm3r(px * WASH_SCALE, py * WASH_SCALE, pz * WASH_SCALE, 2, seed ^ 0x77617368) - 0.5) * 0.4;
+        const cover = smoothstep(0.7 - 0.6 * wash, 1.0 - 0.45 * wash, up + drift) * washOpacity;
+        if (cover > 0) {
+          r *= mix(1, palette.wash[0], cover);
+          g *= mix(1, palette.wash[1], cover);
+          b *= mix(1, palette.wash[2], cover);
+        }
       }
 
       // Glint: shards of mica or pyrite grown in the stone — metallic,
@@ -689,10 +748,10 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
       roughness += 0.1 * dirt;
       ao *= 1 - 0.25 * dirt;
 
-      // Run-off: droplet trails down the sides, thicker at the head and a
-      // hairline at the tail, gathering into the cracks. Measured here, so
-      // the crust below can grow under the drip lines, and painted later, so
-      // it lies over the lichen the way a drip does.
+      // Run-off: droplet trails down the sides, full at the head and shed
+      // as they fall, gathering into the cracks. Measured here, so the crust
+      // below can grow under the drip lines, and painted later, so it lies
+      // over the lichen the way a drip does.
       let film = 0;
       if (streaks > 0) {
         const lateral = Math.hypot(px, pz);
@@ -701,10 +760,11 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
         const holds = smoothstep(-0.6, -0.2, up) * smoothstep(0.08, 0.25, lateral / lateralRadius);
         if (holds > 0) {
           const steep = 1 - smoothstep(0.45, 0.8, up);
-          const run = streakAt(field, Math.atan2(pz, px), py, lateral, streakCells, height, steep);
-          if (run > 0) {
-            const rivulets = 0.55 + 0.7 * fbm3r(px * RIVULET_AROUND, py * RIVULET_DOWN, pz * RIVULET_AROUND, 2, seed ^ 0x72697675);
-            film = clamp01(streaks * run * holds * rivulets * (1 + 0.6 * crack));
+          streakAt(_run, sources, field, Math.atan2(pz, px), py, lateral, steep);
+          if (_run.film > 0) {
+            // Whole at the head, and broken into rivulets as it thins.
+            const rivulets = mix(1, 0.45 + 0.9 * fbm3r(px * RIVULET_AROUND, py * RIVULET_DOWN, pz * RIVULET_AROUND, 2, seed ^ 0x72697675), smoothstep(0, 0.5, _run.t));
+            film = clamp01(streaks * _run.film * holds * rivulets * (1 + 0.6 * crack));
           }
         }
       }
@@ -868,8 +928,9 @@ export function buildStoneCanvas(params: Params, field: RockField): Canvas {
   const chartPx = rockChartPx(params);
   const canvas = createCanvas(chartPx * ROCK_CHART_COLUMNS, chartPx * ROCK_CHART_ROWS, params.bumpStrength * params.bump);
   const palette = paletteOf(params);
+  const sources = params.streaks > 0 ? streakSources(field, params.streakCount, field.extents[1] * 2) : new Float32Array(0);
 
-  for (let faceIndex = 0; faceIndex < FACES.length; faceIndex++) paintChart(canvas, params, field, palette, faceIndex);
+  for (let faceIndex = 0; faceIndex < FACES.length; faceIndex++) paintChart(canvas, params, field, palette, sources, faceIndex);
 
   return canvas;
 }
