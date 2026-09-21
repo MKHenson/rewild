@@ -8,7 +8,7 @@
 // Finer layers are min-blended in, so their gaps chip the coarse plates and
 // their bevels ride on top of them.
 
-import { hash3 } from './noise.ts';
+import { hash3, smax, smin } from './noise.ts';
 import type { Rng } from './rng.ts';
 import type { Vec3 } from './vec.ts';
 
@@ -25,6 +25,8 @@ export interface PlateField {
   bedding: number;
   /** Row-major rotation taking world space into the bedding frame, bedding normal along y. */
   frame: number[];
+  /** How far the slab edges, the gaps and the chips are rounded, 0..1. 0 is knife-edged. */
+  smoothing: number;
   seed: number;
 }
 
@@ -48,6 +50,11 @@ const JITTER = 0.25;
 const SPREAD = Math.PI / 3;
 /** How deep each finer layer chips, relative to the one before it. */
 const CHIP = 0.5;
+// Bands, in slab heights, the plateau and the joins round over at smoothing 1.
+// A polynomial smooth minimum moves the surface by at most a quarter of its
+// band, so a band has to be a good fraction of the feature to round it at all.
+const ROUND_TOP = 1;
+const ROUND_JOIN = 0.8;
 
 /** A per-rock bedding frame: up, tilted by up to `tilt` radians about a random horizontal axis. */
 export function beddingFrame(rng: Rng, tilt: number): number[] {
@@ -76,7 +83,11 @@ function layerAt(field: PlateField, x: number, y: number, z: number, seed: numbe
   const cy = Math.floor(y);
   const cz = Math.floor(z);
   const spread = (1 - field.bedding) * SPREAD;
-  let best = -Infinity;
+  const roundTop = field.smoothing * ROUND_TOP;
+  const roundJoin = field.smoothing * ROUND_JOIN;
+  // Finite, because the smooth maximum multiplies its arguments' gap by a
+  // clamped weight, and infinity times zero is not a number.
+  let best = -1e6;
   let bestId = 0;
 
   for (let oz = -1; oz <= 1; oz++)
@@ -119,16 +130,18 @@ function layerAt(field: PlateField, x: number, y: number, z: number, seed: numbe
         // Flat top, bevelled to the edge, dropping across the slab's width. The
         // bevel carries on below zero past the edge, so a point no slab covers
         // sits in a narrow V between its neighbours rather than on a flat pit.
-        const top = Math.min(1, (1 - edge) / Math.max(1e-3, field.bevel));
+        // Both the plateau's shoulder and the join between two slabs are
+        // rounded: a hard kink in the field is a hard crease in the mesh.
+        const top = smin(1, (1 - edge) / Math.max(1e-3, field.bevel), roundTop);
         const value = top - field.lean * (_local[0] / half + 1) * 0.5;
-        if (value > best) {
-          best = value;
-          if (wantId) bestId = hash3(gx, gy, gz, seed ^ 0x51ed270b);
+        if (value > best - roundJoin) {
+          if (wantId && value > best) bestId = hash3(gx, gy, gz, seed ^ 0x51ed270b);
+          best = smax(best, value, roundJoin);
         }
       }
 
   if (wantId) out.id = bestId;
-  return Math.max(0, best);
+  return smax(0, best, roundJoin);
 }
 
 /** The pile's height and the coarse slab under a world point. */
@@ -143,7 +156,7 @@ export function platesInto(out: PlateSample, field: PlateField, x: number, y: nu
   let depth = 1;
   for (let layer = 0; layer < field.layers; layer++) {
     const value = layerAt(field, _q[0] * scale, _q[1] * scale, _q[2] * scale, field.seed + layer * 7919, layer === 0, out);
-    height = Math.min(height, 1 - (1 - value) * depth);
+    height = smin(height, 1 - (1 - value) * depth, field.smoothing * ROUND_JOIN * depth);
     scale *= LAYER_STEP;
     depth *= CHIP;
   }

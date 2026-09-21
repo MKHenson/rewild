@@ -46,7 +46,7 @@ import {
 } from './lib/templates.ts';
 import { buildClump, patchRadiusOf } from './lib/clump.ts';
 import { buildCrown } from './lib/crown.ts';
-import { buildRock, chartUv, crackMask, cubePoint, FACES, ROCK_CHART_COLUMNS, ROCK_CHART_ROWS, ROCK_GUTTER, rockChartPx, surfaceAt } from './lib/rock.ts';
+import { buildRock, chartUv, crackMask, cubePoint, FACES, ROCK_CHART_COLUMNS, ROCK_CHART_ROWS, ROCK_GUTTER, rockChartPx, scoopOf, surfaceAt } from './lib/rock.ts';
 import { buildStoneCanvas } from './lib/stone.ts';
 import { platesInto } from './lib/plates.ts';
 import { heightPieces, materialPieces } from './lib/pieces.ts';
@@ -2164,8 +2164,8 @@ xdescribe('rock', () => {
     expect(() => parseConfig({ type: 'rock', name: 'a', windAmplitude: 1 }, 'test.json')).toThrow(
       /'windAmplitude' applies to tree, clump, crown, not to type 'rock'/
     );
-    expect(() => parseConfig({ name: 'a', roundness: 1 }, 'test.json')).toThrow(
-      /'roundness' applies to rock, not to type 'tree'/
+    expect(() => parseConfig({ name: 'a', scoops: 1 }, 'test.json')).toThrow(
+      /'scoops' applies to rock, not to type 'tree'/
     );
   });
 
@@ -2178,9 +2178,9 @@ xdescribe('rock', () => {
   });
 
   it('holds its keys to their ranges', () => {
-    expect(() => rockParams({ roundness: 1.5 })).toThrow(/roundness must be within 0..1/);
+    expect(() => rockParams({ scoopDepth: 1.5 })).toThrow(/scoopDepth must be within 0..0.6/);
     expect(() => rockParams({ relief: 0.6 })).toThrow(/relief must be within 0..0.5/);
-    expect(() => rockParams({ cleaves: 13 })).toThrow(/cleaves must be within 0..12/);
+    expect(() => rockParams({ scoops: 25 })).toThrow(/scoops must be within 0..24/);
     expect(() => rockParams({ subdivisions: 1 })).toThrow(/subdivisions must be within 2..128/);
     expect(() => rockParams({ weathering: -1 })).toThrow(/weathering must be within 0..1/);
     expect(() => rockParams({ reliefSize: 0 })).toThrow(/reliefSize must be positive/);
@@ -2188,8 +2188,8 @@ xdescribe('rock', () => {
   });
 
   it('cuts a groove under a coarse crack that reaches the silhouette', () => {
-    const grooved = build({ relief: 0, cleaves: 0, cracks: 2, grooveDepth: 0.1, grooveWidth: 0.2 });
-    const plain = build({ relief: 0, cleaves: 0, cracks: 0 });
+    const grooved = build({ relief: 0, scoops: 0, cracks: 2, grooveDepth: 0.1, grooveWidth: 0.2 });
+    const plain = build({ relief: 0, scoops: 0, cracks: 0 });
     const a = grooved.mesh.pieces[0].attributes.positions;
     const b = plain.mesh.pieces[0].attributes.positions;
     let deepest = 0;
@@ -2213,7 +2213,7 @@ xdescribe('rock', () => {
   // away from it. A face wound the other way would be culled by the engine
   // and show as a hole.
   it('winds every triangle outward from the centre', () => {
-    const { mesh, field } = build({ subdivisions: 8, cleaves: 4, relief: 0.3 });
+    const { mesh, field } = build({ subdivisions: 8, scoops: 12, scoopDepth: 0.6, relief: 0.3 });
     const { positions, indices } = mesh.pieces[0].attributes;
     const centre = [0, -field.base, 0];
     let inward = 0;
@@ -2241,7 +2241,7 @@ xdescribe('rock', () => {
   });
 
   it('stands on its lowest point and spans the size it was asked for', () => {
-    const { mesh, metrics } = build({ height: 2, width: 3, depth: 1.5, relief: 0, cleaves: 0, cracks: 0 });
+    const { mesh, metrics } = build({ height: 2, width: 3, depth: 1.5, relief: 0, scoops: 0, cracks: 0 });
     const { positions } = mesh.pieces[0].attributes;
     let lowest = Infinity;
     for (let i = 1; i < positions.length; i += 3) lowest = Math.min(lowest, positions[i]);
@@ -2252,22 +2252,27 @@ xdescribe('rock', () => {
     expect(metrics.depth).toBeCloseTo(1.5, 5);
   });
 
-  it('clips a cleave to a flat facet', () => {
-    const { mesh, field } = build({ cleaves: 1, relief: 0, cracks: 0 });
-    const [cleave] = field.cleaves;
+  it('keeps every vertex out of every scoop', () => {
+    const { mesh, field } = build({ scoops: 6, scoopDepth: 0.5, relief: 0, cracks: 0, smoothing: 0 });
     const { positions } = mesh.pieces[0].attributes;
-    let past = 0;
-    let onFacet = 0;
+    let inside = 0;
+    let scooped = 0;
 
     for (let i = 0; i < positions.length; i += 3) {
-      const h =
-        positions[i] * cleave.normal[0] + (positions[i + 1] + field.base) * cleave.normal[1] + positions[i + 2] * cleave.normal[2];
-      if (h > cleave.distance + 1e-5) past++;
-      if (Math.abs(h - cleave.distance) < 1e-5) onFacet++;
+      const ux = positions[i] / field.extents[0];
+      const uy = (positions[i + 1] + field.base) / field.extents[1];
+      const uz = positions[i + 2] / field.extents[2];
+      if (Math.hypot(ux, uy, uz) < 1 - 1e-4) scooped++;
+      for (const scoop of field.scoops) {
+        const dx = ux - scoop.centre[0];
+        const dy = uy - scoop.centre[1];
+        const dz = uz - scoop.centre[2];
+        if (Math.hypot(dx, dy, dz) < scoop.radius - 1e-5) inside++;
+      }
     }
 
-    expect(past).toBe(0);
-    expect(onFacet).toBeGreaterThan(0);
+    expect(inside).toBe(0);
+    expect(scooped).toBeGreaterThan(0);
   });
 
   it('builds its relief from a slab pile unless plates is 0', () => {
@@ -2298,25 +2303,15 @@ xdescribe('rock', () => {
     expect(() => rockParams({ plateLayers: 5 })).toThrow(/plateLayers must be within 1..4/);
   });
 
-  it('keeps a share of the relief on a facet, and none at facetRelief 0', () => {
-    const facetSpan = (facetRelief: number): number => {
-      const { mesh, field } = build({ cleaves: 1, relief: 0.3, cracks: 0, facetRelief });
-      const [cleave] = field.cleaves;
-      const { positions } = mesh.pieces[0].attributes;
-      let low = Infinity;
-      let high = -Infinity;
-      for (let i = 0; i < positions.length; i += 3) {
-        const h =
-          positions[i] * cleave.normal[0] + (positions[i + 1] + field.base) * cleave.normal[1] + positions[i + 2] * cleave.normal[2];
-        if (h > cleave.distance - 1e-3 * field.relief) {
-          low = Math.min(low, h);
-          high = Math.max(high, h);
-        }
-      }
-      return high - low;
-    };
-    expect(facetSpan(0)).toBeLessThan(1e-4);
-    expect(facetSpan(0.5)).toBeGreaterThan(0.01);
+  it('holds a scoop back from overhanging, however deep it is asked to go', () => {
+    // A scoop whose silhouette from the centre lies inside the rock would be
+    // an overhang, which a ray from the centre cannot represent.
+    for (const size of [0.3, 0.6, 0.9, 0.97]) {
+      const scoop = scoopOf([0, 1, 0], size, 0.6);
+      const distance = Math.sqrt(scoop.distance2);
+      expect(Math.sqrt(distance * distance - scoop.radius * scoop.radius)).toBeGreaterThan(1.07);
+      expect(distance - scoop.radius).toBeLessThan(1);
+    }
   });
 
   it('lays every face inside its own chart, gutter excluded', () => {
@@ -2367,8 +2362,8 @@ xdescribe('rock', () => {
   it('rebuilds its image for a key that moves the surface, not for one that only tessellates it', () => {
     const base = rockParams();
     expect(sameTexture(base, rockParams({ subdivisions: 12 }))).toBe(true);
-    expect(sameTexture(base, rockParams({ roundness: 0.9 }))).toBe(false);
-    expect(sameTexture(base, rockParams({ cleaves: 0 }))).toBe(false);
+    expect(sameTexture(base, rockParams({ scoopDepth: 0.5 }))).toBe(false);
+    expect(sameTexture(base, rockParams({ scoops: 0 }))).toBe(false);
     expect(sameTexture(base, rockParams({ height: 3 }))).toBe(false);
   });
 

@@ -379,6 +379,67 @@ export function fbm3(x: number, y: number, z: number, octaves: number, seed: num
   return sum / total;
 }
 
+// Rotation applied between octaves, and a lacunarity just off 2, so no two
+// octaves share a lattice. Axis-aligned octaves at exactly 2x line their
+// creases up, and under a normal map the sum reads as a faint grid.
+const OCTAVE_ROTATION = [0.0, -0.8, -0.6, -0.8, 0.36, -0.48, -0.6, -0.48, 0.64];
+const OCTAVE_LACUNARITY = 2.04;
+
+/** Octave sum of `gradientNoise3` with every octave turned off the last, 0..1, clustered about 0.5 like `fbm`. */
+export function fbm3r(x: number, y: number, z: number, octaves: number, seed: number, gain = 0.5): number {
+  let sum = 0;
+  let amplitude = 1;
+  let total = 0;
+  const m = OCTAVE_ROTATION;
+
+  for (let o = 0; o < octaves; o++) {
+    sum += gradientNoise3(x, y, z, seed + o * 7919) * amplitude;
+    total += amplitude;
+    amplitude *= gain;
+    const nx = (m[0] * x + m[1] * y + m[2] * z) * OCTAVE_LACUNARITY;
+    const ny = (m[3] * x + m[4] * y + m[5] * z) * OCTAVE_LACUNARITY;
+    const nz = (m[6] * x + m[7] * y + m[8] * z) * OCTAVE_LACUNARITY;
+    x = nx;
+    y = ny;
+    z = nz;
+  }
+
+  return sum / total;
+}
+
+/**
+ * `fbm3r` as creases rather than blobs.
+ *
+ * `soften` rounds the crease itself. The ridge comes from an absolute value,
+ * whose corner is a knife edge at every zero crossing of the sum, and those
+ * corners are most of what keeps a noise surface sharp however the rest of
+ * the field is rounded. `sabs` replaces the corner with an arc of that width
+ * and is the true absolute value away from it.
+ */
+export function ridged3r(x: number, y: number, z: number, octaves: number, seed: number, gain = 0.5, soften = 0): number {
+  return 1 - sabs(fbm3r(x, y, z, octaves, seed, gain) * 2 - 1, soften);
+}
+
+/** `Math.abs` with its corner rounded over a band `k` wide. */
+export function sabs(v: number, k: number): number {
+  return k > 0 ? Math.sqrt(v * v + k * k) - k : Math.abs(v);
+}
+
+/**
+ * Polynomial smooth minimum: `min(a, b)` with the crease between them rounded
+ * over a band `k` wide. `k` 0 is the hard minimum.
+ */
+export function smin(a: number, b: number, k: number): number {
+  if (k <= 0) return Math.min(a, b);
+  const h = Math.min(1, Math.max(0, 0.5 + (0.5 * (b - a)) / k));
+  return b + (a - b) * h - k * h * (1 - h);
+}
+
+/** `smin` for the maximum. */
+export function smax(a: number, b: number, k: number): number {
+  return -smin(-a, -b, k);
+}
+
 /** `fbm3` remapped to -1..1 across the range it occupies. */
 export function signedFbm3(x: number, y: number, z: number, octaves: number, seed: number, gain = 0.5): number {
   const spread = FBM_HALF_RANGE[octaves] ?? 0.15;

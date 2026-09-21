@@ -233,7 +233,10 @@ async function serve() {
 
   const assetsDir = path.join(process.cwd(), 'assets', 'shared');
 
-  http.createServer((req, res) => {
+  // Node caps request headers at 16 KB by default. Cookies are shared across all
+  // ports on localhost, so other local dev apps can push the header past that cap
+  // and the browser gets a 431 before the request reaches esbuild.
+  http.createServer({ maxHeaderSize: 512 * 1024 }, (req, res) => {
     const isApi = req.url?.startsWith('/api');
     const isSharedAsset = req.url?.startsWith('/assets/shared/');
 

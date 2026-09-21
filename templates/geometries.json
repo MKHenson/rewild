@@ -103,5 +103,13 @@
       "nature/rocks/granite-01/granite-01.lod1.glb",
       "nature/rocks/granite-01/granite-01.lod2.glb"
     ]
+  },
+  "sandstone-01": {
+    "type": "gltf",
+    "url": "nature/rocks/sandstone-01/sandstone-01.glb",
+    "lods": [
+      "nature/rocks/sandstone-01/sandstone-01.lod1.glb",
+      "nature/rocks/sandstone-01/sandstone-01.lod2.glb"
+    ]
   }
 }

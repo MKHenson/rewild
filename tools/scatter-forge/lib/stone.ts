@@ -3,12 +3,19 @@
 // direction to a surface point, and the grain, the cracks and the weathering
 // are all functions of that point and its normal — which is why a crack runs
 // into a chart's gutter and out the neighbouring chart without a break.
+//
+// What makes stone read as stone is fine structure at every scale down to the
+// texel, so the painter is layered: a slow tone, a cellular mineral grain, a
+// texel-scale grit, veins, cracks, staining, then the weathering that sits on
+// top of all of it. Every layer writes the height too, so the normal map
+// carries the same detail the colour does.
 
-import { fbm3, smoothstep, worley3Into, type Worley3Result } from './noise.ts';
+import { fbm3r, hash3, smoothstep, worley3Into, type Worley3Result } from './noise.ts';
 import type { Params } from './params.ts';
 import { platesInto, type PlateSample } from './plates.ts';
 import {
-  crackMask,
+  crackCoarse,
+  crackFine,
   cubePoint,
   FACES,
   ROCK_CHART_COLUMNS,
@@ -16,6 +23,7 @@ import {
   ROCK_GUTTER,
   rockChartPx,
   surfaceAt,
+  type CrackSample,
   type RockField,
 } from './rock.ts';
 import { createCanvas, type Canvas, type Canvases } from './textures.ts';
@@ -25,6 +33,8 @@ type Rgb = [number, number, number];
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 const mix = (a: number, b: number, t: number): number => a + (b - a) * t;
+const fract = (v: number): number => v - Math.floor(v);
+const luminance = (c: Rgb): number => 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
 
 function parseHex(value: string, field: string): Rgb {
   const match = /^#?([0-9a-f]{6})$/i.exec(value);
@@ -33,22 +43,74 @@ function parseHex(value: string, field: string): Rgb {
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
 
-/** Every look value the painter reads, parsed once. */
+const mixRgb = (a: Rgb, b: Rgb, t: number): Rgb => [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
+const mulRgb = (a: Rgb, b: Rgb): Rgb => [a[0] * b[0], a[1] * b[1], a[2] * b[2]];
+
+/** Every look value the painter reads, parsed once, and the colours derived from them. */
 interface Palette {
   mid: Rgb;
   dark: Rgb;
   light: Rgb;
-  lichen: Rgb;
   soil: Rgb;
+  /** The three minerals of the grain: the dark flakes, the glassy grey and the pale bulk. */
+  biotite: Rgb;
+  quartz: Rgb;
+  feldspar: Rgb;
+  vein: Rgb;
+  /** Iron staining, as a tint at unit luminance and as the colour itself. */
+  rust: Rgb;
+  rustTint: Rgb;
+  /** The weathering crust: its dark heart and its thinner brown margin. */
+  patina: Rgb;
+  patinaThin: Rgb;
+  /** The lichens: the common pale disc, its grey-blue neighbour, the rare yellow one, and a disc's darker heart. */
+  lichen: Rgb;
+  lichenGrey: Rgb;
+  lichenYellow: Rgb;
+  lichenHeart: Rgb;
+  /** The bleached colour a worn edge weathers to. */
+  edge: Rgb;
+  /** Snow in the light, and snow in its own shadow. */
+  snow: Rgb;
+  snowShadow: Rgb;
+  /** What the run-off leaves behind, and how dark it is. */
+  streak: Rgb;
+  streakLum: number;
+  /** The metallic flakes in the grain. */
+  glint: Rgb;
 }
 
 function paletteOf(params: Params): Palette {
+  const mid = parseHex(params.stoneTint, 'stoneTint');
+  const dark = parseHex(params.stoneDark, 'stoneDark');
+  const light = parseHex(params.stoneLight, 'stoneLight');
+  const lichen = parseHex(params.lichenTint, 'lichenTint');
+  const rust = parseHex(params.stainTint, 'stainTint');
+  const rustLum = Math.max(0.05, luminance(rust));
+
   return {
-    mid: parseHex(params.stoneTint, 'stoneTint'),
-    dark: parseHex(params.stoneDark, 'stoneDark'),
-    light: parseHex(params.stoneLight, 'stoneLight'),
-    lichen: parseHex(params.lichenTint, 'lichenTint'),
+    mid,
+    dark,
+    light,
     soil: parseHex(params.soilTint, 'soilTint'),
+    biotite: mixRgb(dark, mid, 0.2),
+    quartz: mixRgb(mixRgb(mid, dark, 0.15), [0.5, 0.55, 0.62], 0.12),
+    feldspar: mixRgb(light, [0.8, 0.7, 0.64], 0.15),
+    vein: mixRgb(light, [0.9, 0.87, 0.82], 0.35),
+    rust,
+    rustTint: [rust[0] / rustLum, rust[1] / rustLum, rust[2] / rustLum],
+    patina: [0.14, 0.115, 0.115],
+    patinaThin: [0.27, 0.22, 0.19],
+    lichen,
+    lichenGrey: mixRgb(lichen, [0.55, 0.6, 0.6], 0.6),
+    lichenYellow: [0.8, 0.66, 0.18],
+    lichenHeart: mulRgb(lichen, [0.62, 0.6, 0.5]),
+    edge: parseHex(params.edgeTint, 'edgeTint'),
+    snow: [0.92, 0.935, 0.95],
+    snowShadow: [0.72, 0.79, 0.9],
+    streak: parseHex(params.streakTint, 'streakTint'),
+    streakLum: luminance(parseHex(params.streakTint, 'streakTint')),
+    glint: parseHex(params.glintTint, 'glintTint'),
   };
 }
 
@@ -142,9 +204,16 @@ function curvatureOf(surface: Surface, chartPx: number, x: number, y: number, re
 }
 
 const _worley: Worley3Result = { f1: 0, f2: 0, id: 0 };
+const _crack: CrackSample = { edge: 0, presence: 0, width: 1 };
+const _n: Vec3 = [0, 0, 0];
+const _plate: PlateSample = { height: 0, id: 0 };
 
 // Half the range an octave sum occupies, by octave count, as `noise.ts` measures it.
 const TONE_SPREAD = [0.29, 0.29, 0.2, 0.17, 0.16, 0.155];
+
+/** Octaves of the undulation, and the half range that many occupy. */
+const UNDULATION_OCTAVES = 3;
+const UNDULATION_SPREAD = TONE_SPREAD[UNDULATION_OCTAVES];
 
 /**
  * An octave sum as a 0..1 tone: centred, widened to the range it occupies,
@@ -161,16 +230,206 @@ function ramp(dark: number, mid: number, light: number, t: number): number {
   return t < 0.5 ? mix(dark, mid, t * 2) : mix(mid, light, (t - 0.5) * 2);
 }
 
-/** The coarse crack field alone, for the march that finds cracks above a texel. */
-function crackAbove(field: RockField, x: number, y: number, z: number): number {
-  const w = worley3Into(_worley, x * field.cracks, y * field.cracks, z * field.cracks, field.seed ^ 0x2545f491);
-  return 1 - smoothstep(0, 0.08, w.f2 - w.f1);
+/** Cells per metre of the texel-scale grit under everything. */
+const GRIT_SCALE = 380;
+/** Cells per metre of the lichen discs; one disc at most per cell. */
+const LICHEN_CELLS = 12;
+/** Cells per metre of the areolae a crust is cracked into. */
+const AREOLA_CELLS = 170;
+/** Cycles per metre of the vein field, and how far it is stretched along the vein direction. */
+const VEIN_SCALE = 4;
+const VEIN_STRETCH = 0.16;
+/** Cycles per metre of the stain patches, and how far they flatten into bands along the bedding. */
+const STAIN_SCALE = 1.6;
+const STAIN_BANDING = 3;
+/** Cycles per metre of the patina's growth, and of the fine edge that makes it a skin. */
+const PATINA_SCALE = 3;
+const PATINA_EDGE = 22;
+/** Cycles per metre of the foliation hairlines, across the bedding and along it. */
+const FOLIATION_ACROSS = 38;
+const FOLIATION_ALONG = 2.5;
+/** Cycles per metre of the colonies the lichen gathers in. */
+const COLONY_SCALE = 1.2;
+/** Cycles per metre of the patchiness in the edge wear, and of the drifts in the snow. */
+const WEAR_SCALE = 3;
+const SNOW_SCALE = 5;
+/** Cycles per metre of the snow's mottling, and of the lumps it drifts into. */
+const SNOW_MOTTLE = 18;
+const SNOW_LUMPS = 7;
+
+/** Share of the cells that hold a flake at glint 1. */
+const GLINT_SHARE = 0.22;
+/** How far a shard sits below the stone around it, in height units. */
+const GLINT_INSET = 0.13;
+
+/**
+ * How far a flake's half extents reach across its own cell, and how far its
+ * centre strays from the cell's. The two together bound how far a flake
+ * reaches, which is what lets the search stop at the neighbouring cells.
+ */
+const FLAKE_EXTENT = 0.45;
+const FLAKE_JITTER = 0.25;
+const FLAKE_REACH = (FLAKE_EXTENT * Math.sqrt(3) + FLAKE_JITTER + 0.5) ** 2;
+
+/** One metallic flake under a point. */
+interface FlakeSample {
+  /** 1 inside the shard, 0 clear of it, with a texel of softness at its edge. */
+  cover: number;
+  /** The flake's own random value, 0..1. */
+  id: number;
 }
 
-const DRIP_STEPS = 6;
+const _flake: FlakeSample = { cover: 0, id: 0 };
 
-const _n: Vec3 = [0, 0, 0];
-const _plate: PlateSample = { height: 0, id: 0 };
+/**
+ * The metallic flake under a point: mica or pyrite, grown as a little
+ * crystal rather than a speck.
+ *
+ * A share of the cells of a lattice hold one. A flake is a box at its own
+ * random orientation and its own three half extents, so where the surface
+ * cuts it the outline is a polygon with straight edges and corners — a shard,
+ * which is what the eye reads as a mineral rather than as a dot.
+ */
+function flakeAt(into: FlakeSample, x: number, y: number, z: number, cells: number, share: number, seed: number): FlakeSample {
+  into.cover = 0;
+  into.id = 0;
+  if (share <= 0) return into;
+
+  const fx = x * cells;
+  const fy = y * cells;
+  const fz = z * cells;
+  const cx = Math.floor(fx);
+  const cy = Math.floor(fy);
+  const cz = Math.floor(fz);
+
+  for (let oz = -1; oz <= 1; oz++)
+    for (let oy = -1; oy <= 1; oy++)
+      for (let ox = -1; ox <= 1; ox++) {
+        const gx = cx + ox;
+        const gy = cy + oy;
+        const gz = cz + oz;
+
+        // Most cells hold no flake, so the cheap draw gates the rest.
+        const id = hash3(gx, gy, gz, seed ^ 0x51ed270b);
+        if (id > share) continue;
+
+        const dx = fx - (gx + 0.5 + (hash3(gx, gy, gz, seed) - 0.5) * 2 * FLAKE_JITTER);
+        const dy = fy - (gy + 0.5 + (hash3(gx, gy, gz, seed ^ 0x9e3779b9) - 0.5) * 2 * FLAKE_JITTER);
+        const dz = fz - (gz + 0.5 + (hash3(gx, gy, gz, seed ^ 0x3c6ef372) - 0.5) * 2 * FLAKE_JITTER);
+        if (dx * dx + dy * dy + dz * dz > FLAKE_REACH) continue;
+
+        // The box's own frame: one random axis, and two perpendicular to it.
+        const u = hash3(gx, gy, gz, seed ^ 0x165667b1) * 2 - 1;
+        const phi = hash3(gx, gy, gz, seed ^ 0x27d4eb2d) * TWO_PI;
+        const ring = Math.sqrt(Math.max(0, 1 - u * u));
+        const ax = Math.cos(phi) * ring;
+        const ay = u;
+        const az = Math.sin(phi) * ring;
+        // Perpendicular to it, crossed against whichever reference axis this
+        // one is furthest from, so the cross never collapses.
+        const upright = Math.abs(ay) < 0.9;
+        let bx = upright ? -az : 0;
+        let by = upright ? 0 : az;
+        let bz = upright ? ax : -ay;
+        const bl = Math.hypot(bx, by, bz) || 1;
+        bx /= bl;
+        by /= bl;
+        bz /= bl;
+        const ex = ay * bz - az * by;
+        const ey = az * bx - ax * bz;
+        const ez = ax * by - ay * bx;
+
+        // Three unequal half extents, so a shard is a slab or a wedge and
+        // never a cube: the faces read at different sizes as it turns.
+        const h0 = FLAKE_EXTENT * (0.35 + 0.65 * hash3(gx, gy, gz, seed ^ 0x7f4a7c15));
+        const h1 = FLAKE_EXTENT * (0.5 + 0.5 * hash3(gx, gy, gz, seed ^ 0x2545f491));
+        const h2 = FLAKE_EXTENT * (0.5 + 0.5 * hash3(gx, gy, gz, seed ^ 0x5bd1e995));
+
+        const p0 = Math.abs(dx * ax + dy * ay + dz * az) / h0;
+        const p1 = Math.abs(dx * bx + dy * by + dz * bz) / h1;
+        const p2 = Math.abs(dx * ex + dy * ey + dz * ez) / h2;
+        const edge = Math.max(p0, p1, p2);
+        const cover = 1 - smoothstep(0.86, 1, edge);
+        if (cover <= into.cover) continue;
+
+        into.cover = cover;
+        into.id = id / share;
+      }
+
+  return into;
+}
+
+/** Metres around the rock per possible streak, and the share of those places that have one. */
+const STREAK_SPACING = 0.16;
+const STREAK_DENSITY = 0.6;
+/** Half width of a streak at its head, in metres, from this to twice it. The tail is a sixth of it. */
+const STREAK_WIDTH = 0.018;
+/** How far a streak wanders sideways over its length, in metres. */
+const STREAK_WANDER = 0.06;
+/** How far a branch leaves its streak by the end, in metres. */
+const STREAK_BRANCH = 0.07;
+/** Cycles per metre of the rivulets within a streak, around the rock and down it. */
+const RIVULET_AROUND = 30;
+const RIVULET_DOWN = 3;
+
+const TWO_PI = Math.PI * 2;
+
+/**
+ * The run-off at a point: 0 clear of it, 1 in the head of a streak. Streaks
+ * live on a cylinder about the rock's up axis, one possible source per cell
+ * around it, so each runs straight down under gravity. A streak is a splat
+ * where the drop landed, a trail that wanders a little, thins and fades as
+ * it goes, and sometimes a thinner branch that leaves it part way down.
+ */
+function streakAt(field: RockField, theta: number, y: number, lateral: number, cells: number, height: number, steep: number): number {
+  const cellWidth = TWO_PI / cells;
+  const k0 = Math.floor(theta / cellWidth);
+  const seed = field.seed ^ 0x73747265;
+  let best = 0;
+
+  for (let dk = -1; dk <= 1; dk++) {
+    const k = (((k0 + dk) % cells) + cells) % cells;
+    if (hash3(k, 1, 0, seed) > STREAK_DENSITY) continue;
+
+    const sourceTheta = (k0 + dk + hash3(k, 2, 0, seed)) * cellWidth;
+    const top = field.base + height * (0.4 + 0.6 * hash3(k, 3, 0, seed));
+    const length = height * (0.3 + 0.6 * hash3(k, 4, 0, seed));
+    const headWidth = STREAK_WIDTH * (1 + hash3(k, 5, 0, seed));
+    let dTheta = theta - sourceTheta;
+    dTheta -= Math.round(dTheta / TWO_PI) * TWO_PI;
+    // Sideways distance in metres at this height, so a streak is one width
+    // whatever the rock's girth is here.
+    const across = dTheta * lateral;
+
+    // The splat, a little wider than it is tall, and fainter than the trail's head.
+    const splat = (1 - smoothstep(headWidth * 1.2, headWidth * 3, Math.hypot(across, (y - top) * 1.4))) * 0.7;
+    best = Math.max(best, splat);
+
+    // A drop only runs where the face is steep enough to run down; on a
+    // face that looks up it lies where it landed.
+    const below = top - y;
+    if (steep <= 0 || below < 0 || below > length) continue;
+    const t = below / length;
+    const wander = (fbm3r(below * 4, k * 7.3, 0.5, 2, seed) - 0.5) * STREAK_WANDER * Math.sqrt(t);
+    // Thick at the head, a hairline at the tail: the width and the edge's
+    // softness both taper, or the blur alone sets the width the eye reads.
+    const halfWidth = headWidth * (1 - 0.85 * t);
+    const fade = Math.pow(1 - t, 1.1) * (0.7 + 0.3 * smoothstep(0, 0.15, t));
+    const trail = (1 - smoothstep(halfWidth * 0.5, halfWidth * 1.3, Math.abs(across - wander))) * fade * steep;
+    best = Math.max(best, trail);
+
+    if (t > 0.35 && hash3(k, 6, 0, seed) < 0.6) {
+      const side = hash3(k, 7, 0, seed) < 0.5 ? -1 : 1;
+      const offset = side * STREAK_BRANCH * ((t - 0.35) / 0.65);
+      const branch = (1 - smoothstep(halfWidth * 0.3, halfWidth * 0.9, Math.abs(across - wander - offset))) * fade * 0.7 * steep;
+      best = Math.max(best, branch);
+    }
+  }
+
+  return best;
+}
+
+const DRIP_STEPS = 5;
 
 function paintChart(canvas: Canvas, params: Params, field: RockField, palette: Palette, faceIndex: number): void {
   const chartPx = rockChartPx(params);
@@ -184,9 +443,28 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
   const toneContrast = params.toneContrast;
   const grainScale = params.grainScale;
   const speckle = params.speckle;
+  const veins = params.veins;
+  const stain = params.stain;
+  const crackStrength = params.crackStrength;
+  const edgeWear = params.edgeWear;
+  const snow = params.snow;
+  const streaks = params.streaks;
+  const patinaStrength = params.patina;
+  const undulation = params.undulation;
+  const undulationScale = 1 / params.undulationSize;
+  const glint = params.glint;
+  const glintScale = params.glintScale;
+  const baseRoughness = params.roughness;
+  const lateralRadius = (field.extents[0] + field.extents[2]) / 2;
+  // One lattice around the whole rock, sized off its girth, so a streak is
+  // the same streak at every height it passes.
+  const streakCells = Math.max(6, Math.round((TWO_PI * lateralRadius) / STREAK_SPACING));
   const radius = (field.extents[0] + field.extents[1] + field.extents[2]) / 3;
   const height = field.extents[1] * 2;
-  const dripStep = radius * 0.035;
+  const dripStep = radius * 0.04;
+  const seed = field.seed;
+  const bf = field.frame;
+  const vf = field.veinFrame;
 
   for (let y = 0; y < chartPx; y++) {
     for (let x = 0; x < chartPx; x++) {
@@ -195,14 +473,34 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
       const py = surface.points[i * 3 + 1];
       const pz = surface.points[i * 3 + 2];
       normalOf(_n, surface, chartPx, x, y);
+      const up = _n[1];
       const crease = curvatureOf(surface, chartPx, x, y, 1);
       const hollow = curvatureOf(surface, chartPx, x, y, 8);
 
-      // Tone: an octave stack ramped dark to light through the mid tint. This
-      // is the mottling every rock has under its detail. Each slab of the pile
-      // shifts it by its own value, so no two plates are one grey, and the
-      // pile's bevels go into the height for the normal map to find.
-      let tone = toneOf(fbm3(px * toneScale, py * toneScale, pz * toneScale, toneOctaves, field.seed ^ 0x7f4a7c15), toneOctaves, toneContrast);
+      // Edge wear: where the surface is convex at any scale, from a slab's
+      // edge to the ridge between two scoops, rain and frost have taken the
+      // skin off. The mask is read at three reaches so a rounded ridge
+      // counts as much as a sharp crease, and broken up so it is patchy. It
+      // bleaches the stone below and keeps the stain, the patina and the
+      // lichen off, which is what an edge that sheds water looks like.
+      // Summed rather than taken at the strongest, and weighted toward the
+      // wide reaches, so the wear feathers out from a ridge over a hand's
+      // width instead of drawing a line along it.
+      const convex = clamp01(
+        smoothstep(0.1, 0.8, crease) * 0.2 +
+          smoothstep(0.05, 0.5, curvatureOf(surface, chartPx, x, y, 4)) * 0.3 +
+          smoothstep(0.02, 0.3, curvatureOf(surface, chartPx, x, y, 12)) * 0.4 +
+          smoothstep(0.01, 0.18, curvatureOf(surface, chartPx, x, y, 28)) * 0.4
+      );
+      const wearNoise = fbm3r(px * WEAR_SCALE, py * WEAR_SCALE, pz * WEAR_SCALE, 3, seed ^ 0x77a2c3d1);
+      const wear = edgeWear * convex * convex * smoothstep(0.2, 0.75, wearNoise + 0.1);
+      const sheltered = 1 - wear * 0.85;
+
+      // Tone: a slow octave stack ramped dark to light through the mid tint,
+      // the cloudy mottling every rock has under its detail. Each slab of the
+      // pile shifts it by its own value, so no two plates are one grey, and
+      // the pile's bevels go into the height for the normal map to find.
+      let tone = toneOf(fbm3r(px * toneScale, py * toneScale, pz * toneScale, toneOctaves, seed ^ 0x7f4a7c15), toneOctaves, toneContrast);
       let slab = 0.5;
       if (field.plates) {
         platesInto(_plate, field.plates, px, py, pz);
@@ -212,71 +510,345 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
       let r = ramp(palette.dark[0], palette.mid[0], palette.light[0], tone);
       let g = ramp(palette.dark[1], palette.mid[1], palette.light[1], tone);
       let b = ramp(palette.dark[2], palette.mid[2], palette.light[2], tone);
-      let roughness = 0.78 + (tone - 0.5) * 0.2;
+      let roughness = baseRoughness + (tone - 0.5) * 0.1;
+      let metallic = params.metallic;
       let ao = 1;
-      let relief = 0.5 + (tone - 0.5) * 0.35 + (slab - 0.5) * 0.5 * field.plateShare;
+      let relief = 0.5 + (tone - 0.5) * 0.2 + (slab - 0.5) * 0.25 * field.plateShare;
+      // The surface before any fine layer moves it. A shard is flattened back
+      // to this, and tone and slabs are slow enough that it is one level
+      // across a shard.
+      const baseRelief = relief;
 
-      // Speckle: the mineral flecks, thresholded off a finer stack.
+      // Grain: the rock as a mosaic of crystals. Each cell of a fine cellular
+      // field is one mineral, and each sits at its own height with a soft
+      // grain boundary, which is what puts the mineral-scale facets into the
+      // normal map. Three minerals, in granite's proportions.
       if (speckle > 0) {
-        const grain = fbm3(px * grainScale, py * grainScale, pz * grainScale, 3, field.seed ^ 0x2b9f7e3d);
-        const fleckDark = smoothstep(0.43, 0.37, grain) * speckle;
-        const fleckLight = smoothstep(0.59, 0.65, grain) * speckle;
-        r = mix(mix(r, palette.dark[0], fleckDark), palette.light[0], fleckLight);
-        g = mix(mix(g, palette.dark[1], fleckDark), palette.light[1], fleckLight);
-        b = mix(mix(b, palette.dark[2], fleckDark), palette.light[2], fleckLight);
-        roughness += (fleckLight - fleckDark) * 0.15;
-        relief += (grain - 0.5) * 0.25 * speckle;
+        const grain = worley3Into(_worley, px * grainScale, py * grainScale, pz * grainScale, seed ^ 0x2b9f7e3d);
+        const id = grain.id;
+        const boundary = smoothstep(0, 0.3, grain.f2 - grain.f1);
+        let mineral: Rgb;
+        let mineralRough: number;
+        if (id < 0.11) {
+          mineral = palette.biotite;
+          mineralRough = 0.5;
+        } else if (id < 0.5) {
+          mineral = palette.quartz;
+          mineralRough = 0.62;
+        } else {
+          mineral = palette.feldspar;
+          mineralRough = 0.8;
+        }
+        const amount = speckle * (0.4 + 0.4 * boundary);
+        const crystal = (0.9 + 0.2 * fract(id * 17.31)) * (0.9 + 0.1 * boundary);
+        r = mix(r, mineral[0], amount) * crystal;
+        g = mix(g, mineral[1], amount) * crystal;
+        b = mix(b, mineral[2], amount) * crystal;
+        roughness = mix(roughness, mineralRough, speckle * 0.6);
+        relief += speckle * (fract(id * 53.17) - 0.5) * 0.07 * boundary;
       }
 
-      // Cracks: dark, deep, dusty.
-      const crack = crackMask(field, px, py, pz, params.crackWidth) * params.crackStrength;
-      r *= 1 - 0.6 * crack;
-      g *= 1 - 0.6 * crack;
-      b *= 1 - 0.6 * crack;
-      relief -= crack * params.crackDepth * 0.5;
-      ao *= 1 - 0.6 * crack;
-      roughness += 0.15 * crack;
+      // Glint: shards of mica or pyrite grown in the stone — metallic,
+      // glossy, pale, each an angular crystal set into the surface. Its
+      // colour and its finish are painted here; its height is not, because
+      // the layers below still have the stone's own roughness to add and a
+      // crystal face has none of it. The flattening is after them.
+      let shard = 0;
+      if (glint > 0) {
+        flakeAt(_flake, px, py, pz, glintScale, glint * GLINT_SHARE, seed ^ 0x676c6e74);
+        shard = _flake.cover;
+        if (shard > 0) {
+          const bright = 0.75 + 0.5 * fract(_flake.id * 3.13);
+          r = mix(r, palette.glint[0] * bright, shard);
+          g = mix(g, palette.glint[1] * bright, shard);
+          b = mix(b, palette.glint[2] * bright, shard);
+          metallic = mix(metallic, 1, shard);
+          roughness = mix(roughness, 0.18 + 0.12 * fract(_flake.id * 5.37), shard);
+          ao *= 1 - 0.25 * shard;
+        }
+      }
 
-      // Edge wear: a ridge is rain-rounded, lighter and smoother; a hollow
-      // holds dirt.
-      const ridge = smoothstep(0.15, 0.6, crease);
+      // Grit: texel-scale roughness, the one layer that makes a surface read
+      // as rough rather than as smooth plastic with a picture on it.
+      const grit = fbm3r(px * GRIT_SCALE, py * GRIT_SCALE, pz * GRIT_SCALE, 3, seed ^ 0x4d2a1f3b);
+      const bare = 1 - shard;
+      relief += (grit - 0.5) * 0.14;
+      roughness += (grit - 0.5) * 0.2 * bare;
+      const gritLight = 1 + (grit - 0.5) * 0.3 * bare;
+      r *= gritLight;
+      g *= gritLight;
+      b *= gritLight;
+
+      // Undulation: the soft, irregular unevenness of a weathered face —
+      // the slow waviness between what the mesh carries and the grain. It is
+      // a shape and not a mark, so it writes the height alone and leaves the
+      // colour and the finish to the layers that have a reason to move them.
+      if (undulation > 0) {
+        const wave = fbm3r(px * undulationScale, py * undulationScale, pz * undulationScale, UNDULATION_OCTAVES, seed ^ 0x756e6576);
+        relief += ((wave - 0.5) / UNDULATION_SPREAD) * undulation * 0.12;
+      }
+
+      // A crystal face is flat and sits below the stone around it. The grain,
+      // the grit and the undulation belong to the rock, so inside a shard the
+      // height is the stone's own slow level, sunk by the depth it is set at.
+      if (shard > 0) relief = mix(relief, baseRelief - GLINT_INSET, shard);
+
+      // Veins: the zero crossings of a stretched, warped octave sum are thin
+      // lines that wander across the rock in one direction and branch. Quartz
+      // is lighter, harder and glassier than what it runs through.
+      if (veins > 0) {
+        const gate = smoothstep(0.62 - 0.3 * veins, 0.68 - 0.22 * veins, fbm3r(px * 0.8, py * 0.8, pz * 0.8, 2, seed ^ 0x3779b97f));
+        if (gate > 0) {
+          const vx = (vf[0] * px + vf[1] * py + vf[2] * pz) * VEIN_STRETCH;
+          const vy = vf[3] * px + vf[4] * py + vf[5] * pz;
+          const vz = vf[6] * px + vf[7] * py + vf[8] * pz;
+          const wobble = (fbm3r(vx * 1.5, vy * 1.5, vz * 1.5, 2, seed ^ 0x5f3759df) - 0.5) * 0.2;
+          const f = fbm3r((vx + wobble) * VEIN_SCALE, vy * VEIN_SCALE, vz * VEIN_SCALE, 2, seed ^ 0x61c88647);
+          const line = 1 - smoothstep(0, 0.07, Math.abs((f - 0.5) / 0.2));
+          const vein = line * gate * (0.6 + 0.8 * grit);
+          r = mix(r, palette.vein[0], vein * 0.4);
+          g = mix(g, palette.vein[1], vein * 0.4);
+          b = mix(b, palette.vein[2], vein * 0.4);
+          relief += vein * 0.025;
+          roughness -= vein * 0.12;
+        }
+      }
+
+      // Cracks: a sharp dark core with a faint shoulder, a lighter chipped rim
+      // beside it, and the fine octave as hairlines. `crackStrength` scales
+      // the drawing; the grooves in the mesh are the same coarse field.
+      crackCoarse(_crack, field, px, py, pz);
+      const w = params.crackWidth * _crack.width;
+      const edge = _crack.edge;
+      const presence = _crack.presence;
+      let crack = 0;
+      if (crackStrength > 0 && field.cracks > 0) {
+        const shoulder = (1 - smoothstep(0, w, edge)) * presence;
+        const core = (1 - smoothstep(0, w * 0.35, edge)) * presence;
+        crack = mix(shoulder * 0.45, 1, core) * crackStrength;
+        const fine = crackFine(field, px, py, pz, params.crackWidth * 0.5) * crackStrength * 0.5;
+        crack = Math.max(crack, fine);
+        const rim = (smoothstep(w * 0.7, w * 1.3, edge) - smoothstep(w * 1.3, w * 2.6, edge)) * presence * crackStrength * 0.14;
+        const shade = (1 - 0.85 * crack) * (1 + rim);
+        r *= shade;
+        g *= shade;
+        b *= shade;
+        relief -= crack * params.crackDepth * 0.5;
+        relief += rim * 0.15;
+        ao *= 1 - 0.6 * crack;
+        roughness += 0.15 * crack;
+
+        // Foliation: faint hairlines running with the bedding in bands, the
+        // grain of the stone itself rather than a break in it.
+        if (field.bedding > 0) {
+          const bx = bf[0] * px + bf[1] * py + bf[2] * pz;
+          const by = bf[3] * px + bf[4] * py + bf[5] * pz;
+          const bz = bf[6] * px + bf[7] * py + bf[8] * pz;
+          const f = fbm3r(bx * FOLIATION_ALONG, by * FOLIATION_ACROSS, bz * FOLIATION_ALONG, 2, seed ^ 0x7c1d2e3f);
+          const line = 1 - smoothstep(0, 0.1, Math.abs((f - 0.5) / 0.2));
+          const band = smoothstep(0.5, 0.62, fbm3r(bx * 1.5, by * 4, bz * 1.5, 2, seed ^ 0x1e4b5c6d));
+          const foliation = line * band * field.bedding * crackStrength * 0.35;
+          const dim = 1 - foliation;
+          r *= dim;
+          g *= dim;
+          b *= dim;
+          relief -= foliation * 0.08;
+        }
+      }
+
+      // Stain: iron seeping from the cracks and lying in bands along the
+      // bedding, as a tint that keeps the grain under it.
+      if (stain > 0) {
+        const bx = bf[0] * px + bf[1] * py + bf[2] * pz;
+        const by = (bf[3] * px + bf[4] * py + bf[5] * pz) * STAIN_BANDING;
+        const bz = bf[6] * px + bf[7] * py + bf[8] * pz;
+        const patch = smoothstep(0.56, 0.68, fbm3r(bx * STAIN_SCALE, by * STAIN_SCALE, bz * STAIN_SCALE, 3, seed ^ 0x1b873593));
+        const seep =
+          field.cracks > 0
+            ? (1 - smoothstep(0, w * 4.5, edge)) * presence * smoothstep(0.46, 0.58, fbm3r(px * 1.3, py * 1.3, pz * 1.3, 2, seed ^ 0x2c1b3c6d))
+            : 0;
+        const s = clamp01(stain * (patch * 0.75 + seep * 0.9)) * (0.75 + 0.5 * grit) * sheltered;
+        const sr = mix(r * palette.rustTint[0], palette.rust[0], 0.35) * 0.9;
+        const sg = mix(g * palette.rustTint[1], palette.rust[1], 0.35) * 0.9;
+        const sb = mix(b * palette.rustTint[2], palette.rust[2], 0.35) * 0.9;
+        r = mix(r, sr, s * 0.85);
+        g = mix(g, sg, s * 0.85);
+        b = mix(b, sb, s * 0.85);
+        roughness += 0.08 * s;
+      }
+
+      // The bleaching itself, and the dirt a hollow holds.
       const dirt = weathering * Math.max(smoothstep(0.15, 0.6, -crease), smoothstep(0.1, 0.5, -hollow) * 0.7);
-      r *= 1 + 0.18 * ridge;
-      g *= 1 + 0.18 * ridge;
-      b *= 1 + 0.18 * ridge;
-      roughness -= 0.12 * ridge;
+      r = mix(r, palette.edge[0], wear * 0.6) * (1 + 0.08 * wear);
+      g = mix(g, palette.edge[1], wear * 0.6) * (1 + 0.08 * wear);
+      b = mix(b, palette.edge[2], wear * 0.6) * (1 + 0.08 * wear);
+      roughness -= 0.15 * wear;
       r = mix(r, palette.soil[0], dirt * 0.5);
       g = mix(g, palette.soil[1], dirt * 0.5);
       b = mix(b, palette.soil[2], dirt * 0.5);
       roughness += 0.1 * dirt;
       ao *= 1 - 0.25 * dirt;
 
-      // Exposure: lichen where the face looks at the sky, in patches.
-      const patches = smoothstep(0.5, 0.62, fbm3(px * 4, py * 4, pz * 4, 3, field.seed ^ 0x6a09e667));
-      const lichen = weathering * smoothstep(0.25, 0.85, _n[1]) * patches * 0.7;
-      r = mix(r, palette.lichen[0], lichen);
-      g = mix(g, palette.lichen[1], lichen);
-      b = mix(b, palette.lichen[2], lichen);
-      roughness += 0.1 * lichen;
-
-      // Drip stains: darker below a crack on a side face.
-      if (weathering > 0 && field.cracks > 0 && params.crackStrength > 0 && _n[1] > -0.3 && _n[1] < 0.7) {
-        let above = 0;
-        for (let step = 1; step <= DRIP_STEPS; step++)
-          above = Math.max(above, crackAbove(field, px, py + step * dripStep, pz) * (1 - step / (DRIP_STEPS + 1)));
-        const stain = weathering * above * params.crackStrength * 0.35;
-        r *= 1 - stain;
-        g *= 1 - stain;
-        b *= 1 - stain;
-        roughness += 0.1 * stain;
+      // Run-off: droplet trails down the sides, thicker at the head and a
+      // hairline at the tail, gathering into the cracks. Measured here, so
+      // the crust below can grow under the drip lines, and painted later, so
+      // it lies over the lichen the way a drip does.
+      let film = 0;
+      if (streaks > 0) {
+        const lateral = Math.hypot(px, pz);
+        // Off the underside, where a drop lets go, and off the top's centre,
+        // where every angle around the axis meets.
+        const holds = smoothstep(-0.6, -0.2, up) * smoothstep(0.08, 0.25, lateral / lateralRadius);
+        if (holds > 0) {
+          const steep = 1 - smoothstep(0.45, 0.8, up);
+          const run = streakAt(field, Math.atan2(pz, px), py, lateral, streakCells, height, steep);
+          if (run > 0) {
+            const rivulets = 0.55 + 0.7 * fbm3r(px * RIVULET_AROUND, py * RIVULET_DOWN, pz * RIVULET_AROUND, 2, seed ^ 0x72697675);
+            film = clamp01(streaks * run * holds * rivulets * (1 + 0.6 * crack));
+          }
+        }
       }
 
-      // Ground contact: soil and moss climb the lowest part.
+      const exposure = 0.35 + 0.65 * smoothstep(-0.2, 0.7, up);
+      const colony = smoothstep(0.38, 0.62, fbm3r(px * COLONY_SCALE, py * COLONY_SCALE, pz * COLONY_SCALE, 2, seed ^ 0x3f84d5b5));
+
+      // Patina: the dark crust of oxides and algae that old stone grows
+      // wherever water sits or runs. It is read off the things that hold
+      // moisture — the faces that look up, the hollows, the seep beside a
+      // crack, the drip lines and the lichen colonies — and starved on the
+      // edges that shed it. Its boundary is cut by a fine noise so it reads
+      // as a skin with a margin, not a shadow, and the margin is thinner and
+      // browner than the heart.
+      let patina = 0;
+      if (patinaStrength > 0) {
+        const seep = field.cracks > 0 ? (1 - smoothstep(0, w * 5, edge)) * presence : 0;
+        const moisture =
+          clamp01(
+            0.3 * smoothstep(0.3, 0.9, up) +
+              0.5 * smoothstep(0.05, 0.4, -hollow) +
+              0.45 * colony +
+              0.5 * seep +
+              0.6 * film
+          ) *
+          sheltered *
+          (1 - convex * 0.6) *
+          smoothstep(-0.7, -0.3, up);
+        const growth = fbm3r(px * PATINA_SCALE, py * PATINA_SCALE, pz * PATINA_SCALE, 3, seed ^ 0x68e31da4);
+        const skin = (fbm3r(px * PATINA_EDGE, py * PATINA_EDGE, pz * PATINA_EDGE, 2, seed ^ 0x5041544e) - 0.5) * 0.14 + (grit - 0.5) * 0.1;
+        const threshold = 0.66 - 0.36 * moisture * patinaStrength;
+        const crust = smoothstep(threshold, threshold + 0.07, growth + skin);
+        patina = crust * (0.6 + 0.4 * moisture) * patinaStrength;
+        if (patina > 0) {
+          // Thin at the margin, dark at the heart.
+          const heart = smoothstep(threshold + 0.05, threshold + 0.18, growth + skin);
+          const cr = mix(palette.patinaThin[0], palette.patina[0], heart) * (0.85 + 0.3 * grit);
+          const cg = mix(palette.patinaThin[1], palette.patina[1], heart) * (0.85 + 0.3 * grit);
+          const cb = mix(palette.patinaThin[2], palette.patina[2], heart) * (0.85 + 0.3 * grit);
+          r = mix(r, cr, patina * 0.85);
+          g = mix(g, cg, patina * 0.85);
+          b = mix(b, cb, patina * 0.85);
+          // A varnish is a little glossier than the raw stone; an algal crust is not.
+          roughness = mix(roughness, 0.68 + 0.2 * (1 - heart), patina * 0.6);
+          metallic *= 1 - patina * 0.6;
+          ao *= 1 - 0.1 * patina;
+        }
+      }
+
+      // Lichen: crustose discs, one at most per cell of a cellular field, each
+      // its own size, colour and ragged edge, cracked into areolae with a pale
+      // margin and a darker heart, and standing a little proud of the stone.
+      // Mostly on the faces that look up, thinning down the sides.
+      if (weathering > 0) {
+        const cover = weathering * exposure * colony * (1.2 + 0.4 * patina) * sheltered;
+        const cell = worley3Into(_worley, px * LICHEN_CELLS, py * LICHEN_CELLS, pz * LICHEN_CELLS, seed ^ 0x6a09e667);
+        if (cell.id < cover) {
+          const kind = fract(cell.id * 37.71);
+          const discRadius = (0.2 + 0.36 * fract(cell.id * 91.3)) * (kind < 0.08 ? 0.55 : 1);
+          const ragged = (fbm3r(px * 70, py * 70, pz * 70, 2, seed ^ 0x51ed270b) - 0.5) * 0.3;
+          const f = cell.f1 + ragged;
+          const disc = (1 - smoothstep(discRadius - 0.06, discRadius + 0.02, f)) * (1 - crack * 0.8);
+          if (disc > 0) {
+            const tint: Rgb = kind < 0.08 ? palette.lichenYellow : kind < 0.4 ? palette.lichenGrey : palette.lichen;
+            const areolae = worley3Into(_worley, px * AREOLA_CELLS, py * AREOLA_CELLS, pz * AREOLA_CELLS, seed ^ 0x2545f491);
+            const areola = 1 - smoothstep(0, 0.14, areolae.f2 - areolae.f1);
+            const margin = smoothstep(discRadius - 0.2, discRadius - 0.04, f);
+            const heart = (1 - smoothstep(0, discRadius * 0.6, f)) * 0.3;
+            const shade = (1 - 0.25 * areola) * (1 + 0.2 * margin) * (0.92 + 0.16 * grit);
+            const lr = mix(tint[0], palette.lichenHeart[0], heart) * shade;
+            const lg = mix(tint[1], palette.lichenHeart[1], heart) * shade;
+            const lb = mix(tint[2], palette.lichenHeart[2], heart) * shade;
+            r = mix(r, lr, disc * 0.95);
+            g = mix(g, lg, disc * 0.95);
+            b = mix(b, lb, disc * 0.95);
+            relief += disc * (0.04 - 0.03 * areola);
+            roughness = mix(roughness, 0.92, disc);
+            metallic *= 1 - disc;
+            ao *= 1 - 0.15 * areola * disc;
+          }
+        }
+      }
+
+      // Drip stains: darker below a crack on a side face, from a short march
+      // up the same crack field.
+      if (weathering > 0 && field.cracks > 0 && crackStrength > 0 && up > -0.3 && up < 0.7) {
+        let above = 0;
+        for (let step = 1; step <= DRIP_STEPS; step++) {
+          crackCoarse(_crack, field, px, py + step * dripStep, pz);
+          const line = (1 - smoothstep(0, 0.08 * _crack.width, _crack.edge)) * _crack.presence;
+          above = Math.max(above, line * (1 - step / (DRIP_STEPS + 1)));
+        }
+        const drip = weathering * above * crackStrength * 0.3;
+        r *= 1 - drip;
+        g *= 1 - drip;
+        b *= 1 - drip;
+        roughness += 0.1 * drip;
+      }
+
+      // Ground contact: soil climbs the lowest part.
       const contact = weathering * smoothstep(0.25, 0, (py - field.base) / height);
       r = mix(r, palette.soil[0], contact * 0.6);
       g = mix(g, palette.soil[1], contact * 0.6);
       b = mix(b, palette.soil[2], contact * 0.6);
       roughness += 0.12 * contact;
+
+      // The run-off itself, over the lichen. Colour and finish only, never
+      // height: it is a film on the stone and not the stone.
+      if (film > 0) {
+        r = mix(r, palette.streak[0], film);
+        g = mix(g, palette.streak[1], film);
+        b = mix(b, palette.streak[2], film);
+        roughness += 0.12 * film;
+        metallic *= 1 - film;
+        ao *= 1 - 0.25 * film * (1 - palette.streakLum);
+      }
+
+      // Snow: settles on what faces up, deeper in the hollows, blown off the
+      // edges, and drifted at its margin so the line is never a contour.
+      if (snow > 0) {
+        const settle = smoothstep(0.7 - 0.6 * snow, 1.0 - 0.45 * snow, up);
+        const drift = (fbm3r(px * SNOW_SCALE, py * SNOW_SCALE, pz * SNOW_SCALE, 3, seed ^ 0x536e6f77) - 0.5) * 0.6;
+        const cover = smoothstep(0.25, 0.6, settle + drift + smoothstep(0, 0.4, -hollow) * 0.25 - convex * 0.45 - crack * 0.5);
+        if (cover > 0) {
+          // Snow is not one white: it is mottled where it has lain and
+          // melted, blue in its own shadow, lumpy where it drifted, and thin
+          // at its margin, where the stone shows through.
+          const mottle = fbm3r(px * SNOW_MOTTLE, py * SNOW_MOTTLE, pz * SNOW_MOTTLE, 3, seed ^ 0x4d6f7474);
+          const lumps = fbm3r(px * SNOW_LUMPS, py * SNOW_LUMPS, pz * SNOW_LUMPS, 2, seed ^ 0x4c756d70);
+          const shade = 0.82 + 0.22 * mottle + (grit - 0.5) * 0.1;
+          const shadow = smoothstep(0, 0.4, -hollow) * 0.5 + (1 - smoothstep(0.3, 0.8, lumps)) * 0.3;
+          const sr = mix(palette.snow[0], palette.snowShadow[0], shadow) * shade;
+          const sg = mix(palette.snow[1], palette.snowShadow[1], shadow) * shade;
+          const sb = mix(palette.snow[2], palette.snowShadow[2], shadow) * shade;
+          const thin = cover * (0.75 + 0.25 * smoothstep(0.4, 1, cover));
+          r = mix(r, sr, thin);
+          g = mix(g, sg, thin);
+          b = mix(b, sb, thin);
+          relief = mix(relief, 0.55 + (lumps - 0.5) * 0.3 + (grit - 0.5) * 0.06, cover);
+          roughness = mix(roughness, 0.78 + 0.12 * mottle, cover);
+          metallic *= 1 - cover;
+          ao = mix(ao, 1, cover);
+        }
+      }
 
       const texel = (row * chartPx + y) * stride + column * chartPx + x;
       canvas.albedo[texel * 3] = clamp01(r);
@@ -286,7 +858,7 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
       canvas.relief[texel] = clamp01(relief);
       canvas.ao[texel] = clamp01(ao);
       canvas.roughness[texel] = clamp01(roughness);
-      canvas.metallic[texel] = 0;
+      canvas.metallic[texel] = clamp01(metallic);
     }
   }
 }
@@ -294,7 +866,7 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
 /** The stone image as float channels: six charts in a 3x2 image. */
 export function buildStoneCanvas(params: Params, field: RockField): Canvas {
   const chartPx = rockChartPx(params);
-  const canvas = createCanvas(chartPx * ROCK_CHART_COLUMNS, chartPx * ROCK_CHART_ROWS, params.bumpStrength);
+  const canvas = createCanvas(chartPx * ROCK_CHART_COLUMNS, chartPx * ROCK_CHART_ROWS, params.bumpStrength * params.bump);
   const palette = paletteOf(params);
 
   for (let faceIndex = 0; faceIndex < FACES.length; faceIndex++) paintChart(canvas, params, field, palette, faceIndex);
