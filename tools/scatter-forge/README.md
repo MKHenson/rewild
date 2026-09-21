@@ -19,8 +19,9 @@ shape of thing entirely:
 | `tree` | Recursive branching. Tapered tubes with cards hung on the outermost generations, placed by one of two **branch models**. | Oak, birch, poplar and a shrub, which is the same generator at two metres. Also every conifer, which is that generator under `branchModel: whorl`. See [Conifers](#conifers) |
 | `clump` | Cards radiating from one point on the ground. No stem. | Grass, wildflowers, clover, reeds |
 | `crown` | One undivided stem with a rosette of long curved cards at its top. The stem may be 0m. | Palm, tree fern, cycad, and a fern, which is the same rosette on the ground |
+| `rock` | A solid grown from one 3D field: a cube pushed toward a sphere, cleaved, and displaced by noise. No cards, no alpha, one material, a hull collider. | Boulders and blocks. See [Rocks](#rocks) |
 
-`tree` is the default, so a config written before types existed still opens unchanged. One more is
+`tree` is the default, so a config written before types existed still opens unchanged. Two more are
 planned and not written — see [Where this is going](#where-this-is-going).
 
 Each type takes its own keys, and setting one that belongs to another is an error naming the type
@@ -158,9 +159,9 @@ Every key of the config, grouped by what it touches. `--help` prints the same li
 defaults. A value outside a stated range stops the run with the range in the message, so tuning by
 feel is safe.
 
-Keys marked **tree**, **clump** or **crown** below belong to those types alone. Everything else is
-shared, and a few of the shared ones default differently per type — `cullDistance` is 160 for a tree
-and 50 for a clump, and neither is a sensible fallback for the other.
+Keys marked **tree**, **clump**, **crown** or **rock** below belong to those types alone. Everything
+else is shared, and a few of the shared ones default differently per type — `cullDistance` is 160
+for a tree and 50 for a clump, and neither is a sensible fallback for the other.
 
 **The skeleton** — `tree`, with the tube keys shared by `crown`
 
@@ -168,7 +169,7 @@ The last column reads low to high. Values named after a template are the ones th
 
 | Key | Default | Does | What the values mean |
 | --- | --- | --- | --- |
-| `height` — `tree`, `clump` | 12 | Finished height in metres, to the topmost point. The skeleton grows first, then scales to land on this, so it sizes the tree and not the trunk. A crown has no `height`: it is a stem plus a frond, each in metres. | `2.2` shrub · `12` default · `16` birch · `18` oak and poplar |
+| `height` — `tree`, `clump`, `rock` | 12 | Finished height in metres, to the topmost point. The skeleton grows first, then scales to land on this, so it sizes the tree and not the trunk. A crown has no `height`: it is a stem plus a frond, each in metres. | `2.2` shrub · `12` default · `16` birch · `18` oak and poplar |
 | `trunkRadius` — `tree`, `crown` | 0.32 | Radius at the ground, in metres. `height` never scales it, so a slender tree and a stout one of the same height differ only here. | `0.07` shrub · `0.16` birch, a whip at 16m · `0.22` the crown default and the palm · `0.62` oak, stout at 18m. The oak is `height / 29`, the birch `height / 100` |
 | `trunkTaper` — `tree`, `crown` | 0.22 | Trunk radius at the top as a fraction of the base. Branches always taper to 0.28 of their own base, which this does not touch. | `0.22` birch and poplar, down to a thin leader · `0.42` oak, carries weight high · `0.8` the crown default, a palm barely thins · `0.9` a near-parallel pole. Within 0..1 |
 | `branchModel` | `fork` | How the **trunk** carries its children. Nothing below the trunk changes: a limb always forks. See [Conifers](#conifers). | `fork` divides: the trunk's first child is a leader that carries it on, and every generation splits again · `whorl` does not divide: the trunk runs unbroken to the tip and carries rings of near-horizontal limbs up it, which is a conifer |
@@ -261,6 +262,44 @@ from the tree's tables above, along with the whole of [The trunk](#the-trunk) �
 the stem is one branch on a skeleton of its own and goes through the same bark builder. The fronds
 take `cardSegments`, `cardCurve`, `cardAspect` and `normalLean` from the clump's. Without a stem, the tube keys are accepted and unread.
 
+**The stone** — `rock`
+
+A rock is a field, and every key here but `subdivisions` moves its surface, so every one of them is
+in the image too. See [Rocks](#rocks).
+
+| Key | Default | Does | What the values mean |
+| --- | --- | --- | --- |
+| `height` | 1.2 | Metres tall before the relief. The rock is centred on its own middle and then stood on its lowest point, so the run reports the height it actually reached. | `0.4` a stone · `1.4` the granite template · `4` a boulder to climb |
+| `width`, `depth` | 0, 0 | Metres across along x and along z before the relief. 0 derives them from `height`: 1.3 of it across, 1 of it deep. | `0` derived · `3` and `1.5` a slab · equal to `height` a block |
+| `roundness` | 0.45 | How far the cube is pushed toward a sphere. | `0` a cube, six flat faces and hard edges · `0.45` the granite template, a block whose edges have gone · `1` a sphere, a pebble. Within 0..1 |
+| `cleaves` | 3 | Planes the rock is clipped by. Each sits 0.6 to 0.9 of the way out along its own normal and cuts a flat facet where it meets the surface, which is what reads as fractured stone. | `0` no facets, a lump · `3` the granite template · `12` the ceiling, a rock that is mostly facet. Within 0..12 |
+| `relief` | 0.1 | Depth of the surface displacement, as a fraction of the mean radius: the slab pile at `plateShare` of it, and noise (`reliefOctaves` of lumps under `reliefSize`, plus two octaves of ridges at a quarter share) for the rest. |
+| `plates` | 2 | Slab cells per metre in the pile the relief is built from. Rock breaks along planes, and this is where the planes come from. 0 builds the relief from noise alone. | `0` a lump · `2` the default, slabs about half a metre · `4` cobbles |
+| `plateLayers` | 2 | Layers of slabs, each 1.7x finer than the last, chipping the ones below at half the depth. | `1` plates alone · `2` the default · `4` chipped down to grit. Within 1..4 |
+| `plateBevel` | 0.35 | Fraction of a slab that slopes to its edge. | `0.1` flat-topped and sharp · `0.35` the default · `1` a pyramid, no flat top at all. Within 0..1 |
+| `plateLean` | 0.3 | How far a slab drops across its own width, as a fraction of its height. Tilted slabs read as bedded rock; level ones as paving. | `0` level · `0.3` the default · `0.7` every slab a wedge. Within 0..1 |
+| `bedding` | 0.6 | How far the slabs are flattened and aligned into strata. At 1 every slab lies along one bedding plane, tilted up to 30° from level per rock; at 0 they are blocks at any angle. | `0` rubble · `0.6` the default · `1` sedimentary strata. Within 0..1 |
+| `plateShare` | 0.7 | Share of `relief` the slabs take; noise has the rest. | `0` noise alone, whatever `plates` says · `0.7` the default · `1` slabs alone. Within 0..1 |
+| `plateTint` | 0.25 | How far each slab shifts the tone by its own random value, so no two plates are one grey. | `0` all one stone · `0.25` the default · `0.6` a patchwork. Within 0..1 | `0` the bare cleaved solid, for a test · `0.09` the granite template, slab steps · `0.3` a rough, pitted surface with `plates 0` · `0.5` the ceiling, past which the surface folds through the centre and stops being star-shaped. Within 0..0.5 |
+| `reliefSize` | 0.9 | Metres across the largest lump. Each octave above it is half the size at half the amplitude, the way a terrain heightmap is built, so this sets the scale of the swell and the octaves add the detail. | `0.3` granular, a surface of fist-sized bumps · `0.7` the granite template, a couple of swells across a rock · `3` one slow bulge, and the octaves are the whole texture |
+| `reliefOctaves` | 5 | Octaves under `reliefSize`. | `1` one smooth swell · `3` soft lumps · `4` the granite template · `8` the ceiling, detail down to the texel. Within 1..8 |
+| `facetRelief` | 0.3 | Share of the relief a cleaved facet keeps. The clip lands a point on the plane, which would leave every facet a perfect plane; this puts the noise back at a fraction, and the grooves back in full. | `0` machined flat · `0.5` the granite template, a fracture face · `1` the facet is as rough as the rest and the cleave reads only as a change of direction. Within 0..1 |
+| `cracks` | 1.2 | Crack cells per metre. Cracks are the borders of a 3D cellular field, in two octaves, and the coarse octave also grooves the mesh. | `0` none, and no grooves · `1.2` a metre-scale network · `3` a shattered surface. The bake reads the field at each texel's own position, so a crack crosses a chart seam without a break |
+| `crackStrength` | 1 | How strongly the texture draws the cracks: the darkening, the height, the occlusion, the roughness and the drip stains under them. The grooves are not touched. | `0` no line, grooves only · `0.4` the granite template, faint over the slab gaps · `1` full. Within 0..1 |
+| `grooveDepth` | 0.05 | How deep the coarse cracks cut into the mesh, as a fraction of the mean radius. This is what puts a crack into the silhouette. | `0` cracks in the texture only · `0.02` the granite template, where the slab gaps are the cracks · `0.05` 4cm on a 1.4m rock · `0.15` a rock breaking into blocks. Within 0..0.5 |
+| `grooveWidth` | 0.15 | Width of that groove as a fraction of a crack cell. The texture's crack line sits at its bottom. Needs `subdivisions` enough to carry it: at 24 a side on a 1.4m rock a quad is 6cm. | `0.05` a knife cut, invisible at 24 subdivisions · `0.15` the granite template · `0.4` a broad valley. Within 0..1 |
+| `weathering` | 0.6 | How far the exposure, edge wear, dirt, drip stains and ground contact go. | `0` fresh-cut stone · `0.4` the granite template · `1` lichen on every top, soil up its base |
+| `stoneTint`, `stoneDark`, `stoneLight` | `#8a857d`, `#4a4642`, `#b9b1a5` | The stone's mid tone and the two ends the tone ramps to, six digit hex each. The dark and light are also the fleck colours. | Granite grey by default · `#9c8f7a`, `#5a4a38`, `#c9bda6` sandstone · `#5e6066`, `#2e3034`, `#8d9096` basalt |
+| `lichenTint`, `soilTint` | `#7c8a55`, `#4f4a36` | Lichen on the faces that look up; dirt in the hollows and soil up the base. | |
+| `toneSize` | 0.2 | Metres across the largest patch of the tone mottling: the octave stack the colour is ramped from, and the base every rock has under its detail. | `0.1` fine clouds · `0.2` the default · `1` a couple of broad patches across the rock |
+| `toneOctaves` | 5 | Octaves under `toneSize`, each half the size. | `2` soft blotches · `5` the default · `8` mottling down to the texel. Within 1..8 |
+| `toneContrast` | 0.7 | How far the tone reaches from `stoneTint` toward `stoneDark` and `stoneLight`. | `0` one flat tint · `0.7` the default · `1` the full ramp. Within 0..1 |
+| `grainScale` | 45 | Speckle cells per metre: the size of the mineral flecks. | `20` coarse flecks, a pegmatite · `45` the default · `100` a fine sand |
+| `speckle` | 0.6 | How strongly the flecks are drawn. | `0` none, the tone alone · `0.6` the default · `1` every fleck at full colour. Within 0..1 |
+| `crackWidth` | 0.05 | Width of the crack line in the texture, as a fraction of a crack cell. | `0.02` hairline · `0.05` the default · `0.15` a broad dark band. Within 0..1 |
+| `crackDepth` | 0.6 | How deep the crack line cuts into the texture height, which is what the normal map reads. | `0` a flat stain · `0.6` the default · `1` the full range. Within 0..1 |
+| `subdivisions` | 24 | Quads along each edge of the cube. Triangles are six times this squared, doubled. The one key that is not in the image, and the one a tier overrides. | `4` 192 triangles, a far tier · `16` 3,072, the template's first tier · `48` 27,648, the granite template, enough to carry slab edges · `128` the ceiling, 196k. Within 2..128 |
+
 **The accents** — every type
 
 One key, `accents`, holding a list. Each entry is a population of cards hung plumb off the model
@@ -296,26 +335,26 @@ These name the outputs, or are copied into the printed `scatter-layers.json` ent
 | `skipTextures` | `false` | Reuse the set's existing images instead of writing them. | `false` writes the set · `true` takes a variant to about a tenth of a second. The set has to exist already |
 | `writeTemplates` | `false` | Patch `geometries.json` and `materials.json` in place instead of only printing them. | |
 | `templatesDir` | `templates` | Where those two files live. The engine's `templates/` at the repo root, not this tool's. | |
-| `cullDistance` | 160 | Metres past which the layer draws nothing. | `50` the clump default · `90` shrub · `160` the tree default · `800` oak and poplar |
+| `cullDistance` | 160 | Metres past which the layer draws nothing. | `50` the clump default · `90` shrub · `160` the tree default · `800` oak, poplar and the rock default |
 | `foliage` | `true` | Whether the layer's cutout piece is shaded as foliage — `HAS_FOLIAGE_SHADING` in the renderer: no specular chain, fewer fetches, and the transmission that makes a backlit leaf glow. | `true` every leaf, blade and frond · `false` shades the cards as a standard metallic-roughness surface, for a cutout that is not a leaf: a flower spike, a stalk, a stone. The trunk piece is never affected |
 | `castShadow` | by type | Whether the layer draws into the shadow maps. | `true` a tree, and a crown with a stem · `false` a clump, and a stemless crown: ground cover's shadow is a flicker of blade-sized texels under itself, and casting it draws every card of every patch in the shadow pass. Every template sets it |
-| `impostor` | `{ fromDistance: 0, views: 8, tileSize: 128 }` | The layer's billboard block, keyed exactly as `scatter-layers.json` carries it. Any key left out takes its default. | A tree and a stemmed crown always carry one. A clump or a stemless crown carries one only if the file sets it: `{ fromDistance: 160, views: 2, tileSize: 64 }` the plains, a patch metres wide · omitted, a fern or a lone tuft culls instead |
+| `impostor` | `{ fromDistance: 0, views: 8, tileSize: 128 }` | The layer's billboard block, keyed exactly as `scatter-layers.json` carries it. Any key left out takes its default. | A tree, a stemmed crown and a rock always carry one; a rock's starts at 120m. A clump or a stemless crown carries one only if the file sets it: `{ fromDistance: 160, views: 2, tileSize: 64 }` the plains, a patch metres wide · omitted, a fern or a lone tuft culls instead |
 | `impostor.fromDistance` | 0 | Metres the billboard tier takes over at. Every `lods` distance has to stay below it. | `0` derives 60% of `cullDistance` · `192` oak and poplar, which is where the trees are tuned. **Lower is cheaper**: it hands more of the world to billboards instead of meshes. Pick it from the tile rather than from the cull distance, below |
 | `impostor.views` | 8 | Views baked around the tree. At least 2. | `8` every template. More views means a smoother turn and a bigger bake |
 | `impostor.tileSize` | 128 | Edge of one baked view, in pixels. | `128` every template. This is what decides the handover distance |
 | `footprint` | 0 | Metres of clearance the placer keeps around an instance. **The most expensive number in the file.** | `0` derives it from the model's own spread · `0.7` the clump default · `9.8` the oak's. Read [Density](#density) before lowering it: candidate cost goes as one over its square |
-| `scaleMin`, `scaleMax` | 0.8, 1.25 | Bounds of the random per-instance scale. | `0.8` and `1.25` every tree template, a forest of mixed ages off one model · `0.75` and `1.3` the clump default · `1` and `1` identical copies |
+| `scaleMin`, `scaleMax` | 0.8, 1.25 | Bounds of the random per-instance scale. | `0.8` and `1.25` every tree template, a forest of mixed ages off one model · `0.75` and `1.3` the clump default · `0.6` and `1.6` the rock default, because one model has to be a stone and a boulder · `1` and `1` identical copies |
 | `windAmplitude` | 0.4 | How far it sways, copied into the layer's `ScatterWind`. | `0` still · `0.18` the clump default · `0.4` the tree default · `8` what the shipped oak and poplar rows are actually tuned to |
 | `windFrequency` | 0.45 | How fast it sways. | `0.45` the tree default · `1.1` the clump default. A blade is light and moves faster than a limb |
 | `windFlutter` | 0.35 | High-frequency motion on the cutout cards only, on top of the sway. | `0` the crown moves as one mass · `0.35` the tree default · `0.7` the clump default |
 | `bendCurve` | 1.6 | Exponent shaping the wind bend written into `COLOR_0.r`. See [Wind](#wind). | `1` sways evenly along its whole length, which is the clump default because a blade does · `1.6` every tree template · `3` base locked rigid, motion only in the tips |
 | `leafAlphaCutoff` | 0.45 | Alpha below which a cutout pixel is thrown away. Applies to every cutout piece. | `0.2` keeps the soft edge and shows more of the rectangle behind it · `0.4` the clump default · `0.45` every tree template · `0.7` bites into the leaf shape and thins the canopy |
 
-**The LOD chain** — `tree`, `crown`
+**The LOD chain** — `tree`, `crown`, `rock`
 
 `lods` is a list of coarser tiers, nearest first. Each names the distance it takes over at and the
 mesh keys it overrides — any of `radialSegments`, `trunkSides`, `barkLevels`, `leavesPerBranch` and
-`leafScale` for a tree, `radialSegments` and `cardSegments` for a crown. `trunkSegments` and
+`leafScale` for a tree, `radialSegments` and `cardSegments` for a crown, `subdivisions` for a rock. `trunkSegments` and
 `trunkWander` are not among them: they shape the skeleton, and every tier hangs on the model's own. An override its type never reads is an error,
 as a stray key is:
 
@@ -792,6 +831,240 @@ Every rule under [Authored clumps](#authored-clumps) applies, and the same error
 does [picking stamps](#picking-stamps-out-of-a-folder) by `/pattern`, which is what lets a fern list
 `"fronds": ["palm/palm-01", "palm/palm-02"]` and leave the rest of a folder where it is. A palm's dead
 fronds belong under `sources/accents/` and hang as an [accent](#accents).
+
+## Rocks
+
+A rock is a solid, and the tool's one type with no cards. It ships one opaque piece, `stone`, one
+material, a height map, a hull collider and a LOD chain, and it is laid onto the slope and sunk into
+it. The keys are under [The stone](#the-parameters); the `granite-01` template is the start.
+
+**The rock is a field, not a mesh.** `shape(d)` in `lib/rock.ts` is the surface distance along a
+direction from the rock's centre: a cube pushed toward a sphere by `roundness`, scaled to `width`,
+`height` and `depth`, displaced at `relief` by a pile of bevelled slabs (`lib/plates.ts`) and by
+3D noise in the share the slabs leave, grooved by the crack field, and clipped by `cleaves` planes. Everything moves the point along its own ray,
+so the solid is **star-shaped** — every point on the surface is visible from the centre — and a ray
+from the centre meets it exactly once. The mesh samples that function at its vertices and the bake
+samples it at every texel, which is what makes the next two paragraphs true.
+
+**The six faces of the cube are the six charts of the image.** The image is 3x2 charts of half
+`textureSize` each, so a 1024 set is 1536x1024. A texel maps to a face coordinate, the coordinate to
+a direction, the direction to a surface point, and the grain, the cracks and the weathering are all
+functions of that point and its normal. Nothing reads a UV, so a crack cannot know where a chart
+ends and runs across the seam by construction. A chart's 8-texel **gutter is real surface**: a face
+coordinate just past 0..1 is a direction just past the face's edge, which is the neighbouring
+face's own surface in this chart's frame. There is no dilation, and the mip chain never averages a
+face into a foreign colour.
+
+**A tier shares the image.** `subdivisions` is the one key that only tessellates, so a tier at 4 a
+side samples the same charts as the base at 24, at the same uvs, and the chain hands over with the
+texture standing still. The template's chain is 27,648, 3,072 and 432 triangles.
+
+**The texture** is painted in `lib/stone.ts`, per texel, in this order: the mineral grain (three
+tints from `lib/look.ts`, thresholded off a five-octave 3D noise); the cracks (two octaves of a 3D
+cellular field's borders, domain-warped so they wander, written into the colour, the height, the
+occlusion and the roughness); edge wear off the surface's own curvature, so ridges and cleave
+creases are lighter and smoother and hollows hold dirt; lichen on faces that look at the sky; drip
+stains below a crack on a side face, from a short march up the crack field; and soil up the lowest
+part. Every one of those is scaled by `weathering`. The normal is derived from the height, as bark's
+is.
+
+**The collider is a hull.** The mesh's support points in 26 directions — every combination of -1,
+0 and 1 on three axes — are written into the layer as `{ type: 'hull', points }`, and the engine
+takes their convex hull. It touches the true hull at those points and sits inside it between them
+by the surface's sag between two neighbouring directions, so a cleave facet is a hull face and the
+noise is a few centimetres of give. The scale jitter scales it with the mesh.
+
+**The layer** sets `alignToNormal: 1`, so the rock lies on the slope, and a `yOffset` of a fifth of
+its height, so it beds in. There is no flattened base: an underside as shaped as the top is what a
+rock on a slope shows. `tilt` is 8, `footprint` is 0.8 of the rock's span so boulders touch, and
+there is no wind block, no `foliage` and no `authoredNormals`, because there are no cards for any
+of them to apply to.
+
+What it does not do yet: cluster, take an authored stone source, or stand up as an overhang. Those
+are the `pebble` and `outcrop` types in [Where this is going](#where-this-is-going).
+
+### Tuning a rock
+
+The keys, in the order they act on the surface. Every metre-based key is in the rock's own metres:
+an instance scaled 1.6x by the layer's jitter shows lumps and cracks 1.6x larger too.
+
+**The block** — `height`, `width`, `depth`, `roundness`
+
+Start with a box `width` by `height` by `depth` metres, and push it toward a sphere by `roundness`.
+`0` keeps six flat faces and hard edges; `1` is a sphere; `0.4` is a block whose edges have gone.
+`width` and `depth` at 0 derive from `height`: 1.3 of it across, 1 of it deep.
+
+- A boulder: `height 1.4`, `roundness 0.4`
+- A slab: `height 0.8, width 3, depth 1.8`, `roundness 0.5`
+- A pebble: `height 0.3`, `roundness 1`
+
+*Affected by nothing else. Affects everything else*: `relief` and `grooveDepth` are fractions of the
+mean of the three half extents, so a rock twice the size has bumps twice as deep.
+
+**The plates** — `plates`, `plateLayers`, `plateBevel`, `plateLean`, `bedding`, `plateShare`, `plateTint`
+
+Rock breaks along planes, and an octave sum has none, so the relief is mostly this: a 3D pile of
+bevelled slabs, one per cell of a lattice at `plates` cells per metre, each oversized so it
+overlaps its neighbours, flat on top with a `plateBevel` slope to its edge and a `plateLean` drop
+across it. The surface takes the highest slab under each point. `plateLayers` stacks finer piles
+on top, each chipping the last at half the depth. `bedding` flattens the slabs and lines them up
+along one plane per rock, so a face along the bedding shows plates and a face across it shows
+bands — strata, without a separate strata key. `plateTint` gives each slab its own shade.
+
+![Six rocks: the defaults; bedding 1; bedding 0.2; plates 3.5 with three layers; plateLean 0.7 with plateBevel 0.2; relief 0.15](../../docs/images/rock-plates.png)
+
+Top row: the defaults; `bedding 1`; `bedding 0.2`. Bottom row: `plates 3.5, plateLayers 3`;
+`plateLean 0.7, plateBevel 0.2`; `relief 0.15`. All at `relief 0.08` unless stated, two cleaves,
+`subdivisions 48`, `crackStrength 0.4`.
+
+- Bedded stone: `bedding 1`, `plateLean 0.4`, `plates 2`
+- Granite blocks: `bedding 0.3`, `plateBevel 0.2`, `plates 1.5`
+- Cobbled: `plates 4`, `plateLayers 1`, `plateBevel 0.6`
+- A smooth boulder: `plates 0`, and the lumps below carry the relief
+
+*Affected by*: a slab top stands at `+relief × plateShare` and a gap at its negative, so with
+plates on, `relief` is the step height and wants to be lower than a noise rock's — 0.05 to 0.1,
+not 0.3. Slab edges are as sharp as the bevel lets them be and need the mesh to carry them:
+`subdivisions 48` in the image, where 24 renders the edges as tears. The slab gaps are cracks in
+their own right, so `cracks` can go, or stay faint (`crackStrength 0.4` above). The seed places
+the slabs and the bedding tilt.
+
+**The lumps** — `relief`, `reliefSize`, `reliefOctaves`
+
+The surface noise, in the share of `relief` the plates leave (`1 - plateShare`), and all of it
+at `plates 0`. `reliefSize` is the width in metres of the largest lump; `reliefOctaves` stacks
+finer lumps under it, each half the size and half the height of the last, the way a terrain
+heightmap is built; `relief` is how far the whole stack pushes the surface in and out, as a fraction
+of the radius.
+
+![reliefSize 0.3, 0.7 and 1.4m across; 2 octaves above, 5 below; relief 0.3 throughout](../../docs/images/rock-relief.png)
+
+Columns are `reliefSize` 0.3, 0.7 and 1.4m on a 1.4m rock; rows are `reliefOctaves` 2 and 5. Read
+it against the rock's own size:
+
+- **Smaller than a third of the rock** (left): many lumps across, and the rock is a cauliflower.
+- **About half the rock** (middle): a couple of swells across it. This is the "big even bumps" look.
+- **The rock's size or larger** (right): one swell, so the rock as a whole leans, and the octaves
+  are the only texture left. Larger still does nothing more: a 3m lump on a 1.4m rock is a slow
+  gradient, not a bump, and what you see is whatever octaves are smaller than the rock.
+- **More octaves** (bottom row) add detail under the swell without moving it.
+
+A boulder: `reliefSize 0.7`, `reliefOctaves 4`, `relief 0.2`. Weathered and smooth: `reliefSize 1`,
+`reliefOctaves 2`, `relief 0.12`. Pitted: `reliefSize 0.25`, `reliefOctaves 3`, `relief 0.25`.
+
+*Affected by*: `relief` near its ceiling of 0.5 saturates the soft clamp, so every bump pins at the
+same height and the surface reads as cobbles; stay under about 0.3. Octaves finer than a couple of
+mesh quads vanish — at `subdivisions 24` on a 1.4m rock a quad is 6cm, so an octave at 4cm is not
+there. Ridges ride on the same scale: two octaves of creases at 1.5x the lump frequency take a
+quarter of `relief`, so `reliefSize` moves them too. Every cleave facet cuts the lumps away, and
+`facetRelief` is what puts them back.
+
+**The facets** — `cleaves`, `facetRelief`
+
+`cleaves` planes clip the rock, each 0.6 to 0.9 of the way out along its own random direction, so
+each cuts a flat facet. This is what reads as fractured stone rather than a lump. `facetRelief` is
+the share of the lumps a facet keeps: `0` is a machined plane, `0.3` a fracture face, `1` as rough
+as the rest, so the cleave reads only as a change of direction.
+
+- A block: `cleaves 6`, `facetRelief 0.3`
+- A river boulder: `cleaves 0`
+- A rock that looks cut: `cleaves 3`, `facetRelief 0`
+
+*Affected by*: `seed` decides where the planes fall, so two seeds at `cleaves 6` are two different
+rocks. `roundness` near 0 already has six flat faces, and a cleave on one of them is a chamfer.
+Grooves cut a facet in full regardless of `facetRelief`.
+
+**The cracks** — `cracks`, `crackStrength`, `grooveDepth`, `grooveWidth`
+
+`cracks` is how many crack cells there are per metre: the cracks are the borders of a 3D cellular
+field, so `1.2` is a network about 0.8m across, `3` a shattered surface, `0` none at all. One field
+feeds two things, each with its own switch:
+
+- **The line in the texture**, in two octaves, scaled by `crackStrength`. `1` is a dark, deep,
+  dusty line; `0` draws nothing and leaves the grooves alone.
+- **The groove in the mesh**, from the coarse octave alone: `grooveDepth` as a fraction of the
+  radius, `grooveWidth` as a fraction of a crack cell. `grooveDepth 0` leaves the mesh alone.
+
+![grooveDepth 0, 0.06 and 0.15 across the top row; grooveWidth 0.05, 0.15 and 0.4 across the bottom](../../docs/images/rock-grooves.png)
+
+Top row: `grooveDepth` 0, 0.06 and 0.15 at `grooveWidth` 0.15. Bottom row: `grooveWidth` 0.05,
+0.15 and 0.4 at `grooveDepth` 0.08. Both on a 1.4m rock at `subdivisions 32`, `cracks 1.2`,
+`crackStrength 1`, no cleaves. Depth is how far the crack reaches into the silhouette; width is how
+far its sides slope away from the line. The narrow one at bottom left is under a quad wide, and
+the mesh renders it as a jagged tear rather than a groove.
+
+![crackStrength 1 beside crackStrength 0, grooves the same in both](../../docs/images/rock-crack-strength.png)
+
+`crackStrength` 1 and 0 with the same grooves. At 0 the mesh still carries every groove and the
+texture stops drawing the line into it.
+
+- Cracks in the texture only: `grooveDepth 0`
+- Grooves in the mesh only: `crackStrength 0`
+- Cracks you can see in the silhouette: `grooveDepth 0.05`, `grooveWidth 0.15`
+- A rock coming apart into blocks: `cracks 1`, `grooveDepth 0.15`, `grooveWidth 0.3`
+- No cracks anywhere: `cracks 0`
+
+*Affected by*: `grooveWidth` is a fraction of a cell, so raising `cracks` narrows every groove in
+metres. A groove needs two or three mesh quads to show — bottom left above — so at
+`grooveWidth 0.05` and `subdivisions 24` it is a tear or nothing. The texture's own crack line is a
+fixed fraction of a cell (`crackWidth` in `lib/look.ts`), so more cells per metre also means thinner
+lines. Drip stains march up the coarse crack field and are scaled by `crackStrength` too, so they
+go when the lines go. Grooves cut a cleave facet in full whatever `facetRelief` says.
+
+**The grain** — `stoneTint`, `stoneDark`, `stoneLight`, `toneSize`, `toneOctaves`, `toneContrast`, `grainScale`, `speckle`
+
+Two layers. The **tone** is an octave stack, `toneOctaves` deep under `toneSize` metres, ramped
+from `stoneDark` through `stoneTint` to `stoneLight` by `toneContrast`: the cloudy mottling every
+rock has under its detail, and the base everything else is painted on. The **speckle** is the
+mineral flecks on top: a finer stack at `grainScale` cells per metre, thresholded into dark and
+light flecks at `speckle` strength.
+
+![toneSize 0.12, 0.35 and 1.0 across the top row; toneContrast 0.25, speckle 0 and speckle 1 at grainScale 20 across the bottom](../../docs/images/rock-tone.png)
+
+Top row: `toneSize` 0.12, 0.35 and 1.0m. Bottom row: `toneContrast` 0.25; `speckle` 0, which is
+the tone alone; `speckle` 1 at `grainScale` 20. All on a 1.4m rock, no cracks, no weathering.
+
+- Granite: the defaults
+- Sandstone: `stoneTint #9c8f7a`, `stoneDark #5a4a38`, `stoneLight #c9bda6`, `speckle 0.2`,
+  `toneSize 0.5`
+- Basalt: `stoneTint #5e6066`, `stoneDark #2e3034`, `stoneLight #8d9096`, `speckle 0.3`,
+  `grainScale 80`
+- Chalk: `toneContrast 0.3`, `speckle 0`
+
+*Affected by*: the tone also writes the texture height, so `toneContrast` is in the normal map as
+soft undulation, and the flecks are in it as grit. The weathering masks paint over the grain, so at
+`weathering 1` much of the tone is under lichen and soil. `stoneDark` and `stoneLight` are shared
+between the tone's ends and the flecks, so a high-contrast tone and a strong speckle draw from the
+same two colours.
+
+**The cracks in the texture** — `crackWidth`, `crackDepth`
+
+The drawn line's width as a fraction of a crack cell, and how deep it cuts the texture height. The
+groove keys under **The cracks** are the mesh's; these are the texture's, and `crackStrength`
+scales both of these at once.
+
+**The weathering** — `weathering`
+
+Scales every mask the painter adds after the grain: lichen on faces that look up, lighter and
+smoother ridges, dirt in hollows, drip stains under cracks on side faces, soil up the lowest part.
+`0` is fresh-cut stone; `1` is lichen on every top and soil up its base.
+
+*Affected by*: the ridge and dirt masks come off the surface's curvature, so sharper `relief`, more
+octaves and more cleaves all give the weathering more edges to find. Lichen reads the normal, so a
+flatter top (`roundness` low, or a cleave facing up) takes more of it.
+
+**The mesh** — `subdivisions`
+
+Quads along each edge of the cube. Six faces of this squared, doubled, is the triangle count: `24`
+is 6,912, `10` is 1,200, `4` is 192. The one key that changes nothing in the image, so a change
+rebuilds in a moment while every other key rebakes.
+
+*Affects*: how fine a lump or groove the mesh can carry, above. A tier overrides it.
+
+**The seed** — `seed`
+
+Every random choice: where the cleaves fall, the noise, the cracks, the lichen patches. Omit it and
+each run rolls a new rock and writes the roll to the sidecar; keep the one you like.
 
 ## Accents
 
@@ -1409,7 +1682,7 @@ passes on the output, which is what lets `assets:push` publish it.
 
 ## Where this is going
 
-Three types are written. One more is planned, and this section exists so the reasoning behind it
+Four types are written. Two more are planned, and this section exists so the reasoning behind it
 does not have to be rediscovered.
 
 The axis is **structure**, not plant category. Species that one generator can already reach are
@@ -1422,7 +1695,9 @@ short.
 | `tree` | Written | Recursive branching, tubes plus cards, under either branch model | Oak, birch, poplar, shrub, most broadleaf, and every conifer |
 | `clump` | Written | Cards radiating from one ground point | Grass, wildflowers, clover, reeds |
 | `crown` | Written | One undivided stem, a rosette of long curved cards at the top | Palm, fern, tree fern, cycad |
-| `rock` | Planned | A deformed solid. No cards, no alpha, one material | Boulder, pebble, scree |
+| `rock` | Written | One solid from one 3D field: mesh and image off the same function. No cards, no alpha, one material, a hull | Boulder, block |
+| `pebble` | Planned | The rock's mesh with a grain-only image, clustered, no collider. See [scatter-forge-rocks.md](../../docs/scatter-forge-rocks.md) | Pebble, scree |
+| `outcrop` | Planned | A stack of convex slabs, each its own hull. See [scatter-forge-rocks.md](../../docs/scatter-forge-rocks.md) | Overhang, cliff, strata |
 
 ### Conifers stayed inside `tree`
 
@@ -1442,16 +1717,22 @@ generator exists to be replaced by. See [How the bark is built](#how-the-bark-is
 
 ### `rock` — the type that shares the least
 
-A rock has no cards, no alpha, one material, a real collider and `alignToNormal: 1`. It shares the
-noise, the encoders, the preview, the sidecar loop and the templates emitter with everything else,
-and shares **nothing** with the tree's skeleton or the clump's arrangement.
+**Written.** See [Rocks](#rocks). A rock has no cards, no alpha, one material, a hull collider and
+`alignToNormal: 1`. It shares the encoders, the preview, the sidecar loop and the templates emitter
+with everything else, and shares **nothing** with the tree's skeleton, the clump's arrangement or
+the 2D tiling noise: it brought its own 3D bases to `lib/noise.ts`, because a solid is sampled at a
+position and has no seam to wrap.
 
 That is the clearest evidence the type split is in the right place: the split is at the mesh and the
 texture painter, and everything either side of it is common.
 
-Sketch: a deformed icosphere, displaced by a few octaves of the existing noise with a flattened
-bottom so it beds in, and a tiling stone texture. The engine already has `granite_boulder` and
-`granite_pebble` as two layers on one model, which is the pattern to emit.
+### `pebble` and `outcrop`
+
+The design for both is in [scatter-forge-rocks.md](../../docs/scatter-forge-rocks.md). A pebble is
+the rock's mesh under a grain-only painter, clustered the way a patch clusters tufts, with skins
+picked from a shared atlas and no collider. An outcrop is a stack of convex slabs, each its own hull
+in a layer whose `collider` is a list, which is engine work alongside the ground probe that lets
+the player stand on one.
 
 ### Smaller things worth keeping
 

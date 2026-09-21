@@ -18,6 +18,7 @@ import type { ScatterLayer } from 'rewild-renderer/lib/renderers/terrain/Scatter
 import type { ClumpMetrics } from './clump.ts';
 import type { Crown } from './crown.ts';
 import { IMPOSTOR_DEFAULT, impostorDistance, type Params } from './params.ts';
+import type { Rock } from './rock.ts';
 import type { Skeleton } from './skeleton.ts';
 import type { TextureNames } from './textures.ts';
 
@@ -231,19 +232,51 @@ export function crownLayer(params: Params, crown: Crown): ScatterLayer {
   return clumpLayer(params, { height: crown.metrics.height, spread: crown.metrics.spread, patchRadius: 0, tufts: 1 });
 }
 
+/** Fraction of a rock's height the layer sinks it by, so it beds into the slope. */
+const ROCK_SINK = 0.2;
+
+/**
+ * A rock's layer: laid onto the slope, sunk into it, stopped at its own hull,
+ * and never moved by the wind.
+ *
+ * The hull is the mesh's support points, so it is measured rather than
+ * guessed, and the scale jitter scales it with the mesh. The footprint is a
+ * little under the rock's own span: boulders touch.
+ */
+export function rockLayer(params: Params, rock: Rock): ScatterLayer {
+  const { metrics } = rock;
+  const span = Math.max(metrics.width, metrics.depth);
+
+  return {
+    name: params.name.replace(/-/g, '_'),
+    geometryId: params.name,
+    ...(params.lods.length ? { lodDistances: params.lods.map((tier) => tier.distance) } : {}),
+    cullDistance: params.cullDistance,
+    ...(params.impostor ? { impostor: { ...params.impostor, fromDistance: impostorDistance(params) } } : {}),
+    jitter: { scale: { from: params.scaleMin, to: params.scaleMax }, yaw: { from: 0, to: 360 }, tilt: 8 },
+    alignToNormal: 1,
+    yOffset: -round(metrics.height * ROCK_SINK),
+    footprint: params.footprint > 0 ? params.footprint : round(Math.max(0.3, span * 0.8), 1),
+    collider: { type: 'hull', points: metrics.hull },
+    castShadow: params.castShadow,
+  };
+}
+
 /**
  * The layer as its scatter-layers.json entry, ready to paste.
  *
- * Wind and a yaw range are the two blocks every type fills in, so a gap in
- * either is a generator bug rather than an authoring choice. An impostor and
- * a collider are not: a clump has neither, on purpose.
+ * A yaw range is a block every type fills in, so a gap in it is a generator
+ * bug rather than an authoring choice. Wind, an impostor and a collider are
+ * not: a clump has none of them and a rock has no wind, on purpose.
  */
 export function scatterLayerEntry(layer: ScatterLayer): string {
-  const { jitter, collider, wind } = layer;
-  if (!wind || !jitter.yaw)
+  const { jitter, collider } = layer;
+  if (!jitter.yaw)
     throw new Error(`Scatter layer '${layer.name}' is missing a block the generator always fills in.`);
-  if (collider && (collider.type !== 'capsule' || !collider.offset))
-    throw new Error(`Scatter layer '${layer.name}' collider must be a capsule with an offset, got a ${collider.type}.`);
+  if (collider && collider.type === 'capsule' && !collider.offset)
+    throw new Error(`Scatter layer '${layer.name}' capsule collider needs an offset.`);
+  if (collider && collider.type !== 'capsule' && collider.type !== 'hull')
+    throw new Error(`Scatter layer '${layer.name}' collider must be a capsule or a hull, got a ${collider.type}.`);
 
   return JSON.stringify({ [layer.name]: layer }, null, 2).split('\n').slice(1, -1).join('\n');
 }

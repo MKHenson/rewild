@@ -163,7 +163,7 @@ function parseHex(value: string | undefined, field: string): Rgb {
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
 
-function createCanvas(width: number, height: number, bumpStrength: number): Canvas {
+export function createCanvas(width: number, height: number, bumpStrength: number): Canvas {
   const texels = width * height;
   return {
     width,

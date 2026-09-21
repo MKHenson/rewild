@@ -313,3 +313,131 @@ export function worley(
 ): WorleyResult {
   return worleyInto({ f1: 0, f2: 0, id: 0, nx: 0, ny: 0 }, x, y, periodX, periodY, seed, jitter);
 }
+
+// 3D bases, for a solid rather than a band. Nothing here wraps: a rock is a
+// field sampled at a position on its surface, and the only seam it could have
+// is one the field is not asked to cross.
+
+export function hash3(x: number, y: number, z: number, seed: number): number {
+  let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(z | 0, 0x9e3779b1) ^ seed;
+  h = Math.imul(h ^ (h >>> 15), 0x2545f491);
+  return ((h ^ (h >>> 13)) >>> 0) / 4294967296;
+}
+
+// A unit gradient per lattice point, drawn uniformly over the sphere.
+function gradientDot3(gx: number, gy: number, gz: number, seed: number, dx: number, dy: number, dz: number): number {
+  const u = hash3(gx, gy, gz, seed) * 2 - 1;
+  const phi = hash3(gx, gy, gz, seed ^ 0x5bd1e995) * Math.PI * 2;
+  const r = Math.sqrt(1 - u * u);
+  return Math.cos(phi) * r * dx + Math.sin(phi) * r * dy + u * dz;
+}
+
+/** Gradient noise on a 3D lattice, 0..1. */
+export function gradientNoise3(x: number, y: number, z: number, seed: number): number {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const z0 = Math.floor(z);
+  const fx = x - x0;
+  const fy = y - y0;
+  const fz = z - z0;
+
+  const u = quintic(fx);
+  const v = quintic(fy);
+  const w = quintic(fz);
+
+  const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+
+  const c000 = gradientDot3(x0, y0, z0, seed, fx, fy, fz);
+  const c100 = gradientDot3(x0 + 1, y0, z0, seed, fx - 1, fy, fz);
+  const c010 = gradientDot3(x0, y0 + 1, z0, seed, fx, fy - 1, fz);
+  const c110 = gradientDot3(x0 + 1, y0 + 1, z0, seed, fx - 1, fy - 1, fz);
+  const c001 = gradientDot3(x0, y0, z0 + 1, seed, fx, fy, fz - 1);
+  const c101 = gradientDot3(x0 + 1, y0, z0 + 1, seed, fx - 1, fy, fz - 1);
+  const c011 = gradientDot3(x0, y0 + 1, z0 + 1, seed, fx, fy - 1, fz - 1);
+  const c111 = gradientDot3(x0 + 1, y0 + 1, z0 + 1, seed, fx - 1, fy - 1, fz - 1);
+
+  const front = lerp(lerp(c000, c100, u), lerp(c010, c110, u), v);
+  const back = lerp(lerp(c001, c101, u), lerp(c011, c111, u), v);
+
+  // Perlin's 3D range is about ±0.87, so this lands inside 0..1 with headroom.
+  return lerp(front, back, w) * 0.57 + 0.5;
+}
+
+/** Octave sum of `gradientNoise3`, 0..1, clustered about 0.5 like `fbm`. */
+export function fbm3(x: number, y: number, z: number, octaves: number, seed: number, gain = 0.5): number {
+  let sum = 0;
+  let amplitude = 1;
+  let total = 0;
+
+  for (let o = 0; o < octaves; o++) {
+    const step = 1 << o;
+    sum += gradientNoise3(x * step, y * step, z * step, seed + o * 7919) * amplitude;
+    total += amplitude;
+    amplitude *= gain;
+  }
+
+  return sum / total;
+}
+
+/** `fbm3` remapped to -1..1 across the range it occupies. */
+export function signedFbm3(x: number, y: number, z: number, octaves: number, seed: number, gain = 0.5): number {
+  const spread = FBM_HALF_RANGE[octaves] ?? 0.15;
+  const centred = (fbm3(x, y, z, octaves, seed, gain) - 0.5) / spread;
+  return Math.max(-1, Math.min(1, centred));
+}
+
+/** Creases rather than blobs, in 3D. */
+export function ridged3(x: number, y: number, z: number, octaves: number, seed: number, gain = 0.5): number {
+  return 1 - Math.abs(fbm3(x, y, z, octaves, seed, gain) * 2 - 1);
+}
+
+export interface Worley3Result {
+  /** Distance to the nearest feature point, in cells. */
+  f1: number;
+  /** Distance to the second nearest. `f2 - f1` is 0 on a cell border. */
+  f2: number;
+  /** The winning cell's own random value, 0..1. */
+  id: number;
+}
+
+/** Cellular noise on a 3D lattice, written into a result the caller owns. */
+export function worley3Into(into: Worley3Result, x: number, y: number, z: number, seed: number, jitter = 1): Worley3Result {
+  const cellX = Math.floor(x);
+  const cellY = Math.floor(y);
+  const cellZ = Math.floor(z);
+
+  let f1 = Infinity;
+  let f2 = Infinity;
+  let id = 0;
+
+  for (let oz = -1; oz <= 1; oz++)
+    for (let oy = -1; oy <= 1; oy++)
+      for (let ox = -1; ox <= 1; ox++) {
+        const gx = cellX + ox;
+        const gy = cellY + oy;
+        const gz = cellZ + oz;
+
+        const px = gx + 0.5 + (hash3(gx, gy, gz, seed) - 0.5) * jitter;
+        const py = gy + 0.5 + (hash3(gx, gy, gz, seed ^ 0x9e3779b9) - 0.5) * jitter;
+        const pz = gz + 0.5 + (hash3(gx, gy, gz, seed ^ 0x3c6ef372) - 0.5) * jitter;
+
+        const distance = Math.hypot(px - x, py - y, pz - z);
+        if (distance < f1) {
+          f2 = f1;
+          f1 = distance;
+          id = hash3(gx, gy, gz, seed ^ 0x51ed270b);
+        } else if (distance < f2) {
+          f2 = distance;
+        }
+      }
+
+  into.f1 = f1;
+  into.f2 = f2;
+  into.id = id;
+  return into;
+}
+
+/** `worley3Into` into a fresh result. */
+export function worley3(x: number, y: number, z: number, seed: number, jitter = 1): Worley3Result {
+  return worley3Into({ f1: 0, f2: 0, id: 0 }, x, y, z, seed, jitter);
+}
