@@ -176,7 +176,7 @@ export const PLAIN: BiomeParams = {
       noise: { scale: 160, seedSalt: 23, band: { from: 0.95, to: 0.6 } },
     },
     {
-      layer: 'granite_boulder',
+      layer: 'granite_01',
       density: 0.07,
       noise: { scale: 220, seedSalt: 41, band: { from: 0.55, to: 0.78 } },
     },
@@ -282,7 +282,7 @@ export const MOUNTAIN: BiomeParams = {
   scatter: [
     { layer: 'granite_pebble', density: 0.45, slope: { from: 55, to: 30 } },
     {
-      layer: 'granite_boulder',
+      layer: 'granite_01',
       density: 0.3,
       height: { from: 165, to: 105 },
       slope: { from: 48, to: 22 },
@@ -350,7 +350,7 @@ export const DESERT_MOUNTAIN: BiomeParams = {
   // Weathered blocks, collecting on the flanks and skirts rather than the crest.
   scatter: [
     {
-      layer: 'granite_boulder',
+      layer: 'granite_01',
       density: 0.26,
       height: { from: 420, to: 90 },
       slope: { from: 45, to: 18 },
@@ -421,7 +421,7 @@ export const DESERT: BiomeParams = {
       noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
     },
     {
-      layer: 'granite_boulder',
+      layer: 'granite_01',
       density: 0.05,
       height: { from: 55, to: 12 },
       noise: { scale: 340, seedSalt: 67, band: { from: 0.62, to: 0.85 } },

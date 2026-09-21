@@ -645,7 +645,7 @@ function describeShape({ params, skeleton, metrics, crown, rock }: Built): strin
   if (rock)
     return (
       `  height ${rock.metrics.height.toFixed(2)}m, ${rock.metrics.width.toFixed(2)}m by ${rock.metrics.depth.toFixed(2)}m, ` +
-      `${rock.field.cleaves.length} cleaves, ${params.subdivisions} subdivisions a side, ` +
+      `${rock.field.scoops.length} scoops, ${params.subdivisions} subdivisions a side, ` +
       `hull of ${rock.metrics.hull.length / 3} points`
     );
 

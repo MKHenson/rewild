@@ -19,7 +19,7 @@ shape of thing entirely:
 | `tree` | Recursive branching. Tapered tubes with cards hung on the outermost generations, placed by one of two **branch models**. | Oak, birch, poplar and a shrub, which is the same generator at two metres. Also every conifer, which is that generator under `branchModel: whorl`. See [Conifers](#conifers) |
 | `clump` | Cards radiating from one point on the ground. No stem. | Grass, wildflowers, clover, reeds |
 | `crown` | One undivided stem with a rosette of long curved cards at its top. The stem may be 0m. | Palm, tree fern, cycad, and a fern, which is the same rosette on the ground |
-| `rock` | A solid grown from one 3D field: a cube pushed toward a sphere, cleaved, and displaced by noise. No cards, no alpha, one material, a hull collider. | Boulders and blocks. See [Rocks](#rocks) |
+| `rock` | A solid grown from one 3D field: a sphere with larger spheres scooped out of it, displaced by noise. No cards, no alpha, one material, a hull collider. | Boulders and cobbles. See [Rocks](#rocks) |
 
 `tree` is the default, so a config written before types existed still opens unchanged. Two more are
 planned and not written — see [Where this is going](#where-this-is-going).
@@ -271,32 +271,47 @@ in the image too. See [Rocks](#rocks).
 | --- | --- | --- | --- |
 | `height` | 1.2 | Metres tall before the relief. The rock is centred on its own middle and then stood on its lowest point, so the run reports the height it actually reached. | `0.4` a stone · `1.4` the granite template · `4` a boulder to climb |
 | `width`, `depth` | 0, 0 | Metres across along x and along z before the relief. 0 derives them from `height`: 1.3 of it across, 1 of it deep. | `0` derived · `3` and `1.5` a slab · equal to `height` a block |
-| `roundness` | 0.45 | How far the cube is pushed toward a sphere. | `0` a cube, six flat faces and hard edges · `0.45` the granite template, a block whose edges have gone · `1` a sphere, a pebble. Within 0..1 |
-| `cleaves` | 3 | Planes the rock is clipped by. Each sits 0.6 to 0.9 of the way out along its own normal and cuts a flat facet where it meets the surface, which is what reads as fractured stone. | `0` no facets, a lump · `3` the granite template · `12` the ceiling, a rock that is mostly facet. Within 0..12 |
-| `relief` | 0.1 | Depth of the surface displacement, as a fraction of the mean radius: the slab pile at `plateShare` of it, and noise (`reliefOctaves` of lumps under `reliefSize`, plus two octaves of ridges at a quarter share) for the rest. |
+| `scoops` | 9 | Spheres, each larger than the rock, scooped out of it along their own random directions. The surface is their concave faces meeting at ridges, which is the shape of broken, worn stone. | `0` an egg · `9` the default · `12` the granite template · `24` the ceiling. Within 0..24 |
+| `scoopSize` | 0.8 | How broad a scoop is, as its radius over its distance from the centre. | `0.5` a tight bite · `0.75` the granite template · `0.95` a face as flat as a plane's. Within 0.3..0.97 |
+| `scoopDepth` | 0.35 | How far the deepest scoop reaches in, as a fraction of the mean radius; each scoop takes 0.35 to 1 of it. A scoop is held back where it would overhang. | `0.1` a dimpled egg · `0.45` the granite template · `0.6` the ceiling. Within 0..0.6 |
+| `smoothing` | 0.5 | How far the creases of the field are rounded: the ridges between scoops, the slab edges and joins, the creases of the ridged noise. It rounds the field, so every tier and the bake agree, and it only ever pulls the surface in, so `1` is about a tenth smaller than `0`. | `0` knife-edged, every crease a hard triangle edge · `0.5` the granite template · `1` a scoop ridge rounded over a quarter of the radius, the slabs cobbles. Within 0..1 |
+| `relief` | 0.1 | Depth of the surface displacement, as a fraction of the mean radius: the slab pile at `plateShare` of it, and noise (`reliefOctaves` of lumps under `reliefSize`, plus two octaves of ridges at a quarter share) for the rest. | `0` the bare scooped solid, for a test · `0.29` the granite template · `0.3` a rough, pitted surface with `plates 0` · `0.5` the ceiling, past which the surface folds through the centre and stops being star-shaped. Within 0..0.5 |
 | `plates` | 2 | Slab cells per metre in the pile the relief is built from. Rock breaks along planes, and this is where the planes come from. 0 builds the relief from noise alone. | `0` a lump · `2` the default, slabs about half a metre · `4` cobbles |
 | `plateLayers` | 2 | Layers of slabs, each 1.7x finer than the last, chipping the ones below at half the depth. | `1` plates alone · `2` the default · `4` chipped down to grit. Within 1..4 |
 | `plateBevel` | 0.35 | Fraction of a slab that slopes to its edge. | `0.1` flat-topped and sharp · `0.35` the default · `1` a pyramid, no flat top at all. Within 0..1 |
 | `plateLean` | 0.3 | How far a slab drops across its own width, as a fraction of its height. Tilted slabs read as bedded rock; level ones as paving. | `0` level · `0.3` the default · `0.7` every slab a wedge. Within 0..1 |
 | `bedding` | 0.6 | How far the slabs are flattened and aligned into strata. At 1 every slab lies along one bedding plane, tilted up to 30° from level per rock; at 0 they are blocks at any angle. | `0` rubble · `0.6` the default · `1` sedimentary strata. Within 0..1 |
 | `plateShare` | 0.7 | Share of `relief` the slabs take; noise has the rest. | `0` noise alone, whatever `plates` says · `0.7` the default · `1` slabs alone. Within 0..1 |
-| `plateTint` | 0.25 | How far each slab shifts the tone by its own random value, so no two plates are one grey. | `0` all one stone · `0.25` the default · `0.6` a patchwork. Within 0..1 | `0` the bare cleaved solid, for a test · `0.09` the granite template, slab steps · `0.3` a rough, pitted surface with `plates 0` · `0.5` the ceiling, past which the surface folds through the centre and stops being star-shaped. Within 0..0.5 |
-| `reliefSize` | 0.9 | Metres across the largest lump. Each octave above it is half the size at half the amplitude, the way a terrain heightmap is built, so this sets the scale of the swell and the octaves add the detail. | `0.3` granular, a surface of fist-sized bumps · `0.7` the granite template, a couple of swells across a rock · `3` one slow bulge, and the octaves are the whole texture |
-| `reliefOctaves` | 5 | Octaves under `reliefSize`. | `1` one smooth swell · `3` soft lumps · `4` the granite template · `8` the ceiling, detail down to the texel. Within 1..8 |
-| `facetRelief` | 0.3 | Share of the relief a cleaved facet keeps. The clip lands a point on the plane, which would leave every facet a perfect plane; this puts the noise back at a fraction, and the grooves back in full. | `0` machined flat · `0.5` the granite template, a fracture face · `1` the facet is as rough as the rest and the cleave reads only as a change of direction. Within 0..1 |
-| `cracks` | 1.2 | Crack cells per metre. Cracks are the borders of a 3D cellular field, in two octaves, and the coarse octave also grooves the mesh. | `0` none, and no grooves · `1.2` a metre-scale network · `3` a shattered surface. The bake reads the field at each texel's own position, so a crack crosses a chart seam without a break |
-| `crackStrength` | 1 | How strongly the texture draws the cracks: the darkening, the height, the occlusion, the roughness and the drip stains under them. The grooves are not touched. | `0` no line, grooves only · `0.4` the granite template, faint over the slab gaps · `1` full. Within 0..1 |
-| `grooveDepth` | 0.05 | How deep the coarse cracks cut into the mesh, as a fraction of the mean radius. This is what puts a crack into the silhouette. | `0` cracks in the texture only · `0.02` the granite template, where the slab gaps are the cracks · `0.05` 4cm on a 1.4m rock · `0.15` a rock breaking into blocks. Within 0..0.5 |
-| `grooveWidth` | 0.15 | Width of that groove as a fraction of a crack cell. The texture's crack line sits at its bottom. Needs `subdivisions` enough to carry it: at 24 a side on a 1.4m rock a quad is 6cm. | `0.05` a knife cut, invisible at 24 subdivisions · `0.15` the granite template · `0.4` a broad valley. Within 0..1 |
-| `weathering` | 0.6 | How far the exposure, edge wear, dirt, drip stains and ground contact go. | `0` fresh-cut stone · `0.4` the granite template · `1` lichen on every top, soil up its base |
-| `stoneTint`, `stoneDark`, `stoneLight` | `#8a857d`, `#4a4642`, `#b9b1a5` | The stone's mid tone and the two ends the tone ramps to, six digit hex each. The dark and light are also the fleck colours. | Granite grey by default · `#9c8f7a`, `#5a4a38`, `#c9bda6` sandstone · `#5e6066`, `#2e3034`, `#8d9096` basalt |
-| `lichenTint`, `soilTint` | `#7c8a55`, `#4f4a36` | Lichen on the faces that look up; dirt in the hollows and soil up the base. | |
-| `toneSize` | 0.2 | Metres across the largest patch of the tone mottling: the octave stack the colour is ramped from, and the base every rock has under its detail. | `0.1` fine clouds · `0.2` the default · `1` a couple of broad patches across the rock |
+| `plateTint` | 0.25 | How far each slab shifts the tone by its own random value, so no two plates are one grey. | `0` all one stone · `0.25` the default · `0.6` a patchwork. Within 0..1 |
+| `reliefSize` | 0.9 | Metres across the largest lump. Each octave above it is half the size at half the amplitude, the way a terrain heightmap is built, so this sets the scale of the swell and the octaves add the detail. | `0.3` granular, a surface of fist-sized bumps · `0.8` the granite template, a couple of swells across a rock · `3` one slow bulge, and the octaves are the whole texture |
+| `reliefOctaves` | 5 | Octaves under `reliefSize`. | `1` one smooth swell · `3` soft lumps · `5` the granite template · `8` the ceiling, detail down to the texel. Within 1..8 |
+| `cracks` | 1.2 | Crack cells per metre. Cracks are the borders of a 3D cellular field flattened into the bedding, in two octaves, and the coarse octave also grooves the mesh. Not every border is drawn, and a crack thins and opens along its length. | `0` none, and no grooves · `1.2` a metre-scale network · `3` a shattered surface. The bake reads the field at each texel's own position, so a crack crosses a chart seam without a break |
+| `crackStrength` | 1 | How strongly the texture draws the cracks: the dark core, the chipped rim, the hairlines, the foliation, the height, the occlusion, the roughness and the drip stains under them. The grooves are not touched. | `0` no line, grooves only · `0.7` the granite template · `1` full. Within 0..1 |
+| `grooveDepth` | 0.05 | How deep the coarse cracks cut into the mesh, as a fraction of the mean radius. This is what puts a crack into the silhouette. The fine octave is never cut: under a quad it reads as dimples. | `0` cracks in the texture only · `0.05` 4cm on a 1.4m rock · `0.07` the granite template · `0.15` a rock breaking into blocks. Within 0..0.5 |
+| `grooveWidth` | 0.15 | Width of that groove as a fraction of a crack cell. The texture's crack line sits at its bottom. Needs `subdivisions` enough to carry it: at 24 a side on a 1.4m rock a quad is 6cm. | `0.05` a knife cut, invisible at 24 subdivisions · `0.13` the granite template · `0.4` a broad valley. Within 0..1 |
+| `weathering` | 0.6 | How far the dirt, the lichen, the drip stains and the ground contact go. | `0` fresh-cut stone · `0.55` the granite template · `1` lichen over every top, soil up its base |
+| `patina` | 0.5 | The dark crust old stone grows where water sits or runs: on the tops, in the hollows, beside the cracks, under the drip lines and around the lichen, never on a worn edge. Thin and brown at its margin, dark and a little glossy at its heart. | `0` none · `0.5` the default, an old rock · `1` a crust over most of what is damp. Within 0..1 |
+| `edgeWear` | 0.5 | How far the convex edges weather: bleached toward `edgeTint`, smoother, and clear of stain, patina and lichen. Read off the surface's curvature at four reaches and feathered, so slab lips and scoop ridges both count. | `0` edges the colour of the faces · `0.5` the default · `1` a rock outlined in pale stone. Within 0..1 |
+| `streaks` | 0 | Opacity of the run-off down the sides: droplet trails from a splat, thickest at the head, thinning and fading down, half of them branching, broken into rivulets and gathering in the cracks. Colour, roughness and occlusion; never height. | `0` none · `0.5` a weathered rock · `1` every trail at full colour. Within 0..1 |
+| `snow` | 0 | Snow on the faces that look up, deeper in hollows, off the edges, drifted at its margin, mottled and blue in its shadow. Painted last, over everything. | `0` none · `0.5` the tops · `1` all but the sides and the edges. Within 0..1 |
+| `stain` | 0.5 | How strongly iron staining is drawn: rust seeping from the cracks, and patches banded along the bedding, as a tint that keeps the grain under it. | `0` unstained · `0.5` the default · `1` rust down every crack. Within 0..1 |
+| `veins` | 0.15 | How much of the rock the quartz veins run through: faint pale lines along the zero crossings of a stretched noise, a little glassier and higher than the stone. | `0` none · `0.15` the default, a few faint ones · `1` most of the surface, and it reads as marble. Within 0..1 |
+| `stoneTint`, `stoneDark`, `stoneLight` | `#7f827c`, `#3e403e`, `#b3b5ae` | The stone's mid tone and the two ends the tone ramps to, six digit hex each. The dark and light are also the mineral colours, and the light lifted toward white is the veins'. | Granite grey by default · `#9c8f7a`, `#5a4a38`, `#c9bda6` sandstone · `#5e6066`, `#2e3034`, `#8d9096` basalt |
+| `lichenTint`, `soilTint`, `stainTint`, `edgeTint`, `streakTint` | `#a7b094`, `#4f4a36`, `#8a5a2e`, `#c6c3ba`, `#2a2d28` | The crustose lichen discs, most of them (some are a grey-blue off it, a few small ones yellow); dirt in the hollows and soil up the base; the iron staining; the bleached colour of a worn edge; what the run-off leaves. | `streakTint` near black is mould, `#e8e6dc` bird droppings |
+| `toneSize` | 0.25 | Metres across the largest patch of the tone mottling: the octave stack the colour is ramped from, and the base every rock has under its detail. | `0.1` fine clouds · `0.25` the default · `1` a couple of broad patches across the rock |
 | `toneOctaves` | 5 | Octaves under `toneSize`, each half the size. | `2` soft blotches · `5` the default · `8` mottling down to the texel. Within 1..8 |
-| `toneContrast` | 0.7 | How far the tone reaches from `stoneTint` toward `stoneDark` and `stoneLight`. | `0` one flat tint · `0.7` the default · `1` the full ramp. Within 0..1 |
-| `grainScale` | 45 | Speckle cells per metre: the size of the mineral flecks. | `20` coarse flecks, a pegmatite · `45` the default · `100` a fine sand |
-| `speckle` | 0.6 | How strongly the flecks are drawn. | `0` none, the tone alone · `0.6` the default · `1` every fleck at full colour. Within 0..1 |
-| `crackWidth` | 0.05 | Width of the crack line in the texture, as a fraction of a crack cell. | `0.02` hairline · `0.05` the default · `0.15` a broad dark band. Within 0..1 |
+| `toneContrast` | 0.45 | How far the tone reaches from `stoneTint` toward `stoneDark` and `stoneLight`. | `0` one flat tint · `0.45` the default · `1` the full ramp. Within 0..1 |
+| `grainScale` | 110 | Mineral crystals per metre: the size of the grain. A crystal wants three texels or more. | `30` coarse, a pegmatite · `110` the default · `150` fine, and aliasing at 1024 on a 1.4m rock |
+| `speckle` | 0.6 | How strongly the mineral grain is drawn. | `0` none, the tone alone · `0.6` the default · `1` every crystal at full colour. Within 0..1 |
+| `roughness` | 0.82 | Base roughness of the stone before the grain, the wear and the growth move it. | `0.9` dry sandstone · `0.82` the default · `0.55` wet or polished. Within 0..1 |
+| `metallic` | 0 | Base metalness. Lichen, patina, run-off and snow take it back to 0 where they lie. | `0` stone · `0.3` ore-bearing · `1` a lump of metal. Within 0..1 |
+| `glint` | 0.25 | How much of the stone holds metallic shards: angular crystals at their own orientations, fully metallic, glossy, each a flat face set into the surface. | `0` none · `0.25` the default, a sparkle · `1` a rock full of pyrite. Within 0..1 |
+| `glintScale` | 30 | Metallic flakes per metre: the size of a shard. | `12` big crystals · `30` the default, about 3cm · `120` a speck, and aliasing at 1024 on a 1.4m rock |
+| `glintTint` | `#d8c9a4` | The flakes' colour, six digit hex. | Pale brass pyrite · `#c8cbd0` mica |
+| `bump` | 1 | Gain of the normal map from the texture height, as a multiple of the settled value. | `0.5` soft · `1` the default · `2` twice as steep. Within 0..4 |
+| `undulation` | 0.5 | Soft, irregular unevenness in the texture height: the slow waviness of a weathered face, below what the mesh carries. Height alone. | `0` a surface that is only its grain · `0.5` the default · `1` a visibly wavy face. Within 0..1 |
+| `undulationSize` | 0.09 | Metres across the largest swell of that unevenness, with two finer octaves under it. | `0.04` a close ripple · `0.09` the default · `0.3` a slow roll under the grain |
+| `crackWidth` | 0.035 | Width of the crack line in the texture, as a fraction of a crack cell, before the field varies it along its length. | `0.02` hairline · `0.035` the default · `0.15` a broad dark band. Within 0..1 |
 | `crackDepth` | 0.6 | How deep the crack line cuts into the texture height, which is what the normal map reads. | `0` a flat stain · `0.6` the default · `1` the full range. Within 0..1 |
 | `subdivisions` | 24 | Quads along each edge of the cube. Triangles are six times this squared, doubled. The one key that is not in the image, and the one a tier overrides. | `4` 192 triangles, a far tier · `16` 3,072, the template's first tier · `48` 27,648, the granite template, enough to carry slab edges · `128` the ceiling, 196k. Within 2..128 |
 
@@ -839,16 +854,19 @@ material, a height map, a hull collider and a LOD chain, and it is laid onto the
 it. The keys are under [The stone](#the-parameters); the `granite-01` template is the start.
 
 **The rock is a field, not a mesh.** `shape(d)` in `lib/rock.ts` is the surface distance along a
-direction from the rock's centre: a cube pushed toward a sphere by `roundness`, scaled to `width`,
-`height` and `depth`, displaced at `relief` by a pile of bevelled slabs (`lib/plates.ts`) and by
-3D noise in the share the slabs leave, grooved by the crack field, and clipped by `cleaves` planes. Everything moves the point along its own ray,
-so the solid is **star-shaped** — every point on the surface is visible from the centre — and a ray
-from the centre meets it exactly once. The mesh samples that function at its vertices and the bake
+direction from the rock's centre: a sphere with `scoops` larger spheres scooped out of it, scaled to
+`width`, `height` and `depth`, displaced at `relief` by a pile of bevelled slabs (`lib/plates.ts`)
+and by 3D noise in the share the slabs leave, and grooved by the crack field. Everything moves the
+point along its own ray, so the solid is **star-shaped** — every point on the surface is visible
+from the centre — and a ray from the centre meets it exactly once. A scoop is placed so that its
+silhouette, seen from the centre, lies outside the rock, which is what keeps it from carving an
+overhang the ray could not represent. The mesh samples that function at its vertices and the bake
 samples it at every texel, which is what makes the next two paragraphs true.
 
-**The six faces of the cube are the six charts of the image.** The image is 3x2 charts of half
-`textureSize` each, so a 1024 set is 1536x1024. A texel maps to a face coordinate, the coordinate to
-a direction, the direction to a surface point, and the grain, the cracks and the weathering are all
+**The six faces of a cube are the six charts of the image.** A chart is a bundle of directions,
+not a piece of the shape. The image is 3x2 charts of half `textureSize` each, so a 1024 set is
+1536x1024. A texel maps to a face coordinate, the coordinate to a direction, the direction to a
+surface point, and the grain, the cracks and the weathering are all
 functions of that point and its normal. Nothing reads a UV, so a crack cannot know where a chart
 ends and runs across the seam by construction. A chart's 8-texel **gutter is real surface**: a face
 coordinate just past 0..1 is a direction just past the face's edge, which is the neighbouring
@@ -859,19 +877,28 @@ face into a foreign colour.
 side samples the same charts as the base at 24, at the same uvs, and the chain hands over with the
 texture standing still. The template's chain is 27,648, 3,072 and 432 triangles.
 
-**The texture** is painted in `lib/stone.ts`, per texel, in this order: the mineral grain (three
-tints from `lib/look.ts`, thresholded off a five-octave 3D noise); the cracks (two octaves of a 3D
-cellular field's borders, domain-warped so they wander, written into the colour, the height, the
-occlusion and the roughness); edge wear off the surface's own curvature, so ridges and cleave
-creases are lighter and smoother and hollows hold dirt; lichen on faces that look at the sky; drip
-stains below a crack on a side face, from a short march up the crack field; and soil up the lowest
-part. Every one of those is scaled by `weathering`. The normal is derived from the height, as bark's
-is.
+**The texture** is painted in `lib/stone.ts`, per texel, in this order: the tone, a slow octave
+stack ramped dark to light; the mineral grain, a fine 3D cellular field where every cell is one
+crystal of one of three minerals at its own height; a texel-scale grit; quartz veins along the zero
+crossings of a stretched noise; the cracks, the borders of a 3D cellular field flattened into the
+bedding and warped so they wander, with a dark core, a chipped rim and hairline foliation, written
+into the colour, the height, the occlusion and the roughness; iron staining seeping from the
+cracks and lying in bands along the bedding; edge wear off the surface's own curvature at four
+reaches, so every convex edge from a slab's lip to the ridge between two scoops is bleached, smoother
+and kept clear of stain, patina and lichen, while hollows hold dirt; the patina, a dark crust
+grown wherever water sits or runs; crustose lichen discs in colonies on the faces that look up; drip stains below a crack on a side
+face, from a short march up the crack field; soil up the lowest part; run-off streaks down the
+sides; and snow on what faces up. The dirt, lichen, drips and soil are scaled by
+`weathering`, the patina by `patina`, the stain by `stain`, the veins by `veins`, the edges by
+`edgeWear`, the streaks by `streaks` and the snow by `snow`. The normal is derived from the
+height, as bark's is, and every layer writes the height, so the grain and the grit are in it too.
+Every octave sum is turned between octaves (`fbm3r` in `lib/noise.ts`), so no two octaves share a
+lattice and the sum never reads as a grid.
 
 **The collider is a hull.** The mesh's support points in 26 directions — every combination of -1,
 0 and 1 on three axes — are written into the layer as `{ type: 'hull', points }`, and the engine
 takes their convex hull. It touches the true hull at those points and sits inside it between them
-by the surface's sag between two neighbouring directions, so a cleave facet is a hull face and the
+by the surface's sag between two neighbouring directions, so a ridge between scoops is a hull vertex and the
 noise is a few centimetres of give. The scale jitter scales it with the mesh.
 
 **The layer** sets `alignToNormal: 1`, so the rock lies on the slope, and a `yOffset` of a fifth of
@@ -888,18 +915,34 @@ are the `pebble` and `outcrop` types in [Where this is going](#where-this-is-goi
 The keys, in the order they act on the surface. Every metre-based key is in the rock's own metres:
 an instance scaled 1.6x by the layer's jitter shows lumps and cracks 1.6x larger too.
 
-**The block** — `height`, `width`, `depth`, `roundness`
+**The block** — `height`, `width`, `depth`
 
-Start with a box `width` by `height` by `depth` metres, and push it toward a sphere by `roundness`.
-`0` keeps six flat faces and hard edges; `1` is a sphere; `0.4` is a block whose edges have gone.
-`width` and `depth` at 0 derive from `height`: 1.3 of it across, 1 of it deep.
+An egg `width` by `height` by `depth` metres, before the scoops shape it. `width` and `depth` at 0
+derive from `height`: 1.3 of it across, 1 of it deep.
 
-- A boulder: `height 1.4`, `roundness 0.4`
-- A slab: `height 0.8, width 3, depth 1.8`, `roundness 0.5`
-- A pebble: `height 0.3`, `roundness 1`
+*Affected by nothing else. Affects everything else*: `relief`, `scoopDepth` and `grooveDepth` are
+fractions of the mean of the three half extents, so a rock twice the size has bumps twice as deep.
 
-*Affected by nothing else. Affects everything else*: `relief` and `grooveDepth` are fractions of the
-mean of the three half extents, so a rock twice the size has bumps twice as deep.
+**The scoops** — `scoops`, `scoopSize`, `scoopDepth`
+
+What gives a rock its shape: `scoops` spheres, each larger than the rock, scooped out of the egg
+along their own random directions, so the surface is concave faces meeting at ridges. This is the
+shape of a stone that has been broken and then worn, and it is what a cube pushed toward a sphere
+never was. `scoopSize` is how broad a scoop is, as its radius over its distance from the centre:
+`0.95` is a huge sphere barely curving, so its face is as flat as a plane's; `0.5` is a tight bite.
+`scoopDepth` is how far the deepest one reaches in, as a fraction of the radius, and each scoop
+takes 0.35 to 1 of it, so the faces are no two alike. The ridges between scoops are rounded by
+`smoothing`.
+
+- A fractured boulder: `scoops 12`, `scoopSize 0.75`, `scoopDepth 0.45`
+- A river cobble: `scoops 9`, `scoopSize 0.85`, `scoopDepth 0.3`, `smoothing 1`
+- A block: `scoops 6`, `scoopSize 0.95`, `scoopDepth 0.4`, `smoothing 0.2`
+- An egg: `scoops 0`
+
+*Affected by*: `seed` places the scoops, so two seeds at the same keys are two different rocks. A
+scoop is held back from overhanging: a tight scoop (`scoopSize` low) can only go so deep before its
+silhouette would lie inside the rock, and the depth is clamped there. The relief rides on the scooped
+surface and grooves cut it like the rest.
 
 **The plates** — `plates`, `plateLayers`, `plateBevel`, `plateLean`, `bedding`, `plateShare`, `plateTint`
 
@@ -914,7 +957,7 @@ bands — strata, without a separate strata key. `plateTint` gives each slab its
 ![Six rocks: the defaults; bedding 1; bedding 0.2; plates 3.5 with three layers; plateLean 0.7 with plateBevel 0.2; relief 0.15](../../docs/images/rock-plates.png)
 
 Top row: the defaults; `bedding 1`; `bedding 0.2`. Bottom row: `plates 3.5, plateLayers 3`;
-`plateLean 0.7, plateBevel 0.2`; `relief 0.15`. All at `relief 0.08` unless stated, two cleaves,
+`plateLean 0.7, plateBevel 0.2`; `relief 0.15`. All at `relief 0.08` unless stated, on the older cube base with two cleave planes,
 `subdivisions 48`, `crackStrength 0.4`.
 
 - Bedded stone: `bedding 1`, `plateLean 0.4`, `plates 2`
@@ -956,40 +999,49 @@ A boulder: `reliefSize 0.7`, `reliefOctaves 4`, `relief 0.2`. Weathered and smoo
 same height and the surface reads as cobbles; stay under about 0.3. Octaves finer than a couple of
 mesh quads vanish — at `subdivisions 24` on a 1.4m rock a quad is 6cm, so an octave at 4cm is not
 there. Ridges ride on the same scale: two octaves of creases at 1.5x the lump frequency take a
-quarter of `relief`, so `reliefSize` moves them too. Every cleave facet cuts the lumps away, and
-`facetRelief` is what puts them back.
+quarter of `relief`, so `reliefSize` moves them too. The lumps ride on the scooped surface, as deep
+on a scoop's face as on a ridge.
 
-**The facets** — `cleaves`, `facetRelief`
+**The creases** — `smoothing`
 
-`cleaves` planes clip the rock, each 0.6 to 0.9 of the way out along its own random direction, so
-each cuts a flat facet. This is what reads as fractured stone rather than a lump. `facetRelief` is
-the share of the lumps a facet keeps: `0` is a machined plane, `0.3` a fracture face, `1` as rough
-as the rest, so the cleave reads only as a change of direction.
+`smoothing` rounds every crease the field has: the ridge where two scoops meet, the shoulder and
+the join of every slab, and the creases of the ridged noise, which come from an absolute value and
+are a knife edge at every zero crossing. `0` leaves all of them sharp and the mesh shows each as a
+hard triangle edge; `1` rounds a scoop ridge over a quarter of the radius and turns the slab pile
+into cobbles. On the granite template it moves the surface by up to 18cm and 6.6cm on average,
+against a 3.5cm quad. It rounds the field, not the mesh, so every tier and the bake see the same
+rounded rock. Vertex normals are read at a third of a quad, so a tier shades the surface its own
+triangles carry rather than every crease of the field.
 
-- A block: `cleaves 6`, `facetRelief 0.3`
-- A river boulder: `cleaves 0`
-- A rock that looks cut: `cleaves 3`, `facetRelief 0`
+A smooth minimum only ever pulls the surface in, so a rock at `1` is about a tenth smaller than
+the same rock at `0`. The run reports the size it actually reached.
 
-*Affected by*: `seed` decides where the planes fall, so two seeds at `cleaves 6` are two different
-rocks. `roundness` near 0 already has six flat faces, and a cleave on one of them is a chamfer.
-Grooves cut a facet in full regardless of `facetRelief`.
+Grooves are not in the list: the crack mask is built from a pair of `smoothstep`s, whose ends are
+already flat, so a groove floor and its shoulders have no corner to round.
 
 **The cracks** — `cracks`, `crackStrength`, `grooveDepth`, `grooveWidth`
 
 `cracks` is how many crack cells there are per metre: the cracks are the borders of a 3D cellular
-field, so `1.2` is a network about 0.8m across, `3` a shattered surface, `0` none at all. One field
-feeds two things, each with its own switch:
+field, so `1.2` is a network about 0.8m across, `3` a shattered surface, `0` none at all. The cells
+are flattened along the bedding normal by `bedding`, so the cracks run with the bedding the way
+joints do. Not every border is a crack and no crack is one width: both come off one slow noise
+along the network, so a crack opens where it is strong and thins to nothing where it is not. One
+field feeds two things, each with its own switch:
 
-- **The line in the texture**, in two octaves, scaled by `crackStrength`. `1` is a dark, deep,
-  dusty line; `0` draws nothing and leaves the grooves alone.
+- **The line in the texture**, scaled by `crackStrength`: a sharp dark core with a faint shoulder,
+  a lighter chipped rim beside it, a second finer octave as hairlines, and faint foliation lines
+  along the bedding in bands. `1` is a dark, deep, dusty line; `0` draws nothing and leaves the
+  grooves alone.
 - **The groove in the mesh**, from the coarse octave alone: `grooveDepth` as a fraction of the
-  radius, `grooveWidth` as a fraction of a crack cell. `grooveDepth 0` leaves the mesh alone.
+  radius, `grooveWidth` as a fraction of a crack cell. `grooveDepth 0` leaves the mesh alone. The
+  fine octave is never cut into the mesh: at that scale a line is under a quad, and it reads as
+  dimples rather than cracks.
 
 ![grooveDepth 0, 0.06 and 0.15 across the top row; grooveWidth 0.05, 0.15 and 0.4 across the bottom](../../docs/images/rock-grooves.png)
 
 Top row: `grooveDepth` 0, 0.06 and 0.15 at `grooveWidth` 0.15. Bottom row: `grooveWidth` 0.05,
 0.15 and 0.4 at `grooveDepth` 0.08. Both on a 1.4m rock at `subdivisions 32`, `cracks 1.2`,
-`crackStrength 1`, no cleaves. Depth is how far the crack reaches into the silhouette; width is how
+`crackStrength 1`, on the older cube base. Depth is how far the crack reaches into the silhouette; width is how
 far its sides slope away from the line. The narrow one at bottom left is under a quad wide, and
 the mesh renders it as a jagged tear rather than a groove.
 
@@ -1006,23 +1058,29 @@ texture stops drawing the line into it.
 
 *Affected by*: `grooveWidth` is a fraction of a cell, so raising `cracks` narrows every groove in
 metres. A groove needs two or three mesh quads to show — bottom left above — so at
-`grooveWidth 0.05` and `subdivisions 24` it is a tear or nothing. The texture's own crack line is a
-fixed fraction of a cell (`crackWidth` in `lib/look.ts`), so more cells per metre also means thinner
-lines. Drip stains march up the coarse crack field and are scaled by `crackStrength` too, so they
-go when the lines go. Grooves cut a cleave facet in full whatever `facetRelief` says.
+`grooveWidth 0.05` and `subdivisions 24` it is a tear or nothing. The texture's own crack line is
+`crackWidth` of a cell, so more cells per metre also means thinner lines. Drip stains march up the
+coarse crack field and the iron stain seeps from it, and both are scaled by `crackStrength` too, so
+they go when the lines go. Grooves cut a scoop's face like the rest of the surface. `smoothing`
+does not reach them: a groove is built from a pair of `smoothstep`s and has no corner to round.
 
 **The grain** — `stoneTint`, `stoneDark`, `stoneLight`, `toneSize`, `toneOctaves`, `toneContrast`, `grainScale`, `speckle`
 
 Two layers. The **tone** is an octave stack, `toneOctaves` deep under `toneSize` metres, ramped
 from `stoneDark` through `stoneTint` to `stoneLight` by `toneContrast`: the cloudy mottling every
-rock has under its detail, and the base everything else is painted on. The **speckle** is the
-mineral flecks on top: a finer stack at `grainScale` cells per metre, thresholded into dark and
-light flecks at `speckle` strength.
+rock has under its detail, and the base everything else is painted on. The **grain** is the rock
+as a mosaic of crystals on top: a 3D cellular field at `grainScale` crystals per metre, each cell
+one of three minerals in granite's proportions — a dark glossy flake off `stoneDark`, a glassy grey
+off `stoneTint`, a pale bulk off `stoneLight` — at its own height with a soft grain boundary, drawn
+at `speckle` strength. Under it all is a texel-scale grit in the height and the roughness, which is
+what stops the surface reading as smooth plastic with a picture on it. A crystal wants three
+texels or more: at 1024 a 1.4m rock has 3mm texels, so `grainScale` above about 120 aliases.
 
 ![toneSize 0.12, 0.35 and 1.0 across the top row; toneContrast 0.25, speckle 0 and speckle 1 at grainScale 20 across the bottom](../../docs/images/rock-tone.png)
 
 Top row: `toneSize` 0.12, 0.35 and 1.0m. Bottom row: `toneContrast` 0.25; `speckle` 0, which is
-the tone alone; `speckle` 1 at `grainScale` 20. All on a 1.4m rock, no cracks, no weathering.
+the tone alone; `speckle` 1 at `grainScale` 20. All on a 1.4m rock, no cracks, no weathering, from
+an earlier grain that thresholded flecks off a noise; the keys act the same way on the crystals.
 
 - Granite: the defaults
 - Sandstone: `stoneTint #9c8f7a`, `stoneDark #5a4a38`, `stoneLight #c9bda6`, `speckle 0.2`,
@@ -1032,10 +1090,58 @@ the tone alone; `speckle` 1 at `grainScale` 20. All on a 1.4m rock, no cracks, n
 - Chalk: `toneContrast 0.3`, `speckle 0`
 
 *Affected by*: the tone also writes the texture height, so `toneContrast` is in the normal map as
-soft undulation, and the flecks are in it as grit. The weathering masks paint over the grain, so at
-`weathering 1` much of the tone is under lichen and soil. `stoneDark` and `stoneLight` are shared
-between the tone's ends and the flecks, so a high-contrast tone and a strong speckle draw from the
-same two colours.
+soft undulation, and the crystals are in it as mineral-scale facets. The weathering masks paint
+over the grain, so at `weathering 1` much of the tone is under lichen and patina. `stoneDark` and
+`stoneLight` are shared between the tone's ends and the minerals, so a high-contrast tone and a
+strong grain draw from the same two colours.
+
+**The veins** — `veins`
+
+Quartz veins: faint pale lines along the zero crossings of an octave sum stretched along one
+direction per rock and warped so they wander and branch, a little lighter, higher and glassier
+than the stone they run through. They are kept faint: bright ones read as chalk marks. `veins` is
+how much of the rock they run through: `0` draws none, `0.15` a few, `1` most of the surface,
+which is marble rather than granite. Their colour is `stoneLight` lifted a little toward white.
+
+**The stain** — `stain`, `stainTint`
+
+Iron staining, as a tint that keeps the grain under it: seeping out from the cracks along a share
+of the network, and lying in patches flattened into bands along the bedding. `stain` is how
+strongly it is drawn, `stainTint` its colour. `0` is unstained stone.
+
+*Affected by*: the seep is the coarse crack field, so it goes with `cracks 0` or `crackStrength 0`,
+and the bands follow `bedding`.
+
+**The finish** — `roughness`, `metallic`, `glint`, `glintTint`, `bump`, `undulation`, `undulationSize`
+
+The ARM and the normal map. `roughness` is the stone's base before the grain, the wear and the
+growth move it: `0.9` dry sandstone, `0.82` the default, `0.55` wet or polished rock. `metallic` is
+the base metalness, `0` for stone; `0.3` reads as ore-bearing and `1` as a lump of metal, and the
+lichen, the patina, the run-off and the snow take it back to 0 wherever they lie. `glint` grows
+metallic shards in the stone: a share of the cells of a lattice at `glintScale` flakes a metre hold
+one, each a little box at its own orientation and its own three half extents, so where the surface
+cuts it the outline is a polygon with straight edges and corners — a crystal rather than a speck.
+They are fully metallic, glossy and tinted `glintTint`: pale brass for pyrite, a light grey for
+mica. A shard is **flat and inset**: the grain, the grit and the undulation belong to the stone
+around it, so inside one the height is the stone's own slow level sunk a little, which leaves a
+clean face with a rim where it meets the rock. A crystal that carried the stone's roughness would
+read as a stain rather than as a mineral. A shard wants several texels: at `glintScale` 30 it is about 3cm, which is ten texels on a 1.4m rock at 1024, and past
+about 120 it is a speck that aliases.
+
+`bump` is the gain of the normal map derived from the texture height, as a multiple of the
+settled value: `2` is twice as steep, and it is the first thing to reach for when a rock reads as
+smooth, because it lifts everything the height already holds rather than adding a new mark.
+
+`undulation` is the soft, irregular unevenness of a weathered face: the slow waviness between what
+the mesh carries and the grain, three octaves under `undulationSize` metres. It writes the height
+and nothing else, because it is a shape rather than a mark, and it has no hard edges — a field of
+dimples reads as hammered metal, which is why there is no pitting key.
+
+Neither moves the mesh. What the mesh carries is `relief` and `reliefOctaves`, down to about a
+quad — 3.5cm at `subdivisions 48` on a 1.4m rock — and everything finer than that lives in the
+normal map alone, so more `subdivisions` and more `reliefOctaves` is how a bump gets onto the
+silhouette. The forge preview shades from the mesh's own normals and never samples the normal map,
+so `bump` and `undulation` show in the engine and not in the contact sheet.
 
 **The cracks in the texture** — `crackWidth`, `crackDepth`
 
@@ -1043,15 +1149,79 @@ The drawn line's width as a fraction of a crack cell, and how deep it cuts the t
 groove keys under **The cracks** are the mesh's; these are the texture's, and `crackStrength`
 scales both of these at once.
 
-**The weathering** — `weathering`
+**The edges** — `edgeWear`, `edgeTint`
 
-Scales every mask the painter adds after the grain: lichen on faces that look up, lighter and
-smoother ridges, dirt in hollows, drip stains under cracks on side faces, soil up the lowest part.
-`0` is fresh-cut stone; `1` is lichen on every top and soil up its base.
+Weathering reads the shape. Wherever the surface is convex — a slab's lip, a groove's shoulder, the
+ridge between two scoops — rain and frost have taken the skin off, so the stone there is bleached
+toward `edgeTint`, smoother, and clear of the stain, the patina and the lichen that gather on the
+faces it sheds water onto. The mask is the surface's own curvature read at four reaches and
+summed, weighted toward the wide ones, so a rounded ridge counts as much as a sharp crease and the
+wear feathers out from a ridge over a hand's width rather than drawing a line along it, broken up
+by a noise so it is patchy. `edgeWear` scales it: `0` leaves the edges the colour of the faces; `1` is a rock outlined in
+pale stone.
+
+*Affected by*: `smoothing` rounds the ridges, which spreads the wear wider and fainter; more scoops
+and sharper `relief` give it more edges to find.
+
+**The run-off** — `streaks`, `streakTint`
+
+Droplet stains down the sides. A streak starts at a splat where the drop landed, runs straight
+down under gravity with a little wander, is thickest at its head and tapers to a hairline a sixth
+as wide at its tail, fading as it goes, and about half of them throw a thinner branch part way down, the way water finds a crack.
+Within a streak the film is broken into rivulets, and it gathers where it crosses a crack. It sits
+on the colour, the roughness and the occlusion and never on the height: it is a film on the
+stone, not the stone. The streaks live on a cylinder about the rock's up axis, one possible source
+every 16cm around it, so a rock's girth sets how many it has and the seed which.
+
+`streaks` is the opacity: `0` none, `0.5` a weathered rock, `1` every trail at full colour.
+`streakTint` is what the drop left: near black is mould and algae under a drip line, white is
+bird droppings, a warm brown is iron run-off.
+
+*Affected by*: a trail only runs where the face is steep, so a broad top carries the splats and
+its sides the trails; the underside carries neither, because a drop lets go there. Snow is painted
+over it.
+
+**The snow** — `snow`
+
+Snow on what faces up: deeper in the hollows, blown off the edges, kept out of the open cracks,
+and drifted at its margin so the line is never a contour. `0` is none; `0.5` the tops; `1` all but
+the sides and the edges. It is painted last, over the lichen and everything else. It is not one
+white: mottled where it has lain and melted, blue in its own shadow and in the hollows, lumpy in
+the height where it drifted, and thin at its margin where the stone shows through.
+
+*Affected by*: the layer lays a rock on the slope with `alignToNormal 1`, so on a steep bank the
+snow leans with it. `edgeWear` and `snow` read the same convexity, so a worn edge is a bare one.
+
+**The patina** — `patina`
+
+The dark crust of oxides and algae that old stone grows wherever water sits or runs. It is read
+off the things that hold moisture — the faces that look up, the hollows, the seep beside a crack,
+the drip lines from `streaks` and the lichen colonies — and starved on the edges that shed it, so
+it tells the same story the rest of the surface does: dark bands along the fissures, a stain
+spreading out of each hollow, a halo around the lichen, clean ridges between. Its boundary is cut
+by a fine noise so it reads as a skin with a margin rather than a shadow, and the margin is thinner
+and browner than the heart, which is a little glossier than the raw stone the way a varnish is.
+`0` is none; `0.5` an old rock; `1` a crust over most of what is damp.
+
+*Affected by*: `cracks` and `streaks` give it fissures and drip lines to follow, `weathering`
+gives it colonies, and `edgeWear` keeps it off the ridges.
+
+**The weathering** — `weathering`, `lichenTint`, `soilTint`
+
+Scales every mask the painter adds after the stain: dirt in hollows, lichen, drip stains under
+cracks on side faces, soil up the lowest part. `0` is fresh-cut stone; `1` is lichen over every
+top and soil up its base.
+
+The lichen is crustose: discs, one at most per cell of a 3D cellular field, each its own size,
+colour and ragged edge, cracked into areolae with a pale margin and a darker heart, and standing a
+little proud of the stone so the normal map catches them. They gather in colonies rather than
+scattering evenly, mostly on the faces that look up and thinning down the sides. Most are
+`lichenTint`; some are a grey-blue off it; a few small ones are yellow.
 
 *Affected by*: the ridge and dirt masks come off the surface's curvature, so sharper `relief`, more
-octaves and more cleaves all give the weathering more edges to find. Lichen reads the normal, so a
-flatter top (`roundness` low, or a cleave facing up) takes more of it.
+octaves and more scoops all give the weathering more edges to find. Lichen and patina read the
+normal, so a flatter top (a broad scoop facing up) takes more of both. An open crack
+cuts a disc that grows over it.
 
 **The mesh** — `subdivisions`
 
@@ -1063,7 +1233,7 @@ rebuilds in a moment while every other key rebakes.
 
 **The seed** — `seed`
 
-Every random choice: where the cleaves fall, the noise, the cracks, the lichen patches. Omit it and
+Every random choice: where the scoops fall, the noise, the cracks, the lichen patches. Omit it and
 each run rolls a new rock and writes the roll to the sidecar; keep the one you like.
 
 ## Accents
