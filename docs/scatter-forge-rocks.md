@@ -98,7 +98,8 @@ and reads as dimples.
 | Stain          | Crack proximity, and patches banded along the bedding            | Iron tint                               |
 | Veins          | Zero crossings of a stretched noise                              | Light, glassy, raised lines             |
 | Edge wear      | Curvature of `shape` at four reaches, summed and feathered        | Convex edges bleached, smoother, clear of stain and growth |
-| Run-off        | Droplet trails on a cylinder about up, on steep faces           | Tint, roughness, occlusion; no height   |
+| Run-off        | Droplet trails on a cylinder about up, on steep faces, fading down | Tint, roughness, occlusion; no height   |
+| Wash           | `dot(n, up)`, drifted                                            | One multiply on the base stone, under every mark |
 | Snow           | `dot(n, up)`, less on edges, more in hollows, drifted           | Mottled white, blue in shadow, last     |
 | Cavity dirt    | Low local height                                                 | Dirt colour, rough                      |
 | Drip stains    | March a short way up `+up` sampling the crack field              | Darkening below a crack                 |

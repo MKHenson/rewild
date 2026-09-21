@@ -1,14 +1,14 @@
 {
   "type": "rock",
-  "name": "granite-01",
-  "seed": 2,
-  "height": 2.4,
+  "name": "granite-02",
+  "seed": 3,
+  "height": 4.4,
   "scoops": 12,
   "scoopSize": 0.75,
   "scoopDepth": 0.45,
   "smoothing": 0.9,
   "snow": 0.0,
-  "topWash": 0.3,
+  "topWash": 0.5,
   "topOpacity": 0.25,
   "topTint": "#2a2d28",
   "relief": 0.29,
@@ -37,7 +37,7 @@
   "streakCount": 32,
   "edgeWear": 0.5,
   "weathering": 0.5,
-  "subdivisions": 22,
+  "subdivisions": 16,
   "lods": [
     {
       "distance": 50,
