@@ -68,7 +68,7 @@ Files land in `<out>/<textureSet>/`, which is `assets/shared/nature/trees/<set>/
 | ---------------------- | --------------------------------------------------------------------- |
 | `<name>.glb`           | The model. One primitive per piece, on one node at the origin.        |
 | `<name>.forge.json`    | Every key that made it, so it can be re-cut or nudged.                |
-| `<name>.preview.png`   | A shaded three-quarter render. Only with `preview` set.               |
+| `<name>.preview.png`   | A shaded three-quarter render from four sides, a quarter turn apart, laid out 2x2. One view with `previewAngles: 1`. Only with `preview` set. |
 | `<name>.lods.preview.png` | The model beside every tier at one scale. Only with `preview` and `lods`. |
 | `<set>_<piece>_*.webp` | One image set per piece. See [The texture template](#the-texture-template). |
 | `<set>.textures.json`  | What the images were painted for, read back by variants that reuse them. |
@@ -350,7 +350,8 @@ These name the outputs, or are copied into the printed `scatter-layers.json` ent
 | `seed` | rolled per run | Seeds every random choice. Absent, the CLI rolls one and the tree is new each run. | Omit it while cutting variants, then copy the rolled number out of the sidecar to keep one · set it to hold a tree still, as every template does. The same seed and keys always give a byte-identical file. Under `--watch` a rolled seed is held for the session, or every save would reshape the tree under the key being tuned |
 | `out` | `assets/shared/nature/trees` | Directory the set's folder is written under. | `assets/shared/nature/clumps` for a clump |
 | `assetsRoot` | `assets/shared` | Root the printed template urls are made relative to. | |
-| `preview` | 0 | Edge of each shaded preview panel, in pixels. | `0` writes none · `1024` a quick check · `2056` every template. It costs a second or two, so drop it when cutting a family. With `lods` set it also writes the comparison strip, which is this wide per panel |
+| `preview` | 0 | Edge of each shaded preview panel, in pixels. | `0` writes none · `1024` a quick check · `2056` every template. It costs a second or two, so drop it when cutting a family. The model's own preview is four such panels by default, so its image is twice this on a side. With `lods` set it also writes the comparison strip, which is this wide per panel |
+| `previewAngles` | 4 | Views in that preview. | `4` lays quarter turns out 2x2, which is what judging a shape wants · `1` writes the three-quarter view alone at `preview` pixels, for a single screenshot. The `lods` strip is always the one view |
 | `skipTextures` | `false` | Reuse the set's existing images instead of writing them. | `false` writes the set · `true` takes a variant to about a tenth of a second. The set has to exist already |
 | `writeTemplates` | `false` | Patch `geometries.json` and `materials.json` in place instead of only printing them. | |
 | `templatesDir` | `templates` | Where those two files live. The engine's `templates/` at the repo root, not this tool's. | |

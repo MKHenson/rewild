@@ -348,6 +348,7 @@ export const PARAM_SPEC = {
   barkTextureSize: { type: 'int', default: 0, help: 'Long edge of the bark map in pixels, so the bark and the leaf atlas can differ. 0 follows textureSize.', texture: true, types: WOODY },
   barkAspect: { type: 'int', default: 2, help: 'How many times taller than wide the bark map is, and how many circumferences of branch one tile covers. 1 is square.', texture: true, types: WOODY },
   preview: { type: 'int', default: 0, help: 'Write a shaded preview PNG at this pixel size. 0 writes none.' },
+  previewAngles: { type: 'int', default: 4, help: 'Views in that preview: 4 lays quarter turns out 2x2, 1 writes the three-quarter view alone at this size, for a single screenshot.' },
   skipTextures: { type: 'flag', default: false, help: 'Reuse an existing texture set rather than writing one.' },
   writeTemplates: { type: 'flag', default: false, help: 'Patch geometries.json and materials.json in place.' },
   templatesDir: { type: 'string', default: 'templates', help: 'Directory holding geometries.json, materials.json and scatter-layers.json.' },
@@ -803,6 +804,9 @@ function validate(params: Params): void {
     throw new Error('scaleMax must not be below scaleMin.');
 
   if (params.footprint < 0) throw new Error(`footprint must not be negative, got ${params.footprint}.`);
+
+  if (params.previewAngles !== 1 && params.previewAngles !== 4)
+    throw new Error(`previewAngles must be 1 or 4, got ${params.previewAngles}.`);
 
   // The generated leaf image is a 4x4 grid, so a cell is a sixteenth of it.
   // Below 128 a cell is under 32 texels and there is no room to draw a leaf in
