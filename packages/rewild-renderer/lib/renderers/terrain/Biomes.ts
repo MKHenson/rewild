@@ -464,7 +464,7 @@ export const MOUNTAIN: BiomeParams = {
     },
     {
       layer: 'granite_03',
-      density: 0.2,
+      density: 0.1,
       height: { from: 130, to: 170 },
       slope: { from: 70, to: 55 },
     },
@@ -575,19 +575,19 @@ export const DESERT_MOUNTAIN: BiomeParams = {
   scatter: [
     {
       layer: 'sandstone_01',
-      density: 0.2,
+      density: 0.05,
       height: { from: 420, to: 0 },
       slope: { from: 45, to: 18 },
     },
     {
       layer: 'sandstone_02',
-      density: 0.2,
+      density: 0.05,
       height: { from: 420, to: 0 },
       slope: { from: 45, to: 18 },
     },
     {
       layer: 'sandstone_03',
-      density: 0.2,
+      density: 0.05,
       height: { from: 420, to: 0 },
       slope: { from: 0, to: 18 },
     },
@@ -598,7 +598,7 @@ export const DESERT_MOUNTAIN: BiomeParams = {
     },
     {
       layer: 'sandstone_04',
-      density: 0.14,
+      density: 0.05,
       slope: { from: 40, to: 15 },
     },
   ],
@@ -727,20 +727,7 @@ export const BEACH_SAND: BiomeParams = {
     },
   ],
   // Shingle in the damp hollows, on the same height split the two sands use.
-  scatter: [
-    {
-      layer: 'sandstone_cobbles_01',
-      density: 0.12,
-      height: { from: 40, to: 4 },
-      noise: { scale: 180, seedSalt: 79, band: { from: 0.48, to: 0.72 } },
-    },
-    // The odd stack the sea left behind, on the flats above the tide.
-    {
-      layer: 'sandstone_04',
-      density: 0.05,
-      slope: { from: 40, to: 15 },
-    },
-  ],
+  scatter: [],
 };
 
 // Temperature splits cold (mountain) from warm; moisture splits the warm half
