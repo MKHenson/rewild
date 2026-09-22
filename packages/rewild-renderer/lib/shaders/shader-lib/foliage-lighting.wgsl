@@ -39,34 +39,6 @@ const FOLIAGE_AMBIENT: f32 = 1.0;
 const FOLIAGE_TRANSMIT: f32 = 0.55;
 const FOLIAGE_TRANSMIT_POWER: f32 = 3.0;
 
-// Cosine of the view angle to a card's plane below which the card is gone.
-// A card seen face on is 1 and edge on is 0; 0.25 fades the last 14 degrees.
-// Wider hides more card edges and thins a crown seen from below or a field
-// seen from the ground, where many cards stand near edge on.
-const FOLIAGE_EDGE_FADE: f32 = 0.45;
-
-/**
- * How much of a card's cutout survives at the angle it is seen from.
- *
- * A card is a flat quad standing in for a spray of leaves, and the one view
- * that gives it away is along its own plane, where it is a line. Eroding the
- * cutout to nothing as the view ray comes level with the card is what keeps
- * that line from ever being drawn. Multiplied into the alpha before the mask
- * cutoff, so the leaf shrinks from its soft edges rather than switching off.
- *
- * The plane is the triangle's own, off position derivatives, and not the
- * vertex normal: under HAS_AUTHORED_NORMALS that describes the whole crown, and
- * the fade is about the card. Takes derivatives, so it runs before any discard.
- *
- * Camera-relative by construction, so the shadow passes never apply it — a
- * card edge on to the camera is not edge on to the sun.
- */
-fn foliageEdgeFade(viewPosition: vec3f) -> f32 {
-  let plane = normalize(cross(dpdx(viewPosition), dpdy(viewPosition)));
-  let V = normalize(-viewPosition);
-  return smoothstep(0.0, FOLIAGE_EDGE_FADE, abs(dot(plane, V)));
-}
-
 /**
  * Shading model for foliage: grass clumps and canopy cards.
  *
