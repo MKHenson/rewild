@@ -447,15 +447,26 @@ fn fs(
   // is *least* aligned with. U takes that axis from the existing UV, so the two
   // projections share their horizontal tiling and agree where they cross over.
   let useZAxis = abs(nWorld.x) > abs(nWorld.z);
+  // Which way that axis points. The frame below takes V as cross(N, U), and V
+  // has to be world *up*, because that is what the UV's second coordinate
+  // measures. cross(N, U).y is the normal's own component along the chosen
+  // axis, so on faces pointing down -X or -Z it lands on -Y: the frame comes
+  // out mirrored, the map's green channel reads inverted, and every bump on
+  // half the compass lights as a dent. Flipping the axis with the facing keeps
+  // the frame honest; the cost is a mirrored U, invisible on rock. Safe to flip
+  // discontinuously because the locus where the chosen component crosses zero
+  // forces the other one to zero too (it is the smaller), which is level ground
+  // — sideWeight is already 0 there.
+  let sideFlip = select(-1.0, 1.0, select(nWorld.z, nWorld.x, useZAxis) > 0.0);
   let heightUV = objectHeight * terrainParams.uvPerMetre;
-  let sideUV = vec2f(select(fragUV.x, fragUV.y, useZAxis), heightUV);
+  let sideUV = vec2f(sideFlip * select(fragUV.x, fragUV.y, useZAxis), heightUV);
   // Selected from derivatives already taken, never differentiated *after* the
   // select: the choice flips where |nx| equals |nz|, and a derivative across
   // that flip is a spike that picks a mip from nowhere.
   let dhdx = dpdx(heightUV);
   let dhdy = dpdy(heightUV);
-  let sideDuvdx = vec2f(select(duvdx.x, duvdx.y, useZAxis), dhdx);
-  let sideDuvdy = vec2f(select(duvdy.x, duvdy.y, useZAxis), dhdy);
+  let sideDuvdx = vec2f(sideFlip * select(duvdx.x, duvdx.y, useZAxis), dhdx);
+  let sideDuvdy = vec2f(sideFlip * select(duvdy.x, duvdy.y, useZAxis), dhdy);
 
   // The side frame's own tangent, carried into view space and squared up
   // against the surface normal. A normal map is read in the frame of the UV
@@ -463,7 +474,8 @@ fn fs(
   // planar frame the lighting below works in, or a cliff lights as though its
   // bumps ran sideways. Both frames share N, so the difference is one rotation
   // about it, and these two dot products are its cosine and sine.
-  let sideAxisWorld = select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 0.0, -1.0), useZAxis);
+  let sideAxisWorld =
+    sideFlip * select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 0.0, -1.0), useZAxis);
   var sideTRaw = uniforms.normalMatrix * sideAxisWorld;
   sideTRaw = sideTRaw - parallaxN * dot(parallaxN, sideTRaw);
   // Degenerate only where the chosen axis is the normal, which the choice above
@@ -729,27 +741,57 @@ fn fs(
       // over becomes a line with correct relief on one side and stretched
       // relief on the other, which reads as a hard edge across a cliff that was
       // never there before.
+      //
+      // Two taps mixed like the detail's above, never one tap at a mixed UV.
+      // The projections are unrelated parameterisations: on a cliff they
+      // disagree by whole macro tiles, since one reads chunk-relative XZ and
+      // the other absolute world height. Interpolating the *coordinates* sweeps
+      // that whole gap wherever sideWeight ramps, and the interpolated
+      // gradients cannot see the sweep, so it is sampled sharp — macro relief
+      // compressed into the slope band and smeared along its contours. That is
+      // the onion-ringing on every curved face.
       let macroPlanarUV = fragUV * layer.macroUvScale;
-      let macroUV = mix(macroPlanarUV, sideUV * layer.macroUvScale, sideWeight);
-      let macroDdx = mix(duvdx, sideDuvdx, sideWeight) * layer.macroUvScale;
-      let macroDdy = mix(duvdy, sideDuvdy, sideWeight) * layer.macroUvScale;
+      // Skipped where the side tap takes the mix over whole, exactly as the
+      // second no-tile tap is above; the mix below returns its B operand there.
+      var macroTurned = vec3f(0.0, 0.0, 1.0);
+      if (sideWeight < 1.0) {
+        macroTurned = normalize(decodeNormal(
+          textureSampleGrad(
+            normalArray,
+            seamlessSampler,
+            macroPlanarUV,
+            macroIndex,
+            duvdx * layer.macroUvScale,
+            duvdy * layer.macroUvScale
+          ).rgb,
+          layer.macroNormalYSign
+        ));
+      }
+      if (sideWeight > 0.0) {
+        let macroSideRaw = decodeNormal(
+          textureSampleGrad(
+            normalArray,
+            seamlessSampler,
+            sideUV * layer.macroUvScale,
+            macroIndex,
+            sideDuvdx * layer.macroUvScale,
+            sideDuvdy * layer.macroUvScale
+          ).rgb,
+          layer.macroNormalYSign
+        );
+        // Turned from the side frame into the planar one by the rotation about
+        // the shared normal, as the detail normal's side tap is.
+        let macroSide = normalize(vec3f(
+          macroSideRaw.x * sideCos - macroSideRaw.y * sideSin,
+          macroSideRaw.x * sideSin + macroSideRaw.y * sideCos,
+          macroSideRaw.z
+        ));
+        macroTurned = normalize(mix(macroTurned, macroSide, sideWeight));
+      }
       // Toward flat, before normalizing: macroStrength is an amplitude on the
       // map's tilt, and scaling a decoded normal's xy while z holds is exactly
       // that. Applied here so the crossfade below still interpolates a unit
       // normal, which is what bounds the tilt.
-      let macroRaw = decodeNormal(
-        textureSampleGrad(
-          normalArray, seamlessSampler, macroUV, macroIndex, macroDdx, macroDdy
-        ).rgb,
-        layer.macroNormalYSign
-      );
-      // Turned into the planar frame by the same rotation the detail normal
-      // takes, in proportion to how far the UV was rotated with it.
-      let macroTurned = vec3f(
-        mix(macroRaw.x, macroRaw.x * sideCos - macroRaw.y * sideSin, sideWeight),
-        mix(macroRaw.y, macroRaw.x * sideSin + macroRaw.y * sideCos, sideWeight),
-        macroRaw.z
-      );
       let macroNormal = normalize(
         vec3f(macroTurned.xy * layer.macroStrength, macroTurned.z)
       );
