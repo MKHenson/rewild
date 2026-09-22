@@ -43,6 +43,8 @@
   "streakTint": "#2a2d28",
   "streakCount": 32,
   "edgeWear": 0.5,
+  "scaleMin": 1,
+  "scaleMax": 2,
   "weathering": 0.5,
   "subdivisions": 22,
   "lods": [
