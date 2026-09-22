@@ -938,6 +938,28 @@ already down, so the small ones nestle against the large and none overlaps. Each
 ground by its own share of its own height, and none is turned or tilted afterwards, because a
 rotation applied after the bake would take the weathering's up with it.
 
+**Spacing is two separate problems.** Gravel that reads as a mat is one of them, and the fix depends
+on which:
+
+| Complaint | Key | Notes |
+| --------- | --- | ----- |
+| The stones in one cluster are packed against each other | `pebbleSpacing` | 1 nestles them, 2 leaves a stone's width of ground between neighbours, 3 is a thin scatter. The derived `clusterRadius` grows with it. |
+| The clusters themselves are too close | `footprint`, or the biome entry's `density` | One candidate is resolved per cluster, so this is the cheap lever. `footprint` derives as four times the cluster's own span. |
+| The stones are too small | `height`, with `width` and `depth` | These size the largest stone; the rest follow it down to `pebbleSmallest`. Prefer this over `scaleMin`/`scaleMax`, which vary what the cluster already varies. |
+| Too many stones per cluster | `pebblesPerModel` | Also the lever on the image, which grows a block per pebble. |
+
+`clusterRadius` bounds the disc the bases sit in. It does **not** space them out on its own, because
+the packing puts every new stone against one already down whatever room is left.
+
+**A cluster is posed off one terrain sample**, so it cannot be spread without limit: past about 4m,
+which is two terrain samples, the stones on the rim float or bury on rolling ground. The run says so
+rather than leaving it to be found in game:
+
+```
+spread 4.3m wide, past the 4m one terrain sample poses well. Stones on the rim will float or
+bury on rolling ground. Thin the gravel with footprint or the biome density instead.
+```
+
 **The defaults are grain and colour.** `cracks`, `plates`, `weathering`, `patina`, `stain`, `veins`
 and `edgeWear` are all 0 for a pebble, which is what a stone at this size shows. Every one of them
 still works when a config asks.
@@ -957,8 +979,8 @@ Four templates ship:
 
 | Template | Is | Placed in |
 | -------- | -- | --------- |
-| `granite-pebble-01` | Twelve rounded granite cobbles | Plain, forest, beach, and the mountain's lower flanks |
-| `granite-scree-01` | Twenty small cleaved fragments, on steeper ground than a cobble holds | Mountain |
+| `granite-pebble-01` | Seven rounded granite cobbles, spread over about 3m | Plain, forest, beach, and the mountain's lower flanks |
+| `granite-scree-01` | Twelve cleaved fragments packed tighter, on steeper ground than a cobble holds | Mountain |
 | `granite-pebble-snow-01` | The same cobbles with snow caps, stone still reading on the sides | Mountain, from the snow line up |
 | `sandstone-cobbles-01` | The cobbles on the sandstone palette | Desert and desert mountain |
 
@@ -1080,6 +1102,77 @@ the same rock at `0`. The run reports the size it actually reached.
 
 Grooves are not in the list: the crack mask is built from a pair of `smoothstep`s, whose ends are
 already flat, so a groove floor and its shoulders have no corner to round.
+
+**The bedding** — `laminae`, `laminaeSize`, `laminaeVary`, `laminaeRelief`, `laminaeTint`, `laminaeWarp`, `laminaeWarpSize`, `laminaeAccent`, `laminaeAccentShare`
+
+The stack of beds a sedimentary rock was laid down in. Off by default (`laminae 0`), because it is
+a thing granite never had.
+
+Everything here is a function of **one number**: the distance along the bedding normal, the same
+plane `bedding` aims the plates at. That is what a bed is, rock laid down over a span of time, so it
+varies with depth and not across it. A bed runs the whole width of the rock, which is why this could
+not be built from the 3D cellular fields the plates and the cracks use: those give cells, and a cell
+has an extent in every direction.
+
+It is **additive**. A bed shifts the tone *before* the palette ramp, so the bands are the stone's own
+dark, mid and light rather than a second palette, and the grain, the veins, the cracks, the staining
+and every weathering mask composite on top of a banded base instead of over it. It stacks with
+`plates` freely: plates give the cleaved blocks and steps, laminae the continuous sheets, both off
+one bedding frame so they agree. A bedded sandstone wants both.
+
+**Read at two scales, and the mesh takes one.** `laminaeSize` is one bed. Eight of them make a
+**package**, the group that shares a hardness and so weathers back as a unit. The texture paints
+both: packages carry the broad light-and-dark banding, beds the laminations inside them. The mesh
+takes only the packages, and only when it can resolve them — a cube face crosses about a quarter
+turn of the rock, so a quad spans `pi/2` of the radius over `subdivisions`, and a package under two
+quads is faded out rather than sampled into noise on the silhouette. The run says which happened:
+
+```
+beds 5.5cm in 44cm packages, ribbing the mesh
+beds 1.2cm in 10cm packages, in the texture alone, because a 0.10m package is under 0.22m of mesh
+```
+
+That split is the rule `crackCoarse` and `crackFine` already follow, applied continuously. A config
+asking for hairline beds gets them painted, with no aliasing and no key to remember.
+
+`laminaeRelief` is how far a hard package stands proud of a soft one, as a fraction of the radius.
+This is **differential weathering**, and it is most of what makes a bedded face read: the beds on a
+weathered face are ribbed, not painted. `laminaeWarp` is how far the whole stack wanders, measured
+in packages, and without it a bed is a ruled line. `laminaeVary` spreads the thicknesses, so 0 is a
+ruled stack of one gauge and 1 mixes thick beds with hairlines.
+
+`laminaeTint` is how far each bed moves along the stone's own ramp. `laminaeAccentShare` is the
+share of beds that leave the ramp altogether for `laminaeAccent` — the pale seam or the iron-red
+band that is not one of the rock's three colours at all. It defaults to 0.
+
+**Texture and geometry are separate dials.** `laminae` is the opacity of the bands in the image and
+nothing else. `laminaeRelief` is the ribbing in the mesh and is not scaled by it. So a gentle wash of
+banding over another rock type, with the silhouette untouched, is `laminae 0.2` and
+`laminaeRelief 0` — which leaves the `.glb` byte-identical to the same rock with `laminae 0`. The
+run says which of the two is in play:
+
+```
+beds 5.5cm in 44cm packages, ribbing the mesh
+beds 6.0cm in 48cm packages, in the texture alone, at laminaeRelief 0
+```
+
+- Wind-carved sandstone: `laminae 1`, `laminaeSize 0.055`, `laminaeRelief 0.075`, `laminaeVary 0.85`, `bedding 1`, and `plates 0.5` under it. This is `sandstone-04`.
+- A hint of bedding in a granite: `laminae 0.2`, `laminaeRelief 0`, `laminaeTint 0.6`, `laminaeAccentShare 0`
+- Fine shale: `laminaeSize 0.015`, `laminaeVary 0.3`, `laminaeRelief 0.02`. Painted, not ribbed.
+- Massive sandstone with a few partings: `laminaeSize 0.4`, `laminaeVary 0.9`, `laminaeAccentShare 0`
+- Granite: `laminae 0`. It was never bedded.
+
+**Sides band, tops contour.** The beds are near-horizontal, so a face's own angle decides what it
+shows, and both are right. A steep face cuts across many beds and reads as stripes. A face that
+looks up cuts through the stack at a shallow angle, so successive beds outcrop as closed contours,
+which is the slickrock look of eroded sandstone. A top that was both dead flat and exactly parallel
+to the bedding would be one bed and one colour, which is what a bedding plane is. `relief`, the
+scoops and `laminaeWarp` all keep it from being either.
+
+*Affected by*: `bedding` has no effect on the laminae themselves, only on the plates beside them,
+but both take the same per-rock bedding frame, so a rock's beds and its slabs always share one
+plane. `smoothing` rounds a bed's shoulder the way it rounds everything else. `subdivisions` decides
+whether the packages reach the mesh at all.
 
 **The cracks** — `cracks`, `crackStrength`, `grooveDepth`, `grooveWidth`
 

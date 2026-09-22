@@ -10,6 +10,7 @@
 // top of all of it. Every layer writes the height too, so the normal map
 // carries the same detail the colour does.
 
+import { laminaInto, type LaminaSample } from './laminae.ts';
 import { fbm3r, hash3, smoothstep, worley3Into, type Worley3Result } from './noise.ts';
 import type { Params } from './params.ts';
 import { platesInto, type PlateSample } from './plates.ts';
@@ -80,6 +81,8 @@ interface Palette {
   wash: Rgb;
   /** The metallic flakes in the grain. */
   glint: Rgb;
+  /** The colour the odd standout bed takes, outside the stone's own ramp. */
+  lamina: Rgb;
 }
 
 function paletteOf(params: Params): Palette {
@@ -114,6 +117,7 @@ function paletteOf(params: Params): Palette {
     streakLum: luminance(parseHex(params.streakTint, 'streakTint')),
     wash: mulRgb(parseHex(params.topTint, 'topTint'), [2, 2, 2]),
     glint: parseHex(params.glintTint, 'glintTint'),
+    lamina: parseHex(params.laminaeAccent, 'laminaeAccent'),
   };
 }
 
@@ -212,6 +216,8 @@ const _worley: Worley3Result = { f1: 0, f2: 0, id: 0 };
 const _crack: CrackSample = { edge: 0, presence: 0, width: 1 };
 const _n: Vec3 = [0, 0, 0];
 const _plate: PlateSample = { height: 0, id: 0 };
+const _lamina: LaminaSample = { id: 0, hardness: 0, parting: 0, accent: 0 };
+const _package: LaminaSample = { id: 0, hardness: 0, parting: 0, accent: 0 };
 
 // Half the range an octave sum occupies, by octave count, as `noise.ts` measures it.
 const TONE_SPREAD = [0.29, 0.29, 0.2, 0.17, 0.16, 0.155];
@@ -537,6 +543,8 @@ function paintChart(
   const undulationScale = 1 / params.undulationSize;
   const glint = params.glint;
   const glintScale = params.glintScale;
+  const laminae = params.laminae;
+  const laminaeTint = params.laminaeTint;
   const baseRoughness = params.roughness;
   const lateralRadius = (field.extents[0] + field.extents[2]) / 2;
   const radius = (field.extents[0] + field.extents[1] + field.extents[2]) / 3;
@@ -587,6 +595,22 @@ function paintChart(
         tone = clamp01(tone + (_plate.id - 0.5) * params.plateTint);
         slab = _plate.height;
       }
+
+      // Bedding, at both of its scales. A package is a group of beds that
+      // weathers as one, and it carries the broad light and dark banding; the
+      // beds inside it are the laminations. Both land on the tone and not on
+      // the finished colour, which is what puts every layer below — grain,
+      // veins, cracks, staining, the whole weathering pass — on top of a
+      // banded base rather than over it.
+      let bed = 0;
+      if (laminae > 0 && field.laminae && field.packages) {
+        laminaInto(_package, field.packages, px, py, pz);
+        laminaInto(_lamina, field.laminae, px, py, pz);
+        bed = laminae;
+        const banding = (_package.id - 0.5) * 0.7 + (_lamina.id - 0.5) * 0.5;
+        tone = clamp01(tone + banding * laminaeTint * bed);
+      }
+
       let r = ramp(palette.dark[0], palette.mid[0], palette.light[0], tone);
       let g = ramp(palette.dark[1], palette.mid[1], palette.light[1], tone);
       let b = ramp(palette.dark[2], palette.mid[2], palette.light[2], tone);
@@ -594,6 +618,35 @@ function paintChart(
       let metallic = params.metallic;
       let ao = 1;
       let relief = 0.5 + (tone - 0.5) * 0.2 + (slab - 0.5) * 0.25 * field.plateShare;
+
+      // The rest of the bed: the odd band that is not the stone's colour at
+      // all, the seam where two beds meet, and the ribbing. The ribbing goes
+      // in whatever the mesh took, because a bed too thin for a quad is
+      // exactly the one the height map has to carry.
+      if (bed > 0) {
+        if (_lamina.accent > 0) {
+          // Not every pale band is as pale as the next, and one that replaces
+          // the stone whole reads as paint.
+          const take = _lamina.accent * bed * (0.45 + 0.4 * fract(_lamina.id * 53.17));
+          r = mix(r, palette.lamina[0], take);
+          g = mix(g, palette.lamina[1], take);
+          b = mix(b, palette.lamina[2], take);
+        }
+        // A bedding plane is a seam, not a groove: it darkens and roughens,
+        // and it cuts a hairline into the height. The package's own seam is
+        // the deeper one, because that is where a face steps.
+        const seam = clamp01(_lamina.parting * 0.7 + _package.parting) * bed;
+        const dim = 1 - seam * 0.35;
+        r *= dim;
+        g *= dim;
+        b *= dim;
+        roughness += 0.12 * seam;
+        // The whole stack goes into the height, however little of it the mesh
+        // could take. The packages rib it and the beds ripple across them.
+        relief += (_package.hardness * 0.6 + _lamina.hardness * 0.35) * bed - seam * 0.12;
+        // A soft bed is a weathered bed, and a weathered face is a rough one.
+        roughness += (0.25 - _package.hardness * 0.5) * bed * 0.2;
+      }
       // The surface before any fine layer moves it. A shard is flattened back
       // to this, and tone and slabs are slow enough that it is one level
       // across a shard.

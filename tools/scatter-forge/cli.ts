@@ -34,8 +34,8 @@ import {
   type Params,
 } from './lib/params.ts';
 import { randomSeed } from './lib/rng.ts';
-import { buildPebbleCluster, type Cluster } from './lib/pebbles.ts';
-import { buildRock, type Rock } from './lib/rock.ts';
+import { buildPebbleCluster, CLUSTER_SPAN_LIMIT, type Cluster } from './lib/pebbles.ts';
+import { buildRock, LAMINAE_PACKAGE, meshCarries, type Rock } from './lib/rock.ts';
 import { buildSkeleton, type Skeleton } from './lib/skeleton.ts';
 import { buildPebbleCanvases, buildRockCanvases } from './lib/stone.ts';
 import type { AtlasLayout } from './lib/atlas.ts';
@@ -678,18 +678,25 @@ function lowestLimb(skeleton: Skeleton): number {
 
 /** The second line of the report: what the model measures, by type. */
 function describeShape({ params, skeleton, metrics, crown, rock, cluster }: Built): string {
-  if (cluster)
+  if (cluster) {
+    const span = cluster.metrics.spread * 2;
     return (
       `  ${cluster.metrics.pebbles} pebbles over a ${(cluster.metrics.clusterRadius * 2).toFixed(2)}m cluster, ` +
       `tallest ${cluster.metrics.height.toFixed(2)}m, ${params.subdivisions} subdivisions a side, ` +
-      `${cluster.atlas.columns}x${cluster.atlas.rows} blocks of ${cluster.atlas.chartPx}px charts`
+      `${cluster.atlas.columns}x${cluster.atlas.rows} blocks of ${cluster.atlas.chartPx}px charts` +
+      (span > CLUSTER_SPAN_LIMIT
+        ? `\n  spread ${span.toFixed(1)}m wide, past the ${CLUSTER_SPAN_LIMIT}m one terrain sample poses well. ` +
+          'Stones on the rim will float or bury on rolling ground. Thin the gravel with footprint or the biome density instead.'
+        : '')
     );
+  }
 
   if (rock)
     return (
       `  height ${rock.metrics.height.toFixed(2)}m, ${rock.metrics.width.toFixed(2)}m by ${rock.metrics.depth.toFixed(2)}m, ` +
       `${rock.field.scoops.length} scoops, ${params.subdivisions} subdivisions a side, ` +
-      `hull of ${rock.metrics.hull.length / 3} points`
+      `hull of ${rock.metrics.hull.length / 3} points` +
+      describeLaminae(params, rock)
     );
 
   if (crown)
@@ -716,6 +723,31 @@ function describeShape({ params, skeleton, metrics, crown, rock, cluster }: Buil
     (metrics!.tufts > 1 ? `${metrics!.tufts} tufts over a ${(metrics!.patchRadius * 2).toFixed(1)}m patch, ` : '') +
     `${params.cardsPerTuft} cards at ${params.cardSegments} segments`
   );
+}
+
+/**
+ * What the bedding did, when a config asked for any.
+ *
+ * Worth a line because the split between the beds the mesh ribs and the beds
+ * it only paints is decided for the author rather than by them, and a config
+ * that wanted a ribbed face and got a painted one has no other way to tell.
+ */
+function describeLaminae(params: Params, rock: Rock): string {
+  if (params.laminae <= 0) return '';
+
+  const { radius } = rock.metrics;
+  const quad = ((Math.PI / 2) * radius) / Math.max(1, params.subdivisions);
+  const share = meshCarries(params.laminaeSize * LAMINAE_PACKAGE, radius, params.subdivisions);
+  const reached =
+    params.laminaeRelief <= 0
+      ? 'in the texture alone, at laminaeRelief 0'
+      : share > 0.99
+      ? 'ribbing the mesh'
+      : share < 0.01
+      ? `in the texture alone, because a ${(params.laminaeSize * LAMINAE_PACKAGE).toFixed(2)}m package is under ${(quad * 2).toFixed(2)}m of mesh`
+      : `${Math.round(share * 100)}% of the way into the mesh`;
+
+  return `\n  beds ${(params.laminaeSize * 100).toFixed(1)}cm in ${(params.laminaeSize * LAMINAE_PACKAGE * 100).toFixed(0)}cm packages, ${reached}`;
 }
 
 /** A tier's cost against the base mesh, as a percentage and a factor. */

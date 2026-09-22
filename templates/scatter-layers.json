@@ -51,8 +51,8 @@
       "tilt": 2
     },
     "alignToNormal": 1,
-    "yOffset": -0.03,
-    "footprint": 3.5,
+    "yOffset": -0.061,
+    "footprint": 6.1,
     "castShadow": false
   },
   "alien_plant": {
@@ -1298,11 +1298,11 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 3
+      "tilt": 2
     },
     "alignToNormal": 1,
-    "yOffset": -0.03,
-    "footprint": 2.6,
+    "yOffset": -0.045,
+    "footprint": 4.4,
     "castShadow": false
   },
   "sandstone_cobbles_01": {
@@ -1324,8 +1324,8 @@
       "tilt": 2
     },
     "alignToNormal": 1,
-    "yOffset": -0.03,
-    "footprint": 3.2,
+    "yOffset": -0.061,
+    "footprint": 6.5,
     "castShadow": false
   },
   "granite_pebble_snow_01": {
@@ -1347,8 +1347,119 @@
       "tilt": 2
     },
     "alignToNormal": 1,
-    "yOffset": -0.03,
-    "footprint": 3.2,
+    "yOffset": -0.057,
+    "footprint": 6.1,
     "castShadow": false
+  },
+  "sandstone_04": {
+    "name": "sandstone_04",
+    "geometryId": "sandstone-04",
+    "lodDistances": [
+      50
+    ],
+    "cullDistance": 800,
+    "impostor": {
+      "fromDistance": 120,
+      "views": 8,
+      "tileSize": 128
+    },
+    "jitter": {
+      "scale": {
+        "from": 0.6,
+        "to": 1.6
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 8
+    },
+    "alignToNormal": 1,
+    "yOffset": -0.58,
+    "footprint": 3.5,
+    "collider": {
+      "type": "hull",
+      "points": [
+        -1.123,
+        0.992,
+        -1.312,
+        -1.392,
+        0.219,
+        0.316,
+        -1.353,
+        0.367,
+        0.738,
+        -1.651,
+        1.488,
+        -1.126,
+        -2.281,
+        1.521,
+        -0.13,
+        -2.054,
+        1.618,
+        0.467,
+        -1.786,
+        2.158,
+        -0.609,
+        -2.059,
+        2.165,
+        -0.117,
+        -2.137,
+        1.854,
+        0.243,
+        -0.762,
+        0.511,
+        -1.039,
+        -0.916,
+        0.002,
+        0,
+        -0.138,
+        0.345,
+        1.131,
+        -0.771,
+        1.523,
+        -1.578,
+        0.149,
+        1.685,
+        1.221,
+        -0.174,
+        2.173,
+        -1.42,
+        0,
+        2.875,
+        -0.132,
+        0.382,
+        1.968,
+        1.043,
+        1.54,
+        0.584,
+        -0.35,
+        1.551,
+        0.578,
+        -0.264,
+        1.058,
+        0.593,
+        0.865,
+        2.083,
+        1.732,
+        -0.592,
+        2.092,
+        1.844,
+        -0.476,
+        1.391,
+        1.769,
+        0.87,
+        1.689,
+        2.117,
+        -0.768,
+        1.911,
+        2.211,
+        -0.217,
+        1.873,
+        2.195,
+        0.213
+      ]
+    },
+    "castShadow": true
   }
 }

@@ -266,6 +266,16 @@ export const PARAM_SPEC = {
   bedding: { type: 'number', default: 0.6, help: 'How far the slabs are flattened and aligned into strata, 0..1. 0 is a random rubble of blocks.', texture: true, types: STONE },
   plateShare: { type: 'number', default: 0.7, help: 'Share of the relief the slabs take, 0..1. The noise has the rest.', texture: true, types: STONE },
   plateTint: { type: 'number', default: 0.25, help: 'How far each slab shifts the tone by its own value, 0..1.', texture: true, types: STONE },
+  laminae: { type: 'number', default: 0, help: 'Opacity of the bedding laminae in the texture, 0..1: the stack of beds a sedimentary rock was laid down in, each its own colour and hardness. This is the texture alone, and the geometry is laminaeRelief, so a gentle banding over another rock type is laminae 0.2 with laminaeRelief 0. 0 draws none at all. Composes with everything: the bands shift the tone before the palette ramp, so the grain, the veins, the cracks and the weathering all sit on top of them.', texture: true, types: STONE },
+  laminaeSize: { type: 'number', default: 0.06, help: 'Metres of one bed. Beds thicker than a mesh quad rib the silhouette; thinner ones stay in the height map, the way a fine crack does.', texture: true, types: STONE },
+  laminaeVary: { type: 'number', default: 0.7, help: 'How far bed thicknesses vary from one another, 0..1. 0 is a ruled stack of one thickness; 1 mixes thick beds with hairlines.', texture: true, types: STONE },
+  laminaeRelief: { type: 'number', default: 0.04, help: 'How far a hard bed stands proud of a soft one in the mesh, as a fraction of the radius. This is differential weathering, and it is most of what makes a bedded face read. It is the geometry alone and is not scaled by laminae, so the two are independent: 0 leaves the beds to the texture and never moves a vertex.', texture: true, types: STONE },
+  laminaeTint: { type: 'number', default: 0.5, help: 'How far each bed shifts along the stone\'s own dark-to-light ramp, 0..1. The bands stay the rock\'s own colours, so a tuned palette is never fought.', texture: true, types: STONE },
+  laminaeWarp: { type: 'number', default: 0.6, help: 'How far the bands wander across the rock, in beds. 0 rules them dead level, which reads as printed on.', texture: true, types: STONE },
+  laminaeWarpSize: { type: 'number', default: 1.2, help: 'Metres across one swell of that wander. Near the rock\'s own size the whole stack sags; far under it the bands ripple.', texture: true, types: STONE },
+  laminaeAccent: { type: 'string', default: '#d9d2c0', help: 'The colour the odd standout bed takes, six digit hex: the pale seam or the iron-red band that is not on the stone\'s ramp at all. Read only at laminaeAccentShare above 0.', texture: true, types: STONE },
+  laminaeAccentShare: { type: 'number', default: 0, help: 'Share of beds taking laminaeAccent rather than the ramp, 0..1. 0 keeps every band in the stone\'s own colours.', texture: true, types: STONE },
+
   smoothing: { type: 'number', default: 0.5, byType: { pebble: 0.9 }, help: 'How far the creases of the field are rounded, 0..1: the ridges between scoops, the slab edges and joins, the creases of the ridged noise. 0 is knife-edged; 1 is about a tenth smaller, because rounding only pulls the surface in.', texture: true, types: STONE },
   cracks: { type: 'number', default: 1.2, byType: { pebble: 0 }, help: 'Crack cells per metre. 0 draws none.', texture: true, types: STONE },
   crackStrength: { type: 'number', default: 1, help: 'How strongly the texture draws the cracks, 0..1. 0 draws none and keeps the grooves; cracks 0 removes both.', texture: true, types: STONE },
@@ -309,6 +319,7 @@ export const PARAM_SPEC = {
 
   pebblesPerModel: { type: 'int', default: 12, help: 'Pebbles packed into one cluster. Each is its own stone with its own six charts, so the image and the bake grow with this.', texture: true, types: PEBBLE },
   pebbleSmallest: { type: 'number', default: 0.4, help: 'The smallest pebble as a fraction of the largest, 0..1. The run between them bends toward the small end, so a cluster is a few stones with gravel around them.', texture: true, types: PEBBLE },
+  pebbleSpacing: { type: 'number', default: 1, help: 'How far apart the stones of a cluster sit, as a multiple of them touching. 1 nestles them, 2 leaves a stone\'s width of ground between neighbours, 3 is a thin scatter. Raising it grows the derived clusterRadius with it, so the cluster spreads rather than spilling past its own footprint.', types: PEBBLE },
   clusterRadius: { type: 'number', default: 0, help: 'Metres the pebble bases are spread over. 0 derives it from the ground the pebbles cover, so raising pebblesPerModel spreads the cluster rather than packing it.', types: PEBBLE },
 
   bendCurve: {
