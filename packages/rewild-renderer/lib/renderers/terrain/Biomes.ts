@@ -57,7 +57,12 @@ export interface BiomeScatter {
 // seam-free across chunks. Evaluated by a switch on `kind` (evalDeformation in
 // Noise.ts), never a method call — adding a kind is a member here plus a case
 // there.
-export type Deformation = FbmDeformation | DuneDeformation;
+export type Deformation =
+  | FbmDeformation
+  | DuneDeformation
+  | RidgedDeformation
+  | TerraceDeformation
+  | ErodedDeformation;
 
 // Octaves of simplex summed with falling amplitude and rising frequency — the
 // rolling-hills field every biome is built on.
@@ -87,12 +92,109 @@ export interface DuneDeformation {
   seedSalt: number; // decorrelates the meander from every other field
 }
 
+// Ridged multifractal — `1 - |noise|` per octave, so the field peaks along the
+// lines where the noise crosses zero instead of at its extremes. fBm is round
+// wherever you cut it and makes rolling hills; this makes ridgelines meeting at
+// sharp cols, with V-shaped valleys between, which is the shape a mountain has
+// and the one fBm cannot reach at any setting.
+//
+// Each octave is weighted by the one above it, so the fine detail gathers along
+// the ridges and leaves the flanks smooth, the way erosion leaves them.
+//
+// Non-negative like dunes, so it adds crags onto an fBm massif beneath rather
+// than replacing it, and the two can be dialled against each other.
+export interface RidgedDeformation {
+  kind: 'ridged';
+  amplitude: number; // meters at full ridge
+  noiseScale: number; // horizontal feature size in world-units
+  octaves: number;
+  persistence: number;
+  lacunarity: number;
+  // How sharp a ridge is. 1 rounds them into whalebacks, 2 is an alpine arete,
+  // 4 is a knife edge. Applied per octave, so it sharpens the detail too.
+  sharpness: number;
+  curveExp: number; // >1 sinks the flanks and leaves the crests
+  seedSalt: number;
+}
+
+// Benched ground: an fBm field quantised into steps, which is what a stack of
+// beds of differing hardness weathers into. Mesas, strata benches and the
+// stepped skirts of a butte — none of which a continuous field can produce,
+// because the whole point is the riser between one bench and the next.
+//
+// The same shape the `laminae` keys cut into a rock's face, at the scale of a
+// hillside, which is what makes a bedded rock read as part of the ground it
+// stands on rather than as a prop placed on it.
+export interface TerraceDeformation {
+  kind: 'terrace';
+  amplitude: number; // meters at full noise
+  noiseScale: number; // horizontal feature size in world-units
+  octaves: number;
+  persistence: number;
+  lacunarity: number;
+  // Benches over the full amplitude. 6 over 400m is a bench every 65m.
+  steps: number;
+  // How abrupt the riser is. 0 is an unbroken ramp and quantises nothing; 1 is
+  // a vertical step from one bench to the next.
+  sharpness: number;
+  curveExp: number; // >1 flattens mids, keeps peaks
+  seedSalt: number;
+}
+
+// fBm that remembers its own slope. Each octave carries an analytic gradient,
+// the gradients accumulate, and every octave after the first is damped by how
+// steep the sum already is.
+//
+// What that produces is the shape erosion leaves: fine detail survives on flat
+// ground and on ridge crests, and is stripped from the flanks, because on a
+// slope the loose material has already gone downhill. Plain fBm has the same
+// roughness everywhere, which is the tell that no weather ever touched it.
+//
+// A pure function of position like every other kind — it needs no neighbours
+// and no simulation pass, which is why it costs a case here rather than a
+// change to how chunks are built.
+export interface ErodedDeformation {
+  kind: 'eroded';
+  amplitude: number; // meters at full noise
+  noiseScale: number; // horizontal feature size in world-units
+  octaves: number;
+  persistence: number;
+  lacunarity: number;
+  // How hard a slope suppresses the detail on it. 0 is plain fBm; 1 is a
+  // gentle smoothing of the flanks; 4 leaves them almost bare.
+  erosion: number;
+  curveExp: number; // >1 flattens mids, keeps peaks
+  seedSalt: number;
+}
+
+// Thermal weathering: material above the angle of repose slides downhill until
+// it is under it, which is what builds a talus skirt at the foot of a cliff and
+// a scree cone below a gully.
+//
+// Unlike a deformation this cannot be a pure function of position: a cell has
+// to see its neighbours, and the result of one pass feeds the next. It is run
+// over a margin the height map grows for itself, wide enough that no pass ever
+// reaches the edge, which is what keeps chunks seam-free without them having to
+// know about each other.
+export interface Erosion {
+  // Passes of sliding. Each moves material at most one sample, so this is also
+  // how far talus can travel, and how wide a margin the height map grows.
+  iterations: number;
+  // Degrees of slope material stays put on. Dry scree sits near 34; wet soil
+  // and clay hold a good deal less.
+  talusDeg: number;
+  // Share of the excess that moves per pass, 0..1. Lower is slower and smoother.
+  strength: number;
+}
+
 export interface BiomeParams {
   name: string;
   /** Shapes the ground. Never reads `layers`, and vice versa. */
   deformations: Deformation[];
   /** Surfaces the shape, base first. */
   layers: BiomeLayer[];
+  /** Thermal weathering over the shaped ground. Omitted leaves it unweathered. */
+  erosion?: Erosion;
   // What grows on the shape. Omitted ⇒ bare ground.
   scatter?: BiomeScatter[];
 }
@@ -256,25 +358,69 @@ export const FOREST: BiomeParams = {
 
 export const MOUNTAIN: BiomeParams = {
   name: 'mountain',
+  // The massif, then the crags on it. The fbm carries the bulk and the ridged
+  // field cuts the ridgelines and cols into it: fBm is round wherever it is
+  // cut, so on its own it can only ever make a smooth dome however many
+  // octaves it is given. Its persistence was 0.35, which left octaves four to
+  // six contributing four, one and a half of one percent — six declared and
+  // effectively two heard. Raised, with the amplitude taken out of it and
+  // given to the ridges instead, so the massif is no taller than it was.
   deformations: [
+    // Eroded rather than plain fbm: the flanks lose their fine detail and the
+    // crests keep it, which is where the loose material of a real slope has
+    // and has not gone.
     {
-      kind: 'fbm',
-      amplitude: 300,
+      kind: 'eroded',
+      amplitude: 240,
       noiseScale: 600,
       octaves: 6,
-      persistence: 0.35,
+      persistence: 0.45,
       lacunarity: 2.6,
+      // Gentle. The flanks lose their fine detail and the crests keep it, and
+      // ground steeper than 30 degrees only falls from 32% to 28%. Higher
+      // smooths the massif back toward the dome it used to be: 10 takes it to
+      // 20%, which is most of the way.
+      erosion: 2,
       curveExp: 2.0,
       seedSalt: 0,
     },
+    // Its own salt, so the ridgelines are not forever pinned to the same
+    // features of the field beneath them. 90m against the fbm's 240 is the
+    // split that holds the massif's old height envelope — median 72m against
+    // 69m, peaks 192m against 212m — so the snow line and every height-banded
+    // rock below still land where they were tuned to.
+    {
+      kind: 'ridged',
+      amplitude: 90,
+      noiseScale: 520,
+      octaves: 5,
+      persistence: 0.5,
+      lacunarity: 2.3,
+      sharpness: 2,
+      curveExp: 1.3,
+      seedSalt: 61,
+    },
   ],
+  // Talus under the crags. 40 degrees is steeper than dry scree sits at, on
+  // purpose: most of this massif is bedrock, which holds angles no loose
+  // material would, and only what has already broken off it slides. Eight
+  // passes trims the worst faces from 57 degrees to 51 and half again as much
+  // ground comes to rest at the repose angle, while the share steeper than 30
+  // degrees does not move at all — the crags keep their shape and gain skirts.
+  erosion: { iterations: 8, talusDeg: 40, strength: 0.5 },
   layers: [
     { material: 'aerial_rocks_01' },
     { material: 'marble_cliff_05', slope: { from: 15, to: 75 } },
+    // Snow lies in drifts, not as a sheet. Three things break it up: it sheds
+    // off anything steeper than about 55 degrees, it thins into a noise field
+    // so bare rock shows through in patches, and its line climbs over a
+    // hundred metres rather than arriving on a contour. Wherever its coverage
+    // falls short the rock and the cliff beneath show, which is the whole
+    // reason no fourth material is needed here.
     {
       material: 'snow_field_aerial',
-      height: { from: 100, to: 170 },
-      slope: { from: 70, to: 55 },
+      height: { from: 50, to: 200 },
+      slope: { from: 75, to: 32 },
     },
   ],
   // Scree and erratics on the flanks, and the same cobbles again under snow
@@ -374,9 +520,15 @@ export const MOUNTAIN: BiomeParams = {
 // the mids that carry its skirts down to meet DESERT.
 export const DESERT_MOUNTAIN: BiomeParams = {
   name: 'desert-mountain',
+  // The same massif this biome always had, cut into benches. Salt, scale,
+  // octaves and curve are the ones the fbm carried, so the envelope is
+  // unchanged and only the risers are new: sandstone weathers bed by bed, and
+  // a bench is what a hard bed leaves when the soft one under it goes. It is
+  // the shape the `laminae` keys cut into a rock's face, at the scale of the
+  // hillside the rock stands on.
   deformations: [
     {
-      kind: 'fbm',
+      kind: 'terrace',
       amplitude: 500,
       // Broader than MOUNTAIN: a wider massif spreads its rise over more
       // ground, so the climb starts well before the climate border, not at it.
@@ -384,10 +536,29 @@ export const DESERT_MOUNTAIN: BiomeParams = {
       octaves: 6,
       persistence: 0.42,
       lacunarity: 2.2,
+      steps: 7,
+      sharpness: 0.9,
       curveExp: 1.45,
       seedSalt: 0,
     },
+    // A little roughness over the top, or every bench edge is a clean contour
+    // line and the massif reads as a relief map.
+    {
+      kind: 'fbm',
+      amplitude: 55,
+      noiseScale: 190,
+      octaves: 4,
+      persistence: 0.5,
+      lacunarity: 2.4,
+      curveExp: 1,
+      seedSalt: 91,
+    },
   ],
+  // Debris skirts at the foot of the risers. The risers themselves stand near
+  // vertical, far past any angle loose material rests at, so weathering never
+  // touches them: it takes what has already fallen and piles it below, which is
+  // what the apron of rubble under a real mesa is.
+  erosion: { iterations: 8, talusDeg: 42, strength: 0.4 },
   layers: [
     { material: 'tiger_rock_1k' },
     // Drift sand: low down, and flat enough to hold it — both bands inverted.
