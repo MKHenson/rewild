@@ -61,6 +61,8 @@
   "patina": 0.25,
   "weathering": 0.3,
   "snow": 0,
+  "scaleMin": 1,
+  "scaleMax": 1.4,
   "subdivisions": 16,
   "lods": [
     {
