@@ -30,7 +30,7 @@
   "undulationSize": 0.03,
   "roughness": 0.82,
   "bump": 1.4,
-  "weathering": 0.1,
+  "weathering": 0.3,
   "patina": 0.08,
   "edgeWear": 0.4,
   "stain": 0.05,

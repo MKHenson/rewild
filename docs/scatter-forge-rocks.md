@@ -281,14 +281,38 @@ by nature whatever its settings: it makes rolling hills, never a ridgeline and n
 plain switch on `kind`, with the comment that it *stays cheap however many kinds exist*. It is built
 to be extended, and it has two kinds today. Three worth adding, in order of payoff over effort:
 
-- **`ridged`** — `1 - |noise|` per octave instead of the raw value. Sharp ridgelines and V-shaped
-  valleys in place of rounded blobs. This is the single change that makes a mountain read as a
-  mountain, and it is a handful of lines beside the existing fbm case.
-- **`terrace`** — quantise the height into steps. Mesas, benched cliffs, strata. It is cheap, it is
-  dramatic, and it is the change that makes the laminated sandstone read as *part of* the landscape
-  rather than as props standing on it.
+- **`ridged`** — **written.** `1 - |noise|` per octave instead of the raw value, each octave
+  weighted by the one above it so detail gathers on the ridges. `MOUNTAIN` takes 90m of it over
+  240m of fbm at persistence 0.45, which holds the massif's old height envelope — median 72m
+  against 69m — while taking ground steeper than 30 degrees from **8% to 30%**.
+- **`terrace`** — **written.** The height quantised into benches with a riser between them.
+  `DESERT_MOUNTAIN` takes it at seven steps and 0.9 sharpness, over the same salt, scale and curve
+  its fbm had, so the massif is the one it always was with risers cut into it. Flat ground goes from
+  13% to 22% and the risers are near vertical: the old field had **nothing anywhere steeper than 58
+  degrees**, and 5.4% of the new one is over 60.
 - **`spires`** — sharp positive features placed on a lattice. Still a heightfield, so still no
   overhang, but genuine crags in the silhouette at every distance, which is most of the complaint.
+- **`eroded`** — **written.** fBm that carries its own analytic gradient and damps each octave by
+  how steep the sum already is, so detail survives on crests and flat ground and is stripped from
+  the flanks, which is where loose material has actually gone. A pure function of position like the
+  rest. `MOUNTAIN` takes it at `erosion: 2`.
+
+**Thermal weathering — written**, and it is the one piece here that is not a deformation. Material
+above the angle of repose slides to its lower neighbours, so a cell has to see its neighbours and
+each pass feeds the next. `generateBiomeBlendedHeightMap` grows its own margin of `passes + 1`
+samples, erodes, and trims back: the margin is derived from world position like everything else, so
+two neighbouring chunks compute the same material for the ground they share and no caller had to
+change. Measured seam error is 0.50 of a float32 ULP at 170m, which is two adjacent floats.
+
+It reads as talus. On `MOUNTAIN`, eight passes at a 40 degree repose take the worst faces from 57
+degrees to 51 and half again as much ground comes to rest at the repose angle, while the share
+steeper than 30 degrees does not move — the crags keep their shape and gain skirts. On
+`DESERT_MOUNTAIN` the terrace risers stand near 80 degrees, far past any angle loose material rests
+at, so weathering never touches them and only piles debris at their feet.
+
+**Hydraulic erosion stays out.** A droplet runs downhill for an unbounded distance, so no margin is
+wide enough and chunks would stop being independent. It would need an offline bake over a finite
+world.
 
 `marble_cliff_05` is already keyed to slope 15..75 and is barely showing, because there is little
 steep ground for it to show on. Steepening the terrain pays out in material that is already authored.
@@ -465,9 +489,8 @@ rather than a re-bake of every asset.
 Terrain first, because it is the cheapest change with the largest effect and it fixes the distance
 problem that no scatter layer can:
 
-1. **`ridged` as a deformation kind**, and `MOUNTAIN` retuned off persistence 0.35. Small, and it is
-   the change that makes the massif read as a mountain at every distance.
-2. **`terrace`**, for benched cliffs and mesas. This is what makes the bedded rocks belong.
+1. ~~`ridged`, and `MOUNTAIN` retuned off persistence 0.35.~~ **Done.**
+2. ~~`terrace`, for benched cliffs and mesas.~~ **Done**, on `DESERT_MOUNTAIN`.
 3. The outcrop mesh: SDF, surface nets, slab hulls, triplanar detail. No macro, no blending. The
    hulls are walkable as soon as they exist, so this stands up on its own.
 4. Vertex-baked macro: exposure, staining, occlusion, ground contact.
