@@ -16,9 +16,20 @@ const GROUND: Vec3 = [0.28, 0.26, 0.22];
 const YAW = (28 * Math.PI) / 180;
 const PITCH = (10 * Math.PI) / 180;
 
-function toView(positions: Float32Array): Float32Array {
-  const cy = Math.cos(YAW);
-  const sy = Math.sin(YAW);
+// Quarter turns off the three quarter view. One angle hides a flat back, a
+// gouge on the far side, or a silhouette that only works from the front.
+const TURNS = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2];
+
+/** The turn a view applies to a position, applied to the light instead. */
+function rotateY(v: Vec3, angle: number): Vec3 {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c];
+}
+
+function toView(positions: Float32Array, yaw: number): Float32Array {
+  const cy = Math.cos(yaw);
+  const sy = Math.sin(yaw);
   const cp = Math.cos(PITCH);
   const sp = Math.sin(PITCH);
   const view = new Float32Array(positions.length);
@@ -68,8 +79,8 @@ function createProjector(
   };
 }
 
-function shade(normal: Vec3, colour: Vec3): Vec3 {
-  const lambert = Math.max(0, normal[0] * LIGHT[0] + normal[1] * LIGHT[1] + normal[2] * LIGHT[2]);
+function shade(normal: Vec3, colour: Vec3, light: Vec3): Vec3 {
+  const lambert = Math.max(0, normal[0] * light[0] + normal[1] * light[1] + normal[2] * light[2]);
   const hemisphere = normal[1] * 0.5 + 0.5;
 
   const channel = (c: number): number =>
@@ -88,7 +99,8 @@ function drawPrimitive(
   cutout: boolean,
   cutoff: number,
   doubleSided: boolean,
-  mirrorBackFaces: boolean
+  mirrorBackFaces: boolean,
+  light: Vec3
 ): void {
   const { indices, uvs, normals } = attributes;
   const { width: atlasWidth, height: atlasHeight } = canvas;
@@ -159,7 +171,7 @@ function drawPrimitive(
           canvas.albedo[texel * 3],
           canvas.albedo[texel * 3 + 1],
           canvas.albedo[texel * 3 + 2],
-        ]);
+        ], light);
 
         depth[pixel] = z;
         target[pixel * 3] = Math.round(colour[0] * 255);
@@ -171,8 +183,8 @@ function drawPrimitive(
 }
 
 /** Every piece's positions in view space, before they are fitted. */
-function viewsOf(mesh: ForgeMesh): Float32Array[] {
-  return mesh.pieces.map((piece) => toView(piece.attributes.positions));
+function viewsOf(mesh: ForgeMesh, yaw: number): Float32Array[] {
+  return mesh.pieces.map((piece) => toView(piece.attributes.positions, yaw));
 }
 
 function marginFor(size: number): number {
@@ -186,7 +198,8 @@ function paint(
   canvases: Canvases,
   size: number,
   views: Float32Array[],
-  project: (view: Float32Array) => Float32Array
+  project: (view: Float32Array) => Float32Array,
+  light: Vec3
 ): Buffer {
   const target = Buffer.alloc(size * size * 3);
   const depth = new Float32Array(size * size).fill(-Infinity);
@@ -218,17 +231,54 @@ function paint(
       piece.cutout,
       piece.cutout ? params.leafAlphaCutoff : 0,
       piece.cutout,
-      piece.cutout ? mirrorCutout : true
+      piece.cutout ? mirrorCutout : true,
+      light
     );
   });
 
   return target;
 }
 
-/** RGB bytes of a `size` square preview. */
-export function renderPreview(params: Params, mesh: ForgeMesh, canvases: Canvases, size: number): Buffer {
-  const views = viewsOf(mesh);
-  return paint(params, mesh, canvases, size, views, createProjector(views, size, marginFor(size)));
+/**
+ * The model from `previewAngles` sides, `size` to a panel: four quarter turns
+ * laid out 2x2, or the three-quarter view alone for a screenshot.
+ *
+ * The light turns with the camera, so every panel is lit the way the first is
+ * and a face reads as its own shape rather than as the side the sun missed.
+ * One projection fits them all, so a panel cannot change scale mid-sheet.
+ */
+export function renderPreview(
+  params: Params,
+  mesh: ForgeMesh,
+  canvases: Canvases,
+  size: number
+): { data: Buffer; width: number; height: number } {
+  const turns = (params.previewAngles === 1 ? TURNS.slice(0, 1) : TURNS).map((turn) => ({
+    views: viewsOf(mesh, YAW + turn),
+    light: rotateY(LIGHT, -turn),
+  }));
+  const project = createProjector(turns.flatMap((turn) => turn.views), size, marginFor(size));
+
+  const columns = Math.min(2, turns.length);
+  const width = size * columns;
+  const height = size * Math.ceil(turns.length / 2);
+  const sheet = Buffer.alloc(width * height * 3);
+
+  turns.forEach((turn, index) => {
+    const tile = paint(params, mesh, canvases, size, turn.views, project, turn.light);
+    const left = (index % 2) * size;
+    const top = Math.floor(index / 2) * size;
+
+    for (let y = 0; y < size; y++)
+      tile.copy(sheet, ((top + y) * width + left) * 3, y * size * 3, (y + 1) * size * 3);
+  });
+
+  if (turns.length > 1) {
+    for (let y = 0; y < height; y++) drawDivider(sheet, width, y, size);
+    for (let x = 0; x < width; x++) drawDivider(sheet, width, size, x);
+  }
+
+  return { data: sheet, width, height };
 }
 
 /** One tier of the comparison strip. */
@@ -252,14 +302,14 @@ export function renderComparison(
   canvases: Canvases,
   size: number
 ): { data: Buffer; width: number; height: number } {
-  const views = panels.map((panel) => viewsOf(panel.mesh));
+  const views = panels.map((panel) => viewsOf(panel.mesh, YAW));
   const project = createProjector(views.flat(), size, marginFor(size));
 
   const width = size * panels.length;
   const strip = Buffer.alloc(width * size * 3);
 
   panels.forEach((panel, index) => {
-    const tile = paint(params, panel.mesh, canvases, size, views[index], project);
+    const tile = paint(params, panel.mesh, canvases, size, views[index], project, LIGHT);
 
     for (let y = 0; y < size; y++)
       tile.copy(strip, (y * width + index * size) * 3, y * size * 3, (y + 1) * size * 3);
@@ -268,7 +318,7 @@ export function renderComparison(
   // Drawn after the blit so a label is never clipped by the panel it names.
   panels.forEach((panel, index) => {
     drawLabel(strip, width, panel.label, index * size + marginFor(size), marginFor(size), size);
-    if (index > 0) drawDivider(strip, width, size, index * size);
+    if (index > 0) for (let y = 0; y < size; y++) drawDivider(strip, width, y, index * size);
   });
 
   return { data: strip, width, height: size };
@@ -331,13 +381,12 @@ function drawLabel(
   });
 }
 
-function drawDivider(target: Buffer, width: number, size: number, x: number): void {
-  for (let y = 0; y < size; y++) {
-    const at = (y * width + x) * 3;
-    target[at] = 90;
-    target[at + 1] = 96;
-    target[at + 2] = 104;
-  }
+function drawDivider(target: Buffer, width: number, y: number, x: number): void {
+  const at = (y * width + x) * 3;
+  if (at < 0 || at + 2 >= target.length) return;
+  target[at] = 90;
+  target[at + 1] = 96;
+  target[at + 2] = 104;
 }
 
 function mix(a: number, b: number, t: number): number {

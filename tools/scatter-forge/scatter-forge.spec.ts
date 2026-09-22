@@ -1296,13 +1296,15 @@ describe('preview', () => {
       return bytes;
     };
 
+    // A strip of one is the mesh fitted to itself: the render a per-panel fit
+    // would give it.
     const solo = (target: ForgeMesh): number[] => {
-      const render = renderPreview(params, target, canvases, SIZE);
+      const render = renderComparison(params, [{ label: 'A', mesh: target }], canvases, SIZE);
       const bytes: number[] = [];
       for (let y = Math.round(SIZE * 0.4); y < SIZE; y++)
         for (let x = 2; x < SIZE; x++)
           for (let channel = 0; channel < 3; channel++)
-            bytes.push(render[(y * SIZE + x) * 3 + channel]);
+            bytes.push(render.data[(y * SIZE + x) * 3 + channel]);
       return bytes;
     };
 
@@ -2483,18 +2485,44 @@ describe('rock', () => {
     expect(build(3).equals(build(4))).toBe(false);
   });
 
-  it('renders a preview with no hole', () => {
+  it('renders every side of a preview with no hole', () => {
     const params = rockParams({ textureSize: 128, subdivisions: 6 });
     const rock = buildRock(params);
     const canvases = { stone: buildStoneCanvas(params, rock.field) };
     const size = 64;
-    const pixels = renderPreview(params, rock.mesh, canvases, size);
+    const sheet = renderPreview(params, rock.mesh, canvases, size);
 
-    // The centre of the image is the middle of the rock. A hole there is the
-    // background gradient showing through a face wound inside out.
+    expect(sheet.width).toBe(size * 2);
+    expect(sheet.height).toBe(size * 2);
+    expect(sheet.data.length).toBe(size * size * 4 * 3);
+
+    // Each panel's centre is the middle of the rock from that angle. A hole
+    // there is the background gradient showing through a face wound inside out.
+    for (let panel = 0; panel < 4; panel++) {
+      const x = (panel % 2) * size + size / 2;
+      const y = Math.floor(panel / 2) * size + size / 2;
+      const centre = y * sheet.width + x;
+      const backgroundBlue = sheet.data[centre * 3 + 2] > sheet.data[centre * 3] + 6;
+      expect(backgroundBlue).toBe(false);
+    }
+  });
+
+  it('draws the one view alone at previewAngles 1', () => {
+    const params = rockParams({ textureSize: 128, subdivisions: 6, previewAngles: 1 });
+    const rock = buildRock(params);
+    const size = 64;
+    const sheet = renderPreview(params, rock.mesh, { stone: buildStoneCanvas(params, rock.field) }, size);
+
+    expect(sheet.width).toBe(size);
+    expect(sheet.height).toBe(size);
+    expect(sheet.data.length).toBe(size * size * 3);
+
+    // The panel is fitted to its own view, so the rock fills the frame rather
+    // than sitting at the scale four turns had to share.
     const centre = (size / 2) * size + size / 2;
-    const backgroundBlue = pixels[centre * 3 + 2] > pixels[centre * 3] + 6;
-    expect(backgroundBlue).toBe(false);
+    expect(sheet.data[centre * 3 + 2] > sheet.data[centre * 3] + 6).toBe(false);
+
+    expect(() => rockParams({ previewAngles: 2 })).toThrow(/previewAngles must be 1 or 4/);
   });
 });
 

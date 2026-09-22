@@ -157,9 +157,9 @@ async function writePreview(
   const { default: sharp } = await import('sharp');
   const path = join(directory, `${params.name}.preview.png`);
 
-  await sharp(renderPreview(params, mesh, canvases, params.preview), {
-    raw: { width: params.preview, height: params.preview, channels: 3 },
-  })
+  const { data, width, height } = renderPreview(params, mesh, canvases, params.preview);
+
+  await sharp(data, { raw: { width, height, channels: 3 } })
     .png()
     .toFile(path);
 
