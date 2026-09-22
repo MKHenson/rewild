@@ -62,6 +62,8 @@
   "weathering": 0.08,
   "snow": 0,
   "subdivisions": 24,
+  "scaleMin": 1,
+  "scaleMax": 1.4,
   "lods": [
     {
       "distance": 50,
