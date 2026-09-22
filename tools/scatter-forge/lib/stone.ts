@@ -14,18 +14,18 @@ import { fbm3r, hash3, smoothstep, worley3Into, type Worley3Result } from './noi
 import type { Params } from './params.ts';
 import { platesInto, type PlateSample } from './plates.ts';
 import {
+  chartOrigin,
   crackCoarse,
   crackFine,
   cubePoint,
   FACES,
-  ROCK_CHART_COLUMNS,
-  ROCK_CHART_ROWS,
-  ROCK_GUTTER,
-  rockChartPx,
+  rockAtlas,
   surfaceAt,
+  type ChartAtlas,
   type CrackSample,
   type RockField,
 } from './rock.ts';
+import type { Cluster } from './pebbles.ts';
 import { createCanvas, type Canvas, type Canvases } from './textures.ts';
 import type { Vec3 } from './vec.ts';
 
@@ -133,16 +133,17 @@ const _p: Vec3 = [0, 0, 0];
  * is a face coordinate just past 0..1, which is a direction just past the
  * face's edge: the neighbouring face's own surface, in this chart's frame.
  */
-function sampleSurface(field: RockField, faceIndex: number, chartPx: number): Surface {
+function sampleSurface(field: RockField, faceIndex: number, atlas: ChartAtlas): Surface {
   const face = FACES[faceIndex];
-  const inner = chartPx - ROCK_GUTTER * 2;
+  const { chartPx, gutter } = atlas;
+  const inner = chartPx - gutter * 2;
   const points = new Float32Array(chartPx * chartPx * 3);
   const radius = new Float32Array(chartPx * chartPx);
 
   for (let y = 0; y < chartPx; y++) {
-    const b = (y - ROCK_GUTTER + 0.5) / inner;
+    const b = (y - gutter + 0.5) / inner;
     for (let x = 0; x < chartPx; x++) {
-      const a = (x - ROCK_GUTTER + 0.5) / inner;
+      const a = (x - gutter + 0.5) / inner;
       surfaceAt(_p, field, cubePoint(_c, face, a, b));
       const i = y * chartPx + x;
       points[i * 3] = _p[0];
@@ -194,7 +195,8 @@ function normalOf(into: Vec3, surface: Surface, chartPx: number, x: number, y: n
  * hollow. Scaled by the texel spacing so a crease of a given angle reads the
  * same at any resolution.
  */
-function curvatureOf(surface: Surface, chartPx: number, x: number, y: number, reach: number): number {
+function curvatureOf(surface: Surface, atlas: ChartAtlas, x: number, y: number, reach: number): number {
+  const { chartPx, gutter } = atlas;
   const { radius } = surface;
   const xa = Math.max(0, x - reach);
   const xb = Math.min(chartPx - 1, x + reach);
@@ -202,7 +204,7 @@ function curvatureOf(surface: Surface, chartPx: number, x: number, y: number, re
   const yb = Math.min(chartPx - 1, y + reach);
   const centre = radius[y * chartPx + x];
   const sum = radius[y * chartPx + xa] + radius[y * chartPx + xb] + radius[ya * chartPx + x] + radius[yb * chartPx + x];
-  const spacing = (2 / (chartPx - ROCK_GUTTER * 2)) * reach;
+  const spacing = (2 / (chartPx - gutter * 2)) * reach;
   return (4 * centre - sum) / (centre * spacing);
 }
 
@@ -477,11 +479,44 @@ function streakAt(into: StreakSample, sources: Float32Array, field: RockField, t
 
 const DRIP_STEPS = 5;
 
-function paintChart(canvas: Canvas, params: Params, field: RockField, palette: Palette, sources: Float32Array, faceIndex: number): void {
-  const chartPx = rockChartPx(params);
-  const surface = sampleSurface(field, faceIndex, chartPx);
-  const column = faceIndex % ROCK_CHART_COLUMNS;
-  const row = Math.floor(faceIndex / ROCK_CHART_COLUMNS);
+/**
+ * The chart the curvature reaches below were tuned against. A reach is a span
+ * of surface, not a count of texels, so it is scaled to whatever chart it is
+ * read at: 28 texels is a twentieth of a rock's chart and half of a pebble's,
+ * and at half a chart the mask stops finding edges and finds the whole stone.
+ */
+const REACH_CHART = 512;
+
+const _reach: [number, number, number, number, number] = [1, 4, 8, 12, 28];
+
+/** The reaches at this chart, never under one texel. */
+function reachesOf(atlas: ChartAtlas): typeof _reach {
+  const scale = atlas.chartPx / REACH_CHART;
+  return [1, 4, 8, 12, 28].map((texels) => Math.max(1, Math.round(texels * scale))) as typeof _reach;
+}
+
+/**
+ * One stone's chart, painted into its block of the image.
+ *
+ * `block` is which stone this is. A rock is block 0 of a one-block atlas. A
+ * pebble is its own index, so the marks read off `up` and off the surface's
+ * own curvature land on the stone that actually carries them.
+ */
+function paintChart(
+  canvas: Canvas,
+  params: Params,
+  field: RockField,
+  palette: Palette,
+  sources: Float32Array,
+  atlas: ChartAtlas,
+  block: number,
+  faceIndex: number
+): void {
+  const chartPx = atlas.chartPx;
+  const surface = sampleSurface(field, faceIndex, atlas);
+  const reaches = reachesOf(atlas);
+  const origin: [number, number] = [0, 0];
+  chartOrigin(origin, atlas, block, faceIndex);
   const stride = canvas.width;
   const weathering = params.weathering;
   const toneScale = 1 / params.toneSize;
@@ -519,8 +554,8 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
       const pz = surface.points[i * 3 + 2];
       normalOf(_n, surface, chartPx, x, y);
       const up = _n[1];
-      const crease = curvatureOf(surface, chartPx, x, y, 1);
-      const hollow = curvatureOf(surface, chartPx, x, y, 8);
+      const crease = curvatureOf(surface, atlas, x, y, reaches[0]);
+      const hollow = curvatureOf(surface, atlas, x, y, reaches[2]);
 
       // Edge wear: where the surface is convex at any scale, from a slab's
       // edge to the ridge between two scoops, rain and frost have taken the
@@ -533,9 +568,9 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
       // width instead of drawing a line along it.
       const convex = clamp01(
         smoothstep(0.1, 0.8, crease) * 0.2 +
-          smoothstep(0.05, 0.5, curvatureOf(surface, chartPx, x, y, 4)) * 0.3 +
-          smoothstep(0.02, 0.3, curvatureOf(surface, chartPx, x, y, 12)) * 0.4 +
-          smoothstep(0.01, 0.18, curvatureOf(surface, chartPx, x, y, 28)) * 0.4
+          smoothstep(0.05, 0.5, curvatureOf(surface, atlas, x, y, reaches[1])) * 0.3 +
+          smoothstep(0.02, 0.3, curvatureOf(surface, atlas, x, y, reaches[3])) * 0.4 +
+          smoothstep(0.01, 0.18, curvatureOf(surface, atlas, x, y, reaches[4])) * 0.4
       );
       const wearNoise = fbm3r(px * WEAR_SCALE, py * WEAR_SCALE, pz * WEAR_SCALE, 3, seed ^ 0x77a2c3d1);
       const wear = edgeWear * convex * convex * smoothstep(0.2, 0.75, wearNoise + 0.1);
@@ -910,7 +945,7 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
         }
       }
 
-      const texel = (row * chartPx + y) * stride + column * chartPx + x;
+      const texel = (origin[1] + y) * stride + origin[0] + x;
       canvas.albedo[texel * 3] = clamp01(r);
       canvas.albedo[texel * 3 + 1] = clamp01(g);
       canvas.albedo[texel * 3 + 2] = clamp01(b);
@@ -923,18 +958,38 @@ function paintChart(canvas: Canvas, params: Params, field: RockField, palette: P
   }
 }
 
-/** The stone image as float channels: six charts in a 3x2 image. */
-export function buildStoneCanvas(params: Params, field: RockField): Canvas {
-  const chartPx = rockChartPx(params);
-  const canvas = createCanvas(chartPx * ROCK_CHART_COLUMNS, chartPx * ROCK_CHART_ROWS, params.bumpStrength * params.bump);
+/** One stone painted into its block of an image already made. */
+export function paintStone(canvas: Canvas, params: Params, field: RockField, atlas: ChartAtlas, block: number): void {
   const palette = paletteOf(params);
   const sources = params.streaks > 0 ? streakSources(field, params.streakCount, field.extents[1] * 2) : new Float32Array(0);
 
-  for (let faceIndex = 0; faceIndex < FACES.length; faceIndex++) paintChart(canvas, params, field, palette, sources, faceIndex);
+  for (let faceIndex = 0; faceIndex < FACES.length; faceIndex++)
+    paintChart(canvas, params, field, palette, sources, atlas, block, faceIndex);
+}
 
+/** The stone image as float channels: six charts in a 3x2 image. */
+export function buildStoneCanvas(params: Params, field: RockField): Canvas {
+  const atlas = rockAtlas(params);
+  const canvas = createCanvas(atlas.width, atlas.height, params.bumpStrength * params.bump);
+  paintStone(canvas, params, field, atlas, 0);
   return canvas;
 }
 
 export function buildRockCanvases(params: Params, field: RockField): Canvases {
   return { stone: buildStoneCanvas(params, field) };
+}
+
+/**
+ * The cluster's image: one block of six charts per pebble, each painted from
+ * that pebble's own field. Nothing is shared between two pebbles, so a mark
+ * read off `up` or off the surface's own curvature lands on the stone that
+ * carries it.
+ */
+export function buildPebbleCanvases(params: Params, cluster: Cluster): Canvases {
+  const { atlas } = cluster;
+  const canvas = createCanvas(atlas.width, atlas.height, params.bumpStrength * params.bump);
+
+  cluster.pebbles.forEach((pebble, block) => paintStone(canvas, params, pebble.field, atlas, block));
+
+  return { stone: canvas };
 }

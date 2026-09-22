@@ -86,8 +86,8 @@ describe('validateBiomeScatter', () => {
     expect(() =>
       validateBiomeScatter(
         climateWithScatter([
-          { layer: 'granite_pebble', density: 0.2 },
-          { layer: 'granite_pebble', density: 0.3 },
+          { layer: 'granite_pebble_01', density: 0.2 },
+          { layer: 'granite_pebble_01', density: 0.3 },
         ])
       )
     ).toThrow(/twice/);
@@ -97,7 +97,7 @@ describe('validateBiomeScatter', () => {
     for (const density of [0, -0.1, 1.5])
       expect(() =>
         validateBiomeScatter(
-          climateWithScatter([{ layer: 'granite_pebble', density }])
+          climateWithScatter([{ layer: 'granite_pebble_01', density }])
         )
       ).toThrow(/density .* must be within/);
   });

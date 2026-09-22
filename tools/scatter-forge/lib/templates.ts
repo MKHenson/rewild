@@ -16,6 +16,7 @@ import type {
 import type { PhysicsShape } from 'rewild-renderer/lib/core/PhysicsShape';
 import type { ScatterLayer } from 'rewild-renderer/lib/renderers/terrain/ScatterLayers';
 import type { ClumpMetrics } from './clump.ts';
+import type { ClusterMetrics } from './pebbles.ts';
 import type { Crown } from './crown.ts';
 import { IMPOSTOR_DEFAULT, impostorDistance, type Params } from './params.ts';
 import type { Rock } from './rock.ts';
@@ -99,7 +100,7 @@ export function colliderFor(params: Params, skeleton: Skeleton): PhysicsShape {
  * **No impostor, unless asked.** A billboard is only worth baking while the
  * model covers more pixels than the tile has, and a tuft at half a metre is
  * under a 128px tile at every distance it is still drawn at. It culls instead,
- * which is what `granite_pebble` does for the same reason. A metres-wide patch
+ * which is what a pebble cluster does for the same reason. A metres-wide patch
  * of plains grass is worth one, and sets it.
  *
  * **No collider.** A tuft of grass that stops the player is worse than one they
@@ -258,6 +259,68 @@ export function rockLayer(params: Params, rock: Rock): ScatterLayer {
     yOffset: -round(metrics.height * ROCK_SINK),
     footprint: params.footprint > 0 ? params.footprint : round(Math.max(0.3, span * 0.8), 1),
     collider: { type: 'hull', points: metrics.hull },
+    castShadow: params.castShadow,
+  };
+}
+
+/**
+ * Metres a cluster's rim may lift off the ground, which is what sets its tilt
+ * and how far it is sunk. A tenth of the smallest pebble: enough that a jitter
+ * reads as character, little enough that no stone shows daylight under it.
+ */
+const CLUSTER_LIFT = 0.03;
+
+/**
+ * Metres of clearance a cluster is never placed under, and how far past its
+ * own span it is spaced.
+ *
+ * A patch of grass tiles, because grass covers ground. A cluster of stones
+ * does not: it is a scatter, and clusters laid edge to edge read as a paved
+ * path. Spacing them at several times their span also holds the pebble count
+ * near what a single-stone layer gave, because a cluster is a dozen stones
+ * where the layer it replaces placed one. The floor is what `granite_pebble`
+ * shipped at.
+ */
+const CLUSTER_FOOTPRINT_FLOOR = 2.5;
+const CLUSTER_SPACING = 4;
+
+/**
+ * A pebble cluster's layer: laid onto the slope, sunk a little into it, and
+ * stopped by nothing.
+ *
+ * **No collider.** A stone that stops the player is worse than one they step
+ * over, which is the same call a clump makes about a tuft of grass.
+ *
+ * **No impostor, unless the file sets one.** A billboard is only worth baking
+ * while the model covers more pixels than the tile has, and a cluster under a
+ * metre across never does at the distance it is still drawn at. It culls.
+ *
+ * **One candidate for every pebble in it.** Placement is resolved per
+ * instance, so the cluster is to a pebble what a patch is to a tuft: the
+ * footprint is the cluster's own span rather than a stone's, and the way to
+ * more gravel is `pebblesPerModel`, never a smaller footprint.
+ */
+export function pebbleLayer(params: Params, metrics: ClusterMetrics): ScatterLayer {
+  const span = Math.max(0.05, metrics.spread);
+  const tilt = Math.round((Math.asin(Math.min(1, CLUSTER_LIFT / span)) * 180) / Math.PI);
+
+  return {
+    name: params.name.replace(/-/g, '_'),
+    geometryId: params.name,
+    ...(params.lods.length ? { lodDistances: params.lods.map((tier) => tier.distance) } : {}),
+    cullDistance: params.cullDistance,
+    ...(params.impostor ? { impostor: { ...params.impostor, fromDistance: impostorDistance(params) } } : {}),
+    jitter: {
+      scale: { from: params.scaleMin, to: params.scaleMax },
+      yaw: { from: 0, to: 360 },
+      tilt: Math.max(2, Math.min(12, tilt)),
+    },
+    alignToNormal: 1,
+    // Each pebble already beds into the mesh by its own share of its height.
+    // This is the rest: a cluster is posed off one height sample, so its far
+    // side sits a little above or below the ground it covers.
+    yOffset: -round(Math.min(CLUSTER_LIFT, span * 0.05), 3),
+    footprint: params.footprint > 0 ? params.footprint : round(Math.max(CLUSTER_FOOTPRINT_FLOOR, span * CLUSTER_SPACING), 1),
     castShadow: params.castShadow,
   };
 }

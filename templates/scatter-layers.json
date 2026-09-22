@@ -32,25 +32,28 @@
       ]
     }
   },
-  "granite_pebble": {
-    "name": "granite_pebble",
-    "geometryId": "granite-rock",
-    "materialId": "granite-rock",
-    "cullDistance": 60,
+  "granite_pebble_01": {
+    "name": "granite_pebble_01",
+    "geometryId": "granite-pebble-01",
+    "lodDistances": [
+      50
+    ],
+    "cullDistance": 120,
     "jitter": {
       "scale": {
-        "from": 0.22,
-        "to": 0.45
+        "from": 1,
+        "to": 1.2
       },
       "yaw": {
         "from": 0,
         "to": 360
       },
-      "tilt": 25
+      "tilt": 2
     },
-    "yOffset": -0.05,
     "alignToNormal": 1,
-    "footprint": 2.5
+    "yOffset": -0.03,
+    "footprint": 3.5,
+    "castShadow": false
   },
   "alien_plant": {
     "name": "alien_plant",
@@ -1278,5 +1281,74 @@
       ]
     },
     "castShadow": true
+  },
+  "granite_scree_01": {
+    "name": "granite_scree_01",
+    "geometryId": "granite-scree-01",
+    "lodDistances": [
+      50
+    ],
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 1,
+        "to": 1.2
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 3
+    },
+    "alignToNormal": 1,
+    "yOffset": -0.03,
+    "footprint": 2.6,
+    "castShadow": false
+  },
+  "sandstone_cobbles_01": {
+    "name": "sandstone_cobbles_01",
+    "geometryId": "sandstone-cobbles-01",
+    "lodDistances": [
+      50
+    ],
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 1,
+        "to": 1.2
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 2
+    },
+    "alignToNormal": 1,
+    "yOffset": -0.03,
+    "footprint": 3.2,
+    "castShadow": false
+  },
+  "granite_pebble_snow_01": {
+    "name": "granite_pebble_snow_01",
+    "geometryId": "granite-pebble-snow-01",
+    "lodDistances": [
+      50
+    ],
+    "cullDistance": 120,
+    "jitter": {
+      "scale": {
+        "from": 1,
+        "to": 1.2
+      },
+      "yaw": {
+        "from": 0,
+        "to": 360
+      },
+      "tilt": 2
+    },
+    "alignToNormal": 1,
+    "yOffset": -0.03,
+    "footprint": 3.2,
+    "castShadow": false
   }
 }

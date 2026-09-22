@@ -67,7 +67,7 @@ function countOf(results: ScatterInstances[], layer: string): number {
 }
 
 describe('scatterChunk', () => {
-  const dense = climateOf(flatBiome([{ layer: 'granite_pebble', density: 1 }]));
+  const dense = climateOf(flatBiome([{ layer: 'granite_pebble_01', density: 1 }]));
 
   it('returns nothing for a climate that grows nothing', () => {
     const climate = climateOf(flatBiome(undefined));
@@ -91,9 +91,9 @@ describe('scatterChunk', () => {
       flatHeights(CHUNK)
     );
 
-    expect(instances.layer).toBe('granite_pebble');
+    expect(instances.layer).toBe('granite_pebble_01');
     expect(instances.slot).toBe(
-      Object.keys(SCATTER_LAYERS).indexOf('granite_pebble')
+      Object.keys(SCATTER_LAYERS).indexOf('granite_pebble_01')
     );
     expect(instances.count).toBeGreaterThan(0);
     expect(instances.data.length).toBeGreaterThanOrEqual(
@@ -152,7 +152,7 @@ describe('scatterChunk', () => {
     // Convert both to global sample-space x, then check no instance appears in
     // both and that the pair covers the seam without a gap wider than a cell.
     const cell =
-      (2 * SCATTER_LAYERS['granite_pebble'].footprint) /
+      (2 * SCATTER_LAYERS['granite_pebble_01'].footprint) /
       TERRAIN_METERS_PER_SAMPLE;
     const half = span / 2;
     const toGlobal = (instances: ScatterInstances, originX: number) =>
@@ -199,7 +199,7 @@ describe('scatterChunk', () => {
       dense,
       flatHeights(CHUNK, 12)
     )[0];
-    const expected = 12 + (SCATTER_LAYERS['granite_pebble'].yOffset ?? 0);
+    const expected = 12 + (SCATTER_LAYERS['granite_pebble_01'].yOffset ?? 0);
 
     for (const [, y] of positions(instances))
       expect(y).toBeCloseTo(expected, 5);
@@ -208,7 +208,7 @@ describe('scatterChunk', () => {
   it('scales density down to fewer instances', () => {
     const heights = flatHeights(CHUNK);
     const sparse = climateOf(
-      flatBiome([{ layer: 'granite_pebble', density: 0.1 }])
+      flatBiome([{ layer: 'granite_pebble_01', density: 0.1 }])
     );
 
     const many = scatterChunk(
@@ -233,7 +233,7 @@ describe('scatterChunk', () => {
   it('places nothing where a selector excludes the whole chunk', () => {
     const climate = climateOf(
       flatBiome([
-        { layer: 'granite_pebble', density: 1, height: { from: 900, to: 950 } },
+        { layer: 'granite_pebble_01', density: 1, height: { from: 900, to: 950 } },
       ])
     );
     expect(
@@ -249,7 +249,7 @@ describe('scatterChunk', () => {
       dense,
       flatHeights(CHUNK)
     )[0];
-    const jitter = SCATTER_LAYERS['granite_pebble'].jitter.scale;
+    const jitter = SCATTER_LAYERS['granite_pebble_01'].jitter.scale;
 
     for (let i = 0; i < instances.count; i++) {
       const base = i * SCATTER_INSTANCE_STRIDE;
@@ -331,7 +331,7 @@ describe('scatterChunk', () => {
     const bare = climateOf(flatBiome(undefined));
     const heights = flatHeights(CHUNK);
     const halfDense = climateOf(
-      flatBiome([{ layer: 'granite_pebble', density: 0.4 }])
+      flatBiome([{ layer: 'granite_pebble_01', density: 0.4 }])
     );
 
     // The palette is the whole library: painting a layer the local biome never
@@ -354,7 +354,7 @@ describe('scatterChunk', () => {
     });
 
     it('composites over the biome density rather than replacing it', () => {
-      const slot = getScatterLayerSlot('granite_pebble');
+      const slot = getScatterLayerSlot('granite_pebble_01');
       const biomeOnly = scatterChunk(
         CHUNK,
         SEED,
@@ -371,8 +371,8 @@ describe('scatterChunk', () => {
         { scatterMask: scatterMask(slot, 0.5) }
       );
 
-      expect(countOf(painted, 'granite_pebble')).toBeGreaterThan(
-        countOf(biomeOnly, 'granite_pebble')
+      expect(countOf(painted, 'granite_pebble_01')).toBeGreaterThan(
+        countOf(biomeOnly, 'granite_pebble_01')
       );
     });
 
@@ -393,8 +393,8 @@ describe('scatterChunk', () => {
         { scatterMask: scatterMask(getScatterLayerSlot('alien_plant'), 0) }
       );
 
-      expect(countOf(withMask, 'granite_pebble')).toBe(
-        countOf(plain, 'granite_pebble')
+      expect(countOf(withMask, 'granite_pebble_01')).toBe(
+        countOf(plain, 'granite_pebble_01')
       );
     });
 
@@ -410,11 +410,11 @@ describe('scatterChunk', () => {
         { scatterMask: scatterMask(scatterExcludeChannel(), 1) }
       );
 
-      expect(countOf(results, 'granite_pebble')).toBe(0);
+      expect(countOf(results, 'granite_pebble_01')).toBe(0);
     });
 
     it('exclusion beats paint', () => {
-      const mask = scatterMask(getScatterLayerSlot('granite_pebble'), 1);
+      const mask = scatterMask(getScatterLayerSlot('granite_pebble_01'), 1);
       const plane = mask.size * mask.size;
       const exclude = scatterExcludeChannel();
       mask.weights.fill(255, exclude * plane, (exclude + 1) * plane);
@@ -424,7 +424,7 @@ describe('scatterChunk', () => {
           scatterChunk(CHUNK, SEED, new Vector2(0, 0), dense, heights, {
             scatterMask: mask,
           }),
-          'granite_pebble'
+          'granite_pebble_01'
         )
       ).toBe(0);
     });
@@ -441,12 +441,12 @@ describe('scatterChunk', () => {
           scatterChunk(CHUNK, SEED, new Vector2(0, 0), dense, heights, {
             scatterMask: stale,
           }),
-          'granite_pebble'
+          'granite_pebble_01'
         )
       ).toBe(
         countOf(
           scatterChunk(CHUNK, SEED, new Vector2(0, 0), dense, heights),
-          'granite_pebble'
+          'granite_pebble_01'
         )
       );
     });
@@ -589,7 +589,7 @@ describe('scatterChunk', () => {
       expect(pick!.key).toBe(all.ids![7]);
       expect(pick!.x).toBeCloseTo(target[0], 5);
       expect(pick!.z).toBeCloseTo(target[1], 5);
-      expect(pick!.layer).toBe('granite_pebble');
+      expect(pick!.layer).toBe('granite_pebble_01');
     });
 
     it('finds nothing where the radius reaches nothing', () => {
