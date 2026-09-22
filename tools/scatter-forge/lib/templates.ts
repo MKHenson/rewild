@@ -317,9 +317,12 @@ export function pebbleLayer(params: Params, metrics: ClusterMetrics): ScatterLay
     },
     alignToNormal: 1,
     // Each pebble already beds into the mesh by its own share of its height.
-    // This is the rest: a cluster is posed off one height sample, so its far
-    // side sits a little above or below the ground it covers.
-    yOffset: -round(Math.min(CLUSTER_LIFT, span * 0.05), 3),
+    // This is the rest: a cluster is posed off one height sample and one slope
+    // sample, so its far side sits above or below the ground it covers, and
+    // the wider it is spread the further out that error reaches. Held under a
+    // share of the tallest stone as well, because a cluster sunk by more than
+    // that is a cluster of half-buried stones.
+    yOffset: -round(Math.min(metrics.height * 0.15, span * 0.05), 3),
     footprint: params.footprint > 0 ? params.footprint : round(Math.max(CLUSTER_FOOTPRINT_FLOOR, span * CLUSTER_SPACING), 1),
     castShadow: params.castShadow,
   };

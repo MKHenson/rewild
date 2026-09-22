@@ -165,5 +165,12 @@
     "lods": [
       "nature/pebbles/granite-pebble-snow-01/granite-pebble-snow-01.lod1.glb"
     ]
+  },
+  "sandstone-04": {
+    "type": "gltf",
+    "url": "nature/rocks/sandstone-04/sandstone-04.glb",
+    "lods": [
+      "nature/rocks/sandstone-04/sandstone-04.lod1.glb"
+    ]
   }
 }

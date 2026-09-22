@@ -12,6 +12,7 @@
 // averages one face into a foreign colour.
 
 import { createBuilder, finish, pushVertex, type Builder, type ForgeMesh, type MeshAttributes } from './mesh.ts';
+import { laminaRelief, type LaminaField } from './laminae.ts';
 import { fbm3r, ridged3r, smin, smoothstep, worley3Into, type Worley3Result } from './noise.ts';
 import type { Params } from './params.ts';
 import { beddingFrame, platesInto, type PlateField, type PlateSample } from './plates.ts';
@@ -104,6 +105,16 @@ export interface RockField {
   grooveWidth: number;
   /** The slab pile the relief is mostly made of, or null for noise alone. */
   plates: PlateField | null;
+  /** The bedding stack, or null for a rock that was never laid down in beds. */
+  laminae: LaminaField | null;
+  /**
+   * The same stack read a package at a time: the groups of beds that weather
+   * as one unit. The broad banding, and the only part of the bedding the mesh
+   * can carry.
+   */
+  packages: LaminaField | null;
+  /** Metres a hard package stands proud of a soft one. 0 leaves the beds to the texture. */
+  laminaeRelief: number;
   /** Share of the relief the plates take; the noise has the rest. */
   plateShare: number;
   /** Crack cells per metre. 0 draws none. */
@@ -306,7 +317,13 @@ export function shape(into: Vec3, field: RockField, d: Vec3): Vec3 {
   // Slab tops stand at the full relief and the gaps between them sit at its
   // negative, so a step from gap to top is the whole range.
   const slabs = field.plates ? platesInto(_plate, field.plates, px, py, pz).height * 2 - 1 : 0;
-  const displaced = (noise * (1 - field.plateShare) + slabs * field.plateShare) * field.relief;
+  // The beds ride on top of the relief rather than sharing it out, because
+  // differential weathering is a separate thing from the lumps: a rock can be
+  // smooth and still ribbed. Only beds thicker than a mesh quad show here. A
+  // finer stack is under a quad and stays in the texture, the way a fine
+  // crack does.
+  const beds = field.packages && field.laminaeRelief > 0 ? laminaRelief(field.packages, px, py, pz) * field.laminaeRelief : 0;
+  const displaced = (noise * (1 - field.plateShare) + slabs * field.plateShare) * field.relief + beds;
   const groove = field.groove > 0 ? crackMask(field, px, py, pz, field.grooveWidth) * field.groove : 0;
 
   // Applied along the ray, so an anisotropic rock keeps its relief in
@@ -394,6 +411,55 @@ export function scoopOf(direction: Vec3, size: number, depth: number): Scoop {
 }
 
 /**
+ * Beds per package: how many laminae weather as one unit.
+ *
+ * Bedding reads at two scales, and a rock shows both. Fine laminae are the
+ * layers the sand was laid down in, and they are almost always thinner than a
+ * mesh quad. Packages are the groups of them that share a hardness and so
+ * weather back together, and they are what ribs a face. The mesh takes only
+ * the packages, and the texture takes both.
+ */
+export const LAMINAE_PACKAGE = 8;
+
+/**
+ * One bedding stack, at `step` times the bed size the config asked for.
+ *
+ * Both stacks take the same warp in metres, because a bed and the package it
+ * belongs to are one rock and bend together. A warp scaled to each stack's own
+ * thickness would ripple the laminae inside a package that stayed flat, which
+ * is the one thing bedding never does.
+ */
+function laminaFieldOf(params: Params, frame: number[], step: number, warp: number, salt: number): LaminaField {
+  const size = Math.max(1e-4, params.laminaeSize * step);
+  return {
+    cells: 1 / size,
+    vary: params.laminaeVary,
+    warp,
+    warpScale: 1 / Math.max(1e-4, params.laminaeWarpSize),
+    frame,
+    accentShare: params.laminaeAccentShare,
+    smoothing: params.smoothing,
+    seed: params.seed ^ salt,
+  };
+}
+
+/**
+ * How much of a feature of this size the mesh can carry, 0..1.
+ *
+ * A cube face crosses about a quarter turn of the rock, so a quad spans
+ * `pi/2` of the radius over the subdivisions. Two quads to a band is the least
+ * that samples it at all and four is the least that looks like a band, so
+ * anything finer is faded out rather than sampled into noise on the
+ * silhouette. It is the rule `crackCoarse` and `crackFine` already split on,
+ * applied continuously: a config that asks for hairline beds gets them in the
+ * texture and nothing in the mesh, with no aliasing and no key to remember.
+ */
+export function meshCarries(size: number, radius: number, subdivisions: number): number {
+  const quad = ((Math.PI / 2) * radius) / Math.max(1, subdivisions);
+  return smoothstep(quad * 2, quad * 4, size);
+}
+
+/**
  * The field a config describes. Every random choice comes off the seed, so the
  * mesh, its tiers and its bake all read the same rock.
  */
@@ -406,6 +472,9 @@ export function rockField(params: Params): RockField {
   const radius = (extents[0] + extents[1] + extents[2]) / 3;
   const frame = beddingFrame(rng, BEDDING_TILT);
   const veinFrame = beddingFrame(rng, Math.PI / 2);
+  // Metres the whole bedding stack wanders, measured against a package rather
+  // than a bed, so the number means the same thing however fine the laminae.
+  const laminaeWarp = params.laminaeWarp * params.laminaeSize * LAMINAE_PACKAGE;
 
   const field: RockField = {
     extents,
@@ -430,6 +499,12 @@ export function rockField(params: Params): RockField {
           }
         : null,
     plateShare: params.plates > 0 ? params.plateShare : 0,
+    laminae: params.laminae > 0 ? laminaFieldOf(params, frame, 1, laminaeWarp, 0x6c616d73) : null,
+    packages: params.laminae > 0 ? laminaFieldOf(params, frame, LAMINAE_PACKAGE, laminaeWarp, 0x70616367) : null,
+    laminaeRelief:
+      params.laminae > 0
+        ? params.laminaeRelief * radius * meshCarries(params.laminaeSize * LAMINAE_PACKAGE, radius, params.subdivisions)
+        : 0,
     cracks: params.cracks,
     frame,
     bedding: params.bedding,
