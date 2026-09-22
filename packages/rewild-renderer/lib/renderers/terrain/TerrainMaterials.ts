@@ -273,7 +273,7 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     macroNormalFrom: 'marble_cliff_05',
     heightScale: HEIGHT_SCALE * 1.8,
     macroUvScale: MACRO_UV_SCALE * 2,
-    uvScale: DETAIL_UV_SCALE,
+    uvScale: DETAIL_UV_SCALE * 2,
     roughness: ROUGHNESS * 0.85,
     normalConvention: 'opengl',
   },

@@ -1,4 +1,5 @@
 import { Vector2 } from 'rewild-common';
+import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { TerrainPass } from '../../materials/TerrainPass';
 import { Mesh } from '../../core/Mesh';
 import { Renderer } from '../..';
@@ -334,6 +335,11 @@ export class LODMesh {
         uniforms.layers = getClimateLayerParams(
           resolveClimatePreset(this.climatePreset)
         );
+        // The terrain's UV runs 0..1 across a chunk, so one UV unit is the
+        // chunk's span in metres. The biplanar projection needs that to express
+        // world height in the same units as the horizontal axes.
+        uniforms.uvPerMetre =
+          1 / ((this.chunkSize - 1) * TERRAIN_METERS_PER_SAMPLE);
 
         const newMesh = new Mesh(geometry, terrainPass);
         this.mesh = newMesh;

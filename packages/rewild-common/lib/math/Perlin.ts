@@ -78,6 +78,86 @@ export class Perlin {
     }
   }
 
+  /**
+   * 2D simplex noise and its gradient in one pass.
+   *
+   * The value is exactly `simplex2`'s. The gradient is analytic rather than a
+   * finite difference: a corner contributes `t^4 * (g . p)`, so its derivative
+   * is `t^4 * g - 8 * t^3 * (g . p) * p`, and within a simplex cell the skewed
+   * coordinates move one for one with the input, so the derivative with
+   * respect to the corner offsets is the derivative with respect to `xin` and
+   * `yin`.
+   *
+   * Written into `out` rather than returned, because the caller is a
+   * per-sample terrain loop that must not allocate.
+   */
+  simplex2d(xin: number, yin: number, out: Float64Array): number {
+    const s = (xin + yin) * this.F2;
+    let i = Math.floor(xin + s);
+    let j = Math.floor(yin + s);
+    const t = (i + j) * this.G2;
+    const x0 = xin - i + t;
+    const y0 = yin - j + t;
+
+    let i1: number, j1: number;
+    if (x0 > y0) {
+      i1 = 1;
+      j1 = 0;
+    } else {
+      i1 = 0;
+      j1 = 1;
+    }
+
+    const x1 = x0 - i1 + this.G2;
+    const y1 = y0 - j1 + this.G2;
+    const x2 = x0 - 1 + 2 * this.G2;
+    const y2 = y0 - 1 + 2 * this.G2;
+
+    i &= 255;
+    j &= 255;
+    const g0 = this.gradP[i + this.perm[j]];
+    const g1 = this.gradP[i + i1 + this.perm[j + j1]];
+    const g2 = this.gradP[i + 1 + this.perm[j + 1]];
+
+    let n = 0;
+    let dx = 0;
+    let dy = 0;
+
+    let t0 = 0.5 - x0 * x0 - y0 * y0;
+    if (t0 > 0) {
+      const t0Sq = t0 * t0;
+      const dot = g0.x * x0 + g0.y * y0;
+      n += t0Sq * t0Sq * dot;
+      const w = 8 * t0Sq * t0 * dot;
+      dx += t0Sq * t0Sq * g0.x - w * x0;
+      dy += t0Sq * t0Sq * g0.y - w * y0;
+    }
+
+    let t1 = 0.5 - x1 * x1 - y1 * y1;
+    if (t1 > 0) {
+      const t1Sq = t1 * t1;
+      const dot = g1.x * x1 + g1.y * y1;
+      n += t1Sq * t1Sq * dot;
+      const w = 8 * t1Sq * t1 * dot;
+      dx += t1Sq * t1Sq * g1.x - w * x1;
+      dy += t1Sq * t1Sq * g1.y - w * y1;
+    }
+
+    let t2 = 0.5 - x2 * x2 - y2 * y2;
+    if (t2 > 0) {
+      const t2Sq = t2 * t2;
+      const dot = g2.x * x2 + g2.y * y2;
+      n += t2Sq * t2Sq * dot;
+      const w = 8 * t2Sq * t2 * dot;
+      dx += t2Sq * t2Sq * g2.x - w * x2;
+      dy += t2Sq * t2Sq * g2.y - w * y2;
+    }
+
+    out[0] = 70 * dx;
+    out[1] = 70 * dy;
+    return 70 * n;
+  }
+
   simplex2(xin: number, yin: number): number {
     let n0: number, n1: number, n2: number; // Noise contributions from the three corners
     // Skew the input space to determine which simplex cell we're in

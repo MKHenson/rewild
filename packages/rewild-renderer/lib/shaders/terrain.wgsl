@@ -1,3 +1,11 @@
+// Where the side projection starts and finishes taking over, as 1 - |ny| —
+// which is 1 - cos(slope), so these are 45 and 72 degrees. Below the first,
+// nothing but the planar projection is sampled and a fragment costs exactly
+// what it always did; above the second, the planar tap is skipped instead. Only
+// the band between them pays for both.
+const BIPLANAR_START: f32 = 0.293;
+const BIPLANAR_END: f32 = 0.69;
+
 // Never foliage, but the shared shadow include branches on this to take a
 // cheaper tap for grass and leaves. A literal rather than a define: these
 // materials have no foliage mode to plumb.
@@ -76,6 +84,10 @@ struct TerrainParams {
   // of the winning score contribute: small ⇒ a hard interlocking silhouette
   // (just the tallest material shows), large ⇒ softens toward a plain crossfade.
   heightBlendDepth: f32,
+  // UV units per world metre. The biplanar projection puts world height into
+  // the same units the horizontal axes use, so a layer's uvScale tiles a cliff
+  // at the rate it tiles the ground. 0 disables the side projection.
+  uvPerMetre      : f32,
   // Packed TerrainLayer, three vec4f per splat channel (SPLAT_SLOTS channels):
   //   [slot*3    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
   //   [slot*3 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
@@ -99,6 +111,11 @@ struct VertexOutput {
   @location(0) fragUV : vec2f,
   @location(1) normal : vec3f,
   @location(2) viewPosition : vec3f,
+  // Object space, which for a terrain chunk is world space up to a translation:
+  // chunks are axis-aligned and never rotated. The biplanar projection needs the
+  // world normal to choose a side plane, and world height for its vertical axis.
+  @location(3) objectNormal : vec3f,
+  @location(4) objectHeight : f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
@@ -317,6 +334,8 @@ fn vs(input: VertexInput) -> VertexOutput {
   output.viewPosition = mvPosition.xyz;
   output.fragUV = input.uv;
   output.normal = uniforms.normalMatrix * input.normal;
+  output.objectNormal = input.normal;
+  output.objectHeight = input.position.y;
   return output;
 }
 
@@ -324,7 +343,9 @@ fn vs(input: VertexInput) -> VertexOutput {
 fn fs(
   @location(0) fragUV: vec2f,
   @location(1) normal: vec3f,
-  @location(2) viewPosition: vec3f
+  @location(2) viewPosition: vec3f,
+  @location(3) objectNormal: vec3f,
+  @location(4) objectHeight: f32
 ) -> @location(0) vec4f {
   // --- Uniform control flow: everything needing implicit derivatives ---------
   //
@@ -401,6 +422,59 @@ fn fs(
     dot(parallaxViewDir, parallaxB),
     dot(parallaxViewDir, parallaxN)
   );
+
+  // ── Biplanar projection ────────────────────────────────────────────────────
+  //
+  // The terrain's UV is an affine map of world XZ, so a face at slope theta has
+  // its texels stretched by 1/cos(theta): 1.4x at 45 degrees, 5.8x at 80, 19x at
+  // 87. Nothing was ever steep enough for that to show until the terrain grew
+  // terrace risers, and on a vertical face it is worse than stretching — the UV
+  // does not change at all going up the face, so the texture runs in stripes.
+  //
+  // The fix is to sample a second projection whose axes lie *in* the face. A
+  // general surface needs three planes; a heightfield needs two, because its
+  // normal never points downward (see MeshGenerator, where ny is a positive
+  // constant), so one of the three is unreachable and the remaining choice is
+  // only which of the two side planes to use.
+  let nWorld = normalize(objectNormal);
+  let sideWeight = select(
+    smoothstep(BIPLANAR_START, BIPLANAR_END, 1.0 - abs(nWorld.y)),
+    0.0,
+    terrainParams.uvPerMetre <= 0.0
+  );
+
+  // Which side plane: the face runs along whichever horizontal axis its normal
+  // is *least* aligned with. U takes that axis from the existing UV, so the two
+  // projections share their horizontal tiling and agree where they cross over.
+  let useZAxis = abs(nWorld.x) > abs(nWorld.z);
+  let heightUV = objectHeight * terrainParams.uvPerMetre;
+  let sideUV = vec2f(select(fragUV.x, fragUV.y, useZAxis), heightUV);
+  // Selected from derivatives already taken, never differentiated *after* the
+  // select: the choice flips where |nx| equals |nz|, and a derivative across
+  // that flip is a spike that picks a mip from nowhere.
+  let dhdx = dpdx(heightUV);
+  let dhdy = dpdy(heightUV);
+  let sideDuvdx = vec2f(select(duvdx.x, duvdx.y, useZAxis), dhdx);
+  let sideDuvdy = vec2f(select(duvdy.x, duvdy.y, useZAxis), dhdy);
+
+  // The side frame's own tangent, carried into view space and squared up
+  // against the surface normal. A normal map is read in the frame of the UV
+  // that sampled it, so a side-projected normal has to be turned into the
+  // planar frame the lighting below works in, or a cliff lights as though its
+  // bumps ran sideways. Both frames share N, so the difference is one rotation
+  // about it, and these two dot products are its cosine and sine.
+  let sideAxisWorld = select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 0.0, -1.0), useZAxis);
+  var sideTRaw = uniforms.normalMatrix * sideAxisWorld;
+  sideTRaw = sideTRaw - parallaxN * dot(parallaxN, sideTRaw);
+  // Degenerate only where the chosen axis is the normal, which the choice above
+  // already avoids; this keeps it finite on a skirt face regardless.
+  let sideT = select(
+    parallaxT,
+    normalize(sideTRaw),
+    dot(sideTRaw, sideTRaw) > 1e-6
+  );
+  let sideCos = dot(parallaxT, sideT);
+  let sideSin = dot(parallaxB, sideT);
 
   // Per-layer results, combined *after* the loop by a height-aware blend rather
   // than a straight splat-weighted sum. Gathering first is what lets the blend
@@ -487,7 +561,19 @@ fn fs(
     // each tap marches its own height volume; the blend then mixes two self-
     // consistent parallax samples. detailFade fades the volume depth to zero at
     // range, where the relief has mipped away and the march would only alias.
-    let amplitude = layer.heightScale * detailFade;
+    // Faded out as the side projection takes over. The march is at its most
+    // expensive on a steep face — its step count rises toward grazing — and its
+    // result is about to be mixed away, so this is where the second projection
+    // pays for itself: `parallaxOcclusion` skips the whole loop under 1e-4.
+    let amplitude = layer.heightScale * detailFade * (1.0 - sideWeight);
+
+    // Where the side projection has taken over completely, the planar tap is
+    // mixed away whatever it holds, so its second no-tile sample is bought and
+    // thrown out. Dropping it collapses the blend the way the cheap tier does:
+    // blendFactor stays 0 and every mix below returns its A operand. With the
+    // march already off above, a vertical face now costs *less* than it did
+    // before this projection existed.
+    let wantsNoTile = HAS_TERRAIN_NO_TILE && sideWeight < 1.0;
     let resA = parallaxOcclusion(scaledUV + offa, arrayIndex, ddx, ddy, viewTS, amplitude);
     let sa = resA.xy;
     // Seeded from A so a single tap makes every mix below a no-op, whatever
@@ -506,7 +592,7 @@ fn fs(
     var sb = sa;
     var colb = cola;
     var blendFactor = 0.0;
-    if (HAS_TERRAIN_NO_TILE) {
+    if (wantsNoTile) {
       let resB = parallaxOcclusion(scaledUV + offb, arrayIndex, ddx, ddy, viewTS, amplitude);
       sb = resB.xy;
       colb = textureSampleGrad(albedoArray, seamlessSampler, sb, arrayIndex, ddx, ddy).rgb;
@@ -528,6 +614,51 @@ fn fs(
     // actually shown (the POM march returned it in .z for free).
     let layerHeight = mix(resA.z, layerHeightB, blendFactor);
 
+    // ── The side projection ───────────────────────────────────────────────
+    //
+    // No parallax march: its step count rises toward grazing, which is exactly
+    // how a riser is seen, and the result would be mixed away regardless.
+    //
+    // It does take the no-tile blend. A terrace face runs tens of metres tall
+    // and hundreds wide, so the repeat of a 1K texture across it is as plain as
+    // on open ground, and plainer, because a cliff is one flat plane with
+    // nothing to break the grid up. It needs its own region field rather than
+    // the planar one's: that field is sampled off the UV it belongs to, so
+    // reusing the planar one would carry the ground's region boundaries onto
+    // the face.
+    let sideScaled = sideUV * layer.uvScale;
+    let sideDdx = sideDuvdx * layer.uvScale;
+    let sideDdy = sideDuvdy * layer.uvScale;
+    var sideUvA = sideScaled;
+    var sideUvB = sideScaled;
+    var sideBlend = 0.0;
+    var finalColor = layerColor;
+
+    if (sideWeight > 0.0) {
+      let sideK = textureSampleGrad(
+        noiseTexture,
+        seamlessSampler,
+        sideScaled * terrainParams.noiseScale,
+        sideDdx * terrainParams.noiseScale,
+        sideDdy * terrainParams.noiseScale
+      ).x;
+      let sideI = floor(sideK * 8.0);
+      let sideF = fract(sideK * 8.0);
+      sideUvA = sideScaled + sin(vec2f(3.0, 7.0) * (sideI + 0.0));
+      sideUvB = sideUvA;
+
+      let sideColA = textureSampleGrad(albedoArray, seamlessSampler, sideUvA, arrayIndex, sideDdx, sideDdy).rgb;
+      var sideColB = sideColA;
+      if (HAS_TERRAIN_NO_TILE) {
+        sideUvB = sideScaled + sin(vec2f(3.0, 7.0) * (sideI + 1.0));
+        sideColB = textureSampleGrad(albedoArray, seamlessSampler, sideUvB, arrayIndex, sideDdx, sideDdy).rgb;
+        sideBlend = smoothstep(
+          0.2, 0.8, sideF - 0.1 * dot(sideColA - sideColB, vec3f(1.0, 1.0, 1.0))
+        );
+      }
+      finalColor = mix(layerColor, mix(sideColA, sideColB, sideBlend), sideWeight);
+    }
+
     // Skipped only where the crossfade below would discard it anyway: past the
     // fade, detailFade is 0 and the macro normal stands alone. A layer with no
     // macro normal has no stand-in — its fallback is a flat tangent normal,
@@ -538,7 +669,7 @@ fn fs(
     if (wantsDetailNormal) {
       let nrmA = textureSampleGrad(normalArray, seamlessSampler, sa, arrayIndex, ddx, ddy).rgb;
       var nrmB = nrmA;
-      if (HAS_TERRAIN_NO_TILE) {
+      if (wantsNoTile) {
         nrmB = textureSampleGrad(normalArray, seamlessSampler, sb, arrayIndex, ddx, ddy).rgb;
       }
       // Plain lerp for the same reason as the albedo above: rescaling the blended
@@ -548,6 +679,29 @@ fn fs(
       detailNormal = normalize(
         decodeNormal(mix(nrmA, nrmB, blendFactor), layer.normalYSign)
       );
+
+      // The side normal joins the *detail*, before the macro crossfade below,
+      // rather than after it. Mixed in afterwards it survives past the distance
+      // the detail was meant to have handed over at, so the fragment where
+      // `wantsDetailNormal` turns off drops from full side relief to bare macro
+      // in one step — a hard line across a cliff at exactly detailFadeEnd.
+      // Folded in here it fades out with everything else it belongs to.
+      if (sideWeight > 0.0) {
+        let sideNrmA = textureSampleGrad(normalArray, seamlessSampler, sideUvA, arrayIndex, sideDdx, sideDdy).rgb;
+        var sideNrmB = sideNrmA;
+        if (HAS_TERRAIN_NO_TILE) {
+          sideNrmB = textureSampleGrad(normalArray, seamlessSampler, sideUvB, arrayIndex, sideDdx, sideDdy).rgb;
+        }
+        let sideRaw = decodeNormal(mix(sideNrmA, sideNrmB, sideBlend), layer.normalYSign);
+        // Turned from the side frame into the planar one by the rotation about
+        // the shared normal, so its bumps tilt the way the face runs.
+        let sideNormal = normalize(vec3f(
+          sideRaw.x * sideCos - sideRaw.y * sideSin,
+          sideRaw.x * sideSin + sideRaw.y * sideCos,
+          sideRaw.z
+        ));
+        detailNormal = normalize(mix(detailNormal, sideNormal, sideWeight));
+      }
     }
 
     // Materials with no macro normal keep their detail normal at every
@@ -569,9 +723,16 @@ fn fs(
       // choice is free. Its ySign travels with the borrowed map, not this
       // material, or the macro relief inverts against the detail relief.
       let macroIndex = i32(layer.macroLayerIndex);
-      let macroUV = fragUV * layer.macroUvScale;
-      let macroDdx = duvdx * layer.macroUvScale;
-      let macroDdy = duvdy * layer.macroUvScale;
+      // The macro normal takes the side projection as well. Leaving it planar
+      // is only invisible while the detail beside it is planar too: once the
+      // detail is projected correctly, the distance at which the macro takes
+      // over becomes a line with correct relief on one side and stretched
+      // relief on the other, which reads as a hard edge across a cliff that was
+      // never there before.
+      let macroPlanarUV = fragUV * layer.macroUvScale;
+      let macroUV = mix(macroPlanarUV, sideUV * layer.macroUvScale, sideWeight);
+      let macroDdx = mix(duvdx, sideDuvdx, sideWeight) * layer.macroUvScale;
+      let macroDdy = mix(duvdy, sideDuvdy, sideWeight) * layer.macroUvScale;
       // Toward flat, before normalizing: macroStrength is an amplitude on the
       // map's tilt, and scaling a decoded normal's xy while z holds is exactly
       // that. Applied here so the crossfade below still interpolates a unit
@@ -582,8 +743,15 @@ fn fs(
         ).rgb,
         layer.macroNormalYSign
       );
+      // Turned into the planar frame by the same rotation the detail normal
+      // takes, in proportion to how far the UV was rotated with it.
+      let macroTurned = vec3f(
+        mix(macroRaw.x, macroRaw.x * sideCos - macroRaw.y * sideSin, sideWeight),
+        mix(macroRaw.y, macroRaw.x * sideSin + macroRaw.y * sideCos, sideWeight),
+        macroRaw.z
+      );
       let macroNormal = normalize(
-        vec3f(macroRaw.xy * layer.macroStrength, macroRaw.z)
+        vec3f(macroTurned.xy * layer.macroStrength, macroTurned.z)
       );
 
       // Crossfade, not a sum: the macro *stands in for* the detail at range, so
@@ -618,20 +786,32 @@ fn fs(
     // channel that is unauthored in most of these textures.
     let armA = textureSampleGrad(armArray, seamlessSampler, sa, arrayIndex, ddx, ddy);
     var armB = armA;
-    if (HAS_TERRAIN_NO_TILE) {
+    if (wantsNoTile) {
       armB = textureSampleGrad(armArray, seamlessSampler, sb, arrayIndex, ddx, ddy);
     }
     let arm = mix(armA, armB, blendFactor);
 
-    layerColors[layerSlot] = layerColor;
+    // The ARM map takes the side projection through the same region blend the
+    // albedo did, so occlusion and roughness track the texture actually shown.
+    var finalArm = arm;
+    if (sideWeight > 0.0) {
+      let sideArmA = textureSampleGrad(armArray, seamlessSampler, sideUvA, arrayIndex, sideDdx, sideDdy);
+      var sideArmB = sideArmA;
+      if (HAS_TERRAIN_NO_TILE) {
+        sideArmB = textureSampleGrad(armArray, seamlessSampler, sideUvB, arrayIndex, sideDdx, sideDdy);
+      }
+      finalArm = mix(arm, mix(sideArmA, sideArmB, sideBlend), sideWeight);
+    }
+
+    layerColors[layerSlot] = finalColor;
     layerNormals[layerSlot] = layerNormal;
     // glTF's roughnessFactor: the map is the detail, the material scalar is its
     // overall character. Clamped because a factor above 1 can push a already-
     // rough texel past the valid range.
-    layerRoughness[layerSlot] = clamp(arm.g * layer.roughnessFactor, 0.0, 1.0);
+    layerRoughness[layerSlot] = clamp(finalArm.g * layer.roughnessFactor, 0.0, 1.0);
     // glTF's occlusionTexture.strength, which lerps the map toward "unoccluded"
     // rather than scaling it — 0 ignores the map, 1 applies it in full.
-    layerOcclusion[layerSlot] = 1.0 + layer.occlusionStrength * (arm.r - 1.0);
+    layerOcclusion[layerSlot] = 1.0 + layer.occlusionStrength * (finalArm.r - 1.0);
     // Height carves the boundary: a texel standing above its map's midpoint
     // (a rock bump) lifts the score, below it (a crevice) drops it, so the
     // taller layer shows through where it actually protrudes rather than by a
