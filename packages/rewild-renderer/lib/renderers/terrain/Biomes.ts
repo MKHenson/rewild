@@ -752,9 +752,10 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
     scale: 3000 / TERRAIN_METERS_PER_SAMPLE,
     seedSalt: 7919,
     cuts: [0.4, 0.7],
-    // Wide enough that the ClimateField domain warp can wander the border
-    // without compressing it into a height cliff.
-    blendHalfWidth: 0.1,
+    // A mountain loses ~300m of relief across this band, so a narrow one reads
+    // as a cliff and a hard material line. Capped below 0.15 by the 0.3 gap
+    // between the cuts.
+    blendHalfWidth: 0.14,
   },
   moisture: {
     scale: 2400 / TERRAIN_METERS_PER_SAMPLE,
