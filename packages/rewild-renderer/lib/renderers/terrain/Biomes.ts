@@ -420,7 +420,16 @@ export const DESERT_MOUNTAIN: BiomeParams = {
       height: { from: 420, to: 0 },
       slope: { from: 0, to: 18 },
     },
-    { layer: 'sandstone_cobbles_01', density: 0.34, slope: { from: 50, to: 20 } },
+    {
+      layer: 'sandstone_cobbles_01',
+      density: 0.34,
+      slope: { from: 50, to: 20 },
+    },
+    {
+      layer: 'sandstone_04',
+      density: 0.14,
+      slope: { from: 40, to: 15 },
+    },
   ],
 };
 
@@ -491,7 +500,17 @@ export const DESERT: BiomeParams = {
       height: { from: 55, to: 12 },
       noise: { scale: 340, seedSalt: 67, band: { from: 0.62, to: 0.85 } },
     },
-    { layer: 'sandstone_cobbles_01', density: 0.18, slope: { from: 30, to: 8 } },
+    {
+      layer: 'sandstone_cobbles_01',
+      density: 0.18,
+      slope: { from: 30, to: 8 },
+    },
+    // Sparse on the flats, where the dunes leave anything standing.
+    {
+      layer: 'sandstone_04',
+      density: 0.04,
+      slope: { from: 40, to: 15 },
+    },
   ],
 };
 
@@ -539,10 +558,16 @@ export const BEACH_SAND: BiomeParams = {
   // Shingle in the damp hollows, on the same height split the two sands use.
   scatter: [
     {
-      layer: 'granite_pebble_01',
+      layer: 'sandstone_cobbles_01',
       density: 0.12,
       height: { from: 40, to: 4 },
       noise: { scale: 180, seedSalt: 79, band: { from: 0.48, to: 0.72 } },
+    },
+    // The odd stack the sea left behind, on the flats above the tide.
+    {
+      layer: 'sandstone_04',
+      density: 0.05,
+      slope: { from: 40, to: 15 },
     },
   ],
 };

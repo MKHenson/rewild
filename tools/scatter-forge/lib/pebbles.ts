@@ -63,9 +63,10 @@ function sizesOf(count: number, smallest: number): number[] {
 const sized = (value: number, scale: number): number => (value > 0 ? value * scale : 0);
 
 /**
- * How far a pebble may sit inside its neighbour's reach. A little overlap at
- * the base is what nestling looks like: two stones that touch the ground
- * beside each other and lean together, rather than two discs set apart.
+ * How far a pebble may sit inside its neighbour's reach at `pebbleSpacing` 1. A
+ * little overlap at the base is what nestling looks like: two stones that touch
+ * the ground beside each other and lean together, rather than two discs set
+ * apart.
  */
 const NESTLE = 0.12;
 
@@ -76,25 +77,36 @@ const COVERAGE = 0.55;
 const TRIES = 24;
 
 /**
+ * Centre to centre distance between two touching pebbles, as a multiple of
+ * their reaches. 1 is nestled, and every step above it is that much clear
+ * ground between the stones.
+ */
+function gapOf(params: Params): number {
+  return (1 - NESTLE) * Math.max(0.5, params.pebbleSpacing);
+}
+
+/**
  * Metres the pebble bases are spread over: what the config says, else enough
  * ground for the pebbles asked for.
  *
  * Derived from the area they cover rather than from a count, so raising
  * `pebblesPerModel` spreads the cluster instead of packing it tighter. A
- * cluster that packs tighter as it grows reads as one lump of gravel.
+ * cluster that packs tighter as it grows reads as one lump of gravel. The
+ * spacing goes in as an area, because holding a stone twice as far from its
+ * neighbour needs four times the ground.
  */
 export function clusterRadiusOf(params: Params, reaches: number[]): number {
   if (params.clusterRadius > 0) return params.clusterRadius;
   const area = reaches.reduce((sum, reach) => sum + reach * reach, 0);
-  return Math.sqrt(area / COVERAGE);
+  return Math.sqrt(area / COVERAGE) * Math.max(0.5, params.pebbleSpacing);
 }
 
 /** Whether a placement clears every pebble already down. */
-function clears(placed: Pebble[], x: number, z: number, reach: number): boolean {
+function clears(placed: Pebble[], x: number, z: number, reach: number, gap: number): boolean {
   return placed.every((pebble) => {
     const dx = x - pebble.origin[0];
     const dz = z - pebble.origin[2];
-    return Math.hypot(dx, dz) >= (reach + pebble.reach) * (1 - NESTLE);
+    return Math.hypot(dx, dz) >= (reach + pebble.reach) * gap;
   });
 }
 
@@ -106,14 +118,14 @@ function clears(placed: Pebble[], x: number, z: number, reach: number): boolean 
  * place is taken, so a dense cluster still finds ground for every stone rather
  * than dropping the last few.
  */
-function placeOf(rng: Rng, placed: Pebble[], reach: number, radius: number): [number, number] {
+function placeOf(rng: Rng, placed: Pebble[], reach: number, radius: number, gap: number): [number, number] {
   for (let attempt = 0; attempt < TRIES; attempt++) {
     const host = placed[Math.floor(rng() * placed.length)];
     const angle = rng.range(0, Math.PI * 2);
-    const away = (host.reach + reach) * (1 - NESTLE) * rng.range(1, 1.15);
+    const away = (host.reach + reach) * gap * rng.range(1, 1.15);
     const x = host.origin[0] + Math.cos(angle) * away;
     const z = host.origin[2] + Math.sin(angle) * away;
-    if (Math.hypot(x, z) <= radius && clears(placed, x, z, reach)) return [x, z];
+    if (Math.hypot(x, z) <= radius && clears(placed, x, z, reach, gap)) return [x, z];
   }
 
   // Nowhere against a neighbour. Fall back to the open disc, widening it until
@@ -124,11 +136,26 @@ function placeOf(rng: Rng, placed: Pebble[], reach: number, radius: number): [nu
     const away = Math.sqrt(rng()) * spread;
     const x = Math.cos(angle) * away;
     const z = Math.sin(angle) * away;
-    if (clears(placed, x, z, reach)) return [x, z];
+    if (clears(placed, x, z, reach, gap)) return [x, z];
   }
 
   return [0, 0];
 }
+
+/**
+ * Metres of cluster span past which one terrain sample no longer poses it.
+ *
+ * A cluster is placed on one height and one slope reading, so its far side
+ * sits above or below the ground it covers by more the wider it is spread.
+ *
+ * Two terrain samples, which are 2m apart. The shipped grass patches run to
+ * 4.4m and read well, but grass hides its own base and bends on contact, and a
+ * stone does neither: one floating five centimetres shows daylight under it.
+ * So this sits at the samples rather than at what the patches get away with.
+ * Past it, the way to thinner gravel is a longer `footprint` or a lower biome
+ * density, never a wider cluster.
+ */
+export const CLUSTER_SPAN_LIMIT = 4;
 
 /** How far a pebble beds into the ground, as a fraction of its own height. */
 const PEBBLE_SINK = 0.16;
@@ -163,11 +190,12 @@ export function packPebbles(params: Params): Pebble[] {
   // extents by about what the noise displaces.
   const reaches = fields.map((field) => Math.max(field.extents[0], field.extents[2]) + field.relief);
   const radius = clusterRadiusOf(params, reaches);
+  const gap = gapOf(params);
   const placed: Pebble[] = [];
 
   fields.forEach((field, index) => {
     const reach = reaches[index];
-    const [x, z] = placed.length === 0 ? [0, 0] : placeOf(rng, placed, reach, radius);
+    const [x, z] = placed.length === 0 ? [0, 0] : placeOf(rng, placed, reach, radius, gap);
     placed.push({ field, origin: [x, -field.extents[1] * 2 * PEBBLE_SINK, z], reach });
   });
 
