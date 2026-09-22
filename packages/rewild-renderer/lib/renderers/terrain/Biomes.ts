@@ -537,7 +537,7 @@ export const DESERT_MOUNTAIN: BiomeParams = {
       persistence: 0.42,
       lacunarity: 2.2,
       steps: 7,
-      sharpness: 0.9,
+      sharpness: 0.7,
       curveExp: 1.45,
       seedSalt: 0,
     },
