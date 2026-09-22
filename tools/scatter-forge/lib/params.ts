@@ -43,17 +43,19 @@ interface ParamSpec {
 const TREE = ['tree'] as const;
 const CLUMP = ['clump'] as const;
 const CROWN = ['crown'] as const;
-const ROCK = ['rock'] as const;
+const PEBBLE = ['pebble'] as const;
+/** The types grown from a 3D field: one stone, or a cluster of them. */
+const STONE = ['rock', 'pebble'] as const;
 /** The types that grow a bark tube. */
 const WOODY = ['tree', 'crown'] as const;
 /** The types whose cutout is a segmented card. */
 const CARDED = ['clump', 'crown'] as const;
 /** The types whose `height` is a finished height. A crown is two lengths instead. */
-const SIZED = ['tree', 'clump', 'rock'] as const;
+const SIZED = ['tree', 'clump', 'rock', 'pebble'] as const;
 /** The types that ship a cutout piece, and so read the wind and the foliage keys. */
 const LEAFY = ['tree', 'clump', 'crown'] as const;
 /** The types that coarsen with distance rather than culling. */
-const TIERED = ['tree', 'crown', 'rock'] as const;
+const TIERED = ['tree', 'crown', 'rock', 'pebble'] as const;
 
 /**
  * One coarser mesh tier. The skeleton is the model's own, so the silhouette
@@ -163,7 +165,12 @@ export const PARAM_SPEC = {
   out: {
     type: 'string',
     default: 'assets/shared/nature/trees',
-    byType: { clump: 'assets/shared/nature/clumps', crown: 'assets/shared/nature/crowns', rock: 'assets/shared/nature/rocks' },
+    byType: {
+      clump: 'assets/shared/nature/clumps',
+      crown: 'assets/shared/nature/crowns',
+      rock: 'assets/shared/nature/rocks',
+      pebble: 'assets/shared/nature/pebbles',
+    },
     help: 'Directory the model and textures are written to.',
   },
   assetsRoot: { type: 'string', default: 'assets/shared', help: 'Root the template urls are made relative to.' },
@@ -172,10 +179,10 @@ export const PARAM_SPEC = {
   height: {
     type: 'number',
     default: 12,
-    byType: { clump: 0.35, rock: 1.2 },
-    help: 'Finished height in metres. A tree normalises its skeleton to it; a clump sizes its cards to reach it; a rock is this tall before its relief.',
+    byType: { clump: 0.35, rock: 1.2, pebble: 0.3 },
+    help: 'Finished height in metres. A tree normalises its skeleton to it; a clump sizes its cards to reach it; a rock is this tall before its relief, and so is the largest pebble of a cluster.',
     // A rock's image is baked off its surface, so its size is in the image.
-    texture: ROCK,
+    texture: STONE,
     types: SIZED,
   },
   trunkRadius: { type: 'number', default: 0.32, byType: { crown: 0.22 }, help: 'Trunk radius at the base, in metres.', types: WOODY },
@@ -244,61 +251,65 @@ export const PARAM_SPEC = {
   frondVariance: { type: 'number', default: 20, help: 'Random degrees added to each frond angle: the spread between young fronds standing up and old ones hanging.', types: CROWN },
   frondSpan: { type: 'number', default: 0, help: 'Fraction of the stem, down from its top, the fronds attach along. 0 puts every frond at the top; the lowest hang most.', types: CROWN },
 
-  width: { type: 'number', default: 0, help: 'Metres across the rock along x, before its relief. 0 derives it from height.', texture: true, types: ROCK },
-  depth: { type: 'number', default: 0, help: 'Metres across the rock along z, before its relief. 0 derives it from height.', texture: true, types: ROCK },
-  scoops: { type: 'int', default: 9, help: 'Spheres scooped out of the rock. Each cuts a concave face, and the faces meet at rounded ridges. 0 is an egg.', texture: true, types: ROCK },
-  scoopSize: { type: 'number', default: 0.8, help: 'How broad a scoop is, 0.3..0.97, as its radius over its distance from the centre. Near 1 is a broad shallow face like a plane; near 0.5 a tight bite.', texture: true, types: ROCK },
-  scoopDepth: { type: 'number', default: 0.35, help: 'How deep the deepest scoop reaches in, as a fraction of the radius, 0..0.6. Each scoop takes 0.35..1 of it.', texture: true, types: ROCK },
-  relief: { type: 'number', default: 0.1, help: 'Depth of the surface noise as a fraction of the radius.', texture: true, types: ROCK },
-  reliefSize: { type: 'number', default: 0.9, help: 'Metres across the largest lump of the surface noise. Each octave above it is half the size.', texture: true, types: ROCK },
-  reliefOctaves: { type: 'int', default: 5, help: 'Octaves of surface noise under reliefSize. More is finer detail at lower amplitude.', texture: true, types: ROCK },
-  plates: { type: 'number', default: 2, help: 'Slab cells per metre in the pile the relief is built from. 0 builds it from noise alone.', texture: true, types: ROCK },
-  plateLayers: { type: 'int', default: 2, help: 'Layers of slabs, each 1.7x finer than the last, chipping the ones below.', texture: true, types: ROCK },
-  plateBevel: { type: 'number', default: 0.35, help: 'Fraction of a slab that slopes to its edge, 0..1. Low is flat-topped and sharp; 1 is a pyramid.', texture: true, types: ROCK },
-  plateLean: { type: 'number', default: 0.3, help: 'How far a slab drops across its own width, 0..1 of its height.', texture: true, types: ROCK },
-  bedding: { type: 'number', default: 0.6, help: 'How far the slabs are flattened and aligned into strata, 0..1. 0 is a random rubble of blocks.', texture: true, types: ROCK },
-  plateShare: { type: 'number', default: 0.7, help: 'Share of the relief the slabs take, 0..1. The noise has the rest.', texture: true, types: ROCK },
-  plateTint: { type: 'number', default: 0.25, help: 'How far each slab shifts the tone by its own value, 0..1.', texture: true, types: ROCK },
-  smoothing: { type: 'number', default: 0.5, help: 'How far the creases of the field are rounded, 0..1: the ridges between scoops, the slab edges and joins, the creases of the ridged noise. 0 is knife-edged; 1 is about a tenth smaller, because rounding only pulls the surface in.', texture: true, types: ROCK },
-  cracks: { type: 'number', default: 1.2, help: 'Crack cells per metre. 0 draws none.', texture: true, types: ROCK },
-  crackStrength: { type: 'number', default: 1, help: 'How strongly the texture draws the cracks, 0..1. 0 draws none and keeps the grooves; cracks 0 removes both.', texture: true, types: ROCK },
-  grooveDepth: { type: 'number', default: 0.05, help: 'How deep the coarse cracks cut into the mesh, as a fraction of the radius.', texture: true, types: ROCK },
-  grooveWidth: { type: 'number', default: 0.15, help: 'Width of that groove as a fraction of a crack cell. The texture crack sits at its bottom.', texture: true, types: ROCK },
-  weathering: { type: 'number', default: 0.6, help: 'How far exposure goes, 0..1: lichen, dirt in the hollows, drip stains and soil up the base.', texture: true, types: ROCK },
-  patina: { type: 'number', default: 0.5, help: 'The dark crust old stone grows where water sits or runs, 0..1: on the tops, in the hollows, beside the cracks, under the drip lines and around the lichen, never on a worn edge.', texture: true, types: ROCK },
-  edgeWear: { type: 'number', default: 0.5, help: 'How far the convex edges are weathered, 0..1: bleached toward edgeTint, smoother, and kept clear of stain, patina and lichen.', texture: true, types: ROCK },
-  streaks: { type: 'number', default: 0, help: 'Opacity of the run-off streaks down the sides, 0..1: droplet trails from a splat, full colour at the head and thinning and fading as they fall, branching into the cracks. Colour and finish only, never height.', texture: true, types: ROCK },
-  streakCount: { type: 'int', default: 12, help: 'Streaks around the rock, 0..100, spaced unevenly, each at its own height, run and fade.', texture: true, types: ROCK },
-  snow: { type: 'number', default: 0, help: 'Snow on the faces that look up, 0..1. 0 is none; 0.5 the tops; 1 everything but the sides and the edges.', texture: true, types: ROCK },
-  topWash: { type: 'number', default: 0, help: 'How far down the faces that look up the topTint wash reaches, 0..1, on the same scale as snow. 0 is none.', texture: true, types: ROCK },
-  topOpacity: { type: 'number', default: 1, help: 'How strongly the wash multiplies the stone it reaches, 0..1. Part of the base colour: the glint, the veins, the stain and the growth are never tinted by it.', texture: true, types: ROCK },
-  stain: { type: 'number', default: 0.5, help: 'How strongly iron staining is drawn, 0..1: rust seeping from the cracks and in bands down the bedding.', texture: true, types: ROCK },
-  veins: { type: 'number', default: 0.15, help: 'How much of the stone the quartz veins run through, 0..1. 0 draws none.', texture: true, types: ROCK },
-  stoneTint: { type: 'string', default: '#7f827c', help: 'The mid tone of the stone, six digit hex.', texture: true, types: ROCK },
-  stoneDark: { type: 'string', default: '#3e403e', help: 'The dark end of the stone and its dark minerals, six digit hex.', texture: true, types: ROCK },
-  stoneLight: { type: 'string', default: '#b3b5ae', help: 'The light end of the stone, its light minerals and its veins, six digit hex.', texture: true, types: ROCK },
-  lichenTint: { type: 'string', default: '#a7b094', help: 'The crustose lichen discs on the exposed faces, six digit hex.', texture: true, types: ROCK },
-  soilTint: { type: 'string', default: '#4f4a36', help: 'Dirt in the hollows and soil up the base, six digit hex.', texture: true, types: ROCK },
-  stainTint: { type: 'string', default: '#8a5a2e', help: 'The iron staining, six digit hex.', texture: true, types: ROCK },
-  streakTint: { type: 'string', default: '#2a2d28', help: 'What the run-off leaves, six digit hex. Near black is mould and algae; white is bird droppings.', texture: true, types: ROCK },
-  topTint: { type: 'string', default: '#808080', help: 'What the faces that look up are multiplied by, six digit hex read with #808080 as no change: lighter lifts them, darker shades them, and a hue warms or cools them.', texture: true, types: ROCK },
-  edgeTint: { type: 'string', default: '#c6c3ba', help: 'The bleached colour a worn edge weathers to, six digit hex.', texture: true, types: ROCK },
-  toneSize: { type: 'number', default: 0.25, help: 'Metres across the largest patch of the tone mottling, the octave stack the colour is ramped from.', texture: true, types: ROCK },
-  toneOctaves: { type: 'int', default: 5, help: 'Octaves of tone mottling under toneSize.', texture: true, types: ROCK },
-  toneContrast: { type: 'number', default: 0.45, help: 'How far the tone reaches from stoneTint toward stoneDark and stoneLight, 0..1.', texture: true, types: ROCK },
-  grainScale: { type: 'number', default: 110, help: 'Mineral crystals per metre: the size of the grain.', texture: true, types: ROCK },
-  speckle: { type: 'number', default: 0.6, help: 'How strongly the mineral grain is drawn, 0..1. 0 draws none.', texture: true, types: ROCK },
-  bump: { type: 'number', default: 1, help: 'Gain of the normal map derived from the texture height, as a multiple of the settled value. 2 is twice as steep; 0.5 half.', texture: true, types: ROCK },
-  undulation: { type: 'number', default: 0.5, help: 'Soft, irregular unevenness in the texture height, 0..1: the slow waviness of a weathered face, between what the mesh carries and the grain. Height alone.', texture: true, types: ROCK },
-  undulationSize: { type: 'number', default: 0.09, help: 'Metres across the largest swell of that unevenness. Two finer octaves ride under it.', texture: true, types: ROCK },
-  roughness: { type: 'number', default: 0.82, help: 'Base roughness of the stone, 0..1, before the grain, the wear and the growth move it. 0.9 is dry sandstone; 0.55 wet or polished rock.', texture: true, types: ROCK },
-  metallic: { type: 'number', default: 0, help: 'Base metalness of the stone, 0..1. 0 is stone; 0.3 an ore-bearing rock; 1 a lump of metal.', texture: true, types: ROCK },
-  glint: { type: 'number', default: 0.25, help: 'How much of the stone holds metallic flakes, 0..1: angular mica and pyrite shards, glossy and fully metallic, set into the surface.', texture: true, types: ROCK },
-  glintScale: { type: 'number', default: 30, help: 'Metallic flakes per metre: the size of a shard. 30 is about 3cm, 120 a speck.', texture: true, types: ROCK },
-  glintTint: { type: 'string', default: '#d8c9a4', help: 'The colour of those flakes, six digit hex. Pale brass is pyrite; a light grey is mica.', texture: true, types: ROCK },
-  crackWidth: { type: 'number', default: 0.035, help: 'Width of the crack line in the texture as a fraction of a crack cell.', texture: true, types: ROCK },
-  crackDepth: { type: 'number', default: 0.6, help: 'How deep the crack line cuts into the texture height, 0..1.', texture: true, types: ROCK },
-  subdivisions: { type: 'int', default: 24, help: 'Quads along each edge of the cube the rock is grown from. Six faces of this squared, doubled, is the triangle count.', types: ROCK },
+  width: { type: 'number', default: 0, help: 'Metres across the stone along x, before its relief. On a cluster it is the largest pebble, and the rest scale with it. 0 derives it from height.', texture: true, types: STONE },
+  depth: { type: 'number', default: 0, help: 'Metres across the stone along z, before its relief. On a cluster it is the largest pebble, and the rest scale with it. 0 derives it from height.', texture: true, types: STONE },
+  scoops: { type: 'int', default: 9, byType: { pebble: 6 }, help: 'Spheres scooped out of the rock. Each cuts a concave face, and the faces meet at rounded ridges. 0 is an egg.', texture: true, types: STONE },
+  scoopSize: { type: 'number', default: 0.8, byType: { pebble: 0.88 }, help: 'How broad a scoop is, 0.3..0.97, as its radius over its distance from the centre. Near 1 is a broad shallow face like a plane; near 0.5 a tight bite.', texture: true, types: STONE },
+  scoopDepth: { type: 'number', default: 0.35, byType: { pebble: 0.24 }, help: 'How deep the deepest scoop reaches in, as a fraction of the radius, 0..0.6. Each scoop takes 0.35..1 of it.', texture: true, types: STONE },
+  relief: { type: 'number', default: 0.1, byType: { pebble: 0.07 }, help: 'Depth of the surface noise as a fraction of the radius.', texture: true, types: STONE },
+  reliefSize: { type: 'number', default: 0.9, byType: { pebble: 0.1 }, help: 'Metres across the largest lump of the surface noise. Each octave above it is half the size.', texture: true, types: STONE },
+  reliefOctaves: { type: 'int', default: 5, byType: { pebble: 3 }, help: 'Octaves of surface noise under reliefSize. More is finer detail at lower amplitude.', texture: true, types: STONE },
+  plates: { type: 'number', default: 2, byType: { pebble: 0 }, help: 'Slab cells per metre in the pile the relief is built from. 0 builds it from noise alone.', texture: true, types: STONE },
+  plateLayers: { type: 'int', default: 2, help: 'Layers of slabs, each 1.7x finer than the last, chipping the ones below.', texture: true, types: STONE },
+  plateBevel: { type: 'number', default: 0.35, help: 'Fraction of a slab that slopes to its edge, 0..1. Low is flat-topped and sharp; 1 is a pyramid.', texture: true, types: STONE },
+  plateLean: { type: 'number', default: 0.3, help: 'How far a slab drops across its own width, 0..1 of its height.', texture: true, types: STONE },
+  bedding: { type: 'number', default: 0.6, help: 'How far the slabs are flattened and aligned into strata, 0..1. 0 is a random rubble of blocks.', texture: true, types: STONE },
+  plateShare: { type: 'number', default: 0.7, help: 'Share of the relief the slabs take, 0..1. The noise has the rest.', texture: true, types: STONE },
+  plateTint: { type: 'number', default: 0.25, help: 'How far each slab shifts the tone by its own value, 0..1.', texture: true, types: STONE },
+  smoothing: { type: 'number', default: 0.5, byType: { pebble: 0.9 }, help: 'How far the creases of the field are rounded, 0..1: the ridges between scoops, the slab edges and joins, the creases of the ridged noise. 0 is knife-edged; 1 is about a tenth smaller, because rounding only pulls the surface in.', texture: true, types: STONE },
+  cracks: { type: 'number', default: 1.2, byType: { pebble: 0 }, help: 'Crack cells per metre. 0 draws none.', texture: true, types: STONE },
+  crackStrength: { type: 'number', default: 1, help: 'How strongly the texture draws the cracks, 0..1. 0 draws none and keeps the grooves; cracks 0 removes both.', texture: true, types: STONE },
+  grooveDepth: { type: 'number', default: 0.05, help: 'How deep the coarse cracks cut into the mesh, as a fraction of the radius.', texture: true, types: STONE },
+  grooveWidth: { type: 'number', default: 0.15, help: 'Width of that groove as a fraction of a crack cell. The texture crack sits at its bottom.', texture: true, types: STONE },
+  weathering: { type: 'number', default: 0.6, byType: { pebble: 0 }, help: 'How far exposure goes, 0..1: lichen, dirt in the hollows, drip stains and soil up the base.', texture: true, types: STONE },
+  patina: { type: 'number', default: 0.5, byType: { pebble: 0 }, help: 'The dark crust old stone grows where water sits or runs, 0..1: on the tops, in the hollows, beside the cracks, under the drip lines and around the lichen, never on a worn edge.', texture: true, types: STONE },
+  edgeWear: { type: 'number', default: 0.5, byType: { pebble: 0 }, help: 'How far the convex edges are weathered, 0..1: bleached toward edgeTint, smoother, and kept clear of stain, patina and lichen.', texture: true, types: STONE },
+  streaks: { type: 'number', default: 0, help: 'Opacity of the run-off streaks down the sides, 0..1: droplet trails from a splat, full colour at the head and thinning and fading as they fall, branching into the cracks. Colour and finish only, never height.', texture: true, types: STONE },
+  streakCount: { type: 'int', default: 12, help: 'Streaks around the rock, 0..100, spaced unevenly, each at its own height, run and fade.', texture: true, types: STONE },
+  snow: { type: 'number', default: 0, help: 'Snow on the faces that look up, 0..1. 0 is none; 0.5 the tops; 1 everything but the sides and the edges.', texture: true, types: STONE },
+  topWash: { type: 'number', default: 0, help: 'How far down the faces that look up the topTint wash reaches, 0..1, on the same scale as snow. 0 is none.', texture: true, types: STONE },
+  topOpacity: { type: 'number', default: 1, help: 'How strongly the wash multiplies the stone it reaches, 0..1. Part of the base colour: the glint, the veins, the stain and the growth are never tinted by it.', texture: true, types: STONE },
+  stain: { type: 'number', default: 0.5, byType: { pebble: 0 }, help: 'How strongly iron staining is drawn, 0..1: rust seeping from the cracks and in bands down the bedding.', texture: true, types: STONE },
+  veins: { type: 'number', default: 0.15, byType: { pebble: 0 }, help: 'How much of the stone the quartz veins run through, 0..1. 0 draws none.', texture: true, types: STONE },
+  stoneTint: { type: 'string', default: '#7f827c', help: 'The mid tone of the stone, six digit hex.', texture: true, types: STONE },
+  stoneDark: { type: 'string', default: '#3e403e', help: 'The dark end of the stone and its dark minerals, six digit hex.', texture: true, types: STONE },
+  stoneLight: { type: 'string', default: '#b3b5ae', help: 'The light end of the stone, its light minerals and its veins, six digit hex.', texture: true, types: STONE },
+  lichenTint: { type: 'string', default: '#a7b094', help: 'The crustose lichen discs on the exposed faces, six digit hex.', texture: true, types: STONE },
+  soilTint: { type: 'string', default: '#4f4a36', help: 'Dirt in the hollows and soil up the base, six digit hex.', texture: true, types: STONE },
+  stainTint: { type: 'string', default: '#8a5a2e', help: 'The iron staining, six digit hex.', texture: true, types: STONE },
+  streakTint: { type: 'string', default: '#2a2d28', help: 'What the run-off leaves, six digit hex. Near black is mould and algae; white is bird droppings.', texture: true, types: STONE },
+  topTint: { type: 'string', default: '#808080', help: 'What the faces that look up are multiplied by, six digit hex read with #808080 as no change: lighter lifts them, darker shades them, and a hue warms or cools them.', texture: true, types: STONE },
+  edgeTint: { type: 'string', default: '#c6c3ba', help: 'The bleached colour a worn edge weathers to, six digit hex.', texture: true, types: STONE },
+  toneSize: { type: 'number', default: 0.25, byType: { pebble: 0.06 }, help: 'Metres across the largest patch of the tone mottling, the octave stack the colour is ramped from.', texture: true, types: STONE },
+  toneOctaves: { type: 'int', default: 5, help: 'Octaves of tone mottling under toneSize.', texture: true, types: STONE },
+  toneContrast: { type: 'number', default: 0.45, help: 'How far the tone reaches from stoneTint toward stoneDark and stoneLight, 0..1.', texture: true, types: STONE },
+  grainScale: { type: 'number', default: 110, byType: { pebble: 260 }, help: 'Mineral crystals per metre: the size of the grain.', texture: true, types: STONE },
+  speckle: { type: 'number', default: 0.6, help: 'How strongly the mineral grain is drawn, 0..1. 0 draws none.', texture: true, types: STONE },
+  bump: { type: 'number', default: 1, help: 'Gain of the normal map derived from the texture height, as a multiple of the settled value. 2 is twice as steep; 0.5 half.', texture: true, types: STONE },
+  undulation: { type: 'number', default: 0.5, help: 'Soft, irregular unevenness in the texture height, 0..1: the slow waviness of a weathered face, between what the mesh carries and the grain. Height alone.', texture: true, types: STONE },
+  undulationSize: { type: 'number', default: 0.09, byType: { pebble: 0.03 }, help: 'Metres across the largest swell of that unevenness. Two finer octaves ride under it.', texture: true, types: STONE },
+  roughness: { type: 'number', default: 0.82, help: 'Base roughness of the stone, 0..1, before the grain, the wear and the growth move it. 0.9 is dry sandstone; 0.55 wet or polished rock.', texture: true, types: STONE },
+  metallic: { type: 'number', default: 0, help: 'Base metalness of the stone, 0..1. 0 is stone; 0.3 an ore-bearing rock; 1 a lump of metal.', texture: true, types: STONE },
+  glint: { type: 'number', default: 0.25, help: 'How much of the stone holds metallic flakes, 0..1: angular mica and pyrite shards, glossy and fully metallic, set into the surface.', texture: true, types: STONE },
+  glintScale: { type: 'number', default: 30, help: 'Metallic flakes per metre: the size of a shard. 30 is about 3cm, 120 a speck.', texture: true, types: STONE },
+  glintTint: { type: 'string', default: '#d8c9a4', help: 'The colour of those flakes, six digit hex. Pale brass is pyrite; a light grey is mica.', texture: true, types: STONE },
+  crackWidth: { type: 'number', default: 0.035, help: 'Width of the crack line in the texture as a fraction of a crack cell.', texture: true, types: STONE },
+  crackDepth: { type: 'number', default: 0.6, help: 'How deep the crack line cuts into the texture height, 0..1.', texture: true, types: STONE },
+  subdivisions: { type: 'int', default: 24, byType: { pebble: 6 }, help: 'Quads along each edge of the cube a stone is grown from. Six faces of this squared, doubled, is the triangle count, and a cluster pays it once per pebble.', types: STONE },
+
+  pebblesPerModel: { type: 'int', default: 12, help: 'Pebbles packed into one cluster. Each is its own stone with its own six charts, so the image and the bake grow with this.', texture: true, types: PEBBLE },
+  pebbleSmallest: { type: 'number', default: 0.4, help: 'The smallest pebble as a fraction of the largest, 0..1. The run between them bends toward the small end, so a cluster is a few stones with gravel around them.', texture: true, types: PEBBLE },
+  clusterRadius: { type: 'number', default: 0, help: 'Metres the pebble bases are spread over. 0 derives it from the ground the pebbles cover, so raising pebblesPerModel spreads the cluster rather than packing it.', types: PEBBLE },
 
   bendCurve: {
     type: 'number',
@@ -314,15 +325,15 @@ export const PARAM_SPEC = {
   windAmplitude: { type: 'number', default: 0.4, help: 'ScatterWind amplitude for the emitted layer.', byType: { clump: 0.18 }, types: LEAFY },
   windFrequency: { type: 'number', default: 0.45, help: 'ScatterWind frequency for the emitted layer.', byType: { clump: 1.1 }, types: LEAFY },
   windFlutter: { type: 'number', default: 0.35, help: 'ScatterWind flutter for the emitted layer.', byType: { clump: 0.7 }, types: LEAFY },
-  cullDistance: { type: 'number', default: 160, help: 'ScatterLayer cullDistance for the emitted layer.', byType: { clump: 50, rock: 800 } },
-  castShadow: { type: 'flag', default: true, byType: { clump: false, crown: null }, help: 'Draw the emitted layer into the shadow maps. A clump defaults off; a crown casts while it has a stem.' },
+  cullDistance: { type: 'number', default: 160, help: 'ScatterLayer cullDistance for the emitted layer.', byType: { clump: 50, rock: 800, pebble: 60 } },
+  castShadow: { type: 'flag', default: true, byType: { clump: false, crown: null, pebble: false }, help: 'Draw the emitted layer into the shadow maps. A clump and a pebble cluster default off, because a shadow that small costs a draw to resolve into nothing; a crown casts while it has a stem.' },
   foliage: { type: 'flag', default: true, help: 'Shade the cutout piece as foliage: no specular, with transmission. Off shades it as a standard metallic-roughness surface.', types: LEAFY },
-  impostor: { type: 'impostor', default: IMPOSTOR_DEFAULT, byType: { clump: null, crown: null, rock: { fromDistance: 120, views: 8, tileSize: 128 } }, help: "The layer's impostor block, keyed as the layer keys it: { fromDistance, views, tileSize }. fromDistance 0 derives it from cullDistance; views is per axis, at least 2; tileSize is in pixels. A clump or a stemless crown bakes one only if the file sets it." },
+  impostor: { type: 'impostor', default: IMPOSTOR_DEFAULT, byType: { clump: null, crown: null, pebble: null, rock: { fromDistance: 120, views: 8, tileSize: 128 } }, help: "The layer's impostor block, keyed as the layer keys it: { fromDistance, views, tileSize }. fromDistance 0 derives it from cullDistance; views is per axis, at least 2; tileSize is in pixels. A clump or a stemless crown bakes one only if the file sets it." },
   footprint: { type: 'number', default: 0, help: 'ScatterLayer footprint in metres. 0 derives it from the model. The most expensive number here: candidates go as 1/footprint squared.', byType: { clump: 0.7 } },
-  scaleMin: { type: 'number', default: 0.8, byType: { clump: 0.75, rock: 0.6 }, help: 'Lower bound of the emitted scale jitter.' },
-  scaleMax: { type: 'number', default: 1.25, help: 'Upper bound of the emitted scale jitter.', byType: { clump: 1.3, rock: 1.6 } },
+  scaleMin: { type: 'number', default: 0.8, byType: { clump: 0.75, rock: 0.6, pebble: 0.7 }, help: 'Lower bound of the emitted scale jitter.' },
+  scaleMax: { type: 'number', default: 1.25, help: 'Upper bound of the emitted scale jitter.', byType: { clump: 1.3, rock: 1.6, pebble: 1.4 } },
 
-  textureSize: { type: 'int', default: 1024, byType: { clump: 2048, crown: 2048 }, help: "Edge of the square texture template, and the long edge of the bark one; an authored bark keeps its shape and is reduced to fit. A clump or frond atlas holds every stamp, so it starts larger. A rock's image is six charts of half this edge.", texture: true },
+  textureSize: { type: 'int', default: 1024, byType: { clump: 2048, crown: 2048, pebble: 128 }, help: "Edge of the square texture template, and the long edge of the bark one; an authored bark keeps its shape and is reduced to fit. A clump or frond atlas holds every stamp, so it starts larger. A stone's chart is half this edge: a rock is one block of six charts, and a cluster is one block per pebble, so a pebble's charts are small and there are many.", texture: true },
   barkTextureSize: { type: 'int', default: 0, help: 'Long edge of the bark map in pixels, so the bark and the leaf atlas can differ. 0 follows textureSize.', texture: true, types: WOODY },
   barkAspect: { type: 'int', default: 2, help: 'How many times taller than wide the bark map is, and how many circumferences of branch one tile covers. 1 is square.', texture: true, types: WOODY },
   preview: { type: 'int', default: 0, help: 'Write a shaded preview PNG at this pixel size. 0 writes none.' },
@@ -741,7 +752,7 @@ export function hasStem(params: Params): boolean {
  * A tree and a stemmed crown always do. Ground cover does only when the file
  * asks: a billboard stops being worth it the moment the model covers fewer
  * pixels than the tile has, and a 0.35m tuft is under that at any distance it
- * is still drawn at, so it culls instead, the way `granite_pebble` does. A
+ * is still drawn at, so it culls instead, the way a pebble cluster does. A
  * three metre patch of plains grass is another matter, and sets one.
  */
 export function hasImpostor(params: Params): boolean {

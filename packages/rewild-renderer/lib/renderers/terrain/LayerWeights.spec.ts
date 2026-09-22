@@ -223,7 +223,7 @@ describe('resolveLayerWeights', () => {
 
 describe('resolveScatterDensity', () => {
   const rule: BiomeScatter = {
-    layer: 'granite_pebble',
+    layer: 'granite_pebble_01',
     density: 0.4,
     slope: { from: 40, to: 10 },
     height: { from: 0, to: 50 },

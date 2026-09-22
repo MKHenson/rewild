@@ -137,5 +137,33 @@
     "lods": [
       "nature/rocks/sandstone-03/sandstone-03.lod1.glb"
     ]
+  },
+  "granite-pebble-01": {
+    "type": "gltf",
+    "url": "nature/pebbles/granite-pebble-01/granite-pebble-01.glb",
+    "lods": [
+      "nature/pebbles/granite-pebble-01/granite-pebble-01.lod1.glb"
+    ]
+  },
+  "granite-scree-01": {
+    "type": "gltf",
+    "url": "nature/pebbles/granite-scree-01/granite-scree-01.glb",
+    "lods": [
+      "nature/pebbles/granite-scree-01/granite-scree-01.lod1.glb"
+    ]
+  },
+  "sandstone-cobbles-01": {
+    "type": "gltf",
+    "url": "nature/pebbles/sandstone-cobbles-01/sandstone-cobbles-01.glb",
+    "lods": [
+      "nature/pebbles/sandstone-cobbles-01/sandstone-cobbles-01.lod1.glb"
+    ]
+  },
+  "granite-pebble-snow-01": {
+    "type": "gltf",
+    "url": "nature/pebbles/granite-pebble-snow-01/granite-pebble-snow-01.glb",
+    "lods": [
+      "nature/pebbles/granite-pebble-snow-01/granite-pebble-snow-01.lod1.glb"
+    ]
   }
 }

@@ -107,7 +107,7 @@ describe('ScatterColliderStreamer', () => {
 
   it('skips a layer with no collider proxy', () => {
     const { world, streamer: s } = streamer();
-    s.setChunk('c', 0, 0, HALF, [row('granite_pebble', [1, 2, 3])]);
+    s.setChunk('c', 0, 0, HALF, [row('granite_pebble_01', [1, 2, 3])]);
 
     s.update(0, 0, 0);
 
