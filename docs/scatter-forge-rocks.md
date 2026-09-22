@@ -1,9 +1,10 @@
 # scatter-forge — rocks
 
 Design for the stone types in [scatter-forge](../tools/scatter-forge/README.md): a pebble, a rock and
-an outcrop. `rock` is written and documented under the README's [Rocks](../tools/scatter-forge/README.md#rocks);
-`pebble` and `outcrop` are not. The README's [Tuning a rock](../tools/scatter-forge/README.md#tuning-a-rock)
-explains each key with examples. Fold what remains into the README as it lands.
+an outcrop. `rock` and `pebble` are written and documented under the README's
+[Rocks](../tools/scatter-forge/README.md#rocks); `outcrop` is not. The README's
+[Tuning a rock](../tools/scatter-forge/README.md#tuning-a-rock) explains each key with examples. Fold
+what remains into the README as it lands.
 
 ## Three types
 
@@ -11,11 +12,12 @@ Following the tool's rule that a type earns itself at the mesh and the texture p
 
 | `type`    | Mesh                                   | Texture                                | Collider          | Clusters |
 | --------- | -------------------------------------- | -------------------------------------- | ----------------- | -------- |
-| `pebble`  | Scooped sphere, shallow, light noise   | Grain and colour only, shared atlas    | None              | Yes      |
+| `pebble`  | Scooped sphere, shallow, light noise   | Unique bake per pebble, own block      | None              | Yes      |
 | `rock`    | Scooped sphere, field grooves          | Unique bake: grain, cracks, weathering | One convex hull   | No       |
 | `outcrop` | A stack of convex slabs                | Tiled stone; the cracks are geometry   | One hull per slab | No       |
 
-`pebble` and `rock` share the mesh generator and differ at the painter and in what the layer emits.
+`pebble` and `rock` share the mesh generator **and** the painter, and differ in how many stones one
+model holds and in what the layer emits.
 `outcrop` shares the painter's ingredients and nothing of the mesh. All three share the noise, the
 encoders, the preview, the sidecar loop and the templates emitter, and none of them touch the
 tree's skeleton or the clump's arrangement.
@@ -70,7 +72,14 @@ What the cube base buys:
 - No pole pinching and no irregular valence. A tangent-warped cube mapping evens out texel density at
   the corners if it shows.
 
-Six charts in a 3×2 atlas. One piece: `{ key: 'stone', cutout: false, height: true, material: true }`.
+Six charts make one **block**, in 3×2. A rock is one block, so its image is 3×2 charts. A pebble
+cluster is one block per pebble, in a grid of blocks. One piece either way:
+`{ key: 'stone', cutout: false, height: true, material: true }`, because a piece is a draw and not
+an object.
+
+The gutter is a fraction of the chart rather than a fixed count of texels. A rock's 512px chart keeps
+the 8 texels it has always had. A pebble's 64px chart takes 2, which is the same span of mip chain
+and still the two texels a bilinear tap at an edge needs.
 
 ## Textures
 
@@ -109,29 +118,57 @@ The rest is the existing pipeline: float linear compositing, the normal derived 
 `encodeNormal`, the ARM assembled, the curvature pass. Rock normals are the whole look, which is
 why the 16-bit height argument in [scatter-forge.md](./scatter-forge.md) matters most here.
 
-### Pebbles are grain only
+### A pebble runs the whole painter
 
-A pebble's painter stops after the grain: noise and colour, a derived normal, no cracks and no
-weathering. Pebbles are small, share their skins, and a crack at that scale is a texel.
+A pebble takes every key a rock takes, and every one of them works. That follows from the clusters
+below giving each pebble its own bake: nothing in the painter has to be held back, because every
+mark lands on the stone whose surface it was read off.
+
+The defaults are still grain and colour. `cracks`, `plates` and the weathering keys are 0 for a
+pebble, so a config that sets none gets tone, mineral grain, grit and glint, which is what a stone
+at this size shows. A config that wants lichen on its cobbles sets `weathering` and gets it.
+
+`snow` is what this bought. It reads `dot(n, up)`, the hollows and the edges, so a shared skin could
+never have carried it: the white would have landed on the underside of most of the cluster.
 
 ## Pebble clusters
 
 A cluster is several pebbles in one mesh, the way a patch is several tufts. A packing loop places
-them largest first on the ground plane with the smaller ones nestled at the base of the larger,
-none overlapping. Each pebble is its own seed of the cube-sphere generator.
+them largest first on the ground plane, each new one offered a place at the foot of one already
+down, so the small ones nestle against the large and none overlaps. Each pebble is its own seed of
+the cube-sphere generator, and each beds into the ground by its own share of its own height.
 
-Skins come from an atlas of a few grain bakes, and each pebble in the cluster picks one, the way a
-leaf card picks a cell. A skin's texture does not match that pebble's bumps, which is only
-acceptable because a pebble's texture carries no features that could disagree with its shape.
+**Each pebble takes its own block of the image.** An earlier draft had them share an atlas of a few
+grain bakes, the way a leaf card picks a cell, and stopped the painter after the grain because a
+shared skin has no up: lichen reads off `dot(n, up)`, soil climbs from `field.base`, and edge wear
+reads the curvature of `shape`. A skin baked from one stone and worn by another lands all of it on
+the wrong faces.
+
+The sharing was never needed. A chart is sized off `textureSize`, and a pebble's may be small:
+
+| Layout                       | Image   | Texels baked | Skin matches the stone |
+| ---------------------------- | ------- | ------------ | ---------------------- |
+| 14 blocks at a 64px chart    | 768×512 | 0.34M        | Yes                    |
+| 4 shared blocks, 128px chart | 768×512 | 0.39M        | No                     |
+| One rock, 512px chart        | 1536×1024 | 1.57M      | Yes                    |
+
+A block per pebble is **cheaper** than four shared ones and a fifth of a single rock's bake, so the
+cluster pays nothing for the thing that makes the painter whole. The image grows with
+`pebblesPerModel`, which is the one cost: a texture set can only be shared between variants that
+hold the same number of stones.
+
+No pebble is turned or tilted after it is built, for the same reason the skins are not shared. Its
+seed already gives it its own scoops, bedding and noise, and a rotation applied after the bake would
+take the weathering's up with it.
 
 Rocks and outcrops do not cluster. A rock's bake is its own, and its hull is one shape.
 
 ## Colliders
 
 **Pebbles have none.** A stone that stops the player is worse than one they step over, which is the
-clump's reason.
+clump's reason. Written.
 
-**A rock is one convex hull.** `PhysicsShape` gains `{ type: 'hull', points: number[] }`. The forge
+**A rock is one convex hull.** Written. `PhysicsShape` carries `{ type: 'hull', points: number[] }`. The forge
 decimates the rock to at most 32 points and writes them into the layer entry beside where a tree's
 capsule goes. The hull of a scooped sphere is a close fit: the ridges between scoops are where it
 touches, and the faces sag inside it by the scoop depth. Engine side, `shapeDesc` in
@@ -168,22 +205,32 @@ Cracks by scale:
 
 | Scale   | Cracks are                                     |
 | ------- | ---------------------------------------------- |
-| Pebble  | Not drawn                                      |
+| Pebble  | Off by default, and the rock's own field when asked |
 | Rock    | Texture and mesh grooves from the same field   |
 | Outcrop | Geometry, over a tiled texture                 |
 
 ## Emitted layers
 
 A rock's entry is `granite_boulder`'s with the hull in place of the box: `alignToNormal: 1`, a
-negative `yOffset`, an impostor, a LOD chain. A pebble's is `granite_pebble`'s: no collider, no
-impostor, a short cull distance. An outcrop's is a rock's with a list of hulls, a long cull distance
-and no jitter on scale, because its hulls were measured at one size.
+negative `yOffset`, an impostor, a LOD chain.
+
+A pebble's takes what the old hand-authored `granite_pebble` decided and nothing else: no collider,
+no impostor, no shadow. It differs in one number. A cluster is to a pebble what a patch
+is to a tuft, so one candidate is resolved for a dozen stones, and the footprint is several times
+the cluster's own span rather than just clear of it. Clusters laid edge to edge read as a paved
+path, and a cluster spaced at a single stone's footprint puts thirty times the gravel on the ground
+the layer it replaces did. The floor is the 2.5m `granite_pebble` shipped at.
+
+An outcrop's is a rock's with a list of hulls, a long cull distance and no jitter on scale, because
+its hulls were measured at one size.
 
 ## Engine work
 
-Everything above is forge work except:
+Everything above is forge work except the outcrop's two items. A rock's hull shipped with the rock,
+and a pebble needed nothing: it has no collider, so the only engine change it carries is the six
+biome entries that used to name `granite_pebble` and now name the layer that replaced it.
 
-- `PhysicsShape` gains `hull`, and a layer's `collider` may be a list.
+- A layer's `collider` may be a list, for an outcrop's slabs.
 - The ground probe includes the scatter collider group.
 
 No shader work. Later, an outcrop would benefit from a unique macro map (exposure, stains) multiplied

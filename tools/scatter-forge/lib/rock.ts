@@ -11,19 +11,68 @@
 // surface that really continues past the face edge, so the mip chain never
 // averages one face into a foreign colour.
 
-import { createBuilder, finish, pushVertex, type ForgeMesh, type MeshAttributes } from './mesh.ts';
+import { createBuilder, finish, pushVertex, type Builder, type ForgeMesh, type MeshAttributes } from './mesh.ts';
 import { fbm3r, ridged3r, smin, smoothstep, worley3Into, type Worley3Result } from './noise.ts';
 import type { Params } from './params.ts';
 import { beddingFrame, platesInto, type PlateField, type PlateSample } from './plates.ts';
 import { createRng } from './rng.ts';
 import { cross, normalize, type Vec3 } from './vec.ts';
 
-/** Texels of real surface baked past each face's edge. */
-export const ROCK_GUTTER = 8;
-
-/** Charts across the image and down it. */
+/** Charts across one block and down it: the six faces of the cube. */
 export const ROCK_CHART_COLUMNS = 3;
 export const ROCK_CHART_ROWS = 2;
+
+/**
+ * Texels of real surface baked past each face's edge, as a fraction of the
+ * chart. A fixed count would be a quarter of a pebble's 64-texel chart and an
+ * eighth of a percent of a rock's 512-texel one, which is two different jobs.
+ * Held at a proportion instead, so the gutter covers the same span of mip
+ * chain whatever the chart, and never falls under the two texels a bilinear
+ * tap at the edge needs.
+ */
+export function gutterOf(chartPx: number): number {
+  return Math.max(2, Math.round(chartPx / 64));
+}
+
+/**
+ * How one image is cut into charts.
+ *
+ * A **block** is one stone: six charts in 3x2, the cube's faces. A rock is one
+ * block, so its image is 3x2 charts and this says nothing a constant could
+ * not. A pebble cluster is one block per pebble, laid out in a grid of blocks,
+ * because a stone painted from another stone's field would wear its lichen on
+ * the wrong side.
+ */
+export interface ChartAtlas {
+  /** Edge of one chart in texels, its gutter included. */
+  chartPx: number;
+  gutter: number;
+  /** Blocks across the image and down it. */
+  columns: number;
+  rows: number;
+  /** The image, in texels. */
+  width: number;
+  height: number;
+}
+
+/**
+ * The atlas for `blocks` stones at this chart size. The grid is chosen to keep
+ * the image about square: a block is three charts wide by two tall, so three
+ * columns of blocks are as wide as two rows are tall.
+ */
+export function chartAtlas(chartPx: number, blocks: number): ChartAtlas {
+  const columns = Math.max(1, Math.ceil(Math.sqrt(blocks / 1.5)));
+  const rows = Math.max(1, Math.ceil(blocks / columns));
+
+  return {
+    chartPx,
+    gutter: gutterOf(chartPx),
+    columns,
+    rows,
+    width: chartPx * ROCK_CHART_COLUMNS * columns,
+    height: chartPx * ROCK_CHART_ROWS * rows,
+  };
+}
 
 /**
  * A sphere scooped out of the unit sphere, in unit-sphere space. It never
@@ -408,19 +457,43 @@ export function rockField(params: Params): RockField {
 const SCOOP_SIZE_MIN = 0.3;
 const SCOOP_SIZE_MAX = 0.97;
 
-/** Where a face point lands in the image, 0..1 on both axes. */
-export function chartUv(into: [number, number], faceIndex: number, a: number, b: number, chartPx: number): [number, number] {
-  const column = faceIndex % ROCK_CHART_COLUMNS;
-  const row = Math.floor(faceIndex / ROCK_CHART_COLUMNS);
-  const inner = chartPx - ROCK_GUTTER * 2;
-  into[0] = (column * chartPx + ROCK_GUTTER + a * inner) / (chartPx * ROCK_CHART_COLUMNS);
-  into[1] = (row * chartPx + ROCK_GUTTER + b * inner) / (chartPx * ROCK_CHART_ROWS);
+/** The texel this block's chart for `faceIndex` starts at, written into `into`. */
+export function chartOrigin(into: [number, number], atlas: ChartAtlas, block: number, faceIndex: number): [number, number] {
+  const blockColumn = block % atlas.columns;
+  const blockRow = Math.floor(block / atlas.columns);
+  const column = blockColumn * ROCK_CHART_COLUMNS + (faceIndex % ROCK_CHART_COLUMNS);
+  const row = blockRow * ROCK_CHART_ROWS + Math.floor(faceIndex / ROCK_CHART_COLUMNS);
+  into[0] = column * atlas.chartPx;
+  into[1] = row * atlas.chartPx;
   return into;
 }
 
-/** Edge of one chart in texels: half the set's size, so six fit a 3x2 image. */
+const _origin: [number, number] = [0, 0];
+
+/** Where a face point lands in the image, 0..1 on both axes. */
+export function chartUv(
+  into: [number, number],
+  atlas: ChartAtlas,
+  block: number,
+  faceIndex: number,
+  a: number,
+  b: number
+): [number, number] {
+  chartOrigin(_origin, atlas, block, faceIndex);
+  const inner = atlas.chartPx - atlas.gutter * 2;
+  into[0] = (_origin[0] + atlas.gutter + a * inner) / atlas.width;
+  into[1] = (_origin[1] + atlas.gutter + b * inner) / atlas.height;
+  return into;
+}
+
+/** Edge of one chart in texels: half the set's size, so six fit a 3x2 block. */
 export function rockChartPx(params: Params): number {
   return params.textureSize / 2;
+}
+
+/** A rock is one block, so its image is one block of 3x2 charts. */
+export function rockAtlas(params: Params): ChartAtlas {
+  return chartAtlas(rockChartPx(params), 1);
 }
 
 /**
@@ -467,11 +540,23 @@ const round = (value: number): number => Number(value.toFixed(3));
  */
 const NORMAL_STEP = 0.35;
 
-function buildStone(params: Params, field: RockField): MeshAttributes {
-  const out = createBuilder();
-  const n = params.subdivisions;
+/**
+ * One stone's six charts of vertices, written into a shared builder.
+ *
+ * `origin` is where the stone's lowest point sits, so a caller places a stone
+ * by where it rests rather than by its centre. `block` is which block of the
+ * atlas its charts are cut from: 0 for a rock, its own index for a pebble.
+ */
+export function pushStone(
+  out: Builder,
+  field: RockField,
+  atlas: ChartAtlas,
+  block: number,
+  subdivisions: number,
+  origin: Vec3
+): void {
+  const n = subdivisions;
   const step = NORMAL_STEP / n;
-  const chartPx = rockChartPx(params);
   const c: Vec3 = [0, 0, 0];
   const p: Vec3 = [0, 0, 0];
   const normal: Vec3 = [0, 0, 0];
@@ -486,8 +571,14 @@ function buildStone(params: Params, field: RockField): MeshAttributes {
         const b = j / n;
         surfaceAt(p, field, cubePoint(c, face, a, b));
         normalAt(normal, field, face, a, b, step);
-        chartUv(uv, faceIndex, a, b, chartPx);
-        pushVertex(out, [p[0], p[1] - field.base, p[2]], [normal[0], normal[1], normal[2]], [uv[0], uv[1]], [0, 0, 0, 1]);
+        chartUv(uv, atlas, block, faceIndex, a, b);
+        pushVertex(
+          out,
+          [p[0] + origin[0], p[1] - field.base + origin[1], p[2] + origin[2]],
+          [normal[0], normal[1], normal[2]],
+          [uv[0], uv[1]],
+          [0, 0, 0, 1]
+        );
       }
 
     for (let j = 0; j < n; j++)
@@ -499,15 +590,21 @@ function buildStone(params: Params, field: RockField): MeshAttributes {
         out.indices.push(v00, v10, v11, v00, v11, v01);
       }
   });
+}
 
+const ORIGIN: Vec3 = [0, 0, 0];
+
+function buildStone(params: Params, field: RockField): MeshAttributes {
+  const out = createBuilder();
+  pushStone(out, field, rockAtlas(params), 0, params.subdivisions, ORIGIN);
   return finish(out);
 }
 
 /**
  * The lowest point of the surface, found on a fine direction grid rather than
- * on the mesh, so every tier of one rock shares one origin.
+ * on the mesh, so every tier of one stone shares one origin.
  */
-function baseOf(field: RockField): number {
+export function baseOf(field: RockField): number {
   const c: Vec3 = [0, 0, 0];
   const p: Vec3 = [0, 0, 0];
   const steps = 48;

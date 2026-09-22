@@ -6,6 +6,8 @@
 // rosette — so it is a type, and so is a tuft of grass, and so is a rock.
 //
 // A **piece** is one primitive: one texture set, one glTF material, one draw.
+// A pebble cluster is still one piece, because a piece is a draw and not an
+// object: its stones share an image and differ by the block they sample.
 // Everything downstream keys on its `key`, so the piece named here is the piece
 // in the filename, in the material and on the preview panel. Nothing maps one
 // spelling to another.
@@ -13,7 +15,7 @@
 // Deliberately free of imports, so the parameter table can reach it without a
 // cycle.
 
-export const FORGE_TYPES = ['tree', 'clump', 'crown', 'rock'] as const;
+export const FORGE_TYPES = ['tree', 'clump', 'crown', 'rock', 'pebble'] as const;
 
 export type ForgeType = (typeof FORGE_TYPES)[number];
 
@@ -61,6 +63,10 @@ export const PIECES: Record<ForgeType, readonly PieceSpec[]> = {
     { key: 'frond', cutout: true, height: false, material: false },
   ],
   rock: [{ key: 'stone', cutout: false, height: true, material: true }],
+  // A cluster is one draw of one material, whatever it holds: the pebbles
+  // differ by which block of the image their charts are cut from, not by
+  // piece.
+  pebble: [{ key: 'stone', cutout: false, height: true, material: true }],
 };
 
 /** The pieces a model ships. `hasStem` drops the ones a stemless crown has no use for. */

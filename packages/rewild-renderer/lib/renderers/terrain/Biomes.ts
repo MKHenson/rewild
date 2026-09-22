@@ -147,7 +147,7 @@ export const PLAIN: BiomeParams = {
   // Stones in the sward, and the odd erratic standing in it.
   scatter: [
     {
-      layer: 'granite_pebble',
+      layer: 'granite_pebble_01',
       density: 0.22,
       slope: { from: 24, to: 6 },
     },
@@ -250,7 +250,7 @@ export const FOREST: BiomeParams = {
       ],
       slope: { from: 42, to: 20 },
     },
-    { layer: 'granite_pebble', density: 0.18, slope: { from: 30, to: 8 } },
+    { layer: 'granite_pebble_01', density: 0.18, slope: { from: 30, to: 8 } },
   ],
 };
 
@@ -277,10 +277,33 @@ export const MOUNTAIN: BiomeParams = {
       slope: { from: 70, to: 55 },
     },
   ],
-  // Scree and erratics on the flanks. Both fade out *under* the snow line, so
-  // the stones thin into the white rather than stopping on a contour.
+  // Scree and erratics on the flanks, and the same cobbles again under snow
+  // higher up. Every bare layer fades out *under* the snow line and the
+  // snowed one fades in across it, so the stones thin into the white rather
+  // than stopping on a contour, and no bare cobble sits in the snowfield.
   scatter: [
-    { layer: 'granite_pebble', density: 0.45, slope: { from: 55, to: 30 } },
+    // Loose fragments hold steeper ground than a rounded cobble does.
+    {
+      layer: 'granite_scree_01',
+      density: 0.3,
+      height: { from: 160, to: 100 },
+      slope: { from: 70, to: 45 },
+    },
+    {
+      layer: 'granite_pebble_01',
+      density: 0.45,
+      height: { from: 150, to: 95 },
+      slope: { from: 55, to: 30 },
+    },
+    // The same cobbles under snow, fading in across the line the bare ones
+    // fade out under, and holding all the way up. Only ground gentle enough
+    // to keep snow gets them, which is the band the snow material uses.
+    {
+      layer: 'granite_pebble_snow_01',
+      density: 0.4,
+      height: { from: 100, to: 145 },
+      slope: { from: 65, to: 30 },
+    },
     {
       layer: 'granite_01',
       density: 0.1,
@@ -397,7 +420,7 @@ export const DESERT_MOUNTAIN: BiomeParams = {
       height: { from: 420, to: 0 },
       slope: { from: 0, to: 18 },
     },
-    { layer: 'granite_pebble', density: 0.34, slope: { from: 50, to: 20 } },
+    { layer: 'sandstone_cobbles_01', density: 0.34, slope: { from: 50, to: 20 } },
   ],
 };
 
@@ -468,7 +491,7 @@ export const DESERT: BiomeParams = {
       height: { from: 55, to: 12 },
       noise: { scale: 340, seedSalt: 67, band: { from: 0.62, to: 0.85 } },
     },
-    { layer: 'granite_pebble', density: 0.18, slope: { from: 30, to: 8 } },
+    { layer: 'sandstone_cobbles_01', density: 0.18, slope: { from: 30, to: 8 } },
   ],
 };
 
@@ -516,7 +539,7 @@ export const BEACH_SAND: BiomeParams = {
   // Shingle in the damp hollows, on the same height split the two sands use.
   scatter: [
     {
-      layer: 'granite_pebble',
+      layer: 'granite_pebble_01',
       density: 0.12,
       height: { from: 40, to: 4 },
       noise: { scale: 180, seedSalt: 79, band: { from: 0.48, to: 0.72 } },

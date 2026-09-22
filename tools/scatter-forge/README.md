@@ -600,7 +600,7 @@ reasons a tree's canopy does.
 
 | | Why |
 | --- | --- |
-| **No impostor, unless it sets one** | A billboard is only worth baking while the model covers more pixels than the tile has. A 0.38m tuft is under a 128px tile at every distance it is still drawn at, so it culls instead. `granite_pebble` does the same. A metres-wide patch is worth one: the plains set `impostor` and get it. |
+| **No impostor, unless it sets one** | A billboard is only worth baking while the model covers more pixels than the tile has. A 0.38m tuft is under a 128px tile at every distance it is still drawn at, so it culls instead. A pebble cluster does the same. A metres-wide patch is worth one: the plains set `impostor` and get it. |
 | **No collider** | A tuft that stops the player is worse than one they walk through. |
 | **No shadow** | `castShadow` defaults to `false`. A tuft's shadow is a flicker of blade-sized texels under itself, and casting it means the shadow pass draws every card of every patch in range. |
 | **No LOD chain** | A tier would save 18 triangles. Culling at 50m is the whole budget. |
@@ -911,8 +911,66 @@ rock on a slope shows. `tilt` is 8, `footprint` is 0.8 of the rock's span so bou
 there is no wind block, no `foliage` and no `authoredNormals`, because there are no cards for any
 of them to apply to.
 
-What it does not do yet: cluster, take an authored stone source, or stand up as an overhang. Those
-are the `pebble` and `outcrop` types in [Where this is going](#where-this-is-going).
+What it does not do yet: take an authored stone source, or stand up as an overhang. The second is
+the `outcrop` type in [Where this is going](#where-this-is-going). Clustering is written, as the
+`pebble` type below.
+
+### Pebbles
+
+**A pebble is a rock, several times over.** `type: pebble` packs `pebblesPerModel` stones into one
+mesh, the way `tuftsPerModel` packs tufts into a patch. It shares the rock's field, its cube charts,
+its painter and every key in [Tuning a rock](#tuning-a-rock). What it changes is the count and the
+layer.
+
+**Each pebble is its own stone.** Its own seed, so its own scoops, bedding and noise; its own six
+charts, in its own **block** of the image; and its own bake. So the painter runs whole: lichen sits
+on the faces that look up, soil climbs from that stone's own base, and edge wear finds the ridges
+that stone actually has. Nothing is shared between two pebbles but the image the blocks sit in and
+the material it is bound through.
+
+That is affordable because a pebble's chart is small. `textureSize` defaults to 128 for a cluster, so
+a chart is 64px and a block is 192x128. Fourteen blocks is 768x512 and 0.34M texels, which is under
+what four larger shared blocks would cost and a fifth of one rock's bake. The image grows with
+`pebblesPerModel`, so a texture set is only shareable between variants holding the same count.
+
+**The packing** places the stones largest first, each new one offered a place at the foot of one
+already down, so the small ones nestle against the large and none overlaps. Each beds into the
+ground by its own share of its own height, and none is turned or tilted afterwards, because a
+rotation applied after the bake would take the weathering's up with it.
+
+**The defaults are grain and colour.** `cracks`, `plates`, `weathering`, `patina`, `stain`, `veins`
+and `edgeWear` are all 0 for a pebble, which is what a stone at this size shows. Every one of them
+still works when a config asks.
+
+**The layer** has no collider, no impostor and no shadow, for the reasons the hand-authored
+`granite_pebble` had none. It differs in `footprint`: a cluster resolves one candidate for a dozen
+stones, so it is spaced at four times its own span rather than just clear of it, never under the
+2.5m the layer it replaced shipped at. Clusters laid edge to edge
+read as a paved path, and spacing a cluster as if it were one stone puts thirty times the gravel on
+the ground.
+
+The shipped templates cull at 120m and hand over to their one tier at 50m, so most of the drawn area
+runs at a quarter of the triangles. `cullDistance` defaults to 60 for the type, which is what the
+layer this replaced shipped at; every template names its own.
+
+Four templates ship:
+
+| Template | Is | Placed in |
+| -------- | -- | --------- |
+| `granite-pebble-01` | Twelve rounded granite cobbles | Plain, forest, beach, and the mountain's lower flanks |
+| `granite-scree-01` | Twenty small cleaved fragments, on steeper ground than a cobble holds | Mountain |
+| `granite-pebble-snow-01` | The same cobbles with snow caps, stone still reading on the sides | Mountain, from the snow line up |
+| `sandstone-cobbles-01` | The cobbles on the sandstone palette | Desert and desert mountain |
+
+The snow variant is the pebble answer to `granite-03`, and takes its `snow`, `topWash`,
+`topOpacity` and `topTint`. It fades in across the line the bare cobbles fade out under, which is
+what keeps the stones thinning into the white rather than stopping on a contour. The bands are in
+`MOUNTAIN`'s `scatter` block in `Biomes.ts`. This is the clearest thing a per-pebble bake bought,
+because `snow` reads `dot(n, up)`, the hollows and the edges, and a shared skin has no up.
+
+`subdivisions` is 3 on every one of them, which is 108 triangles a stone. A cobble is a third of a
+metre, so what carries its shape at any distance it is drawn at is the normal map, not the
+silhouette.
 
 ### Tuning a rock
 
@@ -1359,7 +1417,7 @@ candidates per chunk  =  (480 / (2 x footprint))²
 | 2.5m        | 5m   | 9,216                | 250                              |
 
 The hard floor is about **6cm**: below that the kill-set's 12 bits per cell axis run out and
-placement throws. `granite_pebble` ships at 2.5m, and the comment on it warns about 0.8m.
+placement throws. A pebble cluster is floored at 2.5m, and the comment on it warns about 0.8m.
 
 **Triangles are not the problem.** A tuft is 36 of them, so 3,200 in view is 115k triangles in one
 instanced draw. The two costs that bite are candidate resolution in the worker, and overdraw at
@@ -1881,7 +1939,7 @@ short.
 | `clump` | Written | Cards radiating from one ground point | Grass, wildflowers, clover, reeds |
 | `crown` | Written | One undivided stem, a rosette of long curved cards at the top | Palm, fern, tree fern, cycad |
 | `rock` | Written | One solid from one 3D field: mesh and image off the same function. No cards, no alpha, one material, a hull | Boulder, block |
-| `pebble` | Planned | The rock's mesh with a grain-only image, clustered, no collider. See [scatter-forge-rocks.md](../../docs/scatter-forge-rocks.md) | Pebble, scree |
+| `pebble` | Written | The rock, several times over in one mesh: a block of the image each, clustered, no collider | Pebble, cobble, scree |
 | `outcrop` | Planned | A stack of convex slabs, each its own hull. See [scatter-forge-rocks.md](../../docs/scatter-forge-rocks.md) | Overhang, cliff, strata |
 
 ### Conifers stayed inside `tree`
@@ -1911,13 +1969,23 @@ position and has no seam to wrap.
 That is the clearest evidence the type split is in the right place: the split is at the mesh and the
 texture painter, and everything either side of it is common.
 
-### `pebble` and `outcrop`
+### `pebble` shares everything but the count
 
-The design for both is in [scatter-forge-rocks.md](../../docs/scatter-forge-rocks.md). A pebble is
-the rock's mesh under a grain-only painter, clustered the way a patch clusters tufts, with skins
-picked from a shared atlas and no collider. An outcrop is a stack of convex slabs, each its own hull
-in a layer whose `collider` is a list, which is engine work alongside the ground probe that lets
-the player stand on one.
+**Written.** See [Pebbles](#pebbles). A pebble is the rock's field, charts, painter and keys, packed
+several to a mesh with a block of the image each. It earns a type at neither the mesh nor the
+painter, which is the rule everything else here follows, and it earns one anyway: what differs is
+how many stones a model holds, and that changes the packing, the atlas and the layer. The rule holds
+in the sense that mattered, which is that the shared parts stayed shared.
+
+The design drafted a shared skin atlas and a grain-only painter, and that turned out to be a false
+economy: a block per pebble is cheaper than four shared ones at a legible chart size, and it is what
+lets the painter run whole. See [scatter-forge-rocks.md](../../docs/scatter-forge-rocks.md).
+
+### `outcrop`
+
+The design is in [scatter-forge-rocks.md](../../docs/scatter-forge-rocks.md). An outcrop is a stack
+of convex slabs, each its own hull in a layer whose `collider` is a list, which is engine work
+alongside the ground probe that lets the player stand on one.
 
 ### Smaller things worth keeping
 

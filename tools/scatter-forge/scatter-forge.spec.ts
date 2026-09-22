@@ -38,6 +38,7 @@ import {
   colliderFor,
   crownLayer,
   geometryEntry,
+  pebbleLayer,
   rockLayer,
   scatterLayer,
   scatterLayerEntry,
@@ -46,8 +47,9 @@ import {
 } from './lib/templates.ts';
 import { buildClump, patchRadiusOf } from './lib/clump.ts';
 import { buildCrown } from './lib/crown.ts';
-import { buildRock, chartUv, crackMask, cubePoint, FACES, ROCK_CHART_COLUMNS, ROCK_CHART_ROWS, ROCK_GUTTER, rockChartPx, scoopOf, surfaceAt } from './lib/rock.ts';
-import { buildStoneCanvas } from './lib/stone.ts';
+import { buildPebbleCluster, packPebbles } from './lib/pebbles.ts';
+import { buildRock, chartAtlas, chartOrigin, chartUv, crackMask, cubePoint, FACES, gutterOf, ROCK_CHART_COLUMNS, rockAtlas, rockChartPx, scoopOf, surfaceAt } from './lib/rock.ts';
+import { buildPebbleCanvases, buildStoneCanvas } from './lib/stone.ts';
 import { platesInto } from './lib/plates.ts';
 import { heightPieces, materialPieces } from './lib/pieces.ts';
 
@@ -1608,7 +1610,7 @@ describe('crown', () => {
 
     // A crown is two lengths, not one height, so `height` is not its key.
     expect(() => parseConfig({ type: 'crown', name: 'a', height: 8 }, 'test.json')).toThrow(
-      /'height' applies to tree, clump, rock, not to type 'crown'/
+      /'height' applies to tree, clump, rock, pebble, not to type 'crown'/
     );
     expect(() => parseConfig({ type: 'crown', name: 'a', splits: 4 }, 'test.json')).toThrow(/applies to tree/);
     expect(() => parseConfig({ name: 'a', stemHeight: 4 }, 'test.json')).toThrow(
@@ -2147,7 +2149,7 @@ describe('accents', () => {
   });
 });
 
-xdescribe('rock', () => {
+describe('rock', () => {
   const rockParams = (extra: RawConfig = {}): Params =>
     resolveParams({ type: 'rock', name: 'test-rock', seed: 7, ...extra });
 
@@ -2165,7 +2167,7 @@ xdescribe('rock', () => {
       /'windAmplitude' applies to tree, clump, crown, not to type 'rock'/
     );
     expect(() => parseConfig({ name: 'a', scoops: 1 }, 'test.json')).toThrow(
-      /'scoops' applies to rock, not to type 'tree'/
+      /'scoops' applies to rock, pebble, not to type 'tree'/
     );
   });
 
@@ -2317,21 +2319,20 @@ xdescribe('rock', () => {
   it('lays every face inside its own chart, gutter excluded', () => {
     const params = rockParams({ subdivisions: 4 });
     const { uvs, vertexCount } = buildRock(params).mesh.pieces[0].attributes;
-    const chartPx = rockChartPx(params);
+    const atlas = rockAtlas(params);
+    const { chartPx, gutter } = atlas;
     const perFace = vertexCount / 6;
-    const width = chartPx * ROCK_CHART_COLUMNS;
-    const height = chartPx * ROCK_CHART_ROWS;
 
     for (let i = 0; i < vertexCount; i++) {
       const face = Math.floor(i / perFace);
       const column = face % ROCK_CHART_COLUMNS;
       const row = Math.floor(face / ROCK_CHART_COLUMNS);
-      const x = uvs[i * 2] * width;
-      const y = uvs[i * 2 + 1] * height;
-      expect(x).toBeGreaterThanOrEqual(column * chartPx + ROCK_GUTTER - 1e-3);
-      expect(x).toBeLessThanOrEqual((column + 1) * chartPx - ROCK_GUTTER + 1e-3);
-      expect(y).toBeGreaterThanOrEqual(row * chartPx + ROCK_GUTTER - 1e-3);
-      expect(y).toBeLessThanOrEqual((row + 1) * chartPx - ROCK_GUTTER + 1e-3);
+      const x = uvs[i * 2] * atlas.width;
+      const y = uvs[i * 2 + 1] * atlas.height;
+      expect(x).toBeGreaterThanOrEqual(column * chartPx + gutter - 1e-3);
+      expect(x).toBeLessThanOrEqual((column + 1) * chartPx - gutter + 1e-3);
+      expect(y).toBeGreaterThanOrEqual(row * chartPx + gutter - 1e-3);
+      expect(y).toBeLessThanOrEqual((row + 1) * chartPx - gutter + 1e-3);
     }
   });
 
@@ -2435,12 +2436,12 @@ xdescribe('rock', () => {
     const params = rockParams({ textureSize: 256, cracks: 3 });
     const { field } = buildRock(params);
     const canvas = buildStoneCanvas(params, field);
-    const chartPx = rockChartPx(params);
-    const inner = chartPx - ROCK_GUTTER * 2;
+    const atlas = rockAtlas(params);
+    const inner = atlas.chartPx - atlas.gutter * 2;
     const half = 0.5 / inner;
     const uv: [number, number] = [0, 0];
     const texelAt = (face: number, a: number, b: number): number => {
-      chartUv(uv, face, a, b, chartPx);
+      chartUv(uv, atlas, 0, face, a, b);
       return Math.floor(uv[1] * canvas.height) * canvas.width + Math.floor(uv[0] * canvas.width);
     };
     const gap = (a: number, b: number): number => {
@@ -2494,6 +2495,149 @@ xdescribe('rock', () => {
     const centre = (size / 2) * size + size / 2;
     const backgroundBlue = pixels[centre * 3 + 2] > pixels[centre * 3] + 6;
     expect(backgroundBlue).toBe(false);
+  });
+});
+
+describe('pebble clusters', () => {
+  const pebbleParams = (extra: RawConfig = {}): Params =>
+    resolveParams({ type: 'pebble', name: 'test-pebbles', seed: 11, textureSize: 128, ...extra });
+
+  it('takes its defaults from the type', () => {
+    const params = pebbleParams();
+    expect(params.out).toBe('assets/shared/nature/pebbles');
+    expect(params.cullDistance).toBe(60);
+    expect(params.impostor).toBeNull();
+    expect(params.castShadow).toBe(false);
+    // Grain and shape only, until a config asks for more.
+    expect(params.cracks).toBe(0);
+    expect(params.plates).toBe(0);
+    expect(params.weathering).toBe(0);
+  });
+
+  // The decision that replaced the shared skin atlas: a pebble config may name
+  // any key a rock takes, because its bake is its own and every mark lands on
+  // the stone that carries it.
+  it('takes every key a rock takes', () => {
+    for (const key of ['scoops', 'cracks', 'weathering', 'snow', 'plates', 'edgeWear', 'stoneTint'])
+      expect(() => parseConfig({ type: 'pebble', name: 'a', [key]: key === 'stoneTint' ? '#808080' : 1 }, 'test.json')).not.toThrow();
+
+    expect(() => parseConfig({ type: 'pebble', name: 'a', splits: 4 }, 'test.json')).toThrow(
+      /'splits' applies to tree, not to type 'pebble'/
+    );
+    expect(() => parseConfig({ type: 'rock', name: 'a', pebblesPerModel: 4 }, 'test.json')).toThrow(
+      /'pebblesPerModel' applies to pebble, not to type 'rock'/
+    );
+  });
+
+  it('gives every pebble its own block of the image', () => {
+    const params = pebbleParams({ pebblesPerModel: 7, subdivisions: 3 });
+    const cluster = buildPebbleCluster(params);
+    expect(cluster.pebbles).toHaveLength(7);
+
+    // Seven blocks of 3x2 charts, in a grid that holds them all.
+    const { atlas } = cluster;
+    expect(atlas.columns * atlas.rows).toBeGreaterThanOrEqual(7);
+    expect(atlas.width).toBe(atlas.chartPx * 3 * atlas.columns);
+    expect(atlas.height).toBe(atlas.chartPx * 2 * atlas.rows);
+
+    // No two pebbles address the same texels. Each block's charts are walked
+    // through the mesh's own uvs, so this is what the renderer will sample.
+    const { uvs, vertexCount } = cluster.mesh.pieces[0].attributes;
+    const perPebble = vertexCount / 7;
+    const blocks = new Set<number>();
+    for (let i = 0; i < vertexCount; i++) {
+      const column = Math.floor((uvs[i * 2] * atlas.width) / (atlas.chartPx * 3));
+      const row = Math.floor((uvs[i * 2 + 1] * atlas.height) / (atlas.chartPx * 2));
+      blocks.add(Math.floor(i / perPebble) * 1000 + row * atlas.columns + column);
+    }
+    // One block per pebble, and each pebble in exactly one.
+    expect(blocks.size).toBe(7);
+  });
+
+  it('packs the pebbles without overlapping them', () => {
+    const pebbles = packPebbles(pebbleParams({ pebblesPerModel: 14 }));
+    expect(pebbles).toHaveLength(14);
+
+    for (let i = 0; i < pebbles.length; i++)
+      for (let j = i + 1; j < pebbles.length; j++) {
+        const dx = pebbles[i].origin[0] - pebbles[j].origin[0];
+        const dz = pebbles[i].origin[2] - pebbles[j].origin[2];
+        // They may nestle, but a pebble never sits inside its neighbour.
+        expect(Math.hypot(dx, dz)).toBeGreaterThan((pebbles[i].reach + pebbles[j].reach) * 0.85);
+      }
+  });
+
+  it('orders the pebbles largest first and beds each into the ground', () => {
+    const pebbles = packPebbles(pebbleParams({ pebblesPerModel: 9, pebbleSmallest: 0.3 }));
+    const heights = pebbles.map((pebble) => pebble.field.extents[1]);
+
+    for (let i = 1; i < heights.length; i++) expect(heights[i]).toBeLessThanOrEqual(heights[i - 1]);
+    expect(heights[heights.length - 1] / heights[0]).toBeCloseTo(0.3, 2);
+    // Each sits by its own share of its own height, not by the cluster's.
+    for (const pebble of pebbles) expect(pebble.origin[1]).toBeLessThan(0);
+  });
+
+  // A tier is the same cluster at fewer quads a side. It has to land the same
+  // stones in the same places under the same charts, or the handover slides.
+  it('lands the same pebbles under the same charts across tiers', () => {
+    const base = buildPebbleCluster(pebbleParams({ pebblesPerModel: 8, subdivisions: 6 }));
+    const tier = buildPebbleCluster(pebbleParams({ pebblesPerModel: 8, subdivisions: 3 }));
+
+    expect(tier.atlas).toEqual(base.atlas);
+    base.pebbles.forEach((pebble, index) => expect(tier.pebbles[index].origin).toEqual(pebble.origin));
+    expect(tier.mesh.pieces[0].attributes.triangleCount).toBeLessThan(
+      base.mesh.pieces[0].attributes.triangleCount
+    );
+  });
+
+  it('emits a layer with no collider and no impostor', () => {
+    const params = pebbleParams();
+    const cluster = buildPebbleCluster(params);
+    const layer = pebbleLayer(params, cluster.metrics);
+
+    expect(layer.collider).toBeUndefined();
+    expect(layer.impostor).toBeUndefined();
+    expect(layer.alignToNormal).toBe(1);
+    // The cluster is to a pebble what a patch is to a tuft: one candidate for
+    // all of them, so the footprint is never a single stone's, and never
+    // under what the single-stone layer it replaces shipped at.
+    expect(layer.footprint).toBeGreaterThanOrEqual(2.5);
+    expect(layer.yOffset).toBeLessThan(0);
+    expect(() => scatterLayerEntry(layer)).not.toThrow();
+  });
+
+  it('paints every block of the image', () => {
+    const params = pebbleParams({ pebblesPerModel: 4, subdivisions: 3 });
+    const cluster = buildPebbleCluster(params);
+    const { stone } = buildPebbleCanvases(params, cluster);
+    expect(stone.width).toBe(cluster.atlas.width);
+    expect(stone.height).toBe(cluster.atlas.height);
+
+    // The centre texel of every block carries a painted stone, so no block was
+    // left as the zeroed canvas.
+    cluster.pebbles.forEach((_, block) => {
+      const origin: [number, number] = [0, 0];
+      chartOrigin(origin, cluster.atlas, block, 0);
+      const x = origin[0] + cluster.atlas.chartPx / 2;
+      const y = origin[1] + cluster.atlas.chartPx / 2;
+      const texel = y * stone.width + x;
+      expect(stone.albedo[texel * 3] + stone.albedo[texel * 3 + 1] + stone.albedo[texel * 3 + 2]).toBeGreaterThan(0);
+    });
+  });
+
+  // A rock is one block of one atlas, so every number the old constants gave
+  // has to survive the move to a grid.
+  it('leaves a rock as one block of 3x2 charts', () => {
+    const params = resolveParams({ type: 'rock', name: 'a', seed: 1, textureSize: 1024 });
+    const atlas = rockAtlas(params);
+
+    expect(atlas.chartPx).toBe(rockChartPx(params));
+    expect([atlas.columns, atlas.rows]).toEqual([1, 1]);
+    expect([atlas.width, atlas.height]).toEqual([1536, 1024]);
+    // The gutter a rock has always had, now stated as a proportion.
+    expect(atlas.gutter).toBe(8);
+    expect(gutterOf(64)).toBe(2);
+    expect(chartAtlas(64, 14).gutter).toBe(2);
   });
 });
 

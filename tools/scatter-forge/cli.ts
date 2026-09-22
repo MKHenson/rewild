@@ -34,9 +34,10 @@ import {
   type Params,
 } from './lib/params.ts';
 import { randomSeed } from './lib/rng.ts';
+import { buildPebbleCluster, type Cluster } from './lib/pebbles.ts';
 import { buildRock, type Rock } from './lib/rock.ts';
 import { buildSkeleton, type Skeleton } from './lib/skeleton.ts';
-import { buildRockCanvases } from './lib/stone.ts';
+import { buildPebbleCanvases, buildRockCanvases } from './lib/stone.ts';
 import type { AtlasLayout } from './lib/atlas.ts';
 import {
   atlasLayoutFor,
@@ -62,6 +63,7 @@ import {
   crownLayer,
   geometryEntry,
   materialEntries,
+  pebbleLayer,
   rockLayer,
   scatterLayer,
   scatterLayerEntry,
@@ -95,6 +97,8 @@ interface Grown {
   crown: CrownMetrics | null;
   /** The field a rock was grown from, which its bake reads too. */
   rock: Rock | null;
+  /** The pebbles a cluster was packed from, and the blocks their bakes read. */
+  cluster: Cluster | null;
   layer: ScatterLayer;
 }
 
@@ -275,6 +279,7 @@ async function loadSources(params: Params): Promise<Sources> {
     case 'clump':
       return { barkSource: null, leafSource: await loadClumpSource(params.blades), accentSources };
     case 'rock':
+    case 'pebble':
       return { barkSource: null, leafSource: null, accentSources };
     case 'crown':
       return {
@@ -312,17 +317,38 @@ function layoutFromManifest(params: Params, painted: SetManifest, directory: str
 function grow(params: Params, layout: AtlasLayout, bark: BarkTile | null): Grown {
   if (params.type === 'clump') {
     const { mesh, metrics } = buildClump(params, layout);
-    return { mesh, skeleton: null, metrics, crown: null, rock: null, layer: clumpLayer(params, metrics) };
+    return { mesh, skeleton: null, metrics, crown: null, rock: null, cluster: null, layer: clumpLayer(params, metrics) };
+  }
+
+  if (params.type === 'pebble') {
+    const cluster = buildPebbleCluster(params);
+    return {
+      mesh: cluster.mesh,
+      skeleton: null,
+      metrics: null,
+      crown: null,
+      rock: null,
+      cluster,
+      layer: pebbleLayer(params, cluster.metrics),
+    };
   }
 
   if (params.type === 'crown') {
     const crown = buildCrown(params, layout, bark);
-    return { mesh: crown.mesh, skeleton: crown.skeleton, metrics: null, crown: crown.metrics, rock: null, layer: crownLayer(params, crown) };
+    return {
+      mesh: crown.mesh,
+      skeleton: crown.skeleton,
+      metrics: null,
+      crown: crown.metrics,
+      rock: null,
+      cluster: null,
+      layer: crownLayer(params, crown),
+    };
   }
 
   if (params.type === 'rock') {
     const rock = buildRock(params);
-    return { mesh: rock.mesh, skeleton: null, metrics: null, crown: null, rock, layer: rockLayer(params, rock) };
+    return { mesh: rock.mesh, skeleton: null, metrics: null, crown: null, rock, cluster: null, layer: rockLayer(params, rock) };
   }
 
   const skeleton = buildSkeleton(params);
@@ -332,6 +358,7 @@ function grow(params: Params, layout: AtlasLayout, bark: BarkTile | null): Grown
     metrics: null,
     crown: null,
     rock: null,
+    cluster: null,
     layer: scatterLayer(params, skeleton),
   };
 }
@@ -344,13 +371,20 @@ function grow(params: Params, layout: AtlasLayout, bark: BarkTile | null): Grown
 function growTier(params: Params, skeleton: Skeleton | null, layout: AtlasLayout, bark: BarkTile | null): ForgeMesh {
   if (params.type === 'crown') return buildCrown(params, layout, bark).mesh;
   if (params.type === 'rock') return buildRock(params).mesh;
+  if (params.type === 'pebble') return buildPebbleCluster(params).mesh;
   return buildMesh(params, skeleton!, layout, bark);
 }
 
-function paint(params: Params, { barkSource, leafSource, accentSources }: Sources, rock: Rock | null): Canvases {
+function paint(
+  params: Params,
+  { barkSource, leafSource, accentSources }: Sources,
+  rock: Rock | null,
+  cluster: Cluster | null
+): Canvases {
   if (params.type === 'clump') return buildClumpCanvases(params, leafSource, accentSources);
   if (params.type === 'crown') return buildCrownCanvases(params, hasStem(params), barkSource, leafSource, accentSources);
   if (params.type === 'rock') return buildRockCanvases(params, rock!.field);
+  if (params.type === 'pebble') return buildPebbleCanvases(params, cluster!);
   return buildTreeCanvases(params, barkSource, leafSource, accentSources);
 }
 
@@ -381,7 +415,7 @@ async function generate(params: Params, writeTemplate: string | null, previous?:
   // makes a mesh edit rebuild in milliseconds rather than seconds.
   const reusable = previous?.canvases && sameTexture(previous.params, params) ? previous.canvases : undefined;
   const canvases =
-    reusable ?? (params.skipTextures && !params.preview ? undefined : paint(params, sources, grown.rock));
+    reusable ?? (params.skipTextures && !params.preview ? undefined : paint(params, sources, grown.rock, grown.cluster));
 
   let textures = textureFileNames(params.textureSet, pieces);
   if (!params.skipTextures && !reusable) {
@@ -623,6 +657,8 @@ function describeSources({ params, barkSource, leafSource, accentSources, layout
       return [...describeBlades(params, leafSource, layout), ...accents];
     case 'rock':
       return ['  stone    generated from the field'];
+    case 'pebble':
+      return [`  stone    generated from ${params.pebblesPerModel} fields, one per pebble`];
     case 'crown':
       return [
         ...(hasStem(params) ? [describeBark(params, barkSource)] : []),
@@ -641,7 +677,14 @@ function lowestLimb(skeleton: Skeleton): number {
 }
 
 /** The second line of the report: what the model measures, by type. */
-function describeShape({ params, skeleton, metrics, crown, rock }: Built): string {
+function describeShape({ params, skeleton, metrics, crown, rock, cluster }: Built): string {
+  if (cluster)
+    return (
+      `  ${cluster.metrics.pebbles} pebbles over a ${(cluster.metrics.clusterRadius * 2).toFixed(2)}m cluster, ` +
+      `tallest ${cluster.metrics.height.toFixed(2)}m, ${params.subdivisions} subdivisions a side, ` +
+      `${cluster.atlas.columns}x${cluster.atlas.rows} blocks of ${cluster.atlas.chartPx}px charts`
+    );
+
   if (rock)
     return (
       `  height ${rock.metrics.height.toFixed(2)}m, ${rock.metrics.width.toFixed(2)}m by ${rock.metrics.depth.toFixed(2)}m, ` +
