@@ -34,12 +34,15 @@ function seededRandom(seed: number): () => number {
 // (like the climate noise), so borders stay seam-free across chunks, and both
 // axes share one warp so their borders wander coherently.
 //
-// Tuning (both in sample units — multiply by metersPerSample for world units):
-//   WARP_SAMPLE_SCALE — wiggle wavelength; keep well below the biome `scale` so
-//                       wiggles are finer than the biomes but not noisy.
-//   WARP_AMPLITUDE    — how far the border wanders; ~0.2–0.4 × biome `scale`
-//                       reads as natural. Higher fragments biomes into islands.
-const WARP_SAMPLE_SCALE = 1000;
+// Tuning (both in sample units, multiply by metersPerSample for world units):
+//   WARP_SAMPLE_SCALE - wiggle wavelength. Keep it near the biome `scale`.
+//   WARP_AMPLITUDE    - how far the border wanders. Higher fragments biomes
+//                       into islands.
+//
+// WARP_AMPLITUDE / WARP_SAMPLE_SCALE must stay below 0.18. Above that the warp
+// folds: d(sx)/dx turns negative, so two climate values land on one position.
+// The border is then a discontinuity and blendHalfWidth cannot widen it.
+const WARP_SAMPLE_SCALE = 2800;
 const WARP_AMPLITUDE = 350;
 
 // Which band an axis value falls in, plus the smoothstep blend into the next
