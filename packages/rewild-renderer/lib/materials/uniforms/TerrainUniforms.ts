@@ -4,22 +4,23 @@ import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 import { MAX_SPLAT_LAYERS } from '../../renderers/terrain/Biomes';
 
-// TerrainParams layout (400 bytes, std140-compatible) — must match the struct
+// TerrainParams layout (416 bytes, std140-compatible) — must match the struct
 // in terrain.wgsl:
 //   detailFadeStart  f32             offset 0   (4 bytes)
 //   detailFadeEnd    f32             offset 4   (4 bytes)
 //   noiseScale       f32             offset 8   (4 bytes)
 //   heightBlendDepth f32             offset 12  (4 bytes)
-//   layers           array<vec4f,24> offset 16  (384 bytes)
+//   uvPerMetre       f32             offset 16  (4 bytes)
+//   layers           array<vec4f,24> offset 32  (384 bytes)
 //
-// `layers` starts at 16 because a uniform array of vec4f needs 16-byte
-// alignment, and the four scalars above fill exactly one row. Three vec4f per
-// splat channel, MAX_SPLAT_LAYERS channels:
+// `layers` starts at 32 because a uniform array of vec4f needs 16-byte
+// alignment, and the five scalars above spill into a second row. Three vec4f
+// per splat channel, MAX_SPLAT_LAYERS channels:
 //   [slot*3    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
 //   [slot*3 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
 //   [slot*3 + 2] = (macroLayerIndex, macroNormalYSign, macroStrength, _pad)
-const PARAMS_SIZE = 16 + MAX_SPLAT_LAYERS * 3 * 16;
-const LAYERS_OFFSET_FLOATS = 16 / 4;
+const PARAMS_SIZE = 32 + MAX_SPLAT_LAYERS * 3 * 16;
+const LAYERS_OFFSET_FLOATS = 32 / 4;
 const FLOATS_PER_LAYER = 12;
 
 export interface TerrainLayerParams {
@@ -81,6 +82,17 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   // an unpopulated layer slot is given, and the uniform layout's original home
   // for the value.
   heightBlendDepth: number = 0.2;
+
+  // UV units per world metre, which is 1 / (chunk span in metres): the terrain's
+  // UV is an affine map of world XZ, so this is the constant that relates the
+  // two. The biplanar projection needs it to put world height into the same
+  // units the horizontal axes already use, so that a layer's `uvScale` means one
+  // thing on flat ground and on a cliff.
+  //
+  // 0 turns the biplanar path off, which is the safe default: a wrong scale here
+  // would tile the vertical axis at the wrong rate, and no projection at all is
+  // better than a confidently wrong one. LODMesh sets it from the real chunk.
+  uvPerMetre: number = 0;
 
   layers: TerrainLayerParams[] = [];
 
@@ -181,6 +193,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     data[1] = this.detailFadeEnd;
     data[2] = this.noiseScale;
     data[3] = this.heightBlendDepth;
+    data[4] = this.uvPerMetre;
 
     // Channels the palette does not use keep weight 0 in the splat, so the
     // shader's epsilon skips them — but zero them anyway so a stale layer can
