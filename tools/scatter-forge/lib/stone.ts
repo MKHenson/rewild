@@ -84,9 +84,9 @@ interface Palette {
   glint: Rgb;
   /** The colour the odd standout bed takes, outside the stone's own ramp. */
   lamina: Rgb;
-  /** The mineral a filled hole holds, and the dark glass a hole is lined with. */
+  /** The mineral added into a filled hole, and what an open hole is multiplied by. */
   amygdale: Rgb;
-  holeFloor: Rgb;
+  hole: Rgb;
 }
 
 function paletteOf(params: Params): Palette {
@@ -123,7 +123,7 @@ function paletteOf(params: Params): Palette {
     glint: parseHex(params.glintTint, 'glintTint'),
     lamina: parseHex(params.laminaeAccent, 'laminaeAccent'),
     amygdale: parseHex(params.amygdaleTint, 'amygdaleTint'),
-    holeFloor: mulRgb(dark, [0.45, 0.45, 0.45]),
+    hole: parseHex(params.vesicleTint, 'vesicleTint'),
   };
 }
 
@@ -828,8 +828,10 @@ function paintChart(
 
       // Vesicles: gas holes. An open hole is a bowl lined with dark glass,
       // rough and in its own shadow, and deepest where the bubble was widest.
+      // Its tint multiplies the stone and a filled hole's adds to it, so the
+      // grain and the tone read through both.
       // The height map takes the pits the mesh could not, so a pin prick
-      // still has a floor. A filled hole is an amygdale: a pale mineral spot,
+      // still has a floor. A filled hole is an amygdale: a mineral spot,
       // flush with the stone, with a thin dark lining at its edge.
       let hole = 0;
       if (surface.holes) {
@@ -841,10 +843,11 @@ function paintChart(
           if (filled > 0) {
             const lining = cover * (1 - smoothstep(0.35, 0.8, cover));
             const fill = smoothstep(0.5, 1, cover);
-            const shade = 0.9 + 0.2 * grit;
-            r = mix(r, palette.amygdale[0] * shade, fill) * (1 - 0.5 * lining);
-            g = mix(g, palette.amygdale[1] * shade, fill) * (1 - 0.5 * lining);
-            b = mix(b, palette.amygdale[2] * shade, fill) * (1 - 0.5 * lining);
+            const add = fill * (0.9 + 0.2 * grit);
+            const rim = 1 - 0.5 * lining;
+            r = (r + palette.amygdale[0] * add) * rim;
+            g = (g + palette.amygdale[1] * add) * rim;
+            b = (b + palette.amygdale[2] * add) * rim;
             roughness = mix(roughness, 0.55, fill);
             relief = mix(relief, baseRelief + 0.01, fill);
           } else {
@@ -852,10 +855,11 @@ function paintChart(
             // The floor falls away from the lip, so the wall is lit and the
             // bottom is not.
             const floor = smoothstep(0, 0.7, pit);
+            const t = cover * (0.35 + 0.5 * floor);
             const shade = 1 - 0.35 * floor;
-            r = mix(r, palette.holeFloor[0], cover * (0.35 + 0.5 * floor)) * shade;
-            g = mix(g, palette.holeFloor[1], cover * (0.35 + 0.5 * floor)) * shade;
-            b = mix(b, palette.holeFloor[2], cover * (0.35 + 0.5 * floor)) * shade;
+            r *= mix(1, palette.hole[0], t) * shade;
+            g *= mix(1, palette.hole[1], t) * shade;
+            b *= mix(1, palette.hole[2], t) * shade;
             relief -= cover * pit * vesicleDepth * (0.25 + 0.35 * scale);
             ao *= 1 - cover * (0.35 + 0.45 * floor);
             roughness += 0.1 * cover;

@@ -14,7 +14,7 @@ import { createBuilder, finish, pushVertex, type Builder, type MeshAttributes, t
 import { signedFbm, smoothstep } from './noise.ts';
 import { trunkSidesOf, type AccentSpec, type Params } from './params.ts';
 import { createRng, hash2, type Rng } from './rng.ts';
-import { bendWeight, clusterPhase, sampleBranch, type BranchPoint, type Skeleton } from './skeleton.ts';
+import { bendWeight, clusterPhase, leafShare, sampleBranch, type BranchPoint, type Skeleton } from './skeleton.ts';
 import { add, cross, normalize, perpendicular, rotateAbout, scale, sub, transport, type Vec3 } from './vec.ts';
 
 export { createBuilder, finish, pushVertex, type Builder, type MeshAttributes, type Rgba };
@@ -382,6 +382,8 @@ function buildLeaves(params: Params, skeleton: Skeleton, atlas: AtlasLayout): Me
     if (!branch.bearsLeaves) continue;
     const phase = clusterPhase(params, branch.clusterId);
 
+    const size = params.leafSize * params.leafScale * leafShare(params, branch);
+
     for (let k = 0; k < params.leavesPerBranch; k++) {
       const along = params.leafFrom + (1 - params.leafFrom) * ((k + 0.5) / params.leavesPerBranch);
       const at = sampleBranch(branch, Math.min(1, along + (rng() - 0.5) * 0.08));
@@ -390,7 +392,7 @@ function buildLeaves(params: Params, skeleton: Skeleton, atlas: AtlasLayout): Me
       const leafDir = normalize(rotateAbout(at.dir, right, (params.leafAngle + (rng() - 0.5) * 20) * DEG));
       const cardNormal = normalize(cross(right, leafDir));
 
-      const height = params.leafSize * params.leafScale * rng.range(0.75, 1.25);
+      const height = size * rng.range(0.75, 1.25);
       const width = height * params.leafAspect;
       const stem = add(at.p, scale(right, at.radius));
       const cell = cells[Math.floor(hash2(params.seed, branch.id * 977 + k) * variants) % variants];

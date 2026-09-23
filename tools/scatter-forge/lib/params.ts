@@ -221,6 +221,7 @@ export const PARAM_SPEC = {
 
   leavesPerBranch: { type: 'int', default: 18, help: 'Leaf cards on each leaf-bearing branch.', types: TREE },
   leafLevels: { type: 'int', default: 2, help: 'How many of the deepest branch generations carry leaves.', types: TREE },
+  leafEvenness: { type: 'number', default: 1, help: 'How far a card\'s size follows the length of the shoot it sits on, 0..1. 1 makes the spray on a short shoot a scale model of the one on a long shoot, which is what stops the tip of a whorled cone from filling in as a column; 0 draws every card at leafSize whatever it sits on.', types: TREE },
   leafSize: { type: 'number', default: 1, help: 'Leaf card height in metres. Decides how many authored leaves fill a card.', texture: true, types: TREE },
   leafGrid: { type: 'int', default: 0, help: 'Cells along each edge of the leaf image: 1, 2 or 4. Fewer cells give each cluster more texels; more give the canopy more variants. 0 derives it from how many leaves fit a card.', texture: true, types: TREE },
   leafScale: { type: 'number', default: 1, help: 'Card size multiplier that leaves the texture fit alone. Fewer, larger cards for a LOD tier.', types: TREE },
@@ -321,8 +322,9 @@ export const PARAM_SPEC = {
   vesicleStretch: { type: 'number', default: 0, help: 'How far the lava flow drew the bubbles out into ovals, 0..1, along the bedding. 1 is three times longer than wide.', texture: true, types: STONE },
   vesicleZoning: { type: 'number', default: 0, help: 'How far the bubbles gather into zones along the bedding, 0..1. 0 spreads them evenly; 1 leaves dense stone between frothy bands.', texture: true, types: STONE },
   vesicleDepth: { type: 'number', default: 0.8, help: 'How deep a hole goes, 0..1, as a fraction of its own radius. 1 is the full bowl of the bubble.', texture: true, types: STONE },
+  vesicleTint: { type: 'string', default: '#3d3d3d', help: 'The colour an open hole is darkened by, six digit hex, multiplied over the stone so the grain stays under it. Near black is the glass lining a basalt bubble; white leaves the hole untinted.', texture: true, types: STONE },
   amygdales: { type: 'number', default: 0, help: 'Share of the holes filled with minerals, 0..1: pale spots flush with the stone, in amygdaleTint.', texture: true, types: STONE },
-  amygdaleTint: { type: 'string', default: '#e3ddcb', help: 'The mineral that fills a hole, six digit hex. Near white is calcite or zeolite; a soft green is chlorite.', texture: true, types: STONE },
+  amygdaleTint: { type: 'string', default: '#8f8b7b', help: 'The mineral that fills a hole, six digit hex, added to the stone so the grain stays under it. A pale grey is calcite or zeolite; a soft green is chlorite; black fills nothing.', texture: true, types: STONE },
   subdivisions: { type: 'int', default: 24, byType: { pebble: 6 }, help: 'Quads along each edge of the cube a stone is grown from. Six faces of this squared, doubled, is the triangle count, and a cluster pays it once per pebble.', types: STONE },
 
   pebblesPerModel: { type: 'int', default: 12, help: 'Pebbles packed into one cluster. Each is its own stone with its own six charts, so the image and the bake grow with this.', texture: true, types: PEBBLE },
@@ -1041,7 +1043,7 @@ function validateRock(params: Params): void {
 
   if (params.bump < 0 || params.bump > 4) throw new Error(`bump must be within 0..4, got ${params.bump}.`);
 
-  for (const key of ['stoneTint', 'stoneDark', 'stoneLight', 'lichenTint', 'soilTint', 'stainTint', 'edgeTint', 'streakTint', 'topTint', 'glintTint', 'amygdaleTint'] as const)
+  for (const key of ['stoneTint', 'stoneDark', 'stoneLight', 'lichenTint', 'soilTint', 'stainTint', 'edgeTint', 'streakTint', 'topTint', 'glintTint', 'vesicleTint', 'amygdaleTint'] as const)
     if (!/^#?[0-9a-f]{6}$/i.test(params[key]))
       throw new Error(`${key} must be a six digit hex colour, got '${params[key]}'.`);
 
@@ -1197,6 +1199,9 @@ function validateTree(params: Params): void {
     throw new Error(`leafGrid must be 1, 2 or 4, or 0 to derive it, got ${params.leafGrid}.`);
 
   if (params.leavesPerBranch < 0) throw new Error('leavesPerBranch must not be negative.');
+
+  if (params.leafEvenness < 0 || params.leafEvenness > 1)
+    throw new Error(`leafEvenness must be within 0..1, got ${params.leafEvenness}.`);
 
   // Leaves hang off the deepest generations, so asking for more of them than
   // the tree has produces a trunk covered in foliage.

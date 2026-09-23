@@ -359,6 +359,39 @@ describe('whorls', () => {
     );
   });
 
+  it('sizes the cards by the shoot, so a top ring is a scale model of the lowest', () => {
+    const shape: RawConfig = { ...WHORLED, leavesPerBranch: 4, leafSize: 1, leafAngle: 45 };
+    const limbs = limbsOf(shape);
+
+    // The sleeve of foliage a ring throws, as a fraction of its own limbs: what
+    // reads as a spray at a fifth of the limb and as a ball at the limb's own
+    // length. Card heights carry a 25% jitter each, so this is a ring mean.
+    const sleeve = (extra: RawConfig, ring: number) => {
+      const params = paramsFor({ ...shape, ...extra });
+      // A card is four corners, and its height is the base corner to the tip
+      // above it. The limbs are the only leaf branches, in the order they grew.
+      const { positions } = pieceOf(buildMesh(params, buildSkeleton(params), TREE_ATLAS), 'leaf');
+      const height = (card: number) => {
+        const base = card * 4 * 3;
+        const tip = base + 3 * 3;
+        return Math.hypot(positions[tip] - positions[base], positions[tip + 1] - positions[base + 1], positions[tip + 2] - positions[base + 2]);
+      };
+
+      return (
+        limbs.slice(ring * 4, ring * 4 + 4).reduce((sum, limb, i) => sum + height((ring * 4 + i) * 4) / limb.length, 0) / 4
+      );
+    };
+
+    expect(sleeve({}, 5) / sleeve({}, 0)).toBeGreaterThan(0.75);
+    expect(sleeve({}, 5) / sleeve({}, 0)).toBeLessThan(1.35);
+
+    // leafEvenness 0 is the fixed card, and the ball it leaves: the top ring is
+    // a quarter of the lowest at whorlTaper 0.25, and carries the same card.
+    expect(sleeve({ leafEvenness: 0 }, 5) / sleeve({ leafEvenness: 0 }, 0)).toBeGreaterThan(3);
+
+    expect(() => paramsFor({ leafEvenness: 1.5 })).toThrow(/leafEvenness must be within 0..1/);
+  });
+
   it('carries the collider the whole way up an undivided trunk', () => {
     // The proxy stops at the first fork, and there is none: stopping at the
     // lowest whorl instead would leave a spruce with a stub of a collider.

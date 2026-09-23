@@ -128,6 +128,7 @@ function growStem(params: Params, rng: Rng): Branch {
     baseRadius: params.trunkRadius,
     tipRadius,
     children: [],
+    lengthShare: 1,
   };
 
   // The same stray a trunk takes. `stemLean` bends the stem one way over its
