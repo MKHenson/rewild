@@ -42,7 +42,7 @@ export interface PieceSpec {
    *
    * Only worth it for a piece a displacement path might one day be wired for,
    * because binding one through `materialId` replaces *every* material in the
-   * model with it. See "Leave materialId alone" in the README.
+   * model with it. See docs/scatter-forge/in-game.md, "Materials".
    */
   material: boolean;
   /**

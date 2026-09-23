@@ -4,7 +4,7 @@
 # stamp, pinned at the bottom-middle: the pivot is where the card attaches and
 # the image's up is the card's away-from-attachment direction, so a spire is
 # drawn standing and a bunch of catkins is drawn twig-down, however it hangs.
-# `source.json` declares lengthMetres. See ../../README.md, "Accents".
+# `source.json` declares lengthMetres. See ../../../../docs/scatter-forge/accents.md.
 #
 # Large binaries, kept out of git the way /assets/ is. An accent has no
 # generated fallback, so a config that names one needs its art present.

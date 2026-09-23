@@ -65,7 +65,7 @@ because there is no stored Y to fix up.
 | Where scatter runs      | **In the terrain worker**, beside mesh generation                          | The heightfield and resolved layer weights are already there. Doing it on the main thread would mean shipping both back.                                                                                                        |
 | Painted scatter storage | **A `PaintMask` with layer-slot channels**, not stored instance transforms | `PaintMask` is already "N channels of u8 weight" and its header anticipates a third user. A mask is ~3.7KB/channel/chunk and keeps instances derived; transforms would be ~8 bytes each and break that.                         |
 | Paint palette           | **The whole scatter-layer library**, not the biome's subset                | Deliberately wider than Strata's biome painter. Painting a layer the biome never emits _is_ the answer to non-biome mass placement — no special case.                                                                           |
-| Scatter layer content   | **A bundled table** (`templates/scatter-layers.json`, typed by `ScatterLayers.ts`) | A layer is a model _plus_ LOD chain, impostor, collider proxy, jitter ranges and wind params. That is authored content, not a raw template, and scatter-forge writes it.                                                        |
+| Scatter layer content   | **A bundled table** (`templates/scatter-layers.json`, typed by `ScatterLayers.ts`) | A layer is a model _plus_ LOD chain, impostor, collider proxy, jitter ranges and wind params. That is authored content, not a raw template, and [scatter-forge](../scatter-forge/README.md) writes it.                                                        |
 | Instanced draw          | **Per chunk, per layer**                                                   | Gives frustum culling a chunk-sized granularity for free and keeps instance buffers aligned to the streaming unit that already exists.                                                                                          |
 | Far LOD                 | **Octahedral impostors**                                                   | The single biggest range lever. Mesh LODs alone cannot carry a forest to the horizon at web budgets.                                                                                                                            |
 | Collider shapes         | **Authored proxies on the layer**                                          | A trunk capsule, not a trimesh of a 40k-triangle tree. The `physics.shape` block in `template-library.json` is already the right shape for this.                                                                                |
@@ -195,6 +195,14 @@ Phase 7, and a forest without shadows reads as wrong long before anyone notices 
 [#230](https://github.com/MKHenson/rewild/issues/230) is independent of everything after
 [#219](https://github.com/MKHenson/rewild/issues/219) and can be picked up any time the grass
 starts vanishing.
+
+### Asset tool: scatter-forge
+
+[scatter-forge](../scatter-forge/README.md) makes the models that the scatter system places. One
+JSON config gives a glTF model, its textures and its `scatter-layers.json` entry. It grows five
+types: trees (broadleaf and conifer), grass clumps, palms and ferns, rocks, and pebble clusters.
+This tool was not in the original plan, but it is now the source of the milestone's vegetation and
+stone.
 
 **This is a larger milestone than Strata (17) or Lichen (17).** If it needs cutting, phases 6 and 7
 are the clean break — everything through Phase 5 is a complete, usable feature.

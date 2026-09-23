@@ -2,7 +2,7 @@
 # (sRGB) and, optionally, an arm and a 16-bit disp map — either one absent is
 # derived from the diffuse. Tileable on both axes, authored with the trunk
 # running up the image. No normal map — scatter-forge derives it from the
-# composited height. See ../../../../docs/scatter-forge.md.
+# composited height. See ../../../../docs/scatter-forge/authored-art.md.
 #
 # Large binaries, kept out of git the way /assets/ is. With no source here the
 # forge generates its bark instead, so a fresh clone still builds. This rule

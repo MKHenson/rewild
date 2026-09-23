@@ -33,7 +33,7 @@
   "leafLevels": 2,
   "leafSize": 0.32,
   "leafAspect": 0.85,
-  "leafDroop": 25,
+  "leafAngle": 25,
   "leafFrom": 0.1,
   "cullDistance": 450,
   "castShadow": true,
