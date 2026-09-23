@@ -66,6 +66,7 @@ rectangles or the bark turns inside out.
 | `cullDistance` | tree `160`, clump `50`, rock `800`, pebble `60` | The distance in metres past which the engine does not draw the model. |
 | `castShadow` | on for trees, rocks and crowns with a stem | Whether the model casts a shadow. Off for clumps, pebbles and crowns with no stem, because a small shadow costs a lot and shows little. |
 | `foliage` | `true` | Light the cutout piece as leaves: no shine, and light comes through from behind. Set `false` for a cutout that is not a leaf, such as a flower spike or a stalk. The bark is not changed. |
+| `collider` | `true` | Stop the player at the trunk. Trees and crowns with a stem have a capsule measured off the trunk; clumps, pebbles and stemless crowns never have one. Set `false` on a plant low enough to walk through, such as heather: a waist-high bush that stops the player reads as a wall. Rocks stop the player at their own hull and do not read this key. |
 | `footprint` | `0` (clump `0.7`) | The clear space in metres that the engine keeps round each model. `0` lets the tool choose. See [Density](#density). |
 | `scaleMin`, `scaleMax` | `0.8`, `1.25` | The range of random sizes for each copy. Rocks use `0.6` to `1.6`, so one model can be a stone or a boulder. |
 | `impostor` | see [Impostors](#impostors) | The flat picture that the engine draws at far distances. |

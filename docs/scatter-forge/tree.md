@@ -3,11 +3,13 @@
 `type: tree` grows a trunk that divides into branches. Leaf cards hang on the outer branches. This
 is the default type, so a config with no `type` is a tree.
 
-One tree generator makes broadleaf trees, shrubs and conifers. They differ only in their keys.
+One tree generator makes broadleaf trees, shrubs, conifers and bushes. They differ only in their
+keys: `heather-01` is a tree config with no collider and whole flowering sprigs for leaves. See
+[Bushes](#bushes).
 
 [Back to scatter-forge](README.md)
 
-![The tree templates: oak, birch, poplar, shrub, spruce, redwood, larch, juniper and cypress](images/tree-templates.webp)
+![The tree templates: oak, birch, poplar, shrub, spruce, redwood, larch, juniper, cypress and heather](images/tree-templates.webp)
 
 ## How a tree is built
 
@@ -293,6 +295,30 @@ Spruce `78`, cypress `24`.
 
 ![splitAngle 30, 78 and 90 on spruce-01, with the leaves removed](images/tree-whorl-splitAngle.webp)
 
+## Bushes
+
+A bush is a tree with a short frame and no trunk worth the name. `heather-01` is one: a low frame,
+four branches at each split, and leaves on every stem down to the ground.
+
+```json
+{ "height": 2.55, "splits": 4, "splitAngle": 54, "droop": 0, "branchLevels": 3, "leafLevels": 4 }
+```
+
+Tips for a good bush:
+
+- Set `collider` to `false`. A bush the player has to walk round reads as a wall.
+- Watch `droop`. A negative value bends every branch back toward vertical over its own length, which
+  gathers the foliage into a narrow column round the stem however far the branches left it. `0` or
+  a little above lets the bush spread.
+- `splitAngle` and `droop` together set how wide it is, and they move the bulk of the foliage, not
+  only the branch tips.
+- `leafLevels` at `branchLevels + 1` puts cards on the trunk as well. On a bush whose stems are
+  leafy the whole way down that is what you want, and on a tall tree it is not. See
+  [`leafLevels`](#leaflevels).
+- Keep `barkLevels` at `1`. The leaves cover the stems below the first level.
+- A bush spreads over more ground than a tree of the same triangle count, so the cards thin as it
+  widens. Raise `leavesPerBranch` after widening, not before.
+
 ## Leaves
 
 ### `leavesPerBranch`
@@ -501,6 +527,7 @@ These keys work on more than one type. The defaults here are the ones for `tree`
 | [`cullDistance`](in-game.md#layer-keys) | `160` | The distance in metres past which the engine does not draw the model. |
 | [`castShadow`](in-game.md#layer-keys) | `true` | Whether the model casts a shadow. |
 | [`foliage`](in-game.md#layer-keys) | `true` | Light the cutout piece as leaves. Set `false` for a cutout that is not a leaf. |
+| [`collider`](in-game.md#layer-keys) | `true` | Stop the player at the trunk. Set `false` for a plant low enough to walk through. |
 | [`footprint`](in-game.md#density) | `0` | The clear space in metres round each model. `0` lets the tool choose. |
 | [`scaleMin`](in-game.md#layer-keys) | `0.8` | The smallest random size of a copy. |
 | [`scaleMax`](in-game.md#layer-keys) | `1.25` | The largest random size of a copy. |

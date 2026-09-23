@@ -92,6 +92,9 @@ export function colliderFor(params: Params, skeleton: Skeleton): PhysicsShape {
  * Typed as the engine's own `ScatterLayer`, so a field added to that interface
  * fails this file rather than producing a row that no longer compiles once it
  * has been pasted in.
+ *
+ * The collider is the trunk's proxy, and `collider: false` leaves it out: a
+ * plant the player walks through wants none, the way a clump never has one.
  */
 /**
  * A clump's layer: no collider, laid partly onto the slope, and an impostor
@@ -204,7 +207,7 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
     // not as terrain.
     alignToNormal: 0,
     footprint,
-    collider: colliderFor(params, skeleton),
+    ...(params.collider ? { collider: colliderFor(params, skeleton) } : {}),
     wind: {
       amplitude: params.windAmplitude,
       frequency: params.windFrequency,

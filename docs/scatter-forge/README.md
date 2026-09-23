@@ -163,6 +163,7 @@ Each template is a full config. Run it as it is, or copy it to start a new model
 | `birch-01` | tree | A thin, tall birch. It sets `skipTextures`, so the `birch` textures must already exist. |
 | `poplar-01` | tree | A tall, dense poplar with catkins. |
 | `shrub-01` | tree | A 2m shrub. |
+| `heather-01` | tree | A heather bush. It has no collider, and its leaves are whole flowering sprigs. |
 | `spruce-01` | tree | A 24m spruce with a pointed top. |
 | `redwood-01` | tree | A 42m redwood with a bare lower trunk. |
 | `larch-01` | tree | An open conifer with hanging foliage. |
