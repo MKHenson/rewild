@@ -472,7 +472,7 @@ Like the cracks, the holes are in the mesh and in the texture:
   At `subdivisions 24` on a 1.2m rock, that is from 0.09m, and at full depth from 0.17m. You do not
   set this: the tool finds it from the mesh.
 - **Holes in the texture**: all holes. An open hole has a dark floor, less light and a pit in the
-  height map.
+  height map. Its colour is multiplied over the stone, so the grain still reads inside it.
 
 The holes cannot have an overhang, and a hole cannot go through the rock. The rock must stay
 star-shaped (see [How a rock is built](#how-a-rock-is-built)), so a hole is always a bowl.
@@ -549,14 +549,24 @@ Default: `0.8`. `basalt-01` uses `0.85`. Range: 0 to 1.
 
 ![vesicleDepth 0.2, 0.8 and 1, on the hole study with vesicleSize 0.15](images/rock-hole-vesicleDepth.webp)
 
+### `vesicleTint`
+
+The colour an open hole is darkened by. It is multiplied over the stone, so the grain and the tone
+still read inside the hole. Near black is the dark glass that lines a bubble in basalt. `#ffffff`
+leaves the hole its own colour and only the shading marks it. A colour makes a rusted or a
+mineral-stained hole.
+
+Default: `#3d3d3d`. `basalt-01` uses `#3d3d3d`.
+
 ### `amygdales` and `amygdaleTint`
 
 In old basalt, minerals such as calcite fill some holes. A filled hole is an **amygdale**. It is a
 pale spot with a thin dark edge. It has no depth. `amygdales` is the part of the holes that are
-filled: `1` fills all of them. `amygdaleTint` is the colour of the mineral. Near white is calcite
-or zeolite. A soft green is chlorite.
+filled: `1` fills all of them. `amygdaleTint` is the mineral, added on top of the stone, so the
+grain still reads through the spot. A pale grey is calcite or zeolite. A soft green is chlorite.
+`#000000` fills nothing. Bright values wash the spot out to white, so raise the tint slowly.
 
-Default: `0` and `#e3ddcb`. `basalt-01` uses `0.08`. Range: 0 to 1.
+Default: `0` and `#8f8b7b`. `basalt-01` uses `0.08`. Range: 0 to 1.
 
 ![amygdales 0, 0.3 and 1, on the hole study](images/rock-hole-amygdales.webp)
 

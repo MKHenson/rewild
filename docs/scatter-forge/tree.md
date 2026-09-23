@@ -250,6 +250,8 @@ The images in this section start from `spruce-01`.
 Tips for a good conifer:
 
 - Change `whorlTaper` first. It sets the outline.
+- Leave `leafEvenness` at `1`. It is what keeps the short top rings from filling in as a column of
+  leaves around the trunk.
 - Then change `splitAngle`. It sets whether the branches stand out from the trunk or stay close to
   it.
 - Use more `whorls` and fewer `branchLevels`. The templates use 2 or 3 levels.
@@ -302,10 +304,37 @@ Default: `18`. Oak `3`.
 
 ![leavesPerBranch 1, 3 and 10](images/tree-leavesPerBranch.webp)
 
+### `leafEvenness`
+
+How much the size of a card follows the length of the branch it is on.
+
+A card sticks out from its branch, so a row of them makes a sleeve of leaves around it. The sleeve
+is half a card wide whatever the branch is. A conifer tapers its rings toward the top, so at one
+card size that sleeve goes from a fifth of the length of a branch at the bottom to wider than the
+whole branch at the top: the rings there stop reading as branches and fill in as a column of leaves
+around the trunk.
+
+At `1`, a card is scaled by the length of its branch, so a short branch at the top carries the same
+number of cards at the same overlap as a long branch at the bottom, at a smaller size. The top of
+the cone is then a small copy of the skirt, and the tree keeps its shape the whole way up. At `0`,
+every card is `leafSize` wherever it sits.
+
+`leafSize` still sets the size on a full-length branch, and the leaf texture does not change: a
+smaller card shows the same leaves, smaller.
+
+It changes nothing on a tree whose branches are all one length, which is every tree with
+`branchModel: fork`.
+
+Default: `1`. Range: 0 to 1.
+
 ### `leafLevels`
 
 How many of the outermost branch levels have leaves. `1` puts leaves on the tips only. Higher values
 also put leaves on the branches nearer to the trunk.
+
+The highest value it takes is `branchLevels + 1`, and that one puts leaves on the trunk as well. On
+a short stem that is what dresses a shrub. On a tall tree it is a column of leaves up the middle,
+so keep it at `branchLevels` or below unless you want that.
 
 Default: `2`. Oak `1`, birch `3`.
 
@@ -322,8 +351,9 @@ Default: `1`. Shrub `0.3`.
 
 ### `leafScale`
 
-Makes each leaf card larger or smaller without changing its texture. Use it with a low
-`leavesPerBranch` on a LOD tier: fewer, larger cards cover the same area.
+Makes each leaf card larger or smaller without changing its texture, on top of whatever
+`leafEvenness` does. Use it with a low `leavesPerBranch` on a LOD tier: fewer, larger cards cover
+the same area.
 
 Default: `1`.
 

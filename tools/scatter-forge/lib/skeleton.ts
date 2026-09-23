@@ -27,6 +27,13 @@ export interface Branch {
   tipRadius: number;
   children: number[];
   bearsLeaves?: boolean;
+  /**
+   * Length as a fraction of the longest shoot of its own generation, before
+   * the random spread on either. A whorled crown tapers its limbs to
+   * `whorlTaper` at the top, and this is what the leaf count is scaled by so
+   * the cards stay as far apart on a short shoot as on a long one.
+   */
+  lengthShare: number;
 }
 
 export interface Skeleton {
@@ -45,6 +52,7 @@ interface GrowSpec {
   branchLength: number;
   baseRadius: number;
   baseDist: number;
+  lengthShare: number;
 }
 
 const DEG = Math.PI / 180;
@@ -73,7 +81,7 @@ function radiusAt(base: number, tip: number, t: number): number {
 function growBranch(
   params: Params,
   rng: Rng,
-  { id, level, clusterId, origin, direction, branchLength, baseRadius, baseDist }: GrowSpec
+  { id, level, clusterId, origin, direction, branchLength, baseRadius, baseDist, lengthShare }: GrowSpec
 ): Branch {
   const rings = ringsFor(params, level);
   const tipRadius = baseRadius * (level === 0 ? params.trunkTaper : 0.28);
@@ -111,7 +119,7 @@ function growBranch(
     distance += step;
   }
 
-  return { id, level, clusterId, points, length: branchLength, baseRadius, tipRadius, children: [] };
+  return { id, level, clusterId, points, length: branchLength, baseRadius, tipRadius, children: [], lengthShare };
 }
 
 /** Position, radius, distance and heading at a fraction along a branch. */
@@ -259,6 +267,7 @@ export function buildSkeleton(params: Params): Skeleton {
     branchLength: params.height,
     baseRadius: params.trunkRadius,
     baseDist: 0,
+    lengthShare: 1,
   });
   if (params.trunkWander > 0) wanderCentreLine(params, trunk);
   branches.push(trunk);
@@ -300,6 +309,10 @@ export function buildSkeleton(params: Params): Skeleton {
         branchLength: parent.length * params.lengthRatio * placement.lengthScale * rng.range(0.85, 1.15),
         baseRadius: at.radius * params.radiusRatio,
         baseDist: at.dist,
+        // Clamped at 1 because a full-length shoot is what leavesPerBranch
+        // counts: a fork's leader is longer than its siblings rather than
+        // shorter, and it carries what they carry.
+        lengthShare: Math.min(1, parent.lengthShare * placement.lengthScale),
       });
 
       parent.children.push(child.id);
@@ -385,6 +398,21 @@ function finalise(params: Params, branches: Branch[]): Skeleton {
 export function bendWeight(params: Params, skeleton: Skeleton, distance: number): number {
   const t = Math.min(1, distance / skeleton.maxPathDist);
   return t ** params.bendCurve;
+}
+
+/**
+ * What a shoot's leaf cards are sized by, 0..1.
+ *
+ * A card throws a sleeve of foliage off the shoot it sits on, half a card wide
+ * whatever the shoot is. A whorled crown tapers its limbs toward the top, so at
+ * a fixed card size that sleeve grows from a fifth of a limb's length at the
+ * skirt to wider than the limb is long at the tip, and the top of the cone
+ * fills in as a column. Sizing the cards by the shoot makes the spray at the
+ * tip a scale model of the one at the skirt: the same count, the same overlap,
+ * the same share of the ring's own volume. `leafEvenness` 0 is the fixed size.
+ */
+export function leafShare(params: Params, branch: Branch): number {
+  return 1 - params.leafEvenness * (1 - branch.lengthShare);
 }
 
 /** COLOR_0.g: one phase per limb, so a whole branch sways together. */
