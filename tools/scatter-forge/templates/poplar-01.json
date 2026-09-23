@@ -42,7 +42,7 @@
   "leafSize": 1,
   "leafGrid": 1,
   "leafAspect": 0.85,
-  "leafDroop": 80,
+  "leafAngle": 80,
   "leafFrom": 0.1,
   "leafNormalMode": "canopy",
   "leafAlphaCutoff": 0.45,

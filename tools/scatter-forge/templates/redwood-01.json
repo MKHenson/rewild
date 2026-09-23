@@ -33,7 +33,7 @@
   "leafLevels": 2,
   "leafSize": 0.9,
   "leafAspect": 0.85,
-  "leafDroop": 50,
+  "leafAngle": 50,
   "leafFrom": 0.05,
   "leafNormalMode": "canopy",
   "leafAlphaCutoff": 0.45,

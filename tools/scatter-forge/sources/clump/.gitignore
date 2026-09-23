@@ -3,7 +3,7 @@
 # map — either one absent is derived from the diffuse. One whole tuft per stamp, standing the way it is drawn with its base on the bottom edge —
 # unlike a leaf stamp, nothing here is ever rotated, so the stamp is the cell.
 # `source.json` declares heightMetres. No normal map — scatter-forge derives it
-# from the height. See ../../../../docs/scatter-forge.md.
+# from the height. See ../../../../docs/scatter-forge/authored-art.md.
 #
 # Large binaries, kept out of git the way /assets/ is. With no source here the
 # forge generates its blades instead, so a fresh clone still builds. This rule

@@ -387,7 +387,7 @@ function buildLeaves(params: Params, skeleton: Skeleton, atlas: AtlasLayout): Me
       const at = sampleBranch(branch, Math.min(1, along + (rng() - 0.5) * 0.08));
 
       const right = normalize(rotateAbout(perpendicular(at.dir), at.dir, GOLDEN_ANGLE * k + rng() * 0.9));
-      const leafDir = normalize(rotateAbout(at.dir, right, (params.leafDroop + (rng() - 0.5) * 20) * DEG));
+      const leafDir = normalize(rotateAbout(at.dir, right, (params.leafAngle + (rng() - 0.5) * 20) * DEG));
       const cardNormal = normalize(cross(right, leafDir));
 
       const height = params.leafSize * params.leafScale * rng.range(0.75, 1.25);

@@ -4,7 +4,7 @@
 # stamp, base on the bottom edge and tip at the top, standing the way it is
 # drawn — like a clump stamp, nothing here is ever rotated. `source.json`
 # declares lengthMetres. No normal map — scatter-forge derives it from the
-# height. See ../../README.md, "Authored fronds".
+# height. See ../../../../docs/scatter-forge/authored-art.md.
 #
 # Large binaries, kept out of git the way /assets/ is. With no source here the
 # forge generates its fronds instead, so a fresh clone still builds. This rule

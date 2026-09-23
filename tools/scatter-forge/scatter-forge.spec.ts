@@ -2054,7 +2054,7 @@ describe('accents', () => {
   });
 
   it('pitches a card from the sky, not from its branch: 180 hangs, 0 stands', () => {
-    const shape: RawConfig = { leafLevels: 1, leavesPerBranch: 1, leafDroop: 0 };
+    const shape: RawConfig = { leafLevels: 1, leavesPerBranch: 1, leafAngle: 0 };
     const skeleton = buildSkeleton(paramsFor(shape));
     const leafVertices = skeleton.branches.filter((branch) => branch.bearsLeaves).length * 4;
     const atlas = layoutAtlas(LEAF_GRID_GENERATED ** 2, [1]);

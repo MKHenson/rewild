@@ -225,7 +225,7 @@ export const PARAM_SPEC = {
   leafGrid: { type: 'int', default: 0, help: 'Cells along each edge of the leaf image: 1, 2 or 4. Fewer cells give each cluster more texels; more give the canopy more variants. 0 derives it from how many leaves fit a card.', texture: true, types: TREE },
   leafScale: { type: 'number', default: 1, help: 'Card size multiplier that leaves the texture fit alone. Fewer, larger cards for a LOD tier.', types: TREE },
   leafAspect: { type: 'number', default: 0.85, help: 'Leaf card width as a fraction of its height.', types: TREE },
-  leafDroop: { type: 'number', default: 55, help: 'Degrees a leaf card hangs below its branch direction.', types: TREE },
+  leafAngle: { type: 'number', default: 55, help: 'Degrees a leaf card turns away from its branch. 0 lies along it, 90 stands out square.', types: TREE },
   leafFrom: { type: 'number', default: 0.15, help: 'Fraction along a tip branch that leaves start at.', types: TREE },
   leafNormalMode: { type: 'string', default: 'canopy', help: 'card | canopy | up. How leaf normals are authored.', types: TREE },
   leafAlphaCutoff: { type: 'number', default: 0.45, byType: { clump: 0.4 }, help: 'glTF alphaCutoff on every cutout piece.', types: LEAFY },
