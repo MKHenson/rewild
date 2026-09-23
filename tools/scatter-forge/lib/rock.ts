@@ -18,6 +18,7 @@ import type { Params } from './params.ts';
 import { beddingFrame, platesInto, type PlateField, type PlateSample } from './plates.ts';
 import { createRng } from './rng.ts';
 import { cross, normalize, type Vec3 } from './vec.ts';
+import { meshCuts, vesicleFieldOf, vesicleInto, type VesicleField, type VesicleSample } from './vesicles.ts';
 
 /** Charts across one block and down it: the six faces of the cube. */
 export const ROCK_CHART_COLUMNS = 3;
@@ -119,6 +120,10 @@ export interface RockField {
   plateShare: number;
   /** Crack cells per metre. 0 draws none. */
   cracks: number;
+  /** The gas holes, or null for a rock with none. */
+  vesicles: VesicleField | null;
+  /** True if the mesh cuts any of those holes. False leaves them to the texture. */
+  vesicleCuts: boolean;
   /** Row-major rotation taking world space into the bedding frame, bedding normal along y. */
   frame: number[];
   /** How far the cracks are flattened into the bedding, 0..1. */
@@ -283,13 +288,20 @@ export function crackMask(field: RockField, x: number, y: number, z: number, wid
   return (1 - smoothstep(0, width * _crack.width, _crack.edge)) * _crack.presence;
 }
 
+const _holes: VesicleSample = { cover: 0, pit: 0, scale: 0, filled: 0, id: 0, cut: 0 };
+
 /**
  * The surface point in direction `d`, written into `into`.
  *
  * Radial throughout — the base solid, the noise and the clip all move the
  * point along its own ray — so the result stays star-shaped whatever the keys.
+ *
+ * `holes` takes the vesicles at the point, every octave of them, read off the
+ * surface before the pits are cut. The bake passes it, so a texel inside a pit
+ * still knows it is in one. Without it, only the pits the mesh can carry are
+ * read.
  */
-export function shape(into: Vec3, field: RockField, d: Vec3): Vec3 {
+export function shape(into: Vec3, field: RockField, d: Vec3, holes?: VesicleSample): Vec3 {
   // The unit sphere, with every scoop the ray enters cutting it back to where
   // the ray enters, the nearer taken smoothly so the ridge between two scoops
   // is rounded. Then the extents stretch it.
@@ -329,7 +341,16 @@ export function shape(into: Vec3, field: RockField, d: Vec3): Vec3 {
   // Applied along the ray, so an anisotropic rock keeps its relief in
   // proportion on every side.
   const along = Math.hypot(px, py, pz);
-  const factor = along > 1e-6 ? (along + displaced - groove) / along : 1;
+  let factor = along > 1e-6 ? (along + displaced - groove) / along : 1;
+
+  // The pits go in last, off the surface they are cut into, so a bubble's
+  // outline is where the finished face crosses its sphere.
+  if (field.vesicles && (holes || field.vesicleCuts)) {
+    const sample = holes ?? _holes;
+    vesicleInto(sample, field.vesicles, px * factor, py * factor, pz * factor, !holes);
+    if (sample.cut > 0 && along > 1e-6) factor -= sample.cut / along;
+  }
+
   into[0] = px * factor;
   into[1] = py * factor;
   into[2] = pz * factor;
@@ -337,8 +358,8 @@ export function shape(into: Vec3, field: RockField, d: Vec3): Vec3 {
 }
 
 /** `shape` at a cube-space point, which need not lie on the cube. */
-export function surfaceAt(into: Vec3, field: RockField, c: Vec3): Vec3 {
-  return shape(into, field, normalize(c));
+export function surfaceAt(into: Vec3, field: RockField, c: Vec3, holes?: VesicleSample): Vec3 {
+  return shape(into, field, normalize(c), holes);
 }
 
 const _pa: Vec3 = [0, 0, 0];
@@ -506,6 +527,8 @@ export function rockField(params: Params): RockField {
         ? params.laminaeRelief * radius * meshCarries(params.laminaeSize * LAMINAE_PACKAGE, radius, params.subdivisions)
         : 0,
     cracks: params.cracks,
+    vesicles: null,
+    vesicleCuts: false,
     frame,
     bedding: params.bedding,
     veinFrame,
@@ -513,6 +536,11 @@ export function rockField(params: Params): RockField {
     seed: params.seed,
     base: 0,
   };
+
+  // The bubbles froze in the flow the bedding records, so they are drawn out
+  // along it.
+  field.vesicles = vesicleFieldOf(params, frame, (size) => meshCarries(size, radius, params.subdivisions));
+  field.vesicleCuts = field.vesicles ? meshCuts(field.vesicles) : false;
 
   // Each scoop sits along its own random direction, at its own size and
   // depth about the keys, so no two faces of the rock are alike.

@@ -315,6 +315,14 @@ export const PARAM_SPEC = {
   glintTint: { type: 'string', default: '#d8c9a4', help: 'The colour of those flakes, six digit hex. Pale brass is pyrite; a light grey is mica.', texture: true, types: STONE },
   crackWidth: { type: 'number', default: 0.035, help: 'Width of the crack line in the texture as a fraction of a crack cell.', texture: true, types: STONE },
   crackDepth: { type: 'number', default: 0.6, help: 'How deep the crack line cuts into the texture height, 0..1.', texture: true, types: STONE },
+  vesicles: { type: 'number', default: 0, help: 'How full of gas holes the stone is, 0..1: the share of the lattice cells that hold a bubble. 0.3 is a vesicular basalt; 0.8 a scoria. 0 draws none.', texture: true, types: STONE },
+  vesicleSize: { type: 'number', default: 0.02, help: 'Metres across the largest bubble, 0..0.5. The surface cuts each bubble at its own height, so the holes it shows are this size and smaller. Holes wider than two mesh quads are cut into the mesh as well, at full depth from four; smaller ones stay in the texture.', texture: true, types: STONE },
+  vesicleVary: { type: 'number', default: 0.6, help: 'How far the bubble sizes spread, 0..1. 0 is one size of bubble; 1 adds two finer generations, many small holes among few large ones.', texture: true, types: STONE },
+  vesicleStretch: { type: 'number', default: 0, help: 'How far the lava flow drew the bubbles out into ovals, 0..1, along the bedding. 1 is three times longer than wide.', texture: true, types: STONE },
+  vesicleZoning: { type: 'number', default: 0, help: 'How far the bubbles gather into zones along the bedding, 0..1. 0 spreads them evenly; 1 leaves dense stone between frothy bands.', texture: true, types: STONE },
+  vesicleDepth: { type: 'number', default: 0.8, help: 'How deep a hole goes, 0..1, as a fraction of its own radius. 1 is the full bowl of the bubble.', texture: true, types: STONE },
+  amygdales: { type: 'number', default: 0, help: 'Share of the holes filled with minerals, 0..1: pale spots flush with the stone, in amygdaleTint.', texture: true, types: STONE },
+  amygdaleTint: { type: 'string', default: '#e3ddcb', help: 'The mineral that fills a hole, six digit hex. Near white is calcite or zeolite; a soft green is chlorite.', texture: true, types: STONE },
   subdivisions: { type: 'int', default: 24, byType: { pebble: 6 }, help: 'Quads along each edge of the cube a stone is grown from. Six faces of this squared, doubled, is the triangle count, and a cluster pays it once per pebble.', types: STONE },
 
   pebblesPerModel: { type: 'int', default: 12, help: 'Pebbles packed into one cluster. Each is its own stone with its own six charts, so the image and the bake grow with this.', texture: true, types: PEBBLE },
@@ -1006,13 +1014,18 @@ function validateRock(params: Params): void {
   for (const key of ['plateBevel', 'plateLean', 'bedding', 'plateShare', 'plateTint'] as const)
     if (params[key] < 0 || params[key] > 1) throw new Error(`${key} must be within 0..1, got ${params[key]}.`);
 
-  for (const key of ['smoothing', 'stain', 'veins', 'edgeWear', 'snow', 'topWash', 'topOpacity', 'streaks', 'patina', 'undulation', 'roughness', 'metallic', 'glint'] as const)
+  for (const key of ['smoothing', 'stain', 'veins', 'edgeWear', 'snow', 'topWash', 'topOpacity', 'streaks', 'patina', 'undulation', 'roughness', 'metallic', 'glint', 'vesicles', 'vesicleVary', 'vesicleStretch', 'vesicleZoning', 'vesicleDepth', 'amygdales'] as const)
     if (params[key] < 0 || params[key] > 1) throw new Error(`${key} must be within 0..1, got ${params[key]}.`);
 
   if (params.streakCount < 0 || params.streakCount > 100)
     throw new Error(`streakCount must be within 0..100, got ${params.streakCount}.`);
 
   if (params.cracks < 0) throw new Error(`cracks must not be negative, got ${params.cracks}.`);
+
+  // A hole wider than this is a cave, and a cave needs an overhang the
+  // star-shaped surface cannot hold.
+  if (!(params.vesicleSize > 0) || params.vesicleSize > 0.5)
+    throw new Error(`vesicleSize must be within 0..0.5 and above 0, got ${params.vesicleSize}.`);
 
   if (params.crackStrength < 0 || params.crackStrength > 1)
     throw new Error(`crackStrength must be within 0..1, got ${params.crackStrength}.`);
@@ -1028,7 +1041,7 @@ function validateRock(params: Params): void {
 
   if (params.bump < 0 || params.bump > 4) throw new Error(`bump must be within 0..4, got ${params.bump}.`);
 
-  for (const key of ['stoneTint', 'stoneDark', 'stoneLight', 'lichenTint', 'soilTint', 'stainTint', 'edgeTint', 'streakTint', 'topTint', 'glintTint'] as const)
+  for (const key of ['stoneTint', 'stoneDark', 'stoneLight', 'lichenTint', 'soilTint', 'stainTint', 'edgeTint', 'streakTint', 'topTint', 'glintTint', 'amygdaleTint'] as const)
     if (!/^#?[0-9a-f]{6}$/i.test(params[key]))
       throw new Error(`${key} must be a six digit hex colour, got '${params[key]}'.`);
 

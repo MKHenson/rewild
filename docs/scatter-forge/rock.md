@@ -21,7 +21,8 @@ cross texture seams with no break.
 3. **The plates**: flat slabs push up the surface, the way rock breaks along flat planes.
 4. **The lumps**: noise adds bumps.
 5. **The cracks**: grooves cut into the mesh.
-6. **The texture**: colour, grain, cracks, stains, lichen and snow are painted.
+6. **The holes**: large gas holes cut pits into the mesh.
+7. **The texture**: colour, grain, cracks, stains, lichen and snow are painted.
 
 Keys that are fractions of "the radius" use the average half-size of the rock. So a rock that is
 two times larger has bumps that are two times deeper. Keys in metres use the rock's own size. So a
@@ -454,6 +455,110 @@ How deep the crack lines cut into the texture height. The normal map uses this h
 image, because the preview does not show normal maps.
 
 Default: `0.6`. Range: 0 to 1.
+
+## The holes
+
+Lava has gas in it. When the lava cools, the gas bubbles stay in the stone as holes. A stone with
+many of these holes is **vesicular**, and one hole is a **vesicle**. Basalt often has them. Scoria
+is a basalt with so many holes that it looks like a sponge.
+
+Each bubble is a sphere in 3D. The surface of the rock cuts each sphere at a different height. A
+sphere cut near its middle shows a wide hole, and a sphere cut near its top shows a small one. So a
+face shows holes of many sizes, even where the bubbles are all one size.
+
+Like the cracks, the holes are in the mesh and in the texture:
+
+- **Pits in the mesh**: only holes wider than two mesh quads, and at full depth from four quads.
+  At `subdivisions 24` on a 1.2m rock, that is from 0.09m, and at full depth from 0.17m. You do not
+  set this: the tool finds it from the mesh.
+- **Holes in the texture**: all holes. An open hole has a dark floor, less light and a pit in the
+  height map.
+
+The holes cannot have an overhang, and a hole cannot go through the rock. The rock must stay
+star-shaped (see [How a rock is built](#how-a-rock-is-built)), so a hole is always a bowl.
+
+![basalt-01](images/rock-hole-basalt-01.webp)
+
+The images in this section start from a **hole study**:
+- an egg in the `basalt-01` colours, with only a little noise and no scoops, plates or cracks;
+- `subdivisions 64`, and no weathering or stain;
+- `vesicles 0.35`, `vesicleSize 0.04`, `vesicleVary 0.6` and `vesicleDepth 0.8`.
+
+Examples:
+
+- Vesicular basalt: `vesicles 0.35`, `vesicleSize 0.04`, `vesicleZoning 0.5`
+- Basalt from a lava flow: add `vesicleStretch 0.5`
+- Scoria: `vesicles 0.6`, `vesicleSize 0.2`, `vesicleVary 0.8`, `subdivisions 64`
+- Old basalt with filled holes: `amygdales 0.5`
+- No holes: `vesicles 0`
+
+### `vesicles`
+
+How many holes there are, from 0 to 1. `0.35` is a vesicular basalt. `0.7` is almost a scoria. `0`
+turns the holes off.
+
+Default: `0`. `basalt-01` uses `0.55`. Range: 0 to 1.
+
+![vesicles 0.15, 0.35 and 0.7, on the hole study](images/rock-hole-vesicles.webp)
+
+### `vesicleSize`
+
+The width of the largest bubble in metres. The holes on the surface are this size and smaller. A
+large value makes pits in the mesh as well. The value at the right in the image is large enough for
+the mesh.
+
+Default: `0.02`. `basalt-01` uses `0.045`. Range: above 0, to 0.5.
+
+![vesicleSize 0.02, 0.04 and 0.15, on the hole study](images/rock-hole-vesicleSize.webp)
+
+### `vesicleVary`
+
+How much the bubble sizes are different. `0` makes all bubbles one size. `1` adds many small holes
+between the large ones. This is what most basalt looks like.
+
+Default: `0.6`. `basalt-01` uses `0.7`. Range: 0 to 1.
+
+![vesicleVary 0, 0.6 and 1, on the hole study](images/rock-hole-vesicleVary.webp)
+
+### `vesicleStretch`
+
+How much the flow of the lava pulled the bubbles into ovals. The ovals point along the bedding, in
+one direction. `1` makes a hole three times longer than it is wide.
+
+Default: `0`. `basalt-01` uses `0.4`. Range: 0 to 1.
+
+![vesicleStretch 0, 0.5 and 1, on the hole study](images/rock-hole-vesicleStretch.webp)
+
+### `vesicleZoning`
+
+How much the holes collect in zones. A lava flow has many holes near its top and few in its
+middle. `0` puts holes everywhere. At `1`, bands of solid stone are between the zones of holes.
+The holes become smaller at the edge of a zone, so no hole is cut in half.
+
+Default: `0`. `basalt-01` uses `0.45`. Range: 0 to 1.
+
+![vesicleZoning 0, 0.6 and 1, on the hole study](images/rock-hole-vesicleZoning.webp)
+
+### `vesicleDepth`
+
+How deep a hole goes, as a fraction of the radius of its bubble. `1` is the full bowl. The mesh
+shows the change only on large holes, so the image uses `vesicleSize 0.15`. On small holes, it
+changes only the height map.
+
+Default: `0.8`. `basalt-01` uses `0.85`. Range: 0 to 1.
+
+![vesicleDepth 0.2, 0.8 and 1, on the hole study with vesicleSize 0.15](images/rock-hole-vesicleDepth.webp)
+
+### `amygdales` and `amygdaleTint`
+
+In old basalt, minerals such as calcite fill some holes. A filled hole is an **amygdale**. It is a
+pale spot with a thin dark edge. It has no depth. `amygdales` is the part of the holes that are
+filled: `1` fills all of them. `amygdaleTint` is the colour of the mineral. Near white is calcite
+or zeolite. A soft green is chlorite.
+
+Default: `0` and `#e3ddcb`. `basalt-01` uses `0.08`. Range: 0 to 1.
+
+![amygdales 0, 0.3 and 1, on the hole study](images/rock-hole-amygdales.webp)
 
 ## Colour and grain
 
