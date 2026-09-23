@@ -8,7 +8,7 @@ page.
 
 [Back to scatter-forge](README.md)
 
-![The rock templates: granite-01 to granite-03 and sandstone-01 to sandstone-04](images/rock-templates.webp)
+![The rock templates: granite-01 to granite-03, sandstone-01 to sandstone-04 and basalt-01](images/rock-templates.webp)
 
 ## How a rock is built
 

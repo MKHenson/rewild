@@ -1137,6 +1137,18 @@ describe('scatter layer', () => {
     expect(collider.radius).toBeGreaterThan(params.trunkRadius);
   });
 
+  it('leaves the capsule out of a plant the player walks through', () => {
+    const { params, skeleton } = buildAll({ collider: false });
+    const layer = scatterLayer(params, skeleton);
+
+    expect(layer.collider).toBeUndefined();
+    expect(scatterLayerEntry(layer)).not.toContain('collider');
+    expect(scatterLayer(paramsFor(), buildSkeleton(paramsFor())).collider).toBeDefined();
+    expect(() => parseConfig({ name: 'a', type: 'clump', collider: false }, 'test.json')).toThrow(
+      /applies to tree, crown, not to type 'clump'/
+    );
+  });
+
   it('declares authored leaf normals for every mode but card', () => {
     // The engine mirrors a back face's normal. That is right only where the
     // normal is the card's own, so canopy and up have to switch it off or half

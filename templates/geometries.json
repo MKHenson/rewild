@@ -172,5 +172,26 @@
     "lods": [
       "nature/rocks/sandstone-04/sandstone-04.lod1.glb"
     ]
+  },
+  "basalt-01": {
+    "type": "gltf",
+    "url": "nature/rocks/basalt-01/basalt-01.glb",
+    "lods": [
+      "nature/rocks/basalt-01/basalt-01.lod1.glb"
+    ]
+  },
+  "spruce-01": {
+    "type": "gltf",
+    "url": "nature/trees/spruce/spruce-01.glb",
+    "lods": [
+      "nature/trees/spruce/spruce-01.lod1.glb"
+    ]
+  },
+  "heather-01": {
+    "type": "gltf",
+    "url": "nature/trees/heather/heather-01.glb",
+    "lods": [
+      "nature/trees/heather/heather-01.lod1.glb"
+    ]
   }
 }

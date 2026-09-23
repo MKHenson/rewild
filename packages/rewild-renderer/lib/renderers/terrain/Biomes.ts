@@ -267,13 +267,13 @@ export const PLAIN: BiomeParams = {
     },
     {
       layer: 'cardinal_flower_01',
-      density: 0.01,
+      density: 0.02,
       slope: { from: 55, to: 25 },
       noise: { scale: 160, seedSalt: 23, band: { from: 0.95, to: 0.6 } },
     },
     {
       layer: 'thistle_01',
-      density: 0.03,
+      density: 0.1,
       slope: { from: 55, to: 25 },
       noise: { scale: 160, seedSalt: 23, band: { from: 0.95, to: 0.6 } },
     },
@@ -316,18 +316,21 @@ export const FOREST: BiomeParams = {
       layer: 'oak_01',
       density: 0.55,
       slope: { from: 32, to: 10 },
+      height: [{ from: 100, to: 50 }],
       noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
     },
     {
       layer: 'poplar_01',
       density: 0.55,
       slope: { from: 32, to: 10 },
+      height: [{ from: 100, to: 50 }],
       noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
     },
     {
       layer: 'plains_01',
       density: 0.3,
       slope: { from: 55, to: 25 },
+      height: [{ from: 100, to: 50 }],
       // The stand's own field, inverted. Grass fills the glades.
       noise: { scale: 260, seedSalt: 53, band: { from: 0.8, to: 0.45 } },
     },
@@ -335,12 +338,14 @@ export const FOREST: BiomeParams = {
       layer: 'fern_01',
       density: 0.85,
       slope: { from: 32, to: 10 },
+      height: [{ from: 100, to: 50 }],
       noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
     },
     {
       layer: 'fern_02',
       density: 0.85,
       slope: { from: 32, to: 10 },
+      height: [{ from: 100, to: 50 }],
       noise: { scale: 260, seedSalt: 53, band: { from: 0.3, to: 0.62 } },
     },
     {
@@ -366,6 +371,20 @@ export const MOUNTAIN: BiomeParams = {
   // effectively two heard. Raised, with the amplitude taken out of it and
   // given to the ridges instead, so the massif is no taller than it was.
   deformations: [
+    {
+      kind: 'terrace',
+      amplitude: 300,
+      // Broader than MOUNTAIN: a wider massif spreads its rise over more
+      // ground, so the climb starts well before the climate border, not at it.
+      noiseScale: 750,
+      octaves: 6,
+      persistence: 0.42,
+      lacunarity: 2.2,
+      steps: 7,
+      sharpness: 0.7,
+      curveExp: 1.45,
+      seedSalt: 0,
+    },
     // Eroded rather than plain fbm: the flanks lose their fine detail and the
     // crests keep it, which is where the loose material of a real slope has
     // and has not gone.
@@ -419,7 +438,7 @@ export const MOUNTAIN: BiomeParams = {
     // reason no fourth material is needed here.
     {
       material: 'snow_field_aerial',
-      height: { from: 50, to: 200 },
+      height: { from: 150, to: 200 },
       slope: { from: 75, to: 32 },
     },
   ],
@@ -452,21 +471,27 @@ export const MOUNTAIN: BiomeParams = {
     },
     {
       layer: 'granite_01',
-      density: 0.1,
+      density: 0.05,
       height: { from: 165, to: 105 },
       slope: { from: 48, to: 22 },
     },
     {
       layer: 'granite_02',
-      density: 0.1,
+      density: 0.05,
       height: { from: 165, to: 105 },
       slope: { from: 48, to: 22 },
     },
     {
       layer: 'granite_03',
-      density: 0.1,
-      height: { from: 130, to: 170 },
-      slope: { from: 70, to: 55 },
+      density: 0.15,
+      height: { from: 150, to: 170 },
+      slope: { from: 40, to: 35 },
+    },
+    {
+      layer: 'basalt_01',
+      density: 0.02,
+      height: { from: 0, to: 50 },
+      slope: { from: 20, to: 0 },
     },
     // The treeline: conifers climb in from the foothills, stand thickest
     // where the snow begins, and are gone before it closes over. They hold
@@ -474,38 +499,32 @@ export const MOUNTAIN: BiomeParams = {
     // line into stands rather than a contour of trees.
     {
       layer: 'cypress_01',
-      density: 0.01,
-      height: [
-        { from: 0, to: 100 },
-        { from: 150, to: 110 },
-      ],
+      density: 0.005,
+      height: [{ from: 100, to: 50 }],
       slope: { from: 42, to: 20 },
     },
     {
-      layer: 'poplar_01',
-      density: 0.01,
-      height: [
-        { from: 0, to: 100 },
-        { from: 150, to: 110 },
-      ],
+      layer: 'spruce_01',
+      density: 0.15,
+      height: [{ from: 180, to: 150 }],
+      slope: { from: 42, to: 20 },
+    },
+    {
+      layer: 'heather_01',
+      density: 0.2,
+      height: [{ from: 120, to: 80 }],
       slope: { from: 42, to: 20 },
     },
     {
       layer: 'thistle_01',
       density: 0.09,
-      height: [
-        { from: 0, to: 100 },
-        { from: 150, to: 110 },
-      ],
+      height: [{ from: 80, to: 50 }],
       slope: { from: 42, to: 20 },
     },
     {
       layer: 'plains_01',
       density: 0.1,
-      height: [
-        { from: 0, to: 100 },
-        { from: 150, to: 110 },
-      ],
+      height: [{ from: 80, to: 50 }],
       slope: { from: 42, to: 20 },
     },
   ],

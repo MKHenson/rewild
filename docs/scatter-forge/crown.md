@@ -250,6 +250,7 @@ These keys work on more than one type. The defaults here are the ones for `crown
 | [`cullDistance`](in-game.md#layer-keys) | `160` | The distance in metres past which the engine does not draw the model. |
 | [`castShadow`](in-game.md#layer-keys) | on with a stem | Whether the model casts a shadow. |
 | [`foliage`](in-game.md#layer-keys) | `true` | Light the cutout piece as leaves. Set `false` for a cutout that is not a leaf. |
+| [`collider`](in-game.md#layer-keys) | `true` | Stop the player at the stem. Set `false` for a plant low enough to walk through. A crown with no stem never has one. |
 | [`footprint`](in-game.md#density) | `0` | The clear space in metres round each model. `0` lets the tool choose. |
 | [`scaleMin`](in-game.md#layer-keys) | `0.8` | The smallest random size of a copy. |
 | [`scaleMax`](in-game.md#layer-keys) | `1.25` | The largest random size of a copy. |
