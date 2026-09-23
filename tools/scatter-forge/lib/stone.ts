@@ -29,6 +29,7 @@ import {
 import type { Cluster } from './pebbles.ts';
 import { createCanvas, type Canvas, type Canvases } from './textures.ts';
 import type { Vec3 } from './vec.ts';
+import type { VesicleSample } from './vesicles.ts';
 
 type Rgb = [number, number, number];
 
@@ -83,6 +84,9 @@ interface Palette {
   glint: Rgb;
   /** The colour the odd standout bed takes, outside the stone's own ramp. */
   lamina: Rgb;
+  /** The mineral a filled hole holds, and the dark glass a hole is lined with. */
+  amygdale: Rgb;
+  holeFloor: Rgb;
 }
 
 function paletteOf(params: Params): Palette {
@@ -118,6 +122,8 @@ function paletteOf(params: Params): Palette {
     wash: mulRgb(parseHex(params.topTint, 'topTint'), [2, 2, 2]),
     glint: parseHex(params.glintTint, 'glintTint'),
     lamina: parseHex(params.laminaeAccent, 'laminaeAccent'),
+    amygdale: parseHex(params.amygdaleTint, 'amygdaleTint'),
+    holeFloor: mulRgb(dark, [0.45, 0.45, 0.45]),
   };
 }
 
@@ -127,7 +133,16 @@ interface Surface {
   points: Float32Array;
   /** Distance from the centre per texel. */
   radius: Float32Array;
+  /**
+   * The hole under every texel, as `VesicleSample` reads it, four floats a
+   * texel: cover, pit, scale and filled. Null for a rock with no holes. Read
+   * with the surface, off the face before the pits were cut, so the floor of a
+   * pit the mesh carries is still inside its hole.
+   */
+  holes: Float32Array | null;
 }
+
+const _hole: VesicleSample = { cover: 0, pit: 0, scale: 0, filled: 0, id: 0, cut: 0 };
 
 const _c: Vec3 = [0, 0, 0];
 const _p: Vec3 = [0, 0, 0];
@@ -143,13 +158,20 @@ function sampleSurface(field: RockField, faceIndex: number, atlas: ChartAtlas): 
   const inner = chartPx - gutter * 2;
   const points = new Float32Array(chartPx * chartPx * 3);
   const radius = new Float32Array(chartPx * chartPx);
+  const holes = field.vesicles ? new Float32Array(chartPx * chartPx * 4) : null;
 
   for (let y = 0; y < chartPx; y++) {
     const b = (y - gutter + 0.5) / inner;
     for (let x = 0; x < chartPx; x++) {
       const a = (x - gutter + 0.5) / inner;
-      surfaceAt(_p, field, cubePoint(_c, face, a, b));
+      surfaceAt(_p, field, cubePoint(_c, face, a, b), holes ? _hole : undefined);
       const i = y * chartPx + x;
+      if (holes) {
+        holes[i * 4] = _hole.cover;
+        holes[i * 4 + 1] = _hole.pit;
+        holes[i * 4 + 2] = _hole.scale;
+        holes[i * 4 + 3] = _hole.filled;
+      }
       points[i * 3] = _p[0];
       points[i * 3 + 1] = _p[1];
       points[i * 3 + 2] = _p[2];
@@ -157,7 +179,7 @@ function sampleSurface(field: RockField, faceIndex: number, atlas: ChartAtlas): 
     }
   }
 
-  return { points, radius };
+  return { points, radius, holes };
 }
 
 const _du: Vec3 = [0, 0, 0];
@@ -545,6 +567,7 @@ function paintChart(
   const glintScale = params.glintScale;
   const laminae = params.laminae;
   const laminaeTint = params.laminaeTint;
+  const vesicleDepth = params.vesicleDepth;
   const baseRoughness = params.roughness;
   const lateralRadius = (field.extents[0] + field.extents[2]) / 2;
   const radius = (field.extents[0] + field.extents[1] + field.extents[2]) / 3;
@@ -803,6 +826,43 @@ function paintChart(
         }
       }
 
+      // Vesicles: gas holes. An open hole is a bowl lined with dark glass,
+      // rough and in its own shadow, and deepest where the bubble was widest.
+      // The height map takes the pits the mesh could not, so a pin prick
+      // still has a floor. A filled hole is an amygdale: a pale mineral spot,
+      // flush with the stone, with a thin dark lining at its edge.
+      let hole = 0;
+      if (surface.holes) {
+        const cover = surface.holes[i * 4];
+        if (cover > 0) {
+          const pit = surface.holes[i * 4 + 1];
+          const scale = surface.holes[i * 4 + 2];
+          const filled = surface.holes[i * 4 + 3];
+          if (filled > 0) {
+            const lining = cover * (1 - smoothstep(0.35, 0.8, cover));
+            const fill = smoothstep(0.5, 1, cover);
+            const shade = 0.9 + 0.2 * grit;
+            r = mix(r, palette.amygdale[0] * shade, fill) * (1 - 0.5 * lining);
+            g = mix(g, palette.amygdale[1] * shade, fill) * (1 - 0.5 * lining);
+            b = mix(b, palette.amygdale[2] * shade, fill) * (1 - 0.5 * lining);
+            roughness = mix(roughness, 0.55, fill);
+            relief = mix(relief, baseRelief + 0.01, fill);
+          } else {
+            hole = cover;
+            // The floor falls away from the lip, so the wall is lit and the
+            // bottom is not.
+            const floor = smoothstep(0, 0.7, pit);
+            const shade = 1 - 0.35 * floor;
+            r = mix(r, palette.holeFloor[0], cover * (0.35 + 0.5 * floor)) * shade;
+            g = mix(g, palette.holeFloor[1], cover * (0.35 + 0.5 * floor)) * shade;
+            b = mix(b, palette.holeFloor[2], cover * (0.35 + 0.5 * floor)) * shade;
+            relief -= cover * pit * vesicleDepth * (0.25 + 0.35 * scale);
+            ao *= 1 - cover * (0.35 + 0.45 * floor);
+            roughness += 0.1 * cover;
+          }
+        }
+      }
+
       // Stain: iron seeping from the cracks and lying in bands along the
       // bedding, as a tint that keeps the grain under it.
       if (stain > 0) {
@@ -825,7 +885,7 @@ function paintChart(
       }
 
       // The bleaching itself, and the dirt a hollow holds.
-      const dirt = weathering * Math.max(smoothstep(0.15, 0.6, -crease), smoothstep(0.1, 0.5, -hollow) * 0.7);
+      const dirt = weathering * Math.max(smoothstep(0.15, 0.6, -crease), smoothstep(0.1, 0.5, -hollow) * 0.7, hole * 0.5);
       r = mix(r, palette.edge[0], wear * 0.6) * (1 + 0.08 * wear);
       g = mix(g, palette.edge[1], wear * 0.6) * (1 + 0.08 * wear);
       b = mix(b, palette.edge[2], wear * 0.6) * (1 + 0.08 * wear);
@@ -914,7 +974,7 @@ function paintChart(
           const discRadius = (0.2 + 0.36 * fract(cell.id * 91.3)) * (kind < 0.08 ? 0.55 : 1);
           const ragged = (fbm3r(px * 70, py * 70, pz * 70, 2, seed ^ 0x51ed270b) - 0.5) * 0.3;
           const f = cell.f1 + ragged;
-          const disc = (1 - smoothstep(discRadius - 0.06, discRadius + 0.02, f)) * (1 - crack * 0.8);
+          const disc = (1 - smoothstep(discRadius - 0.06, discRadius + 0.02, f)) * (1 - crack * 0.8) * (1 - hole * 0.9);
           if (disc > 0) {
             const tint: Rgb = kind < 0.08 ? palette.lichenYellow : kind < 0.4 ? palette.lichenGrey : palette.lichen;
             const areolae = worley3Into(_worley, px * AREOLA_CELLS, py * AREOLA_CELLS, pz * AREOLA_CELLS, seed ^ 0x2545f491);
@@ -975,7 +1035,7 @@ function paintChart(
       if (snow > 0) {
         const settle = smoothstep(0.7 - 0.6 * snow, 1.0 - 0.45 * snow, up);
         const drift = (fbm3r(px * SNOW_SCALE, py * SNOW_SCALE, pz * SNOW_SCALE, 3, seed ^ 0x536e6f77) - 0.5) * 0.6;
-        const cover = smoothstep(0.25, 0.6, settle + drift + smoothstep(0, 0.4, -hollow) * 0.25 - convex * 0.45 - crack * 0.5);
+        const cover = smoothstep(0.25, 0.6, settle + drift + smoothstep(0, 0.4, -hollow) * 0.25 - convex * 0.45 - crack * 0.5 - hole * 0.3);
         if (cover > 0) {
           // Snow is not one white: it is mottled where it has lain and
           // melted, blue in its own shadow, lumpy where it drifted, and thin

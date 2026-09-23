@@ -2205,6 +2205,44 @@ describe('rock', () => {
     expect(deepest).toBeGreaterThan(grooved.metrics.radius * 0.08);
   });
 
+  it('holds the hole keys to their ranges', () => {
+    expect(() => rockParams({ vesicles: 1.5 })).toThrow(/vesicles must be within 0..1/);
+    expect(() => rockParams({ vesicleSize: 0 })).toThrow(/vesicleSize must be within 0..0.5 and above 0/);
+    expect(() => rockParams({ vesicleSize: 0.6 })).toThrow(/vesicleSize must be within 0..0.5 and above 0/);
+    expect(() => rockParams({ amygdales: -0.1 })).toThrow(/amygdales must be within 0..1/);
+    expect(() => rockParams({ amygdaleTint: 'white' })).toThrow(/amygdaleTint must be a six digit hex colour/);
+  });
+
+  // The deepest vertex of a pit sits a bubble's radius times the depth in, so
+  // this is the depth the keys ask for, less what the lattice leaves off.
+  it('cuts a pit under a hole the mesh can carry, and none under a filled or a small one', () => {
+    const flat = { relief: 0, scoops: 0, cracks: 0, subdivisions: 48 };
+    const plain = build(flat);
+    const deepest = (rock: ReturnType<typeof build>): number => {
+      const a = rock.mesh.pieces[0].attributes.positions;
+      const b = plain.mesh.pieces[0].attributes.positions;
+      let most = 0;
+      for (let i = 0; i < a.length; i += 3) {
+        const ra = Math.hypot(a[i], a[i + 1] + rock.field.base, a[i + 2]);
+        const rb = Math.hypot(b[i], b[i + 1] + plain.field.base, b[i + 2]);
+        most = Math.max(most, rb - ra);
+      }
+      return most;
+    };
+
+    const large = { ...flat, vesicles: 0.6, vesicleSize: 0.3, vesicleVary: 0, vesicleDepth: 1 };
+    const holed = build(large);
+    expect(holed.field.vesicleCuts).toBe(true);
+    expect(deepest(holed)).toBeGreaterThan(0.3 * 0.5 * 0.6);
+    expect(deepest(holed)).toBeLessThanOrEqual(0.3 * 0.5 + 1e-6);
+
+    expect(deepest(build({ ...large, amygdales: 1 }))).toBeLessThan(1e-6);
+
+    const small = build({ ...flat, vesicles: 0.6, vesicleSize: 0.02 });
+    expect(small.field.vesicleCuts).toBe(false);
+    expect(deepest(small)).toBeLessThan(1e-6);
+  });
+
   it('ships one opaque piece of six faces of quads', () => {
     const { mesh } = build({ subdivisions: 6 });
     expect(mesh.pieces).toHaveLength(1);

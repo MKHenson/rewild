@@ -176,6 +176,7 @@ Each template is a full config. Run it as it is, or copy it to start a new model
 | `cardinal-flower-01` | crown | A wildflower with no stem, from colour-only art. |
 | `granite-01` to `granite-03` | rock | Granite boulders. `granite-03` has snow. |
 | `sandstone-01` to `sandstone-04` | rock | Sandstone rocks. `sandstone-04` has clear layers. |
+| `basalt-01` | rock | A vesicular basalt boulder, with gas holes. |
 | `granite-pebble-01` | pebble | Seven granite cobbles. |
 | `granite-scree-01` | pebble | Twelve sharp fragments for steep ground. |
 | `granite-pebble-snow-01` | pebble | Cobbles with snow on top. |
