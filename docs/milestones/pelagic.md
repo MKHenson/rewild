@@ -366,7 +366,12 @@ just inside the far plane.
 - **Sun glint.** A specular sun term, gated by CSM geometry shadows and cloud shadows. This follows
   the Foxfire rule: shadows act on the sun term only.
 - **Fresnel.** Blends reflection and refraction by the view angle.
-- **Depth colour.** Beer-Lambert absorption over the water depth, from the palette.
+- **Depth colour.** Beer-Lambert absorption over the water depth, from the palette. Each chunk
+  draws twice: an absorb draw multiplies the scene behind by the transmittance and `1 − Fresnel`,
+  per channel, and a light draw adds reflection and the light the water scatters back. The
+  scatter is shaded as the diffuse lobe of a dielectric with F0 0.02, so sun, sky ambient and
+  local lights all reach it. Refraction replaces the absorb draw with an offset sample of the
+  scene copy.
 - **Refraction.** Offset the refraction texture sample by the surface normal. Reject samples that
   land in front of the water, from the scene depth.
 - **Foam.** Shore foam where the depth is small. Crest foam where waves are steep. See

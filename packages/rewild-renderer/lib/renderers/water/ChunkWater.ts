@@ -4,6 +4,7 @@ import { Mesh } from '../../core/Mesh';
 import { Transform } from '../../core/Transform';
 import { WaterPass } from '../../materials/WaterPass';
 import { WaterMap, packWaterSurface } from '../terrain/WaterMap';
+import { WaterType } from '../terrain/Water';
 import { getWaterGrid, waterGridQuads } from './WaterGrid';
 
 // Interaction layer the water sits on, so scene raycasts (picking, the camera's
@@ -25,17 +26,20 @@ export class ChunkWater {
   private readonly pass: WaterPass;
   private readonly span: number;
   private texture: GPUTexture | null = null;
+  private typeTexture: GPUTexture | null = null;
   private packed: Uint16Array | null = null;
 
   constructor(
     renderer: Renderer,
     parent: Transform,
     water: WaterMap,
+    palette: readonly WaterType[],
     span: number,
     lod: number
   ) {
     this.span = span;
     this.pass = new WaterPass();
+    this.pass.palette = palette;
     this.mesh = new WaterMesh(
       getWaterGrid(renderer.device, waterGridQuads(lod), span),
       this.pass
@@ -50,22 +54,38 @@ export class ChunkWater {
   update(renderer: Renderer, water: WaterMap) {
     this.packed = packWaterSurface(water, this.packed ?? undefined);
 
-    if (!this.texture || this.texture.width !== water.size) {
+    if (!this.texture || !this.typeTexture || this.texture.width !== water.size) {
       this.texture?.destroy();
+      this.typeTexture?.destroy();
+      const size = [water.size, water.size];
+      const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
       this.texture = renderer.device.createTexture({
         label: 'water-surface',
-        size: [water.size, water.size],
+        size,
         format: 'rgba16float',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        usage,
       });
-      this.pass.waterUniforms.surfaceTexture = this.texture;
+      this.typeTexture = renderer.device.createTexture({
+        label: 'water-types',
+        size,
+        format: 'rgba8unorm',
+        usage,
+      });
+      this.pass.setTextures(this.texture, this.typeTexture);
     }
 
+    const extent = { width: water.size, height: water.size };
     renderer.device.queue.writeTexture(
       { texture: this.texture },
       this.packed as BufferSource,
       { bytesPerRow: water.size * 8 },
-      { width: water.size, height: water.size }
+      extent
+    );
+    renderer.device.queue.writeTexture(
+      { texture: this.typeTexture },
+      water.typeWeights as BufferSource,
+      { bytesPerRow: water.size * 4 },
+      extent
     );
 
     const half = this.span / 2;
@@ -95,6 +115,8 @@ export class ChunkWater {
     this.mesh.transform.removeFromParent();
     this.pass.dispose();
     this.texture?.destroy();
+    this.typeTexture?.destroy();
     this.texture = null;
+    this.typeTexture = null;
   }
 }
