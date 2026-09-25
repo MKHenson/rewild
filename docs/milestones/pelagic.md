@@ -134,6 +134,7 @@ fills. Raise an island and the water moves away from it.
 - Turbidity: how quickly the bed disappears with depth.
 - Wave response: how strongly the wind moves this water.
 - Wave scale: long ocean swells, or short lake ripples.
+- Wind lag: how many seconds the waves take to follow a change in wind.
 - Foam amount and shore foam width.
 - Normal-map detail strength.
 
