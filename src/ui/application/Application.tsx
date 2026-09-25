@@ -35,7 +35,9 @@ export class Application extends Component<Props> {
     const perfPanel = <PerfPanel />;
 
     const canvas = <div class="background" />;
-    canvas.style.backgroundImage = `url(${resolveAssetUrl('strata-bg.jpg')})`;
+    canvas.style.backgroundImage = `url(${resolveAssetUrl(
+      'screenshots/understory-plains.webp'
+    )})`;
 
     return () => {
       return [
