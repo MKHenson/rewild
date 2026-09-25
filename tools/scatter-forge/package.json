@@ -11,12 +11,13 @@
     "node": ">=22.18.0"
   },
   "scripts": {
-    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --config jest.config.cjs",
-    "test:fast": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --config jest.config.cjs --testPathIgnorePatterns textures.spec",
-    "test:textures": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --config jest.config.cjs textures.spec",
+    "test": "node --import ./test-globals.ts --test \"*.spec.ts\"",
+    "test:fast": "node --import ./test-globals.ts --test scatter-forge.spec.ts sources.spec.ts",
+    "test:textures": "node --import ./test-globals.ts --test textures.spec.ts",
     "ts-check": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
+    "expect": "^29.5.0",
     "sharp": "^0.35.3"
   }
 }

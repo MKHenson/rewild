@@ -62,6 +62,16 @@ function scatterMask(channel: number, weight: number, size = CHUNK): PaintMask {
   return mask;
 }
 
+// A chunk size that fits `cellsAcross` pebble cells on each axis. The pebble
+// footprint is game content and changes with asset tuning, so tests that need a
+// cell count size the chunk from it.
+function chunkFitting(cellsAcross: number): number {
+  const cell =
+    (2 * SCATTER_LAYERS['granite_pebble_01'].footprint) /
+    TERRAIN_METERS_PER_SAMPLE;
+  return Math.ceil(cellsAcross * cell) + 1;
+}
+
 function countOf(results: ScatterInstances[], layer: string): number {
   return results.find((r) => r.layer === layer)?.count ?? 0;
 }
@@ -206,20 +216,21 @@ describe('scatterChunk', () => {
   });
 
   it('scales density down to fewer instances', () => {
-    const heights = flatHeights(CHUNK);
+    const size = chunkFitting(20);
+    const heights = flatHeights(size);
     const sparse = climateOf(
       flatBiome([{ layer: 'granite_pebble_01', density: 0.1 }])
     );
 
     const many = scatterChunk(
-      CHUNK,
+      size,
       SEED,
       new Vector2(0, 0),
       dense,
       heights
     )[0];
     const few = scatterChunk(
-      CHUNK,
+      size,
       SEED,
       new Vector2(0, 0),
       sparse,
@@ -634,12 +645,14 @@ describe('scatterChunk', () => {
   });
 
   it('grows past its initial capacity without dropping instances', () => {
+    // 32 cells across is 1024 cells, well past the initial capacity of 256.
+    const size = chunkFitting(32);
     const instances = scatterChunk(
-      129,
+      size,
       SEED,
       new Vector2(0, 0),
       dense,
-      flatHeights(129)
+      flatHeights(size)
     )[0];
 
     expect(instances.count).toBeGreaterThan(256);
