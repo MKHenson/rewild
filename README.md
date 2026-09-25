@@ -36,10 +36,10 @@ Checkout the 🦕[Demo](https://rewild-client.s3-website.fr-par.scw.cloud)🦖 (
 
 ## Screenshots
 
-![Cold Sunrise Pic](./docs/images/screenshots/understory-arid.png)
-![Storm Pic](./docs/images/screenshots/understory-dry-mountains.png)
-![Nightsky Pic](./docs/images/screenshots/understory-mesa.png)
-![Nightsky Pic](./docs/images/screenshots/understory-stormy.png)
-![Nightsky Pic](./docs/images/screenshots/understory-morning.png)
-![Nightsky Pic](./docs/images/screenshots/understory-mountains.png)
-![Nightsky Pic](./docs/images/screenshots/understory-nightsky.png)
+![Cold Sunrise Pic](./docs/images/screenshots/understory-arid.jpg)
+![Storm Pic](./docs/images/screenshots/understory-dry-mountains.jpg)
+![Nightsky Pic](./docs/images/screenshots/understory-mesa.jpg)
+![Nightsky Pic](./docs/images/screenshots/understory-stormy.jpg)
+![Nightsky Pic](./docs/images/screenshots/understory-morning.jpg)
+![Nightsky Pic](./docs/images/screenshots/understory-mountains.jpg)
+![Nightsky Pic](./docs/images/screenshots/understory-nightsky.jpg)
