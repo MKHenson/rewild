@@ -1,8 +1,7 @@
 // The texture half of the suite, kept apart because it is the slow half.
 //
-// One buildCanvas costs about 50ms in node and roughly 1.2s under jest, whose
-// module isolation stops V8 optimising the per-texel loops. These tests build
-// sixteen of them, so they dominate the run however cheap everything else is.
+// One buildCanvas costs about 50ms. These tests build sixteen of them, so they
+// dominate the run however cheap everything else is.
 // 128 is the smallest size the leaf grid still draws at, and nothing here
 // asserts anything a larger atlas would say differently.
 

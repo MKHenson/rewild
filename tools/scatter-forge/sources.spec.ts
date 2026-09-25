@@ -10,8 +10,8 @@ import { crc32, deflateSync } from 'node:zlib';
 import sharp from 'sharp';
 
 // sharp keeps a descriptor cache on files it has read, which on Windows holds
-// every fixture open past its test: the temp folder cannot be removed and jest
-// cannot exit. Nothing here reads a file twice, so the cache buys nothing.
+// every fixture open past its test: the temp folder cannot be removed and the
+// runner cannot exit. Nothing here reads a file twice, so the cache buys nothing.
 sharp.cache(false);
 import {
   fitBark,
