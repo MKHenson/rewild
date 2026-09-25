@@ -351,7 +351,7 @@ setSceneCategoryEnabled('scatter', true);
 showAllSceneCategories();
 ```
 
-Categories are `terrain`, `scatter` and `opaque`, set by `profileCategory` on the
+Categories are `terrain`, `scatter`, `water` and `opaque`, set by `profileCategory` on the
 material pass. Hiding one holds it back from **every** pass including shadows,
 which is what you want: it answers "what would removing this buy me". Each call
 clears the metrics window, so wait for `settling` to clear before reading.
