@@ -21,6 +21,7 @@ import {
 } from './ScatterLayers';
 import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
 import { TextureProperties } from '../../textures/Texture';
+import type { WaterMap } from './WaterMap';
 
 const temp: Vector3 = new Vector3();
 // Kept apart from `temp`, which the constructor and the LOD walk also use.
@@ -117,6 +118,10 @@ export class TerrainChunk implements IComponent {
   // the brush in place and upload only that window — regenerating all 241²
   // texels per stamp is what would make painting stutter.
   splatData: Uint8Array | null = null;
+  // Where the chunk's water is. Null when none shows. Chunk-wide like the
+  // splat, and rebuilt with it after every edit.
+  water: WaterMap | null = null;
+  private waterVersion = -1;
   // The heightsVersion the splat's contents were built from.
   private splatVersion = -1;
   // The chunk's painted biome mask, or null when nothing has been painted here.
@@ -451,6 +456,14 @@ export class TerrainChunk implements IComponent {
     if (!this.scatterKillsResolved) return null;
     this.scatterKills = new Set<number>();
     return this.scatterKills;
+  }
+
+  // Adopts a worker-built water map for the heights at `version`. Older or
+  // equal versions are ignored, on the same terms as populateSplat.
+  populateWater(water: WaterMap | null, version: number) {
+    if (version <= this.waterVersion) return;
+    this.waterVersion = version;
+    this.water = water;
   }
 
   // Adopts a worker-built splat map for the heights at `version`. Creates the
