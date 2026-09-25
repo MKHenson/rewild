@@ -23,6 +23,7 @@ import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
 import { TextureProperties } from '../../textures/Texture';
 import type { WaterMap } from './WaterMap';
 import { ChunkWater } from '../water/ChunkWater';
+import { resolveClimatePreset } from './Biomes';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 
 const temp: Vector3 = new Vector3();
@@ -486,6 +487,7 @@ export class TerrainChunk implements IComponent {
         renderer,
         this.transform,
         water,
+        resolveClimatePreset(this.climatePreset).water ?? [],
         (this.chunkSize - 1) * TERRAIN_METERS_PER_SAMPLE,
         this.targetLod
       );
