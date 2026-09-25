@@ -27,6 +27,7 @@ import {
 } from 'src/ui/stores/SceneGraphStore';
 import { IAssetPlacement, ITreeNodeAction } from 'models';
 import { TemplateLoader } from 'src/core/TemplateLoader';
+import { bindScreenshotHotkey } from 'src/core/ScreenshotHotkey';
 import { Asset3D } from 'src/core/routing/Asset3D';
 import { GizmoDragController } from './utils/GizmoDragController';
 import { TerrainSculptController } from './utils/TerrainSculptController';
@@ -367,15 +368,19 @@ export class EditorViewport extends Component<Props> {
       }
     };
 
+    let unbindScreenshotHotkey: (() => void) | null = null;
+
     this.onMount = () => {
       document.addEventListener('request-renderer', onRequestRendererEvent);
       document.addEventListener('keydown', onKeyDown);
+      unbindScreenshotHotkey = bindScreenshotHotkey(this.renderer);
       beginLevelLoad();
     };
 
     this.onCleanup = () => {
       document.removeEventListener('request-renderer', onRequestRendererEvent);
       document.removeEventListener('keydown', onKeyDown);
+      unbindScreenshotHotkey?.();
       if (this.loadingTimeout !== null) {
         window.clearTimeout(this.loadingTimeout);
         this.loadingTimeout = null;

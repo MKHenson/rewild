@@ -114,6 +114,7 @@ export class Renderer {
   totalDeltaTime: number;
 
   private onFrameHandler: () => void;
+  private pendingScreenshots: ((blob: Blob | null) => void)[] = [];
   private uiVisibleElements: UIElement[] = [];
   private uiElementsByMaterial = new Map<IMaterialPass, UIElement[]>();
   private uiInstanceCounters = new Map<IMaterialPass, number>();
@@ -732,6 +733,25 @@ export class Renderer {
     m.record('counts.opaque', opaque);
   }
 
+  /**
+   * PNG of the next fully rendered frame, exactly as written to the swapchain.
+   * The snapshot is taken at the end of render(), before the frame is
+   * presented, because a WebGPU canvas has no readable contents afterwards.
+   */
+  captureScreenshot(): Promise<Blob | null> {
+    return new Promise((resolve) => this.pendingScreenshots.push(resolve));
+  }
+
+  private flushScreenshots(): void {
+    const pending = this.pendingScreenshots;
+    if (pending.length === 0) return;
+    const resolvers = pending.slice();
+    pending.length = 0;
+    this.canvas.toBlob((blob) => {
+      for (const resolve of resolvers) resolve(blob);
+    }, 'image/png');
+  }
+
   getCurrentTextureView(): GPUTextureView {
     return this.context.getCurrentTexture().createView();
   }
@@ -1100,6 +1120,8 @@ export class Renderer {
 
       // Captured sky cubemap viewer — likewise inert unless switched on.
       this.sky.skyRenderer.cubeDebugRenderer.render(this);
+
+      this.flushScreenshots();
     }
 
     metrics.end('cpu.encode');

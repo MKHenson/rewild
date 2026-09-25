@@ -8,6 +8,7 @@ import { RigidBody, World } from '@dimforge/rapier3d-compat';
 import { TerrainEvent } from 'rewild-renderer/lib/renderers/terrain/TerrainRenderer';
 import { ScatterColliderStreamer } from './physics/ScatterColliderStreamer';
 import { registerScatterColliderCommands } from './debug/ScatterDebugCommands';
+import { bindScreenshotHotkey } from './ScreenshotHotkey';
 
 export class GameManager {
   renderer: Renderer;
@@ -19,6 +20,7 @@ export class GameManager {
   physicsWorld: World;
   onUnlock: () => void;
   private _onPointerlockChange: () => void;
+  private unbindScreenshotHotkey: (() => void) | null = null;
   TerrainEventDelegate: (event: TerrainEvent) => void;
   terrainRapierBodyMap: Map<string, RigidBody>;
   scatterColliders: ScatterColliderStreamer;
@@ -58,6 +60,7 @@ export class GameManager {
       this.clock.start();
 
       document.addEventListener('pointerlockchange', this._onPointerlockChange);
+      this.unbindScreenshotHotkey = bindScreenshotHotkey(this.renderer);
       this.player.requestLock();
 
       return true;
@@ -165,6 +168,7 @@ export class GameManager {
     this.stateMachine?.dispose();
     this.scatterColliders?.dispose();
     this.renderer.dispose();
+    this.unbindScreenshotHotkey?.();
     document.removeEventListener('pointerlockchange', this._onPointerlockChange);
     this.renderer.terrainRenderer.dispatcher.remove(this.TerrainEventDelegate);
   }
