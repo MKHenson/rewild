@@ -66,7 +66,7 @@ paths and goals can go. If objects come first, they must move later.
 | Water mesh            | **One shared flat grid per LOD**, drawn per wet chunk | No mesh is generated for a water body. The vertex shader places the grid and reads the chunk's water map.          |
 | Shoreline             | **Depth test against the terrain**                  | The water plane covers the whole chunk. Terrain above the level hides it, so the shore is correct for each pixel.    |
 | Shore effects         | **Depth from the map**: `level − terrainHeight`     | Foam, shallow colour and wet sand stay stable at low view angles. They do not depend on screen depth.                |
-| Terrain height on GPU | **New per-chunk `R16F` height texture**             | The terrain mesh is built on the CPU, and the GPU has no heights today. Shore effects need them.                     |
+| Terrain height on GPU | **New per-chunk `R16F` height texture**, relative to the chunk's base level | The terrain mesh is built on the CPU, and the GPU has no heights today. Shore effects need them. Relative values keep `f16` precise near the waterline. |
 | Lakes                 | **Sparse seeded cells**, one possible lake per cell | Any chunk can compute a lake's shape and level from the seed. It needs no data from other chunks.                     |
 | Water bodies          | **Records with an ID**, plus a body ID channel      | Edit rules must know which lake a texel belongs to. The ocean is body 0.                                             |
 | Edit rule             | **A lake's level is at most its spill height**      | The editor keeps levels valid with no water simulation. A high lake cannot join the ocean by accident.               |
@@ -82,21 +82,33 @@ climate and height data.
 
 | Data              | Form                                        | Notes                                                                             |
 | ----------------- | ------------------------------------------- | --------------------------------------------------------------------------------- |
-| Surface level     | 1 float channel                             | World height of the water surface. Continuous across chunk seams.                 |
+| Surface level     | 1 `f16` channel, relative to the base level | Height of the water surface. Continuous across chunk seams.                       |
 | Coverage          | 1 channel, 0 to 1                           | Is there water here? Zero means dry land at any terrain height.                   |
 | Type weights      | Weights over the water palette              | Ocean and lake first. Swamp and river later. Weights sum to 1 where coverage > 0. |
-| Body ID           | 1 integer channel                           | Which water body owns this texel. 0 is the ocean. Used by the edit rules.         |
+| Body ID           | 1 integer channel, nearest sampled          | Which water body owns this texel. 0 is the ocean. Used by the edit rules.         |
 | Flow              | 2 channels (direction), optional speed      | Zero for still water. Drives flow-map scrolling, and later, rivers.               |
 
 **Resolution.** Water properties change slowly. The map can use the biome mask's step of 4, which
-gives 61² texels per chunk. The fine shoreline comes from the terrain height, not from the map.
+gives 61² texels per chunk. Neighbouring chunks share their edge texels, so values match at seams.
+The fine shoreline comes from the terrain height, not from the map.
 
-**Chunk summary.** The worker also returns `hasWater` and the lowest and highest level in the chunk.
-A chunk with `hasWater = false` draws no water. Most inland chunks are in this group.
+**Sampling.** Level, coverage, type weights and flow are sampled linearly. Body ID is an integer
+and is always sampled nearest. In a lagoon, the type weights blend but each texel still has one
+owner: the lagoon's own ID. The ocean's ID stops where the lagoon's coverage starts.
+
+**Chunk summary.** The worker also returns `hasWater`, the **base level** and the highest level in
+the chunk. The base level is the lowest water level in the chunk. A chunk with `hasWater = false`
+draws no water. Most inland chunks are in this group.
 
 **Terrain heights.** The worker also writes a small `R16F` height texture for each chunk, at the
 water map's resolution. The GPU has no terrain heights today, because the terrain mesh is built on
 the CPU. The water shader and the terrain shader need them for `level − terrainHeight`.
+
+**Relative heights.** The height texture and the level channel both store `height − baseLevel`.
+The shader adds the base level back from a per-chunk uniform. At world heights `f16` is too coarse:
+at 1,000 m a step is 0.5 m, so shore foam and the wet band would band. Relative values are small
+near the waterline, where precision matters. Far above or below the water, precision drops, but
+there the values only need to show "dry" or "deep".
 
 ### Water bodies
 
@@ -106,7 +118,7 @@ The water map holds a body ID for each texel. The body itself is a record:
 | -------------- | ---------------------------------------------------------------------------- |
 | `id`           | 0 for the ocean. A generated lake takes its ID from its lake cell coordinate. |
 | `level`        | The surface level. For the ocean, this is the world's sea level.             |
-| `spillHeight`  | The lowest point of the rim. Calculated, not authored. See [Edit rules](#edit-rules). |
+| `spillHeight`  | The lowest point of the rim. Calculated, not authored. See [Computing the spill height](#computing-the-spill-height). |
 | `locked`       | If true, the sculpt brush cannot lower the rim below the level.              |
 | `typeWeights`  | The default palette weights for new water in this body.                      |
 
@@ -154,6 +166,15 @@ touches it:
 
 Reject a cell's lake if the ground is too steep or the ring heights differ too much.
 
+**Cells around the chunk.** A lake can reach past its own cell. A chunk checks its own lake cell
+and the 8 cells around it. The maximum lake radius, including the ring, is less than one cell, so
+the 3 × 3 check always finds every lake that touches the chunk.
+
+**Spacing.** Two lakes at different levels must not overlap, or the level would jump. Each lake
+keeps a minimum distance from the lakes in the neighbouring cells: the two radii plus a shore
+margin. When two lakes are too close, the lake with the lower cell hash is removed. Every chunk
+makes the same choice, because it uses only the seed.
+
 ### Where a lake meets the ocean
 
 If a lake's lowest ring point is at or near sea level, the lake becomes a **lagoon**:
@@ -184,6 +205,22 @@ simulate water.
 So a lake above sea level always has land between it and the ocean. It joins the ocean only if
 its spill height comes down to sea level. Then it takes the ocean's level.
 
+### Computing the spill height
+
+For a generated lake, the spill height is the lowest ring height. After a sculpt, the rim may have
+changed, so the editor finds it again with a **priority flood**:
+
+1. Start from the lake's covered texels.
+2. Always grow the lowest unvisited neighbour first, and keep track of the highest terrain
+   height passed so far.
+3. The first time the flood reaches ground lower than that height, the water would run out there.
+   That highest point is the spill height.
+4. The search runs only inside the lake's cell and its neighbours. If it reaches that edge first,
+   the spill height is the lowest terrain height found on the edge.
+
+The flood runs on the CPU at the water map's resolution, and only for lakes that the stroke
+touched.
+
 ### Channels from the sea
 
 A trench that joins the ocean and goes below sea level fills with sea water. A dry trench next to
@@ -207,7 +244,7 @@ The spill rule then drains the lake to sea level, and it joins the ocean as a la
 and the coverage together.
 
 **Cost.** The spill check and the flood fill run on the CPU, and only after an edit. Both stay
-inside the area of one lake cell, so they stay small.
+inside a lake cell and its neighbours, so they stay small.
 
 ### Islands
 
@@ -241,13 +278,21 @@ water pass           ──▶ per-chunk water patches          ──▶ HDR co
         │                  reads: water map, heights, refraction, depth, sky cube, CSM, clouds
         │                ──▶ horizon ring (far shading only)
         ▼
-atmosphere composite ──▶ sky, clouds, fog, god rays over scene and water
+transparent meshes   ──▶ BLEND materials, far to near     ──▶ HDR colour (no depth write)
+        ▼
+atmosphere composite ──▶ sky, clouds, fog, god rays, rain over scene and water
         ▼
 bloom + tonemap      ──▶ swapchain
 ```
 
 Water writes depth. So the existing atmosphere composite puts fog over water at the correct
 distance, and needs no change.
+
+**Transparent meshes move after water.** BLEND materials draw at the end of the scene pass today,
+with depth writes off. Water drawn after them would cover a transparent mesh in front of it, and
+the refraction copy would take it in as if it were under the water. They draw in their own pass
+after water, tested against the depth that water wrote. Rain already draws with the atmosphere, so
+it shows over water with no change.
 
 ### Mesh
 
@@ -305,7 +350,9 @@ just inside the far plane.
   the same flat shading, so the join does not show.
 - **Past the far plane.** The gap after 4,000 m is about `eyeHeight / 4000`. That is under 1 pixel
   below about 70 m. For higher cameras, the ring's outer vertices use `w = 0`, so they project onto
-  the horizon line.
+  the horizon line. Those pixels would get the depth of the far plane, and the composite treats
+  that depth as sky. So the ring clamps its depth just inside the far plane, and the composite
+  fogs it as it does other far water.
 
 ### Surface
 
@@ -422,10 +469,15 @@ shelf.
 - The query adds the **same Gerstner sum** as the vertex shader, so the player sits on the waves
   that you see. Gameplay needs only a few points per frame, which costs microseconds on the CPU. A
   GPU compute readback arrives frames late, so the player would bob out of time with the surface.
+- Gerstner waves move points sideways as well as up. The sum gives where a rest point `p` goes,
+  not the height at a fixed `(x, z)`. The query finds the rest point whose displaced position lands
+  on `(x, z)`: start at `p = (x, z)`, then set `p = (x, z) − horizontalOffset(p)` 3 or 4 times.
+  Then it takes the height at `p`.
 - To keep the two sums the same:
   - One source of wave parameters. The CPU reads it and uploads it to the GPU.
   - The same time value each frame, wrapped to a loop length so `f32` keeps its precision.
-  - A unit test that compares the TypeScript and WGSL results at fixed points.
+  - A unit test that compares the TypeScript and WGSL results at fixed points, including the
+    sideways offset.
 - Normal maps never change the height, so the CPU ignores them.
 - The player does not walk on water. Shallow water slows the player. Deep water makes the player
   swim at the surface.
@@ -463,5 +515,4 @@ shelf.
 - **Wind mapping.** Is the foam table right for how windy the trees look? Tune the two together.
 - **MSAA.** The scene depth texture is multisampled when `sampleCount > 1`. The water pass must
   resolve it or read one sample.
-- **Level precision.** Is `f16` precise enough for the level at large heights, or do we use `f32`?
 - **Palette size.** Ocean and lake only, or swamp as well in Phase 2?
