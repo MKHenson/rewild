@@ -1,6 +1,14 @@
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { SCATTER_LAYERS } from './ScatterLayers';
 import { TERRAIN_MATERIALS } from './TerrainMaterials';
+import {
+  LAKE,
+  OCEAN,
+  SILTY_LAKE,
+  TROPICAL_OCEAN,
+  WaterType,
+  validateWaterPalette,
+} from './Water';
 
 // A smoothstep band over a per-sample value: `from` → 0, `to` → 1. `from` > `to`
 // inverts the ramp, so one band expresses both "fades in" and "fades out".
@@ -234,6 +242,8 @@ export interface ClimateConfig {
   moisture: ClimateAxis;
   /** Omitted ⇒ the world is all land. */
   continent?: ContinentConfig;
+  /** The water map's type weights index this. Required with a continent. */
+  water?: WaterType[];
   biomes: BiomeParams[];
   cells: number[][];
 }
@@ -800,6 +810,7 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
     blendHalfWidth: 0.1,
   },
   continent: DEFAULT_CONTINENT,
+  water: [OCEAN, LAKE],
   biomes: [PLAIN, FOREST, MOUNTAIN],
   cells: [
     [2], // cold → mountain
@@ -825,6 +836,7 @@ export const ARID_CLIMATE: ClimateConfig = {
     blendHalfWidth: 0.1,
   }, // 1 band
   continent: DEFAULT_CONTINENT,
+  water: [TROPICAL_OCEAN, SILTY_LAKE],
   biomes: [BEACH_SAND, DESERT, DESERT_MOUNTAIN],
   cells: [
     [2], // cold → desert mountain
@@ -937,6 +949,7 @@ export function validateClimateLayers(climate: ClimateConfig): void {
     );
 
   validateBiomeScatter(climate);
+  validateWaterPalette(climate);
 }
 
 // A loose upper bound on what generation may produce: every deformation peaks
