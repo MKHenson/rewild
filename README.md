@@ -4,7 +4,7 @@ Rewild is a game about time travel and natural history. Built with Typescipt, Ko
 
 Checkout the 🦕[Demo](https://rewild-client.s3-website.fr-par.scw.cloud)🦖 (WIP)
 
-![Engine Pic](./docs/images/editor.png)
+![Engine Pic](./docs/images/screenshots/understory-plains.png)
 
 ## Installation
 
@@ -36,14 +36,10 @@ Checkout the 🦕[Demo](https://rewild-client.s3-website.fr-par.scw.cloud)🦖 (
 
 ## Screenshots
 
-### Cold Sunrise
-
-![Cold Sunrise Pic](./docs/images/cold-sunrise.png)
-
-### Storm
-
-![Storm Pic](./docs/images/lightning.png)
-
-### Nightsky
-
-![Nightsky Pic](./docs/images/nightsky.png)
+![Cold Sunrise Pic](./docs/images/screenshots/understory-arid.png)
+![Storm Pic](./docs/images/screenshots/understory-dry-mountains.png)
+![Nightsky Pic](./docs/images/screenshots/understory-mesa.png)
+![Nightsky Pic](./docs/images/screenshots/understory-stormy.png)
+![Nightsky Pic](./docs/images/screenshots/understory-morning.png)
+![Nightsky Pic](./docs/images/screenshots/understory-mountains.png)
+![Nightsky Pic](./docs/images/screenshots/understory-nightsky.png)

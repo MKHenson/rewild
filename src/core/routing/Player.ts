@@ -137,7 +137,7 @@ export class Player extends Node {
       const healthBar = stateData.renderer.guiManager.createElement(
         this.uiHealthBar
       );
-      stateData.renderer.ui.addChild(healthBar.transform);
+      // stateData.renderer.ui.addChild(healthBar.transform);
       healthBar.borderRadius = 20;
       healthBar.width = 0.4;
       healthBar.height = 0.05;
