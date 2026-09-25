@@ -17,6 +17,7 @@ Checkout the 🦕[Demo](https://rewild-client.s3-website.fr-par.scw.cloud)🦖 (
 - [Lighting](./docs/milestones/foxfire-lighting.md)
 - [Materials & Shading](./docs/milestones/lichen.md)
 - [Terrain](./docs/milestones/strata.md)
+- [Foliage & Scatter](./docs/milestones/understory.md)
 
 ## Debugging
 
