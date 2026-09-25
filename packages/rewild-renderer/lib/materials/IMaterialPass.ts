@@ -15,7 +15,7 @@ import { Geometry } from '../geometry/Geometry';
  * since it includes the overdraw and tile pressure a split-pass timing would
  * change.
  */
-export type SceneCategory = 'terrain' | 'scatter' | 'opaque';
+export type SceneCategory = 'terrain' | 'scatter' | 'water' | 'opaque';
 
 export interface IMaterialPass {
   pipeline: GPURenderPipeline;

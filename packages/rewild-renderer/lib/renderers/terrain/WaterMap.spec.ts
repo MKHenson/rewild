@@ -12,6 +12,7 @@ import {
   WaterMap,
   buildWaterMap,
   oceanCoverage,
+  packWaterSurface,
 } from './WaterMap';
 import { fromFloat16 } from '../../utils/float16';
 
@@ -144,5 +145,29 @@ describe('oceanCoverage', () => {
     expect(oceanCoverage(c, c.coast + 1.5 * c.blendHalfWidth)).toBeCloseTo(0.5, 6);
     expect(oceanCoverage(c, c.coast + 2 * c.blendHalfWidth)).toBe(0);
     expect(oceanCoverage(c, 1)).toBe(0);
+  });
+});
+
+describe('packWaterSurface', () => {
+  it('interleaves level, terrain height and coverage per texel', () => {
+    const water = build(COASTAL)!;
+    const packed = packWaterSurface(water);
+    expect(packed.length).toBe(SIZE * SIZE * 4);
+    for (let t = 0; t < SIZE * SIZE; t++) {
+      expect(packed[t * 4]).toBe(water.level[t]);
+      expect(packed[t * 4 + 1]).toBe(water.heights[t]);
+      expect(fromFloat16(packed[t * 4 + 2])).toBeCloseTo(
+        water.coverage[t] / 255,
+        3
+      );
+      expect(fromFloat16(packed[t * 4 + 3])).toBe(0);
+    }
+  });
+
+  it('reuses a buffer of the right size', () => {
+    const water = build(COASTAL)!;
+    const out = new Uint16Array(SIZE * SIZE * 4);
+    expect(packWaterSurface(water, out)).toBe(out);
+    expect(packWaterSurface(water, new Uint16Array(3))).not.toBe(out);
   });
 });

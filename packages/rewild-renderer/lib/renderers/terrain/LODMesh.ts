@@ -240,7 +240,7 @@ export class LODMesh {
         // The splat map is chunk state shared by every LOD — hand it over and
         // let the chunk create or re-upload it as its version warrants.
         this.chunk.populateSplat(renderer, splat, version);
-        this.chunk.populateWater(water, version);
+        this.chunk.populateWater(renderer, water, version);
 
         if (wantsScatter)
           this.chunk.populateScatter(
