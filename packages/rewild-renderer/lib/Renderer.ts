@@ -37,8 +37,13 @@ import { QualitySettings } from './utils/QualitySettings';
 
 const _projScreenMatrix = new Matrix4();
 
+// Opaque, then water, then transparent: blended passes write no depth, so
+// water has to land before them.
+const drawRank = (group: IRenderGroup) =>
+  group.pass.transparent ? 2 : group.pass.profileCategory === 'water' ? 1 : 0;
+
 const sortOpaqueFirst = (a: IRenderGroup, b: IRenderGroup) =>
-  (a.pass.transparent ? 1 : 0) - (b.pass.transparent ? 1 : 0);
+  drawRank(a) - drawRank(b);
 
 export class Renderer {
   device: GPUDevice;

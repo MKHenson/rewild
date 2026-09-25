@@ -1,7 +1,7 @@
 import { Renderer } from 'rewild-renderer';
 import { SceneCategory } from 'rewild-renderer/lib/materials/IMaterialPass';
 
-const CATEGORIES: SceneCategory[] = ['terrain', 'scatter', 'opaque'];
+const CATEGORIES: SceneCategory[] = ['terrain', 'scatter', 'water', 'opaque'];
 
 // Attribution for the scene pass. Terrain, scatter and everything else draw
 // through one renderGroupings call in a single render pass, and a GPU timestamp

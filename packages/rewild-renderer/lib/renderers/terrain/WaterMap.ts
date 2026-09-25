@@ -154,3 +154,24 @@ export function waterMapTransferables(water: WaterMap | null): ArrayBuffer[] {
     water.flow.buffer,
   ] as ArrayBuffer[];
 }
+
+/**
+ * Interleaves `water` into one rgba16float texel per map texel: (level,
+ * terrain height, coverage, 0). Writes into `out` when it is the right size.
+ */
+export function packWaterSurface(
+  water: WaterMap,
+  out?: Uint16Array
+): Uint16Array {
+  const texels = water.size * water.size;
+  const packed =
+    out && out.length === texels * 4 ? out : new Uint16Array(texels * 4);
+  const zero = toFloat16(0);
+  for (let t = 0; t < texels; t++) {
+    packed[t * 4] = water.level[t];
+    packed[t * 4 + 1] = water.heights[t];
+    packed[t * 4 + 2] = toFloat16(water.coverage[t] / 255);
+    packed[t * 4 + 3] = zero;
+  }
+  return packed;
+}

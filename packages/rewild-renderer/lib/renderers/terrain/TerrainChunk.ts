@@ -22,6 +22,8 @@ import {
 import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
 import { TextureProperties } from '../../textures/Texture';
 import type { WaterMap } from './WaterMap';
+import { ChunkWater } from '../water/ChunkWater';
+import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 
 const temp: Vector3 = new Vector3();
 // Kept apart from `temp`, which the constructor and the LOD walk also use.
@@ -122,6 +124,10 @@ export class TerrainChunk implements IComponent {
   // splat, and rebuilt with it after every edit.
   water: WaterMap | null = null;
   private waterVersion = -1;
+  // Draws `water`. Null while the chunk is dry.
+  private chunkWater: ChunkWater | null = null;
+  // Terrain LOD the chunk last chose, which the water grid follows.
+  private targetLod: number;
   // The heightsVersion the splat's contents were built from.
   private splatVersion = -1;
   // The chunk's painted biome mask, or null when nothing has been painted here.
@@ -176,6 +182,7 @@ export class TerrainChunk implements IComponent {
     this.position = coord.multiplyScalar(size);
     this.chunkSize = chunkSize;
     this.detailLevels = detailLevels;
+    this.targetLod = detailLevels[detailLevels.length - 1].lod;
     this.seed = seed;
     this.climatePreset = climatePreset;
     this.seaLevel = seaLevel;
@@ -460,10 +467,29 @@ export class TerrainChunk implements IComponent {
 
   // Adopts a worker-built water map for the heights at `version`. Older or
   // equal versions are ignored, on the same terms as populateSplat.
-  populateWater(water: WaterMap | null, version: number) {
+  populateWater(
+    renderer: Renderer,
+    water: WaterMap | null,
+    version: number
+  ) {
     if (version <= this.waterVersion) return;
     this.waterVersion = version;
     this.water = water;
+
+    if (!water) {
+      this.chunkWater?.dispose();
+      this.chunkWater = null;
+    } else if (this.chunkWater) {
+      this.chunkWater.update(renderer, water);
+    } else {
+      this.chunkWater = new ChunkWater(
+        renderer,
+        this.transform,
+        water,
+        (this.chunkSize - 1) * TERRAIN_METERS_PER_SAMPLE,
+        this.targetLod
+      );
+    }
   }
 
   // Adopts a worker-built splat map for the heights at `version`. Creates the
@@ -673,6 +699,10 @@ export class TerrainChunk implements IComponent {
     this.splatTextureExt = null;
     this.splatData = null;
     this.splatVersion = -1;
+    this.chunkWater?.dispose();
+    this.chunkWater = null;
+    this.water = null;
+    this.waterVersion = -1;
     this.scatter?.dispose();
     this.scatter = null;
     this.scatterVersion = -1;
@@ -718,6 +748,8 @@ export class TerrainChunk implements IComponent {
       }
 
       const lodMesh = this.lodMesh[lodIndex];
+      this.targetLod = this.detailLevels[lodIndex].lod;
+      this.chunkWater?.setLod(renderer, this.targetLod);
 
       if (lodMesh.gpuState === 'none' || lodMesh.gpuState === 'unloaded') {
         lodMesh.requestMesh(renderer);

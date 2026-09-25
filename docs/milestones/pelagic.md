@@ -289,11 +289,11 @@ bloom + tonemap      ──▶ swapchain
 Water writes depth. So the existing atmosphere composite puts fog over water at the correct
 distance, and needs no change.
 
-**Transparent meshes move after water.** BLEND materials draw at the end of the scene pass today,
-with depth writes off. Water drawn after them would cover a transparent mesh in front of it, and
-the refraction copy would take it in as if it were under the water. They draw in their own pass
-after water, tested against the depth that water wrote. Rain already draws with the atmosphere, so
-it shows over water with no change.
+**Transparent meshes draw after water.** BLEND materials write no depth, so water drawn after them
+would cover a transparent mesh in front of it. The renderer orders draw groups opaque, then water,
+then transparent, so they test against the depth water wrote. When refraction adds the colour
+copy, they move to their own pass after water, or the copy would take them in as if they were
+under the water. Rain already draws with the atmosphere, so it shows over water with no change.
 
 ### Mesh
 
