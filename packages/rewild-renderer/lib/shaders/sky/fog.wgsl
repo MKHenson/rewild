@@ -91,8 +91,8 @@ fn intersectSphereBoth(origin: vec3f, dir: vec3f, spherePos: vec3f, sphereRad: f
 // ─────────────────────────────────────────────────────────────────────────────
 // Exponential height fog
 //
-// Fog density falls off exponentially with world altitude:
-//   density(y) = baseDensity * exp(-(y - FOG_BASE_HEIGHT) / scaleHeight)
+// Fog is a dense layer up to a ceiling, falling off exponentially above it:
+//   density(y) = baseDensity * exp(-max(y - ceiling, 0) / scaleHeight)
 // so the fog layer is anchored to the world — pooling over low terrain — instead
 // of following the camera. (A uniform-density layer's visual horizon always sits
 // at eye level, which made the fog line climb mountains as the camera rose.)
@@ -103,41 +103,107 @@ fn intersectSphereBoth(origin: vec3f, dir: vec3f, spherePos: vec3f, sphereRad: f
 // even at foginess = 0.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FOG_BASE_HEIGHT: f32 = 100.0;   // world height of maximum fog density
+const FOG_BASE_HEIGHT: f32 = 50.0;   // lowest fog ceiling, and the scene haze's reference height
 const HAZE_DENSITY: f32 = 0.00009;  // constant aerial-perspective haze
 
 // Cloudiness at which the sky counts as fully overcast for lighting purposes.
 // Cover beyond this adds no further occlusion — see getFogScatterColor().
 const OVERCAST_FULL: f32 = 0.95;
 
+// A broad haze over the ground fog, for scene pixels only: it thickens with
+// foginess and reaches far above the ground layer, so distant terrain fades
+// from any camera height. Thinner with altitude, never gone.
+const SCENE_HAZE_DENSITY: f32 = 0.0005;       // per metre at FOG_BASE_HEIGHT, foginess 1
+const SCENE_HAZE_SCALE_HEIGHT: f32 = 1200.0;
+
+// The ground fog is a dense layer with a ceiling, thinning quickly above it, so
+// from a peak its top reads as a surface over the valleys. Both the ceiling
+// and the falloff rise with foginess: low settings pool in the valleys, full
+// fog climbs over the mountains.
+// Mirrored on the CPU in SkyRenderer.postRender — change both together.
+const FOG_LAYER_DEPTH_MAX: f32 = 700.0;   // ceiling above FOG_BASE_HEIGHT at foginess 1
+const FOG_FALLOFF_MIN: f32 = 15.0;        // scale height above the ceiling
+const FOG_FALLOFF_MAX: f32 = 60.0;
+
+fn heightFogCeiling(foginess: f32) -> f32 {
+    return FOG_BASE_HEIGHT + FOG_LAYER_DEPTH_MAX * foginess * foginess;
+}
+
 fn heightFogOpticalDepth(org: vec3f, dir: vec3f, dist: f32) -> f32 {
-    let scaleHeight = mix(15.0, 50.0, object.foginess);
-    let baseDensity = 0.01 * object.foginess * object.foginess;
+    return exponentialOpticalDepth(
+        org, dir, dist,
+        0.01 * object.foginess * object.foginess,
+        mix(FOG_FALLOFF_MIN, FOG_FALLOFF_MAX, object.foginess),
+        heightFogCeiling(object.foginess)
+    );
+}
+
+// Optical depth along the ray through a layer whose density is `baseDensity`
+// at and below `ceiling` and falls off as exp(-(y - ceiling) / scaleHeight)
+// above it.
+//
+// The ray is split where it crosses the base height: constant density below,
+// the exact exponential integral above. Letting the exponential carry on below
+// the base instead makes the fog below it e^(depth / scaleHeight) times too
+// dense, which for a thin layer is hundreds of times.
+fn exponentialOpticalDepth(
+    org: vec3f, dir: vec3f, dist: f32,
+    baseDensity: f32, scaleHeight: f32, ceiling: f32
+) -> f32 {
     if (baseDensity <= 0.0) {
         return 0.0;
     }
+    let d = max(dist, 0.0);
 
-    // Density at the camera; below the base height the layer saturates
-    // (constant density) rather than growing without bound.
-    let relY = max(org.y - FOG_BASE_HEIGHT, 0.0);
-    let densityAtCam = baseDensity * exp(-relY / scaleHeight);
-
-    // ∫ density(org.y + dir.y·t) dt for t ∈ [0, dist]
-    //   = densityAtCam · dist · (1 - exp(-k)) / k,   k = dir.y · dist / scaleHeight
-    let k = dir.y * dist / scaleHeight;
-    if (abs(k) < 1e-3) {
-        // Near-horizontal ray: integrand is ~constant along the path
-        return densityAtCam * dist;
+    // Near-horizontal ray: the density is ~constant along the path.
+    if (abs(dir.y) < 1e-5) {
+        return baseDensity * exp(-max(org.y - ceiling, 0.0) / scaleHeight) * d;
     }
-    // Clamp the exponent to keep steep long rays finite; optical depth is
-    // capped in fogTransmittance anyway.
-    return densityAtCam * dist * (1.0 - exp(-clamp(k, -30.0, 30.0))) / k;
+
+    let tCross = (ceiling - org.y) / dir.y;
+    var below = 0.0;
+    var tAboveStart = 0.0;
+    var tAboveEnd = 0.0;
+    if (org.y < ceiling) {
+        if (dir.y > 0.0) {
+            below = min(tCross, d);
+            tAboveStart = below;
+            tAboveEnd = d;
+        } else {
+            below = d;
+        }
+    } else {
+        tAboveEnd = select(d, min(tCross, d), dir.y < 0.0);
+        below = d - tAboveEnd;
+    }
+
+    // ∫ exp(-(y(t) - base) / H) dt = (H / dir.y) · [e(start) - e(end)], with
+    // every exponent ≤ 0 above the base, so nothing can overflow.
+    var above = 0.0;
+    if (tAboveEnd > tAboveStart) {
+        let yStart = org.y + dir.y * tAboveStart;
+        let yEnd = org.y + dir.y * tAboveEnd;
+        above = (scaleHeight / dir.y) * (
+            exp(-max(yStart - ceiling, 0.0) / scaleHeight) -
+            exp(-max(yEnd - ceiling, 0.0) / scaleHeight)
+        );
+    }
+    return baseDensity * (below + above);
 }
 
 /** Fraction of background light surviving along the ray (0 = full fog, 1 = clear). */
 fn fogTransmittance(org: vec3f, dir: vec3f, dist: f32) -> f32 {
     let d = max(dist, 0.0);
     let opticalDepth = HAZE_DENSITY * d + heightFogOpticalDepth(org, dir, d);
+    return exp(-min(opticalDepth, 50.0));
+}
+
+/** fogTransmittance plus the scene haze: what reaches the eye from a scene pixel. */
+fn sceneFogTransmittance(org: vec3f, dir: vec3f, dist: f32) -> f32 {
+    let d = max(dist, 0.0);
+    let opticalDepth = HAZE_DENSITY * d
+        + heightFogOpticalDepth(org, dir, d)
+        + exponentialOpticalDepth(org, dir, d, SCENE_HAZE_DENSITY * object.foginess, SCENE_HAZE_SCALE_HEIGHT, FOG_BASE_HEIGHT);
     return exp(-min(opticalDepth, 50.0));
 }
 

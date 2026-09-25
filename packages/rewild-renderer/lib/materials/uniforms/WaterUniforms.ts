@@ -14,7 +14,7 @@ const EXTINCTION_OFFSET = SCATTER_OFFSET + MAX_WATER_TYPES * 4;
 const PARAMS_FLOATS = EXTINCTION_OFFSET + MAX_WATER_TYPES * 4;
 
 // Perceptual roughness of the calm surface. The floor the BRDF allows is 0.045.
-const WATER_ROUGHNESS = 0.06;
+export const WATER_ROUGHNESS = 0.06;
 
 /** Packs a water palette into WaterParams. Unused slots stay zero. */
 export function packWaterParams(

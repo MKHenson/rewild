@@ -205,6 +205,9 @@ export interface BiomeParams {
   erosion?: Erosion;
   // What grows on the shape. Omitted ⇒ bare ground.
   scatter?: BiomeScatter[];
+  // Linear albedo of the biome seen from past the last chunk, where the
+  // horizon ring draws it flat. Omitted ⇒ a neutral grey.
+  farColor?: [number, number, number];
 }
 
 // One climate dimension (temperature or moisture): a low-frequency noise field
@@ -254,6 +257,7 @@ export interface ClimateConfig {
 // clearings.
 export const PLAIN: BiomeParams = {
   name: 'plain',
+  farColor: [0.18, 0.15, 0.1],
   deformations: [
     {
       kind: 'fbm',
@@ -317,6 +321,7 @@ export const PLAIN: BiomeParams = {
 // is what fell on it.
 export const FOREST: BiomeParams = {
   name: 'forest',
+  farColor: [0.28, 0.18, 0.1],
   deformations: [
     {
       kind: 'fbm',
@@ -390,6 +395,7 @@ export const FOREST: BiomeParams = {
 
 export const MOUNTAIN: BiomeParams = {
   name: 'mountain',
+  farColor: [0.18, 0.17, 0.16],
   // The massif, then the crags on it. The fbm carries the bulk and the ridged
   // field cuts the ridgelines and cols into it: fBm is round wherever it is
   // cut, so on its own it can only ever make a smooth dome however many
@@ -566,6 +572,7 @@ export const MOUNTAIN: BiomeParams = {
 // the mids that carry its skirts down to meet DESERT.
 export const DESERT_MOUNTAIN: BiomeParams = {
   name: 'desert-mountain',
+  farColor: [0.3, 0.18, 0.1],
   // The same massif this biome always had, cut into benches. Salt, scale,
   // octaves and curve are the ones the fbm carried, so the envelope is
   // unchanged and only the risers are new: sandstone weathers bed by bed, and
@@ -656,6 +663,7 @@ export const DESERT_MOUNTAIN: BiomeParams = {
 // it.
 export const DESERT: BiomeParams = {
   name: 'desert',
+  farColor: [0.45, 0.32, 0.18],
   deformations: [
     {
       kind: 'fbm',
@@ -740,6 +748,7 @@ export const DESERT: BiomeParams = {
 // them — which puts the tide line in the terrain's own shape, not on a contour.
 export const BEACH_SAND: BiomeParams = {
   name: 'beach-sand',
+  farColor: [0.5, 0.4, 0.26],
   deformations: [
     {
       kind: 'fbm',

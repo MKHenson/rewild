@@ -638,12 +638,13 @@ export class SkyRenderer {
       // ground-hugging layer's density at camera height. The bolt shader only
       // takes a scalar density, and bolt rays climb out of the layer toward the
       // cloud base, so the layer term is scaled down to an average along the path.
-      const scaleHeight = 15 + 35 * this.foginess;
+      const falloff = 15 + 45 * this.foginess;
+      const ceiling = 100 + 700 * this.foginess * this.foginess;
       const layerDensityAtCam =
         0.01 *
         this.foginess *
         this.foginess *
-        Math.exp(-Math.max(this.lastCameraPos[1], 0) / scaleHeight);
+        Math.exp(-Math.max(this.lastCameraPos[1] - ceiling, 0) / falloff);
       const fogDensity = 0.00002 + layerDensityAtCam * 0.15;
       this.lightningBoltPass.render(
         renderer,
