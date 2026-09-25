@@ -16,10 +16,10 @@ interface Props {
   onClose: () => void;
 }
 
-// Both settings a world's terrain is generated from. They share one Apply and
-// one confirmation because they have the same consequence: chunks capture the
-// seed and preset when they are built, so changing either throws away every
-// generated chunk and every saved sculpt edit along with it.
+// The settings a world's terrain is generated from. They share one Apply and
+// one confirmation because they have the same consequence: chunks capture them
+// when they are built, so changing any throws away every generated chunk and
+// every saved sculpt edit along with it.
 @register('x-terrain-settings-dialog')
 export class TerrainSettingsDialog extends Component<Props> {
   init() {
@@ -30,6 +30,9 @@ export class TerrainSettingsDialog extends Component<Props> {
     );
     const [climateInput, setClimateInput] = this.useState(
       terrain?.climatePreset ?? DEFAULT_CLIMATE_PRESET
+    );
+    const [seaLevelInput, setSeaLevelInput] = this.useState(
+      String(terrain?.seaLevel ?? 0)
     );
 
     // Presets are code-defined game content, so this list is fixed at build
@@ -42,6 +45,8 @@ export class TerrainSettingsDialog extends Component<Props> {
     const onApply = () => {
       const parsed = parseInt(seedInput(), 10);
       if (isNaN(parsed)) return;
+      const seaLevel = parseFloat(seaLevelInput());
+      if (isNaN(seaLevel)) return;
 
       const project = projectStore.project!;
       const current = project.sceneGraph.terrain;
@@ -50,7 +55,8 @@ export class TerrainSettingsDialog extends Component<Props> {
       // Nothing to regenerate — don't make the user confirm a no-op.
       if (
         current?.seed === parsed &&
-        (current?.climatePreset ?? DEFAULT_CLIMATE_PRESET) === climate
+        (current?.climatePreset ?? DEFAULT_CLIMATE_PRESET) === climate &&
+        (current?.seaLevel ?? 0) === seaLevel
       )
         return;
 
@@ -64,17 +70,19 @@ export class TerrainSettingsDialog extends Component<Props> {
             version: 1,
             seed: parsed,
             climatePreset: climate,
+            seaLevel,
           };
           projectStore.dirty = true;
           projectStore.dispatcher.dispatch({ kind: 'changed' });
 
           const renderer = getActiveRenderer();
           if (renderer) {
-            // reset() rebuilds around the seed; the preset is a plain field on
-            // the renderer, so it has to be pushed across separately. Set it
-            // first so the chunks reset() triggers are built against it rather
-            // than against the outgoing preset.
+            // reset() rebuilds around the seed; the preset and sea level are
+            // plain fields on the renderer, so they have to be pushed across
+            // separately. Set them first so the chunks reset() triggers are
+            // built against them rather than against the outgoing values.
             renderer.terrainRenderer.climatePreset = climate;
+            renderer.terrainRenderer.seaLevel = seaLevel;
             renderer.terrainRenderer.reset(parsed, renderer);
           }
         },
@@ -112,6 +120,18 @@ export class TerrainSettingsDialog extends Component<Props> {
                 value={climateInput()}
                 options={climateOptions}
                 onChange={(v) => setClimateInput(v)}
+              />
+            </div>
+
+            <div style="margin-top: 1rem">
+              <Typography variant="label">Sea Level</Typography>
+              <Typography variant="info">
+                Height of the ocean surface in metres
+              </Typography>
+              <Input
+                fullWidth
+                value={seaLevelInput()}
+                onChange={(v) => setSeaLevelInput(v, false)}
               />
             </div>
           </div>

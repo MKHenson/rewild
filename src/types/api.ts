@@ -1054,6 +1054,11 @@ export interface components {
             /** String */
             climatePreset: string;
             /**
+             * Float
+             * Format: float
+             */
+            seaLevel: number;
+            /**
              * Int
              * Format: int32
              */

@@ -262,7 +262,8 @@ export class TerrainSculptController {
       size,
       chunk.seed,
       new Vector2(chunk.coord.x * (size - 1), chunk.coord.y * (size - 1)),
-      resolveClimatePreset(chunk.climatePreset)
+      resolveClimatePreset(chunk.climatePreset),
+      chunk.seaLevel
     );
   }
 }
