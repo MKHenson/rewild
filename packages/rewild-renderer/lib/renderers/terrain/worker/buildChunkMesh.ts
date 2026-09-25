@@ -9,6 +9,7 @@ import { generateSplatMap } from '../Splat';
 import { PaintMask } from '../PaintMask';
 import { ScatterKillSet } from '../ScatterKillSet';
 import { ScatterInstances, scatterChunk } from '../Scatter';
+import { WaterMap, buildWaterMap } from '../WaterMap';
 import { Vector2 } from 'rewild-common';
 
 export interface BuildChunkMeshRequest {
@@ -95,6 +96,8 @@ export interface BuildChunkMeshResult {
   heights: Float32Array;
   // Per-layer instance lists; empty unless the request asked for scatter.
   scatter: ScatterInstances[];
+  // Chunk-wide like the splat. Null when no water shows in the chunk.
+  water: WaterMap | null;
 }
 
 // Shared by the terrain worker and tests. Everything downstream of the height
@@ -217,6 +220,16 @@ export function buildChunkMesh(
       })
     : [];
 
+  // Built from the same heights, so a sculpted chunk's shore follows the edit.
+  const water = buildWaterMap(
+    chunkSize,
+    seed,
+    worldOffset,
+    climate,
+    seaLevel,
+    heights
+  );
+
   return {
     splat,
     vertices,
@@ -225,5 +238,6 @@ export function buildChunkMesh(
     indices: meshData.triangles,
     heights,
     scatter,
+    water,
   };
 }

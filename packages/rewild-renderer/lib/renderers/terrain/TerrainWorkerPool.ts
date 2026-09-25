@@ -1,6 +1,7 @@
 import type { PaintMask } from './PaintMask';
 import type { ScatterKillSet } from './ScatterKillSet';
 import type { ScatterInstances } from './Scatter';
+import type { WaterMap } from './WaterMap';
 
 interface TerrainWorkerRequest {
   chunkSize: number;
@@ -47,6 +48,8 @@ export interface TerrainWorkerResponse {
   heights: Float32Array;
   // Per-layer instance lists; empty unless the request asked for scatter.
   scatter: ScatterInstances[];
+  // Chunk-wide water map (see BuildChunkMeshResult).
+  water: WaterMap | null;
 }
 
 interface QueuedRequest {

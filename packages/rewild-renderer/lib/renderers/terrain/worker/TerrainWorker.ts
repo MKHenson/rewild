@@ -1,12 +1,13 @@
 import './SetupWorkerUtils';
 import { buildChunkMesh } from './buildChunkMesh';
+import { waterMapTransferables } from '../WaterMap';
 
 self.onmessage = async (event: MessageEvent) => {
-  const { splat, vertices, uvs, normals, indices, heights, scatter } =
+  const { splat, vertices, uvs, normals, indices, heights, scatter, water } =
     buildChunkMesh(event.data);
 
   self.postMessage(
-    { splat, vertices, uvs, normals, indices, heights, scatter },
+    { splat, vertices, uvs, normals, indices, heights, scatter, water },
     {
       transfer: [
         splat.buffer,
@@ -16,6 +17,7 @@ self.onmessage = async (event: MessageEvent) => {
         indices.buffer,
         heights.buffer,
         ...scatter.map((layer) => layer.data.buffer),
+        ...waterMapTransferables(water),
       ],
     }
   );

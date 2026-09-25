@@ -96,9 +96,9 @@ The fine shoreline comes from the terrain height, not from the map.
 and is always sampled nearest. In a lagoon, the type weights blend but each texel still has one
 owner: the lagoon's own ID. The ocean's ID stops where the lagoon's coverage starts.
 
-**Chunk summary.** The worker also returns `hasWater`, the **base level** and the highest level in
-the chunk. The base level is the lowest water level in the chunk. A chunk with `hasWater = false`
-draws no water. Most inland chunks are in this group.
+**Chunk summary.** The water map also holds the **base level** and the highest level in the
+chunk. The base level is the lowest water level in the chunk. A chunk where no water shows gets
+no water map (`hasWater` is false) and draws no water. Most inland chunks are in this group.
 
 **Terrain heights.** The worker also writes a small `R16F` height texture for each chunk, at the
 water map's resolution. The GPU has no terrain heights today, because the terrain mesh is built on
