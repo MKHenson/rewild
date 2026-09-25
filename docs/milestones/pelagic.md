@@ -336,16 +336,20 @@ The gap below the horizon covers an angle of about `eyeHeight / 2800`:
 | On a hill, 30 m               | 0.6°      | About 10 pixels                   |
 | On a cliff or mountain, 150 m | 3°        | About 50 pixels                   |
 
-A **horizon ring** closes the gap. It is one ring mesh, centred on the camera, from 2,800 m out to
-just inside the far plane.
+A **horizon ring** closes the gap. It is one ring mesh, centred where chunk visibility was last
+computed, from 2,800 m out to the horizon. Chunks stop on a ragged edge of whole squares, so the
+ring discards any pixel whose chunk passes the terrain's own visibility test. The ring and the
+chunk water then never overlap, and neither z-fights the other.
 
 - **Shading.** The water shader with far features only: sky reflection, Fresnel, depth colour and
   the ripples as roughness. No waves, refraction or foam, because none of them show at that range.
-- **Coverage.** The ring draws only where the continent field says "ocean". A small texture
-  centred on the camera holds the field, for example 64² texels over 16 km. The CPU updates it when
-  the player moves far enough.
-- **Land.** The ring does not cover land past the chunks. Land already stops at 2,800 m, and fog
-  hides it.
+- **Far map.** Two textures centred on the chunks' visibility centre hold, per texel, the raw
+  continent value and the land's colour: 128² over 16 km, and 128² over 131 km for the rest of the
+  way to the horizon. The continent value is smooth, so a bilinear sample of it gives a smooth
+  coast. The CPU rebuilds a level a few rows per frame once the centre drifts an eighth of its span.
+- **Land.** The ring draws the land past the chunks too, flat at sea level, as a matte surface in
+  the far colour of the biomes there (`farColor` on each biome). Without it the sea would meet
+  holes of bare sky below the horizon. Sea and land blend across the coast in one shading pass.
 - **Fog.** The ring writes depth, so the atmosphere composite fogs it correctly.
 - **The join.** The last chunks use the lowest LOD with no waves. The ring starts at sea level with
   the same flat shading, so the join does not show.

@@ -11,6 +11,12 @@
 // than a constant mirrored between the two, so turning the exposure knob cannot
 // silently desync god-ray coverage from the image it is predicting.
 
+#include "../shader-lib/far-ground.wgsl"
+
+// Furthest a far-ground pixel is taken to be: past this the fog has long
+// saturated, so the exact figure no longer matters.
+const FAR_GROUND_MAX_DISTANCE: f32 = 1e6;
+
 struct FinalUniformStruct {
     invViewProjectionMatrix: mat4x4<f32>,
     invViewMatrix: mat4x4<f32>,
@@ -19,7 +25,8 @@ struct FinalUniformStruct {
     cloudiness: f32,
     sunPosition: vec3f,
     cameraPosition: vec3f,
-    padding0: f32,
+    // World height of the sea surface, where the horizon ring's ground lies.
+    seaLevel: f32,
     foginess: f32,
     temperature: f32,
     lightningFlash: f32,
@@ -88,7 +95,10 @@ var<private> sunDotUp: f32;
     // output because getFogColor + tone mapping are designed for ground-level viewing.
     let cameraAltitude = object.cameraPosition.y;
     let aboveCloudBlend = smoothstep(CLOUD_START, CLOUD_START + 100.0, cameraAltitude);
-    let worldPos = worldFromScreenCoord( uv, rawDepth );
+    var worldPos = worldFromScreenCoord( uv, rawDepth );
+    if (rawDepth >= FAR_GROUND_DEPTH_MIN) {
+      worldPos = farGroundPosition(normalize(worldPos - object.cameraPosition));
+    }
     let terrainBelowClouds = smoothstep(CLOUD_START + CLOUD_HEIGHT + 100.0, CLOUD_START, worldPos.y);
     let cloudOcclusion = aboveCloudBlend * terrainBelowClouds * hdrBlend.a;
 
@@ -105,7 +115,7 @@ var<private> sunDotUp: f32;
     // along the camera→pixel ray. The layer is anchored to world height, so fog
     // pools over low terrain instead of tracking the camera's eye level.
     let distance = length(worldPos - object.cameraPosition);
-    let fogFactor = 1.0 - fogTransmittance(object.cameraPosition, dir, distance);
+    let fogFactor = 1.0 - sceneFogTransmittance(object.cameraPosition, dir, distance);
 
     sunDotUp = dot(sunDirection, vec3f(0.0, 1.0, 0.0));
 
@@ -153,6 +163,20 @@ var<private> sunDotUp: f32;
   // only because the sky pass wrote alpha=1 on non-terrain pixels; that channel
   // now carries cloud opacity, so the constant is stated directly.)
   return vec4f(hdrBlend.rgb + godRays, 1.0);
+}
+
+// Where a horizon-ring pixel's view ray meets the sea-level plane. Depth there
+// is a marker, not a distance: the ring runs past the far plane.
+fn farGroundPosition(dir: vec3f) -> vec3f {
+  let cam = object.cameraPosition;
+  var t = FAR_GROUND_MAX_DISTANCE;
+  if (dir.y < 0.0) {
+    t = min((object.seaLevel - cam.y) / dir.y, FAR_GROUND_MAX_DISTANCE);
+  }
+  if (t <= 0.0) {
+    t = FAR_GROUND_MAX_DISTANCE;
+  }
+  return cam + dir * t;
 }
 
 fn worldFromScreenCoord( coord: vec2f, depthSample: f32 ) -> vec3f {

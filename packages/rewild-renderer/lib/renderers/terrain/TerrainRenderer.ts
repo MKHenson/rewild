@@ -12,7 +12,11 @@ import {
 import { TerrainChunk, TerrainChunkEvent } from './TerrainChunk';
 import { LODMesh } from './LODMesh';
 import { TerrainWorkerPool } from './TerrainWorkerPool';
-import { DEFAULT_CLIMATE_PRESET, resolveClimatePreset } from './Biomes';
+import {
+  ClimateConfig,
+  DEFAULT_CLIMATE_PRESET,
+  resolveClimatePreset,
+} from './Biomes';
 import { ChunkSnapshotProvider } from './ChunkSnapshot';
 import { PaintMaskProvider } from './PaintMask';
 import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
@@ -20,6 +24,7 @@ import { ScatterInstances, ScatterPick, pickScatterInstance } from './Scatter';
 import { generateSplatMap } from './Splat';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { ScatterModels } from './ScatterModels';
+import { HorizonOcean } from '../water/HorizonOcean';
 
 export class LODInfo {
   lod: i32;
@@ -137,6 +142,12 @@ export class TerrainRenderer {
   // Saved kill sets, looked up alongside the density mask.
   scatterKillProvider: ScatterKillSetProvider | null = null;
   private _enabled: boolean = true;
+  // The ocean past the last chunk. Created with the renderer.
+  private horizonOcean: HorizonOcean | null = null;
+  // Resolved once per preset rather than every frame: resolving an unknown id
+  // warns.
+  private horizonClimate: { preset: string; climate: ClimateConfig } | null =
+    null;
 
   constructor() {
     this.terrainChunks = new Map();
@@ -192,7 +203,10 @@ export class TerrainRenderer {
   set enabled(value: boolean) {
     if (this._enabled === value) return;
     this._enabled = value;
-    if (!value) this.clearChunks();
+    if (!value) {
+      this.clearChunks();
+      this.horizonOcean?.hide();
+    }
   }
 
   get maxViewDst() {
@@ -298,6 +312,7 @@ export class TerrainRenderer {
       Math.floor(this.maxViewDst / this.chunkSize) + 1;
     this.workerPool = new TerrainWorkerPool();
     this.scatterModels = new ScatterModels();
+    this.horizonOcean = new HorizonOcean(renderer);
   }
 
   /** Re-runs chunk and scatter visibility on the next update, without waiting
@@ -801,6 +816,32 @@ export class TerrainRenderer {
 
   update(renderer: Renderer, camera: Camera) {
     if (!this._enabled) return;
+    this.updateVisibility(renderer, camera);
+    this.updateHorizonOcean(renderer);
+  }
+
+  // The ring follows the centre chunk visibility was last computed from, so it
+  // starts exactly where the chunks stop.
+  private updateHorizonOcean(renderer: Renderer) {
+    if (!this.horizonOcean || !this.viewPosOld) return;
+    if (this.horizonClimate?.preset !== this._climatePreset)
+      this.horizonClimate = {
+        preset: this._climatePreset,
+        climate: resolveClimatePreset(this._climatePreset),
+      };
+    this.horizonOcean.update(renderer, {
+      seed: this._seed,
+      climatePreset: this._climatePreset,
+      climate: this.horizonClimate.climate,
+      seaLevel: this._seaLevel,
+      centreX: this.viewPosOld.x,
+      centreZ: this.viewPosOld.z,
+      maxViewDst: this.maxViewDst,
+      chunkSize: this.chunkSize,
+    });
+  }
+
+  private updateVisibility(renderer: Renderer, camera: Camera) {
 
     // getWorldDirection refreshes the camera's world matrix and, via its
     // transform observer, matrixWorldInverse — so both the frustum built below
@@ -878,6 +919,8 @@ export class TerrainRenderer {
 
   dispose() {
     this.clearChunks();
+    this.horizonOcean?.dispose();
+    this.horizonOcean = null;
     this.scatterModels.dispose();
     this.workerPool.dispose();
   }
