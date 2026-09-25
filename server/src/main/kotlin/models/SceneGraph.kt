@@ -69,7 +69,9 @@ data class WorldGenConfig(
     val seed: Int,
     // Id of a code-defined climate preset; the preset's tables are game
     // content and are never persisted. Defaulted so older records deserialize.
-    val climatePreset: String = "default"
+    val climatePreset: String = "default",
+    // World height of the ocean surface, in metres.
+    val seaLevel: Float = 0f
 )
 
 @Serializable

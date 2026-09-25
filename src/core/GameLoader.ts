@@ -55,6 +55,8 @@ export async function loadInitialLevels(
       renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
       renderer.terrainRenderer.climatePreset =
         project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
+      renderer.terrainRenderer.seaLevel =
+        project.sceneGraph.terrain.seaLevel ?? 0;
     }
 
     registerDebugCommands(renderer, project);

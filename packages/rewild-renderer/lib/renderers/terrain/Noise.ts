@@ -1,7 +1,13 @@
 import { Perlin, Vector2 } from 'rewild-common';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { ClimateConfig, Deformation } from './Biomes';
-import { createClimateField, resolveBiomeWeights } from './ClimateField';
+import {
+  continentLandWeight,
+  continentSeabedDepth,
+  createClimateField,
+  resolveBiomeWeights,
+  sampleContinent,
+} from './ClimateField';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -473,6 +479,20 @@ function validateClimate(climate: ClimateConfig): void {
         throw new Error(`Biome '${biome.name}' erosion strength must be above 0 and at most 1.`);
     }
   }
+  const continent = climate.continent;
+  if (continent) {
+    if (continent.scale <= 0)
+      throw new Error('Continent scale must be a positive number.');
+    if (
+      continent.blendHalfWidth <= 0 ||
+      continent.shelfWidth <= 0 ||
+      continent.slopeWidth <= 0
+    )
+      throw new Error('Continent blend, shelf and slope widths must be positive numbers.');
+    if (continent.shelfDepth < 0 || continent.oceanDepth < continent.shelfDepth)
+      throw new Error('Continent depths must satisfy 0 <= shelfDepth <= oceanDepth.');
+  }
+
   const tBands = climate.temperature.cuts.length + 1;
   const mBands = climate.moisture.cuts.length + 1;
   if (climate.cells.length !== tBands)
@@ -604,7 +624,8 @@ export function generateBiomeBlendedHeightMap(
   height: number,
   seed: number,
   offset: Vector2,
-  climate: ClimateConfig
+  climate: ClimateConfig,
+  seaLevel: number = 0
 ): Float32Array {
   if (width <= 0 || height <= 0) throw new Error('Width and height must be positive integers.');
   validateClimate(climate);
@@ -653,6 +674,8 @@ export function generateBiomeBlendedHeightMap(
   const halfWidth = fieldWidth / 2;
   const halfHeight = fieldHeight / 2;
 
+  const continent = climate.continent;
+
   // Scratch state reused across samples (no allocation in the sample loop).
   const activeBiomes = new Int32Array(4);
   const activeWeights = new Float64Array(4);
@@ -669,6 +692,16 @@ export function generateBiomeBlendedHeightMap(
         activeWeights
       );
 
+      // Open ocean has no land height to blend, so its biomes are never
+      // evaluated.
+      let land = 1;
+      let seabed = 0;
+      if (continent) {
+        const c = sampleContinent(field, x, y);
+        land = continentLandWeight(continent, c);
+        seabed = seaLevel - continentSeabedDepth(continent, c);
+      }
+
       let h = 0;
       let talus = 0;
       let strength = 0;
@@ -677,7 +710,7 @@ export function generateBiomeBlendedHeightMap(
       // cell half in an unweathered biome would read as twice as steep a
       // repose and never slide.
       let erosionWeight = 0;
-      for (let i = 0; i < activeCount; i++) {
+      for (let i = 0; i < activeCount && land > 0; i++) {
         const biomeIndex = activeBiomes[i];
         const weight = activeWeights[i];
         h +=
@@ -707,7 +740,7 @@ export function generateBiomeBlendedHeightMap(
       }
 
       const cell = x + y * fieldWidth;
-      heights[cell] = h;
+      heights[cell] = seabed + land * (h - seabed);
       if (talusHeight && erodeStrength) {
         // A cell blended between a weathered biome and an unweathered one has
         // a share of the strength, but the repose angle of the weathered ones

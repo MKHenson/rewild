@@ -16,6 +16,7 @@ const baseRequest = {
   position: POSITION,
   seed: SEED,
   climatePreset: DEFAULT_CLIMATE_PRESET,
+  seaLevel: 0,
 };
 
 describe('buildChunkMesh', () => {

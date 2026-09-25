@@ -1,10 +1,13 @@
 import { Vector2 } from 'rewild-common';
 import { generateBiomeBlendedHeightMap } from './Noise';
+import { continentLandWeight, continentSeabedDepth } from './ClimateField';
 import {
   BiomeParams,
   CLIMATE_PRESETS,
   ClimateConfig,
+  ContinentConfig,
   DEFAULT_CLIMATE,
+  DEFAULT_CONTINENT,
   DuneDeformation,
   FbmDeformation,
   MOUNTAIN,
@@ -23,14 +26,16 @@ function generate(
   seed = SEED,
   climate: ClimateConfig = DEFAULT_CLIMATE,
   width = CHUNK_SIZE,
-  height = CHUNK_SIZE
+  height = CHUNK_SIZE,
+  seaLevel = 0
 ) {
   return generateBiomeBlendedHeightMap(
     width,
     height,
     seed,
     new Vector2(offsetX, offsetY),
-    climate
+    climate,
+    seaLevel
   );
 }
 
@@ -54,6 +59,8 @@ function flatBiome(name: string, amplitude: number): BiomeParams {
     layers: [{ material: 'flat-ground-01' }],
   };
 }
+
+const ALL_LAND: ClimateConfig = { ...DEFAULT_CLIMATE, continent: undefined };
 
 function singleBiomeClimate(biome: BiomeParams): ClimateConfig {
   return {
@@ -132,8 +139,8 @@ describe('generateBiomeBlendedHeightMap', () => {
     expect(range(plainOnly)).toBeLessThan(range(mountainOnly));
   });
 
-  it('stays within [0, heightScale] of the tallest biome', () => {
-    const heights = generate(0, 0);
+  it('stays within [0, heightScale] of the tallest biome on land', () => {
+    const heights = generate(0, 0, SEED, ALL_LAND);
     const max = getMaxWorldHeight(DEFAULT_CLIMATE);
     for (let i = 0; i < heights.length; i++) {
       expect(heights[i]).toBeGreaterThanOrEqual(0);
@@ -234,7 +241,7 @@ describe('generateBiomeBlendedHeightMap', () => {
     // output — identical to a climate with no cuts at all.
     const mountainOnly = generate(0, 0, SEED, singleBiomeClimate(MOUNTAIN));
     const blended = generate(0, 0, SEED, {
-      ...DEFAULT_CLIMATE,
+      ...ALL_LAND,
       biomes: [MOUNTAIN],
       // Every cell of the default's full temperature × moisture grid — three
       // temperature bands over an uncut moisture axis.
@@ -347,6 +354,110 @@ describe('deformation stack', () => {
     for (let i = 0; i < heights.length; i++) {
       expect(heights[i]).toBeGreaterThanOrEqual(0);
       expect(heights[i]).toBeLessThanOrEqual(max);
+    }
+  });
+});
+
+describe('continent', () => {
+  const flat = singleBiomeClimate(flatBiome('flat', 30));
+
+  // A continent small enough that a coast crosses one test chunk.
+  const small: ContinentConfig = {
+    ...DEFAULT_CONTINENT,
+    scale: 40,
+    coast: 0.5,
+  };
+
+  function withContinent(continent: ContinentConfig): ClimateConfig {
+    return { ...flat, continent };
+  }
+
+  it('drops the sea bed to the ocean floor below sea level in open ocean', () => {
+    const ocean = withContinent({ ...DEFAULT_CONTINENT, coast: 2 });
+    const heights = generate(0, 0, SEED, ocean, CHUNK_SIZE, CHUNK_SIZE, 12);
+    for (let i = 0; i < heights.length; i++)
+      expect(heights[i]).toBeCloseTo(12 - DEFAULT_CONTINENT.oceanDepth, 4);
+  });
+
+  it('leaves inland heights as the biomes made them', () => {
+    const inland = withContinent({ ...DEFAULT_CONTINENT, coast: -1 });
+    expect(generate(0, 0, SEED, inland)).toEqual(generate(0, 0, SEED, flat));
+  });
+
+  it('crosses from land to sea bed within one chunk', () => {
+    const heights = generate(0, 0, SEED, withContinent(small));
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < heights.length; i++) {
+      if (heights[i] < min) min = heights[i];
+      if (heights[i] > max) max = heights[i];
+    }
+    expect(min).toBeLessThan(0);
+    expect(max).toBeGreaterThan(0);
+    expect(min).toBeGreaterThanOrEqual(-DEFAULT_CONTINENT.oceanDepth - 1e-4);
+    expect(max).toBeLessThanOrEqual(30 + 1e-4);
+  });
+
+  it('has no seams across a coast at chunk borders', () => {
+    const climate = withContinent(small);
+    const left = generate(0, 0, SEED, climate);
+    const right = generate(CHUNK_SIZE - 1, 0, SEED, climate);
+    for (let y = 0; y < CHUNK_SIZE; y++)
+      expect(right[y * CHUNK_SIZE]).toBeCloseTo(
+        left[y * CHUNK_SIZE + (CHUNK_SIZE - 1)],
+        4
+      );
+
+    const top = generate(0, 0, SEED, climate);
+    const bottom = generate(0, CHUNK_SIZE - 1, SEED, climate);
+    for (let x = 0; x < CHUNK_SIZE; x++)
+      expect(bottom[(CHUNK_SIZE - 1) * CHUNK_SIZE + x]).toBeCloseTo(top[x], 4);
+  });
+
+  it('moves the sea bed with the sea level and leaves land alone', () => {
+    const climate = withContinent(small);
+    const low = generate(0, 0, SEED, climate, CHUNK_SIZE, CHUNK_SIZE, 0);
+    const high = generate(0, 0, SEED, climate, CHUNK_SIZE, CHUNK_SIZE, 10);
+    let raised = 0;
+    for (let i = 0; i < low.length; i++) {
+      const shift = high[i] - low[i];
+      expect(shift).toBeGreaterThanOrEqual(-1e-4);
+      expect(shift).toBeLessThanOrEqual(10 + 1e-4);
+      if (low[i] === 30) expect(shift).toBe(0);
+      if (shift > 9.999) raised++;
+    }
+    expect(raised).toBeGreaterThan(0);
+  });
+
+  it('rejects an ocean floor shallower than the shelf', () => {
+    const bad = withContinent({ ...DEFAULT_CONTINENT, oceanDepth: 2, shelfDepth: 6 });
+    expect(() => generate(0, 0, SEED, bad)).toThrow();
+  });
+});
+
+describe('continent profile', () => {
+  const c = DEFAULT_CONTINENT;
+
+  it('keeps all the land height inland and none on the sea bed', () => {
+    expect(continentLandWeight(c, c.coast + c.blendHalfWidth)).toBe(1);
+    expect(continentLandWeight(c, c.coast - c.blendHalfWidth)).toBe(0);
+    expect(continentLandWeight(c, c.coast)).toBeCloseTo(0.5, 6);
+  });
+
+  it('falls from the coast across the shelf to the ocean floor', () => {
+    expect(continentSeabedDepth(c, c.coast + 0.1)).toBe(0);
+    expect(continentSeabedDepth(c, c.coast)).toBe(0);
+    expect(continentSeabedDepth(c, c.coast - c.shelfWidth)).toBeCloseTo(c.shelfDepth, 6);
+    expect(
+      continentSeabedDepth(c, c.coast - c.shelfWidth - c.slopeWidth)
+    ).toBeCloseTo(c.oceanDepth, 6);
+    expect(continentSeabedDepth(c, 0)).toBeCloseTo(c.oceanDepth, 6);
+
+    let previous = 0;
+    for (let v = c.coast; v >= 0; v -= 0.005) {
+      const depth = continentSeabedDepth(c, v);
+      expect(depth).toBeGreaterThanOrEqual(previous - 1e-9);
+      previous = depth;
     }
   });
 });

@@ -109,6 +109,8 @@ declare module 'models' {
     // The preset's tables are game content and are never persisted; older
     // records without this field resolve to the default preset.
     climatePreset?: string;
+    // World height of the ocean surface, in metres. Older records resolve to 0.
+    seaLevel?: number;
   }
 
   export interface IProject {

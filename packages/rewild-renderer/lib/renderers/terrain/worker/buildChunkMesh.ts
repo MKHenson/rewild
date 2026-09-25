@@ -17,6 +17,7 @@ export interface BuildChunkMeshRequest {
   position: { x: number; y: number };
   seed: number;
   climatePreset: string;
+  seaLevel: number;
   // LOD-0 heights from a saved chunk snapshot. Present ⇒ these drive the mesh
   // geometry/splat instead of the generator; absent ⇒ generate from the recipe.
   heights?: Float32Array;
@@ -103,7 +104,7 @@ export interface BuildChunkMeshResult {
 export function buildChunkMesh(
   request: BuildChunkMeshRequest
 ): BuildChunkMeshResult {
-  const { chunkSize, lod, position, seed, climatePreset } = request;
+  const { chunkSize, lod, position, seed, climatePreset, seaLevel } = request;
 
   // Heights in absolute world meters. Which biome shapes each sample comes from
   // the temperature × moisture climate model of the world's climate preset —
@@ -149,7 +150,8 @@ export function buildChunkMesh(
       apronSize,
       seed,
       worldOffset,
-      climate
+      climate,
+      seaLevel
     );
     if (request.heights) {
       // Cached-generated heights: identical to the apron's inner region, so the

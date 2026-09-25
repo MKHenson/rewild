@@ -209,6 +209,21 @@ export interface ClimateAxis {
   blendHalfWidth: number; // half-width of the smoothstep transition band around each cut
 }
 
+// Land and ocean: a very low-frequency noise field over world position, in
+// 0..1. Below `coast` is ocean, where the biome heights give way to a sea bed
+// under the world's sea level. Widths are in field units, like
+// ClimateAxis.blendHalfWidth.
+export interface ContinentConfig {
+  scale: number; // feature size in samples; larger than the climate axes so a coast spans many chunks
+  seedSalt: number;
+  coast: number; // field value at the coastline
+  blendHalfWidth: number; // either side of `coast`, over which land heights give way to the sea bed
+  shelfWidth: number; // from the coast to the shelf edge
+  shelfDepth: number; // metres below sea level at the shelf edge
+  slopeWidth: number; // from the shelf edge down to the ocean floor
+  oceanDepth: number; // metres below sea level on the ocean floor
+}
+
 // The whole climate model: two axes plus a biome lookup grid.
 // cells[temperatureBand][moistureBand] is an index into `biomes`; multiple
 // cells may share a biome. Adding a biome = a table row + a cut + cell entries.
@@ -217,6 +232,8 @@ export interface ClimateConfig {
   label?: string;
   temperature: ClimateAxis;
   moisture: ClimateAxis;
+  /** Omitted ⇒ the world is all land. */
+  continent?: ContinentConfig;
   biomes: BiomeParams[];
   cells: number[][];
 }
@@ -749,6 +766,19 @@ export const BEACH_SAND: BiomeParams = {
   scatter: [],
 };
 
+// Continents several times wider than a temperature band, so a coast runs past
+// more than one biome.
+export const DEFAULT_CONTINENT: ContinentConfig = {
+  scale: 9000 / TERRAIN_METERS_PER_SAMPLE,
+  seedSalt: 60013,
+  coast: 0.44,
+  blendHalfWidth: 0.03,
+  shelfWidth: 0.03,
+  shelfDepth: 6,
+  slopeWidth: 0.06,
+  oceanDepth: 45,
+};
+
 // Temperature splits cold (mountain) from warm; moisture splits the warm half
 // into dry (plain) and wet (forest). Cold ignores moisture, which is what
 // sharing a biome across cells is for. Uses seven of the eight splat channels.
@@ -769,6 +799,7 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
     cuts: [],
     blendHalfWidth: 0.1,
   },
+  continent: DEFAULT_CONTINENT,
   biomes: [PLAIN, FOREST, MOUNTAIN],
   cells: [
     [2], // cold → mountain
@@ -793,6 +824,7 @@ export const ARID_CLIMATE: ClimateConfig = {
     cuts: [],
     blendHalfWidth: 0.1,
   }, // 1 band
+  continent: DEFAULT_CONTINENT,
   biomes: [BEACH_SAND, DESERT, DESERT_MOUNTAIN],
   cells: [
     [2], // cold → desert mountain

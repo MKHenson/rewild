@@ -51,6 +51,7 @@ export class TerrainChunk implements IComponent {
   id: string;
   seed: number;
   climatePreset: string;
+  seaLevel: number;
   // The chunk's current LOD-0 heightfield — the in-memory truth all LOD meshes
   // are built from, including any edits. Populated from the first worker
   // response (or a snapshot read) and kept for the chunk's lifetime; it is the
@@ -157,7 +158,8 @@ export class TerrainChunk implements IComponent {
     chunkSize: i32,
     detailLevels: LODInfo[],
     seed: number,
-    climatePreset: string
+    climatePreset: string,
+    seaLevel: number
   ) {
     this.id = `${coord.x},${coord.y}`;
     this.coord = new Vector2(coord.x, coord.y);
@@ -171,6 +173,7 @@ export class TerrainChunk implements IComponent {
     this.detailLevels = detailLevels;
     this.seed = seed;
     this.climatePreset = climatePreset;
+    this.seaLevel = seaLevel;
     this.dispatcher = new Dispatcher<TerrainChunkEvent>();
 
     this.lodMesh = new Array<LODMesh>(detailLevels.length);

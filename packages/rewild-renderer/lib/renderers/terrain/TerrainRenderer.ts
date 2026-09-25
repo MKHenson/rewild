@@ -125,6 +125,7 @@ export class TerrainRenderer {
 
   private _seed: number = 100;
   private _climatePreset: string = DEFAULT_CLIMATE_PRESET;
+  private _seaLevel: number = 0;
   // Injected by the host app (game/editor); looks up a chunk's saved snapshot
   // heights on the asset path. Saved ⇒ meshed from storage, absent ⇒ generated.
   snapshotProvider: ChunkSnapshotProvider | null = null;
@@ -168,6 +169,17 @@ export class TerrainRenderer {
   set climatePreset(value: string) {
     if (this._climatePreset === value) return;
     this._climatePreset = value;
+    this.clearChunks();
+  }
+
+  get seaLevel() {
+    return this._seaLevel;
+  }
+
+  // Same capture semantics as `seed` — the sea bed is generated below it.
+  set seaLevel(value: number) {
+    if (this._seaLevel === value) return;
+    this._seaLevel = value;
     this.clearChunks();
   }
 
@@ -424,7 +436,8 @@ export class TerrainRenderer {
           this.mapChunkSizeLod,
           this.detailLevels,
           this.seed,
-          this.climatePreset
+          this.climatePreset,
+          this.seaLevel
         );
 
         newChunk.dispatcher.add(this.onChunkLoadedDelegate);

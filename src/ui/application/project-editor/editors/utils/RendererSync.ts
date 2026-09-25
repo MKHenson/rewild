@@ -25,6 +25,8 @@ export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
     renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
     renderer.terrainRenderer.climatePreset =
       project.sceneGraph.terrain.climatePreset ?? DEFAULT_CLIMATE_PRESET;
+    renderer.terrainRenderer.seaLevel =
+      project.sceneGraph.terrain.seaLevel ?? 0;
   }
 
   renderer.terrainRenderer.snapshotProvider = project.levelId

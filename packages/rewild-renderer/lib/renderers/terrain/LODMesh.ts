@@ -210,6 +210,7 @@ export class LODMesh {
             position: this.noiseOffset,
             seed: this.seed,
             climatePreset: this.climatePreset,
+            seaLevel: this.chunk.seaLevel,
             heights: apron ? undefined : knownHeights ?? undefined,
             apron,
             edited: this.chunk.heightsAreEdited,

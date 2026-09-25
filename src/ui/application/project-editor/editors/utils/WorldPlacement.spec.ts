@@ -103,7 +103,8 @@ describe('isTerrainTransform', () => {
       240,
       [{ lod: 0, visibleDstThreshold: 200 }],
       1,
-      'default'
+      'default',
+      0
     );
   }
 

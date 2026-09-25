@@ -8,6 +8,7 @@ interface TerrainWorkerRequest {
   position: { x: number; y: number };
   seed: number;
   climatePreset: string;
+  seaLevel: number;
   // Snapshot heights for a saved chunk — the worker meshes these instead of
   // generating. Structured-cloned (not transferred): the chunk keeps its copy
   // for the other LOD requests.
