@@ -1361,6 +1361,11 @@
                         "type": "string",
                         "title": "String"
                     },
+                    "seaLevel": {
+                        "type": "number",
+                        "format": "float",
+                        "title": "Float"
+                    },
                     "seed": {
                         "type": "integer",
                         "format": "int32",
@@ -1374,6 +1379,7 @@
                 },
                 "required": [
                     "climatePreset",
+                    "seaLevel",
                     "seed",
                     "version"
                 ],

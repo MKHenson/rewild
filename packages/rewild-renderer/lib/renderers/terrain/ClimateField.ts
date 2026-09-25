@@ -1,5 +1,10 @@
 import { Perlin, Vector2 } from 'rewild-common';
-import { ClimateAxis, ClimateConfig, NoiseSelector } from './Biomes';
+import {
+  ClimateAxis,
+  ClimateConfig,
+  ContinentConfig,
+  NoiseSelector,
+} from './Biomes';
 import { PaintMask, samplePaintMask } from './PaintMask';
 
 // Per-sample climate resolution: which biome(s) a world position is in, and in
@@ -44,6 +49,15 @@ function seededRandom(seed: number): () => number {
 // The border is then a discontinuity and blendHalfWidth cannot widen it.
 const WARP_SAMPLE_SCALE = 2800;
 const WARP_AMPLITUDE = 350;
+
+// The continent field's octave stack. The first octave sets where the oceans
+// are; the rest cut bays and headlands into the coast.
+const CONTINENT_OCTAVES = 4;
+const CONTINENT_PERSISTENCE = 0.5;
+const CONTINENT_LACUNARITY = 2;
+const CONTINENT_MAX_AMPLITUDE =
+  (1 - Math.pow(CONTINENT_PERSISTENCE, CONTINENT_OCTAVES)) /
+  (1 - CONTINENT_PERSISTENCE);
 
 // Which band an axis value falls in, plus the smoothstep blend into the next
 // band when the value sits inside a cut's transition zone. bandB === bandA
@@ -124,6 +138,10 @@ export interface ClimateField {
   // Decorrelated world offsets for the domain-warp noise field.
   warpOffsetX: number;
   warpOffsetY: number;
+  // Per-octave world offsets for the continent field; null when the climate
+  // has no continent.
+  continentOffsetsX: Float64Array | null;
+  continentOffsetsY: Float64Array | null;
   // An axis with no cuts has a single band — skip its noise entirely.
   sampleTemperature: boolean;
   sampleMoisture: boolean;
@@ -159,6 +177,18 @@ export function createClimateField(
   const warpOffsetX = wRng() * 200000 - 100000 + offset.x;
   const warpOffsetY = wRng() * 200000 - 100000 + offset.y;
 
+  let continentOffsetsX: Float64Array | null = null;
+  let continentOffsetsY: Float64Array | null = null;
+  if (climate.continent) {
+    const cRng = seededRandom(seed + climate.continent.seedSalt);
+    continentOffsetsX = new Float64Array(CONTINENT_OCTAVES);
+    continentOffsetsY = new Float64Array(CONTINENT_OCTAVES);
+    for (let o = 0; o < CONTINENT_OCTAVES; o++) {
+      continentOffsetsX[o] = cRng() * 200000 - 100000 + offset.x;
+      continentOffsetsY[o] = cRng() * 200000 - 100000 + offset.y;
+    }
+  }
+
   return {
     perlin: new Perlin(seed),
     climate,
@@ -170,6 +200,8 @@ export function createClimateField(
     mOffsetY,
     warpOffsetX,
     warpOffsetY,
+    continentOffsetsX,
+    continentOffsetsY,
     sampleTemperature: tAxis.cuts.length > 0,
     sampleMoisture: mAxis.cuts.length > 0,
     t: { bandA: 0, bandB: 0, weight: 0 },
@@ -257,6 +289,71 @@ export function sampleLayerNoise(
     ) +
       1) *
     0.5
+  );
+}
+
+/**
+ * The continent field at chunk-local sample (x, y), in 0..1. Values below the
+ * climate's `continent.coast` are ocean. Returns 1 (inland) for a climate with
+ * no continent.
+ */
+export function sampleContinent(
+  field: ClimateField,
+  x: number,
+  y: number
+): number {
+  const continent = field.climate.continent;
+  const offsetsX = field.continentOffsetsX;
+  const offsetsY = field.continentOffsetsY;
+  if (!continent || !offsetsX || !offsetsY) return 1;
+
+  let amplitude = 1;
+  let frequency = 1;
+  let sum = 0;
+  for (let o = 0; o < CONTINENT_OCTAVES; o++) {
+    sum +=
+      field.perlin.simplex2(
+        ((x - field.halfWidth + offsetsX[o]) / continent.scale) * frequency,
+        ((y - field.halfHeight - offsetsY[o]) / continent.scale) * frequency
+      ) * amplitude;
+    amplitude *= CONTINENT_PERSISTENCE;
+    frequency *= CONTINENT_LACUNARITY;
+  }
+  return (sum / CONTINENT_MAX_AMPLITUDE + 1) * 0.5;
+}
+
+/**
+ * How much of the land height survives at continent value `c`: 1 inland, 0 on
+ * the sea bed, smoothstepped across `blendHalfWidth` either side of the coast.
+ */
+export function continentLandWeight(
+  continent: ContinentConfig,
+  c: number
+): number {
+  const half = continent.blendHalfWidth;
+  const t = (c - (continent.coast - half)) / (2 * half);
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  return t * t * (3 - 2 * t);
+}
+
+/**
+ * Metres below sea level of the sea bed at continent value `c`: 0 at the coast,
+ * falling linearly across the shelf, then down the slope to the ocean floor.
+ */
+export function continentSeabedDepth(
+  continent: ContinentConfig,
+  c: number
+): number {
+  const u = continent.coast - c;
+  if (u <= 0) return 0;
+
+  const shelf = continent.shelfDepth * Math.min(1, u / continent.shelfWidth);
+  let t = (u - continent.shelfWidth) / continent.slopeWidth;
+  if (t <= 0) return shelf;
+  if (t > 1) t = 1;
+  return (
+    shelf + (continent.oceanDepth - continent.shelfDepth) * t * t * (3 - 2 * t)
   );
 }
 

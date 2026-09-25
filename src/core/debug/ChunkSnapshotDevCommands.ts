@@ -38,7 +38,8 @@ export function registerChunkSnapshotDevCommands(
           size,
           terrain.seed,
           new Vector2(cx * (size - 1), cy * (size - 1)),
-          resolveClimatePreset(terrain.climatePreset)
+          resolveClimatePreset(terrain.climatePreset),
+          terrain.seaLevel
         );
 
     // The "edit": a smooth flat-topped plateau in the chunk centre —
