@@ -233,6 +233,24 @@ export interface ContinentConfig {
   shelfDepth: number; // metres below sea level at the shelf edge
   slopeWidth: number; // from the shelf edge down to the ocean floor
   oceanDepth: number; // metres below sea level on the ocean floor
+  // Added to the moisture value at the coast, fading out `coastalMoistureReach`
+  // inland of it. Omitted ⇒ the coast is no wetter.
+  coastalMoisture?: number;
+  coastalMoistureReach?: number;
+}
+
+// Beaches: sand where the ocean is close, by height above sea level and slope.
+// Laid over the biome layers the way a layer covers the ones beneath it, and
+// thins the biomes' scatter by the same amount.
+export interface CoastConfig {
+  sand: string; // key into TERRAIN_MATERIALS; the dry beach
+  wetSand?: string; // at the waterline. Omitted ⇒ sand
+  seabed?: string; // below seabedDepth. Omitted ⇒ wetSand
+  beachHeight: number; // metres above sea level the beach reaches
+  wetHeight: number; // metres above sea level wet sand reaches
+  seabedDepth: number; // metres below sea level the sea bed starts
+  blend: number; // metres over which each band hands over to the next
+  slope: SelectorBand; // degrees: where sand gives way to the biome's own ground
 }
 
 // The whole climate model: two axes plus a biome lookup grid.
@@ -247,6 +265,8 @@ export interface ClimateConfig {
   continent?: ContinentConfig;
   /** The water map's type weights index this. Required with a continent. */
   water?: WaterType[];
+  /** Omitted, or without a continent ⇒ no beaches. */
+  coast?: CoastConfig;
   biomes: BiomeParams[];
   cells: number[][];
 }
@@ -796,6 +816,27 @@ export const DEFAULT_CONTINENT: ContinentConfig = {
   shelfDepth: 6,
   slopeWidth: 0.06,
   oceanDepth: 45,
+  coastalMoisture: 0.15,
+  coastalMoistureReach: 0.08,
+};
+
+// One sand for the beach and the sea bed; the waterline's wet look comes from
+// the terrain shader.
+export const DEFAULT_COAST: CoastConfig = {
+  sand: 'aerial_beach_01',
+  beachHeight: 6,
+  wetHeight: 0.4,
+  seabedDepth: 2,
+  blend: 12,
+  slope: { from: 30, to: 18 },
+};
+
+// Pale dry sand over darker wet sand, which also carpets the sea bed.
+export const ARID_COAST: CoastConfig = {
+  ...DEFAULT_COAST,
+  sand: 'aerial_beach_01',
+  wetSand: 'aerial_beach_02',
+  beachHeight: 4,
 };
 
 // Temperature splits cold (mountain) from warm; moisture splits the warm half
@@ -820,6 +861,7 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
   },
   continent: DEFAULT_CONTINENT,
   water: [OCEAN, LAKE],
+  coast: DEFAULT_COAST,
   biomes: [PLAIN, FOREST, MOUNTAIN],
   cells: [
     [2], // cold → mountain
@@ -846,6 +888,7 @@ export const ARID_CLIMATE: ClimateConfig = {
   }, // 1 band
   continent: DEFAULT_CONTINENT,
   water: [TROPICAL_OCEAN, SILTY_LAKE],
+  coast: ARID_COAST,
   biomes: [BEACH_SAND, DESERT, DESERT_MOUNTAIN],
   cells: [
     [2], // cold → desert mountain
@@ -865,8 +908,9 @@ export const MAX_SPLAT_LAYERS = 8;
 // each plane uploads straight from the same buffer.
 export const SPLAT_BYTES_PER_TEXEL = MAX_SPLAT_LAYERS;
 
-// The splat map's channel i. Biome order then layer order, so adding a layer
-// shifts later channels — which only matters once splat maps are persisted.
+// The splat map's channel i. Biome order then layer order, then the coast's
+// materials, so adding a layer shifts later channels — which only matters once
+// splat maps are persisted.
 export function getClimatePalette(climate: ClimateConfig): string[] {
   const palette: string[] = [];
   for (const biome of climate.biomes) {
@@ -874,7 +918,18 @@ export function getClimatePalette(climate: ClimateConfig): string[] {
       if (!palette.includes(layer.material)) palette.push(layer.material);
     }
   }
+  for (const material of getCoastMaterials(climate.coast))
+    if (!palette.includes(material)) palette.push(material);
   return palette;
+}
+
+/** The coast's sand, wet sand and sea bed materials, with fallbacks applied. */
+export function getCoastMaterials(
+  coast: CoastConfig | undefined
+): [string, string, string] | [] {
+  if (!coast) return [];
+  const wet = coast.wetSand ?? coast.sand;
+  return [coast.sand, wet, coast.seabed ?? wet];
 }
 
 // Every scatter layer this climate grows, in library slot order rather than
@@ -947,6 +1002,26 @@ export function validateClimateLayers(climate: ClimateConfig): void {
           `Biome '${biome.name}' layer ${i} ('${layer.material}') has no selectors, so it covers everything and buries the layers beneath it. Give it a slope, height or noise selector — or make it the base layer.`
         );
     }
+  }
+
+  const coast = climate.coast;
+  if (coast) {
+    for (const material of getCoastMaterials(coast))
+      if (!TERRAIN_MATERIALS[material])
+        throw new Error(
+          `Coast references unknown terrain material '${material}'.`
+        );
+    if (coast.blend <= 0)
+      throw new Error('Coast blend must be a positive number of metres.');
+    if (
+      !(
+        coast.beachHeight > coast.wetHeight &&
+        coast.wetHeight > -coast.seabedDepth
+      )
+    )
+      throw new Error(
+        'Coast bands must satisfy beachHeight > wetHeight > -seabedDepth.'
+      );
   }
 
   const palette = getClimatePalette(climate);

@@ -491,6 +491,8 @@ function validateClimate(climate: ClimateConfig): void {
       throw new Error('Continent blend, shelf and slope widths must be positive numbers.');
     if (continent.shelfDepth < 0 || continent.oceanDepth < continent.shelfDepth)
       throw new Error('Continent depths must satisfy 0 <= shelfDepth <= oceanDepth.');
+    if (continent.coastalMoisture && !((continent.coastalMoistureReach ?? 0) > 0))
+      throw new Error('Continent coastalMoisture needs a positive coastalMoistureReach.');
   }
 
   const tBands = climate.temperature.cuts.length + 1;

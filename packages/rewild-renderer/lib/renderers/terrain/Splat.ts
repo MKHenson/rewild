@@ -4,16 +4,20 @@ import {
   MAX_SPLAT_LAYERS,
   SPLAT_BYTES_PER_TEXEL,
   getClimatePalette,
+  getCoastMaterials,
   validateClimateLayers,
 } from './Biomes';
 import {
+  ClimateField,
   createBiomeResolver,
   createClimateField,
   createLayerNoiseFields,
+  oceanCoverage,
   resolveActiveBiomes,
+  sampleContinent,
   sampleLayerNoise,
 } from './ClimateField';
-import { resolveLayerWeights } from './LayerWeights';
+import { resolveCoastWeights, resolveLayerWeights } from './LayerWeights';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { PaintMask } from './PaintMask';
 
@@ -55,6 +59,45 @@ export interface SplatOptions {
   out?: Uint8Array;
   /** Only regenerate this window. Defaults to the whole chunk. */
   region?: SplatRegion;
+  /** World height of the sea, which the beach bands are measured from. */
+  seaLevel?: number;
+}
+
+/**
+ * Whether the ocean covers chunk-local sample (x, y): the water map's own test,
+ * ground below sea level where the ocean reaches.
+ */
+export function isUnderOcean(
+  field: ClimateField,
+  heightAboveSea: number,
+  x: number,
+  y: number
+): boolean {
+  const continent = field.climate.continent;
+  if (!continent || heightAboveSea >= 0) return false;
+  return oceanCoverage(continent, sampleContinent(field, x, y)) > 0;
+}
+
+/**
+ * The beach's weights at chunk-local sample (x, y), written into `out` as
+ * [dry sand, wet sand, sea bed] (see resolveCoastWeights); returns their sum,
+ * the share the beach takes. 0 for a climate without a coast or continent.
+ */
+export function coastWeightsAt(
+  field: ClimateField,
+  heightAboveSea: number,
+  slopeDegrees: number,
+  x: number,
+  y: number,
+  out: Float64Array
+): number {
+  const { coast, continent } = field.climate;
+  if (!coast || !continent) return 0;
+  // Most ground stands above the beach; skip the continent noise there.
+  if (heightAboveSea >= coast.beachHeight + coast.blend) return 0;
+  const nearness = oceanCoverage(continent, sampleContinent(field, x, y));
+  if (nearness <= 0) return 0;
+  return resolveCoastWeights(coast, heightAboveSea, slopeDegrees, nearness, out);
 }
 
 /**
@@ -212,6 +255,15 @@ export function generateSplatMap(
   const layerNoise = new Float64Array(maxLayers);
   const channels = new Float64Array(MAX_SPLAT_LAYERS);
 
+  // Splat channels of the beach's dry sand, wet sand and sea bed.
+  const seaLevel = options?.seaLevel ?? 0;
+  const coastMaterials = getCoastMaterials(climate.coast);
+  const coastChannels =
+    coastMaterials.length > 0 && climate.continent
+      ? Int32Array.from(coastMaterials.map((m) => palette.indexOf(m)))
+      : null;
+  const coastWeights = new Float64Array(3);
+
   for (let y = ry0; y <= ry1; y++) {
     for (let x = rx0; x <= rx1; x++) {
       const index = x + y * width;
@@ -258,6 +310,25 @@ export function generateSplatMap(
         const layerChannels = biomeChannels[biomeIndex];
         for (let l = 0; l < biome.layers.length; l++) {
           channels[layerChannels[l]] += biomeWeight * layerWeights[l];
+        }
+      }
+
+      // The beach covers the biome layers the way a layer covers those beneath.
+      if (coastChannels) {
+        const beach = coastWeightsAt(
+          field,
+          worldHeight - seaLevel,
+          slope,
+          x,
+          y,
+          coastWeights
+        );
+        if (beach > 0) {
+          const keep = 1 - beach;
+          for (let c = 0; c < MAX_SPLAT_LAYERS; c++) channels[c] *= keep;
+          channels[coastChannels[0]] += coastWeights[0];
+          channels[coastChannels[1]] += coastWeights[1];
+          channels[coastChannels[2]] += coastWeights[2];
         }
       }
 

@@ -169,7 +169,7 @@ describe('validateTerrainMaterials', () => {
 });
 
 describe('getClimatePalette', () => {
-  it('lists the default climate materials, base-first per biome', () => {
+  it('lists the default climate materials, base-first per biome, then the coast', () => {
     expect(getClimatePalette(DEFAULT_CLIMATE)).toEqual([
       'aerial_grass_rock',
       'grass_path_02_1k',
@@ -178,6 +178,7 @@ describe('getClimatePalette', () => {
       'aerial_rocks_01',
       'marble_cliff_05',
       'snow_field_aerial',
+      'aerial_beach_02',
     ]);
   });
 
