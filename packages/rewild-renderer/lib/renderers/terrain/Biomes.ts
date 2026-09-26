@@ -286,11 +286,11 @@ const REEDS: BiomeScatter = {
   density: 0.9,
   slope: { from: 20, to: 6 },
   waterDepth: [
-    { from: -2.5, to: -2.0 },
+    { from: -5.5, to: -4.0 },
     { from: 1.2, to: 1.1 },
   ],
   underwater: true,
-  noise: { scale: 40, seedSalt: 131, band: { from: 0.35, to: 0.6 } },
+  noise: { scale: 10, seedSalt: 131, band: { from: 0.35, to: 0.6 } },
 };
 
 // Biome parameter table. Rows are data — adding a biome is a table edit.

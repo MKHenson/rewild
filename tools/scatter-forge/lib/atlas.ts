@@ -76,22 +76,100 @@ export interface AtlasLayout {
   cells: number;
   /** Each accent's cells, in the config's order. */
   accents: CellRange[];
+  /**
+   * Width over height of every cell, the host's then the accents'. Present,
+   * the cells are strips shaped like the cards that sample them — see
+   * packStrips. Absent, they are the square grid.
+   */
+  aspects?: number[];
 }
 
-export function layoutAtlas(cells: number, accentCells: number[]): AtlasLayout {
+export function layoutAtlas(cells: number, accentCells: number[], aspects?: number[]): AtlasLayout {
   const accents: CellRange[] = [];
   let offset = cells;
   for (const count of accentCells) {
     accents.push({ offset, count });
     offset += count;
   }
-  return { grid: Math.max(1, Math.ceil(Math.sqrt(offset))), cells, accents };
+  if (aspects && aspects.length !== offset)
+    throw new Error(`A strip layout needs one aspect per cell: ${offset} cells, ${aspects.length} aspects.`);
+  return { grid: Math.max(1, Math.ceil(Math.sqrt(offset))), cells, accents, ...(aspects ? { aspects } : {}) };
+}
+
+/**
+ * Strips of `aspects`, packed left to right in rows of one height, at the
+ * tallest height that fits the square image.
+ *
+ * A frond is several times longer than it is wide, and a square cell gives it
+ * the texels of its length across as well — most of them blank. A strip is
+ * the frond's own shape, so the same image carries it at up to the whole
+ * image's height. Each strip's inside, past the gutter, is exactly its aspect,
+ * so the column a card samples is the whole of it.
+ */
+export function packStrips(size: number, aspects: number[]): PixelRect[] {
+  const g = gutterFor(size);
+  const widthAt = (height: number, aspect: number) => Math.min(size, Math.round((height - 2 * g) * aspect) + 2 * g);
+
+  const pack = (height: number): PixelRect[] | null => {
+    const rects: PixelRect[] = [];
+    let x = 0;
+    let y = 0;
+    for (const aspect of aspects) {
+      const width = widthAt(height, aspect);
+      if (x + width > size) {
+        x = 0;
+        y += height;
+      }
+      if (y + height > size) return null;
+      rects.push({ x, y, width, height });
+      x += width;
+    }
+    return rects;
+  };
+
+  let low = 2 * g + 1;
+  let high = size;
+  let best = pack(low);
+  if (!best) throw new Error(`${aspects.length} strips do not fit a ${size}px image.`);
+
+  while (low < high) {
+    const mid = Math.ceil((low + high) / 2);
+    const rects = pack(mid);
+    if (rects) {
+      best = rects;
+      low = mid;
+    } else high = mid - 1;
+  }
+
+  return best;
+}
+
+/** Every cell in texels, host's then accents', for the image writer. */
+export function cellPixels(size: number, layout: AtlasLayout): PixelRect[] {
+  return layout.aspects ? packStrips(size, layout.aspects) : leafCellPixels(size, layout.grid);
+}
+
+/** Every cell in UV space, inset by the gutter. */
+export function cellUvs(size: number, layout: AtlasLayout): UvRect[] {
+  const g = gutterFor(size);
+  return cellPixels(size, layout).map((rect) => ({
+    u0: (rect.x + g) / size,
+    u1: (rect.x + rect.width - g) / size,
+    v0: (rect.y + g) / size,
+    v1: (rect.y + rect.height - g) / size,
+  }));
+}
+
+/** Texels along a cell's height inside its gutter: what a stamp is fitted to. */
+export function cellInnerPx(size: number, layout: AtlasLayout): number {
+  if (layout.aspects) return packStrips(size, layout.aspects)[0].height - 2 * gutterFor(size);
+  return size / layout.grid - 2 * gutterFor(size);
 }
 
 /** The cells one accent's cards address. */
 export function accentCells(size: number, layout: AtlasLayout, index: number): UvRect[] {
   const range = layout.accents[index];
-  return leafCells(size, layout.grid).slice(range.offset, range.offset + range.count);
+  return cellUvs(size, layout).slice(range.offset, range.offset + range.count);
 }
 
 /** The leaf cells in UV space, inset by the gutter. */

@@ -140,6 +140,7 @@ export function clumpLayer(params: Params, metrics: ClumpMetrics): ScatterLayer 
     // be mirrored on a back face. Same reason a tree's canopy mode sets it.
     authoredNormals: true,
     foliage: params.foliage,
+    ...(params.foliageNormalMap ? { foliageNormalMap: true } : {}),
     castShadow: params.castShadow,
   };
 }
@@ -219,6 +220,7 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
     // A card stands in for a cluster of leaves whatever its normal says, so it
     // reflects off its own face and its occlusion shades its highlights too.
     foliage: params.foliage,
+    ...(params.foliageNormalMap ? { foliageNormalMap: true } : {}),
     castShadow: params.castShadow,
   };
 }
@@ -233,7 +235,10 @@ export function scatterLayer(params: Params, skeleton: Skeleton): ScatterLayer {
  */
 export function crownLayer(params: Params, crown: Crown): ScatterLayer {
   if (crown.skeleton) return scatterLayer(params, crown.skeleton);
-  return clumpLayer(params, { height: crown.metrics.height, spread: crown.metrics.spread, patchRadius: 0, tufts: 1 });
+  return {
+    ...clumpLayer(params, { height: crown.metrics.height, spread: crown.metrics.spread, patchRadius: 0, tufts: 1 }),
+    authoredNormals: params.leafNormalMode !== 'card',
+  };
 }
 
 /** Fraction of a rock's height the layer sinks it by, so it beds into the slope. */

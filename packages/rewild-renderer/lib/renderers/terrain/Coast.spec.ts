@@ -116,13 +116,15 @@ describe('beach splat', () => {
 });
 
 describe('beach scatter', () => {
+  const LAND = { ...PLAIN, scatter: PLAIN.scatter!.filter((rule) => !rule.underwater) };
+
   const count = (climate: ClimateConfig) =>
     scatterChunk(SIZE, SEED, new Vector2(0, 0), climate, flat(1), { seaLevel: 0 })
       .reduce((n, layer) => n + layer.count, 0);
 
   it('grows nothing from the biomes on the beach', () => {
-    expect(count(climateFor(PLAIN, -1))).toBeGreaterThan(0);
-    expect(count(climateFor(PLAIN, 2))).toBe(0);
+    expect(count(climateFor(LAND, -1))).toBeGreaterThan(0);
+    expect(count(climateFor(LAND, 2))).toBe(0);
   });
 
   // Too steep for sand, so only the ocean itself can keep scatter off it.
@@ -141,8 +143,8 @@ describe('beach scatter', () => {
       return min;
     };
 
-    expect(lowest(climateFor(PLAIN, -1))).toBeLessThan(0);
-    expect(lowest(climateFor(PLAIN, 2))).toBeGreaterThanOrEqual(0);
+    expect(lowest(climateFor(LAND, -1))).toBeLessThan(0);
+    expect(lowest(climateFor(LAND, 2))).toBeGreaterThanOrEqual(0);
   });
 });
 

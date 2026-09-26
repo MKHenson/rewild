@@ -111,6 +111,10 @@ export interface AccentSpec {
   aspect: number;
   /** Divisions up the card. 1 is a rigid quad. */
   segments: number;
+  /** Cards crossed about the accent's spine, each turned 180 / planes degrees. 1 is a flat card. */
+  planes: number;
+  /** Fraction shorter than `length` a card may be. 0 makes every card full length. */
+  sizeVariance: number;
   /** Degrees the card bows toward the ground over its length. */
   curve: number;
   /** Scale on the card's flutter weight. Fruit is heavy and a spear frond is stiff. */
@@ -122,7 +126,7 @@ export interface AccentSpec {
   depth: [number, number] | null;
 }
 
-const ACCENT_DEFAULTS = { variance: 10, aspect: 0.5, segments: 1, curve: 0, flutter: 0.25, attach: 'twigs', depth: null } as const;
+const ACCENT_DEFAULTS = { variance: 10, aspect: 0.5, segments: 1, planes: 1, sizeVariance: 0.2, curve: 0, flutter: 0.25, attach: 'twigs', depth: null } as const;
 
 const ACCENT_KEYS = ['stamps', 'count', 'pitch', 'length', ...Object.keys(ACCENT_DEFAULTS)] as const;
 
@@ -228,7 +232,7 @@ export const PARAM_SPEC = {
   leafAspect: { type: 'number', default: 0.85, help: 'Leaf card width as a fraction of its height.', types: TREE },
   leafAngle: { type: 'number', default: 55, help: 'Degrees a leaf card turns away from its branch. 0 lies along it, 90 stands out square.', types: TREE },
   leafFrom: { type: 'number', default: 0.15, help: 'Fraction along a tip branch that leaves start at.', types: TREE },
-  leafNormalMode: { type: 'string', default: 'canopy', help: 'card | canopy | up. How leaf normals are authored.', types: TREE },
+  leafNormalMode: { type: 'string', default: 'canopy', help: 'card | canopy | up. How leaf and frond normals are authored. On a crown, canopy is the rosette normal normalLean shapes.', types: WOODY },
   leafAlphaCutoff: { type: 'number', default: 0.45, byType: { clump: 0.4 }, help: 'glTF alphaCutoff on every cutout piece.', types: LEAFY },
 
   blades: { type: 'list', default: [], help: 'Folders under sources/clump whose stamps fill the blade atlas. Empty generates them.', texture: true, types: CLUMP },
@@ -239,7 +243,7 @@ export const PARAM_SPEC = {
   cardLean: { type: 'number', default: 18, help: 'Degrees a card leans outward from upright over its length.', types: CLUMP },
   cardCurve: { type: 'number', default: 26, byType: { crown: 80 }, help: 'Degrees a card bows over its own length, on top of the lean.', types: CARDED },
   cardSpread: { type: 'number', default: 0.22, help: 'How far card bases sit from the tuft centre, as a fraction of height.', types: CLUMP },
-  cardAspect: { type: 'number', default: 1, byType: { crown: 0.3 }, help: 'Card width as a fraction of its height. A crown card samples that fraction of its cell.', types: CARDED },
+  cardAspect: { type: 'number', default: 1, byType: { crown: 0.3 }, help: 'Card width as a fraction of its height. A crown cuts its frond texture strips to the same shape.', texture: ['crown'], types: CARDED },
   normalLean: { type: 'number', default: 0.45, byType: { crown: 0.6 }, help: 'How far every normal leans outward from straight up. 0 faces the whole tuft at the sky.', types: CARDED },
 
   fronds: { type: 'list', default: [], help: 'Folders under sources/fronds whose stamps fill the frond atlas. Empty generates them.', texture: true, types: CROWN },
@@ -340,7 +344,7 @@ export const PARAM_SPEC = {
     types: LEAFY,
   },
 
-  accents: { type: 'accents', default: [], help: 'Cards hung plumb off the model, off their own stamps under sources/accents: [{ stamps, count, pitch, length, variance?, aspect?, segments?, curve?, flutter?, attach?, depth? }]. Spires at pitch 0, fruit and skirts at 180.', texture: true, types: LEAFY },
+  accents: { type: 'accents', default: [], help: 'Cards hung plumb off the model, off their own stamps under sources/accents: [{ stamps, count, pitch, length, variance?, aspect?, segments?, planes?, sizeVariance?, curve?, flutter?, attach?, depth? }]. Spires at pitch 0, fruit and skirts at 180.', texture: true, types: LEAFY },
   lods: { type: 'tiers', default: [], help: 'Coarser tiers, nearest first: [{ distance, radialSegments?, barkLevels?, leavesPerBranch?, leafScale?, cardSegments?, subdivisions? }]. Each override must be a key of the type.', types: TIERED },
 
   windAmplitude: { type: 'number', default: 0.4, help: 'ScatterWind amplitude for the emitted layer.', byType: { clump: 0.18 }, types: LEAFY },
@@ -349,6 +353,7 @@ export const PARAM_SPEC = {
   cullDistance: { type: 'number', default: 160, help: 'ScatterLayer cullDistance for the emitted layer.', byType: { clump: 50, rock: 800, pebble: 60 } },
   castShadow: { type: 'flag', default: true, byType: { clump: false, crown: null, pebble: false }, help: 'Draw the emitted layer into the shadow maps. A clump and a pebble cluster default off, because a shadow that small costs a draw to resolve into nothing; a crown casts while it has a stem.' },
   foliage: { type: 'flag', default: true, help: 'Shade the cutout piece as foliage: no specular, with transmission. Off shades it as a standard metallic-roughness surface.', types: LEAFY },
+  foliageNormalMap: { type: 'flag', default: false, help: 'With foliage, light the cutout through its normal map as well. One more texture fetch per pixel, for large plants seen up close.', types: LEAFY },
   collider: { type: 'flag', default: true, help: 'Stop the player at the trunk, with a capsule measured off it. Off emits no collider, for a plant low enough to walk through: heather and gorse stop nobody, and a waist-high bush that does reads as a wall.', types: WOODY },
   impostor: { type: 'impostor', default: IMPOSTOR_DEFAULT, byType: { clump: null, crown: null, pebble: null, rock: { fromDistance: 120, views: 8, tileSize: 128 } }, help: "The layer's impostor block, keyed as the layer keys it: { fromDistance, views, tileSize }. fromDistance 0 derives it from cullDistance; views is per axis, at least 2; tileSize is in pixels. A clump or a stemless crown bakes one only if the file sets it." },
   footprint: { type: 'number', default: 0, help: 'ScatterLayer footprint in metres. 0 derives it from the model. The most expensive number here: candidates go as 1/footprint squared.', byType: { clump: 0.7 } },
@@ -583,6 +588,8 @@ function parseAccent(entry: unknown, source: string, modelType: ForgeType): Acce
     length,
     aspect,
     segments: Math.round(number('segments', 1, 12, ACCENT_DEFAULTS.segments)),
+    planes: Math.round(number('planes', 1, 6, ACCENT_DEFAULTS.planes)),
+    sizeVariance: number('sizeVariance', 0, 0.9, ACCENT_DEFAULTS.sizeVariance),
     curve: number('curve', -180, 180, ACCENT_DEFAULTS.curve),
     flutter: number('flutter', 0, 1, ACCENT_DEFAULTS.flutter),
     attach: attach as AccentAttach,
@@ -839,6 +846,9 @@ function validate(params: Params): void {
   else if (params.type === 'rock') validateRock(params);
   else validateTree(params);
 
+  if (params.foliageNormalMap && !params.foliage)
+    throw new Error('foliageNormalMap needs foliage: the standard surface already reads the normal map.');
+
   if (params.impostor) validateImpostor(params.impostor, params.cullDistance);
 }
 
@@ -898,7 +908,13 @@ function validateCrown(params: Params): void {
   if (params.frondSpan < 0 || params.frondSpan > 1)
     throw new Error(`frondSpan must be within 0..1, got ${params.frondSpan}.`);
 
+  validateLeafNormalMode(params);
   validateCards(params);
+}
+
+function validateLeafNormalMode(params: Params): void {
+  if (!['card', 'canopy', 'up'].includes(params.leafNormalMode))
+    throw new Error(`leafNormalMode must be card, canopy or up, got '${params.leafNormalMode}'.`);
 }
 
 /** The bounds a card shares between a clump and a crown. */
@@ -1211,8 +1227,7 @@ function validateTree(params: Params): void {
       `leafLevels must be within 1..${params.branchLevels + 1} at branchLevels ${params.branchLevels}.`
     );
 
-  if (!['card', 'canopy', 'up'].includes(params.leafNormalMode))
-    throw new Error(`leafNormalMode must be card, canopy or up, got '${params.leafNormalMode}'.`);
+  validateLeafNormalMode(params);
 }
 
 /**
@@ -1229,10 +1244,13 @@ export function textureKeys(type: ForgeType): (keyof typeof PARAM_SPEC)[] {
 }
 
 /** Whether two parameter sets would produce the same texture files. Of an
- *  accent only its stamps reach the image; the rest moves cards. */
+ *  accent only its stamps reach the image, and on a crown the aspect its
+ *  strip is cut to; the rest moves cards. */
 export function sameTexture(a: Params, b: Params): boolean {
   const seen = (params: Params, key: keyof typeof PARAM_SPEC): unknown =>
-    key === 'accents' ? params.accents.map((accent) => accent.stamps) : params[key];
+    key === 'accents'
+      ? params.accents.map((accent) => (params.type === 'crown' ? [accent.stamps, accent.aspect] : accent.stamps))
+      : params[key];
   return a.type === b.type && textureKeys(a.type).every((key) => JSON.stringify(seen(a, key)) === JSON.stringify(seen(b, key)));
 }
 

@@ -1680,18 +1680,19 @@
         "from": 0,
         "to": 360
       },
-      "tilt": 2
+      "tilt": 3
     },
     "alignToNormal": 0.6,
-    "yOffset": -0.12,
-    "footprint": 3.7,
+    "yOffset": -0.117,
+    "footprint": 1.2,
     "wind": {
-      "amplitude": 4.15,
+      "amplitude": 1.15,
       "frequency": 0.9,
       "flutter": 0.6
     },
     "authoredNormals": false,
-    "foliage": false,
+    "foliage": true,
+    "foliageNormalMap": true,
     "castShadow": false
   }
 }

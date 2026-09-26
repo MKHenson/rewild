@@ -429,7 +429,7 @@ How the leaf cards are lit.
 - `card`: each card is lit as a flat surface. The crown looks like many flat walls.
 - `up`: every card is lit as if it faces the sky.
 
-Default: `canopy`.
+Default: `canopy`. This key also works on crowns. See [Crowns](crown.md#leafnormalmode).
 
 ![leafNormalMode card, canopy and up](images/tree-leafNormalMode.webp)
 
@@ -527,6 +527,7 @@ These keys work on more than one type. The defaults here are the ones for `tree`
 | [`cullDistance`](in-game.md#layer-keys) | `160` | The distance in metres past which the engine does not draw the model. |
 | [`castShadow`](in-game.md#layer-keys) | `true` | Whether the model casts a shadow. |
 | [`foliage`](in-game.md#layer-keys) | `true` | Light the cutout piece as leaves. Set `false` for a cutout that is not a leaf. |
+| [`foliageNormalMap`](in-game.md#layer-keys) | `false` | With `foliage`, also use the normal map. For large plants seen up close. |
 | [`collider`](in-game.md#layer-keys) | `true` | Stop the player at the trunk. Set `false` for a plant low enough to walk through. |
 | [`footprint`](in-game.md#density) | `0` | The clear space in metres round each model. `0` lets the tool choose. |
 | [`scaleMin`](in-game.md#layer-keys) | `0.8` | The smallest random size of a copy. |

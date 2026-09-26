@@ -115,6 +115,9 @@ export interface ScatterLayer {
    * tree's trunk keeps the standard model while its canopy does not.
    */
   foliage?: boolean;
+  /** With `foliage`, perturb the foliage normal by the cutout's normal map.
+   *  One more texture fetch per fragment, for large plants seen up close. */
+  foliageNormalMap?: boolean;
 
   /** Draw the layer into the shadow maps. Defaults to true. Off for ground
    *  cover whose shadow is a flicker of blade-sized texels under itself. */

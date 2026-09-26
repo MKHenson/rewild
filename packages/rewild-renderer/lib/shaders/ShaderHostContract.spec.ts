@@ -16,6 +16,7 @@ const REQUIRED_CONSTS: Record<string, string[]> = {
     'directional-shadow.frag.wgsl',
     'spot-light-shadow.frag.wgsl',
   ],
+  HAS_FOLIAGE_NORMAL_MAP: ['standard-material.wgsl'],
 };
 
 const hosts = readdirSync(SHADER_DIR).filter((name) => name.endsWith('.wgsl'));

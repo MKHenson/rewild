@@ -20,6 +20,7 @@ const HAS_VERTEX_TANGENTS: bool = ${ HAS_VERTEX_TANGENTS };
 const HAS_PARALLAX: bool = ${ HAS_PARALLAX };
 const HAS_AUTHORED_NORMALS: bool = ${ HAS_AUTHORED_NORMALS };
 const HAS_FOLIAGE_SHADING: bool = ${ HAS_FOLIAGE_SHADING };
+const HAS_FOLIAGE_NORMAL_MAP: bool = ${ HAS_FOLIAGE_NORMAL_MAP };
 // The wind variant: COLOR_0 is a bend weight rather than a tint, and the vertex
 // is displaced by it before projection. Set for a layer with a wind block whose
 // model carries COLOR_0.

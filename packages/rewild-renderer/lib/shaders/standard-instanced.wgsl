@@ -16,6 +16,7 @@ const HAS_VERTEX_TANGENTS: bool = ${ HAS_VERTEX_TANGENTS };
 const HAS_PARALLAX: bool = ${ HAS_PARALLAX };
 const HAS_AUTHORED_NORMALS: bool = ${ HAS_AUTHORED_NORMALS };
 const HAS_FOLIAGE_SHADING: bool = ${ HAS_FOLIAGE_SHADING };
+const HAS_FOLIAGE_NORMAL_MAP: bool = ${ HAS_FOLIAGE_NORMAL_MAP };
 
 #include "./shader-lib/total-lighting.wgsl"
 #include "./shader-lib/brdf.wgsl"
