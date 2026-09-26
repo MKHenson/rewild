@@ -286,8 +286,8 @@ const REEDS: BiomeScatter = {
   density: 0.9,
   slope: { from: 20, to: 6 },
   waterDepth: [
-    { from: -5.5, to: -4.0 },
-    { from: 1.2, to: 1.1 },
+    { from: -2.5, to: -2.0 },
+    { from: 2.5, to: 2.2 },
   ],
   underwater: true,
   noise: { scale: 10, seedSalt: 131, band: { from: 0.35, to: 0.6 } },

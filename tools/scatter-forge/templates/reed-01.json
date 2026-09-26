@@ -40,7 +40,7 @@
   "windAmplitude": 1.15,
   "windFrequency": 0.9,
   "windFlutter": 0.6,
-  "cullDistance": 220,
+  "cullDistance": 520,
   "castShadow": false,
   "footprint": 1.1,
   "scaleMin": 1.0,
