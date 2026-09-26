@@ -2,6 +2,7 @@ import { Vector2 } from 'rewild-common';
 import {
   ARID_COAST,
   BiomeParams,
+  BiomeScatter,
   CLIMATE_PRESETS,
   ClimateConfig,
   CoastConfig,
@@ -13,7 +14,7 @@ import {
   validateClimateLayers,
 } from './Biomes';
 import { coastalMoistureAt } from './ClimateField';
-import { resolveCoastWeights } from './LayerWeights';
+import { resolveCoastWeights, resolveScatterWater } from './LayerWeights';
 import { SCATTER_INSTANCE_STRIDE, scatterChunk } from './Scatter';
 import { generateSplatMap } from './Splat';
 
@@ -142,6 +143,77 @@ describe('beach scatter', () => {
 
     expect(lowest(climateFor(PLAIN, -1))).toBeLessThan(0);
     expect(lowest(climateFor(PLAIN, 2))).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('resolveScatterWater', () => {
+  const plain = { layer: 'granite_01', density: 1 };
+
+  it('keeps a rule out of the water unless it grows underwater', () => {
+    expect(resolveScatterWater(plain, 2, 1, 1, 0)).toBe(0);
+    expect(resolveScatterWater({ ...plain, underwater: true }, 2, 1, 1, 0)).toBe(1);
+    expect(resolveScatterWater(plain, 2, 0, 1, 0)).toBe(1);
+  });
+
+  it('thins only a rule without water conditions by the beach', () => {
+    expect(resolveScatterWater(plain, -1, 1, 1, 0.75)).toBe(0.25);
+    const shore = { ...plain, waterDepth: { from: -4, to: -2 } };
+    expect(resolveScatterWater(shore, -1, 1, 1, 0.75)).toBe(1);
+  });
+
+  it('grows by depth, coverage and type weight', () => {
+    const shelf = { ...plain, underwater: true, waterDepth: { from: 1, to: 3 } };
+    expect(resolveScatterWater(shelf, 0.5, 1, 1, 0)).toBe(0);
+    expect(resolveScatterWater(shelf, 4, 1, 1, 0)).toBe(1);
+    expect(resolveScatterWater(shelf, 4, 0.5, 1, 0)).toBe(0.5);
+    expect(resolveScatterWater(shelf, 4, 0, 1, 0)).toBe(0);
+
+    const lake = { ...plain, waterType: 'lake' as const };
+    expect(resolveScatterWater(lake, -1, 1, 0, 0)).toBe(0);
+    expect(resolveScatterWater(lake, -1, 1, 0.5, 0)).toBe(0.5);
+  });
+});
+
+describe('water scatter', () => {
+  const withRule = (rule: Partial<BiomeScatter>): BiomeParams => ({
+    ...PLAIN,
+    scatter: [{ layer: 'granite_01', density: 1, ...rule }],
+  });
+
+  const count = (biome: BiomeParams, height: number, coast = -1) =>
+    scatterChunk(SIZE, SEED, new Vector2(0, 0), climateFor(biome, coast), flat(height), {
+      seaLevel: 0,
+    }).reduce((n, layer) => n + layer.count, 0);
+
+  it('grows under the sea only when the rule says so', () => {
+    expect(count(withRule({}), -5, 2)).toBe(0);
+    expect(count(withRule({ underwater: true }), -5, 2)).toBeGreaterThan(0);
+  });
+
+  it('grows within its depth range', () => {
+    const shelf = withRule({ underwater: true, waterDepth: { from: 2, to: 4 } });
+    expect(count(shelf, -5, 2)).toBeGreaterThan(0);
+    expect(count(shelf, -1, 2)).toBe(0);
+  });
+
+  it('grows above the water where the sea reaches, not inland', () => {
+    const driftwood = withRule({ waterDepth: [{ from: -4, to: -2 }, { from: 0, to: -1 }] });
+    expect(count(driftwood, 1, 2)).toBeGreaterThan(0);
+    expect(count(driftwood, 1, -1)).toBe(0);
+    expect(count(driftwood, 6, 2)).toBe(0);
+  });
+
+  it('grows only where its water type has weight', () => {
+    expect(count(withRule({ underwater: true, waterType: 'ocean' }), -5, 2)).toBeGreaterThan(0);
+    expect(count(withRule({ underwater: true, waterType: 'lake' }), -5, 2)).toBe(0);
+  });
+
+  it('rejects a water type the palette lacks', () => {
+    const climate = {
+      ...climateFor(withRule({ waterType: 'lake' }), 2),
+      water: DEFAULT_CLIMATE.water!.filter((type) => type.name !== 'lake'),
+    };
+    expect(() => validateClimateLayers(climate)).toThrow(/water type 'lake'/);
   });
 });
 

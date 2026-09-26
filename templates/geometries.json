@@ -193,5 +193,9 @@
     "lods": [
       "nature/trees/heather/heather-01.lod1.glb"
     ]
+  },
+  "reed-01": {
+    "type": "gltf",
+    "url": "nature/plants/reed/reed-01.glb"
   }
 }

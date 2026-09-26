@@ -7,6 +7,7 @@ import {
   SILTY_LAKE,
   TROPICAL_OCEAN,
   WaterType,
+  getWaterTypeIndex,
   validateWaterPalette,
 } from './Water';
 
@@ -57,6 +58,14 @@ export interface BiomeScatter {
   slope?: Selector; // degrees from horizontal
   height?: Selector; // absolute world meters
   noise?: NoiseSelector; // organic patches, independent of terrain shape
+  // Metres below the water surface; negative is height above it. Grows only
+  // where water reaches, fading with its coverage.
+  waterDepth?: Selector;
+  // Grows only where this palette type has weight, scaled by that weight.
+  waterType?: WaterType['name'];
+  // Grow under water. Otherwise a rule stops at the waterline. A rule with no
+  // water condition is also thinned by the beach.
+  underwater?: boolean;
 }
 
 // ── Deformations ─────────────────────────────────────────────────────────────
@@ -271,6 +280,19 @@ export interface ClimateConfig {
   cells: number[][];
 }
 
+// Reed beds along the waterline, from just above it into the shallows.
+const REEDS: BiomeScatter = {
+  layer: 'reed_01',
+  density: 0.9,
+  slope: { from: 20, to: 6 },
+  waterDepth: [
+    { from: -2.5, to: -2.0 },
+    { from: 1.2, to: 1.1 },
+  ],
+  underwater: true,
+  noise: { scale: 40, seedSalt: 131, band: { from: 0.35, to: 0.6 } },
+};
+
 // Biome parameter table. Rows are data — adding a biome is a table edit.
 //
 // Open grassland: sward everywhere, worn through to bare ground in broad
@@ -297,13 +319,16 @@ export const PLAIN: BiomeParams = {
       noise: { scale: 160, seedSalt: 23, band: { from: 0.15, to: 0.92 } },
     },
   ],
-  // Stones in the sward, and the odd erratic standing in it.
+  // Stones in the sward, down the beach and onto the sea bed, and the odd
+  // erratic standing in the sward.
   scatter: [
     {
       layer: 'granite_pebble_01',
       density: 0.22,
       slope: { from: 24, to: 6 },
+      underwater: true,
     },
+    REEDS,
     {
       layer: 'plains_01',
       density: 0.3,
@@ -409,7 +434,13 @@ export const FOREST: BiomeParams = {
       ],
       slope: { from: 42, to: 20 },
     },
-    { layer: 'granite_pebble_01', density: 0.18, slope: { from: 30, to: 8 } },
+    {
+      layer: 'granite_pebble_01',
+      density: 0.18,
+      slope: { from: 30, to: 8 },
+      underwater: true,
+    },
+    REEDS,
   ],
 };
 
@@ -967,6 +998,11 @@ export function validateBiomeScatter(climate: ClimateConfig): void {
       if (rule.density <= 0 || rule.density > 1)
         throw new Error(
           `Biome '${biome.name}' scatter layer '${rule.layer}' density ${rule.density} must be within (0, 1] — it is a fraction of what the layer's footprint allows.`
+        );
+
+      if (rule.waterType && getWaterTypeIndex(climate, rule.waterType) < 0)
+        throw new Error(
+          `Biome '${biome.name}' scatter layer '${rule.layer}' needs water type '${rule.waterType}', which the climate's palette lacks.`
         );
     }
   }
