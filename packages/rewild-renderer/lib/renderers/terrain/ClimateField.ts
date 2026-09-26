@@ -338,6 +338,34 @@ export function continentLandWeight(
 }
 
 /**
+ * How much ocean may stand at continent value `c`: all of it out to where the
+ * land is at full height, then fading over one more blend width inland. Land
+ * past that stays dry even below sea level. Also how close the ocean is, for
+ * beaches.
+ */
+export function oceanCoverage(continent: ContinentConfig, c: number): number {
+  const half = continent.blendHalfWidth;
+  const t = (c - (continent.coast + half)) / half;
+  if (t <= 0) return 1;
+  if (t >= 1) return 0;
+  return 1 - t * t * (3 - 2 * t);
+}
+
+/**
+ * Moisture added at continent value `c`: the continent's coastalMoisture at the
+ * coast and seaward, fading to nothing coastalMoistureReach inland.
+ */
+export function coastalMoistureAt(continent: ContinentConfig, c: number): number {
+  const amount = continent.coastalMoisture ?? 0;
+  const reach = continent.coastalMoistureReach ?? 0;
+  if (amount === 0 || reach <= 0) return 0;
+  const t = (c - continent.coast) / reach;
+  if (t <= 0) return amount;
+  if (t >= 1) return 0;
+  return amount * (1 - t * t * (3 - 2 * t));
+}
+
+/**
  * Metres below sea level of the sea bed at continent value `c`: 0 at the coast,
  * falling linearly across the shelf, then down the slope to the ocean floor.
  */
@@ -402,13 +430,17 @@ export function resolveBiomeWeights(
   }
   if (field.sampleMoisture) {
     const mAxis = climate.moisture;
-    const mValue =
+    let mValue =
       (perlin.simplex2(
         (sx - halfWidth + field.mOffsetX) / mAxis.scale,
         (sy - halfHeight - field.mOffsetY) / mAxis.scale
       ) +
         1) *
       0.5;
+    // Wetter near the ocean. Read at the unwarped position, where the coast is.
+    const continent = climate.continent;
+    if (continent?.coastalMoisture)
+      mValue += coastalMoistureAt(continent, sampleContinent(field, x, y));
     resolveAxis(mValue, mAxis, m);
   }
 

@@ -260,9 +260,14 @@ Raised land inside water gets a full shoreline with no special work:
 ### Climate
 
 - **Coastal moisture.** Moisture increases near the ocean. The continent field gives this without
-  a distance search.
-- **Beaches.** A new terrain material band, chosen by height above the water level. Sand, then wet
-  sand, then sea bed.
+  a distance search: `coastalMoisture` is added at the coast and fades out `coastalMoistureReach`
+  inland. It moves biomes only in a climate whose moisture axis has cuts.
+- **Beaches.** A climate's `coast` lays sand over the biome layers, the way a layer covers those
+  beneath it. The band is chosen by height above sea level: sand, then wet sand, then sea bed. It
+  fades out on steep ground, so cliffs keep their rock, and it only appears where the continent
+  field puts the ocean close, so low ground inland stays as it is. The biomes' scatter thins by the
+  same amount, so trees do not grow on the sand. Wet sand and sea bed fall back to the sand when a
+  climate has no splat channel spare for them.
 
 ## Rendering
 

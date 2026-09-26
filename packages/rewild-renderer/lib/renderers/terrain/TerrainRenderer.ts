@@ -637,6 +637,7 @@ export class TerrainRenderer {
         biomeMask: chunk.biomeMask,
         out: chunk.splatData,
         region: window,
+        seaLevel: chunk.seaLevel,
       }
     );
 
@@ -721,6 +722,7 @@ export class TerrainRenderer {
             biomeMask: chunk.biomeMask,
             scatterMask: chunk.scatterMask,
             killSet: includeKilled ? null : chunk.scatterKills,
+            seaLevel: chunk.seaLevel,
           }
         );
 
