@@ -7,7 +7,11 @@ import {
   resolveActiveBiomes,
   sampleLayerNoise,
 } from './ClimateField';
-import { resolveScatterDensity } from './LayerWeights';
+import {
+  resolveCoastWeights,
+  resolveScatterDensity,
+  resolveScatterWater,
+} from './LayerWeights';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import {
   PaintMask,
@@ -26,12 +30,8 @@ import {
   ScatterKillSet,
   scatterKillKey,
 } from './ScatterKillSet';
-import {
-  coastWeightsAt,
-  heightGradientAt,
-  isUnderOcean,
-  slopeDegreesAt,
-} from './Splat';
+import { heightGradientAt, slopeDegreesAt, waterCoverageAt } from './Splat';
+import { MAX_WATER_TYPES, getWaterTypeIndex } from './Water';
 
 // Per-chunk scatter placement: which instances of which layer stand where.
 //
@@ -168,6 +168,7 @@ const _gradient = new Float64Array(2);
 const _normal = new Float64Array(3);
 const _quaternion = new Float64Array(4);
 const _coastWeights = new Float64Array(3);
+const _waterTypes = new Float64Array(MAX_WATER_TYPES);
 const _tilt = new Float64Array(4);
 const _product = new Float64Array(4);
 
@@ -305,6 +306,7 @@ export function scatterChunk(
   const region = options?.region ?? null;
   const withIds = options?.withIds === true;
   const seaLevel = options?.seaLevel ?? 0;
+  const coast = climate.continent ? (climate.coast ?? null) : null;
   const layerNames = mask
     ? getScatterLayerOrder().filter(
         (name, slot) =>
@@ -354,12 +356,16 @@ export function scatterChunk(
     // `hasRule` false for a purely painted layer — which skips the biome
     // resolve per candidate, since every rule would miss anyway.
     const ruleIndex = new Int32Array(climate.biomes.length).fill(-1);
+    const ruleWaterType = new Int32Array(climate.biomes.length).fill(-1);
     let hasRule = false;
     for (let b = 0; b < climate.biomes.length; b++) {
       const rules = climate.biomes[b].scatter ?? [];
       for (let r = 0; r < rules.length; r++)
         if (rules[r].layer === name) {
           ruleIndex[b] = r;
+          const waterType = rules[r].waterType;
+          if (waterType)
+            ruleWaterType[b] = getWaterTypeIndex(climate, waterType);
           hasRule = true;
         }
     }
@@ -421,13 +427,17 @@ export function scatterChunk(
 
         // Density is the biome-weighted sum of whatever rules grow this layer
         // here, so a climate transition fades scatter in rather than switching
-        // it on at the border.
+        // it on at the border. Paint ignores the water conditions.
         const activeCount = hasRule ? resolveActiveBiomes(resolver, sx, sy) : 0;
+        const depth = seaLevel - worldHeight;
         let density = 0;
+        let waterCoverage = -1;
+        let beach = 0;
         for (let b = 0; b < activeCount; b++) {
           const biomeIndex = resolver.biomes[b];
           const rule = ruleIndex[biomeIndex];
           if (rule < 0) continue;
+          const scatterRule = climate.biomes[biomeIndex].scatter![rule];
 
           const noiseField = noiseFields[biomeIndex][rule];
           const noiseValue = noiseField
@@ -441,25 +451,43 @@ export function scatterChunk(
               )
             : 0;
 
+          const ruleDensity = resolveScatterDensity(
+            scatterRule,
+            worldHeight,
+            slope,
+            noiseValue
+          );
+          if (ruleDensity <= 0) continue;
+
+          // The continent noise is sampled once per candidate, and only once
+          // some rule wants to grow here.
+          if (waterCoverage < 0) {
+            waterCoverage = waterCoverageAt(field, sx, sy, _waterTypes);
+            beach =
+              coast &&
+              waterCoverage > 0 &&
+              -depth < coast.beachHeight + coast.blend
+                ? resolveCoastWeights(
+                    coast,
+                    -depth,
+                    slope,
+                    waterCoverage,
+                    _coastWeights
+                  )
+                : 0;
+          }
+
+          const typeIndex = ruleWaterType[biomeIndex];
           density +=
             resolver.weights[b] *
-            resolveScatterDensity(
-              climate.biomes[biomeIndex].scatter![rule],
-              worldHeight,
-              slope,
-              noiseValue
+            ruleDensity *
+            resolveScatterWater(
+              scatterRule,
+              depth,
+              waterCoverage,
+              typeIndex < 0 ? 1 : _waterTypes[typeIndex],
+              beach
             );
-        }
-
-        // Nothing the biomes grow takes root on the beach or under the sea;
-        // paint still can.
-        if (density > 0) {
-          const heightAboveSea = worldHeight - seaLevel;
-          if (isUnderOcean(field, heightAboveSea, sx, sy)) density = 0;
-          else
-            density *=
-              1 -
-              coastWeightsAt(field, heightAboveSea, slope, sx, sy, _coastWeights);
         }
 
         if (mask)

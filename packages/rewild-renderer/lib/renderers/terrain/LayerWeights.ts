@@ -116,6 +116,26 @@ export function resolveScatterDensity(
 }
 
 /**
+ * The share of a scatter rule's density its water conditions allow at a
+ * sample. `depth` is metres below the water surface (negative above it),
+ * `coverage` how much water the sample holds (0..1), `typeWeight` the weight of
+ * the rule's waterType there (1 when it names none) and `beach` the coast's
+ * share (see resolveCoastWeights).
+ */
+export function resolveScatterWater(
+  rule: BiomeScatter,
+  depth: number,
+  coverage: number,
+  typeWeight: number,
+  beach: number
+): number {
+  if (depth > 0 && coverage > 0 && !rule.underwater) return 0;
+  if (!rule.waterDepth && !rule.waterType)
+    return rule.underwater ? 1 : 1 - beach;
+  return coverage * typeWeight * bandCoverage(rule.waterDepth, depth);
+}
+
+/**
  * The coast's share of a sample, split into its three bands: `out[0]` dry
  * sand, `out[1]` wet sand, `out[2]` sea bed. Returns their sum, the coverage
  * the beach takes from the biome layers beneath it.

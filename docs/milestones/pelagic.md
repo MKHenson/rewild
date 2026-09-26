@@ -456,10 +456,12 @@ The terrain shader reads the chunk's water map as well:
 
 New conditions for a scatter layer, AND'ed with slope, height and noise:
 
-- `waterDepth`: a range. Negative values are height above the water.
+- `waterDepth`: a range. Negative values are height above the water. The layer grows only where
+  water reaches, fading with its coverage.
 - `waterType`: only grow where a given palette type has weight, for example "lake" for reeds.
 - By default, a layer does not grow where `waterDepth > 0`. A layer sets `underwater: true` to
   grow there, for example seaweed or lilies.
+- A layer with none of these conditions is thinned by the beach.
 
 Example additions: reeds at lake edges, driftwood on beaches, lilies on still lakes, seaweed on the
 shelf.
