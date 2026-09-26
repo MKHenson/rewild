@@ -1665,7 +1665,7 @@
   "reed_01": {
     "name": "reed_01",
     "geometryId": "reed-01",
-    "cullDistance": 220,
+    "cullDistance": 520,
     "impostor": {
       "fromDistance": 120,
       "views": 4,
