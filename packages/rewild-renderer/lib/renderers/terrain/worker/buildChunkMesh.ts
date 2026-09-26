@@ -179,7 +179,7 @@ export function buildChunkMesh(
     worldOffset,
     climate,
     heights,
-    { biomeMask: request.biomeMask ?? null }
+    { biomeMask: request.biomeMask ?? null, seaLevel }
   );
 
   // Heights are already in meters (no vertical scaling); the mesh is stretched
@@ -217,6 +217,7 @@ export function buildChunkMesh(
         biomeMask: request.biomeMask ?? null,
         scatterMask: request.scatterMask ?? null,
         killSet: request.scatterKills ?? null,
+        seaLevel,
       })
     : [];
 

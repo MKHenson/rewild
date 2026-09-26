@@ -11,9 +11,9 @@ import {
   WATER_MAP_STEP,
   WaterMap,
   buildWaterMap,
-  oceanCoverage,
   packWaterSurface,
 } from './WaterMap';
+import { oceanCoverage } from './ClimateField';
 import { fromFloat16 } from '../../utils/float16';
 
 const CHUNK_SIZE = 65;

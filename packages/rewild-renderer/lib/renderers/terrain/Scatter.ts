@@ -26,7 +26,12 @@ import {
   ScatterKillSet,
   scatterKillKey,
 } from './ScatterKillSet';
-import { heightGradientAt, slopeDegreesAt } from './Splat';
+import {
+  coastWeightsAt,
+  heightGradientAt,
+  isUnderOcean,
+  slopeDegreesAt,
+} from './Splat';
 
 // Per-chunk scatter placement: which instances of which layer stand where.
 //
@@ -90,6 +95,8 @@ export interface ScatterChunkOptions {
   region?: { x0: number; y0: number; x1: number; y1: number } | null;
   /** Fill `ScatterInstances.ids`. */
   withIds?: boolean;
+  /** World height of the sea, which beaches are measured from. */
+  seaLevel?: number;
 }
 
 /**
@@ -160,6 +167,7 @@ function sampleHeight(
 const _gradient = new Float64Array(2);
 const _normal = new Float64Array(3);
 const _quaternion = new Float64Array(4);
+const _coastWeights = new Float64Array(3);
 const _tilt = new Float64Array(4);
 const _product = new Float64Array(4);
 
@@ -296,6 +304,7 @@ export function scatterChunk(
   const killSet = options?.killSet ?? null;
   const region = options?.region ?? null;
   const withIds = options?.withIds === true;
+  const seaLevel = options?.seaLevel ?? 0;
   const layerNames = mask
     ? getScatterLayerOrder().filter(
         (name, slot) =>
@@ -440,6 +449,17 @@ export function scatterChunk(
               slope,
               noiseValue
             );
+        }
+
+        // Nothing the biomes grow takes root on the beach or under the sea;
+        // paint still can.
+        if (density > 0) {
+          const heightAboveSea = worldHeight - seaLevel;
+          if (isUnderOcean(field, heightAboveSea, sx, sy)) density = 0;
+          else
+            density *=
+              1 -
+              coastWeightsAt(field, heightAboveSea, slope, sx, sy, _coastWeights);
         }
 
         if (mask)

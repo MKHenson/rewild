@@ -1,9 +1,20 @@
-import { BiomeLayer, BiomeParams, BiomeScatter, Selector, SelectorBand } from './Biomes';
+import {
+  BiomeLayer,
+  BiomeParams,
+  BiomeScatter,
+  CoastConfig,
+  Selector,
+  SelectorBand,
+} from './Biomes';
 
 // Smoothstep across a selector band. `from` > `to` inverts the ramp — the same
 // function covers "fades in as the value rises" and "fades out as it rises".
 function rampCoverage(band: SelectorBand, value: number): number {
-  const t = (value - band.from) / (band.to - band.from);
+  return rampBetween(band.from, band.to, value);
+}
+
+function rampBetween(from: number, to: number, value: number): number {
+  const t = (value - from) / (to - from);
   if (t <= 0) return 0;
   if (t >= 1) return 1;
   return t * t * (3 - 2 * t);
@@ -15,7 +26,8 @@ function bandCoverage(selector: Selector | undefined, value: number): number {
   if (!selector) return 1;
   if (!Array.isArray(selector)) return rampCoverage(selector, value);
   let coverage = 1;
-  for (let i = 0; i < selector.length; i++) coverage *= rampCoverage(selector[i], value);
+  for (let i = 0; i < selector.length; i++)
+    coverage *= rampCoverage(selector[i], value);
   return coverage;
 }
 
@@ -101,4 +113,46 @@ export function resolveScatterDensity(
     bandCoverage(rule.height, height) *
     bandCoverage(rule.noise?.band, noiseValue)
   );
+}
+
+/**
+ * The coast's share of a sample, split into its three bands: `out[0]` dry
+ * sand, `out[1]` wet sand, `out[2]` sea bed. Returns their sum, the coverage
+ * the beach takes from the biome layers beneath it.
+ *
+ * `heightAboveSea` is the terrain height minus the sea level. `nearness` is how
+ * close the ocean is, 0..1 (oceanCoverage), so low ground inland stays as it is.
+ */
+export function resolveCoastWeights(
+  coast: CoastConfig,
+  heightAboveSea: number,
+  slopeDegrees: number,
+  nearness: number,
+  out: Float64Array
+): number {
+  const blend = coast.blend;
+  const total =
+    nearness *
+    rampCoverage(coast.slope, slopeDegrees) *
+    rampBetween(coast.beachHeight + blend, coast.beachHeight, heightAboveSea);
+
+  // Each band covers everything below its top, so the wet share includes the
+  // sea bed's and the difference is the wet sand alone. The max keeps that
+  // difference whole when the two blends overlap.
+  const wetBelow = rampBetween(
+    coast.wetHeight + blend,
+    coast.wetHeight,
+    heightAboveSea
+  );
+  const seabed = rampBetween(
+    -coast.seabedDepth + blend,
+    -coast.seabedDepth,
+    heightAboveSea
+  );
+
+  const wet = Math.max(wetBelow, seabed);
+  out[0] = total * (1 - wet);
+  out[1] = total * (wet - seabed);
+  out[2] = total * seabed;
+  return total;
 }

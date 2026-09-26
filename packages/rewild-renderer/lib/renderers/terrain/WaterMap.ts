@@ -1,6 +1,10 @@
 import { Vector2 } from 'rewild-common';
-import { ClimateConfig, ContinentConfig } from './Biomes';
-import { createClimateField, sampleContinent } from './ClimateField';
+import { ClimateConfig } from './Biomes';
+import {
+  createClimateField,
+  oceanCoverage,
+  sampleContinent,
+} from './ClimateField';
 import { BIOME_MASK_STEP, paintMaskSize } from './PaintMask';
 import { MAX_WATER_TYPES, OCEAN_WATER, getWaterTypeIndex } from './Water';
 import { toFloat16 } from '../../utils/float16';
@@ -36,19 +40,6 @@ export interface WaterMap {
 }
 
 export const OCEAN_BODY_ID = 0;
-
-/**
- * How much ocean may stand at continent value `c`: all of it out to where the
- * land is at full height, then fading over one more blend width inland. Land
- * past that stays dry even below sea level.
- */
-export function oceanCoverage(continent: ContinentConfig, c: number): number {
-  const half = continent.blendHalfWidth;
-  const t = (c - (continent.coast + half)) / half;
-  if (t <= 0) return 1;
-  if (t >= 1) return 0;
-  return 1 - t * t * (3 - 2 * t);
-}
 
 /**
  * The water map for a chunk with LOD-0 `heights`, or null when no water shows
