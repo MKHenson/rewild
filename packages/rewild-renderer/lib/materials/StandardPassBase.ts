@@ -46,6 +46,7 @@ export abstract class StandardPassBase implements IMaterialPass {
   private _parallax: boolean = false;
   private _authoredNormals: boolean = false;
   private _foliage: boolean = false;
+  private _foliageNormalMap: boolean = false;
 
   /**
    * glTF's alphaMode:
@@ -158,7 +159,8 @@ export abstract class StandardPassBase implements IMaterialPass {
    * existed only to make the specular chain behave on leaf cards. There is no
    * specular chain here to correct.
    *
-   * Parallax is not available alongside it, and neither is a normal map.
+   * Parallax is not available alongside it. A normal map is, through
+   * `foliageNormalMap`.
    */
   get foliage(): boolean {
     return this._foliage;
@@ -167,6 +169,21 @@ export abstract class StandardPassBase implements IMaterialPass {
   set foliage(value: boolean) {
     if (value === this._foliage) return;
     this._foliage = value;
+    this.invalidatePipeline();
+  }
+
+  /**
+   * Perturb the foliage normal by the material's normal map. Read only with
+   * `foliage` on. Costs a tangent frame and one texture fetch per fragment, so
+   * it is for large foliage seen up close, not for grass.
+   */
+  get foliageNormalMap(): boolean {
+    return this._foliageNormalMap;
+  }
+
+  set foliageNormalMap(value: boolean) {
+    if (value === this._foliageNormalMap) return;
+    this._foliageNormalMap = value;
     this.invalidatePipeline();
   }
 
@@ -258,6 +275,7 @@ export abstract class StandardPassBase implements IMaterialPass {
       HAS_PARALLAX: this._parallax,
       HAS_AUTHORED_NORMALS: this._authoredNormals,
       HAS_FOLIAGE_SHADING: this._foliage,
+      HAS_FOLIAGE_NORMAL_MAP: this._foliage && this._foliageNormalMap,
     };
   }
 

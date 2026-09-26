@@ -111,6 +111,7 @@ function buildTier(
   const cutout: CutoutShading = {
     authoredNormals: !!layer.authoredNormals,
     foliage: !!layer.foliage,
+    foliageNormalMap: !!layer.foliageNormalMap,
   };
 
   const built: ScatterPrimitive[] = [];
@@ -151,6 +152,7 @@ function buildTier(
 interface CutoutShading {
   authoredNormals: boolean;
   foliage: boolean;
+  foliageNormalMap: boolean;
 }
 
 function collectPrimitives(
@@ -203,6 +205,7 @@ function collectPrimitives(
     if (pass.alphaMode === 'MASK') {
       if (cutout.authoredNormals) pass.authoredNormals = true;
       if (cutout.foliage) pass.foliage = true;
+      if (cutout.foliageNormalMap) pass.foliageNormalMap = true;
     }
 
     // Per primitive, because the weights are: a model whose trunk ships

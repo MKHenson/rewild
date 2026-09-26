@@ -44,8 +44,10 @@ Accent cards move with what they hang from, so fruit swings with its branch in t
 | `pitch` | required | The angle from straight up, in degrees. `0` stands up. `180` hangs down. |
 | `length` | required | The card height, in metres. |
 | `variance` | `10` | A random change to `pitch`, in degrees. |
-| `aspect` | `0.5` | The card width as a fraction of its height. If the art is wider, the card cuts off its sides and the run tells you. |
+| `aspect` | `0.5` | The card width as a fraction of its height. If the art is wider, the card cuts off its sides, or on a crown the art is painted smaller. The run tells you. On a crown, changing it paints the texture again. |
 | `segments` | `1` | How many segments go along the card. Use `1` for fruit. Use `4` for a spire or a frond that bends. |
+| `planes` | `1` | How many cards cross at each accent, turned evenly around its centre line. `1` is one flat card. `3` looks solid from every side, like a plume. |
+| `sizeVariance` | `0.2` | How much shorter than `length` a card can be, as a fraction. `0` makes every card the same size. `0.5` makes cards between half and full length. |
 | `curve` | `0` | How far the card bends toward the ground, in degrees. |
 | `flutter` | `0.25` | How much the card moves in the wind. A heavy dead frond uses less. |
 | `attach` | `twigs` | Tree only. `twigs` or `forks`. |
@@ -62,10 +64,12 @@ Examples from the templates:
 ## Cost
 
 An accent adds no new draw call. Its cards go into the model's cutout piece, and its art goes into
-the same texture as the leaves or fronds.
+the same texture as the leaves or fronds. Each extra plane adds the same number of
+triangles again.
 
 The cost is texture space. Each accent picture takes one cell of the texture. On a tree, this can
-make every leaf cell smaller. The run prints the cell sizes.
+make every leaf cell smaller. On a crown, the cell is a strip the shape of the accent's `aspect`, so
+a narrow accent costs little. The run prints the cell sizes.
 
 A LOD tier keeps all of its model's accents.
 

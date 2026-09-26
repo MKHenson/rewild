@@ -14,7 +14,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
-import { gutterFor, layoutAtlas, type AtlasLayout } from './atlas.ts';
+import { cellInnerPx, gutterFor, layoutAtlas, type AtlasLayout } from './atlas.ts';
 import type { Params } from './params.ts';
 import { srgbToLinear } from './colour.ts';
 
@@ -721,8 +721,7 @@ export interface StampFit extends StampAtlas {
  * adding a ninth to a 2x2 set takes every cell from half the atlas edge to a
  * third of it, and nothing says so unless it is measured.
  */
-function fitStamps(source: LeafSource, textureSize: number, { grid, cells }: StampAtlas, imageGrid = grid): StampFit {
-  const inner = textureSize / imageGrid - 2 * gutterFor(textureSize);
+function fitStamps(source: LeafSource, inner: number, { grid, cells }: StampAtlas): StampFit {
 
   let placedPx = 0;
   let sourcePx = 1;
@@ -740,21 +739,23 @@ function fitStamps(source: LeafSource, textureSize: number, { grid, cells }: Sta
 /** `imageGrid` is the grid the image is actually cut on, where accents have
  *  pushed it past the one the stamps alone would take. */
 export function fitClump(source: LeafSource, textureSize: number, imageGrid?: number): StampFit {
-  return fitStamps(source, textureSize, clumpAtlas(source), imageGrid);
+  const atlas = clumpAtlas(source);
+  return fitStamps(source, textureSize / (imageGrid ?? atlas.grid) - 2 * gutterFor(textureSize), atlas);
 }
 
-export function fitCrown(source: LeafSource, textureSize: number, imageGrid?: number): StampFit {
-  return fitStamps(source, textureSize, crownAtlas(source), imageGrid);
+export function fitCrown(source: LeafSource, textureSize: number, layout: AtlasLayout): StampFit {
+  return fitStamps(source, cellInnerPx(textureSize, layout), crownAtlas(source));
 }
 
-/** An accent's stamps on the host's grid: one cell each, at the host's cell size. */
-export function fitAccent(source: LeafSource, textureSize: number, imageGrid: number): StampFit {
-  return fitStamps(source, textureSize, { grid: imageGrid, cells: source.stamps.length });
+/** An accent's stamps on the host's layout: one cell each, at the host's cell height. */
+export function fitAccent(source: LeafSource, textureSize: number, layout: AtlasLayout): StampFit {
+  return fitStamps(source, cellInnerPx(textureSize, layout), { grid: layout.grid, cells: source.stamps.length });
 }
 
 /**
  * The cutout image's layout for a set being written: the host's cells from
- * its own sources, then each accent's stamps.
+ * its own sources, then each accent's stamps. A crown's are strips; the
+ * others' a square grid.
  */
 export function atlasLayoutFor(params: Params, host: LeafSource | null, accents: LeafSource[]): AtlasLayout {
   const cells =
@@ -763,10 +764,15 @@ export function atlasLayoutFor(params: Params, host: LeafSource | null, accents:
       : params.type === 'crown'
       ? crownAtlas(host).cells
       : leafGrid(host, params.leafSize, params.leafGrid) ** 2;
-  return layoutAtlas(
-    cells,
-    accents.map((source) => source.stamps.length)
-  );
+  const accentCells = accents.map((source) => source.stamps.length);
+  if (params.type !== 'crown') return layoutAtlas(cells, accentCells);
+
+  // A crown's cells are strips of the cards that sample them.
+  const aspects = [
+    ...Array<number>(cells).fill(params.cardAspect),
+    ...accentCells.flatMap((count, index) => Array<number>(count).fill(params.accents[index].aspect)),
+  ];
+  return layoutAtlas(cells, accentCells, aspects);
 }
 
 /**

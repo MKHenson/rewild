@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { columnOf, layoutAtlas, leafCellPixels, leafCells } from './lib/atlas.ts';
+import { cellInnerPx, cellUvs, columnOf, gutterFor, layoutAtlas, leafCellPixels, leafCells, packStrips } from './lib/atlas.ts';
 import { writeGlb, type GlbTextureSet } from './lib/glb.ts';
 import {
   boundsOf,
@@ -220,6 +220,17 @@ describe('texture reuse', () => {
     // And which art fills it. Lists compare by value, not by identity.
     expect(sameTexture(base, paramsFor({ leaves: [] }))).toBe(true);
     expect(sameTexture(base, paramsFor({ leaves: ['oak'] }))).toBe(false);
+  });
+
+  it("repaints a crown's strips when a card's aspect changes, and a clump's never", () => {
+    const crown = (extra: RawConfig = {}) => resolveParams({ type: 'crown', name: 'c', seed: 1, ...extra });
+    const accent = { stamps: ['reed'], count: 1, pitch: 0, length: 1 };
+    expect(sameTexture(crown(), crown({ cardAspect: 0.2 }))).toBe(false);
+    expect(sameTexture(crown({ accents: [accent] }), crown({ accents: [{ ...accent, aspect: 0.2 }] }))).toBe(false);
+    expect(sameTexture(crown({ accents: [accent] }), crown({ accents: [{ ...accent, pitch: 20 }] }))).toBe(true);
+
+    const clump = (extra: RawConfig = {}) => resolveParams({ type: 'clump', name: 'c', seed: 1, ...extra });
+    expect(sameTexture(clump(), clump({ cardAspect: 0.2 }))).toBe(true);
   });
 
 });
@@ -751,6 +762,17 @@ describe('winding', () => {
     // deliberately do not follow the card.
     expect(facingAgreement(pieceOf(buildAll({ leafNormalMode: 'card' }).mesh, 'leaf'))).toBe(1);
   });
+
+  it('winds frond and accent cards to face the way their card points', () => {
+    const params = resolveParams({
+      type: 'crown',
+      name: 'reed',
+      stemHeight: 0,
+      leafNormalMode: 'card',
+      accents: [{ stamps: ['fern-spire'], count: 4, pitch: 0, length: 1, aspect: 0.3, segments: 3, curve: 30 }],
+    });
+    expect(facingAgreement(pieceOf(buildCrown(params, layoutAtlas(CROWN_CELLS_GENERATED, [1])).mesh, 'frond'))).toBe(1);
+  });
 });
 
 describe('leaf normals', () => {
@@ -939,6 +961,61 @@ describe('bark uvs', () => {
 });
 
 describe('atlas', () => {
+  it('packs strips of their own aspect, as tall as the image allows', () => {
+    const g = gutterFor(512);
+    const reed = packStrips(512, [0.25, 0.25, 0.25]);
+    expect(reed.map((rect) => rect.height)).toEqual([512, 512, 512]);
+    for (const rect of reed) expect((rect.width - 2 * g) / (rect.height - 2 * g)).toBeCloseTo(0.25, 2);
+
+    // Square strips are the square grid.
+    expect(packStrips(1024, [1, 1, 1, 1])).toEqual(leafCellPixels(1024, 2));
+
+    for (const aspects of [Array(9).fill(0.3), [0.7, 0.7, 0.7, 0.7, 0.7], [0.2, 0.5, 1, 0.1]]) {
+      const rects = packStrips(2048, aspects);
+      expect(rects).toHaveLength(aspects.length);
+      for (const [i, a] of rects.entries()) {
+        expect(a.x).toBeGreaterThanOrEqual(0);
+        expect(a.y).toBeGreaterThanOrEqual(0);
+        expect(a.x + a.width).toBeLessThanOrEqual(2048);
+        expect(a.y + a.height).toBeLessThanOrEqual(2048);
+        for (const b of rects.slice(i + 1))
+          expect(a.x + a.width <= b.x || b.x + b.width <= a.x || a.y + a.height <= b.y || b.y + b.height <= a.y).toBe(true);
+      }
+    }
+  });
+
+  it('keeps a grid layout where no aspects are given, and refuses a count that does not match', () => {
+    const grid = layoutAtlas(3, [1]);
+    expect(grid.aspects).toBeUndefined();
+    expect(cellUvs(1024, grid)).toEqual(leafCells(1024, 2));
+    expect(cellInnerPx(1024, grid)).toBe(512 - 2 * gutterFor(1024));
+
+    const strips = layoutAtlas(2, [1], [0.25, 0.25, 0.25]);
+    expect(cellInnerPx(512, strips)).toBe(512 - 2 * gutterFor(512));
+    expect(() => layoutAtlas(2, [1], [0.25])).toThrow(/one aspect per cell/);
+  });
+
+  it("maps a crown's fronds and accents onto their strips at the card's own aspect", () => {
+    const params = resolveParams({
+      type: 'crown',
+      name: 'reed',
+      stemHeight: 0,
+      frondCount: 6,
+      cardAspect: 0.25,
+      textureSize: 512,
+      accents: [{ stamps: ['reed'], count: 2, pitch: 0, length: 1, aspect: 0.25 }],
+    });
+    const layout = layoutAtlas(2, [1], [0.25, 0.25, 0.25]);
+    const strips = cellUvs(512, layout);
+    const { uvs, vertexCount } = pieceOf(buildCrown(params, layout).mesh, 'frond');
+
+    for (let i = 0; i < vertexCount; i++) {
+      const [u, v] = [uvs[i * 2], uvs[i * 2 + 1]];
+      expect(strips.some((cell) => u >= cell.u0 - 1e-6 && u <= cell.u1 + 1e-6 && v >= cell.v0 - 1e-6 && v <= cell.v1 + 1e-6)).toBe(true);
+    }
+    for (const cell of strips) expect((cell.u1 - cell.u0) / (cell.v1 - cell.v0)).toBeCloseTo(0.25, 2);
+  });
+
   it('insets every leaf cell inside its own image', () => {
     // Bark has its own image, so the only thing a cell can bleed into is
     // another cell. The gutter is what holds that off through the mip chain.
@@ -1819,6 +1896,13 @@ describe('crown', () => {
     expect(() => scatterLayerEntry(palm)).not.toThrow();
     expect(() => scatterLayerEntry(fern)).not.toThrow();
 
+    // Card normals are the one mode the engine may mirror, stem or none.
+    expect(fern.authoredNormals).toBe(true);
+    for (const stemHeight of [0, 6]) {
+      const carded = crownParams({ stemHeight, leafNormalMode: 'card' });
+      expect(crownLayer(carded, buildCrown(carded, CROWN_ATLAS)).authoredNormals).toBe(false);
+    }
+
     // The key overrides the stem's decision either way.
     const shadyFern = crownParams({ stemHeight: 0, castShadow: true });
     expect(crownLayer(shadyFern, buildCrown(shadyFern, CROWN_ATLAS)).castShadow).toBe(true);
@@ -1826,6 +1910,16 @@ describe('crown', () => {
     expect(crownLayer(dimPalm, buildCrown(dimPalm, CROWN_ATLAS)).castShadow).toBe(false);
     expect(resolveParams({ name: 'a' }).castShadow).toBe(true);
     expect(resolveParams({ name: 'a', type: 'clump' }).castShadow).toBe(false);
+  });
+
+  it('emits foliageNormalMap only when set, and only alongside foliage', () => {
+    const plain = crownParams({ stemHeight: 0 });
+    expect(crownLayer(plain, buildCrown(plain, CROWN_ATLAS))).not.toHaveProperty('foliageNormalMap');
+    for (const stemHeight of [0, 6]) {
+      const detailed = crownParams({ stemHeight, foliageNormalMap: true });
+      expect(crownLayer(detailed, buildCrown(detailed, CROWN_ATLAS)).foliageNormalMap).toBe(true);
+    }
+    expect(() => crownParams({ foliage: false, foliageNormalMap: true })).toThrow(/foliageNormalMap needs foliage/);
   });
 
   it('shades the cutout as foliage unless the key turns it off', () => {
@@ -1843,6 +1937,7 @@ describe('crown', () => {
     expect(() => crownParams({ stemHeight: -1 })).toThrow(/stemHeight/);
     expect(() => crownParams({ frondCount: 0 })).toThrow(/frondCount/);
     expect(() => crownParams({ frondAngle: 100 })).toThrow(/frondAngle/);
+    expect(() => crownParams({ leafNormalMode: 'rosette' })).toThrow(/leafNormalMode/);
   });
 
   it('attaches fronds down the stem by frondSpan, with the lowest hanging most', () => {
@@ -2021,13 +2116,15 @@ describe('accents', () => {
 
   it('parses an accent with its defaults, and refuses what it cannot use', () => {
     const [accent] = resolveParams({ name: 'a', accents: [fruit] }).accents;
-    expect(accent).toEqual({ ...fruit, variance: 10, aspect: 0.5, segments: 1, curve: 0, flutter: 0.25, attach: 'twigs', depth: null });
+    expect(accent).toEqual({ ...fruit, variance: 10, aspect: 0.5, segments: 1, planes: 1, sizeVariance: 0.2, curve: 0, flutter: 0.25, attach: 'twigs', depth: null });
 
     expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, size: 2 }] }, 't.json')).toThrow(/unknown key 'size'/);
     expect(() => parseConfig({ name: 'a', accents: [{ count: 1, pitch: 0, length: 1 }] }, 't.json')).toThrow(/needs 'stamps'/);
     expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, stamps: [] }] }, 't.json')).toThrow(/non-empty list/);
     expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, pitch: 200 }] }, 't.json')).toThrow(/'pitch' must be within 0..180/);
     expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, segments: 0 }] }, 't.json')).toThrow(/'segments' must be within 1..12/);
+    expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, planes: 0 }] }, 't.json')).toThrow(/'planes' must be within 1..6/);
+    expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, sizeVariance: 1 }] }, 't.json')).toThrow(/'sizeVariance' must be within 0..0.9/);
     expect(() => parseConfig({ name: 'a', accents: fruit }, 't.json')).toThrow(/must be a list of accents/);
   });
 
@@ -2156,6 +2253,55 @@ describe('accents', () => {
     // Dealt down the band the config named, top first.
     expect(skirt[0][0][1]).toBeCloseTo(8, 5);
     expect(skirt[3][0][1]).toBeCloseTo(6, 5);
+  });
+
+  it('crosses planes about one shared spine, each turned 180 / planes degrees', () => {
+    const fern = (planes: number) =>
+      resolveParams({
+        type: 'crown',
+        name: 'fern',
+        stemHeight: 0,
+        frondCount: 4,
+        cardSegments: 2,
+        accents: [{ ...spire, count: 1, segments: 3, curve: 30, planes }],
+      });
+    const frondVertices = 4 * 3 * 2;
+    const [flat] = cardsAfter(pieceOf(buildCrown(fern(1), layoutAtlas(CROWN_CELLS_GENERATED, [1])).mesh, 'frond'), frondVertices, 3);
+    const crossed = cardsAfter(pieceOf(buildCrown(fern(3), layoutAtlas(CROWN_CELLS_GENERATED, [1])).mesh, 'frond'), frondVertices, 3);
+    expect(crossed).toHaveLength(3);
+
+    const mid = (rows: number[][], k: number) => rows[k * 2].map((v, axis) => (v + rows[k * 2 + 1][axis]) / 2);
+    const across = (rows: number[][], k: number) => rows[k * 2 + 1].map((v, axis) => v - rows[k * 2][axis]);
+    const angle = (a: number[], b: number[]) =>
+      Math.acos(Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (Math.hypot(...a) * Math.hypot(...b))) / (Math.PI / 180);
+
+    for (const [p, rows] of crossed.entries()) {
+      for (let k = 0; k <= 3; k++) {
+        mid(rows, k).forEach((v, axis) => expect(v).toBeCloseTo(mid(flat, k)[axis], 5));
+        expect(Math.hypot(...across(rows, k))).toBeCloseTo(Math.hypot(...across(flat, k)), 5);
+      }
+      expect(angle(across(rows, 0), across(flat, 0))).toBeCloseTo([0, 60, 60][p], 3);
+    }
+  });
+
+  it('shortens cards by up to sizeVariance, and not at all at 0', () => {
+    const lengths = (sizeVariance: number) => {
+      const fern = resolveParams({
+        type: 'crown',
+        name: 'fern',
+        stemHeight: 0,
+        frondCount: 4,
+        cardSegments: 2,
+        accents: [{ ...spire, count: 12, variance: 0, sizeVariance }],
+      });
+      return cardsAfter(pieceOf(buildCrown(fern, layoutAtlas(CROWN_CELLS_GENERATED, [1])).mesh, 'frond'), 4 * 3 * 2).map(
+        (rows) => rows[2][1] - rows[0][1]
+      );
+    };
+    for (const length of lengths(0)) expect(length).toBeCloseTo(0.5, 5);
+    const varied = lengths(0.6);
+    for (const length of varied) expect(length).toBeGreaterThan(0.2 - 1e-6);
+    expect(Math.min(...varied)).toBeLessThan(0.4);
   });
 
   it('stands a spire in every tuft of a patch, or in the share of them the count names', () => {

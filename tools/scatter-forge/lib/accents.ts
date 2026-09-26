@@ -59,7 +59,7 @@ export function accentRng(params: Params, index: number): Rng {
 }
 
 /**
- * One card per site, written into `out`.
+ * One accent per site, written into `out`: `planes` cards crossed about one spine.
  *
  * The card leaves the host's surface and turns `pitch` from world up about a
  * horizontal axis, bowing on toward the ground by `curve` over its length —
@@ -91,7 +91,7 @@ export function buildAccent(
     const side = normalize(cross(UP, outward));
 
     const pitch = spec.pitch + rng.range(-spec.variance, spec.variance);
-    const length = spec.length * rng.range(0.8, 1);
+    const length = spec.length * rng.range(1 - spec.sizeVariance, 1);
     const halfWidth = (length * spec.aspect) / 2;
     const base = add(site.p, scale(outward, site.radius));
 
@@ -99,37 +99,45 @@ export function buildAccent(
     const cardPhase = hash2(params.seed ^ 0x2545f491, site.key * 31 + index);
 
     const directionAt = (t: number): Vec3 => normalize(rotateAbout(UP, side, (pitch + spec.curve * t * t) * DEG));
-    const normal = host.normal(site, outward, normalize(cross(side, directionAt(0))));
 
     // Walked rather than solved, so the card's length is its arc length.
-    let point = base;
-    const rowStart: number[] = [];
+    const spine: Vec3[] = [base];
+    for (let k = 1; k <= spec.segments; k++)
+      spine.push(add(spine[k - 1], scale(directionAt(k / spec.segments), length / spec.segments)));
 
-    for (let k = 0; k <= spec.segments; k++) {
-      const t = k / spec.segments;
-      if (k > 0) point = add(point, scale(directionAt(t), length / spec.segments));
+    // Every plane shares the spine and turns its width about it, so crossed
+    // cards bow together and read as one solid shape rather than a fan.
+    for (let plane = 0; plane < spec.planes; plane++) {
+      const turn = (plane * Math.PI) / spec.planes;
+      const acrossAt = (t: number): Vec3 => rotateAbout(side, directionAt(t), turn);
+      const normal = host.normal(site, outward, normalize(cross(acrossAt(0), directionAt(0))));
+      const rowStart: number[] = [];
 
-      rowStart.push(out.positions.length / 3);
-      const bend = host.bend(site, t * length, t);
+      for (let k = 0; k <= spec.segments; k++) {
+        const t = k / spec.segments;
+        const across = acrossAt(t);
+        rowStart.push(out.positions.length / 3);
+        const bend = host.bend(site, t * length, t);
 
-      for (const across of [-1, 1]) {
-        pushVertex(
-          out,
-          add(point, scale(side, across * halfWidth)),
-          normal,
-          [cell.u0 + (across * 0.5 + 0.5) * (cell.u1 - cell.u0), cell.v1 - t * (cell.v1 - cell.v0)],
-          // Flutter rises to the tip like the bend does, scaled down for a card
-          // that is heavier or stiffer than a leaf.
-          [bend, site.phase, t * spec.flutter, cardPhase]
-        );
+        for (const sign of [-1, 1]) {
+          pushVertex(
+            out,
+            add(spine[k], scale(across, sign * halfWidth)),
+            normal,
+            [cell.u0 + (sign * 0.5 + 0.5) * (cell.u1 - cell.u0), cell.v1 - t * (cell.v1 - cell.v0)],
+            // Flutter rises to the tip like the bend does, scaled down for a card
+            // that is heavier or stiffer than a leaf.
+            [bend, site.phase, t * spec.flutter, cardPhase]
+          );
+        }
       }
-    }
 
-    // Wound the way a frond is, so the front face is the one the card faces.
-    for (let k = 0; k < spec.segments; k++) {
-      const a = rowStart[k];
-      const b = rowStart[k + 1];
-      out.indices.push(a, a + 1, b, a + 1, b + 1, b);
+      // Wound the way a frond is, so the front face is the one the card faces.
+      for (let k = 0; k < spec.segments; k++) {
+        const a = rowStart[k];
+        const b = rowStart[k + 1];
+        out.indices.push(a, a + 1, b, a + 1, b + 1, b);
+      }
     }
   });
 }

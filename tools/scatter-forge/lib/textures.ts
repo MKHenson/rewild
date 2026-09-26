@@ -9,7 +9,7 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import sharp from 'sharp';
-import { columnPixels, gutterFor, insetRect, leafCellPixels, type AtlasLayout, type PixelRect } from './atlas.ts';
+import { cellPixels, columnPixels, gutterFor, insetRect, leafCellPixels, type AtlasLayout, type PixelRect } from './atlas.ts';
 import {
   atlasLayoutFor,
   fitBark,
@@ -688,7 +688,7 @@ export function buildBarkCanvas(params: Params, authored?: BarkSource | null): C
 function paintAccents(canvas: Canvas, params: Params, layout: AtlasLayout, accents: LeafSource[]): void {
   const size = params.textureSize;
   const gutter = gutterFor(size);
-  const rects = leafCellPixels(size, layout.grid);
+  const rects = cellPixels(size, layout);
 
   accents.forEach((source, index) => {
     const { offset, count } = layout.accents[index];
@@ -945,22 +945,21 @@ const frondStyle: StyleFor = (params, rng, rect, variant) => ({
 });
 
 /**
- * The frond atlas: one whole frond per cell, or generated fronds where none
+ * The frond atlas: one whole frond per strip, or generated fronds where none
  * are listed.
  *
- * Each frond is painted into the centred column of its cell that a card of
- * `cardAspect` samples, so it lands on the card at the proportion it was
- * drawn at. A sourced stamp stands at its own aspect and is clipped by the
- * card's edge where it is wider — the run reports that.
+ * Each strip is the shape of a `cardAspect` card, so a frond lands on the
+ * card at the proportion it was drawn at. A sourced stamp wider than the
+ * strip is scaled down to fit it — the run reports that.
  */
 export function buildFrondCanvas(params: Params, source: LeafSource | null = null, accents: LeafSource[] = []): Canvas {
   const size = params.textureSize;
   const gutter = gutterFor(size);
   const layout = atlasLayoutFor(params, source, accents);
-  const rects = leafCellPixels(size, layout.grid).slice(0, layout.cells);
+  const rects = cellPixels(size, layout).slice(0, layout.cells);
 
   if (source) {
-    const fit = fitCrown(source, size, layout.grid);
+    const fit = fitCrown(source, size, layout);
     const canvas = createCanvas(size, size, gradientGainFor(source, params, fit.cellPx));
 
     rects.forEach((rect, index) => {
@@ -1084,6 +1083,8 @@ export interface SetManifest {
    * told when the set was written without them.
    */
   accents?: ManifestAccent[];
+  /** Width over height of every cell, where the set was cut into strips. */
+  aspects?: number[];
 }
 
 function manifestPath(directory: string, textureSet: string): string {
@@ -1112,10 +1113,15 @@ export async function readSetManifest(directory: string, textureSet: string): Pr
     if (!Array.isArray(accent.stamps) || typeof accent.offset !== 'number' || typeof accent.cells !== 'number')
       throw new Error(`${manifestPath(directory, textureSet)} has an accent without stamps, offset and cells.`);
 
+  const aspects = parsed.aspects;
+  if (aspects !== undefined && (!Array.isArray(aspects) || !aspects.every((aspect) => typeof aspect === 'number' && aspect > 0)))
+    throw new Error(`${manifestPath(directory, textureSet)} has aspects that are not a list of positive numbers.`);
+
   return {
     leafGrid: parsed.leafGrid,
     leafSize: parsed.leafSize,
     cells: typeof parsed.cells === 'number' ? parsed.cells : parsed.leafGrid * parsed.leafGrid,
     accents,
+    ...(aspects ? { aspects } : {}),
   };
 }

@@ -18,9 +18,9 @@
 //     bindings ibl.wgsl names
 //   - the `lighting` storage binding those two need, and spotLightShadowParams,
 //     which says which light in it the spot atlas belongs to
-//   - HAS_VERTEX_TANGENTS, HAS_PARALLAX, HAS_AUTHORED_NORMALS and
-//     HAS_FOLIAGE_SHADING, module-scope bool consts the host bakes in from
-//     StandardPassBase.shaderDefines()
+//   - HAS_VERTEX_TANGENTS, HAS_PARALLAX, HAS_AUTHORED_NORMALS,
+//     HAS_FOLIAGE_SHADING and HAS_FOLIAGE_NORMAL_MAP, module-scope bool consts
+//     the host bakes in from StandardPassBase.shaderDefines()
 
 // glTF alphaMode. Shared numbering with ALPHA_MODES in StandardMaterial.ts.
 const ALPHA_MODE_OPAQUE: u32 = 0u;
@@ -150,7 +150,7 @@ fn shadeStandardSurface(
   // and parallax marches the view ray across UV in it. The branch is on a
   // module-scope const rather than a uniform because one side takes derivatives.
   var tbn: mat3x3f;
-  if (!HAS_FOLIAGE_SHADING) {
+  if (!HAS_FOLIAGE_SHADING || HAS_FOLIAGE_NORMAL_MAP) {
     if (HAS_VERTEX_TANGENTS) {
       tbn = tbnFromTangent(geometricNormal, tangent);
     } else {
@@ -188,11 +188,18 @@ fn shadeStandardSurface(
   }
 
   // Everything below is the metallic-roughness model. Foliage leaves here, so
-  // the four remaining texture fetches and the whole specular chain compile out
-  // for it. The cutout above is shared deliberately: both models must cut in
+  // the remaining texture fetches and the whole specular chain compile out for
+  // it; HAS_FOLIAGE_NORMAL_MAP keeps the normal fetch, for large near foliage
+  // whose leaf relief is worth the frame and the tap. The cutout above is shared deliberately: both models must cut in
   // the same place or a layer changes silhouette when its shading model does.
   if (HAS_FOLIAGE_SHADING) {
-    return shadeFoliage(baseColorSample.rgb, geometricNormal, viewPosition, sunShadow);
+    var foliageNormal = geometricNormal;
+    if (HAS_FOLIAGE_NORMAL_MAP) {
+      let foliageNormalSample = (textureSample(normalMap, mySampler, uv).rgb * 2.0 - 1.0)
+                              * vec3f(standardParams.normalScale, standardParams.normalScale, 1.0);
+      foliageNormal = normalize(tbn * foliageNormalSample);
+    }
+    return shadeFoliage(baseColorSample.rgb, foliageNormal, viewPosition, sunShadow);
   }
 
   // glTF's normalTexture.scale, which tilts X and Y while leaving Z alone —

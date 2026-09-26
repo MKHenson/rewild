@@ -182,24 +182,39 @@ Default: `80`. `palm-01` uses `60`.
 
 ### `cardAspect`
 
-The width of a frond as a fraction of its length. A frond uses only this part of its texture cell,
-so the picture is not stretched.
+The width of a frond as a fraction of its length. The frond texture is cut into strips of the same
+shape, so the picture is not stretched. A lower value gives the fronds more of the texture, and
+changing it paints the texture again.
 
 Default: `0.3`. `palm-01` uses `0.7`.
 
-If an authored frond is wider than `cardAspect`, the card cuts off its sides. The run tells you the
-value to use.
+Set it close to the width of the frond art. A higher value wastes texture and draws more see-through
+card. If an authored frond is wider than `cardAspect`, it is painted smaller to fit its strip. The
+run tells you the value to use.
 
 ![cardAspect 0.3, 0.7 and 1](images/crown-cardAspect.webp)
 
 ### `normalLean`
 
 How far the lighting direction of each frond leans out from straight up. `0` lights all fronds as if
-they face the sky. Higher values light the crown more like a dome.
+they face the sky. Higher values light the crown more like a dome. Only read at `leafNormalMode`
+`canopy`.
 
 Default: `0.6`.
 
 ![normalLean 0, 0.45 and 1 on fern-01](images/crown-normalLean.webp)
+
+### `leafNormalMode`
+
+How the fronds and accents are lit.
+
+- `canopy`: every card is lit as part of one rounded rosette, shaped by `normalLean`. The top and
+  underside of a frond are lit the same.
+- `card`: each card is lit as a flat surface, so the underside of an arching frond falls dark.
+  Use this for large, broad-leaved plants such as reeds.
+- `up`: every card is lit as if it faces the sky.
+
+Default: `canopy`. `reed-01` uses `card`.
 
 ### `cardSegments`
 
@@ -214,6 +229,14 @@ Default: `5`.
 | `fronds` | `[]` | The folders under `sources/fronds/` for the frond art. `[]` makes four fronds. See [Authored art](authored-art.md#clumps-and-fronds). |
 | `bark` | `[]` | The folder under `sources/bark/` for the stem art. |
 | `textureSize` | `2048` | The size of the frond texture in pixels. Use 1024 for a model the camera never goes under. |
+
+The frond texture is cut into strips, one for each frond picture and each accent picture. Each
+strip has the shape of its card (`cardAspect`, or the accent's `aspect`). The strips are placed side
+by side in rows, as tall as the texture allows. Narrow fronds therefore get most of the texture
+height, and the run prints the pixels each strip gets.
+
+A variant with `skipTextures` can use a lower `cardAspect` or accent `aspect` than the set was
+painted with, but not a higher one. The run stops and tells you.
 | `barkTextureSize` | `0` | The long edge of the stem texture. `0` uses `textureSize`. |
 | `barkAspect` | `2` | How many times taller than wide the made stem texture is. It has no effect on authored bark. |
 | `leafAlphaCutoff` | `0.45` | The transparency level below which a frond pixel is cut away. See [Trees](tree.md#leafalphacutoff). |
@@ -250,6 +273,7 @@ These keys work on more than one type. The defaults here are the ones for `crown
 | [`cullDistance`](in-game.md#layer-keys) | `160` | The distance in metres past which the engine does not draw the model. |
 | [`castShadow`](in-game.md#layer-keys) | on with a stem | Whether the model casts a shadow. |
 | [`foliage`](in-game.md#layer-keys) | `true` | Light the cutout piece as leaves. Set `false` for a cutout that is not a leaf. |
+| [`foliageNormalMap`](in-game.md#layer-keys) | `false` | With `foliage`, also use the normal map. For large plants seen up close. |
 | [`collider`](in-game.md#layer-keys) | `true` | Stop the player at the stem. Set `false` for a plant low enough to walk through. A crown with no stem never has one. |
 | [`footprint`](in-game.md#density) | `0` | The clear space in metres round each model. `0` lets the tool choose. |
 | [`scaleMin`](in-game.md#layer-keys) | `0.8` | The smallest random size of a copy. |

@@ -247,6 +247,28 @@ describe.each([
     }
   );
 
+  it.each([
+    [false, true, false],
+    [true, false, false],
+    [true, true, true],
+  ])(
+    'compiles foliage = %s with foliageNormalMap = %s as HAS_FOLIAGE_NORMAL_MAP = %s',
+    (foliage, normalMap, expected) => {
+      const pass = create();
+      pass.foliage = foliage;
+      pass.foliageNormalMap = normalMap;
+      const defines = (
+        pass as unknown as { shaderDefines(): ShaderDefines }
+      ).shaderDefines();
+
+      const source = composeShader([shaderSource(shaderName)], defines);
+
+      expect(source).toContain(
+        `const HAS_FOLIAGE_NORMAL_MAP: bool = ${expected};`
+      );
+    }
+  );
+
   it('names a vertex entry point for every attribute combination', () => {
     const pass = create();
     const internals = pass as unknown as { vertexEntryPoint(): string };

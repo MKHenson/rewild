@@ -310,7 +310,26 @@ function layoutFromManifest(params: Params, painted: SetManifest, directory: str
     return { offset: match.offset, count: match.cells };
   });
 
-  return { grid: painted.leafGrid, cells: painted.cells ?? painted.leafGrid * painted.leafGrid, accents };
+  // A card wider than the strip it samples would stretch the art across it.
+  const aspects = painted.aspects;
+  if (aspects) {
+    const tooWide = (asked: number, cell: number, key: string) => {
+      if (asked > aspects[cell] + 1e-6)
+        throw new Error(
+          `Texture set '${params.textureSet}' in ${directory} cut its strips for ${key} ${aspects[cell]}, and this config asks for ${asked}. ` +
+            `Lower it, or re-run the config that writes the set.`
+        );
+    };
+    if (painted.cells) tooWide(params.cardAspect, 0, 'cardAspect');
+    params.accents.forEach((spec, index) => tooWide(spec.aspect, accents[index].offset, `accent ${index} aspect`));
+  }
+
+  return {
+    grid: painted.leafGrid,
+    cells: painted.cells ?? painted.leafGrid * painted.leafGrid,
+    accents,
+    ...(aspects ? { aspects } : {}),
+  };
 }
 
 /** The model, and the layer it is declared through. */
@@ -429,6 +448,7 @@ async function generate(params: Params, writeTemplate: string | null, previous?:
         offset: range.offset,
         cells: range.count,
       })),
+      ...(layout.aspects ? { aspects: layout.aspects } : {}),
     });
   }
 
@@ -549,7 +569,20 @@ function describeLeaves(params: Params, source: LeafSource | null, layout: Atlas
 function onImage(layout: AtlasLayout): string {
   const taken = layout.accents.reduce((sum, range) => sum + range.count, 0);
   if (!taken) return '';
-  return ` on a ${layout.grid}x${layout.grid} image, ${taken} cell${taken === 1 ? '' : 's'} of it accents`;
+  const image = layout.aspects ? 'image of strips' : `${layout.grid}x${layout.grid} image`;
+  return ` on a ${image}, ${taken} cell${taken === 1 ? '' : 's'} of it accents`;
+}
+
+/**
+ * What happens to a stamp wider than the column its card samples: on a grid
+ * the card clips it, and in a strip it is painted smaller to fit.
+ */
+function tooWide(layout: AtlasLayout, widest: number, aspect: number, key: string): string[] {
+  if (widest <= aspect + 1e-3) return [];
+  const what = layout.aspects
+    ? `narrowed: the widest stamp is ${widest.toFixed(2)} of its length and its strip is ${aspect}, so it is painted at ${Math.round((aspect / widest) * 100)}% of the card's length.`
+    : `clipped: the widest stamp is ${widest.toFixed(2)} of its length and the card samples ${aspect}.`;
+  return [`           ${what} Raise ${key} to ${widest.toFixed(2)} or crop the stamp.`];
 }
 
 /** One line per accent: its stamps, its cells, and how the card treats them. */
@@ -557,7 +590,7 @@ function describeAccents(params: Params, sources: LeafSource[], layout: AtlasLay
   return sources.flatMap((source, index) => {
     const spec = params.accents[index];
     const range = layout.accents[index];
-    const fit = fitAccent(source, params.textureSize, layout.grid);
+    const fit = fitAccent(source, params.textureSize, layout);
     const stamps = `${source.stamps.length} stamp${source.stamps.length === 1 ? '' : 's'}`;
     const cells = range.count === 1 ? `cell ${range.offset}` : `cells ${range.offset}..${range.offset + range.count - 1}`;
     const lines = [
@@ -571,12 +604,7 @@ function describeAccents(params: Params, sources: LeafSource[], layout: AtlasLay
           `${Math.round(fit.placedPx)}px of cell. Give it a larger source, or a larger textureSize.`
       );
 
-    const widest = widestAspect(source);
-    if (widest > spec.aspect + 1e-3)
-      lines.push(
-        `           clipped: the widest stamp is ${widest.toFixed(2)} of its length and the card samples ` +
-          `${spec.aspect}. Raise the accent's aspect to ${widest.toFixed(2)} or crop the stamp.`
-      );
+    lines.push(...tooWide(layout, widestAspect(source), spec.aspect, "the accent's aspect"));
 
     return [...lines, ...describeDerived(source.stamps)];
   });
@@ -600,9 +628,10 @@ function describeDerived(stamps: LeafStamp[]): string[] {
  */
 function describeStamps(label: string, source: LeafSource, fit: StampFit, size: string, layout: AtlasLayout): string[] {
   const stamps = `${source.stamps.length} stamp${source.stamps.length === 1 ? '' : 's'}`;
+  const shape = layout.aspects ? 'strips' : `${fit.grid}x${fit.grid} grid`;
   const lines = [
     `  ${label.padEnd(8)} from ${source.directories.map(shellPath).join(', ')} (${stamps}, up to ${source.lengthMetres}m ${size}): ` +
-      `${fit.grid}x${fit.grid} grid${onImage(layout)}, ${fit.cellPx}px a cell`,
+      `${shape}${onImage(layout)}, ${fit.cellPx}px a cell`,
   ];
 
   if (fit.placedPx > fit.sourcePx)
@@ -621,20 +650,13 @@ function describeBlades(params: Params, source: LeafSource | null, layout: Atlas
 
 /**
  * The fronds line. A frond card samples `cardAspect` of its cell, so a stamp
- * wider than that loses its edges at the card's, and only this says so.
+ * wider than that is clipped or narrowed, and only this says so.
  */
 function describeFronds(params: Params, source: LeafSource | null, layout: AtlasLayout): string[] {
   if (!source) return [`  fronds   generated — no sources listed${onImage(layout)}`];
 
-  const lines = describeStamps('fronds', source, fitCrown(source, params.textureSize, layout.grid), 'long', layout);
-  const widest = widestAspect(source);
-  if (widest > params.cardAspect + 1e-3)
-    lines.push(
-      `           clipped: the widest stamp is ${widest.toFixed(2)} of its length and the card samples ` +
-        `${params.cardAspect}. Raise cardAspect to ${widest.toFixed(2)} or crop the stamp.`
-    );
-
-  return lines;
+  const lines = describeStamps('fronds', source, fitCrown(source, params.textureSize, layout), 'long', layout);
+  return [...lines, ...tooWide(layout, widestAspect(source), params.cardAspect, 'cardAspect')];
 }
 
 function describeBark(params: Params, source: BarkSource | null): string {

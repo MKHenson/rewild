@@ -163,6 +163,7 @@ These keys work on more than one type. The defaults here are the ones for `clump
 | [`cullDistance`](in-game.md#layer-keys) | `50` | The distance in metres past which the engine does not draw the model. |
 | [`castShadow`](in-game.md#layer-keys) | `false` | Whether the model casts a shadow. |
 | [`foliage`](in-game.md#layer-keys) | `true` | Light the cutout piece as leaves. Set `false` for a cutout that is not a leaf. |
+| [`foliageNormalMap`](in-game.md#layer-keys) | `false` | With `foliage`, also use the normal map. For large plants seen up close. |
 | [`footprint`](in-game.md#density) | `0.7` | The clear space in metres round each model. `0` lets the tool choose. |
 | [`scaleMin`](in-game.md#layer-keys) | `0.75` | The smallest random size of a copy. |
 | [`scaleMax`](in-game.md#layer-keys) | `1.3` | The largest random size of a copy. |

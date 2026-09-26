@@ -9,7 +9,7 @@
 // ground, and phased with the stem so the rosette rides its sway.
 
 import { accentRng, buildAccent, cardsAt, type AccentSite } from './accents.ts';
-import { accentCells, columnOf, leafCells, type AtlasLayout } from './atlas.ts';
+import { accentCells, cellUvs, columnOf, type AtlasLayout } from './atlas.ts';
 import {
   buildBark,
   createBuilder,
@@ -150,8 +150,14 @@ function tiltAt(params: Params, pitch: number, t: number): number {
   return (90 - pitch + params.cardCurve * t * t) * DEG;
 }
 
-/** The rosette's shading normal: up, leaned outward. See tuftNormal in clump.ts. */
-function rosetteNormal(params: Params, outward: Vec3): Vec3 {
+/**
+ * A frond or accent's shading normal. `canopy` is the rosette's: up, leaned
+ * outward, as tuftNormal in clump.ts. `card` is the card's own face, which the
+ * engine mirrors on the back so an arching frond's underside falls dark.
+ */
+function frondNormal(params: Params, outward: Vec3, face: Vec3): Vec3 {
+  if (params.leafNormalMode === 'card') return face;
+  if (params.leafNormalMode === 'up') return UP;
   return normalize(add(scale(outward, params.normalLean), UP));
 }
 
@@ -218,7 +224,7 @@ function crownSites(params: Params, stem: Branch | null, rosette: Rosette, spec:
  */
 function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, atlas: AtlasLayout): MeshAttributes {
   const cells = atlas.cells;
-  const uvCells = leafCells(params.textureSize, atlas.grid).slice(0, cells);
+  const uvCells = cellUvs(params.textureSize, atlas).slice(0, cells);
   const rng = createRng(params.seed ^ 0x6c3f9a17);
   const out = createBuilder();
   const stem = skeleton.branches[0] ?? null;
@@ -255,8 +261,6 @@ function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, atlas
     const key = frond;
     const frondPhase = hash2(params.seed ^ 0x51ed270b, key);
     const cell = columnOf(uvCells[Math.floor(hash2(params.seed, key * 977) * cells) % cells], params.cardAspect);
-    const normal = rosetteNormal(params, outward);
-
     // Walked rather than solved, so the frond's length is its arc length.
     let point = base;
     const rowStart: number[] = [];
@@ -264,10 +268,11 @@ function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, atlas
     for (let k = 0; k <= params.cardSegments; k++) {
       const t = k / params.cardSegments;
 
-      if (k > 0) {
-        const direction = normalize(rotateAbout(UP, side, tiltAt(params, pitch, t)));
-        point = add(point, scale(direction, frondLength / params.cardSegments));
-      }
+      const direction = normalize(rotateAbout(UP, side, tiltAt(params, pitch, t)));
+      if (k > 0) point = add(point, scale(direction, frondLength / params.cardSegments));
+
+      // Per row, so a card normal follows the frond's bow.
+      const normal = frondNormal(params, outward, normalize(cross(side, direction)));
 
       const bend = bendWeight(params, skeleton, at.dist + t * frondLength);
       rowStart.push(out.positions.length / 3);
@@ -294,7 +299,7 @@ function buildFronds(params: Params, skeleton: Skeleton, rosette: Rosette, atlas
   params.accents.forEach((spec, index) =>
     buildAccent(out, params, index, spec, crownSites(params, stem, rosette, spec, accentRng(params, index)), accentCells(params.textureSize, atlas, index), {
       bend: (site, along) => bendWeight(params, skeleton, site.dist + along),
-      normal: (_site, outward) => rosetteNormal(params, outward),
+      normal: (_site, outward, face) => frondNormal(params, outward, face),
     })
   );
 
