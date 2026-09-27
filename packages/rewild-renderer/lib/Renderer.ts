@@ -33,6 +33,7 @@ import { BVHWorkerManager } from './acceleration/BVHWorkerManager';
 import { DirectionalShadowRenderer } from './renderers/shadow/DirectionalShadowRenderer';
 import { SpotLightShadowRenderer } from './renderers/shadow/SpotLightShadowRenderer';
 import { FrameCompositor } from './post-processes/FrameCompositor';
+import { RefractionCapture } from './renderers/water/RefractionCapture';
 import { QualitySettings } from './utils/QualitySettings';
 
 const _projScreenMatrix = new Matrix4();
@@ -109,8 +110,12 @@ export class Renderer {
 
   // GPU time for the shadow and main scene passes. Terrain is not its own pass —
   // its LOD meshes draw through renderGroupings in the main one — so 'scene'
-  // covers the lot.
+  // covers the lot. When water is in view, 'refraction' and 'water' time the
+  // copy and the pass it and the transparent meshes draw in.
   sceneGpuTimer: GpuPassTimer = new GpuPassTimer(this.metrics, 'gpu/scene');
+
+  /** The opaque scene copied for water to refract, when water is in view. */
+  readonly refraction = new RefractionCapture();
 
   // Scene categories held back from every pass, shadows included. Attribution
   // by ablation: hide one and the `scene` row falls by what it was costing.
@@ -317,7 +322,7 @@ export class Renderer {
     this.context = context;
     this.device = device;
 
-    this.sceneGpuTimer.init(device, ['shadow', 'scene']);
+    this.sceneGpuTimer.init(device, ['shadow', 'scene', 'refraction', 'water']);
     this.declareMetrics();
 
     this.textureManager = new TextureManager();
@@ -419,6 +424,7 @@ export class Renderer {
     this.directionalShadowRenderer.dispose();
     this.spotLightShadowRenderer.dispose();
     this.sceneGpuTimer.dispose();
+    this.refraction.dispose();
     this.frameCompositor.dispose();
     this.disposed = true;
     this.initialized = false;
@@ -634,10 +640,13 @@ export class Renderer {
   renderGroupings(
     renderGroup: IRenderGroup[],
     pass: GPURenderPassEncoder,
-    camera: Camera
+    camera: Camera,
+    from = 0,
+    to = renderGroup.length
   ) {
     const hidden = this.hiddenSceneCategories;
-    for (const item of renderGroup) {
+    for (let i = from; i < to; i++) {
+      const item = renderGroup[i];
       if (hidden.size > 0 && hidden.has(item.pass.profileCategory ?? 'opaque'))
         continue;
 
@@ -963,8 +972,54 @@ export class Renderer {
 
       this.terrainRenderer.render(this, pass, camera.camera);
 
-      this.renderGroupings(renderList, pass, camera.camera);
+      // Water refracts the opaque scene, so when any is in view the pass ends
+      // after the opaque groups, they are copied, and water and the
+      // transparent groups draw over them in a pass of their own.
+      let opaqueEnd = 0;
+      while (opaqueEnd < renderList.length && drawRank(renderList[opaqueEnd]) === 0)
+        opaqueEnd++;
+      const hasWater =
+        opaqueEnd < renderList.length && drawRank(renderList[opaqueEnd]) === 1;
+
+      this.renderGroupings(
+        renderList,
+        pass,
+        camera.camera,
+        0,
+        hasWater ? opaqueEnd : renderList.length
+      );
       pass.end();
+
+      if (hasWater) {
+        this.refraction.capture(
+          device,
+          encoder,
+          this.sceneColorTexture!,
+          this.depthTexture,
+          camera.camera,
+          this.sceneGpuTimer.writes('refraction')
+        );
+        const waterPass = encoder.beginRenderPass({
+          label: 'water pass',
+          colorAttachments: [
+            { view: sceneColorView, loadOp: 'load', storeOp: 'store' },
+          ],
+          depthStencilAttachment: {
+            view: this.depthTexture.createView(),
+            depthLoadOp: 'load',
+            depthStoreOp: 'store',
+          },
+          timestampWrites: this.sceneGpuTimer.writes('water'),
+        });
+        this.renderGroupings(
+          renderList,
+          waterPass,
+          camera.camera,
+          opaqueEnd,
+          renderList.length
+        );
+        waterPass.end();
+      }
       device.queue.submit([encoder.finish()]);
 
       // Resolve the scene-pass GPU timestamps (no-op unless the panel is open).
