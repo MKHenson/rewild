@@ -118,11 +118,12 @@ The water map holds a body ID for each texel. The body itself is a record:
 | -------------- | ---------------------------------------------------------------------------- |
 | `id`           | 0 for the ocean. A generated lake takes its ID from its lake cell coordinate. |
 | `level`        | The surface level. For the ocean, this is the world's sea level.             |
-| `spillHeight`  | The lowest point of the rim. Calculated, not authored. See [Computing the spill height](#computing-the-spill-height). |
+| `spillHeight`  | The lowest point of the rim. Calculated, not authored. See [Computing the spill height](#computing-the-spill-height). A generated lake's is its lowest rim sample, a tarn's its lip and a lagoon's sea level. |
 | `locked`       | If true, the sculpt brush cannot lower the rim below the level.              |
 | `typeWeights`  | The default palette weights for new water in this body.                      |
 
-A generated lake that nobody edits costs nothing to save. The seed builds its record again.
+A generated lake that nobody edits costs nothing to save. The seed builds its record again. Each
+chunk's water map carries the records of the bodies that cover it (`WaterMap.bodies`).
 
 **Coverage and the terrain.** Water shows where coverage > 0 **and** `terrainHeight < level`. So
 sculpting changes the shore with no change to the water data. Dig a hole in the lake bed and it
@@ -194,10 +195,29 @@ only.
 
 ### Where a lake meets the ocean
 
-If a lake's lowest ring point is at or near sea level, the lake becomes a **lagoon**:
+A lake becomes a **lagoon** when any rim point stands in the sea: below sea level, inside the
+ocean's coverage. Coverage alone is not enough, since it reaches a little way over dry land.
 
-- Its level becomes sea level. So the level stays continuous.
-- Its type weights blend from "lake" at the centre to "ocean" at the coast.
+- Its level becomes sea level, so the level stays continuous with the ocean.
+- It has no lip, and a **mouth** is cut through its bank toward the lowest rim point in the sea: a
+  channel 2 m below sea level from just inside the shore to the top of the bank, easing out beyond
+  it. Without it the natural beach between the shore and the rim would close the lagoon off.
+- Where it and the ocean overlap, the water is one surface: coverage is the larger of the two, and
+  the texel belongs to the lagoon while the lagoon covers it. The ocean's ID starts where the
+  lagoon's coverage ends.
+- Its type weights blend from "lake" out to a fifth of its radius to "ocean" at its shore.
+
+A lagoon's rim slope is judged over its dry rim only, with sea points counted at sea level, against
+`maxLagoonSlope`: the sea holds its seaward side. It never falls back to a tarn.
+
+Few seeded centres land just behind a shore, so a share (`lagoonChance`) of the candidates that fall
+out at sea **slide ashore** instead of being dropped: up the continent field's gradient, in small
+steps, to the first ground a metre above sea level, then back from it by the lake's radius so the
+shore lies inside the rim. A slid candidate takes the larger `lagoonRadius`, and settles as a lagoon
+or not at all. The slide is decided from the seed and the procedural ground, so every
+chunk slides a candidate the same way, and spacing is checked on the moved centres. It moves a
+candidate at most `0.4` of a cell, which widens the cells a chunk and the spacing test look at. A candidate whose
+centre is below sea level within the ocean's coverage is out at sea, and is dropped.
 
 This is the only way two bodies join. All other lakes sit above sea level inside their own shore.
 
