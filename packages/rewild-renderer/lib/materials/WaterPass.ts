@@ -40,8 +40,8 @@ class WaterSubPass {
   readonly water: WaterUniforms;
   private meshUniforms = new Map<Mesh, ProjModelView>();
 
-  constructor(refracts = false) {
-    this.water = new WaterUniforms(waterGroupIndex, refracts);
+  constructor(refracts = false, shades = false) {
+    this.water = new WaterUniforms(waterGroupIndex, refracts, shades);
   }
 
   setPipeline(pipeline: GPURenderPipeline) {
@@ -112,10 +112,10 @@ export class WaterPass implements IMaterialPass {
   /** Tier the pipelines were built against; a change rebuilds them. */
   private builtQuality: RenderQuality | null = null;
   private depth = new WaterSubPass();
-  private absorb = new WaterSubPass(true);
+  private absorb = new WaterSubPass(true, true);
 
   constructor() {
-    this.waterUniforms = new WaterUniforms(waterGroupIndex);
+    this.waterUniforms = new WaterUniforms(waterGroupIndex, false, true);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
     this.shadowUniforms = new ShadowUniforms(shadowGroupIndex, true);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [

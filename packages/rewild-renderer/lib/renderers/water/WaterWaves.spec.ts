@@ -3,6 +3,7 @@ import {
   CALM_PEAK,
   CALM_RESPONSE,
   CHOP_FIELD,
+  FOAM_DRIFT_PERIOD,
   GRAVITY,
   SWELL_FIELD,
   VARIATION_RANGES,
@@ -198,6 +199,22 @@ describe('WaterWaves', () => {
     const before = waves.variationOffset[0];
     run(waves, 10);
     expect(waves.variationOffset[0]).not.toBeCloseTo(before, 6);
+  });
+
+  it('drifts the foam downwind with the wind, wrapped, and packs it', () => {
+    const waves = new WaterWaves();
+    waves.update(10, 0, 1, 0, PALETTE);
+    expect(Array.from(waves.foamOffset)).toEqual([0, 0]);
+    waves.update(10, 0, 1, 1, PALETTE);
+    expect(waves.foamOffset[0]).toBeCloseTo(0, 9);
+    expect(waves.foamOffset[1]).toBeCloseTo(15, 9);
+    waves.update(10, 0, -1, 1, PALETTE);
+    waves.update(10, 0, -1, 1, PALETTE);
+    expect(waves.foamOffset[1]).toBeCloseTo(FOAM_DRIFT_PERIOD - 15, 6);
+
+    const out = new Float32Array(WAVE_UNIFORM_FLOATS);
+    waves.pack(1, 0, 0, 2, [], [], [0, -1, 1, 0], out);
+    expect(out[42]).toBe(Math.fround(FOAM_DRIFT_PERIOD - 15));
   });
 
   it('spreads the octaves over every direction, whatever the wind', () => {

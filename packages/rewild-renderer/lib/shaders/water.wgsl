@@ -29,6 +29,53 @@ const AIR_TO_WATER: f32 = 0.75;
 // out at the shore.
 const REFRACTION_REACH: f32 = 3.0;
 
+// Foam. Whitecaps stand where the surface is unusually high for its waves: a
+// z-score of the height over octaves this long and up, so where many crest
+// together. Below FOAM_WIND_START there are none; the z it takes falls from
+// WHITECAP_Z_CALM to WHITECAP_Z_GALE as the wind rises.
+const WHITECAP_MIN_LENGTH: f32 = 2.0;
+const FOAM_WIND_START: f32 = 0.3;
+const WHITECAP_Z_CALM: f32 = 3.0;
+const WHITECAP_Z_GALE: f32 = 1.1;
+const WHITECAP_Z_SOFTNESS: f32 = 0.6;
+// Foam lingers where a crest broke, fading as the crest moves on. The waves
+// are a function of time, so the vertex stage finds the whitecaps of
+// FOAM_LINGER_SAMPLES past moments, FOAM_LINGER_FIRST × (k + 1)^1.3 seconds
+// ago (0.7 s to 4.3 s), each faded by exp(−age / FOAM_LIFETIME).
+const FOAM_LINGER_SAMPLES: i32 = 4;
+const FOAM_LINGER_FIRST: f32 = 0.7;
+const FOAM_LIFETIME: f32 = 16.0;
+// Standard deviation of exp(sin θ − 1), for the z-score.
+const WAVE_HEIGHT_STD: f32 = 0.30266;
+// Streaks along the wind from this strength up, faint and in patches the
+// gust field carries downwind. They sample a blurrier mip, so they read as
+// soft lines rather than cut ones.
+const STREAK_WIND_START: f32 = 0.75;
+const STREAK_COVERAGE: f32 = 0.5;
+const STREAK_OPACITY: f32 = 0.35;
+const STREAK_MIP_BIAS: f32 = 1.5;
+// Metres per repeat of the foam texture: two tilings, one turned, to hide the
+// repeat, and a stretched one for streaks. Each divides FOAM_DRIFT_PERIOD, so
+// the drift wraps without a jump.
+const FOAM_TILE_A: f32 = 8.0;
+const FOAM_TILE_B: f32 = 12.8;
+const STREAK_LENGTH: f32 = 64.0;
+const STREAK_WIDTH: f32 = 4.0;
+// cos and sin of the turn of the second tiling.
+const FOAM_TURN: vec2f = vec2f(0.7986355, 0.6018150);
+// Texture density over which coverage fades foam in.
+const FOAM_SOFTNESS: f32 = 0.25;
+// Opacity of the thinnest foam the texture shows; its densest clumps are
+// opaque, so bubbles and thin spots show the water through.
+const FOAM_THIN: f32 = 0.15;
+// Opacity of all foam.
+const FOAM_OPACITY: f32 = 0.9;
+// Opacity lingering foam fades to as it dies: fresh foam is opaque, and it
+// turns translucent as well as thinning out with age.
+const FOAM_AGED_OPACITY: f32 = 0.2;
+const FOAM_ALBEDO: f32 = 0.65;
+const FOAM_ROUGHNESS: f32 = 0.6;
+
 const MAX_WATER_TYPES: u32 = 4u;
 
 // Wave octaves, from WaterWaves.ts, longest first.
@@ -128,7 +175,8 @@ struct Waves {
   // spacing in metres; unused entries are 0. See waterGridBands.
   lodDistance : array<vec4f, 2>,
   lodSpacing : array<vec4f, 2>,
-  // x: the finest grid's spacing, used nearer than the first distance.
+  // x: the finest grid's spacing, used nearer than the first distance. yz:
+  // metres the foam has drifted downwind, wrapped.
   grid : vec4f,
   // Per octave: direction xz, wavenumber, angular frequency.
   wave : array<vec4f, 40>,
@@ -157,6 +205,10 @@ struct VertexOutput {
   @location(4) dragged : vec2f,
   // The grid spacing the octaves were split by, in metres.
   @location(5) spacing : f32,
+  // Those octaves' height and summed squared amplitude, for the whitecaps.
+  @location(6) crest : vec2f,
+  // Foam coverage left by whitecaps that broke here in the last seconds.
+  @location(7) linger : f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
@@ -171,6 +223,10 @@ struct VertexOutput {
 // The opaque scene behind the water (RefractionCapture): rgb colour, a view
 // depth in metres. Bound for the absorb draw only.
 @group(1) @binding(5) var refraction : texture_2d<f32>;
+// Tileable foam, white against transparent (WaterTextures), and a repeating
+// sampler. Bound for the absorb and light draws.
+@group(1) @binding(6) var foamTexture : texture_2d<f32>;
+@group(1) @binding(7) var foamSampler : sampler;
 @group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
@@ -196,6 +252,8 @@ struct WaterSample {
   weights : vec4f,
   scatter : vec3f,
   extinction : vec3f,
+  // 0..1: how much crest foam the wind raises.
+  foam : f32,
 }
 
 // Type weights summing to 1; a texel with none reads as the first type.
@@ -215,9 +273,11 @@ fn sampleWater(uv: vec2f) -> WaterSample {
   out.weights = weights;
   out.scatter = vec3f(0.0);
   out.extinction = vec3f(0.0);
+  out.foam = 0.0;
   for (var i: u32 = 0u; i < MAX_WATER_TYPES; i++) {
     let e = params.extinction[i];
     out.scatter += params.scatter[i].rgb * weights[i];
+    out.foam += params.scatter[i].a * weights[i];
     out.extinction += (e.rgb + vec3f(e.a)) * weights[i];
   }
   return out;
@@ -269,8 +329,14 @@ fn octaveVariation(variation: vec2f, k: f32) -> f32 {
 // An octave's phase at `p`, measured from the wave origin and wrapped into
 // 0..2π: GPU sin and cos are only accurate over a small range.
 fn wavePhase(i: i32, p: vec2f) -> f32 {
+  return wavePhaseAt(i, p, waves.time);
+}
+
+// An octave's phase at `p` at `time` on the wave clock. Every frequency loops
+// over the clock, so a time before its wrap is still continuous.
+fn wavePhaseAt(i: i32, p: vec2f, time: f32) -> f32 {
   let w = waves.wave[i];
-  let theta = w.z * dot(w.xy, p) - w.w * waves.time + waves.phase[i / 4][i % 4];
+  let theta = w.z * dot(w.xy, p) - w.w * time + waves.phase[i / 4][i % 4];
   return theta - TWO_PI * floor(theta / TWO_PI);
 }
 
@@ -306,6 +372,8 @@ fn resolvedBy(spacing: f32, k: f32) -> f32 {
 struct GeometryWaves {
   height : f32,
   slope : vec2f,
+  // Summed squared amplitude.
+  energy : f32,
   // `rest` less the point the first octave the grid cannot hold samples.
   dragged : vec2f,
 }
@@ -320,6 +388,7 @@ fn geometryWaves(rest: vec2f, weights: vec4f, gain: vec2f, spacing: f32) -> Geom
   var out: GeometryWaves;
   out.height = 0.0;
   out.slope = vec2f(0.0);
+  out.energy = 0.0;
   for (var i: i32 = 0; i < WAVE_COUNT; i++) {
     let w = waves.wave[i];
     let resolved = resolvedBy(spacing, w.z);
@@ -332,6 +401,7 @@ fn geometryWaves(rest: vec2f, weights: vec4f, gain: vec2f, spacing: f32) -> Geom
     let ec = e * cos(theta);
     out.height += amplitude * (e - WAVE_MEAN);
     out.slope += w.xy * (amplitude * ec * w.z);
+    out.energy += amplitude * amplitude;
     p -= w.xy * (drag * amplitude * ec);
   }
   out.dragged = rest - p;
@@ -344,6 +414,9 @@ struct WaveNormal {
   // Slope variance of the octaves too small on screen, or past the tier's
   // budget, to sum: widens the highlight instead of letting it sparkle.
   variance : f32,
+  // How unusually high the surface stands: its height over the octaves at
+  // least WHITECAP_MIN_LENGTH long, in standard deviations.
+  crest : f32,
 }
 
 // Metres of water surface one pixel covers at `rest`. Taken before any
@@ -356,6 +429,39 @@ fn pixelFootprint(rest: vec2f) -> f32 {
 fn gustScale(world: vec2f) -> f32 {
   let gust = smoothstep(0.35, 0.65, gustField(world, waves.wind));
   return mix(1.0, mix(GUST_LULL, GUST_PEAK, gust), min(waves.wind.z / GUST_FULL_STRENGTH, 1.0));
+}
+
+// The height at `rest`, `age` seconds ago, of the octaves the grid holds, as
+// geometryWaves sums it.
+fn pastHeight(rest: vec2f, weights: vec4f, gain: vec2f, spacing: f32, age: f32) -> f32 {
+  let drag = dot(waves.drag, weights);
+  let time = waves.time - age;
+  var p = rest;
+  var height = 0.0;
+  for (var i: i32 = 0; i < WAVE_COUNT; i++) {
+    let w = waves.wave[i];
+    let resolved = resolvedBy(spacing, w.z);
+    if (resolved <= 0.0) {
+      break;
+    }
+    let amplitude = dot(waves.amp[i], weights) * octaveVariation(gain, w.z) * resolved;
+    let theta = wavePhaseAt(i, p, time);
+    let e = exp(sin(theta) - 1.0);
+    height += amplitude * (e - WAVE_MEAN);
+    p -= w.xy * (drag * amplitude * e * cos(theta));
+  }
+  return height;
+}
+
+// How far the wind has come toward raising foam, 0..1.
+fn foamWind() -> f32 {
+  return smoothstep(FOAM_WIND_START, 1.0, waves.wind.z);
+}
+
+// Whitecap coverage for a crest z-score.
+fn whitecap(z: f32) -> f32 {
+  let capZ = mix(WHITECAP_Z_CALM, WHITECAP_Z_GALE, foamWind());
+  return smoothstep(capZ, capZ + WHITECAP_Z_SOFTNESS, z);
 }
 
 // The surface normal at a pixel: the vertex stage's gradient from the octaves
@@ -376,6 +482,8 @@ fn waterNormal(input: VertexOutput, water: WaterSample, footprint: f32, octaves:
   var slope = input.slope;
   var variance = 0.0;
   var summed: i32 = 0;
+  var crestHeight = input.crest.x;
+  var crestEnergy = input.crest.y;
   for (var i: i32 = 0; i < WAVE_COUNT; i++) {
     let w = waves.wave[i];
     let wavelength = TWO_PI / w.z;
@@ -397,11 +505,17 @@ fn waterNormal(input: VertexOutput, water: WaterSample, footprint: f32, octaves:
     summed++;
     let amplitude = steepness / w.z * fade;
     let theta = wavePhase(i, p);
-    let ec = exp(sin(theta) - 1.0) * cos(theta);
+    let e = exp(sin(theta) - 1.0);
+    let ec = e * cos(theta);
     slope += w.xy * (amplitude * ec * w.z);
     p -= w.xy * (drag * amplitude * ec);
+    if (wavelength >= WHITECAP_MIN_LENGTH) {
+      crestHeight += amplitude * (e - WAVE_MEAN);
+      crestEnergy += amplitude * amplitude;
+    }
   }
   var out: WaveNormal;
+  out.crest = crestHeight / max(WAVE_HEIGHT_STD * sqrt(crestEnergy), 1e-6);
   out.normal = normalize(uniforms.normalMatrix * vec3f(-slope.x, 1.0, -slope.y));
   out.variance = variance;
   return out;
@@ -436,12 +550,26 @@ fn vs(input: VertexInput) -> VertexOutput {
   let spacing = gridSpacingAt(length(fromEye));
   let calm = shoreCalm(max(surface.r - surface.g, 0.0));
 
+  let gain = calm * waveVariation(rest + waves.origin.xy);
+
   var geometry: GeometryWaves;
   geometry.height = 0.0;
   geometry.slope = vec2f(0.0);
+  geometry.energy = 0.0;
   geometry.dragged = vec2f(0.0);
   if (calm > 0.0) {
-    geometry = geometryWaves(rest, weights, calm * waveVariation(rest + waves.origin.xy), spacing);
+    geometry = geometryWaves(rest, weights, gain, spacing);
+  }
+
+  // The octaves' energy does not change with time, only their height.
+  var linger = 0.0;
+  if (geometry.energy > 0.0 && foamWind() > 0.0) {
+    let spread = WAVE_HEIGHT_STD * sqrt(geometry.energy);
+    for (var k: i32 = 0; k < FOAM_LINGER_SAMPLES; k++) {
+      let age = FOAM_LINGER_FIRST * pow(f32(k + 1), 1.3);
+      let z = pastHeight(rest, weights, gain, spacing, age) / spread;
+      linger = max(linger, whitecap(z) * exp(-age / FOAM_LIFETIME));
+    }
   }
 
   let local = vec4f(input.position.x, surface.r + geometry.height, input.position.z, 1.0);
@@ -456,6 +584,8 @@ fn vs(input: VertexInput) -> VertexOutput {
   out.slope = select(vec2f(0.0), geometry.slope, waves.normalFade > 0.0);
   out.dragged = geometry.dragged;
   out.spacing = spacing;
+  out.crest = vec2f(geometry.height, geometry.energy);
+  out.linger = linger;
   return out;
 }
 
@@ -466,6 +596,56 @@ fn fs_depth(input: VertexOutput) {
   if (textureSample(surfaceMap, surfaceSampler, surfaceUV(input.uv)).b <= 0.0) {
     discard;
   }
+}
+
+// The foam texture's density at `uv`: brightness × alpha. Sampled at an
+// explicit mip, from the pixel's footprint, so it may run after a discard.
+fn foamDensity(uv: vec2f, footprint: f32, tile: f32, bias: f32) -> f32 {
+  let size = f32(textureDimensions(foamTexture).x);
+  let lod = log2(max(footprint * size / tile, 1.0)) + bias;
+  let texel = textureSampleLevel(foamTexture, foamSampler, uv, lod);
+  return texel.r * texel.a;
+}
+
+// Foam 0..1 where density passes 1 − coverage, so more coverage grows the
+// patches out from the densest clumps.
+fn foamFrom(density: f32, coverage: f32) -> f32 {
+  let shown = smoothstep(1.0 - coverage, 1.0 - coverage + FOAM_SOFTNESS, density);
+  return shown * mix(FOAM_THIN, 1.0, density);
+}
+
+// Foam at `world` xz: whitecaps where the surface stands high, thinner foam
+// left around them, and streaks along the wind in a gale, each scaled by the
+// palette's foam amount and drifting downwind.
+fn waterFoam(world: vec2f, footprint: f32, crest: f32, linger: f32, water: WaterSample) -> f32 {
+  if (water.foam <= 0.0) {
+    return 0.0;
+  }
+  let drifted = world - waves.grid.yz;
+  let amount = foamWind() * water.foam;
+
+  let turned = vec2f(
+    drifted.x * FOAM_TURN.x - drifted.y * FOAM_TURN.y,
+    drifted.x * FOAM_TURN.y + drifted.y * FOAM_TURN.x
+  );
+  let density = 0.6 * foamDensity(drifted / FOAM_TILE_A, footprint, FOAM_TILE_A, 0.0)
+              + 0.4 * foamDensity(turned / FOAM_TILE_B, footprint, FOAM_TILE_B, 0.0);
+  // `linger` falls with age, so it sets both how much old foam covers and how
+  // opaque it still is.
+  let fresh = foamFrom(density, whitecap(crest) * amount);
+  let aged = foamFrom(density, linger * amount) * mix(FOAM_AGED_OPACITY, 1.0, linger);
+  var foam = max(fresh, aged);
+
+  let gusting = smoothstep(0.45, 0.7, gustField(world, waves.wind));
+  let streaky = smoothstep(STREAK_WIND_START, 1.0, waves.wind.z) * STREAK_COVERAGE * water.foam * gusting;
+  if (streaky > 0.0) {
+    let along = waves.wind.xy;
+    let across = vec2f(-along.y, along.x);
+    let streakUV = vec2f(dot(drifted, along) / STREAK_LENGTH, dot(drifted, across) / STREAK_WIDTH);
+    let streak = foamFrom(foamDensity(streakUV, footprint, STREAK_WIDTH, STREAK_MIP_BIAS), streaky);
+    foam = max(foam, streak * STREAK_OPACITY);
+  }
+  return foam * FOAM_OPACITY;
 }
 
 // Where a view-space point lands on screen, in 0..1 texture space.
@@ -506,10 +686,13 @@ fn fs_absorb(input: VertexOutput) -> @location(0) vec4f {
     discard;
   }
 
-  let N = waterNormal(input, water, footprint, ABSORB_OCTAVES).normal;
+  let surfaceWave = waterNormal(input, water, footprint, ABSORB_OCTAVES);
+  let N = surfaceWave.normal;
   let V = normalize(-input.viewPosition);
   let NoV = clamp(dot(N, V), 1e-4, 1.0);
-  let passed = (1.0 - waterFresnel(NoV)) * waterTransmittance(water, NoV);
+  // Foam hides the water beneath it.
+  let foam = waterFoam(input.rest + waves.origin.xy, footprint, surfaceWave.crest, input.linger, water);
+  let passed = (1.0 - waterFresnel(NoV)) * waterTransmittance(water, NoV) * (1.0 - foam);
   return vec4f(refractedScene(input, N, water.depth) * passed, water.coverage);
 }
 
@@ -523,7 +706,9 @@ fn fs_light(input: VertexOutput) -> @location(0) vec4f {
   let normal = surfaceWave.normal;
   // The unsummed octaves' slopes spread the microfacets: α² grows by their
   // variance, so the highlight they would have made widens rather than aliases.
-  let alpha = sqrt(min(pow(perceptualRoughnessToAlpha(params.roughness), 2.0) + surfaceWave.variance, 1.0));
+  let foam = waterFoam(input.rest + waves.origin.xy, footprint, surfaceWave.crest, input.linger, water);
+  let waterAlpha = sqrt(min(pow(perceptualRoughnessToAlpha(params.roughness), 2.0) + surfaceWave.variance, 1.0));
+  let alpha = mix(waterAlpha, perceptualRoughnessToAlpha(FOAM_ROUGHNESS), foam);
   let roughness = sqrt(alpha);
   let V = normalize(-viewPosition);
   let NoV = clamp(dot(normal, V), 1e-4, 1.0);
@@ -534,13 +719,14 @@ fn fs_light(input: VertexOutput) -> @location(0) vec4f {
   #include "./shader-lib/spot-light-shadow.frag.wgsl"
 
   // A dielectric whose diffuse lobe is the light the water scatters back: all
-  // of it over deep water, none where the bed shows through.
+  // of it over deep water, none where the bed shows through. Foam is a rough,
+  // bright diffuse layer over it.
   var surface: PbrSurface;
   surface.normal = normal;
   surface.specularNormal = normal;
   surface.geometricNormal = normal;
   surface.viewPosition = viewPosition;
-  surface.diffuseColor = water.scatter * (vec3f(1.0) - transmittance);
+  surface.diffuseColor = mix(water.scatter * (vec3f(1.0) - transmittance), vec3f(FOAM_ALBEDO), foam);
   surface.f0 = vec3f(WATER_F0);
   surface.alpha = alpha;
 
