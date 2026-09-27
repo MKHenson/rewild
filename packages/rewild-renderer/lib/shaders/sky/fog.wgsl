@@ -106,9 +106,12 @@ fn intersectSphereBoth(origin: vec3f, dir: vec3f, spherePos: vec3f, sphereRad: f
 const FOG_BASE_HEIGHT: f32 = 50.0;   // lowest fog ceiling, and the scene haze's reference height
 const HAZE_DENSITY: f32 = 0.00009;  // constant aerial-perspective haze
 
-// Cloudiness at which the sky counts as fully overcast for lighting purposes.
-// Cover beyond this adds no further occlusion — see getFogScatterColor().
+// Cloudiness bracket over which the fog darkens and greys. Below OVERCAST_START
+// the sky still has clear patches and the fog only dims slightly; cover beyond
+// OVERCAST_FULL adds no further occlusion — see getFogScatterColor().
+const OVERCAST_START: f32 = 0.85;
 const OVERCAST_FULL: f32 = 0.95;
+const BROKEN_CLOUD_DIM: f32 = 0.8;   // fog brightness at OVERCAST_START
 
 // A broad haze over the ground fog, for scene pixels only: it thickens with
 // foginess and reaches far above the ground layer, so distant terrain fades
@@ -254,15 +257,13 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     let foginess = object.foginess;
 
     // Cloud occlusion: clouds block sunlight from reaching the lower atmosphere.
-    // At 0% cloudiness = full sun. Squared curve, so light clouds have a modest
-    // effect and heavy clouds are dramatic.
-    //
-    // The drive plateaus at OVERCAST_FULL. The squared curve is still steepening
-    // at the top, so without the clamp the last 10% of cloudiness dropped fog
-    // brightness ~4x (0.24 → 0.06) and full overcast went almost black. Real
-    // overcast reads flat and grey, not dark — so total cover lights the fog the
-    // same as heavy cover.
-    let cloudOcclusion = mix(1.0, 0.05, pow(min(object.cloudiness, OVERCAST_FULL), 2.0));
+    // Broken cloud (below OVERCAST_START) only dims gently to BROKEN_CLOUD_DIM;
+    // the heavy drop to 0.05 happens across OVERCAST_START → OVERCAST_FULL, and
+    // total cover lights the fog the same as OVERCAST_FULL so it reads flat grey
+    // rather than black.
+    let brokenCloudDim = mix(1.0, BROKEN_CLOUD_DIM, saturate(object.cloudiness / OVERCAST_START));
+    let overcastDim = mix(1.0, 0.05 / BROKEN_CLOUD_DIM, smoothstep(OVERCAST_START, OVERCAST_FULL, object.cloudiness));
+    let cloudOcclusion = brokenCloudDim * overcastDim;
 
     // Combined sun strength: elevation + cloud cover
     let effectiveSunStrength = sunVisibility * cloudOcclusion;
@@ -284,12 +285,12 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     var fogColor = mix(FOG_COLOR_NIGHT, eveningColor, smoothstep(-0.16, 0.0, sunDotUp));
     fogColor = mix(fogColor, FOG_COLOR_DAY, smoothstep(0.0, 0.3, sunDotUp));
 
-    let stormFactor = saturate( (object.cloudiness - 0.8) / 0.2 );
+    let stormFactor = saturate( (object.cloudiness - OVERCAST_START) / (1.0 - OVERCAST_START) );
     fogColor = mix( fogColor, FOG_COLOR_STORM, stormFactor );
 
     // W1.3: shift horizon fog toward neutral gray under overcast (daytime only)
     let overcastDayFactor_fog = smoothstep(-0.05, 0.15, sunDotUp);
-    let overcastFactor_fog    = smoothstep(0.8, 0.9, object.cloudiness) * overcastDayFactor_fog;
+    let overcastFactor_fog    = smoothstep(OVERCAST_START, OVERCAST_FULL, object.cloudiness) * overcastDayFactor_fog;
     fogColor = mix(fogColor, vec3f(0.73, 0.73, 0.73), overcastFactor_fog);
 
     // Extreme overcast (0.9→1.0): desaturate toward luminance so the storm tint's
@@ -318,7 +319,7 @@ fn getFogScatterColor(dir: vec3f, vSunDirection: vec3f) -> vec3f {
     // Night sky-glow. Added rather than folded into the fogBrightness floor on
     // purpose: that floor is also what dims fog under daytime overcast (via
     // cloudOcclusion in effectiveSunStrength), so raising it would have brightened
-    // overcast days by ~6x as a side effect. Gating on nightFactor keeps the change
+    // overcast days as a side effect. Gating on nightFactor keeps the change
     // confined to the hours that are actually broken.
     let nightFactor = 1.0 - sunVisibility;
     let nightAmbient = FOG_NIGHT_AMBIENT * nightFactor;
