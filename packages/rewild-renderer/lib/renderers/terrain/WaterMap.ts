@@ -1,12 +1,9 @@
 import { Vector2 } from 'rewild-common';
 import { ClimateConfig } from './Biomes';
-import {
-  createClimateField,
-  oceanCoverage,
-  sampleContinent,
-} from './ClimateField';
+import { createClimateField } from './ClimateField';
+import { OCEAN_BODY_ID, createWaterSampler, sampleWater } from './Lakes';
 import { BIOME_MASK_STEP, paintMaskSize } from './PaintMask';
-import { MAX_WATER_TYPES, OCEAN_WATER, getWaterTypeIndex } from './Water';
+import { MAX_WATER_TYPES } from './Water';
 import { toFloat16 } from '../../utils/float16';
 
 // Where a chunk's water is, how high, and what kind.
@@ -39,7 +36,7 @@ export interface WaterMap {
   flow: Int8Array;
 }
 
-export const OCEAN_BODY_ID = 0;
+export { OCEAN_BODY_ID };
 
 /**
  * The water map for a chunk with LOD-0 `heights`, or null when no water shows
@@ -54,44 +51,60 @@ export function buildWaterMap(
   seaLevel: number,
   heights: Float32Array
 ): WaterMap | null {
-  const continent = climate.continent;
-  if (!continent) return null;
-
-  const oceanType = getWaterTypeIndex(climate, OCEAN_WATER);
-  if (oceanType < 0 || oceanType >= MAX_WATER_TYPES) return null;
+  if (!climate.continent && !climate.lakes) return null;
 
   const step = WATER_MAP_STEP;
   const size = paintMaskSize(chunkSize, step);
   const texels = size * size;
   const field = createClimateField(chunkSize, chunkSize, seed, offset, climate);
+  const sampler = createWaterSampler(field, seed, offset, seaLevel);
 
   const coverage = new Uint8Array(texels);
+  const levels = new Float64Array(texels);
+  const typeWeights = new Uint8Array(texels * 4);
+  const bodyIds = new Uint32Array(texels);
+  const types = new Float64Array(MAX_WATER_TYPES);
   let covered = false;
   for (let my = 0; my < size; my++) {
     for (let mx = 0; mx < size; mx++) {
-      const c = sampleContinent(field, mx * step, my * step);
-      const value = Math.round(oceanCoverage(continent, c) * 255);
-      coverage[mx + my * size] = value;
-      if (value > 0) covered = true;
+      const t = mx + my * size;
+      const value = Math.round(
+        sampleWater(sampler, mx * step, my * step, types) * 255
+      );
+      coverage[t] = value;
+      levels[t] = sampler.level;
+      bodyIds[t] = sampler.bodyId;
+      if (value > 0) {
+        covered = true;
+        for (let c = 0; c < MAX_WATER_TYPES; c++)
+          typeWeights[t * 4 + c] = Math.round(types[c] * 255);
+      }
     }
   }
   if (!covered) return null;
 
-  // Water shows where a covered texel's footprint dips below the level. The
+  // Water shows where a covered texel's footprint dips below its level. The
   // footprint reaches half a step either side, so no full-resolution hollow is
   // missed between texels.
   const reach = step >> 1;
   let wet = false;
-  for (let my = 0; my < size && !wet; my++) {
-    for (let mx = 0; mx < size && !wet; mx++) {
-      if (coverage[mx + my * size] === 0) continue;
+  let baseLevel = Infinity;
+  let maxLevel = -Infinity;
+  for (let my = 0; my < size; my++) {
+    for (let mx = 0; mx < size; mx++) {
+      const t = mx + my * size;
+      if (coverage[t] === 0) continue;
+      const level = levels[t];
+      if (level < baseLevel) baseLevel = level;
+      if (level > maxLevel) maxLevel = level;
+      if (wet) continue;
       const x0 = Math.max(0, mx * step - reach);
       const x1 = Math.min(chunkSize - 1, mx * step + reach);
       const y0 = Math.max(0, my * step - reach);
       const y1 = Math.min(chunkSize - 1, my * step + reach);
       for (let y = y0; y <= y1 && !wet; y++)
         for (let x = x0; x <= x1; x++)
-          if (heights[x + y * chunkSize] < seaLevel) {
+          if (heights[x + y * chunkSize] < level) {
             wet = true;
             break;
           }
@@ -99,23 +112,17 @@ export function buildWaterMap(
   }
   if (!wet) return null;
 
-  // Only the ocean exists so far, so every texel sits at sea level.
-  const baseLevel = seaLevel;
-  const maxLevel = seaLevel;
-
-  const level = new Uint16Array(texels).fill(toFloat16(0));
+  const level = new Uint16Array(texels);
   const relHeights = new Uint16Array(texels);
-  const typeWeights = new Uint8Array(texels * 4);
-  const bodyIds = new Uint32Array(texels).fill(OCEAN_BODY_ID);
   const flow = new Int8Array(texels * 2);
 
   for (let my = 0; my < size; my++) {
     for (let mx = 0; mx < size; mx++) {
       const t = mx + my * size;
+      level[t] = toFloat16(levels[t] - baseLevel);
       relHeights[t] = toFloat16(
         heights[mx * step + my * step * chunkSize] - baseLevel
       );
-      if (coverage[t] > 0) typeWeights[t * 4 + oceanType] = 255;
     }
   }
 

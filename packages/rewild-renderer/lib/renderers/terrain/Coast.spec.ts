@@ -214,6 +214,7 @@ describe('water scatter', () => {
     const climate = {
       ...climateFor(withRule({ waterType: 'lake' }), 2),
       water: DEFAULT_CLIMATE.water!.filter((type) => type.name !== 'lake'),
+      lakes: undefined,
     };
     expect(() => validateClimateLayers(climate)).toThrow(/water type 'lake'/);
   });

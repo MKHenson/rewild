@@ -3,6 +3,7 @@ import { SCATTER_LAYERS } from './ScatterLayers';
 import { TERRAIN_MATERIALS } from './TerrainMaterials';
 import {
   LAKE,
+  LAKE_WATER,
   OCEAN,
   SILTY_LAKE,
   TROPICAL_OCEAN,
@@ -248,6 +249,35 @@ export interface ContinentConfig {
   coastalMoistureReach?: number;
 }
 
+// Lakes: at most one per cell of a coarse grid, placed and levelled from the
+// seed alone so any chunk can rebuild every lake that reaches it. Distances are
+// in samples; divide metres by TERRAIN_METERS_PER_SAMPLE.
+export interface LakeConfig {
+  cellSize: number; // side of a lake cell
+  seedSalt: number;
+  chance: number; // 0..1: share of cells that try to hold a lake
+  radius: SelectorBand; // shore radius, picked per lake from this range
+  irregularity: number; // 0..0.5: how far the shore wanders from a circle, as a share of the radius
+  bank: number; // > 1: the bank reaches this multiple of the shore radius; the rim is sampled there
+  depth: SelectorBand; // metres at the centre, picked per lake from this range
+  margin: number; // metres the lip stands above the level
+  maxRimSlope: number; // degrees: rim height spread over the rim radius; a steeper site is rejected
+  // Past the bank, as a multiple of the shore radius: where a lip raised to
+  // hold the water eases back down to the ground.
+  moraine: number;
+  spacing: number; // shore kept between the banks of neighbouring lakes
+  // Omitted ⇒ a site too steep for a lake stays dry.
+  tarns?: TarnConfig;
+}
+
+// A small lake in a cirque, tried where a site is too steep for a lake. Its
+// level sits part way up the rim, and a lip dams the downhill side.
+export interface TarnConfig {
+  radius: SelectorBand; // shore radius, in samples
+  maxRimSlope: number; // degrees; steeper sites stay dry
+  lipShare: number; // 0..1: how far up the rim's spread the level sits
+}
+
 // Beaches: sand where the ocean is close, by height above sea level and slope.
 // Laid over the biome layers the way a layer covers the ones beneath it, and
 // thins the biomes' scatter by the same amount.
@@ -276,6 +306,8 @@ export interface ClimateConfig {
   water?: WaterType[];
   /** Omitted, or without a continent ⇒ no beaches. */
   coast?: CoastConfig;
+  /** Omitted ⇒ no lakes. Needs a 'lake' water type. */
+  lakes?: LakeConfig;
   biomes: BiomeParams[];
   cells: number[][];
 }
@@ -851,6 +883,45 @@ export const DEFAULT_CONTINENT: ContinentConfig = {
   coastalMoistureReach: 0.08,
 };
 
+// Small lakes on gentle ground, a couple of kilometres apart.
+export const DEFAULT_LAKES: LakeConfig = {
+  cellSize: 1600 / TERRAIN_METERS_PER_SAMPLE,
+  seedSalt: 70001,
+  chance: 1.0,
+  radius: {
+    from: 50 / TERRAIN_METERS_PER_SAMPLE,
+    to: 130 / TERRAIN_METERS_PER_SAMPLE,
+  },
+  irregularity: 0.25,
+  bank: 1.8,
+  depth: { from: 3, to: 8 },
+  margin: 1,
+  maxRimSlope: 8,
+  moraine: 1,
+  spacing: 40 / TERRAIN_METERS_PER_SAMPLE,
+  tarns: {
+    radius: {
+      from: 25 / TERRAIN_METERS_PER_SAMPLE,
+      to: 50 / TERRAIN_METERS_PER_SAMPLE,
+    },
+    maxRimSlope: 50,
+    lipShare: 0.2,
+  },
+};
+
+// Small oases, mostly ponds among the dunes, whose ground is rarely gentle
+// enough for a lake.
+export const ARID_LAKES: LakeConfig = {
+  ...DEFAULT_LAKES,
+  chance: 0.3,
+  maxRimSlope: 12,
+  radius: {
+    from: 30 / TERRAIN_METERS_PER_SAMPLE,
+    to: 70 / TERRAIN_METERS_PER_SAMPLE,
+  },
+  depth: { from: 2, to: 4 },
+};
+
 // One sand for the beach and the sea bed; the waterline's wet look comes from
 // the terrain shader.
 export const DEFAULT_COAST: CoastConfig = {
@@ -893,6 +964,7 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
   continent: DEFAULT_CONTINENT,
   water: [OCEAN, LAKE],
   coast: DEFAULT_COAST,
+  lakes: DEFAULT_LAKES,
   biomes: [PLAIN, FOREST, MOUNTAIN],
   cells: [
     [2], // cold → mountain
@@ -920,6 +992,7 @@ export const ARID_CLIMATE: ClimateConfig = {
   continent: DEFAULT_CONTINENT,
   water: [TROPICAL_OCEAN, SILTY_LAKE],
   coast: ARID_COAST,
+  lakes: ARID_LAKES,
   biomes: [BEACH_SAND, DESERT, DESERT_MOUNTAIN],
   cells: [
     [2], // cold → desert mountain
@@ -1008,6 +1081,51 @@ export function validateBiomeScatter(climate: ClimateConfig): void {
   }
 }
 
+export function validateLakes(climate: ClimateConfig): void {
+  const lakes = climate.lakes;
+  if (!lakes) return;
+  if (getWaterTypeIndex(climate, LAKE_WATER) < 0)
+    throw new Error(
+      `Climate has lakes but no '${LAKE_WATER}' water type to fill them.`
+    );
+  if (
+    !(lakes.radius.from > 0) ||
+    lakes.radius.to < lakes.radius.from ||
+    !(lakes.bank > 1) ||
+    !(lakes.irregularity >= 0 && lakes.irregularity <= 0.5) ||
+    !(lakes.chance >= 0 && lakes.chance <= 1) ||
+    !(lakes.depth.from > 0) ||
+    lakes.depth.to < lakes.depth.from ||
+    !(lakes.margin >= 0) ||
+    !(lakes.moraine >= 0) ||
+    !(lakes.spacing >= 0)
+  )
+    throw new Error(
+      'Lakes need a positive ascending radius and depth, bank > 1, irregularity within 0..0.5, chance within 0..1 and non-negative margin, moraine and spacing.'
+    );
+  const tarns = lakes.tarns;
+  if (
+    tarns &&
+    (!(tarns.radius.from > 0) ||
+      tarns.radius.to < tarns.radius.from ||
+      !(tarns.lipShare >= 0 && tarns.lipShare <= 1) ||
+      !(tarns.maxRimSlope >= lakes.maxRimSlope))
+  )
+    throw new Error(
+      "Tarns need a positive ascending radius, lipShare within 0..1 and a maxRimSlope no gentler than the lakes'."
+    );
+  // A lake must fit inside one cell's reach, or the neighbouring cells a chunk
+  // checks would miss it.
+  const reach =
+    Math.max(lakes.radius.to, tarns ? tarns.radius.to : 0) *
+    (1 + lakes.irregularity) *
+    (lakes.bank + lakes.moraine);
+  if (reach >= lakes.cellSize)
+    throw new Error(
+      `Lakes reach ${reach} samples, which must be less than the ${lakes.cellSize}-sample cell.`
+    );
+}
+
 // Fails loudly on a mis-authored table rather than rendering something subtly
 // wrong. Called wherever a climate is first resolved for splat generation.
 export function validateClimateLayers(climate: ClimateConfig): void {
@@ -1059,6 +1177,8 @@ export function validateClimateLayers(climate: ClimateConfig): void {
         'Coast bands must satisfy beachHeight > wetHeight > -seabedDepth.'
       );
   }
+
+  validateLakes(climate);
 
   const palette = getClimatePalette(climate);
   if (palette.length > MAX_SPLAT_LAYERS)

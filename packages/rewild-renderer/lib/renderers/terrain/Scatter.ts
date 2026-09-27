@@ -1,4 +1,4 @@
-import { Vector2 } from 'rewild-common';
+import { Vector2, hash01, lerp, mixHash } from 'rewild-common';
 import { ClimateConfig, getClimateScatterLayers } from './Biomes';
 import {
   createBiomeResolver,
@@ -30,7 +30,8 @@ import {
   ScatterKillSet,
   scatterKillKey,
 } from './ScatterKillSet';
-import { heightGradientAt, slopeDegreesAt, waterCoverageAt } from './Splat';
+import { createWaterSampler, sampleWater } from './Lakes';
+import { heightGradientAt, slopeDegreesAt } from './Splat';
 import { MAX_WATER_TYPES, getWaterTypeIndex } from './Water';
 
 // Per-chunk scatter placement: which instances of which layer stand where.
@@ -95,7 +96,7 @@ export interface ScatterChunkOptions {
   region?: { x0: number; y0: number; x1: number; y1: number } | null;
   /** Fill `ScatterInstances.ids`. */
   withIds?: boolean;
-  /** World height of the sea, which beaches are measured from. */
+  /** World height of the sea, which beaches and lakes are measured from. */
   seaLevel?: number;
 }
 
@@ -110,12 +111,6 @@ function compositeDensity(
   return (biome + painted * (1 - biome)) * (1 - exclude);
 }
 
-function mix(h: number): number {
-  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
-  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
-  return (h ^ (h >>> 16)) >>> 0;
-}
-
 // A cell's hash, from its global cell coordinates rather than anything chunk-
 // local — the whole basis of the seam-freeness above.
 function cellHash(
@@ -127,16 +122,7 @@ function cellHash(
   let h = Math.imul(cellX | 0, 0x9e3779b1);
   h = Math.imul(h ^ (cellY | 0), 0x85ebca6b);
   h = Math.imul(h ^ (slot | 0), 0xc2b2ae35);
-  return mix(h ^ (seed | 0));
-}
-
-/** The `index`-th independent 0..1 value derived from a cell hash. */
-function hash01(hash: number, index: number): number {
-  return mix(hash + Math.imul(index | 0, 0x9e3779b1)) / 4294967296;
-}
-
-function lerp(from: number, to: number, t: number): number {
-  return from + (to - from) * t;
+  return mixHash(h ^ (seed | 0));
 }
 
 // Bilinear, because a candidate lands between samples and snapping it to the
@@ -306,7 +292,7 @@ export function scatterChunk(
   const region = options?.region ?? null;
   const withIds = options?.withIds === true;
   const seaLevel = options?.seaLevel ?? 0;
-  const coast = climate.continent ? (climate.coast ?? null) : null;
+  const coast = climate.continent ? climate.coast ?? null : null;
   const layerNames = mask
     ? getScatterLayerOrder().filter(
         (name, slot) =>
@@ -316,6 +302,7 @@ export function scatterChunk(
   if (layerNames.length === 0) return [];
 
   const field = createClimateField(chunkSize, chunkSize, seed, offset, climate);
+  const water = createWaterSampler(field, seed, offset, seaLevel);
   const resolver = createBiomeResolver(field, options?.biomeMask ?? null);
   const noiseFields = createScatterNoiseFields(seed, offset, climate);
 
@@ -429,9 +416,9 @@ export function scatterChunk(
         // here, so a climate transition fades scatter in rather than switching
         // it on at the border. Paint ignores the water conditions.
         const activeCount = hasRule ? resolveActiveBiomes(resolver, sx, sy) : 0;
-        const depth = seaLevel - worldHeight;
         let density = 0;
         let waterCoverage = -1;
+        let depth = 0;
         let beach = 0;
         for (let b = 0; b < activeCount; b++) {
           const biomeIndex = resolver.biomes[b];
@@ -459,19 +446,21 @@ export function scatterChunk(
           );
           if (ruleDensity <= 0) continue;
 
-          // The continent noise is sampled once per candidate, and only once
-          // some rule wants to grow here.
+          // The water is sampled once per candidate, and only once some rule
+          // wants to grow here.
           if (waterCoverage < 0) {
-            waterCoverage = waterCoverageAt(field, sx, sy, _waterTypes);
+            waterCoverage = sampleWater(water, sx, sy, _waterTypes);
+            depth = water.level - worldHeight;
+            const heightAboveSea = worldHeight - seaLevel;
             beach =
               coast &&
-              waterCoverage > 0 &&
-              -depth < coast.beachHeight + coast.blend
+              water.ocean > 0 &&
+              heightAboveSea < coast.beachHeight + coast.blend
                 ? resolveCoastWeights(
                     coast,
-                    -depth,
+                    heightAboveSea,
                     slope,
-                    waterCoverage,
+                    water.ocean,
                     _coastWeights
                   )
                 : 0;

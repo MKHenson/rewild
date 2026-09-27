@@ -153,28 +153,44 @@ same way as temperature and moisture.
 
 ### Lakes
 
-The world is split into a coarse grid of **lake cells**, for example 4 × 4 chunks each. The seed
-decides if a cell holds a lake, and where its centre is. Any chunk can compute every lake that
-touches it:
+The world is split into a coarse grid of **lake cells** (`ClimateConfig.lakes`, 1.6 km in the
+default climate). The seed decides if a cell holds a lake, and where its centre is. Any chunk can
+compute every lake that touches it (`Lakes.ts`):
 
-1. Take the lake centre and a noise-distorted radius from the cell's seed.
-2. Sample the pre-lake terrain at a fixed ring of points around the lake. Terrain is procedural,
-   so any point can be sampled.
-3. Set the lake level to the lowest ring height minus a margin. This makes sure that land
+1. Take the lake centre, a radius and a depth from the cell's hash. The shore wanders from a circle
+   by a few sine harmonics with seeded phases.
+2. Sample the pre-lake terrain at 24 rim points on the top of the bank. The ground sampler reads the
+   un-eroded, uncarved height at any point, so no neighbouring chunk is needed.
+3. Set the lake level to the lowest rim height minus a margin. This makes sure that land
    surrounds the water on all sides.
-4. Carve the lake bed below that level with a smooth depth profile.
-5. Write coverage, level and the "lake" type weight into the water map.
+4. Carve the terrain after erosion: a bowl `level − depth·(1 − d²)` inside the shore, rising
+   across the bank to the natural ground or the **lip** (`level + margin`), whichever is higher, then
+   easing back to the natural ground over the `moraine` beyond the bank. The lip keeps the water in
+   wherever the ground between rim samples, or after erosion, dips below the level. Every chunk that
+   shares a sample carves it the same way.
+5. Write coverage, level, the body ID and the "lake" type weight into the water map. Coverage is
+   full to halfway up the bank and fades out at its top. The level reaches a little past the bank,
+   so the filtered surface does not sag at the shore.
 
-Reject a cell's lake if the ground is too steep or the ring heights differ too much.
+A lake is rejected when any rim point is within the ocean's coverage. When the spread of its rim
+heights, over the rim radius, is steeper than `maxRimSlope`, the site tries a **tarn** instead: a
+smaller radius from `tarns.radius`, the rim sampled again, and rejected if steeper than
+`tarns.maxRimSlope`. A tarn's level sits `lipShare` of the way up its rim's spread, so it sits in a
+cirque with a steep wall uphill, and the lip dams the downhill side. This is how lakes reach the
+mountains, which are too steep for a lake anywhere.
 
-**Cells around the chunk.** A lake can reach past its own cell. A chunk checks its own lake cell
-and the 8 cells around it. The maximum lake radius, including the ring, is less than one cell, so
-the 3 × 3 check always finds every lake that touches the chunk.
+**Cells around the chunk.** A lake can reach past its own cell. Its reach, including the bank, is
+less than one cell, so a chunk finds every lake by checking the cells that overlap its own bounds
+grown by that reach.
 
-**Spacing.** Two lakes at different levels must not overlap, or the level would jump. Each lake
-keeps a minimum distance from the lakes in the neighbouring cells: the two radii plus a shore
-margin. When two lakes are too close, the lake with the lower cell hash is removed. Every chunk
-makes the same choice, because it uses only the seed.
+**Spacing.** Two lakes at different levels must not overlap, or the level would jump. The banks
+of two lakes keep `spacing` apart. When two lakes are too close, the lake with the lower cell hash
+is removed. Two reaches are each under a cell, so only cells up to two away can conflict. Every
+chunk makes the same choice, because it uses only the seed.
+
+**Scatter and beaches.** Scatter measures water depth from the lake level, so land layers stay out
+of lakes and `underwater` layers grow in them. Beaches and the sea bed material follow the ocean
+only.
 
 ### Where a lake meets the ocean
 

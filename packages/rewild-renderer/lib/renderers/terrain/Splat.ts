@@ -20,7 +20,6 @@ import {
 import { resolveCoastWeights, resolveLayerWeights } from './LayerWeights';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { PaintMask } from './PaintMask';
-import { OCEAN_WATER, getWaterTypeIndex } from './Water';
 
 // World units between adjacent heightmap samples — the run that the rise between
 // neighbours is taken over, so the slope below comes out in real degrees.
@@ -62,27 +61,6 @@ export interface SplatOptions {
   region?: SplatRegion;
   /** World height of the sea, which the beach bands are measured from. */
   seaLevel?: number;
-}
-
-/**
- * The water map's coverage at chunk-local sample (x, y), 0..1, with the
- * palette's type weights written into `out`. Its surface is the sea level.
- */
-export function waterCoverageAt(
-  field: ClimateField,
-  x: number,
-  y: number,
-  out: Float64Array
-): number {
-  out.fill(0);
-  const continent = field.climate.continent;
-  if (!continent) return 0;
-  const coverage = oceanCoverage(continent, sampleContinent(field, x, y));
-  if (coverage > 0) {
-    const ocean = getWaterTypeIndex(field.climate, OCEAN_WATER);
-    if (ocean >= 0 && ocean < out.length) out[ocean] = 1;
-  }
-  return coverage;
 }
 
 /**

@@ -6,6 +6,7 @@ export * from './Perlin';
 export * from './Euler';
 export * from './EulerOrder';
 export * from './Frustum';
+export * from './Hash';
 export * from './Line';
 export * from './MathUtils';
 export * from './Matrix3';

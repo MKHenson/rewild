@@ -1,13 +1,15 @@
 import { Perlin, Vector2 } from 'rewild-common';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
-import { ClimateConfig, Deformation } from './Biomes';
+import { ClimateConfig, Deformation, validateLakes } from './Biomes';
 import {
+  ClimateField,
   continentLandWeight,
   continentSeabedDepth,
   createClimateField,
   resolveBiomeWeights,
   sampleContinent,
 } from './ClimateField';
+import { carveLakes } from './Lakes';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -37,7 +39,8 @@ export function generateNoiseMap(
   if (octaves < 1) octaves = 1;
   if (persistence < 0) persistence = 0;
   if (lacunarity < 1) lacunarity = 1;
-  if (width <= 0 || height <= 0) throw new Error('Width and height must be positive integers.');
+  if (width <= 0 || height <= 0)
+    throw new Error('Width and height must be positive integers.');
   if (scale <= 0) throw new Error('Scale must be a positive number.');
 
   const rng = seededRandom(seed);
@@ -59,8 +62,10 @@ export function generateNoiseMap(
       let noiseValue = 0;
 
       for (let o = 0; o < octaves; o++) {
-        const sampleX = ((x - halfWidth + octaveOffsets[o].x) / scale) * frequency;
-        const sampleY = ((y - halfHeight - octaveOffsets[o].y) / scale) * frequency;
+        const sampleX =
+          ((x - halfWidth + octaveOffsets[o].x) / scale) * frequency;
+        const sampleY =
+          ((y - halfHeight - octaveOffsets[o].y) / scale) * frequency;
 
         noiseValue += perlin.simplex2(sampleX, sampleY) * amplitude;
 
@@ -114,7 +119,11 @@ const GRAD = new Float64Array(2);
 // and the normals cannot shade.
 const RISER_MIN = 0.02;
 
-function smoothstepBetween(edge0: number, edge1: number, value: number): number {
+function smoothstepBetween(
+  edge0: number,
+  edge1: number,
+  value: number
+): number {
   const t = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
 }
@@ -240,8 +249,10 @@ function evalDeformation(
       let noiseValue = 0;
 
       for (let o = 0; o < def.octaves; o++) {
-        const sampleX = ((x - halfWidth + offsetsX[o]) / def.noiseScale) * frequency;
-        const sampleY = ((y - halfHeight - offsetsY[o]) / def.noiseScale) * frequency;
+        const sampleX =
+          ((x - halfWidth + offsetsX[o]) / def.noiseScale) * frequency;
+        const sampleY =
+          ((y - halfHeight - offsetsY[o]) / def.noiseScale) * frequency;
 
         noiseValue += perlin.simplex2(sampleX, sampleY) * amplitude;
 
@@ -268,8 +279,10 @@ function evalDeformation(
       let weight = 1;
 
       for (let o = 0; o < def.octaves; o++) {
-        const sampleX = ((x - halfWidth + offsetsX[o]) / def.noiseScale) * frequency;
-        const sampleY = ((y - halfHeight - offsetsY[o]) / def.noiseScale) * frequency;
+        const sampleX =
+          ((x - halfWidth + offsetsX[o]) / def.noiseScale) * frequency;
+        const sampleY =
+          ((y - halfHeight - offsetsY[o]) / def.noiseScale) * frequency;
 
         // 1 where the noise crosses zero, 0 at its extremes: the ridge is the
         // crossing, not the peak.
@@ -302,8 +315,10 @@ function evalDeformation(
       let noiseValue = 0;
 
       for (let o = 0; o < def.octaves; o++) {
-        const sampleX = ((x - halfWidth + offsetsX[o]) / def.noiseScale) * frequency;
-        const sampleY = ((y - halfHeight - offsetsY[o]) / def.noiseScale) * frequency;
+        const sampleX =
+          ((x - halfWidth + offsetsX[o]) / def.noiseScale) * frequency;
+        const sampleY =
+          ((y - halfHeight - offsetsY[o]) / def.noiseScale) * frequency;
 
         noiseValue += perlin.simplex2(sampleX, sampleY) * amplitude;
 
@@ -346,8 +361,10 @@ function evalDeformation(
       let dy = 0;
 
       for (let o = 0; o < def.octaves; o++) {
-        const sampleX = ((x - halfWidth + offsetsX[o]) / def.noiseScale) * frequency;
-        const sampleY = ((y - halfHeight - offsetsY[o]) / def.noiseScale) * frequency;
+        const sampleX =
+          ((x - halfWidth + offsetsX[o]) / def.noiseScale) * frequency;
+        const sampleY =
+          ((y - halfHeight - offsetsY[o]) / def.noiseScale) * frequency;
 
         const value = perlin.simplex2d(sampleX, sampleY, GRAD);
 
@@ -356,7 +373,8 @@ function evalDeformation(
         // flat ground is left alone.
         const slopeX = dx / prep.maxSlope;
         const slopeY = dy / prep.maxSlope;
-        const damp = 1 / (1 + def.erosion * (slopeX * slopeX + slopeY * slopeY));
+        const damp =
+          1 / (1 + def.erosion * (slopeX * slopeX + slopeY * slopeY));
 
         sum += value * amplitude * damp;
         dx += GRAD[0] * amplitude * frequency * damp;
@@ -438,7 +456,9 @@ function biomeHeight(
 function validateClimate(climate: ClimateConfig): void {
   for (const biome of climate.biomes) {
     if (!biome.deformations || biome.deformations.length === 0)
-      throw new Error(`Biome '${biome.name}' must have at least one deformation.`);
+      throw new Error(
+        `Biome '${biome.name}' must have at least one deformation.`
+      );
     for (const def of biome.deformations) {
       if (
         (def.kind === 'fbm' ||
@@ -455,7 +475,9 @@ function validateClimate(climate: ClimateConfig): void {
           `Biome '${biome.name}' ridged deformation sharpness must be a positive number.`
         );
       if (def.kind === 'terrace' && def.steps < 1)
-        throw new Error(`Biome '${biome.name}' terrace deformation needs at least one step.`);
+        throw new Error(
+          `Biome '${biome.name}' terrace deformation needs at least one step.`
+        );
       if (def.kind === 'eroded' && def.erosion < 0)
         throw new Error(
           `Biome '${biome.name}' eroded deformation erosion must not be negative.`
@@ -474,9 +496,13 @@ function validateClimate(climate: ClimateConfig): void {
             'Every pass widens the margin the height map generates for itself.'
         );
       if (e.talusDeg <= 0 || e.talusDeg >= 90)
-        throw new Error(`Biome '${biome.name}' erosion talusDeg must be between 0 and 90.`);
+        throw new Error(
+          `Biome '${biome.name}' erosion talusDeg must be between 0 and 90.`
+        );
       if (e.strength <= 0 || e.strength > 1)
-        throw new Error(`Biome '${biome.name}' erosion strength must be above 0 and at most 1.`);
+        throw new Error(
+          `Biome '${biome.name}' erosion strength must be above 0 and at most 1.`
+        );
     }
   }
   const continent = climate.continent;
@@ -488,12 +514,22 @@ function validateClimate(climate: ClimateConfig): void {
       continent.shelfWidth <= 0 ||
       continent.slopeWidth <= 0
     )
-      throw new Error('Continent blend, shelf and slope widths must be positive numbers.');
+      throw new Error(
+        'Continent blend, shelf and slope widths must be positive numbers.'
+      );
     if (continent.shelfDepth < 0 || continent.oceanDepth < continent.shelfDepth)
-      throw new Error('Continent depths must satisfy 0 <= shelfDepth <= oceanDepth.');
-    if (continent.coastalMoisture && !((continent.coastalMoistureReach ?? 0) > 0))
-      throw new Error('Continent coastalMoisture needs a positive coastalMoistureReach.');
+      throw new Error(
+        'Continent depths must satisfy 0 <= shelfDepth <= oceanDepth.'
+      );
+    if (
+      continent.coastalMoisture &&
+      !((continent.coastalMoistureReach ?? 0) > 0)
+    )
+      throw new Error(
+        'Continent coastalMoisture needs a positive coastalMoistureReach.'
+      );
   }
+  validateLakes(climate);
 
   const tBands = climate.temperature.cuts.length + 1;
   const mBands = climate.moisture.cuts.length + 1;
@@ -501,12 +537,128 @@ function validateClimate(climate: ClimateConfig): void {
     throw new Error(`Climate cells must have ${tBands} temperature rows.`);
   for (const row of climate.cells) {
     if (row.length !== mBands)
-      throw new Error(`Climate cell rows must have ${mBands} moisture entries.`);
+      throw new Error(
+        `Climate cell rows must have ${mBands} moisture entries.`
+      );
     for (const biomeIndex of row) {
       if (biomeIndex < 0 || biomeIndex >= climate.biomes.length)
-        throw new Error(`Climate cell biome index ${biomeIndex} is out of range.`);
+        throw new Error(
+          `Climate cell biome index ${biomeIndex} is out of range.`
+        );
     }
   }
+}
+
+// Everything one height sample reads, built once per field so the sample loop
+// allocates nothing. blendedHeight leaves the biomes it blended, and the land
+// weight, in the scratch fields for the caller.
+export interface HeightContext {
+  perlin: Perlin;
+  field: ClimateField;
+  prepared: PreparedDeformation[][];
+  offsetX: number;
+  offsetY: number;
+  seaLevel: number;
+  activeBiomes: Int32Array;
+  activeWeights: Float64Array;
+  activeCount: number;
+  land: number;
+}
+
+function createHeightContext(
+  width: number,
+  height: number,
+  seed: number,
+  offset: Vector2,
+  climate: ClimateConfig,
+  seaLevel: number
+): HeightContext {
+  // Fbm bases sharing seedSalt 0 all derive the same offsets, which keeps
+  // neighbouring biomes' large-scale relief aligned across transition bands.
+  const prepared: PreparedDeformation[][] = climate.biomes.map((biome) =>
+    biome.deformations.map((def) => prepareDeformation(def, seed, offset))
+  );
+  return {
+    perlin: new Perlin(seed),
+    field: createClimateField(width, height, seed, offset, climate),
+    prepared,
+    offsetX: offset.x,
+    offsetY: offset.y,
+    seaLevel,
+    activeBiomes: new Int32Array(4),
+    activeWeights: new Float64Array(4),
+    activeCount: 0,
+    land: 1,
+  };
+}
+
+// The un-eroded height at field sample (x, y): the biomes' heights blended over
+// the (up to four) neighbouring climate cells, then lowered onto the sea bed by
+// the continent. Open ocean has no land height, so its biomes are skipped.
+function blendedHeight(ctx: HeightContext, x: number, y: number): number {
+  const { field, prepared } = ctx;
+  const biomes = field.climate.biomes;
+  const activeCount = resolveBiomeWeights(
+    field,
+    x,
+    y,
+    ctx.activeBiomes,
+    ctx.activeWeights
+  );
+
+  const continent = field.climate.continent;
+  let land = 1;
+  let seabed = 0;
+  if (continent) {
+    const c = sampleContinent(field, x, y);
+    land = continentLandWeight(continent, c);
+    seabed = ctx.seaLevel - continentSeabedDepth(continent, c);
+  }
+
+  let h = 0;
+  for (let i = 0; i < activeCount && land > 0; i++) {
+    const biomeIndex = ctx.activeBiomes[i];
+    h +=
+      ctx.activeWeights[i] *
+      biomeHeight(
+        ctx.perlin,
+        biomes[biomeIndex].deformations,
+        prepared[biomeIndex],
+        x,
+        y,
+        field.halfWidth,
+        field.halfHeight,
+        ctx.offsetX,
+        ctx.offsetY
+      );
+  }
+
+  ctx.activeCount = activeCount;
+  ctx.land = land;
+  return seabed + land * (h - seabed);
+}
+
+/**
+ * Reads the un-eroded, uncarved ground anywhere in the world by lake space
+ * position (see Lakes.ts). Built once per call site, then sampled freely.
+ */
+export type GroundSampler = HeightContext;
+
+export function createGroundSampler(
+  seed: number,
+  climate: ClimateConfig,
+  seaLevel: number
+): GroundSampler {
+  return createHeightContext(0, 0, seed, new Vector2(0, 0), climate, seaLevel);
+}
+
+// A zero-size field at offset zero puts sample (u, v) at lake space (u, v).
+export function sampleGround(
+  sampler: GroundSampler,
+  u: number,
+  v: number
+): number {
+  return blendedHeight(sampler, u, v);
 }
 
 /**
@@ -629,10 +781,10 @@ export function generateBiomeBlendedHeightMap(
   climate: ClimateConfig,
   seaLevel: number = 0
 ): Float32Array {
-  if (width <= 0 || height <= 0) throw new Error('Width and height must be positive integers.');
+  if (width <= 0 || height <= 0)
+    throw new Error('Width and height must be positive integers.');
   validateClimate(climate);
 
-  const perlin = new Perlin(seed);
   const biomes = climate.biomes;
 
   // Thermal erosion has to see past the edge of what it returns, because a pass
@@ -651,99 +803,45 @@ export function generateBiomeBlendedHeightMap(
   // is surfaced with always agree with the biome that shaped it. Both centre on
   // half their own size, so a grown field puts its inner region on exactly the
   // world positions the ungrown one would have.
-  const field = createClimateField(fieldWidth, fieldHeight, seed, offset, climate);
+  const ctx = createHeightContext(
+    fieldWidth,
+    fieldHeight,
+    seed,
+    offset,
+    climate,
+    seaLevel
+  );
 
   // Per-cell weathering, blended off the same weights the height is, so a biome
   // that asks for none never picks up its neighbour's scree.
   const talusHeight = margin > 0 ? new Float32Array(heights.length) : null;
   const erodeStrength = margin > 0 ? new Float32Array(heights.length) : null;
 
-  // Precompute each biome's per-deformation constants (octave offsets and
-  // normalisation for fbm, orientation and warp offset for dunes) once, before
-  // the sample loop, so the loop reads them and allocates nothing. Fbm bases
-  // sharing seedSalt 0 all derive the same offsets, which keeps neighbouring
-  // biomes' large-scale relief aligned across transition bands — what the old
-  // single shared-offset stream did, now expressed per field.
-  const prepared: PreparedDeformation[][] = new Array(biomes.length);
-  for (let b = 0; b < biomes.length; b++) {
-    const defs = biomes[b].deformations;
-    const row: PreparedDeformation[] = new Array(defs.length);
-    for (let d = 0; d < defs.length; d++)
-      row[d] = prepareDeformation(defs[d], seed, offset);
-    prepared[b] = row;
-  }
-
-  const halfWidth = fieldWidth / 2;
-  const halfHeight = fieldHeight / 2;
-
-  const continent = climate.continent;
-
-  // Scratch state reused across samples (no allocation in the sample loop).
-  const activeBiomes = new Int32Array(4);
-  const activeWeights = new Float64Array(4);
-
   for (let y = 0; y < fieldHeight; y++) {
     for (let x = 0; x < fieldWidth; x++) {
-      // Bilinear weights over the (up to four) neighbouring climate cells;
-      // cells that share a biome merge, so each biome is evaluated at most once.
-      const activeCount = resolveBiomeWeights(
-        field,
-        x,
-        y,
-        activeBiomes,
-        activeWeights
-      );
-
-      // Open ocean has no land height to blend, so its biomes are never
-      // evaluated.
-      let land = 1;
-      let seabed = 0;
-      if (continent) {
-        const c = sampleContinent(field, x, y);
-        land = continentLandWeight(continent, c);
-        seabed = seaLevel - continentSeabedDepth(continent, c);
-      }
-
-      let h = 0;
-      let talus = 0;
-      let strength = 0;
-      // Weight of the biomes at this cell that weather at all. The repose
-      // angle is averaged over these and not over every biome present, or a
-      // cell half in an unweathered biome would read as twice as steep a
-      // repose and never slide.
-      let erosionWeight = 0;
-      for (let i = 0; i < activeCount && land > 0; i++) {
-        const biomeIndex = activeBiomes[i];
-        const weight = activeWeights[i];
-        h +=
-          weight *
-          biomeHeight(
-            perlin,
-            biomes[biomeIndex].deformations,
-            prepared[biomeIndex],
-            x,
-            y,
-            halfWidth,
-            halfHeight,
-            offset.x,
-            offset.y
-          );
-
-        if (talusHeight) {
-          const e = biomes[biomeIndex].erosion;
-          if (e) {
-            // The repose angle as a height difference between neighbouring
-            // samples, which is the form the pass compares against.
-            talus += weight * Math.tan(e.talusDeg * DEG2RAD) * TERRAIN_METERS_PER_SAMPLE;
-            strength += weight * e.strength;
-            erosionWeight += weight;
-          }
-        }
-      }
-
       const cell = x + y * fieldWidth;
-      heights[cell] = seabed + land * (h - seabed);
+      heights[cell] = blendedHeight(ctx, x, y);
+
       if (talusHeight && erodeStrength) {
+        // Weight of the biomes at this cell that weather at all. The repose
+        // angle is averaged over these and not over every biome present, or a
+        // cell half in an unweathered biome would read as twice as steep a
+        // repose and never slide.
+        let talus = 0;
+        let strength = 0;
+        let erosionWeight = 0;
+        for (let i = 0; i < ctx.activeCount && ctx.land > 0; i++) {
+          const e = biomes[ctx.activeBiomes[i]].erosion;
+          if (!e) continue;
+          const weight = ctx.activeWeights[i];
+          // The repose angle as a height difference between neighbouring
+          // samples, which is the form the pass compares against.
+          talus +=
+            weight * Math.tan(e.talusDeg * DEG2RAD) * TERRAIN_METERS_PER_SAMPLE;
+          strength += weight * e.strength;
+          erosionWeight += weight;
+        }
+
         // A cell blended between a weathered biome and an unweathered one has
         // a share of the strength, but the repose angle of the weathered ones
         // alone: averaging the angle against a zero would make it steeper the
@@ -754,12 +852,21 @@ export function generateBiomeBlendedHeightMap(
     }
   }
 
+  let out: Float32Array = heights;
   if (margin > 0 && talusHeight && erodeStrength) {
-    erodeThermal(heights, fieldWidth, fieldHeight, margin, talusHeight, erodeStrength);
-    return extractCentre(heights, fieldWidth, width, height, margin);
+    erodeThermal(
+      heights,
+      fieldWidth,
+      fieldHeight,
+      margin,
+      talusHeight,
+      erodeStrength
+    );
+    out = extractCentre(heights, fieldWidth, width, height, margin);
   }
 
-  return heights;
+  carveLakes(out, width, height, seed, offset, climate, seaLevel);
+  return out;
 }
 
 /** The inner `width` x `height` of a field grown by `margin` on every side. */
