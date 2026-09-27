@@ -13,6 +13,15 @@ export function registerWaterDebugCommands(renderer: Renderer) {
     );
   };
 
+  (window as any).setWaterFoamDebug = (enabled = true) => {
+    renderer.terrainRenderer.waterFoamDebug = enabled;
+    console.log(
+      `setWaterFoamDebug(${enabled}) — ${
+        enabled ? 'water shows its raw foam coverage in grey' : 'water shaded'
+      }. Grey where no foam shows means the foam texture hides it; black means the ocean makes none.`
+    );
+  };
+
   (window as any).setWaterWaveNormals = (enabled = true) => {
     renderer.terrainRenderer.waterWaveNormals = enabled;
     console.log(

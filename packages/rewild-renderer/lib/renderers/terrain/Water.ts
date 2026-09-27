@@ -19,9 +19,10 @@ export interface WaterType {
   // Extinction per metre from suspended sediment, the same on every channel.
   // Hides the bed without tinting it.
   turbidity: number;
-  // 0..1: how strongly the wind raises waves on this water.
+  // 0..1: scale on the ocean's waves on this water.
   waveResponse: number;
-  // Dominant wavelength in metres at full wind: long swells or short ripples.
+  // Metres: this water takes every ocean cascade up to 8 × this long, fading
+  // out by 16 × (cascadeWeight), so long swells or only short ripples.
   waveScale: number;
   // 0..1: how much crest foam the wind raises.
   foam: number;
@@ -44,7 +45,7 @@ export const OCEAN: WaterType = {
   absorption: [0.45, 0.07, 0.03],
   turbidity: 0.04,
   waveResponse: 1,
-  waveScale: 30,
+  waveScale: 100,
   foam: 1,
   shoreFoamWidth: 1.5,
   normalStrength: 1,
