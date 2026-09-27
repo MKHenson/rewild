@@ -44,6 +44,7 @@ import { BiomePaintToolbar } from './BiomePaintToolbar';
 import { TerrainBiomePaintController } from './utils/TerrainBiomePaintController';
 import { scatterPaintStore } from 'src/ui/stores/ScatterPaintStore';
 import { ScatterPaintToolbar } from './ScatterPaintToolbar';
+import { PositionReadout } from './PositionReadout';
 import { TerrainScatterPaintController } from './utils/TerrainScatterPaintController';
 import { loadCameraState, saveCameraState } from './utils/CameraPersistence';
 import {
@@ -896,7 +897,10 @@ export class EditorViewport extends Component<Props> {
       <InfoBox variant="error" title="Could not open the level" />
     ) as InfoBox;
     const container = (
-      <div class="viewport-container">{pane3D}</div>
+      <div class="viewport-container">
+        {pane3D}
+        <PositionReadout renderer={this.renderer} />
+      </div>
     ) as HTMLDivElement;
 
     return () => {
