@@ -10,8 +10,9 @@ import { ShaderDefines, wgslI32 } from '../../utils/shaderDefines';
  * put the player on the surface everyone sees.
  */
 interface WaterQualityTier {
-  /** Octaves the light draw's normal sums, counting only those with any
-   *  height in the water drawn. Loop bound; needs a rebuild. */
+  /** Octaves the light draw's pixel normal sums, counting only those with
+   *  any height in the water drawn that the grid does not already carry.
+   *  Loop bound; needs a rebuild. */
   normalOctaves: number;
   /** Octaves the absorb draw's normal sums. It only feeds Fresnel, where
    *  fine detail barely shows. */

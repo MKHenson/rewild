@@ -44,6 +44,22 @@ fn windNoise(p: vec2f) -> f32 {
   );
 }
 
+// The gust field at world xz, 0..1, blown downwind: the point a sample reads
+// moves upwind through it over time, so its features come toward the viewer
+// with the wind. Three octaves, each offset so none lines up with another.
+// The finest is blown slower than the gusts it rides in, so it drifts through
+// them instead of travelling in lockstep — one field moving as a block reads
+// as a wave train, and this is what breaks it into eddies. Water reads the
+// same field, so one gust crosses a lake and then the wood beyond it.
+fn gustField(world: vec2f, wind: vec4f) -> f32 {
+  let drift = wind.xy * (wind.w * GUST_SPEED);
+  let p = (world - drift) / GUST_LENGTH;
+  let e = (world - drift * EDDY_DRIFT) / GUST_LENGTH;
+  return 0.5 * windNoise(p) +
+    0.3 * windNoise(p * 2.7 + vec2f(37.0, 91.0)) +
+    0.2 * windNoise(e * 6.3 + vec2f(-71.0, 23.0));
+}
+
 // `wind`: xy = world-space direction the air moves, z = strength 0..1, w =
 // the wind clock in full-wind seconds. `params`: x = metres of sway at bend 1
 // in full wind, y = sway cycles per full-wind second, z = flutter as a
@@ -69,19 +85,9 @@ fn scatterWindOffset(
   let across = vec3f(-wind.y, 0.0, wind.x);
   let t = wind.w;
 
-  // The field, blown downwind: the point a vertex reads moves upwind through
-  // it over time, so its features come toward the viewer with the wind. Three
-  // octaves, each offset so none lines up with another. The finest is blown
-  // slower than the gusts it rides in, so it drifts through them instead of
-  // travelling in lockstep — one field moving as a block reads as a wave
-  // train, and this is what breaks it into eddies.
-  let drift = wind.xy * (t * GUST_SPEED);
-  let p = (chunkPosition.xz + origin - drift) / GUST_LENGTH;
-  let e = (chunkPosition.xz + origin - drift * EDDY_DRIFT) / GUST_LENGTH;
-  let field =
-    0.5 * windNoise(p) +
-    0.3 * windNoise(p * 2.7 + vec2f(37.0, 91.0)) +
-    0.2 * windNoise(e * 6.3 + vec2f(-71.0, 23.0));
+  let world = chunkPosition.xz + origin;
+  let field = gustField(world, wind);
+  let p = (world - wind.xy * (t * GUST_SPEED)) / GUST_LENGTH;
   // A plant under wind keeps a lean; the gust adds to it.
   let gust = 0.3 + 0.7 * field;
   // A second read of the same field, off to one side, steers the lean a
