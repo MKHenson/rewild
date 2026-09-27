@@ -868,7 +868,8 @@ export class TerrainRenderer {
       lodEye.z,
       finest,
       this.waterLodDistances,
-      this.waterLodSpacings
+      this.waterLodSpacings,
+      wind
     );
   }
 

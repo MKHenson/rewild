@@ -13,6 +13,7 @@ const HAS_FOLIAGE_SHADING: bool = false;
 #include "./shader-lib/pcf.wgsl"
 #include "./shader-lib/directional-shadow.wgsl"
 #include "./shader-lib/spot-light-shadow.wgsl"
+#include "./shader-lib/scatter-wind.wgsl"
 
 // Air to water at normal incidence.
 const WATER_F0: f32 = 0.02;
@@ -49,6 +50,12 @@ const SILENT_STEEPNESS: f32 = 0.002;
 // Mean of (exp(sin θ − 1)·cos θ)² over a cycle, e⁻²·I1(2)/2: an octave's slope
 // variance per unit (k·A)².
 const SLOPE_VARIANCE: f32 = 0.10763;
+// Cat's paws: the foliage gust field scales the ripples between a lull and a
+// gust, fully so from this wind strength up. Only octaves too short for any
+// grid to displace take part, so the surface the CPU queries is untouched.
+const GUST_LULL: f32 = 0.5;
+const GUST_PEAK: f32 = 1.8;
+const GUST_FULL_STRENGTH: f32 = 0.5;
 // Large-scale variation, matching WaterWaves.variation: a swell and a chop
 // field, each blended into an octave by its length.
 const SWELL_SCALE_A: f32 = 760.0;
@@ -107,6 +114,9 @@ struct Waves {
   // The variation noise's drift in lattice cells: [0] the swell field's
   // octaves A xy and B zw, [1] the chop field's.
   variation : array<vec4f, 2>,
+  // The foliage wind: direction the air moves xz, strength, clock in
+  // full-wind seconds. Its gust field ruffles the ripples.
+  wind : vec4f,
   // Chunk-edge distances past which a coarser grid can appear, and that grid's
   // spacing in metres; unused entries are 0. See waterGridBands.
   lodDistance : array<vec4f, 2>,
@@ -133,6 +143,13 @@ struct VertexOutput {
   @location(1) viewPosition : vec3f,
   // xz the vertex rests at before the waves move it, from the wave origin.
   @location(2) rest : vec2f,
+  // The height gradient of the octaves the grid holds here, which the pixel
+  // shader adds to its own.
+  @location(3) slope : vec2f,
+  // How far those octaves dragged the point the shorter ones sample.
+  @location(4) dragged : vec2f,
+  // The grid spacing the octaves were split by, in metres.
+  @location(5) spacing : f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
@@ -269,25 +286,46 @@ fn shoreCalm(depth: f32) -> f32 {
   return smoothstep(0.0, SHORE_CALM_DEPTH, depth);
 }
 
+// How much of an octave of wavenumber `k` a grid of `spacing` metres holds.
+// The vertex stage displaces and shades by that share; the pixel stage
+// shades by the rest. Matches gridResolve.
+fn resolvedBy(spacing: f32, k: f32) -> f32 {
+  return smoothstep(RESOLVE_FROM * spacing, RESOLVE_TO * spacing, TWO_PI / k);
+}
+
+struct GeometryWaves {
+  height : f32,
+  slope : vec2f,
+  // `rest` less the point the first octave the grid cannot hold samples.
+  dragged : vec2f,
+}
+
 // The height at `rest` from the octaves the grid can hold, as
-// WaterWaves.height sums it. Each octave drags the point the next samples.
-fn geometryHeight(rest: vec2f, weights: vec4f, gain: vec2f, spacing: f32) -> f32 {
+// WaterWaves.height sums it, and their gradient. Each octave drags the point
+// the next samples. The drag's bending of the gradient is left out; it barely
+// shows and would triple the cost.
+fn geometryWaves(rest: vec2f, weights: vec4f, gain: vec2f, spacing: f32) -> GeometryWaves {
   let drag = dot(waves.drag, weights);
   var p = rest;
-  var height = 0.0;
+  var out: GeometryWaves;
+  out.height = 0.0;
+  out.slope = vec2f(0.0);
   for (var i: i32 = 0; i < WAVE_COUNT; i++) {
     let w = waves.wave[i];
-    let resolved = smoothstep(RESOLVE_FROM * spacing, RESOLVE_TO * spacing, TWO_PI / w.z);
+    let resolved = resolvedBy(spacing, w.z);
     if (resolved <= 0.0) {
       break;
     }
     let amplitude = dot(waves.amp[i], weights) * octaveVariation(gain, w.z) * resolved;
     let theta = wavePhase(i, p);
     let e = exp(sin(theta) - 1.0);
-    height += amplitude * (e - WAVE_MEAN);
-    p -= w.xy * (drag * amplitude * e * cos(theta));
+    let ec = e * cos(theta);
+    out.height += amplitude * (e - WAVE_MEAN);
+    out.slope += w.xy * (amplitude * ec * w.z);
+    p -= w.xy * (drag * amplitude * ec);
   }
-  return height;
+  out.dragged = rest - p;
+  return out;
 }
 
 struct WaveNormal {
@@ -304,24 +342,40 @@ fn pixelFootprint(rest: vec2f) -> f32 {
   return max(length(dpdx(rest)), length(dpdy(rest)));
 }
 
-// The surface normal at `rest` over up to `octaves` octaves, including those
-// too short for the grid to displace by, each fading out before it aliases.
-// The drag's bending of the gradient is left out; it barely shows and would
-// triple the cost.
-fn waterNormal(rest: vec2f, water: WaterSample, footprint: f32, octaves: i32) -> WaveNormal {
-  let gain = shoreCalm(water.depth) * waveVariation(rest + waves.origin.xy);
+// How much the gust field scales the ripples at world xz.
+fn gustScale(world: vec2f) -> f32 {
+  let gust = smoothstep(0.35, 0.65, gustField(world, waves.wind));
+  return mix(1.0, mix(GUST_LULL, GUST_PEAK, gust), min(waves.wind.z / GUST_FULL_STRENGTH, 1.0));
+}
+
+// The surface normal at a pixel: the vertex stage's gradient from the octaves
+// the grid holds, plus up to `octaves` of the rest summed here, each fading
+// out before it aliases. The budget goes to the octaves the grid cannot hold,
+// so every tier shows the fine ripples. The drag's bending of the gradient is
+// left out; it barely shows and would triple the cost.
+fn waterNormal(input: VertexOutput, water: WaterSample, footprint: f32, octaves: i32) -> WaveNormal {
+  let rest = input.rest;
+  let world = rest + waves.origin.xy;
+  let gain = shoreCalm(water.depth) * waveVariation(world);
+  let gust = gustScale(world);
+  // No grid displaces an octave shorter than this; gusts reach it fully
+  // below half of it.
+  let shadeOnly = RESOLVE_FROM * waves.grid.x;
   let drag = dot(waves.drag, water.weights);
-  var p = rest;
-  var slope = vec2f(0.0);
+  var p = rest - input.dragged;
+  var slope = input.slope;
   var variance = 0.0;
   var summed: i32 = 0;
   for (var i: i32 = 0; i < WAVE_COUNT; i++) {
     let w = waves.wave[i];
-    let steepness = dot(waves.amp[i], water.weights) * octaveVariation(gain, w.z) * w.z;
+    let wavelength = TWO_PI / w.z;
+    let gusted = mix(gust, 1.0, smoothstep(0.5 * shadeOnly, shadeOnly, wavelength));
+    let unresolved = 1.0 - resolvedBy(input.spacing, w.z);
+    let steepness = dot(waves.amp[i], water.weights) * octaveVariation(gain, w.z) * w.z * gusted * unresolved;
     if (steepness < SILENT_STEEPNESS) {
       continue;
     }
-    let pixels = TWO_PI / w.z / max(footprint, 1e-6) * waves.normalFade;
+    let pixels = wavelength / max(footprint, 1e-6) * waves.normalFade;
     var fade = smoothstep(NORMAL_FADE_GONE_PIXELS, NORMAL_FADE_FULL_PIXELS, pixels);
     if (summed >= octaves) {
       fade = 0.0;
@@ -372,12 +426,15 @@ fn vs(input: VertexInput) -> VertexOutput {
   let spacing = gridSpacingAt(length(fromEye));
   let calm = shoreCalm(max(surface.r - surface.g, 0.0));
 
-  var height = 0.0;
+  var geometry: GeometryWaves;
+  geometry.height = 0.0;
+  geometry.slope = vec2f(0.0);
+  geometry.dragged = vec2f(0.0);
   if (calm > 0.0) {
-    height = geometryHeight(rest, weights, calm * waveVariation(rest + waves.origin.xy), spacing);
+    geometry = geometryWaves(rest, weights, calm * waveVariation(rest + waves.origin.xy), spacing);
   }
 
-  let local = vec4f(input.position.x, surface.r + height, input.position.z, 1.0);
+  let local = vec4f(input.position.x, surface.r + geometry.height, input.position.z, 1.0);
   let viewPosition = uniforms.modelViewMatrix * local;
 
   var out: VertexOutput;
@@ -385,6 +442,10 @@ fn vs(input: VertexInput) -> VertexOutput {
   out.uv = input.uv;
   out.viewPosition = viewPosition.xyz;
   out.rest = rest;
+  // A normal fade of 0 is the debug switch for flat normals.
+  out.slope = select(vec2f(0.0), geometry.slope, waves.normalFade > 0.0);
+  out.dragged = geometry.dragged;
+  out.spacing = spacing;
   return out;
 }
 
@@ -405,7 +466,7 @@ fn fs_absorb(input: VertexOutput) -> @location(0) vec4f {
     discard;
   }
 
-  let N = waterNormal(input.rest, water, footprint, ABSORB_OCTAVES).normal;
+  let N = waterNormal(input, water, footprint, ABSORB_OCTAVES).normal;
   let V = normalize(-input.viewPosition);
   let NoV = clamp(dot(N, V), 1e-4, 1.0);
   let passed = (1.0 - waterFresnel(NoV)) * waterTransmittance(water, NoV);
@@ -418,7 +479,7 @@ fn fs_light(input: VertexOutput) -> @location(0) vec4f {
   let water = sampleWater(input.uv);
 
   let viewPosition = input.viewPosition;
-  let surfaceWave = waterNormal(input.rest, water, footprint, NORMAL_OCTAVES);
+  let surfaceWave = waterNormal(input, water, footprint, NORMAL_OCTAVES);
   let normal = surfaceWave.normal;
   // The unsummed octaves' slopes spread the microfacets: α² grows by their
   // variance, so the highlight they would have made widens rather than aliases.

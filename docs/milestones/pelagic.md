@@ -404,7 +404,8 @@ chunk water then never overlap, and neither z-fights the other.
 - **Waves.** A heightfield of wave octaves in the vertex shader, as a function of world position.
   Blend the octave **amplitudes** between water types, not two separate wave shapes. So the surface
   does not tear at a blend. The weather sets their strength. See [Wind](#wind).
-- **Normals.** Two scrolling detail normal maps. Where flow is set, scroll them along the flow.
+- **Normals.** The wave octaves' own slopes, down to 0.15 m ripples, with the gust field on the
+  short ones. See [Wind](#wind). No detail normal maps: they would tile.
 - **Reflection.** Sample the prefiltered sky cube (`SkyCubeCapture`, `SkyIblPrefilter`). Rougher
   water samples a blurrier mip.
 - **Sun glint.** A specular sun term, gated by CSM geometry shadows and cloud shadows. This follows
@@ -476,19 +477,25 @@ wind speed is `windiness × 10` m/s, with gusts on top. Foliage already reads th
   radians, and GPU trig breaks up into blocks there. The CPU takes the phases from an origin near
   the camera, snapped to 1024 m and reduced in double precision; the shader measures positions from
   it and wraps each phase into 0..2π before `sin` and `cos`.
-- **Normals.** The pixel shader sums the octaves' slopes for its normal, including those too short
-  to displace the grid. Each octave's normal fades out as its wavelength shrinks from 8 to 3
+- **Normals.** The normal splits between the two stages by the same weight that picks the octaves
+  a vertex is displaced by. The vertex shader sums the slopes of the octaves the grid holds, which
+  are smooth across a cell, and passes them and its drag on. The pixel shader adds the rest, so its
+  octave budget goes to the ripples the grid cannot hold, and the normal matches the displaced
+  surface. Each pixel octave's normal fades out as its wavelength shrinks from 8 to 3
   pixels on screen, measured from the pixel's footprint on the water, so it fades sooner at a
   grazing view. Octaves with no height in the water drawn are skipped. The slope variance of every
   octave faded out is added to α², so their highlight widens instead of sparkling. The drag's
   bending of the slope is left out; it barely shows and would triple the cost.
-- **Quality.** The `water` quality aspect (`WaterQuality.ts`) sets how many octaves the normals sum
-  (10 on low to 32 on ultra, counting only octaves with height; the absorb draw, which only needs
+- **Quality.** The `water` quality aspect (`WaterQuality.ts`) sets how many octaves the pixel
+  normal sums (10 on low to 32 on ultra, counting only octaves with height the grid does not
+  already carry; the absorb draw, which only needs
   Fresnel, sums fewer) and how small on screen they carry. The octaves that displace the grid are the same on every tier, so the CPU query
   and every player agree on the surface.
-- **Gusts.** Gusts act on the detail normal maps only. They make "cat's paws": dark patches of
-  ripples that run across the water. The same gust field moves the trees, so one gust crosses the
-  water and then the forest.
+- **Gusts.** The foliage gust field (`gustField` in `scatter-wind.wgsl`, read with the same wind
+  vector) scales the ripples from 0.25 in a lull to 1.8 in a gust, fully from a wind strength of
+  0.3. This makes "cat's paws": dark patches of ripples that run downwind across the water, and
+  one gust crosses the water and then the forest. Only octaves shorter than the finest grid can
+  displace (4 grid spacings) take part, so the surface the CPU queries is untouched.
 
 ### Waves at the shore
 

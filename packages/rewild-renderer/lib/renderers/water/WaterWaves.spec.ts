@@ -225,12 +225,12 @@ describe('WaterWaves', () => {
     expect(waves.originZ).toBe(26624);
 
     const out = new Float32Array(WAVE_UNIFORM_FLOATS);
-    waves.pack(1, 0, 0, 2, [], [], out);
+    waves.pack(1, 0, 0, 2, [], [], [1, 0, 0.5, 12], out);
     expect(out[4]).toBe(-19456);
     expect(out[5]).toBe(26624);
     for (let i = 0; i < WAVE_COUNT; i++) {
       const wave = waves.waves[i];
-      const packed = out[40 + WAVE_COUNT * 8 + i];
+      const packed = out[44 + WAVE_COUNT * 8 + i];
       expect(packed).toBeGreaterThanOrEqual(0);
       expect(packed).toBeLessThan(Math.PI * 2);
       // The phase anywhere is the packed phase plus k·D from the origin.
@@ -264,17 +264,18 @@ describe('WaterWaves', () => {
     run(waves, 1);
     const out = new Float32Array(WAVE_UNIFORM_FLOATS);
     waves.setOrigin(1100, -2000);
-    waves.pack(1.5, 1200, -2100, 2, [200, 400], [4, 8], out);
-    // Ten vec4 of header, two arrays of 40 vec4f, then ten vec4f of phases.
-    expect(out.byteLength).toBe(160 + 640 + 640 + 160);
+    waves.pack(1.5, 1200, -2100, 2, [200, 400], [4, 8], [0, 1, 0.5, 12], out);
+    // Eleven vec4 of header, two arrays of 40 vec4f, then ten vec4f of phases.
+    expect(out.byteLength).toBe(176 + 640 + 640 + 160);
     expect(Array.from(out.subarray(1, 6))).toEqual([1.5, 176, -52, 1024, -2048]);
     expect(out[8]).toBe(Math.fround(waves.drag[0]));
     expect(out[19]).toBe(Math.fround(waves.variationOffset[7]));
-    expect(Array.from(out.subarray(20, 23))).toEqual([200, 400, 0]);
-    expect(Array.from(out.subarray(28, 31))).toEqual([4, 8, 0]);
-    expect(out[36]).toBe(2);
+    expect(Array.from(out.subarray(20, 24))).toEqual([0, 1, 0.5, 12]);
+    expect(Array.from(out.subarray(24, 27))).toEqual([200, 400, 0]);
+    expect(Array.from(out.subarray(32, 35))).toEqual([4, 8, 0]);
+    expect(out[40]).toBe(2);
     const i = 5;
-    expect(out[40 + i * 4 + 2]).toBe(Math.fround(waves.waves[i].k));
-    expect(out[40 + WAVE_COUNT * 4 + i * 4]).toBe(Math.fround(waves.amplitudes[i * 4]));
+    expect(out[44 + i * 4 + 2]).toBe(Math.fround(waves.waves[i].k));
+    expect(out[44 + WAVE_COUNT * 4 + i * 4]).toBe(Math.fround(waves.amplitudes[i * 4]));
   });
 });

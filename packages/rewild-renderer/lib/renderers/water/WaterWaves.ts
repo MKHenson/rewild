@@ -203,7 +203,7 @@ function valueNoise(x: number, y: number): number {
 // loses it by RESOLVE_FROM; shorter octaves only shade. Fewer samples a
 // wavelength leave jagged facets that, at a grazing view, hide one another in
 // grid-aligned bands. water.wgsl's
-// geometryHeight fades them the same way.
+// geometryWaves fades them the same way.
 const RESOLVE_FROM = 4;
 const RESOLVE_TO = 8;
 
@@ -217,13 +217,14 @@ export function gridResolve(wavelength: number, spacing: number): number {
   return t * t * (3 - 2 * t);
 }
 
-// Floats in the packed uniform, matching water.wgsl's Waves struct: five
+// Floats in the packed uniform, matching water.wgsl's Waves struct: six
 // vec4 of state, two of LOD distances, two of LOD spacings and one of grid.
 const VARIATION_OFFSET = 12;
-const LOD_DISTANCE_OFFSET = 20;
-const LOD_SPACING_OFFSET = 28;
-const GRID_OFFSET = 36;
-const HEADER_FLOATS = 40;
+const WIND_OFFSET = 20;
+const LOD_DISTANCE_OFFSET = 24;
+const LOD_SPACING_OFFSET = 32;
+const GRID_OFFSET = 40;
+const HEADER_FLOATS = 44;
 const WAVE_OFFSET = HEADER_FLOATS;
 const AMP_OFFSET = WAVE_OFFSET + WAVE_COUNT * 4;
 const PHASE_OFFSET = AMP_OFFSET + WAVE_COUNT * 4;
@@ -387,8 +388,9 @@ export class WaterWaves {
 
   /**
    * Writes the Waves uniform: the clock, the normal fade scale, the viewer's
-   * xz from the phase origin, the phase origin, per-type drag and the
-   * variation drift; the LOD bands (see waterGridBands) and finest grid
+   * xz from the phase origin, the phase origin, per-type drag, the variation
+   * drift and the foliage wind (direction xz, strength, clock), whose gust
+   * field ruffles the ripples; the LOD bands (see waterGridBands) and finest grid
    * spacing, from which the shader picks the waves each vertex may be
    * displaced by; then per octave (dirX, dirZ, k, ω), per octave each palette
    * type's amplitude, and the phases at the origin.
@@ -400,6 +402,7 @@ export class WaterWaves {
     finestSpacing: number,
     lodDistances: ArrayLike<number>,
     lodSpacings: ArrayLike<number>,
+    wind: ArrayLike<number>,
     out: Float32Array
   ): void {
     out[0] = this.time;
@@ -413,6 +416,7 @@ export class WaterWaves {
     for (let t = 0; t < MAX_WATER_TYPES; t++) out[8 + t] = this.drag[t];
     for (let o = 0; o < this.variationOffset.length; o++)
       out[VARIATION_OFFSET + o] = this.variationOffset[o];
+    for (let i = 0; i < 4; i++) out[WIND_OFFSET + i] = wind[i];
     for (let i = 0; i < 8; i++) {
       out[LOD_DISTANCE_OFFSET + i] = lodDistances[i] ?? 0;
       out[LOD_SPACING_OFFSET + i] = lodSpacings[i] ?? 0;
@@ -466,7 +470,8 @@ export class WaterWaveBuffer {
     eyeZ: number,
     finestSpacing: number,
     lodDistances: ArrayLike<number>,
-    lodSpacings: ArrayLike<number>
+    lodSpacings: ArrayLike<number>,
+    wind: ArrayLike<number>
   ): void {
     this.waves.pack(
       normalFade,
@@ -475,6 +480,7 @@ export class WaterWaveBuffer {
       finestSpacing,
       lodDistances,
       lodSpacings,
+      wind,
       this.data
     );
     device.queue.writeBuffer(this.buffer(device), 0, this.data);
