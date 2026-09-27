@@ -262,6 +262,11 @@ export interface LakeConfig {
   depth: SelectorBand; // metres at the centre, picked per lake from this range
   margin: number; // metres the lip stands above the level
   maxRimSlope: number; // degrees: rim height spread over the rim radius; a steeper site is rejected
+  maxLagoonSlope: number; // degrees: the same for a lagoon, over its dry rim only
+  // 0..1: share of candidates that fall out at sea which slide ashore to try
+  // for a lagoon instead of being dropped.
+  lagoonChance: number;
+  lagoonRadius: SelectorBand; // shore radius of a lagoon slid ashore
   // Past the bank, as a multiple of the shore radius: where a lip raised to
   // hold the water eases back down to the ground.
   moraine: number;
@@ -898,6 +903,12 @@ export const DEFAULT_LAKES: LakeConfig = {
   margin: 1,
   maxRimSlope: 8,
   moraine: 1,
+  maxLagoonSlope: 25,
+  lagoonChance: 0.8,
+  lagoonRadius: {
+    from: 120 / TERRAIN_METERS_PER_SAMPLE,
+    to: 220 / TERRAIN_METERS_PER_SAMPLE,
+  },
   spacing: 40 / TERRAIN_METERS_PER_SAMPLE,
   tarns: {
     radius: {
@@ -1098,10 +1109,12 @@ export function validateLakes(climate: ClimateConfig): void {
     lakes.depth.to < lakes.depth.from ||
     !(lakes.margin >= 0) ||
     !(lakes.moraine >= 0) ||
+    !(lakes.maxLagoonSlope >= 0) ||
+    !(lakes.lagoonChance >= 0 && lakes.lagoonChance <= 1) ||
     !(lakes.spacing >= 0)
   )
     throw new Error(
-      'Lakes need a positive ascending radius and depth, bank > 1, irregularity within 0..0.5, chance within 0..1 and non-negative margin, moraine and spacing.'
+      'Lakes need a positive ascending radius and depth, bank > 1, irregularity within 0..0.5, chance and lagoonChance within 0..1 and non-negative margin, moraine and spacing.'
     );
   const tarns = lakes.tarns;
   if (
@@ -1116,8 +1129,18 @@ export function validateLakes(climate: ClimateConfig): void {
     );
   // A lake must fit inside one cell's reach, or the neighbouring cells a chunk
   // checks would miss it.
+  if (
+    lakes.lagoonChance > 0 &&
+    (!(lakes.lagoonRadius.from > 0) ||
+      lakes.lagoonRadius.to < lakes.lagoonRadius.from)
+  )
+    throw new Error('Lagoons need a positive ascending radius.');
   const reach =
-    Math.max(lakes.radius.to, tarns ? tarns.radius.to : 0) *
+    Math.max(
+      lakes.radius.to,
+      tarns ? tarns.radius.to : 0,
+      lakes.lagoonChance > 0 ? lakes.lagoonRadius.to : 0
+    ) *
     (1 + lakes.irregularity) *
     (lakes.bank + lakes.moraine);
   if (reach >= lakes.cellSize)

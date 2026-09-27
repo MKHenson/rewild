@@ -188,7 +188,7 @@ export class PositionReadout extends Component<Props> {
       }
       lakeSpaceToWorld(nearest.u, nearest.v, lakeWorld);
       lakeValue.textContent =
-        `${nearest.tarn ? 'Tarn' : 'Lake'} ${formatDistance(
+        `${nearest.lagoon ? 'Lagoon' : nearest.tarn ? 'Tarn' : 'Lake'} ${formatDistance(
           nearestDistance
         )} away · ` +
         `(${Math.round(lakeWorld[0])}, ${Math.round(

@@ -23,8 +23,9 @@ import {
 import { createGroundSampler, generateBiomeBlendedHeightMap, sampleGround } from './Noise';
 import { SCATTER_INSTANCE_STRIDE, scatterChunk } from './Scatter';
 import { buildWaterMap } from './WaterMap';
-import { LAKE_WATER, getWaterTypeIndex } from './Water';
+import { LAKE_WATER, OCEAN_WATER, getWaterTypeIndex } from './Water';
 import { fromFloat16 } from '../../utils/float16';
+import { oceanCoverage, sampleContinent } from './ClimateField';
 
 const SEED = 9001;
 const SIZE = 129;
@@ -236,6 +237,18 @@ describe('lake chunks', () => {
     expect(water.typeWeights[texel * 4 + lakeType]).toBe(255);
   });
 
+  it('records the lake as a body', () => {
+    const water = buildWaterMap(SIZE, SEED, offset, INLAND, 0, heights)!;
+    const body = water.bodies.find((b) => b.id === lake.bodyId)!;
+    expect(body).toBeDefined();
+    expect(body.level).toBe(lake.level);
+    expect(body.spillHeight).toBe(lake.spillHeight);
+    expect(body.spillHeight).toBeGreaterThan(body.level);
+    expect(body.locked).toBe(false);
+    expect(body.typeWeights[getWaterTypeIndex(INLAND, LAKE_WATER)]).toBe(1);
+    expect(water.bodies.some((b) => b.id === OCEAN_BODY_ID)).toBe(false);
+  });
+
   it('keeps land scatter out of the lake and lets underwater scatter in', () => {
     const withRule = (rule: Partial<BiomeScatter>): ClimateConfig => {
       const biome: BiomeParams = {
@@ -271,5 +284,90 @@ describe('lake validation', () => {
   it('keeps a lake inside one cell of reach', () => {
     const lakes = { ...DEFAULT_LAKES, cellSize: maxLakeReach(DEFAULT_LAKES) };
     expect(() => validateClimateLayers({ ...INLAND, lakes })).toThrow(/cell/);
+  });
+});
+
+describe('lagoons', () => {
+  const COAST: ClimateConfig = {
+    ...DEFAULT_CLIMATE,
+    lakes: { ...DEFAULT_LAKES, chance: 1 },
+  };
+  const BIG = 257;
+  const lagoon = lakesIn(COAST).find((l) => l.lagoon)!;
+
+  it('opens to the sea at sea level', () => {
+    expect(lagoon).toBeDefined();
+    expect(lagoon.level).toBe(0);
+    expect(lagoon.spillHeight).toBe(0);
+    expect(lagoon.tarn).toBe(false);
+    expect(carveLakeHeight(lagoon, lagoon.u + lagoon.reach * 0.99, lagoon.v, -3)).toBe(-3);
+  });
+
+  it('opens only where the sea stands on its rim', () => {
+    const ground = createGroundSampler(SEED, COAST, 0);
+    const found = lakesIn(COAST);
+    expect(found.some((l) => l.lagoon)).toBe(true);
+    for (const lake of found) {
+      let sea = false;
+      for (let k = 0; k < 24; k++) {
+        const angle = (k / 24) * Math.PI * 2;
+        const r =
+          lakeDistance(lake, lake.u + Math.cos(angle), lake.v + Math.sin(angle));
+        const u = lake.u + (Math.cos(angle) * lake.bank) / r;
+        const v = lake.v + (Math.sin(angle) * lake.bank) / r;
+        if (
+          sampleGround(ground, u, v) < 0 &&
+          oceanCoverage(COAST.continent!, sampleContinent(ground.field, u, v)) > 0
+        )
+          sea = true;
+      }
+      expect(lake.lagoon).toBe(sea);
+    }
+  });
+
+  it('cuts a mouth below sea level from the shore to the sea', () => {
+    const ground = createGroundSampler(SEED, COAST, 0);
+    for (const l of lakesIn(COAST).filter((l) => l.lagoon)) {
+      expect(Number.isNaN(l.mouth)).toBe(false);
+      for (let d = 1; d <= l.bank; d += 0.05) {
+        const [u, v] = along(l, l.mouth, d);
+        expect(carveLakeHeight(l, u, v, sampleGround(ground, u, v))).toBeLessThan(0);
+      }
+    }
+  });
+
+  it('settles no lake out at sea', () => {
+    const ground = createGroundSampler(SEED, COAST, 0);
+    for (const lake of lakesIn(COAST))
+      if (sampleGround(ground, lake.u, lake.v) < 0) expect(lake.lagoon).toBe(true);
+  });
+
+  it('blends from lake water at the centre to sea water at the shore', () => {
+    const offset = offsetOver(lagoon);
+    const heights = generateBiomeBlendedHeightMap(BIG, BIG, SEED, offset, COAST, 0);
+    const water = buildWaterMap(BIG, SEED, offset, COAST, 0, heights)!;
+    const lakeType = getWaterTypeIndex(COAST, LAKE_WATER);
+    const oceanType = getWaterTypeIndex(COAST, OCEAN_WATER);
+    const originU = offset.x - BIG / 2;
+    const originV = -offset.y - BIG / 2;
+    const texelAt = (u: number, v: number) => {
+      const mx = Math.round((u - originU) / water.step);
+      const my = Math.round((v - originV) / water.step);
+      return mx + my * water.size;
+    };
+
+    const centre = texelAt(lagoon.u, lagoon.v);
+    expect(water.bodyIds[centre]).toBe(lagoon.bodyId);
+    expect(water.baseLevel + fromFloat16(water.level[centre])).toBeCloseTo(0, 2);
+    expect(water.typeWeights[centre * 4 + lakeType]).toBeGreaterThan(
+      water.typeWeights[centre * 4 + oceanType]
+    );
+
+    const [u, v] = along(lagoon, 0, 0.95);
+    const shore = texelAt(u, v);
+    expect(water.typeWeights[shore * 4 + oceanType]).toBeGreaterThan(
+      water.typeWeights[shore * 4 + lakeType]
+    );
+    expect(water.bodies.map((b) => b.id)).toContain(lagoon.bodyId);
   });
 });

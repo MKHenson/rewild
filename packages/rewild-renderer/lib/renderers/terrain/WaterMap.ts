@@ -1,7 +1,14 @@
 import { Vector2 } from 'rewild-common';
 import { ClimateConfig } from './Biomes';
 import { createClimateField } from './ClimateField';
-import { OCEAN_BODY_ID, createWaterSampler, sampleWater } from './Lakes';
+import {
+  OCEAN_BODY_ID,
+  WaterBody,
+  createWaterSampler,
+  lakeBody,
+  oceanBody,
+  sampleWater,
+} from './Lakes';
 import { BIOME_MASK_STEP, paintMaskSize } from './PaintMask';
 import { MAX_WATER_TYPES } from './Water';
 import { toFloat16 } from '../../utils/float16';
@@ -34,6 +41,8 @@ export interface WaterMap {
   bodyIds: Uint32Array;
   /** RG8 snorm flow direction. Zero is still water. */
   flow: Int8Array;
+  /** The record of every body that covers a texel here. */
+  bodies: WaterBody[];
 }
 
 export { OCEAN_BODY_ID };
@@ -116,6 +125,17 @@ export function buildWaterMap(
   const relHeights = new Uint16Array(texels);
   const flow = new Int8Array(texels * 2);
 
+  const bodies: WaterBody[] = [];
+  const seen = new Set<number>();
+  for (let t = 0; t < texels; t++) {
+    const id = bodyIds[t];
+    if (coverage[t] === 0 || seen.has(id)) continue;
+    seen.add(id);
+    const lake = sampler.lakes.find((l) => l.bodyId === id);
+    if (lake) bodies.push(lakeBody(lake, climate));
+    else if (id === OCEAN_BODY_ID) bodies.push(oceanBody(climate, seaLevel));
+  }
+
   for (let my = 0; my < size; my++) {
     for (let mx = 0; mx < size; mx++) {
       const t = mx + my * size;
@@ -137,6 +157,7 @@ export function buildWaterMap(
     typeWeights,
     bodyIds,
     flow,
+    bodies,
   };
 }
 

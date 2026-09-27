@@ -94,8 +94,8 @@ export function registerLakeDebugCommands(renderer: Renderer) {
         (lakes.tarns
           ? `; failing that, a tarn needs one under ${lakes.tarns.maxRimSlope}°.`
           : '; this climate has no tarns.') +
-        ` 'crowded' lost to a neighbour's roll; 'ocean' has its rim in the sea's ` +
-        `reach. goToLake(i) flies to the i-th nearest settled lake.`
+        ` 'crowded' lost to a neighbour's roll; 'ocean' is out at sea, or a tarn ` +
+        `with its rim in the sea's reach. goToLake(i) flies to the i-th nearest settled lake.`
     );
     console.table(rows.sort((a, b) => (a.distance as number) - (b.distance as number)));
   };
@@ -124,7 +124,7 @@ export function registerLakeDebugCommands(renderer: Renderer) {
     );
     orbit.update();
     console.log(
-      `goToLake(${index}) — ${lake.tarn ? 'tarn' : 'lake'} ` +
+      `goToLake(${index}) — ${lake.lagoon ? 'lagoon' : lake.tarn ? 'tarn' : 'lake'} ` +
         `at (${Math.round(world[0])}, ${Math.round(world[1])}), level ${lake.level.toFixed(1)} m.`
     );
   };

@@ -3,7 +3,12 @@ import { ClimateConfig, LakeConfig } from './Biomes';
 import { ClimateField, oceanCoverage, sampleContinent } from './ClimateField';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { GroundSampler, createGroundSampler, sampleGround } from './Noise';
-import { LAKE_WATER, OCEAN_WATER, getWaterTypeIndex } from './Water';
+import {
+  LAKE_WATER,
+  MAX_WATER_TYPES,
+  OCEAN_WATER,
+  getWaterTypeIndex,
+} from './Water';
 
 // Seeded lakes: at most one per cell of a coarse grid. A lake is a pure
 // function of the seed, the climate and its cell, so any chunk rebuilds every
@@ -30,6 +35,17 @@ const LEVEL_REACH = 1.25;
 // Share of the bank, from the shore outward, that keeps full coverage.
 const FULL_COVERAGE = 0.5;
 
+// A lagoon's water is lake water out to this share of its shore radius, then
+// blends to sea water at the shore.
+const LAGOON_BLEND_FROM = 0.2;
+
+// A lagoon's mouth: a channel cut through its bank toward the sea, this many
+// metres below sea level and this many radians either side of its bearing.
+const MOUTH_DEPTH = 2;
+const MOUTH_HALF_ANGLE = Math.PI / 10;
+// Share of the shore radius inside the shore where the channel starts.
+const MOUTH_START = 0.8;
+
 export interface Lake {
   cellX: number;
   cellY: number;
@@ -39,6 +55,10 @@ export interface Lake {
   v: number;
   /** A small lake settled in a cirque, where a lake was too steep. */
   tarn: boolean;
+  /** A lake open to the sea: at sea level, with no lip on its seaward side. */
+  lagoon: boolean;
+  /** Bearing of a lagoon's mouth in lake space, in radians; NaN for a lake. */
+  mouth: number;
   /** Mean shore radius, in samples. */
   radius: number;
   /** Bank reach as a multiple of the shore radius. */
@@ -53,8 +73,58 @@ export interface Lake {
   level: number;
   /** The least height the bank's top is raised to, so the water stays in. */
   lip: number;
+  /** The lowest point of the rim: the highest the level can rise. */
+  spillHeight: number;
   irregularity: number;
   phases: Float64Array;
+}
+
+/**
+ * What the edit rules know about one body of water. A generated body is
+ * rebuilt from the seed, so it costs nothing to save until it is edited.
+ */
+export interface WaterBody {
+  /** OCEAN_BODY_ID, or the lake's lakeBodyId. */
+  id: number;
+  /** World height of the surface. */
+  level: number;
+  /** The lowest point of the rim: the level cannot rise above it. */
+  spillHeight: number;
+  /** Sculpting cannot lower the rim of a locked body below its level. */
+  locked: boolean;
+  /** Palette weights for new water in this body, MAX_WATER_TYPES long. */
+  typeWeights: number[];
+}
+
+function bodyWeights(
+  climate: ClimateConfig,
+  name: typeof OCEAN_WATER | typeof LAKE_WATER
+): number[] {
+  const weights = new Array<number>(MAX_WATER_TYPES).fill(0);
+  const index = getWaterTypeIndex(climate, name);
+  if (index >= 0 && index < MAX_WATER_TYPES) weights[index] = 1;
+  return weights;
+}
+
+export function oceanBody(climate: ClimateConfig, seaLevel: number): WaterBody {
+  return {
+    id: OCEAN_BODY_ID,
+    level: seaLevel,
+    spillHeight: seaLevel,
+    locked: false,
+    typeWeights: bodyWeights(climate, OCEAN_WATER),
+  };
+}
+
+/** A generated lake's record. A lagoon's new water starts as lake water too. */
+export function lakeBody(lake: Lake, climate: ClimateConfig): WaterBody {
+  return {
+    id: lake.bodyId,
+    level: lake.level,
+    spillHeight: lake.spillHeight,
+    locked: false,
+    typeWeights: bodyWeights(climate, LAKE_WATER),
+  };
 }
 
 interface Candidate {
@@ -65,6 +135,8 @@ interface Candidate {
   v: number;
   radius: number;
   reach: number;
+  /** Slid ashore from the sea: settles as a lagoon or not at all. */
+  ashore: boolean;
 }
 
 /** The body ID a generated lake takes from its cell. Never the ocean's. */
@@ -77,12 +149,35 @@ function lakeReach(config: LakeConfig, radius: number): number {
   return radius * (1 + config.irregularity) * (config.bank + config.moraine);
 }
 
+// How far a candidate out at sea may slide ashore to become a lagoon, as a
+// share of the cell, and the step it slides in.
+const COAST_SHIFT = 0.4;
+const COAST_STEP = 0.02;
+// Metres above sea level that count as ashore for a sliding candidate.
+const ASHORE = 1;
+
+/** How far a candidate may move from its seeded place, in samples. */
+function maxLakeShift(config: LakeConfig): number {
+  return config.lagoonChance > 0 ? config.cellSize * COAST_SHIFT : 0;
+}
+
+// Cells either side a candidate can collide with.
+function spacingRange(config: LakeConfig): number {
+  const clear =
+    2 * maxLakeReach(config) + config.spacing + 2 * maxLakeShift(config);
+  return 1 + Math.ceil(clear / config.cellSize);
+}
+
 /** The furthest any lake in `config` reaches from its centre, in samples. */
 export function maxLakeReach(config: LakeConfig): number {
   const tarns = config.tarns;
   return lakeReach(
     config,
-    Math.max(config.radius.to, tarns ? tarns.radius.to : 0)
+    Math.max(
+      config.radius.to,
+      tarns ? tarns.radius.to : 0,
+      config.lagoonChance > 0 ? config.lagoonRadius.to : 0
+    )
   );
 }
 
@@ -90,7 +185,8 @@ function lakeCandidate(
   config: LakeConfig,
   seed: number,
   cellX: number,
-  cellY: number
+  cellY: number,
+  ground: GroundSampler
 ): Candidate | null {
   const hash = hashCell(cellX, cellY, seed + config.seedSalt);
   if (hash01(hash, 0) >= config.chance) return null;
@@ -100,7 +196,7 @@ function lakeCandidate(
   const tarnRadius = tarns
     ? lerp(tarns.radius.from, tarns.radius.to, hash01(hash, 1))
     : 0;
-  return {
+  const c: Candidate = {
     cellX,
     cellY,
     hash,
@@ -108,7 +204,54 @@ function lakeCandidate(
     v: (cellY + hash01(hash, 3)) * config.cellSize,
     radius,
     reach: lakeReach(config, Math.max(radius, tarnRadius)),
+    ashore: false,
   };
+  if (hash01(hash, 8) < config.lagoonChance) slideAshore(config, c, ground);
+  return c;
+}
+
+// Moves a candidate that fell out at sea up the continent field to just behind
+// the shore, where its rim reaches back into the sea and it can settle as a
+// lagoon. Left where it is when no shore is within reach.
+function slideAshore(
+  config: LakeConfig,
+  c: Candidate,
+  ground: GroundSampler
+): void {
+  const continent = ground.field.climate.continent;
+  const seaLevel = ground.seaLevel;
+  if (!continent || sampleGround(ground, c.u, c.v) >= seaLevel) return;
+
+  const e = config.cellSize * COAST_STEP;
+  const gu =
+    sampleContinent(ground.field, c.u + e, c.v) -
+    sampleContinent(ground.field, c.u - e, c.v);
+  const gv =
+    sampleContinent(ground.field, c.u, c.v + e) -
+    sampleContinent(ground.field, c.u, c.v - e);
+  const length = Math.hypot(gu, gv);
+  if (length === 0) return;
+  const du = gu / length;
+  const dv = gv / length;
+
+  const steps = Math.floor(COAST_SHIFT / COAST_STEP);
+  for (let i = 1; i <= steps; i++) {
+    const u = c.u + du * e * i;
+    const v = c.v + dv * e * i;
+    if (sampleGround(ground, u, v) < seaLevel + ASHORE) continue;
+    // Sized as a lagoon, and set back from the shore by its radius so the
+    // shore lies inside the rim.
+    c.radius = lerp(
+      config.lagoonRadius.from,
+      config.lagoonRadius.to,
+      hash01(c.hash, 1)
+    );
+    c.reach = lakeReach(config, c.radius);
+    c.ashore = true;
+    c.u = u + du * c.radius;
+    c.v = v + dv * c.radius;
+    return;
+  }
 }
 
 // Of two candidates too close to both stand, the one with the higher hash
@@ -118,13 +261,23 @@ function outranks(a: Candidate, b: Candidate): boolean {
   return a.cellX !== b.cellX ? a.cellX > b.cellX : a.cellY > b.cellY;
 }
 
-function isSpaced(config: LakeConfig, seed: number, c: Candidate): boolean {
-  // Two reaches are each under a cell, so a rival more than two cells away
-  // can never be close enough.
-  for (let dy = -2; dy <= 2; dy++) {
-    for (let dx = -2; dx <= 2; dx++) {
+function isSpaced(
+  config: LakeConfig,
+  seed: number,
+  c: Candidate,
+  ground: GroundSampler
+): boolean {
+  const range = spacingRange(config);
+  for (let dy = -range; dy <= range; dy++) {
+    for (let dx = -range; dx <= range; dx++) {
       if (dx === 0 && dy === 0) continue;
-      const other = lakeCandidate(config, seed, c.cellX + dx, c.cellY + dy);
+      const other = lakeCandidate(
+        config,
+        seed,
+        c.cellX + dx,
+        c.cellY + dy,
+        ground
+      );
       if (!other || !outranks(other, c)) continue;
       const du = other.u - c.u;
       const dv = other.v - c.v;
@@ -161,12 +314,17 @@ export function lakeDistance(lake: Lake, u: number, v: number): number {
   return Math.sqrt(du * du + dv * dv) / shore;
 }
 
-// Scratch for sampleRim: the lowest and highest rim heights.
-const _rim = new Float64Array(2);
+// Scratch for sampleRim: the lowest and highest rim heights, how many rim
+// points stand in the sea, the rim's slope with the sea counted at sea level,
+// and the bearing of the lowest rim point in the sea (NaN with none).
+const _rim = new Float64Array(5);
+
+function slopeDegrees(rise: number, run: number): number {
+  return (Math.atan(rise / run) * 180) / Math.PI;
+}
 
 // Samples the pre-lake ground on the top of the bank of a lake of mean shore
-// `radius` into _rim, and returns the rim's slope in degrees; NaN when the
-// ocean reaches the rim.
+// `radius` into _rim, and returns the rim's slope in degrees.
 function sampleRim(
   config: LakeConfig,
   c: Candidate,
@@ -175,40 +333,72 @@ function sampleRim(
   ground: GroundSampler
 ): number {
   const continent = ground.field.climate.continent;
+  const seaLevel = ground.seaLevel;
   let lowest = Infinity;
   let highest = -Infinity;
+  let lowestAshore = Infinity;
+  let highestAshore = -Infinity;
+  let wet = 0;
+  let mouth = NaN;
+  let mouthHeight = Infinity;
   for (let k = 0; k < RIM_SAMPLES; k++) {
     const angle = (k / RIM_SAMPLES) * Math.PI * 2;
     const r =
       radius * shoreShape(config.irregularity, phases, angle) * config.bank;
     const u = c.u + Math.cos(angle) * r;
     const v = c.v + Math.sin(angle) * r;
+    const h = sampleGround(ground, u, v);
+    // The ocean's coverage reaches a little way over dry land, so only a rim
+    // point below sea level inside it is the sea itself.
     if (
       continent &&
+      h < ground.seaLevel &&
       oceanCoverage(continent, sampleContinent(ground.field, u, v)) > 0
-    )
-      return NaN;
-    const h = sampleGround(ground, u, v);
+    ) {
+      wet++;
+      if (h < mouthHeight) {
+        mouthHeight = h;
+        mouth = angle;
+      }
+    }
     if (h < lowest) lowest = h;
     if (h > highest) highest = h;
+    const ashore = h < seaLevel ? seaLevel : h;
+    if (ashore < lowestAshore) lowestAshore = ashore;
+    if (ashore > highestAshore) highestAshore = ashore;
   }
-  _rim[0] = lowest;
-  _rim[1] = highest;
   // Judged as a slope, so a small lake can sit on a shelf too steep for a
   // large one.
   const rimMetres = radius * config.bank * TERRAIN_METERS_PER_SAMPLE;
-  return (Math.atan((highest - lowest) / rimMetres) * 180) / Math.PI;
+  _rim[0] = lowest;
+  _rim[1] = highest;
+  _rim[2] = wet;
+  _rim[3] = slopeDegrees(highestAshore - lowestAshore, rimMetres);
+  _rim[4] = mouth;
+  return slopeDegrees(highest - lowest, rimMetres);
 }
 
-// Levels a spaced candidate from its rim, or rejects it: over the ocean's
-// reach, or on ground too steep to hold water. A lake sits below its lowest
-// rim; a tarn part way up it, behind a lip.
+// Levels a spaced candidate from its rim, or rejects it: out at sea, or on
+// ground too steep to hold water. A lake sits below its lowest rim; a tarn
+// part way up it, behind a lip. A lake whose rim stands in the sea opens to it
+// as a lagoon at sea level.
 function settleLake(
   config: LakeConfig,
   c: Candidate,
   ground: GroundSampler,
   report?: LakeCellReport
 ): Lake | null {
+  const seaLevel = ground.seaLevel;
+  const continent = ground.field.climate.continent;
+  if (
+    continent &&
+    sampleGround(ground, c.u, c.v) < seaLevel &&
+    oceanCoverage(continent, sampleContinent(ground.field, c.u, c.v)) > 0
+  ) {
+    if (report) report.outcome = 'ocean';
+    return null;
+  }
+
   const phases = new Float64Array(SHAPE_WEIGHTS.length);
   for (let i = 0; i < phases.length; i++)
     phases[i] = hash01(c.hash, 5 + i) * Math.PI * 2;
@@ -216,13 +406,24 @@ function settleLake(
   let radius = c.radius;
   let slope = sampleRim(config, c, radius, phases, ground);
   if (report) report.rimSlope = slope;
-  if (Number.isNaN(slope)) {
-    if (report) report.outcome = 'ocean';
+  const lagoon = _rim[2] > 0;
+  const mouth = _rim[4];
+  if (c.ashore && !lagoon) {
+    if (report) report.outcome = 'missed the sea';
     return null;
   }
-  let level = _rim[0] - config.margin;
+  let level = lagoon ? seaLevel : _rim[0] - config.margin;
+  let spillHeight = lagoon ? seaLevel : _rim[0];
 
-  if (slope > config.maxRimSlope) {
+  // The sea holds a lagoon's seaward side, so only its dry rim is judged.
+  if (lagoon) {
+    slope = _rim[3];
+    if (report) report.rimSlope = slope;
+    if (slope > config.maxLagoonSlope) {
+      if (report) report.outcome = 'too steep for a lagoon';
+      return null;
+    }
+  } else if (slope > config.maxRimSlope) {
     const tarns = config.tarns;
     if (!tarns) {
       if (report) report.outcome = 'too steep';
@@ -231,12 +432,16 @@ function settleLake(
     radius = lerp(tarns.radius.from, tarns.radius.to, hash01(c.hash, 1));
     slope = sampleRim(config, c, radius, phases, ground);
     if (report) report.tarnSlope = slope;
-    if (Number.isNaN(slope) || slope > tarns.maxRimSlope) {
-      if (report)
-        report.outcome = Number.isNaN(slope) ? 'ocean' : 'too steep for a tarn';
+    if (_rim[2] > 0) {
+      if (report) report.outcome = 'ocean';
+      return null;
+    }
+    if (slope > tarns.maxRimSlope) {
+      if (report) report.outcome = 'too steep for a tarn';
       return null;
     }
     level = _rim[0] + (_rim[1] - _rim[0]) * tarns.lipShare;
+    spillHeight = level + config.margin;
   }
 
   return {
@@ -246,13 +451,16 @@ function settleLake(
     u: c.u,
     v: c.v,
     tarn: radius !== c.radius,
+    lagoon,
+    mouth: lagoon ? mouth : NaN,
     radius,
     bank: config.bank,
     outer: config.bank + config.moraine,
     reach: lakeReach(config, radius),
     depth: lerp(config.depth.from, config.depth.to, hash01(c.hash, 4)),
     level,
-    lip: level + config.margin,
+    lip: lagoon ? -Infinity : level + config.margin,
+    spillHeight,
     irregularity: config.irregularity,
     phases,
   };
@@ -273,7 +481,7 @@ export function findLakes(
   const config = climate.lakes;
   if (!config) return [];
 
-  const reach = maxLakeReach(config);
+  const reach = maxLakeReach(config) + maxLakeShift(config);
   const size = config.cellSize;
   const cellX0 = Math.floor((u0 - reach) / size);
   const cellX1 = Math.floor((u1 + reach) / size);
@@ -281,10 +489,10 @@ export function findLakes(
   const cellY1 = Math.floor((v1 + reach) / size);
 
   const lakes: Lake[] = [];
-  let ground: GroundSampler | null = null;
+  const ground = createGroundSampler(seed, climate, seaLevel);
   for (let cellY = cellY0; cellY <= cellY1; cellY++) {
     for (let cellX = cellX0; cellX <= cellX1; cellX++) {
-      const c = lakeCandidate(config, seed, cellX, cellY);
+      const c = lakeCandidate(config, seed, cellX, cellY, ground);
       if (!c) continue;
       if (
         c.u + c.reach < u0 ||
@@ -293,9 +501,8 @@ export function findLakes(
         c.v - c.reach > v1
       )
         continue;
-      if (!isSpaced(config, seed, c)) continue;
+      if (!isSpaced(config, seed, c, ground)) continue;
 
-      ground ??= createGroundSampler(seed, climate, seaLevel);
       const lake = settleLake(config, c, ground);
       if (lake) lakes.push(lake);
     }
@@ -313,8 +520,11 @@ export interface LakeCellReport {
     | 'ocean'
     | 'too steep'
     | 'too steep for a tarn'
+    | 'too steep for a lagoon'
+    | 'missed the sea'
     | 'lake'
-    | 'tarn';
+    | 'tarn'
+    | 'lagoon';
   /** The candidate's centre in lake space; NaN with no roll. */
   u: number;
   v: number;
@@ -364,18 +574,18 @@ export function inspectLakeCells(
         lake: null,
       };
       reports.push(report);
-      const c = lakeCandidate(config, seed, cellX, cellY);
+      const c = lakeCandidate(config, seed, cellX, cellY, ground);
       if (!c) continue;
       report.u = c.u;
       report.v = c.v;
-      if (!isSpaced(config, seed, c)) {
+      if (!isSpaced(config, seed, c, ground)) {
         report.outcome = 'crowded';
         continue;
       }
       const lake = settleLake(config, c, ground, report);
       if (!lake) continue;
       report.lake = lake;
-      report.outcome = lake.tarn ? 'tarn' : 'lake';
+      report.outcome = lake.lagoon ? 'lagoon' : lake.tarn ? 'tarn' : 'lake';
     }
   }
   return reports;
@@ -418,15 +628,35 @@ export function carveLakeHeight(
 
   const d = lakeDistance(lake, u, v);
   if (d >= lake.outer) return height;
-  if (d < 1) return lake.level - lake.depth * (1 - d * d);
-  const lipped = Math.max(height, lake.lip);
-  if (d < lake.bank)
-    return lerp(lake.level, lipped, smoothstep(d, 1, lake.bank));
-  return lerp(
-    lipped,
-    height,
-    smoothstep(d, lake.bank, lake.outer)
-  );
+  let carved: number;
+  if (d < 1) carved = lake.level - lake.depth * (1 - d * d);
+  else {
+    const lipped = Math.max(height, lake.lip);
+    carved =
+      d < lake.bank
+        ? lerp(lake.level, lipped, smoothstep(d, 1, lake.bank))
+        : lerp(lipped, height, smoothstep(d, lake.bank, lake.outer));
+  }
+  if (Number.isNaN(lake.mouth) || d < MOUTH_START) return carved;
+  return Math.min(carved, mouthHeight(lake, du, dv, d, carved));
+}
+
+// The floor of a lagoon's mouth at a point, blending out to `carved` either
+// side of its bearing and past the bank.
+function mouthHeight(
+  lake: Lake,
+  du: number,
+  dv: number,
+  d: number,
+  carved: number
+): number {
+  let off = Math.atan2(dv, du) - lake.mouth;
+  off -= Math.round(off / (Math.PI * 2)) * Math.PI * 2;
+  const across =
+    1 - smoothstep(Math.abs(off), MOUTH_HALF_ANGLE * 0.5, MOUTH_HALF_ANGLE);
+  if (across <= 0) return carved;
+  const along = 1 - smoothstep(d, lake.bank, lake.outer);
+  return lerp(carved, lake.level - MOUTH_DEPTH, across * along);
 }
 
 /**
@@ -534,6 +764,36 @@ export function createWaterSampler(
   };
 }
 
+// A lagoon shares the sea's level, so where the two overlap the water is one
+// surface: covered by either, owned by the lagoon while it covers the texel,
+// and blending from lake water at the centre to sea water at the shore.
+function sampleLagoon(
+  s: WaterSampler,
+  lake: Lake,
+  x: number,
+  y: number,
+  d: number,
+  lakeCoverage: number,
+  types: Float64Array
+): number {
+  const continent = s.field.climate.continent;
+  const ocean =
+    continent && s.oceanType >= 0
+      ? oceanCoverage(continent, sampleContinent(s.field, x, y))
+      : 0;
+  s.ocean = ocean;
+  if (lakeCoverage <= 0) s.bodyId = OCEAN_BODY_ID;
+
+  const coverage = Math.max(lakeCoverage, ocean);
+  if (coverage <= 0) return 0;
+  const toSea = lakeCoverage > 0 ? smoothstep(d, LAGOON_BLEND_FROM, 1) : 1;
+  if (s.lakeType >= 0 && s.lakeType < types.length)
+    types[s.lakeType] = 1 - toSea;
+  if (s.oceanType >= 0 && s.oceanType < types.length)
+    types[s.oceanType] += toSea;
+  return coverage;
+}
+
 /**
  * The water's coverage at chunk sample (x, y), 0..1, with the palette's type
  * weights written into `types`. Also sets the sampler's level, ocean and
@@ -565,6 +825,7 @@ export function sampleWater(
     s.level = lake.level;
     s.bodyId = lake.bodyId;
     const coverage = d < lake.bank ? lakeCoverage(lake, d) : 0;
+    if (lake.lagoon) return sampleLagoon(s, lake, x, y, d, coverage, types);
     if (coverage > 0 && s.lakeType >= 0 && s.lakeType < types.length)
       types[s.lakeType] = 1;
     return coverage;
