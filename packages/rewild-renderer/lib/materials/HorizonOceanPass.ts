@@ -101,12 +101,15 @@ export class HorizonOceanPass implements IMaterialPass {
     pass.setPipeline(this.pipeline);
     pass.setVertexBuffer(0, geometry.vertexBuffer);
     pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
-    this.sharedUniformsTracker.prepareMeshUniforms(
-      renderer,
-      pass,
-      camera,
-      meshes
-    );
+    if (
+      !this.sharedUniformsTracker.prepareMeshUniforms(
+        renderer,
+        pass,
+        camera,
+        meshes
+      )
+    )
+      return;
 
     const numIndices = geometry.indices!.length;
     for (const mesh of meshes) {

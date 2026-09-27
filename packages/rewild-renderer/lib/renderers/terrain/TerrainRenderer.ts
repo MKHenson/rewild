@@ -25,6 +25,9 @@ import { generateSplatMap } from './Splat';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { ScatterModels } from './ScatterModels';
 import { HorizonOcean } from '../water/HorizonOcean';
+import { WaterWaveBuffer } from '../water/WaterWaves';
+import { waterNormalFade } from '../water/WaterQuality';
+import { MAX_WATER_GRID_BANDS, waterGridBands } from '../water/WaterGrid';
 
 export class LODInfo {
   lod: i32;
@@ -144,6 +147,16 @@ export class TerrainRenderer {
   private _enabled: boolean = true;
   // The ocean past the last chunk. Created with the renderer.
   private horizonOcean: HorizonOcean | null = null;
+  /** The waves every chunk's water sums, advanced once a frame. */
+  readonly waterWaves = new WaterWaveBuffer();
+  /** Whether the waves displace the water grid. Off leaves them shading only,
+   *  to tell a geometry artefact from a shading one. */
+  waterWaveGeometry = true;
+  /** Whether the waves shade the water's normal. Off leaves it flat, their
+   *  slope only widening the highlight. */
+  waterWaveNormals = true;
+  private waterLodDistances = new Float32Array(MAX_WATER_GRID_BANDS);
+  private waterLodSpacings = new Float32Array(MAX_WATER_GRID_BANDS);
   // Resolved once per preset rather than every frame: resolving an unknown id
   // warns.
   private horizonClimate: { preset: string; climate: ClimateConfig } | null =
@@ -820,6 +833,43 @@ export class TerrainRenderer {
     if (!this._enabled) return;
     this.updateVisibility(renderer, camera);
     this.updateHorizonOcean(renderer);
+    this.updateWaterWaves(renderer, camera);
+  }
+
+  private updateWaterWaves(renderer: Renderer, camera: Camera) {
+    const wind = renderer.sky.skyRenderer.wind.vec;
+    const palette = resolveClimatePreset(this._climatePreset).water ?? [];
+    const waves = this.waterWaves.waves;
+    waves.update(renderer.delta / 1000, wind[0], wind[1], wind[2], palette);
+    const eye = camera.transform.position;
+    waves.setOrigin(eye.x, eye.z);
+
+    // Distances are measured from where chunk LODs were last chosen, so a
+    // vertex's waves always match the coarsest grid that can border it.
+    const lodEye = this.viewPosOld ?? eye;
+    let finest = waterGridBands(
+      this.detailLevels,
+      this.chunkSize,
+      this.waterLodDistances,
+      this.waterLodSpacings
+    );
+    // A spacing no octave fits in turns displacement off.
+    if (!this.waterWaveGeometry) {
+      finest = 1e6;
+      this.waterLodSpacings.fill(1e6);
+    }
+    this.waterWaves.upload(
+      renderer.device,
+      // No octave is large enough on screen to shade at a scale of 0.
+      this.waterWaveNormals
+        ? waterNormalFade(renderer.quality.aspect('water'))
+        : 0,
+      lodEye.x,
+      lodEye.z,
+      finest,
+      this.waterLodDistances,
+      this.waterLodSpacings
+    );
   }
 
   // The ring follows the centre chunk visibility was last computed from, so it
@@ -844,7 +894,6 @@ export class TerrainRenderer {
   }
 
   private updateVisibility(renderer: Renderer, camera: Camera) {
-
     // getWorldDirection refreshes the camera's world matrix and, via its
     // transform observer, matrixWorldInverse — so both the frustum built below
     // and the facing comparison use this frame's camera pose.
@@ -923,6 +972,7 @@ export class TerrainRenderer {
     this.clearChunks();
     this.horizonOcean?.dispose();
     this.horizonOcean = null;
+    this.waterWaves.dispose();
     this.scatterModels.dispose();
     this.workerPool.dispose();
   }

@@ -45,3 +45,39 @@ describe('shader host contract', () => {
     });
   }
 });
+
+// WGSL reserves these as identifiers (a subset of the spec's list: the ones a
+// shader author could plausibly reach for). Tint rejects them only when the
+// device compiles the module, long after the edit that introduced them.
+const RESERVED = new Set([
+  'active', 'as', 'attribute', 'auto', 'become', 'cast', 'catch', 'class',
+  'common', 'compile', 'do', 'enum', 'export', 'extends', 'filter', 'final',
+  'from', 'get', 'goto', 'impl', 'import', 'layout', 'macro', 'match',
+  'meta', 'mod', 'module', 'move', 'new', 'nil', 'of', 'pass', 'patch',
+  'priv', 'public', 'ref', 'resource', 'self', 'set', 'shared', 'smooth',
+  'static', 'target', 'this', 'type', 'union', 'unless', 'use', 'using',
+  'varying', 'virtual', 'where', 'with', 'yield',
+]);
+
+// Every name a shader declares: let/var/const bindings and function
+// parameters.
+function declaredNames(source: string): string[] {
+  const names: string[] = [];
+  for (const match of source.matchAll(/\b(?:let|var|const)(?:<[^>]*>)?\s+(\w+)/g))
+    names.push(match[1]);
+  for (const match of source.matchAll(/\bfn\s+\w+\s*\(([^)]*)\)/g))
+    for (const param of match[1].split(','))
+      if (param.includes(':')) names.push(param.split(':')[0].replace(/@\w+(\([^)]*\))?/g, '').trim());
+  return names;
+}
+
+describe('shader identifiers', () => {
+  const sources = readdirSync(SHADER_DIR, { recursive: true })
+    .map(String)
+    .filter((name) => name.endsWith('.wgsl'));
+
+  it.each(sources)('declares no reserved word in %s', (name) => {
+    const source = readFileSync(join(SHADER_DIR, name), 'utf8');
+    expect(declaredNames(source).filter((n) => RESERVED.has(n))).toEqual([]);
+  });
+});

@@ -8,6 +8,7 @@ import { registerSkyDebugCommands } from './SkyDebugCommands';
 import { registerPbrHarnessCommands } from './PbrHarnessCommands';
 import { registerGltfImportCommands } from './GltfImportCommands';
 import { registerLakeDebugCommands } from './LakeDebugCommands';
+import { registerWaterDebugCommands } from './WaterDebugCommands';
 import {
   registerScatterDebugCommands,
   registerWindDebugCommands,
@@ -27,5 +28,6 @@ export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerScatterDebugCommands(renderer);
   registerWindDebugCommands(renderer);
   registerLakeDebugCommands(renderer);
+  registerWaterDebugCommands(renderer);
   registerChunkSnapshotDevCommands(renderer, project);
 }
