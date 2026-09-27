@@ -14,8 +14,6 @@ import {
   WaterUniforms,
 } from './uniforms/WaterUniforms';
 import { WaterType } from '../renderers/terrain/Water';
-import { waterShaderDefines } from '../renderers/water/WaterQuality';
-import { RenderQuality } from '../utils/RenderQuality';
 import { composeShader } from '../utils/shaderDefines';
 
 const waterGroupIndex = 1;
@@ -109,8 +107,6 @@ export class WaterPass implements IMaterialPass {
   lightingUniforms: Lighting;
   shadowUniforms: ShadowUniforms;
 
-  /** Tier the pipelines were built against; a change rebuilds them. */
-  private builtQuality: RenderQuality | null = null;
   private depth = new WaterSubPass();
   private absorb = new WaterSubPass(true, true);
 
@@ -159,10 +155,8 @@ export class WaterPass implements IMaterialPass {
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
     const { device, sceneColorFormat } = renderer;
-    const quality = renderer.quality.aspect('water');
-    this.builtQuality = quality;
     const module = device.createShaderModule({
-      code: composeShader([shader], waterShaderDefines(quality)),
+      code: composeShader([shader], {}),
     });
     const multisample = { count: renderer.sampleCount };
     const primitive: GPUPrimitiveState = {
@@ -269,13 +263,6 @@ export class WaterPass implements IMaterialPass {
     meshes: Mesh[],
     geometry: Geometry
   ): void {
-    // The tier bakes loop bounds into the shader, so only a rebuild applies it.
-    // init() reflags every bind group, since `layout: 'auto'` changes.
-    if (renderer.quality.aspect('water') !== this.builtQuality) {
-      this.requiresRebuild = true;
-      return;
-    }
-
     const numIndices = geometry.indices!.length;
     pass.setVertexBuffer(0, geometry.vertexBuffer);
     pass.setVertexBuffer(1, geometry.uvBuffer);

@@ -26,7 +26,8 @@ import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { ScatterModels } from './ScatterModels';
 import { HorizonOcean } from '../water/HorizonOcean';
 import { WaterWaveBuffer } from '../water/WaterWaves';
-import { waterNormalFade } from '../water/WaterQuality';
+import { waterDetailBias } from '../water/WaterQuality';
+import { OceanFFT } from '../water/OceanFFT';
 import { MAX_WATER_GRID_BANDS, waterGridBands } from '../water/WaterGrid';
 
 export class LODInfo {
@@ -147,14 +148,18 @@ export class TerrainRenderer {
   private _enabled: boolean = true;
   // The ocean past the last chunk. Created with the renderer.
   private horizonOcean: HorizonOcean | null = null;
-  /** The waves every chunk's water sums, advanced once a frame. */
+  /** What every chunk's water shares besides the ocean, once a frame. */
   readonly waterWaves = new WaterWaveBuffer();
+  /** The FFT ocean every chunk's water samples; made on the first update. */
+  ocean: OceanFFT | null = null;
   /** Whether the waves displace the water grid. Off leaves them shading only,
    *  to tell a geometry artefact from a shading one. */
   waterWaveGeometry = true;
-  /** Whether the waves shade the water's normal. Off leaves it flat, their
-   *  slope only widening the highlight. */
+  /** Whether the waves shade the water's normal. Off leaves it flat. */
   waterWaveNormals = true;
+  /** Paints the water's raw foam coverage in grey, to tell whether the ocean
+   *  makes foam from whether the foam texture hides it. */
+  waterFoamDebug = false;
   private waterLodDistances = new Float32Array(MAX_WATER_GRID_BANDS);
   private waterLodSpacings = new Float32Array(MAX_WATER_GRID_BANDS);
   // Resolved once per preset rather than every frame: resolving an unknown id
@@ -839,8 +844,11 @@ export class TerrainRenderer {
   private updateWaterWaves(renderer: Renderer, camera: Camera) {
     const wind = renderer.sky.skyRenderer.wind.vec;
     const palette = resolveClimatePreset(this._climatePreset).water ?? [];
+    const deltaSeconds = renderer.delta / 1000;
     const waves = this.waterWaves.waves;
-    waves.update(renderer.delta / 1000, wind[0], wind[1], wind[2], palette);
+    waves.update(deltaSeconds, wind[0], wind[1], wind[2], palette);
+    if (!this.ocean) this.ocean = new OceanFFT(renderer.device);
+    this.ocean.update(renderer.device, deltaSeconds, wind[0], wind[1], wind[2]);
     const eye = camera.transform.position;
     waves.setOrigin(eye.x, eye.z);
 
@@ -853,24 +861,24 @@ export class TerrainRenderer {
       this.waterLodDistances,
       this.waterLodSpacings
     );
-    // A spacing no octave fits in turns displacement off.
+    // A spacing no cascade fits in samples each at its last mip: the mean,
+    // which is flat.
     if (!this.waterWaveGeometry) {
       finest = 1e6;
       this.waterLodSpacings.fill(1e6);
     }
-    this.waterWaves.upload(
-      renderer.device,
-      // No octave is large enough on screen to shade at a scale of 0.
-      this.waterWaveNormals
-        ? waterNormalFade(renderer.quality.aspect('water'))
-        : 0,
-      lodEye.x,
-      lodEye.z,
-      finest,
-      this.waterLodDistances,
-      this.waterLodSpacings,
-      wind
-    );
+    this.waterWaves.upload(renderer.device, {
+      detailBias: waterDetailBias(renderer.quality.aspect('water')),
+      normals: this.waterWaveNormals,
+      foamDebug: this.waterFoamDebug,
+      eyeX: lodEye.x,
+      eyeZ: lodEye.z,
+      finestSpacing: finest,
+      lodDistances: this.waterLodDistances,
+      lodSpacings: this.waterLodSpacings,
+      wind,
+      windSpeed: this.ocean.windSpeed,
+    });
   }
 
   // The ring follows the centre chunk visibility was last computed from, so it
@@ -974,6 +982,8 @@ export class TerrainRenderer {
     this.horizonOcean?.dispose();
     this.horizonOcean = null;
     this.waterWaves.dispose();
+    this.ocean?.dispose();
+    this.ocean = null;
     this.scatterModels.dispose();
     this.workerPool.dispose();
   }

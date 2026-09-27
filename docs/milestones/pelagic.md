@@ -36,7 +36,7 @@ paths and goals can go. If objects come first, they must move later.
 - A **surface shader**: sky reflection, depth colour, Fresnel, foam and refraction.
 - **Waves driven by the weather**. A storm makes the ocean rough and the lake only a little rough.
 - **Waves at the shore** that turn toward the beach, foam lines that roll in, and swash.
-- **Foam that matches the wind**, from a calm mirror to whitecaps and streaks at full wind.
+- **Foam that matches the wind**, from a calm mirror to whitecaps everywhere at full wind.
 - **Beaches and wet shores** on the terrain, and **coastal moisture** in the climate.
 - **Scatter conditions** for water depth and water type.
 - A **water brush** in the editor, with edits saved like other terrain edits.
@@ -50,7 +50,6 @@ paths and goals can go. If objects come first, they must move later.
   That needs data from far outside the chunk. Noise-channel rivers are a stretch goal (Phase 5).
 - **Waterfalls.** A waterfall is a jump in the surface level. The water map does not allow jumps.
 - **Screen-space reflections.** Sky reflections from the existing sky cube are enough for now.
-- **FFT ocean simulation.** A sum of wave octaves is cheaper and easier to control on the web.
 - **Buoyancy, boats and floating objects.** These belong to the objects milestone.
 - **Tides.** Sea level stays fixed for a world.
 
@@ -71,7 +70,8 @@ paths and goals can go. If objects come first, they must move later.
 | Water bodies          | **Records with an ID**, plus a body ID channel      | Edit rules must know which lake a texel belongs to. The ocean is body 0.                                             |
 | Edit rule             | **A lake's level is at most its spill height**      | The editor keeps levels valid with no water simulation. A high lake cannot join the ocean by accident.               |
 | Edits                 | **Extend `PaintMask`** plus a float level grid      | One format, one sampler and one brush. It reuses the existing seam fix at chunk edges.                                |
-| Wave queries          | **Same octave sum on the CPU and the GPU**          | Gameplay needs a few heights per frame. A GPU readback arrives frames late, so the CPU computes them.                |
+| Waves                 | **FFT ocean**: cascaded JONSWAP tiles, choppy       | A measured sea spectrum with a wind sea and a swell reads as water; a sum of a few waves reads as noise.             |
+| Wave queries          | **GPU readback**                                    | The CPU cannot afford the FFT. A few heights per frame arrive a frame or three late, which gameplay tolerates.        |
 | Horizon               | **Ocean ring** from the last chunk to the far plane | Chunks stop at 2,800 m. From high ground, the ocean would stop short of the horizon.                                 |
 | Render position       | **After opaque geometry, before the atmosphere**    | Water refracts the opaque scene. Fog and sky composite over water in the same way as over terrain.                   |
 
@@ -403,11 +403,11 @@ chunk water then never overlap, and neither z-fights the other.
 
 ### Surface
 
-- **Waves.** A heightfield of wave octaves in the vertex shader, as a function of world position.
-  Blend the octave **amplitudes** between water types, not two separate wave shapes. So the surface
-  does not tear at a blend. The weather sets their strength. See [Wind](#wind).
-- **Normals.** The wave octaves' own slopes, down to 0.15 m ripples, with the gust field on the
-  short ones. See [Wind](#wind). No detail normal maps: they would tile.
+- **Waves.** The FFT ocean's displacement moves the grid in the vertex shader, sideways as well
+  as up. Water types weight the **cascades**, not separate oceans, so the surface does not tear
+  at a blend. The weather sets the sea. See [Wind](#wind).
+- **Normals.** The FFT ocean's slopes, per pixel, with the gust field on the short cascades. See
+  [Wind](#wind). No detail normal maps: they would tile.
 - **Reflection.** Sample the prefiltered sky cube (`SkyCubeCapture`, `SkyIblPrefilter`). Rougher
   water samples a blurrier mip.
 - **Sun glint.** A specular sun term, gated by CSM geometry shadows and cloud shadows. This follows
@@ -436,79 +436,64 @@ chunk water then never overlap, and neither z-fights the other.
 `SkyRenderer` gives `windDirection` (a normalized XZ vector) and `windiness` (0 to 1). The base
 wind speed is `windiness × 10` m/s, with gusts on top. Foliage already reads the same wind.
 
-- **Octaves.** `WaterWaves` owns one set of 40 octaves from 120 m down to 0.15 m, longest first,
-  log-spaced about ×1.19 a step with seeded jitter. Octave `i` has phase
-  `θ = k·(D·p) − ω·t + φ` and adds `A·(exp(sin θ − 1) − mean)` to the height: sharp crests and
-  broad troughs, averaging to the level. Each octave then **drags** the point the next samples by
-  `−D·drag·A·exp(sin θ − 1)·cos θ`, so the octaves interact: crests bunch, bend and break up.
-  The surface is a pure heightfield; nothing moves sideways.
-- **Direction.** Each octave has a fixed bearing, stepping by the golden angle with ±20° of
-  seeded jitter, so open water is chop from every side with no prevailing heading. The wind does
-  not turn it, so a change of wind never makes the surface jump. Waves with a heading come from
-  the shore layer (see [Waves at the shore](#waves-at-the-shore)), which the chop does not fight.
-- **Speed.** An octave's speed comes from its length, not from the wind. In deep water,
-  `c = √(g·λ / 2π)`, so long swells stay slow and heavy, and short chop stays fast. Frequencies are
-  snapped to whole cycles over a 256 s loop, and the clock wraps there. The clock runs up to 60%
-  faster in full wind, so a storm's chop looks agitated; it only accumulates, so a change of rate
-  never jumps the surface.
-- **Wind.** Wave height follows the wind as it is, with no lag. The wind sets:
-  - **Height:** each palette type spreads a total steepness `k·A` of 10 over the octaves, scaled by
-    `waveResponse` and by the wind from 15% in a calm to 100% in full wind, so still water keeps
-    some chop. Every octave below the peak is equally steep, as in a wind sea, so the fast short
-    chop carries the look. A low, broad bump at the peak makes the swell stand taller than the
-    chop on it; a narrow one leaves three octaves carrying most of the slope, and three waves at
-    fixed angles cross into a regular lattice. The short end of the set gives a lake's short peak
-    a chop spectrum under it. Octaves under the peak then keep `(λ / peak)^0.25` of their
-    steepness. This taper comes after the spectrum is normalised, so it does not raise the peak:
-    many steep, sharp-crested ripples crossing at fixed angles emboss the surface into cells.
-  - **Peak:** the spectrum peaks at the type's `waveScale` in full wind and at a third of it in a
-    breeze. A stronger wind raises longer, faster waves.
-  - **Choppiness:** the drag grows with the wind, from the same 15% floor.
+- **FFT ocean.** `OceanFFT` runs a Tessendorf ocean (adapted from Tidewater, MIT) in one compute
+  pass a frame: four cascades of 256² texels over tiles of 733, 157, 33.3 and 7.1 m. Their ratios
+  are not whole numbers, so the tiles never repeat in step. Each cascade holds the wavenumbers from
+  6 cycles over its own tile to 6 over the next (`cascadeBand`), so every wave lives in exactly
+  one. A row and a column inverse transform give per cascade a displacement texture (Dx, Dy, Dz,
+  foam) and a slope texture (dDy/dx, dDy/dz, dDx/dx, dDz/dz), 2D arrays with compute-built mips.
+- **Spectrum.** JONSWAP with directional spreading (`OceanSpectrum`), for two sea states: a local
+  **wind sea** over a 200 km fetch, spread around the wind, and a **swell** from a fixed bearing
+  over 1200 km, narrow and always there, about 0.7 m high: a slow heave under the wind sea. The spectrum sets the random phases once per wavenumber
+  from a seed; changing the wind only rebuilds the amplitudes, so the surface never jumps.
+- **Wind.** The weather's `windiness` maps to a wind speed from 0.5 m/s to 22 m/s, climbing as
+  `windiness^1.5` (`oceanWindSpeed`): a sea about 0.2 m high in a calm, 2.5 m at 0.5 and 5.9 m at
+  1. The ocean follows the weather's wind lagged by 6 s, so a sea builds and
+  calms, and it rebuilds the spectrum when the lagged wind has moved by 0.05 m/s or 0.5°. A
+  stronger wind raises a longer, higher sea. The clock runs up to 60% faster in full wind, so a
+  storm's chop looks agitated; it only accumulates, so a change of rate never jumps.
+- **Choppiness.** The horizontal displacement is 1.9 × its linear value: crests sharpen and
+  bunch, troughs broaden.
+- **Speed.** A wave's speed comes from its length, as in deep water, `c = √(g·λ / 2π)`. Every
+  angular frequency is snapped to whole cycles over a 1024 s loop, and the clock wraps there.
+- **Water types.** A palette type takes every cascade up to 8 × its `waveScale` long, fading out
+  by 16 ×, scaled by its `waveResponse` (`cascadeWeight`). The ocean (100 m) takes all four; a
+  lake (10 m) takes only the 33.3 m and 7.1 m cascades, so it stays small in any wind.
 - **Variation.** Two independent fields of value noise scale the waves so no two stretches of
   water look alike: a swell field (760 m and 280 m cells, 0.35 to 1.35) and a chop field (430 m
-  and 150 m cells, 0.08 to 1.45). Each octave blends the two by its length, log-spaced from the
-  longest to the shortest, so one stretch is rolling swell, the next busy chop, and where the chop
-  field bottoms out a glassy slick. The noise drifts downwind at 2.5 m/s at full wind, so rough
-  patches cross the water. Its lattice repeats every 256 cells, so the drift wraps.
+  and 150 m cells, 0.08 to 1.45). Each cascade blends the two by its length, from the longest to
+  the shortest, so one stretch is rolling swell, the next busy chop, and where the chop field
+  bottoms out a glassy slick. The noise drifts downwind at 2.5 m/s at full wind, so rough patches
+  cross the water. Its lattice repeats every 256 cells, so the drift wraps.
 - **Grid and distance.** Water grids are 2 m a quad within the first LOD distance, then 4, 8,
-  16 and 32 m. An octave shorter than 4–8 grid spacings does not displace the grid; fewer samples
-  a wavelength leave jagged facets that, at a grazing view, hide one another in grid-aligned
-  bands. Which octaves displace a vertex depends on its **distance** from where chunk LODs were
-  last chosen, not on its chunk's grid: the distance gives the coarsest grid the LOD system can
-  put there, ramped in 60 m before each LOD distance. Two chunks meeting at a vertex measure the
-  same distance, so they displace it by the same waves, and with at least 4 samples a wavelength
-  on the coarser side the seam stays well under a pixel. Far out no octave fits the grid, so the
-  displacement fades on its own. Waves die down over the last 1.5 m of depth.
-- **Precision.** Far from the world origin a short octave's phase runs to hundreds of thousands of
-  radians, and GPU trig breaks up into blocks there. The CPU takes the phases from an origin near
-  the camera, snapped to 1024 m and reduced in double precision; the shader measures positions from
-  it and wraps each phase into 0..2π before `sin` and `cos`.
-- **Normals.** The normal splits between the two stages by the same weight that picks the octaves
-  a vertex is displaced by. The vertex shader sums the slopes of the octaves the grid holds, which
-  are smooth across a cell, and passes them and its drag on. The pixel shader adds the rest, so its
-  octave budget goes to the ripples the grid cannot hold, and the normal matches the displaced
-  surface. Each pixel octave's normal fades out as its wavelength shrinks from 8 to 3
-  pixels on screen, measured from the pixel's footprint on the water, so it fades sooner at a
-  grazing view. Octaves with no height in the water drawn are skipped. The slope variance of every
-  octave faded out is added to α², so their highlight widens instead of sparkling. The drag's
-  bending of the slope is left out; it barely shows and would triple the cost.
-- **Quality.** The `water` quality aspect (`WaterQuality.ts`) sets how many octaves the pixel
-  normal sums (10 on low to 32 on ultra, counting only octaves with height the grid does not
-  already carry; the absorb draw, which only needs
-  Fresnel, sums fewer) and how small on screen they carry. The octaves that displace the grid are the same on every tier, so the CPU query
-  and every player agree on the surface.
+  16 and 32 m. A vertex samples each cascade's displacement at the mip whose texels match the
+  grid, 0.7 levels coarser, so no wave shorter than the grid can hold moves it. The spacing comes
+  from the vertex's **distance** from where chunk LODs were last chosen, not from its chunk's grid:
+  the coarsest grid the LOD system can put there, ramped in 60 m before each LOD distance. Two
+  chunks meeting at a vertex measure the same distance and sample the same mip, so the seam does
+  not crack. Waves die down over the last 1.5 m of depth.
+- **Precision.** Positions are measured from an origin near the camera, snapped to 1024 m. The CPU
+  gives each cascade where that origin falls in its tile, in double precision, so the shader adds
+  only small numbers.
+- **Normals.** The pixel shader samples each cascade's slopes at the pixel's rest position (where
+  its water came from), with gradients from the pixel's footprint: anisotropic, trilinear. The
+  normal divides the height slopes by the surface's stretch. The slope a mip averages away is
+  estimated from a wind sea's mean square slope (Cox and Munk, `0.003 + 0.00512 × U`) times the
+  share of the spectrum finer than the pixel, and added to α², so the highlight widens instead of
+  sparkling.
+- **Quality.** The `water` quality aspect (`WaterQuality.ts`) biases the slope mip, from −0.5 on
+  ultra to 1 on low. The displacement and the foam are the same on every tier.
 - **Gusts.** The foliage gust field (`gustField` in `scatter-wind.wgsl`, read with the same wind
-  vector) scales the ripples from 0.25 in a lull to 1.8 in a gust, fully from a wind strength of
-  0.3. This makes "cat's paws": dark patches of ripples that run downwind across the water, and
-  one gust crosses the water and then the forest. Only octaves shorter than the finest grid can
-  displace (4 grid spacings) take part, so the surface the CPU queries is untouched.
+  vector) scales the shortest cascade, and half of the next, from 0.5 in a lull to 1.8 in a gust,
+  fully from a wind strength of 0.5. This makes "cat's paws": dark patches of ripples that run
+  downwind across the water, and one gust crosses the water and then the forest.
 
 ### Waves at the shore
 
 The shader has the depth and the terrain height texture. These give the main shore effects:
 
 - **Shoaling.** Waves get shorter and steeper in shallow water, then flatten at the waterline.
-  Scale the octave amplitudes and lengths by depth.
+  Scale the cascade amplitudes by depth, longest first.
 - **Shore waves.** A separate layer whose crests run parallel to the coast and travel inward:
   phase `k·d − ω·t` over a smoothed distance to shore `d`, built per chunk with the water map.
   It fades in over a depth band and steepens as the water shallows, while the open-water chop
@@ -531,7 +516,7 @@ of foam. Tune this mapping together with the foliage:
 | 0.3         | 3 m/s             | Small ripples, no foam                                  |
 | 0.5         | 5 m/s             | Small waves, a few whitecaps                            |
 | 0.8         | 8 m/s             | Moderate waves, many whitecaps                          |
-| 1.0         | 10 m/s and gusts  | Rough sea, whitecaps everywhere, foam streaks with wind |
+| 1.0         | 10 m/s and gusts  | Rough sea, whitecaps everywhere, long foam trails    |
 
 The foam uses no saved state:
 
@@ -542,21 +527,15 @@ The foam uses no saved state:
   through. It tiles twice,
   8 m and 12.8 m turned 37°, to hide the repeat, and drifts downwind at 1.5 m/s at full wind; the
   CPU accumulates the drift and wraps it at 8192 m, which every tiling divides.
-- **Whitecaps.** Foam where many octaves crest together: the surface's height over the octaves at
-  least 2 m long, as a z-score of their summed amplitudes. The vertex stage passes its octaves'
-  height and energy on and the pixel stage adds its own, as for the normal. There is none below
-  a wind strength of 0.3; above it the z a whitecap takes falls from 3 (a crest in a thousand) to
-  1.1 in full wind.
-- **Persistence.** Real foam stays where the crest broke while the crest moves on. The waves are a
-  function of time, so the vertex stage finds the whitecaps of four past moments, 0.7 s to 4.3 s
-  ago, from the heights of the octaves the grid holds (their energy does not change with time).
-  Each is faded by `exp(−age / 3 s)` and the strongest is kept. That sets both the old foam's
-  coverage and its opacity, which falls from 1 to 0.2: falling coverage raises the density
-  threshold, so old foam breaks into lace and turns translucent before it goes.
-- **Streaks.** From a wind strength of 0.75, the texture stretched 64 m along the wind by 4 m
-  across adds streaks, up to half coverage and 0.35 opacity, from a mip 1.5 levels blurrier so
-  they read as soft lines. The gust field masks them, so bands of streaks sweep downwind with the
-  gusts instead of lying on the water as fixed lines.
+- **Whitecaps.** Foam where the surface compresses: the ocean's Jacobian, from the choppy
+  displacement's derivatives. Each cascade's texel makes foam where it falls below 0.89, adds it
+  at 3.5 a second and lets it decay at 0.95 a second, in a buffer kept from frame to frame. The
+  vertex stage sums it over the cascades (0.35, 0.45, 0.5 and 0.25 of each); the pixel adds fresh
+  foam where its own slopes squeeze the surface below 0.43 now.
+- **Persistence.** The foam buffer lives at the water's rest positions, so the foam rides the
+  surface it formed on and is left behind as the crest moves on, thinning into lace as its
+  coverage decays. Far out the texture averages to grey, so from 0.15 m to 1.2 m of water per
+  pixel the plain coverage takes over.
 - **Per type.** The palette's foam amount scales it all, so a lake stays much calmer than the ocean
   in the same wind.
 - **Shading.** All foam is scaled by an overall opacity of 0.9. It is a rough (0.6), bright
@@ -604,19 +583,11 @@ shelf.
 
 ## Gameplay
 
-- A CPU **water query**: `sample(x, z)` gives level, depth, coverage, type weights, body ID and
-  flow. It reads the same data as the shader.
-- The query adds the **same octave sum** as the vertex shader (`WaterWaves.height`), so the
-  player sits on the waves that you see. Gameplay needs only a few points per frame, which costs
-  microseconds on the CPU. A GPU compute readback arrives frames late, so the player would bob out
-  of time with the surface. The surface is a heightfield, so the height at `(x, z)` is the sum
-  there, with no search.
-- To keep the two sums the same:
-  - One source of wave parameters. The CPU reads it and uploads it to the GPU.
-  - The same time value each frame, wrapped to a loop length so `f32` keeps its precision.
-  - The same variation noise, a hashed lattice both sides compute exactly.
-  - A unit test that compares the TypeScript and WGSL results at fixed points.
-- Normal maps never change the height, so the CPU ignores them.
+- A **water query**: `sample(x, z)` gives level, depth, coverage, type weights, body ID and
+  flow from the same data as the shader, and the wave height from a GPU readback.
+- The readback samples the FFT displacement for a few points a frame and arrives a frame or three
+  late. The displacement is sideways as well as up, so a point's height is found by solving for
+  the rest position that lands on it, a few fixed-point steps.
 - The player does not walk on water. Shallow water slows the player. Deep water makes the player
   swim at the surface.
 - The camera knows when it is under water. Phase 5 uses this for the under-water effect.
@@ -627,8 +598,8 @@ shelf.
    `hasWater`, the shared grid mesh, the horizon ring, sky reflection, depth colour, beach band,
    scatter kept out of water.
 2. **Lakes.** Lake cells, carving, lagoons, water body records and palette blending.
-3. **Surface detail.** Wave octaves from the wind, normal maps with gusts, whitecaps and
-   streaks, refraction, sun glint, the wet band and waves at the shore.
+3. **Surface detail.** The FFT ocean from the wind, gusts, whitecaps, refraction,
+   sun glint, the wet band and waves at the shore.
 4. **Editor and gameplay.** Water brush, edit rules and spill height, sea channels, locked lakes,
    saved edits, water query with CPU waves, wading and swimming.
 5. **Stretch.** Under-water post-process, caustics, rain ripples on water, a persistent foam
@@ -639,10 +610,11 @@ shelf.
 - **One extra full-screen copy** per frame for the refraction texture (HDR colour).
 - Water patches draw only for chunks with coverage. Dry chunks cost nothing.
 - Patches reuse terrain LOD. Far water uses fewer vertices and fewer waves.
-- The vertex shader sums 4 to 8 waves. The fragment shader takes two normal samples, one sky cube
-  sample, one depth sample and one refraction sample.
+- One compute pass a frame for the ocean: two transforms and the mip chains over four 256²
+  cascades. The vertex shader takes a displacement sample per cascade; the fragment shader a slope
+  sample per cascade, one sky cube sample and two refraction samples.
 - The horizon ring is one draw call. Its vertices take no waves, and its pixels skip refraction.
-- `QualitySettings` controls the wave count, refraction and crest foam.
+- `QualitySettings` controls the ocean's slope mip bias.
 
 ## Open questions
 
