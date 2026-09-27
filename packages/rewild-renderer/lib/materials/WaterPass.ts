@@ -37,8 +37,12 @@ const vertexBuffers: GPUVertexBufferLayout[] = [
 // bind group layouts of its own, so each such draw keeps its own copies.
 class WaterSubPass {
   pipeline: GPURenderPipeline;
-  readonly water = new WaterUniforms(waterGroupIndex);
+  readonly water: WaterUniforms;
   private meshUniforms = new Map<Mesh, ProjModelView>();
+
+  constructor(refracts = false) {
+    this.water = new WaterUniforms(waterGroupIndex, refracts);
+  }
 
   setPipeline(pipeline: GPURenderPipeline) {
     this.pipeline = pipeline;
@@ -54,7 +58,7 @@ class WaterSubPass {
     numIndices: number
   ) {
     pass.setPipeline(this.pipeline);
-    if (this.water.requiresBuild)
+    if (this.water.requiresBuild || this.water.isStale(renderer))
       this.water.build(
         renderer,
         this.pipeline.getBindGroupLayout(waterGroupIndex)
@@ -88,8 +92,9 @@ class WaterSubPass {
 // alone. The waves fold the surface over itself on screen, a crest in front of
 // the slope behind it, so the absorb and light draws then shade only where the
 // depth is equal: the nearest layer, whatever order the triangles come in. The
-// absorb draw multiplies the scene behind by the light that passes through the
-// water; the light draw adds reflection and in-water scatter. The depth stays
+// absorb draw replaces the scene behind with the refracted scene
+// (Renderer.refraction) times the light that passes through the water; the
+// light draw adds reflection and in-water scatter. The depth stays
 // for the atmosphere composite, which fogs the water like terrain.
 export class WaterPass implements IMaterialPass {
   profileCategory: SceneCategory = 'water';
@@ -107,7 +112,7 @@ export class WaterPass implements IMaterialPass {
   /** Tier the pipelines were built against; a change rebuilds them. */
   private builtQuality: RenderQuality | null = null;
   private depth = new WaterSubPass();
-  private absorb = new WaterSubPass();
+  private absorb = new WaterSubPass(true);
 
   constructor() {
     this.waterUniforms = new WaterUniforms(waterGroupIndex);
@@ -204,8 +209,13 @@ export class WaterPass implements IMaterialPass {
           targets: [
             {
               format: sceneColorFormat,
+              // Alpha is the water's coverage: its edge fades to the scene.
               blend: {
-                color: { srcFactor: 'zero', dstFactor: 'src', operation: 'add' },
+                color: {
+                  srcFactor: 'src-alpha',
+                  dstFactor: 'one-minus-src-alpha',
+                  operation: 'add',
+                },
                 alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
               },
             },

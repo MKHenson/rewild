@@ -68,9 +68,18 @@ export class WaterUniforms implements ISharedUniformBuffer {
   private _wavesBuffer: GPUBuffer | null = null;
   private _paramsBuffer: GPUBuffer | null = null;
   private _paramsData = new Float32Array(PARAMS_FLOATS);
+  private _refraction: GPUTexture | null = null;
 
-  constructor(group: number) {
+  /** `refracts`: bind the renderer's refraction capture, for the pipeline
+   *  whose shader reads it. A pipeline built with `layout: 'auto'` rejects a
+   *  binding it does not use. */
+  constructor(group: number, readonly refracts = false) {
     this.group = group;
+  }
+
+  /** True when the capture this was built with has since been replaced. */
+  isStale(renderer: Renderer): boolean {
+    return this.refracts && this._refraction !== renderer.refraction.texture;
   }
 
   setTextures(surface: GPUTexture, types: GPUTexture) {
@@ -113,19 +122,24 @@ export class WaterUniforms implements ISharedUniformBuffer {
     packWaterParams(this._palette, surface.width, this._grid, this._paramsData);
     device.queue.writeBuffer(this._paramsBuffer, 0, this._paramsData);
 
+    const entries: GPUBindGroupEntry[] = [
+      {
+        binding: 0,
+        resource: renderer.samplerManager.get('linear-clamped'),
+      },
+      { binding: 1, resource: surface.createView() },
+      { binding: 2, resource: { buffer: this._paramsBuffer } },
+      { binding: 3, resource: this._typeTexture!.createView() },
+      { binding: 4, resource: { buffer: this._wavesBuffer! } },
+    ];
+    if (this.refracts) {
+      this._refraction = renderer.refraction.texture;
+      entries.push({ binding: 5, resource: this._refraction!.createView() });
+    }
     this.bindGroup = device.createBindGroup({
       label: 'water surface',
       layout: pipelineLayout,
-      entries: [
-        {
-          binding: 0,
-          resource: renderer.samplerManager.get('linear-clamped'),
-        },
-        { binding: 1, resource: surface.createView() },
-        { binding: 2, resource: { buffer: this._paramsBuffer } },
-        { binding: 3, resource: this._typeTexture!.createView() },
-        { binding: 4, resource: { buffer: this._wavesBuffer! } },
-      ],
+      entries,
     });
 
     this.requiresBuild = false;

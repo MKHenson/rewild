@@ -22,6 +22,13 @@ const WATER_F0: f32 = 0.02;
 // not read as infinitely deep.
 const MIN_PATH_NOV: f32 = 0.1;
 
+// Air over water's index of refraction.
+const AIR_TO_WATER: f32 = 0.75;
+// Metres the refracted ray is followed down, at most, to find how far the
+// waves bend it on screen. Shallow water bends it less, so the offset fades
+// out at the shore.
+const REFRACTION_REACH: f32 = 3.0;
+
 const MAX_WATER_TYPES: u32 = 4u;
 
 // Wave octaves, from WaterWaves.ts, longest first.
@@ -161,6 +168,9 @@ struct VertexOutput {
 // Weights over the water palette.
 @group(1) @binding(3) var typeMap : texture_2d<f32>;
 @group(1) @binding(4) var<uniform> waves : Waves;
+// The opaque scene behind the water (RefractionCapture): rgb colour, a view
+// depth in metres. Bound for the absorb draw only.
+@group(1) @binding(5) var refraction : texture_2d<f32>;
 @group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
@@ -458,6 +468,36 @@ fn fs_depth(input: VertexOutput) {
   }
 }
 
+// Where a view-space point lands on screen, in 0..1 texture space.
+fn screenUV(viewPosition: vec3f) -> vec2f {
+  let clip = uniforms.projMatrix * vec4f(viewPosition, 1.0);
+  let ndc = clip.xy / clip.w;
+  return vec2f(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
+}
+
+// The scene seen through the water at `pixel`. The ray bends into the water by
+// the wave normal N; the sample moves by how far that lands from where a flat
+// surface would bend it, since the scene behind is already drawn where a flat
+// surface puts it. A sample that lands on something in front of the water is
+// not under it, so the pixel keeps its own.
+fn refractedScene(input: VertexOutput, N: vec3f, depth: f32) -> vec3f {
+  let size = vec2i(textureDimensions(refraction));
+  let pixel = vec2i(input.Position.xy);
+  let direction = normalize(input.viewPosition);
+  let up = normalize(uniforms.normalMatrix * vec3f(0.0, 1.0, 0.0));
+  let reach = min(depth, REFRACTION_REACH);
+  let bent = screenUV(input.viewPosition + refract(direction, N, AIR_TO_WATER) * reach);
+  let level = screenUV(input.viewPosition + refract(direction, up, AIR_TO_WATER) * reach);
+  let shifted = clamp(pixel + vec2i(round((bent - level) * vec2f(size))), vec2i(0), size - 1);
+
+  let behind = textureLoad(refraction, shifted, 0);
+  let own = textureLoad(refraction, pixel, 0);
+  return select(own.rgb, behind.rgb, behind.a > -input.viewPosition.z);
+}
+
+// Replaces the scene behind the water with the refracted scene times the light
+// that survives the trip through the water. Alpha is the coverage, so the
+// water's edge fades to the scene.
 @fragment
 fn fs_absorb(input: VertexOutput) -> @location(0) vec4f {
   let footprint = pixelFootprint(input.rest);
@@ -470,7 +510,7 @@ fn fs_absorb(input: VertexOutput) -> @location(0) vec4f {
   let V = normalize(-input.viewPosition);
   let NoV = clamp(dot(N, V), 1e-4, 1.0);
   let passed = (1.0 - waterFresnel(NoV)) * waterTransmittance(water, NoV);
-  return vec4f(mix(vec3f(1.0), passed, water.coverage), 1.0);
+  return vec4f(refractedScene(input, N, water.depth) * passed, water.coverage);
 }
 
 @fragment

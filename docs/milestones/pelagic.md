@@ -312,14 +312,13 @@ Raised land inside water gets a full shoreline with no special work:
 scene pass (opaque)  ──▶ terrain, scatter, objects        ──▶ HDR colour + depth
         │
         ▼
-copy HDR colour      ──▶ refraction texture
+refraction capture   ──▶ HDR colour + view depth          ──▶ refraction texture (rgba16f)
         │
         ▼
 water pass           ──▶ per-chunk water patches          ──▶ HDR colour + depth (water writes depth)
-        │                  reads: water map, heights, refraction, depth, sky cube, CSM, clouds
+        │                  reads: water map, refraction, sky cube, CSM, clouds
         │                ──▶ horizon ring (far shading only)
-        ▼
-transparent meshes   ──▶ BLEND materials, far to near     ──▶ HDR colour (no depth write)
+        │                ──▶ transparent meshes, BLEND materials (no depth write)
         ▼
 atmosphere composite ──▶ sky, clouds, fog, god rays, rain over scene and water
         ▼
@@ -329,11 +328,14 @@ bloom + tonemap      ──▶ swapchain
 Water writes depth. So the existing atmosphere composite puts fog over water at the correct
 distance, and needs no change.
 
-**Transparent meshes draw after water.** BLEND materials write no depth, so water drawn after them
-would cover a transparent mesh in front of it. The renderer orders draw groups opaque, then water,
-then transparent, so they test against the depth water wrote. When refraction adds the colour
-copy, they move to their own pass after water, or the copy would take them in as if they were
-under the water. Rain already draws with the atmosphere, so it shows over water with no change.
+**The scene pass splits when water is in view.** The opaque groups draw, the pass ends, and
+`RefractionCapture` copies the colour and the view depth, linearised from the depth buffer, into
+one `rgba16float` texture. A second pass loads the colour and depth and draws the water, then the
+transparent groups. BLEND materials write no depth, so water drawn after them would cover a
+transparent mesh in front of it; drawing them after water, and after the capture, keeps them
+tested against the water's depth and out of what the water refracts. Rain already draws with the
+atmosphere, so it shows over water with no change. With no water in view, everything draws in the
+one pass and nothing is copied.
 
 ### Mesh
 
@@ -415,13 +417,17 @@ chunk water then never overlap, and neither z-fights the other.
   first writes its depth alone: the waves fold the surface over itself on screen, so the shading
   draws that follow test for equal depth and shade only the nearest layer, whatever order the
   triangles come in. The position is `@invariant` so all three draws agree on it, and chunks draw
-  nearest first so a near crest hides the water behind it in the next chunk too. Then an absorb draw multiplies the scene behind by the transmittance and `1 − Fresnel`,
-  per channel, and a light draw adds reflection and the light the water scatters back. The
+  nearest first so a near crest hides the water behind it in the next chunk too. Then an absorb draw replaces the scene behind with the refracted
+  scene times the transmittance and `1 − Fresnel`, per channel (see Refraction), and a light draw adds reflection and the light the water scatters back. The
   scatter is shaded as the diffuse lobe of a dielectric with F0 0.02, so sun, sky ambient and
-  local lights all reach it. Refraction replaces the absorb draw with an offset sample of the
-  scene copy.
-- **Refraction.** Offset the refraction texture sample by the surface normal. Reject samples that
-  land in front of the water, from the scene depth.
+  local lights all reach it.
+- **Refraction.** The absorb draw replaces the scene behind with a sample of the refraction
+  texture, times the transmittance and `1 − Fresnel`, blended by coverage. The view ray bends
+  into the water (index 1.33) by the wave normal and is followed down the water depth, at most
+  3 m; the sample moves by how far that lands on screen from where a flat surface would bend it,
+  since the scene behind is already drawn where a flat surface puts it. Shallow water bends it
+  less, so the offset fades out at the shore. A sample whose view depth is in front of the water
+  is not under it, and the pixel keeps its own.
 - **Foam.** Shore foam where the depth is small. Crest foam where waves are steep. See
   [Foam](#foam).
 
