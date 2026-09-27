@@ -42,8 +42,20 @@ const _projScreenMatrix = new Matrix4();
 const drawRank = (group: IRenderGroup) =>
   group.pass.transparent ? 2 : group.pass.profileCategory === 'water' ? 1 : 0;
 
-const sortOpaqueFirst = (a: IRenderGroup, b: IRenderGroup) =>
-  drawRank(a) - drawRank(b);
+// Squared view distance of a group's first mesh, from the modelViewMatrix
+// render() fills in before organising the solids.
+const viewDistanceSq = (group: IRenderGroup) => {
+  const e = group.meshes[0].transform.modelViewMatrix.elements;
+  return e[12] * e[12] + e[13] * e[13] + e[14] * e[14];
+};
+
+// Water goes nearest chunk first: each chunk writes its depth before it
+// shades, so a nearer chunk drawn first hides the water behind it.
+const sortOpaqueFirst = (a: IRenderGroup, b: IRenderGroup) => {
+  const rank = drawRank(a) - drawRank(b);
+  if (rank !== 0 || drawRank(a) !== 1) return rank;
+  return viewDistanceSq(a) - viewDistanceSq(b);
+};
 
 export class Renderer {
   device: GPUDevice;

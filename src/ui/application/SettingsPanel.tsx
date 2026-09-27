@@ -64,6 +64,12 @@ const ASPECTS: Record<QualityAspect, { label: string; description: string }> = {
       'Surface relief on the ground and how far out it carries. The heaviest ' +
       'setting here on most views, because terrain fills the screen.',
   },
+  water: {
+    label: 'Water detail',
+    description:
+      'How many ripples shade the surface of the sea and lakes, and how far ' +
+      'out they carry. The waves themselves are the same on every setting.',
+  },
 };
 
 /**

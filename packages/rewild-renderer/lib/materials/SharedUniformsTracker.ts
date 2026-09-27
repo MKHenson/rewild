@@ -40,16 +40,22 @@ export class SharedUniformsTracker implements IMeshTracker {
     }
   }
 
+  /**
+   * Builds, prepares and binds every shared group. Returns false when one has
+   * no bind group yet (it defers until the subsystem it samples exists), in
+   * which case nothing is bound for it and the caller must not draw.
+   */
   prepareMeshUniforms(
     renderer: Renderer,
     pass: GPURenderPassEncoder,
     camera: Camera,
     meshes: IVisualComponent[]
-  ): void {
+  ): boolean {
     const material = this.materialPass;
 
     const uniforms = this.uniforms;
     let uniform: ISharedUniformBuffer;
+    let ready = true;
     for (let i = 0, l = uniforms.length; i < l; i++) {
       uniform = uniforms[i];
 
@@ -61,7 +67,9 @@ export class SharedUniformsTracker implements IMeshTracker {
       }
 
       uniform.prepare(renderer, camera, meshes);
-      pass.setBindGroup(uniform.group, uniform.bindGroup);
+      if (uniform.bindGroup) pass.setBindGroup(uniform.group, uniform.bindGroup);
+      else ready = false;
     }
+    return ready;
   }
 }

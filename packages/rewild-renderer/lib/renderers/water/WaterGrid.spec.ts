@@ -1,10 +1,10 @@
 import { generateTerrainMesh, MESH_STRIDE } from '../terrain/MeshGenerator';
-import { buildWaterGrid, waterGridQuads } from './WaterGrid';
+import { buildWaterGrid, waterGridBands, waterGridQuads } from './WaterGrid';
 
 describe('waterGridQuads', () => {
   it.each([
-    [0, 60],
-    [1, 60],
+    [0, 240],
+    [1, 120],
     [2, 60],
     [3, 30],
     [4, 30],
@@ -12,6 +12,27 @@ describe('waterGridQuads', () => {
     [8, 15],
   ])('terrain LOD %p draws %p quads', (lod, quads) => {
     expect(waterGridQuads(lod)).toBe(quads);
+  });
+});
+
+describe('waterGridBands', () => {
+  it('gives the spacing each LOD transition brings in, finest first', () => {
+    const distances = new Float32Array(8);
+    const spacings = new Float32Array(8);
+    const finest = waterGridBands(
+      [
+        { lod: 0, visibleDstThreshold: 200 },
+        { lod: 1, visibleDstThreshold: 400 },
+        { lod: 2, visibleDstThreshold: 600 },
+        { lod: 3, visibleDstThreshold: 800 },
+      ],
+      480,
+      distances,
+      spacings
+    );
+    expect(finest).toBe(2);
+    expect(Array.from(distances)).toEqual([200, 400, 600, 0, 0, 0, 0, 0]);
+    expect(Array.from(spacings)).toEqual([4, 8, 16, 0, 0, 0, 0, 0]);
   });
 });
 

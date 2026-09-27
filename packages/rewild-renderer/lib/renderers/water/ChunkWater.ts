@@ -12,7 +12,7 @@ import { getWaterGrid, waterGridQuads } from './WaterGrid';
 export const WATER_INTERACTION_LAYER = 2;
 
 // Room above and below the stored levels for the surface to move into.
-const BOUNDS_MARGIN = 4;
+const BOUNDS_MARGIN = 6;
 
 class WaterMesh extends Mesh {
   // The grid is flat; the water's real extent comes from the water map.
@@ -28,6 +28,7 @@ export class ChunkWater {
   private texture: GPUTexture | null = null;
   private typeTexture: GPUTexture | null = null;
   private packed: Uint16Array | null = null;
+  private quads = 0;
 
   constructor(
     renderer: Renderer,
@@ -40,14 +41,25 @@ export class ChunkWater {
     this.span = span;
     this.pass = new WaterPass();
     this.pass.palette = palette;
+    this.pass.wavesBuffer = renderer.terrainRenderer.waterWaves.buffer(
+      renderer.device
+    );
+    this.quads = waterGridQuads(lod);
     this.mesh = new WaterMesh(
-      getWaterGrid(renderer.device, waterGridQuads(lod), span),
+      getWaterGrid(renderer.device, this.quads, span),
       this.pass
     );
     this.mesh.castShadow = false;
     this.mesh.transform.layers.set(WATER_INTERACTION_LAYER);
     parent.addChild(this.mesh.transform);
     this.update(renderer, water);
+  }
+
+  // Waves are summed in world space, and which of them may displace a vertex
+  // depends on its world distance from the viewer.
+  private placeGrid(baseLevel: number) {
+    const parent = this.mesh.transform.parent!.position;
+    this.pass.grid = { originX: parent.x, originZ: parent.z, baseLevel };
   }
 
   /** Uploads a newer water map for the same chunk. */
@@ -96,6 +108,7 @@ export class ChunkWater {
       half
     );
 
+    this.placeGrid(water.baseLevel);
     const transform = this.mesh.transform;
     transform.position.y = water.baseLevel;
     transform.updateWorldMatrix(true, false);
@@ -103,12 +116,10 @@ export class ChunkWater {
 
   /** Draws the grid that suits terrain LOD `lod`. */
   setLod(renderer: Renderer, lod: number) {
-    const geometry = getWaterGrid(
-      renderer.device,
-      waterGridQuads(lod),
-      this.span
-    );
-    if (this.mesh.geometry !== geometry) this.mesh.geometry = geometry;
+    const quads = waterGridQuads(lod);
+    if (quads === this.quads) return;
+    this.quads = quads;
+    this.mesh.geometry = getWaterGrid(renderer.device, quads, this.span);
   }
 
   dispose() {

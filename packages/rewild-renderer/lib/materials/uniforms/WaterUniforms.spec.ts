@@ -2,11 +2,21 @@ import { LAKE, OCEAN } from '../../renderers/terrain/Water';
 import { packWaterParams } from './WaterUniforms';
 
 describe('packWaterParams', () => {
-  const packed = packWaterParams([OCEAN, LAKE], 61);
+  const packed = packWaterParams([OCEAN, LAKE], 61, {
+    originX: 480,
+    originZ: -960,
+    baseLevel: 12.5,
+  });
 
   it('matches the WaterParams struct size', () => {
-    // 16-byte header, then two arrays of four vec4f.
-    expect(packed.byteLength).toBe(16 + 64 + 64);
+    // 16-byte header, two arrays of four vec4f, then the base level padded to 16.
+    expect(packed.byteLength).toBe(16 + 64 + 64 + 16);
+  });
+
+  it('writes the grid placement', () => {
+    expect(packed[2]).toBe(480);
+    expect(packed[3]).toBe(-960);
+    expect(packed[36]).toBe(12.5);
   });
 
   it('writes the texel count and a calm roughness', () => {

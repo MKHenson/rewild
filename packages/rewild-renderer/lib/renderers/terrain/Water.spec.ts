@@ -56,7 +56,6 @@ describe('water palette', () => {
     ['negative scatter', { scatter: [-0.01, 0.03, 0.06] }],
     ['negative turbidity', { turbidity: -1 }],
     ['zero wave scale', { waveScale: 0 }],
-    ['zero wind lag', { windLag: 0 }],
     ['zero shore foam width', { shoreFoamWidth: 0 }],
     ['wave response above 1', { waveResponse: 1.5 }],
     ['foam below 0', { foam: -0.1 }],

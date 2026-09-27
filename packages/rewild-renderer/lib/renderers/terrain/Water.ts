@@ -23,8 +23,6 @@ export interface WaterType {
   waveResponse: number;
   // Dominant wavelength in metres at full wind: long swells or short ripples.
   waveScale: number;
-  // Seconds for the waves to follow a change in wind.
-  windLag: number;
   // 0..1: how much crest foam the wind raises.
   foam: number;
   // Water depth in metres over which shore foam shows.
@@ -47,7 +45,6 @@ export const OCEAN: WaterType = {
   turbidity: 0.04,
   waveResponse: 1,
   waveScale: 30,
-  windLag: 40,
   foam: 1,
   shoreFoamWidth: 1.5,
   normalStrength: 1,
@@ -61,8 +58,7 @@ export const LAKE: WaterType = {
   absorption: [0.35, 0.25, 0.5],
   turbidity: 0.4,
   waveResponse: 0.35,
-  waveScale: 4,
-  windLag: 8,
+  waveScale: 10,
   foam: 0.2,
   shoreFoamWidth: 0.4,
   normalStrength: 0.6,
@@ -121,9 +117,9 @@ export function validateWaterPalette(climate: ClimateConfig): void {
       );
     if (!(type.turbidity >= 0))
       throw new Error(`Water type '${type.name}' turbidity must not be negative.`);
-    if (!(type.waveScale > 0) || !(type.shoreFoamWidth > 0) || !(type.windLag > 0))
+    if (!(type.waveScale > 0) || !(type.shoreFoamWidth > 0))
       throw new Error(
-        `Water type '${type.name}' waveScale, shoreFoamWidth and windLag must be positive numbers.`
+        `Water type '${type.name}' waveScale and shoreFoamWidth must be positive numbers.`
       );
     if (
       !inUnitRange(type.waveResponse) ||

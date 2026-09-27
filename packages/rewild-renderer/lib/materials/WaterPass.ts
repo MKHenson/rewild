@@ -9,8 +9,14 @@ import { Mesh } from '../core/Mesh';
 import { Camera } from '../core/Camera';
 import { Lighting } from './uniforms/Lighting';
 import { ShadowUniforms } from './uniforms/ShadowUniforms';
-import { WaterUniforms } from './uniforms/WaterUniforms';
+import {
+  WaterGridPlacement,
+  WaterUniforms,
+} from './uniforms/WaterUniforms';
 import { WaterType } from '../renderers/terrain/Water';
+import { waterShaderDefines } from '../renderers/water/WaterQuality';
+import { RenderQuality } from '../utils/RenderQuality';
+import { composeShader } from '../utils/shaderDefines';
 
 const waterGroupIndex = 1;
 const lightingGroupIndex = 2;
@@ -27,14 +33,64 @@ const vertexBuffers: GPUVertexBufferLayout[] = [
   },
 ];
 
+// A draw that binds only groups 0 and 1. `layout: 'auto'` gives every pipeline
+// bind group layouts of its own, so each such draw keeps its own copies.
+class WaterSubPass {
+  pipeline: GPURenderPipeline;
+  readonly water = new WaterUniforms(waterGroupIndex);
+  private meshUniforms = new Map<Mesh, ProjModelView>();
+
+  setPipeline(pipeline: GPURenderPipeline) {
+    this.pipeline = pipeline;
+    this.water.requiresBuild = true;
+    this.meshUniforms.forEach((uniform) => (uniform.requiresBuild = true));
+  }
+
+  draw(
+    renderer: Renderer,
+    pass: GPURenderPassEncoder,
+    camera: Camera,
+    meshes: Mesh[],
+    numIndices: number
+  ) {
+    pass.setPipeline(this.pipeline);
+    if (this.water.requiresBuild)
+      this.water.build(
+        renderer,
+        this.pipeline.getBindGroupLayout(waterGroupIndex)
+      );
+    pass.setBindGroup(waterGroupIndex, this.water.bindGroup);
+    for (const mesh of meshes) {
+      let uniform = this.meshUniforms.get(mesh);
+      if (!uniform) {
+        uniform = new ProjModelView(0);
+        this.meshUniforms.set(mesh, uniform);
+      }
+      if (uniform.requiresBuild)
+        uniform.build(renderer, this.pipeline.getBindGroupLayout(0));
+      uniform.prepare(renderer, camera, mesh.transform);
+      pass.setBindGroup(0, uniform.bindGroup);
+      pass.drawIndexed(numIndices);
+    }
+  }
+
+  dispose() {
+    this.water.destroy();
+    this.meshUniforms.forEach((uniform) => uniform.destroy());
+    this.meshUniforms.clear();
+  }
+}
+
 // One chunk's water, drawn after every opaque group and before the transparent
-// ones (Renderer.organizeVisuals).
+// ones, nearest chunk first (Renderer.organizeVisuals).
 //
-// Each mesh is drawn twice. The absorb draw multiplies the scene behind by the
-// light that passes through the water; the light draw adds reflection and
-// in-water scatter and writes depth, so the atmosphere composite fogs the water
-// like terrain. The absorb pipeline binds only groups 0 and 1, so it keeps its
-// own copies of those.
+// Each mesh is drawn three times. The depth draw writes the surface's depth
+// alone. The waves fold the surface over itself on screen, a crest in front of
+// the slope behind it, so the absorb and light draws then shade only where the
+// depth is equal: the nearest layer, whatever order the triangles come in. The
+// absorb draw multiplies the scene behind by the light that passes through the
+// water; the light draw adds reflection and in-water scatter. The depth stays
+// for the atmosphere composite, which fogs the water like terrain.
 export class WaterPass implements IMaterialPass {
   profileCategory: SceneCategory = 'water';
 
@@ -48,13 +104,13 @@ export class WaterPass implements IMaterialPass {
   lightingUniforms: Lighting;
   shadowUniforms: ShadowUniforms;
 
-  private absorbPipeline: GPURenderPipeline;
-  private absorbWaterUniforms: WaterUniforms;
-  private absorbMeshUniforms = new Map<Mesh, ProjModelView>();
+  /** Tier the pipelines were built against; a change rebuilds them. */
+  private builtQuality: RenderQuality | null = null;
+  private depth = new WaterSubPass();
+  private absorb = new WaterSubPass();
 
   constructor() {
     this.waterUniforms = new WaterUniforms(waterGroupIndex);
-    this.absorbWaterUniforms = new WaterUniforms(waterGroupIndex);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
     this.shadowUniforms = new ShadowUniforms(shadowGroupIndex, true);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
@@ -67,60 +123,99 @@ export class WaterPass implements IMaterialPass {
     ]);
   }
 
+  private get allWaterUniforms(): WaterUniforms[] {
+    return [this.waterUniforms, this.depth.water, this.absorb.water];
+  }
+
   setTextures(surface: GPUTexture, types: GPUTexture) {
-    this.waterUniforms.setTextures(surface, types);
-    this.absorbWaterUniforms.setTextures(surface, types);
+    for (const water of this.allWaterUniforms)
+      water.setTextures(surface, types);
   }
 
   set palette(palette: readonly WaterType[]) {
-    this.waterUniforms.palette = palette;
-    this.absorbWaterUniforms.palette = palette;
+    for (const water of this.allWaterUniforms) water.palette = palette;
+  }
+
+  set grid(grid: WaterGridPlacement) {
+    for (const water of this.allWaterUniforms) water.grid = grid;
+  }
+
+  set wavesBuffer(buffer: GPUBuffer) {
+    for (const water of this.allWaterUniforms) water.wavesBuffer = buffer;
   }
 
   dispose(): void {
     this.sharedUniformsTracker.dispose();
     this.perMeshTracker.dispose();
-    this.absorbWaterUniforms.destroy();
-    this.absorbMeshUniforms.forEach((uniform) => uniform.destroy());
-    this.absorbMeshUniforms.clear();
+    this.depth.dispose();
+    this.absorb.dispose();
   }
 
   init(renderer: Renderer): void {
     this.requiresRebuild = false;
     const { device, sceneColorFormat } = renderer;
-    const module = device.createShaderModule({ code: shader });
+    const quality = renderer.quality.aspect('water');
+    this.builtQuality = quality;
+    const module = device.createShaderModule({
+      code: composeShader([shader], waterShaderDefines(quality)),
+    });
     const multisample = { count: renderer.sampleCount };
     const primitive: GPUPrimitiveState = {
       topology: 'triangle-list',
       cullMode: 'back',
       frontFace: this.side,
     };
+    // Shading only where the depth draw left the nearest layer. The position
+    // is @invariant in the shader, so all three pipelines agree on it exactly.
+    const shadeDepth: GPUDepthStencilState = {
+      depthWriteEnabled: false,
+      depthCompare: 'equal',
+      format: 'depth24plus',
+    };
 
-    this.absorbPipeline = device.createRenderPipeline({
-      label: 'water absorb pipeline',
-      layout: 'auto',
-      vertex: { entryPoint: 'vs', module, buffers: vertexBuffers },
-      fragment: {
-        entryPoint: 'fs_absorb',
-        module,
-        targets: [
-          {
-            format: sceneColorFormat,
-            blend: {
-              color: { srcFactor: 'zero', dstFactor: 'src', operation: 'add' },
-              alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
+    this.depth.setPipeline(
+      device.createRenderPipeline({
+        label: 'water depth pipeline',
+        layout: 'auto',
+        vertex: { entryPoint: 'vs', module, buffers: vertexBuffers },
+        fragment: {
+          entryPoint: 'fs_depth',
+          module,
+          targets: [{ format: sceneColorFormat, writeMask: 0 }],
+        },
+        multisample,
+        primitive,
+        depthStencil: {
+          depthWriteEnabled: true,
+          depthCompare: 'less',
+          format: 'depth24plus',
+        },
+      })
+    );
+
+    this.absorb.setPipeline(
+      device.createRenderPipeline({
+        label: 'water absorb pipeline',
+        layout: 'auto',
+        vertex: { entryPoint: 'vs', module, buffers: vertexBuffers },
+        fragment: {
+          entryPoint: 'fs_absorb',
+          module,
+          targets: [
+            {
+              format: sceneColorFormat,
+              blend: {
+                color: { srcFactor: 'zero', dstFactor: 'src', operation: 'add' },
+                alpha: { srcFactor: 'zero', dstFactor: 'one', operation: 'add' },
+              },
             },
-          },
-        ],
-      },
-      multisample,
-      primitive,
-      depthStencil: {
-        depthWriteEnabled: false,
-        depthCompare: 'less',
-        format: 'depth24plus',
-      },
-    });
+          ],
+        },
+        multisample,
+        primitive,
+        depthStencil: shadeDepth,
+      })
+    );
 
     this.pipeline = device.createRenderPipeline({
       label: 'water light pipeline',
@@ -141,24 +236,16 @@ export class WaterPass implements IMaterialPass {
       },
       multisample,
       primitive,
-      depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: 'less',
-        format: 'depth24plus',
-      },
+      depthStencil: shadeDepth,
     });
 
-    // Both pipelines use `layout: 'auto'`, so every bind group built against
+    // Every pipeline uses `layout: 'auto'`, so every bind group built against
     // the old ones is invalid now.
     for (const uniform of this.sharedUniformsTracker.uniforms)
       uniform.requiresBuild = true;
     this.perMeshTracker.meshUniforms.forEach((uniforms) => {
       for (const uniform of uniforms) uniform.requiresBuild = true;
     });
-    this.absorbWaterUniforms.requiresBuild = true;
-    this.absorbMeshUniforms.forEach(
-      (uniform) => (uniform.requiresBuild = true)
-    );
   }
 
   isGeometryCompatible(geometry: Geometry): boolean {
@@ -172,48 +259,35 @@ export class WaterPass implements IMaterialPass {
     meshes: Mesh[],
     geometry: Geometry
   ): void {
+    // The tier bakes loop bounds into the shader, so only a rebuild applies it.
+    // init() reflags every bind group, since `layout: 'auto'` changes.
+    if (renderer.quality.aspect('water') !== this.builtQuality) {
+      this.requiresRebuild = true;
+      return;
+    }
+
     const numIndices = geometry.indices!.length;
     pass.setVertexBuffer(0, geometry.vertexBuffer);
     pass.setVertexBuffer(1, geometry.uvBuffer);
     pass.setIndexBuffer(geometry.indexBuffer, 'uint32');
 
-    // Absorb first: the light draw adds on top of what it leaves.
-    pass.setPipeline(this.absorbPipeline);
-    const absorbWater = this.absorbWaterUniforms;
-    if (absorbWater.requiresBuild)
-      absorbWater.build(
-        renderer,
-        this.absorbPipeline.getBindGroupLayout(waterGroupIndex)
-      );
-    pass.setBindGroup(waterGroupIndex, absorbWater.bindGroup);
-    for (const mesh of meshes) {
-      const uniform = this.absorbUniformFor(mesh);
-      if (uniform.requiresBuild)
-        uniform.build(renderer, this.absorbPipeline.getBindGroupLayout(0));
-      uniform.prepare(renderer, camera, mesh.transform);
-      pass.setBindGroup(0, uniform.bindGroup);
-      pass.drawIndexed(numIndices);
-    }
+    this.depth.draw(renderer, pass, camera, meshes, numIndices);
+    // Absorb before light: the light draw adds on top of what it leaves.
+    this.absorb.draw(renderer, pass, camera, meshes, numIndices);
 
     pass.setPipeline(this.pipeline);
-    this.sharedUniformsTracker.prepareMeshUniforms(
-      renderer,
-      pass,
-      camera,
-      meshes
-    );
+    if (
+      !this.sharedUniformsTracker.prepareMeshUniforms(
+        renderer,
+        pass,
+        camera,
+        meshes
+      )
+    )
+      return;
     for (const mesh of meshes) {
       this.perMeshTracker.prepareMeshUniforms(mesh, renderer, pass, camera);
       pass.drawIndexed(numIndices);
     }
-  }
-
-  private absorbUniformFor(mesh: Mesh): ProjModelView {
-    let uniform = this.absorbMeshUniforms.get(mesh);
-    if (!uniform) {
-      uniform = new ProjModelView(0);
-      this.absorbMeshUniforms.set(mesh, uniform);
-    }
-    return uniform;
   }
 }
