@@ -34,6 +34,7 @@ import { DirectionalShadowRenderer } from './renderers/shadow/DirectionalShadowR
 import { SpotLightShadowRenderer } from './renderers/shadow/SpotLightShadowRenderer';
 import { FrameCompositor } from './post-processes/FrameCompositor';
 import { RefractionCapture } from './renderers/water/RefractionCapture';
+import { initWaterTextures } from './renderers/water/WaterTextures';
 import { QualitySettings } from './utils/QualitySettings';
 
 const _projScreenMatrix = new Matrix4();
@@ -341,6 +342,7 @@ export class Renderer {
     await this.fontManager.initialize(this);
     await this.textureManager.initialize(this, materialsTemplate);
     await initTerrainTextureArrays(this);
+    await initWaterTextures(this);
     await this.geometryManager.initialize(this);
     await this.materialManager.initialize(this, materialsTemplate);
     await this.terrainRenderer.init(this);

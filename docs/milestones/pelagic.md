@@ -535,12 +535,33 @@ of foam. Tune this mapping together with the foliage:
 
 The foam uses no saved state:
 
-- **Whitecaps.** Foam where the surface is steep. The shader gets the steepness from the octave
-  slopes. `windiness` raises the amount.
-- **Persistence.** Real foam stays after the crest passes. The waves have no history, so a
-  noise texture leaves patches behind the crests.
-- **Streaks.** Above about 0.8, add foam texture stretched along `windDirection`.
-- **Per type.** The palette's foam amount keeps a lake much calmer than the ocean in the same wind.
+- **Texture.** `nature/water/sea-foam.webp` (`WaterTextures`), white foam against transparent. The
+  shader reads its brightness × alpha as a density and shows foam where the density passes
+  `1 − coverage`, so more coverage grows the patches out from the densest clumps. Its opacity runs
+  from 0.35 on the thinnest foam to 1 on the densest, so bubbles and thin spots show the water
+  through. It tiles twice,
+  8 m and 12.8 m turned 37°, to hide the repeat, and drifts downwind at 1.5 m/s at full wind; the
+  CPU accumulates the drift and wraps it at 8192 m, which every tiling divides.
+- **Whitecaps.** Foam where many octaves crest together: the surface's height over the octaves at
+  least 2 m long, as a z-score of their summed amplitudes. The vertex stage passes its octaves'
+  height and energy on and the pixel stage adds its own, as for the normal. There is none below
+  a wind strength of 0.3; above it the z a whitecap takes falls from 3 (a crest in a thousand) to
+  1.1 in full wind.
+- **Persistence.** Real foam stays where the crest broke while the crest moves on. The waves are a
+  function of time, so the vertex stage finds the whitecaps of four past moments, 0.7 s to 4.3 s
+  ago, from the heights of the octaves the grid holds (their energy does not change with time).
+  Each is faded by `exp(−age / 3 s)` and the strongest is kept. That sets both the old foam's
+  coverage and its opacity, which falls from 1 to 0.2: falling coverage raises the density
+  threshold, so old foam breaks into lace and turns translucent before it goes.
+- **Streaks.** From a wind strength of 0.75, the texture stretched 64 m along the wind by 4 m
+  across adds streaks, up to half coverage and 0.35 opacity, from a mip 1.5 levels blurrier so
+  they read as soft lines. The gust field masks them, so bands of streaks sweep downwind with the
+  gusts instead of lying on the water as fixed lines.
+- **Per type.** The palette's foam amount scales it all, so a lake stays much calmer than the ocean
+  in the same wind.
+- **Shading.** All foam is scaled by an overall opacity of 0.9. It is a rough (0.6), bright
+  (albedo 0.65) diffuse layer: the light draw blends
+  the water's diffuse and roughness toward it, and the absorb draw hides the water beneath it.
 
 Stretch goals: a foam texture that follows the camera and updates each frame in a compute pass,
 for real persistence. Spray blown off the crests at high wind, starting from the rain particle

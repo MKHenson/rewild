@@ -112,6 +112,11 @@ const VARIATION_SEED = 0x7a1e;
 // The noise lattice repeats every this many cells, so the drift can wrap.
 export const VARIATION_PERIOD = 256;
 
+// Foam rides downwind at this many metres a second at full wind. Its drift
+// wraps at a whole number of every foam texture tile in water.wgsl.
+const FOAM_DRIFT = 1.5;
+export const FOAM_DRIFT_PERIOD = 8192;
+
 const LOG_K_LONGEST = Math.log(TWO_PI / LONGEST);
 const LOG_K_SPAN = Math.log(LONGEST / SHORTEST);
 
@@ -246,6 +251,8 @@ export class WaterWaves {
   /** Per variation octave, its drift in lattice cells (x, z), wrapped. Starts
    *  seeded, so no two octaves sample the same stretch of lattice. */
   readonly variationOffset = new Float64Array(VARIATION_SCALES.length * 2);
+  /** Metres the foam has drifted (x, z), wrapped at FOAM_DRIFT_PERIOD. */
+  readonly foamOffset = new Float64Array(2);
   /** World xz the packed phases are taken from. */
   originX = 0;
   originZ = 0;
@@ -296,6 +303,14 @@ export class WaterWaves {
         this.variationOffset[o] =
           moved - Math.floor(moved / VARIATION_PERIOD) * VARIATION_PERIOD;
       }
+    }
+
+    for (let axis = 0; axis < 2; axis++) {
+      const moved =
+        this.foamOffset[axis] +
+        (axis === 0 ? wx : wz) * FOAM_DRIFT * wind * deltaSeconds;
+      this.foamOffset[axis] =
+        moved - Math.floor(moved / FOAM_DRIFT_PERIOD) * FOAM_DRIFT_PERIOD;
     }
 
     for (let t = 0; t < MAX_WATER_TYPES; t++) {
@@ -390,9 +405,9 @@ export class WaterWaves {
    * Writes the Waves uniform: the clock, the normal fade scale, the viewer's
    * xz from the phase origin, the phase origin, per-type drag, the variation
    * drift and the foliage wind (direction xz, strength, clock), whose gust
-   * field ruffles the ripples; the LOD bands (see waterGridBands) and finest grid
-   * spacing, from which the shader picks the waves each vertex may be
-   * displaced by; then per octave (dirX, dirZ, k, ω), per octave each palette
+   * field ruffles the ripples; the LOD bands (see waterGridBands) and finest
+   * grid spacing, from which the shader picks the waves each vertex may be
+   * displaced by, and the foam drift; then per octave (dirX, dirZ, k, ω), per octave each palette
    * type's amplitude, and the phases at the origin.
    */
   pack(
@@ -422,8 +437,8 @@ export class WaterWaves {
       out[LOD_SPACING_OFFSET + i] = lodSpacings[i] ?? 0;
     }
     out[GRID_OFFSET] = finestSpacing;
-    out[GRID_OFFSET + 1] = 0;
-    out[GRID_OFFSET + 2] = 0;
+    out[GRID_OFFSET + 1] = this.foamOffset[0];
+    out[GRID_OFFSET + 2] = this.foamOffset[1];
     out[GRID_OFFSET + 3] = 0;
     for (let i = 0; i < WAVE_COUNT; i++) {
       const wave = this.waves[i];

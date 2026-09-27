@@ -3,13 +3,14 @@ import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 import { MAX_WATER_TYPES, WaterType } from '../../renderers/terrain/Water';
+import { WATER_FOAM_TEXTURE } from '../../renderers/water/WaterTextures';
 
 // WaterParams layout — must match water.wgsl:
 //   texels      f32               offset 0
 //   roughness   f32               offset 4
 //   originX     f32               offset 8
 //   originZ     f32               offset 12
-//   scatter     array<vec4f, 4>   offset 16
+//   scatter     array<vec4f, 4>   offset 16  (a: crest foam amount)
 //   extinction  array<vec4f, 4>   offset 80
 //   baseLevel   f32               offset 144
 const SCATTER_OFFSET = 4;
@@ -47,6 +48,7 @@ export function packWaterParams(
     out[s] = type.scatter[0];
     out[s + 1] = type.scatter[1];
     out[s + 2] = type.scatter[2];
+    out[s + 3] = type.foam;
     const e = EXTINCTION_OFFSET + i * 4;
     out[e] = type.absorption[0];
     out[e + 1] = type.absorption[1];
@@ -70,10 +72,15 @@ export class WaterUniforms implements ISharedUniformBuffer {
   private _paramsData = new Float32Array(PARAMS_FLOATS);
   private _refraction: GPUTexture | null = null;
 
-  /** `refracts`: bind the renderer's refraction capture, for the pipeline
-   *  whose shader reads it. A pipeline built with `layout: 'auto'` rejects a
-   *  binding it does not use. */
-  constructor(group: number, readonly refracts = false) {
+  /** `refracts`: bind the renderer's refraction capture. `shades`: bind the
+   *  foam texture and its sampler. Each is for the pipelines whose shader
+   *  reads it: one built with `layout: 'auto'` rejects a binding it does not
+   *  use. */
+  constructor(
+    group: number,
+    readonly refracts = false,
+    readonly shades = false
+  ) {
     this.group = group;
   }
 
@@ -135,6 +142,17 @@ export class WaterUniforms implements ISharedUniformBuffer {
     if (this.refracts) {
       this._refraction = renderer.refraction.texture;
       entries.push({ binding: 5, resource: this._refraction!.createView() });
+    }
+    if (this.shades) {
+      entries.push(
+        {
+          binding: 6,
+          resource: renderer.textureManager
+            .get(WATER_FOAM_TEXTURE)
+            .gpuTexture.createView(),
+        },
+        { binding: 7, resource: renderer.samplerManager.get('linear') }
+      );
     }
     this.bindGroup = device.createBindGroup({
       label: 'water surface',
