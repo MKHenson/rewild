@@ -391,9 +391,16 @@ struct CirRegime {
     extinction:  f32,
 };
 
+// Share of cirrusCoverage that cloudiness lets through. Builds with the first
+// half of cloudiness, then eases back as the cumulus close up and hide the deck.
+fn cirrusCloudinessCoverage() -> f32 {
+    let c = object.cloudiness;
+    return smoothstep(0.0, 0.5, c) * mix(1.0, 0.5, smoothstep(0.6, 0.95, c));
+}
+
 fn cirrusRegime(sheet: vec3f) -> CirRegime {
     let wind  = saturate(object.windiness);
-    let depth = saturate(object.cloudiness);
+    let depth = smoothstep(0.3, 1.0, object.cloudiness);
 
     let t      = object.iTime * CIR_REGIME_RATE;
     let driftA = 0.5 + 0.5 * sin(t);
@@ -479,7 +486,7 @@ fn cirrusDensityAt(sheet: vec3f, swirl: vec2f, deckFrac: f32, fine: f32, reg: Ci
     // [0.58, 0.10], landing in the bulk of the fbm distribution so that
     // coverage = 0.3 gives roughly 30% of the sky.
     let n         = cirFbm(q);
-    let threshold = 0.58 - object.cirrusCoverage * smoothstep(0.0, 0.5, object.cloudiness) * 0.48;
+    let threshold = 0.58 - object.cirrusCoverage * cirrusCloudinessCoverage() * 0.48;
     let cov       = clamp((n - threshold) / 0.30, 0.0, 1.0);
 
     // Early-out before the ridge field: most sky pixels stop here, which is what

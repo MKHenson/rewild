@@ -350,15 +350,14 @@ fn getAtmosphereColor(sun_direction: vec3f, dir: vec3f, mu: f32, nightColor: vec
     let nightDayFactor = smoothstep(NIGHT_FADE_END, NIGHT_FADE_START, sunDotUp);
 
     // Overcast has two independent effects, deliberately timed differently:
-    //   greyFactor — desaturates the sky toward flat overcast grey. Ramps in
-    //     early and is fully grey by 0.9, so a heavily-clouded-but-not-total sky
-    //     (~0.8) reads as bright natural overcast rather than a dark sky.
+    //   greyFactor — desaturates the sky toward flat overcast grey. Follows the
+    //     fog's overcast bracket, where the cumulus close up: gaps in broken
+    //     cloud show clear sky, so the sky only greys once there are few left.
     //   darkFactor — dims the sky. Held back to the 0.9→1.0 bracket so only a
-    //     near-total overcast actually goes dark. (Previously both shared one
-    //     0.7→0.95 ramp, so 0.8 was ~35% dimmed and looked unnaturally dark.)
+    //     near-total overcast actually goes dark.
     // Both gated by day so the night sky is unaffected.
     let overcastDayFactor = smoothstep(-0.05, 0.15, sunDotUp);
-    let greyFactor        = smoothstep(0.5, 0.9, object.cloudiness) * overcastDayFactor;
+    let greyFactor        = smoothstep(OVERCAST_START - 0.05, OVERCAST_FULL, object.cloudiness) * overcastDayFactor;
     let darkFactor        = smoothstep(0.9, 1.0, object.cloudiness) * overcastDayFactor;
     let overcastFactor    = greyFactor;
 
