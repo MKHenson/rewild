@@ -28,6 +28,7 @@ import { HorizonOcean } from '../water/HorizonOcean';
 import { WaterWaveBuffer } from '../water/WaterWaves';
 import { waterDetailBias } from '../water/WaterQuality';
 import { OceanFFT } from '../water/OceanFFT';
+import { SeaSpray } from '../water/SeaSpray';
 import { MAX_WATER_GRID_BANDS, waterGridBands } from '../water/WaterGrid';
 
 export class LODInfo {
@@ -152,6 +153,7 @@ export class TerrainRenderer {
   readonly waterWaves = new WaterWaveBuffer();
   /** The FFT ocean every chunk's water samples; made on the first update. */
   ocean: OceanFFT | null = null;
+  seaSpray: SeaSpray | null = null;
   /** Whether the waves displace the water grid. Off leaves them shading only,
    *  to tell a geometry artefact from a shading one. */
   waterWaveGeometry = true;
@@ -160,6 +162,10 @@ export class TerrainRenderer {
   /** Paints the water's raw foam coverage in grey, to tell whether the ocean
    *  makes foam from whether the foam texture hides it. */
   waterFoamDebug = false;
+  /** Strength of the sunlight through the wave crests; 1 is the default. */
+  waterCrestGlow = 1;
+  /** Strength of the trough darkening; 1 is the default. */
+  waterTroughDarkening = 1;
   private waterLodDistances = new Float32Array(MAX_WATER_GRID_BANDS);
   private waterLodSpacings = new Float32Array(MAX_WATER_GRID_BANDS);
   // Resolved once per preset rather than every frame: resolving an unknown id
@@ -846,7 +852,7 @@ export class TerrainRenderer {
     const palette = resolveClimatePreset(this._climatePreset).water ?? [];
     const deltaSeconds = renderer.delta / 1000;
     const waves = this.waterWaves.waves;
-    waves.update(deltaSeconds, wind[0], wind[1], wind[2], palette);
+    waves.update(palette);
     if (!this.ocean) this.ocean = new OceanFFT(renderer.device);
     this.ocean.update(renderer.device, deltaSeconds, wind[0], wind[1], wind[2]);
     const eye = camera.transform.position;
@@ -871,14 +877,42 @@ export class TerrainRenderer {
       detailBias: waterDetailBias(renderer.quality.aspect('water')),
       normals: this.waterWaveNormals,
       foamDebug: this.waterFoamDebug,
+      crestGlow: this.waterCrestGlow,
+      troughDarkening: this.waterTroughDarkening,
       eyeX: lodEye.x,
       eyeZ: lodEye.z,
       finestSpacing: finest,
       lodDistances: this.waterLodDistances,
       lodSpacings: this.waterLodSpacings,
-      wind,
       windSpeed: this.ocean.windSpeed,
     });
+
+    if (!this.seaSpray)
+      this.seaSpray = new SeaSpray(
+        renderer.device,
+        this.ocean,
+        this.waterWaves.buffer(renderer.device)
+      );
+    const sun = renderer.sky.skyRenderer.sun;
+    const radiance = sun.intensity;
+    this.seaSpray.update(
+      renderer.device,
+      deltaSeconds,
+      camera,
+      wind,
+      [sun.color.r * radiance, sun.color.g * radiance, sun.color.b * radiance],
+      this.seaLevel,
+      (x, z) => this.sampleHeight(x, z)
+    );
+  }
+
+  /** Draws the sea spray over the composited HDR scene in `target`. */
+  renderSeaSpray(
+    renderer: Renderer,
+    encoder: GPUCommandEncoder,
+    target: GPUTextureView
+  ) {
+    this.seaSpray?.draw(renderer, encoder, target);
   }
 
   // The ring follows the centre chunk visibility was last computed from, so it
@@ -982,6 +1016,8 @@ export class TerrainRenderer {
     this.horizonOcean?.dispose();
     this.horizonOcean = null;
     this.waterWaves.dispose();
+    this.seaSpray?.dispose();
+    this.seaSpray = null;
     this.ocean?.dispose();
     this.ocean = null;
     this.scatterModels.dispose();

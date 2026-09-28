@@ -3,16 +3,14 @@ import { resolveAssetUrl } from '../../managers/TextureManager';
 import { BitmapTexture } from '../../textures/BitmapTexture';
 import { TextureProperties } from '../../textures/Texture';
 
-/** Tileable foam: white against transparent. water.wgsl thresholds its
- *  brightness × alpha, so more foam grows patches from the densest clumps. */
-export const WATER_FOAM_TEXTURE = 'water-foam';
+/** A puff of sea spray, white against transparent (SeaSpray). */
+export const WATER_SPRAY_TEXTURE = 'water-spray';
 
 export async function initWaterTextures(renderer: Renderer): Promise<void> {
-  // Linear: the shader reads it as a threshold field, not as a colour.
-  const foam = new BitmapTexture(
-    new TextureProperties(WATER_FOAM_TEXTURE, true, 'linear'),
-    resolveAssetUrl('nature/water/sea-foam.webp')
+  const spray = new BitmapTexture(
+    new TextureProperties(WATER_SPRAY_TEXTURE, true, 'srgb'),
+    resolveAssetUrl('nature/water/sea-spray.png')
   );
-  await foam.load(renderer);
-  renderer.textureManager.addTexture(foam);
+  await spray.load(renderer);
+  renderer.textureManager.addTexture(spray);
 }

@@ -38,10 +38,11 @@ export const LAKE_WATER = 'lake';
 // The water map holds type weights in one RGBA8 texel.
 export const MAX_WATER_TYPES = 4;
 
-// Clear, deep blue sea. Red is gone within a few metres; blue carries.
+// Clear, deep blue sea. Red is gone within a few metres; blue carries. Dark,
+// so the sky's reflection carries the waves.
 export const OCEAN: WaterType = {
   name: OCEAN_WATER,
-  scatter: [0.004, 0.03, 0.06],
+  scatter: [0.003, 0.018, 0.04],
   absorption: [0.45, 0.07, 0.03],
   turbidity: 0.04,
   waveResponse: 1,
@@ -65,10 +66,11 @@ export const LAKE: WaterType = {
   normalStrength: 0.6,
 };
 
-// Shallow sea over white sand: turquoise, with the bed showing far out.
+// Shallow sea over white sand: turquoise where the bed shows, which the
+// absorption tints, and a clear, deep blue past it.
 export const TROPICAL_OCEAN: WaterType = {
   ...OCEAN,
-  scatter: [0.01, 0.08, 0.09],
+  scatter: [0.004, 0.03, 0.06],
   absorption: [0.4, 0.05, 0.04],
   turbidity: 0.02,
 };

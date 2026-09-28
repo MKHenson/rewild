@@ -178,7 +178,7 @@ describe('getClimatePalette', () => {
       'aerial_rocks_01',
       'marble_cliff_05',
       'snow_field_aerial',
-      'aerial_beach_02',
+      'aerial_beach_01',
     ]);
   });
 

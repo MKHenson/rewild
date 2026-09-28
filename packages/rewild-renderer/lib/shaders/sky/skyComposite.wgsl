@@ -17,21 +17,7 @@
 // saturated, so the exact figure no longer matters.
 const FAR_GROUND_MAX_DISTANCE: f32 = 1e6;
 
-struct FinalUniformStruct {
-    invViewProjectionMatrix: mat4x4<f32>,
-    invViewMatrix: mat4x4<f32>,
-    resolution: vec2f,
-    iTime: f32,
-    cloudiness: f32,
-    sunPosition: vec3f,
-    cameraPosition: vec3f,
-    // World height of the sea surface, where the horizon ring's ground lies.
-    seaLevel: f32,
-    foginess: f32,
-    temperature: f32,
-    lightningFlash: f32,
-    exposure: f32,
-};
+#include "./atmosphere-uniforms.wgsl"
 
 @group(0) @binding(0)
 var intermediateHDR: texture_2d<f32>;

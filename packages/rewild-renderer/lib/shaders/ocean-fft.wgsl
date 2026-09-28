@@ -26,13 +26,12 @@ struct OceanParams {
   // Per system: JONSWAP alpha, peak angular frequency, peak enhancement,
   // short-wave fade length.
   systemB : array<vec4f, 2>,
+  // Per system: x the share of the energy spread over all directions.
+  systemC : array<vec4f, 2>,
+  // Per cascade: x the Jacobian below which foam grows, y how fast it grows a
+  // second for each unit below, z how fast it decays a second.
+  foam : array<vec4f, 4>,
   choppiness : f32,
-  // Foam is made where the surface compresses below this Jacobian, at gain ×
-  // how far below, added at `foamAdd` a second and decaying at `foamDecay`.
-  foamBias : f32,
-  foamGain : f32,
-  foamDecay : f32,
-  foamAdd : f32,
   // Seconds on the looping ocean clock.
   time : f32,
   // Seconds since the last frame.
@@ -138,8 +137,9 @@ fn spreadNormalisation(s : f32) -> f32 {
 }
 
 // How the energy at `omega` spreads over directions `theta`: a cos² lobe
-// blended toward the Donelan-Banner cos^2s, narrower for swell.
-fn directionSpread(theta : f32, omega : f32, a : vec4f, b : vec4f) -> f32 {
+// blended toward the Donelan-Banner cos^2s, narrower for swell, then a share
+// `omni` spread evenly over all directions.
+fn directionSpread(theta : f32, omega : f32, a : vec4f, b : vec4f, omni : f32) -> f32 {
   let ratio = omega / b.y;
   let spreadPower = select(pow(abs(ratio), 5.0) * 6.97, pow(abs(ratio), -2.5) * 9.77, omega > b.y);
   let s = spreadPower + tanh(min(ratio, 20.0)) * 16.0 * a.w * a.w;
@@ -147,7 +147,7 @@ fn directionSpread(theta : f32, omega : f32, a : vec4f, b : vec4f) -> f32 {
   let cos2s = spreadNormalisation(s) * pow(abs(cos(dTheta * 0.5)), s * 2.0);
   let cosT = cos(dTheta);
   let lobe = cosT * cosT * (2.0 / FFT_PI) * select(0.0, 1.0, cosT > 0.0);
-  return mix(lobe, cos2s, a.z);
+  return mix(mix(lobe, cos2s, a.z), 1.0 / FFT_TWO_PI, omni);
 }
 
 fn shortWaveFade(k : f32, b : vec4f) -> f32 {
@@ -174,7 +174,8 @@ fn initSpectrum(@builtin(global_invocation_id) id : vec3u) {
     for (var s = 0u; s < 2u; s++) {
       let a = ocean.systemA[s];
       let b = ocean.systemB[s];
-      spectrum += jonswap(omega, a, b) * directionSpread(theta, omega, a, b) * shortWaveFade(kLength, b);
+      let omni = ocean.systemC[s].x;
+      spectrum += jonswap(omega, a, b) * directionSpread(theta, omega, a, b, omni) * shortWaveFade(kLength, b);
     }
     // E|h0|² = S(k) dk² / 2, so the height variance is Σ S(k) dk².
     let scale = sqrt(max(spectrum, 0.0) * abs(dispersionDerivative(kLength)) / kLength * dk * dk) * 0.5;
@@ -308,11 +309,12 @@ fn columns(@builtin(local_invocation_id) local : vec3u, @builtin(workgroup_id) g
     let jxz = lambda * A.w;
     let jacobian = jxx * jzz - jxz * jxz;
 
-    // Foam is made where the surface compresses, and decays, so a crest that
-    // broke leaves its foam behind on the water it moved.
-    let made = saturate((ocean.foamBias - jacobian) * ocean.foamGain);
-    let aged = foam[index] * exp(-ocean.foamDecay * ocean.dt) + made * ocean.foamAdd * ocean.dt;
-    let kept = clamp(max(aged, made * 0.5), 0.0, 1.5);
+    // Foam grows where the surface folds past the cascade's whitecap, and
+    // decays, so a crest that broke leaves its foam behind on the water it
+    // moved.
+    let settings = ocean.foam[c];
+    let made = max(settings.x - jacobian, 0.0) * settings.y * ocean.dt;
+    let kept = saturate(foam[index] * exp(-settings.z * ocean.dt) + made);
     foam[index] = kept;
 
     let texel = vec2u(column, y);

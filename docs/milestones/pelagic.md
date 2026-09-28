@@ -406,13 +406,29 @@ chunk water then never overlap, and neither z-fights the other.
 - **Waves.** The FFT ocean's displacement moves the grid in the vertex shader, sideways as well
   as up. Water types weight the **cascades**, not separate oceans, so the surface does not tear
   at a blend. The weather sets the sea. See [Wind](#wind).
-- **Normals.** The FFT ocean's slopes, per pixel, with the gust field on the short cascades. See
-  [Wind](#wind). No detail normal maps: they would tile.
+- **Normals.** The FFT ocean's slopes, per pixel. See [Wind](#wind). No detail normal maps: they
+  would tile.
 - **Reflection.** Sample the prefiltered sky cube (`SkyCubeCapture`, `SkyIblPrefilter`). Rougher
   water samples a blurrier mip.
 - **Sun glint.** A specular sun term, gated by CSM geometry shadows and cloud shadows. This follows
   the Foxfire rule: shadows act on the sun term only.
 - **Fresnel.** Blends reflection and refraction by the view angle.
+- **Crest glow.** Sunlight through the thin top of a wave, after the height term of the Atlas
+  water talk. It fades in with the wave's height from 0.5 m to 3 m above rest. It needs the
+  viewer to face the sun across the water, compared flat so a high sun still counts
+  (`facing³`), and a face turned away from the sun (`(1 − N·L)⁴`). Its colour is the palette's
+  scatter shifted toward green. It is gated by the sun's shadows, and fades where the bed shows
+  or foam covers the water. `setWaterCrestGlow(strength)` scales it in the console, 1 the default.
+- **Trough darkening.** Troughs are darker than crests. A trough sees less sky, since much of
+  what it reflects is the next wave, so the sky reflection and ambient fall to 84%. Less light
+  reaches the water under it than under a thin crest, so its scatter falls to 84%. Both reach
+  their floor at 3.5 m below rest. Water at rest or above is unchanged, so a calm sea is too.
+  `setWaterTroughDarkening(strength)` scales it in the console, 1 the default.
+- **Scatter lighting.** The light the water scatters back comes from under the surface, so its
+  diffuse lobe is lit along the vertical, not by each ripple's tilt. Shading it by the wave normal
+  reads as painted plastic. The waves show through the reflection and the Fresnel instead. Foam is
+  a surface layer, so its diffuse takes the wave normal. The scatter colours are dark (ocean
+  `[0.003, 0.018, 0.04]`, tropical `[0.004, 0.03, 0.06]`) so the sky's reflection stands out.
 - **Depth colour.** Beer-Lambert absorption over the water depth, from the palette. Each chunk
   first writes its depth alone: the waves fold the surface over itself on screen, so the shading
   draws that follow test for equal depth and shade only the nearest layer, whatever order the
@@ -434,7 +450,8 @@ chunk water then never overlap, and neither z-fights the other.
 ### Wind
 
 `SkyRenderer` gives `windDirection` (a normalized XZ vector) and `windiness` (0 to 1). The base
-wind speed is `windiness × 10` m/s, with gusts on top. Foliage already reads the same wind.
+wind speed is `windiness × 10` m/s, with gusts on top. Foliage reads the gusts. The ocean reads
+the direction and the windiness.
 
 - **FFT ocean.** `OceanFFT` runs a Tessendorf ocean (adapted from Tidewater, MIT) in one compute
   pass a frame: four cascades of 256² texels over tiles of 733, 157, 33.3 and 7.1 m. Their ratios
@@ -450,21 +467,19 @@ wind speed is `windiness × 10` m/s, with gusts on top. Foliage already reads th
   `windiness^1.5` (`oceanWindSpeed`): a sea about 0.2 m high in a calm, 2.5 m at 0.5 and 5.9 m at
   1. The ocean follows the weather's wind lagged by 6 s, so a sea builds and
   calms, and it rebuilds the spectrum when the lagged wind has moved by 0.05 m/s or 0.5°. A
-  stronger wind raises a longer, higher sea. The clock runs up to 60% faster in full wind, so a
-  storm's chop looks agitated; it only accumulates, so a change of rate never jumps.
-- **Choppiness.** The horizontal displacement is 1.9 × its linear value: crests sharpen and
-  bunch, troughs broaden.
+  stronger wind raises a longer, higher sea.
+- **Rough sea.** A measured spectrum reads as a gentle heave at game scale, so the windiness also
+  roughens the wind sea past it (`seaState`), climbing as `windiness^1.5`. At full wind the wave
+  heights are 2.5 ×, 20% of the energy spreads over all directions so waves cross into pointed
+  peaks, and the peak wavelength is held to 90 m so the energy is in the waves the viewer sees.
+  `setOceanSeaState({ ... })` overrides it in the console.
+- **Choppiness.** The horizontal displacement is 0.8 × its linear value in a calm, rising to 1.1
+  in full wind: crests sharpen and bunch, troughs broaden.
 - **Speed.** A wave's speed comes from its length, as in deep water, `c = √(g·λ / 2π)`. Every
   angular frequency is snapped to whole cycles over a 1024 s loop, and the clock wraps there.
 - **Water types.** A palette type takes every cascade up to 8 × its `waveScale` long, fading out
   by 16 ×, scaled by its `waveResponse` (`cascadeWeight`). The ocean (100 m) takes all four; a
   lake (10 m) takes only the 33.3 m and 7.1 m cascades, so it stays small in any wind.
-- **Variation.** Two independent fields of value noise scale the waves so no two stretches of
-  water look alike: a swell field (760 m and 280 m cells, 0.35 to 1.35) and a chop field (430 m
-  and 150 m cells, 0.08 to 1.45). Each cascade blends the two by its length, from the longest to
-  the shortest, so one stretch is rolling swell, the next busy chop, and where the chop field
-  bottoms out a glassy slick. The noise drifts downwind at 2.5 m/s at full wind, so rough patches
-  cross the water. Its lattice repeats every 256 cells, so the drift wraps.
 - **Grid and distance.** Water grids are 2 m a quad within the first LOD distance, then 4, 8,
   16 and 32 m. A vertex samples each cascade's displacement at the mip whose texels match the
   grid, 0.7 levels coarser, so no wave shorter than the grid can hold moves it. The spacing comes
@@ -483,10 +498,6 @@ wind speed is `windiness × 10` m/s, with gusts on top. Foliage already reads th
   sparkling.
 - **Quality.** The `water` quality aspect (`WaterQuality.ts`) biases the slope mip, from −0.5 on
   ultra to 1 on low. The displacement and the foam are the same on every tier.
-- **Gusts.** The foliage gust field (`gustField` in `scatter-wind.wgsl`, read with the same wind
-  vector) scales the shortest cascade, and half of the next, from 0.5 in a lull to 1.8 in a gust,
-  fully from a wind strength of 0.5. This makes "cat's paws": dark patches of ripples that run
-  downwind across the water, and one gust crosses the water and then the forest.
 
 ### Waves at the shore
 
@@ -506,45 +517,80 @@ Breaking waves that curl over are out of scope. A heightfield cannot overhang.
 
 ### Foam
 
-At `windiness = 1` the base wind is 10 m/s (Beaufort 5), and gusts reach gale strength. The trees
-already look like a strong wind at that value. The water must match them, so high wind needs a lot
-of foam. Tune this mapping together with the foliage:
+At `windiness = 1` the trees look like a strong wind, so the water must look like a storm. The
+ocean's own wind speed (see [Wind](#wind)) and the rough-sea mapping make it so:
 
-| `windiness` | Wind              | Water                                                   |
-| ----------- | ----------------- | ------------------------------------------------------- |
-| 0           | Calm              | Mirror surface, no foam                                 |
-| 0.3         | 3 m/s             | Small ripples, no foam                                  |
-| 0.5         | 5 m/s             | Small waves, a few whitecaps                            |
-| 0.8         | 8 m/s             | Moderate waves, many whitecaps                          |
-| 1.0         | 10 m/s and gusts  | Rough sea, whitecaps everywhere, long foam trails    |
+| `windiness` | Ocean wind | Water                                                          |
+| ----------- | ---------- | -------------------------------------------------------------- |
+| 0           | 0.5 m/s    | Calm, the swell's slow heave, no foam                          |
+| 0.3         | 4 m/s      | Small waves, no foam                                           |
+| 0.5         | 8 m/s      | Moderate waves, no foam                                        |
+| 0.7         | 13 m/s     | Rough, the first whitecaps and small spray                     |
+| 1.0         | 22 m/s     | Storm: crossing crests, whitecaps with long lace trails, big spray |
 
-The foam uses no saved state:
+The foam comes from the ocean alone, with no texture:
 
-- **Texture.** `nature/water/sea-foam.webp` (`WaterTextures`), white foam against transparent. The
-  shader reads its brightness × alpha as a density and shows foam where the density passes
-  `1 − coverage`, so more coverage grows the patches out from the densest clumps. Its opacity runs
-  from 0.35 on the thinnest foam to 1 on the densest, so bubbles and thin spots show the water
-  through. It tiles twice,
-  8 m and 12.8 m turned 37°, to hide the repeat, and drifts downwind at 1.5 m/s at full wind; the
-  CPU accumulates the drift and wraps it at 8192 m, which every tiling divides.
-- **Whitecaps.** Foam where the surface compresses: the ocean's Jacobian, from the choppy
-  displacement's derivatives. Each cascade's texel makes foam where it falls below 0.89, adds it
-  at 3.5 a second and lets it decay at 0.95 a second, in a buffer kept from frame to frame. The
-  vertex stage sums it over the cascades (0.35, 0.45, 0.5 and 0.25 of each); the pixel adds fresh
-  foam where its own slopes squeeze the surface below 0.43 now.
+- **Whitecaps.** Foam grows where the surface folds: the ocean's Jacobian, from the choppy
+  displacement's derivatives. Each cascade has its own whitecap and foam amount
+  (`CASCADE_FOAM`). A texel grows foam where its Jacobian falls below the whitecap, at 7.5 × amount
+  a second for each unit below. It decays at `max(0.5, 10 − amount)` × 1.15 a second, in a buffer
+  kept from frame to frame. The longest cascade holds the peak waves, so its foam (whitecap 0.7,
+  amount 9) caps the big crests. The next (0.5, 3) adds broken chop. The short two make none. A
+  calm sea never folds that far, so it makes no foam.
 - **Persistence.** The foam buffer lives at the water's rest positions, so the foam rides the
-  surface it formed on and is left behind as the crest moves on, thinning into lace as its
-  coverage decays. Far out the texture averages to grey, so from 0.15 m to 1.2 m of water per
-  pixel the plain coverage takes over.
+  surface it formed on and is left behind as the crest moves on, thinning as it decays.
+- **Sampling.** The pixel sums the cascades' foam, filtered to its footprint through the mips:
+  the coverage. It is coarse (the longest cascade's texel is 2.86 m), so it only says where foam
+  may show.
+- **Lace.** The whole surface's stretch at the pixel, summed over every cascade at full
+  resolution, says where inside that the foam shows: from none at a stretch of 1.1 to all at
+  0.5. Foam shows where the lace passes `1 − coverage`, over a soft band of 0.3, so it starts on
+  the spots the small waves squeeze, grows out from there as the coverage rises, and thins back
+  to lace as it decays. From 0.3 m to 2.5 m of water per pixel the plain coverage takes over,
+  since far out the small waves average away.
 - **Per type.** The palette's foam amount scales it all, so a lake stays much calmer than the ocean
   in the same wind.
 - **Shading.** All foam is scaled by an overall opacity of 0.9. It is a rough (0.6), bright
   (albedo 0.65) diffuse layer: the light draw blends
   the water's diffuse and roughness toward it, and the absorb draw hides the water beneath it.
+- **Tuning.** `setOceanFoam(cascade, { whitecap, amount })` in the console changes one cascade's
+  foam live.
 
-Stretch goals: a foam texture that follows the camera and updates each frame in a compute pass,
-for real persistence. Spray blown off the crests at high wind, starting from the rain particle
-pass.
+### Sea spray
+
+Spray rises from breaking crests near the camera (`SeaSpray`, after GodotOceanWaves).
+
+- **Pool.** 4096 particles. A particle keeps only where and when it rose, how hard its crest
+  broke and a random value, so its motion is a function of its age and the waves under it.
+- **Spawning.** A compute pass gives each free particle four tries a frame at random spots within
+  150 m of the camera. A spot must be open sea at least 1.5 m deep and under foam coverage of at
+  least 0.75. Its chance climbs from none at windiness 0.45 to all at 0.75. Recycling free
+  particles straight onto new spots keeps the pool busy, where scattering them evenly and culling
+  most would not.
+- **Open sea.** A depth mask of 64² texels over the spray's reach, from the terrain heights
+  (`TerrainRenderer.sampleHeight`) and the sea level. It is rebuilt when the camera crosses a
+  texel, and every second as chunks load.
+- **Motion.** A puff rides the wave's displacement where it rose, lifts off it fast and falls back
+  slower, drifts downwind at 2 m/s in full wind, and grows as it spreads. It fades in fast, fades
+  out slow, and dissolves from its thin edges.
+- **Shape by wind.** The first breaking crests throw small puffs and a storm throws big ones. The
+  shape blends from moderate at windiness 0.7 and below (2 m across, 1.3 m rise, 1.6 s) to storm
+  at 1 (7 m, 2.3 m, 2.6 s), fully opaque at both. Lifetimes vary ±30%.
+- **Drawing.** Camera-facing quads with the `sea-spray.png` texture, after the atmosphere
+  composite, premultiplied. It is lit by the sun, 4 × brighter looking toward it (droplets
+  scatter forward), and by the sky's irradiance. It fades where the scene is close behind it, so
+  it meets the water softly and hides behind nearer waves, and fades near the camera and at the
+  edge of its reach.
+- **Fog.** The composite fogs by the depth buffer, and the spray writes none, so it applies the
+  scene's fog itself (`sceneFogTransmittance`, `getFogScatterColor` in `fog.wgsl`), reading the
+  composite's own uniforms.
+- **Tuning.** `setSeaSpray({ moderate: { ... }, storm: { ... }, ... })` in the console.
+- **Not yet.** Spray takes no shadows (cloud or terrain) and no god rays, and rises only from the
+  palette's first type, the ocean.
+
+Stretch goals: sharper foam outlines, from a shorter longest cascade (about 400 m holds every wave
+the spectrum makes now) or from 512² cascades (about 4.5 × the FFT time and 125 MB of GPU memory).
+Time the ocean pass first; it has no GPU timer segment yet.
 
 ### Terrain changes
 
@@ -598,12 +644,12 @@ shelf.
    `hasWater`, the shared grid mesh, the horizon ring, sky reflection, depth colour, beach band,
    scatter kept out of water.
 2. **Lakes.** Lake cells, carving, lagoons, water body records and palette blending.
-3. **Surface detail.** The FFT ocean from the wind, gusts, whitecaps, refraction,
-   sun glint, the wet band and waves at the shore.
+3. **Surface detail.** The FFT ocean from the wind, whitecaps, crest glow, sea spray,
+   refraction, sun glint, the wet band and waves at the shore.
 4. **Editor and gameplay.** Water brush, edit rules and spill height, sea channels, locked lakes,
    saved edits, water query with CPU waves, wading and swimming.
-5. **Stretch.** Under-water post-process, caustics, rain ripples on water, a persistent foam
-   texture, spray, noise-channel rivers.
+5. **Stretch.** Under-water post-process, caustics, rain ripples on water, sharper foam,
+   noise-channel rivers.
 
 ## Performance notes (web budget)
 
@@ -612,7 +658,10 @@ shelf.
 - Patches reuse terrain LOD. Far water uses fewer vertices and fewer waves.
 - One compute pass a frame for the ocean: two transforms and the mip chains over four 256²
   cascades. The vertex shader takes a displacement sample per cascade; the fragment shader a slope
-  sample per cascade, one sky cube sample and two refraction samples.
+  and a foam sample per cascade, one sky cube sample and two refraction samples.
+- Sea spray: one compute pass over 4096 particles (four tries each while free), and one draw of
+  4096 instanced quads, most of them dropped before rasterising. The CPU rebuilds its 64² depth
+  mask (4096 height samples) when the camera crosses a texel, and every second.
 - The horizon ring is one draw call. Its vertices take no waves, and its pixels skip refraction.
 - `QualitySettings` controls the ocean's slope mip bias.
 
@@ -622,7 +671,8 @@ shelf.
   ocean. Generated terrain has no such check, because a connection is not a local question. The
   draft keeps it dry by using the continent field for coverage. Is that enough, or must generation
   prevent inland ground below sea level?
-- **Wind mapping.** Is the foam table right for how windy the trees look? Tune the two together.
-- **MSAA.** The scene depth texture is multisampled when `sampleCount > 1`. The water pass must
-  resolve it or read one sample.
+- **Wind mapping.** The foam table was tuned by eye at windiness 0.7 and 1. Check it against the
+  trees at 0.3 and 0.5.
+- **MSAA.** The scene depth texture is multisampled when `sampleCount > 1`. The water pass and the
+  sea spray, which reads it as a plain depth texture, must resolve it or read one sample.
 - **Palette size.** Ocean and lake only, or swamp as well in Phase 2?

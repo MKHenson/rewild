@@ -43,13 +43,15 @@ describe('resolveCoastWeights', () => {
   const c = DEFAULT_COAST;
 
   it('is dry sand on the beach, wet sand at the waterline and sea bed below', () => {
-    expect(resolveCoastWeights(c, 2, 0, 1, out)).toBeCloseTo(1, 6);
+    // A narrow blend, so each height sits wholly in one band.
+    const sharp: CoastConfig = { ...c, blend: 0.5 };
+    expect(resolveCoastWeights(sharp, 2, 0, 1, out)).toBeCloseTo(1, 6);
     expect(Array.from(out)).toEqual([1, 0, 0]);
 
-    resolveCoastWeights(c, 0, 0, 1, out);
+    resolveCoastWeights(sharp, 0, 0, 1, out);
     expect(Array.from(out)).toEqual([0, 1, 0]);
 
-    resolveCoastWeights(c, -5, 0, 1, out);
+    resolveCoastWeights(sharp, -5, 0, 1, out);
     expect(Array.from(out)).toEqual([0, 0, 1]);
   });
 
