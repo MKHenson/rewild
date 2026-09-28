@@ -624,7 +624,13 @@ fn fs(
         let cosTheta = dot(direction, vec3f(0.0, 1.0, 0.0));
         let hemisphereMask = smoothstep(0.0, 0.1, cosTheta);
         if (hemisphereMask <= 0.0) {
-            output.color = vec4f(0.0, 0.0, 0.0, 0.0);
+            // Transparent, but carrying the cloud-free sky colour rather than black.
+            // Consumers test validity by depth, which can call these texels sky a
+            // pixel above the horizon; filtered in as black they darken the opaque
+            // horizon clouds beside them into a dark line.
+            let horizonDir = normalize(vec3f(direction.x, max(0.001, direction.y), direction.z));
+            let background = getAtmosphereColor(vSunDirection, horizonDir, dot(vSunDirection, horizonDir), vec3f(0.0));
+            output.color = vec4f(getFogColor(horizonDir, org, vSunDirection, background), 0.0);
             output.valid = 0.0;
             return output;
         }
