@@ -1,5 +1,5 @@
 const PI: f32 = 3.141592653589793238462643383279502884197169;
-const FOG_COLOR_DAY = vec3f( 0.66, 0.66, 0.69 );
+const FOG_COLOR_DAY = vec3f( 0.66, 0.66, 0.75 );
 const FOG_COLOR_NIGHT = vec3f( 0.03, 0.04, 0.08 );
 const FOG_COLOR_STORM = vec3f( 0.55, 0.57, 0.45 );
 
