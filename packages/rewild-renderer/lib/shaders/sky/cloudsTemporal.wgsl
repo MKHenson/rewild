@@ -26,6 +26,14 @@ const NUM_LIGHT_SAMPLES = ${ CLOUD_LIGHT_SAMPLES };
 // against it (see the alpha computation in skyRay).
 const CLOUD_TRANSMITTANCE_FLOOR: f32 = 0.05;
 
+// Underside shading. Lower = darker cloud bases; tops are unaffected.
+// Share of the multiple-scattering sunlight that reaches the base.
+const CLOUD_BASE_SCATTER: f32 = 0.4;
+// Skylight ambient at the base, rising to 1.1 at the top.
+const CLOUD_BASE_AMBIENT: f32 = 0.5;
+// Ground-bounce lift on the lower half of the cloud.
+const CLOUD_BASE_BOUNCE: f32 = 0.3;
+
 // How far the depth gate is pulled back from terrain silhouettes, in cloud texels.
 //
 // INVARIANT: this must exceed the filter radius of every consumer that reads this
@@ -209,7 +217,10 @@ fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_d
 
     let sunIntensityModifier = horizonGate * extinction;
     let scatterAmount: f32 = mix(0.008, 1.0, smoothstep(0.96, 0.0, mu));
-    let beersLaw: f32 = exp(-stepL * lighRayDen) + 0.9 * scatterAmount * exp(-0.1 * stepL * lighRayDen) + scatterAmount * 0.5 * exp(-0.02 * stepL * lighRayDen);
+    // The two softer lobes approximate multiple scattering and barely attenuate, so
+    // they keep a cloud's underside sunlit. Scaled back toward the base.
+    let baseScatter = mix(CLOUD_BASE_SCATTER, 1.0, smoothstep(0.0, 0.6, cloudHeight2));
+    let beersLaw: f32 = exp(-stepL * lighRayDen) + baseScatter * scatterAmount * (0.9 * exp(-0.1 * stepL * lighRayDen) + 0.5 * exp(-0.02 * stepL * lighRayDen));
     // Thin cloud absorption: caps forward-scattered sun brightness for low-density clouds.
     // Low lighRayDen → 0.25 floor; thick clouds → 1.0 (unchanged). Tune 1.2 and 0.25.
     let thinCloudDim = mix(0.25, 1.0, 1.0 - exp(-lighRayDen * 1.2));
@@ -300,7 +311,8 @@ fn skyRay(cameraPos: vec3f, dir: vec3f, sun_direction: vec3f) -> vec4f {
             // never actually got a window of its own.
             var cloudAmbientColor = mix(CLOUD_AMBIENT_NIGHT_COLOR, CLOUD_AMBIENT_EVENING_COLOR, smoothstep(-0.25, -0.02, sunDotUp));
             cloudAmbientColor = mix(cloudAmbientColor, CLOUD_AMBIENT_DAY_COLOR, smoothstep(0.1, 0.6, sunDotUp));
-            let ambient = (0.5 + 0.6 * cloudHeight) * cloudAmbientColor * 6.5 + vec3f(0.8) * max(0.0, 1.0 - 2.0 * cloudHeight);
+            let skyAmbient = mix(CLOUD_BASE_AMBIENT, 1.1, cloudHeight);
+            let ambient = skyAmbient * cloudAmbientColor * 6.5 + vec3f(CLOUD_BASE_BOUNCE) * max(0.0, 1.0 - 2.0 * cloudHeight);
             var radiance = ambient + (SUN_POWER * intensity * mix(vec3f(0.8, 0.5, 0.3), vec3f(1.0), clamp(sunDotUp3, 0.0, 1.0)));
             radiance *= density;
             color += transmittance * (radiance - radiance * exp(-density * stepS)) / density;
