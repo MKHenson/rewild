@@ -4,11 +4,16 @@ import {
   CASCADE_COUNT,
   CASCADE_SIZES,
   FFT_SIZE,
+  CALM_CHOPPINESS,
   GALE_WIND_SPEED,
+  ROUGH_CHOPPINESS,
+  ROUGH_HEIGHT_GAIN,
+  ROUGH_OMNI_SHARE,
   cascadeBand,
   cascadeWeight,
   jonswapShape,
   oceanWindSpeed,
+  seaState,
 } from './OceanSpectrum';
 
 describe('OceanSpectrum', () => {
@@ -29,6 +34,26 @@ describe('OceanSpectrum', () => {
     const wavelength = (Math.PI * 2) / k;
     expect(wavelength).toBeGreaterThan(40);
     expect(wavelength).toBeLessThan(150);
+  });
+
+  it('holds the peak no longer than the longest peak wavelength', () => {
+    const { peakOmega } = jonswapShape(GALE_WIND_SPEED, 200, 90);
+    const wavelength = (Math.PI * 2 * 9.81) / (peakOmega * peakOmega);
+    expect(wavelength).toBeCloseTo(90, 6);
+    // A short peak is left as it is.
+    expect(jonswapShape(4, 120, 90).peakOmega).toBe(jonswapShape(4, 120).peakOmega);
+  });
+
+  it('roughens the wind sea from calm to a full wind', () => {
+    const calm = seaState(0);
+    const rough = seaState(1);
+    expect(calm.heightGain).toBe(1);
+    expect(calm.omniShare).toBe(0);
+    expect(calm.choppiness).toBe(CALM_CHOPPINESS);
+    expect(rough.heightGain).toBe(ROUGH_HEIGHT_GAIN);
+    expect(rough.omniShare).toBe(ROUGH_OMNI_SHARE);
+    expect(rough.choppiness).toBe(ROUGH_CHOPPINESS);
+    expect(rough.windSpeed).toBe(GALE_WIND_SPEED);
   });
 
   it('gives every wavenumber to exactly one cascade', () => {

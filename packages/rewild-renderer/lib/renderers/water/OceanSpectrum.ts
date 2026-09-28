@@ -30,6 +30,78 @@ export function oceanWindSpeed(windiness: number): number {
   );
 }
 
+/**
+ * How rough the wind sea looks at windiness 1, past what the spectrum alone
+ * gives. A measured sea spectrum reads as a gentle heave at game scale. These
+ * make a storm read as rough.
+ */
+// Scale on the wind sea's wave heights. The energy takes its square.
+export const ROUGH_HEIGHT_GAIN = 2.5;
+// Share of the wind sea's energy spread over all directions. Waves that cross
+// raise pointed, confused peaks instead of orderly rows.
+export const ROUGH_OMNI_SHARE = 0.2;
+// Sideways displacement as a share of its linear value, from calm to rough.
+// Higher pulls crests narrower and sharper. Much past 1.5 folds them over.
+export const CALM_CHOPPINESS = 0.8;
+export const ROUGH_CHOPPINESS = 1.1;
+// Metres: the longest peak wavelength the wind sea may have. A gale's peak is
+// near 160 m, a long heave that looks calm near the camera. Holding it shorter
+// puts the energy in the waves the viewer sees.
+export const LONGEST_PEAK = 90;
+
+/** What the weather's windiness makes of the wind sea. */
+export interface SeaState {
+  windSpeed: number;
+  /** Scale on the wave heights. */
+  heightGain: number;
+  /** 0..1: share of the energy spread over all directions. */
+  omniShare: number;
+  choppiness: number;
+  /** Metres: the longest peak wavelength. */
+  longestPeak: number;
+}
+
+/** The wind sea for the weather's windiness 0..1. The roughness climbs like
+ *  the wind speed, as windiness^WIND_CURVE. */
+export function seaState(windiness: number): SeaState {
+  const wind = Math.min(1, Math.max(0, windiness));
+  const rough = Math.pow(wind, WIND_CURVE);
+  return {
+    windSpeed: oceanWindSpeed(wind),
+    heightGain: 1 + (ROUGH_HEIGHT_GAIN - 1) * rough,
+    omniShare: ROUGH_OMNI_SHARE * rough,
+    choppiness: CALM_CHOPPINESS + (ROUGH_CHOPPINESS - CALM_CHOPPINESS) * rough,
+    longestPeak: LONGEST_PEAK,
+  };
+}
+
+/**
+ * Crest foam on one cascade. Foam grows where the cascade's surface folds
+ * past `whitecap` (the Jacobian: 1 flat, below 0 folded over), so a lower
+ * whitecap keeps foam to the steepest crests. `amount` 0..10 sets how fast it
+ * grows and how long it lasts: more gives thick caps and long trails.
+ */
+export interface CascadeFoam {
+  whitecap: number;
+  amount: number;
+}
+
+/** Longest cascade first. The long cascade holds the peak waves, so its foam
+ *  caps the big crests. The next adds broken chop. The short two make none. */
+export const CASCADE_FOAM: readonly CascadeFoam[] = [
+  { whitecap: 0.7, amount: 9 },
+  { whitecap: 0.5, amount: 3 },
+  { whitecap: 0, amount: 0 },
+  { whitecap: 0, amount: 0 },
+];
+
+/** Per second: foam grown for each unit the Jacobian is below the whitecap,
+ *  and the decay rate, from a foam amount 0..10. */
+export function foamRates(amount: number): { grow: number; decay: number } {
+  const a = Math.min(10, Math.max(0, amount));
+  return { grow: a * 7.5, decay: Math.max(0.5, 10 - a) * 1.15 };
+}
+
 /** One sea state in the spectrum: a wind sea or a swell. */
 export interface WaveSystem {
   /** Scale on the energy. */
@@ -47,6 +119,10 @@ export interface WaveSystem {
   peakEnhancement: number;
   /** Metres: waves much shorter than this fade out. */
   shortWavesFade: number;
+  /** 0..1: share of the energy spread over all directions. */
+  omniShare: number;
+  /** Metres: the longest peak wavelength, whatever the wind and fetch. */
+  longestPeak: number;
 }
 
 /** The local sea the weather raises; its speed and direction follow it. */
@@ -59,6 +135,8 @@ export const WIND_SEA: WaveSystem = {
   swell: 0.05,
   peakEnhancement: 3.3,
   shortWavesFade: 0.01,
+  omniShare: 0,
+  longestPeak: LONGEST_PEAK,
 };
 
 /** Swell from storms far away: long, narrow and always there. About 0.7 m
@@ -73,18 +151,27 @@ export const SWELL: WaveSystem = {
   swell: 0.9,
   peakEnhancement: 3.3,
   shortWavesFade: 0.1,
+  omniShare: 0,
+  longestPeak: Infinity,
 };
 
-/** JONSWAP's α and peak angular frequency for a wind over a fetch. */
+/** JONSWAP's α and peak angular frequency for a wind over a fetch. The peak
+ *  is held no longer than `longestPeak` metres. */
 export function jonswapShape(
   windSpeed: number,
-  fetchKm: number
+  fetchKm: number,
+  longestPeak = Infinity
 ): { alpha: number; peakOmega: number } {
   const fetch = Math.max(1, fetchKm) * 1000;
   const speed = Math.max(0.1, windSpeed);
+  // Deep water: ω² = g k, with k = 2π / λ.
+  const shortestOmega = Math.sqrt((GRAVITY * Math.PI * 2) / longestPeak);
   return {
     alpha: 0.076 * Math.pow((GRAVITY * fetch) / (speed * speed), -0.22),
-    peakOmega: 22 * Math.pow((speed * fetch) / (GRAVITY * GRAVITY), -0.33),
+    peakOmega: Math.max(
+      22 * Math.pow((speed * fetch) / (GRAVITY * GRAVITY), -0.33),
+      shortestOmega
+    ),
   };
 }
 
@@ -108,10 +195,4 @@ export function cascadeWeight(type: WaterType, size: number): number {
   const t = (size - 8 * type.waveScale) / (8 * type.waveScale);
   const fade = t <= 0 ? 1 : t >= 1 ? 0 : 1 - t * t * (3 - 2 * t);
   return type.waveResponse * fade;
-}
-
-/** 0 for the longest cascade, 1 for the shortest: how far it takes the chop
- *  variation over the swell's. */
-export function cascadeBandPosition(index: number): number {
-  return CASCADE_COUNT > 1 ? index / (CASCADE_COUNT - 1) : 0;
 }

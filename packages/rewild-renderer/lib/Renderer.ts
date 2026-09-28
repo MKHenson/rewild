@@ -8,6 +8,7 @@ import { IMaterialPass } from './materials/IMaterialPass';
 import { IRenderGroup } from '../types/IRenderGroup';
 import { Sky } from './core/Sky';
 import { TerrainRenderer } from './renderers/terrain/TerrainRenderer';
+import { initWaterTextures } from './renderers/water/WaterTextures';
 import { initTerrainTextureArrays } from './renderers/terrain/TerrainTextureArrays';
 import { CanvasSizeWatcher } from './utils/CanvasSizeWatcher';
 import { RenderList } from './core/RenderList';
@@ -34,7 +35,6 @@ import { DirectionalShadowRenderer } from './renderers/shadow/DirectionalShadowR
 import { SpotLightShadowRenderer } from './renderers/shadow/SpotLightShadowRenderer';
 import { FrameCompositor } from './post-processes/FrameCompositor';
 import { RefractionCapture } from './renderers/water/RefractionCapture';
-import { initWaterTextures } from './renderers/water/WaterTextures';
 import { QualitySettings } from './utils/QualitySettings';
 
 const _projScreenMatrix = new Matrix4();
@@ -1056,6 +1056,13 @@ export class Renderer {
       );
       this.sky.render(this, postProcessingPass, camera.camera);
       postProcessingPass.end();
+
+      // Spray fogs itself, so it draws over the composite, not under it.
+      this.terrainRenderer.renderSeaSpray(
+        this,
+        postProcessingEncoder,
+        sceneColorView
+      );
 
       device.queue.submit([postProcessingEncoder.finish()]);
 

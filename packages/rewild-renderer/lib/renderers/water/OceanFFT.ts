@@ -2,15 +2,19 @@ import shader from '../../shaders/ocean-fft.wgsl';
 import { composeShader } from '../../utils/shaderDefines';
 import {
   CASCADE_COUNT,
+  CASCADE_FOAM,
   CASCADE_SIZES,
+  CascadeFoam,
   FFT_SIZE,
   OCEAN_LOOP_SECONDS,
   SWELL,
   WIND_SEA,
+  SeaState,
   WaveSystem,
   cascadeBand,
+  foamRates,
   jonswapShape,
-  oceanWindSpeed,
+  seaState,
 } from './OceanSpectrum';
 
 const FORMAT: GPUTextureFormat = 'rgba16float';
@@ -18,30 +22,13 @@ const MIP_LEVELS = Math.log2(FFT_SIZE) + 1;
 const TEXELS = FFT_SIZE * FFT_SIZE * CASCADE_COUNT;
 
 // OceanParams in ocean-fft.wgsl.
-const PARAMS_FLOATS = 64;
+const PARAMS_FLOATS = 80;
 const SYSTEM_A = 32;
 const SYSTEM_B = 40;
-const SCALARS = 48;
+const SYSTEM_C = 48;
+const FOAM = 56;
+const SCALARS = 72;
 
-// Sideways displacement as a share of its linear value. Raising it pulls
-// crests narrower and sharper and troughs broader; around 1 looks like a
-// wind sea, much past 2 folds crests over each other and shows as pinched,
-// flickering peaks. It also compresses the surface more, so more foam.
-const CHOPPINESS = 0.9;
-// Foam is made in a texel where the surface's stretch (the Jacobian: 1 flat,
-// below 1 squeezed, below 0 folded) falls below FOAM_BIAS. Raise it for foam
-// on gentler crests, lower it to keep foam to the steepest.
-const FOAM_BIAS = 0.92;
-// How fast the foam made rises with how far below FOAM_BIAS the stretch is:
-// higher gives crisp, full caps as soon as a crest qualifies.
-const FOAM_GAIN = 3;
-// How fast foam fades: exp(−decay × seconds), halving every 0.69 / decay
-// seconds (2 s at 0.35, 0.7 s at 0.95). Lower leaves longer trails behind the
-// crests.
-const FOAM_DECAY = 1.15;
-// Foam added per second while a texel is squeezed: higher builds thick caps
-// from a brief squeeze.
-const FOAM_ADD = 5.5;
 // Water depth in metres for the dispersion. Deep water at 500; lower slows
 // the longest waves as they would over a shelf.
 const DEPTH = 500;
@@ -55,9 +42,6 @@ const WIND_LAG = 6;
 // and the surface never jumps.
 const REBUILD_SPEED = 0.05;
 const REBUILD_COS = Math.cos((0.5 * Math.PI) / 180);
-// How much faster the clock runs in full wind, so a storm's chop looks
-// agitated. The clock only accumulates, so a change of rate never jumps.
-export const WIND_TIME_SPEEDUP = 1.8;
 
 /**
  * The FFT ocean: every frame, one compute pass turns each cascade's spectrum
@@ -73,6 +57,11 @@ export class OceanFFT {
   time = 0;
   /** The lagged wind speed in m/s the spectrum was last built for. */
   windSpeed = 0;
+  /** Replaces parts of the sea state the windiness gives, for tuning by eye.
+   *  Set it with `overrideSeaState`. */
+  private seaOverride: Partial<SeaState> = {};
+  /** Crest foam per cascade. Set it with `overrideFoam`. */
+  private foam: CascadeFoam[] = CASCADE_FOAM.map((f) => ({ ...f }));
 
   private params: GPUBuffer;
   private data = new Float32Array(PARAMS_FLOATS);
@@ -263,9 +252,11 @@ export class OceanFFT {
       this.windZ /= norm;
       this.windiness += (target - this.windiness) * follow;
     }
-    this.windSpeed = oceanWindSpeed(this.windiness);
+    const sea = { ...seaState(this.windiness), ...this.seaOverride };
+    this.windSpeed = sea.windSpeed;
 
     const rebuild =
+      this.builtSpeed < 0 ||
       Math.abs(this.windSpeed - this.builtSpeed) > REBUILD_SPEED ||
       this.windX * this.builtX + this.windZ * this.builtZ < REBUILD_COS;
     if (rebuild) {
@@ -274,27 +265,32 @@ export class OceanFFT {
       this.builtZ = this.windZ;
       const local: WaveSystem = {
         ...WIND_SEA,
+        scale: WIND_SEA.scale * sea.heightGain * sea.heightGain,
         windSpeed: this.windSpeed,
         direction: Math.atan2(this.windZ, this.windX),
+        omniShare: sea.omniShare,
+        longestPeak: sea.longestPeak,
       };
       this.packSystem(0, local);
       this.packSystem(1, SWELL);
     }
 
-    const rate = 1 + WIND_TIME_SPEEDUP * this.windiness;
-    this.time = (this.time + deltaSeconds * rate) % OCEAN_LOOP_SECONDS;
+    this.time = (this.time + deltaSeconds) % OCEAN_LOOP_SECONDS;
 
     const s = this.data;
-    s[SCALARS] = CHOPPINESS;
-    s[SCALARS + 1] = FOAM_BIAS;
-    s[SCALARS + 2] = FOAM_GAIN;
-    s[SCALARS + 3] = FOAM_DECAY;
-    s[SCALARS + 4] = FOAM_ADD;
-    s[SCALARS + 5] = this.time;
-    s[SCALARS + 6] = Math.min(deltaSeconds, 0.1);
-    s[SCALARS + 7] = DEPTH;
-    this.words[SCALARS + 8] = SEED;
-    s[SCALARS + 9] = (Math.PI * 2) / OCEAN_LOOP_SECONDS;
+    for (let c = 0; c < CASCADE_COUNT; c++) {
+      const { whitecap, amount } = this.foam[c];
+      const { grow, decay } = foamRates(amount);
+      s[FOAM + c * 4] = whitecap;
+      s[FOAM + c * 4 + 1] = grow;
+      s[FOAM + c * 4 + 2] = decay;
+    }
+    s[SCALARS] = sea.choppiness;
+    s[SCALARS + 1] = this.time;
+    s[SCALARS + 2] = Math.min(deltaSeconds, 0.1);
+    s[SCALARS + 3] = DEPTH;
+    this.words[SCALARS + 4] = SEED;
+    s[SCALARS + 5] = (Math.PI * 2) / OCEAN_LOOP_SECONDS;
     device.queue.writeBuffer(this.params, 0, s);
 
     const encoder = device.createCommandEncoder({ label: 'ocean fft' });
@@ -334,10 +330,39 @@ export class OceanFFT {
     pass.dispatchWorkgroups(x, y, z);
   }
 
+  /**
+   * Replaces parts of the sea state the windiness gives, and rebuilds the
+   * spectrum. An empty object goes back to the weather's.
+   */
+  overrideSeaState(override: Partial<SeaState>): void {
+    this.seaOverride = { ...override };
+    this.builtSpeed = -1;
+  }
+
+  /** Replaces parts of cascade `cascade`'s crest foam. */
+  overrideFoam(cascade: number, override: Partial<CascadeFoam>): void {
+    this.foam[cascade] = { ...this.foam[cascade], ...override };
+  }
+
+  /** Crest foam per cascade, longest first. */
+  currentFoam(): CascadeFoam[] {
+    return this.foam.map((f) => ({ ...f }));
+  }
+
+  /** The sea state the ocean is built for now, with any override. */
+  currentSeaState(): SeaState {
+    return { ...seaState(this.windiness), ...this.seaOverride };
+  }
+
   private packSystem(index: number, system: WaveSystem) {
-    const { alpha, peakOmega } = jonswapShape(system.windSpeed, system.fetch);
+    const { alpha, peakOmega } = jonswapShape(
+      system.windSpeed,
+      system.fetch,
+      system.longestPeak
+    );
     const a = SYSTEM_A + index * 4;
     const b = SYSTEM_B + index * 4;
+    this.data[SYSTEM_C + index * 4] = system.omniShare;
     this.data[a] = system.scale;
     this.data[a + 1] = system.direction;
     this.data[a + 2] = system.spreadBlend;

@@ -3,7 +3,6 @@ import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 import { MAX_WATER_TYPES, WaterType } from '../../renderers/terrain/Water';
-import { WATER_FOAM_TEXTURE } from '../../renderers/water/WaterTextures';
 
 // WaterParams layout — must match water.wgsl:
 //   texels      f32               offset 0
@@ -152,19 +151,10 @@ export class WaterUniforms implements ISharedUniformBuffer {
       { binding: 10, resource: ocean.sampler }
     );
     if (this.shades) {
-      entries.push(
-        {
-          binding: 9,
-          resource: ocean.slopes.createView({ dimension: '2d-array' }),
-        },
-        {
-          binding: 6,
-          resource: renderer.textureManager
-            .get(WATER_FOAM_TEXTURE)
-            .gpuTexture.createView(),
-        },
-        { binding: 7, resource: renderer.samplerManager.get('linear') }
-      );
+      entries.push({
+        binding: 9,
+        resource: ocean.slopes.createView({ dimension: '2d-array' }),
+      });
     }
     this.bindGroup = device.createBindGroup({
       label: 'water surface',

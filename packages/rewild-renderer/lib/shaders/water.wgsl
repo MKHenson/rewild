@@ -18,7 +18,7 @@ const HAS_FOLIAGE_SHADING: bool = false;
 #include "./shader-lib/pcf.wgsl"
 #include "./shader-lib/directional-shadow.wgsl"
 #include "./shader-lib/spot-light-shadow.wgsl"
-#include "./shader-lib/scatter-wind.wgsl"
+#include "./shader-lib/water-waves.wgsl"
 
 // Air to water at normal incidence.
 const WATER_F0: f32 = 0.02;
@@ -35,7 +35,6 @@ const AIR_TO_WATER: f32 = 0.75;
 const REFRACTION_REACH: f32 = 3.0;
 
 const MAX_WATER_TYPES: u32 = 4u;
-const CASCADES: i32 = 4;
 // Texels per side of a cascade's tile.
 const FFT_N: f32 = 256.0;
 // Metres per texel of the finest cascade.
@@ -59,55 +58,49 @@ const MSS_BASE: f32 = 0.003;
 const MSS_PER_WIND: f32 = 0.00512;
 const UNRESOLVED_OCTAVES: f32 = 10.0;
 
-// Cat's paws: the foliage gust field scales the short cascades between a lull
-// and a gust, fully so from this wind strength up. The shortest takes it all,
-// the next half; neither moves the grid near enough to matter.
-const GUST_LULL: f32 = 0.5;
-const GUST_PEAK: f32 = 1.8;
-const GUST_FULL_STRENGTH: f32 = 0.5;
-
-// Large-scale variation, matching WaterWaves.variation: a swell and a chop
-// field, blended into each cascade by its length.
-const SWELL_SCALE_A: f32 = 760.0;
-const SWELL_SCALE_B: f32 = 280.0;
-const CHOP_SCALE_A: f32 = 430.0;
-const CHOP_SCALE_B: f32 = 150.0;
-const VARIATION_WEIGHT_A: f32 = 0.65;
-const VARIATION_WEIGHT_B: f32 = 0.35;
-const VARIATION_CONTRAST_LOW: f32 = 0.3;
-const VARIATION_CONTRAST_HIGH: f32 = 0.7;
-const SWELL_LOW: f32 = 0.35;
-const SWELL_HIGH: f32 = 1.35;
-const CHOP_LOW: f32 = 0.08;
-const CHOP_HIGH: f32 = 1.45;
-
-// Foam. The ocean keeps foam where the surface compressed and lets it decay
-// (OceanFFT); the vertex stage sums it over the cascades. The pixel adds fresh
-// foam where its own slopes squeeze the surface now: the stretch below
-// FOAM_FRESH_BIAS, at FOAM_FRESH_GAIN. The sum is the coverage, times
-// FOAM_COVERAGE and the palette's foam amount.
+// Foam. Each cascade keeps its own crest foam where its surface folded, and
+// lets it decay (OceanFFT). The pixel sums it over the cascades, filtered to
+// its footprint: the coverage, times FOAM_COVERAGE and the palette's foam
+// amount. The coverage is coarse, so it only says where foam may show. The
+// lace says where inside that it does: the whole surface's stretch at the
+// pixel, from LACE_FLAT (none) down to LACE_SQUEEZED (all). Foam shows first
+// where the small waves squeeze the surface, and grows out from there as the
+// coverage rises.
 const FOAM_COVERAGE: f32 = 1.0;
-const FOAM_FRESH_BIAS: f32 = 0.43;
-const FOAM_FRESH_GAIN: f32 = 2.0;
-// Metres per repeat of the foam texture: two tilings, one turned, to hide the
-// repeat. Each divides FOAM_DRIFT_PERIOD, so the drift wraps without a jump.
-const FOAM_TILE_A: f32 = 8.0;
-const FOAM_TILE_B: f32 = 12.8;
-// cos and sin of the turn of the second tiling.
-const FOAM_TURN: vec2f = vec2f(0.7986355, 0.6018150);
-// Texture density over which coverage fades foam in.
-const FOAM_SOFTNESS: f32 = 0.25;
-// Opacity of the thinnest foam the texture shows; its densest clumps are
-// opaque, so bubbles and thin spots show the water through.
-const FOAM_THIN: f32 = 0.15;
+const LACE_FLAT: f32 = 1.1;
+const LACE_SQUEEZED: f32 = 0.5;
+// Lace over which the coverage fades foam in.
+const LACE_SOFTNESS: f32 = 0.3;
+// Metres of water per pixel over which the lace gives way to the plain
+// coverage: far out the small waves average away and the lace fails.
+const FOAM_FAR_NEAR: f32 = 0.3;
+const FOAM_FAR_FAR: f32 = 2.5;
 // Opacity of all foam.
 const FOAM_OPACITY: f32 = 0.9;
-// Metres of water per pixel over which the texture gives way to the plain
-// coverage: far out the texture averages to grey and its threshold fails.
-const FOAM_FAR_NEAR: f32 = 0.15;
-const FOAM_FAR_FAR: f32 = 1.2;
 const FOAM_ALBEDO: f32 = 0.65;
 const FOAM_ROUGHNESS: f32 = 0.6;
+
+// Crest glow: sunlight through the thin top of a wave, lit from behind (after
+// the height term of the Atlas water talk). It fades in with the wave's height
+// from SSS_LOW to SSS_HIGH metres, on faces turned away from the sun by
+// SSS_TURN, and takes the water's scatter colour shifted toward green by
+// SSS_TINT: the short trip through a crest keeps more green than the long
+// trip up from the deep. SSS_STRENGTH is its brightness at a strength of 1.
+const SSS_LOW: f32 = 0.5;
+const SSS_HIGH: f32 = 3.0;
+const SSS_TURN: f32 = 4.0;
+const SSS_TINT: vec3f = vec3f(0.9, 1.4, 0.8);
+const SSS_STRENGTH: f32 = 0.2;
+
+// Troughs are darker than crests. A trough sees less sky, since much of what
+// it reflects is the next wave, so the sky reflection and ambient fall to
+// TROUGH_SKY. Less light reaches the water under it than under a thin crest,
+// so its scatter falls to TROUGH_SCATTER. Both reach their floor at
+// TROUGH_DEPTH metres below rest, scaled by the trough strength. Water at
+// rest or above is unchanged, so a calm sea is too.
+const TROUGH_SKY: f32 = 0.84;
+const TROUGH_SCATTER: f32 = 0.84;
+const TROUGH_DEPTH: f32 = 3.5;
 
 struct Uniforms {
   normalMatrix: mat3x3f,
@@ -131,33 +124,6 @@ struct WaterParams {
   baseLevel : f32,
 }
 
-struct Waves {
-  // x: mip bias on the slopes, from the quality tier. y: 1 to shade by the
-  // waves, 0 to leave the normal flat. zw: the viewer's xz from the origin,
-  // where chunk LODs were chosen.
-  view : vec4f,
-  // xy: the world xz positions are measured from, near the camera. z: the
-  // wind speed in m/s the ocean spectrum was built for. w: 1 paints the raw
-  // foam coverage in grey instead of the water.
-  origin : vec4f,
-  // The variation noise's drift in lattice cells: [0] the swell field's
-  // octaves A xy and B zw, [1] the chop field's.
-  variation : array<vec4f, 2>,
-  // The foliage wind: direction the air moves xz, strength, clock in
-  // full-wind seconds. Its gust field ruffles the short cascades.
-  wind : vec4f,
-  // Chunk-edge distances past which a coarser grid can appear, and that grid's
-  // spacing in metres; unused entries are 0. See waterGridBands.
-  lodDistance : array<vec4f, 2>,
-  lodSpacing : array<vec4f, 2>,
-  // x: the finest grid's spacing, used nearer than the first distance. yz:
-  // metres the foam has drifted downwind, wrapped.
-  grid : vec4f,
-  // Per cascade: x tile size in metres, zw where the origin falls in the tile.
-  cascade : array<vec4f, 4>,
-  // Per cascade: each palette type's weight on it.
-  cascadeTypes : array<vec4f, 4>,
-}
 
 struct VertexInput {
   @location(0) position : vec3f,
@@ -172,8 +138,8 @@ struct VertexOutput {
   // xz the vertex rests at before the waves move it, from the origin. The
   // ocean's textures are sampled here: where the water came from.
   @location(2) rest : vec2f,
-  // The ocean's lasting foam over the cascades.
-  @location(3) foam : f32,
+  // Metres the waves lift the surface above its rest height.
+  @location(3) height : f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms : Uniforms;
@@ -188,10 +154,6 @@ struct VertexOutput {
 // The opaque scene behind the water (RefractionCapture): rgb colour, a view
 // depth in metres. Bound for the absorb draw only.
 @group(1) @binding(5) var refraction : texture_2d<f32>;
-// Tileable foam, white against transparent (WaterTextures), and a repeating
-// sampler. Bound for the absorb and light draws.
-@group(1) @binding(6) var foamTexture : texture_2d<f32>;
-@group(1) @binding(7) var foamSampler : sampler;
 // The ocean (OceanFFT), one layer per cascade: displacement (Dx, Dy, Dz,
 // foam) and slopes (dDy/dx, dDy/dz, dDx/dx, dDz/dz). The slopes are bound for
 // the absorb and light draws.
@@ -254,63 +216,12 @@ fn sampleWater(uv: vec2f) -> WaterSample {
   return out;
 }
 
-fn latticeValue(ix: i32, iy: i32) -> f32 {
-  var h = u32(ix & 255) * 0x9e3779b1u;
-  h = (h ^ u32(iy & 255)) * 0x85ebca6bu;
-  h = (h ^ (h >> 16u)) * 0x85ebca6bu;
-  h = (h ^ (h >> 13u)) * 0xc2b2ae35u;
-  h = h ^ (h >> 16u);
-  return f32(h) / 4294967296.0;
+// How strongly cascade `c` moves this water: the palette's weights and the
+// calm at the shore.
+fn cascadeScale(c: i32, weights: vec4f, calm: f32) -> f32 {
+  return dot(waves.cascadeTypes[c], weights) * calm;
 }
 
-fn valueNoise(p: vec2f) -> f32 {
-  let i = floor(p);
-  var f = p - i;
-  f = f * f * (3.0 - 2.0 * f);
-  let ix = i32(i.x);
-  let iy = i32(i.y);
-  let a = latticeValue(ix, iy);
-  let b = latticeValue(ix + 1, iy);
-  let c = latticeValue(ix, iy + 1);
-  let d = latticeValue(ix + 1, iy + 1);
-  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
-fn variationField(p: vec2f, scaleA: f32, scaleB: f32, drift: vec4f, low: f32, high: f32) -> f32 {
-  let n = VARIATION_WEIGHT_A * valueNoise(p / scaleA + drift.xy)
-        + VARIATION_WEIGHT_B * valueNoise(p / scaleB + drift.zw);
-  return mix(low, high, smoothstep(VARIATION_CONTRAST_LOW, VARIATION_CONTRAST_HIGH, n));
-}
-
-// Scales the waves over hundreds of metres, so no two stretches look alike:
-// x scales the swell, y the chop.
-fn waveVariation(world: vec2f) -> vec2f {
-  return vec2f(
-    variationField(world, SWELL_SCALE_A, SWELL_SCALE_B, waves.variation[0], SWELL_LOW, SWELL_HIGH),
-    variationField(world, CHOP_SCALE_A, CHOP_SCALE_B, waves.variation[1], CHOP_LOW, CHOP_HIGH)
-  );
-}
-
-// How much the gust field scales the ripples at world xz.
-fn gustScale(world: vec2f) -> f32 {
-  let gust = smoothstep(0.35, 0.65, gustField(world, waves.wind));
-  return mix(1.0, mix(GUST_LULL, GUST_PEAK, gust), min(waves.wind.z / GUST_FULL_STRENGTH, 1.0));
-}
-
-// How strongly cascade `c` moves this water: the palette's weights, the
-// variation blended from swell to chop by the cascade's length, the calm at
-// the shore, and the gusts on the two shortest.
-fn cascadeScale(c: i32, weights: vec4f, variation: vec2f, calm: f32, gust: f32) -> f32 {
-  let band = f32(c) / f32(CASCADES - 1);
-  let gusted = select(select(1.0, mix(1.0, gust, 0.5), c == CASCADES - 2), gust, c == CASCADES - 1);
-  return dot(waves.cascadeTypes[c], weights) * mix(variation.x, variation.y, band) * calm * gusted;
-}
-
-// Where `rest` falls in cascade `c`'s tile.
-fn cascadeUV(c: i32, rest: vec2f) -> vec2f {
-  let cascade = waves.cascade[c];
-  return rest / cascade.x + cascade.zw;
-}
 
 // The coarsest grid spacing the LOD system can put at `distance` from the
 // viewer, ramped in before each LOD distance. Two chunks meeting at a vertex
@@ -357,41 +268,42 @@ struct OceanPixel {
   // Slope variance too fine for the mip the pixel sampled: widens the
   // highlight instead of letting it sparkle.
   variance : f32,
-  // Foam coverage before the palette and the texture.
+  // Foam coverage before the palette.
   coverage : f32,
+  // The whole surface's stretch (the Jacobian without its cross term): 1
+  // flat, below 1 squeezed.
+  stretch : f32,
 }
 
-// The ocean at a pixel: the cascades' slopes, filtered to the pixel's
-// footprint, give the normal; the lasting foam from the vertex stage and the
-// fresh foam where the slopes squeeze the surface give the coverage.
+// The ocean at a pixel: the cascades' slopes and foam, filtered to the
+// pixel's footprint, give the normal and the foam coverage.
 fn oceanPixel(input: VertexOutput, water: WaterSample, footprint: Footprint) -> OceanPixel {
-  let world = input.rest + waves.origin.xy;
-  let variation = waveVariation(world);
   let calm = shoreCalm(water.depth);
-  let gust = gustScale(world);
   let bias = exp2(waves.view.x);
   var d = vec4f(0.0);
+  var foam = 0.0;
   for (var c: i32 = 0; c < CASCADES; c++) {
-    let w = cascadeScale(c, water.weights, variation, calm, gust);
+    let w = cascadeScale(c, water.weights, calm);
     if (w <= 0.0) {
       continue;
     }
     let size = waves.cascade[c].x;
-    d += textureSampleGrad(
-      oceanSlopes, oceanSampler, cascadeUV(c, input.rest), c,
-      footprint.dx / size * bias, footprint.dy / size * bias
-    ) * w;
+    let uv = cascadeUV(c, input.rest);
+    let ddx = footprint.dx / size;
+    let ddy = footprint.dy / size;
+    d += textureSampleGrad(oceanSlopes, oceanSampler, uv, c, ddx * bias, ddy * bias) * w;
+    foam += textureSampleGrad(oceanDisplacement, oceanSampler, uv, c, ddx, ddy).w * w;
   }
 
   let shade = waves.view.y;
   let slopes = vec2f(d.x / max(d.z + 1.0, MIN_STRETCH), d.y / max(d.w + 1.0, MIN_STRETCH)) * shade;
-  let stretch = (d.z + 1.0) * (d.w + 1.0);
   let unresolved = saturate(log2(max(footprint.size, FINEST_TEXEL) / FINEST_TEXEL) / UNRESOLVED_OCTAVES);
 
   var out: OceanPixel;
   out.normal = normalize(uniforms.normalMatrix * vec3f(-slopes.x, 1.0, -slopes.y));
   out.variance = (MSS_BASE + MSS_PER_WIND * waves.origin.z) * unresolved * calm * shade;
-  out.coverage = input.foam + saturate((FOAM_FRESH_BIAS - stretch) * FOAM_FRESH_GAIN);
+  out.coverage = foam;
+  out.stretch = (d.z + 1.0) * (d.w + 1.0);
   return out;
 }
 
@@ -403,12 +315,6 @@ fn waterTransmittance(water: WaterSample, NoV: f32) -> vec3f {
 
 fn waterFresnel(NoV: f32) -> f32 {
   return WATER_F0 + (1.0 - WATER_F0) * pow(1.0 - NoV, 5.0);
-}
-
-// Each cascade's share of the lasting foam.
-fn cascadeFoam(c: i32) -> f32 {
-  var shares = array<f32, 4>(0.35, 0.45, 0.5, 0.25);
-  return shares[c];
 }
 
 @vertex
@@ -429,13 +335,11 @@ fn vs(input: VertexInput) -> VertexOutput {
   let fromEye = vec3f(rest.x - waves.view.z, params.baseLevel + surface.r, rest.y - waves.view.w);
   let spacing = gridSpacingAt(length(fromEye));
   let calm = shoreCalm(max(surface.r - surface.g, 0.0));
-  let variation = waveVariation(rest + waves.origin.xy);
 
   var displacement = vec3f(0.0);
-  var foam = 0.0;
   if (calm > 0.0) {
     for (var c: i32 = 0; c < CASCADES; c++) {
-      let w = cascadeScale(c, weights, variation, calm, 1.0);
+      let w = cascadeScale(c, weights, calm);
       if (w <= 0.0) {
         continue;
       }
@@ -443,12 +347,8 @@ fn vs(input: VertexInput) -> VertexOutput {
       // can hold moves it.
       let texel = waves.cascade[c].x / FFT_N;
       let level = max(log2(spacing / texel) + VERTEX_MIP_BIAS, 0.0);
-      let uv = cascadeUV(c, rest);
-      let s = textureSampleLevel(oceanDisplacement, oceanSampler, uv, c, level);
+      let s = textureSampleLevel(oceanDisplacement, oceanSampler, cascadeUV(c, rest), c, level);
       displacement += s.xyz * w;
-      // Foam is smooth enough per vertex, read no finer than this mip.
-      let lasting = select(s.w, textureSampleLevel(oceanDisplacement, oceanSampler, uv, c, 1.5).w, level < 1.5);
-      foam += lasting * cascadeFoam(c) * w;
     }
   }
 
@@ -465,7 +365,7 @@ fn vs(input: VertexInput) -> VertexOutput {
   out.uv = input.uv;
   out.viewPosition = viewPosition.xyz;
   out.rest = rest;
-  out.foam = foam;
+  out.height = displacement.y;
   return out;
 }
 
@@ -478,39 +378,39 @@ fn fs_depth(input: VertexOutput) {
   }
 }
 
-// The foam texture's density at `uv`: brightness × alpha. Sampled at an
-// explicit mip, from the pixel's footprint, so it may run after a discard.
-fn foamDensity(uv: vec2f, footprint: f32, tile: f32) -> f32 {
-  let size = f32(textureDimensions(foamTexture).x);
-  let lod = log2(max(footprint * size / tile, 1.0));
-  let texel = textureSampleLevel(foamTexture, foamSampler, uv, lod);
-  return texel.r * texel.a;
-}
-
-// Foam 0..1 where density passes 1 − coverage, so more coverage grows the
-// patches out from the densest clumps.
-fn foamFrom(density: f32, coverage: f32) -> f32 {
-  let shown = smoothstep(1.0 - coverage, 1.0 - coverage + FOAM_SOFTNESS, density);
-  return shown * mix(FOAM_THIN, 1.0, density);
-}
-
-// Foam at `world` xz for the ocean's coverage there, drawn through the foam
-// texture, scaled by the palette's foam amount and drifting downwind.
-fn waterFoam(world: vec2f, footprint: f32, oceanCoverage: f32, water: WaterSample) -> f32 {
-  if (water.foam <= 0.0) {
-    return 0.0;
+// Sunlight through a wave's crest. It needs the viewer to face the sun across
+// the water (compared flat, so a high sun still counts) and a face that does
+// not turn toward the sun. The higher the crest, the more.
+fn crestGlow(height: f32, N: vec3f, V: vec3f, scatter: vec3f) -> vec3f {
+  let up = normalize(uniforms.normalMatrix * vec3f(0.0, 1.0, 0.0));
+  let view = -V - up * dot(-V, up);
+  var glow = vec3f(0.0);
+  for (var i: u32 = 0u; i < lighting.numLights; i++) {
+    let light = lighting.lights[i];
+    if (light.lightType != 1.0) {
+      continue;
+    }
+    // positionOrDirection is the way the light travels.
+    let L = -light.positionOrDirection;
+    let toSun = L - up * dot(L, up);
+    let facing = dot(toSun, view) / max(length(toSun) * length(view), 1e-4);
+    let behind = pow(saturate(facing), 3.0);
+    let turned = pow(1.0 - saturate(dot(L, N)), SSS_TURN);
+    glow += light.color * light.intensity * behind * turned;
   }
-  let coverage = saturate(oceanCoverage * FOAM_COVERAGE * water.foam);
-  let drifted = world - waves.grid.yz;
-  let turned = vec2f(
-    drifted.x * FOAM_TURN.x - drifted.y * FOAM_TURN.y,
-    drifted.x * FOAM_TURN.y + drifted.y * FOAM_TURN.x
-  );
-  let density = 0.6 * foamDensity(drifted / FOAM_TILE_A, footprint, FOAM_TILE_A)
-              + 0.4 * foamDensity(turned / FOAM_TILE_B, footprint, FOAM_TILE_B);
+  let lift = smoothstep(SSS_LOW, SSS_HIGH, height);
+  return glow * scatter * SSS_TINT * lift * SSS_STRENGTH * waves.grid.y;
+}
+
+// Foam 0..1 for the ocean at a pixel covering `footprint` metres: the lace
+// where it passes 1 − coverage, so more coverage grows the foam out from the
+// most squeezed spots. The coverage takes the palette's foam amount.
+fn waterFoam(ocean: OceanPixel, footprint: f32, water: WaterSample) -> f32 {
+  let coverage = saturate(ocean.coverage * FOAM_COVERAGE * water.foam);
+  let lace = saturate((LACE_FLAT - ocean.stretch) / (LACE_FLAT - LACE_SQUEEZED));
+  let shown = smoothstep(1.0 - coverage, 1.0 - coverage + LACE_SOFTNESS, lace);
   let far = smoothstep(FOAM_FAR_NEAR, FOAM_FAR_FAR, footprint);
-  let foam = mix(foamFrom(density, coverage), coverage * 0.85, far);
-  return foam * FOAM_OPACITY;
+  return mix(shown, coverage, far) * FOAM_OPACITY;
 }
 
 // Where a view-space point lands on screen, in 0..1 texture space.
@@ -556,7 +456,7 @@ fn fs_absorb(input: VertexOutput) -> @location(0) vec4f {
   let V = normalize(-input.viewPosition);
   let NoV = clamp(dot(N, V), 1e-4, 1.0);
   // Foam hides the water beneath it.
-  let foam = waterFoam(input.rest + waves.origin.xy, footprint.size, ocean.coverage, water);
+  let foam = waterFoam(ocean, footprint.size, water);
   let passed = (1.0 - waterFresnel(NoV)) * waterTransmittance(water, NoV) * (1.0 - foam);
   if (waves.origin.w > 0.5) {
     return vec4f(0.0, 0.0, 0.0, water.coverage);
@@ -572,7 +472,7 @@ fn fs_light(input: VertexOutput) -> @location(0) vec4f {
   let viewPosition = input.viewPosition;
   let ocean = oceanPixel(input, water, footprint);
   let normal = ocean.normal;
-  let foam = waterFoam(input.rest + waves.origin.xy, footprint.size, ocean.coverage, water);
+  let foam = waterFoam(ocean, footprint.size, water);
   // The unresolved slopes spread the microfacets: α² grows by their variance,
   // so the highlight they would have made widens rather than aliases.
   let waterAlpha = sqrt(min(pow(perceptualRoughnessToAlpha(params.roughness), 2.0) + ocean.variance, 1.0));
@@ -590,11 +490,18 @@ fn fs_light(input: VertexOutput) -> @location(0) vec4f {
   // of it over deep water, none where the bed shows through. Foam is a rough,
   // bright diffuse layer over it.
   var surface: PbrSurface;
-  surface.normal = normal;
+  // The scatter comes from under the surface, so it is lit along the
+  // vertical, not by each ripple's tilt: shading it by the wave normal makes
+  // painted plastic. The waves show through the reflection and the Fresnel.
+  // Foam is a surface layer, so it takes the wave normal.
+  let up = normalize(uniforms.normalMatrix * vec3f(0.0, 1.0, 0.0));
+  let trough = smoothstep(0.0, TROUGH_DEPTH, -input.height) * waves.grid.z;
+  let scatter = water.scatter * (vec3f(1.0) - transmittance) * mix(1.0, TROUGH_SCATTER, trough);
+  surface.normal = normalize(mix(up, normal, foam));
   surface.specularNormal = normal;
   surface.geometricNormal = normal;
   surface.viewPosition = viewPosition;
-  surface.diffuseColor = mix(water.scatter * (vec3f(1.0) - transmittance), vec3f(FOAM_ALBEDO), foam);
+  surface.diffuseColor = mix(scatter, vec3f(FOAM_ALBEDO), foam);
   surface.f0 = vec3f(WATER_F0);
   surface.alpha = alpha;
 
@@ -608,7 +515,12 @@ fn fs_light(input: VertexOutput) -> @location(0) vec4f {
   let direct = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow
              + lit.punctualDiffuse + lit.punctualSpecular
              + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadowFactor;
-  let indirect = evaluateIbl(surface, roughness);
+  // A trough sees less sky than a crest.
+  let skySeen = mix(1.0, TROUGH_SKY, trough);
+  let indirect = evaluateIbl(surface, roughness) * skySeen;
+  // Only deep water glows: where the bed shows, the light passes through.
+  let glow = crestGlow(input.height, normal, V, water.scatter) * sunShadow
+           * (1.0 - waterFresnel(NoV)) * (1.0 - foam) * (vec3f(1.0) - transmittance);
 
   // Last, so every shadow and cube sample above runs in uniform control flow.
   if (water.coverage <= 0.0) {
@@ -617,5 +529,5 @@ fn fs_light(input: VertexOutput) -> @location(0) vec4f {
   if (waves.origin.w > 0.5) {
     return vec4f(vec3f(saturate(ocean.coverage * FOAM_COVERAGE * water.foam)) * water.coverage, 1.0);
   }
-  return vec4f((direct + indirect) * water.coverage, 1.0);
+  return vec4f((direct + indirect + glow) * water.coverage, 1.0);
 }

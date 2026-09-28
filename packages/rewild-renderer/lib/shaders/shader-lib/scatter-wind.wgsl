@@ -49,8 +49,7 @@ fn windNoise(p: vec2f) -> f32 {
 // with the wind. Three octaves, each offset so none lines up with another.
 // The finest is blown slower than the gusts it rides in, so it drifts through
 // them instead of travelling in lockstep — one field moving as a block reads
-// as a wave train, and this is what breaks it into eddies. Water reads the
-// same field, so one gust crosses a lake and then the wood beyond it.
+// as a wave train, and this is what breaks it into eddies.
 fn gustField(world: vec2f, wind: vec4f) -> f32 {
   let drift = wind.xy * (wind.w * GUST_SPEED);
   let p = (world - drift) / GUST_LENGTH;
