@@ -680,7 +680,7 @@ The terrain shader reads the chunk's water map as well:
   stays dry. A chunk whose ground comes within 2 m of a covered level keeps its water map for
   the terrain, even when no water shows in it and none draws. Otherwise the band would stop at
   that chunk's edge.
-- **Caustics** on the bed, projected from the sun (Phase 5).
+- **Caustics** on the bed (see [Lighting under water](#lighting-under-water)).
 
 **Wet band.** Wet sand is darker, because water fills the gaps between grains, and smoother,
 because a film lies on top. These change at different speeds, so the band has two parts:
@@ -754,7 +754,135 @@ shelf.
   the rest position that lands on it, a few fixed-point steps.
 - The player does not walk on water. Shallow water slows the player. Deep water makes the player
   swim at the surface.
-- The camera knows when it is under water. Phase 5 uses this for the under-water effect.
+- The camera knows when it is under water, from the water probe (see [Under water](#under-water)).
+
+## Under water
+
+When the camera goes below the surface, the view is inside the water: it fogs with the water's
+own colour, the surface is seen from below, and light reaches down in shafts. Where the surface
+crosses the lens, the view splits into an above-water and an under-water part. After surfacing,
+drops of water stay on the lens for a few seconds. The design follows Tidewater's under-water
+post-process (MIT), fitted to this renderer.
+
+Everything below keys off one question per pixel: **is the lens in water or in air here?** The
+lens is the camera's near clip plane (0.1 m). The water between the eye and the lens is clipped
+away, so the view starts at the lens.
+
+### The water probe
+
+A compute pass evaluates the water at the camera every frame, on the GPU:
+
+- **Level, coverage and type weights** from the water map of the chunk under the camera.
+- **Wave height**: the FFT displacement moves the surface sideways as well as up, so the pass
+  solves for the rest position that lands under the camera in a few fixed-point steps (as the
+  water query does). Shore waves and swash are added on top.
+
+It writes a small storage buffer that the under-water passes read in the same frame, so they
+never lag. The CPU reads it back a few frames late, for the lens droplets and gameplay.
+
+Farther than **0.35 m** from the surface, the near plane cannot reach it, and the whole view is
+in the camera's medium: a single value from the probe. Only within that band can the surface
+cross the lens.
+
+### Medium at the lens
+
+While the camera is within 0.35 m of the surface, a full-screen pass writes the medium per pixel
+into an `r8unorm` texture: the point where the pixel's ray meets the near plane, tested against
+the wave height at its xz (the probe's solve). The waterline on the lens is where this flips.
+Outside the band the pass does not run, and the medium is the probe's.
+
+The water draws cannot write this themselves. They share a render pass with the transparent
+pipelines, and an extra attachment would have to be declared by every one of them.
+
+### The surface from below
+
+The water pipelines draw both faces. A back face is the surface seen from below:
+
+- **Snell's window.** The view ray refracts out into the air (1.333 to 1). Inside the window,
+  about 48.6° from straight up, it shows the sky cube along the refracted ray, and objects above
+  the water from the refraction capture where they stand in front of the sky.
+- **Total internal reflection.** Outside the window the surface is a mirror of the water below:
+  the in-water colour of an endless ray, as the fog gives it (see [Fog in the water](#fog-in-the-water)).
+- **Fresnel.** From water into air, so the window's edge brightens into the mirror.
+- **Foam** from below is a dim, rough layer, lit by the light through it.
+- The absorb draw replaces the scene behind with the window's transmission. The water between
+  the camera and the surface is the fog's, so no depth absorption applies here.
+
+The shore waves, whitecaps and swash are the same surface, so they show from below with no extra
+work.
+
+### Fog in the water
+
+In the atmosphere composite, a pixel whose lens is in water takes water fog in place of the air's.
+Clouds, air fog, god rays and rain are skipped for it.
+
+- **Transmittance.** `exp(−σt × distance)` to the first thing the pixel hits: the bed, an object
+  or the surface from below (water writes depth).
+- **In-scatter.** Single scattering of the sun and the sky, each dimmed by the water it has
+  crossed to reach that depth. Light at depth `z` is `E × exp(−σt × z / μ)`, with `μ` the cosine
+  of the refracted sun. Along the view ray the depth changes linearly, so the integral has a
+  closed form. It is written so both exponents stay at or below zero, so looking up through deep
+  water cannot overflow.
+- **Phase.** Forward scattering (Henyey-Greenstein, g 0.85) blended with 25% isotropic, so the
+  water glows toward the sun.
+- **Coefficients** come from the palette at the camera: `σt` is the absorption plus the
+  turbidity. The scattering is set so an endless level ray returns the palette's scatter colour,
+  so the sea is the same colour from above and from below.
+
+### Light shafts
+
+With caustics (see [Lighting under water](#lighting-under-water)), shafts of light run down
+through the water:
+
+- A half-resolution pass marches the view ray to 22 m in 20 steps, sampling the caustics at each
+  step's depth, dimmed along the sun's path and the view's.
+- There is no TAA over the scene to resolve the noise. So, like the god rays, the march is
+  jittered per pixel, and the composite upsamples it weighted by depth, so the shafts do not
+  bleed across edges.
+
+### The waterline on the lens
+
+- **Meniscus.** Where the medium flips, a band up to 16 px either side acts as a rounded water
+  edge: samples bend away from the line, a dark contact line sits on it, and a bright rim
+  follows. The composite finds the line by searching the medium texture along the screen's
+  vertical, which assumes the camera does not roll.
+- **Droplets.** On surfacing, drops of many sizes stay on the lens. Each is a small lens with a
+  blurred, flipped view of the scene, a sky highlight and a dark edge. Small drops cling and
+  evaporate. Large ones slide down after a random delay and leave a thin wet trail. The lens is
+  dry after 9 s. They draw after the tonemap at output resolution, so they stay stuck to the
+  lens as the view moves. Going under clears them.
+
+### Lighting under water
+
+- **Terrain** is dimmed by its depth already (see [Terrain changes](#terrain-changes)).
+- **Standard and scatter materials** take the same sun and sky dimming, from a shared include,
+  so rocks, props and seaweed under water match the bed.
+- **Caustics** by photon splatting (as in Evan Wallace's WebGL Water). A fine grid over one FFT
+  tile is drawn off screen. Each vertex refracts the sun ray through the wave normal there, and
+  lands on a plane below. Its fragment writes the ratio of the areas on the surface and on the
+  plane, with additive blending, so focusing folds into bright networks. The grid covers the
+  tile plus a margin, so the result tiles without seams. Two planes, shallow and deep, blend by
+  the real depth. The terrain, the materials above and the shafts all sample it.
+- **Marine snow.** Specks drift in a box that wraps around the camera. Their positions are a
+  hash of the instance, so there is no simulation. They drift with a slow current and sway with
+  the long swell. They draw only while the view can be under water, and only below the surface.
+
+### Cost and quality
+
+- Nothing in this section runs while the camera is more than 0.35 m above the water, except the
+  probe (one small dispatch) and the back faces, which fail the depth test from above.
+- The medium pass runs only while the surface is within 0.35 m of the camera.
+- The fog is a branch in the composite taken per pixel: no extra pass.
+- The shafts and marine snow are the extras. They are the parts a low quality tier turns off.
+  The fog, the surface from below and the waterline are not: without them the view is wrong,
+  not plainer.
+
+### Build order
+
+1. The water probe, fog in the water, the surface from below, and the lighting of materials
+   under water.
+2. The medium at the lens, the meniscus and the droplets.
+3. Caustics, light shafts and marine snow.
 
 ## Phases
 
@@ -766,8 +894,8 @@ shelf.
    refraction, sun glint, the wet band and waves at the shore.
 4. **Editor and gameplay.** Water brush, edit rules and spill height, sea channels, locked lakes,
    saved edits, water query with CPU waves, wading and swimming.
-5. **Stretch.** Under-water post-process, caustics, rain ripples on water, sharper foam,
-   noise-channel rivers.
+5. **Stretch.** [Under water](#under-water) (the view, the waterline on the lens, caustics),
+   rain ripples on water, sharper foam, noise-channel rivers.
 
 ## Performance notes (web budget)
 
@@ -801,3 +929,8 @@ shelf.
 - **MSAA.** The scene depth texture is multisampled when `sampleCount > 1`. The water pass and the
   sea spray, which reads it as a plain depth texture, must resolve it or read one sample.
 - **Palette size.** Ocean and lake only, or swamp as well in Phase 2?
+- **Level for materials under water.** Terrain reads its chunk's water map for the level. Standard
+  and scatter materials are not bound to a chunk. Sea level from the Waves uniform covers the
+  ocean. Lakes need either a level map around the camera or the chunk's map bound per draw.
+- **Camera roll.** The meniscus search runs along the screen's vertical. If a camera can roll,
+  the search must follow the waterline's direction on screen.

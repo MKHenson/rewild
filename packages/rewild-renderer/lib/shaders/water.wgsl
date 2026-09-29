@@ -135,9 +135,9 @@ const SHORE_FOAM_SOFTNESS: f32 = 0.12;
 // patches. It is gone by SWASH_FOAM_FADE of the wave, just past the top of the
 // uprush.
 const SWASH_DEPTH: f32 = 1.5;
-const SWASH_FOAM_EDGE: f32 = 0.32;
-const SWASH_FOAM_AMOUNT: f32 = 0.85;
-const SWASH_FOAM_FADE: f32 = 0.85;
+const SWASH_FOAM_EDGE: f32 = 0.12;
+const SWASH_FOAM_AMOUNT: f32 = 0.95;
+const SWASH_FOAM_FADE: f32 = 0.45;
 
 struct Uniforms {
   normalMatrix: mat3x3f,
