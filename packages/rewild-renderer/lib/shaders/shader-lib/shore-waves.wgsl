@@ -100,3 +100,80 @@ fn shoreState(shore: vec4f, rest: vec2f, depth: f32) -> ShoreState {
 fn shorePhase(i: i32, seconds: f32, wobble: f32) -> f32 {
   return waves.shore[i + 2] - waves.shore[i] * seconds + wobble;
 }
+
+// Swash: after a shore wave breaks, a sheet of water runs up the beach and
+// drains back. The two trains beat into one wave whose height swells and fades
+// over a set. Each time its crest reaches the waterline, the sheet's edge
+// climbs RUNUP_RATIO of the breaker height, times that wave's share of the
+// set's biggest. The uprush takes SWASH_UPRUSH of the wave and eases out; the
+// backwash eases in. The host samples the swash field (ShoreField) itself.
+const RUNUP_RATIO: f32 = 0.4;
+const SWASH_UPRUSH: f32 = 0.3;
+
+struct SwashState {
+  // Metres above the level the sheet's edge stands now.
+  edge : f32,
+  // Metres above the level this wave runs up to.
+  runup : f32,
+  // Metres above the level the biggest wave of a set runs up to.
+  highest : f32,
+  // 0..1 through the wave: 0 as its crest reaches the waterline.
+  cycle : f32,
+  // Seconds a wave takes.
+  period : f32,
+}
+
+// How high the sheet's edge stands `cycle` of the way through a wave that runs
+// up to `runup`.
+fn swashEdge(runup: f32, cycle: f32) -> f32 {
+  var u = 1.0 - cycle / SWASH_UPRUSH;
+  if (cycle >= SWASH_UPRUSH) {
+    u = (cycle - SWASH_UPRUSH) / (1.0 - SWASH_UPRUSH);
+  }
+  return runup * (1.0 - u * u);
+}
+
+// The swash at `rest` from its swash field texel: x the seconds a wave takes
+// to get to the nearest water it reaches, y its strength there.
+fn swashState(field: vec2f, rest: vec2f) -> SwashState {
+  var out: SwashState;
+  out.edge = 0.0;
+  out.runup = 0.0;
+  out.highest = 0.0;
+  out.cycle = 0.0;
+  out.period = 1.0;
+  let reach = field.y * waves.swash.x;
+  if (reach <= 0.0 || waves.shoreSize.x <= 0.0) {
+    return out;
+  }
+  let wobble = shoreNoise(rest, SHORE_NOISE_CELL, SHORE_NOISE_CELLS, 0u).x * SHORE_WOBBLE;
+  let variation = mix(SHORE_LOW, 1.0, shoreNoise(rest, SHORE_NOISE_CELL, SHORE_NOISE_CELLS, 1u).x * 0.5 + 0.5);
+  let shares = SHORE_TRAIN_SHARE / (SHORE_TRAIN_SHARE.x + SHORE_TRAIN_SHARE.y);
+  let a = shorePhase(0, field.x, wobble);
+  let b = shorePhase(1, field.x, wobble);
+  let sum = shares.x * vec2f(cos(a), sin(a)) + shares.y * vec2f(cos(b), sin(b));
+  out.highest = RUNUP_RATIO * waves.shoreSize.x * variation * reach;
+  out.runup = out.highest * length(sum);
+  out.cycle = fract(atan2(sum.y, sum.x) / 6.2831853);
+  out.period = 6.2831853 / dot(shares, waves.shore.xy);
+  out.edge = swashEdge(out.runup, out.cycle);
+  return out;
+}
+
+// Seconds since the sheet last drained off ground `above` metres over the
+// level: 0 while it covers it, 1e4 where this wave does not reach it.
+fn swashDrained(swash: SwashState, above: f32) -> f32 {
+  if (above <= 0.0) {
+    return 0.0;
+  }
+  if (above >= swash.runup) {
+    return 1e4;
+  }
+  let rise = sqrt(1.0 - above / swash.runup);
+  let arrives = SWASH_UPRUSH * (1.0 - rise);
+  let leaves = SWASH_UPRUSH + (1.0 - SWASH_UPRUSH) * rise;
+  if (swash.cycle >= arrives && swash.cycle <= leaves) {
+    return 0.0;
+  }
+  return fract(swash.cycle - leaves) * swash.period;
+}

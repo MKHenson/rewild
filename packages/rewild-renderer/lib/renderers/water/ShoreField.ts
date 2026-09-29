@@ -42,6 +42,9 @@ const ROWS_PER_FRAME = 32;
 // least sure.
 const EDGE_FADE_START = 0.55;
 const EDGE_FADE_END = 0.85;
+/** Texels the swash field carries the waves onto land past the last water
+ *  they reach. */
+export const SWASH_REACH_TEXELS = 3;
 
 // Rebuild stages after sampling, one a frame.
 const SAMPLING = 0;
@@ -176,16 +179,11 @@ export function packShoreField(
 ): void {
   const zero = toFloat16(0);
   out.fill(zero);
-  const half = size / 2;
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
       const i = x + y * size;
       if (times[i] === Infinity) continue;
-      const edge =
-        Math.max(Math.abs(x + 0.5 - half), Math.abs(y + 0.5 - half)) / half;
-      const strength = reached[i]
-        ? 1 - smoothstep(EDGE_FADE_START, EDGE_FADE_END, edge)
-        : 0;
+      const strength = reached[i] ? edgeStrength(x, y, size) : 0;
       out[i * 4] = toFloat16(times[i]);
       out[i * 4 + 1] = toFloat16(
         slope(times, i, x > 0, x < size - 1, 1, texel)
@@ -197,6 +195,69 @@ export function packShoreField(
     }
 }
 
+// The waves' strength at a reached texel: 1, fading toward the grid's edge.
+function edgeStrength(x: number, y: number, size: number): number {
+  const half = size / 2;
+  const edge =
+    Math.max(Math.abs(x + 0.5 - half), Math.abs(y + 0.5 - half)) / half;
+  return 1 - smoothstep(EDGE_FADE_START, EDGE_FADE_END, edge);
+}
+
+/**
+ * Packs the swash field into f16 texels of (seconds a wave takes to get to the
+ * nearest water it reaches, its strength there). Reached texels keep their
+ * own. Ground up to SWASH_REACH_TEXELS from them takes the nearest one's, so
+ * the swash up a beach keeps time with the crests at its waterline. Water the
+ * waves do not reach (`depth` > 0) gets none. `steps` and `sources` are
+ * scratch, one per texel.
+ */
+export function packSwashField(
+  times: Float32Array,
+  reached: Uint8Array,
+  depth: Float32Array,
+  size: number,
+  out: Uint16Array,
+  steps: Int8Array,
+  sources: Int32Array
+): void {
+  const texels = size * size;
+  for (let i = 0; i < texels; i++) {
+    steps[i] = reached[i] ? 0 : -1;
+    sources[i] = reached[i] ? i : -1;
+  }
+  for (let ring = 1; ring <= SWASH_REACH_TEXELS; ring++)
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < size; x++) {
+        const i = x + y * size;
+        if (steps[i] !== -1 || depth[i] > 0) continue;
+        for (let dy = -1; dy <= 1 && steps[i] === -1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= size || ny >= size) continue;
+            const n = nx + ny * size;
+            if (steps[n] !== ring - 1) continue;
+            steps[i] = ring;
+            sources[i] = sources[n];
+            break;
+          }
+      }
+
+  const zero = toFloat16(0);
+  for (let i = 0; i < texels; i++) {
+    const source = sources[i];
+    if (source < 0) {
+      out[i * 2] = Number.isFinite(times[i]) ? toFloat16(times[i]) : zero;
+      out[i * 2 + 1] = zero;
+      continue;
+    }
+    out[i * 2] = toFloat16(times[source]);
+    out[i * 2 + 1] = toFloat16(
+      edgeStrength(source % size, Math.floor(source / size), size)
+    );
+  }
+}
+
 /**
  * The shore field on the GPU. It is rebuilt around the camera when the camera
  * strays RECENTRE metres from its centre, and every REFRESH seconds after
@@ -205,6 +266,8 @@ export function packShoreField(
  */
 export class ShoreField {
   readonly texture: GPUTexture;
+  /** The swash field over the same grid (packSwashField). */
+  readonly swashTexture: GPUTexture;
   /** World xz of the grid's centre. */
   centreX = 0;
   centreZ = 0;
@@ -215,6 +278,13 @@ export class ShoreField {
   private costs = new Float32Array(SHORE_FIELD_TEXELS * SHORE_FIELD_TEXELS);
   private reached = new Uint8Array(SHORE_FIELD_TEXELS * SHORE_FIELD_TEXELS);
   private packed = new Uint16Array(SHORE_FIELD_TEXELS * SHORE_FIELD_TEXELS * 4);
+  private packedSwash = new Uint16Array(
+    SHORE_FIELD_TEXELS * SHORE_FIELD_TEXELS * 2
+  );
+  private swashSteps = new Int8Array(SHORE_FIELD_TEXELS * SHORE_FIELD_TEXELS);
+  private swashSources = new Int32Array(
+    SHORE_FIELD_TEXELS * SHORE_FIELD_TEXELS
+  );
   private buildX = 0;
   private buildZ = 0;
   // Next row to sample, or -1 when no rebuild is under way.
@@ -231,6 +301,12 @@ export class ShoreField {
       label: 'shore field',
       size: [SHORE_FIELD_TEXELS, SHORE_FIELD_TEXELS],
       format: 'rgba16float',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    this.swashTexture = device.createTexture({
+      label: 'swash field',
+      size: [SHORE_FIELD_TEXELS, SHORE_FIELD_TEXELS],
+      format: 'rg16float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     });
   }
@@ -280,6 +356,21 @@ export class ShoreField {
         { bytesPerRow: size * 8 },
         { width: size, height: size }
       );
+      packSwashField(
+        this.times,
+        this.reached,
+        this.depth,
+        size,
+        this.packedSwash,
+        this.swashSteps,
+        this.swashSources
+      );
+      device.queue.writeTexture(
+        { texture: this.swashTexture },
+        this.packedSwash as BufferSource,
+        { bytesPerRow: size * 4 },
+        { width: size, height: size }
+      );
       this.centreX = this.buildX;
       this.centreZ = this.buildZ;
       this.built = true;
@@ -319,5 +410,6 @@ export class ShoreField {
 
   dispose(): void {
     this.texture.destroy();
+    this.swashTexture.destroy();
   }
 }

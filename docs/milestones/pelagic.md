@@ -97,8 +97,11 @@ and is always sampled nearest. In a lagoon, the type weights blend but each texe
 owner: the lagoon's own ID. The ocean's ID stops where the lagoon's coverage starts.
 
 **Chunk summary.** The water map also holds the **base level** and the highest level in the
-chunk. The base level is the lowest water level in the chunk. A chunk where no water shows gets
-no water map (`hasWater` is false) and draws no water. Most inland chunks are in this group.
+chunk. The base level is the lowest water level in the chunk. Water **shows** where the ground
+dips below a covered level, or below it plus the swash's 1.5 m reach. A chunk where none shows
+draws no water (`shows` is false). It keeps its water map only while its ground comes within 2 m
+of a covered level, for the terrain's wet band. Otherwise it gets none. Most inland chunks are in
+this group.
 
 **Terrain heights.** The worker also writes a small `R16F` height texture for each chunk, at the
 water map's resolution. The GPU has no terrain heights today, because the terrain mesh is built on
@@ -343,7 +346,7 @@ No mesh is generated for a water body. The worker makes only data.
 
 1. At startup, build one flat square grid for each LOD, for example 64², 32² and 16² quads. These
    buffers are shared by every chunk and never change.
-2. For each visible chunk with `hasWater`, draw the grid at that chunk's LOD. The chunk binds its
+2. For each visible chunk where water `shows`, draw the grid at that chunk's LOD. The chunk binds its
    origin, its water map and its height texture, as it binds its splat map for terrain.
 3. The vertex shader moves each vertex to `chunkOrigin + gridPosition`. It samples the water map
    for level, coverage and type weights. It sets the height to `level`, then adds the waves.
@@ -539,10 +542,32 @@ The shader has the depth and the terrain height texture. These give the main sho
   line and a storm whitens the shelf. The water it lies on is flat enough that the whitecaps'
   lace would hide it on its own, so 2 m and 1 m noise joins the lace to break it into grain,
   with a sharp edge. Unlike crest foam it runs up to the waterline.
-- **Swash.** Near the shore, the level rises and falls a little over time. The water runs up the
-  beach and back, and the wet band grows and shrinks with it. It comes with the wet band (see
-  [Terrain changes](#terrain-changes)), timed by the shore waves' phase, since a sheet of water
-  on dry sand only reads as swash with the wet sand it leaves behind.
+- **Swash.** After a wave breaks, a thin sheet of water runs up the beach and drains back. The
+  two trains' periods are close, so together they are one wave whose height swells and fades
+  over a set. Each time its crest reaches the waterline, the sheet's edge climbs to a **runup**
+  of 0.4 × the breaker height × the set's swell. So a still day runs up about 0.3 m and a storm
+  about 1.2 m, and the big waves of a set run farther than the small ones between. The uprush
+  takes the first 30% of the cycle and eases out. The backwash takes the rest and eases in, as
+  the sheet thins and soaks into the sand. Crest height noise varies the runup along the coast.
+  - **Swash field.** The shore field's times rise inland at a metre-deep wave's speed, and its
+    strength is 0 on land, so the swash reads a second grid over the same texels
+    (`packSwashField`, `rg16float`). Reached texels keep their own time and strength. Ground up
+    to 3 texels (24 m) from them takes the nearest one's, so a beach keeps time with the crests
+    at its waterline. Water the waves do not reach gets none, so a lagoon behind a bar has no
+    swash. Only water that takes the longest cascade, the open sea's, has swash, so a lake
+    beside the sea gets none either.
+  - **The sheet.** The water surface lifts by the swash height near the waterline, fading out by
+    1.5 m of depth into the breaking waves. The depth test against the terrain cuts its edge, so
+    the edge climbs the beach by `runup / slope`, and the sheet is thin at the edge with no extra
+    work. It shows only where coverage reaches; the ocean's soft edge runs well past the beach.
+  - **Thickness.** The 8 m height texture cannot resolve a sheet a few centimetres thick. The
+    water reads the thickness from the gap to the scene behind it in the refraction texture, so
+    the light draw binds that texture as well as the absorb draw. Foam rides the last 12 cm of
+    the sheet's edge as the bore arrives, and is gone just past the top of the uprush. At 0.45
+    it is low enough for the shore foam's grain to break it into patches, not a line.
+  - **Shared.** The swash is a function in `shore-waves.wgsl`, so the water and the terrain agree
+    where the sheet is. See [Terrain changes](#terrain-changes) for the wet sand it leaves
+    behind. `setWaterSwash(strength)` scales it in the console.
 
 Breaking waves that curl over are out of scope. A heightfield cannot overhang.
 
@@ -645,10 +670,53 @@ Time the ocean pass first; it has no GPU timer segment yet.
 
 The terrain shader reads the chunk's water map as well:
 
-- A darker, glossier **wet band** just above the water level, with the swash running over it
-  (see [Waves at the shore](#waves-at-the-shore)).
-- **Under-water tint** on the bed, so the bed looks correct through the surface.
+- **Bindings.** A chunk's terrain binds the same surface and type textures its water draws with,
+  plus the chunk's base level and texel count. A chunk with no water map binds a shared dry
+  texel and skips the water terms.
+- **Height above the water.** Each pixel compares its own world height with the level sampled
+  from the map: `h = height − level`. The level is smooth, and the pixel's height is exact, so
+  the band follows the ground at full resolution. The coarse height texture is not used here.
+- **Coverage gate.** The terms fade out where coverage is 0, so dry ground below a nearby level
+  stays dry. A chunk whose ground comes within 2 m of a covered level keeps its water map for
+  the terrain, even when no water shows in it and none draws. Otherwise the band would stop at
+  that chunk's edge.
 - **Caustics** on the bed, projected from the sun (Phase 5).
+
+**Wet band.** Wet sand is darker, because water fills the gaps between grains, and smoother,
+because a film lies on top. These change at different speeds, so the band has two parts:
+
+- **Damp.** Below the highest runup of a set, plus 0.15 m for water that the sand draws up, the
+  ground stays damp. Its albedo falls to 0.75 × and a rougher surface eases 30% of the way
+  toward 0.35. It fades out over 0.3 m above that. Where there is no swash, such as on lakes,
+  the reach is 0.2 × the significant height of the water's own waves, the same share of the sea
+  the runup takes, plus the same 0.15 m. The reach changes with the weather, not with each wave.
+- **Soaked.** Where the swash sheet has just drained, the sand is soaked. The swash height has a
+  closed form over the cycle (`swashDrained`), so the time since the sheet left a given height
+  is found without saved state. A sheen at roughness 0.08 sinks in by e every second. The sand
+  is a further 0.7 × darker, drying by e every 3 s. So a glossy, dark band follows the backwash
+  down the beach, and the sand lightens back to damp behind it. Ground under water stays
+  soaked.
+- **Slope.** Steep ground drains fast, so the wave reach and the soaking thin from 20° to 40° of
+  slope. Rock at the waterline keeps only the 0.15 m damp line, not a wide band.
+- **All materials.** The band acts on whatever the splat shows, not only on sand. The coast's
+  `wetSand` material, where a climate has one, is the colour at rest. The band is the water on
+  top of it. `setWaterWetBand(strength)` scales it in the console.
+
+**Under-water tint.** The absorb draw already dims the view path from the surface to the bed.
+The light that reaches the bed has passed through the water as well, and nothing dims it yet:
+
+- **Sun.** The sun term is dimmed by `exp(−extinction × depth / cosθ)`, where θ is the sun's
+  angle after it bends into the water. The extinction is the palette's, weighted by the type
+  map.
+- **Sky.** The ambient term is dimmed by the same extinction over 1.2 × the depth, for the slant
+  paths of the sky light.
+- **Soaked.** The bed takes the damp and soaked albedo, and loses its specular over its first 5 cm under
+  water: sun and sky alike (`evaluateIblTerms` splits the sky's two lobes). The surface above
+  gives the water's reflections, so a glint on the bed would be counted twice.
+
+The terrain draws before the refraction capture, so the water refracts a bed that is already
+tinted. The depth is the level's, not the swash's: a sheet a few centimetres thick absorbs
+nothing that shows.
 
 ## Scatter
 
@@ -691,7 +759,7 @@ shelf.
 ## Phases
 
 1. **Water map and ocean.** Continent field, sea level, water map and height texture in the worker,
-   `hasWater`, the shared grid mesh, the horizon ring, sky reflection, depth colour, beach band,
+   `shows`, the shared grid mesh, the horizon ring, sky reflection, depth colour, beach band,
    scatter kept out of water.
 2. **Lakes.** Lake cells, carving, lagoons, water body records and palette blending.
 3. **Surface detail.** The FFT ocean from the wind, whitecaps, crest glow, sea spray,
@@ -707,14 +775,18 @@ shelf.
 - Water patches draw only for chunks with coverage. Dry chunks cost nothing.
 - Patches reuse terrain LOD. Far water uses fewer vertices and fewer waves.
 - One compute pass a frame for the ocean: two transforms and the mip chains over four 256²
-  cascades. The vertex shader takes a displacement sample per cascade; the fragment shader a slope
-  and a foam sample per cascade, one sky cube sample and two refraction samples.
+  cascades. The vertex shader takes a displacement sample per cascade and a swash field sample;
+  the fragment shader a slope and a foam sample per cascade, one sky cube sample, two refraction
+  samples and a swash field sample.
 - Sea spray: one compute pass over 4096 particles (four tries each while free), and one draw of
   4096 instanced quads, most of them dropped before rasterising. The CPU rebuilds its 64² depth
   mask (4096 height samples) when the camera crosses a texel, and every second.
 - The shore field rebuilds when the camera moves 128 m or ground loads: 65k height samples over
   eight frames, then a fast-sweeping solve (about 4 ms), the extension past the reached water
-  (about 4 ms), and a pack and upload (about 3 ms) on three more.
+  (about 4 ms), and a pack and upload (about 3 ms) on three more. The swash field packs and
+  uploads with the shore field.
+- Terrain pixels in a chunk with a water map take a surface, a type and a swash field sample.
+  Chunks without one skip them.
 - The horizon ring is one draw call. Its vertices take no waves, and its pixels skip refraction.
 - `QualitySettings` controls the ocean's slope mip bias.
 

@@ -22,7 +22,9 @@ import {
 import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
 import { TextureProperties } from '../../textures/Texture';
 import type { WaterMap } from './WaterMap';
-import { ChunkWater } from '../water/ChunkWater';
+import { ChunkWater, WaterMapTextures } from '../water/ChunkWater';
+import type { TerrainUniforms } from '../../materials/uniforms/TerrainUniforms';
+import type { TerrainPass } from '../../materials/TerrainPass';
 import { resolveClimatePreset } from './Biomes';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 
@@ -121,11 +123,14 @@ export class TerrainChunk implements IComponent {
   // the brush in place and upload only that window — regenerating all 241²
   // texels per stamp is what would make painting stutter.
   splatData: Uint8Array | null = null;
-  // Where the chunk's water is. Null when none shows. Chunk-wide like the
-  // splat, and rebuilt with it after every edit.
+  // Where the chunk's water is. Null when the chunk is dry and no water lies
+  // close enough below it to wet it. Chunk-wide like the splat, and rebuilt
+  // with it after every edit.
   water: WaterMap | null = null;
   private waterVersion = -1;
-  // Draws `water`. Null while the chunk is dry.
+  // `water` on the GPU, for the water and the terrain's wet band.
+  private waterTextures: WaterMapTextures | null = null;
+  // Draws `water`. Null while no water shows.
   private chunkWater: ChunkWater | null = null;
   // Terrain LOD the chunk last chose, which the water grid follows.
   private targetLod: number;
@@ -477,21 +482,55 @@ export class TerrainChunk implements IComponent {
     this.waterVersion = version;
     this.water = water;
 
-    if (!water) {
+    if (water) {
+      this.waterTextures ??= new WaterMapTextures();
+      this.waterTextures.upload(renderer.device, water);
+    }
+
+    if (!water?.shows) {
       this.chunkWater?.dispose();
       this.chunkWater = null;
     } else if (this.chunkWater) {
-      this.chunkWater.update(renderer, water);
+      this.chunkWater.update(water, this.waterTextures!);
     } else {
       this.chunkWater = new ChunkWater(
         renderer,
         this.transform,
         water,
+        this.waterTextures!,
         resolveClimatePreset(this.climatePreset).water ?? [],
         (this.chunkSize - 1) * TERRAIN_METERS_PER_SAMPLE,
         this.targetLod
       );
     }
+
+    for (const lod of this.lodMesh) {
+      const pass = lod.mesh?.material as TerrainPass | undefined;
+      if (pass) this.bindWater(pass.terrainUniforms);
+    }
+
+    if (!water) {
+      this.waterTextures?.dispose();
+      this.waterTextures = null;
+    }
+  }
+
+  /** Gives a terrain pass the chunk's water map, for its wet band. */
+  bindWater(uniforms: TerrainUniforms) {
+    const water = this.water;
+    const textures = this.waterTextures;
+    uniforms.water =
+      water && textures?.surface && textures.types
+        ? {
+            surface: textures.surface,
+            types: textures.types,
+            texels: water.size,
+            baseLevel: water.baseLevel,
+            originX: this.transform.position.x,
+            originZ: this.transform.position.z,
+            palette: resolveClimatePreset(this.climatePreset).water ?? [],
+          }
+        : null;
   }
 
   // Adopts a worker-built splat map for the heights at `version`. Creates the
@@ -703,6 +742,8 @@ export class TerrainChunk implements IComponent {
     this.splatVersion = -1;
     this.chunkWater?.dispose();
     this.chunkWater = null;
+    this.waterTextures?.dispose();
+    this.waterTextures = null;
     this.water = null;
     this.waterVersion = -1;
     this.scatter?.dispose();

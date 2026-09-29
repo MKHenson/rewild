@@ -127,6 +127,17 @@ const SHORE_FOAM_AMOUNT: f32 = 1.3;
 const SHORE_FOAM_CELL: f32 = 2.0;
 const SHORE_FOAM_CELLS: i32 = 512;
 const SHORE_FOAM_SOFTNESS: f32 = 0.12;
+// Swash (shore-waves.wgsl): the surface lifts by the sheet's edge height at
+// the waterline, fading out by SWASH_DEPTH metres of depth, and the terrain's
+// depth test cuts the sheet's edge. Foam rides the edge as the bore arrives,
+// over the sheet's last SWASH_FOAM_EDGE metres of thickness, at
+// SWASH_FOAM_AMOUNT: low enough that the shore foam's grain breaks it into
+// patches. It is gone by SWASH_FOAM_FADE of the wave, just past the top of the
+// uprush.
+const SWASH_DEPTH: f32 = 1.5;
+const SWASH_FOAM_EDGE: f32 = 0.32;
+const SWASH_FOAM_AMOUNT: f32 = 0.85;
+const SWASH_FOAM_FADE: f32 = 0.85;
 
 struct Uniforms {
   normalMatrix: mat3x3f,
@@ -183,6 +194,9 @@ struct VertexOutput {
 // Around the camera (ShoreField): seconds a shore wave takes to get here from
 // deep water, its world xz gradient, and the waves' strength.
 @group(1) @binding(6) var shoreMap : texture_2d<f32>;
+// The swash field over the same grid (ShoreField): seconds a wave takes to
+// get to the nearest water it reaches, and its strength there.
+@group(1) @binding(7) var swashMap : texture_2d<f32>;
 // The ocean (OceanFFT), one layer per cascade: displacement (Dx, Dy, Dz,
 // foam) and slopes (dDy/dx, dDy/dz, dDx/dx, dDz/dz). The slopes are bound for
 // the absorb and light draws.
@@ -291,6 +305,36 @@ struct ShoreWave {
 // The shore field at `rest`.
 fn sampleShore(rest: vec2f) -> vec4f {
   return textureSampleLevel(shoreMap, surfaceSampler, shoreFieldUV(rest), 0.0);
+}
+
+// The swash at `rest` over water with palette `weights`. Only water that takes
+// the longest cascade, the open sea's, has it.
+fn sampleSwash(rest: vec2f, weights: vec4f) -> SwashState {
+  let field = textureSampleLevel(swashMap, surfaceSampler, shoreFieldUV(rest), 0.0).xy;
+  return swashState(vec2f(field.x, field.y * dot(waves.cascadeTypes[0], weights)), rest);
+}
+
+// Metres of water over the ground straight below the pixel, from the gap to
+// the scene behind in the refraction capture: the height texture is too coarse
+// for a sheet a few centimetres thick.
+fn sheetThickness(input: VertexOutput) -> f32 {
+  let behind = textureLoad(refraction, vec2i(input.Position.xy), 0).a;
+  let near = max(-input.viewPosition.z, 1e-4);
+  let direction = normalize(input.viewPosition);
+  let up = normalize(uniforms.normalMatrix * vec3f(0.0, 1.0, 0.0));
+  let path = length(input.viewPosition) * max(behind / near - 1.0, 0.0);
+  return path * abs(dot(direction, up));
+}
+
+// Foam on the swash sheet's leading edge, thinning as the uprush slows.
+fn swashFoam(input: VertexOutput, weights: vec4f) -> f32 {
+  let swash = sampleSwash(input.rest, weights);
+  if (swash.runup <= 0.0) {
+    return 0.0;
+  }
+  let fresh = 1.0 - smoothstep(0.0, SWASH_FOAM_FADE, swash.cycle);
+  let edge = 1.0 - smoothstep(0.0, SWASH_FOAM_EDGE, sheetThickness(input));
+  return edge * fresh * SWASH_FOAM_AMOUNT;
 }
 
 // The shore field painted for the debug view: blue where deep water reaches,
@@ -443,7 +487,7 @@ fn oceanPixel(input: VertexOutput, water: WaterSample, footprint: Footprint) -> 
   out.normal = normalize(uniforms.normalMatrix * vec3f(-slopes.x, 1.0, -slopes.y));
   out.variance = (MSS_BASE + MSS_PER_WIND * waves.origin.z) * unresolved * scales[CASCADES - 1] * shade;
   out.coverage = foam;
-  out.shoreFoam = shore.foam;
+  out.shoreFoam = max(shore.foam, swashFoam(input, water.weights));
   out.shoreBreakup = shoreFoamBreakup(input.rest);
   out.stretch = (d.z + 1.0) * (d.w + 1.0);
   return out;
@@ -496,10 +540,12 @@ fn vs(input: VertexInput) -> VertexOutput {
     }
     displacement.y = floorTrough(displacement.y, depth);
   }
+  let swash = sampleSwash(rest, weights);
+  let lift = swash.edge * (1.0 - smoothstep(0.0, SWASH_DEPTH, depth));
 
   let local = vec4f(
     input.position.x + displacement.x,
-    surface.r + displacement.y,
+    surface.r + displacement.y + lift,
     input.position.z + displacement.z,
     1.0
   );

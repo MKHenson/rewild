@@ -173,6 +173,10 @@ export class TerrainRenderer {
   waterShoreWaves = 1;
   /** Paints the shore field on the water instead of shading it. */
   waterShoreDebug = false;
+  /** Scale on the swash's runup; 1 is the default. */
+  waterSwash = 1;
+  /** Strength of the terrain's wet band; 1 is the default. */
+  waterWetBand = 1;
   /** Where the ocean's shore waves run, around the camera. Made in init. */
   shoreField!: ShoreField;
   private sampleOceanDepthDelegate = this.sampleOceanDepth.bind(this);
@@ -572,21 +576,17 @@ export class TerrainRenderer {
     const chunk = this.oceanChunk;
     const water = chunk?.water;
     if (!chunk?.heights || !water) return 0;
-    const depth = this._seaLevel - this.chunkHeight(chunk.heights, cx, cy, x, z);
+    const depth =
+      this._seaLevel - this.chunkHeight(chunk.heights, cx, cy, x, z);
     if (depth <= 0) return 0;
 
     const texels = (this.mapChunkSizeLod - 1) / water.step;
-    const mx = Math.round(
-      ((x - cx * span + span / 2) / span) * texels
-    );
-    const my = Math.round(
-      ((cy * span + span / 2 - z) / span) * texels
-    );
+    const mx = Math.round(((x - cx * span + span / 2) / span) * texels);
+    const my = Math.round(((cy * span + span / 2 - z) / span) * texels);
     const t =
       Math.min(water.size - 1, Math.max(0, mx)) +
       Math.min(water.size - 1, Math.max(0, my)) * water.size;
-    const ocean =
-      water.coverage[t] * water.typeWeights[t * 4 + this.oceanType];
+    const ocean = water.coverage[t] * water.typeWeights[t * 4 + this.oceanType];
     return ocean >= 0.5 * 255 * 255 ? depth : 0;
   }
 
@@ -971,6 +971,8 @@ export class TerrainRenderer {
       shoreCentreX: this.shoreField.centreX,
       shoreCentreZ: this.shoreField.centreZ,
       shoreSpan: SHORE_FIELD_SPAN,
+      swash: this.waterSwash,
+      wetBand: this.waterWetBand,
     });
 
     if (!this.seaSpray)

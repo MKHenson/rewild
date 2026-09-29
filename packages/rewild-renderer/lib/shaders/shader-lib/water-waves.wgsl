@@ -33,6 +33,8 @@ struct Waves {
   // x: the shore waves' breaker height in metres. yz: the shore field's
   // centre from the origin. w: metres it spans.
   shoreSize : vec4f,
+  // x: scale on the swash's runup. y: the terrain's wet band strength.
+  swash : vec4f,
 }
 
 // 0..1: the share of the sea's height water `depth` metres deep holds, for

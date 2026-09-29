@@ -19,7 +19,8 @@ const GRID_OFFSET = 24;
 const CASCADE_OFFSET = 28;
 const CASCADE_TYPES_OFFSET = CASCADE_OFFSET + CASCADE_COUNT * 4;
 const SHORE_OFFSET = CASCADE_TYPES_OFFSET + CASCADE_COUNT * 4;
-export const WAVE_UNIFORM_FLOATS = SHORE_OFFSET + 8;
+const SWASH_OFFSET = SHORE_OFFSET + 8;
+export const WAVE_UNIFORM_FLOATS = SWASH_OFFSET + 4;
 
 /** Per frame, what the water shader takes besides the ocean textures. */
 export interface WaveFrame {
@@ -55,6 +56,10 @@ export interface WaveFrame {
   shoreCentreX: number;
   shoreCentreZ: number;
   shoreSpan: number;
+  /** Scale on the swash's runup; 1 is the default. */
+  swash: number;
+  /** Strength of the terrain's wet band; 1 is the default. */
+  wetBand: number;
 }
 
 /**
@@ -91,7 +96,8 @@ export class WaterWaves {
    * the LOD bands (see waterGridBands), finest spacing, crest glow and trough darkening, then per cascade
    * its tile size, RMS height and where the origin falls in its tile, per cascade
    * each palette type's weight, then the shore trains' angular frequencies and
-   * phases, their breaker height and where the shore field lies.
+   * phases, their breaker height and where the shore field lies, then the
+   * swash and wet band strengths.
    */
   pack(frame: WaveFrame, out: Float32Array): void {
     out[0] = frame.detailBias;
@@ -133,6 +139,10 @@ export class WaterWaves {
     out[SHORE_OFFSET + 5] = frame.shoreCentreX - this.originX;
     out[SHORE_OFFSET + 6] = frame.shoreCentreZ - this.originZ;
     out[SHORE_OFFSET + 7] = frame.shoreSpan;
+    out[SWASH_OFFSET] = frame.swash;
+    out[SWASH_OFFSET + 1] = frame.wetBand;
+    out[SWASH_OFFSET + 2] = 0;
+    out[SWASH_OFFSET + 3] = 0;
   }
 }
 
