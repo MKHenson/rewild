@@ -75,13 +75,13 @@ export interface SpraySettings {
 export const MODERATE_WINDINESS = 0.7;
 
 export const DEFAULT_SPRAY: SpraySettings = {
-  moderate: { size: 2, rise: 1.3, lifetime: 1.6, opacity: 0.15 },
-  storm: { size: 7, rise: 1.8, lifetime: 2.6, opacity: 0.15 },
+  moderate: { size: 2, rise: 1.3, lifetime: 1.6, opacity: 0.05 },
+  storm: { size: 12, rise: 1.8, lifetime: 2.6, opacity: 0.05 },
   spawnFoam: 0.75,
   reach: 150,
   minWindiness: 0.45,
   drift: 2,
-  surf: { size: 6, rise: 1.8, lifetime: 2.2, opacity: 0.15 },
+  surf: { size: 12, rise: 1.8, lifetime: 2.2, opacity: 0.05 },
   impact: { size: 7, rise: 6, lifetime: 3, opacity: 0.15 },
   shoreShare: 0.25,
   surfMinWindiness: 0.7,
