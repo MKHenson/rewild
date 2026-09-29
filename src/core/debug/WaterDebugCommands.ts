@@ -36,23 +36,51 @@ export function registerWaterDebugCommands(renderer: Renderer) {
     );
   };
 
+  (window as any).setWaterShoreWaves = (strength = 1) => {
+    renderer.terrainRenderer.waterShoreWaves = strength;
+    console.log(
+      `setWaterShoreWaves(${strength}) — scale on the height of the waves rolling in to the coast, 1 the default, 0 off.`
+    );
+  };
+
+  (window as any).setWaterShoreDebug = (enabled = true) => {
+    renderer.terrainRenderer.waterShoreDebug = enabled;
+    console.log(
+      `setWaterShoreDebug(${enabled}) — ${
+        enabled
+          ? 'blue where deep water reaches, red by how strongly shore waves show, green stripes on the crests rolling in'
+          : 'water shaded'
+      }.`
+    );
+  };
+
+  (window as any).shoreFieldStats = () => {
+    const field = renderer.terrainRenderer.shoreField;
+    const { water, sources, reached, longest } = field.stats;
+    console.log(
+      `Shore field at (${field.centreX}, ${field.centreZ}): ${water} ocean texels, ${sources} deep enough to start waves, ${reached} reached, longest trip ${longest.toFixed(1)} s.`
+    );
+  };
+
   (window as any).setSeaSpray = (override = {}) => {
     const spray = renderer.terrainRenderer.seaSpray;
     if (!spray) {
       console.log('setSeaSpray — no spray yet. Go near water first.');
       return;
     }
-    const { moderate, storm, ...rest } = override as any;
+    const { moderate, storm, surf, impact, ...rest } = override as any;
     spray.settings = {
       ...spray.settings,
       ...rest,
       moderate: { ...spray.settings.moderate, ...moderate },
       storm: { ...spray.settings.storm, ...storm },
+      surf: { ...spray.settings.surf, ...surf },
+      impact: { ...spray.settings.impact, ...impact },
     };
     console.log(
       'setSeaSpray — the spray is now',
       spray.settings,
-      '\nKeys: moderate and storm, each { size (m), rise (m), lifetime (s), opacity 0..1 }, blended from windiness 0.7 to 1. Also spawnFoam 0..1, reach (m), minWindiness 0..1, drift (m/s). reach also sets the depth mask span.'
+      '\nKeys: moderate and storm, each { size (m), rise (m), lifetime (s), opacity 0..1 }, blended from windiness 0.7 to 1. Also spawnFoam 0..1, reach (m), minWindiness 0..1, drift (m/s). reach also sets the depth mask span. Shore: surf and impact, the same shape keys at full strength; shoreShare 0..1 of the pool, surfMinWindiness 0..1, impactMinHeight (m), shoreFullHeight (m).'
     );
   };
 

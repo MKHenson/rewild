@@ -186,6 +186,63 @@ export function cascadeBand(index: number): [number, number] {
   return [low, high];
 }
 
+/** JONSWAP energy density in m²·s at angular frequency `omega`, deep water. */
+function jonswapDensity(
+  system: WaveSystem,
+  alpha: number,
+  peakOmega: number,
+  omega: number
+): number {
+  const sigma = omega <= peakOmega ? 0.07 : 0.09;
+  const d = omega - peakOmega;
+  const r = Math.exp((-d * d) / (sigma * sigma * peakOmega * peakOmega * 2));
+  return (
+    system.scale *
+    alpha *
+    GRAVITY *
+    GRAVITY *
+    Math.pow(omega, -5) *
+    Math.exp(-1.25 * Math.pow(peakOmega / omega, 4)) *
+    Math.pow(system.peakEnhancement, r)
+  );
+}
+
+const VARIANCE_STEPS = 256;
+
+/**
+ * Height variance in m² that `systems` put in cascade `index`, in deep water.
+ * The directional spread integrates to 1, so only the frequency spectrum
+ * counts.
+ */
+export function cascadeVariance(
+  systems: readonly WaveSystem[],
+  index: number
+): number {
+  const size = CASCADE_SIZES[index];
+  const [bandLow, bandHigh] = cascadeBand(index);
+  const low = Math.max(bandLow, (Math.PI * 2) / size);
+  const high = Math.min(bandHigh, (Math.PI * FFT_SIZE) / size);
+  const shapes = systems.map((s) =>
+    jonswapShape(s.windSpeed, s.fetch, s.longestPeak)
+  );
+  const step = Math.log(high / low) / VARIANCE_STEPS;
+  let variance = 0;
+  for (let i = 0; i < VARIANCE_STEPS; i++) {
+    const k = low * Math.exp((i + 0.5) * step);
+    const omega = Math.sqrt(GRAVITY * k);
+    // dω = dω/dk · k · d(ln k), with ω = √(g k).
+    const dOmega = omega * 0.5 * step;
+    for (let s = 0; s < systems.length; s++) {
+      const fade = Math.exp(-Math.pow(systems[s].shortWavesFade * k, 2));
+      variance +=
+        jonswapDensity(systems[s], shapes[s].alpha, shapes[s].peakOmega, omega) *
+        fade *
+        dOmega;
+    }
+  }
+  return variance;
+}
+
 /**
  * How strongly a palette type takes a cascade: its wave response, over every
  * cascade up to 8 × its wave scale, fading out by 16 ×. A lake keeps only the

@@ -1,4 +1,9 @@
-import { DEFAULT_SPRAY, seaDepthAt, sprayShapeAt } from './SeaSpray';
+import {
+  DEFAULT_SPRAY,
+  UNKNOWN_GROUND,
+  seaDepthAt,
+  sprayShapeAt,
+} from './SeaSpray';
 
 describe('SeaSpray', () => {
   it('takes the moderate shape up to windiness 0.7 and the storm shape at 1', () => {
@@ -12,9 +17,9 @@ describe('SeaSpray', () => {
     );
   });
 
-  it('measures the sea from the sea level, none on land or unloaded ground', () => {
+  it('measures the sea from the sea level, none on land, unknown unloaded', () => {
     expect(seaDepthAt(0, -12)).toBe(12);
     expect(seaDepthAt(0, 3)).toBe(0);
-    expect(seaDepthAt(0, null)).toBe(0);
+    expect(seaDepthAt(0, null)).toBe(UNKNOWN_GROUND);
   });
 });

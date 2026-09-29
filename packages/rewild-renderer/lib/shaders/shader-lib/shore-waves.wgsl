@@ -1,0 +1,102 @@
+// The ocean's shore waves (ShoreField, ShoreWaves): two trains whose phase is
+// ω × (time − seconds since leaving deep water), so crests roll in along the
+// wavefronts, turning toward the shallows and bunching up as the bed rises. A
+// breaker grows as the water shallows (Green's law, from SHORE_REF_DEPTH)
+// until it is BREAK_INDEX of the depth. They come in between SHORE_FADE_DEEP
+// and SHORE_FADE_SHALLOW metres of depth. The host declares `waves : Waves`
+// (water-waves.wgsl) and samples the shore field itself.
+
+const BREAK_INDEX: f32 = 0.78;
+const SHORE_REF_DEPTH: f32 = 14.0;
+const SHORE_FADE_DEEP: f32 = 24.0;
+const SHORE_FADE_SHALLOW: f32 = 12.0;
+// Each train's share of the breaker height, crest to trough.
+const SHORE_TRAIN_SHARE: vec2f = vec2f(0.3, 0.2);
+// Noise over SHORE_NOISE_CELL metre cells bends the crests by up to
+// SHORE_WOBBLE radians and varies their height down to SHORE_LOW. It repeats
+// every SHORE_NOISE_CELLS cells, 1024 m, so it matches across the snapped
+// origin.
+const SHORE_NOISE_CELL: f32 = 64.0;
+const SHORE_NOISE_CELLS: i32 = 16;
+const SHORE_WOBBLE: f32 = 1.5;
+const SHORE_LOW: f32 = 0.6;
+
+fn shoreHash(cell: vec2i, cells: i32, salt: u32) -> f32 {
+  let wrapped = vec2u((cell % cells + cells) % cells);
+  var h = wrapped.x * 374761393u + wrapped.y * 668265263u + salt * 2246822519u;
+  h = (h ^ (h >> 13u)) * 1274126177u;
+  h = h ^ (h >> 16u);
+  return f32(h & 0xffffu) / 65535.0;
+}
+
+// Value noise at `p` metres from the origin over `size` metre cells, repeating
+// every `cells` of them: x in -1..1, yz its gradient per metre. `size` ×
+// `cells` must divide 1024 so it matches across the snapped origin.
+fn shoreNoise(p: vec2f, size: f32, cells: i32, salt: u32) -> vec3f {
+  let q = p / size;
+  let cell = vec2i(floor(q));
+  let f = q - floor(q);
+  let u = f * f * (3.0 - 2.0 * f);
+  let du = 6.0 * f * (1.0 - f);
+  let a = shoreHash(cell, cells, salt);
+  let b = shoreHash(cell + vec2i(1, 0), cells, salt);
+  let c = shoreHash(cell + vec2i(0, 1), cells, salt);
+  let d = shoreHash(cell + vec2i(1, 1), cells, salt);
+  let twist = a - b - c + d;
+  let value = mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+  let gradient = vec2f(du.x * (b - a + twist * u.y), du.y * (c - a + twist * u.x));
+  return vec3f(value * 2.0 - 1.0, gradient * 2.0 / size);
+}
+
+// Where `rest` falls in the shore field's texture.
+fn shoreFieldUV(rest: vec2f) -> vec2f {
+  return (rest - waves.shoreSize.yz) / waves.shoreSize.w + 0.5;
+}
+
+struct ShoreState {
+  // 0..1: how strongly the shore waves show; 0 where they do not.
+  fade : f32,
+  // Seconds per metre the crests take; |∇T|.
+  slowness : f32,
+  // The way the crests travel, toward the coast.
+  toCoast : vec2f,
+  // 0..1: how near breaking.
+  breaking : f32,
+  // Metres crest to trough, faded and varied.
+  height : f32,
+  variation : f32,
+  // Crest bend in radians, and its gradient per metre.
+  wobble : vec3f,
+}
+
+// The shore waves over water `depth` deep at `rest`, from its shore field
+// texel.
+fn shoreState(shore: vec4f, rest: vec2f, depth: f32) -> ShoreState {
+  var out: ShoreState;
+  out.fade = 0.0;
+  out.slowness = length(shore.yz);
+  out.toCoast = vec2f(0.0);
+  out.breaking = 0.0;
+  out.height = 0.0;
+  out.variation = 0.0;
+  out.wobble = vec3f(0.0);
+  let fade = (1.0 - smoothstep(SHORE_FADE_SHALLOW, SHORE_FADE_DEEP, depth)) * shore.w;
+  if (fade <= 0.0 || depth <= 0.0 || waves.shoreSize.x <= 0.0 || out.slowness < 1e-4) {
+    return out;
+  }
+  out.fade = fade;
+  out.toCoast = shore.yz / out.slowness;
+  let open = waves.shoreSize.x * pow(SHORE_REF_DEPTH / max(depth, 0.05), 0.25);
+  let limit = BREAK_INDEX * depth;
+  out.breaking = smoothstep(0.6, 1.0, open / max(limit, 1e-3));
+  out.variation = mix(SHORE_LOW, 1.0, shoreNoise(rest, SHORE_NOISE_CELL, SHORE_NOISE_CELLS, 1u).x * 0.5 + 0.5);
+  out.height = min(open, limit) * fade * out.variation;
+  out.wobble = shoreNoise(rest, SHORE_NOISE_CELL, SHORE_NOISE_CELLS, 0u) * SHORE_WOBBLE;
+  return out;
+}
+
+// Train `i`'s phase at a point `seconds` from deep water with crest bend
+// `wobble`: its crest passes at 0 mod 2π.
+fn shorePhase(i: i32, seconds: f32, wobble: f32) -> f32 {
+  return waves.shore[i + 2] - waves.shore[i] * seconds + wobble;
+}

@@ -19,6 +19,7 @@ const HAS_FOLIAGE_SHADING: bool = false;
 #include "./shader-lib/directional-shadow.wgsl"
 #include "./shader-lib/spot-light-shadow.wgsl"
 #include "./shader-lib/water-waves.wgsl"
+#include "./shader-lib/shore-waves.wgsl"
 
 // Air to water at normal incidence.
 const WATER_F0: f32 = 0.02;
@@ -46,8 +47,11 @@ const LOD_RAMP: f32 = 60.0;
 // Mips a vertex samples above the one matching its grid spacing, so no wave
 // shorter than the grid can hold displaces it.
 const VERTEX_MIP_BIAS: f32 = 0.7;
-// Depth in metres over which waves die down toward the waterline.
-const SHORE_CALM_DEPTH: f32 = 1.5;
+// Troughs ease toward a floor at TROUGH_FLOOR of the depth, so no rare deep
+// trough reaches the bed. See SHOAL_RATIO.
+const TROUGH_FLOOR: f32 = 0.8;
+// Depth in metres over which crest foam fades out toward the waterline.
+const SHORE_FOAM_DEPTH: f32 = 1.5;
 // Slopes are divided by the stretch of the surface, floored so a folding
 // crest does not blow them up.
 const MIN_STRETCH: f32 = 0.2;
@@ -102,6 +106,28 @@ const TROUGH_SKY: f32 = 0.84;
 const TROUGH_SCATTER: f32 = 0.84;
 const TROUGH_DEPTH: f32 = 3.5;
 
+// How far the shore trains (shore-waves.wgsl) pull water toward their crests: CHOP × their height,
+// bounded so the summed steepness stays under STEEP_OPEN out at sea and
+// STEEP_BREAK where they break, both below 1 so a crest never folds.
+const SHORE_CHOP_OPEN: f32 = 1.0;
+const SHORE_CHOP_BREAK: f32 = 2.0;
+const SHORE_STEEP_OPEN: f32 = 0.35;
+const SHORE_STEEP_BREAK: f32 = 0.9;
+// Most of the depth's height budget the shore waves take from the open sea,
+// so some chop always rides between them.
+const SHORE_BUDGET_SHARE: f32 = 0.8;
+// Breaker foam: where a shore wave breaks it gathers over the last
+// SHORE_FOAM_AHEAD of a cycle before the crest and trails behind it, fading by
+// e every 1 / SHORE_FOAM_TRAIL of a cycle. It breaks up into grain over the
+// lace and SHORE_FOAM_CELL metre noise (SHORE_FOAM_CELLS to a repeat), with
+// an edge SHORE_FOAM_SOFTNESS wide.
+const SHORE_FOAM_AHEAD: f32 = 0.06;
+const SHORE_FOAM_TRAIL: f32 = 5.0;
+const SHORE_FOAM_AMOUNT: f32 = 1.3;
+const SHORE_FOAM_CELL: f32 = 2.0;
+const SHORE_FOAM_CELLS: i32 = 512;
+const SHORE_FOAM_SOFTNESS: f32 = 0.12;
+
 struct Uniforms {
   normalMatrix: mat3x3f,
   projMatrix : mat4x4f,
@@ -154,6 +180,9 @@ struct VertexOutput {
 // The opaque scene behind the water (RefractionCapture): rgb colour, a view
 // depth in metres. Bound for the absorb draw only.
 @group(1) @binding(5) var refraction : texture_2d<f32>;
+// Around the camera (ShoreField): seconds a shore wave takes to get here from
+// deep water, its world xz gradient, and the waves' strength.
+@group(1) @binding(6) var shoreMap : texture_2d<f32>;
 // The ocean (OceanFFT), one layer per cascade: displacement (Dx, Dy, Dz,
 // foam) and slopes (dDy/dx, dDy/dz, dDx/dx, dDz/dz). The slopes are bound for
 // the absorb and light draws.
@@ -216,10 +245,118 @@ fn sampleWater(uv: vec2f) -> WaterSample {
   return out;
 }
 
-// How strongly cascade `c` moves this water: the palette's weights and the
-// calm at the shore.
-fn cascadeScale(c: i32, weights: vec4f, calm: f32) -> f32 {
-  return dot(waves.cascadeTypes[c], weights) * calm;
+// How strongly each cascade moves this water: the palette's weights, then
+// what the depth holds once the shore waves have taken `taken` of its height
+// variance, up to SHORE_BUDGET_SHARE of it. The budget goes to the shortest
+// cascades first, so shallow water loses its long heave and keeps its chop.
+fn cascadeScales(weights: vec4f, depth: f32, taken: f32) -> vec4f {
+  let limit = SHOAL_RATIO * depth * 0.25;
+  let capacity = limit * limit;
+  var budget = capacity - min(taken, capacity * SHORE_BUDGET_SHARE);
+  var scales = vec4f(0.0);
+  for (var c: i32 = CASCADES - 1; c >= 0; c--) {
+    let w = dot(waves.cascadeTypes[c], weights);
+    let rms = waves.cascade[c].y * w;
+    let variance = rms * rms;
+    let held = select(1.0, sqrt(saturate(budget / variance)), variance > 1e-8);
+    scales[c] = w * held;
+    budget = max(budget - variance * held * held, 0.0);
+  }
+  return scales;
+}
+
+// Eases a trough toward the floor below which it would near the bed.
+fn floorTrough(height: f32, depth: f32) -> f32 {
+  let lowest = max(TROUGH_FLOOR * depth, 1e-3);
+  return select(height, -lowest * tanh(-height / lowest), height < 0.0);
+}
+
+// 0..1 breakup for the shore foam, two octaves of fine noise.
+fn shoreFoamBreakup(rest: vec2f) -> f32 {
+  let coarse = shoreNoise(rest, SHORE_FOAM_CELL, SHORE_FOAM_CELLS, 2u).x;
+  let fine = shoreNoise(rest, SHORE_FOAM_CELL * 0.5, SHORE_FOAM_CELLS * 2, 3u).x;
+  return saturate(0.5 + 0.3 * coarse + 0.3 * fine);
+}
+
+struct ShoreWave {
+  displacement : vec3f,
+  // dDy/dx, dDy/dz, dDx/dx, dDz/dz, as the ocean's slopes.
+  slopes : vec4f,
+  // Height variance it adds, which the open sea gives up.
+  variance : f32,
+  // 0..1: foam coverage from the breakers, before its breakup.
+  foam : f32,
+}
+
+// The shore field at `rest`.
+fn sampleShore(rest: vec2f) -> vec4f {
+  return textureSampleLevel(shoreMap, surfaceSampler, shoreFieldUV(rest), 0.0);
+}
+
+// The shore field painted for the debug view: blue where deep water reaches,
+// red by how strongly shore waves show, green on the first train's crests.
+fn shoreDebug(rest: vec2f, depth: f32) -> vec3f {
+  let shore = sampleShore(rest);
+  let reached = select(0.0, 1.0, length(shore.yz) > 1e-4);
+  let fade = (1.0 - smoothstep(SHORE_FADE_SHALLOW, SHORE_FADE_DEEP, depth)) * shore.w;
+  let wobble = shoreNoise(rest, SHORE_NOISE_CELL, SHORE_NOISE_CELLS, 0u).x * SHORE_WOBBLE;
+  let crest = step(0.7, cos(shorePhase(0, shore.x, wobble))) * fade;
+  return vec3f(fade, crest * 0.8, reached * 0.4);
+}
+
+// The shore waves at `rest` over water `depth` deep. A train shorter than
+// 4 × `resolution` metres fades out, so a coarse grid or a distant pixel does
+// not alias it.
+fn shoreWave(rest: vec2f, depth: f32, resolution: f32) -> ShoreWave {
+  var out: ShoreWave;
+  out.displacement = vec3f(0.0);
+  out.slopes = vec4f(0.0);
+  out.variance = 0.0;
+  out.foam = 0.0;
+  let shore = sampleShore(rest);
+  let state = shoreState(shore, rest, depth);
+  if (state.fade <= 0.0) {
+    return out;
+  }
+  let slowness = state.slowness;
+  let toCoast = state.toCoast;
+  let breaking = state.breaking;
+  let height = state.height;
+  let wobble = state.wobble;
+  let chop = mix(SHORE_CHOP_OPEN, SHORE_CHOP_BREAK, breaking);
+  let steep = mix(SHORE_STEEP_OPEN, SHORE_STEEP_BREAK, breaking);
+  let trains = SHORE_TRAIN_SHARE;
+  let shares = trains / (trains.x + trains.y);
+
+  for (var i: i32 = 0; i < 2; i++) {
+    let omega = waves.shore[i];
+    let k = omega * slowness;
+    let resolved = 1.0 - smoothstep(0.125, 0.25, resolution * k / 6.2831853);
+    let phase = shorePhase(i, shore.x, wobble.x);
+    // Where in its cycle the crest is: 0 as it passes, rising behind it.
+    let cycle = fract(phase / 6.2831853);
+    let behind = exp(-cycle * SHORE_FOAM_TRAIL);
+    let ahead = smoothstep(1.0 - SHORE_FOAM_AHEAD, 1.0, cycle);
+    out.foam += shares[i] * max(behind, ahead);
+    let amplitude = height * trains[i] * resolved;
+    if (amplitude <= 0.0) {
+      continue;
+    }
+    let reach = min(amplitude * chop, steep * shares[i] / k);
+    let gradient = wobble.yz - omega * shore.yz;
+    let s = sin(phase);
+    let c = cos(phase);
+    out.displacement += vec3f(toCoast.x * reach * s, amplitude * c, toCoast.y * reach * s);
+    out.slopes += vec4f(
+      -amplitude * s * gradient.x,
+      -amplitude * s * gradient.y,
+      toCoast.x * reach * c * gradient.x,
+      toCoast.y * reach * c * gradient.y
+    );
+    out.variance += amplitude * amplitude * 0.5;
+  }
+  out.foam = saturate(out.foam * breaking * state.fade * state.variation * SHORE_FOAM_AMOUNT);
+  return out;
 }
 
 
@@ -238,11 +375,6 @@ fn gridSpacingAt(distance: f32) -> f32 {
     spacing = mix(spacing, waves.lodSpacing[i / 4][i % 4], ramp);
   }
   return spacing;
-}
-
-// Waves die down toward the waterline rather than lifting water over the sand.
-fn shoreCalm(depth: f32) -> f32 {
-  return smoothstep(0.0, SHORE_CALM_DEPTH, depth);
 }
 
 // How a pixel's rest position changes across the screen. Taken before any
@@ -273,18 +405,26 @@ struct OceanPixel {
   // The whole surface's stretch (the Jacobian without its cross term): 1
   // flat, below 1 squeezed.
   stretch : f32,
+  // Breaker foam coverage, and the 0..1 noise that breaks it up.
+  shoreFoam : f32,
+  shoreBreakup : f32,
 }
 
 // The ocean at a pixel: the cascades' slopes and foam, filtered to the
 // pixel's footprint, give the normal and the foam coverage.
 fn oceanPixel(input: VertexOutput, water: WaterSample, footprint: Footprint) -> OceanPixel {
-  let calm = shoreCalm(water.depth);
+  let shore = shoreWave(input.rest, water.depth, footprint.size);
+  let scales = cascadeScales(water.weights, water.depth, shore.variance);
+  // Depth-limited waves are breaking waves, so the crest foam stays with them
+  // until the waterline.
+  let foamCalm = smoothstep(0.0, SHORE_FOAM_DEPTH, water.depth);
   let bias = exp2(waves.view.x);
-  var d = vec4f(0.0);
+  var d = shore.slopes;
   var foam = 0.0;
   for (var c: i32 = 0; c < CASCADES; c++) {
-    let w = cascadeScale(c, water.weights, calm);
-    if (w <= 0.0) {
+    let w = scales[c];
+    let foamWeight = dot(waves.cascadeTypes[c], water.weights) * foamCalm;
+    if (w <= 0.0 && foamWeight <= 0.0) {
       continue;
     }
     let size = waves.cascade[c].x;
@@ -292,7 +432,7 @@ fn oceanPixel(input: VertexOutput, water: WaterSample, footprint: Footprint) -> 
     let ddx = footprint.dx / size;
     let ddy = footprint.dy / size;
     d += textureSampleGrad(oceanSlopes, oceanSampler, uv, c, ddx * bias, ddy * bias) * w;
-    foam += textureSampleGrad(oceanDisplacement, oceanSampler, uv, c, ddx, ddy).w * w;
+    foam += textureSampleGrad(oceanDisplacement, oceanSampler, uv, c, ddx, ddy).w * foamWeight;
   }
 
   let shade = waves.view.y;
@@ -301,8 +441,10 @@ fn oceanPixel(input: VertexOutput, water: WaterSample, footprint: Footprint) -> 
 
   var out: OceanPixel;
   out.normal = normalize(uniforms.normalMatrix * vec3f(-slopes.x, 1.0, -slopes.y));
-  out.variance = (MSS_BASE + MSS_PER_WIND * waves.origin.z) * unresolved * calm * shade;
+  out.variance = (MSS_BASE + MSS_PER_WIND * waves.origin.z) * unresolved * scales[CASCADES - 1] * shade;
   out.coverage = foam;
+  out.shoreFoam = shore.foam;
+  out.shoreBreakup = shoreFoamBreakup(input.rest);
   out.stretch = (d.z + 1.0) * (d.w + 1.0);
   return out;
 }
@@ -334,12 +476,14 @@ fn vs(input: VertexInput) -> VertexOutput {
   // Distance from the viewer's ground point, as chunk LODs measure it.
   let fromEye = vec3f(rest.x - waves.view.z, params.baseLevel + surface.r, rest.y - waves.view.w);
   let spacing = gridSpacingAt(length(fromEye));
-  let calm = shoreCalm(max(surface.r - surface.g, 0.0));
+  let depth = max(surface.r - surface.g, 0.0);
+  let shore = shoreWave(rest, depth, spacing);
+  let scales = cascadeScales(weights, depth, shore.variance);
 
-  var displacement = vec3f(0.0);
-  if (calm > 0.0) {
+  var displacement = shore.displacement;
+  if (depth > 0.0) {
     for (var c: i32 = 0; c < CASCADES; c++) {
-      let w = cascadeScale(c, weights, calm);
+      let w = scales[c];
       if (w <= 0.0) {
         continue;
       }
@@ -350,6 +494,7 @@ fn vs(input: VertexInput) -> VertexOutput {
       let s = textureSampleLevel(oceanDisplacement, oceanSampler, cascadeUV(c, rest), c, level);
       displacement += s.xyz * w;
     }
+    displacement.y = floorTrough(displacement.y, depth);
   }
 
   let local = vec4f(
@@ -410,7 +555,11 @@ fn waterFoam(ocean: OceanPixel, footprint: f32, water: WaterSample) -> f32 {
   let lace = saturate((LACE_FLAT - ocean.stretch) / (LACE_FLAT - LACE_SQUEEZED));
   let shown = smoothstep(1.0 - coverage, 1.0 - coverage + LACE_SOFTNESS, lace);
   let far = smoothstep(FOAM_FAR_NEAR, FOAM_FAR_FAR, footprint);
-  return mix(shown, coverage, far) * FOAM_OPACITY;
+  // Breaker foam lies on water the small waves may barely squeeze, so noise
+  // joins the lace to break it into grain.
+  let grain = saturate(ocean.shoreBreakup * 0.7 + lace * 0.6);
+  let shore = smoothstep(1.0 - ocean.shoreFoam, 1.0 - ocean.shoreFoam + SHORE_FOAM_SOFTNESS, grain);
+  return max(mix(shown, coverage, far), mix(shore, ocean.shoreFoam, far)) * FOAM_OPACITY;
 }
 
 // Where a view-space point lands on screen, in 0..1 texture space.
@@ -525,6 +674,9 @@ fn fs_light(input: VertexOutput) -> @location(0) vec4f {
   // Last, so every shadow and cube sample above runs in uniform control flow.
   if (water.coverage <= 0.0) {
     discard;
+  }
+  if (waves.origin.w > 1.5) {
+    return vec4f(shoreDebug(input.rest, water.depth) * water.coverage, 1.0);
   }
   if (waves.origin.w > 0.5) {
     return vec4f(vec3f(saturate(ocean.coverage * FOAM_COVERAGE * water.foam)) * water.coverage, 1.0);

@@ -10,22 +10,25 @@ import { WATER_SPRAY_TEXTURE } from './WaterTextures';
 
 // Sea spray: a pool of particles that rise from breaking crests near the
 // camera (after GodotOceanWaves). A compute pass spawns them where the ocean's
-// foam is thick over open sea; a draw after the atmosphere composite animates
-// them on the waves and fogs them as the scene is fogged.
+// foam is thick over open sea, and from the shore: surf where shore waves
+// break and plumes where crests hit rock, as the crests arrive. A draw after
+// the atmosphere composite animates them on the waves and fogs them as the
+// scene is fogged.
 
 /** Particles in the pool. */
 export const SPRAY_PARTICLES = 4096;
-const PARTICLE_BYTES = 32;
+const PARTICLE_BYTES = 48;
 
 // The depth mask: metres of sea on a grid around the camera, from the
-// terrain's heights, so spray rises only over open water. It spans the
+// terrain's heights, so spray rises only over open water and plumes only
+// beside known land. It spans the
 // spray's reach and is rebuilt when the camera crosses a texel or every
 // MASK_REFRESH seconds, as chunks load.
 const MASK_TEXELS = 64;
 const MASK_REFRESH = 1;
 
 // SprayParams in sea-spray-common.wgsl.
-const PARAMS_FLOATS = 64;
+const PARAMS_FLOATS = 76;
 
 /** How a puff looks; blended by the windiness between two ends. */
 export interface SprayShape {
@@ -53,6 +56,18 @@ export interface SpraySettings {
   minWindiness: number;
   /** Metres a second a puff drifts downwind in full wind. */
   drift: number;
+  /** Surf thrown where a shore wave breaks, at full strength. */
+  surf: SprayShape;
+  /** A plume where a crest hits rock, at full strength. */
+  impact: SprayShape;
+  /** 0..1: share of the pool kept for surf and plumes. */
+  shoreShare: number;
+  /** Windiness 0..1 below which no surf rises. */
+  surfMinWindiness: number;
+  /** Metres of wave height a plume needs. */
+  impactMinHeight: number;
+  /** Metres of wave height at which surf and plumes are at full strength. */
+  shoreFullHeight: number;
 }
 
 /** Windiness at which the spray has its moderate shape. It blends to the
@@ -60,12 +75,18 @@ export interface SpraySettings {
 export const MODERATE_WINDINESS = 0.7;
 
 export const DEFAULT_SPRAY: SpraySettings = {
-  moderate: { size: 2, rise: 1.3, lifetime: 1.6, opacity: 1 },
-  storm: { size: 7, rise: 2.3, lifetime: 2.6, opacity: 1 },
+  moderate: { size: 2, rise: 1.3, lifetime: 1.6, opacity: 0.15 },
+  storm: { size: 7, rise: 1.8, lifetime: 2.6, opacity: 0.15 },
   spawnFoam: 0.75,
   reach: 150,
   minWindiness: 0.45,
   drift: 2,
+  surf: { size: 6, rise: 1.8, lifetime: 2.2, opacity: 0.15 },
+  impact: { size: 7, rise: 6, lifetime: 3, opacity: 0.15 },
+  shoreShare: 0.25,
+  surfMinWindiness: 0.7,
+  impactMinHeight: 1,
+  shoreFullHeight: 5,
 };
 
 /** The shape of the spray at `windiness` 0..1. */
@@ -86,13 +107,13 @@ export function sprayShapeAt(
   };
 }
 
-/** Metres of sea at world (x, z): sea level less the ground, 0 on land or
- *  where the ground is not loaded. */
-export function seaDepthAt(
-  seaLevel: number,
-  ground: number | null
-): number {
-  return ground === null ? 0 : Math.max(0, seaLevel - ground);
+/** The depth mask's value where the ground is not loaded. */
+export const UNKNOWN_GROUND = -1;
+
+/** Metres of sea at world (x, z): sea level less the ground, 0 on land, or
+ *  UNKNOWN_GROUND where the ground is not loaded. */
+export function seaDepthAt(seaLevel: number, ground: number | null): number {
+  return ground === null ? UNKNOWN_GROUND : Math.max(0, seaLevel - ground);
 }
 
 export class SeaSpray {
@@ -100,6 +121,8 @@ export class SeaSpray {
     ...DEFAULT_SPRAY,
     moderate: { ...DEFAULT_SPRAY.moderate },
     storm: { ...DEFAULT_SPRAY.storm },
+    surf: { ...DEFAULT_SPRAY.surf },
+    impact: { ...DEFAULT_SPRAY.impact },
   };
 
   private particles: GPUBuffer;
@@ -129,7 +152,9 @@ export class SeaSpray {
   constructor(
     device: GPUDevice,
     private ocean: OceanFFT,
-    private waves: GPUBuffer
+    private waves: GPUBuffer,
+    shoreField: GPUTexture,
+    shoreSampler: GPUSampler
   ) {
     this.particles = device.createBuffer({
       label: 'sea spray particles',
@@ -174,6 +199,8 @@ export class SeaSpray {
         },
         { binding: 4, resource: this.ocean.sampler },
         { binding: 5, resource: this.mask.createView() },
+        { binding: 6, resource: shoreField.createView() },
+        { binding: 7, resource: shoreSampler },
       ],
     });
   }
@@ -226,6 +253,18 @@ export class SeaSpray {
     );
     d.set([sun[0], sun[1], sun[2], 1], 20);
     this.packCamera(camera);
+    const { surf, impact } = settings;
+    d.set([surf.size, surf.rise, surf.lifetime, surf.opacity], 64);
+    d.set([impact.size, impact.rise, impact.lifetime, impact.opacity], 68);
+    d.set(
+      [
+        Math.round(SPRAY_PARTICLES * settings.shoreShare),
+        settings.surfMinWindiness,
+        settings.impactMinHeight,
+        settings.shoreFullHeight,
+      ],
+      72
+    );
     device.queue.writeBuffer(this.params, 0, d);
 
     const encoder = device.createCommandEncoder({ label: 'sea spray update' });
@@ -242,7 +281,8 @@ export class SeaSpray {
     const irradiance = renderer.iblIrradianceMap;
     const atmosphere = renderer.sky?.skyRenderer?.finalPass?.uniformBuffer;
     if (!irradiance || !atmosphere) return;
-    if (!this.drawPipeline) this.drawPipeline = this.createDrawPipeline(renderer);
+    if (!this.drawPipeline)
+      this.drawPipeline = this.createDrawPipeline(renderer);
     if (
       !this.drawGroup ||
       this.drawDepth !== renderer.depthTexture ||

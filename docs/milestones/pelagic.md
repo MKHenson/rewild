@@ -479,14 +479,15 @@ the direction and the windiness.
   angular frequency is snapped to whole cycles over a 1024 s loop, and the clock wraps there.
 - **Water types.** A palette type takes every cascade up to 8 × its `waveScale` long, fading out
   by 16 ×, scaled by its `waveResponse` (`cascadeWeight`). The ocean (100 m) takes all four; a
-  lake (10 m) takes only the 33.3 m and 7.1 m cascades, so it stays small in any wind.
+  lake (25 m, 0.6) takes all but the 733 m cascade: about 0.13 m in a calm and 1.3 m in a gale,
+  a short choppy sea under the same shoaling as the ocean, with no shore waves.
 - **Grid and distance.** Water grids are 2 m a quad within the first LOD distance, then 4, 8,
   16 and 32 m. A vertex samples each cascade's displacement at the mip whose texels match the
   grid, 0.7 levels coarser, so no wave shorter than the grid can hold moves it. The spacing comes
   from the vertex's **distance** from where chunk LODs were last chosen, not from its chunk's grid:
   the coarsest grid the LOD system can put there, ramped in 60 m before each LOD distance. Two
   chunks meeting at a vertex measure the same distance and sample the same mip, so the seam does
-  not crack. Waves die down over the last 1.5 m of depth.
+  not crack.
 - **Precision.** Positions are measured from an origin near the camera, snapped to 1024 m. The CPU
   gives each cascade where that origin falls in its tile, in double precision, so the shader adds
   only small numbers.
@@ -503,15 +504,45 @@ the direction and the windiness.
 
 The shader has the depth and the terrain height texture. These give the main shore effects:
 
-- **Shoaling.** Waves get shorter and steeper in shallow water, then flatten at the waterline.
-  Scale the cascade amplitudes by depth, longest first.
-- **Shore waves.** A separate layer whose crests run parallel to the coast and travel inward:
-  phase `k·d − ω·t` over a smoothed distance to shore `d`, built per chunk with the water map.
-  It fades in over a depth band and steepens as the water shallows, while the open-water chop
-  fades out, so every bay and island gets waves that arrive parallel to its beach.
-- **Foam lines.** Bands of foam driven by `depth − time` roll toward the shore and fade out.
+- **Shoaling.** Water holds a sea whose significant height is at most 0.6 of its depth; taller
+  waves break. The CPU integrates the spectrum over each cascade's band for its RMS height
+  (`cascadeVariance`), and the shader shares the depth's budget out from the shortest cascade to
+  the longest, so shallow water loses its long heave first and keeps its chop. Sideways movement
+  and slopes scale with the height. Troughs ease toward a floor at 0.8 of the depth, so a rare
+  deep one never reaches the bed. Lakes are held the same way. Crest foam is not held: a
+  depth-limited sea is breaking, so its foam stays until the last 1.5 m.
+- **Shore waves.** Two trains of Gerstner waves roll in from deep water, with periods of 8 s and
+  9.7 s that beat into sets. Their phase is `ω × (time − T)`, where `T` is the seconds a wave
+  takes to get to a point from water 24 m deep, moving at the shallow-water speed `√(g·h)` and
+  blocked by land (`ShoreField`). `T` comes from an eikonal solve by fast sweeping over a
+  256² grid of 8 m texels around the camera, from the terrain heights and the chunks' ocean
+  coverage. The wavefronts are the crests, so they turn toward the shallows, wrap around
+  headlands and islands, fill bays, and slow and bunch up as the bed rises. Water deep water
+  cannot reach, such as a lagoon behind a bar, gets none, and so do lakes. Past the water the
+  waves reach, the times carry on at a metre-deep wave's speed with no strength, so the phase has
+  no step where a lagoon or lake meets the sea. The grid is aligned
+  to the world. It follows the camera 128 m at a time and is rebuilt a second after ground loads
+  or changes: sampled over a few frames, then solved, extended, and packed and uploaded, a frame
+  each. The waves fade
+  toward its edge, where paths from deep water outside it are missing. A breaker is half the
+  open sea's significant height, at least 0.8 m so a still day has surf too
+  (`setWaterShoreWaves(strength)` scales it), and grows as the
+  water shallows (Green's law) until it reaches 0.78 of the depth. It comes in between 24 m and
+  12 m deep. Where it breaks it steepens and pulls the water harder toward its crest, never
+  folding. Noise over 64 m bends the crests and varies their height. Shore waves take up to 80%
+  of the depth's height budget from the open sea, so a little chop still rides between them. They
+  fade where the grid or the pixel is too coarse to hold them. `setWaterShoreDebug()` paints the
+  field on the water, and `shoreFieldStats()` counts the last build's texels.
+- **Foam lines.** Where a shore wave breaks, foam gathers over the last 6% of its cycle before the
+  crest and trails behind it, fading by e every fifth of a cycle, so bands of white water roll in
+  with the crests. It scales with how near breaking the wave is, so a calm day has a narrow surf
+  line and a storm whitens the shelf. The water it lies on is flat enough that the whitecaps'
+  lace would hide it on its own, so 2 m and 1 m noise joins the lace to break it into grain,
+  with a sharp edge. Unlike crest foam it runs up to the waterline.
 - **Swash.** Near the shore, the level rises and falls a little over time. The water runs up the
-  beach and back, and the wet band grows and shrinks with it.
+  beach and back, and the wet band grows and shrinks with it. It comes with the wet band (see
+  [Terrain changes](#terrain-changes)), timed by the shore waves' phase, since a sheet of water
+  on dry sand only reads as swash with the wet sand it leaves behind.
 
 Breaking waves that curl over are out of scope. A heightfield cannot overhang.
 
@@ -564,7 +595,9 @@ Spray rises from breaking crests near the camera (`SeaSpray`, after GodotOceanWa
   broke and a random value, so its motion is a function of its age and the waves under it.
 - **Spawning.** A compute pass gives each free particle four tries a frame at random spots within
   150 m of the camera. A spot must be open sea at least 1.5 m deep and under foam coverage of at
-  least 0.75. Its chance climbs from none at windiness 0.45 to all at 0.75. Recycling free
+  least 0.75. Its chance climbs from none at windiness 0.45 to all at 0.75. Shallow water holds
+  only part of the sea (see [Waves at the shore](#waves-at-the-shore)), and both the chance and
+  the puff's strength scale by that share. Recycling free
   particles straight onto new spots keeps the pool busy, where scattering them evenly and culling
   most would not.
 - **Open sea.** A depth mask of 64² texels over the spray's reach, from the terrain heights
@@ -584,7 +617,23 @@ Spray rises from breaking crests near the camera (`SeaSpray`, after GodotOceanWa
 - **Fog.** The composite fogs by the depth buffer, and the spray writes none, so it applies the
   scene's fog itself (`sceneFogTransmittance`, `getFogScatterColor` in `fog.wgsl`), reading the
   composite's own uniforms.
-- **Tuning.** `setSeaSpray({ moderate: { ... }, storm: { ... }, ... })` in the console.
+- **Shore spray.** The first quarter of the pool is kept for the shore, so the open sea cannot
+  starve it. Its particles try the same random spots, and rise while a shore wave's crest is
+  over the spot. The two trains' periods are close, so together they are one wave whose height
+  swells and fades over a set; its crest is where their sum stands above 0.85 of that height,
+  and a set's big waves throw more than the small ones between. So bursts run along the crests
+  the water shows:
+  - **Plumes** where water at least 2.5 m deep lies beside known land in the depth mask: rock,
+    not a beach. Ground that is not loaded, or past the mask, is not land. A shore wave's crest arriving sets one off, or an open-sea crest standing 0.35 of the
+    sea's significant height above rest. Their strength climbs from none at 1 m of wave height
+    to all at 5 m, so a calm sea throws none and a storm throws plumes 12 m high, 1.8 × taller
+    than wide, that rise fast and fall back.
+  - **Surf** where a shore wave is breaking, as its crest passes, scaled by the breaker's height
+    and faded in from windiness 0.3. It is carried shoreward at 0.9 of the wave's speed, so it
+    keeps up with its crest, and is thrown up whole then shrinks to 0.35 of its size.
+  - Both rise from the level rather than riding the open sea's displacement.
+- **Tuning.** `setSeaSpray({ moderate: { ... }, storm: { ... }, surf: { ... }, impact: { ... },
+  ... })` in the console.
 - **Not yet.** Spray takes no shadows (cloud or terrain) and no god rays, and rises only from the
   palette's first type, the ocean.
 
@@ -596,7 +645,8 @@ Time the ocean pass first; it has no GPU timer segment yet.
 
 The terrain shader reads the chunk's water map as well:
 
-- A darker, glossier **wet band** just above the water level.
+- A darker, glossier **wet band** just above the water level, with the swash running over it
+  (see [Waves at the shore](#waves-at-the-shore)).
 - **Under-water tint** on the bed, so the bed looks correct through the surface.
 - **Caustics** on the bed, projected from the sun (Phase 5).
 
@@ -662,6 +712,9 @@ shelf.
 - Sea spray: one compute pass over 4096 particles (four tries each while free), and one draw of
   4096 instanced quads, most of them dropped before rasterising. The CPU rebuilds its 64² depth
   mask (4096 height samples) when the camera crosses a texel, and every second.
+- The shore field rebuilds when the camera moves 128 m or ground loads: 65k height samples over
+  eight frames, then a fast-sweeping solve (about 4 ms), the extension past the reached water
+  (about 4 ms), and a pack and upload (about 3 ms) on three more.
 - The horizon ring is one draw call. Its vertices take no waves, and its pixels skip refraction.
 - `QualitySettings` controls the ocean's slope mip bias.
 

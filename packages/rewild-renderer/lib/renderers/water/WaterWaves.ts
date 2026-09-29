@@ -1,5 +1,6 @@
 import { MAX_WATER_TYPES, WaterType } from '../terrain/Water';
 import { CASCADE_COUNT, CASCADE_SIZES, cascadeWeight } from './OceanSpectrum';
+import { SHORE_OMEGAS, shorePhase } from './ShoreWaves';
 
 // What every water surface shares besides the ocean's textures (OceanFFT):
 // where positions are measured from, the grid's LOD bands, and how strongly
@@ -17,7 +18,8 @@ const LOD_SPACING_OFFSET = 16;
 const GRID_OFFSET = 24;
 const CASCADE_OFFSET = 28;
 const CASCADE_TYPES_OFFSET = CASCADE_OFFSET + CASCADE_COUNT * 4;
-export const WAVE_UNIFORM_FLOATS = CASCADE_TYPES_OFFSET + CASCADE_COUNT * 4;
+const SHORE_OFFSET = CASCADE_TYPES_OFFSET + CASCADE_COUNT * 4;
+export const WAVE_UNIFORM_FLOATS = SHORE_OFFSET + 8;
 
 /** Per frame, what the water shader takes besides the ocean textures. */
 export interface WaveFrame {
@@ -28,6 +30,8 @@ export interface WaveFrame {
   normals: boolean;
   /** Paints the raw foam coverage in grey instead of the water. */
   foamDebug: boolean;
+  /** Paints the shore field instead of the water (water.wgsl shoreDebug). */
+  shoreDebug: boolean;
   /** Strength of the sunlight through the wave crests; 1 is the default. */
   crestGlow: number;
   /** Strength of the trough darkening; 1 is the default. */
@@ -41,6 +45,16 @@ export interface WaveFrame {
   lodSpacings: ArrayLike<number>;
   /** The wind speed in m/s the ocean spectrum was built for. */
   windSpeed: number;
+  /** Per cascade, the RMS height in metres of the sea it holds. */
+  cascadeRms: ArrayLike<number>;
+  /** Seconds on the ocean's looping clock. */
+  time: number;
+  /** Metres: how high the shore waves break (shoreWaveHeight). */
+  shoreHeight: number;
+  /** World xz of the shore field's centre, and metres it spans. */
+  shoreCentreX: number;
+  shoreCentreZ: number;
+  shoreSpan: number;
 }
 
 /**
@@ -75,8 +89,9 @@ export class WaterWaves {
    * Writes the Waves uniform: the view (detail bias, normals on, viewer from
    * the origin), the origin, the ocean's wind speed and the foam debug view,
    * the LOD bands (see waterGridBands), finest spacing, crest glow and trough darkening, then per cascade
-   * its tile size and where the origin falls in its tile, and per cascade
-   * each palette type's weight.
+   * its tile size, RMS height and where the origin falls in its tile, per cascade
+   * each palette type's weight, then the shore trains' angular frequencies and
+   * phases, their breaker height and where the shore field lies.
    */
   pack(frame: WaveFrame, out: Float32Array): void {
     out[0] = frame.detailBias;
@@ -86,7 +101,7 @@ export class WaterWaves {
     out[ORIGIN_OFFSET] = this.originX;
     out[ORIGIN_OFFSET + 1] = this.originZ;
     out[ORIGIN_OFFSET + 2] = frame.windSpeed;
-    out[ORIGIN_OFFSET + 3] = frame.foamDebug ? 1 : 0;
+    out[ORIGIN_OFFSET + 3] = frame.shoreDebug ? 2 : frame.foamDebug ? 1 : 0;
     for (let i = 0; i < 8; i++) {
       out[LOD_DISTANCE_OFFSET + i] = frame.lodDistances[i] ?? 0;
       out[LOD_SPACING_OFFSET + i] = frame.lodSpacings[i] ?? 0;
@@ -103,13 +118,21 @@ export class WaterWaves {
       const x = this.originX / size;
       const z = this.originZ / size;
       out[o] = size;
-      out[o + 1] = 0;
+      out[o + 1] = frame.cascadeRms[c] ?? 0;
       out[o + 2] = x - Math.floor(x);
       out[o + 3] = z - Math.floor(z);
       for (let t = 0; t < MAX_WATER_TYPES; t++)
         out[CASCADE_TYPES_OFFSET + c * 4 + t] =
           this.cascadeTypes[c * MAX_WATER_TYPES + t];
     }
+    for (let i = 0; i < 2; i++) {
+      out[SHORE_OFFSET + i] = SHORE_OMEGAS[i];
+      out[SHORE_OFFSET + 2 + i] = shorePhase(i, frame.time);
+    }
+    out[SHORE_OFFSET + 4] = frame.shoreHeight;
+    out[SHORE_OFFSET + 5] = frame.shoreCentreX - this.originX;
+    out[SHORE_OFFSET + 6] = frame.shoreCentreZ - this.originZ;
+    out[SHORE_OFFSET + 7] = frame.shoreSpan;
   }
 }
 

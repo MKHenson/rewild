@@ -1,5 +1,6 @@
 import { LAKE, OCEAN } from '../terrain/Water';
 import { CASCADE_COUNT, CASCADE_SIZES } from './OceanSpectrum';
+import { SHORE_OMEGAS } from './ShoreWaves';
 import { WAVE_UNIFORM_FLOATS, WaterWaves, WaveFrame } from './WaterWaves';
 
 const PALETTE = [OCEAN, LAKE];
@@ -9,6 +10,7 @@ function frame(overrides: Partial<WaveFrame> = {}): WaveFrame {
     detailBias: 0.5,
     normals: true,
     foamDebug: false,
+    shoreDebug: false,
     crestGlow: 1.5,
     troughDarkening: 0.5,
     eyeX: 0,
@@ -17,18 +19,24 @@ function frame(overrides: Partial<WaveFrame> = {}): WaveFrame {
     lodDistances: [],
     lodSpacings: [],
     windSpeed: 7,
+    cascadeRms: [2, 0.5, 0.1, 0.02],
+    time: 3,
+    shoreHeight: 1.5,
+    shoreCentreX: -19200,
+    shoreCentreZ: 26880,
+    shoreSpan: 2048,
     ...overrides,
   };
 }
 
 describe('WaterWaves', () => {
-  it('gives the ocean every cascade and a lake only the short ones', () => {
+  it('gives the ocean every cascade and a lake all but the longest', () => {
     const waves = new WaterWaves();
     waves.update(PALETTE);
     for (let c = 0; c < CASCADE_COUNT; c++)
       expect(waves.cascadeTypes[c * 4]).toBeCloseTo(OCEAN.waveResponse, 6);
     expect(waves.cascadeTypes[0 * 4 + 1]).toBe(0);
-    expect(waves.cascadeTypes[1 * 4 + 1]).toBeLessThan(0.01);
+    expect(waves.cascadeTypes[1 * 4 + 1]).toBeCloseTo(LAKE.waveResponse, 6);
     expect(waves.cascadeTypes[3 * 4 + 1]).toBeCloseTo(LAKE.waveResponse, 6);
     expect(waves.cascadeTypes[2]).toBe(0);
   });
@@ -51,8 +59,11 @@ describe('WaterWaves', () => {
       }),
       out
     );
-    // Seven vec4 of header, then two arrays of four vec4.
-    expect(out.byteLength).toBe(112 + 64 + 64);
+    // Seven vec4 of header, two arrays of four vec4, then two of the shore.
+    expect(out.byteLength).toBe(112 + 64 + 64 + 32);
+    expect(out[60]).toBeCloseTo(SHORE_OMEGAS[0], 6);
+    expect(out[62]).toBeCloseTo(SHORE_OMEGAS[0] * 3, 5);
+    expect(Array.from(out.subarray(64, 68))).toEqual([1.5, 256, 256, 2048]);
     expect(Array.from(out.subarray(0, 4))).toEqual([0.5, 0, 56, 76]);
     expect(Array.from(out.subarray(4, 7))).toEqual([-19456, 26624, 7]);
     expect(Array.from(out.subarray(8, 11))).toEqual([200, 400, 0]);
@@ -61,6 +72,7 @@ describe('WaterWaves', () => {
     for (let c = 0; c < CASCADE_COUNT; c++) {
       const size = CASCADE_SIZES[c];
       expect(out[28 + c * 4]).toBe(Math.fround(size));
+      expect(out[28 + c * 4 + 1]).toBe(Math.fround([2, 0.5, 0.1, 0.02][c]));
       // The origin's place in the tile: rest / size + it is world / size.
       const place = out[28 + c * 4 + 2];
       expect(place).toBeGreaterThanOrEqual(0);
