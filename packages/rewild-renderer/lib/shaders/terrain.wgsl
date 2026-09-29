@@ -30,6 +30,8 @@ const HAS_TERRAIN_NO_TILE: bool = ${ HAS_TERRAIN_NO_TILE };
 #include "./shader-lib/pcf.wgsl"
 #include "./shader-lib/directional-shadow.wgsl"
 #include "./shader-lib/spot-light-shadow.wgsl"
+#include "./shader-lib/water-waves.wgsl"
+#include "./shader-lib/shore-waves.wgsl"
 
 struct Uniforms {
   normalMatrix: mat3x3f,
@@ -98,6 +100,12 @@ struct TerrainParams {
   // lane in the third vec4 is where the next per-layer parameter goes.
   // Unpack through getLayer().
   layers          : array<vec4f, 24>,
+  // The chunk's water map: x the height its levels are relative to, in the
+  // chunk's space; y its texels per side, 0 for a chunk without one; zw the
+  // chunk's centre in world xz.
+  water           : vec4f,
+  // Per water palette entry: rgb absorption and a turbidity, per metre.
+  waterExtinction : array<vec4f, 4>,
 }
 
 struct VertexInput {
@@ -133,6 +141,14 @@ struct VertexOutput {
 // and uploaded in; `splatMap` carries channels 0-3. Same dimensions, same
 // sampler, same UV — the pair is one logical map.
 @group(1) @binding(9) var splatMapExt: texture_2d<f32>;
+// The chunk's water map (WaterMapTextures): (level, terrain height, coverage,
+// _) relative to terrainParams.water.x, and weights over the water palette.
+@group(1) @binding(10) var waterSurface: texture_2d<f32>;
+@group(1) @binding(11) var waterTypes: texture_2d<f32>;
+@group(1) @binding(12) var<uniform> waves: Waves;
+// The swash field (ShoreField): seconds a wave takes to get to the nearest
+// water it reaches, and its strength there.
+@group(1) @binding(13) var swashMap: texture_2d<f32>;
 @group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
@@ -323,6 +339,125 @@ fn parallaxOcclusion(
   let uvHit = 0.5 * (uvAbove + uvBelow);
   let heightHit = 1.0 - 0.5 * (depthAbove + depthBelow);
   return vec3f(uvHit, heightHit);
+}
+
+// The wet band. Water fills the gaps between grains, so ground the waves reach
+// is damp: its albedo falls to WET_DARKEN and its roughness eases WET_GLOSS of
+// the way toward WET_ROUGHNESS. The waves reach the swash's highest runup, or
+// WAVE_WET_SHARE of the water's significant height where there is no swash,
+// plus WET_CAPILLARY that the ground draws up, fading out over WET_FADE. Where
+// the swash has just drained, the ground is soaked: a sheen at FILM_ROUGHNESS
+// that sinks in by e every SHEEN_SECONDS, and a further SOAK_DARKEN that dries
+// by e every SOAK_SECONDS, so the sand lightens back to damp behind the
+// backwash. Steep ground drains fast, so the band thins from WET_FLAT_SLOPE to
+// WET_STEEP_SLOPE (cosines of 20° and 40°) down to the capillary line.
+const WET_DARKEN: f32 = 0.75;
+const WET_ROUGHNESS: f32 = 0.35;
+const WET_GLOSS: f32 = 0.3;
+const WAVE_WET_SHARE: f32 = 0.2;
+const WET_CAPILLARY: f32 = 0.15;
+const WET_FADE: f32 = 0.3;
+const FILM_ROUGHNESS: f32 = 0.08;
+const SHEEN_SECONDS: f32 = 1.0;
+const SOAK_DARKEN: f32 = 0.7;
+const SOAK_SECONDS: f32 = 3.0;
+const WET_FLAT_SLOPE: f32 = 0.94;
+const WET_STEEP_SLOPE: f32 = 0.766;
+// Under water, light reaching the bed has crossed the water: the sun along its
+// refracted path, the sky along slant paths WATER_SKY_PATH × the depth. The
+// bed is soaked over its first BED_SOAK_DEPTH metres and loses its specular:
+// the surface above gives the water's reflections.
+const AIR_TO_WATER: f32 = 0.75;
+const WATER_SKY_PATH: f32 = 1.2;
+const BED_SOAK_DEPTH: f32 = 0.05;
+
+struct TerrainWater {
+  // 0..1: how damp the ground is; 1 under water.
+  damp : f32,
+  // 0..1: the sheen and the soaking the swash leaves; 1 under it.
+  sheen : f32,
+  soak : f32,
+  // 0..1: how far the ground is under water, for dropping its specular.
+  submerged : f32,
+  // What reaches the bed of the sun and of the sky.
+  sunPassed : vec3f,
+  skyPassed : vec3f,
+}
+
+// The first directional light's cosine to `up`, both in view space.
+fn sunCosine(up: vec3f) -> f32 {
+  for (var i: u32 = 0u; i < lighting.numLights; i++) {
+    let light = lighting.lights[i];
+    if (light.lightType == 1.0) {
+      return saturate(dot(-light.positionOrDirection, up));
+    }
+  }
+  return 1.0;
+}
+
+// The chunk's water at a fragment `height` metres up in the chunk's space, at
+// `uv` across it, on ground whose world normal rises `rise`.
+fn terrainWater(uv: vec2f, height: f32, rise: f32) -> TerrainWater {
+  var out: TerrainWater;
+  out.damp = 0.0;
+  out.sheen = 0.0;
+  out.soak = 0.0;
+  out.submerged = 0.0;
+  out.sunPassed = vec3f(1.0);
+  out.skyPassed = vec3f(1.0);
+  let texels = terrainParams.water.y;
+  if (texels <= 0.0) {
+    return out;
+  }
+  let suv = (uv * (texels - 1.0) + 0.5) / texels;
+  let surface = textureSampleLevel(waterSurface, splatSampler, suv, 0.0);
+  let coverage = surface.b;
+  if (coverage <= 0.0) {
+    return out;
+  }
+  let raw = textureSampleLevel(waterTypes, splatSampler, suv, 0.0);
+  let total = raw.x + raw.y + raw.z + raw.w;
+  let weights = select(vec4f(1.0, 0.0, 0.0, 0.0), raw / total, total > 1e-4);
+  let above = height - (terrainParams.water.x + surface.r);
+
+  var extinction = vec3f(0.0);
+  var variance = 0.0;
+  for (var i: u32 = 0u; i < 4u; i++) {
+    let e = terrainParams.waterExtinction[i];
+    extinction += (e.rgb + vec3f(e.a)) * weights[i];
+  }
+  for (var c: i32 = 0; c < CASCADES; c++) {
+    let rms = waves.cascade[c].y * dot(waves.cascadeTypes[c], weights);
+    variance += rms * rms;
+  }
+
+  // Chunk-local xz from the uv (+u is +x, +v is −z), then from the wave origin.
+  let span = 1.0 / terrainParams.uvPerMetre;
+  let rest = terrainParams.water.zw - waves.origin.xy + vec2f(uv.x - 0.5, 0.5 - uv.y) * span;
+  let field = textureSampleLevel(swashMap, splatSampler, shoreFieldUV(rest), 0.0).xy;
+  // Only water that takes the longest cascade, the open sea's, has swash.
+  let swash = swashState(vec2f(field.x, field.y * dot(waves.cascadeTypes[0], weights)), rest);
+
+  let strength = waves.swash.y * coverage;
+  let gentle = smoothstep(WET_STEEP_SLOPE, WET_FLAT_SLOPE, rise);
+  let waveReach = max(WAVE_WET_SHARE * 4.0 * sqrt(variance), swash.highest);
+  let reach = WET_CAPILLARY + gentle * waveReach;
+  out.damp = (1.0 - smoothstep(reach, reach + WET_FADE, above)) * strength;
+  if (swash.runup > 0.0) {
+    let drained = swashDrained(swash, above);
+    out.sheen = exp(-drained / SHEEN_SECONDS) * gentle * strength;
+    out.soak = exp(-drained / SOAK_SECONDS) * gentle * strength;
+  }
+
+  let depth = max(-above, 0.0);
+  out.submerged = saturate(depth / BED_SOAK_DEPTH) * coverage;
+  out.soak = max(out.soak, out.submerged);
+  let up = normalize(uniforms.normalMatrix * vec3f(0.0, 1.0, 0.0));
+  let sunAir = sunCosine(up);
+  let sunWater = sqrt(1.0 - AIR_TO_WATER * AIR_TO_WATER * (1.0 - sunAir * sunAir));
+  out.sunPassed = mix(vec3f(1.0), exp(-extinction * depth / sunWater), coverage);
+  out.skyPassed = mix(vec3f(1.0), exp(-extinction * depth * WATER_SKY_PATH), coverage);
+  return out;
 }
 
 @vertex
@@ -940,6 +1075,11 @@ fn fs(
     blendedTangentNormal = vec3f(0.0, 0.0, 1.0);
   }
 
+  let wet = terrainWater(fragUV, objectHeight, normalize(objectNormal).y);
+  blendedColor *= mix(1.0, WET_DARKEN, wet.damp) * mix(1.0, SOAK_DARKEN, wet.soak);
+  shadingRoughness = mix(shadingRoughness, min(shadingRoughness, WET_ROUGHNESS), WET_GLOSS * wet.damp);
+  shadingRoughness = mix(shadingRoughness, FILM_ROUGHNESS, wet.sheen);
+
   // One TBN for every layer: perturbNormal derives its basis from screen-space
   // derivatives, and that basis is invariant under uniform UV scaling (the
   // scale cancels through the normalize). So the layers' tangent-space normals
@@ -991,7 +1131,10 @@ fn fs(
   // two paths shade the same way or the objects standing on the terrain do not
   // look like they belong on it.
   let sunShadow = cloudShadowFactor * directionalShadowFactor;
-  let direct = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow
+  // Under water the sun and sky reach the bed through the water, and its
+  // specular goes: the water's own surface reflects.
+  let dry = 1.0 - wet.submerged;
+  let direct = (lit.directionalDiffuse * wet.sunPassed + lit.directionalSpecular * dry) * sunShadow
              + lit.punctualDiffuse + lit.punctualSpecular
              + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadowFactor;
   var shaded = direct;
@@ -999,7 +1142,8 @@ fn fs(
   // Sky IBL in place of the flat ambient constant. Occlusion applies to this and
   // only this: direct light already answers the question with N·L and the shadow
   // maps, so multiplying it there would double-darken every crevice.
-  let indirect = evaluateIbl(surface, shadingRoughness) * shadingOcclusion;
+  let ibl = evaluateIblTerms(surface, shadingRoughness);
+  let indirect = (ibl.diffuse * wet.skyPassed + ibl.specular * dry) * shadingOcclusion;
   shaded += indirect;
 
   // Channel visualisation

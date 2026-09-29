@@ -72,7 +72,7 @@ export class WaterUniforms implements ISharedUniformBuffer {
   private _refraction: GPUTexture | null = null;
 
   /** `refracts`: bind the renderer's refraction capture. `shades`: bind the
-   *  ocean's slopes and the foam texture and its sampler. Each is for the
+   *  ocean's slopes. Each is for the
    *  pipelines whose shader reads it: one built with `layout: 'auto'` rejects a
    *  binding it does not use. */
   constructor(
@@ -140,6 +140,10 @@ export class WaterUniforms implements ISharedUniformBuffer {
       {
         binding: 6,
         resource: renderer.terrainRenderer.shoreField.texture.createView(),
+      },
+      {
+        binding: 7,
+        resource: renderer.terrainRenderer.shoreField.swashTexture.createView(),
       },
     ];
     if (this.refracts) {

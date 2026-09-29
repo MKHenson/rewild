@@ -43,6 +43,20 @@ export function registerWaterDebugCommands(renderer: Renderer) {
     );
   };
 
+  (window as any).setWaterSwash = (strength = 1) => {
+    renderer.terrainRenderer.waterSwash = strength;
+    console.log(
+      `setWaterSwash(${strength}) — scale on how far the water runs up the beach after a wave breaks, 1 the default, 0 off.`
+    );
+  };
+
+  (window as any).setWaterWetBand = (strength = 1) => {
+    renderer.terrainRenderer.waterWetBand = strength;
+    console.log(
+      `setWaterWetBand(${strength}) — strength of the damp, glossy ground above the water, 1 the default, 0 off.`
+    );
+  };
+
   (window as any).setWaterShoreDebug = (enabled = true) => {
     renderer.terrainRenderer.waterShoreDebug = enabled;
     console.log(

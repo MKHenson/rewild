@@ -25,6 +25,8 @@ function frame(overrides: Partial<WaveFrame> = {}): WaveFrame {
     shoreCentreX: -19200,
     shoreCentreZ: 26880,
     shoreSpan: 2048,
+    swash: 1,
+    wetBand: 1,
     ...overrides,
   };
 }
@@ -56,11 +58,15 @@ describe('WaterWaves', () => {
         lodDistances: [200, 400],
         lodSpacings: [4, 8],
         normals: false,
+        swash: 0.5,
+        wetBand: 2,
       }),
       out
     );
-    // Seven vec4 of header, two arrays of four vec4, then two of the shore.
-    expect(out.byteLength).toBe(112 + 64 + 64 + 32);
+    // Seven vec4 of header, two arrays of four vec4, two of the shore, then
+    // the swash.
+    expect(out.byteLength).toBe(112 + 64 + 64 + 32 + 16);
+    expect(Array.from(out.subarray(68, 72))).toEqual([0.5, 2, 0, 0]);
     expect(out[60]).toBeCloseTo(SHORE_OMEGAS[0], 6);
     expect(out[62]).toBeCloseTo(SHORE_OMEGAS[0] * 3, 5);
     expect(Array.from(out.subarray(64, 68))).toEqual([1.5, 256, 256, 2048]);

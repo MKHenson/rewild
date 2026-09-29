@@ -22,6 +22,13 @@ import { toFloat16 } from '../../utils/float16';
 
 export const WATER_MAP_STEP = BIOME_MASK_STEP;
 
+/** Metres above a covered level the swash can run up: water shows over ground
+ *  below it. */
+export const SWASH_REACH = 1.5;
+/** Metres above a covered level within which a chunk keeps its water map for
+ *  the terrain's wet band, though no water shows. */
+export const WET_BAND_REACH = 2;
+
 export interface WaterMap {
   size: number;
   step: number;
@@ -29,6 +36,9 @@ export interface WaterMap {
   baseLevel: number;
   /** Highest water level in the chunk. */
   maxLevel: number;
+  /** Whether water shows anywhere in the chunk. False keeps the map for the
+   *  terrain's wet band alone. */
+  shows: boolean;
   /** f16 bits: water surface height − baseLevel. */
   level: Uint16Array;
   /** f16 bits: terrain height − baseLevel. */
@@ -48,8 +58,8 @@ export interface WaterMap {
 export { OCEAN_BODY_ID };
 
 /**
- * The water map for a chunk with LOD-0 `heights`, or null when no water shows
- * anywhere in it. `offset` is the chunk's sample-space offset, as for the
+ * The water map for a chunk with LOD-0 `heights`, or null when the ground
+ * everywhere stands WET_BAND_REACH or more above the covered levels. `offset` is the chunk's sample-space offset, as for the
  * height and splat generators.
  */
 export function buildWaterMap(
@@ -92,11 +102,12 @@ export function buildWaterMap(
   }
   if (!covered) return null;
 
-  // Water shows where a covered texel's footprint dips below its level. The
-  // footprint reaches half a step either side, so no full-resolution hollow is
-  // missed between texels.
+  // Water shows where a covered texel's footprint dips below its level, or
+  // where the swash can run over it. The footprint reaches half a step either
+  // side, so no full-resolution hollow is missed between texels.
   const reach = step >> 1;
-  let wet = false;
+  let shows = false;
+  let near = false;
   let baseLevel = Infinity;
   let maxLevel = -Infinity;
   for (let my = 0; my < size; my++) {
@@ -106,20 +117,23 @@ export function buildWaterMap(
       const level = levels[t];
       if (level < baseLevel) baseLevel = level;
       if (level > maxLevel) maxLevel = level;
-      if (wet) continue;
+      if (shows) continue;
       const x0 = Math.max(0, mx * step - reach);
       const x1 = Math.min(chunkSize - 1, mx * step + reach);
       const y0 = Math.max(0, my * step - reach);
       const y1 = Math.min(chunkSize - 1, my * step + reach);
-      for (let y = y0; y <= y1 && !wet; y++)
-        for (let x = x0; x <= x1; x++)
-          if (heights[x + y * chunkSize] < level) {
-            wet = true;
+      for (let y = y0; y <= y1 && !shows; y++)
+        for (let x = x0; x <= x1; x++) {
+          const height = heights[x + y * chunkSize];
+          if (height < level + WET_BAND_REACH) near = true;
+          if (height < level + SWASH_REACH) {
+            shows = true;
             break;
           }
+        }
     }
   }
-  if (!wet) return null;
+  if (!near) return null;
 
   const level = new Uint16Array(texels);
   const relHeights = new Uint16Array(texels);
@@ -151,6 +165,7 @@ export function buildWaterMap(
     step,
     baseLevel,
     maxLevel,
+    shows,
     level,
     heights: relHeights,
     coverage,

@@ -1,5 +1,11 @@
 import { fromFloat16 } from '../../utils/float16';
-import { extendArrival, packShoreField, solveArrival } from './ShoreField';
+import {
+  SWASH_REACH_TEXELS,
+  extendArrival,
+  packShoreField,
+  packSwashField,
+  solveArrival,
+} from './ShoreField';
 
 const SIZE = 32;
 const TEXEL = 8;
@@ -109,5 +115,49 @@ describe('packShoreField', () => {
     const out = pack(beach());
     expect(fromFloat16(out[(10 + 0 * SIZE) * 4 + 3])).toBe(0);
     expect(fromFloat16(out[(10 + 16 * SIZE) * 4 + 3])).toBe(1);
+  });
+});
+
+function packSwash(depth: Float32Array) {
+  const times = solve(depth);
+  const reached = new Uint8Array(SIZE * SIZE);
+  extendArrival(times, SIZE, TEXEL, reached);
+  const out = new Uint16Array(SIZE * SIZE * 2);
+  packSwashField(
+    times,
+    reached,
+    depth,
+    SIZE,
+    out,
+    new Int8Array(SIZE * SIZE),
+    new Int32Array(SIZE * SIZE)
+  );
+  return {
+    time: (x: number, y: number) => fromFloat16(out[(x + y * SIZE) * 2]),
+    reach: (x: number, y: number) => fromFloat16(out[(x + y * SIZE) * 2 + 1]),
+    times,
+  };
+}
+
+describe('packSwashField', () => {
+  it('carries the waterline time a few texels up the beach', () => {
+    const { time, reach, times } = packSwash(beach());
+    const waterline = times[23 + 16 * SIZE];
+    for (let x = 24; x < 24 + SWASH_REACH_TEXELS; x++) {
+      expect(reach(x, 16)).toBe(1);
+      expect(time(x, 16)).toBeCloseTo(waterline, 1);
+    }
+    expect(reach(24 + SWASH_REACH_TEXELS, 16)).toBe(0);
+    expect(time(15, 16)).toBeCloseTo(times[15 + 16 * SIZE], 1);
+  });
+
+  it('stays out of water the waves cannot reach', () => {
+    const depth = new Float32Array(SIZE * SIZE).fill(10);
+    for (let y = 0; y < SIZE; y++) depth[y * SIZE] = SOURCE;
+    // A bar one texel wide, with a lagoon behind it.
+    for (let y = 0; y < SIZE; y++) depth[16 + y * SIZE] = 0;
+    const { reach } = packSwash(depth);
+    expect(reach(16, 8)).toBe(1);
+    expect(reach(17, 8)).toBe(0);
   });
 });

@@ -8,7 +8,9 @@ import {
 import { generateBiomeBlendedHeightMap } from './Noise';
 import {
   OCEAN_BODY_ID,
+  SWASH_REACH,
   WATER_MAP_STEP,
+  WET_BAND_REACH,
   WaterMap,
   buildWaterMap,
   packWaterSurface,
@@ -67,7 +69,15 @@ describe('buildWaterMap', () => {
   it('finds a single hollow below sea level between texels', () => {
     const heights = new Float32Array(CHUNK_SIZE * CHUNK_SIZE).fill(5);
     heights[3 + 5 * CHUNK_SIZE] = -1;
-    expect(build(OPEN_OCEAN, 0, 0, 0, heights)).not.toBeNull();
+    expect(build(OPEN_OCEAN, 0, 0, 0, heights)!.shows).toBe(true);
+  });
+
+  it('keeps a map that shows no water for ground within the wet band', () => {
+    const heights = new Float32Array(CHUNK_SIZE * CHUNK_SIZE).fill(5);
+    heights[3 + 5 * CHUNK_SIZE] = (SWASH_REACH + WET_BAND_REACH) / 2;
+    const water = build(OPEN_OCEAN, 0, 0, 0, heights)!;
+    expect(water).not.toBeNull();
+    expect(water.shows).toBe(false);
   });
 
   it('fills open ocean at sea level with ocean water', () => {

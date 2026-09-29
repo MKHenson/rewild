@@ -60,6 +60,17 @@ struct IblParams {
  * so is the BRDF map.
  */
 fn evaluateIbl(surface: PbrSurface, perceptualRoughness: f32) -> vec3f {
+  let terms = evaluateIblTerms(surface, perceptualRoughness);
+  return terms.diffuse + terms.specular;
+}
+
+struct IblTerms {
+  diffuse: vec3f,
+  specular: vec3f,
+}
+
+// evaluateIbl's two lobes apart, for a caller that treats them differently.
+fn evaluateIblTerms(surface: PbrSurface, perceptualRoughness: f32) -> IblTerms {
   let viewToWorld = iblParams.viewToWorld;
 
   // Irradiance is gathered along the shading normal and the reflection is
@@ -119,5 +130,5 @@ fn evaluateIbl(surface: PbrSurface, perceptualRoughness: f32) -> vec3f {
   let specular = prefiltered * FssEss * horizon;
   let diffuse = (FmsEms + kD) * irradiance;
 
-  return (diffuse + specular) * iblParams.intensity;
+  return IblTerms(diffuse * iblParams.intensity, specular * iblParams.intensity);
 }

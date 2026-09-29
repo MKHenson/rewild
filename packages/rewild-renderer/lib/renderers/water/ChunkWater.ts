@@ -19,21 +19,72 @@ class WaterMesh extends Mesh {
   localBounds = new Box3();
 }
 
-// A chunk's water on the GPU: its surface texture and the mesh that draws the
-// shared grid at the chunk's LOD.
+// A chunk's water map on the GPU: (level, terrain height, coverage, 0) and the
+// palette weights. The chunk's water and its terrain both read them.
+export class WaterMapTextures {
+  surface: GPUTexture | null = null;
+  types: GPUTexture | null = null;
+  private packed: Uint16Array | null = null;
+
+  /** Uploads `water`, replacing the textures when its size changed. */
+  upload(device: GPUDevice, water: WaterMap) {
+    this.packed = packWaterSurface(water, this.packed ?? undefined);
+
+    if (!this.surface || !this.types || this.surface.width !== water.size) {
+      this.surface?.destroy();
+      this.types?.destroy();
+      const size = [water.size, water.size];
+      const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+      this.surface = device.createTexture({
+        label: 'water-surface',
+        size,
+        format: 'rgba16float',
+        usage,
+      });
+      this.types = device.createTexture({
+        label: 'water-types',
+        size,
+        format: 'rgba8unorm',
+        usage,
+      });
+    }
+
+    const extent = { width: water.size, height: water.size };
+    device.queue.writeTexture(
+      { texture: this.surface },
+      this.packed as BufferSource,
+      { bytesPerRow: water.size * 8 },
+      extent
+    );
+    device.queue.writeTexture(
+      { texture: this.types },
+      water.typeWeights as BufferSource,
+      { bytesPerRow: water.size * 4 },
+      extent
+    );
+  }
+
+  dispose() {
+    this.surface?.destroy();
+    this.types?.destroy();
+    this.surface = null;
+    this.types = null;
+  }
+}
+
+// A chunk's water: the mesh that draws the shared grid at the chunk's LOD over
+// the chunk's water map textures.
 export class ChunkWater {
   readonly mesh: WaterMesh;
   private readonly pass: WaterPass;
   private readonly span: number;
-  private texture: GPUTexture | null = null;
-  private typeTexture: GPUTexture | null = null;
-  private packed: Uint16Array | null = null;
   private quads = 0;
 
   constructor(
     renderer: Renderer,
     parent: Transform,
     water: WaterMap,
+    textures: WaterMapTextures,
     palette: readonly WaterType[],
     span: number,
     lod: number
@@ -52,7 +103,7 @@ export class ChunkWater {
     this.mesh.castShadow = false;
     this.mesh.transform.layers.set(WATER_INTERACTION_LAYER);
     parent.addChild(this.mesh.transform);
-    this.update(renderer, water);
+    this.update(water, textures);
   }
 
   // Waves are summed in world space, and which of them may displace a vertex
@@ -62,43 +113,9 @@ export class ChunkWater {
     this.pass.grid = { originX: parent.x, originZ: parent.z, baseLevel };
   }
 
-  /** Uploads a newer water map for the same chunk. */
-  update(renderer: Renderer, water: WaterMap) {
-    this.packed = packWaterSurface(water, this.packed ?? undefined);
-
-    if (!this.texture || !this.typeTexture || this.texture.width !== water.size) {
-      this.texture?.destroy();
-      this.typeTexture?.destroy();
-      const size = [water.size, water.size];
-      const usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
-      this.texture = renderer.device.createTexture({
-        label: 'water-surface',
-        size,
-        format: 'rgba16float',
-        usage,
-      });
-      this.typeTexture = renderer.device.createTexture({
-        label: 'water-types',
-        size,
-        format: 'rgba8unorm',
-        usage,
-      });
-      this.pass.setTextures(this.texture, this.typeTexture);
-    }
-
-    const extent = { width: water.size, height: water.size };
-    renderer.device.queue.writeTexture(
-      { texture: this.texture },
-      this.packed as BufferSource,
-      { bytesPerRow: water.size * 8 },
-      extent
-    );
-    renderer.device.queue.writeTexture(
-      { texture: this.typeTexture },
-      water.typeWeights as BufferSource,
-      { bytesPerRow: water.size * 4 },
-      extent
-    );
+  /** Takes a newer water map for the same chunk, already in `textures`. */
+  update(water: WaterMap, textures: WaterMapTextures) {
+    this.pass.setTextures(textures.surface!, textures.types!);
 
     const half = this.span / 2;
     this.mesh.localBounds.min.set(-half, -BOUNDS_MARGIN, -half);
@@ -125,9 +142,5 @@ export class ChunkWater {
   dispose() {
     this.mesh.transform.removeFromParent();
     this.pass.dispose();
-    this.texture?.destroy();
-    this.typeTexture?.destroy();
-    this.texture = null;
-    this.typeTexture = null;
   }
 }

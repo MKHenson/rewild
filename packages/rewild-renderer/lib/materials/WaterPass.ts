@@ -111,7 +111,7 @@ export class WaterPass implements IMaterialPass {
   private absorb = new WaterSubPass(true, true);
 
   constructor() {
-    this.waterUniforms = new WaterUniforms(waterGroupIndex, false, true);
+    this.waterUniforms = new WaterUniforms(waterGroupIndex, true, true);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
     this.shadowUniforms = new ShadowUniforms(shadowGroupIndex, true);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
@@ -273,6 +273,8 @@ export class WaterPass implements IMaterialPass {
     this.absorb.draw(renderer, pass, camera, meshes, numIndices);
 
     pass.setPipeline(this.pipeline);
+    if (this.waterUniforms.isStale(renderer))
+      this.waterUniforms.requiresBuild = true;
     if (
       !this.sharedUniformsTracker.prepareMeshUniforms(
         renderer,

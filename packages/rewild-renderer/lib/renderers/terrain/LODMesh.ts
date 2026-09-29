@@ -342,6 +342,7 @@ export class LODMesh {
         // world height in the same units as the horizontal axes.
         uniforms.uvPerMetre =
           1 / ((this.chunkSize - 1) * TERRAIN_METERS_PER_SAMPLE);
+        this.chunk.bindWater(uniforms);
 
         const newMesh = new Mesh(geometry, terrainPass);
         this.mesh = newMesh;

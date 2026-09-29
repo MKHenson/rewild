@@ -3,8 +3,9 @@ import { ISharedUniformBuffer } from '../../../types/IUniformBuffer';
 import { Camera } from '../../core/Camera';
 import { Mesh } from '../../core/Mesh';
 import { MAX_SPLAT_LAYERS } from '../../renderers/terrain/Biomes';
+import { MAX_WATER_TYPES, WaterType } from '../../renderers/terrain/Water';
 
-// TerrainParams layout (416 bytes, std140-compatible) — must match the struct
+// TerrainParams layout (496 bytes, std140-compatible) — must match the struct
 // in terrain.wgsl:
 //   detailFadeStart  f32             offset 0   (4 bytes)
 //   detailFadeEnd    f32             offset 4   (4 bytes)
@@ -12,6 +13,8 @@ import { MAX_SPLAT_LAYERS } from '../../renderers/terrain/Biomes';
 //   heightBlendDepth f32             offset 12  (4 bytes)
 //   uvPerMetre       f32             offset 16  (4 bytes)
 //   layers           array<vec4f,24> offset 32  (384 bytes)
+//   water            vec4f           offset 416 (16 bytes)
+//   waterExtinction  array<vec4f,4>  offset 432 (64 bytes)
 //
 // `layers` starts at 32 because a uniform array of vec4f needs 16-byte
 // alignment, and the five scalars above spill into a second row. Three vec4f
@@ -19,9 +22,30 @@ import { MAX_SPLAT_LAYERS } from '../../renderers/terrain/Biomes';
 //   [slot*3    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
 //   [slot*3 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
 //   [slot*3 + 2] = (macroLayerIndex, macroNormalYSign, macroStrength, _pad)
-const PARAMS_SIZE = 32 + MAX_SPLAT_LAYERS * 3 * 16;
+//
+// `water` is (base level, texels per side, centre x, centre z); texels 0 means
+// the chunk has no water map. `waterExtinction` is per water palette entry:
+// rgb absorption and a turbidity, per metre.
 const LAYERS_OFFSET_FLOATS = 32 / 4;
 const FLOATS_PER_LAYER = 12;
+const WATER_OFFSET_FLOATS =
+  LAYERS_OFFSET_FLOATS + MAX_SPLAT_LAYERS * FLOATS_PER_LAYER;
+const WATER_EXTINCTION_OFFSET_FLOATS = WATER_OFFSET_FLOATS + 4;
+const PARAMS_SIZE = (WATER_EXTINCTION_OFFSET_FLOATS + MAX_WATER_TYPES * 4) * 4;
+
+/** A chunk's water map as its terrain reads it. */
+export interface TerrainWater {
+  surface: GPUTexture;
+  types: GPUTexture;
+  /** Texels per side. */
+  texels: number;
+  /** Height the map's levels are relative to, in the chunk's space. */
+  baseLevel: number;
+  /** The chunk's centre in world xz. */
+  originX: number;
+  originZ: number;
+  palette: readonly WaterType[];
+}
 
 export interface TerrainLayerParams {
   layerIndex: number;
@@ -112,6 +136,7 @@ export class TerrainUniforms implements ISharedUniformBuffer {
   private _seamlessSampler: GPUSampler;
   private _paramsBuffer: GPUBuffer;
   private _paramsData: Float32Array = new Float32Array(PARAMS_SIZE / 4);
+  private _water: TerrainWater | null = null;
 
   constructor(group: number) {
     this.group = group;
@@ -167,6 +192,12 @@ export class TerrainUniforms implements ISharedUniformBuffer {
     });
     this._writeParams(device);
 
+    // A chunk with no water map binds any texture: the shader reads none of it
+    // while `water.y` is 0.
+    const dry = renderer.textureManager.get('white-1x1').gpuTexture;
+    const water = this._water;
+    const shoreField = renderer.terrainRenderer.shoreField;
+
     this.bindGroup = device.createBindGroup({
       label: 'terrain textures',
       layout: pipelineLayout,
@@ -181,6 +212,15 @@ export class TerrainUniforms implements ISharedUniformBuffer {
         { binding: 7, resource: this._armView },
         { binding: 8, resource: this._heightView },
         { binding: 9, resource: this._splatTextureExt.createView() },
+        { binding: 10, resource: (water?.surface ?? dry).createView() },
+        { binding: 11, resource: (water?.types ?? dry).createView() },
+        {
+          binding: 12,
+          resource: {
+            buffer: renderer.terrainRenderer.waterWaves.buffer(device),
+          },
+        },
+        { binding: 13, resource: shoreField.swashTexture.createView() },
       ],
     });
 
@@ -221,11 +261,31 @@ export class TerrainUniforms implements ISharedUniformBuffer {
       data[base + 11] = 0; // _pad
     }
 
+    const water = this._water;
+    data[WATER_OFFSET_FLOATS] = water ? water.baseLevel : 0;
+    data[WATER_OFFSET_FLOATS + 1] = water ? water.texels : 0;
+    data[WATER_OFFSET_FLOATS + 2] = water ? water.originX : 0;
+    data[WATER_OFFSET_FLOATS + 3] = water ? water.originZ : 0;
+    for (let i = 0; i < MAX_WATER_TYPES; i++) {
+      const type = water?.palette[i];
+      const e = WATER_EXTINCTION_OFFSET_FLOATS + i * 4;
+      data[e] = type ? type.absorption[0] : 0;
+      data[e + 1] = type ? type.absorption[1] : 0;
+      data[e + 2] = type ? type.absorption[2] : 0;
+      data[e + 3] = type ? type.turbidity : 0;
+    }
+
     device.queue.writeBuffer(
       this._paramsBuffer,
       0,
       data as ArrayBufferView<ArrayBuffer>
     );
+  }
+
+  /** The chunk's water map, or null for a chunk with none. */
+  set water(water: TerrainWater | null) {
+    this._water = water;
+    this.requiresBuild = true;
   }
 
   set splatTexture(texture: GPUTexture) {
