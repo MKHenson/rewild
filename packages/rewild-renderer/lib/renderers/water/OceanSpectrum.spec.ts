@@ -9,7 +9,10 @@ import {
   ROUGH_CHOPPINESS,
   ROUGH_HEIGHT_GAIN,
   ROUGH_OMNI_SHARE,
+  SWELL,
+  WIND_SEA,
   cascadeBand,
+  cascadeVariance,
   cascadeWeight,
   jonswapShape,
   oceanWindSpeed,
@@ -77,5 +80,29 @@ describe('OceanSpectrum', () => {
       expect(cascadeWeight(OCEAN, size)).toBeCloseTo(OCEAN.waveResponse, 9);
     expect(cascadeWeight(LAKE, CASCADE_SIZES[0])).toBe(0);
     expect(cascadeWeight(LAKE, CASCADE_SIZES[3])).toBeCloseTo(LAKE.waveResponse, 9);
+  });
+
+  it('puts the swell near 0.7 m and a storm sea well past the shelf depth', () => {
+    const height = (systems: typeof SWELL[]) => {
+      let variance = 0;
+      for (let c = 0; c < CASCADE_COUNT; c++)
+        variance += cascadeVariance(systems, c);
+      return 4 * Math.sqrt(variance);
+    };
+    expect(height([SWELL])).toBeGreaterThan(0.6);
+    expect(height([SWELL])).toBeLessThan(0.8);
+    const sea = seaState(1);
+    const storm = {
+      ...WIND_SEA,
+      scale: sea.heightGain * sea.heightGain,
+      windSpeed: sea.windSpeed,
+      omniShare: sea.omniShare,
+      longestPeak: sea.longestPeak,
+    };
+    expect(height([storm, SWELL])).toBeGreaterThan(6);
+    // The longest cascade holds most of it.
+    expect(cascadeVariance([storm], 0)).toBeGreaterThan(
+      cascadeVariance([storm], 1) * 4
+    );
   });
 });

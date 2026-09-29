@@ -23,6 +23,14 @@ const FORWARD_SCATTER : f32 = 3.0;
 // Most a puff turns off level either way, in radians. The texture is a
 // flattened cloud, so it stays roughly level.
 const MAX_TILT : f32 = 0.35;
+// A plume off rock is this much taller than wide, and rises faster than a
+// puff: its lift follows t^IMPACT_RISE rather than t^0.6.
+const IMPACT_TALL : f32 = 1.8;
+const IMPACT_WIDE : f32 = 0.8;
+const IMPACT_RISE : f32 = 0.4;
+// Surf is thrown up whole and settles: it shrinks to SURF_END of its size by
+// the end of its life.
+const SURF_END : f32 = 0.35;
 
 @group(0) @binding(0) var<uniform> params : SprayParams;
 @group(0) @binding(1) var<storage, read> particles : array<SprayParticle>;
@@ -44,8 +52,9 @@ struct VertexOutput {
   @location(0) uv : vec2f,
   // From the camera to the puff, in world space.
   @location(1) relative : vec3f,
-  // x: 0..1 of its life. y: its random value. z: how hard its crest broke.
-  @location(2) life : vec3f,
+  // x: 0..1 of its life. y: its random value. z: how hard its crest broke. w:
+  // its opacity.
+  @location(2) life : vec4f,
 }
 
 // The waves' displacement at rest position `rest`, over the cascades the ocean
@@ -81,26 +90,47 @@ fn vs(@builtin(vertex_index) vertex : u32, @builtin(instance_index) instance : u
   let corner = corners[vertex];
   let random = particle.shape.y;
   let strength = mix(0.4, 1.0, particle.shape.x);
+  let kind = particle.shape.z;
+  let impact = kind == SPRAY_IMPACT;
 
-  // Rides the crest it rose from, lifts off it fast and falls back slower,
-  // and drifts downwind.
+  // x metres across, y metres it rises, w opacity.
+  var look = vec4f(params.shape.y, params.shape.z, 0.0, params.reach.z);
+  if (kind == SPRAY_SURF) {
+    look = params.surf;
+  } else if (impact) {
+    look = params.impact;
+  }
+
+  // An open-sea puff rides the crest it rose from; shore spray rises from the
+  // level. Each lifts off fast and falls back slower, drifts downwind, and
+  // surf is carried on toward the shore.
   let rest = particle.rise.xy - waves.origin.xy;
-  let wave = displacementAt(rest);
-  let lift = params.shape.z * strength * sin(PI * pow(t, 0.6));
-  let drift = params.wind.xy * (params.reach.w * params.wind.z * age);
+  var wave = vec3f(0.0);
+  if (kind == SPRAY_OPEN) {
+    wave = displacementAt(rest);
+  }
+  let lift = look.y * strength * sin(PI * pow(t, select(0.6, IMPACT_RISE, impact)));
+  let drift = params.wind.xy * (params.reach.w * params.wind.z * age) + particle.motion.xy * age;
   let centre = vec3f(
     particle.rise.x + wave.x + drift.x,
     params.wind.w + wave.y + lift,
     particle.rise.y + wave.z + drift.y
   );
 
-  // Grows as it spreads, turned a little and mirrored by its random value.
-  let half = 0.5 * params.shape.y * strength * (0.45 + 0.55 * sqrt(t));
-  let tilt = (random * 2.0 - 1.0) * MAX_TILT;
+  // A puff or plume grows as it spreads; surf shrinks as it settles. Each is
+  // turned a little and mirrored by its random value, and a plume stands
+  // tall.
+  var growth = 0.45 + 0.55 * sqrt(t);
+  if (kind == SPRAY_SURF) {
+    growth = mix(1.0, SURF_END, t);
+  }
+  let half = 0.5 * look.x * strength * growth;
+  let tilt = (random * 2.0 - 1.0) * MAX_TILT * select(1.0, 0.3, impact);
+  let stretch = select(vec2f(1.0), vec2f(IMPACT_WIDE, IMPACT_TALL), impact);
   let turned = vec2f(
     corner.x * cos(tilt) - corner.y * sin(tilt),
     corner.x * sin(tilt) + corner.y * cos(tilt)
-  );
+  ) * stretch;
   let relative = centre - params.camera.xyz
     + (params.right.xyz * turned.x + params.up.xyz * turned.y) * half;
 
@@ -108,7 +138,7 @@ fn vs(@builtin(vertex_index) vertex : u32, @builtin(instance_index) instance : u
   let flip = select(1.0, -1.0, fract(random * 7.0) > 0.5);
   out.uv = vec2f(corner.x * flip, -corner.y) * 0.5 + 0.5;
   out.relative = relative;
-  out.life = vec3f(t, random, particle.shape.x);
+  out.life = vec4f(t, random, particle.shape.x, look.w);
   return out;
 }
 
@@ -137,7 +167,7 @@ fn fs(input : VertexOutput) -> @location(0) vec4f {
   let fade = smoothstep(0.0, 0.08, t) * (1.0 - smoothstep(0.45, 1.0, t));
   let grain = noise2(input.uv * 6.0 + vec2f(random * 91.0, t * 1.5));
   let dissolve = smoothstep(t * 0.8 - 0.1, t * 0.8 + 0.25, grain * texel.a);
-  var alpha = texel.a * fade * dissolve * params.reach.z;
+  var alpha = texel.a * fade * dissolve * input.life.w;
 
   // Soft against the scene behind, and faded at both ends of its reach.
   let distance = length(input.relative);

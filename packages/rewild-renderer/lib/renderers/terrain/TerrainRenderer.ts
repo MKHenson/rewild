@@ -29,6 +29,9 @@ import { WaterWaveBuffer } from '../water/WaterWaves';
 import { waterDetailBias } from '../water/WaterQuality';
 import { OceanFFT } from '../water/OceanFFT';
 import { SeaSpray } from '../water/SeaSpray';
+import { shoreWaveHeight } from '../water/ShoreWaves';
+import { SHORE_FIELD_SPAN, ShoreField } from '../water/ShoreField';
+import { OCEAN_WATER } from './Water';
 import { MAX_WATER_GRID_BANDS, waterGridBands } from '../water/WaterGrid';
 
 export class LODInfo {
@@ -166,6 +169,17 @@ export class TerrainRenderer {
   waterCrestGlow = 1;
   /** Strength of the trough darkening; 1 is the default. */
   waterTroughDarkening = 1;
+  /** Scale on the shore waves' height; 1 is the default. */
+  waterShoreWaves = 1;
+  /** Paints the shore field on the water instead of shading it. */
+  waterShoreDebug = false;
+  /** Where the ocean's shore waves run, around the camera. Made in init. */
+  shoreField!: ShoreField;
+  private sampleOceanDepthDelegate = this.sampleOceanDepth.bind(this);
+  private oceanType = -1;
+  private oceanChunk: TerrainChunk | null = null;
+  private oceanChunkX = NaN;
+  private oceanChunkY = NaN;
   private waterLodDistances = new Float32Array(MAX_WATER_GRID_BANDS);
   private waterLodSpacings = new Float32Array(MAX_WATER_GRID_BANDS);
   // Resolved once per preset rather than every frame: resolving an unknown id
@@ -337,6 +351,7 @@ export class TerrainRenderer {
     this.workerPool = new TerrainWorkerPool();
     this.scatterModels = new ScatterModels();
     this.horizonOcean = new HorizonOcean(renderer);
+    this.shoreField = new ShoreField(renderer.device);
   }
 
   /** Re-runs chunk and scatter visibility on the next update, without waiting
@@ -347,6 +362,7 @@ export class TerrainRenderer {
 
   private onChunkLoaded(event: TerrainChunkEvent) {
     this._needsVisibilityUpdate = true;
+    this.shoreField?.invalidate();
     // Note: a re-mesh (edit) raises chunk-loaded again for that LOD without a
     // preceding chunk-unloaded — the chunk never went away. Listeners holding
     // per-chunk resources built from a mesh must release the old one when they
@@ -530,14 +546,65 @@ export class TerrainRenderer {
   // behind. Used by the editor's orbit-camera ground clamp.
   sampleHeight(x: number, z: number): number | null {
     const span = this.chunkSize; // world units per chunk
-    const size = this.mapChunkSizeLod;
     if (!span) return null;
 
     const cx = Math.round(x / span);
     const cy = Math.round(z / span);
     const heights = this.terrainChunks.get(`${cx},${cy}`)?.heights;
     if (!heights) return null;
+    return this.chunkHeight(heights, cx, cy, x, z);
+  }
 
+  // Metres of ocean at world (x, z): sea level less the ground, where the
+  // owning chunk's water map holds mostly ocean; 0 on land, in lakes or on
+  // unloaded ground. The shore field samples it a grid at a time, so the
+  // owning chunk is cached between calls; `resetOceanCache` drops it.
+  private sampleOceanDepth(x: number, z: number): number {
+    const span = this.chunkSize;
+    if (!span || this.oceanType < 0) return 0;
+    const cx = Math.round(x / span);
+    const cy = Math.round(z / span);
+    if (cx !== this.oceanChunkX || cy !== this.oceanChunkY) {
+      this.oceanChunkX = cx;
+      this.oceanChunkY = cy;
+      this.oceanChunk = this.terrainChunks.get(`${cx},${cy}`) ?? null;
+    }
+    const chunk = this.oceanChunk;
+    const water = chunk?.water;
+    if (!chunk?.heights || !water) return 0;
+    const depth = this._seaLevel - this.chunkHeight(chunk.heights, cx, cy, x, z);
+    if (depth <= 0) return 0;
+
+    const texels = (this.mapChunkSizeLod - 1) / water.step;
+    const mx = Math.round(
+      ((x - cx * span + span / 2) / span) * texels
+    );
+    const my = Math.round(
+      ((cy * span + span / 2 - z) / span) * texels
+    );
+    const t =
+      Math.min(water.size - 1, Math.max(0, mx)) +
+      Math.min(water.size - 1, Math.max(0, my)) * water.size;
+    const ocean =
+      water.coverage[t] * water.typeWeights[t * 4 + this.oceanType];
+    return ocean >= 0.5 * 255 * 255 ? depth : 0;
+  }
+
+  private resetOceanCache() {
+    this.oceanChunkX = NaN;
+    this.oceanChunkY = NaN;
+    this.oceanChunk = null;
+  }
+
+  private chunkHeight(
+    heights: Float32Array,
+    cx: number,
+    cy: number,
+    x: number,
+    z: number
+  ): number {
+    const span = this.chunkSize;
+    const size = this.mapChunkSizeLod;
     // Chunk-local *world* offset (see MeshGenerator: +z is -sy), then to sample
     // space by dividing out the world scale — heights are indexed per sample.
     const mps = this.metersPerSample;
@@ -858,6 +925,18 @@ export class TerrainRenderer {
     const eye = camera.transform.position;
     waves.setOrigin(eye.x, eye.z);
 
+    this.oceanType = -1;
+    for (let i = 0; i < palette.length; i++)
+      if (palette[i].name === OCEAN_WATER) this.oceanType = i;
+    this.resetOceanCache();
+    this.shoreField.update(
+      renderer.device,
+      deltaSeconds,
+      eye.x,
+      eye.z,
+      this.sampleOceanDepthDelegate
+    );
+
     // Distances are measured from where chunk LODs were last chosen, so a
     // vertex's waves always match the coarsest grid that can border it.
     const lodEye = this.viewPosOld ?? eye;
@@ -877,6 +956,7 @@ export class TerrainRenderer {
       detailBias: waterDetailBias(renderer.quality.aspect('water')),
       normals: this.waterWaveNormals,
       foamDebug: this.waterFoamDebug,
+      shoreDebug: this.waterShoreDebug,
       crestGlow: this.waterCrestGlow,
       troughDarkening: this.waterTroughDarkening,
       eyeX: lodEye.x,
@@ -885,13 +965,21 @@ export class TerrainRenderer {
       lodDistances: this.waterLodDistances,
       lodSpacings: this.waterLodSpacings,
       windSpeed: this.ocean.windSpeed,
+      cascadeRms: this.ocean.cascadeRms,
+      time: this.ocean.time,
+      shoreHeight: shoreWaveHeight(this.ocean.cascadeRms, this.waterShoreWaves),
+      shoreCentreX: this.shoreField.centreX,
+      shoreCentreZ: this.shoreField.centreZ,
+      shoreSpan: SHORE_FIELD_SPAN,
     });
 
     if (!this.seaSpray)
       this.seaSpray = new SeaSpray(
         renderer.device,
         this.ocean,
-        this.waterWaves.buffer(renderer.device)
+        this.waterWaves.buffer(renderer.device),
+        this.shoreField.texture,
+        renderer.samplerManager.get('linear-clamped')
       );
     const sun = renderer.sky.skyRenderer.sun;
     const radiance = sun.intensity;
@@ -1015,6 +1103,7 @@ export class TerrainRenderer {
     this.clearChunks();
     this.horizonOcean?.dispose();
     this.horizonOcean = null;
+    this.shoreField?.dispose();
     this.waterWaves.dispose();
     this.seaSpray?.dispose();
     this.seaSpray = null;

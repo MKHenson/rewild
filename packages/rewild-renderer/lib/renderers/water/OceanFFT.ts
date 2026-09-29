@@ -13,6 +13,7 @@ import {
   WaveSystem,
   cascadeBand,
   foamRates,
+  cascadeVariance,
   jonswapShape,
   seaState,
 } from './OceanSpectrum';
@@ -57,6 +58,8 @@ export class OceanFFT {
   time = 0;
   /** The lagged wind speed in m/s the spectrum was last built for. */
   windSpeed = 0;
+  /** Per cascade, the RMS height in metres of the sea it holds now. */
+  readonly cascadeRms = new Float64Array(CASCADE_COUNT);
   /** Replaces parts of the sea state the windiness gives, for tuning by eye.
    *  Set it with `overrideSeaState`. */
   private seaOverride: Partial<SeaState> = {};
@@ -273,6 +276,8 @@ export class OceanFFT {
       };
       this.packSystem(0, local);
       this.packSystem(1, SWELL);
+      for (let c = 0; c < CASCADE_COUNT; c++)
+        this.cascadeRms[c] = Math.sqrt(cascadeVariance([local, SWELL], c));
     }
 
     this.time = (this.time + deltaSeconds) % OCEAN_LOOP_SECONDS;

@@ -28,7 +28,7 @@ const CLOUD_TRANSMITTANCE_FLOOR: f32 = 0.05;
 
 // Underside shading. Lower = darker cloud bases; tops are unaffected.
 // Share of the multiple-scattering sunlight that reaches the base.
-const CLOUD_BASE_SCATTER: f32 = 0.4;
+const CLOUD_BASE_SCATTER: f32 = 0.2;
 // Skylight ambient at the base, rising to 1.1 at the top.
 const CLOUD_BASE_AMBIENT: f32 = 0.5;
 // Ground-bounce lift on the lower half of the cloud.

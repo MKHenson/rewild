@@ -53,15 +53,17 @@ export const OCEAN: WaterType = {
 };
 
 // Peaty inland water: blue is absorbed first, so the bed goes brown-green, and
-// silt hides it within a couple of metres.
+// silt hides it within a couple of metres. It takes every wave but the ocean's
+// longest swell, a little over half as high, so a gale raises a short, choppy
+// sea with whitecaps.
 export const LAKE: WaterType = {
   name: LAKE_WATER,
   scatter: [0.02, 0.03, 0.015],
   absorption: [0.35, 0.25, 0.5],
   turbidity: 0.4,
-  waveResponse: 0.35,
-  waveScale: 10,
-  foam: 0.2,
+  waveResponse: 0.6,
+  waveScale: 25,
+  foam: 0.5,
   shoreFoamWidth: 0.4,
   normalStrength: 0.6,
 };

@@ -3,6 +3,9 @@
 // weights. The host declares `waves : Waves`.
 
 const CASCADES: i32 = 4;
+// Shoaling: water holds a sea whose significant height is at most
+// SHOAL_RATIO of its depth; the rest breaks.
+const SHOAL_RATIO: f32 = 0.6;
 
 struct Waves {
   // x: mip bias on the slopes, from the quality tier. y: 1 to shade by the
@@ -20,10 +23,27 @@ struct Waves {
   // x: the finest grid's spacing, used nearer than the first distance. y:
   // the crest glow's strength. z: the trough darkening's strength.
   grid : vec4f,
-  // Per cascade: x tile size in metres, zw where the origin falls in the tile.
+  // Per cascade: x tile size in metres, y RMS height in metres of the sea it
+  // holds, zw where the origin falls in the tile.
   cascade : array<vec4f, 4>,
   // Per cascade: each palette type's weight on it.
   cascadeTypes : array<vec4f, 4>,
+  // The shore trains (ShoreWaves): xy angular frequency, zw phase now.
+  shore : vec4f,
+  // x: the shore waves' breaker height in metres. yz: the shore field's
+  // centre from the origin. w: metres it spans.
+  shoreSize : vec4f,
+}
+
+// 0..1: the share of the sea's height water `depth` metres deep holds, for
+// palette `weights`.
+fn seaHeld(depth: f32, weights: vec4f) -> f32 {
+  var variance = 0.0;
+  for (var c: i32 = 0; c < CASCADES; c++) {
+    let rms = waves.cascade[c].y * dot(waves.cascadeTypes[c], weights);
+    variance += rms * rms;
+  }
+  return saturate(SHOAL_RATIO * depth / max(4.0 * sqrt(variance), 1e-4));
 }
 
 // Where `rest` falls in cascade `c`'s tile.

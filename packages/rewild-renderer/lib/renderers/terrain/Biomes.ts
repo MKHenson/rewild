@@ -320,7 +320,7 @@ export interface ClimateConfig {
 // Reed beds along the waterline, from just above it into the shallows.
 const REEDS: BiomeScatter = {
   layer: 'reed_01',
-  density: 0.9,
+  density: 0.2,
   slope: { from: 20, to: 6 },
   waterDepth: [
     { from: -2.5, to: -2.0 },
@@ -394,6 +394,7 @@ export const PLAIN: BiomeParams = {
       layer: 'granite_01',
       density: 0.07,
       noise: { scale: 220, seedSalt: 41, band: { from: 0.55, to: 0.78 } },
+      underwater: true,
     },
   ],
 };
@@ -937,10 +938,10 @@ export const ARID_LAKES: LakeConfig = {
 // the terrain shader.
 export const DEFAULT_COAST: CoastConfig = {
   sand: 'aerial_beach_01',
-  beachHeight: 6,
+  beachHeight: 3,
   wetHeight: 0.4,
   seabedDepth: 2,
-  blend: 12,
+  blend: 6,
   slope: { from: 30, to: 18 },
 };
 
