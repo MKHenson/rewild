@@ -562,9 +562,8 @@ The shader has the depth and the terrain height texture. These give the main sho
     work. It shows only where coverage reaches; the ocean's soft edge runs well past the beach.
   - **Thickness.** The 8 m height texture cannot resolve a sheet a few centimetres thick. The
     water reads the thickness from the gap to the scene behind it in the refraction texture, so
-    the light draw binds that texture as well as the absorb draw. Foam rides the last 12 cm of
-    the sheet's edge as the bore arrives, and is gone just past the top of the uprush. At 0.45
-    it is low enough for the shore foam's grain to break it into patches, not a line.
+    the light draw binds that texture as well as the absorb draw. Foam rides the last 6 cm of
+    the sheet's edge during the uprush and thins as it drains.
   - **Shared.** The swash is a function in `shore-waves.wgsl`, so the water and the terrain agree
     where the sheet is. See [Terrain changes](#terrain-changes) for the wet sand it leaves
     behind. `setWaterSwash(strength)` scales it in the console.

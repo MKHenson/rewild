@@ -129,15 +129,11 @@ const SHORE_FOAM_CELLS: i32 = 512;
 const SHORE_FOAM_SOFTNESS: f32 = 0.12;
 // Swash (shore-waves.wgsl): the surface lifts by the sheet's edge height at
 // the waterline, fading out by SWASH_DEPTH metres of depth, and the terrain's
-// depth test cuts the sheet's edge. Foam rides the edge as the bore arrives,
-// over the sheet's last SWASH_FOAM_EDGE metres of thickness, at
-// SWASH_FOAM_AMOUNT: low enough that the shore foam's grain breaks it into
-// patches. It is gone by SWASH_FOAM_FADE of the wave, just past the top of the
-// uprush.
+// depth test cuts the sheet's edge. Foam rides the edge while it runs up, over
+// the sheet's last SWASH_FOAM_EDGE metres of thickness, and thins as it drains.
 const SWASH_DEPTH: f32 = 1.5;
-const SWASH_FOAM_EDGE: f32 = 0.12;
-const SWASH_FOAM_AMOUNT: f32 = 0.95;
-const SWASH_FOAM_FADE: f32 = 0.45;
+const SWASH_FOAM_EDGE: f32 = 0.06;
+const SWASH_FOAM_AMOUNT: f32 = 0.9;
 
 struct Uniforms {
   normalMatrix: mat3x3f,
@@ -326,15 +322,16 @@ fn sheetThickness(input: VertexOutput) -> f32 {
   return path * abs(dot(direction, up));
 }
 
-// Foam on the swash sheet's leading edge, thinning as the uprush slows.
+// Foam on the swash sheet's leading edge: all of it while the sheet runs up,
+// thinning as it drains.
 fn swashFoam(input: VertexOutput, weights: vec4f) -> f32 {
   let swash = sampleSwash(input.rest, weights);
   if (swash.runup <= 0.0) {
     return 0.0;
   }
-  let fresh = 1.0 - smoothstep(0.0, SWASH_FOAM_FADE, swash.cycle);
+  let draining = saturate((swash.cycle - SWASH_UPRUSH) / (1.0 - SWASH_UPRUSH));
   let edge = 1.0 - smoothstep(0.0, SWASH_FOAM_EDGE, sheetThickness(input));
-  return edge * fresh * SWASH_FOAM_AMOUNT;
+  return edge * (1.0 - draining) * SWASH_FOAM_AMOUNT;
 }
 
 // The shore field painted for the debug view: blue where deep water reaches,
