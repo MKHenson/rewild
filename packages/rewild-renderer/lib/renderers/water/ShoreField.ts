@@ -3,7 +3,11 @@ import { toFloat16 } from '../../utils/float16';
 // Where the ocean's shore waves run: a grid around the camera holding, per
 // texel, the seconds a wave takes to get there from deep water. Waves set out
 // from water SOURCE_DEPTH deep, move at the shallow-water speed √(g·h) and
-// cannot cross land: an eikonal solve by fast sweeping. The wavefronts are the
+// cannot cross land: an eikonal solve by fast sweeping. A grid that holds no
+// water that deep starts them from its deepest water instead, which lies out
+// to sea: a wide shelf can keep deep water past the grid's edge. Water that
+// joins the open sea only outside the grid, such as a bay behind a headland
+// past its edge, gets them from where it meets that edge. The wavefronts are the
 // crests, so they turn toward the shallows, wrap around headlands and islands,
 // and fill bays. Water deep water cannot reach, such as a lagoon behind a
 // bar, gets none.
@@ -30,6 +34,9 @@ const SWEEPS = 2;
 // Metres a second the times carry on at past the water the waves reach: a
 // wave's speed in a metre of water.
 const EXTEND_SPEED = Math.sqrt(GRAVITY * 1);
+// Metres above the grid's deepest water that still start waves when the grid
+// holds none SOURCE_DEPTH deep, so they set out along a band, not a point.
+const SOURCE_BAND = 2;
 // Metres the camera moves from the centre before the grid follows it; the
 // centre snaps to this.
 const RECENTRE = 128;
@@ -56,6 +63,8 @@ export interface ShoreFieldStats {
   water: number;
   sources: number;
   reached: number;
+  /** Metres of water the waves set out from. */
+  sourceDepth: number;
   /** Seconds: the longest trip from deep water. */
   longest: number;
 }
@@ -100,7 +109,10 @@ function sweep(times: Float32Array, costs: Float32Array, size: number): void {
 /**
  * Seconds a wave takes from water `sourceDepth` deep to each of the `size`²
  * texels of `depth`, `texel` metres apart. Infinity where it cannot reach.
- * `costs` is scratch of the same size.
+ * Without water that deep, the waves set out from water within SOURCE_BAND of
+ * the deepest. Water they cannot reach that touches the grid's edge starts
+ * them there too. `costs` is scratch of the same size. Returns the depth they
+ * set out from, or 0 when the grid holds no water deeper than SOURCE_BAND.
  */
 export function solveArrival(
   depth: Float32Array,
@@ -109,10 +121,13 @@ export function solveArrival(
   sourceDepth: number,
   out: Float32Array,
   costs = new Float32Array(size * size)
-): void {
+): number {
+  let deepest = 0;
+  for (let i = 0; i < size * size; i++) deepest = Math.max(deepest, depth[i]);
+  const from = Math.min(sourceDepth, deepest - SOURCE_BAND);
   for (let i = 0; i < size * size; i++) {
     const d = depth[i];
-    const source = d >= sourceDepth;
+    const source = from > 0 && d >= from;
     out[i] = source ? 0 : Infinity;
     costs[i] =
       source || d <= 0
@@ -120,6 +135,17 @@ export function solveArrival(
         : texel / Math.sqrt(GRAVITY * Math.max(d, MIN_DEPTH));
   }
   sweep(out, costs, size);
+
+  let open = false;
+  for (let k = 0; k < size; k++)
+    for (const i of [k, k + (size - 1) * size, k * size, size - 1 + k * size])
+      if (depth[i] > 0 && out[i] === Infinity) {
+        out[i] = 0;
+        costs[i] = 0;
+        open = true;
+      }
+  if (open) sweep(out, costs, size);
+  return Math.max(0, from);
 }
 
 /**
@@ -271,7 +297,13 @@ export class ShoreField {
   /** World xz of the grid's centre. */
   centreX = 0;
   centreZ = 0;
-  readonly stats: ShoreFieldStats = { water: 0, sources: 0, reached: 0, longest: 0 };
+  readonly stats: ShoreFieldStats = {
+    water: 0,
+    sources: 0,
+    reached: 0,
+    sourceDepth: 0,
+    longest: 0,
+  };
 
   private depth = new Float32Array(SHORE_FIELD_TEXELS * SHORE_FIELD_TEXELS);
   private times = new Float32Array(SHORE_FIELD_TEXELS * SHORE_FIELD_TEXELS);
@@ -386,7 +418,7 @@ export class ShoreField {
     this.row = end;
     if (this.row < size) return;
 
-    solveArrival(
+    const sourceDepth = solveArrival(
       this.depth,
       size,
       texel,
@@ -397,9 +429,10 @@ export class ShoreField {
     this.stage = SOLVED;
     const stats = this.stats;
     stats.water = stats.sources = stats.reached = stats.longest = 0;
+    stats.sourceDepth = sourceDepth;
     for (let i = 0; i < size * size; i++) {
       if (this.depth[i] > 0) stats.water++;
-      if (this.depth[i] >= SHORE_SOURCE_DEPTH) stats.sources++;
+      if (sourceDepth > 0 && this.depth[i] >= sourceDepth) stats.sources++;
       const t = this.times[i];
       if (t !== Infinity) {
         stats.reached++;

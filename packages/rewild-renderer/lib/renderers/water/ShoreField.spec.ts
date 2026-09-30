@@ -69,7 +69,58 @@ describe('solveArrival', () => {
     expect(behind).toBeGreaterThan(open);
     expect(times[23 + 15 * SIZE]).toBe(Infinity);
   });
+
+  it('starts on a wide shelf from its deepest water', () => {
+    // A shelf 12 m deep at x = 0 shoaling to a beach at x = 24.
+    const depth = new Float32Array(SIZE * SIZE);
+    for (let y = 0; y < SIZE; y++)
+      for (let x = 0; x < SIZE; x++)
+        depth[x + y * SIZE] = Math.max(0, 12 * (1 - x / 24));
+    const times = new Float32Array(SIZE * SIZE);
+    const from = solveArrival(depth, SIZE, TEXEL, SOURCE, times);
+    expect(from).toBeCloseTo(10, 5);
+    const row = 10 * SIZE;
+    expect(times[row]).toBe(0);
+    for (let x = 5; x < 24; x++)
+      expect(times[row + x]).toBeGreaterThan(times[row + x - 1]);
+  });
+
+  it('starts none in a pool no deeper than its band', () => {
+    const depth = new Float32Array(SIZE * SIZE);
+    for (let y = 8; y < 24; y++)
+      for (let x = 8; x < 24; x++) depth[x + y * SIZE] = 1.5;
+    const times = new Float32Array(SIZE * SIZE);
+    expect(solveArrival(depth, SIZE, TEXEL, SOURCE, times)).toBe(0);
+    expect(times.every((t) => t === Infinity)).toBe(true);
+  });
+
+  it('starts a bay cut off from deep water where it meets the edge', () => {
+    // Deep water in the left half, a bay in the right half that joins it
+    // only outside the grid, past the land wall at x = 16.
+    const depth = new Float32Array(SIZE * SIZE);
+    for (let y = 0; y < SIZE; y++)
+      for (let x = 0; x < SIZE; x++)
+        depth[x + y * SIZE] = x < 16 ? SOURCE : x === 16 || y > 20 ? 0 : 8;
+    const times = new Float32Array(SIZE * SIZE);
+    solveArrival(depth, SIZE, TEXEL, SOURCE, times);
+    expect(times[20]).toBe(0);
+    const inside = times[20 + 10 * SIZE];
+    expect(inside).toBeGreaterThan(0);
+    expect(inside).toBeLessThan(Infinity);
+    // Nearer the edge it came in from is sooner.
+    expect(times[20 + 5 * SIZE]).toBeLessThan(inside);
+  });
 });
+
+// Makes land of the grid's edge right of x = 16, so the water there is a
+// lagoon and not a bay open to the sea outside the grid.
+function closeRight(depth: Float32Array): void {
+  for (let k = 16; k < SIZE; k++) {
+    depth[k] = 0;
+    depth[k + (SIZE - 1) * SIZE] = 0;
+  }
+  for (let y = 0; y < SIZE; y++) depth[SIZE - 1 + y * SIZE] = 0;
+}
 
 function pack(depth: Float32Array): Uint16Array {
   const times = solve(depth);
@@ -103,6 +154,7 @@ describe('packShoreField', () => {
     for (let y = 0; y < SIZE; y++) depth[y * SIZE] = SOURCE;
     // A wall across the grid, with an enclosed lagoon behind it.
     for (let y = 0; y < SIZE; y++) depth[16 + y * SIZE] = 0;
+    closeRight(depth);
     const out = pack(depth);
     const time = (x: number) => fromFloat16(out[(x + 8 * SIZE) * 4]);
     // One texel of 10 m water takes 8 / √(9.81 × 10) ≈ 0.8 s; one of the
@@ -156,6 +208,7 @@ describe('packSwashField', () => {
     for (let y = 0; y < SIZE; y++) depth[y * SIZE] = SOURCE;
     // A bar one texel wide, with a lagoon behind it.
     for (let y = 0; y < SIZE; y++) depth[16 + y * SIZE] = 0;
+    closeRight(depth);
     const { reach } = packSwash(depth);
     expect(reach(16, 8)).toBe(1);
     expect(reach(17, 8)).toBe(0);

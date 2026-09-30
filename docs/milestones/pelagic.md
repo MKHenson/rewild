@@ -522,7 +522,10 @@ The shader has the depth and the terrain height texture. These give the main sho
   takes to get to a point from water 24 m deep, moving at the shallow-water speed `√(g·h)` and
   blocked by land (`ShoreField`). `T` comes from an eikonal solve by fast sweeping over a
   256² grid of 8 m texels around the camera, from the terrain heights and the chunks' ocean
-  coverage. The wavefronts are the crests, so they turn toward the shallows, wrap around
+  coverage. A shelf can keep water 24 m deep outside the grid. A grid without it starts the
+  waves from water within 2 m of its deepest, which lies out to sea. Water that joins the open sea
+  only outside the grid, such as a bay behind a headland past its edge, starts them where it meets
+  the grid's edge. The wavefronts are the crests, so they turn toward the shallows, wrap around
   headlands and islands, fill bays, and slow and bunch up as the bed rises. Water deep water
   cannot reach, such as a lagoon behind a bar, gets none, and so do lakes. Past the water the
   waves reach, the times carry on at a metre-deep wave's speed with no strength, so the phase has
