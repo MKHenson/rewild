@@ -70,13 +70,97 @@ export function registerWaterDebugCommands(renderer: Renderer) {
 
   (window as any).shoreFieldStats = () => {
     const field = renderer.terrainRenderer.shoreField;
-    const { water, sources, reached, longest } = field.stats;
+    const { water, sources, reached, sourceDepth, longest } = field.stats;
     console.log(
-      `Shore field at (${field.centreX}, ${field.centreZ}): ${water} ocean texels, ${sources} deep enough to start waves, ${reached} reached, longest trip ${longest.toFixed(1)} s.`
+      `Shore field at (${field.centreX}, ${field.centreZ}): ${water} ocean texels, ${sources} deep enough to start waves (${sourceDepth.toFixed(1)} m or more), ${reached} reached, longest trip ${longest.toFixed(1)} s.`
     );
   };
 
-  (window as any).setSeaSpray = (override = {}) => {
+  // Samples the shore field's grid again as its depth sampler does, and counts
+  // why each texel reads as no ocean.
+  (window as any).shoreFieldProbe = () => {
+    const terrain = renderer.terrainRenderer as any;
+    const field = terrain.shoreField;
+    const span: number = terrain.chunkSize;
+    const texels = 256;
+    const texel = 8;
+    const counts = {
+      noChunk: 0,
+      noHeights: 0,
+      noWaterMap: 0,
+      aboveSea: 0,
+      notOcean: 0,
+      ocean: 0,
+    };
+    let deepestOcean = 0;
+    let deepestOceanAt = '';
+    let deepestAny = 0;
+    let deepestAnyAt = '';
+    let deepNotOcean = 0;
+    const missing = new Set<string>();
+    for (let y = 0; y < texels; y++)
+      for (let x = 0; x < texels; x++) {
+        const wx = field.centreX - (texels * texel) / 2 + texel / 2 + x * texel;
+        const wz = field.centreZ - (texels * texel) / 2 + texel / 2 + y * texel;
+        const cx = Math.round(wx / span);
+        const cy = Math.round(wz / span);
+        const chunk = terrain.terrainChunks.get(`${cx},${cy}`);
+        if (!chunk) {
+          counts.noChunk++;
+          missing.add(`${cx},${cy}`);
+          continue;
+        }
+        if (!chunk.heights) {
+          counts.noHeights++;
+          continue;
+        }
+        const depth =
+          terrain._seaLevel - terrain.chunkHeight(chunk.heights, cx, cy, wx, wz);
+        if (depth > deepestAny) {
+          deepestAny = depth;
+          deepestAnyAt = `(${wx}, ${wz}) chunk ${cx},${cy}`;
+        }
+        const water = chunk.water;
+        if (!water) {
+          counts.noWaterMap++;
+          continue;
+        }
+        if (depth <= 0) {
+          counts.aboveSea++;
+          continue;
+        }
+        const n = (terrain.mapChunkSizeLod - 1) / water.step;
+        const mx = Math.round(((wx - cx * span + span / 2) / span) * n);
+        const my = Math.round(((cy * span + span / 2 - wz) / span) * n);
+        const t =
+          Math.min(water.size - 1, Math.max(0, mx)) +
+          Math.min(water.size - 1, Math.max(0, my)) * water.size;
+        const ocean =
+          water.coverage[t] * water.typeWeights[t * 4 + terrain.oceanType];
+        if (ocean < 0.5 * 255 * 255) {
+          counts.notOcean++;
+          if (depth >= 24) deepNotOcean++;
+          continue;
+        }
+        counts.ocean++;
+        if (depth > deepestOcean) {
+          deepestOcean = depth;
+          deepestOceanAt = `(${wx}, ${wz}) chunk ${cx},${cy}`;
+        }
+      }
+    console.log(
+      `Shore field probe at (${field.centreX}, ${field.centreZ}), ocean type ${terrain.oceanType}, sea level ${terrain._seaLevel}:`,
+      counts,
+      `\nDeepest ocean ${deepestOcean.toFixed(1)} m at ${deepestOceanAt}.`,
+      `\nDeepest below sea level of any kind ${deepestAny.toFixed(1)} m at ${deepestAnyAt}.`,
+      `\n${deepNotOcean} texels 24 m or deeper rejected as not ocean.`,
+      `\nChunks missing: ${[...missing].join(' ') || 'none'}.`,
+      '\nLast build:',
+      { ...field.stats }
+    );
+  };
+
+  (window as any).setSeaSpray =(override = {}) => {
     const spray = renderer.terrainRenderer.seaSpray;
     if (!spray) {
       console.log('setSeaSpray — no spray yet. Go near water first.');
