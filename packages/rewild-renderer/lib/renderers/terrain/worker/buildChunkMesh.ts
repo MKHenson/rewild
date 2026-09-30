@@ -10,6 +10,7 @@ import { PaintMask } from '../PaintMask';
 import { ScatterKillSet } from '../ScatterKillSet';
 import { ScatterInstances, scatterChunk } from '../Scatter';
 import { WaterMap, buildWaterMap } from '../WaterMap';
+import { WaterEdit } from '../WaterEdit';
 import { Vector2 } from 'rewild-common';
 
 export interface BuildChunkMeshRequest {
@@ -43,6 +44,9 @@ export interface BuildChunkMeshRequest {
   scatterMask?: PaintMask;
   // Instances the author has plucked here, skipped by placement.
   scatterKills?: ScatterKillSet;
+  // The chunk's authored water, blended over the generated water map and read
+  // by placement's water conditions.
+  waterEdit?: WaterEdit;
 }
 
 // One-sample apron ring so edge-vertex normals get a two-sided gradient that
@@ -218,6 +222,7 @@ export function buildChunkMesh(
         scatterMask: request.scatterMask ?? null,
         killSet: request.scatterKills ?? null,
         seaLevel,
+        waterEdit: request.waterEdit ?? null,
       })
     : [];
 
@@ -228,7 +233,8 @@ export function buildChunkMesh(
     worldOffset,
     climate,
     seaLevel,
-    heights
+    heights,
+    request.waterEdit ?? null
   );
 
   return {

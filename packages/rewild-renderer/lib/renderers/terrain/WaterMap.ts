@@ -11,6 +11,12 @@ import {
 } from './Lakes';
 import { BIOME_MASK_STEP, paintMaskSize } from './PaintMask';
 import { MAX_WATER_TYPES } from './Water';
+import {
+  WaterEdit,
+  applyWaterEdit,
+  createWaterEditSample,
+  editedBody,
+} from './WaterEdit';
 import { toFloat16 } from '../../utils/float16';
 
 // Where a chunk's water is, how high, and what kind.
@@ -59,8 +65,9 @@ export { OCEAN_BODY_ID };
 
 /**
  * The water map for a chunk with LOD-0 `heights`, or null when the ground
- * everywhere stands WET_BAND_REACH or more above the covered levels. `offset` is the chunk's sample-space offset, as for the
- * height and splat generators.
+ * everywhere stands WET_BAND_REACH or more above the covered levels. `offset`
+ * is the chunk's sample-space offset, as for the height and splat generators.
+ * `edit` is the chunk's authored water, blended over the generated.
  */
 export function buildWaterMap(
   chunkSize: number,
@@ -68,15 +75,17 @@ export function buildWaterMap(
   offset: Vector2,
   climate: ClimateConfig,
   seaLevel: number,
-  heights: Float32Array
+  heights: Float32Array,
+  edit: WaterEdit | null = null
 ): WaterMap | null {
-  if (!climate.continent && !climate.lakes) return null;
+  if (!climate.continent && !climate.lakes && !edit) return null;
 
   const step = WATER_MAP_STEP;
   const size = paintMaskSize(chunkSize, step);
   const texels = size * size;
   const field = createClimateField(chunkSize, chunkSize, seed, offset, climate);
   const sampler = createWaterSampler(field, seed, offset, seaLevel);
+  const editSample = edit ? createWaterEditSample() : null;
 
   const coverage = new Uint8Array(texels);
   const levels = new Float64Array(texels);
@@ -87,9 +96,18 @@ export function buildWaterMap(
   for (let my = 0; my < size; my++) {
     for (let mx = 0; mx < size; mx++) {
       const t = mx + my * size;
-      const value = Math.round(
-        sampleWater(sampler, mx * step, my * step, types) * 255
-      );
+      let water = sampleWater(sampler, mx * step, my * step, types);
+      if (edit)
+        water = applyWaterEdit(
+          edit,
+          mx * step,
+          my * step,
+          sampler,
+          water,
+          types,
+          editSample!
+        );
+      const value = Math.round(water * 255);
       coverage[t] = value;
       levels[t] = sampler.level;
       bodyIds[t] = sampler.bodyId;
@@ -148,6 +166,10 @@ export function buildWaterMap(
     const lake = sampler.lakes.find((l) => l.bodyId === id);
     if (lake) bodies.push(lakeBody(lake, climate));
     else if (id === OCEAN_BODY_ID) bodies.push(oceanBody(climate, seaLevel));
+    else
+      bodies.push(
+        editedBody(id, levels[t], typeWeights.subarray(t * 4, t * 4 + 4))
+      );
   }
 
   for (let my = 0; my < size; my++) {

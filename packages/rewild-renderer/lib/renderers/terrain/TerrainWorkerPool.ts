@@ -2,6 +2,7 @@ import type { PaintMask } from './PaintMask';
 import type { ScatterKillSet } from './ScatterKillSet';
 import type { ScatterInstances } from './Scatter';
 import type { WaterMap } from './WaterMap';
+import type { WaterEdit } from './WaterEdit';
 
 interface TerrainWorkerRequest {
   chunkSize: number;
@@ -34,6 +35,9 @@ interface TerrainWorkerRequest {
   // Instances plucked here. A Set survives structured cloning, so it crosses
   // as the membership test placement wants rather than a list to rebuild.
   scatterKills?: ScatterKillSet;
+  // The chunk's authored water. Structured-cloned on the same terms as
+  // biomeMask.
+  waterEdit?: WaterEdit;
 }
 
 export interface TerrainWorkerResponse {

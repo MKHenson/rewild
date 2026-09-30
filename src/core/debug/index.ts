@@ -9,6 +9,7 @@ import { registerPbrHarnessCommands } from './PbrHarnessCommands';
 import { registerGltfImportCommands } from './GltfImportCommands';
 import { registerLakeDebugCommands } from './LakeDebugCommands';
 import { registerWaterDebugCommands } from './WaterDebugCommands';
+import { registerWaterEditDevCommands } from './WaterEditDevCommands';
 import {
   registerScatterDebugCommands,
   registerWindDebugCommands,
@@ -29,5 +30,6 @@ export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerWindDebugCommands(renderer);
   registerLakeDebugCommands(renderer);
   registerWaterDebugCommands(renderer);
+  registerWaterEditDevCommands(renderer, project);
   registerChunkSnapshotDevCommands(renderer, project);
 }

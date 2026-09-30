@@ -168,8 +168,12 @@ export class LODMesh {
           renderer.terrainRenderer.biomeMaskProvider,
           climate.biomes.length
         );
+        const waterEdit = await this.chunk.resolveWaterEdit(
+          renderer.terrainRenderer.waterEditProvider
+        );
         const version = this.chunk.heightsVersion;
         const maskVersion = this.chunk.maskVersion;
+        const waterEditVersion = this.chunk.waterEditVersion;
 
         // Scatter rides whichever LOD build gets there first — the instances
         // are chunk state, identical for every LOD, so only one build pays.
@@ -203,22 +207,31 @@ export class LODMesh {
               )
             : undefined;
 
-        const { splat, vertices, uvs, normals, indices, heights, scatter, water } =
-          await renderer.terrainRenderer.workerPool.enqueue({
-            chunkSize: this.chunkSize,
-            lod: this.lod,
-            position: this.noiseOffset,
-            seed: this.seed,
-            climatePreset: this.climatePreset,
-            seaLevel: this.chunk.seaLevel,
-            heights: apron ? undefined : knownHeights ?? undefined,
-            apron,
-            edited: this.chunk.heightsAreEdited,
-            biomeMask: biomeMask ?? undefined,
-            scatter: wantsScatter,
-            scatterMask: scatterMask ?? undefined,
-            scatterKills: scatterKills ?? undefined,
-          });
+        const {
+          splat,
+          vertices,
+          uvs,
+          normals,
+          indices,
+          heights,
+          scatter,
+          water,
+        } = await renderer.terrainRenderer.workerPool.enqueue({
+          chunkSize: this.chunkSize,
+          lod: this.lod,
+          position: this.noiseOffset,
+          seed: this.seed,
+          climatePreset: this.climatePreset,
+          seaLevel: this.chunk.seaLevel,
+          heights: apron ? undefined : knownHeights ?? undefined,
+          apron,
+          edited: this.chunk.heightsAreEdited,
+          biomeMask: biomeMask ?? undefined,
+          scatter: wantsScatter,
+          scatterMask: scatterMask ?? undefined,
+          scatterKills: scatterKills ?? undefined,
+          waterEdit: waterEdit ?? undefined,
+        });
 
         // Cache the heightfield on the chunk so later LODs, snapshot writes,
         // and sculpting all work from the same in-memory truth. A no-op if a
@@ -240,7 +253,7 @@ export class LODMesh {
         // The splat map is chunk state shared by every LOD — hand it over and
         // let the chunk create or re-upload it as its version warrants.
         this.chunk.populateSplat(renderer, splat, version);
-        this.chunk.populateWater(renderer, water, version);
+        this.chunk.populateWater(renderer, water, version, waterEditVersion);
 
         if (wantsScatter)
           this.chunk.populateScatter(
@@ -373,7 +386,8 @@ export class LODMesh {
         });
       } while (
         !this.chunk.disposed &&
-        this.builtVersion !== this.chunk.heightsVersion
+        (this.builtVersion !== this.chunk.heightsVersion ||
+          this.chunk.waterIsStale())
       );
     } finally {
       this.building = false;
