@@ -125,6 +125,10 @@ export class SceneGraphStore {
               value: project.sceneGraph?.atmosphere?.windiness || 0.5,
             },
             {
+              type: 'windDirection',
+              value: project.sceneGraph?.atmosphere?.windDirection ?? 180,
+            },
+            {
               type: 'temperature',
               value: project.sceneGraph?.atmosphere?.temperature || 0.5,
             },

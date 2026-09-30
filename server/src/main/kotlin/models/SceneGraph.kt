@@ -2,6 +2,7 @@ package com.rewild.models
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 
 // PropValue is a TS union (string | boolean | number | Vector3 | object).
 // JsonElement accepts any valid JSON value, which covers all members of that union.
@@ -13,6 +14,8 @@ data class Atmosphere(
     val cloudiness: PropValue,
     val foginess: PropValue,
     val windiness: PropValue,
+    // Bearing in degrees the air moves toward. Defaulted so older records deserialize.
+    val windDirection: PropValue = JsonPrimitive(180),
     val precipitation: PropValue,
     val temperature: PropValue,
     val dayNightCycle: PropValue

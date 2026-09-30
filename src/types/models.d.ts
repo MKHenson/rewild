@@ -25,6 +25,7 @@ declare module 'models' {
     | 'cloudiness'
     | 'foginess'
     | 'windiness'
+    | 'windDirection'
     | 'precipitation'
     | 'temperature'
     | 'elevation'
@@ -125,6 +126,7 @@ declare module 'models' {
         cloudiness: PropValue;
         foginess: PropValue;
         windiness: PropValue;
+        windDirection?: PropValue;
         precipitation: PropValue;
         temperature: PropValue;
         dayNightCycle: PropValue;

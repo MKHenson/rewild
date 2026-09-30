@@ -15,6 +15,8 @@ export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
     renderer.sky.skyRenderer.foginess = atmosphere.foginess as f32;
     renderer.sky.skyRenderer.elevation = atmosphere.elevation as f32;
     renderer.sky.skyRenderer.windiness = atmosphere.windiness as f32;
+    renderer.sky.skyRenderer.windBearing = (atmosphere.windDirection ??
+      180) as f32;
     renderer.sky.skyRenderer.precipitation = atmosphere.precipitation as f32;
     renderer.sky.skyRenderer.temperature = atmosphere.temperature as f32;
     renderer.sky.skyRenderer.dayNightCycle =
@@ -61,6 +63,7 @@ export function syncFromEditorResource(id: string, renderer: Renderer) {
     skyRenderer.foginess = editorResource.foginess as f32;
     skyRenderer.elevation = editorResource.elevation as f32;
     skyRenderer.windiness = editorResource.windiness as f32;
+    skyRenderer.windBearing = editorResource.windDirection as f32;
     skyRenderer.precipitation = editorResource.precipitation as f32;
     skyRenderer.temperature = editorResource.temperature as f32;
 

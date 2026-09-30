@@ -941,6 +941,7 @@ export interface components {
             foginess: components["schemas"]["kotlinx.serialization.json.JsonElement4"];
             precipitation: components["schemas"]["kotlinx.serialization.json.JsonElement5"];
             temperature: components["schemas"]["kotlinx.serialization.json.JsonElement6"];
+            windDirection: components["schemas"]["kotlinx.serialization.json.JsonElement8"];
             windiness: components["schemas"]["kotlinx.serialization.json.JsonElement7"];
         };
         /** JsonElement */

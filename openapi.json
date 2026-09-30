@@ -981,6 +981,9 @@
                     "temperature": {
                         "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement6"
                     },
+                    "windDirection": {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement8"
+                    },
                     "windiness": {
                         "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement7"
                     }
@@ -992,6 +995,7 @@
                     "foginess",
                     "precipitation",
                     "temperature",
+                    "windDirection",
                     "windiness"
                 ],
                 "title": "Atmosphere"

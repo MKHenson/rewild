@@ -1,3 +1,4 @@
+import { Vector2 } from 'rewild-common';
 import { TimestampWritesFn } from '../../metrics/GpuPassTimer';
 import { Renderer } from '../../Renderer';
 import shader from '../../shaders/sky/cloudShadow.wgsl';
@@ -146,6 +147,7 @@ export class CloudShadowRenderer {
     iTime: number,
     cloudiness: number,
     windiness: number,
+    windDirection: Vector2,
     sunDirX: number,
     sunDirY: number,
     sunDirZ: number,
@@ -163,6 +165,8 @@ export class CloudShadowRenderer {
     data[6] = sunDirX;
     data[7] = sunDirY;
     data[8] = sunDirZ;
+    data[9] = windDirection.x;
+    data[10] = windDirection.y;
 
     device.queue.writeBuffer(this.uniformBuffer, 0, data.buffer);
 

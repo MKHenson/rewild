@@ -50,6 +50,7 @@ export class ProjectStore {
           cloudiness: 0.7,
           foginess: 0.3,
           windiness: 0.5,
+          windDirection: 180,
           precipitation: 0.0,
           temperature: 0.5,
           elevation: 80,

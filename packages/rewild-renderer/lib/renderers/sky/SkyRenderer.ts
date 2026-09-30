@@ -107,7 +107,9 @@ export class SkyRenderer {
   /** Quality revision this chain was last built against; -1 until first build. */
   private builtQualityRevision: number = -1;
 
-  windDirection: Vector2 = new Vector2(1, 0);
+  /** Bearing in degrees the air moves toward: 0 = +x, 90 = +z. */
+  windBearing: f32 = 180;
+  private readonly _windDirection = new Vector2(1, 0);
   /** The wind as foliage reads it, resolved from windiness and windDirection
    *  at the top of every frame — see Sky.update. */
   readonly wind = new WindState();
@@ -129,6 +131,13 @@ export class SkyRenderer {
   _eveColor: Color;
 
   gpuTimer: GpuPassTimer;
+
+  /** Where the clouds and rain are advected from: the unit vector opposite
+   *  windBearing, since both sample their fields at position + windDirection. */
+  get windDirection(): Vector2 {
+    const radians = degToRad(this.windBearing);
+    return this._windDirection.set(-Math.cos(radians), -Math.sin(radians));
+  }
 
   constructor(parent: Transform) {
     this.azimuth = 180;
@@ -440,14 +449,17 @@ export class SkyRenderer {
     // far less than a star — and SkyCubeCapture overwrites it in its own copy
     // of this block, so the live buffer never needs anything else.
     uniformData[37] = 0;
-    // Normalize windDirection before writing
-    const wdLen = Math.sqrt(
-      this.windDirection.x * this.windDirection.x +
-        this.windDirection.y * this.windDirection.y
+    const windDirection = this.windDirection;
+    uniformData.set(
+      [
+        windDirection.x,
+        windDirection.y,
+        this.precipitation,
+        this.temperature,
+        0.0,
+      ],
+      38
     );
-    const wdx = wdLen > 0 ? this.windDirection.x / wdLen : 1;
-    const wdy = wdLen > 0 ? this.windDirection.y / wdLen : 0;
-    uniformData.set([wdx, wdy, this.precipitation, this.temperature, 0.0], 38);
 
     // Extract XZ camera forward from the world matrix (-Z column)
     const m = camera.transform.matrixWorld.elements;
@@ -525,6 +537,7 @@ export class SkyRenderer {
       renderer.totalDeltaTime * 0.3,
       this.cloudiness,
       this.windiness,
+      this.windDirection,
       sunPosition.x / sunDir,
       sunPosition.y / sunDir,
       sunPosition.z / sunDir,
@@ -589,9 +602,7 @@ export class SkyRenderer {
     this.pendingBoltStrike = currentStrike.boltVisible ? currentStrike : null;
 
     if (this.precipitation > 0) {
-      const wdLen = Math.hypot(this.windDirection.x, this.windDirection.y);
-      const wdx = wdLen > 0 ? this.windDirection.x / wdLen : 1;
-      const wdy = wdLen > 0 ? this.windDirection.y / wdLen : 0;
+      const { x: wdx, y: wdy } = this.windDirection;
       // Wind speed in m/s: 0 = calm, 1 = 10 m/s (enough to lean rain ~46° at max windiness)
       const baseSpeed = this.windiness * 10.0;
       const t = renderer.totalDeltaTime / 1000;

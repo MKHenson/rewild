@@ -35,6 +35,17 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
       precision: 2,
     },
   },
+  // The bearing the air moves toward, in degrees: 0 = +x, 90 = +z.
+  windDirection: {
+    label: 'Wind Direction',
+    valueType: 'float',
+    valueOptions: {
+      min: 0,
+      max: 360,
+      step: 1,
+      precision: 2,
+    },
+  },
   elevation: {
     label: 'Sun Elevation',
     valueType: 'float',
