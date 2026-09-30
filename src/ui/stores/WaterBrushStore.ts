@@ -31,7 +31,7 @@ export class WaterBrushStore {
   radius = 30;
   /** Brush strength, 0..1. */
   strength = 0.5;
-  /** Metres above the clicked ground that new water on dry land stands. */
+  /** Metres the add brush digs its bed below the water, at the brush centre. */
   depth = 1.5;
   /** Palette entry the type brush paints, by name. */
   waterType = 'lake';

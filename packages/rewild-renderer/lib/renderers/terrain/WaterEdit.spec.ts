@@ -223,6 +223,26 @@ describe('applyWaterStamp', () => {
       expect(isWaterEditEmpty(edit)).toBe(true);
   });
 
+  it('leaves texels its guard blocks', () => {
+    const { edits, source: s } = source();
+    const i0 = corner.x / (METERS_PER_SAMPLE * WATER_EDIT_STEP) - 4;
+    const blocked = new Uint8Array(81);
+    blocked[4 * 9 + 4] = 1;
+    applyWaterStamp(
+      s,
+      stamp({
+        centerX: corner.x,
+        centerZ: corner.z,
+        guard: { i0, j0: i0, width: 9, height: 9, blocked },
+      })
+    );
+    const edit = edits.get('0,0')!;
+    expect(plane(edit, WATER_EDIT_AUTHORITY)[(SIZE - 1) * SIZE]).toBe(0);
+    expect(
+      plane(edit, WATER_EDIT_AUTHORITY)[(SIZE - 1) * SIZE + 1]
+    ).toBeGreaterThan(0);
+  });
+
   it('removes water by owning it with none', () => {
     const { edits, source: s } = source();
     applyWaterStamp(s, stamp({ type: 'remove' }));

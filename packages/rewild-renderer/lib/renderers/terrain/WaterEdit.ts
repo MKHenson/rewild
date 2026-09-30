@@ -321,6 +321,80 @@ export interface WaterStamp {
   bodyId: number;
   /** Palette weights of added or painted water, summing to 1. */
   typeWeights: ArrayLike<number>;
+  /** Texels the stamp leaves alone. */
+  guard?: WaterGuard;
+}
+
+/** Levels closer than this, in metres, count as one surface. */
+export const WATER_LEVEL_MATCH = 0.05;
+
+/**
+ * Texels a stroke adding water at one level leaves alone, over world texels
+ * i0..i0+width-1, j0..j0+height-1: another body's water at a different level,
+ * the texels around it, and texels whose water is not known. Outside the box
+ * counts as blocked.
+ */
+export interface WaterGuard {
+  i0: number;
+  j0: number;
+  width: number;
+  height: number;
+  blocked: Uint8Array;
+}
+
+/**
+ * The guard over world texels (i0, j0)–(i1, j1) for water of `bodyId` at
+ * `level`. `getWater` gives a chunk's water as it stands, or null while it is
+ * not known; `span` is a chunk's width in texels.
+ */
+export function buildWaterGuard(
+  getWater: (cx: number, cy: number) => ResolvedWater | null,
+  span: number,
+  i0: number,
+  j0: number,
+  i1: number,
+  j1: number,
+  bodyId: number,
+  level: number
+): WaterGuard {
+  const width = i1 - i0 + 1;
+  const height = j1 - j0 + 1;
+  const blocked = new Uint8Array(Math.max(0, width * height));
+  const half = span / 2;
+  const cache = new Map<string, ResolvedWater | null>();
+  for (let j = j0 - 1; j <= j1 + 1; j++) {
+    const cy = Math.ceil((j - half) / span);
+    for (let i = i0 - 1; i <= i1 + 1; i++) {
+      const cx = Math.ceil((i - half) / span);
+      const key = `${cx},${cy}`;
+      let water = cache.get(key);
+      if (water === undefined) {
+        water = getWater(cx, cy);
+        cache.set(key, water);
+      }
+      if (water) {
+        const t =
+          (cy * span + half - j) * water.size + (i - cx * span + half);
+        if (
+          water.coverage[t] === 0 ||
+          water.bodyIds[t] === bodyId ||
+          Math.abs(water.levels[t] - level) <= WATER_LEVEL_MATCH
+        )
+          continue;
+      }
+      for (let y = Math.max(j0, j - 1); y <= Math.min(j1, j + 1); y++)
+        for (let x = Math.max(i0, i - 1); x <= Math.min(i1, i + 1); x++)
+          blocked[(y - j0) * width + (x - i0)] = 1;
+    }
+  }
+  return { i0, j0, width, height, blocked };
+}
+
+export function isWaterBlocked(guard: WaterGuard, i: number, j: number) {
+  const x = i - guard.i0;
+  const y = j - guard.j0;
+  if (x < 0 || y < 0 || x >= guard.width || y >= guard.height) return true;
+  return guard.blocked[y * guard.width + x] !== 0;
 }
 
 /**
@@ -409,6 +483,7 @@ export function applyWaterStamp(
       const dz = wz - centerZ;
       const distSq = dx * dx + dz * dz;
       if (distSq > radiusSq) continue;
+      if (stamp.guard && isWaterBlocked(stamp.guard, wx, wz)) continue;
       const cxMin = Math.ceil((wx - half) / span);
       const cxMax = Math.floor((wx + half) / span);
 

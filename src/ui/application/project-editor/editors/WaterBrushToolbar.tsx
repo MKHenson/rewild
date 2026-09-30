@@ -49,8 +49,8 @@ const HINTS: Record<WaterBrushType, string> = {
   level:
     'Click a lake, then drag up or down to set its level · Strength sets the speed · It stops at the spill height',
   type: 'Drag to paint the water type over the water there',
-  add: 'Drag to add water · On a lake it joins it, on dry land it makes a new one at the depth · Shift removes',
-  remove: 'Drag to remove water · Shift adds',
+  add: 'Drag to add water and dig its bed · On a lake it joins it, on dry land it makes a new one at the ground · It stops at other water · Shift removes',
+  remove: 'Drag to remove water and raise land in its place · Shift adds',
   reset: 'Drag to hand the water back to the generated world',
   lock: 'Click a lake to lock or unlock its level',
 };
