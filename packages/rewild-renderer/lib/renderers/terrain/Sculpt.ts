@@ -286,3 +286,66 @@ export function applySculptStamp(
 
   return [...touched.values()];
 }
+
+/**
+ * Rewrites each LOD-0 sample in the sample-space box (x0, z0)–(x1, z1) with
+ * `edit(wx, wz, height)` and returns the chunks whose heights changed. As in
+ * applySculptStamp, a sample is edited only when every chunk that owns it
+ * resolves, and is written to each of them.
+ */
+export function editSamples(
+  source: SculptHeightSource,
+  x0: number,
+  z0: number,
+  x1: number,
+  z1: number,
+  edit: (wx: number, wz: number, height: number) => number
+): TouchedChunk[] {
+  const chunkSize = source.chunkSize;
+  const span = chunkSize - 1;
+  const half = span / 2;
+
+  const chunkCache = new Map<string, Float32Array | null>();
+  const resolve = (cx: number, cy: number): Float32Array | null => {
+    const key = `${cx},${cy}`;
+    let heights = chunkCache.get(key);
+    if (heights === undefined) {
+      heights = source.getHeights(cx, cy);
+      chunkCache.set(key, heights);
+    }
+    return heights;
+  };
+
+  const touched = new Map<string, TouchedChunk>();
+  for (let wz = z0; wz <= z1; wz++) {
+    const cyMin = Math.ceil((wz - half) / span);
+    const cyMax = Math.floor((wz + half) / span);
+    for (let wx = x0; wx <= x1; wx++) {
+      const cxMin = Math.ceil((wx - half) / span);
+      const cxMax = Math.floor((wx + half) / span);
+      let editable = true;
+      for (let cy = cyMin; cy <= cyMax && editable; cy++)
+        for (let cx = cxMin; cx <= cxMax && editable; cx++)
+          if (!resolve(cx, cy)) editable = false;
+      if (!editable) continue;
+
+      const first = resolve(cxMin, cyMin)!;
+      const v =
+        first[
+          (cyMin * span + half - wz) * chunkSize + (wx - cxMin * span + half)
+        ];
+      const next = edit(wx, wz, v);
+      if (next === v) continue;
+
+      for (let cy = cyMin; cy <= cyMax; cy++)
+        for (let cx = cxMin; cx <= cxMax; cx++) {
+          const heights = resolve(cx, cy)!;
+          heights[(cy * span + half - wz) * chunkSize + (wx - cx * span + half)] =
+            next;
+          const key = `${cx},${cy}`;
+          if (!touched.has(key)) touched.set(key, { cx, cy, heights });
+        }
+    }
+  }
+  return [...touched.values()];
+}

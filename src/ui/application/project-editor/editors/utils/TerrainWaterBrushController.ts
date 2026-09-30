@@ -9,19 +9,39 @@ import {
 } from 'rewild-renderer/lib/renderers/terrain/Water';
 import {
   TouchedWaterChunk,
+  WATER_EDIT_STEP,
   WaterEditSource,
+  WaterGuard,
   WaterStampType,
   applyWaterStamp,
+  buildWaterGuard,
   editedBody,
   editedBodyId,
 } from 'rewild-renderer/lib/renderers/terrain/WaterEdit';
+import {
+  CARVE_BANK_REACH,
+  WATER_LIP_EASE,
+  WATER_LIP_WIDTH,
+  applyCarveStamp,
+  applyRaiseStamp,
+  applyWaterLip,
+  buildShoreGrid,
+  buildWaterLevels,
+  WaterLevels,
+} from 'rewild-renderer/lib/renderers/terrain/WaterCarve';
+import type {
+  SculptHeightSource,
+  TouchedChunk,
+} from 'rewild-renderer/lib/renderers/terrain/Sculpt';
 import type { ResolvedWater } from 'rewild-renderer/lib/renderers/terrain/WaterMap';
 import { Raycaster, Intersection } from 'rewild-renderer/lib/core/Raycaster';
+import { writeChunkSnapshot } from 'src/database/chunk-snapshots';
 import { writeWaterBodies } from 'src/database/water-bodies';
 import { writeWaterEdit } from 'src/database/water-edits';
 import { projectStore } from 'src/ui/stores/ProjectStore';
 import { waterBrushStore } from 'src/ui/stores/WaterBrushStore';
 import { BrushCursor, pickTerrain } from './BrushCursor';
+import { ChunkHeightLoader } from './ChunkHeights';
 
 // Stamp pacing, mirroring the paint brushes.
 const MAX_STAMP_DT = 0.1; // seconds
@@ -40,6 +60,10 @@ interface PaintStroke {
   typeWeights: number[];
   // The record of a body this stroke made on dry land.
   newBody: WaterBody | null;
+  // Chunks whose heights an add or remove stroke carved or raised.
+  heights: Map<string, TouchedChunk>;
+  // The add stroke's stamps, as (x, z, radius) triples.
+  discs: number[];
   lastStampTime: number;
   minX: number;
   minZ: number;
@@ -69,10 +93,13 @@ const metres = (value: number) => `${value.toFixed(2)} m`;
 
 /**
  * Editor water brush. Add, remove, reset and type paint the chunks' water
- * edits under the brush like the paint brushes, then the edit rules settle the
- * water they changed. Level picks the lake under the click and moves its level
- * with a vertical drag, live and capped at its spill height. Lock toggles the
- * lock of the lake under the click.
+ * edits under the brush like the paint brushes. Add also digs a bed under the
+ * water and raises a lip around it when the stroke ends, and stops at other
+ * water unless it stands at the same level. Remove raises the ground under
+ * the water above its level. After reset, the edit rules settle the water it
+ * changed. Level picks the lake under the click
+ * and moves its level with a vertical drag, live and capped at its spill
+ * height. Lock toggles the lock of the lake under the click.
  */
 export class TerrainWaterBrushController {
   private stroke: Stroke | null = null;
@@ -80,6 +107,10 @@ export class TerrainWaterBrushController {
   private scratchTransforms: Transform[] = [];
   private cursor: BrushCursor;
   private source: WaterEditSource;
+  private heightSource: SculptHeightSource;
+  private heights: ChunkHeightLoader;
+  private resolvedWater = (cx: number, cy: number) =>
+    this.getResolved(cx, cy);
 
   constructor(private renderer: Renderer) {
     const controller = this;
@@ -96,7 +127,17 @@ export class TerrainWaterBrushController {
         return controller.renderer.terrainRenderer.metersPerSample;
       },
       getEdit: (cx: number, cy: number) => this.getChunkEdit(cx, cy),
-      getResolved: (cx: number, cy: number) => this.getResolved(cx, cy),
+      getResolved: this.resolvedWater,
+    };
+    this.heights = new ChunkHeightLoader(renderer);
+    this.heightSource = {
+      get chunkSize() {
+        return controller.renderer.terrainRenderer.mapChunkSizeLod;
+      },
+      get metersPerSample() {
+        return controller.renderer.terrainRenderer.metersPerSample;
+      },
+      getHeights: (cx: number, cy: number) => this.heights.get(cx, cy),
     };
   }
 
@@ -171,6 +212,8 @@ export class TerrainWaterBrushController {
         brush === 'type' ? waterBrushStore.waterType : LAKE_WATER
       ),
       newBody: null,
+      heights: new Map(),
+      discs: [],
       lastStampTime: performance.now(),
       minX: Infinity,
       minZ: Infinity,
@@ -226,7 +269,7 @@ export class TerrainWaterBrushController {
       return;
     }
 
-    if (stroke.touched.size === 0) return;
+    if (stroke.touched.size === 0 && stroke.heights.size === 0) return;
     if (!levelId) return this.warnUnsaved();
     await Promise.all(
       [...stroke.touched.values()].map((t) =>
@@ -235,7 +278,17 @@ export class TerrainWaterBrushController {
     );
     if (stroke.newBody) await rules.setRecord(stroke.newBody);
 
-    if (stroke.type !== 'paint') {
+    if (stroke.type === 'add' || stroke.type === 'remove') {
+      if (stroke.type === 'add') this.raiseLip(stroke);
+      const size = this.renderer.terrainRenderer.mapChunkSizeLod;
+      await Promise.all(
+        [...stroke.heights.values()].map((t) =>
+          writeChunkSnapshot(levelId, t.cx, t.cy, t.heights, size)
+        )
+      );
+      if (stroke.newBody)
+        await writeWaterBodies(levelId, rules.savedBodies());
+    } else if (stroke.type === 'reset') {
       const settled = await rules.settle(
         stroke.minX,
         stroke.minZ,
@@ -262,11 +315,16 @@ export class TerrainWaterBrushController {
     this.markDirty();
   }
 
-  /** Reads the saved water edits of chunks under the brush before a stroke
-   *  reaches them. */
+  /** Reads the saved water edits and heights of chunks under the brush
+   *  before a stroke reaches them. */
   prefetchEdits(centerX: number, centerZ: number, radius: number) {
     const terrain = this.renderer.terrainRenderer;
     terrain.waterRules.resolveRecords();
+    this.heights.prefetch(
+      centerX,
+      centerZ,
+      radius * (1 + CARVE_BANK_REACH) + WATER_LIP_WIDTH + WATER_LIP_EASE
+    );
     const span = terrain.chunkSize;
     const half = span / 2;
     for (
@@ -291,27 +349,118 @@ export class TerrainWaterBrushController {
     stroke.maxX = Math.max(stroke.maxX, point.x + radius);
     stroke.maxZ = Math.max(stroke.maxZ, point.z + radius);
 
+    const terrain = this.renderer.terrainRenderer;
+    const amount = Math.min(1, waterBrushStore.strength * PAINT_RATE * dt);
+    let guard: WaterGuard | undefined;
+    if (stroke.type === 'add') {
+      const unit = terrain.metersPerSample * WATER_EDIT_STEP;
+      const reach = radius * (1 + CARVE_BANK_REACH);
+      guard = buildWaterGuard(
+        this.resolvedWater,
+        (terrain.mapChunkSizeLod - 1) / WATER_EDIT_STEP,
+        Math.floor((point.x - reach) / unit),
+        Math.floor((point.z - reach) / unit),
+        Math.ceil((point.x + reach) / unit),
+        Math.ceil((point.z + reach) / unit),
+        stroke.bodyId,
+        stroke.level
+      );
+      stroke.discs.push(point.x, point.z, radius);
+    }
+
+    // Read before the stamp takes the water away.
+    let levels: WaterLevels | undefined;
+    if (stroke.type === 'remove') {
+      const unit = terrain.metersPerSample * WATER_EDIT_STEP;
+      levels = buildWaterLevels(
+        this.resolvedWater,
+        (terrain.mapChunkSizeLod - 1) / WATER_EDIT_STEP,
+        Math.floor((point.x - radius) / unit),
+        Math.floor((point.z - radius) / unit),
+        Math.ceil((point.x + radius) / unit),
+        Math.ceil((point.z + radius) / unit)
+      );
+    }
+
     const touched = applyWaterStamp(this.source, {
       type: stroke.type,
       centerX: point.x,
       centerZ: point.z,
       radius,
-      amount: Math.min(1, waterBrushStore.strength * PAINT_RATE * dt),
+      amount,
       level: stroke.level,
       bodyId: stroke.bodyId,
       typeWeights: stroke.typeWeights,
+      guard,
     });
-
-    const terrain = this.renderer.terrainRenderer;
     for (const t of touched) {
       const key = `${t.cx},${t.cy}`;
       if (!stroke.touched.has(key)) stroke.touched.set(key, t);
       terrain.refreshChunkWater(t.cx, t.cy);
     }
+
+    if (guard)
+      this.keepHeights(
+        stroke,
+        applyCarveStamp(this.heightSource, {
+          centerX: point.x,
+          centerZ: point.z,
+          radius,
+          level: stroke.level,
+          depth: waterBrushStore.depth,
+          amount,
+          guard,
+        })
+      );
+    if (levels)
+      this.keepHeights(
+        stroke,
+        applyRaiseStamp(this.heightSource, {
+          centerX: point.x,
+          centerZ: point.z,
+          radius,
+          rise: terrain.waterRules.lockMargin,
+          amount,
+          levels,
+        })
+      );
+  }
+
+  // Raises a lip around the water an add stroke painted, to its level plus
+  // the lakes' margin.
+  private raiseLip(stroke: PaintStroke) {
+    const terrain = this.renderer.terrainRenderer;
+    const rules = terrain.waterRules;
+    const unit = terrain.metersPerSample * WATER_EDIT_STEP;
+    const reach = WATER_LIP_WIDTH + WATER_LIP_EASE + unit;
+    const grid = buildShoreGrid(
+      (cx, cy) => rules.chunkWater(cx, cy),
+      (terrain.mapChunkSizeLod - 1) / WATER_EDIT_STEP,
+      unit,
+      Math.floor((stroke.minX - reach) / unit),
+      Math.floor((stroke.minZ - reach) / unit),
+      Math.ceil((stroke.maxX + reach) / unit),
+      Math.ceil((stroke.maxZ + reach) / unit),
+      stroke.bodyId,
+      stroke.discs
+    );
+    this.keepHeights(
+      stroke,
+      applyWaterLip(this.heightSource, grid, stroke.level + rules.lockMargin)
+    );
+  }
+
+  private keepHeights(stroke: PaintStroke, touched: TouchedChunk[]) {
+    const terrain = this.renderer.terrainRenderer;
+    for (const t of touched) {
+      const key = `${t.cx},${t.cy}`;
+      if (!stroke.heights.has(key)) stroke.heights.set(key, t);
+      terrain.remeshChunk(t.cx, t.cy);
+    }
   }
 
   // Adds to the lake under the click at its level, or starts a new one on dry
-  // land at the ground plus the brush's depth. False while the chunk's water
+  // land with its surface at the clicked ground. False while the chunk's water
   // is still being read.
   private pickAddTarget(stroke: PaintStroke, point: Vector3): boolean {
     const terrain = this.renderer.terrainRenderer;
@@ -349,7 +498,7 @@ export class TerrainWaterBrushController {
         Math.imul(Math.round(point.z), 19349663) ^
         Date.now()
     );
-    stroke.level = ground + waterBrushStore.depth;
+    stroke.level = ground;
     stroke.newBody = editedBody(
       stroke.bodyId,
       stroke.level,

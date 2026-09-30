@@ -1,13 +1,12 @@
-import { Color, Vector2, Vector3 } from 'rewild-common';
-import { Renderer, Transform, resolveClimatePreset } from 'rewild-renderer';
+import { Color, Vector3 } from 'rewild-common';
+import { Renderer, Transform } from 'rewild-renderer';
 import { BrushCursor, pickTerrain } from './BrushCursor';
+import { ChunkHeightLoader } from './ChunkHeights';
 import {
   applySculptStamp,
   SculptHeightSource,
   SculptBrushType,
 } from 'rewild-renderer/lib/renderers/terrain/Sculpt';
-import { TerrainChunk } from 'rewild-renderer/lib/renderers/terrain/TerrainChunk';
-import { generateBiomeBlendedHeightMap } from 'rewild-renderer/lib/renderers/terrain/Noise';
 import { Raycaster, Intersection } from 'rewild-renderer/lib/core/Raycaster';
 import { WATER_MAP_STEP } from 'rewild-renderer/lib/renderers/terrain/WaterMap';
 import { writeChunkSnapshot } from 'src/database/chunk-snapshots';
@@ -56,9 +55,7 @@ interface StrokeState {
  */
 export class TerrainSculptController {
   private stroke: StrokeState | null = null;
-  // Chunks whose snapshot lookup we've kicked off so their heights become
-  // sculptable; getHeights skips them until the lookup lands.
-  private pendingResolves = new Set<string>();
+  private heights: ChunkHeightLoader;
   private scratchIntersections: Intersection[] = [];
   private scratchTransforms: Transform[] = [];
   private cursor: BrushCursor;
@@ -66,6 +63,7 @@ export class TerrainSculptController {
 
   constructor(private renderer: Renderer) {
     const controller = this;
+    this.heights = new ChunkHeightLoader(renderer);
     this.cursor = new BrushCursor(
       renderer,
       new Color(1, 0.6, 0.1),
@@ -213,21 +211,7 @@ export class TerrainSculptController {
   prefetchHeights(centerX: number, centerZ: number, radius: number) {
     const terrain = this.renderer.terrainRenderer;
     terrain.waterRules.resolveRecords();
-    // World span of a chunk (already scaled by metersPerSample), so this maps
-    // the world-space brush footprint to chunk coords at any terrain scale.
-    const span = terrain.chunkSize;
-    const half = span / 2;
-    const cxMin = Math.ceil((centerX - radius - half) / span);
-    const cxMax = Math.floor((centerX + radius + half) / span);
-    const cyMin = Math.ceil((centerZ - radius - half) / span);
-    const cyMax = Math.floor((centerZ + radius + half) / span);
-
-    for (let cy = cyMin; cy <= cyMax; cy++) {
-      for (let cx = cxMin; cx <= cxMax; cx++) {
-        const chunk = terrain.terrainChunks.get(`${cx},${cy}`);
-        if (chunk && !chunk.heights) this.ensureHeights(chunk);
-      }
-    }
+    this.heights.prefetch(centerX, centerZ, radius);
   }
 
   private stamp(point: Vector3, dt: number) {
@@ -286,15 +270,8 @@ export class TerrainSculptController {
   // chunk co-owns, so a not-yet-ready neighbour can never cause a seam). A
   // chunk is also skipped until its locked water levels are known.
   private getChunkHeights(cx: number, cy: number): Float32Array | null {
-    const chunk = this.renderer.terrainRenderer.terrainChunks.get(
-      `${cx},${cy}`
-    );
-    // Chunk objects exist well beyond raycast range; if one is somehow
-    // missing, skipping keeps every write consistent with what will be saved.
-    if (!chunk) return null;
-    if (chunk.heights) return this.locksResolved(cx, cy) ? chunk.heights : null;
-    this.ensureHeights(chunk);
-    return null;
+    const heights = this.heights.get(cx, cy);
+    return heights && this.locksResolved(cx, cy) ? heights : null;
   }
 
   private locksResolved(cx: number, cy: number): boolean {
@@ -309,41 +286,5 @@ export class TerrainSculptController {
     if (levels === undefined) return false;
     stroke.locks.set(key, levels);
     return true;
-  }
-
-  // Resolves heights for a chunk that has none in memory: its saved snapshot
-  // if one exists, else its deterministic generated baseline. Runs once per
-  // chunk; by the next pointer event the chunk is editable.
-  private ensureHeights(chunk: TerrainChunk) {
-    if (chunk.heights || this.pendingResolves.has(chunk.id)) return;
-    this.pendingResolves.add(chunk.id);
-
-    const terrain = this.renderer.terrainRenderer;
-    chunk
-      .resolveHeights(terrain.snapshotProvider)
-      .then((heights) => {
-        if (chunk.disposed) return;
-        // Population, not an edit — the meshes already reflect this baseline,
-        // so bumping the version here would re-mesh the chunk for nothing.
-        chunk.populateHeights(heights ?? this.generateBaseline(chunk));
-      })
-      .finally(() => {
-        this.pendingResolves.delete(chunk.id);
-      });
-  }
-
-  // The chunk's unedited heightfield — byte-identical to what the terrain
-  // worker would generate for it (same generator, seed and preset).
-  private generateBaseline(chunk: TerrainChunk): Float32Array {
-    const terrain = this.renderer.terrainRenderer;
-    const size = terrain.mapChunkSizeLod;
-    return generateBiomeBlendedHeightMap(
-      size,
-      size,
-      chunk.seed,
-      new Vector2(chunk.coord.x * (size - 1), chunk.coord.y * (size - 1)),
-      resolveClimatePreset(chunk.climatePreset),
-      chunk.seaLevel
-    );
   }
 }

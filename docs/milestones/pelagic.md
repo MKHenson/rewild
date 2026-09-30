@@ -813,13 +813,29 @@ shelf.
     stay.
   - **Add / Remove**: paint coverage; Shift swaps them. A stroke that starts on water adds to
     that body at its level, or to the sea at sea level. One that starts on dry land makes a
-    new body, at the clicked ground plus the toolbar's **depth** (1.5 m by default), and saves
-    its record.
+    new body with its surface at the clicked ground, and saves its record.
+  - **Add shapes the terrain** (`WaterCarve.ts`), as a generated lake does, so the water it
+    paints is the water that stays:
+    - Each stamp lowers the ground toward a **bed**: the toolbar's **depth** (1.5 m by default)
+      below the level at the brush centre, rising to the level at the brush edge. Past the
+      edge a **bank** climbs at 1 m per metre for one more radius, so a stroke up a hill cuts
+      into it. Ground is only lowered, blended by the strength like the coverage.
+    - When the stroke ends, dry ground near the water it painted is raised to a **lip** at the
+      level plus the lakes' `margin`: flat for 8 m, easing back to the ground over 16 m.
+    - The stroke **stops at other water**: another body's texels, and the texels around them,
+      get no coverage and no digging (`buildWaterGuard`). Water at the stroke's level, within
+      5 cm, is not in the way, so a lake brought to sea level with **Level** joins the sea when
+      a channel is painted between them.
+    - The edit rules do not run after an Add stroke. The heights are saved with the water edit.
+  - **Remove makes land** (`applyRaiseStamp`): each stamp raises the ground under the water it
+    takes away toward the water's level plus the lakes' `margin` at the brush centre, falling
+    to the level at the brush edge, so the shore follows the brush and a stroke inside a lake
+    leaves an island. Only ground under water rises, blended by the strength. The edit rules do
+    not run after it; the heights are saved with the water edit.
   - **Reset**: hands the water under the brush back to the generator.
   - **Lock**: click a lake to lock or unlock its level. See [Edit rules](#edit-rules).
-  - After an Add, Remove or Reset stroke, the edit rules settle the stroke's box as they do after
-    a sculpt stroke, so new water above its rim drains to the rim. Water added on flat ground
-    drains away: dig a hollow first.
+  - After a Reset stroke, the edit rules settle the stroke's box as they do after a sculpt
+    stroke.
 - The sculpt brush applies the edit rules after each stroke. A lake that drains shows its new
   shore at once.
 - **Debug views** as console commands: level, coverage, type weights, depth and flow.
