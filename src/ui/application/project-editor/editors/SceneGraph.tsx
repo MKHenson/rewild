@@ -21,6 +21,7 @@ import { projectStore } from '../../../stores/ProjectStore';
 import { sculptStore } from '../../../stores/SculptStore';
 import { biomePaintStore } from '../../../stores/BiomePaintStore';
 import { scatterPaintStore } from '../../../stores/ScatterPaintStore';
+import { waterBrushStore } from '../../../stores/WaterBrushStore';
 import { Subscriber } from 'rewild-common';
 
 interface Props {}
@@ -67,7 +68,8 @@ export class SceneGraph extends Component<Props> {
         sceneGraphStore.selectedContainerId &&
         !sculptStore.enabled &&
         !biomePaintStore.enabled &&
-        !scatterPaintStore.enabled
+        !scatterPaintStore.enabled &&
+        !waterBrushStore.enabled
       ) {
         sceneGraphStore.setActiveContainer(null);
         return;

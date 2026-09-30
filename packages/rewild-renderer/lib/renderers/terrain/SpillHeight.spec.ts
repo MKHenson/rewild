@@ -6,6 +6,7 @@ import {
   findBodies,
   findSpillHeight,
   lockedLevels,
+  setBodyLevel,
   texelId,
 } from './SpillHeight';
 import {
@@ -437,6 +438,66 @@ describe('fillSeaChannels', () => {
     expect(read(44, 0)!.bodyId).toBe(0);
     expect(read(44, 0)!.coverage).toBe(255);
     expect(read(36, 0)!.authority).toBe(0);
+  });
+});
+
+describe('setBodyLevel', () => {
+  // The lake's bank slopes from 2 at r = 30 up to 12 at r = 50.
+  const sloped = (wx: number, wz: number) => {
+    const r = Math.hypot(wx, wz);
+    return r < 30 ? 2 : r < 50 ? 2 + (r - 30) * 0.5 : 5;
+  };
+
+  const moved = (target: number) => {
+    const source = makeSource({ height: sloped });
+    const edits = new Map<string, WaterEdit>();
+    const result = setBodyLevel(
+      source,
+      (cx, cy) => {
+        const key = `${cx},${cy}`;
+        if (!edits.has(key)) edits.set(key, createWaterEdit(CHUNK));
+        return edits.get(key)!;
+      },
+      BODY,
+      START,
+      LEVEL,
+      target,
+      [0, 255, 0, 0]
+    );
+    const read = (wx: number, wz: number) => {
+      const cx = Math.floor((wx + HALF) / SPAN);
+      const cy = Math.floor((wz + HALF) / SPAN);
+      const edit = edits.get(`${cx},${cy}`)!;
+      const plane = SIZE * SIZE;
+      const t =
+        ((cy * SPAN + HALF - wz) / STEP) * SIZE +
+        (wx - cx * SPAN + HALF) / STEP;
+      return {
+        coverage: edit.mask.weights[WATER_EDIT_COVERAGE * plane + t],
+        lake: edit.mask.weights[(WATER_EDIT_TYPES + LAKE_TYPE) * plane + t],
+        level: edit.level[t],
+      };
+    };
+    return { result, read };
+  };
+
+  it('spreads a rising lake over the ground below its new level', () => {
+    const { result, read } = moved(9);
+    expect(result.status).toBe('written');
+    expect(read(40, 0)).toEqual({ coverage: 255, lake: 255, level: 9 });
+  });
+
+  it('covers the ground around the new shore', () => {
+    const { read } = moved(9);
+    expect(read(44, 0).coverage).toBe(255);
+    expect(read(48, 0)).toEqual({ coverage: 0, lake: 0, level: 9 });
+  });
+
+  it('shrinks a falling lake, keeping its bank where it now meets it', () => {
+    const { read } = moved(4);
+    expect(read(0, 0)).toEqual({ coverage: 255, lake: 255, level: 4 });
+    expect(read(36, 0).coverage).toBe(128);
+    expect(read(40, 0).coverage).toBe(0);
   });
 });
 

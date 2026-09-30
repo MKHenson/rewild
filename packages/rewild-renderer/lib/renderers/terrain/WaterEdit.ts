@@ -8,6 +8,7 @@ import {
   serializePaintMask,
 } from './PaintMask';
 import type { WaterBody } from './Lakes';
+import type { ResolvedWater } from './WaterMap';
 import { MAX_WATER_TYPES } from './Water';
 
 // A chunk's authored water, blended over what the generator makes.
@@ -303,8 +304,10 @@ export function applyWaterEdit(
  * `add` raises the edit's coverage and sets its level, body and types. `remove`
  * lowers its coverage, taking authority so the generated water goes too.
  * `reset` lowers the authority, handing the texel back to the generator.
+ * `paint` blends the types of the water already there, taking the texel over
+ * as it stands (see WaterEditSource.getResolved).
  */
-export type WaterStampType = 'add' | 'remove' | 'reset';
+export type WaterStampType = 'add' | 'remove' | 'reset' | 'paint';
 
 export interface WaterStamp {
   type: WaterStampType;
@@ -316,7 +319,7 @@ export interface WaterStamp {
   /** World height of added water. */
   level: number;
   bodyId: number;
-  /** Palette weights of added water, summing to 1. */
+  /** Palette weights of added or painted water, summing to 1. */
   typeWeights: ArrayLike<number>;
 }
 
@@ -328,6 +331,10 @@ export interface WaterEditSource {
   chunkSize: number;
   metersPerSample: number;
   getEdit(cx: number, cy: number): WaterEdit | null;
+  /** The chunk's water as it stands (see resolveWater), which a `paint` stamp
+   *  takes over where the edit does not own a texel outright. A chunk without
+   *  it is skipped. */
+  getResolved?(cx: number, cy: number): ResolvedWater | null;
 }
 
 export interface TouchedWaterChunk {
@@ -413,6 +420,11 @@ export function applyWaterStamp(
           if (resolve(cx, cy)) resolved++;
         }
       if (owners === 0 || resolved !== owners) continue;
+      let water: ResolvedWater | null = null;
+      if (stamp.type === 'paint') {
+        water = source.getResolved?.(cxMin, cyMin) ?? null;
+        if (!water) continue;
+      }
 
       const d = Math.min(1, stamp.amount * falloff(Math.sqrt(distSq), radius));
       if (d <= 0) continue;
@@ -432,7 +444,25 @@ export function applyWaterStamp(
       const coverage = coveredByte / 255;
       let level = first.level[firstTexel];
       let bodyId = first.bodyIds[firstTexel];
-      if (stamp.type === 'reset') {
+      if (stamp.type === 'paint') {
+        if (ownedByte < 255) {
+          next[WATER_EDIT_AUTHORITY] = 255;
+          next[WATER_EDIT_COVERAGE] = water!.coverage[firstTexel];
+          for (let c = 0; c < MAX_WATER_TYPES; c++)
+            next[WATER_EDIT_TYPES + c] = water!.typeWeights[firstTexel * 4 + c];
+          level = water!.levels[firstTexel];
+          bodyId = water!.bodyIds[firstTexel];
+        }
+        if (next[WATER_EDIT_COVERAGE] === 0) continue;
+        for (let c = 0; c < MAX_WATER_TYPES; c++) {
+          const byte = next[WATER_EDIT_TYPES + c];
+          const type = byte / 255;
+          next[WATER_EDIT_TYPES + c] = quantise(
+            byte,
+            type + d * ((stamp.typeWeights[c] ?? 0) - type)
+          );
+        }
+      } else if (stamp.type === 'reset') {
         next[WATER_EDIT_AUTHORITY] = quantise(ownedByte, authority * (1 - d));
       } else {
         next[WATER_EDIT_AUTHORITY] = quantise(

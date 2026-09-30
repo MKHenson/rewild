@@ -12,6 +12,7 @@ import {
   findBodies,
   findSpillHeight,
   lockedLevels,
+  setBodyLevel,
 } from './SpillHeight';
 import type { TerrainChunk } from './TerrainChunk';
 import { OCEAN_WATER, getWaterTypeIndex } from './Water';
@@ -65,6 +66,13 @@ export interface WaterSettleResult {
   outcomes: WaterBodyOutcome[];
   /** Texels the sea filled. */
   channelTexels: number;
+  /** Chunks whose water edits changed, to save. */
+  chunks: TouchedWaterChunk[];
+}
+
+/** A body's level after the level brush moved it. */
+export interface WaterLevelResult {
+  body: WaterBody;
   /** Chunks whose water edits changed, to save. */
   chunks: TouchedWaterChunk[];
 }
@@ -288,6 +296,28 @@ export class WaterBodyRules {
   }
 
   /**
+   * A loaded chunk's water as it stands (see resolveWater), or null while its
+   * edit is still being read.
+   */
+  chunkWater(cx: number, cy: number): ResolvedWater | null {
+    const host = this.host;
+    const chunk = host.terrainChunks.get(`${cx},${cy}`);
+    if (!chunk) return null;
+    if (!chunk.waterEditIsResolved) {
+      chunk.resolveWaterEdit(host.waterEditProvider);
+      return null;
+    }
+    return resolveWater(
+      host.mapChunkSizeLod,
+      host.seed,
+      chunk.noiseOffset,
+      resolveClimatePreset(host.climatePreset),
+      host.seaLevel,
+      chunk.waterEdit
+    );
+  }
+
+  /**
    * The locked levels over a chunk's water texels (see lockedLevels): null
    * where nothing is locked, undefined while the records or the chunk's edit
    * are still being read.
@@ -381,10 +411,79 @@ export class WaterBodyRules {
     return body;
   }
 
+  /**
+   * Moves the body that owns the ground at world (x, z) to `target`, held at
+   * or below `cap` (its spill height), spreading or shrinking its water (see
+   * setBodyLevel). Null on the open ocean. The caller saves the records and
+   * the returned edits. Runs one at a time with settle.
+   */
+  setLevelAt(
+    x: number,
+    z: number,
+    target: number,
+    cap: number
+  ): Promise<WaterLevelResult | null> {
+    const run = this.queue.then(() => this.runSetLevel(x, z, target, cap));
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
   /** Saves `body` as the record of an edited body, e.g. new water. */
   async setRecord(body: WaterBody): Promise<void> {
     const records = await this.resolveRecords();
     records.set(body.id, body);
+  }
+
+  private async runSetLevel(
+    x: number,
+    z: number,
+    target: number,
+    cap: number
+  ): Promise<WaterLevelResult | null> {
+    const host = this.host;
+    const records = await this.resolveRecords();
+    const climate = resolveClimatePreset(host.climatePreset);
+    const ctx = new RuleContext(host, climate);
+    const touch = await this.touchAt(ctx, x, z);
+    if (!touch) return null;
+    const body = this.recordOf(touch, records, climate);
+    const level = Math.min(target, cap);
+    const types = body.typeWeights.map((w) => w * 255);
+    const write = await untilLoaded(
+      () =>
+        setBodyLevel(
+          ctx,
+          (cx, cy) => ctx.editFor(cx, cy),
+          body.id,
+          touch.starts,
+          body.level,
+          level,
+          types
+        ),
+      (cx, cy) => ctx.ensure(cx, cy)
+    );
+    const record: WaterBody = {
+      ...body,
+      level,
+      spillHeight: Number.isFinite(cap) ? cap : body.spillHeight,
+    };
+    records.set(record.id, record);
+    this.commit(ctx, write.touched);
+    return { body: record, chunks: write.touched };
+  }
+
+  // Hands edits written for chunks that loaded meanwhile to those chunks, and
+  // rebuilds the water of every chunk touched.
+  private commit(ctx: RuleContext, touched: Iterable<TouchedWaterChunk>) {
+    const host = this.host;
+    for (const t of touched) {
+      const key = `${t.cx},${t.cy}`;
+      const detached = ctx.detached.get(key);
+      const chunk = host.terrainChunks.get(key);
+      if (detached && chunk && chunk.waterEdit !== detached)
+        chunk.setWaterEdit(detached);
+      host.refreshChunkWater(t.cx, t.cy);
+    }
   }
 
   private async touchAt(
@@ -512,14 +611,7 @@ export class WaterBodyRules {
       });
     }
 
-    for (const t of touched.values()) {
-      const key = `${t.cx},${t.cy}`;
-      const detached = ctx.detached.get(key);
-      const chunk = host.terrainChunks.get(key);
-      if (detached && chunk && chunk.waterEdit !== detached)
-        chunk.setWaterEdit(detached);
-      host.refreshChunkWater(t.cx, t.cy);
-    }
+    this.commit(ctx, touched.values());
     return {
       outcomes,
       channelTexels: fill.texels,

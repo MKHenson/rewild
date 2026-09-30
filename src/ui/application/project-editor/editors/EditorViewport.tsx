@@ -46,6 +46,9 @@ import { scatterPaintStore } from 'src/ui/stores/ScatterPaintStore';
 import { ScatterPaintToolbar } from './ScatterPaintToolbar';
 import { PositionReadout } from './PositionReadout';
 import { TerrainScatterPaintController } from './utils/TerrainScatterPaintController';
+import { waterBrushStore } from 'src/ui/stores/WaterBrushStore';
+import { WaterBrushToolbar } from './WaterBrushToolbar';
+import { TerrainWaterBrushController } from './utils/TerrainWaterBrushController';
 import { loadCameraState, saveCameraState } from './utils/CameraPersistence';
 import {
   applyConformPolicy,
@@ -88,6 +91,7 @@ export class EditorViewport extends Component<Props> {
   placementSync: ConformedPlacementSync | null = null;
   biomePaintController: TerrainBiomePaintController | null = null;
   scatterPaintController: TerrainScatterPaintController | null = null;
+  waterBrushController: TerrainWaterBrushController | null = null;
   selectedTransform: Transform | null = null;
   private didDrag = false;
   private mouseDownPos = { x: 0, y: 0 };
@@ -211,6 +215,14 @@ export class EditorViewport extends Component<Props> {
       this.render();
     });
 
+    this.on(waterBrushStore.dispatcher, () => {
+      if (!waterBrushStore.enabled) {
+        endWaterStroke();
+        this.waterBrushController?.hideCursor();
+      }
+      this.render();
+    });
+
     const endSculptStroke = () => {
       if (!this.sculptController?.isSculpting) return;
       this.sculptController.endStroke().catch((err) => {
@@ -231,6 +243,14 @@ export class EditorViewport extends Component<Props> {
       if (!this.scatterPaintController?.isPainting) return;
       this.scatterPaintController.endStroke().catch((err) => {
         console.error('Failed to save painted scatter density:', err);
+      });
+      if (this.orbitController) this.orbitController.enabled = true;
+    };
+
+    const endWaterStroke = () => {
+      if (!this.waterBrushController?.isPainting) return;
+      this.waterBrushController.endStroke().catch((err) => {
+        console.error('Failed to save water edits:', err);
       });
       if (this.orbitController) this.orbitController.enabled = true;
     };
@@ -358,6 +378,8 @@ export class EditorViewport extends Component<Props> {
         biomePaintStore.setEnabled(false);
       } else if (event.code === 'Escape' && scatterPaintStore.enabled) {
         scatterPaintStore.setEnabled(false);
+      } else if (event.code === 'Escape' && waterBrushStore.enabled) {
+        waterBrushStore.setEnabled(false);
       } else if (event.code === 'Equal' || event.code === 'NumpadAdd') {
         this.gizmo?.increaseSize();
         this.updateGizmoScale();
@@ -448,6 +470,9 @@ export class EditorViewport extends Component<Props> {
         this.scatterPaintController = new TerrainScatterPaintController(
           this.renderer
         );
+        this.waterBrushController = new TerrainWaterBrushController(
+          this.renderer
+        );
 
         this.installCameraObserver();
 
@@ -481,7 +506,8 @@ export class EditorViewport extends Component<Props> {
       if (
         sculptStore.enabled ||
         biomePaintStore.enabled ||
-        scatterPaintStore.enabled
+        scatterPaintStore.enabled ||
+        waterBrushStore.enabled
       )
         return;
       if (this.didDrag) {
@@ -568,6 +594,25 @@ export class EditorViewport extends Component<Props> {
         return;
       }
 
+      if (waterBrushStore.enabled && this.waterBrushController) {
+        if (event.altKey) return;
+
+        const hit = this.waterBrushController.pickTerrain(
+          createRaycaster(event.clientX, event.clientY)
+        );
+        if (hit) {
+          this.orbitController?.cancelInteraction();
+          if (this.orbitController) this.orbitController.enabled = false;
+          this.waterBrushController.beginStroke(
+            hit.point,
+            event.shiftKey,
+            event.clientY
+          );
+          document.addEventListener('mouseup', onWaterDocumentMouseUp);
+        }
+        return;
+      }
+
       this.mouseDownPos.x = event.clientX;
       this.mouseDownPos.y = event.clientY;
       this.didDrag = false;
@@ -611,6 +656,14 @@ export class EditorViewport extends Component<Props> {
       if (event.button !== 0) return;
       document.removeEventListener('mouseup', onScatterDocumentMouseUp);
       endScatterStroke();
+    };
+
+    const onWaterDocumentMouseUp = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      document.removeEventListener('mouseup', onWaterDocumentMouseUp);
+      // Lock acts on the click alone, so it has no stroke to end.
+      if (this.waterBrushController?.isPainting) endWaterStroke();
+      else if (this.orbitController) this.orbitController.enabled = true;
     };
 
     const onMouseMove = (event: MouseEvent) => {
@@ -684,6 +737,31 @@ export class EditorViewport extends Component<Props> {
           );
         }
         this.scatterPaintController.updateCursor(hit?.point ?? null);
+        return;
+      }
+
+      if (waterBrushStore.enabled && this.waterBrushController) {
+        if (event.altKey && !this.waterBrushController.isPainting) {
+          this.waterBrushController.hideCursor();
+          return;
+        }
+
+        const hit = this.waterBrushController.pickTerrain(
+          createRaycaster(event.clientX, event.clientY)
+        );
+        if (this.waterBrushController.isPainting) {
+          this.waterBrushController.moveStroke(
+            hit?.point ?? null,
+            event.clientY
+          );
+        } else if (hit) {
+          this.waterBrushController.prefetchEdits(
+            hit.point.x,
+            hit.point.z,
+            waterBrushStore.radius
+          );
+        }
+        this.waterBrushController.updateCursor(hit?.point ?? null);
         return;
       }
 
@@ -890,6 +968,7 @@ export class EditorViewport extends Component<Props> {
     const scatterPaintToolbar = (
       <ScatterPaintToolbar />
     ) as ScatterPaintToolbar;
+    const waterBrushToolbar = (<WaterBrushToolbar />) as WaterBrushToolbar;
     const loadingOverlay = (
       <Loading overlay label="Loading level" />
     ) as Loading;
@@ -934,6 +1013,12 @@ export class EditorViewport extends Component<Props> {
           container.appendChild(scatterPaintToolbar);
       } else {
         scatterPaintToolbar.remove();
+      }
+      if (waterBrushStore.enabled) {
+        if (!waterBrushToolbar.parentElement)
+          container.appendChild(waterBrushToolbar);
+      } else {
+        waterBrushToolbar.remove();
       }
       return container;
     };
@@ -1094,6 +1179,7 @@ export class EditorViewport extends Component<Props> {
     this.sculptController?.dispose();
     this.biomePaintController?.dispose();
     this.scatterPaintController?.dispose();
+    this.waterBrushController?.dispose();
     this.renderer.dispose();
   }
 }

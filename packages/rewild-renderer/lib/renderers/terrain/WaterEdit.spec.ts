@@ -19,7 +19,7 @@ import {
   isWaterEditValid,
   serializeWaterEdit,
 } from './WaterEdit';
-import { buildWaterMap } from './WaterMap';
+import { ResolvedWater, buildWaterMap } from './WaterMap';
 import { fromFloat16 } from '../../utils/float16';
 
 const CHUNK_SIZE = 65;
@@ -287,5 +287,64 @@ describe('buildWaterMap with an edit', () => {
     )!;
     expect(fromFloat16(water.level[0])).toBe(0);
     expect(water.bodyIds[0]).toBe(OCEAN_BODY_ID);
+  });
+});
+
+describe('applyWaterStamp paint', () => {
+  // One chunk of lake water at level 3, body 5, with one dry texel east of the
+  // centre.
+  const CENTRE = 8 * SIZE + 8;
+  const DRY = CENTRE + 1;
+  function painted(authority = 0) {
+    const edit = createWaterEdit(CHUNK_SIZE);
+    plane(edit, WATER_EDIT_AUTHORITY).fill(authority);
+    const texels = SIZE * SIZE;
+    const water: ResolvedWater = {
+      size: SIZE,
+      step: WATER_EDIT_STEP,
+      coverage: new Uint8Array(texels).fill(255),
+      levels: new Float64Array(texels).fill(3),
+      typeWeights: new Uint8Array(texels * 4),
+      bodyIds: new Uint32Array(texels).fill(5),
+      lakes: [],
+      covered: true,
+    };
+    water.coverage[DRY] = 0;
+    for (let t = 0; t < texels; t++) water.typeWeights[t * 4 + 1] = 255;
+    applyWaterStamp(
+      {
+        chunkSize: CHUNK_SIZE,
+        metersPerSample: METERS_PER_SAMPLE,
+        getEdit: (cx, cy) => (cx === 0 && cy === 0 ? edit : null),
+        getResolved: () => water,
+      },
+      stamp({ type: 'paint', typeWeights: [1, 0, 0, 0] })
+    );
+    return edit;
+  }
+
+  it('takes the water over as it stands', () => {
+    const edit = painted();
+    expect(plane(edit, WATER_EDIT_AUTHORITY)[CENTRE]).toBe(255);
+    expect(plane(edit, WATER_EDIT_COVERAGE)[CENTRE]).toBe(255);
+    expect(edit.level[CENTRE]).toBe(3);
+    expect(edit.bodyIds[CENTRE]).toBe(5);
+  });
+
+  it('blends its types toward the painted type', () => {
+    const edit = painted();
+    expect(plane(edit, WATER_EDIT_TYPES)[CENTRE]).toBe(255);
+    expect(plane(edit, WATER_EDIT_TYPES + 1)[CENTRE]).toBe(0);
+  });
+
+  it('leaves dry ground alone', () => {
+    const edit = painted();
+    expect(plane(edit, WATER_EDIT_AUTHORITY)[DRY]).toBe(0);
+  });
+
+  it('paints an owned texel from the edit itself', () => {
+    const edit = painted(255);
+    expect(plane(edit, WATER_EDIT_COVERAGE)[CENTRE]).toBe(0);
+    expect(plane(edit, WATER_EDIT_TYPES)[CENTRE]).toBe(0);
   });
 });

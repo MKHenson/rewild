@@ -303,6 +303,72 @@ function missingSearch(grid: TexelGrid): SpillSearch {
   };
 }
 
+// Collects every texel body `bodyId` owns connected to `starts` into `out`,
+// within two lake cells of the first start. False when a chunk is missing.
+function collectBody(
+  grid: TexelGrid,
+  cellSize: number,
+  bodyId: number,
+  starts: readonly number[],
+  out: number[]
+): boolean {
+  if (starts.length === 0) return true;
+  const reach = Math.ceil((cellSize * 2) / STEP);
+  const i0 = texelI(starts[0]) - reach;
+  const i1 = texelI(starts[0]) + reach;
+  const j0 = texelJ(starts[0]) - reach;
+  const j1 = texelJ(starts[0]) + reach;
+  const stack: number[] = [];
+  for (const id of starts) {
+    if (!grid.select(texelI(id), texelJ(id))) return false;
+    if (grid.bodyId() !== bodyId || grid.flags() & COLLECTED) continue;
+    grid.mark(COLLECTED);
+    stack.push(id);
+  }
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    const i = texelI(id);
+    const j = texelJ(id);
+    out.push(id);
+    for (let n = 0; n < 4; n++) {
+      const ni = i + NEIGHBOUR_I[n];
+      const nj = j + NEIGHBOUR_J[n];
+      if (ni < i0 || ni > i1 || nj < j0 || nj > j1) continue;
+      if (!grid.select(ni, nj)) return false;
+      if (grid.bodyId() !== bodyId || grid.flags() & COLLECTED) continue;
+      grid.mark(COLLECTED);
+      stack.push(texelId(ni, nj));
+    }
+  }
+  return true;
+}
+
+interface TexelBox {
+  i0: number;
+  i1: number;
+  j0: number;
+  j1: number;
+}
+
+// The lake cell holding the centre of `ids`, and its neighbours, in texels.
+// Lake space is (x − 0.5, −z − 0.5) in samples.
+function searchBox(cellSize: number, ids: readonly number[]): TexelBox {
+  let si = 0;
+  let sj = 0;
+  for (const id of ids) {
+    si += texelI(id);
+    sj += texelJ(id);
+  }
+  const cellX = Math.floor(((si / ids.length) * STEP - 0.5) / cellSize);
+  const cellY = Math.floor((-(sj / ids.length) * STEP - 0.5) / cellSize);
+  return {
+    i0: Math.ceil(((cellX - 1) * cellSize + 0.5) / STEP),
+    i1: Math.floor(((cellX + 2) * cellSize + 0.5) / STEP),
+    j0: Math.ceil((-(cellY + 2) * cellSize - 0.5) / STEP),
+    j1: Math.floor((-(cellY - 1) * cellSize - 0.5) / STEP),
+  };
+}
+
 /**
  * Finds the spill height of body `bodyId` at `level`, which owns the texels
  * `starts` (texelIds). The body is every texel it owns connected to them; the
@@ -319,57 +385,24 @@ export function findSpillHeight(
 ): SpillSearch {
   const grid = new TexelGrid(source);
   const seaLevel = source.seaLevel;
-  const reach = Math.ceil((source.cellSize * 2) / STEP);
 
-  // The body: the texels it owns connected to the starts, bounded by two cells.
   const bodyTexels: number[] = [];
-  const seeds: number[] = [];
-  let si = 0;
-  let sj = 0;
-  if (starts.length === 0) return dry();
-  const i0 = texelI(starts[0]) - reach;
-  const i1 = texelI(starts[0]) + reach;
-  const j0 = texelJ(starts[0]) - reach;
-  const j1 = texelJ(starts[0]) + reach;
   const stack: number[] = [];
-  for (const id of starts) {
-    if (!grid.select(texelI(id), texelJ(id))) return missingSearch(grid);
-    if (grid.bodyId() !== bodyId || grid.flags() & COLLECTED) continue;
-    grid.mark(COLLECTED);
-    stack.push(id);
-  }
-  while (stack.length > 0) {
-    const id = stack.pop()!;
-    const i = texelI(id);
-    const j = texelJ(id);
-    grid.select(i, j);
-    bodyTexels.push(id);
-    if (grid.coverage() > 0 && grid.height() < level) {
-      seeds.push(id);
-      si += i;
-      sj += j;
-    }
-    for (let n = 0; n < 4; n++) {
-      const ni = i + NEIGHBOUR_I[n];
-      const nj = j + NEIGHBOUR_J[n];
-      if (ni < i0 || ni > i1 || nj < j0 || nj > j1) continue;
-      if (!grid.select(ni, nj)) return missingSearch(grid);
-      if (grid.bodyId() !== bodyId || grid.flags() & COLLECTED) continue;
-      grid.mark(COLLECTED);
-      stack.push(texelId(ni, nj));
-    }
+  if (!collectBody(grid, source.cellSize, bodyId, starts, bodyTexels))
+    return missingSearch(grid);
+  const seeds: number[] = [];
+  for (const id of bodyTexels) {
+    grid.select(texelI(id), texelJ(id));
+    if (grid.coverage() > 0 && grid.height() < level) seeds.push(id);
   }
   if (seeds.length === 0) return dry();
 
-  // The search area: the lake cell holding the seeds' centre, and its
-  // neighbours. Lake space is (x − 0.5, −z − 0.5) in samples.
-  const cell = source.cellSize;
-  const cellX = Math.floor(((si / seeds.length) * STEP - 0.5) / cell);
-  const cellY = Math.floor((-(sj / seeds.length) * STEP - 0.5) / cell);
-  const fi0 = Math.ceil(((cellX - 1) * cell + 0.5) / STEP);
-  const fi1 = Math.floor(((cellX + 2) * cell + 0.5) / STEP);
-  const fj0 = Math.ceil((-(cellY + 2) * cell - 0.5) / STEP);
-  const fj1 = Math.floor((-(cellY - 1) * cell - 0.5) / STEP);
+  const {
+    i0: fi0,
+    i1: fi1,
+    j0: fj0,
+    j1: fj1,
+  } = searchBox(source.cellSize, seeds);
 
   const effective = (): number => {
     const height = grid.height();
@@ -768,6 +801,128 @@ export function fillSeaChannels(
     missingY: 0,
     touched: [...touched.values()],
     texels: writes.length,
+  };
+}
+
+const FLOODED = 16;
+const RINGED = 32;
+
+/**
+ * Moves body `bodyId`, which owns the texels `starts`, from `level` to
+ * `target`. Its water spreads from what lies below both levels through the
+ * ground below the target: through open ground as it rises, and only through
+ * its own texels as it falls, so hollows it covered keep water at the target.
+ * The caller caps a rise at the spill height, which keeps the spread inside the
+ * rim; it also stays inside the body's lake cell and its neighbours. The texels
+ * it reaches, and those around them for the shoreline, hold its water at the
+ * target; the rest of its texels go dry. Water of new texels takes
+ * `typeWeights` (0..255). With no water below both levels, it spreads from the
+ * starts that lie below the target.
+ */
+export function setBodyLevel(
+  source: WaterRuleSource,
+  edits: WaterRuleEdits,
+  bodyId: number,
+  starts: readonly number[],
+  level: number,
+  target: number,
+  typeWeights: ArrayLike<number>
+): WaterWriteResult {
+  const span = source.chunkSize - 1;
+  const grid = new TexelGrid(source);
+  const rising = target > level;
+
+  const bodyTexels: number[] = [];
+  if (!collectBody(grid, source.cellSize, bodyId, starts, bodyTexels))
+    return missingWrite(grid.missingX, grid.missingY);
+  const below = Math.min(level, target);
+  let seeds: number[] = [];
+  for (const id of bodyTexels) {
+    grid.select(texelI(id), texelJ(id));
+    if (grid.coverage() > 0 && grid.height() < below) seeds.push(id);
+  }
+  if (seeds.length === 0)
+    seeds = starts.filter((id) => {
+      grid.select(texelI(id), texelJ(id));
+      return grid.bodyId() === bodyId && grid.height() < target;
+    });
+
+  const flooded: number[] = [];
+  if (seeds.length > 0) {
+    const { i0, i1, j0, j1 } = searchBox(source.cellSize, seeds);
+    for (const id of seeds) {
+      grid.select(texelI(id), texelJ(id));
+      grid.mark(FLOODED);
+    }
+    const stack = seeds.slice();
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      flooded.push(id);
+      const i = texelI(id);
+      const j = texelJ(id);
+      for (let n = 0; n < 4; n++) {
+        const ni = i + NEIGHBOUR_I[n];
+        const nj = j + NEIGHBOUR_J[n];
+        if (ni < i0 || ni > i1 || nj < j0 || nj > j1) continue;
+        if (!grid.select(ni, nj))
+          return missingWrite(grid.missingX, grid.missingY);
+        if (grid.flags() & FLOODED || grid.height() >= target) continue;
+        const own = grid.bodyId() === bodyId;
+        if (!own && (!rising || grid.coverage() > 0)) continue;
+        grid.mark(FLOODED);
+        stack.push(texelId(ni, nj));
+      }
+    }
+  }
+
+  const ring: number[] = [];
+  for (const id of flooded) {
+    const i = texelI(id);
+    const j = texelJ(id);
+    for (let dj = -1; dj <= 1; dj++)
+      for (let di = -1; di <= 1; di++) {
+        const ni = i + di;
+        const nj = j + dj;
+        if (!grid.select(ni, nj))
+          return missingWrite(grid.missingX, grid.missingY);
+        if (grid.flags() & (FLOODED | RINGED)) continue;
+        if (grid.bodyId() !== bodyId && grid.coverage() > 0) continue;
+        grid.mark(RINGED);
+        ring.push(texelId(ni, nj));
+      }
+  }
+
+  const writes: number[] = [];
+  for (const id of bodyTexels) {
+    grid.select(texelI(id), texelJ(id));
+    if (!(grid.flags() & (FLOODED | RINGED))) writes.push(id);
+  }
+  writes.push(...flooded, ...ring);
+  const missing = missingOwner(edits, span, writes);
+  if (missing) return missing;
+
+  const touched = new Map<string, TouchedWaterChunk>();
+  const types = new Uint8Array(MAX_WATER_TYPES);
+  for (const id of writes) {
+    grid.select(texelI(id), texelJ(id));
+    const flags = grid.flags();
+    const had = grid.bodyId() === bodyId ? grid.coverage() : 0;
+    const coverage = flags & FLOODED ? 255 : flags & RINGED ? had || 255 : 0;
+    for (let c = 0; c < MAX_WATER_TYPES; c++)
+      types[c] =
+        coverage === 0
+          ? 0
+          : had > 0
+          ? grid.type(c)
+          : Math.round(typeWeights[c] ?? 0);
+    writeTexel(edits, span, id, coverage, types, target, bodyId, touched);
+  }
+  return {
+    status: 'written',
+    missingX: 0,
+    missingY: 0,
+    touched: [...touched.values()],
+    texels: flooded.length,
   };
 }
 
