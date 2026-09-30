@@ -269,7 +269,7 @@ than 5 cm above it **drains**:
 the lake drains to sea level and becomes a lagoon. It keeps its body ID. Its type weights blend
 from its own water, out to 80% of the way from its deepest point to its shore, to "ocean" at the
 shore. The cut between it and the sea is filled by the sea channel flood fill (see
-[Channels from the sea](#channels-from-the-sea)), not by the drain. A cut that stops above sea
+[Channels from the sea](#channels-from-the-sea)), which runs before the drain. A cut that stops above sea
 level drains the lake to the cut, and it stays a lake.
 
 **Locked lakes.** A locked body never drains. While a stroke runs, each chunk gets the locked
@@ -317,21 +317,25 @@ its edit saved, and reads it when it loads.
 A trench that joins the ocean and goes below sea level fills with sea water. A dry trench next to
 the sea would look wrong.
 
-After each sculpt stroke, the editor runs a flood fill:
+After each sculpt stroke, before the lake rules, the editor runs a flood fill
+(`fillSeaChannels`) over the box the stroke covered, grown by the stroke's widest brush radius:
 
-1. Start from ocean texels (body 0, coverage > 0) at the edge of the edited area.
-2. Spread to each neighbour texel where the terrain is below sea level.
-3. Stop at the edited area plus the brush radius. The fill does not search the whole world.
-4. Write coverage and body 0 into the water edit mask. The new water takes the ocean's level and
-   type weights.
+1. Start from the sea in the box: ocean texels (body 0, coverage > 0) over ground below sea level.
+2. Spread to each neighbour texel where the terrain is below sea level, unless another body's
+   water covers it. A lake's dry texels past its shore are taken.
+3. Stop at the edge of the box. The fill does not search the whole world.
+4. Write each texel it reached that is not already full sea, and the dry texels around those for
+   the shoreline, into the water edits: full authority, full coverage, body 0, sea level and the
+   "ocean" type weight. The open sea is left to the generator.
 
 The trench fills a little more with each stroke, as the dig reaches farther inland. A trench that
-does not touch the ocean stays dry.
+does not touch the ocean stays dry. `settleWater(x, z, radius)` runs the same fill over a disc.
 
 **A canal to a lake.** If the channel reaches a lake, the lake's spill height drops to sea level.
-The spill rule then drains the lake to sea level, and it joins the ocean as a lagoon. The spill
-flood finds the sea through the terrain on its own, so a rim cut down to sea level beside the
-ocean joins it without the channel. The channel fills the cut with sea water.
+The fill stops at the lake's water, and the lake's own flood then reaches the filled channel as
+sea: the spill rule drains the lake to sea level, and it joins the ocean as a lagoon. The spill
+flood finds the sea through the terrain on its own as well, so a rim cut down to sea level beside
+the ocean joins it even where the cut lies outside the fill's box.
 
 **Undo.** A drain changes the level and the coverage. One undo step restores the terrain, the level
 and the coverage together: a chunk's heights and its water edit (see
@@ -339,8 +343,9 @@ and the coverage together: a chunk's heights and its water edit (see
 `TerrainChunk.setWaterEdit`). The editor's undo stack is its own work, shared by every terrain
 brush.
 
-**Cost.** The spill check and the flood fill run on the CPU, and only after an edit. Both stay
-inside a lake cell and its neighbours, so they stay small.
+**Cost.** The spill check and the flood fill run on the CPU, and only after an edit. The spill
+check stays inside a lake cell and its neighbours, and the fill inside the stroke's box, so both
+stay small.
 
 ### Islands
 

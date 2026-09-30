@@ -17,7 +17,7 @@ import { writeWaterEdit } from 'src/database/water-edits';
 
 // Console commands that write water edits the way the water brush will: stamp
 // the loaded chunks under a disc, rebuild their water, and save the edits. Also
-// the lake edit rules: inspect, lock and settle the body under a point. They
+// the water edit rules: inspect, lock and settle the water at a point. They
 // default to the viewer's position.
 export function registerWaterEditDevCommands(
   renderer: Renderer,
@@ -206,6 +206,8 @@ export function registerWaterEditDevCommands(
             : `level ${o.body.level.toFixed(2)} m holds`
         }${o.body.locked ? ' (locked)' : ''}.`
       );
+    if (settled.channelTexels > 0)
+      console.log(`The sea filled ${settled.channelTexels} texel(s).`);
     if (settled.outcomes.length === 0) console.log('No lake owns this ground.');
   };
 

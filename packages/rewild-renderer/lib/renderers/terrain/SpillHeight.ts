@@ -487,13 +487,93 @@ export function findSpillHeight(
   }
 }
 
-export interface DrainResult {
+export interface WaterWriteResult {
   /** `missing` names a chunk whose edit must resolve first; nothing was
    *  written. */
-  status: 'drained' | 'missing';
+  status: 'written' | 'missing';
   missingX: number;
   missingY: number;
   touched: TouchedWaterChunk[];
+  /** Texels written. */
+  texels: number;
+}
+
+function missingWrite(cx: number, cy: number): WaterWriteResult {
+  return {
+    status: 'missing',
+    missingX: cx,
+    missingY: cy,
+    touched: [],
+    texels: 0,
+  };
+}
+
+// The first chunk owning one of `ids` whose edit is not resolved, or null.
+function missingOwner(
+  edits: WaterRuleEdits,
+  span: number,
+  ids: Iterable<number>
+): WaterWriteResult | null {
+  const half = span / 2;
+  for (const id of ids) {
+    const wx = texelI(id) * STEP;
+    const wz = texelJ(id) * STEP;
+    for (
+      let cy = Math.ceil((wz - half) / span);
+      cy <= Math.floor((wz + half) / span);
+      cy++
+    )
+      for (
+        let cx = Math.ceil((wx - half) / span);
+        cx <= Math.floor((wx + half) / span);
+        cx++
+      )
+        if (!edits(cx, cy)) return missingWrite(cx, cy);
+  }
+  return null;
+}
+
+// Writes one texel into the edit of every chunk that owns it, with full
+// authority.
+function writeTexel(
+  edits: WaterRuleEdits,
+  span: number,
+  id: number,
+  coverage: number,
+  types: Uint8Array,
+  level: number,
+  bodyId: number,
+  touched: Map<string, TouchedWaterChunk>
+) {
+  const half = span / 2;
+  const wx = texelI(id) * STEP;
+  const wz = texelJ(id) * STEP;
+  for (
+    let cy = Math.ceil((wz - half) / span);
+    cy <= Math.floor((wz + half) / span);
+    cy++
+  )
+    for (
+      let cx = Math.ceil((wx - half) / span);
+      cx <= Math.floor((wx + half) / span);
+      cx++
+    ) {
+      const edit = edits(cx, cy)!;
+      const size = edit.mask.size;
+      const plane = size * size;
+      const t =
+        ((cy * span + half - wz) / STEP) * size +
+        (wx - cx * span + half) / STEP;
+      const weights = edit.mask.weights;
+      weights[WATER_EDIT_AUTHORITY * plane + t] = 255;
+      weights[WATER_EDIT_COVERAGE * plane + t] = coverage;
+      for (let c = 0; c < MAX_WATER_TYPES; c++)
+        weights[(WATER_EDIT_TYPES + c) * plane + t] = types[c];
+      edit.level[t] = level;
+      edit.bodyIds[t] = bodyId;
+      const key = `${cx},${cy}`;
+      if (!touched.has(key)) touched.set(key, { cx, cy, edit });
+    }
 }
 
 // A joined lake's water is lake water out to this share of the way from its
@@ -515,28 +595,12 @@ export function drainBody(
   level: number,
   joined: boolean,
   oceanType: number
-): DrainResult {
+): WaterWriteResult {
   const span = source.chunkSize - 1;
-  const half = span / 2;
   const grid = new TexelGrid(source);
   const { bodyTexels, basin } = search;
-
-  for (const id of bodyTexels) {
-    const wx = texelI(id) * STEP;
-    const wz = texelJ(id) * STEP;
-    for (
-      let cy = Math.ceil((wz - half) / span);
-      cy <= Math.floor((wz + half) / span);
-      cy++
-    )
-      for (
-        let cx = Math.ceil((wx - half) / span);
-        cx <= Math.floor((wx + half) / span);
-        cx++
-      )
-        if (!edits(cx, cy))
-          return { status: 'missing', missingX: cx, missingY: cy, touched: [] };
-  }
+  const missing = missingOwner(edits, span, bodyTexels);
+  if (missing) return missing;
 
   const kept = new Set<number>();
   for (const id of bodyTexels) {
@@ -586,13 +650,7 @@ export function drainBody(
   for (const id of bodyTexels) {
     const i = texelI(id);
     const j = texelJ(id);
-    if (!grid.select(i, j))
-      return {
-        status: 'missing',
-        missingX: grid.missingX,
-        missingY: grid.missingY,
-        touched: [],
-      };
+    if (!grid.select(i, j)) return missingWrite(grid.missingX, grid.missingY);
     const keep = kept.has(id);
     const coverage = keep ? grid.coverage() : 0;
     const toSea = joined
@@ -603,41 +661,113 @@ export function drainBody(
       const sea = coverage > 0 && c === oceanType ? 255 : 0;
       types[c] = Math.round(own + (sea - own) * toSea);
     }
-
-    const wx = i * STEP;
-    const wz = j * STEP;
-    for (
-      let cy = Math.ceil((wz - half) / span);
-      cy <= Math.floor((wz + half) / span);
-      cy++
-    )
-      for (
-        let cx = Math.ceil((wx - half) / span);
-        cx <= Math.floor((wx + half) / span);
-        cx++
-      ) {
-        const edit = edits(cx, cy)!;
-        const size = edit.mask.size;
-        const plane = size * size;
-        const t =
-          ((cy * span + half - wz) / STEP) * size +
-          (wx - cx * span + half) / STEP;
-        const weights = edit.mask.weights;
-        weights[WATER_EDIT_AUTHORITY * plane + t] = 255;
-        weights[WATER_EDIT_COVERAGE * plane + t] = coverage;
-        for (let c = 0; c < MAX_WATER_TYPES; c++)
-          weights[(WATER_EDIT_TYPES + c) * plane + t] = types[c];
-        edit.level[t] = level;
-        edit.bodyIds[t] = bodyId;
-        const key = `${cx},${cy}`;
-        if (!touched.has(key)) touched.set(key, { cx, cy, edit });
-      }
+    writeTexel(edits, span, id, coverage, types, level, bodyId, touched);
   }
   return {
-    status: 'drained',
+    status: 'written',
     missingX: 0,
     missingY: 0,
     touched: [...touched.values()],
+    texels: bodyTexels.length,
+  };
+}
+
+const CHANNEL = 1;
+const CHANNEL_SHORE = 2;
+
+/**
+ * Fills trenches below sea level that join the ocean, within the texel box
+ * [i0, i1] × [j0, j1]. The fill starts from the sea in the box (covered ocean
+ * texels over ground below sea level) and spreads through ground below sea
+ * level that no other body covers. The texels it reaches that are not sea
+ * already, and the dry ones around them for the shoreline, become ocean at sea
+ * level with full authority.
+ */
+export function fillSeaChannels(
+  source: WaterRuleSource,
+  edits: WaterRuleEdits,
+  i0: number,
+  j0: number,
+  i1: number,
+  j1: number,
+  oceanType: number
+): WaterWriteResult {
+  const span = source.chunkSize - 1;
+  const seaLevel = source.seaLevel;
+  const grid = new TexelGrid(source);
+
+  const stack: number[] = [];
+  for (let j = j0; j <= j1; j++)
+    for (let i = i0; i <= i1; i++) {
+      if (!grid.select(i, j)) return missingWrite(grid.missingX, grid.missingY);
+      if (
+        grid.bodyId() === OCEAN_BODY_ID &&
+        grid.coverage() > 0 &&
+        grid.height() < seaLevel
+      ) {
+        grid.mark(CHANNEL);
+        stack.push(texelId(i, j));
+      }
+    }
+
+  const channel: number[] = [];
+  while (stack.length > 0) {
+    const id = stack.pop()!;
+    channel.push(id);
+    const i = texelI(id);
+    const j = texelJ(id);
+    for (let n = 0; n < 4; n++) {
+      const ni = i + NEIGHBOUR_I[n];
+      const nj = j + NEIGHBOUR_J[n];
+      if (ni < i0 || ni > i1 || nj < j0 || nj > j1) continue;
+      grid.select(ni, nj);
+      if (grid.flags() & CHANNEL || grid.height() >= seaLevel) continue;
+      if (grid.coverage() > 0 && grid.bodyId() !== OCEAN_BODY_ID) continue;
+      grid.mark(CHANNEL);
+      stack.push(texelId(ni, nj));
+    }
+  }
+
+  // The texels that are not sea yet, and the dry ones around them.
+  const isSea = () =>
+    grid.bodyId() === OCEAN_BODY_ID &&
+    grid.coverage() === 255 &&
+    grid.level() === seaLevel;
+  const writes: number[] = [];
+  for (const id of channel) {
+    grid.select(texelI(id), texelJ(id));
+    if (!isSea()) writes.push(id);
+  }
+  const wet = writes.length;
+  for (let k = 0; k < wet; k++) {
+    const i = texelI(writes[k]);
+    const j = texelJ(writes[k]);
+    for (let dj = -1; dj <= 1; dj++)
+      for (let di = -1; di <= 1; di++) {
+        const ni = i + di;
+        const nj = j + dj;
+        if (ni < i0 || ni > i1 || nj < j0 || nj > j1) continue;
+        grid.select(ni, nj);
+        if (grid.flags() & (CHANNEL | CHANNEL_SHORE) || grid.coverage() > 0)
+          continue;
+        grid.mark(CHANNEL_SHORE);
+        writes.push(texelId(ni, nj));
+      }
+  }
+  const missing = missingOwner(edits, span, writes);
+  if (missing) return missing;
+
+  const types = new Uint8Array(MAX_WATER_TYPES);
+  if (oceanType >= 0 && oceanType < MAX_WATER_TYPES) types[oceanType] = 255;
+  const touched = new Map<string, TouchedWaterChunk>();
+  for (const id of writes)
+    writeTexel(edits, span, id, 255, types, seaLevel, OCEAN_BODY_ID, touched);
+  return {
+    status: 'written',
+    missingX: 0,
+    missingY: 0,
+    touched: [...touched.values()],
+    texels: writes.length,
   };
 }
 
