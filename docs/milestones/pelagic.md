@@ -798,12 +798,28 @@ shelf.
 
 ## Editor
 
-- **Water brush** in the editor ribbon, next to sculpt, biome paint and scatter.
-  - **Level**: click to sample a level, then drag to set it. This works like the flatten brush.
-    The level cannot go above the spill height.
-  - **Paint type**: paint water palette weights.
-  - **Add / remove water**: paint coverage. Adding water on dry land makes a new body record.
-  - **Lock**: lock or unlock a lake's level. See [Edit rules](#edit-rules).
+- **Water brush** in the editor ribbon, next to sculpt, biome paint and scatter
+  (`TerrainWaterBrushController`, `WaterBrushToolbar`). Its toolbar reports what the brush last
+  did, such as a picked lake's level and spill height.
+  - **Level**: click a lake to pick it and sample its level, then drag up or down to move the
+    whole body. Strength sets how many metres a pixel moves it. It applies while the drag
+    runs, taking the latest target each time a rebuild finishes, and saves on release. The
+    level cannot go above the spill height found when the lake was picked. Rising, the water
+    spreads by flood fill over the ground below the new level; falling, it shrinks to its
+    own texels below it, and hollows it covered keep water at the new level
+    (`setBodyLevel`).
+  - **Type**: paints the chosen palette entry over the water under the brush. A texel the edit
+    does not own outright is taken over as it stands first, so its coverage, level and body
+    stay.
+  - **Add / Remove**: paint coverage; Shift swaps them. A stroke that starts on water adds to
+    that body at its level, or to the sea at sea level. One that starts on dry land makes a
+    new body, at the clicked ground plus the toolbar's **depth** (1.5 m by default), and saves
+    its record.
+  - **Reset**: hands the water under the brush back to the generator.
+  - **Lock**: click a lake to lock or unlock its level. See [Edit rules](#edit-rules).
+  - After an Add, Remove or Reset stroke, the edit rules settle the stroke's box as they do after
+    a sculpt stroke, so new water above its rim drains to the rim. Water added on flat ground
+    drains away: dig a hollow first.
 - The sculpt brush applies the edit rules after each stroke. A lake that drains shows its new
   shore at once.
 - **Debug views** as console commands: level, coverage, type weights, depth and flow.
