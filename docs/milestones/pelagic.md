@@ -280,7 +280,10 @@ does not touch the ocean stays dry.
 The spill rule then drains the lake to sea level, and it joins the ocean as a lagoon.
 
 **Undo.** A drain changes the level and the coverage. One undo step restores the terrain, the level
-and the coverage together.
+and the coverage together: a chunk's heights and its water edit (see
+[Water edits](#water-edits)) are captured and restored as one unit (`cloneWaterEdit`,
+`TerrainChunk.setWaterEdit`). The editor's undo stack is its own work, shared by every terrain
+brush.
 
 **Cost.** The spill check and the flood fill run on the CPU, and only after an edit. Both stay
 inside a lake cell and its neighbours, so they stay small.
@@ -741,8 +744,39 @@ shelf.
   - **Lock**: lock or unlock a lake's level. See [Edit rules](#edit-rules).
 - The sculpt brush applies the edit rules after each stroke. A lake that drains shows its new
   shore at once.
-- Water edits save with the other terrain edits, local first and then to the cloud.
 - **Debug views** as console commands: level, coverage, type weights, depth and flow.
+
+### Water edits
+
+Authored water is a **water edit** per chunk (`WaterEdit`), at the water map's resolution:
+
+| Data        | Form                                   | Notes                                                                 |
+| ----------- | -------------------------------------- | --------------------------------------------------------------------- |
+| Authority   | `PaintMask` channel 0                  | How much of the texel the edit owns. The generated water keeps the rest. |
+| Coverage    | `PaintMask` channel 1                  | The edit's own coverage. 0 with full authority removes water.         |
+| Type weights | `PaintMask` channels 2 to 5           | The edit's palette weights.                                           |
+| Level       | `f32` per texel                        | World height of the edit's surface. Read where the edit has authority. |
+| Body ID     | `u32` per texel                        | The body the edit's water belongs to. Nearest sampled.                |
+
+- **Blend.** The worker builds the water map from the generator, then blends the edit over it
+  (`applyWaterEdit`). Each side counts by its coverage times its share of the authority, so
+  removing water leaves the level alone and added water takes the edit's level, type and body.
+  Scatter's water conditions read the same blend, so reeds follow an edited shore.
+- **Bodies.** A body the editor makes takes an id from `editedBodyId`: never 0, and never with the
+  top bit that generated lakes set. Its record is built from the edit: its level, and its spill
+  height at that level until the edit rules find its rim.
+- **Stamps.** `applyWaterStamp` adds water, removes it, or resets texels back to the generator,
+  over a disc. A texel on a chunk edge is written in every chunk that owns it, with the same
+  values, or not at all, as the paint masks are.
+- **Saving.** Each chunk's edit is one blob, `{cx}_{cy}.water.bin`, beside its height snapshot
+  and masks: saved locally first, then synced to the cloud with them. A chunk reads its edit
+  once, on its first build.
+- **Rebuilds.** An edit bumps the chunk's water edit version. The chunk's current LOD rebuilds
+  and brings back the water map and the instances, and the other LODs catch up when they next
+  build.
+- **Console.** `addWater(x, z, radius, level)`, `removeWater(x, z, radius)` and
+  `resetWater(x, z, radius)` stamp the loaded chunks and save them. Each defaults to the
+  viewer's position, a 20 m radius, and 1.5 m above the ground for the level.
 
 ## Gameplay
 

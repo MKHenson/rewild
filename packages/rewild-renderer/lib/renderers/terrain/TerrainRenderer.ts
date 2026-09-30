@@ -19,6 +19,7 @@ import {
 } from './Biomes';
 import { ChunkSnapshotProvider } from './ChunkSnapshot';
 import { PaintMaskProvider } from './PaintMask';
+import { WaterEditProvider } from './WaterEdit';
 import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
 import { ScatterInstances, ScatterPick, pickScatterInstance } from './Scatter';
 import { generateSplatMap } from './Splat';
@@ -147,6 +148,8 @@ export class TerrainRenderer {
   biomeMaskProvider: PaintMaskProvider | null = null;
   // Saved scatter density masks, looked up per chunk on first placement.
   scatterMaskProvider: PaintMaskProvider | null = null;
+  // Saved water edits, looked up per chunk on its first build.
+  waterEditProvider: WaterEditProvider | null = null;
   // Saved kill sets, looked up alongside the density mask.
   scatterKillProvider: ScatterKillSetProvider | null = null;
   private _enabled: boolean = true;
@@ -763,6 +766,19 @@ export class TerrainRenderer {
     const chunk = this.terrainChunks.get(`${cx},${cy}`);
     if (!chunk) return false;
     chunk.bumpScatterInputVersion();
+    this._needsVisibilityUpdate = true;
+    return true;
+  }
+
+  /**
+   * Rebuilds a chunk's water map and instances after its water edit changed.
+   * Returns false when the chunk isn't loaded — its first build reads the
+   * saved edit anyway.
+   */
+  refreshChunkWater(cx: number, cy: number): boolean {
+    const chunk = this.terrainChunks.get(`${cx},${cy}`);
+    if (!chunk) return false;
+    chunk.bumpWaterEditVersion();
     this._needsVisibilityUpdate = true;
     return true;
   }

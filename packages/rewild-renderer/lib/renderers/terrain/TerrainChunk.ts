@@ -22,6 +22,12 @@ import {
 import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
 import { TextureProperties } from '../../textures/Texture';
 import type { WaterMap } from './WaterMap';
+import {
+  WaterEdit,
+  WaterEditProvider,
+  createWaterEdit,
+  isWaterEditValid,
+} from './WaterEdit';
 import { ChunkWater, WaterMapTextures } from '../water/ChunkWater';
 import type { TerrainUniforms } from '../../materials/uniforms/TerrainUniforms';
 import type { TerrainPass } from '../../materials/TerrainPass';
@@ -128,6 +134,16 @@ export class TerrainChunk implements IComponent {
   // with it after every edit.
   water: WaterMap | null = null;
   private waterVersion = -1;
+  // The chunk's authored water, or null when it has none. Read once on first
+  // use like the masks, and edited in place by the water tools.
+  waterEdit: WaterEdit | null = null;
+  // Bumped when `waterEdit` changes, so the water map and the instances
+  // rebuild from it.
+  waterEditVersion = 0;
+  // The waterEditVersion the resident water map was built from.
+  private waterEditBuilt = 0;
+  private waterEditLookup: Promise<WaterEdit | null> | null = null;
+  private waterEditResolved = false;
   // `water` on the GPU, for the water and the terrain's wet band.
   private waterTextures: WaterMapTextures | null = null;
   // Draws `water`. Null while no water shows.
@@ -471,15 +487,18 @@ export class TerrainChunk implements IComponent {
     return this.scatterKills;
   }
 
-  // Adopts a worker-built water map for the heights at `version`. Older or
-  // equal versions are ignored, on the same terms as populateSplat.
+  // Adopts a worker-built water map for the heights at `version` and the water
+  // edit at `editVersion`. Both only rise, so their sum orders the builds; older
+  // or equal ones are ignored, on the same terms as populateSplat.
   populateWater(
     renderer: Renderer,
     water: WaterMap | null,
-    version: number
+    version: number,
+    editVersion: number
   ) {
-    if (version <= this.waterVersion) return;
-    this.waterVersion = version;
+    if (version + editVersion <= this.waterVersion) return;
+    this.waterVersion = version + editVersion;
+    this.waterEditBuilt = editVersion;
     this.water = water;
 
     if (water) {
@@ -531,6 +550,71 @@ export class TerrainChunk implements IComponent {
             palette: resolveClimatePreset(this.climatePreset).water ?? [],
           }
         : null;
+  }
+
+  /**
+   * Resolves this chunk's saved water edit, or null when its water has never
+   * been edited. Same one-lookup-per-chunk contract as resolveScatterMask; an
+   * edit that does not fit the chunk is discarded rather than misapplied.
+   */
+  resolveWaterEdit(
+    provider: WaterEditProvider | null
+  ): Promise<WaterEdit | null> {
+    if (this.waterEdit) return Promise.resolve(this.waterEdit);
+    if (!provider) {
+      this.waterEditResolved = true;
+      return Promise.resolve(null);
+    }
+    if (!this.waterEditLookup) {
+      this.waterEditLookup = provider(this.coord.x, this.coord.y).then(
+        (edit) => {
+          this.waterEditResolved = true;
+          if (!edit) return null;
+          if (!isWaterEditValid(edit, this.chunkSize)) {
+            console.warn(
+              `Chunk ${this.id} water edit does not fit the chunk — ignoring it.`
+            );
+            return null;
+          }
+          this.waterEdit = edit;
+          return edit;
+        },
+        (err) => {
+          this.waterEditResolved = true;
+          console.warn(`Chunk ${this.id} water edit read failed:`, err);
+          return null;
+        }
+      );
+    }
+    return this.waterEditLookup;
+  }
+
+  /** The water edit a tool should change: created blank on first use, and
+   *  null until the saved one has been read. */
+  editableWaterEdit(): WaterEdit | null {
+    if (this.waterEdit) return this.waterEdit;
+    if (!this.waterEditResolved) return null;
+    this.waterEdit = createWaterEdit(this.chunkSize);
+    return this.waterEdit;
+  }
+
+  /** Replaces the water edit, e.g. to restore a captured one. */
+  setWaterEdit(edit: WaterEdit | null) {
+    this.waterEdit = edit;
+    this.waterEditLookup = Promise.resolve(edit);
+    this.waterEditResolved = true;
+    this.bumpWaterEditVersion();
+  }
+
+  // Marks the water map and the instances stale after the water edit changed.
+  bumpWaterEditVersion() {
+    this.waterEditVersion++;
+    this.scatterInputVersion++;
+  }
+
+  // The resident water map predates the latest water edit.
+  waterIsStale(): boolean {
+    return this.waterEditBuilt !== this.waterEditVersion;
   }
 
   // Adopts a worker-built splat map for the heights at `version`. Creates the
@@ -796,11 +880,14 @@ export class TerrainChunk implements IComponent {
 
       if (lodMesh.gpuState === 'none' || lodMesh.gpuState === 'unloaded') {
         lodMesh.requestMesh(renderer);
-      } else if (this.scatterIsStale(this.heightsVersion)) {
+      } else if (
+        this.scatterIsStale(this.heightsVersion) ||
+        this.waterIsStale()
+      ) {
         // A chunk whose mesh is already current has no build left to carry
-        // instances — coming into range, or a density stroke, needs one asking
-        // for. refresh() no-ops while one is in flight, so asking every frame
-        // until the instances land costs nothing and is self-healing.
+        // instances or water — coming into range, or a density or water edit,
+        // needs one asking for. refresh() no-ops while one is in flight, so
+        // asking every frame until they land costs nothing and is self-healing.
         lodMesh.refresh(renderer);
       }
 
