@@ -2,6 +2,7 @@ import {
   WaterRuleChunk,
   WaterRuleSource,
   drainBody,
+  fillSeaChannels,
   findBodies,
   findSpillHeight,
   lockedLevels,
@@ -277,7 +278,7 @@ describe('drainBody', () => {
 
   it('keeps the basin covered at the new level', () => {
     const { result, edits } = drained();
-    expect(result.status).toBe('drained');
+    expect(result.status).toBe('written');
     expect(read(edits.get('0,0')!, 0, 0, 0, 0)).toEqual({
       authority: 255,
       coverage: 255,
@@ -344,6 +345,98 @@ describe('drainBody', () => {
       weights[(WATER_EDIT_TYPES + OCEAN_TYPE) * plane + texel(wx, wz)];
     expect(ocean(0, 0)).toBe(0);
     expect(ocean(-32, 0)).toBe(255);
+  });
+});
+
+describe('fillSeaChannels', () => {
+  // Ground at 5, the sea east of x = 68, and trenches at −1: one from x = 20
+  // to the sea along z = 120, one along z = −120 that stops at x = 60 short of
+  // it, and one from x = 40 to the sea through the lake's bank along z = 0.
+  const ground = (wx: number, wz: number) => {
+    const lake = bowl(wx, wz);
+    if (Math.abs(wz - 120) <= 4 && wx >= 20) return -1;
+    if (Math.abs(wz + 120) <= 4 && wx >= 20 && wx <= 60) return -1;
+    if (Math.abs(wz) <= 4 && wx >= 36) return -1;
+    return Math.hypot(wx, wz) < 50 ? lake : 5;
+  };
+
+  const filled = (i0: number, j0: number, i1: number, j1: number) => {
+    const source = makeSource({ height: ground, seaFrom: 68 });
+    const edits = new Map<string, WaterEdit>();
+    const result = fillSeaChannels(
+      source,
+      (cx, cy) => {
+        const key = `${cx},${cy}`;
+        if (!edits.has(key)) edits.set(key, createWaterEdit(CHUNK));
+        return edits.get(key)!;
+      },
+      i0,
+      j0,
+      i1,
+      j1,
+      OCEAN_TYPE
+    );
+    // The edit at world (wx, wz), from the chunk that owns it.
+    const read = (wx: number, wz: number) => {
+      const cx = Math.floor((wx + HALF) / SPAN);
+      const cy = Math.floor((wz + HALF) / SPAN);
+      const edit = edits.get(`${cx},${cy}`);
+      if (!edit) return null;
+      const plane = SIZE * SIZE;
+      const t =
+        ((cy * SPAN + HALF - wz) / STEP) * SIZE +
+        (wx - cx * SPAN + HALF) / STEP;
+      return {
+        authority: edit.mask.weights[WATER_EDIT_AUTHORITY * plane + t],
+        coverage: edit.mask.weights[WATER_EDIT_COVERAGE * plane + t],
+        ocean: edit.mask.weights[(WATER_EDIT_TYPES + OCEAN_TYPE) * plane + t],
+        level: edit.level[t],
+        bodyId: edit.bodyIds[t],
+      };
+    };
+    return { result, read };
+  };
+
+  it('fills a trench that joins the sea with sea water', () => {
+    const { result, read } = filled(5, 25, 25, 35);
+    expect(result.status).toBe('written');
+    expect(read(40, 120)).toEqual({
+      authority: 255,
+      coverage: 255,
+      ocean: 255,
+      level: 0,
+      bodyId: 0,
+    });
+  });
+
+  it('covers the dry texels beside it for the shoreline', () => {
+    const { read } = filled(5, 25, 25, 35);
+    expect(read(40, 128)!.coverage).toBe(255);
+    expect(read(40, 136)!.authority).toBe(0);
+  });
+
+  it('stops at the edge of the box', () => {
+    const { read } = filled(10, 25, 25, 35);
+    expect(read(40, 120)!.coverage).toBe(255);
+    expect(read(32, 120)?.authority ?? 0).toBe(0);
+  });
+
+  it('leaves the open sea to the generator', () => {
+    const { read } = filled(5, 25, 25, 35);
+    expect(read(80, 120)!.authority).toBe(0);
+  });
+
+  it('leaves a trench that does not reach the sea dry', () => {
+    const { result } = filled(5, -35, 25, -25);
+    expect(result.texels).toBe(0);
+    expect(result.touched).toEqual([]);
+  });
+
+  it('stops at water another body covers', () => {
+    const { read } = filled(5, -5, 25, 5);
+    expect(read(44, 0)!.bodyId).toBe(0);
+    expect(read(44, 0)!.coverage).toBe(255);
+    expect(read(36, 0)!.authority).toBe(0);
   });
 });
 

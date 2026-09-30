@@ -33,11 +33,13 @@ interface StrokeState {
   flattenTarget: number;
   invert: boolean;
   lastStampTime: number;
-  // World box the stroke's stamps covered, for the lake edit rules.
+  // World box the stroke's stamps covered, and its widest brush, for the
+  // water edit rules.
   minX: number;
   minZ: number;
   maxX: number;
   maxZ: number;
+  maxRadius: number;
   // Locked water levels per chunk (see WaterBodyRules.chunkLockLevels),
   // resolved once per stroke.
   locks: Map<string, Float32Array | null>;
@@ -127,6 +129,7 @@ export class TerrainSculptController {
       minZ: Infinity,
       maxX: -Infinity,
       maxZ: -Infinity,
+      maxRadius: 0,
       locks: new Map(),
       lockMargin: this.renderer.terrainRenderer.waterRules.lockMargin,
     };
@@ -148,7 +151,8 @@ export class TerrainSculptController {
    * Ends the stroke and persists every touched chunk as a full-heightfield
    * snapshot (overwriting any previous snapshot and re-dirtying its metadata
    * row for the next sync). Untouched chunks store nothing. Then applies the
-   * lake edit rules over the stroke and saves the water they drained.
+   * water edit rules over the stroke and saves the water they filled or
+   * drained.
    */
   async endStroke(): Promise<void> {
     const stroke = this.stroke;
@@ -176,7 +180,8 @@ export class TerrainSculptController {
         stroke.minX,
         stroke.minZ,
         stroke.maxX,
-        stroke.maxZ
+        stroke.maxZ,
+        stroke.maxRadius
       );
       await Promise.all(
         settled.chunks.map((t) => writeWaterEdit(levelId, t.cx, t.cy, t.edit))
@@ -193,7 +198,7 @@ export class TerrainSculptController {
             }.`
           );
     } catch (err) {
-      console.warn('Lake edit rules failed:', err);
+      console.warn('Water edit rules failed:', err);
     }
 
     projectStore.dirty = true;
@@ -254,6 +259,7 @@ export class TerrainSculptController {
     stroke.minZ = Math.min(stroke.minZ, point.z - radius);
     stroke.maxX = Math.max(stroke.maxX, point.x + radius);
     stroke.maxZ = Math.max(stroke.maxZ, point.z + radius);
+    stroke.maxRadius = Math.max(stroke.maxRadius, radius);
 
     const touched = applySculptStamp(this.source, {
       type,

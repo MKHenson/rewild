@@ -8,6 +8,7 @@ import {
   WaterRuleChunk,
   WaterRuleSource,
   drainBody,
+  fillSeaChannels,
   findBodies,
   findSpillHeight,
   lockedLevels,
@@ -24,10 +25,10 @@ import {
 } from './WaterEdit';
 import { ResolvedWater, WATER_MAP_STEP, resolveWater } from './WaterMap';
 
-// The edit rules for lakes, run on the main thread after the terrain changes.
-// A touched lake whose spill height fell below its level drains to it; a
-// locked lake holds its rim up instead (see lockedLevels and the sculpt
-// brush's lock source).
+// The edit rules, run on the main thread after the terrain changes. The sea
+// fills trenches below sea level that join it. A touched lake whose spill
+// height fell below its level drains to it; a locked lake holds its rim up
+// instead (see lockedLevels and the sculpt brush's lock source).
 //
 // The flood reads heights well past what is loaded. A chunk the flood reaches
 // takes its in-memory heights, else its saved snapshot, else the generator's
@@ -62,6 +63,8 @@ export interface WaterBodyOutcome {
 
 export interface WaterSettleResult {
   outcomes: WaterBodyOutcome[];
+  /** Texels the sea filled. */
+  channelTexels: number;
   /** Chunks whose water edits changed, to save. */
   chunks: TouchedWaterChunk[];
 }
@@ -172,6 +175,14 @@ class RuleContext implements WaterRuleSource {
       this.detached.set(key, edit);
     }
     return edit;
+  }
+
+  /** Reads what a write needs of a chunk: its edit when its heights are
+   *  already here, else the chunk and its neighbours. */
+  ensure(cx: number, cy: number): Promise<void> {
+    return this.heights.has(`${cx},${cy}`)
+      ? this.loadEdit(cx, cy)
+      : this.loadAround(cx, cy);
   }
 
   /** Drops the water resolved for chunks whose edits changed. */
@@ -313,18 +324,21 @@ export class WaterBodyRules {
   }
 
   /**
-   * Applies the edit rules to every lake that owns ground within the world box
-   * (x0, z0)–(x1, z1): finds its spill height again, and drains it to that
-   * height when its level stands above it. Records change in place; the
-   * caller saves them and the returned edits. Runs one at a time.
+   * Applies the edit rules over the world box (x0, z0)–(x1, z1). First the sea
+   * fills the trenches below sea level that join it, within the box grown by
+   * `reach` metres. Then every lake that owns ground in the box has its spill
+   * height found again, and drains to it when its level stands above it.
+   * Records change in place; the caller saves them and the returned edits.
+   * Runs one at a time.
    */
   settle(
     x0: number,
     z0: number,
     x1: number,
-    z1: number
+    z1: number,
+    reach = 0
   ): Promise<WaterSettleResult> {
-    const run = this.queue.then(() => this.runSettle(x0, z0, x1, z1));
+    const run = this.queue.then(() => this.runSettle(x0, z0, x1, z1, reach));
     this.queue = run.catch(() => undefined);
     return run;
   }
@@ -412,7 +426,8 @@ export class WaterBodyRules {
     x0: number,
     z0: number,
     x1: number,
-    z1: number
+    z1: number,
+    reach: number
   ): Promise<WaterSettleResult> {
     const host = this.host;
     const records = await this.resolveRecords();
@@ -421,6 +436,25 @@ export class WaterBodyRules {
     const ctx = new RuleContext(host, climate);
     const unit = host.metersPerSample * WATER_MAP_STEP;
     const load = (cx: number, cy: number) => ctx.loadAround(cx, cy);
+    const ensure = (cx: number, cy: number) => ctx.ensure(cx, cy);
+    const edits = (cx: number, cy: number) => ctx.editFor(cx, cy);
+    const touched = new Map<string, TouchedWaterChunk>();
+
+    const fill = await untilLoaded(
+      () =>
+        fillSeaChannels(
+          ctx,
+          edits,
+          Math.floor((Math.min(x0, x1) - reach) / unit),
+          Math.floor((Math.min(z0, z1) - reach) / unit),
+          Math.ceil((Math.max(x0, x1) + reach) / unit),
+          Math.ceil((Math.max(z0, z1) + reach) / unit),
+          oceanType
+        ),
+      ensure
+    );
+    ctx.invalidate(fill.touched);
+    for (const t of fill.touched) touched.set(`${t.cx},${t.cy}`, t);
 
     const scan = await untilLoaded(
       () =>
@@ -435,7 +469,6 @@ export class WaterBodyRules {
     );
 
     const outcomes: WaterBodyOutcome[] = [];
-    const touched = new Map<string, TouchedWaterChunk>();
     for (const touch of scan.bodies) {
       const body = this.recordOf(touch, records, climate);
       const search: SpillSearch = await untilLoaded(
@@ -451,14 +484,14 @@ export class WaterBodyRules {
           () =>
             drainBody(
               ctx,
-              (cx, cy) => ctx.editFor(cx, cy),
+              edits,
               body.id,
               search,
               spill,
               search.sea,
               oceanType
             ),
-          (cx, cy) => ctx.loadEdit(cx, cy)
+          ensure
         );
         ctx.invalidate(drain.touched);
         for (const t of drain.touched) touched.set(`${t.cx},${t.cy}`, t);
@@ -487,6 +520,10 @@ export class WaterBodyRules {
         chunk.setWaterEdit(detached);
       host.refreshChunkWater(t.cx, t.cy);
     }
-    return { outcomes, chunks: [...touched.values()] };
+    return {
+      outcomes,
+      channelTexels: fill.texels,
+      chunks: [...touched.values()],
+    };
   }
 }
