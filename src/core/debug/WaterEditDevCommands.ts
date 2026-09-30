@@ -9,12 +9,15 @@ import {
   TouchedWaterChunk,
   WaterStampType,
   applyWaterStamp,
+  editedBody,
   editedBodyId,
 } from 'rewild-renderer/lib/renderers/terrain/WaterEdit';
+import { writeWaterBodies } from 'src/database/water-bodies';
 import { writeWaterEdit } from 'src/database/water-edits';
 
 // Console commands that write water edits the way the water brush will: stamp
-// the loaded chunks under a disc, rebuild their water, and save the edits. They
+// the loaded chunks under a disc, rebuild their water, and save the edits. Also
+// the lake edit rules: inspect, lock and settle the body under a point. They
 // default to the viewer's position.
 export function registerWaterEditDevCommands(
   renderer: Renderer,
@@ -98,6 +101,16 @@ export function registerWaterEditDevCommands(
         return writeWaterEdit(levelId, t.cx, t.cy, t.edit);
       })
     );
+    if (type === 'add' && touched.length > 0) {
+      await terrain.waterRules.setRecord(
+        editedBody(
+          bodyId,
+          surface,
+          typeWeights.map((w) => w * 255)
+        )
+      );
+      await writeWaterBodies(levelId, terrain.waterRules.savedBodies());
+    }
     console.log(
       `${type}Water: ${
         touched.length
@@ -107,6 +120,93 @@ export function registerWaterEditDevCommands(
         type === 'add' ? `, level ${surface.toFixed(2)} m` : ''
       }.`
     );
+  };
+
+  const at = (x: number | undefined, z: number | undefined) => {
+    const viewer = renderer.terrainRenderer.viewerPosition;
+    return { x: x ?? viewer.x, z: z ?? viewer.z };
+  };
+
+  const setLocked = async (
+    locked: boolean,
+    x: number | undefined,
+    z: number | undefined
+  ) => {
+    const levelId = project.levelId;
+    const terrain = renderer.terrainRenderer;
+    const p = at(x, z);
+    const body = await terrain.waterRules.setLockedAt(p.x, p.z, locked);
+    if (!body) {
+      console.log('No lake owns the ground here.');
+      return;
+    }
+    if (levelId)
+      await writeWaterBodies(levelId, terrain.waterRules.savedBodies());
+    else console.warn('No levelId on the current project — lock not saved.');
+    console.log(
+      `Water body ${body.id} ${
+        locked ? 'locked' : 'unlocked'
+      } at level ${body.level.toFixed(2)} m.`
+    );
+  };
+
+  (window as any).lockWater = (x?: number, z?: number) => setLocked(true, x, z);
+
+  (window as any).unlockWater = (x?: number, z?: number) =>
+    setLocked(false, x, z);
+
+  (window as any).waterBody = async (x?: number, z?: number) => {
+    const p = at(x, z);
+    const report = await renderer.terrainRenderer.waterRules.bodyAt(p.x, p.z);
+    if (!report) {
+      console.log('No lake owns the ground here.');
+      return;
+    }
+    const { body } = report;
+    console.log(
+      `Water body ${body.id}: level ${body.level.toFixed(
+        2
+      )} m, recorded spill ${body.spillHeight.toFixed(2)} m, spill now ${
+        Number.isNaN(report.spillHeight)
+          ? 'none (no water below its level)'
+          : `${report.spillHeight.toFixed(2)} m${
+              report.sea ? ' (into the sea)' : ''
+            }${report.edge ? ' (search edge)' : ''}`
+      }, ${body.locked ? 'locked' : 'unlocked'}.`
+    );
+    return report;
+  };
+
+  (window as any).settleWater = async (x?: number, z?: number, radius = 20) => {
+    const levelId = project.levelId;
+    const terrain = renderer.terrainRenderer;
+    const p = at(x, z);
+    const settled = await terrain.waterRules.settle(
+      p.x - radius,
+      p.z - radius,
+      p.x + radius,
+      p.z + radius
+    );
+    if (levelId) {
+      await Promise.all(
+        settled.chunks.map((t) => writeWaterEdit(levelId, t.cx, t.cy, t.edit))
+      );
+      if (settled.outcomes.length > 0)
+        await writeWaterBodies(levelId, terrain.waterRules.savedBodies());
+    } else console.warn('No levelId on the current project — not saved.');
+    for (const o of settled.outcomes)
+      console.log(
+        `Water body ${o.body.id}: spill ${o.body.spillHeight.toFixed(2)} m, ${
+          o.drained
+            ? `drained from ${o.previousLevel.toFixed(
+                2
+              )} m to ${o.body.level.toFixed(2)} m${
+                o.joined ? ', joining the ocean' : ''
+              }`
+            : `level ${o.body.level.toFixed(2)} m holds`
+        }${o.body.locked ? ' (locked)' : ''}.`
+      );
+    if (settled.outcomes.length === 0) console.log('No lake owns this ground.');
   };
 
   (window as any).addWater = (

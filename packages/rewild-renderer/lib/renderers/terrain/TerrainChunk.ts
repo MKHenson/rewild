@@ -589,6 +589,11 @@ export class TerrainChunk implements IComponent {
     return this.waterEditLookup;
   }
 
+  /** Whether the saved water edit has been read, so `waterEdit` is final. */
+  get waterEditIsResolved(): boolean {
+    return this.waterEditResolved;
+  }
+
   /** The water edit a tool should change: created blank on first use, and
    *  null until the saved one has been read. */
   editableWaterEdit(): WaterEdit | null {

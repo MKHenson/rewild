@@ -13,6 +13,7 @@ import { createChunkSnapshotProvider } from '../database/chunk-snapshots';
 import { createBiomeMaskProvider } from '../database/biome-masks';
 import { createScatterMaskProvider } from '../database/scatter-masks';
 import { createWaterEditProvider } from '../database/water-edits';
+import { createWaterBodyProvider } from '../database/water-bodies';
 import { createScatterKillProvider } from '../database/scatter-kills';
 import { registerDebugCommands } from './debug';
 
@@ -77,6 +78,9 @@ export async function loadInitialLevels(
     : null;
   renderer.terrainRenderer.waterEditProvider = level?.id
     ? createWaterEditProvider(level.id)
+    : null;
+  renderer.terrainRenderer.waterBodyProvider = level?.id
+    ? createWaterBodyProvider(level.id)
     : null;
   renderer.terrainRenderer.scatterKillProvider = level?.id
     ? createScatterKillProvider(level.id)

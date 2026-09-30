@@ -122,11 +122,19 @@ The water map holds a body ID for each texel. The body itself is a record:
 | `id`           | 0 for the ocean. A generated lake takes its ID from its lake cell coordinate. |
 | `level`        | The surface level. For the ocean, this is the world's sea level.             |
 | `spillHeight`  | The lowest point of the rim. Calculated, not authored. See [Computing the spill height](#computing-the-spill-height). A generated lake's is its lowest rim sample, a tarn's its lip and a lagoon's sea level. |
-| `locked`       | If true, the sculpt brush cannot lower the rim below the level.              |
+| `locked`       | If true, the sculpt brush cannot lower the rim below the level plus a margin. |
 | `typeWeights`  | The default palette weights for new water in this body.                      |
 
 A generated lake that nobody edits costs nothing to save. The seed builds its record again. Each
-chunk's water map carries the records of the bodies that cover it (`WaterMap.bodies`).
+chunk's water map carries the records of the bodies that cover it (`WaterMap.bodies`), as the
+seed and the edit build them.
+
+**Saved records.** A body the editor has changed has a saved record: one whose rim a sculpt
+stroke touched (its spill height found again, and its level if it drained), a locked one, and one
+made with **Add water**. They live in one blob per level, `water-bodies.json`, in the chunk
+folder beside the water edits, so clearing a level's chunks clears them too. A saved record
+wins over the one the seed or the edit builds. `WaterBodyRules` (`TerrainRenderer.waterRules`)
+reads them once through `waterBodyProvider` and holds them for the edit rules.
 
 **Coverage and the terrain.** Water shows where coverage > 0 **and** `terrainHeight < level`. So
 sculpting changes the shore with no change to the water data. Dig a hole in the lake bed and it
@@ -244,21 +252,65 @@ simulate water.
 So a lake above sea level always has land between it and the ocean. It joins the ocean only if
 its spill height comes down to sea level. Then it takes the ocean's level.
 
+**After a stroke.** When a sculpt stroke ends, the editor saves the heights and then runs the
+rules over the box the stroke covered, plus two texels. Every body other than the ocean that owns
+a texel there is touched. Each has its spill height found again, and one whose level stands more
+than 5 cm above it **drains**:
+
+- Its level drops to the spill height, in every texel it owns.
+- It keeps its water over the **basin**: its texels below the spill height that drain through the
+  outlet, and one texel around them for the shoreline. Its other texels go dry. A hollow inside
+  the old shore that is cut off from the basin at the new level goes dry too; **Add water** puts
+  a pond back.
+- The result is written into the water edits of every chunk the body covers, loaded or not, with
+  full authority, so it overrides the generated lake. The edits and the record are saved.
+
+**Joining the ocean.** When the outlet is the sea and the rim was cut to sea level or below,
+the lake drains to sea level and becomes a lagoon. It keeps its body ID. Its type weights blend
+from its own water, out to 80% of the way from its deepest point to its shore, to "ocean" at the
+shore. The cut between it and the sea is filled by the sea channel flood fill (see
+[Channels from the sea](#channels-from-the-sea)), not by the drain. A cut that stops above sea
+level drains the lake to the cut, and it stays a lake.
+
+**Locked lakes.** A locked body never drains. While a stroke runs, each chunk gets the locked
+level over every texel a locked body owns and the texels next to it (`lockedLevels`). A sample
+there that stands above that level cannot be lowered below the level plus the lakes' `margin`
+(1 m in the default climate, the lip's height), or below where it stands if that is lower.
+Ground below the level, such as the lake bed, can be dug freely. Raising is never held back. The
+brush skips a chunk until the records and its water edit are read, as it does until its heights
+are.
+
 ### Computing the spill height
 
 For a generated lake, the spill height is the lowest ring height. After a sculpt, the rim may have
-changed, so the editor finds it again with a **priority flood**:
+changed, so the editor finds it again with a **priority flood** (`findSpillHeight`):
 
-1. Start from the lake's covered texels.
+1. The body is every texel it owns connected to the texels the stroke touched. The flood starts
+   from those that are covered and below its level.
 2. Always grow the lowest unvisited neighbour first, and keep track of the highest terrain
    height passed so far.
 3. The first time the flood reaches ground lower than that height, the water would run out there.
    That highest point is the spill height.
-4. The search runs only inside the lake's cell and its neighbours. If it reaches that edge first,
-   the spill height is the lowest terrain height found on the edge.
+4. If the flood reaches the sea (covered ocean texels over ground below sea level), the spill
+   height is that highest point or sea level, whichever is higher.
+5. The search runs only inside the lake cell that holds the centre of the flood's starting
+   texels, and that cell's neighbours. If it reaches that edge first, the spill height is the
+   highest ground it crossed to get there.
+
+Another lake's covered water counts as ground at its surface. The basin a drain keeps comes from
+the flood as well. It grows from the path to the outlet through the texels the flood took, at or
+below the spill height. For a lake joining the sea, it grows through the lake's own texels too.
 
 The flood runs on the CPU at the water map's resolution, and only for lakes that the stroke
-touched.
+touched. Its heights are the samples on the texels, so it may not see a cut narrower than a
+texel (8 m).
+
+**Chunks that are not loaded.** The flood and the drain reach past what is loaded. A chunk they
+need takes its in-memory heights, else its saved snapshot, else its generated heights, built on a
+worker (`TerrainRenderer.generateChunkHeights`). Its water edit comes from the chunk, or from the
+store if the chunk is not loaded. When the search needs a chunk it does not have, it reads the
+chunk and its eight neighbours together, and runs again. A drained chunk that is not loaded has
+its edit saved, and reads it when it loads.
 
 ### Channels from the sea
 
@@ -277,7 +329,9 @@ The trench fills a little more with each stroke, as the dig reaches farther inla
 does not touch the ocean stays dry.
 
 **A canal to a lake.** If the channel reaches a lake, the lake's spill height drops to sea level.
-The spill rule then drains the lake to sea level, and it joins the ocean as a lagoon.
+The spill rule then drains the lake to sea level, and it joins the ocean as a lagoon. The spill
+flood finds the sea through the terrain on its own, so a rim cut down to sea level beside the
+ocean joins it without the channel. The channel fills the cut with sea water.
 
 **Undo.** A drain changes the level and the coverage. One undo step restores the terrain, the level
 and the coverage together: a chunk's heights and its water edit (see
@@ -779,7 +833,13 @@ Authored water is a **water edit** per chunk (`WaterEdit`), at the water map's r
   build.
 - **Console.** `addWater(x, z, radius, level)`, `removeWater(x, z, radius)` and
   `resetWater(x, z, radius)` stamp the loaded chunks and save them. Each defaults to the
-  viewer's position, a 20 m radius, and 1.5 m above the ground for the level.
+  viewer's position, a 20 m radius, and 1.5 m above the ground for the level. `addWater` saves
+  the new body's record.
+- **Edit rules in the console.** `waterBody(x, z)` logs the record of the body that owns the
+  ground at a point, and its spill height found again. `lockWater(x, z)` and `unlockWater(x, z)`
+  lock or unlock that body and save the records. `settleWater(x, z, radius)` runs the edit rules
+  over a disc, as a sculpt stroke does, and saves what they change. Each defaults to the viewer's
+  position.
 
 ## Gameplay
 

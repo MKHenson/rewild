@@ -9,7 +9,10 @@ import {
 import { TerrainChunk } from 'rewild-renderer/lib/renderers/terrain/TerrainChunk';
 import { generateBiomeBlendedHeightMap } from 'rewild-renderer/lib/renderers/terrain/Noise';
 import { Raycaster, Intersection } from 'rewild-renderer/lib/core/Raycaster';
+import { WATER_MAP_STEP } from 'rewild-renderer/lib/renderers/terrain/WaterMap';
 import { writeChunkSnapshot } from 'src/database/chunk-snapshots';
+import { writeWaterBodies } from 'src/database/water-bodies';
+import { writeWaterEdit } from 'src/database/water-edits';
 import { projectStore } from 'src/ui/stores/ProjectStore';
 import { sculptStore } from 'src/ui/stores/SculptStore';
 
@@ -30,6 +33,15 @@ interface StrokeState {
   flattenTarget: number;
   invert: boolean;
   lastStampTime: number;
+  // World box the stroke's stamps covered, for the lake edit rules.
+  minX: number;
+  minZ: number;
+  maxX: number;
+  maxZ: number;
+  // Locked water levels per chunk (see WaterBodyRules.chunkLockLevels),
+  // resolved once per stroke.
+  locks: Map<string, Float32Array | null>;
+  lockMargin: number;
 }
 
 /**
@@ -65,6 +77,14 @@ export class TerrainSculptController {
         return controller.renderer.terrainRenderer.metersPerSample;
       },
       getHeights: (cx: number, cy: number) => this.getChunkHeights(cx, cy),
+      locks: {
+        step: WATER_MAP_STEP,
+        get margin() {
+          return controller.stroke?.lockMargin ?? 0;
+        },
+        getLevels: (cx: number, cy: number) =>
+          this.stroke?.locks.get(`${cx},${cy}`) ?? null,
+      },
     };
   }
 
@@ -103,6 +123,12 @@ export class TerrainSculptController {
       flattenTarget: point.y,
       invert,
       lastStampTime: performance.now(),
+      minX: Infinity,
+      minZ: Infinity,
+      maxX: -Infinity,
+      maxZ: -Infinity,
+      locks: new Map(),
+      lockMargin: this.renderer.terrainRenderer.waterRules.lockMargin,
     };
     // First stamp at a nominal frame's worth of time so a click sculpts too.
     this.stamp(point, 1 / 60);
@@ -121,7 +147,8 @@ export class TerrainSculptController {
   /**
    * Ends the stroke and persists every touched chunk as a full-heightfield
    * snapshot (overwriting any previous snapshot and re-dirtying its metadata
-   * row for the next sync). Untouched chunks store nothing.
+   * row for the next sync). Untouched chunks store nothing. Then applies the
+   * lake edit rules over the stroke and saves the water they drained.
    */
   async endStroke(): Promise<void> {
     const stroke = this.stroke;
@@ -136,12 +163,38 @@ export class TerrainSculptController {
       return;
     }
 
-    const size = this.renderer.terrainRenderer.mapChunkSizeLod;
+    const terrain = this.renderer.terrainRenderer;
+    const size = terrain.mapChunkSizeLod;
     await Promise.all(
       [...stroke.touched.values()].map((t) =>
         writeChunkSnapshot(levelId, t.cx, t.cy, t.heights, size)
       )
     );
+
+    try {
+      const settled = await terrain.waterRules.settle(
+        stroke.minX,
+        stroke.minZ,
+        stroke.maxX,
+        stroke.maxZ
+      );
+      await Promise.all(
+        settled.chunks.map((t) => writeWaterEdit(levelId, t.cx, t.cy, t.edit))
+      );
+      if (settled.outcomes.length > 0)
+        await writeWaterBodies(levelId, terrain.waterRules.savedBodies());
+      for (const o of settled.outcomes)
+        if (o.drained)
+          console.log(
+            `Water body ${o.body.id} drained from ${o.previousLevel.toFixed(
+              2
+            )} m to ${o.body.level.toFixed(2)} m${
+              o.joined ? ', joining the ocean' : ''
+            }.`
+          );
+    } catch (err) {
+      console.warn('Lake edit rules failed:', err);
+    }
 
     projectStore.dirty = true;
     projectStore.dispatcher.dispatch({ kind: 'changed' });
@@ -154,6 +207,7 @@ export class TerrainSculptController {
    */
   prefetchHeights(centerX: number, centerZ: number, radius: number) {
     const terrain = this.renderer.terrainRenderer;
+    terrain.waterRules.resolveRecords();
     // World span of a chunk (already scaled by metersPerSample), so this maps
     // the world-space brush footprint to chunk coords at any terrain scale.
     const span = terrain.chunkSize;
@@ -196,6 +250,11 @@ export class TerrainSculptController {
       Math.max(1, Math.round(radius * SMOOTH_KERNEL_FRACTION))
     );
 
+    stroke.minX = Math.min(stroke.minX, point.x - radius);
+    stroke.minZ = Math.min(stroke.minZ, point.z - radius);
+    stroke.maxX = Math.max(stroke.maxX, point.x + radius);
+    stroke.maxZ = Math.max(stroke.maxZ, point.z + radius);
+
     const touched = applySculptStamp(this.source, {
       type,
       centerX: point.x,
@@ -218,7 +277,8 @@ export class TerrainSculptController {
 
   // Resolves a chunk's editable heights for the current stamp, or null to
   // skip it this stamp (applySculptStamp then also skips any samples the
-  // chunk co-owns, so a not-yet-ready neighbour can never cause a seam).
+  // chunk co-owns, so a not-yet-ready neighbour can never cause a seam). A
+  // chunk is also skipped until its locked water levels are known.
   private getChunkHeights(cx: number, cy: number): Float32Array | null {
     const chunk = this.renderer.terrainRenderer.terrainChunks.get(
       `${cx},${cy}`
@@ -226,9 +286,23 @@ export class TerrainSculptController {
     // Chunk objects exist well beyond raycast range; if one is somehow
     // missing, skipping keeps every write consistent with what will be saved.
     if (!chunk) return null;
-    if (chunk.heights) return chunk.heights;
+    if (chunk.heights) return this.locksResolved(cx, cy) ? chunk.heights : null;
     this.ensureHeights(chunk);
     return null;
+  }
+
+  private locksResolved(cx: number, cy: number): boolean {
+    const stroke = this.stroke;
+    if (!stroke) return true;
+    const key = `${cx},${cy}`;
+    if (stroke.locks.has(key)) return true;
+    const levels = this.renderer.terrainRenderer.waterRules.chunkLockLevels(
+      cx,
+      cy
+    );
+    if (levels === undefined) return false;
+    stroke.locks.set(key, levels);
+    return true;
   }
 
   // Resolves heights for a chunk that has none in memory: its saved snapshot
