@@ -20,6 +20,8 @@ import {
 import { ChunkSnapshotProvider } from './ChunkSnapshot';
 import { PaintMaskProvider } from './PaintMask';
 import { WaterEditProvider } from './WaterEdit';
+import { WaterBodyProvider } from './WaterBodies';
+import { WaterBodyRules } from './WaterBodyRules';
 import { ScatterKillSet, ScatterKillSetProvider } from './ScatterKillSet';
 import { ScatterInstances, ScatterPick, pickScatterInstance } from './Scatter';
 import { generateSplatMap } from './Splat';
@@ -152,6 +154,8 @@ export class TerrainRenderer {
   waterEditProvider: WaterEditProvider | null = null;
   // Saved kill sets, looked up alongside the density mask.
   scatterKillProvider: ScatterKillSetProvider | null = null;
+  /** The lake edit rules and the level's water body records. */
+  readonly waterRules = new WaterBodyRules(this);
   private _enabled: boolean = true;
   // The ocean past the last chunk. Created with the renderer.
   private horizonOcean: HorizonOcean | null = null;
@@ -226,6 +230,11 @@ export class TerrainRenderer {
     if (this._climatePreset === value) return;
     this._climatePreset = value;
     this.clearChunks();
+  }
+
+  // Saved water body records for the level, read on first use.
+  set waterBodyProvider(provider: WaterBodyProvider | null) {
+    this.waterRules.setProvider(provider);
   }
 
   get seaLevel() {
@@ -768,6 +777,23 @@ export class TerrainRenderer {
     chunk.bumpScatterInputVersion();
     this._needsVisibilityUpdate = true;
     return true;
+  }
+
+  /**
+   * A chunk's generated LOD-0 heights, built on a worker for a chunk that is not
+   * loaded. The coarsest mesh is built alongside and dropped.
+   */
+  async generateChunkHeights(cx: number, cy: number): Promise<Float32Array> {
+    const size = this.mapChunkSizeLod;
+    const { heights } = await this.workerPool.enqueue({
+      chunkSize: size,
+      lod: this.detailLevels.at(-1)!.lod,
+      position: new Vector2(cx * (size - 1), cy * (size - 1)),
+      seed: this.seed,
+      climatePreset: this.climatePreset,
+      seaLevel: this.seaLevel,
+    });
+    return heights;
   }
 
   /**

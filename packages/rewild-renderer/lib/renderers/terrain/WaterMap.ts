@@ -2,6 +2,7 @@ import { Vector2 } from 'rewild-common';
 import { ClimateConfig } from './Biomes';
 import { createClimateField } from './ClimateField';
 import {
+  Lake,
   OCEAN_BODY_ID,
   WaterBody,
   createWaterSampler,
@@ -63,23 +64,35 @@ export interface WaterMap {
 
 export { OCEAN_BODY_ID };
 
+/** A chunk's water before the terrain is consulted: the generator blended with
+ *  the chunk's edit, per water map texel. */
+export interface ResolvedWater {
+  size: number;
+  step: number;
+  /** 0..255. */
+  coverage: Uint8Array;
+  /** World height of the surface. */
+  levels: Float64Array;
+  /** RGBA8 palette weights, written where coverage > 0. */
+  typeWeights: Uint8Array;
+  bodyIds: Uint32Array;
+  /** The generated lakes that reach the chunk. */
+  lakes: Lake[];
+  covered: boolean;
+}
+
 /**
- * The water map for a chunk with LOD-0 `heights`, or null when the ground
- * everywhere stands WET_BAND_REACH or more above the covered levels. `offset`
- * is the chunk's sample-space offset, as for the height and splat generators.
- * `edit` is the chunk's authored water, blended over the generated.
+ * The generated water of a chunk at sample-space `offset`, with `edit` blended
+ * over it. Needs no heights, so it resolves for chunks that are not loaded.
  */
-export function buildWaterMap(
+export function resolveWater(
   chunkSize: number,
   seed: number,
   offset: Vector2,
   climate: ClimateConfig,
   seaLevel: number,
-  heights: Float32Array,
   edit: WaterEdit | null = null
-): WaterMap | null {
-  if (!climate.continent && !climate.lakes && !edit) return null;
-
+): ResolvedWater {
   const step = WATER_MAP_STEP;
   const size = paintMaskSize(chunkSize, step);
   const texels = size * size;
@@ -118,7 +131,46 @@ export function buildWaterMap(
       }
     }
   }
-  if (!covered) return null;
+  return {
+    size,
+    step,
+    coverage,
+    levels,
+    typeWeights,
+    bodyIds,
+    lakes: sampler.lakes,
+    covered,
+  };
+}
+
+/**
+ * The water map for a chunk with LOD-0 `heights`, or null when the ground
+ * everywhere stands WET_BAND_REACH or more above the covered levels. `offset`
+ * is the chunk's sample-space offset, as for the height and splat generators.
+ * `edit` is the chunk's authored water, blended over the generated.
+ */
+export function buildWaterMap(
+  chunkSize: number,
+  seed: number,
+  offset: Vector2,
+  climate: ClimateConfig,
+  seaLevel: number,
+  heights: Float32Array,
+  edit: WaterEdit | null = null
+): WaterMap | null {
+  if (!climate.continent && !climate.lakes && !edit) return null;
+
+  const resolved = resolveWater(
+    chunkSize,
+    seed,
+    offset,
+    climate,
+    seaLevel,
+    edit
+  );
+  if (!resolved.covered) return null;
+  const { size, step, coverage, levels, typeWeights, bodyIds } = resolved;
+  const texels = size * size;
 
   // Water shows where a covered texel's footprint dips below its level, or
   // where the swash can run over it. The footprint reaches half a step either
@@ -163,7 +215,7 @@ export function buildWaterMap(
     const id = bodyIds[t];
     if (coverage[t] === 0 || seen.has(id)) continue;
     seen.add(id);
-    const lake = sampler.lakes.find((l) => l.bodyId === id);
+    const lake = resolved.lakes.find((l) => l.bodyId === id);
     if (lake) bodies.push(lakeBody(lake, climate));
     else if (id === OCEAN_BODY_ID) bodies.push(oceanBody(climate, seaLevel));
     else

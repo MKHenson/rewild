@@ -5,6 +5,7 @@ import { createChunkSnapshotProvider } from 'src/database/chunk-snapshots';
 import { createBiomeMaskProvider } from 'src/database/biome-masks';
 import { createScatterMaskProvider } from 'src/database/scatter-masks';
 import { createWaterEditProvider } from 'src/database/water-edits';
+import { createWaterBodyProvider } from 'src/database/water-bodies';
 import { createScatterKillProvider } from 'src/database/scatter-kills';
 import { registerDebugCommands } from 'src/core/debug';
 
@@ -43,6 +44,9 @@ export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
     : null;
   renderer.terrainRenderer.waterEditProvider = project.levelId
     ? createWaterEditProvider(project.levelId)
+    : null;
+  renderer.terrainRenderer.waterBodyProvider = project.levelId
+    ? createWaterBodyProvider(project.levelId)
     : null;
   renderer.terrainRenderer.scatterKillProvider = project.levelId
     ? createScatterKillProvider(project.levelId)
