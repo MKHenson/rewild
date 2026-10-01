@@ -982,10 +982,10 @@
                         "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement6"
                     },
                     "windDirection": {
-                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement8"
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement7"
                     },
                     "windiness": {
-                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement7"
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement8"
                     }
                 },
                 "required": [
@@ -1173,6 +1173,24 @@
                 ],
                 "title": "JsonElement"
             },
+            "kotlinx.serialization.json.JsonElement8": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {},
+                        "title": "JsonArray"
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonPrimitive"
+                    }
+                ],
+                "title": "JsonElement"
+            },
             "com.rewild.models.Container": {
                 "type": "object",
                 "properties": {
@@ -1230,7 +1248,7 @@
                 ],
                 "title": "Container"
             },
-            "kotlinx.serialization.json.JsonElement8": {
+            "kotlinx.serialization.json.JsonElement9": {
                 "anyOf": [
                     {
                         "type": "array",
@@ -1391,6 +1409,14 @@
                     "activeOnStartup": {
                         "type": "boolean",
                         "title": "Boolean"
+                    },
+                    "chunksClearedAt": {
+                        "type": [
+                            "null",
+                            "integer"
+                        ],
+                        "format": "int64",
+                        "title": "Long"
                     },
                     "containers": {
                         "type": "array",

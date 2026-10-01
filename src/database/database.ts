@@ -8,11 +8,36 @@ export class Database {
   readonly projects = new LocalProjectTable();
   readonly levels = new LocalLevelTable();
   readonly assets = new LocalAssetStore();
-  readonly sync = new SyncEngine({ projects: this.projects, levels: this.levels }, authService);
+  readonly sync = new SyncEngine(
+    { projects: this.projects, levels: this.levels },
+    authService
+  );
 
-  async syncAll(): Promise<void> {
-    await this.sync.run();
-    await this.assets.sync();
+  // Syncs and clears run one at a time. A clear during a sync would let the
+  // sync's asset pull download the files the clear removed.
+  private queue: Promise<unknown> = Promise.resolve();
+
+  private exclusive<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(task, task);
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
+  syncAll(): Promise<void> {
+    return this.exclusive(async () => {
+      // The asset pull needs the server to know the level clears first, so a
+      // failed record sync skips it.
+      if (await this.sync.run()) await this.assets.sync();
+    });
+  }
+
+  /** Removes all of the level's chunk files: heights, paint, scatter and water.
+   *  The next sync removes the server's copies too. */
+  clearLevelChunks(levelId: string): Promise<void> {
+    return this.exclusive(async () => {
+      await this.assets.removeChunksByLevel(levelId);
+      await this.levels.markCleared(levelId);
+    });
   }
 }
 

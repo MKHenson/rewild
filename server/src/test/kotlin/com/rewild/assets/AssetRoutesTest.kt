@@ -223,6 +223,19 @@ class AssetRoutesTest {
         assertEquals(HttpStatusCode.Forbidden, response.status)
     }
 
+    @Test
+    fun `upload-url returns 403 for a deleted level`() = testApplication {
+        installTestApp()
+        levelService.upsert(USER_A, makeLevel("deleted-level", PROJECT_A).copy(deletedAt = 2000L))
+        val token = jwtService.generateToken(USER_A, "$USER_A@test.com", USER_A)
+        val response = client.post("/api/assets/upload-url") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(json.encodeToString(UploadUrlRequest("deleted-level", "chunk", "x.bin")))
+        }
+        assertEquals(HttpStatusCode.Forbidden, response.status)
+    }
+
     // --- POST /api/assets/confirm ---
 
     @Test
