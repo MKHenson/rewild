@@ -10,7 +10,7 @@ import {
   buildWaterLevels,
 } from './WaterCarve';
 import { WATER_EDIT_STEP, buildWaterGuard, isWaterBlocked } from './WaterEdit';
-import type { ResolvedWater } from './WaterMap';
+import { ResolvedWater, SWASH_REACH, waterShowsAt } from './WaterMap';
 
 // One chunk of 81 samples at 1 m per sample: span 80, texels of 4 m, 21
 // texels a side. World sample (wx, wz) sits at chunk sample
@@ -115,6 +115,59 @@ describe('buildWaterGuard', () => {
     const unknown = buildWaterGuard(() => null, TEXEL_SPAN, 0, 0, 2, 2, 7, 10);
     expect(isWaterBlocked(unknown, 1, 1)).toBe(true);
     expect(isWaterBlocked(guard, TEXEL_HALF + 1, 0)).toBe(true);
+  });
+});
+
+describe('buildWaterGuard over the ground', () => {
+  // Sea coverage at level 0 over the whole chunk, as inland of the coast.
+  const sea = fakeWater(() => [255, 0, 0]);
+  const guardOver = (heights: Float32Array | null, level: number) =>
+    buildWaterGuard(
+      only(sea),
+      TEXEL_SPAN,
+      -TEXEL_HALF,
+      -TEXEL_HALF,
+      TEXEL_HALF,
+      TEXEL_HALF,
+      7,
+      level,
+      { getHeights: () => heights, floor: level - 2 }
+    );
+
+  it('lets a stroke pass over water that does not show', () => {
+    const land = new FakeSource(() => 30).heights;
+    expect(isWaterBlocked(guardOver(land, 30), 0, 0)).toBe(false);
+  });
+
+  it('blocks hidden water that the stroke’s bed would uncover', () => {
+    const land = new FakeSource(() => 30).heights;
+    expect(isWaterBlocked(guardOver(land, 1), 0, 0)).toBe(true);
+  });
+
+  it('blocks water that shows', () => {
+    const shore = new FakeSource(() => SWASH_REACH / 2).heights;
+    expect(isWaterBlocked(guardOver(shore, 30), 0, 0)).toBe(true);
+  });
+
+  it('blocks covered water while the heights are read', () => {
+    expect(isWaterBlocked(guardOver(null, 30), 0, 0)).toBe(true);
+  });
+});
+
+describe('waterShowsAt', () => {
+  const sea = fakeWater(() => [255, 0, 0]);
+  const centre = TEXEL_HALF * TEXELS + TEXEL_HALF;
+
+  it('shows where the footprint dips below the level plus the swash', () => {
+    const hollow = new FakeSource((wx, wz) =>
+      wx === 1 && wz === 0 ? SWASH_REACH - 0.1 : 30
+    );
+    expect(waterShowsAt(sea, hollow.heights, centre)).toBe(true);
+  });
+
+  it('is hidden where all the footprint stands above it', () => {
+    const land = new FakeSource(() => SWASH_REACH);
+    expect(waterShowsAt(sea, land.heights, centre)).toBe(false);
   });
 });
 

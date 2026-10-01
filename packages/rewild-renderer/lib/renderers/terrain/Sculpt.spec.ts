@@ -233,3 +233,37 @@ describe('applySculptStamp locks', () => {
     expect(source.at(0, 0, 0, 0)).toBeGreaterThan(5.5);
   });
 });
+
+describe('applySculptStamp reset', () => {
+  // Sculpted to 10 everywhere; generated at 2.
+  const sculpted = () => {
+    const source = new FakeSource([[0, 0], [1, 0]], () => 10);
+    const generated = new FakeSource([[0, 0], [1, 0]], () => 2);
+    return Object.assign(source, {
+      getBaseline: (cx: number, cy: number) =>
+        generated.getHeights(cx, cy),
+    });
+  };
+
+  it('blends back to the generated heights, fully at the centre', () => {
+    const source = sculpted();
+    applySculptStamp(source, stamp({ type: 'reset', amount: 1 }));
+    expect(source.at(0, 0, 0, 0)).toBe(2);
+    expect(source.at(0, 0, 1, 0)).toBeGreaterThan(2);
+    expect(source.at(0, 0, 1, 0)).toBeLessThan(10);
+  });
+
+  it('writes a shared sample to every owner', () => {
+    const source = sculpted();
+    applySculptStamp(source, stamp({ type: 'reset', centerX: 2, amount: 1 }));
+    expect(source.at(0, 0, 2, 0)).toBe(2);
+    expect(source.at(1, 0, 2, 0)).toBe(2);
+  });
+
+  it('leaves samples alone while their generated heights are not known', () => {
+    const source = new FakeSource([[0, 0]], () => 10);
+    const touched = applySculptStamp(source, stamp({ type: 'reset' }));
+    expect(touched).toEqual([]);
+    expect(source.at(0, 0, 0, 0)).toBe(10);
+  });
+});

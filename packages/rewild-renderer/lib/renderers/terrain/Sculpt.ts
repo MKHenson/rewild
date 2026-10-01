@@ -17,7 +17,12 @@
 // |wz - cy*span| <= span/2 — one chunk in the interior, two on an edge,
 // four on a corner.
 
-export type SculptBrushType = 'raise' | 'lower' | 'smooth' | 'flatten';
+export type SculptBrushType =
+  | 'raise'
+  | 'lower'
+  | 'smooth'
+  | 'flatten'
+  | 'reset';
 
 export interface SculptStamp {
   type: SculptBrushType;
@@ -29,7 +34,8 @@ export interface SculptStamp {
   /**
    * Stamp intensity, already scaled by the caller (e.g. by elapsed time):
    * raise/lower — meters added/removed at the brush centre;
-   * smooth/flatten — blend fraction (0..1) toward the smoothed/target height.
+   * smooth/flatten/reset — blend fraction (0..1) toward the smoothed, target
+   * or generated height.
    */
   amount: number;
   /** Flatten only: the world height to move samples toward. */
@@ -64,6 +70,9 @@ export interface SculptHeightSource {
   /** Where locked water holds the ground up. Samples are never lowered through
    *  it. */
   locks?: SculptLockSource;
+  /** Reset only: the chunk's generated heights, or null while they are not
+   *  known. A sample without them is left alone. */
+  getBaseline?(cx: number, cy: number): Float32Array | null;
 }
 
 /**
@@ -201,6 +210,24 @@ export function applySculptStamp(
     return levels[my * size + mx];
   };
 
+  // Every owner's generated copy of a shared sample is the same, so the first
+  // owner's is read.
+  const baselineCache = new Map<string, Float32Array | null>();
+  const baselineAt = (wx: number, wz: number): number => {
+    const cx = Math.ceil((wx - half) / span);
+    const cy = Math.ceil((wz - half) / span);
+    const key = `${cx},${cy}`;
+    let baseline = baselineCache.get(key);
+    if (baseline === undefined) {
+      baseline = source.getBaseline?.(cx, cy) ?? null;
+      baselineCache.set(key, baseline);
+    }
+    if (!baseline) return NaN;
+    const sx = wx - cx * span + half;
+    const sy = cy * span + half - wz;
+    return baseline[sy * chunkSize + sx];
+  };
+
   // Smooth reads neighbours from the pre-stamp state so the result does not
   // depend on sample iteration order.
   const src = type === 'smooth' ? patch.slice() : patch;
@@ -234,6 +261,13 @@ export function applySculptStamp(
         case 'flatten': {
           const blend = Math.min(1, Math.max(0, stamp.amount * f));
           next = v + (stamp.target! - v) * blend;
+          break;
+        }
+        case 'reset': {
+          const generated = baselineAt(wx, wz);
+          if (Number.isNaN(generated)) continue;
+          const blend = Math.min(1, Math.max(0, stamp.amount * f));
+          next = v + (generated - v) * blend;
           break;
         }
         case 'smooth': {

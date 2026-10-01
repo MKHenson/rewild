@@ -8,7 +8,7 @@ import {
   serializePaintMask,
 } from './PaintMask';
 import type { WaterBody } from './Lakes';
-import type { ResolvedWater } from './WaterMap';
+import { ResolvedWater, SWASH_REACH, waterShowsAt } from './WaterMap';
 import { MAX_WATER_TYPES } from './Water';
 
 // A chunk's authored water, blended over what the generator makes.
@@ -342,10 +342,20 @@ export interface WaterGuard {
   blocked: Uint8Array;
 }
 
+/** The ground under a guard, which lets a stroke pass over hidden water. */
+export interface WaterGuardGround {
+  /** A chunk's LOD-0 heights, or null while they are read. */
+  getHeights(cx: number, cy: number): Float32Array | null;
+  /** The lowest bed the stroke digs. */
+  floor: number;
+}
+
 /**
  * The guard over world texels (i0, j0)–(i1, j1) for water of `bodyId` at
  * `level`. `getWater` gives a chunk's water as it stands, or null while it is
- * not known; `span` is a chunk's width in texels.
+ * not known; `span` is a chunk's width in texels. With `ground`, water that
+ * does not show and stays hidden below the stroke's floor does not block.
+ * Without it, all covered water blocks.
  */
 export function buildWaterGuard(
   getWater: (cx: number, cy: number) => ResolvedWater | null,
@@ -355,7 +365,8 @@ export function buildWaterGuard(
   i1: number,
   j1: number,
   bodyId: number,
-  level: number
+  level: number,
+  ground?: WaterGuardGround
 ): WaterGuard {
   const width = i1 - i0 + 1;
   const height = j1 - j0 + 1;
@@ -381,6 +392,10 @@ export function buildWaterGuard(
           Math.abs(water.levels[t] - level) <= WATER_LEVEL_MATCH
         )
           continue;
+        if (ground && water.levels[t] + SWASH_REACH <= ground.floor) {
+          const heights = ground.getHeights(cx, cy);
+          if (heights && !waterShowsAt(water, heights, t)) continue;
+        }
       }
       for (let y = Math.max(j0, j - 1); y <= Math.min(j1, j + 1); y++)
         for (let x = Math.max(i0, i - 1); x <= Math.min(i1, i + 1); x++)
