@@ -258,6 +258,11 @@ export class WaterBodyRules {
   /** Points the rules at a level's saved records, dropping the current ones. */
   setProvider(provider: WaterBodyProvider | null) {
     this.provider = provider;
+    this.clearRecords();
+  }
+
+  /** Drops the records read so far. The next lookup reads them again. */
+  clearRecords() {
     this.records = null;
     this.recordsLookup = null;
   }
@@ -267,7 +272,9 @@ export class WaterBodyRules {
     if (this.records) return Promise.resolve(this.records);
     if (!this.recordsLookup) {
       const provider = this.provider;
-      this.recordsLookup = (provider ? provider() : Promise.resolve([]))
+      const lookup: Promise<Map<number, WaterBody>> = (
+        provider ? provider() : Promise.resolve([])
+      )
         .catch((err) => {
           console.warn('Water body records read failed:', err);
           return [] as WaterBody[];
@@ -275,9 +282,11 @@ export class WaterBodyRules {
         .then((bodies) => {
           const records = new Map<number, WaterBody>();
           for (const body of bodies) records.set(body.id, body);
-          if (this.provider === provider) this.records = records;
+          // A lookup that a clear or a new provider dropped keeps its result.
+          if (this.recordsLookup === lookup) this.records = records;
           return records;
         });
+      this.recordsLookup = lookup;
     }
     return this.recordsLookup;
   }

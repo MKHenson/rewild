@@ -75,7 +75,7 @@ export function registerChunkSnapshotDevCommands(
       return;
     }
 
-    await db.assets.removeChunksByLevel(levelId);
+    await db.clearLevelChunks(levelId);
     renderer.terrainRenderer.reset(renderer.terrainRenderer.seed, renderer);
     console.log('Removed all chunk snapshots for this level — terrain reloading.');
   };

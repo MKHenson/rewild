@@ -1125,6 +1125,8 @@ export class TerrainRenderer {
 
   reset(seed: number, renderer: Renderer) {
     this.dispose();
+    // The old world's records name lakes by cell, which the new world reuses.
+    this.waterRules.clearRecords();
     this.init(renderer);
     this.seed = seed;
   }
