@@ -243,6 +243,18 @@ describe('applyWaterStamp', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('fills to the radius with a hard stamp', () => {
+    const { edits, source: s } = source();
+    applyWaterStamp(
+      s,
+      stamp({ centerX: corner.x, centerZ: corner.z, hard: true })
+    );
+    const edit = edits.get('0,0')!;
+    const texel = (SIZE - 1) * SIZE + 3;
+    expect(plane(edit, WATER_EDIT_COVERAGE)[texel]).toBe(255);
+    expect(plane(edit, WATER_EDIT_TYPES + 1)[texel]).toBe(255);
+  });
+
   it('removes water by owning it with none', () => {
     const { edits, source: s } = source();
     applyWaterStamp(s, stamp({ type: 'remove' }));

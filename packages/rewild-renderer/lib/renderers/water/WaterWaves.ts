@@ -1,6 +1,13 @@
 import { MAX_WATER_TYPES, WaterType } from '../terrain/Water';
 import { CASCADE_COUNT, CASCADE_SIZES, cascadeWeight } from './OceanSpectrum';
-import { SHORE_OMEGAS, shorePhase } from './ShoreWaves';
+import {
+  SHORE_OMEGAS,
+  advanceLakePhase,
+  lakeEdgeFoam,
+  lakeLapOmega,
+  lakeRunup,
+  shorePhase,
+} from './ShoreWaves';
 
 // What every water surface shares besides the ocean's textures (OceanFFT):
 // where positions are measured from, the grid's LOD bands, and how strongly
@@ -20,7 +27,10 @@ const CASCADE_OFFSET = 28;
 const CASCADE_TYPES_OFFSET = CASCADE_OFFSET + CASCADE_COUNT * 4;
 const SHORE_OFFSET = CASCADE_TYPES_OFFSET + CASCADE_COUNT * 4;
 const SWASH_OFFSET = SHORE_OFFSET + 8;
-export const WAVE_UNIFORM_FLOATS = SWASH_OFFSET + 4;
+const LAKE_OFFSET = SWASH_OFFSET + 4;
+const LAKE_TYPES_OFFSET = LAKE_OFFSET + 4;
+const LAKE_FOAM_WIDTH_OFFSET = LAKE_TYPES_OFFSET + 4;
+export const WAVE_UNIFORM_FLOATS = LAKE_FOAM_WIDTH_OFFSET + 4;
 
 /** Per frame, what the water shader takes besides the ocean textures. */
 export interface WaveFrame {
@@ -33,6 +43,9 @@ export interface WaveFrame {
   foamDebug: boolean;
   /** Paints the shore field instead of the water (water.wgsl shoreDebug). */
   shoreDebug: boolean;
+  /** A water.wgsl refractionDebug view in place of the water: 0 off, 1 the
+   *  depth facts, 2 the type weights, 3 the light that passes through. */
+  refractionDebug?: number;
   /** Strength of the sunlight through the wave crests; 1 is the default. */
   crestGlow: number;
   /** Strength of the trough darkening; 1 is the default. */
@@ -69,12 +82,23 @@ export interface WaveFrame {
 export class WaterWaves {
   /** Per cascade and palette type: `cascadeTypes[c * 4 + type]`. */
   readonly cascadeTypes = new Float64Array(CASCADE_COUNT * MAX_WATER_TYPES);
+  /** Per palette type: how strongly it laps, and its edge foam's depth. */
+  readonly lapping = new Float64Array(MAX_WATER_TYPES);
+  readonly shoreFoamWidths = new Float64Array(MAX_WATER_TYPES);
   /** World xz positions are measured from. */
   originX = 0;
   originZ = 0;
+  /** The lapping's phase, carried from pack to pack, and the clock it was
+   *  taken at. */
+  lakePhase = 0;
+  private lakeTime = NaN;
 
-  /** Takes each palette type's weight on each cascade. */
+  /** Takes each palette type's weight on each cascade, and its lapping. */
   update(palette: readonly WaterType[]): void {
+    for (let t = 0; t < MAX_WATER_TYPES; t++) {
+      this.lapping[t] = palette[t]?.lapping ?? 0;
+      this.shoreFoamWidths[t] = palette[t]?.shoreFoamWidth ?? 0;
+    }
     for (let c = 0; c < CASCADE_COUNT; c++)
       for (let t = 0; t < MAX_WATER_TYPES; t++) {
         const type = palette[t];
@@ -97,7 +121,9 @@ export class WaterWaves {
    * its tile size, RMS height and where the origin falls in its tile, per cascade
    * each palette type's weight, then the shore trains' angular frequencies and
    * phases, their breaker height and where the shore field lies, then the
-   * swash and wet band strengths.
+   * swash and wet band strengths, then the lakes' lapping (angular frequency,
+   * phase, runup and edge foam) and per palette type its lapping and edge
+   * foam depth.
    */
   pack(frame: WaveFrame, out: Float32Array): void {
     out[0] = frame.detailBias;
@@ -107,7 +133,13 @@ export class WaterWaves {
     out[ORIGIN_OFFSET] = this.originX;
     out[ORIGIN_OFFSET + 1] = this.originZ;
     out[ORIGIN_OFFSET + 2] = frame.windSpeed;
-    out[ORIGIN_OFFSET + 3] = frame.shoreDebug ? 2 : frame.foamDebug ? 1 : 0;
+    out[ORIGIN_OFFSET + 3] = frame.refractionDebug
+      ? 2 + frame.refractionDebug
+      : frame.shoreDebug
+      ? 2
+      : frame.foamDebug
+      ? 1
+      : 0;
     for (let i = 0; i < 8; i++) {
       out[LOD_DISTANCE_OFFSET + i] = frame.lodDistances[i] ?? 0;
       out[LOD_SPACING_OFFSET + i] = frame.lodSpacings[i] ?? 0;
@@ -143,6 +175,23 @@ export class WaterWaves {
     out[SWASH_OFFSET + 1] = frame.wetBand;
     out[SWASH_OFFSET + 2] = 0;
     out[SWASH_OFFSET + 3] = 0;
+    const omega = lakeLapOmega(frame.windSpeed);
+    if (!Number.isNaN(this.lakeTime))
+      this.lakePhase = advanceLakePhase(
+        this.lakePhase,
+        omega,
+        this.lakeTime,
+        frame.time
+      );
+    this.lakeTime = frame.time;
+    out[LAKE_OFFSET] = omega;
+    out[LAKE_OFFSET + 1] = this.lakePhase;
+    out[LAKE_OFFSET + 2] = lakeRunup(frame.windSpeed);
+    out[LAKE_OFFSET + 3] = lakeEdgeFoam(frame.windSpeed);
+    for (let t = 0; t < MAX_WATER_TYPES; t++) {
+      out[LAKE_TYPES_OFFSET + t] = this.lapping[t];
+      out[LAKE_FOAM_WIDTH_OFFSET + t] = this.shoreFoamWidths[t];
+    }
   }
 }
 

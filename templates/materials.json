@@ -114,6 +114,16 @@
       "name": "light-32",
       "url": "icons/editor/light-32.png",
       "colorSpace": "linear"
+    },
+    {
+      "name": "water-spray",
+      "url": "nature/water/sea-spray.png",
+      "colorSpace": "srgb"
+    },
+    {
+      "name": "water-foam",
+      "url": "nature/water/sea-foam.webp",
+      "colorSpace": "linear"
     }
   ],
   "materials": [

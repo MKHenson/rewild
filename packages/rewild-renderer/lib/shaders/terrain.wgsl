@@ -357,6 +357,9 @@ const WET_GLOSS: f32 = 0.3;
 const WAVE_WET_SHARE: f32 = 0.2;
 const WET_CAPILLARY: f32 = 0.15;
 const WET_FADE: f32 = 0.3;
+// Lapping water (a lake's) draws its capillary rise and fade at this share of
+// the sea's: its banks are not soaked by surf, so the damp band stays narrow.
+const LAKE_WET_SHARE: f32 = 0.4;
 const FILM_ROUGHNESS: f32 = 0.08;
 const SHEEN_SECONDS: f32 = 1.0;
 const SOAK_DARKEN: f32 = 0.7;
@@ -435,14 +438,14 @@ fn terrainWater(uv: vec2f, height: f32, rise: f32) -> TerrainWater {
   let span = 1.0 / terrainParams.uvPerMetre;
   let rest = terrainParams.water.zw - waves.origin.xy + vec2f(uv.x - 0.5, 0.5 - uv.y) * span;
   let field = textureSampleLevel(swashMap, splatSampler, shoreFieldUV(rest), 0.0).xy;
-  // Only water that takes the longest cascade, the open sea's, has swash.
-  let swash = swashState(vec2f(field.x, field.y * dot(waves.cascadeTypes[0], weights)), rest);
+  let swash = waterSwash(field, rest, weights);
 
   let strength = waves.swash.y * coverage;
   let gentle = smoothstep(WET_STEEP_SLOPE, WET_FLAT_SLOPE, rise);
   let waveReach = max(WAVE_WET_SHARE * 4.0 * sqrt(variance), swash.highest);
-  let reach = WET_CAPILLARY + gentle * waveReach;
-  out.damp = (1.0 - smoothstep(reach, reach + WET_FADE, above)) * strength;
+  let wet = mix(1.0, LAKE_WET_SHARE, saturate(dot(waves.lakeTypes, weights)));
+  let reach = WET_CAPILLARY * wet + gentle * waveReach;
+  out.damp = (1.0 - smoothstep(reach, reach + WET_FADE * wet, above)) * strength;
   if (swash.runup > 0.0) {
     let drained = swashDrained(swash, above);
     out.sheen = exp(-drained / SHEEN_SECONDS) * gentle * strength;

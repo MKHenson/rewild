@@ -619,8 +619,17 @@ The shader has the depth and the terrain height texture. These give the main sho
     (`packSwashField`, `rg16float`). Reached texels keep their own time and strength. Ground up
     to 3 texels (24 m) from them takes the nearest one's, so a beach keeps time with the crests
     at its waterline. Water the waves do not reach gets none, so a lagoon behind a bar has no
-    swash. Only water that takes the longest cascade, the open sea's, has swash, so a lake
-    beside the sea gets none either.
+    swash. Only water that takes the longest cascade, the open sea's, has this swash, so a
+    lake beside the sea gets none of it; it laps instead.
+  - **Lapping.** Where no shore waves reach, water laps at its shore (`lakeSwashState`): the
+    wind's short chop runs up as one train (`ShoreWaves`): a slow 6 s lap and a 2 cm runup in calm
+    air, quickening to 2.5 s and running up 0.1 m in a gale (2 to 18 m/s). Its phase is carried
+    from frame to frame at the current period (`advanceLakePhase`), so the wind changing its
+    speed never makes it jump.
+    Its phase drifts by up to a full cycle over 16 m noise, so the sheet does not rise all round
+    a lake at once, and the same noise varies its runup down to 0.6 ×. Each palette type's
+    `lapping` (0..1, 1 for lakes, 0 for the ocean) scales it. It feeds the same sheet, foam,
+    sheen and soaking as the ocean's swash (`waterSwash` picks one).
   - **The sheet.** The water surface lifts by the swash height near the waterline, fading out by
     1.5 m of depth into the breaking waves. The depth test against the terrain cuts its edge, so
     the edge climbs the beach by `runup / slope`, and the sheet is thin at the edge with no extra
@@ -670,9 +679,25 @@ The foam comes from the ocean alone, with no texture:
   since far out the small waves average away.
 - **Per type.** The palette's foam amount scales it all, so a lake stays much calmer than the ocean
   in the same wind.
-- **Shading.** All foam is scaled by an overall opacity of 0.9. It is a rough (0.6), bright
-  (albedo 0.65) diffuse layer: the light draw blends
-  the water's diffuse and roughness toward it, and the absorb draw hides the water beneath it.
+- **Edge foam.** Where water laps (see [Waves at the shore](#waves-at-the-shore)), the wind drives
+  foam into the shallows (`lakeEdgeFoam`). It is the foam texture's own bubbles, not thresholded
+  like the ocean's breaker foam, so it has no hard edge: strongest in the shallowest water and
+  gone by the palette's `shoreFoamWidth` of depth (0.8 m for lakes), the depth read per pixel
+  from the sheet's thickness rather than the 8 m water map, and fading in over the first 4 cm at
+  the waterline. 16 m noise varies it along the shore down to 0.4 ×. None shows below 5 m/s of
+  wind; it is full by 14 m/s. It surges as each lap runs up and ebbs to 0.4 × as it drains, at
+  0.9 × at full wind. Lapping water has no swash foam; its sheet's edge is this foam alone.
+- **Texture.** A tiling grey foam texture (`sea-foam.webp`, `WaterTextures`) gives the foam its
+  bubbles and holes. It is sampled over a 4 m tile and again over a 12.8 m tile turned by a 3-4-5
+  angle, 0.4 of it the larger, so its repeat does not show; both turn a whole number of times
+  over the 1024 m the origin snaps by, so the pattern holds when it moves. It joins the lace
+  and the breakup noise in deciding where foam shows (0.6 of the say), so whitecaps and shore
+  foam grow in from its thick parts and break up through its holes. Far away it averages out
+  with the lace into the plain coverage.
+- **Shading.** All foam is scaled by an overall opacity of 0.9. It is a rough (0.6) diffuse
+  layer, albedo 0.65 where the texture is brightest and half that in its bubbles: the light
+  draw blends the water's diffuse and roughness toward it, and the absorb draw hides the water
+  beneath it.
 - **Tuning.** `setOceanFoam(cascade, { whitecap, amount })` in the console changes one cascade's
   foam live.
 
@@ -751,9 +776,10 @@ because a film lies on top. These change at different speeds, so the band has tw
 
 - **Damp.** Below the highest runup of a set, plus 0.15 m for water that the sand draws up, the
   ground stays damp. Its albedo falls to 0.75 × and a rougher surface eases 30% of the way
-  toward 0.35. It fades out over 0.3 m above that. Where there is no swash, such as on lakes,
-  the reach is 0.2 × the significant height of the water's own waves, the same share of the sea
-  the runup takes, plus the same 0.15 m. The reach changes with the weather, not with each wave.
+  toward 0.35. It fades out over 0.3 m above that. On lakes the highest runup is the lapping's,
+  or 0.2 × the significant height of the water's own waves where that is higher, and the
+  capillary rise and the fade are 0.4 × the sea's (6 cm, over 12 cm), as no surf soaks the
+  bank. The reach changes with the weather, not with each wave.
 - **Soaked.** Where the swash sheet has just drained, the sand is soaked. The swash height has a
   closed form over the cycle (`swashDrained`), so the time since the sheet left a given height
   is found without saved state. A sheen at roughness 0.08 sinks in by e every second. The sand
@@ -816,21 +842,47 @@ shelf.
     new body with its surface at the clicked ground, and saves its record.
   - **Add shapes the terrain** (`WaterCarve.ts`), as a generated lake does, so the water it
     paints is the water that stays:
-    - Each stamp lowers the ground toward a **bed**: the toolbar's **depth** (1.5 m by default)
-      below the level at the brush centre, rising to the level at the brush edge. Past the
-      edge a **bank** climbs at 1 m per metre for one more radius, so a stroke up a hill cuts
-      into it. Ground is only lowered, blended by the strength like the coverage.
-    - When the stroke ends, dry ground near the water it painted is raised to a **lip** at the
-      level plus the lakes' `margin`: flat for 8 m, easing back to the ground over 16 m.
+    - The brush's circle is the **shoreline**. Outside it, a **shore apron** 40 m wide holds
+      the coverage past the shoreline and the lip; it is measured in water map texels (8 m),
+      so it does not grow with the brush.
+    - The stroke digs toward one **bed**. Each stamp's shape is a bowl the toolbar's
+      **depth** (3 m by default) below the level at the brush centre, `depth·(1 − (d/r)²)`,
+      rising to the level at the shoreline, where it is steepest. Across the apron, ground
+      above the level rises from the level, steeply at first, to the ground as it stood when
+      the stroke began, so a stroke up a hill cuts into it with no wall. The bed is the lowest
+      of the stroke's shapes so far, and each stamp moves the ground under it a share of the
+      way down to that one surface, set by the **strength**: holding the brush deepens the
+      lake, and overlapping stamps leave no ledges. Ground is only lowered.
+    - The water takes full coverage and its type at once, with no falloff
+      (`WaterStamp.hard`), out to 12 m past the shoreline (`WATER_COVER_MARGIN`): a texel and
+      a half, so every texel the filtered coverage reads at the shoreline is full. The ground,
+      not the coverage's texels, makes the shoreline. Partial coverage would blend the scene
+      behind over the water, unabsorbed and unbent.
+    - When the stroke ends, dry ground in the apron is raised into a **lip**: from the level at
+      the shoreline up to the level plus the lakes' `margin` over 6 m, steeply at first,
+      holding its top out to `SHORE_CREST`, past every texel the coverage's filter reaches so
+      no water shows beyond it, then easing to the ground as it stood before the stroke by
+      the apron's edge. It is measured from the outline of the stroke's stamps rather than
+      the water map's texels. It holds the water where the ground around it is lower, and
+      never rises under water that was there when the stroke began: another body's water
+      that shows, or its own lake's where the ground then lay below the level, judged per
+      height sample so an existing shore stays smooth. A stroke inside a lake leaves the lake
+      as it is, and the stroke's own new water takes a lip around it.
     - The stroke **stops at other water**: another body's texels, and the texels around them,
       get no coverage and no digging (`buildWaterGuard`). Water at the stroke's level, within
       5 cm, is not in the way, so a lake brought to sea level with **Level** joins the sea when
-      a channel is painted between them.
+      a channel is painted between them. Nor is covered water that does not show
+      (`waterShowsAt`: no ground in its texel dips below its level plus the swash) and whose
+      level plus the swash stays at or below the stroke's bed, so digging cannot uncover it.
+      The sea's coverage runs inland of the coast under land that stands above it, and that
+      land can still take a lake.
+    - A stroke that starts on covered ground standing above the water's level plus the swash
+      starts on dry land, not on that water.
     - The edit rules do not run after an Add stroke. The heights are saved with the water edit.
   - **Remove makes land** (`applyRaiseStamp`): each stamp raises the ground under the water it
-    takes away toward the water's level plus the lakes' `margin` at the brush centre, falling
+    takes away up to the water's level plus the lakes' `margin` at the brush centre, falling
     to the level at the brush edge, so the shore follows the brush and a stroke inside a lake
-    leaves an island. Only ground under water rises, blended by the strength. The edit rules do
+    leaves an island. Only ground under water rises, straight to that shape. The edit rules do
     not run after it; the heights are saved with the water edit.
   - **Reset**: hands the water under the brush back to the generator.
   - **Lock**: click a lake to lock or unlock its level. See [Edit rules](#edit-rules).

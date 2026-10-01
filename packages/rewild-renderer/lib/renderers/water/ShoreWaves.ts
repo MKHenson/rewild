@@ -1,3 +1,4 @@
+import { smoothstep } from 'rewild-common';
 import { OCEAN_LOOP_SECONDS } from './OceanSpectrum';
 
 // The ocean's shore waves: two trains whose crests roll in along the travel
@@ -31,6 +32,70 @@ export function shoreWaveHeight(
     strength
   );
 }
+
+// Lapping: where no shore waves reach, as on a lake, the wind's short chop runs
+// up the shore as one train, slow and gentle in calm air and quicker as the
+// wind rises. Its phase is carried from frame to frame (WaterWaves), so a
+// change in its period never makes it jump.
+
+/** Seconds per lap in calm air and in a gale. */
+export const LAKE_LAP_PERIOD_CALM = 6;
+export const LAKE_LAP_PERIOD_GALE = 2.5;
+/** Metres the lapping runs up the shore in calm air and in a gale. */
+export const LAKE_RUNUP_CALM = 0.02;
+export const LAKE_RUNUP_GALE = 0.1;
+/** Wind speeds in m/s over which the runup grows from calm to gale. */
+export const LAKE_WIND_CALM = 2;
+export const LAKE_WIND_GALE = 18;
+/** Wind speeds in m/s over which edge foam grows from none to full. */
+export const LAKE_FOAM_WIND_FROM = 5;
+export const LAKE_FOAM_WIND_TO = 14;
+
+
+/** The lapping's angular frequency in a `windSpeed` m/s wind. */
+export function lakeLapOmega(windSpeed: number): number {
+  const period =
+    LAKE_LAP_PERIOD_CALM +
+    (LAKE_LAP_PERIOD_GALE - LAKE_LAP_PERIOD_CALM) *
+      smoothstep(windSpeed, LAKE_WIND_CALM, LAKE_WIND_GALE);
+  return (Math.PI * 2) / period;
+}
+
+/** Metres the lapping runs up the shore in a `windSpeed` m/s wind. */
+export function lakeRunup(windSpeed: number): number {
+  return (
+    LAKE_RUNUP_CALM +
+    (LAKE_RUNUP_GALE - LAKE_RUNUP_CALM) *
+      smoothstep(windSpeed, LAKE_WIND_CALM, LAKE_WIND_GALE)
+  );
+}
+
+/** 0..1: how much edge foam a `windSpeed` m/s wind drives into the shallows. */
+export function lakeEdgeFoam(windSpeed: number): number {
+  return smoothstep(windSpeed, LAKE_FOAM_WIND_FROM, LAKE_FOAM_WIND_TO);
+}
+
+/**
+ * The lapping's phase, in 0..2π, `phase` advanced by the seconds from
+ * `fromTime` to `toTime` on the ocean's looping clock at angular frequency
+ * `omega`. A step back is the clock looping; a long step, such as a paused
+ * tab, advances by LAKE_MAX_STEP at most.
+ */
+export function advanceLakePhase(
+  phase: number,
+  omega: number,
+  fromTime: number,
+  toTime: number
+): number {
+  let seconds = toTime - fromTime;
+  if (seconds < 0) seconds += OCEAN_LOOP_SECONDS;
+  seconds = Math.min(seconds, LAKE_MAX_STEP);
+  const next = (phase + omega * seconds) % (Math.PI * 2);
+  return next < 0 ? next + Math.PI * 2 : next;
+}
+
+/** Seconds the lapping advances by at most in one frame. */
+export const LAKE_MAX_STEP = 0.25;
 
 /** Each train's phase in radians at `time` on the ocean clock, in 0..2π. */
 export function shorePhase(train: number, time: number): number {

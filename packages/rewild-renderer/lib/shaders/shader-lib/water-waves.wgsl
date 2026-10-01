@@ -35,6 +35,13 @@ struct Waves {
   shoreSize : vec4f,
   // x: scale on the swash's runup. y: the terrain's wet band strength.
   swash : vec4f,
+  // The lakes' lapping (ShoreWaves): x angular frequency, y phase now, z
+  // metres it runs up the shore, w 0..1 the edge foam the wind raises.
+  lake : vec4f,
+  // Per palette type: how strongly it laps.
+  lakeTypes : vec4f,
+  // Per palette type: metres of depth over which edge foam shows.
+  lakeFoamWidth : vec4f,
 }
 
 // 0..1: the share of the sea's height water `depth` metres deep holds, for

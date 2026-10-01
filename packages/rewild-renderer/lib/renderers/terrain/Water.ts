@@ -28,6 +28,10 @@ export interface WaterType {
   foam: number;
   // Water depth in metres over which shore foam shows.
   shoreFoamWidth: number;
+  // 0..1: how strongly the wind's chop laps at this water's shore, where no
+  // shore waves reach it (ShoreWaves' lapping). The ocean's swash comes from
+  // its shore waves instead.
+  lapping: number;
   // 0..1: strength of the detail normal maps.
   normalStrength: number;
 }
@@ -49,6 +53,7 @@ export const OCEAN: WaterType = {
   waveScale: 100,
   foam: 1,
   shoreFoamWidth: 1.5,
+  lapping: 0,
   normalStrength: 1,
 };
 
@@ -64,7 +69,8 @@ export const LAKE: WaterType = {
   waveResponse: 0.6,
   waveScale: 25,
   foam: 0.5,
-  shoreFoamWidth: 0.4,
+  shoreFoamWidth: 0.3,
+  lapping: 1,
   normalStrength: 0.6,
 };
 
@@ -121,7 +127,9 @@ export function validateWaterPalette(climate: ClimateConfig): void {
         `Water type '${type.name}' scatter and absorption must not be negative.`
       );
     if (!(type.turbidity >= 0))
-      throw new Error(`Water type '${type.name}' turbidity must not be negative.`);
+      throw new Error(
+        `Water type '${type.name}' turbidity must not be negative.`
+      );
     if (!(type.waveScale > 0) || !(type.shoreFoamWidth > 0))
       throw new Error(
         `Water type '${type.name}' waveScale and shoreFoamWidth must be positive numbers.`
@@ -129,10 +137,11 @@ export function validateWaterPalette(climate: ClimateConfig): void {
     if (
       !inUnitRange(type.waveResponse) ||
       !inUnitRange(type.foam) ||
+      !inUnitRange(type.lapping) ||
       !inUnitRange(type.normalStrength)
     )
       throw new Error(
-        `Water type '${type.name}' waveResponse, foam and normalStrength must be within 0..1.`
+        `Water type '${type.name}' waveResponse, foam, lapping and normalStrength must be within 0..1.`
       );
   }
 

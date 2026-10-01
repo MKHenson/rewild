@@ -101,6 +101,17 @@ export function smootherstep(x: f32, min: f32, max: f32): f32 {
   return x * x * x * (x * (x * 6 - 15) + 10);
 }
 
+// 0 at `min` to 1 at `max`, steepest at `min` and flat at `max` (quadratic
+// ease-out).
+export function easeOut(x: f32, min: f32, max: f32): f32 {
+  if (x <= min) return 0;
+  if (x >= max) return 1;
+
+  x = (x - min) / (max - min);
+
+  return 1 - (1 - x) * (1 - x);
+}
+
 // Random integer from <low, high> interval
 export function randInt(low: f32, high: f32): f32 {
   return low + Math.floor(Math.random() * (high - low + 1));

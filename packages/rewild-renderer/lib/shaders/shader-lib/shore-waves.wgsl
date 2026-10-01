@@ -160,6 +160,48 @@ fn swashState(field: vec2f, rest: vec2f) -> SwashState {
   return out;
 }
 
+// Lapping: where no shore waves reach, the wind's short chop runs up the shore
+// as one train (ShoreWaves). Its phase drifts by up to LAKE_WOBBLE radians
+// over LAKE_NOISE_CELL metre noise, so the sheet does not rise all round a
+// lake at once, and its runup varies down to SHORE_LOW.
+const LAKE_NOISE_CELL: f32 = 16.0;
+const LAKE_NOISE_CELLS: i32 = 64;
+const LAKE_WOBBLE: f32 = 6.2831853;
+
+// The lapping at `rest` over water that laps `response` (0..1) strongly.
+fn lakeSwashState(rest: vec2f, response: f32) -> SwashState {
+  var out: SwashState;
+  out.edge = 0.0;
+  out.runup = 0.0;
+  out.highest = 0.0;
+  out.cycle = 0.0;
+  out.period = 1.0;
+  let reach = response * waves.swash.x;
+  if (reach <= 0.0 || waves.lake.z <= 0.0) {
+    return out;
+  }
+  let wobble = shoreNoise(rest, LAKE_NOISE_CELL, LAKE_NOISE_CELLS, 4u).x * LAKE_WOBBLE;
+  let variation = mix(SHORE_LOW, 1.0, shoreNoise(rest, LAKE_NOISE_CELL, LAKE_NOISE_CELLS, 5u).x * 0.5 + 0.5);
+  out.highest = waves.lake.z * variation * reach;
+  out.runup = out.highest;
+  out.cycle = fract((waves.lake.y + wobble) / 6.2831853);
+  out.period = 6.2831853 / waves.lake.x;
+  out.edge = swashEdge(out.runup, out.cycle);
+  return out;
+}
+
+// The swash at `rest` over water with palette `weights`: the ocean's from its
+// swash field texel `field` (see swashState) where its shore waves reach, as
+// only water that takes the longest cascade, the open sea's, has them; else
+// the lapping.
+fn waterSwash(field: vec2f, rest: vec2f, weights: vec4f) -> SwashState {
+  let ocean = swashState(vec2f(field.x, field.y * dot(waves.cascadeTypes[0], weights)), rest);
+  if (ocean.highest > 0.0) {
+    return ocean;
+  }
+  return lakeSwashState(rest, dot(waves.lakeTypes, weights));
+}
+
 // Seconds since the sheet last drained off ground `above` metres over the
 // level: 0 while it covers it, 1e4 where this wave does not reach it.
 fn swashDrained(swash: SwashState, above: f32) -> f32 {

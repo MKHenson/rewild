@@ -316,6 +316,8 @@ export interface WaterStamp {
   radius: number;
   /** Blend fraction (0..1) at the centre, as PaintStamp.amount. */
   amount: number;
+  /** The amount reaches the radius undiminished, with no falloff. */
+  hard?: boolean;
   /** World height of added water. */
   level: number;
   bodyId: number;
@@ -516,7 +518,12 @@ export function applyWaterStamp(
         if (!water) continue;
       }
 
-      const d = Math.min(1, stamp.amount * falloff(Math.sqrt(distSq), radius));
+      const d = Math.min(
+        1,
+        stamp.hard
+          ? stamp.amount
+          : stamp.amount * falloff(Math.sqrt(distSq), radius)
+      );
       if (d <= 0) continue;
 
       const first = resolve(cxMin, cyMin)!;

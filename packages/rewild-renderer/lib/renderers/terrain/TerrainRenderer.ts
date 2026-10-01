@@ -180,6 +180,10 @@ export class TerrainRenderer {
   waterShoreWaves = 1;
   /** Paints the shore field on the water instead of shading it. */
   waterShoreDebug = false;
+  /** A debug view of what the water's absorb draw reads, in place of the
+   *  water: 0 off, 1 the depth facts, 2 the type weights, 3 the light that
+   *  passes through (water.wgsl refractionDebug). */
+  waterRefractionDebug = 0;
   /** Scale on the swash's runup; 1 is the default. */
   waterSwash = 1;
   /** Strength of the terrain's wet band; 1 is the default. */
@@ -999,6 +1003,7 @@ export class TerrainRenderer {
       normals: this.waterWaveNormals,
       foamDebug: this.waterFoamDebug,
       shoreDebug: this.waterShoreDebug,
+      refractionDebug: this.waterRefractionDebug,
       crestGlow: this.waterCrestGlow,
       troughDarkening: this.waterTroughDarkening,
       eyeX: lodEye.x,
