@@ -33,6 +33,8 @@ const _STATE = {
 };
 
 const _EPS: f32 = 0.000001;
+// A pause longer than this between wheel events starts a new gesture.
+const _WHEEL_GESTURE_GAP_MS = 200;
 const _twoPI: f32 = 2 * Math.PI;
 
 // Scratch vector — reused across methods to avoid allocations
@@ -42,8 +44,9 @@ const _v = new Vector3();
  * Orbit controls — camera orbits around a target point.
  *
  * - Orbit  : left mouse drag (or one-finger touch)
- * - Zoom   : scroll wheel / middle-button drag / two-finger pinch
- * - Pan    : right mouse drag (or left + Ctrl/Shift/Meta) / two-finger drag
+ * - Zoom   : scroll wheel / middle-button drag / two-finger pinch / vertical trackpad swipe
+ * - Pan    : right mouse drag (or left + Ctrl/Shift/Meta) / two-finger drag /
+ *            horizontal trackpad swipe
  * - Keys   : arrow keys pan; Ctrl/Shift + arrows rotate
  */
 export class OrbitController implements IController {
@@ -126,6 +129,9 @@ export class OrbitController implements IController {
   _pointers: number[];
   _pointerPositions: { [key: number]: Vector2 };
   _controlActive: boolean;
+  /** Axis the current wheel gesture is locked to: 'x' pans, 'y' zooms. */
+  _wheelAxis: 'x' | 'y';
+  _wheelLastTime: number;
 
   _onPointerMove: (e: PointerEvent) => void;
   _onPointerDown: (e: PointerEvent) => void;
@@ -223,6 +229,8 @@ export class OrbitController implements IController {
     this._pointers = [];
     this._pointerPositions = {};
     this._controlActive = false;
+    this._wheelAxis = 'y';
+    this._wheelLastTime = -Infinity;
 
     this._onPointerDown = this.onPointerDown.bind(this);
     this._onPointerMove = this.onPointerMove.bind(this);
@@ -599,6 +607,24 @@ export class OrbitController implements IController {
     this.update();
   }
 
+  _handleWheelPan(event: WheelEvent) {
+    const lineScale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 100 : 1;
+    // Natural scrolling reports a leftward swipe as positive deltaX. Negate it
+    // so the scene follows the fingers, the same as a pan drag.
+    this._pan(-event.deltaX * lineScale * this.panSpeed, 0);
+    this.update();
+  }
+
+  /** Lock each wheel gesture to its dominant axis on the first event. A swipe
+   *  that drifts off-axis then does not pan and zoom at the same time. */
+  _wheelGestureAxis(event: WheelEvent): 'x' | 'y' {
+    if (event.timeStamp - this._wheelLastTime > _WHEEL_GESTURE_GAP_MS) {
+      this._wheelAxis = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? 'x' : 'y';
+    }
+    this._wheelLastTime = event.timeStamp;
+    return this._wheelAxis;
+  }
+
   _handleKeyDown(event: KeyboardEvent) {
     let needsUpdate = false;
 
@@ -945,10 +971,20 @@ export class OrbitController implements IController {
   }
 
   onMouseWheel(event: WheelEvent) {
-    if (!this.enabled || !this.enableZoom || this.state !== _STATE.NONE) return;
+    if (!this.enabled || this.state !== _STATE.NONE) return;
 
-    event.preventDefault();
-    this._handleMouseWheel(this._customWheelEvent(event));
+    // A trackpad pinch arrives as a Ctrl wheel event and always zooms.
+    const axis = event.ctrlKey ? 'y' : this._wheelGestureAxis(event);
+
+    if (axis === 'x') {
+      if (!this.enablePan) return;
+      event.preventDefault();
+      this._handleWheelPan(event);
+    } else {
+      if (!this.enableZoom) return;
+      event.preventDefault();
+      this._handleMouseWheel(this._customWheelEvent(event));
+    }
   }
 
   onKeyDown(event: KeyboardEvent) {
