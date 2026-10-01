@@ -32,7 +32,7 @@ export class WaterBrushStore {
   /** Brush strength, 0..1. */
   strength = 0.5;
   /** Metres the add brush digs its bed below the water, at the brush centre. */
-  depth = 1.5;
+  depth = 3;
   /** Palette entry the type brush paints, by name. */
   waterType = 'lake';
   /** What the brush last reported, e.g. the picked lake's level. */

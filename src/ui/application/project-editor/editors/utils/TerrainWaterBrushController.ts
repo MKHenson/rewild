@@ -19,9 +19,8 @@ import {
   editedBodyId,
 } from 'rewild-renderer/lib/renderers/terrain/WaterEdit';
 import {
-  CARVE_BANK_REACH,
-  WATER_LIP_EASE,
-  WATER_LIP_WIDTH,
+  SHORE_REACH,
+  WATER_COVER_MARGIN,
   applyCarveStamp,
   applyRaiseStamp,
   applyWaterLip,
@@ -67,6 +66,10 @@ interface PaintStroke {
   heights: Map<string, TouchedChunk>;
   // The add stroke's stamps, as (x, z, radius) triples.
   discs: number[];
+  // Chunks' heights as they stood when the add stroke first reached them.
+  originals: Map<string, Float32Array>;
+  // The add stroke's bed per chunk, which its stamps dig toward.
+  targets: Map<string, Float32Array>;
   lastStampTime: number;
   minX: number;
   minZ: number;
@@ -112,8 +115,17 @@ export class TerrainWaterBrushController {
   private source: WaterEditSource;
   private heightSource: SculptHeightSource;
   private heights: ChunkHeightLoader;
-  private resolvedWater = (cx: number, cy: number) =>
-    this.getResolved(cx, cy);
+  private resolvedWater = (cx: number, cy: number) => this.getResolved(cx, cy);
+  private originalHeights = (cx: number, cy: number) => {
+    const stroke = this.stroke;
+    if (stroke?.kind !== 'paint') return null;
+    return stroke.originals.get(`${cx},${cy}`) ?? null;
+  };
+  private strokeTargets = (cx: number, cy: number) => {
+    const stroke = this.stroke;
+    if (stroke?.kind !== 'paint') return null;
+    return stroke.targets.get(`${cx},${cy}`) ?? null;
+  };
 
   constructor(private renderer: Renderer) {
     const controller = this;
@@ -217,6 +229,8 @@ export class TerrainWaterBrushController {
       newBody: null,
       heights: new Map(),
       discs: [],
+      originals: new Map(),
+      targets: new Map(),
       lastStampTime: performance.now(),
       minX: Infinity,
       minZ: Infinity,
@@ -289,8 +303,7 @@ export class TerrainWaterBrushController {
           writeChunkSnapshot(levelId, t.cx, t.cy, t.heights, size)
         )
       );
-      if (stroke.newBody)
-        await writeWaterBodies(levelId, rules.savedBodies());
+      if (stroke.newBody) await writeWaterBodies(levelId, rules.savedBodies());
     } else if (stroke.type === 'reset') {
       const settled = await rules.settle(
         stroke.minX,
@@ -323,11 +336,7 @@ export class TerrainWaterBrushController {
   prefetchEdits(centerX: number, centerZ: number, radius: number) {
     const terrain = this.renderer.terrainRenderer;
     terrain.waterRules.resolveRecords();
-    this.heights.prefetch(
-      centerX,
-      centerZ,
-      radius * (1 + CARVE_BANK_REACH) + WATER_LIP_WIDTH + WATER_LIP_EASE
-    );
+    this.heights.prefetch(centerX, centerZ, radius + SHORE_REACH);
     const span = terrain.chunkSize;
     const half = span / 2;
     for (
@@ -357,7 +366,7 @@ export class TerrainWaterBrushController {
     let guard: WaterGuard | undefined;
     if (stroke.type === 'add') {
       const unit = terrain.metersPerSample * WATER_EDIT_STEP;
-      const reach = radius * (1 + CARVE_BANK_REACH);
+      const reach = radius + SHORE_REACH;
       guard = buildWaterGuard(
         this.resolvedWater,
         (terrain.mapChunkSizeLod - 1) / WATER_EDIT_STEP,
@@ -393,8 +402,10 @@ export class TerrainWaterBrushController {
       type: stroke.type,
       centerX: point.x,
       centerZ: point.z,
-      radius,
-      amount,
+      radius: guard ? radius + WATER_COVER_MARGIN : radius,
+      // The ground makes the shoreline, so added water is full at once.
+      amount: guard ? 1 : amount,
+      hard: !!guard,
       level: stroke.level,
       bodyId: stroke.bodyId,
       typeWeights: stroke.typeWeights,
@@ -406,7 +417,8 @@ export class TerrainWaterBrushController {
       terrain.refreshChunkWater(t.cx, t.cy);
     }
 
-    if (guard)
+    if (guard) {
+      this.keepOriginals(stroke, point.x, point.z, radius + SHORE_REACH);
       this.keepHeights(
         stroke,
         applyCarveStamp(this.heightSource, {
@@ -417,8 +429,11 @@ export class TerrainWaterBrushController {
           depth: waterBrushStore.depth,
           amount,
           guard,
+          original: this.originalHeights,
+          targets: this.strokeTargets,
         })
       );
+    }
     if (levels)
       this.keepHeights(
         stroke,
@@ -427,34 +442,76 @@ export class TerrainWaterBrushController {
           centerZ: point.z,
           radius,
           rise: terrain.waterRules.lockMargin,
-          amount,
           levels,
         })
       );
   }
 
-  // Raises a lip around the water an add stroke painted, to its level plus
-  // the lakes' margin.
+  // Raises a lip in the shore apron of an add stroke, to its level plus the
+  // lakes' margin.
   private raiseLip(stroke: PaintStroke) {
     const terrain = this.renderer.terrainRenderer;
     const rules = terrain.waterRules;
     const unit = terrain.metersPerSample * WATER_EDIT_STEP;
-    const reach = WATER_LIP_WIDTH + WATER_LIP_EASE + unit;
+    const reach = SHORE_REACH + unit;
+    // The water and heights as they stood when the stroke began.
+    const water = (cx: number, cy: number) =>
+      stroke.resolved.get(`${cx},${cy}`) ?? rules.chunkWater(cx, cy);
+    const original = (cx: number, cy: number) =>
+      stroke.originals.get(`${cx},${cy}`) ?? null;
     const grid = buildShoreGrid(
-      (cx, cy) => rules.chunkWater(cx, cy),
+      water,
+      (cx, cy) => original(cx, cy) ?? this.heights.get(cx, cy),
       (terrain.mapChunkSizeLod - 1) / WATER_EDIT_STEP,
-      unit,
       Math.floor((stroke.minX - reach) / unit),
       Math.floor((stroke.minZ - reach) / unit),
       Math.ceil((stroke.maxX + reach) / unit),
       Math.ceil((stroke.maxZ + reach) / unit),
-      stroke.bodyId,
-      stroke.discs
+      stroke.bodyId
     );
     this.keepHeights(
       stroke,
-      applyWaterLip(this.heightSource, grid, stroke.level + rules.lockMargin)
+      applyWaterLip(
+        this.heightSource,
+        grid,
+        stroke.discs,
+        stroke.level,
+        rules.lockMargin,
+        original
+      )
     );
+  }
+
+  // Copies the heights of the chunks under the brush the first time the
+  // stroke reaches them, before it changes them, and starts their bed.
+  private keepOriginals(
+    stroke: PaintStroke,
+    x: number,
+    z: number,
+    radius: number
+  ) {
+    const span = this.renderer.terrainRenderer.chunkSize;
+    const half = span / 2;
+    for (
+      let cy = Math.ceil((z - radius - half) / span);
+      cy <= Math.floor((z + radius + half) / span);
+      cy++
+    )
+      for (
+        let cx = Math.ceil((x - radius - half) / span);
+        cx <= Math.floor((x + radius + half) / span);
+        cx++
+      ) {
+        const key = `${cx},${cy}`;
+        if (stroke.originals.has(key)) continue;
+        const heights = this.heights.get(cx, cy);
+        if (!heights) continue;
+        stroke.originals.set(key, heights.slice());
+        stroke.targets.set(
+          key,
+          new Float32Array(heights.length).fill(Infinity)
+        );
+      }
   }
 
   private keepHeights(stroke: PaintStroke, touched: TouchedChunk[]) {

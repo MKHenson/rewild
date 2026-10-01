@@ -82,6 +82,18 @@ const FOAM_FAR_FAR: f32 = 2.5;
 // Opacity of all foam.
 const FOAM_OPACITY: f32 = 0.9;
 const FOAM_ALBEDO: f32 = 0.65;
+// The foam texture over FOAM_TILE metres, and again over FOAM_TILE_LARGE
+// turned by a 3-4-5 angle, so its repeat does not show; FOAM_TILE_LARGE share
+// of it. Each tile turns a whole number of times over the 1024 m the origin
+// snaps by, so the pattern does not jump when it moves.
+const FOAM_TILE: f32 = 4.0;
+const FOAM_TILE_LARGE: f32 = 12.8;
+const FOAM_LARGE_SHARE: f32 = 0.4;
+// How much the texture shapes where foam shows, against the lace and the
+// breakup noise.
+const FOAM_TEXTURE_SHAPE: f32 = 0.6;
+// Foam's albedo in the texture's darkest bubbles, as a share of its brightest.
+const FOAM_TEXTURE_SHADE: f32 = 0.5;
 const FOAM_ROUGHNESS: f32 = 0.6;
 
 // Crest glow: sunlight through the thin top of a wave, lit from behind (after
@@ -132,6 +144,19 @@ const SHORE_FOAM_SOFTNESS: f32 = 0.12;
 // depth test cuts the sheet's edge. Foam rides the edge while it runs up, over
 // the sheet's last SWASH_FOAM_EDGE metres of thickness, and thins as it drains.
 const SWASH_DEPTH: f32 = 1.5;
+// Edge foam on lapping water: its strength at full wind, and the share of it
+// left between laps.
+const LAKE_FOAM_AMOUNT: f32 = 0.9;
+const LAKE_FOAM_EBB: f32 = 0.4;
+// Edge foam fades in over the water's first LAKE_FOAM_THIN metres at the
+// waterline, then thins with depth to none at the palette's edge foam depth.
+// Noise over LAKE_NOISE_CELL metres varies it along the shore down to
+// LAKE_FOAM_PATCHY. It shows the foam texture between LAKE_FOAM_TEXTURE_LOW
+// and LAKE_FOAM_TEXTURE_HIGH, so it reads as bubbles, never as a solid band.
+const LAKE_FOAM_THIN: f32 = 0.04;
+const LAKE_FOAM_PATCHY: f32 = 0.4;
+const LAKE_FOAM_TEXTURE_LOW: f32 = 0.25;
+const LAKE_FOAM_TEXTURE_HIGH: f32 = 0.85;
 const SWASH_FOAM_EDGE: f32 = 0.06;
 const SWASH_FOAM_AMOUNT: f32 = 0.9;
 
@@ -199,6 +224,10 @@ struct VertexOutput {
 @group(1) @binding(8) var oceanDisplacement : texture_2d_array<f32>;
 @group(1) @binding(9) var oceanSlopes : texture_2d_array<f32>;
 @group(1) @binding(10) var oceanSampler : sampler;
+// Tiling foam (WaterTextures) with the repeating linear sampler. Bound for the
+// shading draws only.
+@group(1) @binding(11) var foamMap : texture_2d<f32>;
+@group(1) @binding(12) var foamSampler : sampler;
 @group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
@@ -303,11 +332,31 @@ fn sampleShore(rest: vec2f) -> vec4f {
   return textureSampleLevel(shoreMap, surfaceSampler, shoreFieldUV(rest), 0.0);
 }
 
-// The swash at `rest` over water with palette `weights`. Only water that takes
-// the longest cascade, the open sea's, has it.
+// The swash at `rest` over water with palette `weights` (see waterSwash).
 fn sampleSwash(rest: vec2f, weights: vec4f) -> SwashState {
   let field = textureSampleLevel(swashMap, surfaceSampler, shoreFieldUV(rest), 0.0).xy;
-  return swashState(vec2f(field.x, field.y * dot(waves.cascadeTypes[0], weights)), rest);
+  return waterSwash(field, rest, weights);
+}
+
+// Foam the wind drives into the shallows where water laps (see
+// lakeSwashState): the foam texture's bubbles (`foamShade`), strongest in the
+// shallowest water and gone by the palette's edge foam depth, read per pixel
+// from the sheet's thickness, surging as each lap runs up and ebbing to
+// LAKE_FOAM_EBB. It is not thresholded, so it has no hard edge.
+fn lakeEdgeFoam(input: VertexOutput, water: WaterSample, foamShade: f32) -> f32 {
+  let rest = input.rest;
+  let width = dot(waves.lakeFoamWidth, water.weights);
+  let strength = waves.lake.w * dot(waves.lakeTypes, water.weights);
+  if (width <= 0.0 || strength <= 0.0) {
+    return 0.0;
+  }
+  let thickness = sheetThickness(input);
+  let shallow = smoothstep(0.0, LAKE_FOAM_THIN, thickness) * (1.0 - smoothstep(0.0, width, thickness));
+  let patches = mix(LAKE_FOAM_PATCHY, 1.0, smoothstep(-0.6, 0.6, shoreNoise(rest, LAKE_NOISE_CELL, LAKE_NOISE_CELLS, 6u).x));
+  let bubbles = smoothstep(LAKE_FOAM_TEXTURE_LOW, LAKE_FOAM_TEXTURE_HIGH, foamShade);
+  let lap = lakeSwashState(rest, 1.0);
+  let draining = saturate((lap.cycle - SWASH_UPRUSH) / (1.0 - SWASH_UPRUSH));
+  return shallow * patches * bubbles * strength * mix(1.0, LAKE_FOAM_EBB, draining) * LAKE_FOAM_AMOUNT;
 }
 
 // Metres of water over the ground straight below the pixel, from the gap to
@@ -323,7 +372,7 @@ fn sheetThickness(input: VertexOutput) -> f32 {
 }
 
 // Foam on the swash sheet's leading edge: all of it while the sheet runs up,
-// thinning as it drains.
+// thinning as it drains. Lapping water has none; its foam is lakeEdgeFoam.
 fn swashFoam(input: VertexOutput, weights: vec4f) -> f32 {
   let swash = sampleSwash(input.rest, weights);
   if (swash.runup <= 0.0) {
@@ -331,7 +380,8 @@ fn swashFoam(input: VertexOutput, weights: vec4f) -> f32 {
   }
   let draining = saturate((swash.cycle - SWASH_UPRUSH) / (1.0 - SWASH_UPRUSH));
   let edge = 1.0 - smoothstep(0.0, SWASH_FOAM_EDGE, sheetThickness(input));
-  return edge * (1.0 - draining) * SWASH_FOAM_AMOUNT;
+  let ocean = 1.0 - saturate(dot(waves.lakeTypes, weights));
+  return edge * (1.0 - draining) * SWASH_FOAM_AMOUNT * ocean;
 }
 
 // The shore field painted for the debug view: blue where deep water reaches,
@@ -449,6 +499,18 @@ struct OceanPixel {
   // Breaker foam coverage, and the 0..1 noise that breaks it up.
   shoreFoam : f32,
   shoreBreakup : f32,
+  // 0..1: the foam texture, bright where foam is thick.
+  foamTexture : f32,
+  // Edge foam on lapping water (lakeEdgeFoam), shown as it is.
+  lakeFoam : f32,
+}
+
+// The foam texture at `rest` (see FOAM_TILE), filtered to the pixel.
+fn foamTexture(rest: vec2f, footprint: Footprint) -> f32 {
+  let small = textureSampleGrad(foamMap, foamSampler, rest / FOAM_TILE, footprint.dx / FOAM_TILE, footprint.dy / FOAM_TILE).r;
+  let turn = mat2x2f(0.8, 0.6, -0.6, 0.8) * (1.0 / FOAM_TILE_LARGE);
+  let large = textureSampleGrad(foamMap, foamSampler, turn * rest, turn * footprint.dx, turn * footprint.dy).r;
+  return mix(small, large, FOAM_LARGE_SHARE);
 }
 
 // The ocean at a pixel: the cascades' slopes and foam, filtered to the
@@ -486,6 +548,8 @@ fn oceanPixel(input: VertexOutput, water: WaterSample, footprint: Footprint) -> 
   out.coverage = foam;
   out.shoreFoam = max(shore.foam, swashFoam(input, water.weights));
   out.shoreBreakup = shoreFoamBreakup(input.rest);
+  out.foamTexture = foamTexture(input.rest, footprint);
+  out.lakeFoam = lakeEdgeFoam(input, water, out.foamTexture);
   out.stretch = (d.z + 1.0) * (d.w + 1.0);
   return out;
 }
@@ -595,14 +659,17 @@ fn crestGlow(height: f32, N: vec3f, V: vec3f, scatter: vec3f) -> vec3f {
 // most squeezed spots. The coverage takes the palette's foam amount.
 fn waterFoam(ocean: OceanPixel, footprint: f32, water: WaterSample) -> f32 {
   let coverage = saturate(ocean.coverage * FOAM_COVERAGE * water.foam);
-  let lace = saturate((LACE_FLAT - ocean.stretch) / (LACE_FLAT - LACE_SQUEEZED));
+  let squeeze = saturate((LACE_FLAT - ocean.stretch) / (LACE_FLAT - LACE_SQUEEZED));
+  // The texture's bubbles and holes break the lace up, so foam grows in from
+  // its thick parts.
+  let lace = mix(squeeze, saturate(squeeze * 0.5 + ocean.foamTexture * 0.7), FOAM_TEXTURE_SHAPE);
   let shown = smoothstep(1.0 - coverage, 1.0 - coverage + LACE_SOFTNESS, lace);
   let far = smoothstep(FOAM_FAR_NEAR, FOAM_FAR_FAR, footprint);
   // Breaker foam lies on water the small waves may barely squeeze, so noise
-  // joins the lace to break it into grain.
-  let grain = saturate(ocean.shoreBreakup * 0.7 + lace * 0.6);
+  // and the texture join the lace to break it into grain.
+  let grain = saturate(mix(ocean.shoreBreakup * 0.7 + squeeze * 0.6, ocean.shoreBreakup * 0.4 + squeeze * 0.3 + ocean.foamTexture * 0.6, FOAM_TEXTURE_SHAPE));
   let shore = smoothstep(1.0 - ocean.shoreFoam, 1.0 - ocean.shoreFoam + SHORE_FOAM_SOFTNESS, grain);
-  return max(mix(shown, coverage, far), mix(shore, ocean.shoreFoam, far)) * FOAM_OPACITY;
+  return max(max(mix(shown, coverage, far), mix(shore, ocean.shoreFoam, far)), ocean.lakeFoam) * FOAM_OPACITY;
 }
 
 // Where a view-space point lands on screen, in 0..1 texture space.
@@ -632,6 +699,31 @@ fn refractedScene(input: VertexOutput, N: vec3f, depth: f32) -> vec3f {
   return select(own.rgb, behind.rgb, behind.a > -input.viewPosition.z);
 }
 
+// What the absorb draw reads at this pixel, bright enough to read through the
+// exposure. View 1, three yes/no facts: red, the water map puts the ground
+// more than 1 m below the surface; green, the refraction capture puts the
+// opaque scene more than 0.5 m behind the surface; blue, the capture makes the
+// water more than 1 m deep straight down. Deep water reads white. View 2, the
+// palette weights as read, before they are normalised: red, green, blue for
+// types 0, 1, 2; yellow where all four sum to under 0.5. View 3, the share of
+// the light behind that passes through (waterTransmittance), as grey.
+fn refractionDebug(input: VertexOutput, water: WaterSample, NoV: f32, view: f32) -> vec3f {
+  if (view > 2.5) {
+    return waterTransmittance(water, NoV) * 4.0;
+  }
+  if (view > 1.5) {
+    let raw = textureSampleLevel(typeMap, surfaceSampler, surfaceUV(input.uv), 0.0);
+    let total = raw.x + raw.y + raw.z + raw.w;
+    return select(raw.xyz, vec3f(1.0, 1.0, 0.0), total < 0.5) * 4.0;
+  }
+  let behind = textureLoad(refraction, vec2i(input.Position.xy), 0).a;
+  let near = -input.viewPosition.z;
+  let mapDeep = select(0.0, 1.0, water.depth > 1.0);
+  let captureBehind = select(0.0, 1.0, behind > near + 0.5);
+  let captureDeep = select(0.0, 1.0, sheetThickness(input) > 1.0);
+  return vec3f(mapDeep, captureBehind, captureDeep) * 4.0;
+}
+
 // Replaces the scene behind the water with the refracted scene times the light
 // that survives the trip through the water. Alpha is the coverage, so the
 // water's edge fades to the scene.
@@ -650,6 +742,9 @@ fn fs_absorb(input: VertexOutput) -> @location(0) vec4f {
   // Foam hides the water beneath it.
   let foam = waterFoam(ocean, footprint.size, water);
   let passed = (1.0 - waterFresnel(NoV)) * waterTransmittance(water, NoV) * (1.0 - foam);
+  if (waves.origin.w > 2.5) {
+    return vec4f(refractionDebug(input, water, NoV, waves.origin.w - 2.0), 1.0);
+  }
   if (waves.origin.w > 0.5) {
     return vec4f(0.0, 0.0, 0.0, water.coverage);
   }
@@ -693,7 +788,7 @@ fn fs_light(input: VertexOutput) -> @location(0) vec4f {
   surface.specularNormal = normal;
   surface.geometricNormal = normal;
   surface.viewPosition = viewPosition;
-  surface.diffuseColor = mix(scatter, vec3f(FOAM_ALBEDO), foam);
+  surface.diffuseColor = mix(scatter, vec3f(FOAM_ALBEDO * mix(FOAM_TEXTURE_SHADE, 1.0, ocean.foamTexture)), foam);
   surface.f0 = vec3f(WATER_F0);
   surface.alpha = alpha;
 
@@ -717,6 +812,9 @@ fn fs_light(input: VertexOutput) -> @location(0) vec4f {
   // Last, so every shadow and cube sample above runs in uniform control flow.
   if (water.coverage <= 0.0) {
     discard;
+  }
+  if (waves.origin.w > 2.5) {
+    return vec4f(0.0, 0.0, 0.0, 1.0);
   }
   if (waves.origin.w > 1.5) {
     return vec4f(shoreDebug(input.rest, water.depth) * water.coverage, 1.0);

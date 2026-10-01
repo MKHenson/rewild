@@ -68,6 +68,20 @@ export function registerWaterDebugCommands(renderer: Renderer) {
     );
   };
 
+  (window as any).setWaterRefractionDebug = (view: number | boolean = 1) => {
+    const mode = view === true ? 1 : view === false ? 0 : view;
+    renderer.terrainRenderer.waterRefractionDebug = mode;
+    const views = [
+      'water shaded',
+      'three yes/no facts per water pixel. Red: the water map has the ground over 1 m below the surface. Green: the refraction capture has the scene over 0.5 m behind the surface. Blue: the capture makes the water over 1 m deep. Deep water reads white; a missing colour names the fact that fails',
+      'the palette weights as read: red, green, blue for types 0, 1, 2; yellow where the four sum to under 0.5',
+      'the share of the light behind the water that passes through it, as grey',
+    ];
+    console.log(
+      `setWaterRefractionDebug(${mode}) — ${views[mode] ?? 'unknown view'}.`
+    );
+  };
+
   (window as any).shoreFieldStats = () => {
     const field = renderer.terrainRenderer.shoreField;
     const { water, sources, reached, sourceDepth, longest } = field.stats;

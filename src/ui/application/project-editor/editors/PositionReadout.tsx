@@ -14,10 +14,12 @@ import {
 } from 'rewild-renderer/lib/renderers/terrain/ClimateField';
 import {
   Lake,
+  OCEAN_BODY_ID,
   findLakes,
   lakeSpaceToWorld,
   worldToLakeSpace,
 } from 'rewild-renderer/lib/renderers/terrain/Lakes';
+import { fromFloat16 } from 'rewild-renderer/lib/utils/float16';
 
 interface Props {
   renderer: Renderer;
@@ -59,8 +61,119 @@ function formatDistance(metres: number): string {
     : `${(metres / 1000).toFixed(1)} km`;
 }
 
+// Generated lakes set the top bit of their body ID; the editor's do not.
+const GENERATED_LAKE_BIT = 0x80000000;
+
+// The water body showing under world (x, z) in its loaded chunk, or null.
+function waterUnder(
+  renderer: Renderer,
+  x: number,
+  z: number,
+  ground: number | null
+): string | null {
+  const terrain = renderer.terrainRenderer;
+  const span = terrain.chunkSize;
+  const cx = Math.round(x / span);
+  const cy = Math.round(z / span);
+  const water = terrain.terrainChunks.get(`${cx},${cy}`)?.water;
+  if (!water) return null;
+  const unit = terrain.metersPerSample * water.step;
+  const last = water.size - 1;
+  const mx = Math.min(
+    last,
+    Math.max(0, Math.round((x - cx * span + span / 2) / unit))
+  );
+  const my = Math.min(
+    last,
+    Math.max(0, Math.round((cy * span + span / 2 - z) / unit))
+  );
+  const t = my * water.size + mx;
+  if (water.coverage[t] === 0) return null;
+  const id = water.bodyIds[t];
+  const body = water.bodies.find((b) => b.id === id);
+  if (!body || (ground !== null && ground >= body.level)) return null;
+  const kind =
+    id === OCEAN_BODY_ID
+      ? 'Sea'
+      : (id & GENERATED_LAKE_BIT) !== 0
+      ? 'Generated lake'
+      : 'Painted lake';
+  const depth =
+    ground === null ? '' : ` · ${(body.level - ground).toFixed(1)} m deep`;
+  return `${kind} ${
+    id === OCEAN_BODY_ID ? '' : `${id} `
+  }under you · level ${body.level.toFixed(1)} m${depth}${
+    body.locked ? ' · locked' : ''
+  }`;
+}
+
+const PAINTED_SEARCH_METRES = 1000;
+
+interface PaintedWater {
+  id: number;
+  level: number;
+  distance: number;
+}
+
+// The nearest texel of a painted lake within PAINTED_SEARCH_METRES of world
+// (x, z), over the loaded chunks' water maps, where its water shows.
+function nearestPainted(
+  renderer: Renderer,
+  x: number,
+  z: number
+): PaintedWater | null {
+  const terrain = renderer.terrainRenderer;
+  const span = terrain.chunkSize;
+  const reach = PAINTED_SEARCH_METRES;
+  let best: PaintedWater | null = null;
+  for (
+    let cy = Math.round((z - reach) / span);
+    cy <= Math.round((z + reach) / span);
+    cy++
+  )
+    for (
+      let cx = Math.round((x - reach) / span);
+      cx <= Math.round((x + reach) / span);
+      cx++
+    ) {
+      const water = terrain.terrainChunks.get(`${cx},${cy}`)?.water;
+      if (!water?.shows) continue;
+      const unit = terrain.metersPerSample * water.step;
+      for (let my = 0; my < water.size; my++)
+        for (let mx = 0; mx < water.size; mx++) {
+          const t = my * water.size + mx;
+          const id = water.bodyIds[t];
+          if (
+            water.coverage[t] === 0 ||
+            id === OCEAN_BODY_ID ||
+            (id & GENERATED_LAKE_BIT) !== 0 ||
+            fromFloat16(water.heights[t]) >= fromFloat16(water.level[t])
+          )
+            continue;
+          const d = Math.hypot(
+            cx * span - span / 2 + mx * unit - x,
+            cy * span + span / 2 - my * unit - z
+          );
+          if (d > reach || (best && d >= best.distance)) continue;
+          best = {
+            id,
+            level: water.baseLevel + fromFloat16(water.level[t]),
+            distance: d,
+          };
+        }
+    }
+  return best;
+}
+
+function describePainted(painted: PaintedWater): string {
+  return `Painted lake ${painted.id} ${formatDistance(
+    painted.distance
+  )} away · level ${painted.level.toFixed(1)} m`;
+}
+
 // A toggle in the viewport's top right: the camera's world position, the
-// climate biomes under it, the ground height and the nearest lake.
+// climate biomes under it, the ground height, and the water under it or else
+// the nearest lake, painted or generated.
 @register('x-position-readout')
 export class PositionReadout extends Component<Props> {
   init() {
@@ -133,8 +246,16 @@ export class PositionReadout extends Component<Props> {
         );
       biomeValue.textContent = parts.join(' · ');
 
+      const under = waterUnder(renderer, position.x, position.z, ground);
+      if (under) {
+        lakeValue.textContent = under;
+        return;
+      }
+      const painted = nearestPainted(renderer, position.x, position.z);
       if (!climate.lakes) {
-        lakeValue.textContent = 'None in this climate';
+        lakeValue.textContent = painted
+          ? describePainted(painted)
+          : 'None in this climate';
         return;
       }
       if (
@@ -180,6 +301,10 @@ export class PositionReadout extends Component<Props> {
           nearest = lake;
         }
       }
+      if (painted && painted.distance < nearestDistance) {
+        lakeValue.textContent = describePainted(painted);
+        return;
+      }
       if (!nearest) {
         lakeValue.textContent = `None within ${formatDistance(
           LAKE_SEARCH_METRES
@@ -188,9 +313,9 @@ export class PositionReadout extends Component<Props> {
       }
       lakeSpaceToWorld(nearest.u, nearest.v, lakeWorld);
       lakeValue.textContent =
-        `${nearest.lagoon ? 'Lagoon' : nearest.tarn ? 'Tarn' : 'Lake'} ${formatDistance(
-          nearestDistance
-        )} away · ` +
+        `${
+          nearest.lagoon ? 'Lagoon' : nearest.tarn ? 'Tarn' : 'Lake'
+        } ${formatDistance(nearestDistance)} away · ` +
         `(${Math.round(lakeWorld[0])}, ${Math.round(
           lakeWorld[1]
         )}) · level ${nearest.level.toFixed(0)} m`;

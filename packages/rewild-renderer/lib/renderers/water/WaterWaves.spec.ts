@@ -1,6 +1,18 @@
 import { LAKE, OCEAN } from '../terrain/Water';
 import { CASCADE_COUNT, CASCADE_SIZES } from './OceanSpectrum';
-import { SHORE_OMEGAS } from './ShoreWaves';
+import {
+  LAKE_LAP_PERIOD_CALM,
+  LAKE_LAP_PERIOD_GALE,
+  LAKE_MAX_STEP,
+  LAKE_RUNUP_CALM,
+  LAKE_RUNUP_GALE,
+  SHORE_OMEGAS,
+  advanceLakePhase,
+  lakeEdgeFoam,
+  lakeLapOmega,
+  lakeRunup,
+} from './ShoreWaves';
+import { OCEAN_LOOP_SECONDS } from './OceanSpectrum';
 import { WAVE_UNIFORM_FLOATS, WaterWaves, WaveFrame } from './WaterWaves';
 
 const PALETTE = [OCEAN, LAKE];
@@ -65,7 +77,7 @@ describe('WaterWaves', () => {
     );
     // Seven vec4 of header, two arrays of four vec4, two of the shore, then
     // the swash.
-    expect(out.byteLength).toBe(112 + 64 + 64 + 32 + 16);
+    expect(out.byteLength).toBe(112 + 64 + 64 + 32 + 16 + 48);
     expect(Array.from(out.subarray(68, 72))).toEqual([0.5, 2, 0, 0]);
     expect(out[60]).toBeCloseTo(SHORE_OMEGAS[0], 6);
     expect(out[62]).toBeCloseTo(SHORE_OMEGAS[0] * 3, 5);
@@ -87,5 +99,48 @@ describe('WaterWaves', () => {
       expect(Math.abs(place - (world - Math.floor(world)))).toBeLessThan(1e-5);
       expect(out[44 + c * 4]).toBe(Math.fround(waves.cascadeTypes[c * 4]));
     }
+  });
+
+  it('packs the lapping and each palette type’s share of it last', () => {
+    const waves = new WaterWaves();
+    waves.update(PALETTE);
+    const out = new Float32Array(WAVE_UNIFORM_FLOATS);
+    waves.pack(frame({ windSpeed: 10, time: 5 }), out);
+    waves.pack(frame({ windSpeed: 10, time: 5.1 }), out);
+    const lake = WAVE_UNIFORM_FLOATS - 12;
+    expect(out[lake]).toBeCloseTo(lakeLapOmega(10), 6);
+    expect(out[lake + 1]).toBeCloseTo(lakeLapOmega(10) * 0.1, 4);
+    expect(out[lake + 2]).toBeCloseTo(lakeRunup(10), 6);
+    expect(out[lake + 3]).toBeCloseTo(lakeEdgeFoam(10), 6);
+    expect(Array.from(out.subarray(lake + 4, lake + 8))).toEqual([0, 1, 0, 0]);
+    expect(out[lake + 8]).toBeCloseTo(OCEAN.shoreFoamWidth, 6);
+    expect(out[lake + 9]).toBeCloseTo(LAKE.shoreFoamWidth, 6);
+  });
+});
+
+describe('lapping', () => {
+  it('runs up further as the wind rises, within its calm and gale runups', () => {
+    expect(lakeRunup(0)).toBeCloseTo(LAKE_RUNUP_CALM);
+    expect(lakeRunup(10)).toBeGreaterThan(lakeRunup(5));
+    expect(lakeRunup(40)).toBeCloseTo(LAKE_RUNUP_GALE);
+  });
+
+  it('raises edge foam only once there is a breeze', () => {
+    expect(lakeEdgeFoam(3)).toBe(0);
+    expect(lakeEdgeFoam(9)).toBeGreaterThan(0);
+    expect(lakeEdgeFoam(20)).toBe(1);
+  });
+
+  it('laps slowly in calm air and quicker in a gale', () => {
+    expect(lakeLapOmega(0)).toBeCloseTo((Math.PI * 2) / LAKE_LAP_PERIOD_CALM);
+    expect(lakeLapOmega(40)).toBeCloseTo((Math.PI * 2) / LAKE_LAP_PERIOD_GALE);
+  });
+
+  it('carries its phase across the clock looping and caps long steps', () => {
+    const omega = 1;
+    expect(
+      advanceLakePhase(0, omega, OCEAN_LOOP_SECONDS - 0.05, 0.05)
+    ).toBeCloseTo(0.1);
+    expect(advanceLakePhase(0, omega, 0, 30)).toBeCloseTo(LAKE_MAX_STEP);
   });
 });

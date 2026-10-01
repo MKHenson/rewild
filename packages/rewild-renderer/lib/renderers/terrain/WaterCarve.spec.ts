@@ -1,8 +1,7 @@
 import { SculptHeightSource } from './Sculpt';
 import {
-  CARVE_BANK_SLOPE,
-  WATER_LIP_EASE,
-  WATER_LIP_WIDTH,
+  SHORE_CREST,
+  SHORE_RISE,
   applyCarveStamp,
   applyRaiseStamp,
   applyWaterLip,
@@ -172,42 +171,81 @@ describe('waterShowsAt', () => {
 });
 
 describe('applyCarveStamp', () => {
-  const carve = { centerX: 0, centerZ: 0, radius: 12, level: 10, depth: 2 };
+  // A 12 m shoreline at level 10, 2 m deep at the centre.
+  const carve = {
+    centerX: 0,
+    centerZ: 0,
+    radius: 12,
+    level: 10,
+    depth: 2,
+    amount: 1,
+    original: () => null,
+    targets: () => null,
+  };
+  const bed = () => new Float32Array(CHUNK_SIZE * CHUNK_SIZE).fill(Infinity);
 
-  it('digs a bed to depth below the level at the centre', () => {
+  it('digs a bowl to depth below the level, steepest at the shore', () => {
     const source = new FakeSource(() => 10);
-    applyCarveStamp(source, { ...carve, amount: 1, guard: openGuard() });
+    applyCarveStamp(source, { ...carve, guard: openGuard() });
     expect(source.at(0, 0)).toBeCloseTo(8);
+    expect(source.at(6, 0)).toBeCloseTo(8.5);
     expect(source.at(12, 0)).toBe(10);
   });
 
-  it('cuts into higher ground with a bank past the brush', () => {
+  it('rises from the level to higher ground across the shore apron', () => {
     const source = new FakeSource(() => 30);
-    applyCarveStamp(source, { ...carve, amount: 1, guard: openGuard() });
-    expect(source.at(0, 0)).toBeCloseTo(8);
-    expect(source.at(16, 0)).toBeCloseTo(10 + 4 * CARVE_BANK_SLOPE);
-    expect(source.at(25, 0)).toBe(30);
+    applyCarveStamp(source, { ...carve, guard: openGuard() });
+    expect(source.at(12, 0)).toBeCloseTo(10);
+    expect(source.at(22, 0)).toBeCloseTo(18.75);
+    expect(source.at(34, 0)).toBeCloseTo(25.95);
   });
 
   it('never raises ground', () => {
     const source = new FakeSource(() => 0);
-    const touched = applyCarveStamp(source, {
-      ...carve,
-      amount: 1,
-      guard: openGuard(),
-    });
-    expect(touched).toEqual([]);
+    expect(applyCarveStamp(source, { ...carve, guard: openGuard() })).toEqual(
+      []
+    );
   });
 
-  it('blends toward the bed by the amount', () => {
+  it('digs toward the lowest of the stroke’s shapes', () => {
+    const source = new FakeSource(() => 30);
+    const start = source.heights.slice();
+    const targets = bed();
+    const stroke = {
+      ...carve,
+      original: () => start,
+      targets: () => targets,
+    };
+    applyCarveStamp(source, { ...stroke, guard: openGuard() });
+    applyCarveStamp(source, { ...stroke, centerX: 8, guard: openGuard() });
+    expect(source.at(8, 0)).toBeCloseTo(8);
+    expect(source.at(0, 0)).toBeCloseTo(8);
+
+    const before = source.heights.slice();
+    applyCarveStamp(source, { ...stroke, guard: openGuard() });
+    expect(Array.from(source.heights)).toEqual(Array.from(before));
+  });
+
+  it('deepens by the amount with each stamp', () => {
     const source = new FakeSource(() => 10);
-    applyCarveStamp(source, { ...carve, amount: 0.5, guard: openGuard() });
+    const targets = bed();
+    const stroke = {
+      ...carve,
+      amount: 0.5,
+      targets: () => targets,
+      guard: openGuard(),
+    };
+    applyCarveStamp(source, stroke);
     expect(source.at(0, 0)).toBeCloseTo(9);
+    applyCarveStamp(source, stroke);
+    expect(source.at(0, 0)).toBeCloseTo(8.5);
   });
 
   it('leaves blocked ground alone', () => {
     const source = new FakeSource(() => 30);
-    const water = fakeWater((i, j) => (i === 2 && j === 0 ? [255, 40, 3] : null));
+    const water = fakeWater((i, j) =>
+      i === 2 && j === 0 ? [255, 40, 3] : null
+    );
     const guard = buildWaterGuard(
       only(water),
       TEXEL_SPAN,
@@ -218,7 +256,7 @@ describe('applyCarveStamp', () => {
       7,
       10
     );
-    applyCarveStamp(source, { ...carve, amount: 1, guard });
+    applyCarveStamp(source, { ...carve, guard });
     expect(source.at(2 * UNIT, 0)).toBe(30);
     expect(source.at(1 * UNIT, 0)).toBe(30);
     expect(source.at(-2 * UNIT, 0)).toBeLessThan(30);
@@ -226,42 +264,86 @@ describe('applyCarveStamp', () => {
 });
 
 describe('applyWaterLip', () => {
-  // The stroke's water covers the texels within 8 m of the origin.
-  const water = fakeWater((i, j) =>
-    Math.hypot(i * UNIT, j * UNIT) <= 8 ? [255, 10, 7] : null
-  );
-  const grid = (discs: number[]) =>
-    buildShoreGrid(
+  // A stamp on body 7 at level 10 with a 4 m shoreline.
+  const discs = [0, 0, 4];
+  const noWater = fakeWater(() => null);
+  const lip = (
+    water: ResolvedWater,
+    before: (wx: number, wz: number) => number = () => 9,
+    now: (wx: number, wz: number) => number = before
+  ) => {
+    const start = new FakeSource(before);
+    const source = new FakeSource(now);
+    const grid = buildShoreGrid(
       only(water),
+      () => start.heights,
       TEXEL_SPAN,
-      UNIT,
       -TEXEL_HALF,
       -TEXEL_HALF,
       TEXEL_HALF,
       TEXEL_HALF,
-      7,
-      discs
+      7
     );
+    const touched = applyWaterLip(
+      source,
+      grid,
+      discs,
+      10,
+      1,
+      () => start.heights
+    );
+    return { source, touched };
+  };
 
-  it('raises dry ground near the water to the top, easing out', () => {
-    const source = new FakeSource(() => 9);
-    applyWaterLip(source, grid([0, 0, 10]), 11);
+  it('rises steeply from the shoreline, holds past the coverage, then eases to the ground', () => {
+    const { source } = lip(noWater);
     expect(source.at(0, 0)).toBe(9);
-    expect(source.at(12, 0)).toBe(11);
-    const past = 8 + UNIT / 2 + WATER_LIP_WIDTH + WATER_LIP_EASE / 2;
-    expect(source.at(Math.round(past), 0)).toBeGreaterThan(9);
-    expect(source.at(Math.round(past), 0)).toBeLessThan(11);
-    expect(source.at(40, 0)).toBe(9);
+    expect(source.at(7, 0)).toBeCloseTo(10.75);
+    expect(source.at(4 + SHORE_RISE, 0)).toBe(11);
+    expect(source.at(Math.floor(4 + SHORE_CREST), 0)).toBe(11);
+    expect(source.at(36, 0)).toBeGreaterThan(9);
+    expect(source.at(36, 0)).toBeLessThan(11);
+  });
+
+  it('follows the outline, not the texels', () => {
+    const { source } = lip(noWater);
+    expect(Math.abs(source.at(0, -7) - source.at(-5, -5))).toBeLessThan(0.2);
   });
 
   it('keeps ground already above the top', () => {
-    const source = new FakeSource(() => 15);
-    expect(applyWaterLip(source, grid([0, 0, 10]), 11)).toEqual([]);
+    expect(lip(noWater, () => 15).touched).toEqual([]);
   });
 
-  it('only rises around water inside the stroke', () => {
-    const source = new FakeSource(() => 9);
-    expect(applyWaterLip(source, grid([100, 100, 10]), 11)).toEqual([]);
+  it('leaves its own lake as it was, judged by the ground before the stroke', () => {
+    const lake = fakeWater((i, j) =>
+      Math.hypot(i * UNIT, j * UNIT) <= 8 ? [255, 10, 7] : null
+    );
+    const { source } = lip(lake, (wx) => (wx >= 6 ? 10.5 : 9));
+    expect(source.at(0, -6)).toBe(9);
+    expect(source.at(7, 0)).toBeCloseTo(10.75);
+  });
+
+  it('stays out of another body’s water that shows', () => {
+    const other = fakeWater((i, j) =>
+      i === 0 && j === 4 ? [255, 30, 3] : null
+    );
+    const { source } = lip(other);
+    expect(source.at(0, 16)).toBe(9);
+    expect(source.at(0, -16)).toBe(11);
+  });
+
+  it('rises under another body’s covered water that does not show', () => {
+    const { source } = lip(fakeWater(() => [255, 0, 0]));
+    expect(source.at(16, 0)).toBe(11);
+  });
+
+  it('eases back to the ground as it stood before the stroke, not as carved', () => {
+    const { source } = lip(
+      noWater,
+      () => 20,
+      () => 12
+    );
+    expect(source.at(36, 0)).toBeGreaterThan(15);
   });
 });
 
@@ -282,23 +364,17 @@ describe('applyRaiseStamp', () => {
 
   it('raises the bed above the water at the centre, to the level at the edge', () => {
     const source = new FakeSource(() => 6);
-    applyRaiseStamp(source, { ...raise, amount: 1 });
+    applyRaiseStamp(source, raise);
     expect(source.at(0, 0)).toBeCloseTo(11);
     expect(source.at(12, 0)).toBeCloseTo(10);
     expect(source.at(14, 0)).toBe(6);
   });
 
-  it('blends toward the land by the amount', () => {
-    const source = new FakeSource(() => 6);
-    applyRaiseStamp(source, { ...raise, amount: 0.5 });
-    expect(source.at(0, 0)).toBeCloseTo(8.5);
-  });
-
   it('leaves dry ground and higher ground alone', () => {
     const dry = new FakeSource(() => 6);
-    applyRaiseStamp(dry, { ...raise, centerX: 30, amount: 1 });
+    applyRaiseStamp(dry, { ...raise, centerX: 30 });
     expect(dry.at(30, 0)).toBe(6);
     const high = new FakeSource(() => 20);
-    expect(applyRaiseStamp(high, { ...raise, amount: 1 })).toEqual([]);
+    expect(applyRaiseStamp(high, raise)).toEqual([]);
   });
 });

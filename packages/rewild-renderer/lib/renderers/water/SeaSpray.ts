@@ -6,7 +6,6 @@ import drawShader from '../../shaders/sea-spray.wgsl';
 import skyConstants from '../../shaders/sky/skyConstants.wgsl';
 import fogShader from '../../shaders/sky/fog.wgsl';
 import { OceanFFT } from './OceanFFT';
-import { WATER_SPRAY_TEXTURE } from './WaterTextures';
 
 // Sea spray: a pool of particles that rise from breaking crests near the
 // camera (after GodotOceanWaves). A compute pass spawns them where the ocean's
@@ -408,7 +407,7 @@ export class SeaSpray {
         {
           binding: 5,
           resource: renderer.textureManager
-            .get(WATER_SPRAY_TEXTURE)
+            .get('water-spray')
             .gpuTexture.createView(),
         },
         { binding: 6, resource: renderer.samplerManager.get('linear-clamped') },
