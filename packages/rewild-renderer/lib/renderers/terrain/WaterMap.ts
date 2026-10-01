@@ -144,6 +144,34 @@ export function resolveWater(
 }
 
 /**
+ * Whether the water at texel `t` shows over the chunk's LOD-0 `heights`: its
+ * footprint dips below the level plus the swash, as in buildWaterMap. Coverage
+ * alone only says where water may stand. The ocean covers land inland of the
+ * coast that stands above it. True when the heights do not fit the chunk.
+ */
+export function waterShowsAt(
+  water: ResolvedWater,
+  heights: Float32Array,
+  t: number
+): boolean {
+  const { size, step } = water;
+  const chunkSize = (size - 1) * step + 1;
+  if (heights.length !== chunkSize * chunkSize) return true;
+  const mx = t % size;
+  const my = (t - mx) / size;
+  const reach = step >> 1;
+  const top = water.levels[t] + SWASH_REACH;
+  const x0 = Math.max(0, mx * step - reach);
+  const x1 = Math.min(chunkSize - 1, mx * step + reach);
+  const y0 = Math.max(0, my * step - reach);
+  const y1 = Math.min(chunkSize - 1, my * step + reach);
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++)
+      if (heights[x + y * chunkSize] < top) return true;
+  return false;
+}
+
+/**
  * The water map for a chunk with LOD-0 `heights`, or null when the ground
  * everywhere stands WET_BAND_REACH or more above the covered levels. `offset`
  * is the chunk's sample-space offset, as for the height and splat generators.

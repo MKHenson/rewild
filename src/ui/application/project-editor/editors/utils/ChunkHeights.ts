@@ -10,6 +10,7 @@ import { generateBiomeBlendedHeightMap } from 'rewild-renderer/lib/renderers/ter
  */
 export class ChunkHeightLoader {
   private pending = new Set<string>();
+  private baselines = new WeakMap<TerrainChunk, Float32Array>();
 
   constructor(private renderer: Renderer) {}
 
@@ -39,6 +40,21 @@ export class ChunkHeightLoader {
       .finally(() => {
         this.pending.delete(chunk.id);
       });
+  }
+
+  /** The chunk's generated heights, before any edit, or null when it is not
+   *  loaded. Generated on first use and kept while the chunk lives. */
+  baseline(cx: number, cy: number): Float32Array | null {
+    const chunk = this.renderer.terrainRenderer.terrainChunks.get(
+      `${cx},${cy}`
+    );
+    if (!chunk) return null;
+    let heights = this.baselines.get(chunk);
+    if (!heights) {
+      heights = this.generateBaseline(chunk);
+      this.baselines.set(chunk, heights);
+    }
+    return heights;
   }
 
   /** Starts reading the heights of every chunk within `radius` of (x, z). */

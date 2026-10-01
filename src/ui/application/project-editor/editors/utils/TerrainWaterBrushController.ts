@@ -33,7 +33,10 @@ import type {
   SculptHeightSource,
   TouchedChunk,
 } from 'rewild-renderer/lib/renderers/terrain/Sculpt';
-import type { ResolvedWater } from 'rewild-renderer/lib/renderers/terrain/WaterMap';
+import {
+  ResolvedWater,
+  SWASH_REACH,
+} from 'rewild-renderer/lib/renderers/terrain/WaterMap';
 import { Raycaster, Intersection } from 'rewild-renderer/lib/core/Raycaster';
 import { writeChunkSnapshot } from 'src/database/chunk-snapshots';
 import { writeWaterBodies } from 'src/database/water-bodies';
@@ -95,7 +98,7 @@ const metres = (value: number) => `${value.toFixed(2)} m`;
  * Editor water brush. Add, remove, reset and type paint the chunks' water
  * edits under the brush like the paint brushes. Add also digs a bed under the
  * water and raises a lip around it when the stroke ends, and stops at other
- * water unless it stands at the same level. Remove raises the ground under
+ * water that shows unless it stands at the same level. Remove raises the ground under
  * the water above its level. After reset, the edit rules settle the water it
  * changed. Level picks the lake under the click
  * and moves its level with a vertical drag, live and capped at its spill
@@ -363,7 +366,11 @@ export class TerrainWaterBrushController {
         Math.ceil((point.x + reach) / unit),
         Math.ceil((point.z + reach) / unit),
         stroke.bodyId,
-        stroke.level
+        stroke.level,
+        {
+          getHeights: (cx, cy) => this.heights.get(cx, cy),
+          floor: stroke.level - waterBrushStore.depth,
+        }
       );
       stroke.discs.push(point.x, point.z, radius);
     }
@@ -479,8 +486,11 @@ export class TerrainWaterBrushController {
       Math.min(water.size - 1, Math.max(0, my)) * water.size +
       Math.min(water.size - 1, Math.max(0, mx));
     const bodyId = water.bodyIds[t];
+    const ground = terrain.sampleHeight(point.x, point.z) ?? point.y;
 
-    if (water.coverage[t] > 0) {
+    // Covered ground above the water is dry: the sea's coverage runs inland of
+    // the coast, under land that stands above it.
+    if (water.coverage[t] > 0 && ground < water.levels[t] + SWASH_REACH) {
       stroke.bodyId = bodyId;
       stroke.level = water.levels[t];
       if (bodyId === 0) stroke.typeWeights = this.paletteWeights(OCEAN_WATER);
@@ -492,7 +502,6 @@ export class TerrainWaterBrushController {
       return true;
     }
 
-    const ground = terrain.sampleHeight(point.x, point.z) ?? point.y;
     stroke.bodyId = editedBodyId(
       Math.imul(Math.round(point.x), 73856093) ^
         Math.imul(Math.round(point.z), 19349663) ^

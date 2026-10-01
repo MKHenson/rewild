@@ -27,6 +27,7 @@ const BRUSHES: Array<{
   { type: 'lower', icon: 'arrow-down', label: 'Lower' },
   { type: 'smooth', icon: 'waves-horizontal', label: 'Smooth' },
   { type: 'flatten', icon: 'minus', label: 'Flatten' },
+  { type: 'reset', icon: 'rotate-ccw', label: 'Reset' },
 ];
 
 // Floating brush controls shown over the viewport while sculpt mode is

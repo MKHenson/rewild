@@ -77,6 +77,7 @@ export class TerrainSculptController {
         return controller.renderer.terrainRenderer.metersPerSample;
       },
       getHeights: (cx: number, cy: number) => this.getChunkHeights(cx, cy),
+      getBaseline: (cx: number, cy: number) => this.heights.baseline(cx, cy),
       locks: {
         step: WATER_MAP_STEP,
         get margin() {
