@@ -15,6 +15,9 @@ import kotlinx.serialization.json.jsonObject
 
 private val json = Json { ignoreUnknownKeys = true }
 
+private fun isNewer(incoming: Long?, existing: Long?) =
+    incoming != null && (existing == null || incoming > existing)
+
 class SyncService(
     private val projectService: ProjectService,
     private val levelService: LevelService,
@@ -54,13 +57,30 @@ class SyncService(
         // and nothing else would ever reclaim their blobs: collect newly-arrived
         // tombstones and clean them up once the push phase has committed.
         val newlyTombstoned = mutableListOf<String>()
+        // A level whose chunk clear is newer than the server's: the client removed
+        // its chunk files, so the server removes its copies too. Checked on every
+        // record, so an older update that carries a newer clear still clears.
+        val chunksCleared = mutableListOf<String>()
         for ((record, incoming) in levelRecords) {
             val existing = levelService.getById(userId, record.id)
+            val clearsChunks = isNewer(incoming.chunksClearedAt, existing?.chunksClearedAt)
             if (existing == null || record.updatedAt > existing.updatedAt) {
+                // Null when another user owns the id: nothing of theirs is touched.
                 levelService.upsert(userId, incoming.copy(userId = userId, syncedAt = now, syncError = null))
+                    ?: continue
                 // Only on the transition to deleted, so re-syncing a tombstone is a no-op.
                 if (incoming.deletedAt != null && existing?.deletedAt == null) newlyTombstoned.add(record.id)
+            } else if (clearsChunks) {
+                levelService.upsert(
+                    userId,
+                    existing.copy(
+                        chunksClearedAt = incoming.chunksClearedAt,
+                        updatedAt = maxOf(existing.updatedAt, now),
+                        syncedAt = now
+                    )
+                )
             }
+            if (clearsChunks) chunksCleared.add(record.id)
         }
 
         // Pass 3: patch levelId back onto the projects that needed it — levels exist now.
@@ -73,6 +93,8 @@ class SyncService(
         // Reclaim blobs for levels this sync just tombstoned. Never throws, so a bucket
         // outage can't fail the sync — failures are queued for a later retry.
         for (levelId in newlyTombstoned) cleanup?.cleanupLevel(levelId)
+        // A whole-level cleanup already took these files.
+        for (levelId in chunksCleared) if (levelId !in newlyTombstoned) cleanup?.clearChunks(levelId)
 
         // Pull phase: return everything the client hasn't seen yet.
         // lastSyncedAt = 0 means first sync — return the full dataset.

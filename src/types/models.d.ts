@@ -145,6 +145,8 @@ declare module 'models' {
     hasTerrain: boolean;
     startEvent: string;
     containers: IContainer[];
+    /** When a device last removed all of the level's chunk files. */
+    chunksClearedAt?: number | null;
   }
 
   export interface IAsset {

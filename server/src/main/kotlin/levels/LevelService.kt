@@ -54,6 +54,7 @@ class LevelService(private val cleanup: AssetCleanupService? = null) {
                 it[syncedAt] = record.syncedAt
                 it[deletedAt] = record.deletedAt
                 it[syncError] = record.syncError
+                it[chunksClearedAt] = record.chunksClearedAt
             }
         } else {
             LevelsTable.update({ LevelsTable.id eq record.id }) {
@@ -67,6 +68,9 @@ class LevelService(private val cleanup: AssetCleanupService? = null) {
                 it[syncedAt] = record.syncedAt
                 it[deletedAt] = record.deletedAt
                 it[syncError] = record.syncError
+                // A clear never moves back: a device that has not seen it yet
+                // can push an older value.
+                it[chunksClearedAt] = laterOf(existing[chunksClearedAt], record.chunksClearedAt)
             }
         }
 
@@ -109,6 +113,10 @@ class LevelService(private val cleanup: AssetCleanupService? = null) {
         updatedAt = this[LevelsTable.updatedAt],
         syncedAt = this[LevelsTable.syncedAt],
         deletedAt = this[LevelsTable.deletedAt],
-        syncError = this[LevelsTable.syncError]
+        syncError = this[LevelsTable.syncError],
+        chunksClearedAt = this[LevelsTable.chunksClearedAt]
     )
 }
+
+private fun laterOf(a: Long?, b: Long?): Long? = if (a == null) b else if (b == null) a else maxOf(a, b)
+

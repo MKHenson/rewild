@@ -15,5 +15,8 @@ data class Level(
     val updatedAt: Long,
     val syncedAt: Long = 0,
     val deletedAt: Long? = null,
-    val syncError: String? = null
+    val syncError: String? = null,
+    // When the client last removed all of the level's chunk files. A newer value
+    // has the server remove them too.
+    val chunksClearedAt: Long? = null
 )

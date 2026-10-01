@@ -4,6 +4,7 @@ import com.rewild.db.tables.AssetCleanupQueueTable
 import com.rewild.db.tables.AssetsTable
 import org.jetbrains.exposed.sql.SqlExpressionBuilder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -24,6 +25,10 @@ class AssetCleanupService(
 
     fun prefixFor(levelId: String) = "levels/$levelId/"
 
+    companion object {
+        private const val CHUNK = "chunk"
+    }
+
     // Call after the level's deletion has been committed. Never throws.
     fun cleanupLevel(levelId: String) {
         // Bound outside the deleteWhere lambda: inside it, an unqualified `levelId`
@@ -38,6 +43,24 @@ class AssetCleanupService(
         // would only accumulate rows no reaper could ever drain.
         if (s3 == null) return
 
+        try {
+            val deleted = s3.deletePrefix(bucketName, prefix)
+            log.info("Deleted {} object(s) under {}", deleted, prefix)
+        } catch (e: Exception) {
+            log.error("Failed to delete objects under {}: {} — queued for retry", prefix, e.message)
+            enqueue(prefix, e.message)
+        }
+    }
+
+    // Removes every chunk file of a level that stays. Call after the clear has been
+    // committed. Never throws.
+    fun clearChunks(levelId: String) {
+        val target = levelId
+        transaction {
+            AssetsTable.deleteWhere { (AssetsTable.levelId eq target) and (AssetsTable.assetType eq CHUNK) }
+        }
+        if (s3 == null) return
+        val prefix = "${prefixFor(levelId)}$CHUNK/"
         try {
             val deleted = s3.deletePrefix(bucketName, prefix)
             log.info("Deleted {} object(s) under {}", deleted, prefix)

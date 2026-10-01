@@ -10,7 +10,7 @@ describe('AuthStore', () => {
     jest.spyOn(authService, 'signIn').mockResolvedValue(undefined);
     jest.spyOn(authService, 'signOut').mockResolvedValue(undefined);
     jest.spyOn(authService, 'register').mockResolvedValue(undefined);
-    jest.spyOn(db.sync, 'run').mockResolvedValue(undefined);
+    jest.spyOn(db.sync, 'run').mockResolvedValue(true);
     store = new AuthStore();
   });
 

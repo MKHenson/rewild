@@ -187,11 +187,14 @@ export class LocalDataTable<T> {
     const store = tx.objectStore(this.collection);
     const existing = await idbReq<StoredRecord<T> | undefined>(store.get(id));
     if (existing) {
+      const record = withSyncDefaults(existing);
       await idbReq(
         store.put({
-          ...withSyncDefaults(existing),
+          ...record,
           ...token,
-          updatedAt: Date.now(),
+          // As remove(): a patch is dirty even when this clock is behind the
+          // server's syncedAt.
+          updatedAt: Math.max(Date.now(), record.syncedAt + 1),
         })
       );
     }

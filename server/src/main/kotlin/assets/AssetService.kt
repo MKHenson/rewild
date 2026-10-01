@@ -6,6 +6,7 @@ import com.rewild.models.Asset
 import com.rewild.models.UploadUrlResponse
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.isNull
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.UUID
@@ -26,8 +27,11 @@ class AssetService(
     // Returns null if the levelId doesn't belong to the user.
     fun requestUploadUrl(userId: String, levelId: String, assetType: String, filename: String): UploadUrlResponse? = transaction {
         val levelOwned = LevelsTable.selectAll()
-            .where { (LevelsTable.id eq levelId) and (LevelsTable.userId eq userId) }
+            .where {
+                (LevelsTable.id eq levelId) and (LevelsTable.userId eq userId) and LevelsTable.deletedAt.isNull()
+            }
             .count() > 0
+        // A deleted level takes no new files: they would outlive its cleanup.
         if (!levelOwned) return@transaction null
 
         val storageKey = "levels/$levelId/$assetType/$filename"

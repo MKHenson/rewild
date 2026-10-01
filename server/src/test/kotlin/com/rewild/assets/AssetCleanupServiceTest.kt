@@ -90,7 +90,8 @@ class AssetCleanupServiceTest {
         private fun makeLevel(
             id: String,
             updatedAt: Long = 1000L,
-            deletedAt: Long? = null
+            deletedAt: Long? = null,
+            chunksClearedAt: Long? = null
         ) = Level(
             id = id,
             userId = "placeholder",
@@ -101,7 +102,8 @@ class AssetCleanupServiceTest {
             startEvent = "",
             containers = emptyList(),
             updatedAt = updatedAt,
-            deletedAt = deletedAt
+            deletedAt = deletedAt,
+            chunksClearedAt = chunksClearedAt
         )
 
         private fun insertAsset(id: String, levelId: String, filename: String) = transaction {
@@ -231,6 +233,80 @@ class AssetCleanupServiceTest {
         syncService.sync(USER_A, syncRequestFor(later))
 
         assertEquals(listOf("levels/cl-resync/"), bucket.prefixCalls)
+    }
+
+    // --- Chunk clears (chunksClearedAt) ---
+
+    private fun seedChunks(levelId: String) {
+        levelService.upsert(USER_A, makeLevel(levelId))
+        for (name in listOf("0_0.bin", "0_0.biome.bin", "0_0.water.bin", "water-bodies.json")) {
+            insertAsset("$levelId-$name", levelId, name)
+            bucket.objects += "levels/$levelId/chunk/$name"
+        }
+        bucket.objects += "levels/$levelId/other/keep.bin"
+    }
+
+    @Test
+    fun `a newer chunk clear removes every chunk file and nothing else`() {
+        val syncService = SyncService(projectService, levelService, cleanup)
+        seedChunks("cl-reset")
+
+        syncService.sync(USER_A, syncRequestFor(makeLevel("cl-reset", updatedAt = 2000L, chunksClearedAt = 2000L)))
+
+        assertEquals(setOf("levels/cl-reset/other/keep.bin"), bucket.objects)
+        assertTrue(assetIdsFor("cl-reset").isEmpty())
+        assertEquals(2000L, levelService.getById(USER_A, "cl-reset")?.chunksClearedAt)
+    }
+
+    @Test
+    fun `re-syncing the same clear does not remove files uploaded since`() {
+        val syncService = SyncService(projectService, levelService, cleanup)
+        seedChunks("cl-reclear")
+        val cleared = makeLevel("cl-reclear", updatedAt = 2000L, chunksClearedAt = 2000L)
+        syncService.sync(USER_A, syncRequestFor(cleared))
+        insertAsset("cl-reclear-new", "cl-reclear", "0_0.bin")
+        bucket.objects += "levels/cl-reclear/chunk/0_0.bin"
+
+        syncService.sync(USER_A, syncRequestFor(cleared.copy(updatedAt = 3000L)))
+
+        assertEquals(listOf("cl-reclear-new"), assetIdsFor("cl-reclear"))
+        assertTrue("levels/cl-reclear/chunk/0_0.bin" in bucket.objects)
+    }
+
+    @Test
+    fun `an older record still clears when it carries a newer clear, and a clear never moves back`() {
+        val syncService = SyncService(projectService, levelService, cleanup)
+        seedChunks("cl-stale")
+        levelService.upsert(USER_A, makeLevel("cl-stale", updatedAt = 5000L))
+
+        syncService.sync(USER_A, syncRequestFor(makeLevel("cl-stale", updatedAt = 2000L, chunksClearedAt = 2000L)))
+        assertTrue(assetIdsFor("cl-stale").isEmpty())
+
+        syncService.sync(USER_A, syncRequestFor(makeLevel("cl-stale", updatedAt = 9000L, chunksClearedAt = 1000L)))
+        assertEquals(2000L, levelService.getById(USER_A, "cl-stale")?.chunksClearedAt)
+    }
+
+    @Test
+    fun `a clear for another user's level touches nothing`() {
+        val syncService = SyncService(projectService, levelService, cleanup)
+        seedChunks("cl-theirs")
+
+        syncService.sync("cleanup-user-b", syncRequestFor(makeLevel("cl-theirs", updatedAt = 2000L, chunksClearedAt = 2000L)))
+
+        assertEquals(4, assetIdsFor("cl-theirs").size)
+        assertTrue(bucket.prefixCalls.isEmpty())
+    }
+
+    @Test
+    fun `a failed chunk clear queues its prefix`() {
+        val syncService = SyncService(projectService, levelService, cleanup)
+        seedChunks("cl-clear-down")
+        bucket.failing = true
+
+        syncService.sync(USER_A, syncRequestFor(makeLevel("cl-clear-down", updatedAt = 2000L, chunksClearedAt = 2000L)))
+
+        assertTrue(assetIdsFor("cl-clear-down").isEmpty())
+        assertEquals(listOf("levels/cl-clear-down/chunk/"), queuedPrefixes())
     }
 
     @Test

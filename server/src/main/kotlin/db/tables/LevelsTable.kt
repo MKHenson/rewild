@@ -16,6 +16,7 @@ object LevelsTable : Table("levels") {
     val syncedAt = long("synced_at")
     val syncError = text("sync_error").nullable()
     val deletedAt = long("deleted_at").nullable()
+    val chunksClearedAt = long("chunks_cleared_at").nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

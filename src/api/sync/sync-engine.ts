@@ -39,11 +39,13 @@ export class SyncEngine {
     return this.events;
   }
 
-  async run(): Promise<void> {
+  /** Pushes dirty records and applies the server's. False when it did not reach
+   *  the server: signed out, or the request failed. */
+  async run(): Promise<boolean> {
     // Sync is a no-op for unauthenticated users — local store is always the active source of truth.
-    if (!this.auth.getToken()) return;
+    if (!this.auth.getToken()) return false;
     const userId = this.auth.getUserId();
-    if (!userId) return;
+    if (!userId) return false;
 
     // lastSyncedAt tells the server which records we've already seen.
     // On a brand-new device this is 0, which triggers a full pull of all server data.
@@ -83,7 +85,7 @@ export class SyncEngine {
         await this.tables[collection].markSynced(record.id, record.syncedAt, error);
         this.logEvent({ collection, recordId: record.id, status: 'failed', error });
       }
-      return;
+      return false;
     }
 
     // Push succeeded — mark every sent record as clean and clear any prior error.
@@ -117,6 +119,7 @@ export class SyncEngine {
 
     // Advance the cursor so the next sync only asks for records newer than this one.
     this.saveLastSyncedAt(userId, response.syncedAt);
+    return true;
   }
 
   private loadLastSyncedAt(userId: string): number {

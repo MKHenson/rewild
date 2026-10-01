@@ -53,6 +53,22 @@ describe('SyncEngine', () => {
     });
   });
 
+  describe('result', () => {
+    it('is true when the sync reached the server', async () => {
+      expect(await engine.run()).toBe(true);
+    });
+
+    it('is false when signed out', async () => {
+      jest.spyOn(authService, 'getToken').mockReturnValue(null);
+      expect(await engine.run()).toBe(false);
+    });
+
+    it('is false when the request fails', async () => {
+      (global.fetch as jest.Mock).mockResolvedValue(mockResponse(500, {}));
+      expect(await engine.run()).toBe(false);
+    });
+  });
+
   describe('pushing dirty records', () => {
     it('sends dirty projects and levels in a single request', async () => {
       await projects.add({ name: 'Project A' });
