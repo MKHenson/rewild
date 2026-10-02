@@ -1039,6 +1039,10 @@ export class Renderer {
         label: 'post-processing encoder',
       });
 
+      // Light shafts under water march at half resolution; the composite's
+      // pass adds them over the water's fog.
+      this.terrainRenderer.renderLightShafts(this, postProcessingEncoder);
+
       // The atmosphere composite blends sky, clouds, fog and god rays over the
       // scene *in HDR*, loading what the scene pass already wrote. Both sides of
       // its src-alpha blend are now radiance on the same scale, so the result is
@@ -1065,11 +1069,18 @@ export class Renderer {
       this.terrainRenderer.renderUnderWaterFog(this, postProcessingPass);
       postProcessingPass.end();
 
-      // Spray fogs itself, so it draws over the composite, not under it.
+      // Spray and marine snow fog themselves, so they draw over the composite,
+      // not under it.
       this.terrainRenderer.renderSeaSpray(
         this,
         postProcessingEncoder,
         sceneColorView
+      );
+      this.terrainRenderer.renderMarineSnow(
+        this,
+        postProcessingEncoder,
+        sceneColorView,
+        camera.camera
       );
 
       device.queue.submit([postProcessingEncoder.finish()]);

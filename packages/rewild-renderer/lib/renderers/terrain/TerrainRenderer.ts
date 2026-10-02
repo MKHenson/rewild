@@ -29,19 +29,22 @@ import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { ScatterModels } from './ScatterModels';
 import { HorizonOcean } from '../water/HorizonOcean';
 import { WaterWaveBuffer } from '../water/WaterWaves';
-import { waterDetailBias } from '../water/WaterQuality';
+import { underWaterQuality, waterDetailBias } from '../water/WaterQuality';
 import { OceanFFT } from '../water/OceanFFT';
 import { SeaSpray } from '../water/SeaSpray';
 import { WaterProbe } from '../water/WaterProbe';
 import { UnderWater } from '../water/UnderWater';
 import { UnderWaterFog } from '../water/UnderWaterFog';
 import { WaterLens, lensRain } from '../water/WaterLens';
+import { CAUSTIC_CASCADE, Caustics } from '../water/Caustics';
+import { LightShafts } from '../water/LightShafts';
+import { MarineSnow } from '../water/MarineSnow';
 import { GpuPassTimer } from '../../metrics/GpuPassTimer';
 import { WaterQuery, WaterQuerySource } from '../water/WaterQuery';
 import { WaterMap } from './WaterMap';
 import { shoreWaveHeight } from '../water/ShoreWaves';
 import { SHORE_FIELD_SPAN, ShoreField } from '../water/ShoreField';
-import { OCEAN_WATER } from './Water';
+import { MAX_WATER_TYPES, OCEAN_WATER } from './Water';
 import { MAX_WATER_GRID_BANDS, waterGridBands } from '../water/WaterGrid';
 
 export class LODInfo {
@@ -180,9 +183,16 @@ export class TerrainRenderer implements WaterQuerySource {
   private underWaterFog = new UnderWaterFog();
   /** Water on the camera's lens: blur, the waterline and drops. */
   readonly waterLens = new WaterLens();
-  // GPU time of the ocean's transforms and of the lens (gpu/water). Two
-  // timers, as the two run at opposite ends of the frame.
+  /** The sun focused by the waves under water. Its texture and params
+   *  outlive the chunks, as the material passes bind them once. */
+  readonly caustics = new Caustics();
+  readonly lightShafts = new LightShafts();
+  readonly marineSnow = new MarineSnow();
+  // GPU time of the ocean's transforms, the caustics, the light shafts and
+  // the lens (gpu/water). A timer per command buffer they run in.
   private oceanTimer: GpuPassTimer | null = null;
+  private causticsTimer: GpuPassTimer | null = null;
+  private shaftsTimer: GpuPassTimer | null = null;
   private lensTimer: GpuPassTimer | null = null;
   private toSun = new Float64Array(3);
   private sunRadiance = new Float64Array(3);
@@ -396,6 +406,10 @@ export class TerrainRenderer implements WaterQuerySource {
     this.shoreField = new ShoreField(renderer.device);
     this.oceanTimer = new GpuPassTimer(renderer.metrics, 'gpu/water');
     this.oceanTimer.init(renderer.device, ['ocean']);
+    this.causticsTimer = new GpuPassTimer(renderer.metrics, 'gpu/water');
+    this.causticsTimer.init(renderer.device, ['caustics']);
+    this.shaftsTimer = new GpuPassTimer(renderer.metrics, 'gpu/water');
+    this.shaftsTimer.init(renderer.device, ['shafts']);
     this.lensTimer = new GpuPassTimer(renderer.metrics, 'gpu/water');
     this.lensTimer.init(renderer.device, ['lens-frame', 'lens']);
   }
@@ -1107,6 +1121,19 @@ export class TerrainRenderer implements WaterQuerySource {
       (camera as { near?: number }).near ?? 0.1,
       camera.transform.matrixWorld.elements
     );
+    const eyeWorld = camera.transform.matrixWorld.elements;
+    this.caustics.update(
+      renderer.device,
+      this.ocean,
+      toSun,
+      eyeWorld[12],
+      eyeWorld[14],
+      this.cameraCascadeWeight(CAUSTIC_CASCADE),
+      underWater.covered || this.waterInView(),
+      this.causticsTimer?.writes('caustics')
+    );
+    this.causticsTimer?.resolve();
+    this.marineSnow.update(deltaSeconds);
     const sky = renderer.sky.skyRenderer;
     this.waterLens.update(
       underWater,
@@ -1134,8 +1161,25 @@ export class TerrainRenderer implements WaterQuerySource {
     );
   }
 
-  /** Fogs the view in the water while the camera may be under it. Draws into
-   *  the atmosphere composite's `pass`, after the atmosphere. */
+  // Whether a chunk drawn last update has water.
+  private waterInView(): boolean {
+    const chunks = this.terrainChunksVisibleLastUpdate;
+    for (let i = 0; i < chunks.length; i++) if (chunks[i].water) return true;
+    return false;
+  }
+
+  // The water at the camera's weight on cascade `c`; 0 out of the water.
+  private cameraCascadeWeight(c: number): number {
+    const underWater = this.underWater;
+    if (!underWater.covered) return 0;
+    const types = this.waterWaves.waves.cascadeTypes;
+    const weights = underWater.sample.typeWeights;
+    let weight = 0;
+    for (let t = 0; t < MAX_WATER_TYPES; t++)
+      weight += types[c * MAX_WATER_TYPES + t] * weights[t];
+    return weight;
+  }
+
   /** Draws water on the lens over the composited scene, before the tonemap. */
   renderLens(
     renderer: Renderer,
@@ -1143,6 +1187,8 @@ export class TerrainRenderer implements WaterQuerySource {
     scene: GPUTexture,
     sceneView: GPUTextureView
   ) {
+    // The shafts' pass was submitted with the composite.
+    this.shaftsTimer?.resolve();
     if (!this._enabled || !renderer.lensEffects) return;
     this.waterLens.render(
       renderer,
@@ -1156,12 +1202,63 @@ export class TerrainRenderer implements WaterQuerySource {
     this.lensTimer?.resolve();
   }
 
+  /** Marches the light shafts while the camera may be under water. Encode
+   *  before the atmosphere composite's pass. */
+  renderLightShafts(renderer: Renderer, encoder: GPUCommandEncoder) {
+    if (
+      !this._enabled ||
+      !this.underWater.possible ||
+      !underWaterQuality(renderer.quality.aspect('water')).shafts
+    ) {
+      this.lightShafts.skip();
+      return;
+    }
+    this.lightShafts.march(
+      renderer,
+      encoder,
+      this.underWater.buffer(renderer.device),
+      this.caustics,
+      this.shaftsTimer?.writes('shafts')
+    );
+  }
+
+  /** Fogs the view in the water while the camera may be under it, and adds
+   *  the light shafts. Draws into the atmosphere composite's `pass`, after the
+   *  atmosphere. */
   renderUnderWaterFog(renderer: Renderer, pass: GPURenderPassEncoder) {
     if (!this._enabled || !this.underWater.possible) return;
     this.underWaterFog.draw(
       renderer,
       pass,
       this.underWater.buffer(renderer.device)
+    );
+    this.lightShafts.composite(pass);
+  }
+
+  /** Draws the marine snow over the composited HDR scene in `target` while
+   *  the camera may be under water. */
+  renderMarineSnow(
+    renderer: Renderer,
+    encoder: GPUCommandEncoder,
+    target: GPUTextureView,
+    camera: Camera
+  ) {
+    if (!this._enabled || !this.underWater.possible || !this.ocean) return;
+    const share = underWaterQuality(renderer.quality.aspect('water')).snowShare;
+    const waves = this.waterWaves.waves;
+    this.marineSnow.draw(
+      renderer,
+      encoder,
+      target,
+      camera,
+      share,
+      this.underWater.buffer(renderer.device),
+      this.waterWaves.buffer(renderer.device),
+      this.ocean,
+      this.caustics,
+      waves.originX,
+      waves.originZ,
+      this.cameraCascadeWeight(0)
     );
   }
 
@@ -1285,9 +1382,15 @@ export class TerrainRenderer implements WaterQuerySource {
     this.waterProbe = null;
     this.waterLens.dispose();
     this.oceanTimer?.dispose();
+    this.causticsTimer?.dispose();
+    this.shaftsTimer?.dispose();
     this.lensTimer?.dispose();
     this.oceanTimer = null;
+    this.causticsTimer = null;
+    this.shaftsTimer = null;
     this.lensTimer = null;
+    this.lightShafts.dispose();
+    this.marineSnow.dispose();
     this.ocean?.dispose();
     this.ocean = null;
     this.scatterModels?.dispose();

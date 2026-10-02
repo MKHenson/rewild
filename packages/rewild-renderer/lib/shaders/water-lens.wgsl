@@ -22,11 +22,19 @@ const RIM_GAIN: f32 = 0.6;
 // it, each at the mip that matches the radius.
 // A drop's outline wobbles by two sine lobes around it, 3 and 5 to a turn,
 // DROP_LOBE_3 and DROP_LOBE_5 of its radius, at phases from its seed. A
-// sliding drop stretches along its fall by up to 1 / DROP_SLIDE_SQUASH.
+// sliding drop pulls into a teardrop as it gathers speed: its tail above
+// reaches DROP_SLIDE_TAIL of its radius, its belly below DROP_SLIDE_BELLY,
+// it narrows to DROP_SLIDE_NARROW, and its tail tapers to DROP_SLIDE_TAPER of
+// that, as wide as the trail it leads into. Its lobes settle by
+// DROP_SLIDE_CALM.
 const DROP_LOBE_3: f32 = 0.12;
 const DROP_LOBE_5: f32 = 0.06;
-const DROP_SLIDE_SQUASH: f32 = 0.8;
-// The quad around a drop, over its radius: room for the lobes and the stretch.
+const DROP_SLIDE_TAIL: f32 = 2.6;
+const DROP_SLIDE_BELLY: f32 = 1.3;
+const DROP_SLIDE_NARROW: f32 = 0.5;
+const DROP_SLIDE_TAPER: f32 = 0.35;
+const DROP_SLIDE_CALM: f32 = 0.6;
+// The quad around a drop, over its reach: room for the lobes.
 const DROP_EXTENT: f32 = 1.5;
 // A drop is a strong fisheye lens: the scene inside it is inverted, moved by
 // up to DROP_FISHEYE of the frame's height along its surface, and blurred. It
@@ -120,6 +128,12 @@ fn fs_lens(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
   return vec4f(colour, 1.0);
 }
 
+// Pixels a drop's quad reaches above and below its centre, for a drop
+// `radius` pixels across that slides at `slide` 0..1 of full speed.
+fn dropReach(radius: f32, slide: f32) -> vec2f {
+  return vec2f(mix(1.0, DROP_SLIDE_TAIL, slide), mix(1.0, DROP_SLIDE_BELLY, slide)) * radius * DROP_EXTENT;
+}
+
 struct DropOutput {
   @builtin(position) position : vec4f,
   // Pixels from the drop's centre, y down.
@@ -137,15 +151,16 @@ fn vs_drop(@builtin(vertex_index) vertexId : u32, @builtin(instance_index) index
   let radius = drop.body.z * size.y;
   let trail = drop.trail.x * size.y;
   let reach = radius * DROP_EXTENT;
+  let tall = dropReach(radius, drop.trail.w);
   // Two triangles: (0,0) (1,0) (0,1) and (0,1) (1,0) (1,1).
   let corner = vertexId % 6u;
   let at = vec2f(f32((0x32u >> corner) & 1u), f32((0x2Cu >> corner) & 1u));
-  var low = vec2f(-reach);
-  var high = vec2f(reach);
+  var low = vec2f(-reach, -tall.x);
+  var high = vec2f(reach, tall.y);
   if (vertexId >= 6u) {
     let width = radius * DROP_TRAIL_WIDTH;
-    low = vec2f(-width, min(-trail, -reach));
-    high = vec2f(width, -reach);
+    low = vec2f(-width, min(-trail, -tall.x));
+    high = vec2f(width, -tall.x);
   }
   let local = mix(low, high, at);
   let pixel = drop.body.xy * size + local;
@@ -166,11 +181,18 @@ fn fs_drop(input: DropOutput) -> @location(0) vec4f {
 
   var body = vec4f(0.0);
   // The trail's own quad lies above the body's: no outline to draw there.
-  if (input.local.y >= -radius * DROP_EXTENT) {
-    // The outline: a few lobes, stretched along the fall while it slides.
-    let d = input.local * vec2f(1.0, mix(1.0, DROP_SLIDE_SQUASH, drop.trail.w));
+  let slide = drop.trail.w;
+  if (input.local.y >= -dropReach(radius, slide).x) {
+    // The outline: a few lobes, pulled into a teardrop while it slides.
+    let above = input.local.y < 0.0;
+    let tall = select(mix(1.0, DROP_SLIDE_BELLY, slide), mix(1.0, DROP_SLIDE_TAIL, slide), above);
+    let y = input.local.y / tall;
+    let up = saturate(-y / radius);
+    let wide = mix(1.0, DROP_SLIDE_NARROW, slide) * mix(1.0, DROP_SLIDE_TAPER, slide * up);
+    let d = vec2f(input.local.x / wide, y);
     let angle = atan2(d.y, d.x);
-    let wobble = 1.0 + sin(angle * 3.0 + seed * 40.0) * DROP_LOBE_3 + sin(angle * 5.0 + seed * 97.0) * DROP_LOBE_5;
+    let lobes = 1.0 - DROP_SLIDE_CALM * slide;
+    let wobble = 1.0 + (sin(angle * 3.0 + seed * 40.0) * DROP_LOBE_3 + sin(angle * 5.0 + seed * 97.0) * DROP_LOBE_5) * lobes;
     let q = d / (radius * wobble);
     let r2 = dot(q, q);
     if (r2 < 1.0) {

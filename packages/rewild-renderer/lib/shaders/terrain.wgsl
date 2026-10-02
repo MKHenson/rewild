@@ -32,6 +32,7 @@ const HAS_TERRAIN_NO_TILE: bool = ${ HAS_TERRAIN_NO_TILE };
 #include "./shader-lib/spot-light-shadow.wgsl"
 #include "./shader-lib/water-waves.wgsl"
 #include "./shader-lib/shore-waves.wgsl"
+#include "./shader-lib/caustics.wgsl"
 
 struct Uniforms {
   normalMatrix: mat3x3f,
@@ -169,6 +170,9 @@ struct VertexOutput {
 @group(3) @binding(9) var iblBrdfLut: texture_2d<f32>;
 @group(3) @binding(10) var iblSampler: sampler;
 @group(3) @binding(11) var<uniform> iblParams: IblParams;
+@group(3) @binding(12) var causticsMap: texture_2d<f32>;
+@group(3) @binding(13) var causticsSampler: sampler;
+@group(3) @binding(14) var<uniform> caustics: CausticsParams;
 
 // Splat weight below which a layer is skipped outright, saving its whole block
 // of texture samples. One 8-bit quantisation step is 1/255 = 0.0039, so this is
@@ -405,8 +409,9 @@ fn sunCosine(up: vec3f) -> f32 {
 }
 
 // The chunk's water at a fragment `height` metres up in the chunk's space, at
-// `uv` across it, on ground whose world normal rises `rise`.
-fn terrainWater(uv: vec2f, height: f32, rise: f32) -> TerrainWater {
+// `uv` across it, on ground whose world normal rises `rise`, `distance`
+// metres from the camera.
+fn terrainWater(uv: vec2f, height: f32, rise: f32, distance: f32) -> TerrainWater {
   var out: TerrainWater;
   out.damp = 0.0;
   out.sheen = 0.0;
@@ -464,7 +469,9 @@ fn terrainWater(uv: vec2f, height: f32, rise: f32) -> TerrainWater {
   let up = normalize(uniforms.normalMatrix * vec3f(0.0, 1.0, 0.0));
   let sunAir = sunCosine(up);
   let sunWater = sqrt(1.0 - AIR_TO_WATER * AIR_TO_WATER * (1.0 - sunAir * sunAir));
-  out.sunPassed = mix(vec3f(1.0), exp(-extinction * depth / sunWater), coverage);
+  let typeWeight = dot(waves.cascadeTypes[CAUSTIC_CASCADE], weights);
+  let focus = causticLight(cascadeUV(CAUSTIC_CASCADE, rest), depth, distance, typeWeight);
+  out.sunPassed = mix(vec3f(1.0), exp(-extinction * depth / sunWater) * focus, coverage);
   out.skyPassed = mix(vec3f(1.0), exp(-extinction * depth * WATER_SKY_PATH), coverage);
   return out;
 }
@@ -1092,7 +1099,7 @@ fn fs(
     blendedTangentNormal = vec3f(0.0, 0.0, 1.0);
   }
 
-  let wet = terrainWater(fragUV, objectHeight, normalize(objectNormal).y);
+  let wet = terrainWater(fragUV, objectHeight, normalize(objectNormal).y, viewDistance);
   blendedColor *= mix(1.0, WET_DARKEN, wet.damp) * mix(1.0, SOAK_DARKEN, wet.soak);
   shadingRoughness = mix(shadingRoughness, min(shadingRoughness, WET_ROUGHNESS), WET_GLOSS * wet.damp);
   shadingRoughness = mix(shadingRoughness, FILM_ROUGHNESS, wet.sheen);

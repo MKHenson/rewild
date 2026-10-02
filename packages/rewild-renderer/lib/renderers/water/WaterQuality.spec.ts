@@ -1,4 +1,8 @@
-import { waterDetailBias, waterLensQuality } from './WaterQuality';
+import {
+  underWaterQuality,
+  waterDetailBias,
+  waterLensQuality,
+} from './WaterQuality';
 
 describe('water quality tiers', () => {
   it('keeps every drop and the full blur on the top tiers', () => {
@@ -21,5 +25,14 @@ describe('water quality tiers', () => {
 
   it('sharpens the ocean slopes up the tiers', () => {
     expect(waterDetailBias('ultra')).toBeLessThan(waterDetailBias('low'));
+  });
+
+  it('turns the under-water extras off on the low tier only', () => {
+    for (const tier of ['ultra', 'high', 'medium'] as const) {
+      expect(underWaterQuality(tier).shafts).toBe(true);
+      expect(underWaterQuality(tier).snowShare).toBeGreaterThan(0);
+    }
+    expect(underWaterQuality('low').shafts).toBe(false);
+    expect(underWaterQuality('low').snowShare).toBe(0);
   });
 });

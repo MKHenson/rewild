@@ -17,6 +17,7 @@ const IBL_FLOATS = 28;
  * Bindings 3–5:  shadow atlas (depth texture, comparison sampler, directional params buffer)
  * Binding  6:    spot light shadow params buffer
  * Bindings 7–11: sky IBL (irradiance cube, specular cube, BRDF map, sampler, params) — opt-in
+ * Bindings 12–14: caustics (texture, repeating sampler, params) — opt-in
  *
  * All packed into a single bind group because WebGPU limits bind groups to 4 (0–3).
  *
@@ -30,6 +31,9 @@ export class ShadowUniforms implements ISharedUniformBuffer {
   group: number;
   /** Whether bindings 7–11 are populated. See the class comment. */
   private includeIbl: boolean;
+  /** Whether bindings 12–14 are populated, for the passes that light what
+   *  lies under water (water-light.wgsl, terrain). */
+  private includeCaustics: boolean;
   cloudBuffer: GPUBuffer;
   directionalBuffer: GPUBuffer;
   spotBuffer: GPUBuffer;
@@ -62,9 +66,14 @@ export class ShadowUniforms implements ISharedUniformBuffer {
   private iblInts: Uint32Array;
   iblBuffer: GPUBuffer;
 
-  constructor(group: number, includeIbl: boolean = false) {
+  constructor(
+    group: number,
+    includeIbl: boolean = false,
+    includeCaustics: boolean = false
+  ) {
     this.group = group;
     this.includeIbl = includeIbl;
+    this.includeCaustics = includeCaustics;
     this.requiresBuild = true;
     this.cloudData = new Float32Array(20);
     this.directionalData = new ArrayBuffer(224);
@@ -183,6 +192,15 @@ export class ShadowUniforms implements ISharedUniformBuffer {
           resource: renderer.samplerManager.get('linear-clamped'),
         },
         { binding: 11, resource: { buffer: this.iblBuffer } }
+      );
+    }
+
+    if (this.includeCaustics) {
+      const caustics = renderer.terrainRenderer.caustics;
+      entries.push(
+        { binding: 12, resource: caustics.texture(device).createView() },
+        { binding: 13, resource: caustics.sampler(device) },
+        { binding: 14, resource: { buffer: caustics.buffer(device) } }
       );
     }
 

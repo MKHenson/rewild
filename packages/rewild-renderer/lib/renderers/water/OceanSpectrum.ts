@@ -235,7 +235,12 @@ export function cascadeVariance(
     for (let s = 0; s < systems.length; s++) {
       const fade = Math.exp(-Math.pow(systems[s].shortWavesFade * k, 2));
       variance +=
-        jonswapDensity(systems[s], shapes[s].alpha, shapes[s].peakOmega, omega) *
+        jonswapDensity(
+          systems[s],
+          shapes[s].alpha,
+          shapes[s].peakOmega,
+          omega
+        ) *
         fade *
         dOmega;
     }

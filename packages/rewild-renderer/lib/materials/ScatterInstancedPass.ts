@@ -55,7 +55,7 @@ export class ScatterInstancedPass extends StandardPassBase {
     super();
     this.material = new StandardMaterial(materialGroupIndex);
     this.lightingUniforms = new Lighting(lightingGroup);
-    this.shadowUniforms = new ShadowUniforms(shadowGroup, true);
+    this.shadowUniforms = new ShadowUniforms(shadowGroup, true, true);
 
     this.perMeshTracker = new SharedUniformsTracker(this, [
       this.material,
