@@ -17,8 +17,12 @@ export class PaneManager extends Component<Props> {
   viewport: EditorViewport;
 
   init() {
+    let projectLoaded = false;
+
     this.on(projectStore.dispatcher, (event) => {
-      if (event.kind === 'changed') this.render();
+      if (event.kind === 'loading-completed') projectLoaded = true;
+      if (event.kind === 'changed' || event.kind === 'loading-completed')
+        this.render();
     });
 
     // Now create each of the editors
@@ -72,6 +76,10 @@ export class PaneManager extends Component<Props> {
       />
     );
 
+    // Kept after the layout so showing or hiding it never moves the layout,
+    // which would re-mount the viewport.
+    const savingOverlay = <Loading overlay />;
+
     return () => {
       if (projectStore.error)
         return (
@@ -80,9 +88,9 @@ export class PaneManager extends Component<Props> {
           </InfoBox>
         );
 
-      if (projectStore.loading) return <Loading />;
+      if (!projectLoaded) return <Loading />;
 
-      return layout;
+      return projectStore.loading ? [layout, savingOverlay] : [layout];
     };
   }
 
@@ -99,6 +107,7 @@ const StyledEditorGrid = cssStylesheet(css`
   :host {
     height: 100%;
     width: 100%;
-    display: blck;
+    display: block;
+    position: relative;
   }
 `);
