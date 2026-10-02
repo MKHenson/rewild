@@ -3,6 +3,11 @@
 // what survives the trip through the water, per channel; `fs_light` then adds
 // what the surface reflects and what the water scatters back.
 //
+// Both faces draw. From above the front faces shade; from below, with the
+// camera under the surface (under-water.wgsl), the back faces do: the view
+// leaves through Snell's window or reflects off the surface, back down into
+// the water.
+//
 // The surface is the FFT ocean (OceanFFT): each cascade's displacement moves
 // the grid, sampled at a mip the grid can hold, and each cascade's slopes
 // shade the pixel. A palette type weights the cascades, so a lake keeps only
@@ -21,6 +26,8 @@ const HAS_FOLIAGE_SHADING: bool = false;
 #include "./shader-lib/water-waves.wgsl"
 #include "./shader-lib/shore-waves.wgsl"
 #include "./shader-lib/water-surface.wgsl"
+#include "./shader-lib/under-water.wgsl"
+#include "./shader-lib/water-fog.wgsl"
 
 // Air to water at normal incidence.
 const WATER_F0: f32 = 0.02;
@@ -29,8 +36,13 @@ const WATER_F0: f32 = 0.02;
 // not read as infinitely deep.
 const MIN_PATH_NOV: f32 = 0.1;
 
-// Air over water's index of refraction.
+// Air over water's index of refraction, and water over air's.
 const AIR_TO_WATER: f32 = 0.75;
+const WATER_TO_AIR: f32 = 1.333;
+// Metres an in-water ray that meets nothing is taken to run.
+const ENDLESS_WATER: f32 = 1e4;
+// Share of the light foam passes down to a viewer below it.
+const FOAM_BELOW: f32 = 0.3;
 // Metres the refracted ray is followed down, at most, to find how far the
 // waves bend it on screen. Shallow water bends it less, so the offset fades
 // out at the shore.
@@ -129,6 +141,10 @@ const LAKE_FOAM_TEXTURE_LOW: f32 = 0.25;
 const LAKE_FOAM_TEXTURE_HIGH: f32 = 0.85;
 // Swash foam rides the sheet's edge while it runs up, over the sheet's last
 // SWASH_FOAM_EDGE metres of thickness, and thins as it drains.
+// The sine of the view ray's angle below level over which sheetThickness
+// hands over from the water map's depth to the capture's.
+const SHEET_GRAZING_LOW: f32 = 0.02;
+const SHEET_GRAZING_HIGH: f32 = 0.1;
 const SWASH_FOAM_EDGE: f32 = 0.06;
 const SWASH_FOAM_AMOUNT: f32 = 0.9;
 
@@ -200,6 +216,7 @@ struct VertexOutput {
 // shading draws only.
 @group(1) @binding(11) var foamMap : texture_2d<f32>;
 @group(1) @binding(12) var foamSampler : sampler;
+@group(1) @binding(13) var<uniform> underWater : UnderWater;
 @group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
@@ -275,7 +292,7 @@ fn lakeEdgeFoam(input: VertexOutput, water: WaterSample, foamShade: f32) -> f32 
   if (width <= 0.0 || strength <= 0.0) {
     return 0.0;
   }
-  let thickness = sheetThickness(input);
+  let thickness = sheetThickness(input, water.depth);
   let shallow = smoothstep(0.0, LAKE_FOAM_THIN, thickness) * (1.0 - smoothstep(0.0, width, thickness));
   let patches = mix(LAKE_FOAM_PATCHY, 1.0, smoothstep(-0.6, 0.6, shoreNoise(rest, LAKE_NOISE_CELL, LAKE_NOISE_CELLS, 6u).x));
   let bubbles = smoothstep(LAKE_FOAM_TEXTURE_LOW, LAKE_FOAM_TEXTURE_HIGH, foamShade);
@@ -286,25 +303,28 @@ fn lakeEdgeFoam(input: VertexOutput, water: WaterSample, foamShade: f32) -> f32 
 
 // Metres of water over the ground straight below the pixel, from the gap to
 // the scene behind in the refraction capture: the height texture is too coarse
-// for a sheet a few centimetres thick.
-fn sheetThickness(input: VertexOutput) -> f32 {
+// for a sheet a few centimetres thick. The gap is along the view ray, so near
+// level it says nothing of the depth below, and on the level ray itself it
+// reads zero; there the water map's `mapDepth` takes over.
+fn sheetThickness(input: VertexOutput, mapDepth: f32) -> f32 {
   let behind = textureLoad(refraction, vec2i(input.Position.xy), 0).a;
   let near = max(-input.viewPosition.z, 1e-4);
   let direction = normalize(input.viewPosition);
   let up = normalize(uniforms.normalMatrix * vec3f(0.0, 1.0, 0.0));
   let path = length(input.viewPosition) * max(behind / near - 1.0, 0.0);
-  return path * abs(dot(direction, up));
+  let steep = abs(dot(direction, up));
+  return mix(mapDepth, path * steep, smoothstep(SHEET_GRAZING_LOW, SHEET_GRAZING_HIGH, steep));
 }
 
 // Foam on the swash sheet's leading edge: all of it while the sheet runs up,
 // thinning as it drains. Lapping water has none; its foam is lakeEdgeFoam.
-fn swashFoam(input: VertexOutput, weights: vec4f) -> f32 {
+fn swashFoam(input: VertexOutput, weights: vec4f, depth: f32) -> f32 {
   let swash = sampleSwash(input.rest, weights);
   if (swash.runup <= 0.0) {
     return 0.0;
   }
   let draining = saturate((swash.cycle - SWASH_UPRUSH) / (1.0 - SWASH_UPRUSH));
-  let edge = 1.0 - smoothstep(0.0, SWASH_FOAM_EDGE, sheetThickness(input));
+  let edge = 1.0 - smoothstep(0.0, SWASH_FOAM_EDGE, sheetThickness(input, depth));
   let ocean = 1.0 - saturate(dot(waves.lakeTypes, weights));
   return edge * (1.0 - draining) * SWASH_FOAM_AMOUNT * ocean;
 }
@@ -398,7 +418,7 @@ fn oceanPixel(input: VertexOutput, water: WaterSample, footprint: Footprint) -> 
   out.normal = normalize(uniforms.normalMatrix * vec3f(-slopes.x, 1.0, -slopes.y));
   out.variance = (MSS_BASE + MSS_PER_WIND * waves.origin.z) * unresolved * scales[CASCADES - 1] * shade;
   out.coverage = foam;
-  out.shoreFoam = max(shore.foam, swashFoam(input, water.weights));
+  out.shoreFoam = max(shore.foam, swashFoam(input, water.weights, water.depth));
   out.shoreBreakup = shoreFoamBreakup(input.rest);
   out.foamTexture = foamTexture(input.rest, footprint);
   out.lakeFoam = lakeEdgeFoam(input, water, out.foamTexture);
@@ -452,11 +472,17 @@ fn vs(input: VertexInput) -> VertexOutput {
   return out;
 }
 
+// Whether a face is the side of the surface the camera is on: the top from
+// above, the underside from below.
+fn facesCamera(front: bool) -> bool {
+  return front != cameraInWater();
+}
+
 // Writes the nearest layer's depth, so the shading draws skip every layer the
 // waves fold behind it. Discards exactly where they do.
 @fragment
-fn fs_depth(input: VertexOutput) {
-  if (textureSample(surfaceMap, surfaceSampler, surfaceUV(input.uv)).b <= 0.0) {
+fn fs_depth(input: VertexOutput, @builtin(front_facing) front: bool) {
+  if (textureSample(surfaceMap, surfaceSampler, surfaceUV(input.uv)).b <= 0.0 || !facesCamera(front)) {
     discard;
   }
 }
@@ -530,6 +556,51 @@ fn refractedScene(input: VertexOutput, N: vec3f, depth: f32) -> vec3f {
   return select(own.rgb, behind.rgb, behind.a > -input.viewPosition.z);
 }
 
+// The far plane's distance, from the projection.
+fn farPlane() -> f32 {
+  return uniforms.projMatrix[3][2] / (uniforms.projMatrix[2][2] + 1.0);
+}
+
+// A view ray meeting the surface from below, whose normal there is N (up,
+// view space): where it leaves into the air through Snell's window, zero
+// outside it, and the share the surface reflects back into the water.
+struct FromBelow {
+  exit : vec3f,
+  mirror : vec3f,
+  fresnel : f32,
+}
+
+fn fromBelow(viewPosition: vec3f, N: vec3f) -> FromBelow {
+  let direction = normalize(viewPosition);
+  var out: FromBelow;
+  out.exit = refract(direction, -N, WATER_TO_AIR);
+  out.mirror = reflect(direction, -N);
+  let inside = dot(out.exit, out.exit) > 0.0;
+  out.fresnel = select(1.0, waterFresnel(saturate(dot(out.exit, N))), inside);
+  return out;
+}
+
+// The opaque scene above the water seen from below through Snell's window,
+// as refractedScene: the sample moves by how far the waves bend the ray from
+// where a flat surface would. w is 1 where the window shows the scene, 0
+// where it shows the sky.
+fn sceneAbove(input: VertexOutput, below: FromBelow) -> vec4f {
+  let size = vec2i(textureDimensions(refraction));
+  let pixel = vec2i(input.Position.xy);
+  let direction = normalize(input.viewPosition);
+  let up = normalize(uniforms.normalMatrix * vec3f(0.0, 1.0, 0.0));
+  let calm = refract(direction, -up, WATER_TO_AIR);
+  var shifted = pixel;
+  if (dot(calm, calm) > 0.0) {
+    let bent = screenUV(input.viewPosition + below.exit * REFRACTION_REACH);
+    let level = screenUV(input.viewPosition + calm * REFRACTION_REACH);
+    shifted = clamp(pixel + vec2i(round((bent - level) * vec2f(size))), vec2i(0), size - 1);
+  }
+  let behind = textureLoad(refraction, shifted, 0);
+  let scene = behind.a > -input.viewPosition.z && behind.a < farPlane() * 0.999;
+  return select(vec4f(0.0), vec4f(behind.rgb, 1.0), scene);
+}
+
 // What the absorb draw reads at this pixel, bright enough to read through the
 // exposure. View 1, three yes/no facts: red, the water map puts the ground
 // more than 1 m below the surface; green, the refraction capture puts the
@@ -551,7 +622,7 @@ fn refractionDebug(input: VertexOutput, water: WaterSample, NoV: f32, view: f32)
   let near = -input.viewPosition.z;
   let mapDeep = select(0.0, 1.0, water.depth > 1.0);
   let captureBehind = select(0.0, 1.0, behind > near + 0.5);
-  let captureDeep = select(0.0, 1.0, sheetThickness(input) > 1.0);
+  let captureDeep = select(0.0, 1.0, sheetThickness(input, water.depth) > 1.0);
   return vec3f(mapDeep, captureBehind, captureDeep) * 4.0;
 }
 
@@ -559,10 +630,10 @@ fn refractionDebug(input: VertexOutput, water: WaterSample, NoV: f32, view: f32)
 // that survives the trip through the water. Alpha is the coverage, so the
 // water's edge fades to the scene.
 @fragment
-fn fs_absorb(input: VertexOutput) -> @location(0) vec4f {
+fn fs_absorb(input: VertexOutput, @builtin(front_facing) front: bool) -> @location(0) vec4f {
   let footprint = pixelFootprint(input.rest);
   let water = sampleWater(input.uv);
-  if (water.coverage <= 0.0) {
+  if (water.coverage <= 0.0 || !facesCamera(front)) {
     discard;
   }
 
@@ -579,11 +650,18 @@ fn fs_absorb(input: VertexOutput) -> @location(0) vec4f {
   if (waves.origin.w > 0.5) {
     return vec4f(0.0, 0.0, 0.0, water.coverage);
   }
+  // From below, the scene above shows through Snell's window. The water
+  // between the camera and the surface is the fog's (waterFog.wgsl).
+  if (!front) {
+    let below = fromBelow(input.viewPosition, N);
+    let above = sceneAbove(input, below);
+    return vec4f(above.rgb * (1.0 - below.fresnel) * (1.0 - foam), water.coverage);
+  }
   return vec4f(refractedScene(input, N, water.depth) * passed, water.coverage);
 }
 
 @fragment
-fn fs_light(input: VertexOutput) -> @location(0) vec4f {
+fn fs_light(input: VertexOutput, @builtin(front_facing) front: bool) -> @location(0) vec4f {
   let footprint = pixelFootprint(input.rest);
   let water = sampleWater(input.uv);
 
@@ -641,7 +719,7 @@ fn fs_light(input: VertexOutput) -> @location(0) vec4f {
            * (1.0 - waterFresnel(NoV)) * (1.0 - foam) * (vec3f(1.0) - transmittance);
 
   // Last, so every shadow and cube sample above runs in uniform control flow.
-  if (water.coverage <= 0.0) {
+  if (water.coverage <= 0.0 || !facesCamera(front)) {
     discard;
   }
   if (waves.origin.w > 2.5) {
@@ -653,5 +731,28 @@ fn fs_light(input: VertexOutput) -> @location(0) vec4f {
   if (waves.origin.w > 0.5) {
     return vec4f(vec3f(saturate(ocean.coverage * FOAM_COVERAGE * water.foam)) * water.coverage, 1.0);
   }
+  if (!front) {
+    return vec4f(lightFromBelow(input, normal, foam) * water.coverage, 1.0);
+  }
   return vec4f((direct + indirect + glow) * water.coverage, 1.0);
+}
+
+// The surface seen from below: the sky through Snell's window where no scene
+// stands in front of it, the water below mirrored outside it, and the foam,
+// a dim layer lit by the light through it.
+fn lightFromBelow(input: VertexOutput, N: vec3f, foam: f32) -> vec3f {
+  let below = fromBelow(input.viewPosition, N);
+  let toWorld = mat3x3f(iblParams.viewToWorld[0].xyz, iblParams.viewToWorld[1].xyz, iblParams.viewToWorld[2].xyz);
+  // The cube holds irradiance over π.
+  let sky = textureSampleLevel(iblIrradianceMap, iblSampler, vec3f(0.0, 1.0, 0.0), 0.0).rgb * WATER_PI;
+  var window = vec3f(0.0);
+  if (below.fresnel < 1.0) {
+    let skySeen = textureSampleLevel(iblSpecularMap, iblSampler, toWorld * below.exit, 0.0).rgb;
+    window = skySeen * (1.0 - sceneAbove(input, below).w) * (1.0 - below.fresnel);
+  }
+  let bedBelow = cameraWaterDepth() + cameraBedBelow();
+  let mirror = waterInScatter(normalize(toWorld * below.mirror), 0.0, bedBelow, ENDLESS_WATER, sky) * below.fresnel;
+  let lit = (underWater.sun.rgb * underWater.sun.a + sky) / WATER_PI;
+  let foamLight = FOAM_ALBEDO * FOAM_BELOW * lit;
+  return mix((window + mirror) * iblParams.intensity, foamLight, foam);
 }

@@ -18,6 +18,7 @@
 const FAR_GROUND_MAX_DISTANCE: f32 = 1e6;
 
 #include "./atmosphere-uniforms.wgsl"
+#include "../shader-lib/under-water.wgsl"
 
 @group(0) @binding(0)
 var intermediateHDR: texture_2d<f32>;
@@ -34,6 +35,11 @@ var depthTexture: texture_depth_2d;
 @group(0) @binding(4)
 var godRaysTexture: texture_2d<f32>;
 
+// The water around the camera. Under it, the water's fog (waterFog.wgsl)
+// takes the place of the sky, clouds, air fog and god rays.
+@group(0) @binding(5)
+var<uniform> underWater: UnderWater;
+
 var<private> sunDotUp: f32;
 
 
@@ -42,6 +48,9 @@ var<private> sunDotUp: f32;
   ) -> @location(0) vec4f {
   // Define uv based on fragCoord
   let uv = fragCoord.xy / vec2(object.resolution);
+  if (cameraInWater()) {
+    return vec4f(0.0);
+  }
 
   // God rays carry HDR in-scattered radiance and are folded into the scene HDR
   // *before* ACES, so the tone curve's shoulder rolls off bright shafts and they

@@ -10,6 +10,7 @@
 //   - iblIrradianceMap, iblSampler and iblParams
 //   - brdf.wgsl, for BRDF_PI, and total-lighting.wgsl, for
 //     lightDistanceAttenuation
+//   - water-light.wgsl, for waterLightAt
 
 // How far the sun wraps past the terminator on a leaf, as a fraction of the
 // lobe. A blade is thin enough to be lit from well behind its own horizon, and
@@ -66,6 +67,8 @@ fn shadeFoliage(
 
   var direct = vec3f(0.0);
   var transmitted = vec3f(0.0);
+  // Under water the sun and sky reach the blade through it (water-light.wgsl).
+  let water = waterLightAt(viewPosition);
 
   // Every light type, through the same two lobes. A lamp aimed at a field is
   // the case the wrap and transmit terms exist for, so restricting this to the
@@ -88,7 +91,7 @@ fn shadeFoliage(
       // positionOrDirection is the direction the light travels, so the vector
       // toward it is its negation.
       L = normalize(-light.positionOrDirection);
-      radiance *= sunShadow;
+      radiance *= sunShadow * water.sun;
     } else {
       // Rejected on the square, so a light that does not reach this fragment
       // costs a dot and a compare rather than a sqrt. Every punctual light in
@@ -126,7 +129,7 @@ fn shadeFoliage(
   // why evaluateIbl multiplies the diffuse colour by it directly.
   let worldN = normalize((iblParams.viewToWorld * vec4f(N, 0.0)).xyz);
   let ambient = textureSampleLevel(iblIrradianceMap, iblSampler, worldN, 0.0).rgb
-              * FOLIAGE_AMBIENT;
+              * FOLIAGE_AMBIENT * water.sky;
 
   // Transmitted light is tinted by the blade it came through, so it takes the
   // albedo like the rest.

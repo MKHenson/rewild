@@ -145,6 +145,12 @@ export class WaterUniforms implements ISharedUniformBuffer {
         binding: 7,
         resource: renderer.terrainRenderer.shoreField.swashTexture.createView(),
       },
+      {
+        binding: 13,
+        resource: {
+          buffer: renderer.terrainRenderer.underWater.buffer(device),
+        },
+      },
     ];
     if (this.refracts) {
       this._refraction = renderer.refraction.texture;

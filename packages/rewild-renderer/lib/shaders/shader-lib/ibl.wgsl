@@ -46,6 +46,16 @@ struct IblParams {
    * first makes the curve see the raw value rather than crushing it to black.
    */
   debugScale: f32,
+  /**
+   * The water around the camera (UnderWater), for water-light.wgsl: x the
+   * world height of its level, y 1 while there is one.
+   */
+  water: vec4f,
+  /**
+   * rgb its extinction per metre; a the cosine from straight up of the sun
+   * refracted into it.
+   */
+  waterExtinction: vec4f,
 }
 
 /**

@@ -161,7 +161,9 @@ export class WaterPass implements IMaterialPass {
     const multisample = { count: renderer.sampleCount };
     const primitive: GPUPrimitiveState = {
       topology: 'triangle-list',
-      cullMode: 'back',
+      // Both faces: the underside is the surface seen from below. Each draw
+      // keeps the side the camera is on (water.wgsl facesCamera).
+      cullMode: 'none',
       frontFace: this.side,
     };
     // Shading only where the depth draw left the nearest layer. The position

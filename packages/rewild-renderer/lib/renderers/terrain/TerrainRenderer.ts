@@ -32,7 +32,9 @@ import { WaterWaveBuffer } from '../water/WaterWaves';
 import { waterDetailBias } from '../water/WaterQuality';
 import { OceanFFT } from '../water/OceanFFT';
 import { SeaSpray } from '../water/SeaSpray';
-import { WaterProbe } from '../water/WaterProbe';
+import { ProbeCopy, WaterProbe } from '../water/WaterProbe';
+import { UnderWater, UNDER_WATER_PROBE_OFFSET } from '../water/UnderWater';
+import { UnderWaterFog } from '../water/UnderWaterFog';
 import { WaterQuery, WaterQuerySource } from '../water/WaterQuery';
 import { WaterMap } from './WaterMap';
 import { shoreWaveHeight } from '../water/ShoreWaves';
@@ -170,6 +172,17 @@ export class TerrainRenderer implements WaterQuerySource {
   /** The water at a point for gameplay, with the drawn waves' height. */
   readonly waterQuery = new WaterQuery(this);
   private waterProbe: WaterProbe | null = null;
+  /** The water around the camera. Its uniform outlives the chunks, so the
+   *  passes that bind it are not rebuilt when the terrain resets. */
+  readonly underWater = new UnderWater();
+  private underWaterFog = new UnderWaterFog();
+  private toSun = new Float64Array(3);
+  private sunRadiance = new Float64Array(3);
+  private cameraProbeCopy: ProbeCopy = {
+    sourceOffset: 0,
+    target: null as unknown as GPUBuffer,
+    targetOffset: UNDER_WATER_PROBE_OFFSET,
+  };
   /** Whether the waves displace the water grid. Off leaves them shading only,
    *  to tell a geometry artefact from a shading one. */
   waterWaveGeometry = true;
@@ -966,7 +979,10 @@ export class TerrainRenderer implements WaterQuerySource {
   }
 
   update(renderer: Renderer, camera: Camera) {
-    if (!this._enabled) return;
+    if (!this._enabled) {
+      this.underWater.clear(renderer.device);
+      return;
+    }
     this.updateVisibility(renderer, camera);
     this.updateHorizonOcean(renderer);
     this.updateWaterWaves(renderer, camera);
@@ -1044,15 +1060,38 @@ export class TerrainRenderer implements WaterQuerySource {
       );
     const sun = renderer.sky.skyRenderer.sun;
     const radiance = sun.intensity;
+    this.sunRadiance[0] = sun.color.r * radiance;
+    this.sunRadiance[1] = sun.color.g * radiance;
+    this.sunRadiance[2] = sun.color.b * radiance;
     this.seaSpray.update(
       renderer.device,
       deltaSeconds,
       camera,
       wind,
-      [sun.color.r * radiance, sun.color.g * radiance, sun.color.b * radiance],
+      this.sunRadiance,
       this.seaLevel,
       (x, z) => this.sampleHeight(x, z)
     );
+
+    const toSun = this.toSun;
+    const sunAt = sun.transform.position;
+    const sunDistance = sunAt.length() || 1;
+    toSun[0] = sunAt.x / sunDistance;
+    toSun[1] = sunAt.y / sunDistance;
+    toSun[2] = sunAt.z / sunDistance;
+    const underWater = this.underWater;
+    underWater.update(
+      renderer.device,
+      this.waterQuery,
+      palette,
+      eye.x,
+      eye.y,
+      eye.z,
+      toSun,
+      this.sunRadiance
+    );
+    this.cameraProbeCopy.sourceOffset = underWater.probeResultOffset;
+    this.cameraProbeCopy.target = underWater.buffer(renderer.device);
 
     if (!this.waterProbe)
       this.waterProbe = new WaterProbe(
@@ -1066,7 +1105,19 @@ export class TerrainRenderer implements WaterQuerySource {
       renderer.device,
       this.waterQuery,
       waves.originX,
-      waves.originZ
+      waves.originZ,
+      underWater.possible ? this.cameraProbeCopy : undefined
+    );
+  }
+
+  /** Fogs the view in the water while the camera may be under it. Draws into
+   *  the atmosphere composite's `pass`, after the atmosphere. */
+  renderUnderWaterFog(renderer: Renderer, pass: GPURenderPassEncoder) {
+    if (!this._enabled || !this.underWater.possible) return;
+    this.underWaterFog.draw(
+      renderer,
+      pass,
+      this.underWater.buffer(renderer.device)
     );
   }
 
@@ -1076,6 +1127,7 @@ export class TerrainRenderer implements WaterQuerySource {
     encoder: GPUCommandEncoder,
     target: GPUTextureView
   ) {
+    if (this.underWater.submerged) return;
     this.seaSpray?.draw(renderer, encoder, target);
   }
 

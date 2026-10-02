@@ -7,6 +7,8 @@ import { NUM_CASCADES } from '../../renderers/shadow/DirectionalShadowRenderer';
 import { SKY_CUBE_MIP_COUNT } from '../../renderers/sky/SkyCubeCapture';
 
 const _tempMat = new Matrix4();
+// IblParams in ibl.wgsl.
+const IBL_FLOATS = 28;
 
 /**
  * Manages bind group 3 — the scene-wide resources a material pass shades with.
@@ -53,7 +55,8 @@ export class ShadowUniforms implements ISharedUniformBuffer {
   private boundShadowAtlas: GPUTexture | null = null;
   private boundIrradianceMap: GPUTexture | null = null;
 
-  /** viewToWorld (16) + intensity + maxSpecularMip + debugChannel + debugScale. */
+  /** viewToWorld (16) + intensity + maxSpecularMip + debugChannel + debugScale,
+   *  then water (4) and waterExtinction (4). */
   private iblData: Float32Array;
   /** Aliases iblData so debugChannel can be written as the u32 the shader reads. */
   private iblInts: Uint32Array;
@@ -70,7 +73,7 @@ export class ShadowUniforms implements ISharedUniformBuffer {
     this.spotData = new ArrayBuffer(80);
     this.spotFloats = new Float32Array(this.spotData);
     this.spotInts = new Uint32Array(this.spotData);
-    this.iblData = new Float32Array(20);
+    this.iblData = new Float32Array(IBL_FLOATS);
     this.iblInts = new Uint32Array(this.iblData.buffer);
   }
 
@@ -159,7 +162,7 @@ export class ShadowUniforms implements ISharedUniformBuffer {
     if (this.includeIbl) {
       this.iblBuffer = device.createBuffer({
         label: 'ibl params',
-        size: 80,
+        size: IBL_FLOATS * 4,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
 
@@ -229,6 +232,13 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       this.iblInts[18] = renderer.materialDebugChannel;
       const exposure = camera.exposure;
       this.iblData[19] = exposure > 1e-6 ? 1 / exposure : 1;
+      const underWater = renderer.terrainRenderer.underWater;
+      this.iblData[20] = underWater.sample.level;
+      this.iblData[21] = underWater.covered ? 1 : 0;
+      this.iblData[24] = underWater.extinction[0];
+      this.iblData[25] = underWater.extinction[1];
+      this.iblData[26] = underWater.extinction[2];
+      this.iblData[27] = underWater.sunCosine;
       device.queue.writeBuffer(this.iblBuffer, 0, this.iblData.buffer);
     }
 

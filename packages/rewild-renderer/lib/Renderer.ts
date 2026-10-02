@@ -1053,6 +1053,7 @@ export class Renderer {
         this.sky.transform.matrixWorld
       );
       this.sky.render(this, postProcessingPass, camera.camera);
+      this.terrainRenderer.renderUnderWaterFog(this, postProcessingPass);
       postProcessingPass.end();
 
       // Spray fogs itself, so it draws over the composite, not under it.

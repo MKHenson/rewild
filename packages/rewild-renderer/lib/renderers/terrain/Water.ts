@@ -14,6 +14,11 @@ export interface WaterType {
   name: typeof OCEAN_WATER | typeof LAKE_WATER;
   // Linear colour of light scattered back out of deep water.
   scatter: Rgb;
+  // Linear colour the water glows with seen from inside it, lit by the sun and
+  // the sky: the share of the light it scatters, counting the many bounces
+  // that `scatter`, seen from above, leaves to the reflection. The fog under
+  // water (water-fog.wgsl) takes it.
+  inScatter: Rgb;
   // Beer-Lambert absorption per metre, per channel. Tints the bed with depth.
   absorption: Rgb;
   // Extinction per metre from suspended sediment, the same on every channel.
@@ -47,6 +52,7 @@ export const MAX_WATER_TYPES = 4;
 export const OCEAN: WaterType = {
   name: OCEAN_WATER,
   scatter: [0.003, 0.018, 0.04],
+  inScatter: [0.01, 0.06, 0.13],
   absorption: [0.45, 0.07, 0.03],
   turbidity: 0.04,
   waveResponse: 1,
@@ -64,6 +70,7 @@ export const OCEAN: WaterType = {
 export const LAKE: WaterType = {
   name: LAKE_WATER,
   scatter: [0.02, 0.03, 0.015],
+  inScatter: [0.05, 0.07, 0.03],
   absorption: [0.35, 0.25, 0.5],
   turbidity: 0.4,
   waveResponse: 0.6,
@@ -79,6 +86,7 @@ export const LAKE: WaterType = {
 export const TROPICAL_OCEAN: WaterType = {
   ...OCEAN,
   scatter: [0.004, 0.03, 0.06],
+  inScatter: [0.02, 0.12, 0.18],
   absorption: [0.4, 0.05, 0.04],
   turbidity: 0.02,
 };
@@ -87,6 +95,7 @@ export const TROPICAL_OCEAN: WaterType = {
 export const SILTY_LAKE: WaterType = {
   ...LAKE,
   scatter: [0.05, 0.045, 0.03],
+  inScatter: [0.12, 0.11, 0.07],
   absorption: [0.3, 0.3, 0.4],
   turbidity: 0.9,
 };
@@ -121,10 +130,10 @@ export function validateWaterPalette(climate: ClimateConfig): void {
       throw new Error(`Climate names water type '${type.name}' twice.`);
     seen.add(type.name);
 
-    const colours = [...type.scatter, ...type.absorption];
+    const colours = [...type.scatter, ...type.inScatter, ...type.absorption];
     if (colours.some((c) => !(c >= 0)))
       throw new Error(
-        `Water type '${type.name}' scatter and absorption must not be negative.`
+        `Water type '${type.name}' scatter, in-scatter and absorption must not be negative.`
       );
     if (!(type.turbidity >= 0))
       throw new Error(

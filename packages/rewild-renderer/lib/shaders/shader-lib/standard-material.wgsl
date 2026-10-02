@@ -14,7 +14,7 @@
 //   - mySampler, baseColorMap, normalMap, metallicRoughnessMap, occlusionMap,
 //     emissiveMap, heightMap, and the standardParams uniform block
 //   - brdf.wgsl, pbr-lighting.wgsl, tbn.frag.wgsl, parallax.frag.wgsl,
-//     ibl.wgsl and foliage-lighting.wgsl, which this calls into, plus the IBL
+//     ibl.wgsl, foliage-lighting.wgsl and water-light.wgsl, which this calls into, plus the IBL
 //     bindings ibl.wgsl names
 //   - the `lighting` storage binding those two need, and spotLightShadowParams,
 //     which says which light in it the spot atlas belongs to
@@ -242,7 +242,9 @@ fn shadeStandardSurface(
 
   // Shadows attenuate diffuse and specular together — a blocked light delivers
   // neither.
-  let direct = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow
+  // Under water the sun and sky reach the surface through it (water-light.wgsl).
+  let water = waterLightAt(viewPosition);
+  let direct = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow * water.sun
              + lit.punctualDiffuse + lit.punctualSpecular
              + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadow;
   var color = direct;
@@ -252,7 +254,7 @@ fn shadeStandardSurface(
   // black in shadow, and it is the specular half — a real reflection of a real
   // sky — that fixes that. Perceptual roughness rather than surface.alpha,
   // because that is what the prefiltered chain and the BRDF map are indexed by.
-  let indirect = evaluateIbl(surface, roughness) * occlusion;
+  let indirect = evaluateIbl(surface, roughness) * occlusion * water.sky;
   color += indirect;
 
   let emissiveSample = textureSample(emissiveMap, mySampler, uv).rgb;
