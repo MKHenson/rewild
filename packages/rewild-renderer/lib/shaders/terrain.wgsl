@@ -73,6 +73,10 @@ struct TerrainLayer {
   macroNormalYSign: f32,
   // Macro-normal amplitude: 0 flat, 1 the source map's full tilt.
   macroStrength   : f32,
+  // View distance in metres over which the macro normal replaces the detail
+  // normal. macroFadeEnd 0 ⇒ the global detailFadeStart/detailFadeEnd.
+  macroFadeStart  : f32,
+  macroFadeEnd    : f32,
 }
 
 struct TerrainParams {
@@ -90,16 +94,17 @@ struct TerrainParams {
   // the same units the horizontal axes use, so a layer's uvScale tiles a cliff
   // at the rate it tiles the ground. 0 disables the side projection.
   uvPerMetre      : f32,
-  // Packed TerrainLayer, three vec4f per splat channel (SPLAT_SLOTS channels):
-  //   [slot*3    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
-  //   [slot*3 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
-  //   [slot*3 + 2] = (macroLayerIndex, macroNormalYSign, macroStrength, _pad)
+  // Packed TerrainLayer, four vec4f per splat channel (SPLAT_SLOTS channels):
+  //   [slot*4    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
+  //   [slot*4 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
+  //   [slot*4 + 2] = (macroLayerIndex, macroNormalYSign, macroStrength, _pad)
+  //   [slot*4 + 3] = (macroFadeStart, macroFadeEnd, _pad, _pad)
   // vec4f rather than array<TerrainLayer, N> because a uniform array's element
   // stride must be a multiple of 16 — a vec4f guarantees that, whereas a struct
   // depends on alignment rules that are easy to get subtly wrong. The spare
-  // lane in the third vec4 is where the next per-layer parameter goes.
+  // lanes are where the next per-layer parameters go.
   // Unpack through getLayer().
-  layers          : array<vec4f, 24>,
+  layers          : array<vec4f, 32>,
   // The chunk's water map: x the height its levels are relative to, in the
   // chunk's space; y its texels per side, 0 for a chunk without one; zw the
   // chunk's centre in world xz.
@@ -214,16 +219,17 @@ const POM_REFINE_STEPS: i32 = ${ POM_REFINE_STEPS };
 const POM_MIN_VIEW_Z: f32 = 0.6;
 
 // Splat channels the palette can address, across the two splat textures. Must
-// match MAX_SPLAT_LAYERS (Biomes.ts) and the `layers` array above (3 vec4f
+// match MAX_SPLAT_LAYERS (Biomes.ts) and the `layers` array above (4 vec4f
 // each). Raising it costs nothing per fragment beyond the extra weight compares:
 // every channel below WEIGHT_EPSILON skips its whole sample block.
 const SPLAT_SLOTS: u32 = 8u;
 
 fn getLayer(slot: u32) -> TerrainLayer {
-  let a = terrainParams.layers[slot * 3u];
-  let b = terrainParams.layers[slot * 3u + 1u];
-  let c = terrainParams.layers[slot * 3u + 2u];
-  return TerrainLayer(a.x, a.y, a.z, a.w, b.x, b.y, b.z, b.w, c.x, c.y, c.z);
+  let a = terrainParams.layers[slot * 4u];
+  let b = terrainParams.layers[slot * 4u + 1u];
+  let c = terrainParams.layers[slot * 4u + 2u];
+  let d = terrainParams.layers[slot * 4u + 3u];
+  return TerrainLayer(a.x, a.y, a.z, a.w, b.x, b.y, b.z, b.w, c.x, c.y, c.z, d.x, d.y);
 }
 
 // Decodes a normal map sample from [0,1] to [-1,1] and resolves its green-
@@ -809,11 +815,19 @@ fn fs(
       finalColor = mix(layerColor, mix(sideColA, sideColB, sideBlend), sideWeight);
     }
 
+    // Detail-to-macro normal crossfade: the material's own range when it sets
+    // one, else the tier's. Parallax keeps the tier's detailFade regardless.
+    let normalFade = select(
+      detailFade,
+      1.0 - smoothstep(layer.macroFadeStart, layer.macroFadeEnd, viewDistance),
+      layer.macroFadeEnd > 0.0
+    );
+
     // Skipped only where the crossfade below would discard it anyway: past the
-    // fade, detailFade is 0 and the macro normal stands alone. A layer with no
+    // fade, normalFade is 0 and the macro normal stands alone. A layer with no
     // macro normal has no stand-in — its fallback is a flat tangent normal,
     // uniform full diffuse — so it keeps its detail map at every distance.
-    let wantsDetailNormal = detailFade > 0.0 || layer.macroUvScale <= 0.0;
+    let wantsDetailNormal = normalFade > 0.0 || layer.macroUvScale <= 0.0;
 
     var detailNormal = vec3f(0.0, 0.0, 1.0);
     if (wantsDetailNormal) {
@@ -947,7 +961,7 @@ fn fs(
       // face — and the face renders black. normalize() bounds length, not tilt.
       layerNormal = select(
         macroNormal,
-        normalize(mix(macroNormal, detailNormal, detailFade)),
+        normalize(mix(macroNormal, detailNormal, normalFade)),
         wantsDetailNormal
       );
     }

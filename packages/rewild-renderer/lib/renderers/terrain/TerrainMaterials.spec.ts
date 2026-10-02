@@ -166,6 +166,44 @@ describe('validateTerrainMaterials', () => {
     };
     expect(() => validateTerrainMaterials()).toThrow(/must not be negative/);
   });
+
+  it('accepts a macro fade range', () => {
+    TERRAIN_MATERIALS['broken'] = {
+      ...VALID,
+      macroUvScale: 2,
+      macroFadeStart: 20,
+      macroFadeEnd: 60,
+    };
+    expect(() => validateTerrainMaterials()).not.toThrow();
+  });
+
+  it('rejects a macro fade without a macroUvScale', () => {
+    TERRAIN_MATERIALS['broken'] = {
+      ...VALID,
+      macroFadeStart: 20,
+      macroFadeEnd: 60,
+    };
+    expect(() => validateTerrainMaterials()).toThrow(/without macroUvScale/);
+  });
+
+  it('rejects a macro fade with only one end set', () => {
+    TERRAIN_MATERIALS['broken'] = {
+      ...VALID,
+      macroUvScale: 2,
+      macroFadeStart: 20,
+    };
+    expect(() => validateTerrainMaterials()).toThrow(/both macroFadeStart/);
+  });
+
+  it('rejects a macro fade that ends before it starts', () => {
+    TERRAIN_MATERIALS['broken'] = {
+      ...VALID,
+      macroUvScale: 2,
+      macroFadeStart: 60,
+      macroFadeEnd: 20,
+    };
+    expect(() => validateTerrainMaterials()).toThrow(/macroFadeStart < macroFadeEnd/);
+  });
 });
 
 describe('getClimatePalette', () => {
