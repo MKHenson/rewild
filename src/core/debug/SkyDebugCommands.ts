@@ -7,6 +7,16 @@ export function registerSkyDebugCommands(renderer: Renderer) {
     renderer.sky.skyRenderer.triggerLightning(pos);
   };
 
+  (window as any).setLightningFlash = (override = {}) => {
+    const flash = renderer.sky.skyRenderer.flash;
+    flash.settings = { ...flash.settings, ...override };
+    console.log(
+      'setLightningFlash — the flash is now',
+      flash.settings,
+      '\nKeys: light, radiance of the light from the bolt (the sun is 120); sky, radiance of the lit cloud deck (a clear day is about 7); glare, over the screen with the bolt ahead (0 none); linger, scale on how long the flicker lasts (1 about a second). triggerLightning([x, y, z]) to see it.'
+    );
+  };
+
   (window as any).toggleCloudShadowDebug = () => {
     const config = renderer.sky.skyRenderer.cloudShadowRenderer.config;
     console.log(
@@ -91,6 +101,25 @@ export function registerSkyDebugCommands(renderer: Renderer) {
         `${prefilter.schedule.stepsPerFrame} step(s)/frame, ` +
         `${prefilter.schedule.isRunning ? 'running' : 'idle'}, ` +
         `next step ${prefilter.schedule.nextStep}`
+    );
+  };
+
+  (window as any).setRainWetness = (override = {}) => {
+    const wetness = renderer.sky.skyRenderer.rainWetness;
+    wetness.settings = { ...wetness.settings, ...override };
+    console.log(
+      'setRainWetness — rain wetness is now',
+      wetness.settings,
+      '\nKeys: soakIn and soakOut, seconds by e for the ground to soak up rain and to dry; filmIn and filmOut, the same for the glossy film on top; strength, scale on both (0 dry).'
+    );
+  };
+
+  (window as any).holdRainWetness = (value: number | null = 1) => {
+    renderer.sky.skyRenderer.rainWetness.override = value;
+    console.log(
+      value === null
+        ? 'holdRainWetness(null) — wetness follows the weather again.'
+        : `holdRainWetness(${value}) — every surface held at ${value} wet, whatever the weather. holdRainWetness(null) to let go.`
     );
   };
 }

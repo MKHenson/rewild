@@ -35,6 +35,7 @@ const HAS_FOLIAGE_NORMAL_MAP: bool = ${ HAS_FOLIAGE_NORMAL_MAP };
 #include "./shader-lib/parallax.frag.wgsl"
 #include "./shader-lib/ibl.wgsl"
 #include "./shader-lib/water-light.wgsl"
+#include "./shader-lib/rain-wet.wgsl"
 #include "./shader-lib/caustics.wgsl"
 #include "./shader-lib/material-debug.wgsl"
 #include "./shader-lib/foliage-lighting.wgsl"

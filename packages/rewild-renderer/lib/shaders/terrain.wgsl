@@ -33,6 +33,7 @@ const HAS_TERRAIN_NO_TILE: bool = ${ HAS_TERRAIN_NO_TILE };
 #include "./shader-lib/water-waves.wgsl"
 #include "./shader-lib/shore-waves.wgsl"
 #include "./shader-lib/caustics.wgsl"
+#include "./shader-lib/rain-wet.wgsl"
 
 struct Uniforms {
   normalMatrix: mat3x3f,
@@ -1103,6 +1104,9 @@ fn fs(
   blendedColor *= mix(1.0, WET_DARKEN, wet.damp) * mix(1.0, SOAK_DARKEN, wet.soak);
   shadingRoughness = mix(shadingRoughness, min(shadingRoughness, WET_ROUGHNESS), WET_GLOSS * wet.damp);
   shadingRoughness = mix(shadingRoughness, FILM_ROUGHNESS, wet.sheen);
+  let rain = rainWet(blendedColor, shadingRoughness, 0.0, normalize(objectNormal).y, max(wet.damp, wet.soak));
+  blendedColor = rain.color;
+  shadingRoughness = rain.roughness;
 
   // One TBN for every layer: perturbNormal derives its basis from screen-space
   // derivatives, and that basis is invariant under uniform UV scaling (the
@@ -1131,8 +1135,10 @@ fn fs(
   #include "./shader-lib/spot-light-shadow.frag.wgsl"
 
   var surface: PbrSurface;
-  surface.normal = normalizedNormal;
-  surface.specularNormal = normalizedNormal;
+  // Raindrops ring the film on top (rain-wet.wgsl).
+  let patter = rainPatter(normalizedNormal, viewPosition, iblParams.rain.y);
+  surface.normal = patter.normal;
+  surface.specularNormal = patter.normal;
   // parallaxN is the mesh normal before any map tilts it — the surface the
   // triangle actually has, which is what horizon occlusion needs.
   surface.geometricNormal = parallaxN;
@@ -1140,7 +1146,7 @@ fn fs(
   // Metallic is pinned at 0: every material in the palette is a dielectric, so
   // the diffuse colour is the albedo and F0 is glTF's fixed 4%. If a metallic
   // terrain material ever exists, this is where the ARM map's B channel goes.
-  surface.diffuseColor = diffuseColorFromBaseColor(blendedColor, 0.0);
+  surface.diffuseColor = diffuseColorFromBaseColor(blendedColor * rainGlint(patter.crest), 0.0);
   surface.f0 = f0FromBaseColor(blendedColor, 0.0);
   surface.alpha = perceptualRoughnessToAlpha(shadingRoughness);
 

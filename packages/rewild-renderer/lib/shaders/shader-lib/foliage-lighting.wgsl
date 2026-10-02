@@ -11,6 +11,7 @@
 //   - brdf.wgsl, for BRDF_PI, and total-lighting.wgsl, for
 //     lightDistanceAttenuation
 //   - water-light.wgsl, for waterLightAt
+//   - rain-wet.wgsl, for rainLeaf
 
 // How far the sun wraps past the terminator on a leaf, as a fraction of the
 // lobe. A blade is thin enough to be lit from well behind its own horizon, and
@@ -92,6 +93,9 @@ fn shadeFoliage(
       // toward it is its negation.
       L = normalize(-light.positionOrDirection);
       radiance *= sunShadow * water.sun;
+    } else if (light.lightType == 3.0) {
+      L = normalize(-light.positionOrDirection);
+      radiance *= water.sun;
     } else {
       // Rejected on the square, so a light that does not reach this fragment
       // costs a dot and a compare rather than a sqrt. Every punctual light in
@@ -128,10 +132,10 @@ fn shadeFoliage(
   // No 1/pi here: the irradiance cube already holds irradiance/pi, which is
   // why evaluateIbl multiplies the diffuse colour by it directly.
   let worldN = normalize((iblParams.viewToWorld * vec4f(N, 0.0)).xyz);
-  let ambient = textureSampleLevel(iblIrradianceMap, iblSampler, worldN, 0.0).rgb
+  let ambient = (textureSampleLevel(iblIrradianceMap, iblSampler, worldN, 0.0).rgb + flashIrradiance(worldN))
               * FOLIAGE_AMBIENT * water.sky;
 
   // Transmitted light is tinted by the blade it came through, so it takes the
   // albedo like the rest.
-  return vec4f(albedo * (direct + ambient + transmitted), 1.0);
+  return vec4f(albedo * rainLeaf() * (direct + ambient + transmitted), 1.0);
 }

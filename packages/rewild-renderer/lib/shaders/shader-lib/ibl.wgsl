@@ -56,6 +56,34 @@ struct IblParams {
    * refracted into it.
    */
   waterExtinction: vec4f,
+  /**
+   * How wet the rain has left the world (RainWetness), for rain-wet.wgsl: x
+   * the soak, y the film on top, both 0..1.
+   */
+  rain: vec4f,
+  /**
+   * rgb: the radiance of the cloud deck a lightning flash lights up
+   * (LightningFlash), over the upper half of the sky. The sky cubes are
+   * captured too slowly to catch a flash, so it is added on top of them.
+   */
+  flash: vec4f,
+  /**
+   * Raindrops landing (rain-wet.wgsl): x how hard rain falls now, 0..1, 0
+   * where the quality tier turns them off; y layers of drops, 1 or 2; z
+   * seconds on a looping clock.
+   */
+  rainPatter: vec4f,
+}
+
+// What a lightning flash adds to the irradiance cube along world normal `N`:
+// a bright upper hemisphere, as the cube holds it, irradiance over pi.
+fn flashIrradiance(N: vec3f) -> vec3f {
+  return iblParams.flash.rgb * saturate(0.5 + 0.5 * N.y);
+}
+
+// What a lightning flash adds to the sky seen along world direction `R`.
+fn flashRadiance(R: vec3f) -> vec3f {
+  return iblParams.flash.rgb * smoothstep(-0.05, 0.15, R.y);
 }
 
 /**
@@ -101,13 +129,15 @@ fn evaluateIblTerms(surface: PbrSurface, perceptualRoughness: f32) -> IblTerms {
   // The irradiance cube already holds irradiance/pi, so it multiplies the
   // diffuse colour directly — no further division, and no cosine, both having
   // been folded in by the cosine-weighted convolution that produced it.
-  let irradiance = textureSampleLevel(iblIrradianceMap, iblSampler, worldN, 0.0).rgb;
+  let irradiance = textureSampleLevel(iblIrradianceMap, iblSampler, worldN, 0.0).rgb
+                 + flashIrradiance(worldN);
   // Roughness maps linearly onto the chain, matching how the prefilter assigned
   // roughness to each level (mip m holds m / maxSpecularMip). Sampled with an
   // explicit level so the hardware's own derivative-based choice, which would
   // be meaningless for a direction vector, never enters into it.
   let lod = clamp(perceptualRoughness, 0.0, 1.0) * iblParams.maxSpecularMip;
-  let prefiltered = textureSampleLevel(iblSpecularMap, iblSampler, worldR, lod).rgb;
+  let prefiltered = textureSampleLevel(iblSpecularMap, iblSampler, worldR, lod).rgb
+                  + flashRadiance(worldR);
 
   // The split sum's second factor: scale and bias for F0, integrated over the
   // BRDF alone. Convention fixed by iblBrdfLut.wgsl — x is NdotV, y is

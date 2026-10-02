@@ -61,6 +61,8 @@ A GPU compute + render particle system managing **50,000 particles**. Not a scre
 
 `SkyRenderer` calls `rainPass.simulate()` then `rainPass.render()` each frame, passing current wind, precipitation, and camera data via the `RainParticleParams` struct.
 
+**Wet surfaces** (`RainWetness`): rain darkens porous surfaces and glosses level ones, building while it falls and drying after. `SkyRenderer.rainWetness` carries it to every lit material through `IblParams.rain`. See [Rain on surfaces](./milestones/pelagic.md#rain-on-surfaces).
+
 ---
 
 ## Lightning (LightningController + LightningBoltPass)
@@ -81,7 +83,7 @@ The bolt path is generated via **fractal subdivision** (4 levels, 2–3 branches
 
 Key output via `currentStrike: LightningStrike`:
 
-- `flashIntensity` — drives screen flash and directional light
+- `flashIntensity` — drives the flash's light (`LightningFlash`) and the clouds' glow
 - `boltVisible` — whether the bolt geometry pass should run
 - `boltPath` / `boltBranches` — world-space point arrays for rendering
 
@@ -91,10 +93,15 @@ Converts the `LightningStrike` path arrays into billboard triangle strips and re
 
 ### Flash Effects
 
-`SkyRenderer` feeds `flashIntensity` into two places each frame:
+`SkyRenderer.flash` (`LightningFlash`) turns `flashIntensity` into light on the world each frame.
 
-1. The sky uniform's `lightningFlash` field — used in `atmosphereFinal.wgsl` for a screen-space vignette flash
-2. The public getter `lightningFlashIntensity`
+**Flicker.** A flash is several strokes down one channel, so its light pulses rather than blinking once. When the strike's flash begins, `LightningFlash` lays out one to four strokes: the first at full strength, each later one 0.06 to 0.2 s after the last at 35% to 90% of it. A stroke rises in about 12 ms and falls by e every 70 ms. Under them the clouds hold an afterglow at 22% of the first stroke, fading by e every 0.35 s, so the light lingers for about a second (`flickerLight`). The light, the sky, the glare, the clouds' own glow and the composite all follow it.
+
+1. **Light from the bolt.** A directional light from the strike toward the camera, in a cool white, 60 at a full flash (the sun is 120). It is light type 3: directional, but the sun's cloud and cascade shadows do not fall on it, as they point the sun's way. Faces turned to the bolt light up, and wet ground glints. It is hidden between strikes, so it costs nothing then.
+2. **The lit cloud deck.** The clouds' own glow (`lightningBoost` in the sky uniform), and a radiance of 12 over the upper half of the sky added to every material's ambient and reflections (`IblParams.flash`, `flashIrradiance` and `flashRadiance` in `ibl.wgsl`). The sky cubes are captured too slowly to catch a flash, so it is added on top of them.
+3. **Glare.** A little white over the screen after the tone curve, as the eye is dazzled: 0.15 at a full flash with the bolt straight ahead, none with it abeam or behind.
+
+`setLightningFlash({ light, sky, glare, linger })` tunes them in the console, `linger` stretching the flicker (2 lasts twice as long); `triggerLightning([x, y, z])` fires a strike.
 
 ---
 
@@ -105,7 +112,7 @@ Cloud Shadow Map
     → Temporal Clouds (TemporalCloudRenderer)
     → Atmosphere / Sky Gradient (overcast applied)
     → Blur → Bloom → God Rays → Bilateral Filter
-    → Final Composite (flash applied)
+    → Final Composite
     → Lightning Bolt   ← postRender, skipped between strikes
     → Rain Particles   ← postRender, sits in front of bolt
 ```

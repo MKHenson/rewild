@@ -19,6 +19,7 @@ const HAS_FOLIAGE_SHADING: bool = false;
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
 #include "./shader-lib/ibl.wgsl"
+#include "./shader-lib/rain-wet.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"
 #include "./shader-lib/directional-shadow.wgsl"
@@ -668,8 +669,11 @@ fn fs_light(input: VertexOutput, @builtin(front_facing) front: bool) -> @locatio
 
   let viewPosition = input.viewPosition;
   let ocean = oceanPixel(input, water, footprint);
-  let normal = ocean.normal;
-  let foam = waterFoam(ocean, footprint.size, water);
+  // Raindrops ring the open water, their crests a faint foam. Only this
+  // draw binds the rain.
+  let patter = rainPatter(ocean.normal, viewPosition, 1.0);
+  let normal = patter.normal;
+  let foam = max(waterFoam(ocean, footprint.size, water), patter.crest * RAIN_RING_FOAM);
   // The unresolved slopes spread the microfacets: α² grows by their variance,
   // so the highlight they would have made widens rather than aliases.
   let waterAlpha = sqrt(min(pow(perceptualRoughnessToAlpha(params.roughness), 2.0) + ocean.variance, 1.0));

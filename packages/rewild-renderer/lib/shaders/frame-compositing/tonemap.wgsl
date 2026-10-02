@@ -60,11 +60,11 @@ struct VSOut {
 
   var color = tonemapACES(uniforms.exposure * (sceneHDR + bloom * uniforms.bloomScale));
 
-  // Lightning screen flash: brightest at centre, dimmed at edges. Applied after
-  // the curve, as it did when it lived in the sky composite — it represents the
-  // eye being overwhelmed, not extra scene radiance.
+  // Lightning glare (LightningFlash): brightest at centre, dimmed at edges.
+  // The flash lights the scene itself; this is only the eye dazzled by a bolt
+  // in view, so it is applied after the curve.
   let flashVignette = 1.0 - smoothstep(0.3, 1.0, length(uv - vec2f(0.5, 0.5)));
-  color += uniforms.lightningFlash * 0.7 * (0.6 + flashVignette * 0.4);
+  color += uniforms.lightningFlash * (0.6 + flashVignette * 0.4);
 
   // Half an LSB of triangular noise. ACES compresses a night sky into a handful
   // of 8-bit levels, and a smooth gradient across so few steps reads as contour

@@ -30,6 +30,8 @@ import {
 import { LightningController } from './LightningController';
 import { LightningBoltPass } from '../../post-processes/LightningBoltPass';
 import type { LightningStrike } from './LightningController';
+import { RainWetness, rainShare } from './RainWetness';
+import { LightningFlash } from './LightningFlash';
 
 /** How much brighter the fully-cold, fully-desaturated colour reads. 1.0 = plain
  *  grey; above that it lifts toward a pale white-out. Mirrors COLD_LIFT in
@@ -69,6 +71,8 @@ export class SkyRenderer {
   godRaysPass: GodRaysPostProcess;
   rainPass: RainParticlePass;
   lightning: LightningController;
+  /** The light a lightning flash throws on the world. */
+  flash: LightningFlash;
   lightningBoltPass: LightningBoltPass;
   starfieldRenderer: StarfieldRenderer;
   cloudShadowRenderer: CloudShadowRenderer;
@@ -124,6 +128,8 @@ export class SkyRenderer {
   precipitation: number = 0.0;
   temperature: number = 0.5;
   lightningFlash: number = 0.0;
+  /** How wet the rain has left every lit surface. */
+  readonly rainWetness = new RainWetness();
 
   private pendingBoltStrike: LightningStrike | null = null;
   private lastCameraPos: [number, number, number] = [0, 0, 0];
@@ -158,6 +164,7 @@ export class SkyRenderer {
     this.sun = new DirectionLight();
     this.sun.intensity = this.baseSunIntensity;
     parent.addChild(this.sun.transform);
+    this.flash = new LightningFlash(parent);
     this.requiresRebuild = true;
 
     this._dayColor = new Color(1, 1, 1);
@@ -337,6 +344,10 @@ export class SkyRenderer {
 
   update(renderer: Renderer, camera: Camera, width: number, height: number) {
     if (this.dayNightCycle) this.elevation += renderer.delta * 0.002;
+    this.rainWetness.update(
+      rainShare(this.precipitation, this.temperature),
+      renderer.delta / 1000
+    );
 
     const phi = degToRad(90 - this.elevation);
     const theta = degToRad(this.azimuth);
@@ -488,11 +499,25 @@ export class SkyRenderer {
       cfwdZ
     );
 
+    // The flash flickers on after the strike's flash (LightningFlash); the
+    // clouds' glow and the composite follow the flicker.
+    const eye = camera.transform.position;
+    this.flash.update(
+      renderer.delta / 1000,
+      strike.flashIntensity,
+      this.lightning.strikePosition,
+      eye.x,
+      eye.y,
+      eye.z,
+      cfwdX,
+      cfwdZ
+    );
+
     // lightningBoost drives cloud ambient flash (float index 42)
-    uniformData[42] = strike.flashIntensity * 0.6;
+    uniformData[42] = this.flash.intensity * 0.6;
 
     // lightningFlash is read by SkyCompositePass.setupFinalPassUniforms
-    this.lightningFlash = strike.flashIntensity;
+    this.lightningFlash = this.flash.intensity;
 
     this.lastCameraPos[0] = camera.transform.position.x;
     this.lastCameraPos[1] = camera.transform.position.y;
