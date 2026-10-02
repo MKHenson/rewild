@@ -28,6 +28,7 @@ const HAS_FOLIAGE_SHADING: bool = false;
 #include "./shader-lib/pbr-lighting.wgsl"
 #include "./shader-lib/ibl.wgsl"
 #include "./shader-lib/water-light.wgsl"
+#include "./shader-lib/caustics.wgsl"
 #include "./shader-lib/foliage-lighting.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"
@@ -108,6 +109,9 @@ struct VertexOutput {
 @group(3) @binding(9) var iblBrdfLut: texture_2d<f32>;
 @group(3) @binding(10) var iblSampler: sampler;
 @group(3) @binding(11) var<uniform> iblParams: IblParams;
+@group(3) @binding(12) var causticsMap: texture_2d<f32>;
+@group(3) @binding(13) var causticsSampler: sampler;
+@group(3) @binding(14) var<uniform> caustics: CausticsParams;
 
 fn rotateByQuat(q: vec4f, v: vec3f) -> vec3f {
   let t = 2.0 * cross(q.xyz, v);

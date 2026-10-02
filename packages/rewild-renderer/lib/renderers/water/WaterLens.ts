@@ -11,9 +11,11 @@ import { gustField, gustShare } from '../sky/GustField';
 
 /** How water on the lens blurs the view. */
 export interface LensBlurSettings {
-  /** Blur radius over the frame's height where the lens is in water. Goggles
-   *  turn it down; 0 is clear. */
+  /** Blur radius over the frame's height where the lens is in water, in a
+   *  calm. Goggles turn it down; 0 is clear. */
   underWater: number;
+  /** The same at windiness 1; it ramps between the two with the windiness. */
+  underWaterGale: number;
   /** Seconds the view takes to clear in air after surfacing. */
   recovery: number;
   /** Blur radius over the frame's height at the screen's corners in full
@@ -32,7 +34,8 @@ export interface LensBlurSettings {
 }
 
 export const DEFAULT_LENS_BLUR: LensBlurSettings = {
-  underWater: 0.012,
+  underWater: 0.0023,
+  underWaterGale: 0.012,
   recovery: 3,
   wind: 0.02,
   windStart: 0.8,
@@ -52,6 +55,18 @@ const PARAMS_FLOATS = 28;
  */
 export function lensRain(precipitation: number, temperature: number): number {
   return Math.max(0, precipitation) * Math.min(1, Math.max(0, temperature * 2));
+}
+
+/** Blur radius over the frame's height where the lens is in water, at
+ *  `windiness` 0..1: from `underWater` in a calm to `underWaterGale`. */
+export function underWaterBlur(
+  settings: LensBlurSettings,
+  windiness: number
+): number {
+  const t = Math.min(1, Math.max(0, windiness));
+  return (
+    settings.underWater + (settings.underWaterGale - settings.underWater) * t
+  );
 }
 
 /** 0..1: how much the wind blurs the view at `windiness`, from `start` up
@@ -232,8 +247,9 @@ export class WaterLens {
     d.set(this.viewProjection.elements, 0);
     d[16] = scene.width;
     d[17] = height;
-    d[18] = this.settings.underWater * height;
-    d[19] = this.settings.underWater * height * air;
+    const wetBlur = underWaterBlur(this.settings, wind[2]);
+    d[18] = wetBlur * height;
+    d[19] = wetBlur * height * air;
     d[20] = windBlur * height;
     // The clear middle swings as the eye refocuses, more the windier it is.
     d[21] = Math.min(

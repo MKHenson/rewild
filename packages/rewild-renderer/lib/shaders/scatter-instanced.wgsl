@@ -33,6 +33,7 @@ const HAS_WIND: bool = ${ HAS_WIND };
 #include "./shader-lib/parallax.frag.wgsl"
 #include "./shader-lib/ibl.wgsl"
 #include "./shader-lib/water-light.wgsl"
+#include "./shader-lib/caustics.wgsl"
 #include "./shader-lib/material-debug.wgsl"
 #include "./shader-lib/foliage-lighting.wgsl"
 #include "./shader-lib/standard-material.wgsl"
@@ -159,6 +160,9 @@ const NO_TANGENT = vec4f(1.0, 0.0, 0.0, 0.0);
 @group(3) @binding(9) var iblBrdfLut: texture_2d<f32>;
 @group(3) @binding(10) var iblSampler: sampler;
 @group(3) @binding(11) var<uniform> iblParams: IblParams;
+@group(3) @binding(12) var causticsMap: texture_2d<f32>;
+@group(3) @binding(13) var causticsSampler: sampler;
+@group(3) @binding(14) var<uniform> caustics: CausticsParams;
 
 // The standard quaternion sandwich, which is cheaper than building a rotation
 // matrix per vertex and is why the instance carries a quaternion at all.

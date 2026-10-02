@@ -117,7 +117,34 @@ export function registerWaterDebugCommands(renderer: Renderer) {
     console.log(
       'setWaterLens — water on the lens is now',
       lens.settings,
-      '\nKeys: underWater, the blur radius over the frame height where the lens is in water (0 clear, as goggles); recovery, seconds the view takes to clear after surfacing; wind, the blur radius over the frame height at the corners in full wind; windStart, the windiness 0..1 it starts at; windClear, 0..1 of the way to the corners it starts (below 0 it reaches the centre); windSwing, how far windClear swings either way as the eye refocuses.'
+      '\nKeys: underWater, the blur radius over the frame height where the lens is in water in a calm (0 clear, as goggles); underWaterGale, the same at windiness 1, ramping between; recovery, seconds the view takes to clear after surfacing; wind, the blur radius over the frame height at the corners in full wind; windStart, the windiness 0..1 it starts at; windClear, 0..1 of the way to the corners it starts (below 0 it reaches the centre); windSwing, how far windClear swings either way as the eye refocuses.'
+    );
+  };
+
+  (window as any).setWaterCaustics = (override = {}) => {
+    const caustics = renderer.terrainRenderer.caustics;
+    caustics.settings = { ...caustics.settings, ...override };
+    console.log(
+      'setWaterCaustics — caustics are now',
+      caustics.settings,
+      '\nKeys: strength, 0..1 how strongly the waves focus the sun (0 off); shallow and deep, metres down to the two planes the light lands on.'
+    );
+  };
+
+  (window as any).setWaterShafts = (strength = 1) => {
+    renderer.terrainRenderer.lightShafts.strength = strength;
+    console.log(
+      `setWaterShafts(${strength}) — scale on the light shafts under water, 1 the physical answer, 0 off.`
+    );
+  };
+
+  (window as any).setMarineSnow = (override = {}) => {
+    const snow = renderer.terrainRenderer.marineSnow;
+    snow.settings = { ...snow.settings, ...override };
+    console.log(
+      'setMarineSnow — marine snow is now',
+      snow.settings,
+      '\nKeys: count, specks at full quality; box, metres the box around the camera spans; size, metres a speck spans; minPixels; opacity; brightness; current, [x, y, z] metres a second.'
     );
   };
 

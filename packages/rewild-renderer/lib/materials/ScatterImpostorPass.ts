@@ -48,7 +48,7 @@ export class ScatterImpostorPass implements IMaterialPass {
   constructor(atlas: ScatterImpostorAtlas) {
     this.atlas = atlas;
     this.lightingUniforms = new Lighting(lightingGroup);
-    this.shadowUniforms = new ShadowUniforms(shadowGroup, true);
+    this.shadowUniforms = new ShadowUniforms(shadowGroup, true, true);
     this.perMeshTracker = new SharedUniformsTracker(this, [
       this.lightingUniforms,
       this.shadowUniforms,

@@ -56,7 +56,7 @@ export class StandardPass extends StandardPassBase {
     super();
     this.material = new StandardMaterial(materialGroupIndex);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
-    this.shadowUniforms = new ShadowUniforms(shadowGroupIndex, true);
+    this.shadowUniforms = new ShadowUniforms(shadowGroupIndex, true, true);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       this.material,
       this.lightingUniforms,

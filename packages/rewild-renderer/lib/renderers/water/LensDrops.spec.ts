@@ -7,10 +7,12 @@ import {
   SURFACING_DROPS,
 } from './LensDrops';
 import {
+  DEFAULT_LENS_BLUR,
   airBlurShare,
   eyeAdjust,
   followGust,
   lensRain,
+  underWaterBlur,
   windBlurShare,
   windFacing,
 } from './WaterLens';
@@ -139,6 +141,15 @@ describe('lensRain', () => {
     expect(lensRain(1, 0)).toBe(0);
     expect(lensRain(1, 0.25)).toBeCloseTo(0.5);
     expect(lensRain(1, 0.9)).toBeCloseTo(1);
+  });
+});
+
+describe('underWaterBlur', () => {
+  it('ramps from the calm blur to the gale blur with the windiness', () => {
+    expect(underWaterBlur(DEFAULT_LENS_BLUR, 0)).toBeCloseTo(0.003);
+    expect(underWaterBlur(DEFAULT_LENS_BLUR, 0.5)).toBeCloseTo(0.0075);
+    expect(underWaterBlur(DEFAULT_LENS_BLUR, 1)).toBeCloseTo(0.012);
+    expect(underWaterBlur(DEFAULT_LENS_BLUR, 2)).toBeCloseTo(0.012);
   });
 });
 

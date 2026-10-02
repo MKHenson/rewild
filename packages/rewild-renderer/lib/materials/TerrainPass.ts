@@ -38,7 +38,7 @@ export class TerrainPass implements IMaterialPass {
     this.requiresRebuild = true;
     this.terrainUniforms = new TerrainUniforms(sharedBindgroupIndex);
     this.lightingUniforms = new Lighting(lightingGroupIndex);
-    this.shadowUniforms = new ShadowUniforms(shadowGroupIndex, true);
+    this.shadowUniforms = new ShadowUniforms(shadowGroupIndex, true, true);
     this.sharedUniformsTracker = new SharedUniformsTracker(this, [
       this.terrainUniforms,
       this.lightingUniforms,

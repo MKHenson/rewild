@@ -772,7 +772,8 @@ The terrain shader reads the chunk's water map as well:
   stays dry. A chunk whose ground comes within 2 m of a covered level keeps its water map for
   the terrain, even when no water shows in it and none draws. Otherwise the band would stop at
   that chunk's edge.
-- **Caustics** on the bed (see [Lighting under water](#lighting-under-water)).
+- **Caustics** on the bed (see [Lighting under water](#lighting-under-water)). They multiply the
+  sun term under water, with the chunk's own water types.
 
 **Wet band.** Wet sand is darker, because water fills the gaps between grains, and smoother,
 because a film lies on top. These change at different speeds, so the band has two parts:
@@ -1074,13 +1075,19 @@ unless it may be under water.
 ### Light shafts
 
 With caustics (see [Lighting under water](#lighting-under-water)), shafts of light run down
-through the water:
+through the water (`LightShafts`, `lightShafts.wgsl`):
 
-- A half-resolution pass marches the view ray to 22 m in 20 steps, sampling the caustics at each
-  step's depth, dimmed along the sun's path and the view's.
+- A half-resolution pass, before the atmosphere composite, marches the view ray to 22 m in 20
+  steps, or to the surface or the first thing it hits if nearer. At each step it samples the
+  caustics at that depth, dimmed along the sun's path and the view's.
+- The fog already scatters the light of a calm surface, so the march sums only what the
+  caustics add or take away: `caustics − 1`, with the fog's phase and scattering. Points along
+  one refracted sun ray read the same place in the caustics, so the shafts run toward the sun.
 - There is no TAA over the scene to resolve the noise. So, like the god rays, the march is
-  jittered per pixel, and the composite upsamples it weighted by depth, so the shafts do not
-  bleed across edges.
+  jittered per pixel, turning each frame. A draw in the composite's pass, after the fog, adds it
+  to the full frame from the four nearest half-resolution texels, weighted by how near each
+  one's distance is to the pixel's, so the shafts do not bleed across edges.
+- `setWaterShafts(strength)` scales them in the console, 1 the default.
 
 ### The waterline on the lens
 
@@ -1093,10 +1100,11 @@ clearing, a gale, or drops on the lens.
   distance in pixels to the waterline, at any roll. Within 16 px either side, samples bend away
   from the line by up to 6 px, a dark contact line 1.5 px wide sits on it, and a bright rim
   follows on the water side.
-- **Blur.** Water on the eye blurs the view: where the lens is in water, by `underWater` of the
-  frame's height (1.2% by default), sampled on a ring of 8 taps at the mip that matches. After
-  surfacing the air side starts as blurred and clears over `recovery` seconds (3 by default),
-  easing out. Goggles turn `underWater` down; 0 is clear.
+- **Blur.** Water on the eye blurs the view: where the lens is in water, by a share of the
+  frame's height that ramps with the windiness, from `underWater` in a calm (0.3% by default)
+  to `underWaterGale` at windiness 1 (1.2%) (`underWaterBlur`), sampled on a ring of 8 taps at
+  the mip that matches. After surfacing the air side starts as blurred and clears over
+  `recovery` seconds (3 by default), easing out. Goggles turn both down; 0 is clear.
 - **Wind.** In a gale the eyes water: from windiness 0.8 to 1 the air side of the lens blurs
   toward the screen's edges. The middle stays clear; from `windClear` (30%) of the way out to
   the corners the blur grows, as its share squared, to `wind` of the frame's height (1.2% by
@@ -1106,8 +1114,8 @@ clearing, a gale, or drops on the lens.
   (`eyeAdjust`), more the windier it is. Gusts drive the blur's strength: the foliage's gust
   field read at the camera (`GustField.ts`), so the eyes water as the trees around bend, and the
   eye follows it quickly as a gust hits and slowly as it passes (`followGust`, a quarter second and a second
-  and a half). Between gusts the blur falls to 0.4 of its strength. Under water there is no
-  wind. `setWaterLens({ underWater, recovery, wind, windStart, windClear, windSwing })` sets
+  and a half). Between gusts the blur falls to 0.4 of its strength. Under water this blur does not
+  apply. `setWaterLens({ underWater, underWaterGale, recovery, wind, windStart, windClear, windSwing })` sets
   these in the console.
 - **Droplets** (`LensDrops`). On surfacing, 120 drops stay on the lens, a third of them large.
   Small drops cling and evaporate. Large ones hang for 0.3 to 2.8 s, then slide down faster and
@@ -1115,8 +1123,10 @@ clearing, a gale, or drops on the lens.
   clears them. Surfacing is read from the probe's readback, a few frames late. The drops are
   drawn in screen space, so they stay stuck to the lens as the view moves.
 - **Drop shape** (after Tidewater's lens droplets, MIT). Each outline wobbles by two sine lobes,
-  3 and 5 to a turn, at phases from the drop's own seed, and a sliding drop stretches along its
-  fall as it gathers speed. A drop is a strong fisheye lens: the scene inside is inverted and
+  3 and 5 to a turn, at phases from the drop's own seed. A sliding drop pulls into a teardrop as
+  it gathers speed: at full speed its tail reaches 2.6 radii above its centre and its belly 1.3
+  below, it narrows to 0.8 of its width, its tail tapers to the width of the trail it leads
+  into, and its lobes settle. A drop is a strong fisheye lens: the scene inside is inverted and
   moved along its surface, blurred, darkened toward its edge, with a highlight scaled by what it
   shows. A trail is blurred and darkened.
 - **Rain** lands drops on the lens while it is in air (`lensRain`): up to 60 a second, scaled by
@@ -1132,15 +1142,43 @@ clearing, a gale, or drops on the lens.
   water is the camera's: while the camera stands over water, its level and extinction ride in
   `IblParams`, and anything below that level is dimmed by its depth. Out of the water, or over
   another body's water, nothing is dimmed.
-- **Caustics** by photon splatting (as in Evan Wallace's WebGL Water). A fine grid over one FFT
-  tile is drawn off screen. Each vertex refracts the sun ray through the wave normal there, and
-  lands on a plane below. Its fragment writes the ratio of the areas on the surface and on the
-  plane, with additive blending, so focusing folds into bright networks. The grid covers the
-  tile plus a margin, so the result tiles without seams. Two planes, shallow and deep, blend by
-  the real depth. The terrain, the materials above and the shafts all sample it.
-- **Marine snow.** Specks drift in a box that wraps around the camera. Their positions are a
-  hash of the instance, so there is no simulation. They drift with a slow current and sway with
-  the long swell. They draw only while the view can be under water, and only below the surface.
+- **Caustics** by photon splatting (`Caustics`, `caustics.wgsl`, as in Evan Wallace's WebGL
+  Water). Each frame a grid over the 7.1 m cascade's tile is drawn into a 512² `rg16float`
+  texture, with mips. That cascade holds ripples 5 cm to 1.2 m long, curved enough to focus the
+  sun a metre or two down; the longer cascades focus far below any lake bed and change the
+  light by a few percent there. The grid has a vertex per FFT texel. Each vertex refracts the
+  sun ray through the wave normal there and lands on a plane below. Its fragment adds the ratio
+  of the areas on the surface and on the plane, so focusing folds into bright lines and a calm
+  surface gives 1.
+  - **Where it is stored.** A ray is stored where it lands less where a calm surface would land
+    it, at most 1 m away. So the texture is indexed by where the sun's ray entered the water,
+    and a point under water reads it after tracing back toward the refracted sun. The grid
+    reaches past the tile by a margin wider than that 1 m, so every ray that lands in the tile
+    is drawn and the result tiles without seams.
+  - **Planes.** Two planes, 1 m (r) and 3 m (g) down, drawn as two instances of one grid. The
+    pattern grows from none at the surface to the shallow plane's, blends to the deep plane's,
+    and fades out below it by e every 3 m.
+  - **Strength.** It scales by the water's weight on the cascade, so a lake's caustics are
+    weaker than the sea's. It fades in as the sun rises, is off while the sun is down, and fades
+    out from 40 m to 120 m from the camera. A point reads the mip whose texels match its
+    pixel's footprint, so a distant bed reads the average rather than sparkling.
+  - **Repeat.** The pattern repeats every 7.1 m. It is drawn only while the camera
+    is over water or a drawn chunk has water.
+  - **Who reads it.** The terrain bed, by its own chunk's water types; standard and scatter
+    materials under the camera's water; the light shafts; and the marine snow. It acts on the
+    sun term only. The material passes and the terrain bind it in their shadow group
+    (`ShadowUniforms`, bindings 12 to 14). `setWaterCaustics({ strength, shallow, deep })` sets
+    it in the console.
+- **Marine snow** (`MarineSnow`, `marine-snow.wgsl`). 2048 specks, about 8 mm across, in a 12 m
+  box that wraps around the camera. Their positions are a hash of the instance, carried by a
+  slow current the CPU keeps, so there is no simulation. They sway with the longest cascade's
+  displacement, as much as the water takes it, falling by e every 16 m down. They are lit by the
+  sun, focused by the caustics, and the sky through the water above them, and scatter forward as
+  the water does. They draw after the atmosphere composite, so they apply the water's
+  transmittance to the camera themselves, tested against the scene's depth. A speck smaller than
+  1.5 pixels is drawn at that size and fades instead. They fade in over the first 0.5 m and out
+  toward the box's edge. They draw only while the camera is in water, and only below the surface.
+  `setMarineSnow({ ... })` sets them in the console.
 
 ### Cost and quality
 
@@ -1150,9 +1188,12 @@ clearing, a gale, or drops on the lens.
   the view is still clearing, the windiness is over 0.8, or drops are on the lens: a frame copy, its mips, and one
   full-screen draw with 9 taps a pixel, plus the drops.
 - The fog is two full-screen draws, and only while the camera is within 15 m of the level.
-- The shafts and marine snow are the extras. They are the parts a low quality tier turns off.
-  The fog, the surface from below and the waterline are not: without them the view is wrong,
-  not plainer.
+- The shafts and marine snow are the extras. They are the parts a low quality tier turns off;
+  medium keeps half the snow (`underWaterQuality`). The fog, the surface from below, the
+  waterline and the caustics are not: without them the view is wrong, not plainer.
+- The caustics are one draw of about 440k small triangles a frame, and a mip chain, while
+  water is in view and the sun is up. The shafts are a half-resolution pass of 20 caustics samples a pixel, and one
+  full-screen draw of four taps, while the camera may be under water.
 
 ### Build order
 
@@ -1201,8 +1242,11 @@ clearing, a gale, or drops on the lens.
   trail. The drop share scales the pool, the drops left on surfacing and the rain's rate.
 - Each drop draws two quads, its body and a strip as wide as its trail above it, so a long
   trail does not shade a body-wide column up the screen.
-- GPU timers (`gpu/water`): `ocean`, the FFT's compute pass; `lens-frame`, the lens's mip
-  chain over the frame copy; `lens`, its full-screen draw and the drops.
+- GPU timers (`gpu/water`): `ocean`, the FFT's compute pass; `caustics`, the photon splat;
+  `shafts`, the half-resolution march; `lens-frame`, the lens's mip chain over the frame copy;
+  `lens`, its full-screen draw and the drops.
+- The terrain shader samples 16 textures with the caustics, the most a stage may by default.
+  Another texture in it needs one taken out first.
 
 ## Open questions
 
