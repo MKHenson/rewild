@@ -54,6 +54,7 @@ describe('water palette', () => {
   it.each<[string, Partial<WaterType>]>([
     ['negative absorption', { absorption: [0.4, -0.1, 0.02] }],
     ['negative scatter', { scatter: [-0.01, 0.03, 0.06] }],
+    ['negative in-scatter', { inScatter: [0.01, -0.03, 0.06] }],
     ['negative turbidity', { turbidity: -1 }],
     ['zero wave scale', { waveScale: 0 }],
     ['zero shore foam width', { shoreFoamWidth: 0 }],

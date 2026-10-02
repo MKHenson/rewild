@@ -644,6 +644,8 @@ export class SkyRenderer {
 
   /** Called after the sky compositor is submitted — renders bolt then rain onto the canvas. */
   postRender(renderer: Renderer): void {
+    // Under water the view is the water's, not the air's.
+    if (renderer.terrainRenderer.underWater.submerged) return;
     if (this.pendingBoltStrike) {
       // Match fog.wgsl's exponential height fog: constant aerial haze plus the
       // ground-hugging layer's density at camera height. The bolt shader only

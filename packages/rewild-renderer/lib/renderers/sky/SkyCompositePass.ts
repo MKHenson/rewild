@@ -181,6 +181,12 @@ export class SkyCompositePass implements IPostProcess {
         { binding: 2, resource: renderer.samplerManager.get('linear-clamped') },
         { binding: 3, resource: renderer.depthTexture.createView() },
         { binding: 4, resource: this.godRaysTexture!.createView() },
+        {
+          binding: 5,
+          resource: {
+            buffer: renderer.terrainRenderer.underWater.buffer(device),
+          },
+        },
       ],
     });
 

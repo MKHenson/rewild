@@ -8,8 +8,15 @@ import {
   WaterQuery,
 } from './WaterQuery';
 
+/** One point's result copied into another buffer on the GPU. */
+export interface ProbeCopy {
+  sourceOffset: number;
+  target: GPUBuffer;
+  targetOffset: number;
+}
+
 // Readbacks in flight at once. A map lands a few frames after its submit, so
-// one buffer would leave most frames without a dispatch.
+// one buffer would leave most frames without a readback.
 const READBACKS = 3;
 const RESULT_BYTES = PROBE_POINTS * PROBE_RESULT_FLOATS * 4;
 
@@ -26,6 +33,7 @@ export class WaterProbe {
   private resultData = new Float32Array(PROBE_POINTS * PROBE_RESULT_FLOATS);
   private reads: GPUBuffer[] = [];
   private readGenerations: Uint32Array[] = [];
+  private generations = new Uint32Array(PROBE_POINTS);
   private busy: boolean[] = [];
   private pipeline: GPUComputePipeline;
   private group: GPUBindGroup;
@@ -93,18 +101,19 @@ export class WaterProbe {
   /**
    * Probes the points `query` asked for since the last update, measured from
    * the waves' origin (`originX`, `originZ`), and hands the heights back to it
-   * when the readback lands. Skips a frame when every readback is in flight.
+   * when the readback lands; while every readback is in flight, the results
+   * stay on the GPU. `copy`, when given, takes one point's result into a
+   * buffer the same frame.
    */
   update(
     device: GPUDevice,
     query: WaterQuery,
     originX: number,
-    originZ: number
+    originZ: number,
+    copy?: ProbeCopy
   ): void {
-    const slot = this.busy.indexOf(false);
-    if (slot < 0) return;
-    const generations = this.readGenerations[slot];
-    if (!query.stage(originX, originZ, this.pointData, generations)) return;
+    if (!query.stage(originX, originZ, this.pointData, this.generations))
+      return;
 
     device.queue.writeBuffer(this.points, 0, this.pointData);
     const encoder = device.createCommandEncoder({ label: 'water probe' });
@@ -113,14 +122,26 @@ export class WaterProbe {
     pass.setBindGroup(0, this.group);
     pass.dispatchWorkgroups(Math.ceil(PROBE_POINTS / 16));
     pass.end();
-    encoder.copyBufferToBuffer(
-      this.results,
-      0,
-      this.reads[slot],
-      0,
-      RESULT_BYTES
-    );
+    if (copy)
+      encoder.copyBufferToBuffer(
+        this.results,
+        copy.sourceOffset,
+        copy.target,
+        copy.targetOffset,
+        PROBE_RESULT_FLOATS * 4
+      );
+    const slot = this.busy.indexOf(false);
+    if (slot >= 0)
+      encoder.copyBufferToBuffer(
+        this.results,
+        0,
+        this.reads[slot],
+        0,
+        RESULT_BYTES
+      );
     device.queue.submit([encoder.finish()]);
+    if (slot < 0) return;
+    this.readGenerations[slot].set(this.generations);
     this.busy[slot] = true;
     void this.read(slot, query);
   }

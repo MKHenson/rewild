@@ -142,7 +142,8 @@ fills. Raise an island and the water moves away from it.
 
 **The water palette.** It lives in `ClimateConfig` beside the biomes. Each entry defines:
 
-- Scattering colour and absorption (for Beer-Lambert depth colour).
+- Scattering colour and absorption (for Beer-Lambert depth colour), and the in-water glow seen
+  from inside it.
 - Turbidity: how quickly the bed disappears with depth.
 - Wave response: how strongly the wind moves this water.
 - Wave scale: long ocean swells, or short lake ripples.
@@ -636,7 +637,9 @@ The shader has the depth and the terrain height texture. These give the main sho
     work. It shows only where coverage reaches; the ocean's soft edge runs well past the beach.
   - **Thickness.** The 8 m height texture cannot resolve a sheet a few centimetres thick. The
     water reads the thickness from the gap to the scene behind it in the refraction texture, so
-    the light draw binds that texture as well as the absorb draw. Foam rides the last 6 cm of
+    the light draw binds that texture as well as the absorb draw. That gap is along the view
+    ray, so near level it says nothing of the depth below, and on the level ray it reads zero.
+    Where the ray is within about 6° of level, the water map's depth takes over. Foam rides the last 6 cm of
     the sheet's edge during the uprush and thins as it drains.
   - **Shared.** The swash is a function in `shore-waves.wgsl`, so the water and the terrain agree
     where the sheet is. See [Terrain changes](#terrain-changes) for the wet sand it leaves
@@ -978,15 +981,19 @@ away, so the view starts at the lens.
 
 ### The water probe
 
-A compute pass evaluates the water at the camera every frame, on the GPU:
+The camera holds one of the water query's probes (`UnderWater`, `TerrainRenderer.underWater`):
 
-- **Level, coverage and type weights** from the water map of the chunk under the camera.
-- **Wave height**: the FFT displacement moves the surface sideways as well as up, so the pass
-  solves for the rest position that lands under the camera in a few fixed-point steps (as the
-  water query does). Shore waves and swash are added on top.
-
-It writes a small storage buffer that the under-water passes read in the same frame, so they
-never lag. The CPU reads it back a few frames late, for the lens droplets and gameplay.
+- **Level, coverage and type weights** come from the water map at the camera, read on the CPU
+  each frame. The palette at the camera gives the extinction and scatter colour, and the sky
+  gives the sun's radiance and its direction, refracted into the water.
+- **Wave height** comes from the probe's dispatch that frame (see [Gameplay](#gameplay)).
+- All of it goes into one uniform, `UnderWater` (`under-water.wgsl`). The probe's result for the
+  camera is copied into it on the GPU after the dispatch, so the passes that read it in the same
+  frame never lag. The CPU's readback, a few frames late, is for what the CPU decides: rain,
+  lightning and spray are skipped while it says the camera is under.
+- The camera **may** be under water while it stands over covered water within 15 m of its level
+  (`WAVE_REACH`). Then the probe decides. Farther above, or over no water, nothing under-water
+  runs.
 
 Farther than **0.35 m** from the surface, the near plane cannot reach it, and the whole view is
 in the camera's medium: a single value from the probe. Only within that band can the surface
@@ -1004,38 +1011,54 @@ pipelines, and an extra attachment would have to be declared by every one of the
 
 ### The surface from below
 
-The water pipelines draw both faces. A back face is the surface seen from below:
+The water pipelines draw both faces. Each draw keeps only the side the camera is on
+(`facesCamera`): the top from above, the underside from below. A back face is the surface seen
+from below:
 
 - **Snell's window.** The view ray refracts out into the air (1.333 to 1). Inside the window,
   about 48.6° from straight up, it shows the sky cube along the refracted ray, and objects above
-  the water from the refraction capture where they stand in front of the sky.
+  the water from the refraction capture where they stand in front of the sky. The capture's
+  sample moves by how far the waves bend the ray from a calm surface, as refraction from above
+  does. A sample at the far plane is the sky.
 - **Total internal reflection.** Outside the window the surface is a mirror of the water below:
   the in-water colour of an endless ray, as the fog gives it (see [Fog in the water](#fog-in-the-water)).
 - **Fresnel.** From water into air, so the window's edge brightens into the mirror.
-- **Foam** from below is a dim, rough layer, lit by the light through it.
-- The absorb draw replaces the scene behind with the window's transmission. The water between
-  the camera and the surface is the fog's, so no depth absorption applies here.
+- **Foam** from below is a dim layer: its albedo times 0.3, lit by the sun and the sky through it.
+- The absorb draw replaces the scene behind with the scene above the window. The light draw adds
+  the sky through the window, the mirror and the foam. The water between the camera and the
+  surface is the fog's, so no depth absorption applies here.
 
 The shore waves, whitecaps and swash are the same surface, so they show from below with no extra
 work.
 
 ### Fog in the water
 
-In the atmosphere composite, a pixel whose lens is in water takes water fog in place of the air's.
-Clouds, air fog, god rays and rain are skipped for it.
+While the camera is in water, the atmosphere composite leaves the frame alone: no sky, clouds,
+air fog or god rays. Two full-screen draws in its pass take their place (`UnderWaterFog`,
+`waterFog.wgsl`). The first multiplies the scene by the transmittance, per channel. The second
+adds the in-scatter. Both discard while the camera is above the surface, and are not drawn
+unless it may be under water.
 
 - **Transmittance.** `exp(−σt × distance)` to the first thing the pixel hits: the bed, an object
   or the surface from below (water writes depth).
-- **In-scatter.** Single scattering of the sun and the sky, each dimmed by the water it has
+- **In-scatter.** Scattering of the sun, the sky and the bed, each dimmed by the water it has
   crossed to reach that depth. Light at depth `z` is `E × exp(−σt × z / μ)`, with `μ` the cosine
-  of the refracted sun. Along the view ray the depth changes linearly, so the integral has a
-  closed form. It is written so both exponents stay at or below zero, so looking up through deep
-  water cannot overflow.
+  of the refracted sun. A rising ray stops at the surface and a falling one at the bed, so along
+  it the depth changes linearly and the integral has a closed form. It is written so both
+  exponents stay at or below zero, so looking up through deep water cannot overflow, and where
+  the ray's rise nearly cancels the extinction a series replaces the difference.
+- **The bed.** It returns 0.3 of the sun and sky that reach it, and that light rises through the
+  water as the sky's comes down. The bed under the camera is the one the water map reads, so
+  shallow water glows with the light off its sand and deep water keeps its dark blue.
 - **Phase.** Forward scattering (Henyey-Greenstein, g 0.85) blended with 25% isotropic, so the
   water glows toward the sun.
 - **Coefficients** come from the palette at the camera: `σt` is the absorption plus the
-  turbidity. The scattering is set so an endless level ray returns the palette's scatter colour,
-  so the sea is the same colour from above and from below.
+  turbidity. The scattering is the palette's `inScatter` times `σt`, so an endless level ray
+  near the surface returns `inScatter` lit by the sun and sky. `inScatter` is several times the
+  `scatter` seen from above: from inside, the light the water scatters many times over is what
+  the viewer sees, where from above the sky's reflection outshines it. The sky's light is the
+  irradiance cube's, straight up.
+- A pixel that hits nothing, the sky, is taken as 10 km of water.
 
 ### Light shafts
 
@@ -1063,8 +1086,11 @@ through the water:
 ### Lighting under water
 
 - **Terrain** is dimmed by its depth already (see [Terrain changes](#terrain-changes)).
-- **Standard and scatter materials** take the same sun and sky dimming, from a shared include,
-  so rocks, props and seaweed under water match the bed.
+- **Standard and scatter materials** take the same sun and sky dimming (`water-light.wgsl`),
+  so rocks, props and seaweed under water match the bed. They are not bound to a chunk, so the
+  water is the camera's: while the camera stands over water, its level and extinction ride in
+  `IblParams`, and anything below that level is dimmed by its depth. Out of the water, or over
+  another body's water, nothing is dimmed.
 - **Caustics** by photon splatting (as in Evan Wallace's WebGL Water). A fine grid over one FFT
   tile is drawn off screen. Each vertex refracts the sun ray through the wave normal there, and
   lands on a plane below. Its fragment writes the ratio of the areas on the surface and on the
@@ -1077,10 +1103,10 @@ through the water:
 
 ### Cost and quality
 
-- Nothing in this section runs while the camera is more than 0.35 m above the water, except the
-  probe (one small dispatch) and the back faces, which fail the depth test from above.
+- The probe runs every frame the camera stands over water, as one of its points. The back faces
+  rasterise but are discarded from above.
 - The medium pass runs only while the surface is within 0.35 m of the camera.
-- The fog is a branch in the composite taken per pixel: no extra pass.
+- The fog is two full-screen draws, and only while the camera is within 15 m of the level.
 - The shafts and marine snow are the extras. They are the parts a low quality tier turns off.
   The fog, the surface from below and the waterline are not: without them the view is wrong,
   not plainer.
@@ -1140,7 +1166,8 @@ through the water:
   sea spray, which reads it as a plain depth texture, must resolve it or read one sample.
 - **Palette size.** Ocean and lake only, or swamp as well in Phase 2?
 - **Level for materials under water.** Terrain reads its chunk's water map for the level. Standard
-  and scatter materials are not bound to a chunk. Sea level from the Waves uniform covers the
-  ocean. Lakes need either a level map around the camera or the chunk's map bound per draw.
+  and scatter materials take the camera's water. A rock in a lake seen from the sea, or below
+  the level on dry land beside the camera's water, is dimmed wrongly or not at all. A level map
+  around the camera, or the chunk's map bound per draw, would fix both.
 - **Camera roll.** The meniscus search runs along the screen's vertical. If a camera can roll,
   the search must follow the waterline's direction on screen.

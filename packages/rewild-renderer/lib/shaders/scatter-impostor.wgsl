@@ -27,6 +27,7 @@ const HAS_FOLIAGE_SHADING: bool = false;
 #include "./shader-lib/brdf.wgsl"
 #include "./shader-lib/pbr-lighting.wgsl"
 #include "./shader-lib/ibl.wgsl"
+#include "./shader-lib/water-light.wgsl"
 #include "./shader-lib/foliage-lighting.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
 #include "./shader-lib/pcf.wgsl"
@@ -306,10 +307,11 @@ fn fs(
       spotLightShadowParams.hasSpotShadow,
       spotLightShadowParams.lightIndex
     );
-    var color = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow
+    let water = waterLightAt(surfaceViewPosition);
+    var color = (lit.directionalDiffuse + lit.directionalSpecular) * sunShadow * water.sun
               + lit.punctualDiffuse + lit.punctualSpecular
               + (lit.spotShadowDiffuse + lit.spotShadowSpecular) * spotShadowFactor;
-    color += evaluateIbl(surface, 1.0);
+    color += evaluateIbl(surface, 1.0) * water.sky;
     outColor = vec4f(color, 1.0);
   }
 
