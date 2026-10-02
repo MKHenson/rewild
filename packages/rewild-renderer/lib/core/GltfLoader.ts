@@ -32,6 +32,9 @@ export interface GltfPrimitive {
   geometry: Geometry;
   materialName: string | null;
   materialKey: string;
+  /** `extras.authoredNormals`: the normals are not the triangles' own, so a
+   *  back face must not mirror them. */
+  authoredNormals: boolean;
 }
 
 /**
@@ -232,6 +235,7 @@ function parseNode(
       materialKey:
         (primitive.material && materialKeys.get(primitive.material.id)) ??
         materialKeys.get(DEFAULT_MATERIAL_ID)!,
+      authoredNormals: primitive.extras?.authoredNormals === true,
     });
   }
 

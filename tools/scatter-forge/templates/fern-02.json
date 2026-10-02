@@ -11,7 +11,7 @@
       "pitch": 0,
       "variance": 0,
       "length": 1.5,
-      "aspect": 0.52,
+      "aspect": 0.72,
       "segments": 4,
       "curve": 25,
       "flutter": 0.2
@@ -28,7 +28,7 @@
   "frondVariance": 20,
   "cardCurve": 110,
   "cardSegments": 5,
-  "cardAspect": 1,
+  "cardAspect": 0.72,
   "normalLean": 0.45,
   "leafAlphaCutoff": 0.45,
   "bendCurve": 1.4,

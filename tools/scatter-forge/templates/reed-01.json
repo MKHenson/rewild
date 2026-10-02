@@ -15,8 +15,9 @@
       "segments": 4,
       "curve": 25,
       "flutter": 0.2,
-      "planes": 4,
-      "sizeVariance": 0.9
+      "planes": 3,
+      "sizeVariance": 0.9,
+      "normals": "sphere"
     }
   ],
   "out": "assets/shared/nature/plants",

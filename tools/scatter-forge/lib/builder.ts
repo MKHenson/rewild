@@ -11,6 +11,9 @@ export interface MeshAttributes {
   uvs: Float32Array;
   colors: Float32Array;
   indices: Uint32Array;
+  /** Index where the authored-normal triangles start: the engine draws them as
+   *  their own primitive and does not mirror them on back faces. */
+  authoredFrom: number;
   vertexCount: number;
   triangleCount: number;
 }
@@ -22,12 +25,14 @@ export interface Builder {
   uvs: number[];
   colors: number[];
   indices: number[];
+  /** Indices of triangles whose normals the back face must not mirror. */
+  authored: number[];
 }
 
 export type Rgba = [number, number, number, number];
 
 export function createBuilder(): Builder {
-  return { positions: [], normals: [], uvs: [], colors: [], indices: [] };
+  return { positions: [], normals: [], uvs: [], colors: [], indices: [], authored: [] };
 }
 
 export function pushVertex(
@@ -50,8 +55,9 @@ export function finish(out: Builder): MeshAttributes {
     normals: new Float32Array(out.normals),
     uvs: new Float32Array(out.uvs),
     colors: new Float32Array(out.colors),
-    indices: new Uint32Array(out.indices),
+    indices: new Uint32Array([...out.indices, ...out.authored]),
+    authoredFrom: out.indices.length,
     vertexCount: out.positions.length / 3,
-    triangleCount: out.indices.length / 3,
+    triangleCount: (out.indices.length + out.authored.length) / 3,
   };
 }

@@ -8,13 +8,15 @@
 // builds the cards. The tree offers its leaf twigs or its forks, the crown its
 // rosette down the same span its fronds take, the clump each tuft's centre.
 // The cards are written into the host's cutout piece and address cells the
-// host's atlas set aside for them, so they cost no draw and no image.
+// host's atlas set aside for them, so they cost no draw and no image. Cards
+// with spine or sphere normals are the exception: they go in the piece's authored tail,
+// which ships as a second primitive on the same material.
 
 import { columnOf, type UvRect } from './atlas.ts';
 import { pushVertex, type Builder } from './builder.ts';
 import type { AccentSpec, Params } from './params.ts';
 import { createRng, hash2, type Rng } from './rng.ts';
-import { add, cross, normalize, rotateAbout, scale, type Vec3 } from './vec.ts';
+import { add, cross, normalize, rotateAbout, scale, sub, type Vec3 } from './vec.ts';
 
 const DEG = Math.PI / 180;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
@@ -81,6 +83,7 @@ export function buildAccent(
   if (!sites.length || !cells.length) return;
 
   const rng = createRng(params.seed ^ 0x5a17c3e9 ^ (index * 0x9e3779b1));
+  const indices = spec.normals === 'host' ? out.indices : out.authored;
   const azimuth = rng() * TWO_PI;
 
   sites.forEach((site, i) => {
@@ -105,12 +108,17 @@ export function buildAccent(
     for (let k = 1; k <= spec.segments; k++)
       spine.push(add(spine[k - 1], scale(directionAt(k / spec.segments), length / spec.segments)));
 
+    // The ball a sphere card shades as: centred halfway up the spine, its
+    // radius half the card's length.
+    const half = spec.segments / 2;
+    const centre = scale(add(spine[Math.floor(half)], spine[Math.ceil(half)]), 0.5);
+
     // Every plane shares the spine and turns its width about it, so crossed
     // cards bow together and read as one solid shape rather than a fan.
     for (let plane = 0; plane < spec.planes; plane++) {
       const turn = (plane * Math.PI) / spec.planes;
       const acrossAt = (t: number): Vec3 => rotateAbout(side, directionAt(t), turn);
-      const normal = host.normal(site, outward, normalize(cross(acrossAt(0), directionAt(0))));
+      const cardNormal = spec.normals === 'host' ? host.normal(site, outward, normalize(cross(acrossAt(0), directionAt(0)))) : null;
       const rowStart: number[] = [];
 
       for (let k = 0; k <= spec.segments; k++) {
@@ -119,7 +127,18 @@ export function buildAccent(
         rowStart.push(out.positions.length / 3);
         const bend = host.bend(site, t * length, t);
 
+        // Along the spine from the ball's centre, -1 at the base and 1 at the tip.
+        const along = scale(sub(spine[k], centre), 2 / length);
+
         for (const sign of [-1, 1]) {
+          // Out from the spine or the centre, and up by normalLean: every
+          // plane's normal agrees where the planes cross, so they meet without
+          // a seam, and the lean keeps a row's two edges from cancelling.
+          const normal =
+            cardNormal ??
+            (spec.normals === 'spine'
+              ? normalize(add(scale(across, sign * params.normalLean), UP))
+              : normalize(add(add(along, scale(across, sign)), scale(UP, params.normalLean))));
           pushVertex(
             out,
             add(spine[k], scale(across, sign * halfWidth)),
@@ -136,7 +155,7 @@ export function buildAccent(
       for (let k = 0; k < spec.segments; k++) {
         const a = rowStart[k];
         const b = rowStart[k + 1];
-        out.indices.push(a, a + 1, b, a + 1, b + 1, b);
+        indices.push(a, a + 1, b, a + 1, b + 1, b);
       }
     }
   });

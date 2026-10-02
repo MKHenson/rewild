@@ -543,7 +543,7 @@
     },
     "alignToNormal": 0.6,
     "yOffset": -0.061,
-    "footprint": 4.58,
+    "footprint": 4.33,
     "wind": {
       "amplitude": 2.15,
       "frequency": 0.9,
@@ -575,7 +575,7 @@
     },
     "alignToNormal": 0.6,
     "yOffset": -0.071,
-    "footprint": 3.35,
+    "footprint": 3.12,
     "wind": {
       "amplitude": 2.15,
       "frequency": 0.9,
@@ -1683,8 +1683,8 @@
       "tilt": 3
     },
     "alignToNormal": 0.6,
-    "yOffset": -0.117,
-    "footprint": 1.2,
+    "yOffset": -0.116,
+    "footprint": 1.1,
     "wind": {
       "amplitude": 1.15,
       "frequency": 0.9,

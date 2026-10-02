@@ -769,7 +769,7 @@ describe('winding', () => {
       name: 'reed',
       stemHeight: 0,
       leafNormalMode: 'card',
-      accents: [{ stamps: ['fern-spire'], count: 4, pitch: 0, length: 1, aspect: 0.3, segments: 3, curve: 30 }],
+      accents: [{ stamps: ['fern-spire'], count: 4, pitch: 0, length: 1, aspect: 0.3, segments: 3, curve: 30, normals: 'host' }],
     });
     expect(facingAgreement(pieceOf(buildCrown(params, layoutAtlas(CROWN_CELLS_GENERATED, [1])).mesh, 'frond'))).toBe(1);
   });
@@ -2116,7 +2116,7 @@ describe('accents', () => {
 
   it('parses an accent with its defaults, and refuses what it cannot use', () => {
     const [accent] = resolveParams({ name: 'a', accents: [fruit] }).accents;
-    expect(accent).toEqual({ ...fruit, variance: 10, aspect: 0.5, segments: 1, planes: 1, sizeVariance: 0.2, curve: 0, flutter: 0.25, attach: 'twigs', depth: null });
+    expect(accent).toEqual({ ...fruit, variance: 10, aspect: 0.5, segments: 1, planes: 1, sizeVariance: 0.2, curve: 0, flutter: 0.25, attach: 'twigs', depth: null, normals: 'spine' });
 
     expect(() => parseConfig({ name: 'a', accents: [{ ...fruit, size: 2 }] }, 't.json')).toThrow(/unknown key 'size'/);
     expect(() => parseConfig({ name: 'a', accents: [{ count: 1, pitch: 0, length: 1 }] }, 't.json')).toThrow(/needs 'stamps'/);
@@ -2281,6 +2281,81 @@ describe('accents', () => {
         expect(Math.hypot(...across(rows, k))).toBeCloseTo(Math.hypot(...across(flat, k)), 5);
       }
       expect(angle(across(rows, 0), across(flat, 0))).toBeCloseTo([0, 60, 60][p], 3);
+    }
+  });
+
+  it('gives spine accents normals that meet at the spine, in an authored primitive', () => {
+    const reed = (normals: 'host' | 'spine') =>
+      buildCrown(
+        resolveParams({
+          type: 'crown',
+          name: 'reed',
+          stemHeight: 0,
+          frondCount: 4,
+          cardSegments: 2,
+          leafNormalMode: 'card',
+          accents: [{ ...spire, count: 1, segments: 3, planes: 3, variance: 0, normals }],
+        }),
+        layoutAtlas(CROWN_CELLS_GENERATED, [1])
+      ).mesh;
+    const frondVertices = 4 * 3 * 2;
+    const frondIndices = 4 * 2 * 6;
+
+    expect(pieceOf(reed('host'), 'frond').authoredFrom).toBe(pieceOf(reed('host'), 'frond').indices.length);
+
+    const frond = pieceOf(reed('spine'), 'frond');
+    expect(frond.authoredFrom).toBe(frondIndices);
+    expect(frond.indices.length).toBe(frondIndices + 3 * 3 * 6);
+    for (const index of frond.indices.subarray(frond.authoredFrom)) expect(index).toBeGreaterThanOrEqual(frondVertices);
+
+    for (let v = frondVertices; v < frond.vertexCount; v += 2) {
+      const left = frond.normals.subarray(v * 3, v * 3 + 3);
+      const right = frond.normals.subarray(v * 3 + 3, v * 3 + 6);
+      expect((left[0] + right[0]) / 2).toBeCloseTo(0, 5);
+      expect((left[2] + right[2]) / 2).toBeCloseTo(0, 5);
+      expect(left[1]).toBeGreaterThan(0);
+    }
+
+    const gltf = readGltf(writeGlb({ name: 'reed', mesh: reed('spine'), textures: CROWN_TEXTURES, alphaCutoff: 0.45 }));
+    const [cards, authored] = gltf.meshes[0].primitives;
+    expect(gltf.meshes[0].primitives).toHaveLength(2);
+    expect(cards.extras).toBeUndefined();
+    expect(authored.extras).toEqual({ authoredNormals: true });
+    expect(authored.attributes).toEqual(cards.attributes);
+    expect(authored.material).toBe(cards.material);
+  });
+
+  it('gives sphere accents normals that face down at the base and up at the tip', () => {
+    const frond = pieceOf(
+      buildCrown(
+        resolveParams({
+          type: 'crown',
+          name: 'reed',
+          stemHeight: 0,
+          frondCount: 4,
+          cardSegments: 2,
+          accents: [{ ...spire, count: 1, segments: 4, planes: 3, variance: 0, normals: 'sphere' }],
+        }),
+        layoutAtlas(CROWN_CELLS_GENERATED, [1])
+      ).mesh,
+      'frond'
+    );
+    const frondVertices = 4 * 3 * 2;
+    const perPlane = 5 * 2;
+    expect(frond.authoredFrom).toBe(4 * 2 * 6);
+
+    for (let plane = 0; plane < 3; plane++) {
+      const row = (k: number) => {
+        const v = frondVertices + plane * perPlane + k * 2;
+        return [frond.normals.subarray(v * 3, v * 3 + 3), frond.normals.subarray(v * 3 + 3, v * 3 + 6)];
+      };
+      for (const normal of row(0)) expect(normal[1]).toBeLessThan(-0.3);
+      for (const normal of row(4)) expect(normal[1]).toBeGreaterThan(0.3);
+
+      const [left, right] = row(2);
+      const mid = [0, 1, 2].map((axis) => (left[axis] + right[axis]) / 2);
+      expect(mid[1]).toBeGreaterThan(0.1);
+      expect(Math.hypot(mid[0], mid[2])).toBeLessThan(0.05);
     }
   });
 
