@@ -28,9 +28,10 @@ export class GuiManager {
   }
 
   dispose(): void {
-    const { canvas } = this.renderer;
     this.uiRaycaster = null;
     this.hoveredElements.clear();
+    if (!this.renderer) return;
+    const { canvas } = this.renderer;
     canvas.removeEventListener('click', this.onClickDelegate);
     canvas.removeEventListener('mousemove', this.onMouseMoveDelegate);
     canvas.removeEventListener('mousedown', this.onMouseDownDelegate);

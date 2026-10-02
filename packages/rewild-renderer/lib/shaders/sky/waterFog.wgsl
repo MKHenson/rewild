@@ -1,6 +1,6 @@
-// Fog in the water (UnderWaterFog). While the camera is under water, the
-// atmosphere composite leaves the frame alone and these two draws take its
-// place: `fs_absorb` multiplies the scene by what survives the trip through
+// Fog in the water (UnderWaterFog). Where the lens is under water
+// (lensInWater), the atmosphere composite leaves the pixel alone and these two
+// draws take its place: `fs_absorb` multiplies the scene by what survives the trip through
 // the water, per channel, and `fs_scatter` adds what the water scatters into
 // the ray. Water writes depth, so a pixel looking up stops at the surface.
 
@@ -37,10 +37,10 @@ fn viewRay(fragCoord: vec4f) -> Ray {
 
 @fragment
 fn fs_absorb(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
-  if (!cameraInWater()) {
+  let ray = viewRay(fragCoord);
+  if (!lensInWater(ray.dir)) {
     discard;
   }
-  let ray = viewRay(fragCoord);
   return vec4f(waterTransmittanceAlong(ray.distance), 1.0);
 }
 
@@ -48,9 +48,9 @@ fn fs_absorb(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
 fn fs_scatter(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
   // The cube holds irradiance over π.
   let sky = textureSampleLevel(iblIrradianceMap, iblSampler, vec3f(0.0, 1.0, 0.0), 0.0).rgb * WATER_PI;
-  if (!cameraInWater()) {
+  let ray = viewRay(fragCoord);
+  if (!lensInWater(ray.dir)) {
     discard;
   }
-  let ray = viewRay(fragCoord);
   return vec4f(waterInScatter(ray.dir, cameraWaterDepth(), cameraBedBelow(), ray.distance, sky), 1.0);
 }

@@ -59,6 +59,21 @@ fn hf(n: u32) -> f32 {
     return f32(ihash(n)) / 4294967296.0;
 }
 
+// The rain's wind in a gale (SkyRenderer rainWindSpeed), and how much a gust
+// adds to it at its height there.
+const GALE_WIND: f32 = 24.0;
+const GALE_GUST: f32 = 0.9;
+// Snow takes SNOW_CALM_SHARE of the wind, rising to all of it between wind
+// speeds SNOW_LEVEL_FROM and SNOW_LEVEL_AT m/s: windiness 0.55 and 0.85 by
+// SkyRenderer's rainWindSpeed.
+const SNOW_CALM_SHARE: f32 = 0.1;
+const SNOW_LEVEL_FROM: f32 = 6.8;
+const SNOW_LEVEL_AT: f32 = 17.1;
+// Metres a second a snowflake flutters across the wind in a breeze, and how
+// many times that again it adds in a gale.
+const SNOW_FLUTTER: f32 = 0.4;
+const SNOW_GALE_FLUTTER: f32 = 4.0;
+
 fn spawnParticle(i: u32, windVel: vec3<f32>, fallSpeed: f32,
                  cameraPos: vec3<f32>, spawnRadius: f32, spawnHeight: f32) -> Particle {
     let tick = u32(u.iTime * 20.0) + 1u;
@@ -88,12 +103,20 @@ fn computeMain(@builtin(global_invocation_id) id: vec3<u32>) {
     // above 0.5 is pure rain. Keep this remap identical in both shaders.
     let rainFactor = saturate(u.temperature * 2.0);
     let fallSpeed  = mix(1.0, 9.5, rainFactor);
-    let windFactor = mix(0.2, 1.0, rainFactor);
     let gustAmp    = sin(u.iTime * 0.41) * 0.5
                    + sin(u.iTime * 1.17) * 0.3
                    + sin(u.iTime * 2.73) * 0.2;
     let gust       = 0.5 + gustAmp * 0.45;
-    let effWind    = u.windSpeed * windFactor * (1.0 + gust * 0.5);
+    // Gusts blow harder the stronger the wind: up to half again in a breeze,
+    // up to GALE_GUST more in a gale (rainWindSpeed reaches GALE_WIND).
+    let gale       = saturate(u.windSpeed / GALE_WIND);
+    let gustGain   = mix(0.5, GALE_GUST, gale * gale);
+    // Rain is carried at the wind's speed. Snow takes a little of it, so it
+    // still falls on a slant in a strong breeze, then all of it toward a
+    // gale, where a blizzard streams level.
+    let snowShare  = mix(SNOW_CALM_SHARE, 1.0, smoothstep(SNOW_LEVEL_FROM, SNOW_LEVEL_AT, u.windSpeed));
+    let windFactor = mix(snowShare, 1.0, rainFactor);
+    let effWind    = u.windSpeed * windFactor * (1.0 + gust * gustGain);
     let windVel    = vec3f(u.windDir.x * effWind, 0.0, u.windDir.y * effWind);
 
     // ── Post-contact state (rain arc or snow rest) ────────────────────────────
@@ -123,7 +146,9 @@ fn computeMain(@builtin(global_invocation_id) id: vec3<u32>) {
     }
 
     // ── Normal physics ────────────────────────────────────────────────────────
-    let wobbleAmp  = sin(u.iTime * 2.3 + p.seed * 6.28) * (1.0 - rainFactor) * 0.4;
+    // Snow flutters across the wind, harder the stronger it blows.
+    let wobbleAmp  = sin(u.iTime * 2.3 + p.seed * 6.28) * (1.0 - rainFactor)
+                   * SNOW_FLUTTER * (1.0 + SNOW_GALE_FLUTTER * gale);
     let wobble     = vec3f(-u.windDir.y * wobbleAmp, 0.0, u.windDir.x * wobbleAmp);
     let termVel    = windVel + vec3f(0.0, -fallSpeed, 0.0) + wobble;
     let blend      = min(u.deltaTime * 8.0, 1.0);

@@ -472,17 +472,18 @@ fn vs(input: VertexInput) -> VertexOutput {
   return out;
 }
 
-// Whether a face is the side of the surface the camera is on: the top from
-// above, the underside from below.
-fn facesCamera(front: bool) -> bool {
-  return front != cameraInWater();
+// Whether a face is the side of the surface the pixel looks from: the top
+// where its lens is in air, the underside where it is in water.
+fn facesCamera(front: bool, viewPosition: vec3f) -> bool {
+  let dir = (underWater.viewToWorld * vec4f(normalize(viewPosition), 0.0)).xyz;
+  return front != lensInWater(dir);
 }
 
 // Writes the nearest layer's depth, so the shading draws skip every layer the
 // waves fold behind it. Discards exactly where they do.
 @fragment
 fn fs_depth(input: VertexOutput, @builtin(front_facing) front: bool) {
-  if (textureSample(surfaceMap, surfaceSampler, surfaceUV(input.uv)).b <= 0.0 || !facesCamera(front)) {
+  if (textureSample(surfaceMap, surfaceSampler, surfaceUV(input.uv)).b <= 0.0 || !facesCamera(front, input.viewPosition)) {
     discard;
   }
 }
@@ -633,7 +634,7 @@ fn refractionDebug(input: VertexOutput, water: WaterSample, NoV: f32, view: f32)
 fn fs_absorb(input: VertexOutput, @builtin(front_facing) front: bool) -> @location(0) vec4f {
   let footprint = pixelFootprint(input.rest);
   let water = sampleWater(input.uv);
-  if (water.coverage <= 0.0 || !facesCamera(front)) {
+  if (water.coverage <= 0.0 || !facesCamera(front, input.viewPosition)) {
     discard;
   }
 
@@ -719,7 +720,7 @@ fn fs_light(input: VertexOutput, @builtin(front_facing) front: bool) -> @locatio
            * (1.0 - waterFresnel(NoV)) * (1.0 - foam) * (vec3f(1.0) - transmittance);
 
   // Last, so every shadow and cube sample above runs in uniform control flow.
-  if (water.coverage <= 0.0 || !facesCamera(front)) {
+  if (water.coverage <= 0.0 || !facesCamera(front, input.viewPosition)) {
     discard;
   }
   if (waves.origin.w > 2.5) {

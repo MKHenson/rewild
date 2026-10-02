@@ -36,6 +36,14 @@ import type { LightningStrike } from './LightningController';
  *  fog.wgsl — keep the two in sync. */
 const COLD_LIFT = 1.12;
 
+/** The wind the rain is blown by, in m/s, at `windiness` 0..1: 10 m/s a unit
+ *  in light wind, climbing to 24 m/s in a gale, near the ocean's (22 m/s), so
+ *  rain is driven as hard as the trees thrash. */
+export function rainWindSpeed(windiness: number): number {
+  const w = Math.min(1, Math.max(0, windiness));
+  return 10 * w + 14 * w * w * w;
+}
+
 export class SkyRenderer {
   requiresRebuild: boolean = true;
   private invViewProjectionMatrix = new Matrix4();
@@ -603,8 +611,7 @@ export class SkyRenderer {
 
     if (this.precipitation > 0) {
       const { x: wdx, y: wdy } = this.windDirection;
-      // Wind speed in m/s: 0 = calm, 1 = 10 m/s (enough to lean rain ~46° at max windiness)
-      const baseSpeed = this.windiness * 10.0;
+      const baseSpeed = rainWindSpeed(this.windiness);
       const t = renderer.totalDeltaTime / 1000;
       // Gust oscillation ranges approx -1..+1
       const gustAmp =

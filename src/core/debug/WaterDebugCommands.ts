@@ -111,6 +111,16 @@ export function registerWaterDebugCommands(renderer: Renderer) {
     tick();
   };
 
+  (window as any).setWaterLens = (override = {}) => {
+    const lens = renderer.terrainRenderer.waterLens;
+    lens.settings = { ...lens.settings, ...override };
+    console.log(
+      'setWaterLens — water on the lens is now',
+      lens.settings,
+      '\nKeys: underWater, the blur radius over the frame height where the lens is in water (0 clear, as goggles); recovery, seconds the view takes to clear after surfacing; wind, the blur radius over the frame height at the corners in full wind; windStart, the windiness 0..1 it starts at; windClear, 0..1 of the way to the corners it starts (below 0 it reaches the centre); windSwing, how far windClear swings either way as the eye refocuses.'
+    );
+  };
+
   (window as any).shoreFieldStats = () => {
     const field = renderer.terrainRenderer.shoreField;
     const { water, sources, reached, sourceDepth, longest } = field.stats;

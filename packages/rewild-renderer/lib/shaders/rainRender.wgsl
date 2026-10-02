@@ -87,9 +87,11 @@ fn vs(
     }
     rainRight = normalize(rainRight);
 
-    // head (uv.y=0) = current drop position; tail (uv.y=1) = where it was
+    // head (uv.y=0) = current drop position; tail (uv.y=1) = where it was.
+    // Faster drops streak longer: still-air rain falls at 9.5 m/s, and a drop
+    // driven by a gale stretches up to 2.5 times as long.
     let rainWidth   = 0.016;
-    let rainLength  = 0.40;
+    let rainLength  = 0.40 * clamp(pvLen / 9.5, 1.0, 2.5);
     let rainOffset  = rainRight * ((lUV.x - 0.5) * rainWidth)
                     - velDir   * ((lUV.y - 0.5) * rainLength);
 

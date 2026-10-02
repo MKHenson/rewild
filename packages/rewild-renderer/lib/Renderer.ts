@@ -230,6 +230,12 @@ export class Renderer {
    * and the same channel can be compared across all three.
    */
   materialDebugChannel: number = 0;
+  /**
+   * Whether water and wind on the camera's lens show (WaterLens): the blur
+   * under water and after surfacing, the wind's blur, the drops and the
+   * waterline. Off gives a clear view to edit in.
+   */
+  lensEffects: boolean = true;
 
   /** Returns the shared shadow atlas (directional cascades + spot light quadrant), or null if not yet initialized. */
   get shadowAtlas(): GPUTexture | null {
@@ -487,8 +493,11 @@ export class Renderer {
       size: [currentWidth, currentHeight],
       sampleCount: this.sampleCount,
       format: this.sceneColorFormat,
+      // COPY_SRC: the water lens copies the composited frame to blur it.
       usage:
-        GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_SRC,
     });
 
     this.sceneColorTexture = sceneColorTexture;
@@ -1064,6 +1073,15 @@ export class Renderer {
       );
 
       device.queue.submit([postProcessingEncoder.finish()]);
+
+      // Water on the lens blurs and bends the composited frame, so bloom and
+      // the tonemap see it as the eye does.
+      this.terrainRenderer.renderLens(
+        this,
+        camera.camera,
+        this.sceneColorTexture!,
+        sceneColorView
+      );
 
       // Bloom + whole-frame tonemap. Runs after the composite has been submitted
       // because bloom reads the target that pass writes. This is the only place
