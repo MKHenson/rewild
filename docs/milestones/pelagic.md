@@ -944,9 +944,25 @@ Authored water is a **water edit** per chunk (`WaterEdit`), at the water map's r
   held by the depth. The displacement is sideways as well as up, so it finds the rest position
   that lands on the point in four fixed-point steps. The depth and type it uses are the map's at
   the point. There are 16 probes, one dispatch a frame and up to three readbacks in flight.
-- The player does not walk on water. Shallow water slows the player. Deep water makes the player
-  swim at the surface.
-- The camera knows when it is under water, from the water probe (see [Under water](#under-water)).
+- The player holds a probe and reads the water over their feet each frame, waves included
+  (`Player.immersion`). Rules are in `Swimming.ts`.
+- Depths are measured against the eye's height above the feet, so they follow the player's body.
+- **Wading.** Past 0.1 m of water the player slows, down to 0.6 of walking speed at the swim
+  depth.
+- **Swimming.** With the water 0.6 m below the eye, shoulder deep, the player swims. They stand
+  again 0.2 m shallower, so a wave does not flicker the switch. A swimmer has no gravity and
+  cannot jump or crouch. They float with the eye 0.2 m above the surface, closing on it at a
+  rate of 3 a second, so the waves lift and drop them. Water takes a falling player's speed at
+  the same rate, so a fall plunges and then floats up. They move at 0.8 of walking speed, and
+  starting to swim ends a crouch.
+- **Diving.** Holding C dives at 1.5 m a second. Holding Space rises at the same speed. Between
+  them the swimmer holds the height they stopped at, which stays out of the waves' reach. The eye
+  stays at least its height above the feet plus 0.1 m over the bed, so a rising bed lifts them.
+  A swimmer who stops within 0.4 m of the floating height floats again. C is the crouch key on
+  land; Left Ctrl is not used, as Ctrl+W closes the browser tab.
+- The camera knows when its eye is below the surface (`Player.cameraUnderWater`), from the same
+  sample. The under-water view uses the GPU probe at the camera instead (see
+  [Under water](#under-water)).
 
 ## Under water
 

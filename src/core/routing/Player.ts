@@ -1,4 +1,8 @@
-import { ICameraController } from 'rewild-renderer';
+import {
+  ICameraController,
+  WaterQuery,
+  createWaterQuerySample,
+} from 'rewild-renderer';
 import { Node } from 'rewild-routing';
 import { Asset3D } from './Asset3D';
 import { StateMachineData } from './Types';
@@ -21,6 +25,16 @@ import {
   Euler,
   EulerRotationOrder,
 } from 'node_modules/rewild-common';
+import {
+  BED_CLEARANCE,
+  SWIM_EYE_ABOVE,
+  SWIM_SPEED_SHARE,
+  holdHeight,
+  isSwimming,
+  swimStep,
+  wadeSpeedShare,
+  waterDrag,
+} from './utils/Swimming';
 
 const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);
 const _PI_HALF = Math.PI / 2 - 0.01;
@@ -35,6 +49,8 @@ const _FLASHLIGHT_BODY_DROP: f32 = 0.8;
 const _DEG2RAD = Math.PI / 180;
 // Distance from the capsule's centre to its base (0.9 half-height + 0.5 radius).
 const _CAPSULE_HALF_EXTENT: f32 = 1.4;
+// The standing eye's height above the feet; water depths are measured by it.
+const _EYE_ABOVE_FEET: f32 = _CAPSULE_HALF_EXTENT + _STANDING_EYE_HEIGHT;
 // Where the capsule centre goes when spawning onto a known ground height: just
 // clear of the surface, so the character controller settles the last fraction
 // instead of starting interpenetrated.
@@ -66,6 +82,17 @@ export class Player extends Node {
   // Set once the player has been placed somewhere valid — by a PlayerStart, or
   // by the terrain-surface fallback for levels that have no PlayerStart.
   spawnResolved: boolean = false;
+  /** Whether the player is swimming rather than standing. */
+  swimming: boolean = false;
+  /** Metres of water over the player's feet, waves included. */
+  immersion: f32 = 0;
+  /** Whether the camera's eye is below the water's surface. */
+  cameraUnderWater: boolean = false;
+  private _water = createWaterQuerySample();
+  // World height a submerged swimmer holds their eye at; NaN while floating.
+  private _swimHold: f32 = NaN;
+  private _waterProbe = -1;
+  private _waterQuery: WaterQuery | null = null;
   uiHealthBar: UIElementHealthPass;
 
   // Pointer-lock / mouse-look state
@@ -76,6 +103,9 @@ export class Player extends Node {
   private _movingLeft = false;
   private _movingRight = false;
   private _sprinting = false;
+  // Held keys: C dives and Space rises while swimming.
+  private _downHeld = false;
+  private _upHeld = false;
   jumpRequested: boolean = false;
   private _isLocked = false;
   private _canvas: HTMLCanvasElement | null = null;
@@ -159,6 +189,13 @@ export class Player extends Node {
     this.spawnResolved = false;
     this.grounded = false;
     this.verticalVelocity = 0.0;
+    this.swimming = false;
+    this._swimHold = NaN;
+    this.immersion = 0;
+    this.cameraUnderWater = false;
+    this._waterQuery = stateData.renderer.terrainRenderer.waterQuery;
+    if (this._waterProbe < 0)
+      this._waterProbe = this._waterQuery.acquireProbe();
 
     this._canvas = stateData.renderer.canvas;
     // The lock may already be held: GameManager requests it before the first
@@ -252,6 +289,10 @@ export class Player extends Node {
     if (this._flashlight) {
       this._flashlight.transform.removeFromParent();
     }
+
+    this._waterQuery?.releaseProbe(this._waterProbe);
+    this._waterProbe = -1;
+    this._waterQuery = null;
 
     if (this.rapierWorld && this.characterController) {
       this.rapierWorld.removeCharacterController(this.characterController);
@@ -352,10 +393,29 @@ export class Player extends Node {
       gravityEnabled = !!hit;
     }
 
+    // The water over the feet, with the waves the probe last reported.
+    const water = this._water;
+    const body = this.capsuleBody.translation();
+    const feet = body.y - _CAPSULE_HALF_EXTENT;
+    const inWater =
+      hasTerrain &&
+      terrainRenderer!.waterQuery.sample(
+        body.x,
+        body.z,
+        water,
+        this._waterProbe
+      ) &&
+      water.coverage > 0;
+    this.immersion = inWater ? Math.max(0, water.surface - feet) : 0;
+    this.swimming =
+      gravityEnabled &&
+      isSwimming(this.swimming, this.immersion, _EYE_ABOVE_FEET);
+    if (this.swimming) this._crouching = false;
+
     // Jump
     const JUMP_IMPULSE: f32 = 10.5;
     if (this.jumpRequested) {
-      if (this.grounded) {
+      if (this.grounded && !this.swimming) {
         this.verticalVelocity = JUMP_IMPULSE;
         this.grounded = false;
       }
@@ -367,6 +427,8 @@ export class Player extends Node {
 
     if (!gravityEnabled) {
       this.verticalVelocity = 0.0;
+    } else if (this.swimming) {
+      this.verticalVelocity = waterDrag(this.verticalVelocity, delta);
     } else if (!this.grounded) {
       this.verticalVelocity += gravity * dt;
     } else if (this.verticalVelocity <= 0.0) {
@@ -376,13 +438,17 @@ export class Player extends Node {
     // Compute horizontal movement from key state (yaw-relative, XZ plane only)
     const sinYaw = Math.sin(this._yaw);
     const cosYaw = Math.cos(this._yaw);
-    const eyeHeight = this._crouching
-      ? _CROUCH_EYE_HEIGHT
-      : _STANDING_EYE_HEIGHT;
+    const eyeHeight =
+      this._crouching && !this.swimming
+        ? _CROUCH_EYE_HEIGHT
+        : _STANDING_EYE_HEIGHT;
     const speed =
       _MOVE_SPEED *
       (this._sprinting ? _RUN_MULTIPLIER : 1.0) *
-      (this._crouching ? _CROUCH_SPEED_MULTIPLIER : 1.0);
+      (this._crouching && !this.swimming ? _CROUCH_SPEED_MULTIPLIER : 1.0) *
+      (this.swimming
+        ? SWIM_SPEED_SHARE
+        : wadeSpeedShare(this.immersion, _EYE_ABOVE_FEET));
     let moveX: f32 = 0;
     let moveZ: f32 = 0;
 
@@ -403,11 +469,25 @@ export class Player extends Node {
       moveZ += sinYaw * speed * dt;
     }
 
-    const desiredMove = new RapierVector3(
-      moveX,
-      gravityEnabled ? this.verticalVelocity * dt : 0.0,
-      moveZ
-    );
+    let moveY: f32 = gravityEnabled ? this.verticalVelocity * dt : 0.0;
+    if (this.swimming) {
+      const eyeY = body.y + eyeHeight;
+      this._swimHold = holdHeight(
+        this._swimHold,
+        eyeY,
+        this._downHeld,
+        this._upHeld,
+        delta,
+        water.level,
+        water.ground + _EYE_ABOVE_FEET + BED_CLEARANCE
+      );
+      const target = Number.isNaN(this._swimHold)
+        ? water.surface + SWIM_EYE_ABOVE
+        : this._swimHold;
+      moveY += swimStep(eyeY, target, delta);
+    } else this._swimHold = NaN;
+
+    const desiredMove = new RapierVector3(moveX, moveY, moveZ);
 
     this.characterController.computeColliderMovement(
       this.collider,
@@ -423,7 +503,8 @@ export class Player extends Node {
       this.health -= damage;
     }
 
-    this.grounded = controllerGrounded && this.verticalVelocity <= 0.0;
+    this.grounded =
+      controllerGrounded && this.verticalVelocity <= 0.0 && !this.swimming;
     if (this.grounded && this.verticalVelocity < 0) this.verticalVelocity = 0.0;
 
     const currentPos = this.capsuleBody.translation();
@@ -438,6 +519,7 @@ export class Player extends Node {
     const camY = pos.y + eyeHeight;
     const camZ = pos.z;
     this.cameraController.camera.transform.position.set(camX, camY, camZ);
+    this.cameraUnderWater = inWater && camY < water.surface;
 
     if (this._flashlight) {
       const flashY = camY - _FLASHLIGHT_BODY_DROP;
@@ -467,11 +549,15 @@ export class Player extends Node {
     else if (e.code === 'KeyS') this._movingBackward = true;
     else if (e.code === 'KeyA') this._movingLeft = true;
     else if (e.code === 'KeyD') this._movingRight = true;
-    else if (e.code === 'Space') this.jumpRequested = true;
-    else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight')
+    else if (e.code === 'Space') {
+      this.jumpRequested = true;
+      this._upHeld = true;
+    } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight')
       this._sprinting = true;
-    else if (e.code === 'KeyC') this._crouching = !this._crouching;
-    else if (e.code === 'KeyF' && this._flashlight) {
+    else if (e.code === 'KeyC') {
+      this._downHeld = true;
+      if (!e.repeat && !this.swimming) this._crouching = !this._crouching;
+    } else if (e.code === 'KeyF' && this._flashlight) {
       this._flashlightOn = !this._flashlightOn;
       this._flashlight.intensity = this._flashlightOn
         ? Player._FLASHLIGHT_INTENSITY
@@ -484,6 +570,8 @@ export class Player extends Node {
     else if (e.code === 'KeyS') this._movingBackward = false;
     else if (e.code === 'KeyA') this._movingLeft = false;
     else if (e.code === 'KeyD') this._movingRight = false;
+    else if (e.code === 'Space') this._upHeld = false;
+    else if (e.code === 'KeyC') this._downHeld = false;
     else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight')
       this._sprinting = false;
   }
