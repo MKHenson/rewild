@@ -32,6 +32,9 @@ import { WaterWaveBuffer } from '../water/WaterWaves';
 import { waterDetailBias } from '../water/WaterQuality';
 import { OceanFFT } from '../water/OceanFFT';
 import { SeaSpray } from '../water/SeaSpray';
+import { WaterProbe } from '../water/WaterProbe';
+import { WaterQuery, WaterQuerySource } from '../water/WaterQuery';
+import { WaterMap } from './WaterMap';
 import { shoreWaveHeight } from '../water/ShoreWaves';
 import { SHORE_FIELD_SPAN, ShoreField } from '../water/ShoreField';
 import { OCEAN_WATER } from './Water';
@@ -74,7 +77,7 @@ const _frustum = new Frustum();
 const _cullBox = new Box3();
 const _viewDir = new Vector3();
 
-export class TerrainRenderer {
+export class TerrainRenderer implements WaterQuerySource {
   viewPosOld: Vector3;
   // Camera facing at the last chunk-selection pass — a turn past
   // viewDirDotThresholdForChunkUpdate re-runs selection even without movement,
@@ -164,6 +167,9 @@ export class TerrainRenderer {
   /** The FFT ocean every chunk's water samples; made on the first update. */
   ocean: OceanFFT | null = null;
   seaSpray: SeaSpray | null = null;
+  /** The water at a point for gameplay, with the drawn waves' height. */
+  readonly waterQuery = new WaterQuery(this);
+  private waterProbe: WaterProbe | null = null;
   /** Whether the waves displace the water grid. Off leaves them shading only,
    *  to tell a geometry artefact from a shading one. */
   waterWaveGeometry = true;
@@ -573,6 +579,12 @@ export class TerrainRenderer {
     const heights = this.terrainChunks.get(`${cx},${cy}`)?.heights;
     if (!heights) return null;
     return this.chunkHeight(heights, cx, cy, x, z);
+  }
+
+  /** The water map of chunk (cx, cy); null where it has none or is not
+   *  loaded. */
+  waterMapAt(cx: number, cy: number): WaterMap | null {
+    return this.terrainChunks.get(`${cx},${cy}`)?.water ?? null;
   }
 
   // Metres of ocean at world (x, z): sea level less the ground, where the
@@ -1041,6 +1053,21 @@ export class TerrainRenderer {
       this.seaLevel,
       (x, z) => this.sampleHeight(x, z)
     );
+
+    if (!this.waterProbe)
+      this.waterProbe = new WaterProbe(
+        renderer.device,
+        this.ocean,
+        this.waterWaves.buffer(renderer.device),
+        this.shoreField,
+        renderer.samplerManager.get('linear-clamped')
+      );
+    this.waterProbe.update(
+      renderer.device,
+      this.waterQuery,
+      waves.originX,
+      waves.originZ
+    );
   }
 
   /** Draws the sea spray over the composited HDR scene in `target`. */
@@ -1158,6 +1185,8 @@ export class TerrainRenderer {
     this.waterWaves.dispose();
     this.seaSpray?.dispose();
     this.seaSpray = null;
+    this.waterProbe?.dispose();
+    this.waterProbe = null;
     this.ocean?.dispose();
     this.ocean = null;
     this.scatterModels.dispose();

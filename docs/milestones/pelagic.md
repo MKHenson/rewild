@@ -932,11 +932,18 @@ Authored water is a **water edit** per chunk (`WaterEdit`), at the water map's r
 
 ## Gameplay
 
-- A **water query**: `sample(x, z)` gives level, depth, coverage, type weights, body ID and
-  flow from the same data as the shader, and the wave height from a GPU readback.
-- The readback samples the FFT displacement for a few points a frame and arrives a frame or three
-  late. The displacement is sideways as well as up, so a point's height is found by solving for
-  the rest position that lands on it, a few fixed-point steps.
+- A **water query** (`TerrainRenderer.waterQuery`): `sample(x, z, out, probe)` gives the level,
+  ground, depth, coverage, type weights, body ID and flow at once. It reads the chunk's water map
+  as the shader does: filtered bilinearly, the weights normalised, the body from the nearest
+  texel. The depth is measured from the full-resolution ground. `waterAt(x, z)` logs it in the
+  console.
+- **Wave height** comes from a GPU probe (`WaterProbe`). A caller takes a probe
+  (`acquireProbe`) and samples with it each frame, and gets the height the probe last reported,
+  a few frames old. The probe moves the point with the same function as the water's vertices
+  (`surfaceDisplacement` in `water-surface.wgsl`): the cascades, the shore waves and the swash,
+  held by the depth. The displacement is sideways as well as up, so it finds the rest position
+  that lands on the point in four fixed-point steps. The depth and type it uses are the map's at
+  the point. There are 16 probes, one dispatch a frame and up to three readbacks in flight.
 - The player does not walk on water. Shallow water slows the player. Deep water makes the player
   swim at the surface.
 - The camera knows when it is under water, from the water probe (see [Under water](#under-water)).
@@ -1078,7 +1085,7 @@ through the water:
 3. **Surface detail.** The FFT ocean from the wind, whitecaps, crest glow, sea spray,
    refraction, sun glint, the wet band and waves at the shore.
 4. **Editor and gameplay.** Water brush, edit rules and spill height, sea channels, locked lakes,
-   saved edits, water query with CPU waves, wading and swimming.
+   saved edits, water query with probed waves, wading and swimming.
 5. **Stretch.** [Under water](#under-water) (the view, the waterline on the lens, caustics),
    rain ripples on water, sharper foam, noise-channel rivers.
 
@@ -1098,6 +1105,8 @@ through the water:
   eight frames, then a fast-sweeping solve (about 4 ms), the extension past the reached water
   (about 4 ms), and a pack and upload (about 3 ms) on three more. The swash field packs and
   uploads with the shore field.
+- The water probe: one dispatch over 16 points while any is asked for, each five displacement
+  evaluations, and a 256-byte readback.
 - Terrain pixels in a chunk with a water map take a surface, a type and a swash field sample.
   Chunks without one skip them.
 - The horizon ring is one draw call. Its vertices take no waves, and its pixels skip refraction.

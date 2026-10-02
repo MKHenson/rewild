@@ -31,6 +31,7 @@ export * from './core/PhysicsShape';
 export * from './renderers/terrain/Biomes';
 export * from './renderers/terrain/Water';
 export * from './renderers/terrain/WaterMap';
+export * from './renderers/water/WaterQuery';
 export * from './renderers/terrain/ChunkSnapshot';
 export * from './renderers/terrain/Sculpt';
 export * from './renderers/terrain/PaintMask';

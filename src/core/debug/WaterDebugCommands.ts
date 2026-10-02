@@ -1,4 +1,4 @@
-import { Renderer } from 'rewild-renderer';
+import { Renderer, createWaterQuerySample } from 'rewild-renderer';
 
 // Water surface inspection. An artefact on the water can come from the waves
 // displacing the grid or from the per-pixel normal shading it; these pull the
@@ -80,6 +80,35 @@ export function registerWaterDebugCommands(renderer: Renderer) {
     console.log(
       `setWaterRefractionDebug(${mode}) — ${views[mode] ?? 'unknown view'}.`
     );
+  };
+
+  // Reads the water query at a point, holding a probe for a few frames so the
+  // wave height has landed. Defaults to the viewer's position.
+  (window as any).waterAt = (x?: number, z?: number) => {
+    const terrain = renderer.terrainRenderer;
+    const px = x ?? terrain.viewerPosition.x;
+    const pz = z ?? terrain.viewerPosition.z;
+    const query = terrain.waterQuery;
+    const probe = query.acquireProbe();
+    if (probe < 0) {
+      console.log('waterAt — every probe is taken.');
+      return;
+    }
+    const out = createWaterQuerySample();
+    let frames = 0;
+    const tick = () => {
+      const loaded = query.sample(px, pz, out, probe);
+      if (loaded && ++frames < 10) {
+        requestAnimationFrame(tick);
+        return;
+      }
+      query.releaseProbe(probe);
+      console.log(
+        `waterAt(${px.toFixed(1)}, ${pz.toFixed(1)})${loaded ? '' : ' — ground not loaded'}:`,
+        { ...out, typeWeights: Array.from(out.typeWeights) }
+      );
+    };
+    tick();
   };
 
   (window as any).shoreFieldStats = () => {
