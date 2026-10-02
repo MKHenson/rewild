@@ -228,14 +228,15 @@ export class OceanFFT {
   /**
    * Advances the ocean by `deltaSeconds` under the weather's wind (`windX`,
    * `windZ` the direction the air moves, `windiness` 0..1) and encodes this
-   * frame's transforms.
+   * frame's transforms. `timestamps` times the compute pass (GpuPassTimer).
    */
   update(
     device: GPUDevice,
     deltaSeconds: number,
     windX: number,
     windZ: number,
-    windiness: number
+    windiness: number,
+    timestamps?: GPURenderPassTimestampWrites
   ): void {
     const length = Math.hypot(windX, windZ);
     const targetX = length > 0 ? windX / length : this.windX;
@@ -299,7 +300,10 @@ export class OceanFFT {
     device.queue.writeBuffer(this.params, 0, s);
 
     const encoder = device.createCommandEncoder({ label: 'ocean fft' });
-    const pass = encoder.beginComputePass({ label: 'ocean fft' });
+    const pass = encoder.beginComputePass({
+      label: 'ocean fft',
+      timestampWrites: timestamps as unknown as GPUComputePassTimestampWrites,
+    });
     const tiles = FFT_SIZE / 16;
     if (rebuild) {
       this.dispatch(pass, this.init, tiles, tiles, CASCADE_COUNT);

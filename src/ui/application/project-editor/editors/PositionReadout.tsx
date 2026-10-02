@@ -26,23 +26,25 @@ interface Props {
 }
 
 const STORAGE_KEY = 'rewild.editor.positionReadout';
+const WEATHER_KEY = 'rewild.editor.lensEffects';
 const REFRESH_MS = 200;
 // Lakes are searched this far around the camera, and searched again once the
 // camera has moved a share of it.
 const LAKE_SEARCH_METRES = 4000;
 const LAKE_REFRESH_METRES = 500;
 
-function readShown(): boolean {
+function readFlag(key: string, fallback: boolean): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) === '1';
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : value === '1';
   } catch {
-    return false;
+    return fallback;
   }
 }
 
-function writeShown(shown: boolean): void {
+function writeFlag(key: string, on: boolean): void {
   try {
-    localStorage.setItem(STORAGE_KEY, shown ? '1' : '0');
+    localStorage.setItem(key, on ? '1' : '0');
   } catch {
     // Storage is a convenience; the toggle still works for this session.
   }
@@ -173,11 +175,14 @@ function describePainted(painted: PaintedWater): string {
 
 // A toggle in the viewport's top right: the camera's world position, the
 // climate biomes under it, the ground height, and the water under it or else
-// the nearest lake, painted or generated.
+// the nearest lake, painted or generated. Under it, a toggle for the lens
+// effects (Renderer.lensEffects), the blur and drops: off gives a clear view
+// to edit in.
 @register('x-position-readout')
 export class PositionReadout extends Component<Props> {
   init() {
-    const [shown, setShown] = this.useState(readShown());
+    const [shown, setShown] = this.useState(readFlag(STORAGE_KEY, false));
+    const [weather, setWeather] = this.useState(readFlag(WEATHER_KEY, true));
 
     const position = new Vector3();
     const lakeSpace = new Float64Array(2);
@@ -338,12 +343,26 @@ export class PositionReadout extends Component<Props> {
         variant="ghost"
         onClick={() => {
           const next = !shown();
-          writeShown(next);
+          writeFlag(STORAGE_KEY, next);
           setShown(next);
         }}>
         <StyledIcon icon="map-pin" size="s" />
       </Button>
     ) as unknown as Button;
+
+    const weatherToggle = (
+      <Button
+        variant="ghost"
+        onClick={() => {
+          const next = !weather();
+          writeFlag(WEATHER_KEY, next);
+          setWeather(next);
+        }}>
+        <StyledIcon icon="cloud-rain-wind" size="s" />
+      </Button>
+    ) as unknown as Button;
+    (weatherToggle as unknown as HTMLElement).title =
+      'Lens effects: blur and drops';
 
     const panel = (
       <div class="panel">
@@ -377,17 +396,26 @@ export class PositionReadout extends Component<Props> {
     const elm = (
       <div class="readout">
         <div class="toggle">{toggle}</div>
+        <div class="toggle">{weatherToggle}</div>
         {panel}
       </div>
     );
 
     this.onMount = () => {
+      this.props.renderer.lensEffects = weather();
       if (shown()) start();
     };
-    this.onCleanup = stop;
+    // The game shares the renderer, so leaving the editor gives the lens
+    // effects back.
+    this.onCleanup = () => {
+      stop();
+      this.props.renderer.lensEffects = true;
+    };
 
     return () => {
       toggle.selected = shown();
+      weatherToggle.selected = weather();
+      this.props.renderer.lensEffects = weather();
       panel.hidden = !shown();
       if (shown() && this.isConnected) start();
       else stop();

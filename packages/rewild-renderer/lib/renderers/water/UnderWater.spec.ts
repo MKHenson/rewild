@@ -3,7 +3,8 @@ import { WaterMap } from '../terrain/WaterMap';
 import { toFloat16 } from '../../utils/float16';
 import {
   UNDER_WATER_FLOATS,
-  UNDER_WATER_PROBE_OFFSET,
+  UNDER_WATER_PROBE_OFFSETS,
+  LENS_PROBE_STEP,
   UnderWater,
   WAVE_REACH,
   blendWaterOptics,
@@ -72,6 +73,8 @@ function makeQuery(water: WaterMap | null) {
 
 const SUN = [0, 1, 0];
 const RADIANCE = [10, 10, 10];
+const NEAR = 0.1;
+const MATRIX = Array.from({ length: 16 }, (_, i) => i);
 
 describe('refractedSunCosine', () => {
   it('is 1 for a sun overhead and 0 for one that is down', () => {
@@ -105,7 +108,18 @@ describe('UnderWater.update', () => {
     const { device } = fakeDevice();
     const query = makeQuery(flatMap());
     const underWater = new UnderWater();
-    underWater.update(device, query, [OCEAN], 0, LEVEL + 1, 0, SUN, RADIANCE);
+    underWater.update(
+      device,
+      query,
+      [OCEAN],
+      0,
+      LEVEL + 1,
+      0,
+      SUN,
+      RADIANCE,
+      NEAR,
+      MATRIX
+    );
     expect(underWater.covered).toBe(true);
     expect(underWater.possible).toBe(true);
     underWater.update(
@@ -116,7 +130,9 @@ describe('UnderWater.update', () => {
       LEVEL + WAVE_REACH + 1,
       0,
       SUN,
-      RADIANCE
+      RADIANCE,
+      NEAR,
+      MATRIX
     );
     expect(underWater.possible).toBe(false);
   });
@@ -124,13 +140,24 @@ describe('UnderWater.update', () => {
   it('is out of the water where none covers the camera', () => {
     const { device } = fakeDevice();
     const underWater = new UnderWater();
-    underWater.update(device, makeQuery(null), [OCEAN], 0, 0, 0, SUN, RADIANCE);
+    underWater.update(
+      device,
+      makeQuery(null),
+      [OCEAN],
+      0,
+      0,
+      0,
+      SUN,
+      RADIANCE,
+      NEAR,
+      MATRIX
+    );
     expect(underWater.covered).toBe(false);
     expect(underWater.possible).toBe(false);
     expect(underWater.submerged).toBe(false);
   });
 
-  it('writes every field but the probe, which the GPU copies in', () => {
+  it('writes every field but the probes, which the GPU copies in', () => {
     const { device, uniform } = fakeDevice();
     const underWater = new UnderWater();
     underWater.update(
@@ -141,23 +168,29 @@ describe('UnderWater.update', () => {
       2,
       0,
       SUN,
-      RADIANCE
+      RADIANCE,
+      NEAR,
+      MATRIX
     );
-    const probe = UNDER_WATER_PROBE_OFFSET / 4;
+    // The probes, from the second vec4 to the fourth, are the GPU's.
+    const probes = UNDER_WATER_PROBE_OFFSETS[0] / 4;
     for (let i = 0; i < UNDER_WATER_FLOATS; i++)
-      if (i >= probe && i < probe + 4) expect(uniform[i]).toBeNaN();
+      if (i >= probes && i < probes + 12) expect(uniform[i]).toBeNaN();
       else expect(uniform[i]).not.toBeNaN();
     expect(uniform[0]).toBe(1);
     expect(uniform[1]).toBe(2);
     expect(uniform[2]).toBeCloseTo(LEVEL);
     expect(uniform[3]).toBeCloseTo(LEVEL - 20);
-    expect(uniform[12]).toBeCloseTo(OCEAN.inScatter[0]);
-    expect(uniform[8]).toBeCloseTo(OCEAN.absorption[0] + OCEAN.turbidity);
+    expect(uniform[16]).toBeCloseTo(OCEAN.absorption[0] + OCEAN.turbidity);
+    expect(uniform[20]).toBeCloseTo(OCEAN.inScatter[0]);
     // An overhead sun goes straight down, at its full radiance less the share
     // the surface reflects.
-    expect(uniform[19]).toBeCloseTo(1);
-    expect(uniform[16]).toBeCloseTo(9.8);
-    expect(uniform[21]).toBeCloseTo(1);
+    expect(uniform[24]).toBeCloseTo(9.8);
+    expect(uniform[27]).toBeCloseTo(1);
+    expect(uniform[29]).toBeCloseTo(1);
+    expect(uniform[32]).toBeCloseTo(NEAR);
+    expect(uniform[33]).toBeCloseTo(LENS_PROBE_STEP);
+    expect(Array.from(uniform.subarray(36, 52))).toEqual(MATRIX);
   });
 
   it('takes the camera out of the water when cleared', () => {
@@ -171,7 +204,9 @@ describe('UnderWater.update', () => {
       2,
       0,
       SUN,
-      RADIANCE
+      RADIANCE,
+      NEAR,
+      MATRIX
     );
     underWater.clear(device);
     expect(underWater.possible).toBe(false);

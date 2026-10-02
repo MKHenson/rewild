@@ -22,29 +22,37 @@
 
 const WIND_TAU = 6.28318530718;
 // Metres a gust feature spans, and how far the field travels per full-wind
-// second — the 10 m/s the rain leans by at strength 1.
+// second — near the rain's gale wind, so a gust sweeps through in a second or
+// two rather than sitting over a wood.
 const GUST_LENGTH = 60.0;
-const GUST_SPEED = 10.0;
+const GUST_SPEED = 20.0;
 // Fraction of the gust speed the finest octave is blown at.
 const EDDY_DRIFT = 0.55;
 
-fn windHash(p: vec2f) -> f32 {
-  return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.5453);
+// 0..1 for a cell, from integer arithmetic alone, so the CPU's copy
+// (GustField.ts) reads the same gusts the foliage bends to.
+fn windHash(cell: vec2i) -> f32 {
+  var h = (bitcast<u32>(cell.x) * 0x8da6b343u) ^ (bitcast<u32>(cell.y) * 0xd8163841u);
+  h = (h ^ (h >> 16u)) * 0x7feb352du;
+  h = (h ^ (h >> 15u)) * 0x846ca68bu;
+  h = h ^ (h >> 16u);
+  return f32(h >> 8u) / 16777216.0;
 }
 
 // Value noise, 0..1, smooth across cells.
 fn windNoise(p: vec2f) -> f32 {
-  let i = floor(p);
-  let f = fract(p);
+  let i = vec2i(floor(p));
+  let f = p - floor(p);
   let u = f * f * (3.0 - 2.0 * f);
   return mix(
-    mix(windHash(i), windHash(i + vec2f(1.0, 0.0)), u.x),
-    mix(windHash(i + vec2f(0.0, 1.0)), windHash(i + vec2f(1.0, 1.0)), u.x),
+    mix(windHash(i), windHash(i + vec2i(1, 0)), u.x),
+    mix(windHash(i + vec2i(0, 1)), windHash(i + vec2i(1, 1)), u.x),
     u.y
   );
 }
 
-// The gust field at world xz, 0..1, blown downwind: the point a sample reads
+// The gust field at world xz, 0..1, blown downwind (GustField.ts mirrors
+// it for the CPU — change both together): the point a sample reads
 // moves upwind through it over time, so its features come toward the viewer
 // with the wind. Three octaves, each offset so none lines up with another.
 // The finest is blown slower than the gusts it rides in, so it drifts through

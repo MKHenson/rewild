@@ -963,6 +963,19 @@ Authored water is a **water edit** per chunk (`WaterEdit`), at the water map's r
   stays at least its height above the feet plus 0.1 m over the bed, so a rising bed lifts them.
   A swimmer who stops within 0.4 m of the floating height floats again. C is the crouch key on
   land; Left Ctrl is not used, as Ctrl+W closes the browser tab.
+- **Headwind.** A gale holds back a player walking into it (`Headwind.ts`): full drag within
+  20° of straight into the wind, easing out by 45° either side, ramping in from windiness 0.8.
+  At windiness 1 a player walking into the wind keeps 45% of their speed. It goes by the
+  way the player walks, not where they look, and leaves swimmers alone.
+- **Gusts.** A gale's gusts shove the player downwind whatever they do: up to 4 m/s at a full
+  gale's strongest (`GUST_PUSH`), building and easing over 0.3 s. That is enough to push a
+  player back while they walk into it, or off a ridge. The gusts are the foliage's own gust
+  field (`gustField` in `scatter-wind.wgsl`), mirrored on the CPU in `GustField.ts` and read
+  where the player stands, so a shove lands as the trees around them bend. The field's hash is
+  integer arithmetic on both sides, so the two agree exactly. The field drifts at 20 m/s in
+  full wind, near the rain's gale wind. `gustShare` reads only its peaks, 0 below 0.6 and 1 by
+  0.8, so a fixed point in full wind is in a gust about a quarter of the time, in bursts of
+  1.7 s on average.
 - The camera knows when its eye is below the surface (`Player.cameraUnderWater`), from the same
   sample. The under-water view uses the GPU probe at the camera instead (see
   [Under water](#under-water)).
@@ -995,19 +1008,17 @@ The camera holds one of the water query's probes (`UnderWater`, `TerrainRenderer
   (`WAVE_REACH`). Then the probe decides. Farther above, or over no water, nothing under-water
   runs.
 
-Farther than **0.35 m** from the surface, the near plane cannot reach it, and the whole view is
-in the camera's medium: a single value from the probe. Only within that band can the surface
-cross the lens.
+The camera also holds two more probes, 0.25 m along +x and along +z (`LENS_PROBE_STEP`). The
+three give the surface's height and slope over the lens.
 
 ### Medium at the lens
 
-While the camera is within 0.35 m of the surface, a full-screen pass writes the medium per pixel
-into an `r8unorm` texture: the point where the pixel's ray meets the near plane, tested against
-the wave height at its xz (the probe's solve). The waterline on the lens is where this flips.
-Outside the band the pass does not run, and the medium is the probe's.
-
-The water draws cannot write this themselves. They share a render pass with the transparent
-pipelines, and an extra attachment would have to be declared by every one of them.
+The lens spans centimetres, so the surface over it is the plane through the three probes. Each
+pixel's ray meets the near plane at a point; the pixel is in water where that point lies below
+the plane (`lensWaterDepth`, `lensInWater` in `under-water.wgsl`). This takes a few operations,
+so every pass that cares asks per pixel: the atmosphere composite, the water fog, and the water
+surface's choice of face. No medium texture is written. The waterline on the lens is where the
+answer flips.
 
 ### The surface from below
 
@@ -1073,15 +1084,45 @@ through the water:
 
 ### The waterline on the lens
 
-- **Meniscus.** Where the medium flips, a band up to 16 px either side acts as a rounded water
-  edge: samples bend away from the line, a dark contact line sits on it, and a bright rim
-  follows. The composite finds the line by searching the medium texture along the screen's
-  vertical, which assumes the camera does not roll.
-- **Droplets.** On surfacing, drops of many sizes stay on the lens. Each is a small lens with a
-  blurred, flipped view of the scene, a sky highlight and a dark edge. Small drops cling and
-  evaporate. Large ones slide down after a random delay and leave a thin wet trail. The lens is
-  dry after 9 s. They draw after the tonemap at output resolution, so they stay stuck to the
-  lens as the view moves. Going under clears them.
+Water on the lens draws over the composited frame, before bloom and the tonemap (`WaterLens`,
+`water-lens.wgsl`). It copies the frame with a mip chain, then redraws it, and runs only while
+there is something to show: the camera under water or near the surface, the blur still
+clearing, a gale, or drops on the lens.
+
+- **Meniscus.** The lens's water depth over its screen gradient gives each pixel's signed
+  distance in pixels to the waterline, at any roll. Within 16 px either side, samples bend away
+  from the line by up to 6 px, a dark contact line 1.5 px wide sits on it, and a bright rim
+  follows on the water side.
+- **Blur.** Water on the eye blurs the view: where the lens is in water, by `underWater` of the
+  frame's height (1.2% by default), sampled on a ring of 8 taps at the mip that matches. After
+  surfacing the air side starts as blurred and clears over `recovery` seconds (3 by default),
+  easing out. Goggles turn `underWater` down; 0 is clear.
+- **Wind.** In a gale the eyes water: from windiness 0.8 to 1 the air side of the lens blurs
+  toward the screen's edges. The middle stays clear; from `windClear` (30%) of the way out to
+  the corners the blur grows, as its share squared, to `wind` of the frame's height (1.2% by
+  default) at the corners. It is full looking into the wind and eases to none with the wind
+  behind (`windFacing`). The eye keeps refocusing: the clear middle's edge swings by
+  `windSwing` (0.25) either way on an irregular signal of about 0.3 to 1.2 a second
+  (`eyeAdjust`), more the windier it is. Gusts drive the blur's strength: the foliage's gust
+  field read at the camera (`GustField.ts`), so the eyes water as the trees around bend, and the
+  eye follows it quickly as a gust hits and slowly as it passes (`followGust`, a quarter second and a second
+  and a half). Between gusts the blur falls to 0.4 of its strength. Under water there is no
+  wind. `setWaterLens({ underWater, recovery, wind, windStart, windClear, windSwing })` sets
+  these in the console.
+- **Droplets** (`LensDrops`). On surfacing, 120 drops stay on the lens, a third of them large.
+  Small drops cling and evaporate. Large ones hang for 0.3 to 2.8 s, then slide down faster and
+  faster, leaving a thin wet trail that dries behind them. The lens is dry after 9 s. Going under
+  clears them. Surfacing is read from the probe's readback, a few frames late. The drops are
+  drawn in screen space, so they stay stuck to the lens as the view moves.
+- **Drop shape** (after Tidewater's lens droplets, MIT). Each outline wobbles by two sine lobes,
+  3 and 5 to a turn, at phases from the drop's own seed, and a sliding drop stretches along its
+  fall as it gathers speed. A drop is a strong fisheye lens: the scene inside is inverted and
+  moved along its surface, blurred, darkened toward its edge, with a highlight scaled by what it
+  shows. A trail is blurred and darkened.
+- **Rain** lands drops on the lens while it is in air (`lensRain`): up to 60 a second, scaled by
+  the precipitation and by the snow-to-rain blend over temperature 0 to 0.5 that the rain itself
+  uses. Rain drops are smaller and shorter-lived than the ones left on surfacing; about one in
+  eight is large enough to slide. In rain alone the full-screen lens draw is skipped and only the drops draw.
 
 ### Lighting under water
 
@@ -1105,7 +1146,9 @@ through the water:
 
 - The probe runs every frame the camera stands over water, as one of its points. The back faces
   rasterise but are discarded from above.
-- The medium pass runs only while the surface is within 0.35 m of the camera.
+- The lens pass runs only while the camera is under water or within a metre of the surface,
+  the view is still clearing, the windiness is over 0.8, or drops are on the lens: a frame copy, its mips, and one
+  full-screen draw with 9 taps a pixel, plus the drops.
 - The fog is two full-screen draws, and only while the camera is within 15 m of the level.
 - The shafts and marine snow are the extras. They are the parts a low quality tier turns off.
   The fog, the surface from below and the waterline are not: without them the view is wrong,
@@ -1152,7 +1195,14 @@ through the water:
 - Terrain pixels in a chunk with a water map take a surface, a type and a swash field sample.
   Chunks without one skip them.
 - The horizon ring is one draw call. Its vertices take no waves, and its pixels skip refraction.
-- `QualitySettings` controls the ocean's slope mip bias.
+- `QualitySettings` (the `water` aspect, `WaterQuality.ts`) controls the ocean's slope mip bias
+  and the lens: ultra and high keep every drop, an 8-tap ring for the blur and blurred trails;
+  medium keeps 60% of the drops and 6 taps; low 30% of the drops, 4 taps and one sample a
+  trail. The drop share scales the pool, the drops left on surfacing and the rain's rate.
+- Each drop draws two quads, its body and a strip as wide as its trail above it, so a long
+  trail does not shade a body-wide column up the screen.
+- GPU timers (`gpu/water`): `ocean`, the FFT's compute pass; `lens-frame`, the lens's mip
+  chain over the frame copy; `lens`, its full-screen draw and the drops.
 
 ## Open questions
 
@@ -1169,5 +1219,3 @@ through the water:
   and scatter materials take the camera's water. A rock in a lake seen from the sea, or below
   the level on dry land beside the camera's water, is dimmed wrongly or not at all. A level map
   around the camera, or the chunk's map bound per draw, would fix both.
-- **Camera roll.** The meniscus search runs along the screen's vertical. If a camera can roll,
-  the search must follow the waterline's direction on screen.

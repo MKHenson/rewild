@@ -1,4 +1,6 @@
 import {
+  gustField,
+  gustShare,
   ICameraController,
   WaterQuery,
   createWaterQuerySample,
@@ -35,6 +37,11 @@ import {
   wadeSpeedShare,
   waterDrag,
 } from './utils/Swimming';
+import {
+  easeGustPush,
+  gustPushSpeed,
+  headwindSpeedShare,
+} from './utils/Headwind';
 
 const _euler = new Euler(0, 0, 0, EulerRotationOrder.YXZ);
 const _PI_HALF = Math.PI / 2 - 0.01;
@@ -93,6 +100,8 @@ export class Player extends Node {
   private _swimHold: f32 = NaN;
   private _waterProbe = -1;
   private _waterQuery: WaterQuery | null = null;
+  // Metres a second the wind's gusts shove the player downwind.
+  private _gustPush: f32 = 0;
   uiHealthBar: UIElementHealthPass;
 
   // Pointer-lock / mouse-look state
@@ -467,6 +476,25 @@ export class Player extends Node {
     if (this._movingLeft) {
       moveX -= cosYaw * speed * dt;
       moveZ += sinYaw * speed * dt;
+    }
+
+    // A gale holds back a player walking into it, and its gusts shove them
+    // downwind, arriving with the gusts the trees around them bend to.
+    const wind = stateData?.renderer?.sky?.skyRenderer?.wind.vec;
+    if (wind && !this.swimming) {
+      const share = headwindSpeedShare(moveX, moveZ, wind[0], wind[1], wind[2]);
+      moveX *= share;
+      moveZ *= share;
+      const gust = gustShare(gustField(body.x, body.z, wind));
+      this._gustPush = easeGustPush(
+        this._gustPush,
+        gustPushSpeed(gust, wind[2]),
+        delta
+      );
+      moveX += wind[0] * this._gustPush * delta;
+      moveZ += wind[1] * this._gustPush * delta;
+    } else {
+      this._gustPush = 0;
     }
 
     let moveY: f32 = gravityEnabled ? this.verticalVelocity * dt : 0.0;

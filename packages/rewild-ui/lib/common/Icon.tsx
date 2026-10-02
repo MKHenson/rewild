@@ -43,6 +43,7 @@ import {
   Box,
   MountainSnow,
   TrendingUpDown,
+  CloudRainWind,
   type IconNode,
 } from 'lucide';
 
@@ -62,6 +63,7 @@ const icons = {
   'circle-alert': CircleAlert,
   'circle-dot': CircleDot,
   'circle-plus': CirclePlus,
+  'cloud-rain-wind': CloudRainWind,
   droplet: Droplet,
   droplets: Droplets,
   eraser: Eraser,

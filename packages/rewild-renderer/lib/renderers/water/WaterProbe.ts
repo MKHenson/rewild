@@ -102,15 +102,15 @@ export class WaterProbe {
    * Probes the points `query` asked for since the last update, measured from
    * the waves' origin (`originX`, `originZ`), and hands the heights back to it
    * when the readback lands; while every readback is in flight, the results
-   * stay on the GPU. `copy`, when given, takes one point's result into a
-   * buffer the same frame.
+   * stay on the GPU. `copies`, when given, take points' results into other
+   * buffers the same frame.
    */
   update(
     device: GPUDevice,
     query: WaterQuery,
     originX: number,
     originZ: number,
-    copy?: ProbeCopy
+    copies?: readonly ProbeCopy[]
   ): void {
     if (!query.stage(originX, originZ, this.pointData, this.generations))
       return;
@@ -122,14 +122,15 @@ export class WaterProbe {
     pass.setBindGroup(0, this.group);
     pass.dispatchWorkgroups(Math.ceil(PROBE_POINTS / 16));
     pass.end();
-    if (copy)
-      encoder.copyBufferToBuffer(
-        this.results,
-        copy.sourceOffset,
-        copy.target,
-        copy.targetOffset,
-        PROBE_RESULT_FLOATS * 4
-      );
+    if (copies)
+      for (const copy of copies)
+        encoder.copyBufferToBuffer(
+          this.results,
+          copy.sourceOffset,
+          copy.target,
+          copy.targetOffset,
+          PROBE_RESULT_FLOATS * 4
+        );
     const slot = this.busy.indexOf(false);
     if (slot >= 0)
       encoder.copyBufferToBuffer(

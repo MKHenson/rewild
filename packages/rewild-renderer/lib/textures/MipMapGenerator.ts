@@ -31,7 +31,12 @@ export class MipMapGenerator {
    * `viewFormats`) to strip the `-srgb` suffix would silently be back to
    * averaging the encoding.
    */
-  generateMips(device: GPUDevice, texture: GPUTexture, baseArrayLayer = 0) {
+  generateMips(
+    device: GPUDevice,
+    texture: GPUTexture,
+    baseArrayLayer = 0,
+    timestamps?: GPURenderPassTimestampWrites
+  ) {
     // The module, sampler and pipelines all belong to the device that created
     // them, so a new device invalidates every cached object.
     if (this.device !== device) {
@@ -80,6 +85,25 @@ export class MipMapGenerator {
     let height = texture.height;
     let baseMipLevel = 0;
 
+    // `timestamps` (GpuPassTimer) spans the chain: its start on the first
+    // level's pass, its end on the last's.
+    let levels = 0;
+    for (
+      let w = width, h = height;
+      (w > 1 || h > 1) && levels + 1 < texture.mipLevelCount;
+      levels++
+    ) {
+      w = Math.max(1, (w / 2) | 0);
+      h = Math.max(1, (h / 2) | 0);
+    }
+    const span = timestamps as unknown as
+      | {
+          querySet: GPUQuerySet;
+          beginningOfPassWriteIndex: number;
+          endOfPassWriteIndex: number;
+        }
+      | undefined;
+
     // Stops at the chain the texture was created with, which may be shorter
     // than a full one.
     while (
@@ -108,8 +132,22 @@ export class MipMapGenerator {
 
       ++baseMipLevel;
 
+      const first = baseMipLevel === 1;
+      const last = baseMipLevel === levels;
       const renderPassDescriptor: GPURenderPassDescriptor = {
         label: 'our basic canvas renderPass',
+        timestampWrites:
+          span && (first || last)
+            ? ({
+                querySet: span.querySet,
+                beginningOfPassWriteIndex: first
+                  ? span.beginningOfPassWriteIndex
+                  : undefined,
+                endOfPassWriteIndex: last
+                  ? span.endOfPassWriteIndex
+                  : undefined,
+              } as unknown as GPURenderPassTimestampWrites)
+            : undefined,
         colorAttachments: [
           {
             view: texture.createView({

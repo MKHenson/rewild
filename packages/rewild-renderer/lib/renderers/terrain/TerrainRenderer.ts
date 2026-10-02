@@ -32,9 +32,11 @@ import { WaterWaveBuffer } from '../water/WaterWaves';
 import { waterDetailBias } from '../water/WaterQuality';
 import { OceanFFT } from '../water/OceanFFT';
 import { SeaSpray } from '../water/SeaSpray';
-import { ProbeCopy, WaterProbe } from '../water/WaterProbe';
-import { UnderWater, UNDER_WATER_PROBE_OFFSET } from '../water/UnderWater';
+import { WaterProbe } from '../water/WaterProbe';
+import { UnderWater } from '../water/UnderWater';
 import { UnderWaterFog } from '../water/UnderWaterFog';
+import { WaterLens, lensRain } from '../water/WaterLens';
+import { GpuPassTimer } from '../../metrics/GpuPassTimer';
 import { WaterQuery, WaterQuerySource } from '../water/WaterQuery';
 import { WaterMap } from './WaterMap';
 import { shoreWaveHeight } from '../water/ShoreWaves';
@@ -176,13 +178,14 @@ export class TerrainRenderer implements WaterQuerySource {
    *  passes that bind it are not rebuilt when the terrain resets. */
   readonly underWater = new UnderWater();
   private underWaterFog = new UnderWaterFog();
+  /** Water on the camera's lens: blur, the waterline and drops. */
+  readonly waterLens = new WaterLens();
+  // GPU time of the ocean's transforms and of the lens (gpu/water). Two
+  // timers, as the two run at opposite ends of the frame.
+  private oceanTimer: GpuPassTimer | null = null;
+  private lensTimer: GpuPassTimer | null = null;
   private toSun = new Float64Array(3);
   private sunRadiance = new Float64Array(3);
-  private cameraProbeCopy: ProbeCopy = {
-    sourceOffset: 0,
-    target: null as unknown as GPUBuffer,
-    targetOffset: UNDER_WATER_PROBE_OFFSET,
-  };
   /** Whether the waves displace the water grid. Off leaves them shading only,
    *  to tell a geometry artefact from a shading one. */
   waterWaveGeometry = true;
@@ -391,6 +394,10 @@ export class TerrainRenderer implements WaterQuerySource {
     this.scatterModels = new ScatterModels();
     this.horizonOcean = new HorizonOcean(renderer);
     this.shoreField = new ShoreField(renderer.device);
+    this.oceanTimer = new GpuPassTimer(renderer.metrics, 'gpu/water');
+    this.oceanTimer.init(renderer.device, ['ocean']);
+    this.lensTimer = new GpuPassTimer(renderer.metrics, 'gpu/water');
+    this.lensTimer.init(renderer.device, ['lens-frame', 'lens']);
   }
 
   /** Re-runs chunk and scatter visibility on the next update, without waiting
@@ -995,7 +1002,15 @@ export class TerrainRenderer implements WaterQuerySource {
     const waves = this.waterWaves.waves;
     waves.update(palette);
     if (!this.ocean) this.ocean = new OceanFFT(renderer.device);
-    this.ocean.update(renderer.device, deltaSeconds, wind[0], wind[1], wind[2]);
+    this.ocean.update(
+      renderer.device,
+      deltaSeconds,
+      wind[0],
+      wind[1],
+      wind[2],
+      this.oceanTimer?.writes('ocean')
+    );
+    this.oceanTimer?.resolve();
     const eye = camera.transform.position;
     waves.setOrigin(eye.x, eye.z);
 
@@ -1088,10 +1103,19 @@ export class TerrainRenderer implements WaterQuerySource {
       eye.y,
       eye.z,
       toSun,
-      this.sunRadiance
+      this.sunRadiance,
+      (camera as { near?: number }).near ?? 0.1,
+      camera.transform.matrixWorld.elements
     );
-    this.cameraProbeCopy.sourceOffset = underWater.probeResultOffset;
-    this.cameraProbeCopy.target = underWater.buffer(renderer.device);
+    const sky = renderer.sky.skyRenderer;
+    this.waterLens.update(
+      underWater,
+      deltaSeconds,
+      lensRain(sky.precipitation, sky.temperature),
+      sky.wind.vec,
+      eye.x,
+      eye.z
+    );
 
     if (!this.waterProbe)
       this.waterProbe = new WaterProbe(
@@ -1106,12 +1130,32 @@ export class TerrainRenderer implements WaterQuerySource {
       this.waterQuery,
       waves.originX,
       waves.originZ,
-      underWater.possible ? this.cameraProbeCopy : undefined
+      underWater.possible ? underWater.probeCopies : undefined
     );
   }
 
   /** Fogs the view in the water while the camera may be under it. Draws into
    *  the atmosphere composite's `pass`, after the atmosphere. */
+  /** Draws water on the lens over the composited scene, before the tonemap. */
+  renderLens(
+    renderer: Renderer,
+    camera: Camera,
+    scene: GPUTexture,
+    sceneView: GPUTextureView
+  ) {
+    if (!this._enabled || !renderer.lensEffects) return;
+    this.waterLens.render(
+      renderer,
+      renderer.sky.skyRenderer.wind.vec,
+      camera,
+      this.underWater,
+      scene,
+      sceneView,
+      this.lensTimer ?? undefined
+    );
+    this.lensTimer?.resolve();
+  }
+
   renderUnderWaterFog(renderer: Renderer, pass: GPURenderPassEncoder) {
     if (!this._enabled || !this.underWater.possible) return;
     this.underWaterFog.draw(
@@ -1239,9 +1283,14 @@ export class TerrainRenderer implements WaterQuerySource {
     this.seaSpray = null;
     this.waterProbe?.dispose();
     this.waterProbe = null;
+    this.waterLens.dispose();
+    this.oceanTimer?.dispose();
+    this.lensTimer?.dispose();
+    this.oceanTimer = null;
+    this.lensTimer = null;
     this.ocean?.dispose();
     this.ocean = null;
-    this.scatterModels.dispose();
-    this.workerPool.dispose();
+    this.scatterModels?.dispose();
+    this.workerPool?.dispose();
   }
 }
