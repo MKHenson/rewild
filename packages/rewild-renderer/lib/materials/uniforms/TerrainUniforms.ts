@@ -5,29 +5,30 @@ import { Mesh } from '../../core/Mesh';
 import { MAX_SPLAT_LAYERS } from '../../renderers/terrain/Biomes';
 import { MAX_WATER_TYPES, WaterType } from '../../renderers/terrain/Water';
 
-// TerrainParams layout (496 bytes, std140-compatible) — must match the struct
+// TerrainParams layout (624 bytes, std140-compatible) — must match the struct
 // in terrain.wgsl:
 //   detailFadeStart  f32             offset 0   (4 bytes)
 //   detailFadeEnd    f32             offset 4   (4 bytes)
 //   noiseScale       f32             offset 8   (4 bytes)
 //   heightBlendDepth f32             offset 12  (4 bytes)
 //   uvPerMetre       f32             offset 16  (4 bytes)
-//   layers           array<vec4f,24> offset 32  (384 bytes)
-//   water            vec4f           offset 416 (16 bytes)
-//   waterExtinction  array<vec4f,4>  offset 432 (64 bytes)
+//   layers           array<vec4f,32> offset 32  (512 bytes)
+//   water            vec4f           offset 544 (16 bytes)
+//   waterExtinction  array<vec4f,4>  offset 560 (64 bytes)
 //
 // `layers` starts at 32 because a uniform array of vec4f needs 16-byte
-// alignment, and the five scalars above spill into a second row. Three vec4f
+// alignment, and the five scalars above spill into a second row. Four vec4f
 // per splat channel, MAX_SPLAT_LAYERS channels:
-//   [slot*3    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
-//   [slot*3 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
-//   [slot*3 + 2] = (macroLayerIndex, macroNormalYSign, macroStrength, _pad)
+//   [slot*4    ] = (layerIndex, uvScale, macroUvScale, roughnessFactor)
+//   [slot*4 + 1] = (normalYSign, heightScale, occlusionStrength, blendDepth)
+//   [slot*4 + 2] = (macroLayerIndex, macroNormalYSign, macroStrength, _pad)
+//   [slot*4 + 3] = (macroFadeStart, macroFadeEnd, _pad, _pad)
 //
 // `water` is (base level, texels per side, centre x, centre z); texels 0 means
 // the chunk has no water map. `waterExtinction` is per water palette entry:
 // rgb absorption and a turbidity, per metre.
 const LAYERS_OFFSET_FLOATS = 32 / 4;
-const FLOATS_PER_LAYER = 12;
+const FLOATS_PER_LAYER = 16;
 const WATER_OFFSET_FLOATS =
   LAYERS_OFFSET_FLOATS + MAX_SPLAT_LAYERS * FLOATS_PER_LAYER;
 const WATER_EXTINCTION_OFFSET_FLOATS = WATER_OFFSET_FLOATS + 4;
@@ -70,6 +71,10 @@ export interface TerrainLayerParams {
   macroNormalYSign: number;
   // Macro-normal amplitude: 0 flat, 1 the source map's full tilt.
   macroStrength: number;
+  // View distance in metres over which the macro normal replaces the detail
+  // normal. macroFadeEnd 0 ⇒ use detailFadeStart/detailFadeEnd.
+  macroFadeStart: number;
+  macroFadeEnd: number;
 }
 
 export class TerrainUniforms implements ISharedUniformBuffer {
@@ -259,6 +264,10 @@ export class TerrainUniforms implements ISharedUniformBuffer {
       data[base + 9] = layer ? layer.macroNormalYSign : 1;
       data[base + 10] = layer ? layer.macroStrength : 0;
       data[base + 11] = 0; // _pad
+      data[base + 12] = layer ? layer.macroFadeStart : 0;
+      data[base + 13] = layer ? layer.macroFadeEnd : 0;
+      data[base + 14] = 0; // _pad
+      data[base + 15] = 0; // _pad
     }
 
     const water = this._water;

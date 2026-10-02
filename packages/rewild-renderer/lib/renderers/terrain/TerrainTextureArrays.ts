@@ -108,6 +108,8 @@ export function getClimateLayerParams(
       macroUvScale: material.macroUvScale ?? 0,
       macroLayerIndex: getTerrainMaterialLayer(macroSource.name),
       macroStrength: material.macroStrength ?? 1,
+      macroFadeStart: material.macroFadeStart ?? 0,
+      macroFadeEnd: material.macroFadeEnd ?? 0,
       heightScale: material.heightScale,
       roughnessFactor: material.roughness,
       occlusionStrength: material.occlusionStrength ?? 1,

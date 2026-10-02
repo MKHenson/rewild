@@ -28,6 +28,11 @@ export interface TerrainMaterial {
   // How much of the macro normal to apply, 0 (flat) to 1 (the map's full tilt).
   // Omitted ⇒ 1.
   macroStrength?: number;
+  // View distance in metres where the macro normal starts replacing the detail
+  // normal, and where it has replaced it fully. Set both or neither; omitted ⇒
+  // the quality tier's detail fade.
+  macroFadeStart?: number;
+  macroFadeEnd?: number;
   roughness: number;
   occlusionStrength?: number;
   // How softly this material hands over to its neighbours, in blend-score units
@@ -145,8 +150,12 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     armUrl: 'terrain/snow-field-aerial/snow_field_aerial_arm_1k.webp',
     heightUrl: 'terrain/snow-field-aerial/snow_field_aerial_height_1k.webp',
     heightScale: HEIGHT_SCALE * 0.5,
-    macroUvScale: MACRO_UV_SCALE,
+    macroUvScale: MACRO_UV_SCALE * 2.0,
+    macroStrength: 2.5,
     uvScale: DETAIL_UV_SCALE,
+    macroNormalFrom: 'marble_cliff_05',
+    macroFadeStart: 0,
+    macroFadeEnd: 800,
     roughness: ROUGHNESS * 0.55,
     normalConvention: 'opengl',
   },
@@ -169,7 +178,10 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     armUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_arm_1k.webp',
     heightUrl: 'terrain/aerial_rocks_01/aerial_rocks_01_disp_1k.webp',
     heightScale: HEIGHT_SCALE * 1.6,
-    macroUvScale: MACRO_UV_SCALE * 2,
+    macroUvScale: MACRO_UV_SCALE * 0.5,
+    macroStrength: 1.5,
+    macroFadeStart: 0,
+    macroFadeEnd: 200,
     uvScale: DETAIL_UV_SCALE,
     roughness: ROUGHNESS * 1.55,
     normalConvention: 'opengl',
@@ -181,8 +193,12 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     armUrl: 'terrain/marble-cliff-05/marble_cliff_05_arm_1k.webp',
     heightUrl: 'terrain/marble-cliff-05/marble_cliff_05_disp_1k.webp',
     heightScale: HEIGHT_SCALE * 2,
-    macroUvScale: MACRO_UV_SCALE * 2,
+    macroUvScale: MACRO_UV_SCALE * 1,
+    macroStrength: 2.0,
     uvScale: DETAIL_UV_SCALE * 0.5,
+    blendDepth: BLEND_DEPTH_SOFT,
+    macroFadeStart: 0,
+    macroFadeEnd: 800,
     roughness: ROUGHNESS * 0.8,
     normalConvention: 'opengl',
   },
@@ -212,6 +228,22 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     blendDepth: BLEND_DEPTH_SOFT,
     normalConvention: 'opengl',
   },
+  forest_leaves_03_1k: {
+    name: 'forest_leaves_03_1k',
+    albedoUrl: 'terrain/forest-leaves-03/forest_leaves_03_diff_1k.jpg',
+    normalUrl: 'terrain/forest-leaves-03/forest_leaves_03_nor_gl_1k.webp',
+    armUrl: 'terrain/forest-leaves-03/forest_leaves_03_arm_1k.webp',
+    heightUrl: 'terrain/forest-leaves-03/forest_leaves_03_disp_1k.webp',
+    heightScale: HEIGHT_SCALE * 2,
+    macroUvScale: MACRO_UV_SCALE * 2,
+    uvScale: DETAIL_UV_SCALE,
+    roughness: ROUGHNESS * 1.17,
+    blendDepth: BLEND_DEPTH_SOFT,
+    normalConvention: 'opengl',
+    macroStrength: 2.5,
+    macroFadeStart: 0,
+    macroFadeEnd: 200,
+  },
   forest_leaves_02: {
     name: 'forest_leaves_02',
     albedoUrl: 'terrain/forest-leaves-02/forest_leaves_02_diffuse_1k.jpg',
@@ -219,11 +251,14 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     armUrl: 'terrain/forest-leaves-02/forest_leaves_02_arm_1k.webp',
     heightUrl: 'terrain/forest-leaves-02/forest_leaves_02_disp_1k.webp',
     heightScale: HEIGHT_SCALE * 2,
-    macroUvScale: MACRO_UV_SCALE,
+    macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
     roughness: ROUGHNESS * 1.17,
     blendDepth: BLEND_DEPTH_SOFT,
     normalConvention: 'opengl',
+    macroStrength: 2.5,
+    macroFadeStart: 0,
+    macroFadeEnd: 200,
   },
   aerial_beach_01: {
     name: 'aerial_beach_01',
@@ -232,11 +267,14 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     armUrl: 'terrain/aerial-beach-01/aerial_beach_01_arm_1k.webp',
     heightUrl: 'terrain/aerial-beach-01/aerial_beach_01_disp_1k.webp',
     heightScale: HEIGHT_SCALE,
-    macroUvScale: MACRO_UV_SCALE,
+    macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE,
     roughness: ROUGHNESS * 1.17,
     blendDepth: BLEND_DEPTH_SOFT,
     normalConvention: 'opengl',
+    macroStrength: 2.5,
+    macroFadeStart: 0,
+    macroFadeEnd: 200,
   },
   aerial_beach_02: {
     name: 'aerial_beach_02',
@@ -272,10 +310,14 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     heightUrl: 'terrain/tiger-rock/tiger_rock_disp_1k.webp',
     macroNormalFrom: 'marble_cliff_05',
     heightScale: HEIGHT_SCALE * 1.8,
-    macroUvScale: MACRO_UV_SCALE * 2,
     uvScale: DETAIL_UV_SCALE * 2,
     roughness: ROUGHNESS * 0.85,
     normalConvention: 'opengl',
+    macroUvScale: MACRO_UV_SCALE * 3,
+    macroStrength: 4.0,
+    blendDepth: BLEND_DEPTH_SOFT,
+    macroFadeStart: 0,
+    macroFadeEnd: 400,
   },
   aerial_grass_rock: {
     name: 'aerial_grass_rock',
@@ -289,6 +331,9 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughness: ROUGHNESS * 1.17,
     blendDepth: BLEND_DEPTH_SOFT,
     normalConvention: 'opengl',
+    macroStrength: 2.5,
+    macroFadeStart: 0,
+    macroFadeEnd: 200,
   },
   grass_path_02_1k: {
     name: 'grass_path_02_1k',
@@ -302,19 +347,9 @@ export const TERRAIN_MATERIALS: Record<string, TerrainMaterial> = {
     roughness: ROUGHNESS * 1.07,
     blendDepth: BLEND_DEPTH_SOFT,
     normalConvention: 'opengl',
-  },
-  forest_leaves_03_1k: {
-    name: 'forest_leaves_03_1k',
-    albedoUrl: 'terrain/forest-leaves-03/forest_leaves_03_diff_1k.jpg',
-    normalUrl: 'terrain/forest-leaves-03/forest_leaves_03_nor_gl_1k.webp',
-    armUrl: 'terrain/forest-leaves-03/forest_leaves_03_arm_1k.webp',
-    heightUrl: 'terrain/forest-leaves-03/forest_leaves_03_disp_1k.webp',
-    heightScale: HEIGHT_SCALE * 2,
-    macroUvScale: MACRO_UV_SCALE,
-    uvScale: DETAIL_UV_SCALE,
-    roughness: ROUGHNESS * 1.17,
-    blendDepth: BLEND_DEPTH_SOFT,
-    normalConvention: 'opengl',
+    macroStrength: 2.5,
+    macroFadeStart: 0,
+    macroFadeEnd: 200,
   },
 };
 
@@ -373,7 +408,32 @@ export function validateTerrainMaterials(): void {
         throw new Error(
           `Terrain material '${material.name}' sets macroStrength without macroUvScale — it has no macro normal, so the strength would be ignored.`
         );
+      if (
+        material.macroFadeStart !== undefined ||
+        material.macroFadeEnd !== undefined
+      )
+        throw new Error(
+          `Terrain material '${material.name}' sets a macro fade without macroUvScale — it has no macro normal, so the fade would be ignored.`
+        );
     }
+
+    if (
+      (material.macroFadeStart === undefined) !==
+      (material.macroFadeEnd === undefined)
+    )
+      throw new Error(
+        `Terrain material '${material.name}' must set both macroFadeStart and macroFadeEnd, or neither.`
+      );
+
+    if (
+      material.macroFadeStart !== undefined &&
+      material.macroFadeEnd !== undefined &&
+      (material.macroFadeStart < 0 ||
+        material.macroFadeEnd <= material.macroFadeStart)
+    )
+      throw new Error(
+        `Terrain material '${material.name}' macro fade must satisfy 0 <= macroFadeStart < macroFadeEnd.`
+      );
 
     // There is one normal array, so a borrowed macro normal has to be a layer
     // in it — i.e. some material in this library. A name that isn't would
