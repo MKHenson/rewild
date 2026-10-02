@@ -90,6 +90,11 @@ export const ACCENT_ATTACH = ['twigs', 'forks'] as const;
 
 export type AccentAttach = (typeof ACCENT_ATTACH)[number];
 
+/** How an accent's cards are shaded: as the host's cutout is, or as one soft volume about the spine or its midpoint. */
+export const ACCENT_NORMALS = ['host', 'spine', 'sphere'] as const;
+
+export type AccentNormals = (typeof ACCENT_NORMALS)[number];
+
 /**
  * One accent: a population of cards hung plumb off the model, sourced from
  * their own stamps and sharing the cutout's atlas. A fern's spire, a poplar's
@@ -124,9 +129,17 @@ export interface AccentSpec {
   /** crown: the band of stem the cards attach over, as fractions down from the
    *  top. Null follows the fronds, 0..frondSpan. */
   depth: [number, number] | null;
+  /**
+   * host shades the cards as the host's cutout is. spine points every normal
+   * out from the spine and up by normalLean, so crossed planes agree where
+   * they meet and a plume shades as one volume under a low sun. sphere points
+   * them out from the card's midpoint instead, so a seed head darkens
+   * underneath. Both ship as their own primitive with authored normals.
+   */
+  normals: AccentNormals;
 }
 
-const ACCENT_DEFAULTS = { variance: 10, aspect: 0.5, segments: 1, planes: 1, sizeVariance: 0.2, curve: 0, flutter: 0.25, attach: 'twigs', depth: null } as const;
+const ACCENT_DEFAULTS = { variance: 10, aspect: 0.5, segments: 1, planes: 1, sizeVariance: 0.2, curve: 0, flutter: 0.25, attach: 'twigs', depth: null, normals: 'spine' } as const;
 
 const ACCENT_KEYS = ['stamps', 'count', 'pitch', 'length', ...Object.keys(ACCENT_DEFAULTS)] as const;
 
@@ -344,7 +357,7 @@ export const PARAM_SPEC = {
     types: LEAFY,
   },
 
-  accents: { type: 'accents', default: [], help: 'Cards hung plumb off the model, off their own stamps under sources/accents: [{ stamps, count, pitch, length, variance?, aspect?, segments?, planes?, sizeVariance?, curve?, flutter?, attach?, depth? }]. Spires at pitch 0, fruit and skirts at 180.', texture: true, types: LEAFY },
+  accents: { type: 'accents', default: [], help: 'Cards hung plumb off the model, off their own stamps under sources/accents: [{ stamps, count, pitch, length, variance?, aspect?, segments?, planes?, sizeVariance?, curve?, flutter?, attach?, depth?, normals? }]. Spires at pitch 0, fruit and skirts at 180.', texture: true, types: LEAFY },
   lods: { type: 'tiers', default: [], help: 'Coarser tiers, nearest first: [{ distance, radialSegments?, barkLevels?, leavesPerBranch?, leafScale?, cardSegments?, subdivisions? }]. Each override must be a key of the type.', types: TIERED },
 
   windAmplitude: { type: 'number', default: 0.4, help: 'ScatterWind amplitude for the emitted layer.', byType: { clump: 0.18 }, types: LEAFY },
@@ -570,6 +583,10 @@ function parseAccent(entry: unknown, source: string, modelType: ForgeType): Acce
   if (typeof attach !== 'string' || !(ACCENT_ATTACH as readonly string[]).includes(attach))
     throw new Error(`${source} key 'attach' must be one of ${ACCENT_ATTACH.join(', ')}, got '${String(raw.attach)}'.`);
 
+  const normals = raw.normals === undefined ? ACCENT_DEFAULTS.normals : raw.normals;
+  if (typeof normals !== 'string' || !(ACCENT_NORMALS as readonly string[]).includes(normals))
+    throw new Error(`${source} key 'normals' must be one of ${ACCENT_NORMALS.join(', ')}, got '${String(raw.normals)}'.`);
+
   let depth: [number, number] | null = null;
   if (raw.depth !== undefined && raw.depth !== null) {
     const pair = raw.depth;
@@ -594,6 +611,7 @@ function parseAccent(entry: unknown, source: string, modelType: ForgeType): Acce
     flutter: number('flutter', 0, 1, ACCENT_DEFAULTS.flutter),
     attach: attach as AccentAttach,
     depth,
+    normals: normals as AccentNormals,
   };
 }
 

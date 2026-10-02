@@ -70,6 +70,9 @@ interface GltfPrimitive {
   };
   indices: number;
   material: number;
+  /** Read by the engine: these normals are not the triangles' own, so a back
+   *  face must not mirror them. */
+  extras?: { authoredNormals: true };
 }
 
 interface Gltf {
@@ -172,22 +175,33 @@ function addAccessor(
   return gltf.accessors.length - 1;
 }
 
-function addPrimitive(
+/**
+ * A piece's primitives on one material: its triangles, then its authored tail
+ * if it has one. Both read the same vertex accessors.
+ */
+function addPrimitives(
   gltf: Gltf,
   buffers: BufferBuilder,
   attributes: MeshAttributes,
   material: number
-): GltfPrimitive {
-  return {
-    attributes: {
-      POSITION: addAccessor(gltf, buffers, attributes.positions, 'VEC3', FLOAT, ARRAY_BUFFER, true),
-      NORMAL: addAccessor(gltf, buffers, attributes.normals, 'VEC3', FLOAT, ARRAY_BUFFER, false),
-      TEXCOORD_0: addAccessor(gltf, buffers, attributes.uvs, 'VEC2', FLOAT, ARRAY_BUFFER, false),
-      COLOR_0: addAccessor(gltf, buffers, attributes.colors, 'VEC4', FLOAT, ARRAY_BUFFER, false),
-    },
-    indices: addAccessor(gltf, buffers, attributes.indices, 'SCALAR', UNSIGNED_INT, ELEMENT_ARRAY_BUFFER, false),
-    material,
+): GltfPrimitive[] {
+  const vertices = {
+    POSITION: addAccessor(gltf, buffers, attributes.positions, 'VEC3', FLOAT, ARRAY_BUFFER, true),
+    NORMAL: addAccessor(gltf, buffers, attributes.normals, 'VEC3', FLOAT, ARRAY_BUFFER, false),
+    TEXCOORD_0: addAccessor(gltf, buffers, attributes.uvs, 'VEC2', FLOAT, ARRAY_BUFFER, false),
+    COLOR_0: addAccessor(gltf, buffers, attributes.colors, 'VEC4', FLOAT, ARRAY_BUFFER, false),
   };
+  const { indices, authoredFrom } = attributes;
+  const primitive = (from: number, to: number): GltfPrimitive => ({
+    attributes: vertices,
+    indices: addAccessor(gltf, buffers, indices.subarray(from, to), 'SCALAR', UNSIGNED_INT, ELEMENT_ARRAY_BUFFER, false),
+    material,
+  });
+
+  const primitives: GltfPrimitive[] = [];
+  if (authoredFrom > 0) primitives.push(primitive(0, authoredFrom));
+  if (authoredFrom < indices.length) primitives.push({ ...primitive(authoredFrom, indices.length), extras: { authoredNormals: true } });
+  return primitives;
 }
 
 /**
@@ -261,7 +275,7 @@ export function writeGlb({ name, mesh, textures, alphaCutoff }: GlbRequest): Buf
     // A piece a tier stripped to nothing keeps its material slot, so the
     // remaining pieces do not renumber between tiers of one model.
     if (piece.attributes.vertexCount)
-      primitives.push(addPrimitive(gltf, buffers, piece.attributes, gltf.materials.length - 1));
+      primitives.push(...addPrimitives(gltf, buffers, piece.attributes, gltf.materials.length - 1));
   }
 
   const bin = buffers.concat();

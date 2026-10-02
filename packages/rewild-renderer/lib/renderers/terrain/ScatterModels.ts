@@ -203,7 +203,8 @@ function collectPrimitives(
     // The cutout piece only. A tree ships bark and leaves as two materials and
     // these flags describe the leaves; a trunk's normals are its own.
     if (pass.alphaMode === 'MASK') {
-      if (cutout.authoredNormals) pass.authoredNormals = true;
+      if (cutout.authoredNormals || primitive.authoredNormals)
+        pass.authoredNormals = true;
       if (cutout.foliage) pass.foliage = true;
       if (cutout.foliageNormalMap) pass.foliageNormalMap = true;
     }

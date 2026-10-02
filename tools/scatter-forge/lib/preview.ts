@@ -221,19 +221,25 @@ function paint(
     const canvas = canvases[piece.key];
     if (!canvas) throw new Error(`No canvas for piece '${piece.key}'.`);
 
-    drawPrimitive(
-      target,
-      depth,
-      size,
-      piece.attributes,
-      project(views[index]),
-      canvas,
-      piece.cutout,
-      piece.cutout ? params.leafAlphaCutoff : 0,
-      piece.cutout,
-      piece.cutout ? mirrorCutout : true,
-      light
-    );
+    const view = project(views[index]);
+    const { indices, authoredFrom } = piece.attributes;
+    const draw = (from: number, to: number, mirror: boolean) =>
+      drawPrimitive(
+        target,
+        depth,
+        size,
+        { ...piece.attributes, indices: indices.subarray(from, to) },
+        view,
+        canvas,
+        piece.cutout,
+        piece.cutout ? params.leafAlphaCutoff : 0,
+        piece.cutout,
+        mirror,
+        light
+      );
+
+    draw(0, authoredFrom, piece.cutout ? mirrorCutout : true);
+    draw(authoredFrom, indices.length, false);
   });
 
   return target;
