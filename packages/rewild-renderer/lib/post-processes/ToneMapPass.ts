@@ -101,7 +101,7 @@ export class ToneMapPass {
     this.ensureSources(renderer, sceneTexture, bloomTexture);
     if (!this.bindGroup) return;
 
-    uniformData[0] = renderer.sky?.skyRenderer?.lightningFlash ?? 0;
+    uniformData[0] = renderer.sky?.skyRenderer?.flash?.glare ?? 0;
     // Read every frame rather than on change: it is one float in a buffer that
     // is already written each frame, so tracking dirtiness would cost more than
     // it saves and would be one more thing to get wrong.

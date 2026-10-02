@@ -28,6 +28,7 @@ const HAS_FOLIAGE_SHADING: bool = false;
 #include "./shader-lib/pbr-lighting.wgsl"
 #include "./shader-lib/ibl.wgsl"
 #include "./shader-lib/water-light.wgsl"
+#include "./shader-lib/rain-wet.wgsl"
 #include "./shader-lib/caustics.wgsl"
 #include "./shader-lib/foliage-lighting.wgsl"
 #include "./shader-lib/cloud-shadow.wgsl"
@@ -297,13 +298,15 @@ fn fs(
     outColor = shadeFoliage(baseColor, normal, surfaceViewPosition, sunShadow);
   } else {
     // A rough dielectric: bark and rock alike at the distance this draws.
+    let rainUp = (iblParams.viewToWorld * vec4f(normal, 0.0)).y;
+    let wetColor = rainWet(baseColor, 1.0, 0.0, rainUp, 0.0).color;
     var surface : PbrSurface;
     surface.normal = normal;
     surface.specularNormal = normal;
     surface.geometricNormal = normal;
     surface.viewPosition = surfaceViewPosition;
-    surface.diffuseColor = diffuseColorFromBaseColor(baseColor, 0.0);
-    surface.f0 = f0FromBaseColor(baseColor, 0.0);
+    surface.diffuseColor = diffuseColorFromBaseColor(wetColor, 0.0);
+    surface.f0 = f0FromBaseColor(wetColor, 0.0);
     surface.alpha = perceptualRoughnessToAlpha(1.0);
 
     let lit = accumulatePbrLighting(

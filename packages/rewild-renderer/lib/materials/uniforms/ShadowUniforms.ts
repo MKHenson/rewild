@@ -5,10 +5,14 @@ import { Camera } from '../../core/Camera';
 import { IVisualComponent } from '../../../types/interfaces';
 import { NUM_CASCADES } from '../../renderers/shadow/DirectionalShadowRenderer';
 import { SKY_CUBE_MIP_COUNT } from '../../renderers/sky/SkyCubeCapture';
+import { rainPatterLayers } from '../../renderers/water/WaterQuality';
 
 const _tempMat = new Matrix4();
 // IblParams in ibl.wgsl.
-const IBL_FLOATS = 28;
+const IBL_FLOATS = 40;
+// Seconds the raindrops' clock loops over: a whole number of their periods
+// (RAIN_PERIOD in rain-wet.wgsl), so the drops do not jump as it wraps.
+const RAIN_CLOCK_LOOP = 1000;
 
 /**
  * Manages bind group 3 — the scene-wide resources a material pass shades with.
@@ -60,7 +64,8 @@ export class ShadowUniforms implements ISharedUniformBuffer {
   private boundIrradianceMap: GPUTexture | null = null;
 
   /** viewToWorld (16) + intensity + maxSpecularMip + debugChannel + debugScale,
-   *  then water (4) and waterExtinction (4). */
+   *  then water (4), waterExtinction (4), rain (4), flash (4) and
+   *  rainPatter (4). */
   private iblData: Float32Array;
   /** Aliases iblData so debugChannel can be written as the u32 the shader reads. */
   private iblInts: Uint32Array;
@@ -257,6 +262,17 @@ export class ShadowUniforms implements ISharedUniformBuffer {
       this.iblData[25] = underWater.extinction[1];
       this.iblData[26] = underWater.extinction[2];
       this.iblData[27] = underWater.sunCosine;
+      const rain = renderer.sky.skyRenderer.rainWetness;
+      this.iblData[28] = rain.soak;
+      this.iblData[29] = rain.film;
+      const flash = renderer.sky.skyRenderer.flash.sky;
+      this.iblData[32] = flash[0];
+      this.iblData[33] = flash[1];
+      this.iblData[34] = flash[2];
+      const layers = rainPatterLayers(renderer.quality.aspect('water'));
+      this.iblData[36] = layers > 0 ? rain.falling : 0;
+      this.iblData[37] = layers;
+      this.iblData[38] = (renderer.totalDeltaTime / 1000) % RAIN_CLOCK_LOOP;
       device.queue.writeBuffer(this.iblBuffer, 0, this.iblData.buffer);
     }
 

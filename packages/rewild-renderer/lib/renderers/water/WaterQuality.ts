@@ -12,7 +12,8 @@ import { RenderQuality } from '../../utils/RenderQuality';
  * fewer taps, and take one sample for a trail.
  *
  * Under water, the light shafts and marine snow are the extras: medium keeps
- * half the snow, and low turns both off.
+ * half the snow, and low turns both off. Raindrops rippling wet surfaces and
+ * water take two layers, one on medium and none on low.
  */
 interface WaterQualityTier {
   /** Mip bias on the ocean slopes: lower is sharper. A uniform. */
@@ -28,6 +29,8 @@ interface WaterQualityTier {
   shafts: boolean;
   /** Share of the marine snow's specks drawn. */
   snowShare: number;
+  /** Layers of raindrops rippling wet surfaces and water; 0 is none. */
+  rainLayers: number;
 }
 
 const TIERS: Record<RenderQuality, WaterQualityTier> = {
@@ -38,6 +41,7 @@ const TIERS: Record<RenderQuality, WaterQualityTier> = {
     trailBlur: true,
     shafts: true,
     snowShare: 1,
+    rainLayers: 2,
   },
   high: {
     detailBias: 0,
@@ -46,6 +50,7 @@ const TIERS: Record<RenderQuality, WaterQualityTier> = {
     trailBlur: true,
     shafts: true,
     snowShare: 1,
+    rainLayers: 2,
   },
   medium: {
     detailBias: 0.5,
@@ -54,6 +59,7 @@ const TIERS: Record<RenderQuality, WaterQualityTier> = {
     trailBlur: true,
     shafts: true,
     snowShare: 0.5,
+    rainLayers: 1,
   },
   low: {
     detailBias: 1,
@@ -62,6 +68,7 @@ const TIERS: Record<RenderQuality, WaterQualityTier> = {
     trailBlur: false,
     shafts: false,
     snowShare: 0,
+    rainLayers: 0,
   },
 };
 
@@ -82,4 +89,9 @@ export function underWaterQuality(
   quality: RenderQuality
 ): Pick<WaterQualityTier, 'shafts' | 'snowShare'> {
   return TIERS[quality];
+}
+
+/** Layers of raindrops rippling wet surfaces and water at a tier. */
+export function rainPatterLayers(quality: RenderQuality): number {
+  return TIERS[quality].rainLayers;
 }

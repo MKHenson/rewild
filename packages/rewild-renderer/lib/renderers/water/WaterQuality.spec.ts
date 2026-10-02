@@ -1,4 +1,5 @@
 import {
+  rainPatterLayers,
   underWaterQuality,
   waterDetailBias,
   waterLensQuality,
@@ -34,5 +35,12 @@ describe('water quality tiers', () => {
     }
     expect(underWaterQuality('low').shafts).toBe(false);
     expect(underWaterQuality('low').snowShare).toBe(0);
+  });
+
+  it('ripples wet surfaces with fewer raindrop layers down the tiers', () => {
+    expect(rainPatterLayers('ultra')).toBe(2);
+    expect(rainPatterLayers('high')).toBe(2);
+    expect(rainPatterLayers('medium')).toBe(1);
+    expect(rainPatterLayers('low')).toBe(0);
   });
 });

@@ -211,19 +211,28 @@ fn shadeStandardSurface(
   // G is roughness and B is metallic, per glTF. A standalone grayscale
   // roughness map works in this slot too, since R = G = B in one.
   let metallicRoughnessSample = textureSample(metallicRoughnessMap, mySampler, uv);
-  let roughness = standardParams.roughness * metallicRoughnessSample.g;
+  let dryRoughness = standardParams.roughness * metallicRoughnessSample.g;
   let metallic = standardParams.metallic * metallicRoughnessSample.b;
+
+  // Rain darkens what soaks it up and glosses what faces the sky
+  // (rain-wet.wgsl).
+  let rainUp = (iblParams.viewToWorld * vec4f(geometricNormal, 0.0)).y;
+  let rain = rainWet(baseColor, dryRoughness, metallic, rainUp, 0.0);
+  let roughness = rain.roughness;
+  let wetColor = rain.color;
 
   var surface: PbrSurface;
 
-  surface.normal = normalize(tbn * normalSample);
-  surface.specularNormal = surface.normal;
+  // Raindrops ring the film on top (rain-wet.wgsl).
+  let patter = rainPatter(normalize(tbn * normalSample), viewPosition, iblParams.rain.y);
+  surface.normal = patter.normal;
+  surface.specularNormal = patter.normal;
   // Pre-perturbation, so horizon occlusion can tell how far the normal map has
   // tilted the shading normal off the triangle.
   surface.geometricNormal = geometricNormal;
   surface.viewPosition = viewPosition;
-  surface.diffuseColor = diffuseColorFromBaseColor(baseColor, metallic);
-  surface.f0 = f0FromBaseColor(baseColor, metallic);
+  surface.diffuseColor = diffuseColorFromBaseColor(wetColor * rainGlint(patter.crest), metallic);
+  surface.f0 = f0FromBaseColor(wetColor, metallic);
   surface.alpha = perceptualRoughnessToAlpha(roughness);
 
   let lit = accumulatePbrLighting(
@@ -267,7 +276,7 @@ fn shadeStandardSurface(
   // direct and indirect terms that would have been summed above.
   if (iblParams.debugChannel != DEBUG_CHANNEL_OFF) {
     return materialDebugColor(
-      baseColor, metallic, roughness, surface.normal, occlusion, emissive,
+      wetColor, metallic, roughness, surface.normal, occlusion, emissive,
       direct, indirect
     );
   }

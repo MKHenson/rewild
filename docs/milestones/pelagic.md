@@ -812,6 +812,41 @@ The terrain draws before the refraction capture, so the water refracts a bed tha
 tinted. The depth is the level's, not the swash's: a sheet a few centimetres thick absorbs
 nothing that shows.
 
+### Rain on surfaces
+
+Rain wets every lit surface, not only the ground by the water (`RainWetness`, `rain-wet.wgsl`):
+
+- **Two parts.** Water soaks into porous surfaces and darkens them, and a film on top makes them
+  glossy. They follow the rain's strength (`rainShare`: the precipitation, as rain rather than
+  snow), so there is none in dry weather, a drizzle leaves the world damp, and a downpour leaves
+  it soaked and shining. The soak builds by e every 20 s and dries by e every 120 s. The film
+  forms by e every 4 s and runs off by e every 25 s, so the shine goes soon after the rain and
+  the dark ground stays a while.
+- **Soak.** Albedo falls to 0.5 on a fully porous surface. Porosity follows roughness, from
+  sealed at 0.2 to fully porous at 0.8, and metals do not soak. Faces turned to the sky take all
+  of it, walls 0.4, faces turned down none.
+- **Film.** Roughness eases 85% of the way toward 0.12 on level surfaces, fading out from a rise
+  of 0.9 to 0.3, so slopes and walls shed it.
+- **Who takes it.** The terrain, which the water's own wet band has already soaked does not
+  darken again; standard materials; impostors of rock and bark. Leaves shed water, so foliage
+  only darkens to 0.85 and takes no film.
+- **Drops.** While rain falls, drops land on level wet surfaces and on open water and spread
+  rings (`rainPatter`). They land on a grid 0.9 m apart, one somewhere in the middle of each
+  cell, again every second at a time of their own; light rain lands in only some cells. A ring
+  spreads to 17 cm, 3 cm wide and 5 mm high, and flattens as it goes. Seen from above, a wet
+  surface reflects a few percent of an overcast sky that looks the same however a ring tilts
+  it, so the rings do more than ripple the reflection: they tilt the shading normal as well,
+  and their crests catch the light, the surface up to 60% brighter at the top of one. On water,
+  whose colour is too dark to brighten, a crest shows as a faint foam instead, in the light
+  draw only; the absorb draw does not bind the rain, so the refraction stays still. They fade
+  out from 15 m to 45 m away. They are procedural, with no texture: ultra and high draw two
+  layers half a cell apart, medium one, and low none (`rainPatterLayers`).
+- **Not yet.** Nothing shelters a surface from the rain: the ground under a tree or an overhang
+  wets as the open ground does. No puddles form.
+- `setRainWetness({ soakIn, soakOut, filmIn, filmOut, strength })` tunes it in the console, and
+  `holdRainWetness(value)` holds every surface at a wetness whatever the weather;
+  `holdRainWetness(null)` lets go.
+
 ## Scatter
 
 New conditions for a scatter layer, AND'ed with slope, height and noise:
@@ -1213,7 +1248,7 @@ clearing, a gale, or drops on the lens.
 4. **Editor and gameplay.** Water brush, edit rules and spill height, sea channels, locked lakes,
    saved edits, water query with probed waves, wading and swimming.
 5. **Stretch.** [Under water](#under-water) (the view, the waterline on the lens, caustics),
-   rain ripples on water, sharper foam, noise-channel rivers.
+   rain on surfaces and rain ripples on them and on water, sharper foam, noise-channel rivers.
 
 ## Performance notes (web budget)
 

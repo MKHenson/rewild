@@ -128,7 +128,8 @@ export class Lighting implements ISharedUniformBuffer {
         this.lightingFloats[offset + 8] = 0.0;
         this.lightingFloats[offset + 9] = 0.0;
         this.lightingFloats[offset + 10] = 0.0;
-        this.lightingFloats[offset + 11] = 1.0; // lightType = directional
+        // lightType = directional, or directional without the sun's shadows
+        this.lightingFloats[offset + 11] = light.shadowed ? 1.0 : 3.0;
         this.lightingFloats[offset + 12] = 0.0;
         this.lightingFloats[offset + 13] = 0.0;
         this.lightingFloats[offset + 14] = 0.0;

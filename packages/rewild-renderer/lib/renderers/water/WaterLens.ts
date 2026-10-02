@@ -8,6 +8,7 @@ import { UnderWater } from './UnderWater';
 import { GpuPassTimer } from '../../metrics/GpuPassTimer';
 import { waterLensQuality } from './WaterQuality';
 import { gustField, gustShare } from '../sky/GustField';
+import { rainShare } from '../sky/RainWetness';
 
 /** How water on the lens blurs the view. */
 export interface LensBlurSettings {
@@ -48,13 +49,9 @@ const FRAME_MIPS = 7;
 // LensParams in water-lens.wgsl.
 const PARAMS_FLOATS = 28;
 
-/**
- * 0..1: how hard rain lands on the lens. `precipitation` is the sky's 0..1;
- * `temperature` turns snow to rain between 0 and 0.5, as the rain does
- * (rainCompute.wgsl).
- */
+/** 0..1: how hard rain lands on the lens (rainShare). */
 export function lensRain(precipitation: number, temperature: number): number {
-  return Math.max(0, precipitation) * Math.min(1, Math.max(0, temperature * 2));
+  return rainShare(precipitation, temperature);
 }
 
 /** Blur radius over the frame's height where the lens is in water, at

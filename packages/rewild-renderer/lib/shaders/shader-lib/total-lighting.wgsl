@@ -1,4 +1,5 @@
-// lightType: 0 = point, 1 = directional, 2 = spot
+// lightType: 0 = point, 1 = directional, 2 = spot, 3 = directional that the
+// sun's shadows do not fall on
 struct Light {
   positionOrDirection : vec3f,  // point/spot: view-space position; directional: view-space direction
   intensity : f32,

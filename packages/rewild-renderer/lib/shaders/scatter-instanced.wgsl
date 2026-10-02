@@ -33,6 +33,7 @@ const HAS_WIND: bool = ${ HAS_WIND };
 #include "./shader-lib/parallax.frag.wgsl"
 #include "./shader-lib/ibl.wgsl"
 #include "./shader-lib/water-light.wgsl"
+#include "./shader-lib/rain-wet.wgsl"
 #include "./shader-lib/caustics.wgsl"
 #include "./shader-lib/material-debug.wgsl"
 #include "./shader-lib/foliage-lighting.wgsl"

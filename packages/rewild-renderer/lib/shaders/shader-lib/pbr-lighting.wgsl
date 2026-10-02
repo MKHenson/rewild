@@ -9,7 +9,8 @@
 //
 // The result is split into three buckets because each is multiplied by a
 // different shadow factor: the sun takes cloud and cascade shadows, the one
-// shadow-casting spot takes the spot atlas, and everything else takes neither.
+// shadow-casting spot takes the spot atlas, and everything else takes neither,
+// an unshadowed directional light (type 3) included.
 //
 // Requires from the including shader:
 //   - the `lighting` storage binding, whose group/binding index belongs to that
@@ -91,6 +92,15 @@ fn accumulatePbrLighting(
       );
       accum.directionalDiffuse += brdf.diffuse * radiance;
       accum.directionalSpecular += brdf.specular * radiance * specularHorizon;
+      continue;
+    }
+    if (light.lightType == 3.0) {
+      let brdf = evaluateBRDF(
+        N, Ns, V, -light.positionOrDirection,
+        surface.diffuseColor, surface.f0, surface.alpha
+      );
+      accum.punctualDiffuse += brdf.diffuse * radiance;
+      accum.punctualSpecular += brdf.specular * radiance * specularHorizon;
       continue;
     }
 

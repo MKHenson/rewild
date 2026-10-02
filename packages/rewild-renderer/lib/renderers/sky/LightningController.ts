@@ -60,6 +60,12 @@ export class LightningController {
   private readonly strikePos = new Float32Array(3);
   private hasStrikePos = false;
 
+  /** World position of the last strike's top, at the cloud base; null before
+   *  the first strike. */
+  get strikePosition(): ArrayLike<number> | null {
+    return this.hasStrikePos ? this.strikePos : null;
+  }
+
   // Pending manually-triggered position
   private readonly pendingPos = new Float32Array(3);
   private hasPendingPos = false;
