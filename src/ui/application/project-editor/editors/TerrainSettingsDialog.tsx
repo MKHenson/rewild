@@ -150,6 +150,12 @@ export class TerrainSettingsDialog extends Component<Props> {
       setPending('regenerate');
     };
 
+    // Modal calls onClose after onOk, so Apply must not close the dialog while
+    // its confirmation banner is waiting.
+    const onModalClose = () => {
+      if (pending() === null) this.props.onClose();
+    };
+
     return () => {
       return (
         <Modal
@@ -160,7 +166,7 @@ export class TerrainSettingsDialog extends Component<Props> {
           hideConfirmButtons={pending() !== null}
           onOk={onApply}
           onCancel={this.props.onClose}
-          onClose={this.props.onClose}>
+          onClose={onModalClose}>
           <div style="min-width: 600px">
             <Typography variant="label">World Seed</Typography>
             <Typography variant="info">
