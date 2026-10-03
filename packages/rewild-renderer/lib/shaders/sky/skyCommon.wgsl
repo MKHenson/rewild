@@ -37,10 +37,14 @@ struct ObjectStruct {
     // than pick one. Written per-face by SkyCubeCapture. Was _skyPad0, and still
     // does that job: it aligns windDirection to an 8-byte boundary (byte 152).
     starLod: f32,
+    // The upper air's (WindState.upperDirection): it turns slowly, so the
+    // cirrus does not swing with every gust.
     windDirection: vec2<f32>, // byte 152
     precipitation: f32,       // byte 160
     temperature: f32,         // byte 164
     lightningBoost: f32,      // byte 168
+    cirrusScroll: f32,        // byte 172, WindState.cirrusScroll
+    cloudDrift: vec2<f32>,    // byte 176, WindState.cloudDrift
 };
 
 struct OutputStruct {

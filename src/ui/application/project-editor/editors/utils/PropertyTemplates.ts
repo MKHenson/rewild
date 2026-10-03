@@ -1,4 +1,5 @@
 import { IProperty, PropertyType } from 'models';
+import { WEATHER_STATE_IDS } from 'rewild-renderer';
 
 export const propertyTemplates: { [key in PropertyType]: IProperty } = {
   active: {
@@ -56,9 +57,18 @@ export const propertyTemplates: { [key in PropertyType]: IProperty } = {
       precision: 2,
     },
   },
+  // Runs the day/night cycle and the weather, starting from the knobs above.
   dayNightCycle: {
-    label: 'Day Night Cycle',
+    label: 'Dynamic Day & Weather',
     valueType: 'boolean',
+  },
+  weatherState: {
+    label: 'Starting Weather',
+    valueType: 'enum',
+    options: [
+      { value: 'auto', label: 'Auto (nearest the knobs)' },
+      ...WEATHER_STATE_IDS.map((id) => ({ value: id, label: id })),
+    ],
   },
   precipitation: {
     label: 'Precipitation',

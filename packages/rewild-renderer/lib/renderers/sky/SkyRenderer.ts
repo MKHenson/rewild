@@ -85,7 +85,6 @@ export class SkyRenderer {
   cubeDebugRenderer: SkyCubeDebugRenderer;
 
   elevation: f32;
-  dayNightCycle: boolean = false;
   azimuth: f32;
   cloudiness: f32;
   foginess: f32;
@@ -268,6 +267,8 @@ export class SkyRenderer {
         4 + // precipitation
         4 + // temperature
         4 + // lightningBoost
+        4 + // cirrusScroll
+        2 * 4 + // cloudDrift (vec2)
         0;
 
       // Align the buffer size to the next multiple of 256
@@ -343,7 +344,6 @@ export class SkyRenderer {
   addingCloudiness: boolean = false;
 
   update(renderer: Renderer, camera: Camera, width: number, height: number) {
-    if (this.dayNightCycle) this.elevation += renderer.delta * 0.002;
     this.rainWetness.update(
       rainShare(this.precipitation, this.temperature),
       renderer.delta / 1000
@@ -468,17 +468,15 @@ export class SkyRenderer {
     // far less than a star — and SkyCubeCapture overwrites it in its own copy
     // of this block, so the live buffer never needs anything else.
     uniformData[37] = 0;
-    const windDirection = this.windDirection;
-    uniformData.set(
-      [
-        windDirection.x,
-        windDirection.y,
-        this.precipitation,
-        this.temperature,
-        0.0,
-      ],
-      38
-    );
+    const wind = this.wind;
+    uniformData[38] = wind.upperDirection[0];
+    uniformData[39] = wind.upperDirection[1];
+    uniformData[40] = this.precipitation;
+    uniformData[41] = this.temperature;
+    uniformData[42] = 0.0;
+    uniformData[43] = wind.cirrusScroll;
+    uniformData[44] = wind.cloudDrift[0];
+    uniformData[45] = wind.cloudDrift[1];
 
     // Extract XZ camera forward from the world matrix (-Z column)
     const m = camera.transform.matrixWorld.elements;
@@ -567,10 +565,8 @@ export class SkyRenderer {
       commandEncoder,
       camera.transform.position.x,
       camera.transform.position.z,
-      renderer.totalDeltaTime * 0.3,
       this.cloudiness,
-      this.windiness,
-      this.windDirection,
+      this.wind.cloudDrift,
       sunPosition.x / sunDir,
       sunPosition.y / sunDir,
       sunPosition.z / sunDir,

@@ -16,6 +16,7 @@ import { createWaterEditProvider } from '../database/water-edits';
 import { createWaterBodyProvider } from '../database/water-bodies';
 import { createScatterKillProvider } from '../database/scatter-kills';
 import { registerDebugCommands } from './debug';
+import { applyAtmosphere } from './AtmosphereSync';
 
 /** Loads game files and assets and sends the created objects to wasm */
 
@@ -41,20 +42,6 @@ export async function loadInitialLevels(
   });
 
   if (project) {
-    // Load the sky properties
-    const skyRenderer = renderer.sky.skyRenderer;
-    skyRenderer.cloudiness = project.sceneGraph.atmosphere.cloudiness as f32;
-    skyRenderer.foginess = project.sceneGraph.atmosphere.foginess as f32;
-    skyRenderer.windiness = project.sceneGraph.atmosphere.windiness as f32;
-    skyRenderer.windBearing = (project.sceneGraph.atmosphere.windDirection ??
-      180) as f32;
-    skyRenderer.precipitation = project.sceneGraph.atmosphere
-      .precipitation as f32;
-    skyRenderer.temperature = project.sceneGraph.atmosphere.temperature as f32;
-    skyRenderer.elevation = project.sceneGraph.atmosphere.elevation as f32;
-    skyRenderer.dayNightCycle = project.sceneGraph.atmosphere
-      .dayNightCycle as boolean;
-
     if (project.sceneGraph.terrain) {
       renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
       renderer.terrainRenderer.climatePreset =
@@ -62,6 +49,8 @@ export async function loadInitialLevels(
       renderer.terrainRenderer.seaLevel =
         project.sceneGraph.terrain.seaLevel ?? 0;
     }
+
+    applyAtmosphere(renderer, project.sceneGraph.atmosphere);
 
     registerDebugCommands(renderer, project);
   }

@@ -695,11 +695,13 @@ export class DirectionalShadowRenderer {
       data[38] = uniforms.cutout ? 1 : 0;
       // The same wind the scene pass reads this frame, so the shadow of a
       // leaf lands where the leaf is.
-      data.set(renderer.sky.skyRenderer.wind.vec, 40);
+      const wind = renderer.sky.skyRenderer.wind;
+      data.set(wind.vec, 40);
       writeScatterWindParams(
         (group.material as ScatterInstancedPass).wind,
         world.elements[12],
         world.elements[14],
+        wind.gustDrift,
         data,
         44
       );

@@ -8,23 +8,9 @@ import { createWaterEditProvider } from 'src/database/water-edits';
 import { createWaterBodyProvider } from 'src/database/water-bodies';
 import { createScatterKillProvider } from 'src/database/scatter-kills';
 import { registerDebugCommands } from 'src/core/debug';
+import { applyAtmosphere } from 'src/core/AtmosphereSync';
 
 export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
-  const atmosphere = project.sceneGraph?.atmosphere;
-
-  if (atmosphere) {
-    renderer.sky.skyRenderer.cloudiness = atmosphere.cloudiness as f32;
-    renderer.sky.skyRenderer.foginess = atmosphere.foginess as f32;
-    renderer.sky.skyRenderer.elevation = atmosphere.elevation as f32;
-    renderer.sky.skyRenderer.windiness = atmosphere.windiness as f32;
-    renderer.sky.skyRenderer.windBearing = (atmosphere.windDirection ??
-      180) as f32;
-    renderer.sky.skyRenderer.precipitation = atmosphere.precipitation as f32;
-    renderer.sky.skyRenderer.temperature = atmosphere.temperature as f32;
-    renderer.sky.skyRenderer.dayNightCycle =
-      atmosphere.dayNightCycle as boolean;
-  }
-
   if (project.sceneGraph?.terrain) {
     renderer.terrainRenderer.seed = project.sceneGraph.terrain.seed;
     renderer.terrainRenderer.climatePreset =
@@ -32,6 +18,9 @@ export function SyncRendererFromProject(renderer: Renderer, project: IProject) {
     renderer.terrainRenderer.seaLevel =
       project.sceneGraph.terrain.seaLevel ?? 0;
   }
+
+  const atmosphere = project.sceneGraph?.atmosphere;
+  if (atmosphere) applyAtmosphere(renderer, atmosphere);
 
   renderer.terrainRenderer.snapshotProvider = project.levelId
     ? createChunkSnapshotProvider(project.levelId)
@@ -68,16 +57,7 @@ export function syncFromEditorResource(id: string, renderer: Renderer) {
   const editorResource = sceneGraphStore.buildObjectFromProperties(id);
   const sceneObject = renderer.scene.findObjectById(id);
   if (id === 'SKY' && editorResource) {
-    const skyRenderer = renderer.sky.skyRenderer;
-    skyRenderer.cloudiness = editorResource.cloudiness as f32;
-    skyRenderer.foginess = editorResource.foginess as f32;
-    skyRenderer.elevation = editorResource.elevation as f32;
-    skyRenderer.windiness = editorResource.windiness as f32;
-    skyRenderer.windBearing = editorResource.windDirection as f32;
-    skyRenderer.precipitation = editorResource.precipitation as f32;
-    skyRenderer.temperature = editorResource.temperature as f32;
-
-    skyRenderer.dayNightCycle = editorResource.dayNightCycle as boolean;
+    applyAtmosphere(renderer, editorResource);
   } else if (sceneObject && editorResource) {
     if (sceneObject.component instanceof PointLight) {
       const color = editorResource.color as Vector3;

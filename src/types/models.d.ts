@@ -30,6 +30,7 @@ declare module 'models' {
     | 'temperature'
     | 'elevation'
     | 'dayNightCycle'
+    | 'weatherState'
     | 'color'
     | 'target'
     | 'active'
@@ -132,6 +133,8 @@ declare module 'models' {
         precipitation: PropValue;
         temperature: PropValue;
         dayNightCycle: PropValue;
+        /** A weather state id to start in, or 'auto' for the nearest to the knobs. */
+        weatherState?: PropValue;
       };
       terrain?: WorldGenConfig;
     };

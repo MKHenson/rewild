@@ -445,12 +445,19 @@ The gap below the horizon covers an angle of about `eyeHeight / 2800`:
 | On a cliff or mountain, 150 m | 3°        | About 50 pixels                   |
 
 A **horizon ring** closes the gap. It is one ring mesh, centred where chunk visibility was last
-computed, from 2,800 m out to the horizon. Chunks stop on a ragged edge of whole squares, so the
-ring discards any pixel whose chunk passes the terrain's own visibility test. The ring and the
-chunk water then never overlap, and neither z-fights the other.
+computed, from three chunks inside 2,800 m (1,360 m) out to the horizon. Chunks stop on a ragged
+edge of whole squares, and a chunk in range is drawn only once it has meshed, so the ring discards
+exactly where a chunk drew this frame. The terrain writes that to a 16² chunk mask (one texel per
+chunk, centred on the visibility centre's chunk) and the ring reads it with `textureLoad`. The ring
+and the chunk water then never overlap, and a chunk still streaming in shows the ring's far sea and
+land instead of sky.
 
 - **Shading.** The water shader with far features only: sky reflection, Fresnel, depth colour and
   the ripples as roughness. No waves, refraction or foam, because none of them show at that range.
+  None of the waves resolve there, so the whole of their mean square slope (Cox and Munk, from the
+  ocean's wind speed) is added to α², as the chunk water adds its unresolved share. A smooth ring
+  mirrors the bright horizon sky at a grazing angle and reads far lighter than the chunk water
+  beside it. `setWaterHorizonSlope(scale)` scales it in the console.
 - **Far map.** Two textures centred on the chunks' visibility centre hold, per texel, the raw
   continent value and the land's colour: 128² over 16 km, and 128² over 131 km for the rest of the
   way to the horizon. The continent value is smooth, so a bilinear sample of it gives a smooth

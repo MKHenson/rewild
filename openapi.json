@@ -981,11 +981,14 @@
                     "temperature": {
                         "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement6"
                     },
-                    "windDirection": {
+                    "weatherState": {
                         "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement7"
                     },
-                    "windiness": {
+                    "windDirection": {
                         "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement8"
+                    },
+                    "windiness": {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonElement9"
                     }
                 },
                 "required": [
@@ -995,6 +998,7 @@
                     "foginess",
                     "precipitation",
                     "temperature",
+                    "weatherState",
                     "windDirection",
                     "windiness"
                 ],
@@ -1191,6 +1195,24 @@
                 ],
                 "title": "JsonElement"
             },
+            "kotlinx.serialization.json.JsonElement9": {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {},
+                        "title": "JsonArray"
+                    },
+                    {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "title": "JsonObject"
+                    },
+                    {
+                        "$ref": "#/components/schemas/kotlinx.serialization.json.JsonPrimitive"
+                    }
+                ],
+                "title": "JsonElement"
+            },
             "com.rewild.models.Container": {
                 "type": "object",
                 "properties": {
@@ -1248,7 +1270,7 @@
                 ],
                 "title": "Container"
             },
-            "kotlinx.serialization.json.JsonElement9": {
+            "kotlinx.serialization.json.JsonElement10": {
                 "anyOf": [
                     {
                         "type": "array",

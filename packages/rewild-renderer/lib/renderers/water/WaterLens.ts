@@ -168,12 +168,12 @@ export class WaterLens {
     underWater: UnderWater,
     seconds: number,
     rain: number,
-    wind: ArrayLike<number>,
+    gustDrift: ArrayLike<number>,
     eyeX: number,
     eyeZ: number
   ): void {
     // The gusts the trees around the camera bend to (GustField).
-    const gust = gustShare(gustField(eyeX, eyeZ, wind));
+    const gust = gustShare(gustField(eyeX, eyeZ, gustDrift));
     this.gust = followGust(this.gust, gust, seconds);
     const submerged = underWater.submerged;
     if (submerged) {

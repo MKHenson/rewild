@@ -12,15 +12,13 @@ struct CloudDensityResult {
 // the model is translation-invariant and doesn't break far from world origin.
 // `domainOffset` is the camera's world XZ — added back for noise sampling only,
 // keeping the cloud pattern anchored to the world so it parallaxes correctly.
-fn cloudDensity(position: vec3f, domainOffset: vec2f, windiness: f32, cloudiness: f32, iTime: f32, windDirection: vec2f) -> CloudDensityResult {
-  let windDir3D = vec3f(windDirection.x, 0.0, windDirection.y);
-  let cloudinessSpeedFactor = smoothstep(0.9, 1.0, cloudiness);
-  let cloudMovementSpeed = iTime * 0.01 * mix(1.0, 3.0, cloudinessSpeedFactor);
-
+// `drift` is how far the deck has blown (WindState.cloudDrift), integrated on
+// the CPU so a wind that turns moves the clouds on rather than jumping them.
+fn cloudDensity(position: vec3f, domainOffset: vec2f, cloudiness: f32, drift: vec2f) -> CloudDensityResult {
   // Single coherent wind offset — all layers move together as one mass
-  let windOffset = windDir3D * windiness * cloudMovementSpeed * 10.3;
+  let windOffset = vec3f(drift.x, 0.0, drift.y);
   // Small turbulence offset for FBM detail layers (subtle internal cloud motion)
-  let turbulenceOffset = windDir3D * windiness * cloudMovementSpeed * 1.5;
+  let turbulenceOffset = windOffset * (1.5 / 10.3);
   var p = position + vec3f(domainOffset.x, 0.0, domainOffset.y) + windOffset;
 
   var result: CloudDensityResult;

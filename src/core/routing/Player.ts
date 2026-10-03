@@ -480,12 +480,13 @@ export class Player extends Node {
 
     // A gale holds back a player walking into it, and its gusts shove them
     // downwind, arriving with the gusts the trees around them bend to.
-    const wind = stateData?.renderer?.sky?.skyRenderer?.wind.vec;
-    if (wind && !this.swimming) {
+    const windState = stateData?.renderer?.sky?.skyRenderer?.wind;
+    const wind = windState?.vec;
+    if (windState && wind && !this.swimming) {
       const share = headwindSpeedShare(moveX, moveZ, wind[0], wind[1], wind[2]);
       moveX *= share;
       moveZ *= share;
-      const gust = gustShare(gustField(body.x, body.z, wind));
+      const gust = gustShare(gustField(body.x, body.z, windState.gustDrift));
       this._gustPush = easeGustPush(
         this._gustPush,
         gustPushSpeed(gust, wind[2]),

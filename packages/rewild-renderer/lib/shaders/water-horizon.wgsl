@@ -1,7 +1,7 @@
 // Everything past the last terrain chunk, out to the horizon. One ring around
-// the chunks' visibility centre: its inner edge sits at the terrain's view
-// distance and its outer edge at infinity, so the ground meets the horizon line
-// at any camera height. Flat at sea level: open sea is shaded like deep chunk
+// the chunks' visibility centre: its inner edge sits inside the terrain's view
+// distance, so it also fills chunks still streaming in, and its outer edge at
+// infinity, so the ground meets the horizon line at any camera height. Flat at sea level: open sea is shaded like deep chunk
 // water with its far features only, land as a matte surface in its biome's far
 // colour, blended across the coast.
 
@@ -34,8 +34,8 @@ struct Uniforms {
 struct HorizonParams {
   // Chunk visibility centre (world x, z).
   centre : vec2f,
-  // The terrain's view distance: the ring's inner radius.
-  maxViewDst : f32,
+  // Metres from the centre the ring starts.
+  innerRadius : f32,
   chunkSize : f32,
   // Centre (world x, z) and span in metres of each far map level.
   nearCentre : vec2f,
@@ -48,10 +48,14 @@ struct HorizonParams {
   // The continent's coast value and blend half-width.
   coast : f32,
   blendHalfWidth : f32,
-  _pad0 : f32,
-  _pad1 : f32,
+  // The chunk coordinates the chunk mask is centred on.
+  maskOrigin : vec2f,
   // The ocean's scattered deep colour.
-  scatter : vec4f,
+  scatter : vec3f,
+  // Mean square slope of the waves (Cox and Munk). At this range none of
+  // them resolve, so all of it widens the reflection, as it does on far chunk
+  // water: a smooth mirror of the horizon sky reads far too bright.
+  slopeVariance : f32,
 }
 
 struct VertexInput {
@@ -72,6 +76,8 @@ struct VertexOutput {
 @group(1) @binding(1) var nearMap : texture_2d<f32>;
 @group(1) @binding(2) var<uniform> horizon : HorizonParams;
 @group(1) @binding(3) var wideMap : texture_2d<f32>;
+// 1 where a terrain chunk drew this frame, per chunk, centred on maskOrigin.
+@group(1) @binding(4) var chunkMask : texture_2d<f32>;
 @group(2) @binding(0) var<storage, read> lighting : LightingUniforms;
 @group(3) @binding(0) var cloudShadowMap: texture_2d<f32>;
 @group(3) @binding(1) var cloudShadowSampler: sampler;
@@ -92,9 +98,9 @@ fn vs(input: VertexInput) -> VertexOutput {
   let outer = input.position.z > 0.5;
 
   var world = vec4f(
-    horizon.centre.x + dir.x * horizon.maxViewDst,
+    horizon.centre.x + dir.x * horizon.innerRadius,
     horizon.seaLevel,
-    horizon.centre.y + dir.y * horizon.maxViewDst,
+    horizon.centre.y + dir.y * horizon.innerRadius,
     1.0
   );
   if (outer) {
@@ -114,13 +120,16 @@ fn vs(input: VertexInput) -> VertexOutput {
   return out;
 }
 
-// True where a terrain chunk is drawn: its square lies within the view
-// distance of the visibility centre, the same test TerrainRenderer uses.
-fn insideChunks(p: vec2f) -> bool {
-  let size = horizon.chunkSize;
-  let chunkCentre = round(p / size) * size;
-  let nearest = clamp(horizon.centre, chunkCentre - size * 0.5, chunkCentre + size * 0.5);
-  return distance(horizon.centre, nearest) <= horizon.maxViewDst;
+// True where a terrain chunk drew this frame. A chunk in range but not yet
+// meshed reads false, so the ring fills it instead of leaving sky.
+fn chunkDrawn(p: vec2f) -> bool {
+  let size = vec2i(textureDimensions(chunkMask));
+  // floor(x + 0.5) rounds as Math.round does on the CPU.
+  let cell = vec2i(floor(p / horizon.chunkSize + 0.5) - horizon.maskOrigin) + size / 2;
+  if (any(cell < vec2i(0)) || any(cell >= size)) {
+    return false;
+  }
+  return textureLoad(chunkMask, cell, 0).r > 0.5;
 }
 
 // Near level where it reaches, handing over to the wide level before its edge.
@@ -149,7 +158,9 @@ fn fs(input: VertexOutput) -> FragmentOutput {
   let p = input.world.xy / max(input.world.z, 1e-6);
   let far = sampleFarMap(p);
   let ocean = oceanWeight(far.a);
-  let roughness = mix(LAND_ROUGHNESS, horizon.roughness, ocean);
+  let waterAlpha = sqrt(min(pow(perceptualRoughnessToAlpha(horizon.roughness), 2.0) + horizon.slopeVariance, 1.0));
+  let alpha = mix(perceptualRoughnessToAlpha(LAND_ROUGHNESS), waterAlpha, ocean);
+  let roughness = sqrt(alpha);
 
   let viewPosition = input.view.xyz / max(input.view.w, 1e-6);
   let normal = normalize(uniforms.normalMatrix * vec3f(0.0, 1.0, 0.0));
@@ -166,7 +177,7 @@ fn fs(input: VertexOutput) -> FragmentOutput {
   surface.viewPosition = viewPosition;
   surface.diffuseColor = mix(far.rgb, horizon.scatter.rgb, ocean);
   surface.f0 = vec3f(mix(LAND_F0, WATER_F0, ocean));
-  surface.alpha = perceptualRoughnessToAlpha(roughness);
+  surface.alpha = alpha;
 
   let lit = accumulatePbrLighting(
     surface,
@@ -181,7 +192,7 @@ fn fs(input: VertexOutput) -> FragmentOutput {
   let indirect = evaluateIbl(surface, roughness);
 
   // Last, so every sample above runs in uniform control flow.
-  if (insideChunks(p)) {
+  if (chunkDrawn(p)) {
     discard;
   }
 

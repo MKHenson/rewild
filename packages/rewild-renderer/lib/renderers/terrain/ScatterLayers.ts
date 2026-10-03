@@ -50,13 +50,15 @@ export interface ScatterWind {
 /**
  * A layer's wind block as the scatter shaders' `windParams` vec4 — zeros for a
  * rigid layer, which the wind pipeline is never compiled for anyway — followed
- * by `windOrigin`, the drawing chunk's world xz, so the wind field is read in
- * world space and crosses chunk borders without a seam.
+ * by `windOrigin`: the drawing chunk's world xz, so the wind field is read in
+ * world space and crosses chunk borders without a seam, then the gust field's
+ * drift (WindState.gustDrift).
  */
 export function writeScatterWindParams(
   wind: ScatterWind | null | undefined,
   originX: number,
   originZ: number,
+  gustDrift: ArrayLike<number>,
   out: Float32Array,
   offset: number
 ): void {
@@ -66,8 +68,8 @@ export function writeScatterWindParams(
   out[offset + 3] = 0;
   out[offset + 4] = originX;
   out[offset + 5] = originZ;
-  out[offset + 6] = 0;
-  out[offset + 7] = 0;
+  out[offset + 6] = gustDrift[0];
+  out[offset + 7] = gustDrift[1];
 }
 
 export interface ScatterLayer {

@@ -941,8 +941,9 @@ export interface components {
             foginess: components["schemas"]["kotlinx.serialization.json.JsonElement4"];
             precipitation: components["schemas"]["kotlinx.serialization.json.JsonElement5"];
             temperature: components["schemas"]["kotlinx.serialization.json.JsonElement6"];
-            windDirection: components["schemas"]["kotlinx.serialization.json.JsonElement7"];
-            windiness: components["schemas"]["kotlinx.serialization.json.JsonElement8"];
+            weatherState: components["schemas"]["kotlinx.serialization.json.JsonElement7"];
+            windDirection: components["schemas"]["kotlinx.serialization.json.JsonElement8"];
+            windiness: components["schemas"]["kotlinx.serialization.json.JsonElement9"];
         };
         /** JsonElement */
         "kotlinx.serialization.json.JsonElement": unknown[] | {
@@ -992,6 +993,10 @@ export interface components {
         "kotlinx.serialization.json.JsonElement8": unknown[] | {
             [key: string]: unknown;
         } | components["schemas"]["kotlinx.serialization.json.JsonPrimitive"];
+        /** JsonElement */
+        "kotlinx.serialization.json.JsonElement9": unknown[] | {
+            [key: string]: unknown;
+        } | components["schemas"]["kotlinx.serialization.json.JsonPrimitive"];
         /** Container */
         "com.rewild.models.Container": {
             /** String */
@@ -1011,7 +1016,7 @@ export interface components {
             pod: components["schemas"]["com.rewild.models.ContainerPod"];
         };
         /** JsonElement */
-        "kotlinx.serialization.json.JsonElement9": unknown[] | {
+        "kotlinx.serialization.json.JsonElement10": unknown[] | {
             [key: string]: unknown;
         } | components["schemas"]["kotlinx.serialization.json.JsonPrimitive"];
         /** Actor */

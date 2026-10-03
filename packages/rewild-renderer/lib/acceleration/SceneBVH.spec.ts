@@ -32,11 +32,11 @@ function everythingFrustum(): Frustum {
 
 describe('SceneBVH membership', () => {
   // transform.visible is read as membership, not as culling: an invisible
-  // transform never enters the tree, and turning it visible again does not put
-  // it back, because nothing bumped structureVersion. Anything that culls per
-  // frame therefore has to use its component's own `visible` flag — see
-  // ChunkScatter.updateVisibility.
-  it('drops an invisible transform and does not take it back on its own', () => {
+  // transform never enters the tree. Changing it bumps structureVersion, so
+  // the tree rebuilds and takes it back. Anything that culls per frame should
+  // still use its component's own `visible` flag, which needs no rebuild —
+  // see ChunkScatter.updateVisibility.
+  it('drops an invisible transform and takes it back when shown', () => {
     const scene = new Transform();
     const child = visualTransform('child');
     // A resident sibling, so the tree never empties — an empty root forces a
@@ -50,21 +50,38 @@ describe('SceneBVH membership', () => {
     expect(bvh.frustumCull(everythingFrustum(), [])).toContain(child);
 
     child.visible = false;
-    bvh.markDirty();
     bvh.update();
     expect(bvh.frustumCull(everythingFrustum(), [])).not.toContain(child);
 
-    // Visible again, but no structural change — the tree is not rebuilt, so the
-    // object stays missing.
     child.visible = true;
     bvh.update();
+    expect(bvh.frustumCull(everythingFrustum(), [])).toContain(child);
+  });
+
+  it('takes back a child shown under a parent that was hidden', () => {
+    const scene = new Transform();
+    const parent = new Transform();
+    const child = visualTransform('child');
+    parent.addChild(child);
+    scene.addChild(visualTransform('sibling'));
+    scene.addChild(parent);
+    scene.updateMatrixWorld();
+
+    const bvh = new SceneBVH(scene);
+    parent.visible = false;
+    bvh.update();
     expect(bvh.frustumCull(everythingFrustum(), [])).not.toContain(child);
 
-    // Only a structure change brings it back.
-    scene.addChild(visualTransform('another'));
-    scene.updateMatrixWorld();
+    parent.visible = true;
     bvh.update();
     expect(bvh.frustumCull(everythingFrustum(), [])).toContain(child);
+  });
+
+  it('does not rebuild when visibility is set to what it already is', () => {
+    const scene = new Transform();
+    const version = scene.structureVersion;
+    scene.visible = true;
+    expect(scene.structureVersion).toBe(version);
   });
 
   it('keeps a transform whose component is merely marked invisible', () => {

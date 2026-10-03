@@ -18,7 +18,9 @@ data class Atmosphere(
     val windDirection: PropValue = JsonPrimitive(180),
     val precipitation: PropValue,
     val temperature: PropValue,
-    val dayNightCycle: PropValue
+    val dayNightCycle: PropValue,
+    // A weather state id to start in, or "auto". Defaulted so older records deserialize.
+    val weatherState: PropValue = JsonPrimitive("auto")
 )
 
 @Serializable

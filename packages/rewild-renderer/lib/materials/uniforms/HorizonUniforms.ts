@@ -5,7 +5,7 @@ import { Mesh } from '../../core/Mesh';
 
 // HorizonParams layout — must match water-horizon.wgsl:
 //   centre          vec2f  offset 0
-//   maxViewDst      f32    offset 8
+//   innerRadius     f32    offset 8
 //   chunkSize       f32    offset 12
 //   nearCentre      vec2f  offset 16
 //   nearSpan        f32    offset 24
@@ -15,13 +15,16 @@ import { Mesh } from '../../core/Mesh';
 //   roughness       f32    offset 44
 //   coast           f32    offset 48
 //   blendHalfWidth  f32    offset 52
-//   scatter         vec4f  offset 64
+//   maskOrigin      vec2f  offset 56
+//   scatter         vec3f  offset 64
+//   slopeVariance   f32    offset 76
 const PARAMS_FLOATS = 20;
 
 export interface HorizonParams {
   centreX: number;
   centreZ: number;
-  maxViewDst: number;
+  /** Metres from the centre the ring starts. */
+  innerRadius: number;
   chunkSize: number;
   nearCentreX: number;
   nearCentreZ: number;
@@ -33,7 +36,12 @@ export interface HorizonParams {
   roughness: number;
   coast: number;
   blendHalfWidth: number;
+  /** The chunk coordinates the chunk mask is centred on. */
+  maskOriginX: number;
+  maskOriginZ: number;
   scatter: readonly [number, number, number];
+  /** Mean square slope of the waves, all too fine to resolve at this range. */
+  slopeVariance: number;
 }
 
 export function packHorizonParams(
@@ -43,7 +51,7 @@ export function packHorizonParams(
   out.fill(0);
   out[0] = params.centreX;
   out[1] = params.centreZ;
-  out[2] = params.maxViewDst;
+  out[2] = params.innerRadius;
   out[3] = params.chunkSize;
   out[4] = params.nearCentreX;
   out[5] = params.nearCentreZ;
@@ -55,10 +63,12 @@ export function packHorizonParams(
   out[11] = params.roughness;
   out[12] = params.coast;
   out[13] = params.blendHalfWidth;
+  out[14] = params.maskOriginX;
+  out[15] = params.maskOriginZ;
   out[16] = params.scatter[0];
   out[17] = params.scatter[1];
   out[18] = params.scatter[2];
-  out[19] = 1;
+  out[19] = params.slopeVariance;
   return out;
 }
 
@@ -72,6 +82,7 @@ export class HorizonUniforms implements ISharedUniformBuffer {
 
   private _near: GPUTexture | null = null;
   private _wide: GPUTexture | null = null;
+  private _chunkMask: GPUTexture | null = null;
   private _buffer: GPUBuffer | null = null;
   private _data = new Float32Array(PARAMS_FLOATS);
 
@@ -79,9 +90,10 @@ export class HorizonUniforms implements ISharedUniformBuffer {
     this.group = group;
   }
 
-  setMaps(near: GPUTexture, wide: GPUTexture) {
+  setMaps(near: GPUTexture, wide: GPUTexture, chunkMask: GPUTexture) {
     this._near = near;
     this._wide = wide;
+    this._chunkMask = chunkMask;
     this.requiresBuild = true;
   }
 
@@ -110,6 +122,7 @@ export class HorizonUniforms implements ISharedUniformBuffer {
         { binding: 1, resource: this._near!.createView() },
         { binding: 2, resource: { buffer: this._buffer } },
         { binding: 3, resource: this._wide!.createView() },
+        { binding: 4, resource: this._chunkMask!.createView() },
       ],
     });
     this.requiresBuild = false;
