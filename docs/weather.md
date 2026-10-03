@@ -1,6 +1,68 @@
 # Weather System
 
-The weather system lives inside `SkyRenderer` and is composed of three subsystems: overcast sky response, precipitation (rain/snow particles), and lightning. All controls are exposed as properties on `SkyRenderer`.
+The weather has two halves. The **atmosphere system** (`AtmosphereSystem`, in `rewild-renderer/lib/atmosphere`) runs the day/night cycle and decides the weather. The **sky** (`SkyRenderer`) draws it through three subsystems: overcast sky response, precipitation (rain/snow particles), and lightning. The sky's knobs are properties on `SkyRenderer`; while the atmosphere system runs, it writes them at the top of every frame.
+
+---
+
+## Atmosphere System
+
+The Sky's **Dynamic Day & Weather** switch turns it on, in the editor and in the game. The Sky's knobs are where it starts: the sun elevation, the wind direction and the five weather knobs. **Starting Weather** picks the first state, or `Auto` for the state whose middle looks most like the knobs. Any edit to the Sky restarts it from the knobs. `applyAtmosphere` (`src/core/AtmosphereSync.ts`) does this for the game loader and the editor.
+
+`Sky` owns it as `renderer.sky.atmosphere`. Each frame `Sky.update` calls `atmosphere.update(dt)` and copies the sample to the `SkyRenderer` before anything reads the wind.
+
+### Day/night cycle
+
+`DayNightCycle` moves the sun elevation, in degrees and unwrapped: 0 to 180 is day, 180 to 360 night.
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `cycleSeconds` | 300 | One full day and night. |
+| `dayShare` | 0.5 | The part of the cycle the sun is up. The sun crosses the sky and the night at different speeds. |
+| `paused` | false | Holds the sun. The weather continues unless `weatherPausesWithCycle`. |
+| `timeScale` | 1 | Scale on the sun's speed only. |
+
+The start is the Sky's elevation. Tune with `setDayCycle` (see [Debug Commands](./debug-commands.md#day-night--weather)).
+
+### Layers
+
+1. **Climate profile** (`ClimateProfiles.ts`). One per world, picked by the terrain climate preset's `weather` field: `default` is temperate, `arid` is arid. It scales the driver ranges, weights the transitions, and sets the derivation constants, the wind's wander and the variation scale.
+2. **State machine** (`WeatherStates.ts`). Eight states: `Clear`, `Fair`, `Overcast`, `Mist`, `FrontApproaching`, `Rain`, `Storm`, `Clearing`. Each gives a range for each driver, a duration in day cycles and weighted transitions. Only `FrontApproaching` and `Rain` lead to `Storm`, so every storm builds. `Mist` is likely at dawn; `Storm` more likely in the afternoon by the climate's `afternoonStormBias`.
+3. **Drivers.** `pressure`, `moisture` and `instability`, 0 to 1, ease toward targets inside the state's ranges. The targets wander inside the ranges at the state's retarget interval.
+4. **Knobs** (`WeatherDerivation.ts`). Cloudiness, windiness, precipitation, fog and temperature are derived from the drivers each tick, then each follows at its own rate: wind fast, clouds and rain medium, fog and temperature slow. The wind rises with the rate of pressure change, so it rises before a front's rain.
+5. **Wind direction.** See below.
+6. **Variation.** See below.
+7. **Modifiers** (`AtmosphereModifiers.ts`). Temporary changes from gameplay (`addModifier`, `setModifierWeight`, `removeModifier`): `set`, `add`, `multiply`, `min` or `max` on a knob, faded by a weight, lowest priority first. They change the output only, so the weather continues beneath.
+
+Weather time is counted in day cycles: a longer cycle gives longer weather. At the default 5-minute cycle, calm states last 2 to 6 minutes, rain and storms 1 to 4, and fronts under a minute and a quarter, so a calm spell can outlast a day. The seed is the world's terrain seed, and the same seed and start give the same sequence of states. The system keeps the next states picked in advance, so `forecast(n)` is always what comes.
+
+### Wind direction
+
+The wind's bearing is degrees the air moves toward (0 = +x, 90 = +z), as `SkyRenderer.windBearing`.
+
+- **Prevailing wind.** It starts at the Sky's wind direction. On each new state it picks a new bearing up to the climate's `prevailingWander` (40°) either side of the start, and turns to it over about two cycles.
+- **Fronts.** Each state turns the wind from the prevailing bearing by its `bearingOffset`. Ahead of a front the wind backs 20° to 60°; behind it (`Clearing`) it veers 40° to 90°. The fronts turn the wind in under a minute; other states over about two minutes.
+- **Swings.** The variation layer adds the short swings on top.
+
+### Variation
+
+A state does not hold still. Each state's `variation` sets:
+
+- **Wander.** The most each knob and the bearing strays from the weather. Each strays on its own smooth curve that turns every few seconds to a minute. Rain wanders only where it falls, so a drizzle rises and falls but a dry sky stays dry.
+- **Bursts.** Short events at random intervals: the wind swings by a bearing either way and strengthens, and the rain lashes harder, then they settle. `Storm` swings 35° to 80° for 5 to 14 s every 15 to 45 s. The other states have smaller ones: a calm day gusts 10° to 25° for a few seconds about once a minute. `Mist` has none.
+
+Variation runs in seconds and is added after the knobs follow, so a burst arrives at once. A new state's wander fades in over about ten seconds. `climate.variationScale` scales all of it.
+
+### Scripted events
+
+`setEnabled(false)` stops the weather where it is. The script then writes the knobs with `setKnobs({ ..., windBearing })`; modifiers still apply on top. `setEnabled(true)` lets each knob move from where the script left it back to the weather at its normal rate. Disabled time does not count toward the state.
+
+### Moving the world with the wind
+
+Everything the wind moves integrates its own drift each frame (`WindState`), rather than computing direction × time in a shader, so a wind that turns or strengthens moves each field on from where it is:
+
+- `gustDrift`: metres the foliage gust field has blown. Read by the scatter shaders (`windOrigin.zw`), the player's gusts and the lens.
+- `cloudDrift`: the cumulus deck's offset, in the sky uniform and the cloud shadow map.
+- `cirrusScroll` and `upperDirection`: the cirrus scrolls along the upper air's direction, which turns toward the surface wind over about a minute, so the cirrus does not swing with each gust.
 
 ---
 
@@ -8,6 +70,8 @@ The weather system lives inside `SkyRenderer` and is composed of three subsystem
 
 | File                                                                | Role                                                         |
 | ------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `packages/rewild-renderer/lib/atmosphere/AtmosphereSystem.ts`       | Day/night cycle, weather states, wind direction, variation   |
+| `packages/rewild-renderer/lib/renderers/sky/WindState.ts`           | The wind as things read it, and the drifts it integrates     |
 | `packages/rewild-renderer/lib/renderers/sky/SkyRenderer.ts`         | Main API — owns all weather state and coordinates subsystems |
 | `packages/rewild-renderer/lib/renderers/sky/LightningController.ts` | Strike timing, state machine, bolt path generation           |
 | `packages/rewild-renderer/lib/post-processes/LightningBoltPass.ts`  | Renders bolt geometry as billboard triangle strips           |

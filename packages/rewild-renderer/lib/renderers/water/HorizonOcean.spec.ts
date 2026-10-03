@@ -1,5 +1,10 @@
 import { packHorizonParams } from '../../materials/uniforms/HorizonUniforms';
-import { buildHorizonRing } from './HorizonOcean';
+import {
+  CHUNK_MASK_SIZE,
+  buildHorizonRing,
+  chunkMaskIndex,
+  oceanSlopeVariance,
+} from './HorizonOcean';
 
 describe('buildHorizonRing', () => {
   const segments = 16;
@@ -36,7 +41,7 @@ describe('packHorizonParams', () => {
     const packed = packHorizonParams({
       centreX: 1,
       centreZ: 2,
-      maxViewDst: 2800,
+      innerRadius: 1360,
       chunkSize: 480,
       nearCentreX: 5,
       nearCentreZ: 6,
@@ -48,12 +53,43 @@ describe('packHorizonParams', () => {
       roughness: 0.25,
       coast: 0.5,
       blendHalfWidth: 0.125,
+      maskOriginX: 3,
+      maskOriginZ: -4,
       scatter: [0.5, 0.25, 0.125],
+      slopeVariance: 0.03125,
     });
     expect(packed.byteLength).toBe(80);
     expect(Array.from(packed)).toEqual([
-      1, 2, 2800, 480, 5, 6, 16000, 7, 8, 9, 131072, 0.25, 0.5, 0.125, 0, 0,
-      0.5, 0.25, 0.125, 1,
+      1, 2, 1360, 480, 5, 6, 16000, 7, 8, 9, 131072, 0.25, 0.5, 0.125, 3, -4,
+      0.5, 0.25, 0.125, 0.03125,
     ]);
+  });
+});
+
+describe('chunkMaskIndex', () => {
+  it('centres the mask on the origin chunk, rows along z', () => {
+    const half = CHUNK_MASK_SIZE / 2;
+    expect(chunkMaskIndex(10, -3, 10, -3)).toBe(half * CHUNK_MASK_SIZE + half);
+    expect(chunkMaskIndex(11, -3, 10, -3)).toBe(
+      half * CHUNK_MASK_SIZE + half + 1
+    );
+    expect(chunkMaskIndex(10, -2, 10, -3)).toBe(
+      (half + 1) * CHUNK_MASK_SIZE + half
+    );
+  });
+
+  it('covers every chunk the terrain can draw', () => {
+    // 2800 m view distance over 480 m chunks: six either side of the centre.
+    expect(chunkMaskIndex(-6, -6, 0, 0)).toBeGreaterThanOrEqual(0);
+    expect(chunkMaskIndex(6, 6, 0, 0)).toBeGreaterThanOrEqual(0);
+    expect(chunkMaskIndex(-9, 0, 0, 0)).toBe(-1);
+    expect(chunkMaskIndex(0, 8, 0, 0)).toBe(-1);
+  });
+});
+
+describe('oceanSlopeVariance', () => {
+  it('follows Cox and Munk', () => {
+    expect(oceanSlopeVariance(0)).toBeCloseTo(0.003);
+    expect(oceanSlopeVariance(10)).toBeCloseTo(0.0542);
   });
 });

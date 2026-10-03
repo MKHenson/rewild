@@ -344,9 +344,17 @@ export class ScatterChunkLayer implements IScatterInstanceGroup {
     uniforms[53] = renderer.terrainRenderer.scatterLodTint ? 1 : 0;
     uniforms[54] = 1 / renderer.camera.camera.exposure;
 
-    uniforms.set(renderer.sky.skyRenderer.wind.vec, 56);
+    const wind = renderer.sky.skyRenderer.wind;
+    uniforms.set(wind.vec, 56);
     const world = this.transform.matrixWorld.elements;
-    writeScatterWindParams(this.layer.wind, world[12], world[14], uniforms, 60);
+    writeScatterWindParams(
+      this.layer.wind,
+      world[12],
+      world[14],
+      wind.gustDrift,
+      uniforms,
+      60
+    );
 
     renderer.device.queue.writeBuffer(this.uniformBuffer, 0, uniforms);
   }

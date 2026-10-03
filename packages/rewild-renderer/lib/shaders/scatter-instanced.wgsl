@@ -62,7 +62,8 @@ struct Uniforms {
   wind : vec4f,
   // The layer's wind block: x = amplitude, y = frequency, z = flutter.
   windParams : vec4f,
-  // xy = the chunk's world origin, so the wind field is read in world space.
+  // xy = the chunk's world origin, so the wind field is read in world space;
+  // zw = metres the gust field has drifted.
   windOrigin : vec4f,
 }
 
@@ -201,7 +202,7 @@ fn transformVertex(
     chunkPosition += scatterWindOffset(
       uniforms.wind,
       uniforms.windParams,
-      uniforms.windOrigin.xy,
+      uniforms.windOrigin,
       color,
       instance.params.x,
       instance.posScale.w,

@@ -310,11 +310,12 @@ fn cirrusBasis() -> CirBasis {
     return b;
 }
 
-// Downwind advection of the whole sheet, in sheet units. Unbounded — it grows
-// for as long as the app runs — so it must only ever be added to a coordinate,
-// never multiplied by anything that varies (see cirrusDensityAt).
+// Downwind advection of the whole sheet, in sheet units, integrated on the CPU
+// (WindState.cirrusScroll). Unbounded — it grows for as long as the app runs —
+// so it must only ever be added to a coordinate, never multiplied by anything
+// that varies (see cirrusDensityAt).
 fn cirScroll() -> f32 {
-    return object.iTime * 0.00035 * object.windiness;
+    return object.cirrusScroll;
 }
 
 // Raw sheet coordinates for a camera-relative position: x downwind, y up,

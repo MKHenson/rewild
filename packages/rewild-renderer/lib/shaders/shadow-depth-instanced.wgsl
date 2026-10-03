@@ -95,7 +95,7 @@ fn transformVertex(
     chunkPosition += scatterWindOffset(
       uniforms.wind,
       uniforms.windParams,
-      uniforms.windOrigin.xy,
+      uniforms.windOrigin,
       weights,
       instance.params.x,
       instance.posScale.w,

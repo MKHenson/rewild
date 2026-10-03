@@ -117,10 +117,9 @@ export class ChunkScatter {
       if (origin) _bounds.translate(origin);
 
       // The component's flag, never the transform's: SceneBVH.collectObjects
-      // treats transform.visible as *membership* and only rebuilds on a
-      // structure change, so hiding a transform drops it from the tree and
-      // showing it again does not put it back. organizeVisuals skips a
-      // component whose own `visible` is false, which is the culling this wants.
+      // treats transform.visible as *membership*, so changing it rebuilds the
+      // whole tree. organizeVisuals skips a component whose own `visible` is
+      // false, which is the per-frame culling this wants with no rebuild.
       layer.visible =
         layer.draws &&
         _bounds.distanceToPoint(viewerPosition) <= layer.fadeBand[3];

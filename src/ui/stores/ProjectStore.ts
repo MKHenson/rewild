@@ -55,6 +55,7 @@ export class ProjectStore {
           temperature: 0.5,
           elevation: 80,
           dayNightCycle: false,
+          weatherState: 'auto',
         },
         containers: [],
         terrain: {

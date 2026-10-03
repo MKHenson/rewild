@@ -144,6 +144,10 @@ export class SceneGraphStore {
               type: 'dayNightCycle',
               value: project.sceneGraph?.atmosphere?.dayNightCycle || false,
             },
+            {
+              type: 'weatherState',
+              value: project.sceneGraph?.atmosphere?.weatherState ?? 'auto',
+            },
           ],
         },
       } as ITreeNode<IResource>,

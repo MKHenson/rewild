@@ -29,6 +29,13 @@ export function registerWaterDebugCommands(renderer: Renderer) {
     );
   };
 
+  (window as any).setWaterHorizonSlope = (scale = 1) => {
+    renderer.terrainRenderer.waterHorizonSlope = scale;
+    console.log(
+      `setWaterHorizonSlope(${scale}) — scale on the roughness of the sea past the terrain chunks, 1 matches the chunk water at range. Higher reads darker and duller at a grazing angle, 0 a mirror of the sky.`
+    );
+  };
+
   (window as any).setWaterTroughDarkening = (strength = 1) => {
     renderer.terrainRenderer.waterTroughDarkening = strength;
     console.log(

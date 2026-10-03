@@ -173,6 +173,28 @@ See [Sky Rendering](./sky-rendering.md).
 
 ---
 
+## Day, night & weather
+
+Registered in `AtmosphereDebugCommands.ts`. They act while the Sky's **Dynamic
+Day & Weather** switch is on.
+
+```js
+weather(); // State, output vs weather knobs, drivers, wind bearing, forecast
+setWeather('Storm'); // Jump to a state; setWeather('Storm', true) skips the ease
+setDayCycle({ cycleSeconds: 120 }); // Also dayShare, paused, timeScale, weatherPausesWithCycle
+setTimeOfDay(90); // Sun elevation: 0 sunrise, 90 noon, 180 sunset, 270 midnight
+setWeatherClimate('tropical'); // arid | temperate | tropical | coastal | tundra
+setWeatherVariation(2); // Scale on the wander and bursts inside a state; 0 off
+```
+
+A short `cycleSeconds` is the fastest way to watch a sequence: weather durations
+are fractions of a cycle, so everything speeds up together. The in-state
+variation runs in seconds and does not.
+
+See [Weather System](./weather.md#atmosphere-system).
+
+---
+
 ## Shadows
 
 Registered in `ShadowDebugCommands.ts`.

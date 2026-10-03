@@ -27,7 +27,11 @@ import { ScatterInstances, ScatterPick, pickScatterInstance } from './Scatter';
 import { generateSplatMap } from './Splat';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { ScatterModels } from './ScatterModels';
-import { HorizonOcean } from '../water/HorizonOcean';
+import {
+  CHUNK_MASK_SIZE,
+  HorizonOcean,
+  chunkMaskIndex,
+} from '../water/HorizonOcean';
 import { WaterWaveBuffer } from '../water/WaterWaves';
 import { underWaterQuality, waterDetailBias } from '../water/WaterQuality';
 import { OceanFFT } from '../water/OceanFFT';
@@ -77,9 +81,31 @@ const viewDirDotThresholdForChunkUpdate = Math.cos(0.05);
 // avoid culling a chunk whose surface is actually in view.
 const CULL_BOX_HALF_HEIGHT: f32 = 1000;
 
+// Radians the view chunks are generated for reaches past the camera's on each
+// side, so the chunks a turn brings in are usually meshed before they reach
+// the screen rather than showing sky while they stream in.
+const GENERATION_VIEW_MARGIN = (25 * Math.PI) / 180;
+
+/** Widens a perspective projection by `margin` radians each side, in place.
+ *  An orthographic one is left as it is. */
+export function widenProjection(projection: Matrix4, margin: number): void {
+  const e = projection.elements;
+  if (e[11] === 0) return;
+  e[0] = widenScale(e[0], margin);
+  e[5] = widenScale(e[5], margin);
+}
+
+// A projection's scale on one axis is 1 / tan(half the view angle).
+function widenScale(scale: number, margin: number): number {
+  const half = Math.atan(1 / Math.abs(scale));
+  const widened = Math.min(half + margin, Math.PI / 2 - 0.01);
+  return Math.sign(scale) / Math.tan(widened);
+}
+
 // Reusable scratch — chunk selection runs every frame the view changes, so it
 // must not allocate (see project note on per-frame allocation).
 const _projScreenMatrix = new Matrix4();
+const _generationProj = new Matrix4();
 const _frustum = new Frustum();
 const _cullBox = new Box3();
 const _viewDir = new Vector3();
@@ -101,6 +127,8 @@ export class TerrainRenderer implements WaterQuerySource {
   chunksVisibleInViewDst: i32;
   terrainChunks: Map<string, TerrainChunk>;
   terrainChunksVisibleLastUpdate: TerrainChunk[];
+  private readonly previouslyVisibleChunks: TerrainChunk[] = [];
+  private visibilityPass = 0;
   // Distance-banded LODs, nearest to farthest. `visibleDstThreshold` is the
   // nearest-edge WORLD distance past which the *next* (coarser) LOD takes over;
   // the last entry's threshold is maxViewDst, the terrain's visible radius. This
@@ -206,6 +234,12 @@ export class TerrainRenderer implements WaterQuerySource {
   waterFoamDebug = false;
   /** Strength of the sunlight through the wave crests; 1 is the default. */
   waterCrestGlow = 1;
+  /** Scale on the far sea's roughness past the chunks; 1 matches the chunk
+   *  water at range. */
+  waterHorizonSlope = 1;
+  private readonly horizonChunkMask = new Uint8Array(
+    CHUNK_MASK_SIZE * CHUNK_MASK_SIZE
+  );
   /** Strength of the trough darkening; 1 is the default. */
   waterTroughDarkening = 1;
   /** Scale on the shore waves' height; 1 is the default. */
@@ -456,12 +490,15 @@ export class TerrainRenderer implements WaterQuerySource {
   }
 
   private updateVisibleChunks(renderer: Renderer) {
-    for (const chunk of this.terrainChunksVisibleLastUpdate) {
-      chunk.visible = false;
-    }
-
-    // Clear the last update array
+    // Chunks still in range stay visible throughout, and only those that left
+    // it are hidden after: toggling a transform's visibility rebuilds the
+    // scene BVH, so hiding and re-showing every chunk would rebuild it on
+    // every update.
+    const previous = this.previouslyVisibleChunks;
+    previous.length = 0;
+    for (const chunk of this.terrainChunksVisibleLastUpdate) previous.push(chunk);
     this.terrainChunksVisibleLastUpdate.length = 0;
+    const pass = ++this.visibilityPass;
 
     const chunkSize = this.chunkSize;
     const half = chunkSize / 2;
@@ -519,6 +556,7 @@ export class TerrainRenderer implements WaterQuerySource {
           );
 
           if (existing.visible) {
+            existing.visibilityPass = pass;
             this.terrainChunksVisibleLastUpdate.push(existing);
           }
           continue;
@@ -566,6 +604,10 @@ export class TerrainRenderer implements WaterQuerySource {
           renderer
         );
       }
+    }
+
+    for (const chunk of previous) {
+      if (chunk.visibilityPass !== pass) chunk.visible = false;
     }
 
     // Eviction pass — runs after visible chunk processing so we never
@@ -1139,7 +1181,7 @@ export class TerrainRenderer implements WaterQuerySource {
       underWater,
       deltaSeconds,
       lensRain(sky.precipitation, sky.temperature),
-      sky.wind.vec,
+      sky.wind.gustDrift,
       eye.x,
       eye.z
     );
@@ -1281,6 +1323,24 @@ export class TerrainRenderer implements WaterQuerySource {
         preset: this._climatePreset,
         climate: resolveClimatePreset(this._climatePreset),
       };
+    const chunkSize = this.chunkSize;
+    const originX = Math.round(this.viewPosOld.x / chunkSize);
+    const originZ = Math.round(this.viewPosOld.z / chunkSize);
+    const mask = this.horizonChunkMask;
+    mask.fill(0);
+    const chunks = this.terrainChunksVisibleLastUpdate;
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      if (!chunk.drawn) continue;
+      const index = chunkMaskIndex(
+        chunk.coord.x,
+        chunk.coord.y,
+        originX,
+        originZ
+      );
+      if (index >= 0) mask[index] = 255;
+    }
+
     this.horizonOcean.update(renderer, {
       seed: this._seed,
       climatePreset: this._climatePreset,
@@ -1289,7 +1349,10 @@ export class TerrainRenderer implements WaterQuerySource {
       centreX: this.viewPosOld.x,
       centreZ: this.viewPosOld.z,
       maxViewDst: this.maxViewDst,
-      chunkSize: this.chunkSize,
+      chunkSize,
+      chunkMask: mask,
+      windSpeed: this.ocean?.windSpeed ?? 0,
+      slopeScale: this.waterHorizonSlope,
     });
   }
 
@@ -1306,11 +1369,14 @@ export class TerrainRenderer implements WaterQuerySource {
     );
     this.viewerEye.copy(camera.transform.position);
 
-    // View frustum for this pass; chunk selection uses it to skip generating
-    // terrain the player cannot see. One frame stale at worst, which coarse
-    // chunk streaming tolerates.
+    // The view chunk selection generates terrain for: the camera's, widened by
+    // GENERATION_VIEW_MARGIN, so terrain the player cannot see is still
+    // skipped. One frame stale at worst, which coarse chunk streaming
+    // tolerates.
+    _generationProj.copy(camera.projectionMatrix);
+    widenProjection(_generationProj, GENERATION_VIEW_MARGIN);
     _projScreenMatrix.multiplyMatrices(
-      camera.projectionMatrix,
+      _generationProj,
       camera.matrixWorldInverse
     );
     _frustum.setFromProjectionMatrix(_projScreenMatrix, WebGPUCoordinateSystem);

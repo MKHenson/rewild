@@ -45,7 +45,7 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
   up: Vector3;
   matrixWorldNeedsUpdate: boolean;
   matrixAutoUpdate: boolean;
-  visible: boolean = true;
+  private _visible: boolean = true;
   userData: Record<string, unknown> = {};
   observers: ITransformObserver[];
   component: IComponent | null;
@@ -467,6 +467,18 @@ export class Transform implements IQuatChangeListener, IEulerChangeListener {
    * checking the root's version detects deep structural changes.
    */
   structureVersion: number = 0;
+
+  get visible(): boolean {
+    return this._visible;
+  }
+
+  /** The scene BVH leaves hidden subtrees out, so a change rebuilds it as
+   *  adding or removing a child does. */
+  set visible(value: boolean) {
+    if (value === this._visible) return;
+    this._visible = value;
+    this.bubbleStructureVersion();
+  }
 
   addChild(child: Transform): Transform {
     if (child === this)

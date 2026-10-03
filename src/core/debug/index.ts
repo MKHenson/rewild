@@ -5,6 +5,7 @@ import { registerRenderQualityCommands } from './RenderQualityCommands';
 import { registerShadowDebugCommands } from './ShadowDebugCommands';
 import { registerSceneDebugCommands } from './SceneDebugCommands';
 import { registerSkyDebugCommands } from './SkyDebugCommands';
+import { registerAtmosphereDebugCommands } from './AtmosphereDebugCommands';
 import { registerPbrHarnessCommands } from './PbrHarnessCommands';
 import { registerGltfImportCommands } from './GltfImportCommands';
 import { registerLakeDebugCommands } from './LakeDebugCommands';
@@ -23,6 +24,7 @@ export function registerDebugCommands(renderer: Renderer, project: IProject) {
   registerRenderQualityCommands(renderer);
   registerSceneDebugCommands(renderer);
   registerSkyDebugCommands(renderer);
+  registerAtmosphereDebugCommands(renderer);
   registerShadowDebugCommands(renderer);
   registerPbrHarnessCommands(renderer);
   registerGltfImportCommands(renderer);

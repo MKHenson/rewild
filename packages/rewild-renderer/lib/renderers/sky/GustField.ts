@@ -6,7 +6,8 @@ import { smoothstep } from 'rewild-common';
 // Change both together.
 
 const GUST_LENGTH = 60;
-const GUST_SPEED = 20;
+/** Metres the field travels per full-wind second. */
+export const GUST_SPEED = 20;
 const EDDY_DRIFT = 0.55;
 
 function windHash(x: number, y: number): number {
@@ -34,17 +35,16 @@ function windNoise(px: number, py: number): number {
 }
 
 /**
- * The gust field at world (`x`, `z`), 0..1, blown downwind. `wind` is the
- * sky's WindState vec: xy the way the air moves, z its strength, w its clock.
+ * The gust field at world (`x`, `z`), 0..1, blown downwind. `drift` is the
+ * sky's WindState gustDrift: metres the field has travelled.
  */
 export function gustField(
   x: number,
   z: number,
-  wind: ArrayLike<number>
+  drift: ArrayLike<number>
 ): number {
-  const drift = wind[3] * GUST_SPEED;
-  const dx = wind[0] * drift;
-  const dz = wind[1] * drift;
+  const dx = drift[0];
+  const dz = drift[1];
   const px = (x - dx) / GUST_LENGTH;
   const pz = (z - dz) / GUST_LENGTH;
   const ex = (x - dx * EDDY_DRIFT) / GUST_LENGTH;

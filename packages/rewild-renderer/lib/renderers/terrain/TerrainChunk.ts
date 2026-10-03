@@ -54,6 +54,8 @@ export class TerrainChunk implements IComponent {
   // seam-free at any TERRAIN_METERS_PER_SAMPLE (see MeshGenerator).
   noiseOffset: Vector2;
   _visible: boolean = false;
+  /** The TerrainRenderer visibility update that last found it in range. */
+  visibilityPass = -1;
   bounds: Box3;
   transform: Transform;
   detailLevels: LODInfo[];
@@ -929,6 +931,14 @@ export class TerrainChunk implements IComponent {
       this._visible = false;
       this.transform.visible = false;
     }
+  }
+
+  /** Whether any of its LOD meshes is on screen this frame. */
+  get drawn(): boolean {
+    if (!this._visible) return false;
+    const lods = this.lodMesh;
+    for (let i = 0; i < lods.length; i++) if (lods[i].mesh?.visible) return true;
+    return false;
   }
 
   get visible() {

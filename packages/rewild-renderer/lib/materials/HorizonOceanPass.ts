@@ -17,7 +17,7 @@ const shadowGroupIndex = 3;
 
 // The ocean ring past the terrain chunks. Opaque and depth-writing, ordered with
 // the chunk water; the two never overlap, since the ring discards wherever a
-// chunk is drawn.
+// chunk drew.
 export class HorizonOceanPass implements IMaterialPass {
   profileCategory: SceneCategory = 'water';
 

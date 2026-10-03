@@ -1,6 +1,6 @@
-import { gustField, gustShare } from './GustField';
+import { GUST_SPEED, gustField, gustShare } from './GustField';
 
-const CALM = [1, 0, 0, 0];
+const CALM = [0, 0];
 
 describe('gustField', () => {
   it('stays within 0..1 and varies across the world', () => {
@@ -24,12 +24,11 @@ describe('gustField', () => {
       ).toBeLessThan(0.08);
   });
 
-  it('carries its gusts downwind as the clock runs', () => {
-    // Air moving toward +x, twenty metres a full-wind second: a coarse
-    // feature at x now reads at x + 20 a second later, give or take the
-    // eddies.
-    const now = [1, 0, 1, 0];
-    const later = [1, 0, 1, 1];
+  it('carries its gusts downwind as it drifts', () => {
+    // Drifted twenty metres toward +x: a coarse feature at x now reads at
+    // x + 20, give or take the eddies.
+    const now = [0, 0];
+    const later = [20, 0];
     let near = 0;
     for (let x = 0; x < 600; x += 5)
       near += Math.abs(gustField(x, 0, now) - gustField(x + 20, 0, later));
@@ -55,7 +54,8 @@ describe('gustShare', () => {
     let was = false;
     const seconds = 600;
     for (let t = 0; t < seconds; t += dt) {
-      const gusting = gustShare(gustField(13.7, -41.2, [1, 0, 1, t])) > 0;
+      const gusting =
+        gustShare(gustField(13.7, -41.2, [t * GUST_SPEED, 0])) > 0;
       if (gusting) on += dt;
       if (gusting && !was) bursts++;
       was = gusting;

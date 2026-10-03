@@ -21,11 +21,10 @@
 // strength, so a calm day's gusts drift slower as well as press less.
 
 const WIND_TAU = 6.28318530718;
-// Metres a gust feature spans, and how far the field travels per full-wind
-// second — near the rain's gale wind, so a gust sweeps through in a second or
-// two rather than sitting over a wood.
+// Metres a gust feature spans. How far the field has travelled comes from the
+// CPU (WindState.gustDrift, GUST_SPEED in GustField.ts), integrated so a wind
+// that turns moves the field on rather than jumping it.
 const GUST_LENGTH = 60.0;
-const GUST_SPEED = 20.0;
 // Fraction of the gust speed the finest octave is blown at.
 const EDDY_DRIFT = 0.55;
 
@@ -58,8 +57,7 @@ fn windNoise(p: vec2f) -> f32 {
 // The finest is blown slower than the gusts it rides in, so it drifts through
 // them instead of travelling in lockstep — one field moving as a block reads
 // as a wave train, and this is what breaks it into eddies.
-fn gustField(world: vec2f, wind: vec4f) -> f32 {
-  let drift = wind.xy * (wind.w * GUST_SPEED);
+fn gustField(world: vec2f, drift: vec2f) -> f32 {
   let p = (world - drift) / GUST_LENGTH;
   let e = (world - drift * EDDY_DRIFT) / GUST_LENGTH;
   return 0.5 * windNoise(p) +
@@ -70,13 +68,14 @@ fn gustField(world: vec2f, wind: vec4f) -> f32 {
 // `wind`: xy = world-space direction the air moves, z = strength 0..1, w =
 // the wind clock in full-wind seconds. `params`: x = metres of sway at bend 1
 // in full wind, y = sway cycles per full-wind second, z = flutter as a
-// fraction of the sway. `origin` is the drawing chunk's world xz, so the
-// field is sampled in world space and crosses chunk borders without a seam;
+// fraction of the sway. `origin` xy is the drawing chunk's world xz, so the
+// field is sampled in world space and crosses chunk borders without a seam,
+// and zw is the metres the gust field has drifted (WindState.gustDrift);
 // `chunkPosition` is the vertex after its instance transform.
 fn scatterWindOffset(
   wind: vec4f,
   params: vec4f,
-  origin: vec2f,
+  origin: vec4f,
   weights: vec4f,
   instancePhase: f32,
   scale: f32,
@@ -92,9 +91,9 @@ fn scatterWindOffset(
   let across = vec3f(-wind.y, 0.0, wind.x);
   let t = wind.w;
 
-  let world = chunkPosition.xz + origin;
-  let field = gustField(world, wind);
-  let p = (world - wind.xy * (t * GUST_SPEED)) / GUST_LENGTH;
+  let world = chunkPosition.xz + origin.xy;
+  let field = gustField(world, origin.zw);
+  let p = (world - origin.zw) / GUST_LENGTH;
   // A plant under wind keeps a lean; the gust adds to it.
   let gust = 0.3 + 0.7 * field;
   // A second read of the same field, off to one side, steers the lean a

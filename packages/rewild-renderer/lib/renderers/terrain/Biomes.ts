@@ -1,3 +1,4 @@
+import type { WeatherClimateId } from '../../atmosphere/WeatherTypes';
 import { TERRAIN_METERS_PER_SAMPLE } from './MeshGenerator';
 import { SCATTER_LAYERS } from './ScatterLayers';
 import { TERRAIN_MATERIALS } from './TerrainMaterials';
@@ -303,6 +304,8 @@ export interface CoastConfig {
 export interface ClimateConfig {
   /** For the editor's preset picker. Omitted ⇒ callers fall back to the id. */
   label?: string;
+  /** The world's weather profile. Omitted ⇒ temperate. */
+  weather?: WeatherClimateId;
   temperature: ClimateAxis;
   moisture: ClimateAxis;
   /** Omitted ⇒ the world is all land. */
@@ -958,6 +961,7 @@ export const ARID_COAST: CoastConfig = {
 // sharing a biome across cells is for. Uses seven of the eight splat channels.
 export const DEFAULT_CLIMATE: ClimateConfig = {
   label: 'Default',
+  weather: 'temperate',
   temperature: {
     scale: 3000 / TERRAIN_METERS_PER_SAMPLE,
     seedSalt: 7919,
@@ -989,6 +993,7 @@ export const DEFAULT_CLIMATE: ClimateConfig = {
 // the borders in the same places; "moisture" here only means less dry.
 export const ARID_CLIMATE: ClimateConfig = {
   label: 'Arid',
+  weather: 'arid',
   temperature: {
     scale: 6000 / TERRAIN_METERS_PER_SAMPLE,
     seedSalt: 7919,
