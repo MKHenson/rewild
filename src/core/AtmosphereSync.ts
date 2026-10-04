@@ -11,8 +11,9 @@ export type AtmosphereProps = Partial<Record<string, PropValue>>;
 /**
  * Sets the sky to the authored atmosphere. With the day/night switch on, the
  * atmosphere system starts from those values and runs the cycle and the
- * weather; the world's climate preset picks the weather profile and its seed
- * the sequence. Set the terrain's preset and seed first.
+ * weather. The world's climate preset picks the weather profile; the seed is
+ * random, so each start plays out differently. `setWeatherSeed` replays one.
+ * Set the terrain's preset first.
  */
 export function applyAtmosphere(renderer: Renderer, atmosphere: AtmosphereProps) {
   const sky = renderer.sky.skyRenderer;
@@ -34,7 +35,8 @@ export function applyAtmosphere(renderer: Renderer, atmosphere: AtmosphereProps)
   const climate = resolveWeatherClimate(
     resolveClimatePreset(terrain.climatePreset).weather
   );
-  system.init(climate, terrain.seed, {
+  const seed = Math.floor(Math.random() * 0x100000000);
+  system.init(climate, seed, {
     elevation: sky.elevation,
     windBearing: sky.windBearing,
     cloudiness: sky.cloudiness,

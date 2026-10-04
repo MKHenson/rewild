@@ -1,6 +1,6 @@
 import { ClimateProfile, WeatherClimateId } from './WeatherTypes';
 
-const DRIVER_RATES = { pressure: 7.5, moisture: 6, instability: 9 };
+const DRIVER_RATES = { pressure: 30, moisture: 24, instability: 36 };
 const KNOB_RATES = {
   windiness: 0.5,
   cloudiness: 0.025,
@@ -14,9 +14,9 @@ const SHARED = {
   initialState: 'Fair',
   pressureOffset: 0,
   instabilityScale: 1,
-  maxPressureTrend: 3,
+  maxPressureTrend: 12,
   prevailingWander: 40,
-  bearingRate: 2.5,
+  bearingRate: 10,
   variationScale: 1,
   driverRates: DRIVER_RATES,
   knobRates: KNOB_RATES,

@@ -31,7 +31,7 @@ import { WeatherVariation } from './WeatherVariation';
 /** Per second: how fast the wind's pressure trend follows the pressure. */
 const TREND_RATE = 0.3;
 /** Per cycle: how fast the prevailing wind turns to a new bearing. */
-const PREVAILING_RATE = 0.5;
+const PREVAILING_RATE = 2;
 
 interface UpcomingState {
   state: WeatherStateId;
@@ -89,6 +89,7 @@ export class AtmosphereSystem {
   private prevailingTarget = 180;
   private stateBearingOffset = 0;
 
+  private start: AtmosphereStart | null = null;
   private enabled = true;
   private time = 0;
   private nextRetarget = 0;
@@ -104,6 +105,7 @@ export class AtmosphereSystem {
   init(climate: ClimateProfile, seed: number, start: AtmosphereStart): void {
     this.climate = climate;
     this.seed = seed;
+    this.start = { ...start };
     this.stateRng = new WeatherRandom(seed ^ 0x9e3779b9);
     this.targetRng = new WeatherRandom(seed ^ 0x85ebca6b);
     this.variationRng = new WeatherRandom(seed ^ 0xc2b2ae35);
@@ -146,6 +148,12 @@ export class AtmosphereSystem {
     this.modifiers.update(deltaSeconds);
     this.writeSample();
     return this.sample;
+  }
+
+  /** Starts over from the last init's start with `seed`, to replay a
+   *  sequence. Does nothing before an init. */
+  reseed(seed: number): void {
+    if (this.start) this.init(this.climate, seed, this.start);
   }
 
   /** The next `count` states, in order. Picking them fixes them. */

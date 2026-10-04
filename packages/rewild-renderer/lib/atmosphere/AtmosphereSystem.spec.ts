@@ -22,7 +22,7 @@ function system(
   start = FAIR_START
 ) {
   const atmosphere = new AtmosphereSystem();
-  atmosphere.cycle.cycleSeconds = 150;
+  atmosphere.cycle.cycleSeconds = 600;
   atmosphere.init(resolveWeatherClimate(climate), seed, start);
   return atmosphere;
 }
@@ -102,13 +102,26 @@ describe('AtmosphereSystem', () => {
 
   it('blows a storm at 0.8 to 1', () => {
     const atmosphere = system(31);
-    atmosphere.cycle.cycleSeconds = 2400;
+    atmosphere.cycle.cycleSeconds = 4800;
     atmosphere.forceState('Storm', true);
     const wind: number[] = [];
     run(atmosphere, 300, () => wind.push(atmosphere.sample.windiness));
     wind.sort((a, b) => a - b);
     expect(wind[Math.floor(wind.length * 0.05)]).toBeGreaterThan(0.75);
     expect(wind[Math.floor(wind.length * 0.5)]).toBeGreaterThan(0.85);
+  });
+
+  it('clouds steady rain at 0.85 and a storm at 0.95', () => {
+    const settled = (state: 'Rain' | 'Storm') => {
+      const atmosphere = system(17);
+      atmosphere.cycle.cycleSeconds = 4800;
+      atmosphere.forceState(state, true);
+      run(atmosphere, 120);
+      return atmosphere.base.cloudiness;
+    };
+    expect(settled('Rain')).toBeCloseTo(0.85, 1);
+    expect(settled('Storm')).toBeGreaterThan(0.92);
+    expect(settled('Storm')).toBeLessThanOrEqual(0.95);
   });
 
   it('never mists in an arid world', () => {
@@ -198,7 +211,7 @@ describe('AtmosphereSystem', () => {
     it('swings the wind in short bursts in a storm', () => {
       const atmosphere = system(12);
       // A long day, so the storm holds for the whole window.
-      atmosphere.cycle.cycleSeconds = 2400;
+      atmosphere.cycle.cycleSeconds = 4800;
       atmosphere.forceState('Storm', true);
       let widest = 0;
       let burstSeconds = 0;
@@ -329,5 +342,27 @@ describe('AtmosphereSystem', () => {
         1
       );
     });
+  });
+});
+
+describe('AtmosphereSystem.reseed', () => {
+  it('replays a seed from the same start, and other seeds differ', () => {
+    const start = { ...FAIR_START, state: 'FrontApproaching' as const };
+    const a = system(5, 'temperate', start);
+    const replay = a.forecast(4).map((entry) => entry.state);
+    run(a, 200);
+    a.reseed(5);
+    expect(a.state).toBe('FrontApproaching');
+    expect(a.forecast(4).map((entry) => entry.state)).toEqual(replay);
+
+    const sequences = new Set<string>();
+    for (let seed = 0; seed < 20; seed++)
+      sequences.add(
+        system(seed, 'temperate', start)
+          .forecast(3)
+          .map((entry) => entry.state)
+          .join()
+      );
+    expect(sequences.size).toBeGreaterThan(3);
   });
 });
