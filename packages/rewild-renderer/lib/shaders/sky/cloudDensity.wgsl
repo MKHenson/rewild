@@ -14,7 +14,23 @@ struct CloudDensityResult {
 // keeping the cloud pattern anchored to the world so it parallaxes correctly.
 // `drift` is how far the deck has blown (WindState.cloudDrift), integrated on
 // the CPU so a wind that turns moves the clouds on rather than jumping them.
-fn cloudDensity(position: vec3f, domainOffset: vec2f, cloudiness: f32, drift: vec2f) -> CloudDensityResult {
+// `front` (WindState.cloudFront) makes a changing cloudiness arrive from
+// upwind: see frontCloudiness.
+// Metres upwind over which the sky eases into its full lean. Wide and smooth,
+// so a changing sky shades across the whole view rather than splitting in two.
+const FRONT_WIDTH: f32 = 6000.0;
+
+// The cloudiness at a camera-relative position. Overhead it is the sky's; while
+// the cloudiness is changing, the sky upwind leans toward where it is heading
+// (front.w at the far upwind horizon) and the sky downwind away from it, so
+// building cloud shows first upwind and a clearing breaks from upwind.
+fn frontCloudiness(position: vec3f, cloudiness: f32, front: vec4f) -> f32 {
+  let x = dot(position.xz, front.xy) / FRONT_WIDTH;
+  return saturate(cloudiness + front.w * x * inverseSqrt(1.0 + x * x));
+}
+
+fn cloudDensity(position: vec3f, domainOffset: vec2f, skyCloudiness: f32, drift: vec2f, front: vec4f) -> CloudDensityResult {
+  let cloudiness = frontCloudiness(position, skyCloudiness, front);
   // Single coherent wind offset — all layers move together as one mass
   let windOffset = vec3f(drift.x, 0.0, drift.y);
   // Small turbulence offset for FBM detail layers (subtle internal cloud motion)
@@ -30,9 +46,14 @@ fn cloudDensity(position: vec3f, domainOffset: vec2f, cloudiness: f32, drift: ve
   result.cloudHeight = cloudHeight;
 
   // Sample the large-scale weather pattern
+  // Sparse skies use a finer pattern than overcast ones. The two scales are
+  // blended rather than the scale itself, which would zoom the pattern about
+  // the world origin as the cloudiness changes.
   let weatherThreshold = mix(0.18, 0.04, smoothstep(0.7, 1.0, cloudiness));
+  let largeFine = textureSampleLevel(pebblesTexture, noiseSampler, -0.00005 * p.zx, 0.0).x;
+  let largeBroad = textureSampleLevel(pebblesTexture, noiseSampler, -0.000015 * p.zx, 0.0).x;
   var largeWeather: f32 = clamp(
-    (textureSampleLevel(pebblesTexture, noiseSampler, -mix(0.00005, 0.000015, cloudiness) * p.zx, 0.0).x - weatherThreshold) * 5.0 * cloudiness,
+    (mix(largeFine, largeBroad, cloudiness) - weatherThreshold) * 5.0 * cloudiness,
     0.0, 6.0
   );
 

@@ -269,6 +269,8 @@ export class SkyRenderer {
         4 + // lightningBoost
         4 + // cirrusScroll
         2 * 4 + // cloudDrift (vec2)
+        2 * 4 + // padding (aligns cloudFront)
+        4 * 4 + // cloudFront (vec4)
         0;
 
       // Align the buffer size to the next multiple of 256
@@ -477,6 +479,7 @@ export class SkyRenderer {
     uniformData[43] = wind.cirrusScroll;
     uniformData[44] = wind.cloudDrift[0];
     uniformData[45] = wind.cloudDrift[1];
+    uniformData.set(wind.cloudFront, 48);
 
     // Extract XZ camera forward from the world matrix (-Z column)
     const m = camera.transform.matrixWorld.elements;
@@ -567,6 +570,7 @@ export class SkyRenderer {
       camera.transform.position.z,
       this.cloudiness,
       this.wind.cloudDrift,
+      this.wind.cloudFront,
       sunPosition.x / sunDir,
       sunPosition.y / sunDir,
       sunPosition.z / sunDir,

@@ -45,6 +45,7 @@ struct ObjectStruct {
     lightningBoost: f32,      // byte 168
     cirrusScroll: f32,        // byte 172, WindState.cirrusScroll
     cloudDrift: vec2<f32>,    // byte 176, WindState.cloudDrift
+    cloudFront: vec4<f32>,    // byte 192, WindState.cloudFront
 };
 
 struct OutputStruct {

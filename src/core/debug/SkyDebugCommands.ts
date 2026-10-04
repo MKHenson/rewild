@@ -110,7 +110,7 @@ export function registerSkyDebugCommands(renderer: Renderer) {
     console.log(
       'setRainWetness — rain wetness is now',
       wetness.settings,
-      '\nKeys: soakIn and soakOut, seconds by e for the ground to soak up rain and to dry; filmIn and filmOut, the same for the glossy film on top; strength, scale on both (0 dry).'
+      '\nKeys: soakIn and soakOut, seconds by e for the ground to soak up rain and to dry; filmIn and filmOut, the same for the glossy film on top; fullAt, the rain strength at which the world is fully wet (0.4); strength, scale on both (0 dry).'
     );
   };
 

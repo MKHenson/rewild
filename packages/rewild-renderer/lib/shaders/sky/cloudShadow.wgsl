@@ -16,6 +16,8 @@ struct CloudShadowUniforms {
   padding0: f32,
   padding1: f32,
   padding2: f32,
+  // WindState.cloudFront.
+  front: vec4f,
 };
 
 @group(0) @binding(0) var<uniform> shadow: CloudShadowUniforms;
@@ -92,7 +94,7 @@ const NUM_SHADOW_SAMPLES: i32 = ${ SHADOW_SAMPLES };
     // Offset XZ based on sun angle: at height h, light arrives from an XZ offset
     let xzOffset = sunDir.xz * (h * invSunY);
     let samplePos = vec3f(relativeXZ.x + xzOffset.x, sampleY, relativeXZ.y + xzOffset.y);
-    let density = cloudDensity(samplePos, vec2f(shadow.centerX, shadow.centerZ), shadow.cloudiness, vec2f(shadow.driftX, shadow.driftZ)).density;
+    let density = cloudDensity(samplePos, vec2f(shadow.centerX, shadow.centerZ), shadow.cloudiness, vec2f(shadow.driftX, shadow.driftZ), shadow.front).density;
     totalDensity += density * stepSize;
   }
 

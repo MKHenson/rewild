@@ -100,6 +100,17 @@ describe('AtmosphereSystem', () => {
       expect(windAtFirstRain).toBeGreaterThan(calm + 0.1);
   });
 
+  it('blows a storm at 0.8 to 1', () => {
+    const atmosphere = system(31);
+    atmosphere.cycle.cycleSeconds = 2400;
+    atmosphere.forceState('Storm', true);
+    const wind: number[] = [];
+    run(atmosphere, 300, () => wind.push(atmosphere.sample.windiness));
+    wind.sort((a, b) => a - b);
+    expect(wind[Math.floor(wind.length * 0.05)]).toBeGreaterThan(0.75);
+    expect(wind[Math.floor(wind.length * 0.5)]).toBeGreaterThan(0.85);
+  });
+
   it('never mists in an arid world', () => {
     const atmosphere = system(11, 'arid');
     run(atmosphere, 20 * 600, () => {
@@ -186,6 +197,8 @@ describe('AtmosphereSystem', () => {
   describe('variation within a state', () => {
     it('swings the wind in short bursts in a storm', () => {
       const atmosphere = system(12);
+      // A long day, so the storm holds for the whole window.
+      atmosphere.cycle.cycleSeconds = 2400;
       atmosphere.forceState('Storm', true);
       let widest = 0;
       let burstSeconds = 0;

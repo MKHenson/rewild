@@ -1,3 +1,4 @@
+import { smoothstep } from 'rewild-common';
 import { AtmosphereModifiers } from './AtmosphereModifiers';
 import { resolveWeatherClimate } from './ClimateProfiles';
 import {
@@ -268,6 +269,12 @@ export class AtmosphereSystem {
       const id = KNOB_IDS[i];
       base[id] += ease(this.raw[id] - base[id], knobRates[id], dt);
     }
+    // Rain needs the cloud it falls from: it never runs ahead of the clouds
+    // the sky shows, however fast the drivers turn.
+    base.precipitation = Math.min(
+      base.precipitation,
+      smoothstep(base.cloudiness, 0.6, 0.9)
+    );
 
     this.prevailing += ease(
       angleDelta(this.prevailing, this.prevailingTarget),

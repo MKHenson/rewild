@@ -100,8 +100,8 @@ export class CloudShadowRenderer {
       },
     });
 
-    // Uniform buffer: 12 floats (CloudShadowUniforms struct)
-    const uniformSize = 12 * 4;
+    // Uniform buffer: 16 floats (CloudShadowUniforms struct)
+    const uniformSize = 16 * 4;
     const alignedSize = Math.ceil(uniformSize / 16) * 16;
     this.uniformData = new Float32Array(alignedSize / 4);
 
@@ -145,6 +145,7 @@ export class CloudShadowRenderer {
     cameraZ: number,
     cloudiness: number,
     cloudDrift: ArrayLike<number>,
+    cloudFront: ArrayLike<number>,
     sunDirX: number,
     sunDirY: number,
     sunDirZ: number,
@@ -164,6 +165,10 @@ export class CloudShadowRenderer {
     data[8] = sunDirZ;
     data[9] = 0;
     data[10] = 0;
+    data[12] = cloudFront[0];
+    data[13] = cloudFront[1];
+    data[14] = cloudFront[2];
+    data[15] = cloudFront[3];
 
     device.queue.writeBuffer(this.uniformBuffer, 0, data.buffer);
 

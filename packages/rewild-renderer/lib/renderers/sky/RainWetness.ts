@@ -14,6 +14,10 @@ export interface RainWetnessSettings {
   /** Seconds by e for the film on top to form, and to run off. */
   filmIn: number;
   filmOut: number;
+  /** Rain strength (rainShare) at which the world is fully wet; lighter rain
+   *  wets it in proportion. Steady rain soaks and glosses everything, so only
+   *  a drizzle leaves the world part wet. */
+  fullAt: number;
   /** Scale on both; 0 leaves every surface dry. */
   strength: number;
 }
@@ -23,6 +27,7 @@ export const DEFAULT_RAIN_WETNESS: RainWetnessSettings = {
   soakOut: 60,
   filmIn: 4,
   filmOut: 25,
+  fullAt: 0.4,
   strength: 1,
 };
 
@@ -44,8 +49,8 @@ export function easeWetness(
  * How wet the rain has left the world, for every lit surface (rain-wet.wgsl):
  * the soak, which darkens porous surfaces and lingers long after the rain,
  * and the film on top, which glosses level surfaces and runs off soon after.
- * Both follow the rain's strength, so a drizzle leaves the world damp and a
- * downpour leaves it soaked and shining.
+ * Both follow the rain's strength up to `fullAt`, so a drizzle leaves the
+ * world damp and steady rain leaves it soaked and shining.
  */
 export class RainWetness {
   settings: RainWetnessSettings = { ...DEFAULT_RAIN_WETNESS };
@@ -63,7 +68,8 @@ export class RainWetness {
   /** Advances by `seconds` under rain falling at `rain` 0..1 (rainShare). */
   update(rain: number, seconds: number): void {
     const s = this.settings;
-    const target = Math.min(1, Math.max(0, rain));
+    const falling = Math.min(1, Math.max(0, rain));
+    const target = Math.min(1, falling / Math.max(s.fullAt, 1e-3));
     this.soakState = easeWetness(
       this.soakState,
       target,
@@ -82,6 +88,6 @@ export class RainWetness {
     const held = this.override;
     this.soak = Math.min(1, (held ?? this.soakState) * strength);
     this.film = Math.min(1, (held ?? this.filmState) * strength);
-    this.falling = Math.min(1, (held ?? target) * strength);
+    this.falling = Math.min(1, (held ?? falling) * strength);
   }
 }
