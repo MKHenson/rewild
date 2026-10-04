@@ -14,6 +14,12 @@ const CLOUD_DRIFT_SPEED = 30.9;
 const CIRRUS_SCROLL_SPEED = 0.105;
 /** Per second: how fast the upper air turns to the surface wind. */
 const UPPER_TURN_RATE = 1 / 60;
+/** Per second: how fast cloudFront's trend follows the cloudiness. */
+const CLOUD_TREND_RATE = 0.2;
+/** Seconds of the cloudiness trend that make the full upwind lean. */
+const FRONT_LEAD_SECONDS = 60;
+/** The most the far upwind sky leans from the cloudiness overhead. */
+const FRONT_REACH = 0.25;
 
 /**
  * The wind as the things it moves read it, resolved once at the top of the
@@ -40,6 +46,14 @@ export class WindState {
   readonly cloudDrift = new Float32Array(2);
   /** How far the cirrus sheet has scrolled along its strands. */
   cirrusScroll = 0;
+  /** How the sky's cloudiness arrives: xy the upwind direction (windDirection),
+   *  w how far the far upwind sky leans from the cloudiness overhead, -0.25 to
+   *  0.25, from how fast the cloudiness is changing. Building cloud shows
+   *  first upwind, and a clearing breaks from upwind. z is unused. */
+  readonly cloudFront = new Float32Array(4);
+  /** Smoothed change in cloudiness per second. */
+  cloudTrend = 0;
+  private lastCloudiness = NaN;
   /** The upper air's windDirection: it follows the surface wind slowly, so
    *  the cirrus does not swing with every gust. */
   readonly upperDirection = new Float32Array([1, 0]);
@@ -82,6 +96,19 @@ export class WindState {
     this.cloudDrift[0] += fromX * cloudSpeed * deltaSeconds;
     this.cloudDrift[1] += fromZ * cloudSpeed * deltaSeconds;
     this.cirrusScroll += CIRRUS_SCROLL_SPEED * strength * deltaSeconds;
+
+    if (deltaSeconds > 0 && !Number.isNaN(this.lastCloudiness)) {
+      const rate = (cloudiness - this.lastCloudiness) / deltaSeconds;
+      const follow = 1 - Math.exp(-CLOUD_TREND_RATE * deltaSeconds);
+      this.cloudTrend += (rate - this.cloudTrend) * follow;
+    }
+    this.lastCloudiness = cloudiness;
+    const lean = Math.max(-1, Math.min(1, this.cloudTrend * FRONT_LEAD_SECONDS));
+    const front = this.cloudFront;
+    front[0] = fromX;
+    front[1] = fromZ;
+    front[2] = 0;
+    front[3] = lean * FRONT_REACH;
 
     const target = Math.atan2(fromZ, fromX);
     if (!this.upperStarted) {

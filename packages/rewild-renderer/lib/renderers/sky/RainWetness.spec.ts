@@ -24,15 +24,19 @@ describe('RainWetness', () => {
     expect(wet.film).toBe(0);
   });
 
-  it('wets further in a downpour than a drizzle', () => {
+  it('wets a drizzle in part and steady rain fully', () => {
     const drizzle = new RainWetness();
+    const steady = new RainWetness();
     const downpour = new RainWetness();
     for (let i = 0; i < 300; i++) {
-      drizzle.update(0.2, 1);
+      drizzle.update(0.1, 1);
+      steady.update(0.4, 1);
       downpour.update(1, 1);
     }
-    expect(drizzle.soak).toBeCloseTo(0.2, 2);
-    expect(downpour.soak).toBeCloseTo(1, 2);
+    expect(drizzle.soak).toBeCloseTo(0.25, 2);
+    expect(drizzle.film).toBeCloseTo(0.25, 2);
+    expect(steady.soak).toBeCloseTo(1, 2);
+    expect(steady.film).toBeCloseTo(1, 2);
     expect(downpour.film).toBeCloseTo(1, 2);
   });
 

@@ -3,8 +3,8 @@ import { ClimateProfile, WeatherClimateId } from './WeatherTypes';
 const DRIVER_RATES = { pressure: 7.5, moisture: 6, instability: 9 };
 const KNOB_RATES = {
   windiness: 0.5,
-  cloudiness: 0.08,
-  precipitation: 0.06,
+  cloudiness: 0.025,
+  precipitation: 0.04,
   fog: 0.03,
   temperature: 0.02,
 };

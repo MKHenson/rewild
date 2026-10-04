@@ -825,8 +825,9 @@ Rain wets every lit surface, not only the ground by the water (`RainWetness`, `r
 
 - **Two parts.** Water soaks into porous surfaces and darkens them, and a film on top makes them
   glossy. They follow the rain's strength (`rainShare`: the precipitation, as rain rather than
-  snow), so there is none in dry weather, a drizzle leaves the world damp, and a downpour leaves
-  it soaked and shining. The soak builds by e every 20 s and dries by e every 120 s. The film
+  snow), so there is none in dry weather. They reach full at a rain strength of 0.4 (`fullAt`) and
+  scale down in proportion below it, so a drizzle leaves the world damp and steady rain leaves it
+  soaked and shining. The soak builds by e every 20 s and dries by e every 120 s. The film
   forms by e every 4 s and runs off by e every 25 s, so the shine goes soon after the rain and
   the dark ground stays a while.
 - **Soak.** Albedo falls to 0.5 on a fully porous surface. Porosity follows roughness, from

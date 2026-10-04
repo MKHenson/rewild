@@ -73,6 +73,30 @@ describe('WindState', () => {
     expect(wind.cirrusScroll - scroll).toBeLessThan(0.01);
   });
 
+  it('tells the clouds a rising cloudiness comes from upwind', () => {
+    const wind = new WindState();
+    let cloudiness = 0.3;
+    for (let i = 0; i < 1800; i++) {
+      cloudiness += 0.01 / 60;
+      wind.update(1, 0, 0.5, cloudiness, 1 / 60);
+    }
+    expect(wind.cloudFront[0]).toBeCloseTo(1);
+    expect(wind.cloudFront[1]).toBeCloseTo(0);
+    expect(wind.cloudTrend).toBeCloseTo(0.01, 3);
+    // 0.01 a second over 60 s leans the far upwind sky 0.6 of its reach.
+    expect(wind.cloudFront[3]).toBeCloseTo(0.6 * 0.25, 2);
+
+    for (let i = 0; i < 1800; i++) wind.update(1, 0, 0.5, cloudiness, 1 / 60);
+    expect(Math.abs(wind.cloudFront[3])).toBeLessThan(0.001);
+  });
+
+  it('caps how far the upwind sky leans however fast the sky changes', () => {
+    const wind = new WindState();
+    wind.update(1, 0, 0.5, 0, 1 / 60);
+    for (let i = 0; i < 600; i++) wind.update(1, 0, 0.5, i % 2, 1 / 60);
+    expect(Math.abs(wind.cloudFront[3])).toBeLessThanOrEqual(0.25);
+  });
+
   it('turns the upper air slowly toward the surface wind', () => {
     const wind = new WindState();
     wind.update(1, 0, 0.5, 0, 0);

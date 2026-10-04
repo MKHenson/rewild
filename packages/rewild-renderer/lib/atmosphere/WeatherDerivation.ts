@@ -31,7 +31,7 @@ export function deriveKnobs(
   const windiness = saturate(
     climate.baseWind +
       0.6 * pressureTrend +
-      0.5 * instability * (1 - pressure) +
+      instability * (1 - pressure) +
       gust * 0.1
   );
 

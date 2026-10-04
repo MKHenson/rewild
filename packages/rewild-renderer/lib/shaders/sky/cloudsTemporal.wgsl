@@ -183,7 +183,7 @@ fn numericalMieFit(costh: f32) -> f32 {
 }
 
 fn clouds(position: vec3f) -> CloudDensityResult {
-    return cloudDensity(position, object.cameraPosition.xz, object.cloudiness, object.cloudDrift);
+    return cloudDensity(position, object.cameraPosition.xz, object.cloudiness, object.cloudDrift, object.cloudFront);
 }
 
 fn lightRay(rayStartPosition: vec3f, phaseFunction: f32, dC: f32, mu: f32, sun_direction: vec3f, cloudHeight2: f32) -> f32 {

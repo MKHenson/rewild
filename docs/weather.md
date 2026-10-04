@@ -50,7 +50,7 @@ A state does not hold still. Each state's `variation` sets:
 - **Wander.** The most each knob and the bearing strays from the weather. Each strays on its own smooth curve that turns every few seconds to a minute. Rain wanders only where it falls, so a drizzle rises and falls but a dry sky stays dry.
 - **Bursts.** Short events at random intervals: the wind swings by a bearing either way and strengthens, and the rain lashes harder, then they settle. `Storm` swings 35° to 80° for 5 to 14 s every 15 to 45 s. The other states have smaller ones: a calm day gusts 10° to 25° for a few seconds about once a minute. `Mist` has none.
 
-Variation runs in seconds and is added after the knobs follow, so a burst arrives at once. A new state's wander fades in over about ten seconds. `climate.variationScale` scales all of it.
+Rain never runs ahead of the clouds: precipitation is held below what the smoothed cloudiness can carry. Variation runs in seconds and is added after the knobs follow, so a burst arrives at once. A new state's wander fades in over about ten seconds. `climate.variationScale` scales all of it.
 
 ### Scripted events
 
@@ -62,6 +62,7 @@ Everything the wind moves integrates its own drift each frame (`WindState`), rat
 
 - `gustDrift`: metres the foliage gust field has blown. Read by the scatter shaders (`windOrigin.zw`), the player's gusts and the lens.
 - `cloudDrift`: the cumulus deck's offset, in the sky uniform and the cloud shadow map.
+- `cloudFront`: the upwind direction and a lean from how fast the cloudiness is changing. Overhead the clouds follow the weather; upwind they lean toward where it is heading, up to 0.25 at the far horizon and easing in over about 6 km, and downwind away from it. Building cloud shows first on the upwind horizon and a clearing breaks from upwind, with no edge across the sky.
 - `cirrusScroll` and `upperDirection`: the cirrus scrolls along the upper air's direction, which turns toward the surface wind over about a minute, so the cirrus does not swing with each gust.
 
 ---
