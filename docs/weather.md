@@ -16,7 +16,7 @@ The Sky's **Dynamic Day & Weather** switch turns it on, in the editor and in the
 
 | Setting | Default | Effect |
 | --- | --- | --- |
-| `cycleSeconds` | 300 | One full day and night. |
+| `cycleSeconds` | 1200 | One full day and night. |
 | `dayShare` | 0.5 | The part of the cycle the sun is up. The sun crosses the sky and the night at different speeds. |
 | `paused` | false | Holds the sun. The weather continues unless `weatherPausesWithCycle`. |
 | `timeScale` | 1 | Scale on the sun's speed only. |
@@ -33,7 +33,7 @@ The start is the Sky's elevation. Tune with `setDayCycle` (see [Debug Commands](
 6. **Variation.** See below.
 7. **Modifiers** (`AtmosphereModifiers.ts`). Temporary changes from gameplay (`addModifier`, `setModifierWeight`, `removeModifier`): `set`, `add`, `multiply`, `min` or `max` on a knob, faded by a weight, lowest priority first. They change the output only, so the weather continues beneath.
 
-Weather time is counted in day cycles: a longer cycle gives longer weather. At the default 5-minute cycle, calm states last 2 to 6 minutes, rain and storms 1 to 4, and fronts under a minute and a quarter, so a calm spell can outlast a day. The seed is the world's terrain seed, and the same seed and start give the same sequence of states. The system keeps the next states picked in advance, so `forecast(n)` is always what comes.
+Weather time is counted in day cycles: a longer cycle gives longer weather. At the default 20-minute cycle, calm states last 2 to 6 minutes, rain and storms 1 to 4, and fronts 30 to 90 seconds, so the weather changes several times a day. Each start picks a random seed, so every session plays out differently; the same seed and start give the same sequence of states, and `setWeatherSeed(seed)` replays one. `weather()` and the editor's position readout show the seed. The system keeps the next states picked in advance, so `forecast(n)` is always what comes.
 
 ### Wind direction
 

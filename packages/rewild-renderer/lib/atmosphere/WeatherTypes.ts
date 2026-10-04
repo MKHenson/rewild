@@ -91,7 +91,7 @@ export interface WeatherVariationDef {
  * One named weather state. The three driver ranges decide what the state looks
  * like; the knobs are derived from the drivers (WeatherDerivation), never set
  * directly. A rate "per cycle" of r eases with a time constant of
- * cycleSeconds / r: 10 in a 300 s cycle is 30 s.
+ * cycleSeconds / r: 40 in a 1200 s cycle is 30 s.
  */
 export interface WeatherStateDef {
   /** Must match the state's key in WEATHER_STATES. */
@@ -106,7 +106,7 @@ export interface WeatherStateDef {
    *  Lightning needs it high, through the cloud and rain it raises. */
   instability: WeatherRange;
   /** How long the state holds, in fractions of one day cycle, picked once on
-   *  entry. 0.4 in a 300 s cycle is 2 minutes. */
+   *  entry. 0.1 in a 1200 s cycle is 2 minutes. */
   duration: WeatherRange;
   /** Fractions of one day cycle between new driver targets inside the three
    *  ranges, so a long state drifts instead of holding one look. */

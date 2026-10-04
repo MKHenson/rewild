@@ -126,6 +126,20 @@ export function registerAtmosphereDebugCommands(renderer: Renderer) {
     atmosphere().climate = resolveWeatherClimate(id);
   };
 
+  (window as any).setWeatherSeed = (seed?: number) => {
+    if (typeof seed !== 'number') {
+      console.log(
+        `setWeatherSeed(seed) — starts the weather over from the Sky's knobs with this seed, to replay a sequence. This run's seed is ${
+          atmosphere().seed
+        } (weather() shows it too).`
+      );
+      return;
+    }
+    warnIfStopped();
+    atmosphere().reseed(seed >>> 0);
+    console.log(`setWeatherSeed(${seed >>> 0})`);
+  };
+
   (window as any).setWeatherVariation = (scale = 1) => {
     const system = atmosphere();
     system.climate = { ...system.climate, variationScale: scale };

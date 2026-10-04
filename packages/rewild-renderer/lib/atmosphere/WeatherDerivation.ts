@@ -2,6 +2,10 @@ import { smoothstep } from 'rewild-common';
 import { sunHeight } from './DayNightCycle';
 import { ClimateProfile, Drivers, WeatherKnobs } from './WeatherTypes';
 
+/** Cloudiness in steady rain, and the most a storm reaches. */
+const RAIN_CLOUDINESS = 0.85;
+const STORM_CLOUDINESS = 0.95;
+
 function saturate(x: number): number {
   return x < 0 ? 0 : x > 1 ? 1 : x;
 }
@@ -21,7 +25,15 @@ export function deriveKnobs(
 ): WeatherKnobs {
   const { pressure, moisture, instability } = drivers;
 
-  const cloudiness = smoothstep(moisture * (1 - pressure), 0.05, 0.45);
+  // Fills to RAIN_CLOUDINESS as the air turns wet and unsettled; unstable air
+  // towers into storm cloud up to STORM_CLOUDINESS. A full 1 shuts out the sun
+  // and leaves the scene too dark to play in.
+  const humid = moisture * (1 - pressure);
+  const cloudiness =
+    RAIN_CLOUDINESS * smoothstep(humid, 0.05, 0.45) +
+    (STORM_CLOUDINESS - RAIN_CLOUDINESS) *
+      smoothstep(instability, 0.5, 0.85) *
+      smoothstep(humid, 0.3, 0.6);
 
   const precipitation =
     smoothstep(cloudiness, 0.6, 0.9) *
@@ -46,9 +58,10 @@ export function deriveKnobs(
 
   const snowFraction = saturate((0.5 - temperature) / 0.5);
   const calm = 1 - windiness;
-  const mist = smoothstep(moisture, 0.75, 0.95) * calm * calm * climate.mistFactor;
+  const mist =
+    smoothstep(moisture, 0.75, 0.95) * calm * calm * climate.mistFactor;
   const precHaze = saturate(
-    0.9 * Math.pow(precipitation, 1.5) * (1 + 0.3 * snowFraction)
+    0.35 * Math.pow(precipitation, 1.5) * (1 + 0.3 * snowFraction)
   );
   const cloudDim = 0.3 * smoothstep(cloudiness, 0.8, 1);
   const dust = saturate(windiness * (1 - moisture) * climate.dustFactor);

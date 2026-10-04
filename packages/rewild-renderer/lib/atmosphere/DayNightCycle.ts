@@ -10,7 +10,7 @@ const MIN_SHARE = 0.05;
 export class DayNightCycle {
   elevation = 80;
   /** Seconds for one full day and night. */
-  cycleSeconds = 300;
+  cycleSeconds = 1200;
   dayShare = 0.5;
   paused = false;
   /** Scale on the cycle's speed, for tuning. */

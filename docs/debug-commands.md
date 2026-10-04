@@ -185,6 +185,7 @@ setDayCycle({ cycleSeconds: 120 }); // Also dayShare, paused, timeScale, weather
 setTimeOfDay(90); // Sun elevation: 0 sunrise, 90 noon, 180 sunset, 270 midnight
 setWeatherClimate('tropical'); // arid | temperate | tropical | coastal | tundra
 setWeatherVariation(2); // Scale on the wander and bursts inside a state; 0 off
+setWeatherSeed(12345); // Restart from the Sky's knobs with this seed, to replay a run
 ```
 
 A short `cycleSeconds` is the fastest way to watch a sequence: weather durations

@@ -57,6 +57,42 @@ function labelForBiome(name: string): string {
     .join(' ');
 }
 
+// "FrontApproaching" → "Front approaching".
+function labelForState(state: string): string {
+  const words = state.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function formatDuration(seconds: number): string {
+  const whole = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(whole / 60);
+  return `${minutes}:${String(whole % 60).padStart(2, '0')}`;
+}
+
+const FORECAST_SHOWN = 3;
+
+// The weather state and the ones coming, while the atmosphere runs.
+function describeWeather(renderer: Renderer): { now: string; next: string } {
+  const atmosphere = renderer.sky.atmosphere;
+  if (!atmosphere.running)
+    return { now: 'Static (Dynamic Day & Weather off)', next: '—' };
+  const sample = atmosphere.sample;
+  const left = atmosphere.stateDuration - atmosphere.stateElapsed;
+  const now = `${labelForState(sample.state)} · ${Math.round(
+    sample.stateProgress * 100
+  )}% · ${formatDuration(left)} left${
+    atmosphere.isEnabled ? '' : ' · scripted'
+  } · seed ${atmosphere.seed}`;
+  const next = atmosphere
+    .forecast(FORECAST_SHOWN)
+    .map(
+      (entry) =>
+        `${labelForState(entry.state)} in ${formatDuration(entry.startsIn)}`
+    )
+    .join(' · ');
+  return { now, next };
+}
+
 function formatDistance(metres: number): string {
   return metres < 1000
     ? `${Math.round(metres)} m`
@@ -174,8 +210,9 @@ function describePainted(painted: PaintedWater): string {
 }
 
 // A toggle in the viewport's top right: the camera's world position, the
-// climate biomes under it, the ground height, and the water under it or else
-// the nearest lake, painted or generated. Under it, a toggle for the lens
+// climate biomes under it, the ground height, the water under it or else the
+// nearest lake, painted or generated, and the weather state and the ones
+// coming. The panel opens to the left of the toggles. Under it, a toggle for the lens
 // effects (Renderer.lensEffects), the blur and drops: off gives a clear view
 // to edit in.
 @register('x-position-readout')
@@ -204,6 +241,8 @@ export class PositionReadout extends Component<Props> {
     const groundValue = (<span class="value" />) as HTMLSpanElement;
     const biomeValue = (<span class="value" />) as HTMLSpanElement;
     const lakeValue = (<span class="value" />) as HTMLSpanElement;
+    const weatherValue = (<span class="value" />) as HTMLSpanElement;
+    const nextValue = (<span class="value" />) as HTMLSpanElement;
 
     const refresh = () => {
       const renderer = this.props.renderer;
@@ -212,6 +251,10 @@ export class PositionReadout extends Component<Props> {
       xValue.textContent = position.x.toFixed(1);
       yValue.textContent = position.y.toFixed(1);
       zValue.textContent = position.z.toFixed(1);
+
+      const forecast = describeWeather(renderer);
+      weatherValue.textContent = forecast.now;
+      nextValue.textContent = forecast.next;
 
       const ground = terrain.sampleHeight(position.x, position.z);
       groundValue.textContent =
@@ -390,14 +433,24 @@ export class PositionReadout extends Component<Props> {
           <span class="label">Lake</span>
           {lakeValue}
         </div>
+        <div class="row">
+          <span class="label">Weather</span>
+          {weatherValue}
+        </div>
+        <div class="row">
+          <span class="label">Next</span>
+          {nextValue}
+        </div>
       </div>
     ) as HTMLDivElement;
 
     const elm = (
       <div class="readout">
-        <div class="toggle">{toggle}</div>
-        <div class="toggle">{weatherToggle}</div>
         {panel}
+        <div class="toggles">
+          <div class="toggle">{toggle}</div>
+          <div class="toggle">{weatherToggle}</div>
+        </div>
       </div>
     );
 
@@ -439,8 +492,13 @@ const StyledPositionReadout = cssStylesheet(css`
 
   .readout {
     display: flex;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .toggles {
+    display: flex;
     flex-direction: column;
-    align-items: flex-end;
     gap: 0.25rem;
   }
 
@@ -460,7 +518,7 @@ const StyledPositionReadout = cssStylesheet(css`
     color: ${theme.colors.onSurface};
     padding: 0.5rem 0.6rem;
     min-width: 200px;
-    max-width: 320px;
+    max-width: 360px;
     font-size: 0.8rem;
   }
 
@@ -475,7 +533,7 @@ const StyledPositionReadout = cssStylesheet(css`
   }
 
   .label {
-    flex: 0 0 3.5rem;
+    flex: 0 0 4rem;
     opacity: 0.7;
   }
 
