@@ -17,7 +17,7 @@ import { writeWaterEdit } from 'src/database/water-edits';
 
 // Console commands that write water edits the way the water brush will: stamp
 // the loaded chunks under a disc, rebuild their water, and save the edits. Also
-// the water edit rules: inspect, lock and settle the water at a point. They
+// the water edit rules: inspect and settle the water at a point. They
 // default to the viewer's position.
 export function registerWaterEditDevCommands(
   renderer: Renderer,
@@ -127,34 +127,6 @@ export function registerWaterEditDevCommands(
     return { x: x ?? viewer.x, z: z ?? viewer.z };
   };
 
-  const setLocked = async (
-    locked: boolean,
-    x: number | undefined,
-    z: number | undefined
-  ) => {
-    const levelId = project.levelId;
-    const terrain = renderer.terrainRenderer;
-    const p = at(x, z);
-    const body = await terrain.waterRules.setLockedAt(p.x, p.z, locked);
-    if (!body) {
-      console.log('No lake owns the ground here.');
-      return;
-    }
-    if (levelId)
-      await writeWaterBodies(levelId, terrain.waterRules.savedBodies());
-    else console.warn('No levelId on the current project — lock not saved.');
-    console.log(
-      `Water body ${body.id} ${
-        locked ? 'locked' : 'unlocked'
-      } at level ${body.level.toFixed(2)} m.`
-    );
-  };
-
-  (window as any).lockWater = (x?: number, z?: number) => setLocked(true, x, z);
-
-  (window as any).unlockWater = (x?: number, z?: number) =>
-    setLocked(false, x, z);
-
   (window as any).waterBody = async (x?: number, z?: number) => {
     const p = at(x, z);
     const report = await renderer.terrainRenderer.waterRules.bodyAt(p.x, p.z);
@@ -172,7 +144,7 @@ export function registerWaterEditDevCommands(
           : `${report.spillHeight.toFixed(2)} m${
               report.sea ? ' (into the sea)' : ''
             }${report.edge ? ' (search edge)' : ''}`
-      }, ${body.locked ? 'locked' : 'unlocked'}.`
+      }.`
     );
     return report;
   };
@@ -204,7 +176,7 @@ export function registerWaterEditDevCommands(
                 o.joined ? ', joining the ocean' : ''
               }`
             : `level ${o.body.level.toFixed(2)} m holds`
-        }${o.body.locked ? ' (locked)' : ''}.`
+        }.`
       );
     if (settled.channelTexels > 0)
       console.log(`The sea filled ${settled.channelTexels} texel(s).`);

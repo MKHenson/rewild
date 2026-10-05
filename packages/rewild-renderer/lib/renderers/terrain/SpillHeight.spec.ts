@@ -5,7 +5,6 @@ import {
   fillSeaChannels,
   findBodies,
   findSpillHeight,
-  lockedLevels,
   setBodyLevel,
   texelId,
 } from './SpillHeight';
@@ -498,34 +497,5 @@ describe('setBodyLevel', () => {
     expect(read(0, 0)).toEqual({ coverage: 255, lake: 255, level: 4 });
     expect(read(36, 0).coverage).toBe(128);
     expect(read(40, 0).coverage).toBe(0);
-  });
-});
-
-describe('lockedLevels', () => {
-  const water = (): ResolvedWater => {
-    const texels = SIZE * SIZE;
-    const bodyIds = new Uint32Array(texels);
-    bodyIds[5 + 5 * SIZE] = BODY;
-    return {
-      size: SIZE,
-      step: STEP,
-      coverage: new Uint8Array(texels),
-      levels: new Float64Array(texels),
-      typeWeights: new Uint8Array(texels * 4),
-      bodyIds,
-      lakes: [],
-      covered: true,
-    };
-  };
-
-  it('is null with no locked body in the chunk', () => {
-    expect(lockedLevels(water(), new Map([[3, 4]]))).toBeNull();
-  });
-
-  it('covers a locked body and the texels around it', () => {
-    const levels = lockedLevels(water(), new Map([[BODY, 4]]))!;
-    expect(levels[5 + 5 * SIZE]).toBe(4);
-    expect(levels[6 + 6 * SIZE]).toBe(4);
-    expect(levels[7 + 5 * SIZE]).toBe(-Infinity);
   });
 });

@@ -90,8 +90,6 @@ export interface WaterBody {
   level: number;
   /** The lowest point of the rim: the level cannot rise above it. */
   spillHeight: number;
-  /** Sculpting cannot lower the rim of a locked body below its level. */
-  locked: boolean;
   /** Palette weights for new water in this body, MAX_WATER_TYPES long. */
   typeWeights: number[];
 }
@@ -111,7 +109,6 @@ export function oceanBody(climate: ClimateConfig, seaLevel: number): WaterBody {
     id: OCEAN_BODY_ID,
     level: seaLevel,
     spillHeight: seaLevel,
-    locked: false,
     typeWeights: bodyWeights(climate, OCEAN_WATER),
   };
 }
@@ -122,7 +119,6 @@ export function lakeBody(lake: Lake, climate: ClimateConfig): WaterBody {
     id: lake.bodyId,
     level: lake.level,
     spillHeight: lake.spillHeight,
-    locked: false,
     typeWeights: bodyWeights(climate, LAKE_WATER),
   };
 }

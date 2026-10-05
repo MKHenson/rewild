@@ -122,7 +122,6 @@ The water map holds a body ID for each texel. The body itself is a record:
 | `id`           | 0 for the ocean. A generated lake takes its ID from its lake cell coordinate. |
 | `level`        | The surface level. For the ocean, this is the world's sea level.             |
 | `spillHeight`  | The lowest point of the rim. Calculated, not authored. See [Computing the spill height](#computing-the-spill-height). A generated lake's is its lowest rim sample, a tarn's its lip and a lagoon's sea level. |
-| `locked`       | If true, the sculpt brush cannot lower the rim below the level plus a margin. |
 | `typeWeights`  | The default palette weights for new water in this body.                      |
 
 A generated lake that nobody edits costs nothing to save. The seed builds its record again. Each
@@ -130,8 +129,8 @@ chunk's water map carries the records of the bodies that cover it (`WaterMap.bod
 seed and the edit build them.
 
 **Saved records.** A body the editor has changed has a saved record: one whose rim a sculpt
-stroke touched (its spill height found again, and its level if it drained), a locked one, and one
-made with **Add water**. They live in one blob per level, `water-bodies.json`, in the chunk
+stroke touched (its spill height found again, and its level if it drained), and one made with
+**Add water**. They live in one blob per level, `water-bodies.json`, in the chunk
 folder beside the water edits, so clearing a level's chunks clears them too. A saved record
 wins over the one the seed or the edit builds. `WaterBodyRules` (`TerrainRenderer.waterRules`)
 reads them once through `waterBodyProvider` and holds them for the edit rules.
@@ -248,7 +247,6 @@ simulate water.
 | Dig below sea level, connected to the ocean       | The trench **fills with sea water**. See [Channels from the sea](#channels-from-the-sea).        |
 | Fill in a flooded trench                          | The terrain rises above the level, and the depth test hides the water.                           |
 | Raise land inside a lake or the ocean             | An island. See [Islands](#islands).                                                              |
-| Sculpt the rim of a **locked** lake               | The brush cannot go below the level plus a small margin. The lake does not drain.               |
 
 So a lake above sea level always has land between it and the ocean. It joins the ocean only if
 its spill height comes down to sea level. Then it takes the ocean's level.
@@ -272,14 +270,6 @@ from its own water, out to 80% of the way from its deepest point to its shore, t
 shore. The cut between it and the sea is filled by the sea channel flood fill (see
 [Channels from the sea](#channels-from-the-sea)), which runs before the drain. A cut that stops above sea
 level drains the lake to the cut, and it stays a lake.
-
-**Locked lakes.** A locked body never drains. While a stroke runs, each chunk gets the locked
-level over every texel a locked body owns and the texels next to it (`lockedLevels`). A sample
-there that stands above that level cannot be lowered below the level plus the lakes' `margin`
-(1 m in the default climate, the lip's height), or below where it stands if that is lower.
-Ground below the level, such as the lake bed, can be dug freely. Raising is never held back. The
-brush skips a chunk until the records and its water edit are read, as it does until its heights
-are.
 
 ### Computing the spill height
 
@@ -932,7 +922,6 @@ shelf.
     leaves an island. Only ground under water rises, straight to that shape. The edit rules do
     not run after it; the heights are saved with the water edit.
   - **Reset**: hands the water under the brush back to the generator.
-  - **Lock**: click a lake to lock or unlock its level. See [Edit rules](#edit-rules).
   - After a Reset stroke, the edit rules settle the stroke's box as they do after a sculpt
     stroke.
 - The sculpt brush applies the edit rules after each stroke. A lake that drains shows its new
@@ -972,8 +961,7 @@ Authored water is a **water edit** per chunk (`WaterEdit`), at the water map's r
   viewer's position, a 20 m radius, and 1.5 m above the ground for the level. `addWater` saves
   the new body's record.
 - **Edit rules in the console.** `waterBody(x, z)` logs the record of the body that owns the
-  ground at a point, and its spill height found again. `lockWater(x, z)` and `unlockWater(x, z)`
-  lock or unlock that body and save the records. `settleWater(x, z, radius)` runs the edit rules
+  ground at a point, and its spill height found again. `settleWater(x, z, radius)` runs the edit rules
   over a disc, as a sculpt stroke does, and saves what they change. Each defaults to the viewer's
   position.
 
@@ -1253,7 +1241,7 @@ clearing, a gale, or drops on the lens.
 2. **Lakes.** Lake cells, carving, lagoons, water body records and palette blending.
 3. **Surface detail.** The FFT ocean from the wind, whitecaps, crest glow, sea spray,
    refraction, sun glint, the wet band and waves at the shore.
-4. **Editor and gameplay.** Water brush, edit rules and spill height, sea channels, locked lakes,
+4. **Editor and gameplay.** Water brush, edit rules and spill height, sea channels,
    saved edits, water query with probed waves, wading and swimming.
 5. **Stretch.** [Under water](#under-water) (the view, the waterline on the lens, caustics),
    rain on surfaces and rain ripples on them and on water, sharper foam, noise-channel rivers.

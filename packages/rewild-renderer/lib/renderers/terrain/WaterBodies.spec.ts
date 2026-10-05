@@ -6,7 +6,6 @@ const body = (overrides: Partial<WaterBody> = {}): WaterBody => ({
   id: 0x80010002,
   level: 12.5,
   spillHeight: 13.25,
-  locked: true,
   typeWeights: [0, 1, 0, 0],
   ...overrides,
 });
@@ -16,7 +15,7 @@ const encode = (value: unknown) =>
 
 describe('water body records', () => {
   it('round-trips', () => {
-    const bodies = [body(), body({ id: 5, locked: false, level: -1 })];
+    const bodies = [body(), body({ id: 5, level: -1 })];
     expect(deserializeWaterBodies(serializeWaterBodies(bodies))).toEqual(
       bodies
     );
@@ -38,8 +37,15 @@ describe('water body records', () => {
   it('rejects a malformed record', () => {
     expect(() =>
       deserializeWaterBodies(
-        encode({ version: 1, bodies: [{ ...body(), locked: 'yes' }] })
+        encode({ version: 1, bodies: [{ ...body(), level: 'high' }] })
       )
     ).toThrow('Malformed');
+  });
+
+  it('ignores fields it does not know', () => {
+    const [read] = deserializeWaterBodies(
+      encode({ version: 1, bodies: [{ ...body(), locked: true }] })
+    );
+    expect(read).toEqual(body());
   });
 });

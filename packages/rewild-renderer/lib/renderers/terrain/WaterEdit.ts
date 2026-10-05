@@ -174,7 +174,7 @@ export function editedBody(
   const typeWeights = new Array<number>(MAX_WATER_TYPES);
   for (let c = 0; c < MAX_WATER_TYPES; c++)
     typeWeights[c] = (weights[c] ?? 0) / 255;
-  return { id, level, spillHeight: level, locked: false, typeWeights };
+  return { id, level, spillHeight: level, typeWeights };
 }
 
 // ── Sampling ─────────────────────────────────────────────────────────────────
