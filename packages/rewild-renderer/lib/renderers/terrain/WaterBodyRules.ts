@@ -324,6 +324,21 @@ export class WaterBodyRules {
     );
   }
 
+  /** A loaded chunk's water as the generator makes it, with no edit. */
+  generatedWater(cx: number, cy: number): ResolvedWater | null {
+    const host = this.host;
+    const chunk = host.terrainChunks.get(`${cx},${cy}`);
+    if (!chunk) return null;
+    return resolveWater(
+      host.mapChunkSizeLod,
+      host.seed,
+      chunk.noiseOffset,
+      resolveClimatePreset(host.climatePreset),
+      host.seaLevel,
+      null
+    );
+  }
+
   /**
    * Applies the edit rules over the world box (x0, z0)–(x1, z1). First the sea
    * fills the trenches below sea level that join it, within the box grown by
