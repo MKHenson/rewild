@@ -4,7 +4,7 @@ Rewild is a game about time travel and natural history. Built with Typescipt, Ko
 
 Checkout the 🦕[Demo](https://rewild-client.s3-website.fr-par.scw.cloud)🦖 (WIP)
 
-![Engine Pic](./docs/images/screenshots/understory-plains.png)
+![Engine Pic](./docs/images/screenshots/understory-plains.jpg)
 
 ## Installation
 
