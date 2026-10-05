@@ -13,9 +13,9 @@ export const SWIM_LEAVE_MARGIN = 0.2;
 /** Metres of water over the feet before wading slows the player. */
 export const WADE_START = 0.1;
 /** Share of the walking speed left at the swim depth. */
-export const WADE_SLOWEST = 0.6;
+export const WADE_SLOWEST = 0.1;
 /** Share of the walking speed a swimmer moves at. */
-export const SWIM_SPEED_SHARE = 0.8;
+export const SWIM_SPEED_SHARE = 0.5;
 /** Metres the eye floats above the surface. */
 export const SWIM_EYE_ABOVE = 0.2;
 /** Per second: how fast a swimmer closes on the height they hold. */
@@ -23,8 +23,8 @@ export const FLOAT_RATE = 3;
 /** Per second: how fast water takes a falling or rising player's speed. */
 export const WATER_DRAG = 3;
 /** Metres a second a swimmer dives or rises. */
-export const DIVE_SPEED = 1.5;
-export const RISE_SPEED = 1.5;
+export const DIVE_SPEED = 2.1;
+export const RISE_SPEED = 2.1;
 /** Metres below the floating height within which a swimmer who stops diving
  *  floats again. */
 export const FLOAT_SNAP = 0.4;
