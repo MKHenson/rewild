@@ -187,53 +187,6 @@ describe('applySculptStamp', () => {
   });
 });
 
-describe('applySculptStamp locks', () => {
-  // Locked at level 5 with a 1 m margin across the chunk. Ground west of x = 0
-  // stands at 10, the column x = 0 at 5.5 and east of it at 3.
-  const locked = () => {
-    const source = new FakeSource([[0, 0]], (wx) =>
-      wx < 0 ? 10 : wx === 0 ? 5.5 : 3
-    );
-    const levels = new Float32Array(4).fill(5);
-    const withLocks: SculptHeightSource = {
-      chunkSize: source.chunkSize,
-      getHeights: (cx, cy) => source.getHeights(cx, cy),
-      locks: { step: 4, margin: 1, getLevels: () => levels },
-    };
-    return { source, withLocks };
-  };
-
-  it('stops a lowered rim at the level plus the margin', () => {
-    const { source, withLocks } = locked();
-    applySculptStamp(
-      withLocks,
-      stamp({ type: 'lower', radius: 3, amount: 100 })
-    );
-    expect(source.at(0, 0, -1, 0)).toBe(6);
-  });
-
-  it('does not lower ground already within the margin', () => {
-    const { source, withLocks } = locked();
-    applySculptStamp(
-      withLocks,
-      stamp({ type: 'lower', radius: 3, amount: 100 })
-    );
-    expect(source.at(0, 0, 0, 0)).toBe(5.5);
-  });
-
-  it('lowers ground below the level freely', () => {
-    const { source, withLocks } = locked();
-    applySculptStamp(withLocks, stamp({ type: 'lower', radius: 3, amount: 1 }));
-    expect(source.at(0, 0, 1, 0)).toBeLessThan(3);
-  });
-
-  it('never holds back a raise', () => {
-    const { source, withLocks } = locked();
-    applySculptStamp(withLocks, stamp({ type: 'raise', radius: 3, amount: 1 }));
-    expect(source.at(0, 0, 0, 0)).toBeGreaterThan(5.5);
-  });
-});
-
 describe('applySculptStamp reset', () => {
   // Sculpted to 10 everywhere; generated at 2.
   const sculpted = () => {

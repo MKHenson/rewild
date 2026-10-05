@@ -140,9 +140,7 @@ function waterUnder(
     ground === null ? '' : ` · ${(body.level - ground).toFixed(1)} m deep`;
   return `${kind} ${
     id === OCEAN_BODY_ID ? '' : `${id} `
-  }under you · level ${body.level.toFixed(1)} m${depth}${
-    body.locked ? ' · locked' : ''
-  }`;
+  }under you · level ${body.level.toFixed(1)} m${depth}`;
 }
 
 const PAINTED_SEARCH_METRES = 1000;

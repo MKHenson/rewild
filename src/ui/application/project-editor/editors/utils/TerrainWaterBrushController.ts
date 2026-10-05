@@ -105,7 +105,7 @@ const metres = (value: number) => `${value.toFixed(2)} m`;
  * the water above its level. After reset, the edit rules settle the water it
  * changed. Level picks the lake under the click
  * and moves its level with a vertical drag, live and capped at its spill
- * height. Lock toggles the lock of the lake under the click.
+ * height.
  */
 export class TerrainWaterBrushController {
   private stroke: Stroke | null = null;
@@ -160,10 +160,9 @@ export class TerrainWaterBrushController {
     return this.stroke !== null;
   }
 
-  /** Whether the brush paints a disc; level and lock act on a whole lake. */
+  /** Whether the brush paints a disc; level acts on a whole lake. */
   get usesRadius() {
-    const brush = waterBrushStore.brush;
-    return brush !== 'level' && brush !== 'lock';
+    return waterBrushStore.brush !== 'level';
   }
 
   updateCursor(point: Vector3 | null) {
@@ -193,12 +192,6 @@ export class TerrainWaterBrushController {
    */
   beginStroke(point: Vector3, shift: boolean, screenY: number) {
     const brush = waterBrushStore.brush;
-    if (brush === 'lock') {
-      this.toggleLock(point.x, point.z).catch((err) =>
-        console.error('Failed to lock the lake:', err)
-      );
-      return;
-    }
     if (brush === 'level') {
       this.beginLevel(point, screenY);
       return;
@@ -441,7 +434,7 @@ export class TerrainWaterBrushController {
           centerX: point.x,
           centerZ: point.z,
           radius,
-          rise: terrain.waterRules.lockMargin,
+          rise: terrain.waterRules.lakeMargin,
           levels,
         })
       );
@@ -476,7 +469,7 @@ export class TerrainWaterBrushController {
         grid,
         stroke.discs,
         stroke.level,
-        rules.lockMargin,
+        rules.lakeMargin,
         original
       )
     );
@@ -653,26 +646,6 @@ export class TerrainWaterBrushController {
           : ''
       }`
     );
-  }
-
-  private async toggleLock(x: number, z: number) {
-    const rules = this.renderer.terrainRenderer.waterRules;
-    const report = await rules.bodyAt(x, z);
-    if (!report) {
-      waterBrushStore.setInfo('Click on a lake to lock it.');
-      return;
-    }
-    const body = await rules.setLockedAt(x, z, !report.body.locked);
-    if (!body) return;
-    waterBrushStore.setInfo(
-      `Lake ${body.id} ${body.locked ? 'locked' : 'unlocked'} at ${metres(
-        body.level
-      )}.`
-    );
-    const levelId = projectStore.project?.levelId;
-    if (!levelId) return this.warnUnsaved();
-    await writeWaterBodies(levelId, rules.savedBodies());
-    this.markDirty();
   }
 
   private paletteWeights(name: string): number[] {

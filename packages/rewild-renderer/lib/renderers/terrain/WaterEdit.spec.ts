@@ -291,7 +291,7 @@ describe('buildWaterMap with an edit', () => {
     expect(water.bodyIds[0]).toBe(1234);
     expect(water.typeWeights[1]).toBe(255);
     expect(water.bodies).toEqual([
-      expect.objectContaining({ id: 1234, level: 8, locked: false }),
+      expect.objectContaining({ id: 1234, level: 8 }),
     ]);
   });
 

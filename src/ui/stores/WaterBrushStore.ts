@@ -4,14 +4,8 @@ export type WaterBrushStoreEvents = { kind: 'changed' };
 
 // Level picks a lake and drags its level up or down; type paints palette
 // weights over the water there; add and remove paint coverage; reset hands
-// the ground back to the generator; lock toggles a lake's lock.
-export type WaterBrushType =
-  | 'level'
-  | 'type'
-  | 'add'
-  | 'remove'
-  | 'reset'
-  | 'lock';
+// the ground back to the generator.
+export type WaterBrushType = 'level' | 'type' | 'add' | 'remove' | 'reset';
 
 export const WATER_BRUSH_RADIUS_MIN = 8;
 export const WATER_BRUSH_RADIUS_MAX = 200;

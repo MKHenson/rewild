@@ -67,23 +67,9 @@ export interface SculptHeightSource {
    */
   metersPerSample?: number;
   getHeights(cx: number, cy: number): Float32Array | null;
-  /** Where locked water holds the ground up. Samples are never lowered through
-   *  it. */
-  locks?: SculptLockSource;
   /** Reset only: the chunk's generated heights, or null while they are not
    *  known. A sample without them is left alone. */
   getBaseline?(cx: number, cy: number): Float32Array | null;
-}
-
-/**
- * Per chunk, a grid of levels at every `step` samples (see lockedLevels): a
- * sample above its nearest level cannot be lowered below that level plus
- * `margin`, or below where it stands if that is lower. -Infinity is unlocked.
- */
-export interface SculptLockSource {
-  step: number;
-  margin: number;
-  getLevels(cx: number, cy: number): Float32Array | null;
 }
 
 export interface TouchedChunk {
@@ -191,25 +177,6 @@ export function applySculptStamp(
     }
   }
 
-  const locks = source.locks;
-  const lockCache = new Map<string, Float32Array | null>();
-  const lockLevel = (wx: number, wz: number): number => {
-    const cx = Math.ceil((wx - half) / span);
-    const cy = Math.ceil((wz - half) / span);
-    const key = `${cx},${cy}`;
-    let levels = lockCache.get(key);
-    if (levels === undefined) {
-      levels = locks!.getLevels(cx, cy);
-      lockCache.set(key, levels);
-    }
-    if (!levels) return -Infinity;
-    const step = locks!.step;
-    const size = span / step + 1;
-    const mx = Math.round((wx - cx * span + half) / step);
-    const my = Math.round((cy * span + half - wz) / step);
-    return levels[my * size + mx];
-  };
-
   // Every owner's generated copy of a shared sample is the same, so the first
   // owner's is read.
   const baselineCache = new Map<string, Float32Array | null>();
@@ -291,10 +258,6 @@ export function applySculptStamp(
         }
       }
 
-      if (locks && next < v) {
-        const lock = lockLevel(wx, wz);
-        if (v > lock) next = Math.max(next, Math.min(v, lock + locks.margin));
-      }
       if (next === v) continue;
       patch[i] = next;
 

@@ -37,7 +37,6 @@ const BRUSHES: Array<{
   { type: 'add', icon: 'droplet', label: 'Add' },
   { type: 'remove', icon: 'eraser', label: 'Remove' },
   { type: 'reset', icon: 'rotate-ccw', label: 'Reset' },
-  { type: 'lock', icon: 'lock', label: 'Lock' },
 ];
 
 const WATER_TYPES = [
@@ -52,7 +51,6 @@ const HINTS: Record<WaterBrushType, string> = {
   add: 'Drag to add water and dig its bed · On a lake it joins it, on dry land it makes a new one at the ground · It stops at other water · Shift removes',
   remove: 'Drag to remove water and raise land in its place · Shift adds',
   reset: 'Drag to hand the water back to the generated world',
-  lock: 'Click a lake to lock or unlock its level',
 };
 
 // Floating brush controls shown over the viewport while the water brush is
@@ -174,16 +172,13 @@ export class WaterBrushToolbar extends Component<Props> {
       // the panel does not jump between brushes.
       const brush = waterBrushStore.brush;
       const typeOff = brush !== 'type';
-      const radiusOff = brush === 'level' || brush === 'lock';
-      const strengthOff = brush === 'lock';
+      const radiusOff = brush === 'level';
       const depthOff = brush !== 'add';
       typeRow.classList.toggle('inactive', typeOff);
       radiusRow.classList.toggle('inactive', radiusOff);
-      strengthRow.classList.toggle('inactive', strengthOff);
       depthRow.classList.toggle('inactive', depthOff);
       typeSelect.disabled = typeOff;
       radiusSlider.disabled = radiusOff;
-      strengthSlider.disabled = strengthOff;
       depthSlider.disabled = depthOff;
       typeSelect.value = waterBrushStore.waterType;
 

@@ -925,26 +925,3 @@ export function setBodyLevel(
     texels: flooded.length,
   };
 }
-
-/**
- * Per texel of `water`, the level of the locked body whose ground it lies on,
- * or -Infinity: every texel a body in `locked` (id → level) owns, and those
- * next to them. Null when the chunk holds no locked body.
- */
-export function lockedLevels(
-  water: ResolvedWater,
-  locked: ReadonlyMap<number, number>
-): Float32Array | null {
-  const { size, bodyIds } = water;
-  let levels: Float32Array | null = null;
-  for (let my = 0; my < size; my++)
-    for (let mx = 0; mx < size; mx++) {
-      const level = locked.get(bodyIds[mx + my * size]);
-      if (level === undefined) continue;
-      if (!levels) levels = new Float32Array(size * size).fill(-Infinity);
-      for (let y = Math.max(0, my - 1); y <= Math.min(size - 1, my + 1); y++)
-        for (let x = Math.max(0, mx - 1); x <= Math.min(size - 1, mx + 1); x++)
-          if (level > levels[x + y * size]) levels[x + y * size] = level;
-    }
-  return levels;
-}

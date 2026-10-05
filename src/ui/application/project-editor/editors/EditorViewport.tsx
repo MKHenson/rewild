@@ -661,7 +661,7 @@ export class EditorViewport extends Component<Props> {
     const onWaterDocumentMouseUp = (event: MouseEvent) => {
       if (event.button !== 0) return;
       document.removeEventListener('mouseup', onWaterDocumentMouseUp);
-      // Lock acts on the click alone, so it has no stroke to end.
+      // An add that found no water to read started no stroke.
       if (this.waterBrushController?.isPainting) endWaterStroke();
       else if (this.orbitController) this.orbitController.enabled = true;
     };

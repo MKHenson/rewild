@@ -5,7 +5,6 @@ const body = (id: number): WaterBody => ({
   id,
   level: 10,
   spillHeight: 10,
-  locked: true,
   typeWeights: [255, 0, 0, 0],
 });
 

@@ -8,7 +8,6 @@ import {
   SculptBrushType,
 } from 'rewild-renderer/lib/renderers/terrain/Sculpt';
 import { Raycaster, Intersection } from 'rewild-renderer/lib/core/Raycaster';
-import { WATER_MAP_STEP } from 'rewild-renderer/lib/renderers/terrain/WaterMap';
 import { writeChunkSnapshot } from 'src/database/chunk-snapshots';
 import { writeWaterBodies } from 'src/database/water-bodies';
 import { writeWaterEdit } from 'src/database/water-edits';
@@ -39,10 +38,6 @@ interface StrokeState {
   maxX: number;
   maxZ: number;
   maxRadius: number;
-  // Locked water levels per chunk (see WaterBodyRules.chunkLockLevels),
-  // resolved once per stroke.
-  locks: Map<string, Float32Array | null>;
-  lockMargin: number;
 }
 
 /**
@@ -76,16 +71,8 @@ export class TerrainSculptController {
       get metersPerSample() {
         return controller.renderer.terrainRenderer.metersPerSample;
       },
-      getHeights: (cx: number, cy: number) => this.getChunkHeights(cx, cy),
+      getHeights: (cx: number, cy: number) => this.heights.get(cx, cy),
       getBaseline: (cx: number, cy: number) => this.heights.baseline(cx, cy),
-      locks: {
-        step: WATER_MAP_STEP,
-        get margin() {
-          return controller.stroke?.lockMargin ?? 0;
-        },
-        getLevels: (cx: number, cy: number) =>
-          this.stroke?.locks.get(`${cx},${cy}`) ?? null,
-      },
     };
   }
 
@@ -129,8 +116,6 @@ export class TerrainSculptController {
       maxX: -Infinity,
       maxZ: -Infinity,
       maxRadius: 0,
-      locks: new Map(),
-      lockMargin: this.renderer.terrainRenderer.waterRules.lockMargin,
     };
     // First stamp at a nominal frame's worth of time so a click sculpts too.
     this.stamp(point, 1 / 60);
@@ -264,28 +249,5 @@ export class TerrainSculptController {
       // background (rebuilds coalesce while stamps keep arriving).
       terrain.remeshChunk(t.cx, t.cy);
     }
-  }
-
-  // Resolves a chunk's editable heights for the current stamp, or null to
-  // skip it this stamp (applySculptStamp then also skips any samples the
-  // chunk co-owns, so a not-yet-ready neighbour can never cause a seam). A
-  // chunk is also skipped until its locked water levels are known.
-  private getChunkHeights(cx: number, cy: number): Float32Array | null {
-    const heights = this.heights.get(cx, cy);
-    return heights && this.locksResolved(cx, cy) ? heights : null;
-  }
-
-  private locksResolved(cx: number, cy: number): boolean {
-    const stroke = this.stroke;
-    if (!stroke) return true;
-    const key = `${cx},${cy}`;
-    if (stroke.locks.has(key)) return true;
-    const levels = this.renderer.terrainRenderer.waterRules.chunkLockLevels(
-      cx,
-      cy
-    );
-    if (levels === undefined) return false;
-    stroke.locks.set(key, levels);
-    return true;
   }
 }

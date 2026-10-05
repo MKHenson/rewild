@@ -11,7 +11,6 @@ import {
   fillSeaChannels,
   findBodies,
   findSpillHeight,
-  lockedLevels,
   setBodyLevel,
 } from './SpillHeight';
 import type { TerrainChunk } from './TerrainChunk';
@@ -28,8 +27,7 @@ import { ResolvedWater, WATER_MAP_STEP, resolveWater } from './WaterMap';
 
 // The edit rules, run on the main thread after the terrain changes. The sea
 // fills trenches below sea level that join it. A touched lake whose spill
-// height fell below its level drains to it; a locked lake holds its rim up
-// instead (see lockedLevels and the sculpt brush's lock source).
+// height fell below its level drains to it.
 //
 // The flood reads heights well past what is loaded. A chunk the flood reaches
 // takes its in-memory heights, else its saved snapshot, else the generator's
@@ -90,8 +88,8 @@ export interface WaterBodyReport {
 const DRAIN_TOLERANCE = 0.05;
 // How far past a stroke, in texels, a body counts as touched.
 const TOUCH_TEXELS = 2;
-// The lock margin where a climate has no lakes.
-const DEFAULT_LOCK_MARGIN = 1;
+// The lip height where a climate has no lakes.
+const DEFAULT_LAKE_MARGIN = 1;
 
 // Heights, water and edits of the chunks one run reaches.
 class RuleContext implements WaterRuleSource {
@@ -296,11 +294,11 @@ export class WaterBodyRules {
     return this.records ? [...this.records.values()] : [];
   }
 
-  /** Metres above its level a locked body's rim stays. */
-  get lockMargin(): number {
+  /** Metres a lake's lip stands above its level. */
+  get lakeMargin(): number {
     return (
       resolveClimatePreset(this.host.climatePreset).lakes?.margin ??
-      DEFAULT_LOCK_MARGIN
+      DEFAULT_LAKE_MARGIN
     );
   }
 
@@ -323,42 +321,6 @@ export class WaterBodyRules {
       resolveClimatePreset(host.climatePreset),
       host.seaLevel,
       chunk.waterEdit
-    );
-  }
-
-  /**
-   * The locked levels over a chunk's water texels (see lockedLevels): null
-   * where nothing is locked, undefined while the records or the chunk's edit
-   * are still being read.
-   */
-  chunkLockLevels(cx: number, cy: number): Float32Array | null | undefined {
-    const records = this.records;
-    if (!records) {
-      this.resolveRecords();
-      return undefined;
-    }
-    const locked = new Map<number, number>();
-    for (const body of records.values())
-      if (body.locked) locked.set(body.id, body.level);
-    if (locked.size === 0) return null;
-
-    const host = this.host;
-    const chunk = host.terrainChunks.get(`${cx},${cy}`);
-    if (!chunk) return null;
-    if (!chunk.waterEditIsResolved) {
-      chunk.resolveWaterEdit(host.waterEditProvider);
-      return undefined;
-    }
-    return lockedLevels(
-      resolveWater(
-        host.mapChunkSizeLod,
-        host.seed,
-        chunk.noiseOffset,
-        resolveClimatePreset(host.climatePreset),
-        host.seaLevel,
-        chunk.waterEdit
-      ),
-      locked
     );
   }
 
@@ -401,23 +363,6 @@ export class WaterBodyRules {
       sea: search.sea,
       edge: search.edge,
     };
-  }
-
-  /** Locks or unlocks the body at world (x, z). Returns its record, or null
-   *  on the open ocean. The caller saves the records. */
-  async setLockedAt(
-    x: number,
-    z: number,
-    locked: boolean
-  ): Promise<WaterBody | null> {
-    const records = await this.resolveRecords();
-    const climate = resolveClimatePreset(this.host.climatePreset);
-    const ctx = new RuleContext(this.host, climate);
-    const touch = await this.touchAt(ctx, x, z);
-    if (!touch) return null;
-    const body = { ...this.recordOf(touch, records, climate), locked };
-    records.set(body.id, body);
-    return body;
   }
 
   /**
@@ -525,7 +470,6 @@ export class WaterBodyRules {
       id: touch.id,
       level: touch.level,
       spillHeight: touch.level,
-      locked: false,
       typeWeights: touch.typeWeights,
     };
   }
@@ -586,7 +530,7 @@ export class WaterBodyRules {
       if (search.status !== 'found') continue;
 
       const spill = search.spillHeight;
-      const drains = !body.locked && spill < body.level - DRAIN_TOLERANCE;
+      const drains = spill < body.level - DRAIN_TOLERANCE;
       if (drains) {
         const drain = await untilLoaded(
           () =>

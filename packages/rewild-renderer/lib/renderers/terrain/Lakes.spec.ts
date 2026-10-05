@@ -244,7 +244,6 @@ describe('lake chunks', () => {
     expect(body.level).toBe(lake.level);
     expect(body.spillHeight).toBe(lake.spillHeight);
     expect(body.spillHeight).toBeGreaterThan(body.level);
-    expect(body.locked).toBe(false);
     expect(body.typeWeights[getWaterTypeIndex(INLAND, LAKE_WATER)]).toBe(1);
     expect(water.bodies.some((b) => b.id === OCEAN_BODY_ID)).toBe(false);
   });
